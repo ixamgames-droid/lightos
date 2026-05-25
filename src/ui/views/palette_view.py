@@ -1,0 +1,179 @@
+"""Palette View — Color, Position, Beam preset manager."""
+from __future__ import annotations
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
+                                QScrollArea, QGridLayout, QPushButton, QLabel,
+                                QInputDialog, QMessageBox, QSizePolicy)
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QColor, QPainter, QFont
+from src.core.engine.palette import PaletteManager, Palette, PaletteType, get_palette_manager
+
+
+class PaletteButton(QPushButton):
+    """Button showing a palette swatch."""
+    SIZE = 72
+
+    def __init__(self, palette: Palette, parent=None):
+        super().__init__(parent)
+        self.palette = palette
+        self.setFixedSize(self.SIZE, self.SIZE)
+        self._update_style()
+        self.setToolTip(palette.name)
+
+    def _update_style(self):
+        p = self.palette
+        if p.type == PaletteType.COLOR:
+            r = p.values.get("color_r", 200)
+            g = p.values.get("color_g", 200)
+            b = p.values.get("color_b", 200)
+            bg = f"rgb({r},{g},{b})"
+            text_color = "#000" if (r + g + b) > 380 else "#fff"
+        elif p.type == PaletteType.POSITION:
+            bg = "#1a3a5c"
+            text_color = "#58a6ff"
+        elif p.type == PaletteType.BEAM:
+            bg = "#1a4a2a"
+            text_color = "#3fb950"
+        else:
+            bg = "#2a1a4a"
+            text_color = "#bc8cff"
+
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background: {bg}; color: {text_color};
+                border: 1px solid #30363d; border-radius: 4px;
+                font-size: 9px; font-weight: bold;
+                padding: 4px;
+            }}
+            QPushButton:hover {{ border: 2px solid #58a6ff; }}
+            QPushButton:pressed {{ border: 2px solid #1f6feb; background: #4d8dff; }}
+        """)
+        self.setText(p.name)
+
+    def apply(self, fids: list[int] | None = None):
+        self.palette.apply_to_programmer(fids)
+
+
+class PalettePage(QWidget):
+    """Scrollable grid of palette buttons for one type."""
+
+    def __init__(self, ptype: PaletteType, manager: PaletteManager, parent=None):
+        super().__init__(parent)
+        self.ptype = ptype
+        self.manager = manager
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+
+        # Toolbar
+        tbar = QHBoxLayout()
+        btn_new = QPushButton("+ Neu aufzeichnen")
+        btn_new.setFixedHeight(26)
+        btn_new.setStyleSheet("""
+            QPushButton { background:#21262d; color:#3fb950; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        btn_new.clicked.connect(self._record_new)
+        tbar.addWidget(btn_new)
+        tbar.addStretch()
+        layout.addLayout(tbar)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
+        self._grid_widget = QWidget()
+        self._grid_widget.setStyleSheet("background:#0d1117;")
+        self._grid = QGridLayout(self._grid_widget)
+        self._grid.setContentsMargins(4, 4, 4, 4)
+        self._grid.setSpacing(6)
+        scroll.setWidget(self._grid_widget)
+        layout.addWidget(scroll)
+
+        self._refresh()
+
+    def _refresh(self):
+        # Clear grid
+        for i in reversed(range(self._grid.count())):
+            item = self._grid.itemAt(i)
+            if item and item.widget():
+                item.widget().deleteLater()
+        palettes = self.manager.get_by_type(self.ptype)
+        col_count = 6
+        for idx, pal in enumerate(palettes):
+            btn = PaletteButton(pal)
+            btn.clicked.connect(lambda checked=False, p=pal: p.apply_to_programmer())
+            btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            btn.customContextMenuRequested.connect(
+                lambda pos, p=pal, b=btn: self._context(p, b)
+            )
+            self._grid.addWidget(btn, idx // col_count, idx % col_count)
+
+    def _record_new(self):
+        name, ok = QInputDialog.getText(self, "Palette aufzeichnen", "Name:")
+        if not ok or not name:
+            return
+        pal = Palette(name=name, type=self.ptype)
+        pal.record_from_programmer()
+        self.manager.add(pal)
+        self._refresh()
+
+    def _context(self, pal: Palette, btn: PaletteButton):
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.addAction("Anwenden").triggered.connect(pal.apply_to_programmer)
+        menu.addAction("Überschreiben (Programmer)").triggered.connect(
+            lambda: (pal.record_from_programmer(), self._refresh())
+        )
+        menu.addSeparator()
+        menu.addAction("Löschen").triggered.connect(
+            lambda: (self.manager.remove(pal), self._refresh())
+        )
+        menu.exec(btn.mapToGlobal(btn.rect().center()))
+
+
+class PaletteView(QWidget):
+    """Multi-tab palette manager: Color, Position, Beam, Effect."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._manager = get_palette_manager()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        tabs = QTabWidget()
+        tabs.setStyleSheet("""
+            QTabWidget::pane { border:none; }
+            QTabBar::tab { background:#161b22; color:#8b949e; padding:6px 14px;
+                           border:1px solid #30363d; font-size:11px; }
+            QTabBar::tab:selected { background:#1f6feb; color:#fff; }
+        """)
+
+        self._pages: list = []
+        for ptype, label in [
+            (PaletteType.COLOR,    "Farben"),
+            (PaletteType.POSITION, "Position"),
+            (PaletteType.BEAM,     "Beam"),
+            (PaletteType.EFFECT,   "Effekte"),
+        ]:
+            page = PalettePage(ptype, self._manager)
+            tabs.addTab(page, label)
+            self._pages.append(page)
+
+        layout.addWidget(tabs)
+
+        # Zentraler StateSync: alle PalettePages refreshen
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            sync = get_sync()
+            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._sync_refresh())
+            sync.subscribe(SyncEvent.PALETTE_CHANGED, lambda *_: self._sync_refresh())
+            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._sync_refresh())
+        except Exception as e:
+            print(f"[palette_view] sync subscribe error: {e}")
+
+    def _sync_refresh(self):
+        for page in getattr(self, "_pages", []):
+            try:
+                page._refresh()
+            except Exception as e:
+                print(f"[palette_view] page refresh error: {e}")

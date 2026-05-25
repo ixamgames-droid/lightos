@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LightOS Remote</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', sans-serif;
+         min-height: 100vh; display: flex; flex-direction: column; }
+  header { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 16px;
+           display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  #status { font-size: 11px; color: #8b949e; }
+  main { flex: 1; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: 1fr 1fr; }
+  section { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
+  h2 { font-size: 13px; color: #8b949e; margin-bottom: 12px; text-transform: uppercase;
+       letter-spacing: 0.5px; }
+
+  button { cursor: pointer; border: none; border-radius: 4px; font-size: 14px;
+           font-weight: 700; padding: 0; transition: background 0.1s; }
+  button:active { filter: brightness(0.85); }
+
+  .transport { display: flex; gap: 10px; }
+  .btn-go   { background: #1f6feb; color: #fff; flex: 1; height: 60px; font-size: 18px; }
+  .btn-back { background: #21262d; color: #e6edf3; flex: 1; height: 60px;
+              border: 1px solid #30363d; }
+  .btn-stop { background: #da3633; color: #fff; flex: 1; height: 60px; }
+
+  .btn-blackout { background: #000; color: #ff4444; border: 2px solid #da3633;
+                  width: 100%; height: 70px; font-size: 20px; margin-top: 8px; }
+  .btn-blackout.active { background: #da3633; color: #fff; }
+
+  .faders { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .fader-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .fader-col label { font-size: 10px; color: #8b949e; }
+  input[type=range] { writing-mode: vertical-lr; direction: rtl;
+                       width: 32px; height: 120px; -webkit-appearance: slider-vertical; }
+  .fader-val { font-size: 10px; color: #58a6ff; }
+
+  #log { background: #0d1117; border: 1px solid #21262d; border-radius: 4px;
+         padding: 8px; height: 100px; overflow-y: auto; font-size: 10px;
+         font-family: Consolas, monospace; color: #484f58; }
+  @media (max-width: 600px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ LightOS Remote</h1>
+  <span id="status">Verbinde...</span>
+</header>
+<main>
+  <section>
+    <h2>Transport</h2>
+    <div class="transport">
+      <button class="btn-go" onclick="doGo()">GO ▶</button>
+      <button class="btn-back" onclick="doBack()">◀◀ BACK</button>
+      <button class="btn-stop" onclick="doStop()">■ STOP</button>
+    </div>
+    <button class="btn-blackout" id="blackoutBtn" onclick="toggleBlackout()">
+      ◼ BLACKOUT
+    </button>
+  </section>
+
+  <section>
+    <h2>Executor Fader</h2>
+    <div class="faders" id="faders"></div>
+  </section>
+
+  <section style="grid-column: 1 / -1;">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</main>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const socket = io();
+let blackout = false;
+
+// Build faders
+const fadersEl = document.getElementById('faders');
+for (let i = 1; i <= 10; i++) {
+  fadersEl.innerHTML += `
+    <div class="fader-col">
+      <label>Ex ${i}</label>
+      <input type="range" min="0" max="255" value="255" orient="vertical"
+             oninput="setFader(${i}, this.value)" />
+      <span class="fader-val" id="fv${i}">100%</span>
+    </div>`;
+}
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.innerHTML += `<div>${new Date().toLocaleTimeString()} ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+  if (el.children.length > 100) el.removeChild(el.children[0]);
+}
+
+socket.on('connect', () => {
+  document.getElementById('status').textContent = 'Verbunden';
+  log('WebSocket verbunden');
+});
+socket.on('disconnect', () => {
+  document.getElementById('status').textContent = 'Getrennt';
+  log('Verbindung unterbrochen');
+});
+socket.on('ack', d => log(`ACK: ${d.action}`));
+
+function doGo()   { socket.emit('go');   log('GO'); }
+function doBack()  { socket.emit('back'); log('BACK'); }
+function doStop()  { fetch('/api/executor/1/back', {method:'POST'}); log('STOP'); }
+
+function toggleBlackout() {
+  blackout = !blackout;
+  socket.emit('blackout', {enabled: blackout});
+  const btn = document.getElementById('blackoutBtn');
+  btn.classList.toggle('active', blackout);
+  log('Blackout: ' + (blackout ? 'AN' : 'AUS'));
+}
+
+function setFader(slot, raw) {
+  const level = raw / 255;
+  socket.emit('fader', {slot, level});
+  const pct = Math.round(level * 100);
+  const el = document.getElementById('fv' + slot);
+  if (el) el.textContent = pct + '%';
+}
+
+// Initial status
+fetch('/api/status').then(r => r.json()).then(d => {
+  document.getElementById('status').textContent =
+    `Verbunden · ${d.fixtures} Geräte · ${d.universes.length} Universes`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+# LightOS - Python Abhaengigkeiten
+# Python 3.11+ erforderlich (3.12+ empfohlen)
+# Laeuft auf Windows x64 UND ARM64 (Snapdragon, Apple via Wine)
+
+# ── GUI ─────────────────────────────────────────────────────────────────────
+PySide6>=6.7.0           # Qt6 - ARM64 wheels ab 6.6
+PySide6-Addons>=6.7.0    # WebEngine fuer 3D-Visualizer
+
+# ── DMX-Ausgabe ─────────────────────────────────────────────────────────────
+pyserial>=3.5            # Enttec Pro USB (pure Python)
+
+# ── Datenbank ───────────────────────────────────────────────────────────────
+SQLAlchemy>=2.0.0        # Fixture-DB (pure Python)
+
+# ── Numerik / Audio-Analyse ─────────────────────────────────────────────────
+numpy>=1.26.0            # DMX-Fade, Beat-Detection FFT
+
+# ── MIDI ────────────────────────────────────────────────────────────────────
+mido>=1.3.0              # MIDI-Abstraktion (pure Python)
+python-rtmidi>=1.5.0     # MIDI-Backend (C-Extension, baut auf ARM64 mit MSVC)
+
+# ── Audio-Capture (WASAPI Loopback fuer BPM-Detection) ──────────────────────
+soundcard>=0.4.0         # ctypes-basiert, ARM64-kompatibel
+
+# ── Netzwerk / Remote ───────────────────────────────────────────────────────
+Flask>=3.0.0             # Web-Remote
+flask-socketio>=5.3.0    # Live-Updates im Browser
+python-osc>=1.8.0        # OSC In/Out (z.B. TouchOSC)
+
+# ── Windows MIDI 2.0 (optional, fuer neuere Controller wie APC mk2) ─────────
+winrt-Windows.Devices.Midi          ; sys_platform == "win32"
+winrt-Windows.Devices.Enumeration   ; sys_platform == "win32"
+winrt-Windows.Foundation            ; sys_platform == "win32"
+winrt-Windows.Foundation.Collections ; sys_platform == "win32"
+
+# ── Build (optional, nicht zur Laufzeit) ────────────────────────────────────
+# pyinstaller>=6.0.0      # Erzeugt .exe (ARM64 unterstuetzt ab 6.3)

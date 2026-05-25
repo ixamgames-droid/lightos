@@ -1,0 +1,208 @@
+"""Sequence Function — Variante des Chasers gebunden an eine Fixture-Selektion.
+
+Im Gegensatz zum Chaser (der andere Functions als Steps verkettet) operiert
+eine Sequence direkt auf einer Liste von Fixtures: jeder Step ist ein Dict
+{fid: {attribute: value}} mit Zeitparametern.
+"""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+from .function import Function, FunctionType, RunOrder, Direction
+
+if TYPE_CHECKING:
+    from src.core.dmx.universe import Universe
+    from src.core.database.models import PatchedFixture
+
+
+@dataclass
+class SequenceStep:
+    # values: dict[fid_str, dict[attribute_str, int 0-255]]
+    values: dict = field(default_factory=dict)
+    fade_in: float = 0.5
+    hold: float = 1.0
+    fade_out: float = 0.0
+    note: str = ""
+
+    def total_duration(self) -> float:
+        return self.fade_in + self.hold + self.fade_out
+
+
+class Sequence(Function):
+    """
+    QLC+ Sequence: Cue-Stack-aehnliche Liste fixierter Werte fuer eine
+    festgelegte Fixture-Selektion. Schreibt Werte direkt in die Universen.
+    """
+
+    function_type = FunctionType.Sequence
+
+    def __init__(self, name: str = "Neue Sequence", fid: int | None = None):
+        super().__init__(name, fid)
+        self.steps: list[SequenceStep] = []
+        self.bound_fixtures: list[int] = []   # fids
+        self.run_order: RunOrder = RunOrder.Loop
+        self.direction: Direction = Direction.Forward
+        self.speed: float = 1.0
+        self._step_idx: int = 0
+        self._step_elapsed: float = 0.0
+        self._ping_pong_dir: int = 1
+        self._prev_values: dict[int, dict[str, int]] = {}
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    def _on_start(self):
+        if self.direction == Direction.Backward:
+            self._step_idx = max(0, len(self.steps) - 1)
+        else:
+            self._step_idx = 0
+        self._step_elapsed = 0.0
+        self._ping_pong_dir = 1 if self.direction == Direction.Forward else -1
+        self._prev_values = {}
+
+    def _on_stop(self):
+        self._step_idx = 0
+        self._step_elapsed = 0.0
+
+    # ── Builder ──────────────────────────────────────────────────────────────
+
+    def add_step_from_programmer(self, programmer: dict, fade_in=0.5, hold=1.0, fade_out=0.0):
+        """Erstellt einen Step aus aktuellem Programmer-Inhalt der bound_fixtures."""
+        vals = {}
+        for fid in self.bound_fixtures:
+            if fid in programmer:
+                # JSON-Key muss str sein bei Serialisierung
+                vals[str(fid)] = dict(programmer[fid])
+        self.steps.append(SequenceStep(
+            values=vals, fade_in=fade_in, hold=hold, fade_out=fade_out))
+
+    # ── write ─────────────────────────────────────────────────────────────────
+
+    def write(self, universes, patch_cache, dt, function_registry=None):
+        if not self._running or not self.steps:
+            return
+
+        effective_dt = dt * self.speed
+        step = self.steps[self._step_idx]
+        total = step.total_duration()
+        if total <= 0:
+            total = 0.001
+
+        # Compute mix factor 0..1 across fade_in/hold/fade_out
+        t = self._step_elapsed
+        if t < step.fade_in:
+            mix = t / step.fade_in if step.fade_in > 0 else 1.0
+        elif t < step.fade_in + step.hold:
+            mix = 1.0
+        else:
+            rem = total - t
+            mix = max(0.0, rem / step.fade_out) if step.fade_out > 0 else 0.0
+        mix = max(0.0, min(1.0, mix))
+
+        # Apply values
+        from src.core.app_state import get_channels_for_patched
+        # Build fid -> PF lookup
+        pf_by_fid = {f.fid: f for f in patch_cache}
+        for fid_str, attrs in step.values.items():
+            try:
+                fid = int(fid_str)
+            except ValueError:
+                continue
+            pf = pf_by_fid.get(fid)
+            if pf is None or pf.universe not in universes:
+                continue
+            channels = get_channels_for_patched(pf)
+            for ch in channels:
+                if ch.attribute in attrs:
+                    target = attrs[ch.attribute]
+                    prev = self._prev_values.get(fid, {}).get(ch.attribute, 0)
+                    val = int(prev + (target - prev) * mix)
+                    dmx_addr = pf.address + ch.channel_number - 1
+                    if 1 <= dmx_addr <= 512:
+                        universes[pf.universe].set_channel(dmx_addr, val)
+
+        self._step_elapsed += effective_dt
+        self._elapsed += effective_dt
+
+        if self._step_elapsed >= total:
+            # Save current step values as previous for next crossfade
+            self._prev_values = {}
+            for fid_str, attrs in step.values.items():
+                try:
+                    fid = int(fid_str)
+                except ValueError:
+                    continue
+                self._prev_values[fid] = dict(attrs)
+            self._step_elapsed = 0.0
+            advanced = self._advance_step()
+            if not advanced:
+                self._running = False
+
+    def _advance_step(self) -> bool:
+        if not self.steps:
+            return False
+        n = len(self.steps)
+
+        if self.run_order == RunOrder.SingleShot:
+            next_idx = self._step_idx + (1 if self.direction == Direction.Forward else -1)
+            if next_idx < 0 or next_idx >= n:
+                return False
+            self._step_idx = next_idx
+            return True
+
+        elif self.run_order == RunOrder.Loop:
+            if self.direction == Direction.Forward:
+                self._step_idx = (self._step_idx + 1) % n
+            else:
+                self._step_idx = (self._step_idx - 1) % n
+            return True
+
+        elif self.run_order == RunOrder.PingPong:
+            next_idx = self._step_idx + self._ping_pong_dir
+            if next_idx >= n:
+                self._ping_pong_dir = -1
+                next_idx = max(0, n - 2)
+            elif next_idx < 0:
+                self._ping_pong_dir = 1
+                next_idx = min(n - 1, 1)
+            self._step_idx = next_idx
+            return True
+
+        return True
+
+    # ── Serialisation ─────────────────────────────────────────────────────────
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        d.update({
+            "bound_fixtures": list(self.bound_fixtures),
+            "run_order": self.run_order.value,
+            "direction": self.direction.value,
+            "speed": self.speed,
+            "steps": [
+                {
+                    "values": s.values,
+                    "fade_in": s.fade_in,
+                    "hold": s.hold,
+                    "fade_out": s.fade_out,
+                    "note": s.note,
+                }
+                for s in self.steps
+            ],
+        })
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Sequence":
+        sq = cls(name=d.get("name", "Sequence"), fid=d.get("id"))
+        sq.bound_fixtures = [int(x) for x in d.get("bound_fixtures", [])]
+        sq.run_order = RunOrder(d.get("run_order", "Loop"))
+        sq.direction = Direction(d.get("direction", "Forward"))
+        sq.speed = float(d.get("speed", 1.0))
+        for sd in d.get("steps", []):
+            sq.steps.append(SequenceStep(
+                values=sd.get("values", {}),
+                fade_in=sd.get("fade_in", 0.5),
+                hold=sd.get("hold", 1.0),
+                fade_out=sd.get("fade_out", 0.0),
+                note=sd.get("note", ""),
+            ))
+        return sq

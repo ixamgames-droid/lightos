@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; }
+  body { background: #0a0a0a; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+  canvas { display: block; }
+  #overlay {
+    position: absolute; top: 8px; left: 8px;
+    color: #aaa; font-size: 11px; pointer-events: none;
+    background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 4px;
+    z-index: 5;
+  }
+  #mode-banner {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    color: #ffcc00; font-size: 12px; font-weight: 600;
+    background: rgba(40,30,0,0.85); padding: 5px 14px; border-radius: 4px;
+    pointer-events: none; display: none; z-index: 5;
+    border: 1px solid #886;
+  }
+  #tooltip {
+    position: absolute; background: rgba(20,20,20,0.92); color: #eee;
+    padding: 4px 8px; border-radius: 4px; font-size: 11px;
+    pointer-events: none; display: none; border: 1px solid #444;
+    z-index: 10;
+  }
+  #marquee {
+    position: absolute; border: 1px dashed #6cf;
+    background: rgba(100,180,255,0.10);
+    pointer-events: none; display: none; z-index: 6;
+  }
+  #controls {
+    position: absolute; bottom: 8px; right: 8px;
+    color: #777; font-size: 10px; text-align: right;
+    pointer-events: none; z-index: 5;
+  }
+  #ruler-info {
+    position: absolute; bottom: 8px; left: 8px;
+    color: #999; font-size: 11px;
+    background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px;
+    pointer-events: none; z-index: 5;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div id="overlay">LightOS Visualizer | <span id="mode-text">3D View</span></div>
+<div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
+<div id="selection-banner" style="position:absolute; top:42px; left:50%; transform:translateX(-50%);
+     color:#ffd700; font-size:14px; font-weight:bold;
+     background:rgba(0,0,0,0.6); padding:5px 14px; border-radius:4px;
+     border:1px solid #ffd700; display:none; z-index:50; pointer-events:none;">
+  Selektion: <span id="selection-banner-text">?</span>
+</div>
+<div id="tooltip"></div>
+<div id="marquee"></div>
+<div id="controls">
+  LMB drag: Rotate (3D) / Pan (2D) | Wheel: Zoom | RMB: Place fixture
+</div>
+<div id="ruler-info"></div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="three_local.js"></script>
+<script src="assets/OBJLoader.js"></script>
+<script src="assets/ColladaLoader.js"></script>
+<script>
+"use strict";
+
+// ============================================================================
+// Globals
+// ============================================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x080808);
+scene.fog = new THREE.FogExp2(0x080808, 0.025);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Two cameras
+const perspectiveCam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+perspectiveCam.position.set(0, 12, 18);
+perspectiveCam.lookAt(0, 0, 0);
+
+let orthoSize = 18; // half-height in world units
+const aspect = window.innerWidth / window.innerHeight;
+const orthoCam = new THREE.OrthographicCamera(
+  -orthoSize * aspect, orthoSize * aspect, orthoSize, -orthoSize, 0.1, 500
+);
+orthoCam.position.set(0, 60, 0.001);
+orthoCam.lookAt(0, 0, 0);
+orthoCam.up.set(0, 0, -1); // so +Z points down on screen, +X right
+
+let activeCam = perspectiveCam;
+let viewMode = '3D';      // '2D' | '3D'
+let editMode = 'view';    // 'view' | 'edit' | 'stage'
+
+// State
+const settings = {
+  beamOpacity: 0.7,
+  showCones: true,
+  showFloorSpots: true,
+  showFog: true,
+  stagePreset: 'theatre',
+  snapToGrid: true,
+  gridStep: 1.0,
+  brightness: 0.20,        // 0.0 = pitch black, 1.0 = bright daylight
+  autoBrightness: true,    // auto-bump brightness when in edit modes
+};
+
+// ============================================================================
+// Lights (always) - intensity modulated via settings.brightness
+// ============================================================================
+const ambient = new THREE.AmbientLight(0x222233, 0.35);
+scene.add(ambient);
+const hemi = new THREE.HemisphereLight(0x404060, 0x101010, 0.2);
+scene.add(hemi);
+// Additional directional light only used when brightness > 0.4 (edit mode helper)
+const editLight = new THREE.DirectionalLight(0xffffff, 0);
+editLight.position.set(10, 20, 10);
+scene.add(editLight);
+
+// Map brightness (0..1) -> ambient/hemi intensities, scene bg color
+function applyBrightness(b) {
+  b = Math.max(0, Math.min(1, b));
+  settings.brightness = b;
+  // Background colour: from #080808 (dark) to #b0b8c0 (bright neutral)
+  const bg = Math.round(8 + (176 - 8) * b);
+  const bgColor = new THREE.Color(bg / 255, bg / 255, (bg + 8) / 255);
+  scene.background = bgColor;
+  // Fog matches background so distant objects fade nicely
+  if (settings.showFog && viewMode === '3D') {
+    scene.fog = new THREE.FogExp2(bgColor.getHex(), Math.max(0.005, 0.025 * (1 - b)));
+  }
+  // Ambient: 0.35 (default dark) -> 1.4 (very bright)
+  ambient.intensity = 0.35 + b * 1.05;
+  // Hemisphere: 0.2 -> 1.0
+  hemi.intensity = 0.2 + b * 0.8;
+  // Edit-helper directional light kicks in above 40% brightness
+  editLight.intensity = Math.max(0, (b - 0.4) * 1.5);
+  // Beam visibility: in bright mode beams become less visible naturally
+  // so we keep them but they look more washed out (which is realistic)
+}
+
+// ============================================================================
+// Stage (preset + custom objects) management
+// ============================================================================
+const presetObjects = [];   // built from "preset" templates - cleared on switch
+const stageObjects = {};    // id -> { mesh, data }  - custom editable objects
+let stageObjIdCounter = 1;
+
+let gridHelper = null;
+let gridLabelsGroup = null;
+let floorMesh = null;
+
+function disposeObj(o) {
+  if (!o) return;
+  if (o.geometry) o.geometry.dispose();
+  if (o.material) {
+    if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+    else o.material.dispose();
+  }
+}
+
+function clearPreset() {
+  for (const obj of presetObjects) {
+    scene.remove(obj);
+    obj.traverse(c => disposeObj(c));
+  }
+  presetObjects.length = 0;
+  if (gridHelper) { scene.remove(gridHelper); disposeObj(gridHelper); gridHelper = null; }
+  if (gridLabelsGroup) { scene.remove(gridLabelsGroup); gridLabelsGroup.traverse(disposeObj); gridLabelsGroup = null; }
+  if (floorMesh) { scene.remove(floorMesh); disposeObj(floorMesh); floorMesh = null; }
+}
+
+function trackPreset(obj) {
+  scene.add(obj);
+  presetObjects.push(obj);
+  return obj;
+}
+
+function buildGridAndFloor() {
+  gridHelper = new THREE.GridHelper(60, 60, 0x444444, 0x1a1a1a);
+  scene.add(gridHelper);
+  // Floor
+  floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(80, 80),
+    new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95, metalness: 0.0 })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.y = -0.002;
+  floorMesh.receiveShadow = true;
+  floorMesh.userData.isFloor = true;
+  scene.add(floorMesh);
+}
+
+function buildTheatrePreset() {
+  // platform
+  const stage = new THREE.Mesh(
+    new THREE.BoxGeometry(16, 0.5, 10),
+    new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 0.9 })
+  );
+  stage.position.set(0, 0.25, 0);
+  stage.receiveShadow = true;
+  trackPreset(stage);
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 12),
+    new THREE.MeshStandardMaterial({ color: 0x1a1429, roughness: 1.0, side: THREE.DoubleSide })
+  );
+  backdrop.position.set(0, 6, -5);
+  trackPreset(backdrop);
+  const valance = new THREE.Mesh(
+    new THREE.BoxGeometry(22, 1.6, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x4a0e0e, roughness: 0.9 })
+  );
+  valance.position.set(0, 11, 5);
+  trackPreset(valance);
+  // Side prosceniums
+  [-10, 10].forEach(x => {
+    const p = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 12, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x1a0808, roughness: 0.9 })
+    );
+    p.position.set(x, 6, 5);
+    trackPreset(p);
+  });
+  // Truss bars
+  [-7, 0, 7].forEach(x => {
+    const tg = new THREE.BoxGeometry(0.18, 0.18, 15);
+    const tm = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.5 });
+    const t = new THREE.Mesh(tg, tm);
+    t.position.set(x, 9, 0);
+    trackPreset(t);
+    [-6, 6].forEach(dz => {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.12, 9, 0.12), tm);
+      s.position.set(x, 4.5, dz);
+      trackPreset(s);
+    });
+  });
+}
+
+function buildRockPreset() {
+  const stage = new THREE.Mesh(
+    new THREE.BoxGeometry(22, 0.6, 14),
+    new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.85 })
+  );
+  stage.position.set(0, 0.3, 0);
+  stage.receiveShadow = true;
+  trackPreset(stage);
+  const trussMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.6 });
+  // Two truss bars front/back
+  [-6, 6].forEach(z => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(24, 0.25, 0.25), trussMat);
+    t.position.set(0, 9, z);
+    trackPreset(t);
+  });
+  // Sides
+  [-12, 12].forEach(x => {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 13), trussMat);
+    t.position.set(x, 9, 0);
+    trackPreset(t);
+  });
+  // Posts
+  [-12, 12].forEach(x => [-6, 6].forEach(z => {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 9, 0.3), trussMat);
+    p.position.set(x, 4.5, z);
+    trackPreset(p);
+  }));
+  // LED Wall
+  const ledWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 6),
+    new THREE.MeshBasicMaterial({ color: 0x080820 })
+  );
+  ledWall.position.set(0, 4, -5.9);
+  trackPreset(ledWall);
+  // Speaker stacks
+  const sMat = new THREE.MeshStandardMaterial({ color: 0x202020, roughness: 0.9 });
+  [-11, 11].forEach(x => {
+    for (let i = 0; i < 4; i++) {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), sMat);
+      s.position.set(x, 0.6 + i * 1.25, 5);
+      s.castShadow = true;
+      trackPreset(s);
+    }
+  });
+}
+
+function buildBoxPreset() {
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x202028, roughness: 0.95, side: THREE.DoubleSide });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), wallMat); back.position.set(0, 6, -10); trackPreset(back);
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), wallMat); front.position.set(0, 6, 10); front.rotation.y = Math.PI; trackPreset(front);
+  const left = new THREE.Mesh(new THREE.PlaneGeometry(20, 12), wallMat); left.position.set(-15, 6, 0); left.rotation.y = Math.PI / 2; trackPreset(left);
+  const right = new THREE.Mesh(new THREE.PlaneGeometry(20, 12), wallMat); right.position.set(15, 6, 0); right.rotation.y = -Math.PI / 2; trackPreset(right);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(30, 20), wallMat); ceil.position.set(0, 12, 0); ceil.rotation.x = Math.PI / 2; trackPreset(ceil);
+}
+
+function setStagePreset(name) {
+  settings.stagePreset = name || 'simple';
+  clearPreset();
+  buildGridAndFloor();
+  if (name === 'theatre') buildTheatrePreset();
+  else if (name === 'rock') buildRockPreset();
+  else if (name === 'box') buildBoxPreset();
+  // 'simple' = just grid + floor
+}
+
+setStagePreset('theatre');
+
+// ============================================================================
+// Async model loader (OBJ / DAE) with cache - falls back to caller if no loader
+// ============================================================================
+const modelCache = {};           // path -> THREE.Object3D (cloned per use)
+const modelLoadCallbacks = {};   // path -> [callbacks waiting]
+
+function loadModel(path, callback) {
+  if (modelCache[path]) {
+    try { callback(modelCache[path].clone(true)); } catch (e) { console.log('loadModel cb err:', e); }
+    return;
+  }
+  if (modelLoadCallbacks[path]) {
+    modelLoadCallbacks[path].push(callback);
+    return;
+  }
+  modelLoadCallbacks[path] = [callback];
+
+  const isObj = path.toLowerCase().endsWith('.obj');
+  const isDae = path.toLowerCase().endsWith('.dae');
+
+  const onLoaded = (obj) => {
+    if (obj) {
+      obj.traverse(c => {
+        if (c.isMesh && !c.material) {
+          c.material = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 });
+        }
+      });
+      modelCache[path] = obj;
+    }
+    const cbs = modelLoadCallbacks[path] || [];
+    delete modelLoadCallbacks[path];
+    for (const cb of cbs) {
+      try { cb(obj ? obj.clone(true) : null); } catch (e) { console.log('model cb err:', e); }
+    }
+  };
+
+  const onError = (err) => {
+    console.log('model load FAILED:', path, err);
+    const cbs = modelLoadCallbacks[path] || [];
+    delete modelLoadCallbacks[path];
+    for (const cb of cbs) {
+      try { cb(null); } catch (e) {}
+    }
+  };
+
+  try {
+    if (isObj && typeof THREE.OBJLoader === 'function') {
+      new THREE.OBJLoader().load(path, obj => onLoaded(obj), undefined, onError);
+    } else if (isDae && typeof THREE.ColladaLoader === 'function') {
+      new THREE.ColladaLoader().load(path, result => onLoaded(result.scene || result), undefined, onError);
+    } else {
+      onError(new Error('no loader available for ' + path));
+    }
+  } catch (err) {
+    onError(err);
+  }
+}
+
+// Helper: scale a loaded model into a target bounding box (size.x/y/z in world units)
+function fitModelToSize(model, size) {
+  const bbox = new THREE.Box3().setFromObject(model);
+  const ms = bbox.getSize(new THREE.Vector3());
+  if (ms.x > 0 && ms.y > 0 && ms.z > 0) {
+    model.scale.set(size.x / ms.x, size.y / ms.y, size.z / ms.z);
+  }
+  // Re-center on origin
+  const center = bbox.getCenter(new THREE.Vector3());
+  // After we scaled, offset by the (scaled) center
+  model.position.sub(new THREE.Vector3(
+    center.x * (size.x / Math.max(ms.x, 1e-6)),
+    center.y * (size.y / Math.max(ms.y, 1e-6)),
+    center.z * (size.z / Math.max(ms.z, 1e-6))
+  ));
+}
+
+// ============================================================================
+// Custom stage object builders (for stage builder mode)
+// ============================================================================
+const STAGE_BLUEPRINTS = {
+  platform: {
+    label: 'Stage Platform',
+    defaultSize: { x: 6, y: 0.4, z: 4 },
+    defaultColor: '#332520',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 })
+    ),
+  },
+  truss_h: {
+    label: 'Truss horizontal',
+    defaultSize: { x: 4, y: 0.3, z: 0.3 },
+    defaultColor: '#999999',
+    build: (size, color) => {
+      const group = new THREE.Group();
+      const placeholder = new THREE.Mesh(
+        new THREE.BoxGeometry(size.x, size.y, size.z),
+        new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 })
+      );
+      placeholder.castShadow = true;
+      placeholder.receiveShadow = true;
+      group.add(placeholder);
+      group.userData.isTrussGroup = true;
+      group.userData.color = color;
+      group.userData.size = { x: size.x, y: size.y, z: size.z };
+      loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
+        if (!model) return;
+        fitModelToSize(model, size);
+        model.traverse(c => {
+          if (c.isMesh) {
+            c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        group.remove(placeholder);
+        if (placeholder.geometry) placeholder.geometry.dispose();
+        if (placeholder.material) placeholder.material.dispose();
+        group.add(model);
+      });
+      return group;
+    },
+  },
+  truss_v: {
+    label: 'Truss vertical',
+    defaultSize: { x: 0.3, y: 4, z: 0.3 },
+    defaultColor: '#999999',
+    build: (size, color) => {
+      const group = new THREE.Group();
+      const placeholder = new THREE.Mesh(
+        new THREE.BoxGeometry(size.x, size.y, size.z),
+        new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 })
+      );
+      placeholder.castShadow = true;
+      placeholder.receiveShadow = true;
+      group.add(placeholder);
+      group.userData.isTrussGroup = true;
+      group.userData.color = color;
+      group.userData.size = { x: size.x, y: size.y, z: size.z };
+      loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
+        if (!model) return;
+        // truss_square_2m.obj has its long axis along X. Rotate 90deg around Z so it becomes Y-vertical.
+        model.rotation.z = Math.PI / 2;
+        // After rotation, X<->Y swap for sizing; pass swapped target.
+        fitModelToSize(model, { x: size.y, y: size.x, z: size.z });
+        model.traverse(c => {
+          if (c.isMesh) {
+            c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        group.remove(placeholder);
+        if (placeholder.geometry) placeholder.geometry.dispose();
+        if (placeholder.material) placeholder.material.dispose();
+        group.add(model);
+      });
+      return group;
+    },
+  },
+  wall: {
+    label: 'Wall / Backdrop',
+    defaultSize: { x: 10, y: 6, z: 0.2 },
+    defaultColor: '#222230',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 1.0, side: THREE.DoubleSide })
+    ),
+  },
+  led_wall: {
+    label: 'LED Wall',
+    defaultSize: { x: 8, y: 4.5, z: 0.15 },
+    defaultColor: '#080820',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshBasicMaterial({ color: color })
+    ),
+  },
+  speaker: {
+    label: 'Speaker Stack',
+    defaultSize: { x: 1.4, y: 4.5, z: 1.4 },
+    defaultColor: '#111111',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 0.9 })
+    ),
+  },
+  audience: {
+    label: 'Audience Area',
+    defaultSize: { x: 12, y: 0.05, z: 8 },
+    defaultColor: '#0c0c10',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 1.0 })
+    ),
+  },
+  dj_booth: {
+    label: 'DJ Booth',
+    defaultSize: { x: 2.4, y: 1.2, z: 1.0 },
+    defaultColor: '#1a1a25',
+    build: (size, color) => new THREE.Mesh(
+      new THREE.BoxGeometry(size.x, size.y, size.z),
+      new THREE.MeshStandardMaterial({ color: color, roughness: 0.7, metalness: 0.3 })
+    ),
+  },
+};
+
+function createStageObject(type, position, size, color, rotation, providedId, name) {
+  const bp = STAGE_BLUEPRINTS[type];
+  if (!bp) return null;
+  const sz = size || { ...bp.defaultSize };
+  const cl = color || bp.defaultColor;
+  const mesh = bp.build(sz, cl);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  if (position) mesh.position.set(
+    (position.x != null) ? position.x : 0,
+    (position.y != null) ? position.y : (sz.y / 2),
+    (position.z != null) ? position.z : 0
+  );
+  else mesh.position.set(0, sz.y / 2, 0);
+  mesh.rotation.y = rotation || 0;
+  // ID-FIX: Python-seitige IDs respektieren (sonst stimmen select/update nicht ueberein)
+  let id = (providedId && typeof providedId === 'string') ? providedId : ('stage-' + (stageObjIdCounter++));
+  // Falls Kollision (sehr unwahrscheinlich): Suffix dranhaengen
+  if (stageObjects[id]) id = id + '_' + (stageObjIdCounter++);
+  mesh.userData.stageId = id;
+  mesh.userData.isStageObject = true;
+  mesh.userData.stageType = type;
+  scene.add(mesh);
+  stageObjects[id] = {
+    mesh,
+    data: {
+      id, type,
+      position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+      size: { ...sz },
+      rotation: mesh.rotation.y,
+      color: cl,
+      name: name || '',
+    }
+  };
+  notifyStageListChanged();
+  return id;
+}
+
+// Update existing stage object in-place (geometry, color, position, rotation)
+// Returns true if updated, false if not found
+function updateStageObjectProps(id, props) {
+  const so = stageObjects[id];
+  if (!so) return false;
+  const data = so.data;
+
+  // Size: replace geometry (Mesh) or rebuild scale (Group with loaded model / truss)
+  if (props.size) {
+    const sz = props.size;
+    if (sz.x != null) data.size.x = sz.x;
+    if (sz.y != null) data.size.y = sz.y;
+    if (sz.z != null) data.size.z = sz.z;
+    if (so.mesh.isMesh && so.mesh.geometry) {
+      so.mesh.geometry.dispose();
+      so.mesh.geometry = new THREE.BoxGeometry(data.size.x, data.size.y, data.size.z);
+    } else if (so.mesh.isGroup) {
+      // Rebuild the group entirely (cheap - blueprint creates placeholder + reloads cached model)
+      const type = data.type;
+      const bp = STAGE_BLUEPRINTS[type];
+      if (bp) {
+        const newGroup = bp.build({ x: data.size.x, y: data.size.y, z: data.size.z }, data.color);
+        newGroup.position.copy(so.mesh.position);
+        newGroup.rotation.copy(so.mesh.rotation);
+        newGroup.userData.stageId = data.id;
+        newGroup.userData.isStageObject = true;
+        newGroup.userData.stageType = type;
+        scene.remove(so.mesh);
+        so.mesh.traverse(disposeObj);
+        scene.add(newGroup);
+        so.mesh = newGroup;
+      }
+    }
+  }
+
+  // Color: update material (works on Mesh or recursively on Group)
+  if (props.color) {
+    data.color = props.color;
+    const col = new THREE.Color(props.color);
+    if (so.mesh.isMesh && so.mesh.material) {
+      so.mesh.material.color = col;
+    } else if (so.mesh.isGroup) {
+      so.mesh.traverse(c => {
+        if (c.isMesh && c.material && c.material.color) {
+          c.material.color = col.clone();
+        }
+      });
+      so.mesh.userData.color = props.color;
+    }
+  }
+
+  // Position
+  if (props.position) {
+    const p = props.position;
+    if (p.x != null) { data.position.x = p.x; so.mesh.position.x = p.x; }
+    if (p.y != null) { data.position.y = p.y; so.mesh.position.y = p.y; }
+    if (p.z != null) { data.position.z = p.z; so.mesh.position.z = p.z; }
+  }
+
+  // Rotation
+  if (props.rotation != null) {
+    data.rotation = props.rotation;
+    so.mesh.rotation.y = props.rotation;
+  }
+
+  // Name
+  if (props.name != null) data.name = props.name;
+
+  // 2D-View Top-Color update
+  updateStageObject2D(id);
+  return true;
+}
+
+// In 2D-View: render stage objects with distinct top-down colors per type
+const STAGE_2D_COLORS = {
+  platform:  { fill: 0x6b4a3a, edge: 0xc7906a, label: 'PLATFORM' },
+  truss_h:   { fill: 0x999999, edge: 0xcccccc, label: 'TRUSS H' },
+  truss_v:   { fill: 0x999999, edge: 0xcccccc, label: 'TRUSS V' },
+  wall:      { fill: 0x3a3a55, edge: 0x6a6a8a, label: 'WALL' },
+  led_wall:  { fill: 0x202060, edge: 0x4080ff, label: 'LED' },
+  speaker:   { fill: 0x1a1a1a, edge: 0xff8800, label: 'SPK' },
+  audience:  { fill: 0x4a3a2a, edge: 0xb89060, label: 'AUDIENCE' },
+  dj_booth:  { fill: 0x2a2a4a, edge: 0x60a0ff, label: 'DJ' },
+};
+
+function updateStageObject2D(id) {
+  // Placeholder - the per-type material already gives distinct look in 3D.
+  // In 2D we rely on the bird's eye view of the box plus per-type material color.
+  // The 2D colors aren't currently used unless we add icon overlays.
+}
+
+function removeStageObject(id) {
+  const so = stageObjects[id];
+  if (!so) return;
+  // BoxHelper + Label entfernen
+  if (so._helper) {
+    scene.remove(so._helper);
+    if (so._helper.geometry) so._helper.geometry.dispose();
+    if (so._helper.material) so._helper.material.dispose();
+    so._helper = null;
+  }
+  if (so._label) {
+    scene.remove(so._label);
+    if (so._label.material && so._label.material.map) so._label.material.map.dispose();
+    if (so._label.material) so._label.material.dispose();
+    so._label = null;
+  }
+  scene.remove(so.mesh);
+  disposeObj(so.mesh);
+  delete stageObjects[id];
+  if (selectedStageId === id) {
+    selectedStageId = null;
+    clearResizeHandles();
+  }
+  updateOutlines();
+  notifyStageListChanged();
+}
+
+function clearStageObjects() {
+  // Snapshot der IDs - sonst mutieren wir waehrend Iteration
+  const ids = Object.keys(stageObjects).slice();
+  for (const id of ids) removeStageObject(id);
+  // Defensiv: Falls etwas haengt
+  for (const id in stageObjects) delete stageObjects[id];
+  clearResizeHandles();
+  clearStageLabels();
+}
+
+// ============================================================================
+// Resize-Handles (4 gelbe Wuerfel an den Box-Ecken, 2D-Editmodus)
+// ============================================================================
+let resizeHandles = [];          // Array von Mesh-Handles (in scene)
+let dragResizeCorner = null;     // 'nw' | 'ne' | 'sw' | 'se'
+let dragResizeStart = null;      // {startCenterX,Z, startSizeX,Z, fixedCornerX,Z}
+let resizeModeEnabled = false;   // Toggle: nur wenn aktiv erscheinen Resize-Handles
+
+function setResizeModeEnabled(on) {
+  resizeModeEnabled = !!on;
+  updateResizeHandles();
+}
+
+function clearResizeHandles() {
+  for (const h of resizeHandles) {
+    scene.remove(h);
+    if (h.geometry) h.geometry.dispose();
+    if (h.material) h.material.dispose();
+  }
+  resizeHandles.length = 0;
+}
+
+function updateResizeHandles() {
+  clearResizeHandles();
+  // Resize-Handles nur wenn explizit aktiviert (Toggle "Groesse anpassen")
+  if (!resizeModeEnabled) return;
+  if (editMode !== 'stage' || !selectedStageId) return;
+  const so = stageObjects[selectedStageId];
+  if (!so) return;
+  const pos = so.mesh.position;
+  const halfX = so.data.size.x / 2;
+  const halfZ = so.data.size.z / 2;
+  const handleY = pos.y + so.data.size.y / 2 + 0.4;
+  const handleSize = (viewMode === '2D') ? 0.7 : 0.45;
+  const corners = [
+    {name: 'nw', x: pos.x - halfX, z: pos.z - halfZ},
+    {name: 'ne', x: pos.x + halfX, z: pos.z - halfZ},
+    {name: 'sw', x: pos.x - halfX, z: pos.z + halfZ},
+    {name: 'se', x: pos.x + halfX, z: pos.z + halfZ},
+  ];
+  for (const c of corners) {
+    const geo = new THREE.BoxGeometry(handleSize, handleSize, handleSize);
+    const mat = new THREE.MeshBasicMaterial({color: 0xffd700, transparent: true, opacity: 0.95});
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(c.x, handleY, c.z);
+    m.userData = {isResizeHandle: true, corner: c.name, stageId: selectedStageId};
+    scene.add(m);
+    resizeHandles.push(m);
+  }
+}
+
+function pickResizeHandle() {
+  raycaster.setFromCamera(mouse, activeCam);
+  const hits = raycaster.intersectObjects(resizeHandles, false);
+  if (hits.length > 0) return hits[0].object;
+  return null;
+}
+
+// ============================================================================
+// 3D-Text-Labels (Sprite mit Canvas-Texture) ueber jedem Stage-Element
+// ============================================================================
+function makeLabelSprite(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 256, 64);
+  // Hintergrund halbtransparent
+  ctx.fillStyle = 'rgba(20, 20, 30, 0.78)';
+  ctx.fillRect(0, 0, 256, 64);
+  ctx.strokeStyle = color || '#ffd700';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, 252, 60);
+  ctx.fillStyle = color || '#ffd700';
+  ctx.font = 'bold 30px Segoe UI, Tahoma, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(text).toUpperCase(), 128, 32);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({map: tex, transparent: true, depthTest: false});
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(3.0, 0.75, 1);
+  return sprite;
+}
+
+function clearStageLabels() {
+  for (const id in stageObjects) {
+    const so = stageObjects[id];
+    if (so._label) {
+      scene.remove(so._label);
+      if (so._label.material && so._label.material.map) so._label.material.map.dispose();
+      if (so._label.material) so._label.material.dispose();
+      so._label = null;
+    }
+  }
+}
+
+function ensureLabel(id) {
+  const so = stageObjects[id];
+  if (!so) return;
+  const typeLabel = (STAGE_2D_COLORS[so.data.type] && STAGE_2D_COLORS[so.data.type].label) || so.data.type;
+  const text = so.data.name ? (so.data.name + ' [' + typeLabel + ']') : typeLabel;
+  if (so._label) {
+    // Update vorhandenes Label
+    scene.remove(so._label);
+    if (so._label.material && so._label.material.map) so._label.material.map.dispose();
+    if (so._label.material) so._label.material.dispose();
+  }
+  so._label = makeLabelSprite(text, '#ffd700');
+  scene.add(so._label);
+}
+
+function updateStageLabelPositions() {
+  for (const id in stageObjects) {
+    const so = stageObjects[id];
+    if (!so._label) continue;
+    so._label.position.set(
+      so.mesh.position.x,
+      so.mesh.position.y + so.data.size.y / 2 + 1.2,
+      so.mesh.position.z
+    );
+  }
+}
+
+function getStageJson() {
+  return {
+    name: 'CustomStage',
+    objects: Object.values(stageObjects).map(s => ({
+      id: s.data.id,
+      type: s.data.type,
+      position: { ...s.data.position },
+      size: { ...s.data.size },
+      rotation: s.data.rotation,
+      color: s.data.color,
+    })),
+    fixtures: Object.entries(fixtures).map(([fid, f]) => ({
+      fid: Number(fid),
+      x: f.group.position.x,
+      y: f.group.position.y,
+      z: f.group.position.z,
+      rotationY: f.group.rotation.y,
+    })),
+  };
+}
+
+function loadStageJson(json) {
+  try {
+    const data = typeof json === 'string' ? JSON.parse(json) : json;
+    // NEW-STAGE-FIX: clearStageObjects MUSS alle alten Stage-Objects entfernen.
+    clearStageObjects();
+    // Sicherheits-Reset: Selektion + Resize-Handles + Labels weg
+    selectedStageId = null;
+    clearResizeHandles();
+    clearStageLabels();
+    if (data.objects && Array.isArray(data.objects)) {
+      data.objects.forEach(o => {
+        createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+      });
+    }
+    // Fixture positions get applied as DMX/positions stream in via bridge
+    if (data.fixtures && Array.isArray(data.fixtures)) {
+      data.fixtures.forEach(fp => {
+        const f = fixtures[fp.fid];
+        if (f) {
+          f.group.position.set(fp.x || 0, fp.y || 6.5, fp.z || 0);
+          if (typeof fp.rotationY === 'number') f.group.rotation.y = fp.rotationY;
+        }
+      });
+    }
+    updateOutlines();
+  } catch (e) {
+    console.log('loadStageJson error:', e);
+  }
+}
+
+function notifyStageListChanged() {
+  if (bridge && bridge.stageListChanged) {
+    try { bridge.stageListChanged(JSON.stringify(Object.values(stageObjects).map(s => s.data))); } catch (e) {}
+  }
+}
+
+// ============================================================================
+// Fixture management
+// ============================================================================
+const fixtures = {}; // fid -> {...}
+const fixtureMeshes = []; // for raycasting
+const topDownIcons = {}; // fid -> sprite/mesh
+
+function rebuildFixtureMeshList() {
+  fixtureMeshes.length = 0;
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    f.group.traverse(o => {
+      if (o.isMesh) {
+        o.userData.fid = Number(fid);
+        fixtureMeshes.push(o);
+      }
+    });
+  }
+}
+
+// ── Builders ─────────────────────────────────────────────────────────────────
+function buildMovingHead() {
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.4 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.18, 16), baseMat);
+  base.position.y = 0.09;
+  base.castShadow = true;
+  group.add(base);
+  const yoke = new THREE.Group();
+  yoke.position.y = 0.18;
+  group.add(yoke);
+  const yokeMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
+  [-0.18, 0.18].forEach(x => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.08), yokeMat);
+    arm.position.set(x, 0.22, 0);
+    yoke.add(arm);
+  });
+  const head = new THREE.Group();
+  head.position.y = 0.4;
+  yoke.add(head);
+  const headBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.16, 0.36, 16),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.4 })
+  );
+  headBody.rotation.z = Math.PI / 2;
+  head.add(headBody);
+  const lens = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.14, 0.02, 16),
+    new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.9, roughness: 0.05 })
+  );
+  lens.rotation.z = Math.PI / 2;
+  lens.position.x = 0.19;
+  head.add(lens);
+  // Optional real model overlay - replaces yoke arms + head body, keeps procedural lens for emissive.
+  loadModel('assets/models/fixtures/moving_head.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.6, y: 0.8, z: 0.6 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    // Hide procedural body parts (keep lens visible for emissive feedback)
+    base.visible = false;
+    yoke.children.forEach(arm => { arm.visible = false; });
+    headBody.visible = false;
+    group.add(model);
+  });
+  return { group, yoke, head, lens };
+}
+
+function buildPar() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.32, 16),
+    new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 })
+  );
+  body.castShadow = true;
+  group.add(body);
+  const front = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.04, 16),
+    new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95, roughness: 0.05 })
+  );
+  front.position.y = -0.18;
+  group.add(front);
+  // Try to overlay a real PAR model. If loaded, hide procedural body but keep lens for emissive.
+  loadModel('assets/models/fixtures/par.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.5, y: 0.5, z: 0.5 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    body.visible = false;
+    group.add(model);
+  });
+  return { group, head: group, lens: front };
+}
+
+function buildLedBar() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(1.2, 0.12, 0.18),
+    new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 })
+  );
+  body.castShadow = true;
+  group.add(body);
+  const pxMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4 });
+  for (let i = 0; i < 8; i++) {
+    const px = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.02), pxMat);
+    px.position.set(-0.5 + i * 0.14, 0, 0.1);
+    group.add(px);
+  }
+  return { group, head: group, lamp: body };
+}
+
+function buildStrobe() {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.15, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 })
+  );
+  body.castShadow = true;
+  group.add(body);
+  const lamp = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.04, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 })
+  );
+  lamp.position.y = -0.08;
+  group.add(lamp);
+  loadModel('assets/models/fixtures/strobe.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.7, y: 0.3, z: 0.6 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    body.visible = false;
+    group.add(model);
+  });
+  return { group, head: group, lamp };
+}
+
+function buildDimmer() {
+  const group = new THREE.Group();
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.1 })
+  );
+  group.add(bulb);
+  return { group, head: group, lamp: bulb };
+}
+
+function buildFixtureModel(type) {
+  switch (type) {
+    case 'moving_head': return buildMovingHead();
+    case 'par':         return buildPar();
+    case 'led_bar':     return buildLedBar();
+    case 'strobe':      return buildStrobe();
+    case 'dimmer':      return buildDimmer();
+    default:            return buildPar();
+  }
+}
+
+// 2D top-down icon
+function buildTopDownIcon(type) {
+  const group = new THREE.Group();
+  const matLine = new THREE.LineBasicMaterial({ color: 0xcccccc });
+  let body, ring;
+  if (type === 'moving_head') {
+    // circle + arrow
+    body = new THREE.Mesh(
+      new THREE.CircleGeometry(0.6, 24),
+      new THREE.MeshBasicMaterial({ color: 0x2a4060, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    const arrowPts = [
+      new THREE.Vector3(0, 0.05, 0),
+      new THREE.Vector3(0, 0.05, -0.7),
+    ];
+    const arrowGeo = new THREE.BufferGeometry().setFromPoints(arrowPts);
+    const arrow = new THREE.Line(arrowGeo, matLine);
+    group.add(arrow);
+    const tipPts = [
+      new THREE.Vector3(-0.15, 0.05, -0.5),
+      new THREE.Vector3(0, 0.05, -0.7),
+      new THREE.Vector3(0.15, 0.05, -0.5),
+    ];
+    const tipGeo = new THREE.BufferGeometry().setFromPoints(tipPts);
+    const tip = new THREE.Line(tipGeo, matLine);
+    group.add(tip);
+  } else if (type === 'par') {
+    body = new THREE.Mesh(
+      new THREE.CircleGeometry(0.55, 24),
+      new THREE.MeshBasicMaterial({ color: 0x404040, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+  } else if (type === 'led_bar') {
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 0.4),
+      new THREE.MeshBasicMaterial({ color: 0x303030, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+  } else if (type === 'strobe') {
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.8, 0.8),
+      new THREE.MeshBasicMaterial({ color: 0x505050, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    // X cross
+    const xpts = [
+      new THREE.Vector3(-0.35, 0.05, -0.35), new THREE.Vector3(0.35, 0.05, 0.35),
+      new THREE.Vector3(-0.35, 0.05, 0.35), new THREE.Vector3(0.35, 0.05, -0.35),
+    ];
+    const xGeo = new THREE.BufferGeometry().setFromPoints(xpts);
+    const xLine = new THREE.LineSegments(xGeo, matLine);
+    group.add(xLine);
+  } else {
+    body = new THREE.Mesh(
+      new THREE.CircleGeometry(0.45, 16),
+      new THREE.MeshBasicMaterial({ color: 0x606060, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+  }
+  // Outline ring
+  ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.62, 0.72, 24),
+    new THREE.MeshBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.0, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.03;
+  group.add(ring);
+  group.userData.body = body;
+  group.userData.ring = ring;
+  // Force-pickable via tag
+  body.userData.isTopDownIcon = true;
+  body.userData.isFixtureMesh = true;
+  return group;
+}
+
+// ── Beam helpers ─────────────────────────────────────────────────────────────
+function createBeamCone(color, intensity, angle, length) {
+  const radius = Math.tan(angle) * length;
+  const geo = new THREE.ConeGeometry(radius, length, 24, 1, true);
+  const mat = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: Math.max(0.02, intensity * settings.beamOpacity),
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const cone = new THREE.Mesh(geo, mat);
+  cone.position.y = -length / 2;
+  cone.visible = settings.showCones;
+  return cone;
+}
+
+function createFloorSpot(color, intensity, radius) {
+  const geo = new THREE.CircleGeometry(radius, 32);
+  const mat = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: Math.max(0.0, intensity * 0.55),
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const disc = new THREE.Mesh(geo, mat);
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.01;
+  disc.visible = settings.showFloorSpots;
+  return disc;
+}
+
+function addFixture(data) {
+  const fid = data.fid;
+  if (fixtures[fid]) removeFixture(fid);
+  const model = buildFixtureModel(data.type || 'par');
+  const root = new THREE.Group();
+  root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
+  root.add(model.group);
+
+  const headHost = model.head || model.group;
+  const color = new THREE.Color((data.r||0)/255, (data.g||0)/255, (data.b||0)/255);
+  const intensity = (data.intensity||0) / 255;
+  const beamLength = data.type === 'led_bar' ? 6.0 : 8.0;
+  const beamAngle = data.type === 'led_bar' ? Math.PI/14 : Math.PI/10;
+  const beam = createBeamCone(color, intensity, beamAngle, beamLength);
+  headHost.add(beam);
+
+  const spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
+  spot.castShadow = true;
+  spot.shadow.mapSize.width = 512;
+  spot.shadow.mapSize.height = 512;
+  root.add(spot);
+
+  const spotTarget = new THREE.Object3D();
+  spotTarget.position.set(0, -root.position.y, 0);
+  scene.add(spotTarget);
+  spot.target = spotTarget;
+
+  const floorSpot = createFloorSpot(color, intensity, 1.2);
+  scene.add(floorSpot);
+
+  scene.add(root);
+
+  // 2D top-down icon
+  const icon = buildTopDownIcon(data.type || 'par');
+  icon.position.set(root.position.x, 0.05, root.position.z);
+  icon.userData.fid = Number(fid);
+  // Force pickable: tag children
+  icon.traverse(o => { if (o.isMesh) o.userData.fid = Number(fid); });
+  icon.visible = (viewMode === '2D');
+  scene.add(icon);
+  topDownIcons[fid] = icon;
+
+  // Hide 3D model in 2D mode
+  root.visible = (viewMode === '3D');
+
+  fixtures[fid] = {
+    group: root,
+    yoke: model.yoke || null,
+    head: model.head || null,
+    lens: model.lens || null,
+    lamp: model.lamp || null,
+    beam, spot, spotTarget, floorSpot,
+    icon,
+    type: data.type || 'par',
+    data: { ...data },
+  };
+
+  rebuildFixtureMeshList();
+  updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128);
+}
+
+function removeFixture(fid) {
+  const f = fixtures[fid];
+  if (!f) return;
+  scene.remove(f.group);
+  if (f.spotTarget) scene.remove(f.spotTarget);
+  if (f.floorSpot) { scene.remove(f.floorSpot); disposeObj(f.floorSpot); }
+  if (f.icon) { scene.remove(f.icon); f.icon.traverse(disposeObj); }
+  f.group.traverse(disposeObj);
+  delete fixtures[fid];
+  delete topDownIcons[fid];
+  // Clean selection
+  const idx = selectedFids.indexOf(Number(fid));
+  if (idx >= 0) selectedFids.splice(idx, 1);
+  rebuildFixtureMeshList();
+  updateOutlines();
+}
+
+function updateFixture(fid, r, g, b, intensity, pan, tilt) {
+  const f = fixtures[fid];
+  if (!f) return;
+  const color = new THREE.Color(r/255, g/255, b/255);
+  const intNorm = intensity / 255;
+  const skipBeam = (viewMode === '2D' && Object.keys(fixtures).length > 50);
+
+  if (f.beam) {
+    f.beam.material.color = color;
+    f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
+    f.beam.visible = settings.showCones && intNorm > 0.01 && viewMode === '3D';
+  }
+  if (f.spot) {
+    f.spot.color = color;
+    f.spot.intensity = intNorm * 3.0;
+  }
+  if (f.floorSpot) {
+    f.floorSpot.material.color = color;
+    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55);
+    f.floorSpot.visible = settings.showFloorSpots && intNorm > 0.01;
+  }
+  if (f.lens && f.lens.material) {
+    f.lens.material.emissive = color;
+    f.lens.material.emissiveIntensity = intNorm * 1.5;
+  }
+  if (f.lamp && f.lamp.material) {
+    f.lamp.material.emissive = color;
+    f.lamp.material.emissiveIntensity = intNorm * 1.5;
+  }
+  // Top-down icon color reflects active output color (only when bright)
+  if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
+    if (intNorm > 0.05) {
+      f.icon.userData.body.material.color.copy(color);
+      f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
+    } else {
+      f.icon.userData.body.material.color.setHex(0x3a3a4a);
+      f.icon.userData.body.material.opacity = 0.85;
+    }
+  }
+
+  // Pan/Tilt
+  if (f.type === 'moving_head' && f.yoke && f.head) {
+    const panRad = ((pan - 128) / 128) * Math.PI;
+    const tiltRad = ((tilt - 128) / 128) * (Math.PI / 2);
+    f.yoke.rotation.y = panRad;
+    f.head.rotation.x = tiltRad;
+    // Reflect pan in top-down icon (rotate the whole icon)
+    if (f.icon) f.icon.rotation.y = panRad + f.group.rotation.y;
+  }
+
+  // Floor spot follow direction
+  if (!skipBeam && f.floorSpot && f.spotTarget) {
+    const dir = new THREE.Vector3(0, -1, 0);
+    if (f.type === 'moving_head') {
+      f.head.updateMatrixWorld();
+      const wq = new THREE.Quaternion();
+      f.head.getWorldQuaternion(wq);
+      dir.applyQuaternion(wq);
+    }
+    const origin = new THREE.Vector3();
+    f.group.getWorldPosition(origin);
+    if (Math.abs(dir.y) > 0.001) {
+      const t = -origin.y / dir.y;
+      if (t > 0 && t < 100) {
+        const hitX = origin.x + dir.x * t;
+        const hitZ = origin.z + dir.z * t;
+        f.floorSpot.position.set(hitX, 0.01, hitZ);
+        f.spotTarget.position.set(hitX, 0.0, hitZ);
+      }
+    }
+  }
+  // Keep top-down icon position synced
+  if (f.icon) {
+    f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+  }
+}
+
+// ============================================================================
+// View mode 2D / 3D
+// ============================================================================
+function setViewMode(mode) {
+  viewMode = (mode === '2D') ? '2D' : '3D';
+  activeCam = (viewMode === '2D') ? orthoCam : perspectiveCam;
+  document.getElementById('mode-text').textContent = (viewMode === '2D') ? '2D Top View' : '3D View';
+  document.getElementById('ruler-info').style.display = (viewMode === '2D') ? 'block' : 'none';
+  // Toggle fixtures visibility
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    f.group.visible = (viewMode === '3D');
+    if (f.icon) f.icon.visible = (viewMode === '2D');
+    // Hide beam cones in 2D
+    if (f.beam) f.beam.visible = (viewMode === '3D') && settings.showCones && f.beam.material.opacity > 0.01;
+  }
+  // Hide preset 3D scenery in 2D top-down to reduce clutter
+  presetObjects.forEach(o => {
+    if (o.userData && o.userData.isFloor) return;
+    o.visible = (viewMode === '3D');
+  });
+  if (floorMesh) floorMesh.visible = true;
+  // Resize ortho on mode switch (preserve aspect)
+  resizeOrtho();
+  // Resize-Handles neu generieren (Groesse haengt vom Viewmode ab)
+  updateResizeHandles();
+}
+
+let _userBrightnessOverride = null;  // wenn Slider manuell gesetzt
+
+function setEditMode(mode) {
+  editMode = mode || 'view';
+  const banner = document.getElementById('mode-banner');
+  if (editMode === 'edit') {
+    banner.textContent = 'EDIT MODE - Drag fixtures with mouse (Shift=multi-select, Del=remove)';
+    banner.style.display = 'block';
+  } else if (editMode === 'stage') {
+    banner.textContent = 'STAGE BUILDER - Drag stage objects (Del=remove, R=rotate 90deg)';
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+  // Auto-Brightness: edit/stage modes brighten the scene for visibility
+  if (settings.autoBrightness && _userBrightnessOverride === null) {
+    if (editMode === 'edit' || editMode === 'stage') {
+      applyBrightness(0.65);
+    } else {
+      applyBrightness(0.20);
+    }
+    // Inform Python so UI slider reflects current value
+    if (typeof bridge !== 'undefined' && bridge && bridge.brightnessChanged) {
+      try { bridge.brightnessChanged(settings.brightness); } catch (e) {}
+    }
+  }
+  // Clear selection on mode change
+  selectedFids = [];
+  selectedStageId = null;
+  updateOutlines();
+}
+
+// Direkter Slider-Setter (von Python aufgerufen) - markiert User-Override
+function setBrightnessManual(b) {
+  _userBrightnessOverride = b;
+  applyBrightness(b);
+}
+
+// Reset auto-brightness (User klickt "Auto")
+function resetBrightnessAuto() {
+  _userBrightnessOverride = null;
+  // Trigger current edit mode brightness
+  setEditMode(editMode);
+}
+
+function resizeOrtho() {
+  const a = window.innerWidth / window.innerHeight;
+  orthoCam.left = -orthoSize * a;
+  orthoCam.right = orthoSize * a;
+  orthoCam.top = orthoSize;
+  orthoCam.bottom = -orthoSize;
+  orthoCam.updateProjectionMatrix();
+}
+
+// ============================================================================
+// Selection / outlines
+// ============================================================================
+let selectedFids = []; // fid numbers
+let selectedStageId = null;
+
+// Apply an emissive RGB (0..1) to a mesh or all child meshes of a Group.
+function applyStageEmissive(target, r, g, b) {
+  if (!target) return;
+  if (target.isMesh) {
+    if (target.material && target.material.emissive) {
+      target.material.emissive.setRGB(r, g, b);
+    }
+  } else if (target.isGroup || target.children) {
+    target.traverse(c => {
+      if (c.isMesh && c.material && c.material.emissive) {
+        c.material.emissive.setRGB(r, g, b);
+      }
+    });
+  }
+}
+
+function updateOutlines() {
+  // Fixture outlines: tint icon ring in 2D, otherwise fall back to a wireframe-like hue
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    const sel = selectedFids.includes(Number(fid));
+    if (f.icon && f.icon.userData.ring && f.icon.userData.ring.material) {
+      f.icon.userData.ring.material.opacity = sel ? 1.0 : 0.0;
+    }
+    // 3D selection: brighten lens emissive a bit when no DMX intensity
+    if (f.lens && f.lens.material) {
+      if (sel) {
+        // ensure visible cue
+        if (!f._selBorder) {
+          const geo = new THREE.RingGeometry(0.4, 0.55, 24);
+          const mat = new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+          const ring = new THREE.Mesh(geo, mat);
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.y = -0.5;
+          f.group.add(ring);
+          f._selBorder = ring;
+        }
+        f._selBorder.visible = true;
+      } else if (f._selBorder) {
+        f._selBorder.visible = false;
+      }
+    }
+  }
+  // Stage object highlight: selektiertes Element gelb (sehr auffaellig), andere unmarkiert
+  for (const id in stageObjects) {
+    const so = stageObjects[id];
+    if (id === selectedStageId) {
+      // BoxHelper in hellgelb mit dicker Linie
+      if (!so._helper) {
+        so._helper = new THREE.BoxHelper(so.mesh, 0xffd700);
+        if (so._helper.material) {
+          so._helper.material.linewidth = 4;
+          so._helper.material.depthTest = false;
+          so._helper.material.transparent = true;
+          so._helper.material.opacity = 1.0;
+        }
+        scene.add(so._helper);
+      } else {
+        so._helper.material.color.setHex(0xffd700);
+        so._helper.material.opacity = 1.0;
+      }
+      so._helper.update();
+      so._helper.visible = true;
+      // Labels ueber Elementen wurden auf Wunsch entfernt (stoeren) - nichts tun
+      // Emissive-Boost als Start-Wert (animate() pulsiert weiter)
+      applyStageEmissive(so.mesh, 0.4, 0.25, 0.0);
+    } else {
+      if (so._helper) so._helper.visible = false;
+      // Emissive zuruecksetzen
+      applyStageEmissive(so.mesh, 0, 0, 0);
+    }
+  }
+  // Resize-Handles neu aufbauen (nur sichtbar wenn editMode == 'stage' + Selektion)
+  updateResizeHandles();
+  // Top-Banner: zeige welche Art von Element selektiert ist
+  const sb = document.getElementById('selection-banner');
+  const sbt = document.getElementById('selection-banner-text');
+  if (sb && sbt) {
+    if (selectedStageId && stageObjects[selectedStageId]) {
+      const so = stageObjects[selectedStageId];
+      const typeLabels = {
+        platform: 'PLATTFORM', truss_h: 'TRASSE (horizontal)', truss_v: 'TRASSE (vertikal)',
+        wall: 'WAND', led_wall: 'LED-WAND', speaker: 'LAUTSPRECHER',
+        audience: 'PUBLIKUM', dj_booth: 'DJ-BOOTH'
+      };
+      const nm = so.data.name || '';
+      const tp = typeLabels[so.data.type] || String(so.data.type || '').toUpperCase();
+      sbt.textContent = nm ? (tp + ' - ' + nm) : tp;
+      sb.style.display = 'block';
+    } else if (selectedFids.length > 0) {
+      sbt.textContent = 'FIXTURE x' + selectedFids.length;
+      sb.style.display = 'block';
+    } else {
+      sb.style.display = 'none';
+    }
+  }
+  // Notify python of selection
+  if (bridge && bridge.fixtureSelectionChanged) {
+    try { bridge.fixtureSelectionChanged(JSON.stringify(selectedFids)); } catch (e) {}
+  }
+  if (bridge && bridge.stageSelectionChanged) {
+    try { bridge.stageSelectionChanged(selectedStageId || ''); } catch (e) {}
+  }
+}
+
+// ============================================================================
+// Pointer / drag / select
+// ============================================================================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+let isLeftDragging = false;
+let dragMode = 'none';  // 'rotate' | 'pan' | 'fixtureDrag' | 'stageDrag' | 'marquee' | 'none'
+let lastMouseX = 0, lastMouseY = 0;
+let downMouseX = 0, downMouseY = 0;
+let mouseMovedDuringClick = false;
+
+let dragStartPositions = {}; // fid -> {x, z}
+let dragStartStagePos = null; // for stage drag
+let dragGroundOffset = new THREE.Vector3();
+
+function setMouseFromEvent(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function intersectGround() {
+  raycaster.setFromCamera(mouse, activeCam);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const out = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, out);
+  return out;
+}
+
+function pickFixture() {
+  raycaster.setFromCamera(mouse, activeCam);
+  // For 2D mode prefer the top-down icons (their body meshes are in fixtureMeshes? No, we rebuild only on add/remove - icons aren't in that list. Build dynamic list here.)
+  const meshes = [];
+  if (viewMode === '2D') {
+    for (const fid in topDownIcons) {
+      topDownIcons[fid].traverse(o => { if (o.isMesh) { o.userData.fid = Number(fid); meshes.push(o); } });
+    }
+  } else {
+    for (const fid in fixtures) {
+      fixtures[fid].group.traverse(o => { if (o.isMesh) { o.userData.fid = Number(fid); meshes.push(o); } });
+    }
+  }
+  const hits = raycaster.intersectObjects(meshes, true);
+  if (hits.length > 0) return hits[0].object.userData.fid;
+  return null;
+}
+
+function pickStageObject() {
+  raycaster.setFromCamera(mouse, activeCam);
+  const meshes = Object.values(stageObjects).map(s => s.mesh);
+  const hits = raycaster.intersectObjects(meshes, false);
+  if (hits.length > 0) return hits[0].object.userData.stageId;
+  return null;
+}
+
+function snap(v) {
+  if (!settings.snapToGrid) return v;
+  return Math.round(v / settings.gridStep) * settings.gridStep;
+}
+
+renderer.domElement.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  setMouseFromEvent(e);
+  raycaster.setFromCamera(mouse, activeCam);
+  const target = new THREE.Vector3();
+  raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0), -0.4), target);
+  if (bridge && target && bridge.placeFixture) {
+    bridge.placeFixture(JSON.stringify({ x: snap(target.x), y: 6.5, z: snap(target.z) }));
+  }
+}, false);
+
+renderer.domElement.addEventListener('mousedown', function(e) {
+  if (e.button !== 0) return;
+  setMouseFromEvent(e);
+  isLeftDragging = true;
+  downMouseX = e.clientX; downMouseY = e.clientY;
+  lastMouseX = e.clientX; lastMouseY = e.clientY;
+  mouseMovedDuringClick = false;
+
+  if (editMode === 'edit') {
+    const fid = pickFixture();
+    if (fid != null) {
+      // start fixture drag
+      const additive = e.shiftKey;
+      if (!additive && !selectedFids.includes(fid)) {
+        selectedFids = [fid];
+      } else if (additive) {
+        if (!selectedFids.includes(fid)) selectedFids.push(fid);
+      }
+      // Cache drag start positions for all selected
+      dragStartPositions = {};
+      for (const sf of selectedFids) {
+        if (fixtures[sf]) {
+          dragStartPositions[sf] = {
+            x: fixtures[sf].group.position.x,
+            z: fixtures[sf].group.position.z,
+          };
+        }
+      }
+      const groundHit = intersectGround();
+      const refF = fixtures[fid];
+      if (groundHit && refF) {
+        dragGroundOffset.set(groundHit.x - refF.group.position.x, 0, groundHit.z - refF.group.position.z);
+        dragGroundOffset.userData = { refFid: fid };
+      }
+      dragMode = 'fixtureDrag';
+      updateOutlines();
+      return;
+    } else {
+      // marquee select (only in edit mode on empty area)
+      dragMode = 'marquee';
+      const m = document.getElementById('marquee');
+      m.style.display = 'block';
+      m.style.left = e.clientX + 'px';
+      m.style.top = e.clientY + 'px';
+      m.style.width = '0px';
+      m.style.height = '0px';
+      if (!e.shiftKey) { selectedFids = []; updateOutlines(); }
+      return;
+    }
+  }
+
+  if (editMode === 'stage') {
+    // 1) Erst Resize-Handles abfragen (wenn Selektion vorhanden)
+    if (selectedStageId && resizeHandles.length > 0) {
+      const handle = pickResizeHandle();
+      if (handle) {
+        const so = stageObjects[selectedStageId];
+        if (so) {
+          dragResizeCorner = handle.userData.corner;
+          // Fixierte Ecke = gegenueberliegende Ecke (der Greifpunkt der NICHT bewegt wird)
+          const halfX = so.data.size.x / 2;
+          const halfZ = so.data.size.z / 2;
+          const cx = so.mesh.position.x;
+          const cz = so.mesh.position.z;
+          let fixedX, fixedZ;
+          if (dragResizeCorner === 'nw') { fixedX = cx + halfX; fixedZ = cz + halfZ; }
+          else if (dragResizeCorner === 'ne') { fixedX = cx - halfX; fixedZ = cz + halfZ; }
+          else if (dragResizeCorner === 'sw') { fixedX = cx + halfX; fixedZ = cz - halfZ; }
+          else                                { fixedX = cx - halfX; fixedZ = cz - halfZ; } // 'se'
+          dragResizeStart = {
+            fixedX, fixedZ,
+            startSizeX: so.data.size.x,
+            startSizeZ: so.data.size.z,
+          };
+          dragMode = 'stageResize';
+          return;
+        }
+      }
+    }
+    // 2) Sonst: Stage-Objekt direkt picken
+    const sid = pickStageObject();
+    if (sid != null) {
+      selectedStageId = sid;
+      const so = stageObjects[sid];
+      const groundHit = intersectGround();
+      if (groundHit) {
+        dragStartStagePos = {
+          startX: so.mesh.position.x,
+          startZ: so.mesh.position.z,
+          offsetX: groundHit.x - so.mesh.position.x,
+          offsetZ: groundHit.z - so.mesh.position.z,
+        };
+      }
+      dragMode = 'stageDrag';
+      updateOutlines();
+      return;
+    } else {
+      selectedStageId = null;
+      updateOutlines();
+    }
+  }
+
+  // Default: rotate or pan camera
+  if (viewMode === '3D') {
+    dragMode = 'rotate';
+  } else {
+    dragMode = 'pan';
+  }
+}, false);
+
+window.addEventListener('mouseup', function(e) {
+  if (!isLeftDragging) return;
+  isLeftDragging = false;
+  // finalize fixture drag positions to python
+  if (dragMode === 'fixtureDrag') {
+    for (const fid of selectedFids) {
+      const f = fixtures[fid];
+      if (!f) continue;
+      if (bridge && bridge.fixturePositionChanged) {
+        try {
+          bridge.fixturePositionChanged(
+            String(fid),
+            f.group.position.x,
+            f.group.position.y,
+            f.group.position.z
+          );
+        } catch (err) {}
+      }
+    }
+  }
+  if (dragMode === 'stageDrag' && selectedStageId) {
+    const so = stageObjects[selectedStageId];
+    if (so) {
+      so.data.position.x = so.mesh.position.x;
+      so.data.position.y = so.mesh.position.y;
+      so.data.position.z = so.mesh.position.z;
+    }
+    notifyStageListChanged();
+  }
+  if (dragMode === 'stageResize' && selectedStageId) {
+    notifyStageListChanged();
+    updateResizeHandles();
+    dragResizeCorner = null;
+    dragResizeStart = null;
+  }
+  if (dragMode === 'marquee') {
+    const m = document.getElementById('marquee');
+    const rect = renderer.domElement.getBoundingClientRect();
+    const x1 = parseInt(m.style.left, 10);
+    const y1 = parseInt(m.style.top, 10);
+    const w = parseInt(m.style.width, 10);
+    const h = parseInt(m.style.height, 10);
+    m.style.display = 'none';
+    // Test all fixtures: project their group position to screen and check rect
+    const newlySelected = [];
+    for (const fid in fixtures) {
+      const f = fixtures[fid];
+      const pos = (viewMode === '2D' && f.icon) ? f.icon.position.clone() : f.group.position.clone();
+      const screen = pos.project(activeCam);
+      const sx = ((screen.x + 1) / 2) * rect.width + rect.left;
+      const sy = ((1 - screen.y) / 2) * rect.height + rect.top;
+      if (sx >= x1 && sx <= x1 + w && sy >= y1 && sy <= y1 + h) {
+        newlySelected.push(Number(fid));
+      }
+    }
+    if (e.shiftKey) {
+      for (const fid of newlySelected) if (!selectedFids.includes(fid)) selectedFids.push(fid);
+    } else {
+      selectedFids = newlySelected;
+    }
+    updateOutlines();
+  }
+  // Click without movement on empty = clear selection
+  if (!mouseMovedDuringClick && (dragMode === 'rotate' || dragMode === 'pan')) {
+    if (editMode === 'edit' || editMode === 'stage') {
+      // already handled
+    }
+  }
+  dragMode = 'none';
+});
+
+window.addEventListener('mousemove', function(e) {
+  if (Math.abs(e.clientX - downMouseX) > 3 || Math.abs(e.clientY - downMouseY) > 3) {
+    mouseMovedDuringClick = true;
+  }
+  // Update ruler info in 2D
+  if (viewMode === '2D') {
+    setMouseFromEvent(e);
+    const gh = intersectGround();
+    if (gh) {
+      document.getElementById('ruler-info').textContent =
+        'X: ' + gh.x.toFixed(2) + ' m | Z: ' + gh.z.toFixed(2) + ' m | Grid: ' + (settings.snapToGrid ? 'ON' : 'OFF');
+    }
+  }
+  if (!isLeftDragging) return;
+  setMouseFromEvent(e);
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+
+  if (dragMode === 'rotate') {
+    theta -= dx * 0.008;
+    phi = Math.max(0.2, Math.min(Math.PI * 0.49, phi + dy * 0.008));
+    updateCamera();
+  } else if (dragMode === 'pan') {
+    // Ortho pan: convert pixel delta to world delta
+    const a = window.innerWidth / window.innerHeight;
+    const wPerPxX = (2 * orthoSize * a) / window.innerWidth;
+    const wPerPxZ = (2 * orthoSize) / window.innerHeight;
+    orthoCam.position.x -= dx * wPerPxX;
+    // up vector is (0,0,-1) so screen Y maps to +Z
+    orthoCam.position.z -= dy * wPerPxZ;
+  } else if (dragMode === 'fixtureDrag') {
+    const gh = intersectGround();
+    if (gh && dragGroundOffset.userData) {
+      const refFid = dragGroundOffset.userData.refFid;
+      const newX = gh.x - dragGroundOffset.x;
+      const newZ = gh.z - dragGroundOffset.z;
+      const refStart = dragStartPositions[refFid];
+      if (refStart) {
+        const dxw = snap(newX) - refStart.x;
+        const dzw = snap(newZ) - refStart.z;
+        for (const fid of selectedFids) {
+          const start = dragStartPositions[fid];
+          const f = fixtures[fid];
+          if (start && f) {
+            f.group.position.x = start.x + dxw;
+            f.group.position.z = start.z + dzw;
+            if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+          }
+        }
+      }
+    }
+  } else if (dragMode === 'stageDrag' && selectedStageId) {
+    const so = stageObjects[selectedStageId];
+    const gh = intersectGround();
+    if (gh && so && dragStartStagePos) {
+      const nx = snap(gh.x - dragStartStagePos.offsetX);
+      const nz = snap(gh.z - dragStartStagePos.offsetZ);
+      so.mesh.position.x = nx;
+      so.mesh.position.z = nz;
+      so.data.position.x = nx;
+      so.data.position.z = nz;
+      if (so._helper) so._helper.update();
+      // Resize-Handles + Label live nachfuehren
+      updateResizeHandles();
+    }
+  } else if (dragMode === 'stageResize' && selectedStageId && dragResizeStart) {
+    const so = stageObjects[selectedStageId];
+    const gh = intersectGround();
+    if (gh && so) {
+      // Neue Diagonale: gegenueberliegende Ecke fix, gh ist die neue Greifecke
+      const fx = dragResizeStart.fixedX;
+      const fz = dragResizeStart.fixedZ;
+      const newGripX = snap(gh.x);
+      const newGripZ = snap(gh.z);
+      const newSizeX = Math.max(0.2, Math.abs(newGripX - fx));
+      const newSizeZ = Math.max(0.2, Math.abs(newGripZ - fz));
+      const newCX = (fx + newGripX) / 2;
+      const newCZ = (fz + newGripZ) / 2;
+      updateStageObjectProps(selectedStageId, {
+        size: {x: newSizeX, z: newSizeZ},
+        position: {x: newCX, z: newCZ},
+      });
+      if (so._helper) so._helper.update();
+      updateResizeHandles();
+    }
+  } else if (dragMode === 'marquee') {
+    const m = document.getElementById('marquee');
+    const x1 = Math.min(downMouseX, e.clientX);
+    const y1 = Math.min(downMouseY, e.clientY);
+    const x2 = Math.max(downMouseX, e.clientX);
+    const y2 = Math.max(downMouseY, e.clientY);
+    m.style.left = x1 + 'px';
+    m.style.top = y1 + 'px';
+    m.style.width = (x2 - x1) + 'px';
+    m.style.height = (y2 - y1) + 'px';
+  }
+  lastMouseX = e.clientX; lastMouseY = e.clientY;
+});
+
+renderer.domElement.addEventListener('wheel', function(e) {
+  if (viewMode === '3D') {
+    radius = Math.max(4, Math.min(120, radius + e.deltaY * 0.04));
+    updateCamera();
+  } else {
+    orthoSize = Math.max(4, Math.min(80, orthoSize + e.deltaY * 0.02));
+    resizeOrtho();
+  }
+}, { passive: true });
+
+// Tooltip
+renderer.domElement.addEventListener('mousemove', function(e) {
+  if (isLeftDragging) {
+    document.getElementById('tooltip').style.display = 'none';
+    return;
+  }
+  setMouseFromEvent(e);
+  const fid = pickFixture();
+  const tt = document.getElementById('tooltip');
+  if (fid != null && fixtures[fid]) {
+    const f = fixtures[fid];
+    tt.style.display = 'block';
+    tt.style.left = (e.clientX + 12) + 'px';
+    tt.style.top = (e.clientY - 8) + 'px';
+    const pos = f.group.position;
+    tt.textContent = '[' + fid + '] ' + (f.data.label || '?') + ' - ' + f.type +
+      '  (X:' + pos.x.toFixed(1) + ' Y:' + pos.y.toFixed(1) + ' Z:' + pos.z.toFixed(1) + ')';
+  } else {
+    tt.style.display = 'none';
+  }
+}, false);
+
+// Keyboard
+window.addEventListener('keydown', function(e) {
+  if (e.key === 'Delete') {
+    if (editMode === 'edit' && selectedFids.length > 0) {
+      for (const fid of selectedFids.slice()) {
+        if (bridge && bridge.fixtureDeleted) {
+          try { bridge.fixtureDeleted(String(fid)); } catch (err) {}
+        }
+        removeFixture(fid);
+      }
+      selectedFids = [];
+      updateOutlines();
+    } else if (editMode === 'stage' && selectedStageId) {
+      removeStageObject(selectedStageId);
+    }
+  } else if ((e.key === 'r' || e.key === 'R') && editMode === 'stage' && selectedStageId) {
+    const so = stageObjects[selectedStageId];
+    if (so) {
+      so.mesh.rotation.y += Math.PI / 2;
+      so.data.rotation = so.mesh.rotation.y;
+      if (so._helper) so._helper.update();
+    }
+  } else if (e.key === 'Escape') {
+    selectedFids = [];
+    selectedStageId = null;
+    updateOutlines();
+  }
+});
+
+// ============================================================================
+// Camera
+// ============================================================================
+let theta = 0.3, phi = 1.1, radius = 22;
+function updateCamera() {
+  perspectiveCam.position.x = radius * Math.sin(phi) * Math.sin(theta);
+  perspectiveCam.position.y = radius * Math.cos(phi);
+  perspectiveCam.position.z = radius * Math.sin(phi) * Math.cos(theta);
+  perspectiveCam.lookAt(0, 2, 0);
+}
+updateCamera();
+
+window.addEventListener('resize', function() {
+  perspectiveCam.aspect = window.innerWidth / window.innerHeight;
+  perspectiveCam.updateProjectionMatrix();
+  resizeOrtho();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ============================================================================
+// Settings
+// ============================================================================
+function applySettings(s) {
+  if (typeof s.beamOpacity === 'number') settings.beamOpacity = s.beamOpacity;
+  if (typeof s.showCones === 'boolean') settings.showCones = s.showCones;
+  if (typeof s.showFloorSpots === 'boolean') settings.showFloorSpots = s.showFloorSpots;
+  if (typeof s.showFog === 'boolean') {
+    settings.showFog = s.showFog;
+    if (s.showFog && viewMode === '3D') {
+      const bg = scene.background ? scene.background.getHex() : 0x080808;
+      scene.fog = new THREE.FogExp2(bg, Math.max(0.005, 0.025 * (1 - settings.brightness)));
+    } else {
+      scene.fog = null;
+    }
+  }
+  if (typeof s.snapToGrid === 'boolean') settings.snapToGrid = s.snapToGrid;
+  if (typeof s.gridStep === 'number') settings.gridStep = s.gridStep;
+  if (typeof s.brightness === 'number') applyBrightness(s.brightness);
+  if (typeof s.autoBrightness === 'boolean') settings.autoBrightness = s.autoBrightness;
+  if (typeof s.stagePreset === 'string' && s.stagePreset !== settings.stagePreset) {
+    setStagePreset(s.stagePreset);
+  }
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    if (f.beam) f.beam.visible = settings.showCones && (viewMode === '3D') && f.beam.material.opacity > 0.01;
+    if (f.floorSpot) f.floorSpot.visible = settings.showFloorSpots && f.floorSpot.material.opacity > 0.01;
+  }
+}
+
+// ============================================================================
+// Python bridge actions used externally
+// ============================================================================
+function jsAddStageObject(type) {
+  return createStageObject(type, null, null, null, 0, null, null);
+}
+
+function jsRemoveStageObject(id) {
+  removeStageObject(id);
+}
+
+function jsSelectStageObject(id) {
+  selectedStageId = id || null;
+  updateOutlines();
+}
+
+function jsApplyFixtureTransform(fid, x, y, z, rotY) {
+  const f = fixtures[fid];
+  if (!f) return;
+  if (x != null) f.group.position.x = x;
+  if (y != null) f.group.position.y = y;
+  if (z != null) f.group.position.z = z;
+  if (rotY != null) f.group.rotation.y = rotY;
+  if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+}
+
+function jsAlignSelected(mode) {
+  if (selectedFids.length < 2) return;
+  const fs = selectedFids.map(fid => fixtures[fid]).filter(Boolean);
+  if (fs.length < 2) return;
+  let val;
+  if (mode === 'left') {
+    val = Math.min(...fs.map(f => f.group.position.x));
+    fs.forEach(f => f.group.position.x = val);
+  } else if (mode === 'right') {
+    val = Math.max(...fs.map(f => f.group.position.x));
+    fs.forEach(f => f.group.position.x = val);
+  } else if (mode === 'front') {
+    val = Math.max(...fs.map(f => f.group.position.z));
+    fs.forEach(f => f.group.position.z = val);
+  } else if (mode === 'back') {
+    val = Math.min(...fs.map(f => f.group.position.z));
+    fs.forEach(f => f.group.position.z = val);
+  } else if (mode === 'center_x') {
+    val = fs.reduce((s, f) => s + f.group.position.x, 0) / fs.length;
+    fs.forEach(f => f.group.position.x = val);
+  } else if (mode === 'center_z') {
+    val = fs.reduce((s, f) => s + f.group.position.z, 0) / fs.length;
+    fs.forEach(f => f.group.position.z = val);
+  }
+  pushTransformsToPython();
+}
+
+function jsDistributeSelected(axis) {
+  if (selectedFids.length < 3) return;
+  const fs = selectedFids.map(fid => fixtures[fid]).filter(Boolean);
+  if (fs.length < 3) return;
+  const key = (axis === 'x') ? 'x' : 'z';
+  fs.sort((a, b) => a.group.position[key] - b.group.position[key]);
+  const min = fs[0].group.position[key];
+  const max = fs[fs.length - 1].group.position[key];
+  const step = (max - min) / (fs.length - 1);
+  fs.forEach((f, i) => f.group.position[key] = min + step * i);
+  pushTransformsToPython();
+}
+
+function pushTransformsToPython() {
+  for (const fid of selectedFids) {
+    const f = fixtures[fid];
+    if (!f) continue;
+    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    if (bridge && bridge.fixturePositionChanged) {
+      try {
+        bridge.fixturePositionChanged(String(fid), f.group.position.x, f.group.position.y, f.group.position.z);
+      } catch (err) {}
+    }
+  }
+}
+
+// ============================================================================
+// Qt WebChannel
+// ============================================================================
+let bridge = null;
+function tryChannel() {
+  if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+      bridge = channel.objects.bridge;
+      if (bridge) {
+        if (bridge.fixtureAdded)   bridge.fixtureAdded.connect(j => { addFixture(JSON.parse(j)); });
+        if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); });
+        if (bridge.dmxUpdated)     bridge.dmxUpdated.connect(j => {
+          const d = JSON.parse(j);
+          updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128);
+        });
+        if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
+          const list = JSON.parse(j);
+          list.forEach(f => addFixture(f));
+        });
+        if (bridge.settingsChanged) bridge.settingsChanged.connect(j => applySettings(JSON.parse(j)));
+        if (bridge.stageChanged)   bridge.stageChanged.connect(name => setStagePreset(name));
+        if (bridge.viewModeChanged) bridge.viewModeChanged.connect(name => setViewMode(name));
+        if (bridge.editModeChanged) bridge.editModeChanged.connect(name => setEditMode(name));
+        if (bridge.stageLoaded)    bridge.stageLoaded.connect(j => loadStageJson(j));
+        if (bridge.addStageObject) bridge.addStageObject.connect(t => jsAddStageObject(t));
+        if (bridge.removeStageObject) bridge.removeStageObject.connect(id => jsRemoveStageObject(id));
+        if (bridge.selectStageObject) bridge.selectStageObject.connect(id => jsSelectStageObject(id));
+        if (bridge.applyFixtureTransform) bridge.applyFixtureTransform.connect(j => {
+          const d = JSON.parse(j);
+          jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotY);
+        });
+        if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
+        if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));
+        if (bridge.requestSaveStage) bridge.requestSaveStage.connect(() => {
+          try { bridge.saveStage(JSON.stringify(getStageJson())); } catch (e) {}
+        });
+        if (bridge.cameraReset)    bridge.cameraReset.connect(() => { theta = 0.3; phi = 1.1; radius = 22; updateCamera(); orthoSize = 18; orthoCam.position.set(0,60,0.001); orthoCam.lookAt(0,0,0); resizeOrtho(); });
+        if (bridge.brightnessSignal) bridge.brightnessSignal.connect(v => setBrightnessManual(v));
+        if (bridge.brightnessAutoSignal) bridge.brightnessAutoSignal.connect(() => resetBrightnessAuto());
+        if (bridge.updateStageObject) bridge.updateStageObject.connect(j => {
+          try {
+            const d = JSON.parse(j);
+            updateStageObjectProps(d.id, d);
+          } catch (err) { console.log('updateStageObject err:', err); }
+        });
+        if (bridge.resizeModeSignal) bridge.resizeModeSignal.connect(on => setResizeModeEnabled(on));
+        if (bridge.requestFixtures) bridge.requestFixtures();
+      }
+    });
+  } else {
+    setTimeout(tryChannel, 200);
+  }
+}
+setTimeout(tryChannel, 200);
+
+// ============================================================================
+// Render loop
+// ============================================================================
+function animate() {
+  requestAnimationFrame(animate);
+  // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
+  if (selectedStageId && stageObjects[selectedStageId]) {
+    const so = stageObjects[selectedStageId];
+    const t = Date.now() * 0.005;
+    const pulse = 0.5 + 0.5 * Math.sin(t);
+    applyStageEmissive(so.mesh, pulse * 0.7, pulse * 0.45, 0.0);
+    // Resize-Handles pulsen ebenfalls (Skala leicht moduliert)
+    const handleScale = 1.0 + 0.15 * Math.sin(t * 1.4);
+    for (const h of resizeHandles) {
+      h.scale.set(handleScale, handleScale, handleScale);
+    }
+    if (so._helper) so._helper.update();
+  }
+  renderer.render(scene, activeCam);
+}
+animate();
+
+// Initial Brightness anwenden (Default = dunkel fuer Beam-Wiedergabe)
+applyBrightness(settings.brightness);
+
+// Expose for debug
+window.__lightos = { fixtures, stageObjects, settings,
+  setViewMode, setEditMode, setStagePreset, getStageJson, loadStageJson,
+  addStageObject: jsAddStageObject,
+  clearStageObjects, updateResizeHandles, resizeHandles: () => resizeHandles,
+  setBrightnessManual, resetBrightnessAuto, applyBrightness };
+</script>
+</body>
+</html>
