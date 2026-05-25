@@ -27,6 +27,7 @@ from src.ui.views.show_manager_view import ShowManagerView
 from src.ui.views.dmx_monitor_view import DmxMonitorView
 from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
+from src.ui.views.live_view import LiveView
 
 
 # Recent files storage
@@ -311,6 +312,7 @@ class MainWindow(QMainWindow):
 
         # Sektions-Definitionen: (Label, Icon-Farbe, Index)
         sections = [
+            ("Live View",            "#FFD700"),
             ("Geraete & Funktionen", "#0978FF"),
             ("Programmer",           "#FFD700"),
             ("Virtual Console",      "#9DFF52"),
@@ -436,14 +438,21 @@ class MainWindow(QMainWindow):
             print(f"[main_window] CommandLine init error: {e}")
             self._command_line = None
 
-        # Sektion 0: Geraete & Funktionen (Patch | EFX | RGB Matrix)
+        # Sektion 0: Live View (2D Top-Down)
+        try:
+            self._live_view = LiveView()
+        except Exception as e:
+            print(f"[main_window] LiveView init error: {e}")
+            self._live_view = QWidget()
+        self._stack.addWidget(self._live_view)
+        # Sektion 1: Geraete & Funktionen (Patch | EFX | RGB Matrix)
         self._stack.addWidget(self._build_section_fixtures())
-        # Sektion 1: Programmer (Programmer | Paletten)
+        # Sektion 2: Programmer (Programmer | Paletten)
         self._stack.addWidget(self._build_section_programmer())
-        # Sektion 2: Virtual Console
+        # Sektion 3: Virtual Console
         self._vc_view = VirtualConsoleView()
         self._stack.addWidget(self._vc_view)
-        # Sektion 3: Simple Desk + Channel Groups
+        # Sektion 4: Simple Desk + Channel Groups
         sd_tabs = _SubTabs()
         self._simple_desk = SimpleDeskView()
         try:
@@ -454,15 +463,15 @@ class MainWindow(QMainWindow):
         sd_tabs.addTab(self._simple_desk, "Simple Desk")
         sd_tabs.addTab(self._channel_groups_view, "Channel Groups")
         self._stack.addWidget(sd_tabs)
-        # Sektion 4: Playback
+        # Sektion 5: Playback
         self._stack.addWidget(self._build_section_playback())
-        # Sektion 5: Eingabe / Ausgabe
+        # Sektion 6: Eingabe / Ausgabe
         self._stack.addWidget(self._build_section_io())
 
         # Verbindung Buttons <-> Stack
         self._btn_group.idClicked.connect(self._stack.setCurrentIndex)
 
-        # Startseite: Geraete & Funktionen
+        # Startseite: Live View
         self._section_btns[0].setChecked(True)
         self._stack.setCurrentIndex(0)
 
