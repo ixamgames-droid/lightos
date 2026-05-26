@@ -1,8 +1,8 @@
-"""LightOS — Einstiegspunkt."""
+"""LightOS - Einstiegspunkt."""
 import sys
 import os
+import argparse
 
-# Sicherstellen dass src/ im Python-Pfad ist
 sys.path.insert(0, os.path.dirname(__file__))
 
 from PySide6.QtWidgets import QApplication
@@ -11,7 +11,13 @@ from src.ui.main_window import MainWindow
 
 
 def main():
-    # High-DPI Support (wichtig für Snapdragon-Displays)
+    parser = argparse.ArgumentParser(description="LightOS DMX Lichtsteuerung")
+    parser.add_argument("--kiosk", action="store_true",
+                        help="Kiosk-Modus: Vollbild, nur Virtual Console, keine Bearbeitung")
+    parser.add_argument("--touch", action="store_true",
+                        help="Touch-Modus: groessere Buttons fuer Tablet-Bedienung")
+    args = parser.parse_args()
+
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
     app = QApplication(sys.argv)
@@ -19,8 +25,11 @@ def main():
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("LightOS")
 
-    window = MainWindow()
-    window.show()
+    window = MainWindow(kiosk=args.kiosk, touch=args.touch)
+    if args.kiosk:
+        window.showFullScreen()
+    else:
+        window.show()
 
     sys.exit(app.exec())
 
