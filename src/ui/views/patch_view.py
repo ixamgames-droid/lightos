@@ -2,7 +2,8 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView
+    QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView,
+    QInputDialog
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
@@ -166,7 +167,52 @@ class PatchView(QWidget):
         self._state.auto_patch_fixtures()
 
     def _on_double_click(self, index):
-        pass  # TODO: Fixture-Einstellungen bearbeiten
+        row = index.row()
+        fixtures = self._state.get_patched_fixtures()
+        if row < 0 or row >= len(fixtures):
+            return
+        fx = fixtures[row]
+
+        label, ok = QInputDialog.getText(
+            self, "Fixture bearbeiten", "Label:", text=fx.label
+        )
+        if not ok:
+            return
+        universe, ok = QInputDialog.getInt(
+            self, "Fixture bearbeiten", "Universe:", fx.universe, 1, 32
+        )
+        if not ok:
+            return
+        address, ok = QInputDialog.getInt(
+            self, "Fixture bearbeiten", "DMX-Adresse:", fx.address, 1, 512
+        )
+        if not ok:
+            return
+
+        end_addr = address + fx.channel_count - 1
+        if end_addr > 512:
+            QMessageBox.warning(
+                self, "Ungültige Adresse",
+                f"Adresse {address} + {fx.channel_count}ch = {end_addr} > 512."
+            )
+            return
+
+        conflicts = self._state.check_address_conflict(
+            universe, address, fx.channel_count, exclude_fid=fx.fid
+        )
+        if conflicts:
+            QMessageBox.warning(
+                self, "Adresskonflikt",
+                "Die gewählte Adresse kollidiert mit bestehenden Fixtures."
+            )
+            return
+
+        self._state.update_fixture(
+            fx.fid,
+            label=label.strip() or fx.label,
+            universe=universe,
+            address=address,
+        )
 
     def _on_state_change(self, event: str, _data):
         if event == "patch_changed":

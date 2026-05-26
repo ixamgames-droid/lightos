@@ -94,6 +94,45 @@ class AppState:
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
 
+    def update_fixture(self, fid: int, undoable: bool = True, **changes):
+        allowed = {
+            "label", "fixture_profile_id", "mode_name", "universe",
+            "address", "channel_count", "manufacturer_name",
+            "fixture_name", "fixture_type",
+        }
+        values = {k: v for k, v in changes.items() if k in allowed}
+        if not values:
+            return
+
+        before = None
+        for f in self._patch_cache:
+            if f.fid == fid:
+                before = self._fixture_to_dict(f)
+                break
+        if before is None:
+            return
+
+        from sqlalchemy import update
+        with self._session() as s:
+            s.execute(
+                update(PatchedFixture)
+                .where(PatchedFixture.fid == fid)
+                .values(**values)
+            )
+            s.commit()
+        self._reload_patch_cache()
+        self._emit("patch_changed")
+
+        if undoable:
+            after = dict(before)
+            after.update(values)
+            self._push_undo(
+                label=f"Fixture ~{before.get('label', '')}",
+                do=lambda: None,
+                undo=lambda b=before: self.update_fixture(fid, undoable=False, **b),
+                redo=lambda a=after: self.update_fixture(fid, undoable=False, **a),
+            )
+
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         return {
             "fid": f.fid,
