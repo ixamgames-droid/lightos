@@ -94,15 +94,16 @@ class AppState:
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
 
-    def update_fixture(self, fid: int, undoable: bool = True, **changes):
+    def update_fixture(self, fid: int, undoable: bool = True, **changes) -> bool:
         allowed = {
             "label", "fixture_profile_id", "mode_name", "universe",
             "address", "channel_count", "manufacturer_name",
-            "fixture_name", "fixture_type",
+            "fixture_name", "fixture_type", "invert_pan",
+            "invert_tilt", "swap_pan_tilt", "dimmer_curve",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
         if not values:
-            return
+            return False
 
         before = None
         for f in self._patch_cache:
@@ -110,7 +111,16 @@ class AppState:
                 before = self._fixture_to_dict(f)
                 break
         if before is None:
-            return
+            return False
+
+        # Normalize common numeric fields to stable types for DB + compare.
+        for key in ("fixture_profile_id", "universe", "address", "channel_count"):
+            if key in values:
+                values[key] = int(values[key])
+
+        changed = any(before.get(k) != values.get(k) for k in values.keys())
+        if not changed:
+            return False
 
         from sqlalchemy import update
         with self._session() as s:
@@ -132,6 +142,7 @@ class AppState:
                 undo=lambda b=before: self.update_fixture(fid, undoable=False, **b),
                 redo=lambda a=after: self.update_fixture(fid, undoable=False, **a),
             )
+        return True
 
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         return {
@@ -142,6 +153,10 @@ class AppState:
             "universe": f.universe,
             "address": f.address,
             "channel_count": f.channel_count,
+            "invert_pan": f.invert_pan,
+            "invert_tilt": f.invert_tilt,
+            "swap_pan_tilt": f.swap_pan_tilt,
+            "dimmer_curve": f.dimmer_curve,
             "manufacturer_name": f.manufacturer_name,
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
@@ -155,6 +170,10 @@ class AppState:
             universe=d.get("universe", 1),
             address=d.get("address", 1),
             channel_count=d.get("channel_count", 1),
+            invert_pan=d.get("invert_pan", False),
+            invert_tilt=d.get("invert_tilt", False),
+            swap_pan_tilt=d.get("swap_pan_tilt", False),
+            dimmer_curve=d.get("dimmer_curve", "linear"),
             manufacturer_name=d.get("manufacturer_name", ""),
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),
