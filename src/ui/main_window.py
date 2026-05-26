@@ -962,11 +962,21 @@ class MainWindow(QMainWindow):
                 self._visualizer_window = None
         except Exception:
             self._visualizer_window = None
-        from src.ui.visualizer.visualizer_window import VisualizerWindow
-        self._visualizer_window = VisualizerWindow(self)
-        self._visualizer_window.show()
-        self._visualizer_window.raise_()
-        self._visualizer_window.activateWindow()
+        try:
+            from src.ui.visualizer.visualizer_window import VisualizerWindow
+            self._visualizer_window = VisualizerWindow(self)
+            self._visualizer_window.show()
+            self._visualizer_window.raise_()
+            self._visualizer_window.activateWindow()
+        except Exception as e:
+            self._visualizer_window = None
+            print(f"[MainWindow] Visualizer start error: {e}")
+            QMessageBox.warning(
+                self,
+                "Visualizer nicht verfuegbar",
+                "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
+                "Bitte pruefe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+            )
 
     def _close_visualizer(self):
         if self._visualizer_window:

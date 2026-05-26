@@ -8,8 +8,9 @@ python install.py
 
 Das war's. Das Script:
 - Pruefte Python-Version (>= 3.11)
+- Prueft Python-Architektur vs. OS-Architektur (ARM64-Emulation wird erkannt)
 - Erstellt `venv/`
-- Installiert alle Dependencies
+- Installiert Kern-Abhaengigkeiten + optionale Pakete separat
 - Legt App-Verzeichnisse an
 - Erstellt Desktop-Verknuepfung
 - Speichert Manifest fuer sauberes Deinstallieren
@@ -20,7 +21,7 @@ Das war's. Das Script:
 |---|---|---|
 | **Windows** | 10/11 | 11 (ARM-Version) |
 | **Python** | 3.11+ (3.12/3.13/3.14 OK) | 3.11+ ARM64-Build |
-| **VS Build Tools** | nicht noetig | **noetig** fuer `python-rtmidi` |
+| **VS Build Tools** | nicht noetig | optional (nur fuer `python-rtmidi`) |
 
 ### Python fuer ARM64 holen
 - Offizielle ARM64-Builds: https://www.python.org/downloads/windows/
@@ -53,7 +54,7 @@ python uninstall.py --keep-appdata  # Snapshots, Stages behalten
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
-Alle 11 Dependencies sind ARM64-kompatibel:
+Kern-Abhaengigkeiten sind ARM64-kompatibel. Ein Paket bleibt optional:
 
 | Paket | ARM64 Status |
 |---|---|
@@ -67,7 +68,7 @@ Alle 11 Dependencies sind ARM64-kompatibel:
 | pyserial | OK (pure-Python) |
 | SQLAlchemy | OK (pure-Python) |
 | mido | OK (pure-Python) |
-| **python-rtmidi** | **Build noetig** (MSVC Build Tools) |
+| **python-rtmidi** | optional, Build noetig (MSVC Build Tools) |
 
 Stand: 2026-05-25 (PyPI Latest Stable)
 
@@ -132,7 +133,9 @@ Wenn du das vorbereitest sag Bescheid - dann mache ich ein dediziertes Build-Scr
 | Problem | Loesung |
 |---|---|
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
+| Installer meldet "Python laeuft emuliert auf ARM64" | ARM64-Python installieren (`winget install Python.Python.3.13 --arch arm64`) und `install.py` erneut ausfuehren |
 | `python-rtmidi` Build-Fehler auf ARM64 | MSVC Build Tools installieren |
+| "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |

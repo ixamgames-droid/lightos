@@ -15,6 +15,9 @@ und Web-Remote.
 | Windows 10/11 | OK | OK (Win 11) |
 | Python | 3.11+ | 3.11+ |
 
+Hinweis fuer Snapdragon: `install.py` erkennt, wenn ein emuliertes x64-Python
+auf ARM64 laeuft, und warnt dann mit konkreter Umstiegs-Empfehlung auf ARM64-Python.
+
 ---
 
 ## Feature-Ueberblick

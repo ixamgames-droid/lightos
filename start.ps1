@@ -7,6 +7,15 @@ Set-Location -Path $PSScriptRoot
 $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
 Write-Host "[start] Arch: $arch"
 
+# Hinweis, wenn auf ARM64 vermutlich ein emuliertes x64-Python genutzt wird
+$nativeArch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+if ($nativeArch -eq "ARM64") {
+    $pyArch = $env:PROCESSOR_ARCHITECTURE
+    if ($pyArch -ne "ARM64") {
+        Write-Host "[start] WARN: Python scheint emuliert zu laufen. Fuer beste Stabilitaet/Performance ARM64-Python nutzen."
+    }
+}
+
 # venv-Python suchen (Windows-Pfad ODER Unix-Pfad)
 $pythonPaths = @(
     "venv\Scripts\python.exe",   # Windows

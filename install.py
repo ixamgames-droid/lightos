@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import platform
 import argparse
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
@@ -32,6 +33,13 @@ MANIFEST_PATH = ROOT / "install_manifest.json"
 APPDATA_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "LightOS"
 
 PYTHON_MIN = (3, 11)
+OPTIONAL_REQUIREMENTS = {
+    "python-rtmidi",
+    "winrt-windows.devices.midi",
+    "winrt-windows.devices.enumeration",
+    "winrt-windows.foundation",
+    "winrt-windows.foundation.collections",
+}
 
 
 def info(msg: str):
@@ -54,9 +62,8 @@ def check_python():
     info(f"Python {sys.version.split()[0]} OK")
 
 
-def detect_arch() -> str:
-    """Liefert 'x64' oder 'arm64' oder 'x86' oder 'unknown'."""
-    m = platform.machine().lower()
+def normalize_arch(raw: str | None) -> str:
+    m = (raw or "").strip().lower()
     if m in ("amd64", "x86_64"):
         return "x64"
     if m in ("arm64", "aarch64"):
@@ -64,6 +71,36 @@ def detect_arch() -> str:
     if m in ("x86", "i386"):
         return "x86"
     return m or "unknown"
+
+
+def detect_arch() -> str:
+    """Liefert 'x64' oder 'arm64' oder 'x86' oder 'unknown'."""
+    return normalize_arch(platform.machine())
+
+
+def detect_native_os_arch() -> str:
+    """Liefert die native OS-Architektur (auf Windows auch unter Emulation korrekt)."""
+    if os.name != "nt":
+        return detect_arch()
+    # Unter WOW64 ist PROCESSOR_ARCHITEW6432 gesetzt und zeigt auf die native Arch.
+    return normalize_arch(
+        os.environ.get("PROCESSOR_ARCHITEW6432")
+        or os.environ.get("PROCESSOR_ARCHITECTURE")
+        or platform.machine()
+    )
+
+
+def check_arm_runtime():
+    """Hinweise, wenn auf ARM64 ein emuliertes Python genutzt wird."""
+    py_arch = detect_arch()
+    os_arch = detect_native_os_arch()
+    info(f"Python-Architektur: {py_arch} | OS-Architektur: {os_arch}")
+    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
+        warn(
+            "Du bist auf Windows ARM64, aber Python laeuft nicht nativ als ARM64. "
+            "Bitte ARM64-Python installieren, sonst laufen DMX/MIDI/Qt ggf. nur per Emulation."
+        )
+        warn("Empfohlen: winget install Python.Python.3.13 --arch arm64")
 
 
 def create_venv():
@@ -84,6 +121,49 @@ def venv_pip() -> list[str]:
     return [venv_python(), "-m", "pip"]
 
 
+def _load_requirements(req_path: Path) -> list[str]:
+    lines: list[str] = []
+    with open(req_path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            lines.append(line)
+    return lines
+
+
+def _requirement_name(req_line: str) -> str:
+    base = req_line.split(";", 1)[0].strip()
+    return re.split(r"[<>=!~\s\[]", base, maxsplit=1)[0].lower()
+
+
+def _split_requirements(lines: list[str]) -> tuple[list[str], list[str]]:
+    core: list[str] = []
+    optional: list[str] = []
+    for line in lines:
+        name = _requirement_name(line)
+        if name in OPTIONAL_REQUIREMENTS:
+            optional.append(line)
+        else:
+            core.append(line)
+    return core, optional
+
+
+def _install_via_temp_requirements(pip_cmd: list[str], lines: list[str], label: str) -> int:
+    if not lines:
+        return 0
+    req_tmp = ROOT / f".tmp_{label}.requirements.txt"
+    try:
+        req_tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        result = subprocess.run(pip_cmd + ["install", "-r", str(req_tmp)], capture_output=False)
+        return result.returncode
+    finally:
+        try:
+            req_tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 def install_requirements(use_venv: bool):
     py = venv_python() if use_venv else sys.executable
     pip_cmd = [py, "-m", "pip"]
@@ -91,19 +171,33 @@ def install_requirements(use_venv: bool):
     info("Aktualisiere pip ...")
     subprocess.run(pip_cmd + ["install", "--upgrade", "pip"], check=False)
 
-    info("Installiere requirements.txt ...")
     req = ROOT / "requirements.txt"
     if not req.exists():
         error("requirements.txt fehlt!")
         sys.exit(1)
 
-    result = subprocess.run(
-        pip_cmd + ["install", "-r", str(req)],
-        capture_output=False
-    )
-    if result.returncode != 0:
-        warn("Einige Pakete konnten nicht installiert werden. "
-             "Bei ARM64: ggf. Visual Studio Build Tools fuer python-rtmidi benoetigt.")
+    req_lines = _load_requirements(req)
+    core_reqs, optional_reqs = _split_requirements(req_lines)
+
+    info(f"Installiere Kern-Abhaengigkeiten ({len(core_reqs)} Pakete) ...")
+    core_rc = _install_via_temp_requirements(pip_cmd, core_reqs, "core")
+    if core_rc != 0:
+        error("Kern-Abhaengigkeiten konnten nicht vollstaendig installiert werden.")
+        sys.exit(2)
+
+    if optional_reqs:
+        info(f"Installiere optionale Pakete ({len(optional_reqs)}) ...")
+        opt_rc = _install_via_temp_requirements(pip_cmd, optional_reqs, "optional")
+        if opt_rc != 0:
+            warn(
+                "Optionale Pakete konnten nicht vollstaendig installiert werden. "
+                "Die App startet trotzdem, einzelne Features (MIDI 2.0 / rtmidi) "
+                "koennen fehlen."
+            )
+            for req_line in optional_reqs:
+                rc = _install_via_temp_requirements(pip_cmd, [req_line], "optional_single")
+                if rc != 0:
+                    warn(f"Optional nicht installiert: {req_line}")
 
 
 def create_directories():
@@ -173,6 +267,8 @@ def create_shortcut():
 
 
 def write_manifest(created_dirs: list[str], shortcut: str | None):
+    py_arch = detect_arch()
+    os_arch = detect_native_os_arch()
     manifest = {
         "version": "1.0",
         "install_root": str(ROOT),
@@ -181,7 +277,10 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
         "directories_created": created_dirs,
         "shortcut": shortcut,
         "python_version": sys.version.split()[0],
-        "arch": detect_arch(),
+        "python_arch": py_arch,
+        "os_arch": os_arch,
+        "python_emulated_on_arm64": bool(os_arch == "arm64" and py_arch != "arm64"),
+        "arch": py_arch,
         "platform": platform.platform(),
     }
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
@@ -190,10 +289,15 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
 
 
 def show_summary():
+    py_arch = detect_arch()
+    os_arch = detect_native_os_arch()
     info("=" * 60)
     info("Installation abgeschlossen!")
     info("=" * 60)
-    info(f"Architektur: {detect_arch()}")
+    info(f"Python-Architektur: {py_arch}")
+    info(f"OS-Architektur:     {os_arch}")
+    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
+        warn("Python laeuft emuliert auf ARM64. Fuer native Performance ARM64-Python nutzen.")
     info(f"venv:        {VENV_DIR}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
@@ -222,6 +326,7 @@ def main():
 
     info(f"LightOS Installer - Arch: {detect_arch()}")
     check_python()
+    check_arm_runtime()
 
     use_venv = not args.no_venv
     if use_venv:
