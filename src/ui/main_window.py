@@ -138,11 +138,17 @@ class MainWindow(QMainWindow):
             sync = get_sync()
             sync.subscribe(SyncEvent.REFRESH_ALL, self._on_refresh_all)
             sync.subscribe(SyncEvent.SHOW_LOADED, self._on_show_loaded)
+            # Validation-Banner bei relevanten Aenderungen aktualisieren
+            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
+            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
+            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
         # Auto-Save: alle 5 Minuten Show als auto_save.lshow speichern
         self._setup_autosave()
+        # Initial: Validation-Banner einmal pruefen
+        QTimer.singleShot(1000, self._refresh_validation_banner)
         # Beim Start: pruefen ob Wiederherstellung noetig
         QTimer.singleShot(500, self._check_autosave_recovery)
 
@@ -391,6 +397,15 @@ class MainWindow(QMainWindow):
         self._btn_tap.setToolTip("Tap-Tempo (4x klicken)")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
+
+        # Validation-Banner (zeigt Anzahl Issues, klickbar)
+        self._lbl_validation = QLabel("")
+        self._lbl_validation.setFixedHeight(22)
+        self._lbl_validation.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_validation.setToolTip("Klick: Validierung anzeigen")
+        self._lbl_validation.mousePressEvent = lambda _ev: self._show_validation_dialog()
+        self._lbl_validation.hide()  # Versteckt wenn keine Issues
+        bar_layout.addWidget(self._lbl_validation)
 
         # Snapshot-Button (Quick-Capture aktueller Programmer)
         btn_snapshot = QPushButton("Snap")
@@ -832,6 +847,50 @@ class MainWindow(QMainWindow):
         pv = getattr(self, "_programmer_view", None)
         if pv and hasattr(pv, "_paste_from_clipboard"):
             pv._paste_from_clipboard()
+
+    # ── Validation-Banner (Section-Bar) ───────────────────────────────────────
+
+    def _refresh_validation_banner(self):
+        """Laeuft Validation (ohne Fix) und aktualisiert Banner-Text."""
+        try:
+            from src.core.sync import validate_and_repair
+            issues = validate_and_repair(self._state, fix=False)
+            errors = [i for i in issues if i.severity == "error"]
+            warns = [i for i in issues if i.severity == "warn"]
+            count = len(errors) + len(warns)
+            if count == 0:
+                self._lbl_validation.hide()
+                return
+            if errors:
+                color = "#ff4444"
+                icon = "!"
+            else:
+                color = "#ffaa00"
+                icon = "*"
+            self._lbl_validation.setText(f" {icon} {count} Issues ")
+            self._lbl_validation.setStyleSheet(
+                f"background:{color}; color:#000; font-weight:bold;"
+                f" border-radius:3px; padding:2px 8px;"
+            )
+            self._lbl_validation.show()
+            self._lbl_validation._cached_issues = issues
+        except Exception as e:
+            print(f"[main_window] validation refresh error: {e}")
+            self._lbl_validation.hide()
+
+    def _show_validation_dialog(self):
+        """Oeffnet Validation-Dialog auf Klick aufs Banner."""
+        try:
+            from src.ui.widgets.validation_dialog import ValidationDialog
+            issues = getattr(self._lbl_validation, "_cached_issues", None)
+            if issues is None:
+                from src.core.sync import validate_and_repair
+                issues = validate_and_repair(self._state, fix=False)
+            ValidationDialog(issues, self).exec()
+            # Nach Dialog ggf. neu pruefen (User koennte Auto-Repair gestartet haben)
+            self._refresh_validation_banner()
+        except Exception as e:
+            print(f"[main_window] validation dialog error: {e}")
 
     # ── Quick-Snapshot (Section-Bar Button) ───────────────────────────────────
 
