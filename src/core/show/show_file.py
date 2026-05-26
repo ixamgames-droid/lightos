@@ -165,6 +165,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "version": SHOW_VERSION,
         "name": getattr(state, "show_name", "Neue Show"),
         "patch": patch_data,
+        "programmer": getattr(state, "programmer", {}) or {},
         "cue_stacks": stacks_data,
         "palettes": palettes_data,
         "functions": functions_data,
@@ -207,6 +208,23 @@ def load_show(path: str | os.PathLike):
     patch_entries = data.get("patch", [])
     if isinstance(patch_entries, list):
         _replace_patch_from_data(state, patch_entries)
+
+    try:
+        programmer = data.get("programmer", {}) or {}
+        cleaned = {}
+        for fid_raw, attrs in programmer.items():
+            try:
+                fid = int(fid_raw)
+            except Exception:
+                continue
+            if not isinstance(attrs, dict):
+                continue
+            cleaned[fid] = {str(a): int(v) for a, v in attrs.items()}
+        state.programmer = cleaned
+        state._flush_all_to_dmx()
+    except Exception as e:
+        print(f"[show_file] load programmer error: {e}")
+        state.programmer = {}
 
     if "palettes" in data:
         try:

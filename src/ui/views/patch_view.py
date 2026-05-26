@@ -304,7 +304,7 @@ class PatchView(QWidget):
         fixture = fixtures[row]
         dlg = PatchFixtureEditDialog(self._state, fixture, self)
         if dlg.exec() and dlg.result_updates:
-            self._state.update_fixture(fixture.fid, dlg.result_updates)
+            self._state.update_fixture(fixture.fid, **dlg.result_updates)
 
     def _on_state_change(self, event: str, _data):
         if event == "patch_changed":

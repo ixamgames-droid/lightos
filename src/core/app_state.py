@@ -94,52 +94,53 @@ class AppState:
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
 
-    def update_fixture(self, fid: int, updates: dict, undoable: bool = True) -> bool:
-        """Aktualisiert ein bestehendes Patch-Geraet.
-
-        Erlaubte Keys in updates:
-        label, mode_name, universe, address, channel_count.
-        """
-        current = next((f for f in self._patch_cache if f.fid == fid), None)
-        if current is None:
+    def update_fixture(self, fid: int, undoable: bool = True, **changes) -> bool:
+        allowed = {
+            "label", "fixture_profile_id", "mode_name", "universe",
+            "address", "channel_count", "manufacturer_name",
+            "fixture_name", "fixture_type", "invert_pan",
+            "invert_tilt", "swap_pan_tilt", "dimmer_curve",
+        }
+        values = {k: v for k, v in changes.items() if k in allowed}
+        if not values:
             return False
 
-        allowed = {"label", "mode_name", "universe", "address", "channel_count"}
-        clean_updates = {k: v for k, v in updates.items() if k in allowed}
-        if not clean_updates:
+        before = None
+        for f in self._patch_cache:
+            if f.fid == fid:
+                before = self._fixture_to_dict(f)
+                break
+        if before is None:
             return False
 
-        old = self._fixture_to_dict(current)
-        new = dict(old)
-        new.update(clean_updates)
+        # Normalize common numeric fields to stable types for DB + compare.
+        for key in ("fixture_profile_id", "universe", "address", "channel_count"):
+            if key in values:
+                values[key] = int(values[key])
 
-        changed = any(new.get(k) != old.get(k) for k in clean_updates.keys())
+        changed = any(before.get(k) != values.get(k) for k in values.keys())
         if not changed:
             return False
 
         from sqlalchemy import update
-        from .database.models import PatchedFixture as PF
         with self._session() as s:
             s.execute(
-                update(PF).where(PF.fid == fid).values(
-                    label=str(new.get("label", old["label"])),
-                    mode_name=str(new.get("mode_name", old["mode_name"])),
-                    universe=int(new.get("universe", old["universe"])),
-                    address=int(new.get("address", old["address"])),
-                    channel_count=int(new.get("channel_count", old["channel_count"])),
-                )
+                update(PatchedFixture)
+                .where(PatchedFixture.fid == fid)
+                .values(**values)
             )
             s.commit()
-
         self._reload_patch_cache()
         self._emit("patch_changed")
 
         if undoable:
+            after = dict(before)
+            after.update(values)
             self._push_undo(
-                label=f"Fixture edit {old.get('label', fid)}",
+                label=f"Fixture ~{before.get('label', '')}",
                 do=lambda: None,
-                undo=lambda s=old: self.update_fixture(s["fid"], s, undoable=False),
-                redo=lambda s=new: self.update_fixture(s["fid"], s, undoable=False),
+                undo=lambda b=before: self.update_fixture(fid, undoable=False, **b),
+                redo=lambda a=after: self.update_fixture(fid, undoable=False, **a),
             )
         return True
 
