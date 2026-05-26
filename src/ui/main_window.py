@@ -96,12 +96,14 @@ class SectionButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
         self._state = get_state()
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
+        self._kiosk_mode = kiosk
+        self._touch_mode = touch
 
         self.setWindowTitle("LightOS")
         self.resize(1400, 900)
@@ -112,6 +114,23 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._setup_statusbar()
         self._check_hardware()
+
+        # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
+        if kiosk:
+            self.menuBar().hide()
+            self.statusBar().hide()
+            # Section-Bar verstecken (nur VC sichtbar lassen)
+            if hasattr(self, "_section_bar"):
+                self._section_bar.hide()
+            if hasattr(self, "_command_line") and self._command_line:
+                self._command_line.hide()
+            # Wechsel zu Virtual Console Section
+            try:
+                vc_idx = next((i for i, b in enumerate(self._section_btns)
+                              if "Virtual" in b.text()), 3)
+                self._stack.setCurrentIndex(vc_idx)
+            except Exception:
+                pass
 
         # Subscribe an zentralen Sync-Event-Bus
         try:
@@ -133,9 +152,24 @@ class MainWindow(QMainWindow):
         theme_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..", "assets", "themes", "dark.qss")
         )
+        qss = ""
         if os.path.exists(theme_path):
             with open(theme_path, "r", encoding="utf-8") as f:
-                self.setStyleSheet(f.read())
+                qss = f.read()
+        # Touch-Mode: Buttons + Slider + Items vergroessern via Override
+        if getattr(self, "_touch_mode", False):
+            qss += "\n/* Touch-Mode Override */\n"
+            qss += (
+                "QPushButton { min-height: 38px; padding: 6px 14px; font-size: 14px; }\n"
+                "QSlider::handle:horizontal, QSlider::handle:vertical { "
+                "width: 26px; height: 26px; }\n"
+                "QListWidget::item, QTreeWidget::item, QTableWidget::item { "
+                "min-height: 36px; padding: 6px; }\n"
+                "QComboBox { min-height: 38px; font-size: 14px; }\n"
+                "QTabBar::tab { min-height: 40px; padding: 8px 16px; font-size: 13px; }\n"
+                "QSpinBox, QDoubleSpinBox, QLineEdit { min-height: 32px; font-size: 13px; }\n"
+            )
+        self.setStyleSheet(qss)
 
     # ── Menu bar ──────────────────────────────────────────────────────────────
 
@@ -237,6 +271,10 @@ class MainWindow(QMainWindow):
         a = pm.addAction("Selektion einfuegen")
         a.setShortcut("Ctrl+V")
         a.triggered.connect(self._global_paste_programmer)
+        pm.addSeparator()
+        a = pm.addAction("Snapshot aufnehmen")
+        a.setShortcut("Ctrl+Shift+S")
+        a.triggered.connect(self._quick_snapshot)
 
         # Datenbank
         dbm = mb.addMenu("&Datenbank")
@@ -353,6 +391,19 @@ class MainWindow(QMainWindow):
         self._btn_tap.setToolTip("Tap-Tempo (4x klicken)")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
+
+        # Snapshot-Button (Quick-Capture aktueller Programmer)
+        btn_snapshot = QPushButton("Snap")
+        btn_snapshot.setFixedHeight(22)
+        btn_snapshot.setFixedWidth(60)
+        btn_snapshot.setToolTip("Aktuellen Programmer als Snapshot speichern (Strg+Shift+S)")
+        btn_snapshot.setStyleSheet(
+            "QPushButton { background:#ffd700; color:#000; font-weight:bold;"
+            " border:1px solid #b89000; border-radius:3px; padding:0 8px; }"
+            "QPushButton:hover { background:#ffea4d; }"
+        )
+        btn_snapshot.clicked.connect(self._quick_snapshot)
+        bar_layout.addWidget(btn_snapshot)
 
         # Page-Anzeige + Pfeile (T0.1 Multi-Page)
         page_prev = QPushButton("<")
@@ -782,6 +833,51 @@ class MainWindow(QMainWindow):
         if pv and hasattr(pv, "_paste_from_clipboard"):
             pv._paste_from_clipboard()
 
+    # ── Quick-Snapshot (Section-Bar Button) ───────────────────────────────────
+
+    def _quick_snapshot(self):
+        """Speichert aktuellen Programmer in den naechsten leeren Snapshot-Slot."""
+        try:
+            sv = getattr(self, "_snapshots_view", None)
+            if sv is None:
+                QMessageBox.information(self, "Snapshot", "Snapshots-View nicht initialisiert.")
+                return
+            # Naechsten leeren Slot finden
+            free_idx = None
+            for i in range(len(sv._snapshots)):
+                if sv._snapshots[i].is_empty():
+                    free_idx = i
+                    break
+            if free_idx is None:
+                QMessageBox.warning(self, "Snapshot",
+                    "Alle 48 Slots belegt. Bitte einen leeren oder den Snapshots-Tab oeffnen.")
+                return
+            # Programmer pruefen
+            if not self._state.programmer:
+                QMessageBox.information(self, "Snapshot",
+                    "Programmer ist leer - nichts zu speichern.")
+                return
+            # Name abfragen + capture
+            name, ok = QInputDialog.getText(
+                self, "Snapshot speichern",
+                f"Name fuer Snapshot Slot {free_idx + 1}:",
+                text=f"Snap {free_idx + 1}"
+            )
+            if not ok or not name.strip():
+                return
+            # Direkter Capture (umgeht den eigenen Dialog von SnapshotsView)
+            import copy
+            sv._snapshots[free_idx].name = name.strip()
+            sv._snapshots[free_idx].values = copy.deepcopy(self._state.programmer)
+            sv._buttons[free_idx].refresh()
+            sv._save_to_disk()
+            self.statusBar().showMessage(
+                f"Snapshot '{name}' in Slot {free_idx + 1} gespeichert", 3000
+            )
+        except Exception as e:
+            print(f"[main_window] quick_snapshot error: {e}")
+            QMessageBox.warning(self, "Snapshot Fehler", str(e))
+
     # ── Mock / Visualizer ─────────────────────────────────────────────────────
 
     def _toggle_mock(self, checked: bool):
@@ -1167,6 +1263,24 @@ class MainWindow(QMainWindow):
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
+        # Warnung wenn Show ungespeicherte Aenderungen hat
+        if self._has_unsaved_changes():
+            reply = QMessageBox.question(
+                self, "Show speichern?",
+                "Es gibt moeglicherweise ungespeicherte Aenderungen "
+                "(Cuelisten, VC-Layout, Snapshots).\n\n"
+                "Vor dem Beenden speichern?",
+                QMessageBox.StandardButton.Save |
+                QMessageBox.StandardButton.Discard |
+                QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            if reply == QMessageBox.StandardButton.Save:
+                self._save_show()
+
         self._state.output_manager.stop()
         if self._state.playback_engine:
             self._state.playback_engine.stop()
@@ -1175,6 +1289,21 @@ class MainWindow(QMainWindow):
         if self._visualizer_window:
             self._visualizer_window.close()
         super().closeEvent(event)
+
+    def _has_unsaved_changes(self) -> bool:
+        """Heuristik: Show hat Cuelisten oder Funktionen aber wurde nie gespeichert."""
+        try:
+            # Nie gespeichert + es gibt Inhalt?
+            if self._current_show_path is None:
+                has_content = (
+                    len(self._state.cue_stacks) > 0
+                    or len(self._state.function_manager.all()) > 0
+                    or bool(self._state.programmer)
+                )
+                return has_content
+            return False  # Bei gespeicherter Show wuerde ein "dirty"-Flag noetig sein
+        except Exception:
+            return False
 
 
 # ── Hilfklassen ───────────────────────────────────────────────────────────────
