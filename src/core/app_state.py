@@ -94,6 +94,55 @@ class AppState:
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
 
+    def update_fixture(self, fid: int, updates: dict, undoable: bool = True) -> bool:
+        """Aktualisiert ein bestehendes Patch-Geraet.
+
+        Erlaubte Keys in updates:
+        label, mode_name, universe, address, channel_count.
+        """
+        current = next((f for f in self._patch_cache if f.fid == fid), None)
+        if current is None:
+            return False
+
+        allowed = {"label", "mode_name", "universe", "address", "channel_count"}
+        clean_updates = {k: v for k, v in updates.items() if k in allowed}
+        if not clean_updates:
+            return False
+
+        old = self._fixture_to_dict(current)
+        new = dict(old)
+        new.update(clean_updates)
+
+        changed = any(new.get(k) != old.get(k) for k in clean_updates.keys())
+        if not changed:
+            return False
+
+        from sqlalchemy import update
+        from .database.models import PatchedFixture as PF
+        with self._session() as s:
+            s.execute(
+                update(PF).where(PF.fid == fid).values(
+                    label=str(new.get("label", old["label"])),
+                    mode_name=str(new.get("mode_name", old["mode_name"])),
+                    universe=int(new.get("universe", old["universe"])),
+                    address=int(new.get("address", old["address"])),
+                    channel_count=int(new.get("channel_count", old["channel_count"])),
+                )
+            )
+            s.commit()
+
+        self._reload_patch_cache()
+        self._emit("patch_changed")
+
+        if undoable:
+            self._push_undo(
+                label=f"Fixture edit {old.get('label', fid)}",
+                do=lambda: None,
+                undo=lambda s=old: self.update_fixture(s["fid"], s, undoable=False),
+                redo=lambda s=new: self.update_fixture(s["fid"], s, undoable=False),
+            )
+        return True
+
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         return {
             "fid": f.fid,
@@ -103,6 +152,10 @@ class AppState:
             "universe": f.universe,
             "address": f.address,
             "channel_count": f.channel_count,
+            "invert_pan": f.invert_pan,
+            "invert_tilt": f.invert_tilt,
+            "swap_pan_tilt": f.swap_pan_tilt,
+            "dimmer_curve": f.dimmer_curve,
             "manufacturer_name": f.manufacturer_name,
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
@@ -116,6 +169,10 @@ class AppState:
             universe=d.get("universe", 1),
             address=d.get("address", 1),
             channel_count=d.get("channel_count", 1),
+            invert_pan=d.get("invert_pan", False),
+            invert_tilt=d.get("invert_tilt", False),
+            swap_pan_tilt=d.get("swap_pan_tilt", False),
+            dimmer_curve=d.get("dimmer_curve", "linear"),
             manufacturer_name=d.get("manufacturer_name", ""),
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),

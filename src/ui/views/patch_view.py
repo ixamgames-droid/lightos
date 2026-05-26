@@ -2,11 +2,13 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView
+    QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDialogButtonBox
 )
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor
 from src.core.app_state import get_state, AppState
+from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
 from src.ui.widgets.fixture_browser import FixtureBrowserDialog
 
@@ -20,6 +22,135 @@ TYPE_COLORS = {
 }
 
 COLS = ["FID", "Label", "Hersteller", "Gerät", "Modus", "Univ.", "Adresse", "Kanäle", "Typ"]
+
+
+class PatchFixtureEditDialog(QDialog):
+    """Dialog zum Bearbeiten eines gepatchten Geraets."""
+
+    def __init__(self, state: AppState, fixture: PatchedFixture, parent=None):
+        super().__init__(parent)
+        self._state = state
+        self._fixture = fixture
+        self.result_updates: dict | None = None
+        self._modes = fdb.get_modes(fixture.fixture_profile_id) if fixture.fixture_profile_id else []
+        self.setWindowTitle("Geraet bearbeiten")
+        self.setMinimumWidth(440)
+        self._setup_ui()
+        self._validate()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        form.addRow("FID:", QLabel(str(self._fixture.fid)))
+        form.addRow("Hersteller:", QLabel(self._fixture.manufacturer_name or "-"))
+        form.addRow("Geraet:", QLabel(self._fixture.fixture_name or "-"))
+
+        self._edit_label = QLineEdit(self._fixture.label)
+        form.addRow("Label:", self._edit_label)
+
+        self._combo_mode = QComboBox()
+        current_mode_idx = -1
+        for i, m in enumerate(self._modes):
+            self._combo_mode.addItem(f"{m.name} ({m.channel_count}ch)", (m.name, m.channel_count))
+            if m.name == self._fixture.mode_name:
+                current_mode_idx = i
+        if current_mode_idx >= 0:
+            self._combo_mode.setCurrentIndex(current_mode_idx)
+        elif self._modes:
+            self._combo_mode.setCurrentIndex(0)
+        self._combo_mode.currentIndexChanged.connect(self._on_mode_changed)
+        form.addRow("Modus:", self._combo_mode)
+
+        self._spin_universe = QSpinBox()
+        self._spin_universe.setRange(1, 32)
+        self._spin_universe.setValue(max(1, min(32, int(self._fixture.universe))))
+        self._spin_universe.valueChanged.connect(self._validate)
+        form.addRow("Universe:", self._spin_universe)
+
+        self._spin_address = QSpinBox()
+        self._spin_address.setRange(1, 512)
+        self._spin_address.setValue(max(1, min(512, int(self._fixture.address))))
+        self._spin_address.valueChanged.connect(self._validate)
+        form.addRow("DMX-Adresse:", self._spin_address)
+
+        self._lbl_channels = QLabel("")
+        form.addRow("Kanaele:", self._lbl_channels)
+
+        layout.addLayout(form)
+
+        self._lbl_warn = QLabel("")
+        self._lbl_warn.setStyleSheet("color: #ff6666;")
+        layout.addWidget(self._lbl_warn)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _selected_mode_and_channels(self) -> tuple[str, int]:
+        data = self._combo_mode.currentData()
+        if isinstance(data, tuple) and len(data) == 2:
+            return str(data[0]), int(data[1])
+        return self._fixture.mode_name, int(self._fixture.channel_count)
+
+    def _on_mode_changed(self, _idx):
+        self._validate()
+
+    def _validate(self):
+        _mode_name, ch_count = self._selected_mode_and_channels()
+        ch_count = max(1, ch_count)
+        self._lbl_channels.setText(str(ch_count))
+
+        max_start = max(1, 512 - ch_count + 1)
+        self._spin_address.setMaximum(max_start)
+        if self._spin_address.value() > max_start:
+            self._spin_address.setValue(max_start)
+
+        conflicts = self._state.check_address_conflict(
+            self._spin_universe.value(),
+            self._spin_address.value(),
+            ch_count,
+            exclude_fid=self._fixture.fid,
+        )
+        if conflicts:
+            self._lbl_warn.setText(
+                "Adresskonflikt mit FID: " + ", ".join(str(fid) for fid in sorted(conflicts))
+            )
+        else:
+            self._lbl_warn.setText("")
+
+    def _on_accept(self):
+        mode_name, ch_count = self._selected_mode_and_channels()
+        label = (self._edit_label.text() or "").strip() or self._fixture.label
+        universe = self._spin_universe.value()
+        address = self._spin_address.value()
+
+        conflicts = self._state.check_address_conflict(
+            universe, address, ch_count, exclude_fid=self._fixture.fid
+        )
+        if conflicts:
+            reply = QMessageBox.question(
+                self,
+                "Adresskonflikt",
+                "Es gibt Adresskonflikte mit FID "
+                + ", ".join(str(fid) for fid in sorted(conflicts))
+                + ".\nTrotzdem speichern?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        self.result_updates = {
+            "label": label,
+            "mode_name": mode_name,
+            "universe": universe,
+            "address": address,
+            "channel_count": ch_count,
+        }
+        self.accept()
 
 
 class PatchView(QWidget):
@@ -166,7 +297,14 @@ class PatchView(QWidget):
         self._state.auto_patch_fixtures()
 
     def _on_double_click(self, index):
-        pass  # TODO: Fixture-Einstellungen bearbeiten
+        row = index.row()
+        fixtures = self._state.get_patched_fixtures()
+        if row < 0 or row >= len(fixtures):
+            return
+        fixture = fixtures[row]
+        dlg = PatchFixtureEditDialog(self._state, fixture, self)
+        if dlg.exec() and dlg.result_updates:
+            self._state.update_fixture(fixture.fid, dlg.result_updates)
 
     def _on_state_change(self, event: str, _data):
         if event == "patch_changed":
