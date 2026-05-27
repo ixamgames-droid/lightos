@@ -1,4 +1,9 @@
-"""MIDI Manager — Geräte auflisten, empfangen, senden, virtueller Port."""
+"""MIDI Manager — Geräte auflisten, empfangen, senden, virtueller Port.
+
+Backend-Priorität:
+  1. python-rtmidi  (plattformübergreifend, falls installiert)
+  2. WinMM via ctypes  (Windows ARM64 / kein Compiler nötig)
+"""
 from __future__ import annotations
 import threading
 from dataclasses import dataclass
@@ -9,6 +14,20 @@ try:
     RTMIDI_OK = True
 except ImportError:
     RTMIDI_OK = False
+
+try:
+    from .midi_backend_winmm import (
+        WINMM_OK,
+        list_inputs as _winmm_list_inputs,
+        list_outputs as _winmm_list_outputs,
+        WinMMInput,
+        WinMMOutput,
+    )
+except Exception:
+    WINMM_OK = False
+
+# Welches Backend ist aktiv?
+_USE_WINMM = (not RTMIDI_OK) and WINMM_OK
 
 
 @dataclass
@@ -44,16 +63,20 @@ def _decode(raw: list[int], port_name: str) -> MidiMessage | None:
 
 class MidiManager:
     def __init__(self):
-        self._inputs: dict[str, object] = {}     # name → rtmidi.MidiIn
-        self._output: object | None = None       # rtmidi.MidiOut
+        self._inputs: dict[str, object] = {}
+        self._output: object | None = None
         self._virtual_out: object | None = None
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
-        self.available = RTMIDI_OK
+        self.available = RTMIDI_OK or WINMM_OK
+        if _USE_WINMM:
+            self._log("MIDI: rtmidi nicht verfügbar — nutze Windows WinMM Backend (ARM-kompatibel)")
 
     # ── Port-Listing ─────────────────────────────────────────────────────────
 
     def list_inputs(self) -> list[str]:
+        if _USE_WINMM:
+            return _winmm_list_inputs()
         if not RTMIDI_OK:
             return []
         m = rtmidi.MidiIn()
@@ -62,6 +85,8 @@ class MidiManager:
         return ports
 
     def list_outputs(self) -> list[str]:
+        if _USE_WINMM:
+            return _winmm_list_outputs()
         if not RTMIDI_OK:
             return []
         m = rtmidi.MidiOut()
@@ -72,7 +97,21 @@ class MidiManager:
     # ── Verbinden ────────────────────────────────────────────────────────────
 
     def open_input(self, port_name: str):
-        if not RTMIDI_OK or port_name in self._inputs:
+        if port_name in self._inputs:
+            return
+        if _USE_WINMM:
+            ports = _winmm_list_inputs()
+            if port_name not in ports:
+                return
+            idx = ports.index(port_name)
+            try:
+                m = WinMMInput(idx, port_name, self._on_message)
+                self._inputs[port_name] = m
+                self._log(f"MIDI Input geöffnet (WinMM): {port_name}")
+            except Exception as e:
+                self._log(f"MIDI Input Fehler: {e}")
+            return
+        if not RTMIDI_OK:
             return
         m = rtmidi.MidiIn()
         ports = [m.get_port_name(i) for i in range(m.get_port_count())]
@@ -86,6 +125,17 @@ class MidiManager:
         self._log(f"MIDI Input geöffnet: {port_name}")
 
     def open_output(self, port_name: str):
+        if _USE_WINMM:
+            ports = _winmm_list_outputs()
+            if port_name not in ports:
+                return
+            idx = ports.index(port_name)
+            try:
+                self._output = WinMMOutput(idx)
+                self._log(f"MIDI Output geöffnet (WinMM): {port_name}")
+            except Exception as e:
+                self._log(f"MIDI Output Fehler: {e}")
+            return
         if not RTMIDI_OK:
             return
         m = rtmidi.MidiOut()
@@ -100,6 +150,9 @@ class MidiManager:
 
     def open_virtual_input(self, name: str = "LightOS Virtual IN"):
         """Erstellt einen virtuellen MIDI-Eingang (andere Apps können darauf senden)."""
+        if _USE_WINMM:
+            self._log("Virtueller MIDI-Port: WinMM unterstützt keine virtuellen Ports. loopMIDI installieren.")
+            return False
         if not RTMIDI_OK:
             return False
         try:
@@ -115,6 +168,9 @@ class MidiManager:
 
     def open_virtual_output(self, name: str = "LightOS Virtual OUT"):
         """Erstellt einen virtuellen MIDI-Ausgang."""
+        if _USE_WINMM:
+            self._log("Virtueller MIDI-Port: WinMM unterstützt keine virtuellen Ports. loopMIDI installieren.")
+            return False
         if not RTMIDI_OK:
             return False
         try:

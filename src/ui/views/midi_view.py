@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTabWidget
-from src.core.midi.midi_manager import get_midi_manager, MidiMessage
+from src.core.midi.midi_manager import get_midi_manager, MidiMessage, RTMIDI_OK
 from src.core.midi.midi_mapper import (
     MidiMapper, MidiMapping,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
@@ -185,7 +185,9 @@ class MidiView(QWidget):
         self._refresh_ports()
 
         if not self._midi.available:
-            self._append_log("⚠ python-rtmidi nicht verfügbar. MIDI deaktiviert.")
+            self._append_log("⚠ Kein MIDI-Backend verfügbar (weder rtmidi noch WinMM). MIDI deaktiviert.")
+        elif not RTMIDI_OK:
+            self._append_log("ℹ MIDI: Windows WinMM Backend aktiv (ARM-Modus, rtmidi nicht installiert)")
 
     # ── Geräteverwaltung ──────────────────────────────────────────────────────
 

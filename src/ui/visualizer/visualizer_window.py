@@ -339,19 +339,28 @@ class VisualizerWindow(QMainWindow):
     # ── UI ──────────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
-        # -------- Toolbar --------
+        # -------- Toolbar (touch-optimiert) --------
         tb = QToolBar("Visualizer")
         tb.setMovable(False)
+        tb.setStyleSheet(
+            "QToolBar { spacing: 6px; padding: 4px; }"
+            "QToolButton { min-height: 38px; min-width: 38px;"
+            "              padding: 6px 12px; font-size: 12px; }"
+            "QComboBox   { min-height: 36px; padding: 4px 8px;"
+            "              font-size: 12px; min-width: 130px; }"
+            "QComboBox QAbstractItemView::item { min-height: 32px; padding: 4px; }"
+            "QToolBar QLabel { padding: 0 4px; font-weight: bold; }"
+        )
         self.addToolBar(tb)
 
-        tb.addWidget(QLabel("  Ansicht: "))
+        tb.addWidget(QLabel("Ansicht:"))
         self._combo_view = QComboBox()
         self._combo_view.addItem("3D Perspective", "3D")
         self._combo_view.addItem("2D Top-Down",    "2D")
         self._combo_view.currentIndexChanged.connect(self._on_view_mode_changed)
         tb.addWidget(self._combo_view)
 
-        tb.addWidget(QLabel("   Modus: "))
+        tb.addWidget(QLabel("Modus:"))
         self._combo_edit = QComboBox()
         self._combo_edit.addItem("Ansehen",            "view")
         self._combo_edit.addItem("Fixtures bearbeiten", "edit")
@@ -361,31 +370,31 @@ class VisualizerWindow(QMainWindow):
 
         tb.addSeparator()
 
-        tb.addWidget(QLabel("  Buehne: "))
+        tb.addWidget(QLabel("Buehne:"))
         self._combo_stage = QComboBox()
         self._reload_stage_combo()
         self._combo_stage.currentIndexChanged.connect(self._on_stage_combo_changed)
         tb.addWidget(self._combo_stage)
 
-        act_save = QAction("Buehne speichern", self)
+        act_save = QAction("💾 Speichern", self)
         act_save.triggered.connect(self._on_save_stage)
         tb.addAction(act_save)
 
-        act_new = QAction("Neue Buehne", self)
+        act_new = QAction("✚ Neu", self)
         act_new.triggered.connect(self._on_new_stage)
         tb.addAction(act_new)
 
-        act_del = QAction("Buehne loeschen", self)
+        act_del = QAction("🗑 Loeschen", self)
         act_del.triggered.connect(self._on_delete_stage)
         tb.addAction(act_del)
 
         tb.addSeparator()
 
-        act_reset_cam = QAction("Kamera zuruecksetzen", self)
+        act_reset_cam = QAction("⌖ Kamera", self)
         act_reset_cam.triggered.connect(self._reset_camera)
         tb.addAction(act_reset_cam)
 
-        act_clear_fx = QAction("Alle Fixtures entfernen", self)
+        act_clear_fx = QAction("✖ Alle Fixtures", self)
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
@@ -410,8 +419,8 @@ class VisualizerWindow(QMainWindow):
         splitter.addWidget(self._view)
 
         right_panel = self._build_right_panel()
-        right_panel.setMinimumWidth(290)
-        right_panel.setMaximumWidth(360)
+        right_panel.setMinimumWidth(330)
+        right_panel.setMaximumWidth(420)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
@@ -447,9 +456,11 @@ class VisualizerWindow(QMainWindow):
 
         row = QHBoxLayout()
         btn_place = QPushButton("Im Raum platzieren")
+        btn_place.setMinimumHeight(40)
         btn_place.clicked.connect(self._place_selected)
         row.addWidget(btn_place)
         btn_remove = QPushButton("Entfernen")
+        btn_remove.setMinimumHeight(40)
         btn_remove.clicked.connect(self._remove_selected)
         row.addWidget(btn_remove)
         layout.addLayout(row)
@@ -460,6 +471,7 @@ class VisualizerWindow(QMainWindow):
         self._spin_y = QDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
         self._spin_z = QDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
         for sp in (self._spin_x, self._spin_y, self._spin_z):
+            sp.setMinimumHeight(38)
             sp.valueChanged.connect(self._on_fixture_pos_spin_changed)
         form.addRow("X (links/rechts):", self._spin_x)
         form.addRow("Y (Hoehe):",        self._spin_y)
@@ -477,21 +489,32 @@ class VisualizerWindow(QMainWindow):
         self._stage_tree = QTreeWidget()
         self._stage_tree.setHeaderLabels(["Typ", "Name"])
         self._stage_tree.itemSelectionChanged.connect(self._on_stage_tree_selected)
+        # Touch-freundliche groessere Zeilen + ruhigeres Painting
+        self._stage_tree.setStyleSheet(
+            "QTreeWidget::item { padding: 8px 4px; }"
+            "QTreeWidget::item:selected { background: #ffd700; color: #000; }"
+        )
+        self._stage_tree.setUniformRowHeights(True)   # weniger Reflow beim Add/Remove
+        self._stage_tree.setAlternatingRowColors(True)
         layout.addWidget(self._stage_tree, 1)
 
         # Add-buttons grid
         add_box = QGroupBox("Element hinzufuegen")
         add_grid = QVBoxLayout(add_box)
+        add_grid.setSpacing(4)
         row = QHBoxLayout()
+        row.setSpacing(4)
         col_count = 0
         for type_, label in self.STAGE_TYPES:
             btn = QPushButton("+ " + label)
+            btn.setMinimumHeight(40)
             btn.clicked.connect(lambda _checked=False, t=type_: self._add_stage_element(t))
             row.addWidget(btn)
             col_count += 1
             if col_count == 2:
                 add_grid.addLayout(row)
                 row = QHBoxLayout()
+                row.setSpacing(4)
                 col_count = 0
         if col_count > 0:
             add_grid.addLayout(row)
@@ -515,6 +538,7 @@ class VisualizerWindow(QMainWindow):
         for sp in (self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
                    self._stage_spin_w, self._stage_spin_h, self._stage_spin_d,
                    self._stage_spin_rot):
+            sp.setMinimumHeight(38)
             sp.valueChanged.connect(self._on_stage_property_changed)
 
         prop_form.addRow("X:", self._stage_spin_x)
@@ -888,21 +912,34 @@ class VisualizerWindow(QMainWindow):
     def _refresh_stage_tree(self):
         # Aktuelle Selektion merken um sie nach Rebuild wiederherzustellen (T4.3)
         selected_id = self._selected_stage_id or ""
+        # FLICKER-FIX: Painting komplett aussetzen waehrend Clear+Rebuild,
+        # sonst sieht der User die leere Liste fuer einen Frame.
+        self._stage_tree.setUpdatesEnabled(False)
         self._stage_tree.blockSignals(True)
-        self._stage_tree.clear()
-        for el in self._current_stage.elements:
-            label_name = el.name or el.id
-            it = QTreeWidgetItem([el.type, label_name])
-            it.setData(0, Qt.ItemDataRole.UserRole, el.id)
-            self._stage_tree.addTopLevelItem(it)
-        # Selektion wiederherstellen
-        if selected_id:
-            for i in range(self._stage_tree.topLevelItemCount()):
-                it = self._stage_tree.topLevelItem(i)
-                if it.data(0, Qt.ItemDataRole.UserRole) == selected_id:
-                    self._stage_tree.setCurrentItem(it)
-                    break
-        self._stage_tree.blockSignals(False)
+        try:
+            self._stage_tree.clear()
+            type_labels = {
+                "platform":  "Plattform",  "truss_h":  "Truss horiz.",
+                "truss_v":   "Truss vert.", "wall":    "Wand",
+                "led_wall":  "LED-Wand",   "speaker":  "Speaker",
+                "audience":  "Publikum",   "dj_booth": "DJ-Booth",
+            }
+            for el in self._current_stage.elements:
+                label_name = el.name or el.id
+                type_label = type_labels.get(el.type, el.type)
+                it = QTreeWidgetItem([type_label, label_name])
+                it.setData(0, Qt.ItemDataRole.UserRole, el.id)
+                self._stage_tree.addTopLevelItem(it)
+            # Selektion wiederherstellen
+            if selected_id:
+                for i in range(self._stage_tree.topLevelItemCount()):
+                    it = self._stage_tree.topLevelItem(i)
+                    if it.data(0, Qt.ItemDataRole.UserRole) == selected_id:
+                        self._stage_tree.setCurrentItem(it)
+                        break
+        finally:
+            self._stage_tree.blockSignals(False)
+            self._stage_tree.setUpdatesEnabled(True)
 
     def _add_stage_element(self, type_: str):
         # Pick reasonable defaults per type
@@ -1131,9 +1168,9 @@ class VisualizerWindow(QMainWindow):
 
     def _on_stage_list_from_js(self, items: list):
         """Wird ausgeloest wenn JS Stage-Objekte aendert (z.B. Drag im 3D-View).
-        Aktualisiert nur die Datenmodelle - KEIN Tree-Rebuild (verhindert Selection-Swap)."""
-        # Wenn JS-Liste neue IDs enthaelt die wir nicht kennen -> hinzufuegen
-        # (passiert wenn User per Hotkey im JS ein Element erstellt)
+        Aktualisiert nur die Datenmodelle - KEIN Tree-Rebuild (verhindert Selection-Swap),
+        ausser ein Element wurde hinzugefuegt ODER entfernt."""
+        tree_needs_rebuild = False
         js_ids = set()
         for it in items:
             sid = it.get("id")
@@ -1156,8 +1193,7 @@ class VisualizerWindow(QMainWindow):
                     name=it.get("name", ""),
                 )
                 self._current_stage.elements.append(el)
-                # Tree neu aufbauen NUR wenn Element fehlt
-                self._refresh_stage_tree()
+                tree_needs_rebuild = True
                 continue
             pos = it.get("position") or {}
             size = it.get("size") or {}
@@ -1169,6 +1205,18 @@ class VisualizerWindow(QMainWindow):
             el.d = float(size.get("z", el.d))
             el.rotation = float(it.get("rotation", el.rotation))
             el.color = it.get("color", el.color)
+
+        # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht) entfernen
+        py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
+        if py_ids_to_remove:
+            for pid in py_ids_to_remove:
+                self._current_stage.remove(pid)
+                if self._selected_stage_id == pid:
+                    self._selected_stage_id = ""
+            tree_needs_rebuild = True
+
+        if tree_needs_rebuild:
+            self._refresh_stage_tree()
 
         # Properties-Panel updaten OHNE Tree-Rebuild
         cur = self._selected_stage_element()

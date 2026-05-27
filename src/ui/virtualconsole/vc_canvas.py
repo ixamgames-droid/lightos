@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
                                 QMessageBox, QInputDialog, QSizePolicy)
-from PySide6.QtCore import Qt, QPoint, QSize
+from PySide6.QtCore import Qt, QPoint, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction
 
 from .vc_widget import VCWidget
@@ -35,7 +35,11 @@ _register()
 class VCCanvas(QWidget):
     """The free-form canvas. Widgets are placed as direct children."""
 
-    GRID = 8       # snap grid in pixels
+    GRID = 8
+
+    # Signale nach außen (für VirtualConsoleView)
+    midi_learn_done = Signal()          # MIDI-Learn für Button abgeschlossen
+    snapshot_assign_done = Signal()     # Snapshot-Assign abgeschlossen
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -46,6 +50,122 @@ class VCCanvas(QWidget):
         self.customContextMenuRequested.connect(self._context_menu)
         self._bg = QColor("#0d1117")
 
+        # MIDI-Learn-Modus
+        self._midi_learn_btn = None       # VCButton das auf MIDI wartet
+
+        # Snapshot-Assign-Modus
+        self._assign_snapshot_index: int | None = None  # welcher Snap zugewiesen wird
+        self._awaiting_button_click_for: str | None = None
+
+        self._setup_midi()
+
+    # ── MIDI ─────────────────────────────────────────────────────────────────
+
+    def _setup_midi(self):
+        try:
+            from src.core.midi.midi_manager import get_midi_manager
+            get_midi_manager().subscribe(self._on_midi_raw)
+        except Exception as e:
+            print(f"[VCCanvas] MIDI-Subscribe-Fehler: {e}")
+
+    def _on_midi_raw(self, msg):
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda m=msg: self._handle_midi(m))
+
+    def _handle_midi(self, msg):
+        # MIDI-Learn: nächste Message wird dem bewaffneten Button zugewiesen
+        if self._midi_learn_btn is not None:
+            btn = self._midi_learn_btn
+            self._midi_learn_btn = None
+            btn.accept_midi(msg.channel, msg.data1, msg.msg_type)
+            self.midi_learn_done.emit()
+            return
+
+        # Dispatch an alle VCWidgets (VCButton, VCSlider, …)
+        for widget in self.findChildren(VCWidget):
+            widget.handle_midi(msg)
+
+    # ── MIDI-Learn-Modus ─────────────────────────────────────────────────────
+
+    def start_midi_learn(self):
+        """
+        Aktiviert MIDI-Learn: der nächste Klick auf einen VCButton bewaffnet ihn,
+        die darauf folgende MIDI-Message wird ihm zugewiesen.
+        """
+        self._midi_learn_btn = None
+        # Signalisiere allen Buttons dass sie für MIDI-Learn klickbar sind
+        self._awaiting_button_click_for = "midi_learn"
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def cancel_midi_learn(self):
+        if self._midi_learn_btn is not None:
+            try:
+                self._midi_learn_btn._midi_armed = False
+                self._midi_learn_btn.update()
+            except Exception:
+                pass
+        self._midi_learn_btn = None
+        self._awaiting_button_click_for = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    # ── Snapshot-Assign-Modus ─────────────────────────────────────────────────
+
+    def start_snapshot_assign(self, snapshot_index: int):
+        """
+        Aktiviert Assign-Modus: nächster Klick auf einen VCButton weist ihm
+        den angegebenen Snapshot zu.
+        """
+        self._assign_snapshot_index = snapshot_index
+        self._awaiting_button_click_for = "snapshot"
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def cancel_snapshot_assign(self):
+        self._assign_snapshot_index = None
+        self._awaiting_button_click_for = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    # ── Mausereignisse für Learn/Assign ──────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        mode = getattr(self, "_awaiting_button_click_for", None)
+        if mode and event.button() == Qt.MouseButton.LeftButton:
+            child = self.childAt(event.position().toPoint())
+            if child is not None:
+                # VCButton-Elternteil suchen
+                from .vc_button import VCButton
+                btn = child if isinstance(child, VCButton) else None
+                p = child.parent()
+                while p is not None and not isinstance(p, VCCanvas):
+                    if isinstance(p, VCButton):
+                        btn = p
+                        break
+                    p = p.parent()
+
+                if btn is not None:
+                    if mode == "midi_learn":
+                        self._midi_learn_btn = btn
+                        btn.arm_midi_learn()
+                        self._awaiting_button_click_for = None
+                        self.setCursor(Qt.CursorShape.ArrowCursor)
+                        return
+                    elif mode == "snapshot":
+                        from .vc_button import ButtonAction
+                        btn.action = ButtonAction.SNAPSHOT
+                        btn.snapshot_index = self._assign_snapshot_index
+                        btn.update()
+                        self._assign_snapshot_index = None
+                        self._awaiting_button_click_for = None
+                        self.setCursor(Qt.CursorShape.ArrowCursor)
+                        self.snapshot_assign_done.emit()
+                        return
+
+            # Klick ins Leere bricht Modus ab
+            self.cancel_midi_learn()
+            self.cancel_snapshot_assign()
+            return
+
+        super().mousePressEvent(event)
+
     # ── Edit mode ────────────────────────────────────────────────────────────
 
     def set_edit_mode(self, enabled: bool):
@@ -54,7 +174,7 @@ class VCCanvas(QWidget):
             child.set_edit_mode(enabled)
         self.update()
 
-    # ── Context menu (right-click on canvas) ──────────────────────────────────
+    # ── Context menu ─────────────────────────────────────────────────────────
 
     def _context_menu(self, local_pos: QPoint):
         if not self._edit_mode:
@@ -159,4 +279,17 @@ class VCCanvas(QWidget):
                 p.drawLine(x, 0, x, self.height())
             for y in range(0, self.height(), g):
                 p.drawLine(0, y, self.width(), y)
+
+        # Hinweis wenn MIDI-Learn oder Snapshot-Assign aktiv
+        mode = getattr(self, "_awaiting_button_click_for", None)
+        if mode == "midi_learn":
+            p.setPen(QColor("#ff8800"))
+            p.drawText(self.rect().adjusted(8, 4, -8, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                       "MIDI-Learn: Klicke einen Button an...")
+        elif mode == "snapshot":
+            p.setPen(QColor("#ffd700"))
+            p.drawText(self.rect().adjusted(8, 4, -8, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                       f"Snapshot zuweisen: Klicke einen Button an...")
         p.end()

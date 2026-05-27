@@ -43,6 +43,41 @@
     pointer-events: none; z-index: 5;
     display: none;
   }
+  #fab-container {
+    position: absolute; bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 20;
+  }
+  .fab-btn {
+    display: none;
+    min-width: 56px; min-height: 56px;
+    border-radius: 28px;
+    border: none; cursor: pointer;
+    font-size: 22px; font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    transition: transform 0.1s, box-shadow 0.1s;
+    pointer-events: auto;
+    align-items: center; justify-content: center;
+  }
+  .fab-btn:active { transform: scale(0.93); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  #fab-delete  { background: #c0392b; color: #fff; }
+  #fab-delete:hover  { background: #e04030; }
+  #fab-rotate  { background: #2a6090; color: #fff; }
+  #fab-rotate:hover  { background: #3a80b0; }
+  #fab-place   { background: #27ae60; color: #fff; }
+  #fab-place:hover   { background: #2ecc71; }
+  #longpress-ring {
+    position: absolute; pointer-events: none; display: none;
+    width: 60px; height: 60px; border-radius: 50%;
+    border: 3px solid #27ae60;
+    box-shadow: 0 0 0 0 rgba(39,174,96,0.6);
+    animation: lp-pulse 0.6s ease-out;
+    z-index: 30; transform: translate(-50%,-50%);
+  }
+  @keyframes lp-pulse {
+    0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1.4); opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -57,9 +92,15 @@
 <div id="tooltip"></div>
 <div id="marquee"></div>
 <div id="controls">
-  LMB drag: Rotate (3D) / Pan (2D) | Wheel: Zoom | RMB: Place fixture
+  3D: 1-Finger drehen | 2-Finger Pinch-Zoom | Lang drücken = Fixture platzieren
 </div>
 <div id="ruler-info"></div>
+<div id="fab-container">
+  <button class="fab-btn" id="fab-rotate"  title="90° drehen (R)" onclick="fabRotate()">↻</button>
+  <button class="fab-btn" id="fab-delete"  title="Löschen (Del)"  onclick="fabDelete()">🗑</button>
+  <button class="fab-btn" id="fab-place"   title="Fixture hier platzieren" onclick="fabPlace()">📌</button>
+</div>
+<div id="longpress-ring"></div>
 
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="three_local.js"></script>
@@ -828,12 +869,16 @@ function getStageJson() {
   };
 }
 
+// FLICKER-FIX: Während eines kompletten Stage-Loads dürfen die
+// einzelnen create/remove-Operationen NICHT jeweils zurück an Python
+// melden – das löst sonst N×Tree-Rebuilds aus.
+let _isLoadingStage = false;
+
 function loadStageJson(json) {
+  _isLoadingStage = true;
   try {
     const data = typeof json === 'string' ? JSON.parse(json) : json;
-    // NEW-STAGE-FIX: clearStageObjects MUSS alle alten Stage-Objects entfernen.
     clearStageObjects();
-    // Sicherheits-Reset: Selektion + Resize-Handles + Labels weg
     selectedStageId = null;
     clearResizeHandles();
     clearStageLabels();
@@ -842,7 +887,6 @@ function loadStageJson(json) {
         createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
       });
     }
-    // Fixture positions get applied as DMX/positions stream in via bridge
     if (data.fixtures && Array.isArray(data.fixtures)) {
       data.fixtures.forEach(fp => {
         const f = fixtures[fp.fid];
@@ -855,10 +899,15 @@ function loadStageJson(json) {
     updateOutlines();
   } catch (e) {
     console.log('loadStageJson error:', e);
+  } finally {
+    _isLoadingStage = false;
+    // EINE einzige finale Sync ans Python schicken (statt N×)
+    notifyStageListChanged();
   }
 }
 
 function notifyStageListChanged() {
+  if (_isLoadingStage) return;  // unterdrücken während Bulk-Load
   if (bridge && bridge.stageListChanged) {
     try { bridge.stageListChanged(JSON.stringify(Object.values(stageObjects).map(s => s.data))); } catch (e) {}
   }
@@ -1323,14 +1372,15 @@ function setEditMode(mode) {
   editMode = mode || 'view';
   const banner = document.getElementById('mode-banner');
   if (editMode === 'edit') {
-    banner.textContent = 'EDIT MODE - Drag fixtures with mouse (Shift=multi-select, Del=remove)';
+    banner.textContent = 'FIXTURE EDIT – Ziehen=Bewegen | Rechtsklick/Lang-Drücken=Platzieren | 📌 Taste unten rechts';
     banner.style.display = 'block';
   } else if (editMode === 'stage') {
-    banner.textContent = 'STAGE BUILDER - Drag stage objects (Del=remove, R=rotate 90deg)';
+    banner.textContent = 'BÜHNE BEARBEITEN – Tippen=Auswählen | Ziehen=Verschieben | ↻ / 🗑 unten rechts';
     banner.style.display = 'block';
   } else {
     banner.style.display = 'none';
   }
+  updateFABs();
   // Auto-Brightness: edit/stage modes brighten the scene for visibility
   if (settings.autoBrightness && _userBrightnessOverride === null) {
     if (editMode === 'edit' || editMode === 'stage') {
@@ -1480,6 +1530,7 @@ function updateOutlines() {
   if (bridge && bridge.stageSelectionChanged) {
     try { bridge.stageSelectionChanged(selectedStageId || ''); } catch (e) {}
   }
+  updateFABs();
 }
 
 // ============================================================================
@@ -1498,10 +1549,14 @@ let dragStartPositions = {}; // fid -> {x, z}
 let dragStartStagePos = null; // for stage drag
 let dragGroundOffset = new THREE.Vector3();
 
-function setMouseFromEvent(e) {
+function setMouseFromCoords(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
-  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function setMouseFromEvent(e) {
+  setMouseFromCoords(e.clientX, e.clientY);
 }
 
 function intersectGround() {
@@ -1543,36 +1598,39 @@ function snap(v) {
   return Math.round(v / settings.gridStep) * settings.gridStep;
 }
 
-renderer.domElement.addEventListener('contextmenu', function(e) {
-  e.preventDefault();
-  setMouseFromEvent(e);
+function _placeFixtureAtMouse() {
   raycaster.setFromCamera(mouse, activeCam);
   const target = new THREE.Vector3();
   raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0), -0.4), target);
   if (bridge && target && bridge.placeFixture) {
+    _fabLastPlaceCoords = { x: target.x, z: target.z };
     bridge.placeFixture(JSON.stringify({ x: snap(target.x), y: 6.5, z: snap(target.z) }));
   }
+}
+
+renderer.domElement.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  setMouseFromEvent(e);
+  _placeFixtureAtMouse();
 }, false);
 
-renderer.domElement.addEventListener('mousedown', function(e) {
-  if (e.button !== 0) return;
-  setMouseFromEvent(e);
+// Shared pointer logic (called by both mouse and touch handlers)
+function handlePointerDown(clientX, clientY, shiftKey) {
+  setMouseFromCoords(clientX, clientY);
   isLeftDragging = true;
-  downMouseX = e.clientX; downMouseY = e.clientY;
-  lastMouseX = e.clientX; lastMouseY = e.clientY;
+  downMouseX = clientX; downMouseY = clientY;
+  lastMouseX = clientX; lastMouseY = clientY;
   mouseMovedDuringClick = false;
 
   if (editMode === 'edit') {
     const fid = pickFixture();
     if (fid != null) {
-      // start fixture drag
-      const additive = e.shiftKey;
+      const additive = shiftKey;
       if (!additive && !selectedFids.includes(fid)) {
         selectedFids = [fid];
       } else if (additive) {
         if (!selectedFids.includes(fid)) selectedFids.push(fid);
       }
-      // Cache drag start positions for all selected
       dragStartPositions = {};
       for (const sf of selectedFids) {
         if (fixtures[sf]) {
@@ -1592,28 +1650,26 @@ renderer.domElement.addEventListener('mousedown', function(e) {
       updateOutlines();
       return;
     } else {
-      // marquee select (only in edit mode on empty area)
+      // Marquee-Selektion (nur mit Maus; Touch springt direkt zu Kamera-Pan)
       dragMode = 'marquee';
       const m = document.getElementById('marquee');
       m.style.display = 'block';
-      m.style.left = e.clientX + 'px';
-      m.style.top = e.clientY + 'px';
+      m.style.left = clientX + 'px';
+      m.style.top = clientY + 'px';
       m.style.width = '0px';
       m.style.height = '0px';
-      if (!e.shiftKey) { selectedFids = []; updateOutlines(); }
+      if (!shiftKey) { selectedFids = []; updateOutlines(); }
       return;
     }
   }
 
   if (editMode === 'stage') {
-    // 1) Erst Resize-Handles abfragen (wenn Selektion vorhanden)
     if (selectedStageId && resizeHandles.length > 0) {
       const handle = pickResizeHandle();
       if (handle) {
         const so = stageObjects[selectedStageId];
         if (so) {
           dragResizeCorner = handle.userData.corner;
-          // Fixierte Ecke = gegenueberliegende Ecke (der Greifpunkt der NICHT bewegt wird)
           const halfX = so.data.size.x / 2;
           const halfZ = so.data.size.z / 2;
           const cx = so.mesh.position.x;
@@ -1622,7 +1678,7 @@ renderer.domElement.addEventListener('mousedown', function(e) {
           if (dragResizeCorner === 'nw') { fixedX = cx + halfX; fixedZ = cz + halfZ; }
           else if (dragResizeCorner === 'ne') { fixedX = cx - halfX; fixedZ = cz + halfZ; }
           else if (dragResizeCorner === 'sw') { fixedX = cx + halfX; fixedZ = cz - halfZ; }
-          else                                { fixedX = cx - halfX; fixedZ = cz - halfZ; } // 'se'
+          else                                { fixedX = cx - halfX; fixedZ = cz - halfZ; }
           dragResizeStart = {
             fixedX, fixedZ,
             startSizeX: so.data.size.x,
@@ -1633,7 +1689,6 @@ renderer.domElement.addEventListener('mousedown', function(e) {
         }
       }
     }
-    // 2) Sonst: Stage-Objekt direkt picken
     const sid = pickStageObject();
     if (sid != null) {
       selectedStageId = sid;
@@ -1656,18 +1711,110 @@ renderer.domElement.addEventListener('mousedown', function(e) {
     }
   }
 
-  // Default: rotate or pan camera
   if (viewMode === '3D') {
     dragMode = 'rotate';
   } else {
     dragMode = 'pan';
   }
-}, false);
+}
 
-window.addEventListener('mouseup', function(e) {
+function handlePointerMove(clientX, clientY) {
+  if (Math.abs(clientX - downMouseX) > 3 || Math.abs(clientY - downMouseY) > 3) {
+    mouseMovedDuringClick = true;
+  }
+  if (viewMode === '2D') {
+    setMouseFromCoords(clientX, clientY);
+    const gh = intersectGround();
+    if (gh) {
+      document.getElementById('ruler-info').textContent =
+        'X: ' + gh.x.toFixed(2) + ' m | Z: ' + gh.z.toFixed(2) + ' m | Grid: ' + (settings.snapToGrid ? 'ON' : 'OFF');
+    }
+  }
+  if (!isLeftDragging) return;
+  setMouseFromCoords(clientX, clientY);
+  const dx = clientX - lastMouseX;
+  const dy = clientY - lastMouseY;
+
+  if (dragMode === 'rotate') {
+    theta -= dx * 0.008;
+    phi = Math.max(0.2, Math.min(Math.PI * 0.49, phi + dy * 0.008));
+    updateCamera();
+  } else if (dragMode === 'pan') {
+    const a = window.innerWidth / window.innerHeight;
+    const wPerPxX = (2 * orthoSize * a) / window.innerWidth;
+    const wPerPxZ = (2 * orthoSize) / window.innerHeight;
+    orthoCam.position.x -= dx * wPerPxX;
+    orthoCam.position.z -= dy * wPerPxZ;
+  } else if (dragMode === 'fixtureDrag') {
+    const gh = intersectGround();
+    if (gh && dragGroundOffset.userData) {
+      const refFid = dragGroundOffset.userData.refFid;
+      const newX = gh.x - dragGroundOffset.x;
+      const newZ = gh.z - dragGroundOffset.z;
+      const refStart = dragStartPositions[refFid];
+      if (refStart) {
+        const dxw = snap(newX) - refStart.x;
+        const dzw = snap(newZ) - refStart.z;
+        for (const fid of selectedFids) {
+          const start = dragStartPositions[fid];
+          const f = fixtures[fid];
+          if (start && f) {
+            f.group.position.x = start.x + dxw;
+            f.group.position.z = start.z + dzw;
+            if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+          }
+        }
+      }
+    }
+  } else if (dragMode === 'stageDrag' && selectedStageId) {
+    const so = stageObjects[selectedStageId];
+    const gh = intersectGround();
+    if (gh && so && dragStartStagePos) {
+      const nx = snap(gh.x - dragStartStagePos.offsetX);
+      const nz = snap(gh.z - dragStartStagePos.offsetZ);
+      so.mesh.position.x = nx;
+      so.mesh.position.z = nz;
+      so.data.position.x = nx;
+      so.data.position.z = nz;
+      if (so._helper) so._helper.update();
+      updateResizeHandles();
+    }
+  } else if (dragMode === 'stageResize' && selectedStageId && dragResizeStart) {
+    const so = stageObjects[selectedStageId];
+    const gh = intersectGround();
+    if (gh && so) {
+      const fx = dragResizeStart.fixedX;
+      const fz = dragResizeStart.fixedZ;
+      const newGripX = snap(gh.x);
+      const newGripZ = snap(gh.z);
+      const newSizeX = Math.max(0.2, Math.abs(newGripX - fx));
+      const newSizeZ = Math.max(0.2, Math.abs(newGripZ - fz));
+      const newCX = (fx + newGripX) / 2;
+      const newCZ = (fz + newGripZ) / 2;
+      updateStageObjectProps(selectedStageId, {
+        size: {x: newSizeX, z: newSizeZ},
+        position: {x: newCX, z: newCZ},
+      });
+      if (so._helper) so._helper.update();
+      updateResizeHandles();
+    }
+  } else if (dragMode === 'marquee') {
+    const m = document.getElementById('marquee');
+    const x1 = Math.min(downMouseX, clientX);
+    const y1 = Math.min(downMouseY, clientY);
+    const x2 = Math.max(downMouseX, clientX);
+    const y2 = Math.max(downMouseY, clientY);
+    m.style.left = x1 + 'px';
+    m.style.top = y1 + 'px';
+    m.style.width = (x2 - x1) + 'px';
+    m.style.height = (y2 - y1) + 'px';
+  }
+  lastMouseX = clientX; lastMouseY = clientY;
+}
+
+function handlePointerUp(shiftKey) {
   if (!isLeftDragging) return;
   isLeftDragging = false;
-  // finalize fixture drag positions to python
   if (dragMode === 'fixtureDrag') {
     for (const fid of selectedFids) {
       const f = fixtures[fid];
@@ -1707,7 +1854,6 @@ window.addEventListener('mouseup', function(e) {
     const w = parseInt(m.style.width, 10);
     const h = parseInt(m.style.height, 10);
     m.style.display = 'none';
-    // Test all fixtures: project their group position to screen and check rect
     const newlySelected = [];
     for (const fid in fixtures) {
       const f = fixtures[fid];
@@ -1719,119 +1865,45 @@ window.addEventListener('mouseup', function(e) {
         newlySelected.push(Number(fid));
       }
     }
-    if (e.shiftKey) {
+    if (shiftKey) {
       for (const fid of newlySelected) if (!selectedFids.includes(fid)) selectedFids.push(fid);
     } else {
       selectedFids = newlySelected;
     }
     updateOutlines();
   }
-  // Click without movement on empty = clear selection
-  if (!mouseMovedDuringClick && (dragMode === 'rotate' || dragMode === 'pan')) {
-    if (editMode === 'edit' || editMode === 'stage') {
-      // already handled
-    }
-  }
   dragMode = 'none';
+}
+
+// Mouse listeners (thin wrappers)
+renderer.domElement.addEventListener('mousedown', function(e) {
+  if (e.button !== 0) return;
+  handlePointerDown(e.clientX, e.clientY, e.shiftKey);
+}, false);
+
+window.addEventListener('mouseup', function(e) {
+  handlePointerUp(e.shiftKey);
 });
 
 window.addEventListener('mousemove', function(e) {
-  if (Math.abs(e.clientX - downMouseX) > 3 || Math.abs(e.clientY - downMouseY) > 3) {
-    mouseMovedDuringClick = true;
-  }
-  // Update ruler info in 2D
-  if (viewMode === '2D') {
-    setMouseFromEvent(e);
-    const gh = intersectGround();
-    if (gh) {
-      document.getElementById('ruler-info').textContent =
-        'X: ' + gh.x.toFixed(2) + ' m | Z: ' + gh.z.toFixed(2) + ' m | Grid: ' + (settings.snapToGrid ? 'ON' : 'OFF');
+  handlePointerMove(e.clientX, e.clientY);
+  // Tooltip (Maus-only, bei Touch irrelevant)
+  if (!isLeftDragging) {
+    setMouseFromCoords(e.clientX, e.clientY);
+    const fid = pickFixture();
+    const tt = document.getElementById('tooltip');
+    if (fid != null && fixtures[fid]) {
+      const f = fixtures[fid];
+      tt.style.display = 'block';
+      tt.style.left = (e.clientX + 12) + 'px';
+      tt.style.top = (e.clientY - 8) + 'px';
+      const pos = f.group.position;
+      tt.textContent = '[' + fid + '] ' + (f.data.label || '?') + ' - ' + f.type +
+        '  (X:' + pos.x.toFixed(1) + ' Y:' + pos.y.toFixed(1) + ' Z:' + pos.z.toFixed(1) + ')';
+    } else {
+      tt.style.display = 'none';
     }
   }
-  if (!isLeftDragging) return;
-  setMouseFromEvent(e);
-  const dx = e.clientX - lastMouseX;
-  const dy = e.clientY - lastMouseY;
-
-  if (dragMode === 'rotate') {
-    theta -= dx * 0.008;
-    phi = Math.max(0.2, Math.min(Math.PI * 0.49, phi + dy * 0.008));
-    updateCamera();
-  } else if (dragMode === 'pan') {
-    // Ortho pan: convert pixel delta to world delta
-    const a = window.innerWidth / window.innerHeight;
-    const wPerPxX = (2 * orthoSize * a) / window.innerWidth;
-    const wPerPxZ = (2 * orthoSize) / window.innerHeight;
-    orthoCam.position.x -= dx * wPerPxX;
-    // up vector is (0,0,-1) so screen Y maps to +Z
-    orthoCam.position.z -= dy * wPerPxZ;
-  } else if (dragMode === 'fixtureDrag') {
-    const gh = intersectGround();
-    if (gh && dragGroundOffset.userData) {
-      const refFid = dragGroundOffset.userData.refFid;
-      const newX = gh.x - dragGroundOffset.x;
-      const newZ = gh.z - dragGroundOffset.z;
-      const refStart = dragStartPositions[refFid];
-      if (refStart) {
-        const dxw = snap(newX) - refStart.x;
-        const dzw = snap(newZ) - refStart.z;
-        for (const fid of selectedFids) {
-          const start = dragStartPositions[fid];
-          const f = fixtures[fid];
-          if (start && f) {
-            f.group.position.x = start.x + dxw;
-            f.group.position.z = start.z + dzw;
-            if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-          }
-        }
-      }
-    }
-  } else if (dragMode === 'stageDrag' && selectedStageId) {
-    const so = stageObjects[selectedStageId];
-    const gh = intersectGround();
-    if (gh && so && dragStartStagePos) {
-      const nx = snap(gh.x - dragStartStagePos.offsetX);
-      const nz = snap(gh.z - dragStartStagePos.offsetZ);
-      so.mesh.position.x = nx;
-      so.mesh.position.z = nz;
-      so.data.position.x = nx;
-      so.data.position.z = nz;
-      if (so._helper) so._helper.update();
-      // Resize-Handles + Label live nachfuehren
-      updateResizeHandles();
-    }
-  } else if (dragMode === 'stageResize' && selectedStageId && dragResizeStart) {
-    const so = stageObjects[selectedStageId];
-    const gh = intersectGround();
-    if (gh && so) {
-      // Neue Diagonale: gegenueberliegende Ecke fix, gh ist die neue Greifecke
-      const fx = dragResizeStart.fixedX;
-      const fz = dragResizeStart.fixedZ;
-      const newGripX = snap(gh.x);
-      const newGripZ = snap(gh.z);
-      const newSizeX = Math.max(0.2, Math.abs(newGripX - fx));
-      const newSizeZ = Math.max(0.2, Math.abs(newGripZ - fz));
-      const newCX = (fx + newGripX) / 2;
-      const newCZ = (fz + newGripZ) / 2;
-      updateStageObjectProps(selectedStageId, {
-        size: {x: newSizeX, z: newSizeZ},
-        position: {x: newCX, z: newCZ},
-      });
-      if (so._helper) so._helper.update();
-      updateResizeHandles();
-    }
-  } else if (dragMode === 'marquee') {
-    const m = document.getElementById('marquee');
-    const x1 = Math.min(downMouseX, e.clientX);
-    const y1 = Math.min(downMouseY, e.clientY);
-    const x2 = Math.max(downMouseX, e.clientX);
-    const y2 = Math.max(downMouseY, e.clientY);
-    m.style.left = x1 + 'px';
-    m.style.top = y1 + 'px';
-    m.style.width = (x2 - x1) + 'px';
-    m.style.height = (y2 - y1) + 'px';
-  }
-  lastMouseX = e.clientX; lastMouseY = e.clientY;
 });
 
 renderer.domElement.addEventListener('wheel', function(e) {
@@ -1844,27 +1916,135 @@ renderer.domElement.addEventListener('wheel', function(e) {
   }
 }, { passive: true });
 
-// Tooltip
-renderer.domElement.addEventListener('mousemove', function(e) {
-  if (isLeftDragging) {
-    document.getElementById('tooltip').style.display = 'none';
-    return;
+// ============================================================================
+// Touch support (Pinch-Zoom + Long-Press statt Rechtsklick + Drag)
+// ============================================================================
+let lastTouchDist = 0;
+let longPressTimer = null;
+let _lpTouchX = 0, _lpTouchY = 0;
+let _fabLastPlaceCoords = null;
+
+function _showLongPressRing(cx, cy) {
+  const ring = document.getElementById('longpress-ring');
+  if (!ring) return;
+  ring.style.left = cx + 'px';
+  ring.style.top = cy + 'px';
+  ring.style.display = 'block';
+  ring.style.animation = 'none';
+  ring.offsetHeight; // trigger reflow
+  ring.style.animation = 'lp-pulse 0.6s ease-out';
+  setTimeout(function() { if (ring) ring.style.display = 'none'; }, 700);
+}
+
+renderer.domElement.addEventListener('touchstart', function(e) {
+  e.preventDefault();
+  document.getElementById('tooltip').style.display = 'none';
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    _lpTouchX = t.clientX; _lpTouchY = t.clientY;
+    // Long-Press (600ms) = Fixture platzieren (ersetzt Rechtsklick)
+    longPressTimer = setTimeout(function() {
+      longPressTimer = null;
+      setMouseFromCoords(_lpTouchX, _lpTouchY);
+      _placeFixtureAtMouse();
+      _showLongPressRing(_lpTouchX, _lpTouchY);
+      isLeftDragging = false;
+      dragMode = 'none';
+    }, 600);
+    handlePointerDown(t.clientX, t.clientY, false);
+  } else if (e.touches.length === 2) {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    isLeftDragging = false;
+    dragMode = 'none';
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    lastTouchDist = Math.sqrt(dx * dx + dy * dy);
   }
-  setMouseFromEvent(e);
-  const fid = pickFixture();
-  const tt = document.getElementById('tooltip');
-  if (fid != null && fixtures[fid]) {
-    const f = fixtures[fid];
-    tt.style.display = 'block';
-    tt.style.left = (e.clientX + 12) + 'px';
-    tt.style.top = (e.clientY - 8) + 'px';
-    const pos = f.group.position;
-    tt.textContent = '[' + fid + '] ' + (f.data.label || '?') + ' - ' + f.type +
-      '  (X:' + pos.x.toFixed(1) + ' Y:' + pos.y.toFixed(1) + ' Z:' + pos.z.toFixed(1) + ')';
-  } else {
-    tt.style.display = 'none';
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', function(e) {
+  e.preventDefault();
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    handlePointerMove(t.clientX, t.clientY);
+  } else if (e.touches.length === 2) {
+    // Zwei-Finger Pinch-Zoom
+    isLeftDragging = false;
+    dragMode = 'none';
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const delta = lastTouchDist - dist;
+    if (viewMode === '3D') {
+      radius = Math.max(4, Math.min(120, radius + delta * 0.06));
+      updateCamera();
+    } else {
+      orthoSize = Math.max(4, Math.min(80, orthoSize + delta * 0.03));
+      resizeOrtho();
+    }
+    lastTouchDist = dist;
   }
-}, false);
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchend', function(e) {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  if (e.touches.length === 0) {
+    handlePointerUp(false);
+  } else if (e.touches.length === 1) {
+    const t = e.touches[0];
+    lastMouseX = t.clientX;
+    lastMouseY = t.clientY;
+  }
+}, { passive: false });
+
+// ============================================================================
+// Floating Action Buttons (FABs) – sichtbar im Touch-Betrieb
+// ============================================================================
+function fabDelete() {
+  if (editMode === 'edit' && selectedFids.length > 0) {
+    for (const fid of selectedFids.slice()) {
+      if (bridge && bridge.fixtureDeleted) {
+        try { bridge.fixtureDeleted(String(fid)); } catch (err) {}
+      }
+      removeFixture(fid);
+    }
+    selectedFids = [];
+    updateOutlines();
+  } else if (editMode === 'stage' && selectedStageId) {
+    removeStageObject(selectedStageId);
+  }
+}
+
+function fabRotate() {
+  if (editMode === 'stage' && selectedStageId) {
+    const so = stageObjects[selectedStageId];
+    if (so) {
+      so.mesh.rotation.y += Math.PI / 2;
+      so.data.rotation = so.mesh.rotation.y;
+      if (so._helper) so._helper.update();
+    }
+  }
+}
+
+function fabPlace() {
+  const cx = _fabLastPlaceCoords ? _fabLastPlaceCoords.x : 0;
+  const cz = _fabLastPlaceCoords ? _fabLastPlaceCoords.z : 0;
+  if (bridge && bridge.placeFixture) {
+    bridge.placeFixture(JSON.stringify({ x: snap(cx), y: 6.5, z: snap(cz) }));
+  }
+}
+
+function updateFABs() {
+  const btnDelete = document.getElementById('fab-delete');
+  const btnRotate = document.getElementById('fab-rotate');
+  const btnPlace  = document.getElementById('fab-place');
+  const hasFixtureSel = editMode === 'edit' && selectedFids.length > 0;
+  const hasStageSel   = editMode === 'stage' && !!selectedStageId;
+  if (btnDelete) btnDelete.style.display = (hasFixtureSel || hasStageSel) ? 'flex' : 'none';
+  if (btnRotate) btnRotate.style.display = hasStageSel ? 'flex' : 'none';
+  if (btnPlace)  btnPlace.style.display  = (editMode === 'edit') ? 'flex' : 'none';
+}
 
 // Keyboard
 window.addEventListener('keydown', function(e) {

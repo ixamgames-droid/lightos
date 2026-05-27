@@ -101,6 +101,10 @@ class VCWidget(QFrame):
         menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
         menu.exec(global_pos)
 
+    def handle_midi(self, msg) -> bool:
+        """Verarbeitet eine MIDI-Message. Gibt True zurück wenn konsumiert."""
+        return False
+
     def _open_properties(self):
         pass  # override in subclasses
 

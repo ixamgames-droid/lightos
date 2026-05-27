@@ -1,6 +1,7 @@
 """VCSlider — Virtual Console Fader Widget."""
 from __future__ import annotations
-from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox, QSizePolicy
+from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
+                                QDialogButtonBox, QSizePolicy, QSpinBox, QLabel)
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient
 from .vc_widget import VCWidget
@@ -26,6 +27,9 @@ class VCSlider(VCWidget):
         self._drag_start_val: int = 0
         self._bg_color = QColor("#1a1a2e")
         self._fg_color = QColor("#ffffff")
+        # MIDI CC binding
+        self.midi_cc: int = -1        # -1 = kein MIDI
+        self.midi_ch: int = 0         # 0 = alle Kanäle
         self.resize(60, 200)
 
     # ── Value ─────────────────────────────────────────────────────────────────
@@ -53,6 +57,18 @@ class VCSlider(VCWidget):
                 executors[slot].fader_value = self._value / 255.0
         elif self.mode == SliderMode.SUBMASTER:
             state.output_manager.set_submaster(self.function_id or 0, self._value / 255.0)
+
+    # ── MIDI ─────────────────────────────────────────────────────────────────
+
+    def handle_midi(self, msg) -> bool:
+        if self.midi_cc < 0 or msg.msg_type != "cc":
+            return False
+        if self.midi_ch != 0 and self.midi_ch != msg.channel:
+            return False
+        if msg.data1 != self.midi_cc:
+            return False
+        self.value = int(msg.data2 / 127.0 * 255)
+        return True
 
     # ── Track geometry ────────────────────────────────────────────────────────
 
@@ -133,6 +149,10 @@ class VCSlider(VCWidget):
         val_rect = QRect(0, 2, self.width(), 14)
         pct = int(self._value / 255 * 100)
         p.drawText(val_rect, Qt.AlignmentFlag.AlignCenter, f"{pct}%")
+
+        # MIDI-Bindung-Indikator oben rechts (cyan dot)
+        if self.midi_cc >= 0:
+            p.fillRect(self.width() - 8, 0, 8, 8, QColor("#00aaff"))
         p.end()
 
     # ── Properties ───────────────────────────────────────────────────────────
@@ -156,6 +176,20 @@ class VCSlider(VCWidget):
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
+        form.addRow(QLabel("── MIDI CC Bindung ──"))
+
+        midi_cc_spin = QSpinBox()
+        midi_cc_spin.setRange(-1, 127)
+        midi_cc_spin.setValue(self.midi_cc)
+        midi_cc_spin.setSpecialValueText("keine")
+        form.addRow("CC-Nummer (-1=keine):", midi_cc_spin)
+
+        midi_ch_spin = QSpinBox()
+        midi_ch_spin.setRange(0, 16)
+        midi_ch_spin.setValue(self.midi_ch)
+        midi_ch_spin.setSpecialValueText("Alle")
+        form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
+
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
             self.mode = mode_cb.currentText()
@@ -167,6 +201,8 @@ class VCSlider(VCWidget):
                 self.function_id = int(slot.text())
             except ValueError:
                 self.function_id = None
+            self.midi_cc = midi_cc_spin.value()
+            self.midi_ch = midi_ch_spin.value()
             self.update()
 
     # ── Serialization ─────────────────────────────────────────────────────────
@@ -178,6 +214,8 @@ class VCSlider(VCWidget):
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["value"] = self._value
+        d["midi_cc"] = self.midi_cc
+        d["midi_ch"] = self.midi_ch
         return d
 
     def apply_dict(self, d: dict):
@@ -187,3 +225,5 @@ class VCSlider(VCWidget):
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 0)
         self._value = d.get("value", 0)
+        self.midi_cc = d.get("midi_cc", -1)
+        self.midi_ch = d.get("midi_ch", 0)

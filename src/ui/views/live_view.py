@@ -1,5 +1,7 @@
 """2D Top-Down Live-View - zeigt alle gepatchten Fixtures aus der Vogelperspektive."""
 from __future__ import annotations
+import math
+import time
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QPushButton, QSlider, QFrame, QSizePolicy)
 from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal
@@ -14,9 +16,25 @@ class FixtureRenderer:
     @staticmethod
     def draw(painter: QPainter, fixture_type: str, x: float, y: float,
              size: float, color: QColor, intensity: int, label: str,
-             selected: bool = False, pan: int = 128, tilt: int = 128):
+             selected: bool = False, pan: int = 128, tilt: int = 128,
+             effects: list = [], anim_phase: float = 0.0,
+             blink_off: bool = False):
         painter.save()
         painter.translate(x, y)
+
+        # Blinkt die Fixture gerade im "Aus"-Phase → Licht ausschalten
+        if blink_off:
+            color = QColor(18, 18, 22)
+            intensity = 0
+
+        # Effekt-Ring (pulsierend, blau) — hinter Selection-Ring
+        if effects:
+            pulse = 0.5 + 0.5 * math.sin(anim_phase * 2 * math.pi)
+            ring_alpha = int(60 + 160 * pulse)
+            ring_color = QColor(80, 160, 255, ring_alpha)
+            painter.setPen(QPen(ring_color, 2, Qt.PenStyle.DashLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(QPointF(0, 0), size * 0.72, size * 0.72)
 
         # Selection-Ring
         if selected:
@@ -126,6 +144,17 @@ class FixtureRenderer:
             painter.drawText(QRectF(-size, -size*0.85, size*2, 12),
                             Qt.AlignmentFlag.AlignCenter, f"{inten_pct}%")
 
+        # FX-Badge oben rechts
+        if effects:
+            badge_rect = QRectF(size*0.25, -size*0.9, 22, 12)
+            painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(badge_rect, 3, 3)
+            painter.setPen(QColor(210, 230, 255))
+            painter.setFont(QFont("Arial", 6, QFont.Weight.Bold))
+            painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter,
+                             f"FX{len(effects)}" if len(effects) > 1 else "FX")
+
         painter.restore()
 
 
@@ -181,6 +210,175 @@ class StageCanvas(QWidget):
                 cx = 300 + cos(angle) * 200
                 cz = 100 + sin(angle) * 80
                 self._positions[f.fid] = (cx, cz)
+
+    def _get_strobe_info(self, fid: int, fixture) -> tuple[float, bool]:
+        """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken."""
+        freq_hz = 0.0
+
+        # 1. Shutter/Strobe-DMX-Kanal auslesen
+        try:
+            universe = self._state.universes.get(fixture.universe)
+            if universe:
+                channels = get_channels_for_patched(fixture)
+                for ch in channels:
+                    if ch.attribute in ("shutter", "strobe"):
+                        addr = fixture.address + ch.channel_number - 1
+                        if 1 <= addr <= 512:
+                            val = universe.get_channel(addr)
+                            if val > 10:
+                                # DMX 11-255 → ~0.5-20 Hz
+                                freq_hz = 0.5 + (val - 11) / 244.0 * 19.5
+        except Exception:
+            pass
+
+        # 2. LayeredEffect mit Square-Wave auf Intensity
+        if freq_hz == 0.0:
+            try:
+                from src.core.engine.effect_layers import LayerType
+                fm = self._state.function_manager
+                for func_id in list(fm._running_ids):
+                    func = fm.get(func_id)
+                    if func is None:
+                        continue
+                    if (hasattr(func, 'fixture_ids') and fid in func.fixture_ids
+                            and hasattr(func, 'layers')
+                            and getattr(func, 'target_attribute', '') == 'intensity'):
+                        for layer in func.layers:
+                            if layer.type == LayerType.SQUARE:
+                                freq_hz = layer.frequency
+                                break
+                    if freq_hz > 0.0:
+                        break
+            except Exception:
+                pass
+
+        if freq_hz == 0.0:
+            return 0.0, True
+
+        # Aktueller On/Off-Zustand anhand Systemzeit berechnen
+        phase = (time.time() * freq_hz) % 1.0
+        return freq_hz, phase < 0.5
+
+    def _get_active_effects(self, fid: int, strobe_hz: float = 0.0) -> list[str]:
+        """Gibt Liste der aktiven Effekt-/Funktionsnamen zurück, die dieses Fixture betreffen."""
+        effects = []
+        if strobe_hz > 0.0:
+            effects.append(f"Strobe  {strobe_hz:.1f} Hz")
+        try:
+            fm = self._state.function_manager
+            for func_id in list(fm._running_ids):
+                func = fm.get(func_id)
+                if func is None:
+                    continue
+                # LayeredEffect hat fixture_ids
+                if hasattr(func, 'fixture_ids') and fid in func.fixture_ids:
+                    effects.append(func.name)
+                # Scene hat _values mit fixture_id
+                elif hasattr(func, '_values'):
+                    if any(sv.fixture_id == fid for sv in func._values):
+                        effects.append(func.name)
+        except Exception:
+            pass
+        # Programmer-Werte
+        try:
+            if self._state.programmer.get(fid):
+                effects.append("Programmer")
+        except Exception:
+            pass
+        return effects
+
+    def _draw_info_box(self, painter: QPainter, fixture, color: QColor,
+                       intensity: int, pan: int, tilt: int,
+                       effects: list[str], fx: float, fy: float):
+        """Zeichnet ein Info-Overlay neben dem selektierten Fixture."""
+        ft_lower = (fixture.fixture_type or "").lower()
+        has_pantilt = "moving" in ft_lower or "head" in ft_lower
+
+        line_h = 15
+        n_lines = 4 + (1 if has_pantilt else 0) + min(len(effects), 3)
+        box_w, box_h = 185, 14 + n_lines * line_h
+
+        # Position: rechts neben Fixture, bei Randüberschreitung links
+        bx = fx + self._fixture_size * 0.85
+        by = fy - box_h // 2
+        if bx + box_w > self.width() - 8:
+            bx = fx - self._fixture_size * 0.85 - box_w
+        by = max(8, min(by, self.height() - box_h - 8))
+
+        # Hintergrund
+        painter.setBrush(QBrush(QColor(12, 14, 32, 230)))
+        painter.setPen(QPen(QColor("#FFD700"), 1))
+        painter.drawRoundedRect(QRectF(bx, by, box_w, box_h), 7, 7)
+
+        tx = bx + 9
+        ty = by + 12
+
+        # Titel
+        painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        painter.setPen(QColor("#FFD700"))
+        name = fixture.label or fixture.fixture_type or "?"
+        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                         Qt.AlignmentFlag.AlignLeft, f"#{fixture.fid}  {name}")
+        ty += line_h + 1
+
+        painter.setFont(QFont("Arial", 9))
+        painter.setPen(QColor("#aaaaaa"))
+        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                         Qt.AlignmentFlag.AlignLeft,
+                         f"Typ: {fixture.fixture_type or '?'}")
+        ty += line_h
+
+        # Farb-Swatch + Hex
+        swatch = QRectF(tx, ty + 2, 11, 11)
+        painter.setBrush(QBrush(color))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(swatch)
+        painter.setPen(QColor("#cccccc"))
+        painter.drawText(QRectF(tx + 14, ty, box_w - 30, line_h),
+                         Qt.AlignmentFlag.AlignLeft,
+                         f"#{color.red():02X}{color.green():02X}{color.blue():02X}"
+                         f"  ({color.red()},{color.green()},{color.blue()})")
+        ty += line_h
+
+        # Intensitäts-Balken
+        pct = int(intensity / 255 * 100)
+        bar_max = box_w - 18
+        bar_fill = int(bar_max * intensity / 255)
+        painter.setBrush(QBrush(QColor(255, 200, 0, 40)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(QRectF(tx, ty + 3, bar_max, 9))
+        painter.setBrush(QBrush(QColor(255, 200, 0, 130)))
+        painter.drawRect(QRectF(tx, ty + 3, bar_fill, 9))
+        painter.setPen(QColor("#FFD700"))
+        painter.setFont(QFont("Arial", 8))
+        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                         Qt.AlignmentFlag.AlignLeft, f"Intensität: {pct}%")
+        ty += line_h
+
+        # Pan/Tilt
+        if has_pantilt:
+            pan_deg = int((pan - 128) / 128 * 270)
+            tilt_deg = int((tilt - 128) / 128 * 135)
+            painter.setPen(QColor("#aaaaaa"))
+            painter.setFont(QFont("Arial", 9))
+            painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                             Qt.AlignmentFlag.AlignLeft,
+                             f"Pan: {pan_deg:+d}°  Tilt: {tilt_deg:+d}°")
+            ty += line_h
+
+        # Effekte
+        if effects:
+            painter.setPen(QColor("#6699ff"))
+            painter.setFont(QFont("Arial", 8))
+            for eff in effects[:3]:
+                painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                                 Qt.AlignmentFlag.AlignLeft, f"~ {eff}")
+                ty += line_h
+        else:
+            painter.setPen(QColor("#555555"))
+            painter.setFont(QFont("Arial", 8))
+            painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
+                             Qt.AlignmentFlag.AlignLeft, "Keine Effekte aktiv")
 
     def _fixture_color_and_intensity(self, fixture) -> tuple[QColor, int]:
         """Liest aktuelle DMX-Werte und gibt Farbe + Intensity zurueck."""
@@ -249,6 +447,10 @@ class StageCanvas(QWidget):
         new_fids = [f.fid for f in fixtures if f.fid not in self._positions]
         if new_fids:
             self._auto_layout_if_empty()
+
+        anim_phase = time.time() % 2.0 / 2.0  # 0..1 über 2 Sekunden (0.5 Hz)
+        info_box_data = None  # (fixture, color, intensity, pan, tilt, effects, x, y)
+
         for fixture in fixtures:
             if fixture.fid not in self._positions:
                 continue
@@ -267,13 +469,24 @@ class StageCanvas(QWidget):
                             elif ch.attribute == "tilt": tilt = v
             except Exception:
                 pass
+            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture)
+            effects = self._get_active_effects(fixture.fid, strobe_hz)
             label = f"{fixture.fid}"
             FixtureRenderer.draw(
                 painter, fixture.fixture_type or "par", x, y,
                 self._fixture_size, color, intensity, label,
                 selected=(fixture.fid in self._selected_fids),
-                pan=pan, tilt=tilt
+                pan=pan, tilt=tilt,
+                effects=effects, anim_phase=anim_phase,
+                blink_off=not blink_on
             )
+            # Info-Box für genau ein selektiertes Fixture vorbereiten
+            if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
+                info_box_data = (fixture, color, intensity, pan, tilt, effects, x, y)
+
+        # Info-Box über allem zeichnen
+        if info_box_data:
+            self._draw_info_box(painter, *info_box_data)
 
         painter.end()
 

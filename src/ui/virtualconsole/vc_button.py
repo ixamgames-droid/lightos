@@ -1,10 +1,17 @@
 """VCButton — Virtual Console Button Widget."""
 from __future__ import annotations
+import os
+import json
 from enum import Enum
-from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QComboBox, QKeySequenceEdit, QDialogButtonBox, QSizePolicy
+from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
+                                QDialogButtonBox, QSizePolicy, QSpinBox, QLabel)
 from PySide6.QtCore import Qt, QRect
-from PySide6.QtGui import QPainter, QColor, QFont, QKeySequence
+from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
+
+_SNAPSHOTS_FILE = os.path.join(
+    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
+)
 
 
 class ButtonAction(str, Enum):
@@ -12,24 +19,106 @@ class ButtonAction(str, Enum):
     FLASH    = "Flash"
     BLACKOUT = "Blackout"
     STOP_ALL = "StopAll"
+    SNAPSHOT = "Snapshot"
 
 
 class VCButton(VCWidget):
-    """Pushbutton — Flash / Toggle / Blackout / StopAll."""
+    """Pushbutton — Flash / Toggle / Blackout / StopAll / Snapshot."""
 
     def __init__(self, caption: str = "Button", parent=None):
         super().__init__(caption, parent)
         self.action = ButtonAction.TOGGLE
-        self.function_id: int | None = None   # linked CueStack slot
+        self.function_id: int | None = None
+        self.snapshot_index: int | None = None
+
+        # MIDI binding (-1 = keine Bindung)
+        self.midi_ch: int = 0          # 0 = alle Kanäle
+        self.midi_data1: int = -1      # Note / CC-Nummer
+        self.midi_type: str = "note_on"
+
         self._pressed = False
+        self._midi_armed = False       # leuchtet auf im MIDI-Learn-Modus
         self._bg_color = QColor("#1a3a5c")
         self._fg_color = QColor("#ffffff")
         self.resize(120, 60)
 
+    # ── MIDI-Learn ───────────────────────────────────────────────────────────
+
+    def arm_midi_learn(self):
+        """Aktiviert den MIDI-Learn-Modus für diesen Button (visuelles Feedback)."""
+        self._midi_armed = True
+        self.update()
+
+    def accept_midi(self, ch: int, data1: int, msg_type: str):
+        """Speichert die empfangene MIDI-Bindung."""
+        self.midi_ch = ch
+        self.midi_data1 = data1
+        self.midi_type = msg_type
+        self._midi_armed = False
+        self.update()
+
+    def matches_midi(self, msg) -> bool:
+        """True wenn die MIDI-Message zu dieser Bindung passt."""
+        if self.midi_data1 < 0:
+            return False
+        if self.midi_type == "note_on":
+            if msg.msg_type not in ("note_on", "note_off"):
+                return False
+        elif self.midi_type != msg.msg_type:
+            return False
+        if self.midi_ch != 0 and self.midi_ch != msg.channel:
+            return False
+        return self.midi_data1 == msg.data1
+
+    def handle_midi(self, msg) -> bool:
+        if not self.matches_midi(msg):
+            return False
+        self.trigger_from_midi(msg)
+        return True
+
+    def trigger_from_midi(self, msg):
+        """Löst den Button durch eine MIDI-Message aus."""
+        if msg.msg_type == "note_on" and msg.data2 > 0:
+            self._pressed = True
+            self._trigger(True)
+            self.update()
+        elif msg.msg_type in ("note_off",) or (msg.msg_type == "note_on" and msg.data2 == 0):
+            self._pressed = False
+            self._trigger(False)
+            self.update()
+        elif msg.msg_type == "cc":
+            press = msg.data2 > 63
+            if press != self._pressed:
+                self._pressed = press
+                self._trigger(press)
+                self.update()
+
+    # ── Snapshot ─────────────────────────────────────────────────────────────
+
+    def _apply_snapshot(self, index: int):
+        try:
+            with open(_SNAPSHOTS_FILE, encoding="utf-8") as f:
+                payload = json.load(f)
+            if not isinstance(payload, list) or index >= len(payload):
+                return
+            snap_data = payload[index]
+            if not snap_data:
+                return
+            raw = snap_data.get("values", {})
+            from src.core.app_state import get_state
+            state = get_state()
+            for k, attrs in raw.items():
+                for attr, val in attrs.items():
+                    try:
+                        state.set_programmer_value(int(k), attr, int(val))
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[VCButton] Snapshot-Apply-Fehler: {e}")
+
     # ── Action ───────────────────────────────────────────────────────────────
 
     def _trigger(self, press: bool):
-        # Solo-Frame: parent informieren wenn dieser Button aktiviert wird (T0.4)
         if press:
             try:
                 from .vc_frame import VCFrame
@@ -44,16 +133,21 @@ class VCButton(VCWidget):
 
         from src.core.app_state import get_state
         state = get_state()
+
         if self.action == ButtonAction.BLACKOUT:
-            if press:
-                state.output_manager.set_blackout(True)
-            else:
-                state.output_manager.set_blackout(False)
+            state.output_manager.set_blackout(bool(press))
             return
+
         if self.action == ButtonAction.STOP_ALL:
             if press:
                 state.playback_engine.stop_all()
             return
+
+        if self.action == ButtonAction.SNAPSHOT:
+            if press and self.snapshot_index is not None:
+                self._apply_snapshot(self.snapshot_index)
+            return
+
         if self.function_id is None:
             return
         slot = self.function_id
@@ -95,14 +189,35 @@ class VCButton(VCWidget):
         p = QPainter(self)
         bg = self._bg_color.lighter(140) if self._pressed else self._bg_color
         p.fillRect(self.rect(), bg)
+
+        # MIDI-Learn-Arm: orange Rahmen pulsieren
+        if self._midi_armed:
+            p.setPen(QPen(QColor("#ff8800"), 3))
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+
         p.setPen(self._fg_color)
         font = QFont("Segoe UI", 9, QFont.Weight.Bold)
         p.setFont(font)
-        p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, self.caption)
+
+        # Snapshot-Index anzeigen wenn Snapshot-Aktion
+        display = self.caption
+        if self.action == ButtonAction.SNAPSHOT and self.snapshot_index is not None:
+            display += f"\n[Snap {self.snapshot_index + 1}]"
+
+        p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+
+        # Farbbalken unten je nach Aktion
         if self.action == ButtonAction.FLASH:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff8800"))
         elif self.action == ButtonAction.BLACKOUT:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+        elif self.action == ButtonAction.SNAPSHOT:
+            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ffd700"))
+
+        # MIDI-Bindung-Indikator oben rechts
+        if self.midi_data1 >= 0:
+            p.fillRect(self.width() - 8, 0, 8, 8, QColor("#00aaff"))
+
         p.end()
 
     # ── Properties dialog ────────────────────────────────────────────────────
@@ -111,19 +226,55 @@ class VCButton(VCWidget):
         dlg = QDialog(self)
         dlg.setWindowTitle("Button Einstellungen")
         form = QFormLayout(dlg)
+
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
+
         act = QComboBox()
         for a in ButtonAction:
             act.addItem(a.value)
         act.setCurrentText(self.action.value)
         form.addRow("Aktion:", act)
+
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
         form.addRow("Executor-Slot:", slot)
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+
+        # Snapshot-Auswahl
+        snap_combo = QComboBox()
+        snap_combo.addItem("(keiner)", -1)
+        self._populate_snapshot_combo(snap_combo)
+        if self.snapshot_index is not None:
+            for i in range(snap_combo.count()):
+                if snap_combo.itemData(i) == self.snapshot_index:
+                    snap_combo.setCurrentIndex(i)
+                    break
+        form.addRow("Snapshot:", snap_combo)
+
+        form.addRow(QLabel("── MIDI-Bindung ──"))
+
+        midi_type_combo = QComboBox()
+        midi_type_combo.addItems(["note_on", "cc"])
+        midi_type_combo.setCurrentText(self.midi_type)
+        form.addRow("MIDI-Typ:", midi_type_combo)
+
+        midi_ch_spin = QSpinBox()
+        midi_ch_spin.setRange(0, 16)
+        midi_ch_spin.setValue(self.midi_ch)
+        midi_ch_spin.setSpecialValueText("Alle")
+        form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
+
+        midi_note_spin = QSpinBox()
+        midi_note_spin.setRange(-1, 127)
+        midi_note_spin.setValue(self.midi_data1)
+        midi_note_spin.setSpecialValueText("keine")
+        form.addRow("Note / CC (-1=keine):", midi_note_spin)
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
+
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
             self.action = ButtonAction(act.currentText())
@@ -131,7 +282,25 @@ class VCButton(VCWidget):
                 self.function_id = int(slot.text())
             except ValueError:
                 self.function_id = None
+            snap_idx = snap_combo.currentData()
+            self.snapshot_index = snap_idx if snap_idx >= 0 else None
+            self.midi_type = midi_type_combo.currentText()
+            self.midi_ch = midi_ch_spin.value()
+            self.midi_data1 = midi_note_spin.value()
             self.update()
+
+    def _populate_snapshot_combo(self, combo: QComboBox):
+        try:
+            with open(_SNAPSHOTS_FILE, encoding="utf-8") as f:
+                payload = json.load(f)
+            if not isinstance(payload, list):
+                return
+            for i, s in enumerate(payload):
+                if s and s.get("values"):
+                    name = s.get("name") or f"Snap {i + 1}"
+                    combo.addItem(f"{i + 1}: {name}", i)
+        except Exception:
+            pass
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -139,9 +308,17 @@ class VCButton(VCWidget):
         d = super().to_dict()
         d["action"] = self.action.value
         d["function_id"] = self.function_id
+        d["snapshot_index"] = self.snapshot_index
+        d["midi_ch"] = self.midi_ch
+        d["midi_data1"] = self.midi_data1
+        d["midi_type"] = self.midi_type
         return d
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
         self.action = ButtonAction(d.get("action", "Toggle"))
         self.function_id = d.get("function_id")
+        self.snapshot_index = d.get("snapshot_index")
+        self.midi_ch = d.get("midi_ch", 0)
+        self.midi_data1 = d.get("midi_data1", -1)
+        self.midi_type = d.get("midi_type", "note_on")
