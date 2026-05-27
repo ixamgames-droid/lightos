@@ -1,0 +1,13 @@
+# Alle Textdateien: LF im Repo, CRLF beim Checkout auf Windows
+* text=auto eol=lf
+
+# Shell-Skripte immer LF
+*.sh text eol=lf
+
+# Windows-Batch immer CRLF
+*.bat text eol=crlf
+
+# Binaere Dateien
+*.png binary
+*.ico binary
+*.db  binary

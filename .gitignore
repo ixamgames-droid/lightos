@@ -1,0 +1,84 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.Python
+
+# ── Virtual Environment ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── User-Laufzeit-Daten ─────────────────────────────────────────────────────
+# Show-Datenbank, MIDI-Mappings, Channel-Modifier - alles user-spezifisch
+data/*.db
+data/*.db-journal
+data/*.json
+
+# Eigene Shows
+shows/*.lshow
+shows/*.lshow.layout.json
+
+# Eigene Fixture-Profile
+fixtures/custom/*
+
+# ── Test-Artefakte ──────────────────────────────────────────────────────────
+.pytest_cache/
+test_imports.py
+test_ui.py
+test_full.py
+test_sync.py
+test_dmx_flow.py
+test_audio.py
+test_round.py
+fix_show_modes.py
+*.log
+app_stderr.txt
+err.txt
+
+# ── Build-Output ────────────────────────────────────────────────────────────
+dist/
+build/
+*.spec
+
+# Vom Installer erstellt
+install_manifest.json
+
+# ── Externes OSS (Referenz, nicht unser Code) ───────────────────────────────
+qlcplus-src/
+qlcplus-master.zip
+blinder-src/
+BlinderKitten-main.zip
+*.zip
+
+# ── IDE / Editor ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ──────────────────────────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── Claude / KI Working Files ───────────────────────────────────────────────
+.claude/
+.aider*
+.cursorignore
+
+# ── Audio/Video Recordings (User-Daten) ─────────────────────────────────────
+recordings/
+*.wav
+*.mp3
+*.mp4
+*.mkv
+
+# ── Backups ─────────────────────────────────────────────────────────────────
+*.bak
+*.backup
+*.orig
