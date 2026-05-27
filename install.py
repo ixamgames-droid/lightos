@@ -164,44 +164,6 @@ def _install_via_temp_requirements(pip_cmd: list[str], lines: list[str], label: 
             pass
 
 
-def _has_cxx_compiler() -> bool:
-    """Prueft ob ein C++ Compiler im PATH verfuegbar ist."""
-    return any(shutil.which(c) for c in ("cl", "g++", "clang++", "clang-cl"))
-
-
-def _install_optional_single(pip_cmd: list[str], req_line: str) -> bool:
-    """Installiert ein optionales Paket. Gibt True zurueck wenn erfolgreich."""
-    name = _requirement_name(req_line)
-
-    if name == "python-rtmidi":
-        # Zuerst Binary-Wheel versuchen (kein Compiler noetig)
-        pkg = req_line.split(";", 1)[0].strip()
-        rc = subprocess.run(
-            pip_cmd + ["install", "--only-binary", ":all:", pkg],
-            capture_output=True,   # Probe - Fehlerausgabe unterdrücken
-        ).returncode
-        if rc == 0:
-            info("python-rtmidi: Binary-Wheel installiert.")
-            return True
-        # Kein Binary-Wheel - Source-Build braucht Compiler
-        if not _has_cxx_compiler():
-            warn(
-                "python-rtmidi: Kein C++-Compiler gefunden.\n"
-                "  MIDI (Legacy-Geraete) bleibt deaktiviert. App startet normal.\n"
-                "  Zum Aktivieren: Visual Studio Build Tools installieren,\n"
-                "  dann: venv\\Scripts\\pip install python-rtmidi"
-            )
-            return False
-        # Compiler vorhanden → Source-Build versuchen
-        info("python-rtmidi: Kompiliere aus Quellcode (Compiler gefunden) ...")
-
-    rc = _install_via_temp_requirements(pip_cmd, [req_line], f"opt_{name.replace('-', '_')}")
-    if rc != 0:
-        warn(f"Optional nicht installiert: {req_line}")
-        return False
-    return True
-
-
 def install_requirements(use_venv: bool):
     py = venv_python() if use_venv else sys.executable
     pip_cmd = [py, "-m", "pip"]
@@ -225,12 +187,17 @@ def install_requirements(use_venv: bool):
 
     if optional_reqs:
         info(f"Installiere optionale Pakete ({len(optional_reqs)}) ...")
-        failed: list[str] = []
-        for req_line in optional_reqs:
-            if not _install_optional_single(pip_cmd, req_line):
-                failed.append(_requirement_name(req_line))
-        if failed:
-            warn(f"Nicht installiert (optional): {', '.join(failed)} -- App startet trotzdem.")
+        opt_rc = _install_via_temp_requirements(pip_cmd, optional_reqs, "optional")
+        if opt_rc != 0:
+            warn(
+                "Optionale Pakete konnten nicht vollstaendig installiert werden. "
+                "Die App startet trotzdem, einzelne Features (MIDI 2.0 / rtmidi) "
+                "koennen fehlen."
+            )
+            for req_line in optional_reqs:
+                rc = _install_via_temp_requirements(pip_cmd, [req_line], "optional_single")
+                if rc != 0:
+                    warn(f"Optional nicht installiert: {req_line}")
 
 
 def create_directories():
@@ -252,11 +219,8 @@ def create_directories():
     return created
 
 
-def create_shortcut(touch: bool = False):
-    """Erstellt eine Desktop-Verknuepfung (nur Windows).
-
-    *touch*: True  → Argumente enthalten --touch (erzwingt Touch-Tastatur).
-    """
+def create_shortcut():
+    """Erstellt eine Desktop-Verknuepfung (nur Windows)."""
     if os.name != "nt":
         return None
     try:
@@ -277,8 +241,7 @@ def create_shortcut(touch: bool = False):
 
     shortcut_path = os.path.join(desktop, "LightOS.lnk")
     target = venv_python()
-    extra = " --touch" if touch else ""
-    arguments = f'"{ROOT / "main.py"}"{extra}'
+    arguments = f'"{ROOT / "main.py"}"'
     working_dir = str(ROOT)
 
     # Verknuepfung via PowerShell erstellen (kein zusaetzliches pip-Paket noetig)
@@ -296,8 +259,7 @@ def create_shortcut(touch: bool = False):
             ["powershell", "-NoProfile", "-Command", ps],
             check=True, capture_output=True
         )
-        label = " (Touch-Modus)" if touch else ""
-        info(f"Verknuepfung erstellt{label}: {shortcut_path}")
+        info(f"Verknuepfung erstellt: {shortcut_path}")
         return shortcut_path
     except Exception as e:
         warn(f"Verknuepfung fehlgeschlagen: {e}")
@@ -343,20 +305,10 @@ def show_summary():
     if os.name == "nt":
         info(f"  {VENV_DIR / 'Scripts' / 'python.exe'} main.py")
         info("oder Desktop-Verknuepfung doppelklicken")
-        info("")
-        info("Touch-Modus (Tablet/Touchscreen):")
-        info("  python install.py --touch   legt Verknuepfung mit --touch an")
-        info("  oder: Ziel der LNK um --touch ergaenzen")
     else:
         info(f"  {VENV_DIR / 'bin' / 'python'} main.py")
     info("")
     info("Beispiel-Setups (vorkonfigurierte Patches/MIDI) siehe examples/")
-    info("")
-    info("APC Mini / MIDI-Controller:")
-    info("  Das Akai APC Mini ist ein USB-Class-Compliant-Geraet — auf Windows 10/11")
-    info("  werden keine separaten Treiber benoetigt. Einfach per USB anschliessen,")
-    info("  dann in LightOS unter Einstellungen → MIDI den Port auswaehlen.")
-    info("  LED-Feedback: In der Virtual Console den Knopf 'APC LEDs' aktivieren.")
     info("")
     info("Deinstallieren mit:")
     info("  python uninstall.py")
@@ -368,8 +320,6 @@ def main():
                    help="Direkt ins aktuelle Python installieren (kein venv)")
     p.add_argument("--no-shortcut", action="store_true",
                    help="Keine Desktop-Verknuepfung erstellen")
-    p.add_argument("--touch", action="store_true",
-                   help="Verknuepfung mit --touch anlegen (erzwingt Touch-Tastatur)")
     p.add_argument("--dev", action="store_true",
                    help="Inklusive Dev-Dependencies (pyinstaller etc.)")
     args = p.parse_args()
@@ -395,7 +345,7 @@ def main():
 
     shortcut = None
     if not args.no_shortcut:
-        shortcut = create_shortcut(touch=args.touch)
+        shortcut = create_shortcut()
 
     write_manifest(created, shortcut)
     show_summary()

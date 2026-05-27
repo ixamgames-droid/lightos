@@ -49,7 +49,7 @@ build/
 # Vom Installer erstellt
 install_manifest.json
 
-# ── Externes OSS (Referenz, nicht unser Code) ───────────────────────────────
+# ── Externes OSS (Referenz, nicht unser Code) ──────────────────────────────────
 qlcplus-src/
 qlcplus-master.zip
 blinder-src/
@@ -68,19 +68,19 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# ── Claude / KI Working Files ───────────────────────────────────────────────
+# ── Claude / KI Working Files ─────────────────────────────────────────────
 .claude/
 .aider*
 .cursorignore
 
-# ── Audio/Video Recordings (User-Daten) ─────────────────────────────────────
+# ── Audio/Video Recordings (User-Daten) ────────────────────────────────────────
 recordings/
 *.wav
 *.mp3
 *.mp4
 *.mkv
 
-# ── Backups ─────────────────────────────────────────────────────────────────
+# ── Backups ──────────────────────────────────────────────────────────────────
 *.bak
 *.backup
 *.orig

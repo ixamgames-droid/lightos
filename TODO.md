@@ -3,12 +3,12 @@
 > Letzte Aktualisierung: 2026-05-27 (automatisch umgesetzt)
 
 ## 1) Stabilitaet & Qualitaet
-- [x] Bestehende Tests (`tests/test_show_file.py`, `tests/test_views.py`) automatisiert in CI laufen lassen → `.github/workflows/ci.yml` angelegt
-- [x] Weitere Unit-Tests fuer Core-Engine (DMX-Merge, Cue-Handling, Undo/Redo) ergaenzen → `tests/test_core_engine.py` (93 Tests: Universe, Cue, CueStack/FadeState, ChannelModifier, cmdline Parser, UndoStack)
+- [x] Bestehende Tests automatisiert in CI laufen lassen → `.github/workflows/ci.yml`
+- [x] Weitere Unit-Tests fuer Core-Engine ergaenzen → `tests/test_core_engine.py` (93 Tests: Universe, Cue, CueStack/FadeState, ChannelModifier, cmdline Parser, UndoStack)
 - [x] Smoke-Test-Checkliste fuer Audio, MIDI, OSC und Web-Remote definieren → `docs/SMOKE_TEST.md`
 
 ## 2) Dokumentation aktualisieren
-- [x] `README.md` um klaren "Quick Start" fuer neue Nutzer erweitern (Install, Start, erste Fixture patchen).
+- [x] `README.md` um klaren "Quick Start" fuer neue Nutzer erweitern.
 - [x] Feature-Dokus in `docs/` um konkrete Praxisbeispiele pro Bereich erweitern → `docs/WORKFLOWS.md`
 - [x] Changelog/Release-Notizen-Struktur einfuehren → `CHANGELOG.md` (Keep-a-Changelog-Format)
 

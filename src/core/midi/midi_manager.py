@@ -10,21 +10,6 @@ try:
 except ImportError:
     RTMIDI_OK = False
 
-try:
-    from .midi_backend_winmm import (
-        WINMM_OK,
-        list_inputs  as _wm_list_inputs,
-        list_outputs as _wm_list_outputs,
-        WinMMInput,
-        WinMMOutput,
-    )
-except Exception:
-    WINMM_OK = False
-    _wm_list_inputs  = lambda: []
-    _wm_list_outputs = lambda: []
-    WinMMInput  = None
-    WinMMOutput = None
-
 
 @dataclass
 class MidiMessage:
@@ -64,74 +49,54 @@ class MidiManager:
         self._virtual_out: object | None = None
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
-        self._learn_cb: Callable[[MidiMessage], None] | None = None
-        self.available = RTMIDI_OK or WINMM_OK
+        self.available = RTMIDI_OK
 
     # ── Port-Listing ─────────────────────────────────────────────────────────
 
     def list_inputs(self) -> list[str]:
-        if RTMIDI_OK:
-            m = rtmidi.MidiIn()
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            del m
-            return ports
-        if WINMM_OK:
-            return _wm_list_inputs()
-        return []
+        if not RTMIDI_OK:
+            return []
+        m = rtmidi.MidiIn()
+        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+        del m
+        return ports
 
     def list_outputs(self) -> list[str]:
-        if RTMIDI_OK:
-            m = rtmidi.MidiOut()
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            del m
-            return ports
-        if WINMM_OK:
-            return _wm_list_outputs()
-        return []
+        if not RTMIDI_OK:
+            return []
+        m = rtmidi.MidiOut()
+        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+        del m
+        return ports
 
     # ── Verbinden ────────────────────────────────────────────────────────────
 
     def open_input(self, port_name: str):
-        if port_name in self._inputs:
+        if not RTMIDI_OK or port_name in self._inputs:
             return
-        if RTMIDI_OK:
-            m = rtmidi.MidiIn()
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            if port_name not in ports:
-                del m
-                return
-            idx = ports.index(port_name)
-            m.open_port(idx)
-            m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
-            self._inputs[port_name] = m
-            self._log(f"MIDI Input geöffnet: {port_name}")
-        elif WINMM_OK:
-            ports = _wm_list_inputs()
-            if port_name not in ports:
-                return
-            idx = ports.index(port_name)
-            m = WinMMInput(idx, port_name, self._on_message)
-            self._inputs[port_name] = m
-            self._log(f"MIDI Input geöffnet (WinMM): {port_name}")
+        m = rtmidi.MidiIn()
+        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+        if port_name not in ports:
+            del m
+            return
+        idx = ports.index(port_name)
+        m.open_port(idx)
+        m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
+        self._inputs[port_name] = m
+        self._log(f"MIDI Input geöffnet: {port_name}")
 
     def open_output(self, port_name: str):
-        if RTMIDI_OK:
-            m = rtmidi.MidiOut()
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            if port_name not in ports:
-                del m
-                return
-            idx = ports.index(port_name)
-            m.open_port(idx)
-            self._output = m
-            self._log(f"MIDI Output geöffnet: {port_name}")
-        elif WINMM_OK:
-            ports = _wm_list_outputs()
-            if port_name not in ports:
-                return
-            idx = ports.index(port_name)
-            self._output = WinMMOutput(idx)
-            self._log(f"MIDI Output geöffnet (WinMM): {port_name}")
+        if not RTMIDI_OK:
+            return
+        m = rtmidi.MidiOut()
+        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+        if port_name not in ports:
+            del m
+            return
+        idx = ports.index(port_name)
+        m.open_port(idx)
+        self._output = m
+        self._log(f"MIDI Output geöffnet: {port_name}")
 
     def open_virtual_input(self, name: str = "LightOS Virtual IN"):
         """Erstellt einen virtuellen MIDI-Eingang (andere Apps können darauf senden)."""
@@ -201,25 +166,9 @@ class MidiManager:
     def subscribe_log(self, cb: Callable[[str], None]):
         self._log_callbacks.append(cb)
 
-    def start_learn(self, callback: Callable[[MidiMessage], None]):
-        """Einmaliger MIDI-Learn: ruft callback(msg) mit der naechsten empfangenen
-        MIDI-Message auf. Normale Callbacks werden danach trotzdem ausgefuehrt."""
-        self._learn_cb = callback
-
-    def cancel_learn(self):
-        """Bricht laufenden MIDI-Learn ab."""
-        self._learn_cb = None
-
     def _on_message(self, raw: list[int], port_name: str):
         msg = _decode(raw, port_name)
         if msg:
-            if self._learn_cb is not None:
-                cb = self._learn_cb
-                self._learn_cb = None
-                try:
-                    cb(msg)
-                except Exception:
-                    pass
             for cb in self._callbacks:
                 try:
                     cb(msg)

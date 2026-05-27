@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
-from .models import Base, Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange
+from .models import Base, Manufacturer, FixtureProfile, FixtureMode, FixtureChannel
 
 DB_PATH = os.path.join(
     os.path.expanduser("~"), "AppData", "Roaming", "LightOS", "fixtures.db"
@@ -134,16 +134,12 @@ def _add_fixture(s, mfr, name, short, ftype, power, modes_data):
         ch_count = len(channels)
         mode = FixtureMode(fixture=f, name=mode_name, channel_count=ch_count)
         s.add(mode)
-        for i, ch_data in enumerate(channels, 1):
-            ch_name, attr, default, highlight = ch_data[:4]
+        for i, (ch_name, attr, default, highlight) in enumerate(channels, 1):
             ch = FixtureChannel(
                 mode=mode, channel_number=i, name=ch_name,
                 attribute=attr, default_value=default, highlight_value=highlight
             )
             s.add(ch)
-            s.flush()
-            for r_from, r_to, r_name in (ch_data[4] if len(ch_data) > 4 else []):
-                s.add(ChannelRange(channel=ch, range_from=r_from, range_to=r_to, name=r_name))
 
 
 def _seed(s: Session):
@@ -320,34 +316,6 @@ def _seed(s: Session):
             ("Weiß",  "color_w",  0, 255),
             ("Amber", "color_a",  0, 255),
             ("UV",    "color_uv", 0, 255),
-        ]),
-    ])
-
-    # ── Generic Stage Light ZQ01424 RGBW ────────────────────────────────────
-    _ZQ_FUNKTION_RANGES = [
-        (  0,   3, "DMX-Kanal-Steuerung"),
-        (  4, 127, "8 Festfarben"),
-        (128, 169, "Sprung (Jump)"),
-        (170, 210, "Übergang (Gradient)"),
-        (211, 229, "Sound 1"),
-        (230, 255, "Sound 2"),
-    ]
-    _add_fixture(s, generic, "Stage Light ZQ01424", "ZQ01424", "par", 30, [
-        ("8-Kanal RGBW", [
-            ("Master Dimmer", "intensity",  0,   255),
-            ("Rot",          "color_r",     0,   255),
-            ("Grün",         "color_g",     0,   255),
-            ("Blau",         "color_b",     0,   255),
-            ("Weiß",         "color_w",     0,   255),
-            ("Strobe",       "shutter",     0,   0),
-            ("Funktion",     "macro",       0,   0,   _ZQ_FUNKTION_RANGES),
-            ("Funk.Speed",   "speed",       0,   0),
-        ]),
-        ("4-Kanal RGBW", [
-            ("Rot",  "color_r", 0, 255),
-            ("Grün", "color_g", 0, 255),
-            ("Blau", "color_b", 0, 255),
-            ("Weiß", "color_w", 0, 255),
         ]),
     ])
 

@@ -185,7 +185,7 @@ class MidiView(QWidget):
         self._refresh_ports()
 
         if not self._midi.available:
-            self._append_log("⚠ Kein MIDI-Backend verfügbar (python-rtmidi und WinMM fehlgeschlagen).")
+            self._append_log("⚠ python-rtmidi nicht verfügbar. MIDI deaktiviert.")
 
     # ── Geräteverwaltung ──────────────────────────────────────────────────────
 

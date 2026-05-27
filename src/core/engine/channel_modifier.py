@@ -22,15 +22,13 @@ class ChannelModifier:
     name: str = ""
     curve: CurveType = CurveType.LINEAR
     custom_lut: list = field(default_factory=list)  # 256 Werte fuer CUSTOM
-    range_min: int = 0       # Sub-Range-Minimum (0-255)
-    range_max: int = 255     # Sub-Range-Maximum (0-255)
 
     def apply(self, value: int) -> int:
         value = max(0, min(255, int(value)))
-        x = value / 255.0
         if self.curve == CurveType.LINEAR:
-            y = x
-        elif self.curve == CurveType.INVERSE:
+            return value
+        x = value / 255.0
+        if self.curve == CurveType.INVERSE:
             y = 1.0 - x
         elif self.curve == CurveType.SCURVE:
             y = x * x * (3.0 - 2.0 * x)
@@ -44,19 +42,12 @@ class ChannelModifier:
             y = math.sqrt(x)
         elif self.curve == CurveType.CUSTOM and len(self.custom_lut) == 256:
             try:
-                curved = max(0, min(255, int(self.custom_lut[value])))
+                return max(0, min(255, int(self.custom_lut[value])))
             except Exception:
-                curved = value
-            y = curved / 255.0
+                return value
         else:
             y = x
-        result = max(0, min(255, int(y * 255)))
-        # Sub-Range-Skalierung: Eingabe 0-255 wird auf range_min..range_max abgebildet
-        if self.range_min != 0 or self.range_max != 255:
-            span = max(0, self.range_max - self.range_min)
-            result = self.range_min + int(result / 255.0 * span)
-            result = max(self.range_min, min(self.range_max, result))
-        return result
+        return max(0, min(255, int(y * 255)))
 
 
 class ChannelModifierManager:
@@ -108,8 +99,6 @@ class ChannelModifierManager:
                 "name": m.name,
                 "curve": m.curve.value,
                 "custom_lut": m.custom_lut,
-                "range_min": m.range_min,
-                "range_max": m.range_max,
             })
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -133,8 +122,6 @@ class ChannelModifierManager:
                     name=d.get("name", ""),
                     curve=CurveType(d.get("curve", "Linear")),
                     custom_lut=d.get("custom_lut", []),
-                    range_min=int(d.get("range_min", 0)),
-                    range_max=int(d.get("range_max", 255)),
                 )
                 self.add(m)
             except Exception:

@@ -40,26 +40,11 @@ class VCCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
-        self._snap_to_grid = True
         self.setMinimumSize(QSize(1200, 800))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
         self._bg = QColor("#0d1117")
-        try:
-            from src.core.midi.midi_manager import get_midi_manager
-            get_midi_manager().subscribe(self._on_midi)
-        except Exception:
-            pass
-
-    def _on_midi(self, msg):
-        """Leitet MIDI-Nachrichten an alle VC-Widgets mit passender Bindung weiter."""
-        for child in self.findChildren(VCWidget):
-            if hasattr(child, "handle_midi"):
-                try:
-                    child.handle_midi(msg)
-                except Exception:
-                    pass
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
@@ -68,12 +53,6 @@ class VCCanvas(QWidget):
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
         self.update()
-
-    def set_snap_to_grid(self, enabled: bool):
-        self._snap_to_grid = enabled
-        for child in self.findChildren(VCWidget):
-            if hasattr(child, '_snap_to_grid'):
-                child._snap_to_grid = enabled
 
     # ── Context menu (right-click on canvas) ──────────────────────────────────
 
@@ -115,12 +94,11 @@ class VCCanvas(QWidget):
         if d:
             w.apply_dict(d)
         else:
-            if self._snap_to_grid:
-                pos = QPoint(
-                    round(pos.x() / self.GRID) * self.GRID,
-                    round(pos.y() / self.GRID) * self.GRID,
-                )
-            w.move(pos)
+            snapped = QPoint(
+                round(pos.x() / self.GRID) * self.GRID,
+                round(pos.y() / self.GRID) * self.GRID,
+            )
+            w.move(snapped)
         w.delete_requested.connect(lambda widget=w: self._remove_widget(widget))
         w.show()
         return w

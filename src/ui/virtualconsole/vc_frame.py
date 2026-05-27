@@ -1,8 +1,7 @@
 """VCFrame — Container widget with optional multi-page support."""
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QCheckBox,
-                                QSpinBox, QDialogButtonBox, QTabBar, QSizePolicy,
-                                QMenu)
+                                QSpinBox, QDialogButtonBox, QTabBar, QSizePolicy)
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
@@ -20,7 +19,6 @@ class VCFrame(VCWidget):
         self._bg_color = QColor("#161b22")
         self._fg_color = QColor("#8b949e")
         self._tab_height = 22
-        self._snap_to_grid = True
         self.resize(300, 200)
         self.setAcceptDrops(True)
 
@@ -34,16 +32,15 @@ class VCFrame(VCWidget):
         self.update()
 
     def on_child_activated(self, child: VCWidget):
-        """Wird vom VC-Button aufgerufen wenn er aktiviert wird.
-        Im Solo-Modus: alle anderen aktiven Children werden deaktiviert."""
+        """Wird vom VC-Button aufgerufen wenn er gepresst/aktiviert wird.
+        Im Solo-Modus: alle anderen Children mit toggle-state werden released."""
         if not self._solo:
             return
         for c in self.findChildren(VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
             if c is child:
                 continue
-            if hasattr(c, "_deactivate"):
-                c._deactivate()
-            elif hasattr(c, "_state") and getattr(c, "_state", False):
+            # VCButton-spezifisch: setze _state auf False und triggere
+            if hasattr(c, "_state") and getattr(c, "_state", False):
                 try:
                     c._state = False
                     if hasattr(c, "_trigger"):
@@ -76,59 +73,6 @@ class VCFrame(VCWidget):
         if self._edit_mode:
             widget.set_edit_mode(True)
         widget.show()
-
-    # ── Widget-Verwaltung ─────────────────────────────────────────────────────
-
-    _GRID = 8
-
-    def set_snap_to_grid(self, enabled: bool):
-        self._snap_to_grid = enabled
-
-    def _add_child_widget(self, wtype: str, pos: QPoint):
-        from .vc_canvas import WIDGET_REGISTRY
-        cls = WIDGET_REGISTRY.get(wtype)
-        if cls is None:
-            return
-        child = cls(parent=self)
-        child.set_edit_mode(self._edit_mode)
-        if self._snap_to_grid:
-            pos = QPoint(
-                round(pos.x() / self._GRID) * self._GRID,
-                round(pos.y() / self._GRID) * self._GRID,
-            )
-        child.move(pos)
-        child.setProperty("vc_page", self._current_page)
-        child.delete_requested.connect(lambda c=child: self._remove_child(c))
-        child.show()
-
-    def _remove_child(self, widget: VCWidget):
-        widget.hide()
-        widget.setParent(None)
-        widget.deleteLater()
-
-    # ── Kontextmenü (überschreibt VCWidget) ──────────────────────────────────
-
-    def _show_context_menu(self, global_pos: QPoint):
-        from .vc_canvas import WIDGET_REGISTRY
-        local_pos = self.mapFromGlobal(global_pos)
-        menu = QMenu(self)
-        menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
-
-        add_menu = menu.addMenu("Widget hinzufügen")
-        for wtype in WIDGET_REGISTRY:
-            act = add_menu.addAction(wtype.replace("VC", ""))
-            act.setData((wtype, local_pos))
-
-        menu.addSeparator()
-        menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
-        menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
-        menu.addSeparator()
-        menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
-
-        chosen = menu.exec(global_pos)
-        if chosen and chosen.data():
-            wtype, pos = chosen.data()
-            self._add_child_widget(wtype, pos)
 
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
@@ -226,17 +170,3 @@ class VCFrame(VCWidget):
         self._page_count = d.get("page_count", 1)
         self._show_header = d.get("show_header", True)
         self._solo = d.get("solo", False)
-        from .vc_canvas import WIDGET_REGISTRY
-        for cd in d.get("children", []):
-            wtype = cd.get("type", "")
-            cls = WIDGET_REGISTRY.get(wtype)
-            if cls is None:
-                continue
-            child = cls(parent=self)
-            child.apply_dict(cd)
-            page = cd.get("vc_page", 0)
-            child.setProperty("vc_page", page)
-            child.setVisible(page == self._current_page)
-            child.set_edit_mode(self._edit_mode)
-            child.delete_requested.connect(lambda c=child: self._remove_child(c))
-            child.show()

@@ -73,7 +73,7 @@ class VCSpeedDial(VCWidget):
 
     def _bpm_to_angle(self) -> float:
         t = (self._bpm - self._min_bpm) / (self._max_bpm - self._min_bpm)
-        return 225.0 - t * 270.0   # 225° (unten-links, min) → -45° (unten-rechts, max)
+        return -225 + t * 270   # degrees: -225° (min) → 45° (max)
 
     # ── Mouse ─────────────────────────────────────────────────────────────────
 

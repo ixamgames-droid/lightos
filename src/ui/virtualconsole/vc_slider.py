@@ -72,11 +72,6 @@ class VCSlider(VCWidget):
             super().mousePressEvent(event)
             return
         if event.button() == Qt.MouseButton.LeftButton:
-            # Direkt zur angeklickten Position springen
-            tr = self._track_rect()
-            y = event.position().toPoint().y()
-            ratio = (y - tr.y()) / max(1, tr.height())
-            self.value = int((1.0 - max(0.0, min(1.0, ratio))) * 255)
             self._drag_y = event.position().toPoint().y()
             self._drag_start_val = self._value
         event.accept()
@@ -104,26 +99,6 @@ class VCSlider(VCWidget):
             return
         steps = event.angleDelta().y() // 120
         self.value = self._value + steps * 5
-
-    # ── MIDI ─────────────────────────────────────────────────────────────────
-
-    def handle_midi(self, msg):
-        """Wird vom VCCanvas aufgerufen wenn eine MIDI-Nachricht eingeht."""
-        b = self.midi_binding
-        if b is None:
-            return
-        if b.get("msg_type") != msg.msg_type:
-            return
-        ch = b.get("channel", 0)
-        if ch != 0 and ch != msg.channel:
-            return
-        if b.get("data1") != msg.data1:
-            return
-        pf = b.get("port_filter", "")
-        if pf and pf not in msg.port_name:
-            return
-        # CC-Wert 0-127 → Slider-Wert 0-255
-        self.value = int(msg.data2 / 127.0 * 255)
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 
@@ -163,8 +138,6 @@ class VCSlider(VCWidget):
     # ── Properties ───────────────────────────────────────────────────────────
 
     def _open_properties(self):
-        from PySide6.QtWidgets import QHBoxLayout
-        from PySide6.QtCore import QTimer
         dlg = QDialog(self)
         dlg.setWindowTitle("Fader Einstellungen")
         form = QFormLayout(dlg)
@@ -179,64 +152,6 @@ class VCSlider(VCWidget):
         form.addRow("DMX-Kanal (Level-Modus):", ch)
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
         form.addRow("Executor-Slot (Playback):", slot)
-
-        # MIDI-Bindung
-        _binding = [self.midi_binding.copy() if self.midi_binding else None]
-
-        def _binding_text():
-            b = _binding[0]
-            if b is None:
-                return "Keine"
-            return f"{b.get('msg_type','')} / CH{b.get('channel',0)} / CC/Note {b.get('data1',0)}"
-
-        midi_display = QLabel(_binding_text())
-        midi_display.setStyleSheet("color:#58a6ff; font-size:10px;")
-        btn_learn = QPushButton("MIDI Lernen")
-        btn_learn.setFixedHeight(22)
-        btn_clear_midi = QPushButton("Loeschen")
-        btn_clear_midi.setFixedHeight(22)
-
-        def on_learn():
-            try:
-                from src.core.midi.midi_manager import get_midi_manager
-                btn_learn.setText("Warte auf MIDI...")
-                btn_learn.setEnabled(False)
-                midi = get_midi_manager()
-                def on_msg(msg):
-                    _binding[0] = {
-                        "msg_type": msg.msg_type,
-                        "channel": msg.channel,
-                        "data1": msg.data1,
-                        "port_filter": msg.port_name,
-                    }
-                    def _update_ui():
-                        midi_display.setText(_binding_text())
-                        btn_learn.setText("MIDI Lernen")
-                        btn_learn.setEnabled(True)
-                    QTimer.singleShot(0, _update_ui)
-                midi.start_learn(on_msg)
-            except Exception as e:
-                btn_learn.setText("MIDI Lernen")
-                btn_learn.setEnabled(True)
-                print(f"[VCSlider] MIDI Learn Fehler: {e}")
-
-        def on_clear_midi():
-            _binding[0] = None
-            midi_display.setText("Keine")
-
-        btn_learn.clicked.connect(on_learn)
-        btn_clear_midi.clicked.connect(on_clear_midi)
-
-        from PySide6.QtWidgets import QWidget as _QWidget
-        midi_row = _QWidget()
-        midi_row_layout = QHBoxLayout(midi_row)
-        midi_row_layout.setContentsMargins(0, 0, 0, 0)
-        midi_row_layout.setSpacing(4)
-        midi_row_layout.addWidget(midi_display, stretch=1)
-        midi_row_layout.addWidget(btn_learn)
-        midi_row_layout.addWidget(btn_clear_midi)
-        form.addRow("MIDI-Bindung:", midi_row)
-
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -252,7 +167,6 @@ class VCSlider(VCWidget):
                 self.function_id = int(slot.text())
             except ValueError:
                 self.function_id = None
-            self.midi_binding = _binding[0]
             self.update()
 
     # ── Serialization ─────────────────────────────────────────────────────────

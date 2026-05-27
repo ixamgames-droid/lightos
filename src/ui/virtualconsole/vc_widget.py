@@ -8,7 +8,7 @@ from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 class VCWidget(QFrame):
     """Basisklasse — abstrakt, nicht direkt instanziieren."""
 
-    HANDLE_SIZE = 14
+    HANDLE_SIZE = 8
     MIN_SIZE = (40, 30)
 
     moved = Signal(int, int)       # x, y
@@ -25,12 +25,9 @@ class VCWidget(QFrame):
         self._orig_rect = QRect()
         self._bg_color = QColor("#2a2a2a")
         self._fg_color = QColor("#ffffff")
-        # MIDI-Bindung: {"msg_type": "note_on"/"cc", "channel": 1, "data1": 0, "port_filter": "APC"}
-        self.midi_binding: dict | None = None
         self.setFrameShape(QFrame.Shape.Box)
         self.setFrameShadow(QFrame.Shadow.Raised)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setMouseTracking(True)
 
     # ── Edit Mode ─────────────────────────────────────────────────────────────
 
@@ -72,16 +69,10 @@ class VCWidget(QFrame):
     def mouseMoveEvent(self, event):
         if not self._edit_mode:
             return
-        pos = event.position().toPoint()
         delta = event.globalPosition().toPoint() - self._drag_start
         if self._dragging and self.parent():
             nx = max(0, self._orig_rect.x() + delta.x())
             ny = max(0, self._orig_rect.y() + delta.y())
-            p = self.parent()
-            grid = getattr(p, 'GRID', None) or getattr(p, '_GRID', 0)
-            if getattr(p, '_snap_to_grid', False) and grid:
-                nx = round(nx / grid) * grid
-                ny = round(ny / grid) * grid
             self.move(nx, ny)
             self.moved.emit(nx, ny)
         elif self._resizing:
@@ -89,11 +80,6 @@ class VCWidget(QFrame):
             nh = max(self.MIN_SIZE[1], self._orig_rect.height() + delta.y())
             self.resize(nw, nh)
             self.resized.emit(nw, nh)
-        else:
-            if self._is_resize_handle(pos):
-                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
-            else:
-                self.setCursor(Qt.CursorShape.SizeAllCursor)
         event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -137,16 +123,12 @@ class VCWidget(QFrame):
         p = QPainter(self)
         p.fillRect(self.rect(), self._bg_color)
         if self._edit_mode:
+            # Resize-Handle
             hs = self.HANDLE_SIZE
             r = self.rect()
+            p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
             p.setPen(QPen(QColor("#0088ff"), 1, Qt.PenStyle.DashLine))
             p.drawRect(r.adjusted(0, 0, -1, -1))
-            # Resize-Handle (diagonal gestreift)
-            p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
-            p.setPen(QPen(QColor("#ffffff"), 1))
-            for i in range(3, hs, 4):
-                p.drawLine(r.right() - hs + i, r.bottom() - 2,
-                           r.right() - 2,      r.bottom() - hs + i)
         p.end()
 
     # ── Serialisierung ────────────────────────────────────────────────────────
@@ -160,7 +142,6 @@ class VCWidget(QFrame):
             "w": g.width(), "h": g.height(),
             "bg": self._bg_color.name(),
             "fg": self._fg_color.name(),
-            "midi_binding": self.midi_binding,
         }
 
     def apply_dict(self, d: dict):
@@ -171,4 +152,3 @@ class VCWidget(QFrame):
             self._bg_color = QColor(d["bg"])
         if "fg" in d:
             self._fg_color = QColor(d["fg"])
-        self.midi_binding = d.get("midi_binding")

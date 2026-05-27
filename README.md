@@ -97,8 +97,8 @@ Fuer neue Nutzer — von null zum ersten Lichteffekt in 5 Minuten.
 
 ### 2. Installieren
 ```cmd
-git clone <repo-url>
-cd LightOS
+git clone https://github.com/ixamgames-droid/lightos.git
+cd lightos
 python install.py
 ```
 Das Script erstellt ein `venv/`, installiert alle Abhaengigkeiten und legt eine Desktop-Verknuepfung an.

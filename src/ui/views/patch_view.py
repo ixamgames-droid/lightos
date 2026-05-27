@@ -182,9 +182,6 @@ class PatchView(QWidget):
         btn_delete.clicked.connect(self._delete_selected)
         btn_autopatch = QPushButton("Auto-Patch")
         btn_autopatch.clicked.connect(self._auto_patch)
-        btn_ranges = QPushButton("Kanal-Ranges...")
-        btn_ranges.setToolTip("Kanal auf einen Sub-Range (z.B. nur Gradient 170–210) sperren")
-        btn_ranges.clicked.connect(self._open_range_lock)
 
         self._lbl_conflict = QLabel("")
         self._lbl_conflict.setStyleSheet("color: #ff4444; font-weight: bold;")
@@ -192,7 +189,6 @@ class PatchView(QWidget):
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
         toolbar.addWidget(btn_autopatch)
-        toolbar.addWidget(btn_ranges)
         toolbar.addStretch()
         toolbar.addWidget(self._lbl_conflict)
         layout.addLayout(toolbar)
@@ -299,25 +295,6 @@ class PatchView(QWidget):
         if not fixtures:
             return
         self._state.auto_patch_fixtures()
-
-    def _open_range_lock(self):
-        rows = {idx.row() for idx in self._table.selectedIndexes()}
-        if not rows:
-            QMessageBox.information(self, "Kanal-Ranges", "Bitte zuerst ein Gerät auswählen.")
-            return
-        fixtures = self._state.get_patched_fixtures()
-        row = min(rows)
-        if row >= len(fixtures):
-            return
-        fixture = fixtures[row]
-        try:
-            from src.core.engine.channel_modifier import get_modifier_manager
-            from src.ui.widgets.channel_range_lock_dialog import ChannelRangeLockDialog
-            mgr = get_modifier_manager()
-            dlg = ChannelRangeLockDialog(fixture, mgr, self)
-            dlg.exec()
-        except Exception as e:
-            QMessageBox.warning(self, "Fehler", f"Kanal-Ranges konnten nicht geöffnet werden:\n{e}")
 
     def _on_double_click(self, index):
         row = index.row()

@@ -115,7 +115,7 @@ class ColorWheel(QWidget):
                       int(radius * 2), int(radius * 2))
 
         # Marker
-        angle = math.radians((90 - self._hue) % 360)
+        angle = math.radians(self._hue)
         r = self._sat * radius
         mx = cx + math.cos(angle) * r
         my = cy - math.sin(angle) * r
@@ -141,7 +141,7 @@ class ColorWheel(QWidget):
             return
         sat = min(1.0, dist / radius)
         angle = math.degrees(math.atan2(dy, dx)) % 360
-        self._hue = (90 - angle) % 360
+        self._hue = angle
         self._sat = sat
         self.update()
         self.color_changed.emit(self.color())
