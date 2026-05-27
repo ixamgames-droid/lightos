@@ -26,6 +26,7 @@ shows/*.lshow.layout.json
 fixtures/custom/*
 
 # ── Test-Artefakte ──────────────────────────────────────────────────────────
+.pytest_cache/
 test_imports.py
 test_ui.py
 test_full.py

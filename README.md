@@ -86,6 +86,71 @@ blackout           # Blackout toggle
 
 ---
 
+## Quick Start
+
+Fuer neue Nutzer — von null zum ersten Lichteffekt in 5 Minuten.
+
+### 1. Voraussetzungen
+- Windows 10/11 (x64 oder ARM64)
+- Python 3.11+ — Download: https://www.python.org/downloads/windows/
+  (ARM64-Geraete: "ARM64"-Installer auswaehlen)
+
+### 2. Installieren
+```cmd
+git clone https://github.com/ixamgames-droid/lightos.git
+cd lightos
+python install.py
+```
+Das Script erstellt ein `venv/`, installiert alle Abhaengigkeiten und legt eine Desktop-Verknuepfung an.
+
+Detaillierte Optionen und Troubleshooting: **[INSTALL.md](INSTALL.md)**
+
+### 3. Starten
+```cmd
+venv\Scripts\python main.py
+```
+Oder die Desktop-Verknuepfung doppelklicken (nach `install.py`).
+
+**PowerShell / start.ps1:**
+```powershell
+.\start.ps1
+```
+
+### 4. Erstes Fixture patchen
+1. Oben links: **Patch**-Tab oeffnen
+2. **"+ Fixture"** klicken → Hersteller/Modell suchen (z.B. "Generic RGB")
+3. Universe `1`, Adresse `1`, Anzahl `1` → **Patchen**
+4. Fixture taucht in der Liste auf (FID 1)
+
+### 5. Wert setzen (Programmer)
+- **Programmer**-Tab oeffnen → FID 1 anklicken
+- Dimmer-Slider auf 100 % ziehen
+- Oder Command-Line (`>`) eingeben: `1 @ full`
+
+### 6. Cue aufnehmen
+```
+record cue 1
+```
+in der Command-Line — der aktuelle Programmer-Zustand wird als Cue 1 gespeichert.
+
+### 7. Cue abspielen
+```
+go 1
+```
+Startet den ersten Executor. Mehr Playback-Optionen im **Playback**-Tab.
+
+---
+
+## Tests ausfuehren
+
+```cmd
+venv\Scripts\python -m pytest tests/ -v
+```
+
+Alle Tests laufen ohne Hardware oder GUI (offscreen).
+
+---
+
 ## Installation
 
 Siehe **[INSTALL.md](INSTALL.md)** fuer Schritt-fuer-Schritt-Anleitung.

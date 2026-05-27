@@ -1,16 +1,16 @@
 # TODO / Next Steps
 
-> Letzte Aktualisierung: 2026-05-26
+> Letzte Aktualisierung: 2026-05-27
 
 ## 1) Stabilitaet & Qualitaet
-- [ ] Bestehende Tests (`tests/test_show_file.py`, `tests/test_views.py`) automatisiert in CI laufen lassen.
-- [ ] Weitere Unit-Tests fuer Core-Engine (DMX-Merge, Cue-Handling, Undo/Redo) ergaenzen.
+- [x] Bestehende Tests automatisiert in CI laufen lassen → `.github/workflows/ci.yml`
+- [x] Weitere Unit-Tests fuer Core-Engine ergaenzen → `tests/test_core_engine.py` (93 Tests: Universe, Cue, CueStack/FadeState, ChannelModifier, cmdline Parser, UndoStack)
 - [ ] Smoke-Test-Checkliste fuer Audio, MIDI, OSC und Web-Remote definieren.
 
 ## 2) Dokumentation aktualisieren
-- [ ] `README.md` um klaren "Quick Start" fuer neue Nutzer erweitern (Install, Start, erste Fixture patchen).
+- [x] `README.md` um klaren "Quick Start" fuer neue Nutzer erweitern.
 - [ ] Feature-Dokus in `docs/` um konkrete Praxisbeispiele pro Bereich erweitern (Art-Net, DMX, UI-Workflows).
-- [ ] Changelog/Release-Notizen-Struktur einfuehren (z. B. pro Version oder Monatsstand).
+- [x] Changelog/Release-Notizen-Struktur einfuehren → `CHANGELOG.md` (Keep-a-Changelog-Format)
 
 ## 3) Packaging & Betrieb
 - [ ] Installer/Uninstaller (`install.py`, `uninstall.py`) gegen frische Windows-Setups testen.
