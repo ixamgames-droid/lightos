@@ -23,6 +23,8 @@ if exist "venv\Scripts\python.exe" (
     set PYTHON=python
 )
 
+echo [start] Verwende Python: %PYTHON%
+
 REM Main starten
 "%PYTHON%" main.py %*
 

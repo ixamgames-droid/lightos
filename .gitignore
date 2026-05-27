@@ -18,9 +18,11 @@ data/*.db
 data/*.db-journal
 data/*.json
 
-# Eigene Shows
+# Eigene Shows (user-spezifisch, nicht versioniert)
 shows/*.lshow
 shows/*.lshow.layout.json
+# Demo-Shows werden versioniert
+!shows/demo_*.lshow
 
 # Eigene Fixture-Profile
 fixtures/custom/*
