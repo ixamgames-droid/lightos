@@ -41,6 +41,20 @@ Wird nur einmal benoetigt nach Fixture-Profil-Updates.
 python examples\fix_cq6136_rgbw.py
 ```
 
+### `midi_color_chase_test.py`
+APC Mini LED-Selbsttest (mk1/mk2):
+- laesst Grid + Randbuttons in mehreren Mustern laufen
+- prueft schnell, ob alle LEDs reagieren
+- raeumt am Ende alle LEDs wieder auf
+
+```cmd
+python examples\midi_color_chase_test.py --layout mk2 --color-mode full --loops 1 --step-ms 25
+```
+
+Hinweis:
+- `--layout auto` erkennt per Port-Name; bei unklarer Bezeichnung ist `--layout both` robust.
+- `--color-mode auto` nutzt auf mk2 automatisch die volle Farbpalette (127 Farben).
+
 ## Eigenes Beispiel schreiben
 
 Vorlage:

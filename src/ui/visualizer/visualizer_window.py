@@ -38,8 +38,8 @@ from src.core.stage.stage_definition import (
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 
-# Positions-Cache: {fid: (x, y, z)}
-_POSITIONS: dict[int, tuple[float, float, float]] = {}
+# Fixture-Positionen leben in AppState.visualizer_positions ({fid: (x, y, z)})
+# und werden mit der Show (.lshow) persistiert. Zugriff ueber self._state.
 
 
 # ============================================================================
@@ -117,8 +117,8 @@ class VisualizerBridge(QObject):
         try:
             pos = json.loads(pos_json)
             for f in self._state.get_patched_fixtures():
-                if f.fid not in _POSITIONS:
-                    _POSITIONS[f.fid] = (
+                if f.fid not in self._state.visualizer_positions:
+                    self._state.visualizer_positions[f.fid] = (
                         float(pos["x"]),
                         float(pos.get("y", 6.5)),
                         float(pos["z"]),
@@ -134,7 +134,7 @@ class VisualizerBridge(QObject):
         """JS meldet neue Fixture-Position (nach Drag)."""
         try:
             fid = int(fid_str)
-            _POSITIONS[fid] = (float(x), float(y), float(z))
+            self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
             self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
         except Exception as e:
             print(f"[Visualizer] fixturePositionChanged error: {e}")
@@ -151,7 +151,7 @@ class VisualizerBridge(QObject):
     def fixtureDeleted(self, fid_str: str):
         try:
             fid = int(fid_str)
-            _POSITIONS.pop(fid, None)
+            self._state.visualizer_positions.pop(fid, None)
             self.pyFixtureDeleted.emit(fid)
         except Exception as e:
             print(f"[Visualizer] fixtureDeleted error: {e}")
@@ -190,13 +190,13 @@ class VisualizerBridge(QObject):
     # ── Python -> JS helpers ────────────────────────────────────────────────
 
     def place_fixture_at(self, fid: int, x: float, y: float, z: float):
-        _POSITIONS[fid] = (x, y, z)
+        self._state.visualizer_positions[fid] = (x, y, z)
         fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
         if fid in fixtures:
             self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(fixtures[fid])))
 
     def remove_fixture_from_scene(self, fid: int):
-        _POSITIONS.pop(fid, None)
+        self._state.visualizer_positions.pop(fid, None)
         self.fixtureRemoved.emit(fid)
 
     def push_dmx_update(self, fid: int, attrs: dict[str, int]):
@@ -279,7 +279,7 @@ class VisualizerBridge(QObject):
     # ── interne helpers ─────────────────────────────────────────────────────
 
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
-        pos = _POSITIONS.get(f.fid, (0.0, 6.5, 0.0))
+        pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
         return {
             "fid": f.fid,
             "label": f.label,
@@ -293,13 +293,13 @@ class VisualizerBridge(QObject):
         return [
             self._fixture_to_dict(f)
             for f in self._state.get_patched_fixtures()
-            if f.fid in _POSITIONS
+            if f.fid in self._state.visualizer_positions
         ]
 
     def _on_state(self, event: str, data):
         if event == "patch_changed":
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
-            stale = [fid for fid in list(_POSITIONS) if fid not in current_fids]
+            stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
                 self.remove_fixture_from_scene(fid)
 
@@ -725,12 +725,37 @@ class VisualizerWindow(QMainWindow):
             return
         QTimer.singleShot(400, self._push_initial_state)
 
+    def _apply_active_stage_from_state(self):
+        """Setzt die in AppState gespeicherte Buehne (Preset-Key oder User-Name)
+        als aktuelle Stage und synchronisiert die Combo-Auswahl."""
+        name = getattr(self._state, "active_stage_name", "simple") or "simple"
+        stage = None
+        combo_kind = combo_name = None
+        if name in DEFAULT_PRESETS:
+            try:
+                stage = DEFAULT_PRESETS[name]()
+                combo_kind, combo_name = "default", name
+            except Exception as e:
+                print(f"[Visualizer] default stage '{name}' error: {e}")
+        else:
+            loaded = load_stage(name)
+            if loaded:
+                stage = loaded
+                combo_kind, combo_name = "user", name
+        if stage is None:
+            stage = get_default_simple()
+            combo_kind, combo_name = "default", "simple"
+        self._current_stage = stage
+        self._selected_stage_id = ""
+        self._select_stage_in_combo(combo_kind, combo_name)
+        self._apply_stage(self._current_stage)
+
     def _push_initial_state(self):
         try:
             self._bridge.push_settings(self._collect_settings())
             self._bridge.push_view_mode(self._combo_view.currentData() or "3D")
             self._bridge.push_edit_mode(self._combo_edit.currentData() or "view")
-            self._apply_stage(self._current_stage)
+            self._apply_active_stage_from_state()
             self._bridge.requestFixtures()
             self._refresh_patch_list()
         except Exception as e:
@@ -745,7 +770,7 @@ class VisualizerWindow(QMainWindow):
     def _push_dmx_updates(self):
         try:
             for fixture in self._state.get_patched_fixtures():
-                if fixture.fid not in _POSITIONS:
+                if fixture.fid not in self._state.visualizer_positions:
                     continue
                 if fixture.universe not in self._state.universes:
                     continue
@@ -766,11 +791,11 @@ class VisualizerWindow(QMainWindow):
         self._patch_list.blockSignals(True)
         self._patch_list.clear()
         for f in self._state.get_patched_fixtures():
-            mark = "[X] " if f.fid in _POSITIONS else "[ ] "
+            mark = "[X] " if f.fid in self._state.visualizer_positions else "[ ] "
             item = QListWidgetItem(f"{mark}[{f.fid:03d}] {f.label} ({f.fixture_type})")
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
-        count = len(_POSITIONS)
+        count = len(self._state.visualizer_positions)
         self._lbl_info.setText(f"{count} Fixture(s) in Szene  |  {len(self._current_stage.elements)} Buehnen-Elemente")
         self._patch_list.blockSignals(False)
 
@@ -779,8 +804,8 @@ class VisualizerWindow(QMainWindow):
         if not item:
             return
         fid = item.data(Qt.ItemDataRole.UserRole)
-        if fid in _POSITIONS:
-            x, y, z = _POSITIONS[fid]
+        if fid in self._state.visualizer_positions:
+            x, y, z = self._state.visualizer_positions[fid]
             self._suppress_property_signals = True
             try:
                 self._spin_x.setValue(x)
@@ -813,16 +838,16 @@ class VisualizerWindow(QMainWindow):
         if not item:
             return
         fid = item.data(Qt.ItemDataRole.UserRole)
-        if fid not in _POSITIONS:
+        if fid not in self._state.visualizer_positions:
             return
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
-        _POSITIONS[fid] = (x, y, z)
+        self._state.visualizer_positions[fid] = (x, y, z)
         self._bridge.push_apply_fixture_transform(fid, x, y, z, 0.0)
 
     def _clear_positions(self):
-        for fid in list(_POSITIONS):
+        for fid in list(self._state.visualizer_positions):
             self._bridge.remove_fixture_from_scene(fid)
-        _POSITIONS.clear()
+        self._state.visualizer_positions.clear()
         self._refresh_patch_list()
 
     # ── Fixture-Bridge-Slots (JS -> Python) ─────────────────────────────────
@@ -851,7 +876,7 @@ class VisualizerWindow(QMainWindow):
                 break
 
     def _on_fixture_deleted_from_js(self, fid: int):
-        _POSITIONS.pop(fid, None)
+        self._state.visualizer_positions.pop(fid, None)
         self._refresh_patch_list()
 
     # ── Stage-Tab actions ───────────────────────────────────────────────────
@@ -898,6 +923,7 @@ class VisualizerWindow(QMainWindow):
         else:
             return
         self._selected_stage_id = ""
+        self._state.active_stage_name = name
         self._apply_stage(self._current_stage)
         self._refresh_patch_list()
 
@@ -1107,6 +1133,7 @@ class VisualizerWindow(QMainWindow):
             # Combo neu aufbauen UND die soeben gespeicherte Buehne auswaehlen
             self._reload_stage_combo()
             self._select_stage_in_combo("user", name.strip())
+            self._state.active_stage_name = name.strip()
         else:
             QMessageBox.warning(self, "Fehler", "Konnte Buehne nicht speichern.")
 
@@ -1330,3 +1357,11 @@ class VisualizerWindow(QMainWindow):
     def _on_state(self, event: str, _data):
         if event == "patch_changed":
             self._refresh_patch_list()
+        elif event == "show_loaded":
+            # Neue Show geladen -> Stage + Fixture-Positionen aus AppState uebernehmen
+            try:
+                self._apply_active_stage_from_state()
+                self._bridge.requestFixtures()
+                self._refresh_patch_list()
+            except Exception as e:
+                print(f"[Visualizer] show_loaded handling error: {e}")

@@ -10,7 +10,7 @@ import copy
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
     QListWidget, QListWidgetItem, QGroupBox, QScrollArea, QFrame,
-    QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog
+    QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter
@@ -148,22 +148,39 @@ class ProgrammerView(QWidget):
         left_w.setFixedWidth(220)
         body.addWidget(left_w)
 
-        # Rechts: Tab-Editor
-        right = QVBoxLayout()
+        # Rechts: Tab-Editor + Snap-Bibliothek (Splitter)
+        right_top = QWidget()
+        right_top_layout = QVBoxLayout(right_top)
+        right_top_layout.setContentsMargins(0, 0, 0, 0)
+        right_top_layout.setSpacing(4)
+
         self._lbl_selection = QLabel("Kein Geraet ausgewaehlt")
         self._lbl_selection.setObjectName("label_header")
-        right.addWidget(self._lbl_selection)
+        right_top_layout.addWidget(self._lbl_selection)
 
         self._color_preview = ColorPreview([], self._state)
-        right.addWidget(self._color_preview)
+        right_top_layout.addWidget(self._color_preview)
 
         self._attr_tabs = QTabWidget()
         self._attr_tabs.setTabPosition(QTabWidget.TabPosition.North)
-        right.addWidget(self._attr_tabs, stretch=1)
+        right_top_layout.addWidget(self._attr_tabs, stretch=1)
 
-        right_w = QWidget()
-        right_w.setLayout(right)
-        body.addWidget(right_w, stretch=1)
+        try:
+            from src.ui.views.snap_file_panel import SnapFilePanel
+            self._snap_file_panel = SnapFilePanel()
+        except Exception as e:
+            print(f"[programmer_view] snap_file_panel load error: {e}")
+            self._snap_file_panel = QWidget()
+
+        right_splitter = QSplitter(Qt.Orientation.Horizontal)
+        right_splitter.addWidget(right_top)
+        right_splitter.addWidget(self._snap_file_panel)
+        right_splitter.setSizes([760, 320])
+        right_splitter.setStretchFactor(0, 3)
+        right_splitter.setStretchFactor(1, 1)
+        right_splitter.setChildrenCollapsible(False)
+
+        body.addWidget(right_splitter, stretch=1)
 
         root.addLayout(body, stretch=1)
 

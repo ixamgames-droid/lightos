@@ -241,6 +241,25 @@ class VirtualConsoleView(QWidget):
         self._btn_edit.toggled.connect(self._toggle_edit)
         tb_layout.addWidget(self._btn_edit)
 
+        self._btn_snap = QPushButton("⊞ Snap")
+        self._btn_snap.setCheckable(True)
+        self._btn_snap.setChecked(False)
+        self._btn_snap.setFixedHeight(26)
+        self._btn_snap.setToolTip(
+            "Snap auf Grid — Widgets rasten beim Verschieben und Skalieren\n"
+            "am Raster ein (Grid-Größe: 8 px)"
+        )
+        self._btn_snap.setStyleSheet("""
+            QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
+            QPushButton:hover:!disabled { background:#30363d; color:#e6edf3; }
+            QPushButton:disabled { color:#484f58; border-color:#21262d; }
+        """)
+        self._btn_snap.setEnabled(False)
+        self._btn_snap.toggled.connect(self._toggle_snap)
+        tb_layout.addWidget(self._btn_snap)
+
         tb_layout.addSpacing(8)
 
         # Widget quick-add buttons
@@ -397,9 +416,13 @@ class VirtualConsoleView(QWidget):
         self._edit_mode = enabled
         self._btn_edit.setText("Bearbeiten ✓" if enabled else "Bearbeiten")
         self._canvas.set_edit_mode(enabled)
+        self._btn_snap.setEnabled(enabled)
         for btn in self._toolbar_widget.findChildren(QPushButton):
             if btn.property("add_btn"):
                 btn.setEnabled(enabled)
+
+    def _toggle_snap(self, checked: bool):
+        self._canvas.set_snap_to_grid(checked)
 
     # ── MIDI-Learn ───────────────────────────────────────────────────────────
 

@@ -190,12 +190,12 @@ class StageCanvas(QWidget):
             fixtures = []
         if not fixtures:
             return
-        # Versuche Positionen vom 3D-Visualizer
+        # Versuche Positionen vom 3D-Visualizer (leben jetzt in AppState)
         try:
-            from src.ui.visualizer.visualizer_window import _POSITIONS as VIZ_POS
+            viz_pos = getattr(self._state, "visualizer_positions", {}) or {}
             for f in fixtures:
-                if f.fid in VIZ_POS:
-                    x3d, y3d, z3d = VIZ_POS[f.fid]
+                if f.fid in viz_pos:
+                    x3d, y3d, z3d = viz_pos[f.fid]
                     # 3D: x=links/rechts, z=vorne/hinten (y=Hoehe ignoriert in 2D)
                     self._positions[f.fid] = (x3d * 20 + 300, z3d * 20 + 200)
         except Exception:

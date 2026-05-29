@@ -21,7 +21,7 @@ class VCSlider(VCWidget):
         self.mode = SliderMode.LEVEL
         self.function_id: int | None = None
         self.dmx_channel: int = 1
-        self.dmx_universe: int = 0
+        self.dmx_universe: int = 1
         self._value: int = 0          # 0–255
         self._drag_y: int | None = None
         self._drag_start_val: int = 0
@@ -48,8 +48,14 @@ class VCSlider(VCWidget):
         from src.core.app_state import get_state
         state = get_state()
         if self.mode == SliderMode.LEVEL:
-            if self.dmx_universe < len(state.universes):
-                state.universes[self.dmx_universe].set_channel(self.dmx_channel, self._value)
+            # universes ist ein dict mit 1-basierten Keys — Universe bei Bedarf
+            # anlegen, damit der Fader auch ohne gepatchte Fixture funktioniert
+            # (analog SimpleDesk). Frueher: "< len(...)" -> KeyError: 0 -> Crash.
+            u = state.universes.get(self.dmx_universe)
+            if u is None:
+                u = state.output_manager.add_universe(self.dmx_universe)
+                state.universes[self.dmx_universe] = u
+            u.set_channel(self.dmx_channel, self._value)
         elif self.mode == SliderMode.PLAYBACK and self.function_id is not None:
             slot = self.function_id
             executors = state.playback_engine.executors
@@ -168,6 +174,8 @@ class VCSlider(VCWidget):
             mode_cb.addItem(m)
         mode_cb.setCurrentText(self.mode)
         form.addRow("Modus:", mode_cb)
+        univ = QLineEdit(str(self.dmx_universe))
+        form.addRow("DMX-Universe (Level-Modus):", univ)
         ch = QLineEdit(str(self.dmx_channel))
         form.addRow("DMX-Kanal (Level-Modus):", ch)
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
@@ -193,6 +201,10 @@ class VCSlider(VCWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
             self.mode = mode_cb.currentText()
+            try:
+                self.dmx_universe = int(univ.text())
+            except ValueError:
+                pass
             try:
                 self.dmx_channel = int(ch.text())
             except ValueError:
@@ -223,7 +235,7 @@ class VCSlider(VCWidget):
         self.mode = d.get("mode", SliderMode.LEVEL)
         self.function_id = d.get("function_id")
         self.dmx_channel = d.get("dmx_channel", 1)
-        self.dmx_universe = d.get("dmx_universe", 0)
+        self.dmx_universe = d.get("dmx_universe", 1)
         self._value = d.get("value", 0)
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)

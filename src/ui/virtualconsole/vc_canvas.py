@@ -44,6 +44,7 @@ class VCCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
+        self._snap_to_grid = False
         self.setMinimumSize(QSize(1200, 800))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -174,6 +175,12 @@ class VCCanvas(QWidget):
             child.set_edit_mode(enabled)
         self.update()
 
+    def set_snap_to_grid(self, enabled: bool):
+        self._snap_to_grid = enabled
+        grid = self.GRID if enabled else 0
+        for child in self.findChildren(VCWidget):
+            child.set_snap_grid(grid)
+
     # ── Context menu ─────────────────────────────────────────────────────────
 
     def _context_menu(self, local_pos: QPoint):
@@ -211,6 +218,7 @@ class VCCanvas(QWidget):
             return
         w = cls(parent=self)
         w.set_edit_mode(self._edit_mode)
+        w.set_snap_grid(self.GRID if self._snap_to_grid else 0)
         if d:
             w.apply_dict(d)
         else:

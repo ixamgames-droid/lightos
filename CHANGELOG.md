@@ -7,7 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### Behoben
+- Virtual Console: Absturz (`KeyError: 0`) beim Bewegen eines Level-Faders. Ursache war
+  eine fehlerhafte Universe-Pruefung (`< len()` auf einem dict mit 1-basierten Keys).
+  Der Fader legt das Ziel-Universe nun bei Bedarf an; das Universe ist im
+  Fader-Eigenschaften-Dialog einstellbar (Default 1).
+
 ### Hinzugefuegt
+- Visualizer-Persistenz: Fixture-Positionen und die aktive Buehne werden mit der Show
+  (`.lshow`) gespeichert und beim Laden wiederhergestellt (T-VIZ-01, T-VIZ-02).
 - Unit-Tests fuer Core-Engine: `tests/test_core_engine.py`
   - `Universe` (DMX-Kanalverwaltung, Thread-Safety, Boundaries)
   - `Cue` (Datenmodell, Serialisierung-Roundtrip)

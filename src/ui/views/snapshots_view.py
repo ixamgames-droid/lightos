@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QAction, QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGridLayout, QLabel,
-    QMenu, QInputDialog, QMessageBox, QFileDialog
+    QMenu, QInputDialog, QMessageBox, QFileDialog, QDialog, QSplitter
 )
 
 try:
@@ -167,7 +167,12 @@ class SnapshotsView(QWidget):
         tb.addStretch(1)
         root.addLayout(tb)
 
-        # Grid
+        # Linke Seite: Snapshot-Grid
+        left_content = QWidget()
+        left_layout = QVBoxLayout(left_content)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+
         grid = QGridLayout()
         grid.setSpacing(4)
         for i in range(SNAPSHOT_TOTAL):
@@ -176,8 +181,25 @@ class SnapshotsView(QWidget):
             btn = SnapshotButton(i, self)
             grid.addWidget(btn, row, col)
             self._buttons.append(btn)
-        root.addLayout(grid)
-        root.addStretch(1)
+        left_layout.addLayout(grid)
+        left_layout.addStretch(1)
+
+        # Rechte Seite: Snap-Dateimanager
+        try:
+            from src.ui.views.snap_file_panel import SnapFilePanel
+            self._snap_file_panel = SnapFilePanel()
+        except Exception as e:
+            print(f"[snapshots] snap_file_panel load error: {e}")
+            self._snap_file_panel = QWidget()
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left_content)
+        splitter.addWidget(self._snap_file_panel)
+        splitter.setSizes([900, 320])
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 1)
+        splitter.setChildrenCollapsible(False)
+        root.addWidget(splitter, stretch=1)
 
     # ── Snapshot API ─────────────────────────────────────────────────────────
 
@@ -204,6 +226,21 @@ class SnapshotsView(QWidget):
             )
             if not ok:
                 return
+
+            # Kanal-Auswahl: welche Attribut-Gruppen sollen gespeichert werden?
+            try:
+                from src.ui.views.snap_file_panel import ChannelSelectDialog
+                chan_dlg = ChannelSelectDialog(vals, self)
+                if chan_dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                vals = chan_dlg.filter_programmer(vals)
+                if not vals:
+                    QMessageBox.information(self, "Snapshot",
+                        "Keine Kanaele ausgewaehlt - Snapshot nicht gespeichert.")
+                    return
+            except Exception as e:
+                print(f"[snapshots] channel select error: {e}")
+
             self._snapshots[index] = Snapshot(name=name or f"Snap {index + 1}",
                                               values=vals)
             self._buttons[index].refresh()

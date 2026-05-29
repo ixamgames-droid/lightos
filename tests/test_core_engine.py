@@ -26,12 +26,20 @@ def _stub(name: str, **attrs):
     return m
 
 
-# PySide6 komplett stubben
-for _n in [
-    "PySide6", "PySide6.QtCore", "PySide6.QtWidgets", "PySide6.QtGui",
-    "PySide6.QtWebEngineWidgets", "PySide6.QtWebChannel",
-]:
-    sys.modules.setdefault(_n, types.ModuleType(_n))
+# PySide6 nur stubben, wenn es NICHT installiert ist. Sonst wuerden die leeren
+# Stub-Module dauerhaft in sys.modules verbleiben und den echten Qt-Import in
+# anderen Testmodulen desselben pytest-Laufs zerstoeren (z. B. test_views ->
+# "cannot import name 'QPoint' from 'PySide6.QtCore'").
+try:
+    import PySide6.QtCore       # noqa: F401
+    import PySide6.QtGui        # noqa: F401
+    import PySide6.QtWidgets    # noqa: F401
+except Exception:
+    for _n in [
+        "PySide6", "PySide6.QtCore", "PySide6.QtWidgets", "PySide6.QtGui",
+        "PySide6.QtWebEngineWidgets", "PySide6.QtWebChannel",
+    ]:
+        sys.modules.setdefault(_n, types.ModuleType(_n))
 
 # SQLAlchemy
 _sa = _stub("sqlalchemy")

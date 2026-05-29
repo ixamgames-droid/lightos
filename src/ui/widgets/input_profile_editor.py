@@ -267,9 +267,9 @@ class InputProfileEditor(QDialog):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            if not hasattr(state, "midi_mapper") or not getattr(state, "midi_mapper", None):
-                from src.core.midi.midi_mapper import MidiMapper
-                state.midi_mapper = MidiMapper(state)
+            if not getattr(state, "midi_mapper", None):
+                from src.core.midi.midi_mapper import get_midi_mapper
+                state.midi_mapper = get_midi_mapper(state)
             QMessageBox.information(self, "MIDI Lernen",
                                     "Druecke jetzt eine Taste/Note auf deinem MIDI-Geraet ...")
 
@@ -310,11 +310,11 @@ class InputProfileEditor(QDialog):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            if not hasattr(state, "midi_mapper") or not getattr(state, "midi_mapper", None):
-                from src.core.midi.midi_mapper import MidiMapper
-                state.midi_mapper = MidiMapper(state)
+            if not getattr(state, "midi_mapper", None):
+                from src.core.midi.midi_mapper import get_midi_mapper
+                state.midi_mapper = get_midi_mapper(state)
             mapper = state.midi_mapper
-            mapper._mappings = list(self._profile.mappings)
+            mapper.replace_mappings(list(self._profile.mappings))
             import os
             os.makedirs("data", exist_ok=True)
             mapper.save("data/midi_mappings.json")

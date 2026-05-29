@@ -6,6 +6,7 @@ Backend-Priorität:
 """
 from __future__ import annotations
 import threading
+import queue
 from dataclasses import dataclass
 from typing import Callable
 
@@ -65,9 +66,15 @@ class MidiManager:
     def __init__(self):
         self._inputs: dict[str, object] = {}
         self._output: object | None = None
+        self._output_name: str = ""
         self._virtual_out: object | None = None
+        self._io_lock = threading.RLock()
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
+        self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=4096)
+        self._rx_running = True
+        self._rx_thread = threading.Thread(target=self._rx_loop, daemon=True, name="MidiDispatch")
+        self._rx_thread.start()
         self.available = RTMIDI_OK or WINMM_OK
         if _USE_WINMM:
             self._log("MIDI: rtmidi nicht verfügbar — nutze Windows WinMM Backend (ARM-kompatibel)")
@@ -125,28 +132,46 @@ class MidiManager:
         self._log(f"MIDI Input geöffnet: {port_name}")
 
     def open_output(self, port_name: str):
-        if _USE_WINMM:
-            ports = _winmm_list_outputs()
+        with self._io_lock:
+            if self._output is not None and self._output_name == port_name:
+                return
+
+            if _USE_WINMM:
+                ports = _winmm_list_outputs()
+                if port_name not in ports:
+                    return
+                idx = ports.index(port_name)
+                try:
+                    if self._output is not None:
+                        try:
+                            self._output.close_port()
+                        except Exception:
+                            pass
+                        self._output = None
+                    self._output = WinMMOutput(idx)
+                    self._output_name = port_name
+                    self._log(f"MIDI Output geöffnet (WinMM): {port_name}")
+                except Exception as e:
+                    self._log(f"MIDI Output Fehler: {e}")
+                return
+
+            if not RTMIDI_OK:
+                return
+            m = rtmidi.MidiOut()
+            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
             if port_name not in ports:
+                del m
                 return
             idx = ports.index(port_name)
-            try:
-                self._output = WinMMOutput(idx)
-                self._log(f"MIDI Output geöffnet (WinMM): {port_name}")
-            except Exception as e:
-                self._log(f"MIDI Output Fehler: {e}")
-            return
-        if not RTMIDI_OK:
-            return
-        m = rtmidi.MidiOut()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        if port_name not in ports:
-            del m
-            return
-        idx = ports.index(port_name)
-        m.open_port(idx)
-        self._output = m
-        self._log(f"MIDI Output geöffnet: {port_name}")
+            m.open_port(idx)
+            if self._output is not None:
+                try:
+                    self._output.close_port()
+                except Exception:
+                    pass
+            self._output = m
+            self._output_name = port_name
+            self._log(f"MIDI Output geöffnet: {port_name}")
 
     def open_virtual_input(self, name: str = "LightOS Virtual IN"):
         """Erstellt einen virtuellen MIDI-Eingang (andere Apps können darauf senden)."""
@@ -184,35 +209,59 @@ class MidiManager:
             return False
 
     def close_all(self):
+        self._rx_running = False
+        try:
+            self._rx_queue.put_nowait(([], ""))
+        except Exception:
+            pass
+        try:
+            self._rx_thread.join(timeout=0.5)
+        except Exception:
+            pass
         for m in self._inputs.values():
             try:
                 m.close_port()
             except Exception:
                 pass
         self._inputs.clear()
-        if self._output:
-            try:
-                self._output.close_port()
-            except Exception:
-                pass
-        self._output = None
+        with self._io_lock:
+            if self._output:
+                try:
+                    self._output.close_port()
+                except Exception:
+                    pass
+            if self._virtual_out:
+                try:
+                    self._virtual_out.close_port()
+                except Exception:
+                    pass
+            self._output = None
+            self._output_name = ""
+            self._virtual_out = None
 
     # ── Senden ───────────────────────────────────────────────────────────────
 
     def send_cc(self, channel: int, cc: int, value: int, virtual: bool = False):
         status = 0xB0 | ((channel - 1) & 0x0F)
         msg = [status, cc & 0x7F, value & 0x7F]
-        out = self._virtual_out if virtual else self._output
-        if out:
-            out.send_message(msg)
+        with self._io_lock:
+            out = self._virtual_out if virtual else self._output
+            if out:
+                out.send_message(msg)
 
     def send_note(self, channel: int, note: int, velocity: int = 127):
         status = 0x90 | ((channel - 1) & 0x0F)
-        self._output and self._output.send_message([status, note & 0x7F, velocity & 0x7F])
+        with self._io_lock:
+            self._output and self._output.send_message([status, note & 0x7F, velocity & 0x7F])
 
     def send_note_off(self, channel: int, note: int):
         status = 0x80 | ((channel - 1) & 0x0F)
-        self._output and self._output.send_message([status, note & 0x7F, 0])
+        with self._io_lock:
+            self._output and self._output.send_message([status, note & 0x7F, 0])
+
+    def current_output_name(self) -> str:
+        with self._io_lock:
+            return self._output_name
 
     # ── Callbacks ────────────────────────────────────────────────────────────
 
@@ -223,14 +272,32 @@ class MidiManager:
         self._log_callbacks.append(cb)
 
     def _on_message(self, raw: list[int], port_name: str):
-        msg = _decode(raw, port_name)
-        if msg:
-            for cb in self._callbacks:
-                try:
-                    cb(msg)
-                except Exception:
-                    pass
-            self._log(f"[{port_name}] {msg.msg_type} CH{msg.channel} D1={msg.data1} D2={msg.data2}")
+        try:
+            self._rx_queue.put_nowait((list(raw), port_name))
+        except queue.Full:
+            # Bei sehr hoher Last Events droppen statt Callback-Thread zu blockieren.
+            pass
+
+    def _rx_loop(self):
+        while self._rx_running:
+            try:
+                raw, port_name = self._rx_queue.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            if not self._rx_running:
+                break
+            if not raw and not port_name:
+                continue
+            msg = _decode(raw, port_name)
+            if msg:
+                for cb in self._callbacks:
+                    try:
+                        cb(msg)
+                    except Exception:
+                        pass
+                # Kein Per-Nachricht-Log hier: die MIDI-View zeigt eingehende Nachrichten
+                # thread-sicher und gedrosselt im Monitor an. Ein zusätzliches Log pro
+                # Event würde die Anzeige duplizieren und die Qt-Event-Loop fluten.
 
     def _log(self, text: str):
         for cb in self._log_callbacks:

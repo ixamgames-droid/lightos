@@ -22,32 +22,43 @@ class ChannelModifier:
     name: str = ""
     curve: CurveType = CurveType.LINEAR
     custom_lut: list = field(default_factory=list)  # 256 Werte fuer CUSTOM
+    range_min: int = 0       # Output auf [range_min, range_max] skalieren (0/255 = kein Effekt)
+    range_max: int = 255
 
     def apply(self, value: int) -> int:
         value = max(0, min(255, int(value)))
+        # 1) Curve anwenden -> out (0-255)
         if self.curve == CurveType.LINEAR:
-            return value
-        x = value / 255.0
-        if self.curve == CurveType.INVERSE:
-            y = 1.0 - x
-        elif self.curve == CurveType.SCURVE:
-            y = x * x * (3.0 - 2.0 * x)
-        elif self.curve == CurveType.GAMMA22:
-            y = x ** 2.2
-        elif self.curve == CurveType.GAMMA045:
-            y = x ** 0.45
-        elif self.curve == CurveType.SQUARED:
-            y = x * x
-        elif self.curve == CurveType.SQRT:
-            y = math.sqrt(x)
+            out = value
         elif self.curve == CurveType.CUSTOM and len(self.custom_lut) == 256:
             try:
-                return max(0, min(255, int(self.custom_lut[value])))
+                out = max(0, min(255, int(self.custom_lut[value])))
             except Exception:
-                return value
+                out = value
         else:
-            y = x
-        return max(0, min(255, int(y * 255)))
+            x = value / 255.0
+            if self.curve == CurveType.INVERSE:
+                y = 1.0 - x
+            elif self.curve == CurveType.SCURVE:
+                y = x * x * (3.0 - 2.0 * x)
+            elif self.curve == CurveType.GAMMA22:
+                y = x ** 2.2
+            elif self.curve == CurveType.GAMMA045:
+                y = x ** 0.45
+            elif self.curve == CurveType.SQUARED:
+                y = x * x
+            elif self.curve == CurveType.SQRT:
+                y = math.sqrt(x)
+            else:
+                y = x
+            out = max(0, min(255, int(y * 255)))
+        # 2) Auf Sub-Range skalieren (Range-Lock)
+        lo = max(0, min(255, int(self.range_min)))
+        hi = max(0, min(255, int(self.range_max)))
+        if lo != 0 or hi != 255:
+            out = lo + int(round((out / 255.0) * (hi - lo)))
+            out = max(0, min(255, out))
+        return out
 
 
 class ChannelModifierManager:
@@ -99,6 +110,8 @@ class ChannelModifierManager:
                 "name": m.name,
                 "curve": m.curve.value,
                 "custom_lut": m.custom_lut,
+                "range_min": m.range_min,
+                "range_max": m.range_max,
             })
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -122,6 +135,8 @@ class ChannelModifierManager:
                     name=d.get("name", ""),
                     curve=CurveType(d.get("curve", "Linear")),
                     custom_lut=d.get("custom_lut", []),
+                    range_min=int(d.get("range_min", 0)),
+                    range_max=int(d.get("range_max", 255)),
                 )
                 self.add(m)
             except Exception:

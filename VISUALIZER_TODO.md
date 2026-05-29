@@ -30,8 +30,12 @@
 
 ## KRITISCH — muss zuerst behoben werden
 
-### T-VIZ-01: Fixture-Positionen werden nicht persistiert
-**Problem:** `_POSITIONS` in `visualizer_window.py` ist ein modul-globales Dict.
+### ✅ T-VIZ-01: Fixture-Positionen werden nicht persistiert — ERLEDIGT
+**Geloest:** `_POSITIONS` wurde nach `AppState.visualizer_positions` verschoben und wird
+in `show_file.save_show()`/`load_show()` mit der `.lshow` persistiert. Beim Laden bzw.
+Oeffnen des Visualizers werden die Positionen via `requestFixtures()` wiederhergestellt.
+
+**Problem (urspruenglich):** `_POSITIONS` in `visualizer_window.py` ist ein modul-globales Dict.
 Nach jedem App-Neustart sind alle platzierten Fixtures weg.
 **Wo:**
 - `lightos-main/src/ui/visualizer/visualizer_window.py` — `_POSITIONS` (Zeile 42)
@@ -48,8 +52,12 @@ Nach jedem App-Neustart sind alle platzierten Fixtures weg.
 
 ---
 
-### T-VIZ-02: Aktive Stage wird nicht mit der Show gespeichert
-**Problem:** Welche Stage geladen ist (Preset oder User-Stage-Name), geht beim Speichern verloren.
+### ✅ T-VIZ-02: Aktive Stage wird nicht mit der Show gespeichert — ERLEDIGT
+**Geloest:** `AppState.active_stage_name` haelt den aktiven Stage-Key/-Namen, wird in der
+`.lshow` gespeichert und beim Laden via `_apply_active_stage_from_state()` wiederhergestellt
+(reagiert auch auf das `show_loaded`-Event, wenn der Visualizer offen ist).
+
+**Problem (urspruenglich):** Welche Stage geladen ist (Preset oder User-Stage-Name), geht beim Speichern verloren.
 Nach dem Laden einer Show ist immer "Simple" ausgewaehlt.
 **Wo:**
 - `visualizer_window.py` — `_current_stage`, `_combo_stage`

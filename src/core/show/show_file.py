@@ -161,6 +161,14 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
 
     vc_data = getattr(state, "_vc_layout", {}) or {}
 
+    visualizer_data = {
+        "positions": {
+            str(fid): [float(p[0]), float(p[1]), float(p[2])]
+            for fid, p in (getattr(state, "visualizer_positions", {}) or {}).items()
+        },
+        "active_stage": getattr(state, "active_stage_name", "simple") or "simple",
+    }
+
     show = {
         "version": SHOW_VERSION,
         "name": getattr(state, "show_name", "Neue Show"),
@@ -172,6 +180,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "efx": efx_data,
         "rgb_matrix": rgb_data,
         "virtual_console": vc_data,
+        "visualizer": visualizer_data,
     }
     if layout:
         show["layout"] = layout
@@ -269,6 +278,22 @@ def load_show(path: str | os.PathLike):
         print(f"[show_file] load rgb matrix error: {e}")
 
     state._vc_layout = data.get("virtual_console", {}) or {}
+
+    # Visualizer: Fixture-Positionen + aktive Stage wiederherstellen
+    try:
+        viz = data.get("visualizer", {}) or {}
+        positions: dict[int, tuple[float, float, float]] = {}
+        for fid_raw, p in (viz.get("positions", {}) or {}).items():
+            try:
+                positions[int(fid_raw)] = (float(p[0]), float(p[1]), float(p[2]))
+            except Exception:
+                continue
+        state.visualizer_positions = positions
+        state.active_stage_name = str(viz.get("active_stage", "simple") or "simple")
+    except Exception as e:
+        print(f"[show_file] load visualizer error: {e}")
+        state.visualizer_positions = {}
+        state.active_stage_name = "simple"
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}

@@ -1355,6 +1355,11 @@ class MainWindow(QMainWindow):
             self._state.playback_engine.stop()
         from src.core.midi.midi_manager import get_midi_manager
         get_midi_manager().close_all()
+        try:
+            if getattr(self._state, "midi_mapper", None):
+                self._state.midi_mapper.close()
+        except Exception:
+            pass
         if self._visualizer_window:
             self._visualizer_window.close()
         super().closeEvent(event)

@@ -1,11 +1,19 @@
 """VCSpeedDial — Rotary speed control with tap-tempo."""
 from __future__ import annotations
 import time
-from PySide6.QtWidgets import QDialog, QFormLayout, QDoubleSpinBox, QLineEdit, QDialogButtonBox, QSizePolicy
+from PySide6.QtWidgets import (
+    QDialog, QFormLayout, QDoubleSpinBox, QLineEdit, QDialogButtonBox,
+    QSizePolicy, QComboBox,
+)
 from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
 import math
 from .vc_widget import VCWidget
+
+
+class SpeedTarget(str):
+    EXECUTOR = "Executor"
+    FUNCTION = "Function"
 
 
 class VCSpeedDial(VCWidget):
@@ -14,6 +22,7 @@ class VCSpeedDial(VCWidget):
     def __init__(self, caption: str = "Speed", parent=None):
         super().__init__(caption, parent)
         self.function_id: int | None = None
+        self.target_mode: str = SpeedTarget.EXECUTOR
         self._bpm: float = 120.0         # 20–600 BPM
         self._min_bpm: float = 20.0
         self._max_bpm: float = 600.0
@@ -39,10 +48,16 @@ class VCSpeedDial(VCWidget):
     def _apply(self):
         if self.function_id is None:
             return
-        hz = self._bpm / 60.0
         try:
             from src.core.app_state import get_state
             state = get_state()
+            if self.target_mode == SpeedTarget.FUNCTION:
+                fn = state.function_manager.get(int(self.function_id))
+                if fn is None or not hasattr(fn, "speed"):
+                    return
+                fn.speed = max(0.05, min(20.0, self._bpm / 120.0))
+                return
+
             executors = state.playback_engine.executors
             if self.function_id < len(executors):
                 ex = executors[self.function_id]
@@ -181,8 +196,12 @@ class VCSpeedDial(VCWidget):
         bpm_sb.setRange(20, 600)
         bpm_sb.setValue(self._bpm)
         form.addRow("BPM:", bpm_sb)
+        mode_cb = QComboBox()
+        mode_cb.addItems([SpeedTarget.EXECUTOR, SpeedTarget.FUNCTION])
+        mode_cb.setCurrentText(self.target_mode)
+        form.addRow("Target:", mode_cb)
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        form.addRow("Executor-Slot:", slot)
+        form.addRow("Executor-Slot / Function-ID:", slot)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -190,6 +209,7 @@ class VCSpeedDial(VCWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
             self.bpm = bpm_sb.value()
+            self.target_mode = mode_cb.currentText()
             try:
                 self.function_id = int(slot.text())
             except ValueError:
@@ -202,9 +222,11 @@ class VCSpeedDial(VCWidget):
         d = super().to_dict()
         d["bpm"] = self._bpm
         d["function_id"] = self.function_id
+        d["target_mode"] = self.target_mode
         return d
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
         self._bpm = d.get("bpm", 120.0)
         self.function_id = d.get("function_id")
+        self.target_mode = d.get("target_mode", SpeedTarget.EXECUTOR)

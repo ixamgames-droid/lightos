@@ -17,6 +17,8 @@ _SNAPSHOTS_FILE = os.path.join(
 class ButtonAction(str, Enum):
     TOGGLE   = "Toggle"
     FLASH    = "Flash"
+    FUNCTION_TOGGLE = "FunctionToggle"
+    FUNCTION_FLASH  = "FunctionFlash"
     BLACKOUT = "Blackout"
     STOP_ALL = "StopAll"
     SNAPSHOT = "Snapshot"
@@ -148,6 +150,24 @@ class VCButton(VCWidget):
                 self._apply_snapshot(self.snapshot_index)
             return
 
+        if self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+            if self.function_id is None:
+                return
+            fid = int(self.function_id)
+            fm = state.function_manager
+            if self.action == ButtonAction.FUNCTION_TOGGLE:
+                if press:
+                    if fm.is_running(fid):
+                        fm.stop(fid)
+                    else:
+                        fm.start(fid)
+            else:
+                if press:
+                    fm.start(fid)
+                else:
+                    fm.stop(fid)
+            return
+
         if self.function_id is None:
             return
         slot = self.function_id
@@ -209,6 +229,8 @@ class VCButton(VCWidget):
         # Farbbalken unten je nach Aktion
         if self.action == ButtonAction.FLASH:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff8800"))
+        elif self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#3fb950"))
         elif self.action == ButtonAction.BLACKOUT:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
         elif self.action == ButtonAction.SNAPSHOT:
@@ -237,7 +259,7 @@ class VCButton(VCWidget):
         form.addRow("Aktion:", act)
 
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        form.addRow("Executor-Slot:", slot)
+        form.addRow("Executor-Slot / Function-ID:", slot)
 
         # Snapshot-Auswahl
         snap_combo = QComboBox()

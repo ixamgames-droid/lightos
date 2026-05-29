@@ -21,6 +21,8 @@ class VCWidget(QFrame):
         self._edit_mode = False
         self._dragging = False
         self._resizing = False
+        self._selected = False
+        self._snap_grid = 0      # 0 = kein Snap, sonst Grid-Größe in Pixel
         self._drag_start = QPoint()
         self._orig_rect = QRect()
         self._bg_color = QColor("#2a2a2a")
@@ -33,10 +35,18 @@ class VCWidget(QFrame):
 
     def set_edit_mode(self, enabled: bool):
         self._edit_mode = enabled
+        if not enabled:
+            self._selected = False
         self.setCursor(Qt.CursorShape.SizeAllCursor if enabled else Qt.CursorShape.ArrowCursor)
         self.update()
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
+
+    def set_snap_grid(self, grid: int):
+        """Setzt die Snap-Grid-Größe (0 = kein Snap)."""
+        self._snap_grid = grid
+        for child in self.findChildren(VCWidget):
+            child.set_snap_grid(grid)
 
     # ── Farben ────────────────────────────────────────────────────────────────
 
@@ -56,14 +66,19 @@ class VCWidget(QFrame):
             return
         if event.button() == Qt.MouseButton.RightButton:
             self._show_context_menu(event.globalPosition().toPoint())
+            event.accept()
             return
-        pos = event.position().toPoint()
-        if self._is_resize_handle(pos):
-            self._resizing = True
-        else:
-            self._dragging = True
-        self._drag_start = event.globalPosition().toPoint()
-        self._orig_rect = self.geometry()
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._deselect_siblings()
+            self._selected = True
+            self.update()
+            pos = event.position().toPoint()
+            if self._is_resize_handle(pos):
+                self._resizing = True
+            else:
+                self._dragging = True
+            self._drag_start = event.globalPosition().toPoint()
+            self._orig_rect = self.geometry()
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -73,19 +88,40 @@ class VCWidget(QFrame):
         if self._dragging and self.parent():
             nx = max(0, self._orig_rect.x() + delta.x())
             ny = max(0, self._orig_rect.y() + delta.y())
+            if self._snap_grid > 0:
+                nx = round(nx / self._snap_grid) * self._snap_grid
+                ny = round(ny / self._snap_grid) * self._snap_grid
             self.move(nx, ny)
             self.moved.emit(nx, ny)
         elif self._resizing:
             nw = max(self.MIN_SIZE[0], self._orig_rect.width() + delta.x())
             nh = max(self.MIN_SIZE[1], self._orig_rect.height() + delta.y())
+            if self._snap_grid > 0:
+                nw = round(nw / self._snap_grid) * self._snap_grid
+                nh = round(nh / self._snap_grid) * self._snap_grid
             self.resize(nw, nh)
             self.resized.emit(nw, nh)
         event.accept()
+
+    def mouseDoubleClickEvent(self, event):
+        if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
+            self._open_properties()
+            event.accept()
+        else:
+            super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._dragging = False
         self._resizing = False
         event.accept()
+
+    def _deselect_siblings(self):
+        """Deselektiert alle anderen VCWidgets im selben Parent."""
+        if self.parent() is not None:
+            for sibling in self.parent().findChildren(VCWidget):
+                if sibling is not self and sibling._selected:
+                    sibling._selected = False
+                    sibling.update()
 
     def _is_resize_handle(self, pos: QPoint) -> bool:
         r = self.rect()
@@ -127,11 +163,13 @@ class VCWidget(QFrame):
         p = QPainter(self)
         p.fillRect(self.rect(), self._bg_color)
         if self._edit_mode:
-            # Resize-Handle
             hs = self.HANDLE_SIZE
             r = self.rect()
             p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
-            p.setPen(QPen(QColor("#0088ff"), 1, Qt.PenStyle.DashLine))
+            if self._selected:
+                p.setPen(QPen(QColor("#58d68d"), 2, Qt.PenStyle.SolidLine))
+            else:
+                p.setPen(QPen(QColor("#0088ff"), 1, Qt.PenStyle.DashLine))
             p.drawRect(r.adjusted(0, 0, -1, -1))
         p.end()
 

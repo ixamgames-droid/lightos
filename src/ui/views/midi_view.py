@@ -1,5 +1,6 @@
 """MIDI-Konsole — Monitoring, Konfiguration, Mapping, Virtueller Port."""
 from __future__ import annotations
+import time
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
@@ -12,7 +13,8 @@ from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTabWidget
 from src.core.midi.midi_manager import get_midi_manager, MidiMessage, RTMIDI_OK
 from src.core.midi.midi_mapper import (
-    MidiMapper, MidiMapping,
+    MidiMapping, MidiOutFeedback, get_midi_mapper,
+    BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
     ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE
 )
@@ -32,11 +34,12 @@ ACTION_LABELS = {
     ACTION_NONE:           "Keine Aktion",
 }
 
-MAP_COLS = ["Name", "Typ", "Ch", "D1", "Aktion", "Parameter", "Port"]
+MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
 
 
 class MidiLogSignal(QObject):
     log_received = Signal(str)
+    msg_received = Signal(object)
 
 
 class MidiView(QWidget):
@@ -44,10 +47,13 @@ class MidiView(QWidget):
         super().__init__(parent)
         self._midi = get_midi_manager()
         self._state = get_state()
-        self._mapper = MidiMapper(self._state)
+        self._mapper = self._state.midi_mapper or get_midi_mapper(self._state)
         self._log_signal = MidiLogSignal()
         self._log_signal.log_received.connect(self._append_log)
+        self._log_signal.msg_received.connect(self._on_midi_msg_ui)
         self._learn_target_row = -1
+        self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
+        self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
         self._setup_ui()
         self._midi.subscribe_log(lambda t: self._log_signal.log_received.emit(t))
         self._midi.subscribe(self._on_midi_msg)
@@ -122,6 +128,7 @@ class MidiView(QWidget):
         btn_row.addWidget(btn_clear)
         self._chk_monitor = QCheckBox("Monitor aktiv")
         self._chk_monitor.setChecked(True)
+        self._chk_monitor.toggled.connect(self._set_monitor_active)
         btn_row.addWidget(self._chk_monitor)
         mon_l.addLayout(btn_row)
 
@@ -142,11 +149,14 @@ class MidiView(QWidget):
         btn_learn = QPushButton("MIDI Learn")
         btn_learn.setToolTip("Wähle eine Zeile, dann klicke MIDI-Learn\nund sende eine MIDI-Nachricht")
         btn_learn.clicked.connect(self._start_learn)
+        btn_feedback = QPushButton("Feedback...")
+        btn_feedback.setToolTip("LED-Farben für ON/OFF (Velocity) setzen")
+        btn_feedback.clicked.connect(self._edit_feedback_values)
         btn_save = QPushButton("Speichern")
         btn_save.clicked.connect(self._save_mappings)
         btn_load = QPushButton("Laden")
         btn_load.clicked.connect(self._load_mappings)
-        for btn in [btn_add_map, btn_del_map, btn_learn, btn_save, btn_load]:
+        for btn in [btn_add_map, btn_del_map, btn_learn, btn_feedback, btn_save, btn_load]:
             map_toolbar.addWidget(btn)
         map_toolbar.addStretch()
         map_l.addLayout(map_toolbar)
@@ -155,9 +165,11 @@ class MidiView(QWidget):
         self._map_table.setHorizontalHeaderLabels(MAP_COLS)
         self._map_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._map_table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        self._map_table.itemChanged.connect(self._on_map_item_changed)
         hdr = self._map_table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         map_l.addWidget(self._map_table)
 
         # Schnell-Mapping-Vorlagen
@@ -183,6 +195,7 @@ class MidiView(QWidget):
 
         # Ports laden
         self._refresh_ports()
+        self._refresh_map_table()
 
         if not self._midi.available:
             self._append_log("⚠ Kein MIDI-Backend verfügbar (weder rtmidi noch WinMM). MIDI deaktiviert.")
@@ -272,8 +285,22 @@ class MidiView(QWidget):
     # ── Monitor ───────────────────────────────────────────────────────────────
 
     def _on_midi_msg(self, msg: MidiMessage):
-        if not self._chk_monitor.isChecked():
+        # WICHTIG: läuft im MIDI-Dispatch-Thread — niemals direkt auf Qt-Widgets zugreifen!
+        # Stattdessen via Signal in den GUI-Thread marshallen (_on_midi_msg_ui).
+        if not self._monitor_active:
             return
+        # CC-Strom (Fader) auf ~60 Hz drosseln, damit die Qt-Event-Loop nicht überflutet
+        # wird. Betrifft nur die Monitor-Anzeige; die Fader-Steuerung im MidiMapper
+        # bleibt ungedrosselt.
+        if msg.msg_type == "cc":
+            now = time.monotonic()
+            if now - self._last_monitor_emit < 0.015:
+                return
+            self._last_monitor_emit = now
+        self._log_signal.msg_received.emit(msg)
+
+    def _on_midi_msg_ui(self, msg: MidiMessage):
+        # Läuft thread-sicher im GUI-Thread (queued Signal aus _on_midi_msg).
         prefixes = {
             "cc":       "CC   ",
             "note_on":  "NOTE+",
@@ -284,6 +311,9 @@ class MidiView(QWidget):
         line = (f"{prefix} [{msg.port_name[:20]}] "
                 f"CH{msg.channel:2d} D1={msg.data1:3d} D2={msg.data2:3d}")
         self._console.appendPlainText(line)
+
+    def _set_monitor_active(self, active: bool):
+        self._monitor_active = bool(active)
 
     def _append_log(self, text: str):
         self._console.appendPlainText(text)
@@ -299,6 +329,8 @@ class MidiView(QWidget):
             action=ACTION_EXECUTOR_GO,
             param="1",
             port_filter="",
+            button_mode=BUTTON_TOGGLE,
+            midi_out=MidiOutFeedback(state_off=5, state_on=3, trigger_id=0),
         )
         self._mapper.add_mapping(m)
         self._refresh_map_table()
@@ -311,15 +343,76 @@ class MidiView(QWidget):
 
     def _refresh_map_table(self):
         mappings = self._mapper.get_mappings()
+        self._map_table.blockSignals(True)
         self._map_table.setRowCount(len(mappings))
         for row, m in enumerate(mappings):
+            on_val = ""
+            off_val = ""
+            if m.midi_out:
+                on_val = str(m.midi_out.state_on)
+                off_val = str(m.midi_out.state_off)
             vals = [
-                m.name, m.msg_type, str(m.channel),
-                str(m.data1), ACTION_LABELS.get(m.action, m.action),
-                m.param, m.port_filter,
+                m.name,
+                m.target_id,
+                m.msg_type,
+                str(m.channel),
+                str(m.data1),
+                m.button_mode,
+                on_val,
+                off_val,
+                m.port_filter,
             ]
             for col, val in enumerate(vals):
                 self._map_table.setItem(row, col, QTableWidgetItem(val))
+        self._map_table.blockSignals(False)
+
+    def _on_map_item_changed(self, item: QTableWidgetItem):
+        row = item.row()
+        mappings = self._mapper.get_mappings()
+        if row < 0 or row >= len(mappings):
+            return
+        m = mappings[row]
+        col = item.column()
+        txt = item.text()
+        try:
+            if col == 0:
+                m.name = txt
+            elif col == 1:
+                m.target_id = txt.strip()
+                if ":" in m.target_id:
+                    m.action, m.param = m.target_id.split(":", 1)
+                elif m.target_id:
+                    m.action = m.target_id
+                    m.param = ""
+            elif col == 2:
+                m.msg_type = txt.strip() or "note_on"
+            elif col == 3:
+                m.channel = int(txt or "1")
+            elif col == 4:
+                m.data1 = int(txt or "0")
+            elif col == 5:
+                m.button_mode = txt.strip().lower()
+            elif col == 6:
+                if m.midi_out is None:
+                    m.midi_out = MidiOutFeedback()
+                m.midi_out.state_on = max(0, min(127, int(txt or "127")))
+            elif col == 7:
+                if m.midi_out is None:
+                    m.midi_out = MidiOutFeedback()
+                m.midi_out.state_off = max(0, min(127, int(txt or "0")))
+            elif col == 8:
+                m.port_filter = txt
+            m.midi_in.device = m.port_filter
+            m.midi_in.channel = m.channel
+            m.midi_in.trigger_id = m.data1
+            m.midi_in.message_type = "cc" if m.msg_type == "cc" else "note"
+            if m.midi_out:
+                if m.midi_out.trigger_id < 0:
+                    m.midi_out.trigger_id = m.data1
+                m.midi_out.channel = m.channel
+                m.midi_out.message_type = "cc" if m.msg_type == "cc" else "note"
+        except ValueError:
+            pass
 
     def _start_learn(self):
         rows = {i.row() for i in self._map_table.selectedIndexes()}
@@ -336,12 +429,46 @@ class MidiView(QWidget):
         if row < 0 or row >= len(mappings):
             return
         m = mappings[row]
-        m.msg_type = msg.msg_type
-        m.channel = msg.channel
-        m.data1 = msg.data1
-        m.port_filter = msg.port_name
+        m.set_from_learn_message(msg)
+        self._prompt_feedback_values(m)
         self._refresh_map_table()
         self._append_log(f"✓ Learn: {msg.msg_type} CH{msg.channel} D1={msg.data1}")
+
+    def _edit_feedback_values(self):
+        rows = {i.row() for i in self._map_table.selectedIndexes()}
+        if not rows:
+            QMessageBox.information(self, "Feedback", "Erst eine Mapping-Zeile auswählen.")
+            return
+        row = list(rows)[0]
+        mappings = self._mapper.get_mappings()
+        if row < 0 or row >= len(mappings):
+            return
+        self._prompt_feedback_values(mappings[row])
+        self._refresh_map_table()
+
+    def _prompt_feedback_values(self, mapping: MidiMapping):
+        if mapping.midi_out is None:
+            mapping.midi_out = MidiOutFeedback(trigger_id=mapping.data1)
+        default_off = mapping.midi_out.state_off
+        default_on = mapping.midi_out.state_on
+        off_val, ok = QInputDialog.getInt(
+            self, "Feedback OFF", "Velocity OFF (0-127):", default_off, 0, 127, 1
+        )
+        if not ok:
+            return
+        on_val, ok = QInputDialog.getInt(
+            self, "Feedback ON", "Velocity ON (0-127):", default_on, 0, 127, 1
+        )
+        if not ok:
+            return
+        mapping.midi_out.state_off = off_val
+        mapping.midi_out.state_on = on_val
+        mapping.midi_out.trigger_id = mapping.data1
+        mapping.midi_out.channel = mapping.channel
+        mapping.midi_out.message_type = "cc" if mapping.msg_type == "cc" else "note"
+        out_port = self._combo_out.currentText()
+        if out_port and not out_port.startswith("("):
+            mapping.midi_out.device = out_port
 
     # ── Vorlagen ──────────────────────────────────────────────────────────────
 
@@ -354,6 +481,8 @@ class MidiView(QWidget):
                 action=ACTION_EXECUTOR_FADER,
                 param=str(i),
                 port_filter="",
+                button_mode=BUTTON_CONTINUOUS,
+                midi_out=MidiOutFeedback(trigger_id=i - 1),
             )
             self._mapper.add_mapping(m)
         self._refresh_map_table()
@@ -368,6 +497,8 @@ class MidiView(QWidget):
                 action=ACTION_EXECUTOR_GO,
                 param=str(i),
                 port_filter="",
+                button_mode=BUTTON_TOGGLE,
+                midi_out=MidiOutFeedback(trigger_id=i - 1, state_off=5, state_on=3),
             )
             self._mapper.add_mapping(m)
         self._refresh_map_table()

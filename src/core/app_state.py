@@ -16,6 +16,10 @@ class AppState:
         self.output_manager = OutputManager()
         self.universes: dict[int, Universe] = {}
         self.programmer: dict[int, dict[str, int]] = {}
+        # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
+        # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
+        self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
+        self.active_stage_name: str = "simple"
         self._patch_cache: list[PatchedFixture] = []
         self._callbacks: list = []
         self.mock_mode: bool = False
@@ -26,6 +30,13 @@ class AppState:
         # QLC+ Function Manager
         from .engine.function_manager import get_function_manager
         self.function_manager = get_function_manager()
+        # Central MIDI mapping engine (singleton, bidirectional in/out).
+        from .midi.midi_mapper import get_midi_mapper
+        self.midi_mapper = get_midi_mapper(self)
+        try:
+            self.midi_mapper and self.midi_mapper.load("data/midi_mappings.json")
+        except Exception:
+            pass
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
