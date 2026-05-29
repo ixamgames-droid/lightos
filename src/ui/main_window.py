@@ -1116,6 +1116,11 @@ class MainWindow(QMainWindow):
     def _do_save(self, path: str):
         from src.core.show.show_file import save_show
         try:
+            # VC-Layout (Buttons/Fader) aus dem aktuellen Canvas uebernehmen
+            try:
+                self._state._vc_layout = self._vc_view.to_dict()
+            except Exception as e:
+                print(f"[main_window] collect vc layout error: {e}")
             # T1.6 Layout-Persistenz: Layout dazupacken
             layout = None
             try:
@@ -1258,6 +1263,13 @@ class MainWindow(QMainWindow):
                 apply_layout(self, layout)
         except Exception as e:
             print(f"[main_window] apply_layout error: {e}")
+        # VC-Layout (Buttons/Fader) in den Canvas laden
+        try:
+            vc = getattr(self._state, "_vc_layout", None)
+            if vc and getattr(vc, "get", None) and vc.get("widgets"):
+                self._vc_view.from_dict(vc)
+        except Exception as e:
+            print(f"[main_window] vc layout restore error: {e}")
 
     def _open_input_profile_editor(self):
         """T1.4 Input-Profile-Editor (MIDI/OSC/Keyboard)."""
