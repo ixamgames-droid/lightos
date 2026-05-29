@@ -174,6 +174,10 @@ class MidiTeachDialog(QDialog):
         info.setWordWrap(True)
         lay.addWidget(info)
 
+        self._lbl_inputs = QLabel("")
+        self._lbl_inputs.setWordWrap(True)
+        lay.addWidget(self._lbl_inputs)
+
         self._view = _ApcView(accept_kinds=accept_kinds)
         self._view.element_selected.connect(self._on_view_select)
         wrap = QHBoxLayout()
@@ -211,7 +215,13 @@ class MidiTeachDialog(QDialog):
         # QTimer.singleShot in den UI-Thread marshallen (sonst nativer Crash).
         from src.core.midi.midi_manager import get_midi_manager
         self._mm = get_midi_manager()
+        # Sicherstellen, dass MIDI-Eingaenge offen sind — sonst kommt nichts an.
+        try:
+            self._mm.open_all_inputs()
+        except Exception:
+            pass
         self._mm.subscribe(self._on_midi_raw)
+        self._refresh_input_label()
 
     # ── MIDI ───────────────────────────────────────────────────────────────────
 
@@ -252,6 +262,21 @@ class MidiTeachDialog(QDialog):
         ch_txt = "alle" if not ch else str(ch)
         kind = "CC / Fader" if mtype == "cc" else "Note / Taste"
         self._status.setText(f"Gewaehlt: {kind} {d1}  ·  Kanal {ch_txt}")
+
+    def _refresh_input_label(self):
+        """Zeigt an, ob ein MIDI-Eingang verbunden ist (sonst kommt nichts an)."""
+        try:
+            ins = [p for p in self._mm.list_inputs() if p and not p.startswith("(")]
+        except Exception:
+            ins = []
+        if ins:
+            self._lbl_inputs.setText("🟢 MIDI-Eingang: " + ", ".join(ins))
+            self._lbl_inputs.setStyleSheet("color:#3fb950;")
+        else:
+            self._lbl_inputs.setText(
+                "🔴 Kein MIDI-Eingang gefunden — ist die APC mini angeschlossen? "
+                "(USB neu einstecken)")
+            self._lbl_inputs.setStyleSheet("color:#ff5555; font-weight:bold;")
 
     # ── Schliessen → unsubscribe ───────────────────────────────────────────────
 

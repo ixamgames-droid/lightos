@@ -131,6 +131,24 @@ class MidiManager:
         self._inputs[port_name] = m
         self._log(f"MIDI Input geöffnet: {port_name}")
 
+    def open_all_inputs(self) -> int:
+        """Öffnet alle verfügbaren MIDI-Eingänge (Auto-Connect, idempotent).
+
+        open_input() überspringt bereits offene Ports, daher kann dies gefahrlos
+        periodisch (Hot-Plug) aufgerufen werden. Gibt die Anzahl offener Eingänge
+        zurück."""
+        try:
+            names = self.list_inputs()
+        except Exception:
+            names = []
+        for name in names:
+            if name and not name.startswith("("):
+                try:
+                    self.open_input(name)
+                except Exception as e:
+                    self._log(f"Auto-Connect Fehler ({name}): {e}")
+        return len(self._inputs)
+
     def open_output(self, port_name: str):
         with self._io_lock:
             if self._output is not None and self._output_name == port_name:

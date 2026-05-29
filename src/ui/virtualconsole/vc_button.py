@@ -226,8 +226,13 @@ class VCButton(VCWidget):
     def paintEvent(self, event):
         super().paintEvent(event)
         p = QPainter(self)
-        bg = self._bg_color.lighter(140) if self._pressed else self._bg_color
+        bg = self._bg_color.lighter(160) if self._pressed else self._bg_color
         p.fillRect(self.rect(), bg)
+
+        # "Gedrueckt"-Feedback (Maus ODER MIDI): deutlicher heller Rahmen
+        if self._pressed:
+            p.setPen(QPen(QColor("#ffe680"), 3))
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
 
         # MIDI-Learn-Arm: orange Rahmen pulsieren
         if self._midi_armed:

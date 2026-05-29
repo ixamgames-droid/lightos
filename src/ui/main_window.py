@@ -151,6 +151,29 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(1000, self._refresh_validation_banner)
         # Beim Start: pruefen ob Wiederherstellung noetig
         QTimer.singleShot(500, self._check_autosave_recovery)
+        # MIDI-Eingaenge automatisch verbinden (APC mini etc.) — beim Start und
+        # periodisch, damit auch nachtraeglich eingestecktes Geraet erkannt wird.
+        QTimer.singleShot(800, self._auto_connect_midi)
+        self._midi_autoconnect_timer = QTimer(self)
+        self._midi_autoconnect_timer.timeout.connect(self._auto_connect_midi)
+        self._midi_autoconnect_timer.start(4000)
+
+    # ── MIDI Auto-Connect ───────────────────────────────────────────────────────
+
+    def _auto_connect_midi(self):
+        """Öffnet automatisch alle verfügbaren MIDI-Eingänge, damit Controller
+        (z.B. APC mini) ohne manuelles 'Input öffnen' in der MIDI-Ansicht
+        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC."""
+        try:
+            from src.core.midi.midi_manager import get_midi_manager
+            mm = get_midi_manager()
+            before = set(getattr(mm, "_inputs", {}).keys())
+            mm.open_all_inputs()
+            new = set(getattr(mm, "_inputs", {}).keys()) - before
+            if new:
+                print(f"[main_window] MIDI auto-connect: {sorted(new)}")
+        except Exception as e:
+            print(f"[main_window] MIDI auto-connect error: {e}")
 
     # ── Theme ─────────────────────────────────────────────────────────────────
 
