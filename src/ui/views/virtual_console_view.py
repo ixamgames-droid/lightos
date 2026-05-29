@@ -442,9 +442,17 @@ class VirtualConsoleView(QWidget):
     def _toggle_apc_leds(self, checked: bool):
         if checked:
             try:
-                from src.core.midi.apc_mini_feedback import APCMiniFeedback
                 from src.core.app_state import get_state
-                self._apc_feedback = APCMiniFeedback()
+                from src.core.midi.midi_manager import get_midi_manager
+                outs = get_midi_manager().list_outputs()
+                is_mk2 = any("mk2" in p.lower() for p in outs)
+                if is_mk2:
+                    # mk2 nutzt RGB + spiegelt die VC-Button-Zustaende
+                    from src.core.midi.apc_mk2_feedback import ApcMk2Feedback
+                    self._apc_feedback = ApcMk2Feedback(self._canvas)
+                else:
+                    from src.core.midi.apc_mini_feedback import APCMiniFeedback
+                    self._apc_feedback = APCMiniFeedback()
                 if self._apc_feedback.is_connected:
                     self._apc_feedback.attach(get_state())
                 else:
