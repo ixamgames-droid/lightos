@@ -132,6 +132,8 @@ class VCWidget(QFrame):
     def _show_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
         menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
+        if self.supports_midi_teach():
+            menu.addAction("🎹 MIDI Teach...").triggered.connect(self._teach_midi)
         menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
         menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
         menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
@@ -140,6 +142,39 @@ class VCWidget(QFrame):
     def handle_midi(self, msg) -> bool:
         """Verarbeitet eine MIDI-Message. Gibt True zurück wenn konsumiert."""
         return False
+
+    # ── MIDI Teach (Rechtsklick → Teach mit APC-mini-Abbild) ───────────────────
+
+    def supports_midi_teach(self) -> bool:
+        """True, wenn dieses Widget eine MIDI-Bindung unterstützt."""
+        return False
+
+    def current_midi_binding(self):
+        """Aktuelle Bindung als (msg_type, channel, data1) oder None."""
+        return None
+
+    def apply_midi_binding(self, msg_type, channel, data1):
+        """Setzt die MIDI-Bindung. data1 < 0 / None = 'entfernen'.
+        Subklassen überschreiben dies."""
+        pass
+
+    def _midi_teach_kinds(self):
+        """Welche APC-Element-Typen darf dieses Widget binden (note/cc)."""
+        return ("note", "cc")
+
+    def _teach_midi(self):
+        from PySide6.QtWidgets import QDialog
+        from src.ui.widgets.midi_teach_dialog import MidiTeachDialog
+        dlg = MidiTeachDialog(self, current=self.current_midi_binding(),
+                              accept_kinds=self._midi_teach_kinds(),
+                              title=f"MIDI Teach — {self.caption}")
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            b = dlg.result_binding
+            if b is None:
+                self.apply_midi_binding(None, 0, -1)
+            else:
+                self.apply_midi_binding(b[0], b[1], b[2])
+            self.update()
 
     def _open_properties(self):
         pass  # override in subclasses

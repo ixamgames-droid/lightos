@@ -268,6 +268,14 @@ class MidiManager:
     def subscribe(self, cb: Callable[[MidiMessage], None]):
         self._callbacks.append(cb)
 
+    def unsubscribe(self, cb: Callable[[MidiMessage], None]):
+        """Entfernt einen zuvor registrierten Callback (z.B. beim Schliessen
+        eines temporaeren Subscribers wie dem MIDI-Teach-Dialog)."""
+        try:
+            self._callbacks.remove(cb)
+        except ValueError:
+            pass
+
     def subscribe_log(self, cb: Callable[[str], None]):
         self._log_callbacks.append(cb)
 

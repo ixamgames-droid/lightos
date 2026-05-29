@@ -76,6 +76,27 @@ class VCSlider(VCWidget):
         self.value = int(msg.data2 / 127.0 * 255)
         return True
 
+    # ── MIDI Teach (siehe VCWidget) — Fader bindet nur CC ──────────────────────
+
+    def supports_midi_teach(self) -> bool:
+        return True
+
+    def _midi_teach_kinds(self):
+        return ("cc",)
+
+    def current_midi_binding(self):
+        if self.midi_cc is None or self.midi_cc < 0:
+            return None
+        return ("cc", self.midi_ch, self.midi_cc)
+
+    def apply_midi_binding(self, msg_type, channel, data1):
+        if data1 is None or data1 < 0:
+            self.midi_cc = -1
+            return
+        if msg_type == "cc":
+            self.midi_cc = data1
+            self.midi_ch = channel or 0
+
     # ── Track geometry ────────────────────────────────────────────────────────
 
     def _track_rect(self) -> QRect:

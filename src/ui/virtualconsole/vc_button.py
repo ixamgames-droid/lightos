@@ -59,6 +59,25 @@ class VCButton(VCWidget):
         self._midi_armed = False
         self.update()
 
+    # ── MIDI Teach (siehe VCWidget) ────────────────────────────────────────────
+
+    def supports_midi_teach(self) -> bool:
+        return True
+
+    def current_midi_binding(self):
+        if self.midi_data1 is None or self.midi_data1 < 0:
+            return None
+        return (self.midi_type, self.midi_ch, self.midi_data1)
+
+    def apply_midi_binding(self, msg_type, channel, data1):
+        if data1 is None or data1 < 0:
+            self.midi_data1 = -1
+            return
+        # APC-Tasten -> note_on, Fader -> cc (VCButton kann beides auswerten)
+        self.midi_type = "cc" if msg_type == "cc" else "note_on"
+        self.midi_ch = channel or 0
+        self.midi_data1 = data1
+
     def matches_midi(self, msg) -> bool:
         """True wenn die MIDI-Message zu dieser Bindung passt."""
         if self.midi_data1 < 0:
