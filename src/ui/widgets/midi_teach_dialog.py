@@ -153,6 +153,9 @@ class _ApcView(QWidget):
 class MidiTeachDialog(QDialog):
     """Dialog zum Teachen einer MIDI-Bindung fuer ein VC-Widget."""
 
+    # MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
+    _midi_received = Signal(object)
+
     def __init__(self, parent=None, current=None,
                  accept_kinds=("note", "cc"), title="MIDI Teach"):
         super().__init__(parent)
@@ -220,13 +223,15 @@ class MidiTeachDialog(QDialog):
             self._mm.open_all_inputs()
         except Exception:
             pass
+        self._midi_received.connect(self._on_midi)
         self._mm.subscribe(self._on_midi_raw)
         self._refresh_input_label()
 
     # ── MIDI ───────────────────────────────────────────────────────────────────
 
     def _on_midi_raw(self, msg):
-        QTimer.singleShot(0, lambda m=msg: self._on_midi(m))
+        # Laeuft im MidiDispatch-Thread (kein Event-Loop) -> Signal marshallt in den UI-Thread.
+        self._midi_received.emit(msg)
 
     def _on_midi(self, msg):
         try:

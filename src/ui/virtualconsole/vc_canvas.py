@@ -40,6 +40,8 @@ class VCCanvas(QWidget):
     # Signale nach außen (für VirtualConsoleView)
     midi_learn_done = Signal()          # MIDI-Learn für Button abgeschlossen
     snapshot_assign_done = Signal()     # Snapshot-Assign abgeschlossen
+    # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
+    _midi_received = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -58,6 +60,9 @@ class VCCanvas(QWidget):
         self._assign_snapshot_index: int | None = None  # welcher Snap zugewiesen wird
         self._awaiting_button_click_for: str | None = None
 
+        # MIDI aus dem Dispatch-Thread sicher in den UI-Thread marshallen.
+        # (Cross-Thread-Signal -> automatisch QueuedConnection -> _handle_midi laeuft im UI-Thread)
+        self._midi_received.connect(self._handle_midi)
         self._setup_midi()
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
@@ -70,8 +75,9 @@ class VCCanvas(QWidget):
             print(f"[VCCanvas] MIDI-Subscribe-Fehler: {e}")
 
     def _on_midi_raw(self, msg):
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(0, lambda m=msg: self._handle_midi(m))
+        # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
+        # wuerde hier NIE feuern. Ein Qt-Signal marshallt thread-sicher in den UI-Thread.
+        self._midi_received.emit(msg)
 
     def _handle_midi(self, msg):
         # MIDI-Learn: nächste Message wird dem bewaffneten Button zugewiesen
