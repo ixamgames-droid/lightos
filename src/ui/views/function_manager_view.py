@@ -119,6 +119,17 @@ class FunctionManagerView(QWidget):
         toolbar.setContentsMargins(4, 2, 4, 2)
         toolbar.setSpacing(4)
 
+        # Geführter Effekt-Assistent (prominent, vorne)
+        self._btn_wizard = QPushButton("✨ Effekt-Assistent")
+        self._btn_wizard.setFixedHeight(26)
+        self._btn_wizard.setStyleSheet(
+            "QPushButton { background:#2d6a4f; color:#eafff3; font-weight:bold;"
+            " border:1px solid #40916c; border-radius:4px; padding:0 10px; }"
+            "QPushButton:hover { background:#40916c; }")
+        self._btn_wizard.setToolTip("Schritt-für-Schritt einen Effekt bauen (Typ → Lampen → Farben → Tempo)")
+        self._btn_wizard.clicked.connect(self._open_effect_wizard)
+        toolbar.addWidget(self._btn_wizard)
+
         for label, ftype in [
             ("+ Szene", FunctionType.Scene),
             ("+ Chaser", FunctionType.Chaser),
@@ -265,6 +276,18 @@ class FunctionManagerView(QWidget):
                 break
 
     # ── Actions ───────────────────────────────────────────────────────────────
+
+    def _open_effect_wizard(self):
+        """Geführter Assistent: erzeugt Szenen + Chaser und selektiert das Ergebnis."""
+        try:
+            from src.ui.widgets.effect_wizard import EffectWizard
+            from PySide6.QtWidgets import QDialog
+            wiz = EffectWizard(self)
+            if wiz.exec() == QDialog.DialogCode.Accepted and wiz.created_function is not None:
+                self._refresh_tree()
+                self._select_by_id(wiz.created_function.id)
+        except Exception as e:
+            QMessageBox.warning(self, "Effekt-Assistent", str(e))
 
     def _new_function(self, ftype):
         if ftype == FunctionType.Scene:

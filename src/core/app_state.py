@@ -21,6 +21,15 @@ class AppState:
         self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
         self.active_stage_name: str = "simple"
         self._patch_cache: list[PatchedFixture] = []
+        # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
+        # zentralen Per-Frame-Renderer _render_frame().
+        self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
+        self._commit_spans: dict[int, list[tuple[int, int]]] = {}  # univ -> [(start,len)]
+        self._patched_set: dict[int, frozenset] = {}    # univ -> {gepatchte Adressen}
+        # Nicht-gepatchte Adressen, die Funktionen (z. B. ScriptFunction setdmx)
+        # im letzten Frame geschrieben haben — fuer korrektes Freigeben.
+        self._engine_extra_prev: dict[int, set] = {}
         self._callbacks: list = []
         self.mock_mode: bool = False
         # Cuelisten und Playback
@@ -210,6 +219,49 @@ class AppState:
                 s.execute(select(PatchedFixture).order_by(PatchedFixture.fid)).scalars()
             )
         self._rebuild_universes()
+        clear_channel_cache()
+        self._rebuild_render_plan()
+
+    def _rebuild_render_plan(self):
+        """Berechnet aus dem Patch die Strukturen fuer den Per-Frame-Renderer:
+        Default-Frame (gepatchte Kanaele auf Default), fid->Kanal-Index und die
+        zusammenhaengenden Adress-Spans, die pro Frame committed werden."""
+        fix_index: dict[int, tuple] = {}
+        defaults: dict[int, bytearray] = {}
+        addrs: dict[int, set] = {}
+        for fx in self._patch_cache:
+            chans = get_channels_for_patched(fx)
+            fix_index[fx.fid] = (fx, chans)
+            for ch in chans:
+                addr = fx.address + ch.channel_number - 1
+                if not (1 <= addr <= 512):
+                    continue
+                dv = ch.default_value
+                try:
+                    dv = int(dv) if dv is not None else 0
+                except (TypeError, ValueError):
+                    dv = 0
+                defaults.setdefault(fx.universe, bytearray(512))[addr - 1] = max(0, min(255, dv))
+                addrs.setdefault(fx.universe, set()).add(addr)
+        # Adressen pro Universe zu zusammenhaengenden Spans zusammenfassen
+        spans: dict[int, list[tuple[int, int]]] = {}
+        for univ, aset in addrs.items():
+            ordered = sorted(aset)
+            runs: list[tuple[int, int]] = []
+            start = prev = ordered[0]
+            for a in ordered[1:]:
+                if a == prev + 1:
+                    prev = a
+                else:
+                    runs.append((start, prev - start + 1))
+                    start = prev = a
+            runs.append((start, prev - start + 1))
+            spans[univ] = runs
+        self._fix_index = fix_index
+        self._default_frame = {u: bytes(b) for u, b in defaults.items()}
+        self._commit_spans = spans
+        self._patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        self._engine_extra_prev = {}
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}
@@ -325,10 +377,93 @@ class AppState:
         from .engine.executor import PlaybackEngine
         self.playback_engine = PlaybackEngine(self)
         self.playback_engine.start()
-        # Hook FunctionManager into the 44 Hz output loop
-        self.output_manager.add_tick_callback(
-            lambda dt: self.function_manager.tick(self.universes, self._patch_cache, dt)
-        )
+        # EIN zentraler Renderer im 44-Hz-Output-Loop (ersetzt den frueheren
+        # zweiten PlaybackEngine-Thread) — behebt Tearing + haengende Werte.
+        self.output_manager.add_tick_callback(self._render_frame)
+
+    # ── Zentraler Per-Frame-Renderer ──────────────────────────────────────────
+
+    def _render_frame(self, dt: float):
+        """Berechnet jeden Output-Frame komplett neu (ein Thread):
+        Default → Funktionen → Executoren → Programmer, dann atomarer Commit
+        der gepatchten Kanaele ins Live-Universe. Nicht gepatchte Kanaele
+        (SimpleDesk/OSC-Roh/Input-Merge) bleiben unberuehrt."""
+        # Snapshots: dieser Renderer laeuft im Output-Thread, waehrend UI-/MIDI-/
+        # RX-Threads programmer/universes mutieren (set_programmer_value,
+        # Input-Merge legt Universen an). Iteration ueber Live-Dicts wuerde sonst
+        # "dict changed size during iteration" werfen.
+        live_universes = list(self.universes.items())
+        programmer = {fid: dict(attrs)
+                      for fid, attrs in list(self.programmer.items())}
+        # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
+        scratch: dict[int, Universe] = {}
+        for univ, _live in live_universes:
+            su = Universe(univ)
+            base = self._default_frame.get(univ)
+            if base:
+                su.set_range(1, base)
+            scratch[univ] = su
+        # 2. Funktionen rendern in die Scratch-Universen.
+        try:
+            self.function_manager.tick(scratch, self._patch_cache, dt)
+        except Exception as exc:
+            print(f"[AppState] render functions error: {exc}")
+        # 3. Executoren (Cue-Playback) darueber.
+        if self.playback_engine is not None:
+            try:
+                self._apply_fixture_map(scratch, self.playback_engine.compute_merged())
+            except Exception as exc:
+                print(f"[AppState] render executors error: {exc}")
+        # 4. Programmer hat hoechste Prioritaet (LTP).
+        self._apply_fixture_map(scratch, programmer)
+        # 5. Atomarer Commit der gepatchten Spans ins Live-Universe.
+        for univ, live in live_universes:
+            su = scratch.get(univ)
+            if su is None:
+                continue
+            data = su.get_all()
+            for start, length in self._commit_spans.get(univ, ()):
+                live.set_range(start, data[start - 1:start - 1 + length])
+            # Roh-Kanaele, die Funktionen (z. B. ScriptFunction setdmx) auf NICHT
+            # gepatchte Adressen geschrieben haben, ebenfalls committen — und
+            # zuvor geschriebene, jetzt nicht mehr aktive, wieder freigeben (0).
+            patched = self._patched_set.get(univ, frozenset())
+            cur = {a for a in range(1, 513) if a not in patched and data[a - 1] != 0}
+            prev = self._engine_extra_prev.get(univ)
+            if cur or prev:
+                for a in cur:
+                    live.set_channel(a, data[a - 1])
+                if prev:
+                    for a in prev - cur:
+                        live.set_channel(a, 0)
+                self._engine_extra_prev[univ] = cur
+
+    def _apply_fixture_map(self, scratch: dict, fixmap: dict):
+        """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
+        nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht)."""
+        for fid, attrs in fixmap.items():
+            try:
+                entry = self._fix_index.get(int(fid))
+            except (TypeError, ValueError):
+                continue
+            if not entry:
+                continue
+            fx, chans = entry
+            su = scratch.get(fx.universe)
+            if su is None:
+                continue
+            for ch in chans:
+                if ch.attribute not in attrs:
+                    continue
+                addr = fx.address + ch.channel_number - 1
+                if not (1 <= addr <= 512):
+                    continue
+                v = attrs[ch.attribute]
+                try:
+                    v = int(v)
+                except (TypeError, ValueError):
+                    v = 0
+                su.set_channel(addr, max(0, min(255, v)))
 
     def new_cue_stack(self, name: str = "Neue Cueliste"):
         from .engine.cue_stack import CueStack
@@ -372,11 +507,28 @@ class AppState:
             pass
 
 
+# Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).
+# Ohne Cache macht get_channels_for_patched pro Fixture pro Frame (44 Hz) eine
+# neue DB-Session — viel zu teuer fuer den zentralen Per-Frame-Renderer.
+_channel_cache: dict = {}
+
+
+def clear_channel_cache():
+    """Invalidiert den Channel-Cache (bei jeder Patch-Aenderung aufrufen)."""
+    _channel_cache.clear()
+
+
 def get_channels_for_patched(fixture: PatchedFixture):
-    """Laedt die Channel-Objekte fuer ein gepatchtes Geraet.
+    """Laedt die Channel-Objekte fuer ein gepatchtes Geraet (gecached).
     Fallback: Wenn der exakte Mode-Name nicht existiert, wird der erste Mode
     des Profils mit passender Kanalanzahl verwendet (oder einfach der erste).
     """
+    key = (getattr(fixture, "fixture_profile_id", None),
+           getattr(fixture, "mode_name", None),
+           getattr(fixture, "channel_count", None))
+    cached = _channel_cache.get(key)
+    if cached is not None:
+        return cached
     from sqlalchemy import select
     from .database.fixture_db import engine
     from .database.models import FixtureMode, FixtureChannel
@@ -405,6 +557,7 @@ def get_channels_for_patched(fixture: PatchedFixture):
             ).scalars().first()
 
         if not mode:
+            _channel_cache[key] = []
             return []
 
         result = s.execute(
@@ -413,6 +566,7 @@ def get_channels_for_patched(fixture: PatchedFixture):
             .order_by(FixtureChannel.channel_number)
         ).scalars().all()
         s.expunge_all()
+        _channel_cache[key] = result
         return result
 
 

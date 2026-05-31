@@ -256,7 +256,8 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover:!disabled { background:#30363d; color:#e6edf3; }
             QPushButton:disabled { color:#484f58; border-color:#21262d; }
         """)
-        self._btn_snap.setEnabled(False)
+        self._btn_snap.setProperty("edit_only", True)
+        self._btn_snap.setVisible(False)
         self._btn_snap.toggled.connect(self._toggle_snap)
         tb_layout.addWidget(self._btn_snap)
 
@@ -269,6 +270,7 @@ class VirtualConsoleView(QWidget):
             ("XY Pad",    "VCXYPad"),
             ("Cue List",  "VCCueList"),
             ("SpeedDial", "VCSpeedDial"),
+            ("Farbe",     "VCColor"),
             ("Label",     "VCLabel"),
             ("Frame",     "VCFrame"),
         ]
@@ -282,8 +284,9 @@ class VirtualConsoleView(QWidget):
                 QPushButton:disabled { color:#484f58; }
             """)
             btn.clicked.connect(lambda checked=False, wt=wtype: self._add_widget(wt))
-            btn.setEnabled(False)
             btn.setProperty("add_btn", True)
+            btn.setProperty("edit_only", True)
+            btn.setVisible(False)
             tb_layout.addWidget(btn)
 
         tb_layout.addSpacing(16)
@@ -322,6 +325,23 @@ class VirtualConsoleView(QWidget):
         self._btn_apc_leds.toggled.connect(self._toggle_apc_leds)
         tb_layout.addWidget(self._btn_apc_leds)
 
+        # Touch-Lock (Display-only): nur Anzeige, keine Steuerung per Touchscreen
+        self._btn_touch_lock = QPushButton("🔒 Touch-Lock")
+        self._btn_touch_lock.setCheckable(True)
+        self._btn_touch_lock.setFixedHeight(26)
+        self._btn_touch_lock.setToolTip(
+            "Display-only: Touchscreen/Maus steuert nicht mehr (nur Anzeige).\n"
+            "APC mini / MIDI steuern weiterhin. Schützt vor versehentlichem Antippen."
+        )
+        self._btn_touch_lock.setStyleSheet("""
+            QPushButton { background:#21262d; color:#ffb000; border:1px solid #ffb000;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#ffb000; color:#000; font-weight:bold; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_touch_lock.toggled.connect(self._toggle_touch_lock)
+        tb_layout.addWidget(self._btn_touch_lock)
+
         # Popout Button
         self._btn_popout = QPushButton("⧉ Popout")
         self._btn_popout.setFixedHeight(26)
@@ -344,6 +364,8 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         btn_clear.clicked.connect(self._clear_all)
+        btn_clear.setProperty("edit_only", True)
+        btn_clear.setVisible(False)
         tb_layout.addWidget(btn_clear)
 
         btn_save = QPushButton("Speichern")
@@ -416,10 +438,11 @@ class VirtualConsoleView(QWidget):
         self._edit_mode = enabled
         self._btn_edit.setText("Bearbeiten ✓" if enabled else "Bearbeiten")
         self._canvas.set_edit_mode(enabled)
-        self._btn_snap.setEnabled(enabled)
+        # Bearbeiten-only-Buttons (Widgets hinzufügen, Snap, Alle löschen) nur
+        # im Bearbeiten-Modus zeigen -> aufgeraeumtes Fenster im Live-Betrieb.
         for btn in self._toolbar_widget.findChildren(QPushButton):
-            if btn.property("add_btn"):
-                btn.setEnabled(enabled)
+            if btn.property("edit_only"):
+                btn.setVisible(enabled)
 
     def _toggle_snap(self, checked: bool):
         self._canvas.set_snap_to_grid(checked)
@@ -438,6 +461,15 @@ class VirtualConsoleView(QWidget):
         self._btn_midi_learn.setChecked(False)
 
     # ── APC LEDs ─────────────────────────────────────────────────────────────
+
+    def _toggle_touch_lock(self, checked: bool):
+        """Display-only: Touch/Maus im Run-Modus sperren (APC/MIDI bleibt aktiv)."""
+        try:
+            from src.ui.virtualconsole.vc_widget import VCWidget
+            VCWidget.input_locked = bool(checked)
+            self._btn_touch_lock.setText("🔒 Gesperrt" if checked else "🔒 Touch-Lock")
+        except Exception as e:
+            print(f"[VC] touch lock error: {e}")
 
     def _toggle_apc_leds(self, checked: bool):
         if checked:

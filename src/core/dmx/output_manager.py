@@ -111,7 +111,7 @@ class OutputManager:
                 data = bytes(512)
             elif self.grand_master < 0.999:
                 gm = self.grand_master
-                data = bytes(int(b * gm) for b in data)
+                data = bytes(min(255, int(b * gm + 0.5)) for b in data)
             if univ_num in self._enttec_outputs:
                 try:
                     self._enttec_outputs[univ_num].send_dmx(data)

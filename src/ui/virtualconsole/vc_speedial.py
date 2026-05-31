@@ -99,6 +99,9 @@ class VCSpeedDial(VCWidget):
         if self._edit_mode:
             super().mousePressEvent(event)
             return
+        if self._run_input_blocked():
+            event.accept()
+            return
         pos = event.position().toPoint()
         if self._tap_rect().contains(pos):
             self._tap()
@@ -202,6 +205,23 @@ class VCSpeedDial(VCWidget):
         form.addRow("Target:", mode_cb)
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
         form.addRow("Executor-Slot / Function-ID:", slot)
+        # Funktion/Chase nach Namen auswaehlen -> fuellt das Function-ID-Feld.
+        func_combo = QComboBox()
+        func_combo.addItem("(nach ID/Slot oben)", -1)
+        self._populate_function_combo(func_combo)
+        if self.function_id is not None:
+            for i in range(func_combo.count()):
+                if func_combo.itemData(i) == self.function_id:
+                    func_combo.setCurrentIndex(i)
+                    break
+
+        def _on_func_pick(_i):
+            data = func_combo.currentData()
+            if data is not None and data >= 0:
+                slot.setText(str(data))
+                mode_cb.setCurrentText(SpeedTarget.FUNCTION)
+        func_combo.currentIndexChanged.connect(_on_func_pick)
+        form.addRow("Funktion/Chase (Name):", func_combo)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -215,6 +235,17 @@ class VCSpeedDial(VCWidget):
             except ValueError:
                 self.function_id = None
             self.update()
+
+    def _populate_function_combo(self, combo: QComboBox):
+        """Listet alle Funktionen (Chases/Sequences/Scenes...) nach Namen auf."""
+        try:
+            from src.core.app_state import get_state
+            funcs = get_state().function_manager.all()
+            for f in sorted(funcs, key=lambda x: (x.name or "").lower()):
+                ftype = getattr(f.function_type, "value", str(f.function_type))
+                combo.addItem(f"{f.name}  [{ftype} #{f.id}]", int(f.id))
+        except Exception as e:
+            print(f"[VCSpeedDial] function combo error: {e}")
 
     # ── Serialization ─────────────────────────────────────────────────────────
 

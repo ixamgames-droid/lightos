@@ -184,4 +184,5 @@ class RgbMatrixInstance:
         m.color2 = tuple(d.get("color2", [0, 0, 255]))
         m.color3 = tuple(d.get("color3", [0, 255, 0]))
         m.speed = float(d.get("speed", 1.0))
+        m.direction = d.get("direction", "forward")
         return m

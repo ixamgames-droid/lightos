@@ -11,6 +11,10 @@ class SliderMode(str):
     LEVEL    = "Level"
     PLAYBACK = "Playback"
     SUBMASTER = "Submaster"
+    GRANDMASTER = "GrandMaster"   # steuert die globale Gesamthelligkeit
+    PROGRAMMER  = "Programmer"    # setzt ein Programmer-Attribut (programmer_attr)
+    BPM         = "BPM"           # steuert das globale Tempo (Beat-Effekte folgen)
+    SPEED       = "Speed"         # steuert die Geschwindigkeit laufender Effekte
 
 
 class VCSlider(VCWidget):
@@ -22,6 +26,7 @@ class VCSlider(VCWidget):
         self.function_id: int | None = None
         self.dmx_channel: int = 1
         self.dmx_universe: int = 1
+        self.programmer_attr: str = "intensity"   # fuer PROGRAMMER-Modus
         self._value: int = 0          # 0–255
         self._drag_y: int | None = None
         self._drag_start_val: int = 0
@@ -47,7 +52,37 @@ class VCSlider(VCWidget):
     def _apply(self):
         from src.core.app_state import get_state
         state = get_state()
-        if self.mode == SliderMode.LEVEL:
+        if self.mode == SliderMode.GRANDMASTER:
+            try:
+                state.output_manager.set_grand_master(self._value / 255.0)
+            except Exception:
+                pass
+        elif self.mode == SliderMode.BPM:
+            # Globales Tempo 30..300 BPM -> Beat-Effekte folgen.
+            try:
+                from src.core.engine.bpm_manager import get_bpm_manager
+                get_bpm_manager().set_bpm(30.0 + (self._value / 255.0) * 270.0)
+            except Exception:
+                pass
+        elif self.mode == SliderMode.SPEED:
+            # Geschwindigkeit aller laufenden Chaser 0.1..4.0x (z.B. Strobe-Rate).
+            try:
+                from src.core.engine.function_manager import get_function_manager
+                from src.core.engine.chaser import Chaser
+                mult = 0.1 + (self._value / 255.0) * 3.9
+                for f in get_function_manager().all():
+                    if isinstance(f, Chaser) and f.is_running:
+                        f.speed = mult
+            except Exception:
+                pass
+        elif self.mode == SliderMode.PROGRAMMER:
+            attr = self.programmer_attr or "intensity"
+            try:
+                for f in state.get_patched_fixtures():
+                    state.set_programmer_value(f.fid, attr, self._value)
+            except Exception:
+                pass
+        elif self.mode == SliderMode.LEVEL:
             # universes ist ein dict mit 1-basierten Keys — Universe bei Bedarf
             # anlegen, damit der Fader auch ohne gepatchte Fixture funktioniert
             # (analog SimpleDesk). Frueher: "< len(...)" -> KeyError: 0 -> Crash.
@@ -113,6 +148,9 @@ class VCSlider(VCWidget):
     def mousePressEvent(self, event):
         if self._edit_mode:
             super().mousePressEvent(event)
+            return
+        if self._run_input_blocked():
+            event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_y = event.position().toPoint().y()
@@ -191,7 +229,9 @@ class VCSlider(VCWidget):
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
         mode_cb = QComboBox()
-        for m in (SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER):
+        for m in (SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER,
+                  SliderMode.GRANDMASTER, SliderMode.PROGRAMMER, SliderMode.BPM,
+                  SliderMode.SPEED):
             mode_cb.addItem(m)
         mode_cb.setCurrentText(self.mode)
         form.addRow("Modus:", mode_cb)
@@ -246,6 +286,7 @@ class VCSlider(VCWidget):
         d["function_id"] = self.function_id
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
+        d["programmer_attr"] = self.programmer_attr
         d["value"] = self._value
         d["midi_cc"] = self.midi_cc
         d["midi_ch"] = self.midi_ch
@@ -257,6 +298,7 @@ class VCSlider(VCWidget):
         self.function_id = d.get("function_id")
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
+        self.programmer_attr = d.get("programmer_attr", "intensity")
         self._value = d.get("value", 0)
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)

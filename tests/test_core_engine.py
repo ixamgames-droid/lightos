@@ -41,11 +41,18 @@ except Exception:
     ]:
         sys.modules.setdefault(_n, types.ModuleType(_n))
 
-# SQLAlchemy
-_sa = _stub("sqlalchemy")
-_sa_orm = _stub("sqlalchemy.orm")
-sys.modules.setdefault("sqlalchemy", _sa)
-sys.modules.setdefault("sqlalchemy.orm", _sa_orm)
+# SQLAlchemy — nur stubben, wenn NICHT installiert (analog PySide6 oben). Sonst
+# bleibt der leere Stub dauerhaft in sys.modules und zerstoert den echten Import
+# in anderen Testmodulen desselben Laufs (z. B. test_render_frame -> app_state ->
+# "cannot import name 'create_engine' from 'sqlalchemy'").
+try:
+    import sqlalchemy        # noqa: F401
+    import sqlalchemy.orm    # noqa: F401
+except Exception:
+    _sa = _stub("sqlalchemy")
+    _sa_orm = _stub("sqlalchemy.orm")
+    sys.modules.setdefault("sqlalchemy", _sa)
+    sys.modules.setdefault("sqlalchemy.orm", _sa_orm)
 
 
 # ════════════════════════════════════════════════════════════════════════════

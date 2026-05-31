@@ -19,6 +19,7 @@ def _register():
     from .vc_cuelist  import VCCueList
     from .vc_speedial import VCSpeedDial
     from .vc_frame    import VCFrame
+    from .vc_color    import VCColor
     WIDGET_REGISTRY.update({
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
@@ -26,6 +27,7 @@ def _register():
         "VCLabel":    VCLabel,
         "VCCueList":  VCCueList,
         "VCSpeedDial":VCSpeedDial,
+        "VCColor":    VCColor,
         "VCFrame":    VCFrame,
     })
 
@@ -68,11 +70,29 @@ class VCCanvas(QWidget):
     # ── MIDI ─────────────────────────────────────────────────────────────────
 
     def _setup_midi(self):
+        self._mm = None
         try:
             from src.core.midi.midi_manager import get_midi_manager
-            get_midi_manager().subscribe(self._on_midi_raw)
+            self._mm = get_midi_manager()
+            self._mm.subscribe(self._on_midi_raw)
+            # Beim Zerstoeren der Canvas zuverlaessig abmelden (sonst Leak +
+            # MIDI-Dispatch auf bereits geloeschte Widgets → Crash/Doppeltrigger).
+            self.destroyed.connect(lambda *_: self._teardown_midi())
         except Exception as e:
             print(f"[VCCanvas] MIDI-Subscribe-Fehler: {e}")
+
+    def _teardown_midi(self):
+        mm = getattr(self, "_mm", None)
+        if mm is not None:
+            try:
+                mm.unsubscribe(self._on_midi_raw)
+            except Exception:
+                pass
+            self._mm = None
+
+    def closeEvent(self, event):
+        self._teardown_midi()
+        super().closeEvent(event)
 
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
@@ -89,7 +109,13 @@ class VCCanvas(QWidget):
             return
 
         # Dispatch an alle VCWidgets (VCButton, VCSlider, …)
-        for widget in self.findChildren(VCWidget):
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            # Canvas wird gerade zerstoert — abmelden und aussteigen.
+            self._teardown_midi()
+            return
+        for widget in widgets:
             widget.handle_midi(msg)
 
     # ── MIDI-Learn-Modus ─────────────────────────────────────────────────────

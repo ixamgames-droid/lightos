@@ -246,6 +246,11 @@ class ColorPicker(QWidget):
         btn_white = QPushButton("White")
         btn_white.clicked.connect(lambda: self.set_color(QColor(255, 255, 255)))
         btn_row.addWidget(btn_white)
+
+        self._btn_palette = QPushButton("Als Palette…")
+        self._btn_palette.setToolTip("Aktuelle Farbe als benannte Farb-Palette speichern")
+        self._btn_palette.clicked.connect(self._save_as_palette)
+        btn_row.addWidget(self._btn_palette)
         root.addLayout(btn_row)
 
     # ── Basic Tab ────────────────────────────────────────────────────────────
@@ -546,6 +551,36 @@ class ColorPicker(QWidget):
                     state.set_programmer_value(fid, "color_uv", self._uv)
         except Exception as e:
             print(f"[color_picker] apply error: {e}")
+
+    def _save_as_palette(self):
+        """Speichert die aktuelle Farbe als benannte Color-Palette."""
+        from PySide6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "Als Palette speichern", "Name:")
+        if not ok or not name.strip():
+            return
+        try:
+            from src.core.engine.palette import (get_palette_manager, Palette,
+                                                  PaletteType)
+            vals = {
+                "color_r": self._color.red(),
+                "color_g": self._color.green(),
+                "color_b": self._color.blue(),
+            }
+            if self._white:
+                vals["color_w"] = self._white
+            if self._amber:
+                vals["color_a"] = self._amber
+            if self._uv:
+                vals["color_uv"] = self._uv
+            pal = Palette(name=name.strip(), type=PaletteType.COLOR, values=vals)
+            get_palette_manager().add(pal)
+            try:
+                from src.core.sync import get_sync, SyncEvent
+                get_sync().emit(SyncEvent.PALETTE_CHANGED, None)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[color_picker] save palette error: {e}")
 
     def _get_selected_fids(self, state) -> list[int]:
         # Versuche selektierte Fixtures aus dem ProgrammerView zu holen

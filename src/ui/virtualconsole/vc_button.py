@@ -22,6 +22,8 @@ class ButtonAction(str, Enum):
     BLACKOUT = "Blackout"
     STOP_ALL = "StopAll"
     SNAPSHOT = "Snapshot"
+    CLEAR    = "Clear"        # Programmer leeren (manuelle Farben/Snaps freigeben)
+    TAP      = "Tap"          # Tap-Tempo: setzt globale BPM (beat-Effekte folgen)
 
 
 class VCButton(VCWidget):
@@ -32,6 +34,16 @@ class VCButton(VCWidget):
         self.action = ButtonAction.TOGGLE
         self.function_id: int | None = None
         self.snapshot_index: int | None = None
+        # Verhalten beim Starten einer Funktion:
+        #   exclusive        -> stoppt alle anderen Funktionen (nur 1 aktiv)
+        #   clear_programmer -> leert vorher den Programmer (manuelle Farben/Snaps
+        #                       blockieren sonst den Effekt, da Programmer = hoechste Prioritaet)
+        self.exclusive: bool = False
+        self.clear_programmer: bool = False
+        # APC-Pad-Anzeige-Stil: mirror = Effekt-Farbe spiegeln, solid = feste Farbe,
+        # pulse = pulsieren, alternate = zwei Farben im Wechsel, wave = Dauer-Welle.
+        self.pad_style: str = "mirror"
+        self.pad_color2 = (0, 0, 255)   # zweite Farbe fuer 'alternate'
 
         # MIDI binding (-1 = keine Bindung)
         self.midi_ch: int = 0          # 0 = alle Kanäle
@@ -169,20 +181,53 @@ class VCButton(VCWidget):
                 self._apply_snapshot(self.snapshot_index)
             return
 
+        if self.action == ButtonAction.CLEAR:
+            if press:
+                try:
+                    state.clear_programmer()
+                except Exception:
+                    pass
+            return
+
+        if self.action == ButtonAction.TAP:
+            if press:
+                try:
+                    from src.core.engine.bpm_manager import get_bpm_manager
+                    get_bpm_manager().tap()
+                except Exception:
+                    pass
+            return
+
         if self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
             if self.function_id is None:
                 return
             fid = int(self.function_id)
             fm = state.function_manager
+
+            def _begin():
+                # Manuelle Farben/Snaps freigeben + ggf. andere Funktionen stoppen,
+                # damit der Effekt sichtbar wird bzw. nur einer laeuft.
+                if self.clear_programmer:
+                    try:
+                        state.clear_programmer()
+                    except Exception:
+                        pass
+                if self.exclusive:
+                    try:
+                        fm.stop_all()
+                    except Exception:
+                        pass
+                fm.start(fid)
+
             if self.action == ButtonAction.FUNCTION_TOGGLE:
                 if press:
                     if fm.is_running(fid):
                         fm.stop(fid)
                     else:
-                        fm.start(fid)
-            else:
+                        _begin()
+            else:  # FUNCTION_FLASH
                 if press:
-                    fm.start(fid)
+                    _begin()
                 else:
                     fm.stop(fid)
             return
@@ -204,6 +249,9 @@ class VCButton(VCWidget):
     def mousePressEvent(self, event):
         if self._edit_mode:
             super().mousePressEvent(event)
+            return
+        if self._run_input_blocked():       # Display-only: Touch gesperrt
+            event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
             self._pressed = True
@@ -285,6 +333,22 @@ class VCButton(VCWidget):
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
         form.addRow("Executor-Slot / Function-ID:", slot)
 
+        # Funktion/Chase nach Namen auswaehlen -> fuellt das Function-ID-Feld.
+        func_combo = QComboBox()
+        func_combo.addItem("(nach ID/Slot oben)", -1)
+        self._populate_function_combo(func_combo)
+        if self.function_id is not None:
+            for i in range(func_combo.count()):
+                if func_combo.itemData(i) == self.function_id:
+                    func_combo.setCurrentIndex(i)
+                    break
+        func_combo.currentIndexChanged.connect(
+            lambda _i: slot.setText(str(func_combo.currentData()))
+            if func_combo.currentData() is not None and func_combo.currentData() >= 0
+            else None
+        )
+        form.addRow("Funktion/Chase (Name):", func_combo)
+
         # Snapshot-Auswahl
         snap_combo = QComboBox()
         snap_combo.addItem("(keiner)", -1)
@@ -315,6 +379,19 @@ class VCButton(VCWidget):
         midi_note_spin.setSpecialValueText("keine")
         form.addRow("Note / CC (-1=keine):", midi_note_spin)
 
+        form.addRow(QLabel("── APC-Pad-Anzeige ──"))
+        pad_style_combo = QComboBox()
+        _PAD_STYLES = [("mirror", "Spiegel (Effekt-Farbe)"), ("solid", "Feste Farbe"),
+                       ("pulse", "Pulsieren"), ("alternate", "Zwei Farben im Wechsel"),
+                       ("wave", "Dauer-Welle")]
+        for key, label in _PAD_STYLES:
+            pad_style_combo.addItem(label, key)
+        for i, (key, _l) in enumerate(_PAD_STYLES):
+            if key == self.pad_style:
+                pad_style_combo.setCurrentIndex(i)
+                break
+        form.addRow("Pad-Stil:", pad_style_combo)
+
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -333,7 +410,19 @@ class VCButton(VCWidget):
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
+            self.pad_style = pad_style_combo.currentData() or "mirror"
             self.update()
+
+    def _populate_function_combo(self, combo: QComboBox):
+        """Listet alle Funktionen (Chases/Sequences/Scenes...) nach Namen auf."""
+        try:
+            from src.core.app_state import get_state
+            funcs = get_state().function_manager.all()
+            for f in sorted(funcs, key=lambda x: (x.name or "").lower()):
+                ftype = getattr(f.function_type, "value", str(f.function_type))
+                combo.addItem(f"{f.name}  [{ftype} #{f.id}]", int(f.id))
+        except Exception as e:
+            print(f"[VCButton] function combo error: {e}")
 
     def _populate_snapshot_combo(self, combo: QComboBox):
         try:
@@ -355,6 +444,10 @@ class VCButton(VCWidget):
         d["action"] = self.action.value
         d["function_id"] = self.function_id
         d["snapshot_index"] = self.snapshot_index
+        d["exclusive"] = self.exclusive
+        d["clear_programmer"] = self.clear_programmer
+        d["pad_style"] = self.pad_style
+        d["pad_color2"] = list(self.pad_color2)
         d["midi_ch"] = self.midi_ch
         d["midi_data1"] = self.midi_data1
         d["midi_type"] = self.midi_type
@@ -365,6 +458,11 @@ class VCButton(VCWidget):
         self.action = ButtonAction(d.get("action", "Toggle"))
         self.function_id = d.get("function_id")
         self.snapshot_index = d.get("snapshot_index")
+        self.exclusive = bool(d.get("exclusive", False))
+        self.clear_programmer = bool(d.get("clear_programmer", False))
+        self.pad_style = d.get("pad_style", "mirror")
+        c2 = d.get("pad_color2", [0, 0, 255])
+        self.pad_color2 = tuple(c2) if isinstance(c2, (list, tuple)) and len(c2) == 3 else (0, 0, 255)
         self.midi_ch = d.get("midi_ch", 0)
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")

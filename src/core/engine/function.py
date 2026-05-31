@@ -42,6 +42,19 @@ def _alloc_id() -> int:
     return fid
 
 
+def bump_next_id(used_ids) -> None:
+    """Hebt den globalen ID-Zaehler an, damit kuenftige _alloc_id()-Aufrufe
+    keine bereits vergebene (z. B. aus einer geladenen Show stammende) ID
+    erneut liefern. Verhindert stilles Ueberschreiben geladener Funktionen."""
+    global _next_id
+    for fid in used_ids:
+        try:
+            if int(fid) >= _next_id:
+                _next_id = int(fid) + 1
+        except (TypeError, ValueError):
+            continue
+
+
 class Function:
     """Abstract base for all QLC+ function types."""
 

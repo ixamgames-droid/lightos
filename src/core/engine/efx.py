@@ -171,6 +171,7 @@ class EfxInstance:
             "x_offset": self.x_offset, "y_offset": self.y_offset,
             "rotation": self.rotation,
             "x_freq": self.x_freq, "y_freq": self.y_freq,
+            "x_phase": self.x_phase, "y_phase": self.y_phase,
             "speed_hz": self.speed_hz, "direction": self.direction,
         }
 
@@ -186,7 +187,7 @@ class EfxInstance:
             or (not isinstance(f, dict) and getattr(f, "fid", None) is not None)
         ]
         for k in ("width","height","x_offset","y_offset","rotation",
-                  "x_freq","y_freq","speed_hz"):
+                  "x_freq","y_freq","x_phase","y_phase","speed_hz"):
             if k in d:
                 setattr(e, k, float(d[k]))
         e.direction = d.get("direction", "forward")

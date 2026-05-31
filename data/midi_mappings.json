@@ -1,0 +1,986 @@
+[
+  {
+    "id": "7a53a0b5285f4b12a792364bf368ada2",
+    "name": "Fader R",
+    "target": "programmer_value:color_r",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 48,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 48,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "59598d1313394d43bba79d803b82d0f3",
+    "name": "Fader G",
+    "target": "programmer_value:color_g",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 49,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 49,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "48aabfe39bcd497db07b40aa152e7daf",
+    "name": "Fader B",
+    "target": "programmer_value:color_b",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 50,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 50,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "aaf947fc54ea47c3a3e974f26b8a08bd",
+    "name": "Fader W",
+    "target": "programmer_value:color_w",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 51,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 51,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "e37628b5ddf04e9e90c88de914ac13bc",
+    "name": "Dimmer",
+    "target": "grand_master",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 52,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 52,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "305b67858a5246a1b86505f7b56d0fb4",
+    "name": "APC Fader 6",
+    "target": "executor_fader:6",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 53,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 53,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "c903f5f6f5a3422d8525e4146f812ca9",
+    "name": "APC Fader 7",
+    "target": "executor_fader:7",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 54,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 54,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "172fbc7805ea4b469e73776db9265426",
+    "name": "APC Fader 8",
+    "target": "executor_fader:8",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 55,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 55,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "408cce2af4e74812ba2ea4c48baf931f",
+    "name": "APC Master Fader",
+    "target": "grand_master",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 56,
+      "message_type": "cc"
+    },
+    "button_mode": "continuous",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 56,
+      "message_type": "cc",
+      "state_off": 0,
+      "state_on": 127,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "b7fc9dda4b0c4c858ead93c4902b6bf2",
+    "name": "APC GO 1",
+    "target": "executor_go:1",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 0,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 0,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "7111c6d5e68f4df391993a9a6f37543f",
+    "name": "APC GO 2",
+    "target": "executor_go:2",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 1,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 1,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "631ade02b383477f8c1da3f9783aad54",
+    "name": "APC GO 3",
+    "target": "executor_go:3",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 2,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 2,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "2fef136ad95f4c0e9c264deffc7fcf76",
+    "name": "APC GO 4",
+    "target": "executor_go:4",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 3,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 3,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "ec50042edc4549a0a5546d140190f621",
+    "name": "APC GO 5",
+    "target": "executor_go:5",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 4,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 4,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "c8ee61a39c354d309b6fd5660ebba9c9",
+    "name": "APC GO 6",
+    "target": "executor_go:6",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 5,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 5,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "ab5b612639e541709c9b4b61e5f7fbd5",
+    "name": "APC GO 7",
+    "target": "executor_go:7",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 6,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 6,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "708c4bb5d3c6478dbb9632d82cf19b22",
+    "name": "APC GO 8",
+    "target": "executor_go:8",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 7,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 7,
+      "message_type": "note",
+      "state_off": 5,
+      "state_on": 3,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "107c3ac4d56148699236c260bae89c87",
+    "name": "APC FLASH 1",
+    "target": "executor_flash:1",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 8,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 8,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "c7049a48be2f4c82bcf15aa076728812",
+    "name": "APC FLASH 2",
+    "target": "executor_flash:2",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 9,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 9,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "25a507445fdf484da87c19dd868e992e",
+    "name": "APC FLASH 3",
+    "target": "executor_flash:3",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 10,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 10,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "011cab9abefb467ca7461913cb37c878",
+    "name": "APC FLASH 4",
+    "target": "executor_flash:4",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 11,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 11,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "cda1a241fdd840bc8052065d9bf3982b",
+    "name": "APC FLASH 5",
+    "target": "executor_flash:5",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 12,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 12,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "4f832aff89574c1fa440fbe1923a8d1b",
+    "name": "APC FLASH 6",
+    "target": "executor_flash:6",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 13,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 13,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "eb1aa25bf2144ebf84879631d89b5cab",
+    "name": "APC FLASH 7",
+    "target": "executor_flash:7",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 14,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 14,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "d26675a9618c4a868c9246baadffdf7c",
+    "name": "APC FLASH 8",
+    "target": "executor_flash:8",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 15,
+      "message_type": "note"
+    },
+    "button_mode": "flash",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 15,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 4,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "610e1364e9e64eb0943edc50f9ba5bfb",
+    "name": "APC BACK 1",
+    "target": "executor_back:1",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 64,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 64,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "c615ad8e86744433b11f1736f11d7fbc",
+    "name": "APC BACK 2",
+    "target": "executor_back:2",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 65,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 65,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "494c8fb49a3f4caba8e955289db6adf3",
+    "name": "APC BACK 3",
+    "target": "executor_back:3",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 66,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 66,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "3f250cd588f145cf8797fe06e08497b4",
+    "name": "APC BACK 4",
+    "target": "executor_back:4",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 67,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 67,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "a7beafb8e6354a06be9533e6332d6a4a",
+    "name": "APC BACK 5",
+    "target": "executor_back:5",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 68,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 68,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "425daeeae30c4a1e8fd3397726d2cb1b",
+    "name": "APC BACK 6",
+    "target": "executor_back:6",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 69,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 69,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "2a188e03ad3a4acdbbe65bdf633bc406",
+    "name": "APC BACK 7",
+    "target": "executor_back:7",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 70,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 70,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "b4e0e74a40034faa87f6d1180527d0bb",
+    "name": "APC BACK 8",
+    "target": "executor_back:8",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 71,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 71,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 1,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "4d2338134be74f5e9affaf8fd8583742",
+    "name": "APC Page 1",
+    "target": "page_select:1",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 82,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 82,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "c6f3b02c62ab4c4e92b218845c685a45",
+    "name": "APC Page 2",
+    "target": "page_select:2",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 83,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 83,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "19547776a0444476b8badbb1c25ba31c",
+    "name": "APC Page 3",
+    "target": "page_select:3",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 84,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 84,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "d6d85eaf781e4749a254f18143cb7b18",
+    "name": "APC Page 4",
+    "target": "page_select:4",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 85,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 85,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "635c79afd1474067868f0e4221ccf9cd",
+    "name": "APC Page 5",
+    "target": "page_select:5",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 86,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 86,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "ce724a76800f41cdb8c0194ea4d2c00e",
+    "name": "APC Page 6",
+    "target": "page_select:6",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 87,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 87,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "d227abaf5ade4a08b420b2d6183e5fd5",
+    "name": "APC Page 7",
+    "target": "page_select:7",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 88,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 88,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  },
+  {
+    "id": "ec424f574a0b4fe890d1fd375f50788a",
+    "name": "APC Page 8",
+    "target": "page_select:8",
+    "midi_in": {
+      "device": "APC mini",
+      "channel": 1,
+      "trigger_id": 89,
+      "message_type": "note"
+    },
+    "button_mode": "toggle",
+    "midi_out": {
+      "device": "APC mini mk2",
+      "channel": 1,
+      "trigger_id": 89,
+      "message_type": "note",
+      "state_off": 0,
+      "state_on": 5,
+      "brightness": null,
+      "aux_channel": null
+    },
+    "continuous_min": 0.0,
+    "continuous_max": 1.0
+  }
+]

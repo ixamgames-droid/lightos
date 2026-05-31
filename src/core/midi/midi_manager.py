@@ -316,7 +316,9 @@ class MidiManager:
                 continue
             msg = _decode(raw, port_name)
             if msg:
-                for cb in self._callbacks:
+                # Kopie: subscribe/unsubscribe aus dem UI-Thread darf die Liste
+                # waehrend der Iteration veraendern (sonst RuntimeError/Skips).
+                for cb in list(self._callbacks):
                     try:
                         cb(msg)
                     except Exception:

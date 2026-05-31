@@ -240,7 +240,11 @@ def create_shortcut():
         return None
 
     shortcut_path = os.path.join(desktop, "LightOS.lnk")
-    target = venv_python()
+    # pythonw.exe -> startet OHNE Konsolenfenster; Fallback auf python.exe.
+    target = str(venv_python())
+    pyw = target.replace("python.exe", "pythonw.exe")
+    if os.path.exists(pyw):
+        target = pyw
     arguments = f'"{ROOT / "main.py"}"'
     working_dir = str(ROOT)
 
@@ -252,6 +256,7 @@ def create_shortcut():
         f'$s.Arguments=\'{arguments}\';'
         f'$s.WorkingDirectory="{working_dir}";'
         f'$s.IconLocation="{ROOT / "assets" / "icons" / "lightos.ico"}";'
+        f'$s.WindowStyle=7;'
         f'$s.Save();'
     )
     try:

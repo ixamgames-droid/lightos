@@ -1,7 +1,7 @@
 """FunctionManager singleton — owns all Functions and drives their tick loop."""
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from .function import Function, FunctionType, _alloc_id
+from .function import Function, FunctionType, _alloc_id, bump_next_id
 from .scene import Scene
 from .chaser import Chaser
 from .collection import Collection
@@ -170,6 +170,9 @@ class FunctionManager:
                 print(f"[FunctionManager] from_dict skip {ftype}: {exc}")
                 continue
             self._functions[f.id] = f
+        # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
+        # neu erstellte Funktionen mit geladenen und ueberschreiben sie.
+        bump_next_id(self._functions.keys())
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────

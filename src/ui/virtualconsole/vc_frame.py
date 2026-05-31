@@ -37,9 +37,9 @@ class VCFrame(VCWidget):
         for c in self.findChildren(VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
             if c is child:
                 continue
-            if hasattr(c, "_state") and getattr(c, "_state", False):
+            if getattr(c, "_pressed", False):
                 try:
-                    c._state = False
+                    c._pressed = False
                     if hasattr(c, "_trigger"):
                         c._trigger(False)
                     c.update()

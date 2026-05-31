@@ -11,6 +11,14 @@ class VCWidget(QFrame):
     HANDLE_SIZE = 8
     MIN_SIZE = (40, 30)
 
+    # Globaler Touch-/Maus-Lock im Run-Modus: True = nur Anzeige, keine Steuerung
+    # ueber den Touchscreen (APC/MIDI steuert weiter). Vom VC-Toolbar gesetzt.
+    input_locked = False
+
+    def _run_input_blocked(self) -> bool:
+        """True, wenn im Run-Modus Touch/Maus gesperrt ist (Display-only)."""
+        return (not self._edit_mode) and VCWidget.input_locked
+
     moved = Signal(int, int)       # x, y
     resized = Signal(int, int)     # w, h
     delete_requested = Signal()

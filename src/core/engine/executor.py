@@ -113,24 +113,19 @@ class PlaybackEngine:
             self._page_callbacks.append(cb)
 
     def start(self):
+        # Kein eigener Thread mehr: das Rendern erfolgt zentral im einen
+        # Output-Frame (AppState._render_frame), um Tearing durch zwei
+        # konkurrierende Render-Loops zu vermeiden. start()/stop() bleiben fuer
+        # API-Kompatibilitaet erhalten.
         self._running = True
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="PlaybackEngine")
-        self._thread.start()
 
     def stop(self):
         self._running = False
 
-    def _loop(self):
-        while self._running:
-            t0 = time.monotonic()
-            self._tick()
-            elapsed = time.monotonic() - t0
-            sleep = max(0.0, TICK - elapsed)
-            time.sleep(sleep)
-
-    def _tick(self):
-        # Alle Executoren auf ALLEN Pages ticken - laufende Cues
-        # ueberleben so einen Page-Wechsel
+    def compute_merged(self) -> dict[int, dict[str, int]]:
+        """Tickt alle Cue-Stacks (Echtzeit-Fades) und liefert den gemergten
+        Output aller Executoren ALLER Pages als {fid: {attr: val}}.
+        Schreibt NICHT direkt ins Universe — das macht der zentrale Renderer."""
         merged: dict[int, dict[str, int]] = {}
         for page in self.pages:
             for ex in page:
@@ -141,14 +136,25 @@ class PlaybackEngine:
                     if fid not in merged:
                         merged[fid] = {}
                     merged[fid].update(attrs)
-
-        # In DMX-Universe schreiben
-        self._flush_to_dmx(merged)
         for cb in self._on_output:
             try:
                 cb(merged)
             except Exception:
                 pass
+        return merged
+
+    def _loop(self):
+        while self._running:
+            t0 = time.monotonic()
+            self._tick()
+            elapsed = time.monotonic() - t0
+            sleep = max(0.0, TICK - elapsed)
+            time.sleep(sleep)
+
+    def _tick(self):
+        # Legacy-Pfad (nicht mehr aus einem Thread getrieben). Beibehalten, falls
+        # extern/Tests aufgerufen: nutzt denselben Merge wie der zentrale Renderer.
+        self._flush_to_dmx(self.compute_merged())
 
     def _flush_to_dmx(self, merged: dict[int, dict[str, int]]):
         from src.core.app_state import get_channels_for_patched
@@ -168,7 +174,13 @@ class PlaybackEngine:
                 val = final.get(ch.attribute, ch.default_value)
                 dmx_addr = fixture.address + ch.channel_number - 1
                 if 1 <= dmx_addr <= 512:
-                    universe.set_channel(dmx_addr, val)
+                    # Klemmen + None-Default abfangen: set_channel hat ein hartes
+                    # assert 0<=val<=255, das sonst den Playback-Thread killt.
+                    try:
+                        v = int(val) if val is not None else 0
+                    except (TypeError, ValueError):
+                        v = 0
+                    universe.set_channel(dmx_addr, max(0, min(255, v)))
 
     def stop_all(self):
         # Stoppt Stacks auf ALLEN Pages

@@ -72,6 +72,9 @@ class VCXYPad(VCWidget):
         if self._edit_mode:
             super().mousePressEvent(event)
             return
+        if self._run_input_blocked():
+            event.accept()
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             self._dragging_pad = True
             self._pos_to_value(event.position().toPoint())

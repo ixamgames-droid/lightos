@@ -27,6 +27,7 @@ class BPMManager:
         self._bpm: float = 0.0
         self._last_taps: list[float] = []
         self._beat_callbacks: list[BeatCallback] = []
+        self._bpm_change_callbacks: list = []   # callback(bpm: float)
         self._timer: threading.Thread | None = None
         self._running: bool = False
         self._beat_index: int = 0
@@ -50,6 +51,7 @@ class BPMManager:
             self._ensure_running()
         else:
             self._stop_timer()
+        self._emit_bpm_change()
 
     def tap(self) -> float:
         """Tap-Tempo: Speichert Zeitstempel, errechnet BPM ueber die letzten 4 Taps.
@@ -81,6 +83,7 @@ class BPMManager:
             self._beat_index = 0
         self._bpm = 0.0
         self._stop_timer()
+        self._emit_bpm_change()
 
     # ── Beat-Subscriber ───────────────────────────────────────────────────────
 
@@ -91,6 +94,22 @@ class BPMManager:
     def unsubscribe_beat(self, cb: BeatCallback):
         if cb in self._beat_callbacks:
             self._beat_callbacks.remove(cb)
+
+    def subscribe_bpm_change(self, cb):
+        """Callback(bpm) wird bei jeder BPM-Aenderung aufgerufen (Tap/Set/Audio)."""
+        if cb not in self._bpm_change_callbacks:
+            self._bpm_change_callbacks.append(cb)
+
+    def unsubscribe_bpm_change(self, cb):
+        if cb in self._bpm_change_callbacks:
+            self._bpm_change_callbacks.remove(cb)
+
+    def _emit_bpm_change(self):
+        for cb in list(self._bpm_change_callbacks):
+            try:
+                cb(self._bpm)
+            except Exception as e:
+                print(f"[BPMManager] bpm-change callback error: {e}")
 
     def _emit_beat(self):
         idx = self._beat_index

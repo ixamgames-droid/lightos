@@ -5,6 +5,24 @@ import argparse
 import faulthandler
 import datetime
 
+# pythonw.exe (Start ohne Konsolenfenster) liefert kein stdout/stderr -> print()
+# wuerde dann crashen. Ausgaben in diesem Fall in eine Logdatei umleiten.
+if sys.stdout is None or sys.stderr is None:
+    try:
+        _ld = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+        os.makedirs(_ld, exist_ok=True)
+        _lf = open(os.path.join(_ld, "lightos.log"), "a", encoding="utf-8", buffering=1)
+        if sys.stdout is None:
+            sys.stdout = _lf
+        if sys.stderr is None:
+            sys.stderr = _lf
+    except Exception:
+        import io
+        if sys.stdout is None:
+            sys.stdout = io.StringIO()
+        if sys.stderr is None:
+            sys.stderr = io.StringIO()
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from PySide6.QtWidgets import QApplication
@@ -61,10 +79,29 @@ def main():
 
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
+    # Eigene AppUserModelID -> Windows zeigt in der Taskleiste das LightOS-Icon
+    # (statt des generischen Python-Icons) und gruppiert die Fenster korrekt.
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LightOS.DMX.Control.1")
+        except Exception:
+            pass
+
     app = QApplication(sys.argv)
     app.setApplicationName("LightOS")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("LightOS")
+
+    # App-/Fenster-Icon (assets/icons/lightos.png, .ico fuer den Installer-Shortcut)
+    try:
+        from PySide6.QtGui import QIcon
+        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "assets", "icons", "lightos.png")
+        if os.path.exists(_icon_path):
+            app.setWindowIcon(QIcon(_icon_path))
+    except Exception as _e:
+        print(f"[main] Icon konnte nicht gesetzt werden: {_e}")
 
     window = MainWindow(kiosk=args.kiosk, touch=args.touch)
     if args.kiosk:

@@ -55,6 +55,17 @@ class Chaser(Function):
         self._step_elapsed = 0.0
         self._ping_pong_dir = 1 if self.direction == Direction.Forward else -1
         self._visited = set()
+        self._beat_counter = 0
+        # Beat-getriggerte Chaser brauchen einen laufenden BPM-Takt — sonst
+        # stehen sie still. Default 120 BPM starten, falls noch keine BPM gesetzt.
+        if self.audio_triggered:
+            try:
+                from .bpm_manager import get_bpm_manager
+                bm = get_bpm_manager()
+                if bm.bpm <= 0:
+                    bm.set_bpm(120.0)
+            except Exception:
+                pass
 
     def _on_stop(self):
         self._step_idx = 0

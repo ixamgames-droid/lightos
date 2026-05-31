@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
     QMenu, QSlider, QInputDialog,
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter
 from src.core.app_state import get_state
 from src.core.dmx.enttec_pro import find_enttec_port
@@ -96,6 +96,9 @@ class SectionButton(QPushButton):
 
 
 class MainWindow(QMainWindow):
+    # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
+    _bpm_changed_sig = Signal(float)
+
     def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
         self._state = get_state()
@@ -492,6 +495,9 @@ class MainWindow(QMainWindow):
             from src.core.engine.bpm_manager import get_bpm_manager
             self._bpm_mgr = get_bpm_manager()
             self._bpm_mgr.subscribe_beat(self._on_beat)
+            # BPM-Aenderung (Tap/APC/Audio) -> Label sofort aktualisieren.
+            self._bpm_changed_sig.connect(self._update_bpm_label)
+            self._bpm_mgr.subscribe_bpm_change(lambda b: self._bpm_changed_sig.emit(b))
         except Exception as e:
             print(f"[main_window] bpm subscribe error: {e}")
             self._bpm_mgr = None
@@ -759,12 +765,29 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _update_bpm_label(self, bpm: float):
+        """Aktualisiert die BPM-Anzeige sofort bei jeder Tempo-Aenderung (UI-Thread)."""
+        try:
+            if bpm and bpm > 0:
+                self._lbl_bpm.setText(f"BPM: {bpm:.1f}")
+                self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
+            else:
+                self._lbl_bpm.setText("BPM: --")
+                self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
+        except Exception:
+            pass
+
     def _flash_bpm_indicator(self):
         # Akzent auf Beat 1 (alle 4)
         col = "#FFD700" if (self._bpm_mgr and self._bpm_mgr._beat_index % 4 == 1) else "#9DFF52"
         self._bpm_indicator.setStyleSheet(
             f"background:{col}; border-radius:3px; margin:4px 4px;")
         self._bpm_indicator_timer.start()
+        # BPM-Label synchron halten — auch wenn das Tempo extern (APC-TAP / Audio)
+        # geaendert wurde und nicht ueber den Tap-Button im Hauptfenster.
+        if self._bpm_mgr and self._bpm_mgr.bpm > 0:
+            self._lbl_bpm.setText(f"BPM: {self._bpm_mgr.bpm:.1f}")
+            self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
 
     def _set_bpm_manually(self):
         if not self._bpm_mgr:

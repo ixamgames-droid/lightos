@@ -564,8 +564,10 @@ class SnapFilePanel(QWidget):
                 f"Function-ID: {seq.id}\n"
                 f"Steps: {len(seq.steps)}\n\n"
                 "Virtual Console Tipp:\n"
-                "Button Aktion auf 'FunctionToggle' und Function-ID setzen.\n"
-                "SpeedDial Target auf 'Function' und gleiche Function-ID setzen."
+                "Im Button-Dialog Aktion 'FunctionToggle' waehlen und die Funktion\n"
+                "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswaehlen.\n"
+                "Beim SpeedDial dieselbe Funktion im Namens-Dropdown waehlen\n"
+                "(Target wird automatisch auf 'Function' gesetzt)."
             ),
         )
 
