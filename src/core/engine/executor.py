@@ -46,6 +46,57 @@ class Executor:
         if fn == "flash":
             self._flash_active = False
 
+    # ── Serialisierung ────────────────────────────────────────────────────────
+
+    def to_dict(self, cue_stacks: list) -> dict:
+        """Serialisiert den Executor. Die Stack-Bindung wird als Index in die
+        Show-weite cue_stacks-Liste abgelegt (-1 = nicht gebunden)."""
+        stack_idx = -1
+        if self.stack is not None:
+            try:
+                stack_idx = cue_stacks.index(self.stack)
+            except ValueError:
+                stack_idx = -1
+        return {
+            "slot": self.slot,
+            "label": self.label,
+            "fader_value": self.fader_value,
+            "fader_function": self.fader_function,
+            "btn1": self.btn1,
+            "btn2": self.btn2,
+            "btn3": self.btn3,
+            "stack_index": stack_idx,
+        }
+
+    def reset(self):
+        """Setzt den Executor auf Werkszustand (loest stale Stack-Referenzen)."""
+        self.label = f"Exec {self.slot}"
+        self.stack = None
+        self.fader_value = 1.0
+        self.fader_function = "volume"
+        self.btn1 = "go"
+        self.btn2 = "back"
+        self.btn3 = "flash"
+        self._flash_active = False
+        self._latch_active = False
+
+    def apply_dict(self, d: dict, cue_stacks: list):
+        self.label = str(d.get("label", self.label))
+        try:
+            self.fader_value = max(0.0, min(1.0, float(d.get("fader_value", 1.0))))
+        except (TypeError, ValueError):
+            self.fader_value = 1.0
+        ff = d.get("fader_function", "volume")
+        self.fader_function = ff if ff in self.FADER_FUNCTIONS else "volume"
+        self.btn1 = str(d.get("btn1", "go"))
+        self.btn2 = str(d.get("btn2", "back"))
+        self.btn3 = str(d.get("btn3", "flash"))
+        idx = d.get("stack_index", -1)
+        if isinstance(idx, int) and 0 <= idx < len(cue_stacks):
+            self.stack = cue_stacks[idx]
+        else:
+            self.stack = None
+
     def get_output(self) -> dict[int, dict[str, int]]:
         if self.stack is None:
             return {}
@@ -111,6 +162,12 @@ class PlaybackEngine:
     def subscribe_page(self, cb):
         if cb not in self._page_callbacks:
             self._page_callbacks.append(cb)
+
+    def unsubscribe_page(self, cb):
+        try:
+            self._page_callbacks.remove(cb)
+        except ValueError:
+            pass
 
     def start(self):
         # Kein eigener Thread mehr: das Rendern erfolgt zentral im einen
@@ -196,3 +253,60 @@ class PlaybackEngine:
         """Liefert Executor von angegebener Page (default = aktuelle)."""
         p = self.current_page if page is None else max(0, min(self.MAX_PAGES - 1, page))
         return self.pages[p][slot - 1]
+
+    # ── Serialisierung ────────────────────────────────────────────────────────
+
+    def to_dict(self, cue_stacks: list) -> dict:
+        """Serialisiert alle Pages/Executoren. Nur Executoren mit abweichendem
+        Zustand werden abgelegt, um die Show-Datei kompakt zu halten."""
+        pages_data: list[list[dict]] = []
+        for page in self.pages:
+            execs: list[dict] = []
+            for ex in page:
+                default = (
+                    ex.stack is None
+                    and ex.label == f"Exec {ex.slot}"
+                    and ex.fader_function == "volume"
+                    and abs(ex.fader_value - 1.0) < 1e-6
+                    and (ex.btn1, ex.btn2, ex.btn3) == ("go", "back", "flash")
+                )
+                if not default:
+                    execs.append(ex.to_dict(cue_stacks))
+            pages_data.append(execs)
+        return {
+            "current_page": self.current_page,
+            "page_names": list(self.page_names),
+            "pages": pages_data,
+        }
+
+    def from_dict(self, d: dict, cue_stacks: list):
+        """Stellt Pages/Executoren wieder her. Setzt vorab ALLE Executoren
+        zurueck, damit stale Stack-Referenzen einer zuvor geladenen Show
+        verschwinden (auch bei Legacy-Shows ohne Executor-Daten)."""
+        for page in self.pages:
+            for ex in page:
+                ex.reset()
+        self.current_page = 0
+        self.page_names = [f"Page {i+1}" for i in range(self.MAX_PAGES)]
+        if not isinstance(d, dict):
+            return
+        names = d.get("page_names")
+        if isinstance(names, list):
+            for i, nm in enumerate(names[:self.MAX_PAGES]):
+                self.page_names[i] = str(nm)
+        for p_idx, execs in enumerate(d.get("pages", []) or []):
+            if p_idx >= self.MAX_PAGES or not isinstance(execs, list):
+                continue
+            page = self.pages[p_idx]
+            for ed in execs:
+                if not isinstance(ed, dict):
+                    continue
+                try:
+                    slot = int(ed.get("slot", 0))
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= slot <= self.MAX_EXECUTORS:
+                    page[slot - 1].apply_dict(ed, cue_stacks)
+        cp = d.get("current_page", 0)
+        if isinstance(cp, int) and 0 <= cp < self.MAX_PAGES:
+            self.current_page = cp

@@ -25,7 +25,7 @@ class LayeredEffect(Function):
     def write(self, universes, patch_cache, dt, function_registry=None):
         if not self._running or not self.layers:
             return
-        self._elapsed += dt
+        self._elapsed += dt * self.speed   # Per-Effekt-Speed-Master (Block B)
         t = self._elapsed
 
         # Lookup

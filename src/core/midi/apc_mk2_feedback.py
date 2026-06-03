@@ -227,8 +227,13 @@ class ApcMk2Feedback:
             now = time.monotonic()
             desired = self._collect_desired(now)
             if self.ripple_enabled:
-                # Neu aktivierte Pads -> Welle ausloesen (laeuft nach aussen).
+                # Welle nur fuer Pads mit Stil 'wave' (Farb-Kacheln gelten als
+                # 'wave', s. _collect_desired). Effekt-/Funktions-Buttons wellen
+                # NICHT mehr bei jedem Druck — David-Wunsch: Wave nur bei Farben,
+                # nicht beim Umschalten von Effekten.
                 for note in (self._active_notes - self._prev_active):
+                    if self._note_style.get(note) != "wave":
+                        continue
                     self._ripples.append({"note": note, "t0": now,
                                           "rgb": self._note_rgb.get(note, (255, 255, 255))})
                 # Pad-Stil 'wave': dauerhaft Wellen nachschieben, solange aktiv.
@@ -276,12 +281,15 @@ class ApcMk2Feedback:
         note_rgb: dict[int, tuple] = {}
         note_style: dict[int, str] = {}
         bpm = self._bm.bpm if self._bm is not None else 0.0
+        on_bank = getattr(self._canvas, "on_active_bank", None)
         for w in self._canvas.findChildren(VCButton):
             note = getattr(w, "midi_data1", -1)
             if note is None or not (PAD_MIN <= note <= PAD_MAX):
                 continue
             if getattr(w, "midi_type", "note_on") != "note_on":
                 continue
+            if on_bank is not None and not on_bank(w):
+                continue   # Pad gehoert zu einer anderen Bank -> aus
             # TAP-Pad: blinkt im BPM-Takt (Beat = heller Blitz).
             if getattr(w, "action", None) == ButtonAction.TAP:
                 if bpm > 0 and (now - self._last_beat_time) < 0.11:
@@ -302,16 +310,31 @@ class ApcMk2Feedback:
             if self._is_active(w) or getattr(w, "_pressed", False):
                 active.add(note)
         # Farb-Kacheln: Pad in der tatsaechlichen Farbe leuchten lassen.
+        # Die AKTUELL angewaehlte Farbe (= Programmer-Farbe) blinkt (PULSE),
+        # damit auf dem APC sichtbar ist, welcher Farbkanal gerade aktiv ist.
+        active_color = self._active_color_rgb()
         for w in self._canvas.findChildren(VCColor):
             note = getattr(w, "midi_data1", -1)
             if note is None or not (PAD_MIN <= note <= PAD_MAX):
                 continue
             if getattr(w, "midi_type", "note_on") != "note_on":
                 continue
+            if on_bank is not None and not on_bank(w):
+                continue
             color = rgb_to_mk2_index(w.color_r, w.color_g, w.color_b)
-            mode = FULL if getattr(w, "_pressed", False) else MID
+            tile_rgb = (w.color_r, w.color_g, w.color_b)
+            is_selected = active_color is not None and tile_rgb == active_color
+            if getattr(w, "_pressed", False):
+                mode = FULL
+            elif is_selected:
+                mode = PULSE          # aktive Farbe blinkt
+            else:
+                mode = MID
             desired[note] = (mode, color)
-            note_rgb[note] = (w.color_r, w.color_g, w.color_b)
+            note_rgb[note] = tile_rgb
+            note_style[note] = "wave"   # Farb-Kacheln wellen (David: bei Farben cool)
+            # Nur beim tatsaechlichen Druck eine Welle ausloesen; die aktive Farbe
+            # blinkt via PULSE (kein Dauer-Wellen-Spam, solange sie ausgewaehlt ist).
             if getattr(w, "_pressed", False):
                 active.add(note)
         self._active_notes = active
@@ -351,6 +374,23 @@ class ApcMk2Feedback:
         if rgb and sum(rgb) > 12:
             return (FULL, rgb_to_mk2_index(*rgb))
         return (FULL, bg_idx) if style == "wave" else (DIM, GREEN)
+
+    def _active_color_rgb(self):
+        """Die aktuell im Programmer gesetzte Farbe (color_r/g/b) — fuer das
+        Blinken der angewaehlten Farb-Kachel. None, wenn keine Farbe aktiv ist."""
+        try:
+            from src.core.app_state import get_state
+            st = get_state()
+            for attrs in st.programmer.values():
+                if not isinstance(attrs, dict):
+                    continue
+                if any(k in attrs for k in ("color_r", "color_g", "color_b")):
+                    return (int(attrs.get("color_r", 0)),
+                            int(attrs.get("color_g", 0)),
+                            int(attrs.get("color_b", 0)))
+        except Exception:
+            pass
+        return None
 
     def _current_rig_color(self):
         """Aktuelle Farbe des ersten gepatchten Fixtures aus dem Live-Universe

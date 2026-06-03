@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem, QStackedWidget, QPushButton, QLabel,
     QMenu, QInputDialog, QMessageBox, QToolBar, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer, QMimeData
+from PySide6.QtCore import Qt, QTimer, QMimeData, Signal
 from PySide6.QtGui import QFont, QAction, QDrag
 from src.core.engine.function import FunctionType
 from src.core.engine.function_manager import get_function_manager
@@ -78,10 +78,21 @@ _TYPE_ORDER = [
 
 
 class FunctionManagerView(QWidget):
+    # MIDI-Learn-Message aus dem MIDI-Thread thread-sicher in den UI-Thread holen.
+    _midi_learned_sig = Signal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._fm = get_function_manager()
         self._type_items: dict = {}
+        # Aktuell angezeigter Editor — verhindert Neuaufbau bei jedem Refresh
+        # (Eingabe-/Fokusverlust). Merkt fid + Objekt-Identitaet.
+        self._editor_fid: int | None = None
+        self._editor_obj_id: int | None = None
+        self._learn_fid: int | None = None
+        self._learn_name: str = ""
+        self._learn_box = None
+        self._midi_learned_sig.connect(self._apply_learned_midi)
         self._setup_ui()
         self._populate_tree()
 
@@ -157,6 +168,18 @@ class FunctionManagerView(QWidget):
         self._btn_stop.setFixedHeight(26)
         self._btn_stop.clicked.connect(self._stop_selected)
         toolbar.addWidget(self._btn_stop)
+
+        self._btn_learn = QPushButton("🎹 MIDI lernen")
+        self._btn_learn.setFixedHeight(26)
+        self._btn_learn.setToolTip(
+            "Ausgewählte Funktion live auf ein Pad/Fader legen:\n"
+            "klicken, dann das gewünschte Bedienelement drücken.")
+        self._btn_learn.setStyleSheet(
+            "QPushButton { background:#21262d; color:#ff8800; border:1px solid #ff8800;"
+            " border-radius:4px; padding:0 8px; }"
+            "QPushButton:hover { background:#30363d; }")
+        self._btn_learn.clicked.connect(self._learn_midi_for_selected)
+        toolbar.addWidget(self._btn_learn)
 
         self._btn_del = QPushButton("Loeschen")
         self._btn_del.setFixedHeight(26)
@@ -346,6 +369,8 @@ class FunctionManagerView(QWidget):
                 self._stack.removeWidget(w)
                 w.deleteLater()
             self._stack.setCurrentIndex(0)
+            self._editor_fid = None
+            self._editor_obj_id = None
 
     def _run_selected(self):
         fid = self._selected_function_id()
@@ -356,6 +381,102 @@ class FunctionManagerView(QWidget):
         fid = self._selected_function_id()
         if fid is not None:
             self._fm.stop(fid)
+
+    # ── MIDI-Learn (live, ohne Editor) ─────────────────────────────────────────
+
+    def _get_mapper(self):
+        try:
+            from src.core.app_state import get_state
+            return get_state().midi_mapper
+        except Exception:
+            return None
+
+    def _learn_midi_for_selected(self):
+        fid = self._selected_function_id()
+        if fid is None:
+            QMessageBox.information(self, "MIDI lernen",
+                                    "Bitte zuerst eine Funktion auswählen.")
+            return
+        f = self._fm.get(fid)
+        if f is None:
+            return
+        mapper = self._get_mapper()
+        if mapper is None:
+            QMessageBox.warning(self, "MIDI lernen",
+                                "Kein MIDI-Mapper verfügbar (MIDI nicht initialisiert).")
+            return
+        self._learn_fid = int(fid)
+        self._learn_name = f.name
+        box = QMessageBox(self)
+        box.setWindowTitle("MIDI lernen")
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText(f'Drücke jetzt das Pad / den Fader für\n„{f.name}" …')
+        box.setStandardButtons(QMessageBox.StandardButton.Cancel)
+        box.buttonClicked.connect(lambda *_: self._cancel_learn())
+        self._learn_box = box
+        mapper.start_learn(self._on_midi_learned)
+        box.show()
+
+    def _cancel_learn(self):
+        mapper = self._get_mapper()
+        if mapper is not None:
+            try:
+                mapper.stop_learn()
+            except Exception:
+                pass
+        self._learn_fid = None
+        self._learn_box = None
+
+    def _on_midi_learned(self, msg):
+        # Läuft im MIDI-Thread → thread-sicher in den UI-Thread marshallen.
+        self._midi_learned_sig.emit(msg)
+
+    def _apply_learned_midi(self, msg):
+        box = self._learn_box
+        self._learn_box = None
+        if box is not None:
+            try:
+                box.close()
+            except Exception:
+                pass
+        fid = self._learn_fid
+        self._learn_fid = None
+        if fid is None:
+            return
+        mapper = self._get_mapper()
+        if mapper is None:
+            return
+        try:
+            from src.core.midi.midi_mapper import MidiMapping, MidiOutFeedback
+            is_cc = (msg.msg_type == "cc")
+            # Vorhandene Bindung auf demselben Bedienelement entfernen
+            # (verhindert Doppel-Trigger / erlaubt Neu-Belegen).
+            existing = mapper.get_mappings()
+            for i in range(len(existing) - 1, -1, -1):
+                m = existing[i]
+                same_type = (m.msg_type == "cc") == is_cc
+                if (same_type and int(m.channel) == int(msg.channel)
+                        and int(m.data1) == int(msg.data1)):
+                    mapper.remove_mapping(i)
+            mapping = MidiMapping(
+                name=f"Funktion: {self._learn_name}",
+                msg_type="cc" if is_cc else "note_on",
+                channel=int(msg.channel),
+                data1=int(msg.data1),
+                target_id=f"function:{int(fid)}",
+                button_mode="toggle",
+                port_filter=getattr(msg, "port_name", "") or "",
+                midi_out=MidiOutFeedback(message_type="cc" if is_cc else "note"),
+            )
+            mapper.add_mapping(mapping)
+            mapper.save("data/midi_mappings.json")
+            kind = "CC" if is_cc else "Note"
+            QMessageBox.information(
+                self, "MIDI gelernt",
+                f'„{self._learn_name}" liegt jetzt auf {kind} {int(msg.data1)} '
+                f'(Kanal {int(msg.channel)}).')
+        except Exception as e:
+            QMessageBox.warning(self, "MIDI lernen", f"Fehler: {e}")
 
     def _rename_selected(self):
         fid = self._selected_function_id()
@@ -377,59 +498,28 @@ class FunctionManagerView(QWidget):
         if f is None:
             return
 
+        # Schon offen fuer genau diese Funktion (gleiche fid + Objekt-Identitaet)?
+        # Dann NICHT neu bauen — sonst gehen Eingabe/Fokus bei jedem Refresh
+        # verloren. Nur sicherstellen, dass der Editor sichtbar ist.
+        if (self._stack.count() > 1 and self._editor_fid == fid
+                and self._editor_obj_id == id(f)):
+            self._stack.setCurrentIndex(self._stack.count() - 1)
+            return
+
         # Remove old editors (keep placeholder at index 0)
         while self._stack.count() > 1:
             w = self._stack.widget(1)
             self._stack.removeWidget(w)
             w.deleteLater()
+        self._editor_fid = None
+        self._editor_obj_id = None
 
-        if getattr(f, "is_script", False):
-            from src.ui.views.script_editor import ScriptEditor
-            editor = ScriptEditor(f)
-        elif getattr(f, "is_layered_effect", False):
-            try:
-                from src.ui.views.effect_layer_editor import EffectLayerEditor
-                editor = EffectLayerEditor(f)
-            except Exception as e:
-                editor = _placeholder(f"Effect-Layer Editor Fehler: {e}")
-        elif getattr(f, "is_carousel", False):
-            try:
-                from src.ui.views.carousel_editor import CarouselEditor
-                editor = CarouselEditor(f)
-            except Exception as e:
-                editor = _placeholder(f"Carousel Editor Fehler: {e}")
-        elif f.function_type == FunctionType.Scene:
-            from src.ui.views.scene_editor import SceneEditor
-            editor = SceneEditor(f)
-        elif f.function_type == FunctionType.Chaser:
-            from src.ui.views.chaser_editor import ChaserEditor
-            editor = ChaserEditor(f)
-        elif f.function_type == FunctionType.Sequence:
-            try:
-                from src.ui.views.sequence_editor import SequenceEditor
-                editor = SequenceEditor(f)
-            except Exception as e:
-                editor = _placeholder(f"Sequence Editor Fehler: {e}")
-        elif f.function_type == FunctionType.Audio:
-            try:
-                from src.ui.views.audio_editor import AudioEditor
-                editor = AudioEditor(f)
-            except Exception as e:
-                editor = _placeholder(f"Audio Editor Fehler: {e}")
-        elif f.function_type == FunctionType.Collection:
-            try:
-                from src.ui.views.collection_editor import CollectionEditor
-                editor = CollectionEditor(f)
-            except Exception as e:
-                editor = _placeholder(f"Collection Editor Fehler: {e}")
-        elif f.function_type == FunctionType.Show:
-            editor = _placeholder(
-                f"Show: {f.name}\n\nBearbeiten in 'Playback' → 'Show Manager'.")
-        else:
-            editor = _placeholder(f"{f.function_type.value}: {f.name}\n\nEditor kommt bald.")
+        editor = create_function_editor(f)
 
         self._stack.addWidget(editor)
         self._stack.setCurrentWidget(editor)
+        self._editor_fid = fid
+        self._editor_obj_id = id(f)
 
     # ── Tree events ───────────────────────────────────────────────────────────
 
@@ -468,10 +558,65 @@ class FunctionManagerView(QWidget):
             menu.addAction("Neues Script",     lambda: self._new_function(SCRIPT_GROUP))
             if item is not None and item.data(0, Qt.ItemDataRole.UserRole) is not None:
                 menu.addSeparator()
+                menu.addAction("🎹 MIDI lernen (Pad/Fader drücken)",
+                               self._learn_midi_for_selected)
                 menu.addAction("Umbenennen", self._rename_selected)
                 menu.addAction("Loeschen",   self._delete_selected)
 
         menu.exec(self._tree.viewport().mapToGlobal(pos))
+
+
+# ── Editor-Factory (wiederverwendbar, auch vom Bibliotheks-Panel) ──────────────
+
+def create_function_editor(f) -> QWidget:
+    """Baut den passenden Editor-Widget für eine Funktion (oder einen Platzhalter).
+
+    Wird vom Funktions-Browser (`_open_editor`) und vom Bibliotheks-Panel
+    (Rechtsklick → Bearbeiten) genutzt, damit die Dispatch-Logik nur einmal
+    existiert."""
+    if getattr(f, "is_script", False):
+        from src.ui.views.script_editor import ScriptEditor
+        return ScriptEditor(f)
+    if getattr(f, "is_layered_effect", False):
+        try:
+            from src.ui.views.effect_layer_editor import EffectLayerEditor
+            return EffectLayerEditor(f)
+        except Exception as e:
+            return _placeholder(f"Effect-Layer Editor Fehler: {e}")
+    if getattr(f, "is_carousel", False):
+        try:
+            from src.ui.views.carousel_editor import CarouselEditor
+            return CarouselEditor(f)
+        except Exception as e:
+            return _placeholder(f"Carousel Editor Fehler: {e}")
+    if f.function_type == FunctionType.Scene:
+        from src.ui.views.scene_editor import SceneEditor
+        return SceneEditor(f)
+    if f.function_type == FunctionType.Chaser:
+        from src.ui.views.chaser_editor import ChaserEditor
+        return ChaserEditor(f)
+    if f.function_type == FunctionType.Sequence:
+        try:
+            from src.ui.views.sequence_editor import SequenceEditor
+            return SequenceEditor(f)
+        except Exception as e:
+            return _placeholder(f"Sequence Editor Fehler: {e}")
+    if f.function_type == FunctionType.Audio:
+        try:
+            from src.ui.views.audio_editor import AudioEditor
+            return AudioEditor(f)
+        except Exception as e:
+            return _placeholder(f"Audio Editor Fehler: {e}")
+    if f.function_type == FunctionType.Collection:
+        try:
+            from src.ui.views.collection_editor import CollectionEditor
+            return CollectionEditor(f)
+        except Exception as e:
+            return _placeholder(f"Collection Editor Fehler: {e}")
+    if f.function_type == FunctionType.Show:
+        return _placeholder(
+            f"Show: {f.name}\n\nBearbeiten in 'Playback' → 'Show Manager'.")
+    return _placeholder(f"{f.function_type.value}: {f.name}\n\nEditor kommt bald.")
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────

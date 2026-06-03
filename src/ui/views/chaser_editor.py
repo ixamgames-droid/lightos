@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from src.core.engine.chaser import Chaser, ChaserStep
 from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
+from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 
 
 class FunctionSelectorDialog(QDialog):
@@ -126,17 +127,19 @@ class ChaserEditor(QWidget):
 
         # Step table
         self._table = QTableWidget()
-        self._table.setColumnCount(6)
+        self._table.setColumnCount(7)
         self._table.setHorizontalHeaderLabels(
-            ["Schritt", "Funktion", "Fade In", "Hold", "Fade Out", "Notiz"]
+            ["Schritt", "Funktion", "Fade In", "Kurve", "Hold", "Fade Out", "Notiz"]
         )
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for c in range(2, 6):
+        for c in range(2, 7):
             self._table.horizontalHeader().setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        # Notiz-Spalte (6) zurueckschreiben — sonst geht die Eingabe verloren.
+        self._table.itemChanged.connect(self._on_note_changed)
         root.addWidget(self._table, 1)
 
         # Action buttons
@@ -201,8 +204,8 @@ class ChaserEditor(QWidget):
             fn_item.setFlags(fn_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._table.setItem(row, 1, fn_item)
 
-            # Timing spinboxes
-            for col_offset, attr in enumerate(["fade_in", "hold", "fade_out"]):
+            # Timing spinboxes: Fade In(2), Hold(4), Fade Out(5)
+            for col, attr in ((2, "fade_in"), (4, "hold"), (5, "fade_out")):
                 spin = QDoubleSpinBox()
                 spin.setRange(0.0, 3600.0)
                 spin.setSingleStep(0.1)
@@ -212,11 +215,18 @@ class ChaserEditor(QWidget):
                 spin.setProperty("row", row)
                 spin.setProperty("attr", attr)
                 spin.valueChanged.connect(self._on_step_timing_changed)
-                self._table.setCellWidget(row, col_offset + 2, spin)
+                self._table.setCellWidget(row, col, spin)
+
+            # Fade-In-Kurve (Spalte 3): klickbare Mini-Vorschau
+            thumb = CurveThumbnail(step.fade_in_curve)
+            thumb.setToolTip(f"Fade-Kurve: {step.fade_in_curve.name}\n"
+                             "Klicken zum Bearbeiten")
+            thumb.clicked.connect(lambda r=row: self._edit_curve(r))
+            self._table.setCellWidget(row, 3, thumb)
 
             # Note
             note_item = QTableWidgetItem(step.note)
-            self._table.setItem(row, 5, note_item)
+            self._table.setItem(row, 6, note_item)
 
         self._table.blockSignals(False)
 
@@ -240,6 +250,25 @@ class ChaserEditor(QWidget):
         is_beat = bool(self._combo_trigger.currentData())
         self._lbl_bps.setVisible(is_beat)
         self._spin_bps.setVisible(is_beat)
+
+    def _edit_curve(self, row: int):
+        if not (0 <= row < len(self._chaser.steps)):
+            return
+        step = self._chaser.steps[row]
+        dlg = CurveEditorDialog(step.fade_in_curve,
+                                title=f"Fade-Kurve – Schritt {row + 1}", parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+            step.fade_in_curve = dlg.result_curve
+            self._rebuild_table()
+            self._table.selectRow(row)
+
+    def _on_note_changed(self, item):
+        """Schreibt die editierte Notiz-Zelle (Spalte 6) in den Step zurueck."""
+        if self._building or item is None or item.column() != 6:
+            return
+        row = item.row()
+        if 0 <= row < len(self._chaser.steps):
+            self._chaser.steps[row].note = item.text()
 
     def _on_step_timing_changed(self, value: float):
         spin = self.sender()

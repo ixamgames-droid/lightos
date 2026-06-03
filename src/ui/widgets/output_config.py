@@ -35,6 +35,25 @@ def _save_universe_config(rows: list[dict]) -> None:
         print(f"[output_config] save universes error: {e}")
 
 
+def _persist_output(num: int, output: str, patch: str) -> None:
+    """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
+    Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
+    wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
+    nach einem Neustart weg -> 'es kommt kein Output'."""
+    rows = _load_universe_config()
+    found = False
+    for r in rows:
+        if int(r.get("num", -1)) == int(num):
+            r["output"] = output
+            r["patch"] = patch
+            found = True
+            break
+    if not found:
+        rows.append({"num": int(num), "name": f"Universe {num}",
+                     "output": output, "patch": patch})
+    _save_universe_config(rows)
+
+
 class OutputConfigDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,7 +96,7 @@ class OutputConfigDialog(QDialog):
         self._check_artnet = QCheckBox("Art-Net aktivieren")
         af.addRow(self._check_artnet)
 
-        self._edit_artnet_ip = QLineEdit("2.255.255.255")
+        self._edit_artnet_ip = QLineEdit("255.255.255.255")
         af.addRow("Ziel-IP / Broadcast:", self._edit_artnet_ip)
 
         self._spin_artnet_start_univ = QSpinBox()
@@ -246,27 +265,14 @@ class OutputConfigDialog(QDialog):
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
 
-        # Wenn auf diesem Universe bereits eine Enttec offen ist -> schliessen
-        existing = om._enttec_outputs.get(univ)
-        if existing is not None:
-            try:
-                existing.close()
-            except Exception:
-                pass
-            om._enttec_outputs.pop(univ, None)
-
-        # Pruefen ob der gleiche Port auf einem anderen Universe offen ist
-        for u, dev in list(om._enttec_outputs.items()):
-            try:
-                if getattr(dev, "port", None) == port or getattr(dev, "_port_name", None) == port:
-                    dev.close()
-                    om._enttec_outputs.pop(u, None)
-            except Exception:
-                pass
-
+        # add_enttec() ist thread-sicher: es schliesst eine evtl. offene
+        # Verbindung auf demselben Port/Universe selbst (unter dem Output-Lock),
+        # bevor es die neue oeffnet. KEIN direkter Zugriff auf om._enttec_outputs
+        # aus dem UI-Thread mehr -> verhindert den Deadlock mit dem Output-Thread.
         try:
             om.add_enttec(univ, port)
-            self._lbl_enttec_status.setText(f"Verbunden: {port} -> Universe {univ}")
+            _persist_output(univ, "Enttec", port)
+            self._lbl_enttec_status.setText(f"Verbunden: {port} -> Universe {univ} (gespeichert)")
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
 
@@ -274,11 +280,12 @@ class OutputConfigDialog(QDialog):
         if not self._check_artnet.isChecked():
             self._lbl_artnet_status.setText("Deaktiviert")
             return
-        ip = self._edit_artnet_ip.text().strip() or "2.255.255.255"
+        ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
         state = get_state()
         for univ_num in state.universes:
             state.output_manager.add_artnet(univ_num, ip)
-        self._lbl_artnet_status.setText(f"Aktiv → {ip}")
+            _persist_output(univ_num, "ArtNet", ip)
+        self._lbl_artnet_status.setText(f"Aktiv → {ip} (gespeichert)")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
 
@@ -337,6 +344,11 @@ class OutputConfigDialog(QDialog):
                 "patch": patch_item.text() if patch_item else "",
             })
         _save_universe_config(rows)
+        # Sofort anwenden, damit Änderungen ohne Neustart greifen.
+        try:
+            get_state().apply_output_config()
+        except Exception as e:
+            print(f"[output_config] apply after save error: {e}")
         QMessageBox.information(self, "Gespeichert", _UNIV_CONFIG_PATH)
 
     def _apply_sacn(self):
@@ -349,8 +361,9 @@ class OutputConfigDialog(QDialog):
         try:
             for univ_num in state.universes:
                 state.output_manager.add_sacn(univ_num, target_ip)
+                _persist_output(univ_num, "sACN", target_ip or "")
             mode = f"Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
-            self._lbl_sacn_status.setText(f"Aktiv · {mode}")
+            self._lbl_sacn_status.setText(f"Aktiv · {mode} (gespeichert)")
         except Exception as e:
             self._lbl_sacn_status.setText(f"Fehler: {e}")
 

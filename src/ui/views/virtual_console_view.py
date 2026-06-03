@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QLabel, QSizePolicy, QSplitter, QListWidget, QListWidgetItem,
     QFrame, QMenu
 )
-from PySide6.QtCore import Qt, QPoint, QSize
+from PySide6.QtCore import Qt, QPoint, QSize, QTimer
 from PySide6.QtGui import QColor, QCursor
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
@@ -101,6 +101,55 @@ class SnapshotSidebar(QWidget):
         self._btn_assign = btn_assign
         layout.addWidget(btn_assign)
 
+        # ── Funktionen (Effekte / Matrix / Scenes / Chaser) ────────────────────
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet("color:#30363d;")
+        layout.addWidget(sep2)
+
+        hdr2 = QLabel("Funktionen")
+        hdr2.setStyleSheet(
+            "color:#9DFF52; font-weight:bold; font-size:12px; padding:2px 0;")
+        hdr2.setToolTip("Gespeicherte Effekte, Matrix, Scenes und Chaser dieser Show")
+        layout.addWidget(hdr2)
+
+        self._fn_list = QListWidget()
+        self._fn_list.setStyleSheet(
+            "QListWidget { background:#0d1117; border:1px solid #21262d;"
+            " color:#c9d1d9; font-size:11px; }"
+            "QListWidget::item { padding:5px 4px; border-bottom:1px solid #21262d; }"
+            "QListWidget::item:selected { background:#2ea043; color:#ffffff; }"
+            "QListWidget::item:hover { background:#21262d; }"
+        )
+        self._fn_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._fn_list.customContextMenuRequested.connect(self._fn_context_menu)
+        self._fn_list.itemDoubleClicked.connect(self._on_fn_double_click)
+        layout.addWidget(self._fn_list, 1)
+
+        btn_fn_toggle = QPushButton("Start / Stop")
+        btn_fn_toggle.setFixedHeight(26)
+        btn_fn_toggle.setToolTip("Ausgewählte Funktion starten bzw. stoppen (zum Testen)")
+        btn_fn_toggle.setStyleSheet(
+            "QPushButton { background:#238636; color:#fff; border:none;"
+            " border-radius:3px; font-size:10px; }"
+            "QPushButton:hover { background:#2ea043; }")
+        btn_fn_toggle.clicked.connect(self._toggle_selected_function)
+        layout.addWidget(btn_fn_toggle)
+
+        btn_fn_assign = QPushButton("→ VC-Button zuweisen")
+        btn_fn_assign.setFixedHeight(26)
+        btn_fn_assign.setToolTip(
+            "Weist die ausgewählte Funktion dem nächsten angeklickten VC-Button zu")
+        btn_fn_assign.setStyleSheet(
+            "QPushButton { background:#2a3344; color:#9DFF52; border:1px solid #3a6b3a;"
+            " border-radius:3px; font-size:10px; }"
+            "QPushButton:hover { background:#364463; }"
+            "QPushButton:checked { background:#9DFF52; color:#000; }")
+        btn_fn_assign.setCheckable(True)
+        btn_fn_assign.clicked.connect(self._on_fn_assign_clicked)
+        self._btn_fn_assign = btn_fn_assign
+        layout.addWidget(btn_fn_assign)
+
         self.refresh()
 
     # ── Daten ────────────────────────────────────────────────────────────────
@@ -120,6 +169,104 @@ class SnapshotSidebar(QWidget):
                 item = QListWidgetItem(f"{i + 1}:  {name}\n        ({count} Fixtures)")
                 item.setData(Qt.ItemDataRole.UserRole, i)
                 self._list.addItem(item)
+        except Exception:
+            pass
+        self.refresh_functions()
+
+    # ── Funktionen ─────────────────────────────────────────────────────────────
+
+    # Kurze, sprechende Typ-Labels für die Liste.
+    _FN_TYPE_LABEL = {
+        "Scene": "Scene", "Chaser": "Chaser", "RGBMatrix": "Matrix",
+        "EFX": "Effekt", "Sequence": "Seq", "Collection": "Coll",
+        "Audio": "Audio", "Script": "Script", "Show": "Show",
+    }
+
+    def refresh_functions(self):
+        if not hasattr(self, "_fn_list"):
+            return
+        # Auswahl merken, damit Start/Stop die Selektion nicht verliert.
+        prev_fid = self._selected_function_id()
+        self._fn_list.clear()
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            funcs = fm.all()
+        except Exception:
+            return
+        # Nach Typ, dann Name sortieren — übersichtliche Gruppen.
+        def _key(f):
+            return (f.function_type.value, (f.name or "").lower())
+        restore_row = -1
+        for row, f in enumerate(sorted(funcs, key=_key)):
+            try:
+                tlabel = self._FN_TYPE_LABEL.get(
+                    f.function_type.value, f.function_type.value)
+                running = " ●" if fm.is_running(f.id) else ""
+                item = QListWidgetItem(f"[{tlabel}] {f.name}{running}")
+                item.setData(Qt.ItemDataRole.UserRole, f.id)
+                self._fn_list.addItem(item)
+                if f.id == prev_fid:
+                    restore_row = row
+            except Exception:
+                continue
+        if restore_row >= 0:
+            self._fn_list.setCurrentRow(restore_row)
+
+    def _selected_function_id(self):
+        item = self._fn_list.currentItem()
+        if item is None:
+            return None
+        return item.data(Qt.ItemDataRole.UserRole)
+
+    def _toggle_selected_function(self):
+        fid = self._selected_function_id()
+        if fid is None:
+            return
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            if fm.is_running(fid):
+                fm.stop(fid)
+            else:
+                fm.start(fid)
+        except Exception as e:
+            print(f"[Sidebar] Funktion toggeln fehlgeschlagen: {e}")
+        self.refresh_functions()
+
+    def _on_fn_double_click(self, item: QListWidgetItem):
+        self._toggle_selected_function()
+
+    def _fn_context_menu(self, pos: QPoint):
+        item = self._fn_list.itemAt(pos)
+        if item is None:
+            return
+        fid = item.data(Qt.ItemDataRole.UserRole)
+        menu = QMenu(self)
+        menu.addAction("Start / Stop").triggered.connect(self._toggle_selected_function)
+        menu.addAction("Diesem VC-Button zuweisen →").triggered.connect(
+            lambda: self._start_fn_assign(fid))
+        menu.exec(QCursor.pos())
+
+    def _on_fn_assign_clicked(self, checked: bool):
+        if not checked:
+            self._canvas.cancel_function_assign()
+            return
+        fid = self._selected_function_id()
+        if fid is None:
+            self._btn_fn_assign.setChecked(False)
+            return
+        self._start_fn_assign(fid)
+
+    def _start_fn_assign(self, fid):
+        self._canvas.start_function_assign(fid)
+        self._canvas.function_assign_done.connect(self._on_fn_assign_done)
+        self._btn_fn_assign.setChecked(True)
+
+    def _on_fn_assign_done(self):
+        self._btn_fn_assign.setChecked(False)
+        try:
+            self._canvas.function_assign_done.disconnect(self._on_fn_assign_done)
         except Exception:
             pass
 
@@ -215,6 +362,7 @@ class VirtualConsoleView(QWidget):
         self._edit_mode = False
         self._midi_learn_active = False
         self._popout_window = None
+        self._pop_scroll = None
         self._apc_feedback = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -342,6 +490,36 @@ class VirtualConsoleView(QWidget):
         self._btn_touch_lock.toggled.connect(self._toggle_touch_lock)
         tb_layout.addWidget(self._btn_touch_lock)
 
+        # Bank-Umschaltung (= Executor-Page): bestimmt, welche Widgets/Pads aktiv
+        # sind. APC-Page-Buttons schalten dieselbe Bank. Immer sichtbar.
+        tb_layout.addSpacing(12)
+        _bank_btn_css = """
+            QPushButton { background:#21262d; color:#58a6ff; border:1px solid #30363d;
+                          border-radius:3px; font-size:12px; font-weight:bold; }
+            QPushButton:hover { background:#30363d; color:#e6edf3; }
+        """
+        self._btn_bank_prev = QPushButton("◀")
+        self._btn_bank_prev.setFixedSize(26, 26)
+        self._btn_bank_prev.setToolTip("Vorherige Bank (Pad-/Widget-Seite)")
+        self._btn_bank_prev.setStyleSheet(_bank_btn_css)
+        self._btn_bank_prev.clicked.connect(lambda: self._step_bank(-1))
+        tb_layout.addWidget(self._btn_bank_prev)
+
+        self._lbl_bank = QLabel("Bank 1")
+        self._lbl_bank.setFixedWidth(54)
+        self._lbl_bank.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lbl_bank.setStyleSheet(
+            "color:#58a6ff; font-size:11px; font-weight:bold;"
+        )
+        tb_layout.addWidget(self._lbl_bank)
+
+        self._btn_bank_next = QPushButton("▶")
+        self._btn_bank_next.setFixedSize(26, 26)
+        self._btn_bank_next.setToolTip("Nächste Bank (Pad-/Widget-Seite)")
+        self._btn_bank_next.setStyleSheet(_bank_btn_css)
+        self._btn_bank_next.clicked.connect(lambda: self._step_bank(1))
+        tb_layout.addWidget(self._btn_bank_next)
+
         # Popout Button
         self._btn_popout = QPushButton("⧉ Popout")
         self._btn_popout.setFixedHeight(26)
@@ -389,7 +567,7 @@ class VirtualConsoleView(QWidget):
         tb_layout.addWidget(btn_load)
 
         # Sidebar-Toggle
-        self._btn_sidebar = QPushButton("◀ Snaps")
+        self._btn_sidebar = QPushButton("◀ Bibliothek")
         self._btn_sidebar.setCheckable(True)
         self._btn_sidebar.setChecked(True)
         self._btn_sidebar.setFixedHeight(26)
@@ -405,6 +583,20 @@ class VirtualConsoleView(QWidget):
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
 
+        # ── Status-Zeile: aktiver Effekt ──────────────────────────────────────
+        self._lbl_active_fx = QLabel("Aktiver Effekt: —")
+        # Feste, schmale Hoehe: sonst dehnt sich das Label vertikal auf und
+        # verdeckt die halbe Canvas-Flaeche.
+        self._lbl_active_fx.setFixedHeight(22)
+        self._lbl_active_fx.setStyleSheet(
+            "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
+            " padding:2px 10px; font-size:11px;")
+        layout.addWidget(self._lbl_active_fx)
+        self._active_fx_timer = QTimer(self)
+        self._active_fx_timer.setInterval(400)
+        self._active_fx_timer.timeout.connect(self._update_active_fx)
+        self._active_fx_timer.start()
+
         # ── Splitter: Canvas links, Sidebar rechts ────────────────────────────
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet("QSplitter::handle { background:#30363d; width:2px; }")
@@ -415,6 +607,8 @@ class VirtualConsoleView(QWidget):
 
         self._canvas = VCCanvas()
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
+        self._canvas.bank_changed.connect(self._on_bank_changed)
+        self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
         splitter.addWidget(self._main_scroll)
 
@@ -430,13 +624,60 @@ class VirtualConsoleView(QWidget):
         splitter.setStretchFactor(1, 1)
         self._splitter = splitter
 
-        layout.addWidget(splitter)
+        # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
+        # verbleibenden vertikalen Platz (Toolbar + Statuszeile sind fix).
+        layout.addWidget(splitter, 1)
+
+    # ── Status: aktiver Effekt ───────────────────────────────────────────────
+
+    def _update_active_fx(self):
+        """Zeigt den zuletzt gestarteten, noch laufenden Effekt + Anzahl laufender."""
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            # Funktionsliste der Sidebar nachziehen, wenn sich die Anzahl geaendert
+            # hat (z. B. Show geladen) — ohne bei jedem Tick die Auswahl zu stoeren.
+            try:
+                cnt = len(fm.all())
+                if cnt != getattr(self, "_last_fn_count", -1):
+                    self._last_fn_count = cnt
+                    if getattr(self, "_sidebar", None) is not None:
+                        self._sidebar.refresh_functions()
+            except Exception:
+                pass
+            active = fm.active_function()
+            running = len(getattr(fm, "_running_ids", ()) or ())
+            if active is not None:
+                extra = f"  (+{running - 1} weitere)" if running > 1 else ""
+                self._lbl_active_fx.setText(
+                    f"Aktiver Effekt: {active.function_type.value} · {active.name}{extra}")
+                self._lbl_active_fx.setStyleSheet(
+                    "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
+                    " padding:2px 10px; font-size:11px;")
+            else:
+                self._lbl_active_fx.setText("Aktiver Effekt: —")
+                self._lbl_active_fx.setStyleSheet(
+                    "background:#0d1117; color:#666; border-bottom:1px solid #21262d;"
+                    " padding:2px 10px; font-size:11px;")
+        except Exception:
+            pass
 
     # ── Edit mode ────────────────────────────────────────────────────────────
+
+    def _canvas_alive(self) -> bool:
+        """True, wenn das C++-Objekt des Canvas noch existiert (gegen
+        'already deleted'-Abstürze, falls der Canvas anderweitig zerstört wurde)."""
+        try:
+            import shiboken6
+            return shiboken6.isValid(self._canvas)
+        except Exception:
+            return self._canvas is not None
 
     def _toggle_edit(self, enabled: bool):
         self._edit_mode = enabled
         self._btn_edit.setText("Bearbeiten ✓" if enabled else "Bearbeiten")
+        if not self._canvas_alive():
+            return
         self._canvas.set_edit_mode(enabled)
         # Bearbeiten-only-Buttons (Widgets hinzufügen, Snap, Alle löschen) nur
         # im Bearbeiten-Modus zeigen -> aufgeraeumtes Fenster im Live-Betrieb.
@@ -498,6 +739,24 @@ class VirtualConsoleView(QWidget):
                 self._apc_feedback.close()
                 self._apc_feedback = None
 
+    # ── Bank/Page ──────────────────────────────────────────────────────────────
+
+    def _step_bank(self, delta: int):
+        target = max(0, min(9, self._canvas.active_bank + int(delta)))
+        pe = None
+        try:
+            from src.core.app_state import get_state
+            pe = get_state().playback_engine
+        except Exception:
+            pe = None
+        if pe is not None:
+            pe.set_page(target)        # -> Canvas via Page-Callback -> bank_changed
+        else:
+            self._canvas.set_active_bank(target)
+
+    def _on_bank_changed(self, b: int):
+        self._lbl_bank.setText(f"Bank {int(b) + 1}")
+
     # ── Popout ────────────────────────────────────────────────────────────────
 
     def _popout_canvas(self):
@@ -506,7 +765,25 @@ class VirtualConsoleView(QWidget):
             self._popout_window.raise_()
             return
 
-        win = QWidget(None, Qt.WindowType.Window)
+        view = self
+
+        class _PopoutWindow(QWidget):
+            def closeEvent(self, event):
+                # Beim Schließen des Popout-Fensters den Canvas zurück in die
+                # Haupt-Ansicht holen — sonst bleibt er im (versteckten) Fenster
+                # hängen und die Virtual Console verschwindet aus LightOS.
+                # WICHTIG: takeWidget() löst die Eigentümerschaft, ohne den Canvas
+                # zu löschen. Würde man ihn im Popout-Scroll lassen, zerstört das
+                # schließende Fenster das C++-Objekt (-> "VCCanvas already deleted"
+                # beim nächsten Bearbeiten-/Hinzufügen-Klick).
+                if view._pop_scroll is not None:
+                    view._pop_scroll.takeWidget()
+                    view._pop_scroll = None
+                view._main_scroll.setWidget(view._canvas)
+                view._popout_window = None
+                event.accept()
+
+        win = _PopoutWindow(None, Qt.WindowType.Window)
         win.setWindowTitle("Virtual Console — Popout")
         win.resize(1280, 800)
         pop_l = QVBoxLayout(win)
@@ -515,16 +792,12 @@ class VirtualConsoleView(QWidget):
         pop_scroll = QScrollArea()
         pop_scroll.setWidgetResizable(False)
         pop_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
+        # Canvas zuerst aus dem Haupt-Scroll lösen (ohne Löschen), dann übergeben.
+        self._main_scroll.takeWidget()
         pop_scroll.setWidget(self._canvas)
         pop_l.addWidget(pop_scroll)
 
-        def _on_close(event):
-            self._main_scroll.setWidget(self._canvas)
-            self._popout_window = None
-            self._btn_popout.setStyleSheet(self._btn_popout.styleSheet())
-            event.accept()
-
-        win.closeEvent = _on_close
+        self._pop_scroll = pop_scroll
         self._popout_window = win
         win.show()
 
@@ -532,14 +805,14 @@ class VirtualConsoleView(QWidget):
 
     def _toggle_sidebar(self, checked: bool):
         self._sidebar.setVisible(checked)
-        self._btn_sidebar.setText("◀ Snaps" if checked else "▶ Snaps")
+        self._btn_sidebar.setText("◀ Bibliothek" if checked else "▶ Bibliothek")
         if checked:
             self._sidebar.refresh()
 
     # ── Widget actions ────────────────────────────────────────────────────────
 
     def _add_widget(self, wtype: str):
-        if not self._edit_mode:
+        if not self._edit_mode or not self._canvas_alive():
             return
         center = QPoint(self._canvas.width() // 2, self._canvas.height() // 2)
         self._canvas._add_widget(wtype, center)

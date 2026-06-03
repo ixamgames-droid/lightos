@@ -39,13 +39,27 @@ def _build_packet(dmx_data: bytes) -> bytes:
 class EnttecPro:
     def __init__(self, port: str):
         self.port = port
-        self._ser = serial.Serial(port, ENTTEC_BAUD, timeout=1)
+        # write_timeout ist KRITISCH: ohne ihn blockiert _ser.write() endlos,
+        # wenn das Geraet nicht abnimmt (falscher Port / abgezogen / kein echter
+        # Enttec). Da Render+Senden im selben 44-Hz-Thread laufen, wuerde das die
+        # GESAMTE Engine einfrieren. 0.5 s sind grosszuegig fuer ein 513-Byte-
+        # Paket bei 57600 Baud (~90 ms); ein Timeout wirft SerialTimeoutException,
+        # die der OutputManager faengt und das Frame ueberspringt.
+        self._ser = serial.Serial(port, ENTTEC_BAUD, timeout=1, write_timeout=0.5)
 
     def send_dmx(self, dmx_data: bytes):
         """Sendet 512 Bytes DMX-Daten an den Enttec Pro."""
         assert len(dmx_data) == 512
         packet = _build_packet(dmx_data)
-        self._ser.write(packet)
+        try:
+            self._ser.write(packet)
+        except serial.SerialTimeoutException:
+            # Geraet nimmt gerade nicht ab -> Frame verwerfen, naechstes Frame
+            # versucht es erneut. NICHT blockieren.
+            try:
+                self._ser.reset_output_buffer()
+            except Exception:
+                pass
 
     def is_open(self) -> bool:
         return self._ser.is_open

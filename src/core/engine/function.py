@@ -65,6 +65,15 @@ class Function:
         self.name: str = name
         self._running: bool = False
         self._elapsed: float = 0.0
+        # Per-Effekt-Master (Block B). intensity skaliert die Ausgabe (0..1,
+        # angewandt im FunctionManager.tick), speed ist ein Zeit-Multiplikator
+        # (0.1..4.0, von zeitbasierten Subtypen selbst angewandt). Chaser und
+        # Sequence definieren self.speed bereits eigenstaendig (gleicher Name).
+        self.intensity: float = 1.0
+        self.speed: float = 1.0
+        # Bibliotheks-Ordner (verschachtelbar, "/"-getrennt). "" = Wurzel.
+        # Pro Show gespeichert; siehe docs/PROGRAMMER_REBUILD.md (Phase 1).
+        self.folder: str = ""
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -110,6 +119,9 @@ class Function:
             "id": self.id,
             "name": self.name,
             "type": self.function_type.value,
+            "intensity": self.intensity,
+            "speed": self.speed,
+            "folder": self.folder,
         }
 
     @classmethod

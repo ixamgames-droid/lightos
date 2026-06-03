@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, RunOrder, Direction
+from . import fade_curve as fc
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -22,6 +23,9 @@ class SequenceStep:
     hold: float = 1.0
     fade_out: float = 0.0
     note: str = ""
+    # Fade-Kurven formen Ein- und Ausblenden des Crossfades.
+    fade_in_curve: fc.FadeCurve = field(default_factory=fc.linear)
+    fade_out_curve: fc.FadeCurve = field(default_factory=fc.linear)
 
     def total_duration(self) -> float:
         return self.fade_in + self.hold + self.fade_out
@@ -86,15 +90,19 @@ class Sequence(Function):
         if total <= 0:
             total = 0.001
 
-        # Compute mix factor 0..1 across fade_in/hold/fade_out
+        # Compute mix factor 0..1 across fade_in/hold/fade_out (kurvengeformt)
         t = self._step_elapsed
         if t < step.fade_in:
-            mix = t / step.fade_in if step.fade_in > 0 else 1.0
+            p = t / step.fade_in if step.fade_in > 0 else 1.0
+            mix = step.fade_in_curve.eval(p)
         elif t < step.fade_in + step.hold:
             mix = 1.0
+        elif step.fade_out > 0:
+            # p läuft 0→1 über die Fade-Out-Zeit; eval = bereits Ausgeblendetes
+            p = (t - step.fade_in - step.hold) / step.fade_out
+            mix = 1.0 - step.fade_out_curve.eval(p)
         else:
-            rem = total - t
-            mix = max(0.0, rem / step.fade_out) if step.fade_out > 0 else 0.0
+            mix = 0.0
         mix = max(0.0, min(1.0, mix))
 
         # Apply values
@@ -177,17 +185,23 @@ class Sequence(Function):
             "run_order": self.run_order.value,
             "direction": self.direction.value,
             "speed": self.speed,
-            "steps": [
-                {
-                    "values": s.values,
-                    "fade_in": s.fade_in,
-                    "hold": s.hold,
-                    "fade_out": s.fade_out,
-                    "note": s.note,
-                }
-                for s in self.steps
-            ],
+            "steps": [self._step_to_dict(s) for s in self.steps],
         })
+        return d
+
+    @staticmethod
+    def _step_to_dict(s: "SequenceStep") -> dict:
+        d = {
+            "values": s.values,
+            "fade_in": s.fade_in,
+            "hold": s.hold,
+            "fade_out": s.fade_out,
+            "note": s.note,
+        }
+        if not s.fade_in_curve.is_linear_default():
+            d["fade_in_curve"] = s.fade_in_curve.to_dict()
+        if not s.fade_out_curve.is_linear_default():
+            d["fade_out_curve"] = s.fade_out_curve.to_dict()
         return d
 
     @classmethod
@@ -198,11 +212,16 @@ class Sequence(Function):
         sq.direction = Direction(d.get("direction", "Forward"))
         sq.speed = float(d.get("speed", 1.0))
         for sd in d.get("steps", []):
-            sq.steps.append(SequenceStep(
+            step = SequenceStep(
                 values=sd.get("values", {}),
                 fade_in=sd.get("fade_in", 0.5),
                 hold=sd.get("hold", 1.0),
                 fade_out=sd.get("fade_out", 0.0),
                 note=sd.get("note", ""),
-            ))
+            )
+            if "fade_in_curve" in sd:
+                step.fade_in_curve = fc.FadeCurve.from_dict(sd["fade_in_curve"])
+            if "fade_out_curve" in sd:
+                step.fade_out_curve = fc.FadeCurve.from_dict(sd["fade_out_curve"])
+            sq.steps.append(step)
         return sq

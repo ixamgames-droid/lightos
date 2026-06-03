@@ -83,9 +83,13 @@ class _FixturePage(QWizardPage):
         self.checks = []
         try:
             from src.core.app_state import get_state
-            for f in get_state().get_patched_fixtures():
+            state = get_state()
+            # Vorauswahl aus dem Programmer (R2): liegen gewählte Geräte vor, nur
+            # diese vorab ankreuzen; sonst (leer) wie bisher alle.
+            sel = set(state.get_selected_fids())
+            for f in state.get_patched_fixtures():
                 cb = QCheckBox(f"{getattr(f,'label','Fixture')}  (ID {f.fid}, U{f.universe} @{f.address})")
-                cb.setChecked(True)
+                cb.setChecked(f.fid in sel if sel else True)
                 cb.fid = f.fid
                 self.checks.append(cb)
                 lay.addWidget(cb)

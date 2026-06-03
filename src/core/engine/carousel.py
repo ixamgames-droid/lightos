@@ -76,7 +76,9 @@ class Carousel(Function):
             except Exception:
                 pass
         else:
-            phase = (self._elapsed % 2.0) / 2.0
+            # frei laufend: Per-Effekt-Speed-Master skaliert die Zyklus-Rate
+            # (Block B). Beat-Sync oben folgt bewusst der BPM, nicht self.speed.
+            phase = ((self._elapsed * self.speed) % 2.0) / 2.0
 
         try:
             patch = {f.fid: f for f in patch_cache}

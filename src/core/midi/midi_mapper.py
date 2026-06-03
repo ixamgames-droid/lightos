@@ -21,6 +21,7 @@ ACTION_GRAND_MASTER = "grand_master"
 ACTION_PAGE_SELECT = "page_select"
 ACTION_PAGE_NEXT = "page_next"
 ACTION_PAGE_PREV = "page_prev"
+ACTION_FUNCTION = "function"      # target_id "function:<id>" -> Scene/Chaser/etc.
 ACTION_NONE = "none"
 
 BUTTON_TOGGLE = "toggle"
@@ -404,19 +405,22 @@ class MidiMapper:
             pe.set_page(pe.current_page - 1)
             return
 
-        if action == ACTION_NONE:
-            # target can be "function:<id>" as modern mapping id/target
-            target = (mapping.target_id or "").strip()
-            if target.startswith("function:"):
-                try:
-                    fid = int(target.split(":", 1)[1])
-                    fm = self._state.function_manager
-                    if state_on:
-                        fm.start(fid)
-                    else:
-                        fm.stop(fid)
-                except Exception:
-                    pass
+        if action == ACTION_FUNCTION or (
+            action == ACTION_NONE
+            and (mapping.target_id or "").strip().startswith("function:")
+        ):
+            # Scene/Chaser/etc. ueber Funktions-ID starten/stoppen. Akzeptiert
+            # sowohl param ("function:<id>" -> action="function") als auch das
+            # Legacy-target_id mit action="none".
+            try:
+                fid = int(mapping.param or mapping.target_id.split(":", 1)[1])
+                fm = self._state.function_manager
+                if state_on:
+                    fm.start(fid)
+                else:
+                    fm.stop(fid)
+            except Exception:
+                pass
 
     def _execute_continuous(self, mapping: MidiMapping, normalized_value: float):
         value = max(0.0, min(1.0, float(normalized_value)))

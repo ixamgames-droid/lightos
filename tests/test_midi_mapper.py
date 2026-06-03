@@ -203,6 +203,35 @@ class MidiMapperTests(unittest.TestCase):
             self.assertIsNotNone(loaded[0].midi_out)
             self.assertEqual(loaded[0].midi_out.state_off, 1)
 
+    def test_function_target_toggles_function(self):
+        # target "function:<id>" -> Scene/Chaser per Toggle starten/stoppen.
+        mapping = mm.MidiMapping(
+            name="Funktion: Scene 7",
+            msg_type="note_on",
+            channel=1,
+            data1=20,
+            target_id="function:7",
+            button_mode=mm.BUTTON_TOGGLE,
+        )
+        self.assertEqual(mapping.action, mm.ACTION_FUNCTION)
+        self.mapper.add_mapping(mapping)
+
+        self.mapper._on_midi(_msg("note_on", 20, 127))
+        self.assertTrue(self.state.function_manager.is_running(7))
+
+        self.mapper._on_midi(_msg("note_on", 20, 127))
+        self.assertFalse(self.state.function_manager.is_running(7))
+
+    def test_learn_captures_next_message_then_resumes(self):
+        captured = []
+        self.mapper.start_learn(lambda m: captured.append(m))
+        # Erste Message wird gelernt (und NICHT als Mapping ausgefuehrt).
+        self.mapper._on_midi(_msg("note_on", 33, 127))
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0].data1, 33)
+        # Learn-Modus danach beendet.
+        self.assertFalse(self.mapper._learn_mode)
+
     def test_feedback_stress_reuses_output_port(self):
         mapping = mm.MidiMapping(
             name="Stress Fader",

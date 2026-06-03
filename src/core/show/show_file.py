@@ -131,6 +131,8 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     """
     from src.core.app_state import get_state
     from src.core.engine.palette import get_palette_manager
+    from src.core.engine.curve_library import get_curve_library
+    from src.core.engine.snap_library import get_snap_library
 
     state = get_state()
     pm = get_palette_manager()
@@ -138,6 +140,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     patch_data = [_fixture_to_dict(pf) for pf in state.get_patched_fixtures()]
     stacks_data = [s.to_dict() for s in getattr(state, "cue_stacks", [])]
     palettes_data = pm.to_dict()
+    curves_data = get_curve_library().to_dict()
 
     functions_data = {"functions": []}
     try:
@@ -145,19 +148,19 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     except Exception as e:
         print(f"[show_file] save function manager error: {e}")
 
-    efx_data = []
-    for e in getattr(state, "_efx_instances", []) or []:
-        try:
-            efx_data.append(e.to_dict())
-        except Exception as ex:
-            print(f"[show_file] save efx item error: {ex}")
+    # EFX- und RGB-Matrix-Instanzen sind seit dem Programmer-Umbau echte
+    # Funktionen und werden im "functions"-Block gespeichert. Die separaten
+    # Bloecke bleiben (leer) im Schema fuer Abwaertskompatibilitaet erhalten.
+    efx_data: list = []
+    rgb_data: list = []
 
-    rgb_data = []
-    for m in getattr(state, "_rgb_matrix_instances", []) or []:
+    executors_data = {}
+    pe = getattr(state, "playback_engine", None)
+    if pe is not None:
         try:
-            rgb_data.append(m.to_dict())
-        except Exception as ex:
-            print(f"[show_file] save rgb item error: {ex}")
+            executors_data = pe.to_dict(getattr(state, "cue_stacks", []))
+        except Exception as e:
+            print(f"[show_file] save executors error: {e}")
 
     vc_data = getattr(state, "_vc_layout", {}) or {}
 
@@ -169,18 +172,32 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "active_stage": getattr(state, "active_stage_name", "simple") or "simple",
     }
 
+    # Live-View-2D-Positionen (eigene Persistenz, entkoppelt vom 3D-Visualizer)
+    live_view_data = {
+        "positions": {
+            str(fid): [float(p[0]), float(p[1])]
+            for fid, p in (getattr(state, "live_view_positions", {}) or {}).items()
+        },
+    }
+
     show = {
         "version": SHOW_VERSION,
         "name": getattr(state, "show_name", "Neue Show"),
         "patch": patch_data,
         "programmer": getattr(state, "programmer", {}) or {},
+        "base_levels": getattr(state, "base_levels", {}) or {},
         "cue_stacks": stacks_data,
+        "executors": executors_data,
         "palettes": palettes_data,
+        "curves": curves_data,
         "functions": functions_data,
         "efx": efx_data,
         "rgb_matrix": rgb_data,
         "virtual_console": vc_data,
         "visualizer": visualizer_data,
+        "live_view": live_view_data,
+        "snapshots": getattr(state, "_snapshots_data", None) or [],
+        "library": get_snap_library().to_dict(),
     }
     if layout:
         show["layout"] = layout
@@ -196,6 +213,102 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         state._emit("show_saved", {"path": path})
     except Exception:
         pass
+
+
+def reset_show():
+    """Setzt den App-State vollstaendig auf eine leere Show zurueck.
+
+    Mirror von load_show(), nur mit leeren Daten: Patch (gepatchte Fixtures),
+    Programmer, Cue-Stacks, Executors, Paletten, Kurven, Funktionen,
+    Snap-Bibliothek, Virtual Console, Snapshots sowie Visualizer-/Live-View-
+    Positionen werden geleert. So beginnt "Neue Show" wirklich bei null und
+    behaelt nichts aus der vorherigen Show (auch nicht aus current_show.db).
+    """
+    from src.core.app_state import get_state
+    from src.core.engine.palette import get_palette_manager
+
+    state = get_state()
+
+    # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
+    _replace_patch_from_data(state, [])
+
+    # Fixture-Gruppen aus der Show-DB leeren (SSOT — sonst bleiben Gruppen nach Neue Show)
+    try:
+        from sqlalchemy import delete
+        from src.core.database.models import FixtureGroup
+        with state._session() as s:
+            s.execute(delete(FixtureGroup))
+            s.commit()
+    except Exception as e:
+        print(f"[show_file] reset groups error: {e}")
+
+    state.programmer = {}
+    state.base_levels = {}
+    try:
+        state._flush_all_to_dmx()
+    except Exception as e:
+        print(f"[show_file] reset flush error: {e}")
+
+    try:
+        get_palette_manager().from_dict({})
+    except Exception as e:
+        print(f"[show_file] reset palettes error: {e}")
+
+    try:
+        from src.core.engine.curve_library import get_curve_library
+        get_curve_library().from_dict({})
+    except Exception as e:
+        print(f"[show_file] reset curves error: {e}")
+
+    try:
+        state.cue_stacks.clear()
+    except Exception as e:
+        print(f"[show_file] reset cue stacks error: {e}")
+
+    pe = getattr(state, "playback_engine", None)
+    if pe is not None:
+        try:
+            pe.from_dict({}, state.cue_stacks)
+        except Exception as e:
+            print(f"[show_file] reset executors error: {e}")
+
+    try:
+        fm = getattr(state, "function_manager", None)
+        if fm is not None:
+            fm.from_dict({"functions": []})
+    except Exception as e:
+        print(f"[show_file] reset function manager error: {e}")
+
+    try:
+        from src.core.engine.snap_library import get_snap_library
+        get_snap_library().from_dict({})
+    except Exception as e:
+        print(f"[show_file] reset snap library error: {e}")
+
+    state._efx_instances = []
+    state._rgb_matrix_instances = []
+    state._vc_layout = {}
+    state._snapshots_data = []
+    state.visualizer_positions = {}
+    state.active_stage_name = "simple"
+    state.live_view_positions = {}
+    state._last_loaded_layout = {}
+    state.show_name = "Neue Show"
+
+    try:
+        state._rebuild_render_plan()
+    except Exception as e:
+        print(f"[show_file] reset render plan error: {e}")
+
+    # Listener benachrichtigen (gleiche Events wie beim Laden), damit alle
+    # Views (Patch, VC, Programmer, Snapshots …) die leere Show uebernehmen.
+    try:
+        state._emit("patch_changed", None)
+        state._emit("stacks_changed", None)
+        state._emit("show_loaded", {"path": None, "issues": []})
+        state.sync.refresh_all()
+    except Exception as e:
+        print(f"[show_file] reset post events error: {e}")
 
 
 def load_show(path: str | os.PathLike):
@@ -235,11 +348,30 @@ def load_show(path: str | os.PathLike):
         print(f"[show_file] load programmer error: {e}")
         state.programmer = {}
 
+    # Basis-Level (PAR-Grundhelligkeit o. ä.) NACH dem Patch laden und den
+    # Render-Plan neu bauen, damit die Basis im Default-Frame landet.
+    try:
+        bl = data.get("base_levels", {}) or {}
+        state.base_levels = {
+            int(k): {str(a): int(v) for a, v in (vals or {}).items()}
+            for k, vals in bl.items() if isinstance(vals, dict)
+        }
+        state._rebuild_render_plan()
+    except Exception as e:
+        print(f"[show_file] load base_levels error: {e}")
+        state.base_levels = {}
+
     if "palettes" in data:
         try:
             pm.from_dict(data["palettes"])
         except Exception as e:
             print(f"[show_file] load palettes error: {e}")
+
+    try:
+        from src.core.engine.curve_library import get_curve_library
+        get_curve_library().from_dict(data.get("curves", {}) or {})
+    except Exception as e:
+        print(f"[show_file] load curves error: {e}")
 
     try:
         state.cue_stacks.clear()
@@ -248,6 +380,16 @@ def load_show(path: str | os.PathLike):
                 state.cue_stacks.append(CueStack.from_dict(sd))
     except Exception as e:
         print(f"[show_file] load cue stacks error: {e}")
+
+    # Executor-/Page-Bindung wiederherstellen (nach den cue_stacks, da die
+    # Stack-Referenzen als Index in cue_stacks abgelegt sind). Wird auch bei
+    # fehlendem "executors"-Key aufgerufen → setzt stale Bindungen zurueck.
+    pe = getattr(state, "playback_engine", None)
+    if pe is not None:
+        try:
+            pe.from_dict(data.get("executors", {}) or {}, state.cue_stacks)
+        except Exception as e:
+            print(f"[show_file] load executors error: {e}")
 
     try:
         fm = getattr(state, "function_manager", None)
@@ -259,25 +401,44 @@ def load_show(path: str | os.PathLike):
     except Exception as e:
         print(f"[show_file] load function manager error: {e}")
 
+    # Snap-Bibliothek pro Show. Hat die Show einen "library"-Block, ist er
+    # maßgeblich. Alt-Shows ohne Block erben einmalig die globalen Snap-Dateien.
+    try:
+        from src.core.engine.snap_library import get_snap_library
+        lib = get_snap_library()
+        if "library" in data:
+            lib.from_dict(data.get("library") or {})
+        else:
+            lib.migrate_from_disk(replace=True)
+    except Exception as e:
+        print(f"[show_file] load snap library error: {e}")
+
+    # Abwaertskompatibilitaet: Alt-Shows speicherten EFX/RGB-Matrix in separaten
+    # Bloecken (nicht als Funktionen). Diese werden hier einmalig in echte
+    # Funktionen migriert, damit sie ausgegeben/abrufbar werden. Neue Shows haben
+    # die Bloecke leer (Instanzen stehen bereits im "functions"-Block).
+    state._efx_instances = []
+    state._rgb_matrix_instances = []
     try:
         from src.core.engine.efx import EfxInstance
-        state._efx_instances = []
-        for ed in data.get("efx", []) or []:
+        for ed in (data.get("efx", []) or []):
             if isinstance(ed, dict):
-                state._efx_instances.append(EfxInstance.from_dict(ed))
+                state.function_manager.add(EfxInstance.from_dict(ed))
     except Exception as e:
-        print(f"[show_file] load efx error: {e}")
-
+        print(f"[show_file] migrate legacy efx error: {e}")
     try:
         from src.core.engine.rgb_matrix import RgbMatrixInstance
-        state._rgb_matrix_instances = []
-        for md in data.get("rgb_matrix", []) or []:
+        for md in (data.get("rgb_matrix", []) or []):
             if isinstance(md, dict):
-                state._rgb_matrix_instances.append(RgbMatrixInstance.from_dict(md))
+                state.function_manager.add(RgbMatrixInstance.from_dict(md))
     except Exception as e:
-        print(f"[show_file] load rgb matrix error: {e}")
+        print(f"[show_file] migrate legacy rgb matrix error: {e}")
 
     state._vc_layout = data.get("virtual_console", {}) or {}
+
+    # Snapshots pro Show: Rohdaten ablegen, die SnapshotsView spielt sie im
+    # show_loaded-Handler des Hauptfensters zurück (UI-Thread).
+    state._snapshots_data = data.get("snapshots", []) or []
 
     # Visualizer: Fixture-Positionen + aktive Stage wiederherstellen
     try:
@@ -294,6 +455,20 @@ def load_show(path: str | os.PathLike):
         print(f"[show_file] load visualizer error: {e}")
         state.visualizer_positions = {}
         state.active_stage_name = "simple"
+
+    # Live View: 2D-Fixture-Positionen (eigene Persistenz, entkoppelt vom 3D-Viz)
+    try:
+        lv = data.get("live_view", {}) or {}
+        lv_pos: dict[int, tuple[float, float]] = {}
+        for fid_raw, p in (lv.get("positions", {}) or {}).items():
+            try:
+                lv_pos[int(fid_raw)] = (float(p[0]), float(p[1]))
+            except Exception:
+                continue
+        state.live_view_positions = lv_pos
+    except Exception as e:
+        print(f"[show_file] load live_view error: {e}")
+        state.live_view_positions = {}
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}

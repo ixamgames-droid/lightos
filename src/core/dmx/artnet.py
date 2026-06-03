@@ -22,7 +22,7 @@ def _build_artdmx(universe: int, data: bytes, sequence: int) -> bytes:
 
 
 class ArtNetSender:
-    def __init__(self, target_ip: str = "2.255.255.255"):
+    def __init__(self, target_ip: str = "255.255.255.255"):
         self.target_ip = target_ip
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)

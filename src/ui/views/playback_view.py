@@ -42,8 +42,16 @@ class PlaybackView(QWidget):
         try:
             self._refresh_stack_combo()
             self._refresh_table()
+            self._refresh_executors()
         except Exception as e:
             print(f"[playback_view] sync_refresh error: {e}")
+
+    def _refresh_executors(self):
+        for w in getattr(self, "_executors_widgets", []):
+            try:
+                w.refresh_from_state()
+            except Exception as e:
+                print(f"[playback_view] executor refresh error: {e}")
 
     # ── Multi-Page (T0.1) ───────────────────────────────────────────────────
 
@@ -56,12 +64,14 @@ class PlaybackView(QWidget):
         for i, btn in enumerate(self._page_buttons):
             btn.setChecked(i == page_idx)
         self._refresh_stack_combo()
+        self._refresh_executors()
 
     def _on_page_changed_from_engine(self, page_idx: int):
         """Engine meldet Page-Wechsel (z.B. via MIDI/Hotkey)."""
         for i, btn in enumerate(self._page_buttons):
             btn.setChecked(i == page_idx)
         self._refresh_stack_combo()
+        self._refresh_executors()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -375,6 +385,7 @@ class PlaybackView(QWidget):
     def _on_state(self, event: str, _data):
         if event in ("stacks_changed", "cue_recorded"):
             self._refresh_stack_combo()
+            self._refresh_executors()
 
 
 class ExecutorWidget(QWidget):
@@ -448,6 +459,28 @@ class ExecutorWidget(QWidget):
         stack = self._combo.currentData()
         ex.stack = stack
         self._lbl.setText(stack.name[:12] if stack else f"Ex {self._slot}")
+
+    def refresh_from_state(self):
+        """Combo/Fader/Label aus dem Executor der aktuellen Page neu aufbauen
+        (nach Show-Load, Page-Wechsel oder Cuelisten-Aenderung)."""
+        pe = self._state.playback_engine
+        if not pe:
+            return
+        ex = pe.get_executor(self._slot)
+        self._combo.blockSignals(True)
+        self._combo.clear()
+        self._combo.addItem("— Leer —", None)
+        sel = 0
+        for i, s in enumerate(self._state.cue_stacks):
+            self._combo.addItem(s.name, s)
+            if s is ex.stack:
+                sel = i + 1
+        self._combo.setCurrentIndex(sel)
+        self._combo.blockSignals(False)
+        self._lbl.setText(ex.stack.name[:12] if ex.stack else f"Ex {self._slot}")
+        self._fader.blockSignals(True)
+        self._fader.setValue(int(round(ex.fader_value * 100)))
+        self._fader.blockSignals(False)
 
     def _fader_changed(self, value: int):
         if not self._state.playback_engine:

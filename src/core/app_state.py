@@ -9,6 +9,16 @@ from .dmx.output_manager import OutputManager
 
 SHOW_DB_PATH = "data/current_show.db"
 
+# Attribut-Klassen fuer den multiplikativen Dimmer-Layer (EE-02). Wird ein
+# dedizierter Dimmer/Intensitaets-Kanal gefunden, skaliert der Dimmer-Master nur
+# diesen (kein Doppel-Dimmen); sonst die Farbkanaele. Pan/Tilt/Gobo bleiben unberuehrt.
+_DIM_INTENSITY_ATTRS = frozenset({"intensity", "dimmer", "master"})
+_DIM_COLOR_ATTRS = frozenset({
+    "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
+    "red", "green", "blue", "white", "amber", "uv",
+    "cyan", "magenta", "yellow",
+})
+
 
 class AppState:
     def __init__(self):
@@ -16,11 +26,27 @@ class AppState:
         self.output_manager = OutputManager()
         self.universes: dict[int, Universe] = {}
         self.programmer: dict[int, dict[str, int]] = {}
+        # Gemeinsame Programmer-Geraeteauswahl (Reihenfolge = Auswahl-Reihenfolge).
+        # Wird vom ProgrammerView gesetzt; alle Kategorien (RGB Matrix, Effekte,
+        # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
+        # (REVISION, Phase R1).
+        self.selected_fids: list[int] = []
+        # Aktive Gruppen-ID im Programmer (None = lose Einzel-/Mehrfachauswahl).
+        # Wird VOR set_selected_fids gesetzt, damit die Matrix beim SELECTION_CHANGED
+        # bereits die korrekte Gruppen-ID vorfindet.
+        self.selected_group_id: int | None = None
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
         self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
         self.active_stage_name: str = "simple"
+        # Live-View-Positionen (2D, {fid: (x, y)}) — eigene Persistenz, entkoppelt
+        # vom 3D-Visualizer. Migration aus visualizer_positions beim Laden, falls leer.
+        self.live_view_positions: dict[int, tuple[float, float]] = {}
         self._patch_cache: list[PatchedFixture] = []
+        # Basis-Level pro Fixture: {fid: {attr: 0-255}}. Wird in den Default-Frame
+        # gelegt (siehe _rebuild_render_plan) und mit der Show gespeichert. Typisch:
+        # PAR-Grundhelligkeit, damit eine reine Farbe sofort sichtbar ist.
+        self.base_levels: dict[int, dict[str, int]] = {}
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
@@ -32,6 +58,20 @@ class AppState:
         self._engine_extra_prev: dict[int, set] = {}
         self._callbacks: list = []
         self.mock_mode: bool = False
+        # Multiplikative Dimmer-Master (EE-02), wirken NACH dem Effekt-Layer:
+        #   submaster_level — globaler Faktor (VC-Submaster-Fader)
+        #   fixture_dimmers — pro Fixture (Gruppen-Dimmer löst auf fids auf)
+        # Programmer-Dimmer multipliziert Effekte zusätzlich, statt sie per LTP
+        # zu ersetzen (siehe _render_frame).
+        self.submaster_level: float = 1.0
+        self.fixture_dimmers: dict[int, float] = {}
+        # EFX-/RGB-Matrix-Effekt-Instanzen — Single Source of Truth.
+        # EfxView und RgbMatrixView lesen/schreiben direkt diese Listen
+        # (gemeinsame Referenz), show/show_file.py persistiert sie in der .lshow.
+        # Beim Show-Laden werden sie IN-PLACE ersetzt (Slice-Assignment), damit
+        # die in den Views gehaltenen Referenzen gueltig bleiben.
+        self._efx_instances: list = []
+        self._rgb_matrix_instances: list = []
         # Cuelisten und Playback
         from .engine.cue_stack import CueStack
         self.cue_stacks: list[CueStack] = []
@@ -257,6 +297,30 @@ class AppState:
                     start = prev = a
             runs.append((start, prev - start + 1))
             spans[univ] = runs
+        # Basis-Level (z. B. PAR-Grundhelligkeit) in den Default-Frame legen:
+        # Damit sind Fixtures "scharf" — eine reine Farbe (color-only) ist sofort
+        # sichtbar, und ein Dimmer-Effekt UEBERSCHREIBT die Basis (kann bis 0
+        # dunkeln). Ohne Basis muesste jede Farbe zusaetzlich Intensitaet setzen,
+        # was mit Dimmer-Effekten kollidiert (s. docs/PROGRAMMER_REBUILD.md).
+        for fid_raw, attrs in (getattr(self, "base_levels", None) or {}).items():
+            try:
+                fid = int(fid_raw)
+            except (TypeError, ValueError):
+                continue
+            entry = fix_index.get(fid)
+            if not entry or not isinstance(attrs, dict):
+                continue
+            fx, chans = entry
+            buf = defaults.setdefault(fx.universe, bytearray(512))
+            for ch in chans:
+                aname = getattr(ch, "attribute", "") or ""
+                if aname in attrs:
+                    addr = fx.address + ch.channel_number - 1
+                    if 1 <= addr <= 512:
+                        try:
+                            buf[addr - 1] = max(0, min(255, int(attrs[aname])))
+                        except (TypeError, ValueError):
+                            pass
         self._fix_index = fix_index
         self._default_frame = {u: bytes(b) for u, b in defaults.items()}
         self._commit_spans = spans
@@ -268,6 +332,46 @@ class AppState:
         for u in needed:
             if u not in self.universes:
                 self.universes[u] = self.output_manager.add_universe(u)
+
+    def apply_output_config(self, path: str = "data/universes.json"):
+        """Liest die im Universe-Manager gespeicherte Output-Konfiguration und
+        richtet beim Start die passenden Backends (Enttec/ArtNet/sACN) ein.
+
+        Format pro Zeile: {"num", "name", "output", "patch"}.
+        - Enttec: ``patch`` = COM-Port
+        - ArtNet: ``patch`` = Ziel-IP/Broadcast (leer = Default-Broadcast)
+        - sACN:   ``patch`` = Unicast-IP (leer = Multicast)
+        Fehler pro Universe werden geloggt, brechen den Start aber nicht ab.
+        """
+        import json
+        import os
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                rows = json.load(f)
+        except Exception as e:
+            print(f"[app_state] apply_output_config: konnte {path} nicht lesen: {e}")
+            return
+        for r in rows or []:
+            try:
+                num = int(r.get("num", 1))
+            except (TypeError, ValueError):
+                continue
+            output = (r.get("output") or "Disabled").strip()
+            patch = (r.get("patch") or "").strip()
+            if num not in self.universes:
+                self.universes[num] = self.output_manager.add_universe(num)
+            try:
+                if output == "Enttec" and patch:
+                    self.output_manager.add_enttec(num, patch)
+                elif output == "ArtNet":
+                    self.output_manager.add_artnet(num, patch or "255.255.255.255")
+                elif output == "sACN":
+                    self.output_manager.add_sacn(num, patch or None)
+            except Exception as e:
+                print(f"[app_state] apply_output_config: Universe {num} "
+                      f"({output}) fehlgeschlagen: {e}")
 
     def auto_patch_fixtures(self):
         """Weist allen Fixtures aufeinander folgende Adressen zu."""
@@ -349,6 +453,33 @@ class AppState:
     def get_programmer_value(self, fid: int, attribute: str) -> int | None:
         return self.programmer.get(fid, {}).get(attribute)
 
+    # ── Gemeinsame Geraeteauswahl (R1) ─────────────────────────────────────────
+
+    def set_selected_fids(self, fids: list[int]):
+        """Setzt die gemeinsame Programmer-Auswahl und benachrichtigt alle
+        Kategorien (RGB Matrix, Effekte, Paletten …) via SELECTION_CHANGED.
+        Reihenfolge bleibt erhalten (wichtig fuer Fan/Chase)."""
+        new = [int(f) for f in fids]
+        if new == self.selected_fids:
+            return
+        self.selected_fids = new
+        try:
+            from .sync import SyncEvent
+            self.sync.emit(SyncEvent.SELECTION_CHANGED, list(new))
+        except Exception as e:
+            print(f"[app_state] selection emit error: {e}")
+
+    def get_selected_fids(self) -> list[int]:
+        return list(self.selected_fids)
+
+    def set_selected_group_id(self, gid: int | None):
+        """Merkt die aktuell im Programmer gewaehlte Gruppe (oder None bei loser
+        Auswahl). Die Matrix nutzt das, um das echte 2D-Grid inkl. Luecken zu uebernehmen."""
+        self.selected_group_id = int(gid) if gid is not None else None
+
+    def get_selected_group_id(self):
+        return getattr(self, "selected_group_id", None)
+
     def _flush_programmer_to_dmx(self, fid: int):
         fixture = next((f for f in self._patch_cache if f.fid == fid), None)
         if not fixture or fixture.universe not in self.universes:
@@ -408,14 +539,80 @@ class AppState:
             self.function_manager.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        # 2b. Welche Fixtures treibt der EFFEKT-Layer (Funktionen) auf ihren
+        #     Intensitaets-Kanaelen? Basis fuer Programmer-Multiply (EE-02).
+        #     Bewusst VOR den Executoren erfasst: Cues behalten LTP-Ersatz durch
+        #     den Programmer, nur laufende Effekte werden multipliziert.
+        inten_addrs: dict[int, list[int]] = {}
+        effect_present: dict[int, bool] = {}
+        for fidi, entry in self._fix_index.items():
+            fx, chans = entry
+            addrs = self._fixture_intensity_addrs(fx, chans)
+            inten_addrs[fidi] = addrs
+            su = scratch.get(fx.universe)
+            if su is None:
+                effect_present[fidi] = False
+                continue
+            base = self._default_frame.get(fx.universe)
+            present = False
+            for a in addrs:
+                dv = base[a - 1] if (base and a - 1 < len(base)) else 0
+                if su.get_channel(a) != dv:
+                    present = True
+                    break
+            effect_present[fidi] = present
         # 3. Executoren (Cue-Playback) darueber.
         if self.playback_engine is not None:
             try:
                 self._apply_fixture_map(scratch, self.playback_engine.compute_merged())
             except Exception as exc:
                 print(f"[AppState] render executors error: {exc}")
-        # 4. Programmer hat hoechste Prioritaet (LTP).
-        self._apply_fixture_map(scratch, programmer)
+
+        # 4. Programmer (LTP, hoechste Prioritaet) — ABER Intensitaets-Attribute
+        #    multiplizieren einen laufenden EFFEKT, statt ihn zu ersetzen
+        #    (EE-02 "Programmer-Dimmer multipliziert"). Ohne Effekt: LTP-Ersatz.
+        prog_factor: dict[int, float] = {}
+        for fid, attrs in programmer.items():
+            try:
+                fidi = int(fid)
+            except (TypeError, ValueError):
+                continue
+            if not effect_present.get(fidi):
+                continue
+            for ikey in _DIM_INTENSITY_ATTRS:
+                if ikey in attrs:
+                    try:
+                        f = max(0.0, min(1.0, int(attrs[ikey]) / 255.0))
+                    except (TypeError, ValueError):
+                        continue
+                    prog_factor[fidi] = min(prog_factor.get(fidi, 1.0), f)
+        self._apply_fixture_map(scratch, programmer, skip_intensity_for=set(prog_factor))
+
+        # 4b. Multiplikativer Dimmer-Master: submaster * Gruppen-/Fixture-Dimmer *
+        #     Programmer-Dimmer (nur wo Effekt aktiv). Skaliert pro Fixture die
+        #     Intensitaets- bzw. (ersatzweise) Farbkanaele.
+        submaster = 1.0
+        om = getattr(self, "output_manager", None)
+        if om is not None and hasattr(om, "effective_submaster"):
+            try:
+                submaster = om.effective_submaster()
+            except Exception:
+                submaster = 1.0
+        fixture_dimmers = getattr(self, "fixture_dimmers", {}) or {}
+        global_sub = max(0.0, min(1.0, float(getattr(self, "submaster_level", 1.0)))) * submaster
+        for fidi, addrs in inten_addrs.items():
+            factor = global_sub * float(fixture_dimmers.get(fidi, 1.0)) * prog_factor.get(fidi, 1.0)
+            if factor >= 0.999 or not addrs:
+                continue
+            entry = self._fix_index.get(fidi)
+            if not entry:
+                continue
+            su = scratch.get(entry[0].universe)
+            if su is None:
+                continue
+            for a in addrs:
+                su.set_channel(a, int(su.get_channel(a) * factor))
+
         # 5. Atomarer Commit der gepatchten Spans ins Live-Universe.
         for univ, live in live_universes:
             su = scratch.get(univ)
@@ -438,22 +635,31 @@ class AppState:
                         live.set_channel(a, 0)
                 self._engine_extra_prev[univ] = cur
 
-    def _apply_fixture_map(self, scratch: dict, fixmap: dict):
+    def _apply_fixture_map(self, scratch: dict, fixmap: dict,
+                           skip_intensity_for: set | None = None):
         """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
-        nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht)."""
+        nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht).
+
+        skip_intensity_for: fids, fuer die Intensitaets-Attribute NICHT absolut
+        geschrieben werden (sie werden stattdessen multiplikativ angewandt, EE-02)."""
+        skip = skip_intensity_for or ()
         for fid, attrs in fixmap.items():
             try:
-                entry = self._fix_index.get(int(fid))
+                fidi = int(fid)
             except (TypeError, ValueError):
                 continue
+            entry = self._fix_index.get(fidi)
             if not entry:
                 continue
             fx, chans = entry
             su = scratch.get(fx.universe)
             if su is None:
                 continue
+            skip_inten = fidi in skip
             for ch in chans:
                 if ch.attribute not in attrs:
+                    continue
+                if skip_inten and (ch.attribute or "").lower() in _DIM_INTENSITY_ATTRS:
                     continue
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -464,6 +670,43 @@ class AppState:
                 except (TypeError, ValueError):
                     v = 0
                 su.set_channel(addr, max(0, min(255, v)))
+
+    # ── Dimmer-Master API (EE-02) ──────────────────────────────────────────────
+
+    def set_fixture_dimmer(self, fid: int, factor: float):
+        """Setzt den multiplikativen Dimmer-Faktor (0.0–1.0) eines Fixtures.
+        1.0 = voll (Eintrag wird entfernt, damit kein unnoetiges Skalieren)."""
+        try:
+            fid = int(fid)
+            factor = max(0.0, min(1.0, float(factor)))
+        except (TypeError, ValueError):
+            return
+        if factor >= 0.999:
+            self.fixture_dimmers.pop(fid, None)
+        else:
+            self.fixture_dimmers[fid] = factor
+
+    def set_group_dimmer(self, fids, factor: float):
+        """Setzt denselben Dimmer-Faktor fuer mehrere Fixtures (Gruppen-Dimmer)."""
+        for fid in fids or ():
+            self.set_fixture_dimmer(fid, factor)
+
+    def _fixture_intensity_addrs(self, fx, chans) -> list[int]:
+        """Adressen, die der Dimmer-Master fuer dieses Fixture skaliert: der
+        Dimmer/Intensitaets-Kanal falls vorhanden (virtueller Dimmer), sonst die
+        Farbkanaele. Pan/Tilt/Gobo etc. werden nie skaliert."""
+        inten: list[int] = []
+        color: list[int] = []
+        for ch in chans:
+            attr = (getattr(ch, "attribute", "") or "").lower()
+            addr = fx.address + ch.channel_number - 1
+            if not (1 <= addr <= 512):
+                continue
+            if attr in _DIM_INTENSITY_ATTRS:
+                inten.append(addr)
+            elif attr in _DIM_COLOR_ATTRS:
+                color.append(addr)
+        return inten if inten else color
 
     def new_cue_stack(self, name: str = "Neue Cueliste"):
         from .engine.cue_stack import CueStack
@@ -579,6 +822,7 @@ def get_state() -> AppState:
     if _state is None:
         _state = AppState()
         _state.open_show()
+        _state.apply_output_config()
         _state.output_manager.start()
         _state.start_playback()
     return _state

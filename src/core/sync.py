@@ -25,6 +25,7 @@ class SyncEvent(str, Enum):
     OUTPUT_CONFIG_CHANGED = "output_config_changed"  # Enttec/ArtNet/sACN
     SHOW_LOADED = "show_loaded"
     SHOW_SAVED = "show_saved"
+    SELECTION_CHANGED = "selection_changed"    # Programmer-Geraeteauswahl geaendert
     REFRESH_ALL = "refresh_all"                # Globale "Alle neu laden"
 
 

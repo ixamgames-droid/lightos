@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType
+from . import fade_curve as fc
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -29,6 +30,7 @@ class Scene(Function):
         self.fade_in: float = 0.0    # seconds
         self.fade_out: float = 0.0
         self.hold: float = 0.0       # 0 = infinite
+        self.fade_in_curve: fc.FadeCurve = fc.linear()  # Form des Einblendens
         self._values: list[SceneValue] = []
         self._start_vals: dict[tuple[int, int], int] = {}   # (fid, ch) -> start dmx value
         self._done: bool = False
@@ -95,9 +97,9 @@ class Scene(Function):
 
         self._elapsed += dt
 
-        # Compute fade progress
+        # Compute fade progress (durch die Fade-Kurve geformt)
         if self.fade_in > 0.0:
-            t = min(1.0, self._elapsed / self.fade_in)
+            t = self.fade_in_curve.eval(min(1.0, self._elapsed / self.fade_in))
         else:
             t = 1.0
 
@@ -136,6 +138,9 @@ class Scene(Function):
                 for sv in self._values
             ],
         })
+        # Kurve nur speichern, wenn sie von der Standard-Geraden abweicht.
+        if not self.fade_in_curve.is_linear_default():
+            d["fade_in_curve"] = self.fade_in_curve.to_dict()
         return d
 
     @classmethod
@@ -144,6 +149,8 @@ class Scene(Function):
         s.fade_in = d.get("fade_in", 0.0)
         s.fade_out = d.get("fade_out", 0.0)
         s.hold = d.get("hold", 0.0)
+        if "fade_in_curve" in d:
+            s.fade_in_curve = fc.FadeCurve.from_dict(d["fade_in_curve"])
         for v in d.get("values", []):
             s.set_value(v["fid"], v["ch"], v["val"])
         return s

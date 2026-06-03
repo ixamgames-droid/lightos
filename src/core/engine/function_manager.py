@@ -10,6 +10,8 @@ from .sequence import Sequence
 from .audio_func import AudioFunction
 from .effect_func import LayeredEffect
 from .carousel import Carousel
+from .efx import EfxInstance
+from .rgb_matrix import RgbMatrixInstance
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -25,6 +27,13 @@ class FunctionManager:
     def __init__(self):
         self._functions: dict[int, Function] = {}
         self._running_ids: set[int] = set()
+        # Start-Reihenfolge laufender Funktionen (zuletzt gestartete am Ende) —
+        # fuer active_function() / Aktiv-Effekt-Master (Block B).
+        self._start_order: list[int] = []
+        # Cache der Dim-Adressen je Universum fuer die Per-Effekt-Intensitaet.
+        # An die Identitaet des patch_cache gebunden (Re-Patch => Neuaufbau).
+        self._dim_map_cache: dict[int, frozenset[int]] | None = None
+        self._dim_map_key: int = -1
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -79,6 +88,14 @@ class FunctionManager:
         f = Carousel(name)
         return self.add(f)
 
+    def new_efx(self, name: str = "Neue Bewegung") -> EfxInstance:
+        f = EfxInstance(name)
+        return self.add(f)
+
+    def new_rgb_matrix(self, name: str = "Neue Matrix") -> RgbMatrixInstance:
+        f = RgbMatrixInstance(name)
+        return self.add(f)
+
     # ── Playback ──────────────────────────────────────────────────────────────
 
     def start(self, fid: int):
@@ -87,12 +104,33 @@ class FunctionManager:
             return
         f.start()
         self._running_ids.add(fid)
+        # Start-Reihenfolge pflegen: ans Ende (= zuletzt gestartet) verschieben.
+        try:
+            self._start_order.remove(fid)
+        except ValueError:
+            pass
+        self._start_order.append(fid)
 
     def stop(self, fid: int):
         f = self._functions.get(fid)
         if f is not None:
             f.stop()
         self._running_ids.discard(fid)
+        try:
+            self._start_order.remove(fid)
+        except ValueError:
+            pass
+
+    def active_function(self) -> Function | None:
+        """Die zuletzt gestartete, noch laufende Funktion (Aktiv-Effekt-Master).
+        Aufraeumen stiller Eintraege (z. B. selbst-stoppende SingleShot-Chaser)."""
+        while self._start_order:
+            fid = self._start_order[-1]
+            f = self._functions.get(fid)
+            if f is not None and f.is_running:
+                return f
+            self._start_order.pop()
+        return None
 
     def stop_all(self):
         for fid in list(self._running_ids):
@@ -104,24 +142,107 @@ class FunctionManager:
 
     # ── Frame tick ────────────────────────────────────────────────────────────
 
+    # Attribut-Klassen fuer die Per-Effekt-Intensitaet (Block B).
+    _INTENSITY_ATTRS = frozenset({"intensity", "dimmer", "master"})
+    _COLOR_ATTRS = frozenset({
+        "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
+        "red", "green", "blue", "white", "amber", "uv",
+        "cyan", "magenta", "yellow",
+    })
+
+    def _dim_addr_map(self, patch_cache: list["PatchedFixture"]
+                      ) -> dict[int, frozenset[int]]:
+        """{universe: frozenset(addr)} — Adressen, die die Per-Effekt-Intensitaet
+        skaliert. Pro Fixture: gibt es einen Dimmer/Intensitaets-Kanal, werden nur
+        dessen Adressen skaliert (virtueller Dimmer, kein Doppel-Dimmen). Sonst
+        Fallback auf die Farbkanaele. Pan/Tilt/Gobo etc. werden nie skaliert.
+        Ergebnis an die patch_cache-Identitaet gebunden gecached."""
+        key = id(patch_cache)
+        if self._dim_map_cache is not None and self._dim_map_key == key:
+            return self._dim_map_cache
+        try:
+            from src.core.app_state import get_channels_for_patched
+        except Exception:
+            return {}
+        acc: dict[int, set[int]] = {}
+        for fx in patch_cache or ():
+            try:
+                channels = get_channels_for_patched(fx)
+            except Exception:
+                continue
+            inten_addrs: set[int] = set()
+            color_addrs: set[int] = set()
+            for ch in channels:
+                attr = (getattr(ch, "attribute", "") or "").lower()
+                addr = fx.address + ch.channel_number - 1
+                if not (1 <= addr <= 512):
+                    continue
+                if attr in self._INTENSITY_ATTRS:
+                    inten_addrs.add(addr)
+                elif attr in self._COLOR_ATTRS:
+                    color_addrs.add(addr)
+            scal = inten_addrs if inten_addrs else color_addrs
+            if scal:
+                acc.setdefault(fx.universe, set()).update(scal)
+        result = {u: frozenset(a) for u, a in acc.items()}
+        self._dim_map_cache = result
+        self._dim_map_key = key
+        return result
+
     def tick(self, universes: dict[int, "Universe"],
              patch_cache: list["PatchedFixture"],
              dt: float):
-        """Called every frame (44 Hz). Drives all running functions."""
+        """Called every frame (44 Hz). Drives all running functions.
+
+        Per-Effekt-Intensitaet (Block B): Funktionen mit intensity < 1.0 werden
+        in ein privates Universum gerendert und ihre geaenderten Kanaele skaliert
+        ins gemeinsame Scratch gemerged (Dim-/Farbadressen * intensity). Bei
+        intensity == 1.0 wird direkt geschrieben (Fast-Path, kein Kopieraufwand)."""
+        from src.core.dmx.universe import Universe
+        dim_map = None  # lazy — nur bei Bedarf aufbauen
         finished = set()
         for fid in list(self._running_ids):
             f = self._functions.get(fid)
-            if f is None:
-                finished.add(fid)
-                continue
-            if not f.is_running:
+            if f is None or not f.is_running:
                 finished.add(fid)
                 continue
             try:
-                f.write(universes, patch_cache, dt, self._functions)
+                inten = f.intensity
+                try:
+                    inten = max(0.0, min(1.0, float(inten)))
+                except (TypeError, ValueError):
+                    inten = 1.0
+                if inten >= 0.999:
+                    f.write(universes, patch_cache, dt, self._functions)
+                else:
+                    if dim_map is None:
+                        dim_map = self._dim_addr_map(patch_cache)
+                    # privates Universum je Universum = Kopie des aktuellen Scratch
+                    priv: dict[int, Universe] = {}
+                    before: dict[int, bytes] = {}
+                    for u, su in universes.items():
+                        cur = su.get_all()
+                        pu = Universe(u)
+                        pu.set_range(1, cur)
+                        priv[u] = pu
+                        before[u] = bytes(cur)
+                    f.write(priv, patch_cache, dt, self._functions)
+                    for u, pu in priv.items():
+                        shared = universes.get(u)
+                        if shared is None:
+                            continue
+                        after = pu.get_all()
+                        b = before[u]
+                        dims = dim_map.get(u, frozenset())
+                        for i in range(512):
+                            av = after[i]
+                            if av == b[i]:
+                                continue
+                            if (i + 1) in dims:
+                                av = int(av * inten)
+                            shared.set_channel(i + 1, av if av < 255 else 255)
             except Exception as exc:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
-            # After write, check again
             if not f.is_running:
                 finished.add(fid)
         self._running_ids -= finished
@@ -156,19 +277,39 @@ class FunctionManager:
                 elif ftype == FunctionType.Audio.value:
                     f = AudioFunction.from_dict(fd)
                 elif ftype == FunctionType.EFX.value:
-                    # EFX-Tag wird von LayeredEffect und Carousel geteilt.
-                    # Unterscheidung anhand der gespeicherten Keys.
-                    if "layers" in fd:
+                    # EFX-Tag wird von EfxInstance (Pan/Tilt-Bewegung), LayeredEffect
+                    # und Carousel geteilt. Unterscheidung anhand der Keys.
+                    if fd.get("motion") or "speed_hz" in fd:
+                        f = EfxInstance.from_dict(fd)
+                    elif "layers" in fd:
                         f = LayeredEffect.from_dict(fd)
                     elif "pattern" in fd:
                         f = Carousel.from_dict(fd)
                     else:
                         continue
+                elif ftype == FunctionType.RGBMatrix.value:
+                    f = RgbMatrixInstance.from_dict(fd)
                 else:
                     continue
             except Exception as exc:
                 print(f"[FunctionManager] from_dict skip {ftype}: {exc}")
                 continue
+            # Per-Effekt-Master generisch laden (Block B) — eine Stelle statt in
+            # jeder Subtyp-from_dict. Chaser/Sequence setzen speed schon selbst,
+            # das ueberschreibt der gespeicherte Wert hier konsistent.
+            try:
+                f.intensity = max(0.0, min(1.0, float(fd.get("intensity", 1.0))))
+            except (TypeError, ValueError):
+                f.intensity = 1.0
+            try:
+                f.speed = max(0.1, min(4.0, float(fd.get("speed", f.speed))))
+            except (TypeError, ValueError):
+                pass
+            # Bibliotheks-Ordner generisch laden (Phase 1). Fehlt = Wurzel.
+            try:
+                f.folder = str(fd.get("folder", "") or "")
+            except (TypeError, ValueError):
+                f.folder = ""
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

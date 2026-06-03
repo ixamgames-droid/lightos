@@ -8,7 +8,8 @@ dieser Farbe (siehe apc_mk2_feedback.py).
 """
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
-                                QDialogButtonBox, QSpinBox, QLabel, QPushButton)
+                                QDialogButtonBox, QSpinBox, QLabel, QPushButton,
+                                QCheckBox)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
@@ -232,6 +233,15 @@ class VCColor(VCWidget):
         _refresh_swatch()
         form.addRow("Farbe:", btn_color)
 
+        # Helligkeit mitsenden: AN = Kachel setzt auch Intensitaet (sofort hell,
+        # aber kollidiert mit Dimmer-Effekten). AUS = reine Farb-Ebene (empfohlen,
+        # wenn die Fixtures eine Basis-Helligkeit haben) -> Dimmer-Effekte dunkeln.
+        intens_chk = QCheckBox("Helligkeit mitsenden (aus = nur Farbe)")
+        intens_chk.setChecked(self.with_intensity)
+        form.addRow("Modus:", intens_chk)
+        i_spin = QSpinBox(); i_spin.setRange(0, 255); i_spin.setValue(self.intensity)
+        form.addRow("Helligkeit (falls aktiv):", i_spin)
+
         w_spin = QSpinBox(); w_spin.setRange(0, 255); w_spin.setValue(self.color_w)
         form.addRow("White (0=aus):", w_spin)
         a_spin = QSpinBox(); a_spin.setRange(0, 255); a_spin.setValue(self.color_a)
@@ -264,6 +274,8 @@ class VCColor(VCWidget):
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
+            self.with_intensity = intens_chk.isChecked()
+            self.intensity = i_spin.value()
             self.color_w = w_spin.value()
             self.color_a = a_spin.value()
             self.color_uv = uv_spin.value()

@@ -42,13 +42,18 @@ class VCCanvas(QWidget):
     # Signale nach außen (für VirtualConsoleView)
     midi_learn_done = Signal()          # MIDI-Learn für Button abgeschlossen
     snapshot_assign_done = Signal()     # Snapshot-Assign abgeschlossen
+    function_assign_done = Signal()     # Funktions-Assign abgeschlossen
+    bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
+    # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
+    _bank_change_sig = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
         self._snap_to_grid = False
+        self._active_bank = 0
         self.setMinimumSize(QSize(1200, 800))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -60,12 +65,16 @@ class VCCanvas(QWidget):
 
         # Snapshot-Assign-Modus
         self._assign_snapshot_index: int | None = None  # welcher Snap zugewiesen wird
+        # Funktions-Assign-Modus (Effekt/Matrix/Scene auf VC-Button legen)
+        self._assign_function_id: int | None = None
         self._awaiting_button_click_for: str | None = None
 
         # MIDI aus dem Dispatch-Thread sicher in den UI-Thread marshallen.
         # (Cross-Thread-Signal -> automatisch QueuedConnection -> _handle_midi laeuft im UI-Thread)
         self._midi_received.connect(self._handle_midi)
+        self._bank_change_sig.connect(self.set_active_bank)
         self._setup_midi()
+        self._setup_engine_page()
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +103,59 @@ class VCCanvas(QWidget):
         self._teardown_midi()
         super().closeEvent(event)
 
+    # ── Bank/Page (= Executor-Page der Engine) ────────────────────────────────
+
+    def _setup_engine_page(self):
+        """Koppelt die VC-Bank an die Executor-Page der Engine: ein Page-Wechsel
+        (z.B. via APC-Page-Button) blendet die passenden VC-Widgets ein."""
+        self._pe = None
+        try:
+            from src.core.app_state import get_state
+            pe = getattr(get_state(), "playback_engine", None)
+            if pe is not None:
+                self._pe = pe
+                self._active_bank = pe.current_page
+                pe.subscribe_page(self._on_engine_page)
+                self.destroyed.connect(lambda *_: self._teardown_engine_page())
+        except Exception as e:
+            print(f"[VCCanvas] Page-Subscribe-Fehler: {e}")
+
+    def _teardown_engine_page(self):
+        pe = getattr(self, "_pe", None)
+        if pe is not None:
+            try:
+                pe.unsubscribe_page(self._on_engine_page)
+            except Exception:
+                pass
+            self._pe = None
+
+    def _on_engine_page(self, page_idx: int):
+        # Kann aus dem MIDI-Thread kommen -> thread-sicher in den UI-Thread.
+        self._bank_change_sig.emit(int(page_idx))
+
+    def set_active_bank(self, b: int):
+        b = max(0, min(9, int(b)))
+        self._active_bank = b
+        self._apply_bank_visibility()
+        self.update()
+        self.bank_changed.emit(b)
+
+    @property
+    def active_bank(self) -> int:
+        return self._active_bank
+
+    def on_active_bank(self, w) -> bool:
+        """True, wenn das Widget auf der aktuell aktiven Bank sichtbar/aktiv ist
+        (Bank < 0 = auf allen Banks)."""
+        bnk = getattr(w, "bank", -1)
+        return bnk is None or bnk < 0 or bnk == self._active_bank
+
+    def _apply_bank_visibility(self):
+        for child in self.findChildren(
+            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly
+        ):
+            child.setVisible(self.on_active_bank(child))
+
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
         # wuerde hier NIE feuern. Ein Qt-Signal marshallt thread-sicher in den UI-Thread.
@@ -116,6 +178,9 @@ class VCCanvas(QWidget):
             self._teardown_midi()
             return
         for widget in widgets:
+            # Nur Widgets der aktiven Bank reagieren (verdeckte Banks stumm).
+            if not self.on_active_bank(widget):
+                continue
             widget.handle_midi(msg)
 
     # ── MIDI-Learn-Modus ─────────────────────────────────────────────────────
@@ -157,6 +222,20 @@ class VCCanvas(QWidget):
         self._awaiting_button_click_for = None
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
+    # ── Funktions-Assign-Modus ────────────────────────────────────────────────
+
+    def start_function_assign(self, function_id: int):
+        """Aktiviert Assign-Modus: nächster Klick auf einen VCButton macht ihn
+        zum Funktions-Toggle für die gewählte Funktion (Effekt/Matrix/Scene)."""
+        self._assign_function_id = function_id
+        self._awaiting_button_click_for = "function"
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def cancel_function_assign(self):
+        self._assign_function_id = None
+        self._awaiting_button_click_for = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
     # ── Mausereignisse für Learn/Assign ──────────────────────────────────────
 
     def mousePressEvent(self, event):
@@ -191,10 +270,29 @@ class VCCanvas(QWidget):
                         self.setCursor(Qt.CursorShape.ArrowCursor)
                         self.snapshot_assign_done.emit()
                         return
+                    elif mode == "function":
+                        from .vc_button import ButtonAction
+                        btn.action = ButtonAction.FUNCTION_TOGGLE
+                        btn.function_id = self._assign_function_id
+                        # Caption auf den Funktionsnamen setzen (falls auffindbar).
+                        try:
+                            from src.core.engine.function_manager import get_function_manager
+                            fn = get_function_manager().get(self._assign_function_id)
+                            if fn is not None and getattr(btn, "caption", None) in (None, "", "Button"):
+                                btn.caption = fn.name
+                        except Exception:
+                            pass
+                        btn.update()
+                        self._assign_function_id = None
+                        self._awaiting_button_click_for = None
+                        self.setCursor(Qt.CursorShape.ArrowCursor)
+                        self.function_assign_done.emit()
+                        return
 
             # Klick ins Leere bricht Modus ab
             self.cancel_midi_learn()
             self.cancel_snapshot_assign()
+            self.cancel_function_assign()
             return
 
         super().mousePressEvent(event)
@@ -259,8 +357,10 @@ class VCCanvas(QWidget):
                 round(pos.y() / self.GRID) * self.GRID,
             )
             w.move(snapped)
+            # Neu angelegte Widgets landen auf der aktuell sichtbaren Bank.
+            w.bank = self._active_bank
         w.delete_requested.connect(lambda widget=w: self._remove_widget(widget))
-        w.show()
+        w.setVisible(self.on_active_bank(w))
         return w
 
     def _remove_widget(self, widget: VCWidget):
@@ -288,6 +388,12 @@ class VCCanvas(QWidget):
         for wd in d.get("widgets", []):
             wtype = wd.get("type", "")
             self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
+        # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
+        # und Sichtbarkeit setzen.
+        if getattr(self, "_pe", None) is not None:
+            self._active_bank = self._pe.current_page
+        self._apply_bank_visibility()
+        self.bank_changed.emit(self._active_bank)
 
     def _save(self):
         path, _ = QFileDialog.getSaveFileName(self, "VC Layout speichern",

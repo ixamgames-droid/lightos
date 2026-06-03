@@ -383,7 +383,7 @@ class MainWindow(QMainWindow):
         # Sektions-Definitionen: (Label, Icon-Farbe, Index)
         sections = [
             ("Live View",            "#FFD700"),
-            ("Geraete & Funktionen", "#0978FF"),
+            ("Patchen",              "#0978FF"),
             ("Programmer",           "#FFD700"),
             ("Virtual Console",      "#9DFF52"),
             ("Simple Desk",          "#8F8F8F"),
@@ -478,17 +478,19 @@ class MainWindow(QMainWindow):
         self._lbl_bpm.mousePressEvent = lambda _ev: self._set_bpm_manually()
         bar_layout.addWidget(self._lbl_bpm)
 
-        # BPM-Pulse Indikator
+        # BPM-Pulse Indikator — groesserer runder Beat-Punkt (deutlich sichtbar)
+        self._BPM_DOT_IDLE = ("background:#1c1c1c; border:1px solid #333;"
+                              " border-radius:13px; margin:2px 4px;")
         self._bpm_indicator = QLabel(" ")
-        self._bpm_indicator.setFixedSize(12, 18)
-        self._bpm_indicator.setStyleSheet("background:#222222; border-radius:3px; margin:4px 4px;")
+        self._bpm_indicator.setFixedSize(26, 26)
+        self._bpm_indicator.setToolTip("Beat-Indikator (Takt 1 gelb, sonst gruen)")
+        self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE)
         bar_layout.addWidget(self._bpm_indicator)
         self._bpm_indicator_timer = QTimer(self)
-        self._bpm_indicator_timer.setInterval(80)
+        self._bpm_indicator_timer.setInterval(110)
         self._bpm_indicator_timer.setSingleShot(True)
         self._bpm_indicator_timer.timeout.connect(
-            lambda: self._bpm_indicator.setStyleSheet(
-                "background:#222222; border-radius:3px; margin:4px 4px;"))
+            lambda: self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE))
 
         # BPM-Manager Subscribe
         try:
@@ -540,9 +542,9 @@ class MainWindow(QMainWindow):
             print(f"[main_window] LiveView init error: {e}")
             self._live_view = QWidget()
         self._stack.addWidget(self._live_view)
-        # Sektion 1: Geraete & Funktionen (Patch | EFX | RGB Matrix)
+        # Sektion 1: Patchen (Patch | Gruppen)
         self._stack.addWidget(self._build_section_fixtures())
-        # Sektion 2: Programmer (Programmer | Paletten)
+        # Sektion 2: Programmer (Programmer | Funktionen | EFX | RGB Matrix | Paletten | Snapshots)
         self._stack.addWidget(self._build_section_programmer())
         # Sektion 3: Virtual Console
         self._vc_view = VirtualConsoleView()
@@ -600,31 +602,34 @@ class MainWindow(QMainWindow):
     # ── Sektions-Seiten ───────────────────────────────────────────────────────
 
     def _build_section_fixtures(self) -> QWidget:
-        """Sektion 0: Patch, EFX, RGB Matrix, Funktionen, Gruppen."""
+        """Sektion 1 (Patchen): Patch + Gruppen.
+
+        EFX / RGB Matrix / Funktionen sind nach P-01 in den Programmer
+        umgezogen (gehoeren logisch zum Programmieren, nicht zum Patchen).
+        """
         tabs = _SubTabs()
         self._patch_view = PatchView()
-        self._efx_view = EfxView()
-        self._rgb_matrix_view = RgbMatrixView()
-        self._function_manager_view = FunctionManagerView()
         try:
             self._fixture_group_view = FixtureGroupView()
         except Exception as e:
             print(f"[main_window] FixtureGroupView init error: {e}")
             self._fixture_group_view = QWidget()
         tabs.addTab(self._patch_view,             "Patch")
-        tabs.addTab(self._efx_view,               "EFX")
-        tabs.addTab(self._rgb_matrix_view,        "RGB Matrix")
-        tabs.addTab(self._function_manager_view,  "Funktionen")
         tabs.addTab(self._fixture_group_view,     "Gruppen")
         return tabs
 
     def _build_section_programmer(self) -> QWidget:
-        """Sektion 1: Programmer + Paletten + Snapshots."""
+        """Sektion 2 (Programmer): EIN Programmer + Snapshots-Schnellzugriff.
+
+        Vereinheitlichung (REVISION/R4, siehe docs/PROGRAMMER_REBUILD.md):
+        Funktionen / EFX / RGB Matrix / Paletten sind keine eigenen Sub-Tabs mehr,
+        sondern Kategorien im Programmer (`programmer_view._make_mitte`) und arbeiten
+        auf der gemeinsamen Auswahl (`AppState.selected_fids`). Die rechte Bibliothek
+        verwaltet Snaps + Funktionen. Der Snapshots-Tab bleibt als Schnellzugriff.
+        """
         tabs = _SubTabs()
         self._programmer_view = ProgrammerView()
-        self._palette_view = PaletteView()
-        tabs.addTab(self._programmer_view, "Programmer")
-        tabs.addTab(self._palette_view,    "Paletten")
+        tabs.addTab(self._programmer_view, "Attribute")
         try:
             from src.ui.views.snapshots_view import SnapshotsView
             self._snapshots_view = SnapshotsView()
@@ -781,7 +786,7 @@ class MainWindow(QMainWindow):
         # Akzent auf Beat 1 (alle 4)
         col = "#FFD700" if (self._bpm_mgr and self._bpm_mgr._beat_index % 4 == 1) else "#9DFF52"
         self._bpm_indicator.setStyleSheet(
-            f"background:{col}; border-radius:3px; margin:4px 4px;")
+            f"background:{col}; border:1px solid {col}; border-radius:13px; margin:2px 4px;")
         self._bpm_indicator_timer.start()
         # BPM-Label synchron halten — auch wenn das Tempo extern (APC-TAP / Audio)
         # geaendert wurde und nicht ueber den Tap-Button im Hauptfenster.
@@ -1047,11 +1052,13 @@ class MainWindow(QMainWindow):
 
     def _new_show(self):
         reply = QMessageBox.question(self, "Neue Show",
-            "Aktuelle Show verwerfen und neu beginnen?",
+            "Aktuelle Show komplett verwerfen und leer neu beginnen?\n\n"
+            "Gepatchte Fixtures, Virtual Console, Funktionen, Paletten und "
+            "Bibliothek werden geleert.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            self._state.clear_programmer()
-            self._state.cue_stacks.clear()
+            from src.core.show.show_file import reset_show
+            reset_show()
             self._current_show_path = None
             self.setWindowTitle("LightOS")
 
@@ -1144,6 +1151,13 @@ class MainWindow(QMainWindow):
                 self._state._vc_layout = self._vc_view.to_dict()
             except Exception as e:
                 print(f"[main_window] collect vc layout error: {e}")
+            # Snapshots (pro Show) aus der View uebernehmen
+            try:
+                sv = getattr(self, "_snapshots_view", None)
+                if sv is not None:
+                    self._state._snapshots_data = sv.to_dict()
+            except Exception as e:
+                print(f"[main_window] collect snapshots error: {e}")
             # T1.6 Layout-Persistenz: Layout dazupacken
             layout = None
             try:
@@ -1293,6 +1307,13 @@ class MainWindow(QMainWindow):
                 self._vc_view.from_dict(vc)
         except Exception as e:
             print(f"[main_window] vc layout restore error: {e}")
+        # Snapshots (pro Show) in die View laden
+        try:
+            sv = getattr(self, "_snapshots_view", None)
+            if sv is not None:
+                sv.load_data(getattr(self._state, "_snapshots_data", []) or [])
+        except Exception as e:
+            print(f"[main_window] snapshots restore error: {e}")
 
     def _open_input_profile_editor(self):
         """T1.4 Input-Profile-Editor (MIDI/OSC/Keyboard)."""

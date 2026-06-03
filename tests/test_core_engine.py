@@ -358,6 +358,193 @@ class TestCueStack(unittest.TestCase):
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# 4b) PlaybackEngine / Executor — Persistenz (Stack-Bindung pro Page/Slot)
+# ════════════════════════════════════════════════════════════════════════════
+
+from src.core.engine.executor import PlaybackEngine, Executor
+
+
+class TestExecutorPersistence(unittest.TestCase):
+    def setUp(self):
+        self.engine = PlaybackEngine(None)   # _state nur in _flush_to_dmx genutzt
+        self.stacks = [CueStack("Main"), CueStack("Strobe"), CueStack("Wash")]
+
+    def test_default_engine_serializes_empty_pages(self):
+        d = self.engine.to_dict(self.stacks)
+        self.assertEqual(d["current_page"], 0)
+        self.assertEqual(len(d["page_names"]), PlaybackEngine.MAX_PAGES)
+        # Frisch = keine abweichenden Executoren
+        self.assertTrue(all(p == [] for p in d["pages"]))
+
+    def test_roundtrip_restores_binding_and_fader(self):
+        ex = self.engine.get_executor(1)
+        ex.stack = self.stacks[2]          # "Wash"
+        ex.fader_value = 0.5
+        ex.label = "Front Wash"
+        ex.fader_function = "master"
+        # Executor auf Page 1 (zweite Page)
+        ex2 = self.engine.get_executor(3, page=1)
+        ex2.stack = self.stacks[0]
+        self.engine.current_page = 1
+        self.engine.page_names[1] = "Looks"
+
+        d = self.engine.to_dict(self.stacks)
+
+        # Neue Engine, gleiche (aequivalente) Stack-Liste in gleicher Reihenfolge
+        engine2 = PlaybackEngine(None)
+        engine2.from_dict(d, self.stacks)
+
+        r1 = engine2.get_executor(1, page=0)
+        self.assertIs(r1.stack, self.stacks[2])
+        self.assertAlmostEqual(r1.fader_value, 0.5)
+        self.assertEqual(r1.label, "Front Wash")
+        self.assertEqual(r1.fader_function, "master")
+        r2 = engine2.get_executor(3, page=1)
+        self.assertIs(r2.stack, self.stacks[0])
+        self.assertEqual(engine2.current_page, 1)
+        self.assertEqual(engine2.page_names[1], "Looks")
+
+    def test_from_dict_resets_stale_bindings(self):
+        # Bindung setzen, dann Legacy-Show (ohne executors) laden → muss leeren
+        self.engine.get_executor(2).stack = self.stacks[0]
+        self.engine.current_page = 3
+        self.engine.from_dict({}, self.stacks)
+        self.assertIsNone(self.engine.get_executor(2).stack)
+        self.assertEqual(self.engine.current_page, 0)
+        self.assertEqual(self.engine.page_names[0], "Page 1")
+
+    def test_invalid_stack_index_yields_no_binding(self):
+        ex = self.engine.get_executor(1)
+        ex.stack = self.stacks[1]
+        d = self.engine.to_dict(self.stacks)
+        # Laden gegen LEERE Stack-Liste → Index ungueltig → keine Bindung
+        engine2 = PlaybackEngine(None)
+        engine2.from_dict(d, [])
+        self.assertIsNone(engine2.get_executor(1).stack)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 4c) Per-Effekt-Intensität & -Speed (Block B)
+# ════════════════════════════════════════════════════════════════════════════
+
+import src.core.app_state as _appstate
+from src.core.engine.function_manager import FunctionManager
+from src.core.engine.scene import Scene
+from src.core.engine.effect_func import LayeredEffect
+from src.core.engine.effect_layers import EffectLayer
+from src.core.engine.function import Function
+
+
+class _EffCh:
+    def __init__(self, attr, num):
+        self.attribute = attr
+        self.channel_number = num
+
+
+class _EffFx:
+    def __init__(self, fid, universe, address):
+        self.fid = fid
+        self.universe = universe
+        self.address = address
+
+
+class TestPerEffectIntensity(unittest.TestCase):
+    """Skalierung im FunctionManager.tick + Aktiv-Effekt-Tracking."""
+
+    def setUp(self):
+        # Fixture @ U1 Adr 10: intensity@1(=10), color_r@2(=11), pan@3(=12)
+        self._orig = _appstate.get_channels_for_patched
+        _appstate.get_channels_for_patched = lambda fx: [
+            _EffCh("intensity", 1), _EffCh("color_r", 2), _EffCh("pan", 3),
+        ]
+        self.patch = [_EffFx(1, 1, 10)]
+        self.fm = FunctionManager()
+
+    def tearDown(self):
+        _appstate.get_channels_for_patched = self._orig
+
+    def _scene(self):
+        sc = Scene("S")
+        sc.set_value(1, 1, 200)   # intensity
+        sc.set_value(1, 2, 100)   # color_r
+        sc.set_value(1, 3, 128)   # pan (darf NICHT skaliert werden)
+        return self.fm.add(sc)
+
+    def _tick_once(self):
+        univ = {1: Universe(1)}
+        self.fm.tick(univ, self.patch, 0.02)
+        return univ[1]
+
+    def test_full_intensity_is_unscaled(self):
+        sc = self._scene()
+        self.fm.start(sc.id)
+        u = self._tick_once()
+        self.assertEqual(u.get_channel(10), 200)
+        self.assertEqual(u.get_channel(11), 100)
+        self.assertEqual(u.get_channel(12), 128)
+
+    def test_half_intensity_scales_only_dimmer(self):
+        sc = self._scene()
+        sc.intensity = 0.5
+        self.fm.start(sc.id)
+        u = self._tick_once()
+        # Fixture hat Dimmer -> nur der Dimmer wird skaliert (virtueller Dimmer)
+        self.assertEqual(u.get_channel(10), 100)   # 200 * 0.5
+        self.assertEqual(u.get_channel(11), 100)   # color_r unberührt
+        self.assertEqual(u.get_channel(12), 128)   # pan unberührt
+
+    def test_color_only_fixture_scales_color(self):
+        # Fixture ohne Dimmer -> Farbkanäle werden skaliert
+        _appstate.get_channels_for_patched = lambda fx: [
+            _EffCh("color_r", 1), _EffCh("color_g", 2), _EffCh("pan", 3),
+        ]
+        self.fm._dim_map_cache = None   # Cache invalidieren
+        sc = Scene("C")
+        sc.set_value(1, 1, 200)   # color_r
+        sc.set_value(1, 3, 128)   # pan
+        self.fm.add(sc)
+        sc.intensity = 0.5
+        self.fm.start(sc.id)
+        u = self._tick_once()
+        self.assertEqual(u.get_channel(10), 100)   # color_r * 0.5
+        self.assertEqual(u.get_channel(12), 128)   # pan unberührt
+
+    def test_active_function_tracks_last_started(self):
+        a, b = self._scene(), self.fm.add(Scene("B"))
+        self.fm.start(a.id)
+        self.fm.start(b.id)
+        self.assertIs(self.fm.active_function(), b)
+        self.fm.stop(b.id)
+        self.assertIs(self.fm.active_function(), a)
+        self.fm.stop(a.id)
+        self.assertIsNone(self.fm.active_function())
+
+    def test_intensity_speed_roundtrip(self):
+        sc = self._scene()
+        sc.intensity = 0.4
+        sc.speed = 2.5
+        d = sc.to_dict()
+        self.assertAlmostEqual(d["intensity"], 0.4)
+        self.assertAlmostEqual(d["speed"], 2.5)
+        fm2 = FunctionManager()
+        fm2.from_dict({"functions": [d]})
+        restored = fm2.get(sc.id)
+        self.assertAlmostEqual(restored.intensity, 0.4)
+        self.assertAlmostEqual(restored.speed, 2.5)
+
+
+class TestEffectSpeedMaster(unittest.TestCase):
+    def test_layered_effect_speed_scales_time(self):
+        eff = LayeredEffect("E")
+        eff.layers = [EffectLayer()]
+        eff.fixture_ids = []          # Loop no-op, _elapsed läuft trotzdem
+        eff.speed = 2.0
+        eff._running = True
+        eff.write({}, [], 0.1, None)
+        self.assertAlmostEqual(eff._elapsed, 0.2)
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # 5) ChannelModifier + ChannelModifierManager
 # ════════════════════════════════════════════════════════════════════════════
 

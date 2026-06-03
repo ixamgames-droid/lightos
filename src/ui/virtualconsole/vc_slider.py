@@ -14,7 +14,9 @@ class SliderMode(str):
     GRANDMASTER = "GrandMaster"   # steuert die globale Gesamthelligkeit
     PROGRAMMER  = "Programmer"    # setzt ein Programmer-Attribut (programmer_attr)
     BPM         = "BPM"           # steuert das globale Tempo (Beat-Effekte folgen)
-    SPEED       = "Speed"         # steuert die Geschwindigkeit laufender Effekte
+    SPEED       = "Speed"         # steuert die Geschwindigkeit ALLER laufenden Effekte
+    EFFECT_INTENSITY = "EffectIntensity"  # Helligkeits-Master EINES Effekts
+    EFFECT_SPEED     = "EffectSpeed"       # Tempo-Master EINES Effekts
 
 
 class VCSlider(VCWidget):
@@ -24,6 +26,10 @@ class VCSlider(VCWidget):
         super().__init__(caption, parent)
         self.mode = SliderMode.LEVEL
         self.function_id: int | None = None
+        # Mehrere Effekt-IDs = Gruppen-Submaster: der Fader regelt in den
+        # EFFECT_*-Modi ALLE gelisteten Effekte gemeinsam (Intensitaet/Speed).
+        # Leer -> Einzel-Effekt ueber function_id (bzw. aktiver Effekt).
+        self.function_ids: list[int] = []
         self.dmx_channel: int = 1
         self.dmx_universe: int = 1
         self.programmer_attr: str = "intensity"   # fuer PROGRAMMER-Modus
@@ -65,16 +71,34 @@ class VCSlider(VCWidget):
             except Exception:
                 pass
         elif self.mode == SliderMode.SPEED:
-            # Geschwindigkeit aller laufenden Chaser 0.1..4.0x (z.B. Strobe-Rate).
+            # Geschwindigkeit ALLER laufenden zeitbasierten Effekte 0.1..4.0x
+            # (Chaser, Sequence, Carousel, RGB-Matrix, EFX). Der Master multipliziert
+            # die jeweilige Basisrate.
             try:
                 from src.core.engine.function_manager import get_function_manager
                 from src.core.engine.chaser import Chaser
+                from src.core.engine.sequence import Sequence
+                from src.core.engine.carousel import Carousel
+                from src.core.engine.rgb_matrix import RgbMatrixInstance
+                from src.core.engine.efx import EfxInstance
+                timed = (Chaser, Sequence, Carousel, RgbMatrixInstance, EfxInstance)
                 mult = 0.1 + (self._value / 255.0) * 3.9
                 for f in get_function_manager().all():
-                    if isinstance(f, Chaser) and f.is_running:
+                    if isinstance(f, timed) and f.is_running:
                         f.speed = mult
             except Exception:
                 pass
+        elif self.mode == SliderMode.EFFECT_INTENSITY:
+            # Helligkeits-Master eines Effekts ODER einer Effekt-Gruppe
+            # (function_ids). Leer -> aktiver Effekt.
+            lvl = self._value / 255.0
+            for f in self._effect_targets():
+                f.intensity = lvl
+        elif self.mode == SliderMode.EFFECT_SPEED:
+            # Tempo-Master eines Effekts/einer Gruppe (0.1..4.0x).
+            spd = 0.1 + (self._value / 255.0) * 3.9
+            for f in self._effect_targets():
+                f.speed = spd
         elif self.mode == SliderMode.PROGRAMMER:
             attr = self.programmer_attr or "intensity"
             try:
@@ -98,6 +122,31 @@ class VCSlider(VCWidget):
                 executors[slot].fader_value = self._value / 255.0
         elif self.mode == SliderMode.SUBMASTER:
             state.output_manager.set_submaster(self.function_id or 0, self._value / 255.0)
+
+    def _effect_target(self):
+        """Einzel-Zielfunktion fuer die EFFECT_*-Modi: feste Bindung ueber
+        function_id, sonst der gerade aktive (zuletzt gestartete) Effekt."""
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            if self.function_id is not None:
+                return fm.get(self.function_id)
+            return fm.active_function()
+        except Exception:
+            return None
+
+    def _effect_targets(self) -> list:
+        """Alle Zielfunktionen: function_ids (Gruppen-Submaster) ODER der eine
+        function_id / der aktive Effekt. Nicht gefundene IDs werden uebersprungen."""
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            if self.function_ids:
+                return [f for f in (fm.get(i) for i in self.function_ids) if f is not None]
+        except Exception:
+            return []
+        f = self._effect_target()
+        return [f] if f is not None else []
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
 
@@ -231,7 +280,8 @@ class VCSlider(VCWidget):
         mode_cb = QComboBox()
         for m in (SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER,
                   SliderMode.GRANDMASTER, SliderMode.PROGRAMMER, SliderMode.BPM,
-                  SliderMode.SPEED):
+                  SliderMode.SPEED, SliderMode.EFFECT_INTENSITY,
+                  SliderMode.EFFECT_SPEED):
             mode_cb.addItem(m)
         mode_cb.setCurrentText(self.mode)
         form.addRow("Modus:", mode_cb)
@@ -239,8 +289,15 @@ class VCSlider(VCWidget):
         form.addRow("DMX-Universe (Level-Modus):", univ)
         ch = QLineEdit(str(self.dmx_channel))
         form.addRow("DMX-Kanal (Level-Modus):", ch)
-        slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        form.addRow("Executor-Slot (Playback):", slot)
+        if self.function_ids:
+            slot_text = ", ".join(str(i) for i in self.function_ids)
+        elif self.function_id is not None:
+            slot_text = str(self.function_id)
+        else:
+            slot_text = ""
+        slot = QLineEdit(slot_text)
+        form.addRow("Slot/Funktions-ID (Playback/Effekt):", slot)
+        form.addRow(QLabel("  ↳ Effekt-Modi: leer = aktiver Effekt · mehrere IDs mit Komma = Gruppe"))
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -270,10 +327,17 @@ class VCSlider(VCWidget):
                 self.dmx_channel = int(ch.text())
             except ValueError:
                 pass
-            try:
-                self.function_id = int(slot.text())
-            except ValueError:
-                self.function_id = None
+            ids = []
+            for part in slot.text().replace(";", ",").split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    ids.append(int(part))
+                except ValueError:
+                    pass
+            self.function_ids = ids
+            self.function_id = ids[0] if ids else None
             self.midi_cc = midi_cc_spin.value()
             self.midi_ch = midi_ch_spin.value()
             self.update()
@@ -284,6 +348,7 @@ class VCSlider(VCWidget):
         d = super().to_dict()
         d["mode"] = self.mode
         d["function_id"] = self.function_id
+        d["function_ids"] = list(self.function_ids)
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
@@ -296,6 +361,7 @@ class VCSlider(VCWidget):
         super().apply_dict(d)
         self.mode = d.get("mode", SliderMode.LEVEL)
         self.function_id = d.get("function_id")
+        self.function_ids = [int(i) for i in d.get("function_ids", []) if str(i).strip().lstrip("-").isdigit()]
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")

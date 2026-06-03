@@ -26,6 +26,9 @@ class VCWidget(QFrame):
     def __init__(self, caption: str = "", parent=None):
         super().__init__(parent)
         self.caption = caption
+        # Bank/Page-Zugehoerigkeit: -1 = auf allen Banks sichtbar (Default,
+        # rueckwaertskompatibel), 0..9 = nur auf dieser Bank (= Executor-Page).
+        self.bank = -1
         self._edit_mode = False
         self._dragging = False
         self._resizing = False
@@ -142,10 +145,34 @@ class VCWidget(QFrame):
         menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
         if self.supports_midi_teach():
             menu.addAction("🎹 MIDI Teach...").triggered.connect(self._teach_midi)
+        # Bank-Zuweisung (einheitlich fuer alle Widget-Typen)
+        bank_menu = menu.addMenu("Bank")
+        act_all = bank_menu.addAction("Alle Banks")
+        act_all.setCheckable(True)
+        act_all.setChecked(self.bank < 0)
+        act_all.triggered.connect(lambda: self._set_bank(-1))
+        bank_menu.addSeparator()
+        for i in range(10):
+            a = bank_menu.addAction(f"Bank {i + 1}")
+            a.setCheckable(True)
+            a.setChecked(self.bank == i)
+            a.triggered.connect(lambda checked=False, b=i: self._set_bank(b))
         menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
         menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
         menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
         menu.exec(global_pos)
+
+    def _set_bank(self, b: int):
+        """Weist das Widget einer Bank zu (-1 = alle) und aktualisiert die
+        Sichtbarkeit ueber die Canvas."""
+        self.bank = int(b)
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, "_apply_bank_visibility"):
+                p._apply_bank_visibility()
+                break
+            p = p.parent()
+        self.update()
 
     def handle_midi(self, msg) -> bool:
         """Verarbeitet eine MIDI-Message. Gibt True zurück wenn konsumiert."""
@@ -223,6 +250,7 @@ class VCWidget(QFrame):
         return {
             "type": self.__class__.__name__,
             "caption": self.caption,
+            "bank": self.bank,
             "x": g.x(), "y": g.y(),
             "w": g.width(), "h": g.height(),
             "bg": self._bg_color.name(),
@@ -231,6 +259,10 @@ class VCWidget(QFrame):
 
     def apply_dict(self, d: dict):
         self.caption = d.get("caption", self.caption)
+        try:
+            self.bank = int(d.get("bank", -1))
+        except (TypeError, ValueError):
+            self.bank = -1
         self.setGeometry(d.get("x", 0), d.get("y", 0),
                          d.get("w", 120), d.get("h", 60))
         if "bg" in d:

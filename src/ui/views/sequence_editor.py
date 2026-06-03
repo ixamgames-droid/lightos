@@ -11,9 +11,12 @@ from src.core.engine.sequence import Sequence, SequenceStep
 from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
 from src.core.app_state import get_state
+from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
+from PySide6.QtWidgets import QDialog
 
 
-COLS = ["#", "Werte (FID → Attr=Wert)", "Fade In", "Hold", "Fade Out", "Notiz"]
+COLS = ["#", "Werte (FID → Attr=Wert)", "Fade In", "In-Kurve",
+        "Hold", "Fade Out", "Out-Kurve", "Notiz"]
 
 
 class SequenceEditor(QWidget):
@@ -154,11 +157,13 @@ class SequenceEditor(QWidget):
         self._tbl.setRowCount(len(self._seq.steps))
         for i, st in enumerate(self._seq.steps):
             vals_txt = self._format_values(st.values)
-            for col, txt in enumerate([
-                str(i + 1), vals_txt,
-                f"{st.fade_in:.2f}", f"{st.hold:.2f}", f"{st.fade_out:.2f}",
-                st.note
-            ]):
+            # Text-Spalten: 0 #, 1 Werte, 2 Fade In, 4 Hold, 5 Fade Out, 7 Notiz
+            text_cols = {
+                0: str(i + 1), 1: vals_txt,
+                2: f"{st.fade_in:.2f}", 4: f"{st.hold:.2f}",
+                5: f"{st.fade_out:.2f}", 7: st.note,
+            }
+            for col, txt in text_cols.items():
                 item = QTableWidgetItem(txt)
                 if col == 0:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -167,7 +172,31 @@ class SequenceEditor(QWidget):
                         "Format: FID:attr=wert[, attr=wert]; FID:attr=wert ...\n"
                         "z.B. '3:dimmer=255, red=200; 5:dimmer=128'")
                 self._tbl.setItem(i, col, item)
+            # Kurven-Spalten: 3 In-Kurve, 6 Out-Kurve
+            self._tbl.setCellWidget(i, 3, self._make_curve_cell(i, "fade_in_curve"))
+            self._tbl.setCellWidget(i, 6, self._make_curve_cell(i, "fade_out_curve"))
         self._building = False
+
+    def _make_curve_cell(self, row: int, attr: str) -> CurveThumbnail:
+        curve = getattr(self._seq.steps[row], attr)
+        thumb = CurveThumbnail(curve)
+        label = "Fade-In" if attr == "fade_in_curve" else "Fade-Out"
+        thumb.setToolTip(f"{label}-Kurve: {curve.name}\nKlicken zum Bearbeiten")
+        thumb.clicked.connect(lambda r=row, a=attr: self._edit_curve(r, a))
+        return thumb
+
+    def _edit_curve(self, row: int, attr: str):
+        if not (0 <= row < len(self._seq.steps)):
+            return
+        step = self._seq.steps[row]
+        cur = getattr(step, attr)
+        label = "Fade-In" if attr == "fade_in_curve" else "Fade-Out"
+        dlg = CurveEditorDialog(cur, title=f"{label}-Kurve – Step {row + 1}",
+                                parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+            setattr(step, attr, dlg.result_curve)
+            self._refresh_steps()
+            self._tbl.selectRow(row)
 
     def _format_values(self, vals: dict) -> str:
         parts = []
@@ -253,11 +282,11 @@ class SequenceEditor(QWidget):
                     st.values = parsed
             elif col == 2:
                 st.fade_in = max(0.0, float(item.text()))
-            elif col == 3:
-                st.hold = max(0.0, float(item.text()))
             elif col == 4:
-                st.fade_out = max(0.0, float(item.text()))
+                st.hold = max(0.0, float(item.text()))
             elif col == 5:
+                st.fade_out = max(0.0, float(item.text()))
+            elif col == 7:
                 st.note = item.text()
         except ValueError:
             pass

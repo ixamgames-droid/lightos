@@ -90,9 +90,61 @@ class EfxView(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._instances: list[EfxInstance] = []
+        # SSOT seit dem Umbau: EFX-Bewegungen sind echte Funktionen im
+        # FunctionManager (EFX-Typ, Marker motion). Beide EfxView-Instanzen
+        # (Programmer-Seite + Sub-Tab) lesen denselben Manager.
+        from src.core.engine.function_manager import get_function_manager
+        self._fm = get_function_manager()
         self._current: EfxInstance | None = None
         self._setup_ui()
+        self._connect_sync()
+        self._rebuild_from_state()
+
+    @property
+    def _instances(self) -> list[EfxInstance]:
+        """Aktuelle EFX-Bewegungen aus dem FunctionManager (Reihenfolge stabil)."""
+        from src.core.engine.efx import EfxInstance as _Efx
+        return [f for f in self._fm.all() if isinstance(f, _Efx)]
+
+    def _notify_change(self):
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.FUNCTION_CHANGED)
+        except Exception:
+            pass
+
+    def _connect_sync(self):
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            sync = get_sync()
+            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._rebuild_from_state())
+            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._rebuild_from_state())
+        except Exception as e:
+            print(f"[efx_view] sync subscribe error: {e}")
+
+    def _rebuild_from_state(self):
+        """Liste aus self._instances neu aufbauen (nach Show-Load / Tab-Wechsel)."""
+        try:
+            prev = self._list.currentRow()
+            self._list.blockSignals(True)
+            self._list.clear()
+            for efx in self._instances:
+                self._list.addItem(efx.name)
+            self._list.blockSignals(False)
+            n = len(self._instances)
+            if n == 0:
+                self._current = None
+                self._preview.set_efx(None)
+                return
+            self._list.setCurrentRow(prev if 0 <= prev < n else 0)
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel gelöscht
+
+    def showEvent(self, event):
+        # Beim Sichtbarwerden aus dem geteilten State neu aufbauen, damit die
+        # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
+        super().showEvent(event)
+        self._rebuild_from_state()
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -238,20 +290,21 @@ class EfxView(QWidget):
     # ── List management ───────────────────────────────────────────────────────
 
     def _add_efx(self):
-        efx = EfxInstance(name=f"EFX {len(self._instances)+1}")
-        self._instances.append(efx)
+        efx = self._fm.new_efx(name=f"EFX {len(self._instances)+1}")
         self._list.addItem(efx.name)
         self._list.setCurrentRow(len(self._instances) - 1)
+        self._notify_change()
 
     def _delete_efx(self):
         row = self._list.currentRow()
-        if row < 0:
+        insts = self._instances
+        if row < 0 or row >= len(insts):
             return
-        self._instances[row].stop()
-        self._instances.pop(row)
+        self._fm.remove(insts[row].id)
         self._list.takeItem(row)
         self._current = None
         self._preview.set_efx(None)
+        self._notify_change()
 
     def _select_efx(self, row: int):
         if row < 0 or row >= len(self._instances):
@@ -304,11 +357,11 @@ class EfxView(QWidget):
 
     def _start_efx(self):
         if self._current:
-            self._current.start()
+            self._fm.start(self._current.id)
 
     def _stop_efx(self):
         if self._current:
-            self._current.stop()
+            self._fm.stop(self._current.id)
 
     def _add_fixture(self):
         if self._current is None:
@@ -318,7 +371,7 @@ class EfxView(QWidget):
             state = get_state()
             patched = state.get_patched_fixtures()
             if patched:
-                fid = patched[0]["id"]
+                fid = patched[0].fid
                 n = len(self._current.fixtures)
                 offset = n / max(len(patched), 1)
                 self._current.fixtures.append(EfxFixture(fid=fid, start_offset=offset))

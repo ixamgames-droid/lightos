@@ -23,6 +23,7 @@ import json
 import shutil
 import subprocess
 import platform
+import sysconfig
 import argparse
 import re
 from pathlib import Path
@@ -62,27 +63,85 @@ def check_python():
     info(f"Python {sys.version.split()[0]} OK")
 
 
+# IMAGE_FILE_MACHINE_* Konstanten (winnt.h) fuer IsWow64Process2.
+_IMAGE_MACHINE = {
+    0x0: "unknown",
+    0x14C: "x86",
+    0x1C4: "arm",     # ARMNT (32-bit)
+    0x8664: "x64",    # AMD64
+    0xAA64: "arm64",  # ARM64
+}
+
+
 def normalize_arch(raw: str | None) -> str:
     m = (raw or "").strip().lower()
-    if m in ("amd64", "x86_64"):
+    if m in ("amd64", "x86_64", "x64", "win-amd64"):
         return "x64"
-    if m in ("arm64", "aarch64"):
+    if m in ("arm64", "aarch64", "win-arm64"):
         return "arm64"
-    if m in ("x86", "i386"):
+    if m in ("x86", "i386", "win32"):
         return "x86"
     return m or "unknown"
 
 
-def detect_arch() -> str:
-    """Liefert 'x64' oder 'arm64' oder 'x86' oder 'unknown'."""
+def detect_python_arch() -> str:
+    """Architektur des LAUFENDEN Python-Interpreters (= welche Wheels gelten).
+
+    Nutzt sysconfig.get_platform() ('win-amd64' / 'win-arm64' / 'win32'), das auch
+    unter ARM64-Emulation korrekt den Interpreter-Build meldet. platform.machine()
+    ist hier unzuverlaessig (liefert auf emuliertem x64-Python teils 'ARM64').
+    """
+    plat = sysconfig.get_platform()
+    if plat == "win32":
+        return "x86"
+    if plat.startswith("win-"):
+        return normalize_arch(plat.split("-", 1)[1])
     return normalize_arch(platform.machine())
+
+
+# Rueckwaerts-kompatibler Alias: "die" Arch meint die des Interpreters.
+def detect_arch() -> str:
+    """Liefert 'x64' oder 'arm64' oder 'x86' oder 'unknown' (Interpreter-Arch)."""
+    return detect_python_arch()
+
+
+def _windows_native_machine() -> str | None:
+    """Native OS-Architektur via IsWow64Process2 (zuverlaessig auch unter Emulation).
+
+    Liefert None, wenn die API nicht verfuegbar ist oder der Aufruf scheitert.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k = ctypes.windll.kernel32
+        k.IsWow64Process2.restype = wintypes.BOOL
+        k.IsWow64Process2.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.USHORT),
+            ctypes.POINTER(wintypes.USHORT),
+        ]
+        proc = wintypes.USHORT(0)
+        native = wintypes.USHORT(0)
+        if not k.IsWow64Process2(
+            k.GetCurrentProcess(), ctypes.byref(proc), ctypes.byref(native)
+        ):
+            return None
+        arch = _IMAGE_MACHINE.get(native.value)
+        return arch if arch and arch != "unknown" else None
+    except Exception:
+        return None
 
 
 def detect_native_os_arch() -> str:
     """Liefert die native OS-Architektur (auf Windows auch unter Emulation korrekt)."""
     if os.name != "nt":
-        return detect_arch()
-    # Unter WOW64 ist PROCESSOR_ARCHITEW6432 gesetzt und zeigt auf die native Arch.
+        return normalize_arch(platform.machine())
+    native = _windows_native_machine()
+    if native:
+        return native
+    # Fallback: Umgebungsvariablen (klassisches WOW64 setzt PROCESSOR_ARCHITEW6432).
     return normalize_arch(
         os.environ.get("PROCESSOR_ARCHITEW6432")
         or os.environ.get("PROCESSOR_ARCHITECTURE")
@@ -210,6 +269,7 @@ def create_directories():
         APPDATA_DIR,
         APPDATA_DIR / "stages",
         APPDATA_DIR / "input_profiles",
+        APPDATA_DIR / "snaps",
     ]
     for d in dirs:
         if not d.exists():

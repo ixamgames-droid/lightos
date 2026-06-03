@@ -101,12 +101,24 @@ class PalettePage(QWidget):
         col_count = 6
         for idx, pal in enumerate(palettes):
             btn = PaletteButton(pal)
-            btn.clicked.connect(lambda checked=False, p=pal: p.apply_to_programmer())
+            btn.clicked.connect(lambda checked=False, p=pal: self._apply(p))
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.customContextMenuRequested.connect(
                 lambda pos, p=pal, b=btn: self._context(p, b)
             )
             self._grid.addWidget(btn, idx // col_count, idx % col_count)
+
+    def _target_fids(self) -> list[int] | None:
+        """Programmer-Auswahl (R2); None = alle Geräte (Fallback, wenn nichts gewählt)."""
+        try:
+            from src.core.app_state import get_state
+            fids = get_state().get_selected_fids()
+            return list(fids) if fids else None
+        except Exception:
+            return None
+
+    def _apply(self, pal: Palette):
+        pal.apply_to_programmer(self._target_fids())
 
     def _record_new(self):
         name, ok = QInputDialog.getText(self, "Palette aufzeichnen", "Name:")
@@ -120,7 +132,7 @@ class PalettePage(QWidget):
     def _context(self, pal: Palette, btn: PaletteButton):
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
-        menu.addAction("Anwenden").triggered.connect(pal.apply_to_programmer)
+        menu.addAction("Anwenden").triggered.connect(lambda: self._apply(pal))
         menu.addAction("Überschreiben (Programmer)").triggered.connect(
             lambda: (pal.record_from_programmer(), self._refresh())
         )

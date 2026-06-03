@@ -122,5 +122,53 @@ class RenderFrameTest(unittest.TestCase):
         self.assertEqual(self.live.get_channel(80), 99)    # weiterhin erhalten
 
 
+class BaseLevelsTest(unittest.TestCase):
+    """Sichert den Layer-Fix vom 2026-06-02 ab: Basis-Helligkeit macht eine
+    reine Farbe (color-only) sofort sichtbar, ein Dimmer-Effekt UEBERSCHREIBT die
+    Basis und kann bis 0 dunkeln (kein 'Lauflicht bleibt hell')."""
+
+    def setUp(self):
+        self._orig = A.get_channels_for_patched
+        A.get_channels_for_patched = lambda fx: [
+            _Ch("intensity", 1, 0), _Ch("color_r", 2, 0),
+            _Ch("color_g", 3, 0), _Ch("color_b", 4, 0),
+        ]
+        self.st = _make_state()
+        self.st.base_levels = {1: {"intensity": 255}}   # PAR "scharf"
+        self.st.submaster_level = 1.0
+        self.st.fixture_dimmers = {}
+        self.st._rebuild_render_plan()
+        self.live = self.st.universes[1]
+
+    def tearDown(self):
+        A.get_channels_for_patched = self._orig
+
+    def test_base_in_default_frame(self):
+        # Intensitaet (Kanal 1 -> Adresse 10) traegt die Basis 255.
+        self.assertEqual(self.st._default_frame[1][9], 255)
+
+    def test_color_only_instant_light(self):
+        # Nur Farbe im Programmer (keine Intensitaet) -> Basis macht hell.
+        self.st.programmer = {1: {"color_r": 255}}
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 255)   # Intensitaet aus Basis
+        self.assertEqual(self.live.get_channel(11), 255)   # Farbe gesetzt
+
+    def test_effect_overrides_base_to_zero(self):
+        # Ein Effekt, der die Intensitaet auf 0 zieht, gewinnt ueber die Basis —
+        # color-only Programmer leuchtet sie NICHT wieder hoch (der fruehere Bug).
+        self.st.programmer = {1: {"color_r": 255}}
+        self.st.function_manager.raw_addr = 10   # Intensitaets-Adresse
+        self.st.function_manager.raw_val = 0
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 0)
+
+    def test_submaster_dims_base_to_zero(self):
+        self.st.programmer = {1: {"color_r": 255}}
+        self.st.submaster_level = 0.0
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

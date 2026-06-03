@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, RunOrder, Direction
+from . import fade_curve as fc
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -17,6 +18,9 @@ class ChaserStep:
     hold: float = 1.0       # seconds (how long step stays at full)
     fade_out: float = 0.0   # seconds
     note: str = ""
+    # Fade-Kurven formen den Verlauf (wirken auf Scene-Children beim Einblenden).
+    fade_in_curve: fc.FadeCurve = field(default_factory=fc.linear)
+    fade_out_curve: fc.FadeCurve = field(default_factory=fc.linear)
 
     def total_duration(self) -> float:
         return self.fade_in + self.hold + self.fade_out
@@ -44,6 +48,12 @@ class Chaser(Function):
         self._visited: set[int] = set()  # for random
         self._pending_advance: bool = False  # set by trigger_next_step()
         self._beat_counter: int = 0     # zaehlt Beats fuer beats_per_step
+        # Crossfade-Status (EE-01): der Chaser blendet selbst zwischen den
+        # Schritten, weil der Per-Frame-Clear im Renderer ein Snapshotten des
+        # Vorgaengerwerts in der Scene unmoeglich macht. _from_values = der zuletzt
+        # ausgegebene Frame (Ausgangspunkt der Blende), _cur_output = aktueller Frame.
+        self._from_values: dict[tuple[int, int], int] = {}
+        self._cur_output: dict[tuple[int, int], int] = {}
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -56,6 +66,8 @@ class Chaser(Function):
         self._ping_pong_dir = 1 if self.direction == Direction.Forward else -1
         self._visited = set()
         self._beat_counter = 0
+        self._from_values = {}
+        self._cur_output = {}
         # Beat-getriggerte Chaser brauchen einen laufenden BPM-Takt — sonst
         # stehen sie still. Default 120 BPM starten, falls noch keine BPM gesetzt.
         if self.audio_triggered:
@@ -90,52 +102,124 @@ class Chaser(Function):
             return
 
         effective_dt = dt * self.speed
-        step = self.steps[self._step_idx]
-        total = step.total_duration()
-        if total <= 0:
-            total = 0.001
 
         if self.audio_triggered:
             # Step-Advance ist nur per Beat-Trigger
             if self._pending_advance:
                 self._pending_advance = False
+                self._from_values = dict(self._cur_output)
                 advanced = self._advance_step()
                 if not advanced:
                     self._running = False
                     return
-                step = self.steps[self._step_idx]
                 self._step_elapsed = 0.0
-            # Aktuelle Step laufen lassen (Scene write)
-            if function_registry:
-                child = function_registry.get(step.function_id)
-                if child is not None:
-                    child._running = True
-                    child._elapsed = self._step_elapsed
-                    child.write(universes, patch_cache, 0.0, function_registry)
-                    child._running = False
+            self._render_and_blend(universes, patch_cache, function_registry)
             self._step_elapsed += effective_dt
             self._elapsed += effective_dt
             return
 
-        # Run the child function for this step
-        if function_registry:
-            child = function_registry.get(step.function_id)
-            if child is not None:
-                # Ensure child is "running" for write to work
-                child._running = True
-                child._elapsed = self._step_elapsed
-                child.write(universes, patch_cache, 0.0, function_registry)
-                child._running = False
-
+        # Zeitbasiert: aktuellen Schritt rendern + ueber fade_in einblenden.
+        self._render_and_blend(universes, patch_cache, function_registry)
         self._step_elapsed += effective_dt
         self._elapsed += effective_dt
 
+        step = self.steps[self._step_idx]
+        total = step.total_duration()
+        if total <= 0:
+            total = 0.001
         # Advance step when duration elapses
         if self._step_elapsed >= total:
+            self._from_values = dict(self._cur_output)
             self._step_elapsed = 0.0
             advanced = self._advance_step()
             if not advanced:
                 self._running = False
+
+    # ── Crossfade-Rendering (EE-01) ────────────────────────────────────────────
+
+    def _render_and_blend(self, universes: dict[int, "Universe"],
+                          patch_cache: list["PatchedFixture"],
+                          function_registry: dict[int, Function] | None):
+        """Rendert den aktuellen Schritt und blendet ihn vom zuletzt
+        ausgegebenen Frame (_from_values) ueber step.fade_in weich ein.
+        Schreibt den Mischwert direkt in die Scratch-Universen und merkt sich
+        das Ergebnis als _cur_output fuer die naechste Blende."""
+        if not function_registry or not self.steps:
+            return
+        step = self.steps[self._step_idx]
+        child = function_registry.get(step.function_id)
+        target = self._render_child_target(
+            child, universes, patch_cache, function_registry)
+
+        # Blend-Fortschritt entlang fade_in (durch die Kurve geformt).
+        fade_in = max(0.0, float(getattr(step, "fade_in", 0.0)))
+        if fade_in <= 0.0:
+            t = 1.0
+        else:
+            frac = min(1.0, self._step_elapsed / fade_in)
+            curve = getattr(step, "fade_in_curve", None)
+            t = curve.eval(frac) if curve is not None else frac
+
+        out: dict[tuple[int, int], int] = {}
+        keys = set(target) | set(self._from_values)
+        for key in keys:
+            src = self._from_values.get(key, 0)
+            dst = target.get(key, 0)
+            val = int(round(src + (dst - src) * t))
+            val = 0 if val < 0 else (255 if val > 255 else val)
+            out[key] = val
+            u, addr = key
+            uni = universes.get(u)
+            if uni is not None and 1 <= addr <= 512:
+                uni.set_channel(addr, val)
+        self._cur_output = out
+
+    @staticmethod
+    def _render_child_target(child, universes, patch_cache, function_registry
+                             ) -> dict[tuple[int, int], int]:
+        """Liefert die Zielwerte {(univ, addr): value} des Schritt-Childs ohne
+        dessen eigene Blende. Trick: das Child wird in zwei Scratch-Kopien mit
+        unterschiedlichem Hintergrund (0x00 / 0xFF) gerendert — Kanaele, die in
+        beiden gleich sind, hat das Child absolut gesetzt; abweichende Kanaele
+        hat es unberuehrt gelassen. So lassen sich auch bewusst auf 0 gesetzte
+        Kanaele von nicht beschriebenen unterscheiden."""
+        from src.core.dmx.universe import Universe
+        if child is None:
+            return {}
+
+        def _render(bg: int) -> dict[int, bytes]:
+            temp = {}
+            for u in universes:
+                tu = Universe(u)
+                if bg:
+                    tu.set_range(1, bytes([bg]) * Universe.SIZE)
+                temp[u] = tu
+            saved_running = child._running
+            saved_elapsed = child._elapsed
+            saved_fade_in = getattr(child, "fade_in", None)
+            try:
+                child._running = True
+                if saved_fade_in is not None:
+                    child.fade_in = 0.0  # Chaser besitzt die Blende
+                child.write(temp, patch_cache, 0.0, function_registry)
+            except Exception:
+                pass
+            finally:
+                child._running = saved_running
+                child._elapsed = saved_elapsed
+                if saved_fade_in is not None:
+                    child.fade_in = saved_fade_in
+            return {u: tu.get_all() for u, tu in temp.items()}
+
+        a = _render(0x00)
+        b = _render(0xFF)
+        target: dict[tuple[int, int], int] = {}
+        for u, av in a.items():
+            bv = b.get(u, av)
+            for i in range(512):
+                if av[i] == bv[i]:  # vom Child absolut gesetzt
+                    target[(u, i + 1)] = av[i]
+        return target
 
     def _advance_step(self) -> bool:
         """Move to next step. Returns False if sequence is finished."""
@@ -191,16 +275,25 @@ class Chaser(Function):
             "audio_triggered": self.audio_triggered,
             "beats_per_step": self.beats_per_step,
             "steps": [
-                {
-                    "function_id": s.function_id,
-                    "fade_in": s.fade_in,
-                    "hold": s.hold,
-                    "fade_out": s.fade_out,
-                    "note": s.note,
-                }
+                self._step_to_dict(s)
                 for s in self.steps
             ],
         })
+        return d
+
+    @staticmethod
+    def _step_to_dict(s: "ChaserStep") -> dict:
+        d = {
+            "function_id": s.function_id,
+            "fade_in": s.fade_in,
+            "hold": s.hold,
+            "fade_out": s.fade_out,
+            "note": s.note,
+        }
+        if not s.fade_in_curve.is_linear_default():
+            d["fade_in_curve"] = s.fade_in_curve.to_dict()
+        if not s.fade_out_curve.is_linear_default():
+            d["fade_out_curve"] = s.fade_out_curve.to_dict()
         return d
 
     @classmethod
@@ -212,11 +305,16 @@ class Chaser(Function):
         c.audio_triggered = bool(d.get("audio_triggered", False))
         c.beats_per_step = int(d.get("beats_per_step", 1))
         for sd in d.get("steps", []):
-            c.steps.append(ChaserStep(
+            step = ChaserStep(
                 function_id=sd["function_id"],
                 fade_in=sd.get("fade_in", 0.0),
                 hold=sd.get("hold", 1.0),
                 fade_out=sd.get("fade_out", 0.0),
                 note=sd.get("note", ""),
-            ))
+            )
+            if "fade_in_curve" in sd:
+                step.fade_in_curve = fc.FadeCurve.from_dict(sd["fade_in_curve"])
+            if "fade_out_curve" in sd:
+                step.fade_out_curve = fc.FadeCurve.from_dict(sd["fade_out_curve"])
+            c.steps.append(step)
         return c

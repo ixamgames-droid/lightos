@@ -19,6 +19,8 @@ class Collection(Function):
     def __init__(self, name: str = "Neue Collection", fid: int | None = None):
         super().__init__(name, fid)
         self.function_ids: list[int] = []
+        self._registry: dict[int, Function] | None = None
+        self._started: set[int] = set()
 
     # ── Management ────────────────────────────────────────────────────────────
 
@@ -32,10 +34,20 @@ class Collection(Function):
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def _on_start(self):
-        pass
+        # Kinder werden beim ersten write() sauber gestartet (start() setzt
+        # _running=True, _elapsed=0 und ruft _on_start) — hier nur Tracking leeren.
+        self._started = set()
 
     def _on_stop(self):
-        pass
+        # Kinder ebenfalls stoppen, sonst laufen sie nach dem Collection-Stop
+        # weiter (Audit-Befund: child._running nie zurueckgesetzt).
+        reg = self._registry
+        if reg:
+            for fid in self.function_ids:
+                child = reg.get(fid)
+                if child is not None:
+                    child.stop()
+        self._started = set()
 
     # ── write ─────────────────────────────────────────────────────────────────
 
@@ -50,13 +62,19 @@ class Collection(Function):
 
         if function_registry is None:
             return
+        self._registry = function_registry
 
         for fid in self.function_ids:
             child = function_registry.get(fid)
-            if child is not None:
-                child._running = True
-                child._elapsed += dt
-                child.write(universes, patch_cache, dt, function_registry)
+            if child is None:
+                continue
+            # Beim ersten Frame sauber starten (Fade-In/Step-Reset). Danach nur
+            # write() aufrufen — das Child zaehlt _elapsed selbst hoch (kein
+            # doppeltes dt mehr).
+            if fid not in self._started:
+                child.start()
+                self._started.add(fid)
+            child.write(universes, patch_cache, dt, function_registry)
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

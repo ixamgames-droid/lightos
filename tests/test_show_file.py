@@ -56,12 +56,17 @@ class _FakeFunctionManager:
     def __init__(self):
         self.saved = {"functions": [{"id": 1, "name": "Scene 1", "type": "Scene"}]}
         self.loaded = None
+        self.added = []  # via add() migrierte Funktionen (z. B. Legacy-EFX/RGB)
 
     def to_dict(self):
         return self.saved
 
     def from_dict(self, d: dict):
         self.loaded = d
+
+    def add(self, f):
+        self.added.append(f)
+        return f
 
 
 class _FakeSync:
@@ -101,6 +106,8 @@ class _FakeState:
         self._patch_cache: list[_FakePatchedFixture] = []
         self.cue_stacks: list[_FakeCueStack] = []
         self.programmer = {}
+        self.base_levels = {}
+        self.render_rebuilds = 0
         self.function_manager = _FakeFunctionManager()
         self.sync = _FakeSync()
         self._efx_instances: list[_FakeEfxInstance] = []
@@ -120,6 +127,9 @@ class _FakeState:
 
     def clear_programmer(self):
         self.programmer.clear()
+
+    def _rebuild_render_plan(self):
+        self.render_rebuilds += 1
 
     def _emit(self, event: str, data=None):
         self.emitted.append((event, data))
@@ -198,6 +208,8 @@ class ShowFileTests(unittest.TestCase):
         ]
         self.state.cue_stacks = [_FakeCueStack("Main Stack")]
         self.state._vc_layout = {"page": 1}
+        # EFX/RGB-Matrix sind seit dem Programmer-Umbau echte Funktionen und
+        # werden NICHT mehr ueber State-Listen gespeichert (Bloecke bleiben leer).
         self.state._efx_instances = [_FakeEfxInstance("EFX A")]
         self.state._rgb_matrix_instances = [_FakeRgbMatrixInstance("RGB A")]
 
@@ -212,6 +224,9 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(data["patch"][0]["fixture_profile_id"], 100)
             self.assertIn("functions", data)
             self.assertNotIn("profile_id", data["patch"][0])
+            # Neuer Vertrag: separate Bloecke werden leer geschrieben.
+            self.assertEqual(data.get("efx", []), [])
+            self.assertEqual(data.get("rgb_matrix", []), [])
 
             # Dirty current state before load to ensure replacement.
             self.state._patch_cache = [_FakePatchedFixture(fid=999, label="Old")]
@@ -231,13 +246,59 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(self.state.cue_stacks[0].name, "Main Stack")
             self.assertEqual(self.state._vc_layout, {"page": 1})
             self.assertEqual(getattr(self.state, "_last_loaded_layout", {}), {"current_section": 3})
-            self.assertEqual(len(self.state._efx_instances), 1)
-            self.assertEqual(self.state._efx_instances[0].name, "EFX A")
-            self.assertEqual(len(self.state._rgb_matrix_instances), 1)
-            self.assertEqual(self.state._rgb_matrix_instances[0].name, "RGB A")
+            # State-Listen werden beim Laden geleert (Instanzen leben jetzt im
+            # FunctionManager). Keine Legacy-Bloecke in dieser Show -> keine
+            # Migration.
+            self.assertEqual(self.state._efx_instances, [])
+            self.assertEqual(self.state._rgb_matrix_instances, [])
+            self.assertEqual(self.state.function_manager.added, [])
             self.assertEqual(self.state.sync.refresh_count, 1)
             emitted_names = [ev[0] for ev in self.state.emitted]
             self.assertIn("show_loaded", emitted_names)
+
+    def test_legacy_efx_rgb_blocks_migrate_to_functions(self):
+        """Alt-Shows mit separaten efx/rgb_matrix-Bloecken werden beim Laden in
+        echte Funktionen (function_manager.add) migriert."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "legacy.lshow")
+            payload = {
+                "version": "1.1",
+                "name": "Legacy",
+                "patch": [],
+                "functions": {"functions": []},
+                "efx": [{"name": "Alt-EFX"}],
+                "rgb_matrix": [{"name": "Alt-RGB"}],
+            }
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("show.json", json.dumps(payload))
+
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+            added_names = sorted(getattr(f, "name", "") for f in
+                                 self.state.function_manager.added)
+            self.assertEqual(added_names, ["Alt-EFX", "Alt-RGB"])
+            # State-Listen bleiben leer — Migration geht in den FunctionManager.
+            self.assertEqual(self.state._efx_instances, [])
+            self.assertEqual(self.state._rgb_matrix_instances, [])
+
+    def test_base_levels_roundtrip(self):
+        """base_levels (z. B. PAR-Grundhelligkeit) wird gespeichert, beim Laden
+        wiederhergestellt und der Render-Plan neu gebaut."""
+        self.state.base_levels = {2: {"intensity": 255}, 3: {"intensity": 200}}
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "base.lshow")
+            self.show_file.save_show(path)
+            with zipfile.ZipFile(path, "r") as zf:
+                data = json.loads(zf.read("show.json").decode("utf-8"))
+            self.assertIn("base_levels", data)
+
+            self.state.base_levels = {}            # vor dem Laden verschmutzen
+            self.state.render_rebuilds = 0
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.state.base_levels,
+                             {2: {"intensity": 255}, 3: {"intensity": 200}})
+            self.assertGreaterEqual(self.state.render_rebuilds, 1)
 
     def test_load_legacy_patch_schema(self):
         legacy_payload = {
@@ -270,6 +331,106 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(fixtures[0].mode_name, "Basic")
             self.assertEqual(fixtures[0].universe, 2)
             self.assertEqual(fixtures[0].address, 50)
+
+
+class _FakeStateWithDB(_FakeState):
+    """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""
+
+    def __init__(self):
+        super().__init__()
+        from sqlalchemy import create_engine as _ce
+        from src.core.database.models import Base
+        from sqlalchemy.orm import Session as _Session
+        self._show_engine = _ce("sqlite:///:memory:", echo=False)
+        Base.metadata.create_all(self._show_engine)
+        self._Session = _Session
+
+    def _session(self):
+        return self._Session(self._show_engine)
+
+    def _flush_all_to_dmx(self):
+        pass
+
+
+class ResetGroupsTest(unittest.TestCase):
+    """Regressionstest: reset_show() leert Fixture-Gruppen in der Show-DB."""
+
+    def setUp(self):
+        self._orig_modules = {}
+        self.state = _FakeStateWithDB()
+        self.palette_manager = _FakePaletteManager()
+
+        from src.core.database.models import FixtureGroup as _RealFG
+
+        mod_app_state = types.ModuleType("src.core.app_state")
+        mod_app_state.get_state = lambda: self.state
+
+        mod_palette = types.ModuleType("src.core.engine.palette")
+        mod_palette.get_palette_manager = lambda: self.palette_manager
+
+        mod_cue_stack = types.ModuleType("src.core.engine.cue_stack")
+        mod_cue_stack.CueStack = _FakeCueStack
+
+        mod_models = types.ModuleType("src.core.database.models")
+        mod_models.PatchedFixture = _FakePatchedFixture
+        mod_models.FixtureGroup = _RealFG
+
+        mod_efx = types.ModuleType("src.core.engine.efx")
+        mod_efx.EfxInstance = _FakeEfxInstance
+
+        mod_rgb = types.ModuleType("src.core.engine.rgb_matrix")
+        mod_rgb.RgbMatrixInstance = _FakeRgbMatrixInstance
+
+        self._install_module("src.core.app_state", mod_app_state)
+        self._install_module("src.core.engine.palette", mod_palette)
+        self._install_module("src.core.engine.cue_stack", mod_cue_stack)
+        self._install_module("src.core.database.models", mod_models)
+        self._install_module("src.core.engine.efx", mod_efx)
+        self._install_module("src.core.engine.rgb_matrix", mod_rgb)
+
+        self.show_file = importlib.import_module("src.core.show.show_file")
+        self.show_file = importlib.reload(self.show_file)
+
+    def tearDown(self):
+        for name, old in self._orig_modules.items():
+            if old is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = old
+
+    def _install_module(self, name: str, module):
+        self._orig_modules[name] = sys.modules.get(name)
+        sys.modules[name] = module
+
+    def test_reset_show_clears_fixture_groups(self):
+        """Nach reset_show() darf keine FixtureGroup mehr in der DB vorhanden sein."""
+        from sqlalchemy import select
+        from src.core.database.models import FixtureGroup
+
+        # Gruppe anlegen
+        with self.state._session() as s:
+            s.add(FixtureGroup(name="T", cols=4, rows=1, positions_json="{}"))
+            s.commit()
+
+        # Sicherstellen, dass sie wirklich drin ist
+        with self.state._session() as s:
+            before = list(s.execute(select(FixtureGroup)).scalars())
+        self.assertEqual(len(before), 1)
+
+        # Dirty State vor Reset setzen
+        self.state.programmer = {"x": 1}
+        self.state.live_view_positions = {"1": {"x": 10, "y": 20}}
+
+        self.show_file.reset_show()
+
+        # Gruppen-Tabelle muss leer sein
+        with self.state._session() as s:
+            after = list(s.execute(select(FixtureGroup)).scalars())
+        self.assertEqual(after, [], "Fixture-Gruppen wurden nach reset_show() nicht geleert")
+
+        # Weitere Reset-Zustaende pruefen
+        self.assertEqual(self.state.programmer, {})
+        self.assertEqual(self.state.live_view_positions, {})
 
 
 if __name__ == "__main__":

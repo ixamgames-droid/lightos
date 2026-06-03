@@ -3,17 +3,14 @@
 
 Set-Location -Path $PSScriptRoot
 
-# Architektur erkennen (nur Info)
-$arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-Write-Host "[start] Arch: $arch"
+# Architektur erkennen (zuverlaessig, auch unter ARM64-Emulation)
+$osArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+$procArch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
+Write-Host "[start] OS-Arch: $osArch | Prozess-Arch: $procArch"
 
-# Hinweis, wenn auf ARM64 vermutlich ein emuliertes x64-Python genutzt wird
-$nativeArch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
-if ($nativeArch -eq "ARM64") {
-    $pyArch = $env:PROCESSOR_ARCHITECTURE
-    if ($pyArch -ne "ARM64") {
-        Write-Host "[start] WARN: Python scheint emuliert zu laufen. Fuer beste Stabilitaet/Performance ARM64-Python nutzen."
-    }
+# Hinweis, wenn auf ARM64 ein emuliertes (nicht-ARM64) Python genutzt wird
+if ($osArch -eq "Arm64" -and $procArch -ne "Arm64") {
+    Write-Host "[start] WARN: Python laeuft emuliert ($procArch auf ARM64). Fuer beste Stabilitaet/Performance ARM64-Python nutzen (winget install Python.Python.3.13 --arch arm64)."
 }
 
 # venv-Python suchen (Windows-Pfad ODER Unix-Pfad)

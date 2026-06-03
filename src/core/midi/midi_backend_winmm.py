@@ -9,11 +9,38 @@ Schnittstelle wie die rtmidi-Objekte in MidiManager:
 from __future__ import annotations
 import ctypes
 import ctypes.wintypes as _w
+import threading
 
+# Probe-Aufruf in einem Worker-Thread MIT TIMEOUT:
+# midiInGetNumDevs() kehrt normalerweise sofort zurueck. Ist das Windows-
+# MIDI-Subsystem aber festgefahren (klemmender USB-MIDI-Treiber, z.B. nach
+# einem USB-Freeze), blockiert der Aufruf UNBEGRENZT. Frueher lief er direkt
+# beim Import auf dem Hauptthread -> die ganze App fror schon vor dem ersten
+# Fenster ein ("nichts passiert"). Jetzt: max. 2 s warten; haengt der Aufruf,
+# wird MIDI deaktiviert und die App startet trotzdem (nur ohne MIDI, bis das
+# Geraet/der Treiber wieder gesund ist — Abhilfe: APC neu einstecken / reboot).
 try:
     _lib = ctypes.windll.winmm
-    _lib.midiInGetNumDevs()   # Probe-Aufruf
-    WINMM_OK = True
+    _probe_ok = {"v": False}
+
+    def _winmm_probe():
+        try:
+            _lib.midiInGetNumDevs()
+            _probe_ok["v"] = True
+        except Exception:
+            _probe_ok["v"] = False
+
+    _t = threading.Thread(target=_winmm_probe, name="WinMMProbe", daemon=True)
+    _t.start()
+    _t.join(2.0)
+    if _t.is_alive():
+        # Aufruf haengt weiter im (geleakten) Daemon-Thread -> MIDI aus, App lebt.
+        WINMM_OK = False
+        print("[winmm] midiInGetNumDevs() haengt (MIDI-Subsystem blockiert) "
+              "-> MIDI deaktiviert, App startet trotzdem. "
+              "Abhilfe: APC mini neu einstecken oder Windows neu starten.")
+    else:
+        WINMM_OK = bool(_probe_ok["v"])
 except Exception:
     WINMM_OK = False
     _lib = None

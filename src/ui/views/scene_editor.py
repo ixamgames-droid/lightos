@@ -45,6 +45,13 @@ class SceneEditor(QWidget):
         self._spin_fade_in.valueChanged.connect(self._on_timing_changed)
         timing_row.addWidget(self._spin_fade_in)
 
+        timing_row.addWidget(QLabel("Kurve:"))
+        from src.ui.widgets.curve_editor import CurveThumbnail
+        self._curve_thumb = CurveThumbnail(self._scene.fade_in_curve)
+        self._curve_thumb.setToolTip("Fade-In-Kurve – Klicken zum Bearbeiten")
+        self._curve_thumb.clicked.connect(self._edit_curve)
+        timing_row.addWidget(self._curve_thumb)
+
         timing_row.addWidget(QLabel("Fade Out:"))
         self._spin_fade_out = _make_time_spin()
         self._spin_fade_out.valueChanged.connect(self._on_timing_changed)
@@ -89,8 +96,18 @@ class SceneEditor(QWidget):
         self._spin_fade_in.setValue(self._scene.fade_in)
         self._spin_fade_out.setValue(self._scene.fade_out)
         self._spin_hold.setValue(self._scene.hold)
+        self._curve_thumb.set_curve(self._scene.fade_in_curve)
         self._rebuild_table()
         self._building = False
+
+    def _edit_curve(self):
+        from src.ui.widgets.curve_editor import CurveEditorDialog
+        from PySide6.QtWidgets import QDialog
+        dlg = CurveEditorDialog(self._scene.fade_in_curve,
+                                title="Fade-In-Kurve", parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+            self._scene.fade_in_curve = dlg.result_curve
+            self._curve_thumb.set_curve(dlg.result_curve)
 
     def _rebuild_table(self):
         """Build a row per fixture, a column per channel."""

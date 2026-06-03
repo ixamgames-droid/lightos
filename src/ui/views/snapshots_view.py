@@ -334,6 +334,32 @@ class SnapshotsView(QWidget):
                 b.refresh()
             self._save_to_disk()
 
+    # ── Show-Integration (pro Show statt global) ──────────────────────────────
+
+    def to_dict(self) -> list[dict]:
+        """Serialisiert alle Slots für die Show-Datei (.lshow)."""
+        return [s.to_dict() for s in self._snapshots]
+
+    def load_data(self, payload) -> None:
+        """Ersetzt die Slots aus Show-Daten und aktualisiert die Anzeige.
+
+        Wird beim Laden einer Show aufgerufen → Snapshots sind pro Show.
+        Leere/ungültige Payload setzt alle Slots zurück. Das Ergebnis wird
+        zusätzlich in die lokale Arbeitsdatei geschrieben (Live-Puffer).
+        """
+        new_list = [Snapshot() for _ in range(SNAPSHOT_TOTAL)]
+        if isinstance(payload, list):
+            for i in range(SNAPSHOT_TOTAL):
+                if i < len(payload) and isinstance(payload[i], dict):
+                    try:
+                        new_list[i] = Snapshot.from_dict(payload[i])
+                    except Exception:
+                        pass
+        self._snapshots = new_list
+        for b in self._buttons:
+            b.refresh()
+        self._save_to_disk()
+
     # ── Persistenz ───────────────────────────────────────────────────────────
 
     def _save_to_disk(self):

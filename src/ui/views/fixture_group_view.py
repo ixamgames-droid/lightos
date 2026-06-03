@@ -2,11 +2,11 @@
 from __future__ import annotations
 import json
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget, QTreeWidgetItem,
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
-    QFormLayout,
+    QFormLayout, QFrame, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QMimeData, QSize, QPoint
+from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, Signal
 from PySide6.QtGui import (
     QPainter, QColor, QPen, QDrag, QFont, QBrush,
 )
@@ -16,11 +16,127 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 
 
+# ── Floating Panel (Rastergröße) ──────────────────────────────────────────────
+
+class _FloatingGridPanel(QFrame):
+    """Schwebendes, ein-/ausklappbares, verschiebbares Panel für Rastergröße.
+
+    Lebt als Kind-Widget des rechten Container-Widgets über dem Raster.
+    """
+
+    def __init__(self, parent: QWidget = None):
+        super().__init__(parent)
+        self.setObjectName("floatingGridPanel")
+        self.setStyleSheet("""
+            #floatingGridPanel {
+                background: #23232e;
+                border: 1px solid #444;
+                border-radius: 6px;
+            }
+        """)
+        self._collapsed = False
+        self._drag_start: QPoint | None = None
+        self._panel_start: QPoint | None = None
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Header
+        self._header = QWidget()
+        self._header.setFixedHeight(24)
+        self._header.setStyleSheet("background: #2d2d3a; border-radius: 6px;")
+        self._header.setCursor(Qt.CursorShape.SizeAllCursor)
+        header_layout = QHBoxLayout(self._header)
+        header_layout.setContentsMargins(6, 0, 4, 0)
+        header_layout.setSpacing(4)
+
+        lbl = QLabel("Rastergröße")
+        lbl.setStyleSheet("color: #cccccc; font-size: 11px; font-weight: bold; background: transparent;")
+        header_layout.addWidget(lbl, 1)
+
+        self._btn_toggle = QPushButton("▾")
+        self._btn_toggle.setFixedSize(18, 18)
+        self._btn_toggle.setStyleSheet("""
+            QPushButton { background: transparent; color: #aaa; border: none; font-size: 11px; }
+            QPushButton:hover { color: #fff; }
+        """)
+        self._btn_toggle.clicked.connect(self._toggle_body)
+        header_layout.addWidget(self._btn_toggle)
+
+        layout.addWidget(self._header)
+
+        # Body mit Spinboxen
+        self._body = QWidget()
+        body_layout = QFormLayout(self._body)
+        body_layout.setContentsMargins(8, 6, 8, 6)
+        body_layout.setSpacing(4)
+
+        self.spin_cols = QSpinBox()
+        self.spin_cols.setRange(1, 64)
+        self.spin_cols.setValue(8)
+        self.spin_rows = QSpinBox()
+        self.spin_rows.setRange(1, 64)
+        self.spin_rows.setValue(8)
+
+        for sp in (self.spin_cols, self.spin_rows):
+            sp.setStyleSheet("""
+                QSpinBox { background: #1a1a26; color: #ddd;
+                           border: 1px solid #555; border-radius: 3px; padding: 1px 3px; }
+            """)
+
+        body_layout.addRow(QLabel("Spalten:"), self.spin_cols)
+        body_layout.addRow(QLabel("Zeilen:"), self.spin_rows)
+        for lbl_w in self._body.findChildren(QLabel):
+            lbl_w.setStyleSheet("color: #bbb; font-size: 11px;")
+
+        layout.addWidget(self._body)
+        self.adjustSize()
+
+    def _toggle_body(self):
+        self._collapsed = not self._collapsed
+        self._body.setVisible(not self._collapsed)
+        self._btn_toggle.setText("▸" if self._collapsed else "▾")
+        self.adjustSize()
+
+    # ── Drag to move ─────────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start = event.globalPosition().toPoint()
+            self._panel_start = self.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            delta = event.globalPosition().toPoint() - self._drag_start
+            new_pos = self._panel_start + delta
+            if self.parent():
+                pw, ph = self.parent().width(), self.parent().height()
+                new_x = max(0, min(new_pos.x(), pw - self.width()))
+                new_y = max(0, min(new_pos.y(), ph - self.height()))
+                self.move(new_x, new_y)
+            else:
+                self.move(new_pos)
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_start = None
+        self._panel_start = None
+        super().mouseReleaseEvent(event)
+
+
+# ── Grid Widget ───────────────────────────────────────────────────────────────
+
 class FixtureGridWidget(QWidget):
     """Custom widget that paints the 2D grid with placed fixtures.
 
-    Accepts drops from the fixture list (Mime type: application/x-fid).
+    Accepts drops from the fixture tree (Mime type: application/x-fid).
+    Also supports intra-grid drag: left-press on a filled cell starts an
+    internal move; release on empty cell = move, release on other cell = swap.
     """
+
+    positions_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -30,6 +146,11 @@ class FixtureGridWidget(QWidget):
         self.setMinimumSize(320, 320)
         self.setAcceptDrops(True)
         self._labels: dict[int, str] = {}
+
+        # Internal drag state
+        self._drag_from: tuple[int, int] | None = None
+        self._drag_fid: int | None = None
+        self._drag_current: tuple[int, int] | None = None  # for visual feedback
 
     def update_fixture_labels(self, labels: dict[int, str]):
         self._labels = labels
@@ -50,6 +171,12 @@ class FixtureGridWidget(QWidget):
         ch = self.height() / self.rows
         return cw, ch
 
+    def _cell_at(self, point: QPoint) -> tuple[int, int]:
+        cw, ch = self.cell_size()
+        col = int(point.x() // cw)
+        row = int(point.y() // ch)
+        return col, row
+
     def paintEvent(self, _ev):
         p = QPainter(self)
         p.fillRect(self.rect(), QColor("#181820"))
@@ -62,27 +189,46 @@ class FixtureGridWidget(QWidget):
         for r in range(self.rows + 1):
             y = int(r * ch)
             p.drawLine(0, y, self.width(), y)
-        # Placed fixtures
+
         font = QFont("Segoe UI", 9)
         font.setBold(True)
         p.setFont(font)
+
         for (c, r), fid in self.positions.items():
             x = c * cw
             y = r * ch
             rect = (int(x) + 2, int(y) + 2, int(cw) - 4, int(ch) - 4)
-            p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(QColor("#0978FF")))
+            # Highlight the cell being dragged internally
+            if self._drag_from and (c, r) == self._drag_from:
+                fill_color = QColor("#ff8c00")
+            else:
+                fill_color = QColor("#0978FF")
+            p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
-            label = self._labels.get(fid, str(fid))
+            p.setFont(font)
             p.drawText(rect[0], rect[1], rect[2], rect[3],
                        Qt.AlignmentFlag.AlignCenter, f"{fid}")
+            label = self._labels.get(fid, str(fid))
             small = QFont("Segoe UI", 7)
             p.setFont(small)
             p.drawText(rect[0], rect[1] + 14, rect[2], rect[3] - 14,
                        Qt.AlignmentFlag.AlignCenter, label[:8])
-            p.setFont(font)
+
+        # Visual feedback: highlight drop target during internal drag
+        if self._drag_from is not None and self._drag_current is not None:
+            tc, tr = self._drag_current
+            if (tc, tr) != self._drag_from and 0 <= tc < self.cols and 0 <= tr < self.rows:
+                tx = int(tc * cw) + 2
+                ty = int(tr * ch) + 2
+                tw = int(cw) - 4
+                th_ = int(ch) - 4
+                p.fillRect(tx, ty, tw, th_, QBrush(QColor(255, 140, 0, 80)))
+                p.setPen(QPen(QColor("#ff8c00"), 2))
+                p.drawRect(tx, ty, tw, th_)
+
         p.end()
 
-    # ── Drag & Drop ───────────────────────────────────────────────────────────
+    # ── External Drag & Drop (from fixture tree) ──────────────────────────────
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-fid"):
@@ -109,26 +255,96 @@ class FixtureGridWidget(QWidget):
             self.positions[(col, row)] = fid
             self.update()
             event.acceptProposedAction()
+            self.positions_changed.emit()
+
+    # ── Internal Drag (cell → cell: move or swap) ─────────────────────────────
 
     def mousePressEvent(self, event):
-        # Allow right-click to remove
         if event.button() == Qt.MouseButton.RightButton:
-            cw, ch = self.cell_size()
-            col = int(event.position().x() // cw)
-            row = int(event.position().y() // ch)
+            # Right-click: remove fixture from cell
+            col, row = self._cell_at(event.position().toPoint())
             if (col, row) in self.positions:
                 del self.positions[(col, row)]
                 self.update()
+                self.positions_changed.emit()
+            return
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            col, row = self._cell_at(event.position().toPoint())
+            if (col, row) in self.positions:
+                # Start internal drag
+                self._drag_from = (col, row)
+                self._drag_fid = self.positions[(col, row)]
+                self._drag_current = (col, row)
+                self.update()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_from is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            col, row = self._cell_at(event.position().toPoint())
+            self._drag_current = (col, row)
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._drag_from is not None:
+            col, row = self._cell_at(event.position().toPoint())
+            src = self._drag_from
+            fid = self._drag_fid
+
+            changed = False
+            if (col, row) != src and 0 <= col < self.cols and 0 <= row < self.rows:
+                if (col, row) not in self.positions:
+                    # Move to empty cell
+                    del self.positions[src]
+                    self.positions[(col, row)] = fid
+                    changed = True
+                else:
+                    # Swap with existing fixture
+                    other_fid = self.positions[(col, row)]
+                    self.positions[src] = other_fid
+                    self.positions[(col, row)] = fid
+                    changed = True
+
+            self._drag_from = None
+            self._drag_fid = None
+            self._drag_current = None
+            self.update()
+            if changed:
+                self.positions_changed.emit()
 
 
-class FixtureListWithDrag(QListWidget):
-    """QListWidget that supports starting a drag with the fixture id."""
+# ── Fixture Tree with Drag ────────────────────────────────────────────────────
+
+class FixtureTreeWithDrag(QTreeWidget):
+    """QTreeWidget mit Universe-Ordnern als Top-Level-Items.
+
+    Kind-Items (Fixtures) sind draggbar via Mime 'application/x-fid'.
+    Top-Level-Universe-Items sind NICHT draggbar.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setHeaderHidden(True)
+        self.setDragEnabled(True)
+        self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
+        self.setStyleSheet("""
+            QTreeWidget {
+                background: #1a1a26;
+                color: #cccccc;
+                border: 1px solid #333;
+                border-radius: 4px;
+            }
+            QTreeWidget::item:hover { background: #2a2a3a; }
+            QTreeWidget::item:selected { background: #0978FF; color: #fff; }
+        """)
 
     def startDrag(self, supportedActions):
         item = self.currentItem()
         if not item:
             return
-        fid = item.data(Qt.ItemDataRole.UserRole)
+        # Only child items (fixtures) are draggable — top-level = universe
+        if item.parent() is None:
+            return
+        fid = item.data(0, Qt.ItemDataRole.UserRole)
         if fid is None:
             return
         drag = QDrag(self)
@@ -137,6 +353,8 @@ class FixtureListWithDrag(QListWidget):
         drag.setMimeData(mime)
         drag.exec(Qt.DropAction.MoveAction)
 
+
+# ── Group View ────────────────────────────────────────────────────────────────
 
 class FixtureGroupView(QWidget):
     def __init__(self, parent=None):
@@ -168,7 +386,7 @@ class FixtureGroupView(QWidget):
         root = QHBoxLayout(self)
         root.setContentsMargins(6, 6, 6, 6)
 
-        # ── Left: group selector + fixtures ───────────────────────────────
+        # ── Left: group selector + fixture tree ───────────────────────────
         left = QVBoxLayout()
 
         grp_row = QHBoxLayout()
@@ -191,21 +409,9 @@ class FixtureGroupView(QWidget):
         btns.addWidget(b_save)
         left.addLayout(btns)
 
-        # Grid size config
-        size_box = QGroupBox("Rastergroesse")
-        size_form = QFormLayout(size_box)
-        self._spin_cols = QSpinBox(); self._spin_cols.setRange(1, 64); self._spin_cols.setValue(8)
-        self._spin_rows = QSpinBox(); self._spin_rows.setRange(1, 64); self._spin_rows.setValue(8)
-        self._spin_cols.valueChanged.connect(self._apply_grid_size)
-        self._spin_rows.valueChanged.connect(self._apply_grid_size)
-        size_form.addRow("Spalten:", self._spin_cols)
-        size_form.addRow("Zeilen:", self._spin_rows)
-        left.addWidget(size_box)
-
-        # Fixtures list
+        # Fixture tree (Universe-Ordner)
         left.addWidget(QLabel("Fixtures (drag auf Raster):"))
-        self._fixture_list = FixtureListWithDrag()
-        self._fixture_list.setDragEnabled(True)
+        self._fixture_list = FixtureTreeWithDrag()
         left.addWidget(self._fixture_list, 1)
 
         btn_refresh = QPushButton("Fixtures neu laden")
@@ -217,16 +423,52 @@ class FixtureGroupView(QWidget):
         left_w.setFixedWidth(260)
         root.addWidget(left_w)
 
-        # ── Right: grid ──────────────────────────────────────────────────
-        right = QVBoxLayout()
-        right.addWidget(QLabel("Raster (Drag&Drop fuer Platzierung, Rechtsklick zum Entfernen):"))
-        self._grid_widget = FixtureGridWidget()
-        right.addWidget(self._grid_widget, 1)
+        # ── Right: container with grid + floating panel ───────────────────
         right_w = QWidget()
-        right_w.setLayout(right)
+        right_w.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         root.addWidget(right_w, 1)
 
+        right_inner = QVBoxLayout(right_w)
+        right_inner.setContentsMargins(0, 0, 0, 0)
+        right_inner.addWidget(
+            QLabel("Raster (Drag&Drop fuer Platzierung, Rechtsklick zum Entfernen):"))
+
+        self._grid_widget = FixtureGridWidget(right_w)
+        self._grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        right_inner.addWidget(self._grid_widget, 1)
+
+        # Schwebende Rastergröße-Panel (Kind von right_w, schwebt über dem Grid)
+        self._float_panel = _FloatingGridPanel(right_w)
+        # Spinbox-Referenzen auf Attributnamen, die _apply_grid_size/_save_group/_load_group nutzen
+        self._spin_cols = self._float_panel.spin_cols
+        self._spin_rows = self._float_panel.spin_rows
+        self._spin_cols.valueChanged.connect(self._apply_grid_size)
+        self._spin_rows.valueChanged.connect(self._apply_grid_size)
+
+        # Signal: Raster-Änderungen → Hervorhebung aktualisieren
+        self._grid_widget.positions_changed.connect(self._highlight_group_members)
+
         self._refresh_fixtures()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_float_panel()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._reposition_float_panel()
+
+    def _reposition_float_panel(self):
+        """Floating Panel oben rechts im right_w positionieren."""
+        panel = self._float_panel
+        parent = panel.parent()
+        if parent is None:
+            return
+        panel.adjustSize()
+        pw = parent.width()
+        x = max(0, pw - panel.width() - 8)
+        panel.move(x, 8)
+        panel.raise_()
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -237,14 +479,59 @@ class FixtureGroupView(QWidget):
         return Session(eng)
 
     def _refresh_fixtures(self):
-        labels = {}
+        """Baut den Universe-Baum neu auf und aktualisiert Grid-Labels."""
+        labels: dict[int, str] = {}
+        fixtures = self._state.get_patched_fixtures()
+
+        # Gruppiere nach Universe
+        by_universe: dict[int, list] = {}
+        for f in fixtures:
+            by_universe.setdefault(f.universe, []).append(f)
+        for uni_list in by_universe.values():
+            uni_list.sort(key=lambda fx: fx.address)
+
         self._fixture_list.clear()
-        for f in self._state.get_patched_fixtures():
-            item = QListWidgetItem(f"[{f.fid:03d}] {f.label}")
-            item.setData(Qt.ItemDataRole.UserRole, f.fid)
-            self._fixture_list.addItem(item)
-            labels[f.fid] = f.label
+        for uni_num in sorted(by_universe.keys()):
+            uni_item = QTreeWidgetItem(self._fixture_list, [f"Universe {uni_num}"])
+            uni_item.setFlags(uni_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            uni_item.setExpanded(True)
+            for f in by_universe[uni_num]:
+                # Konstruktor mit uni_item als Parent hängt das Kind bereits ein
+                # (kein zusätzliches addChild → sonst qWarning "already owned").
+                child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {f.label}"])
+                child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
+                labels[f.fid] = f.label
+
         self._grid_widget.update_fixture_labels(labels)
+        self._highlight_group_members()
+
+    def _highlight_group_members(self):
+        """Hebt Fixture-Items hervor, die im aktuellen Raster platziert sind."""
+        active_fids = set(self._grid_widget.positions.values())
+
+        accent_bg = QColor("#1f6feb")
+        accent_fg = QColor("#ffffff")
+        normal_bg = QColor(0, 0, 0, 0)  # transparent
+        normal_fg = QColor("#cccccc")
+
+        bold_font = QFont("Segoe UI", 9)
+        bold_font.setBold(True)
+        normal_font = QFont("Segoe UI", 9)
+
+        root = self._fixture_list.invisibleRootItem()
+        for i in range(root.childCount()):
+            uni_item = root.child(i)
+            for j in range(uni_item.childCount()):
+                child = uni_item.child(j)
+                fid = child.data(0, Qt.ItemDataRole.UserRole)
+                if fid in active_fids:
+                    child.setBackground(0, QBrush(accent_bg))
+                    child.setForeground(0, QBrush(accent_fg))
+                    child.setFont(0, bold_font)
+                else:
+                    child.setBackground(0, QBrush(normal_bg))
+                    child.setForeground(0, QBrush(normal_fg))
+                    child.setFont(0, normal_font)
 
     def _reload_group_list(self):
         self._combo_group.blockSignals(True)
@@ -306,6 +593,7 @@ class FixtureGroupView(QWidget):
         self._grid_widget.set_grid(g.cols, g.rows)
         self._grid_widget.positions = positions
         self._grid_widget.update()
+        self._highlight_group_members()
 
     def _new_group(self):
         name, ok = QInputDialog.getText(self, "Neue Gruppe", "Name:")
@@ -368,7 +656,12 @@ class FixtureGroupView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
 
+    def _group_fids(self) -> list[int]:
+        """Fids der aktuell im Raster platzierten Fixtures der Gruppe."""
+        return list(self._grid_widget.positions.values())
+
     def _apply_grid_size(self, *_):
         c = self._spin_cols.value()
         r = self._spin_rows.value()
         self._grid_widget.set_grid(c, r)
+        self._highlight_group_members()
