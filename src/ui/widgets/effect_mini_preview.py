@@ -11,9 +11,9 @@ src/core/engine/rgb_matrix.py (gleiches Modell wie die RGB-Matrix-Vorschau).
 from __future__ import annotations
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPainter, QColor
+from PySide6.QtGui import QPainter, QColor, QPen
 
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, Color
+from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, Color, is_gap
 
 
 class _DemoGrid(QWidget):
@@ -41,16 +41,24 @@ class _DemoGrid(QWidget):
             return
         cw = (self.width() - 8) / cols
         ch = (self.height() - 8) / rows
+        grid_assign = self._inst.fixture_grid
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
                 if idx >= len(self._grid):
                     break
-                r, g, b = self._grid[idx]
                 x = int(4 + col * cw)
                 y = int(4 + row * ch)
-                p.fillRect(x, y, max(1, int(cw) - 1), max(1, int(ch) - 1),
-                           QColor(r, g, b))
+                w = max(1, int(cw) - 1)
+                h = max(1, int(ch) - 1)
+                if is_gap(grid_assign, idx):
+                    # Luecke bleibt sichtbar leer (kein Effekt-Output).
+                    p.fillRect(x, y, w, h, QColor("#0d1117"))
+                    p.setPen(QPen(QColor("#30363d"), 1, Qt.PenStyle.DotLine))
+                    p.drawRect(x, y, w - 1, h - 1)
+                    continue
+                r, g, b = self._grid[idx]
+                p.fillRect(x, y, w, h, QColor(r, g, b))
         p.end()
 
 

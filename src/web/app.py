@@ -104,7 +104,7 @@ def _register_routes(app):
         data = request.get_json(silent=True) or {}
         value = int(data.get("value", 0))
         state = _get_state()
-        if universe in state.universes:
+        if universe in state.universes and 1 <= channel <= 512:
             state.universes[universe].set_channel(channel, max(0, min(255, value)))
         return jsonify({"ok": True})
 

@@ -18,44 +18,65 @@ _PREAMBLE = bytes([
 ])
 
 
+# E1.31 / ACN vectors
+_VECTOR_ROOT_E131_DATA = 0x00000004
+_VECTOR_E131_DATA_PACKET = 0x00000002
+_VECTOR_DMP_SET_PROPERTY = 0x02
+_DMP_ADDR_DATA_TYPE = 0xA1   # 1-byte addressing, increment 1
+_E131_DEFAULT_PRIORITY = 100
+
+# PDU-Flags: oberes Nibble 0x7 (Längen/Vector/Header-Flags gesetzt), die unteren
+# 12 Bit tragen die PDU-Länge (inkl. des Flags+Length-Feldes selbst).
+_PDU_FLAGS = 0x7000
+
+
 def _pack_framing(data: bytes, universe: int, seq: int, source: str, cid: bytes) -> bytes:
-    """Build a complete sACN (E1.31) packet for one universe."""
-    # DMP layer (with 513-byte property block: startcode 0x00 + 512 DMX bytes)
-    dmp_flags = 0x70A0 | (len(data) + 11)
-    dmp_layer = struct.pack(
-        "!HBHHHB",
-        dmp_flags,   # Flags+Length (DMP layer)
-        0x02,        # Vector: DMP_VECTOR_SET_PROPERTY
-        0xA100,      # Address type + first property addr
-        0x0001,      # Address increment
-        len(data) + 1,  # Property count
-        0x00,        # Start code
-    ) + data
+    """Baut ein spec-konformes sACN-(E1.31-)Datenpaket fuer ein Universum.
 
-    # Framing layer
-    source_enc = source.encode("utf-8")[:64].ljust(64, b"\x00")
-    fl_flags = 0x70000000 | (len(dmp_layer) + 77)
-    fl_layer = struct.pack(
-        "!IBBB64sBBH",
-        fl_flags,
-        0x00000002,   # E1.31 vector
-        0x00, 0x00,   # reserved
-        source_enc,
-        0x64,         # Priority
-        0x00,         # Synchronization address
-        seq & 0xFF,   # Sequence
-    ) + struct.pack("!BH", 0x00, universe) + dmp_layer
+    Layout (ANSI E1.31-2018) fuer 512 DMX-Kanaele = 638 Byte:
+      Root-Layer   38B = Preamble/ACN-ID 16 + Flags&Len 2 + Vector 4 + CID 16
+      Framing-Lay. 77B = Flags&Len 2 + Vector 4 + Source 64 + Prio 1 +
+                          SyncAddr 2 + Seq 1 + Options 1 + Universe 2
+      DMP-Layer   523B = Flags&Len 2 + Vector 1 + AddrType 1 + FirstAddr 2 +
+                          AddrIncr 2 + PropCount 2 + (Startcode 1 + 512 DMX)
+    """
+    n = len(data)
+    prop_count = n + 1                 # Startcode + DMX-Slots
+    dmp_len = 10 + prop_count          # DMP-Header (10) + Property-Block
+    framing_len = 77 + dmp_len         # Framing-Header (77) + DMP-PDU
+    root_len = 22 + framing_len        # Flags&Len 2 + Vector 4 + CID 16 + Framing
 
-    # Root layer
-    pdu_len = len(fl_layer) + len(_PREAMBLE) + 6
-    root_flags = 0x70000000 | pdu_len
-    root_layer = (
-        _PREAMBLE
-        + cid
-        + struct.pack("!I", root_flags | 0x00000004)
-        + fl_layer
-    )
-    return root_layer
+    # Root-Layer
+    root = bytearray()
+    root += _PREAMBLE                                       # 16B Preamble + ACN-ID
+    root += struct.pack("!H", _PDU_FLAGS | root_len)        # Flags & Length
+    root += struct.pack("!I", _VECTOR_ROOT_E131_DATA)       # Vector (4B)
+    root += cid                                             # CID (16B)
+
+    # Framing-Layer
+    source_enc = source.encode("utf-8")[:63].ljust(64, b"\x00")  # null-terminiert
+    framing = bytearray()
+    framing += struct.pack("!H", _PDU_FLAGS | framing_len)  # Flags & Length
+    framing += struct.pack("!I", _VECTOR_E131_DATA_PACKET)  # Vector (4B)
+    framing += source_enc                                   # Source Name (64B)
+    framing += struct.pack("!B", _E131_DEFAULT_PRIORITY)    # Priority
+    framing += struct.pack("!H", 0x0000)                    # Synchronization Address
+    framing += struct.pack("!B", seq & 0xFF)                # Sequence Number
+    framing += struct.pack("!B", 0x00)                      # Options
+    framing += struct.pack("!H", universe & 0xFFFF)         # Universe
+
+    # DMP-Layer
+    dmp = bytearray()
+    dmp += struct.pack("!H", _PDU_FLAGS | dmp_len)          # Flags & Length
+    dmp += struct.pack("!B", _VECTOR_DMP_SET_PROPERTY)      # Vector (1B)
+    dmp += struct.pack("!B", _DMP_ADDR_DATA_TYPE)           # Address & Data Type
+    dmp += struct.pack("!H", 0x0000)                        # First Property Address
+    dmp += struct.pack("!H", 0x0001)                        # Address Increment
+    dmp += struct.pack("!H", prop_count)                    # Property Value Count
+    dmp += b"\x00"                                          # DMX Start Code
+    dmp += data                                             # DMX-Slots
+
+    return bytes(root + framing + dmp)
 
 
 class SACNSender:
@@ -95,7 +116,10 @@ class SACNSender:
         if self._target_ip:
             dest = (self._target_ip, SACN_PORT)
         else:
-            dest = (f"{SACN_MULTICAST_BASE}{universe}", SACN_PORT)
+            # E1.31 Multicast: 239.255.<Universe-High>.<Universe-Low>
+            hi = (universe >> 8) & 0xFF
+            lo = universe & 0xFF
+            dest = (f"239.255.{hi}.{lo}", SACN_PORT)
 
         try:
             self._sock.sendto(packet, dest)

@@ -58,6 +58,9 @@ def _make_state(effect_active=True):
     st._patch_cache = [fx]
     st.submaster_level = 1.0
     st.fixture_dimmers = {}
+    import threading as _t, types as _ty
+    st._prog_lock = _t.RLock()             # set_programmer_value/_render_frame
+    st.output_manager = _ty.SimpleNamespace(set_gm_address_mask=lambda m: None)
     return st
 
 

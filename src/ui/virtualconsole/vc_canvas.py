@@ -2,8 +2,8 @@
 from __future__ import annotations
 import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
-                                QMessageBox, QInputDialog, QSizePolicy)
-from PySide6.QtCore import Qt, QPoint, QSize, Signal
+                                QMessageBox, QInputDialog, QSizePolicy, QRubberBand)
+from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction
 
 from .vc_widget import VCWidget
@@ -20,6 +20,7 @@ def _register():
     from .vc_speedial import VCSpeedDial
     from .vc_frame    import VCFrame
     from .vc_color    import VCColor
+    from .vc_encoder  import VCEncoder
     WIDGET_REGISTRY.update({
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
@@ -27,6 +28,7 @@ def _register():
         "VCLabel":    VCLabel,
         "VCCueList":  VCCueList,
         "VCSpeedDial":VCSpeedDial,
+        "VCEncoder":  VCEncoder,
         "VCColor":    VCColor,
         "VCFrame":    VCFrame,
     })
@@ -43,7 +45,9 @@ class VCCanvas(QWidget):
     midi_learn_done = Signal()          # MIDI-Learn für Button abgeschlossen
     snapshot_assign_done = Signal()     # Snapshot-Assign abgeschlossen
     function_assign_done = Signal()     # Funktions-Assign abgeschlossen
+    snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
+    area_selected = Signal(str, int, int, int, int)  # (tool, x, y, w, h) aufgezogener Bereich
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
     # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
@@ -59,6 +63,7 @@ class VCCanvas(QWidget):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
         self._bg = QColor("#0d1117")
+        self.setAcceptDrops(True)
 
         # MIDI-Learn-Modus
         self._midi_learn_btn = None       # VCButton das auf MIDI wartet
@@ -67,7 +72,13 @@ class VCCanvas(QWidget):
         self._assign_snapshot_index: int | None = None  # welcher Snap zugewiesen wird
         # Funktions-Assign-Modus (Effekt/Matrix/Scene auf VC-Button legen)
         self._assign_function_id: int | None = None
+        # Bibliothek-Snap-Assign-Modus (Farbe/Look auf VC-Button legen)
+        self._assign_snap_id: int | None = None
         self._awaiting_button_click_for: str | None = None
+        # Canvas-Editor: Bereich aufziehen (Rubber-Band) fuer z. B. Color-Chase
+        self._area_tool: str | None = None
+        self._area_origin: QPoint | None = None
+        self._rubber: QRubberBand | None = None
 
         # MIDI aus dem Dispatch-Thread sicher in den UI-Thread marshallen.
         # (Cross-Thread-Signal -> automatisch QueuedConnection -> _handle_midi laeuft im UI-Thread)
@@ -236,9 +247,31 @@ class VCCanvas(QWidget):
         self._awaiting_button_click_for = None
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
+    # ── Bibliothek-Snap-Assign-Modus ──────────────────────────────────────────
+
+    def start_snap_assign(self, snap_id: int):
+        """Aktiviert Assign-Modus: naechster Klick auf einen VCButton macht ihn
+        zur Farb-/Snap-Taste fuer den gewaehlten Bibliothek-Snap."""
+        self._assign_snap_id = snap_id
+        self._awaiting_button_click_for = "library_snap"
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def cancel_snap_assign(self):
+        self._assign_snap_id = None
+        self._awaiting_button_click_for = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
     # ── Mausereignisse für Learn/Assign ──────────────────────────────────────
 
     def mousePressEvent(self, event):
+        # Canvas-Editor: Bereich aufziehen (nur wenn ein Area-Tool armiert ist).
+        if self._area_tool and self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
+            self._area_origin = event.position().toPoint()
+            if self._rubber is None:
+                self._rubber = QRubberBand(QRubberBand.Shape.Rectangle, self)
+            self._rubber.setGeometry(QRect(self._area_origin, QSize()))
+            self._rubber.show()
+            return
         mode = getattr(self, "_awaiting_button_click_for", None)
         if mode and event.button() == Qt.MouseButton.LeftButton:
             child = self.childAt(event.position().toPoint())
@@ -288,14 +321,56 @@ class VCCanvas(QWidget):
                         self.setCursor(Qt.CursorShape.ArrowCursor)
                         self.function_assign_done.emit()
                         return
+                    elif mode == "library_snap":
+                        self._assign_snap_to_button(btn, self._assign_snap_id)
+                        self._assign_snap_id = None
+                        self._awaiting_button_click_for = None
+                        self.setCursor(Qt.CursorShape.ArrowCursor)
+                        self.snap_assign_done.emit()
+                        return
 
             # Klick ins Leere bricht Modus ab
             self.cancel_midi_learn()
             self.cancel_snapshot_assign()
             self.cancel_function_assign()
+            self.cancel_snap_assign()
             return
 
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._rubber is not None and self._area_origin is not None:
+            self._rubber.setGeometry(QRect(self._area_origin,
+                                           event.position().toPoint()).normalized())
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._rubber is not None and self._area_origin is not None:
+            rect = QRect(self._area_origin, event.position().toPoint()).normalized()
+            tool = self._area_tool
+            self._rubber.hide()
+            self._area_origin = None
+            self._area_tool = None          # Tool nach einem Zug wieder entwaffnen
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            if rect.width() >= 60 and rect.height() >= 60:
+                self.area_selected.emit(tool or "", rect.x(), rect.y(),
+                                        rect.width(), rect.height())
+            return
+        super().mouseReleaseEvent(event)
+
+    def arm_area_tool(self, name: str):
+        """Aktiviert das Aufziehen eines Bereichs (z. B. 'color_chase'). Der naechste
+        Maus-Zug auf der Canvas loest ``area_selected`` aus."""
+        self._area_tool = name
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
+    def cancel_area_tool(self):
+        self._area_tool = None
+        self._area_origin = None
+        if self._rubber is not None:
+            self._rubber.hide()
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
@@ -310,6 +385,192 @@ class VCCanvas(QWidget):
         grid = self.GRID if enabled else 0
         for child in self.findChildren(VCWidget):
             child.set_snap_grid(grid)
+
+    # ── Drag & Drop ──────────────────────────────────────────────────────────
+
+    _MIME_FUNCTION = "application/x-lightos-function"
+    _MIME_SNAPSHOT  = "application/x-lightos-snapshot"
+    _MIME_SNAP      = "application/x-lightos-snap"   # Bibliothek-Snap (Farbe/Look)
+
+    def _accepts(self, md) -> bool:
+        return (md.hasFormat(self._MIME_FUNCTION)
+                or md.hasFormat(self._MIME_SNAPSHOT)
+                or md.hasFormat(self._MIME_SNAP))
+
+    def dragEnterEvent(self, event):
+        if self._accepts(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self._accepts(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        if not self._edit_mode:
+            event.ignore()
+            return
+
+        md = event.mimeData()
+        pos = event.position().toPoint()
+
+        # Ziel-Widget unter dem Mauszeiger suchen (wie in mousePressEvent)
+        from .vc_button import VCButton
+        from .vc_slider import VCSlider
+        target = None
+        child = self.childAt(pos)
+        if child is not None:
+            if isinstance(child, (VCButton, VCSlider)):
+                target = child
+            else:
+                p = child.parent()
+                while p is not None and not isinstance(p, VCCanvas):
+                    if isinstance(p, (VCButton, VCSlider)):
+                        target = p
+                        break
+                    p = p.parent()
+
+        if md.hasFormat(self._MIME_FUNCTION):
+            try:
+                fid = int(md.data(self._MIME_FUNCTION).data().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                event.ignore()
+                return
+            self.apply_drop(function_id=fid, pos=pos, target=target)
+
+        elif md.hasFormat(self._MIME_SNAPSHOT):
+            try:
+                idx = int(md.data(self._MIME_SNAPSHOT).data().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                event.ignore()
+                return
+            self.apply_drop(snapshot_index=idx, pos=pos, target=target)
+
+        elif md.hasFormat(self._MIME_SNAP):
+            try:
+                sid = int(md.data(self._MIME_SNAP).data().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                event.ignore()
+                return
+            self.apply_drop(snap_id=sid, pos=pos, target=target)
+
+        else:
+            event.ignore()
+            return
+
+        event.acceptProposedAction()
+
+    # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
+
+    def apply_drop(self, *, function_id=None, snapshot_index=None, snap_id=None,
+                   pos=None, target=None):
+        """Fuehrt den Drop aus: Funktion, Snapshot oder Bibliothek-Snap (Farbe/Look)
+        auf ein Ziel-Widget oder das leere Canvas anwenden.
+
+        Args:
+            function_id:    Funktions-ID eines Effekts/Matrix/Scene (oder None).
+            snapshot_index: Snapshot-Index (oder None).
+            snap_id:        Bibliothek-Snap-ID (Farbe/Look) (oder None).
+            pos:            QPoint der Drop-Position (benoetigt wenn target None).
+            target:         VCButton oder VCSlider unter dem Mauszeiger, oder None
+                            fuer leeres Canvas.
+        Reihenfolge der Prioritaet: function_id > snapshot_index > snap_id.
+        """
+        from .vc_button import VCButton, ButtonAction
+        from .vc_slider import VCSlider, SliderMode
+
+        if function_id is not None:
+            # Funktionsnamen fuer Caption ermitteln
+            fn_name: str | None = None
+            try:
+                from src.core.engine.function_manager import get_function_manager
+                fn = get_function_manager().get(function_id)
+                fn_name = fn.name if fn is not None else None
+            except Exception:
+                pass
+
+            if isinstance(target, VCSlider):
+                # Effekt-Parameter-Fader konfigurieren
+                target.mode = SliderMode.EFFECT_PARAM
+                target.function_id = function_id
+                try:
+                    from src.core.engine import effect_live
+                    default_key = effect_live.default_param_key(function_id)
+                    if default_key:
+                        target.param_key = default_key
+                except Exception:
+                    pass
+                if fn_name and getattr(target, "caption", None) in (None, "", "Fader"):
+                    target.caption = fn_name
+                target.update()
+
+            elif isinstance(target, VCButton):
+                # Vorhandenen Button auf Funktion umbiegen
+                target.action = ButtonAction.FUNCTION_TOGGLE
+                target.function_id = function_id
+                if fn_name and getattr(target, "caption", None) in (None, "", "Button"):
+                    target.caption = fn_name
+                target.update()
+
+            else:
+                # Leeres Canvas → neuen Button anlegen
+                drop_pos = pos if pos is not None else QPoint(40, 40)
+                w = self._add_widget("VCButton", drop_pos)
+                if w is not None:
+                    w.action = ButtonAction.FUNCTION_TOGGLE
+                    w.function_id = function_id
+                    if fn_name:
+                        w.caption = fn_name
+                    w.setVisible(self.on_active_bank(w))
+                    w.show()
+
+        elif snapshot_index is not None:
+            if isinstance(target, VCButton):
+                target.action = ButtonAction.SNAPSHOT
+                target.snapshot_index = snapshot_index
+                target.update()
+
+            else:
+                drop_pos = pos if pos is not None else QPoint(40, 40)
+                w = self._add_widget("VCButton", drop_pos)
+                if w is not None:
+                    w.action = ButtonAction.SNAPSHOT
+                    w.snapshot_index = snapshot_index
+                    w.setVisible(self.on_active_bank(w))
+                    w.show()
+
+        elif snap_id is not None:
+            if isinstance(target, VCButton):
+                self._assign_snap_to_button(target, snap_id)
+            else:
+                drop_pos = pos if pos is not None else QPoint(40, 40)
+                w = self._add_widget("VCButton", drop_pos)
+                if w is not None:
+                    self._assign_snap_to_button(w, snap_id)
+                    w.setVisible(self.on_active_bank(w))
+                    w.show()
+
+    def _assign_snap_to_button(self, btn, snap_id):
+        """Macht einen VCButton zur Bibliothek-Farb-/Snap-Taste (Standard: Umschalten).
+        Setzt die Beschriftung auf den Snap-Namen, wenn noch generisch."""
+        from .vc_button import ButtonAction
+        if snap_id is None:
+            return
+        btn.action = ButtonAction.LIBRARY_SNAP
+        btn.snap_id = int(snap_id)
+        btn._snap_active = False
+        btn._snap_prev = {}
+        try:
+            from src.core.engine.snap_library import get_snap_library
+            snap = get_snap_library().get(int(snap_id))
+            if snap is not None and getattr(btn, "caption", None) in (None, "", "Button"):
+                btn.caption = snap.name
+        except Exception:
+            pass
+        btn.update()
 
     # ── Context menu ─────────────────────────────────────────────────────────
 

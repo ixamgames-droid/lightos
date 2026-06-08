@@ -1,353 +1,65 @@
-"""Virtual Console tab — toolbar + canvas + Snapshot-Sidebar."""
+"""Virtual Console tab — toolbar + canvas + Bibliothek-Sidebar."""
 from __future__ import annotations
-import os
-import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QPushButton,
-    QLabel, QSizePolicy, QSplitter, QListWidget, QListWidgetItem,
-    QFrame, QMenu
+    QLabel, QSizePolicy, QSplitter,
 )
 from PySide6.QtCore import Qt, QPoint, QSize, QTimer
-from PySide6.QtGui import QColor, QCursor
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 
-_SNAPSHOTS_FILE = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
-)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Snapshot-Sidebar
+#  Bibliothek-Sidebar (Show-Bibliothek → VC-Tasten)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SnapshotSidebar(QWidget):
-    """Rechte Seitenleiste mit der Snapshot-Übersicht."""
+    """Rechte Seitenleiste: die Show-Bibliothek (Farben/Snaps + Effekte/Funktionen
+    in einer gemeinsamen Ordnerstruktur). Eintraege lassen sich per Ziehen auf das
+    Canvas oder per Rechtsklick -> „Auf VC-Taste legen" direkt auf eine Taste legen
+    (VC-Patching). Programmierte Snapshots (Vollbilder) bleiben ueber den
+    Button-Dialog unter „Snapshot" erreichbar.
+    """
 
     def __init__(self, canvas: VCCanvas, parent=None):
         super().__init__(parent)
         self._canvas = canvas
-        self._assign_snap_idx: int | None = None
         self._setup_ui()
-        self.setMinimumWidth(180)
-        self.setMaximumWidth(280)
+        self.setMinimumWidth(200)
+        self.setMaximumWidth(340)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(4)
 
-        # Header
-        hdr = QLabel("Snapshots")
+        hdr = QLabel("Bibliothek")
         hdr.setStyleSheet(
-            "color:#ffd700; font-weight:bold; font-size:12px; padding:2px 0;"
-        )
+            "color:#ffd700; font-weight:bold; font-size:12px; padding:2px 0;")
+        hdr.setToolTip("Farben/Snaps (gelb) und Effekte/Funktionen (farbig) dieser Show")
         layout.addWidget(hdr)
 
-        btn_refresh = QPushButton("Aktualisieren")
-        btn_refresh.setFixedHeight(22)
-        btn_refresh.setStyleSheet(
-            "QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;"
-            " border-radius:3px; font-size:10px; }"
-            "QPushButton:hover { background:#30363d; color:#e6edf3; }"
-        )
-        btn_refresh.clicked.connect(self.refresh)
-        layout.addWidget(btn_refresh)
+        hint = QLabel("Eintrag auf eine Taste ziehen –\noder Rechtsklick → „Auf VC-Taste legen\".")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#8b949e; font-size:10px; padding-bottom:2px;")
+        layout.addWidget(hint)
 
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color:#30363d;")
-        layout.addWidget(sep)
+        # Gemeinsame Bibliothek (snap_file_panel) im Drag-auf-Canvas-Modus
+        # wiederverwenden — eine Quelle fuer Programmer UND Virtual Console.
+        from src.ui.views.snap_file_panel import SnapFilePanel
+        self._panel = SnapFilePanel(drag_to_canvas=True, canvas=self._canvas)
+        layout.addWidget(self._panel, 1)
 
-        # Liste
-        self._list = QListWidget()
-        self._list.setStyleSheet(
-            "QListWidget { background:#0d1117; border:1px solid #21262d;"
-            " color:#c9d1d9; font-size:11px; }"
-            "QListWidget::item { padding:6px 4px; border-bottom:1px solid #21262d; }"
-            "QListWidget::item:selected { background:#1f6feb; color:#ffffff; }"
-            "QListWidget::item:hover { background:#21262d; }"
-        )
-        self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._list.customContextMenuRequested.connect(self._context_menu)
-        self._list.itemDoubleClicked.connect(self._on_double_click)
-        layout.addWidget(self._list, 1)
-
-        # Buttons unten
-        btn_apply = QPushButton("Apply")
-        btn_apply.setFixedHeight(26)
-        btn_apply.setToolTip("Ausgewählten Snapshot in den Programmer laden")
-        btn_apply.setStyleSheet(
-            "QPushButton { background:#1f6feb; color:#fff; border:none;"
-            " border-radius:3px; font-size:10px; }"
-            "QPushButton:hover { background:#388bfd; }"
-        )
-        btn_apply.clicked.connect(self._apply_selected)
-        layout.addWidget(btn_apply)
-
-        btn_assign = QPushButton("→ VC-Button zuweisen")
-        btn_assign.setFixedHeight(26)
-        btn_assign.setToolTip(
-            "Assigns den ausgewählten Snapshot dem nächsten angeklickten VC-Button"
-        )
-        btn_assign.setStyleSheet(
-            "QPushButton { background:#2a3344; color:#ffd700; border:1px solid #4f6391;"
-            " border-radius:3px; font-size:10px; }"
-            "QPushButton:hover { background:#364463; }"
-            "QPushButton:checked { background:#ffd700; color:#000; }"
-        )
-        btn_assign.setCheckable(True)
-        btn_assign.clicked.connect(self._on_assign_clicked)
-        self._btn_assign = btn_assign
-        layout.addWidget(btn_assign)
-
-        # ── Funktionen (Effekte / Matrix / Scenes / Chaser) ────────────────────
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color:#30363d;")
-        layout.addWidget(sep2)
-
-        hdr2 = QLabel("Funktionen")
-        hdr2.setStyleSheet(
-            "color:#9DFF52; font-weight:bold; font-size:12px; padding:2px 0;")
-        hdr2.setToolTip("Gespeicherte Effekte, Matrix, Scenes und Chaser dieser Show")
-        layout.addWidget(hdr2)
-
-        self._fn_list = QListWidget()
-        self._fn_list.setStyleSheet(
-            "QListWidget { background:#0d1117; border:1px solid #21262d;"
-            " color:#c9d1d9; font-size:11px; }"
-            "QListWidget::item { padding:5px 4px; border-bottom:1px solid #21262d; }"
-            "QListWidget::item:selected { background:#2ea043; color:#ffffff; }"
-            "QListWidget::item:hover { background:#21262d; }"
-        )
-        self._fn_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._fn_list.customContextMenuRequested.connect(self._fn_context_menu)
-        self._fn_list.itemDoubleClicked.connect(self._on_fn_double_click)
-        layout.addWidget(self._fn_list, 1)
-
-        btn_fn_toggle = QPushButton("Start / Stop")
-        btn_fn_toggle.setFixedHeight(26)
-        btn_fn_toggle.setToolTip("Ausgewählte Funktion starten bzw. stoppen (zum Testen)")
-        btn_fn_toggle.setStyleSheet(
-            "QPushButton { background:#238636; color:#fff; border:none;"
-            " border-radius:3px; font-size:10px; }"
-            "QPushButton:hover { background:#2ea043; }")
-        btn_fn_toggle.clicked.connect(self._toggle_selected_function)
-        layout.addWidget(btn_fn_toggle)
-
-        btn_fn_assign = QPushButton("→ VC-Button zuweisen")
-        btn_fn_assign.setFixedHeight(26)
-        btn_fn_assign.setToolTip(
-            "Weist die ausgewählte Funktion dem nächsten angeklickten VC-Button zu")
-        btn_fn_assign.setStyleSheet(
-            "QPushButton { background:#2a3344; color:#9DFF52; border:1px solid #3a6b3a;"
-            " border-radius:3px; font-size:10px; }"
-            "QPushButton:hover { background:#364463; }"
-            "QPushButton:checked { background:#9DFF52; color:#000; }")
-        btn_fn_assign.setCheckable(True)
-        btn_fn_assign.clicked.connect(self._on_fn_assign_clicked)
-        self._btn_fn_assign = btn_fn_assign
-        layout.addWidget(btn_fn_assign)
-
-        self.refresh()
-
-    # ── Daten ────────────────────────────────────────────────────────────────
+    # ── Kompatible API (von VirtualConsoleView aufgerufen) ────────────────────
 
     def refresh(self):
-        self._list.clear()
         try:
-            with open(_SNAPSHOTS_FILE, encoding="utf-8") as f:
-                payload = json.load(f)
-            if not isinstance(payload, list):
-                return
-            for i, s in enumerate(payload):
-                if not s or not s.get("values"):
-                    continue
-                name = s.get("name") or f"Snap {i + 1}"
-                count = len(s.get("values", {}))
-                item = QListWidgetItem(f"{i + 1}:  {name}\n        ({count} Fixtures)")
-                item.setData(Qt.ItemDataRole.UserRole, i)
-                self._list.addItem(item)
-        except Exception:
+            self._panel._refresh_tree()
+        except (RuntimeError, AttributeError):
             pass
-        self.refresh_functions()
-
-    # ── Funktionen ─────────────────────────────────────────────────────────────
-
-    # Kurze, sprechende Typ-Labels für die Liste.
-    _FN_TYPE_LABEL = {
-        "Scene": "Scene", "Chaser": "Chaser", "RGBMatrix": "Matrix",
-        "EFX": "Effekt", "Sequence": "Seq", "Collection": "Coll",
-        "Audio": "Audio", "Script": "Script", "Show": "Show",
-    }
 
     def refresh_functions(self):
-        if not hasattr(self, "_fn_list"):
-            return
-        # Auswahl merken, damit Start/Stop die Selektion nicht verliert.
-        prev_fid = self._selected_function_id()
-        self._fn_list.clear()
-        try:
-            from src.core.engine.function_manager import get_function_manager
-            fm = get_function_manager()
-            funcs = fm.all()
-        except Exception:
-            return
-        # Nach Typ, dann Name sortieren — übersichtliche Gruppen.
-        def _key(f):
-            return (f.function_type.value, (f.name or "").lower())
-        restore_row = -1
-        for row, f in enumerate(sorted(funcs, key=_key)):
-            try:
-                tlabel = self._FN_TYPE_LABEL.get(
-                    f.function_type.value, f.function_type.value)
-                running = " ●" if fm.is_running(f.id) else ""
-                item = QListWidgetItem(f"[{tlabel}] {f.name}{running}")
-                item.setData(Qt.ItemDataRole.UserRole, f.id)
-                self._fn_list.addItem(item)
-                if f.id == prev_fid:
-                    restore_row = row
-            except Exception:
-                continue
-        if restore_row >= 0:
-            self._fn_list.setCurrentRow(restore_row)
-
-    def _selected_function_id(self):
-        item = self._fn_list.currentItem()
-        if item is None:
-            return None
-        return item.data(Qt.ItemDataRole.UserRole)
-
-    def _toggle_selected_function(self):
-        fid = self._selected_function_id()
-        if fid is None:
-            return
-        try:
-            from src.core.engine.function_manager import get_function_manager
-            fm = get_function_manager()
-            if fm.is_running(fid):
-                fm.stop(fid)
-            else:
-                fm.start(fid)
-        except Exception as e:
-            print(f"[Sidebar] Funktion toggeln fehlgeschlagen: {e}")
-        self.refresh_functions()
-
-    def _on_fn_double_click(self, item: QListWidgetItem):
-        self._toggle_selected_function()
-
-    def _fn_context_menu(self, pos: QPoint):
-        item = self._fn_list.itemAt(pos)
-        if item is None:
-            return
-        fid = item.data(Qt.ItemDataRole.UserRole)
-        menu = QMenu(self)
-        menu.addAction("Start / Stop").triggered.connect(self._toggle_selected_function)
-        menu.addAction("Diesem VC-Button zuweisen →").triggered.connect(
-            lambda: self._start_fn_assign(fid))
-        menu.exec(QCursor.pos())
-
-    def _on_fn_assign_clicked(self, checked: bool):
-        if not checked:
-            self._canvas.cancel_function_assign()
-            return
-        fid = self._selected_function_id()
-        if fid is None:
-            self._btn_fn_assign.setChecked(False)
-            return
-        self._start_fn_assign(fid)
-
-    def _start_fn_assign(self, fid):
-        self._canvas.start_function_assign(fid)
-        self._canvas.function_assign_done.connect(self._on_fn_assign_done)
-        self._btn_fn_assign.setChecked(True)
-
-    def _on_fn_assign_done(self):
-        self._btn_fn_assign.setChecked(False)
-        try:
-            self._canvas.function_assign_done.disconnect(self._on_fn_assign_done)
-        except Exception:
-            pass
-
-    def _selected_index(self) -> int | None:
-        item = self._list.currentItem()
-        if item is None:
-            return None
-        return item.data(Qt.ItemDataRole.UserRole)
-
-    # ── Apply ────────────────────────────────────────────────────────────────
-
-    def _apply_selected(self):
-        idx = self._selected_index()
-        if idx is None:
-            return
-        self._apply_snapshot(idx)
-
-    def _on_double_click(self, item: QListWidgetItem):
-        idx = item.data(Qt.ItemDataRole.UserRole)
-        self._apply_snapshot(idx)
-
-    def _apply_snapshot(self, index: int):
-        try:
-            with open(_SNAPSHOTS_FILE, encoding="utf-8") as f:
-                payload = json.load(f)
-            if not isinstance(payload, list) or index >= len(payload):
-                return
-            snap_data = payload[index]
-            if not snap_data:
-                return
-            raw = snap_data.get("values", {})
-            from src.core.app_state import get_state
-            state = get_state()
-            for k, attrs in raw.items():
-                for attr, val in attrs.items():
-                    try:
-                        state.set_programmer_value(int(k), attr, int(val))
-                    except Exception:
-                        pass
-        except Exception as e:
-            print(f"[SnapshotSidebar] Apply-Fehler: {e}")
-
-    # ── Assign to Button ─────────────────────────────────────────────────────
-
-    def _on_assign_clicked(self, checked: bool):
-        if not checked:
-            self._canvas.cancel_snapshot_assign()
-            return
-        idx = self._selected_index()
-        if idx is None:
-            self._btn_assign.setChecked(False)
-            return
-        self._canvas.start_snapshot_assign(idx)
-        # Button automatisch zurücksetzen wenn fertig
-        self._canvas.snapshot_assign_done.connect(self._on_assign_done)
-
-    def _on_assign_done(self):
-        self._btn_assign.setChecked(False)
-        try:
-            self._canvas.snapshot_assign_done.disconnect(self._on_assign_done)
-        except Exception:
-            pass
-
-    # ── Kontext-Menü ─────────────────────────────────────────────────────────
-
-    def _context_menu(self, pos: QPoint):
-        item = self._list.itemAt(pos)
-        if item is None:
-            return
-        idx = item.data(Qt.ItemDataRole.UserRole)
-        menu = QMenu(self)
-        menu.addAction("Apply (in Programmer laden)").triggered.connect(
-            lambda: self._apply_snapshot(idx))
-        menu.addAction("Diesem VC-Button zuweisen →").triggered.connect(
-            lambda: self._start_assign(idx))
-        menu.exec(QCursor.pos())
-
-    def _start_assign(self, idx: int):
-        self._canvas.start_snapshot_assign(idx)
-        self._canvas.snapshot_assign_done.connect(self._on_assign_done)
-        self._btn_assign.setChecked(True)
+        self.refresh()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -418,6 +130,7 @@ class VirtualConsoleView(QWidget):
             ("XY Pad",    "VCXYPad"),
             ("Cue List",  "VCCueList"),
             ("SpeedDial", "VCSpeedDial"),
+            ("Encoder",   "VCEncoder"),
             ("Farbe",     "VCColor"),
             ("Label",     "VCLabel"),
             ("Frame",     "VCFrame"),
@@ -436,6 +149,22 @@ class VirtualConsoleView(QWidget):
             btn.setProperty("edit_only", True)
             btn.setVisible(False)
             tb_layout.addWidget(btn)
+
+        # Editor-Bausteine: Controller-Vorlage + Color-Chase-Baukasten (edit-only)
+        for _lbl, _slot in [("⌗ Controller", self._insert_controller_template),
+                            ("🎨 Color-Chase", self._insert_color_chase_kit),
+                            ("🟦 Chase-Bereich", self._arm_chase_area)]:
+            eb = QPushButton(_lbl)
+            eb.setFixedHeight(26)
+            eb.setStyleSheet("""
+                QPushButton { background:#21262d; color:#58d68d; border:1px solid #30363d;
+                              border-radius:3px; font-size:10px; padding:0 8px; }
+                QPushButton:hover { background:#30363d; color:#e6edf3; }
+            """)
+            eb.clicked.connect(lambda checked=False, s=_slot: s())
+            eb.setProperty("edit_only", True)
+            eb.setVisible(False)
+            tb_layout.addWidget(eb)
 
         tb_layout.addSpacing(16)
 
@@ -608,6 +337,7 @@ class VirtualConsoleView(QWidget):
         self._canvas = VCCanvas()
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
+        self._canvas.area_selected.connect(self._on_area_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
         splitter.addWidget(self._main_scroll)
@@ -816,6 +546,115 @@ class VirtualConsoleView(QWidget):
             return
         center = QPoint(self._canvas.width() // 2, self._canvas.height() // 2)
         self._canvas._add_widget(wtype, center)
+
+    def _insert_widgets(self, dicts) -> int:
+        """Fuegt vorkonfigurierte Widget-Dicts auf die aktuell sichtbare Bank ein."""
+        if not self._edit_mode or not self._canvas_alive():
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Bearbeiten noetig",
+                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann erneut einfuegen.")
+            return 0
+        from PySide6.QtCore import QPoint
+        bank = self._canvas.active_bank
+        n = 0
+        for wd in dicts:
+            d = dict(wd)
+            d["bank"] = bank          # auf die gerade sichtbare Seite legen
+            w = self._canvas._add_widget(d.get("type", "VCButton"),
+                                         QPoint(d.get("x", 0), d.get("y", 0)), d)
+            if w is not None:
+                n += 1
+        return n
+
+    def _insert_controller_template(self):
+        """Toolbar: ein MIDI-Panel als beschriftetes Raster auf die aktuelle Seite legen."""
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        from src.ui.virtualconsole.controller_templates import controller_template, CONTROLLERS
+        keys = list(CONTROLLERS.keys())
+        labels = [CONTROLLERS[k]["label"] for k in keys]
+        label, ok = QInputDialog.getItem(self, "Controller-Vorlage",
+                                         "MIDI-Controller waehlen:", labels, 0, False)
+        if not ok:
+            return
+        kind = keys[labels.index(label)]
+        n = self._insert_widgets(controller_template(kind))
+        if n:
+            QMessageBox.information(self, "Controller-Vorlage",
+                                   f"{n} Elemente eingefuegt. Pads per Rechtsklick mit "
+                                   "Funktionen/Farben belegen, Fader-Modus im Properties-Dialog.")
+
+    def _insert_color_chase_kit(self):
+        """Toolbar: einen wiederverwendbaren Live-Color-Chase-Baustein einfuegen
+        (legt zugleich eine COLORFADE-Funktion an, gebunden an die Pads/Fader)."""
+        from PySide6.QtWidgets import QMessageBox
+        from src.ui.virtualconsole.controller_templates import color_chase_kit
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            from src.core.engine.rgb_matrix import RgbAlgorithm
+            from src.core.app_state import get_state
+            fm = get_function_manager()
+            m = fm.new_rgb_matrix("Color-Chase")
+            m.algorithm = RgbAlgorithm.COLORFADE
+            m.matrix_speed = 2.0
+            m.params = {"hold": 0.25}
+            fids = [f.fid for f in get_state().get_patched_fixtures()]
+            if fids:
+                m.fixture_grid = fids
+                m.cols, m.rows = len(fids), 1
+        except Exception as e:
+            QMessageBox.warning(self, "Fehler",
+                                f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
+            return
+        n = self._insert_widgets(color_chase_kit(m.id))
+        if n:
+            QMessageBox.information(self, "Color-Chase-Baukasten",
+                                   f"{n} Elemente + Funktion 'Color-Chase' angelegt.\n"
+                                   "Ablauf: Clear -> Farben antippen -> Start. "
+                                   "Den Pads/Fadern per 'MIDI Lernen' APC-Tasten zuweisen.")
+
+    def _new_colorfade_function(self):
+        """Legt eine COLORFADE-RGB-Matrix ueber die gepatchten Fixtures an (Chase-Ziel)."""
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.rgb_matrix import RgbAlgorithm
+        from src.core.app_state import get_state
+        fm = get_function_manager()
+        m = fm.new_rgb_matrix("Color-Chase")
+        m.algorithm = RgbAlgorithm.COLORFADE
+        m.matrix_speed = 2.0
+        m.params = {"hold": 0.25}
+        fids = [f.fid for f in get_state().get_patched_fixtures()]
+        if fids:
+            m.fixture_grid = fids
+            m.cols, m.rows = len(fids), 1
+        return m
+
+    def _arm_chase_area(self):
+        """Toolbar: Aufzieh-Modus an — der naechste Maus-Zug auf der Canvas spannt
+        einen Bereich auf, in den ein Live-Color-Chase eingesetzt wird."""
+        from PySide6.QtWidgets import QMessageBox
+        if not self._edit_mode or not self._canvas_alive():
+            QMessageBox.information(self, "Bearbeiten noetig",
+                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann einen Bereich aufziehen.")
+            return
+        self._canvas.arm_area_tool("color_chase")
+
+    def _on_area_selected(self, tool, x, y, w, h):
+        """Callback: aufgezogener Bereich -> Color-Chase hineinlegen (+ Funktion anlegen)."""
+        if tool != "color_chase" or not self._canvas_alive():
+            return
+        from PySide6.QtWidgets import QMessageBox
+        from src.ui.virtualconsole.controller_templates import color_chase_kit_in_rect
+        try:
+            m = self._new_colorfade_function()
+        except Exception as e:
+            QMessageBox.warning(self, "Fehler",
+                                f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
+            return
+        n = self._insert_widgets(color_chase_kit_in_rect(m.id, x, y, w, h))
+        if n:
+            QMessageBox.information(self, "Color-Chase-Bereich",
+                                   f"{n} Elemente im Bereich + Funktion 'Color-Chase' angelegt.\n"
+                                   "Clear -> Farben antippen -> Start. Per 'MIDI Lernen' zuweisen.")
 
     def _clear_all(self):
         if self._edit_mode:

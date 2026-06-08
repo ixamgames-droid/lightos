@@ -29,6 +29,12 @@ class OutputManager:
         self._tick_callbacks: list = []   # callables(dt: float)
         self.grand_master: float = 1.0  # 0.0–1.0 — globale Helligkeit
         self._gm_callbacks: list = []   # callables(value: float)
+        # Adressen je Universum, die der Grand-Master skalieren darf (Intensitaet/
+        # Farbe — NICHT Pan/Tilt/Gobo). Wird vom AppState aus dem Patch gesetzt
+        # (_rebuild_render_plan). Universen OHNE Eintrag (rein roh/ungepatcht)
+        # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
+        # global dimmen. {universe:int -> frozenset[addr 1..512]}
+        self._gm_address_mask: dict[int, frozenset] = {}
 
     # ── Grand Master ─────────────────────────────────────────────────────────
 
@@ -44,6 +50,12 @@ class OutputManager:
     def subscribe_grand_master(self, cb):
         if cb not in self._gm_callbacks:
             self._gm_callbacks.append(cb)
+
+    def set_gm_address_mask(self, mask: dict[int, frozenset]):
+        """Setzt je Universum die Adressen, die der Grand-Master skalieren darf
+        (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
+        aus dem Patch gepflegt."""
+        self._gm_address_mask = mask or {}
 
     def add_tick_callback(self, cb):
         """Register a callable(dt) that is called each output frame."""
@@ -151,8 +163,10 @@ class OutputManager:
             time.sleep(sleep)
 
     def _send_all(self):
-        # Drive all registered tick callbacks first (function_manager, etc.)
-        for cb in self._tick_callbacks:
+        # Drive all registered tick callbacks first (function_manager, etc.).
+        # Ueber eine Kopie iterieren: add_/remove_tick_callback laufen im UI-Thread
+        # und koennen die Liste waehrenddessen mutieren (list changed size).
+        for cb in list(self._tick_callbacks):
             try:
                 cb(FRAME_INTERVAL)
             except Exception:
@@ -170,7 +184,20 @@ class OutputManager:
                 data = bytes(512)
             elif self.grand_master < 0.999:
                 gm = self.grand_master
-                data = bytes(min(255, int(b * gm + 0.5)) for b in data)
+                mask = self._gm_address_mask.get(univ_num)
+                if mask is None:
+                    # Ungepatchtes/rohes Universum: kein Adresswissen -> global
+                    # dimmen wie bisher (Roh-DMX-Setups behalten ihren GM).
+                    data = bytes(min(255, int(b * gm + 0.5)) for b in data)
+                else:
+                    # Nur Intensitaets-/Farbadressen skalieren; Pan/Tilt/Gobo/
+                    # Prism/Shutter bleiben unangetastet (sonst fahren Moving Heads
+                    # bei GM<100% auf falsche Positionen — Audit B4).
+                    buf = bytearray(data)
+                    for addr in mask:
+                        if 1 <= addr <= 512:
+                            buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
+                    data = bytes(buf)
             # Geraete-Zugriff unter Lock: verhindert, dass der UI-Thread ein
             # Geraet schliesst/austauscht, waehrend wir hier senden (Deadlock).
             with self._io_lock:

@@ -18,6 +18,13 @@ from .vc_widget import VCWidget
 class ColorTarget(str):
     PROGRAMMER = "Programmer/Selektion"
     ALL = "Alle Fixtures"
+    # Phase 6: setzt live die aktuell ausgewaehlte Farbe der Color-Sequence eines
+    # Effekts (gebundene function_id oder aktiver Effekt) — Live-Farbsteuerung.
+    EFFECT = "Effekt (aktive Farbe)"
+    # Live-Color-Chase: HAENGT diese Farbe an die Color-Sequence des Ziel-Effekts
+    # an (statt die aktive zu ersetzen) — so baut man per Pad-Druck eine Farbliste
+    # zusammen, durch die ein COLORFADE/CHASE-Effekt dann durchlaeuft.
+    EFFECT_ADD = "Effekt (Farbe hinzufuegen)"
 
 
 class VCColor(VCWidget):
@@ -36,6 +43,8 @@ class VCColor(VCWidget):
         self.with_intensity = True
         self.intensity = 255
         self.target = ColorTarget.PROGRAMMER
+        # Phase 6: Ziel-Effekt fuer ColorTarget.EFFECT (None = aktiver Effekt).
+        self.function_id: int | None = None
 
         # MIDI-Bindung (-1 = keine) — identisch zu VCButton
         self.midi_ch: int = 0
@@ -72,6 +81,24 @@ class VCColor(VCWidget):
         return out
 
     def _apply(self):
+        if self.target == ColorTarget.EFFECT_ADD:
+            # Live-Color-Chase: Farbe an die Color-Sequence des Ziel-Effekts anhaengen.
+            try:
+                from src.core.engine import effect_live
+                effect_live.do_action("add_color", self.function_id,
+                                      rgb=(self.color_r, self.color_g, self.color_b))
+            except Exception as e:
+                print(f"[VCColor] effect add color error: {e}")
+            return
+        if self.target == ColorTarget.EFFECT:
+            # Phase 6: Live in die aktive Sequence-Farbe des Effekts faerben.
+            try:
+                from src.core.engine import effect_live
+                effect_live.set_selected_color(
+                    (self.color_r, self.color_g, self.color_b), self.function_id)
+            except Exception as e:
+                print(f"[VCColor] effect color error: {e}")
+            return
         try:
             from src.core.app_state import get_state
             state = get_state()
@@ -233,6 +260,32 @@ class VCColor(VCWidget):
         _refresh_swatch()
         form.addRow("Farbe:", btn_color)
 
+        # WP-9: gespeicherte Farb-Paletten (im Programmer aufgezeichnet) direkt
+        # waehlbar. Liste wird bei JEDEM Oeffnen frisch geladen -> neu gespeicherte
+        # Farben erscheinen sofort (kein Neuladen/Neustart noetig).
+        pal_cb = QComboBox()
+        pal_cb.addItem("— gespeicherte Farbe wählen —", None)
+        try:
+            from src.core.engine.palette import get_palette_manager, PaletteType
+            for p in get_palette_manager().get_by_type(PaletteType.COLOR):
+                pal_cb.addItem(p.name, p)
+        except Exception as e:
+            print(f"[VCColor] palette list error: {e}")
+
+        def _pick_palette(idx):
+            p = pal_cb.itemData(idx)
+            if p is None:
+                return
+            vals = getattr(p, "values", {}) or {}
+            self.color_r = int(vals.get("color_r", self.color_r))
+            self.color_g = int(vals.get("color_g", self.color_g))
+            self.color_b = int(vals.get("color_b", self.color_b))
+            _refresh_swatch()
+            if cap.text().strip() in ("", "Farbe"):
+                cap.setText(p.name)
+        pal_cb.currentIndexChanged.connect(_pick_palette)
+        form.addRow("Aus Palette:", pal_cb)
+
         # Helligkeit mitsenden: AN = Kachel setzt auch Intensitaet (sofort hell,
         # aber kollidiert mit Dimmer-Effekten). AUS = reine Farb-Ebene (empfohlen,
         # wenn die Fixtures eine Basis-Helligkeit haben) -> Dimmer-Effekte dunkeln.
@@ -250,9 +303,15 @@ class VCColor(VCWidget):
         form.addRow("UV (0=aus):", uv_spin)
 
         target_cb = QComboBox()
-        target_cb.addItems([ColorTarget.PROGRAMMER, ColorTarget.ALL])
+        target_cb.addItems([ColorTarget.PROGRAMMER, ColorTarget.ALL, ColorTarget.EFFECT,
+                            ColorTarget.EFFECT_ADD])
         target_cb.setCurrentText(self.target)
         form.addRow("Ziel:", target_cb)
+
+        # Phase 6: Ziel-Effekt-ID (nur Ziel = Effekt; leer = aktiver Effekt)
+        fid_edit = QLineEdit("" if self.function_id is None else str(self.function_id))
+        fid_edit.setToolTip("Funktions-ID des Ziel-Effekts (Ziel = Effekt). Leer = aktiver Effekt.")
+        form.addRow("Effekt-ID (Ziel=Effekt):", fid_edit)
 
         form.addRow(QLabel("── MIDI-Bindung (oder Rechtsklick → Teach) ──"))
         midi_type_combo = QComboBox()
@@ -280,6 +339,8 @@ class VCColor(VCWidget):
             self.color_a = a_spin.value()
             self.color_uv = uv_spin.value()
             self.target = target_cb.currentText()
+            _ftxt = fid_edit.text().strip()
+            self.function_id = int(_ftxt) if _ftxt.lstrip("-").isdigit() else None
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
@@ -298,6 +359,7 @@ class VCColor(VCWidget):
         d["with_intensity"] = self.with_intensity
         d["intensity"] = self.intensity
         d["target"] = self.target
+        d["function_id"] = self.function_id
         d["midi_ch"] = self.midi_ch
         d["midi_data1"] = self.midi_data1
         d["midi_type"] = self.midi_type
@@ -314,6 +376,7 @@ class VCColor(VCWidget):
         self.with_intensity = bool(d.get("with_intensity", True))
         self.intensity = d.get("intensity", 255)
         self.target = d.get("target", ColorTarget.PROGRAMMER)
+        self.function_id = d.get("function_id")
         self.midi_ch = d.get("midi_ch", 0)
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")

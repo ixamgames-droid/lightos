@@ -432,6 +432,22 @@ class ResetGroupsTest(unittest.TestCase):
         self.assertEqual(self.state.programmer, {})
         self.assertEqual(self.state.live_view_positions, {})
 
+    def test_reset_show_zeroes_universes(self):
+        """Nach reset_show() muessen alle DMX-Universe-Puffer auf 0 stehen, damit
+        der Output-Thread keine alten Werte der vorigen Show weitersendet."""
+        from src.core.dmx.universe import Universe
+
+        u1, u2 = Universe(1), Universe(2)
+        u1.set_channel(1, 255)
+        u1.set_channel(17, 200)
+        u2.set_channel(5, 128)
+        self.state.universes = {1: u1, 2: u2}
+
+        self.show_file.reset_show()
+
+        self.assertEqual(u1.get_all(), bytes(Universe.SIZE))
+        self.assertEqual(u2.get_all(), bytes(Universe.SIZE))
+
 
 if __name__ == "__main__":
     unittest.main()

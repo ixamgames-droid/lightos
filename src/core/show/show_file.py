@@ -244,6 +244,15 @@ def reset_show():
 
     state.programmer = {}
     state.base_levels = {}
+    # DMX-Puffer aller Universes nullen. Sonst sendet der Output-Thread nach
+    # "Neue Show" weiter die ALTEN Werte (die Strahler bleiben an): ein leerer
+    # Patch hat keinen Default-Frame mehr, und _render_frame fasst die Buffer der
+    # nun unpatchten Universes nicht mehr an -> alte Werte bleiben stehen.
+    try:
+        for _u in getattr(state, "universes", {}).values():
+            _u.clear()
+    except Exception as e:
+        print(f"[show_file] reset universes error: {e}")
     try:
         state._flush_all_to_dmx()
     except Exception as e:
@@ -305,6 +314,7 @@ def reset_show():
     try:
         state._emit("patch_changed", None)
         state._emit("stacks_changed", None)
+        state._emit("cue_stack_changed", None)
         state._emit("show_loaded", {"path": None, "issues": []})
         state.sync.refresh_all()
     except Exception as e:
@@ -481,6 +491,7 @@ def load_show(path: str | os.PathLike):
     try:
         state._emit("patch_changed", None)
         state._emit("stacks_changed", None)
+        state._emit("cue_stack_changed", None)
         state._emit("show_loaded", {"path": os.fspath(path), "issues": []})
         state.sync.refresh_all()
     except Exception as e:

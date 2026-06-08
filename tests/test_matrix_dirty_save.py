@@ -126,6 +126,56 @@ def test_save_edit_kopiert_draft_nach_saved():
     assert view._dirty_lbl.text() == "", "Dirty-Label muss leer sein"
 
 
+# ── View: Name-Aenderung ist deferred (dirty + Speichern persistiert) ────────
+
+def test_name_change_macht_dirty():
+    """Namensaenderung landet nur im Draft -> dirty, _saved unveraendert."""
+    _app()
+    view = _make_view_with_matrix()
+    alter_name = view._saved.name
+
+    view._name_edit.setText("Mein neuer Name")
+
+    assert view._current.name == "Mein neuer Name", "Draft-Name muss gesetzt sein"
+    assert view._saved.name == alter_name, "_saved.name darf sich nicht aendern"
+    assert view._btn_save.isEnabled(), "Speichern-Button muss nach Namensaenderung aktiv sein"
+
+
+def test_name_save_persistiert_und_benachrichtigt():
+    """_save_edit uebernimmt den neuen Namen in _saved und feuert FUNCTION_CHANGED."""
+    _app()
+    view = _make_view_with_matrix()
+
+    events = []
+    from src.core.sync import get_sync, SyncEvent
+    get_sync().subscribe(SyncEvent.FUNCTION_CHANGED, lambda *a: events.append(a))
+
+    view._name_edit.setText("Gespeicherter Name")
+    assert view._btn_save.isEnabled()
+    view._save_edit()
+
+    assert view._saved.name == "Gespeicherter Name", "_saved.name muss nach Save aktualisiert sein"
+    assert not view._btn_save.isEnabled(), "Nach Save kein dirty mehr"
+    assert len(events) >= 1, "FUNCTION_CHANGED muss gefeuert werden (Bibliothek refreshen)"
+
+
+def test_name_reset_verwirft_listeneintrag():
+    """_reset_edit setzt Draft-Name und Listeneintrag auf den gespeicherten Wert zurueck."""
+    _app()
+    view = _make_view_with_matrix()
+    alter_name = view._saved.name
+    row = view._list.currentRow()
+
+    view._name_edit.setText("Verworfener Name")
+    assert view._list.item(row).text() == "Verworfener Name", "Live-Vorschau in der Liste"
+
+    view._reset_edit()
+
+    assert view._current.name == alter_name, "Draft muss zurueckgesetzt sein"
+    assert view._list.item(row).text() == alter_name, "Listeneintrag muss zurueckgesetzt sein"
+    assert not view._btn_save.isEnabled()
+
+
 # ── View: _reset_edit ─────────────────────────────────────────────────────────
 
 def test_reset_edit_verwirft_draft():
@@ -198,14 +248,14 @@ def test_assign_from_selection_kein_dirty():
 def test_from_dict_roundtrip_unveraendert():
     """Bestehende from_dict-Semantik: Roundtrip erhaelt alle Felder."""
     m = RgbMatrixInstance(name="Test", cols=5, rows=3)
-    m.algorithm = RgbAlgorithm.CHASE_V
+    m.algorithm = RgbAlgorithm.CHASE
     m.matrix_speed = 2.0
     m.color1 = (10, 20, 30)
     m.params = {"runner_count": 2}
 
     restored = RgbMatrixInstance.from_dict(m.to_dict())
 
-    assert restored.algorithm == RgbAlgorithm.CHASE_V
+    assert restored.algorithm == RgbAlgorithm.CHASE
     assert restored.matrix_speed == 2.0
     assert restored.cols == 5
     assert restored.rows == 3

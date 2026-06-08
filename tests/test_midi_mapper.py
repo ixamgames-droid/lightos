@@ -222,6 +222,45 @@ class MidiMapperTests(unittest.TestCase):
         self.mapper._on_midi(_msg("note_on", 20, 127))
         self.assertFalse(self.state.function_manager.is_running(7))
 
+    def test_effect_param_sets_matrix_speed(self):
+        """Phase 6: MIDI-CC steuert einen Effekt-Parameter (gleicher Dispatcher wie VC)."""
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm
+        fm = get_function_manager()
+        fm.stop_all()
+        m = RgbMatrixInstance(name="midi", cols=4, rows=1,
+                              algorithm=RgbAlgorithm.CHASE, fixture_grid=[1, 2, 3, 4])
+        fm.add(m)
+        try:
+            mapping = mm.MidiMapping(name="EP", msg_type="cc", channel=1, data1=70,
+                                     target_id=f"effect_param:speed@{m.id}")
+            self.assertEqual(mapping.button_mode, mm.BUTTON_CONTINUOUS)
+            self.mapper.add_mapping(mapping)
+            self.mapper._on_midi(_msg("cc", 70, 127))
+            self.assertGreater(m.matrix_speed, 15)   # CC voll → ~max
+        finally:
+            fm.remove(m.id)
+
+    def test_effect_action_adds_color(self):
+        """Phase 6: MIDI-Note loest eine Effekt-Aktion aus (einmal pro Druck)."""
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, ColorSequence
+        fm = get_function_manager()
+        fm.stop_all()
+        m = RgbMatrixInstance(name="midi2", cols=4, rows=1,
+                              algorithm=RgbAlgorithm.CHASE, fixture_grid=[1, 2, 3, 4])
+        m.colors = ColorSequence([(255, 0, 0)])
+        fm.add(m)
+        try:
+            mapping = mm.MidiMapping(name="EA", msg_type="note_on", channel=1, data1=71,
+                                     target_id=f"effect_action:add_color@{m.id}")
+            self.assertEqual(mapping.button_mode, mm.BUTTON_FLASH)
+            self.mapper.add_mapping(mapping)
+            self.mapper._on_midi(_msg("note_on", 71, 127))   # Druck → feuert
+            self.assertEqual(len(m.colors), 2)
+        finally:
+            fm.remove(m.id)
+
     def test_learn_captures_next_message_then_resumes(self):
         captured = []
         self.mapper.start_learn(lambda m: captured.append(m))

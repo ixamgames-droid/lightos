@@ -1,7 +1,8 @@
 """VCSlider — Virtual Console Fader Widget."""
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
-                                QDialogButtonBox, QSizePolicy, QSpinBox, QLabel)
+                                QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
+                                QCheckBox)
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient
 from .vc_widget import VCWidget
@@ -17,6 +18,9 @@ class SliderMode(str):
     SPEED       = "Speed"         # steuert die Geschwindigkeit ALLER laufenden Effekte
     EFFECT_INTENSITY = "EffectIntensity"  # Helligkeits-Master EINES Effekts
     EFFECT_SPEED     = "EffectSpeed"       # Tempo-Master EINES Effekts
+    # Phase 6: bindet einen BELIEBIGEN Effekt-Parameter (param_key) live —
+    # Fader 0..255 wird auf den Wertebereich der ParamSpec abgebildet.
+    EFFECT_PARAM     = "EffectParam"
 
 
 class VCSlider(VCWidget):
@@ -33,6 +37,13 @@ class VCSlider(VCWidget):
         self.dmx_channel: int = 1
         self.dmx_universe: int = 1
         self.programmer_attr: str = "intensity"   # fuer PROGRAMMER-Modus
+        self.param_key: str = "speed"             # fuer EFFECT_PARAM-Modus
+        # Effekt-Fader-Verhalten am unteren Anschlag (nur EFFECT_*-Modi):
+        #   False = Fader REGELT nur (Effekt muss separat gestartet werden;
+        #           bei 0 laeuft der Effekt mit Wert 0 weiter) — bisheriges Verhalten.
+        #   True  = Fader STEUERT AN/AUS: Wert > 0 startet den/die Ziel-Effekte
+        #           (falls noch nicht laufend), Wert == 0 stoppt sie wirklich.
+        self.effect_autostart: bool = False
         self._value: int = 0          # 0–255
         self._drag_y: int | None = None
         self._drag_start_val: int = 0
@@ -58,6 +69,10 @@ class VCSlider(VCWidget):
     def _apply(self):
         from src.core.app_state import get_state
         state = get_state()
+        # Optional: Effekt-Fader steuert auch An/Aus (siehe effect_autostart).
+        if self.mode in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                         SliderMode.EFFECT_PARAM):
+            self._autostart_targets()
         if self.mode == SliderMode.GRANDMASTER:
             try:
                 state.output_manager.set_grand_master(self._value / 255.0)
@@ -99,6 +114,16 @@ class VCSlider(VCWidget):
             spd = 0.1 + (self._value / 255.0) * 3.9
             for f in self._effect_targets():
                 f.speed = spd
+        elif self.mode == SliderMode.EFFECT_PARAM:
+            # Phase 6: beliebiger Effekt-Parameter live. Fader 0..255 → Wertebereich
+            # der ParamSpec (im Effekt). Leere Bindung = aktiver Effekt.
+            try:
+                from src.core.engine import effect_live
+                targets = self.function_ids or [self.function_id]
+                for fid in targets:
+                    effect_live.set_param_normalized(self.param_key, self._value / 255.0, fid)
+            except Exception:
+                pass
         elif self.mode == SliderMode.PROGRAMMER:
             attr = self.programmer_attr or "intensity"
             try:
@@ -147,6 +172,37 @@ class VCSlider(VCWidget):
             return []
         f = self._effect_target()
         return [f] if f is not None else []
+
+    def _autostart_targets(self):
+        """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
+        An/Aus der Ziel-Effekte. Wert > 0 startet sie (falls noch nicht laufend),
+        Wert == 0 stoppt sie wirklich. Ohne festes Ziel (function_id/-ids leer ->
+        „aktiver Effekt") wird nichts erzwungen. Bei effect_autostart == False
+        bleibt der Effekt unberuehrt und der Fader regelt nur."""
+        if not self.effect_autostart:
+            return
+        ids = self.function_ids or (
+            [self.function_id] if self.function_id is not None else [])
+        if not ids:
+            return
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+        except Exception:
+            return
+        on = self._value > 0
+        for fid in ids:
+            if fid is None:
+                continue
+            try:
+                fid = int(fid)
+                if on:
+                    if not fm.is_running(fid):
+                        fm.start(fid)
+                elif fm.is_running(fid):
+                    fm.stop(fid)
+            except Exception:
+                pass
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
 
@@ -281,10 +337,25 @@ class VCSlider(VCWidget):
         for m in (SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER,
                   SliderMode.GRANDMASTER, SliderMode.PROGRAMMER, SliderMode.BPM,
                   SliderMode.SPEED, SliderMode.EFFECT_INTENSITY,
-                  SliderMode.EFFECT_SPEED):
+                  SliderMode.EFFECT_SPEED, SliderMode.EFFECT_PARAM):
             mode_cb.addItem(m)
         mode_cb.setCurrentText(self.mode)
         form.addRow("Modus:", mode_cb)
+
+        # Parameter-Key fuer EFFECT_PARAM (z. B. speed, level, count, intensity,
+        # runner_count, fade, density …). Siehe Effekt-Parameter im Matrix-Programmer.
+        param_key_edit = QLineEdit(self.param_key)
+        param_key_edit.setToolTip("Effekt-Parameter-Key (nur Modus EffectParam), z. B. level, speed, count")
+        form.addRow("Parameter-Key (EffectParam):", param_key_edit)
+
+        autostart_cb = QCheckBox("bei 0 wirklich stoppen (sonst nur runterregeln)")
+        autostart_cb.setChecked(self.effect_autostart)
+        autostart_cb.setToolTip(
+            "Nur EFFECT-Modi (Intensity/Speed/Param):\n"
+            "An  = Fader steuert An/Aus — Wert > 0 startet den Ziel-Effekt,\n"
+            "      Wert 0 stoppt ihn wirklich.\n"
+            "Aus = Fader regelt nur; den Effekt separat per Taste starten.")
+        form.addRow("Effekt An/Aus (EFFECT-Modi):", autostart_cb)
         univ = QLineEdit(str(self.dmx_universe))
         form.addRow("DMX-Universe (Level-Modus):", univ)
         ch = QLineEdit(str(self.dmx_channel))
@@ -338,6 +409,8 @@ class VCSlider(VCWidget):
                     pass
             self.function_ids = ids
             self.function_id = ids[0] if ids else None
+            self.param_key = param_key_edit.text().strip() or self.param_key
+            self.effect_autostart = autostart_cb.isChecked()
             self.midi_cc = midi_cc_spin.value()
             self.midi_ch = midi_ch_spin.value()
             self.update()
@@ -352,6 +425,8 @@ class VCSlider(VCWidget):
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
+        d["param_key"] = self.param_key
+        d["effect_autostart"] = self.effect_autostart
         d["value"] = self._value
         d["midi_cc"] = self.midi_cc
         d["midi_ch"] = self.midi_ch
@@ -365,6 +440,8 @@ class VCSlider(VCWidget):
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")
+        self.param_key = d.get("param_key", "speed")
+        self.effect_autostart = bool(d.get("effect_autostart", False))
         self._value = d.get("value", 0)
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)

@@ -119,6 +119,9 @@ class EfxView(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._rebuild_from_state())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._rebuild_from_state())
+            # Abschnitt 1: neu erstellte/umbenannte/geloeschte EFX erscheinen sofort
+            # in beiden EFX-Ansichten (Programmer-Seite + Sub-Tab).
+            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._rebuild_from_state())
         except Exception as e:
             print(f"[efx_view] sync subscribe error: {e}")
 
@@ -291,20 +294,22 @@ class EfxView(QWidget):
 
     def _add_efx(self):
         efx = self._fm.new_efx(name=f"EFX {len(self._instances)+1}")
-        self._list.addItem(efx.name)
-        self._list.setCurrentRow(len(self._instances) - 1)
-        self._notify_change()
+        # new_efx() -> FunctionManager.add() emittiert FUNCTION_CHANGED; die Liste
+        # ist via _rebuild_from_state bereits aktuell. Nur noch neu Selektieren
+        # (kein manuelles addItem -> sonst Doppel-Eintrag).
+        for i, inst in enumerate(self._instances):
+            if inst.id == efx.id:
+                self._list.setCurrentRow(i)
+                break
 
     def _delete_efx(self):
         row = self._list.currentRow()
         insts = self._instances
         if row < 0 or row >= len(insts):
             return
+        # remove() emittiert FUNCTION_CHANGED -> _rebuild_from_state aktualisiert die
+        # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
         self._fm.remove(insts[row].id)
-        self._list.takeItem(row)
-        self._current = None
-        self._preview.set_efx(None)
-        self._notify_change()
 
     def _select_efx(self, row: int):
         if row < 0 or row >= len(self._instances):

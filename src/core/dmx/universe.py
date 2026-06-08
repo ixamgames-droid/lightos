@@ -11,9 +11,25 @@ class Universe:
         self._lock = threading.Lock()
 
     def set_channel(self, channel: int, value: int):
-        """Setzt einen Kanal (1-basiert, Wert 0-255)."""
-        assert 1 <= channel <= self.SIZE, f"Kanal {channel} außerhalb Bereich"
-        assert 0 <= value <= 255
+        """Setzt einen Kanal (1-basiert, Wert 0-255).
+
+        Robuste Validierung statt ``assert``: Eingaben kommen u. a. ungeprueft
+        aus Netzwerk-Quellen (OSC/Web/ArtNet-Merge). Out-of-range-Kanaele werden
+        verworfen, der Wert wird auf 0-255 geklemmt. ``assert`` waere unter
+        ``python -O`` entfernt und wuerde dann zu stillem Negativ-Index-Wraparound
+        (channel<=0) bzw. IndexError/ValueError fuehren.
+        """
+        try:
+            channel = int(channel)
+        except (TypeError, ValueError):
+            return
+        if not (1 <= channel <= self.SIZE):
+            return
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            return
+        value = 0 if value < 0 else 255 if value > 255 else value
         with self._lock:
             self._data[channel - 1] = value
 

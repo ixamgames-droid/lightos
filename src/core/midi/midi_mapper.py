@@ -22,7 +22,18 @@ ACTION_PAGE_SELECT = "page_select"
 ACTION_PAGE_NEXT = "page_next"
 ACTION_PAGE_PREV = "page_prev"
 ACTION_FUNCTION = "function"      # target_id "function:<id>" -> Scene/Chaser/etc.
+# Phase 6: dieselben Effekt-Parameter/Aktionen wie die virtuelle Konsole steuern.
+# param-Form: "<key>" (aktiver Effekt) oder "<key>@<function_id>" (fester Effekt).
+ACTION_EFFECT_PARAM = "effect_param"    # continuous -> effect_live.set_param_normalized
+ACTION_EFFECT_ACTION = "effect_action"  # button     -> effect_live.do_action
 ACTION_NONE = "none"
+
+
+def _parse_effect_param(param: str) -> tuple[str, int | None]:
+    """'<key>[@<fid>]' -> (key, fid|None)."""
+    key, _, fid = str(param or "").partition("@")
+    fid = fid.strip()
+    return key.strip(), (int(fid) if fid.lstrip("-").isdigit() else None)
 
 BUTTON_TOGGLE = "toggle"
 BUTTON_FLASH = "flash"
@@ -34,10 +45,11 @@ def _clamp_7bit(value: int) -> int:
 
 
 def _infer_button_mode(action: str) -> str:
-    if action in (ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER):
+    if action in (ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER,
+                  ACTION_EFFECT_PARAM):
         return BUTTON_CONTINUOUS
-    if action == ACTION_EXECUTOR_FLASH:
-        return BUTTON_FLASH
+    if action in (ACTION_EXECUTOR_FLASH, ACTION_EFFECT_ACTION):
+        return BUTTON_FLASH   # Effekt-Aktion: einmal pro Tastendruck feuern
     return BUTTON_TOGGLE
 
 
@@ -421,6 +433,18 @@ class MidiMapper:
                     fm.stop(fid)
             except Exception:
                 pass
+            return
+
+        if action == ACTION_EFFECT_ACTION:
+            # Phase 6: Effekt-Aktion (add_color/next_color/toggle_freeze/…) auf Press.
+            if state_on:
+                key, fid = _parse_effect_param(mapping.param)
+                try:
+                    from src.core.engine import effect_live
+                    effect_live.do_action(key, fid)
+                except Exception:
+                    pass
+            return
 
     def _execute_continuous(self, mapping: MidiMapping, normalized_value: float):
         value = max(0.0, min(1.0, float(normalized_value)))
@@ -448,6 +472,17 @@ class MidiMapper:
                 for ex in pe.executors:
                     if ex.fader_function == "master":
                         ex.fader_value = val
+            return
+
+        if action == ACTION_EFFECT_PARAM:
+            # Phase 6: beliebiger Effekt-Parameter live (gleicher Dispatcher wie die VC).
+            key, fid = _parse_effect_param(mapping.param)
+            try:
+                from src.core.engine import effect_live
+                effect_live.set_param_normalized(key, max(0.0, min(1.0, normalized_value)), fid)
+            except Exception:
+                pass
+            return
 
     # Outbound feedback engine ------------------------------------------
 

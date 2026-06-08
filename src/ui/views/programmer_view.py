@@ -123,6 +123,10 @@ class ProgrammerView(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._sync_refresh())
             sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._sync_refresh())
+            # Abschnitt 1: neue/geaenderte Funktionen + Gruppen erscheinen sofort,
+            # ohne manuelles Neuladen (kein Refresh-Button als Hauptloesung).
+            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._refresh_effects_list())
+            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._refresh_group_list())
         except Exception as e:
             print(f"[programmer_view] sync subscribe error: {e}")
 
@@ -270,23 +274,51 @@ class ProgrammerView(QWidget):
         return left_w
 
     def _make_attr_area(self) -> QWidget:
-        """Selektions-Label + Farb-Vorschau + Attribut-Tabs (alle Gruppen)."""
-        right_top = QWidget()
-        right_top_layout = QVBoxLayout(right_top)
-        right_top_layout.setContentsMargins(0, 0, 0, 0)
-        right_top_layout.setSpacing(4)
+        """Einheitliche Tab-Leiste (WP-5/Abschnitt 7).
+
+        Ersetzt die fruehere Doppel-Navigation (obere Kategorie-Leiste + untere
+        Attribut-Tabs) durch EINE Tab-Leiste:
+          Attribut-Tabs: Intensity · Color · Position · Weitere
+            (Weitere buendelt Beam + Gobo + Effect + Other — keine Doppelungen).
+          Funktions-Tabs: Helper (Auto-Programm/Assistent + Effektliste) · EFX ·
+            Matrix · Paletten.
+        Selektions-Label + Farb-Vorschau bleiben darueber. Oben in der Toolbar
+        bleiben nur Color-/Position-/Fan-Tool.
+        """
+        area = QWidget()
+        al = QVBoxLayout(area)
+        al.setContentsMargins(0, 0, 0, 0)
+        al.setSpacing(4)
 
         self._lbl_selection = QLabel("Kein Geraet ausgewaehlt")
         self._lbl_selection.setObjectName("label_header")
-        right_top_layout.addWidget(self._lbl_selection)
+        al.addWidget(self._lbl_selection)
 
         self._color_preview = ColorPreview([], self._state)
-        right_top_layout.addWidget(self._color_preview)
+        al.addWidget(self._color_preview)
 
-        self._attr_tabs = QTabWidget()
-        self._attr_tabs.setTabPosition(QTabWidget.TabPosition.North)
-        right_top_layout.addWidget(self._attr_tabs, stretch=1)
-        return right_top
+        self._main_tabs = QTabWidget()
+        self._main_tabs.setTabPosition(QTabWidget.TabPosition.North)
+
+        # Attribut-Tabs: je ein Container, dessen Inhalt _rebuild_attr_editor
+        # abhaengig von der Auswahl neu befuellt. "Weitere" = Beam+Gobo+Effect+Other.
+        self._attr_group_tabs: dict[str, QWidget] = {}
+        for label, key in (("Intensity", "Intensity"), ("Color", "Color"),
+                           ("Position", "Position"), ("Weitere", "Weitere")):
+            cont = QWidget()
+            cl = QVBoxLayout(cont)
+            cl.setContentsMargins(0, 0, 0, 0)
+            self._main_tabs.addTab(cont, label)
+            self._attr_group_tabs[key] = cont
+
+        # Funktions-Tabs (einmalig gebaut).
+        self._main_tabs.addTab(self._make_effects_page(), "Helper")
+        self._main_tabs.addTab(self._make_efx_page(), "EFX")
+        self._main_tabs.addTab(self._make_rgb_page(), "Matrix")
+        self._main_tabs.addTab(self._make_palette_page(), "Paletten")
+
+        al.addWidget(self._main_tabs, stretch=1)
+        return area
 
     def _make_snap_panel(self) -> QWidget:
         """RECHTS: Snap-/Datei-Browser (LAYOUT-04)."""
@@ -332,9 +364,9 @@ class ProgrammerView(QWidget):
         left_w.setMaximumWidth(300)
         h.addWidget(left_w)
 
-        # CENTER: [ MITTE-top | UNTEN ]
+        # CENTER: [ einheitliche Tab-Leiste (oben) | Fixture-Vorschau (unten) ]
         center = QSplitter(Qt.Orientation.Vertical)
-        center.addWidget(self._make_mitte())
+        center.addWidget(self._make_attr_area())
         try:
             from src.ui.widgets.fixture_tile_preview import FixtureTilePreview
             self._tile_preview = FixtureTilePreview()
@@ -359,70 +391,9 @@ class ProgrammerView(QWidget):
         h.setChildrenCollapsible(False)
         outer.addWidget(h)
 
-    def _make_mitte(self) -> QWidget:
-        """MITTE: Kategorie-Leiste + gestapelte Eingabe-Panels (P-05 / LAYOUT-03).
-
-        Farben/Dimmer/Bewegung/Weitere zeigen die Attribut-Tabs (und springen auf
-        den passenden Tab); Effekte und EFX sind eigene Seiten.
-        """
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(4)
-
-        bar = QHBoxLayout()
-        bar.setSpacing(2)
-        self._cat_group = QButtonGroup(self)
-        self._cat_group.setExclusive(True)
-
-        self._mitte_stack = QStackedWidget()
-        self._mitte_stack.addWidget(self._make_attr_area())     # Index 0
-        self._mitte_stack.addWidget(self._make_effects_page())  # Index 1
-        self._mitte_stack.addWidget(self._make_efx_page())      # Index 2
-        self._mitte_stack.addWidget(self._make_rgb_page())      # Index 3
-        self._mitte_stack.addWidget(self._make_palette_page())  # Index 4
-
-        cats = [
-            ("Farben", "Color"), ("Dimmer", "Intensity"),
-            ("Bewegung", "Position"), ("Weitere", None),
-            ("Effekte", "__effects__"), ("EFX", "__efx__"),
-            ("Matrix", "__rgb__"), ("Paletten", "__palette__"),
-        ]
-        for label, target in cats:
-            b = QPushButton(label)
-            b.setCheckable(True)
-            b.setFixedHeight(26)
-            b.clicked.connect(lambda _=False, t=target: self._on_category(t))
-            self._cat_group.addButton(b)
-            bar.addWidget(b)
-        bar.addStretch(1)
-        v.addLayout(bar)
-        v.addWidget(self._mitte_stack, stretch=1)
-
-        # Default: Farben
-        buttons = self._cat_group.buttons()
-        if buttons:
-            buttons[0].setChecked(True)
-        return w
-
-    def _on_category(self, target):
-        page_index = {
-            "__effects__": 1, "__efx__": 2, "__rgb__": 3, "__palette__": 4,
-        }
-        if target in page_index:
-            self._mitte_stack.setCurrentIndex(page_index[target])
-        else:
-            self._mitte_stack.setCurrentIndex(0)
-            if target:
-                self._select_attr_tab(target)
-
-    def _select_attr_tab(self, name: str):
-        if not hasattr(self, "_attr_tabs"):
-            return
-        for i in range(self._attr_tabs.count()):
-            if self._attr_tabs.tabText(i) == name:
-                self._attr_tabs.setCurrentIndex(i)
-                return
+    # _make_mitte/_on_category/_select_attr_tab wurden entfernt (WP-5/Abschnitt 7):
+    # die einheitliche Tab-Leiste (_make_attr_area) ersetzt die fruehere
+    # Doppel-Navigation (obere Kategorie-Leiste + untere Attribut-Tabs).
 
     def _make_effects_page(self) -> QWidget:
         """Effekte-Seite: Assistent + eigene Effekte anlegen + Liste mit Start/Stop."""
@@ -795,52 +766,58 @@ class ProgrammerView(QWidget):
     def _rebuild_attr_editor(self):
         # UNTEN-Vorschau (Zonen-Layout) an aktuelle Auswahl koppeln.
         self._push_selection_to_preview()
-        # Tabs leeren
-        while self._attr_tabs.count():
-            w = self._attr_tabs.widget(0)
-            self._attr_tabs.removeTab(0)
-            if w:
-                w.deleteLater()
-
-        if not self._selected_fids:
-            self._lbl_selection.setText("Kein Geraet ausgewaehlt")
-            self._color_preview.set_fixtures([])
+        # Neue einheitliche Tab-Struktur (WP-5): die 4 Attribut-Container befuellen.
+        if not hasattr(self, "_attr_group_tabs"):
             return
 
-        fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
-        selected = [fixtures[fid] for fid in self._selected_fids if fid in fixtures]
-        self._lbl_selection.setText(
-            f"{len(selected)} Geraet(e): " +
-            ", ".join(f"[{f.fid}] {f.label}" for f in selected[:3]) +
-            ("..." if len(selected) > 3 else "")
-        )
-        self._color_preview.set_fixtures(selected)
+        def _clear(container):
+            lay = container.layout()
+            while lay.count():
+                w = lay.takeAt(0).widget()
+                if w:
+                    w.deleteLater()
+            return lay
 
-        # Sammele alle Kanaele aller selektierten Fixtures (gruppieren nach Gruppe)
-        template = selected[0]
-        channels = get_channels_for_patched(template)
+        try:
+            fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
+            selected = [fixtures[fid] for fid in self._selected_fids if fid in fixtures]
+            if not selected:
+                self._lbl_selection.setText("Kein Geraet ausgewaehlt")
+                self._color_preview.set_fixtures([])
+                for cont in self._attr_group_tabs.values():
+                    _clear(cont).addWidget(QLabel("Kein Gerät ausgewählt"))
+                return
 
-        # Map: Group -> List[FixtureChannel]
-        groups: dict[str, list[FixtureChannel]] = {
-            "Intensity": [], "Color": [], "Position": [],
-            "Beam": [], "Gobo": [], "Effect": [], "Other": []
-        }
-        seen_attrs: set[str] = set()
-        for ch in channels:
-            if ch.attribute in seen_attrs:
-                continue
-            seen_attrs.add(ch.attribute)
-            grp = _classify_attribute(ch.attribute)
-            groups[grp].append(ch)
+            self._lbl_selection.setText(
+                f"{len(selected)} Geraet(e): " +
+                ", ".join(f"[{f.fid}] {f.label}" for f in selected[:3]) +
+                ("..." if len(selected) > 3 else "")
+            )
+            self._color_preview.set_fixtures(selected)
 
-        # Tabs in fester Reihenfolge bauen
-        order = ["Intensity", "Color", "Position", "Beam", "Gobo", "Effect", "Other"]
-        for grp_name in order:
-            chans = groups.get(grp_name, [])
-            if not chans and grp_name not in ("Color", "Position"):
-                continue
-            tab = self._build_group_tab(grp_name, chans, selected)
-            self._attr_tabs.addTab(tab, grp_name)
+            # Kanaele des Templates nach Gruppe sortieren. "Weitere" buendelt
+            # Beam+Gobo+Effect+Other (eine Stelle, keine Doppelung — Abschnitt 7).
+            template = selected[0]
+            channels = get_channels_for_patched(template)
+            groups: dict[str, list[FixtureChannel]] = {
+                "Intensity": [], "Color": [], "Position": [], "Weitere": []
+            }
+            seen_attrs: set[str] = set()
+            for ch in channels:
+                if ch.attribute in seen_attrs:
+                    continue
+                seen_attrs.add(ch.attribute)
+                grp = _classify_attribute(ch.attribute)
+                if grp in ("Intensity", "Color", "Position"):
+                    groups[grp].append(ch)
+                else:  # Beam, Gobo, Effect, Other
+                    groups["Weitere"].append(ch)
+
+            for key, cont in self._attr_group_tabs.items():
+                inner = self._build_group_tab(key, groups.get(key, []), selected)
+                _clear(cont).addWidget(inner)
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
 
     def _build_group_tab(self, group_name: str,
                          channels: list[FixtureChannel],

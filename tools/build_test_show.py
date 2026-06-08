@@ -146,10 +146,10 @@ def matrix(name, algo, fids, c1=(255, 0, 0), c2=(0, 0, 255), c3=(0, 255, 0), spe
     return m
 
 
-mx_chase = matrix("Matrix Lauflicht (PARs)", RgbAlgorithm.CHASE_H, par_fids,
+mx_chase = matrix("Matrix Lauflicht (PARs)", RgbAlgorithm.CHASE, par_fids,
                   c1=(255, 0, 0), speed=3.0)
 mx_rain  = matrix("Matrix Regenbogen (PARs)", RgbAlgorithm.RAINBOW, par_fids, speed=1.5)
-mx_wipe  = matrix("Matrix Wipe (alle)", RgbAlgorithm.WIPE_H, all_fids,
+mx_wipe  = matrix("Matrix Wipe (alle)", RgbAlgorithm.WIPE, all_fids,
                   c1=(0, 200, 255), c2=(255, 0, 120), speed=1.0)
 matrix_funcs = [mx_chase, mx_rain, mx_wipe]
 

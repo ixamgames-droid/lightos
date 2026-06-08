@@ -22,8 +22,14 @@ class ButtonAction(str, Enum):
     BLACKOUT = "Blackout"
     STOP_ALL = "StopAll"
     SNAPSHOT = "Snapshot"
+    # Bibliothek-Snap (Farbe/Look aus der Show-Bibliothek) auf die Taste legen.
+    # Verhalten ueber snap_mode: set (bleibt), flash (nur gehalten), toggle (an/aus).
+    LIBRARY_SNAP = "LibrarySnap"
     CLEAR    = "Clear"        # Programmer leeren (manuelle Farben/Snaps freigeben)
     TAP      = "Tap"          # Tap-Tempo: setzt globale BPM (beat-Effekte folgen)
+    # Phase 6: loest eine Effekt-Aktion aus (effect_action_key), z. B. add_color,
+    # next_color, toggle_bounce, toggle_freeze, clear_live_override, reverse_direction.
+    EFFECT_ACTION = "EffectAction"
 
 
 class VCButton(VCWidget):
@@ -34,6 +40,16 @@ class VCButton(VCWidget):
         self.action = ButtonAction.TOGGLE
         self.function_id: int | None = None
         self.snapshot_index: int | None = None
+        # Bibliothek-Snap (ButtonAction.LIBRARY_SNAP): Referenz auf einen Snap der
+        # Show-Bibliothek (src.core.engine.snap_library) + Tastenverhalten.
+        self.snap_id: int | None = None
+        self.snap_mode: str = "toggle"      # "set" | "flash" | "toggle"
+        self._snap_active: bool = False     # Laufzeit-Zustand fuer toggle
+        # Vorherige Programmer-Werte (fuer Toggle/Flash-Ruecknahme):
+        # {(fid, attr): alter_wert_oder_None}
+        self._snap_prev: dict[tuple[int, str], int | None] = {}
+        # Phase 6: Effekt-Aktions-Name fuer ButtonAction.EFFECT_ACTION.
+        self.effect_action_key: str = "next_color"
         # Verhalten beim Starten einer Funktion:
         #   exclusive        -> stoppt alle anderen Funktionen (nur 1 aktiv)
         #   clear_programmer -> leert vorher den Programmer (manuelle Farben/Snaps
@@ -149,6 +165,65 @@ class VCButton(VCWidget):
         except Exception as e:
             print(f"[VCButton] Snapshot-Apply-Fehler: {e}")
 
+    # ── Bibliothek-Snap (Farbe / Look) ───────────────────────────────────────
+
+    def _library_snap(self):
+        """Liefert den referenzierten Snap aus der Show-Bibliothek (oder None)."""
+        if self.snap_id is None:
+            return None
+        try:
+            from src.core.engine.snap_library import get_snap_library
+            return get_snap_library().get(int(self.snap_id))
+        except Exception as e:
+            print(f"[VCButton] Snap-Lookup-Fehler: {e}")
+            return None
+
+    def _apply_library_snap(self):
+        """Schreibt die Werte des Bibliothek-Snaps in den Programmer und merkt
+        sich die vorherigen Werte, damit Toggle/Flash sie zuruecknehmen koennen."""
+        snap = self._library_snap()
+        if snap is None:
+            return
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            self._snap_prev = {}
+            for fid, attrs in snap.values.items():
+                for attr, val in attrs.items():
+                    fid_i = int(fid)
+                    self._snap_prev[(fid_i, attr)] = state.get_programmer_value(fid_i, attr)
+                    state.set_programmer_value(fid_i, attr, int(val))
+        except Exception as e:
+            print(f"[VCButton] Snap-Apply-Fehler: {e}")
+
+    def _restore_library_snap(self):
+        """Stellt die vor dem Snap aktiven Programmer-Werte wieder her."""
+        if not self._snap_prev:
+            return
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            for (fid, attr), old in self._snap_prev.items():
+                if old is None:
+                    state.clear_programmer_value(fid, attr)
+                else:
+                    state.set_programmer_value(fid, attr, int(old))
+        except Exception as e:
+            print(f"[VCButton] Snap-Restore-Fehler: {e}")
+        finally:
+            self._snap_prev = {}
+
+    def _snap_swatch_color(self) -> QColor | None:
+        """Repraesentative Farbe des Snaps (erstes Fixture mit RGB) fuer die Kachel."""
+        snap = self._library_snap()
+        if snap is None:
+            return None
+        for attrs in snap.values.values():
+            r = attrs.get("color_r"); g = attrs.get("color_g"); b = attrs.get("color_b")
+            if r is not None or g is not None or b is not None:
+                return QColor(int(r or 0), int(g or 0), int(b or 0))
+        return None
+
     # ── Action ───────────────────────────────────────────────────────────────
 
     def _trigger(self, press: bool):
@@ -181,6 +256,28 @@ class VCButton(VCWidget):
                 self._apply_snapshot(self.snapshot_index)
             return
 
+        if self.action == ButtonAction.LIBRARY_SNAP:
+            if self.snap_mode == "flash":
+                # Halten: beim Druck setzen, beim Loslassen zuruecknehmen.
+                if press:
+                    self._apply_library_snap()
+                else:
+                    self._restore_library_snap()
+            elif self.snap_mode == "set":
+                # Setzen: bleibt bestehen (kein Toggle/Restore).
+                if press:
+                    self._apply_library_snap()
+                    self._snap_active = True
+            else:  # "toggle"
+                if press:
+                    if self._snap_active:
+                        self._restore_library_snap()
+                        self._snap_active = False
+                    else:
+                        self._apply_library_snap()
+                        self._snap_active = True
+            return
+
         if self.action == ButtonAction.CLEAR:
             if press:
                 try:
@@ -194,6 +291,16 @@ class VCButton(VCWidget):
                 try:
                     from src.core.engine.bpm_manager import get_bpm_manager
                     get_bpm_manager().tap()
+                except Exception:
+                    pass
+            return
+
+        if self.action == ButtonAction.EFFECT_ACTION:
+            # Phase 6: Effekt-Aktion auf dem gebundenen / aktiven Effekt ausloesen.
+            if press:
+                try:
+                    from src.core.engine import effect_live
+                    effect_live.do_action(self.effect_action_key, self.function_id)
                 except Exception:
                     pass
             return
@@ -274,12 +381,19 @@ class VCButton(VCWidget):
     def paintEvent(self, event):
         super().paintEvent(event)
         p = QPainter(self)
-        bg = self._bg_color.lighter(160) if self._pressed else self._bg_color
+        # "lit" = gedrueckt ODER ein Bibliothek-Snap-Toggle ist aktiv (bleibt an).
+        snap_on = (self.action == ButtonAction.LIBRARY_SNAP and self._snap_active)
+        lit = self._pressed or snap_on
+        bg = self._bg_color.lighter(160) if lit else self._bg_color
         p.fillRect(self.rect(), bg)
 
         # "Gedrueckt"-Feedback (Maus ODER MIDI): deutlicher heller Rahmen
         if self._pressed:
             p.setPen(QPen(QColor("#ffe680"), 3))
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+        elif snap_on:
+            # Aktiver Snap-Toggle: dezenter gruener Rahmen (an, aber nicht gedrueckt).
+            p.setPen(QPen(QColor("#58d68d"), 2))
             p.drawRect(self.rect().adjusted(1, 1, -2, -2))
 
         # MIDI-Learn-Arm: orange Rahmen pulsieren
@@ -307,6 +421,10 @@ class VCButton(VCWidget):
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
         elif self.action == ButtonAction.SNAPSHOT:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ffd700"))
+        elif self.action == ButtonAction.LIBRARY_SNAP:
+            # Farbbalken in der Snap-Farbe (Bibliothek-Look auf einen Blick).
+            sc = self._snap_swatch_color() or QColor("#b388ff")
+            p.fillRect(0, self.height() - 4, self.width(), 4, sc)
 
         # MIDI-Bindung-Indikator oben rechts
         if self.midi_data1 >= 0:
@@ -360,6 +478,37 @@ class VCButton(VCWidget):
                     break
         form.addRow("Snapshot:", snap_combo)
 
+        # Bibliothek-Snap (Farbe/Look) — Aktion = LibrarySnap
+        lib_combo = QComboBox()
+        lib_combo.addItem("(keiner)", -1)
+        self._populate_library_combo(lib_combo)
+        if self.snap_id is not None:
+            for i in range(lib_combo.count()):
+                if lib_combo.itemData(i) == self.snap_id:
+                    lib_combo.setCurrentIndex(i)
+                    break
+        form.addRow("Bibliothek-Farbe/Snap:", lib_combo)
+
+        snap_mode_combo = QComboBox()
+        _SNAP_MODES = [("toggle", "Umschalten (an/aus)"),
+                       ("set", "Setzen (bleibt)"),
+                       ("flash", "Halten (nur gedrückt)")]
+        for key, label in _SNAP_MODES:
+            snap_mode_combo.addItem(label, key)
+        for i, (key, _l) in enumerate(_SNAP_MODES):
+            if key == self.snap_mode:
+                snap_mode_combo.setCurrentIndex(i)
+                break
+        form.addRow("Tasten-Modus (Snap):", snap_mode_combo)
+
+        # Phase 6: Effekt-Aktion (nur bei Aktion = EffectAction)
+        eff_action_edit = QLineEdit(self.effect_action_key)
+        eff_action_edit.setToolTip(
+            "Effekt-Aktion (Aktion = EffectAction): add_color, remove_color, "
+            "toggle_color, next_color, prev_color, reverse_direction, toggle_bounce, "
+            "toggle_freeze, clear_live_override, commit_live, tap")
+        form.addRow("Effekt-Aktion (EffectAction):", eff_action_edit)
+
         form.addRow(QLabel("── MIDI-Bindung ──"))
 
         midi_type_combo = QComboBox()
@@ -407,6 +556,12 @@ class VCButton(VCWidget):
                 self.function_id = None
             snap_idx = snap_combo.currentData()
             self.snapshot_index = snap_idx if snap_idx >= 0 else None
+            lib_id = lib_combo.currentData()
+            self.snap_id = lib_id if lib_id is not None and lib_id >= 0 else None
+            self.snap_mode = snap_mode_combo.currentData() or "toggle"
+            self._snap_active = False
+            self._snap_prev = {}
+            self.effect_action_key = eff_action_edit.text().strip() or self.effect_action_key
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
@@ -437,6 +592,16 @@ class VCButton(VCWidget):
         except Exception:
             pass
 
+    def _populate_library_combo(self, combo: QComboBox):
+        """Listet die Snaps der Show-Bibliothek (Farben/Looks) nach Ordner+Name."""
+        try:
+            from src.core.engine.snap_library import get_snap_library
+            for s in get_snap_library().snaps_sorted():
+                label = f"{s.folder}/{s.name}" if s.folder else s.name
+                combo.addItem(label, int(s.id))
+        except Exception as e:
+            print(f"[VCButton] library combo error: {e}")
+
     # ── Serialization ─────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
@@ -444,6 +609,9 @@ class VCButton(VCWidget):
         d["action"] = self.action.value
         d["function_id"] = self.function_id
         d["snapshot_index"] = self.snapshot_index
+        d["snap_id"] = self.snap_id
+        d["snap_mode"] = self.snap_mode
+        d["effect_action_key"] = self.effect_action_key
         d["exclusive"] = self.exclusive
         d["clear_programmer"] = self.clear_programmer
         d["pad_style"] = self.pad_style
@@ -458,6 +626,9 @@ class VCButton(VCWidget):
         self.action = ButtonAction(d.get("action", "Toggle"))
         self.function_id = d.get("function_id")
         self.snapshot_index = d.get("snapshot_index")
+        self.snap_id = d.get("snap_id")
+        self.snap_mode = d.get("snap_mode", "toggle")
+        self.effect_action_key = d.get("effect_action_key", "next_color")
         self.exclusive = bool(d.get("exclusive", False))
         self.clear_programmer = bool(d.get("clear_programmer", False))
         self.pad_style = d.get("pad_style", "mirror")

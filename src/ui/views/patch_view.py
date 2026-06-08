@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
+from src.ui.widgets import mini_icons as _mini
 from src.core.app_state import get_state, AppState
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
@@ -243,6 +244,9 @@ class PatchView(QWidget):
                     item.setForeground(QColor("#ff6666"))
                 else:
                     item.setBackground(bg)
+                # Geraetetyp-Icon links neben das Label (Spalte 1) setzen.
+                if col == 1:
+                    item.setIcon(_mini.fixture_icon(f.fixture_type))
                 self._table.setItem(row, col, item)
 
         self._univ_bar.update_fixtures(fixtures)

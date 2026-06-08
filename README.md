@@ -215,6 +215,29 @@ LightOS/
 
 ---
 
+## Dokumentation
+
+| Thema | Datei |
+|---|---|
+| **Schritt‑für‑Schritt (APC mini + 4 RGBW‑PAR)** | **[docs/APC_SCHRITT_FUER_SCHRITT.md](docs/APC_SCHRITT_FUER_SCHRITT.md)** |
+| **Seiten‑Übersicht mit Bildern (welche Taste tut was)** | **[docs/APC_SEITEN_UEBERSICHT.md](docs/APC_SEITEN_UEBERSICHT.md)** |
+| Test‑Show‑Referenz / Hintergrund | [docs/APC_TEST_SHOW.md](docs/APC_TEST_SHOW.md) |
+| **Feature‑Showcase (alle Features, selbst‑verifizierend)** | **[docs/FEATURE_SHOWCASE.md](docs/FEATURE_SHOWCASE.md)** |
+| Komplette Oberflächen‑Anleitung | [docs/ANLEITUNG.md](docs/ANLEITUNG.md) |
+| Praxis‑Workflows (Schritt für Schritt) | [docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
+| Effekte & Geschwindigkeit | [docs/EFFEKTE.md](docs/EFFEKTE.md) |
+| RGB‑Matrix live programmieren | [docs/MATRIX_LIVE.md](docs/MATRIX_LIVE.md) |
+| Show‑Dateiformat | [docs/SHOW_FILE_FORMAT.md](docs/SHOW_FILE_FORMAT.md) |
+| Art‑Net / DMX‑Protokoll | [docs/ARTNET.md](docs/ARTNET.md) · [docs/DMX_PROTOCOL.md](docs/DMX_PROTOCOL.md) |
+
+Schneller Einstieg in die mitgelieferte Demo für die echte Hardware:
+```cmd
+venv\Scripts\python tools\build_apc_test_show.py       :: shows\APC_Test_Komplett.lshow neu bauen
+venv\Scripts\python tools\build_feature_showcase.py    :: shows\Feature_Showcase.lshow (alle Features)
+```
+
+---
+
 ## Status
 
 Diese Software ist in aktiver Entwicklung und wird kontinuierlich erweitert.

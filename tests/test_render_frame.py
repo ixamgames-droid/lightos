@@ -55,6 +55,9 @@ def _make_state():
     st._patched_set = {}
     st._engine_extra_prev = {}
     st._patch_cache = [_Fx(1, 1, 10)]      # Adressen 10..13
+    import threading as _t, types as _ty
+    st._prog_lock = _t.RLock()             # set_programmer_value/_render_frame
+    st.output_manager = _ty.SimpleNamespace(set_gm_address_mask=lambda m: None)
     return st
 
 

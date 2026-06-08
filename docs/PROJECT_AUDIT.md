@@ -79,6 +79,48 @@ abgesprochen: Engine besitzt gepatchte Fixture-Kanäle.
 **Noch offen:** C5 (sACN — Hardware-Test), C8 (restliche Thread-Disziplin: Legacy-`_emit`
 cross-thread) + MITTEL/NIEDRIG unten.
 
+## ✅ Behoben am 2026-06-08 (Multi-Agent-Audit-Runde 3)
+
+Frische Audit-Runde (3 Sub-Agents: Netzwerk/Eingabe, Concurrency, Engine-Logik),
+jeder Befund im Code verifiziert. Umgesetzte Fixes:
+
+- **B1/C8 — UI-Thread-Marshalling [behoben].** `AppState._emit` aus Worker-Threads
+  (MIDI/OSC/Web/Audio) rief Legacy-Callbacks (und damit `setText`/`update()`)
+  direkt im Fremd-Thread → sporadische Qt-Crashes. Jetzt: `set_ui_marshaller`
+  (vom `MainWindow` via `Signal(object)` gesetzt) verlagert die komplette
+  Event-Zustellung off-thread in den UI-Thread; auf dem UI-Thread laeuft `_emit`
+  unveraendert synchron. `_emit` in `_emit`/`_emit_impl` aufgeteilt.
+- **B2 — `programmer` jetzt unter `_prog_lock` (RLock).** `set_programmer_value`,
+  `clear_programmer`, `_clear_programmer_attr` und der Render-Snapshot in
+  `_render_frame` sind serialisiert → kein „dict changed size during iteration".
+- **B3 — `FunctionManager` jetzt unter `_lock`.** `start`/`stop`/`tick`
+  (Reihenfolge-Snapshot + Finalisierung) serialisiert; der Lock wird NICHT
+  waehrend `f.write()` gehalten.
+- **B4 — Grand-Master skaliert nur Intensitaet/Farbe.** Neue GM-Adressmaske
+  (`_rebuild_render_plan` → `OutputManager.set_gm_address_mask`); `_send_all`
+  dimmt nur Maske, Pan/Tilt/Gobo/Prism bleiben unberuehrt. Universen ohne Patch
+  (rohes DMX) dimmen weiter global (Fallback).
+- **B5 — `_emit` iteriert ueber Listenkopie** und loggt Callback-Exceptions
+  (statt sie stumm zu verschlucken).
+- **B6 — `_send_all` iteriert `_tick_callbacks` ueber Kopie** (UI-Thread mutiert).
+- **B7 — `Universe.set_channel` gehaertet:** `assert` → echte Validierung
+  (Out-of-range-Kanal verworfen, Wert auf 0–255 geklemmt). `-O`-sicher, kein
+  Negativ-Index-Wraparound mehr. Web-`/api/channel` validiert `channel` zusaetzlich.
+- **B8 — ArtNet/sACN-Input klemmen die Laengenfelder** (`length` bzw.
+  `prop_count`) gegen reale Paketlaenge und 512 → DMX nie > 512 Slots.
+- **C5/D2 — sACN-Sender E1.31-spec-konform neu** (`sacn.py`): korrekte
+  Flags+Length (`0x7000|pdu_len`) je Layer, Root-/Framing-Vector als 4-Byte,
+  638-Byte-Paket fuer 512 Kanaele, Multicast `239.255.<hi>.<lo>`. Verifiziert:
+  PDU-Laengen 622/600/523, Round-Trip durch den eigenen Receiver.
+  **⚠ Noch offen:** Verifikation gegen echte sACN-Hardware/Wireshark.
+
+**Bewusst NICHT geaendert (Design-Entscheidung des Bedieners):** Web-/OSC-Server
+binden weiter auf `0.0.0.0` ohne Auth (beide Server standardmaessig aus; Schutz =
+Netz-Isolation). Realistisch nur bei aktivem Server relevant.
+
+Tests: 397 grün (+ neue `tests/test_audit_fixes_2026_06_08.py`: GM-Maske,
+set_channel-Haertung, sACN-Konformitaet/Parser-Clamp, Concurrency-Smoke).
+
 ## 2. Befunde nach Schweregrad
 
 ### 🔴 KRITISCH
@@ -131,3 +173,51 @@ cross-thread) + MITTEL/NIEDRIG unten.
 3. **sACN (C5)** spec-konform neu aufbauen (idealerweise `sacn`-Lib) — braucht Hardware-/Wireshark-Test.
 4. **Thread-Disziplin (C8)** — Legacy-`_emit` in den UI-Thread marshallen oder `programmer` mit Lock.
 5. **Rest MITTEL/NIEDRIG** nach Bedarf.
+
+---
+
+## 4. Layering-/Überschreib-Audit (2026-06-07)
+
+Fokus: falsch überschriebene Werte, doppelte Wertquellen, Kombinierbarkeit von
+Effekt-Ebenen (Matrix Dimmer + Matrix Color, Snap + Matrix), VC-Aktivierung.
+
+### ✅ Behoben
+- **LAYER-01 — nicht-deterministische LTP-Reihenfolge [behoben].**
+  `FunctionManager.tick()` iterierte über das **ungeordnete** `_running_ids`-Set
+  statt über `_start_order`. Schrieben zwei laufende Funktionen denselben Kanal
+  (z. B. eine Matrix mit `drive_intensity=True` + eine Dimmer-Matrix, oder zwei
+  Effekte auf denselben Dimmer), gewann ein **zufälliger** Writer (Hash-Reihenfolge)
+  statt der zuletzt gestarteten Funktion. Fix: Tick läuft jetzt in `_start_order`
+  (zuletzt gestartet = schreibt zuletzt = gewinnt); `_start_order` wird mit
+  selbst-beendeten Funktionen synchron gehalten. Regressionstest:
+  `tests/test_function_layer_order.py`.
+
+### ✅ Verifiziert in Ordnung (kein Bug)
+- **Kein Doppel-Schreibpfad:** `PlaybackEngine._loop`/`_flush_to_dmx` ist Legacy
+  und wird nicht mehr aus einem Thread getrieben (`start()` setzt nur ein Flag).
+  Einziger Render-Pfad ist `AppState._render_frame`.
+- **Matrix speichert nur Matrix-Parameter** (`to_dict`), keinen DMX-Snapshot →
+  „Matrix pur" lässt alle Nicht-Matrix-Kanäle leer. Die Style-Kanalmaske in
+  `RgbMatrixInstance.write` schreibt je Style nur Farbe **oder** Dimmer **oder**
+  Shutter, andere Kanäle bleiben unangetastet → Ebenen kombinierbar.
+- **Szene/Snap speichert nur ausgewählte Attribute** (`ChannelSelectDialog` +
+  `programmer_to_scene_values`) → Farbe- und Dimmer-Ebenen stapelbar.
+- **VC-Drag/Drop bindet korrekt:** Function-/Snap-/Snapshot-MIME-Typen stimmen
+  zwischen allen Drag-Quellen (FunctionManager, Library-Panel) und dem VC-Canvas
+  überein; ein gedroppter Effekt wird zu `FUNCTION_TOGGLE` (aktivierbar).
+- **Keine globale MIDI-Doppelbelegung mehr:** `data/midi_mappings.json` enthält
+  nur die 8 `page_select`-Notes (82–89), kein CC-Konflikt mit Fadern.
+
+### 🟠 Offen / Design-Entscheidung nötig
+- **VC-EFFEKT-01 — Fader aktivieren keinen Effekt.** `EFFECT_PARAM` /
+  `EFFECT_INTENSITY` / `EFFECT_SPEED`-Fader (`vc_slider.py`) **regeln** einen
+  Effekt, **starten** ihn aber nicht. Ist der Effekt nicht aktiv, bewirkt der
+  Fader nichts Sichtbares → Eindruck „ich kann nur Werte anpassen, nicht
+  aktivieren". Mögliche Behebung: Fader > 0 startet die Funktion, Fader = 0
+  stoppt sie (wie eine Playback-Fader-Cue).
+- **VC-EFFEKT-02 — Intensity-Fader wirkungslos bei reiner Farb-Matrix.** Bei
+  Fixtures **mit** Dimmer-Kanal skaliert die Per-Effekt-Intensität nur den
+  Dimmer. Eine Farb-Matrix (`drive_intensity=False`) schreibt den aber nicht →
+  Intensity-Fader bleibt ohne Wirkung; Helligkeit kommt aus der separaten
+  Dimmer-Ebene/`base_levels`. Konsistent mit dem Ebenen-Modell, aber als UX
+  überraschend.

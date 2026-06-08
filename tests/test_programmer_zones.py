@@ -36,7 +36,9 @@ def test_programmer_classic_builds(tmp_path, monkeypatch):
     pv = ProgrammerView()
     assert pv._layout_mode == "zones"            # Default seit Phase 0 = Zonen
     assert pv._snap_file_panel is not None
-    assert hasattr(pv, "_attr_tabs")
+    # WP-5: einheitliche Tab-Leiste statt der frueheren Attribut-Tabs.
+    assert hasattr(pv, "_main_tabs")
+    assert hasattr(pv, "_attr_group_tabs")
 
 
 def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
@@ -50,12 +52,15 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     # LINKS / MITTE / UNTEN / RECHTS
     assert hasattr(pv, "_fixture_list")           # LINKS
     assert pv._snap_file_panel is not None        # RECHTS (Snap-Browser, Effekt-Preview entfernt I2.7)
-    assert pv._mitte_stack.count() == 5           # MITTE: Attr / Effekte / EFX / RGB / Palette
+    # MITTE: WP-5 — EINE Tab-Leiste statt Kategorie-Leiste + Stack.
+    labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
+    assert labels == ["Intensity", "Color", "Position", "Weitere",
+                      "Helper", "EFX", "Matrix", "Paletten"], labels
     assert pv._tile_preview is not None           # UNTEN
 
-    # Kategorie-Wechsel wirft nicht.
-    for target in ("Color", "Intensity", "Position", None, "__effects__", "__efx__"):
-        pv._on_category(target)
+    # Tab-Wechsel wirft nicht.
+    for i in range(pv._main_tabs.count()):
+        pv._main_tabs.setCurrentIndex(i)
 
     # Zonen-Widgets nehmen Daten an, ohne zu werfen.
     pv._tile_preview.set_fixtures([1, 2, 3])
@@ -103,7 +108,7 @@ def test_effect_mini_preview_play(tmp_path, monkeypatch):
     from src.core.engine.rgb_matrix import RgbAlgorithm
 
     w = EffectMiniPreview(cols=8, rows=2)
-    w.play(algorithm=RgbAlgorithm.CHASE_H, color1=(0, 255, 0), speed=4.0, label="X")
+    w.play(algorithm=RgbAlgorithm.CHASE, color1=(0, 255, 0), speed=4.0, label="X")
     w.play(algorithm="Rainbow")      # String-Variante
     w.play(algorithm="Unbekannt")    # Fallback ohne Exception
     w._grid.refresh()                # ein Frame rendern

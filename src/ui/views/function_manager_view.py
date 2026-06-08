@@ -10,6 +10,7 @@ from PySide6.QtGui import QFont, QAction, QDrag
 from src.core.engine.function import FunctionType
 from src.core.engine.function_manager import get_function_manager
 from src.core.engine.script_func import ScriptFunction
+from src.ui.widgets import mini_icons as _mini
 
 
 FUNCTION_MIME = "application/x-lightos-function"
@@ -75,6 +76,21 @@ _TYPE_ORDER = [
     FunctionType.Audio,
     SCRIPT_GROUP,
 ]
+
+# Mapping Typ/Gruppe -> mini_icons kind (fuer die Gruppen-Ueberschriften)
+_TYPE_ICON_KIND = {
+    FunctionType.Scene:     "scene",
+    FunctionType.Chaser:    "chaser",
+    FunctionType.Sequence:  "sequence",
+    FunctionType.Collection:"collection",
+    FunctionType.Show:      "show",
+    FunctionType.EFX:       "efx",
+    FunctionType.RGBMatrix: "rgbmatrix",
+    FunctionType.Audio:     "audio",
+    SCRIPT_GROUP:           "script",
+    LAYERED_EFFECT_GROUP:   "layered",
+    CAROUSEL_GROUP:         "carousel",
+}
 
 
 class FunctionManagerView(QWidget):
@@ -225,6 +241,9 @@ class FunctionManagerView(QWidget):
         for ftype in _TYPE_ORDER:
             top = QTreeWidgetItem(self._tree, [_TYPE_LABELS[ftype]])
             top.setData(0, Qt.ItemDataRole.UserRole, None)
+            kind = _TYPE_ICON_KIND.get(ftype)
+            if kind:
+                top.setIcon(0, _mini.icon_for_kind(kind))
             top.setExpanded(True)
             self._type_items[ftype] = top
 
@@ -247,6 +266,7 @@ class FunctionManagerView(QWidget):
             return None
         item = QTreeWidgetItem(parent, [f.name])
         item.setData(0, Qt.ItemDataRole.UserRole, f.id)
+        item.setIcon(0, _mini.function_icon(f))
         return item
 
     def _refresh_tree(self):
@@ -344,7 +364,9 @@ class FunctionManagerView(QWidget):
         else:
             return
 
-        self._add_tree_item(f)
+        # new_*()/add() emittiert FUNCTION_CHANGED -> _refresh_tree() hat das neue
+        # Item bereits eingefuegt (kein manuelles _add_tree_item -> sonst Doppel-
+        # Eintrag). Nur noch selektieren + Editor oeffnen.
         self._select_by_id(f.id)
         self._open_editor(f.id)
 

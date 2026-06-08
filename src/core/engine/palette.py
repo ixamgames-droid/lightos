@@ -140,9 +140,22 @@ class PaletteManager:
 
     def add(self, palette: Palette):
         self._palettes.append(palette)
+        # Zentrale Benachrichtigung: neue Palette erscheint sofort in allen
+        # Paletten-Ansichten (eingebettet + Sub-Tab) ohne manuelles Neuladen.
+        # _load_defaults()/from_dict() umgehen add() (direktes append) → kein Spam.
+        self._notify_palettes_changed()
 
     def remove(self, palette: Palette):
         self._palettes.remove(palette)
+        self._notify_palettes_changed()
+
+    @staticmethod
+    def _notify_palettes_changed(data=None):
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.PALETTE_CHANGED, data)
+        except Exception:
+            pass
 
     def get_by_type(self, ptype: PaletteType) -> list[Palette]:
         if ptype == PaletteType.ALL:

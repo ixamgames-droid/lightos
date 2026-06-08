@@ -1,5 +1,6 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
+import threading
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from .database.models import Base, PatchedFixture
@@ -26,6 +27,17 @@ class AppState:
         self.output_manager = OutputManager()
         self.universes: dict[int, Universe] = {}
         self.programmer: dict[int, dict[str, int]] = {}
+        # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
+        # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
+        # Output-Thread im _render_frame einen Snapshot zieht — ohne Lock drohte
+        # "dict changed size during iteration". RLock, damit re-entrante Aufrufe
+        # (z. B. ueber Undo) nicht selbst-blockieren.
+        self._prog_lock = threading.RLock()
+        # Marshalling von Event-Callbacks in den Qt-UI-Thread (vom MainWindow per
+        # set_ui_marshaller gesetzt). Ohne dieses Marshalling wuerden Worker-
+        # Threads (MIDI/OSC/Audio) ueber _emit direkt Qt-Widgets anfassen → Crash.
+        self._ui_marshaller = None
+        self._ui_thread_id: int | None = None
         # Gemeinsame Programmer-Geraeteauswahl (Reihenfolge = Auswahl-Reihenfolge).
         # Wird vom ProgrammerView gesetzt; alle Kategorien (RGB Matrix, Effekte,
         # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
@@ -326,6 +338,17 @@ class AppState:
         self._commit_spans = spans
         self._patched_set = {u: frozenset(s) for u, s in addrs.items()}
         self._engine_extra_prev = {}
+        # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
+        # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
+        gm_mask: dict[int, set] = {}
+        for fid, (fx, chans) in fix_index.items():
+            for addr in self._fixture_intensity_addrs(fx, chans):
+                gm_mask.setdefault(fx.universe, set()).add(addr)
+        try:
+            self.output_manager.set_gm_address_mask(
+                {u: frozenset(s) for u, s in gm_mask.items()})
+        except Exception as e:
+            print(f"[AppState] set gm mask error: {e}")
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}
@@ -415,14 +438,15 @@ class AppState:
 
     def set_programmer_value(self, fid: int, attribute: str, value: int,
                              undoable: bool = False):
-        old = self.programmer.get(fid, {}).get(attribute, None)
-        if fid not in self.programmer:
-            self.programmer[fid] = {}
-        self.programmer[fid][attribute] = max(0, min(255, value))
+        with self._prog_lock:
+            old = self.programmer.get(fid, {}).get(attribute, None)
+            if fid not in self.programmer:
+                self.programmer[fid] = {}
+            self.programmer[fid][attribute] = max(0, min(255, value))
+            new_val = self.programmer[fid][attribute]
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
-        if undoable and old != self.programmer[fid][attribute]:
-            new_val = self.programmer[fid][attribute]
+        if undoable and old != new_val:
             self._push_undo(
                 label=f"Programmer FID{fid}.{attribute}={new_val}",
                 do=lambda: None,
@@ -435,23 +459,31 @@ class AppState:
             )
 
     def _clear_programmer_attr(self, fid: int, attribute: str):
-        if fid in self.programmer:
+        with self._prog_lock:
+            if fid not in self.programmer:
+                return
             self.programmer[fid].pop(attribute, None)
             if not self.programmer[fid]:
                 self.programmer.pop(fid, None)
-            self._flush_programmer_to_dmx(fid)
-            self._emit("programmer_changed", fid)
+        self._flush_programmer_to_dmx(fid)
+        self._emit("programmer_changed", fid)
 
     def clear_programmer(self, fid: int | None = None):
-        if fid is None:
-            self.programmer.clear()
-        else:
-            self.programmer.pop(fid, None)
+        with self._prog_lock:
+            if fid is None:
+                self.programmer.clear()
+            else:
+                self.programmer.pop(fid, None)
         self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
 
     def get_programmer_value(self, fid: int, attribute: str) -> int | None:
         return self.programmer.get(fid, {}).get(attribute)
+
+    def clear_programmer_value(self, fid: int, attribute: str):
+        """Entfernt einen einzelnen Programmer-Wert (z. B. fuer Toggle-/Flash-
+        Ruecknahme einer Farb-/Snap-Taste in der Virtual Console)."""
+        self._clear_programmer_attr(int(fid), attribute)
 
     # ── Gemeinsame Geraeteauswahl (R1) ─────────────────────────────────────────
 
@@ -524,8 +556,9 @@ class AppState:
         # Input-Merge legt Universen an). Iteration ueber Live-Dicts wuerde sonst
         # "dict changed size during iteration" werfen.
         live_universes = list(self.universes.items())
-        programmer = {fid: dict(attrs)
-                      for fid, attrs in list(self.programmer.items())}
+        with self._prog_lock:
+            programmer = {fid: dict(attrs)
+                          for fid, attrs in self.programmer.items()}
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
@@ -539,6 +572,26 @@ class AppState:
             self.function_manager.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        # 2a. WP-6 (Abschnitt 8): Adressen erfassen, die der FUNKTIONS-Layer
+        #     (Matrix/EFX/…) in DIESEM Frame treibt (Scratch != Default). Der
+        #     Programmer-LTP ueberschreibt diese Nicht-Intensitaets-Kanaele dann
+        #     NICHT mehr (Funktionen "besitzen" sie) — eine laufende Matrix-Farbe
+        #     wird also nicht vom normalen Color-Tab ueberschrieben. Intensitaet
+        #     wird weiterhin multipliziert statt ersetzt (EE-02, s. u.). Nur
+        #     gepatchte Adressen werden geprueft (schnell).
+        func_driven: dict[int, set[int]] = {}
+        for univ, su in scratch.items():
+            base = self._default_frame.get(univ)
+            patched = self._patched_set.get(univ, frozenset())
+            if not patched:
+                continue
+            cur = su.get_all()
+            if base:
+                fd = {a for a in patched if cur[a - 1] != base[a - 1]}
+            else:
+                fd = {a for a in patched if cur[a - 1] != 0}
+            if fd:
+                func_driven[univ] = fd
         # 2b. Welche Fixtures treibt der EFFEKT-Layer (Funktionen) auf ihren
         #     Intensitaets-Kanaelen? Basis fuer Programmer-Multiply (EE-02).
         #     Bewusst VOR den Executoren erfasst: Cues behalten LTP-Ersatz durch
@@ -586,7 +639,8 @@ class AppState:
                     except (TypeError, ValueError):
                         continue
                     prog_factor[fidi] = min(prog_factor.get(fidi, 1.0), f)
-        self._apply_fixture_map(scratch, programmer, skip_intensity_for=set(prog_factor))
+        self._apply_fixture_map(scratch, programmer, skip_intensity_for=set(prog_factor),
+                                protect_addrs=func_driven)
 
         # 4b. Multiplikativer Dimmer-Master: submaster * Gruppen-/Fixture-Dimmer *
         #     Programmer-Dimmer (nur wo Effekt aktiv). Skaliert pro Fixture die
@@ -636,13 +690,19 @@ class AppState:
                 self._engine_extra_prev[univ] = cur
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
-                           skip_intensity_for: set | None = None):
+                           skip_intensity_for: set | None = None,
+                           protect_addrs: dict | None = None):
         """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
         nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht).
 
         skip_intensity_for: fids, fuer die Intensitaets-Attribute NICHT absolut
-        geschrieben werden (sie werden stattdessen multiplikativ angewandt, EE-02)."""
+        geschrieben werden (sie werden stattdessen multiplikativ angewandt, EE-02).
+        protect_addrs: {universe: set(addr)} — Nicht-Intensitaets-Kanaele, die der
+        Funktions-Layer (Matrix/EFX) treibt und die dieser Layer NICHT ueberschreiben
+        darf (WP-6/Abschnitt 8). Intensitaet bleibt unberuehrt von protect (sie wird
+        ueber skip_intensity_for multipliziert)."""
         skip = skip_intensity_for or ()
+        protect = protect_addrs or {}
         for fid, attrs in fixmap.items():
             try:
                 fidi = int(fid)
@@ -656,13 +716,20 @@ class AppState:
             if su is None:
                 continue
             skip_inten = fidi in skip
+            prot = protect.get(fx.universe, ())
             for ch in chans:
                 if ch.attribute not in attrs:
                     continue
-                if skip_inten and (ch.attribute or "").lower() in _DIM_INTENSITY_ATTRS:
+                attr_l = (ch.attribute or "").lower()
+                is_inten = attr_l in _DIM_INTENSITY_ATTRS
+                if skip_inten and is_inten:
                     continue
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
+                    continue
+                # WP-6: laufende Funktion besitzt diesen (Nicht-Intensitaets-)Kanal
+                # -> Programmer schreibt nicht drueber (kein Blind-Overwrite).
+                if (not is_inten) and addr in prot:
                     continue
                 v = attrs[ch.attribute]
                 try:
@@ -712,12 +779,15 @@ class AppState:
         from .engine.cue_stack import CueStack
         stack = CueStack(name)
         self.cue_stacks.append(stack)
+        # Legacy-Callbacks (stacks_changed) UND zentraler Bus (cue_stack_changed).
         self._emit("stacks_changed", None)
+        self._emit("cue_stack_changed", None)
         return stack
 
     def remove_cue_stack(self, stack):
         self.cue_stacks.remove(stack)
         self._emit("stacks_changed", None)
+        self._emit("cue_stack_changed", None)
 
     def record_cue(self, stack, number: float, label: str = "",
                    fade_in: float = 2.0, fade_out: float = 0.0):
@@ -728,16 +798,42 @@ class AppState:
                   fade_out=fade_out, values=values)
         stack.add_cue(cue)
         self._emit("cue_recorded", (stack, cue))
+        self._emit("cue_stack_changed", None)
         return cue
 
+    def notify_groups_changed(self, data=None):
+        """Zentrale Benachrichtigung bei Fixture-Gruppen-Aenderungen (erstellt/
+        geaendert/geloescht). Alle gruppen-konsumierenden Views (Programmer,
+        Live View, Matrix, Patcher) lauschen auf GROUP_CHANGED und aktualisieren
+        ihre Gruppenlisten ohne manuelles Neuladen (Abschnitt 1)."""
+        self._emit("group_changed", data)
+
     def _emit(self, event: str, data=None):
-        """Emit auf Legacy-Callbacks UND auf neuen StateSync routen."""
-        # Legacy callbacks
-        for cb in self._callbacks:
+        """Emit auf Legacy-Callbacks UND auf neuen StateSync routen.
+
+        Wird der Emit aus einem Worker-Thread (MIDI/OSC/Web/Audio) ausgeloest und
+        ist ein UI-Marshaller registriert, wird die komplette Zustellung in den
+        Qt-UI-Thread verlagert. Damit fassen die Listener (Views) Qt-Widgets nie
+        aus einem Fremd-Thread an (sporadische Crashes). Auf dem UI-Thread selbst
+        und vor Registrierung laeuft der Emit unveraendert synchron.
+        """
+        marshaller = self._ui_marshaller
+        if marshaller is not None and threading.get_ident() != self._ui_thread_id:
+            try:
+                marshaller(lambda e=event, d=data: self._emit_impl(e, d))
+                return
+            except Exception:
+                pass  # Fallback: lieber synchron als Event-Verlust
+        self._emit_impl(event, data)
+
+    def _emit_impl(self, event: str, data=None):
+        # Legacy callbacks — ueber eine Kopie iterieren, damit ein Callback, der
+        # sich (un)subscribed, die Iteration nicht sprengt.
+        for cb in list(self._callbacks):
             try:
                 cb(event, data)
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[AppState] emit callback error ({event}): {exc}")
         # Neue zentrale Sync-Routing
         try:
             from .sync import SyncEvent
@@ -748,6 +844,13 @@ class AppState:
             self.sync.emit(ev, data)
         except Exception:
             pass
+
+    def set_ui_marshaller(self, fn):
+        """Registriert eine Funktion fn(callable)->None, die ihr Argument im
+        Qt-UI-Thread ausfuehrt (vom MainWindow gesetzt). Speichert zugleich die
+        ID des aufrufenden Threads als 'UI-Thread'."""
+        self._ui_marshaller = fn
+        self._ui_thread_id = threading.get_ident()
 
 
 # Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).

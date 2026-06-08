@@ -15,12 +15,34 @@ from .rgb_matrix import RgbAlgorithm
 class ParamSpec:
     key: str
     label: str
-    kind: str            # "int" | "float" | "bool"
+    # "int" | "float" | "bool" | "select" | "color" | "color_sequence" | "action"
+    kind: str
     default: object
     min: float = 0.0
     max: float = 0.0
     step: float = 1.0
     tooltip: str = ""
+    # Auswahlwerte fuer kind=="select" (Tupel aus internen Werten oder
+    # (wert, label)-Paaren). Leer fuer alle anderen Typen.
+    options: tuple = ()
+    # Live-Programming-Metadaten (Phase 2): kann der Parameter auf ein
+    # Bedienelement der virtuellen Konsole / MIDI gelegt werden, und darf er
+    # im laufenden Effekt live geaendert werden? Die VC liest diese Flags, um
+    # dynamisch zu erkennen, was steuerbar ist (Anforderung #13).
+    mappable: bool = True
+    live_editable: bool = True
+    # Style-/Bedingungs-Sichtbarkeit (WP-2, Abschnitte 3/4/10): ein Parameter ist
+    # nur relevant (= sichtbar UND wird geschrieben), wenn er zum gewaehlten
+    # MatrixStyle passt und seine `when`-Bedingungen erfuellt sind. So zeigt der
+    # Random-/Fill-Algorithmus bei Style "Dimmer" nur Helligkeits-Parameter, bei
+    # "RGB/RGBW" nur Farb-Parameter usw. — und schreibt auch nur diese (keine
+    # gegenseitige Ueberschreibung von Dimmer-/Color-/Effect-Werten).
+    #   styles: leer = fuer alle Styles relevant; sonst nur fuer die genannten
+    #           MatrixStyle-Werte ("RGB"/"RGBW"/"Dimmer"/"Shutter").
+    #   when:   Tupel aus (anderer_key, (erlaubte_werte, …)) — alle Bedingungen
+    #           muessen erfuellt sein (z. B. (("mode", ("strobe",)),)).
+    styles: tuple = ()
+    when: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -28,6 +50,10 @@ class AlgoMeta:
     description: str = ""
     direction: bool = False          # Richtung Vor/Rueck sinnvoll?
     params: tuple = field(default_factory=tuple)
+    # Anzahl der Farbfelder (C1..C3), die der Algorithmus tatsaechlich auswertet.
+    # 0 = gar keine (z. B. Rainbow erzeugt eigene HSV-Farben). So zeigt die View
+    # nur die Farben an, die wirklich programmierbar sind (UI-01).
+    colors: int = 1
 
 
 # Wiederverwendbare Param-Bausteine
@@ -50,33 +76,247 @@ def _fade():
     return ParamSpec("fade", "Schweif", "float", 0.3, 0.0, 1.0, 0.05,
                      "Schweif-Länge hinter dem Strahl (0..1)")
 
+def _after_fade():
+    # WP-4/Abschnitt 5: ex-"Schweif" am Chase, jetzt "After Fade" in Prozent.
+    # 0 % = harter Wechsel, 100 % = langer weicher Übergang. Eigener Key
+    # (after_fade) -> eindeutige Migration der alten 0..1-Werte (siehe apply_dict).
+    return ParamSpec("after_fade", "After Fade", "float", 30.0, 0.0, 100.0, 5.0,
+                     "Nachfaden hinter dem Läufer in % (0=harter Wechsel, 100=langer weicher Übergang)")
+
+def _color_order():
+    # WP-4/Abschnitt 6: Reihenfolge des Farbwechsels pro Runde (nur wenn aktiv).
+    return ParamSpec("color_order", "Farb-Reihenfolge", "select", "normal",
+                     options=("normal", "random", "pingpong"),
+                     when=(("color_cycle", (True,)),),
+                     tooltip="Reihenfolge, in der pro Runde durch die Color-Sequence gewechselt wird")
+
 def _turns():
     return ParamSpec("turns", "Windungen", "float", 1.0, 0.25, 8.0, 0.25,
                      "Anzahl Spiral-Windungen")
 
+# ── Bausteine fuer die konsolidierten Grundalgorithmen (Phase 3) ──────────────
+def _axis(options=("H", "V", "Diag")):
+    return ParamSpec("axis", "Achse", "select", "H", options=options,
+                     tooltip="Bewegungsachse (horizontal/vertikal/diagonal)")
+
+def _movement(options):
+    return ParamSpec("movement", "Bewegung", "select", "normal", options=options,
+                     tooltip="Bewegungsmodus (normal/bounce/center_out/outside_in)")
+
+def _origin():
+    return ParamSpec("origin", "Ursprung", "select", "left",
+                     options=("left", "right", "top", "bottom", "center", "radial"),
+                     tooltip="Ausgangspunkt/Richtung der Welle")
+
+def _blend():
+    return ParamSpec("blend", "Verlauf", "select", "smooth",
+                     options=("smooth", "steps"),
+                     tooltip="weicher Verlauf oder harte Farb-Baender")
+
+def _edge_fade():
+    return ParamSpec("edge_fade", "Kanten-Fade", "float", 0.0, 0.0, 1.0, 0.05,
+                     "0 = harte Kante, >0 = weicher Uebergang")
+
+def _density():
+    return ParamSpec("density", "Dichte", "float", 1.0, 0.25, 8.0, 0.25,
+                     "Anzahl Wellenberge")
+
+def _spread():
+    return ParamSpec("spread", "Breite", "float", 1.0, 0.25, 8.0, 0.25,
+                     "Breite der hellen Wellenbaender")
+
+def _color_cycle():
+    return ParamSpec("color_cycle", "Farbe pro Runde wechseln", "bool", False,
+                     tooltip="Laeufer wechselt pro Durchlauf durch die Farb-Sequence")
+
+# ── Bausteine fuer die Phase-4-Algorithmen (Fill / Random / ColorFade / Rainbow) ──
+def _level():
+    return ParamSpec("level", "Füll-Level", "float", 100.0, 0.0, 100.0, 1.0,
+                     "Anteil aktiver echter Fixtures (0..100 %) — live steuerbar")
+
+def _fill_dir():
+    return ParamSpec("fill_dir", "Reihenfolge", "select", "left",
+                     options=("left", "right", "top", "bottom",
+                              "center_out", "outside_in", "diag", "random"),
+                     tooltip="Reihenfolge, in der die Fixtures nacheinander gefüllt werden")
+
+# ── WP-3/Abschnitt 4: zeitlicher Fill — style-abhängige Parameter ──────────────
+def _fill_mode_intensity():
+    return ParamSpec("fill_mode", "Füll-Modus", "select", "up",
+                     options=("up", "down", "random"), styles=("Dimmer", "Shutter"),
+                     tooltip="up=nacheinander heller · down=nacheinander dunkler · random=zufällige Helligkeit")
+
+def _fill_mode_color():
+    return ParamSpec("fill_mode", "Füll-Modus", "select", "target",
+                     options=("target", "random", "sequence"), styles=("RGB", "RGBW"),
+                     tooltip="target=zur aktiven Farbe · random=zufällige Farben · sequence=Farben aus der Color-Sequence")
+
+def _fill_speed():
+    return ParamSpec("fill_speed", "Füll-Tempo", "float", 1.0, 0.05, 10.0, 0.05,
+                     "wie schnell die Fixtures nacheinander gefüllt werden")
+
+def _fill_fade():
+    return ParamSpec("fade", "Fade pro Fixture", "float", 0.4, 0.0, 1.0, 0.05,
+                     "weicher Übergang je Fixture (0=harter Schritt, 1=über den ganzen Schritt)")
+
+def _fill_hold():
+    return ParamSpec("hold", "Halte-Zeit", "float", 0.0, 0.0, 20.0, 0.5,
+                     "Pause (in Füll-Schritten), wenn alles gefüllt ist")
+
+def _loop_mode():
+    return ParamSpec("loop_mode", "Loop-Modus", "select", "restart",
+                     options=("restart", "stay", "reverse", "fadeout"),
+                     tooltip="neu starten / stehen bleiben / rückwärts leeren / ausfaden")
+
+def _edge():
+    return ParamSpec("edge", "Kante", "select", "hard", options=("hard", "fade"),
+                     tooltip="harte oder weiche Füllkante")
+
+def _mode(options):
+    return ParamSpec("mode", "Modus", "select", "color", options=options,
+                     tooltip="Random-Art")
+
+# WP-2/Abschnitt 3: style-gefilterte Random-Modi (gleicher Key "mode", aber je
+# Style nur der passende sichtbar -> kein Cross-Overwrite Dimmer/Color).
+def _mode_color():
+    return ParamSpec("mode", "Random Color Mode", "select", "color",
+                     options=("color", "flash"), styles=("RGB", "RGBW"),
+                     tooltip="zufällige Farbe aus der Color-Sequence / kurzer Farb-Blitz")
+
+def _mode_intensity():
+    return ParamSpec("mode", "Random Intensity Mode", "select", "dimmer",
+                     options=("dimmer", "strobe", "pulse", "sparkle"),
+                     styles=("Dimmer", "Shutter"),
+                     tooltip="zufällige Helligkeit / Strobe / Puls / Funkeln")
+
+def _count():
+    return ParamSpec("count", "Aktive Fixtures", "int", 1, 1, 64, 1,
+                     "Anzahl gleichzeitig aktiver echter Fixtures")
+
+def _rate():
+    return ParamSpec("rate", "Rate", "float", 1.0, 0.1, 20.0, 0.1,
+                     "Wie oft die Auswahl wechselt")
+
+def _scope():
+    return ParamSpec("scope", "Auswahl", "select", "all",
+                     options=("all", "row", "col"),
+                     tooltip="komplett zufällig / pro Reihe / pro Spalte")
+
+def _no_repeat():
+    return ParamSpec("no_repeat", "Wiederholschutz", "bool", True,
+                     tooltip="vermeidet, dass direkt dieselben Fixtures erneut gewählt werden")
+
+def _strobe_rate():
+    return ParamSpec("strobe_rate", "Strobe-Rate", "int", 4, 1, 20, 1,
+                     "Blitze pro Auswahl (nur Modus Strobe)",
+                     when=(("mode", ("strobe",)),))
+
+def _hold():
+    return ParamSpec("hold", "Halte-Zeit", "float", 0.0, 0.0, 0.95, 0.05,
+                     "Anteil pro Farbe, bevor übergeblendet wird")
+
+def _pingpong():
+    return ParamSpec("pingpong", "Ping-Pong", "bool", False,
+                     tooltip="Sequence vor und zurück durchlaufen")
+
+def _saturation():
+    return ParamSpec("saturation", "Sättigung", "float", 1.0, 0.0, 1.0, 0.05, "Farbsättigung")
+
+def _value():
+    return ParamSpec("value", "Helligkeit", "float", 1.0, 0.0, 1.0, 0.05, "Farb-Helligkeit")
+
+def _hue_spread():
+    return ParamSpec("spread", "Spread", "float", 1.0, 0.25, 8.0, 0.25,
+                     "Farbzyklen über die Matrix")
+
+def _rainbow_movement():
+    return ParamSpec("movement", "Bewegung", "select", "linear",
+                     options=("linear", "radial", "center_out", "outside_in"),
+                     tooltip="Ausbreitung des Regenbogens")
+
 
 ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
-    RgbAlgorithm.PLAIN:        AlgoMeta("Volle Fläche in C1.", False, ()),
-    RgbAlgorithm.CHASE_H:      AlgoMeta("Horizontales Lauflicht.", True,  (_runner_count(), _runner_width(), _invert())),
-    RgbAlgorithm.CHASE_V:      AlgoMeta("Vertikales Lauflicht.",   True,  (_runner_count(), _runner_width(), _invert())),
-    RgbAlgorithm.CHASE_DIAG:   AlgoMeta("Diagonales Schachbrett.", True,  ()),
-    RgbAlgorithm.WIPE_H:       AlgoMeta("Horizontaler Wipe.",      True,  ()),
-    RgbAlgorithm.WIPE_V:       AlgoMeta("Vertikaler Wipe.",        True,  ()),
-    RgbAlgorithm.RAINBOW:      AlgoMeta("Regenbogen-Verlauf.",     True,  ()),
-    RgbAlgorithm.RANDOM:       AlgoMeta("Zufallsfarben C1/C2/C3.", False, ()),
-    RgbAlgorithm.SPARKLE:      AlgoMeta("Funkeln in C1.",          False, ()),
-    RgbAlgorithm.RADAR:        AlgoMeta("Rotierender Radarstrahl.", True, (_beam_width("Strahlbreite"), _fade(), _invert())),
-    RgbAlgorithm.SINEPLASMA:   AlgoMeta("Sinus-Plasma C1↔C2.",     True,  ()),
-    RgbAlgorithm.COLOR_SCROLL: AlgoMeta("3-Farben-Bänder.",        True,  ()),
-    RgbAlgorithm.CHASE_MULTI:  AlgoMeta("Mehrfarb-Lauflicht.",     True,  ()),
-    RgbAlgorithm.CENTER_OUT:   AlgoMeta("Ring expandiert ab Mitte.", True, (_runner_width("Ringbreite"), _invert())),
-    RgbAlgorithm.OUTER_IN:     AlgoMeta("Ring kontrahiert nach innen.", True, (_runner_width("Ringbreite"), _invert())),
-    RgbAlgorithm.BOUNCE_H:     AlgoMeta("Pingpong horizontal.",    True,  (_runner_width(), _invert())),
-    RgbAlgorithm.BOUNCE_V:     AlgoMeta("Pingpong vertikal.",      True,  (_runner_width(), _invert())),
-    RgbAlgorithm.DIAG_WAVE:    AlgoMeta("Wandernde Diagonalbande.", True, (_runner_width("Bandbreite"), _invert())),
-    RgbAlgorithm.SPIRAL:       AlgoMeta("Rotierender Spiralarm.",  True,  (_turns(), _beam_width("Armbreite"), _invert())),
+    RgbAlgorithm.PLAIN:        AlgoMeta("Volle Fläche in C1.", False, (), colors=1),
+    # ── Konsolidierte Grundalgorithmen (Phase 3) ──────────────────────────────
+    RgbAlgorithm.CHASE:        AlgoMeta(
+        "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farbwechsel pro Runde.",
+        True,
+        (_axis(), _movement(("normal", "bounce", "center_out", "outside_in")),
+         _runner_count(), _runner_width(), _after_fade(), _color_cycle(), _color_order(), _invert()),
+        colors=1),
+    RgbAlgorithm.WIPE:         AlgoMeta(
+        "Wisch über die Matrix (Achse, Bewegung, Kanten-Fade).",
+        True,
+        (_axis(("H", "V")), _movement(("normal", "center_out", "outside_in", "bounce")),
+         _edge_fade()),
+        colors=2),
+    RgbAlgorithm.WAVE:         AlgoMeta(
+        "Welle mit wählbarem Ursprung (links/rechts/oben/unten/Mitte/radial).",
+        True,
+        (_origin(), _density(), _spread()),
+        colors=2),
+    RgbAlgorithm.GRADIENT:     AlgoMeta(
+        "Scrollender Farbverlauf über die Color-Sequence (Achse, weich/Bänder).",
+        True,
+        (_axis(("H", "V")), _blend()),
+        colors=2),
+    RgbAlgorithm.RAINBOW:      AlgoMeta(
+        "Regenbogen (Bewegung, Spread, Sättigung, Helligkeit).",
+        True, (_rainbow_movement(), _hue_spread(), _saturation(), _value()), colors=0),
+    RgbAlgorithm.FILL:         AlgoMeta(
+        "Füllt Gruppe/Matrix Schritt für Schritt — je Style: Helligkeit (up/down/"
+        "random) oder Farbe (Ziel/zufällig/Sequence). Reihenfolge, Tempo, Fade, Loop.",
+        False,
+        (_fill_mode_intensity(), _fill_mode_color(), _fill_dir(), _fill_speed(),
+         _fill_fade(), _fill_hold(), _loop_mode()), colors=3),
+    RgbAlgorithm.RANDOM:       AlgoMeta(
+        "Zufalls-Effekt — Parameter richten sich nach dem Style (Color vs. Dimmer/Shutter).",
+        False,
+        (_mode_color(), _mode_intensity(),
+         _count(), _rate(), _scope(), _no_repeat(), _strobe_rate()), colors=3),
+    RgbAlgorithm.COLORFADE:    AlgoMeta(
+        "Crossfade durch die Color-Sequence (deaktivierte Farben werden übersprungen).",
+        True, (_hold(), _pingpong()), colors=3),
+    RgbAlgorithm.STROBE:       AlgoMeta("Ganzes Feld blitzt an/aus.",  False, (), colors=1),
+    # ── Texturen / Einzel-Looks (bewusst eigenständig) ────────────────────────
+    RgbAlgorithm.RADAR:        AlgoMeta("Rotierender Radarstrahl.", True, (_beam_width("Strahlbreite"), _fade(), _invert()), colors=1),
+    RgbAlgorithm.SPIRAL:       AlgoMeta("Rotierender Spiralarm.",  True,  (_turns(), _beam_width("Armbreite"), _invert()), colors=1),
+    RgbAlgorithm.SINEPLASMA:   AlgoMeta("Sinus-Plasma C1↔C2.",     True,  (), colors=2),
+    RgbAlgorithm.PINWHEEL:     AlgoMeta("Rotierende Segmente C1/C2.", True,
+                                        (ParamSpec("runner_count", "Segmente", "int", 1, 1, 16, 1,
+                                                   "Anzahl Segment-Paare (1..16)"),
+                                         _invert()), colors=2),
+    RgbAlgorithm.BREATHE:      AlgoMeta("Ganzes Feld pulsiert in C1.", False, (), colors=1),
+    RgbAlgorithm.FIRE:         AlgoMeta("Flackernder Flammen-Look C1→C2.", False, (), colors=2),
+    RgbAlgorithm.RAIN:         AlgoMeta("Fallende Tropfen je Spalte.", True, (_fade(),), colors=1),
 }
 
 
 def meta_for(algo: RgbAlgorithm) -> AlgoMeta:
     return ALGO_META.get(algo, AlgoMeta())
+
+
+def spec_relevant(spec: ParamSpec, style_value: str, params: dict) -> bool:
+    """True, wenn ``spec`` beim aktuellen Style + aktuellen Param-Werten relevant
+    ist (= sichtbar UND schreibbar). Grundlage des style-abhaengigen Param-Systems
+    (WP-2, Abschnitte 3/4/10): ein Dimmer-Parameter ist bei Style "RGB" nicht
+    relevant, ein Strobe-Detail nur bei Modus "strobe" usw."""
+    if spec.styles and style_value not in spec.styles:
+        return False
+    for cond in (spec.when or ()):
+        try:
+            key, allowed = cond
+        except (TypeError, ValueError):
+            continue
+        if params.get(key) not in allowed:
+            return False
+    return True
+
+
+def visible_specs(algo: RgbAlgorithm, style_value: str, params: dict) -> list:
+    """Liste der aktuell relevanten ParamSpecs eines Algorithmus (style-/when-
+    gefiltert). Die View baut daraus ihre Felder und schreibt NUR diese Werte."""
+    meta = ALGO_META.get(algo)
+    if not meta or not meta.params:
+        return []
+    return [s for s in meta.params if spec_relevant(s, style_value, params)]

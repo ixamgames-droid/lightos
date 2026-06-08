@@ -21,6 +21,7 @@ class SyncEvent(str, Enum):
     DMX_CHANGED = "dmx_changed"                # Direktes Universe-Update (Simple Desk)
     PALETTE_CHANGED = "palette_changed"        # Paletten erstellt/geaendert
     FUNCTION_CHANGED = "function_changed"      # Funktionen erstellt/gestartet/gestoppt
+    GROUP_CHANGED = "group_changed"            # Fixture-Gruppen erstellt/geaendert/geloescht
     CUE_STACK_CHANGED = "cue_stack_changed"    # CueStacks geaendert
     OUTPUT_CONFIG_CHANGED = "output_config_changed"  # Enttec/ArtNet/sACN
     SHOW_LOADED = "show_loaded"

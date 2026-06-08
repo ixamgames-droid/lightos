@@ -81,6 +81,12 @@ Editor, rechts Live-Vorschau des Pixelbilds.
 > Die Reihenfolge der Zuweisung ist Zeile für Zeile, links → rechts. Für eine
 > LED-Bar also Spalten = Anzahl Geräte, Reihen = 1.
 
+**Seit dem Engine-Umbau (2026-06):** 17 konsolidierte Algorithmen mit
+**Parametern** (z. B. Chase: Achse, Bewegung, Schweif), eine **ColorSequence**
+beliebiger Länge statt fixem C1/C2/C3, sichtbar gehaltene **Lücken** im Raster
+und **Live-Steuerung** einzelner Parameter über die virtuelle Konsole / MIDI.
+Vollständige Referenz: **[MATRIX_LIVE.md](MATRIX_LIVE.md)**.
+
 ---
 
 ## 4. Chaser – Lauflicht aus Funktionen (Tab Funktionen → „+ Chaser")
@@ -132,13 +138,18 @@ Laufende Funktionen werden im Baum **fett** dargestellt.
   **Toggle** auf diesem Bedienelement.
 - **Eingabe / Ausgabe → MIDI:** vollständige Mapping-Tabelle. Verfügbare
   Aktionen: **Executor GO / BACK / FLASH / FADER**, **Programmer Attribut**,
-  **Grand Master**. Schnell-Vorlagen: „CC1-10 → Executor-Fader 1-10",
-  „Note 0-9 → Executor GO 1-10".
+  **Grand Master** sowie (neu) **Effekt-Parameter** (`effect_param:<key>`) und
+  **Effekt-Aktion** (`effect_action:<key>`). Schnell-Vorlagen: „CC1-10 →
+  Executor-Fader 1-10", „Note 0-9 → Executor GO 1-10".
 - **GM-Fader** (oben) regelt die Gesamthelligkeit.
 
-> Hinweis: Eine direkte MIDI-Aktion „Tempo/Speed" gibt es derzeit nicht. Tempo
-> regelst du global über **BPM** (TAP / BPM-Klick / Audio) – Effekte im
-> **Beat-Modus** folgen automatisch.
+> **Live-Programming (neu, 2026-06):** Einzelne Effekt-Parameter und -Aktionen
+> lassen sich direkt auf VC-Fader/-Buttons/-Farbkacheln und MIDI legen — Fader
+> im Modus **EffectParam** (z. B. `level`, `speed`, `count`), Buttons als
+> **EffectAction** (`next_color`, `toggle_freeze`, …), Farb-Kacheln mit Ziel
+> **Effekt**. Damit gibt es jetzt auch eine direkte **Speed-Steuerung per
+> MIDI/Fader** (`effect_param:speed`). Details und eine fertige Demo-Show:
+> **[MATRIX_LIVE.md](MATRIX_LIVE.md)**.
 
 ---
 

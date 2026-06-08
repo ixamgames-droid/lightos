@@ -4,16 +4,16 @@
     "name": "APC Page 1",
     "target": "page_select:1",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 82,
+      "trigger_id": 112,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 82,
+      "trigger_id": 112,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -28,16 +28,16 @@
     "name": "APC Page 2",
     "target": "page_select:2",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 83,
+      "trigger_id": 113,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 83,
+      "trigger_id": 113,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -52,16 +52,16 @@
     "name": "APC Page 3",
     "target": "page_select:3",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 84,
+      "trigger_id": 114,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 84,
+      "trigger_id": 114,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -76,16 +76,16 @@
     "name": "APC Page 4",
     "target": "page_select:4",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 85,
+      "trigger_id": 115,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 85,
+      "trigger_id": 115,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -100,16 +100,16 @@
     "name": "APC Page 5",
     "target": "page_select:5",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 86,
+      "trigger_id": 116,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 86,
+      "trigger_id": 116,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -124,16 +124,16 @@
     "name": "APC Page 6",
     "target": "page_select:6",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 87,
+      "trigger_id": 117,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 87,
+      "trigger_id": 117,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -148,16 +148,16 @@
     "name": "APC Page 7",
     "target": "page_select:7",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 88,
+      "trigger_id": 118,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 88,
+      "trigger_id": 118,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,
@@ -172,16 +172,16 @@
     "name": "APC Page 8",
     "target": "page_select:8",
     "midi_in": {
-      "device": "APC mini",
+      "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 89,
+      "trigger_id": 119,
       "message_type": "note"
     },
     "button_mode": "toggle",
     "midi_out": {
       "device": "APC mini mk2",
       "channel": 1,
-      "trigger_id": 89,
+      "trigger_id": 119,
       "message_type": "note",
       "state_off": 0,
       "state_on": 5,

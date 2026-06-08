@@ -8,12 +8,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 ## [Unreleased]
 
 ### Behoben
+- Effekt-Layering (LAYER-01): Laufende Funktionen wurden in **ungeordneter** Reihenfolge
+  (Set) getickt. Schrieben zwei Effekte denselben DMX-Kanal (z. B. Farb-Matrix mit
+  `drive_intensity` + Dimmer-Matrix), gewann ein **zufaelliger** Writer statt der zuletzt
+  gestarteten Funktion → Werte wurden unvorhersehbar ueberschrieben. `FunctionManager.tick()`
+  laeuft jetzt in Start-Reihenfolge (LTP: zuletzt gestartet gewinnt). Test:
+  `tests/test_function_layer_order.py`.
 - Virtual Console: Absturz (`KeyError: 0`) beim Bewegen eines Level-Faders. Ursache war
   eine fehlerhafte Universe-Pruefung (`< len()` auf einem dict mit 1-basierten Keys).
   Der Fader legt das Ziel-Universe nun bei Bedarf an; das Universe ist im
   Fader-Eigenschaften-Dialog einstellbar (Default 1).
 
 ### Hinzugefuegt
+- Virtual Console: pro Effekt-Fader einstellbar, ob er **bei 0 den Effekt stoppt** oder
+  **nur runterregelt** (Eigenschaft `effect_autostart`, Checkbox im Fader-Dialog). An:
+  Wert > 0 startet den gebundenen Effekt, Wert 0 stoppt ihn (wie ein Playback-Fader);
+  aus (Default): Fader regelt nur. Gilt fuer *EffectIntensity/EffectSpeed/EffectParam*.
 - Visualizer-Persistenz: Fixture-Positionen und die aktive Buehne werden mit der Show
   (`.lshow`) gespeichert und beim Laden wiederhergestellt (T-VIZ-01, T-VIZ-02).
 - Unit-Tests fuer Core-Engine: `tests/test_core_engine.py`

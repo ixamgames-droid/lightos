@@ -149,6 +149,10 @@ class ArtNetReceiver:
                 # [16:18] = Length (BE)
                 universe = struct.unpack("<H", data[14:16])[0] + 1
                 length = struct.unpack(">H", data[16:18])[0]
+                # Laengenfeld stammt ungeprueft aus dem Paket: gegen die real
+                # vorhandenen Bytes UND das DMX-Maximum (512) klemmen, damit ein
+                # manipuliertes Paket keine ueberlangen Slices erzeugt.
+                length = max(0, min(length, len(data) - 18, 512))
                 dmx = data[18:18 + length]
                 for cb in list(self._callbacks):
                     try:

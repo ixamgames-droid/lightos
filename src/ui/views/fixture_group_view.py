@@ -12,6 +12,7 @@ from PySide6.QtGui import (
 )
 from src.core.app_state import get_state
 from src.core.database.models import FixtureGroup
+from src.ui.widgets import mini_icons as _mini
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 
@@ -370,6 +371,8 @@ class FixtureGroupView(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._sync_refresh())
             sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._sync_refresh())
+            # Gruppe anderswo erstellt/geaendert (Live View, …) -> Liste auffrischen.
+            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._reload_group_list())
         except Exception as e:
             print(f"[fixture_group_view] sync subscribe error: {e}")
 
@@ -494,12 +497,14 @@ class FixtureGroupView(QWidget):
         for uni_num in sorted(by_universe.keys()):
             uni_item = QTreeWidgetItem(self._fixture_list, [f"Universe {uni_num}"])
             uni_item.setFlags(uni_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            uni_item.setIcon(0, _mini.folder_icon())
             uni_item.setExpanded(True)
             for f in by_universe[uni_num]:
                 # Konstruktor mit uni_item als Parent hängt das Kind bereits ein
                 # (kein zusätzliches addChild → sonst qWarning "already owned").
                 child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {f.label}"])
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
+                child.setIcon(0, _mini.fixture_icon(getattr(f, "fixture_type", "other")))
                 labels[f.fid] = f.label
 
         self._grid_widget.update_fixture_labels(labels)
@@ -612,6 +617,7 @@ class FixtureGroupView(QWidget):
             QMessageBox.warning(self, "Fehler", str(e))
             return
         self._reload_group_list()
+        self._notify_groups_changed()
 
     def _delete_group(self):
         if self._current_group is None:
@@ -633,6 +639,7 @@ class FixtureGroupView(QWidget):
             return
         self._current_group = None
         self._reload_group_list()
+        self._notify_groups_changed()
 
     def _save_group(self):
         if self._current_group is None:
@@ -652,6 +659,7 @@ class FixtureGroupView(QWidget):
                 g.rows = self._spin_rows.value()
                 g.positions_json = pos_json
                 s.commit()
+            self._notify_groups_changed()
             QMessageBox.information(self, "Gespeichert", f'Gruppe "{self._current_group.name}" gespeichert.')
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
@@ -659,6 +667,15 @@ class FixtureGroupView(QWidget):
     def _group_fids(self) -> list[int]:
         """Fids der aktuell im Raster platzierten Fixtures der Gruppe."""
         return list(self._grid_widget.positions.values())
+
+    def _notify_groups_changed(self):
+        """Zentrale GROUP_CHANGED-Benachrichtigung: Programmer, Live View, Matrix
+        und Patcher aktualisieren ihre Gruppenlisten automatisch (Abschnitt 1)."""
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
+        except Exception as e:
+            print(f"[fixture_group_view] group notify error: {e}")
 
     def _apply_grid_size(self, *_):
         c = self._spin_cols.value()

@@ -210,7 +210,10 @@ class SACNReceiver:
             start_code = packet[125]
             if start_code != 0x00:
                 return None  # not DMX
-            dmx = packet[126:126 + (prop_count - 1)]
+            # property count stammt ungeprueft aus dem Paket: Slot-Zahl gegen die
+            # real vorhandenen Bytes UND 512 klemmen (513 = Startcode + 512 Slots).
+            slots = max(0, min(prop_count - 1, len(packet) - 126, 512))
+            dmx = packet[126:126 + slots]
             return universe, dmx
         except Exception:
             return None

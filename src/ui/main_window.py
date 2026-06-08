@@ -98,10 +98,19 @@ class SectionButton(QPushButton):
 class MainWindow(QMainWindow):
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
+    # Marshallt beliebige State-Event-Zustellungen aus Worker-Threads (MIDI/OSC/
+    # Web/Audio) in den UI-Thread. AutoConnection => Cross-Thread-Emits werden
+    # gequeued, Emits aus dem UI-Thread laufen direkt.
+    _emit_marshal_sig = Signal(object)
 
     def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
         self._state = get_state()
+        # UI-Marshaller registrieren, BEVOR irgendein Worker-Thread Events feuert:
+        # _emit aus Fremd-Threads ruft danach _run_in_ui (Qt-Queued) statt direkt
+        # Widget-Code im Fremd-Thread (Crash-Quelle, Audit B1/C8).
+        self._emit_marshal_sig.connect(self._run_in_ui)
+        self._state.set_ui_marshaller(self._emit_marshal_sig.emit)
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
@@ -1265,6 +1274,15 @@ class MainWindow(QMainWindow):
         )
 
     # ── State-Events ─────────────────────────────────────────────────────────
+
+    def _run_in_ui(self, fn):
+        """Slot im UI-Thread: fuehrt die vom AppState-Marshaller uebergebene
+        Zustellung aus. Wird via _emit_marshal_sig (Qt-Queued) aus Worker-Threads
+        aufgerufen, sodass Widget-Code garantiert im UI-Thread laeuft."""
+        try:
+            fn()
+        except Exception as exc:
+            print(f"[MainWindow] marshalled emit error: {exc}")
 
     def _on_state_event(self, event: str, _data):
         if event == "patch_changed":

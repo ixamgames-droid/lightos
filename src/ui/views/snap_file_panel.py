@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QColor
+from src.ui.widgets import mini_icons as _mini
 
 try:
     from src.core.app_state import get_state
@@ -235,9 +236,38 @@ class _SnapTree(QTreeWidget):
         super().__init__(parent)
         self._panel = panel
         self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.setDropIndicatorShown(True)
-        self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        if getattr(panel, "_drag_to_canvas", False):
+            # VC-Modus: Items werden auf das VC-Canvas gezogen (Drag-out, kein
+            # internes Verschieben zwischen Ordnern).
+            self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        else:
+            self.setAcceptDrops(True)
+            self.setDropIndicatorShown(True)
+            self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+
+    def startDrag(self, supportedActions):
+        """Im VC-Modus: Snap/Funktion mit eigenem MIME-Type exportieren, damit das
+        VC-Canvas daraus eine Taste machen kann. Sonst Standard (internes Move)."""
+        if not getattr(self._panel, "_drag_to_canvas", False):
+            return super().startDrag(supportedActions)
+        item = self.currentItem()
+        if item is None:
+            return
+        kind = item.data(0, _ROLE_KIND)
+        ref = item.data(0, _ROLE_REF)
+        if kind == "snap":
+            mime, payload = "application/x-lightos-snap", str(int(ref))
+        elif kind == "function":
+            mime, payload = "application/x-lightos-function", str(int(ref))
+        else:
+            return  # Ordner sind nicht auf Tasten legbar
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QDrag
+        md = QMimeData()
+        md.setData(mime, payload.encode("utf-8"))
+        drag = QDrag(self)
+        drag.setMimeData(md)
+        drag.exec(Qt.DropAction.CopyAction)
 
     def dropEvent(self, event):
         target_item = self.itemAt(event.position().toPoint())
@@ -275,8 +305,13 @@ class SnapFilePanel(QWidget):
     # MIDI-Learn läuft im MIDI-Thread → thread-sicher in den UI-Thread marshallen.
     _midi_learned_sig = Signal(object)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, drag_to_canvas: bool = False, canvas=None):
         super().__init__(parent)
+        # VC-Modus: Baum-Items lassen sich auf das VC-Canvas ziehen und per
+        # Kontextmenue direkt auf eine Taste legen. Muss VOR _setup_ui() stehen
+        # (der Baum liest das Flag im Konstruktor).
+        self._drag_to_canvas = bool(drag_to_canvas)
+        self._canvas = canvas
         self._learn_fid: int | None = None
         self._learn_name: str = ""
         self._learn_box = None
@@ -412,6 +447,7 @@ class SnapFilePanel(QWidget):
             item.setData(0, _ROLE_REF, snap.id)
             item.setData(0, _ROLE_KIND, "snap")
             item.setForeground(0, _SNAP_COLOR)
+            item.setIcon(0, _mini.snap_icon())
         # Funktionen/Effekte (je Typ farbig)
         fm = self._fm()
         if fm is not None:
@@ -425,6 +461,7 @@ class SnapFilePanel(QWidget):
                 item.setData(0, _ROLE_REF, int(fid))
                 item.setData(0, _ROLE_KIND, "function")
                 item.setForeground(0, _func_color(f))
+                item.setIcon(0, _mini.function_icon(f))
                 self._func_items.append((item, int(fid)))
         self._update_running()
 
@@ -455,6 +492,7 @@ class SnapFilePanel(QWidget):
         item = QTreeWidgetItem(parent_item, [name])
         item.setData(0, _ROLE_REF, path)
         item.setData(0, _ROLE_KIND, "folder")
+        item.setIcon(0, _mini.folder_icon())
         item.setExpanded(True)
         self._folder_items[path] = item
         return item
@@ -739,10 +777,28 @@ class SnapFilePanel(QWidget):
             act = move_menu.addAction(display)
             act.triggered.connect(lambda checked, p=fpath: self._move_to(p))
 
+    def set_canvas(self, canvas):
+        """Hinterlegt das VC-Canvas (fuer „Auf VC-Taste legen" im Kontextmenue)."""
+        self._canvas = canvas
+
+    def _add_vc_assign_action(self, menu: QMenu, kind: str, ref):
+        """Fuegt im VC-Modus „➡ Auf VC-Taste legen" hinzu (Klick-Alternative zum Ziehen)."""
+        if not self._drag_to_canvas or self._canvas is None or ref is None:
+            return
+        if kind == "snap":
+            act = menu.addAction("➡ Auf VC-Taste legen")
+            act.triggered.connect(lambda: self._canvas.start_snap_assign(int(ref)))
+            menu.addSeparator()
+        elif kind == "function":
+            act = menu.addAction("➡ Auf VC-Taste legen")
+            act.triggered.connect(lambda: self._canvas.start_function_assign(int(ref)))
+            menu.addSeparator()
+
     def _context_menu(self, _pos):
         ref, kind = self._selected()
         menu = QMenu(self)
         if kind == "snap":
+            self._add_vc_assign_action(menu, kind, ref)
             menu.addAction("Anwenden").triggered.connect(self._apply_selected)
             menu.addAction("Chase aus Auswahl erstellen").triggered.connect(
                 self._create_chase_from_selection
@@ -753,6 +809,7 @@ class SnapFilePanel(QWidget):
             menu.addSeparator()
             menu.addAction("Löschen").triggered.connect(self._delete_selected)
         elif kind == "function":
+            self._add_vc_assign_action(menu, kind, ref)
             fm = self._fm()
             running = fm.is_running(int(ref)) if fm is not None else False
             if running:

@@ -967,6 +967,8 @@ class LiveView(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._on_patch_changed())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._on_patch_changed())
+            # Gruppe anderswo erstellt/geaendert (Gruppen-Editor, …) -> Liste auffrischen.
+            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._refresh_group_list())
         except Exception as e:
             print(f"[live_view] sync (fixture list) subscribe error: {e}")
 
@@ -1589,7 +1591,7 @@ class LiveView(QWidget):
         # Programmer + Patcher aktualisieren (beide lauschen auf PATCH_CHANGED)
         try:
             from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.PATCH_CHANGED, None)
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
         except Exception:
             pass
         self._refresh_group_list()
@@ -1682,7 +1684,7 @@ class LiveView(QWidget):
         # Sync + Detail/Liste/Highlight aktualisieren (gleiches Muster wie entfernen)
         try:
             from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.PATCH_CHANGED, None)
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
         except Exception:
             pass
         self._refresh_group_list()
@@ -1728,7 +1730,7 @@ class LiveView(QWidget):
         # Sync + Refresh
         try:
             from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.PATCH_CHANGED, None)
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
         except Exception:
             pass
         self._refresh_group_list()
@@ -1833,7 +1835,7 @@ class LiveView(QWidget):
         # Sync + Refresh Detail + Liste + Highlight
         try:
             from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.PATCH_CHANGED, None)
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
         except Exception:
             pass
         self._refresh_group_list()

@@ -1,5 +1,6 @@
 """FunctionManager singleton — owns all Functions and drives their tick loop."""
 from __future__ import annotations
+import threading
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, _alloc_id, bump_next_id
 from .scene import Scene
@@ -27,6 +28,11 @@ class FunctionManager:
     def __init__(self):
         self._functions: dict[int, Function] = {}
         self._running_ids: set[int] = set()
+        # Schuetzt _running_ids/_start_order. start()/stop() laufen aus dem MIDI-/
+        # OSC-Thread, tick() aus dem Output-Thread — ohne Lock drohte beim Bilden
+        # der Tick-Reihenfolge "set/list changed size during iteration". RLock,
+        # weil stop_all() ueber stop() reentrant ist.
+        self._lock = threading.RLock()
         # Start-Reihenfolge laufender Funktionen (zuletzt gestartete am Ende) —
         # fuer active_function() / Aktiv-Effekt-Master (Block B).
         self._start_order: list[int] = []
@@ -39,11 +45,25 @@ class FunctionManager:
 
     def add(self, f: Function) -> Function:
         self._functions[f.id] = f
+        # Zentrale Benachrichtigung: jede neu erstellte Funktion (Scene, Chaser,
+        # Matrix, EFX, …) erscheint sofort in allen Listen/Auswahlfeldern
+        # (Abschnitt 1). from_dict() umgeht add() bewusst (Bulk-Load → SHOW_LOADED),
+        # daher kein Event-Spam beim Show-Laden.
+        self._notify_functions_changed({"id": f.id})
         return f
 
     def remove(self, fid: int):
         self.stop(fid)
         self._functions.pop(fid, None)
+        self._notify_functions_changed({"id": fid, "removed": True})
+
+    @staticmethod
+    def _notify_functions_changed(data=None):
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.FUNCTION_CHANGED, data)
+        except Exception:
+            pass
 
     def get(self, fid: int) -> Function | None:
         return self._functions.get(fid)
@@ -103,23 +123,25 @@ class FunctionManager:
         if f is None:
             return
         f.start()
-        self._running_ids.add(fid)
-        # Start-Reihenfolge pflegen: ans Ende (= zuletzt gestartet) verschieben.
-        try:
-            self._start_order.remove(fid)
-        except ValueError:
-            pass
-        self._start_order.append(fid)
+        with self._lock:
+            self._running_ids.add(fid)
+            # Start-Reihenfolge pflegen: ans Ende (= zuletzt gestartet) verschieben.
+            try:
+                self._start_order.remove(fid)
+            except ValueError:
+                pass
+            self._start_order.append(fid)
 
     def stop(self, fid: int):
         f = self._functions.get(fid)
         if f is not None:
             f.stop()
-        self._running_ids.discard(fid)
-        try:
-            self._start_order.remove(fid)
-        except ValueError:
-            pass
+        with self._lock:
+            self._running_ids.discard(fid)
+            try:
+                self._start_order.remove(fid)
+            except ValueError:
+                pass
 
     def active_function(self) -> Function | None:
         """Die zuletzt gestartete, noch laufende Funktion (Aktiv-Effekt-Master).
@@ -201,7 +223,21 @@ class FunctionManager:
         from src.core.dmx.universe import Universe
         dim_map = None  # lazy — nur bei Bedarf aufbauen
         finished = set()
-        for fid in list(self._running_ids):
+        # LTP-Reihenfolge: in Start-Reihenfolge ticken — die zuletzt gestartete
+        # Funktion schreibt zuletzt und gewinnt damit bei Kanal-Ueberschneidung
+        # (z. B. zwei Effekte auf denselben Dimmer-/Farbkanal). Frueher wurde
+        # ueber das ungeordnete _running_ids-Set iteriert -> nicht-deterministisches
+        # Ueberschreiben. IDs, die (defensiv) nur im Set stehen, hinten anhaengen.
+        # Tick-Reihenfolge unter Lock als Snapshot bilden: start()/stop() koennen
+        # _start_order/_running_ids aus anderen Threads mutieren. Der Lock wird
+        # NICHT waehrend der (potenziell langsamen) f.write()-Schleife gehalten.
+        with self._lock:
+            running = set(self._running_ids)
+            ordered = [fid for fid in self._start_order if fid in running]
+            if len(ordered) != len(running):
+                ordered += [fid for fid in running
+                            if fid not in self._start_order]
+        for fid in ordered:
             f = self._functions.get(fid)
             if f is None or not f.is_running:
                 finished.add(fid)
@@ -245,7 +281,14 @@ class FunctionManager:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
                 finished.add(fid)
-        self._running_ids -= finished
+        if finished:
+            with self._lock:
+                self._running_ids -= finished
+                # _start_order mit _running_ids synchron halten: selbst-beendete
+                # Funktionen (die nicht ueber stop() liefen) hier entfernen, damit
+                # die Liste nicht mit stale-IDs volllaeuft.
+                self._start_order = [fid for fid in self._start_order
+                                     if fid in self._running_ids]
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

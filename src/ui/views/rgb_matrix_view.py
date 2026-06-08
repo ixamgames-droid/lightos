@@ -1,14 +1,15 @@
 """Matrix View — GUI for LED grid effects (RGB/RGBW/Dimmer/Shutter)."""
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-                                QListWidget, QPushButton, QGroupBox,
+                                QListWidget, QListWidgetItem, QPushButton, QGroupBox,
                                 QFormLayout, QDoubleSpinBox, QSpinBox,
                                 QComboBox, QLineEdit, QLabel, QScrollArea,
-                                QColorDialog, QFrame, QSlider, QCheckBox)
-from PySide6.QtCore import Qt, QTimer, QRect
-from PySide6.QtGui import QPainter, QColor, QFont
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color
+                                QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
+from PySide6.QtCore import Qt, QTimer, QRect, Signal
+from PySide6.QtGui import QPainter, QColor, QFont, QPen
+from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
 from src.core.engine.rgb_matrix_meta import ALGO_META
+from src.ui.widgets.color_sequence_editor import ColorSequenceField
 
 
 class MatrixPreview(QWidget):
@@ -52,15 +53,26 @@ class MatrixPreview(QWidget):
         rows = self._matrix.rows
         cell_w = (self.width() - 10) / cols
         cell_h = (self.height() - 10) / rows
+        grid_assign = self._matrix.fixture_grid
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
                 if idx >= len(self._grid):
                     break
-                r, g, b = self._grid[idx]
                 x = int(5 + col * cell_w)
                 y = int(5 + row * cell_h)
-                p.fillRect(x, y, int(cell_w) - 1, int(cell_h) - 1, QColor(r, g, b))
+                w = max(1, int(cell_w) - 1)
+                h = max(1, int(cell_h) - 1)
+                if is_gap(grid_assign, idx):
+                    # Luecke: sichtbar leer (kein Licht/keine Farbe), klar von einem
+                    # dunklen echten Pixel unterscheidbar (gepunkteter Rahmen + Schraege).
+                    p.fillRect(x, y, w, h, QColor("#0d1117"))
+                    p.setPen(QPen(QColor("#30363d"), 1, Qt.PenStyle.DotLine))
+                    p.drawRect(x, y, w - 1, h - 1)
+                    p.drawLine(x, y, x + w - 1, y + h - 1)
+                    continue
+                r, g, b = self._grid[idx]
+                p.fillRect(x, y, w, h, QColor(r, g, b))
         p.end()
 
 
@@ -129,8 +141,22 @@ class RgbMatrixView(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._rebuild_from_state())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._rebuild_from_state())
+            # Abschnitt 1: neu erstellte/umbenannte/geloeschte Matrizen erscheinen
+            # sofort in beiden Matrix-Ansichten (Programmer-Seite + Sub-Tab).
+            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._rebuild_from_state())
+            # Geaenderte Gruppe -> im Folgemodus das Grid sofort neu uebernehmen.
+            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._on_group_changed())
         except Exception as e:
             print(f"[rgb_matrix_view] sync subscribe error: {e}")
+
+    def _on_group_changed(self):
+        """GROUP_CHANGED: im Folgemodus das Grid aus der (ggf. geaenderten) Auswahl
+        neu uebernehmen, damit Geraete-Aenderungen einer Gruppe sofort wirken."""
+        if self._follow_selection:
+            try:
+                self._sync_follow_selection()
+            except RuntimeError:
+                pass
 
     def _rebuild_from_state(self):
         """Liste aus self._instances neu aufbauen (nach Show-Load / Tab-Wechsel)."""
@@ -250,13 +276,32 @@ class RgbMatrixView(QWidget):
         self._c1_btn = ColorButton((255, 0, 0))
         self._c2_btn = ColorButton((0, 0, 255))
         self._c3_btn = ColorButton((0, 255, 0))
-        for i, b in enumerate((self._c1_btn, self._c2_btn, self._c3_btn)):
-            b.color_changed = lambda c, btn=b: self._param_change()
-            color_row.addWidget(QLabel(f"C{i+1}:"))
+        self._color_btns = (self._c1_btn, self._c2_btn, self._c3_btn)
+        # Pro Farbfeld ein eigenes "Cx:"-Label merken, damit einzelne Slots
+        # (je nach Algorithmus) ein-/ausgeblendet werden koennen (UI-01).
+        self._c_labels: list[QLabel] = []
+        for i, b in enumerate(self._color_btns):
+            # Farb-Buttons schreiben gezielt nur ihre Sequence-Position (nicht ueber
+            # _param_change, das sonst bei jeder Param-Aenderung c1/2/3 ueberschreiben
+            # und damit eine laengere Color-Sequence beschaedigen wuerde).
+            b.color_changed = lambda c, idx=i: self._on_color_button(idx, c)
+            lbl = QLabel(f"C{i+1}:")
+            self._c_labels.append(lbl)
+            color_row.addWidget(lbl)
             color_row.addWidget(b)
-        self._color_label = QLabel("Farben:")
+        color_row.addStretch(1)
+        self._color_label = QLabel("Farbe:")
         form.addRow(self._color_label, color_row)
         self._color_row_widget = color_row  # handle fuer Sichtbarkeit via label
+
+        # Color-Sequence-UI (kanonisch, geteiltes Widget): kompaktes Feld mit
+        # Swatch-Vorschau + Popout-Button (nicht mehr ins Formular gequetscht,
+        # Abschnitt 2). Wird bei mehrfarbigen Algorithmen (meta.colors >= 2) statt
+        # der festen Farbknoepfe gezeigt; bei Einfarbigen (==1) bleibt der C1-Knopf.
+        self._seq_editor = ColorSequenceField(title="Color Sequence")
+        self._seq_editor.changed.connect(self._on_sequence_changed)
+        self._seq_label = QLabel("Color Sequence:")
+        form.addRow(self._seq_label, self._seq_editor)
 
         # Weiß-Anteil (nur RGBW)
         white_row = QHBoxLayout()
@@ -319,16 +364,18 @@ class RgbMatrixView(QWidget):
         self._dir_label = QLabel("Richtung:")
         form.addRow(self._dir_label, self._dir_combo)
 
-        # Dynamischer Container: Felder werden in _rebuild_param_fields befuellt
+        # Dynamischer Container: Felder werden in _rebuild_param_fields befuellt.
+        # Liegt NICHT mehr im Einstellungs-Formular (sonst wird es bei vielen
+        # Parametern zu eng), sondern in einem eigenen scrollbaren Bereich, der
+        # sich per Button in ein eigenes Fenster auskoppeln laesst (siehe unten).
         self._param_widgets: dict[str, object] = {}
         self._param_box = QGroupBox("Algorithmus-Parameter")
         self._param_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
         self._param_form = QFormLayout(self._param_box)
         self._param_form.setSpacing(4)
-        form.addRow(self._param_box)
 
         # Initial-Aufbau fuer den Standard-Algorithmus
-        self._rebuild_param_fields(RgbAlgorithm.CHASE_H)
+        self._rebuild_param_fields(RgbAlgorithm.CHASE)
 
         top.addWidget(ed)
 
@@ -363,6 +410,38 @@ class RgbMatrixView(QWidget):
         rl.addLayout(save_bar)
 
         rl.addLayout(top)
+
+        # ── Algorithmus-Parameter: scrollbar inline + auskoppelbar ins Fenster ──
+        # Loest das Platzproblem bei vielen Parametern (z. B. Chase = 7): inline
+        # gedeckelte Hoehe mit Scroll, plus Button fuer ein eigenes, grosses Fenster.
+        param_bar = QHBoxLayout()
+        param_bar.setContentsMargins(0, 0, 0, 0)
+        param_bar.addStretch(1)
+        self._btn_param_popout = QPushButton("⤢ Eigenes Fenster")
+        self._btn_param_popout.setFixedHeight(22)
+        self._btn_param_popout.setToolTip(
+            "Algorithmus-Parameter in einem eigenen, größeren Fenster bearbeiten")
+        self._btn_param_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}"
+        )
+        self._btn_param_popout.clicked.connect(self._toggle_param_popout)
+        param_bar.addWidget(self._btn_param_popout)
+        rl.addLayout(param_bar)
+
+        self._param_window = None
+        self._param_scroll = QScrollArea()
+        self._param_scroll.setWidgetResizable(True)
+        self._param_scroll.setWidget(self._param_box)
+        self._param_scroll.setMaximumHeight(240)
+        self._param_scroll.setStyleSheet("QScrollArea{border:none;}")
+        rl.addWidget(self._param_scroll)
+
+        self._param_placeholder = QLabel("⤢ Parameter werden in einem eigenen Fenster bearbeitet.")
+        self._param_placeholder.setStyleSheet("color:#8b949e; font-size:10px; padding:8px;")
+        self._param_placeholder.setVisible(False)
+        rl.addWidget(self._param_placeholder)
 
         # Fixture grid assignment
         grid_box = QGroupBox("Fixture-Grid (Fixture-IDs, Zeile × Spalte)")
@@ -407,21 +486,22 @@ class RgbMatrixView(QWidget):
 
     def _add(self):
         m = self._fm.new_rgb_matrix(name=f"Matrix {len(self._instances)+1}")
-        self._list.addItem(m.name)
-        self._list.setCurrentRow(len(self._instances) - 1)
-        self._notify_change()
+        # new_rgb_matrix() -> FunctionManager.add() emittiert FUNCTION_CHANGED;
+        # die Liste ist via _rebuild_from_state bereits aktuell. Nur noch die neue
+        # Matrix selektieren (kein manuelles addItem -> sonst Doppel-Eintrag).
+        for i, inst in enumerate(self._instances):
+            if inst.id == m.id:
+                self._list.setCurrentRow(i)
+                break
 
     def _delete(self):
         row = self._list.currentRow()
         insts = self._instances
         if row < 0 or row >= len(insts):
             return
+        # remove() emittiert FUNCTION_CHANGED -> _rebuild_from_state aktualisiert die
+        # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
         self._fm.remove(insts[row].id)
-        self._list.takeItem(row)
-        self._saved = None
-        self._current = None
-        self._preview.set_matrix(None)
-        self._notify_change()
 
     def _select(self, row: int):
         if row < 0 or row >= len(self._instances):
@@ -436,12 +516,22 @@ class RgbMatrixView(QWidget):
         self._update_dirty()
 
     def _on_style_change(self, text: str):
-        """Style-Combo hat sich geaendert: Sichtbarkeit anpassen + param_change."""
+        """Style-Combo hat sich geaendert: Sichtbarkeit anpassen, style-abhaengige
+        Algorithmus-Parameter neu aufbauen (WP-2) + param_change."""
         try:
             style = MatrixStyle(text)
         except ValueError:
             style = MatrixStyle.RGB
         self._apply_style_visibility(style)
+        # Der Style bestimmt mit, welche Algorithmus-Parameter relevant sind
+        # (z. B. Random: Color- vs. Dimmer-Modus) -> Felder neu aufbauen.
+        try:
+            algo = RgbAlgorithm(self._algo_combo.currentText())
+        except ValueError:
+            algo = RgbAlgorithm.PLAIN
+        self._rebuild_param_fields(algo)
+        if self._current is not None:
+            self._load_params_into_widgets(self._current)
         self._param_change()
 
     def _on_algo_change(self, text: str):
@@ -451,13 +541,19 @@ class RgbMatrixView(QWidget):
         except ValueError:
             return
         self._rebuild_param_fields(algo)
+        # Nur die vom Algorithmus genutzten Farbfelder zeigen (UI-01).
+        self._apply_color_visibility()
         if self._current is not None:
             self._load_params_into_widgets(self._current)
         self._param_change()
 
     def _rebuild_param_fields(self, algo):
-        """Baut die Param-Felder dynamisch aus den Algorithmus-Metadaten."""
-        from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox
+        """Baut die Param-Felder dynamisch aus den Algorithmus-Metadaten —
+        gefiltert nach aktuellem Style und Bedingungen (WP-2): es werden nur die
+        Parameter angezeigt (und spaeter geschrieben), die fuer den gewaehlten
+        Style/Modus relevant sind."""
+        from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox
+        from src.core.engine.rgb_matrix_meta import visible_specs
         # alte Felder entfernen
         while self._param_form.rowCount():
             self._param_form.removeRow(0)
@@ -467,10 +563,15 @@ class RgbMatrixView(QWidget):
         has_dir = bool(meta and meta.direction)
         self._dir_label.setVisible(has_dir)
         self._dir_combo.setVisible(has_dir)
-        if not meta or not meta.params:
+        # Style + aktuelle Werte bestimmen, welche Specs relevant sind.
+        style_value = self._style_combo.currentText()
+        cur_params = dict(self._current.params) if self._current is not None else {}
+        specs = visible_specs(algo, style_value, cur_params)
+        self._param_specs = specs
+        if not specs:
             self._param_box.setVisible(False)
             return
-        for spec in meta.params:
+        for spec in specs:
             if spec.kind == "bool":
                 w = QCheckBox(spec.label)
                 if spec.tooltip:
@@ -486,6 +587,17 @@ class RgbMatrixView(QWidget):
                     w.setToolTip(spec.tooltip)
                 w.valueChanged.connect(self._param_change)
                 self._param_form.addRow(spec.label + ":", w)
+            elif spec.kind == "select":
+                # Bewegungs-/Achsen-/Ursprungs-Auswahl (Phase 3). Die volle
+                # Color-Sequence-/Action-UI folgt in Phase 5.
+                w = QComboBox()
+                for opt in spec.options:
+                    w.addItem(str(opt))
+                w.setCurrentText(str(spec.default))
+                if spec.tooltip:
+                    w.setToolTip(spec.tooltip)
+                w.currentTextChanged.connect(self._param_change)
+                self._param_form.addRow(spec.label + ":", w)
             else:  # float
                 w = QDoubleSpinBox()
                 w.setRange(float(spec.min), float(spec.max))
@@ -499,12 +611,10 @@ class RgbMatrixView(QWidget):
         self._param_box.setVisible(True)
 
     def _load_params_into_widgets(self, m):
-        """Laedt die gespeicherten Param-Werte in die dynamisch erstellten Felder."""
+        """Laedt die gespeicherten Param-Werte in die dynamisch erstellten Felder.
+        Iteriert nur die tatsaechlich gebauten (style-/bedingungs-relevanten) Specs."""
         from PySide6.QtWidgets import QCheckBox
-        meta = ALGO_META.get(m.algorithm)
-        if not meta:
-            return
-        for spec in meta.params:
+        for spec in getattr(self, "_param_specs", []):
             w = self._param_widgets.get(spec.key)
             if w is None:
                 continue
@@ -514,22 +624,20 @@ class RgbMatrixView(QWidget):
                 w.setChecked(bool(val))
             elif spec.kind == "int":
                 w.setValue(int(val))
+            elif spec.kind == "select":
+                w.setCurrentText(str(val))
             else:
                 w.setValue(float(val))
             w.blockSignals(False)
 
     def _apply_style_visibility(self, style: MatrixStyle):
         """Zeigt/verbirgt style-spezifische Form-Zeilen."""
-        is_color  = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
         is_rgbw   = style == MatrixStyle.RGBW
         is_dimmer = style == MatrixStyle.DIMMER
         is_shutter = style == MatrixStyle.SHUTTER
 
-        # Farben-Zeile (C1/C2/C3)
-        self._color_label.setVisible(is_color)
-        self._c1_btn.setVisible(is_color)
-        self._c2_btn.setVisible(is_color)
-        self._c3_btn.setVisible(is_color)
+        # Farben-Zeile (C1/C2/C3): Anzahl haengt von Style UND Algorithmus ab.
+        self._apply_color_visibility(style)
         # Weiß-Anteil
         self._white_form_label.setVisible(is_rgbw)
         self._white_slider.setVisible(is_rgbw)
@@ -542,6 +650,41 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
+
+    def _apply_color_visibility(self, style: MatrixStyle | None = None):
+        """Zeigt nur so viele Farbfelder, wie der aktive Algorithmus auswertet.
+
+        Farben sind nur bei RGB/RGBW-Style relevant; die konkrete Anzahl (0..3)
+        liefert ALGO_META[algo].colors. So sieht man nur die Farben, die man
+        tatsaechlich programmieren kann (z. B. Plain=1, Wipe=2, Color Scroll=3,
+        Rainbow=0)."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        is_color = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
+        try:
+            algo = RgbAlgorithm(self._algo_combo.currentText())
+        except ValueError:
+            algo = RgbAlgorithm.PLAIN
+        meta = ALGO_META.get(algo)
+        n_colors = meta.colors if (meta and is_color) else (1 if is_color else 0)
+        # Abschnitt 6: Chase mit "Farbe pro Runde wechseln" nutzt die ganze
+        # Color-Sequence -> Multi-Color-UI zeigen (statt nur Einzelfarbe).
+        if (is_color and algo == RgbAlgorithm.CHASE
+                and self._current is not None and self._current.params.get("color_cycle")):
+            n_colors = max(2, n_colors)
+        # Einfarbig (==1) → einzelner C1-Knopf; mehrfarbig (>=2) → Color-Sequence-
+        # Feld (kanonische Multi-Color-UI mit Popout); keine Farbe (0) → nichts.
+        use_seq = n_colors >= 2
+        for i, (lbl, btn) in enumerate(zip(self._c_labels, self._color_btns)):
+            visible = (not use_seq) and (i < n_colors)
+            lbl.setVisible(visible)
+            btn.setVisible(visible)
+        self._color_label.setVisible(is_color and n_colors == 1)
+        self._seq_editor.setVisible(use_seq)
+        self._seq_label.setVisible(use_seq)
 
     def _load_ui(self, m: RgbMatrixInstance):
         self._name_edit.blockSignals(True)
@@ -576,6 +719,8 @@ class RgbMatrixView(QWidget):
         self._c1_btn._color = m.color1; self._c1_btn._update_style()
         self._c2_btn._color = m.color2; self._c2_btn._update_style()
         self._c3_btn._color = m.color3; self._c3_btn._update_style()
+        # Color-Sequence-Editor an die Draft-Sequence binden (mutiert sie direkt).
+        self._seq_editor.set_sequence(m.colors)
         self._apply_style_visibility(m.style)
         # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
         self._dir_combo.blockSignals(True)
@@ -589,14 +734,18 @@ class RgbMatrixView(QWidget):
         self._grid_label.setText(f"{m.rows}×{m.cols} = {n} Fixtures{suffix}")
 
     def _name_change(self, text: str):
-        # Name ist live: wird sofort in beide Instanzen geschrieben (kein dirty).
-        if self._current:
-            self._current.name = text
-        if self._saved:
-            self._saved.name = text
+        # Name ist deferred wie alle anderen Felder: er landet nur im Draft und
+        # erzeugt damit einen Dirty-State. Erst beim Speichern wird er in die
+        # echte Instanz uebernommen und die Bibliothek benachrichtigt (sonst
+        # bliebe der alte Name in der Ordnerstruktur stehen). Der Listeneintrag
+        # zeigt den Draft-Namen als Live-Vorschau.
+        if self._current is None:
+            return
+        self._current.name = text
         row = self._list.currentRow()
         if row >= 0 and self._list.item(row) is not None:
             self._list.item(row).setText(text)
+        self._update_dirty()
 
     def _param_change(self):
         if self._current is None:
@@ -610,9 +759,9 @@ class RgbMatrixView(QWidget):
         self._current.rows  = self._rows_spin.value()
         self._current.matrix_speed = self._speed_spin.value()
         # drive_intensity wird nicht mehr aus UI gesetzt (bleibt im Datenmodell).
-        self._current.color1 = self._c1_btn.color
-        self._current.color2 = self._c2_btn.color
-        self._current.color3 = self._c3_btn.color
+        # Farben werden separat ueber _on_color_button / _on_sequence_changed
+        # geschrieben (nicht hier, sonst wuerde eine laengere Color-Sequence bei
+        # jeder Param-Aenderung auf die ersten 3 Knopf-Farben gekuerzt).
         self._current.white_amount = self._white_slider.value()
         self._current.intensity_min = self._imin_spin.value()
         self._current.intensity_max = self._imax_spin.value()
@@ -620,15 +769,104 @@ class RgbMatrixView(QWidget):
         self._current.shutter_max = self._smax_spin.value()
         # I2.4: Richtung + dynamische Algorithmus-Parameter schreiben
         self._current.direction = "reverse" if self._dir_combo.currentText().startswith("Rück") else "forward"
-        from PySide6.QtWidgets import QCheckBox, QSpinBox, QDoubleSpinBox
+        from PySide6.QtWidgets import QCheckBox, QSpinBox, QDoubleSpinBox, QComboBox
+        # Es werden NUR die aktuell gebauten (style-/bedingungs-relevanten) Felder
+        # geschrieben (WP-2/Abschnitt 3/10) — kein Cross-Overwrite Dimmer/Color/Effect.
         for key, w in self._param_widgets.items():
             if isinstance(w, QCheckBox):
                 self._current.params[key] = w.isChecked()
+            elif isinstance(w, QComboBox):
+                self._current.params[key] = w.currentText()
             elif isinstance(w, QSpinBox):
                 self._current.params[key] = w.value()
             elif isinstance(w, QDoubleSpinBox):
                 self._current.params[key] = float(w.value())
+        # Sichtbarkeit kann sich durch die eben geschriebenen Werte aendern
+        # (z. B. mode=strobe -> Strobe-Rate, color_cycle=an -> Farb-Reihenfolge +
+        # Color-Sequence). Felder bei Bedarf neu aufbauen.
+        self._refresh_param_visibility()
         self._update_dirty()
+
+    def _refresh_param_visibility(self):
+        """Baut die Param-Felder neu auf, wenn sich durch geaenderte Werte die
+        Menge der relevanten Parameter veraendert hat (WP-2). Verhindert Endlos-
+        Schleifen, da nur bei tatsaechlicher Aenderung neu aufgebaut wird."""
+        if self._current is None:
+            return
+        try:
+            algo = RgbAlgorithm(self._algo_combo.currentText())
+        except ValueError:
+            return
+        from src.core.engine.rgb_matrix_meta import visible_specs
+        new_keys = [s.key for s in visible_specs(
+            algo, self._style_combo.currentText(), self._current.params)]
+        if new_keys != list(self._param_widgets.keys()):
+            self._rebuild_param_fields(algo)
+            self._load_params_into_widgets(self._current)
+        # Color-Sequence vs. Einzelfarbe kann ebenfalls vom color_cycle abhaengen.
+        self._apply_color_visibility()
+
+    # ── Farben (Einzel-Knopf + Sequence-Editor) ───────────────────────────────
+
+    def _on_color_button(self, idx: int, color: Color):
+        """Schreibt eine einzelne Farbe (C1..C3-Knopf) in die Draft-Sequence."""
+        if self._current is None:
+            return
+        self._current._set_seq_color(idx, color)
+        # Editor spiegelt denselben Sequence-Zustand (falls sichtbar).
+        self._seq_editor.set_sequence(self._current.colors)
+        self._update_dirty()
+
+    def _on_sequence_changed(self):
+        """Der Sequence-Editor hat die Draft-Farbliste (per Referenz) veraendert."""
+        if self._current is None:
+            return
+        # Einzel-Knopf-Anzeige mit den ersten Farben synchron halten.
+        for i, btn in enumerate(self._color_btns):
+            btn._color = self._current.colors.color_at(i)
+            btn._update_style()
+        self._update_dirty()
+
+    def _toggle_param_popout(self):
+        """Koppelt die Algorithmus-Parameter in ein eigenes Fenster aus / dockt zurueck."""
+        if self._param_window is not None:
+            self._param_window.close()      # → finished → _redock_param
+            return
+        box = self._param_scroll.takeWidget()
+        if box is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Algorithmus-Parameter")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setWidget(box)
+        wl.addWidget(sc)
+        win.resize(380, 520)
+        win.finished.connect(lambda *_: self._redock_param())
+        self._param_window = win
+        self._param_window_scroll = sc
+        self._btn_param_popout.setText("⤡ Andocken")
+        self._param_scroll.setVisible(False)
+        self._param_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_param(self):
+        """Holt den Parameter-Block aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._param_window is None:
+            return
+        try:
+            box = self._param_window_scroll.takeWidget()
+            if box is not None:
+                self._param_scroll.setWidget(box)
+            self._param_scroll.setVisible(True)
+            self._param_placeholder.setVisible(False)
+            self._btn_param_popout.setText("⤢ Eigenes Fenster")
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zerstoert
+        self._param_window = None
 
     def _start(self):
         # Gestartet wird immer die gespeicherte (echte) Instanz im FunctionManager.
@@ -664,6 +902,10 @@ class RgbMatrixView(QWidget):
         self._make_draft()
         self._preview.set_matrix(self._current)
         self._load_ui(self._current)
+        # Live-Vorschau des Namens in der Liste auf den gespeicherten Wert zurueck.
+        row = self._list.currentRow()
+        if row >= 0 and self._list.item(row) is not None:
+            self._list.item(row).setText(self._saved.name)
         self._update_dirty()
 
     def _update_dirty(self):

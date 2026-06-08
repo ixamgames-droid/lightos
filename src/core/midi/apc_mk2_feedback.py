@@ -321,9 +321,15 @@ class ApcMk2Feedback:
                 continue
             if on_bank is not None and not on_bank(w):
                 continue
-            color = rgb_to_mk2_index(w.color_r, w.color_g, w.color_b)
-            tile_rgb = (w.color_r, w.color_g, w.color_b)
-            is_selected = active_color is not None and tile_rgb == active_color
+            # Weiss-Kanal in die LED-Farbe einrechnen, sonst zeigt eine reine
+            # W-Kachel (RGB 0,0,0, W>0) faelschlich OFF (4. Pad blieb dunkel).
+            cw = int(getattr(w, "color_w", 0) or 0)
+            disp = (min(255, w.color_r + cw), min(255, w.color_g + cw),
+                    min(255, w.color_b + cw))
+            color = rgb_to_mk2_index(*disp)
+            tile_rgb = disp
+            is_selected = active_color is not None and \
+                (w.color_r, w.color_g, w.color_b) == active_color
             if getattr(w, "_pressed", False):
                 mode = FULL
             elif is_selected:
@@ -354,6 +360,16 @@ class ApcMk2Feedback:
             bg_idx = rgb_to_mk2_index(bg.red(), bg.green(), bg.blue())
         except Exception:
             bg, bg_idx = None, BLUE
+        if action == ButtonAction.LIBRARY_SNAP:
+            # Bibliothek-Farb-/Snap-Taste: Pad in der Snap-Farbe, hell wenn aktiv.
+            sc = None
+            try:
+                sc = w._snap_swatch_color()
+            except Exception:
+                sc = None
+            idx = (rgb_to_mk2_index(sc.red(), sc.green(), sc.blue())
+                   if sc is not None else bg_idx)
+            return (FULL if self._is_active(w) else MID, idx)
         if not is_func:
             # Snapshot / Clear: feste Button-Farbe halten.
             return (MID, bg_idx)
@@ -424,6 +440,9 @@ class ApcMk2Feedback:
         from src.ui.virtualconsole.vc_button import ButtonAction
         from src.core.app_state import get_state
         try:
+            # Bibliothek-Snap-Toggle: aktiv = Snap liegt im Programmer.
+            if getattr(w, "action", None) == ButtonAction.LIBRARY_SNAP:
+                return bool(getattr(w, "_snap_active", False))
             st = get_state()
             fid = getattr(w, "function_id", None)
             if fid is None:

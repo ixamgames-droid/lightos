@@ -96,17 +96,23 @@ class TestUniverse(unittest.TestCase):
     def test_get_all_length(self):
         self.assertEqual(len(self.u.get_all()), 512)
 
-    def test_set_channel_out_of_range_raises(self):
-        with self.assertRaises((AssertionError, Exception)):
-            self.u.set_channel(0, 100)
-        with self.assertRaises((AssertionError, Exception)):
-            self.u.set_channel(513, 100)
+    def test_set_channel_out_of_range_ignored(self):
+        # Gehaerteter Vertrag (Audit B7): Out-of-range-Kanaele werden verworfen,
+        # nicht per assert geworfen (assert waere unter `python -O` weg). Wichtig:
+        # channel<=0 darf KEINEN anderen Kanal beschreiben (kein Negativ-Index-
+        # Wraparound auf Kanal 512).
+        self.u.set_channel(512, 0)
+        self.u.set_channel(0, 100)      # darf nicht crashen ...
+        self.assertEqual(self.u.get_channel(512), 0)  # ... und 512 nicht treffen
+        self.u.set_channel(513, 100)    # ueber Bereich: ebenfalls ignoriert
+        self.assertEqual(self.u.get_all(), bytes(512))
 
-    def test_set_channel_value_out_of_range_raises(self):
-        with self.assertRaises((AssertionError, Exception)):
-            self.u.set_channel(1, 256)
-        with self.assertRaises((AssertionError, Exception)):
-            self.u.set_channel(1, -1)
+    def test_set_channel_value_out_of_range_clamped(self):
+        # Werte werden auf 0..255 geklemmt statt eine Exception zu werfen.
+        self.u.set_channel(1, 256)
+        self.assertEqual(self.u.get_channel(1), 255)
+        self.u.set_channel(1, -1)
+        self.assertEqual(self.u.get_channel(1), 0)
 
     def test_multiple_channels_independent(self):
         for ch in range(1, 513):

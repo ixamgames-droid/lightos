@@ -183,14 +183,18 @@ def matrix(name, algo, c1=(255, 0, 0), c2=(0, 0, 255), c3=(0, 255, 0), speed=3.0
     return m
 
 
-mx_scroll = matrix("Matrix 3-Farben", RgbAlgorithm.COLOR_SCROLL,
+# Phase-3-Konsolidierung: Color-Scroll/Multicolor sind jetzt Gradient/Chase + Parameter.
+mx_scroll = matrix("Matrix 3-Farben", RgbAlgorithm.GRADIENT,
                    c1=(255, 0, 0), c2=(0, 255, 0), c3=(0, 0, 255), speed=2.5)
-mx_multi = matrix("Matrix Multicolor", RgbAlgorithm.CHASE_MULTI,
+mx_scroll.params = {"axis": "H", "blend": "steps"}
+mx_multi = matrix("Matrix Multicolor", RgbAlgorithm.CHASE,
                   c1=(255, 0, 0), c2=(0, 255, 0), c3=(0, 0, 255), speed=4.0)
-mx_run = matrix("Matrix Lauflicht", RgbAlgorithm.CHASE_H, c1=(255, 255, 255), speed=4.0)
+mx_multi.params = {"axis": "H", "movement": "normal", "color_cycle": True}
+mx_run = matrix("Matrix Lauflicht", RgbAlgorithm.CHASE, c1=(255, 255, 255), speed=4.0)
 mx_rain = matrix("Matrix Regenbogen", RgbAlgorithm.RAINBOW, speed=1.5)
-mx_wipe = matrix("Matrix Wipe", RgbAlgorithm.WIPE_H, c1=(0, 200, 255), c2=(255, 0, 120), speed=1.2)
-mx_spark = matrix("Matrix Sparkle", RgbAlgorithm.SPARKLE, c1=(255, 255, 255), speed=6.0)
+mx_wipe = matrix("Matrix Wipe", RgbAlgorithm.WIPE, c1=(0, 200, 255), c2=(255, 0, 120), speed=1.2)
+mx_spark = matrix("Matrix Sparkle", RgbAlgorithm.RANDOM, c1=(255, 255, 255), speed=6.0)
+mx_spark.params = {"mode": "sparkle", "count": 2, "rate": 3.0}
 mx_radar = matrix("Matrix Radar", RgbAlgorithm.RADAR, c1=(255, 160, 0), speed=2.0)
 matrix_funcs = [mx_scroll, mx_multi, mx_run, mx_rain, mx_wipe, mx_spark, mx_radar]
 
