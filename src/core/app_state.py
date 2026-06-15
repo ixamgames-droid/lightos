@@ -174,6 +174,22 @@ class AppState:
         return list(self._patch_cache)
 
     def add_fixture(self, fixture: PatchedFixture, undoable: bool = True):
+        # FLD-FID: gegen Cache/DB-Desync absichern. Kollidiert die fid mit einer
+        # bereits persistierten Zeile (z.B. verwaiste current_show.db-Eintraege),
+        # auf die naechste freie fid ausweichen statt mit IntegrityError die App
+        # einzufrieren.
+        try:
+            existing = {f.fid for f in self._patch_cache}
+            if self._show_engine is not None:
+                from sqlalchemy import select
+                with self._session() as s:
+                    existing |= set(
+                        s.execute(select(PatchedFixture.fid)).scalars()
+                    )
+            if fixture.fid in existing:
+                fixture.fid = self.next_fid()
+        except Exception as e:
+            debug_swallow("app_state.add_fixture.fid_guard", e)
         # Save snapshot for undo BEFORE modifying
         snapshot = self._fixture_to_dict(fixture)
         with self._session() as s:
@@ -210,6 +226,21 @@ class AppState:
                 undo=lambda s=snap: self._restore_fixture_dict(s),
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
+
+    def clear_patch(self):
+        """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
+        die (durch Cache/DB-Desync) nicht im Cache stehen. Verhindert verwaiste
+        fid-Kollisionen beim Neuaufbau des Patches (FLD-FID). Wird beim Laden
+        einer Show genutzt, um die Patch-Tabelle verlustfrei zu ersetzen."""
+        if self._show_engine is None:
+            self._patch_cache = []
+            return
+        from sqlalchemy import delete
+        with self._session() as s:
+            s.execute(delete(PatchedFixture))
+            s.commit()
+        self._reload_patch_cache()
+        self._emit("patch_changed")
 
     def update_fixture(self, fid: int, undoable: bool = True, **changes) -> bool:
         allowed = {
@@ -483,9 +514,24 @@ class AppState:
         self._emit("patch_changed")
 
     def next_fid(self) -> int:
-        if not self._patch_cache:
-            return 1
-        return max(f.fid for f in self._patch_cache) + 1
+        """Naechste freie Fixture-ID. Robust gegen Cache/DB-Desync (FLD-FID):
+        nimmt das Maximum aus der persistenten patched_fixtures-Tabelle UND dem
+        In-Memory-Cache. Sonst kann add_fixture auf eine bereits in der DB
+        belegte fid INSERTen -> IntegrityError (UNIQUE constraint failed:
+        patched_fixtures.fid), der bis zum globalen Fehlerdialog durchschlaegt
+        und das Hauptfenster einfriert."""
+        cache_max = max((f.fid for f in self._patch_cache), default=0)
+        db_max = 0
+        if self._show_engine is not None:
+            try:
+                from sqlalchemy import select, func
+                with self._session() as s:
+                    db_max = s.execute(
+                        select(func.max(PatchedFixture.fid))
+                    ).scalar() or 0
+            except Exception as e:
+                debug_swallow("app_state.next_fid.db_max", e)
+        return max(cache_max, db_max) + 1
 
     def check_address_conflict(self, universe: int, address: int, channel_count: int,
                                exclude_fid: int = -1) -> list[int]:

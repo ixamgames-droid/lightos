@@ -87,15 +87,26 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
 
 
 def _replace_patch_from_data(state, patch_data: list[dict]):
-    # Remove old fixtures first
-    old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
-    for fid in [f for f in old_fids if f is not None]:
-        try:
-            state.remove_fixture(fid, undoable=False)
-        except TypeError:
-            state.remove_fixture(fid)
-        except Exception as e:
-            print(f"[show_file] remove fixture {fid} failed: {e}")
+    # Remove old fixtures first. FLD-FID: hart ueber clear_patch() leeren, damit
+    # auch verwaiste DB-Zeilen (Cache/DB-Desync) verschwinden — sonst kollidieren
+    # neue fids mit Altzeilen (IntegrityError: UNIQUE constraint patched_fixtures.fid).
+    cleared = False
+    try:
+        state.clear_patch()
+        cleared = True
+    except AttributeError:
+        cleared = False  # aeltere AppState-API ohne clear_patch
+    except Exception as e:
+        print(f"[show_file] clear_patch failed: {e}")
+    if not cleared:
+        old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
+        for fid in [f for f in old_fids if f is not None]:
+            try:
+                state.remove_fixture(fid, undoable=False)
+            except TypeError:
+                state.remove_fixture(fid)
+            except Exception as e:
+                print(f"[show_file] remove fixture {fid} failed: {e}")
 
     # Clear stale programmer values referencing old patch
     try:
