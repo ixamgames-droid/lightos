@@ -4,7 +4,7 @@ import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget, QTreeWidgetItem,
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
-    QFormLayout, QFrame, QSizePolicy,
+    QFormLayout, QFrame, QSizePolicy, QGridLayout,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, Signal
 from PySide6.QtGui import (
@@ -399,30 +399,34 @@ class FixtureGroupView(QWidget):
         grp_row.addWidget(self._combo_group, 1)
         left.addLayout(grp_row)
 
-        btns = QHBoxLayout()
+        # B-07-Fix: 6 Buttons in ein 2-spaltiges Grid (3 Reihen) statt in EINE
+        # HBox-Reihe. Im schmalen (260px), touch-grossen Panel wurde jeder Button
+        # sonst nur ~43px breit -> die Labels wurden zu unleserlichen Fragmenten
+        # beschnitten. 2 Spalten verdoppeln die Button-Breite -> Text lesbar.
+        btns = QGridLayout()
         b_new = QPushButton("+ Neu")
         b_new.clicked.connect(self._new_group)
-        btns.addWidget(b_new)
+        btns.addWidget(b_new, 0, 0)
         b_rename = QPushButton("Umbenennen")
         b_rename.setToolTip("Name der ausgewählten Gruppe ändern")
         b_rename.clicked.connect(self._rename_group)
-        btns.addWidget(b_rename)
+        btns.addWidget(b_rename, 0, 1)
         b_edit = QPushButton("Bearbeiten…")
         b_edit.setToolTip("Mitglieder, Name und Reihenfolge der Gruppe ändern "
                           "(touch-tauglich, ohne Drag&Drop)")
         b_edit.clicked.connect(self._edit_group)
-        btns.addWidget(b_edit)
+        btns.addWidget(b_edit, 1, 0)
         b_del = QPushButton("Loeschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._delete_group)
-        btns.addWidget(b_del)
+        btns.addWidget(b_del, 1, 1)
         b_save = QPushButton("Speichern")
         b_save.clicked.connect(self._save_group)
-        btns.addWidget(b_save)
+        btns.addWidget(b_save, 2, 0)
         b_folder = QPushButton("Ordner…")
         b_folder.setToolTip("Gruppe einem (verschachtelten) Ordner zuordnen — z. B. Front/Wash")
         b_folder.clicked.connect(self._set_group_folder)
-        btns.addWidget(b_folder)
+        btns.addWidget(b_folder, 2, 1)
         left.addLayout(btns)
 
         # Fixture tree (Universe-Ordner)
