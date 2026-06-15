@@ -4,9 +4,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
                                 QLabel, QSpinBox, QComboBox, QPushButton,
                                 QSizePolicy, QGridLayout, QSlider,
                                 QTreeWidget, QTreeWidgetItem, QSplitter,
-                                QFrame)
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QPainter, QFont, QBrush
+                                QFrame, QCheckBox)
+from PySide6.QtCore import Qt, QTimer, Signal, QRectF
+from PySide6.QtGui import QColor, QPainter, QFont, QBrush, QPen, QFontMetrics
 
 # ── Farb-Konstanten (Dark-Theme) ──────────────────────────────────────────────
 _C_BG        = "#0d1117"
@@ -28,6 +28,7 @@ class ChannelFader(QWidget):
         super().__init__(parent)
         self.channel = channel
         self._value = 0
+        self._tint_color: QColor | None = None
         self.setFixedSize(36, 110)
         self.setToolTip(f"CH {channel}")
 
@@ -71,6 +72,117 @@ class ChannelFader(QWidget):
         self._value = val
         self._val_lbl.setText(str(val))
         self._slider.blockSignals(False)
+
+    def set_tint(self, color: QColor | None):
+        """SDK-01: faerbt den Fader nach Fixture (visuelle Gruppierung). None = neutral.
+        Scoped auf ChannelFader, damit Slider/Labels ihre eigenen Styles behalten."""
+        self._tint_color = color
+        if color is None:
+            self.setStyleSheet("")
+            self._ch_lbl.setStyleSheet("color:#484f58; font-size:7px;")
+            return
+        r, g, b = color.red(), color.green(), color.blue()
+        self.setStyleSheet(
+            f"ChannelFader {{ background: rgba({r},{g},{b},38); border-radius:4px; }}")
+        self._ch_lbl.setStyleSheet(
+            f"color:#fff; font-size:7px; background: rgba({r},{g},{b},190); border-radius:2px;")
+
+    def flash(self):
+        """Kurzes Aufblinken (Klick in Übersicht/Header-Band → Fader hervorheben)."""
+        self.setStyleSheet(
+            "ChannelFader { background:#ffd33d; border:2px solid #ffd33d; border-radius:4px; }")
+        QTimer.singleShot(450, lambda: self.set_tint(self._tint_color))
+
+
+# ── Fixture-Header-Band (zeigt Zusammengehörigkeit über den Fadern) ───────────
+
+# Geometrie MUSS exakt zur Fader-Reihe passen (ChannelFader 36px breit,
+# QHBoxLayout-Spacing 2px, linker Rand 4px) — sonst sitzen die Balken schief.
+_FADER_W       = 36
+_FADER_SPACING = 2
+_FADER_MARGIN  = 4
+_FADER_STRIDE  = _FADER_W + _FADER_SPACING   # 38px pro Kanal-Spalte
+
+
+class FixtureHeaderBand(QWidget):
+    """Schmaler Balken über den Fadern: zeichnet pro Fixture einen farbigen
+    Balken über GENAU seine Kanal-Spalten (= direkt sichtbare Zusammengehörigkeit).
+    Liegt im selben Scroll-Inhalt wie die Fader und scrollt mit ihnen mit."""
+
+    channel_clicked = Signal(int)   # Start-Kanal des angeklickten Fixtures
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # (start, count, QColor, label)
+        self._spans: list[tuple[int, int, QColor, str]] = []
+        self.setFixedHeight(26)
+        self._row_width = _FADER_MARGIN * 2 + 512 * _FADER_W + 511 * _FADER_SPACING
+        self.setFixedWidth(self._row_width)
+        self.setMouseTracking(True)
+
+    def set_spans(self, spans):
+        self._spans = list(spans)
+        self.update()
+
+    @staticmethod
+    def _x_for(channel: int) -> int:
+        """Linke Kante der Fader-Spalte für DMX-Kanal (1-basiert)."""
+        return _FADER_MARGIN + (channel - 1) * _FADER_STRIDE
+
+    def _fixture_at(self, x: int):
+        for span in self._spans:
+            start, count = span[0], span[1]
+            x0 = self._x_for(start)
+            x1 = self._x_for(start + count - 1) + _FADER_W
+            if x0 <= x <= x1:
+                return span
+        return None
+
+    def mousePressEvent(self, ev):
+        hit = self._fixture_at(int(ev.position().x()))
+        if hit:
+            self.channel_clicked.emit(hit[0])
+        super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev):
+        hit = self._fixture_at(int(ev.position().x()))
+        if hit:
+            start, count, _c, label = hit
+            end = start + count - 1
+            self.setToolTip(f"{label} · CH {start:03d}–{end:03d} ({count} Kanäle)")
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setToolTip("")
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().mouseMoveEvent(ev)
+
+    def paintEvent(self, _ev):
+        if not self._spans:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        font = QFont()
+        font.setPointSizeF(8.0)
+        font.setBold(True)
+        p.setFont(font)
+        fm = QFontMetrics(font)
+        h = self.height()
+        for start, count, color, label in self._spans:
+            x0 = self._x_for(start)
+            x1 = self._x_for(start + count - 1) + _FADER_W
+            w = x1 - x0
+            rect = QRectF(x0 + 0.5, 3.5, w - 1, h - 7)
+            fill = QColor(color)
+            fill.setAlpha(210)
+            p.setBrush(QBrush(fill))
+            p.setPen(QPen(QColor(color).darker(150), 1))
+            p.drawRoundedRect(rect, 4, 4)
+            # Label weiß, auf die Fixture-Breite gekürzt
+            p.setPen(QPen(QColor("#ffffff")))
+            txt = fm.elidedText(label, Qt.TextElideMode.ElideRight, int(max(0, w - 8)))
+            p.drawText(rect.adjusted(4, 0, -2, 0),
+                       int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft), txt)
+        p.end()
 
 
 # ── Geräteübersicht ───────────────────────────────────────────────────────────
@@ -119,6 +231,12 @@ QTreeWidget::branch:open:has-children:has-siblings {{
 class FixtureOverviewPanel(QWidget):
     """Einklappbares Panel mit QTreeWidget-Geräteübersicht."""
 
+    # (universe, address, channel_count) eines angeklickten Geräts → die Haupt-
+    # View springt zu seinen Fadern und lässt sie kurz aufblinken.
+    fixture_activated = Signal(int, int, int)
+    # Gewähltes Universe des Filters (0 = Alle) → Faderbereich kann mitziehen.
+    universe_filter_changed = Signal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._filter_universe: int = 0   # 0 = alle
@@ -155,6 +273,18 @@ class FixtureOverviewPanel(QWidget):
         toolbar.addWidget(self._uni_filter)
 
         toolbar.addStretch()
+
+        # ── Legende (nur sichtbar, wenn es Probleme gibt) + Status ──
+        self._legend = QLabel("⬤ Konflikt / ungültige Adresse")
+        self._legend.setStyleSheet(f"color:{_C_RED}; font-size:10px;")
+        self._legend.setVisible(False)
+        toolbar.addWidget(self._legend)
+        toolbar.addSpacing(12)
+
+        self._status_lbl = QLabel("")
+        self._status_lbl.setStyleSheet(f"color:{_C_TEXT_DIM}; font-size:10px;")
+        toolbar.addWidget(self._status_lbl)
+
         layout.addLayout(toolbar)
 
         # ── Trennlinie ──
@@ -181,6 +311,8 @@ class FixtureOverviewPanel(QWidget):
         for i, w in enumerate(col_widths):
             self._tree.setColumnWidth(i, w)
 
+        self._tree.itemClicked.connect(self._on_item_clicked)
+
         layout.addWidget(self._tree)
 
     # ── Filter ────────────────────────────────────────────────────────────────
@@ -189,6 +321,37 @@ class FixtureOverviewPanel(QWidget):
         data = self._uni_filter.currentData()
         self._filter_universe = data if data is not None else 0
         self.rebuild()
+        self.universe_filter_changed.emit(self._filter_universe)
+
+    def set_universe_filter(self, universe: int):
+        """Filter von außen (Fader-Universe) setzen — ohne universe_filter_changed
+        erneut auszulösen (verhindert Signal-Pingpong)."""
+        for i in range(self._uni_filter.count()):
+            if self._uni_filter.itemData(i) == universe:
+                self._uni_filter.blockSignals(True)
+                self._uni_filter.setCurrentIndex(i)
+                self._uni_filter.blockSignals(False)
+                self._filter_universe = universe
+                self.rebuild()
+                return
+
+    def follow_universe(self, universe: int):
+        """Beim Universe-Wechsel im Faderbereich nachziehen — aber eine bewusste
+        'Alle'-Auswahl respektieren."""
+        cur = self._uni_filter.currentData() or 0
+        if cur == 0:
+            return
+        self.set_universe_filter(universe)
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, _col: int):
+        """Klick auf ein Gerät (oder seine Kanalzeile) → Haupt-View springt zu
+        dessen Fadern."""
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if data is None and item.parent() is not None:
+            data = item.parent().data(0, Qt.ItemDataRole.UserRole)
+        if data:
+            universe, address, count = data
+            self.fixture_activated.emit(int(universe), int(address), int(count))
 
     def _update_uni_filter_items(self, universes: list[int]):
         """Universe-Filter-ComboBox mit vorhandenen Universen befüllen."""
@@ -230,11 +393,28 @@ class FixtureOverviewPanel(QWidget):
             print(f"[simple_desk] Sortierung fehlgeschlagen: {e}")
             fixtures_sorted = list(fixtures)
 
+        shown = 0
+        problems = 0
         for fx in fixtures_sorted:
             # Universe-Filter anwenden
             if self._filter_universe != 0 and fx.universe != self._filter_universe:
                 continue
-            self._add_fixture_item(fx, state)
+            ok, has_problem = self._add_fixture_item(fx, state)
+            if ok:
+                shown += 1
+                if has_problem:
+                    problems += 1
+        self._update_status(shown, problems)
+
+    def _update_status(self, shown: int, problems: int):
+        """Status-Zeile (Geräteanzahl + Probleme) + Legende ein/aus."""
+        if not hasattr(self, "_status_lbl"):
+            return
+        txt = f"{shown} Gerät" + ("" if shown == 1 else "e")
+        if problems:
+            txt += f"  ·  {problems} Problem" + ("" if problems == 1 else "e")
+        self._status_lbl.setText(txt)
+        self._legend.setVisible(problems > 0)
 
     def _add_fixture_item(self, fx, state):
         """Fixture-Zeile + Kanal-Detailzeilen zum Tree hinzufügen."""
@@ -281,6 +461,9 @@ class FixtureOverviewPanel(QWidget):
                 fx.mode_name or "–",
                 typ,
             ])
+            # Daten für Klick→Fader-Sprung (Universe, Startadresse, Kanalanzahl)
+            top.setData(0, Qt.ItemDataRole.UserRole,
+                        (int(fx.universe), int(fx.address), int(fx.channel_count)))
 
             # ── Farb-Markierung ──
             if has_error:
@@ -321,8 +504,11 @@ class FixtureOverviewPanel(QWidget):
             except Exception as ch_e:
                 print(f"[simple_desk] Kanäle FID {fx.fid}: {ch_e}")
 
+            return True, (has_error or has_conflict)
+
         except Exception as e:
             print(f"[simple_desk] Fixture-Item Fehler (FID {getattr(fx, 'fid', '?')}): {e}")
+            return False, False
 
     @staticmethod
     def _color_item(item: QTreeWidgetItem, fg: str, bg: str):
@@ -345,6 +531,15 @@ class SimpleDeskView(QWidget):
         self._faders: list[ChannelFader] = []
         self._user_active_until: dict[int, float] = {}  # {channel: timestamp}
         self._setup_ui()
+
+        # Override-Zustand initialisieren (Default: Anzeige -> Fader/Buttons gesperrt).
+        try:
+            from src.core.app_state import get_state
+            _initial_override = bool(getattr(get_state(), "simple_desk_override", False))
+        except Exception:
+            _initial_override = False
+        self._override_cb.setChecked(_initial_override)
+        self._apply_override_ui(_initial_override)
 
         self._sync_timer = QTimer(self)
         self._sync_timer.timeout.connect(self._sync_from_output)
@@ -381,21 +576,36 @@ class SimpleDeskView(QWidget):
         header.addWidget(self._uni_combo)
         header.addSpacing(20)
 
-        btn_all_zero = QPushButton("Alles auf 0")
-        btn_all_zero.setFixedHeight(24)
-        btn_all_zero.clicked.connect(self._zero_all)
-        btn_all_zero.setStyleSheet("""
+        # Manueller Override (ISO-03): Default AUS = Simple Desk ist reine Anzeige
+        # (Fader spiegeln die Live-Ausgabe). AN = die Fader uebernehmen mit
+        # absoluter Oberhand (oberste Render-Schicht).
+        self._override_cb = QCheckBox("Manueller Override")
+        self._override_cb.setToolTip(
+            "Aus: Simple Desk zeigt nur die Ausgabe an (Monitor).\n"
+            "An: die Fader steuern direkt mit absoluter Prioritaet (ueber Effekte/Programmer).")
+        self._override_cb.setStyleSheet(
+            f"QCheckBox {{ color:{_C_TEXT_DIM}; font-size:11px; }}"
+            f"QCheckBox:checked {{ color:{_C_RED}; font-weight:bold; }}")
+        self._override_cb.toggled.connect(self._on_override_toggled)
+        header.addWidget(self._override_cb)
+        header.addSpacing(12)
+
+        self._btn_all_zero = QPushButton("Alles auf 0")
+        self._btn_all_zero.setFixedHeight(24)
+        self._btn_all_zero.clicked.connect(self._zero_all)
+        self._btn_all_zero.setStyleSheet("""
             QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:hover { background:#30363d; }
+            QPushButton:disabled { color:#5a5a5a; border-color:#21262d; }
         """)
-        header.addWidget(btn_all_zero)
+        header.addWidget(self._btn_all_zero)
 
-        btn_full = QPushButton("Alles auf 255")
-        btn_full.setFixedHeight(24)
-        btn_full.clicked.connect(lambda: self._set_all(255))
-        btn_full.setStyleSheet(btn_all_zero.styleSheet().replace("#f85149", "#3fb950"))
-        header.addWidget(btn_full)
+        self._btn_full = QPushButton("Alles auf 255")
+        self._btn_full.setFixedHeight(24)
+        self._btn_full.clicked.connect(lambda: self._set_all(255))
+        self._btn_full.setStyleSheet(self._btn_all_zero.styleSheet().replace("#f85149", "#3fb950"))
+        header.addWidget(self._btn_full)
 
         header.addStretch()
 
@@ -429,6 +639,8 @@ class SimpleDeskView(QWidget):
         # Geräteübersicht-Panel
         self._overview = FixtureOverviewPanel()
         self._overview.setMinimumHeight(60)
+        self._overview.fixture_activated.connect(self._on_overview_fixture)
+        self._overview.universe_filter_changed.connect(self._on_overview_universe)
         self._splitter.addWidget(self._overview)
 
         # Fader-Bereich
@@ -441,19 +653,31 @@ class SimpleDeskView(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet(f"QScrollArea {{ border:none; background:{_C_BG}; }}")
+        self._scroll = scroll
 
         fader_widget = QWidget()
         fader_widget.setStyleSheet(f"background:{_C_BG};")
-        grid = QHBoxLayout(fader_widget)
-        grid.setContentsMargins(4, 4, 4, 4)
-        grid.setSpacing(2)
-        grid.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        outer = QVBoxLayout(fader_widget)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
+        # Fixture-Header-Band (scrollt mit den Fadern, zeigt Zusammengehörigkeit)
+        self._header_band = FixtureHeaderBand()
+        self._header_band.channel_clicked.connect(self._on_band_clicked)
+        outer.addWidget(self._header_band, 0, Qt.AlignmentFlag.AlignLeft)
+
+        fader_row = QWidget()
+        grid = QHBoxLayout(fader_row)
+        grid.setContentsMargins(_FADER_MARGIN, 4, _FADER_MARGIN, 4)
+        grid.setSpacing(_FADER_SPACING)
+        grid.setAlignment(Qt.AlignmentFlag.AlignLeft)
         for ch in range(1, 513):
             f = ChannelFader(ch)
             f.value_changed = lambda val, c=ch: self._on_fader_change(c, val)
             grid.addWidget(f)
             self._faders.append(f)
+        outer.addWidget(fader_row, 0, Qt.AlignmentFlag.AlignLeft)
+        outer.addStretch(1)
 
         scroll.setWidget(fader_widget)
         fader_v.addWidget(scroll)
@@ -488,6 +712,83 @@ class SimpleDeskView(QWidget):
             self._overview.rebuild()
         except Exception as e:
             print(f"[simple_desk] _rebuild_overview Fehler: {e}")
+        self._apply_fixture_tints()
+
+    # SDK-01: Fader nach Fixture einfaerben (visuelle Gruppierung im aktuellen Universe)
+    _TINTS = ["#1f6feb", "#3fb950", "#d29922", "#a371f7", "#f85149", "#39c5cf",
+              "#db61a2", "#bc8cff"]
+
+    def _apply_fixture_tints(self):
+        for f in self._faders:
+            f.set_tint(None)
+            f.setToolTip(f"CH {f.channel}")
+        spans: list[tuple[int, int, QColor, str]] = []
+        try:
+            from src.core.app_state import get_state, get_channels_for_patched
+            state = get_state()
+            fixtures = [fx for fx in state.get_patched_fixtures()
+                        if fx.universe == self._universe]
+            fixtures.sort(key=lambda fx: fx.address)
+            for idx, fx in enumerate(fixtures):
+                color = QColor(self._TINTS[idx % len(self._TINTS)])
+                try:
+                    cmap = {c.channel_number:
+                            (c.name if (c.name and c.name.strip()) else c.attribute)
+                            for c in get_channels_for_patched(fx)}
+                except Exception:
+                    cmap = {}
+                count = int(getattr(fx, "channel_count", 1) or 1)
+                label = getattr(fx, "label", "") or f"FID {getattr(fx, 'fid', '?')}"
+                for off in range(count):
+                    ch = fx.address + off
+                    if 1 <= ch <= 512:
+                        fader = self._faders[ch - 1]
+                        fader.set_tint(color)
+                        cname = cmap.get(off + 1, "")
+                        fader.setToolTip(
+                            f"CH {ch} · {label}" + (f" · {cname}" if cname else ""))
+                # Header-Band-Eintrag (sichtbaren Bereich auf 1..512 begrenzen)
+                if 1 <= fx.address <= 512:
+                    vis = min(count, 512 - fx.address + 1)
+                    spans.append((fx.address, vis, color, label))
+        except Exception as e:
+            print(f"[simple_desk] tint error: {e}")
+        self._band_spans = spans
+        if hasattr(self, "_header_band"):
+            self._header_band.set_spans(spans)
+
+    def _reveal_fixture(self, address: int, count: int):
+        """Fader eines Fixtures sichtbar scrollen und kurz aufblinken lassen."""
+        if not (1 <= address <= 512):
+            return
+        try:
+            self._scroll.ensureWidgetVisible(self._faders[address - 1], 100, 0)
+        except Exception as e:
+            print(f"[simple_desk] reveal scroll error: {e}")
+        for off in range(max(1, count)):
+            ch = address + off
+            if 1 <= ch <= 512:
+                self._faders[ch - 1].flash()
+
+    def _on_overview_fixture(self, universe: int, address: int, count: int):
+        """Klick in der Geräteübersicht → ggf. Universe wechseln, dann Fader zeigen."""
+        if 1 <= universe <= 4 and universe != self._universe:
+            self._uni_combo.setCurrentIndex(universe - 1)  # löst _universe_changed aus
+            QTimer.singleShot(60, lambda a=address, c=count: self._reveal_fixture(a, c))
+        else:
+            self._reveal_fixture(address, count)
+
+    def _on_overview_universe(self, universe: int):
+        """Overview-Filter auf ein konkretes Universe gestellt → Fader ziehen mit."""
+        if universe and 1 <= universe <= 4 and universe != self._universe:
+            self._uni_combo.setCurrentIndex(universe - 1)
+
+    def _on_band_clicked(self, start_channel: int):
+        """Klick auf das Header-Band → Fader des Fixtures hervorheben."""
+        for s, c, _color, _label in getattr(self, "_band_spans", []):
+            if s == start_channel:
+                self._reveal_fixture(s, c)
+                return
 
     # ── Sync-Callbacks ────────────────────────────────────────────────────────
 
@@ -503,17 +804,46 @@ class SimpleDeskView(QWidget):
 
     # ── Fader-Logik (unverändert) ─────────────────────────────────────────────
 
+    def _on_override_toggled(self, checked: bool):
+        """Manueller Override an/aus. Aus = reine Anzeige (Fader gesperrt, Werte
+        verworfen); An = Fader steuern mit absoluter Prioritaet."""
+        try:
+            from src.core.app_state import get_state
+            get_state().set_simple_desk_override(bool(checked))
+        except Exception as e:
+            print(f"[SimpleDesk] override toggle error: {e}")
+        self._apply_override_ui(bool(checked))
+        if not checked:
+            # Zurueck zur Anzeige: Fader sofort auf die Live-Ausgabe syncen.
+            self._sync_from_output()
+
+    def _apply_override_ui(self, enabled: bool):
+        """Sperrt/entsperrt die Fader und die 'Alles auf …'-Buttons je nach
+        Override-Zustand (im Anzeige-Modus sind sie nur Monitor)."""
+        for f in self._faders:
+            f.setEnabled(enabled)
+        if hasattr(self, "_btn_all_zero"):
+            self._btn_all_zero.setEnabled(enabled)
+        if hasattr(self, "_btn_full"):
+            self._btn_full.setEnabled(enabled)
+
     def _on_fader_change(self, channel: int, value: int):
         import time
+        # Nur wirksam im manuellen Override-Modus (sonst reine Anzeige).
+        if not self._override_cb.isChecked():
+            return
         # User aktiv -> 800ms lang nicht vom Sync ueberschreiben
         self._user_active_until[channel] = time.monotonic() + 0.8
         try:
             from src.core.app_state import get_state
             state = get_state()
-            # Sicherstellen dass das Universe existiert
+            # Sicherstellen dass das Universe existiert (Renderer baut Scratch nur
+            # aus state.universes; sonst wuerde der Override nicht gerendert).
             if self._universe not in state.universes:
                 state.universes[self._universe] = state.output_manager.add_universe(self._universe)
-            state.universes[self._universe].set_channel(channel, value)
+            # ISO-03: in die Simple-Desk-Override-Ebene schreiben statt roh ins
+            # Live-Universe — der zentrale Renderer wendet sie deterministisch an.
+            state.set_simple_desk_channel(self._universe, channel, value)
         except Exception as e:
             print(f"[SimpleDesk] fader change error: {e}")
 
@@ -522,21 +852,29 @@ class SimpleDeskView(QWidget):
         self._universe = idx + 1
         self._user_active_until.clear()
         self._sync_from_output()
+        self._apply_fixture_tints()      # SDK-01: Faerbung fuers neue Universe
+        # Übersicht kohärent nachziehen (außer der Nutzer hat bewusst "Alle" gewählt)
+        try:
+            self._overview.follow_universe(self._universe)
+        except Exception as e:
+            print(f"[simple_desk] follow_universe error: {e}")
 
     def _zero_all(self):
         self._set_all(0)
 
     def _set_all(self, val: int):
         import time
+        if not self._override_cb.isChecked():
+            return  # nur im manuellen Override-Modus wirksam
         try:
             from src.core.app_state import get_state
             state = get_state()
             if self._universe not in state.universes:
                 state.universes[self._universe] = state.output_manager.add_universe(self._universe)
-            u = state.universes[self._universe]
+            # ISO-03: alle 512 Kanaele als Simple-Desk-Override setzen (statt roh).
+            state.set_simple_desk_all(self._universe, val)
             now = time.monotonic() + 0.8
             for ch in range(1, 513):
-                u.set_channel(ch, val)
                 self._user_active_until[ch] = now
         except Exception as e:
             print(f"[SimpleDesk] set_all error: {e}")
@@ -563,3 +901,19 @@ class SimpleDeskView(QWidget):
                 f.set_value_silent(data[i])
         except Exception as e:
             print(f"[SimpleDesk] sync error: {e}")
+
+    # ── Sichtbarkeit: Sync-Timer nur laufen lassen, wenn der Tab sichtbar ist ──
+    # (512 Fader 5×/s zu aktualisieren ist sinnlos, wenn niemand hinsieht.)
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        if hasattr(self, "_sync_timer") and not self._sync_timer.isActive():
+            self._sync_timer.start(200)
+        # Beim Zurückkehren auf den Tab: frischer Stand.
+        self._sync_from_output()
+        self._rebuild_overview()
+
+    def hideEvent(self, ev):
+        super().hideEvent(ev)
+        if hasattr(self, "_sync_timer"):
+            self._sync_timer.stop()

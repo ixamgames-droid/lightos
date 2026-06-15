@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "behringer_x_touch_mini",
+  "manufacturer": "Behringer",
+  "model": "X-Touch Mini",
+  "device_type": "midi_fader_controller",
+  "connections": ["USB-MIDI"],
+  "buttons": 18,
+  "faders": 1,
+  "encoders": 8,
+  "pad_matrix": null,
+  "banks": "2 Hardware-Layer (A/B) mit getrennten CC-/Note-Nummern",
+  "controls": [
+    {"name": "Encoder 1-8 (Layer A, drehen)", "type": "cc", "channel": 10, "range": [1, 8], "layout": "Standard-MIDI-Modus, Kanal 11 (1-basiert)"},
+    {"name": "Encoder 1-8 (Layer A, Druck)", "type": "note", "channel": 10, "range": [0, 7], "layout": ""},
+    {"name": "Tasten 1-16 (Layer A)", "type": "note", "channel": 10, "range": [8, 23], "layout": "2 Reihen à 8 Tasten"},
+    {"name": "Master-Fader (Layer A)", "type": "cc", "channel": 10, "range": [9, 9], "layout": ""},
+    {"name": "Encoder 1-8 (Layer B, drehen)", "type": "cc", "channel": 10, "range": [11, 18], "layout": ""},
+    {"name": "Tasten 1-16 (Layer B)", "type": "note", "channel": 10, "range": [32, 47], "layout": ""},
+    {"name": "Master-Fader (Layer B)", "type": "cc", "channel": 10, "range": [10, 10], "layout": ""}
+  ],
+  "led_feedback": {
+    "type": "note_velocity",
+    "notes": "Tasten-LEDs per Note-On (0=aus, 1=an, 2=blinkend); Encoder-LED-Ringe per CC. Gilt für den Standard-MIDI-Modus (nicht Mackie-Control-Modus)."
+  },
+  "features": ["Encoder mit LED-Ringen", "2 Layer", "alternativ Mackie-Control-Modus (andere Belegung)"],
+  "source": "Behringer X-Touch Mini Bedienungsanleitung / öffentlich dokumentierter Standard-MIDI-Modus. Hinweis: Belegung per Hersteller-Editor änderbar — Werte gelten für Werkseinstellung.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

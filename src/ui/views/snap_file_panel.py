@@ -278,13 +278,24 @@ class _SnapTree(QTreeWidget):
 
         dragged_item = dragged[0]
         src_kind = dragged_item.data(0, _ROLE_KIND)
+
+        # Ziel-Ordner aus dem Drop-Ziel bestimmen (Ordner→Pfad, Snap/Funktion→deren
+        # Ordner, leere Flaeche→Wurzel).
+        dest = self._panel._folder_of_item(target_item)
+
+        # Ordner in einen anderen Ordner ziehen (Re-Parenting).
+        if src_kind == "folder":
+            src_path = str(dragged_item.data(0, _ROLE_REF) or "")
+            if self._panel._move_folder(src_path, dest):
+                event.accept()
+            else:
+                event.ignore()
+            return
+
         if src_kind not in ("snap", "function"):
             event.ignore()
             return
         ref = dragged_item.data(0, _ROLE_REF)
-
-        # Ziel-Ordner aus dem Drop-Ziel bestimmen
-        dest = self._panel._folder_of_item(target_item)
 
         if src_kind == "snap":
             lib = self._panel._lib()
@@ -315,6 +326,10 @@ class SnapFilePanel(QWidget):
         self._learn_fid: int | None = None
         self._learn_name: str = ""
         self._learn_box = None
+        # Eingeklappte Ordner überleben Baum-Rebuilds (FUNCTION_CHANGED feuert
+        # oft) und werden in ui_prefs.json gemerkt (Neustart).
+        self._collapsed_folders: set[str] = self._load_collapsed_folders()
+        self._tree_rebuilding = False
         self._midi_learned_sig.connect(self._apply_learned_midi)
         self._setup_ui()
         self._refresh_tree()
@@ -322,8 +337,8 @@ class SnapFilePanel(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._safe_refresh())
-            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._safe_refresh())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._safe_refresh())
+            sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, self, lambda *_: self._safe_refresh())
         except Exception as e:
             print(f"[snap_file_panel] sync subscribe error: {e}")
         # Laufende Funktionen alle 500 ms fett markieren (ohne Neuaufbau).
@@ -412,7 +427,62 @@ class SnapFilePanel(QWidget):
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._context_menu)
         self._tree.itemDoubleClicked.connect(self._on_double_click)
+        self._tree.itemExpanded.connect(
+            lambda it: self._on_folder_toggled(it, expanded=True))
+        self._tree.itemCollapsed.connect(
+            lambda it: self._on_folder_toggled(it, expanded=False))
         layout.addWidget(self._tree, stretch=1)
+
+    # ── Ordner-Zustand (auf-/zugeklappt) ──────────────────────────────────────
+
+    @staticmethod
+    def _prefs_path() -> str:
+        import os
+        return os.path.join(
+            os.environ.get("APPDATA", os.path.expanduser("~")),
+            "LightOS", "ui_prefs.json")
+
+    def _load_collapsed_folders(self) -> set[str]:
+        import json
+        try:
+            with open(self._prefs_path(), encoding="utf-8") as f:
+                data = json.load(f) or {}
+            return set(data.get("library_collapsed_folders", []) or [])
+        except Exception:
+            return set()
+
+    def _save_collapsed_folders(self):
+        import json
+        import os
+        try:
+            path = self._prefs_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            data = {}
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f) or {}
+            except Exception:
+                data = {}
+            data["library_collapsed_folders"] = sorted(self._collapsed_folders)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass  # Prefs sind nice-to-have, nie fatal
+
+    def _on_folder_toggled(self, item, expanded: bool):
+        """Merkt sich den Klapp-Zustand eines Ordners (ohne Rebuild-Echos)."""
+        if self._tree_rebuilding:
+            return
+        if item.data(0, _ROLE_KIND) != "folder":
+            return
+        path = item.data(0, _ROLE_REF)
+        if not isinstance(path, str):
+            return
+        if expanded:
+            self._collapsed_folders.discard(path)
+        else:
+            self._collapsed_folders.add(path)
+        self._save_collapsed_folders()
 
     # â”€â”€ Baum aufbauen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -432,9 +502,11 @@ class SnapFilePanel(QWidget):
         return folders
 
     def _refresh_tree(self):
+        self._tree_rebuilding = True  # Expand/Collapse-Echos unterdrücken
         self._tree.clear()
         lib = self._lib()
         if lib is None:
+            self._tree_rebuilding = False
             return
         self._folder_items: dict[str, QTreeWidgetItem] = {}
         self._func_items: list[tuple[QTreeWidgetItem, int]] = []
@@ -464,6 +536,7 @@ class SnapFilePanel(QWidget):
                 item.setIcon(0, _mini.function_icon(f))
                 self._func_items.append((item, int(fid)))
         self._update_running()
+        self._tree_rebuilding = False
 
     def _update_running(self):
         """Laufende Funktionen fett markieren (ohne den Baum neu aufzubauen)."""
@@ -493,7 +566,8 @@ class SnapFilePanel(QWidget):
         item.setData(0, _ROLE_REF, path)
         item.setData(0, _ROLE_KIND, "folder")
         item.setIcon(0, _mini.folder_icon())
-        item.setExpanded(True)
+        # Klapp-Zustand aus den Prefs wiederherstellen (statt immer auf)
+        item.setExpanded(path not in self._collapsed_folders)
         self._folder_items[path] = item
         return item
 
@@ -552,6 +626,53 @@ class SnapFilePanel(QWidget):
             f = self._get_func(int(ref))
             return getattr(f, "folder", "") or "" if f is not None else ""
         return ""
+
+    def _move_folder(self, src_path: str, dest_parent: str) -> bool:
+        """Verschiebt den Ordner ``src_path`` unter ``dest_parent`` — zieht Snaps
+        (ueber die Bibliothek) UND Funktionen (deren ``folder``-Attribut) mit.
+        Liefert True bei Erfolg, False wenn der Zug ungueltig ist (in sich selbst /
+        einen eigenen Unterordner) oder keine Bibliothek vorhanden ist."""
+        src_path = (src_path or "").strip("/")
+        if not src_path:
+            return False
+        lib = self._lib()
+        if lib is None:
+            return False
+        new_path = lib.move_folder(src_path, dest_parent)
+        if new_path is None:
+            return False
+        # Funktionen mitziehen (sie liegen nicht in der Snap-Bibliothek).
+        prefix = src_path + "/"
+        fm = self._fm()
+        moved_func = False
+        if fm is not None:
+            try:
+                funcs = list(fm.all())
+            except Exception:
+                funcs = []
+            for f in funcs:
+                fld = getattr(f, "folder", "") or ""
+                if fld == src_path:
+                    f.folder = new_path
+                    moved_func = True
+                elif fld.startswith(prefix):
+                    f.folder = new_path + "/" + fld[len(prefix):]
+                    moved_func = True
+        # Eingeklappt-Zustand der betroffenen Pfade mit-umschreiben (kosmetisch).
+        remapped: set[str] = set()
+        for p in self._collapsed_folders:
+            if p == src_path:
+                remapped.add(new_path)
+            elif p.startswith(prefix):
+                remapped.add(new_path + "/" + p[len(prefix):])
+            else:
+                remapped.add(p)
+        self._collapsed_folders = remapped
+        self._save_collapsed_folders()
+        if moved_func:
+            self._emit_function_changed()
+        self._refresh_tree()
+        return True
 
     # â”€â”€ Aktionen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

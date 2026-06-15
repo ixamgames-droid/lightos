@@ -1,295 +1,58 @@
-# Show-Dateiformat — Spezifikation
+# Show-Dateiformat (.lshow) — Spezifikation
+
+> **Stand: 2026-06-10**, verifiziert gegen `src/core/show/show_file.py`
+> (`SHOW_VERSION = "1.1"`). Frühere Versionen dieser Datei beschrieben ein
+> geplantes Multi-Datei-Format (patch.json, sequences/, …), das **nie gebaut
+> wurde** — real ist es ein ZIP mit genau einer Datei.
 
 ## Überblick
 
-Eine LightOS Show-Datei (`.lshow`) ist ein **ZIP-Archiv** das alle Show-Daten enthält:
+Eine LightOS-Show (`.lshow`) ist ein **ZIP-Archiv** mit genau einem Eintrag:
 
 ```
-myshow.lshow  (ZIP)
-├── show.json          # Haupt-Show-Metadaten
-├── patch.json         # Fixture-Patch (Geräte + Adressen)
-├── fixtures/          # Verwendete Fixture-Profile (self-contained)
-│   ├── fixture_1.json
-│   └── fixture_2.json
-├── groups.json        # Fixture-Gruppen
-├── palettes.json      # Paletten (Farbe, Position, Beam)
-├── sequences/         # Alle Cuelisten
-│   ├── seq_001.json
-│   └── seq_002.json
-├── effects.json       # Effekt-Definitionen
-├── executors.json     # Executor-Zuweisungen
-├── settings.json      # Show-spezifische Einstellungen
-└── timeline.json      # Timeline / Timecode-Daten
+meineshow.lshow  (ZIP, deflate)
+└── show.json     # komplette Show als ein JSON-Dokument
 ```
 
----
+Geschrieben von `save_show(path, layout=None)`, gelesen von `load_show(path)`
+(tolerant: fehlende Blöcke werden mit Defaults ersetzt). `reset_show()` leert
+den State **und nullt die DMX-Puffer** (keine Artefakte nach „Neue Show").
 
-## show.json
+## Aufbau von `show.json`
 
-```json
-{
-  "format_version": "1.0",
-  "name": "Meine Show",
-  "created": "2026-05-23T10:00:00",
-  "modified": "2026-05-23T15:30:00",
-  "author": "Max Muster",
-  "notes": "Sommer Open Air 2026",
-  "universes": 4,
-  "software_version": "1.0.0"
-}
-```
+| Schlüssel | Inhalt | Quelle im Code |
+|-----------|--------|----------------|
+| `version` | Formatversion, aktuell `"1.1"` | `SHOW_VERSION` |
+| `name` | Show-Name | `state.show_name` |
+| `patch` | Liste gepatchter Fixtures (fid, Profil, Mode, Universum, Adresse, Pan/Tilt-Invert/Swap, …) | `_fixture_to_dict` |
+| `programmer` | aktueller Programmer-Inhalt `{fid: {attr: val}}` | `state.programmer` |
+| `base_levels` | Grundhelligkeiten `{fid: {attr: val}}` (in den Default-Frame gebacken) | `state.base_levels` |
+| `cue_stacks` | Cuelisten (Cues, Fades, Follow) | `CueStack.to_dict` |
+| `executors` | Executor-Pages und -Zuweisungen | `PlaybackEngine.to_dict` |
+| `palettes` | Paletten (inkl. Ordner) | `PaletteManager.to_dict` |
+| `curves` | Fade-Kurven-Bibliothek | `CurveLibrary.to_dict` |
+| `functions` | **alle Engine-Funktionen** (Scene, Chaser, Sequence, Collection, Show, EFX, RGBMatrix, Audio, Script) inkl. Running-Parameter | `FunctionManager.to_dict` |
+| `efx`, `rgb_matrix` | **immer leer** — Altlast-Blöcke fürs Schema; EFX/Matrix sind seit dem Function-Umbau echte Funktionen im `functions`-Block | — |
+| `virtual_console` | VC-Layout (Banks/Seiten, Widgets inkl. MIDI-Bindings) | `state._vc_layout` |
+| `visualizer` | 3D-Positionen `{fid: [x,y,z]}`, Y-Rotationen `{fid: grad}` + aktive Bühne | `visualizer_positions` / `visualizer_rotations` |
+| `live_view` | 2D-Positionen `{fid: [x,y]}` der Live-View-Arbeitsfläche | `live_view_positions` |
+| `snapshots` | gespeicherte Snapshots | `state._snapshots_data` |
+| `channel_groups` | Kanal-Gruppen | `state._channel_groups_data` |
+| `fixture_groups` | Fixture-Gruppen (inkl. Ordner, Gruppen-Modi Linked/Einzeln/Relativ) | `_collect_fixture_groups` |
+| `library` | Show-Bibliothek (Snaps **und** Effekt-Verweise, Ordner) | `SnapLibrary.to_dict` |
+| `layout` | optional: Fenster-/Dock-Layout (`collect_layout(main_window)`) | Parameter |
 
----
+## Hinweise
 
-## patch.json
-
-```json
-{
-  "fixtures": [
-    {
-      "fid": 1,
-      "label": "PAR links",
-      "fixture_ref": "fixture_1",
-      "mode": "3-Kanal RGB",
-      "universe": 1,
-      "address": 1,
-      "settings": {
-        "invert_pan": false,
-        "invert_tilt": false,
-        "swap_pan_tilt": false,
-        "dimmer_curve": "linear"
-      }
-    },
-    {
-      "fid": 2,
-      "label": "Moving Head 1",
-      "fixture_ref": "fixture_2",
-      "mode": "16bit Extended",
-      "universe": 1,
-      "address": 10,
-      "settings": {
-        "invert_pan": false,
-        "invert_tilt": true,
-        "swap_pan_tilt": false,
-        "dimmer_curve": "square"
-      }
-    }
-  ]
-}
-```
-
----
-
-## groups.json
-
-```json
-{
-  "groups": [
-    {
-      "id": "g1",
-      "name": "Alle PAR",
-      "color": "#FF6600",
-      "fixture_ids": [1, 2, 3, 4],
-      "order": [1, 2, 3, 4]
-    },
-    {
-      "id": "g2",
-      "name": "Moving Heads",
-      "color": "#0066FF",
-      "fixture_ids": [5, 6],
-      "order": [5, 6]
-    }
-  ]
-}
-```
-
----
-
-## palettes.json
-
-```json
-{
-  "color_palettes": [
-    {
-      "id": "cp1",
-      "name": "Rot",
-      "icon": "color_red",
-      "values": {
-        "color_r": 255,
-        "color_g": 0,
-        "color_b": 0
-      }
-    },
-    {
-      "id": "cp2",
-      "name": "Deep Blue",
-      "values": {
-        "color_r": 0,
-        "color_g": 0,
-        "color_b": 200
-      }
-    }
-  ],
-  "position_palettes": [
-    {
-      "id": "pp1",
-      "name": "Center",
-      "values": {
-        "pan": 128,
-        "tilt": 100
-      }
-    }
-  ],
-  "beam_palettes": [
-    {
-      "id": "bp1",
-      "name": "Gobo Sterne",
-      "values": {
-        "gobo_wheel": 45
-      }
-    }
-  ]
-}
-```
-
----
-
-## sequences/seq_001.json (Cueliste)
-
-```json
-{
-  "id": "seq_001",
-  "name": "Intro Show",
-  "loop": false,
-  "tracking": true,
-  "cues": [
-    {
-      "number": 1.0,
-      "label": "Blackout",
-      "fade_in": 2.0,
-      "fade_out": 0.0,
-      "delay_in": 0.0,
-      "delay_out": 0.0,
-      "follow": null,
-      "wait": null,
-      "link": null,
-      "values": {
-        "1": { "intensity": 0 },
-        "2": { "intensity": 0 }
-      }
-    },
-    {
-      "number": 2.0,
-      "label": "Opener Rot",
-      "fade_in": 3.0,
-      "fade_out": 2.0,
-      "delay_in": 0.5,
-      "delay_out": 0.0,
-      "follow": null,
-      "wait": null,
-      "link": null,
-      "values": {
-        "1": {
-          "intensity": 255,
-          "color_r": 255,
-          "color_g": 0,
-          "color_b": 0
-        },
-        "2": {
-          "intensity": 200,
-          "color_r": 255,
-          "color_g": 0,
-          "color_b": 0
-        }
-      }
-    }
-  ]
-}
-```
-
----
-
-## executors.json
-
-```json
-{
-  "executors": [
-    {
-      "slot": 1,
-      "label": "Intro",
-      "sequence_id": "seq_001",
-      "fader_function": "volume",
-      "button1_function": "go",
-      "button2_function": "back",
-      "button3_function": "flash",
-      "fader_value": 1.0
-    },
-    {
-      "slot": 2,
-      "label": "Ambient",
-      "sequence_id": "seq_002",
-      "fader_function": "volume",
-      "button1_function": "go",
-      "button2_function": "pause",
-      "button3_function": "solo"
-    }
-  ],
-  "grand_master": 1.0,
-  "master_dimmer": 1.0
-}
-```
-
----
-
-## settings.json (Show-spezifisch)
-
-```json
-{
-  "default_fade_in": 2.0,
-  "default_fade_out": 0.0,
-  "output": {
-    "enttec_port": "COM3",
-    "artnet_enabled": true,
-    "artnet_target": "2.255.255.255",
-    "universe_mapping": {
-      "1": { "type": "enttec", "port": "COM3" },
-      "2": { "type": "artnet", "net": 0, "subnet": 0, "universe": 1 }
-    }
-  },
-  "ui": {
-    "theme": "dark",
-    "language": "de"
-  }
-}
-```
-
----
-
-## Speichern & Laden
-
-```python
-import zipfile
-import json
-import os
-
-def save_show(show_data: dict, path: str):
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        for filename, data in show_data.items():
-            z.writestr(filename, json.dumps(data, indent=2, ensure_ascii=False))
-
-def load_show(path: str) -> dict:
-    result = {}
-    with zipfile.ZipFile(path, "r") as z:
-        for name in z.namelist():
-            with z.open(name) as f:
-                result[name] = json.load(f)
-    return result
-```
-
----
-
-## Autosave
-
-- Autosave alle 5 Minuten (konfigurierbar)
-- Autosave-Datei: `shows/.autosave/autosave.lshow`
-- Beim Start: Wiederherstellungs-Dialog wenn Autosave neuer als letzte Speicherung
+- **Fixture-Profile sind NICHT in der Show enthalten** — sie liegen in der
+  SQLite-DB (`data/current_show.db`); der Patch referenziert sie. Builtin-Profile
+  werden beim Start per `ensure_builtins()` aktuell gehalten.
+- **Nicht in der Show**: Output-Verbindungen (`data/universes.json`), globale
+  MIDI-Mappings (`data/midi_mappings.json`), UI-Präferenzen
+  (`%APPDATA%\LightOS\ui_prefs.json`).
+- Abwärtskompatibilität: ältere Shows mit gefüllten `efx`-/`rgb_matrix`-Blöcken
+  werden beim Laden migriert (Legacy-Algorithmus-Namen über
+  `_LEGACY_ALGO_MAP` in rgb_matrix.py).
+- Beispiel-Shows + Generatoren: `shows/*.lshow` ↔ `tools/build_*.py`
+  (Generatoren sind selbstverifizierend und die beste „lebende Doku" des
+  Formats).

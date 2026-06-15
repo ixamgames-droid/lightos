@@ -403,6 +403,15 @@ class FixtureGroupView(QWidget):
         b_new = QPushButton("+ Neu")
         b_new.clicked.connect(self._new_group)
         btns.addWidget(b_new)
+        b_rename = QPushButton("Umbenennen")
+        b_rename.setToolTip("Name der ausgewählten Gruppe ändern")
+        b_rename.clicked.connect(self._rename_group)
+        btns.addWidget(b_rename)
+        b_edit = QPushButton("Bearbeiten…")
+        b_edit.setToolTip("Mitglieder, Name und Reihenfolge der Gruppe ändern "
+                          "(touch-tauglich, ohne Drag&Drop)")
+        b_edit.clicked.connect(self._edit_group)
+        btns.addWidget(b_edit)
         b_del = QPushButton("Loeschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._delete_group)
@@ -410,6 +419,10 @@ class FixtureGroupView(QWidget):
         b_save = QPushButton("Speichern")
         b_save.clicked.connect(self._save_group)
         btns.addWidget(b_save)
+        b_folder = QPushButton("Ordner…")
+        b_folder.setToolTip("Gruppe einem (verschachtelten) Ordner zuordnen — z. B. Front/Wash")
+        b_folder.clicked.connect(self._set_group_folder)
+        btns.addWidget(b_folder)
         left.addLayout(btns)
 
         # Fixture tree (Universe-Ordner)
@@ -547,9 +560,14 @@ class FixtureGroupView(QWidget):
             return
         try:
             with s:
-                groups = list(s.execute(select(FixtureGroup).order_by(FixtureGroup.id)).scalars())
+                groups = list(s.execute(select(FixtureGroup)).scalars())
+                # FLD-01b: nach Ordner + Name sortieren und mit Ordnerpfad anzeigen.
+                groups.sort(key=lambda x: ((getattr(x, "folder", "") or "").lower(),
+                                           (x.name or "").lower()))
                 for g in groups:
-                    self._combo_group.addItem(g.name, g.id)
+                    folder = getattr(g, "folder", "") or ""
+                    label = f"{folder}/{g.name}" if folder else g.name
+                    self._combo_group.addItem(label, g.id)
                 if groups:
                     self._current_group = groups[0]
                 else:
@@ -612,6 +630,137 @@ class FixtureGroupView(QWidget):
             with s:
                 g = FixtureGroup(name=name.strip(), cols=8, rows=8, positions_json="{}")
                 s.add(g)
+                s.commit()
+        except Exception as e:
+            QMessageBox.warning(self, "Fehler", str(e))
+            return
+        self._reload_group_list()
+        self._notify_groups_changed()
+
+    def _set_group_folder(self):
+        """FLD-01b: weist die aktuelle Gruppe einem (verschachtelten) Ordner zu.
+        Pfad mit '/' = Unterordner; leer = Wurzel. Verschieben = Pfad ändern."""
+        if self._current_group is None:
+            QMessageBox.information(self, "Ordner", "Erst eine Gruppe auswählen.")
+            return
+        cur = getattr(self._current_group, "folder", "") or ""
+        path, ok = QInputDialog.getText(
+            self, "Ordner setzen",
+            "Ordnerpfad (verschachtelt mit /, leer = Wurzel):", text=cur)
+        if not ok:
+            return
+        path = "/".join(p.strip() for p in path.split("/") if p.strip())
+        s = self._session()
+        if s is None:
+            return
+        try:
+            with s:
+                g = s.get(FixtureGroup, self._current_group.id)
+                if g is None:
+                    return
+                g.folder = path
+                s.commit()
+        except Exception as e:
+            QMessageBox.warning(self, "Fehler", str(e))
+            return
+        self._reload_group_list()
+        self._notify_groups_changed()
+
+    def _rename_group(self):
+        """P5: Gruppe nachtraeglich umbenennen (mit Leer-/Duplikat-Pruefung).
+        Der neue Name erscheint ueberall (Programmer/Live View/Matrix) ueber
+        GROUP_CHANGED."""
+        if self._current_group is None:
+            QMessageBox.information(self, "Umbenennen", "Erst eine Gruppe auswählen.")
+            return
+        name, ok = QInputDialog.getText(
+            self, "Gruppe umbenennen", "Neuer Name:",
+            text=self._current_group.name or "")
+        if not ok:
+            return
+        name = name.strip()
+        if not name:
+            QMessageBox.warning(self, "Umbenennen", "Der Name darf nicht leer sein.")
+            return
+        s = self._session()
+        if s is None:
+            return
+        try:
+            with s:
+                from sqlalchemy import select
+                dup = s.execute(
+                    select(FixtureGroup)
+                    .where(FixtureGroup.name == name)
+                    .where(FixtureGroup.id != self._current_group.id)
+                ).scalars().first()
+                if dup is not None:
+                    if QMessageBox.question(
+                        self, "Doppelter Name",
+                        f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    ) != QMessageBox.StandardButton.Yes:
+                        return
+                g = s.get(FixtureGroup, self._current_group.id)
+                if g is None:
+                    return
+                g.name = name
+                s.commit()
+        except Exception as e:
+            QMessageBox.warning(self, "Fehler", str(e))
+            return
+        self._reload_group_list()
+        self._notify_groups_changed()
+
+    def _edit_group(self):
+        """Feature „Gruppe bearbeiten": Mitglieder hinzufügen/entfernen, Name
+        ändern und Reihenfolge anpassen — über einen touch-tauglichen Dialog
+        statt Drag&Drop. Persistiert in der Show-DB, GROUP_CHANGED informiert
+        Programmer/Live View/EFX/Matrix."""
+        if self._current_group is None:
+            QMessageBox.information(self, "Bearbeiten", "Erst eine Gruppe auswählen.")
+            return
+        from src.ui.widgets.group_edit_dialog import GroupEditDialog
+        labels = {f.fid: f.label for f in self._state.get_patched_fixtures()}
+        dlg = GroupEditDialog(
+            group_name=self._current_group.name or "",
+            positions_json=self._current_group.positions_json or "{}",
+            cols=self._current_group.cols,
+            rows=self._current_group.rows,
+            patched_labels=labels,
+            parent=self,
+        )
+        if not dlg.exec():
+            return
+        name = dlg.result_name()
+        if not name:
+            QMessageBox.warning(self, "Bearbeiten", "Der Name darf nicht leer sein.")
+            return
+        pos_json, cols, rows = dlg.result_positions()
+        s = self._session()
+        if s is None:
+            return
+        try:
+            with s:
+                if name != (self._current_group.name or ""):
+                    dup = s.execute(
+                        select(FixtureGroup)
+                        .where(FixtureGroup.name == name)
+                        .where(FixtureGroup.id != self._current_group.id)
+                    ).scalars().first()
+                    if dup is not None:
+                        if QMessageBox.question(
+                            self, "Doppelter Name",
+                            f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        ) != QMessageBox.StandardButton.Yes:
+                            return
+                g = s.get(FixtureGroup, self._current_group.id)
+                if g is None:
+                    return
+                g.name = name
+                g.positions_json = pos_json
+                g.cols = cols
+                g.rows = rows
                 s.commit()
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))

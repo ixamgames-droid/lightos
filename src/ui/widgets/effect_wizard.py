@@ -230,13 +230,28 @@ class EffectWizard(QWizard):
         fm = get_function_manager()
         if not fids:
             raise ValueError("Keine Lampe ausgewählt.")
-        chan = {c.attribute: c.channel_number
-                for c in get_channels_for_patched(st.get_patched_fixtures()[0])}
+        # Bugfix: Kanal-Zuordnung MUSS pro Fixture berechnet werden. Frueher kam
+        # die Map aus dem ersten Geraet und galt fuer alle — bei gemischten Typen
+        # (PAR + Moving Head) landete color_r=Ch1 dann auf dem Pan-Kanal des MH
+        # (er bewegte sich statt die Farbe zu wechseln). Jetzt: pro fid die echte
+        # {attr: channel_number}-Map des jeweiligen Geraets.
+        fx_by_fid = {f.fid: f for f in st.get_patched_fixtures()}
+        chan_cache: dict[int, dict[str, int]] = {}
+
+        def _chan_for(fid):
+            m = chan_cache.get(fid)
+            if m is None:
+                fx = fx_by_fid.get(fid)
+                m = ({c.attribute: c.channel_number
+                      for c in get_channels_for_patched(fx)} if fx is not None else {})
+                chan_cache[fid] = m
+            return m
 
         def scene(sname, rgb=(0, 0, 0), intensity=255, only=None, white=0):
             s = fm.new_scene(sname)
             r, g, b = rgb
             for fid in (only if only is not None else fids):
+                chan = _chan_for(fid)
                 if "intensity" in chan:
                     s.set_value(fid, chan["intensity"], intensity)
                 for a, v in (("color_r", r), ("color_g", g), ("color_b", b), ("color_w", white)):

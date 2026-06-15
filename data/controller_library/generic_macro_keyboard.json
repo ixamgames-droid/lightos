@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "generic_macro_keyboard",
+  "manufacturer": "(generisch)",
+  "model": "Makro-Tastatur / Zweittastatur",
+  "device_type": "keyboard_macro",
+  "connections": ["USB-HID (Tastatur)"],
+  "buttons": 0,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": null,
+  "banks": "",
+  "controls": [
+    {"name": "Beliebige Tasten/Kombinationen", "type": "key", "channel": -1, "range": [0, 0], "layout": "über das VC-Keyboard-Mapping (Rechtsklick auf VC-Button → 'Taste zuweisen…') belegbar"}
+  ],
+  "led_feedback": {},
+  "features": [
+    "funktioniert mit jeder als Tastatur erkannten Hardware (Makro-Pads, Zweittastatur, Fußtaster mit HID-Keyboard-Modus)",
+    "WICHTIG: Windows/Qt unterscheidet NICHT zwischen mehreren Tastaturen — eine zweite USB-Tastatur sendet dieselben Tastencodes wie die Haupttastatur (Details: docs/KEYBOARD_MAPPING.md)",
+    "Empfehlung für Makro-Boards: Tasten auf F13-F24 oder Strg/Alt-Kombinationen programmieren, die auf der Haupttastatur nicht vorkommen"
+  ],
+  "source": "LightOS-Keyboard-Mapping (src/core/input/keyboard_hotkeys.py)",
+  "license": "CC0",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

@@ -119,6 +119,11 @@ class RgbMatrixView(QWidget):
         # _current = Draft (Arbeitskopie) der aktuell editierten Matrix.
         self._saved: RgbMatrixInstance | None = None
         self._current: RgbMatrixInstance | None = None
+        # Guard: True während _load_ui die Widgets aus dem Draft befüllt —
+        # verhindert, dass Widget-Signale die Werte zurück in den (frisch
+        # erzeugten) Draft schreiben (sonst erbt die Matrix die alten Werte der
+        # zuvor angezeigten Matrix und gilt sofort als „geändert").
+        self._loading = False
         # Einbettungs-Modus: die Matrix folgt automatisch der Programmer-Auswahl,
         # statt dass man hier separat Geräte zuweist (siehe R3-Fix).
         self._follow_selection = follow_selection
@@ -139,13 +144,13 @@ class RgbMatrixView(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._rebuild_from_state())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._rebuild_from_state())
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte Matrizen erscheinen
             # sofort in beiden Matrix-Ansichten (Programmer-Seite + Sub-Tab).
-            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, self, lambda *_: self._rebuild_from_state())
             # Geaenderte Gruppe -> im Folgemodus das Grid sofort neu uebernehmen.
-            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._on_group_changed())
+            sync.subscribe_widget(SyncEvent.GROUP_CHANGED, self, lambda *_: self._on_group_changed())
         except Exception as e:
             print(f"[rgb_matrix_view] sync subscribe error: {e}")
 
@@ -670,68 +675,83 @@ class RgbMatrixView(QWidget):
             algo = RgbAlgorithm.PLAIN
         meta = ALGO_META.get(algo)
         n_colors = meta.colors if (meta and is_color) else (1 if is_color else 0)
+        # M2: Der Sequence-Editor erscheint nur fuer Algorithmen, die die GANZE
+        # Color-Sequence auswerten (meta.sequence). Wipe/Wave/SinePlasma/Windrad
+        # haben colors>=2, nutzen aber nur feste c1/c2 -> dort feste Farbknoepfe
+        # statt eines Sequence-Editors, der mehr verspricht als die Engine einloest.
+        uses_seq = bool(meta and meta.sequence)
         # Abschnitt 6: Chase mit "Farbe pro Runde wechseln" nutzt die ganze
         # Color-Sequence -> Multi-Color-UI zeigen (statt nur Einzelfarbe).
         if (is_color and algo == RgbAlgorithm.CHASE
                 and self._current is not None and self._current.params.get("color_cycle")):
+            uses_seq = True
             n_colors = max(2, n_colors)
-        # Einfarbig (==1) → einzelner C1-Knopf; mehrfarbig (>=2) → Color-Sequence-
-        # Feld (kanonische Multi-Color-UI mit Popout); keine Farbe (0) → nichts.
-        use_seq = n_colors >= 2
+        # Sequence-Algorithmus → Color-Sequence-Feld (kanonische Multi-Color-UI mit
+        # Popout); sonst so viele feste C1..Cn-Knoepfe wie der Algorithmus nutzt
+        # (1..3); keine Farbe (0) → nichts.
+        use_seq = is_color and uses_seq
         for i, (lbl, btn) in enumerate(zip(self._c_labels, self._color_btns)):
-            visible = (not use_seq) and (i < n_colors)
+            visible = is_color and (not use_seq) and (i < n_colors)
             lbl.setVisible(visible)
             btn.setVisible(visible)
-        self._color_label.setVisible(is_color and n_colors == 1)
+        self._color_label.setVisible(is_color and (not use_seq) and n_colors >= 1)
         self._seq_editor.setVisible(use_seq)
         self._seq_label.setVisible(use_seq)
 
     def _load_ui(self, m: RgbMatrixInstance):
-        self._name_edit.blockSignals(True)
-        self._name_edit.setText(m.name)
-        self._name_edit.blockSignals(False)
-        self._algo_combo.blockSignals(True)
-        self._algo_combo.setCurrentText(m.algorithm.value)
-        self._algo_combo.blockSignals(False)
-        self._style_combo.blockSignals(True)
-        self._style_combo.setCurrentText(m.style.value)
-        self._style_combo.blockSignals(False)
-        self._cols_spin.setValue(m.cols)
-        self._rows_spin.setValue(m.rows)
-        self._speed_spin.setValue(m.matrix_speed)
-        # Neue Style-Felder laden
-        self._white_slider.blockSignals(True)
-        self._white_slider.setValue(m.white_amount)
-        self._white_lbl.setText(f"{m.white_amount} %")
-        self._white_slider.blockSignals(False)
-        self._imin_spin.blockSignals(True)
-        self._imin_spin.setValue(m.intensity_min)
-        self._imin_spin.blockSignals(False)
-        self._imax_spin.blockSignals(True)
-        self._imax_spin.setValue(m.intensity_max)
-        self._imax_spin.blockSignals(False)
-        self._smin_spin.blockSignals(True)
-        self._smin_spin.setValue(m.shutter_min)
-        self._smin_spin.blockSignals(False)
-        self._smax_spin.blockSignals(True)
-        self._smax_spin.setValue(m.shutter_max)
-        self._smax_spin.blockSignals(False)
-        self._c1_btn._color = m.color1; self._c1_btn._update_style()
-        self._c2_btn._color = m.color2; self._c2_btn._update_style()
-        self._c3_btn._color = m.color3; self._c3_btn._update_style()
-        # Color-Sequence-Editor an die Draft-Sequence binden (mutiert sie direkt).
-        self._seq_editor.set_sequence(m.colors)
-        self._apply_style_visibility(m.style)
-        # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
-        self._dir_combo.blockSignals(True)
-        self._dir_combo.setCurrentIndex(1 if m.direction == "reverse" else 0)
-        self._dir_combo.blockSignals(False)
-        self._rebuild_param_fields(m.algorithm)
-        self._load_params_into_widgets(m)
-        n = sum(1 for f in m.fixture_grid if f is not None)
-        luecken = len(m.fixture_grid) - n
-        suffix = f", {luecken} Lücken" if luecken else ""
-        self._grid_label.setText(f"{m.rows}×{m.cols} = {n} Fixtures{suffix}")
+        # Guard: Beim Befüllen der Widgets aus dem Draft dürfen die Widget-
+        # Signale (cols/rows/speed sind NICHT blockiert) NICHT _param_change
+        # auslösen, sonst würden die noch-alten Werte der zuvor angezeigten
+        # Matrix in den frisch erzeugten Draft zurückgeschrieben.
+        self._loading = True
+        try:
+            self._name_edit.blockSignals(True)
+            self._name_edit.setText(m.name)
+            self._name_edit.blockSignals(False)
+            self._algo_combo.blockSignals(True)
+            self._algo_combo.setCurrentText(m.algorithm.value)
+            self._algo_combo.blockSignals(False)
+            self._style_combo.blockSignals(True)
+            self._style_combo.setCurrentText(m.style.value)
+            self._style_combo.blockSignals(False)
+            self._cols_spin.setValue(m.cols)
+            self._rows_spin.setValue(m.rows)
+            self._speed_spin.setValue(m.matrix_speed)
+            # Neue Style-Felder laden
+            self._white_slider.blockSignals(True)
+            self._white_slider.setValue(m.white_amount)
+            self._white_lbl.setText(f"{m.white_amount} %")
+            self._white_slider.blockSignals(False)
+            self._imin_spin.blockSignals(True)
+            self._imin_spin.setValue(m.intensity_min)
+            self._imin_spin.blockSignals(False)
+            self._imax_spin.blockSignals(True)
+            self._imax_spin.setValue(m.intensity_max)
+            self._imax_spin.blockSignals(False)
+            self._smin_spin.blockSignals(True)
+            self._smin_spin.setValue(m.shutter_min)
+            self._smin_spin.blockSignals(False)
+            self._smax_spin.blockSignals(True)
+            self._smax_spin.setValue(m.shutter_max)
+            self._smax_spin.blockSignals(False)
+            self._c1_btn._color = m.color1; self._c1_btn._update_style()
+            self._c2_btn._color = m.color2; self._c2_btn._update_style()
+            self._c3_btn._color = m.color3; self._c3_btn._update_style()
+            # Color-Sequence-Editor an die Draft-Sequence binden (mutiert sie direkt).
+            self._seq_editor.set_sequence(m.colors)
+            self._apply_style_visibility(m.style)
+            # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
+            self._dir_combo.blockSignals(True)
+            self._dir_combo.setCurrentIndex(1 if m.direction == "reverse" else 0)
+            self._dir_combo.blockSignals(False)
+            self._rebuild_param_fields(m.algorithm)
+            self._load_params_into_widgets(m)
+            n = sum(1 for f in m.fixture_grid if f is not None)
+            luecken = len(m.fixture_grid) - n
+            suffix = f", {luecken} Lücken" if luecken else ""
+            self._grid_label.setText(f"{m.rows}×{m.cols} = {n} Fixtures{suffix}")
+        finally:
+            self._loading = False
 
     def _name_change(self, text: str):
         # Name ist deferred wie alle anderen Felder: er landet nur im Draft und
@@ -748,7 +768,7 @@ class RgbMatrixView(QWidget):
         self._update_dirty()
 
     def _param_change(self):
-        if self._current is None:
+        if self._current is None or self._loading:
             return
         self._current.algorithm = RgbAlgorithm(self._algo_combo.currentText())
         try:

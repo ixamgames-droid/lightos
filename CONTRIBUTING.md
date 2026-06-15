@@ -19,7 +19,7 @@ Danke für dein Interesse an LightOS! Diese Anleitung erklärt, wie du die Entwi
 ### Repository klonen und Setup
 
 ```powershell
-git clone https://github.com/<org>/lightos.git
+git clone https://github.com/ixamgames-droid/lightos.git
 cd lightos
 
 # Virtuelle Umgebung erstellen
@@ -155,5 +155,5 @@ src/
 
 ## Fragen?
 
-- [Issue öffnen](https://github.com/<org>/lightos/issues) mit Label `question`
-- Diskussionen im [Discussions-Tab](https://github.com/<org>/lightos/discussions)
+- [Issue öffnen](https://github.com/ixamgames-droid/lightos/issues) mit Label `question`
+- Diskussionen im [Discussions-Tab](https://github.com/ixamgames-droid/lightos/discussions)

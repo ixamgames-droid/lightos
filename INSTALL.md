@@ -7,7 +7,7 @@ python install.py
 ```
 
 Das war's. Das Script:
-- Pruefte Python-Version (>= 3.11)
+- Prueft Python-Version (>= 3.11)
 - Prueft Python-Architektur vs. OS-Architektur (ARM64-Emulation wird erkannt)
 - Erstellt `venv/`
 - Installiert Kern-Abhaengigkeiten + optionale Pakete separat

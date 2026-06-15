@@ -100,40 +100,51 @@ class Chaser(Function):
               function_registry: dict[int, Function] | None = None):
         if not self._running or not self.steps:
             return
+        # Re-Entrancy-Schutz: Referenziert ein Schritt (direkt oder zyklisch über
+        # weitere Chaser) diesen Chaser selbst, würde _render_child_target ->
+        # child.write() endlos rekursiv aufrufen (Absturz). Ist dieser Chaser
+        # bereits weiter oben im aktuellen Render-Stack aktiv, brechen wir hier
+        # ab. Das Flag wird nach jedem verschachtelten write() zurückgesetzt,
+        # legitime (azyklische) Verschachtelung bleibt also erlaubt.
+        if getattr(self, "_rendering", False):
+            return
+        self._rendering = True
+        try:
+            effective_dt = dt * self.speed
 
-        effective_dt = dt * self.speed
+            if self.audio_triggered:
+                # Step-Advance ist nur per Beat-Trigger
+                if self._pending_advance:
+                    self._pending_advance = False
+                    self._from_values = dict(self._cur_output)
+                    advanced = self._advance_step()
+                    if not advanced:
+                        self._running = False
+                        return
+                    self._step_elapsed = 0.0
+                self._render_and_blend(universes, patch_cache, function_registry)
+                self._step_elapsed += effective_dt
+                self._elapsed += effective_dt
+                return
 
-        if self.audio_triggered:
-            # Step-Advance ist nur per Beat-Trigger
-            if self._pending_advance:
-                self._pending_advance = False
-                self._from_values = dict(self._cur_output)
-                advanced = self._advance_step()
-                if not advanced:
-                    self._running = False
-                    return
-                self._step_elapsed = 0.0
+            # Zeitbasiert: aktuellen Schritt rendern + ueber fade_in einblenden.
             self._render_and_blend(universes, patch_cache, function_registry)
             self._step_elapsed += effective_dt
             self._elapsed += effective_dt
-            return
 
-        # Zeitbasiert: aktuellen Schritt rendern + ueber fade_in einblenden.
-        self._render_and_blend(universes, patch_cache, function_registry)
-        self._step_elapsed += effective_dt
-        self._elapsed += effective_dt
-
-        step = self.steps[self._step_idx]
-        total = step.total_duration()
-        if total <= 0:
-            total = 0.001
-        # Advance step when duration elapses
-        if self._step_elapsed >= total:
-            self._from_values = dict(self._cur_output)
-            self._step_elapsed = 0.0
-            advanced = self._advance_step()
-            if not advanced:
-                self._running = False
+            step = self.steps[self._step_idx]
+            total = step.total_duration()
+            if total <= 0:
+                total = 0.001
+            # Advance step when duration elapses
+            if self._step_elapsed >= total:
+                self._from_values = dict(self._cur_output)
+                self._step_elapsed = 0.0
+                advanced = self._advance_step()
+                if not advanced:
+                    self._running = False
+        finally:
+            self._rendering = False
 
     # ── Crossfade-Rendering (EE-01) ────────────────────────────────────────────
 
@@ -263,6 +274,150 @@ class Chaser(Function):
             return True
 
         return True
+
+    # ── Live-Build-API (APC-Probier To-Do #2) ────────────────────────────────
+    # Ein echter Szenen-Chaser laesst sich damit LIVE zusammenstecken: per
+    # VC-Button/MIDI den aktuellen Programmer als Schritt aufnehmen, einen
+    # bestehenden Look anhaengen, den letzten/alle Schritte verwerfen. Die VC
+    # erreicht alles ueber do_action (effect_live-Dispatcher).
+
+    def add_step(self, function_id: int, fade_in: float = 0.0, hold: float = 1.0,
+                 fade_out: float = 0.0, note: str = "") -> int:
+        """Haengt einen Schritt an, der auf eine bestehende Funktion zeigt."""
+        self.steps.append(ChaserStep(function_id=int(function_id),
+                                      fade_in=float(fade_in), hold=float(hold),
+                                      fade_out=float(fade_out), note=note))
+        return len(self.steps) - 1
+
+    def capture_step(self, hold: float = 1.0, fade_in: float = 0.0,
+                     fade_out: float = 0.0, name: str | None = None) -> int | None:
+        """Erfasst den AKTUELLEN Programmer-Zustand als neue Scene-Funktion und
+        haengt sie als Schritt an. Gibt den Step-Index zurueck oder None, wenn
+        der Programmer leer ist bzw. kein State verfuegbar (Live-Step-Capture)."""
+        try:
+            from src.core.app_state import get_state, get_channels_for_patched
+            from .function_manager import get_function_manager
+        except Exception:
+            return None
+        state = get_state()
+        prog = {fid: dict(attrs) for fid, attrs in state.programmer.items()}
+        if not prog:
+            return None
+        fm = get_function_manager()
+        scene = fm.new_scene(name or f"{self.name} · Schritt {len(self.steps) + 1}")
+        # Aufgenommene Schritt-Szenen unter dem Chaser-Namen gruppieren.
+        scene.folder = getattr(self, "folder", "") or f"{self.name} (Schritte)"
+        patched = {f.fid: f for f in state.get_patched_fixtures()}
+        for fid, attrs in prog.items():
+            fx = patched.get(fid)
+            if fx is None:
+                continue
+            chan_of = {c.attribute: c.channel_number for c in get_channels_for_patched(fx)}
+            for attr, val in attrs.items():
+                ch = chan_of.get(attr)
+                if ch is not None:
+                    scene.set_value(fid, ch, int(val))
+        return self.add_step(scene.id, fade_in=fade_in, hold=hold,
+                             fade_out=fade_out, note="captured")
+
+    def list_params(self) -> list:
+        """Live steuerbare Parameter (analog EFX/Matrix) — macht den Chaser auf
+        VC-Fader/Encoder mappbar."""
+        from .rgb_matrix_meta import ParamSpec  # lazy: Import-Zyklus vermeiden
+        return [
+            ParamSpec("speed", "Tempo", "float", 1.0, 0.05, 8.0, 0.05,
+                      "Geschwindigkeits-Faktor"),
+            ParamSpec("direction", "Richtung", "select", Direction.Forward.value,
+                      options=tuple(d.value for d in Direction)),
+            ParamSpec("run_order", "Modus", "select", RunOrder.Loop.value,
+                      options=tuple(r.value for r in RunOrder)),
+        ]
+
+    def get_param(self, key: str):
+        if key == "speed":
+            return self.speed
+        if key == "direction":
+            return self.direction.value
+        if key == "run_order":
+            return self.run_order.value
+        return None
+
+    def set_param(self, key: str, value) -> bool:
+        if key == "speed":
+            self.speed = max(0.05, min(8.0, float(value)))
+            return True
+        if key == "direction":
+            try:
+                self.direction = Direction(str(value))
+            except ValueError:
+                s = str(value).lower()
+                self.direction = (Direction.Backward
+                                  if s.startswith(("back", "rück", "ruck", "rev"))
+                                  else Direction.Forward)
+            return True
+        if key == "run_order":
+            try:
+                self.run_order = RunOrder(str(value))
+                return True
+            except ValueError:
+                return False
+        return False
+
+    def do_action(self, action: str, **kw) -> bool:
+        """Live-Aktionen fuer VC-Buttons/MIDI-Notes (analog Matrix/EFX)."""
+        a = str(action)
+        if a in ("capture_step", "captureStep", "add_current", "grab_step"):
+            return self.capture_step(hold=float(kw.get("hold", 1.0)),
+                                     fade_in=float(kw.get("fade_in", 0.0))) is not None
+        if a in ("add_step", "addStep"):
+            fid = kw.get("function_id")
+            if fid is None:
+                return False
+            self.add_step(fid, fade_in=float(kw.get("fade_in", 0.0)),
+                          hold=float(kw.get("hold", 1.0)))
+            return True
+        if a in ("remove_last_step", "removeLastStep", "undo_step"):
+            if not self.steps:
+                return False
+            self.steps.pop()
+            if self._step_idx >= len(self.steps):
+                self._step_idx = max(0, len(self.steps) - 1)
+            return True
+        if a in ("clear_steps", "clearSteps"):
+            self.steps.clear()
+            self._step_idx = 0
+            return True
+        if a in ("restart", "reset", "retrigger"):
+            self._on_start()
+            return True
+        if a in ("reverse_direction", "reverseDirection"):
+            self.direction = (Direction.Backward if self.direction == Direction.Forward
+                              else Direction.Forward)
+            return True
+        if a in ("toggle_bounce", "toggleBounce", "toggle_pingpong"):
+            self.run_order = (RunOrder.Loop if self.run_order == RunOrder.PingPong
+                              else RunOrder.PingPong)
+            return True
+        if a in ("tap", "tap_tempo", "tapTempo"):
+            try:
+                from .bpm_manager import get_bpm_manager
+                get_bpm_manager().tap()
+                return True
+            except Exception:
+                return False
+        return False
+
+    def list_actions(self) -> list[tuple[str, str]]:
+        """(key, label) der Chaser-Live-Aktionen fuer die Bindungs-UI (VC/MIDI)."""
+        return [
+            ("capture_step",     "Schritt aufnehmen"),
+            ("remove_last_step", "Letzten Schritt löschen"),
+            ("clear_steps",      "Alle Schritte löschen"),
+            ("reverse_direction", "Richtung"),
+            ("toggle_bounce",    "Ping-Pong"),
+            ("restart",          "Neustart"),
+            ("tap",              "Tap-Tempo"),
+        ]
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "novation_launchpad_mini_mk3",
+  "manufacturer": "Novation",
+  "model": "Launchpad Mini MK3",
+  "device_type": "midi_grid_controller",
+  "connections": ["USB-MIDI"],
+  "buttons": 80,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": [8, 8],
+  "banks": "keine Hardware-Banks; Modi (Session/Drum/Programmer) per SysEx umschaltbar",
+  "controls": [
+    {"name": "Grid-Pads (Programmer-Modus)", "type": "note", "channel": 0, "range": [11, 88], "layout": "Note = 10*Zeile + Spalte; 11 = unten links, 88 = oben rechts (Lücken bei x9/x0)"},
+    {"name": "Top-Reihe (Pfeile/Modi)", "type": "cc", "channel": 0, "range": [91, 98], "layout": "8 Funktionstasten oben"},
+    {"name": "Rechte Spalte (Scene Launch)", "type": "note", "channel": 0, "range": [19, 89], "layout": "Notes 19, 29, 39, … 89 (Schrittweite 10)"}
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "RGB über 128-Farben-Palette (Velocity = Paletten-Index); MIDI-Kanal wählt statisch/blinkend/pulsierend; echtes RGB per SysEx. Programmer-Modus per SysEx aktivieren (siehe Programmer's Reference)."
+  },
+  "features": ["RGB-Pads", "Programmer-Modus für eigene Anwendungen", "LED-Feedback"],
+  "source": "Novation 'Launchpad Mini [MK3] Programmer's Reference Manual' (öffentlich auf novationmusic.com)",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

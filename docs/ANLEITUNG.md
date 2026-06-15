@@ -102,10 +102,23 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
-**Intensity · Color · Position · Beam · Gobo · Effect**. Pro Kanal ein Fader
+**Intensity · Color · Position · Gobo · Weitere**. Pro Kanal ein Fader
 (0–255 / 0–100 %); `↺` setzt einen Kanal auf den Standardwert.
+- **Intensity-Tab:** Dimmer + **Strobe** (Status-Kacheln „Kein Strobe/Strobe aus",
+  Geschwindigkeits-Slider langsam→schnell, DMX-Legende) — der Grand Master
+  dimmt nur den Dimmer, nie den Strobe.
 - **Color-Tab:** „Color Picker einbetten" blendet einen Farbwähler ein.
+  Bei Geräten mit **Farbrad**: farbige Direktwahl-Kacheln für alle Voll- und
+  Split-Farben + Auto-Farbwechsel (Hardware-Rotation oder Software-Simulation
+  mit wählbarem Bereich).
 - **Position-Tab:** „Position Tool einbetten" blendet ein Pan/Tilt-Pad ein.
+- **Gobo-Tab** (nur bei Gobo-fähigen Geräten sichtbar): Gobo-Kacheln **mit
+  grafischer Vorschau**, Shake-Kacheln + Shake-Geschwindigkeit,
+  Gobo-Wechsel-Slider, Gobo-FX-Fader.
+- **Weitere-Tab:** restliche Kanäle (Beam/Effect/…) + **„⟳ Moving Head
+  Reset…"**-Button (mit Sicherheitsabfrage, setzt sich automatisch zurück).
+
+Details für Moving Heads: [MOVING_HEADS.md](MOVING_HEADS.md).
 
 ### 4.3 Toolbar
 | Button | Funktion |

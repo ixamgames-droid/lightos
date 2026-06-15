@@ -153,17 +153,32 @@ class ColorSequenceEditor(QWidget):
 
 
 class _SwatchStrip(QWidget):
-    """Kompakte, nicht-interaktive Farbstreifen-Vorschau einer ColorSequence."""
+    """Kompakte Farbstreifen-Vorschau einer ColorSequence. Einzelne Swatches sind
+    anklickbar (MXP-04): Klick auf ein Quadrat oeffnet den Color-Picker fuer genau
+    diese Farbe (``swatch_clicked`` mit dem Index)."""
+
+    swatch_clicked = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._seq = None
         self.setMinimumHeight(20)
         self.setMinimumWidth(60)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Klick auf eine Farbe öffnet den Color-Picker")
 
     def set_sequence(self, seq):
         self._seq = seq
         self.update()
+
+    def mousePressEvent(self, event):
+        entries = getattr(self._seq, "entries", None) or []
+        n = len(entries)
+        if n == 0:
+            return
+        sw = max(1, self.width() // n)
+        idx = min(n - 1, max(0, int(event.position().x()) // sw))
+        self.swatch_clicked.emit(idx)
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -213,6 +228,7 @@ class ColorSequenceField(QWidget):
         row.setSpacing(4)
 
         self._strip = _SwatchStrip()
+        self._strip.swatch_clicked.connect(self._pick_color)
         row.addWidget(self._strip, stretch=1)
 
         self._btn = QPushButton("🎨 Bearbeiten…")
@@ -265,6 +281,25 @@ class ColorSequenceField(QWidget):
         self._dlg = dlg
         self._editor = editor
         dlg.show()
+
+    def _pick_color(self, idx: int):
+        """MXP-04: Klick auf ein Swatch oeffnet den Color-Picker fuer diese Farbe
+        und uebernimmt die Aenderung sofort (live)."""
+        if self._seq is None or not (0 <= idx < len(self._seq)):
+            return
+        c = QColorDialog.getColor(QColor(*self._seq.color_at(idx)), self, "Farbe ändern")
+        if not c.isValid():
+            return
+        self._seq.set_color(idx, (c.red(), c.green(), c.blue()))
+        self._seq.active_index = idx
+        self._strip.set_sequence(self._seq)
+        # Falls der Popout-Editor offen ist, mitziehen.
+        if self._editor is not None:
+            try:
+                self._editor.set_sequence(self._seq)
+            except RuntimeError:
+                self._editor = None
+        self.changed.emit()
 
     def _on_editor_changed(self):
         self._strip.set_sequence(self._seq)

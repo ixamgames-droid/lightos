@@ -2,6 +2,13 @@
 
 Vergleich mit GrandMA3 und ChamSys MagicQ als Referenz.
 
+> **Charakter dieser Datei:** Ziel-/Soll-Spezifikation (Funktionsumfang als
+> Referenz). Das meiste ist umgesetzt; einzelne Punkte sind noch Ziel und mit
+> **⚠ noch nicht implementiert** markiert. Bei Abweichung zwischen Spezifikation
+> und Realität gilt der Code — siehe [fixture-library](FIXTURE_LIBRARY.md),
+> [EFFEKTE](EFFEKTE.md), [MATRIX_LIVE](MATRIX_LIVE.md), [ARTNET](ARTNET.md),
+> [DMX_PROTOCOL](DMX_PROTOCOL.md).
+
 ---
 
 ## 1. PATCH
@@ -173,7 +180,7 @@ Vergleich mit GrandMA3 und ChamSys MagicQ als Referenz.
 ### Features
 - Interne Uhr (Start/Stop/Reset)
 - MIDI Timecode (MTC) Empfang via USB-MIDI
-- LTC (Linear Timecode) Empfang via Audio-Eingang
+- LTC (Linear Timecode) Empfang via Audio-Eingang — **⚠ noch nicht implementiert** (aktuell nur MTC)
 - Timeline-Ansicht: Cues auf Zeitachse positioniert
 - Timecode-Loop (bestimmten Bereich wiederholen)
 - Offset (globale Zeitverschiebung)
@@ -182,11 +189,11 @@ Vergleich mit GrandMA3 und ChamSys MagicQ als Referenz.
 
 ## 8. GERÄTEDATENBANK
 
-Siehe [FIXTURE_DATABASE.md](FIXTURE_DATABASE.md) für Details.
+Siehe [FIXTURE_LIBRARY.md](FIXTURE_LIBRARY.md) für Details.
 
 ### Schnellübersicht
 - SQLite-Datenbank mit vorinstallierten Fixtures
-- GDTF-Import (Industry Standard Format)
+- GDTF-Import (Industry Standard Format) — **⚠ noch nicht implementiert**
 - Eigene Profile erstellen (JSON-Editor)
 - Suche nach Hersteller, Typ, Kanalanzahl
 - Firmware-unabhängige Modusauswahl
@@ -204,7 +211,7 @@ Siehe [DMX_PROTOCOL.md](DMX_PROTOCOL.md) und [ARTNET.md](ARTNET.md).
 | Enttec Open DMX USB | DMX512 (Serial) | USB |
 | Enttec Pro USB | DMX512 (Serial + Firmware) | USB |
 | Art-Net Node (beliebig) | Art-Net 4 | Ethernet/WLAN |
-| sACN / E1.31 | sACN | Ethernet (geplant) |
+| sACN / E1.31 | sACN | Ethernet (Output + Input) |
 
 ### Ausgabe-Einstellungen
 - Refresh-Rate: 44 Hz (Standard), konfigurierbar 1–44 Hz

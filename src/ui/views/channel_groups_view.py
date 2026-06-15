@@ -217,16 +217,49 @@ class ChannelGroupsView(QWidget):
                 self._groups.pop(row)
         self._refresh_table()
 
+    # ── Show-Integration (SDK-02: Kanal-Gruppen pro Show) ─────────────────────
+
+    def to_dict(self) -> list[dict]:
+        """Serialisiert alle Gruppen für die Show-Datei (.lshow)."""
+        return [g.to_dict() for g in self._groups]
+
+    def load_data(self, payload) -> None:
+        """Ersetzt die Gruppen aus Show-Daten, wendet sie an und spiegelt sie in
+        die lokale Arbeitsdatei (Live-Puffer). Wird beim Show-Laden aufgerufen."""
+        groups: list[ChannelGroup] = []
+        if isinstance(payload, list):
+            for d in payload:
+                if isinstance(d, dict):
+                    try:
+                        groups.append(ChannelGroup.from_dict(d))
+                    except Exception:
+                        pass
+        self._groups = groups
+        self._refresh_table()
+        self._apply_all()
+        self._write_disk()
+
+    def _apply_all(self):
+        for r in range(len(self._groups)):
+            self._apply_value(r)
+
     # ── Persistence ───────────────────────────────────────────────────────────
 
-    def _save(self):
+    def _write_disk(self) -> bool:
         try:
             os.makedirs(os.path.dirname(_PERSIST_PATH), exist_ok=True)
             with open(_PERSIST_PATH, "w", encoding="utf-8") as f:
                 json.dump([g.to_dict() for g in self._groups], f, indent=2, ensure_ascii=False)
-            QMessageBox.information(self, "Gespeichert", _PERSIST_PATH)
+            return True
         except Exception as e:
-            QMessageBox.warning(self, "Fehler", str(e))
+            print(f"[ChannelGroupsView] save error: {e}")
+            return False
+
+    def _save(self):
+        if self._write_disk():
+            QMessageBox.information(self, "Gespeichert", _PERSIST_PATH)
+        else:
+            QMessageBox.warning(self, "Fehler", "Speichern fehlgeschlagen")
 
     def _load(self):
         if not os.path.exists(_PERSIST_PATH):

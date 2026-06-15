@@ -40,6 +40,11 @@ class BPMManager:
     def bpm(self) -> float:
         return self._bpm
 
+    @property
+    def audio_active(self) -> bool:
+        """True wenn die BPM gerade aus dem Audio-Eingang kommt (Musik-Modus)."""
+        return self._audio_active
+
     def set_bpm(self, bpm: float):
         """Setzt BPM manuell. 0 = aus."""
         if bpm < 0:
@@ -128,6 +133,15 @@ class BPMManager:
                 if (isinstance(f, Chaser) and f.is_running
                         and getattr(f, 'audio_triggered', False)):
                     f.trigger_next_step()
+        except Exception:
+            pass
+        # Plus: Beat-synchrone Cuelisten taktgenau weiterschalten (on_beat zählt
+        # selbst die beats_per_cue und triggert nur die aktive, beat_sync-Liste).
+        try:
+            from src.core.app_state import get_state
+            for stack in list(getattr(get_state(), "cue_stacks", []) or []):
+                if getattr(stack, "beat_sync", False):
+                    stack.on_beat()
         except Exception:
             pass
 

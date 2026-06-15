@@ -89,6 +89,32 @@ class VcEffectLiveTest(unittest.TestCase):
         self.assertEqual(self.m.colors.all_colors(),
                          [(255, 0, 0), (0, 255, 0), (0, 0, 255)])
 
+    def test_color_target_effect_slots(self):
+        """To-Do #5: ColorTarget.EFFECT_C1/C2/C3 setzen gezielt color1/2/3 des
+        Effekts — fuer Algorithmen, die feste Farben lesen (Feuer/Plasma/Windrad),
+        wo die Color-Sequence-Variante (EFFECT) nichts bewirkt."""
+        from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
+        self.m.algorithm = RgbAlgorithm.FIRE
+        for tgt, slot in ((ColorTarget.EFFECT_C1, "color1"),
+                          (ColorTarget.EFFECT_C2, "color2"),
+                          (ColorTarget.EFFECT_C3, "color3")):
+            c = VCColor("Slot")
+            c.target = tgt
+            c.function_id = self.m.id
+            c.color_r, c.color_g, c.color_b = 11, 22, 33
+            c._apply()
+            self.assertEqual(getattr(self.m, slot), (11, 22, 33))
+
+    def test_color_slot_serialization_roundtrip(self):
+        from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
+        c = VCColor("X")
+        c.target = ColorTarget.EFFECT_C2
+        c.function_id = 7
+        c2 = VCColor("Y")
+        c2.apply_dict(c.to_dict())
+        self.assertEqual(c2.target, ColorTarget.EFFECT_C2)
+        self.assertEqual(c2.function_id, 7)
+
     def test_slider_serialization_roundtrip(self):
         from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
         s = VCSlider("X")

@@ -98,6 +98,10 @@ class SectionButton(QPushButton):
 class MainWindow(QMainWindow):
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
+    # Page-Wechsel meldet die PlaybackEngine ggf. aus dem MIDI-Thread -> Signal
+    # marshallt die Label-Aktualisierung in den UI-Thread (crash.log 2026-06-14:
+    # MIDI-Thread fasste Widgets direkt an -> Access Violation).
+    _page_changed_sig = Signal(int)
     # Marshallt beliebige State-Event-Zustellungen aus Worker-Threads (MIDI/OSC/
     # Web/Audio) in den UI-Thread. AutoConnection => Cross-Thread-Emits werden
     # gequeued, Emits aus dem UI-Thread laufen direkt.
@@ -154,6 +158,12 @@ class MainWindow(QMainWindow):
             sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
+            # ISO-01: Fremdwert-Badges bei Simple-Desk-(DMX) und Programmer-Aenderung
+            # sowie bei Show-Wechsel/Refresh aktualisieren.
+            sync.subscribe(SyncEvent.DMX_CHANGED, lambda *_: self._refresh_foreign_badges())
+            sync.subscribe(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
+            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
+            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
@@ -161,6 +171,8 @@ class MainWindow(QMainWindow):
         self._setup_autosave()
         # Initial: Validation-Banner einmal pruefen
         QTimer.singleShot(1000, self._refresh_validation_banner)
+        # Initial: Fremdwert-Badges (ISO-01) einmal aktualisieren
+        QTimer.singleShot(800, self._refresh_foreign_badges)
         # Beim Start: pruefen ob Wiederherstellung noetig
         QTimer.singleShot(500, self._check_autosave_recovery)
         # MIDI-Eingaenge automatisch verbinden (APC mini etc.) — beim Start und
@@ -251,6 +263,10 @@ class MainWindow(QMainWindow):
         a.setShortcut("Ctrl+Shift+R")
         a.triggered.connect(self._validate_show)
 
+        # F-10: Auto-Save-Intervall konfigurierbar
+        a = fm.addAction("Auto-Save-Intervall...")
+        a.triggered.connect(self._configure_autosave_interval)
+
         fm.addSeparator()
         fm.addAction("Beenden").triggered.connect(self.close)
 
@@ -279,6 +295,7 @@ class MainWindow(QMainWindow):
         a = am.addAction("Alle Views aktualisieren")
         a.setShortcut("F5")
         a.triggered.connect(self._refresh_all_views)
+        am.addAction("Musik-Fenster (Now Playing)").triggered.connect(self._open_music_window)
 
         # Show
         sm = mb.addMenu("&Show")
@@ -442,18 +459,36 @@ class MainWindow(QMainWindow):
         self._lbl_validation.hide()  # Versteckt wenn keine Issues
         bar_layout.addWidget(self._lbl_validation)
 
-        # Snapshot-Button (Quick-Capture aktueller Programmer)
-        btn_snapshot = QPushButton("Snap")
-        btn_snapshot.setFixedHeight(22)
-        btn_snapshot.setFixedWidth(60)
-        btn_snapshot.setToolTip("Aktuellen Programmer als Snapshot speichern (Strg+Shift+S)")
-        btn_snapshot.setStyleSheet(
-            "QPushButton { background:#ffd700; color:#000; font-weight:bold;"
-            " border:1px solid #b89000; border-radius:3px; padding:0 8px; }"
-            "QPushButton:hover { background:#ffea4d; }"
+        # UIC-01: Quick-Snap-Button aus der Section-Bar entfernt (redundant zu
+        # Menue "Programmer -> Snapshot aufnehmen" / Strg+Shift+S, SnapshotsView
+        # und VC-Sidebar). _quick_snapshot() bleibt fuer Menue/Shortcut erhalten.
+
+        # ISO-01: Anzeige aktiver Fremdwerte (Programmer / Simple Desk). Nur
+        # sichtbar wenn etwas aktiv ist; Klick oeffnet das Clear-Menue (ISO-02).
+        self._lbl_foreign = QLabel("")
+        self._lbl_foreign.setFixedHeight(22)
+        self._lbl_foreign.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_foreign.setToolTip("Aktive Programmer-/Simple-Desk-Werte — Klick: leeren")
+        self._lbl_foreign.setStyleSheet(
+            "QLabel { background:#3a2a00; color:#ffb000; font-weight:bold;"
+            " border:1px solid #6b5000; border-radius:3px; padding:0 8px; }"
         )
-        btn_snapshot.clicked.connect(self._quick_snapshot)
-        bar_layout.addWidget(btn_snapshot)
+        self._lbl_foreign.mousePressEvent = lambda _ev: self._open_clear_menu()
+        self._lbl_foreign.hide()
+        bar_layout.addWidget(self._lbl_foreign)
+
+        # ISO-02: Zentrales Clear-Menue (immer erreichbar: Programmer / Simple Desk
+        # / Alle Nicht-VC-Werte). Loescht nur aktive Werte, nie gespeicherte Daten.
+        self._btn_clear_nonvc = QPushButton("✖ Clear ▾")
+        self._btn_clear_nonvc.setFixedHeight(22)
+        self._btn_clear_nonvc.setToolTip("Aktive Werte zuruecksetzen (Programmer / Simple Desk / Alle Nicht-VC)")
+        self._btn_clear_nonvc.setStyleSheet(
+            "QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;"
+            " border-radius:3px; padding:0 8px; }"
+            "QPushButton:hover { background:#30363d; }"
+        )
+        self._btn_clear_nonvc.clicked.connect(self._open_clear_menu)
+        bar_layout.addWidget(self._btn_clear_nonvc)
 
         # Page-Anzeige + Pfeile (T0.1 Multi-Page)
         page_prev = QPushButton("<")
@@ -475,10 +510,13 @@ class MainWindow(QMainWindow):
         page_next.clicked.connect(self._page_next)
         bar_layout.addWidget(page_next)
 
-        # Subscribe an PlaybackEngine fuer Page-Wechsel via MIDI etc.
+        # Subscribe an PlaybackEngine fuer Page-Wechsel via MIDI etc. Die Engine
+        # ruft die Subscriber ggf. aus dem MIDI-Thread auf -> ueber das Signal in
+        # den UI-Thread marshallen (sonst cross-thread Widget-Zugriff -> Crash).
+        self._page_changed_sig.connect(self._on_page_changed)
         pe = self._state.playback_engine
         if pe:
-            pe.subscribe_page(self._on_page_changed)
+            pe.subscribe_page(lambda idx: self._page_changed_sig.emit(int(idx)))
 
         self._lbl_bpm = QLabel("BPM: --")
         self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
@@ -672,10 +710,24 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] AudioInputView init error: {e}")
             self._audio_input_view = QWidget()
+        try:
+            from src.ui.views.music_view import MusicView
+            self._music_view = MusicView()
+        except Exception as e:
+            print(f"[main_window] MusicView init error: {e}")
+            self._music_view = QWidget()
+        # Auto-Lichtshow an den Musik-Player koppeln (startet beim Play die in
+        # state.music_autoshow konfigurierten Funktionen). Idempotent.
+        try:
+            from src.core.audio.music_show import get_music_director
+            get_music_director().attach()
+        except Exception as e:
+            print(f"[main_window] MusicShowDirector attach error: {e}")
         tabs.addTab(self._output_view,      "Output")
         tabs.addTab(self._dmx_monitor_view, "DMX Monitor")
         tabs.addTab(self._midi_view,        "MIDI")
         tabs.addTab(self._audio_input_view, "Audio Input")
+        tabs.addTab(self._music_view,       "Musik")
         return tabs
 
     # ── Statusbar ─────────────────────────────────────────────────────────────
@@ -1009,6 +1061,26 @@ class MainWindow(QMainWindow):
             self._lbl_mock.setText("")
             self._lbl_mock.setStyleSheet("")
 
+    def _open_music_window(self):
+        """Öffnet die Musik-View als kleines eigenes Fenster (Now Playing)."""
+        try:
+            from PySide6.QtWidgets import QMainWindow
+            from src.ui.views.music_view import MusicView
+            win = getattr(self, "_music_window", None)
+            if win is not None:
+                try:
+                    win.close()
+                    win.deleteLater()
+                except Exception:
+                    pass
+            self._music_window = QMainWindow(self)
+            self._music_window.setWindowTitle("LightOS — Musik")
+            self._music_window.setCentralWidget(MusicView())
+            self._music_window.resize(520, 560)
+            self._music_window.show()
+        except Exception as e:
+            print(f"[main_window] music window error: {e}")
+
     def _open_visualizer(self):
         # IMMER neu instanziieren -> HTML/JS wird frisch geladen (kein Stale-Cache).
         # Altes Fenster sauber schliessen falls noch offen.
@@ -1167,6 +1239,13 @@ class MainWindow(QMainWindow):
                     self._state._snapshots_data = sv.to_dict()
             except Exception as e:
                 print(f"[main_window] collect snapshots error: {e}")
+            # Kanal-Gruppen (pro Show, SDK-02) aus der View uebernehmen
+            try:
+                cg = getattr(self, "_channel_groups_view", None)
+                if cg is not None and hasattr(cg, "to_dict"):
+                    self._state._channel_groups_data = cg.to_dict()
+            except Exception as e:
+                print(f"[main_window] collect channel groups error: {e}")
             # T1.6 Layout-Persistenz: Layout dazupacken
             layout = None
             try:
@@ -1288,6 +1367,67 @@ class MainWindow(QMainWindow):
         if event == "patch_changed":
             count = len(self._state.get_patched_fixtures())
             self._lbl_fixtures.setText(f"{count} Geraet(e)")
+        elif event == "programmer_changed":
+            self._refresh_foreign_badges()
+
+    # ── ISO-01/02: aktive Fremdwerte anzeigen + zentral leeren ─────────────────
+
+    def _refresh_foreign_badges(self):
+        """Aktualisiert die Anzeige aktiver Programmer-/Simple-Desk-Werte (ISO-01)."""
+        if not hasattr(self, "_lbl_foreign"):
+            return
+        try:
+            p = self._state.programmer_active()
+            s = self._state.simple_desk_active()
+        except Exception:
+            p, s = 0, 0
+        parts = []
+        if p:
+            parts.append(f"Programmer {p}")
+        if s:
+            parts.append(f"Simple Desk {s}")
+        if parts:
+            self._lbl_foreign.setText("● " + " · ".join(parts))
+            self._lbl_foreign.show()
+        else:
+            self._lbl_foreign.hide()
+
+    def _open_clear_menu(self, *_):
+        """ISO-02: Menue zum Zuruecksetzen aktiver Werte. Loescht NUR aktive
+        Programmer-/Simple-Desk-Werte — keine Funktionen/Effekte/Shows/Patches."""
+        from PySide6.QtWidgets import QMenu
+        m = QMenu(self)
+        p = 0
+        s = 0
+        try:
+            p = self._state.programmer_active()
+            s = self._state.simple_desk_active()
+        except Exception:
+            pass
+        a_prog = m.addAction(f"Programmer leeren ({p})")
+        a_prog.setEnabled(p > 0)
+        a_prog.triggered.connect(lambda: self._do_clear("programmer"))
+        a_sd = m.addAction(f"Simple Desk leeren ({s})")
+        a_sd.setEnabled(s > 0)
+        a_sd.triggered.connect(lambda: self._do_clear("simple_desk"))
+        m.addSeparator()
+        a_all = m.addAction(f"Alle Nicht-VC-Werte leeren ({p + s})")
+        a_all.setEnabled((p + s) > 0)
+        a_all.triggered.connect(lambda: self._do_clear("all"))
+        anchor = self._btn_clear_nonvc
+        m.exec(anchor.mapToGlobal(anchor.rect().bottomLeft()))
+
+    def _do_clear(self, what: str):
+        try:
+            if what == "programmer":
+                self._state.clear_programmer()
+            elif what == "simple_desk":
+                self._state.clear_simple_desk()
+            else:
+                self._state.clear_all_non_vc()
+        except Exception as e:
+            print(f"[main_window] clear '{what}' error: {e}")
+        self._refresh_foreign_badges()
 
     def _on_refresh_all(self, _ev, _data):
         """Globaler REFRESH_ALL Handler - re-checked Hardware + Status."""
@@ -1332,6 +1472,13 @@ class MainWindow(QMainWindow):
                 sv.load_data(getattr(self._state, "_snapshots_data", []) or [])
         except Exception as e:
             print(f"[main_window] snapshots restore error: {e}")
+        # Kanal-Gruppen (pro Show, SDK-02) in die View laden
+        try:
+            cg = getattr(self, "_channel_groups_view", None)
+            if cg is not None and hasattr(cg, "load_data"):
+                cg.load_data(getattr(self._state, "_channel_groups_data", []) or [])
+        except Exception as e:
+            print(f"[main_window] channel groups restore error: {e}")
 
     def _open_input_profile_editor(self):
         """T1.4 Input-Profile-Editor (MIDI/OSC/Keyboard)."""
@@ -1383,21 +1530,72 @@ class MainWindow(QMainWindow):
             pass
         return os.path.join(base, "auto_save.lshow")
 
+    def _autosave_minutes(self) -> int:
+        """F-10: konfiguriertes Auto-Save-Intervall in Minuten (1–60, Default 5).
+        Persistiert in ui_prefs.json."""
+        try:
+            from src.ui.views.programmer_view import _load_prefs
+            val = int(_load_prefs().get("autosave_minutes", 5))
+        except Exception:
+            val = 5
+        return max(1, min(60, val))
+
     def _setup_autosave(self):
         try:
+            mins = self._autosave_minutes()
             self._autosave_timer = QTimer(self)
-            self._autosave_timer.setInterval(5 * 60 * 1000)  # 5 Minuten
+            self._autosave_timer.setInterval(mins * 60 * 1000)
             self._autosave_timer.timeout.connect(self._do_autosave)
             self._autosave_timer.start()
-            print(f"[autosave] aktiv (5 min) -> {self._autosave_path()}")
+            # P4: Dirty-Flag — Auto-Save schreibt nur noch, wenn sich seit dem
+            # letzten Lauf tatsaechlich etwas geaendert hat (sonst alle 5 min
+            # ein unnoetiger Disk-Write). Gespeist aus den zentralen
+            # SyncEvents inkl. neuem LIVE_VIEW_CHANGED (Fixture verschoben,
+            # Zoom/Grid geaendert).
+            self._autosave_dirty = True   # erster Lauf sichert immer
+            from src.core.sync import get_sync, SyncEvent
+            sync = get_sync()
+            for ev in (SyncEvent.PATCH_CHANGED, SyncEvent.PROGRAMMER_CHANGED,
+                       SyncEvent.FUNCTION_CHANGED, SyncEvent.GROUP_CHANGED,
+                       SyncEvent.CUE_STACK_CHANGED, SyncEvent.PALETTE_CHANGED,
+                       SyncEvent.OUTPUT_CONFIG_CHANGED,
+                       SyncEvent.LIVE_VIEW_CHANGED):
+                sync.subscribe(ev, self._mark_autosave_dirty)
+            print(f"[autosave] aktiv ({mins} min, dirty-basiert) -> {self._autosave_path()}")
         except Exception as e:
             print(f"[autosave] setup error: {e}")
 
+    def _configure_autosave_interval(self):
+        """F-10: Auto-Save-Intervall (1–60 min) per Dialog setzen + sofort anwenden."""
+        cur = self._autosave_minutes()
+        mins, ok = QInputDialog.getInt(
+            self, "Auto-Save-Intervall",
+            "Show automatisch sichern alle (Minuten):",
+            cur, 1, 60, 1
+        )
+        if not ok:
+            return
+        try:
+            from src.ui.views.programmer_view import _save_prefs
+            _save_prefs({"autosave_minutes": int(mins)})
+        except Exception as e:
+            print(f"[autosave] save interval error: {e}")
+        # Live anwenden, ohne Neustart
+        if getattr(self, "_autosave_timer", None) is not None:
+            self._autosave_timer.setInterval(int(mins) * 60 * 1000)
+        self.statusBar().showMessage(f"Auto-Save-Intervall: {mins} min", 3000)
+
+    def _mark_autosave_dirty(self, *_args):
+        self._autosave_dirty = True
+
     def _do_autosave(self):
+        if not getattr(self, "_autosave_dirty", True):
+            return  # nichts geaendert seit dem letzten Auto-Save
         try:
             from src.core.show.show_file import save_show
             path = self._autosave_path()
             save_show(path)
+            self._autosave_dirty = False
             self.statusBar().showMessage(f"Auto-Save: {path}", 2500)
         except Exception as e:
             print(f"[autosave] save error: {e}")

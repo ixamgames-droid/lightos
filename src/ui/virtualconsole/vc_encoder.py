@@ -32,6 +32,9 @@ class VCEncoder(VCWidget):
         super().__init__(caption, parent)
         self.param_key: str = "speed"
         self.function_id: int | None = None     # None = aktiver Effekt
+        # Live-Bearbeitung: ohne feste function_id den Effekt aus diesem Edit-Slot
+        # (von einem Effekt-Pad gesetzt) verstellen statt den global aktiven.
+        self.edit_slot: str = ""
         # Schrittweite je Detent/Rad-Schritt als Anteil des Wertebereichs (0..1).
         self.step: float = 0.05
         self.midi_mode: str = EncoderMidiMode.RELATIVE
@@ -46,10 +49,24 @@ class VCEncoder(VCWidget):
 
     # ── Dispatcher-Anbindung (gemeinsam mit VC/MIDI) ──────────────────────────
 
+    def _fid(self):
+        """Ziel-fid: feste function_id, sonst Live-Edit-Slot, sonst None (= aktiv)."""
+        if self.function_id is not None:
+            return self.function_id
+        if self.edit_slot:
+            try:
+                from src.core.engine import effect_live
+                fid = effect_live.get_edit_target(self.edit_slot)
+                if fid is not None:
+                    return fid
+            except Exception:
+                pass
+        return None
+
     def _spec(self):
         try:
             from src.core.engine import effect_live
-            for s in effect_live.list_params(self.function_id):
+            for s in effect_live.list_params(self._fid()):
                 if s.key == self.param_key:
                     return s
         except Exception:
@@ -59,7 +76,7 @@ class VCEncoder(VCWidget):
     def _current_value(self):
         try:
             from src.core.engine import effect_live
-            return effect_live.get_param(self.param_key, self.function_id)
+            return effect_live.get_param(self.param_key, self._fid())
         except Exception:
             return None
 
@@ -86,7 +103,7 @@ class VCEncoder(VCWidget):
         """Relativ um `ticks` Schritte (× step) verstellen — der Kern des Encoders."""
         try:
             from src.core.engine import effect_live
-            effect_live.adjust_param(self.param_key, ticks * self.step, self.function_id)
+            effect_live.adjust_param(self.param_key, ticks * self.step, self._fid())
         except Exception:
             pass
         self.update()
@@ -95,7 +112,7 @@ class VCEncoder(VCWidget):
         """Absolut setzen (nur fuer den absoluten MIDI-Modus)."""
         try:
             from src.core.engine import effect_live
-            effect_live.set_param_normalized(self.param_key, norm, self.function_id)
+            effect_live.set_param_normalized(self.param_key, norm, self._fid())
         except Exception:
             pass
         self.update()
@@ -255,6 +272,11 @@ class VCEncoder(VCWidget):
         fid_edit.setToolTip("Funktions-ID des Ziel-Effekts. Leer = aktiver Effekt.")
         form.addRow("Effekt-ID (leer=aktiv):", fid_edit)
 
+        edit_slot_edit = QLineEdit(self.edit_slot)
+        edit_slot_edit.setToolTip("Live-Edit-Slot (Freitext, z. B. MH/MX). Ohne feste "
+                                  "Effekt-ID verstellt der Encoder den Effekt aus diesem Slot.")
+        form.addRow("Live-Edit-Slot:", edit_slot_edit)
+
         step_sb = QDoubleSpinBox()
         step_sb.setRange(0.005, 1.0)
         step_sb.setSingleStep(0.01)
@@ -291,6 +313,7 @@ class VCEncoder(VCWidget):
             self.param_key = key_edit.text().strip() or self.param_key
             t = fid_edit.text().strip()
             self.function_id = int(t) if t.lstrip("-").isdigit() else None
+            self.edit_slot = edit_slot_edit.text().strip()
             self.step = float(step_sb.value())
             self.midi_mode = mode_cb.currentText()
             self.midi_cc = cc_sb.value()
@@ -303,6 +326,7 @@ class VCEncoder(VCWidget):
         d = super().to_dict()
         d["param_key"] = self.param_key
         d["function_id"] = self.function_id
+        d["edit_slot"] = self.edit_slot
         d["step"] = self.step
         d["midi_mode"] = self.midi_mode
         d["midi_cc"] = self.midi_cc
@@ -313,6 +337,7 @@ class VCEncoder(VCWidget):
         super().apply_dict(d)
         self.param_key = d.get("param_key", "speed")
         self.function_id = d.get("function_id")
+        self.edit_slot = d.get("edit_slot", "")
         self.step = float(d.get("step", 0.05))
         self.midi_mode = d.get("midi_mode", EncoderMidiMode.RELATIVE)
         self.midi_cc = int(d.get("midi_cc", -1))

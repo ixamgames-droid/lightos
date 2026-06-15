@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "generic_artnet_node",
+  "manufacturer": "(generisch)",
+  "model": "Art-Net-Node",
+  "device_type": "network_node",
+  "connections": ["Art-Net (UDP 6454)", "sACN/E1.31 (Multicast)"],
+  "buttons": 0,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": null,
+  "banks": "",
+  "controls": [],
+  "led_feedback": {},
+  "features": ["beliebige Art-Net-/sACN-Nodes (z. B. von Enttec, Eurolite, Showtec) werden über die Ausgabe-Konfiguration von LightOS angesprochen (Art-Net: src/core/dmx/artnet.py, sACN: src/core/dmx/sacn.py)", "auch als Eingang nutzbar (artnet_input.py/sacn_input.py, merged auf freie Kanäle)"],
+  "source": "Art-Net-Spezifikation (Artistic Licence, öffentlich), ANSI E1.31 (sACN)",
+  "license": "Faktendaten (Protokollbeschreibung). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

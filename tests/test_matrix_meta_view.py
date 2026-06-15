@@ -153,13 +153,16 @@ def test_plain_zeigt_eine_farbe():
     assert view._seq_editor.isHidden()
 
 
-def test_wipe_zeigt_sequence_editor():
-    """WIPE (colors=2) → Color-Sequence-Editor statt fester Farbknöpfe."""
+def test_wipe_zeigt_feste_farbknoepfe():
+    """WIPE (colors=2, sequence=False) → 2 feste Farbknöpfe, KEIN Sequence-Editor.
+
+    Wipe wertet nur c1/c2 aus; der Sequence-Editor versprach früher mehr Farben,
+    als die Engine einlöst (M2) — jetzt feste C1/C2-Knöpfe."""
     _app()
     view = _make_view_with_matrix()
     view._algo_combo.setCurrentText(RgbAlgorithm.WIPE.value)
-    assert _visible_color_count(view) == 0, "feste Farbknöpfe bei Mehrfarb aus"
-    assert not view._seq_editor.isHidden(), "Sequence-Editor muss sichtbar sein"
+    assert _visible_color_count(view) == 2, "Wipe nutzt 2 feste Farben"
+    assert view._seq_editor.isHidden(), "Sequence-Editor bei Wipe aus"
 
 
 def test_random_zeigt_sequence_editor():

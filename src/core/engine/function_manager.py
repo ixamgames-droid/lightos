@@ -158,9 +158,119 @@ class FunctionManager:
         for fid in list(self._running_ids):
             self.stop(fid)
 
+    # ── Geraete-Zuordnung / „Solo auf gleichen Geraeten" ────────────────────────
+
+    def affected_fids(self, fid: int, _seen: set[int] | None = None) -> set[int]:
+        """Menge der Fixture-IDs (fids), die die Funktion ``fid`` ansteuert.
+
+        Deckt alle Funktionstypen ab (EFX ``fixtures``, Carousel/LayeredEffect
+        ``fixture_ids``, RGB-Matrix ``fixture_grid``, Scene ``_values``) und loest
+        Chaser/Collection/Sequence rekursiv ueber ihre referenzierten Funktionen
+        auf (mit Zyklus-Schutz). Defensiv: unbekannte Formen werden ignoriert,
+        nie eine Exception nach aussen."""
+        f = self._functions.get(fid)
+        if f is None:
+            return set()
+        _seen = _seen if _seen is not None else set()
+        if fid in _seen:
+            return set()
+        _seen.add(fid)
+        out: set[int] = set()
+
+        def _seq(name):
+            # Nur echte Sequenz-Attribute zurueckgeben — NICHT gleichnamige
+            # Methoden (EfxInstance._values() ist z. B. eine Methode, Scene._values
+            # eine Liste). Sonst iteriert die Schleife ein Bound-Method-Objekt.
+            v = getattr(f, name, None)
+            return v if isinstance(v, (list, tuple, set)) else ()
+
+        # EFX: fixtures-Liste (Objekte mit .fid)
+        for fx in _seq("fixtures"):
+            sub = getattr(fx, "fid", None)
+            if sub is not None:
+                try:
+                    out.add(int(sub))
+                except (TypeError, ValueError):
+                    pass
+        # Carousel / LayeredEffect: fixture_ids (list[int])
+        for sub in _seq("fixture_ids"):
+            try:
+                out.add(int(sub))
+            except (TypeError, ValueError):
+                pass
+        # RGB-Matrix: fixture_grid (list[int|None], None = leere Zelle)
+        for sub in _seq("fixture_grid"):
+            if sub is None:
+                continue
+            try:
+                out.add(int(sub))
+            except (TypeError, ValueError):
+                pass
+        # Scene: _values (Objekte mit .fixture_id)
+        for sv in _seq("_values"):
+            sub = getattr(sv, "fixture_id", None)
+            if sub is not None:
+                try:
+                    out.add(int(sub))
+                except (TypeError, ValueError):
+                    pass
+        # Collection: referenzierte Funktionen (rekursiv)
+        for sub in _seq("function_ids"):
+            try:
+                out |= self.affected_fids(int(sub), _seen)
+            except (TypeError, ValueError):
+                pass
+        # Chaser/Sequence: Schritte -> referenzierte Funktion (rekursiv) bzw.
+        # direkt im Schritt hinterlegte Geraete-Werte.
+        for st in _seq("steps"):
+            ref = getattr(st, "function_id", None)
+            if ref is None:
+                ref = getattr(st, "scene_id", None)
+            if ref is not None:
+                try:
+                    out |= self.affected_fids(int(ref), _seen)
+                except (TypeError, ValueError):
+                    pass
+            vals = getattr(st, "values", None)
+            if isinstance(vals, dict):
+                for k in vals:
+                    try:
+                        out.add(int(k))
+                    except (TypeError, ValueError):
+                        pass
+        return out
+
+    def stop_others_sharing_fixtures(self, fid: int) -> int:
+        """Stoppt alle ANDEREN laufenden Funktionen, die mindestens ein Geraet mit
+        ``fid`` gemeinsam haben. Gibt die Anzahl gestoppter Funktionen zurueck.
+
+        Fuer die VC-Pad-Option „andere Effekte auf gleichen Geraeten ersetzen":
+        ein neuer Effekt loest die alten auf denselben Strahlern ab (auch aus einer
+        anderen Bank), waehrend Effekte auf anderen Geraeten weiterlaufen."""
+        own = self.affected_fids(fid)
+        if not own:
+            return 0
+        stopped = 0
+        for other in self.running_ids():
+            if other == fid:
+                continue
+            if self.affected_fids(other) & own:
+                self.stop(other)
+                stopped += 1
+        return stopped
+
     def is_running(self, fid: int) -> bool:
         f = self._functions.get(fid)
         return f is not None and f.is_running
+
+    def running_ids(self) -> list[int]:
+        """Thread-sicherer Snapshot der laufenden Funktions-IDs (B-8).
+
+        UI-Threads (z. B. live_view) sollen NICHT direkt ueber ``_running_ids``
+        iterieren — das Set wird aus dem MIDI-/DMX-Thread mutiert. Diese Kopie
+        unter dem Lock vermeidet ein „Set changed size during iteration"/Race."""
+        with self._lock:
+            return list(self._running_ids)
 
     # ── Frame tick ────────────────────────────────────────────────────────────
 

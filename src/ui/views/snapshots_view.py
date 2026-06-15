@@ -14,7 +14,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QAction, QCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGridLayout, QLabel,
-    QMenu, QInputDialog, QMessageBox, QFileDialog, QDialog, QSplitter
+    QMenu, QInputDialog, QMessageBox, QFileDialog, QDialog, QSplitter,
+    QListWidget, QListWidgetItem, QDialogButtonBox
 )
 
 try:
@@ -35,19 +36,32 @@ SNAPSHOT_TOTAL = SNAPSHOT_COLS * SNAPSHOT_ROWS
 class Snapshot:
     """Ein gespeicherter Programmer-State."""
 
-    def __init__(self, name: str = "", values: dict | None = None):
+    def __init__(self, name: str = "", values: dict | None = None,
+                 ignored: set | None = None):
         self.name = name
         self.values: dict[int, dict[str, int]] = values or {}
+        # SNP-01: (fid, attr)-Paare, die beim ANWENDEN uebersprungen werden
+        # (gespeicherter Wert bleibt erhalten, wird aber nicht in den Programmer
+        # geschrieben). Unterschied: gespeichert vs. nicht-gespeichert (gar nicht
+        # in values) vs. bewusst ignoriert (in values, aber hier gelistet).
+        self.ignored: set[tuple[int, str]] = set(ignored or set())
 
     def is_empty(self) -> bool:
         return not self.values
+
+    def is_ignored(self, fid, attr) -> bool:
+        return (int(fid), attr) in self.ignored
+
+    def ignored_count(self) -> int:
+        return len(self.ignored)
 
     def to_dict(self) -> dict:
         # JSON keys muessen Strings sein
         ser_vals = {}
         for fid, attrs in self.values.items():
             ser_vals[str(fid)] = dict(attrs)
-        return {"name": self.name, "values": ser_vals}
+        return {"name": self.name, "values": ser_vals,
+                "ignored": [[fid, attr] for (fid, attr) in sorted(self.ignored)]}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Snapshot":
@@ -58,7 +72,86 @@ class Snapshot:
                 vals[int(k)] = {ak: int(av) for ak, av in v.items()}
             except Exception:
                 pass
-        return cls(name=d.get("name", ""), values=vals)
+        ign: set[tuple[int, str]] = set()
+        for item in d.get("ignored", []):
+            try:
+                ign.add((int(item[0]), str(item[1])))
+            except Exception:
+                pass
+        return cls(name=d.get("name", ""), values=vals, ignored=ign)
+
+
+class SnapshotIgnoreDialog(QDialog):
+    """SNP-01: einzelne (fid, attr)-Kanäle eines Snapshots vom Anwenden ausschließen."""
+
+    def __init__(self, snap: "Snapshot", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Kanäle ignorieren — {snap.name or 'Snapshot'}")
+        self.setModal(True)
+        self.resize(360, 440)
+
+        names = {}
+        try:
+            if get_state is not None:
+                for f in get_state().get_patched_fixtures():
+                    names[int(f.fid)] = getattr(f, "name", None) or f"Fixture {f.fid}"
+        except Exception:
+            pass
+
+        root = QVBoxLayout(self)
+        hint = QLabel("Angehakte Kanäle werden beim Anwenden NICHT geschrieben "
+                      "(gespeicherter Wert bleibt erhalten).")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#888; font-size:10px;")
+        root.addWidget(hint)
+
+        self._list = QListWidget()
+        root.addWidget(self._list, stretch=1)
+        for fid in sorted(snap.values):
+            fname = names.get(int(fid), f"Fixture {fid}")
+            for attr in sorted(snap.values[fid]):
+                it = QListWidgetItem(f"FID {fid} · {fname} — {attr}")
+                it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                it.setCheckState(Qt.CheckState.Checked if snap.is_ignored(fid, attr)
+                                 else Qt.CheckState.Unchecked)
+                it.setData(Qt.ItemDataRole.UserRole, (int(fid), attr))
+                self._list.addItem(it)
+
+        tb = QHBoxLayout()
+        for txt, fn in (("Alle", lambda: self._set_all(True)),
+                        ("Keine", lambda: self._set_all(False)),
+                        ("Invertieren", self._invert)):
+            b = QPushButton(txt)
+            b.clicked.connect(fn)
+            tb.addWidget(b)
+        tb.addStretch(1)
+        root.addLayout(tb)
+
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        root.addWidget(bb)
+
+    def _set_all(self, ignored: bool):
+        st = Qt.CheckState.Checked if ignored else Qt.CheckState.Unchecked
+        for i in range(self._list.count()):
+            self._list.item(i).setCheckState(st)
+
+    def _invert(self):
+        for i in range(self._list.count()):
+            it = self._list.item(i)
+            it.setCheckState(Qt.CheckState.Unchecked
+                             if it.checkState() == Qt.CheckState.Checked
+                             else Qt.CheckState.Checked)
+
+    def get_ignored(self) -> set:
+        out = set()
+        for i in range(self._list.count()):
+            it = self._list.item(i)
+            if it.checkState() == Qt.CheckState.Checked:
+                out.add(it.data(Qt.ItemDataRole.UserRole))
+        return out
 
 
 class SnapshotButton(QPushButton):
@@ -89,7 +182,9 @@ class SnapshotButton(QPushButton):
         else:
             name = snap.name or f"Snap {self._index + 1}"
             count = len(snap.values)
-            self.setText(f"{name}\n({count} FX)")
+            ign = snap.ignored_count()
+            suffix = f", ⊘{ign}" if ign else ""
+            self.setText(f"{name}\n({count} FX{suffix})")
             self.setStyleSheet(
                 "QPushButton { background: #2a3344; color: #FFD700; "
                 "border: 1px solid #4f6391; font-weight: bold; }"
@@ -117,6 +212,8 @@ class SnapshotButton(QPushButton):
             a_rename.triggered.connect(lambda: self._view.rename(self._index))
             a_export = menu.addAction("Exportieren...")
             a_export.triggered.connect(lambda: self._view.export(self._index))
+            a_ignore = menu.addAction("Kanäle ignorieren...")
+            a_ignore.triggered.connect(lambda: self._view.edit_ignored(self._index))
             menu.addSeparator()
             a_del = menu.addAction("Loeschen")
             a_del.triggered.connect(lambda: self._view.delete(self._index))
@@ -146,6 +243,7 @@ class SnapshotsView(QWidget):
             "Klick auf leeren Slot: aktuellen Programmer speichern. "
             "Klick auf gefuellten Slot: anwenden. Rechtsklick: Menue."
         )
+        info.setWordWrap(True)
         info.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(info)
 
@@ -258,9 +356,22 @@ class SnapshotsView(QWidget):
             state = get_state()
             for fid, attrs in snap.values.items():
                 for attr, val in attrs.items():
+                    if snap.is_ignored(fid, attr):
+                        continue          # SNP-01: bewusst ignorierter Kanal
                     state.set_programmer_value(int(fid), attr, int(val))
         except Exception as e:
             print(f"[snapshots] apply error: {e}")
+
+    def edit_ignored(self, index: int):
+        """SNP-01: Dialog zum nachträglichen Ignorieren einzelner Kanäle."""
+        snap = self._snapshots[index]
+        if snap.is_empty():
+            return
+        dlg = SnapshotIgnoreDialog(snap, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            snap.ignored = dlg.get_ignored()
+            self._buttons[index].refresh()
+            self._save_to_disk()
 
     def rename(self, index: int):
         snap = self._snapshots[index]

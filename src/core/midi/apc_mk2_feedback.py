@@ -300,6 +300,17 @@ class ApcMk2Feedback:
                     desired[note] = (DIM, BLUE)
                 note_rgb[note] = (80, 120, 255)
                 continue
+            # Musik-BPM-Pad: cyan, hell + Beat-Blitz wenn der Audio-Modus laeuft.
+            if getattr(w, "action", None) == ButtonAction.AUDIO_BPM:
+                audio_on = self._bm is not None and getattr(self._bm, "audio_active", False)
+                if audio_on and (now - self._last_beat_time) < 0.11:
+                    desired[note] = (FULL, WHITE)
+                elif audio_on:
+                    desired[note] = (FULL, AZURE)
+                else:
+                    desired[note] = (DIM, AZURE)
+                note_rgb[note] = (0, 212, 255)
+                continue
             desired[note] = self._led_for_button(w, now)
             note_style[note] = getattr(w, "pad_style", "mirror")
             try:

@@ -174,6 +174,43 @@ class SnapLibrary:
                 s.folder = new_path + "/" + s.folder[len(prefix):]
         return new_path
 
+    def move_folder(self, old_path: str, dest_parent: str) -> str | None:
+        """Verschiebt einen Ordner UNTER ``dest_parent`` (zieht Unterordner +
+        enthaltene Snaps mit). Anders als ``rename_folder`` aendert das den ELTERN-
+        Ordner, nicht den Namen. ``dest_parent=""`` = in die Wurzel.
+
+        Gibt den neuen Pfad zurueck — oder ``None``, wenn der Zug ungueltig ist
+        (Ordner in sich selbst / einen eigenen Unterordner). Ein Namenskonflikt im
+        Ziel fuehrt zu einer Verschmelzung (beide Inhalte landen im selben Pfad)."""
+        old_path = (old_path or "").strip("/")
+        dest_parent = (dest_parent or "").strip("/")
+        if not old_path:
+            return None
+        name = old_path.rpartition("/")[2]
+        new_path = f"{dest_parent}/{name}" if dest_parent else name
+        if new_path == old_path:
+            return old_path                      # schon dort — No-op
+        # In sich selbst oder einen eigenen Unterordner schieben: verboten.
+        if dest_parent == old_path or dest_parent.startswith(old_path + "/"):
+            return None
+        prefix = old_path + "/"
+        updated: set[str] = set()
+        for f in self._folders:
+            if f == old_path:
+                updated.add(new_path)
+            elif f.startswith(prefix):
+                updated.add(new_path + "/" + f[len(prefix):])
+            else:
+                updated.add(f)
+        updated.add(new_path)                    # Ordner existiert danach garantiert
+        self._folders = updated
+        for s in self._snaps.values():
+            if s.folder == old_path:
+                s.folder = new_path
+            elif s.folder.startswith(prefix):
+                s.folder = new_path + "/" + s.folder[len(prefix):]
+        return new_path
+
     def remove_folder(self, path: str) -> None:
         """Löscht einen Ordner inkl. Unterordner und enthaltener Snaps."""
         if not path:

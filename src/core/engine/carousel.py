@@ -30,6 +30,14 @@ class Carousel(Function):
         self.color_r: int = 255
         self.color_g: int = 255
         self.color_b: int = 255
+        # Pulse/Wave/Chase sind INTENSITAETS-Effekte: sie modulieren nur die
+        # Helligkeit, die Farbe kommt aus der Ebene darunter (Programmer/Look).
+        # Frueher schrieb das Carousel IMMER seine eigene Farbe (Default 255/255/
+        # 255 = Weiss) -> es "besass" die Farbkanaele und blockierte die im
+        # Programmer gewaehlte Farbe (Bug: "Pulse macht alles weiss"). Daher ist
+        # das Faerben jetzt opt-in (Default aus) — nur True, wenn ein Carousel
+        # bewusst eine feste Eigenfarbe ausgeben soll.
+        self.paint_color: bool = False
         self._beat_count: int = 0
         # Marker fuer FunctionManager.from_dict-Routing
         self.is_carousel = True
@@ -123,11 +131,23 @@ class Carousel(Function):
                     self._set_attr(universe, fixture, "pan", pan)
                     self._set_attr(universe, fixture, "intensity", self.intensity_max)
 
-                # Farbe
-                for attr, col in [("color_r", self.color_r),
-                                  ("color_g", self.color_g),
-                                  ("color_b", self.color_b)]:
-                    self._set_attr(universe, fixture, attr, col)
+                # Farbe nur schreiben, wenn bewusst gewuenscht (sonst kommt die
+                # Farbe aus dem Programmer/Look darunter -> kombinierbar).
+                # Ueber den zentralen Helper: RGB(W)-Geraete bekommen color_r/g/b
+                # wie bisher, Farbrad-Geraete den passenden Slot (attribute=="color").
+                if self.paint_color:
+                    try:
+                        from src.core.color_utils import color_attrs_for_fixture
+                        from src.core.app_state import get_channels_for_patched
+                        attrs = color_attrs_for_fixture(
+                            get_channels_for_patched(fixture),
+                            (self.color_r, self.color_g, self.color_b))
+                    except Exception:
+                        attrs = {"color_r": self.color_r,
+                                 "color_g": self.color_g,
+                                 "color_b": self.color_b}
+                    for attr, col in attrs.items():
+                        self._set_attr(universe, fixture, attr, col)
             except Exception as exc:
                 print(f"[Carousel] write error: {exc}")
 
@@ -159,6 +179,7 @@ class Carousel(Function):
             "color_r": self.color_r,
             "color_g": self.color_g,
             "color_b": self.color_b,
+            "paint_color": self.paint_color,
         })
         return d
 
@@ -185,4 +206,5 @@ class Carousel(Function):
             c.color_b = int(d.get("color_b", 255))
         except (TypeError, ValueError):
             c.color_r = c.color_g = c.color_b = 255
+        c.paint_color = bool(d.get("paint_color", False))
         return c

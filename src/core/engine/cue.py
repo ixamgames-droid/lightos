@@ -12,6 +12,9 @@ class Cue:
     delay_in: float = 0.0
     delay_out: float = 0.0
     follow: float | None = None            # Auto-Follow nach N Sekunden
+    # F-5: Fade-Verlauf dieser Cue (scurve/linear/ease_in/ease_out/snap).
+    # "scurve" = historischer Standard (Smoothstep) → Alt-Shows faden unverändert.
+    fade_curve: str = "scurve"
     # {fid: {attribute: value}}
     values: dict[int, dict[str, int]] = field(default_factory=dict)
 
@@ -27,6 +30,7 @@ class Cue:
             "delay_in": self.delay_in,
             "delay_out": self.delay_out,
             "follow": self.follow,
+            "fade_curve": self.fade_curve,
             "values": {str(k): v for k, v in self.values.items()},
         }
 
@@ -40,6 +44,7 @@ class Cue:
             delay_in=d.get("delay_in", 0.0),
             delay_out=d.get("delay_out", 0.0),
             follow=d.get("follow"),
+            fade_curve=d.get("fade_curve", "scurve"),
         )
         c.values = {int(k): v for k, v in d.get("values", {}).items()}
         return c

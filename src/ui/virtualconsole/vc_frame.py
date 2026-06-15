@@ -49,9 +49,7 @@ class VCFrame(VCWidget):
     # ── Page management ───────────────────────────────────────────────────────
 
     def _content_rect(self) -> QRect:
-        top = self._tab_height if self._show_header and self._page_count > 1 else 0
-        if self._show_header:
-            top = self._tab_height
+        top = self._tab_height if self._show_header else 0
         return self.rect().adjusted(2, top + 2, -2, -2)
 
     def _tab_for_page(self, page: int) -> QRect:
@@ -127,14 +125,18 @@ class VCFrame(VCWidget):
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
-        if self._edit_mode:
-            super().mousePressEvent(event)
-            return
         pos = event.position().toPoint()
+        # Tab-Klick wechselt die Seite — auch im Edit-Modus, damit man die Widgets
+        # JEDER Seite bearbeiten kann (sonst bliebe im Edit-Modus nur Seite 1 sichtbar).
         if self._show_header and self._page_count > 1 and pos.y() < self._tab_height:
             w = max(40, self.width() // self._page_count)
-            page = pos.x() // w
-            self.switch_page(page)
+            page = int(pos.x() // w)
+            if 0 <= page < self._page_count:
+                self.switch_page(page)
+                event.accept()
+                return
+        if self._edit_mode:
+            super().mousePressEvent(event)
             return
         super().mousePressEvent(event)
 
@@ -226,7 +228,7 @@ class VCFrame(VCWidget):
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
-        self._page_count = d.get("page_count", 1)
+        self._page_count = max(1, int(d.get("page_count", 1)))
         self._show_header = d.get("show_header", True)
         self._solo = d.get("solo", False)
         # Kinder wiederherstellen
@@ -240,6 +242,14 @@ class VCFrame(VCWidget):
             child.apply_dict(cd)
             page = cd.get("vc_page", 0)
             child.setProperty("vc_page", page)
-            child.setVisible(page == self._current_page)
+            # Edit-Mode/Snap des Frames an die wiederhergestellten Kinder
+            # weiterreichen — beim set_edit_mode/_snap_grid des Frames (in
+            # VCCanvas._add_widget) existierten sie noch nicht.
+            child.set_edit_mode(self._edit_mode)
+            child.set_snap_grid(self._snap_grid)
             child.delete_requested.connect(lambda w=child: self._remove_child(w))
-            child.show()
+        # Seiten-Sichtbarkeit konsistent setzen. Früher überschrieb ein
+        # bedingungsloses child.show() die Seiten-Logik → alle Seiten überlappten
+        # nach dem Laden. switch_page() blendet nur die aktuelle Seite ein.
+        self._current_page = max(0, min(self._page_count - 1, self._current_page))
+        self.switch_page(self._current_page)

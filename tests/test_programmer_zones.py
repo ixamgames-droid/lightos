@@ -53,9 +53,13 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     assert hasattr(pv, "_fixture_list")           # LINKS
     assert pv._snap_file_panel is not None        # RECHTS (Snap-Browser, Effekt-Preview entfernt I2.7)
     # MITTE: WP-5 — EINE Tab-Leiste statt Kategorie-Leiste + Stack.
+    # M2.1: "Gobo" als eigener Tab (standardmaessig versteckt, nur bei
+    # Gobo-faehigen Fixtures sichtbar) zwischen Position und Weitere.
     labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
-    assert labels == ["Intensity", "Color", "Position", "Weitere",
+    assert labels == ["Intensity", "Color", "Position", "Gobo", "Weitere",
                       "Helper", "EFX", "Matrix", "Paletten"], labels
+    # Gobo-Tab ist ohne Auswahl ausgeblendet.
+    assert pv._main_tabs.isTabVisible(pv._gobo_tab_index) is False
     assert pv._tile_preview is not None           # UNTEN
 
     # Tab-Wechsel wirft nicht.

@@ -27,6 +27,7 @@ class SyncEvent(str, Enum):
     SHOW_LOADED = "show_loaded"
     SHOW_SAVED = "show_saved"
     SELECTION_CHANGED = "selection_changed"    # Programmer-Geraeteauswahl geaendert
+    LIVE_VIEW_CHANGED = "live_view_changed"    # Live-View-Layout (Positionen/Zoom/Grid) geaendert
     REFRESH_ALL = "refresh_all"                # Globale "Alle neu laden"
 
 
@@ -51,12 +52,40 @@ class StateSync:
         if event in self._subscribers and callback in self._subscribers[event]:
             self._subscribers[event].remove(callback)
 
+    def subscribe_widget(self, event: SyncEvent, widget, callback: Callable):
+        """Wie subscribe(), aber an die Lebenszeit eines QWidgets gebunden:
+        beim destroyed()-Signal des Widgets wird der Callback automatisch
+        abgemeldet.
+
+        Hintergrund (Crash-Klasse, siehe crash.log 2026-06): Views, die bei
+        jedem Programmer-Layout-Wechsel neu gebaut werden (eingebettete
+        EFX-/Matrix-/Paletten-Seiten, SnapFilePanel), subscriben mit Lambdas
+        und wurden nie abgemeldet. Der naechste Emit lief dann in geloeschte
+        Qt-Objekte (RuntimeError bis Access Violation)."""
+        self.subscribe(event, callback)
+        try:
+            widget.destroyed.connect(lambda *_: self.unsubscribe(event, callback))
+        except Exception:
+            pass  # kein Qt-Objekt -> Verhalten wie subscribe()
+
     def emit(self, event: SyncEvent, data=None):
         """Emit an event to all subscribers. Errors don't break other subscribers."""
         subs = list(self._subscribers.get(event, []))
         for cb in subs:
             try:
                 cb(event, data)
+            except RuntimeError as e:
+                # PySide6 wirft "Internal C++ object ... already deleted", wenn
+                # ein Subscriber an einem zerstoerten Widget haengt (Zombie).
+                # Selbstheilung: abmelden, damit kein weiterer Emit ins
+                # geloeschte Objekt laeuft (Vorstufe der Access-Violation-
+                # Crashes aus crash.log).
+                if "already deleted" in str(e).lower():
+                    self.unsubscribe(event, cb)
+                    print(f"[StateSync] toter Subscriber entfernt ({event.value}): {e}")
+                else:
+                    name = getattr(cb, "__name__", repr(cb))
+                    print(f"[StateSync] error in {name} for {event.value}: {e}")
             except Exception as e:
                 name = getattr(cb, "__name__", repr(cb))
                 print(f"[StateSync] error in {name} for {event.value}: {e}")

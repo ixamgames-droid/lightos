@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal, QPoint
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QMouseEvent
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QGroupBox, QSizePolicy, QFrame
+    QListWidget, QListWidgetItem, QGroupBox, QSizePolicy, QFrame, QCheckBox
 )
 
 try:
@@ -137,6 +137,7 @@ class PositionTool(QWidget):
         self._pan_fine = 0
         self._tilt_fine = 0
         self._block_signals = False
+        self._live = False   # M3.1: wenn True, wirkt jede Aenderung sofort
         self._setup_ui()
 
     def _setup_ui(self):
@@ -211,6 +212,10 @@ class PositionTool(QWidget):
         b_apply.setObjectName("btn_primary")
         b_apply.clicked.connect(self._apply_to_selection)
         btn_row.addWidget(b_apply)
+        self._chk_live = QCheckBox("Live")
+        self._chk_live.setToolTip("Pad-Bewegung wirkt sofort auf die Auswahl")
+        self._chk_live.toggled.connect(self.set_live)
+        btn_row.addWidget(self._chk_live)
         b_center = QPushButton("Center")
         b_center.clicked.connect(lambda: self.set_position(127, 127))
         btn_row.addWidget(b_center)
@@ -326,10 +331,20 @@ class PositionTool(QWidget):
             f"PF: {self._pan_fine}  TF: {self._tilt_fine}"
         )
 
+    def set_live(self, on: bool):
+        """Live-Modus: jede Pad-/Slider-Aenderung wirkt sofort auf die Auswahl."""
+        self._live = bool(on)
+        if hasattr(self, "_chk_live") and self._chk_live.isChecked() != self._live:
+            self._chk_live.blockSignals(True)
+            self._chk_live.setChecked(self._live)
+            self._chk_live.blockSignals(False)
+
     def _emit(self):
         self.position_changed.emit(
             self._pan, self._tilt, self._pan_fine, self._tilt_fine
         )
+        if self._live:
+            self._apply_to_selection()
 
     def _apply_to_selection(self):
         self.applied.emit(self._pan, self._tilt, self._pan_fine, self._tilt_fine)
@@ -337,13 +352,16 @@ class PositionTool(QWidget):
             return
         try:
             state = get_state()
-            fids = list(state.programmer.keys()) or [f.fid for f in state.get_patched_fixtures()]
+            # M3.1: bevorzugt die aktuelle Programmer-Auswahl.
+            fids = list(state.get_selected_fids())
+            if not fids:
+                fids = list(state.programmer.keys()) or \
+                    [f.fid for f in state.get_patched_fixtures()]
             for fid in fids:
                 state.set_programmer_value(fid, "pan", self._pan)
                 state.set_programmer_value(fid, "tilt", self._tilt)
-                if self._pan_fine:
-                    state.set_programmer_value(fid, "pan_fine", self._pan_fine)
-                if self._tilt_fine:
-                    state.set_programmer_value(fid, "tilt_fine", self._tilt_fine)
+                # M3.2: Fine immer schreiben (auch 0 -> sonst bleibt alter Wert).
+                state.set_programmer_value(fid, "pan_fine", self._pan_fine)
+                state.set_programmer_value(fid, "tilt_fine", self._tilt_fine)
         except Exception as e:
             print(f"[position_tool] apply error: {e}")

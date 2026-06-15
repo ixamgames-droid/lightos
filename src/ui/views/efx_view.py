@@ -5,90 +5,332 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton,
                                 QGroupBox, QFormLayout, QDoubleSpinBox,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
-                                QSizePolicy, QScrollArea)
+                                QSizePolicy, QScrollArea, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture
 
+# Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
+PHASE_MODE_LABELS = [
+    ("sync",   "Synchron (alle Köpfe gleich)"),
+    ("fan",    "Gleichmäßig verteilt (Fächer)"),
+    ("offset", "Fester Versatz pro Gerät (°)"),
+]
+
 
 class EfxPreviewWidget(QWidget):
-    """Live preview of the EFX path."""
+    """Live-Vorschau des EFX (P11).
 
-    def __init__(self, parent=None):
+    Zeigt statt eines wandernden Punkts den **kompletten Bewegungspfad**
+    (aus ``efx._calc`` gesampelt, nutzt also die echten Parameter inkl.
+    Rotation/Frequenzen), einen Richtungspfeil, sowie pro zugewiesenem
+    Fixture einen animierten Punkt mit Fan-Verteilung (``spread``) und
+    Spiegelung (``mirror``) — exakt die Phasenlogik aus ``EfxInstance._values``.
+    Richtung (forward/backward/bounce) ist in der Animation sichtbar.
+    """
+
+    _DOT_COLORS = ["#ffd700", "#58a6ff", "#3fb950", "#ff7b72",
+                   "#d2a8ff", "#79c0ff", "#ffa657", "#a5d6ff"]
+
+    _MARGIN = 18           # Rand des Pan/Tilt-Felds in px
+    _HANDLE = 5            # Klick-Toleranz/Halbgroesse der Eck-Griffe
+
+    def __init__(self, parent=None, editable: bool = False):
         super().__init__(parent)
         self._efx: EfxInstance | None = None
         self._phase = 0.0
-        self._trail: list[tuple[float, float]] = []
-        self.setFixedSize(220, 220)
+        self._bounce_dir = 1.0
+        # Editier-Modus: Zentrum per Drag verschieben, Eck-Griffe = Groesse.
+        # Ein Callback meldet Geometrie-Aenderungen ({attr: wert}) an die EfxView,
+        # die Spinboxen/Modell/zweite Vorschau synchron haelt.
+        self._editable = bool(editable)
+        self._geom_cb = None
+        self._drag_mode: str | None = None      # None | "move" | "resize"
+        self._resize_sign = (1, 1)
+        self.setMinimumSize(240, 240)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Expanding)
         self.setStyleSheet("background:#0d1117; border:1px solid #21262d; border-radius:4px;")
+        if self._editable:
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
+            self.setMouseTracking(True)
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(40)
 
+    def set_geometry_callback(self, cb):
+        """cb(updates: dict) wird bei interaktiver Geometrie-Aenderung gerufen."""
+        self._geom_cb = cb
+
     def set_efx(self, efx: EfxInstance | None):
         self._efx = efx
-        self._trail.clear()
+        self._phase = 0.0
+        self._bounce_dir = 1.0
+        self.update()
 
     def _tick(self):
-        if self._efx is None:
+        e = self._efx
+        if e is None or not self.isVisible():
             return
-        self._phase = (self._phase + self._efx.speed_hz * 0.04) % 1.0
-        pan, tilt = self._efx._calc(self._phase)
-        # Normalize to 0-1
-        x = pan / 255.0
-        y = tilt / 255.0
-        self._trail.append((x, y))
-        if len(self._trail) > 100:
-            self._trail.pop(0)
+        # Gleiche Phasenfortschreibung wie EfxInstance._advance (inkl. Richtung)
+        try:
+            speed = max(0.0, float(getattr(e, "speed", 1.0)))
+        except (TypeError, ValueError):
+            speed = 1.0
+        delta = e.speed_hz * speed * 0.04
+        # E3: One-Shot (Loop aus) — Phase klemmt am Ende wie in EfxInstance._advance,
+        # statt in der Vorschau endlos weiterzulaufen (bounce loopt weiterhin).
+        if not getattr(e, "loop", True) and e.direction != "bounce":
+            if e.direction == "backward":
+                self._phase = max(0.0, self._phase - delta)
+            else:
+                self._phase = min(1.0, self._phase + delta)
+            self.update()
+            return
+        if e.direction == "backward":
+            self._phase = (self._phase - delta) % 1.0
+        elif e.direction == "bounce":
+            self._phase += delta * self._bounce_dir
+            if self._phase >= 1.0:
+                self._phase = 1.0
+                self._bounce_dir = -1.0
+            elif self._phase <= 0.0:
+                self._phase = 0.0
+                self._bounce_dir = 1.0
+        else:
+            self._phase = (self._phase + delta) % 1.0
         self.update()
+
+    # ── Geometrie-Helfer ─────────────────────────────────────────────────────
+
+    def _to_px(self, pan: float, tilt: float, m: int, w: int, h: int):
+        return (int(m + (pan / 255.0) * w), int(m + (tilt / 255.0) * h))
 
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(self.rect(), QColor("#0d1117"))
 
-        m = 20
+        m = 18
         w = self.width() - m * 2
         h = self.height() - m * 2
 
-        # Grid
+        # Grid (Pan/Tilt-Raum 0..255)
         p.setPen(QPen(QColor("#1f2937"), 1))
         for i in range(5):
             x = m + i * w // 4
             y = m + i * h // 4
             p.drawLine(x, m, x, m + h)
             p.drawLine(m, y, m + w, y)
-
-        # Trail
-        if len(self._trail) > 1:
-            for i in range(1, len(self._trail)):
-                alpha = int(255 * i / len(self._trail))
-                pen = QPen(QColor(31, 111, 235, alpha), 2)
-                p.setPen(pen)
-                x0 = int(m + self._trail[i-1][0] * w)
-                y0 = int(m + self._trail[i-1][1] * h)
-                x1 = int(m + self._trail[i][0] * w)
-                y1 = int(m + self._trail[i][1] * h)
-                p.drawLine(x0, y0, x1, y1)
-
-        # Current position dot
-        if self._trail:
-            x = int(m + self._trail[-1][0] * w)
-            y = int(m + self._trail[-1][1] * h)
-            p.setBrush(QColor("#58a6ff"))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(QPoint(x, y), 5, 5)
-
         p.setPen(QColor("#30363d"))
         p.drawRect(m, m, w, h)
+
+        e = self._efx
+        if e is None:
+            p.setPen(QColor("#7d8590"))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "Kein EFX ausgewählt")
+            p.end()
+            return
+
+        # 1) Kompletter Pfad aus den ECHTEN Parametern (keine Hardcodes)
+        samples = 128
+        pts = []
+        try:
+            for i in range(samples + 1):
+                pan, tilt = e._calc(i / samples)
+                pts.append(self._to_px(pan, tilt, m, w, h))
+        except Exception:
+            pts = []
+        if len(pts) > 1:
+            p.setPen(QPen(QColor(31, 111, 235, 160), 2))
+            for i in range(1, len(pts)):
+                p.drawLine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1])
+
+            # 2) Richtungspfeil bei Phase ~0.06 entlang der Laufrichtung
+            sgn = -1.0 if e.direction == "backward" else 1.0
+            try:
+                a0 = e._calc(0.05)
+                a1 = e._calc(0.05 + sgn * 0.02)
+                x0, y0 = self._to_px(a0[0], a0[1], m, w, h)
+                x1, y1 = self._to_px(a1[0], a1[1], m, w, h)
+                ang = math.atan2(y1 - y0, x1 - x0)
+                p.setPen(QPen(QColor("#79c0ff"), 2))
+                for off in (math.radians(150), math.radians(-150)):
+                    p.drawLine(x1, y1,
+                               int(x1 + 9 * math.cos(ang + off)),
+                               int(y1 + 9 * math.sin(ang + off)))
+            except Exception:
+                pass
+
+        # 3) Fixture-Punkte: Verhaeltnis (sync/fan/offset) + Gegenlauf + Mirror —
+        #    exakt die Phasenlogik aus EfxInstance._values / _fan_for (Werte-gleich).
+        fixtures = list(getattr(e, "fixtures", None) or [])
+        n = max(1, len(fixtures))
+        counter = bool(getattr(e, "counter_rotate", False))
+        for i in range(n):
+            try:
+                fan = e._fan_for(i, n)
+            except Exception:
+                fan = (i / n) * e.spread if n > 1 else 0.0
+            offset = 0.0
+            if i < len(fixtures):
+                offset = float(getattr(fixtures[i], "start_offset", 0.0) or 0.0)
+            base = -self._phase if (counter and i % 2 == 1) else self._phase
+            ph = (base + offset + fan) % 1.0
+            try:
+                pan, tilt = e._calc(ph)
+            except Exception:
+                continue
+            mirrored = bool(e.mirror and (i % 2 == 1))
+            if mirrored:
+                pan = 255 - pan
+            x, y = self._to_px(pan, tilt, m, w, h)
+            color = QColor(self._DOT_COLORS[i % len(self._DOT_COLORS)])
+            p.setBrush(color)
+            p.setPen(QPen(QColor("#0d1117"), 1))
+            p.drawEllipse(QPoint(x, y), 6, 6)
+            if len(fixtures) > 1:
+                p.setPen(QColor("#0d1117"))
+                f = QFont()
+                f.setPixelSize(8)
+                p.setFont(f)
+                p.drawText(QRect(x - 6, y - 6, 12, 12),
+                           Qt.AlignmentFlag.AlignCenter, str(i + 1))
+
+        # 3b) Editier-Griffe: Zentrum (ziehen = verschieben) + Eck-Quadrate (Groesse)
+        if self._editable:
+            cx, cy = self._to_px(e.x_offset, e.y_offset, m, w, h)
+            for (sx, sy) in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+                hxp, hyp = self._corner_px(sx, sy, m, w, h)
+                p.setBrush(QColor("#f0a020"))
+                p.setPen(QPen(QColor("#0d1117"), 1))
+                p.drawRect(hxp - self._HANDLE, hyp - self._HANDLE,
+                           self._HANDLE * 2, self._HANDLE * 2)
+            # Bounding-Box (gestrichelt)
+            x0, y0 = self._corner_px(-1, -1, m, w, h)
+            x1, y1 = self._corner_px(1, 1, m, w, h)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor(240, 160, 32, 120), 1, Qt.PenStyle.DashLine))
+            p.drawRect(QRect(min(x0, x1), min(y0, y1),
+                             abs(x1 - x0), abs(y1 - y0)))
+            # Zentrum-Griff
+            p.setBrush(QColor("#ffd700"))
+            p.setPen(QPen(QColor("#0d1117"), 2))
+            p.drawEllipse(QPoint(cx, cy), 7, 7)
+            p.setPen(QColor("#0d1117"))
+            p.drawLine(cx - 4, cy, cx + 4, cy)
+            p.drawLine(cx, cy - 4, cx, cy + 4)
+
+        # 4) Status-Zeile: Algorithmus · Tempo · Richtung (+ Spiegel-Hinweis)
+        p.setPen(QColor("#7d8590"))
+        f = QFont()
+        f.setPixelSize(10)
+        p.setFont(f)
+        info = f"{e.algorithm.value} · {e.speed_hz:.2f} Hz · {e.direction}"
+        if e.mirror:
+            info += " · gespiegelt"
+        if len(fixtures) > 1:
+            mode = getattr(e, "phase_mode", "fan")
+            if mode == "sync":
+                info += " · synchron"
+            elif mode == "offset":
+                info += f" · Versatz {int(getattr(e, 'phase_offset_deg', 0))}°"
+            elif e.spread > 0:
+                info += f" · Fächer {int(e.spread * 100)}%"
+            if getattr(e, "counter_rotate", False):
+                info += " · gegenläufig"
+        if self._editable:
+            info += "   ✋ Zentrum ziehen · Ecken = Größe"
+        p.drawText(QRect(m, self.height() - m + 2, w, m - 2),
+                   Qt.AlignmentFlag.AlignLeft, info)
         p.end()
+
+    # ── Interaktive Geometrie (Editier-Modus) ─────────────────────────────────
+
+    def _metrics(self):
+        m = self._MARGIN
+        return m, self.width() - m * 2, self.height() - m * 2
+
+    def _corner_px(self, sx: int, sy: int, m: int, w: int, h: int):
+        """Pixelposition einer Bounding-Box-Ecke (sx/sy = ±1)."""
+        e = self._efx
+        pan = max(0.0, min(255.0, e.x_offset + sx * e.width / 2.0))
+        tilt = max(0.0, min(255.0, e.y_offset + sy * e.height / 2.0))
+        return self._to_px(pan, tilt, m, w, h)
+
+    def _from_px(self, px: float, py: float):
+        """Pixel → (pan, tilt) im Bereich 0..255 (geklemmt)."""
+        m, w, h = self._metrics()
+        pan = (px - m) / w * 255.0 if w else 0.0
+        tilt = (py - m) / h * 255.0 if h else 0.0
+        return (max(0.0, min(255.0, pan)), max(0.0, min(255.0, tilt)))
+
+    def mousePressEvent(self, ev):
+        if (not self._editable or self._efx is None
+                or ev.button() != Qt.MouseButton.LeftButton):
+            return
+        m, w, h = self._metrics()
+        pos = ev.position()
+        # Eck-Griffe zuerst pruefen (Groesse), sonst Zentrum verschieben.
+        for (sx, sy) in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+            hxp, hyp = self._corner_px(sx, sy, m, w, h)
+            if abs(pos.x() - hxp) <= self._HANDLE + 3 and \
+               abs(pos.y() - hyp) <= self._HANDLE + 3:
+                self._drag_mode = "resize"
+                self._resize_sign = (sx, sy)
+                self.setCursor(Qt.CursorShape.SizeAllCursor)
+                return
+        self._drag_mode = "move"
+        self.setCursor(Qt.CursorShape.ClosedHandCursor)
+        self._apply_move(pos)
+
+    def mouseMoveEvent(self, ev):
+        if self._drag_mode == "move":
+            self._apply_move(ev.position())
+        elif self._drag_mode == "resize":
+            self._apply_resize(ev.position())
+
+    def mouseReleaseEvent(self, ev):
+        if self._drag_mode is not None:
+            self._drag_mode = None
+            self.setCursor(Qt.CursorShape.OpenHandCursor
+                           if self._editable else Qt.CursorShape.ArrowCursor)
+
+    def _apply_move(self, pos):
+        pan, tilt = self._from_px(pos.x(), pos.y())
+        self._emit_geom({"x_offset": round(pan), "y_offset": round(tilt)})
+
+    def _apply_resize(self, pos):
+        e = self._efx
+        pan, tilt = self._from_px(pos.x(), pos.y())
+        width = max(0.0, min(255.0, abs(pan - e.x_offset) * 2.0))
+        height = max(0.0, min(255.0, abs(tilt - e.y_offset) * 2.0))
+        self._emit_geom({"width": round(width), "height": round(height)})
+
+    def _emit_geom(self, updates: dict):
+        # Modell sofort aktualisieren (auch fuer eigenstaendigen Betrieb), dann
+        # die EfxView informieren (Spinboxen/Bibliothek/zweite Vorschau).
+        e = self._efx
+        if e is not None:
+            for k, v in updates.items():
+                try:
+                    setattr(e, k, float(v))
+                except Exception:
+                    pass
+        if self._geom_cb is not None:
+            try:
+                self._geom_cb(updates)
+            except Exception as exc:
+                print(f"[EfxPreview] geom callback error: {exc}")
+        self.update()
 
 
 class EfxView(QWidget):
     """EFX manager: list of EFX instances + editor + preview."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, follow_selection: bool = False):
         super().__init__(parent)
         # SSOT seit dem Umbau: EFX-Bewegungen sind echte Funktionen im
         # FunctionManager (EFX-Typ, Marker motion). Beide EfxView-Instanzen
@@ -96,9 +338,25 @@ class EfxView(QWidget):
         from src.core.engine.function_manager import get_function_manager
         self._fm = get_function_manager()
         self._current: EfxInstance | None = None
+        self._popout: "EfxPopoutDialog | None" = None   # Großansicht-Fenster
+        # Guard: True während _load_to_ui die Widgets aus dem Modell befüllt —
+        # verhindert, dass Widget-Signale die Werte zurück ins (frisch geladene)
+        # Modell schreiben (sonst erbt die neu gewählte EFX die alten Werte).
+        self._loading = False
+        # M0.1: im Programmer eingebettet folgt EFX automatisch der Auswahl
+        self._follow = bool(follow_selection)
+        # E2: EFX editiert die Live-Instanz direkt (gewollt fuer Live-Programming),
+        # informiert aber Bibliothek/andere EFX-Ansicht ueber Aenderungen —
+        # entprellt, damit Spin-/Tipp-Folgen nicht je Tick FUNCTION_CHANGED feuern.
+        self._notify_timer = QTimer(self)
+        self._notify_timer.setSingleShot(True)
+        self._notify_timer.setInterval(250)
+        self._notify_timer.timeout.connect(self._notify_change)
         self._setup_ui()
         self._connect_sync()
         self._rebuild_from_state()
+        if self._follow:
+            self._enable_follow_selection()
 
     @property
     def _instances(self) -> list[EfxInstance]:
@@ -198,23 +456,24 @@ class EfxView(QWidget):
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(8)
 
+        # P11: Editor entzerrt — drei thematische Gruppen in einer ScrollArea
+        # (nichts wird mehr gestaucht), Vorschau daneben mit fester Mindest-
+        # groesse und Stretch.
         top_row = QHBoxLayout()
+        _box_style = "QGroupBox { color:#8b949e; font-size:10px; }"
 
-        # Editor form
-        editor_box = QGroupBox("EFX Einstellungen")
-        editor_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
-        form = QFormLayout(editor_box)
-        form.setSpacing(4)
+        editor_col = QWidget()
+        ec = QVBoxLayout(editor_col)
+        ec.setContentsMargins(0, 0, 0, 0)
+        ec.setSpacing(6)
 
         self._name_edit = QLineEdit()
+        self._name_edit.setPlaceholderText("Name des Effekts")
         self._name_edit.textChanged.connect(self._on_name_change)
-        form.addRow("Name:", self._name_edit)
-
-        self._algo_combo = QComboBox()
-        for a in EfxAlgorithm:
-            self._algo_combo.addItem(a.value)
-        self._algo_combo.currentTextChanged.connect(self._on_param_change)
-        form.addRow("Algorithmus:", self._algo_combo)
+        name_row = QFormLayout()
+        name_row.setSpacing(4)
+        name_row.addRow("Name:", self._name_edit)
+        ec.addLayout(name_row)
 
         def dspin(lo, hi, step=1.0, val=0.0):
             s = QDoubleSpinBox()
@@ -224,43 +483,230 @@ class EfxView(QWidget):
             s.valueChanged.connect(self._on_param_change)
             return s
 
+        # ── Gruppe 1: Form & Geometrie ──────────────────────────────────
+        form_box = QGroupBox("Form && Geometrie")
+        form_box.setStyleSheet(_box_style)
+        form = QFormLayout(form_box)
+        form.setSpacing(4)
+
+        self._algo_combo = QComboBox()
+        for a in EfxAlgorithm:
+            self._algo_combo.addItem(a.value)
+        self._algo_combo.currentTextChanged.connect(self._on_param_change)
+        form.addRow("Algorithmus:", self._algo_combo)
+
+        # Custom Paths: Auswahl aus der Pfad-Bibliothek + Editor-Popout
+        path_row_w = QWidget()
+        path_row = QHBoxLayout(path_row_w)
+        path_row.setContentsMargins(0, 0, 0, 0)
+        path_row.setSpacing(4)
+        self._path_combo = QComboBox()
+        self._path_combo.currentTextChanged.connect(self._on_path_selected)
+        path_row.addWidget(self._path_combo, stretch=1)
+        self._btn_path_new  = QPushButton("+ Aufzeichnen…")
+        self._btn_path_edit = QPushButton("Bearbeiten…")
+        self._btn_path_del  = QPushButton("🗑")
+        self._btn_path_del.setFixedWidth(30)
+        for b in (self._btn_path_new, self._btn_path_edit, self._btn_path_del):
+            b.setFixedHeight(26)
+            b.setStyleSheet("""
+                QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
+                              border-radius:3px; font-size:10px; }
+                QPushButton:hover { background:#30363d; }
+            """)
+            path_row.addWidget(b)
+        self._btn_path_new.clicked.connect(self._record_new_path)
+        self._btn_path_edit.clicked.connect(self._edit_current_path)
+        self._btn_path_del.clicked.connect(self._delete_current_path)
+        form.addRow("Custom Path:", path_row_w)
+        self._refresh_path_combo()
+
         self._width_spin  = dspin(0, 255, 5, 100)
         self._height_spin = dspin(0, 255, 5, 100)
         self._xoff_spin   = dspin(0, 255, 5, 128)
         self._yoff_spin   = dspin(0, 255, 5, 128)
         self._rot_spin    = dspin(0, 360, 5, 0)
-        self._speed_spin  = dspin(0.01, 10, 0.1, 0.5)
         self._xfreq_spin  = dspin(0.1, 10, 0.1, 1.0)
         self._yfreq_spin  = dspin(0.1, 10, 0.1, 1.0)
-
-        form.addRow("Breite:", self._width_spin)
-        form.addRow("Höhe:", self._height_spin)
-        form.addRow("X-Offset:", self._xoff_spin)
-        form.addRow("Y-Offset:", self._yoff_spin)
+        # E1: Lissajous-Phase (Versatz der X-/Y-Schwingung) — bisher nur im
+        # Datenmodell, jetzt editierbar. y_phase=90° ergibt die klassische Figur.
+        self._xphase_spin = dspin(0, 360, 5, 0)
+        self._yphase_spin = dspin(0, 360, 5, 90)
+        form.addRow("Breite (Pan-Hub):", self._width_spin)
+        form.addRow("Höhe (Tilt-Hub):", self._height_spin)
+        form.addRow("Zentrum Pan:", self._xoff_spin)
+        form.addRow("Zentrum Tilt:", self._yoff_spin)
         form.addRow("Rotation (°):", self._rot_spin)
-        form.addRow("Geschwindigkeit (Hz):", self._speed_spin)
         form.addRow("X-Frequenz (Lissajous):", self._xfreq_spin)
         form.addRow("Y-Frequenz (Lissajous):", self._yfreq_spin)
+        form.addRow("X-Phase (Lissajous °):", self._xphase_spin)
+        form.addRow("Y-Phase (Lissajous °):", self._yphase_spin)
+        ec.addWidget(form_box)
 
+        # ── Gruppe 2: Tempo & Richtung ──────────────────────────────────
+        tempo_box = QGroupBox("Tempo && Richtung")
+        tempo_box.setStyleSheet(_box_style)
+        tform = QFormLayout(tempo_box)
+        tform.setSpacing(4)
+        self._speed_spin = dspin(0.01, 10, 0.1, 0.5)
+        tform.addRow("Geschwindigkeit (Hz):", self._speed_spin)
         self._dir_combo = QComboBox()
         self._dir_combo.addItems(["forward", "backward", "bounce"])
         self._dir_combo.currentTextChanged.connect(self._on_param_change)
-        form.addRow("Richtung:", self._dir_combo)
+        tform.addRow("Richtung:", self._dir_combo)
+        self._loop_chk = QCheckBox("Endlos wiederholen")
+        self._loop_chk.setChecked(True)
+        self._loop_chk.setToolTip("aus = One-Shot: Bewegung läuft einmal ab "
+                                  "und hält am Endpunkt an")
+        self._loop_chk.toggled.connect(self._on_param_change)
+        tform.addRow("Loop:", self._loop_chk)
+        ec.addWidget(tempo_box)
 
-        top_row.addWidget(editor_box)
+        # ── Gruppe 3: Verhältnis der Geräte zueinander ──────────────────
+        # Steuert, WIE mehrere Köpfe zueinander durch die Figur laufen:
+        # synchron, gleichmäßig verteilt (Fächer) oder fester Gradversatz — plus
+        # gegenläufig (jedes 2. Gerät entgegengesetzt). Spiegeln liegt direkt
+        # daneben, weil es ebenfalls das Zusammenspiel der Köpfe formt.
+        rel_box = QGroupBox("Verhältnis der Geräte zueinander")
+        rel_box.setStyleSheet(_box_style)
+        relf = QFormLayout(rel_box)
+        relf.setSpacing(4)
+        self._phase_mode_combo = QComboBox()
+        for key, label in PHASE_MODE_LABELS:
+            self._phase_mode_combo.addItem(label, key)
+        self._phase_mode_combo.setToolTip(
+            "Wie laufen mehrere Köpfe zueinander?\n"
+            "• Synchron: alle fahren dieselbe Figur gleichzeitig.\n"
+            "• Gleichmäßig verteilt: Köpfe über die Figur gefächert "
+            "(2 Köpfe = 180° auseinander).\n"
+            "• Fester Versatz: jeder Kopf um die eingestellten Grad später.")
+        self._phase_mode_combo.currentIndexChanged.connect(
+            lambda *_: self._set_relationship(
+                "phase_mode", self._phase_mode_combo.currentData()))
+        relf.addRow("Verhältnis:", self._phase_mode_combo)
 
-        # Preview
+        self._spread_spin = QDoubleSpinBox()
+        self._spread_spin.setRange(0, 1.0)
+        self._spread_spin.setSingleStep(0.05)
+        self._spread_spin.setDecimals(2)
+        self._spread_spin.setValue(1.0)
+        self._spread_spin.setToolTip(
+            "Nur bei „Gleichmäßig verteilt“: Fächer-Anteil.\n"
+            "0 = praktisch synchron · 1 = voller Fächer über die ganze Figur "
+            "(bei 2 Köpfen gegenphasig).")
+        self._spread_spin.valueChanged.connect(
+            lambda v: self._set_relationship("spread", v))
+        relf.addRow("Fächer-Streuung:", self._spread_spin)
+
+        self._offset_spin = QDoubleSpinBox()
+        self._offset_spin.setRange(0, 360)
+        self._offset_spin.setSingleStep(5)
+        self._offset_spin.setDecimals(0)
+        self._offset_spin.setSuffix(" °")
+        self._offset_spin.setToolTip(
+            "Nur bei „Fester Versatz“: jeder weitere Kopf läuft um so viel Grad "
+            "versetzt (z. B. 15° leichter Nachlauf, 180° gegenphasig).")
+        self._offset_spin.valueChanged.connect(
+            lambda v: self._set_relationship("phase_offset_deg", v))
+        relf.addRow("Versatz pro Gerät:", self._offset_spin)
+
+        self._counter_chk = QCheckBox("jedes 2. Gerät entgegengesetzt")
+        self._counter_chk.setToolTip(
+            "Gegenläufig: jeder zweite Kopf durchläuft die Figur rückwärts — "
+            "z. B. zwei Köpfe gegenläufig im Kreis (einer cw, einer ccw).")
+        self._counter_chk.toggled.connect(
+            lambda v: self._set_relationship("counter_rotate", v))
+        relf.addRow("Gegenläufig:", self._counter_chk)
+
+        self._mirror_chk = QCheckBox("jedes 2. Gerät spiegeln (Pan)")
+        self._mirror_chk.setToolTip(
+            "Spiegelt bei jedem zweiten Kopf die Pan-Achse — symmetrische "
+            "(spiegelbildliche) Bewegung statt versetzter.")
+        self._mirror_chk.toggled.connect(
+            lambda v: self._set_relationship("mirror", v))
+        relf.addRow("Spiegeln:", self._mirror_chk)
+        ec.addWidget(rel_box)
+
+        # ── Gruppe 4: Sichtbarkeit & Sonstiges ──────────────────────────
+        vis_box = QGroupBox("Sichtbarkeit && Sonstiges")
+        vis_box.setStyleSheet(_box_style)
+        vform = QFormLayout(vis_box)
+        vform.setSpacing(4)
+        self._open_beam_chk = QCheckBox("Dimmer/Shutter mit öffnen")
+        self._open_beam_chk.toggled.connect(self._on_param_change)
+        vform.addRow("Sichtbarkeit:", self._open_beam_chk)
+        # E1: Relativ/additiv — Bewegung um die aktuelle Pan/Tilt-Position jedes
+        # Geraets (beim Start aus dem Programmer geschnappt) statt um die feste
+        # Mitte. Bisher nur ueber VC/MIDI erreichbar, jetzt direkt im Editor.
+        self._relative_chk = QCheckBox("um aktuelle Pan/Tilt-Position")
+        self._relative_chk.setToolTip(
+            "Bewegung relativ um die beim Start geschnappte Position jedes Geräts "
+            "(z. B. „fahr zur Bühne, dann dort die Acht“) statt um Zentrum Pan/Tilt.")
+        self._relative_chk.toggled.connect(self._on_param_change)
+        vform.addRow("Relativ:", self._relative_chk)
+        # T-9: 16-bit-Ausgabe ueber die Fine-Kanaele (geschmeidigere Bewegung;
+        # Geraete ohne pan_fine/tilt_fine ignorieren es). Default an.
+        self._bit16_chk = QCheckBox("Pan/Tilt über pan_fine/tilt_fine")
+        self._bit16_chk.setToolTip(
+            "16-bit-Ausgabe: schreibt die Sub-Step-Präzision zusätzlich in die "
+            "Fine-Kanäle → geschmeidigere Moving-Head-Bewegung. Geräte ohne "
+            "Fine-Kanal ignorieren es.")
+        self._bit16_chk.toggled.connect(self._on_param_change)
+        vform.addRow("16-bit:", self._bit16_chk)
+        # E1: „Neue Zufallsbahn“ — andere Random-Sequenz (nur fuer Algorithmus
+        # Random sinnvoll), entspricht der VC/MIDI-Aktion „reseed“.
+        self._btn_reseed = QPushButton("🎲 Neue Zufallsbahn")
+        self._btn_reseed.setFixedHeight(24)
+        self._btn_reseed.setToolTip("Würfelt für den Random-Algorithmus eine neue Bahn aus")
+        self._btn_reseed.setStyleSheet("""
+            QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_reseed.clicked.connect(self._reseed_random)
+        vform.addRow("Random:", self._btn_reseed)
+        ec.addWidget(vis_box)
+        ec.addStretch(1)
+
+        editor_scroll = QScrollArea()
+        editor_scroll.setWidgetResizable(True)
+        editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        editor_scroll.setWidget(editor_col)
+        editor_scroll.setMinimumWidth(280)
+        top_row.addWidget(editor_scroll, stretch=2)
+
+        # Vorschau (Pfad + animierte Fixture-Punkte) — interaktiv: Zentrum/Figur
+        # direkt im Feld positionieren („Gobo" einstellen), Eck-Griffe = Groesse.
         prev_box = QGroupBox("Vorschau")
-        prev_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
+        prev_box.setStyleSheet(_box_style)
         pv = QVBoxLayout(prev_box)
-        self._preview = EfxPreviewWidget()
+        pv.setSpacing(4)
+        prev_head = QHBoxLayout()
+        prev_head.addWidget(QLabel("<span style='color:#8b949e;font-size:10px'>"
+                                   "Zentrum ziehen · Ecken = Größe</span>"))
+        prev_head.addStretch(1)
+        self._btn_popout = QPushButton("⛶ Großansicht")
+        self._btn_popout.setFixedHeight(24)
+        self._btn_popout.setToolTip("Öffnet ein großes Fenster zum präzisen "
+                                    "Einstellen von Zentrum, Größe und Rotation.")
+        self._btn_popout.setStyleSheet("""
+            QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:2px 8px; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_popout.clicked.connect(self._open_popout)
+        prev_head.addWidget(self._btn_popout)
+        pv.addLayout(prev_head)
+        self._preview = EfxPreviewWidget(editable=True)
+        self._preview.setMinimumSize(300, 300)
+        self._preview.set_geometry_callback(self._apply_geometry)
         pv.addWidget(self._preview)
-        top_row.addWidget(prev_box)
+        top_row.addWidget(prev_box, stretch=3)
 
-        rl.addLayout(top_row)
+        rl.addLayout(top_row, stretch=1)
 
         # Fixture list
-        fx_box = QGroupBox("Fixtures")
+        self._fx_box = fx_box = QGroupBox("Fixtures")
         fx_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
         fx_l = QVBoxLayout(fx_box)
         self._fx_list = QListWidget()
@@ -272,8 +718,8 @@ class EfxView(QWidget):
         fx_l.addWidget(self._fx_list)
 
         fx_btns = QHBoxLayout()
-        btn_fx_add = QPushButton("+ Fixture hinzufügen")
-        btn_fx_rem = QPushButton("Entfernen")
+        self._btn_fx_add = btn_fx_add = QPushButton("+ Fixture hinzufügen")
+        self._btn_fx_rem = btn_fx_rem = QPushButton("Entfernen")
         for b in (btn_fx_add, btn_fx_rem):
             b.setFixedHeight(24)
             b.setStyleSheet("""
@@ -315,29 +761,117 @@ class EfxView(QWidget):
         if row < 0 or row >= len(self._instances):
             self._current = None
             self._preview.set_efx(None)
+            if self._popout is not None:
+                self._popout.bind(None)
             return
         self._current = self._instances[row]
         self._preview.set_efx(self._current)
         self._load_to_ui(self._current)
+        if self._popout is not None:
+            self._popout.bind(self._current)
+        # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl.
+        if self._follow:
+            self._assign_from_selection()
+
+    # ── Follow-Selection (M0.1, eingebettet im Programmer) ────────────────────
+
+    def _enable_follow_selection(self):
+        """EFX folgt automatisch der Programmer-Geraeteauswahl; manuelle
+        Fixture-Zuweisung wird ausgeblendet."""
+        try:
+            self._btn_fx_add.setVisible(False)
+            self._btn_fx_rem.setVisible(False)
+            self._fx_box.setTitle("Geräte (folgen der Auswahl)")
+        except Exception:
+            pass
+        if not self._instances:
+            self._add_efx()  # eine Standard-EFX, sofort programmierbar
+        if self._instances and self._current is None:
+            self._list.setCurrentRow(0)
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().subscribe(SyncEvent.SELECTION_CHANGED,
+                                 lambda *_: self._assign_from_selection())
+        except Exception as e:
+            print(f"[efx_view] follow subscribe error: {e}")
+        self._assign_from_selection()
+
+    def _assign_from_selection(self):
+        """Baut die Fixture-Liste der aktiven EFX aus der aktuellen Auswahl —
+        nur Geraete mit Pan UND Tilt (Moving Heads). Reihenfolge = Auswahl-/
+        Gruppenreihenfolge (wichtig fuer Fan/Spread)."""
+        try:
+            if self._current is None:
+                if self._instances:
+                    self._list.setCurrentRow(0)
+                if self._current is None:
+                    return
+            from src.core.app_state import get_state, get_channels_for_patched
+            state = get_state()
+            try:
+                fids = [int(f) for f in state.get_selected_fids()]
+            except Exception:
+                fids = []
+            patched = {f.fid: f for f in state.get_patched_fixtures()}
+            movers = []
+            for fid in fids:
+                fx = patched.get(fid)
+                if fx is None:
+                    continue
+                attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
+                if "pan" in attrs and "tilt" in attrs:
+                    movers.append(fid)
+            self._current.fixtures = [EfxFixture(fid=fid) for fid in movers]
+            self._fx_list.clear()
+            for fid in movers:
+                self._fx_list.addItem(f"Fixture #{fid}")
+            self._fx_box.setTitle(
+                f"Geräte: {len(movers)} Moving Head(s) (folgen der Auswahl)"
+                if movers else "Geräte: keine Moving Heads in der Auswahl")
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel geloescht
 
     def _load_to_ui(self, efx: EfxInstance):
-        self._name_edit.blockSignals(True)
-        self._name_edit.setText(efx.name)
-        self._name_edit.blockSignals(False)
-        self._algo_combo.setCurrentText(efx.algorithm.value)
-        self._width_spin.setValue(efx.width)
-        self._height_spin.setValue(efx.height)
-        self._xoff_spin.setValue(efx.x_offset)
-        self._yoff_spin.setValue(efx.y_offset)
-        self._rot_spin.setValue(efx.rotation)
-        self._speed_spin.setValue(efx.speed_hz)
-        self._xfreq_spin.setValue(efx.x_freq)
-        self._yfreq_spin.setValue(efx.y_freq)
-        self._dir_combo.setCurrentText(efx.direction)
-        # Fixtures
-        self._fx_list.clear()
-        for fx in efx.fixtures:
-            self._fx_list.addItem(f"Fixture #{fx.fid}  offset={fx.start_offset:.2f}")
+        # Während des Ladens dürfen Widget-Signale NICHT zurück ins Modell
+        # schreiben: einige Widgets setzen wir mit blockierten Signalen, andere
+        # (Algo/Geometrie/Richtung) nicht. Ohne Guard würde das erste feuernde
+        # Widget die noch-alten Werte der zuvor angezeigten EFX in die neu
+        # gewählte EFX zurückschreiben (Daten-Korruption beim Umschalten).
+        self._loading = True
+        try:
+            self._name_edit.blockSignals(True)
+            self._name_edit.setText(efx.name)
+            self._name_edit.blockSignals(False)
+            self._algo_combo.setCurrentText(efx.algorithm.value)
+            self._width_spin.setValue(efx.width)
+            self._height_spin.setValue(efx.height)
+            self._xoff_spin.setValue(efx.x_offset)
+            self._yoff_spin.setValue(efx.y_offset)
+            self._rot_spin.setValue(efx.rotation)
+            self._speed_spin.setValue(efx.speed_hz)
+            self._xfreq_spin.setValue(efx.x_freq)
+            self._yfreq_spin.setValue(efx.y_freq)
+            self._xphase_spin.setValue(efx.x_phase)
+            self._yphase_spin.setValue(efx.y_phase)
+            self._dir_combo.setCurrentText(efx.direction)
+            for w, v in ((self._open_beam_chk, efx.open_beam),
+                         (self._relative_chk, efx.relative),
+                         (self._bit16_chk, getattr(efx, "bit16", True))):
+                w.blockSignals(True)
+                w.setChecked(bool(v))
+                w.blockSignals(False)
+            self._sync_relationship_widgets()
+            self._update_relationship_enabled()
+            self._loop_chk.blockSignals(True)
+            self._loop_chk.setChecked(bool(efx.loop))
+            self._loop_chk.blockSignals(False)
+            self._refresh_path_combo()
+            # Fixtures
+            self._fx_list.clear()
+            for fx in efx.fixtures:
+                self._fx_list.addItem(f"Fixture #{fx.fid}  offset={fx.start_offset:.2f}")
+        finally:
+            self._loading = False
 
     def _on_name_change(self, text: str):
         if self._current:
@@ -345,9 +879,10 @@ class EfxView(QWidget):
             row = self._list.currentRow()
             if row >= 0:
                 self._list.item(row).setText(text)
+            self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
 
     def _on_param_change(self):
-        if self._current is None:
+        if self._current is None or self._loading:
             return
         self._current.algorithm = EfxAlgorithm(self._algo_combo.currentText())
         self._current.width    = self._width_spin.value()
@@ -358,7 +893,213 @@ class EfxView(QWidget):
         self._current.speed_hz = self._speed_spin.value()
         self._current.x_freq   = self._xfreq_spin.value()
         self._current.y_freq   = self._yfreq_spin.value()
+        self._current.x_phase  = self._xphase_spin.value()
+        self._current.y_phase  = self._yphase_spin.value()
         self._current.direction = self._dir_combo.currentText()
+        self._current.open_beam = self._open_beam_chk.isChecked()
+        self._current.relative  = self._relative_chk.isChecked()
+        self._current.bit16     = self._bit16_chk.isChecked()
+        self._current.loop      = self._loop_chk.isChecked()
+        self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
+
+    def _reseed_random(self):
+        """E1: würfelt eine neue Random-Bahn (VC/MIDI-Aktion „reseed“)."""
+        if self._current is None:
+            return
+        self._current.do_action("reseed")
+        self._preview.set_efx(self._current)   # Vorschau-Phase frisch starten
+        self._notify_timer.start()
+
+    # ── Geräte-Verhältnis (Phasen zueinander) ─────────────────────────────────
+
+    def _set_relationship(self, key: str, value) -> None:
+        """Setzt ein Verhältnis-Attribut (phase_mode/spread/phase_offset_deg/
+        counter_rotate) am aktiven EFX und hält Editor, Großansicht und Vorschau
+        synchron. Geht über set_param (zentrale Engine-Validierung)."""
+        cur = self._current
+        if cur is None or self._loading:
+            return
+        cur.set_param(key, value)
+        self._sync_relationship_widgets()
+        self._update_relationship_enabled()
+        if self._popout is not None:
+            self._popout.sync_relationship()
+        try:
+            self._preview.update()
+        except Exception:
+            pass
+        self._notify_timer.start()   # Bibliothek/2. Ansicht aktualisieren
+
+    def _sync_relationship_widgets(self) -> None:
+        """Schreibt das Geräte-Verhältnis des aktuellen EFX in die Editor-Widgets
+        (Signale blockiert → kein Rück-Schreiben)."""
+        cur = self._current
+        if cur is None:
+            return
+        widgets = (self._phase_mode_combo, self._spread_spin,
+                   self._offset_spin, self._counter_chk, self._mirror_chk)
+        for w in widgets:
+            w.blockSignals(True)
+        try:
+            idx = self._phase_mode_combo.findData(getattr(cur, "phase_mode", "fan"))
+            self._phase_mode_combo.setCurrentIndex(idx if idx >= 0 else 1)
+            self._spread_spin.setValue(cur.spread)
+            self._offset_spin.setValue(getattr(cur, "phase_offset_deg", 0.0))
+            self._counter_chk.setChecked(bool(getattr(cur, "counter_rotate", False)))
+            self._mirror_chk.setChecked(bool(getattr(cur, "mirror", False)))
+        finally:
+            for w in widgets:
+                w.blockSignals(False)
+
+    def _update_relationship_enabled(self) -> None:
+        """Fächer-Streuung nur bei „Fächer“, Gradversatz nur bei „Versatz“ aktiv —
+        damit klar ist, welcher Regler gerade wirkt."""
+        cur = self._current
+        mode = getattr(cur, "phase_mode", "fan") if cur is not None else "fan"
+        self._spread_spin.setEnabled(mode == "fan")
+        self._offset_spin.setEnabled(mode == "offset")
+
+    # ── Interaktive Geometrie / Großansicht ───────────────────────────────────
+
+    # Geometrie-Spinboxen, die mit der interaktiven Vorschau gespiegelt werden.
+    _GEOM_SPINS = (("_width_spin", "width"), ("_height_spin", "height"),
+                   ("_xoff_spin", "x_offset"), ("_yoff_spin", "y_offset"),
+                   ("_rot_spin", "rotation"))
+
+    def _apply_geometry(self, updates: dict):
+        """Übernimmt eine interaktive Geometrie-Änderung ({attr: wert}) aus der
+        Vorschau ODER dem Popout: Modell setzen, alle Spinboxen + die zweite
+        Vorschau synchronisieren, Bibliothek entprellt informieren."""
+        cur = self._current
+        if cur is None:
+            return
+        for k, v in updates.items():
+            try:
+                setattr(cur, k, float(v))
+            except Exception:
+                pass
+        self._sync_geometry_spins()
+        try:
+            self._preview.update()
+        except Exception:
+            pass
+        if self._popout is not None:
+            self._popout.sync_from_model()
+        self._notify_timer.start()
+
+    def _sync_geometry_spins(self):
+        """Schreibt die Geometrie des aktuellen EFX in die Editor-Spinboxen
+        (Signale blockiert → kein Rück-Schreiben über _on_param_change)."""
+        cur = self._current
+        if cur is None:
+            return
+        for attr, key in self._GEOM_SPINS:
+            spin = getattr(self, attr, None)
+            if spin is None:
+                continue
+            spin.blockSignals(True)
+            spin.setValue(getattr(cur, key))
+            spin.blockSignals(False)
+
+    def _open_popout(self):
+        """Öffnet (oder fokussiert) das Großansicht-Fenster."""
+        if self._current is None:
+            return
+        if self._popout is not None:
+            self._popout.raise_()
+            self._popout.activateWindow()
+            return
+        self._popout = EfxPopoutDialog(self, parent=self)
+        self._popout.finished.connect(lambda *_: self._on_popout_closed())
+        self._popout.show()
+
+    def _on_popout_closed(self):
+        self._popout = None
+
+    # ── Custom Paths ──────────────────────────────────────────────────────────
+
+    def _refresh_path_combo(self):
+        """Pfad-Auswahl aus der Bibliothek neu füllen (Auswahl = Pfad der EFX)."""
+        from src.core.engine.efx_path import get_efx_path_library
+        lib = get_efx_path_library()
+        cur = getattr(self, "_current", None)
+        cur_name = None
+        if cur is not None and getattr(cur, "path_id", None):
+            p = lib.find(cur.path_id)
+            cur_name = p.name if p is not None else None
+        self._path_combo.blockSignals(True)
+        self._path_combo.clear()
+        self._path_combo.addItem("—")
+        for p in lib.all():
+            self._path_combo.addItem(p.name)
+        self._path_combo.setCurrentText(cur_name or "—")
+        self._path_combo.blockSignals(False)
+
+    def _on_path_selected(self, name: str):
+        """Pfad aus der Liste gewählt → der aktiven EFX zuweisen."""
+        cur = getattr(self, "_current", None)
+        if not name or name == "—" or cur is None:
+            return
+        from src.core.engine.efx_path import get_efx_path_library
+        p = get_efx_path_library().find_by_name(name)
+        if p is None:
+            return
+        cur.set_custom_path(p)
+        self._algo_combo.blockSignals(True)
+        self._algo_combo.setCurrentText(EfxAlgorithm.CUSTOM.value)
+        self._algo_combo.blockSignals(False)
+        self._notify_change()
+
+    def _record_new_path(self):
+        """Popout: neuen Custom Path aufzeichnen und speichern."""
+        from src.core.engine.efx_path import get_efx_path_library
+        from src.ui.widgets.efx_path_editor import EfxPathEditorDialog
+        dlg = EfxPathEditorDialog(parent=self)
+        if not dlg.exec():
+            return
+        path = get_efx_path_library().add(dlg.result_path)
+        cur = getattr(self, "_current", None)
+        if cur is not None:
+            cur.set_custom_path(path)
+        self._refresh_path_combo()
+        if cur is not None:
+            self._algo_combo.blockSignals(True)
+            self._algo_combo.setCurrentText(EfxAlgorithm.CUSTOM.value)
+            self._algo_combo.blockSignals(False)
+        self._notify_change()
+
+    def _edit_current_path(self):
+        """Popout: den in der Liste gewählten Pfad bearbeiten."""
+        from src.core.engine.efx_path import get_efx_path_library
+        from src.ui.widgets.efx_path_editor import EfxPathEditorDialog
+        lib = get_efx_path_library()
+        name = self._path_combo.currentText()
+        p = lib.find_by_name(name) if name and name != "—" else None
+        if p is None:
+            self._record_new_path()
+            return
+        dlg = EfxPathEditorDialog(p, parent=self)
+        if not dlg.exec():
+            return
+        updated = lib.add(dlg.result_path)  # gleiche id → ersetzt
+        cur = getattr(self, "_current", None)
+        if cur is not None and getattr(cur, "path_id", None) == updated.id:
+            cur.set_custom_path(updated)  # eingebettete Kopie aktualisieren
+        self._refresh_path_combo()
+        self._notify_change()
+
+    def _delete_current_path(self):
+        """Gewählten Pfad aus der Bibliothek entfernen (EFX behalten ihre
+        eingebettete Kopie und laufen weiter)."""
+        from src.core.engine.efx_path import get_efx_path_library
+        lib = get_efx_path_library()
+        name = self._path_combo.currentText()
+        p = lib.find_by_name(name) if name and name != "—" else None
+        if p is None:
+            return
+        lib.remove(p.id)
+        self._refresh_path_combo()
+        self._notify_change()
 
     def _start_efx(self):
         if self._current:
@@ -374,13 +1115,21 @@ class EfxView(QWidget):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            patched = state.get_patched_fixtures()
-            if patched:
-                fid = patched[0].fid
-                n = len(self._current.fixtures)
-                offset = n / max(len(patched), 1)
-                self._current.fixtures.append(EfxFixture(fid=fid, start_offset=offset))
-                self._fx_list.addItem(f"Fixture #{fid}  offset={offset:.2f}")
+            # M0.5: die aktuelle Auswahl hinzufuegen (vorher hartkodiert patched[0]).
+            try:
+                fids = [int(f) for f in state.get_selected_fids()]
+            except Exception:
+                fids = []
+            if not fids:
+                patched = state.get_patched_fixtures()
+                fids = [patched[0].fid] if patched else []
+            existing = {f.fid for f in self._current.fixtures}
+            for fid in fids:
+                if fid in existing:
+                    continue
+                self._current.fixtures.append(EfxFixture(fid=fid))
+                self._fx_list.addItem(f"Fixture #{fid}")
+                existing.add(fid)
         except Exception:
             pass
 
@@ -391,3 +1140,169 @@ class EfxView(QWidget):
         if 0 <= row < len(self._current.fixtures):
             self._current.fixtures.pop(row)
             self._fx_list.takeItem(row)
+
+
+class EfxPopoutDialog(QDialog):
+    """Großansicht mit allen Freiheiten: Figur/„Gobo" per Drag (Zentrum) und
+    Eck-Griffe (Größe) plus präzise Spinboxen für Breite/Höhe/Zentrum/Rotation
+    UND das komplette Verhältnis der Geräte zueinander (synchron / Fächer /
+    Gradversatz, gegenläufig, spiegeln).
+
+    Nicht-modal; jede Änderung wird über ``EfxView._apply_geometry`` bzw.
+    ``EfxView._set_relationship`` direkt in Modell + Editor + die kleine Vorschau
+    gespiegelt (und umgekehrt)."""
+
+    def __init__(self, view: "EfxView", parent=None):
+        super().__init__(parent)
+        self._view = view
+        self.setWindowTitle("EFX – Großansicht (Figur && Geräte-Verhältnis)")
+        self.setModal(False)
+        self.resize(780, 740)
+        self.setStyleSheet("QDialog { background:#0d1117; }")
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
+
+        self.preview = EfxPreviewWidget(editable=True)
+        self.preview.setMinimumSize(420, 420)
+        self.preview.set_geometry_callback(view._apply_geometry)
+        lay.addWidget(self.preview, stretch=1)
+
+        _grp_style = "QGroupBox { color:#8b949e; font-size:11px; }"
+        controls = QHBoxLayout()
+        controls.setSpacing(10)
+
+        # ── Geometrie ──────────────────────────────────────────────────────
+        box = QGroupBox("Geometrie – präzise einstellen")
+        box.setStyleSheet(_grp_style)
+        form = QFormLayout(box)
+        form.setSpacing(6)
+        self._spins: dict[str, QDoubleSpinBox] = {}
+        for key, label, lo, hi, step in (
+            ("width",    "Breite (Pan-Hub):", 0, 255, 5),
+            ("height",   "Höhe (Tilt-Hub):",  0, 255, 5),
+            ("x_offset", "Zentrum Pan:",      0, 255, 5),
+            ("y_offset", "Zentrum Tilt:",     0, 255, 5),
+            ("rotation", "Rotation (°):",     0, 360, 5),
+        ):
+            s = QDoubleSpinBox()
+            s.setRange(lo, hi)
+            s.setSingleStep(step)
+            s.setDecimals(0)
+            s.valueChanged.connect(
+                lambda v, k=key: self._view._apply_geometry({k: int(v)}))
+            form.addRow(label, s)
+            self._spins[key] = s
+        controls.addWidget(box, stretch=1)
+
+        # ── Verhältnis der Geräte zueinander ───────────────────────────────
+        rel = QGroupBox("Verhältnis der Geräte zueinander")
+        rel.setStyleSheet(_grp_style)
+        rform = QFormLayout(rel)
+        rform.setSpacing(6)
+        self._mode_combo = QComboBox()
+        for k, label in PHASE_MODE_LABELS:
+            self._mode_combo.addItem(label, k)
+        self._mode_combo.setToolTip(
+            "Wie laufen mehrere Köpfe zueinander?\n"
+            "• Synchron: alle gleichzeitig dieselbe Figur.\n"
+            "• Gleichmäßig verteilt: gefächert (2 Köpfe = 180°).\n"
+            "• Fester Versatz: jeder Kopf um die eingestellten Grad später.")
+        self._mode_combo.currentIndexChanged.connect(
+            lambda *_: self._view._set_relationship(
+                "phase_mode", self._mode_combo.currentData()))
+        rform.addRow("Verhältnis:", self._mode_combo)
+
+        self._rel_spread = QDoubleSpinBox()
+        self._rel_spread.setRange(0, 1.0)
+        self._rel_spread.setSingleStep(0.05)
+        self._rel_spread.setDecimals(2)
+        self._rel_spread.setToolTip("Nur bei „Gleichmäßig verteilt“: Fächer-Anteil "
+                                    "(0 = synchron, 1 = voller Fächer).")
+        self._rel_spread.valueChanged.connect(
+            lambda v: self._view._set_relationship("spread", v))
+        rform.addRow("Fächer-Streuung:", self._rel_spread)
+
+        self._rel_offset = QDoubleSpinBox()
+        self._rel_offset.setRange(0, 360)
+        self._rel_offset.setSingleStep(5)
+        self._rel_offset.setDecimals(0)
+        self._rel_offset.setSuffix(" °")
+        self._rel_offset.setToolTip("Nur bei „Fester Versatz“: jeder weitere Kopf "
+                                    "um so viel Grad versetzt (z. B. 15°, 180°).")
+        self._rel_offset.valueChanged.connect(
+            lambda v: self._view._set_relationship("phase_offset_deg", v))
+        rform.addRow("Versatz pro Gerät:", self._rel_offset)
+
+        self._rel_counter = QCheckBox("jedes 2. Gerät entgegengesetzt")
+        self._rel_counter.setToolTip("Gegenläufig: jeder zweite Kopf durchläuft die "
+                                     "Figur rückwärts (z. B. Kreis cw/ccw).")
+        self._rel_counter.toggled.connect(
+            lambda v: self._view._set_relationship("counter_rotate", v))
+        rform.addRow("Gegenläufig:", self._rel_counter)
+
+        self._rel_mirror = QCheckBox("jedes 2. Gerät spiegeln (Pan)")
+        self._rel_mirror.setToolTip("Spiegelt die Pan-Achse jedes zweiten Kopfes "
+                                    "(spiegelbildliche statt versetzter Bewegung).")
+        self._rel_mirror.toggled.connect(
+            lambda v: self._view._set_relationship("mirror", v))
+        rform.addRow("Spiegeln:", self._rel_mirror)
+        controls.addWidget(rel, stretch=1)
+
+        lay.addLayout(controls)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        close = QPushButton("Schließen")
+        close.setFixedHeight(26)
+        close.setStyleSheet("""
+            QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
+                          border-radius:3px; padding:2px 14px; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        close.clicked.connect(self.close)
+        btn_row.addWidget(close)
+        lay.addLayout(btn_row)
+
+        self.bind(view._current)
+
+    def bind(self, efx):
+        """Bindet den Dialog an eine EFX-Instanz (oder None bei Abwahl)."""
+        self.preview.set_efx(efx)
+        self.sync_from_model()
+        self.sync_relationship()
+
+    def sync_from_model(self):
+        """Geometrie-Spinboxen aus dem aktuellen Modell auffrischen (blockiert)."""
+        cur = self._view._current
+        for key, spin in self._spins.items():
+            spin.blockSignals(True)
+            spin.setValue(getattr(cur, key) if cur is not None else 0)
+            spin.blockSignals(False)
+        try:
+            self.preview.update()
+        except Exception:
+            pass
+
+    def sync_relationship(self):
+        """Verhältnis-Widgets aus dem aktuellen Modell auffrischen (blockiert)."""
+        cur = self._view._current
+        widgets = (self._mode_combo, self._rel_spread, self._rel_offset,
+                   self._rel_counter, self._rel_mirror)
+        for w in widgets:
+            w.blockSignals(True)
+        try:
+            mode = getattr(cur, "phase_mode", "fan") if cur is not None else "fan"
+            idx = self._mode_combo.findData(mode)
+            self._mode_combo.setCurrentIndex(idx if idx >= 0 else 1)
+            self._rel_spread.setValue(cur.spread if cur is not None else 1.0)
+            self._rel_offset.setValue(getattr(cur, "phase_offset_deg", 0.0)
+                                      if cur is not None else 0.0)
+            self._rel_counter.setChecked(bool(getattr(cur, "counter_rotate", False)))
+            self._rel_mirror.setChecked(bool(getattr(cur, "mirror", False)))
+        finally:
+            for w in widgets:
+                w.blockSignals(False)
+        self._rel_spread.setEnabled(mode == "fan")
+        self._rel_offset.setEnabled(mode == "offset")

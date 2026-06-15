@@ -23,6 +23,8 @@ class Palette:
     # Per-fixture overrides (fid → {attr: val}) — empty means use generic values
     fixture_values: dict[int, dict[str, int]] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
+    # FLD-01c: "/"-getrennter Ordnerpfad (z. B. "Warm/Sommer"); "" = Wurzel.
+    folder: str = ""
 
     ATTR_GROUPS = {
         PaletteType.COLOR:    {"color_r", "color_g", "color_b", "color_w",
@@ -89,6 +91,7 @@ class Palette:
             "values": self.values,
             "fixture_values": {str(k): v for k, v in self.fixture_values.items()},
             "tags": self.tags,
+            "folder": self.folder,
         }
 
     @classmethod
@@ -98,6 +101,7 @@ class Palette:
             type=PaletteType(d.get("type", "Color")),
             values=d.get("values", {}),
             tags=d.get("tags", []),
+            folder=str(d.get("folder", "") or ""),
         )
         p.fixture_values = {int(k): v for k, v in d.get("fixture_values", {}).items()}
         return p

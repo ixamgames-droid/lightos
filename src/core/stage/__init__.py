@@ -8,8 +8,9 @@ from .stage_definition import (
     save_stage,
     delete_stage,
     get_default_simple,
-    get_default_theatre,
-    get_default_rock,
+    get_default_empty,
+    get_default,
+    DEFAULT_PRESETS,
 )
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "save_stage",
     "delete_stage",
     "get_default_simple",
-    "get_default_theatre",
-    "get_default_rock",
+    "get_default_empty",
+    "get_default",
+    "DEFAULT_PRESETS",
 ]

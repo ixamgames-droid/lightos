@@ -26,9 +26,11 @@ FIXTURE_TYPES = [
 
 CHANNEL_ATTRS = [
     "intensity", "color_r", "color_g", "color_b", "color_w", "color_a",
-    "color_uv", "color_wheel", "pan", "pan_fine", "tilt", "tilt_fine",
-    "speed", "shutter", "strobe", "gobo_wheel", "gobo_rotation",
-    "prism", "prism_rotation", "frost", "zoom", "focus", "macro", "raw",
+    "color_uv", "cmy_c", "cmy_m", "cmy_y", "color_wheel",
+    "pan", "pan_fine", "tilt", "tilt_fine",
+    "speed", "shutter", "strobe", "gobo_wheel", "gobo_rotation", "gobo_fx",
+    "prism", "prism_rotation", "frost", "iris", "zoom", "focus", "macro",
+    "reset", "raw",
 ]
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]

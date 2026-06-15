@@ -13,9 +13,10 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
     QListWidget, QListWidgetItem, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
-    QStackedWidget, QButtonGroup, QInputDialog
+    QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
+    QWhatsThis
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import get_state, AppState, get_channels_for_patched
 from src.core.database.models import PatchedFixture, FixtureChannel
@@ -78,6 +79,28 @@ def _save_prefs(updates: dict) -> None:
     except Exception as e:
         print(f"[programmer_view] save prefs error: {e}")
 
+
+# U-3 (P-08): Hilfetexte fuer den Hilfe-Modus (Qt "What's This?"). Per setWhatsThis
+# an die Bedienelemente gehaengt; der Hilfe-Modus zeigt sie statt die Aktion auszuloesen.
+_PROGRAMMER_HELP = {
+    "Highlight": "Setzt die ausgewählten Fixtures vorübergehend auf volle "
+                 "Helligkeit, um sie auf der Bühne zu lokalisieren.",
+    "Lowlight": "Dimmt alle NICHT ausgewählten Fixtures ab, damit die aktuelle "
+                "Auswahl hervorsticht.",
+    "Clear": "Leert den Programmer (alle hier manuell gesetzten Werte). "
+             "Gespeicherte Funktionen, Cues und Snapshots bleiben unberührt.",
+    "Copy": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
+    "Paste": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
+    "Undo": "Macht die letzte Programmer-Änderung rückgängig.",
+    "Redo": "Stellt eine rückgängig gemachte Programmer-Änderung wieder her.",
+    "Color Tool...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
+                     "für die ausgewählten Fixtures.",
+    "Position Tool...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "
+                        "(Position live setzen, inkl. Fine-Kanäle).",
+    "Fan...": "Verteilt einen Wert fächerförmig über die ausgewählten Fixtures "
+              "(z. B. Pan-Fächer oder Farbverlauf über die Gruppe).",
+}
+
 # Bestehende Attribut-Konstanten (Kompatibilitaet)
 COLOR_ATTRS = {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv"}
 PAN_TILT_ATTRS = {"pan", "tilt", "pan_fine", "tilt_fine"}
@@ -85,13 +108,16 @@ INTENSITY_ATTRS = {"intensity", "dimmer", "master"}
 
 # Attribut-Gruppen (Name -> Set of attribute names oder Substring-Match)
 ATTR_GROUPS = {
-    "Intensity": {"intensity", "dimmer", "master"},
+    # Shutter/Strobe liegt bewusst im Intensity-Tab neben dem Dimmer
+    # (Moving-Head-Initiative 2026-06-10) — NICHT in INTENSITY_ATTRS aufnehmen,
+    # sonst wuerde der Grand Master den Strobe mit skalieren.
+    "Intensity": {"intensity", "dimmer", "master", "shutter", "strobe"},
     "Color":     {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
                   "cyan", "magenta", "yellow", "color_wheel", "colour_wheel", "color"},
     "Position":  {"pan", "tilt", "pan_fine", "tilt_fine"},
-    "Beam":      {"shutter", "strobe", "zoom", "focus", "frost", "iris", "prism"},
-    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo1", "gobo2",
-                  "gobo_rot"},
+    "Beam":      {"zoom", "focus", "frost", "iris", "prism"},
+    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo_fx", "gobo1",
+                  "gobo2", "gobo_rot"},
     "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "animation"},
 }
 
@@ -121,12 +147,22 @@ class ProgrammerView(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._sync_refresh())
-            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._sync_refresh())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._sync_refresh())
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self, lambda *_: self._sync_refresh())
             # Abschnitt 1: neue/geaenderte Funktionen + Gruppen erscheinen sofort,
             # ohne manuelles Neuladen (kein Refresh-Button als Hauptloesung).
-            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._refresh_effects_list())
-            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._refresh_group_list())
+            sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, self, lambda *_: self._refresh_effects_list())
+            sync.subscribe_widget(SyncEvent.GROUP_CHANGED, self, lambda *_: self._refresh_group_list())
+            # P7: Slider folgen externen Programmer-Aenderungen live (Quick-
+            # Colors, Paletten, Snaps, VC/MIDI). Kurzer Coalescing-Timer, damit
+            # ein Farbklick (mehrere set_programmer_value-Emits) nur EINEN
+            # Refresh ausloest.
+            self._slider_sync_timer = QTimer(self)
+            self._slider_sync_timer.setSingleShot(True)
+            self._slider_sync_timer.setInterval(30)
+            self._slider_sync_timer.timeout.connect(self._refresh_sliders_from_state)
+            sync.subscribe_widget(SyncEvent.PROGRAMMER_CHANGED, self,
+                                  lambda *_: self._slider_sync_timer.start())
         except Exception as e:
             print(f"[programmer_view] sync subscribe error: {e}")
 
@@ -143,6 +179,22 @@ class ProgrammerView(QWidget):
             self._refresh_effects_list()
         except Exception as e:
             print(f"[programmer_view] sync_refresh error: {e}")
+
+    def _refresh_sliders_from_state(self):
+        """P7: Alle sichtbaren AttributeSlider aus dem Programmer-State neu
+        laden. _load_current_value() blockt Signale (keine Echo-Loops);
+        Slider, die der Nutzer gerade zieht, werden nicht angefasst."""
+        try:
+            sliders = self.findChildren(AttributeSlider)
+        except RuntimeError:
+            return  # View bereits zerstoert
+        for s in sliders:
+            try:
+                if s._slider.isSliderDown():
+                    continue
+                s._load_current_value()
+            except Exception:
+                continue
 
     # ── UI Build ─────────────────────────────────────────────────────────────
 
@@ -173,6 +225,7 @@ class ProgrammerView(QWidget):
                 f"QPushButton {{ color: {color}; font-weight: bold; padding: 0 10px; }}"
             )
             b.clicked.connect(slot)
+            b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3: Hilfe-Modus
             tb.addWidget(b)
         tb.addSpacing(20)
 
@@ -185,13 +238,36 @@ class ProgrammerView(QWidget):
             b = QPushButton(label)
             b.setFixedHeight(26)
             b.clicked.connect(slot)
+            b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3
             tb.addWidget(b)
 
         tb.addStretch(1)
 
+        # U-3 (P-08): Hilfe-Modus. Aktiviert Qts "What's This?" — der naechste Klick
+        # auf ein Bedienelement zeigt dessen Hilfetext (setWhatsThis) als Sprechblase,
+        # statt die Aktion auszuloesen. Esc beendet den Modus.
+        self._btn_help = QPushButton("?")
+        self._btn_help.setFixedHeight(26)
+        self._btn_help.setFixedWidth(30)
+        self._btn_help.setToolTip(
+            "Hilfe-Modus: danach auf ein Bedienelement klicken, um seine "
+            "Erklärung zu sehen (Esc beendet)."
+        )
+        self._btn_help.setWhatsThis(
+            "Hilfe-Modus. Klicke nach dem Aktivieren ein beliebiges Bedienelement "
+            "an, um zu erfahren, was es tut."
+        )
+        self._btn_help.clicked.connect(lambda: QWhatsThis.enterWhatsThisMode())
+        tb.addWidget(self._btn_help)
+
         self._btn_layout = QPushButton()
         self._btn_layout.setFixedHeight(26)
         self._btn_layout.setToolTip("Programmer-Layout umschalten (Klassisch / Zonen)")
+        self._btn_layout.setWhatsThis(
+            "Schaltet zwischen dem klassischen Programmer-Layout und dem "
+            "5-Zonen-Layout um (links wählen · Mitte programmieren · rechts "
+            "Bibliothek · unten Vorschau)."
+        )
         self._btn_layout.clicked.connect(self._toggle_layout)
         self._update_layout_button()
         tb.addWidget(self._btn_layout)
@@ -297,6 +373,30 @@ class ProgrammerView(QWidget):
         self._color_preview = ColorPreview([], self._state)
         al.addWidget(self._color_preview)
 
+        # Gruppen-Modus-Leiste (M5.2): Linked / Einzeln / Relativ + Fixture-Wahl.
+        self._group_mode = _load_prefs().get("programmer_group_mode", "linked")
+        self._active_fixture_idx = 0
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Gruppe:"))
+        self._mode_btn_group = QButtonGroup(self)
+        for label, key, tip in (
+            ("Linked", "linked", "Ein Regler wirkt auf alle Geräte gleich"),
+            ("Einzeln", "individual", "Nur das gewählte Fixture ändern"),
+            ("Relativ", "relative", "Relative Änderung — Unterschiede bleiben erhalten"),
+        ):
+            rb = QRadioButton(label)
+            rb.setToolTip(tip)
+            rb.setChecked(self._group_mode == key)
+            rb.toggled.connect(lambda chk, k=key: chk and self._set_group_mode(k))
+            self._mode_btn_group.addButton(rb)
+            mode_row.addWidget(rb)
+        self._fixture_combo = QComboBox()
+        self._fixture_combo.setToolTip("Aktives Fixture im Einzelmodus")
+        self._fixture_combo.setEnabled(self._group_mode == "individual")
+        self._fixture_combo.currentIndexChanged.connect(self._on_active_fixture_changed)
+        mode_row.addWidget(self._fixture_combo, stretch=1)
+        al.addLayout(mode_row)
+
         self._main_tabs = QTabWidget()
         self._main_tabs.setTabPosition(QTabWidget.TabPosition.North)
 
@@ -304,12 +404,16 @@ class ProgrammerView(QWidget):
         # abhaengig von der Auswahl neu befuellt. "Weitere" = Beam+Gobo+Effect+Other.
         self._attr_group_tabs: dict[str, QWidget] = {}
         for label, key in (("Intensity", "Intensity"), ("Color", "Color"),
-                           ("Position", "Position"), ("Weitere", "Weitere")):
+                           ("Position", "Position"), ("Gobo", "Gobo"),
+                           ("Weitere", "Weitere")):
             cont = QWidget()
             cl = QVBoxLayout(cont)
             cl.setContentsMargins(0, 0, 0, 0)
             self._main_tabs.addTab(cont, label)
             self._attr_group_tabs[key] = cont
+        # Gobo-Tab nur sichtbar, wenn das Geraet Gobos hat (M2.1).
+        self._gobo_tab_index = self._main_tabs.indexOf(self._attr_group_tabs["Gobo"])
+        self._main_tabs.setTabVisible(self._gobo_tab_index, False)
 
         # Funktions-Tabs (einmalig gebaut).
         self._main_tabs.addTab(self._make_effects_page(), "Helper")
@@ -440,7 +544,9 @@ class ProgrammerView(QWidget):
     def _make_efx_page(self) -> QWidget:
         try:
             from src.ui.views.efx_view import EfxView
-            self._embedded_efx = EfxView()
+            # M0.1: eingebettet folgt EFX automatisch der Programmer-Auswahl
+            # (analog zur RGB-Matrix nebenan).
+            self._embedded_efx = EfxView(follow_selection=True)
             return self._embedded_efx
         except Exception as e:
             print(f"[programmer_view] efx embed error: {e}")
@@ -704,12 +810,36 @@ class ProgrammerView(QWidget):
             from src.core.database.models import FixtureGroup
             from sqlalchemy import select
             with s:
+                # P5/Ordner-Fix: nach Ordner + Name sortieren und Ordner als
+                # (nicht waehlbare) Kopfzeilen anzeigen — vorher wurden die im
+                # Patch-Bereich angelegten Ordner hier komplett ignoriert.
                 groups = list(
-                    s.execute(select(FixtureGroup).order_by(FixtureGroup.name)).scalars()
+                    s.execute(select(FixtureGroup)
+                              .order_by(FixtureGroup.folder, FixtureGroup.name)
+                              ).scalars()
                 )
+                # Ordner-Kopfzeilen sind antippbar und klappen ihre Gruppen
+                # ein/aus; der Zustand überlebt Neustarts (ui_prefs.json).
+                collapsed = set(_load_prefs().get(
+                    "programmer_collapsed_group_folders", []) or [])
+                current_folder: str | None = None
                 for g in groups:
+                    folder = (getattr(g, "folder", "") or "").strip()
+                    if folder != (current_folder or "") and folder:
+                        arrow = "▸" if folder in collapsed else "▾"
+                        header = QListWidgetItem(f"{arrow} 📁 {folder}")
+                        header.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                        header.setData(Qt.ItemDataRole.UserRole + 2, folder)
+                        f = header.font()
+                        f.setBold(True)
+                        header.setFont(f)
+                        self._group_list.addItem(header)
+                    current_folder = folder
+                    if folder and folder in collapsed:
+                        continue  # Inhalt eingeklappter Ordner verbergen
                     fids = self._group_fids(g)
-                    it = QListWidgetItem(f"{g.name}  ({len(fids)})")
+                    prefix = "    " if folder else ""
+                    it = QListWidgetItem(f"{prefix}{g.name}  ({len(fids)})")
                     it.setData(Qt.ItemDataRole.UserRole, fids)
                     # Gruppen-ID fuer den Gruppen-Pfad in der Matrix speichern
                     it.setData(Qt.ItemDataRole.UserRole + 1, g.id)
@@ -718,6 +848,19 @@ class ProgrammerView(QWidget):
             print(f"[programmer_view] group list error: {e}")
 
     def _on_group_clicked(self, item: QListWidgetItem):
+        # Ordner-Kopfzeile angetippt → Ordner auf-/zuklappen (Feature:
+        # klappbare Programmer-Ordner), Zustand in ui_prefs persistieren.
+        folder = item.data(Qt.ItemDataRole.UserRole + 2)
+        if folder:
+            collapsed = set(_load_prefs().get(
+                "programmer_collapsed_group_folders", []) or [])
+            if folder in collapsed:
+                collapsed.discard(folder)
+            else:
+                collapsed.add(folder)
+            _save_prefs({"programmer_collapsed_group_folders": sorted(collapsed)})
+            self._refresh_group_list()
+            return
         # Gruppen-ID VOR dem Publish setzen (Matrix liest sie beim SELECTION_CHANGED)
         gid = item.data(Qt.ItemDataRole.UserRole + 1)
         try:
@@ -784,8 +927,11 @@ class ProgrammerView(QWidget):
             if not selected:
                 self._lbl_selection.setText("Kein Geraet ausgewaehlt")
                 self._color_preview.set_fixtures([])
+                self._template_channels = []
                 for cont in self._attr_group_tabs.values():
                     _clear(cont).addWidget(QLabel("Kein Gerät ausgewählt"))
+                if getattr(self, "_gobo_tab_index", -1) >= 0:
+                    self._main_tabs.setTabVisible(self._gobo_tab_index, False)
                 return
 
             self._lbl_selection.setText(
@@ -794,13 +940,16 @@ class ProgrammerView(QWidget):
                 ("..." if len(selected) > 3 else "")
             )
             self._color_preview.set_fixtures(selected)
+            self._update_fixture_combo(selected)   # M5: Einzelmodus-Auswahl
 
             # Kanaele des Templates nach Gruppe sortieren. "Weitere" buendelt
             # Beam+Gobo+Effect+Other (eine Stelle, keine Doppelung — Abschnitt 7).
             template = selected[0]
             channels = get_channels_for_patched(template)
+            self._template_channels = list(channels)
             groups: dict[str, list[FixtureChannel]] = {
-                "Intensity": [], "Color": [], "Position": [], "Weitere": []
+                "Intensity": [], "Color": [], "Position": [], "Gobo": [],
+                "Weitere": []
             }
             seen_attrs: set[str] = set()
             for ch in channels:
@@ -808,14 +957,22 @@ class ProgrammerView(QWidget):
                     continue
                 seen_attrs.add(ch.attribute)
                 grp = _classify_attribute(ch.attribute)
-                if grp in ("Intensity", "Color", "Position"):
+                if grp in ("Intensity", "Color", "Position", "Gobo"):
                     groups[grp].append(ch)
-                else:  # Beam, Gobo, Effect, Other
+                else:  # Beam, Effect, Other
                     groups["Weitere"].append(ch)
+            # Dimmer vor Shutter/Strobe (Strobe liegt "neben" dem Dimmer).
+            groups["Intensity"].sort(
+                key=lambda c: 0 if c.attribute in INTENSITY_ATTRS else 1)
 
             for key, cont in self._attr_group_tabs.items():
                 inner = self._build_group_tab(key, groups.get(key, []), selected)
                 _clear(cont).addWidget(inner)
+
+            # M2.1: Gobo-Tab nur bei vorhandenen Gobo-Kanaelen einblenden.
+            if getattr(self, "_gobo_tab_index", -1) >= 0:
+                self._main_tabs.setTabVisible(
+                    self._gobo_tab_index, bool(groups.get("Gobo")))
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
 
@@ -834,17 +991,34 @@ class ProgrammerView(QWidget):
         sub_tb.addWidget(b_fan)
 
         if group_name == "Color":
-            b_ct = QPushButton("Color Picker einbetten")
+            b_ct = QPushButton("Color Picker (Fenster)")
             b_ct.setCheckable(True)
+            b_ct.setToolTip("Öffnet den Color Picker als eigenes, frei platzierbares "
+                            "Fenster (statt unten eingebettet/abgeschnitten).")
             b_ct.toggled.connect(lambda chk: self._toggle_embedded_color(tab, chk))
+            tab._cp_button = b_ct
             sub_tb.addWidget(b_ct)
-        elif group_name == "Position":
-            b_pt = QPushButton("Position Tool einbetten")
-            b_pt.setCheckable(True)
-            b_pt.toggled.connect(lambda chk: self._toggle_embedded_position(tab, chk))
-            sub_tb.addWidget(b_pt)
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
+
+        # Capability-Schnellwahl (M2.2/M2.4): Kacheln aus den Fixture-Daten.
+        self._add_quick_select(layout, group_name, fixtures)
+
+        # P8: Position-Tool fest als Aufklapp-Bereich im Layoutfluss — ersetzt
+        # den frueheren "einbetten"-Toggle (dynamisches add/delete verschob das
+        # Layout und konnte ueberlappen). Zustand merkt sich ui_prefs.
+        if group_name == "Position":
+            try:
+                from src.ui.widgets.position_tool import PositionTool
+                from src.ui.widgets.collapsible_section import CollapsibleSection
+                pt = PositionTool()
+                pt.set_live(True)   # M3.1: eingebettet wirkt das Pad sofort
+                section = CollapsibleSection(
+                    "Position-Tool (XY-Pad)", pt, collapsed=True,
+                    prefs_key="programmer_position_tool")
+                layout.addWidget(section)
+            except Exception as e:
+                print(f"[programmer_view] position tool embed error: {e}")
 
         # Slider-Liste
         scroll = QScrollArea()
@@ -856,42 +1030,176 @@ class ProgrammerView(QWidget):
             ilay.addWidget(QLabel(f"Keine {group_name}-Kanaele gefunden."))
         else:
             for ch in channels:
-                ilay.addWidget(AttributeSlider(ch, fixtures, self._state))
+                # Reset/Rekalibrierung bekommt bewusst KEINEN Dauer-Slider —
+                # nur den sicheren Button (ResetActionButton, _add_quick_select).
+                if ch.attribute == "reset":
+                    continue
+                ilay.addWidget(AttributeSlider(ch, fixtures, self._state, owner=self))
         scroll.setWidget(inner)
         layout.addWidget(scroll, stretch=1)
 
         return tab
 
-    def _toggle_embedded_color(self, tab: QWidget, on: bool):
-        # Embed color picker in tab below the slider list
-        layout = tab.layout()
-        if on and not hasattr(tab, "_embedded_cp"):
-            try:
-                from src.ui.widgets.color_picker import ColorPicker
-                cp = ColorPicker()
-                layout.addWidget(cp)
-                tab._embedded_cp = cp
-            except Exception as e:
-                print(f"[programmer_view] color picker embed error: {e}")
-        elif not on and hasattr(tab, "_embedded_cp"):
-            tab._embedded_cp.setParent(None)
-            tab._embedded_cp.deleteLater()
-            del tab._embedded_cp
+    # ── Gruppen-Modus (M5) ────────────────────────────────────────────────────
 
-    def _toggle_embedded_position(self, tab: QWidget, on: bool):
-        layout = tab.layout()
-        if on and not hasattr(tab, "_embedded_pt"):
+    def group_mode(self) -> str:
+        return getattr(self, "_group_mode", "linked")
+
+    def active_fixture_index(self) -> int:
+        return getattr(self, "_active_fixture_idx", 0)
+
+    def _set_group_mode(self, key: str):
+        self._group_mode = key
+        if hasattr(self, "_fixture_combo"):
+            self._fixture_combo.setEnabled(key == "individual")
+        try:
+            prefs = _load_prefs()
+            prefs["programmer_group_mode"] = key
+            _save_prefs(prefs)
+        except Exception:
+            pass
+        self._rebuild_attr_editor()
+
+    def _on_active_fixture_changed(self, idx: int):
+        self._active_fixture_idx = max(0, idx)
+        if self.group_mode() == "individual":
+            self._rebuild_attr_editor()
+
+    def _update_fixture_combo(self, selected):
+        if not hasattr(self, "_fixture_combo"):
+            return
+        combo = self._fixture_combo
+        combo.blockSignals(True)
+        combo.clear()
+        for f in selected:
+            combo.addItem(f"[{f.fid}] {f.label}")
+        if self._active_fixture_idx >= len(selected):
+            self._active_fixture_idx = 0
+        combo.setCurrentIndex(self._active_fixture_idx if selected else -1)
+        combo.setEnabled(self.group_mode() == "individual")
+        combo.blockSignals(False)
+
+    def _is_touch(self) -> bool:
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            return bool(is_touch_mode())
+        except Exception:
+            return False
+
+    def _template_channel_in(self, attrs: tuple):
+        """Erstes Template-Kanalobjekt mit einem dieser Attribute (oder None)."""
+        for ch in getattr(self, "_template_channels", []):
+            if ch.attribute in attrs:
+                return ch
+        return None
+
+    def _add_quick_select(self, layout, group_name: str, fixtures):
+        """Fuegt die capability-basierten Schnellwahl-Kacheln zum Tab hinzu."""
+        touch = self._is_touch()
+        try:
+            if group_name == "Intensity":
+                sh = self._template_channel_in(("shutter", "strobe"))
+                if sh is not None:
+                    from src.ui.widgets.preset_tile import ShutterQuickBar
+                    layout.addWidget(QLabel("Shutter / Strobe:"))
+                    layout.addWidget(ShutterQuickBar(sh, fixtures, self._state, touch=touch))
+            elif group_name == "Color":
+                attrs_present = {c.attribute for c in getattr(self, "_template_channels", [])}
+                cw = self._template_channel_in(("color_wheel",))
+                if (attrs_present & {"color_r", "color_g", "color_b", "color_w"}) or cw is not None:
+                    from src.ui.widgets.preset_tile import ColorQuickBar
+                    layout.addWidget(QLabel("Schnellwahl:"))
+                    layout.addWidget(ColorQuickBar(fixtures, self._state, attrs_present,
+                                                   cw, touch=touch))
+            elif group_name == "Gobo":
+                gw = self._template_channel_in(("gobo_wheel",))
+                if gw is not None:
+                    from src.ui.widgets.preset_tile import GoboQuickBar
+                    layout.addWidget(QLabel("Gobo-Auswahl:"))
+                    layout.addWidget(GoboQuickBar(gw, fixtures, self._state, touch=touch))
+            elif group_name == "Position":
+                if self._template_channel_in(("pan", "tilt")) is not None:
+                    bar = self._build_orientation_bar(fixtures)
+                    if bar is not None:
+                        layout.addWidget(bar)
+                sp = self._template_channel_in(("speed",))
+                if sp is not None:
+                    layout.addWidget(QLabel("Pan/Tilt-Speed:"))
+                    layout.addWidget(AttributeSlider(sp, fixtures, self._state, owner=self))
+            elif group_name == "Weitere":
+                rs = self._template_channel_in(("reset",))
+                if rs is not None:
+                    from src.ui.widgets.preset_tile import ResetActionButton
+                    layout.addWidget(QLabel("Reset / Rekalibrierung:"))
+                    layout.addWidget(ResetActionButton(rs, fixtures, self._state))
+        except Exception as e:
+            print(f"[programmer_view] quick-select error: {e}")
+
+    def _build_orientation_bar(self, fixtures):
+        """Invert/Swap-Toggles fuer Pan/Tilt (M3.3). Schreibt die Flags pro
+        Fixture via update_fixture (persistiert + im Renderer wirksam)."""
+        if not fixtures:
+            return None
+        from PySide6.QtWidgets import QCheckBox, QGroupBox
+        box = QGroupBox("Ausrichtung (pro Fixture)")
+        row = QHBoxLayout(box)
+        f0 = fixtures[0]
+        for label, attr in (("Pan invert", "invert_pan"),
+                            ("Tilt invert", "invert_tilt"),
+                            ("Pan/Tilt tauschen", "swap_pan_tilt")):
+            cb = QCheckBox(label)
+            cb.setChecked(bool(getattr(f0, attr, False)))
+            cb.toggled.connect(
+                lambda chk, a=attr, fx=fixtures: self._set_orientation(a, chk, fx))
+            row.addWidget(cb)
+        row.addStretch(1)
+        return box
+
+    def _set_orientation(self, attr: str, value: bool, fixtures):
+        for f in fixtures:
             try:
-                from src.ui.widgets.position_tool import PositionTool
-                pt = PositionTool()
-                layout.addWidget(pt)
-                tab._embedded_pt = pt
+                self._state.update_fixture(f.fid, undoable=True, **{attr: bool(value)})
             except Exception as e:
-                print(f"[programmer_view] position tool embed error: {e}")
-        elif not on and hasattr(tab, "_embedded_pt"):
-            tab._embedded_pt.setParent(None)
-            tab._embedded_pt.deleteLater()
-            del tab._embedded_pt
+                print(f"[programmer_view] orientation set error: {e}")
+
+    def _toggle_embedded_color(self, tab: QWidget, on: bool):
+        """Color Picker als schwebendes Popup-Fenster zeigen/schließen.
+
+        Früher wurde der Picker unten in den Color-Tab eingebettet — dort war er
+        oft abgeschnitten/nicht ganz sichtbar. Jetzt ein eigenes, NICHT-modales
+        Fenster (Programmer bleibt bedienbar, Fenster frei verschiebbar)."""
+        win = getattr(tab, "_cp_window", None)
+        if on:
+            if win is None:
+                try:
+                    from src.ui.widgets.color_picker import ColorPicker
+                    win = _ToolDialog("Color Picker", self)
+                    win.setModal(False)
+                    win.set_content(ColorPicker())
+                    win.finished.connect(lambda *_: self._on_color_window_closed(tab))
+                    tab._cp_window = win
+                except Exception as e:
+                    print(f"[programmer_view] color picker window error: {e}")
+                    return
+            win.show()
+            win.raise_()
+            win.activateWindow()
+        elif win is not None:
+            win.close()
+
+    def _on_color_window_closed(self, tab: QWidget):
+        """Color-Picker-Fenster wurde geschlossen (X/„Schliessen") → Toggle lösen."""
+        btn = getattr(tab, "_cp_button", None)
+        if btn is not None:
+            btn.blockSignals(True)
+            btn.setChecked(False)
+            btn.blockSignals(False)
+        win = getattr(tab, "_cp_window", None)
+        if win is not None:
+            win.deleteLater()
+            tab._cp_window = None
+
+    
 
     # ── Toolbar Actions ──────────────────────────────────────────────────────
 
@@ -1062,11 +1370,13 @@ class AttributeSlider(QWidget):
     }
 
     def __init__(self, channel: FixtureChannel, fixtures: list[PatchedFixture],
-                 state: AppState, parent=None):
+                 state: AppState, owner=None, parent=None):
         super().__init__(parent)
         self._channel = channel
         self._fixtures = fixtures
         self._state = state
+        self._owner = owner   # ProgrammerView (Gruppen-Modus); None = Linked
+        self._last_value = channel.default_value
         self._setup_ui()
         self._load_current_value()
 
@@ -1082,7 +1392,8 @@ class AttributeSlider(QWidget):
         layout.addWidget(indicator)
 
         lbl = QLabel(self._channel.name)
-        lbl.setFixedWidth(120)
+        lbl.setMinimumWidth(120)
+        lbl.setToolTip(self._channel.name)
         layout.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
@@ -1108,30 +1419,81 @@ class AttributeSlider(QWidget):
         btn_reset.clicked.connect(self._reset)
         layout.addWidget(btn_reset)
 
+        # M2.5: groessere Touch-Targets im Touch-Modus.
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            if is_touch_mode():
+                self.setMinimumHeight(44)
+                self._slider.setMinimumHeight(30)
+                btn_reset.setFixedSize(36, 36)
+        except Exception:
+            pass
+
+    def _values_per_fixture(self) -> list[int]:
+        out = []
+        for f in self._fixtures:
+            v = self._state.get_programmer_value(f.fid, self._channel.attribute)
+            out.append(self._channel.default_value if v is None else v)
+        return out
+
     def _load_current_value(self):
         if not self._fixtures:
             return
-        val = self._state.get_programmer_value(
-            self._fixtures[0].fid, self._channel.attribute
-        )
-        if val is None:
-            val = self._channel.default_value
+        vals = self._values_per_fixture()
+        # M5.1: im Einzelmodus den Wert des aktiven Fixtures anzeigen.
+        idx = self._active_index()
+        template = vals[idx] if 0 <= idx < len(vals) else vals[0]
         self._slider.blockSignals(True)
-        self._slider.setValue(val)
+        self._slider.setValue(template)
         self._slider.blockSignals(False)
-        self._update_labels(val)
+        self._last_value = template
+        divergent = len(set(vals)) > 1 and self._mode() != "individual"
+        self._update_labels(template, divergent)
+
+    def _mode(self) -> str:
+        owner = self._owner
+        if owner is not None and hasattr(owner, "group_mode"):
+            try:
+                return owner.group_mode()
+            except Exception:
+                return "linked"
+        return "linked"
+
+    def _active_index(self) -> int:
+        owner = self._owner
+        if owner is not None and hasattr(owner, "active_fixture_index"):
+            try:
+                return int(owner.active_fixture_index())
+            except Exception:
+                return 0
+        return 0
 
     def _on_value_changed(self, value: int):
-        self._update_labels(value)
-        for f in self._fixtures:
-            self._state.set_programmer_value(f.fid, self._channel.attribute, value)
+        attr = self._channel.attribute
+        mode = self._mode()
+        if mode == "individual":
+            idx = self._active_index()
+            if 0 <= idx < len(self._fixtures):
+                self._state.set_programmer_value(self._fixtures[idx].fid, attr, value)
+            self._update_labels(value)
+        elif mode == "relative":
+            delta = value - self._last_value
+            for f, cur in zip(self._fixtures, self._values_per_fixture()):
+                self._state.set_programmer_value(
+                    f.fid, attr, max(0, min(255, cur + delta)))
+            self._update_labels(value)
+        else:  # linked
+            for f in self._fixtures:
+                self._state.set_programmer_value(f.fid, attr, value)
+            self._update_labels(value)
+        self._last_value = value
 
     def _reset(self):
         self._slider.setValue(self._channel.default_value)
 
-    def _update_labels(self, value: int):
-        self._lbl_val.setText(str(value))
-        self._lbl_pct.setText(f"{int(value / 255 * 100)}%")
+    def _update_labels(self, value: int, divergent: bool = False):
+        self._lbl_val.setText("—" if divergent else str(value))
+        self._lbl_pct.setText("" if divergent else f"{int(value / 255 * 100)}%")
 
 
 class ColorPreview(QWidget):

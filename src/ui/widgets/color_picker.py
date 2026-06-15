@@ -527,22 +527,33 @@ class ColorPicker(QWidget):
             self._live_timer.stop()
 
     def _apply_to_selection(self):
-        """Sendet Farbe an alle selektierten Fixtures via Programmer."""
+        """Sendet Farbe an alle selektierten Fixtures via Programmer.
+
+        P6: Steht der manuelle Weiss-Slider auf 0, wird der Weissanteil der
+        RGB-Farbe pro Fixture automatisch in den color_w-Kanal verschoben
+        (RGBW-Konvertierung, zentrale Logik in core.color_utils). Ein manuell
+        gesetzter W-/A-/UV-Wert gilt als bewusste Konfiguration und wird
+        unveraendert geschrieben."""
         self.applied.emit(QColor(self._color))
         if get_state is None:
             return
         try:
+            from src.core.color_utils import adapt_color_payload, fixture_attr_set
             state = get_state()
             fids = self._get_selected_fids(state)
             if not fids:
                 return
+            fx_by_fid = {f.fid: f for f in state.get_patched_fixtures()}
             r = self._color.red()
             g = self._color.green()
             b = self._color.blue()
             for fid in fids:
-                state.set_programmer_value(fid, "color_r", r)
-                state.set_programmer_value(fid, "color_g", g)
-                state.set_programmer_value(fid, "color_b", b)
+                payload = {"color_r": r, "color_g": g, "color_b": b}
+                fx = fx_by_fid.get(fid)
+                if fx is not None and not self._white:
+                    payload = adapt_color_payload(fixture_attr_set(fx), payload)
+                for attr, value in payload.items():
+                    state.set_programmer_value(fid, attr, int(value))
                 if self._white:
                     state.set_programmer_value(fid, "color_w", self._white)
                 if self._amber:

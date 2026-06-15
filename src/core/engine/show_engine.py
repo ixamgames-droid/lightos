@@ -85,7 +85,21 @@ class Show(Function):
                 sf.reset()
 
     def _on_stop(self):
-        pass
+        # Gestartete, noch nicht gestoppte Kinder sauber stoppen — sonst bleiben
+        # sie als "running" markiert, obwohl niemand sie mehr rendert (falsches
+        # Button-/LED-Feedback, naechster Show-Start resettet sie ohnehin).
+        try:
+            from .function_manager import get_function_manager
+            fm = get_function_manager()
+            for track in self.tracks:
+                for sf in track.show_functions:
+                    if sf._started and not sf._stopped:
+                        child = fm.get(sf.function_id)
+                        if child is not None:
+                            child.stop()
+                        sf._stopped = True
+        except Exception:
+            pass
 
     # ── write ─────────────────────────────────────────────────────────────────
 

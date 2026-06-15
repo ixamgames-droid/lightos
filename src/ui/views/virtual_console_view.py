@@ -101,7 +101,7 @@ class VirtualConsoleView(QWidget):
         self._btn_edit.toggled.connect(self._toggle_edit)
         tb_layout.addWidget(self._btn_edit)
 
-        self._btn_snap = QPushButton("⊞ Snap")
+        self._btn_snap = QPushButton("⊞ Raster")
         self._btn_snap.setCheckable(True)
         self._btn_snap.setChecked(False)
         self._btn_snap.setFixedHeight(26)
@@ -132,6 +132,8 @@ class VirtualConsoleView(QWidget):
             ("SpeedDial", "VCSpeedDial"),
             ("Encoder",   "VCEncoder"),
             ("Farbe",     "VCColor"),
+            ("Chase-Liste", "VCColorList"),
+            ("Chase Builder", "VCChaseBuilder"),
             ("Label",     "VCLabel"),
             ("Frame",     "VCFrame"),
         ]
@@ -219,6 +221,27 @@ class VirtualConsoleView(QWidget):
         self._btn_touch_lock.toggled.connect(self._toggle_touch_lock)
         tb_layout.addWidget(self._btn_touch_lock)
 
+        # Soft-Takeover / „Pickup": für nicht-motorisierte Controller (APC mini & Co.).
+        # Nach einem Seiten-/Bankwechsel übernimmt ein Fader erst, wenn der physische
+        # Fader den aktuellen VC-Wert einmal durchfahren hat → keine Wertsprünge.
+        self._btn_pickup = QPushButton("🎚 Pickup")
+        self._btn_pickup.setCheckable(True)
+        self._btn_pickup.setFixedHeight(26)
+        self._btn_pickup.setToolTip(
+            "Soft-Takeover für nicht-motorisierte Fader (APC mini …):\n"
+            "Nach einem Seitenwechsel springt der Wert nicht — der Fader übernimmt\n"
+            "erst, wenn er den aktuellen VC-Wert einmal durchfahren hat.\n"
+            "Ein gelber Pfeil zeigt, wohin der Fader bewegt werden muss."
+        )
+        self._btn_pickup.setStyleSheet("""
+            QPushButton { background:#21262d; color:#ffb000; border:1px solid #ffb000;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#ffb000; color:#000; font-weight:bold; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_pickup.toggled.connect(self._toggle_soft_takeover)
+        tb_layout.addWidget(self._btn_pickup)
+
         # Bank-Umschaltung (= Executor-Page): bestimmt, welche Widgets/Pads aktiv
         # sind. APC-Page-Buttons schalten dieselbe Bank. Immer sichtbar.
         tb_layout.addSpacing(12)
@@ -275,8 +298,10 @@ class VirtualConsoleView(QWidget):
         btn_clear.setVisible(False)
         tb_layout.addWidget(btn_clear)
 
-        btn_save = QPushButton("Speichern")
+        btn_save = QPushButton("Canvas exportieren…")
         btn_save.setFixedHeight(26)
+        btn_save.setToolTip("Nur dieses VC-Layout als separate JSON-Datei exportieren "
+                            "(unabhängig vom Show-Speichern unter Datei → Speichern).")
         btn_save.setStyleSheet("""
             QPushButton { background:#21262d; color:#3fb950; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
@@ -285,8 +310,9 @@ class VirtualConsoleView(QWidget):
         btn_save.clicked.connect(self._save)
         tb_layout.addWidget(btn_save)
 
-        btn_load = QPushButton("Laden")
+        btn_load = QPushButton("Canvas importieren…")
         btn_load.setFixedHeight(26)
+        btn_load.setToolTip("Ein zuvor exportiertes VC-Layout (JSON) in dieses Canvas laden.")
         btn_load.setStyleSheet("""
             QPushButton { background:#21262d; color:#58a6ff; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
@@ -376,7 +402,23 @@ class VirtualConsoleView(QWidget):
             except Exception:
                 pass
             active = fm.active_function()
-            running = len(getattr(fm, "_running_ids", ()) or ())
+            # Thread-sicherer Snapshot statt Direktzugriff auf _running_ids.
+            running_ids = frozenset(fm.running_ids())
+            running = len(running_ids)
+            # Bei JEDEM Wechsel des Laufzustands die funktionsgebundenen VC-Widgets
+            # neu zeichnen — sonst bleibt ein Toggle-Pad „aus", obwohl sein Effekt
+            # noch laeuft (oder „an", obwohl er sich selbst/per StopAll beendet hat).
+            if running_ids != getattr(self, "_last_running_ids", None):
+                self._last_running_ids = running_ids
+                if self._canvas_alive():
+                    from src.ui.virtualconsole.vc_button import VCButton
+                    from src.ui.virtualconsole.vc_slider import VCSlider
+                    for cls in (VCButton, VCSlider):
+                        for w in self._canvas.findChildren(cls):
+                            try:
+                                w.update()
+                            except Exception:
+                                pass
             if active is not None:
                 extra = f"  (+{running - 1} weitere)" if running > 1 else ""
                 self._lbl_active_fx.setText(
@@ -384,11 +426,27 @@ class VirtualConsoleView(QWidget):
                 self._lbl_active_fx.setStyleSheet(
                     "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
                     " padding:2px 10px; font-size:11px;")
+                self._lbl_active_fx.setVisible(True)   # UIC-04: nur bei laufendem Effekt sichtbar
             else:
+                self._lbl_active_fx.setVisible(False)
                 self._lbl_active_fx.setText("Aktiver Effekt: —")
                 self._lbl_active_fx.setStyleSheet(
                     "background:#0d1117; color:#666; border-bottom:1px solid #21262d;"
                     " padding:2px 10px; font-size:11px;")
+        except Exception:
+            pass
+        # To-Do #9: Farb-Kacheln (Programmer/Alle) ausgrauen, sobald eine RGB-/
+        # RGBW-Matrix läuft (die besitzt dann die Farbe). Nur bei Zustandswechsel
+        # neu zeichnen, damit der 400-ms-Tick nicht ständig repaintet.
+        try:
+            from src.core.engine import effect_live
+            from src.ui.virtualconsole.vc_color import VCColor
+            driven = effect_live.color_is_effect_driven()
+            if driven != getattr(self, "_last_color_driven", None):
+                self._last_color_driven = driven
+                if self._canvas_alive():
+                    for w in self._canvas.findChildren(VCColor):
+                        w.update()
         except Exception:
             pass
 
@@ -441,6 +499,24 @@ class VirtualConsoleView(QWidget):
             self._btn_touch_lock.setText("🔒 Gesperrt" if checked else "🔒 Touch-Lock")
         except Exception as e:
             print(f"[VC] touch lock error: {e}")
+
+    def _toggle_soft_takeover(self, checked: bool):
+        """Soft-Takeover (Pickup) global ein-/ausschalten und die Fader der aktuellen
+        Seite sofort (neu) armieren."""
+        try:
+            from src.ui.virtualconsole.vc_slider import VCSlider
+            VCSlider.soft_takeover = bool(checked)
+            self._btn_pickup.setText("🎚 Pickup AN" if checked else "🎚 Pickup")
+            if checked and hasattr(self._canvas, "_rearm_slider_pickup"):
+                self._canvas._rearm_slider_pickup()
+            else:
+                # beim Ausschalten alle Fader sofort wieder „frei" schalten
+                from src.ui.virtualconsole.vc_slider import VCSlider as _S
+                for w in self._canvas.findChildren(_S):
+                    w._pickup_armed = False
+                    w.update()
+        except Exception as e:
+            print(f"[VC] soft-takeover error: {e}")
 
     def _toggle_apc_leds(self, checked: bool):
         if checked:

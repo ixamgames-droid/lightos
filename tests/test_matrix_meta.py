@@ -28,6 +28,8 @@ ALLOWED_KEYS = {
     "strobe_rate", "hold", "pingpong", "saturation", "value",
     # WP-4 (Abschnitte 5/6): Chase After-Fade (%) + Farb-Reihenfolge
     "after_fade", "color_order",
+    # MXP-01 (Abschnitt 10): Farbwechsel-Intervall (alle N Durchlaeufe)
+    "color_interval",
     # WP-3 (Abschnitt 4): zeitlicher Fill
     "fill_mode", "fill_speed", "loop_mode",
 }
@@ -54,12 +56,13 @@ def test_plain_hat_keine_params():
 
 
 def test_chase_params():
-    """CHASE: Achse/Bewegung/Laeufer/After-Fade/Farb-Cycle/Farb-Reihenfolge/Invert."""
+    """CHASE: Achse/Bewegung/Laeufer/After-Fade/Farb-Cycle/Farb-Reihenfolge/
+    Farbwechsel-Intervall/Invert."""
     meta = ALGO_META[RgbAlgorithm.CHASE]
     assert meta.direction is True
     keys = {s.key for s in meta.params}
     assert keys == {"axis", "movement", "runner_count", "runner_width",
-                    "after_fade", "color_cycle", "color_order", "invert"}
+                    "after_fade", "color_cycle", "color_order", "color_interval", "invert"}
 
 
 def test_wave_params():

@@ -54,6 +54,13 @@ class AlgoMeta:
     # 0 = gar keine (z. B. Rainbow erzeugt eigene HSV-Farben). So zeigt die View
     # nur die Farben an, die wirklich programmierbar sind (UI-01).
     colors: int = 1
+    # True = der Algorithmus nutzt die GANZE Color-Sequence (beliebig viele
+    # aktive Farben) -> die View zeigt den Sequence-Editor. False = er nutzt nur
+    # `colors` feste Farbfelder (C1..Cn) -> die View zeigt feste Farbknoepfe.
+    # So passt die Farb-UI exakt zur Engine (Wipe/Wave/SinePlasma/Windrad nutzen
+    # nur c1/c2, NICHT die ganze Sequence — der Sequence-Editor versprach dort
+    # mehr als die Engine einloest, M2).
+    sequence: bool = False
 
 
 # Wiederverwendbare Param-Bausteine
@@ -128,6 +135,15 @@ def _spread():
 def _color_cycle():
     return ParamSpec("color_cycle", "Farbe pro Runde wechseln", "bool", False,
                      tooltip="Laeufer wechselt pro Durchlauf durch die Farb-Sequence")
+
+def _color_interval():
+    # MXP-01 (Abschnitt 10): Farbe erst alle N Durchlaeufe wechseln. 1 = jeder
+    # Durchlauf (= bisheriges Verhalten). Default 1 -> Alt-Shows unveraendert.
+    return ParamSpec("color_interval", "Farbwechsel-Intervall", "int", 1, 1, 16, 1,
+                     when=(("color_cycle", (True,)),),
+                     tooltip="Farbe bleibt N Durchlaeufe gleich, bevor sie zur naechsten "
+                             "Farbe der Sequence wechselt (1 = jeder Durchlauf, 2/4/8 = "
+                             "langsamer)")
 
 # ── Bausteine fuer die Phase-4-Algorithmen (Fill / Random / ColorFade / Rainbow) ──
 def _level():
@@ -242,7 +258,8 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
         "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farbwechsel pro Runde.",
         True,
         (_axis(), _movement(("normal", "bounce", "center_out", "outside_in")),
-         _runner_count(), _runner_width(), _after_fade(), _color_cycle(), _color_order(), _invert()),
+         _runner_count(), _runner_width(), _after_fade(), _color_cycle(), _color_order(),
+         _color_interval(), _invert()),
         colors=1),
     RgbAlgorithm.WIPE:         AlgoMeta(
         "Wisch über die Matrix (Achse, Bewegung, Kanten-Fade).",
@@ -259,7 +276,7 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
         "Scrollender Farbverlauf über die Color-Sequence (Achse, weich/Bänder).",
         True,
         (_axis(("H", "V")), _blend()),
-        colors=2),
+        colors=2, sequence=True),
     RgbAlgorithm.RAINBOW:      AlgoMeta(
         "Regenbogen (Bewegung, Spread, Sättigung, Helligkeit).",
         True, (_rainbow_movement(), _hue_spread(), _saturation(), _value()), colors=0),
@@ -268,15 +285,15 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
         "random) oder Farbe (Ziel/zufällig/Sequence). Reihenfolge, Tempo, Fade, Loop.",
         False,
         (_fill_mode_intensity(), _fill_mode_color(), _fill_dir(), _fill_speed(),
-         _fill_fade(), _fill_hold(), _loop_mode()), colors=3),
+         _fill_fade(), _fill_hold(), _loop_mode()), colors=3, sequence=True),
     RgbAlgorithm.RANDOM:       AlgoMeta(
         "Zufalls-Effekt — Parameter richten sich nach dem Style (Color vs. Dimmer/Shutter).",
         False,
         (_mode_color(), _mode_intensity(),
-         _count(), _rate(), _scope(), _no_repeat(), _strobe_rate()), colors=3),
+         _count(), _rate(), _scope(), _no_repeat(), _strobe_rate()), colors=3, sequence=True),
     RgbAlgorithm.COLORFADE:    AlgoMeta(
         "Crossfade durch die Color-Sequence (deaktivierte Farben werden übersprungen).",
-        True, (_hold(), _pingpong()), colors=3),
+        True, (_hold(), _pingpong()), colors=3, sequence=True),
     RgbAlgorithm.STROBE:       AlgoMeta("Ganzes Feld blitzt an/aus.",  False, (), colors=1),
     # ── Texturen / Einzel-Looks (bewusst eigenständig) ────────────────────────
     RgbAlgorithm.RADAR:        AlgoMeta("Rotierender Radarstrahl.", True, (_beam_width("Strahlbreite"), _fade(), _invert()), colors=1),

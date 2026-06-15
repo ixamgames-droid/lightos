@@ -40,6 +40,7 @@ MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
 class MidiLogSignal(QObject):
     log_received = Signal(str)
     msg_received = Signal(object)
+    mtc_received = Signal(int, int, int, int)   # MTC aus dem Reader-Thread -> UI
 
 
 class MidiView(QWidget):
@@ -51,6 +52,7 @@ class MidiView(QWidget):
         self._log_signal = MidiLogSignal()
         self._log_signal.log_received.connect(self._append_log)
         self._log_signal.msg_received.connect(self._on_midi_msg_ui)
+        self._log_signal.mtc_received.connect(self._update_mtc_label)
         self._learn_target_row = -1
         self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
         self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
@@ -108,6 +110,14 @@ class MidiView(QWidget):
         self._lbl_midi_status = QLabel("Nicht verbunden")
         self._lbl_midi_status.setStyleSheet("color: #888;")
         dev_l.addRow("Status:", self._lbl_midi_status)
+
+        btn_ctrl_lib = QPushButton("Controller-Profile…")
+        btn_ctrl_lib.setToolTip(
+            "Controller-Bibliothek: bekannte MIDI-/DMX-Controller mit "
+            "Belegung, LED-Feedback und Mapping-Vorlagen (Feature 6); "
+            "QLC+-Inputprofile (.qxi) importierbar")
+        btn_ctrl_lib.clicked.connect(self._open_controller_browser)
+        dev_l.addRow(btn_ctrl_lib)
 
         top_l.addWidget(dev_box, stretch=1)
 
@@ -203,6 +213,14 @@ class MidiView(QWidget):
             self._append_log("ℹ MIDI: Windows WinMM Backend aktiv (ARM-Modus, rtmidi nicht installiert)")
 
     # ── Geräteverwaltung ──────────────────────────────────────────────────────
+
+    def _open_controller_browser(self):
+        """Controller-Bibliothek öffnen (Feature 6: Controller-Datenbank)."""
+        try:
+            from src.ui.widgets.controller_browser import ControllerBrowserDialog
+            ControllerBrowserDialog(self).exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Controller-Bibliothek", str(e))
 
     def _refresh_ports(self):
         # Aktuelle Auswahl merken um sie wiederherzustellen
@@ -584,8 +602,10 @@ class MidiView(QWidget):
             self._append_log(f"MTC: Fehler {e}")
 
     def _on_mtc(self, h: int, m: int, s: int, f: int):
+        # Laeuft im MTC-Reader-Thread (kein Qt-Event-Loop) -> QTimer.singleShot
+        # wuerde hier NIE feuern. Per Signal thread-sicher in den UI-Thread.
         try:
-            QTimer.singleShot(0, lambda: self._update_mtc_label(h, m, s, f))
+            self._log_signal.mtc_received.emit(int(h), int(m), int(s), int(f))
         except Exception:
             pass
 

@@ -13,11 +13,12 @@ import json
 import os
 import uuid
 from dataclasses import dataclass, field, asdict
-from typing import Optional
+from typing import Callable, Optional
 
 
 SUPPORTED_TYPES = (
     "platform",
+    "floor",     # beweglicher Boden/Deck (grosse flache Flaeche)
     "truss_h",
     "truss_v",
     "wall",
@@ -28,6 +29,16 @@ SUPPORTED_TYPES = (
     "support",   # Alias fuer truss_v
     "truss",     # Alias fuer truss_h
 )
+
+# --- Andock-Klassifikation (Fixtures rasten an Buehnen-Elemente ein) ----------
+# HANG: Strahler haengt UNTEN am Element (Trusses).
+# TOP:  Strahler steht OBEN drauf (Plattform, Boden, Speaker, ...).
+# Andere Typen (Waende, LED-Walls) ziehen keine Strahler an.
+DOCK_HANG_TYPES = frozenset({"truss_h", "truss_v"})
+DOCK_TOP_TYPES = frozenset({"platform", "floor", "dj_booth", "speaker", "audience"})
+# Laenge des gedachten Clamps unter einer Trasse bzw. Sockel-Versatz auf Flaechen.
+DOCK_HANG_OFFSET = 0.25
+DOCK_TOP_OFFSET = 0.30
 
 
 @dataclass
@@ -88,6 +99,37 @@ class StageElement:
             name=d.get("name", ""),
         )
 
+    # --- Geometrie-Helfer (Andocken) -----------------------------------------
+    def contains_xz(self, px: float, pz: float, margin: float = 0.0) -> bool:
+        """True, wenn der Punkt (px, pz) in der (gedrehten) Grundflaeche liegt.
+
+        Beruecksichtigt die Y-Rotation: Punkt ins lokale Koordinatensystem
+        des Elements zuruecktransformieren und gegen die halbe Breite/Tiefe
+        pruefen. `margin` weitet die Flaeche fuer touch-tolerantes Andocken.
+        """
+        import math
+        dx = px - self.x
+        dz = pz - self.z
+        c = math.cos(-self.rotation)
+        s = math.sin(-self.rotation)
+        local_x = dx * c - dz * s
+        local_z = dx * s + dz * c
+        return (abs(local_x) <= self.w / 2.0 + margin and
+                abs(local_z) <= self.d / 2.0 + margin)
+
+    @property
+    def top_y(self) -> float:
+        """Oberkante des Elements (fuer Raycast-Sortierung von oben)."""
+        return self.y + self.h / 2.0
+
+    def dock_y(self) -> Optional[float]:
+        """Montagehoehe fuer einen daran angedockten Strahler, oder None."""
+        if self.type in DOCK_HANG_TYPES:
+            return self.y - self.h / 2.0 - DOCK_HANG_OFFSET
+        if self.type in DOCK_TOP_TYPES:
+            return self.y + self.h / 2.0 + DOCK_TOP_OFFSET
+        return None
+
 
 @dataclass
 class StageDefinition:
@@ -121,6 +163,35 @@ class StageDefinition:
             if hasattr(el, k):
                 setattr(el, k, v)
         return True
+
+    # --- Andocken ------------------------------------------------------------
+    def dock_target_for(self, px: float, pz: float, margin: float = 0.0
+                        ) -> Optional[dict]:
+        """Findet das Buehnen-Element, an das ein Strahler bei (px, pz) andockt.
+
+        Spiegelt das JS-Verhalten (vertikaler Raycast von oben): unter allen
+        andockbaren Elementen, deren Grundflaeche den Punkt enthaelt, wird das
+        mit der hoechsten Oberkante gewaehlt (das ein Strahl von oben zuerst
+        traefe). Trusses -> Strahler haengt unten dran ('hang'), Plattform/
+        Boden -> oben drauf ('top'). Waende/LED-Walls docken nicht an.
+
+        Rueckgabe: {"id", "kind", "y"} oder None.
+        """
+        best: Optional[StageElement] = None
+        for el in self.elements:
+            if el.type not in DOCK_HANG_TYPES and el.type not in DOCK_TOP_TYPES:
+                continue
+            if not el.contains_xz(px, pz, margin):
+                continue
+            if best is None or el.top_y > best.top_y:
+                best = el
+        if best is None:
+            return None
+        y = best.dock_y()
+        if y is None:
+            return None
+        kind = "hang" if best.type in DOCK_HANG_TYPES else "top"
+        return {"id": best.id, "kind": kind, "y": float(y)}
 
     # --- JSON / Persistenz ---------------------------------------------------
     def to_dict(self) -> dict:
@@ -210,70 +281,31 @@ def delete_stage(name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Default-Buehnen
+# Default-Buehne
 # ---------------------------------------------------------------------------
 
+# Der Visualizer startet bewusst mit einer LEEREN Buehne: keine vorgerenderte
+# Kulisse (frueher theatre/rock), nur das fixe Welt-Grid als Referenz im
+# Hintergrund. Der User baut seine eigene Buehne/Trassen selbst auf.
+
 def get_default_simple() -> StageDefinition:
-    s = StageDefinition(name="Simple")
-    s.add("platform", x=0, y=0.2, z=0, w=12, h=0.4, d=8, color="#2a2520", name="Stage")
-    return s
+    """Leere Buehne (keine Elemente) — Default fuer den Visualizer."""
+    return StageDefinition(name="Leer")
 
 
-def get_default_theatre() -> StageDefinition:
-    s = StageDefinition(name="Theater")
-    s.add("platform", x=0, y=0.25, z=0, w=16, h=0.5, d=10,
-          color="#2a1a0e", name="Buehne")
-    s.add("wall", x=0, y=6, z=-5, w=20, h=12, d=0.2,
-          color="#1a1429", name="Hintergrund")
-    s.add("wall", x=-10, y=6, z=5, w=2, h=12, d=0.4,
-          color="#1a0808", name="Proszenium L")
-    s.add("wall", x=10, y=6, z=5, w=2, h=12, d=0.4,
-          color="#1a0808", name="Proszenium R")
-    s.add("truss_h", x=0, y=9, z=0, w=15, h=0.18, d=0.18,
-          color="#666666", name="Mittel-Truss")
-    s.add("truss_h", x=-7, y=9, z=0, w=15, h=0.18, d=0.18,
-          color="#666666", name="Links-Truss")
-    s.add("truss_h", x=7, y=9, z=0, w=15, h=0.18, d=0.18,
-          color="#666666", name="Rechts-Truss")
-    return s
+# Rueckwaerts-kompatibler Alias-Name.
+def get_default_empty() -> StageDefinition:
+    return get_default_simple()
 
 
-def get_default_rock() -> StageDefinition:
-    s = StageDefinition(name="Rock Concert")
-    s.add("platform", x=0, y=0.3, z=0, w=22, h=0.6, d=14,
-          color="#111111", name="Mainstage")
-    # Truss-Rahmen
-    s.add("truss_h", x=0, y=9, z=-6, w=24, h=0.25, d=0.25,
-          color="#666666", name="Truss hinten")
-    s.add("truss_h", x=0, y=9, z=6, w=24, h=0.25, d=0.25,
-          color="#666666", name="Truss vorne")
-    # Seitliche Stuetzen
-    for x in (-12, 12):
-        for z in (-6, 6):
-            s.add("truss_v", x=x, y=4.5, z=z, w=0.3, h=9, d=0.3,
-                  color="#666666", name=f"Stuetze {x}/{z}")
-    # LED-Wall
-    s.add("led_wall", x=0, y=4, z=-5.9, w=20, h=6, d=0.15,
-          color="#080820", name="LED Wand")
-    # Speakers
-    for x in (-11, 11):
-        for i in range(3):
-            s.add("speaker", x=x, y=0.6 + i * 1.25, z=5,
-                  w=1.4, h=1.2, d=1.4,
-                  color="#202020", name=f"Speaker {x}/{i}")
-    # Audience
-    s.add("audience", x=0, y=0.05, z=10, w=24, h=0.1, d=10,
-          color="#0c0c10", name="Publikum")
-    return s
-
-
-DEFAULT_PRESETS: dict[str, "callable"] = {
+DEFAULT_PRESETS: dict[str, Callable[[], StageDefinition]] = {
     "simple": get_default_simple,
-    "theatre": get_default_theatre,
-    "rock": get_default_rock,
+    "empty": get_default_simple,
 }
 
 
 def get_default(name: str) -> StageDefinition:
+    # Unbekannte/alte Preset-Keys (z.B. "theatre"/"rock" aus Alt-Shows) fallen
+    # bewusst auf die leere Buehne zurueck.
     fn = DEFAULT_PRESETS.get((name or "simple").lower())
     return fn() if fn else get_default_simple()

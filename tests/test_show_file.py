@@ -256,6 +256,22 @@ class ShowFileTests(unittest.TestCase):
             emitted_names = [ev[0] for ev in self.state.emitted]
             self.assertIn("show_loaded", emitted_names)
 
+    def test_channel_groups_roundtrip(self):
+        # SDK-02: Kanal-Gruppen werden pro Show gespeichert/geladen.
+        self.state.show_name = "CG Show"
+        cg = [{"name": "G1", "universe": 1, "channels": [1, 2, 3], "value": 100}]
+        self.state._channel_groups_data = list(cg)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "cg.lshow")
+            self.show_file.save_show(path)
+            with zipfile.ZipFile(path, "r") as zf:
+                data = json.loads(zf.read("show.json").decode("utf-8"))
+            self.assertEqual(data["channel_groups"], cg)
+            self.state._channel_groups_data = []          # dirty vor dem Laden
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.state._channel_groups_data, cg)
+
     def test_legacy_efx_rgb_blocks_migrate_to_functions(self):
         """Alt-Shows mit separaten efx/rgb_matrix-Bloecken werden beim Laden in
         echte Funktionen (function_manager.add) migriert."""

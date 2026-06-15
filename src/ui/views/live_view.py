@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QScrollArea, QListWidget, QListWidgetItem,
                                 QGroupBox, QFormLayout, QSpinBox, QCheckBox,
                                 QTabWidget, QInputDialog, QMessageBox,
-                                QTreeWidgetItem, QLineEdit)
+                                QTreeWidgetItem, QLineEdit,
+                                QButtonGroup, QStackedWidget)
 from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMimeData
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
@@ -53,10 +54,17 @@ class FixtureRenderer:
     def draw(painter: QPainter, fixture_type: str, x: float, y: float,
              size: float, color: QColor, intensity: int, label: str,
              selected: bool = False, pan: int = 128, tilt: int = 128,
-             effects: list = [], anim_phase: float = 0.0,
-             blink_off: bool = False, highlighted: bool = False):
+             effects: list | None = None, anim_phase: float = 0.0,
+             blink_off: bool = False, highlighted: bool = False,
+             zoom: float = 1.0):
+        effects = effects or []
         painter.save()
         painter.translate(x, y)
+        # Texte in konstanter Bildschirmgroesse: der Painter ist global mit dem
+        # Zoom skaliert, also Punktgroessen/Badge-Geometrie mit 1/Zoom
+        # gegenrechnen, damit Labels bei kleinem Zoom lesbar bleiben und bei
+        # grossem Zoom nicht ueberlaufen.
+        tscale = 1.0 / zoom if zoom > 0 else 1.0
 
         # Blinkt die Fixture gerade im "Aus"-Phase → Licht ausschalten
         if blink_off:
@@ -172,29 +180,37 @@ class FixtureRenderer:
             painter.drawRect(QRectF(-size*0.4, -size*0.4, size*0.8, size*0.8))
             label_prefix = "?"
 
-        # Label darunter
+        # Label darunter (konstante Bildschirmgroesse, nicht abschneiden)
+        _fl = QFont("Arial"); _fl.setPointSizeF(8 * tscale)
         painter.setPen(QColor("#bbb"))
-        painter.setFont(QFont("Arial", 8))
+        painter.setFont(_fl)
         text_rect = QRectF(-size, size*0.55, size*2, 16)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, label or label_prefix)
+        painter.drawText(text_rect,
+                         Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
+                         label or label_prefix)
 
         # Intensity-Wert oben
         if intensity > 0:
+            _fi = QFont("Arial"); _fi.setPointSizeF(7 * tscale)
             painter.setPen(QColor("#FFD700") if intensity > 200 else QColor("#aaa"))
-            painter.setFont(QFont("Arial", 7))
+            painter.setFont(_fi)
             inten_pct = int(intensity / 255 * 100)
-            painter.drawText(QRectF(-size, -size*0.85, size*2, 12),
-                            Qt.AlignmentFlag.AlignCenter, f"{inten_pct}%")
+            painter.drawText(QRectF(-size, -size*0.9, size*2, 12),
+                            Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
+                            f"{inten_pct}%")
 
-        # FX-Badge oben rechts
+        # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant)
         if effects:
-            badge_rect = QRectF(size*0.25, -size*0.9, 22, 12)
+            bw, bh = 22 * tscale, 12 * tscale
+            badge_rect = QRectF(size*0.25, -size*0.9, bw, bh)
             painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(badge_rect, 3, 3)
+            painter.drawRoundedRect(badge_rect, 3 * tscale, 3 * tscale)
+            _fb = QFont("Arial"); _fb.setPointSizeF(6 * tscale); _fb.setBold(True)
             painter.setPen(QColor(210, 230, 255))
-            painter.setFont(QFont("Arial", 6, QFont.Weight.Bold))
-            painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter,
+            painter.setFont(_fb)
+            painter.drawText(badge_rect,
+                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
                              f"FX{len(effects)}" if len(effects) > 1 else "FX")
 
         painter.restore()
@@ -207,6 +223,8 @@ class StageCanvas(QWidget):
 
     fixture_clicked = Signal(int)   # fid
     selection_changed = Signal()    # Auswahl geaendert (Phase 7b)
+    zoom_requested = Signal(int)    # Strg+Mausrad -> gewuenschter Zoom in %
+    context_menu_requested = Signal(int, object)  # (fid|-1, global QPoint)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -223,6 +241,8 @@ class StageCanvas(QWidget):
         self._apply_canvas_size()
         self.setStyleSheet("background:#0d1117;")
         self.setAcceptDrops(True)
+        # Fokus annehmen, damit Tastatur (Esc = Auswahl leeren) ankommt
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self._state = get_state()
         # Fixture-Positionen (fid -> (x, y) in Welt-Koordinaten)
@@ -231,6 +251,10 @@ class StageCanvas(QWidget):
         self._selected_fids: list[int] = []
         self._drag_fid: int | None = None
         self._drag_offset: QPointF = QPointF()
+        # Drag-Schwelle: ein reiner Klick (ohne Bewegung) darf das Fixture weder
+        # ans Raster snappen noch die Show als "geaendert" markieren.
+        self._drag_press: QPointF = QPointF()
+        self._drag_moved: bool = False
 
         # Gruppen-Hervorhebung (Phase 7a)
         self._highlight_fids: set[int] = set()
@@ -240,6 +264,7 @@ class StageCanvas(QWidget):
         self._band_rect: QRectF | None = None
         self._multi_drag_start: dict[int, tuple] | None = None
         self._multi_mouse_start: QPointF | None = None
+        self._multi_moved: bool = False
 
         # Touch-Mehrfachauswahl-Modus: Antippen toggelt die Auswahl (kein Shift noetig)
         self._multi_select_mode: bool = False
@@ -268,6 +293,13 @@ class StageCanvas(QWidget):
         self._highlight_fids = set(fids)
         self.update()
 
+    def set_selection(self, fids) -> None:
+        """P2: Auswahl von aussen setzen (linke Liste → Canvas-Highlight).
+        Bewusst OHNE selection_changed-Emit — der Aufrufer pflegt den globalen
+        State selbst (sonst Ping-Pong zwischen Liste und Canvas)."""
+        self._selected_fids = list(fids)
+        self.update()
+
     # ── Canvas-Groesse (Welt × Zoom) ─────────────────────────────────────────
 
     def _apply_canvas_size(self) -> None:
@@ -279,6 +311,18 @@ class StageCanvas(QWidget):
         self.zoom = max(0.25, min(4.0, float(z)))
         self._apply_canvas_size()
         self.update()
+
+    def set_active(self, on: bool) -> None:
+        """Startet/stoppt den 20-FPS-Render-Timer — pausiert, wenn die Live View
+        nicht der sichtbare Tab ist (spart CPU im Hintergrund)."""
+        try:
+            if on:
+                if not self._update_timer.isActive():
+                    self._update_timer.start(50)
+            else:
+                self._update_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
 
     # ── Koordinaten-Umrechnung Canvas→Welt ───────────────────────────────────
 
@@ -318,13 +362,23 @@ class StageCanvas(QWidget):
     # ── Auswahl-Helfer (Phase 7b) ─────────────────────────────────────────────
 
     def _fixture_at(self, pos: QPointF):
-        """Gibt die fid des Fixtures an Canvas-Position pos zurueck, oder None."""
+        """Gibt die fid des Fixtures an Canvas-Position pos zurueck, oder None.
+
+        Touch: Es gewinnt das NÄCHSTE Fixture im Trefferradius (nicht das
+        erste in Dict-Reihenfolge — wichtig bei dicht platzierten Geräten).
+        Im Mehrfachauswahl-Modus ist der Radius mindestens ~24 Bildschirm-
+        Pixel, damit auch bei kleinem Zoom mit dem Finger getroffen wird."""
+        r = self._fixture_size * 0.6
+        if self._multi_select_mode:
+            r = max(r, 24.0 / max(0.25, self.zoom))
+        best_fid, best_d = None, r * r
         for fid, (x, y) in self._positions.items():
             dx = pos.x() - x
             dy = pos.y() - y
-            if dx * dx + dy * dy < (self._fixture_size * 0.6) ** 2:
-                return fid
-        return None
+            d = dx * dx + dy * dy
+            if d < best_d:
+                best_fid, best_d = fid, d
+        return best_fid
 
     def _select_in_rect(self, rect: QRectF | None, additive: bool) -> None:
         """Waehlt alle Fixtures innerhalb von rect aus (canvas-Koordinaten)."""
@@ -357,7 +411,16 @@ class StageCanvas(QWidget):
             self._state.live_view_positions[fid] = (float(x), float(y))
         except Exception:
             pass
+        self._notify_layout_changed()
         self.update()
+
+    def _notify_layout_changed(self) -> None:
+        """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save)."""
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     # ── Drag & Drop von der Fixture-Liste ─────────────────────────────────────
 
@@ -386,9 +449,31 @@ class StageCanvas(QWidget):
     def _reload_positions_safe(self):
         try:
             self._load_positions()
+            self._apply_meta_from_state()
             self.update()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel geloescht
+
+    def _apply_meta_from_state(self):
+        """P4: Show-spezifische Live-View-Einstellungen (Zoom/Grid/Snap/Welt)
+        aus state.live_view_meta anwenden. Alte Shows ohne Meta-Block behalten
+        die ui_prefs-Defaults (Fallback) — kein Fehler, kein Reset."""
+        meta = getattr(self._state, "live_view_meta", None)
+        if not isinstance(meta, dict) or not meta:
+            return
+        try:
+            if "world_w" in meta and "world_h" in meta:
+                self.set_world_size(int(meta["world_w"]), int(meta["world_h"]))
+            if "grid_size" in meta:
+                self.grid_size = int(meta["grid_size"])
+            if "snap" in meta:
+                self.snap_enabled = bool(meta["snap"])
+            if "grid_visible" in meta:
+                self.grid_visible = bool(meta["grid_visible"])
+            if "zoom" in meta:
+                self.set_zoom(float(meta["zoom"]))
+        except Exception as e:
+            print(f"[live_view] apply meta error: {e}")
 
     def _load_positions(self):
         """Live-View-Positionen aus dem persistenten 2D-Store laden.
@@ -443,7 +528,22 @@ class StageCanvas(QWidget):
 
     # ── Strobe / Effekte ──────────────────────────────────────────────────────
 
-    def _get_strobe_info(self, fid: int, fixture) -> tuple[float, bool]:
+    def _running_functions(self) -> list:
+        """Thread-sicherer Snapshot der laufenden Funktionen (einmal pro Frame
+        bauen und an _get_strobe_info / _get_active_effects durchreichen, statt
+        pro Fixture erneut fm.running_ids()/get() aufzurufen — B-8)."""
+        out = []
+        try:
+            fm = self._state.function_manager
+            for func_id in fm.running_ids():
+                func = fm.get(func_id)
+                if func is not None:
+                    out.append(func)
+        except Exception:
+            pass
+        return out
+
+    def _get_strobe_info(self, fid: int, fixture, running=None) -> tuple[float, bool]:
         """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken."""
         freq_hz = 0.0
 
@@ -467,11 +567,8 @@ class StageCanvas(QWidget):
         if freq_hz == 0.0:
             try:
                 from src.core.engine.effect_layers import LayerType
-                fm = self._state.function_manager
-                for func_id in list(fm._running_ids):
-                    func = fm.get(func_id)
-                    if func is None:
-                        continue
+                funcs = running if running is not None else self._running_functions()
+                for func in funcs:
                     if (hasattr(func, 'fixture_ids') and fid in func.fixture_ids
                             and hasattr(func, 'layers')
                             and getattr(func, 'target_attribute', '') == 'intensity'):
@@ -491,29 +588,45 @@ class StageCanvas(QWidget):
         phase = (time.time() * freq_hz) % 1.0
         return freq_hz, phase < 0.5
 
-    def _get_active_effects(self, fid: int, strobe_hz: float = 0.0) -> list[str]:
+    def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
+                            running=None) -> list[str]:
         """Gibt Liste der aktiven Effekt-/Funktionsnamen zurück, die dieses Fixture betreffen."""
         effects = []
         if strobe_hz > 0.0:
             effects.append(f"Strobe  {strobe_hz:.1f} Hz")
         try:
-            fm = self._state.function_manager
-            for func_id in list(fm._running_ids):
-                func = fm.get(func_id)
-                if func is None:
-                    continue
-                # LayeredEffect hat fixture_ids
-                if hasattr(func, 'fixture_ids') and fid in func.fixture_ids:
+            funcs = running if running is not None else self._running_functions()
+            for func in funcs:
+                # Welche Geraete steuert die Funktion? Je Typ anders gespeichert —
+                # und nur ECHTE Sequenz-Attribute pruefen: EfxInstance._values() ist
+                # eine Methode (nicht Scene's Liste), daher isinstance-Guard. Vorher
+                # warf das bei laufenden EFX/Matrix eine Exception -> sie wurden in
+                # der Info-Box NIE als aktiv angezeigt.
+                fixture_ids = getattr(func, 'fixture_ids', None)   # Carousel/LayeredEffect
+                fixtures = getattr(func, 'fixtures', None)         # EFX (Objekte mit .fid)
+                grid = getattr(func, 'fixture_grid', None)         # RGB-Matrix
+                vals = getattr(func, '_values', None)              # Scene
+                hit = False
+                if isinstance(fixture_ids, (list, tuple, set)) and fid in fixture_ids:
+                    hit = True
+                elif isinstance(fixtures, (list, tuple)) and \
+                        any(getattr(fx, 'fid', None) == fid for fx in fixtures):
+                    hit = True
+                elif isinstance(grid, (list, tuple)) and fid in grid:
+                    hit = True
+                elif isinstance(vals, (list, tuple)) and \
+                        any(getattr(sv, 'fixture_id', None) == fid for sv in vals):
+                    hit = True
+                if hit:
                     effects.append(func.name)
-                # Scene hat _values mit fixture_id
-                elif hasattr(func, '_values'):
-                    if any(sv.fixture_id == fid for sv in func._values):
-                        effects.append(func.name)
         except Exception:
             pass
-        # Programmer-Werte
+        # Programmer-Werte (unter demselben Lock lesen, den der Output-/MIDI-
+        # Thread beim Mutieren haelt — sonst "dict changed size").
         try:
-            if self._state.programmer.get(fid):
+            with self._state._prog_lock:
+                has_prog = bool(self._state.programmer.get(fid))
+            if has_prog:
                 effects.append("Programmer")
         except Exception:
             pass
@@ -524,69 +637,81 @@ class StageCanvas(QWidget):
     def _draw_info_box(self, painter: QPainter, fixture, color: QColor,
                        intensity: int, pan: int, tilt: int,
                        effects: list[str], fx: float, fy: float):
-        """Zeichnet ein Info-Overlay neben dem selektierten Fixture."""
+        """Zeichnet ein Info-Overlay neben dem selektierten Fixture.
+
+        Geometrie und Schrift werden mit 1/Zoom skaliert, damit die Box auf dem
+        Bildschirm immer gleich gross und lesbar bleibt (der Painter ist global
+        mit dem Zoom skaliert)."""
+        s = 1.0 / self.zoom if self.zoom > 0 else 1.0
         ft_lower = (fixture.fixture_type or "").lower()
         has_pantilt = "moving" in ft_lower or "head" in ft_lower
 
-        line_h = 15
-        n_lines = 4 + (1 if has_pantilt else 0) + min(len(effects), 3)
-        box_w, box_h = 185, 14 + n_lines * line_h
+        line_h = 15 * s
+        # +1 Zeile fuer "Keine Effekte aktiv", wenn keine Effekte aktiv sind
+        eff_lines = min(len(effects), 3) if effects else 1
+        n_lines = 4 + (1 if has_pantilt else 0) + eff_lines
+        box_w, box_h = 185 * s, 14 * s + n_lines * line_h
 
-        # Position: rechts neben Fixture, bei Randüberschreitung links
+        # Position: rechts neben Fixture, bei Randüberschreitung links — und in
+        # beide Richtungen in die Welt geklemmt (kein Abschneiden am Rand).
         bx = fx + self._fixture_size * 0.85
-        by = fy - box_h // 2
+        by = fy - box_h / 2
         if bx + box_w > self.world_w - 8:
             bx = fx - self._fixture_size * 0.85 - box_w
-        by = max(8, min(by, self.world_h - box_h - 8))
+        bx = max(8.0, min(bx, self.world_w - box_w - 8))
+        by = max(8.0, min(by, self.world_h - box_h - 8))
 
-        # Hintergrund
+        # Hintergrund (Rahmen bildschirm-konstant ~1 px)
         painter.setBrush(QBrush(QColor(12, 14, 32, 230)))
-        painter.setPen(QPen(QColor("#FFD700"), 1))
-        painter.drawRoundedRect(QRectF(bx, by, box_w, box_h), 7, 7)
+        painter.setPen(QPen(QColor("#FFD700"), 1 * s))
+        painter.drawRoundedRect(QRectF(bx, by, box_w, box_h), 7 * s, 7 * s)
 
-        tx = bx + 9
-        ty = by + 12
+        tx = bx + 9 * s
+        ty = by + 12 * s
+        inner_w = box_w - 18 * s
+        _AL = Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextDontClip
+
+        def _font(pt, bold=False):
+            f = QFont("Arial"); f.setPointSizeF(pt * s); f.setBold(bold)
+            return f
 
         # Titel
-        painter.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        painter.setFont(_font(10, True))
         painter.setPen(QColor("#FFD700"))
         name = fixture.label or fixture.fixture_type or "?"
-        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                         Qt.AlignmentFlag.AlignLeft, f"#{fixture.fid}  {name}")
-        ty += line_h + 1
+        painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL, f"#{fixture.fid}  {name}")
+        ty += line_h + 1 * s
 
-        painter.setFont(QFont("Arial", 9))
+        painter.setFont(_font(9))
         painter.setPen(QColor("#aaaaaa"))
-        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                         Qt.AlignmentFlag.AlignLeft,
+        painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL,
                          f"Typ: {fixture.fixture_type or '?'}")
         ty += line_h
 
         # Farb-Swatch + Hex
-        swatch = QRectF(tx, ty + 2, 11, 11)
+        swatch = QRectF(tx, ty + 2 * s, 11 * s, 11 * s)
         painter.setBrush(QBrush(color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(swatch)
         painter.setPen(QColor("#cccccc"))
-        painter.drawText(QRectF(tx + 14, ty, box_w - 30, line_h),
-                         Qt.AlignmentFlag.AlignLeft,
+        painter.setFont(_font(9))
+        painter.drawText(QRectF(tx + 14 * s, ty, inner_w - 14 * s, line_h), _AL,
                          f"#{color.red():02X}{color.green():02X}{color.blue():02X}"
                          f"  ({color.red()},{color.green()},{color.blue()})")
         ty += line_h
 
         # Intensitäts-Balken
         pct = int(intensity / 255 * 100)
-        bar_max = box_w - 18
-        bar_fill = int(bar_max * intensity / 255)
+        bar_max = inner_w
+        bar_fill = bar_max * intensity / 255
         painter.setBrush(QBrush(QColor(255, 200, 0, 40)))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(QRectF(tx, ty + 3, bar_max, 9))
+        painter.drawRect(QRectF(tx, ty + 3 * s, bar_max, 9 * s))
         painter.setBrush(QBrush(QColor(255, 200, 0, 130)))
-        painter.drawRect(QRectF(tx, ty + 3, bar_fill, 9))
+        painter.drawRect(QRectF(tx, ty + 3 * s, bar_fill, 9 * s))
         painter.setPen(QColor("#FFD700"))
-        painter.setFont(QFont("Arial", 8))
-        painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                         Qt.AlignmentFlag.AlignLeft, f"Intensität: {pct}%")
+        painter.setFont(_font(8))
+        painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL, f"Intensität: {pct}%")
         ty += line_h
 
         # Pan/Tilt
@@ -594,25 +719,22 @@ class StageCanvas(QWidget):
             pan_deg = int((pan - 128) / 128 * 270)
             tilt_deg = int((tilt - 128) / 128 * 135)
             painter.setPen(QColor("#aaaaaa"))
-            painter.setFont(QFont("Arial", 9))
-            painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                             Qt.AlignmentFlag.AlignLeft,
+            painter.setFont(_font(9))
+            painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL,
                              f"Pan: {pan_deg:+d}°  Tilt: {tilt_deg:+d}°")
             ty += line_h
 
         # Effekte
         if effects:
             painter.setPen(QColor("#6699ff"))
-            painter.setFont(QFont("Arial", 8))
+            painter.setFont(_font(8))
             for eff in effects[:3]:
-                painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                                 Qt.AlignmentFlag.AlignLeft, f"~ {eff}")
+                painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL, f"~ {eff}")
                 ty += line_h
         else:
             painter.setPen(QColor("#555555"))
-            painter.setFont(QFont("Arial", 8))
-            painter.drawText(QRectF(tx, ty, box_w - 18, line_h),
-                             Qt.AlignmentFlag.AlignLeft, "Keine Effekte aktiv")
+            painter.setFont(_font(8))
+            painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL, "Keine Effekte aktiv")
 
     # ── Farbe / Intensität ────────────────────────────────────────────────────
 
@@ -648,6 +770,8 @@ class StageCanvas(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.scale(self.zoom, self.zoom)
+        # Bereichs-Beschriftungen bildschirm-konstant halten (Painter ist skaliert)
+        tscale = 1.0 / self.zoom if self.zoom > 0 else 1.0
 
         # Hintergrund
         painter.fillRect(QRectF(0, 0, self.world_w, self.world_h), QColor("#0d1117"))
@@ -670,8 +794,9 @@ class StageCanvas(QWidget):
         painter.setPen(QPen(QColor("#444"), 2))
         painter.setBrush(QBrush(QColor("#1a1a2a")))
         painter.drawRoundedRect(stage_rect, 6, 6)
+        _fst = QFont("Arial"); _fst.setBold(True); _fst.setPointSizeF(9 * tscale)
         painter.setPen(QColor("#666"))
-        painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+        painter.setFont(_fst)
         painter.drawText(stage_rect, Qt.AlignmentFlag.AlignCenter, "BUEHNE")
 
         # "Publikum"-Bereich unten
@@ -679,8 +804,9 @@ class StageCanvas(QWidget):
         painter.setPen(QPen(QColor("#333"), 1))
         painter.setBrush(QBrush(QColor("#0a0a10")))
         painter.drawRoundedRect(aud_rect, 4, 4)
+        _fau = QFont("Arial"); _fau.setPointSizeF(8 * tscale)
         painter.setPen(QColor("#555"))
-        painter.setFont(QFont("Arial", 8))
+        painter.setFont(_fau)
         painter.drawText(aud_rect, Qt.AlignmentFlag.AlignCenter, "PUBLIKUM")
 
         # Fixtures
@@ -694,6 +820,7 @@ class StageCanvas(QWidget):
             self._load_positions()
 
         anim_phase = time.time() % 2.0 / 2.0  # 0..1 über 2 Sekunden (0.5 Hz)
+        running = self._running_functions()  # einmal pro Frame statt pro Fixture
         info_box_data = None  # (fixture, color, intensity, pan, tilt, effects, x, y)
 
         for fixture in fixtures:
@@ -714,8 +841,8 @@ class StageCanvas(QWidget):
                             elif ch.attribute == "tilt": tilt = v
             except Exception:
                 pass
-            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture)
-            effects = self._get_active_effects(fixture.fid, strobe_hz)
+            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running)
+            effects = self._get_active_effects(fixture.fid, strobe_hz, running)
             label = f"{fixture.fid}"
             FixtureRenderer.draw(
                 painter, fixture.fixture_type or "par", x, y,
@@ -724,7 +851,8 @@ class StageCanvas(QWidget):
                 pan=pan, tilt=tilt,
                 effects=effects, anim_phase=anim_phase,
                 blink_off=not blink_on,
-                highlighted=(fixture.fid in self._highlight_fids)
+                highlighted=(fixture.fid in self._highlight_fids),
+                zoom=self.zoom
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
@@ -747,6 +875,7 @@ class StageCanvas(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()  # Tastaturfokus holen (Esc = Auswahl leeren)
             pos = self._to_world(event.position())
             shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             hit = self._fixture_at(pos)
@@ -766,6 +895,7 @@ class StageCanvas(QWidget):
                 elif hit in self._selected_fids and len(self._selected_fids) > 1:
                     # Multi-Drag starten (Auswahl unveraendert)
                     self._multi_mouse_start = QPointF(pos)
+                    self._multi_moved = False
                     self._multi_drag_start = {
                         fid: self._positions[fid]
                         for fid in self._selected_fids
@@ -776,6 +906,8 @@ class StageCanvas(QWidget):
                     self._selected_fids = [hit]
                     self._drag_fid = hit
                     self._drag_offset = QPointF(pos.x() - x, pos.y() - y)
+                    self._drag_press = QPointF(pos)
+                    self._drag_moved = False
                     self._emit_selection()
                 self.fixture_clicked.emit(hit)
                 self.update()
@@ -793,6 +925,9 @@ class StageCanvas(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = self._to_world(event.position())
         if self._drag_fid is not None:
+            if (abs(pos.x() - self._drag_press.x())
+                    + abs(pos.y() - self._drag_press.y())) > 3:
+                self._drag_moved = True
             self._positions[self._drag_fid] = (
                 pos.x() - self._drag_offset.x(),
                 pos.y() - self._drag_offset.y()
@@ -801,6 +936,8 @@ class StageCanvas(QWidget):
         elif self._multi_drag_start is not None:
             dx = pos.x() - self._multi_mouse_start.x()
             dy = pos.y() - self._multi_mouse_start.y()
+            if abs(dx) + abs(dy) > 3:
+                self._multi_moved = True
             for fid, (sx, sy) in self._multi_drag_start.items():
                 self._positions[fid] = (sx + dx, sy + dy)
             self.update()
@@ -810,8 +947,9 @@ class StageCanvas(QWidget):
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if self._drag_fid is not None:
-            # Einzel-Drag: snappen + persistieren
-            if self._drag_fid in self._positions:
+            # Einzel-Drag: nur bei echter Bewegung snappen + persistieren
+            # (ein reiner Klick darf das Fixture nicht versetzen / dirty machen).
+            if self._drag_moved and self._drag_fid in self._positions:
                 x, y = self._positions[self._drag_fid]
                 x, y = self._snap(x, y)
                 self._positions[self._drag_fid] = (x, y)
@@ -819,19 +957,24 @@ class StageCanvas(QWidget):
                     self._state.live_view_positions[self._drag_fid] = (float(x), float(y))
                 except Exception:
                     pass
+                self._notify_layout_changed()
             self._drag_fid = None
+            self._drag_moved = False
         elif self._multi_drag_start is not None:
-            # Multi-Drag: alle beteiligten Fixtures snappen + persistieren
-            for fid in self._multi_drag_start:
-                if fid in self._positions:
-                    x, y = self._snap(*self._positions[fid])
-                    self._positions[fid] = (x, y)
-                    try:
-                        self._state.live_view_positions[fid] = (float(x), float(y))
-                    except Exception:
-                        pass
+            # Multi-Drag: nur bei echter Bewegung snappen + persistieren
+            if self._multi_moved:
+                for fid in self._multi_drag_start:
+                    if fid in self._positions:
+                        x, y = self._snap(*self._positions[fid])
+                        self._positions[fid] = (x, y)
+                        try:
+                            self._state.live_view_positions[fid] = (float(x), float(y))
+                        except Exception:
+                            pass
+                self._notify_layout_changed()
             self._multi_drag_start = None
             self._multi_mouse_start = None
+            self._multi_moved = False
             self.update()
         elif self._band_origin is not None:
             # Rubber-Band abschliessen: Fixtures in Rechteck auswaehlen
@@ -841,6 +984,43 @@ class StageCanvas(QWidget):
             self._band_origin = None
             self._band_rect = None
             self.update()
+
+    # ── Tastatur / Mausrad / Kontextmenue ─────────────────────────────────────
+
+    def keyPressEvent(self, event):
+        """Esc leert die Auswahl (und das Gruppen-Highlight)."""
+        if event.key() == Qt.Key.Key_Escape and (self._selected_fids
+                                                  or self._highlight_fids):
+            self._selected_fids = []
+            self._highlight_fids = set()
+            self._emit_selection()
+            self.update()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        """Strg+Mausrad zoomt (über die LiveView, die Slider/Persistenz pflegt);
+        ohne Strg läuft das Ereignis an die ScrollArea (normales Scrollen)."""
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            step = 10 if event.angleDelta().y() > 0 else -10
+            new_pct = int(max(25, min(400, round(self.zoom * 100) + step)))
+            self.zoom_requested.emit(new_pct)
+            event.accept()
+        else:
+            event.ignore()
+
+    def contextMenuEvent(self, event):
+        """Rechtsklick: trifft er ein (noch nicht ausgewähltes) Fixture, wird es
+        selektiert; danach baut die LiveView das Menü (Gruppe / Auswahl leeren)."""
+        pos = self._to_world(QPointF(event.pos()))
+        hit = self._fixture_at(pos)
+        if hit is not None and hit not in self._selected_fids:
+            self._selected_fids = [hit]
+            self._emit_selection()
+            self.update()
+        self.context_menu_requested.emit(
+            hit if hit is not None else -1, event.globalPos())
 
 
 # ── Minimap / Navigator ───────────────────────────────────────────────────────
@@ -860,6 +1040,17 @@ class Minimap(QWidget):
         self._repaint_timer = QTimer(self)
         self._repaint_timer.timeout.connect(self.update)
         self._repaint_timer.start(200)
+
+    def set_active(self, on: bool) -> None:
+        """Startet/stoppt das Repaint-Timer der Minimap (Pause im Hintergrund)."""
+        try:
+            if on:
+                if not self._repaint_timer.isActive():
+                    self._repaint_timer.start(200)
+            else:
+                self._repaint_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
 
     def _scale(self) -> float:
         """Welt→Minimap-Faktor (mit 6 px Rand)."""
@@ -969,6 +1160,15 @@ class LiveView(QWidget):
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._on_patch_changed())
             # Gruppe anderswo erstellt/geaendert (Gruppen-Editor, …) -> Liste auffrischen.
             sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._refresh_group_list())
+            # Globale Programmer-Auswahl (anderswo gesetzt) in der Live View
+            # spiegeln (goldener Ring + Listen-Markierung). cb(event, data).
+            sync.subscribe(SyncEvent.SELECTION_CHANGED,
+                           lambda *a: self._on_global_selection_changed(
+                               a[1] if len(a) > 1 else None))
+            # P4: Nach Show-Load die Steuerelemente (Zoom/Grid/Snap/Welt) an den
+            # wiederhergestellten Canvas-Zustand angleichen.
+            sync.subscribe(SyncEvent.SHOW_LOADED,
+                           lambda *_: self._sync_controls_from_canvas())
         except Exception as e:
             print(f"[live_view] sync (fixture list) subscribe error: {e}")
 
@@ -977,7 +1177,56 @@ class LiveView(QWidget):
         self._refresh_fixture_list()
         self._refresh_group_list()
 
+    def _set_view_3d(self, on: bool):
+        """Umschalten zwischen 2D-Top-Down-Canvas und eingebetteter 3D-Ansicht.
+
+        Die eingebettete 3D-Ansicht dient der Live-Vorschau und dem Verschieben
+        von Strahlern; das Bauen der Buehne bleibt dem separaten 3D-Editor-
+        Fenster vorbehalten. Die 3D-View wird beim ersten Umschalten lazy erzeugt.
+        """
+        self._btn_view2d.setChecked(not on)
+        self._btn_view3d.setChecked(on)
+        if on:
+            if self._viz3d is None:
+                try:
+                    from src.ui.visualizer.visualizer_view import Visualizer3DView
+                    self._viz3d = Visualizer3DView(self)
+                    self._view_stack.addWidget(self._viz3d)   # index 1
+                except Exception as e:
+                    print(f"[live_view] 3D-Ansicht nicht verfuegbar: {e}")
+                    self._set_view_3d(False)
+                    return
+            self._view_stack.setCurrentWidget(self._viz3d)
+            try:
+                self._minimap.hide()
+            except Exception:
+                pass
+            try:
+                self._viz3d.on_shown()
+            except Exception:
+                pass
+        else:
+            if self._viz3d is not None:
+                try:
+                    self._viz3d.on_hidden()
+                except Exception:
+                    pass
+            self._view_stack.setCurrentWidget(self._scroll)
+            try:
+                self._minimap.show()
+            except Exception:
+                pass
+            # 2D-Canvas neu aus dem State laden -> spiegelt im 3D vorgenommene
+            # Verschiebungen (Live View ist die Quelle der Top-Down-Positionen).
+            try:
+                self._canvas._reload_positions_safe()
+            except Exception:
+                pass
+
     def _setup_ui(self):
+        # Zeitpunkt, bis zu dem eine sticky-Statusmeldung im Footer nicht vom
+        # Info-Timer ueberschrieben wird (siehe _set_status / _update_selection_label).
+        self._sticky_until: float = 0.0
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
@@ -989,7 +1238,7 @@ class LiveView(QWidget):
         title.setStyleSheet("color:#FFD700; font-weight:bold; font-size:13px;")
         header.addWidget(title)
 
-        self._lbl_info = QLabel("0 Geraete sichtbar")
+        self._lbl_info = QLabel("0 Geräte im Patch")
         self._lbl_info.setStyleSheet("color:#888; padding-left:20px;")
         header.addWidget(self._lbl_info)
         header.addStretch()
@@ -1032,6 +1281,28 @@ class LiveView(QWidget):
         self._btn_clear_sel.clicked.connect(self._on_clear_selection)
         toolbar.addWidget(self._btn_clear_sel)
         toolbar.addStretch()
+
+        # ── 2D/3D-Umschalter (eingebettete 3D-Ansicht ohne Extra-Fenster) ─────
+        self._btn_view2d = QPushButton("🗺 2D")
+        self._btn_view3d = QPushButton("🧊 3D")
+        for b in (self._btn_view2d, self._btn_view3d):
+            b.setCheckable(True)
+            b.setMinimumHeight(34)
+            b.setStyleSheet(_tb_style)
+        self._btn_view2d.setChecked(True)
+        self._btn_view2d.setToolTip("2D Top-Down-Arbeitsflaeche (Strahler platzieren)")
+        self._btn_view3d.setToolTip(
+            "Eingebettete 3D-Ansicht (Live-Vorschau). Zum Bauen der Buehne das\n"
+            "separate 3D-Editor-Fenster nutzen (Menue Visualizer)."
+        )
+        self._view_mode_group = QButtonGroup(self)
+        self._view_mode_group.setExclusive(True)
+        self._view_mode_group.addButton(self._btn_view2d, 0)
+        self._view_mode_group.addButton(self._btn_view3d, 1)
+        self._btn_view2d.clicked.connect(lambda: self._set_view_3d(False))
+        self._btn_view3d.clicked.connect(lambda: self._set_view_3d(True))
+        toolbar.addWidget(self._btn_view2d)
+        toolbar.addWidget(self._btn_view3d)
         root.addLayout(toolbar)
 
         # ── Mittlere Zeile: Links | Canvas | Rechts ───────────────────────────
@@ -1088,6 +1359,15 @@ class LiveView(QWidget):
         self._fixture_search.textChanged.connect(self._apply_fixture_filter)
         tf_layout.addWidget(self._fixture_search)
         self._fixture_list = FixtureTreeWithDrag()
+        # P2: Mehrfachauswahl (Klick / Strg+Klick / Shift+Klick) — Auswahl
+        # spiegelt sich als goldener Ring auf der Canvas und in der globalen
+        # Programmer-Auswahl (Gruppenbildung ueber die Toolbar).
+        from PySide6.QtWidgets import QAbstractItemView
+        self._fixture_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._fixture_list.itemSelectionChanged.connect(
+            self._on_tree_selection_changed)
+        self._tree_sync_guard = False
         tf_layout.addWidget(self._fixture_list)
         _hint_fx = QLabel("Tipp: Geräte auf die Fläche ziehen. Auswählen & gruppieren\nüber die Leiste oben.")
         _hint_fx.setStyleSheet("color:#667; font-size:9px; padding:2px 4px;")
@@ -1165,6 +1445,7 @@ class LiveView(QWidget):
         self._canvas = StageCanvas()
         self._canvas.fixture_clicked.connect(self._on_fixture_clicked)
         self._canvas.selection_changed.connect(self._on_canvas_selection_changed)
+        self._canvas.context_menu_requested.connect(self._on_canvas_context_menu)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(False)
@@ -1172,7 +1453,13 @@ class LiveView(QWidget):
         self._scroll.setStyleSheet(
             "QScrollArea { border: none; background: #0d1117; }"
         )
-        mid.addWidget(self._scroll, 1)
+
+        # QStackedWidget: Seite 0 = 2D-Canvas, Seite 1 = eingebettete 3D-Ansicht
+        # (lazy erzeugt beim ersten Umschalten auf 3D).
+        self._view_stack = QStackedWidget()
+        self._view_stack.addWidget(self._scroll)        # index 0
+        self._viz3d = None                              # type: ignore[assignment]
+        mid.addWidget(self._view_stack, 1)
 
         # Minimap als schwebende Overlay-Widget im Viewport
         self._minimap = Minimap(self._scroll, self._canvas, self._scroll.viewport())
@@ -1314,12 +1601,22 @@ class LiveView(QWidget):
         detail_layout.setContentsMargins(6, 4, 6, 6)
         detail_layout.setSpacing(4)
 
-        self._lbl_group_name = QLabel("")
-        self._lbl_group_name.setStyleSheet(
-            "color:#88ffaa; font-weight:bold; font-size:11px;"
+        # P3: Gruppenname ist direkt editierbar (Enter/Fokusverlust speichert).
+        name_row = QHBoxLayout()
+        name_row.setSpacing(4)
+        self._edit_group_name = QLineEdit()
+        self._edit_group_name.setPlaceholderText("Gruppenname")
+        self._edit_group_name.setStyleSheet(
+            "QLineEdit { background:#0e1318; color:#88ffaa; font-weight:bold;"
+            " font-size:11px; border:1px solid #2a4a3a; border-radius:3px;"
+            " padding:2px 4px; }"
         )
-        self._lbl_group_name.setWordWrap(True)
-        detail_layout.addWidget(self._lbl_group_name)
+        self._edit_group_name.editingFinished.connect(self._on_group_name_edited)
+        name_row.addWidget(self._edit_group_name, 1)
+        self._lbl_group_count = QLabel("")
+        self._lbl_group_count.setStyleSheet("color:#7d8590; font-size:10px;")
+        name_row.addWidget(self._lbl_group_count)
+        detail_layout.addLayout(name_row)
 
         self._group_members = QListWidget()
         self._group_members.setStyleSheet("""
@@ -1334,6 +1631,11 @@ class LiveView(QWidget):
             QListWidget::item:selected { background: #1a4a2a; color: #88ffaa; }
         """)
         self._group_members.setMaximumHeight(120)
+        # Entf-Taste in der Mitglieder-Liste entfernt das markierte Fixture
+        from PySide6.QtGui import QShortcut, QKeySequence
+        _sc_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), self._group_members)
+        _sc_del.setContext(Qt.ShortcutContext.WidgetShortcut)
+        _sc_del.activated.connect(self._on_remove_member_clicked)
         detail_layout.addWidget(self._group_members)
 
         btn_add_sel = QPushButton("＋ Auswahl zur Gruppe hinzufügen")
@@ -1397,6 +1699,9 @@ class LiveView(QWidget):
         self._cb_snap.toggled.connect(self._on_snap_toggled)
         self._cb_grid_vis.toggled.connect(self._on_grid_vis_toggled)
         self._zoom_slider.valueChanged.connect(self._on_zoom_changed)
+        # Strg+Mausrad auf der Canvas -> Slider setzen (treibt set_zoom + Persistenz)
+        self._canvas.zoom_requested.connect(
+            lambda p: self._zoom_slider.setValue(int(p)))
 
         # Refresh-Timer fuer Status-Texte
         self._info_timer = QTimer(self)
@@ -1449,16 +1754,46 @@ class LiveView(QWidget):
         self._persist_live_view_prefs()
 
     def _persist_live_view_prefs(self):
-        _save_prefs({
-            "live_view": {
-                "world_w": self._canvas.world_w,
-                "world_h": self._canvas.world_h,
-                "grid_size": self._canvas.grid_size,
-                "snap": self._canvas.snap_enabled,
-                "grid_visible": self._canvas.grid_visible,
-                "zoom": self._canvas.zoom,
-            }
-        })
+        meta = {
+            "world_w": self._canvas.world_w,
+            "world_h": self._canvas.world_h,
+            "grid_size": self._canvas.grid_size,
+            "snap": self._canvas.snap_enabled,
+            "grid_visible": self._canvas.grid_visible,
+            "zoom": self._canvas.zoom,
+        }
+        # Nutzer-Default fuer NEUE Shows (ui_prefs.json) ...
+        _save_prefs({"live_view": meta})
+        # ... und P4: Show-spezifischer Zustand — wandert mit save_show /
+        # Auto-Save in die .lshow und wird beim Laden wiederhergestellt.
+        try:
+            self._state.live_view_meta = dict(meta)
+            self._canvas._notify_layout_changed()
+        except Exception:
+            pass
+
+    def _sync_controls_from_canvas(self):
+        """P4: Slider/Checkboxen an den (z. B. nach Show-Load) geaenderten
+        Canvas-Zustand angleichen — ohne Echo-Persistierung."""
+        try:
+            widgets = [
+                (self._zoom_slider, int(round(self._canvas.zoom * 100))),
+                (self._sb_grid, int(self._canvas.grid_size)),
+                (self._sb_world_w, int(self._canvas.world_w)),
+                (self._sb_world_h, int(self._canvas.world_h)),
+            ]
+            for w, val in widgets:
+                w.blockSignals(True)
+                w.setValue(val)
+                w.blockSignals(False)
+            for cb, val in ((self._cb_snap, self._canvas.snap_enabled),
+                            (self._cb_grid_vis, self._canvas.grid_visible)):
+                cb.blockSignals(True)
+                cb.setChecked(bool(val))
+                cb.blockSignals(False)
+            self._lbl_zoom.setText(f"{int(round(self._canvas.zoom * 100))} %")
+        except (RuntimeError, AttributeError):
+            pass  # View/Widgets (noch) nicht gebaut oder bereits zerstoert
 
     # ── Minimap positionieren ─────────────────────────────────────────────────
 
@@ -1486,6 +1821,46 @@ class LiveView(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         QTimer.singleShot(0, self._position_minimap)
+
+    # ── Timer pausieren, wenn die Live View nicht der sichtbare Tab ist ───────
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._set_views_active(True)
+        QTimer.singleShot(0, self._position_minimap)
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._set_views_active(False)
+
+    def _set_views_active(self, on: bool):
+        """Startet/stoppt Canvas-, Minimap- und Info-Timer (CPU sparen, wenn der
+        Live-View-Tab nicht sichtbar ist)."""
+        for obj in (getattr(self, "_canvas", None), getattr(self, "_minimap", None)):
+            try:
+                if obj is not None:
+                    obj.set_active(on)
+            except RuntimeError:
+                pass
+        try:
+            if on:
+                if not self._info_timer.isActive():
+                    self._info_timer.start(500)
+            else:
+                self._info_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
+        # Eingebettete 3D-Ansicht: DMX-Timer nur laufen lassen, wenn der Live-View-
+        # Tab sichtbar UND die 3D-Seite aktiv ist.
+        try:
+            viz = getattr(self, "_viz3d", None)
+            if viz is not None:
+                if on and self._view_stack.currentWidget() is viz:
+                    viz.on_shown()
+                else:
+                    viz.on_hidden()
+        except (RuntimeError, AttributeError):
+            pass
 
     # ── Fixture-Liste befuellen ───────────────────────────────────────────────
 
@@ -1618,14 +1993,25 @@ class LiveView(QWidget):
         if gid is not None:
             # Auf den Gruppen-Reiter wechseln
             self._left_tabs.setCurrentIndex(1)
-            # Statushinweis im Footer
-            self._lbl_selected.setText(
-                f"Gruppe \"{name.strip()}\" erstellt (ID {gid})"
-            )
+            # Statushinweis im Footer (sticky, wird nicht sofort ueberschrieben)
+            self._set_status(f"Gruppe \"{name.strip()}\" erstellt (ID {gid})")
 
     def _on_multi_toggle(self, checked: bool):
-        """Schaltet den Touch-Mehrfachauswahl-Modus des Canvas um."""
+        """Schaltet den Touch-Mehrfachauswahl-Modus um.
+
+        Wirkt auf Canvas UND linke Liste: im Modus toggelt einfaches Antippen
+        eines Listeneintrags die Auswahl (Qt MultiSelection — kein Strg/Shift
+        nötig); aus = gewohnte ExtendedSelection mit Strg/Shift."""
         self._canvas.set_multi_select_mode(checked)
+        from PySide6.QtWidgets import QAbstractItemView
+        mode = (QAbstractItemView.SelectionMode.MultiSelection if checked
+                else QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._fixture_list.setSelectionMode(mode)
+        if checked:
+            self._set_status("Mehrfachauswahl AN: Antippen sammelt (Fläche und Liste)")
+        else:
+            self._clear_status()
+            self._update_selection_label()
 
     def _on_clear_selection(self):
         """Leert die aktuelle Auswahl in der Live View."""
@@ -1693,7 +2079,7 @@ class LiveView(QWidget):
             if it and it.data(Qt.ItemDataRole.UserRole) == gid:
                 self._on_group_selected(it)
                 break
-        self._lbl_selected.setText(f"{added} Fixture(s) zur Gruppe hinzugefügt")
+        self._set_status(f"{added} Fixture(s) zur Gruppe hinzugefügt")
 
     def _on_delete_group_clicked(self):
         """Loescht die aktuell in der Gruppen-Liste gewaehlte Gruppe."""
@@ -1769,7 +2155,10 @@ class LiveView(QWidget):
                 # Canvas Highlight setzen
                 self._canvas.set_highlight(set(fids))
                 # Detail-Panel befuellen
-                self._lbl_group_name.setText(f"{g.name}  ({len(fids)} Fixtures)")
+                self._edit_group_name.blockSignals(True)
+                self._edit_group_name.setText(g.name or "")
+                self._edit_group_name.blockSignals(False)
+                self._lbl_group_count.setText(f"{len(fids)} Fixtures")
                 self._group_members.clear()
                 # Fixture-Labels holen
                 try:
@@ -1787,6 +2176,39 @@ class LiveView(QWidget):
                 self._group_detail_box.setVisible(True)
         except Exception as e:
             print(f"[live_view] _on_group_selected error: {e}")
+
+    def _on_group_name_edited(self):
+        """P3: Gruppenname aus dem Detail-Panel speichern. Leerer Name wird
+        verworfen (alter Name bleibt); der neue Name verteilt sich ueber
+        GROUP_CHANGED an Programmer/Patch/Matrix."""
+        gid = getattr(self, "_detail_group_id", None)
+        if gid is None:
+            return
+        name = (self._edit_group_name.text() or "").strip()
+        eng = getattr(self._state, "_show_engine", None)
+        if eng is None:
+            return
+        try:
+            from sqlalchemy.orm import Session as _Session
+            from src.core.database.models import FixtureGroup as _FG
+            with _Session(eng) as s:
+                g = s.get(_FG, gid)
+                if g is None:
+                    return
+                if not name:
+                    # leeren Namen nicht zulassen -> Feld zuruecksetzen
+                    self._edit_group_name.blockSignals(True)
+                    self._edit_group_name.setText(g.name or "")
+                    self._edit_group_name.blockSignals(False)
+                    return
+                if name == (g.name or ""):
+                    return
+                g.name = name
+                s.commit()
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.GROUP_CHANGED, None)
+        except Exception as e:
+            print(f"[live_view] group rename error: {e}")
 
     # ── Fixture aus Gruppe entfernen ──────────────────────────────────────────
 
@@ -1853,30 +2275,110 @@ class LiveView(QWidget):
             fixtures = self._state.get_patched_fixtures()
         except Exception:
             fixtures = []
-        self._lbl_info.setText(f"{len(fixtures)} Geraete im Patch")
+        self._lbl_info.setText(f"{len(fixtures)} Geräte im Patch")
+        self._update_selection_label()
+
+    # ── Footer-Status (sticky-faehig) ─────────────────────────────────────────
+
+    def _set_status(self, msg: str, sticky_sec: float = 4.0):
+        """Zeigt eine kurzlebige Statusmeldung im Footer, die der Info-Timer
+        sticky_sec Sekunden lang NICHT mit dem Auswahl-Text ueberschreibt."""
+        self._sticky_until = time.time() + sticky_sec
+        self._lbl_selected.setText(msg)
+
+    def _clear_status(self):
+        """Hebt eine sticky-Meldung sofort auf (z. B. bei neuer Auswahl)."""
+        self._sticky_until = 0.0
+
+    def _update_selection_label(self):
+        """Schreibt den Auswahl-Text in den Footer — respektiert sticky-Meldungen
+        und nutzt ein einheitliches, lesbares Format (kein rohes fids=[…])."""
+        if time.time() < getattr(self, "_sticky_until", 0.0):
+            return
         sel = self._canvas._selected_fids
-        if sel:
-            self._lbl_selected.setText(f"Selektion: fids={sel}")
-        else:
+        n = len(sel)
+        if n == 0:
             self._lbl_selected.setText("Selektion: -")
+        elif n == 1:
+            self._lbl_selected.setText(f"Selektion: 1 Fixture (fid={sel[0]})")
+        else:
+            self._lbl_selected.setText(f"Selektion: {n} Fixtures")
 
     def _on_fixture_clicked(self, fid: int):
-        # Synchronisiere mit globalem Selektions-State
+        # Globaler State + Footer werden bereits ueber selection_changed
+        # (_on_canvas_selection_changed) gepflegt — hier nichts doppelt setzen,
+        # sonst zwei SELECTION_CHANGED-Emits pro Klick.
+        pass
+
+    def _on_tree_selection_changed(self):
+        """P2: Auswahl in der linken Liste -> Canvas-Highlight + globaler State.
+        Universe-Ordner (UserRole=None) werden ignoriert."""
+        if self._tree_sync_guard:
+            return
+        fids: list[int] = []
+        for it in self._fixture_list.selectedItems():
+            fid = it.data(0, Qt.ItemDataRole.UserRole)
+            if fid is not None:
+                fids.append(int(fid))
+        self._canvas.set_selection(fids)
         try:
-            self._state.selected_fids = self._canvas._selected_fids
+            self._state.set_selected_fids(fids)
         except Exception:
             pass
+        self._clear_status()
+        self._update_selection_label()
+
+    def _mirror_selection_to_tree(self, fids):
+        """Canvas-Auswahl in der linken Liste markieren (ohne Echo)."""
+        self._tree_sync_guard = True
+        try:
+            wanted = set(int(f) for f in fids)
+            for i in range(self._fixture_list.topLevelItemCount()):
+                top = self._fixture_list.topLevelItem(i)
+                for j in range(top.childCount()):
+                    ch = top.child(j)
+                    fid = ch.data(0, Qt.ItemDataRole.UserRole)
+                    ch.setSelected(fid is not None and int(fid) in wanted)
+        except Exception:
+            pass
+        finally:
+            self._tree_sync_guard = False
 
     def _on_canvas_selection_changed(self):
         """Wird bei jeder Aenderung der Canvas-Auswahl aufgerufen (Phase 7b)."""
         try:
-            self._state.selected_fids = list(self._canvas._selected_fids)
+            self._state.set_selected_fids(list(self._canvas._selected_fids))
         except Exception:
             pass
+        self._mirror_selection_to_tree(self._canvas._selected_fids)
+        self._clear_status()
+        self._update_selection_label()
+
+    def _on_global_selection_changed(self, fids=None):
+        """Globale Programmer-Auswahl in der Live View spiegeln (goldener Ring +
+        Listen-Markierung). set_selection emittiert NICHT zurueck -> kein Loop;
+        set_selected_fids feuert bei gleicher Auswahl ohnehin nicht erneut."""
+        try:
+            if fids is None:
+                fids = self._state.get_selected_fids()
+            self._canvas.set_selection(list(fids))
+            self._mirror_selection_to_tree(fids)
+            self._clear_status()
+            self._update_selection_label()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _on_canvas_context_menu(self, fid: int, global_pos):
+        """Kontextmenue auf der Canvas (Rechtsklick) — bleibt im Live-View-Umfang."""
+        from PySide6.QtWidgets import QMenu
         n = len(self._canvas._selected_fids)
-        if n == 0:
-            self._lbl_selected.setText("Selektion: -")
-        elif n == 1:
-            self._lbl_selected.setText(f"Selektion: 1 Fixture (fid={self._canvas._selected_fids[0]})")
-        else:
-            self._lbl_selected.setText(f"Selektion: {n} Fixtures")
+        menu = QMenu(self)
+        act_group = menu.addAction("＋ Gruppe aus Auswahl …")
+        act_group.setEnabled(n > 0)
+        act_clear = menu.addAction("Auswahl leeren")
+        act_clear.setEnabled(n > 0)
+        chosen = menu.exec(global_pos)
+        if chosen is act_group:
+            self._on_create_group_clicked()
+        elif chosen is act_clear:
+            self._on_clear_selection()

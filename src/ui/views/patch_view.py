@@ -3,7 +3,8 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView,
-    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDialogButtonBox
+    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDialogButtonBox,
+    QCheckBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -78,6 +79,19 @@ class PatchFixtureEditDialog(QDialog):
         self._lbl_channels = QLabel("")
         form.addRow("Kanaele:", self._lbl_channels)
 
+        # Moving-Head-Ausrichtung (M3.4): Pan/Tilt invertieren/tauschen.
+        self._chk_inv_pan = self._chk_inv_tilt = self._chk_swap = None
+        if (self._fixture.fixture_type or "") in ("moving_head", "scanner"):
+            self._chk_inv_pan = QCheckBox("Pan invertieren")
+            self._chk_inv_pan.setChecked(bool(self._fixture.invert_pan))
+            self._chk_inv_tilt = QCheckBox("Tilt invertieren")
+            self._chk_inv_tilt.setChecked(bool(self._fixture.invert_tilt))
+            self._chk_swap = QCheckBox("Pan/Tilt tauschen")
+            self._chk_swap.setChecked(bool(self._fixture.swap_pan_tilt))
+            form.addRow("Ausrichtung:", self._chk_inv_pan)
+            form.addRow("", self._chk_inv_tilt)
+            form.addRow("", self._chk_swap)
+
         layout.addLayout(form)
 
         self._lbl_warn = QLabel("")
@@ -151,6 +165,12 @@ class PatchFixtureEditDialog(QDialog):
             "address": address,
             "channel_count": ch_count,
         }
+        if self._chk_inv_pan is not None:
+            self.result_updates.update({
+                "invert_pan": self._chk_inv_pan.isChecked(),
+                "invert_tilt": self._chk_inv_tilt.isChecked(),
+                "swap_pan_tilt": self._chk_swap.isChecked(),
+            })
         self.accept()
 
 
@@ -183,6 +203,11 @@ class PatchView(QWidget):
         btn_delete.clicked.connect(self._delete_selected)
         btn_autopatch = QPushButton("Auto-Patch")
         btn_autopatch.clicked.connect(self._auto_patch)
+        btn_generator = QPushButton("Gerät erstellen…")
+        btn_generator.setToolTip(
+            "Fixture Generator: eigenes Geräte-Profil grafisch anlegen "
+            "(Modi, Kanäle, Bereiche, Live-Test) und in die Bibliothek speichern.")
+        btn_generator.clicked.connect(self._open_generator)
 
         self._lbl_conflict = QLabel("")
         self._lbl_conflict.setStyleSheet("color: #ff4444; font-weight: bold;")
@@ -190,6 +215,7 @@ class PatchView(QWidget):
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
         toolbar.addWidget(btn_autopatch)
+        toolbar.addWidget(btn_generator)
         toolbar.addStretch()
         toolbar.addWidget(self._lbl_conflict)
         layout.addLayout(toolbar)
@@ -211,8 +237,15 @@ class PatchView(QWidget):
         self._table.doubleClicked.connect(self._on_double_click)
         layout.addWidget(self._table)
 
-        # Universe-Leiste
-        layout.addWidget(QLabel("Universe 1 — Belegte DMX-Kanäle:"))
+        # Universe-Leiste mit Universe-Umschalter (zeigt nicht mehr nur Univ 1)
+        bar_head = QHBoxLayout()
+        bar_head.addWidget(QLabel("Belegte DMX-Kanäle — Universe:"))
+        self._univ_select = QComboBox()
+        self._univ_select.setMinimumWidth(120)
+        self._univ_select.currentIndexChanged.connect(self._on_univ_select)
+        bar_head.addWidget(self._univ_select)
+        bar_head.addStretch()
+        layout.addLayout(bar_head)
         self._univ_bar = UniverseBar(self)
         layout.addWidget(self._univ_bar)
 
@@ -237,19 +270,29 @@ class PatchView(QWidget):
             is_conflict = f.fid in conflicts
 
             for col, val in enumerate(vals):
+                # FID-Spalte bei Konflikt mit ⚠ markieren — eindeutig auch dort,
+                # wo die Typ-Farbe (z. B. Strobe-Rot) der Konflikt-Farbe aehnelt.
+                if col == 0 and is_conflict:
+                    val = f"⚠ {val}"
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
                 if is_conflict:
-                    item.setBackground(QColor("#5c1a1a"))
-                    item.setForeground(QColor("#ff6666"))
+                    # Deutlich helleres Rot als jede Typ-Farbe (Strobe = #5c2020),
+                    # damit eine Konflikt-Zeile nicht mit einem Strobe verwechselt wird.
+                    item.setBackground(QColor("#b11d1d"))
+                    item.setForeground(QColor("#fff0f0"))
                 else:
                     item.setBackground(bg)
+                # FID an jeder Zelle hinterlegen → Zeilen-Zuordnung unabhaengig
+                # von der Sortier-/Anzeigereihenfolge (robust gegen kuenftige
+                # Spalten-Sortierung).
+                item.setData(Qt.ItemDataRole.UserRole, f.fid)
                 # Geraetetyp-Icon links neben das Label (Spalte 1) setzen.
                 if col == 1:
                     item.setIcon(_mini.fixture_icon(f.fixture_type))
                 self._table.setItem(row, col, item)
 
-        self._univ_bar.update_fixtures(fixtures)
+        self._refresh_univ_bar(fixtures)
         conflict_count = len(conflicts)
         if conflict_count:
             self._lbl_conflict.setText(f"⚠ {conflict_count} Adresskonflikt(e)!")
@@ -275,13 +318,41 @@ class PatchView(QWidget):
             self._state.add_fixture(dlg.result_fixture)
             for extra in getattr(dlg, "extra_fixtures", []):
                 self._state.add_fixture(extra)
+            skipped = getattr(dlg, "skipped_count", 0)
+            if skipped:
+                QMessageBox.warning(
+                    self, "Nicht alle Geräte gepatcht",
+                    f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
+                    "ab Universe 32 war kein Platz mehr.")
+
+    def _open_generator(self):
+        """Oeffnet den Fixture Generator. Nach erfolgreichem Speichern
+        refresht REFRESH_ALL Patch/Bibliothek (vom Dialog emittiert)."""
+        try:
+            from src.ui.widgets.fixture_generator import FixtureGeneratorDialog
+        except Exception as e:
+            QMessageBox.warning(self, "Fixture Generator",
+                                f"Generator konnte nicht geladen werden:\n{e}")
+            return
+        dlg = FixtureGeneratorDialog(self)
+        if dlg.exec() and dlg.saved_id is not None:
+            self._refresh_table()
+
+    def _fid_at_row(self, row: int) -> int | None:
+        """FID der angezeigten Zeile (aus den Item-Daten, nicht positionsbasiert)."""
+        item = self._table.item(row, 0)
+        if item is None:
+            return None
+        fid = item.data(Qt.ItemDataRole.UserRole)
+        return int(fid) if fid is not None else None
 
     def _delete_selected(self):
         rows = {idx.row() for idx in self._table.selectedIndexes()}
         if not rows:
             return
-        fixtures = self._state.get_patched_fixtures()
-        to_delete = [fixtures[r] for r in rows if r < len(fixtures)]
+        by_fid = {f.fid: f for f in self._state.get_patched_fixtures()}
+        to_delete = [by_fid[fid] for r in sorted(rows)
+                     if (fid := self._fid_at_row(r)) in by_fid]
         if not to_delete:
             return
         names = ", ".join(f.label for f in to_delete)
@@ -298,17 +369,49 @@ class PatchView(QWidget):
         fixtures = self._state.get_patched_fixtures()
         if not fixtures:
             return
-        self._state.auto_patch_fixtures()
+        # Auto-Patch schreibt ALLE Adressen/Universen neu — vorher bestaetigen,
+        # damit ein versehentlicher Klick kein abgestimmtes Patch zerstoert.
+        reply = QMessageBox.question(
+            self, "Auto-Patch bestätigen",
+            f"Auto-Patch weist allen {len(fixtures)} Geräten neue, "
+            "fortlaufende Adressen zu (überschreibt Universe und Adresse).\n"
+            "Fortfahren? (rückgängig mit Strg+Z möglich)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self._state.auto_patch_fixtures()
 
     def _on_double_click(self, index):
-        row = index.row()
-        fixtures = self._state.get_patched_fixtures()
-        if row < 0 or row >= len(fixtures):
+        fid = self._fid_at_row(index.row())
+        if fid is None:
             return
-        fixture = fixtures[row]
+        fixture = next((f for f in self._state.get_patched_fixtures()
+                        if f.fid == fid), None)
+        if fixture is None:
+            return
         dlg = PatchFixtureEditDialog(self._state, fixture, self)
         if dlg.exec() and dlg.result_updates:
             self._state.update_fixture(fixture.fid, **dlg.result_updates)
+
+    def _on_univ_select(self, _idx):
+        sel = self._univ_select.currentData()
+        self._univ_bar.update_fixtures(
+            self._state.get_patched_fixtures(), int(sel) if sel is not None else 1)
+
+    def _refresh_univ_bar(self, fixtures: list[PatchedFixture]):
+        """Universe-Auswahl mit den im Patch vorhandenen Universen fuellen und
+        die Belegungsleiste fuer das ausgewaehlte Universe zeichnen."""
+        univs = sorted({f.universe for f in fixtures}) or [1]
+        prev = self._univ_select.currentData()
+        self._univ_select.blockSignals(True)
+        self._univ_select.clear()
+        for u in univs:
+            self._univ_select.addItem(f"Universe {u}", u)
+        target = prev if prev in univs else univs[0]
+        idx = self._univ_select.findData(target)
+        self._univ_select.setCurrentIndex(max(0, idx))
+        self._univ_select.blockSignals(False)
+        self._univ_bar.update_fixtures(fixtures, int(target))
 
     def _on_state_change(self, event: str, _data):
         if event == "patch_changed":
@@ -316,15 +419,17 @@ class PatchView(QWidget):
 
 
 class UniverseBar(QWidget):
-    """Zeigt belegte DMX-Kanäle in Universe 1 als farbige Blöcke."""
+    """Zeigt belegte DMX-Kanäle eines Universe als farbige Blöcke."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(28)
         self._fixtures: list[PatchedFixture] = []
+        self._universe = 1
 
-    def update_fixtures(self, fixtures: list[PatchedFixture]):
-        self._fixtures = [f for f in fixtures if f.universe == 1]
+    def update_fixtures(self, fixtures: list[PatchedFixture], universe: int = 1):
+        self._universe = universe
+        self._fixtures = [f for f in fixtures if f.universe == universe]
         self.update()
 
     def paintEvent(self, _event):

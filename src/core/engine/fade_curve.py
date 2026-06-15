@@ -39,6 +39,8 @@ class FadeCurve:
     name: str = "Linear"
     mode: str = "linear"                       # "linear" | "smooth"
     points: list[Point] = field(default_factory=lambda: [(0.0, 0.0), (1.0, 1.0)])
+    # FLD-01c: "/"-getrennter Ordnerpfad (z. B. "Fades/Soft"); "" = Wurzel.
+    folder: str = ""
 
     def __post_init__(self):
         self._normalize()
@@ -137,6 +139,7 @@ class FadeCurve:
             "name": self.name,
             "mode": self.mode,
             "points": [[round(x, 5), round(y, 5)] for (x, y) in self.points],
+            "folder": self.folder,
         }
 
     @classmethod
@@ -146,10 +149,12 @@ class FadeCurve:
             name=d.get("name", "Linear"),
             mode=d.get("mode", "linear"),
             points=pts or [(0.0, 0.0), (1.0, 1.0)],
+            folder=str(d.get("folder", "") or ""),
         )
 
     def copy(self) -> "FadeCurve":
-        return FadeCurve(name=self.name, mode=self.mode, points=list(self.points))
+        return FadeCurve(name=self.name, mode=self.mode, points=list(self.points),
+                         folder=self.folder)
 
     def is_linear_default(self) -> bool:
         """True, wenn die Kurve eine reine 0→1-Gerade ist (Standard).
@@ -195,3 +200,46 @@ _LINEAR_SINGLETON = linear()
 def default_curve() -> FadeCurve:
     """Geteilte Linear-Kurve für Stellen ohne eigene Kurve (read-only nutzen)."""
     return _LINEAR_SINGLETON
+
+
+# ── Benannte Cue-Fade-Verläufe (F-5) ────────────────────────────────────────────
+#
+# Cue-Fades wählen ihren Verlauf über einen kurzen Namen (in der .lshow gespeichert).
+# ``scurve`` ist der historische Standard (Smoothstep t²(3−2t)) — damit faden alte
+# Shows bit-identisch wie vor F-5. Die übrigen Namen nutzen die Presets oben.
+
+def smoothstep(t: float) -> float:
+    """Klassischer Smoothstep-Verlauf t²(3−2t) — historischer CueStack-Standard."""
+    t = _clamp01(t)
+    return t * t * (3.0 - 2.0 * t)
+
+
+_EASE_IN_SINGLETON = ease_in()
+_EASE_OUT_SINGLETON = ease_out()
+_SNAP_SINGLETON = snap()
+
+# name -> eval(progress 0..1) -> completion 0..1
+_NAMED_EVAL = {
+    "scurve": smoothstep,
+    "linear": _clamp01,
+    "ease_in": _EASE_IN_SINGLETON.eval,
+    "ease_out": _EASE_OUT_SINGLETON.eval,
+    "snap": _SNAP_SINGLETON.eval,
+}
+
+# UI-Reihenfolge + Klartext-Labels (Standard zuerst).
+CURVE_NAMES = ["scurve", "linear", "ease_in", "ease_out", "snap"]
+CURVE_LABELS = {
+    "scurve": "S-Kurve (Standard)",
+    "linear": "Linear",
+    "ease_in": "Ease In",
+    "ease_out": "Ease Out",
+    "snap": "Snap",
+}
+
+
+def eval_named(name: str, t: float) -> float:
+    """Completion (0..1) für einen benannten Cue-Fade-Verlauf.
+    Unbekannte Namen fallen sicher auf den Smoothstep-Standard zurück."""
+    fn = _NAMED_EVAL.get(name) or smoothstep
+    return _clamp01(fn(_clamp01(t)))

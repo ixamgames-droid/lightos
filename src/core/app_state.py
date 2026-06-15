@@ -1,5 +1,6 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
+import os
 import threading
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from .database.models import Base, PatchedFixture
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
+from .debug_log import debug_swallow
 
 SHOW_DB_PATH = "data/current_show.db"
 
@@ -50,10 +52,21 @@ class AppState:
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
         self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
+        # T-VIZ-03: Y-Rotation (Grad) je Fixture im 3D-Visualizer; getrennt von
+        # positions, damit die (x,y,z)-Tupelform unveraendert bleibt (keine Migration).
+        self.visualizer_rotations: dict[int, float] = {}
+        # Andock-Beziehungen: {fid: stage_element_id} — Strahler haengt an/auf
+        # diesem Buehnen-Element (Trasse/Plattform/Boden). Bewegt sich das
+        # Element, wandert der Strahler mit. Geht mit in die .lshow.
+        self.visualizer_docks: dict[int, str] = {}
         self.active_stage_name: str = "simple"
         # Live-View-Positionen (2D, {fid: (x, y)}) — eigene Persistenz, entkoppelt
         # vom 3D-Visualizer. Migration aus visualizer_positions beim Laden, falls leer.
         self.live_view_positions: dict[int, tuple[float, float]] = {}
+        # P4: Show-spezifische Live-View-Einstellungen (zoom, grid_size, snap,
+        # grid_visible, world_w/h) — von der Live View gepflegt, wandert mit
+        # save_show/load_show. Leer = ui_prefs-Defaults (alte Shows).
+        self.live_view_meta: dict = {}
         self._patch_cache: list[PatchedFixture] = []
         # Basis-Level pro Fixture: {fid: {attr: 0-255}}. Wird in den Default-Frame
         # gelegt (siehe _rebuild_render_plan) und mit der Show gespeichert. Typisch:
@@ -68,6 +81,17 @@ class AppState:
         # Nicht-gepatchte Adressen, die Funktionen (z. B. ScriptFunction setdmx)
         # im letzten Frame geschrieben haben — fuer korrektes Freigeben.
         self._engine_extra_prev: dict[int, set] = {}
+        # Simple Desk = manuelle Roh-Override-Ebene (ISO-03). {universe: {ch: val}},
+        # nur explizit gesetzte Kanaele. Wird im _render_frame als OBERSTE Schicht
+        # angewandt (deterministisch jeden Frame) — frueher schrieb der Fader direkt
+        # ins Live-Universe am Renderer vorbei (Flackern auf gepatchten Kanaelen +
+        # unsichtbarer Zombie auf freien). Sicht- (ISO-01) und loeschbar (ISO-02).
+        self.simple_desk: dict[int, dict[int, int]] = {}
+        self._sd_lock = threading.RLock()
+        # Simple Desk ist standardmaessig reine ANZEIGE (Monitor). Erst mit aktivem
+        # 'Manueller Override' wirkt die Ebene auf die Ausgabe (Schicht 4c, absolute
+        # Oberhand). Default False = nichts faellt ungewollt in die Live-Ausgabe.
+        self.simple_desk_override: bool = False
         self._callbacks: list = []
         self.mock_mode: bool = False
         # Multiplikative Dimmer-Master (EE-02), wirken NACH dem Effekt-Layer:
@@ -88,6 +112,21 @@ class AppState:
         from .engine.cue_stack import CueStack
         self.cue_stacks: list[CueStack] = []
         self.playback_engine = None  # wird in start_playback() gesetzt
+        # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
+        # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
+        # daraus gefüllt, und die Virtuelle Konsole (VCSongInfo) liest „aktuelles/
+        # nächstes Lied".
+        self.playlist: list[dict] = []
+        # Auto-Show an Musik koppeln: startet beim Play im In-App-Player automatisch
+        # die angegebenen Funktionen (BPM-synchrone Lichtshow), stoppt beim Pause/Stop.
+        #   enabled       — Kopplung aktiv?
+        #   function_ids  — Funktionen, die der MusicShowDirector startet/stoppt
+        #   bank          — empfohlene VC-Bank der Auto-Show (Info/optionales Umschalten)
+        #   slots         — {function_id: live_edit_slot} damit Bank-Pads desselben
+        #                   Slots die director-gestartete Funktion sauber ablösen
+        #                   (layer-getrennt, ohne globales stop_all)
+        # Getrieben von core/audio/music_show.py (MusicShowDirector).
+        self.music_autoshow: dict = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
         # QLC+ Function Manager
         from .engine.function_manager import get_function_manager
         self.function_manager = get_function_manager()
@@ -96,8 +135,8 @@ class AppState:
         self.midi_mapper = get_midi_mapper(self)
         try:
             self.midi_mapper and self.midi_mapper.load("data/midi_mappings.json")
-        except Exception:
-            pass
+        except Exception as e:
+            debug_swallow("app_state.midi_load", e)
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
@@ -109,6 +148,12 @@ class AppState:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         self._show_engine = create_engine(f"sqlite:///{path}", echo=False)
         Base.metadata.create_all(self._show_engine)
+        # FLD-01b: fehlende Spalten in bestehenden Show-DBs nachziehen.
+        try:
+            from .database.models import migrate_show_db
+            migrate_show_db(self._show_engine)
+        except Exception as e:
+            print(f"[AppState] migrate_show_db failed: {e}")
         self._reload_patch_cache()
         # Validierung + Auto-Repair beim Show-Laden
         try:
@@ -396,23 +441,43 @@ class AppState:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
 
-    def auto_patch_fixtures(self):
-        """Weist allen Fixtures aufeinander folgende Adressen zu."""
-        from sqlalchemy import update
-        from .database.models import PatchedFixture as PF
+    def auto_patch_fixtures(self, undoable: bool = True):
+        """Weist allen Fixtures aufeinander folgende Adressen zu (undobar)."""
+        # Snapshot der aktuellen Adressierung fuer Undo (vor der Aenderung).
+        before = [
+            {"fid": f.fid, "universe": f.universe, "address": f.address}
+            for f in self._patch_cache
+        ]
         addr = 1
         univ = 1
+        after = []
+        for f in sorted(self._patch_cache, key=lambda x: x.fid):
+            if addr + f.channel_count - 1 > 512:
+                univ += 1
+                addr = 1
+            after.append({"fid": f.fid, "universe": univ, "address": addr})
+            addr += f.channel_count
+        self._apply_patch_addresses(after)
+        if undoable:
+            self._push_undo(
+                label="Auto-Patch",
+                do=lambda: None,
+                undo=lambda b=before: self._apply_patch_addresses(b),
+                redo=lambda a=after: self._apply_patch_addresses(a),
+            )
+
+    def _apply_patch_addresses(self, rows: list[dict]):
+        """Setzt universe/address fuer eine Liste {fid, universe, address} und
+        baut Cache/Render-Plan neu auf (gemeinsame Basis fuer Auto-Patch+Undo)."""
+        from sqlalchemy import update
+        from .database.models import PatchedFixture as PF
         with self._session() as s:
-            for f in sorted(self._patch_cache, key=lambda x: x.fid):
-                if addr + f.channel_count - 1 > 512:
-                    univ += 1
-                    addr = 1
+            for r in rows:
                 s.execute(
-                    update(PF).where(PF.fid == f.fid).values(
-                        universe=univ, address=addr
+                    update(PF).where(PF.fid == r["fid"]).values(
+                        universe=r["universe"], address=r["address"]
                     )
                 )
-                addr += f.channel_count
             s.commit()
         self._reload_patch_cache()
         self._emit("patch_changed")
@@ -433,6 +498,34 @@ class AppState:
             if address <= their_end and my_end >= f.address:
                 conflicts.append(f.fid)
         return conflicts
+
+    def suggest_address(self, universe: int, channel_count: int,
+                        exclude_fid: int = -1) -> int | None:
+        """Schlaegt die naechste freie Startadresse fuer ein Fixture mit
+        channel_count Kanaelen im Universum vor (P1, zentral wiederverwendbar).
+
+        Strategie: belegte Bereiche sortieren und die ERSTE Luecke nehmen, in
+        die das Fixture passt (auch Luecken zwischen Fixtures) — sonst direkt
+        hinter dem letzten belegten Kanal. Passt es nirgends mehr (Ende > 512),
+        wird None geliefert; die UI zeigt dann eine Warnung.
+        """
+        try:
+            channel_count = max(1, int(channel_count))
+        except (TypeError, ValueError):
+            return None
+        spans = sorted(
+            (f.address, f.address + f.channel_count - 1)
+            for f in self._patch_cache
+            if f.universe == universe and f.fid != exclude_fid
+        )
+        cursor = 1  # naechster Kandidat fuer eine Startadresse
+        for start, end in spans:
+            if start - cursor >= channel_count:
+                return cursor  # Luecke vor diesem Fixture reicht aus
+            cursor = max(cursor, end + 1)
+        if cursor + channel_count - 1 <= 512:
+            return cursor
+        return None
 
     # ── Programmer ────────────────────────────────────────────────────────────
 
@@ -512,12 +605,51 @@ class AppState:
     def get_selected_group_id(self):
         return getattr(self, "selected_group_id", None)
 
+    # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
+    def _group_lookup(self, name: str):
+        """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe per Name.
+        (None, []) wenn die Gruppe nicht existiert."""
+        import json
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup
+            with self._session() as s:
+                g = s.execute(
+                    select(FixtureGroup).where(FixtureGroup.name == name)
+                ).scalar_one_or_none()
+            if g is None:
+                return None, []
+            items = []
+            for key, fid in (json.loads(g.positions_json or "{}") or {}).items():
+                try:
+                    c, r = str(key).split(",")
+                    items.append((int(r), int(c), int(fid)))
+                except Exception:
+                    continue
+            items.sort()
+            return g.id, [fid for _, _, fid in items]
+        except Exception:
+            return None, []
+
+    def group_fids_by_name(self, name: str) -> list[int]:
+        """Fids einer Gruppe (Name) in Raster-Reihenfolge; [] wenn unbekannt."""
+        return self._group_lookup(name)[1]
+
+    def select_group_by_name(self, name: str) -> bool:
+        """Wählt die Fixtures einer Gruppe in den Programmer (F-24). True bei Erfolg."""
+        gid, fids = self._group_lookup(name)
+        if gid is None or not fids:
+            return False
+        self.set_selected_group_id(gid)
+        self.set_selected_fids(fids)
+        return True
+
     def _flush_programmer_to_dmx(self, fid: int):
         fixture = next((f for f in self._patch_cache if f.fid == fid), None)
         if not fixture or fixture.universe not in self.universes:
             return
         universe = self.universes[fixture.universe]
-        prog = self.programmer.get(fid, {})
+        prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
         channels = get_channels_for_patched(fixture)
         for ch in channels:
             val = prog.get(ch.attribute, ch.default_value)
@@ -528,6 +660,90 @@ class AppState:
     def _flush_all_to_dmx(self):
         for f in self._patch_cache:
             self._flush_programmer_to_dmx(f.fid)
+
+    # ── Simple Desk (manuelle Roh-Override-Ebene, ISO-03) ──────────────────────
+
+    def _emit_dmx_changed(self, universe=None):
+        try:
+            from .sync import SyncEvent
+            self.sync.emit(SyncEvent.DMX_CHANGED, universe)
+        except Exception as e:
+            print(f"[app_state] dmx emit error: {e}")
+
+    def set_simple_desk_channel(self, universe: int, channel: int, value: int):
+        """Setzt einen manuellen Simple-Desk-Override (Kanal 1..512, Wert 0..255).
+        Wird im _render_frame als oberste Schicht angewandt (kein Roh-Bypass mehr)."""
+        try:
+            universe = int(universe)
+            channel = int(channel)
+            value = max(0, min(255, int(value)))
+        except (TypeError, ValueError):
+            return
+        if not (1 <= channel <= 512):
+            return
+        with self._sd_lock:
+            self.simple_desk.setdefault(universe, {})[channel] = value
+        self._emit_dmx_changed(universe)
+
+    def set_simple_desk_all(self, universe: int, value: int):
+        """Setzt ALLE 512 Kanaele eines Universums als Simple-Desk-Override
+        (Buttons 'Alles auf 0' / 'Alles auf 255')."""
+        try:
+            universe = int(universe)
+            value = max(0, min(255, int(value)))
+        except (TypeError, ValueError):
+            return
+        with self._sd_lock:
+            self.simple_desk[universe] = {ch: value for ch in range(1, 513)}
+        self._emit_dmx_changed(universe)
+
+    def get_simple_desk_channel(self, universe: int, channel: int) -> int | None:
+        with self._sd_lock:
+            return self.simple_desk.get(int(universe), {}).get(int(channel))
+
+    def clear_simple_desk(self, universe: int | None = None):
+        """Entfernt Simple-Desk-Overrides (ein Universum oder alle). Die Kanaele
+        fallen im naechsten Frame auf die gerenderte Ausgabe/Default zurueck —
+        kein haengender Roh-Wert mehr (ISO-02)."""
+        with self._sd_lock:
+            if universe is None:
+                self.simple_desk.clear()
+            else:
+                self.simple_desk.pop(int(universe), None)
+        self._emit_dmx_changed(universe)
+
+    def set_simple_desk_override(self, enabled: bool):
+        """Schaltet den manuellen Override (Schicht 4c) an/aus. Nur wenn aktiv,
+        wirkt die Simple-Desk-Ebene auf die Ausgabe (absolute Oberhand). Beim
+        Ausschalten werden die Override-Werte verworfen (Kanaele werden frei)."""
+        self.simple_desk_override = bool(enabled)
+        if not self.simple_desk_override:
+            with self._sd_lock:
+                self.simple_desk.clear()
+        self._emit_dmx_changed(None)
+
+    # ── Aktive Fremdwerte: Anzeige (ISO-01) + zentrales Clear (ISO-02) ─────────
+
+    def programmer_active(self) -> int:
+        """Anzahl aktiver Programmer-Attribute (0 = leer). Fuer die ISO-01-Anzeige
+        'Programmer aktiv (n)'."""
+        with self._prog_lock:
+            return sum(len(a) for a in self.programmer.values())
+
+    def simple_desk_active(self) -> int:
+        """Anzahl wirksamer Simple-Desk-Override-Kanaele (0 wenn der manuelle
+        Override aus ist — dann ist Simple Desk reine Anzeige)."""
+        if not getattr(self, "simple_desk_override", False):
+            return 0
+        with self._sd_lock:
+            return sum(len(c) for c in self.simple_desk.values())
+
+    def clear_all_non_vc(self):
+        """ISO-02: setzt ALLE manuellen Stoerwerte zurueck (Programmer + Simple
+        Desk). Laufende Funktionen/Effekte/Cues, gespeicherte Effekte, Shows,
+        Patches und Fixtures bleiben UNANGETASTET."""
+        self.clear_programmer()
+        self.clear_simple_desk()
 
     # ── Events ────────────────────────────────────────────────────────────────
 
@@ -567,11 +783,20 @@ class AppState:
             if base:
                 su.set_range(1, base)
             scratch[univ] = su
-        # 2. Funktionen rendern in die Scratch-Universen.
+        # 2. Funktionen rendern in die Scratch-Universen. Dabei protokollieren,
+        #    welche Adressen der Funktions-Layer schreibt (WERT-unabhaengig) —
+        #    so erkennt 4a² einen Dimmer-Effekt auch dann als „treibt die
+        #    Intensitaet", wenn er gerade 0 ausgibt (Strobe-Nulldurchgang,
+        #    dunkles Matrix-Pixel) und darf ihn dann nicht aufhellen.
+        for su in scratch.values():
+            su.begin_write_log()
         try:
             self.function_manager.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        func_touched: dict[int, set[int]] = {}
+        for univ, su in scratch.items():
+            func_touched[univ] = su.end_write_log()
         # 2a. WP-6 (Abschnitt 8): Adressen erfassen, die der FUNKTIONS-Layer
         #     (Matrix/EFX/…) in DIESEM Frame treibt (Scratch != Default). Der
         #     Programmer-LTP ueberschreibt diese Nicht-Intensitaets-Kanaele dann
@@ -597,11 +822,28 @@ class AppState:
         #     Bewusst VOR den Executoren erfasst: Cues behalten LTP-Ersatz durch
         #     den Programmer, nur laufende Effekte werden multipliziert.
         inten_addrs: dict[int, list[int]] = {}
+        # Getrennt erfasst fuer die implizite Grundhelligkeit (4a²): NUR echte
+        # Dimmer-/Intensitaets-Kanaele bzw. NUR Farb-Kanaele eines Fixtures.
+        dim_addrs: dict[int, list[int]] = {}
+        color_addrs: dict[int, list[int]] = {}
         effect_present: dict[int, bool] = {}
         for fidi, entry in self._fix_index.items():
             fx, chans = entry
             addrs = self._fixture_intensity_addrs(fx, chans)
             inten_addrs[fidi] = addrs
+            dims: list[int] = []
+            cols: list[int] = []
+            for ch in chans:
+                a_l = (getattr(ch, "attribute", "") or "").lower()
+                ad = fx.address + ch.channel_number - 1
+                if not (1 <= ad <= 512):
+                    continue
+                if a_l in _DIM_INTENSITY_ATTRS:
+                    dims.append(ad)
+                elif a_l in _DIM_COLOR_ATTRS:
+                    cols.append(ad)
+            dim_addrs[fidi] = dims
+            color_addrs[fidi] = cols
             su = scratch.get(fx.universe)
             if su is None:
                 effect_present[fidi] = False
@@ -615,9 +857,19 @@ class AppState:
                     break
             effect_present[fidi] = present
         # 3. Executoren (Cue-Playback) darueber.
+        exec_dimmer_fids: set[int] = set()
         if self.playback_engine is not None:
             try:
-                self._apply_fixture_map(scratch, self.playback_engine.compute_merged())
+                merged = self.playback_engine.compute_merged()
+                self._apply_fixture_map(scratch, merged)
+                # Fixtures, deren Intensitaet ein Cue setzt (auch 0) → 4a² laesst
+                # sie in Ruhe (der Cue „besitzt" den Dimmer).
+                for fid_m, attrs_m in merged.items():
+                    try:
+                        if any(k in attrs_m for k in _DIM_INTENSITY_ATTRS):
+                            exec_dimmer_fids.add(int(fid_m))
+                    except (TypeError, ValueError):
+                        continue
             except Exception as exc:
                 print(f"[AppState] render executors error: {exc}")
 
@@ -641,6 +893,59 @@ class AppState:
                     prog_factor[fidi] = min(prog_factor.get(fidi, 1.0), f)
         self._apply_fixture_map(scratch, programmer, skip_intensity_for=set(prog_factor),
                                 protect_addrs=func_driven)
+
+        # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
+        #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch
+        #      Programmer ODER einen laufenden Farb-Effekt/Matrix), dessen Dimmer
+        #      aber von NICHTS getrieben wird, wird hier auf voll gesetzt — damit
+        #      die Farbe leuchtet, OHNE dass der Master-/Programmer-Dimmer manuell
+        #      hochgezogen werden muss (frueher blieb so eine reine Farb-Matrix auf
+        #      Geraeten mit Dimmer-Kanal dunkel). Ein echter Dimmer gewinnt weiter:
+        #        • Funktion schreibt den Dimmer  → func_touched (auch Wert 0!) →
+        #          uebersprungen. Deckt „Dimmer-Effekt/Matrix zieht auf 0“ robust ab
+        #          (Strobe-Nulldurchgang/dunkles Pixel bleibt dunkel, kein Flackern).
+        #        • Cue setzt den Dimmer            → exec_dimmer_fids → uebersprungen
+        #        • Programmer-Dimmer gesetzt        → uebersprungen (absolut/Multiply)
+        #        • Base-Level / bereits getrieben   → Dimmer ≠ 0 → uebersprungen
+        #      Die nachfolgende 4b-Skalierung (Submaster/Fixture-Dimmer/Blackout)
+        #      regelt dieses implizite Voll ganz normal wieder herunter.
+        prog_dimmer_fids: set[int] = set()
+        for fid, attrs in programmer.items():
+            try:
+                if any(k in attrs for k in _DIM_INTENSITY_ATTRS):
+                    prog_dimmer_fids.add(int(fid))
+            except (TypeError, ValueError):
+                continue
+        for fidi, dims in dim_addrs.items():
+            if not dims or fidi in exec_dimmer_fids or fidi in prog_dimmer_fids:
+                continue
+            entry = self._fix_index.get(fidi)
+            if not entry:
+                continue
+            univ = entry[0].universe
+            touched = func_touched.get(univ, ())
+            if any(a in touched for a in dims):
+                continue   # eine Funktion treibt den Dimmer (auch auf 0)
+            su = scratch.get(univ)
+            if su is None:
+                continue
+            if any(su.get_channel(a) for a in dims):
+                continue   # Dimmer schon getrieben (Base-Level o. Ae.)
+            # „Farbe aktiv" = ein Farbkanal wird UEBER seinen Ruhewert (Default-
+            # Frame) getrieben. Ein blosser Geraete-Default (z. B. color_b=5) zaehlt
+            # also nicht — nur eine echt gesetzte/effekt­getriebene Farbe lichtet.
+            base = self._default_frame.get(univ)
+            cols = color_addrs.get(fidi) or []
+            active = False
+            for a in cols:
+                dv = base[a - 1] if (base and a - 1 < len(base)) else 0
+                if su.get_channel(a) > dv:
+                    active = True
+                    break
+            if not active:
+                continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
+            for a in dims:
+                su.set_channel(a, 255)
 
         # 4b. Multiplikativer Dimmer-Master: submaster * Gruppen-/Fixture-Dimmer *
         #     Programmer-Dimmer (nur wo Effekt aktiv). Skaliert pro Fixture die
@@ -666,6 +971,30 @@ class AppState:
                 continue
             for a in addrs:
                 su.set_channel(a, int(su.get_channel(a) * factor))
+
+        # 4c. Simple Desk (ISO-03): manuelle Override-Ebene als OBERSTE Schicht —
+        #     NUR wenn 'Manueller Override' aktiv ist (sonst ist Simple Desk reine
+        #     Anzeige und wirkt gar nicht). Patched-Kanaele committen ueber
+        #     _commit_spans (Schritt 5), freie ueber den Engine-Extra-Pfad inkl.
+        #     korrekter Freigabe bei Clear/Override-Aus. Frueher schrieb der Fader
+        #     direkt ins Live-Universe (am Renderer vorbei) -> Flackern auf
+        #     gepatchten + Zombie auf freien Kanaelen. Jetzt sicht- (ISO-01) und
+        #     loeschbar (ISO-02).
+        sd_state = getattr(self, "simple_desk", None)
+        if sd_state and getattr(self, "simple_desk_override", False):
+            sd_lock = getattr(self, "_sd_lock", None)
+            if sd_lock is not None:
+                with sd_lock:
+                    sd_layer = {u: dict(ch) for u, ch in sd_state.items()}
+            else:
+                sd_layer = {u: dict(ch) for u, ch in sd_state.items()}
+            for univ, chans in sd_layer.items():
+                su = scratch.get(univ)
+                if su is None:
+                    continue
+                for ch, val in chans.items():
+                    if 1 <= ch <= 512:
+                        su.set_channel(ch, max(0, min(255, int(val))))
 
         # 5. Atomarer Commit der gepatchten Spans ins Live-Universe.
         for univ, live in live_universes:
@@ -712,6 +1041,9 @@ class AppState:
             if not entry:
                 continue
             fx, chans = entry
+            # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden, bevor geschrieben
+            # wird (wirkt damit auf Programmer + Cues gleichermassen).
+            attrs = apply_pan_tilt_orientation(fx, attrs)
             su = scratch.get(fx.universe)
             if su is None:
                 continue
@@ -822,8 +1154,8 @@ class AppState:
             try:
                 marshaller(lambda e=event, d=data: self._emit_impl(e, d))
                 return
-            except Exception:
-                pass  # Fallback: lieber synchron als Event-Verlust
+            except Exception as e:
+                debug_swallow("app_state.marshaller", e)  # Fallback: synchron
         self._emit_impl(event, data)
 
     def _emit_impl(self, event: str, data=None):
@@ -842,8 +1174,8 @@ class AppState:
             except ValueError:
                 return  # Unbekanntes Event -> ignorieren (kein Crash)
             self.sync.emit(ev, data)
-        except Exception:
-            pass
+        except Exception as e:
+            debug_swallow("app_state.emit", e)
 
     def set_ui_marshaller(self, fn):
         """Registriert eine Funktion fn(callable)->None, die ihr Argument im
@@ -876,6 +1208,7 @@ def get_channels_for_patched(fixture: PatchedFixture):
     if cached is not None:
         return cached
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
     from .database.fixture_db import engine
     from .database.models import FixtureMode, FixtureChannel
     with Session(engine()) as s:
@@ -910,10 +1243,110 @@ def get_channels_for_patched(fixture: PatchedFixture):
             select(FixtureChannel)
             .where(FixtureChannel.mode_id == mode.id)
             .order_by(FixtureChannel.channel_number)
+            # Ranges eager laden, damit sie auf den detachten (gecachten)
+            # Objekten verfuegbar sind — open_value_for()/Quick-Select greifen
+            # sonst per Lazy-Load zu und crashen im Per-Frame-Renderer.
+            .options(selectinload(FixtureChannel.ranges))
         ).scalars().all()
         s.expunge_all()
         _channel_cache[key] = result
         return result
+
+
+def find_channel(fixture, attribute: str):
+    """Erstes FixtureChannel-Objekt eines Geraets mit diesem ``attribute``
+    (oder None). Zentraler Ersatz fuer die ueberall duplizierte
+    ``for ch ... if ch.attribute == attr``-Schleife (M0.3)."""
+    for ch in get_channels_for_patched(fixture):
+        if ch.attribute == attribute:
+            return ch
+    return None
+
+
+def channel_addr(fixture, attribute: str):
+    """DMX-Adresse (1..512) des Kanals mit ``attribute``, oder None wenn das
+    Geraet diesen Kanal nicht hat bzw. die Adresse ausserhalb liegt (M0.3)."""
+    ch = find_channel(fixture, attribute)
+    if ch is None:
+        return None
+    addr = fixture.address + ch.channel_number - 1
+    return addr if 1 <= addr <= 512 else None
+
+
+def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
+    """Sinnvoller "offener"/Highlight-Wert eines Kanals: bevorzugt eine
+    ChannelRange mit ``kind == "open"`` (Mittelwert), sonst ``highlight_value``,
+    sonst ``fallback``. Nutzt nur vorhandene Capability-Daten (kein Raten)."""
+    ch = find_channel(fixture, attribute)
+    if ch is None:
+        return fallback
+    for rng in (getattr(ch, "ranges", None) or ()):
+        if (getattr(rng, "kind", "") or "").lower() == "open":
+            return max(0, min(255, (int(rng.range_from) + int(rng.range_to)) // 2))
+    hv = getattr(ch, "highlight_value", None)
+    return int(hv) if hv is not None else fallback
+
+
+def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
+    """Wendet ``invert_pan`` / ``invert_tilt`` / ``swap_pan_tilt`` eines
+    Geraets auf eine ``{attr: val}``-Schicht an (M0.2).
+
+    Gibt das Original unveraendert zurueck, wenn keine Flag gesetzt ist oder
+    die Schicht gar kein Pan/Tilt enthaelt (kein Overhead im heissen Render-
+    Pfad). Andernfalls ein NEUES dict (Programmer-/Funktions-State bleibt roh).
+    Reihenfolge: erst Swap (Achsen tauschen inkl. Fine), dann Invert je Kanal.
+    Fine-Kanaele werden als 16-bit-Paar korrekt mit-invertiert.
+    """
+    inv_pan = bool(getattr(fx, "invert_pan", False))
+    inv_tilt = bool(getattr(fx, "invert_tilt", False))
+    swap = bool(getattr(fx, "swap_pan_tilt", False))
+    if not (inv_pan or inv_tilt or swap):
+        return attrs
+    if not any(k in attrs for k in ("pan", "pan_fine", "tilt", "tilt_fine")):
+        return attrs
+    out = dict(attrs)
+
+    if swap:
+        for a, b in (("pan", "tilt"), ("pan_fine", "tilt_fine")):
+            va, vb = out.get(a), out.get(b)
+            if va is None and vb is None:
+                continue
+            if vb is not None:
+                out[a] = vb
+            else:
+                out.pop(a, None)
+            if va is not None:
+                out[b] = va
+            else:
+                out.pop(b, None)
+
+    def _invert(coarse: str, fine: str):
+        if coarse not in out:
+            return
+        # P9: defensiv gegen kaputte Werte (None/Strings aus OSC/Web/MIDI) —
+        # ein ungueltiger Pan/Tilt-Wert darf den Render-Thread nicht stoppen.
+        try:
+            c = max(0, min(255, int(out[coarse])))
+        except (TypeError, ValueError):
+            out.pop(coarse, None)
+            out.pop(fine, None)
+            return
+        if fine in out:
+            try:
+                f = max(0, min(255, int(out[fine])))
+            except (TypeError, ValueError):
+                f = 0
+            combined = 65535 - ((c << 8) | f)
+            out[coarse] = (combined >> 8) & 0xFF
+            out[fine] = combined & 0xFF
+        else:
+            out[coarse] = 255 - c
+
+    if inv_pan:
+        _invert("pan", "pan_fine")
+    if inv_tilt:
+        _invert("tilt", "tilt_fine")
+    return out
 
 
 # Singleton
@@ -926,6 +1359,14 @@ def get_state() -> AppState:
         _state = AppState()
         _state.open_show()
         _state.apply_output_config()
-        _state.output_manager.start()
+        # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
+        # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
+        # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
+        # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
+        # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
+        # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
+        # dort ohnehin nicht geprueft.
+        if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
+            _state.output_manager.start()
         _state.start_playback()
     return _state

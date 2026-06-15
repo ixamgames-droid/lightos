@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "id": "korg_nanokontrol2",
+  "manufacturer": "KORG",
+  "model": "nanoKONTROL2",
+  "device_type": "midi_fader_controller",
+  "connections": ["USB-MIDI"],
+  "buttons": 35,
+  "faders": 8,
+  "encoders": 8,
+  "pad_matrix": null,
+  "banks": "keine Hardware-Banks (Szenen nur über Korg-Editor umkonfigurierbar)",
+  "controls": [
+    {"name": "Slider 1-8", "type": "cc", "channel": 0, "range": [0, 7], "layout": "8 Fader (Default-Szene)"},
+    {"name": "Drehregler 1-8", "type": "cc", "channel": 0, "range": [16, 23], "layout": "8 Potis über den Fadern"},
+    {"name": "S-Tasten (Solo)", "type": "cc", "channel": 0, "range": [32, 39], "layout": "CC-Tasten, 127=gedrückt / 0=losgelassen"},
+    {"name": "M-Tasten (Mute)", "type": "cc", "channel": 0, "range": [48, 55], "layout": ""},
+    {"name": "R-Tasten (Rec)", "type": "cc", "channel": 0, "range": [64, 71], "layout": ""},
+    {"name": "Transport Play/Stop/Rew/FF/Rec/Cycle", "type": "cc", "channel": 0, "range": [41, 46], "layout": "41=Play 42=Stop 43=Rew 44=FF 45=Rec 46=Cycle"},
+    {"name": "Track </>", "type": "cc", "channel": 0, "range": [58, 59], "layout": ""},
+    {"name": "Marker Set/</>", "type": "cc", "channel": 0, "range": [60, 62], "layout": ""}
+  ],
+  "led_feedback": {
+    "type": "cc",
+    "notes": "Tasten-LEDs per CC an die Tasten-Nummer (127=an, 0=aus); nur im 'LED External'-Modus (über Korg Kontrol Editor aktivierbar), sonst leuchten LEDs lokal beim Drücken."
+  },
+  "features": ["sehr kompakt", "Tasten senden CC (nicht Note!) — in LightOS als CC-Buttons binden"],
+  "source": "KORG 'nanoKONTROL2 MIDI Implementation' (öffentlich dokumentiert, Default-Szene)",
+  "license": "Faktendaten (MIDI-CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

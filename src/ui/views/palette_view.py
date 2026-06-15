@@ -97,16 +97,37 @@ class PalettePage(QWidget):
             item = self._grid.itemAt(i)
             if item and item.widget():
                 item.widget().deleteLater()
-        palettes = self.manager.get_by_type(self.ptype)
+        # FLD-01c: nach Ordner + Name sortieren und je Ordner eine Überschrift zeigen.
+        palettes = list(self.manager.get_by_type(self.ptype))
+        palettes.sort(key=lambda p: ((getattr(p, "folder", "") or "").lower(),
+                                     (p.name or "").lower()))
         col_count = 6
-        for idx, pal in enumerate(palettes):
+        row = 0
+        col = 0
+        cur_folder = None
+        for pal in palettes:
+            folder = getattr(pal, "folder", "") or ""
+            if folder != cur_folder:
+                if col != 0:
+                    row += 1
+                    col = 0
+                cur_folder = folder
+                hdr = QLabel(f"📁 {folder}" if folder else "● (kein Ordner)")
+                hdr.setStyleSheet("color:#8b949e; font-size:10px; font-weight:bold; padding-top:4px;")
+                self._grid.addWidget(hdr, row, 0, 1, col_count)
+                row += 1
+                col = 0
             btn = PaletteButton(pal)
             btn.clicked.connect(lambda checked=False, p=pal: self._apply(p))
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             btn.customContextMenuRequested.connect(
                 lambda pos, p=pal, b=btn: self._context(p, b)
             )
-            self._grid.addWidget(btn, idx // col_count, idx % col_count)
+            self._grid.addWidget(btn, row, col)
+            col += 1
+            if col >= col_count:
+                col = 0
+                row += 1
 
     def _target_fids(self) -> list[int] | None:
         """Programmer-Auswahl (R2); None = alle Geräte (Fallback, wenn nichts gewählt)."""
@@ -136,11 +157,30 @@ class PalettePage(QWidget):
         menu.addAction("Überschreiben (Programmer)").triggered.connect(
             lambda: (pal.record_from_programmer(), self._refresh())
         )
+        menu.addAction("In Ordner verschieben…").triggered.connect(
+            lambda: self._set_folder(pal)
+        )
         menu.addSeparator()
         menu.addAction("Löschen").triggered.connect(
             lambda: (self.manager.remove(pal), self._refresh())
         )
         menu.exec(btn.mapToGlobal(btn.rect().center()))
+
+    def _set_folder(self, pal: Palette):
+        """FLD-01c: Palette einem (verschachtelten) Ordner zuordnen (Pfad mit /)."""
+        cur = getattr(pal, "folder", "") or ""
+        path, ok = QInputDialog.getText(
+            self, "Ordner setzen",
+            "Ordnerpfad (verschachtelt mit /, leer = Wurzel):", text=cur)
+        if not ok:
+            return
+        pal.folder = "/".join(p.strip() for p in path.split("/") if p.strip())
+        self._refresh()
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.PALETTE_CHANGED, None)
+        except Exception:
+            pass
 
 
 class PaletteView(QWidget):
@@ -177,9 +217,9 @@ class PaletteView(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._sync_refresh())
-            sync.subscribe(SyncEvent.PALETTE_CHANGED, lambda *_: self._sync_refresh())
-            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._sync_refresh())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._sync_refresh())
+            sync.subscribe_widget(SyncEvent.PALETTE_CHANGED, self, lambda *_: self._sync_refresh())
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self, lambda *_: self._sync_refresh())
         except Exception as e:
             print(f"[palette_view] sync subscribe error: {e}")
 

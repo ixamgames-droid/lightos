@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "enttec_dmx_usb_pro",
+  "manufacturer": "Enttec",
+  "model": "DMX USB Pro",
+  "device_type": "dmx_interface",
+  "connections": ["DMX-USB (FTDI, serielles Protokoll)"],
+  "buttons": 0,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": null,
+  "banks": "",
+  "controls": [],
+  "led_feedback": {},
+  "features": ["1 DMX-Universum Out (512 Kanäle)", "DMX-In möglich", "wird von LightOS direkt angesteuert (src/core/dmx/enttec_pro.py, 'Enttec Pro' in der Ausgabe-Konfiguration)"],
+  "source": "Enttec 'DMX USB Pro API' (öffentlich dokumentiertes serielles Protokoll); LightOS-Treiber enttec_pro.py",
+  "license": "Faktendaten (Protokollbeschreibung). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "",
+  "mapping_template": ""
+}

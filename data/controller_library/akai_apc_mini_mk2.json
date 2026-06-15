@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "akai_apc_mini_mk2",
+  "manufacturer": "Akai Professional",
+  "model": "APC mini mk2",
+  "device_type": "midi_grid_controller",
+  "connections": ["USB-MIDI"],
+  "buttons": 72,
+  "faders": 9,
+  "encoders": 0,
+  "pad_matrix": [8, 8],
+  "banks": "8 Scene-Tasten rechts werden in LightOS als Seiten-/Bank-Wechsel genutzt",
+  "controls": [
+    {"name": "Grid-Pads (RGB)", "type": "note", "channel": 0, "range": [0, 63], "layout": "8x8; Note 0 = unten links, zeilenweise nach oben"},
+    {"name": "Track-Tasten (unten)", "type": "note", "channel": 0, "range": [100, 107], "layout": "8 Tasten unter dem Grid"},
+    {"name": "Scene-Tasten (rechts)", "type": "note", "channel": 0, "range": [112, 119], "layout": "8 Tasten rechts neben dem Grid"},
+    {"name": "Shift", "type": "note", "channel": 0, "range": [122, 122], "layout": ""},
+    {"name": "Fader 1-8", "type": "cc", "channel": 0, "range": [48, 55], "layout": "8 Kanal-Fader"},
+    {"name": "Master-Fader", "type": "cc", "channel": 0, "range": [56, 56], "layout": ""}
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "Grid-Pads: RGB über 128-Farben-Palette (Velocity = Paletten-Index) bzw. SysEx für echtes RGB; MIDI-Kanal des Note-On wählt das LED-Verhalten (solid/blink/pulse). Track-/Scene-Tasten einfarbig: 0=aus, 1=an, 2=blinkend."
+  },
+  "features": ["RGB-Pads", "LED-Feedback", "Bus-powered USB", "von LightOS direkt unterstützt (VC-Vorlage apc_mini_mk2)"],
+  "source": "Akai 'APC mini mk2 Communication Protocol' (öffentlich dokumentiert); Track/Scene-Notes verifiziert gegen LightOS-Code (controller_templates.py)",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-11",
+  "vc_template": "apc_mini_mk2",
+  "mapping_template": "apc_mini_default"
+}

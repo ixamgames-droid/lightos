@@ -10,20 +10,20 @@
 - **Preset-Browser** — Schnellzugriff auf Paletten und Gruppen per Suchfeld
 - **Undo im Patch** — Fixture löschen rückgängig machen
 - **Fixture-Kopieren mit Offset** — Mehrere Geräte gleichzeitig patchen mit Adress-Abstand
-- **Touch-Keyboard** — On-Screen-Numpad bei Texteingabe auf Touchscreen
+- ✅ **Touch-Keyboard** — On-Screen-Numpad bei Texteingabe auf Touchscreen *(erledigt — `src/ui/touch_keyboard.py`)*
 
 ### Engine
-- **Fade-Kurven auswählen** — Linear, Ease-In, Ease-Out, S-Kurve pro Cue konfigurierbar
-- **Cue-Delay In/Out** — Separat für jedes Attribut einstellbar (Attribute-Level Delay)
-- **Stack-Loop-Modi** — Einzel, Loop, Bounce, Ping-Pong
+- ✅ **Fade-Kurven auswählen** — Linear, Ease-In, Ease-Out, S-Kurve, Snap pro Cue konfigurierbar *(erledigt 2026-06-14 — `Cue.fade_curve`, Combo im Playback-Tab; Default `scurve` = altes Verhalten)*
+- **Cue-Delay In/Out** — Separat für jedes Attribut einstellbar (Attribute-Level Delay) *(Cue-Ebene erledigt: `delay_in`/`delay_out`; Attribut-Ebene offen)*
+- ✅ **Stack-Loop-Modi** — Einzel, Loop, Bounce, Ping-Pong *(erledigt — `CueStack.mode`)*
 
 ### Ausgabe
 - **sACN / E1.31 Ausgabe** — Alternative zu Art-Net für Environments mit sACN-Nodes
 - **Enttec Open DMX USB** — Stabilisierung des Treibers für lange Sessions (>8h)
 
 ### Stabilität
-- **Crash-Report-Dialog** — Bei unbehandelter Exception: Fehlermeldung + Log-Snippet anzeigen
-- **Autosave-Intervall** — Konfigurierbar (1–60 Minuten), Standard 5 Minuten
+- ✅ **Crash-Report-Dialog** — Bei unbehandelter Exception: Fehlermeldung + Log-Snippet anzeigen *(erledigt 2026-06-14 — `crash_dialog.CrashReporter` an `sys.excepthook`, thread-sicher, mit Traceback + crash.log-Auszug)*
+- ✅ **Autosave-Intervall** — Konfigurierbar (1–60 Minuten), Standard 5 Minuten *(erledigt 2026-06-14 — Datei-Menü „Auto-Save-Intervall…", persistiert in ui_prefs.json)*
 
 ---
 

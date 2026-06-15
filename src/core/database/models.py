@@ -89,6 +89,10 @@ class ChannelRange(Base):
     range_from: Mapped[int] = mapped_column(Integer)
     range_to: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(80))
+    # Maschinen-lesbare Kategorie (M1.2): "open" / "closed" / "strobe" / "color" /
+    # "gobo" / "rotate" / "shake" / "sound" / "reset" / "" (unbekannt). Erlaubt
+    # generische Schnellwahl (Shutter-Open erkennen, Gobo-/Farb-Slots auflisten).
+    kind: Mapped[str] = mapped_column(String(20), default="")
 
     channel: Mapped[FixtureChannel] = relationship(back_populates="ranges")
 
@@ -127,9 +131,43 @@ class FixtureGroup(Base):
     rows: Mapped[int] = mapped_column(Integer, default=8)
     # JSON serialized dict {"<col>,<row>": fid, ...}
     positions_json: Mapped[str] = mapped_column(Text, default="{}")
+    # FLD-01b: "/"-getrennter Ordnerpfad (z. B. "Front/Wash"); "" = Wurzel.
+    folder: Mapped[str] = mapped_column(String(200), default="")
+
+
+def migrate_show_db(engine) -> None:
+    """Idempotente Light-Migrationen fuer bestehende Show-DBs (current_show.db).
+    create_all() legt fehlende TABELLEN an, aber keine fehlenden SPALTEN — daher
+    hier per ALTER TABLE nachziehen, ohne bestehende Daten zu verlieren."""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(fixture_groups)"))}
+            # Tabelle existiert (cols nicht leer), aber noch ohne 'folder' -> ergaenzen.
+            if cols and "folder" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE fixture_groups ADD COLUMN folder VARCHAR DEFAULT ''"))
+    except Exception as e:
+        print(f"[models] migrate_show_db error: {e}")
+
+
+def migrate_fixtures_db(engine) -> None:
+    """Idempotente Migration fuer die Fixture-DB (fixtures.db): ergaenzt die
+    Spalte ``channel_ranges.kind`` (M1.2), falls eine aeltere DB sie noch nicht
+    hat. create_all() legt nur fehlende Tabellen an, keine fehlenden Spalten."""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            cols = {row[1] for row in conn.execute(text("PRAGMA table_info(channel_ranges)"))}
+            if cols and "kind" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE channel_ranges ADD COLUMN kind VARCHAR DEFAULT ''"))
+    except Exception as e:
+        print(f"[models] migrate_fixtures_db error: {e}")
 
 
 def create_db(path: str):
     engine = create_engine(f"sqlite:///{path}", echo=False)
     Base.metadata.create_all(engine)
+    migrate_show_db(engine)
     return engine

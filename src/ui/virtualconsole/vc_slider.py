@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
                                 QCheckBox)
 from PySide6.QtCore import Qt, QRect, QPoint
-from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient
+from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from .vc_widget import VCWidget
 
 
@@ -21,10 +21,44 @@ class SliderMode(str):
     # Phase 6: bindet einen BELIEBIGEN Effekt-Parameter (param_key) live —
     # Fader 0..255 wird auf den Wertebereich der ParamSpec abgebildet.
     EFFECT_PARAM     = "EffectParam"
+    # F-25: multiplikativer Gruppen-Dimmer — der Fader skaliert die Helligkeit
+    # einer festen Fixture-Gruppe (programmer_group) über set_group_dimmer().
+    GROUP_DIMMER     = "GroupDimmer"
+
+
+# Benutzerfreundliche deutsche Labels für die Modus-Auswahl (statt roher Codes).
+SLIDER_MODE_LABELS: list[tuple[str, str]] = [
+    (SliderMode.EFFECT_INTENSITY, "Effekt-Helligkeit"),
+    (SliderMode.EFFECT_SPEED,     "Effekt-Tempo"),
+    (SliderMode.EFFECT_PARAM,     "Effekt-Parameter"),
+    (SliderMode.PROGRAMMER,       "Programmer-Attribut"),
+    (SliderMode.GROUP_DIMMER,     "Gruppen-Dimmer"),
+    (SliderMode.SUBMASTER,        "Submaster"),
+    (SliderMode.GRANDMASTER,      "Grand Master"),
+    (SliderMode.SPEED,            "Speed (alle Effekte)"),
+    (SliderMode.BPM,              "Tempo (BPM)"),
+    (SliderMode.PLAYBACK,         "Playback (Executor)"),
+    (SliderMode.LEVEL,            "DMX-Kanal (Level)"),
+]
 
 
 class VCSlider(VCWidget):
     """Vertikaler Fader — Level / Playback / Submaster."""
+
+    # Soft-Takeover / „Pickup" (global, von der VC-Toolbar gesetzt): für nicht-
+    # motorisierte Controller (APC mini & Co.). Nach einem Bank-/Seitenwechsel steht
+    # der physische Fader woanders als der VC-Wert — bei aktivem Pickup übernimmt der
+    # Fader erst, wenn er den aktuellen VC-Wert EINMAL durchfahren hat (kein Sprung).
+    soft_takeover: bool = False
+
+    def is_effect_bound(self) -> bool:
+        return self.mode in (SliderMode.EFFECT_PARAM, SliderMode.EFFECT_INTENSITY,
+                             SliderMode.EFFECT_SPEED)
+
+    def live_effect_function_id(self):
+        if self.function_ids:
+            return self.function_ids[0]
+        return self.function_id
 
     def __init__(self, caption: str = "Fader", parent=None):
         super().__init__(caption, parent)
@@ -37,7 +71,17 @@ class VCSlider(VCWidget):
         self.dmx_channel: int = 1
         self.dmx_universe: int = 1
         self.programmer_attr: str = "intensity"   # fuer PROGRAMMER-Modus
+        # FDR-01: Reichweite im PROGRAMMER-Modus — "all" = alle gepatchten Fixtures,
+        # "selected" = nur die aktuelle Programmer-Auswahl, "group" = eine FESTE
+        # Fixture-Gruppe (programmer_group), unabhaengig von der Live-Auswahl
+        # (APC-Probier To-Do #4: PAR-Dim trifft die PARs ohne vorher anzuklicken).
+        self.programmer_scope: str = "all"
+        self.programmer_group: str = ""           # Gruppenname fuer scope == "group"
         self.param_key: str = "speed"             # fuer EFFECT_PARAM-Modus
+        # Live-Bearbeitung: bearbeitet den Effekt im benannten Edit-Slot (von einem
+        # Effekt-Pad gesetzt). Greift nur, wenn keine feste function_id/-ids gesetzt
+        # sind — dann statt „aktiver Effekt" das Slot-Ziel.
+        self.edit_slot: str = ""
         # Effekt-Fader-Verhalten am unteren Anschlag (nur EFFECT_*-Modi):
         #   False = Fader REGELT nur (Effekt muss separat gestartet werden;
         #           bei 0 laeuft der Effekt mit Wert 0 weiter) — bisheriges Verhalten.
@@ -52,6 +96,20 @@ class VCSlider(VCWidget):
         # MIDI CC binding
         self.midi_cc: int = -1        # -1 = kein MIDI
         self.midi_ch: int = 0         # 0 = alle Kanäle
+        # Soft-Takeover-Laufzeitzustand (s. Klassen-Flag soft_takeover):
+        #   _pickup_armed = True  -> wartet, bis der physische Fader den VC-Wert
+        #                            durchfährt; bis dahin wird MIDI ignoriert.
+        #   _last_cc      = letzter empfangener CC-Wert (0–255) zur Richtungs-/
+        #                   Durchfahr-Erkennung; None = noch keine Referenz.
+        self._pickup_armed: bool = False
+        self._last_cc: int | None = None
+        # Wert-Leitplanken: der Fader bildet seinen Hub 0..255 auf
+        # [range_min, range_max] ab; invert dreht die Richtung. So lassen sich
+        # Kanäle/Effekte bewusst nur in einem Teilbereich regeln ("halb anpassen"),
+        # z. B. ein Dimmer der nie unter 30% oder ein invertierter Nebel-Fader.
+        self.invert: bool = False
+        self.range_min: int = 0       # 0–255
+        self.range_max: int = 255     # 0–255
         self.resize(60, 200)
 
     # ── Value ─────────────────────────────────────────────────────────────────
@@ -66,23 +124,36 @@ class VCSlider(VCWidget):
         self._apply()
         self.update()
 
+    def _effective_value(self) -> int:
+        """Tatsächlicher Ausgabewert: der Hub 0..255 wird auf [range_min, range_max]
+        abgebildet, optional invertiert. min==max -> konstanter Wert (kein
+        Division-by-zero, da hier nicht geteilt wird). Ergebnis stets 0..255."""
+        ratio = self._value / 255.0
+        if self.invert:
+            ratio = 1.0 - ratio
+        lo, hi = self.range_min, self.range_max
+        if lo > hi:                       # vertauschte Grenzen tolerieren
+            lo, hi = hi, lo
+        return max(0, min(255, int(round(lo + ratio * (hi - lo)))))
+
     def _apply(self):
         from src.core.app_state import get_state
         state = get_state()
+        v = self._effective_value()       # Leitplanken (Range/Invert) angewandt
         # Optional: Effekt-Fader steuert auch An/Aus (siehe effect_autostart).
         if self.mode in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
                          SliderMode.EFFECT_PARAM):
             self._autostart_targets()
         if self.mode == SliderMode.GRANDMASTER:
             try:
-                state.output_manager.set_grand_master(self._value / 255.0)
+                state.output_manager.set_grand_master(v / 255.0)
             except Exception:
                 pass
         elif self.mode == SliderMode.BPM:
             # Globales Tempo 30..300 BPM -> Beat-Effekte folgen.
             try:
                 from src.core.engine.bpm_manager import get_bpm_manager
-                get_bpm_manager().set_bpm(30.0 + (self._value / 255.0) * 270.0)
+                get_bpm_manager().set_bpm(30.0 + (v / 255.0) * 270.0)
             except Exception:
                 pass
         elif self.mode == SliderMode.SPEED:
@@ -97,7 +168,7 @@ class VCSlider(VCWidget):
                 from src.core.engine.rgb_matrix import RgbMatrixInstance
                 from src.core.engine.efx import EfxInstance
                 timed = (Chaser, Sequence, Carousel, RgbMatrixInstance, EfxInstance)
-                mult = 0.1 + (self._value / 255.0) * 3.9
+                mult = 0.1 + (v / 255.0) * 3.9
                 for f in get_function_manager().all():
                     if isinstance(f, timed) and f.is_running:
                         f.speed = mult
@@ -106,12 +177,12 @@ class VCSlider(VCWidget):
         elif self.mode == SliderMode.EFFECT_INTENSITY:
             # Helligkeits-Master eines Effekts ODER einer Effekt-Gruppe
             # (function_ids). Leer -> aktiver Effekt.
-            lvl = self._value / 255.0
+            lvl = v / 255.0
             for f in self._effect_targets():
                 f.intensity = lvl
         elif self.mode == SliderMode.EFFECT_SPEED:
             # Tempo-Master eines Effekts/einer Gruppe (0.1..4.0x).
-            spd = 0.1 + (self._value / 255.0) * 3.9
+            spd = 0.1 + (v / 255.0) * 3.9
             for f in self._effect_targets():
                 f.speed = spd
         elif self.mode == SliderMode.EFFECT_PARAM:
@@ -119,16 +190,26 @@ class VCSlider(VCWidget):
             # der ParamSpec (im Effekt). Leere Bindung = aktiver Effekt.
             try:
                 from src.core.engine import effect_live
-                targets = self.function_ids or [self.function_id]
+                targets = self.function_ids or [self._resolved_effect_fid()]
                 for fid in targets:
-                    effect_live.set_param_normalized(self.param_key, self._value / 255.0, fid)
+                    effect_live.set_param_normalized(self.param_key, v / 255.0, fid)
             except Exception:
                 pass
         elif self.mode == SliderMode.PROGRAMMER:
             attr = self.programmer_attr or "intensity"
             try:
-                for f in state.get_patched_fixtures():
-                    state.set_programmer_value(f.fid, attr, self._value)
+                if self.programmer_scope == "group" and self.programmer_group:
+                    fids = self._group_fids(state, self.programmer_group)
+                    if not fids:                       # Gruppe leer/fehlt -> alle
+                        fids = [f.fid for f in state.get_patched_fixtures()]
+                elif self.programmer_scope == "selected":
+                    fids = list(state.get_selected_fids())
+                    if not fids:                       # Fallback: nichts gewaehlt -> alle
+                        fids = [f.fid for f in state.get_patched_fixtures()]
+                else:
+                    fids = [f.fid for f in state.get_patched_fixtures()]
+                for fid in fids:
+                    state.set_programmer_value(fid, attr, v)
             except Exception:
                 pass
         elif self.mode == SliderMode.LEVEL:
@@ -139,23 +220,55 @@ class VCSlider(VCWidget):
             if u is None:
                 u = state.output_manager.add_universe(self.dmx_universe)
                 state.universes[self.dmx_universe] = u
-            u.set_channel(self.dmx_channel, self._value)
+            u.set_channel(self.dmx_channel, v)
         elif self.mode == SliderMode.PLAYBACK and self.function_id is not None:
             slot = self.function_id
             executors = state.playback_engine.executors
             if slot < len(executors):
-                executors[slot].fader_value = self._value / 255.0
+                executors[slot].fader_value = v / 255.0
         elif self.mode == SliderMode.SUBMASTER:
-            state.output_manager.set_submaster(self.function_id or 0, self._value / 255.0)
+            state.output_manager.set_submaster(self.function_id or 0, v / 255.0)
+        elif self.mode == SliderMode.GROUP_DIMMER:
+            # F-25: multiplikativer Gruppen-Dimmer über set_group_dimmer().
+            try:
+                fids = self._group_fids(state, self.programmer_group)
+                state.set_group_dimmer(fids, v / 255.0)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _group_fids(state, group_name: str) -> list[int]:
+        """Fids einer FESTEN Fixture-Gruppe (Name) in Raster-Reihenfolge (To-Do #4).
+        Delegiert an die zentrale Auflösung in app_state (dedupliziert)."""
+        try:
+            return state.group_fids_by_name(group_name)
+        except Exception:
+            return []
+
+    def _resolved_effect_fid(self):
+        """Einzel-Ziel-fid für Effekt-Modi: feste function_id, sonst der Live-Edit-Slot
+        (von einem Effekt-Pad gesetzt), sonst None (= aktiver Effekt)."""
+        if self.function_id is not None:
+            return self.function_id
+        if self.edit_slot:
+            try:
+                from src.core.engine import effect_live
+                fid = effect_live.get_edit_target(self.edit_slot)
+                if fid is not None:
+                    return fid
+            except Exception:
+                pass
+        return None
 
     def _effect_target(self):
         """Einzel-Zielfunktion fuer die EFFECT_*-Modi: feste Bindung ueber
-        function_id, sonst der gerade aktive (zuletzt gestartete) Effekt."""
+        function_id / Live-Edit-Slot, sonst der gerade aktive Effekt."""
         try:
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
-            if self.function_id is not None:
-                return fm.get(self.function_id)
+            fid = self._resolved_effect_fid()
+            if fid is not None:
+                return fm.get(fid)
             return fm.active_function()
         except Exception:
             return None
@@ -181,8 +294,8 @@ class VCSlider(VCWidget):
         bleibt der Effekt unberuehrt und der Fader regelt nur."""
         if not self.effect_autostart:
             return
-        ids = self.function_ids or (
-            [self.function_id] if self.function_id is not None else [])
+        _fid = self._resolved_effect_fid()
+        ids = self.function_ids or ([_fid] if _fid is not None else [])
         if not ids:
             return
         try:
@@ -190,7 +303,7 @@ class VCSlider(VCWidget):
             fm = get_function_manager()
         except Exception:
             return
-        on = self._value > 0
+        on = self._effective_value() > 0
         for fid in ids:
             if fid is None:
                 continue
@@ -206,6 +319,18 @@ class VCSlider(VCWidget):
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
 
+    # Toleranz (0–255) für den Pickup-„Treffer".  ~2 MIDI-Schritte.
+    _PICKUP_TOLERANCE = 4
+
+    def arm_pickup(self):
+        """Aktiviert Soft-Takeover für diesen Fader (falls global eingeschaltet):
+        der nächste MIDI-Zugriff wirkt erst, wenn der physische Fader den aktuellen
+        VC-Wert durchfährt. Wird bei jedem Bank-/Seitenwechsel aufgerufen."""
+        if VCSlider.soft_takeover:
+            self._pickup_armed = True
+            self._last_cc = None
+            self.update()
+
     def handle_midi(self, msg) -> bool:
         if self.midi_cc < 0 or msg.msg_type != "cc":
             return False
@@ -213,7 +338,27 @@ class VCSlider(VCWidget):
             return False
         if msg.data1 != self.midi_cc:
             return False
-        self.value = int(msg.data2 / 127.0 * 255)
+        iv = round(msg.data2 / 127.0 * 255)
+
+        # Ohne Soft-Takeover (oder nicht „armiert"): direkt übernehmen.
+        if not VCSlider.soft_takeover or not self._pickup_armed:
+            self._last_cc = iv
+            self.value = iv
+            return True
+
+        # Soft-Takeover: erst übernehmen, wenn der physische Fader den aktuellen
+        # VC-Wert erreicht/durchfährt — sonst MIDI ignorieren (kein Sprung).
+        prev = self._last_cc
+        self._last_cc = iv
+        cur = self._value
+        caught = abs(iv - cur) <= self._PICKUP_TOLERANCE
+        if not caught and prev is not None:
+            caught = (prev <= cur <= iv) or (iv <= cur <= prev)
+        if caught:
+            self._pickup_armed = False
+            self.value = iv            # ab jetzt normal mitlaufen
+        else:
+            self.update()              # nur den Pickup-Hinweis (Pfeil) auffrischen
         return True
 
     # ── MIDI Teach (siehe VCWidget) — Fader bindet nur CC ──────────────────────
@@ -308,17 +453,40 @@ class VCSlider(VCWidget):
         # Handle knob
         p.fillRect(tr.x() - 8, hy - 4, tr.width() + 16, 8, QColor("#aaccff"))
 
+        # Soft-Takeover-Hinweis: Fader „armiert" und wartet, bis der physische
+        # Fader den VC-Wert (hy) durchfährt. Ziel-Linie + Geist-Position + Pfeil.
+        if self._pickup_armed:
+            p.setPen(QPen(QColor("#ffb000"), 1, Qt.PenStyle.DashLine))
+            p.drawLine(tr.x() - 6, hy, tr.right() + 6, hy)   # Ziel = aktueller VC-Wert
+            arrow = ""
+            if self._last_cc is not None:
+                gy = int(tr.y() + (1.0 - self._last_cc / 255.0) * tr.height())
+                p.fillRect(tr.x() - 4, gy - 1, tr.width() + 8, 3, QColor("#ffb000"))
+                arrow = "▲" if self._last_cc < self._value else "▼"
+            p.setPen(QColor("#ffb000"))
+            p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            p.drawText(QRect(0, 16, self.width(), 14),
+                       Qt.AlignmentFlag.AlignCenter, f"⊘{arrow}")
+
         # Label at bottom
         p.setPen(self._fg_color)
         p.setFont(QFont("Segoe UI", 8))
         label_rect = QRect(0, self.height() - 18, self.width(), 18)
         p.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, self.caption)
 
-        # Value
+        # Value — zeigt den TATSÄCHLICHEN Ausgabewert (Range/Invert angewandt),
+        # damit eine gesetzte Leitplanke direkt ablesbar ist.
         p.setFont(QFont("Segoe UI", 7))
         val_rect = QRect(0, 2, self.width(), 14)
-        pct = int(self._value / 255 * 100)
+        pct = int(self._effective_value() / 255 * 100)
         p.drawText(val_rect, Qt.AlignmentFlag.AlignCenter, f"{pct}%")
+
+        # Leitplanken-Indikator oben links: ⇅ wenn invertiert / ▯ wenn Teilbereich.
+        if self.invert or self.range_min > 0 or self.range_max < 255:
+            p.setPen(QColor("#ffcc55"))
+            p.setFont(QFont("Segoe UI", 7))
+            mark = "⇅" if self.invert else "▯"
+            p.drawText(QRect(2, 0, 12, 12), Qt.AlignmentFlag.AlignCenter, mark)
 
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:
@@ -334,19 +502,84 @@ class VCSlider(VCWidget):
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
         mode_cb = QComboBox()
-        for m in (SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER,
-                  SliderMode.GRANDMASTER, SliderMode.PROGRAMMER, SliderMode.BPM,
-                  SliderMode.SPEED, SliderMode.EFFECT_INTENSITY,
-                  SliderMode.EFFECT_SPEED, SliderMode.EFFECT_PARAM):
-            mode_cb.addItem(m)
-        mode_cb.setCurrentText(self.mode)
+        for m, lbl in SLIDER_MODE_LABELS:
+            mode_cb.addItem(lbl, m)          # Label sichtbar, Modus-Wert als Data
+        for i in range(mode_cb.count()):
+            if mode_cb.itemData(i) == self.mode:
+                mode_cb.setCurrentIndex(i)
+                break
         form.addRow("Modus:", mode_cb)
 
-        # Parameter-Key fuer EFFECT_PARAM (z. B. speed, level, count, intensity,
-        # runner_count, fade, density …). Siehe Effekt-Parameter im Matrix-Programmer.
-        param_key_edit = QLineEdit(self.param_key)
-        param_key_edit.setToolTip("Effekt-Parameter-Key (nur Modus EffectParam), z. B. level, speed, count")
-        form.addRow("Parameter-Key (EffectParam):", param_key_edit)
+        # Parameter-Key fuer EFFECT_PARAM — Auswahl aus den Parametern des
+        # gebundenen Effekts (list_params: Label + Key) statt blindem Freitext.
+        # Editierbar, damit Power-User auch ohne aktiven Effekt einen Key tippen
+        # koennen; der gespeicherte Key bleibt immer erhalten.
+        param_key_combo = QComboBox()
+        param_key_combo.setEditable(True)
+        _pk_keys: list[str] = []
+        try:
+            from src.core.engine import effect_live
+            _fid = self.function_id if self.function_id is not None else (self.function_ids[0] if self.function_ids else None)
+            for _spec in effect_live.list_params(_fid):
+                _key = getattr(_spec, "key", None)
+                if not _key:
+                    continue
+                _lbl = getattr(_spec, "label", _key)
+                param_key_combo.addItem(f"{_lbl}  ({_key})", _key)
+                _pk_keys.append(_key)
+        except Exception:
+            pass
+        if self.param_key and self.param_key not in _pk_keys:
+            param_key_combo.addItem(self.param_key, self.param_key)
+            _pk_keys.append(self.param_key)
+        # aktuellen Key vorwaehlen (per Data; sonst als Freitext setzen)
+        _pk_idx = next((i for i in range(param_key_combo.count())
+                        if param_key_combo.itemData(i) == self.param_key), -1)
+        if _pk_idx >= 0:
+            param_key_combo.setCurrentIndex(_pk_idx)
+        else:
+            param_key_combo.setCurrentText(self.param_key)
+        param_key_combo.setToolTip("Effekt-Parameter (nur Modus Effekt-Parameter). "
+                                   "Liste = Parameter des gebundenen Effekts; eigener Key tippbar.")
+        form.addRow("Parameter (Effekt-Parameter):", param_key_combo)
+
+        # FDR-01 / To-Do #4: Reichweite im Programmer-Modus.
+        scope_cb = QComboBox()
+        scope_cb.addItem("Alle Geräte", "all")
+        scope_cb.addItem("Nur Auswahl", "selected")
+        scope_cb.addItem("Feste Gruppe", "group")
+        _scope_idx = {"selected": 1, "group": 2}.get(self.programmer_scope, 0)
+        scope_cb.setCurrentIndex(_scope_idx)
+        scope_cb.setToolTip("Modus Programmer: auf welche Fixtures der Fader wirkt "
+                            "(alle gepatchten, die aktuelle Auswahl, oder eine fest "
+                            "gewählte Gruppe — unabhängig von der Live-Auswahl).")
+        form.addRow("Reichweite (Programmer):", scope_cb)
+
+        # Feste Gruppe (nur scope == "group"): Auswahl aus den vorhandenen Gruppen.
+        group_cb = QComboBox()
+        group_cb.setEditable(True)
+        group_cb.addItem("")
+        try:
+            from sqlalchemy import select
+            from src.core.database.models import FixtureGroup
+            from src.core.app_state import get_state as _gs
+            with _gs()._session() as _s:
+                for _g in _s.execute(select(FixtureGroup.name)).scalars().all():
+                    group_cb.addItem(_g)
+        except Exception:
+            pass
+        group_cb.setCurrentText(self.programmer_group or "")
+        group_cb.setToolTip("Fixture-Gruppe für Reichweite = 'Feste Gruppe' "
+                            "(PROGRAMMER) bzw. für den Modus 'GroupDimmer'.")
+        form.addRow("Feste Gruppe:", group_cb)
+
+        # Live-Edit-Slot: bei EFFECT-Modi ohne feste Funktions-ID den Effekt aus
+        # diesem Slot bearbeiten (von einem Effekt-Pad gesetzt).
+        edit_slot_edit = QLineEdit(self.edit_slot)
+        edit_slot_edit.setToolTip("Live-Edit-Slot (Freitext, z. B. MH/MX). EFFECT-Modi ohne "
+                                  "feste ID bearbeiten den Effekt aus diesem Slot statt den "
+                                  "global aktiven.")
+        form.addRow("Live-Edit-Slot (EFFECT):", edit_slot_edit)
 
         autostart_cb = QCheckBox("bei 0 wirklich stoppen (sonst nur runterregeln)")
         autostart_cb.setChecked(self.effect_autostart)
@@ -356,6 +589,26 @@ class VCSlider(VCWidget):
             "      Wert 0 stoppt ihn wirklich.\n"
             "Aus = Fader regelt nur; den Effekt separat per Taste starten.")
         form.addRow("Effekt An/Aus (EFFECT-Modi):", autostart_cb)
+
+        # ── Wert-Leitplanken (gelten für ALLE Modi) ──
+        invert_cb = QCheckBox("Fader invertieren (oben = klein)")
+        invert_cb.setChecked(self.invert)
+        invert_cb.setToolTip("Dreht die Wirkrichtung um: ganz oben = range_min, "
+                             "ganz unten = range_max.")
+        form.addRow("Invertieren:", invert_cb)
+        rmin = QSpinBox()
+        rmin.setRange(0, 255)
+        rmin.setValue(self.range_min)
+        rmin.setToolTip("Unterer Ausgabewert (Leitplanke), 0–255. Der Fader regelt "
+                        "nie darunter — z. B. ein Dimmer der nie ganz aus geht.")
+        form.addRow("Wert min:", rmin)
+        rmax = QSpinBox()
+        rmax.setRange(0, 255)
+        rmax.setValue(self.range_max)
+        rmax.setToolTip("Oberer Ausgabewert (Leitplanke), 0–255. Der Fader regelt "
+                        "nie darüber — z. B. ein Speed-Fader der bei 70% deckelt.")
+        form.addRow("Wert max:", rmax)
+
         univ = QLineEdit(str(self.dmx_universe))
         form.addRow("DMX-Universe (Level-Modus):", univ)
         ch = QLineEdit(str(self.dmx_channel))
@@ -369,6 +622,32 @@ class VCSlider(VCWidget):
         slot = QLineEdit(slot_text)
         form.addRow("Slot/Funktions-ID (Playback/Effekt):", slot)
         form.addRow(QLabel("  ↳ Effekt-Modi: leer = aktiver Effekt · mehrere IDs mit Komma = Gruppe"))
+
+        # ── Kontextabhängige Feld-Sichtbarkeit ──
+        # Zeigt je Modus nur die passenden Felder; Beschriftung/Modus + Leitplanken
+        # (Invert/Min/Max) bleiben immer sichtbar.
+        _EFFECT_MODES = (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                         SliderMode.EFFECT_PARAM)
+
+        def _update_slider_fields():
+            m = mode_cb.currentData() or self.mode
+            eff = m in _EFFECT_MODES
+            vis = {
+                param_key_combo: m == SliderMode.EFFECT_PARAM,
+                scope_cb:        m == SliderMode.PROGRAMMER,
+                group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER),
+                edit_slot_edit:  eff,
+                autostart_cb:    eff,
+                univ:            m == SliderMode.LEVEL,
+                ch:              m == SliderMode.LEVEL,
+                slot:            eff or m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER),
+            }
+            for widget, show in vis.items():
+                form.setRowVisible(widget, bool(show))
+
+        mode_cb.currentIndexChanged.connect(lambda _i: _update_slider_fields())
+        _update_slider_fields()
+
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -389,7 +668,7 @@ class VCSlider(VCWidget):
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
-            self.mode = mode_cb.currentText()
+            self.mode = mode_cb.currentData() or self.mode
             try:
                 self.dmx_universe = int(univ.text())
             except ValueError:
@@ -409,8 +688,19 @@ class VCSlider(VCWidget):
                     pass
             self.function_ids = ids
             self.function_id = ids[0] if ids else None
-            self.param_key = param_key_edit.text().strip() or self.param_key
+            _pk_text = param_key_combo.currentText().strip()
+            _pk_hit = param_key_combo.findText(_pk_text)
+            if _pk_hit >= 0 and param_key_combo.itemData(_pk_hit):
+                self.param_key = param_key_combo.itemData(_pk_hit)
+            else:
+                self.param_key = _pk_text or self.param_key
+            self.edit_slot = edit_slot_edit.text().strip()
+            self.programmer_scope = scope_cb.currentData() or "all"
+            self.programmer_group = group_cb.currentText().strip()
             self.effect_autostart = autostart_cb.isChecked()
+            self.invert = invert_cb.isChecked()
+            self.range_min = rmin.value()
+            self.range_max = rmax.value()
             self.midi_cc = midi_cc_spin.value()
             self.midi_ch = midi_ch_spin.value()
             self.update()
@@ -425,8 +715,14 @@ class VCSlider(VCWidget):
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
+        d["programmer_scope"] = self.programmer_scope
+        d["programmer_group"] = self.programmer_group
         d["param_key"] = self.param_key
+        d["edit_slot"] = self.edit_slot
         d["effect_autostart"] = self.effect_autostart
+        d["invert"] = self.invert
+        d["range_min"] = self.range_min
+        d["range_max"] = self.range_max
         d["value"] = self._value
         d["midi_cc"] = self.midi_cc
         d["midi_ch"] = self.midi_ch
@@ -440,8 +736,14 @@ class VCSlider(VCWidget):
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")
+        self.programmer_scope = d.get("programmer_scope", "all")
+        self.programmer_group = d.get("programmer_group", "")
         self.param_key = d.get("param_key", "speed")
+        self.edit_slot = d.get("edit_slot", "")
         self.effect_autostart = bool(d.get("effect_autostart", False))
+        self.invert = bool(d.get("invert", False))
+        self.range_min = int(d.get("range_min", 0))
+        self.range_max = int(d.get("range_max", 255))
         self._value = d.get("value", 0)
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)

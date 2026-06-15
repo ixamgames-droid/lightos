@@ -357,6 +357,12 @@ class RgbMatrixInstance(Function):
         self._step = 0.0
         self._last_tick = time.monotonic()
 
+    def sync_phase(self):
+        """Setzt die Animations-Phase zurueck (Speed-Dial-Sync, SPD-03). Mehrere
+        Effekte lassen sich so auf einen gemeinsamen Startpunkt angleichen."""
+        self._step = 0.0
+        self._last_tick = time.monotonic()
+
     # ── Farb-Kompatibilitaet: color1/2/3 zeigen auf die ColorSequence ──────────
     # So funktioniert aller bestehender Code (View, Show-Builder, Tests, _render),
     # waehrend die Sequence das kanonische, beliebig lange Farbmodell ist.
@@ -488,7 +494,35 @@ class RgbMatrixInstance(Function):
             universe = universes.get(fx.universe)
             if universe is None:
                 continue
-            for ch in get_channels_for_patched(fx):
+            chans = get_channels_for_patched(fx)
+            # M1: Per-Effekt-Master (intensity) auf die Farbkanaele anwenden — aber
+            # NUR wenn der generische FunctionManager-Merge sie nicht ohnehin
+            # skaliert. Der Merge skaliert pro Fixture entweder dessen Dimmer-Kanal
+            # (falls vorhanden) ODER – als Fallback – die Farbkanaele. Hat das
+            # Fixture also einen eigenen Dimmer, den die Matrix NICHT treibt
+            # (drive_intensity False), bleibt der Dimmer unangetastet -> der Merge
+            # skaliert nichts -> die Farben muessen hier gedimmt werden. Bei reinen
+            # Farb-Fixtures (Fallback skaliert die Farben) oder drive_intensity True
+            # (Dimmer-Kanal wird gedimmt) uebernimmt der Merge -> kein Doppel-Dimmen.
+            inten = max(0.0, min(1.0, float(self.intensity)))
+            has_dimmer = any((c.attribute or "").lower() in ("intensity", "dimmer", "master")
+                             for c in chans)
+            scale_colors = has_dimmer and not self.drive_intensity and inten < 0.999
+            # Farbrad-Fallback: hat das Fixture KEINE RGB-Kanaele, aber einen
+            # Farbrad-Kanal (attribute=="color"), wird der passende Slot gesetzt.
+            # Der Slot-Wert wird bewusst NICHT mit intensity skaliert (das wuerde
+            # den Slot verschieben → andere Farbe); Helligkeit gehoert auf den
+            # Dimmer. Der RGB(W)-Pfad bleibt davon bit-identisch unberuehrt.
+            has_rgb = any((c.attribute or "").lower() in ("color_r", "color_g", "color_b")
+                          for c in chans)
+            wheel_val: int | None = None
+            if not has_rgb:
+                try:
+                    from src.core.color_utils import color_attrs_for_fixture
+                    wheel_val = color_attrs_for_fixture(chans, rgb).get("color")
+                except Exception:
+                    wheel_val = None
+            for ch in chans:
                 attr = (ch.attribute or "").lower()
                 # ── Style-Kanalmaske ────────────────────────────────────────
                 if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
@@ -500,12 +534,18 @@ class RgbMatrixInstance(Function):
                         val = b
                     elif attr == "color_w" and self.style == MatrixStyle.RGBW:
                         val = round(min(r, g, b) * self.white_amount / 100)
+                    elif attr == "color" and not has_rgb and wheel_val is not None:
+                        # Farbrad: Slot setzen, NICHT mit intensity skalieren
+                        # (Helligkeit gehoert auf den Dimmer, nicht aufs Farbrad).
+                        val = wheel_val
                     elif attr in ("intensity", "dimmer", "master"):
                         if not self.drive_intensity:
                             continue
                         val = 255
                     else:
                         continue  # andere Kanaele unangetastet lassen
+                    if scale_colors and attr in ("color_r", "color_g", "color_b", "color_w"):
+                        val = int(val * inten)
                 elif self.style == MatrixStyle.DIMMER:
                     if attr in ("intensity", "dimmer", "master"):
                         val = self._scalar_level(rgb, self.intensity_min, self.intensity_max)
@@ -532,6 +572,8 @@ class RgbMatrixInstance(Function):
         Python-Modulo liefert korrekte Ergebnisse auch fuer negative Werte.
         """
         cols, rows = self.cols, self.rows
+        # MXP-02: Phasen-Versatz (versetzte Effekte).
+        phase = phase + float(self.params.get("offset", 0.0))
         # Richtung anwenden: reverse negiert die Phase
         p = -phase if self.direction == "reverse" else phase
         pixels: list[Color] = [(0, 0, 0)] * (cols * rows)
@@ -693,7 +735,9 @@ class RgbMatrixInstance(Function):
         # Reihenfolge normal / zufällig / Ping-Pong (color_order).
         if params.get("color_cycle") and enabled:
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
-            rnd = int(p) // max(1, length_hint)   # Runden-Index
+            # MXP-01: Farbe erst alle N Durchlaeufe wechseln (Default 1 = jeder Lauf).
+            interval = max(1, int(params.get("color_interval", 1)))
+            rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
             nc = len(enabled)
             order = str(params.get("color_order", "normal"))
             if order == "random":
@@ -1087,6 +1131,20 @@ class RgbMatrixInstance(Function):
                       "Animationsrate (Schritte/s)"),
             ParamSpec("intensity", "Helligkeit", "float", 1.0, 0.0, 1.0, 0.01,
                       "Effekt-Master 0..1"),
+            # MXP-02: Phasen-Versatz (für versetzte Effekte), live steuerbar.
+            ParamSpec("offset", "Versatz", "float", 0.0, 0.0, 16.0, 0.1,
+                      "Phasen-Versatz in Schritten (versetzte Effekte)"),
+            # MXP-03: Dimmer-/Shutter-Grenzen + Weissanteil live steuerbar.
+            ParamSpec("white_amount", "Weissanteil", "int", 100, 0, 100, 1,
+                      "RGBW-Weissanteil in %"),
+            ParamSpec("intensity_min", "Dimmer min", "int", 0, 0, 255, 1,
+                      "Untergrenze des Dimmer-Styles"),
+            ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
+                      "Obergrenze des Dimmer-Styles"),
+            ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
+                      "Untergrenze des Shutter-Styles"),
+            ParamSpec("shutter_max", "Shutter max", "int", 255, 0, 255, 1,
+                      "Obergrenze des Shutter-Styles"),
         ]
         meta = ALGO_META.get(self.algorithm)
         if meta and meta.direction:
@@ -1108,9 +1166,15 @@ class RgbMatrixInstance(Function):
             return self.intensity
         if key == "direction":
             return self.direction
+        if key == "algorithm":
+            return self.algorithm.value
         if key in ("colors", "color_sequence"):
             return self.colors
         if key in ("color1", "color2", "color3"):
+            return getattr(self, key)
+        if key == "offset":
+            return float(self.params.get("offset", 0.0))
+        if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             return getattr(self, key)
         return self.params.get(key)
 
@@ -1130,6 +1194,19 @@ class RgbMatrixInstance(Function):
                 s = str(value).lower()
                 self.direction = "reverse" if s.startswith(("rev", "rück", "ruck", "back")) else "forward"
             return True
+        if key == "algorithm":
+            try:
+                self.algorithm = RgbAlgorithm(str(value))
+                return True
+            except ValueError:
+                # Legacy-Varianten-Namen (z. B. "Chase Horizontal") mit migrieren.
+                mapped = _LEGACY_ALGO_MAP.get(str(value))
+                if mapped:
+                    self.algorithm = RgbAlgorithm(mapped[0])
+                    for _k, _v in mapped[1].items():
+                        self.params.setdefault(_k, _v)
+                    return True
+                return False
         if key in ("colors", "color_sequence"):
             if isinstance(value, ColorSequence):
                 self.colors = value
@@ -1141,6 +1218,11 @@ class RgbMatrixInstance(Function):
             return True
         if key in ("color1", "color2", "color3"):
             setattr(self, key, tuple(value)); return True
+        if key == "offset":
+            self.params["offset"] = max(0.0, min(16.0, float(value))); return True
+        if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
+            hi = 100 if key == "white_amount" else 255
+            setattr(self, key, max(0, min(hi, int(round(float(value)))))); return True
         # Algo-spezifisch: in params ablegen, ueber die Meta-Spec klemmen.
         spec = None
         meta = ALGO_META.get(self.algorithm)
@@ -1169,6 +1251,21 @@ class RgbMatrixInstance(Function):
         self.params[key] = value
         return True
 
+    def _cycle_algorithm(self, step: int) -> bool:
+        """Schaltet live auf den naechsten/vorherigen Algorithmus um (APC-Probier
+        To-Do #3: EINE Matrix + "Form +/-"-Pad statt ein Pad je Algorithmus).
+
+        Es wird durch alle RgbAlgorithm-Werte rotiert; leftover params des alten
+        Algorithmus sind harmlos (jeder Render-Helfer liest nur seine eigenen
+        Keys mit Defaults). Die Animations-Phase laeuft bewusst weiter."""
+        algos = list(RgbAlgorithm)
+        try:
+            i = algos.index(self.algorithm)
+        except ValueError:
+            i = 0
+        self.algorithm = algos[(i + step) % len(algos)]
+        return True
+
     def do_action(self, action: str, **kw) -> bool:
         """Loest eine Live-Aktion aus (Buttons der virtuellen Konsole, MIDI-Notes).
         Gibt True zurueck, wenn die Aktion bekannt war (Anforderung #14)."""
@@ -1194,6 +1291,10 @@ class RgbMatrixInstance(Function):
         if a in ("reverse_direction", "reverseDirection"):
             self.direction = "forward" if self.direction == "reverse" else "reverse"
             return True
+        if a in ("next_algorithm", "nextAlgorithm", "next_form"):
+            return self._cycle_algorithm(+1)
+        if a in ("prev_algorithm", "prevAlgorithm", "previous_algorithm", "prev_form"):
+            return self._cycle_algorithm(-1)
         if a in ("toggle_bounce", "toggleBounce"):
             cur = self.params.get("movement", "normal")
             self.params["movement"] = "normal" if cur == "bounce" else "bounce"
@@ -1221,6 +1322,23 @@ class RgbMatrixInstance(Function):
             except Exception:
                 return False
         return False
+
+    def list_actions(self) -> list[tuple[str, str]]:
+        """(key, label) der Matrix-Live-Aktionen für die Bindungs-UI (VC/MIDI)."""
+        return [
+            ("next_color",          "Farbe +"),
+            ("prev_color",          "Farbe −"),
+            ("add_color",           "+ Farbe"),
+            ("toggle_color",        "Farbe an/aus"),
+            ("next_algorithm",      "Form +"),
+            ("prev_algorithm",      "Form −"),
+            ("reverse_direction",   "Richtung"),
+            ("toggle_bounce",       "Bounce"),
+            ("toggle_freeze",       "Freeze"),
+            ("clear_live_override", "Reset Live"),
+            ("commit_live",         "Commit"),
+            ("tap",                 "Tap"),
+        ]
 
     # ── Live-Override-Modell (Phase 6, #17) ───────────────────────────────────
     # Die VC veraendert die laufenden Felder direkt (sofort sichtbar). Der

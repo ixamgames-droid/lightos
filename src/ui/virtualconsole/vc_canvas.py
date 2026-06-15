@@ -21,6 +21,9 @@ def _register():
     from .vc_frame    import VCFrame
     from .vc_color    import VCColor
     from .vc_encoder  import VCEncoder
+    from .vc_color_list import VCColorList
+    from .vc_chase_builder import VCChaseBuilder
+    from .vc_song_info import VCSongInfo
     WIDGET_REGISTRY.update({
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
@@ -30,6 +33,9 @@ def _register():
         "VCSpeedDial":VCSpeedDial,
         "VCEncoder":  VCEncoder,
         "VCColor":    VCColor,
+        "VCColorList":VCColorList,
+        "VCChaseBuilder": VCChaseBuilder,
+        "VCSongInfo": VCSongInfo,
         "VCFrame":    VCFrame,
     })
 
@@ -85,6 +91,7 @@ class VCCanvas(QWidget):
         self._midi_received.connect(self._handle_midi)
         self._bank_change_sig.connect(self.set_active_bank)
         self._setup_midi()
+        self._setup_keyboard()
         self._setup_engine_page()
 
     # ── MIDI ─────────────────────────────────────────────────────────────────
@@ -112,7 +119,74 @@ class VCCanvas(QWidget):
 
     def closeEvent(self, event):
         self._teardown_midi()
+        self._teardown_keyboard()
         super().closeEvent(event)
+
+    # ── Keyboard-Hotkeys (Feature: Tasten in der VC patchen) ──────────────────
+    #
+    # Gleiche Architektur wie MIDI: ein zentraler App-Filter
+    # (core/input/keyboard_hotkeys.py) liefert (seq, pressed) — die Canvas
+    # verteilt an die Widgets der aktiven Bank. Textfelder/Modal-Dialoge
+    # blockt bereits der Filter.
+
+    def _setup_keyboard(self):
+        self._kb = None
+        try:
+            from src.core.input.keyboard_hotkeys import get_keyboard_hotkeys
+            self._kb = get_keyboard_hotkeys()
+            self._kb.subscribe(self._on_hotkey)
+            self.destroyed.connect(lambda *_: self._teardown_keyboard())
+        except Exception as e:
+            print(f"[VCCanvas] Keyboard-Subscribe-Fehler: {e}")
+
+    def _teardown_keyboard(self):
+        kb = getattr(self, "_kb", None)
+        if kb is not None:
+            try:
+                kb.unsubscribe(self._on_hotkey)
+            except Exception:
+                pass
+            self._kb = None
+
+    def _on_hotkey(self, seq: str, pressed: bool) -> bool:
+        """Hotkey an die Widgets der aktiven Bank verteilen (wie _handle_midi)."""
+        if not self.isVisible():
+            return False
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            self._teardown_keyboard()
+            return False
+        consumed = False
+        for widget in widgets:
+            if not self.on_active_bank(widget):
+                continue
+            try:
+                if widget.handle_key(seq, pressed):
+                    consumed = True
+            except Exception as e:
+                print(f"[VCCanvas] handle_key error: {e}")
+        return consumed
+
+    def key_binding_owners(self, seq: str, exclude=None) -> list[str]:
+        """Captions aller Widgets, die `seq` bereits gebunden haben
+        (Konfliktprüfung für den Tasten-Lern-Dialog)."""
+        owners: list[str] = []
+        if not seq:
+            return owners
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return owners
+        for w in widgets:
+            if w is exclude:
+                continue
+            try:
+                if w.current_key_binding() == seq:
+                    owners.append(w.caption or w.__class__.__name__)
+            except Exception:
+                continue
+        return owners
 
     # ── Bank/Page (= Executor-Page der Engine) ────────────────────────────────
 
@@ -148,8 +222,21 @@ class VCCanvas(QWidget):
         b = max(0, min(9, int(b)))
         self._active_bank = b
         self._apply_bank_visibility()
+        self._rearm_slider_pickup()    # Soft-Takeover: Fader nach Seitenwechsel neu armieren
         self.update()
         self.bank_changed.emit(b)
+
+    def _rearm_slider_pickup(self):
+        """Soft-Takeover: nach einem Bank-/Seitenwechsel alle Fader neu armieren,
+        damit ein nicht-motorisierter Controller keine Wertsprünge auslöst (der
+        physische Fader steht ggf. woanders als der VC-Wert der neuen Seite).
+        arm_pickup() prüft selbst, ob Soft-Takeover global aktiv ist."""
+        from .vc_slider import VCSlider
+        for w in self.findChildren(VCSlider):
+            try:
+                w.arm_pickup()
+            except Exception:
+                pass
 
     @property
     def active_bank(self) -> int:
@@ -417,18 +504,19 @@ class VCCanvas(QWidget):
         md = event.mimeData()
         pos = event.position().toPoint()
 
-        # Ziel-Widget unter dem Mauszeiger suchen (wie in mousePressEvent)
-        from .vc_button import VCButton
-        from .vc_slider import VCSlider
+        # Ziel-Widget unter dem Mauszeiger suchen (wie in mousePressEvent).
+        # Funktions-Drops akzeptieren jetzt auch Farbe/Encoder/XY/SpeedDial — die
+        # konkrete Zuordnung passiert in apply_drop je nach Widget-Typ.
         target = None
+        droppable = self._droppable_types()
         child = self.childAt(pos)
         if child is not None:
-            if isinstance(child, (VCButton, VCSlider)):
+            if isinstance(child, droppable):
                 target = child
             else:
                 p = child.parent()
                 while p is not None and not isinstance(p, VCCanvas):
-                    if isinstance(p, (VCButton, VCSlider)):
+                    if isinstance(p, droppable):
                         target = p
                         break
                     p = p.parent()
@@ -462,6 +550,17 @@ class VCCanvas(QWidget):
             return
 
         event.acceptProposedAction()
+
+    @staticmethod
+    def _droppable_types():
+        """Widget-Typen, die einen Funktions-Drop direkt annehmen."""
+        from .vc_button import VCButton
+        from .vc_slider import VCSlider
+        from .vc_color import VCColor
+        from .vc_encoder import VCEncoder
+        from .vc_xypad import VCXYPad
+        from .vc_speedial import VCSpeedDial
+        return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial)
 
     # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
 
@@ -515,6 +614,10 @@ class VCCanvas(QWidget):
                     target.caption = fn_name
                 target.update()
 
+            elif self._apply_function_to_special(target, function_id, fn_name):
+                # Farbe / Encoder / XY-Pad / SpeedDial haben den Drop verarbeitet.
+                pass
+
             else:
                 # Leeres Canvas → neuen Button anlegen
                 drop_pos = pos if pos is not None else QPoint(40, 40)
@@ -553,6 +656,58 @@ class VCCanvas(QWidget):
                     w.setVisible(self.on_active_bank(w))
                     w.show()
 
+    def _apply_function_to_special(self, target, function_id, fn_name) -> bool:
+        """Funktions-Drop auf Farbe / Encoder / XY-Pad / SpeedDial anwenden.
+        Gibt True zurück, wenn der Drop von einem dieser Typen verarbeitet wurde."""
+        from .vc_color import VCColor, ColorTarget
+        from .vc_encoder import VCEncoder
+        from .vc_xypad import VCXYPad
+        from .vc_speedial import VCSpeedDial, SpeedTarget
+
+        if isinstance(target, VCColor):
+            # Farb-Kachel färbt live die aktive Sequence-Farbe DIESES Effekts.
+            target.target = ColorTarget.EFFECT
+            target.function_id = function_id
+            if fn_name and getattr(target, "caption", None) in (None, "", "Farbe"):
+                target.caption = fn_name
+            target.update()
+            return True
+
+        if isinstance(target, VCEncoder):
+            # Encoder verstellt einen Parameter dieses Effekts relativ.
+            target.function_id = function_id
+            try:
+                from src.core.engine import effect_live
+                dk = effect_live.default_param_key(function_id)
+                if dk:
+                    target.param_key = dk
+            except Exception:
+                pass
+            if fn_name and getattr(target, "caption", None) in (None, "", "Encoder"):
+                target.caption = fn_name
+            target.update()
+            return True
+
+        if isinstance(target, VCXYPad):
+            # XY-Pad im Feld-Modus steuert Zentrum/Größe dieses EFX.
+            target.mode = "area"
+            target.efx_function_id = function_id
+            if fn_name and getattr(target, "caption", None) in (None, "", "XY Pad"):
+                target.caption = fn_name
+            target.update()
+            return True
+
+        if isinstance(target, VCSpeedDial):
+            # Speed-Dial steuert das Tempo dieser Funktion/dieses Effekts.
+            target.target_mode = SpeedTarget.FUNCTION
+            target.function_id = function_id
+            if fn_name and getattr(target, "caption", None) in (None, "", "Speed"):
+                target.caption = fn_name
+            target.update()
+            return True
+
+        return False
+
     def _assign_snap_to_button(self, btn, snap_id):
         """Macht einen VCButton zur Bibliothek-Farb-/Snap-Taste (Standard: Umschalten).
         Setzt die Beschriftung auf den Snap-Namen, wenn noch generisch."""
@@ -587,18 +742,14 @@ class VCCanvas(QWidget):
 
         menu.addSeparator()
         act_clear = menu.addAction("Alle löschen")
-        act_save  = menu.addAction("Speichern als…")
-        act_load  = menu.addAction("Laden…")
+        # UIC-05: Canvas-Export/Import nur noch über die Toolbar (keine Dopplung im
+        # Kontextmenü). Das Menü dient dem Hinzufügen + schnellen Leeren.
 
         chosen = menu.exec(self.mapToGlobal(local_pos))
         if chosen is None:
             return
         if chosen == act_clear:
             self._clear()
-        elif chosen == act_save:
-            self._save()
-        elif chosen == act_load:
-            self._load()
         elif chosen.data():
             wtype, pos = chosen.data()
             self._add_widget(wtype, pos)
@@ -623,6 +774,104 @@ class VCCanvas(QWidget):
         w.delete_requested.connect(lambda widget=w: self._remove_widget(widget))
         w.setVisible(self.on_active_bank(w))
         return w
+
+    def add_live_controls(self, function_id, param_keys, action_keys, origin=None):
+        """MLV-02: erzeugt aus gewaehlten Effekt-Parametern Fader (EFFECT_PARAM) und
+        aus Aktionen Tasten (EFFECT_ACTION), gebunden an function_id, und legt sie
+        ordentlich unter dem Ursprungs-Widget ab. Persistenz: normale VC-Serialisierung."""
+        from .vc_button import VCButton, ButtonAction
+        from .vc_slider import VCSlider, SliderMode
+
+        labels = {}
+        try:
+            from src.core.engine import effect_live
+            for s in effect_live.list_params(function_id):
+                labels[s.key] = getattr(s, "label", s.key)
+        except Exception:
+            pass
+        try:
+            from src.ui.widgets.matrix_live_dialog import ACTION_LABELS
+        except Exception:
+            ACTION_LABELS = {}
+
+        if origin is not None:
+            x0, y0 = origin.x(), origin.y() + origin.height() + self.GRID
+        else:
+            x0, y0 = 40, 40
+        gap = self.GRID
+        created = []
+
+        x = x0
+        for key in (param_keys or []):
+            w = self._add_widget("VCSlider", QPoint(x, y0))
+            if w is None:
+                continue
+            w.mode = SliderMode.EFFECT_PARAM
+            w.function_id = function_id
+            w.param_key = key
+            w.caption = labels.get(key, key)
+            w.update()
+            w.show()
+            created.append(w)
+            x += w.width() + gap
+
+        if action_keys:
+            x = x0
+            yb = y0 + 200 + gap     # Reihe unter den Fadern
+            for akey in action_keys:
+                w = self._add_widget("VCButton", QPoint(x, yb))
+                if w is None:
+                    continue
+                w.action = ButtonAction.EFFECT_ACTION
+                w.function_id = function_id
+                w.effect_action_key = akey
+                w.caption = ACTION_LABELS.get(akey, akey)
+                w.update()
+                w.show()
+                created.append(w)
+                x += w.width() + gap
+        return created
+
+    def handle_drag_drop(self, widget):
+        """FRM-01: Reparenting nach einem Drag. Liegt der Widget-Mittelpunkt über
+        einem Frame, wird das Widget dessen Kind (Position relativ zum Frame); wird
+        es aus einem Frame heraus gezogen, kehrt es auf den Canvas zurück. Frames
+        selbst werden nicht verschachtelt."""
+        from .vc_frame import VCFrame
+        if isinstance(widget, VCFrame):
+            return
+        center_canvas = self.mapFromGlobal(widget.mapToGlobal(widget.rect().center()))
+        target = None
+        for f in self.findChildren(VCFrame, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            if f is widget:
+                continue
+            if f.geometry().contains(center_canvas):
+                target = f
+                break
+        parent = widget.parent()
+        grid = self.GRID if self._snap_to_grid else 0
+
+        if target is not None and parent is not target:
+            # In den Frame hinein.
+            local = target.mapFromGlobal(widget.mapToGlobal(QPoint(0, 0)))
+            cr = target._content_rect()
+            lx = min(max(local.x(), cr.x()), max(cr.x(), cr.right() - widget.width()))
+            ly = min(max(local.y(), cr.y()), max(cr.y(), cr.bottom() - widget.height()))
+            target.add_child_to_page(widget, target._current_page)
+            widget.set_snap_grid(grid)
+            widget.move(lx, ly)
+            widget.update()
+        elif target is None and isinstance(parent, VCFrame):
+            # Aus dem Frame heraus -> zurück auf den Canvas.
+            canvas_tl = self.mapFromGlobal(widget.mapToGlobal(QPoint(0, 0)))
+            widget.setParent(self)
+            widget.setProperty("vc_page", None)
+            widget.set_edit_mode(self._edit_mode)
+            widget.set_snap_grid(grid)
+            widget.bank = self._active_bank
+            widget.move(max(0, canvas_tl.x()), max(0, canvas_tl.y()))
+            widget.setVisible(self.on_active_bank(widget))
+            widget.show()
 
     def _remove_widget(self, widget: VCWidget):
         widget.hide()

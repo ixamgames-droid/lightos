@@ -29,7 +29,7 @@ auf ARM64 laeuft, und warnt dann mit konkreter Umstiegs-Empfehlung auf ARM64-Pyt
 - Bis zu 32 Universen
 
 ### Engine
-- **10 Function-Typen**: Scene, Chaser, Collection, Show (Timeline), EFX,
+- **11 Function-Typen**: Scene, Chaser, Collection, Show (Timeline), EFX,
   RGB-Matrix, Sequence, Audio, Script, LayeredEffect, Carousel
 - **Multi-Page-Playback**: 10 Pages x 20 Executors = 200 Slots
 - **Grand Master Fader** + Blackout
@@ -38,7 +38,11 @@ auf ARM64 laeuft, und warnt dann mit konkreter Umstiegs-Empfehlung auf ARM64-Pyt
 - **State-Sync** + Auto-Validate beim Show-Load
 
 ### Programmierung
-- **Programmer** mit Attribut-Gruppen (Intensity / Color / Position / Beam / Gobo / Effect)
+- **Programmer** mit Attribut-Gruppen (Intensity / Color / Position / Gobo / Weitere)
+- **Moving-Head-Schnellwahl**: Strobe (Status + Speed) im Intensity-Tab,
+  Farbrad-Kacheln inkl. Split-Farben + Auto-Farbwechsel (Hardware/Software),
+  Gobo-Tab mit grafischer Gobo-Vorschau, Shake-Speed und sicherem Reset-Button
+  — generisch aus den Fixture-Wertebereichen ([docs/MOVING_HEADS.md](docs/MOVING_HEADS.md))
 - **Color Picker** (RGB / HSB / CMY / 27 Lee-Rosco Filter)
 - **Position Tool** (2D-Pad, Pan/Tilt-Fine, 13 Presets)
 - **Fan Tool** (Symmetric / Asymmetric / Start / End, 5 Kurven)
@@ -226,6 +230,10 @@ LightOS/
 | Komplette Oberflächen‑Anleitung | [docs/ANLEITUNG.md](docs/ANLEITUNG.md) |
 | Praxis‑Workflows (Schritt für Schritt) | [docs/WORKFLOWS.md](docs/WORKFLOWS.md) |
 | Effekte & Geschwindigkeit | [docs/EFFEKTE.md](docs/EFFEKTE.md) |
+| **Moving Heads (ZQ02001, Gobo/Farbrad/Strobe/Reset)** | **[docs/MOVING_HEADS.md](docs/MOVING_HEADS.md)** |
+| Fixture Library (Profile, Modi, Wertebereiche) | [docs/FIXTURE_LIBRARY.md](docs/FIXTURE_LIBRARY.md) |
+| Offene Punkte / Backlog (repo-weit) | [docs/OPEN_POINTS_OVERVIEW.md](docs/OPEN_POINTS_OVERVIEW.md) |
+| Zukunftsidee Fixture Generator | [docs/FUTURE_FIXTURE_GENERATOR.md](docs/FUTURE_FIXTURE_GENERATOR.md) |
 | RGB‑Matrix live programmieren | [docs/MATRIX_LIVE.md](docs/MATRIX_LIVE.md) |
 | Show‑Dateiformat | [docs/SHOW_FILE_FORMAT.md](docs/SHOW_FILE_FORMAT.md) |
 | Art‑Net / DMX‑Protokoll | [docs/ARTNET.md](docs/ARTNET.md) · [docs/DMX_PROTOCOL.md](docs/DMX_PROTOCOL.md) |

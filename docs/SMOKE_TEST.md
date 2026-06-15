@@ -96,4 +96,4 @@
 
 ## Fehler melden
 
-Wenn ein Schritt fehlschlägt: [Bug-Report öffnen](.github/ISSUE_TEMPLATE/bug_report.md) und Schritt + Fehlermeldung aus dem Log (`logs/lightos.log`) beifügen.
+Wenn ein Schritt fehlschlägt: [Bug-Report öffnen](../.github/ISSUE_TEMPLATE/bug_report.md) und Schritt + Fehlermeldung aus dem Log (`logs/lightos.log`) beifügen.

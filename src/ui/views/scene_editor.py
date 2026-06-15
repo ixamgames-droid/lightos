@@ -222,5 +222,5 @@ def _make_time_spin() -> QDoubleSpinBox:
     s.setSingleStep(0.1)
     s.setDecimals(1)
     s.setSuffix(" s")
-    s.setFixedWidth(80)
+    s.setMinimumWidth(80)
     return s

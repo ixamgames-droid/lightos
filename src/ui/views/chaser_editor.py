@@ -16,7 +16,7 @@ from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 class FunctionSelectorDialog(QDialog):
     """Modal dialog to pick a function from the registry."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, exclude_id: int | None = None):
         super().__init__(parent)
         self.setWindowTitle("Funktion auswaehlen")
         self.setMinimumSize(340, 400)
@@ -28,6 +28,10 @@ class FunctionSelectorDialog(QDialog):
 
         fm = get_function_manager()
         for f in fm.all():
+            # Den bearbeiteten Chaser NICHT als eigenen Schritt anbieten —
+            # Selbstreferenz würde beim Abspielen zu Endlos-Rekursion führen.
+            if exclude_id is not None and f.id == exclude_id:
+                continue
             item = QListWidgetItem(f"{f.function_type.value}: {f.name}")
             item.setData(Qt.ItemDataRole.UserRole, f.id)
             self._list.addItem(item)
@@ -101,7 +105,7 @@ class ChaserEditor(QWidget):
         self._spin_speed.setSingleStep(0.1)
         self._spin_speed.setDecimals(2)
         self._spin_speed.setSuffix("x")
-        self._spin_speed.setFixedWidth(70)
+        self._spin_speed.setMinimumWidth(70)
         self._spin_speed.valueChanged.connect(self._on_props_changed)
         prop_row.addWidget(self._spin_speed)
 
@@ -280,7 +284,7 @@ class ChaserEditor(QWidget):
             setattr(self._chaser.steps[row], attr, value)
 
     def _add_step(self):
-        dlg = FunctionSelectorDialog(self)
+        dlg = FunctionSelectorDialog(self, exclude_id=getattr(self._chaser, "id", None))
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         fid = dlg.selected_id

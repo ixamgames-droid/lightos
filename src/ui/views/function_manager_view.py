@@ -264,10 +264,40 @@ class FunctionManagerView(QWidget):
             parent = self._type_items.get(f.function_type)
         if parent is None:
             return None
+        # FLD-01a: verschachtelte Ordner aus dem folder-Feld (z. B. "Blau/Sommer")
+        # innerhalb der Typ-Gruppe abbilden.
+        folder = getattr(f, "folder", "") or ""
+        if folder:
+            parent = self._ensure_folder(parent, folder)
         item = QTreeWidgetItem(parent, [f.name])
         item.setData(0, Qt.ItemDataRole.UserRole, f.id)
         item.setIcon(0, _mini.function_icon(f))
         return item
+
+    def _ensure_folder(self, parent_item: QTreeWidgetItem, path: str) -> QTreeWidgetItem:
+        """Erzeugt/findet die verschachtelten Ordner-Items entlang eines
+        "/"-getrennten Pfades unterhalb von parent_item (Typ-Gruppe). Ordner-Items
+        tragen UserRole=None (so werden sie von Funktions-Logik ignoriert)."""
+        cur = parent_item
+        for part in (p.strip() for p in path.split("/")):
+            if not part:
+                continue
+            found = None
+            for i in range(cur.childCount()):
+                ch = cur.child(i)
+                if ch.data(0, Qt.ItemDataRole.UserRole) is None and ch.text(0) == part:
+                    found = ch
+                    break
+            if found is None:
+                found = QTreeWidgetItem(cur, [part])
+                found.setData(0, Qt.ItemDataRole.UserRole, None)
+                try:
+                    found.setIcon(0, _mini.icon_for_kind("folder"))
+                except Exception:
+                    pass
+                found.setExpanded(True)
+            cur = found
+        return cur
 
     def _refresh_tree(self):
         """Rebuild tree preserving selection."""

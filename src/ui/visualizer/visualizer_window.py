@@ -10,6 +10,7 @@ Features:
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from typing import Optional
@@ -25,15 +26,18 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QTimer, Signal, Slot, QObject
-from PySide6.QtGui import QAction, QColor
+from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import AppState, get_state, get_channels_for_patched
 from src.core.database.models import PatchedFixture
 from src.core.stage.stage_definition import (
     StageDefinition, StageElement,
     list_stages, load_stage, save_stage, delete_stage,
-    get_default_simple, get_default_theatre, get_default_rock,
+    get_default_simple,
     DEFAULT_PRESETS,
+)
+from src.core.stage.coords import (
+    live_to_world3d, world3d_to_live, default_height_for,
 )
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -105,17 +109,49 @@ class VisualizerBridge(QObject):
     @Slot()
     def requestFixtures(self):
         try:
+            self._sync_positions_from_live_view()
             fixtures = self._build_fixture_list()
             self.allFixtures.emit(json.dumps(fixtures))
         except Exception as e:
             print(f"[Visualizer] requestFixtures error: {e}")
 
+    def _sync_positions_from_live_view(self) -> bool:
+        """Auto-Patch: Top-Down-X/Z aus der Live View ins 3D uebernehmen.
+
+        Die Live View ist die Quelle der Top-Down-X/Z (gemeinsame Umrechnung in
+        ``coords``). Die Hoehe (Y) ist 3D-eigen und bleibt erhalten (typ-
+        abhaengiger Default beim ersten Mal). So erscheinen in der Live View
+        platzierte Strahler automatisch im 3D — ohne "Im Raum platzieren" — und
+        folgen spaeteren Live-View-Verschiebungen.
+        """
+        lv = getattr(self._state, "live_view_positions", {}) or {}
+        if not lv:
+            return False
+        changed = False
+        for f in self._state.get_patched_fixtures():
+            p = lv.get(f.fid)
+            if not p:
+                continue
+            try:
+                x, z = live_to_world3d(float(p[0]), float(p[1]))
+                old = self._state.visualizer_positions.get(f.fid)
+                y = old[1] if old else default_height_for(f.fixture_type)
+                new = (x, float(y), z)
+                if old != new:
+                    self._state.visualizer_positions[f.fid] = new
+                    changed = True
+            except Exception:
+                continue
+        return changed
+
     @Slot(str)
     def placeFixture(self, pos_json: str):
         """JS sendet Rechtsklick-Position - platziert den naechsten
-        noch unplatzierten Fixture an dieser Stelle."""
+        noch unplatzierten Fixture an dieser Stelle. Optionales 'dock'-Feld
+        (stage_element_id) haelt die Andock-Beziehung fest."""
         try:
             pos = json.loads(pos_json)
+            dock_id = pos.get("dock") or ""
             for f in self._state.get_patched_fixtures():
                 if f.fid not in self._state.visualizer_positions:
                     self._state.visualizer_positions[f.fid] = (
@@ -123,6 +159,11 @@ class VisualizerBridge(QObject):
                         float(pos.get("y", 6.5)),
                         float(pos["z"]),
                     )
+                    if dock_id:
+                        self._state.visualizer_docks[f.fid] = str(dock_id)
+                    else:
+                        self._state.visualizer_docks.pop(f.fid, None)
+                    self._write_back_to_live_view(f.fid, float(pos["x"]), float(pos["z"]))
                     data = self._fixture_to_dict(f)
                     self.fixtureAdded.emit(json.dumps(data))
                     return
@@ -135,9 +176,36 @@ class VisualizerBridge(QObject):
         try:
             fid = int(fid_str)
             self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
+            # Top-Down-X/Z zurueck in die Live View (Single Source of Truth) — so
+            # spiegelt die 2D-Ansicht eine 3D-Verschiebung; Y bleibt 3D-eigen.
+            self._write_back_to_live_view(fid, float(x), float(z))
             self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
         except Exception as e:
             print(f"[Visualizer] fixturePositionChanged error: {e}")
+
+    def _write_back_to_live_view(self, fid: int, x: float, z: float):
+        """3D-Top-Down-(x,z) -> Live-View-Pixel zurueckschreiben + melden."""
+        try:
+            self._state.live_view_positions[fid] = world3d_to_live(x, z)
+        except Exception:
+            return
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
+
+    @Slot(str, str)
+    def fixtureDockChanged(self, fid_str: str, sid: str):
+        """JS meldet eine geaenderte Andock-Beziehung (leerer sid = loesen)."""
+        try:
+            fid = int(fid_str)
+            if sid:
+                self._state.visualizer_docks[fid] = str(sid)
+            else:
+                self._state.visualizer_docks.pop(fid, None)
+        except Exception as e:
+            print(f"[Visualizer] fixtureDockChanged error: {e}")
 
     @Slot(str)
     def fixtureSelectionChanged(self, fids_json: str):
@@ -152,6 +220,7 @@ class VisualizerBridge(QObject):
         try:
             fid = int(fid_str)
             self._state.visualizer_positions.pop(fid, None)
+            self._state.visualizer_docks.pop(fid, None)
             self.pyFixtureDeleted.emit(fid)
         except Exception as e:
             print(f"[Visualizer] fixtureDeleted error: {e}")
@@ -189,8 +258,14 @@ class VisualizerBridge(QObject):
 
     # ── Python -> JS helpers ────────────────────────────────────────────────
 
-    def place_fixture_at(self, fid: int, x: float, y: float, z: float):
+    def place_fixture_at(self, fid: int, x: float, y: float, z: float,
+                         dock_id: str | None = None):
         self._state.visualizer_positions[fid] = (x, y, z)
+        if dock_id:
+            self._state.visualizer_docks[fid] = str(dock_id)
+        else:
+            self._state.visualizer_docks.pop(fid, None)
+        self._write_back_to_live_view(fid, float(x), float(z))
         fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
         if fid in fixtures:
             self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(fixtures[fid])))
@@ -285,6 +360,7 @@ class VisualizerBridge(QObject):
             "label": f.label,
             "type": f.fixture_type,
             "x": pos[0], "y": pos[1], "z": pos[2],
+            "dockedTo": self._state.visualizer_docks.get(f.fid, ""),
             "r": 0, "g": 0, "b": 0, "intensity": 0,
             "pan": 128, "tilt": 128,
         }
@@ -302,6 +378,7 @@ class VisualizerBridge(QObject):
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
                 self.remove_fixture_from_scene(fid)
+                self._state.visualizer_docks.pop(fid, None)
 
 
 # ============================================================================
@@ -311,6 +388,7 @@ class VisualizerBridge(QObject):
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
+        ("floor",     "Boden / Floor"),
         ("platform",  "Plattform"),
         ("truss_h",   "Truss (horizontal)"),
         ("truss_v",   "Truss/Stuetze (vertikal)"),
@@ -398,6 +476,36 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
+        tb.addSeparator()
+
+        # Andock-Modus (opt-in): Strahler rasten beim Platzieren/Ziehen an
+        # Trassen (haengen unten) bzw. Plattform/Boden (oben drauf) ein.
+        # Default AUS -> freie Platzierung wie bisher.
+        self._act_dock = QAction("🔗 Andocken", self)
+        self._act_dock.setCheckable(True)
+        self._act_dock.setChecked(False)
+        self._act_dock.setToolTip(
+            "Andock-Modus (Taste D):\n"
+            "AN  – Strahler rasten an Trassen (haengen unten) bzw.\n"
+            "       Plattform/Boden (stehen oben drauf) ein und wandern\n"
+            "       mit, wenn das Element verschoben wird.\n"
+            "AUS – freie Platzierung auf fester Hoehe (wie bisher)."
+        )
+        self._act_dock.toggled.connect(self._on_dock_mode_toggled)
+        tb.addAction(self._act_dock)
+
+        # T-VIZ-09: Helligkeit direkt in der Toolbar (sonst nur im Einstellungen-Tab,
+        # was im Live-Betrieb den Workflow bremst). Synchron mit dem Tab-Slider.
+        tb.addSeparator()
+        tb.addWidget(QLabel("☀"))
+        self._sld_brightness_tb = QSlider(Qt.Orientation.Horizontal)
+        self._sld_brightness_tb.setRange(0, 100)
+        self._sld_brightness_tb.setValue(20)        # vor connect -> kein Spurious-Fire
+        self._sld_brightness_tb.setFixedWidth(120)
+        self._sld_brightness_tb.setToolTip("Szenen-Helligkeit (synchron mit Einstellungen-Tab)")
+        self._sld_brightness_tb.valueChanged.connect(self._on_brightness_changed)
+        tb.addWidget(self._sld_brightness_tb)
+
         # -------- Splitter --------
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -432,6 +540,41 @@ class VisualizerWindow(QMainWindow):
         self._lbl_info.setStyleSheet("color: #888; font-size: 11px;")
         self.statusBar().addWidget(self._lbl_info)
 
+        self._setup_shortcuts()
+
+    def _setup_shortcuts(self):
+        """T-VIZ-10: Tastatur-Shortcuts fuer schnellen Modus-Wechsel.
+        V = 3D/2D umschalten · E = Bearbeitungsmodus durchschalten ·
+        F/S = Fixtures-/Buehne-Tab fokussieren."""
+        def _toggle_view():
+            self._combo_view.setCurrentIndex(1 - self._combo_view.currentIndex())
+
+        def _cycle_edit():
+            n = self._combo_edit.count()
+            self._combo_edit.setCurrentIndex((self._combo_edit.currentIndex() + 1) % n)
+
+        for key, fn in (
+            ("V", _toggle_view),
+            ("E", _cycle_edit),
+            ("F", lambda: self._tabs.setCurrentIndex(0)),
+            ("S", lambda: self._tabs.setCurrentIndex(1)),
+            ("D", lambda: self._act_dock.toggle()),
+        ):
+            sc = QShortcut(QKeySequence(key), self)
+            sc.activated.connect(fn)
+
+    def _on_dock_mode_toggled(self, checked: bool):
+        """Andock-Modus an/aus -> an JS pushen + Status anzeigen."""
+        try:
+            self._bridge.push_settings(self._collect_settings())
+            self._lbl_info.setText(
+                "🔗 Andocken AN – Strahler rasten an Trassen/Plattformen ein."
+                if checked else
+                "Andocken AUS – freie Platzierung auf fester Hoehe."
+            )
+        except Exception as e:
+            print(f"[Visualizer] dock toggle error: {e}")
+
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout(panel)
@@ -465,17 +608,23 @@ class VisualizerWindow(QMainWindow):
         row.addWidget(btn_remove)
         layout.addLayout(row)
 
-        box = QGroupBox("Position (X / Y / Z)")
+        box = QGroupBox("Position & Ausrichtung")
         form = QFormLayout(box)
+        self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
         self._spin_x = QDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
         self._spin_y = QDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
         self._spin_z = QDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
-        for sp in (self._spin_x, self._spin_y, self._spin_z):
+        # T-VIZ-03: Y-Rotation (Ausrichtung um die Hochachse), in 3D + 2D sinnvoll
+        self._spin_rot_y = QDoubleSpinBox()
+        self._spin_rot_y.setRange(-180, 180); self._spin_rot_y.setSingleStep(15)
+        self._spin_rot_y.setSuffix(" °"); self._spin_rot_y.setWrapping(True)
+        for sp in (self._spin_x, self._spin_y, self._spin_z, self._spin_rot_y):
             sp.setMinimumHeight(38)
             sp.valueChanged.connect(self._on_fixture_pos_spin_changed)
         form.addRow("X (links/rechts):", self._spin_x)
         form.addRow("Y (Hoehe):",        self._spin_y)
         form.addRow("Z (vorne/hinten):", self._spin_z)
+        form.addRow("Drehung Y:",        self._spin_rot_y)
         layout.addWidget(box)
 
         return w
@@ -811,6 +960,7 @@ class VisualizerWindow(QMainWindow):
                 self._spin_x.setValue(x)
                 self._spin_y.setValue(y)
                 self._spin_z.setValue(z)
+                self._spin_rot_y.setValue(self._state.visualizer_rotations.get(fid, 0.0))
             finally:
                 self._suppress_property_signals = False
 
@@ -820,8 +970,36 @@ class VisualizerWindow(QMainWindow):
             return
         fid = item.data(Qt.ItemDataRole.UserRole)
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
-        self._bridge.place_fixture_at(fid, x, y, z)
+        rot = self._spin_rot_y.value()
+        # Andock-Modus: Hoehe automatisch aus dem Buehnen-Element unter (x, z) ziehen.
+        dock_id = ""
+        dock_name = ""
+        if self._dock_enabled():
+            target = self._current_stage.dock_target_for(x, z)
+            if target:
+                y = target["y"]
+                dock_id = target["id"]
+                el = self._current_stage.get(dock_id)
+                dock_name = (el.name or el.type) if el else dock_id
+                self._suppress_property_signals = True
+                try:
+                    self._spin_y.setValue(y)
+                finally:
+                    self._suppress_property_signals = False
+        self._bridge.place_fixture_at(fid, x, y, z, dock_id or None)
+        self._state.visualizer_rotations[fid] = rot
+        if rot:
+            self._bridge.push_apply_fixture_transform(fid, x, y, z, rot)
         self._refresh_patch_list()
+        # T-VIZ-11: sichtbares Platzierungs-Feedback (nach refresh, der _lbl_info setzt)
+        if dock_id:
+            self._lbl_info.setText(
+                f"Fixture #{fid} angedockt an '{dock_name}' bei Hoehe {y:.1f} m"
+            )
+        else:
+            self._lbl_info.setText(
+                f"Fixture #{fid} platziert bei ({x:.1f}, {y:.1f}, {z:.1f})"
+            )
 
     def _remove_selected(self):
         item = self._patch_list.currentItem()
@@ -841,10 +1019,27 @@ class VisualizerWindow(QMainWindow):
         if fid not in self._state.visualizer_positions:
             return
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
+        rot = self._spin_rot_y.value()
         self._state.visualizer_positions[fid] = (x, y, z)
-        self._bridge.push_apply_fixture_transform(fid, x, y, z, 0.0)
+        self._state.visualizer_rotations[fid] = rot
+        # Manuelle Positionseingabe loest eine bestehende Andock-Beziehung.
+        if self._state.visualizer_docks.pop(fid, None) is not None:
+            self._bridge.fixtureDockChanged(str(fid), "")
+        self._bridge.push_apply_fixture_transform(fid, x, y, z, rot)
 
     def _clear_positions(self):
+        # T-VIZ-04 (B-6): Sicherheitsabfrage — Loeschen aller Positionen ist nicht
+        # trivial rueckgaengig zu machen.
+        n = len(self._state.visualizer_positions)
+        if n == 0:
+            return
+        if QMessageBox.question(
+                self, "Alle Fixtures entfernen?",
+                f"{n} platzierte Fixture(s) aus der Visualizer-Szene entfernen?\n"
+                "Die Patch-Daten bleiben erhalten — nur die Platzierung wird gelöscht.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
         for fid in list(self._state.visualizer_positions):
             self._bridge.remove_fixture_from_scene(fid)
         self._state.visualizer_positions.clear()
@@ -884,9 +1079,8 @@ class VisualizerWindow(QMainWindow):
     def _reload_stage_combo(self):
         self._combo_stage.blockSignals(True)
         self._combo_stage.clear()
-        # Defaults
-        for key, label in [("simple", "Simple"), ("theatre", "Theatre"), ("rock", "Rock Concert")]:
-            self._combo_stage.addItem(label, ("default", key))
+        # Leere Buehne (Default) — keine vorgerenderten Presets mehr.
+        self._combo_stage.addItem("Leer (eigene Buehne)", ("default", "simple"))
         # User-saved
         saved = list_stages()
         if saved:
@@ -945,6 +1139,7 @@ class VisualizerWindow(QMainWindow):
         try:
             self._stage_tree.clear()
             type_labels = {
+                "floor":     "Boden",
                 "platform":  "Plattform",  "truss_h":  "Truss horiz.",
                 "truss_v":   "Truss vert.", "wall":    "Wand",
                 "led_wall":  "LED-Wand",   "speaker":  "Speaker",
@@ -970,6 +1165,7 @@ class VisualizerWindow(QMainWindow):
     def _add_stage_element(self, type_: str):
         # Pick reasonable defaults per type
         defaults = {
+            "floor":     dict(x=0, y=0.05, z=0, w=14, h=0.1, d=10, color="#1c1c1c"),
             "platform":  dict(x=0, y=0.2, z=0, w=6, h=0.4, d=4, color="#332520"),
             "truss_h":   dict(x=0, y=8, z=0, w=4, h=0.3, d=0.3, color="#999999"),
             "truss_v":   dict(x=0, y=2, z=0, w=0.3, h=4, d=0.3, color="#999999"),
@@ -1029,22 +1225,26 @@ class VisualizerWindow(QMainWindow):
             self._stage_spin_w.setValue(el.w)
             self._stage_spin_h.setValue(el.h)
             self._stage_spin_d.setValue(el.d)
-            import math
             self._stage_spin_rot.setValue(math.degrees(el.rotation))
             self._stage_color_preview.setStyleSheet(
                 f"background:{el.color}; border:1px solid #555;"
             )
-            # Resize-Mode bei Element-Wechsel zuruecksetzen (Default = Verschieben)
+            # Erst im JS selektieren (setzt selectedStageId), DANN den aktuellen
+            # Resize-Modus erneut anwenden, damit die Handles am neu selektierten
+            # (auch frisch geladenen) Element wieder erscheinen.
+            #
+            # FIX: Frueher wurde der Resize-Modus bei JEDER Selektion hart auf AUS
+            # gesetzt. Folge: Nach dem Speichern/Neuladen einer Buehne wurde die
+            # Trasse beim Anklicken sofort wieder auf "nur verschieben" gestellt,
+            # die Eck-Handles verschwanden und "Groesse anpassen" wirkte tot.
+            # Jetzt bleibt der Modus persistent (T-VIZ-12).
+            self._bridge.push_select_stage_object(el.id)
             if hasattr(self, "_btn_resize_mode"):
-                self._btn_resize_mode.blockSignals(True)
-                self._btn_resize_mode.setChecked(False)
-                self._btn_resize_mode.setText("Groesse anpassen")
-                self._btn_resize_mode.blockSignals(False)
                 try:
-                    self._bridge.resizeModeSignal.emit(False)
+                    self._bridge.resizeModeSignal.emit(
+                        bool(self._btn_resize_mode.isChecked()))
                 except Exception:
                     pass
-            self._bridge.push_select_stage_object(el.id)
         finally:
             self._suppress_property_signals = False
 
@@ -1054,7 +1254,6 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
-        import math
         el.name     = self._stage_name_edit.text()
         el.x        = self._stage_spin_x.value()
         el.y        = self._stage_spin_y.value()
@@ -1207,7 +1406,6 @@ class VisualizerWindow(QMainWindow):
             el = self._current_stage.get(sid)
             if el is None:
                 # Neues Element aus JS - in Python-Modell anlegen
-                from src.core.stage.stage_definition import StageElement
                 pos = it.get("position") or {}
                 size = it.get("size") or {}
                 el = StageElement(
@@ -1250,7 +1448,6 @@ class VisualizerWindow(QMainWindow):
         if cur:
             self._suppress_property_signals = True
             try:
-                import math
                 self._stage_spin_x.setValue(cur.x)
                 self._stage_spin_y.setValue(cur.y)
                 self._stage_spin_z.setValue(cur.z)
@@ -1284,6 +1481,22 @@ class VisualizerWindow(QMainWindow):
     def _on_view_mode_changed(self, idx: int):
         mode = self._combo_view.itemData(idx) or "3D"
         self._bridge.push_view_mode(mode)
+        self._set_height_row_visible(mode != "2D")
+
+    def _set_height_row_visible(self, visible: bool):
+        """T-VIZ-06 (B-7): Im 2D-Top-Down-Modus ist der Y-(Höhen-)Spinner
+        wirkungslos — Row ausblenden, damit er nicht verwirrt."""
+        form = getattr(self, "_pos_form", None)
+        if form is None:
+            return
+        try:
+            form.setRowVisible(self._spin_y, visible)
+        except (AttributeError, RuntimeError):
+            # Aeltere Qt ohne setRowVisible: wenigstens den Spinner selbst schalten.
+            self._spin_y.setVisible(visible)
+            lbl = form.labelForField(self._spin_y)
+            if lbl is not None:
+                lbl.setVisible(visible)
 
     def _on_edit_mode_changed(self, idx: int):
         mode = self._combo_edit.itemData(idx) or "view"
@@ -1309,7 +1522,12 @@ class VisualizerWindow(QMainWindow):
             "gridStep":        float(self._spin_grid.value()),
             "brightness":      self._sld_brightness.value() / 100.0,
             "autoBrightness":  self._chk_auto_brightness.isChecked(),
+            "dockEnabled":     self._dock_enabled(),
         }
+
+    def _dock_enabled(self) -> bool:
+        act = getattr(self, "_act_dock", None)
+        return bool(act.isChecked()) if act is not None else False
 
     def _on_settings_changed(self, *_):
         try:
@@ -1319,9 +1537,18 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_settings_changed error: {e}")
 
     def _on_brightness_changed(self, value: int):
-        """User bewegt den Helligkeits-Slider - sendet Manual-Override an JS."""
+        """User bewegt einen Helligkeits-Slider (Toolbar oder Einstellungen-Tab).
+        Haelt beide Slider synchron und sendet einen Manual-Override an JS."""
         try:
-            self._lbl_brightness.setText(f"{value}%")
+            if hasattr(self, "_lbl_brightness"):
+                self._lbl_brightness.setText(f"{value}%")
+            # T-VIZ-09: Toolbar- und Tab-Slider gleich halten (ohne Rueckkopplung)
+            for sld in (getattr(self, "_sld_brightness", None),
+                        getattr(self, "_sld_brightness_tb", None)):
+                if sld is not None and sld.value() != value:
+                    sld.blockSignals(True)
+                    sld.setValue(value)
+                    sld.blockSignals(False)
             # Direkter Manual-Setter im JS (verhindert Auto-Override beim Mode-Wechsel)
             self._bridge.brightnessSignal.emit(value / 100.0)
         except Exception as e:
@@ -1344,13 +1571,17 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_auto_brightness_apply error: {e}")
 
     def _on_brightness_from_js(self, value: float):
-        """JS-Auto-Brightness updated den Slider stumm (ohne Signal-Loop)."""
+        """JS-Auto-Brightness updated die Slider stumm (ohne Signal-Loop)."""
         try:
             v = int(round(max(0.0, min(1.0, value)) * 100))
-            self._sld_brightness.blockSignals(True)
-            self._sld_brightness.setValue(v)
-            self._lbl_brightness.setText(f"{v}%")
-            self._sld_brightness.blockSignals(False)
+            for sld in (getattr(self, "_sld_brightness", None),
+                        getattr(self, "_sld_brightness_tb", None)):
+                if sld is not None:
+                    sld.blockSignals(True)
+                    sld.setValue(v)
+                    sld.blockSignals(False)
+            if hasattr(self, "_lbl_brightness"):
+                self._lbl_brightness.setText(f"{v}%")
         except Exception as e:
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 

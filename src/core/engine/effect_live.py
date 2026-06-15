@@ -14,6 +14,37 @@ und Aktionen steuern, ohne dass irgendwo hartkodiertes Effekt-Wissen liegt.
 from __future__ import annotations
 
 
+# ── Live-Edit-Slots (benannte Bearbeitungsziele) ───────────────────────────────
+# Idee „Live-Bearbeitung": ein Effekt-Pad macht seinen Effekt zum aktiven Ziel
+# eines benannten Slots (z. B. "MH" oder "MX"); die Fader/Farb-Kacheln desselben
+# Slots bearbeiten dann GENAU diesen Effekt — pro Quadrant/Slot unabhängig,
+# ohne dass jeder Fader fest an eine function_id gebunden werden muss.
+_edit_targets: dict[str, int] = {}
+
+
+def set_edit_target(slot: str, function_id) -> None:
+    """Merkt ``function_id`` als aktives Bearbeitungsziel für ``slot``."""
+    if not slot:
+        return
+    if function_id is None:
+        _edit_targets.pop(slot, None)
+    else:
+        try:
+            _edit_targets[slot] = int(function_id)
+        except (TypeError, ValueError):
+            pass
+
+
+def get_edit_target(slot: str):
+    """function_id des aktuellen Bearbeitungsziels von ``slot`` (oder None)."""
+    return _edit_targets.get(slot) if slot else None
+
+
+def clear_edit_targets() -> None:
+    """Alle Slots leeren (z. B. bei neuer Show)."""
+    _edit_targets.clear()
+
+
 def resolve_target(function_id=None):
     """Ziel-Funktion bestimmen: feste ``function_id`` oder der aktive Effekt."""
     try:
@@ -115,6 +146,20 @@ def do_action(action, function_id=None, **kw) -> bool:
     return bool(fn.do_action(action, **kw))
 
 
+def list_actions(function_id=None) -> list:
+    """(key, label)-Paare der Live-Aktionen des Zieleffekts.
+
+    Funktionen, die ``list_actions`` implementieren (EFX, Matrix), liefern ihre
+    eigene Liste — die Bindungs-UI zeigt damit nur sinnvolle Aktionen an."""
+    fn = resolve_target(function_id)
+    if fn is None or not hasattr(fn, "list_actions"):
+        return []
+    try:
+        return [(str(k), str(lbl)) for k, lbl in fn.list_actions()]
+    except Exception:
+        return []
+
+
 def default_param_key(function_id=None) -> str | None:
     """Erster sinnvoll live-steuerbarer Parameter eines Effekts fuer Drag&Drop
     auf einen Slider.
@@ -140,6 +185,27 @@ def default_param_key(function_id=None) -> str | None:
             if preferred is None:
                 preferred = spec.key
     return preferred or fallback
+
+
+def color_is_effect_driven() -> bool:
+    """True, wenn ein laufender Effekt gerade die Farbkanaele (color_r/g/b)
+    „besitzt" — dann wirkt eine manuelle Farb-Kachel (Ziel Programmer/Alle) nicht
+    sichtbar (APC-Probier To-Do #9). Erkannt wird eine laufende RGB-/RGBW-Matrix
+    (der klare, eindeutige Fall — z. B. „Mtx Regenbogen"). Dimmer-/Shutter-Style-
+    Matrizen fassen die Farbe NICHT an und zaehlen daher nicht."""
+    try:
+        from .function_manager import get_function_manager
+        from .rgb_matrix import RgbMatrixInstance, MatrixStyle
+    except Exception:
+        return False
+    try:
+        for f in get_function_manager().all():
+            if (isinstance(f, RgbMatrixInstance) and f.is_running
+                    and f.style in (MatrixStyle.RGB, MatrixStyle.RGBW)):
+                return True
+    except Exception:
+        return False
+    return False
 
 
 def set_selected_color(rgb, function_id=None) -> bool:

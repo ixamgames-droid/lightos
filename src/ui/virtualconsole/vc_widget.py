@@ -5,6 +5,22 @@ from PySide6.QtCore import Qt, QPoint, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 
 
+def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> bool:
+    """Gemeinsame MIDI-Bindungs-Prüfung (T-6: war byte-gleich in VCButton/VCColor).
+
+    note_on bindet auch note_off (für Press/Release); Kanal 0 = alle Kanäle."""
+    if midi_data1 is None or midi_data1 < 0:
+        return False
+    if midi_type == "note_on":
+        if msg.msg_type not in ("note_on", "note_off"):
+            return False
+    elif midi_type != msg.msg_type:
+        return False
+    if midi_ch != 0 and midi_ch != msg.channel:
+        return False
+    return midi_data1 == msg.data1
+
+
 class VCWidget(QFrame):
     """Basisklasse — abstrakt, nicht direkt instanziieren."""
 
@@ -122,8 +138,18 @@ class VCWidget(QFrame):
             super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
+        was_dragging = self._dragging
         self._dragging = False
         self._resizing = False
+        # FRM-01: nach einem Drag pruefen, ob das Widget in einen Frame hinein
+        # oder aus einem Frame heraus gezogen wurde (Reparenting per Hit-Test).
+        if was_dragging and self._edit_mode:
+            canvas = self._find_canvas()
+            if canvas is not None and hasattr(canvas, "handle_drag_drop"):
+                try:
+                    canvas.handle_drag_drop(self)
+                except Exception as e:
+                    print(f"[VCWidget] drag-drop reparent error: {e}")
         event.accept()
 
     def _deselect_siblings(self):
@@ -143,8 +169,23 @@ class VCWidget(QFrame):
     def _show_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
         menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
+        # MLV-01: ist das Widget an einen Effekt mit Live-Parametern gebunden,
+        # bietet das Menue einen Live-Editor (Parameter/Aktionen -> erzeugt
+        # automatisch VC-Bedienelemente, MLV-02).
+        if self.is_effect_bound():
+            _fid = self.live_effect_function_id()
+            try:
+                from src.core.engine import effect_live
+                _has_live = bool(effect_live.list_params(_fid))
+            except Exception:
+                _has_live = False
+            if _has_live:
+                menu.addAction("⚡ Live-Parameter…").triggered.connect(
+                    lambda checked=False, f=_fid: self._open_live_editor(f))
         if self.supports_midi_teach():
             menu.addAction("🎹 MIDI Teach...").triggered.connect(self._teach_midi)
+        if self.supports_key_teach():
+            menu.addAction("⌨ Taste zuweisen...").triggered.connect(self._teach_key)
         # Bank-Zuweisung (einheitlich fuer alle Widget-Typen)
         bank_menu = menu.addMenu("Bank")
         act_all = bank_menu.addAction("Alle Banks")
@@ -211,8 +252,78 @@ class VCWidget(QFrame):
                 self.apply_midi_binding(b[0], b[1], b[2])
             self.update()
 
+    # ── Keyboard-Teach (Rechtsklick → Taste zuweisen) ──────────────────────────
+    #
+    # Spiegelbild des MIDI-Teach: ein app-weiter Hotkey-Filter
+    # (core/input/keyboard_hotkeys.py) verteilt Tastendrücke an die Canvas,
+    # diese ruft handle_key() der Widgets der aktiven Bank auf.
+
+    def supports_key_teach(self) -> bool:
+        """True, wenn dieses Widget eine Tastatur-Bindung unterstützt."""
+        return False
+
+    def current_key_binding(self) -> str:
+        """Aktuelle Bindung als Sequenz-String ("Ctrl+F5") oder ""."""
+        return ""
+
+    def apply_key_binding(self, seq: str):
+        """Setzt die Tastatur-Bindung ("" = entfernen). Subklassen überschreiben."""
+        pass
+
+    def handle_key(self, seq: str, pressed: bool) -> bool:
+        """Verarbeitet einen Hotkey. True = konsumiert (Bindung passt)."""
+        return False
+
+    def _teach_key(self):
+        from PySide6.QtWidgets import QDialog
+        from src.ui.widgets.key_teach_dialog import KeyTeachDialog
+        canvas = self._find_canvas()
+        conflict_check = None
+        if canvas is not None and hasattr(canvas, "key_binding_owners"):
+            conflict_check = lambda seq: canvas.key_binding_owners(seq, exclude=self)
+        dlg = KeyTeachDialog(self, current=self.current_key_binding(),
+                             conflict_check=conflict_check,
+                             title=f"Taste zuweisen — {self.caption}")
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.apply_key_binding(dlg.result_sequence or "")
+            self.update()
+
     def _open_properties(self):
         pass  # override in subclasses
+
+    # ── MLV: Matrix-/Effekt-Live-Editor (Phase 2) ──────────────────────────────
+
+    def is_effect_bound(self) -> bool:
+        """True, wenn dieses Widget an einen Effekt gebunden ist (Subklassen
+        ueberschreiben: Button mit Funktions-/Effekt-Aktion, Slider im EFFECT_*-Modus)."""
+        return False
+
+    def live_effect_function_id(self):
+        """function_id des gebundenen Effekts (oder None = aktiver Effekt)."""
+        return None
+
+    def _find_canvas(self):
+        """Naechster Vorfahr, der Live-Bedienelemente erzeugen kann (VCCanvas)."""
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, "add_live_controls"):
+                return p
+            p = p.parent()
+        return None
+
+    def _open_live_editor(self, function_id):
+        """Oeffnet den Matrix-Live-Editor-Dialog und laesst die ausgewaehlten
+        Parameter/Aktionen als VC-Bedienelemente erzeugen (MLV-01/02)."""
+        from PySide6.QtWidgets import QDialog
+        from src.ui.widgets.matrix_live_dialog import MatrixLiveDialog
+        dlg = MatrixLiveDialog(function_id, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        canvas = self._find_canvas()
+        if canvas is None:
+            return
+        canvas.add_live_controls(function_id, dlg.selected_param_keys(),
+                                 dlg.selected_action_keys(), origin=self)
 
     def _pick_fg(self):
         from PySide6.QtWidgets import QColorDialog
