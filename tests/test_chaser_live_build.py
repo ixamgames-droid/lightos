@@ -96,7 +96,10 @@ class ChaserLiveBuildTest(unittest.TestCase):
         self.assertIn("capture_step", actions)
         self.assertIn("clear_steps", actions)
         params = {s.key for s in self.c.list_params()}
-        self.assertEqual(params, {"speed", "direction", "run_order"})
+        # Kern-Params muessen enthalten sein; Tempo-Bus-Params (tempo_bus_id/
+        # tempo_multiplier/phase_offset) sind zusaetzlich erlaubt -> Subset-Check
+        # statt exakter Menge (sonst bricht jede neue Param-Erweiterung diesen Test).
+        self.assertTrue({"speed", "direction", "run_order"} <= params)
 
     def test_dispatcher_set_param_and_action(self):
         from src.core.engine import effect_live

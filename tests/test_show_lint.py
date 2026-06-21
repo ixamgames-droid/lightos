@@ -1,0 +1,175 @@
+"""Tests für die Show-Validierungs-Ebene (Phase 1, Report-Modus).
+
+- Akzeptanz: eine absichtlich kaputte Show (Fake-Algo + Fake-Widget +
+  Fake-param_key) erzeugt genau die erwarteten lauten Findings.
+- Eine saubere Minimal-Show erzeugt KEINE Fehler.
+- Report-Lauf über alle committeten shows/*.lshow (blockiert NICHT — Phase 1 ist
+  Frühwarnung; das harte CI-Gate kommt erst in Phase 5).
+"""
+from __future__ import annotations
+
+import glob
+import os
+
+from src.core.capability.reflect import get_capabilities
+from src.core.capability.validate import (
+    ERROR, WARNING, validate_show_dict, validate_lshow, assert_show_dict,
+    ShowValidationError, format_findings)
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SHOWS = os.path.join(_ROOT, "shows")
+
+
+def _codes(findings, severity=None):
+    return [f.code for f in findings if severity is None or f.severity == severity]
+
+
+def test_reflect_smoke():
+    """Die SSOT reflektiert die echten Sätze (nicht leer, echte Werte drin)."""
+    caps = get_capabilities()
+    assert "VCButton" in caps.widget_types
+    assert "VCSlider" in caps.widget_types
+    assert "Toggle" in caps.button_actions          # ButtonAction.TOGGLE.value
+    assert "Level" in caps.slider_modes             # plain-str SliderMode
+    assert "Schachbrett" in caps.matrix_algorithms  # RgbAlgorithm.CHECKER.value
+    assert "RGB" in caps.matrix_styles
+    assert "Circle" in caps.efx_algorithms
+    assert "RGBMatrix" in caps.function_types
+    assert "speed" in caps.all_param_keys
+    assert caps.show_version  # "1.1"
+
+
+def test_validator_catches_broken_show():
+    """ACCEPTANCE: Fake-Matrix-Algo + unbekanntes Widget + Fake-param_key →
+    drei laute ERROR-Findings mit den richtigen Codes."""
+    show = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 1, "type": "RGBMatrix", "name": "Kaputte Matrix",
+             "algorithm": "Schachbret",   # Tippfehler von "Schachbrett"
+             "style": "RGB", "params": {}},
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCBogus", "caption": "gibt's nicht"},
+            {"type": "VCSlider", "caption": "Tempo", "mode": "Level",
+             "param_key": "speeed", "function_id": 1},   # Tippfehler von "speed"
+        ]},
+    }
+    findings = validate_show_dict(show)
+    errors = [f for f in findings if f.severity == ERROR]
+    codes = _codes(findings, ERROR)
+
+    assert "MX-ALGO" in codes, format_findings(findings)
+    assert "VC-TYPE" in codes, format_findings(findings)
+    assert "VC-PARAMKEY" in codes, format_findings(findings)
+    assert len(errors) >= 3, format_findings(findings)
+
+    # Jedes Finding zitiert die echte Schluck-Stelle.
+    assert all(f.swallow_site for f in errors), format_findings(errors)
+
+    # assert_* wirft entsprechend.
+    try:
+        assert_show_dict(show)
+    except ShowValidationError:
+        pass
+    else:
+        raise AssertionError("assert_show_dict hätte werfen müssen")
+
+
+def test_asymmetry_efx_and_style_caught():
+    """Die zentrale Asymmetrie: falscher EFX-Algo (hart) und falscher Matrix-Style
+    (hart) werden BEIDE gefangen — nicht nur der weiche Matrix-Algo-Fall."""
+    show = {
+        "functions": {"functions": [
+            {"id": 1, "type": "EFX", "name": "Bad EFX", "motion": True,
+             "algorithm": "Kreisel"},                       # kein EfxAlgorithm
+            {"id": 2, "type": "RGBMatrix", "name": "Bad Style",
+             "algorithm": "Plain", "style": "Regenbogen"},  # kein MatrixStyle
+        ]},
+    }
+    codes = _codes(validate_show_dict(show), ERROR)
+    assert "EFX-ALGO" in codes
+    assert "MX-STYLE" in codes
+
+
+def test_clean_show_passes():
+    """Eine saubere Minimal-Show erzeugt keine Fehler."""
+    show = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 1, "type": "RGBMatrix", "name": "OK Matrix",
+             "algorithm": "Plain", "style": "RGB", "params": {}},
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCButton", "caption": "Go", "action": "Toggle", "function_id": 1},
+            {"type": "VCSlider", "caption": "Speed", "mode": "EffectSpeed",
+             "param_key": "speed", "function_id": 1},
+        ]},
+    }
+    findings = validate_show_dict(show)
+    errors = [f for f in findings if f.severity == ERROR]
+    assert not errors, format_findings(findings)
+    assert_show_dict(show)  # darf NICHT werfen
+
+
+def test_legacy_matrix_algo_accepted():
+    """Ein Legacy-Algorithmus-String (über _LEGACY_ALGO_MAP migriert) ist gültig."""
+    show = {"functions": {"functions": [
+        {"id": 1, "type": "RGBMatrix", "name": "Legacy",
+         "algorithm": "Chase Horizontal", "style": "RGB"},
+    ]}}
+    assert "MX-ALGO" not in _codes(validate_show_dict(show), ERROR)
+
+
+def test_ascii_color_target_normalized():
+    """Alt-Show mit ASCII-ColorTarget ('…hinzufuegen') wird NICHT als Fehler
+    gemeldet — der Loader normalisiert ASCII->Umlaut, der Validator spiegelt das."""
+    show = {"virtual_console": {"widgets": [
+        {"type": "VCColor", "caption": "x", "target": "Effekt (Farbe hinzufuegen)"},
+    ]}}
+    codes = _codes(validate_show_dict(show), ERROR)
+    assert "VC-COLORTARGET" not in codes
+    # ein WIRKLICH falscher Wert wird weiter gemeldet
+    bad = {"virtual_console": {"widgets": [
+        {"type": "VCColor", "caption": "x", "target": "Gibtsnicht"}]}}
+    assert "VC-COLORTARGET" in _codes(validate_show_dict(bad), ERROR)
+
+
+def test_vccolor_loads_ascii_target():
+    """VCColor.apply_dict normalisiert einen ASCII-Alt-Wert auf den heutigen."""
+    from PySide6.QtWidgets import QApplication
+    _app = QApplication.instance() or QApplication([])  # noqa: F841
+    from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
+    w = VCColor("x")
+    w.apply_dict({"target": "Effekt (Farbe hinzufuegen)"})
+    assert w.target == ColorTarget.EFFECT_ADD   # '…hinzufügen' (Umlaut)
+
+
+def test_committed_shows_have_no_errors(capsys):
+    """PHASE 5 HARD-GATE: alle committeten Shows MÜSSEN frei von ERROR-Findings
+    sein (Warnungen erlaubt). Blockiert ab jetzt (Report→Fail)."""
+    paths = sorted(glob.glob(os.path.join(_SHOWS, "*.lshow")))
+    if not paths:
+        return  # keine Shows committet
+    total_err = total_warn = 0
+    lines = []
+    for p in paths:
+        try:
+            findings = validate_lshow(p)
+        except Exception as exc:
+            lines.append(f"[FAIL] {os.path.basename(p)}: Lesefehler: {exc}")
+            total_err += 1
+            continue
+        errs = sum(1 for f in findings if f.severity == ERROR)
+        warns = sum(1 for f in findings if f.severity == WARNING)
+        total_err += errs
+        total_warn += warns
+        mark = "[FAIL]" if errs else ("[warn]" if warns else "[ ok ]")
+        lines.append(f"{mark} {os.path.basename(p)}: {errs} Fehler, {warns} Warnungen")
+    report = "\n".join(lines) + \
+        f"\n== GATE: {total_err} Fehler, {total_warn} Warnungen ueber {len(paths)} Shows =="
+    with capsys.disabled():
+        print("\n[show-lint Hard-Gate]\n" + report)
+    assert total_err == 0, (
+        "Committete Shows enthalten Lint-FEHLER (Phase-5-Hard-Gate). "
+        "Mit `python tools/lint_show.py shows/*.lshow` ansehen:\n" + report)

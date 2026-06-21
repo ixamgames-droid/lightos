@@ -375,18 +375,27 @@ class ShowManagerView(QWidget):
         transport.setContentsMargins(4, 4, 4, 4)
         transport.setSpacing(6)
 
+        # Touch-Modus erzwingt font-size:14px + breites Padding auf QPushButtons;
+        # bei zu schmaler Festbreite wurde der Text abgeschnitten. Lokales CSS
+        # zähmt die Schrift, Mindestbreiten halten die Buttons kompakt UND
+        # vollständig (Höhe wächst unter Touch ohnehin auf eine Touch-Größe).
+        _tp_css = "QPushButton { font-size:13px; padding:4px 12px; }"
+
         self._btn_rewind = QPushButton("|<<")
-        self._btn_rewind.setFixedSize(36, 28)
+        self._btn_rewind.setStyleSheet(_tp_css)
+        self._btn_rewind.setMinimumWidth(48)
         self._btn_rewind.clicked.connect(self._rewind)
         transport.addWidget(self._btn_rewind)
 
         self._btn_play = QPushButton("Play")
-        self._btn_play.setFixedSize(60, 28)
+        self._btn_play.setStyleSheet(_tp_css)
+        self._btn_play.setMinimumWidth(64)
         self._btn_play.clicked.connect(self._toggle_play)
         transport.addWidget(self._btn_play)
 
         self._btn_stop_transport = QPushButton("Stop")
-        self._btn_stop_transport.setFixedSize(50, 28)
+        self._btn_stop_transport.setStyleSheet(_tp_css)
+        self._btn_stop_transport.setMinimumWidth(60)
         self._btn_stop_transport.clicked.connect(self._stop)
         transport.addWidget(self._btn_stop_transport)
 

@@ -14,7 +14,7 @@ Der echte ``QMediaPlayer`` wird LAZY erst beim ersten Abspielen erzeugt; Playlis
 from __future__ import annotations
 import os
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field
 
 from PySide6.QtCore import QObject, Signal
 
@@ -30,21 +30,52 @@ class Track:
     title: str = ""
     genre: str = ""
     bpm: float = 0.0
+    # F-15: Herkunft der BPM — "guess" (Dateiname), "tag" (eingebettetes ID3/MP4-Tag),
+    # "analysis" (Offline-numpy-Analyse). Nur Info/Anzeige, kein Verhalten.
+    bpm_source: str = "guess"
+    # AUTODJ-(a): Funktions-IDs der „Per-Song-Look"-Auto-Show für diesen Track.
+    autoshow_function_ids: list[int] = field(default_factory=list)
+    # BPM-Generator: zeitgestützte BPM-Kurve (Offline-Analyse) als kompaktes
+    # BpmTimeline.to_dict() ({} = keine). Treibt beim Abspielen die BPM über die
+    # Wiedergabe-Position (MusicShowDirector → request_bpm("timeline")).
+    bpm_timeline: dict = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.title:
             self.title = clean_title(self.path)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = {
+            "path": self.path,
+            "title": self.title,
+            "genre": self.genre,
+            "bpm": self.bpm,
+            "bpm_source": self.bpm_source,
+            "autoshow_function_ids": [int(x) for x in self.autoshow_function_ids],
+        }
+        if self.bpm_timeline:   # nur wenn vorhanden — Alt-Shows bleiben schlank
+            d["bpm_timeline"] = self.bpm_timeline
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Track":
+        ids = []
+        for x in d.get("autoshow_function_ids", []) or []:
+            try:
+                ids.append(int(x))
+            except (TypeError, ValueError):
+                pass
+        tl = d.get("bpm_timeline") or {}
+        if not isinstance(tl, dict):
+            tl = {}
         return cls(
             path=str(d.get("path", "")),
             title=str(d.get("title", "") or ""),
             genre=str(d.get("genre", "") or ""),
             bpm=float(d.get("bpm", 0) or 0),
+            bpm_source=str(d.get("bpm_source", "guess") or "guess"),
+            autoshow_function_ids=ids,
+            bpm_timeline=tl,
         )
 
 
@@ -118,13 +149,44 @@ class MediaPlayer(QObject):
         return [t.to_dict() for t in self.tracks]
 
     def load_paths(self, paths: list[str]):
-        """Erzeugt Tracks aus Dateipfaden (BPM/Genre geschätzt)."""
+        """Erzeugt Tracks aus Dateipfaden. BPM: eingebettetes Tag (F-15) schlägt die
+        Dateinamen-Schätzung; sonst Genre/BPM aus dem Namen geraten."""
         out: list[Track] = []
         for p in paths:
             title = clean_title(p)
             genre, bpm = guess_genre_bpm(os.path.basename(p))
-            out.append(Track(path=p, title=title, genre=genre, bpm=bpm))
+            source = "guess"
+            try:
+                from src.core.audio.tag_reader import read_tag_bpm
+                tb = read_tag_bpm(p)
+                if tb > 0:
+                    bpm, source = tb, "tag"
+            except Exception:
+                pass
+            out.append(Track(path=p, title=title, genre=genre,
+                             bpm=bpm, bpm_source=source))
         self.set_tracks(out)
+
+    def refine_bpm_from_tags(self) -> int:
+        """F-15: BPM aller Tracks aus eingebetteten Tags nachziehen (Tag schlägt die
+        Schätzung). Setzt NUR ``Track.bpm``/``bpm_source`` — greift NICHT in den
+        BPM-Manager ein (OS2L/Audio bleiben Vorrang). Liefert die Anzahl Änderungen."""
+        try:
+            from src.core.audio.tag_reader import read_tag_bpm
+        except Exception:
+            return 0
+        changed = 0
+        for t in self.tracks:
+            try:
+                tb = read_tag_bpm(t.path)
+            except Exception:
+                tb = 0.0
+            if tb > 0 and (t.bpm_source != "tag" or abs(t.bpm - tb) > 0.001):
+                t.bpm, t.bpm_source = tb, "tag"
+                changed += 1
+        if changed:
+            self.playlistChanged.emit()
+        return changed
 
     def load_folder(self, folder: str):
         try:
@@ -268,7 +330,7 @@ class MediaPlayer(QObject):
             from src.core.engine.bpm_manager import get_bpm_manager
             mgr = get_bpm_manager()
             if not mgr.audio_active:
-                mgr.set_bpm(t.bpm)
+                mgr.request_bpm(t.bpm, "file")
         except Exception as e:
             print(f"[MediaPlayer] BPM-Kopplung Fehler: {e}")
 

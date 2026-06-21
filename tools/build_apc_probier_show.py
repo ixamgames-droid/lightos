@@ -139,7 +139,7 @@ def par_look(name, r=0, g=0, b=0, w=0, intensity=255):
 
 # Farb-Looks (Farbe) fuer den Color-Chase.
 lk_red = par_look("Rot voll", r=255)
-lk_grn = par_look("Gruen voll", g=255)
+lk_grn = par_look("Grün voll", g=255)
 lk_blu = par_look("Blau voll", b=255)
 lk_amb = par_look("Amber voll", r=255, g=140)
 lk_cya = par_look("Cyan voll", g=255, b=255)
@@ -407,7 +407,7 @@ fader("Speed", 6, BANK_ALL, SliderMode.SPEED, midi_cc=54, value=64)
 fader("Master", 8, BANK_ALL, SliderMode.GRANDMASTER, midi_cc=56, value=255)
 
 label("APC mini  -  8x8 Pads (Note 0 = unten links).  SCENE-Tasten rechts = Seite 1-4. "
-      "TRACK-Tasten unten = Clear/Stop/Blackout/Tap/Musik-BPM (ueberall aktiv).",
+      "TRACK-Tasten unten = Clear/Stop/Blackout/Tap/Musik-BPM (überall aktiv).",
       X0, 6, 1150, BANK_ALL, hh=18, fg="#88c0ff")
 label("Fader F1-F9 = CC48-56.  F6 Dimmer | F7 Speed global | F9 Master immer aktiv, "
       "F1-F5/F8 je nach Seite.", X0, Y_FAD + FAD_H + 4, 1150, BANK_ALL, hh=18, fg="#88c0ff")
@@ -416,9 +416,9 @@ for i, nm in enumerate(PAGE_NAMES):
 
 
 # ── BANK 1 — ALLE EFFEKTE (alles hintereinander) ────────────────────────────
-COLORS8 = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-           ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-           ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60)]
+COLORS8 = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+           ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+           ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60)]
 # Slots 0-7: Farben (nur Farbe -> sofort sichtbar, Effekt darunter modelliert Helligkeit)
 for s, (nm, r, g, b, w) in enumerate(COLORS8):
     color_tile(nm, slot_note(s), B_ALL, r, g, b, w)
@@ -434,7 +434,7 @@ for i, (fn, accent) in enumerate(_all_fx):
     func_btn(fn, slot_note(8 + i), B_ALL, accent,
              style="solid" if accent == "#3a2a5a" else "pulse",
              clear_prog=(fn.id in COLOR_FX_IDS))
-label("SEITE 1  ALLE EFFEKTE  -  Reihe 1 Farben (fuer Dimmer-FX: erst Farbe waehlen). "
+label("SEITE 1  ALLE EFFEKTE  -  Reihe 1 Farben (für Dimmer-FX: erst Farbe wählen). "
       "Farb-Chaser/Police/Matrix bringen Farbe selbst mit + leeren den Programmer.",
       X0, 28, 1100, B_ALL, fg="#9DFF52")
 
@@ -450,9 +450,9 @@ for i, fn in enumerate(_fader_fx):
 # Fader: PARs live formen.  F1-F4 RGBW (nur PARs haben diese Kanaele),
 # F5 PAR-Dim (nur Auswahl -> erst PAR-Gruppe waehlen), F8 FX-Level des Effekts.
 fader("Rot", 0, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
-fader("Gruen", 1, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
+fader("Grün", 1, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
 fader("Blau", 2, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_b", midi_cc=50, value=0)
-fader("Weiss", 3, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
+fader("Weiß", 3, B_FADER, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
 fader("PAR-Dim", 4, B_FADER, SliderMode.PROGRAMMER, programmer_attr="intensity",
       programmer_scope="group", programmer_group="PAR-Reihe", midi_cc=52, value=255)
 fader("FX-Level", 7, B_FADER, SliderMode.EFFECT_INTENSITY,
@@ -465,11 +465,11 @@ label("SEITE 2  EFFEKTE + PAR-FADER  -  Effekt starten, dann die PARs live forme
 
 # ── BANK 3 — CHASE BUILDER (Farb-Chase live bauen) ──────────────────────────
 _chase_colors = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                 ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                 ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                  ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-                 ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
-                 ("Limette", 160, 255, 0, 0), ("Warmweiss", 255, 130, 40, 60),
-                 ("Weiss", 255, 255, 255, 255)]
+                 ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
+                 ("Limette", 160, 255, 0, 0), ("Warmweiß", 255, 130, 40, 60),
+                 ("Weiß", 255, 255, 255, 255)]
 for s, (nm, r, g, b, w) in enumerate(_chase_colors):
     color_tile(nm, slot_note(s), B_CHASE, r, g, b, w,
                target=ColorTarget.EFFECT_ADD, function_id=chase_builder.id)
@@ -483,13 +483,13 @@ effect_action_btn("Bounce", 5, B_CHASE, "#335533", "toggle_bounce", chase_builde
 effect_action_btn("Freeze", 6, B_CHASE, "#553333", "toggle_freeze", chase_builder.id)
 effect_action_btn("Commit", 7, B_CHASE, "#1d4d2d", "commit_live", chase_builder.id)
 fader("Speed", 0, B_CHASE, SliderMode.EFFECT_SPEED, function_id=chase_builder.id, midi_cc=48, value=80)
-fader("Uebergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=chase_builder.id,
+fader("Übergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=chase_builder.id,
       param_key="hold", midi_cc=49, value=64)
 label("SEITE 3  CHASE BUILDER  -  1) Pad unten links = Start  2) oben Farben "
-      "antippen = der Reihe nach an die Liste anhaengen  3) Clear leert die Liste.",
+      "antippen = der Reihe nach an die Liste anhängen  3) Clear leert die Liste.",
       X0, 28, 1100, B_CHASE, fg="#9DFF52")
 label("Untere Reihe: Start/Stop | Clear | Farbe -/+ | Richtung | Bounce | Freeze | "
-      "Commit (Live als Preset uebernehmen).  F1 Speed, F2 Uebergang (0 weich..hart).",
+      "Commit (Live als Preset übernehmen).  F1 Speed, F2 Übergang (0 weich..hart).",
       X0, 48, 1100, B_CHASE)
 # To-Do #1: All-in-One-Builder-Widget rechts neben dem Pad-Grid — bündelt Palette
 # (antippen = anhängen), gebaute Liste (Feedback #6), Aktionen und Speed/Hold in
@@ -504,8 +504,8 @@ chase_builder_widget("Chase Builder", RIGHT_X, Y0 + 4 * 26 + 6, 210, 250, B_CHAS
 # Feuer/Plasma/Windrad/Lauflicht), 1 Reihe fuer die aktive Sequence-Farbe
 # (greift bei Color-Fade/Gradient). Alle binden fest auf den Matrix-Builder.
 MB = matrix_builder.id
-RECOLOR = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiss", 255, 255, 255)]
-SEQCOL = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Gelb", 255, 220, 0)]
+RECOLOR = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiß", 255, 255, 255)]
+SEQCOL = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Gelb", 255, 220, 0)]
 for s, (nm, r, g, b) in enumerate(RECOLOR):          # Reihe 1, Slots 0-3: color1
     color_tile(f"C1 {nm}", slot_note(s), B_MATRIX, r, g, b,
                target=ColorTarget.EFFECT_C1, function_id=MB)
@@ -533,7 +533,7 @@ fader("Mtx-Mst", 1, B_MATRIX, SliderMode.EFFECT_INTENSITY, function_ids=[MB], mi
 fader("Param", 2, B_MATRIX, SliderMode.EFFECT_PARAM, function_id=MB,
       param_key="white_amount", midi_cc=50, value=0)
 label("SEITE 4  MATRIX BUILDER  -  Pad unten links startet EINE Matrix; 'Form -/+' "
-      "blaettert durch ALLE Algorithmen.  Unten tunen: Richtung/Bounce/Freeze/Reset/Commit.",
+      "blättert durch ALLE Algorithmen.  Unten tunen: Richtung/Bounce/Freeze/Reset/Commit.",
       X0, 28, 1100, B_MATRIX, fg="#9DFF52")
 label("Recolor oben: Reihe 1 = color1 (+ Sequence-Farbe rechts), Reihe 2 = color2, "
       "Reihe 3 = color3.  C1/2/3 greifen bei Feuer/Plasma/Windrad; Seq-Farbe bei Color-Fade.",

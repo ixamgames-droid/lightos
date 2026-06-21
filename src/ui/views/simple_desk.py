@@ -22,6 +22,76 @@ _C_WARN_BG   = "#2d1117"   # Roter Hintergrund (dezent)
 _C_WARN2_BG  = "#1d2217"   # Oranger Hintergrund für fehlerhafte Adresse
 
 
+# ── SD-01/SD-02: Kanal-Funktion (Kürzel + Farbe) ─────────────────────────────
+# Attribut-Strings stammen aus dem Engine-/Fixture-Vokabular
+# (app_state._DIM_INTENSITY_ATTRS/_DIM_COLOR_ATTRS, qxf_import, fixture_db).
+# Farben angelehnt an AttributeSlider.ATTR_COLORS (programmer_view), erweitert
+# um Shutter/Strobe/Gobo/Zoom/Focus/Dimmer.
+CHANNEL_FUNCTION_COLORS: dict[str, str] = {
+    # Intensität / Dimmer
+    "intensity": "#ffcc00", "dimmer": "#ffcc00", "master": "#ffcc00",
+    # Farbe (RGBW + A/UV)
+    "color_r": "#ff4444", "red": "#ff4444",
+    "color_g": "#44ff44", "green": "#44ff44",
+    "color_b": "#4488ff", "blue": "#4488ff",
+    "color_w": "#ffffff", "white": "#ffffff",
+    "color_a": "#ffaa00", "amber": "#ffaa00",
+    "color_uv": "#aa44ff", "uv": "#aa44ff",
+    # CMY / Farbrad
+    "cyan": "#33dddd", "magenta": "#ff55cc", "yellow": "#ffee55",
+    "color_wheel": "#ff66cc",
+    # Position
+    "pan": "#00ccff", "tilt": "#00ccff",
+    "pan_fine": "#007799", "tilt_fine": "#007799",
+    # Beam
+    "shutter": "#ff8800", "strobe": "#ff8800",
+    "zoom": "#66ddaa", "focus": "#66ddaa", "iris": "#9fe04f", "prism": "#9fe04f",
+    # Gobo
+    "gobo": "#cc66ff", "gobo_wheel": "#cc66ff", "gobo_fx": "#cc66ff",
+    "gobo_rotation": "#b34dff", "gobo_rot": "#b34dff",
+    # Sonstiges
+    "frost": "#bcd0e6", "prism_rotation": "#9fe04f",
+    "reset": "#8b949e", "speed": "#8b949e", "macro": "#8b949e",
+}
+_CHANNEL_FUNCTION_DEFAULT = "#6e7681"   # neutral-grau für unbekannte Attribute
+
+CHANNEL_FUNCTION_ABBREV: dict[str, str] = {
+    "intensity": "Dim", "dimmer": "Dim", "master": "GM",
+    "color_r": "R", "red": "R",
+    "color_g": "G", "green": "G",
+    "color_b": "B", "blue": "B",
+    "color_w": "W", "white": "W",
+    "color_a": "A", "amber": "A",
+    "color_uv": "UV", "uv": "UV",
+    "cyan": "C", "magenta": "M", "yellow": "Y",
+    "color_wheel": "CW",
+    "pan": "Pan", "tilt": "Tlt",
+    "pan_fine": "Pn-", "tilt_fine": "Tl-",
+    "shutter": "Sh", "strobe": "Str",
+    "zoom": "Zm", "focus": "Foc", "iris": "Iri", "prism": "Pri",
+    "gobo": "Gob", "gobo_wheel": "Gob", "gobo_fx": "GbX",
+    "gobo_rotation": "GbR", "gobo_rot": "GbR",
+    "frost": "Frs", "prism_rotation": "PrR", "reset": "Rst",
+    "speed": "Spd", "macro": "Mac",
+}
+
+
+def channel_function_color(attr: str) -> str:
+    """SD-02: Farbe (Hex) für ein Kanal-Attribut; neutral-grau wenn unbekannt."""
+    return CHANNEL_FUNCTION_COLORS.get((attr or "").strip().lower(),
+                                       _CHANNEL_FUNCTION_DEFAULT)
+
+
+def channel_function_abbrev(attr: str, name: str = "") -> str:
+    """SD-01: kurzes Kürzel für einen Kanal (z. B. 'R', 'Dim').
+    Bekanntes Attribut -> Map; sonst die ersten Zeichen des Kanalnamens."""
+    a = (attr or "").strip().lower()
+    if a in CHANNEL_FUNCTION_ABBREV:
+        return CHANNEL_FUNCTION_ABBREV[a]
+    n = (name or "").strip()
+    return n[:3] if n else ""
+
+
 class ChannelFader(QWidget):
     """Single vertical fader for one DMX channel."""
     def __init__(self, channel: int, parent=None):
@@ -29,7 +99,8 @@ class ChannelFader(QWidget):
         self.channel = channel
         self._value = 0
         self._tint_color: QColor | None = None
-        self.setFixedSize(36, 110)
+        self._attr_text = ""
+        self.setFixedSize(36, 124)
         self.setToolTip(f"CH {channel}")
 
         layout = QVBoxLayout(self)
@@ -52,6 +123,12 @@ class ChannelFader(QWidget):
         """)
         self._slider.valueChanged.connect(self._on_change)
         layout.addWidget(self._slider)
+
+        # SD-01: kleines Funktions-Kürzel (z. B. 'R'/'Dim'); voller Name im Tooltip.
+        self._attr_lbl = QLabel("")
+        self._attr_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._attr_lbl.setStyleSheet("color:#adbac7; font-size:7px;")
+        layout.addWidget(self._attr_lbl)
 
         self._ch_lbl = QLabel(str(channel))
         self._ch_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -92,6 +169,11 @@ class ChannelFader(QWidget):
         self.setStyleSheet(
             "ChannelFader { background:#ffd33d; border:2px solid #ffd33d; border-radius:4px; }")
         QTimer.singleShot(450, lambda: self.set_tint(self._tint_color))
+
+    def set_function_label(self, text: str):
+        """SD-01: setzt das Funktions-Kürzel unter dem Slider (leer = aus)."""
+        self._attr_text = text or ""
+        self._attr_lbl.setText(self._attr_text)
 
 
 # ── Fixture-Header-Band (zeigt Zusammengehörigkeit über den Fadern) ───────────
@@ -528,6 +610,7 @@ class SimpleDeskView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._universe = 1   # 1-based DMX universe number
+        self._color_by_function = False   # SD-02: False=nach Fixture, True=nach Funktion
         self._faders: list[ChannelFader] = []
         self._user_active_until: dict[int, float] = {}  # {channel: timestamp}
         self._setup_ui()
@@ -582,12 +665,24 @@ class SimpleDeskView(QWidget):
         self._override_cb = QCheckBox("Manueller Override")
         self._override_cb.setToolTip(
             "Aus: Simple Desk zeigt nur die Ausgabe an (Monitor).\n"
-            "An: die Fader steuern direkt mit absoluter Prioritaet (ueber Effekte/Programmer).")
+            "An: die Fader steuern direkt mit absoluter Priorität (über Effekte/Programmer).")
         self._override_cb.setStyleSheet(
             f"QCheckBox {{ color:{_C_TEXT_DIM}; font-size:11px; }}"
             f"QCheckBox:checked {{ color:{_C_RED}; font-weight:bold; }}")
         self._override_cb.toggled.connect(self._on_override_toggled)
         header.addWidget(self._override_cb)
+        header.addSpacing(12)
+
+        # SD-02: Fader nach Kanal-Funktion (R/G/B/W/Dimmer/…) statt nach Fixture faerben.
+        self._func_color_cb = QCheckBox("Farbe nach Funktion")
+        self._func_color_cb.setToolTip(
+            "Aus: Fader nach Gerät gruppiert (Fixture-Farbe).\n"
+            "An: jeder Fader bekommt die Farbe seiner Funktion (R/G/B/W/Dimmer/Pan…).")
+        self._func_color_cb.setStyleSheet(
+            f"QCheckBox {{ color:{_C_TEXT_DIM}; font-size:11px; }}"
+            f"QCheckBox:checked {{ color:{_C_ACCENT}; font-weight:bold; }}")
+        self._func_color_cb.toggled.connect(self._on_func_color_toggled)
+        header.addWidget(self._func_color_cb)
         header.addSpacing(12)
 
         self._btn_all_zero = QPushButton("Alles auf 0")
@@ -721,6 +816,7 @@ class SimpleDeskView(QWidget):
     def _apply_fixture_tints(self):
         for f in self._faders:
             f.set_tint(None)
+            f.set_function_label("")
             f.setToolTip(f"CH {f.channel}")
         spans: list[tuple[int, int, QColor, str]] = []
         try:
@@ -729,22 +825,32 @@ class SimpleDeskView(QWidget):
             fixtures = [fx for fx in state.get_patched_fixtures()
                         if fx.universe == self._universe]
             fixtures.sort(key=lambda fx: fx.address)
+            by_function = getattr(self, "_color_by_function", False)
             for idx, fx in enumerate(fixtures):
                 color = QColor(self._TINTS[idx % len(self._TINTS)])
                 try:
+                    chans = get_channels_for_patched(fx)
                     cmap = {c.channel_number:
                             (c.name if (c.name and c.name.strip()) else c.attribute)
-                            for c in get_channels_for_patched(fx)}
+                            for c in chans}
+                    amap = {c.channel_number: (getattr(c, "attribute", "") or "")
+                            for c in chans}
                 except Exception:
                     cmap = {}
+                    amap = {}
                 count = int(getattr(fx, "channel_count", 1) or 1)
                 label = getattr(fx, "label", "") or f"FID {getattr(fx, 'fid', '?')}"
                 for off in range(count):
                     ch = fx.address + off
                     if 1 <= ch <= 512:
                         fader = self._faders[ch - 1]
-                        fader.set_tint(color)
+                        attr = amap.get(off + 1, "")
                         cname = cmap.get(off + 1, "")
+                        # SD-02: nach Funktion einfaerben, sonst nach Fixture gruppieren.
+                        fader.set_tint(QColor(channel_function_color(attr))
+                                       if by_function else color)
+                        # SD-01: pro-Kanal-Kürzel (voller Name bleibt im Tooltip).
+                        fader.set_function_label(channel_function_abbrev(attr, cname))
                         fader.setToolTip(
                             f"CH {ch} · {label}" + (f" · {cname}" if cname else ""))
                 # Header-Band-Eintrag (sichtbaren Bereich auf 1..512 begrenzen)
@@ -816,6 +922,11 @@ class SimpleDeskView(QWidget):
         if not checked:
             # Zurueck zur Anzeige: Fader sofort auf die Live-Ausgabe syncen.
             self._sync_from_output()
+
+    def _on_func_color_toggled(self, checked: bool):
+        """SD-02: zwischen Fixture-Gruppierung und Funktions-Farbe umschalten."""
+        self._color_by_function = bool(checked)
+        self._apply_fixture_tints()
 
     def _apply_override_ui(self, enabled: bool):
         """Sperrt/entsperrt die Fader und die 'Alles auf …'-Buttons je nach

@@ -12,7 +12,7 @@ from .function import Function, FunctionType
 class CarouselPattern(Enum):
     CIRCLE = "Circle"      # Pan/Tilt fahren Kreis
     SWEEP  = "Sweep"       # Sweep links/rechts
-    PULSE  = "Pulse"       # Intensity puls auf Beat
+    PULSE  = "Pulse"       # Intensity-Puls auf Beat
     WAVE   = "Wave"        # Wellenmuster ueber Fixtures
     CHASE  = "Chase"       # Lauflicht auf Beat
 
@@ -137,11 +137,19 @@ class Carousel(Function):
                 # wie bisher, Farbrad-Geraete den passenden Slot (attribute=="color").
                 if self.paint_color:
                     try:
-                        from src.core.color_utils import color_attrs_for_fixture
+                        from src.core.color_utils import (
+                            color_attrs_for_fixture, adapt_color_payload,
+                            fixture_attr_set)
                         from src.core.app_state import get_channels_for_patched
                         attrs = color_attrs_for_fixture(
                             get_channels_for_patched(fixture),
                             (self.color_r, self.color_g, self.color_b))
+                        # Echtes-Weiss-Subtraktion fuer RGBW (wie Programmer/Matrix):
+                        # color_attrs_for_fixture Stufe 1 liefert volles RGB +
+                        # color_w=min(r,g,b) -> ohne diesen Schritt doppeltes Weiss.
+                        # Farbrad-Ausgabe ({"color": ...}) bleibt unveraendert
+                        # (kein RGB-Key -> adapt_color_payload reicht sie durch).
+                        attrs = adapt_color_payload(fixture_attr_set(fixture), attrs)
                     except Exception:
                         attrs = {"color_r": self.color_r,
                                  "color_g": self.color_g,

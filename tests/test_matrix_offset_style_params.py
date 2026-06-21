@@ -19,9 +19,12 @@ def _m():
 class ListedTest(unittest.TestCase):
     def test_keys_listed(self):
         keys = [s.key for s in _m().list_params()]
-        for k in ("offset", "white_amount", "intensity_min", "intensity_max",
+        for k in ("offset", "intensity_min", "intensity_max",
                   "shutter_min", "shutter_max"):
             self.assertIn(k, keys)
+        # white_amount entfaellt aus list_params: RGBW erzeugt echtes Weiss
+        # automatisch ueber den W-Kanal (kein "Weissanteil"-Regler mehr).
+        self.assertNotIn("white_amount", keys)
 
 
 class SetGetClampTest(unittest.TestCase):

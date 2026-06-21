@@ -55,7 +55,7 @@ class VisualizerBridge(QObject):
 
     Signals -> JS
         fixtureAdded(json), fixtureRemoved(fid), dmxUpdated(json),
-        allFixtures(json), settingsChanged(json), stageChanged(name),
+        allFixtures(json), settingsChanged(json),
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
         applyFixtureTransform(json), alignSelected(mode),
@@ -73,7 +73,6 @@ class VisualizerBridge(QObject):
     dmxUpdated              = Signal(str)
     allFixtures             = Signal(str)
     settingsChanged         = Signal(str)
-    stageChanged            = Signal(str)
     viewModeChanged         = Signal(str)
     editModeChanged         = Signal(str)
     stageLoaded             = Signal(str)
@@ -302,12 +301,6 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_settings error: {e}")
 
-    def push_stage_preset(self, name: str):
-        try:
-            self.stageChanged.emit(name)
-        except Exception as e:
-            print(f"[Visualizer] push_stage_preset error: {e}")
-
     def push_view_mode(self, mode: str):
         try:
             self.viewModeChanged.emit(mode)
@@ -391,11 +384,11 @@ class VisualizerWindow(QMainWindow):
         ("floor",     "Boden / Floor"),
         ("platform",  "Plattform"),
         ("truss_h",   "Truss (horizontal)"),
-        ("truss_v",   "Truss/Stuetze (vertikal)"),
+        ("truss_v",   "Truss/Stütze (vertikal)"),
         ("wall",      "Wand / Backdrop"),
         ("led_wall",  "LED-Wand"),
         ("speaker",   "Lautsprecher"),
-        ("audience",  "Publikumsflaeche"),
+        ("audience",  "Publikumsfläche"),
         ("dj_booth",  "DJ-Booth"),
     ]
 
@@ -442,13 +435,13 @@ class VisualizerWindow(QMainWindow):
         self._combo_edit = QComboBox()
         self._combo_edit.addItem("Ansehen",            "view")
         self._combo_edit.addItem("Fixtures bearbeiten", "edit")
-        self._combo_edit.addItem("Buehne bearbeiten",   "stage")
+        self._combo_edit.addItem("Bühne bearbeiten",   "stage")
         self._combo_edit.currentIndexChanged.connect(self._on_edit_mode_changed)
         tb.addWidget(self._combo_edit)
 
         tb.addSeparator()
 
-        tb.addWidget(QLabel("Buehne:"))
+        tb.addWidget(QLabel("Bühne:"))
         self._combo_stage = QComboBox()
         self._reload_stage_combo()
         self._combo_stage.currentIndexChanged.connect(self._on_stage_combo_changed)
@@ -462,7 +455,7 @@ class VisualizerWindow(QMainWindow):
         act_new.triggered.connect(self._on_new_stage)
         tb.addAction(act_new)
 
-        act_del = QAction("🗑 Loeschen", self)
+        act_del = QAction("🗑 Löschen", self)
         act_del.triggered.connect(self._on_delete_stage)
         tb.addAction(act_del)
 
@@ -486,10 +479,10 @@ class VisualizerWindow(QMainWindow):
         self._act_dock.setChecked(False)
         self._act_dock.setToolTip(
             "Andock-Modus (Taste D):\n"
-            "AN  – Strahler rasten an Trassen (haengen unten) bzw.\n"
+            "AN  – Strahler rasten an Trassen (hängen unten) bzw.\n"
             "       Plattform/Boden (stehen oben drauf) ein und wandern\n"
             "       mit, wenn das Element verschoben wird.\n"
-            "AUS – freie Platzierung auf fester Hoehe (wie bisher)."
+            "AUS – freie Platzierung auf fester Höhe (wie bisher)."
         )
         self._act_dock.toggled.connect(self._on_dock_mode_toggled)
         tb.addAction(self._act_dock)
@@ -570,7 +563,7 @@ class VisualizerWindow(QMainWindow):
             self._lbl_info.setText(
                 "🔗 Andocken AN – Strahler rasten an Trassen/Plattformen ein."
                 if checked else
-                "Andocken AUS – freie Platzierung auf fester Hoehe."
+                "Andocken AUS – freie Platzierung auf fester Höhe."
             )
         except Exception as e:
             print(f"[Visualizer] dock toggle error: {e}")
@@ -582,7 +575,7 @@ class VisualizerWindow(QMainWindow):
 
         self._tabs = QTabWidget()
         self._tabs.addTab(self._build_fixture_tab(), "Fixtures")
-        self._tabs.addTab(self._build_stage_tab(),   "Buehne")
+        self._tabs.addTab(self._build_stage_tab(),   "Bühne")
         self._tabs.addTab(self._build_settings_tab(), "Einstellungen")
         layout.addWidget(self._tabs)
         return panel
@@ -608,7 +601,7 @@ class VisualizerWindow(QMainWindow):
         row.addWidget(btn_remove)
         layout.addLayout(row)
 
-        box = QGroupBox("Position & Ausrichtung")
+        box = QGroupBox("Position && Ausrichtung")
         form = QFormLayout(box)
         self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
         self._spin_x = QDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
@@ -622,7 +615,7 @@ class VisualizerWindow(QMainWindow):
             sp.setMinimumHeight(38)
             sp.valueChanged.connect(self._on_fixture_pos_spin_changed)
         form.addRow("X (links/rechts):", self._spin_x)
-        form.addRow("Y (Hoehe):",        self._spin_y)
+        form.addRow("Y (Höhe):",        self._spin_y)
         form.addRow("Z (vorne/hinten):", self._spin_z)
         form.addRow("Drehung Y:",        self._spin_rot_y)
         layout.addWidget(box)
@@ -634,7 +627,7 @@ class VisualizerWindow(QMainWindow):
         w = QWidget()
         layout = QVBoxLayout(w)
 
-        layout.addWidget(QLabel("Buehnen-Elemente:"))
+        layout.addWidget(QLabel("Bühnen-Elemente:"))
         self._stage_tree = QTreeWidget()
         self._stage_tree.setHeaderLabels(["Typ", "Name"])
         self._stage_tree.itemSelectionChanged.connect(self._on_stage_tree_selected)
@@ -648,7 +641,7 @@ class VisualizerWindow(QMainWindow):
         layout.addWidget(self._stage_tree, 1)
 
         # Add-buttons grid
-        add_box = QGroupBox("Element hinzufuegen")
+        add_box = QGroupBox("Element hinzufügen")
         add_grid = QVBoxLayout(add_box)
         add_grid.setSpacing(4)
         row = QHBoxLayout()
@@ -682,7 +675,7 @@ class VisualizerWindow(QMainWindow):
         self._stage_spin_w = QDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
         self._stage_spin_h = QDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
         self._stage_spin_d = QDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
-        self._stage_spin_rot = QDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" deg")
+        self._stage_spin_rot = QDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" °")
 
         for sp in (self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
                    self._stage_spin_w, self._stage_spin_h, self._stage_spin_d,
@@ -694,12 +687,12 @@ class VisualizerWindow(QMainWindow):
         prop_form.addRow("Y:", self._stage_spin_y)
         prop_form.addRow("Z:", self._stage_spin_z)
         prop_form.addRow("Breite (W):", self._stage_spin_w)
-        prop_form.addRow("Hoehe  (H):", self._stage_spin_h)
+        prop_form.addRow("Höhe  (H):", self._stage_spin_h)
         prop_form.addRow("Tiefe  (D):", self._stage_spin_d)
         prop_form.addRow("Rotation:",   self._stage_spin_rot)
 
         color_row = QHBoxLayout()
-        self._stage_color_btn = QPushButton("Farbe waehlen")
+        self._stage_color_btn = QPushButton("Farbe wählen")
         self._stage_color_btn.clicked.connect(self._on_pick_stage_color)
         color_row.addWidget(self._stage_color_btn)
         self._stage_color_preview = QLabel("    ")
@@ -709,13 +702,13 @@ class VisualizerWindow(QMainWindow):
         prop_form.addRow("Farbe:", color_row)
 
         # Resize-Mode Toggle (default AUS - sonst stoeren die Handles bei kleinen Elementen)
-        self._btn_resize_mode = QPushButton("Groesse anpassen")
+        self._btn_resize_mode = QPushButton("Größe anpassen")
         self._btn_resize_mode.setCheckable(True)
         self._btn_resize_mode.setChecked(False)
         self._btn_resize_mode.setMinimumHeight(32)
         self._btn_resize_mode.setToolTip(
-            "AUS: Element kann nur verschoben werden (kein Stoeren durch Eck-Handles).\n"
-            "AN: 4 gelbe Eck-Handles erscheinen - mit Maus ziehen zum Groesse aendern."
+            "AUS: Element kann nur verschoben werden (kein Stören durch Eck-Handles).\n"
+            "AN: 4 gelbe Eck-Handles erscheinen - mit Maus ziehen zum Größe ändern."
         )
         self._btn_resize_mode.setStyleSheet(
             "QPushButton {"
@@ -733,7 +726,7 @@ class VisualizerWindow(QMainWindow):
         prop_form.addRow(self._btn_resize_mode)
 
         del_row = QHBoxLayout()
-        btn_del = QPushButton("Element LOESCHEN")
+        btn_del = QPushButton("Element LÖSCHEN")
         btn_del.setObjectName("btn_danger")
         btn_del.setMinimumHeight(36)
         btn_del.setStyleSheet(
@@ -773,7 +766,7 @@ class VisualizerWindow(QMainWindow):
         self._sld_brightness.setToolTip(
             "Hintergrund/Ambient-Licht der Visualizer-Szene.\n"
             "Niedrig = dunkel (Beams sichtbar)\n"
-            "Hoch = hell (Buehne gut sichtbar zum Bearbeiten)"
+            "Hoch = hell (Bühne gut sichtbar zum Bearbeiten)"
         )
         self._sld_brightness.valueChanged.connect(self._on_brightness_changed)
         b_row.addWidget(self._sld_brightness, 1)
@@ -787,7 +780,7 @@ class VisualizerWindow(QMainWindow):
         self._chk_auto_brightness.setChecked(True)
         self._chk_auto_brightness.setToolTip(
             "Wenn aktiv: Helligkeit springt automatisch auf 65% wenn du in den\n"
-            "Fixtures-/Buehne-Edit-Modus wechselst, und zurueck auf 20% im Ansichts-Modus."
+            "Fixtures-/Bühne-Edit-Modus wechselst, und zurück auf 20% im Ansichts-Modus."
         )
         self._chk_auto_brightness.toggled.connect(self._on_auto_brightness_toggled)
         ab_row.addWidget(self._chk_auto_brightness)
@@ -945,7 +938,7 @@ class VisualizerWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
         count = len(self._state.visualizer_positions)
-        self._lbl_info.setText(f"{count} Fixture(s) in Szene  |  {len(self._current_stage.elements)} Buehnen-Elemente")
+        self._lbl_info.setText(f"{count} Fixture(s) in Szene  |  {len(self._current_stage.elements)} Bühnen-Elemente")
         self._patch_list.blockSignals(False)
 
     def _on_patch_list_selected(self):
@@ -994,7 +987,7 @@ class VisualizerWindow(QMainWindow):
         # T-VIZ-11: sichtbares Platzierungs-Feedback (nach refresh, der _lbl_info setzt)
         if dock_id:
             self._lbl_info.setText(
-                f"Fixture #{fid} angedockt an '{dock_name}' bei Hoehe {y:.1f} m"
+                f"Fixture #{fid} angedockt an '{dock_name}' bei Höhe {y:.1f} m"
             )
         else:
             self._lbl_info.setText(
@@ -1080,7 +1073,7 @@ class VisualizerWindow(QMainWindow):
         self._combo_stage.blockSignals(True)
         self._combo_stage.clear()
         # Leere Buehne (Default) — keine vorgerenderten Presets mehr.
-        self._combo_stage.addItem("Leer (eigene Buehne)", ("default", "simple"))
+        self._combo_stage.addItem("Leer (eigene Bühne)", ("default", "simple"))
         # User-saved
         saved = list_stages()
         if saved:
@@ -1111,7 +1104,7 @@ class VisualizerWindow(QMainWindow):
                 print(f"[stage] load failed for user-stage: {name}")
                 QMessageBox.warning(
                     self, "Laden fehlgeschlagen",
-                    f"Buehne '{name}' konnte nicht geladen werden."
+                    f"Bühne '{name}' konnte nicht geladen werden."
                 )
                 return
         else:
@@ -1287,9 +1280,9 @@ class VisualizerWindow(QMainWindow):
         try:
             self._bridge.resizeModeSignal.emit(bool(checked))
             if checked:
-                self._btn_resize_mode.setText("Groesse anpassen: AN")
+                self._btn_resize_mode.setText("Größe anpassen: AN")
             else:
-                self._btn_resize_mode.setText("Groesse anpassen")
+                self._btn_resize_mode.setText("Größe anpassen")
         except Exception as e:
             print(f"[Visualizer] resize toggle error: {e}")
 
@@ -1297,19 +1290,46 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
-        col = QColorDialog.getColor(QColor(el.color), self, "Element-Farbe")
-        if col.isValid():
-            el.color = col.name()
+        # Bereits offenen Picker wiederverwenden statt doppelt zu oeffnen.
+        existing = getattr(self, "_stage_color_picker", None)
+        if existing is not None:
+            try:
+                existing.raise_()
+                existing.activateWindow()
+                return
+            except RuntimeError:
+                self._stage_color_picker = None  # C++-Objekt bereits zerstoert
+
+        # T-VIZ-15: nicht-modaler Dialog mit Live-Preview — die Farbe wirkt sofort
+        # beim Durchscrollen. OK uebernimmt, Abbrechen stellt die Ausgangsfarbe her.
+        original = el.color
+
+        def _set(hex_color: str):
+            el.color = hex_color
             self._stage_color_preview.setStyleSheet(
                 f"background:{el.color}; border:1px solid #555;"
             )
-            # Gezielter Farb-Update (kein Rebuild)
             try:
                 self._bridge.updateStageObject.emit(json.dumps({
                     "id": el.id, "color": el.color,
                 }))
             except Exception as e:
                 print(f"[Visualizer] update stage color error: {e}")
+
+        def _live(c):
+            # Nur das beim Oeffnen gewaehlte Element faerben — der Dialog ist
+            # nicht-modal, die Baum-Auswahl kann sich zwischenzeitlich aendern.
+            if c.isValid() and self._selected_stage_element() is el:
+                _set(c.name())
+
+        dlg = QColorDialog(QColor(el.color), self)
+        dlg.setWindowTitle(f"Element-Farbe — {getattr(el, 'name', '') or el.id}")
+        dlg.setModal(False)
+        dlg.currentColorChanged.connect(_live)
+        dlg.rejected.connect(lambda: _set(original))   # Abbruch -> Ausgangsfarbe
+        dlg.finished.connect(lambda *_: setattr(self, "_stage_color_picker", None))
+        self._stage_color_picker = dlg
+        dlg.show()
 
     def _delete_selected_stage_element(self):
         el = self._selected_stage_element()
@@ -1320,7 +1340,7 @@ class VisualizerWindow(QMainWindow):
 
     def _on_save_stage(self):
         name, ok = QInputDialog.getText(
-            self, "Buehne speichern", "Name:",
+            self, "Bühne speichern", "Name:",
             QLineEdit.EchoMode.Normal, self._current_stage.name
         )
         if not ok or not name.strip():
@@ -1328,13 +1348,13 @@ class VisualizerWindow(QMainWindow):
         self._current_stage.name = name.strip()
         path = save_stage(self._current_stage)
         if path:
-            QMessageBox.information(self, "Gespeichert", f"Buehne '{name}' gespeichert.")
+            QMessageBox.information(self, "Gespeichert", f"Bühne '{name}' gespeichert.")
             # Combo neu aufbauen UND die soeben gespeicherte Buehne auswaehlen
             self._reload_stage_combo()
             self._select_stage_in_combo("user", name.strip())
             self._state.active_stage_name = name.strip()
         else:
-            QMessageBox.warning(self, "Fehler", "Konnte Buehne nicht speichern.")
+            QMessageBox.warning(self, "Fehler", "Konnte Bühne nicht speichern.")
 
     def _select_stage_in_combo(self, kind: str, name: str):
         """Selektiert eine bestimmte Buehne im Combo (ohne Signal-Loop)."""
@@ -1350,8 +1370,8 @@ class VisualizerWindow(QMainWindow):
 
     def _on_new_stage(self):
         name, ok = QInputDialog.getText(
-            self, "Neue Buehne", "Name:",
-            QLineEdit.EchoMode.Normal, "Neue Buehne"
+            self, "Neue Bühne", "Name:",
+            QLineEdit.EchoMode.Normal, "Neue Bühne"
         )
         if not ok or not name.strip():
             return
@@ -1379,12 +1399,12 @@ class VisualizerWindow(QMainWindow):
         data = self._combo_stage.currentData()
         if not data or data[0] != "user":
             QMessageBox.information(
-                self, "Hinweis", "Nur gespeicherte Buehnen koennen geloescht werden."
+                self, "Hinweis", "Nur gespeicherte Bühnen können gelöscht werden."
             )
             return
         name = data[1]
         if QMessageBox.question(
-            self, "Loeschen", f"Buehne '{name}' loeschen?"
+            self, "Löschen", f"Bühne '{name}' löschen?"
         ) != QMessageBox.StandardButton.Yes:
             return
         delete_stage(name)

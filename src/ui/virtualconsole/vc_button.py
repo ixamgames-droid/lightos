@@ -29,6 +29,11 @@ class ButtonAction(str, Enum):
     CLEAR    = "Clear"        # Programmer leeren (manuelle Farben/Snaps freigeben)
     TAP      = "Tap"          # Tap-Tempo: setzt globale BPM (beat-Effekte folgen)
     AUDIO_BPM = "AudioBpm"    # Musik-Modus: BPM aus dem Audio-Eingang (an/aus)
+    # WP-8: BPM-Manager live ueber Pads/MIDI steuern. Werte explizit (str-Enum) →
+    # to_dict/from_dict funktionieren by-NAME wie by-VALUE, Reihenfolge egal.
+    BPM_NUDGE_UP   = "BpmNudgeUp"     # Tempo um +1 BPM nachziehen (→ MANUAL)
+    BPM_NUDGE_DOWN = "BpmNudgeDown"   # Tempo um -1 BPM nachziehen (→ MANUAL)
+    BPM_MODE_TOGGLE = "BpmModeToggle" # Betriebsart AUTO ↔ MANUAL umschalten
     # Phase 6: loest eine Effekt-Aktion aus (effect_action_key), z. B. add_color,
     # next_color, toggle_bounce, toggle_freeze, clear_live_override, reverse_direction.
     EFFECT_ACTION = "EffectAction"
@@ -39,6 +44,17 @@ class ButtonAction(str, Enum):
     MEDIA_PLAY_PAUSE = "MediaPlayPause"
     MEDIA_NEXT = "MediaNext"
     MEDIA_PREV = "MediaPrev"
+    # Tempo-Sync Phase 5: benannte Tempo-Buses (A/B/C/D) live steuern. Wirken ueber
+    # tempo_bus_id auf get_tempo_bus_manager().resolve(bus) — unabhaengig vom globalen
+    # BPM-Leader (TAP/AUDIO_BPM bleiben global).
+    TAP_BUS  = "TapBus"      # Tap-Tempo auf einen benannten Bus
+    SYNC_BUS = "SyncBus"     # Bus re-ankern + Downbeat ("jetzt ist die Eins")
+    ARM_BUS  = "ArmBus"      # Bus scharf schalten (armed_bus_id) fuer Pads/MIDI
+    # ── Farb-/Effekt-VC (F3): globale Show-Aktionen ───────────────────────────
+    ALL_WHITE    = "AllWhite"     # Moment-Override: alles weiss 100% (nur gehalten); flasht die gebundene Weiss-Szene
+    FREEZE       = "Freeze"       # BPM einfrieren (alle Buses + globaler Leader -> 0), Toggle; bus-gekoppelte Effekte halten (F5)
+    STOP_EFFECTS = "StopEffects"  # alle laufenden Effekt-Funktionen stoppen (Tempo/BPM bleiben) -> Pause/Effekt-Stop
+    AUTO_SYNC    = "AutoSync"     # Auto-Sync an/aus: neu startende bus-gekoppelte Effekte phasengleich am gemeinsamen Beat-Raster
 
 
 # Benutzerfreundliche deutsche Labels für die Aktions-Auswahl (statt der rohen
@@ -52,9 +68,19 @@ BUTTON_ACTION_LABELS: list[tuple[str, str]] = [
     (ButtonAction.SNAPSHOT,        "Snapshot abrufen"),
     (ButtonAction.CLEAR,           "Programmer leeren (Clear)"),
     (ButtonAction.STOP_ALL,        "Alles stoppen"),
+    (ButtonAction.STOP_EFFECTS,    "Effekte stoppen (Tempo bleibt)"),
     (ButtonAction.BLACKOUT,        "Blackout"),
+    (ButtonAction.ALL_WHITE,       "Alles Weiß (gehalten)"),
+    (ButtonAction.FREEZE,          "Freeze (BPM einfrieren)"),
+    (ButtonAction.AUTO_SYNC,       "Auto-Sync an/aus"),
     (ButtonAction.TAP,             "Tap-Tempo"),
     (ButtonAction.AUDIO_BPM,       "Musik-BPM"),
+    (ButtonAction.BPM_NUDGE_UP,    "BPM +1 (Nudge)"),
+    (ButtonAction.BPM_NUDGE_DOWN,  "BPM -1 (Nudge)"),
+    (ButtonAction.BPM_MODE_TOGGLE, "BPM-Modus AUTO/MANUAL"),
+    (ButtonAction.TAP_BUS,         "Tap-Tempo (Bus)"),
+    (ButtonAction.SYNC_BUS,        "Sync (Bus)"),
+    (ButtonAction.ARM_BUS,         "Bus scharf schalten"),
     (ButtonAction.MEDIA_PLAY_PAUSE, "Musik: Play/Pause"),
     (ButtonAction.MEDIA_NEXT,      "Musik: Nächstes Lied"),
     (ButtonAction.MEDIA_PREV,      "Musik: Voriges Lied"),
@@ -89,6 +115,10 @@ class VCButton(VCWidget):
         super().__init__(caption, parent)
         self.action = ButtonAction.TOGGLE
         self.function_id: int | None = None
+        # Phase E (Multi-Effekt): weitere gekoppelte Effekt-IDs. FUNCTION_TOGGLE/
+        # FUNCTION_FLASH wirken auf function_id + alle function_ids. Leer =
+        # klassischer Ein-Funktions-Button (vollstaendig rueckwaertskompatibel).
+        self.function_ids: list[int] = []
         self.snapshot_index: int | None = None
         # Bibliothek-Snap (ButtonAction.LIBRARY_SNAP): Referenz auf einen Snap der
         # Show-Bibliothek (src.core.engine.snap_library) + Tastenverhalten.
@@ -102,6 +132,8 @@ class VCButton(VCWidget):
         self.effect_action_key: str = "next_color"
         # F-24: Gruppenname fuer ButtonAction.SELECT_GROUP.
         self.group_name: str = ""
+        # Tempo-Sync Phase 5: Ziel-Bus fuer TAP_BUS/SYNC_BUS/ARM_BUS ("" = aktiver/Default-Bus).
+        self.tempo_bus_id: str = ""
         # Live-Bearbeitung: macht den gestarteten Effekt zum aktiven Bearbeitungsziel
         # dieses Slots (FUNCTION_TOGGLE/FLASH). Fader/Farb-Kacheln mit gleichem
         # edit_slot bearbeiten dann GENAU diesen Effekt (quadrantenweise exklusiv).
@@ -123,6 +155,9 @@ class VCButton(VCWidget):
         self.exclusive: bool = False
         self.solo_fixtures: bool = False
         self.clear_programmer: bool = False
+        # Welle 4 (O): Long-Press im Live-Modus oeffnet den Effekt-Mini-Editor
+        # (deferred apply). Pro Button schaltbar (Flash-Buttons sollen es nicht haben).
+        self.long_press_editor: bool = False
         # APC-Pad-Anzeige-Stil: mirror = Effekt-Farbe spiegeln, solid = feste Farbe,
         # pulse = pulsieren, alternate = zwei Farben im Wechsel, wave = Dauer-Welle.
         self.pad_style: str = "mirror"
@@ -136,6 +171,14 @@ class VCButton(VCWidget):
 
         self._pressed = False
         self._midi_armed = False       # leuchtet auf im MIDI-Learn-Modus
+        # Long-Press-Timer (Welle 4, O): feuert nach ~500 ms gedrueckt-halten.
+        from PySide6.QtCore import QTimer
+        self._lp_timer = QTimer(self)
+        self._lp_timer.setSingleShot(True)
+        self._lp_timer.setInterval(500)
+        self._lp_timer.timeout.connect(self._open_live_mini_editor)
+        self._lp_fired = False
+        self._live_editor = None
         self._bg_color = QColor("#1a3a5c")
         self._fg_color = QColor("#ffffff")
         self.resize(120, 60)
@@ -163,6 +206,21 @@ class VCButton(VCWidget):
 
     def live_effect_function_id(self):
         return self.function_id
+
+    def _all_function_ids(self) -> list[int]:
+        """Phase E: alle gekoppelten Funktions-IDs (function_id + function_ids),
+        function_id zuerst, dedupliziert. Leer = keine Bindung."""
+        ids: list[int] = []
+        if self.function_id is not None:
+            ids.append(int(self.function_id))
+        for i in self.function_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in ids:
+                ids.append(iv)
+        return ids
 
     # ── MIDI Teach (siehe VCWidget) ────────────────────────────────────────────
 
@@ -314,6 +372,73 @@ class VCButton(VCWidget):
                 return QColor(int(r or 0), int(g or 0), int(b or 0))
         return None
 
+    def _gobo_icon(self):
+        """Gobo-Icon (QPixmap) wenn dieser Button einen Gobo setzt, sonst None.
+
+        Erkennt Gobos aus einem Bibliothek-Snap (LIBRARY_SNAP) ODER einer Szene
+        (FUNCTION_TOGGLE/FLASH): findet einen ``gobo_wheel``-Wert, schlaegt im
+        Fixture-Profil den Range-Namen nach und zeichnet ihn ueber gobo_icons.
+        Ergebnis wird pro Bindung gecacht (paintEvent laeuft oft)."""
+        key = (self.action, self.snap_id, self.function_id)
+        if getattr(self, "_gobo_cache_key", None) == key:
+            return getattr(self, "_gobo_cache_pm", None)
+        pm = self._resolve_gobo_icon()
+        self._gobo_cache_key = key
+        self._gobo_cache_pm = pm
+        return pm
+
+    def _resolve_gobo_icon(self):
+        cands: list[tuple[int, int]] = []   # (fid, gobo_wheel-Wert)
+        try:
+            if self.action == ButtonAction.LIBRARY_SNAP:
+                snap = self._library_snap()
+                if snap is not None:
+                    for fid, attrs in snap.values.items():
+                        if "gobo_wheel" in attrs:
+                            cands.append((int(fid), int(attrs["gobo_wheel"])))
+            elif (self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH)
+                  and self.function_id is not None):
+                from src.core.app_state import get_state, get_channels_for_patched
+                from src.core.engine.scene import Scene
+                st = get_state()
+                fn = st.function_manager.get(int(self.function_id))
+                if isinstance(fn, Scene):
+                    fxs = {f.fid: f for f in st.get_patched_fixtures()}
+                    for sv in fn.values:
+                        fx = fxs.get(sv.fixture_id)
+                        if fx is None:
+                            continue
+                        ch = next((c for c in get_channels_for_patched(fx)
+                                   if c.channel_number == sv.channel), None)
+                        if ch is not None and (ch.attribute or "") == "gobo_wheel":
+                            cands.append((sv.fixture_id, int(sv.value)))
+            if not cands:
+                return None
+            from src.core.app_state import get_state, get_channels_for_patched
+            from src.ui.widgets.gobo_icons import gobo_pixmap_for_name, gobo_style_for
+            st = get_state()
+            fxs = {f.fid: f for f in st.get_patched_fixtures()}
+            for fid, val in cands:
+                fx = fxs.get(fid)
+                if fx is None:
+                    continue
+                gch = next((c for c in get_channels_for_patched(fx)
+                            if (c.attribute or "") == "gobo_wheel"), None)
+                if gch is None:
+                    continue
+                rng = next((r for r in getattr(gch, "ranges", [])
+                            if r.range_from <= val <= r.range_to), None)
+                if rng is None or (getattr(rng, "kind", "") or "") not in ("gobo", "shake", "rotate"):
+                    continue
+                if not gobo_style_for(rng.name):   # nur echte Muster (kein "offen")
+                    continue
+                pm = gobo_pixmap_for_name(rng.name, size=26)
+                if pm is not None and not pm.isNull():
+                    return pm
+        except Exception:
+            return None
+        return None
+
     # ── Action ───────────────────────────────────────────────────────────────
 
     def _trigger(self, press: bool):
@@ -422,6 +547,53 @@ class VCButton(VCWidget):
                 state.playback_engine.stop_all()
             return
 
+        if self.action == ButtonAction.STOP_EFFECTS:
+            # F3: Effekte aus, aber Tempo/BPM bleiben (Pause / Effekt-Stop).
+            if press:
+                try:
+                    state.function_manager.stop_all()
+                except Exception:
+                    pass
+            return
+
+        if self.action == ButtonAction.ALL_WHITE:
+            # F3: Moment-Override "alles weiss 100%". Blitzt die gebundene
+            # (hochpriore) Weiss-Szene; beim Loslassen zurueck. Korrekt pro Gerät
+            # (PAR/Spider RGBW, MH Farbrad-Weiss) -> die Szene weiss das, nicht der Button.
+            fid = self.function_id
+            if fid is not None:
+                fm = state.function_manager
+                if press:
+                    fm.start(fid)
+                else:
+                    fm.stop(fid)
+            return
+
+        if self.action == ButtonAction.FREEZE:
+            # F3: Tempo einfrieren — alle Buses + globaler Leader auf 0 (Toggle).
+            # Bus-gekoppelte Effekte halten dann ihre Position (F5).
+            if press:
+                try:
+                    from src.core.engine.tempo_bus import get_tempo_bus_manager
+                    get_tempo_bus_manager().toggle_freeze()
+                except Exception as e:
+                    print(f"[VCButton] freeze error: {e}")
+                self.update()
+            return
+
+        if self.action == ButtonAction.AUTO_SYNC:
+            # Auto-Sync an/aus (Toggle): neu startende bus-gekoppelte Effekte uebernehmen
+            # den gemeinsamen Beat-Raster-Ursprung -> phasengleicher Start, egal wann.
+            if press:
+                try:
+                    from src.core.engine.tempo_bus import get_tempo_bus_manager
+                    m = get_tempo_bus_manager()
+                    m.set_auto_sync(not m.auto_sync)
+                except Exception as e:
+                    print(f"[VCButton] auto-sync toggle error: {e}")
+                self.update()
+            return
+
         if self.action == ButtonAction.SNAPSHOT:
             if press and self.snapshot_index is not None:
                 self._apply_snapshot(self.snapshot_index)
@@ -475,6 +647,27 @@ class VCButton(VCWidget):
                     pass
             return
 
+        if self.action in (ButtonAction.TAP_BUS, ButtonAction.SYNC_BUS,
+                           ButtonAction.ARM_BUS):
+            # Tempo-Sync Phase 5: auf einen benannten Tempo-Bus wirken.
+            if press:
+                try:
+                    from src.core.engine.tempo_bus import get_tempo_bus_manager
+                    mgr = get_tempo_bus_manager()
+                    if self.action == ButtonAction.ARM_BUS:
+                        mgr.armed_bus_id = self.tempo_bus_id
+                    else:
+                        bus = mgr.resolve(self.tempo_bus_id)
+                        if bus is not None:
+                            if self.action == ButtonAction.TAP_BUS:
+                                bus.tap()
+                            else:
+                                bus.sync(reset_downbeat=True)
+                except Exception as e:
+                    print(f"[VCButton] tempo-bus action error: {e}")
+                self.update()
+            return
+
         if self.action == ButtonAction.AUDIO_BPM:
             if press:
                 try:
@@ -483,6 +676,31 @@ class VCButton(VCWidget):
                     mgr.use_audio_source(not mgr.audio_active)
                 except Exception as e:
                     print(f"[VCButton] audio-bpm toggle error: {e}")
+                self.update()
+            return
+
+        if self.action in (ButtonAction.BPM_NUDGE_UP, ButtonAction.BPM_NUDGE_DOWN):
+            # WP-8: Tempo manuell nachziehen (+/-1 BPM → MANUAL). Kein
+            # per-Button-Schritt vorhanden, daher fester Default d = 1.0.
+            if press:
+                try:
+                    from src.core.engine.bpm_manager import get_bpm_manager
+                    d = 1.0 if self.action == ButtonAction.BPM_NUDGE_UP else -1.0
+                    get_bpm_manager().nudge(d)
+                except Exception as e:
+                    print(f"[VCButton] bpm-nudge error: {e}")
+            return
+
+        if self.action == ButtonAction.BPM_MODE_TOGGLE:
+            # WP-8: Betriebsart AUTO ↔ MANUAL umschalten.
+            if press:
+                try:
+                    from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
+                    mgr = get_bpm_manager()
+                    new_mode = BpmMode.MANUAL if mgr.mode == BpmMode.AUTO else BpmMode.AUTO
+                    mgr.set_mode(new_mode)
+                except Exception as e:
+                    print(f"[VCButton] bpm-mode toggle error: {e}")
                 self.update()
             return
 
@@ -517,12 +735,12 @@ class VCButton(VCWidget):
             return
 
         if self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
-            if self.function_id is None:
+            fids = self._all_function_ids()
+            if not fids:
                 return
-            fid = int(self.function_id)
             fm = state.function_manager
 
-            def _begin():
+            def _begin(fid: int):
                 # Manuelle Farben/Snaps freigeben + ggf. andere Funktionen stoppen,
                 # damit der Effekt sichtbar wird bzw. nur einer laeuft.
                 if self.clear_programmer:
@@ -563,16 +781,23 @@ class VCButton(VCWidget):
                         pass
 
             if self.action == ButtonAction.FUNCTION_TOGGLE:
+                # Phase E: alle gekoppelten Funktionen gemeinsam umschalten. Als
+                # Gruppe behandeln — laeuft IRGENDEINE, stoppe alle; sonst starte alle.
                 if press:
-                    if fm.is_running(fid):
-                        fm.stop(fid)
+                    if any(fm.is_running(fid) for fid in fids):
+                        for fid in fids:
+                            if fm.is_running(fid):
+                                fm.stop(fid)
                     else:
-                        _begin()
+                        for fid in fids:
+                            _begin(fid)
             else:  # FUNCTION_FLASH
                 if press:
-                    _begin()
+                    for fid in fids:
+                        _begin(fid)
                 else:
-                    fm.stop(fid)
+                    for fid in fids:
+                        fm.stop(fid)
             return
 
         if self.function_id is None:
@@ -600,17 +825,50 @@ class VCButton(VCWidget):
             self._pressed = True
             self._trigger(True)
             self.update()
+            self._maybe_arm_long_press()
         event.accept()
 
     def mouseReleaseEvent(self, event):
         if self._edit_mode:
             super().mouseReleaseEvent(event)
             return
+        self._lp_timer.stop()           # kurzer Tap -> Long-Press abbrechen
         if event.button() == Qt.MouseButton.LeftButton and self._pressed:
             self._pressed = False
             self._trigger(False)
             self.update()
         event.accept()
+
+    # ── Live-Mini-Editor (Welle 4, O): Long-Press im Live-Modus ───────────────
+
+    def _maybe_arm_long_press(self):
+        """Startet den Long-Press-Timer, wenn dieser Button das Editor-Oeffnen
+        erlaubt (pro-Button-Flag) UND einen Effekt steuert. Nur Toggle/Effekt-
+        Aktion — bei FLASH wuerde Halten mit dem Flash kollidieren."""
+        if (self.long_press_editor
+                and self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.EFFECT_ACTION)
+                and self.live_effect_function_id() is not None):
+            self._lp_fired = False
+            self._lp_timer.start()
+
+    def _open_live_mini_editor(self):
+        """Timer-Callback: oeffnet den nicht-modalen Deferred-Apply-Editor fuer den
+        gebundenen Effekt (Werte werden erst beim Klick auf „Anwenden" gesendet)."""
+        self._lp_fired = True
+        fid = self.live_effect_function_id()
+        if fid is None:
+            ids = self._all_function_ids()
+            fid = ids[0] if ids else None
+        if fid is None:
+            return
+        try:
+            from .vc_live_editor import VCLiveEditor
+            ed = VCLiveEditor(int(fid), self)
+            self._live_editor = ed       # Referenz halten (nicht-modal)
+            ed.show()
+            ed.raise_()
+        except Exception:
+            pass
 
     def _function_running(self) -> bool:
         """True, wenn dieser Button eine Funktion steuert, die gerade laeuft.
@@ -681,6 +939,11 @@ class VCButton(VCWidget):
             display += f"\n[Snap {self.snapshot_index + 1}]"
 
         p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+
+        # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.
+        _gpm = self._gobo_icon()
+        if _gpm is not None and not _gpm.isNull():
+            p.drawPixmap(self.width() - _gpm.width() - 4, 4, _gpm)
 
         # Farbbalken unten je nach Aktion
         if self.action == ButtonAction.FLASH:
@@ -762,6 +1025,25 @@ class VCButton(VCWidget):
         )
         form.addRow("Funktion/Chase (Name):", func_combo)
 
+        # Phase E: weitere gekoppelte Funktions-IDs (Komma-getrennt) — der Button
+        # schaltet/flasht function_id + diese gemeinsam (FUNCTION_TOGGLE/FLASH).
+        extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
+        extra_ids.setToolTip("Weitere Funktions-IDs (Komma-getrennt) — Toggle/Flash "
+                             "wirkt zusaetzlich auf diese Funktionen (als Gruppe).")
+        form.addRow("Weitere Ziel-IDs:", extra_ids)
+
+        # Lesbare, aufklappbare „Steuert"-Liste (wie beim BPM/Speed-Dial): zeigt die
+        # gebundenen Funktionen/Effekte nach NAMEN, je Zeile auswaehl- und loeschbar.
+        # Ist sie befuellt, hat sie beim Speichern Vorrang vor Slot/Weitere-IDs.
+        from .target_list_editor import TargetListEditor
+        target_editor = TargetListEditor(with_params=False, title="Steuert")
+        _t0 = ([int(self.function_id)] if self.function_id is not None else []) \
+            + [int(i) for i in self.function_ids]
+        target_editor.set_targets(_t0)
+        target_editor.setToolTip("Funktionen/Effekte, die dieser Button schaltet — "
+                                 "per Dropdown auswählen, mit ✕ entfernen, „+\" hinzufügen.")
+        form.addRow("Steuert:", target_editor)
+
         # Snapshot-Auswahl
         snap_combo = QComboBox()
         snap_combo.addItem("(keiner)", -1)
@@ -838,6 +1120,18 @@ class VCButton(VCWidget):
         group_combo.setCurrentText(self.group_name or "")
         group_combo.setToolTip("Fixture-Gruppe für Aktion = SelectGroup.")
         form.addRow("Gruppe (SelectGroup):", group_combo)
+
+        # Tempo-Sync Phase 5: Ziel-Bus (nur Aktionen TAP_BUS/SYNC_BUS/ARM_BUS).
+        bus_combo = QComboBox()
+        for _bid, _blbl in (("", "(aktiver/Default-Bus)"), ("A", "Bus A"),
+                            ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
+            bus_combo.addItem(_blbl, _bid)
+        for i in range(bus_combo.count()):
+            if bus_combo.itemData(i) == self.tempo_bus_id:
+                bus_combo.setCurrentIndex(i)
+                break
+        bus_combo.setToolTip("Auf welchen Tempo-Bus Tap/Sync/Scharfschalten wirkt.")
+        form.addRow("Tempo-Bus:", bus_combo)
 
         # Live-Edit-Slot (FUNCTION_TOGGLE/FLASH): macht den Effekt zum aktiven
         # Bearbeitungsziel des Slots; Fader/Farben mit gleichem Slot editieren ihn.
@@ -937,6 +1231,14 @@ class VCButton(VCWidget):
         actions_btn.clicked.connect(_edit_actions)
         form.addRow("Zusatz-Aktionen:", actions_btn)
 
+        # Welle 4 (O): Long-Press im Live-Modus oeffnet den Effekt-Mini-Editor.
+        from PySide6.QtWidgets import QCheckBox as _QCheckBox
+        long_press_cb = _QCheckBox("Lang drücken → Live-Einstellungen (erst Anwenden sendet)")
+        long_press_cb.setChecked(self.long_press_editor)
+        long_press_cb.setToolTip("Im Live-Modus den Button lange halten, um die Effekt-"
+                                 "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
+        form.addRow("Long-Press:", long_press_cb)
+
         # ── Kontextabhängige Feld-Sichtbarkeit ──
         # Zeigt je Aktion nur die passenden Felder (statt immer alle ~12 Zeilen).
         # Caption/Aktion/MIDI/Pad bleiben immer sichtbar.
@@ -944,13 +1246,17 @@ class VCButton(VCWidget):
         EA, SG = ButtonAction.EFFECT_ACTION, ButtonAction.SELECT_GROUP
         LS, SN = ButtonAction.LIBRARY_SNAP, ButtonAction.SNAPSHOT
         TG, FL = ButtonAction.TOGGLE, ButtonAction.FLASH
+        TB, SB, AB = ButtonAction.TAP_BUS, ButtonAction.SYNC_BUS, ButtonAction.ARM_BUS
+        AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
 
         def _update_field_visibility():
             a = act.currentData()        # roher Enum-Wert (str)
-            func_like = a in (FT, FF, EA, TG, FL)
+            func_like = a in (FT, FF, EA, TG, FL, AW)
             vis = {
                 slot:            func_like,
                 func_combo:      func_like,
+                extra_ids:       a in (FT, FF),
+                target_editor:   a in (FT, FF, EA, AW),
                 snap_combo:      a == SN,
                 lib_combo:       a == LS,
                 snap_mode_combo: a == LS,
@@ -960,6 +1266,8 @@ class VCButton(VCWidget):
                 exclusive_cb:    a in (FT, FF),
                 solo_fix_cb:     a in (FT, FF),
                 clear_prog_cb:   a in (FT, FF),
+                long_press_cb:   a in (FT, EA),
+                bus_combo:       a in (TB, SB, AB),
                 pad_color2_btn:  self.pad_style == "alternate" or
                                  pad_style_combo.currentData() == "alternate",
             }
@@ -984,6 +1292,24 @@ class VCButton(VCWidget):
                 self.function_id = _fid if _fid >= 0 else None
             except ValueError:
                 self.function_id = None
+            # Phase E: weitere gekoppelte Funktions-IDs.
+            _eids = []
+            for part in extra_ids.text().split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    _eids.append(int(part))
+                except ValueError:
+                    pass
+            self.function_ids = _eids
+            # „Steuert"-Liste hat Vorrang, wenn befuellt: erste Zeile -> function_id,
+            # restliche -> function_ids (nur bei funktionsgebundenen Aktionen).
+            if self.action in (FT, FF, EA, AW):
+                _tids = target_editor.ids()
+                if _tids:
+                    self.function_id = _tids[0]
+                    self.function_ids = _tids[1:]
             snap_idx = snap_combo.currentData()
             self.snapshot_index = snap_idx if snap_idx >= 0 else None
             lib_id = lib_combo.currentData()
@@ -994,6 +1320,7 @@ class VCButton(VCWidget):
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
             self.edit_slot = edit_slot_edit.text().strip()
+            self.tempo_bus_id = bus_combo.currentData() or ""
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
@@ -1002,6 +1329,7 @@ class VCButton(VCWidget):
             self.exclusive = exclusive_cb.isChecked()
             self.solo_fixtures = solo_fix_cb.isChecked()
             self.clear_programmer = clear_prog_cb.isChecked()
+            self.long_press_editor = long_press_cb.isChecked()
             self.actions = _edited["list"]
             self.update()
 
@@ -1045,11 +1373,13 @@ class VCButton(VCWidget):
         d = super().to_dict()
         d["action"] = self.action.value
         d["function_id"] = self.function_id
+        d["function_ids"] = list(self.function_ids)
         d["snapshot_index"] = self.snapshot_index
         d["snap_id"] = self.snap_id
         d["snap_mode"] = self.snap_mode
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
+        d["tempo_bus_id"] = self.tempo_bus_id
         d["edit_slot"] = self.edit_slot
         d["actions"] = [dict(a) for a in self.actions]
         d["exclusive"] = self.exclusive
@@ -1061,17 +1391,31 @@ class VCButton(VCWidget):
         d["midi_data1"] = self.midi_data1
         d["midi_type"] = self.midi_type
         d["key_binding"] = self.key_binding
+        d["long_press_editor"] = self.long_press_editor
         return d
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
-        self.action = ButtonAction(d.get("action", "Toggle"))
+        try:
+            self.action = ButtonAction(d.get("action", "Toggle"))
+        except ValueError:
+            # Unbekannte Aktion (z. B. aus einer neueren Version) -> sicherer Default
+            # statt Absturz; das Widget bleibt erhalten (Vorwaerts-/Rueckwaerts-Kompat).
+            self.action = ButtonAction.TOGGLE
         self.function_id = d.get("function_id")
+        _fids = []
+        for i in d.get("function_ids", []):
+            try:
+                _fids.append(int(i))
+            except (TypeError, ValueError):
+                pass
+        self.function_ids = _fids
         self.snapshot_index = d.get("snapshot_index")
         self.snap_id = d.get("snap_id")
         self.snap_mode = d.get("snap_mode", "toggle")
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
+        self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.edit_slot = d.get("edit_slot", "")
         self.actions = [dict(a) for a in d.get("actions", []) if isinstance(a, dict)]
         self.exclusive = bool(d.get("exclusive", False))
@@ -1084,3 +1428,4 @@ class VCButton(VCWidget):
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")
         self.key_binding = d.get("key_binding", "") or ""
+        self.long_press_editor = bool(d.get("long_press_editor", False))

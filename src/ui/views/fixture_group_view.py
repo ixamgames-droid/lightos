@@ -416,7 +416,7 @@ class FixtureGroupView(QWidget):
                           "(touch-tauglich, ohne Drag&Drop)")
         b_edit.clicked.connect(self._edit_group)
         btns.addWidget(b_edit, 1, 0)
-        b_del = QPushButton("Loeschen")
+        b_del = QPushButton("Löschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._delete_group)
         btns.addWidget(b_del, 1, 1)
@@ -451,7 +451,7 @@ class FixtureGroupView(QWidget):
         right_inner = QVBoxLayout(right_w)
         right_inner.setContentsMargins(0, 0, 0, 0)
         right_inner.addWidget(
-            QLabel("Raster (Drag&Drop fuer Platzierung, Rechtsklick zum Entfernen):"))
+            QLabel("Raster (Drag&Drop für Platzierung, Rechtsklick zum Entfernen):"))
 
         self._grid_widget = FixtureGridWidget(right_w)
         self._grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -628,7 +628,7 @@ class FixtureGroupView(QWidget):
             return
         s = self._session()
         if s is None:
-            QMessageBox.warning(self, "Fehler", "Keine Show geoeffnet.")
+            QMessageBox.warning(self, "Fehler", "Keine Show geöffnet.")
             return
         try:
             with s:
@@ -775,8 +775,8 @@ class FixtureGroupView(QWidget):
     def _delete_group(self):
         if self._current_group is None:
             return
-        reply = QMessageBox.question(self, "Loeschen",
-                                     f'Gruppe "{self._current_group.name}" loeschen?',
+        reply = QMessageBox.question(self, "Löschen",
+                                     f'Gruppe "{self._current_group.name}" löschen?',
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply != QMessageBox.StandardButton.Yes:
             return

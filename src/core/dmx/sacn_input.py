@@ -142,22 +142,12 @@ class SACNReceiver:
         if not cfg:
             return
         out_univ, mode = cfg
+        # F-20: in die Eingangs-Schicht des AppState legen statt direkt ins
+        # Live-Universe zu schreiben — der Per-Frame-Renderer ueberschrieb sonst
+        # gepatchte Kanaele. ``_render_frame`` mischt die Schicht deterministisch.
         try:
             from src.core.app_state import get_state
-            state = get_state()
-            if out_univ not in state.universes:
-                state.universes[out_univ] = state.output_manager.add_universe(out_univ)
-            target = state.universes[out_univ]
-            existing = target.get_all()
-            new_data = bytearray(existing)
-            for i in range(min(len(data), 512)):
-                val = data[i]
-                if mode == "HTP":
-                    if val > new_data[i]:
-                        new_data[i] = val
-                else:
-                    new_data[i] = val
-            target.set_range(1, bytes(new_data))
+            get_state().apply_input_merge(out_univ, data, mode)
         except Exception as e:
             print(f"[sACN-In] merge error: {e}")
 

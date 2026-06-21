@@ -187,7 +187,9 @@ class OS2LServer:
         try:
             from src.core.engine.bpm_manager import get_bpm_manager
             mgr = get_bpm_manager()
-            if hasattr(mgr, "set_bpm"):
+            if hasattr(mgr, "request_bpm"):
+                mgr.request_bpm(bpm, "os2l")
+            elif hasattr(mgr, "set_bpm"):
                 mgr.set_bpm(bpm)
         except Exception as e:
             print(f"[OS2L] BPM-Manager error: {e}")

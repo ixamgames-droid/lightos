@@ -14,7 +14,8 @@ from PySide6.QtCore import Qt, Signal, QPoint, QTimer, QRect
 from PySide6.QtGui import QColor, QPainter, QPen, QBrush, QConicalGradient, QLinearGradient, QMouseEvent
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QPushButton,
-    QTabWidget, QGridLayout, QGroupBox, QSpinBox, QSizePolicy, QFrame
+    QTabWidget, QGridLayout, QGroupBox, QSpinBox, QSizePolicy, QFrame,
+    QScrollArea, QDialog
 )
 
 try:
@@ -220,12 +221,37 @@ class ColorPicker(QWidget):
         prev_row.addWidget(self._lbl_rgb)
         root.addLayout(prev_row)
 
-        # Tabs
+        # ── Header: Voll-Editor-Popout ("Großes Fenster") ───────────────────
+        self._root_layout = root
+        self._editor_window = None
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den ganzen Farb-Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        root.addLayout(header)
+
+        # Tabs — jede Seite scrollt fuer sich, damit bei kleiner Fensterhoehe
+        # keine Gruppen (CMY / White-UV-Amber) abgeschnitten werden.
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._build_basic_tab(), "Basic")
-        self._tabs.addTab(self._build_full_tab(), "Full")
-        self._tabs.addTab(self._build_filter_tab(), "Filter")
+        self._tabs.addTab(self._wrap_scroll(self._build_basic_tab()), "Basic")
+        self._tabs.addTab(self._wrap_scroll(self._build_full_tab()), "Full")
+        self._tabs.addTab(self._wrap_scroll(self._build_filter_tab()), "Filter")
         root.addWidget(self._tabs, stretch=1)
+
+        # Platzhalter, solange der Editor in ein eigenes Fenster ausgekoppelt ist
+        self._editor_placeholder = QLabel(
+            "⤢ Der Farb-Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        root.addWidget(self._editor_placeholder, stretch=1)
 
         # Button row
         btn_row = QHBoxLayout()
@@ -252,6 +278,52 @@ class ColorPicker(QWidget):
         self._btn_palette.clicked.connect(self._save_as_palette)
         btn_row.addWidget(self._btn_palette)
         root.addLayout(btn_row)
+
+    # ── Scroll-Wrapper + Voll-Editor-Popout ──────────────────────────────────
+    def _wrap_scroll(self, w: QWidget) -> QScrollArea:
+        """Packt eine Tab-Seite in einen eigenen Scrollbereich, damit bei kleiner
+        Fensterhoehe alle Gruppen erreichbar bleiben statt abgeschnitten zu werden."""
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame)
+        sc.setWidget(w)
+        return sc
+
+    def _toggle_editor_popout(self):
+        """Koppelt die Farb-Tabs (RGB/HSB/CMY/W-UV-A + Filter) in ein grosses,
+        scrollbares Fenster aus / dockt sie zurueck, damit sich alle Regler und
+        Zahlenfelder bequem in gross einstellen lassen."""
+        if self._editor_window is not None:
+            self._editor_window.close()      # → finished → _redock_editor
+            return
+        self._root_layout.removeWidget(self._tabs)
+        win = QDialog(self)
+        win.setWindowTitle("Farb-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        wl.addWidget(self._tabs)
+        win.resize(620, 880)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        """Holt die Farb-Tabs aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
+            return
+        try:
+            self._tabs.setParent(None)
+            idx = self._root_layout.indexOf(self._editor_placeholder)
+            self._root_layout.insertWidget(idx, self._tabs, stretch=1)
+            self._tabs.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zerstoert
+        self._editor_window = None
 
     # ── Basic Tab ────────────────────────────────────────────────────────────
 
@@ -360,7 +432,10 @@ class ColorPicker(QWidget):
         spin = QSpinBox()
         spin.setRange(lo, hi)
         spin.setValue(default)
-        spin.setFixedWidth(64)
+        # Mindestbreite statt fester 64px: dreistellige Werte (255) wurden samt
+        # den (im Touch-Modus grossen) Pfeil-Buttons abgeschnitten -> nur "2"
+        # statt "255" sichtbar.
+        spin.setMinimumWidth(92)
         spin.valueChanged.connect(slider.setValue)
         slider.valueChanged.connect(spin.setValue)
         row.addWidget(spin)
@@ -373,7 +448,7 @@ class ColorPicker(QWidget):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setContentsMargins(8, 8, 8, 8)
-        info = QLabel("Lee / Rosco Gel-Farben - klicken um zu uebernehmen.")
+        info = QLabel("Lee / Rosco Gel-Farben - klicken um zu übernehmen.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         layout.addWidget(info)
 
@@ -384,10 +459,7 @@ class ColorPicker(QWidget):
             sw = ColorSwatch(QColor(r, g, b), name)
             sw.clicked.connect(self.set_color)
             grid.addWidget(sw, i // cols, i % cols)
-            lbl = QLabel(name)
-            lbl.setStyleSheet("font-size: 9px; color: #aaa;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            # Label under swatch is too much - tooltip is enough
+            # Kein Label unter dem Swatch — der Tooltip reicht.
         layout.addLayout(grid)
         layout.addStretch(1)
         return w

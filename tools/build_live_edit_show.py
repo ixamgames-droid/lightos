@@ -141,9 +141,9 @@ mh_looks = [mh_scene("Pos Center", pan=128, tilt=128, intensity=255, shutter=4),
             mh_scene("Pos Publikum", pan=128, tilt=180, intensity=255, shutter=4),
             mh_scene("MH Rot", color_wheel=14, intensity=255, shutter=4),
             mh_scene("MH Blau", color_wheel=34, intensity=255, shutter=4),
-            mh_scene("MH Gruen", color_wheel=54, intensity=255, shutter=4),
+            mh_scene("MH Grün", color_wheel=54, intensity=255, shutter=4),
             mh_scene("MH Gelb", color_wheel=74, intensity=255, shutter=4),
-            mh_scene("MH Weiss", color_wheel=0, intensity=255, shutter=4),
+            mh_scene("MH Weiß", color_wheel=0, intensity=255, shutter=4),
             mh_scene("Gobo", gobo_wheel=190, intensity=255, shutter=4)]
 
 # Matrix-Effekte (Slot „MX")
@@ -275,15 +275,15 @@ for i, fn in enumerate(MX_FX):                       # Reihe 1: Effekt wählen
 for i, (nm, key) in enumerate([("Form -", "prev_algorithm"), ("Form +", "next_algorithm"),
                                ("Freeze", "toggle_freeze"), ("Reset", "clear_live_override")]):
     edit_action(nm, qnote("TR", 1, i), "#5a4a00", key, "MX")   # Reihe 2: Aktionen
-_RC = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiss", 255, 255, 255)]
+_RC = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiß", 255, 255, 255)]
 for i, (nm, r, g, b) in enumerate(_RC):              # Reihe 3: color1-Recolor
     recolor_tile(f"C1 {nm}", qnote("TR", 2, i), r, g, b, ColorTarget.EFFECT_C1, "MX")
-_SEQ = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Gelb", 255, 220, 0)]
+_SEQ = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Gelb", 255, 220, 0)]
 for i, (nm, r, g, b) in enumerate(_SEQ):             # Reihe 4: Sequence-Farbe
     recolor_tile(f"Seq {nm}", qnote("TR", 3, i), r, g, b, ColorTarget.EFFECT, "MX")
 
 # ── BL — PAR-Farben + Gruppen ────────────────────────────────────────────────
-_PARCOL = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0), ("Weiss", 255, 255, 255, 255),
+_PARCOL = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0), ("Weiß", 255, 255, 255, 255),
            ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0), ("Warm", 255, 130, 40, 60)]
 for i, (nm, r, g, b, w) in enumerate(_PARCOL):
     par_color(nm, qnote("BL", i // 4, i % 4), r, g, b, w)
@@ -298,7 +298,7 @@ _x, _y = pad_xy(qnote("BR", 0, 1)); _add(b, _x, _y, PAD, PAD, B_MAIN)
 
 # ── Fader (Edit-Slots) + global ──────────────────────────────────────────────
 fader("MH-Speed", 0, SliderMode.EFFECT_SPEED, edit_slot="MH", midi_cc=48, value=64)
-fader("MH-Groesse", 1, SliderMode.EFFECT_PARAM, edit_slot="MH", param_key="size", midi_cc=49, value=110)
+fader("MH-Größe", 1, SliderMode.EFFECT_PARAM, edit_slot="MH", param_key="size", midi_cc=49, value=110)
 fader("MX-Speed", 3, SliderMode.EFFECT_SPEED, edit_slot="MX", midi_cc=51, value=64)
 fader("MX-Master", 4, SliderMode.EFFECT_INTENSITY, edit_slot="MX", midi_cc=52, value=255)
 fader("MX-Param", 5, SliderMode.EFFECT_PARAM, edit_slot="MX", param_key="white_amount", midi_cc=53, value=0)

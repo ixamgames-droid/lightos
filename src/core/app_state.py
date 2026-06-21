@@ -10,7 +10,9 @@ from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .debug_log import debug_swallow
 
-SHOW_DB_PATH = "data/current_show.db"
+# Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
+# eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
+SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
 
 # Attribut-Klassen fuer den multiplikativen Dimmer-Layer (EE-02). Wird ein
 # dedizierter Dimmer/Intensitaets-Kanal gefunden, skaliert der Dimmer-Master nur
@@ -40,6 +42,11 @@ class AppState:
         # Threads (MIDI/OSC/Audio) ueber _emit direkt Qt-Widgets anfassen → Crash.
         self._ui_marshaller = None
         self._ui_thread_id: int | None = None
+        # BUG-01: Solange True, unterdrückt _emit() alle State-Events. Wird beim
+        # Bulk-Patch-Ersatz (_replace_patch_from_data in show_file) gesetzt, damit
+        # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
+        # Aufrufer macht danach EINEN gebündelten Refresh.
+        self._suppress_emits: bool = False
         # Gemeinsame Programmer-Geraeteauswahl (Reihenfolge = Auswahl-Reihenfolge).
         # Wird vom ProgrammerView gesetzt; alle Kategorien (RGB Matrix, Effekte,
         # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
@@ -72,6 +79,11 @@ class AppState:
         # gelegt (siehe _rebuild_render_plan) und mit der Show gespeichert. Typisch:
         # PAR-Grundhelligkeit, damit eine reine Farbe sofort sichtbar ist.
         self.base_levels: dict[int, dict[str, int]] = {}
+        # Implizite Grundhelligkeit (4a²): True = eine aktive Farbe ohne getriebenen
+        # Dimmer wird auf voll gesetzt ("Farbe heisst sichtbar"). False = strikte
+        # Trennung Farbe ↔ Dimmer (reine Farbe bleibt dunkel; Helligkeit kommt NUR
+        # aus Dimmer-Effekten/Mastern). Mit der Show gespeichert.
+        self.implicit_brightness: bool = True
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
@@ -88,6 +100,16 @@ class AppState:
         # unsichtbarer Zombie auf freien). Sicht- (ISO-01) und loeschbar (ISO-02).
         self.simple_desk: dict[int, dict[int, int]] = {}
         self._sd_lock = threading.RLock()
+        # F-20: Art-Net/sACN-EINGANG als eigene Render-Schicht. Die Empfaenger
+        # (artnet_input/sacn_input) schreiben ihre gemergten Werte NICHT mehr direkt
+        # ins Live-Universe (das ueberschrieb der Per-Frame-Renderer auf gepatchten
+        # Kanaelen), sondern in diesen Puffer; _render_frame mischt ihn deterministisch
+        # je Universe mit dem konfigurierten Modus. Leer = kein Eingang = kein Effekt.
+        #   input_layer:       {out_universe: {channel(1..512): value}}
+        #   input_merge_modes: {out_universe: "HTP"|"LTP"|"REPLACE"}
+        self.input_layer: dict[int, dict[int, int]] = {}
+        self.input_merge_modes: dict[int, str] = {}
+        self._input_lock = threading.RLock()
         # Simple Desk ist standardmaessig reine ANZEIGE (Monitor). Erst mit aktivem
         # 'Manueller Override' wirkt die Ebene auf die Ausgabe (Schicht 4c, absolute
         # Oberhand). Default False = nichts faellt ungewollt in die Live-Ausgabe.
@@ -576,25 +598,29 @@ class AppState:
     # ── Programmer ────────────────────────────────────────────────────────────
 
     def set_programmer_value(self, fid: int, attribute: str, value: int,
-                             undoable: bool = False):
+                             undoable: bool = False, head: int = 0):
+        # Mehrkopf (X-6): head>0 adressiert das N-te Vorkommen eines Attributs
+        # (z. B. die 2. Farb-/Tilt-Bank eines Spiders) ueber den Schluessel
+        # "attr#N". head=0 = "attr" -> byte-genau wie bisher.
+        key = attribute if not head else f"{attribute}#{int(head)}"
         with self._prog_lock:
-            old = self.programmer.get(fid, {}).get(attribute, None)
+            old = self.programmer.get(fid, {}).get(key, None)
             if fid not in self.programmer:
                 self.programmer[fid] = {}
-            self.programmer[fid][attribute] = max(0, min(255, value))
-            new_val = self.programmer[fid][attribute]
+            self.programmer[fid][key] = max(0, min(255, value))
+            new_val = self.programmer[fid][key]
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
-                label=f"Programmer FID{fid}.{attribute}={new_val}",
+                label=f"Programmer FID{fid}.{key}={new_val}",
                 do=lambda: None,
-                undo=lambda f=fid, a=attribute, v=old: (
-                    self.set_programmer_value(f, a, v, undoable=False)
+                undo=lambda f=fid, a=attribute, v=old, h=head: (
+                    self.set_programmer_value(f, a, v, undoable=False, head=h)
                     if v is not None
-                    else self._clear_programmer_attr(f, a)),
-                redo=lambda f=fid, a=attribute, v=new_val:
-                    self.set_programmer_value(f, a, v, undoable=False),
+                    else self._clear_programmer_attr(f, key)),
+                redo=lambda f=fid, a=attribute, v=new_val, h=head:
+                    self.set_programmer_value(f, a, v, undoable=False, head=h),
             )
 
     def _clear_programmer_attr(self, fid: int, attribute: str):
@@ -616,8 +642,9 @@ class AppState:
         self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
 
-    def get_programmer_value(self, fid: int, attribute: str) -> int | None:
-        return self.programmer.get(fid, {}).get(attribute)
+    def get_programmer_value(self, fid: int, attribute: str, head: int = 0) -> int | None:
+        key = attribute if not head else f"{attribute}#{int(head)}"
+        return self.programmer.get(fid, {}).get(key)
 
     def clear_programmer_value(self, fid: int, attribute: str):
         """Entfernt einen einzelnen Programmer-Wert (z. B. fuer Toggle-/Flash-
@@ -650,6 +677,16 @@ class AppState:
 
     def get_selected_group_id(self):
         return getattr(self, "selected_group_id", None)
+
+    def active_scope_fids(self) -> list[int]:
+        """Geraete im aktiven Speicher-Scope = die gemeinsame Auswahl.
+
+        Beim Gruppenwechsel setzt der Programmer die Auswahl auf die Geraete der
+        Gruppe (set_selected_fids), daher ist die aktuelle Auswahl der korrekte
+        Scope: Speichern beruecksichtigt nur diese Geraete und NICHT liegen-
+        gebliebene Programmer-Werte zuvor gewaehlter Gruppen. Leere Liste = kein
+        Scope -> alles speichern (Alt-Verhalten, z. B. wenn nichts gewaehlt ist)."""
+        return list(self.selected_fids)
 
     # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
     def _group_lookup(self, name: str):
@@ -697,8 +734,20 @@ class AppState:
         universe = self.universes[fixture.universe]
         prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
         channels = get_channels_for_patched(fixture)
+        seen: dict[str, int] = {}
         for ch in channels:
-            val = prog.get(ch.attribute, ch.default_value)
+            a = ch.attribute
+            head = seen.get(a, 0)
+            seen[a] = head + 1
+            # Mehrkopf (X-6): Kopf N liest "attr#N", faellt auf Kopf 0 ("attr")
+            # zurueck, sonst Default -> Einzelkopf byte-genau wie bisher.
+            key = a if head == 0 else f"{a}#{head}"
+            if key in prog:
+                val = prog[key]
+            elif a in prog:
+                val = prog[a]
+            else:
+                val = ch.default_value
             dmx_addr = fixture.address + ch.channel_number - 1
             if 1 <= dmx_addr <= 512:
                 universe.set_channel(dmx_addr, val)
@@ -808,6 +857,33 @@ class AppState:
 
     # ── Zentraler Per-Frame-Renderer ──────────────────────────────────────────
 
+    def apply_input_merge(self, out_univ: int, data, mode: str = "HTP"):
+        """F-20: Empfangene DMX-Werte (Art-Net/sACN) in die Eingangs-Schicht legen.
+        Thread-safe; wird vom RX-Thread aufgerufen, ``_render_frame`` mischt sie pro
+        Frame deterministisch. ``data`` = bytes/bytearray (Kanal 1 == Index 0)."""
+        if mode not in ("HTP", "LTP", "REPLACE"):
+            mode = "HTP"
+        out_univ = int(out_univ)
+        with self._input_lock:
+            layer = self.input_layer.get(out_univ)
+            if layer is None:
+                layer = {}
+                self.input_layer[out_univ] = layer
+            self.input_merge_modes[out_univ] = mode
+            for i in range(min(len(data), 512)):
+                layer[i + 1] = data[i] & 0xFF
+
+    def clear_input_merge(self, out_univ: int | None = None):
+        """F-20: Eingangs-Schicht leeren (eine Universe oder alle). Damit ein
+        weggefallener externer Sender keine eingefrorenen Werte hinterlaesst."""
+        with self._input_lock:
+            if out_univ is None:
+                self.input_layer.clear()
+                self.input_merge_modes.clear()
+            else:
+                self.input_layer.pop(int(out_univ), None)
+                self.input_merge_modes.pop(int(out_univ), None)
+
     def _render_frame(self, dt: float):
         """Berechnet jeden Output-Frame komplett neu (ein Thread):
         Default → Funktionen → Executoren → Programmer, dann atomarer Commit
@@ -834,6 +910,15 @@ class AppState:
         #    so erkennt 4a² einen Dimmer-Effekt auch dann als „treibt die
         #    Intensitaet", wenn er gerade 0 ausgibt (Strobe-Nulldurchgang,
         #    dunkles Matrix-Pixel) und darf ihn dann nicht aufhellen.
+        # WP-Tempo: Tempo-Buses EINMAL pro Frame fortschreiben, BEVOR die Funktionen
+        # rendern — so liest jeder beat-synchrone Effekt im selben Frame dieselbe,
+        # eingefrorene Bus-Position (phasenkohärent, da nur dieser Render-Thread
+        # advance_frame aufruft). Rein additiv: schreibt KEINE Universen.
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            get_tempo_bus_manager().advance_frame(dt)
+        except Exception as exc:
+            print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
         try:
@@ -962,7 +1047,10 @@ class AppState:
                     prog_dimmer_fids.add(int(fid))
             except (TypeError, ValueError):
                 continue
-        for fidi, dims in dim_addrs.items():
+        # implicit_brightness=False -> strikte Trennung Farbe/Dimmer: kein implizites Voll
+        # (reine Farbe bleibt dunkel, Helligkeit nur aus Dimmer-Effekten/Mastern).
+        _dim_items = dim_addrs.items() if getattr(self, "implicit_brightness", True) else ()
+        for fidi, dims in _dim_items:
             if not dims or fidi in exec_dimmer_fids or fidi in prog_dimmer_fids:
                 continue
             entry = self._fix_index.get(fidi)
@@ -1017,6 +1105,37 @@ class AppState:
                 continue
             for a in addrs:
                 su.set_channel(a, int(su.get_channel(a) * factor))
+
+        # 4b-Input. F-20: Art-Net/sACN-EINGANG als Schicht. Extern empfangene DMX-
+        #     Werte (Puffer input_layer, vom RX-Thread gefuellt) je Universe mit dem
+        #     konfigurierten Modus einmischen: HTP (Hoechstwert), LTP/REPLACE (ersetzt).
+        #     RAW (nach dem Dimmer-Master, vor Simple Desk) — externer Eingang wird
+        #     NICHT vom eigenen Submaster skaliert; manueller Simple-Desk-Override (4c)
+        #     gewinnt weiterhin oben drauf. Leer = kein Eingang = kein Effekt.
+        in_state = getattr(self, "input_layer", None)
+        if in_state:
+            in_lock = getattr(self, "_input_lock", None)
+            if in_lock is not None:
+                with in_lock:
+                    in_layer = {u: dict(ch) for u, ch in in_state.items()}
+                    in_modes = dict(self.input_merge_modes)
+            else:
+                in_layer = {u: dict(ch) for u, ch in in_state.items()}
+                in_modes = dict(self.input_merge_modes)
+            for univ, chans in in_layer.items():
+                su = scratch.get(univ)
+                if su is None:
+                    continue
+                htp = in_modes.get(univ, "HTP") == "HTP"
+                for ch, val in chans.items():
+                    if not (1 <= ch <= 512):
+                        continue
+                    v = max(0, min(255, int(val)))
+                    if htp:
+                        if v > su.get_channel(ch):
+                            su.set_channel(ch, v)
+                    else:
+                        su.set_channel(ch, v)
 
         # 4c. Simple Desk (ISO-03): manuelle Override-Ebene als OBERSTE Schicht —
         #     NUR wenn 'Manueller Override' aktiv ist (sonst ist Simple Desk reine
@@ -1075,7 +1194,12 @@ class AppState:
         protect_addrs: {universe: set(addr)} — Nicht-Intensitaets-Kanaele, die der
         Funktions-Layer (Matrix/EFX) treibt und die dieser Layer NICHT ueberschreiben
         darf (WP-6/Abschnitt 8). Intensitaet bleibt unberuehrt von protect (sie wird
-        ueber skip_intensity_for multipliziert)."""
+        ueber skip_intensity_for multipliziert).
+
+        Mehrkopf (X-6): wiederholt sich ein Attribut in den Kanaelen (z. B. zwei
+        Farb-/Tilt-Baenke eines Spiders), liest das N-te Vorkommen den Schluessel
+        "attr#N"; fehlt der, spiegelt es "attr" (Kopf 0). Einzelkopf-Geraete und
+        nicht separat gesetzte Koepfe verhalten sich damit byte-genau wie bisher."""
         skip = skip_intensity_for or ()
         protect = protect_addrs or {}
         for fid, attrs in fixmap.items():
@@ -1095,10 +1219,23 @@ class AppState:
                 continue
             skip_inten = fidi in skip
             prot = protect.get(fx.universe, ())
+            seen_attr: dict[str, int] = {}
             for ch in chans:
-                if ch.attribute not in attrs:
-                    continue
-                attr_l = (ch.attribute or "").lower()
+                a = ch.attribute
+                head = seen_attr.get(a, 0)
+                seen_attr[a] = head + 1
+                if head == 0:
+                    if a not in attrs:
+                        continue
+                    key = a
+                else:
+                    key = f"{a}#{head}"
+                    if key not in attrs:
+                        if a in attrs:
+                            key = a   # Kopf>0 spiegelt Kopf 0, falls nicht separat gesetzt
+                        else:
+                            continue
+                attr_l = (a or "").lower()
                 is_inten = attr_l in _DIM_INTENSITY_ATTRS
                 if skip_inten and is_inten:
                     continue
@@ -1109,7 +1246,7 @@ class AppState:
                 # -> Programmer schreibt nicht drueber (kein Blind-Overwrite).
                 if (not is_inten) and addr in prot:
                     continue
-                v = attrs[ch.attribute]
+                v = attrs[key]
                 try:
                     v = int(v)
                 except (TypeError, ValueError):
@@ -1153,9 +1290,23 @@ class AppState:
                 color.append(addr)
         return inten if inten else color
 
+    def _resolve_cue_stack(self, idx):
+        """F-16: Index → Geschwister-Cueliste (oder None). Liest die Liste LIVE, ist
+        also auch nach Show-Reloads gültig. Wird als ``CueStack._resolve_sub`` injiziert."""
+        if isinstance(idx, int) and 0 <= idx < len(self.cue_stacks):
+            return self.cue_stacks[idx]
+        return None
+
+    def wire_cue_stack_resolvers(self):
+        """F-16: Allen Cuelisten den Sub-Cuelisten-Resolver geben (idempotent).
+        Nach jedem Erzeugen/Entfernen/Laden aufrufen."""
+        for st in self.cue_stacks:
+            st.set_sub_stack_resolver(self._resolve_cue_stack)
+
     def new_cue_stack(self, name: str = "Neue Cueliste"):
         from .engine.cue_stack import CueStack
         stack = CueStack(name)
+        stack.set_sub_stack_resolver(self._resolve_cue_stack)   # F-16
         self.cue_stacks.append(stack)
         # Legacy-Callbacks (stacks_changed) UND zentraler Bus (cue_stack_changed).
         self._emit("stacks_changed", None)
@@ -1195,6 +1346,14 @@ class AppState:
         aus einem Fremd-Thread an (sporadische Crashes). Auf dem UI-Thread selbst
         und vor Registrierung laeuft der Emit unveraendert synchron.
         """
+        # BUG-01: Während eines Bulk-Vorgangs (Patch-Ersatz beim Laden/Reset)
+        # alle Emits unterdrücken. Sonst feuert jedes clear_patch()/add_fixture()
+        # synchron patch_changed → die Views refreshen re-entrant mitten im noch
+        # inkonsistenten Zustand (programmer_view._refresh_effects_list →
+        # QListWidget.clear() → AccessViolation). Der Aufrufer macht nach dem
+        # vollständigen Aufbau EINEN gebündelten Refresh.
+        if getattr(self, "_suppress_emits", False):
+            return
         marshaller = self._ui_marshaller
         if marshaller is not None and threading.get_ident() != self._ui_thread_id:
             try:

@@ -2,7 +2,7 @@
 2026-06-14, aus der QLC+-Definition U-King-Speider.qxf).
 
 Abgedeckt:
-- 14-Kanal-Layout (Pan/Tilt/Speed/Dimmer/Shutter + 2x RGBW + Reset).
+- 14-Kanal-Layout (2x Tilt [Bar L/R] /Speed/Dimmer/Shutter + 2x RGBW + Reset).
 - Beide RGBW-Baenke teilen die Farbattribute -> gemeinsame Farbe.
 - Shutter-Bereiche/kinds (offen/strobe/blinken) + offener Default -> leuchtet.
 - Fixture-Typ moving_head (echte Pan/Tilt-Motoren).
@@ -80,7 +80,7 @@ class SpiderProfileTest(unittest.TestCase):
         with Session(self._eng) as s:
             attrs = _attrs(_mode(_load_spider(s)))
         self.assertEqual(attrs, [
-            "pan", "tilt", "speed", "intensity", "shutter",
+            "tilt", "tilt", "speed", "intensity", "shutter",
             "color_r", "color_g", "color_b", "color_w",
             "color_r", "color_g", "color_b", "color_w", "reset"])
 
@@ -118,12 +118,16 @@ class SpiderProfileTest(unittest.TestCase):
         self.assertEqual((first_open.range_from, first_open.range_to), (8, 15))
         self.assertEqual(mid, 11)   # open_value_for-Mittelwert, offen
 
-    def test_pan_tilt_zentriert(self):
+    def test_tilts_zentriert(self):
+        # Mehrkopf 2026-06-16: zwei separate Tilts (Bar L/R), kein Pan mehr.
         with Session(self._eng) as s:
-            chans = {c.attribute: c for c in _mode(_load_spider(s)).channels}
-            self.assertEqual(chans["pan"].default_value, 128)
-            self.assertEqual(chans["tilt"].default_value, 128)
-            self.assertEqual(chans["intensity"].default_value, 0)
+            chans = _chans(_mode(_load_spider(s)))
+        tilts = [c for c in chans if c.attribute == "tilt"]
+        self.assertEqual(len(tilts), 2, "zwei separate Tilts (Bar L/R)")
+        for t in tilts:
+            self.assertEqual(t.default_value, 128)
+        inten = next(c for c in chans if c.attribute == "intensity")
+        self.assertEqual(inten.default_value, 0)
 
 
 class EnsureBuiltinsSpiderTest(unittest.TestCase):

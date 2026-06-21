@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem,
     QComboBox, QDialog, QListWidget, QListWidgetItem,
     QDialogButtonBox, QHeaderView, QAbstractItemView, QSizePolicy,
+    QScrollArea, QGroupBox, QFormLayout,
 )
 from PySide6.QtCore import Qt
 from src.core.engine.chaser import Chaser, ChaserStep
@@ -18,7 +19,7 @@ class FunctionSelectorDialog(QDialog):
 
     def __init__(self, parent=None, exclude_id: int | None = None):
         super().__init__(parent)
-        self.setWindowTitle("Funktion auswaehlen")
+        self.setWindowTitle("Funktion auswählen")
         self.setMinimumSize(340, 400)
         self._selected_id: int | None = None
 
@@ -71,35 +72,52 @@ class ChaserEditor(QWidget):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        # --- top-level layout on self ---
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        header = QHBoxLayout(); header.setContentsMargins(0, 0, 0, 0); header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip("Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        outer.addLayout(header)
+
+        self._editor_body = QWidget()
+        root = QVBoxLayout(self._editor_body)
+        root.setContentsMargins(4, 4, 4, 4)
         root.setSpacing(6)
 
-        # Name
-        name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("Name:"))
+        # Grundeinstellungen — Name
+        grp_basic = QGroupBox("Grundeinstellungen")
+        basic_form = QFormLayout(grp_basic)
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
-        name_row.addWidget(self._name_edit, 1)
-        root.addLayout(name_row)
+        basic_form.addRow("Name:", self._name_edit)
+        root.addWidget(grp_basic)
 
-        # Properties row
-        prop_row = QHBoxLayout()
-        prop_row.addWidget(QLabel("Run Order:"))
+        # Wiedergabe & Tempo — vorher eine schmale prop_row (clippte horizontal)
+        grp_play = QGroupBox("Wiedergabe && Tempo")
+        play_form = QFormLayout(grp_play)
+
         self._combo_order = QComboBox()
         for ro in RunOrder:
             self._combo_order.addItem(ro.value, ro)
         self._combo_order.currentIndexChanged.connect(self._on_props_changed)
-        prop_row.addWidget(self._combo_order)
+        play_form.addRow("Run Order:", self._combo_order)
 
-        prop_row.addWidget(QLabel("Direction:"))
         self._combo_dir = QComboBox()
         for d in Direction:
             self._combo_dir.addItem(d.value, d)
         self._combo_dir.currentIndexChanged.connect(self._on_props_changed)
-        prop_row.addWidget(self._combo_dir)
+        play_form.addRow("Direction:", self._combo_dir)
 
-        prop_row.addWidget(QLabel("Speed:"))
         self._spin_speed = QDoubleSpinBox()
         self._spin_speed.setRange(0.01, 100.0)
         self._spin_speed.setSingleStep(0.1)
@@ -107,29 +125,28 @@ class ChaserEditor(QWidget):
         self._spin_speed.setSuffix("x")
         self._spin_speed.setMinimumWidth(70)
         self._spin_speed.valueChanged.connect(self._on_props_changed)
-        prop_row.addWidget(self._spin_speed)
+        play_form.addRow("Speed:", self._spin_speed)
 
         # Trigger-Modus
-        prop_row.addWidget(QLabel("Trigger:"))
         self._combo_trigger = QComboBox()
         self._combo_trigger.addItem("Timer", False)
         self._combo_trigger.addItem("Beat", True)
         self._combo_trigger.currentIndexChanged.connect(self._on_props_changed)
-        prop_row.addWidget(self._combo_trigger)
+        play_form.addRow("Trigger:", self._combo_trigger)
 
         self._lbl_bps = QLabel("Beats/Step:")
-        prop_row.addWidget(self._lbl_bps)
         self._spin_bps = QSpinBox()
         self._spin_bps.setRange(1, 32)
         self._spin_bps.setValue(1)
-        self._spin_bps.setFixedWidth(56)
+        self._spin_bps.setMinimumWidth(70)
         self._spin_bps.valueChanged.connect(self._on_props_changed)
-        prop_row.addWidget(self._spin_bps)
+        play_form.addRow(self._lbl_bps, self._spin_bps)
+        root.addWidget(grp_play)
 
-        prop_row.addStretch(1)
-        root.addLayout(prop_row)
+        # Schritte — Tabelle + Aktions-Buttons
+        grp_steps = QGroupBox("Schritte")
+        steps_layout = QVBoxLayout(grp_steps)
 
-        # Step table
         self._table = QTableWidget()
         self._table.setColumnCount(7)
         self._table.setHorizontalHeaderLabels(
@@ -142,13 +159,14 @@ class ChaserEditor(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         for c in range(2, 7):
             self._table.horizontalHeader().setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        self._table.setMinimumHeight(200)
         # Notiz-Spalte (6) zurueckschreiben — sonst geht die Eingabe verloren.
         self._table.itemChanged.connect(self._on_note_changed)
-        root.addWidget(self._table, 1)
+        steps_layout.addWidget(self._table, 1)
 
         # Action buttons
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("+ Hinzufuegen")
+        btn_add = QPushButton("+ Hinzufügen")
         btn_add.clicked.connect(self._add_step)
         btn_row.addWidget(btn_add)
 
@@ -164,7 +182,89 @@ class ChaserEditor(QWidget):
         btn_down.clicked.connect(self._move_down)
         btn_row.addWidget(btn_down)
         btn_row.addStretch(1)
-        root.addLayout(btn_row)
+        steps_layout.addLayout(btn_row)
+        root.addWidget(grp_steps)
+
+        # Inline-Funktions-Picker: die ganze Liste verfuegbarer Funktionen, Mehrfach-
+        # auswahl -> direkt als Schritte ans Ende anhaengen (ohne jedes Mal einen
+        # Modal-Dialog). So baut man einen frisch angelegten, leeren Chase unten zusammen.
+        grp_pick = QGroupBox("Funktionen zum Chase hinzufügen")
+        pick_layout = QVBoxLayout(grp_pick)
+        self._add_list = QListWidget()
+        self._add_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._add_list.setMinimumHeight(120)
+        self._add_list.itemDoubleClicked.connect(self._add_from_picker_item)
+        pick_layout.addWidget(self._add_list, 1)
+        pick_btn_row = QHBoxLayout()
+        btn_take = QPushButton("↳ In Chase übernehmen")
+        btn_take.setToolTip("Alle markierten Funktionen als Schritte ans Ende anhängen")
+        btn_take.clicked.connect(self._add_selected_from_picker)
+        pick_btn_row.addWidget(btn_take)
+        btn_refresh = QPushButton("↻")
+        btn_refresh.setFixedWidth(34)
+        btn_refresh.setToolTip("Liste aktualisieren")
+        btn_refresh.clicked.connect(self._refresh_picker)
+        pick_btn_row.addWidget(btn_refresh)
+        pick_btn_row.addStretch(1)
+        pick_layout.addLayout(pick_btn_row)
+        root.addWidget(grp_pick)
+
+        # --- outer scroll + popout plumbing ---
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        outer.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        outer.addWidget(self._editor_placeholder, 1)
+
+    def _toggle_editor_popout(self):
+        if self._editor_window is not None:
+            self._editor_window.close()
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Chaser-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win); wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea(); sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame); sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass
+        self._editor_window = None
 
     # ── Load ─────────────────────────────────────────────────────────────────
 
@@ -187,6 +287,7 @@ class ChaserEditor(QWidget):
         self._spin_bps.setValue(max(1, int(getattr(self._chaser, "beats_per_step", 1))))
         self._update_trigger_visibility()
         self._rebuild_table()
+        self._refresh_picker()
         self._building = False
 
     def _rebuild_table(self):
@@ -315,3 +416,37 @@ class ChaserEditor(QWidget):
             steps[row], steps[row + 1] = steps[row + 1], steps[row]
             self._rebuild_table()
             self._table.selectRow(row + 1)
+
+    # ── Inline-Funktions-Picker ────────────────────────────────────────────────
+
+    def _refresh_picker(self):
+        """Liste aller verfuegbaren Funktionen aufbauen (ohne den Chaser selbst)."""
+        self._add_list.clear()
+        fm = get_function_manager()
+        self_id = getattr(self._chaser, "id", None)
+        for f in fm.all():
+            if self_id is not None and f.id == self_id:
+                continue   # Selbstreferenz vermeiden (Endlos-Rekursion beim Abspielen)
+            it = QListWidgetItem(f"{f.function_type.value}: {f.name}")
+            it.setData(Qt.ItemDataRole.UserRole, f.id)
+            self._add_list.addItem(it)
+
+    def _append_step(self, fid: int):
+        self._chaser.steps.append(
+            ChaserStep(function_id=int(fid), fade_in=0.0, hold=1.0, fade_out=0.0))
+
+    def _add_from_picker_item(self, item):
+        fid = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if fid is not None:
+            self._append_step(int(fid))
+            self._rebuild_table()
+
+    def _add_selected_from_picker(self):
+        added = 0
+        for item in self._add_list.selectedItems():
+            fid = item.data(Qt.ItemDataRole.UserRole)
+            if fid is not None:
+                self._append_step(int(fid))
+                added += 1
+        if added:
+            self._rebuild_table()

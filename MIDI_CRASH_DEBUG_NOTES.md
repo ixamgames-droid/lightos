@@ -1,6 +1,26 @@
-﻿# MIDI Crash Debug Notes
+﻿> ## ⚠️ HISTORISCH — überholt durch spätere Fixes
+>
+> **Dieses Dokument beschreibt den Debug-Stand vom 2026-05-27 und ist nur noch als History relevant.**
+> Die hier vermuteten Haupt-Crash-Ursachen wurden inzwischen behoben:
+>
+> - **Hypothese B** (nativer Hard-Crash außerhalb Python) und **Hypothese C** (Event-Sturm durch
+>   mehrere Subscriber/Views) gelten als **adressiert** durch:
+>   - **Thread-Safety-Runde 2026-06-08** — `RLock` als `_io_lock`, entkoppelter `MidiDispatch` über
+>     `_rx_queue`, Drop-on-Overload statt blockierendem Callback.
+>   - **MIDI-Page-Crash-Fix 2026-06-14** — `_page_changed_sig` (Qt-Signal-Marshalling); QWidgets werden
+>     nicht mehr cross-thread gebaut.
+> - **Offen bleibt nur Hypothese A** (WinMM + Gerätetreiber/Port-Zustand unter Last) — rein
+>   hardwareabhängig (`needs_hardware`) und nur am echten Gerät unter Last verifizierbar; dafür
+>   gibt es keinen offenen Code-Punkt mehr (B-9 = diese Markierung, in
+>   `docs/OPEN_POINTS_OVERVIEW.md` §5 als erledigt geführt).
+>
+> Offene Aufgaben werden ausschließlich in `docs/OPEN_POINTS_OVERVIEW.md` gepflegt, nicht hier.
 
-Stand: 2026-05-27
+---
+
+# MIDI Crash Debug Notes
+
+Stand: 2026-05-27 (siehe HISTORISCH-Hinweis oben)
 Projekt: LightOS (`lightos-main`)
 
 ## Kontext

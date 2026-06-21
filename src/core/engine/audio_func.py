@@ -39,7 +39,7 @@ class AudioFunction(Function):
             from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput  # noqa: F401
             return True
         except Exception as e:
-            print(f"[AudioFunction] QtMultimedia nicht verfuegbar: {e}")
+            print(f"[AudioFunction] QtMultimedia nicht verfügbar: {e}")
             return False
 
     def _create_player(self):

@@ -171,7 +171,7 @@ st = [par_dim(f"Dim P{i+1}", [par_fids[i]]) for i in range(4)]
 st_all, st_off = par_dim("Dim alle", par_fids), par_dim("Dim aus", [])
 st_odd, st_even = par_dim("Dim 1+3", [1, 3]), par_dim("Dim 2+4", [2, 4])
 st_b = [par_dim(f"Build {i+1}", par_fids[:i+1]) for i in range(4)]
-lk = [par_look("Rot", r=255), par_look("Gruen", g=255), par_look("Blau", b=255),
+lk = [par_look("Rot", r=255), par_look("Grün", g=255), par_look("Blau", b=255),
       par_look("Amber", r=255, g=140), par_look("Cyan", g=255, b=255), par_look("Magenta", r=255, b=255)]
 
 dim_run = chaser("Lauflicht", [st[0].id, st[1].id, st[2].id, st[3].id], hold=0.35, fade=0.08)
@@ -218,8 +218,8 @@ chase_builder = matrix("Chase-Builder", RgbAlgorithm.COLORFADE, speed=2.0, param
 chase_builder.colors = ColorSequence([(255, 0, 0), (0, 255, 0), (0, 0, 255)])
 
 # Schnell-Looks (Bank 1, Sonstiges-Quadrant).
-look_warm = par_look("Warmweiss", r=255, g=130, b=40, w=60)
-look_white = par_look("Weiss", r=255, g=255, b=255, w=255)
+look_warm = par_look("Warmweiß", r=255, g=130, b=40, w=60)
+look_white = par_look("Weiß", r=255, g=255, b=255, w=255)
 
 # Effekt-Mix für den Quadranten (Bank 1, 16 Slots) — referenziert vorhandene Fkt.
 by_name = {f.name: f for f in fm.all()}
@@ -464,9 +464,9 @@ label("SCENE-Tasten = Bank 1-5 (= Playback-Seite):  1 Quadranten · 2 Matrix-Loo
 # ── BANK 1 — QUADRANTEN ──────────────────────────────────────────────────────
 COLORS16 = [
     ("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Amber", 255, 160, 0, 0), ("Gelb", 255, 220, 0, 0),
-    ("Limette", 160, 255, 0, 0), ("Gruen", 0, 255, 0, 0), ("Tuerkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
+    ("Limette", 160, 255, 0, 0), ("Grün", 0, 255, 0, 0), ("Türkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
     ("Hellblau", 0, 140, 255, 0), ("Blau", 0, 0, 255, 0), ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-    ("Pink", 255, 0, 120, 0), ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
+    ("Pink", 255, 0, 120, 0), ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
 ]
 for i, (nm, r, g, b, w) in enumerate(COLORS16):
     color_tile(nm, qnote("TL", i // 4, i % 4), B_QUAD, r, g, b, w)
@@ -532,7 +532,7 @@ effect_action_btn("Form +", note_rc(0, 7), B_BUILD, "#7a6500", "next_algorithm",
 effect_action_btn("Richtung", note_rc(1, 5), B_BUILD, "#335533", "reverse_direction", MB)
 effect_action_btn("Freeze", note_rc(1, 6), B_BUILD, "#553333", "toggle_freeze", MB)
 effect_action_btn("Commit", note_rc(1, 7), B_BUILD, "#1d4d2d", "commit_live", MB)
-_RC = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255)]
+_RC = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255)]
 for s, (nm, r, g, b) in enumerate(_RC):
     color_tile(f"C1 {nm}", note_rc(2, 5 + s), B_BUILD, r, g, b,
                target=ColorTarget.EFFECT_C1, function_id=MB, with_intensity=False)
@@ -563,7 +563,7 @@ func_btn(efx_area, note_rc(3, 4), B_MH, "#1f6a4a", exclusive=False)
 xy_area = VCXYPad("Feld → Kreis"); xy_area.mode = "area"; xy_area.efx_function_id = efx_area.id
 _add(xy_area, RIGHT_X, Y0, 196, 196, B_MH)
 fader("EFX-Speed", 0, B_MH, SliderMode.EFFECT_SPEED, midi_cc=48, value=64)
-fader("EFX-Groesse", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
+fader("EFX-Größe", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
 fader("MH-Dim", 3, B_MH, SliderMode.GROUP_DIMMER, programmer_group="Moving Heads", midi_cc=51, value=255)
 label("BANK 4  MOVING HEADS  —  LINKS zielen (16-bit XY).  Rechts oben: 8 EFX-Formen (Kreis/Acht/"
       "Dreieck/Zufall/Linie/Raute/Quadrat/Lissajous), 'Relativ'/'Spiegeln'/'Neustart'.",

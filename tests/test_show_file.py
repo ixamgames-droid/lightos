@@ -348,6 +348,37 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(fixtures[0].universe, 2)
             self.assertEqual(fixtures[0].address, 50)
 
+    def test_patch_replace_suppresses_emits_during_rebuild(self):
+        """BUG-01 (Reload-Crash): Während _replace_patch_from_data den Patch
+        ersetzt, muss die Emit-Unterdrückung aktiv sein (_suppress_emits=True),
+        damit kein Listener re-entrant mitten im noch inkonsistenten Patch
+        refresht (programmer_view._refresh_effects_list -> QListWidget.clear()
+        -> AccessViolation). Nach dem Aufbau ist die Unterdrückung wieder
+        aufgehoben — load_show()/reset_show() machen dann EINEN gebündelten
+        Refresh."""
+        seen_during_add: list[bool] = []
+        orig_add = self.state.add_fixture
+
+        def _spy_add(fixture, undoable=True):
+            seen_during_add.append(getattr(self.state, "_suppress_emits", False))
+            return orig_add(fixture, undoable=undoable)
+
+        self.state.add_fixture = _spy_add
+
+        patch_data = [
+            {"id": 1, "profile_id": 10, "name": "PAR 1", "mode": "8ch",
+             "universe": 1, "address": 1},
+            {"id": 2, "profile_id": 10, "name": "PAR 2", "mode": "8ch",
+             "universe": 1, "address": 9},
+        ]
+        self.show_file._replace_patch_from_data(self.state, patch_data)
+
+        # Jeder add_fixture-Aufruf lief mit aktiver Unterdrückung.
+        self.assertEqual(seen_during_add, [True, True])
+        # Danach ist die Unterdrückung wieder aus (auf den vorherigen Wert restauriert).
+        self.assertFalse(getattr(self.state, "_suppress_emits", False))
+        self.assertEqual(len(self.state.get_patched_fixtures()), 2)
+
 
 class _FakeStateWithDB(_FakeState):
     """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""

@@ -1,9 +1,11 @@
 """Layer-Editor fuer LayeredEffect: Liste von Layern editieren."""
 from __future__ import annotations
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QComboBox, QPushButton, QDoubleSpinBox, QListWidget,
-    QFormLayout, QGroupBox, QLineEdit, QPlainTextEdit
+    QFormLayout, QGroupBox, QLineEdit, QPlainTextEdit,
+    QScrollArea, QDialog
 )
 from src.core.engine.effect_layers import EffectLayer, LayerType
 from src.core.engine.effect_func import LayeredEffect
@@ -17,10 +19,35 @@ class EffectLayerEditor(QWidget):
         self._refresh()
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # --- top-level layout on self: header + outer scroll + placeholder ---
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
 
-        # Name + Target
-        top = QFormLayout()
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        outer.addLayout(header)
+
+        # All existing editor content is built into this body widget.
+        self._editor_body = QWidget()
+        layout = QVBoxLayout(self._editor_body)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
+
+        # Grundeinstellungen: Name + Target + Base Value + Fixture-IDs
+        grund = QGroupBox("Grundeinstellungen")
+        top = QFormLayout(grund)
         self._name_edit = QLineEdit(self._effect.name)
         self._name_edit.textChanged.connect(
             lambda s: setattr(self._effect, "name", s)
@@ -53,27 +80,28 @@ class EffectLayerEditor(QWidget):
         self._fixtures_edit.editingFinished.connect(self._apply_fixture_ids)
         top.addRow("Fixture-IDs (komma):", self._fixtures_edit)
 
-        layout.addLayout(top)
+        layout.addWidget(grund)
 
         # Layer-Liste + Add
         add_row = QHBoxLayout()
         self._add_combo = QComboBox()
         for lt in LayerType:
             self._add_combo.addItem(lt.value, lt)
-        btn_add = QPushButton("+ Layer hinzufuegen")
+        btn_add = QPushButton("+ Layer hinzufügen")
         btn_add.clicked.connect(self._add_layer)
         add_row.addWidget(self._add_combo)
         add_row.addWidget(btn_add)
         layout.addLayout(add_row)
 
         self._list = QListWidget()
+        self._list.setMinimumHeight(120)
         self._list.currentRowChanged.connect(self._on_select)
-        layout.addWidget(self._list, 1)
+        layout.addWidget(self._list)
 
         btn_row = QHBoxLayout()
         for label, fn in [("Hoch", self._move_up),
                           ("Runter", self._move_down),
-                          ("Loeschen", self._delete)]:
+                          ("Löschen", self._delete)]:
             btn = QPushButton(label)
             btn.clicked.connect(fn)
             btn_row.addWidget(btn)
@@ -146,6 +174,69 @@ class EffectLayerEditor(QWidget):
         btn_transport.addWidget(btn_play)
         btn_transport.addWidget(btn_stop)
         layout.addLayout(btn_transport)
+
+        # --- outer scroll holding the whole editor body ---
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        outer.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        outer.addWidget(self._editor_placeholder, 1)
+
+    def _toggle_editor_popout(self):
+        """Koppelt den GANZEN Layer-Editor in ein grosses, scrollbares Fenster
+        aus / dockt ihn zurueck."""
+        if self._editor_window is not None:
+            self._editor_window.close()      # → finished → _redock_editor
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Effekt-Layer-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame)
+        sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zerstoert
+        self._editor_window = None
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

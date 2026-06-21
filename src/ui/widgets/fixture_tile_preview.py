@@ -70,7 +70,7 @@ class _TileGrid(QWidget):
             p.setPen(QColor("#30363d"))
             p.drawText(
                 self.rect(), Qt.AlignmentFlag.AlignCenter,
-                "Keine Auswahl - Lampen links waehlen"
+                "Keine Auswahl - Lampen links wählen"
             )
             p.end()
             return

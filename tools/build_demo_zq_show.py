@@ -101,9 +101,9 @@ def par_look(name, r=0, g=0, b=0, w=0, intensity=255):
 lk_warm = par_look("Warm Wash", r=255, g=120, b=20, w=120)
 lk_cold = par_look("Cold Wash", r=0, g=60, b=255, w=80)
 lk_red = par_look("Rot", r=255)
-lk_grn = par_look("Gruen", g=255)
+lk_grn = par_look("Grün", g=255)
 lk_blu = par_look("Blau", b=255)
-lk_white = par_look("Weiss", r=255, g=255, b=255, w=255)
+lk_white = par_look("Weiß", r=255, g=255, b=255, w=255)
 
 
 def par_dim_step(name, on_fids):
@@ -213,8 +213,8 @@ def make_frame(caption, x, y, w, h, children):
 
 # Frame 1: PARs (Farben + Dimmer-Lauflicht + Matrix)
 par_children = []
-for nm, r, g, b, w in [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-                       ("Weiss", 255, 255, 255, 255)]:
+for nm, r, g, b, w in [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+                       ("Weiß", 255, 255, 255, 255)]:
     par_children.append((_mk_color_tile(nm, r, g, b, w), 70, 50))
 par_children.append((_mk_func_btn(lk_warm, "#264a6a"), 70, 44))
 par_children.append((_mk_func_btn(lk_cold, "#264a6a"), 70, 44))
@@ -277,7 +277,7 @@ state._vc_layout = {"widgets": widgets}
 
 # ── 4) Speichern + Verifikation ─────────────────────────────────────────────────
 state.programmer = {}
-state.show_name = "Demo ZQ Buehne"
+state.show_name = "Demo ZQ Bühne"
 save_show(OUT)
 print(f"Gespeichert: {OUT}")
 

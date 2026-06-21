@@ -215,7 +215,7 @@ def look(name, r=0, g=0, b=0, w=0, intensity=255):
 
 
 lk_red = look("Rot", r=255)
-lk_green = look("Gruen", g=255)
+lk_green = look("Grün", g=255)
 lk_blue = look("Blau", b=255)
 lk_mag = look("Magenta", r=255, b=255)
 lk_cyan = look("Cyan", g=255, b=255)
@@ -233,8 +233,8 @@ ch_rain = chaser("Regenbogen Chase",
 # ── 5) FARB-PALETTEN (nur Farbe) als Snaps in der Bibliothek ────────────────────
 lib.clear()
 lib.add_folder("Farben")
-for nm, (r, g, b) in [("Warmweiss", (255, 140, 40)), ("Tiefblau", (0, 30, 255)),
-                      ("Pink", (255, 0, 140)), ("Tuerkis", (0, 220, 180))]:
+for nm, (r, g, b) in [("Warmweiß", (255, 140, 40)), ("Tiefblau", (0, 30, 255)),
+                      ("Pink", (255, 0, 140)), ("Türkis", (0, 220, 180))]:
     values = {f_id: {a: v for a, v in (("color_r", r), ("color_g", g), ("color_b", b))
                      if a in chan_of[f_id]} for f_id in all_fids}
     lib.add_snap(nm, "Farben", values)
@@ -328,8 +328,8 @@ for i, fn in enumerate(matrix_funcs):
 
 # Reihe 6 (notes 48-55, OBEN): FARBEN (nur Farbe; mit Basis sofort sichtbar)
 for i, (cname, r, g, b, w) in enumerate([
-        ("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-        ("Weiss", 255, 255, 255, 0), ("Warmweiss", 255, 130, 40, 0),
+        ("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+        ("Weiß", 255, 255, 255, 0), ("Warmweiß", 255, 130, 40, 0),
         ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0)]):
     color_tile(cname, 48 + i, r, g, b, w)
 
@@ -365,7 +365,7 @@ state._vc_layout = {"widgets": widgets}
 
 # ── 7) Blackout-Start, benennen, speichern ─────────────────────────────────────
 state.programmer = {}
-state.show_name = "Buehnen-Show"
+state.show_name = "Bühnen-Show"
 
 from src.core.show.show_file import save_show, load_show
 save_show(OUT)

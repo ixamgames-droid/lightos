@@ -58,16 +58,16 @@ def _new_labels():
     out = []
     # Kopfzeile: auf allen Seiten
     out.append(_label(
-        "LightOS Buehnen-Show  -  oben: FARB-PRESETS (immer da)  -  "
+        "LightOS Bühnen-Show  -  oben: FARB-PRESETS (immer da)  -  "
         "Bank ◀ ▶ oben schaltet:  Seite 1 = EFFEKTE   /   Seite 2 = FARBE/RGBW",
         20, 12, 1100, BANK_ALL, fg="#9DFF52"))
     # --- Effekt-Seite (Bank 1) ---
     out.append(_label(
-        "EFFEKT-SEITE:  1) Farbe oben waehlen   2) Dimmer-Effekt unten starten   "
+        "EFFEKT-SEITE:  1) Farbe oben wählen   2) Dimmer-Effekt unten starten   "
         "3) Speed mit Fader F1-F4 regeln    -    'Clear' gibt die Farbe wieder frei",
         20, 44, 1100, BANK_FX))
     out.append(_label(
-        "Matrix-Effekte (gold) bringen eigene Farben mit -> vorher 'Clear' druecken.   "
+        "Matrix-Effekte (gold) bringen eigene Farben mit -> vorher 'Clear' drücken.   "
         "F6 = Dimmer (bis 0), F7 = Speed global, F8 = Matrix-Master, F9 = Master.",
         20, 66, 1100, BANK_FX))
     out.append(_label(
@@ -76,12 +76,12 @@ def _new_labels():
         20, 88, 1100, BANK_FX))
     # --- Farb-/RGBW-Seite (Bank 2) ---
     out.append(_label(
-        "FARB-SEITE (RGBW):  Fader 1-4 mischen von Hand   Rot - Gruen - Blau - Weiss.   "
+        "FARB-SEITE (RGBW):  Fader 1-4 mischen von Hand   Rot - Grün - Blau - Weiß.   "
         "Wirkt auf alle Strahler.",
         20, 44, 1100, BANK_RGBW, fg="#ffd0d0"))
     out.append(_label(
-        "Zurueck zur Effekt-Seite: Bank ◀ oben.   'Clear' (oben) setzt die Farbe "
-        "zurueck.   Helligkeit ueber F6 (Dimmer) oder F9 (Master).",
+        "Zurück zur Effekt-Seite: Bank ◀ oben.   'Clear' (oben) setzt die Farbe "
+        "zurück.   Helligkeit über F6 (Dimmer) oder F9 (Master).",
         20, 66, 1100, BANK_RGBW, fg="#ffd0d0"))
     out.append(_label(
         "↓  RGBW von Hand mischen  ↓",
@@ -103,9 +103,9 @@ def _new_rgbw_faders():
     # Gleiche Positionen wie F1-F4 (Bank 1) -> ersetzen sie optisch auf Seite 2.
     return [
         _rgbw_fader("Rot",   24,  "color_r", 48, "#5a0000"),
-        _rgbw_fader("Gruen", 100, "color_g", 49, "#005a00"),
+        _rgbw_fader("Grün", 100, "color_g", 49, "#005a00"),
         _rgbw_fader("Blau",  176, "color_b", 50, "#00205a"),
-        _rgbw_fader("Weiss", 252, "color_w", 51, "#404040"),
+        _rgbw_fader("Weiß", 252, "color_w", 51, "#404040"),
     ]
 
 

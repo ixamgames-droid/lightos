@@ -23,7 +23,8 @@ import re
 
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout,
                                QGridLayout, QSizePolicy, QSlider, QPushButton,
-                               QComboBox, QCheckBox, QMessageBox)
+                               QComboBox, QCheckBox, QMessageBox, QGroupBox,
+                               QFormLayout)
 from PySide6.QtCore import Qt, Signal, QTimer
 
 
@@ -138,16 +139,16 @@ COLOR_PRESETS = [
 # wichtig: "hellblau" muss vor "blau" geprueft werden.
 _NAME_COLOR_WORDS = [
     ("hellblau", "#7fd4ff"), ("light blue", "#7fd4ff"), ("lightblue", "#7fd4ff"),
-    ("türkis", "#00d0d0"), ("tuerkis", "#00d0d0"), ("cyan", "#00d0d0"),
+    ("tuerkis", "#00d0d0"), ("türkis", "#00d0d0"), ("cyan", "#00d0d0"),
     ("magenta", "#ff40c0"),
     ("violett", "#a040ff"), ("purple", "#a040ff"), ("lila", "#a040ff"),
     ("rosa", "#ff8fc8"), ("pink", "#ff8fc8"),
     ("orange", "#ff8000"), ("amber", "#ffbf00"),
     ("gelb", "#ffe000"), ("yellow", "#ffe000"),
-    ("grün", "#30d030"), ("gruen", "#30d030"), ("green", "#30d030"),
+    ("gruen", "#30d030"), ("grün", "#30d030"), ("green", "#30d030"),
     ("blau", "#3060ff"), ("blue", "#3060ff"),
     ("rot", "#ff3030"), ("red", "#ff3030"),
-    ("weiß", "#ffffff"), ("weiss", "#ffffff"), ("white", "#ffffff"),
+    ("weiss", "#ffffff"), ("weiß", "#ffffff"), ("white", "#ffffff"),
     ("offen", "#ffffff"), ("open", "#ffffff"),
 ]
 
@@ -351,15 +352,20 @@ class ColorWheelAutoBar(QWidget, _ApplyMixin):
         self._open_value = int(open_slot["value"]) if open_slot else 0
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(3)
+        lay.setSpacing(8)
 
-        # ── Hardware-Rotation ────────────────────────────────────────────
+        # ── Hardware-Rotation (eigene beschriftete Gruppe) ───────────────
+        # Eigene QGroupBox + ausreichend Abstand: früher lagen Hardware-Zeile,
+        # Von/Bis-Combos und Software-Speed-Slider mit nur 3px ineinander und
+        # überlappten unter --touch (hohe Combos). Gruppen + Stapeln behebt das.
         if rotate_slot is not None:
             self._rotate = rotate_slot
+            grp_hw = QGroupBox("Auto-Farbwechsel (Hardware)")
+            hwl = QVBoxLayout(grp_hw)
+            hwl.addWidget(_legend_label(
+                f"Hardware-Rotation des Farbrads (DMX {rotate_slot['from']}–"
+                f"{rotate_slot['to']}) — läuft im Gerät über alle Farben."))
             row = QHBoxLayout()
-            row.addWidget(_section_label(
-                f"Auto-Farbwechsel (Hardware, DMX "
-                f"{rotate_slot['from']}–{rotate_slot['to']}):"))
             row.addWidget(QLabel("langsam"))
             self._hw_speed = QSlider(Qt.Orientation.Horizontal)
             self._hw_speed.setRange(0, 100)
@@ -371,37 +377,42 @@ class ColorWheelAutoBar(QWidget, _ApplyMixin):
             b_start.clicked.connect(self._hw_start)
             row.addWidget(b_start)
             b_stop = QPushButton("Stopp")
-            b_stop.setToolTip("Zurueck auf Weiß/Offen")
+            b_stop.setToolTip("Zurück auf Weiß/Offen")
             b_stop.clicked.connect(self._all_stop)
             row.addWidget(b_stop)
-            lay.addLayout(row)
+            hwl.addLayout(row)
+            lay.addWidget(grp_hw)
         else:
             self._rotate = None
             self._hw_speed = None
 
-        # ── Software-Simulation (Bereich waehlbar) ───────────────────────
+        # ── Software-Simulation (eigene Gruppe, Von/Bis gestapelt) ────────
         self._sw_timer = QTimer(self)
         self._sw_timer.timeout.connect(self._sw_tick)
         self._sw_index = 0
         if len(self._slots) >= 2:
-            row = QHBoxLayout()
-            row.addWidget(_section_label("Farbwechsel (Software):"))
-            row.addWidget(QLabel("Von"))
+            grp_sw = QGroupBox("Farbwechsel (Software)")
+            swl = QVBoxLayout(grp_sw)
             self._cb_from = QComboBox()
             self._cb_to = QComboBox()
             for s in self._slots:
                 self._cb_from.addItem(s["label"])
                 self._cb_to.addItem(s["label"])
             self._cb_to.setCurrentIndex(len(self._slots) - 1)
-            row.addWidget(self._cb_from)
-            row.addWidget(QLabel("Bis"))
-            row.addWidget(self._cb_to)
+            # Von/Bis untereinander (QFormLayout) → kein horizontales Klippen
+            # unter --touch (zwei breite Combos passen nicht in eine Zeile).
+            form = QFormLayout()
+            form.setContentsMargins(0, 0, 0, 0)
+            form.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+            form.addRow("Von:", self._cb_from)
+            form.addRow("Bis:", self._cb_to)
+            swl.addLayout(form)
             self._chk_split = QCheckBox("Nur Split-Farben")
             has_split = any("/" in s["label"] or "+" in s["label"]
                             for s in self._slots)
             self._chk_split.setVisible(has_split)
-            row.addWidget(self._chk_split)
-            lay.addLayout(row)
+            swl.addWidget(self._chk_split)
 
             row2 = QHBoxLayout()
             row2.addWidget(QLabel("langsam"))
@@ -415,10 +426,11 @@ class ColorWheelAutoBar(QWidget, _ApplyMixin):
             self._btn_sw.setCheckable(True)
             self._btn_sw.toggled.connect(self._sw_toggled)
             row2.addWidget(self._btn_sw)
-            lay.addLayout(row2)
-            lay.addWidget(_legend_label(
+            swl.addLayout(row2)
+            swl.addWidget(_legend_label(
                 "Software-Wechsel: LightOS schaltet das Farbrad selbst um "
                 "(nur solange der Programmer aktiv ist, harte Wechsel)."))
+            lay.addWidget(grp_sw)
 
     # Hardware --------------------------------------------------------------
     def _hw_value(self) -> int:
@@ -638,7 +650,7 @@ class GoboQuickBar(QWidget, _ApplyMixin):
                       if gobo_pixmap_for_name else None)
                 t = PresetTile(_short(s["label"]), s, pixmap=pm, touch=touch,
                                tooltip=f"{s['label']} — DMX {s['from']}–{s['to']}"
-                                       f" (hoeher = schneller)")
+                                       f" (höher = schneller)")
                 t.clicked.connect(self._on_shake_clicked)
                 st.append(t)
             lay.addWidget(_section_label("Gobo-Shake (Wackeln):"))
@@ -671,7 +683,7 @@ class GoboQuickBar(QWidget, _ApplyMixin):
             row.addWidget(sl, stretch=1)
             row.addWidget(QLabel("schnell"))
             b_stop = QPushButton("Stopp")
-            b_stop.setToolTip("Zurueck auf 'Kein Gobo'")
+            b_stop.setToolTip("Zurück auf 'Kein Gobo'")
             stop_val = opens[0]["value"] if opens else 0
             b_stop.clicked.connect(
                 lambda: self._set_on_fixtures(self._attr, stop_val))
@@ -724,17 +736,17 @@ class ResetActionButton(QPushButton, _ApplyMixin):
         self._reset_value = _range_mid(reset_r) if reset_r is not None else 255
         rng_txt = (f"DMX {int(reset_r.range_from)}–{int(reset_r.range_to)}"
                    if reset_r is not None else "DMX 255")
-        self.setToolTip(f"Reset/Rekalibrierung ausloesen ({rng_txt}, "
+        self.setToolTip(f"Reset/Rekalibrierung auslösen ({rng_txt}, "
                         f"wird nach {self.HOLD_MS // 1000} s automatisch "
-                        f"zurueckgesetzt)")
+                        f"zurückgesetzt)")
         self.clicked.connect(self._on_clicked)
 
     def _on_clicked(self):
         ans = QMessageBox.question(
             self, "Moving Head Reset",
-            "Reset/Rekalibrierung wirklich ausloesen?\n\n"
-            "Die ausgewaehlten Moving Heads fahren dabei in ihre Home-Position "
-            "— waehrend einer laufenden Show ist das deutlich sichtbar.",
+            "Reset/Rekalibrierung wirklich auslösen?\n\n"
+            "Die ausgewählten Moving Heads fahren dabei in ihre Home-Position "
+            "— während einer laufenden Show ist das deutlich sichtbar.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if ans != QMessageBox.StandardButton.Yes:
@@ -743,7 +755,7 @@ class ResetActionButton(QPushButton, _ApplyMixin):
 
     def _trigger_reset(self):
         self.setEnabled(False)
-        self.setText("Reset laeuft…")
+        self.setText("Reset läuft…")
         self._set_on_fixtures(self._attr, self._reset_value)
         QTimer.singleShot(self.HOLD_MS, self._make_revert())
 

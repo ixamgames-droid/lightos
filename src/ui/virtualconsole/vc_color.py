@@ -9,7 +9,8 @@ dieser Farbe (siehe apc_mk2_feedback.py).
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSpinBox, QLabel, QPushButton,
-                                QCheckBox)
+                                QCheckBox, QScrollArea, QGroupBox, QWidget,
+                                QVBoxLayout)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
@@ -24,7 +25,7 @@ class ColorTarget(str):
     # Live-Color-Chase: HAENGT diese Farbe an die Color-Sequence des Ziel-Effekts
     # an (statt die aktive zu ersetzen) — so baut man per Pad-Druck eine Farbliste
     # zusammen, durch die ein COLORFADE/CHASE-Effekt dann durchlaeuft.
-    EFFECT_ADD = "Effekt (Farbe hinzufuegen)"
+    EFFECT_ADD = "Effekt (Farbe hinzufügen)"
     # APC-Probier To-Do #5: setzt gezielt color1/2/3 des Ziel-Effekts. Algorithmen
     # wie Feuer/Plasma/Windrad lesen feste color1/2/3 (NICHT die Color-Sequence) —
     # damit lassen sie sich live umfaerben, was ColorTarget.EFFECT dort nicht kann.
@@ -39,6 +40,34 @@ _EFFECT_COLOR_SLOTS = {
     ColorTarget.EFFECT_C2: "color2",
     ColorTarget.EFFECT_C3: "color3",
 }
+
+
+# Alt-Show-Migration: vor dem UI-Umlaut-Cleanup (2026-06-16) wurden ColorTarget-
+# Werte ASCII gespeichert (z. B. "Effekt (Farbe hinzufuegen)"); heute tragen sie
+# Umlaute ("…hinzufügen"). Ohne Normalisierung matcht der gespeicherte ASCII-Wert
+# keinen Dispatch-Vergleich mehr -> das Color-Widget fiele still auf den Default
+# zurueck (tote Kachel). ASCII-Faltung (ue->ü …) bildet Alt-Werte verlustfrei auf
+# den heutigen kanonischen Wert ab; unbekannte Werte bleiben unveraendert.
+def _ascii_fold(s: str) -> str:
+    return (str(s).replace("ä", "ae").replace("ö", "oe").replace("ü", "ue")
+            .replace("Ä", "Ae").replace("Ö", "Oe").replace("Ü", "Ue").replace("ß", "ss"))
+
+
+def _color_target_values() -> set:
+    return {v for k, v in vars(ColorTarget).items()
+            if not k.startswith("_") and isinstance(v, str)}
+
+
+def normalize_color_target(value):
+    """Mappt einen (evtl. ASCII-alt geschriebenen) Ziel-String auf den heutigen
+    kanonischen ColorTarget-Wert. Unbekannte Werte bleiben unveraendert."""
+    if value is None:
+        return value
+    valid = _color_target_values()
+    if value in valid:
+        return value
+    folded = {_ascii_fold(v): v for v in valid}
+    return folded.get(_ascii_fold(value), value)
 
 
 class VCColor(VCWidget):
@@ -62,6 +91,9 @@ class VCColor(VCWidget):
         # Live-Bearbeitung: Effekt-Ziel aus einem benannten Edit-Slot (von einem
         # Effekt-Pad gesetzt). Greift nur bei EFFECT*-Zielen ohne feste function_id.
         self.edit_slot: str = ""
+        # Mehrkopf (X-6): Ziel-Kopf fuer Programmer/ALL-Faerbung (0 = Bar L / Bank 1,
+        # 1 = Bar R / Bank 2 ...). Der geteilte Dimmer bleibt immer Kopf 0.
+        self.head: int = 0
 
         # MIDI-Bindung (-1 = keine) — identisch zu VCButton
         self.midi_ch: int = 0
@@ -145,18 +177,19 @@ class VCColor(VCWidget):
         try:
             from src.core.app_state import get_state
             state = get_state()
+            h = self.head
             for fid in self._target_fids(state):
                 if self.with_intensity:
-                    state.set_programmer_value(fid, "intensity", self.intensity)
-                state.set_programmer_value(fid, "color_r", self.color_r)
-                state.set_programmer_value(fid, "color_g", self.color_g)
-                state.set_programmer_value(fid, "color_b", self.color_b)
+                    state.set_programmer_value(fid, "intensity", self.intensity)  # geteilter Dimmer = Kopf 0
+                state.set_programmer_value(fid, "color_r", self.color_r, head=h)
+                state.set_programmer_value(fid, "color_g", self.color_g, head=h)
+                state.set_programmer_value(fid, "color_b", self.color_b, head=h)
                 # color_w IMMER setzen -> klärt Restweiss eines vorigen Looks/Effekts
-                state.set_programmer_value(fid, "color_w", self.color_w)
+                state.set_programmer_value(fid, "color_w", self.color_w, head=h)
                 if self.color_a:
-                    state.set_programmer_value(fid, "color_a", self.color_a)
+                    state.set_programmer_value(fid, "color_a", self.color_a, head=h)
                 if self.color_uv:
-                    state.set_programmer_value(fid, "color_uv", self.color_uv)
+                    state.set_programmer_value(fid, "color_uv", self.color_uv, head=h)
         except Exception as e:
             print(f"[VCColor] apply error: {e}")
 
@@ -334,7 +367,31 @@ class VCColor(VCWidget):
     def _open_properties(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Farb-Kachel Einstellungen")
-        form = QFormLayout(dlg)
+        dlg.resize(540, 660)
+
+        # Statt EINER langen, flachen Form jetzt thematische Gruppen in EINEM
+        # Scrollbereich (kein Stauchen/Ueberlappen der vielen Zeilen mehr; lange
+        # deutsche Labels duerfen umbrechen statt abgeschnitten zu werden).
+        outer = QVBoxLayout(dlg)
+        outer.setContentsMargins(8, 8, 8, 8)
+        outer.setSpacing(8)
+        body = QWidget()
+        body_lay = QVBoxLayout(body)
+        body_lay.setContentsMargins(0, 0, 0, 0)
+        body_lay.setSpacing(8)
+
+        def _mk_group(title):
+            g = QGroupBox(title)
+            f = QFormLayout(g)
+            f.setSpacing(6)
+            f.setFieldGrowthPolicy(
+                QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+            f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+            body_lay.addWidget(g)
+            return f
+
+        # ── Grundeinstellungen ───────────────────────────────────────────────
+        form = _mk_group("Grundeinstellungen")
 
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
@@ -353,7 +410,7 @@ class VCColor(VCWidget):
 
         def _pick():
             from PySide6.QtWidgets import QColorDialog
-            c = QColorDialog.getColor(self.color(), dlg, "Farbe waehlen")
+            c = QColorDialog.getColor(self.color(), dlg, "Farbe wählen")
             if c.isValid():
                 self.color_r, self.color_g, self.color_b = c.red(), c.green(), c.blue()
                 _refresh_swatch()
@@ -387,56 +444,75 @@ class VCColor(VCWidget):
         pal_cb.currentIndexChanged.connect(_pick_palette)
         form.addRow("Aus Palette:", pal_cb)
 
+        # ── Modus & Zusatzfarben ─────────────────────────────────────────────
+        form_mode = _mk_group("Modus && Zusatzfarben")
         # Helligkeit mitsenden: AN = Kachel setzt auch Intensitaet (sofort hell,
         # aber kollidiert mit Dimmer-Effekten). AUS = reine Farb-Ebene (empfohlen,
         # wenn die Fixtures eine Basis-Helligkeit haben) -> Dimmer-Effekte dunkeln.
         intens_chk = QCheckBox("Helligkeit mitsenden (aus = nur Farbe)")
         intens_chk.setChecked(self.with_intensity)
-        form.addRow("Modus:", intens_chk)
+        form_mode.addRow("Modus:", intens_chk)
         i_spin = QSpinBox(); i_spin.setRange(0, 255); i_spin.setValue(self.intensity)
-        form.addRow("Helligkeit (falls aktiv):", i_spin)
+        form_mode.addRow("Helligkeit (falls aktiv):", i_spin)
 
         w_spin = QSpinBox(); w_spin.setRange(0, 255); w_spin.setValue(self.color_w)
-        form.addRow("White (0=aus):", w_spin)
+        form_mode.addRow("White (0=aus):", w_spin)
         a_spin = QSpinBox(); a_spin.setRange(0, 255); a_spin.setValue(self.color_a)
-        form.addRow("Amber (0=aus):", a_spin)
+        form_mode.addRow("Amber (0=aus):", a_spin)
         uv_spin = QSpinBox(); uv_spin.setRange(0, 255); uv_spin.setValue(self.color_uv)
-        form.addRow("UV (0=aus):", uv_spin)
+        form_mode.addRow("UV (0=aus):", uv_spin)
 
+        # ── Ziel ─────────────────────────────────────────────────────────────
+        form_target = _mk_group("Ziel")
         target_cb = QComboBox()
         target_cb.addItems([ColorTarget.PROGRAMMER, ColorTarget.ALL, ColorTarget.EFFECT,
                             ColorTarget.EFFECT_ADD, ColorTarget.EFFECT_C1,
                             ColorTarget.EFFECT_C2, ColorTarget.EFFECT_C3])
         target_cb.setCurrentText(self.target)
-        form.addRow("Ziel:", target_cb)
+        form_target.addRow("Ziel:", target_cb)
 
         # Phase 6: Ziel-Effekt-ID (nur Ziel = Effekt; leer = aktiver Effekt)
         fid_edit = QLineEdit("" if self.function_id is None else str(self.function_id))
         fid_edit.setToolTip("Funktions-ID des Ziel-Effekts (Ziel = Effekt). Leer = aktiver Effekt.")
-        form.addRow("Effekt-ID (Ziel=Effekt):", fid_edit)
+        form_target.addRow("Effekt-ID (Ziel=Effekt):", fid_edit)
         # Live-Edit-Slot: greift bei EFFECT*-Zielen ohne feste ID.
         edit_slot_edit = QLineEdit(self.edit_slot)
         edit_slot_edit.setToolTip("Live-Edit-Slot (Freitext, z. B. MX). Färbt den Effekt aus "
                                   "diesem Slot, falls keine feste Effekt-ID gesetzt ist.")
-        form.addRow("Live-Edit-Slot:", edit_slot_edit)
+        form_target.addRow("Live-Edit-Slot:", edit_slot_edit)
+        # Mehrkopf (X-6): welcher Kopf/Bar wird gefärbt (Spider hat 2 LED-Bänke).
+        head_spin = QSpinBox(); head_spin.setRange(0, 7)
+        head_spin.setValue(self.head)
+        head_spin.setToolTip("Kopf/Bar bei Mehrkopf-Geräten (Spider): 0 = Bar L / Bank 1, "
+                             "1 = Bar R / Bank 2. Der Dimmer bleibt geteilt (Kopf 0).")
+        form_target.addRow("Kopf / Bar (0=L, 1=R):", head_spin)
 
-        form.addRow(QLabel("── MIDI-Bindung (oder Rechtsklick → Teach) ──"))
+        # ── MIDI-Bindung ─────────────────────────────────────────────────────
+        form_midi = _mk_group("MIDI-Bindung (oder Rechtsklick → Teach)")
         midi_type_combo = QComboBox()
         midi_type_combo.addItems(["note_on", "cc"])
         midi_type_combo.setCurrentText(self.midi_type)
-        form.addRow("MIDI-Typ:", midi_type_combo)
+        form_midi.addRow("MIDI-Typ:", midi_type_combo)
         midi_ch_spin = QSpinBox(); midi_ch_spin.setRange(0, 16)
         midi_ch_spin.setValue(self.midi_ch); midi_ch_spin.setSpecialValueText("Alle")
-        form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
+        form_midi.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
         midi_note_spin = QSpinBox(); midi_note_spin.setRange(-1, 127)
         midi_note_spin.setValue(self.midi_data1); midi_note_spin.setSpecialValueText("keine")
-        form.addRow("Note / CC (-1=keine):", midi_note_spin)
+        form_midi.addRow("Note / CC (-1=keine):", midi_note_spin)
+
+        body_lay.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setWidget(body)
+        outer.addWidget(scroll, 1)
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
-        form.addRow(btns)
+        outer.addWidget(btns)
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
@@ -449,6 +525,7 @@ class VCColor(VCWidget):
             _ftxt = fid_edit.text().strip()
             self.function_id = int(_ftxt) if _ftxt.lstrip("-").isdigit() else None
             self.edit_slot = edit_slot_edit.text().strip()
+            self.head = head_spin.value()
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
@@ -469,6 +546,7 @@ class VCColor(VCWidget):
         d["target"] = self.target
         d["function_id"] = self.function_id
         d["edit_slot"] = self.edit_slot
+        d["head"] = self.head
         d["midi_ch"] = self.midi_ch
         d["midi_data1"] = self.midi_data1
         d["midi_type"] = self.midi_type
@@ -484,9 +562,10 @@ class VCColor(VCWidget):
         self.color_uv = d.get("color_uv", 0)
         self.with_intensity = bool(d.get("with_intensity", True))
         self.intensity = d.get("intensity", 255)
-        self.target = d.get("target", ColorTarget.PROGRAMMER)
+        self.target = normalize_color_target(d.get("target", ColorTarget.PROGRAMMER))
         self.function_id = d.get("function_id")
         self.edit_slot = d.get("edit_slot", "")
+        self.head = int(d.get("head", 0))
         self.midi_ch = d.get("midi_ch", 0)
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")

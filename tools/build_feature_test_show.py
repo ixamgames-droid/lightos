@@ -275,7 +275,7 @@ effect_action_btn("Richtung", 3, P_MATRIX, "#335533", "reverse_direction", MB)
 effect_action_btn("Freeze", 4, P_MATRIX, "#553333", "toggle_freeze", MB)
 effect_action_btn("Reset", 5, P_MATRIX, "#5a3010", "clear_live_override", MB)
 effect_action_btn("Commit", 6, P_MATRIX, "#1d4d2d", "commit_live", MB)
-_RECOLOR = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiss", 255, 255, 255)]
+_RECOLOR = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiß", 255, 255, 255)]
 for s, (nm, r, g, b) in enumerate(_RECOLOR):
     color_tile(f"C1 {nm}", slot_note(8 + s), P_MATRIX, r, g, b, target=ColorTarget.EFFECT_C1, function_id=MB)
 for s, (nm, r, g, b) in enumerate(_RECOLOR):
@@ -295,9 +295,9 @@ label("color1/2 wirken bei Feuer/Plasma/Windrad/Lauflicht; Sequence-Farbe bei Co
 # ── SEITE 2 — CHASE BAUEN (#2 echter Szenen-Chaser live) ────────────────────
 LC = live_chaser.id
 # Looks in den Programmer legen (Farbe + volle Helligkeit), dann als Schritt aufnehmen.
-_LOOKS = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+_LOOKS = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
           ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0),
-          ("Weiss", 255, 255, 255, 255), ("Warm", 255, 130, 40, 60)]
+          ("Weiß", 255, 255, 255, 255), ("Warm", 255, 130, 40, 60)]
 for s, (nm, r, g, b, w) in enumerate(_LOOKS):
     color_tile(nm, slot_note(s), P_CHASE, r, g, b, w,
                target=ColorTarget.PROGRAMMER, with_intensity=True)
@@ -339,8 +339,8 @@ label("RECHTS 'Feld': ein Rechteck aufziehen -> 'MH Kreis' fährt seinen Kreis i
 
 # ── SEITE 4 — FARBE & KONTEXT (#4 Gruppen-Dimmer + #9 Farb-Lock) ────────────
 # Farb-Kacheln auf den Programmer (grauen aus, sobald die Matrix die Farbe besitzt).
-_COLS = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-         ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+_COLS = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+         ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
          ("Magenta", 255, 0, 255, 0), ("Warm", 255, 130, 40, 60)]
 for s, (nm, r, g, b, w) in enumerate(_COLS):
     color_tile(nm, slot_note(s), P_COLOR, r, g, b, w,

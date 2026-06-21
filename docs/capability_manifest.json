@@ -1,0 +1,3268 @@
+{
+  "_about": "GENERATED — nicht von Hand editieren. Neu erzeugen mit tools/gen_capabilities.py. Quelle: src/core/capability/reflect.py.",
+  "show_version": "1.1",
+  "asymmetry_warnings": [
+    "Falscher RGB-Matrix-Algorithmus -> laedt STILL als flaches PLAIN (rgb_matrix.py:1569). Falscher EFX-Algorithmus (efx.py:882) ODER Matrix-Style (rgb_matrix.py:1612) -> wirft beim Laden, die GANZE Funktion faellt weg. Gegensaetzlich, beide unsichtbar.",
+    "Daher beim Bauen IMMER das echte Enum-Member konstruieren (RgbAlgorithm.FIRE, EfxAlgorithm.CIRCLE, MatrixStyle.RGBW) — ein falscher Enum-NAME wirft sofort AttributeError, bevor der stille Loader den Wert je sieht."
+  ],
+  "widget_types": [
+    "VCBpmDisplay",
+    "VCBusSelector",
+    "VCButton",
+    "VCChaseBuilder",
+    "VCColor",
+    "VCColorList",
+    "VCCueList",
+    "VCEffectColors",
+    "VCEffectDisplay",
+    "VCEffectEditor",
+    "VCEncoder",
+    "VCFrame",
+    "VCLabel",
+    "VCSlider",
+    "VCSongInfo",
+    "VCSpeedDial",
+    "VCStepper",
+    "VCXYPad"
+  ],
+  "button_actions": [
+    "AllWhite",
+    "ArmBus",
+    "AudioBpm",
+    "AutoSync",
+    "Blackout",
+    "BpmModeToggle",
+    "BpmNudgeDown",
+    "BpmNudgeUp",
+    "Clear",
+    "EffectAction",
+    "Flash",
+    "Freeze",
+    "FunctionFlash",
+    "FunctionToggle",
+    "LibrarySnap",
+    "MediaNext",
+    "MediaPlayPause",
+    "MediaPrev",
+    "SelectGroup",
+    "Snapshot",
+    "StopAll",
+    "StopEffects",
+    "SyncBus",
+    "Tap",
+    "TapBus",
+    "Toggle"
+  ],
+  "slider_modes": [
+    "BPM",
+    "EffectIntensity",
+    "EffectParam",
+    "EffectSpeed",
+    "GrandMaster",
+    "GroupDimmer",
+    "Level",
+    "Playback",
+    "Programmer",
+    "Speed",
+    "Submaster",
+    "TempoBus"
+  ],
+  "speed_targets": [
+    "Executor",
+    "Function",
+    "SpeedNode",
+    "TempoBus",
+    "TempoBusMult"
+  ],
+  "color_targets": [
+    "Alle Fixtures",
+    "Effekt (Farbe hinzufügen)",
+    "Effekt (aktive Farbe)",
+    "Effekt Farbe 1",
+    "Effekt Farbe 2",
+    "Effekt Farbe 3",
+    "Programmer/Selektion"
+  ],
+  "color_targets_note": "ColorTarget-Werte sind deutsche Anzeige-Strings (z. B. 'Effekt Farbe 1'), NICHT die Attribut-Namen.",
+  "encoder_modes": [
+    "Absolut",
+    "Relativ"
+  ],
+  "matrix_styles": [
+    "Dimmer",
+    "RGB",
+    "RGBW",
+    "Shutter"
+  ],
+  "matrix_algorithms": {
+    "Plain": {
+      "colors": 1,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        }
+      ]
+    },
+    "Chase": {
+      "colors": 1,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "axis",
+          "label": "Achse",
+          "kind": "select",
+          "options": [
+            "H",
+            "V",
+            "Diag"
+          ]
+        },
+        {
+          "key": "movement",
+          "label": "Bewegung",
+          "kind": "select",
+          "options": [
+            "normal",
+            "bounce",
+            "center_out",
+            "outside_in"
+          ]
+        },
+        {
+          "key": "runner_count",
+          "label": "Läufer-Anzahl",
+          "kind": "int",
+          "range": [
+            1,
+            16
+          ]
+        },
+        {
+          "key": "runner_width",
+          "label": "Läufer-Breite",
+          "kind": "int",
+          "range": [
+            1,
+            16
+          ]
+        },
+        {
+          "key": "after_fade",
+          "label": "After Fade",
+          "kind": "float",
+          "range": [
+            0.0,
+            100.0
+          ]
+        },
+        {
+          "key": "color_cycle",
+          "label": "Farbe pro Runde wechseln",
+          "kind": "bool"
+        },
+        {
+          "key": "color_order",
+          "label": "Farb-Reihenfolge",
+          "kind": "select",
+          "options": [
+            "normal",
+            "random",
+            "pingpong"
+          ]
+        },
+        {
+          "key": "color_interval",
+          "label": "Farbwechsel-Intervall",
+          "kind": "int",
+          "range": [
+            1,
+            16
+          ]
+        },
+        {
+          "key": "invert",
+          "label": "Invertieren",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Wipe": {
+      "colors": 2,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "axis",
+          "label": "Achse",
+          "kind": "select",
+          "options": [
+            "H",
+            "V"
+          ]
+        },
+        {
+          "key": "movement",
+          "label": "Bewegung",
+          "kind": "select",
+          "options": [
+            "normal",
+            "center_out",
+            "outside_in",
+            "bounce"
+          ]
+        },
+        {
+          "key": "edge_fade",
+          "label": "Kanten-Fade",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "Wave": {
+      "colors": 2,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "origin",
+          "label": "Ursprung",
+          "kind": "select",
+          "options": [
+            "left",
+            "right",
+            "top",
+            "bottom",
+            "center",
+            "radial"
+          ]
+        },
+        {
+          "key": "density",
+          "label": "Dichte",
+          "kind": "float",
+          "range": [
+            0.25,
+            8.0
+          ]
+        },
+        {
+          "key": "spread",
+          "label": "Breite",
+          "kind": "float",
+          "range": [
+            0.25,
+            8.0
+          ]
+        }
+      ]
+    },
+    "Gradient": {
+      "colors": 2,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "axis",
+          "label": "Achse",
+          "kind": "select",
+          "options": [
+            "H",
+            "V"
+          ]
+        },
+        {
+          "key": "blend",
+          "label": "Verlauf",
+          "kind": "select",
+          "options": [
+            "smooth",
+            "steps"
+          ]
+        }
+      ]
+    },
+    "Rainbow": {
+      "colors": 0,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "movement",
+          "label": "Bewegung",
+          "kind": "select",
+          "options": [
+            "linear",
+            "radial",
+            "center_out",
+            "outside_in"
+          ]
+        },
+        {
+          "key": "spread",
+          "label": "Spread",
+          "kind": "float",
+          "range": [
+            0.25,
+            8.0
+          ]
+        },
+        {
+          "key": "saturation",
+          "label": "Sättigung",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "value",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        }
+      ]
+    },
+    "Fill": {
+      "colors": 3,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "fill_mode",
+          "label": "Füll-Modus",
+          "kind": "select",
+          "options": [
+            "up",
+            "down",
+            "random"
+          ]
+        },
+        {
+          "key": "fill_mode",
+          "label": "Füll-Modus",
+          "kind": "select",
+          "options": [
+            "target",
+            "random",
+            "sequence"
+          ]
+        },
+        {
+          "key": "fill_dir",
+          "label": "Reihenfolge",
+          "kind": "select",
+          "options": [
+            "left",
+            "right",
+            "top",
+            "bottom",
+            "center_out",
+            "outside_in",
+            "diag",
+            "random"
+          ]
+        },
+        {
+          "key": "fill_speed",
+          "label": "Füll-Tempo",
+          "kind": "float",
+          "range": [
+            0.05,
+            10.0
+          ]
+        },
+        {
+          "key": "fade",
+          "label": "Fade pro Fixture",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "hold",
+          "label": "Halte-Zeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            20.0
+          ]
+        },
+        {
+          "key": "loop_mode",
+          "label": "Loop-Modus",
+          "kind": "select",
+          "options": [
+            "restart",
+            "stay",
+            "reverse",
+            "fadeout"
+          ]
+        }
+      ]
+    },
+    "Random": {
+      "colors": 3,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "mode",
+          "label": "Random Color Mode",
+          "kind": "select",
+          "options": [
+            "color",
+            "flash"
+          ]
+        },
+        {
+          "key": "mode",
+          "label": "Random Intensity Mode",
+          "kind": "select",
+          "options": [
+            "dimmer",
+            "strobe",
+            "pulse",
+            "sparkle"
+          ]
+        },
+        {
+          "key": "count",
+          "label": "Aktive Fixtures",
+          "kind": "int",
+          "range": [
+            1,
+            64
+          ]
+        },
+        {
+          "key": "rate",
+          "label": "Rate",
+          "kind": "float",
+          "range": [
+            0.1,
+            20.0
+          ]
+        },
+        {
+          "key": "scope",
+          "label": "Auswahl",
+          "kind": "select",
+          "options": [
+            "all",
+            "row",
+            "col"
+          ]
+        },
+        {
+          "key": "no_repeat",
+          "label": "Wiederholschutz",
+          "kind": "bool"
+        },
+        {
+          "key": "strobe_rate",
+          "label": "Strobe-Rate",
+          "kind": "int",
+          "range": [
+            1,
+            20
+          ]
+        }
+      ]
+    },
+    "Color Fade": {
+      "colors": 3,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "hold",
+          "label": "Halte-Zeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            0.95
+          ]
+        },
+        {
+          "key": "pingpong",
+          "label": "Ping-Pong",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Strobe": {
+      "colors": 1,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        }
+      ]
+    },
+    "Schachbrett": {
+      "colors": 2,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "tile",
+          "label": "Kachelgröße",
+          "kind": "int",
+          "range": [
+            1,
+            8
+          ]
+        },
+        {
+          "key": "blink",
+          "label": "Pro Beat umschalten",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Radar": {
+      "colors": 1,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "beam_width",
+          "label": "Strahlbreite",
+          "kind": "float",
+          "range": [
+            0.02,
+            1.0
+          ]
+        },
+        {
+          "key": "fade",
+          "label": "Schweif",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "invert",
+          "label": "Invertieren",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Spirale": {
+      "colors": 1,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "turns",
+          "label": "Windungen",
+          "kind": "float",
+          "range": [
+            0.25,
+            8.0
+          ]
+        },
+        {
+          "key": "beam_width",
+          "label": "Armbreite",
+          "kind": "float",
+          "range": [
+            0.02,
+            1.0
+          ]
+        },
+        {
+          "key": "invert",
+          "label": "Invertieren",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Sine Plasma": {
+      "colors": 2,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        }
+      ]
+    },
+    "Windrad": {
+      "colors": 2,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "runner_count",
+          "label": "Segmente",
+          "kind": "int",
+          "range": [
+            1,
+            16
+          ]
+        },
+        {
+          "key": "invert",
+          "label": "Invertieren",
+          "kind": "bool"
+        }
+      ]
+    },
+    "Atmen (Puls)": {
+      "colors": 1,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        }
+      ]
+    },
+    "Feuer": {
+      "colors": 2,
+      "has_direction": false,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        }
+      ]
+    },
+    "Regen": {
+      "colors": 1,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "",
+            "Global",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "colors",
+          "label": "Farben",
+          "kind": "color_sequence"
+        },
+        {
+          "key": "fade",
+          "label": "Schweif",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        }
+      ]
+    }
+  },
+  "matrix_legacy_algorithms": [
+    "Außen→Center",
+    "Bounce H",
+    "Bounce V",
+    "Center→Außen",
+    "Chase Diagonal",
+    "Chase Horizontal",
+    "Chase Multicolor",
+    "Chase Vertical",
+    "Color Scroll",
+    "Diagonal Welle",
+    "Gradient Horizontal",
+    "Gradient Vertikal",
+    "Komet Horizontal",
+    "Ripple (Ringe)",
+    "Sparkle",
+    "Welle Horizontal",
+    "Wipe Horizontal",
+    "Wipe Vertical"
+  ],
+  "efx_algorithms": [
+    "Circle",
+    "Custom Path",
+    "Diamond",
+    "Eight",
+    "Line",
+    "Lissajous",
+    "Random",
+    "Square",
+    "Trapez",
+    "Triangle"
+  ],
+  "efx_params": [
+    {
+      "key": "speed",
+      "label": "Geschwindigkeit (Hz)",
+      "kind": "float",
+      "range": [
+        0.01,
+        10.0
+      ]
+    },
+    {
+      "key": "intensity",
+      "label": "Intensität",
+      "kind": "float",
+      "range": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "key": "size",
+      "label": "Größe",
+      "kind": "float",
+      "range": [
+        0.0,
+        255.0
+      ]
+    },
+    {
+      "key": "width",
+      "label": "Breite (Pan-Hub)",
+      "kind": "float",
+      "range": [
+        0.0,
+        255.0
+      ]
+    },
+    {
+      "key": "height",
+      "label": "Höhe (Tilt-Hub)",
+      "kind": "float",
+      "range": [
+        0.0,
+        255.0
+      ]
+    },
+    {
+      "key": "x_offset",
+      "label": "Zentrum Pan",
+      "kind": "float",
+      "range": [
+        0.0,
+        255.0
+      ]
+    },
+    {
+      "key": "y_offset",
+      "label": "Zentrum Tilt",
+      "kind": "float",
+      "range": [
+        0.0,
+        255.0
+      ]
+    },
+    {
+      "key": "rotation",
+      "label": "Rotation",
+      "kind": "float",
+      "range": [
+        0.0,
+        360.0
+      ]
+    },
+    {
+      "key": "spread",
+      "label": "Streuung (Fan)",
+      "kind": "float",
+      "range": [
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "key": "phase_mode",
+      "label": "Verhältnis der Geräte",
+      "kind": "select",
+      "options": [
+        "sync",
+        "fan",
+        "offset"
+      ]
+    },
+    {
+      "key": "phase_offset_deg",
+      "label": "Versatz pro Gerät (°)",
+      "kind": "float",
+      "range": [
+        0.0,
+        360.0
+      ]
+    },
+    {
+      "key": "counter_rotate",
+      "label": "Gegenläufig",
+      "kind": "bool"
+    },
+    {
+      "key": "direction",
+      "label": "Richtung",
+      "kind": "select",
+      "options": [
+        "forward",
+        "backward",
+        "bounce"
+      ]
+    },
+    {
+      "key": "loop",
+      "label": "Loop",
+      "kind": "bool"
+    },
+    {
+      "key": "mirror",
+      "label": "Spiegeln",
+      "kind": "bool"
+    },
+    {
+      "key": "relative",
+      "label": "Relativ (additiv)",
+      "kind": "bool"
+    },
+    {
+      "key": "open_beam",
+      "label": "Dimmer/Shutter öffnen",
+      "kind": "bool"
+    },
+    {
+      "key": "bit16",
+      "label": "16-bit (Fine-Kanäle)",
+      "kind": "bool"
+    },
+    {
+      "key": "algorithm",
+      "label": "Form",
+      "kind": "select",
+      "options": [
+        "Circle",
+        "Eight",
+        "Line",
+        "Diamond",
+        "Square",
+        "Trapez",
+        "Lissajous",
+        "Random",
+        "Triangle",
+        "Custom Path"
+      ]
+    },
+    {
+      "key": "tempo_bus_id",
+      "label": "Tempo-Bus",
+      "kind": "select",
+      "options": [
+        "",
+        "Global",
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    {
+      "key": "tempo_multiplier",
+      "label": "Tempo ×",
+      "kind": "float",
+      "range": [
+        0.0625,
+        16.0
+      ]
+    },
+    {
+      "key": "phase_offset",
+      "label": "Tempo-Versatz (Beats)",
+      "kind": "float",
+      "range": [
+        0.0,
+        1.0
+      ]
+    }
+  ],
+  "carousel_patterns": [
+    "Chase",
+    "Circle",
+    "Pulse",
+    "Sweep",
+    "Wave"
+  ],
+  "function_types": [
+    "Audio",
+    "Chaser",
+    "Collection",
+    "EFX",
+    "RGBMatrix",
+    "Scene",
+    "Script",
+    "Sequence",
+    "Show"
+  ],
+  "run_orders": [
+    "Loop",
+    "PingPong",
+    "Random",
+    "SingleShot"
+  ],
+  "directions": [
+    "Backward",
+    "Forward"
+  ],
+  "cue_stack_modes": [
+    "bounce",
+    "loop",
+    "pingpong",
+    "single"
+  ],
+  "tempo_buses_always_valid": [
+    "",
+    "A",
+    "B",
+    "C",
+    "D",
+    "Global",
+    "default",
+    "global"
+  ],
+  "curve_names": [
+    "ease_in",
+    "ease_out",
+    "linear",
+    "scurve",
+    "snap"
+  ],
+  "fixtures_note": "Die Fixture-Bibliothek ist maschinenabhaengig und NICHT Teil dieses Manifests. Zur Laufzeit abfragen: fixture_db.get_all_manufacturers() -> FixtureProfile.short_name/.modes[].channels[]. Patch via state.add_fixture(PatchedFixture(...))."
+}

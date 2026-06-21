@@ -43,7 +43,7 @@ class CollectionEditor(QWidget):
         list_layout.addWidget(self._lst)
 
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("+ Funktion hinzufuegen")
+        btn_add = QPushButton("+ Funktion hinzufügen")
         btn_add.clicked.connect(self._add_function)
         btn_remove = QPushButton("- Entfernen")
         btn_remove.clicked.connect(self._remove_selected)

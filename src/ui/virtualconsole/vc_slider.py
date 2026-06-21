@@ -2,7 +2,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
-                                QCheckBox)
+                                QCheckBox, QWidget, QVBoxLayout, QHBoxLayout)
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from .vc_widget import VCWidget
@@ -24,6 +24,9 @@ class SliderMode(str):
     # F-25: multiplikativer Gruppen-Dimmer — der Fader skaliert die Helligkeit
     # einer festen Fixture-Gruppe (programmer_group) über set_group_dimmer().
     GROUP_DIMMER     = "GroupDimmer"
+    # Tempo-Sync Phase 5: steuert die BPM EINES benannten Tempo-Bus (A/B/C/D),
+    # unabhaengig vom globalen Leader (tempo_bus_id, "" = aktiver/Default-Bus).
+    TEMPO_BUS        = "TempoBus"
 
 
 # Benutzerfreundliche deutsche Labels für die Modus-Auswahl (statt roher Codes).
@@ -37,6 +40,7 @@ SLIDER_MODE_LABELS: list[tuple[str, str]] = [
     (SliderMode.GRANDMASTER,      "Grand Master"),
     (SliderMode.SPEED,            "Speed (alle Effekte)"),
     (SliderMode.BPM,              "Tempo (BPM)"),
+    (SliderMode.TEMPO_BUS,        "Tempo-Bus (BPM)"),
     (SliderMode.PLAYBACK,         "Playback (Executor)"),
     (SliderMode.LEVEL,            "DMX-Kanal (Level)"),
 ]
@@ -78,6 +82,11 @@ class VCSlider(VCWidget):
         self.programmer_scope: str = "all"
         self.programmer_group: str = ""           # Gruppenname fuer scope == "group"
         self.param_key: str = "speed"             # fuer EFFECT_PARAM-Modus
+        # Phase E (Multi-Effekt): je gekoppeltem Effekt ein eigener gesteuerter
+        # Parameter (Map fid -> param_key). Fehlt ein Eintrag -> param_key (Default).
+        # Greift nur im EFFECT_PARAM-Modus; leer = alle Ziele nutzen param_key.
+        self.param_keys_per_id: dict[int, str] = {}
+        self.tempo_bus_id: str = ""               # fuer TEMPO_BUS-Modus ("" = aktiv/Default)
         # Live-Bearbeitung: bearbeitet den Effekt im benannten Edit-Slot (von einem
         # Effekt-Pad gesetzt). Greift nur, wenn keine feste function_id/-ids gesetzt
         # sind — dann statt „aktiver Effekt" das Slot-Ziel.
@@ -151,9 +160,21 @@ class VCSlider(VCWidget):
                 pass
         elif self.mode == SliderMode.BPM:
             # Globales Tempo 30..300 BPM -> Beat-Effekte folgen.
+            # WP-8: set_manual_bpm() statt set_bpm() — das Ziehen des BPM-Faders
+            # erzwingt damit den MANUAL-Modus (der Fader ist die Tempo-Quelle).
             try:
                 from src.core.engine.bpm_manager import get_bpm_manager
-                get_bpm_manager().set_bpm(30.0 + (v / 255.0) * 270.0)
+                get_bpm_manager().set_manual_bpm(30.0 + (v / 255.0) * 270.0)
+            except Exception:
+                pass
+        elif self.mode == SliderMode.TEMPO_BUS:
+            # Tempo-Sync Phase 5: BPM eines benannten Bus (30..300), unabhaengig
+            # vom globalen Leader. "" = aktiver/Default-Bus.
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().resolve(self.tempo_bus_id)
+                if bus is not None:
+                    bus.set_bpm(30.0 + (v / 255.0) * 270.0)
             except Exception:
                 pass
         elif self.mode == SliderMode.SPEED:
@@ -190,9 +211,12 @@ class VCSlider(VCWidget):
             # der ParamSpec (im Effekt). Leere Bindung = aktiver Effekt.
             try:
                 from src.core.engine import effect_live
-                targets = self.function_ids or [self._resolved_effect_fid()]
+                targets = self._all_target_fids() or [self._resolved_effect_fid()]
                 for fid in targets:
-                    effect_live.set_param_normalized(self.param_key, v / 255.0, fid)
+                    # Phase E: je Effekt darf ein eigener Parameter gesteuert werden;
+                    # fehlt ein Eintrag, gilt der Default-param_key des Faders.
+                    key = self.param_keys_per_id.get(fid, self.param_key) if fid is not None else self.param_key
+                    effect_live.set_param_normalized(key, v / 255.0, fid)
             except Exception:
                 pass
         elif self.mode == SliderMode.PROGRAMMER:
@@ -285,6 +309,22 @@ class VCSlider(VCWidget):
             return []
         f = self._effect_target()
         return [f] if f is not None else []
+
+    def _all_target_fids(self) -> list[int]:
+        """Phase E: alle gekoppelten Effekt-IDs (function_id + function_ids),
+        function_id zuerst, dedupliziert. Leer = keine feste Bindung
+        (-> der Aufrufer faellt auf den aktiven/Edit-Slot-Effekt zurueck)."""
+        ids: list[int] = []
+        if self.function_id is not None:
+            ids.append(int(self.function_id))
+        for i in self.function_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in ids:
+                ids.append(iv)
+        return ids
 
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
@@ -543,6 +583,18 @@ class VCSlider(VCWidget):
                                    "Liste = Parameter des gebundenen Effekts; eigener Key tippbar.")
         form.addRow("Parameter (Effekt-Parameter):", param_key_combo)
 
+        # ── Aufklappbare „Steuert"-Liste (ersetzt die fruehere Gekoppelte-Effekte-
+        # Tabelle): listet die gesteuerten Effekte/Funktionen nach NAMEN, je Zeile
+        # mit Parameter-Combo, auswaehl-/loeschbar + „+"-Hinzufuegen. Bei den
+        # EFFECT-Modi ist sie maßgeblich fuer die ID-Liste UND die je-Effekt-Parameter.
+        from .target_list_editor import TargetListEditor
+        target_editor = TargetListEditor(with_params=True, title="Steuert")
+        target_editor.set_targets(self._all_target_fids(), dict(self.param_keys_per_id))
+        target_editor.setToolTip("Effekte/Funktionen, die dieser Fader steuert — je Zeile "
+                                 "den Parameter wählen, mit ✕ entfernen, „+“ hinzufügen. "
+                                 "Bei Effekt-Modi maßgeblich (überschreibt das Slot-Feld).")
+        form.addRow("Steuert:", target_editor)
+
         # FDR-01 / To-Do #4: Reichweite im Programmer-Modus.
         scope_cb = QComboBox()
         scope_cb.addItem("Alle Geräte", "all")
@@ -580,6 +632,18 @@ class VCSlider(VCWidget):
                                   "feste ID bearbeiten den Effekt aus diesem Slot statt den "
                                   "global aktiven.")
         form.addRow("Live-Edit-Slot (EFFECT):", edit_slot_edit)
+
+        # Tempo-Sync Phase 5: Ziel-Bus (nur Modus Tempo-Bus). "" = aktiver/Default-Bus.
+        bus_cb = QComboBox()
+        for _bid, _blbl in (("", "(aktiver/Default-Bus)"), ("A", "Bus A"),
+                            ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
+            bus_cb.addItem(_blbl, _bid)
+        for i in range(bus_cb.count()):
+            if bus_cb.itemData(i) == self.tempo_bus_id:
+                bus_cb.setCurrentIndex(i)
+                break
+        bus_cb.setToolTip("Welcher Tempo-Bus vom Fader gesetzt wird (Modus Tempo-Bus).")
+        form.addRow("Tempo-Bus:", bus_cb)
 
         autostart_cb = QCheckBox("bei 0 wirklich stoppen (sonst nur runterregeln)")
         autostart_cb.setChecked(self.effect_autostart)
@@ -641,6 +705,8 @@ class VCSlider(VCWidget):
                 univ:            m == SliderMode.LEVEL,
                 ch:              m == SliderMode.LEVEL,
                 slot:            eff or m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER),
+                bus_cb:          m == SliderMode.TEMPO_BUS,
+                target_editor:   eff,
             }
             for widget, show in vis.items():
                 form.setRowVisible(widget, bool(show))
@@ -686,6 +752,20 @@ class VCSlider(VCWidget):
                     ids.append(int(part))
                 except ValueError:
                     pass
+            # Bei EFFECT-Modi ist die „Steuert"-Liste maßgeblich (IDs + je-Effekt-
+            # Parameter); sonst zaehlt das Slot-Feld (Playback-Slot etc.).
+            # WICHTIG: param_keys_per_id nur bei BEFUELLTEM Editor ersetzen — sonst
+            # (Editor leer / Funktionen nicht geladen) die vorhandenen Parameter
+            # behalten und nur auf die noch gueltigen IDs beschraenken (kein Wipen).
+            if self.mode in _EFFECT_MODES:
+                _eids = target_editor.ids()
+                if _eids:
+                    ids = _eids
+                    self.param_keys_per_id = target_editor.param_keys()
+                else:
+                    _keep = set(ids)
+                    self.param_keys_per_id = {k: v for k, v in self.param_keys_per_id.items()
+                                              if k in _keep}
             self.function_ids = ids
             self.function_id = ids[0] if ids else None
             _pk_text = param_key_combo.currentText().strip()
@@ -695,6 +775,7 @@ class VCSlider(VCWidget):
             else:
                 self.param_key = _pk_text or self.param_key
             self.edit_slot = edit_slot_edit.text().strip()
+            self.tempo_bus_id = bus_cb.currentData() or ""
             self.programmer_scope = scope_cb.currentData() or "all"
             self.programmer_group = group_cb.currentText().strip()
             self.effect_autostart = autostart_cb.isChecked()
@@ -718,7 +799,9 @@ class VCSlider(VCWidget):
         d["programmer_scope"] = self.programmer_scope
         d["programmer_group"] = self.programmer_group
         d["param_key"] = self.param_key
+        d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
         d["edit_slot"] = self.edit_slot
+        d["tempo_bus_id"] = self.tempo_bus_id
         d["effect_autostart"] = self.effect_autostart
         d["invert"] = self.invert
         d["range_min"] = self.range_min
@@ -739,7 +822,14 @@ class VCSlider(VCWidget):
         self.programmer_scope = d.get("programmer_scope", "all")
         self.programmer_group = d.get("programmer_group", "")
         self.param_key = d.get("param_key", "speed")
+        self.param_keys_per_id = {}
+        for k, v in (d.get("param_keys_per_id") or {}).items():
+            try:
+                self.param_keys_per_id[int(k)] = str(v)
+            except (TypeError, ValueError):
+                pass
         self.edit_slot = d.get("edit_slot", "")
+        self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.effect_autostart = bool(d.get("effect_autostart", False))
         self.invert = bool(d.get("invert", False))
         self.range_min = int(d.get("range_min", 0))

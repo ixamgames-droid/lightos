@@ -21,33 +21,22 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QColor
 from src.ui.widgets import mini_icons as _mini
+from src.ui.widgets.flow_layout import FlowLayout
 
 try:
     from src.core.app_state import get_state
 except Exception:
     get_state = None  # type: ignore
 
-_ATTR_GROUPS = {
-    "Intensity": {"intensity", "dimmer", "master"},
-    "Color":     {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
-                  "cyan", "magenta", "yellow", "color_wheel", "colour_wheel", "color"},
-    "Position":  {"pan", "tilt", "pan_fine", "tilt_fine"},
-    "Beam":      {"shutter", "strobe", "zoom", "focus", "frost", "iris", "prism"},
-    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo1", "gobo2", "gobo_rot"},
-    "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "animation"},
-}
-_ATTR_GROUP_ORDER = ["Intensity", "Color", "Position", "Beam", "Gobo", "Effect", "Other"]
-
-
-def _classify_attr(attr: str) -> str:
-    a = (attr or "").lower()
-    for grp, names in _ATTR_GROUPS.items():
-        if a in names:
-            return grp
-        for n in names:
-            if n in a:
-                return grp
-    return "Other"
+# Kanonische Attribut-Gruppen-Klassifikation: EINE Quelle (src/core/attr_groups),
+# gemeinsam mit dem Programmer-Attribut-Tab. Frueher gab es hier eine eigene Map,
+# die mit programmer_view divergierte -> ein im Intensity-Tab geschobener Strobe
+# wurde beim Speichern faelschlich "Beam" genannt (Bug E). palette bleibt separat.
+from src.core.attr_groups import (
+    ATTR_GROUPS as _ATTR_GROUPS,
+    ATTR_GROUP_ORDER as _ATTR_GROUP_ORDER,
+    classify_attr as _classify_attr,
+)
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -57,12 +46,23 @@ def _classify_attr(attr: str) -> str:
 class ChannelSelectDialog(QDialog):
     """Zeigt Checkboxen pro Attribut-Gruppe. Nutzer waehlt, was gespeichert wird."""
 
-    def __init__(self, programmer: dict, parent=None):
+    def __init__(self, programmer: dict, parent=None, *, scope_fids=None):
         super().__init__(parent)
         self.setWindowTitle("Kanäle auswählen")
         self.setMinimumWidth(300)
         self._checks: dict[str, QCheckBox] = {}
+        # scope_fids: nur diese Geraete (aktive Gruppe/Auswahl) beruecksichtigen,
+        # damit liegengebliebene Werte zuvor gewaehlter Gruppen NICHT mitgespeichert
+        # werden. None/leer -> kein Scope (alle Programmer-Werte, Alt-Verhalten).
+        self._scope = {int(f) for f in scope_fids} if scope_fids else None
         self._setup_ui(programmer)
+
+    def _in_scope(self, programmer: dict) -> dict:
+        """Programmer auf die Geraete im aktiven Scope reduzieren."""
+        if not self._scope:
+            return dict(programmer)
+        return {fid: attrs for fid, attrs in programmer.items()
+                if int(fid) in self._scope}
 
     def _setup_ui(self, programmer: dict):
         layout = QVBoxLayout(self)
@@ -72,9 +72,15 @@ class ChannelSelectDialog(QDialog):
         lbl.setStyleSheet("font-weight: bold;")
         layout.addWidget(lbl)
 
-        # Zaehle Werte pro Gruppe
+        scoped = self._in_scope(programmer)
+        if self._scope is not None:
+            info = QLabel(f"Nur aktive Auswahl: {len(scoped)} von {len(programmer)} Gerät(en)")
+            info.setStyleSheet("color: #8b949e; font-size: 11px;")
+            layout.addWidget(info)
+
+        # Zaehle Werte pro Gruppe (nur Geraete im aktiven Scope)
         counts: dict[str, int] = {}
-        for attrs in programmer.values():
+        for attrs in scoped.values():
             for attr in attrs:
                 grp = _classify_attr(attr)
                 counts[grp] = counts.get(grp, 0) + 1
@@ -107,10 +113,11 @@ class ChannelSelectDialog(QDialog):
         return {grp for grp, cb in self._checks.items() if cb.isChecked()}
 
     def filter_programmer(self, programmer: dict) -> dict:
-        """Gibt gefilterte Kopie des Programmers zurueck (nur gewaehlte Gruppen)."""
+        """Gibt gefilterte Kopie des Programmers zurueck (nur gewaehlte Attribut-
+        Gruppen UND nur Geraete im aktiven Scope)."""
         selected = self.get_selected_groups()
         result: dict = {}
-        for fid, attrs in programmer.items():
+        for fid, attrs in self._in_scope(programmer).items():
             filtered = {
                 attr: val for attr, val in attrs.items()
                 if _classify_attr(attr) in selected
@@ -316,13 +323,17 @@ class SnapFilePanel(QWidget):
     # MIDI-Learn läuft im MIDI-Thread → thread-sicher in den UI-Thread marshallen.
     _midi_learned_sig = Signal(object)
 
-    def __init__(self, parent=None, *, drag_to_canvas: bool = False, canvas=None):
+    def __init__(self, parent=None, *, drag_to_canvas: bool = False, canvas=None,
+                 show_header: bool = True):
         super().__init__(parent)
         # VC-Modus: Baum-Items lassen sich auf das VC-Canvas ziehen und per
         # Kontextmenue direkt auf eine Taste legen. Muss VOR _setup_ui() stehen
         # (der Baum liest das Flag im Konstruktor).
         self._drag_to_canvas = bool(drag_to_canvas)
         self._canvas = canvas
+        # In der VC-Sidebar liefert SnapshotSidebar bereits einen "Bibliothek"-
+        # Header -> dort den eigenen Header unterdruecken (sonst doppelt sichtbar).
+        self._show_header = bool(show_header)
         self._learn_fid: int | None = None
         self._learn_name: str = ""
         self._learn_box = None
@@ -378,15 +389,21 @@ class SnapFilePanel(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        hdr = QLabel("Bibliothek")
-        hdr.setStyleSheet("font-weight: bold; font-size: 12px; color: #ccc;")
-        hdr.setToolTip("Snaps (gelb) und Effekte/Funktionen (farbig) in einer "
-                       "gemeinsamen Ordnerstruktur")
-        layout.addWidget(hdr)
+        if self._show_header:
+            hdr = QLabel("Bibliothek")
+            hdr.setStyleSheet("font-weight: bold; font-size: 12px; color: #ccc;")
+            hdr.setToolTip("Snaps (gelb) und Effekte/Funktionen (farbig) in einer "
+                           "gemeinsamen Ordnerstruktur")
+            layout.addWidget(hdr)
 
-        # Toolbar
-        tb = QHBoxLayout()
-        tb.setSpacing(4)
+        # Toolbar — umbrechend: unter --touch-QSS (groessere Schrift/Padding) und
+        # 200%-Skalierung passen sonst nicht alle Buttons in eine Zeile und die
+        # Beschriftungen werden abgeschnitten. FlowLayout bricht stattdessen um.
+        tb_host = QWidget()
+        _sp = tb_host.sizePolicy()
+        _sp.setHeightForWidth(True)
+        tb_host.setSizePolicy(_sp)
+        tb = FlowLayout(tb_host, margin=0, h_spacing=4, v_spacing=4)
 
         b_save = QPushButton("Speichern")
         b_save.setFixedHeight(24)
@@ -418,7 +435,7 @@ class SnapFilePanel(QWidget):
 
         for btn in [b_save, b_folder, b_apply, b_chase, b_del, b_ref]:
             tb.addWidget(btn)
-        layout.addLayout(tb)
+        layout.addWidget(tb_host)
 
         # Tree mit Drag & Drop
         self._tree = _SnapTree(self)
@@ -427,6 +444,8 @@ class SnapFilePanel(QWidget):
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._context_menu)
         self._tree.itemDoubleClicked.connect(self._on_double_click)
+        # VC: Auswahl eines Effekts im Baum -> dessen VC-Widgets hervorheben.
+        self._tree.itemSelectionChanged.connect(self._on_selection_highlight)
         self._tree.itemExpanded.connect(
             lambda it: self._on_folder_toggled(it, expanded=True))
         self._tree.itemCollapsed.connect(
@@ -690,7 +709,7 @@ class SnapFilePanel(QWidget):
                     "Programmer ist leer - nichts zu speichern.")
                 return
 
-            dlg = ChannelSelectDialog(prog, self)
+            dlg = ChannelSelectDialog(prog, self, scope_fids=state.active_scope_fids())
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)
@@ -741,14 +760,47 @@ class SnapFilePanel(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Fehler beim Anwenden", str(e))
 
+    def _new_empty_chaser(self):
+        """Leeren Chaser anlegen und im Editor-Overlay oeffnen — dort wird er ueber
+        den Inline-Funktions-Picker zusammengebaut (Fall: <2 Snaps markiert)."""
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            chaser = get_function_manager().new_chaser("Neuer Chase")
+        except Exception as e:
+            QMessageBox.warning(self, "Chase erstellen", f"Konnte keinen Chase anlegen: {e}")
+            return
+        try:   # in den aktuellen Ziel-Ordner legen, falls unterstuetzt
+            folder = self._target_folder()
+            if folder and hasattr(chaser, "folder"):
+                chaser.folder = folder
+        except Exception:
+            pass
+        try:
+            from src.ui.views.function_manager_view import create_function_editor
+            editor = create_function_editor(chaser)
+        except Exception as e:
+            QMessageBox.warning(self, "Chase bearbeiten", f"Editor nicht verfügbar: {e}")
+            self._refresh_tree()
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Chase bearbeiten: {getattr(chaser, 'name', '')}")
+        dlg.resize(720, 600)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(editor)
+        dlg.exec()
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.FUNCTION_CHANGED, {"id": getattr(chaser, "id", None)})
+        except Exception:
+            pass
+        self._refresh_tree()
+
     def _create_chase_from_selection(self):
         snap_ids = self._selected_snap_ids()
         if len(snap_ids) < 2:
-            QMessageBox.information(
-                self,
-                "Chase erstellen",
-                "Bitte mindestens zwei Snaps markieren.",
-            )
+            # Keine/eine Auswahl -> leeren Chaser anlegen + im Editor oeffnen
+            # (dort Inline-Funktions-Picker), statt nur eine Hinweis-Box zu zeigen.
+            self._new_empty_chaser()
             return
 
         dlg = ChaseCreateDialog(parent=self)
@@ -768,7 +820,7 @@ class SnapFilePanel(QWidget):
             QMessageBox.warning(
                 self,
                 "Chase erstellen",
-                "Zu wenige gueltige Snaps gefunden (mindestens 2 mit Werten noetig).",
+                "Zu wenige gültige Snaps gefunden (mindestens 2 mit Werten nötig).",
             )
             return
 
@@ -826,9 +878,9 @@ class SnapFilePanel(QWidget):
                 f"Function-ID: {seq.id}\n"
                 f"Steps: {len(seq.steps)}\n\n"
                 "Virtual Console Tipp:\n"
-                "Im Button-Dialog Aktion 'FunctionToggle' waehlen und die Funktion\n"
-                "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswaehlen.\n"
-                "Beim SpeedDial dieselbe Funktion im Namens-Dropdown waehlen\n"
+                "Im Button-Dialog Aktion 'FunctionToggle' wählen und die Funktion\n"
+                "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswählen.\n"
+                "Beim SpeedDial dieselbe Funktion im Namens-Dropdown wählen\n"
                 "(Target wird automatisch auf 'Function' gesetzt)."
             ),
         )
@@ -878,6 +930,25 @@ class SnapFilePanel(QWidget):
                 lib.remove_snap(int(ref))
                 self._refresh_tree()
 
+    def _on_selection_highlight(self):
+        """VC: hebt beim Auswaehlen von Effekt(en) im Bibliotheks-Baum alle
+        VC-Widgets hervor, die diese Effekte steuern. Nur wirksam, wenn das Panel
+        an einen VC-Canvas gekoppelt ist (sonst No-op, z. B. im Programmer)."""
+        canvas = getattr(self, "_canvas", None)
+        if canvas is None or not hasattr(canvas, "highlight_effects"):
+            return
+        fids: list[int] = []
+        for item in self._tree.selectedItems():
+            if item.data(0, _ROLE_KIND) == "function":
+                try:
+                    fids.append(int(item.data(0, _ROLE_REF)))
+                except (TypeError, ValueError):
+                    pass
+        try:
+            canvas.highlight_effects(fids)
+        except Exception:
+            pass
+
     def _on_double_click(self, item: QTreeWidgetItem, _col: int):
         kind = item.data(0, _ROLE_KIND)
         ref = item.data(0, _ROLE_REF)
@@ -920,6 +991,8 @@ class SnapFilePanel(QWidget):
         menu = QMenu(self)
         if kind == "snap":
             self._add_vc_assign_action(menu, kind, ref)
+            menu.addAction("Bearbeiten...").triggered.connect(
+                lambda: self._edit_snap(int(ref)))
             menu.addAction("Anwenden").triggered.connect(self._apply_selected)
             menu.addAction("Chase aus Auswahl erstellen").triggered.connect(
                 self._create_chase_from_selection
@@ -1141,6 +1214,26 @@ class SnapFilePanel(QWidget):
                 f'(Kanal {int(msg.channel)}).')
         except Exception as e:
             QMessageBox.warning(self, "MIDI lernen", f"Fehler: {e}")
+
+    def _edit_snap(self, sid: int):
+        """Snap-Editor-Overlay oeffnen (Liste der programmierten Kanaele bearbeiten)."""
+        lib = self._lib()
+        snap = lib.get(int(sid)) if lib is not None else None
+        if snap is None:
+            return
+        try:
+            from src.ui.views.snap_editor import SnapEditor
+            editor = SnapEditor(snap)
+        except Exception as e:
+            QMessageBox.warning(self, "Bearbeiten", f"Editor nicht verfügbar: {e}")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Snap bearbeiten: {getattr(snap, 'name', '')}")
+        dlg.resize(640, 480)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(editor)
+        dlg.exec()
+        self._refresh_tree()
 
     def _edit_function(self, fid: int):
         f = self._get_func(fid)

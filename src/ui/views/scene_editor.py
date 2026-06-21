@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QDoubleSpinBox, QPushButton, QTableWidget, QTableWidgetItem,
     QSpinBox, QHeaderView, QAbstractItemView, QSizePolicy,
+    QScrollArea, QDialog, QGroupBox,
 )
 from PySide6.QtCore import Qt
 from src.core.app_state import get_state, get_channels_for_patched
@@ -26,9 +27,32 @@ class SceneEditor(QWidget):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        # --- top-level layout on self ---
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        header = QHBoxLayout(); header.setContentsMargins(0, 0, 0, 0); header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip("Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        outer.addLayout(header)
+
+        self._editor_body = QWidget()
+        root = QVBoxLayout(self._editor_body)   # build ALL existing content into THIS
+        root.setContentsMargins(4, 4, 4, 4)
         root.setSpacing(6)
+
+        # Grundeinstellungen & Timing
+        basics_group = QGroupBox("Grundeinstellungen && Timing")
+        basics_layout = QVBoxLayout(basics_group)
+        basics_layout.setSpacing(6)
 
         # Name
         name_row = QHBoxLayout()
@@ -36,7 +60,7 @@ class SceneEditor(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
         name_row.addWidget(self._name_edit, 1)
-        root.addLayout(name_row)
+        basics_layout.addLayout(name_row)
 
         # Timing
         timing_row = QHBoxLayout()
@@ -62,11 +86,12 @@ class SceneEditor(QWidget):
         self._spin_hold.valueChanged.connect(self._on_timing_changed)
         timing_row.addWidget(self._spin_hold)
         timing_row.addStretch(1)
-        root.addLayout(timing_row)
+        basics_layout.addLayout(timing_row)
+        root.addWidget(basics_group)
 
         # Buttons row
         btn_row = QHBoxLayout()
-        btn_prog = QPushButton("Vom Programmer uebernehmen")
+        btn_prog = QPushButton("Vom Programmer übernehmen")
         btn_prog.clicked.connect(self._take_from_programmer)
         btn_row.addWidget(btn_prog)
 
@@ -74,7 +99,7 @@ class SceneEditor(QWidget):
         btn_preview.clicked.connect(self._send_preview)
         btn_row.addWidget(btn_preview)
 
-        btn_clear = QPushButton("Alle Loeschen")
+        btn_clear = QPushButton("Alle Löschen")
         btn_clear.clicked.connect(self._clear_all)
         btn_row.addWidget(btn_clear)
         btn_row.addStretch(1)
@@ -86,7 +111,64 @@ class SceneEditor(QWidget):
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self._table.horizontalHeader().setStretchLastSection(False)
+        self._table.setMinimumHeight(200)
         root.addWidget(self._table, 1)
+
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        outer.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        outer.addWidget(self._editor_placeholder, 1)
+
+    def _toggle_editor_popout(self):
+        if self._editor_window is not None:
+            self._editor_window.close()
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Szenen-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win); wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea(); sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame); sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass
+        self._editor_window = None
 
     # ── Load / Refresh ────────────────────────────────────────────────────────
 
@@ -118,7 +200,7 @@ class SceneEditor(QWidget):
         fixtures = self._state.get_patched_fixtures()
         if not fixtures:
             self._table.setColumnCount(1)
-            self._table.setHorizontalHeaderLabels(["Kein Fixture gepacht"])
+            self._table.setHorizontalHeaderLabels(["Kein Fixture gepatcht"])
             self._table.blockSignals(False)
             return
 
@@ -131,7 +213,7 @@ class SceneEditor(QWidget):
             max_ch = max(max_ch, len(chs))
 
         # Columns: fixture name + one per channel
-        col_labels = ["Geraet"] + [f"CH{i+1}" for i in range(max_ch)]
+        col_labels = ["Gerät"] + [f"CH{i+1}" for i in range(max_ch)]
         self._table.setColumnCount(len(col_labels))
         self._table.setHorizontalHeaderLabels(col_labels)
         self._table.setRowCount(len(fixtures))

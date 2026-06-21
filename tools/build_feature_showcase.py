@@ -251,10 +251,10 @@ lk_ocean = look("Ozean", g=120, b=255)
 lk_forest = look("Wald", r=20, g=255, b=40)
 lk_party = look("Party", r=255, g=0, b=180, w=20)
 lk_candle = look("Kerzenlicht", r=255, g=90, b=10, w=40, intensity=160)
-lk_white = look("Vollweiss", r=255, g=255, b=255, w=255)
+lk_white = look("Vollweiß", r=255, g=255, b=255, w=255)
 look_funcs = [lk_warm, lk_cold, lk_sunset, lk_ocean, lk_forest, lk_party, lk_candle, lk_white]
 
-lk_red = look("Rot voll", r=255); lk_grn = look("Gruen voll", g=255); lk_blu = look("Blau voll", b=255)
+lk_red = look("Rot voll", r=255); lk_grn = look("Grün voll", g=255); lk_blu = look("Blau voll", b=255)
 lk_amb = look("Amber voll", r=255, g=140); lk_cya = look("Cyan voll", g=255, b=255); lk_mag = look("Magenta voll", r=255, b=255)
 ch_color = chaser("Color-Chase", [lk_red.id, lk_grn.id, lk_blu.id, lk_amb.id, lk_cya.id, lk_mag.id], hold=0.55, fade=0.25)
 ch_police = chaser("Police", [lk_red.id, lk_blu.id], hold=0.16, fade=0.0)
@@ -299,10 +299,10 @@ sc_macro = macro_scene("Auto-Programm", macro=200, fspeed=160)
 # ════════════════════════════════════════════════════════════════════════════════
 lib.clear()
 lib.add_folder("Farben"); lib.add_folder("Looks"); lib.add_folder("Positionen")
-_COLORS = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-           ("Weiss", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-           ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60),
-           ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_COLORS = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+           ("Weiß", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+           ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60),
+           ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
            ("Orange", 255, 80, 0, 0), ("Violett", 140, 0, 255, 0)]
 for nm, r, g, b, w in _COLORS:
     values = {fid: {a: v for a, v in (("color_r", r), ("color_g", g), ("color_b", b), ("color_w", w)) if has(fid, a)}
@@ -469,12 +469,12 @@ for i, nm in enumerate(PAGE_NAMES):
 # ════════════════════════════════════════════════════════════════════════════════
 #  SEITE 1 (Bank 0) — FARBEN & LOOKS
 # ════════════════════════════════════════════════════════════════════════════════
-_row7 = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-         ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-         ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60)]
+_row7 = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+         ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+         ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60)]
 for i, (nm, r, g, b, w) in enumerate(_row7):
     color_tile(nm, 56 + i, B_COLOR, r, g, b, w)                       # ColorTarget.ALL
-_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
          ("Violett", 140, 0, 255, 0), ("Hellblau", 0, 160, 255, 0), ("Limette", 160, 255, 0, 0),
          ("Rosa", 255, 80, 120, 0), ("Gelb", 255, 220, 0, 0)]
 for i, (nm, r, g, b, w) in enumerate(_row6):
@@ -568,11 +568,11 @@ func_btn(sc_fstrobe, 0, B_HAND, "#503010", style="solid")
 func_btn(sc_macro, 1, B_HAND, "#503010", style="solid")
 func_btn(dim_full, 2, B_HAND, "#3a3a14", style="solid")
 fader("Rot", 0, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
-fader("Gruen", 1, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
+fader("Grün", 1, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
 fader("Blau", 2, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_b", midi_cc=50, value=0)
-fader("Weiss", 3, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
+fader("Weiß", 3, B_HAND, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
 fader("Level", 4, B_HAND, SliderMode.LEVEL, midi_cc=52, value=255)
-label("SEITE 6  HAND  -  Fader F1-F4 = Rot/Gruen/Blau/Weiss (Programmer), F5 = Level. "
+label("SEITE 6  HAND  -  Fader F1-F4 = Rot/Grün/Blau/Weiß (Programmer), F5 = Level. "
       "Pad 1 Fixt-Strobe (Shutter), Pad 2 Auto-Programm (Makro), Pad 3 Full.",
       X0, 28, 1100, B_HAND, fg="#9DFF52")
 
@@ -603,12 +603,12 @@ label("SEITE 7  MIX & PLAYBACK  -  Farbe + Dimmer-/Matrix-Effekt frei kombiniere
 #  SEITE 8 (Bank 7) — LIVE COLOR-CHASE
 # ════════════════════════════════════════════════════════════════════════════════
 _chase_colors = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                 ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                 ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                  ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors):
     color_tile(nm, 56 + i, B_CHASE, r, g, b, w, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
-_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0), ("Limette", 160, 255, 0, 0),
-                  ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255)]
+_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0), ("Limette", 160, 255, 0, 0),
+                  ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors2):
     color_tile(nm, 48 + i, B_CHASE, r, g, b, w, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
 func_btn(live_chase, 0, B_CHASE, "#1f6a4a", style="pulse")
@@ -617,9 +617,9 @@ effect_action_btn("Farbe -", 2, B_CHASE, "#333355", "prev_color", live_chase.id)
 effect_action_btn("Farbe +", 3, B_CHASE, "#333355", "next_color", live_chase.id)
 effect_action_btn("Letzte weg", 4, B_CHASE, "#553311", "remove_color", live_chase.id)
 fader("Speed", 0, B_CHASE, SliderMode.EFFECT_SPEED, function_id=live_chase.id, midi_cc=48, value=70)
-fader("Uebergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=live_chase.id, param_key="hold", midi_cc=49, value=64)
+fader("Übergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=live_chase.id, param_key="hold", midi_cc=49, value=64)
 label("SEITE 8  LIVE COLOR-CHASE  -  1) 'Clear Chase' leert die Liste  2) oben Farben antippen "
-      "(ColorTarget=Effekt-Hinzufuegen)  3) Pad 1 Start.   F1 Speed, F2 Uebergang (hold).",
+      "(ColorTarget=Effekt-Hinzufügen)  3) Pad 1 Start.   F1 Speed, F2 Übergang (hold).",
       X0, 28, 1100, B_CHASE, fg="#9DFF52")
 
 state._vc_layout = {"widgets": widgets}
@@ -660,7 +660,7 @@ from collections import Counter
 print(f"VC-Widgets: {len(vc)}  Typen={dict(Counter(w['type'] for w in vc))}")
 print(f"VC-Bank-Verteilung: {dict(sorted(Counter(w.get('bank') for w in vc).items()))}")
 maxy = max((w.get('y', 0) + w.get('h', 0)) for w in vc)
-print(f"Max-Y der Widgets: {maxy}  (Canvas-Min-Hoehe 800)")
+print(f"Max-Y der Widgets: {maxy}  (Canvas-Min-Höhe 800)")
 
 # ── Feature-Coverage: jeder Enum-Wert MUSS verwendet worden sein ────────────────
 print("\n=== FEATURE-COVERAGE ===")

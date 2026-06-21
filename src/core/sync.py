@@ -228,7 +228,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                             else:
                                 issues.append(ValidationIssue(
                                     'warn', location,
-                                    f"Mode '{mode_name}' fehlt - waere ersetzt durch '{fallback.name}'",
+                                    f"Mode '{mode_name}' fehlt - wäre ersetzt durch '{fallback.name}'",
                                 ))
                         else:
                             issues.append(ValidationIssue(
@@ -240,7 +240,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     if universe < 1 or universe > 32:
                         issues.append(ValidationIssue(
                             'error', location,
-                            f"Ungueltige Universe-Nummer: {universe}",
+                            f"Ungültige Universe-Nummer: {universe}",
                         ))
 
                     # 4. Adresse + Channels <= 512?
@@ -253,7 +253,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     if address < 1:
                         issues.append(ValidationIssue(
                             'error', location,
-                            f"Ungueltige Startadresse: {address}",
+                            f"Ungültige Startadresse: {address}",
                         ))
 
                     if fid is not None:
@@ -262,7 +262,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                 except Exception as e_inner:
                     issues.append(ValidationIssue(
                         'error', 'PatchedFixture',
-                        f"Fehler beim Pruefen: {e_inner}",
+                        f"Fehler beim Prüfen: {e_inner}",
                     ))
 
             # 5. Adresskonflikte innerhalb eines Universe
@@ -282,7 +282,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                             issues.append(ValidationIssue(
                                 'error', f"Universe {univ}",
                                 f"Konflikt: {getattr(a, 'label', '?')}[{getattr(a, 'fid', '?')}] "
-                                f"@ {getattr(a, 'address', '?')}-{a_end} ueberlappt "
+                                f"@ {getattr(a, 'address', '?')}-{a_end} überlappt "
                                 f"{getattr(b, 'label', '?')}[{getattr(b, 'fid', '?')}] @ {b_addr}",
                             ))
             except Exception as e:

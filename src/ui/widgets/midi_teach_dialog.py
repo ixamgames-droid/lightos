@@ -168,7 +168,7 @@ class MidiTeachDialog(QDialog):
         lay = QVBoxLayout(self)
         hint_kinds = []
         if "note" in self._accept:
-            hint_kinds.append("eine Taste druecken")
+            hint_kinds.append("eine Taste drücken")
         if "cc" in self._accept:
             hint_kinds.append("einen Fader bewegen")
         info = QLabel("Am APC mini " + " oder ".join(hint_kinds) +
@@ -189,7 +189,7 @@ class MidiTeachDialog(QDialog):
         wrap.addStretch(1)
         lay.addLayout(wrap)
 
-        self._status = QLabel("Keine Bindung gewaehlt.")
+        self._status = QLabel("Keine Bindung gewählt.")
         self._status.setStyleSheet("font-weight:bold; padding:4px;")
         lay.addWidget(self._status)
 
@@ -257,16 +257,16 @@ class MidiTeachDialog(QDialog):
     def _on_clear(self):
         self._binding = None
         self._view.set_selected(None, None)
-        self._status.setText("Bindung wird ENTFERNT (mit OK bestaetigen).")
+        self._status.setText("Bindung wird ENTFERNT (mit OK bestätigen).")
 
     def _update_status(self):
         if not self._binding:
-            self._status.setText("Keine Bindung gewaehlt.")
+            self._status.setText("Keine Bindung gewählt.")
             return
         mtype, ch, d1 = self._binding
         ch_txt = "alle" if not ch else str(ch)
         kind = "CC / Fader" if mtype == "cc" else "Note / Taste"
-        self._status.setText(f"Gewaehlt: {kind} {d1}  ·  Kanal {ch_txt}")
+        self._status.setText(f"Gewählt: {kind} {d1}  ·  Kanal {ch_txt}")
 
     def _refresh_input_label(self):
         """Zeigt an, ob ein MIDI-Eingang verbunden ist (sonst kommt nichts an)."""

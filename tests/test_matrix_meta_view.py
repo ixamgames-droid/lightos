@@ -184,21 +184,20 @@ def test_rainbow_zeigt_keine_farben():
 
 # ── Parameter-Pop-out-Fenster ────────────────────────────────────────────────
 
-def test_param_popout_und_andocken():
-    """Parameter lassen sich in ein eigenes Fenster auskoppeln und zurückdocken."""
+def test_editor_popout_und_andocken():
+    """Der GANZE Editor lässt sich in ein großes Fenster auskoppeln und zurückdocken."""
     _app()
     view = _make_view_with_matrix()
-    view._rebuild_param_fields(RgbAlgorithm.CHASE)
-    assert view._param_window is None
-    # Inline ist der Param-Block im Scrollbereich
-    assert view._param_scroll.widget() is view._param_box
-    view._toggle_param_popout()
-    assert view._param_window is not None, "Fenster geöffnet"
-    assert view._param_scroll.widget() is None, "Param-Block aus dem Inline-Scroll entnommen"
-    assert not view._param_placeholder.isHidden()
-    view._toggle_param_popout()              # schließt → _redock_param
-    assert view._param_window is None
-    assert view._param_scroll.widget() is view._param_box, "Param-Block zurück angedockt"
+    assert view._editor_window is None
+    # Inline liegt der Editor-Körper im Scrollbereich
+    assert view._editor_scroll.widget() is view._editor_body
+    view._toggle_editor_popout()
+    assert view._editor_window is not None, "Fenster geöffnet"
+    assert view._editor_scroll.widget() is None, "Editor-Körper aus dem Inline-Scroll entnommen"
+    assert not view._editor_placeholder.isHidden()
+    view._toggle_editor_popout()              # schließt → _redock_editor
+    assert view._editor_window is None
+    assert view._editor_scroll.widget() is view._editor_body, "Editor-Körper zurück angedockt"
 
 
 def test_sequence_editor_bearbeitet_draft():

@@ -797,7 +797,7 @@ class StageCanvas(QWidget):
         _fst = QFont("Arial"); _fst.setBold(True); _fst.setPointSizeF(9 * tscale)
         painter.setPen(QColor("#666"))
         painter.setFont(_fst)
-        painter.drawText(stage_rect, Qt.AlignmentFlag.AlignCenter, "BUEHNE")
+        painter.drawText(stage_rect, Qt.AlignmentFlag.AlignCenter, "BÜHNE")
 
         # "Publikum"-Bereich unten
         aud_rect = QRectF(self.world_w*0.1, self.world_h - 60, self.world_w*0.8, 40)
@@ -1193,7 +1193,7 @@ class LiveView(QWidget):
                     self._viz3d = Visualizer3DView(self)
                     self._view_stack.addWidget(self._viz3d)   # index 1
                 except Exception as e:
-                    print(f"[live_view] 3D-Ansicht nicht verfuegbar: {e}")
+                    print(f"[live_view] 3D-Ansicht nicht verfügbar: {e}")
                     self._set_view_3d(False)
                     return
             self._view_stack.setCurrentWidget(self._viz3d)
@@ -1290,10 +1290,10 @@ class LiveView(QWidget):
             b.setMinimumHeight(34)
             b.setStyleSheet(_tb_style)
         self._btn_view2d.setChecked(True)
-        self._btn_view2d.setToolTip("2D Top-Down-Arbeitsflaeche (Strahler platzieren)")
+        self._btn_view2d.setToolTip("2D Top-Down-Arbeitsfläche (Strahler platzieren)")
         self._btn_view3d.setToolTip(
-            "Eingebettete 3D-Ansicht (Live-Vorschau). Zum Bauen der Buehne das\n"
-            "separate 3D-Editor-Fenster nutzen (Menue Visualizer)."
+            "Eingebettete 3D-Ansicht (Live-Vorschau). Zum Bauen der Bühne das\n"
+            "separate 3D-Editor-Fenster nutzen (Menü Visualizer)."
         )
         self._view_mode_group = QButtonGroup(self)
         self._view_mode_group.setExclusive(True)
@@ -1507,7 +1507,7 @@ class LiveView(QWidget):
         self._sb_world_h.setSingleStep(50)
         self._sb_world_h.setValue(int(lv_prefs.get("world_h", 800)))
         self._sb_world_h.setStyleSheet(self._spinbox_style())
-        form.addRow("Hoehe (px):", self._sb_world_h)
+        form.addRow("Höhe (px):", self._sb_world_h)
 
         # Raster-Groesse
         self._sb_grid = QSpinBox()

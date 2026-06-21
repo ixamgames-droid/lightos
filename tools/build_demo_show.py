@@ -71,7 +71,7 @@ look_white  = scene("Open White", w=255, intensity=255)
 look_warm   = scene("Warm",  r=255, g=110, b=20, w=40)
 look_cold   = scene("Cold",  r=0,   g=60,  b=255)
 look_red    = scene("Rot",     r=255)
-look_green  = scene("Gruen",   g=255)
+look_green  = scene("Grün",   g=255)
 look_blue   = scene("Blau",    b=255)
 look_amber  = scene("Amber",   r=255, g=140)
 look_magenta= scene("Magenta", r=255, b=255)
@@ -96,8 +96,8 @@ look_funcs   = [look_white, look_warm, look_cold, look_red, look_green,
 
 # Live-Farb-Kacheln (VCColor, Ziel = alle Fixtures)
 color_tiles = [
-    ("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255),
-    ("Weiss", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
+    ("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255),
+    ("Weiß", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
     ("Magenta", 255, 0, 255), ("Gelb", 255, 255, 0),
 ]
 

@@ -240,9 +240,9 @@ dim_pulse.fixture_ids = list(par_fids); dim_pulse.speed = 1.0
 dim_wave = fm.new_carousel("Wave"); dim_wave.pattern = CarouselPattern.WAVE
 dim_wave.fixture_ids = list(par_fids); dim_wave.speed = 1.0
 
-lk = [par_look("Rot", r=255), par_look("Gruen", g=255), par_look("Blau", b=255),
+lk = [par_look("Rot", r=255), par_look("Grün", g=255), par_look("Blau", b=255),
       par_look("Amber", r=255, g=140), par_look("Cyan", g=255, b=255), par_look("Magenta", r=255, b=255),
-      par_look("Warmweiss", r=255, g=130, b=40, w=60), par_look("Weiss", r=255, g=255, b=255, w=255)]
+      par_look("Warmweiß", r=255, g=130, b=40, w=60), par_look("Weiß", r=255, g=255, b=255, w=255)]
 look_warm, look_white = lk[6], lk[7]
 ch_color = chaser("Color-Chase", [c.id for c in lk[:6]], hold=BAR / 2, fade=BEAT)
 
@@ -514,9 +514,9 @@ label("SCENE-Tasten = Bank 1-5 (= Playback-Seite):  1 LIVE/Party · 2 Matrix-Loo
 # ── BANK 1 — LIVE/PARTY ──────────────────────────────────────────────────────────
 COLORS16 = [
     ("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Amber", 255, 160, 0, 0), ("Gelb", 255, 220, 0, 0),
-    ("Limette", 160, 255, 0, 0), ("Gruen", 0, 255, 0, 0), ("Tuerkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
+    ("Limette", 160, 255, 0, 0), ("Grün", 0, 255, 0, 0), ("Türkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
     ("Hellblau", 0, 140, 255, 0), ("Blau", 0, 0, 255, 0), ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-    ("Pink", 255, 0, 120, 0), ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
+    ("Pink", 255, 0, 120, 0), ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
 ]
 for i, (nm, r, g, b, w) in enumerate(COLORS16):     # Reihen 0-1 = 16 Farben (Programmer)
     color_tile(nm, note_rc(i // 8, i % 8), B_LIVE, r, g, b, w)
@@ -574,7 +574,7 @@ effect_action_btn("Neustart", note_rc(2, 5), B_MH, "#553010", "restart", None)
 effect_action_btn("Spiegeln", note_rc(2, 6), B_MH, "#334455", "toggle_mirror", None)
 func_btn(efx_rel, note_rc(2, 7), B_MH, "#1f6a4a", exclusive=False)
 fader("EFX-Speed", 0, B_MH, SliderMode.EFFECT_SPEED, midi_cc=48, value=80)
-fader("EFX-Groesse", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
+fader("EFX-Größe", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
 fader("MH-Dim", 3, B_MH, SliderMode.GROUP_DIMMER, programmer_group="Moving Heads", midi_cc=51, value=255)
 label("BANK 3  MOVING HEADS  —  LINKS zielen (16-bit XY).  Rechts: 8 EFX-Formen (Kreis/Acht/Dreieck/"
       "Zufall/Linie/Raute/Quadrat/Lissajous), 'Relativ'/'Spiegeln'/'Neustart'.", X0, 28, 1150, B_MH)

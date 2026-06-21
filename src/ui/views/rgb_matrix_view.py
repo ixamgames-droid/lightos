@@ -187,6 +187,18 @@ class RgbMatrixView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
+        # Folgemodus: das Grid sofort aus der aktiven Auswahl/Gruppe ableiten,
+        # sobald die Matrix-Ansicht sichtbar wird. Ohne das zeigt der erste
+        # Wechsel auf den Matrix-Tab die 8x4-Standardmatrix, weil
+        # set_selected_fids() bei unveraenderter Auswahl kein SELECTION_CHANGED
+        # feuert (und set_selected_group_id() nie eines feuert) — das Grid wurde
+        # dann nie aus der gewaehlten Gruppe uebernommen. _assign_from_selection
+        # liest die selected_group_id direkt, also greift es beim ersten Mal.
+        if self._follow_selection:
+            try:
+                self._sync_follow_selection()
+            except RuntimeError:
+                pass
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -223,176 +235,47 @@ class RgbMatrixView(QWidget):
         left.setMaximumWidth(200)
         splitter.addWidget(left)
 
-        # ── Right: editor ────────────────────────────────────────────────────
+        # ── Right: editor (gruppiert, scrollbar, in grosses Fenster auskoppelbar) ─
+        # Loest das alte Platzproblem: statt eines einzigen, ueberfuellten Formulars
+        # (dessen Labels sich ohne Scroll stauchten/ueberlappten) liegt der ganze
+        # Editor jetzt in beschrifteten Gruppen innerhalb EINES Scrollbereichs, der
+        # sich per Knopf in ein grosses eigenes Fenster auskoppeln laesst.
         right = QWidget()
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
-        rl.setSpacing(8)
+        rl.setSpacing(6)
 
-        top = QHBoxLayout()
-
-        # Settings
-        ed = QGroupBox("Einstellungen")
-        ed.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
-        form = QFormLayout(ed)
-        form.setSpacing(4)
-
-        self._name_edit = QLineEdit()
-        self._name_edit.textChanged.connect(self._name_change)
-        form.addRow("Name:", self._name_edit)
-
-        self._algo_combo = QComboBox()
-        for a in RgbAlgorithm:
-            self._algo_combo.addItem(a.value)
-        # Phase 4: eigener Algorithmus-Handler (param_change + Sichtbarkeit)
-        self._algo_combo.currentTextChanged.connect(self._on_algo_change)
-        form.addRow("Algorithmus:", self._algo_combo)
-
-        # Style-Dropdown (unmittelbar unter Algorithmus)
-        self._style_combo = QComboBox()
-        for s in MatrixStyle:
-            self._style_combo.addItem(s.value)
-        self._style_combo.currentTextChanged.connect(self._on_style_change)
-        form.addRow("Style:", self._style_combo)
-
-        self._cols_spin = QSpinBox()
-        self._cols_spin.setRange(1, 64)
-        self._cols_spin.setValue(8)
-        self._cols_spin.valueChanged.connect(self._param_change)
-        form.addRow("Spalten:", self._cols_spin)
-
-        self._rows_spin = QSpinBox()
-        self._rows_spin.setRange(1, 32)
-        self._rows_spin.setValue(4)
-        self._rows_spin.valueChanged.connect(self._param_change)
-        form.addRow("Reihen:", self._rows_spin)
-
-        self._speed_spin = QDoubleSpinBox()
-        self._speed_spin.setRange(0.01, 20)
-        self._speed_spin.setSingleStep(0.1)
-        self._speed_spin.setValue(1.0)
-        self._speed_spin.valueChanged.connect(self._param_change)
-        form.addRow("Geschwindigkeit:", self._speed_spin)
-
-        # ── Style-spezifische Einstellungen ───────────────────────────────────
-
-        # Farben-Gruppe (RGB + RGBW): C1/C2/C3
-        color_row = QHBoxLayout()
-        self._c1_btn = ColorButton((255, 0, 0))
-        self._c2_btn = ColorButton((0, 0, 255))
-        self._c3_btn = ColorButton((0, 255, 0))
-        self._color_btns = (self._c1_btn, self._c2_btn, self._c3_btn)
-        # Pro Farbfeld ein eigenes "Cx:"-Label merken, damit einzelne Slots
-        # (je nach Algorithmus) ein-/ausgeblendet werden koennen (UI-01).
-        self._c_labels: list[QLabel] = []
-        for i, b in enumerate(self._color_btns):
-            # Farb-Buttons schreiben gezielt nur ihre Sequence-Position (nicht ueber
-            # _param_change, das sonst bei jeder Param-Aenderung c1/2/3 ueberschreiben
-            # und damit eine laengere Color-Sequence beschaedigen wuerde).
-            b.color_changed = lambda c, idx=i: self._on_color_button(idx, c)
-            lbl = QLabel(f"C{i+1}:")
-            self._c_labels.append(lbl)
-            color_row.addWidget(lbl)
-            color_row.addWidget(b)
-        color_row.addStretch(1)
-        self._color_label = QLabel("Farbe:")
-        form.addRow(self._color_label, color_row)
-        self._color_row_widget = color_row  # handle fuer Sichtbarkeit via label
-
-        # Color-Sequence-UI (kanonisch, geteiltes Widget): kompaktes Feld mit
-        # Swatch-Vorschau + Popout-Button (nicht mehr ins Formular gequetscht,
-        # Abschnitt 2). Wird bei mehrfarbigen Algorithmen (meta.colors >= 2) statt
-        # der festen Farbknoepfe gezeigt; bei Einfarbigen (==1) bleibt der C1-Knopf.
-        self._seq_editor = ColorSequenceField(title="Color Sequence")
-        self._seq_editor.changed.connect(self._on_sequence_changed)
-        self._seq_label = QLabel("Color Sequence:")
-        form.addRow(self._seq_label, self._seq_editor)
-
-        # Weiß-Anteil (nur RGBW)
-        white_row = QHBoxLayout()
-        self._white_slider = QSlider(Qt.Orientation.Horizontal)
-        self._white_slider.setRange(0, 100)
-        self._white_slider.setValue(100)
-        self._white_slider.valueChanged.connect(self._param_change)
-        self._white_lbl = QLabel("100 %")
-        self._white_slider.valueChanged.connect(
-            lambda v: self._white_lbl.setText(f"{v} %")
+        _grp_style = (
+            "QGroupBox{color:#8b949e;font-size:10px;font-weight:bold;"
+            "border:1px solid #21262d;border-radius:5px;margin-top:8px;padding-top:4px;}"
+            "QGroupBox::title{subcontrol-origin:margin;subcontrol-position:top left;"
+            "left:8px;padding:0 4px;}"
         )
-        white_row.addWidget(self._white_slider)
-        white_row.addWidget(self._white_lbl)
-        self._white_form_label = QLabel("Weiß-Anteil:")
-        form.addRow(self._white_form_label, white_row)
 
-        # Dimmer-Bereich (nur DIMMER)
-        dim_row = QHBoxLayout()
-        self._imin_spin = QSpinBox()
-        self._imin_spin.setRange(0, 255)
-        self._imin_spin.setValue(0)
-        self._imin_spin.setPrefix("Min ")
-        self._imin_spin.valueChanged.connect(self._param_change)
-        self._imax_spin = QSpinBox()
-        self._imax_spin.setRange(0, 255)
-        self._imax_spin.setValue(255)
-        self._imax_spin.setPrefix("Max ")
-        self._imax_spin.valueChanged.connect(self._param_change)
-        dim_row.addWidget(self._imin_spin)
-        dim_row.addWidget(self._imax_spin)
-        self._dim_form_label = QLabel("Dimmer-Bereich:")
-        form.addRow(self._dim_form_label, dim_row)
+        # ── Header: Pop-out-Knopf (bleibt im Hauptfenster, auch wenn ausgekoppelt) ─
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den ganzen Matrix-Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}"
+        )
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        rl.addLayout(header)
 
-        # Shutter-Bereich (nur SHUTTER)
-        shut_row = QHBoxLayout()
-        self._smin_spin = QSpinBox()
-        self._smin_spin.setRange(0, 255)
-        self._smin_spin.setValue(0)
-        self._smin_spin.setPrefix("Min ")
-        self._smin_spin.valueChanged.connect(self._param_change)
-        self._smax_spin = QSpinBox()
-        self._smax_spin.setRange(0, 255)
-        self._smax_spin.setValue(255)
-        self._smax_spin.setPrefix("Max ")
-        self._smax_spin.valueChanged.connect(self._param_change)
-        shut_row.addWidget(self._smin_spin)
-        shut_row.addWidget(self._smax_spin)
-        self._shut_form_label = QLabel("Shutter-Bereich:")
-        form.addRow(self._shut_form_label, shut_row)
+        # ── Editor-Koerper (alles ausser dem Header; wandert komplett ins Pop-out) ─
+        self._editor_body = QWidget()
+        body = QVBoxLayout(self._editor_body)
+        body.setContentsMargins(2, 2, 2, 2)
+        body.setSpacing(8)
 
-        # Initial-Sichtbarkeit (RGB ist Standard)
-        self._apply_style_visibility(MatrixStyle.RGB)
-
-        # ── I2.4: Algorithmus-Parameter-Gruppe ───────────────────────────────
-        # Richtung (je Algorithmus ein-/ausgeblendet via _rebuild_param_fields)
-        self._dir_combo = QComboBox()
-        self._dir_combo.addItem("Vorwärts")
-        self._dir_combo.addItem("Rückwärts")
-        self._dir_combo.currentTextChanged.connect(self._param_change)
-        self._dir_label = QLabel("Richtung:")
-        form.addRow(self._dir_label, self._dir_combo)
-
-        # Dynamischer Container: Felder werden in _rebuild_param_fields befuellt.
-        # Liegt NICHT mehr im Einstellungs-Formular (sonst wird es bei vielen
-        # Parametern zu eng), sondern in einem eigenen scrollbaren Bereich, der
-        # sich per Button in ein eigenes Fenster auskoppeln laesst (siehe unten).
-        self._param_widgets: dict[str, object] = {}
-        self._param_box = QGroupBox("Algorithmus-Parameter")
-        self._param_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
-        self._param_form = QFormLayout(self._param_box)
-        self._param_form.setSpacing(4)
-
-        # Initial-Aufbau fuer den Standard-Algorithmus
-        self._rebuild_param_fields(RgbAlgorithm.CHASE)
-
-        top.addWidget(ed)
-
-        # Preview
-        pv_box = QGroupBox("Vorschau")
-        pv_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
-        pv_l = QVBoxLayout(pv_box)
-        self._preview = MatrixPreview()
-        pv_l.addWidget(self._preview)
-        top.addWidget(pv_box)
-
-        # ── Speichern / Zurücksetzen (Dirty-State-Bar) ───────────────────────
+        # Speichern / Zuruecksetzen (Dirty-State-Bar) — reist mit ins Pop-out.
         save_bar = QHBoxLayout()
         self._dirty_lbl = QLabel("")
         self._dirty_lbl.setStyleSheet("color:#d29922; font-size:10px;")
@@ -412,45 +295,199 @@ class RgbMatrixView(QWidget):
         save_bar.addStretch(1)
         save_bar.addWidget(self._btn_reset)
         save_bar.addWidget(self._btn_save)
-        rl.addLayout(save_bar)
+        body.addLayout(save_bar)
 
-        rl.addLayout(top)
+        # ── Gruppe: Grundeinstellungen (+ Vorschau daneben) ───────────────────
+        grp_general = QGroupBox("Grundeinstellungen")
+        grp_general.setStyleSheet(_grp_style)
+        fg = QFormLayout(grp_general)
+        fg.setSpacing(6)
 
-        # ── Algorithmus-Parameter: scrollbar inline + auskoppelbar ins Fenster ──
-        # Loest das Platzproblem bei vielen Parametern (z. B. Chase = 7): inline
-        # gedeckelte Hoehe mit Scroll, plus Button fuer ein eigenes, grosses Fenster.
-        param_bar = QHBoxLayout()
-        param_bar.setContentsMargins(0, 0, 0, 0)
-        param_bar.addStretch(1)
-        self._btn_param_popout = QPushButton("⤢ Eigenes Fenster")
-        self._btn_param_popout.setFixedHeight(22)
-        self._btn_param_popout.setToolTip(
-            "Algorithmus-Parameter in einem eigenen, größeren Fenster bearbeiten")
-        self._btn_param_popout.setStyleSheet(
-            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
-            "border-radius:3px;font-size:10px;padding:1px 8px;} "
-            "QPushButton:hover{background:#30363d;}"
-        )
-        self._btn_param_popout.clicked.connect(self._toggle_param_popout)
-        param_bar.addWidget(self._btn_param_popout)
-        rl.addLayout(param_bar)
+        self._name_edit = QLineEdit()
+        self._name_edit.textChanged.connect(self._name_change)
+        fg.addRow("Name:", self._name_edit)
 
-        self._param_window = None
-        self._param_scroll = QScrollArea()
-        self._param_scroll.setWidgetResizable(True)
-        self._param_scroll.setWidget(self._param_box)
-        self._param_scroll.setMaximumHeight(240)
-        self._param_scroll.setStyleSheet("QScrollArea{border:none;}")
-        rl.addWidget(self._param_scroll)
+        self._algo_combo = QComboBox()
+        for a in RgbAlgorithm:
+            self._algo_combo.addItem(a.value)
+        self._algo_combo.currentTextChanged.connect(self._on_algo_change)
+        fg.addRow("Algorithmus:", self._algo_combo)
 
-        self._param_placeholder = QLabel("⤢ Parameter werden in einem eigenen Fenster bearbeitet.")
-        self._param_placeholder.setStyleSheet("color:#8b949e; font-size:10px; padding:8px;")
-        self._param_placeholder.setVisible(False)
-        rl.addWidget(self._param_placeholder)
+        self._style_combo = QComboBox()
+        for s in MatrixStyle:
+            self._style_combo.addItem(s.value)
+        self._style_combo.currentTextChanged.connect(self._on_style_change)
+        fg.addRow("Style:", self._style_combo)
 
-        # Fixture grid assignment
+        self._cols_spin = QSpinBox()
+        self._cols_spin.setRange(1, 64)
+        self._cols_spin.setValue(8)
+        self._cols_spin.valueChanged.connect(self._param_change)
+        fg.addRow("Spalten:", self._cols_spin)
+
+        self._rows_spin = QSpinBox()
+        self._rows_spin.setRange(1, 32)
+        self._rows_spin.setValue(4)
+        self._rows_spin.valueChanged.connect(self._param_change)
+        fg.addRow("Reihen:", self._rows_spin)
+
+        pv_box = QGroupBox("Vorschau")
+        pv_box.setStyleSheet(_grp_style)
+        pv_l = QVBoxLayout(pv_box)
+        self._preview = MatrixPreview()
+        pv_l.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop)
+
+        top = QHBoxLayout()
+        top.addWidget(grp_general, 1)
+        top.addWidget(pv_box, 0)
+        body.addLayout(top)
+
+        # ── Gruppe: Tempo & Blende ────────────────────────────────────────────
+        grp_time = QGroupBox("Tempo && Blende")
+        grp_time.setStyleSheet(_grp_style)
+        ft = QFormLayout(grp_time)
+        ft.setSpacing(6)
+
+        self._speed_spin = QDoubleSpinBox()
+        self._speed_spin.setRange(0.01, 20)
+        self._speed_spin.setSingleStep(0.1)
+        self._speed_spin.setValue(1.0)
+        self._speed_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Geschwindigkeit:", self._speed_spin)
+
+        self._priority_spin = QSpinBox()
+        self._priority_spin.setRange(-99, 99)
+        self._priority_spin.setValue(0)
+        self._priority_spin.setToolTip(
+            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
+            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
+        self._priority_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Layer-Priorität:", self._priority_spin)
+
+        self._env_in_spin = QDoubleSpinBox()
+        self._env_in_spin.setRange(0.0, 60.0)
+        self._env_in_spin.setSingleStep(0.1)
+        self._env_in_spin.setSuffix(" s")
+        self._env_in_spin.setToolTip("Einblendzeit beim Start des Effekts (0 = sofort).")
+        self._env_in_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Einblenden:", self._env_in_spin)
+
+        self._env_out_spin = QDoubleSpinBox()
+        self._env_out_spin.setRange(0.0, 60.0)
+        self._env_out_spin.setSingleStep(0.1)
+        self._env_out_spin.setSuffix(" s")
+        self._env_out_spin.setToolTip("Ausblendzeit beim Stoppen des Effekts (0 = sofort).")
+        self._env_out_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Ausblenden:", self._env_out_spin)
+
+        from src.core.engine.fade_curve import CURVE_NAMES, CURVE_LABELS
+        self._env_curve_combo = QComboBox()
+        for _nm in CURVE_NAMES:
+            self._env_curve_combo.addItem(CURVE_LABELS.get(_nm, _nm), _nm)
+        self._env_curve_combo.setToolTip("Form der Ein-/Ausblend-Hüllkurve.")
+        self._env_curve_combo.currentIndexChanged.connect(self._param_change)
+        ft.addRow("Hüllkurven-Form:", self._env_curve_combo)
+        body.addWidget(grp_time)
+
+        # ── Gruppe: Farben (style-/algorithmusabhaengig sichtbar) ─────────────
+        grp_colors = QGroupBox("Farben")
+        grp_colors.setStyleSheet(_grp_style)
+        self._grp_colors = grp_colors
+        fc = QFormLayout(grp_colors)
+        fc.setSpacing(6)
+
+        # Farben-Gruppe (RGB + RGBW): C1/C2/C3
+        color_row = QHBoxLayout()
+        self._c1_btn = ColorButton((255, 0, 0))
+        self._c2_btn = ColorButton((0, 0, 255))
+        self._c3_btn = ColorButton((0, 255, 0))
+        self._color_btns = (self._c1_btn, self._c2_btn, self._c3_btn)
+        # Pro Farbfeld ein eigenes "Cx:"-Label merken, damit einzelne Slots
+        # (je nach Algorithmus) ein-/ausgeblendet werden koennen (UI-01).
+        self._c_labels: list[QLabel] = []
+        for i, b in enumerate(self._color_btns):
+            # Farb-Buttons schreiben gezielt nur ihre Sequence-Position (nicht ueber
+            # _param_change, das sonst c1/2/3 ueberschreiben wuerde).
+            b.color_changed = lambda c, idx=i: self._on_color_button(idx, c)
+            lbl = QLabel(f"C{i+1}:")
+            self._c_labels.append(lbl)
+            color_row.addWidget(lbl)
+            color_row.addWidget(b)
+        color_row.addStretch(1)
+        self._color_label = QLabel("Farbe:")
+        fc.addRow(self._color_label, color_row)
+        self._color_row_widget = color_row  # handle fuer Sichtbarkeit via label
+
+        # Color-Sequence-UI (kanonisch, geteiltes Widget): kompaktes Feld mit
+        # Swatch-Vorschau + Popout-Button. Wird bei Sequence-Algorithmen gezeigt.
+        self._seq_editor = ColorSequenceField(title="Color Sequence")
+        self._seq_editor.changed.connect(self._on_sequence_changed)
+        self._seq_label = QLabel("Color Sequence:")
+        fc.addRow(self._seq_label, self._seq_editor)
+
+        # Dimmer-Bereich (nur DIMMER)
+        dim_row = QHBoxLayout()
+        self._imin_spin = QSpinBox()
+        self._imin_spin.setRange(0, 255)
+        self._imin_spin.setValue(0)
+        self._imin_spin.setPrefix("Min ")
+        self._imin_spin.valueChanged.connect(self._param_change)
+        self._imax_spin = QSpinBox()
+        self._imax_spin.setRange(0, 255)
+        self._imax_spin.setValue(255)
+        self._imax_spin.setPrefix("Max ")
+        self._imax_spin.valueChanged.connect(self._param_change)
+        dim_row.addWidget(self._imin_spin)
+        dim_row.addWidget(self._imax_spin)
+        self._dim_form_label = QLabel("Dimmer-Bereich:")
+        fc.addRow(self._dim_form_label, dim_row)
+
+        # Shutter-Bereich (nur SHUTTER)
+        shut_row = QHBoxLayout()
+        self._smin_spin = QSpinBox()
+        self._smin_spin.setRange(0, 255)
+        self._smin_spin.setValue(0)
+        self._smin_spin.setPrefix("Min ")
+        self._smin_spin.valueChanged.connect(self._param_change)
+        self._smax_spin = QSpinBox()
+        self._smax_spin.setRange(0, 255)
+        self._smax_spin.setValue(255)
+        self._smax_spin.setPrefix("Max ")
+        self._smax_spin.valueChanged.connect(self._param_change)
+        shut_row.addWidget(self._smin_spin)
+        shut_row.addWidget(self._smax_spin)
+        self._shut_form_label = QLabel("Shutter-Bereich:")
+        fc.addRow(self._shut_form_label, shut_row)
+        body.addWidget(grp_colors)
+
+        # ── Gruppe: Bewegung & Parameter (Richtung + dynamische Algo-Parameter) ─
+        # Richtung liegt in einer EIGENEN, dauerhaften Form-Zeile; die dynamischen
+        # Felder darunter werden je Algorithmus komplett neu aufgebaut
+        # (_rebuild_param_fields leert nur _param_form, nicht die Richtung).
+        self._dir_combo = QComboBox()
+        self._dir_combo.addItem("Vorwärts")
+        self._dir_combo.addItem("Rückwärts")
+        self._dir_combo.currentTextChanged.connect(self._param_change)
+        self._dir_label = QLabel("Richtung:")
+
+        self._param_widgets: dict[str, object] = {}
+        self._param_box = QGroupBox("Bewegung && Parameter")
+        self._param_box.setStyleSheet(_grp_style)
+        pbl = QVBoxLayout(self._param_box)
+        pbl.setContentsMargins(8, 6, 8, 6)
+        pbl.setSpacing(4)
+        dir_form = QFormLayout()
+        dir_form.setSpacing(6)
+        dir_form.addRow(self._dir_label, self._dir_combo)
+        pbl.addLayout(dir_form)
+        self._param_form = QFormLayout()
+        self._param_form.setSpacing(6)
+        pbl.addLayout(self._param_form)
+        body.addWidget(self._param_box)
+
+        # ── Gruppe: Fixture-Grid-Zuweisung ────────────────────────────────────
         grid_box = QGroupBox("Fixture-Grid (Fixture-IDs, Zeile × Spalte)")
-        grid_box.setStyleSheet("QGroupBox { color:#8b949e; font-size:10px; }")
+        grid_box.setStyleSheet(_grp_style)
         self._grid_box = grid_box
         grid_l = QVBoxLayout(grid_box)
         self._grid_label = QLabel("Keine Grid-Zuweisung")
@@ -474,7 +511,34 @@ class RgbMatrixView(QWidget):
         self._btn_auto_assign.setStyleSheet(_assign_style)
         self._btn_auto_assign.clicked.connect(self._auto_assign)
         grid_l.addWidget(self._btn_auto_assign)
-        rl.addWidget(grid_box)
+        body.addWidget(grid_box)
+
+        body.addStretch(1)
+
+        # Initial-Sichtbarkeit (RGB ist Standard) + Param-Felder fuer Default-Algo.
+        self._apply_style_visibility(MatrixStyle.RGB)
+        self._rebuild_param_fields(RgbAlgorithm.CHASE)
+
+        # ── Aeusserer Scrollbereich + Pop-out-Verwaltung ──────────────────────
+        # Der ganze Editor-Koerper liegt in EINEM Scrollbereich (kein Stauchen mehr)
+        # und laesst sich per _toggle_editor_popout komplett in ein grosses Fenster
+        # auskoppeln; inline bleibt dann nur der Platzhalter.
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        rl.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Matrix-Editor ist in einem eigenen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        rl.addWidget(self._editor_placeholder, 1)
 
         splitter.addWidget(right)
         layout.addWidget(splitter)
@@ -574,7 +638,9 @@ class RgbMatrixView(QWidget):
         specs = visible_specs(algo, style_value, cur_params)
         self._param_specs = specs
         if not specs:
-            self._param_box.setVisible(False)
+            # Keine Algo-Parameter -> Box nur zeigen, wenn wenigstens die Richtung
+            # relevant ist (z. B. SinePlasma: Richtung ja, Parameter nein).
+            self._param_box.setVisible(has_dir)
             return
         for spec in specs:
             if spec.kind == "bool":
@@ -637,16 +703,9 @@ class RgbMatrixView(QWidget):
 
     def _apply_style_visibility(self, style: MatrixStyle):
         """Zeigt/verbirgt style-spezifische Form-Zeilen."""
-        is_rgbw   = style == MatrixStyle.RGBW
         is_dimmer = style == MatrixStyle.DIMMER
         is_shutter = style == MatrixStyle.SHUTTER
 
-        # Farben-Zeile (C1/C2/C3): Anzahl haengt von Style UND Algorithmus ab.
-        self._apply_color_visibility(style)
-        # Weiß-Anteil
-        self._white_form_label.setVisible(is_rgbw)
-        self._white_slider.setVisible(is_rgbw)
-        self._white_lbl.setVisible(is_rgbw)
         # Dimmer-Bereich
         self._dim_form_label.setVisible(is_dimmer)
         self._imin_spin.setVisible(is_dimmer)
@@ -655,6 +714,10 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
+        # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
+        # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
+        # "Farben"-Gruppe den vollstaendigen, gerade gesetzten Zustand sieht.
+        self._apply_color_visibility(style)
 
     def _apply_color_visibility(self, style: MatrixStyle | None = None):
         """Zeigt nur so viele Farbfelder, wie der aktive Algorithmus auswertet.
@@ -697,6 +760,16 @@ class RgbMatrixView(QWidget):
         self._color_label.setVisible(is_color and (not use_seq) and n_colors >= 1)
         self._seq_editor.setVisible(use_seq)
         self._seq_label.setVisible(use_seq)
+        # Die ganze "Farben"-Gruppe ausblenden, wenn nichts darin sichtbar ist
+        # (z. B. Rainbow ohne Farben bei RGB) — kein leerer Gruppenkasten.
+        any_color = (
+            (not self._seq_editor.isHidden())
+            or any(not b.isHidden() for b in self._color_btns)
+            or (not self._color_label.isHidden())
+            or (not self._dim_form_label.isHidden())
+            or (not self._shut_form_label.isHidden())
+        )
+        self._grp_colors.setVisible(any_color)
 
     def _load_ui(self, m: RgbMatrixInstance):
         # Guard: Beim Befüllen der Widgets aus dem Draft dürfen die Widget-
@@ -717,11 +790,12 @@ class RgbMatrixView(QWidget):
             self._cols_spin.setValue(m.cols)
             self._rows_spin.setValue(m.rows)
             self._speed_spin.setValue(m.matrix_speed)
+            self._priority_spin.setValue(int(getattr(m, "priority", 0)))
+            self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
+            self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))
+            _ci = self._env_curve_combo.findData(getattr(m, "env_curve", "linear"))
+            self._env_curve_combo.setCurrentIndex(_ci if _ci >= 0 else 0)
             # Neue Style-Felder laden
-            self._white_slider.blockSignals(True)
-            self._white_slider.setValue(m.white_amount)
-            self._white_lbl.setText(f"{m.white_amount} %")
-            self._white_slider.blockSignals(False)
             self._imin_spin.blockSignals(True)
             self._imin_spin.setValue(m.intensity_min)
             self._imin_spin.blockSignals(False)
@@ -782,11 +856,14 @@ class RgbMatrixView(QWidget):
         # Farben werden separat ueber _on_color_button / _on_sequence_changed
         # geschrieben (nicht hier, sonst wuerde eine laengere Color-Sequence bei
         # jeder Param-Aenderung auf die ersten 3 Knopf-Farben gekuerzt).
-        self._current.white_amount = self._white_slider.value()
         self._current.intensity_min = self._imin_spin.value()
         self._current.intensity_max = self._imax_spin.value()
         self._current.shutter_min = self._smin_spin.value()
         self._current.shutter_max = self._smax_spin.value()
+        self._current.priority = self._priority_spin.value()
+        self._current.env_fade_in = self._env_in_spin.value()
+        self._current.env_fade_out = self._env_out_spin.value()
+        self._current.env_curve = self._env_curve_combo.currentData() or "linear"
         # I2.4: Richtung + dynamische Algorithmus-Parameter schreiben
         self._current.direction = "reverse" if self._dir_combo.currentText().startswith("Rück") else "forward"
         from PySide6.QtWidgets import QCheckBox, QSpinBox, QDoubleSpinBox, QComboBox
@@ -847,46 +924,49 @@ class RgbMatrixView(QWidget):
             btn._update_style()
         self._update_dirty()
 
-    def _toggle_param_popout(self):
-        """Koppelt die Algorithmus-Parameter in ein eigenes Fenster aus / dockt zurueck."""
-        if self._param_window is not None:
-            self._param_window.close()      # → finished → _redock_param
+    def _toggle_editor_popout(self):
+        """Koppelt den GANZEN Matrix-Editor in ein grosses, scrollbares Fenster
+        aus / dockt ihn zurueck. Loest das Platzproblem bei vielen Einstellwerten:
+        statt im schmalen Tab arbeitet man in einem frei vergroesserbaren Fenster."""
+        if self._editor_window is not None:
+            self._editor_window.close()      # → finished → _redock_editor
             return
-        box = self._param_scroll.takeWidget()
-        if box is None:
+        body = self._editor_scroll.takeWidget()
+        if body is None:
             return
         win = QDialog(self)
-        win.setWindowTitle("Algorithmus-Parameter")
+        win.setWindowTitle("Matrix-Editor")
         win.setModal(False)
         wl = QVBoxLayout(win)
         wl.setContentsMargins(6, 6, 6, 6)
         sc = QScrollArea()
         sc.setWidgetResizable(True)
-        sc.setWidget(box)
+        sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
-        win.resize(380, 520)
-        win.finished.connect(lambda *_: self._redock_param())
-        self._param_window = win
-        self._param_window_scroll = sc
-        self._btn_param_popout.setText("⤡ Andocken")
-        self._param_scroll.setVisible(False)
-        self._param_placeholder.setVisible(True)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
         win.show()
 
-    def _redock_param(self):
-        """Holt den Parameter-Block aus dem Fenster zurueck in die Inline-Ansicht."""
-        if self._param_window is None:
+    def _redock_editor(self):
+        """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
             return
         try:
-            box = self._param_window_scroll.takeWidget()
-            if box is not None:
-                self._param_scroll.setWidget(box)
-            self._param_scroll.setVisible(True)
-            self._param_placeholder.setVisible(False)
-            self._btn_param_popout.setText("⤢ Eigenes Fenster")
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zerstoert
-        self._param_window = None
+        self._editor_window = None
 
     def _start(self):
         # Gestartet wird immer die gespeicherte (echte) Instanz im FunctionManager.
@@ -1049,14 +1129,18 @@ class RgbMatrixView(QWidget):
         self._update_dirty()
 
     def _auto_assign(self):
-        # Auto-Zuweisung aus Patch: deferred (nur Draft, erzeugt dirty).
+        # Auto-Zuweisung: bevorzugt die aktive Auswahl/Gruppe, damit die Matrix nur
+        # die Geraete der gewaehlten Gruppe nutzt (A: Gruppen-Scope). Nur ohne aktive
+        # Auswahl faellt sie auf den ganzen Patch zurueck. Deferred (Draft -> dirty).
         if self._current is None:
             return
         try:
             from src.core.app_state import get_state
             state = get_state()
-            fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
-            fids = [fid for fid in fids if fid is not None]
+            fids = [int(f) for f in state.active_scope_fids()]
+            if not fids:
+                fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
+                fids = [fid for fid in fids if fid is not None]
             total = self._current.cols * self._current.rows
             grid = []
             for i in range(total):

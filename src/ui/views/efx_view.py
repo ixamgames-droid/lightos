@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton,
-                                QGroupBox, QFormLayout, QDoubleSpinBox,
+                                QGroupBox, QFormLayout, QDoubleSpinBox, QSpinBox,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
                                 QSizePolicy, QScrollArea, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
@@ -375,11 +375,16 @@ class EfxView(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._rebuild_from_state())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._rebuild_from_state())
+            # subscribe_widget (statt subscribe): die Handler melden sich beim
+            # Zerstoeren der View automatisch ab. Mit plain subscribe + frischen
+            # Lambdas sammelten sich bei jedem Programmer-Rebuild Zombie-Subscriber
+            # an -> jede FUNCTION_CHANGED-Aktualisierung (auch die VC-Bibliothek)
+            # wurde mit der Zeit immer langsamer. Spiegelt rgb_matrix_view._connect_sync.
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._rebuild_from_state())
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte EFX erscheinen sofort
             # in beiden EFX-Ansichten (Programmer-Seite + Sub-Tab).
-            sync.subscribe(SyncEvent.FUNCTION_CHANGED, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, self, lambda *_: self._rebuild_from_state())
         except Exception as e:
             print(f"[efx_view] sync subscribe error: {e}")
 
@@ -455,6 +460,28 @@ class EfxView(QWidget):
         rl = QVBoxLayout(right)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(8)
+
+        # ── Header: Pop-out-Knopf (bleibt im Hauptfenster, auch wenn ausgekoppelt) ─
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den GANZEN EFX-Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        rl.addLayout(header)
+
+        # ── Editor-Koerper (alles ausser dem Header; wandert komplett ins Pop-out) ─
+        self._editor_body = QWidget()
+        body = QVBoxLayout(self._editor_body)
+        body.setContentsMargins(2, 2, 2, 2)
+        body.setSpacing(8)
 
         # P11: Editor entzerrt — drei thematische Gruppen in einer ScrollArea
         # (nichts wird mehr gestaucht), Vorschau daneben mit fester Mindest-
@@ -560,6 +587,38 @@ class EfxView(QWidget):
                                   "und hält am Endpunkt an")
         self._loop_chk.toggled.connect(self._on_param_change)
         tform.addRow("Loop:", self._loop_chk)
+        # F-17: Layer-Prioritaet beim Engine-Merge.
+        self._priority_spin = QSpinBox()
+        self._priority_spin.setRange(-99, 99)
+        self._priority_spin.setValue(0)
+        self._priority_spin.setToolTip(
+            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
+            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
+        self._priority_spin.valueChanged.connect(self._on_param_change)
+        tform.addRow("Layer-Priorität:", self._priority_spin)
+        # ARC-04: Ein-/Ausblend-Hüllkurve (Sekunden, 0 = sofort).
+        self._env_in_spin = QDoubleSpinBox()
+        self._env_in_spin.setRange(0.0, 60.0)
+        self._env_in_spin.setSingleStep(0.1)
+        self._env_in_spin.setSuffix(" s")
+        self._env_in_spin.setToolTip("Einblendzeit beim Start des Effekts (0 = sofort).")
+        self._env_in_spin.valueChanged.connect(self._on_param_change)
+        tform.addRow("Einblenden:", self._env_in_spin)
+        self._env_out_spin = QDoubleSpinBox()
+        self._env_out_spin.setRange(0.0, 60.0)
+        self._env_out_spin.setSingleStep(0.1)
+        self._env_out_spin.setSuffix(" s")
+        self._env_out_spin.setToolTip("Ausblendzeit beim Stoppen des Effekts (0 = sofort).")
+        self._env_out_spin.valueChanged.connect(self._on_param_change)
+        tform.addRow("Ausblenden:", self._env_out_spin)
+        # FW-4: Form der Hüllkurve (Linear / S-Kurve / Ease / Snap).
+        from src.core.engine.fade_curve import CURVE_NAMES, CURVE_LABELS
+        self._env_curve_combo = QComboBox()
+        for _nm in CURVE_NAMES:
+            self._env_curve_combo.addItem(CURVE_LABELS.get(_nm, _nm), _nm)
+        self._env_curve_combo.setToolTip("Form der Ein-/Ausblend-Hüllkurve.")
+        self._env_curve_combo.currentIndexChanged.connect(self._on_param_change)
+        tform.addRow("Hüllkurven-Form:", self._env_curve_combo)
         ec.addWidget(tempo_box)
 
         # ── Gruppe 3: Verhältnis der Geräte zueinander ──────────────────
@@ -668,12 +727,11 @@ class EfxView(QWidget):
         ec.addWidget(vis_box)
         ec.addStretch(1)
 
-        editor_scroll = QScrollArea()
-        editor_scroll.setWidgetResizable(True)
-        editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        editor_scroll.setWidget(editor_col)
-        editor_scroll.setMinimumWidth(280)
-        top_row.addWidget(editor_scroll, stretch=2)
+        # Kein eigener Scroll mehr um die Formspalte (das erzeugte sonst eine
+        # zweite, horizontale Not-Scrollleiste). Die GANZE rechte Seite liegt
+        # jetzt in EINEM aeusseren Scrollbereich (siehe unten).
+        editor_col.setMinimumWidth(280)
+        top_row.addWidget(editor_col, stretch=2)
 
         # Vorschau (Pfad + animierte Fixture-Punkte) — interaktiv: Zentrum/Figur
         # direkt im Feld positionieren („Gobo" einstellen), Eck-Griffe = Groesse.
@@ -703,7 +761,7 @@ class EfxView(QWidget):
         pv.addWidget(self._preview)
         top_row.addWidget(prev_box, stretch=3)
 
-        rl.addLayout(top_row, stretch=1)
+        body.addLayout(top_row, stretch=1)
 
         # Fixture list
         self._fx_box = fx_box = QGroupBox("Fixtures")
@@ -731,7 +789,29 @@ class EfxView(QWidget):
         btn_fx_add.clicked.connect(self._add_fixture)
         btn_fx_rem.clicked.connect(self._remove_fixture)
         fx_l.addLayout(fx_btns)
-        rl.addWidget(fx_box)
+        body.addWidget(fx_box)
+
+        # ── Aeusserer Scrollbereich + Pop-out-Verwaltung ──────────────────────
+        # Der GANZE Editor-Koerper liegt in EINEM Scrollbereich (kein vertikales
+        # Stauchen / keine horizontale Not-Schiene mehr) und laesst sich per Knopf
+        # komplett in ein grosses Fenster auskoppeln; inline bleibt ein Hinweis.
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        rl.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der EFX-Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        rl.addWidget(self._editor_placeholder, 1)
 
         splitter.addWidget(right)
         layout.addWidget(splitter)
@@ -849,6 +929,11 @@ class EfxView(QWidget):
             self._yoff_spin.setValue(efx.y_offset)
             self._rot_spin.setValue(efx.rotation)
             self._speed_spin.setValue(efx.speed_hz)
+            self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
+            self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
+            self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
+            _ci = self._env_curve_combo.findData(getattr(efx, "env_curve", "linear"))
+            self._env_curve_combo.setCurrentIndex(_ci if _ci >= 0 else 0)
             self._xfreq_spin.setValue(efx.x_freq)
             self._yfreq_spin.setValue(efx.y_freq)
             self._xphase_spin.setValue(efx.x_phase)
@@ -900,6 +985,10 @@ class EfxView(QWidget):
         self._current.relative  = self._relative_chk.isChecked()
         self._current.bit16     = self._bit16_chk.isChecked()
         self._current.loop      = self._loop_chk.isChecked()
+        self._current.priority  = self._priority_spin.value()
+        self._current.env_fade_in = self._env_in_spin.value()
+        self._current.env_fade_out = self._env_out_spin.value()
+        self._current.env_curve = self._env_curve_combo.currentData() or "linear"
         self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
 
     def _reseed_random(self):
@@ -1015,6 +1104,53 @@ class EfxView(QWidget):
 
     def _on_popout_closed(self):
         self._popout = None
+
+    # ── Voll-Editor-Popout (ganzer Editor in ein grosses Fenster) ─────────────
+    def _toggle_editor_popout(self):
+        """Koppelt den GANZEN EFX-Editor in ein grosses, scrollbares Fenster aus /
+        dockt ihn zurueck. Anders als die Vorschau-Grossansicht (``_open_popout``)
+        zeigt dieses Fenster ALLE Felder (Name, Algorithmus, Geometrie, Tempo,
+        Geraete-Verhaeltnis, Sichtbarkeit, Fixtures) zum bequemen Einstellen in gross."""
+        if self._editor_window is not None:
+            self._editor_window.close()      # → finished → _redock_editor
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("EFX-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame)
+        sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(940, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zerstoert
+        self._editor_window = None
 
     # ── Custom Paths ──────────────────────────────────────────────────────────
 

@@ -236,7 +236,7 @@ class PositionTool(QWidget):
             self._preset_list.addItem(it)
         self._preset_list.itemDoubleClicked.connect(self._on_preset_dblclick)
         right_l.addWidget(self._preset_list)
-        b_use = QPushButton("Preset uebernehmen")
+        b_use = QPushButton("Preset übernehmen")
         b_use.clicked.connect(self._use_current_preset)
         right_l.addWidget(b_use)
         right_box.setFixedWidth(220)

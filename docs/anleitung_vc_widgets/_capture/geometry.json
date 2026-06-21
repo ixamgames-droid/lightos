@@ -1,0 +1,226 @@
+{
+  "calibration": {
+    "cal1": {
+      "color": [
+        255,
+        0,
+        255
+      ],
+      "x": 4,
+      "y": 4,
+      "w": 14,
+      "h": 14
+    },
+    "cal2": {
+      "color": [
+        0,
+        255,
+        255
+      ],
+      "x": 1304,
+      "y": 4,
+      "w": 14,
+      "h": 14
+    }
+  },
+  "widgets": {
+    "VCButton": {
+      "title": "Button (VCButton)",
+      "x": 30,
+      "y": 24,
+      "w": 160,
+      "h": 88,
+      "wx": 30,
+      "wy": 48,
+      "ww": 160,
+      "wh": 64
+    },
+    "VCSlider": {
+      "title": "Fader (VCSlider)",
+      "x": 230,
+      "y": 24,
+      "w": 150,
+      "h": 184,
+      "wx": 230,
+      "wy": 48,
+      "ww": 60,
+      "wh": 160
+    },
+    "VCColor": {
+      "title": "Farbe (VCColor)",
+      "x": 330,
+      "y": 24,
+      "w": 150,
+      "h": 114,
+      "wx": 330,
+      "wy": 48,
+      "ww": 90,
+      "wh": 90
+    },
+    "VCEncoder": {
+      "title": "Encoder (VCEncoder)",
+      "x": 460,
+      "y": 24,
+      "w": 150,
+      "h": 144,
+      "wx": 460,
+      "wy": 48,
+      "ww": 100,
+      "wh": 120
+    },
+    "VCStepper": {
+      "title": "Stepper (VCStepper)",
+      "x": 600,
+      "y": 24,
+      "w": 150,
+      "h": 104,
+      "wx": 600,
+      "wy": 48,
+      "ww": 120,
+      "wh": 80
+    },
+    "VCSpeedDial": {
+      "title": "Speed-Dial (VCSpeedDial)",
+      "x": 760,
+      "y": 24,
+      "w": 160,
+      "h": 174,
+      "wx": 760,
+      "wy": 48,
+      "ww": 160,
+      "wh": 150
+    },
+    "VCXYPad": {
+      "title": "XY-Pad (VCXYPad)",
+      "x": 30,
+      "y": 210,
+      "w": 160,
+      "h": 184,
+      "wx": 30,
+      "wy": 234,
+      "ww": 160,
+      "wh": 160
+    },
+    "VCCueList": {
+      "title": "Cue-Liste (VCCueList)",
+      "x": 230,
+      "y": 210,
+      "w": 210,
+      "h": 184,
+      "wx": 230,
+      "wy": 234,
+      "ww": 210,
+      "wh": 160
+    },
+    "VCChaseBuilder": {
+      "title": "Chase-Builder (VCChaseBuilder)",
+      "x": 480,
+      "y": 210,
+      "w": 230,
+      "h": 184,
+      "wx": 480,
+      "wy": 234,
+      "ww": 230,
+      "wh": 160
+    },
+    "VCColorList": {
+      "title": "Chase-Liste (VCColorList)",
+      "x": 750,
+      "y": 210,
+      "w": 230,
+      "h": 104,
+      "wx": 750,
+      "wy": 234,
+      "ww": 230,
+      "wh": 80
+    },
+    "VCEffectColors": {
+      "title": "Effekt-Farben (VCEffectColors)",
+      "x": 750,
+      "y": 316,
+      "w": 230,
+      "h": 110,
+      "wx": 750,
+      "wy": 340,
+      "ww": 230,
+      "wh": 86
+    },
+    "VCBpmDisplay": {
+      "title": "BPM-Anzeige (VCBpmDisplay)",
+      "x": 30,
+      "y": 426,
+      "w": 190,
+      "h": 120,
+      "wx": 30,
+      "wy": 450,
+      "ww": 190,
+      "wh": 96
+    },
+    "VCBusSelector": {
+      "title": "Tempo-Bus (VCBusSelector)",
+      "x": 260,
+      "y": 426,
+      "w": 210,
+      "h": 110,
+      "wx": 260,
+      "wy": 450,
+      "ww": 210,
+      "wh": 86
+    },
+    "VCSongInfo": {
+      "title": "Musik-Info (VCSongInfo)",
+      "x": 510,
+      "y": 426,
+      "w": 220,
+      "h": 120,
+      "wx": 510,
+      "wy": 450,
+      "ww": 220,
+      "wh": 96
+    },
+    "VCLabel": {
+      "title": "Text-Label (VCLabel)",
+      "x": 770,
+      "y": 426,
+      "w": 220,
+      "h": 68,
+      "wx": 770,
+      "wy": 450,
+      "ww": 220,
+      "wh": 44
+    },
+    "VCEffectDisplay": {
+      "title": "Effekt-Anzeige (VCEffectDisplay)",
+      "x": 770,
+      "y": 516,
+      "w": 210,
+      "h": 148,
+      "wx": 770,
+      "wy": 540,
+      "ww": 210,
+      "wh": 124
+    },
+    "VCFrame": {
+      "title": "Container (VCFrame)",
+      "x": 30,
+      "y": 560,
+      "w": 240,
+      "h": 174,
+      "wx": 30,
+      "wy": 584,
+      "ww": 240,
+      "wh": 150
+    },
+    "VCEffectEditor": {
+      "title": "Effekt-Editor-Box (VCEffectEditor)",
+      "x": 320,
+      "y": 560,
+      "w": 380,
+      "h": 248,
+      "wx": 320,
+      "wy": 584,
+      "ww": 380,
+      "wh": 224
+    }
+  }
+}

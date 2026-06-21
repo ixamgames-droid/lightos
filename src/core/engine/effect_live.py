@@ -8,7 +8,7 @@ aktiven Effekt (zuletzt gestartet).
 So bleibt das Wissen darueber, *welche* Parameter ein Effekt hat und *wie* man
 sie setzt, ausschliesslich im Effekt (``list_params``/``set_param``/``do_action``)
 — die Bedienelemente kennen nur einen Parameter-Key bzw. einen Aktions-Namen.
-Dadurch koennen VC und MIDi (und spaeter andere Hardware) dieselben Parameter
+Dadurch koennen VC und MIDI (und spaeter andere Hardware) dieselben Parameter
 und Aktionen steuern, ohne dass irgendwo hartkodiertes Effekt-Wissen liegt.
 """
 from __future__ import annotations

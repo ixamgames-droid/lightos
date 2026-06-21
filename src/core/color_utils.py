@@ -26,16 +26,16 @@ _RGB_KEYS = ("color_r", "color_g", "color_b")
 # importieren) — bei Aenderungen bitte beide Listen synchron halten.
 _NAME_COLOR_WORDS = [
     ("hellblau", "#7fd4ff"), ("light blue", "#7fd4ff"), ("lightblue", "#7fd4ff"),
-    ("türkis", "#00d0d0"), ("tuerkis", "#00d0d0"), ("cyan", "#00d0d0"),
+    ("tuerkis", "#00d0d0"), ("türkis", "#00d0d0"), ("cyan", "#00d0d0"),
     ("magenta", "#ff40c0"),
     ("violett", "#a040ff"), ("purple", "#a040ff"), ("lila", "#a040ff"),
     ("rosa", "#ff8fc8"), ("pink", "#ff8fc8"),
     ("orange", "#ff8000"), ("amber", "#ffbf00"),
     ("gelb", "#ffe000"), ("yellow", "#ffe000"),
-    ("grün", "#30d030"), ("gruen", "#30d030"), ("green", "#30d030"),
+    ("gruen", "#30d030"), ("grün", "#30d030"), ("green", "#30d030"),
     ("blau", "#3060ff"), ("blue", "#3060ff"),
     ("rot", "#ff3030"), ("red", "#ff3030"),
-    ("weiß", "#ffffff"), ("weiss", "#ffffff"), ("white", "#ffffff"),
+    ("weiss", "#ffffff"), ("weiß", "#ffffff"), ("white", "#ffffff"),
     ("offen", "#ffffff"), ("open", "#ffffff"),
 ]
 

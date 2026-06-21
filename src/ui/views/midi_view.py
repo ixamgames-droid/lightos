@@ -241,7 +241,7 @@ class MidiView(QWidget):
             for p in inputs:
                 self._combo_in.addItem(p)
             if not inputs:
-                self._combo_in.addItem("(Keine MIDI-Eingaenge gefunden - APC angeschlossen?)")
+                self._combo_in.addItem("(Keine MIDI-Eingänge gefunden - APC angeschlossen?)")
             else:
                 # Selektion wiederherstellen oder erste Auswahl wo "APC" drinsteht
                 apc_idx = next((i for i, p in enumerate(inputs) if "APC" in p), -1)
@@ -255,7 +255,7 @@ class MidiView(QWidget):
             for p in outputs:
                 self._combo_out.addItem(p)
             if not outputs:
-                self._combo_out.addItem("(Keine MIDI-Ausgaenge gefunden)")
+                self._combo_out.addItem("(Keine MIDI-Ausgänge gefunden)")
             else:
                 if prev_out in outputs:
                     self._combo_out.setCurrentText(prev_out)
@@ -265,8 +265,8 @@ class MidiView(QWidget):
             cur_status = self._lbl_midi_status.text()
             if not cur_status.startswith("IN:") and "TIPP" not in cur_status:
                 self._lbl_midi_status.setText(
-                    "Keine Eingaenge. TIPP: USB neu einstecken, "
-                    "anderen USB-Port probieren, MIDI 2.0 Modus pruefen"
+                    "Keine Eingänge. TIPP: USB neu einstecken, "
+                    "anderen USB-Port probieren, MIDI 2.0 Modus prüfen"
                 )
                 self._lbl_midi_status.setStyleSheet("color: #ffaa00;")
 

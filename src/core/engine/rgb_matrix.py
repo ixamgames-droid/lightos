@@ -50,6 +50,7 @@ class RgbAlgorithm(str, Enum):
     RANDOM     = "Random"     # Phase 4: vereinheitlicht — mode dimmer/color/strobe/flash/sparkle/pulse, nur echte Fixtures (ex-Sparkle)
     COLORFADE  = "Color Fade" # Phase 4: Multi-Color-Crossfade ueber die Color-Sequence (deaktivierte Farben werden uebersprungen)
     STROBE     = "Strobe"     # ganzes Feld an/aus (Tempo = Speed)
+    CHECKER    = "Schachbrett" # benachbarte Zellen abwechselnd Farbe A/B (rot-blau / rot-aus), optional pro Beat tauschen
     # ── Texturen / Einzel-Looks (bewusst eigenstaendig, nicht verschmolzen) ────
     RADAR      = "Radar"
     SPIRAL     = "Spirale"
@@ -318,6 +319,13 @@ class RgbMatrixInstance(Function):
         self.rows = rows
         # None-Eintraege = Luecken (raeumlich vorhanden, kein Fixture)
         self.fixture_grid: list[int | None] = list(fixture_grid or [])
+        # Gruppen-Bindung (nur fuer die Programmer-Listen-Filterung): Name der
+        # Fixture-Gruppe, fuer die dieser Matrix-Effekt erstellt wurde. Bewusst per
+        # NAME (nicht DB-id), weil Gruppen beim Show-Save/Load per Name neu angelegt
+        # werden und ihre id sich dabei aendern kann. None = ungebunden (erscheint
+        # in jeder Gruppe). Beeinflusst NICHT das Rendering/DMX — nur, unter welcher
+        # Gruppe der Effekt im Programmer aufgelistet wird.
+        self.source_group: str | None = None
         self.algorithm = algorithm
         # Kanonisches Farbmodell: eine live-editierbare ColorSequence. color1/2/3
         # sind Properties darauf (Rueckwaertskompatibilitaet, siehe unten).
@@ -356,10 +364,36 @@ class RgbMatrixInstance(Function):
     def _on_start(self):
         self._step = 0.0
         self._last_tick = time.monotonic()
+        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern, damit der
+        # Effekt bei local_beats=0 beginnt (gemeinsamer Start mit der sync_group).
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+            except Exception:
+                pass
 
     def sync_phase(self):
         """Setzt die Animations-Phase zurueck (Speed-Dial-Sync, SPD-03). Mehrere
-        Effekte lassen sich so auf einen gemeinsamen Startpunkt angleichen."""
+        Effekte lassen sich so auf einen gemeinsamen Startpunkt angleichen.
+
+        Bus-synchron (``tempo_bus_id`` gesetzt): re-ankert auf die aktuelle Bus-Position
+        (``_beat_anchor = bus.position``), sodass ``local_beats`` wieder bei 0 startet —
+        so beginnen alle Effekte derselben ``sync_group`` GEMEINSAM. Frei: ``_step = 0``."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+                    self._last_tick = time.monotonic()
+                    return
+            except Exception:
+                pass
         self._step = 0.0
         self._last_tick = time.monotonic()
 
@@ -439,13 +473,8 @@ class RgbMatrixInstance(Function):
         now = time.monotonic()
         dt = now - self._last_tick
         self._last_tick = now
-        # Effektive Rate = Basisrate (matrix_speed) × Function.speed-Master.
-        # So steuern VC-Slider (EFFECT_SPEED / globaler SPEED) das Matrix-Tempo.
-        rate = self.matrix_speed * max(0.0, float(self.speed))
-        # Phase 4: unbeschraenkter Akkumulator (kein % mehr).
-        # Phase 6: Freeze haelt die Animation an (Ausgabe bleibt stehen).
-        if not self._frozen:
-            self._step = self._step + rate * dt
+        # WP-Tempo: self._step bus-synchron oder frei fortschreiben (Vorschau).
+        self._advance_step(dt)
 
         grid = self._generate()
         result = {}
@@ -458,6 +487,50 @@ class RgbMatrixInstance(Function):
             result[fid] = {"color_r": r, "color_g": g, "color_b": b}
         return result
 
+    def _advance_step(self, dt: float) -> None:
+        """Schreibt ``self._step`` fort.
+
+        Bus-synchron (``tempo_bus_id`` gesetzt UND Bus laeuft, bpm>0):
+            ``self._step = (bus.position - _beat_anchor) * tempo_multiplier + phase_offset``
+        — Einheit Beats (1 Schritt = 1 Beat). So koppeln zwei Matrizen auf demselben
+        Bus exakt (z. B. Farbe ×1, Dimmer ×2 phasengleich), unabhaengig von Frame-Jitter
+        und Startzeitpunkt, weil beide aus derselben Bus-Position + demselben Anker ableiten.
+        Sonst Free-Run wie bisher: ``matrix_speed × Function.speed × dt`` (byte-identisch).
+        ``_frozen`` haelt die Animation in beiden Modi an."""
+        if self._frozen:
+            return
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            bus = None
+            _tbm = None
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                _tbm = get_tempo_bus_manager()
+                bus = _tbm.get(bus_id)
+            except Exception:
+                bus = None
+            if bus is not None:
+                bpm, _bc, _bp, pos = bus.snapshot()
+                if bpm > 0:
+                    mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+                    off = getattr(self, "phase_offset", 0.0) or 0.0
+                    anchor = getattr(self, "_beat_anchor", 0.0)
+                    # round(...,9) killt die Float-Kante an ganzzahligen Beats: die
+                    # Bus-Position landet oft als N-1e-16, und int(N-1e-16)=N-1 → ein
+                    # STROBE (on=int(p)%2==0) liefe genau am Beat 1 Frame falsch. 9
+                    # Nachkommastellen sind fuers Rendering mehr als genug; betrifft
+                    # NUR den bus-synchronen Pfad (Free-Run bleibt byte-identisch).
+                    self._step = round((pos - anchor) * mult + off, 9)
+                    return
+                # F5: nur bei AKTIVEM Freeze die Position HALTEN; sonst Free-Run.
+                # Ein Bus, der nur "noch nicht gestartet" ist (bpm 0, kein Freeze),
+                # laesst den Effekt frei weiterlaufen (rueckwaerts-kompatibel).
+                if _tbm is not None and _tbm.is_frozen():
+                    return
+        # Free-Run (alt-Verhalten, byte-identisch).
+        rate = self.matrix_speed * max(0.0, float(self.speed))
+        self._step = self._step + rate * dt
+
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
               dt: float,
@@ -469,13 +542,9 @@ class RgbMatrixInstance(Function):
         (der Programmer-/Submaster-Dimmer skaliert spaeter im Renderer)."""
         if not self._running or not self.fixture_grid:
             return
-        # Effektive Rate = Basisrate (matrix_speed) × Function.speed-Master.
-        # So steuern VC-Slider (EFFECT_SPEED / globaler SPEED) das Matrix-Tempo.
-        rate = self.matrix_speed * max(0.0, float(self.speed))
-        # Phase 4: unbeschraenkter Akkumulator (kein % mehr).
-        # Phase 6: Freeze haelt die Animation an (Ausgabe bleibt stehen).
-        if not self._frozen:
-            self._step = self._step + rate * dt
+        # WP-Tempo: self._step bus-synchron (tempo_bus_id) ODER frei (matrix_speed ×
+        # Function.speed × dt, byte-identisch) fortschreiben; Freeze haelt an.
+        self._advance_step(dt)
         grid = self._render(self._step)
         try:
             from src.core.app_state import get_channels_for_patched
@@ -522,18 +591,29 @@ class RgbMatrixInstance(Function):
                     wheel_val = color_attrs_for_fixture(chans, rgb).get("color")
                 except Exception:
                     wheel_val = None
+            # RGBW: echtes Weiss -> Weissanteil cw=min(r,g,b) auf den W-Kanal, RGB
+            # nur der Rest (r-cw, g-cw, b-cw). Pures Weiss laeuft damit rein ueber
+            # den weissen Chip (R=G=B=0), nicht zusaetzlich ueber RGB. RGB-Style:
+            # r,g,b unveraendert, der W-Kanal wird nie angefasst. (Gleiche Konvention
+            # wie color_utils.color_attrs_for_fixture -> test_color_white_channel.)
+            if self.style == MatrixStyle.RGBW:
+                cw = min(r, g, b)
+                cr, cg, cb = r - cw, g - cw, b - cw
+            else:
+                cw = 0
+                cr, cg, cb = r, g, b
             for ch in chans:
                 attr = (ch.attribute or "").lower()
                 # ── Style-Kanalmaske ────────────────────────────────────────
                 if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
                     if attr == "color_r":
-                        val = r
+                        val = cr
                     elif attr == "color_g":
-                        val = g
+                        val = cg
                     elif attr == "color_b":
-                        val = b
+                        val = cb
                     elif attr == "color_w" and self.style == MatrixStyle.RGBW:
-                        val = round(min(r, g, b) * self.white_amount / 100)
+                        val = cw
                     elif attr == "color" and not has_rgb and wheel_val is not None:
                         # Farbrad: Slot setzen, NICHT mit intensity skalieren
                         # (Helligkeit gehoert auf den Dimmer, nicht aufs Farbrad).
@@ -600,6 +680,8 @@ class RgbMatrixInstance(Function):
             return self._render_random(p, cols, rows, enabled)
         if algo == RgbAlgorithm.COLORFADE:
             return self._render_colorfade(p, cols, rows, enabled)
+        if algo == RgbAlgorithm.CHECKER:
+            return self._render_checker(p, cols, rows, enabled)
 
         # ── Texturen / Einzel-Looks: per-Zelle (bewusst eigenstaendig) ────────────
         for row in range(rows):
@@ -698,6 +780,26 @@ class RgbMatrixInstance(Function):
                     even = int(a * seg * 2) % 2 == 0
                     pixels[idx] = c1 if (even != invert) else c2
 
+        return pixels
+
+    def _render_checker(self, p: float, cols: int, rows: int,
+                        enabled: list[Color]) -> list[Color]:
+        """Schachbrett/Wechsel: benachbarte Zellen abwechselnd Farbe A/B/...
+
+        Statisches raeumliches Muster A/B/A/B ueber die Fixtures (Kachelgroesse
+        ``tile``). Bei ``blink`` (Default) tauschen die Farben pro Beat
+        (= Wechsellicht/Blinken): rot-blau -> blau-rot bzw. rot-aus -> aus-rot.
+        Nutzt die aktiven Farben der Color-Sequence (2 = A/B; eine schwarze Farbe
+        (0,0,0) ergibt 'rot-nichts'). Reihenfolge row-major (idx = row*cols+col).
+        """
+        n = len(enabled) or 1
+        tile = max(1, int(self.params.get("tile", 1)))
+        step = int(p) if bool(self.params.get("blink", True)) else 0
+        pixels: list[Color] = []
+        for row in range(rows):
+            for col in range(cols):
+                k = ((col + row) // tile + step) % n
+                pixels.append(enabled[k])
         return pixels
 
     # ── Konsolidierte Grundalgorithmen (Phase 3) ──────────────────────────────
@@ -1134,9 +1236,8 @@ class RgbMatrixInstance(Function):
             # MXP-02: Phasen-Versatz (für versetzte Effekte), live steuerbar.
             ParamSpec("offset", "Versatz", "float", 0.0, 0.0, 16.0, 0.1,
                       "Phasen-Versatz in Schritten (versetzte Effekte)"),
-            # MXP-03: Dimmer-/Shutter-Grenzen + Weissanteil live steuerbar.
-            ParamSpec("white_amount", "Weissanteil", "int", 100, 0, 100, 1,
-                      "RGBW-Weissanteil in %"),
+            # MXP-03: Dimmer-/Shutter-Grenzen live steuerbar. (Weissanteil entfaellt:
+            # RGBW erzeugt echtes Weiss automatisch ueber den W-Kanal.)
             ParamSpec("intensity_min", "Dimmer min", "int", 0, 0, 255, 1,
                       "Untergrenze des Dimmer-Styles"),
             ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
@@ -1145,6 +1246,24 @@ class RgbMatrixInstance(Function):
                       "Untergrenze des Shutter-Styles"),
             ParamSpec("shutter_max", "Shutter max", "int", 255, 0, 255, 1,
                       "Obergrenze des Shutter-Styles"),
+            # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei/eigene
+            # Geschwindigkeit. Multiplier frei (×0.5/×2/×3…), Versatz in Beats.
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
+                      options=("", "Global", "A", "B", "C", "D"),
+                      tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
+                              "Global = Master-BPM, A–D = eigene Buses)"),
+            ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,
+                      "Verhältnis zum Bus (frei, z. B. 0.5 halb, 2 doppelt, 3 dreifach)"),
+            ParamSpec("phase_offset", "Tempo-Versatz (Beats)", "float", 0.0, 0.0, 1.0, 0.05,
+                      "Phasen-Versatz in Beats (versetzter Start auf dem Bus)"),
+            # F2: Ein-/Ausblendzeit des Effekts (Hüllkurve, Function-Basis) live steuerbar
+            # -> Fade-Fader in der VC (SliderMode.EFFECT_PARAM, param_key env_fade_in/out).
+            ParamSpec("env_fade_in", "Fade ein (s)", "float", 0.0, 0.0, 10.0, 0.1,
+                      "Einblendzeit des Effekts in Sekunden"),
+            ParamSpec("env_fade_out", "Fade aus (s)", "float", 0.0, 0.0, 10.0, 0.1,
+                      "Ausblendzeit des Effekts in Sekunden"),
+            ParamSpec("env_fade", "Fade ein+aus (s)", "float", 0.0, 0.0, 10.0, 0.1,
+                      "Setzt Ein- und Ausblendzeit gemeinsam"),
         ]
         meta = ALGO_META.get(self.algorithm)
         if meta and meta.direction:
@@ -1153,7 +1272,7 @@ class RgbMatrixInstance(Function):
         n_colors = meta.colors if meta else 1
         if n_colors > 0:
             specs.append(ParamSpec("colors", "Farben", "color_sequence", None,
-                                   tooltip="Farbliste (aktiv/inaktiv, hinzufuegen/entfernen)"))
+                                   tooltip="Farbliste (aktiv/inaktiv, hinzufügen/entfernen)"))
         if meta:
             specs.extend(meta.params)
         return specs
@@ -1176,6 +1295,18 @@ class RgbMatrixInstance(Function):
             return float(self.params.get("offset", 0.0))
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             return getattr(self, key)
+        if key == "tempo_bus_id":
+            return getattr(self, "tempo_bus_id", "")
+        if key == "tempo_multiplier":
+            return getattr(self, "tempo_multiplier", 1.0)
+        if key == "phase_offset":
+            return getattr(self, "phase_offset", 0.0)
+        if key in ("env_fade_in", "env_fade_out"):
+            return float(getattr(self, key, 0.0))
+        if key == "env_fade":
+            return float(getattr(self, "env_fade_in", 0.0))
+        if key == "env_curve":
+            return getattr(self, "env_curve", "linear")
         return self.params.get(key)
 
     def set_param(self, key: str, value) -> bool:
@@ -1223,6 +1354,37 @@ class RgbMatrixInstance(Function):
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             hi = 100 if key == "white_amount" else 255
             setattr(self, key, max(0, min(hi, int(round(float(value)))))); return True
+        if key == "tempo_bus_id":
+            self.tempo_bus_id = str(value or "").strip(); return True
+        if key == "tempo_multiplier":
+            try:
+                self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "phase_offset":
+            try:
+                self.phase_offset = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key in ("env_fade_in", "env_fade_out"):
+            try:
+                setattr(self, key, max(0.0, min(60.0, float(value))))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "env_fade":
+            try:
+                v = max(0.0, min(60.0, float(value)))
+                self.env_fade_in = v
+                self.env_fade_out = v
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "env_curve":
+            self.env_curve = str(value or "linear")
+            return True
         # Algo-spezifisch: in params ablegen, ueber die Meta-Spec klemmen.
         spec = None
         meta = ALGO_META.get(self.algorithm)
@@ -1368,6 +1530,8 @@ class RgbMatrixInstance(Function):
         d.update({
             "cols": self.cols, "rows": self.rows,
             "fixture_grid": self.fixture_grid,
+            # Gruppen-Bindung (Programmer-Listen-Scope) — per Name, stabil ueber Save/Load.
+            "source_group": self.source_group,
             "algorithm": self.algorithm.value,
             # Kanonisches Farbmodell (beliebig lang, aktiv/inaktiv je Farbe).
             "color_sequence": self.colors.to_list(),
@@ -1403,6 +1567,10 @@ class RgbMatrixInstance(Function):
         self.rows = d.get("rows", 4)
         # None-Eintraege = Luecken; alte dichte Listen (ohne None) laden unveraendert (Migration).
         self.fixture_grid = list(d.get("fixture_grid", []))
+        # Gruppen-Bindung (Programmer-Listen-Scope). Fehlender Key (Alt-Shows) ODER
+        # leerer String = ungebunden (None) -> erscheint in jeder Gruppe.
+        _sg = d.get("source_group", getattr(self, "source_group", None))
+        self.source_group = str(_sg) if _sg else None
         # Algorithmus + Migration alter Varianten-Namen → (Grundalgorithmus, params).
         # Legacy-Strings werden auf den neuen Enum-Wert + Default-Parameter gemappt,
         # BEVOR das Enum gebildet wird (sonst ValueError bei alten Shows, #18).
@@ -1434,6 +1602,23 @@ class RgbMatrixInstance(Function):
         # Animationsrate: neuer Key "matrix_speed"; Alt-Shows hatten "speed".
         self.matrix_speed = float(d.get("matrix_speed", d.get("speed", 1.0)))
         self.direction = d.get("direction", "forward")
+        # F-17: Layer-Prioritaet (Function-Basisfeld) auch im Draft-Roundtrip
+        # (_save_edit -> apply_dict) erhalten — apply_dict laedt sonst keine
+        # Basisfelder. Default = aktueller Wert bzw. 0 (alt-kompatibel).
+        try:
+            self.priority = int(d.get("priority", getattr(self, "priority", 0)))
+        except (TypeError, ValueError):
+            self.priority = 0
+        # ARC-04: Hüllkurven-Zeiten ebenfalls im Draft-Roundtrip erhalten.
+        try:
+            self.env_fade_in = max(0.0, float(d.get("env_fade_in",
+                                                    getattr(self, "env_fade_in", 0.0))))
+            self.env_fade_out = max(0.0, float(d.get("env_fade_out",
+                                                     getattr(self, "env_fade_out", 0.0))))
+        except (TypeError, ValueError):
+            self.env_fade_in = self.env_fade_out = 0.0
+        self.env_curve = str(d.get("env_curve",
+                                   getattr(self, "env_curve", "linear")) or "linear")
         # drive_intensity: R1-Default True fuer Alt-Shows (ohne Key) bleibt hell.
         self.drive_intensity = bool(d.get("drive_intensity", True))
         # Phase-3-Style-Felder (Default RGB damit Alt-Shows unveraendert bleiben).

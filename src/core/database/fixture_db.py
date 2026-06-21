@@ -131,7 +131,7 @@ def _infer_range_kind(name: str) -> str:
     """Leitet die maschinen-lesbare Kategorie (M1.2) aus dem Range-Namen ab.
     Konservativ: nur eindeutige Schluesselwoerter, sonst "" (unbekannt)."""
     n = (name or "").lower()
-    if any(w in n for w in ("offen", "open", "weiß", "weiss")):
+    if any(w in n for w in ("offen", "open", "weiss", "weiß")):
         return "open"
     if any(w in n for w in ("geschlossen", "closed", "blackout", "zu ")):
         return "closed"
@@ -486,13 +486,15 @@ _SPIDER_RESET = [
 def _spider_modes_data():
     """14-Kanal-Layout des U King Spider (Flower) — siehe U-King-Speider.qxf.
 
-    CH1/2 Pan/Tilt-Motoren, CH3 Bewegungs-Speed, CH4 Master-Dimmer, CH5 Shutter/
-    Strobe/Blinken/Effekte, CH6–9 RGBW Bank 1, CH10–13 RGBW Bank 2 (teilen die
-    Farbattribute -> gemeinsame Farbe), CH14 Neustart/Maintenance."""
+    CH1/CH2 = zwei SEPARATE Tilt-Motoren (Bar L = Kopf 0, Bar R = Kopf 1; die zwei
+    Lichtleisten schwenken zu-/voneinander weg), CH3 Bewegungs-Speed, CH4 Master-
+    Dimmer, CH5 Shutter/Strobe/Blinken/Effekte, CH6–9 RGBW Bank 1 (Bar L = Kopf 0),
+    CH10–13 RGBW Bank 2 (Bar R = Kopf 1), CH14 Neustart/Maintenance.
+    Mehrkopf (X-6): wiederholtes Attribut -> N-tes Vorkommen = Kopf N (head)."""
     return [
         ("14-Kanal", [
-            ("Pan (Motor 1)",  "pan",       128, 128),
-            ("Tilt (Motor 2)", "tilt",      128, 128),
+            ("Tilt Bar Links",  "tilt",      128, 128),   # Kopf 0 (Bar L) — zwei SEPARATE Tilts
+            ("Tilt Bar Rechts", "tilt",      128, 128),   # Kopf 1 (Bar R)
             ("Speed",          "speed",     0,   0),
             ("Master Dimmer",  "intensity", 0,   255),
             ("Shutter/Strobe", "shutter",   8,   8,   _SPIDER_SHUTTER),
@@ -639,7 +641,7 @@ def _eurolite_gross_modes_data():
 
 def _add_eurolite_gross(s, mfr):
     """Eurolite Großer Straler 5ch — Layout siehe _eurolite_gross_modes_data()."""
-    _add_fixture(s, mfr, "Großer Straler 5ch", "EUROGROSS", "par", 32,
+    _add_fixture(s, mfr, "Großer Strahler 5ch", "EUROGROSS", "par", 32,
                  _eurolite_gross_modes_data())
 
 
@@ -673,6 +675,13 @@ def _mode_attr_signature(profile) -> dict[str, list[str]]:
 _ZQ02001_SIGNATURE = {
     mode_name: [ch[1] for ch in channels]
     for mode_name, channels in _zq02001_modes_data()
+}
+
+# Soll-Signatur des Spider (2026-06-16): zwei separate Tilts (Bar L/R) statt
+# Pan/Tilt. Aeltere DBs (CH1=pan) werden in-place migriert.
+_SPIDER14_SIGNATURE = {
+    mode_name: [ch[1] for ch in channels]
+    for mode_name, channels in _spider_modes_data()
 }
 
 
@@ -746,6 +755,21 @@ def ensure_builtins():
                 prof.modes.clear()          # cascade loescht Kanaele + Ranges
                 s.flush()
                 _add_modes(s, prof, _zq02001_modes_data())
+                changed = True
+        if "SPIDER14" in have:
+            # Profil-Umstellung 2026-06-16: CH1/CH2 = zwei separate Tilts (Bar L/R)
+            # statt Pan/Tilt (Mehrkopf, X-6). Aeltere DB (CH1=pan) in-place migrieren.
+            prof = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == "SPIDER14",
+                       FixtureProfile.source == "builtin")
+            ).scalars().first()
+            if prof is not None and _mode_attr_signature(prof) != _SPIDER14_SIGNATURE:
+                prof.modes.clear()
+                s.flush()
+                _add_modes(s, prof, _spider_modes_data())
                 changed = True
         # X-3: generische MH-Spots mit Farb-/Gobo-Rad-Slots nachruesten
         if _ensure_wheel_ranges(s, "MH8", _mh8_modes_data()):

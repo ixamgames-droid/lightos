@@ -11,11 +11,13 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QSlider, QCheckBox, QFileDialog,
-    QHeaderView, QAbstractItemView,
+    QHeaderView, QAbstractItemView, QDialog, QListWidget, QListWidgetItem,
+    QDialogButtonBox, QMessageBox,
 )
 from PySide6.QtCore import Qt
 
 from src.core.audio.media_player import get_media_player
+from src.ui.views.spectrum_bars import SpectrumBars
 
 
 def _fmt_time(ms: int) -> str:
@@ -43,15 +45,15 @@ class MusicView(QWidget):
         hint = QLabel(
             "🎵 In-App-Player — spielt die Playlist der Show. Doppelklick auf ein Lied = abspielen.\n"
             "Für taktgenaue Lichteffekte: VirtualDJ starten und OS2L senden lassen "
-            "(Menü „Ausgabe → OS2L-Server starten“)."
+            "(Menü „Ausgabe → OS2L-Server (Port 1234)“ aktivieren)."
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color:#9aa4ad;")
         root.addWidget(hint)
 
         # Playlist-Tabelle
-        self._table = QTableWidget(0, 4)
-        self._table.setHorizontalHeaderLabels(["", "Titel", "Genre", "BPM"])
+        self._table = QTableWidget(0, 5)
+        self._table.setHorizontalHeaderLabels(["", "Titel", "Genre", "BPM", "Auto-Show"])
         self._table.verticalHeader().setVisible(False)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -60,6 +62,7 @@ class MusicView(QWidget):
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self._table.setColumnWidth(0, 28)
         self._table.doubleClicked.connect(self._on_double_click)
         root.addWidget(self._table, 1)
@@ -73,6 +76,12 @@ class MusicView(QWidget):
         np_lay = QVBoxLayout(np_box)
         np_lay.addWidget(self._lbl_now)
         np_lay.addWidget(self._lbl_next)
+        # AUTODJ-(b): Spektrum/VU (Quelle = Loopback-Beat-Detector, nicht der Player-Stream)
+        self._spectrum = SpectrumBars()
+        np_lay.addWidget(self._spectrum)
+        spec_hint = QLabel("Spektrum: Audio-Eingang (Loopback) — Menü „Ausgabe → Audio-Eingang“")
+        spec_hint.setStyleSheet("color:#6b7480; font-size:10px;")
+        np_lay.addWidget(spec_hint)
         root.addWidget(np_box)
 
         # Positions-Slider + Zeit
@@ -131,6 +140,18 @@ class MusicView(QWidget):
         self._chk_couple.toggled.connect(self._on_couple)
         opt.addWidget(self._chk_couple)
         opt.addStretch(1)
+        # AUTODJ-(a): Per-Song-Look des markierten Lieds zuweisen
+        self._btn_autoshow = QPushButton("Auto-Show für Lied…")
+        self._btn_autoshow.setToolTip(
+            "Dem markierten Lied Funktionen zuweisen, die beim Abspielen automatisch starten.")
+        self._btn_autoshow.clicked.connect(self._on_edit_autoshow)
+        opt.addWidget(self._btn_autoshow)
+        # F-15: BPM aus eingebetteten Datei-Tags nachziehen (Tag schlägt Schätzung)
+        self._btn_tagbpm = QPushButton("BPM aus Datei-Tags")
+        self._btn_tagbpm.setToolTip(
+            "Liest die im Audiofile gespeicherte BPM (ID3/MP4-Tag) und ersetzt die Schätzung.")
+        self._btn_tagbpm.clicked.connect(self._on_refine_bpm)
+        opt.addWidget(self._btn_tagbpm)
         btn_folder = QPushButton("Ordner laden…")
         btn_folder.clicked.connect(self._on_load_folder)
         opt.addWidget(btn_folder)
@@ -183,11 +204,90 @@ class MusicView(QWidget):
         folder = QFileDialog.getExistingDirectory(self, "Musik-Ordner laden")
         if folder:
             self._mp.load_folder(folder)
-            try:
-                from src.core.app_state import get_state
-                get_state().playlist = self._mp.to_dicts()
-            except Exception:
-                pass
+            self._write_playlist()
+
+    def _write_playlist(self):
+        """Playlist (SSOT in state.playlist) aus dem MediaPlayer schreiben — sonst gehen
+        BPM-Tag/Auto-Show-Zuweisungen beim Speichern verloren."""
+        try:
+            from src.core.app_state import get_state
+            get_state().playlist = self._mp.to_dicts()
+        except Exception:
+            pass
+
+    # ── F-15: BPM aus Datei-Tags ────────────────────────────────────────────────
+    def _on_refine_bpm(self):
+        if not self._mp.tracks:
+            return
+        n = self._mp.refine_bpm_from_tags()
+        self._write_playlist()
+        self._rebuild_table()
+        QMessageBox.information(
+            self, "BPM aus Datei-Tags",
+            f"{n} Lied(er) mit BPM aus dem Datei-Tag aktualisiert."
+            if n else "Keine eingebetteten BPM-Tags gefunden.")
+
+    # ── AUTODJ-(a): Per-Song-Look ───────────────────────────────────────────────
+    @staticmethod
+    def _autoshow_label(track) -> str:
+        ids = getattr(track, "autoshow_function_ids", None) or []
+        return f"{len(ids)} Funktion(en)" if ids else "—"
+
+    def _selected_row(self) -> int:
+        rows = self._table.selectionModel().selectedRows() if self._table.selectionModel() else []
+        if rows:
+            return rows[0].row()
+        return self._table.currentRow()
+
+    def _on_edit_autoshow(self):
+        row = self._selected_row()
+        if not (0 <= row < len(self._mp.tracks)):
+            QMessageBox.information(self, "Auto-Show für Lied",
+                                   "Bitte zuerst ein Lied in der Liste markieren.")
+            return
+        track = self._mp.tracks[row]
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            funcs = list(get_function_manager().all())
+        except Exception:
+            funcs = []
+        if not funcs:
+            QMessageBox.information(self, "Auto-Show für Lied",
+                                   "Es sind noch keine Funktionen vorhanden.")
+            return
+        current = set(getattr(track, "autoshow_function_ids", None) or [])
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Auto-Show für: {track.title}")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("Funktionen, die beim Abspielen dieses Lieds automatisch starten:"))
+        lst = QListWidget()
+        for f in funcs:
+            it = QListWidgetItem(getattr(f, "name", str(f.id)))
+            it.setData(Qt.ItemDataRole.UserRole, f.id)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Checked if f.id in current
+                             else Qt.CheckState.Unchecked)
+            lst.addItem(it)
+        lay.addWidget(lst)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                              | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        ids = [lst.item(i).data(Qt.ItemDataRole.UserRole)
+               for i in range(lst.count())
+               if lst.item(i).checkState() == Qt.CheckState.Checked]
+        self._assign_autoshow(row, ids)
+
+    def _assign_autoshow(self, row: int, ids: list[int]):
+        """Per-Song-Look einem Lied zuweisen (testbar, ohne Dialog)."""
+        if not (0 <= row < len(self._mp.tracks)):
+            return
+        self._mp.tracks[row].autoshow_function_ids = [int(x) for x in ids]
+        self._write_playlist()
+        self._rebuild_table()
 
     # ── Anzeige-Updates ─────────────────────────────────────────────────────────────
 
@@ -200,7 +300,10 @@ class MusicView(QWidget):
             self._table.setItem(r, 1, QTableWidgetItem(t.title))
             self._table.setItem(r, 2, QTableWidgetItem(t.genre))
             bpm = f"{t.bpm:.0f}" if t.bpm else "—"
+            if getattr(t, "bpm_source", "guess") == "tag":
+                bpm += " 🏷"           # F-15: BPM stammt aus dem Datei-Tag
             self._table.setItem(r, 3, QTableWidgetItem(bpm))
+            self._table.setItem(r, 4, QTableWidgetItem(self._autoshow_label(t)))
         self._mark_current_row()
         self._refresh_now_playing()
         # Auto-Show-Schalter an die (ggf. frisch geladene) Show angleichen.

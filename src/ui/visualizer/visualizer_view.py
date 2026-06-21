@@ -69,7 +69,7 @@ class Visualizer3DView(QWidget):
         self._btn_move.setToolTip(
             "Aus: nur Kamera drehen/zoomen (Ansehen).\n"
             "An: Strahler per Drag im 3D verschieben (X/Z wandert in die Live View).\n"
-            "Buehne/Trassen bearbeiten: dafuer das separate 3D-Editor-Fenster nutzen."
+            "Bühne/Trassen bearbeiten: dafür das separate 3D-Editor-Fenster nutzen."
         )
         self._btn_move.toggled.connect(self._on_move_toggled)
         bar.addWidget(self._btn_move)
@@ -77,7 +77,7 @@ class Visualizer3DView(QWidget):
         btn_cam = QPushButton("⌖ Kamera")
         btn_cam.setMinimumHeight(30)
         btn_cam.setStyleSheet(_style)
-        btn_cam.setToolTip("Kamera zuruecksetzen")
+        btn_cam.setToolTip("Kamera zurücksetzen")
         btn_cam.clicked.connect(self._reset_camera)
         bar.addWidget(btn_cam)
 

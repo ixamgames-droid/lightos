@@ -35,7 +35,7 @@ class PatchFixtureEditDialog(QDialog):
         self._fixture = fixture
         self.result_updates: dict | None = None
         self._modes = fdb.get_modes(fixture.fixture_profile_id) if fixture.fixture_profile_id else []
-        self.setWindowTitle("Geraet bearbeiten")
+        self.setWindowTitle("Gerät bearbeiten")
         self.setMinimumWidth(440)
         self._setup_ui()
         self._validate()
@@ -46,7 +46,7 @@ class PatchFixtureEditDialog(QDialog):
 
         form.addRow("FID:", QLabel(str(self._fixture.fid)))
         form.addRow("Hersteller:", QLabel(self._fixture.manufacturer_name or "-"))
-        form.addRow("Geraet:", QLabel(self._fixture.fixture_name or "-"))
+        form.addRow("Gerät:", QLabel(self._fixture.fixture_name or "-"))
 
         self._edit_label = QLineEdit(self._fixture.label)
         form.addRow("Label:", self._edit_label)
@@ -77,7 +77,7 @@ class PatchFixtureEditDialog(QDialog):
         form.addRow("DMX-Adresse:", self._spin_address)
 
         self._lbl_channels = QLabel("")
-        form.addRow("Kanaele:", self._lbl_channels)
+        form.addRow("Kanäle:", self._lbl_channels)
 
         # Moving-Head-Ausrichtung (M3.4): Pan/Tilt invertieren/tauschen.
         self._chk_inv_pan = self._chk_inv_tilt = self._chk_swap = None

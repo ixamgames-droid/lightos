@@ -49,9 +49,11 @@ class VCWidget(QFrame):
         self._dragging = False
         self._resizing = False
         self._selected = False
+        self._effect_highlight = False   # Glow: „gehoert zum selben Effekt"
         self._snap_grid = 0      # 0 = kein Snap, sonst Grid-Größe in Pixel
         self._drag_start = QPoint()
         self._orig_rect = QRect()
+        self._pre_edit_snapshot = None   # Canvas-Stand vor Move/Resize (fuer Undo)
         self._bg_color = QColor("#2a2a2a")
         self._fg_color = QColor("#ffffff")
         self.setFrameShape(QFrame.Shape.Box)
@@ -64,6 +66,7 @@ class VCWidget(QFrame):
         self._edit_mode = enabled
         if not enabled:
             self._selected = False
+            self.set_effect_highlight(False)   # keine Hervorhebung im Betrieb
         self.setCursor(Qt.CursorShape.SizeAllCursor if enabled else Qt.CursorShape.ArrowCursor)
         self.update()
         for child in self.findChildren(VCWidget):
@@ -99,6 +102,7 @@ class VCWidget(QFrame):
             self._deselect_siblings()
             self._selected = True
             self.update()
+            self._notify_effect_highlight()    # Gruppe „beeinflusst denselben Effekt"
             pos = event.position().toPoint()
             if self._is_resize_handle(pos):
                 self._resizing = True
@@ -106,6 +110,15 @@ class VCWidget(QFrame):
                 self._dragging = True
             self._drag_start = event.globalPosition().toPoint()
             self._orig_rect = self.geometry()
+            # Vorher-Stand fuer Undo erfassen (erst bei echter Geometrie-Aenderung
+            # auf Release tatsaechlich auf den Undo-Stapel gelegt).
+            self._pre_edit_snapshot = None
+            _canvas = self._find_canvas()
+            if _canvas is not None and hasattr(_canvas, "to_dict"):
+                try:
+                    self._pre_edit_snapshot = _canvas.to_dict()
+                except Exception:
+                    self._pre_edit_snapshot = None
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -132,15 +145,26 @@ class VCWidget(QFrame):
 
     def mouseDoubleClickEvent(self, event):
         if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
-            self._open_properties()
+            self._edit_properties()
             event.accept()
         else:
             super().mouseDoubleClickEvent(event)
 
     def mouseReleaseEvent(self, event):
         was_dragging = self._dragging
+        was_resizing = self._resizing
         self._dragging = False
         self._resizing = False
+        # Verschieben/Groesse ist ein Undo-Punkt — aber nur bei wirklicher
+        # Geometrie-Aenderung (reiner Auswahl-Klick erzeugt keinen).
+        if (was_dragging or was_resizing) and self._edit_mode \
+                and self.geometry() != self._orig_rect:
+            _snap = getattr(self, "_pre_edit_snapshot", None)
+            _canvas = self._find_canvas()
+            if _canvas is not None and _snap is not None \
+                    and hasattr(_canvas, "push_undo_snapshot"):
+                _canvas.push_undo_snapshot(_snap)
+        self._pre_edit_snapshot = None
         # FRM-01: nach einem Drag pruefen, ob das Widget in einen Frame hinein
         # oder aus einem Frame heraus gezogen wurde (Reparenting per Hit-Test).
         if was_dragging and self._edit_mode:
@@ -168,7 +192,22 @@ class VCWidget(QFrame):
 
     def _show_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
-        menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
+        menu.addAction("Einstellungen...").triggered.connect(self._edit_properties)
+        # Grafische Widget-Galerie: nur wenn fuer den aktuellen Aspekt mehrere
+        # Bedien-Element-Typen passen (z. B. Tempo -> Speed-Rad ODER Fader).
+        _canvas = self._find_canvas()
+        if _canvas is not None and hasattr(_canvas, "replace_widget_type"):
+            try:
+                _aspect = _canvas._widget_aspect(self)
+            except Exception:
+                _aspect = None
+            if _aspect:
+                from .vc_effect_meta import widget_choices, ControlOption
+                _choices = widget_choices(ControlOption(_aspect, ""))
+                if len(_choices) > 1:
+                    menu.addAction("↔ Widget ändern…").triggered.connect(
+                        lambda checked=False, a=_aspect, c=list(_choices):
+                        self._change_widget_type(a, c))
         # MLV-01: ist das Widget an einen Effekt mit Live-Parametern gebunden,
         # bietet das Menue einen Live-Editor (Parameter/Aktionen -> erzeugt
         # automatisch VC-Bedienelemente, MLV-02).
@@ -291,6 +330,77 @@ class VCWidget(QFrame):
     def _open_properties(self):
         pass  # override in subclasses
 
+    def _edit_properties(self):
+        """Eigenschafts-Dialog MIT Undo-Punkt: erfasst den Vorher-Stand und legt ihn
+        nur dann auf den Undo-Stapel, wenn der Dialog wirklich etwas geaendert hat.
+        Ueber Doppelklick + Kontextmenue aufgerufen (statt _open_properties direkt)."""
+        _canvas = self._find_canvas()
+        _before = None
+        if _canvas is not None and hasattr(_canvas, "to_dict"):
+            try:
+                _before = _canvas.to_dict()
+            except Exception:
+                _before = None
+        self._open_properties()
+        if _canvas is not None and _before is not None \
+                and hasattr(_canvas, "push_undo_snapshot"):
+            try:
+                if _canvas.to_dict() != _before:
+                    _canvas.push_undo_snapshot(_before)
+            except Exception:
+                pass
+
+    def _change_widget_type(self, aspect, choices):
+        """Oeffnet die grafische Widget-Galerie und tauscht den Typ dieses Widgets
+        bindungserhaltend (VCCanvas.replace_widget_type) — ein Undo-Schritt."""
+        canvas = self._find_canvas()
+        if canvas is None or not hasattr(canvas, "replace_widget_type"):
+            return
+        from .vc_widget_gallery import VCWidgetGallery
+        chosen = VCWidgetGallery(choices, current=self.__class__.__name__,
+                                 parent=self).run()
+        if chosen and chosen != self.__class__.__name__:
+            canvas.replace_widget_type(self, chosen, aspect)
+
+    # ── Effekt-Gruppen-Hervorhebung ───────────────────────────────────────────
+
+    def set_effect_highlight(self, on: bool):
+        """Hebt dieses Widget als „gehoert zum selben Effekt" hervor (oranger
+        Glow-Halo). Wird vom Canvas gesetzt, wenn ein Widget/Effekt ausgewaehlt
+        ist (effect_binding-Gruppe). Universell ohne paintEvent-Eingriff via
+        QGraphicsDropShadowEffect."""
+        on = bool(on)
+        if on == getattr(self, "_effect_highlight", False):
+            return
+        self._effect_highlight = on
+        try:
+            if on:
+                from PySide6.QtWidgets import QGraphicsDropShadowEffect
+                from PySide6.QtGui import QColor
+                eff = QGraphicsDropShadowEffect(self)
+                eff.setColor(QColor("#ff9500"))   # Amber/Orange
+                eff.setBlurRadius(30)
+                eff.setOffset(0, 0)
+                self.setGraphicsEffect(eff)
+            else:
+                self.setGraphicsEffect(None)
+        except Exception:
+            pass
+        self.update()
+
+    def _notify_effect_highlight(self):
+        """Bittet den Canvas, alle Widgets hervorzuheben, die denselben Effekt
+        steuern wie dieses (Selektion -> Gruppe sichtbar). Ohne Effekt-Bindung
+        wird eine bestehende Hervorhebung aufgehoben."""
+        canvas = self._find_canvas()
+        if canvas is None or not hasattr(canvas, "highlight_effects"):
+            return
+        try:
+            ids = canvas._effect_ids_of(self)
+        except Exception:
+            ids = set()
+        canvas.highlight_effects(ids, exclude=self)
+
     # ── MLV: Matrix-/Effekt-Live-Editor (Phase 2) ──────────────────────────────
 
     def is_effect_bound(self) -> bool:
@@ -298,7 +408,7 @@ class VCWidget(QFrame):
         ueberschreiben: Button mit Funktions-/Effekt-Aktion, Slider im EFFECT_*-Modus)."""
         return False
 
-    def live_effect_function_id(self):
+    def live_effect_function_id(self) -> "int | None":
         """function_id des gebundenen Effekts (oder None = aktiver Effekt)."""
         return None
 

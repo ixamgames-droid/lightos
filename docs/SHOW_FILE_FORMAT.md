@@ -1,6 +1,6 @@
 # Show-Dateiformat (.lshow) — Spezifikation
 
-> **Stand: 2026-06-10**, verifiziert gegen `src/core/show/show_file.py`
+> **Stand: 2026-06-15**, verifiziert gegen `src/core/show/show_file.py`
 > (`SHOW_VERSION = "1.1"`). Frühere Versionen dieser Datei beschrieben ein
 > geplantes Multi-Datei-Format (patch.json, sequences/, …), das **nie gebaut
 > wurde** — real ist es ein ZIP mit genau einer Datei.
@@ -31,15 +31,18 @@ den State **und nullt die DMX-Puffer** (keine Artefakte nach „Neue Show").
 | `executors` | Executor-Pages und -Zuweisungen | `PlaybackEngine.to_dict` |
 | `palettes` | Paletten (inkl. Ordner) | `PaletteManager.to_dict` |
 | `curves` | Fade-Kurven-Bibliothek | `CurveLibrary.to_dict` |
-| `functions` | **alle Engine-Funktionen** (Scene, Chaser, Sequence, Collection, Show, EFX, RGBMatrix, Audio, Script) inkl. Running-Parameter | `FunctionManager.to_dict` |
+| `efx_paths` | Custom-EFX-Pfade-Bibliothek (selbst gezeichnete EFX-Bahnen) | `EfxPathLibrary.to_dict` |
+| `functions` | **alle Engine-Funktionen** (Scene, Chaser, Sequence, Collection, Show, EFX, RGBMatrix, Audio, Script) inkl. Running-Parameter (intensity, speed, **priority** [F-17], folder) | `FunctionManager.to_dict` |
 | `efx`, `rgb_matrix` | **immer leer** — Altlast-Blöcke fürs Schema; EFX/Matrix sind seit dem Function-Umbau echte Funktionen im `functions`-Block | — |
 | `virtual_console` | VC-Layout (Banks/Seiten, Widgets inkl. MIDI-Bindings) | `state._vc_layout` |
-| `visualizer` | 3D-Positionen `{fid: [x,y,z]}`, Y-Rotationen `{fid: grad}` + aktive Bühne | `visualizer_positions` / `visualizer_rotations` |
-| `live_view` | 2D-Positionen `{fid: [x,y]}` der Live-View-Arbeitsfläche | `live_view_positions` |
+| `visualizer` | 3D-Positionen `{fid: [x,y,z]}`, Y-Rotationen `{fid: grad}`, Andock-Beziehungen `docks {fid: stage_element_id}` + aktive Bühne (`active_stage`, Default `"simple"`) | `visualizer_positions` / `visualizer_rotations` / `visualizer_docks` / `active_stage_name` |
+| `live_view` | 2D-Positionen `{fid: [x,y]}` + `meta` (Zoom/Grid/Snap/Weltgröße der Live-View-Arbeitsfläche) | `live_view_positions` / `live_view_meta` |
 | `snapshots` | gespeicherte Snapshots | `state._snapshots_data` |
 | `channel_groups` | Kanal-Gruppen | `state._channel_groups_data` |
 | `fixture_groups` | Fixture-Gruppen (inkl. Ordner, Gruppen-Modi Linked/Einzeln/Relativ) | `_collect_fixture_groups` |
 | `library` | Show-Bibliothek (Snaps **und** Effekt-Verweise, Ordner) | `SnapLibrary.to_dict` |
+| `playlist` | Musik-Playlist des In-App-Players (Track-Dicts) | `state.playlist` |
+| `music_autoshow` | An Musik gekoppelte Auto-Show: `{enabled, function_ids, bank, slots}` (`slots {int: function-id}`, beim Laden ergänzt) | `state.music_autoshow` |
 | `layout` | optional: Fenster-/Dock-Layout (`collect_layout(main_window)`) | Parameter |
 
 ## Hinweise

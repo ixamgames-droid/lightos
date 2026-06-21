@@ -14,7 +14,8 @@ density, spread, runner_count …
 from __future__ import annotations
 import math
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
-                                QDialogButtonBox, QDoubleSpinBox, QSpinBox, QLabel)
+                                QDialogButtonBox, QDoubleSpinBox, QSpinBox, QLabel,
+                                QWidget, QVBoxLayout, QHBoxLayout)
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
@@ -32,6 +33,12 @@ class VCEncoder(VCWidget):
         super().__init__(caption, parent)
         self.param_key: str = "speed"
         self.function_id: int | None = None     # None = aktiver Effekt
+        # Phase E (Multi-Effekt): weitere gekoppelte Effekt-IDs. Der Encoder wirkt
+        # auf function_id + alle function_ids. Leer = nur function_id / aktiver Effekt.
+        self.function_ids: list[int] = []
+        # Je gekoppeltem Effekt ein eigener gesteuerter Parameter (fid -> key);
+        # fehlt ein Eintrag -> param_key (Default).
+        self.param_keys_per_id: dict[int, str] = {}
         # Live-Bearbeitung: ohne feste function_id den Effekt aus diesem Edit-Slot
         # (von einem Effekt-Pad gesetzt) verstellen statt den global aktiven.
         self.edit_slot: str = ""
@@ -62,6 +69,30 @@ class VCEncoder(VCWidget):
             except Exception:
                 pass
         return None
+
+    def _all_fids(self) -> list:
+        """Phase E: alle Ziel-fids (resolvte function_id/Edit-Slot + function_ids),
+        dedupliziert. Leer = keine Bindung -> Aufrufer faellt auf den aktiven
+        Effekt zurueck (fid None)."""
+        ids: list = []
+        primary = self._fid()
+        if primary is not None:
+            ids.append(int(primary))
+        for i in self.function_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in ids:
+                ids.append(iv)
+        return ids
+
+    def _key_for(self, fid) -> str:
+        """Phase E: gesteuerter Parameter fuer einen Effekt — eigener Eintrag in
+        param_keys_per_id, sonst der Default-param_key."""
+        if fid is None:
+            return self.param_key
+        return self.param_keys_per_id.get(int(fid), self.param_key)
 
     def _spec(self):
         try:
@@ -100,19 +131,25 @@ class VCEncoder(VCWidget):
             return None
 
     def nudge(self, ticks: float):
-        """Relativ um `ticks` Schritte (× step) verstellen — der Kern des Encoders."""
+        """Relativ um `ticks` Schritte (× step) verstellen — der Kern des Encoders.
+        Phase E: wirkt auf ALLE gekoppelten Effekte (je mit eigenem Parameter)."""
         try:
             from src.core.engine import effect_live
-            effect_live.adjust_param(self.param_key, ticks * self.step, self._fid())
+            fids = self._all_fids() or [None]
+            for fid in fids:
+                effect_live.adjust_param(self._key_for(fid), ticks * self.step, fid)
         except Exception:
             pass
         self.update()
 
     def set_normalized(self, norm: float):
-        """Absolut setzen (nur fuer den absoluten MIDI-Modus)."""
+        """Absolut setzen (nur fuer den absoluten MIDI-Modus).
+        Phase E: wirkt auf ALLE gekoppelten Effekte (je mit eigenem Parameter)."""
         try:
             from src.core.engine import effect_live
-            effect_live.set_param_normalized(self.param_key, norm, self._fid())
+            fids = self._all_fids() or [None]
+            for fid in fids:
+                effect_live.set_param_normalized(self._key_for(fid), norm, fid)
         except Exception:
             pass
         self.update()
@@ -272,6 +309,13 @@ class VCEncoder(VCWidget):
         fid_edit.setToolTip("Funktions-ID des Ziel-Effekts. Leer = aktiver Effekt.")
         form.addRow("Effekt-ID (leer=aktiv):", fid_edit)
 
+        # Phase E: weitere gekoppelte Effekt-IDs (Komma-getrennt) — der Encoder
+        # wirkt zusaetzlich auf diese Effekte.
+        extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
+        extra_ids.setToolTip("Weitere Effekt-IDs (Komma-getrennt) — der Encoder "
+                             "verstellt zusaetzlich diese Effekte.")
+        form.addRow("Weitere Ziel-IDs:", extra_ids)
+
         edit_slot_edit = QLineEdit(self.edit_slot)
         edit_slot_edit.setToolTip("Live-Edit-Slot (Freitext, z. B. MH/MX). Ohne feste "
                                   "Effekt-ID verstellt der Encoder den Effekt aus diesem Slot.")
@@ -302,6 +346,44 @@ class VCEncoder(VCWidget):
         ch_sb.setSpecialValueText("Alle")
         form.addRow("MIDI-Kanal (0=alle):", ch_sb)
 
+        # ── Phase E: Gekoppelte Effekte (je Effekt gesteuerten Parameter) ──
+        coupled_box = QWidget()
+        coupled_lay = QVBoxLayout(coupled_box)
+        coupled_lay.setContentsMargins(0, 0, 0, 0)
+        coupled_combos: list[tuple[int, QComboBox]] = []
+        try:
+            from .vc_effect_meta import mappable_param_choices, effect_name
+            for _fid in self._all_fids():
+                row = QWidget()
+                rl = QHBoxLayout(row)
+                rl.setContentsMargins(0, 0, 0, 0)
+                rl.addWidget(QLabel(effect_name(_fid)))
+                pcombo = QComboBox()
+                pcombo.setEditable(True)
+                pcombo.addItem("(Standard)", "")
+                _keys = [k for k, _l in mappable_param_choices(_fid)]
+                for _k, _l in mappable_param_choices(_fid):
+                    pcombo.addItem(f"{_l}  ({_k})", _k)
+                _cur = self.param_keys_per_id.get(int(_fid), "")
+                if _cur and _cur not in _keys:
+                    pcombo.addItem(_cur, _cur)
+                _idx = next((i for i in range(pcombo.count())
+                             if pcombo.itemData(i) == _cur), -1)
+                if _idx >= 0:
+                    pcombo.setCurrentIndex(_idx)
+                elif _cur:
+                    pcombo.setCurrentText(_cur)
+                else:
+                    pcombo.setCurrentIndex(0)
+                rl.addWidget(pcombo, 1)
+                coupled_lay.addWidget(row)
+                coupled_combos.append((int(_fid), pcombo))
+        except Exception:
+            pass
+        if coupled_combos:
+            form.addRow(QLabel("── Gekoppelte Effekte ──"))
+            form.addRow("Je Effekt steuern:", coupled_box)
+
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -313,6 +395,30 @@ class VCEncoder(VCWidget):
             self.param_key = key_edit.text().strip() or self.param_key
             t = fid_edit.text().strip()
             self.function_id = int(t) if t.lstrip("-").isdigit() else None
+            ids = []
+            for part in extra_ids.text().split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    ids.append(int(part))
+                except ValueError:
+                    pass
+            self.function_ids = ids
+            # Phase E: je-Effekt-Parameter aus den Combos uebernehmen — nur fuer
+            # IDs, die nach der Bearbeitung noch gekoppelt sind.
+            _final_ids = set(self._all_fids())
+            new_pkpi: dict[int, str] = {}
+            for _fid, _pc in coupled_combos:
+                if _fid not in _final_ids:
+                    continue
+                _hit = _pc.findText(_pc.currentText().strip())
+                _val = _pc.itemData(_hit) if _hit >= 0 else None
+                if _val is None:
+                    _val = _pc.currentText().strip()
+                if _val:
+                    new_pkpi[int(_fid)] = str(_val)
+            self.param_keys_per_id = new_pkpi
             self.edit_slot = edit_slot_edit.text().strip()
             self.step = float(step_sb.value())
             self.midi_mode = mode_cb.currentText()
@@ -326,6 +432,8 @@ class VCEncoder(VCWidget):
         d = super().to_dict()
         d["param_key"] = self.param_key
         d["function_id"] = self.function_id
+        d["function_ids"] = list(self.function_ids)
+        d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
         d["edit_slot"] = self.edit_slot
         d["step"] = self.step
         d["midi_mode"] = self.midi_mode
@@ -337,6 +445,19 @@ class VCEncoder(VCWidget):
         super().apply_dict(d)
         self.param_key = d.get("param_key", "speed")
         self.function_id = d.get("function_id")
+        _fids = []
+        for i in d.get("function_ids", []):
+            try:
+                _fids.append(int(i))
+            except (TypeError, ValueError):
+                pass
+        self.function_ids = _fids
+        self.param_keys_per_id = {}
+        for k, v in (d.get("param_keys_per_id") or {}).items():
+            try:
+                self.param_keys_per_id[int(k)] = str(v)
+            except (TypeError, ValueError):
+                pass
         self.edit_slot = d.get("edit_slot", "")
         self.step = float(d.get("step", 0.05))
         self.midi_mode = d.get("midi_mode", EncoderMidiMode.RELATIVE)

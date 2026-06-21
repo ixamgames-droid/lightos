@@ -159,7 +159,7 @@ st = [par_dim(f"Dim P{i+1}", [par_fids[i]]) for i in range(4)]
 st_all, st_off = par_dim("Dim alle", par_fids), par_dim("Dim aus", [])
 st_odd, st_even = par_dim("Dim 1+3", [1, 3]), par_dim("Dim 2+4", [2, 4])
 st_b = [par_dim(f"Build {i+1}", par_fids[:i+1]) for i in range(4)]
-lk = [par_look("Rot", r=255), par_look("Gruen", g=255), par_look("Blau", b=255),
+lk = [par_look("Rot", r=255), par_look("Grün", g=255), par_look("Blau", b=255),
       par_look("Amber", r=255, g=140), par_look("Cyan", g=255, b=255), par_look("Magenta", r=255, b=255)]
 
 dim_run = chaser("Lauflicht", [st[0].id, st[1].id, st[2].id, st[3].id], hold=0.35, fade=0.08)
@@ -302,8 +302,8 @@ for i, nm in enumerate(PAGE_NAMES):
 
 
 # ── SEITE 1 — FARBEN & GRUPPEN (F-24 / F-25) ────────────────────────────────
-COLORS8 = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-           ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+COLORS8 = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+           ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
            ("Magenta", 255, 0, 255, 0), ("Warm", 255, 130, 40, 60)]
 for s, (nm, r, g, b, w) in enumerate(COLORS8):
     color_tile(nm, slot_note(s), B_COLOR, r, g, b, w)
@@ -339,7 +339,7 @@ effect_action_btn("Form +", 2, B_MATRIX, "#7a6500", "next_algorithm", MB)
 effect_action_btn("Richtung", 3, B_MATRIX, "#335533", "reverse_direction", MB)
 effect_action_btn("Freeze", 4, B_MATRIX, "#553333", "toggle_freeze", MB)
 effect_action_btn("Commit", 5, B_MATRIX, "#1d4d2d", "commit_live", MB)
-_RC = [("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiss", 255, 255, 255)]
+_RC = [("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255), ("Weiß", 255, 255, 255)]
 for s, (nm, r, g, b) in enumerate(_RC):
     color_tile(f"C1 {nm}", slot_note(8 + s), B_MATRIX, r, g, b, target=ColorTarget.EFFECT_C1, function_id=MB, with_intensity=False)
 for s, (nm, r, g, b) in enumerate(_RC):

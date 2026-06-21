@@ -271,7 +271,7 @@ class FixtureEditorDialog(QDialog):
     def _del_mode(self):
         idx = self._tabs.currentIndex()
         if idx < 0 or self._tabs.count() <= 1:
-            QMessageBox.information(self, "Mode loeschen",
+            QMessageBox.information(self, "Mode löschen",
                                     "Mindestens ein Mode muss existieren.")
             return
         self._tabs.removeTab(idx)
@@ -324,7 +324,7 @@ class FixtureEditorDialog(QDialog):
             QMessageBox.warning(self, "Speichern", "Modell-Name fehlt.")
             return
         if self._tabs.count() == 0:
-            QMessageBox.warning(self, "Speichern", "Mindestens ein Mode noetig.")
+            QMessageBox.warning(self, "Speichern", "Mindestens ein Mode nötig.")
             return
 
         # Sync alle Modes

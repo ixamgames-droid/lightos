@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QDoubleSpinBox, QLineEdit, QDialogButtonBox,
-    QSizePolicy, QComboBox, QCheckBox,
+    QSizePolicy, QComboBox, QCheckBox, QLabel, QWidget, QVBoxLayout, QHBoxLayout,
 )
 from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
@@ -14,6 +14,47 @@ from .vc_widget import VCWidget
 class SpeedTarget(str):
     EXECUTOR = "Executor"
     FUNCTION = "Function"
+    # Tempo-Sync Phase 5: Dial setzt die BPM eines benannten Tempo-Bus.
+    TEMPO_BUS = "TempoBus"
+    # Half/Double: Dial setzt den tempo_multiplier der Ziel-Effekte (×0.5/×1/×2/×4).
+    TEMPO_BUS_MULT = "TempoBusMult"
+    # QLC+-Parität (Phase C): der Dial IST ein Speed-Knoten (Tempo-Bus) — Master
+    # (eigene BPM via Tap/Rad) oder Sub (folgt einem Master, Faktor-Gitter ¼ ½ 1 2 4).
+    SPEED_NODE = "SpeedNode"
+
+
+# Standard-Faktor-Set für den Sub-Modus (konfigurierbar im Dialog).
+DEFAULT_FACTORS = [0.25, 0.5, 1.0, 2.0, 4.0]
+
+
+def _fmt_factor(f: float) -> str:
+    """Faktor hübsch formatieren: 0.25→¼, 0.5→½, 2.0→2×, 1.0→1×."""
+    table = {0.25: "¼", 0.5: "½", 0.75: "¾", 1.0: "1×", 1.5: "1½",
+             2.0: "2×", 3.0: "3×", 4.0: "4×", 8.0: "8×", 16.0: "16×",
+             0.125: "⅛", 0.0625: "1/16"}
+    if f in table:
+        return table[f]
+    if float(f).is_integer():
+        return f"{int(f)}×"
+    return f"{f:g}×"
+
+
+def _parse_factor_token(tok: str):
+    """Parst einen Faktor-Token aus dem Dialog: „¼"/„½"/„2×"/„0.5"/„1/4" → float."""
+    s = (tok or "").strip().replace("×", "").replace("x", "").replace("X", "").strip()
+    if not s:
+        return None
+    symbols = {"¼": 0.25, "½": 0.5, "¾": 0.75, "⅛": 0.125, "1/16": 0.0625}
+    if s in symbols:
+        return symbols[s]
+    try:
+        if "/" in s:
+            a, b = s.split("/", 1)
+            b = float(b)
+            return float(a) / b if b else None
+        return float(s)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
 
 
 class VCSpeedDial(VCWidget):
@@ -25,7 +66,14 @@ class VCSpeedDial(VCWidget):
         # SPD-04: zusaetzliche Ziel-IDs (Komma-getrennt im Dialog). Leer = nur
         # function_id. Sync/Speed wirken auf ALLE Ziele.
         self.function_ids: list[int] = []
+        # Phase E (Multi-Effekt): je gekoppeltem Effekt ein eigener gesteuerter
+        # Parameter (fid -> key). Greift in den Effekt-Modi (FUNCTION ->
+        # Default "speed", Effekt-Multiplier -> Default "tempo_multiplier");
+        # fehlt ein Eintrag, gilt der jeweilige Default-Parameter.
+        self.param_keys_per_id: dict[int, str] = {}
         self.target_mode: str = SpeedTarget.EXECUTOR
+        # Ziel-Bus fuer TEMPO_BUS-Modus ("" = aktiver/Default-Bus).
+        self.tempo_bus_id: str = ""
         self._bpm: float = 120.0         # 20–600 BPM
         self._min_bpm: float = 20.0
         self._max_bpm: float = 600.0
@@ -37,12 +85,32 @@ class VCSpeedDial(VCWidget):
         self._max_mult: float = 8.0
         # SPD-01: optionale Invertierung (hoeherer Dial-Wert = langsamer).
         self.invert: bool = False
+        # ── Speed-Node (Phase C, QLC+-Parität) ────────────────────────────────────
+        # role: "master" = eigene BPM (Tap/Rad), "sub" = folgt parent_bus_id × Faktor.
+        self.role: str = "master"
+        self.parent_bus_id: str = ""        # bei sub: Master-Bus ("" = Default/Sound-BPM)
+        self.factor_buttons: list[float] = list(DEFAULT_FACTORS)
+        self._active_factor: float = 1.0    # aktuell gewählter Sub-Faktor
+        # Anzeige-Schalter (QLC+ „Erscheinungsbild"): welche Teile sichtbar sind.
+        self.show_dial: bool = True         # Rad (nur Master sinnvoll)
+        self.show_tap: bool = True          # Tap-Button (Master)
+        self.show_factors: bool = True      # Faktor-Gitter (Sub)
+        self.show_sync: bool = True         # Sync-Button (Sub: Downbeat neu setzen)
+        self.show_bpm: bool = True          # digitale BPM-Anzeige
         self._drag_y: int | None = None
         self._drag_start_val: float = 120.0
         self._tap_times: list[float] = []
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
         self.resize(120, 140)
+        # Auto-Refresh (~10 Hz): die BPM-/Multiplikator-Anzeige (Master × Faktor bzw.
+        # Bus-BPM) verfolgt die extern — z. B. per Audio/Tap — wechselnde Master-BPM in
+        # Echtzeit, statt erst beim Antippen. Repaint nur bei echter Wertaenderung.
+        self._last_live_probe = None
+        self._live_timer = QTimer(self)
+        self._live_timer.setInterval(100)
+        self._live_timer.timeout.connect(self._poll_live)
+        self._live_timer.start()
 
     # ── BPM ──────────────────────────────────────────────────────────────────
 
@@ -72,12 +140,50 @@ class VCSpeedDial(VCWidget):
             ids.insert(0, int(self.function_id))
         return ids
 
+    def _key_for(self, fid, default: str) -> str:
+        """Phase E: gesteuerter Parameter fuer einen Effekt — eigener Eintrag in
+        param_keys_per_id, sonst der uebergebene Default-Key des Modus."""
+        try:
+            return self.param_keys_per_id.get(int(fid), default)
+        except (TypeError, ValueError):
+            return default
+
     def _effective_bpm(self) -> float:
         # SPD-01: Invertierung spiegelt den Wert am Bereich (hoeher = langsamer).
         return (self._min_bpm + self._max_bpm - self._bpm) if self.invert else self._bpm
 
     def _effective_mult(self) -> float:
         return (self._min_mult + self._max_mult - self._mult) if self.invert else self._mult
+
+    # ── Auto-Refresh der Live-Anzeige ──────────────────────────────────────────
+    def _live_bpm_probe(self):
+        """Der extern wechselnde Wert, den dieses Widget anzeigt (Master×Faktor bzw.
+        Bus-BPM). None = haengt an keiner externen BPM -> kein Poll-Repaint noetig."""
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            tbm = get_tempo_bus_manager()
+            if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+                mb = tbm.get("")
+                return round((mb.bpm if mb is not None else 0.0) * self._active_factor, 2)
+            if self.target_mode == SpeedTarget.TEMPO_BUS:
+                b = tbm.get(self.tempo_bus_id)
+                return round(b.bpm if b is not None else 0.0, 2)
+            if self.target_mode == SpeedTarget.SPEED_NODE and self.role == "sub":
+                b = self._node_bus()
+                return round(b.bpm if b is not None else 0.0, 2)
+        except Exception:
+            return None
+        return None
+
+    def _poll_live(self):
+        """~10-Hz-Tick: die Live-Anzeige neu zeichnen, sobald sich die externe BPM
+        aendert (kein Dauer-Repaint, nur bei Wertwechsel; nichts wenn unsichtbar)."""
+        if not self.isVisible():
+            return
+        probe = self._live_bpm_probe()
+        if probe is not None and probe != self._last_live_probe:
+            self._last_live_probe = probe
+            self.update()
 
     def _speed_factor(self) -> float:
         """Geschwindigkeitsfaktor (1.0 = normal) aus dem aktuellen Dial-Wert."""
@@ -86,6 +192,37 @@ class VCSpeedDial(VCWidget):
         return max(0.05, min(20.0, self._effective_bpm() / 120.0))
 
     def _apply(self):
+        # QLC+-Parität (Phase C): Speed-Knoten steuert direkt einen Tempo-Bus.
+        if self.target_mode == SpeedTarget.SPEED_NODE:
+            self._ensure_node_config()
+            if self.role == "master":
+                bus = self._node_bus()
+                if bus is not None:
+                    try:
+                        bus.set_bpm(self._effective_bpm())
+                    except Exception:
+                        pass
+            return
+        # Tempo-Sync Phase 5: Dial steuert die BPM eines benannten Bus.
+        if self.target_mode == SpeedTarget.TEMPO_BUS:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().resolve(self.tempo_bus_id)
+                if bus is not None:
+                    bus.set_bpm(self._effective_bpm())
+            except Exception:
+                pass
+            return
+        # Half/Double: Dial setzt den tempo_multiplier der Ziel-Effekte.
+        if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+            try:
+                from src.core.engine import effect_live
+                for fid in self._targets():
+                    effect_live.set_param(self._key_for(fid, "tempo_multiplier"),
+                                          self._effective_mult(), fid)
+            except Exception:
+                pass
+            return
         targets = self._targets()
         if not targets:
             return
@@ -103,8 +240,9 @@ class VCSpeedDial(VCWidget):
                     factor = self._speed_factor()
                     # Effekte (Matrix/EFX) nutzen set_param('speed') -> matrix_speed;
                     # klassische Funktionen haben ein .speed-Attribut.
+                    # Phase E: je Effekt darf ein eigener Parameter gesteuert werden.
                     if hasattr(fn, "set_param") and hasattr(fn, "list_params"):
-                        fn.set_param("speed", factor)
+                        fn.set_param(self._key_for(fid, "speed"), factor)
                     elif hasattr(fn, "speed"):
                         fn.speed = factor
                 else:
@@ -125,6 +263,19 @@ class VCSpeedDial(VCWidget):
         """SPD-03: gleicht die Phase aller Ziel-Effekte an (gemeinsamer Startpunkt).
         Effekte ohne Phasen-Unterstuetzung werden uebersprungen (kein Crash)."""
         synced = 0
+        if self.target_mode == SpeedTarget.SPEED_NODE:
+            self._node_sync()
+            return 1
+        if self.target_mode == SpeedTarget.TEMPO_BUS:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().resolve(self.tempo_bus_id)
+                if bus is not None:
+                    bus.sync(reset_downbeat=True)
+                    return 1
+            except Exception:
+                pass
+            return 0
         try:
             from src.core.app_state import get_state
             fm = get_state().function_manager
@@ -153,6 +304,27 @@ class VCSpeedDial(VCWidget):
         return synced
 
     def _tap(self):
+        if self.target_mode == SpeedTarget.SPEED_NODE:
+            bus = self._node_bus()
+            if bus is not None and self.role == "master":
+                try:
+                    bus.tap()
+                    self._bpm = bus.bpm
+                    self.update()
+                except Exception:
+                    pass
+            return
+        if self.target_mode == SpeedTarget.TEMPO_BUS:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().resolve(self.tempo_bus_id)
+                if bus is not None:
+                    bus.tap()
+                    self._bpm = bus.bpm     # ohne _apply (sonst Ueberschreiben mit Dial-Wert)
+                    self.update()
+            except Exception:
+                pass
+            return
         now = time.monotonic()
         self._tap_times.append(now)
         # Keep last 8 taps
@@ -162,6 +334,211 @@ class VCSpeedDial(VCWidget):
                          for i in range(len(self._tap_times) - 1)]
             avg = sum(intervals) / len(intervals)
             self.bpm = 60.0 / avg
+
+    # ── Speed-Node (Master/Sub) ───────────────────────────────────────────────
+
+    def _node_bus(self):
+        """Der Tempo-Bus, den dieser Speed-Knoten steuert (oder None).
+        Mit gesetzter ``tempo_bus_id`` wird der Bus bei Bedarf ERZEUGT (der Knoten
+        besitzt seinen Bus); leer = aktiver/Default-Bus über ``resolve``."""
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            mgr = get_tempo_bus_manager()
+            if self.tempo_bus_id:
+                return mgr.ensure_bus(self.tempo_bus_id)
+            return mgr.resolve(self.tempo_bus_id)
+        except Exception:
+            return None
+
+    def _ensure_node_config(self):
+        """Drueckt Rolle/Parent (und bei Sub den aktuellen Faktor) auf den Ziel-Bus.
+        Der reservierte Default-Bus wird NIE zum Sub gemacht."""
+        if self.target_mode != SpeedTarget.SPEED_NODE:
+            return
+        bus = self._node_bus()
+        if bus is None:
+            return
+        try:
+            from src.core.engine.tempo_bus import TempoBusManager
+            if self.role == "sub":
+                if bus.bus_id == TempoBusManager.DEFAULT_BUS:
+                    return
+                bus.set_role("sub")
+                bus.set_parent(self.parent_bus_id)
+                bus.set_bus_multiplier(self._active_factor)
+            else:
+                bus.set_role("master")
+        except Exception:
+            pass
+
+    def _factor_grid_mode(self) -> bool:
+        """True, wenn der Dial das Faktor-Gitter (¼ ½ 1 2 3 4) zeigt: SPEED_NODE-Sub
+        (-> bus_multiplier) ODER TEMPO_BUS_MULT (-> tempo_multiplier je Effekt)."""
+        return ((self.target_mode == SpeedTarget.SPEED_NODE and self.role == "sub")
+                or self.target_mode == SpeedTarget.TEMPO_BUS_MULT)
+
+    def _show_factor_grid(self) -> bool:
+        """Soll das Faktor-Gitter wirklich gezeichnet/klickbar sein? Im Multiplikator-
+        Modus IMMER (sonst waere das Widget leer/unbedienbar — es gibt dort nichts
+        anderes anzuzeigen), sonst respektiert es die ``show_factors``-Anzeigeoption.
+        Hält Render (_paint_node_sub) und Klick (_node_sub_click) konsistent mit
+        _factor_grid_mode(), ohne show_factors zu mutieren/persistieren."""
+        if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+            return True
+        return self.show_factors
+
+    def _set_factor(self, f: float):
+        """Faktor waehlen (¼ ½ 1 2 3 4 …). SPEED_NODE-Sub -> bus_multiplier des
+        Ziel-Bus; TEMPO_BUS_MULT -> tempo_multiplier der Ziel-Effekte (pro Effekt,
+        unbegrenzt viele unabhaengige Multiplikatoren am selben Master)."""
+        self._active_factor = float(f)
+        if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+            self._mult = float(f)
+            self._apply()
+        elif self.role == "sub":
+            bus = self._node_bus()
+            if bus is not None:
+                try:
+                    bus.set_bus_multiplier(self._active_factor)
+                except Exception:
+                    pass
+        self.update()
+
+    def _step_factor(self, direction: int):
+        """Einen Schritt im Faktor-Set nach langsamer (-1) / schneller (+1)."""
+        facs = sorted(self.factor_buttons) or list(DEFAULT_FACTORS)
+        idx = min(range(len(facs)), key=lambda i: abs(facs[i] - self._active_factor))
+        idx = max(0, min(len(facs) - 1, idx + int(direction)))
+        self._set_factor(facs[idx])
+
+    def _reset_factor(self):
+        self._set_factor(1.0)
+
+    def _node_sync(self):
+        """Downbeat des Ziel-Bus neu auf 'jetzt' setzen (Sub-Sync)."""
+        bus = self._node_bus()
+        if bus is not None:
+            try:
+                bus.sync(reset_downbeat=True)
+            except Exception:
+                pass
+
+    # ── Sub-Layout (Faktor-Gitter) ────────────────────────────────────────────
+
+    def _factor_rects(self) -> list[tuple[QRect, float]]:
+        facs = list(self.factor_buttons) or list(DEFAULT_FACTORS)
+        n = len(facs)
+        if n == 0:
+            return []
+        m, gap, y, h = 4, 4, 22, 28
+        total = self.width() - 2 * m - gap * (n - 1)
+        bw = max(18, total // n)
+        out, x = [], m
+        for f in facs:
+            out.append((QRect(x, y, bw, h), f))
+            x += bw + gap
+        return out
+
+    def _node_step_rects(self) -> tuple[QRect, QRect, QRect, QRect]:
+        y, h, m, bw = 54, 24, 4, 30
+        minus = QRect(m, y, bw, h)
+        reset = QRect(self.width() - m - bw, y, bw, h)
+        plus = QRect(self.width() - m - 2 * bw - 4, y, bw, h)
+        readout = QRect(minus.right() + 4, y, max(10, plus.left() - minus.right() - 8), h)
+        return minus, readout, plus, reset
+
+    def _node_sync_rect(self) -> QRect:
+        y, h, m = 82, 24, 4
+        return QRect(m, y, self.width() - 2 * m, h)
+
+    def _node_bpm_rect(self) -> QRect:
+        h = 26
+        return QRect(0, self.height() - h, self.width(), h)
+
+    def _node_sub_click(self, pos: QPoint) -> bool:
+        if self._show_factor_grid():
+            for rect, f in self._factor_rects():
+                if rect.contains(pos):
+                    self._set_factor(f)
+                    return True
+            minus, _readout, plus, reset = self._node_step_rects()
+            if minus.contains(pos):
+                self._step_factor(-1)
+                return True
+            if plus.contains(pos):
+                self._step_factor(+1)
+                return True
+            if reset.contains(pos):
+                self._reset_factor()
+                return True
+        if self.show_sync and self._node_sync_rect().contains(pos):
+            self._node_sync()
+            return True
+        return False
+
+    def _paint_node_sub(self, p: QPainter):
+        # Kopfzeile: Beschriftung links, Rolle/Parent-Badge rechts (amber = Sub).
+        p.setFont(QFont("Segoe UI", 8))
+        p.setPen(QColor("#e6edf3"))
+        p.drawText(QRect(4, 2, self.width() - 8, 16),
+                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self.caption)
+        p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        p.setPen(QColor("#d29922"))
+        _badge = ("× Master" if self.target_mode == SpeedTarget.TEMPO_BUS_MULT
+                  else f"Sub→{self.parent_bus_id or 'Sound'}")
+        p.drawText(QRect(0, 2, self.width() - 4, 16),
+                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, _badge)
+
+        if self._show_factor_grid():
+            p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            for rect, f in self._factor_rects():
+                active = abs(f - self._active_factor) < 1e-6
+                p.fillRect(rect, QColor("#1f6feb") if active else QColor("#21262d"))
+                p.setPen(QColor("#ffffff") if active else QColor("#8b949e"))
+                p.drawText(rect, Qt.AlignmentFlag.AlignCenter, _fmt_factor(f))
+            minus, readout, plus, reset = self._node_step_rects()
+            p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            for rr, txt in ((minus, "-"), (plus, "+"), (reset, "X")):
+                p.fillRect(rr, QColor("#21262d"))
+                p.setPen(QColor("#e6edf3"))
+                p.drawText(rr, Qt.AlignmentFlag.AlignCenter, txt)
+            p.setPen(QColor("#58a6ff"))
+            p.drawText(readout, Qt.AlignmentFlag.AlignCenter, _fmt_factor(self._active_factor))
+
+        if self.show_sync:
+            sr = self._node_sync_rect()
+            p.fillRect(sr, QColor("#1f3a26"))
+            p.setPen(QColor("#3fb950"))
+            p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            p.drawText(sr, Qt.AlignmentFlag.AlignCenter, "SYNC")
+
+        if self.show_bpm:
+            br = self._node_bpm_rect()
+            p.fillRect(br, QColor("#161b22"))
+            if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+                # Effektives Effekt-Tempo = Master-BPM (Default-Bus) × Faktor.
+                try:
+                    from src.core.engine.tempo_bus import get_tempo_bus_manager
+                    mb = get_tempo_bus_manager().get("")
+                    master = mb.bpm if mb is not None else 0.0
+                except Exception:
+                    master = 0.0
+                bpm = master * self._active_factor
+                right = f"Master · {_fmt_factor(self._active_factor)}"
+            else:
+                bus = self._node_bus()
+                bpm = bus.bpm if bus is not None else 0.0
+                right = (f"folgt {self.parent_bus_id or 'Sound-BPM'} · "
+                         f"{_fmt_factor(self._active_factor)}")
+            p.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+            p.setPen(QColor("#3fb950") if bpm > 0 else QColor("#8b949e"))
+            p.drawText(QRect(br.x() + 6, br.y(), br.width() - 12, br.height()),
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       (f"{bpm:.0f} BPM" if bpm > 0 else "— BPM"))
+            p.setPen(QColor("#8b949e"))
+            p.setFont(QFont("Segoe UI", 7))
+            p.drawText(QRect(br.x() + 6, br.y(), br.width() - 12, br.height()),
+                       Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, right)
 
     # ── Dial geometry ─────────────────────────────────────────────────────────
 
@@ -199,6 +576,11 @@ class VCSpeedDial(VCWidget):
             event.accept()
             return
         pos = event.position().toPoint()
+        if self._factor_grid_mode():
+            if self._node_sub_click(pos):
+                return
+            event.accept()
+            return
         if self._tap_rect().contains(pos):
             self._tap()
             return
@@ -243,6 +625,11 @@ class VCSpeedDial(VCWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(self.rect(), self._bg_color)
+
+        if self._factor_grid_mode():
+            self._paint_node_sub(p)
+            p.end()
+            return
 
         cx = self._dial_center()
         r = self._dial_radius()
@@ -338,6 +725,9 @@ class VCSpeedDial(VCWidget):
         mode_cb = QComboBox()
         mode_cb.addItem("Executor (Playback)", SpeedTarget.EXECUTOR)
         mode_cb.addItem("Funktion / Effekt", SpeedTarget.FUNCTION)
+        mode_cb.addItem("Tempo-Bus (BPM setzen)", SpeedTarget.TEMPO_BUS)
+        mode_cb.addItem("Effekt ×½/×2 (Multiplier)", SpeedTarget.TEMPO_BUS_MULT)
+        mode_cb.addItem("Speed-Knoten (Master/Sub)", SpeedTarget.SPEED_NODE)
         for i in range(mode_cb.count()):
             if mode_cb.itemData(i) == self.target_mode:
                 mode_cb.setCurrentIndex(i)
@@ -365,12 +755,142 @@ class VCSpeedDial(VCWidget):
             data = func_combo.currentData()
             if data is not None and data >= 0:
                 slot.setText(str(data))
-                for i in range(mode_cb.count()):
-                    if mode_cb.itemData(i) == SpeedTarget.FUNCTION:
-                        mode_cb.setCurrentIndex(i)
-                        break
+                # Den Ziel-Modus NUR aus dem Default (Executor) heraus auf
+                # „Funktion/Effekt" stellen. Eine bereits getroffene Wahl
+                # (Multiplier/Tempo-Bus/Speed-Knoten) NICHT ueberschreiben — sonst
+                # kippt das Auswaehlen des Ziel-Effekts den Multiplikator-Modus zurueck.
+                if mode_cb.currentData() == SpeedTarget.EXECUTOR:
+                    for i in range(mode_cb.count()):
+                        if mode_cb.itemData(i) == SpeedTarget.FUNCTION:
+                            mode_cb.setCurrentIndex(i)
+                            break
         func_combo.currentIndexChanged.connect(_on_func_pick)
         form.addRow("Funktion/Chase (Name):", func_combo)
+
+        # Tempo-Sync Phase 5: Ziel-Bus (Modi 'Tempo-Bus' und 'Speed-Knoten').
+        bus_cb = QComboBox()
+        for _bid, _blbl in (("", "(aktiver/Default-Bus)"), ("A", "Bus A"),
+                            ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
+            bus_cb.addItem(_blbl, _bid)
+        for i in range(bus_cb.count()):
+            if bus_cb.itemData(i) == self.tempo_bus_id:
+                bus_cb.setCurrentIndex(i)
+                break
+        bus_cb.setToolTip("Tempo-Bus, den der Dial steuert (Modi 'Tempo-Bus' / 'Speed-Knoten').")
+        form.addRow("Tempo-Bus:", bus_cb)
+
+        # ── Phase C: Speed-Knoten — Rolle / Parent / Faktor-Set / Anzeige ─────────
+        role_cb = QComboBox()
+        role_cb.addItem("Master (eigene BPM)", "master")
+        role_cb.addItem("Sub (folgt Master × Faktor)", "sub")
+        for i in range(role_cb.count()):
+            if role_cb.itemData(i) == self.role:
+                role_cb.setCurrentIndex(i)
+                break
+        role_cb.setToolTip("Master = eigenes Tempo (Tap/Rad). Sub = folgt einem Master mit Faktor.")
+        form.addRow("Speed-Rolle:", role_cb)
+
+        parent_cb = QComboBox()
+        for _pid, _plbl in (("", "(Sound-BPM / Default)"), ("A", "Bus A"),
+                            ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
+            parent_cb.addItem(_plbl, _pid)
+        for i in range(parent_cb.count()):
+            if parent_cb.itemData(i) == self.parent_bus_id:
+                parent_cb.setCurrentIndex(i)
+                break
+        parent_cb.setToolTip("Master, dem dieser Sub folgt (nur Rolle 'Sub').")
+        form.addRow("Folgt Master:", parent_cb)
+
+        factors_edit = QLineEdit(", ".join(_fmt_factor(f) for f in self.factor_buttons))
+        factors_edit.setToolTip("Faktor-Buttons, Komma-getrennt — z.B. ¼, ½, 1, 2, 4 "
+                                "oder 0.25, 0.5, 1, 2, 4 oder 1/4, 1/2, 1, 2, 4.")
+        form.addRow("Faktor-Set (Sub):", factors_edit)
+
+        show_dial_cb = QCheckBox("Rad (Master)")
+        show_dial_cb.setChecked(self.show_dial)
+        show_tap_cb = QCheckBox("Tap (Master)")
+        show_tap_cb.setChecked(self.show_tap)
+        show_fac_cb = QCheckBox("Faktor-Gitter (Sub)")
+        show_fac_cb.setChecked(self.show_factors)
+        show_sync_cb = QCheckBox("Sync (Sub)")
+        show_sync_cb.setChecked(self.show_sync)
+        show_bpm_cb = QCheckBox("BPM-Anzeige")
+        show_bpm_cb.setChecked(self.show_bpm)
+        form.addRow("Anzeigen:", show_dial_cb)
+        form.addRow("", show_tap_cb)
+        form.addRow("", show_fac_cb)
+        form.addRow("", show_sync_cb)
+        form.addRow("", show_bpm_cb)
+
+        # ── Phase E: Gekoppelte Effekte (je Effekt gesteuerten Parameter) ──
+        # Greift in den Effekt-Modi (Funktion/Effekt-Multiplier). (Standard) =
+        # Default-Parameter des Modus (speed bzw. tempo_multiplier).
+        coupled_box = QWidget()
+        coupled_lay = QVBoxLayout(coupled_box)
+        coupled_lay.setContentsMargins(0, 0, 0, 0)
+        coupled_combos: list[tuple[int, QComboBox]] = []
+        try:
+            from .vc_effect_meta import mappable_param_choices, effect_name
+            for _fid in self._targets():
+                row = QWidget()
+                rl = QHBoxLayout(row)
+                rl.setContentsMargins(0, 0, 0, 0)
+                rl.addWidget(QLabel(effect_name(_fid)))
+                pcombo = QComboBox()
+                pcombo.setEditable(True)
+                pcombo.addItem("(Standard)", "")
+                _keys = [k for k, _l in mappable_param_choices(_fid)]
+                for _k, _l in mappable_param_choices(_fid):
+                    pcombo.addItem(f"{_l}  ({_k})", _k)
+                _cur = self.param_keys_per_id.get(int(_fid), "")
+                if _cur and _cur not in _keys:
+                    pcombo.addItem(_cur, _cur)
+                _idx = next((i for i in range(pcombo.count())
+                             if pcombo.itemData(i) == _cur), -1)
+                if _idx >= 0:
+                    pcombo.setCurrentIndex(_idx)
+                elif _cur:
+                    pcombo.setCurrentText(_cur)
+                else:
+                    pcombo.setCurrentIndex(0)
+                rl.addWidget(pcombo, 1)
+                coupled_lay.addWidget(row)
+                coupled_combos.append((int(_fid), pcombo))
+        except Exception:
+            pass
+        if coupled_combos:
+            form.addRow(QLabel("── Gekoppelte Effekte ──"))
+            form.addRow("Je Effekt steuern:", coupled_box)
+
+        # ── Kontextabhaengige Feld-Sichtbarkeit (Muster wie VCSlider): je Ziel-
+        # Modus nur die passenden Felder zeigen. Allgemeine Felder (Beschriftung/
+        # BPM/Multiplikator/Invert/Ziel) + Anzeige-Dial/Tap/BPM bleiben immer
+        # sichtbar; die Speicherlogik unten liest weiterhin ALLE Felder (kein
+        # Datenverlust durch ausgeblendete Zeilen).
+        _EFFECT_TARGETS = (SpeedTarget.FUNCTION, SpeedTarget.TEMPO_BUS_MULT)
+
+        def _update_speeddial_fields():
+            m = mode_cb.currentData() or self.target_mode
+            is_node = (m == SpeedTarget.SPEED_NODE)
+            vis = {
+                slot:         m in (SpeedTarget.EXECUTOR,) + _EFFECT_TARGETS,
+                extra_ids:    m in _EFFECT_TARGETS,
+                func_combo:   m in _EFFECT_TARGETS,
+                bus_cb:       m in (SpeedTarget.TEMPO_BUS, SpeedTarget.TEMPO_BUS_MULT,
+                                    SpeedTarget.SPEED_NODE),
+                role_cb:      is_node,
+                parent_cb:    is_node,
+                factors_edit: is_node or mult_cb.isChecked(),
+                show_fac_cb:  is_node,
+                show_sync_cb: is_node,
+            }
+            for _w, _show in vis.items():
+                form.setRowVisible(_w, bool(_show))
+
+        mode_cb.currentIndexChanged.connect(lambda _i: _update_speeddial_fields())
+        mult_cb.toggled.connect(lambda _c: _update_speeddial_fields())
+        _update_speeddial_fields()
+
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -380,6 +900,26 @@ class VCSpeedDial(VCWidget):
             self.multiplier_mode = mult_cb.isChecked()
             self.invert = invert_cb.isChecked()
             self.target_mode = mode_cb.currentData() or SpeedTarget.EXECUTOR
+            self.tempo_bus_id = bus_cb.currentData() or ""
+            self.role = role_cb.currentData() or "master"
+            self.parent_bus_id = parent_cb.currentData() or ""
+            facs: list[float] = []
+            for tok in factors_edit.text().split(","):
+                f = _parse_factor_token(tok)
+                if f is not None and f > 0:
+                    facs.append(f)
+            if facs:
+                self.factor_buttons = facs
+                if self._active_factor not in self.factor_buttons:
+                    self._active_factor = 1.0 if 1.0 in self.factor_buttons else self.factor_buttons[0]
+            self.show_dial = show_dial_cb.isChecked()
+            self.show_tap = show_tap_cb.isChecked()
+            self.show_factors = show_fac_cb.isChecked()
+            # Hinweis: Im Multiplikator-Modus wird das Faktor-Gitter unabhaengig von
+            # show_factors gezeigt (siehe _show_factor_grid) — kein Mutieren/Persistieren
+            # der Anzeigeoption noetig, die bewusste Wahl des Nutzers bleibt erhalten.
+            self.show_sync = show_sync_cb.isChecked()
+            self.show_bpm = show_bpm_cb.isChecked()
             try:
                 self.function_id = int(slot.text())
             except ValueError:
@@ -393,8 +933,23 @@ class VCSpeedDial(VCWidget):
                     except ValueError:
                         pass
             self.function_ids = ids
+            # Phase E: je-Effekt-Parameter aus den Combos — nur noch gekoppelte IDs.
+            _final_ids = set(self._targets())
+            new_pkpi: dict[int, str] = {}
+            for _fid, _pc in coupled_combos:
+                if _fid not in _final_ids:
+                    continue
+                _hit = _pc.findText(_pc.currentText().strip())
+                _val = _pc.itemData(_hit) if _hit >= 0 else None
+                if _val is None:
+                    _val = _pc.currentText().strip()
+                if _val:
+                    new_pkpi[int(_fid)] = str(_val)
+            self.param_keys_per_id = new_pkpi
             self._bpm = max(self._min_bpm, min(self._max_bpm, bpm_sb.value()))
             self._mult = max(self._min_mult, min(self._max_mult, mult_sb.value()))
+            if self.target_mode == SpeedTarget.SPEED_NODE:
+                self._ensure_node_config()
             self._apply()
             self.update()
 
@@ -416,10 +971,22 @@ class VCSpeedDial(VCWidget):
         d["bpm"] = self._bpm
         d["function_id"] = self.function_id
         d["function_ids"] = list(self.function_ids)
+        d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
         d["target_mode"] = self.target_mode
+        d["tempo_bus_id"] = self.tempo_bus_id
         d["multiplier_mode"] = self.multiplier_mode
         d["mult"] = self._mult
         d["invert"] = self.invert
+        # Phase C: Speed-Knoten
+        d["role"] = self.role
+        d["parent_bus_id"] = self.parent_bus_id
+        d["factor_buttons"] = list(self.factor_buttons)
+        d["active_factor"] = self._active_factor
+        d["show_dial"] = self.show_dial
+        d["show_tap"] = self.show_tap
+        d["show_factors"] = self.show_factors
+        d["show_sync"] = self.show_sync
+        d["show_bpm"] = self.show_bpm
         return d
 
     def apply_dict(self, d: dict):
@@ -433,7 +1000,38 @@ class VCSpeedDial(VCWidget):
             except (TypeError, ValueError):
                 pass
         self.function_ids = _fids
+        self.param_keys_per_id = {}
+        for k, v in (d.get("param_keys_per_id") or {}).items():
+            try:
+                self.param_keys_per_id[int(k)] = str(v)
+            except (TypeError, ValueError):
+                pass
         self.target_mode = d.get("target_mode", SpeedTarget.EXECUTOR)
+        self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.multiplier_mode = bool(d.get("multiplier_mode", False))
         self._mult = float(d.get("mult", 1.0))
         self.invert = bool(d.get("invert", False))
+        # Phase C: Speed-Knoten (Defaults = rückwärtskompatibel zum klassischen Dial)
+        self.role = "sub" if str(d.get("role", "master")) == "sub" else "master"
+        self.parent_bus_id = str(d.get("parent_bus_id", "") or "")
+        _facs = []
+        for f in d.get("factor_buttons", DEFAULT_FACTORS):
+            try:
+                fv = float(f)
+                if fv > 0:
+                    _facs.append(fv)
+            except (TypeError, ValueError):
+                pass
+        self.factor_buttons = _facs or list(DEFAULT_FACTORS)
+        try:
+            self._active_factor = float(d.get("active_factor", 1.0)) or 1.0
+        except (TypeError, ValueError):
+            self._active_factor = 1.0
+        self.show_dial = bool(d.get("show_dial", True))
+        self.show_tap = bool(d.get("show_tap", True))
+        self.show_factors = bool(d.get("show_factors", True))
+        self.show_sync = bool(d.get("show_sync", True))
+        self.show_bpm = bool(d.get("show_bpm", True))
+        # Bus-Konfiguration (Rolle/Parent/Faktor) nach dem Laden anwenden.
+        if self.target_mode == SpeedTarget.SPEED_NODE:
+            self._ensure_node_config()

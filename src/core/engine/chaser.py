@@ -78,6 +78,18 @@ class Chaser(Function):
                     bm.set_bpm(120.0)
             except Exception:
                 pass
+        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern + Step-Zaehler
+        # zuruecksetzen, damit der Chaser gemeinsam mit der sync_group bei 0 startet.
+        self._synced_target_prev = None
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+            except Exception:
+                pass
 
     def _on_stop(self):
         self._step_idx = 0
@@ -93,6 +105,72 @@ class Chaser(Function):
         if self._beat_counter >= per:
             self._beat_counter = 0
             self._pending_advance = True
+
+    def _advance_from_bus(self, universes, patch_cache, function_registry,
+                          effective_dt: float) -> bool:
+        """WP-Tempo: Liegt der Chaser auf einem LAUFENDEN Tempo-Bus, treibt die
+        Bus-Position das Stepping — 1 Step je ``beats_per_step`` Beats, durch
+        ``tempo_multiplier`` skaliert (×2 = doppelt so schnell, ÷2 = halb). So laufen
+        mehrere Chaser/Effekte auf demselben Bus phasenkohaerent. Liefert True, wenn so
+        behandelt; sonst False -> der normale Audio-/Zeit-Pfad in write() laeuft weiter."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if not bus_id:
+            return False
+        _tbm = None
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            _tbm = get_tempo_bus_manager()
+            bus = _tbm.get(bus_id)
+        except Exception:
+            bus = None
+        if bus is None:
+            return False
+        bpm, _bc, _bp, pos = bus.snapshot()
+        if bpm <= 0:
+            # F5: nur bei AKTIVEM Freeze den aktuellen Schritt HALTEN (weiter ausgeben,
+            # NICHT weiterschalten); sonst Free-Run/Audio-Fallback wie bisher.
+            if _tbm is not None and _tbm.is_frozen():
+                self._render_and_blend(universes, patch_cache, function_registry)
+                return True
+            return False
+        mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+        anchor = getattr(self, "_beat_anchor", 0.0)
+        per = max(1e-9, float(self.beats_per_step or 1))
+        target = int(round(((pos - anchor) * mult) / per, 9))
+        prev = getattr(self, "_synced_target_prev", None)
+        if prev is None or target < prev:
+            self._synced_target_prev = target  # (Re-)Sync ohne Sprung
+        elif target > prev:
+            steps = min(target - prev, max(1, len(self.steps)))
+            self._synced_target_prev = target
+            for _ in range(steps):
+                self._from_values = dict(self._cur_output)
+                self._step_elapsed = 0.0
+                if not self._advance_step():
+                    self._running = False
+                    return True
+        self._render_and_blend(universes, patch_cache, function_registry)
+        self._step_elapsed += effective_dt
+        self._elapsed += effective_dt
+        return True
+
+    def sync_phase(self):
+        """WP-Tempo / Speed-Dial-Sync: bus-synchron -> auf die aktuelle Bus-Position
+        re-ankern (Step-Zaehler neu, gemeinsam mit der sync_group); frei -> auf den
+        Startschritt zuruecksetzen."""
+        self._synced_target_prev = None
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+                    return
+            except Exception:
+                pass
+        self._step_idx = (len(self.steps) - 1) if self.direction == Direction.Backward else 0
+        self._step_elapsed = 0.0
 
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
@@ -111,6 +189,11 @@ class Chaser(Function):
         self._rendering = True
         try:
             effective_dt = dt * self.speed
+
+            # WP-Tempo: Tempo-Bus treibt das Stepping (×2/÷2, phasenkohaerent), falls
+            # gesetzt + Bus laeuft. Sonst faellt es auf Audio/Zeit zurueck.
+            if self._advance_from_bus(universes, patch_cache, function_registry, effective_dt):
+                return
 
             if self.audio_triggered:
                 # Step-Advance ist nur per Beat-Trigger
@@ -331,6 +414,15 @@ class Chaser(Function):
                       options=tuple(d.value for d in Direction)),
             ParamSpec("run_order", "Modus", "select", RunOrder.Loop.value,
                       options=tuple(r.value for r in RunOrder)),
+            # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei.
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
+                      options=("", "Global", "A", "B", "C", "D"),
+                      tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
+                              "Global = Master-BPM, A–D = eigene Buses)"),
+            ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,
+                      "Verhältnis zum Bus (frei, z. B. 0.5 halb, 2 doppelt, 3 dreifach)"),
+            ParamSpec("phase_offset", "Tempo-Versatz (Beats)", "float", 0.0, 0.0, 1.0, 0.05,
+                      "Phasen-Versatz in Beats (versetzter Start auf dem Bus)"),
         ]
 
     def get_param(self, key: str):
@@ -340,6 +432,12 @@ class Chaser(Function):
             return self.direction.value
         if key == "run_order":
             return self.run_order.value
+        if key == "tempo_bus_id":
+            return getattr(self, "tempo_bus_id", "")
+        if key == "tempo_multiplier":
+            return getattr(self, "tempo_multiplier", 1.0)
+        if key == "phase_offset":
+            return getattr(self, "phase_offset", 0.0)
         return None
 
     def set_param(self, key: str, value) -> bool:
@@ -361,6 +459,20 @@ class Chaser(Function):
                 return True
             except ValueError:
                 return False
+        if key == "tempo_bus_id":
+            self.tempo_bus_id = str(value or "").strip(); return True
+        if key == "tempo_multiplier":
+            try:
+                self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "phase_offset":
+            try:
+                self.phase_offset = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
         return False
 
     def do_action(self, action: str, **kw) -> bool:

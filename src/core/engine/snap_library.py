@@ -136,6 +136,35 @@ class SnapLibrary:
         snap.folder = dest_folder or ""
         return True
 
+    def set_snap_value(self, sid: int, fid: int, attr: str, val: int) -> bool:
+        """Einen einzelnen programmierten Kanalwert setzen (0..255 geklemmt)."""
+        snap = self._snaps.get(int(sid))
+        if snap is None:
+            return False
+        snap.values.setdefault(int(fid), {})[str(attr)] = max(0, min(255, int(val)))
+        return True
+
+    def remove_snap_attr(self, sid: int, fid: int, attr: str) -> bool:
+        """Ein Attribut aus dem Snap entfernen (leeres Gerät wird mitgeloescht)."""
+        snap = self._snaps.get(int(sid))
+        if snap is None:
+            return False
+        attrs = snap.values.get(int(fid))
+        if not attrs or str(attr) not in attrs:
+            return False
+        del attrs[str(attr)]
+        if not attrs:
+            snap.values.pop(int(fid), None)
+        return True
+
+    def set_snap_values(self, sid: int, values: dict) -> bool:
+        """Komplette Werte ersetzen (normalisiert + geklemmt wie beim Laden)."""
+        snap = self._snaps.get(int(sid))
+        if snap is None:
+            return False
+        snap.values = _clean_values(values)
+        return True
+
     # ── Ordner-Verwaltung ──────────────────────────────────────────────────────
 
     def add_folder(self, path: str) -> bool:

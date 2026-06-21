@@ -6,6 +6,11 @@ Vollstaendige DMX-Steuerung mit 3D-Visualizer, Audio-reaktivem Beat-Detect,
 Multi-Page-Playback, modularem Effect-System, Virtual Console, Command-Line
 und Web-Remote.
 
+![LightOS – Virtuelle Konsole](docs/anleitung_vc/img/01_vc_leer.png)
+
+> **Neu hier?** Bebilderte Schritt-für-Schritt-Anleitungen mit Screenshots:
+> **[docs/ANLEITUNGEN.md](docs/ANLEITUNGEN.md)**
+
 ---
 
 ## Plattform
@@ -38,7 +43,8 @@ auf ARM64 laeuft, und warnt dann mit konkreter Umstiegs-Empfehlung auf ARM64-Pyt
 - **State-Sync** + Auto-Validate beim Show-Load
 
 ### Programmierung
-- **Programmer** mit Attribut-Gruppen (Intensity / Color / Position / Gobo / Weitere)
+- **Programmer** mit Attribut-Tabs (Intensity / Color / Position / Gobo / Weitere /
+  Helper / EFX / Matrix / Paletten) — EFX, RGB-Matrix und Funktionen sind in den Programmer integriert
 - **Moving-Head-Schnellwahl**: Strobe (Status + Speed) im Intensity-Tab,
   Farbrad-Kacheln inkl. Split-Farben + Auto-Farbwechsel (Hardware/Software),
   Gobo-Tab mit grafischer Gobo-Vorschau, Shake-Speed und sicherem Reset-Button
@@ -121,7 +127,7 @@ Oder die Desktop-Verknuepfung doppelklicken (nach `install.py`).
 ```
 
 ### 4. Erstes Fixture patchen
-1. Oben links: **Patch**-Tab oeffnen
+1. Sektion **Patchen** → Tab **Patch** oeffnen
 2. **"+ Fixture"** klicken → Hersteller/Modell suchen (z.B. "Generic RGB")
 3. Universe `1`, Adresse `1`, Anzahl `1` → **Patchen**
 4. Fixture taucht in der Liste auf (FID 1)
@@ -221,8 +227,25 @@ LightOS/
 
 ## Dokumentation
 
+### Bebilderte Anleitungen (Schritt für Schritt, mit Screenshots/GIFs)
+
+Übersicht: **[docs/ANLEITUNGEN.md](docs/ANLEITUNGEN.md)**
+
+- [Patchen & Gruppen](docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md)
+- [Virtuelle Konsole (VC) bauen & designen](docs/anleitung_vc/ANLEITUNG_VC.md)
+- [APC mini auf die VC mappen](docs/anleitung_apc_mapping/ANLEITUNG_APC.md)
+- [EFX — Moving-Head-Bewegung (Kreise/Achten)](docs/anleitung_efx/ANLEITUNG_EFX.md)
+- [Farb-Matrix (RGB/RGBW)](docs/anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md)
+- [Farbchase frei zusammenstellen (z. B. Blau-Weiß)](docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md)
+- [Dimmer-Matrix & relative Geschwindigkeit](docs/anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)
+- [Musik-Sync & automatische Live-Show](docs/anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md)
+- [Komplettes Lichtshow-Tutorial (Matrix · Chase · MH-EFX · VC)](docs/tutorial_matrix/TUTORIAL_LICHTSHOW.md)
+
+### Referenz & Hintergrund
+
 | Thema | Datei |
 |---|---|
+| **Bebilderte Anleitungen (Übersicht)** | **[docs/ANLEITUNGEN.md](docs/ANLEITUNGEN.md)** |
 | **Schritt‑für‑Schritt (APC mini + 4 RGBW‑PAR)** | **[docs/APC_SCHRITT_FUER_SCHRITT.md](docs/APC_SCHRITT_FUER_SCHRITT.md)** |
 | **Seiten‑Übersicht mit Bildern (welche Taste tut was)** | **[docs/APC_SEITEN_UEBERSICHT.md](docs/APC_SEITEN_UEBERSICHT.md)** |
 | Test‑Show‑Referenz / Hintergrund | [docs/APC_TEST_SHOW.md](docs/APC_TEST_SHOW.md) |

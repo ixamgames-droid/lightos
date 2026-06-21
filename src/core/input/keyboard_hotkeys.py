@@ -23,7 +23,7 @@ Technische Grenzen (dokumentiert, siehe docs/KEYBOARD_MAPPING.md):
 - Windows liefert über Qt KEINE Geräte-Unterscheidung: eine zweite
   USB-/Makro-Tastatur sendet dieselben Key-Events wie die Haupttastatur.
   Getrennte Profile pro Tastatur bräuchten Raw-Input (WM_INPUT) über einen
-  nativen Hook — als möglacher Ausbau dokumentiert, nicht implementiert.
+  nativen Hook — als möglicher Ausbau dokumentiert, nicht implementiert.
 """
 from __future__ import annotations
 

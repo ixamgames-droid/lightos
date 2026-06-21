@@ -49,7 +49,7 @@ class AudioInputView(QWidget):
         if not AUDIO_AVAILABLE or not HAS_NUMPY or (
                 AUDIO_AVAILABLE and not HAS_SOUNDCARD):
             self._disable_ui_with_message(
-                "Audio nicht verfuegbar.\n"
+                "Audio nicht verfügbar.\n"
                 "Installiere 'soundcard' und 'numpy' (pip install soundcard numpy)."
             )
             return
@@ -60,6 +60,17 @@ class AudioInputView(QWidget):
 
         # Geraete-Liste aufbauen
         self._populate_devices()
+
+        # Checkbox den LIVE-Zustand spiegeln: AUTO+Loopback laeuft per Default
+        # schon beim Start, sonst zeigt die Box faelschlich AUS und der erste
+        # Klick waere ein No-op statt eines echten Toggles.
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            self._chk_drive_bpm.blockSignals(True)
+            self._chk_drive_bpm.setChecked(get_bpm_manager().audio_active)
+            self._chk_drive_bpm.blockSignals(False)
+        except Exception as e:
+            print(f"[audio_input_view] drive-bpm init error: {e}")
 
         # UI-Refresh-Timer (30 Hz)
         self._ui_timer = QTimer(self)
@@ -81,7 +92,7 @@ class AudioInputView(QWidget):
         self._combo_device = QComboBox()
         self._combo_device.setMinimumWidth(280)
         self._combo_device.currentIndexChanged.connect(self._on_device_changed)
-        dev_layout.addRow("Geraet:", self._combo_device)
+        dev_layout.addRow("Gerät:", self._combo_device)
 
         btn_row = QHBoxLayout()
         self._btn_start = QPushButton("Start")
@@ -92,7 +103,7 @@ class AudioInputView(QWidget):
         self._btn_stop.clicked.connect(self._stop_capture)
         btn_row.addWidget(self._btn_stop)
 
-        self._btn_refresh = QPushButton("Geraete neu lesen")
+        self._btn_refresh = QPushButton("Geräte neu lesen")
         self._btn_refresh.clicked.connect(self._populate_devices)
         btn_row.addWidget(self._btn_refresh)
         btn_row.addStretch(1)
@@ -231,7 +242,7 @@ class AudioInputView(QWidget):
             self._capture.set_device(name)
         ok = self._capture.start()
         if ok:
-            self._lbl_status.setText("Status: laeuft")
+            self._lbl_status.setText("Status: läuft")
             self._lbl_status.setStyleSheet("color:#9DFF52;")
         else:
             self._lbl_status.setText("Status: Start fehlgeschlagen")
@@ -331,7 +342,7 @@ class AudioInputView(QWidget):
 
         # Capture-Status checken (z.B. wenn Thread gestorben ist)
         if self._capture and not self._capture.is_running() and (
-                self._lbl_status.text() == "Status: laeuft"):
+                self._lbl_status.text() == "Status: läuft"):
             self._lbl_status.setText("Status: gestoppt")
             self._lbl_status.setStyleSheet("color:#888888;")
 

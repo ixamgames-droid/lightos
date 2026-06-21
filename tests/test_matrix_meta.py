@@ -32,6 +32,8 @@ ALLOWED_KEYS = {
     "color_interval",
     # WP-3 (Abschnitt 4): zeitlicher Fill
     "fill_mode", "fill_speed", "loop_mode",
+    # F1 (CHECKER / Schachbrett): Kachelgroesse + Pro-Beat-Umschalten
+    "tile", "blink",
 }
 ALLOWED_KINDS = {"int", "float", "bool", "select", "color", "color_sequence", "action"}
 

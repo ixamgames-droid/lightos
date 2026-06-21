@@ -15,6 +15,13 @@ SQLAlchemy>=2.0.0        # Fixture-DB (pure Python)
 # ── Numerik / Audio-Analyse ─────────────────────────────────────────────────
 numpy>=1.26.0            # DMX-Fade, Beat-Detection FFT
 
+# ── Optionale BPM-Generator-Engines (NICHT erforderlich; eingebaute numpy-Engine
+#    laeuft ohne diese). Werden im Generator-Tab automatisch erkannt. ──────────
+# librosa>=0.10.0        # "librosa"-Engine: DP-Beat-Tracking (zieht scipy/numba/llvmlite)
+# soundfile>=0.12.0      # Datei-Decode-Helfer fuer librosa
+# torch>=2.2.0           # "Beat This!"-Engine (SOTA, gross) — nur bei Bedarf
+# beat_this             # Beat This! Inferenz (ISMIR 2024); braucht torch
+
 # ── MIDI ────────────────────────────────────────────────────────────────────
 mido>=1.3.0              # MIDI-Abstraktion (pure Python)
 python-rtmidi>=1.5.0     # MIDI-Backend (C-Extension, baut auf ARM64 mit MSVC)

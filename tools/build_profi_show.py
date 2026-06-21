@@ -139,7 +139,7 @@ def par_look(name, r=0, g=0, b=0, w=0):
     return sc
 
 
-lk_red, lk_grn, lk_blu = par_look("Rot", r=255), par_look("Gruen", g=255), par_look("Blau", b=255)
+lk_red, lk_grn, lk_blu = par_look("Rot", r=255), par_look("Grün", g=255), par_look("Blau", b=255)
 lk_amb, lk_cya, lk_mag = par_look("Amber", r=255, g=140), par_look("Cyan", g=255, b=255), par_look("Magenta", r=255, b=255)
 
 
@@ -201,8 +201,8 @@ EFFECTS = [dim_run, dim_ping, dim_pairs, dim_strobe,
 COLOR_FX_IDS = {ch_color.id, mx_rainbow.id, mx_fade.id, mx_fire.id, mx_plasma.id}
 
 # Looks für den Sonstiges-Quadranten (Schnell-Szenen).
-look_warm = par_look("Warmweiss", r=255, g=130, b=40, w=60)
-look_white = par_look("Weiss", r=255, g=255, b=255, w=255)
+look_warm = par_look("Warmweiß", r=255, g=130, b=40, w=60)
+look_white = par_look("Weiß", r=255, g=255, b=255, w=255)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -293,9 +293,9 @@ def label(text, x, y, ww, hh=18):
 # ── Quadrant FARBEN (oben links) — 16 Farb-Kacheln ─────────────────────────
 COLORS16 = [
     ("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Amber", 255, 160, 0, 0), ("Gelb", 255, 220, 0, 0),
-    ("Limette", 160, 255, 0, 0), ("Gruen", 0, 255, 0, 0), ("Tuerkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
+    ("Limette", 160, 255, 0, 0), ("Grün", 0, 255, 0, 0), ("Türkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
     ("Hellblau", 0, 140, 255, 0), ("Blau", 0, 0, 255, 0), ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-    ("Pink", 255, 0, 120, 0), ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
+    ("Pink", 255, 0, 120, 0), ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
 ]
 for i, (nm, r, g, b, w) in enumerate(COLORS16):
     color_tile(nm, qnote("TL", i // 4, i % 4), r, g, b, w)

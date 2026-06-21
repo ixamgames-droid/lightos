@@ -61,6 +61,18 @@ class Sequence(Function):
         self._step_elapsed = 0.0
         self._ping_pong_dir = 1 if self.direction == Direction.Forward else -1
         self._prev_values = {}
+        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern + Step-Zaehler
+        # zuruecksetzen, damit die Sequence gemeinsam mit der sync_group bei 0 startet.
+        self._synced_target_prev = None
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+            except Exception:
+                pass
 
     def _on_stop(self):
         self._step_idx = 0
@@ -79,6 +91,53 @@ class Sequence(Function):
             values=vals, fade_in=fade_in, hold=hold, fade_out=fade_out))
 
     # ── write ─────────────────────────────────────────────────────────────────
+
+    def _bus_steps_to_advance(self):
+        """WP-Tempo: Anzahl Step-Advances fuer DIESEN Frame, wenn die Sequence auf
+        einem LAUFENDEN Tempo-Bus liegt — 1 Step je ``beats_per_step`` Beats (Default 1),
+        durch ``tempo_multiplier`` skaliert (×2/÷2). None = nicht bus-synchron -> der
+        Aufrufer nutzt den Zeit-Pfad (>= Step-Dauer)."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if not bus_id:
+            return None
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().get(bus_id)
+        except Exception:
+            bus = None
+        if bus is None:
+            return None
+        bpm, _bc, _bp, pos = bus.snapshot()
+        if bpm <= 0:
+            return None  # Bus aus -> Zeit-Fallback
+        mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+        anchor = getattr(self, "_beat_anchor", 0.0)
+        per = max(1e-9, float(getattr(self, "beats_per_step", 1) or 1))
+        target = int(round(((pos - anchor) * mult) / per, 9))
+        prev = getattr(self, "_synced_target_prev", None)
+        if prev is None or target < prev:
+            self._synced_target_prev = target  # (Re-)Sync ohne Sprung
+            return 0
+        n = target - prev
+        self._synced_target_prev = target
+        return min(n, max(1, len(self.steps)))
+
+    def sync_phase(self):
+        """WP-Tempo / Speed-Dial-Sync: bus-synchron -> auf die Bus-Position re-ankern
+        (gemeinsam mit der sync_group); frei -> auf den Startschritt zuruecksetzen."""
+        self._synced_target_prev = None
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+                    return
+            except Exception:
+                pass
+        self._step_idx = max(0, len(self.steps) - 1) if self.direction == Direction.Backward else 0
+        self._step_elapsed = 0.0
 
     def write(self, universes, patch_cache, dt, function_registry=None):
         if not self._running or not self.steps:
@@ -130,19 +189,24 @@ class Sequence(Function):
         self._step_elapsed += effective_dt
         self._elapsed += effective_dt
 
-        if self._step_elapsed >= total:
-            # Save current step values as previous for next crossfade
+        # WP-Tempo: Step-Advance bus-getrieben (falls gesetzt + Bus laeuft), sonst
+        # zeitbasiert wie bisher (>= Step-Dauer). Der Crossfade-Mix oben bleibt von
+        # _step_elapsed/fade_in getrieben — nur der Advance-AUSLOESER aendert sich.
+        n_adv = self._bus_steps_to_advance()
+        advance_now = n_adv if n_adv is not None else (1 if self._step_elapsed >= total else 0)
+        for _ in range(advance_now):
+            # aktuellen Step als prev fuer den naechsten Crossfade merken
             self._prev_values = {}
-            for fid_str, attrs in step.values.items():
+            for fid_str, attrs in self.steps[self._step_idx].values.items():
                 try:
                     fid = int(fid_str)
                 except ValueError:
                     continue
                 self._prev_values[fid] = dict(attrs)
             self._step_elapsed = 0.0
-            advanced = self._advance_step()
-            if not advanced:
+            if not self._advance_step():
                 self._running = False
+                break
 
     def _advance_step(self) -> bool:
         if not self.steps:

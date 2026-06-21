@@ -67,13 +67,13 @@ fm._functions.clear()
 L = {
     "white": scene("Open White", w=255), "warm": scene("Warm", r=255, g=110, b=20, w=40),
     "cold": scene("Cold", g=60, b=255), "red": scene("Rot", r=255),
-    "amber": scene("Amber", r=255, g=140), "green": scene("Gruen", g=255),
+    "amber": scene("Amber", r=255, g=140), "green": scene("Grün", g=255),
     "blue": scene("Blau", b=255), "magenta": scene("Magenta", r=255, b=255),
     "cyan": scene("Cyan", g=255, b=255), "off": scene("Black", intensity=0),
 }
 has3 = len(fids) >= 3
 p_white = [scene(f"Nur P{i+1}", w=255, only=[fid]) for i, fid in enumerate(fids)]
-p_color = ([scene("P1 Rot", r=255, only=[fids[0]]), scene("P2 Gruen", g=255, only=[fids[1]]),
+p_color = ([scene("P1 Rot", r=255, only=[fids[0]]), scene("P2 Grün", g=255, only=[fids[1]]),
             scene("P3 Blau", b=255, only=[fids[2]])] if has3
            else [scene("P1 Rot", r=255, only=[fids[0]])])
 # Theater (Funktionsbereiche aufteilen): aussen / mitte
@@ -109,7 +109,7 @@ looks = [(L["white"], (255, 255, 255)), (L["warm"], (255, 140, 40)), (L["cold"],
 
 snap_looks = [("Open White", 255, 255, 255, 255, 255), ("Warm", 255, 255, 110, 20, 40),
               ("Cold", 255, 0, 60, 255, 0), ("Rot", 255, 255, 0, 0, 0),
-              ("Amber", 255, 255, 140, 0, 0), ("Gruen", 255, 0, 255, 0, 0),
+              ("Amber", 255, 255, 140, 0, 0), ("Grün", 255, 0, 255, 0, 0),
               ("Blau", 255, 0, 0, 255, 0), ("Blackout", 0, 0, 0, 0, 0)]
 ap = set(chan.keys())
 def sv(inten, r, g, b, w):
@@ -120,8 +120,8 @@ snaps += [{"name": "", "values": {}} for _ in range(48 - len(snaps))]
 os.makedirs(APPDIR, exist_ok=True)
 json.dump(snaps, open(SNAP_FILE, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
 
-tiles = [("Rot", 255, 0, 0), ("Amber", 255, 140, 0), ("Gelb", 255, 255, 0), ("Gruen", 0, 255, 0),
-         ("Cyan", 0, 255, 255), ("Blau", 0, 0, 255), ("Magenta", 255, 0, 255), ("Weiss", 255, 255, 255)]
+tiles = [("Rot", 255, 0, 0), ("Amber", 255, 140, 0), ("Gelb", 255, 255, 0), ("Grün", 0, 255, 0),
+         ("Cyan", 0, 255, 255), ("Blau", 0, 0, 255), ("Magenta", 255, 0, 255), ("Weiß", 255, 255, 255)]
 
 # ── Virtual Console ────────────────────────────────────────────────────────────
 PAD, GAP, X0, Y0 = 76, 6, 150, 140      # X0 nach rechts -> Platz fuer Sektions-Labels links
@@ -232,7 +232,7 @@ divider(8); divider(4); divider(5); divider(6); divider(7)
 for text, y in [("LightOS — Demo-Lightshow v4", 12),
                 ("Effekt/Look = nur EINER aktiv, raeumt manuelle Farbe frei", 40),
                 ("CLEAR = manuelle Farbe loslassen · TAP = Tempo der Beat-Effekte", 64),
-                ("Farb-Kacheln = volle Farbe (mit Intensitaet) · Fader synchron zur APC", 88)]:
+                ("Farb-Kacheln = volle Farbe (mit Intensität) · Fader synchron zur APC", 88)]:
     hl = VCLabel(text); hl._bg_color = QColor(20, 22, 28); hl._fg_color = QColor(180, 190, 205)
     add(hl, 10, y, 900, 22)
 

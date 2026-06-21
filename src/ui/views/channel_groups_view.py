@@ -92,7 +92,7 @@ class ChannelGroupsView(QWidget):
         b_new = QPushButton("+ Neue Gruppe")
         b_new.clicked.connect(self._add_group)
         tb.addWidget(b_new)
-        b_del = QPushButton("Loeschen")
+        b_del = QPushButton("Löschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._delete_selected)
         tb.addWidget(b_del)
@@ -100,13 +100,13 @@ class ChannelGroupsView(QWidget):
         b_save.clicked.connect(self._save)
         tb.addWidget(b_save)
         tb.addStretch(1)
-        tb.addWidget(QLabel("Wert-Slider regelt alle Kanaele der Gruppe gleichzeitig."))
+        tb.addWidget(QLabel("Wert-Slider regelt alle Kanäle der Gruppe gleichzeitig."))
         root.addLayout(tb)
 
         # Table
         self._table = QTableWidget(0, 5)
         self._table.setHorizontalHeaderLabels(
-            ["Name", "Universe", "Kanaele", "Wert (0-255)", ""]
+            ["Name", "Universe", "Kanäle", "Wert (0-255)", ""]
         )
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -155,7 +155,9 @@ class ChannelGroupsView(QWidget):
 
             # Apply button (re-push)
             b_apply = QPushButton("Send")
-            b_apply.setFixedWidth(60)
+            # Touch-Schrift (14px) sprengte die feste 60px-Breite -> Text knapp.
+            b_apply.setStyleSheet("QPushButton { font-size:12px; padding:2px 8px; }")
+            b_apply.setMinimumWidth(60)
             b_apply.clicked.connect(lambda _, r=row: self._apply_value(r))
             self._table.setCellWidget(row, 4, b_apply)
         self._table.blockSignals(False)

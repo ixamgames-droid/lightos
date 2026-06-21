@@ -4,7 +4,7 @@ import os
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
     QPushButton, QLabel, QFileDialog, QSlider, QCheckBox, QDoubleSpinBox,
-    QGroupBox,
+    QGroupBox, QScrollArea, QDialog,
 )
 from PySide6.QtCore import Qt
 from src.core.engine.audio_func import AudioFunction
@@ -20,8 +20,31 @@ class AudioEditor(QWidget):
         self._refresh()
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(12, 12, 12, 12)
+        # --- top-level layout on self ---
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        outer.addLayout(header)
+
+        # --- editor body: ALL existing content goes here ---
+        self._editor_body = QWidget()
+        root = QVBoxLayout(self._editor_body)
+        root.setContentsMargins(4, 4, 4, 4)
+        root.setSpacing(6)
 
         title = QLabel(f"Audio: {self._audio.name}")
         title.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
@@ -62,7 +85,7 @@ class AudioEditor(QWidget):
         self._lbl_vol.setMinimumWidth(40)
         vol_row.addWidget(self._slider_vol)
         vol_row.addWidget(self._lbl_vol)
-        cfg_form.addRow("Lautstaerke:", vol_row)
+        cfg_form.addRow("Lautstärke:", vol_row)
 
         # Loop
         self._chk_loop = QCheckBox("Endlos wiederholen")
@@ -102,6 +125,69 @@ class AudioEditor(QWidget):
 
         root.addStretch(1)
 
+        # --- outer scroll area holds the editor body ---
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        outer.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        outer.addWidget(self._editor_placeholder, 1)
+
+    def _toggle_editor_popout(self):
+        """Koppelt den GANZEN Audio-Editor in ein grosses, scrollbares Fenster
+        aus / dockt ihn zurueck."""
+        if self._editor_window is not None:
+            self._editor_window.close()      # → finished → _redock_editor
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Audio-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame)
+        sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass  # Widgets beim Layout-Wechsel zerstoert
+        self._editor_window = None
+
     def _refresh(self):
         if self._audio.file_path and os.path.exists(self._audio.file_path):
             size = os.path.getsize(self._audio.file_path) // 1024
@@ -111,7 +197,7 @@ class AudioEditor(QWidget):
             self._lbl_status.setText(f"Datei nicht gefunden: {self._audio.file_path}")
             self._lbl_status.setStyleSheet("color: #ff4444; font-size: 10px;")
         else:
-            self._lbl_status.setText("Keine Datei ausgewaehlt")
+            self._lbl_status.setText("Keine Datei ausgewählt")
             self._lbl_status.setStyleSheet("color: #888888; font-size: 10px;")
         if not self._audio._available:
             self._lbl_status.setText(self._lbl_status.text() +
@@ -119,7 +205,7 @@ class AudioEditor(QWidget):
 
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Audio-Datei auswaehlen", "",
+            self, "Audio-Datei auswählen", "",
             "Audio (*.mp3 *.wav *.ogg *.flac *.m4a *.aac);;Alle Dateien (*)"
         )
         if path:

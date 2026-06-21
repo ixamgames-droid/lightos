@@ -116,6 +116,7 @@ class FunctionManager:
         f = RgbMatrixInstance(name)
         return self.add(f)
 
+
     # ── Playback ──────────────────────────────────────────────────────────────
 
     def start(self, fid: int):
@@ -132,8 +133,15 @@ class FunctionManager:
                 pass
             self._start_order.append(fid)
 
-    def stop(self, fid: int):
+    def stop(self, fid: int, allow_release: bool = True):
         f = self._functions.get(fid)
+        # ARC-04: Bei gesetztem Fade-Out (und erlaubtem Release) NICHT sofort
+        # entfernen — die Funktion bleibt laufend und blendet im tick() ueber
+        # env_fade_out aus; tick() raeumt sie ab, wenn der Fade-Out fertig ist.
+        if (allow_release and f is not None and getattr(f, "env_fade_out", 0.0) > 0.0
+                and f.is_running and not getattr(f, "_releasing", False)):
+            f.release()
+            return
         if f is not None:
             f.stop()
         with self._lock:
@@ -155,8 +163,9 @@ class FunctionManager:
         return None
 
     def stop_all(self):
+        # Sofort-Stopp ohne Fade-Out (fuer Show-Reset/Blackout/Clear).
         for fid in list(self._running_ids):
-            self.stop(fid)
+            self.stop(fid, allow_release=False)
 
     # ── Geraete-Zuordnung / „Solo auf gleichen Geraeten" ────────────────────────
 
@@ -347,6 +356,12 @@ class FunctionManager:
             if len(ordered) != len(running):
                 ordered += [fid for fid in running
                             if fid not in self._start_order]
+            # F-17: nach Layer-Prioritaet sortieren (stabil -> Start-Reihenfolge
+            # bleibt der Tie-Break). Hoehere Prioritaet steht hinten und schreibt
+            # damit zuletzt = gewinnt LTP bei Kanal-Ueberschneidung. Default 0
+            # laesst die Reihenfolge unveraendert (kein Regressionsrisiko).
+            ordered.sort(key=lambda fid: getattr(
+                self._functions.get(fid), "priority", 0))
         for fid in ordered:
             f = self._functions.get(fid)
             if f is None or not f.is_running:
@@ -358,35 +373,52 @@ class FunctionManager:
                     inten = max(0.0, min(1.0, float(inten)))
                 except (TypeError, ValueError):
                     inten = 1.0
-                if inten >= 0.999:
+                # ARC-04: Ein-/Ausblend-Huellkurve — pro Frame genau einmal die
+                # Uhr treiben. env<1.0 skaliert ALLE Kanaele (nicht nur Dimmer),
+                # daher dann ebenfalls den priv-Pfad nehmen.
+                try:
+                    env = f.env_factor(dt)
+                except AttributeError:
+                    env = 1.0
+                if inten >= 0.999 and env >= 0.999:
                     f.write(universes, patch_cache, dt, self._functions)
                 else:
                     if dim_map is None:
                         dim_map = self._dim_addr_map(patch_cache)
-                    # privates Universum je Universum = Kopie des aktuellen Scratch
+                    # Privates Universum je Universum = Kopie des aktuellen Scratch.
+                    # F-17: Welche Kanaele die Funktion schreibt, ueber das WRITE-LOG
+                    # erfassen (wert-unabhaengig) statt per Wert-Diff. Sonst
+                    # "verschwindet" eine hoeher-priorisierte Funktion mit
+                    # intensity<1.0, die zufaellig denselben Rohwert wie ein
+                    # darunterliegender Effekt schreibt — die Skalierung wuerde nie
+                    # angewandt und der unskalierte Wert ueberlebte (Prioritaet
+                    # verletzt). Per Log gewinnt die zuletzt tickende Funktion immer.
                     priv: dict[int, Universe] = {}
-                    before: dict[int, bytes] = {}
                     for u, su in universes.items():
-                        cur = su.get_all()
                         pu = Universe(u)
-                        pu.set_range(1, cur)
+                        pu.set_range(1, su.get_all())   # Seed — NICHT geloggt
+                        pu.begin_write_log()            # ab hier nur Funktions-Writes
                         priv[u] = pu
-                        before[u] = bytes(cur)
                     f.write(priv, patch_cache, dt, self._functions)
                     for u, pu in priv.items():
                         shared = universes.get(u)
                         if shared is None:
                             continue
+                        touched = pu.end_write_log()
                         after = pu.get_all()
-                        b = before[u]
                         dims = dim_map.get(u, frozenset())
-                        for i in range(512):
-                            av = after[i]
-                            if av == b[i]:
-                                continue
-                            if (i + 1) in dims:
+                        for ch in touched:
+                            av = after[ch - 1]
+                            if ch in dims:
                                 av = int(av * inten)
-                            shared.set_channel(i + 1, av if av < 255 else 255)
+                            if env < 0.999:
+                                av = int(av * env)
+                            shared.set_channel(ch, av if av < 255 else 255)
+                # ARC-04: Fade-Out fertig -> Funktion endgueltig stoppen (der
+                # finished-Pfad unten raeumt sie aus _running_ids/_start_order).
+                done = getattr(f, "env_release_done", None)
+                if done is not None and done():
+                    f.stop()
             except Exception as exc:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
@@ -446,6 +478,11 @@ class FunctionManager:
                     continue
             except Exception as exc:
                 print(f"[FunctionManager] from_dict skip {ftype}: {exc}")
+                # Phase 6: im Strict-Modus (LIGHTOS_STRICT) eine kaputte Funktion
+                # NICHT still droppen, sondern laut scheitern (src/core/strict.py).
+                from src.core.strict import strict_mode
+                if strict_mode():
+                    raise
                 continue
             # Per-Effekt-Master generisch laden (Block B) — eine Stelle statt in
             # jeder Subtyp-from_dict. Chaser/Sequence setzen speed schon selbst,
@@ -463,6 +500,36 @@ class FunctionManager:
                 f.folder = str(fd.get("folder", "") or "")
             except (TypeError, ValueError):
                 f.folder = ""
+            # F-17: Layer-Prioritaet generisch laden (Default 0 -> alt-kompatibel).
+            try:
+                f.priority = int(fd.get("priority", 0))
+            except (TypeError, ValueError):
+                f.priority = 0
+            # ARC-04: Huellkurven-Zeiten generisch laden (Default 0 = aus).
+            try:
+                f.env_fade_in = max(0.0, float(fd.get("env_fade_in", 0.0)))
+                f.env_fade_out = max(0.0, float(fd.get("env_fade_out", 0.0)))
+            except (TypeError, ValueError):
+                f.env_fade_in = f.env_fade_out = 0.0
+            f.env_curve = str(fd.get("env_curve", "linear") or "linear")
+            # WP-Tempo: Tempo-Bus-Anbindung generisch laden (alt-kompatibel —
+            # fehlende Keys -> Free-Run-Defaults, also kein Verhaltenswechsel).
+            try:
+                f.tempo_bus_id = str(fd.get("tempo_bus_id", "") or "")
+            except (TypeError, ValueError):
+                f.tempo_bus_id = ""
+            try:
+                f.tempo_multiplier = float(fd.get("tempo_multiplier", 1.0))
+            except (TypeError, ValueError):
+                f.tempo_multiplier = 1.0
+            try:
+                f.phase_offset = float(fd.get("phase_offset", 0.0))
+            except (TypeError, ValueError):
+                f.phase_offset = 0.0
+            try:
+                f.sync_group = str(fd.get("sync_group", "") or "")
+            except (TypeError, ValueError):
+                f.sync_group = ""
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

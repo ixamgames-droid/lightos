@@ -135,7 +135,7 @@ class StageElement:
 class StageDefinition:
     """Eine komplette Buehnen-Definition (Sammlung von Elementen)."""
 
-    name: str = "Neue Buehne"
+    name: str = "Neue Bühne"
     elements: list[StageElement] = field(default_factory=list)
 
     # --- mutation ------------------------------------------------------------
@@ -210,7 +210,7 @@ class StageDefinition:
 
     @classmethod
     def from_dict(cls, d: dict) -> "StageDefinition":
-        sd = cls(name=d.get("name", "Buehne"))
+        sd = cls(name=d.get("name", "Bühne"))
         # Native format
         for el_data in d.get("elements", []) or []:
             sd.elements.append(StageElement(**el_data))

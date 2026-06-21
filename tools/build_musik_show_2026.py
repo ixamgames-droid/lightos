@@ -258,19 +258,19 @@ RED, ORANGE, GREEN, CYAN, BLUE, MAGENTA, AMBER, WHITE = (
     (0, 0, 255, 0), (255, 0, 255, 0), (255, 160, 0, 0), (255, 255, 255, 255))
 
 look_red = par_look("Look Rot", *RED)
-look_grn = par_look("Look Gruen", *GREEN)
+look_grn = par_look("Look Grün", *GREEN)
 look_cyan = par_look("Look Cyan", *CYAN)
 look_blue = par_look("Look Blau", *BLUE)
 look_mag = par_look("Look Magenta", *MAGENTA)
 look_amber = par_look("Look Amber", *AMBER)
-look_white = par_look("Look Weiss", *WHITE)
-look_warm = par_look("Look Warmweiss", 255, 130, 40, 60)
-look_teal = par_look("Look Tuerkis", 0, 230, 150, 0)
+look_white = par_look("Look Weiß", *WHITE)
+look_warm = par_look("Look Warmweiß", 255, 130, 40, 60)
+look_teal = par_look("Look Türkis", 0, 230, 150, 0)
 look_deepblue = par_look("Look Tiefblau", 0, 40, 255, 0)
 VIVID = [look_red, look_grn, look_cyan, look_blue, look_mag, look_amber, look_white, look_warm]
 split_rb = par_split("Split Rot/Blau", RED, BLUE)
 split_cm = par_split("Split Cyan/Magenta", CYAN, MAGENTA)
-split_gw = par_split("Split Gruen/Weiss", GREEN, WHITE)
+split_gw = par_split("Split Grün/Weiß", GREEN, WHITE)
 
 # Build-Szenen (1..8 PARs an, weiß) für den Build-Up-Chaser.
 build_steps = [par_dim(f"Build {i+1}", par_fids[:i + 1]) for i in range(8)]
@@ -404,7 +404,7 @@ pb_color.beat_sync = True
 pb_color.beats_per_cue = 8
 for num, lbl, (r, g, b) in [
     (1.0, "Rot", (255, 0, 0)), (2.0, "Gelb", (255, 200, 0)),
-    (3.0, "Gruen", (0, 255, 60)), (4.0, "Cyan", (0, 255, 230)),
+    (3.0, "Grün", (0, 255, 60)), (4.0, "Cyan", (0, 255, 230)),
     (5.0, "Blau", (0, 40, 255)), (6.0, "Magenta", (255, 0, 200)),
 ]:
     pb_color.add_cue(Cue(number=num, label=lbl, fade_in=BEAT, follow=None, values=par_vals(r, g, b)))
@@ -624,9 +624,9 @@ label("BANK 1  AUTO-SHOW  —  ▶/❚❚ startet Musik + Auto-Lichtshow (Drop-B
 # ── BANK 2 — STANDARD (Farben + Matrix + Chases, volle Kontrolle) ─────────────────
 COLORS16 = [
     ("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Amber", 255, 160, 0, 0), ("Gelb", 255, 220, 0, 0),
-    ("Limette", 160, 255, 0, 0), ("Gruen", 0, 255, 0, 0), ("Tuerkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
+    ("Limette", 160, 255, 0, 0), ("Grün", 0, 255, 0, 0), ("Türkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
     ("Hellblau", 0, 140, 255, 0), ("Blau", 0, 0, 255, 0), ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-    ("Pink", 255, 0, 120, 0), ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
+    ("Pink", 255, 0, 120, 0), ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
 ]
 for i, (nm, r, g, b, w) in enumerate(COLORS16):     # R0-1 = 16 anpassbare Farb-Kacheln
     color_tile(nm, note_rc(i // 8, i % 8), B_STD, r, g, b, w)
@@ -685,7 +685,7 @@ effect_action_btn("Spiegeln", note_rc(3, 5), B_MH, "#334455", "toggle_mirror", N
 effect_action_btn("Gegenläufig", note_rc(3, 6), B_MH, "#7a6500", "toggle_counter", None)
 effect_action_btn("Neustart", note_rc(3, 7), B_MH, "#553010", "restart", None)
 fader("EFX-Speed", 0, B_MH, SliderMode.EFFECT_SPEED, midi_cc=48, value=80)
-fader("EFX-Groesse", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
+fader("EFX-Größe", 1, B_MH, SliderMode.EFFECT_PARAM, param_key="size", midi_cc=49, value=110)
 fader("MH-Dim", 3, B_MH, SliderMode.GROUP_DIMMER, programmer_group="Moving Heads", midi_cc=51, value=255)
 label("BANK 4  MH-STAGE  —  LINKS frei zielen (16-bit XY).  Orbit-Pads richten die Bewegung auf eine "
       "Bühnen-Zone aus (Mitte/Links/Rechts/Publikum/Hoch).  Relative Formen orbiten das aktuelle Ziel; "

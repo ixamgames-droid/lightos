@@ -167,6 +167,11 @@ class PlaybackView(QWidget):
         cue_toolbar = QHBoxLayout()
         btn_add_cue = QPushButton("+ Cue aufnehmen")
         btn_add_cue.clicked.connect(self._record_cue)
+        btn_quick = QPushButton("⚡ Quick-Rec")
+        btn_quick.setToolTip(
+            "Sofort als neue Cue auf der aktuellen Cueliste aufnehmen "
+            "(Auto-Nummer/Label, kein Dialog)")
+        btn_quick.clicked.connect(self._quick_record_cue)
         btn_del_cue = QPushButton("Cue löschen")
         btn_del_cue.setObjectName("btn_danger")
         btn_del_cue.clicked.connect(self._delete_cue)
@@ -174,6 +179,7 @@ class PlaybackView(QWidget):
         btn_goto.setToolTip("Direkt zur markierten Cue faden (statt mehrfach GO)")
         btn_goto.clicked.connect(self._go_to_selected)
         cue_toolbar.addWidget(btn_add_cue)
+        cue_toolbar.addWidget(btn_quick)
         cue_toolbar.addWidget(btn_del_cue)
         cue_toolbar.addWidget(btn_goto)
         cue_toolbar.addStretch()
@@ -433,6 +439,17 @@ class PlaybackView(QWidget):
         if not ok2:
             label = f"Cue {num}"
         self._state.record_cue(self._current_stack, num, label)
+        self._refresh_table()
+
+    def _quick_record_cue(self):
+        """F-14: dialogfreies Ein-Klick-Record auf die AKTUELLE Cueliste
+        (Auto-Nummer = letzte+1, Auto-Label 'Cue N'), ohne QInputDialog."""
+        if not self._current_stack:
+            QMessageBox.information(self, "Info", "Erst eine Cueliste anlegen.")
+            return
+        existing = [c.number for c in self._current_stack.cues]
+        n = (max(existing) + 1.0) if existing else 1.0
+        self._state.record_cue(self._current_stack, n, f"Cue {n:g}")
         self._refresh_table()
 
     def _delete_cue(self):

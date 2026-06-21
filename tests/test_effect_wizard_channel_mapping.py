@@ -61,6 +61,9 @@ class _Page2:
     def selected_colors(self):
         return [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
 
+    def expanded_colors(self):
+        return self.selected_colors()
+
 
 class _Spin:
     def __init__(self, v):

@@ -100,7 +100,7 @@ look_white = scene("Open White", w=255, intensity=255)
 look_warm  = scene("Warm",  r=255, g=110, b=20, w=40)
 look_cold  = scene("Cold",  r=0,   g=60,  b=255)
 look_red   = scene("Rot",     r=255)
-look_green = scene("Gruen",   g=255)
+look_green = scene("Grün",   g=255)
 look_blue  = scene("Blau",    b=255)
 look_amber = scene("Amber",   r=255, g=140)
 look_mag   = scene("Magenta", r=255, b=255)
@@ -195,7 +195,7 @@ def snap(name, folder, r, g, b, w=0, intensity=255, fids=None):
 
 snap("Blau warm", "Farben", 0, 40, 255, intensity=200)
 snap("Rot voll",  "Farben", 255, 0, 0)
-snap("Gruen voll", "Farben", 0, 255, 0)
+snap("Grün voll", "Farben", 0, 255, 0)
 snap("Intro Soft", "Intros", 80, 0, 160, w=20, intensity=120)
 
 
@@ -267,8 +267,8 @@ for i, fn in enumerate(look_funcs):
     func_button(fn, 32 + i, "#11304a")
 # Live-Farben (VCColor): Notes 40-47 (Reihe 6)
 color_tiles = [
-    ("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255),
-    ("Weiss", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
+    ("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255),
+    ("Weiß", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
     ("Magenta", 255, 0, 255), ("Gelb", 255, 255, 0),
 ]
 for i, (cname, r, g, b) in enumerate(color_tiles):
@@ -288,7 +288,7 @@ labels = [
     ("LightOS — Test-Show (Komplett)", X0, 16, 640, 28),
     ("Reihe3: Chaser + RGB-MATRIX (gold)  ·  Reihe4: EFX  ·  Reihe5: Looks  ·  Reihe6: Live-Farben",
      X0, 50, 1000, 20),
-    ("Fader rechts: Grand Master (CC56) + Effekt-Intensitaeten (CC48-51)", X0, 74, 1000, 20),
+    ("Fader rechts: Grand Master (CC56) + Effekt-Intensitäten (CC48-51)", X0, 74, 1000, 20),
 ]
 for text, x, y, ww, hh in labels:
     lbl = VCLabel(text)

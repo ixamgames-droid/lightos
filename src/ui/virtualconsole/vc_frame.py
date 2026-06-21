@@ -69,9 +69,28 @@ class VCFrame(VCWidget):
         widget.setVisible(page == self._current_page)
         if self._edit_mode:
             widget.set_edit_mode(True)
+        # FRM-01: Delete-Ownership an die Box uebergeben. Die Methode verdrahtete
+        # `delete_requested` frueher NICHT — ein per Snap-in/Drop hineingelegtes
+        # Widget blieb an der Canvas (semantisch falsch) bzw. liess sich gar nicht
+        # loeschen. Etwaige Alt-Verdrahtung loesen (kein Doppel-Delete), dann an das
+        # (undobare) `_remove_child` der Box haengen.
+        try:
+            widget.delete_requested.disconnect()
+        except (TypeError, RuntimeError):
+            pass
+        widget.delete_requested.connect(lambda w=widget: self._remove_child(w))
         widget.show()
 
     # ── Child widget management ───────────────────────────────────────────────
+
+    def _find_canvas(self):
+        """Naechster Vorfahre mit Canvas-Undo-API (duck-typed, kein Import-Zyklus)."""
+        obj = self.parent()
+        while obj is not None:
+            if hasattr(obj, "push_undo_snapshot") and hasattr(obj, "to_dict"):
+                return obj
+            obj = obj.parent() if hasattr(obj, "parent") else None
+        return None
 
     def _add_child_widget(self, wtype: str, pos: QPoint | None = None):
         from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
@@ -94,6 +113,15 @@ class VCFrame(VCWidget):
         return child
 
     def _remove_child(self, widget: VCWidget):
+        # Undo-Punkt VOR dem Entfernen (Canvas-Gesamt-Snapshot, wie beim Loeschen
+        # eines Top-Level-Widgets) -> Strg+Z holt das in der Box geloeschte Widget
+        # zurueck. Waehrend einer laufenden Wiederherstellung NICHT snapshotten.
+        canvas = self._find_canvas()
+        if canvas is not None and not getattr(canvas, "_restoring", False):
+            try:
+                canvas.push_undo_snapshot(canvas.to_dict())
+            except Exception:
+                pass
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
@@ -140,6 +168,20 @@ class VCFrame(VCWidget):
             return
         super().mousePressEvent(event)
 
+    # ── Effekt-Gruppen-Highlight (Box als Einheit) ─────────────────────────────
+
+    def set_effect_highlight(self, on: bool):
+        """Container-Variante: Glow als GEZEICHNETER Amber-Rahmen statt
+        ``QGraphicsDropShadowEffect``. Ein Graphics-Effect auf einem Widget mit
+        Kind-Widgets (= die Box + ihre Live-Regler) verursacht Render-Quirks der
+        Kinder -> hier bewusst per paintEvent. So leuchtet die Box als EINHEIT,
+        wenn man ein zugehoeriges Widget antippt oder den Effekt waehlt."""
+        on = bool(on)
+        if on == getattr(self, "_effect_highlight", False):
+            return
+        self._effect_highlight = on
+        self.update()
+
     # ── Paint ─────────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):
@@ -151,6 +193,9 @@ class VCFrame(VCWidget):
         else:
             p.setPen(QPen(QColor("#30363d"), 1))
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        if getattr(self, "_effect_highlight", False):
+            p.setPen(QPen(QColor("#ff9500"), 3))         # Box-als-Einheit: Amber-Rahmen
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
 
         if self._show_header:
             header = QRect(0, 0, self.width(), self._tab_height)

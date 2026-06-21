@@ -250,13 +250,7 @@ function buildGridAndFloor() {
 // Visualizer startet mit einer LEEREN Buehne. Es bleibt nur das Welt-Grid +
 // ein dezenter Referenz-Boden als Orientierung. Der User baut seine eigene
 // Buehne/Trassen als editierbare stageObjects selbst auf.
-function setStagePreset(name) {
-  settings.stagePreset = 'simple';
-  clearPreset();
-  buildGridAndFloor();
-}
-
-setStagePreset('simple');
+buildGridAndFloor();
 
 // ============================================================================
 // Async model loader (OBJ / DAE) with cache - falls back to caller if no loader
@@ -2336,9 +2330,6 @@ function applySettings(s) {
     settings.dockEnabled = s.dockEnabled;
     if (!s.dockEnabled) clearDockHighlight();
   }
-  if (typeof s.stagePreset === 'string' && s.stagePreset !== settings.stagePreset) {
-    setStagePreset(s.stagePreset);
-  }
   for (const fid in fixtures) {
     const f = fixtures[fid];
     if (f.beam) f.beam.visible = settings.showCones && (viewMode === '3D') && f.beam.material.opacity > 0.01;
@@ -2445,7 +2436,6 @@ function tryChannel() {
           list.forEach(f => addFixture(f));
         });
         if (bridge.settingsChanged) bridge.settingsChanged.connect(j => applySettings(JSON.parse(j)));
-        if (bridge.stageChanged)   bridge.stageChanged.connect(name => setStagePreset(name));
         if (bridge.viewModeChanged) bridge.viewModeChanged.connect(name => setViewMode(name));
         if (bridge.editModeChanged) bridge.editModeChanged.connect(name => setEditMode(name));
         if (bridge.stageLoaded)    bridge.stageLoaded.connect(j => loadStageJson(j));
@@ -2507,7 +2497,7 @@ applyBrightness(settings.brightness);
 
 // Expose for debug
 window.__lightos = { fixtures, stageObjects, settings,
-  setViewMode, setEditMode, setStagePreset, getStageJson, loadStageJson,
+  setViewMode, setEditMode, getStageJson, loadStageJson,
   addStageObject: jsAddStageObject,
   clearStageObjects, updateResizeHandles, resizeHandles: () => resizeHandles,
   setBrightnessManual, resetBrightnessAuto, applyBrightness };

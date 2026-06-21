@@ -311,6 +311,18 @@ class ApcMk2Feedback:
                     desired[note] = (DIM, AZURE)
                 note_rgb[note] = (0, 212, 255)
                 continue
+            # WP-8: BPM-Modus-Pad (AUTO/MANUAL): violett-hell wenn MANUAL aktiv,
+            # gedimmt in AUTO — konsistent mit dem AUDIO_BPM-Pad oben.
+            if getattr(w, "action", None) == ButtonAction.BPM_MODE_TOGGLE:
+                manual = False
+                try:
+                    from src.core.engine.bpm_manager import BpmMode
+                    manual = self._bm is not None and self._bm.mode == BpmMode.MANUAL
+                except Exception:
+                    manual = False
+                desired[note] = (FULL, VIOLET) if manual else (DIM, VIOLET)
+                note_rgb[note] = (160, 80, 255)
+                continue
             desired[note] = self._led_for_button(w, now)
             note_style[note] = getattr(w, "pad_style", "mirror")
             try:

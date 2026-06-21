@@ -60,7 +60,7 @@ Ergebnis – die Patch‑Tabelle: 8 PARs (Adressen 1, 5, 9 … 29) + 2 MH (33, 4
 
 ---
 
-## 2. In der Live‑View platzieren
+## 2. In der Live-View platzieren
 
 In der Sektion **„Live View"** ordnest du die Strahler so an, wie sie real auf
 der Bühne stehen. Hier: die 8 PARs als **4×2‑Block**, die 2 Moving Heads darüber.
@@ -81,18 +81,19 @@ Gruppen fassen Geräte zusammen, damit Effekte „die ganze Gruppe" treffen.
 
 1. In der Live‑View **`☑ Mehrfachauswahl`** aktivieren.
 2. Mit der Maus ein **Auswahl‑Rechteck** über die 8 PARs ziehen → sie bekommen
-   einen gelben Ring (Statuszeile: *„Selection: 8 Fixtures"*).
+   einen gelben Ring (Statuszeile: *„Selektion: 8 Fixtures"*).
 
    ![8 PARs ausgewählt](web/15_select_pars.png)
 
-3. **`+ Gruppe aus Auswahl`** klicken, im Dialog einen **Namen** vergeben, **OK**.
+3. **`＋ Gruppe aus Auswahl`** klicken, im Dialog einen **Namen** vergeben, **OK**.
 
    ![Gruppe benennen](web/16_group_create.png)
 
 ### Die fertigen Gruppen
 
-Im **Patchen → Gruppen**‑Tab (oder im Drop‑down „Gruppe:") siehst du jede Gruppe
-als Raster. Das Raster (Spalten × Zeilen) bestimmt später die **Matrix‑Form**.
+Im **Patchen → Fixture‑Gruppen** siehst du jede Gruppe als Raster. Das Raster
+(Spalten × Zeilen) bestimmt später die **Matrix‑Form** – das Matrix‑Raster
+selbst entsteht im Editor über den Button **„Aus Auswahl"**.
 
 **PAR‑Matrix** – 4 Spalten × 2 Zeilen, Geräte 1–8:
 
@@ -107,26 +108,30 @@ als Raster. Das Raster (Spalten × Zeilen) bestimmt später die **Matrix‑Form*
 
 ---
 
-## 4. Matrix‑Effekte
+## 4. Matrix-Effekte
 
 Eine **RGB‑Matrix** legt ein Muster (Regenbogen, Gradient, Lauflicht …) über das
-**Raster** einer Gruppe. Entscheidend ist der **Style** – er bestimmt, **welche
-Kanäle** die Matrix anfasst:
+**Raster** einer Gruppe. Entscheidend ist der **Style** (Auswahl **`Style:`** im
+Editor) – er bestimmt **ganz allein**, **welche Kanäle** die Matrix anfasst:
 
 | Style | schreibt nur … | lässt unangetastet |
 |-------|----------------|--------------------|
-| **RGB** (mit *„Dimmer treiben" = aus*) | Farbe (R/G/B) | den Dimmer‑Kanal |
+| **RGB** | Farbe (R/G/B) | den Dimmer‑Kanal |
 | **Dimmer** | den Dimmer‑Kanal (Helligkeit) | die Farbe |
 
-Genau deshalb lassen sich beide als **getrennte Ebenen** kombinieren.
+> 💡 Die Trennung läuft **ausschließlich über den Style** – einen Extra‑Schalter
+> „Dimmer treiben" gibt es **nicht** (mehr). RGB‑Style fasst nur die Farbkanäle
+> an, Dimmer‑Style nur den Dimmer‑Kanal. Genau deshalb lassen sich beide als
+> **getrennte Ebenen** kombinieren.
 
-Editor: **Programmer → Reiter „Matrix"**. Links die Matrix‑Liste, rechts
-Einstellungen + **Vorschau**, unten **▶ Start / ■ Stop**.
+Editor: **Programmer → Reiter „Matrix"** (Matrix ist einer der Reiter oben im
+Programmer). Links die Matrix‑Liste, rechts Einstellungen + **Vorschau**, unten
+**▶ Start / ■ Stop**.
 
 ### 4.1 Reine Farb‑Matrix (Regenbogen)
 
-Algorithmus **Rainbow**, Style **RGB**, Raster **4×2**. „Dimmer treiben" ist
-**aus** → die Matrix setzt nur R/G/B, der Dimmer bleibt, wo er ist.
+Algorithmus **Rainbow**, Style **RGB**, Raster **4×2**. Durch den RGB‑Style
+setzt die Matrix **nur** R/G/B, der Dimmer bleibt, wo er ist.
 
 ![Farb‑Matrix‑Editor](web/m1_color_editor.png)
 
@@ -190,7 +195,9 @@ Im Editor steuerst du alles, was einen Chase ausmacht:
   Schritt **erfassen**.
 - **Fade In / Hold / Fade Out** pro Schritt – wie schnell ein‑/wie lange gehalten wird.
 - **Nach oben / Nach unten** – **Reihenfolge** ändern.
-- **Run Order** (Loop/…), **Direction** (Forward/Backward/Bounce) und **Speed** (×‑Faktor).
+- **Run Order** (Loop / PingPong / …) – das **Hin‑und‑Her** ist die Run Order
+  **PingPong**, nicht eine Direction.
+- **Direction** (Forward/Backward) und **Speed** (×‑Faktor).
 
 Gestartet wandert das Licht über die 4×2‑Matrix:
 
@@ -200,15 +207,16 @@ Gestartet wandert das Licht über die 4×2‑Matrix:
 
 ---
 
-## 6. Moving‑Head‑Effekt (Kreis)
+## 6. Moving-Head-Effekt (Kreis)
 
 Ein **EFX** bewegt Pan/Tilt auf einer geometrischen Bahn. Editor:
-**Programmer → Reiter „EFX"**.
+**Programmer → Reiter „EFX"** (EFX ist einer der Reiter oben im Programmer).
 
-- **Algorithmus: Circle** (Kreis; auch Acht, Dreieck, Lissajous … verfügbar)
+- **Algorithmus: Circle** (die meisten Namen stehen **englisch** im Auswahlfeld:
+  *Circle, Eight, Line, Diamond, Square, Lissajous, Triangle* — einzelne deutsch wie *Trapez*)
 - **Breite (Pan‑Hub) / Höhe (Tilt‑Hub):** Größe des Kreises
 - **Zentrum Pan / Tilt:** Mittelpunkt (128 = Mitte)
-- **Geschwindigkeit** und Richtung
+- **Geschwindigkeit** und **Richtung** (*forward / backward / bounce*)
 
 Die Vorschau zeichnet die Bahn; die Punkte sind die beiden Moving Heads, die
 darauf im Kreis laufen:
@@ -238,15 +246,35 @@ In dieser Show:
 
 ### a) Funktionen auf Pads ziehen (Drag‑in)
 
-Rechts ist die **Bibliothek** mit allen Funktionen. Eintrag einfach **auf ein
-(leeres) Pad ziehen** – oder **Rechtsklick → „Auf VC‑Taste legen"**. Das Pad ist
-danach mit dieser Funktion belegt.
+Rechts ist die **Bibliothek** mit allen Funktionen. Eintrag einfach **auf eine
+leere Fläche** der Konsole ziehen – oder **Rechtsklick → „➡ Auf VC‑Taste legen"**.
+
+**Was beim Ziehen passiert:** Lässt du den Effekt auf einer **leeren** Stelle
+(leeres Canvas/Pad) los, öffnet sich die **Drop‑Karte „Effekt einrichten"**. Sie
+fragt *„… — was soll dieser Effekt können?"* und zeigt je Aspekt eine
+**Ankreuz‑Zeile**. **„An/Aus" (Toggle) ist bereits vorangekreuzt** – ein Klick
+auf **`Erstellen`** liefert also genau das **einfache An/Aus‑Pad**. Setzt du
+weitere Häkchen (z. B. Tempo, Helligkeit, Farbe), entstehen in **einem** Schritt
+mehrere fertig verdrahtete Widgets.
+
+![Drop‑Karte „Effekt einrichten"](img/17_drop_karte.png)
+
+- **Widget‑Galerie:** Hat ein Aspekt mehrere passende Bedien‑Elemente, steht in
+  der Zeile **„Widget: … ▸ ändern"** – ein Klick öffnet die grafische
+  **Galerie** (*„Bedien‑Element wählen — tippe eine Kachel an"*) mit gemalten
+  Vorschau‑Kacheln.
+- **Konflikt‑Karte:** Ziehst du einen Effekt auf einen **schon belegten** Regler,
+  erscheint die Karte **„Regler ist schon belegt"** mit den drei
+  Auswahlmöglichkeiten **„Ersetzen"**, **„Dazu koppeln"** (bindet beide Effekte an
+  denselben Regler: eine Gruppe, ein Tempo) oder **„Neues Widget daneben"**.
+- Ein vorhandenes Bedien‑Element lässt sich später per Kontextmenü
+  **„↔ Widget ändern"** auf einen anderen Typ umstellen.
 
 ![VC‑Bibliothek](web/11_vc_library.png)
 
 ### b) Pads/Fader benennen & konfigurieren
 
-Im **Bearbeiten**‑Modus ein Pad **doppelklicken** → *Button‑Einstellungen*.
+Im **Bearbeiten**‑Modus ein Pad **doppelklicken** → *Button Einstellungen*.
 Das Feld **Beschriftung** ist der **Name** auf dem Pad.
 
 ![Pad‑Konfiguration](web/09_pad_config.png)
@@ -312,13 +340,13 @@ Chaser, dem MH‑EFX und der kompletten Virtuellen Konsole gesichert.
 | Aufgabe | Weg in LightOS |
 |---------|----------------|
 | Gerät patchen | Patchen → `+ Gerät hinzufügen` → suchen, Anzahl, Adresse → `Hinzufügen` |
-| Gruppe bauen | Live View → `☑ Mehrfachauswahl` → Rechteck ziehen → `+ Gruppe aus Auswahl` → benennen |
-| Reine Farbe | Programmer → Matrix → Style **RGB**, „Dimmer treiben" **aus** |
-| Reiner Dimmer | Programmer → Matrix → Style **Dimmer** |
+| Gruppe bauen | Live View → `☑ Mehrfachauswahl` → Rechteck ziehen → `＋ Gruppe aus Auswahl` → benennen |
+| Reine Farbe | Programmer → Reiter **Matrix** → Style **RGB** |
+| Reiner Dimmer | Programmer → Reiter **Matrix** → Style **Dimmer** |
 | Farbe + Dimmer | beide Matrizen **gleichzeitig** starten → Badge **FX2** |
 | Chase bauen | Bibliothek → Rechtsklick Chaser → **Bearbeiten…** → `+ Hinzufügen`, Hold/Speed, Nach oben/unten |
-| MH‑Bewegung | Programmer → EFX → Algorithmus **Circle**, Hub/Zentrum/Speed |
-| Funktion auf Pad | Bibliothek‑Eintrag auf Pad **ziehen** (oder Rechtsklick → „Auf VC‑Taste legen") |
+| MH‑Bewegung | Programmer → Reiter **EFX** → Algorithmus **Circle**, Hub/Zentrum/Speed |
+| Funktion auf Pad | Bibliothek‑Eintrag auf leere Fläche **ziehen** → Drop‑Karte „Effekt einrichten" → `Erstellen` (oder Rechtsklick → „➡ Auf VC‑Taste legen") |
 | Pad benennen | Bearbeiten‑Modus → Pad doppelklicken → **Beschriftung** |
 | Nur 1 Effekt aktiv | Pad‑Dialog → **Exklusiv** ✓ |
 | Nur auf eigenen Geräten solo | Pad‑Dialog → **Geräte‑Solo** ✓ |

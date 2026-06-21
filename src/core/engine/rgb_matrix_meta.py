@@ -64,9 +64,9 @@ class AlgoMeta:
 
 
 # Wiederverwendbare Param-Bausteine
-def _runner_count():
+def _runner_count(when=()):
     return ParamSpec("runner_count", "Läufer-Anzahl", "int", 1, 1, 16, 1,
-                     "Anzahl gleichzeitiger Läufer (1..16)")
+                     "Anzahl gleichzeitiger Läufer (1..16)", when=when)
 
 def _runner_width(label="Läufer-Breite"):
     return ParamSpec("runner_width", label, "int", 1, 1, 16, 1,
@@ -83,12 +83,13 @@ def _fade():
     return ParamSpec("fade", "Schweif", "float", 0.3, 0.0, 1.0, 0.05,
                      "Schweif-Länge hinter dem Strahl (0..1)")
 
-def _after_fade():
+def _after_fade(when=()):
     # WP-4/Abschnitt 5: ex-"Schweif" am Chase, jetzt "After Fade" in Prozent.
     # 0 % = harter Wechsel, 100 % = langer weicher Übergang. Eigener Key
     # (after_fade) -> eindeutige Migration der alten 0..1-Werte (siehe apply_dict).
     return ParamSpec("after_fade", "After Fade", "float", 30.0, 0.0, 100.0, 5.0,
-                     "Nachfaden hinter dem Läufer in % (0=harter Wechsel, 100=langer weicher Übergang)")
+                     "Nachfaden hinter dem Läufer in % (0=harter Wechsel, 100=langer weicher Übergang)",
+                     when=when)
 
 def _color_order():
     # WP-4/Abschnitt 6: Reihenfolge des Farbwechsels pro Runde (nur wenn aktiv).
@@ -118,11 +119,11 @@ def _origin():
 def _blend():
     return ParamSpec("blend", "Verlauf", "select", "smooth",
                      options=("smooth", "steps"),
-                     tooltip="weicher Verlauf oder harte Farb-Baender")
+                     tooltip="weicher Verlauf oder harte Farb-Bänder")
 
 def _edge_fade():
     return ParamSpec("edge_fade", "Kanten-Fade", "float", 0.0, 0.0, 1.0, 0.05,
-                     "0 = harte Kante, >0 = weicher Uebergang")
+                     "0 = harte Kante, >0 = weicher Übergang")
 
 def _density():
     return ParamSpec("density", "Dichte", "float", 1.0, 0.25, 8.0, 0.25,
@@ -130,18 +131,18 @@ def _density():
 
 def _spread():
     return ParamSpec("spread", "Breite", "float", 1.0, 0.25, 8.0, 0.25,
-                     "Breite der hellen Wellenbaender")
+                     "Breite der hellen Wellenbänder")
 
 def _color_cycle():
     return ParamSpec("color_cycle", "Farbe pro Runde wechseln", "bool", False,
-                     tooltip="Laeufer wechselt pro Durchlauf durch die Farb-Sequence")
+                     tooltip="Läufer wechselt pro Durchlauf durch die Farb-Sequence")
 
 def _color_interval():
     # MXP-01 (Abschnitt 10): Farbe erst alle N Durchlaeufe wechseln. 1 = jeder
     # Durchlauf (= bisheriges Verhalten). Default 1 -> Alt-Shows unveraendert.
     return ParamSpec("color_interval", "Farbwechsel-Intervall", "int", 1, 1, 16, 1,
                      when=(("color_cycle", (True,)),),
-                     tooltip="Farbe bleibt N Durchlaeufe gleich, bevor sie zur naechsten "
+                     tooltip="Farbe bleibt N Durchläufe gleich, bevor sie zur nächsten "
                              "Farbe der Sequence wechselt (1 = jeder Durchlauf, 2/4/8 = "
                              "langsamer)")
 
@@ -251,6 +252,16 @@ def _rainbow_movement():
                      tooltip="Ausbreitung des Regenbogens")
 
 
+# ── Baustein fuer CHECKER (Schachbrett/Wechsel) ───────────────────────────────
+def _tile():
+    return ParamSpec("tile", "Kachelgröße", "int", 1, 1, 8, 1,
+                     "Wie viele benachbarte Fixtures dieselbe Farbe bekommen (1 = jedes einzeln)")
+
+def _blink():
+    return ParamSpec("blink", "Pro Beat umschalten", "bool", True,
+                     tooltip="Farben pro Beat tauschen (Wechsellicht/Blinken). Aus = statisches Muster")
+
+
 ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
     RgbAlgorithm.PLAIN:        AlgoMeta("Volle Fläche in C1.", False, (), colors=1),
     # ── Konsolidierte Grundalgorithmen (Phase 3) ──────────────────────────────
@@ -258,7 +269,11 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
         "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farbwechsel pro Runde.",
         True,
         (_axis(), _movement(("normal", "bounce", "center_out", "outside_in")),
-         _runner_count(), _runner_width(), _after_fade(), _color_cycle(), _color_order(),
+         # Läufer-Anzahl + After Fade wertet die Engine NUR bei movement=normal aus
+         # (bounce/center_out/outside_in ignorieren sie) -> nur dann anzeigen,
+         # statt tote Regler zu zeigen.
+         _runner_count(when=(("movement", ("normal",)),)), _runner_width(),
+         _after_fade(when=(("movement", ("normal",)),)), _color_cycle(), _color_order(),
          _color_interval(), _invert()),
         colors=1),
     RgbAlgorithm.WIPE:         AlgoMeta(
@@ -295,6 +310,10 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
         "Crossfade durch die Color-Sequence (deaktivierte Farben werden übersprungen).",
         True, (_hold(), _pingpong()), colors=3, sequence=True),
     RgbAlgorithm.STROBE:       AlgoMeta("Ganzes Feld blitzt an/aus.",  False, (), colors=1),
+    RgbAlgorithm.CHECKER:      AlgoMeta(
+        "Schachbrett/Wechsel: benachbarte Fixtures abwechselnd Farbe A/B (z. B. rot-blau "
+        "oder rot-aus). Optional pro Beat umschalten (Wechsellicht).",
+        False, (_tile(), _blink()), colors=2, sequence=True),
     # ── Texturen / Einzel-Looks (bewusst eigenständig) ────────────────────────
     RgbAlgorithm.RADAR:        AlgoMeta("Rotierender Radarstrahl.", True, (_beam_width("Strahlbreite"), _fade(), _invert()), colors=1),
     RgbAlgorithm.SPIRAL:       AlgoMeta("Rotierender Spiralarm.",  True,  (_turns(), _beam_width("Armbreite"), _invert()), colors=1),
@@ -336,4 +355,13 @@ def visible_specs(algo: RgbAlgorithm, style_value: str, params: dict) -> list:
     meta = ALGO_META.get(algo)
     if not meta or not meta.params:
         return []
-    return [s for s in meta.params if spec_relevant(s, style_value, params)]
+    # Fehlende Keys mit ihrem Default auffuellen, damit `when`-Bedingungen auch
+    # greifen, bevor der steuernde Wert einmal explizit gesetzt wurde. Beispiel:
+    # CHASE zeigt runner_count/after_fade per Default (movement=normal) — ohne
+    # Auffuellen waere movement noch "nicht gesetzt" und beide Regler waeren
+    # faelschlich ausgeblendet. (Setzt der Nutzer movement=bounce, ueberschreibt
+    # params den Default und die Regler verschwinden korrekt.)
+    effective = dict(params)
+    for s in meta.params:
+        effective.setdefault(s.key, s.default)
+    return [s for s in meta.params if spec_relevant(s, style_value, effective)]

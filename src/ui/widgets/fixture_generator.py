@@ -209,7 +209,7 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
     for mode in model.modes:
         loc = f"Modus '{mode.name}'"
         if not mode.channels:
-            issues.append(("error", f"{loc}: keine Kanaele."))
+            issues.append(("error", f"{loc}: keine Kanäle."))
             continue
 
         # Doppelte (echte) Attribute — nur Hinweis (zwei Pan/Tilt erlaubt).
@@ -240,9 +240,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
 def _validate_channel(ch: GenChannel, loc: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     if not (0 <= int(ch.default_value) <= 255):
-        out.append(("error", f"{loc}: Default {ch.default_value} ausserhalb 0–255."))
+        out.append(("error", f"{loc}: Default {ch.default_value} außerhalb 0–255."))
     if not (0 <= int(ch.highlight_value) <= 255):
-        out.append(("error", f"{loc}: Highlight {ch.highlight_value} ausserhalb 0–255."))
+        out.append(("error", f"{loc}: Highlight {ch.highlight_value} außerhalb 0–255."))
 
     if ch.resolution == "16bit" and not (ch.fine_channel or "").strip():
         out.append(("warn", f"{loc}: 16-bit ohne gekoppelten Fine-Kanal."))
@@ -251,7 +251,7 @@ def _validate_channel(ch: GenChannel, loc: str) -> list[tuple[str, str]]:
     for r in ranges:
         if not (0 <= int(r.range_from) <= 255) or not (0 <= int(r.range_to) <= 255):
             out.append(("error",
-                        f"{loc}: Bereich '{r.name}' ausserhalb 0–255 "
+                        f"{loc}: Bereich '{r.name}' außerhalb 0–255 "
                         f"({r.range_from}–{r.range_to})."))
         if int(r.range_from) > int(r.range_to):
             out.append(("error",
@@ -263,11 +263,11 @@ def _validate_channel(ch: GenChannel, loc: str) -> list[tuple[str, str]]:
     for a, b in zip(valid, valid[1:]):
         if int(a.range_to) >= int(b.range_from):
             out.append(("warn",
-                        f"{loc}: Bereiche '{a.name}' und '{b.name}' ueberlappen "
+                        f"{loc}: Bereiche '{a.name}' und '{b.name}' überlappen "
                         f"(…{a.range_to} / {b.range_from}…)."))
         elif int(b.range_from) - int(a.range_to) > 1:
             out.append(("warn",
-                        f"{loc}: Luecke zwischen '{a.name}' ({a.range_to}) und "
+                        f"{loc}: Lücke zwischen '{a.name}' ({a.range_to}) und "
                         f"'{b.name}' ({b.range_from})."))
 
     # Fehlender open-Bereich an shutter/strobe mit Bereichen.
@@ -300,7 +300,7 @@ def _check_dimmer_strobe(mode: GenMode, loc: str) -> list[tuple[str, str]]:
         if not c.ranges and int(c.highlight_value) >= 255:
             out.append(("warn",
                         f"{loc}: Kanal '{c.name}' ist als Strobe deklariert, "
-                        f"verhaelt sich aber wie ein Dimmer (Highlight 255, keine "
+                        f"verhält sich aber wie ein Dimmer (Highlight 255, keine "
                         f"Bereiche) — Dimmer/Strobe vertauscht?"))
     return out
 
@@ -412,9 +412,9 @@ def model_to_markdown(model: GeneratorModel) -> str:
         lines.append(model.notes)
     for mode in model.modes:
         lines.append("")
-        lines.append(f"## {mode.name} ({len(mode.channels)} Kanaele)")
+        lines.append(f"## {mode.name} ({len(mode.channels)} Kanäle)")
         lines.append("")
-        lines.append("| # | Name | Attribut | Default | Highlight | Aufloesung | Bereiche |")
+        lines.append("| # | Name | Attribut | Default | Highlight | Auflösung | Bereiche |")
         lines.append("|---|------|----------|---------|-----------|------------|----------|")
         for i, ch in enumerate(mode.channels, 1):
             rngs = "; ".join(
@@ -444,7 +444,7 @@ class _RangeEditor(QWidget):
         self.ranges: list[GenRange] = []
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        self._title = QLabel("Bereiche (Kanal waehlen)")
+        self._title = QLabel("Bereiche (Kanal wählen)")
         self._title.setStyleSheet("color:#9aa4af;")
         lay.addWidget(self._title)
 
@@ -806,7 +806,7 @@ class _LiveTestPanel(QGroupBox):
         head.addStretch(1)
         lay.addLayout(head)
 
-        self._info = QLabel("Test inaktiv. Universe/Adresse waehlen und starten.")
+        self._info = QLabel("Test inaktiv. Universe/Adresse wählen und starten.")
         self._info.setStyleSheet("color:#9aa4af;")
         lay.addWidget(self._info)
 
@@ -821,7 +821,7 @@ class _LiveTestPanel(QGroupBox):
         wig.addWidget(self._cb_wiggle, 1)
         self._btn_wiggle = QPushButton("Wackeln")
         self._btn_wiggle.setCheckable(True)
-        self._btn_wiggle.setToolTip("Rampt den gewaehlten Kanal hin/her — gut "
+        self._btn_wiggle.setToolTip("Rampt den gewählten Kanal hin/her — gut "
                                     "zum Identifizieren von Pan/Tilt.")
         self._btn_wiggle.toggled.connect(self._on_wiggle_toggle)
         wig.addWidget(self._btn_wiggle)
@@ -839,7 +839,7 @@ class _LiveTestPanel(QGroupBox):
     def _start(self):
         mode = self.current_mode()
         if not mode or not mode.channels:
-            self._info.setText("Kein Modus/Kanaele zum Testen.")
+            self._info.setText("Kein Modus/Kanäle zum Testen.")
             self._btn_start.setChecked(False)
             return
         try:
@@ -865,7 +865,7 @@ class _LiveTestPanel(QGroupBox):
         self._btn_start.setText("Test stoppen")
         self._info.setText(
             f"AKTIV — Universe {univ_num}, Adresse {self._spin_addr.value()}. "
-            f"Fader schreiben direkt aufs Geraet.")
+            f"Fader schreiben direkt aufs Gerät.")
 
     def _stop(self):
         self._btn_wiggle.setChecked(False)
@@ -878,7 +878,7 @@ class _LiveTestPanel(QGroupBox):
         self._spin_addr.setEnabled(True)
         self._btn_start.setChecked(False)
         self._btn_start.setText("Test starten")
-        self._info.setText("Test gestoppt — Kanaele zurueckgesetzt.")
+        self._info.setText("Test gestoppt — Kanäle zurückgesetzt.")
 
     def _on_blackout(self):
         if self._tester is not None:
@@ -990,7 +990,7 @@ class FixtureGeneratorDialog(QDialog):
         root = QVBoxLayout(self)
 
         # Kopf
-        head = QGroupBox("Geraet")
+        head = QGroupBox("Gerät")
         form = QFormLayout(head)
         self._edit_mfr = QLineEdit(self._model.manufacturer)
         form.addRow("Hersteller:", self._edit_mfr)
@@ -1021,7 +1021,7 @@ class FixtureGeneratorDialog(QDialog):
         root.addWidget(head)
 
         # Modi
-        modes_box = QGroupBox("Modi & Kanaele")
+        modes_box = QGroupBox("Modi && Kanäle")
         mbl = QVBoxLayout(modes_box)
         self._tabs = QTabWidget()
         self._tabs.currentChanged.connect(lambda *_: self._revalidate())
@@ -1034,7 +1034,7 @@ class FixtureGeneratorDialog(QDialog):
             b.clicked.connect(slot)
             mrow.addWidget(b)
         mrow.addStretch(1)
-        b_val = QPushButton("Pruefen")
+        b_val = QPushButton("Prüfen")
         b_val.clicked.connect(self._revalidate)
         mrow.addWidget(b_val)
         mbl.addLayout(mrow)
@@ -1103,7 +1103,7 @@ class FixtureGeneratorDialog(QDialog):
     def _del_mode(self):
         idx = self._tabs.currentIndex()
         if idx < 0 or self._tabs.count() <= 1:
-            QMessageBox.information(self, "Modus loeschen",
+            QMessageBox.information(self, "Modus löschen",
                                     "Mindestens ein Modus muss bleiben.")
             return
         self._tabs.removeTab(idx)
@@ -1140,7 +1140,7 @@ class FixtureGeneratorDialog(QDialog):
     # ── Import / Export ──────────────────────────────────────────────────
     def _import_qxf(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "QLC+ Fixture (.qxf) waehlen", "", "QLC+ Fixture (*.qxf)")
+            self, "QLC+ Fixture (.qxf) wählen", "", "QLC+ Fixture (*.qxf)")
         if not path:
             return
         try:
@@ -1178,7 +1178,7 @@ class FixtureGeneratorDialog(QDialog):
         self._sync_all()
         if not self._model.modes or not any(m.channels for m in self._model.modes):
             QMessageBox.warning(self, "Speichern",
-                                "Mindestens ein Modus mit Kanaelen noetig.")
+                                "Mindestens ein Modus mit Kanälen nötig.")
             return
         # Live-Test sauber beenden, bevor wir speichern.
         self._live.shutdown()
@@ -1232,7 +1232,7 @@ def _default_model() -> GeneratorModel:
         modes=[GenMode("Default", [
             GenChannel("Dimmer", "intensity", 0, 255),
             GenChannel("Rot", "color_r", 0, 255),
-            GenChannel("Gruen", "color_g", 0, 255),
+            GenChannel("Grün", "color_g", 0, 255),
             GenChannel("Blau", "color_b", 0, 255),
         ])])
 

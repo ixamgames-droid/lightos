@@ -132,13 +132,13 @@ def color_chase_kit(function_id: int, x0: int = 20, y0: int = 70, bank: int = -1
     """
     if palette is None:
         palette = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                   ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                   ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                    ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-                   ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
-                   ("Weiss", 255, 255, 255, 255)]
+                   ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
+                   ("Weiß", 255, 255, 255, 255)]
     out: list[dict] = []
     out.append(_label_dict("Color-Chase-Baukasten: 1) Clear  2) Farben antippen  3) Start  "
-                           "-  Fader = Speed / Uebergang", x0, y0 - 24, 760, 20, bank))
+                           "-  Fader = Speed / Übergang", x0, y0 - 24, 760, 20, bank))
     # Farb-Pads (Farbe hinzufuegen) — bis zu 2 Reihen
     for i, (nm, r, g, b, w) in enumerate(palette):
         row, col = divmod(i, 8)
@@ -165,7 +165,7 @@ def color_chase_kit(function_id: int, x0: int = 20, y0: int = 70, bank: int = -1
     out.append(_slider_dict("Speed", x0, fad_y, 50, 140, bank,
                             mode=SliderMode.EFFECT_SPEED, function_id=function_id,
                             _value=70, midi_cc=-1, midi_ch=0))
-    out.append(_slider_dict("Uebergang", x0 + _STEP, fad_y, 50, 140, bank,
+    out.append(_slider_dict("Übergang", x0 + _STEP, fad_y, 50, 140, bank,
                             mode=SliderMode.EFFECT_PARAM, function_id=function_id,
                             param_key="hold", _value=64, midi_cc=-1, midi_ch=0))
     return out
@@ -181,7 +181,7 @@ def color_chase_kit_in_rect(function_id: int, x: int, y: int, w: int, h: int,
     """
     if palette is None:
         palette = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                   ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                   ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                    ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0)]
     gap = 6
     w = max(240, int(w))
@@ -220,7 +220,7 @@ def color_chase_kit_in_rect(function_id: int, x: int, y: int, w: int, h: int,
     out.append(_slider_dict("Speed", x + gap, cy, 50, fad_h, bank,
                             mode=SliderMode.EFFECT_SPEED, function_id=function_id,
                             _value=70, midi_cc=-1, midi_ch=0))
-    out.append(_slider_dict("Uebergang", x + gap + 60, cy, 50, fad_h, bank,
+    out.append(_slider_dict("Übergang", x + gap + 60, cy, 50, fad_h, bank,
                             mode=SliderMode.EFFECT_PARAM, function_id=function_id,
                             param_key="hold", _value=64, midi_cc=-1, midi_ch=0))
     return out

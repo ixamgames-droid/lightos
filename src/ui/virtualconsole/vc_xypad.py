@@ -21,6 +21,7 @@ class VCXYPad(VCWidget):
         #   "position" = klassisch, treibt Pan/Tilt live (Punkt).
         #   "area"     = einen Bereich aufziehen -> setzt Zentrum (x_offset/y_offset)
         #                und Größe (width/height) eines Ziel-EFX: „mach hier deine Acht".
+        #   "path"     = eine Bahn live zeichnen -> als Custom-EfxPath auf den Ziel-EFX.
         self.mode = "position"
         # 16-bit Pan/Tilt: schreibt zusätzlich die Fine-Kanäle (pan_fine/tilt_fine)
         # für ruckelfreie Moving-Head-Bewegung. Fixtures ohne Fine-Kanal ignorieren
@@ -29,6 +30,16 @@ class VCXYPad(VCWidget):
         self.efx_function_id: int | None = None   # Ziel-EFX im area-Modus (None=aktiv)
         self._area: tuple[float, float, float, float] | None = None  # x0,y0,x1,y1 in 0..1
         self._area_drag: tuple[float, float] | None = None           # Startecke beim Ziehen
+        # F4 "path"-Modus: Bahn live zeichnen -> beim Loslassen als Custom-EfxPath
+        # auf den Ziel-EFX (efx_function_id). Punkte 0..1, transient (nicht serialisiert).
+        self._path_pts: list[tuple[float, float]] = []
+        self._path_drawing: bool = False
+        # MIDI-Bindung (AUDIT-VCXYPad-MIDI): zwei absolute CCs (Pan/Tilt) auf einem
+        # gemeinsamen Kanal. -1 = nicht gebunden, midi_ch 0 = alle Kanaele. Nur im
+        # Positions-Modus wirksam; Bindung ueber den Eigenschaften-Dialog.
+        self.midi_cc_pan: int = -1
+        self.midi_cc_tilt: int = -1
+        self.midi_ch: int = 0
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
         self.resize(200, 200)
@@ -106,6 +117,33 @@ class VCXYPad(VCWidget):
         except Exception as e:
             print(f"[VCXYPad] area apply error: {e}")
 
+    def _apply_path(self):
+        """F4: gezeichnete Bahn (Punkte 0..1) als Custom-EfxPath auf den Ziel-EFX legen.
+        Der Pfad fuellt das ganze Pad-Feld (Zentrum Mitte, volle Groesse), sodass die
+        gezeichnete Bahn direkt der Pan/Tilt-Bahn der Moving Heads entspricht."""
+        pts = list(self._path_pts)
+        if len(pts) < 2:
+            return
+        # Gleichmaessig auf <=48 Punkte ausduennen, Float kurz halten.
+        if len(pts) > 48:
+            step = len(pts) / 48.0
+            pts = [pts[int(i * step)] for i in range(48)]
+        pts = [(round(x, 4), round(y, 4)) for x, y in pts]
+        try:
+            from src.core.engine import effect_live
+            from src.core.engine.efx_path import EfxPath
+            fn = effect_live.resolve_target(self.efx_function_id)
+            if fn is None or not hasattr(fn, "set_custom_path"):
+                return
+            fn.set_custom_path(EfxPath("VC-Pfad", pts, mode="linear", closed=False))
+            # Pfad fuellt das ganze Feld -> direkte Pan/Tilt-Bahn.
+            effect_live.set_param("x_offset", 128.0, self.efx_function_id)
+            effect_live.set_param("y_offset", 128.0, self.efx_function_id)
+            effect_live.set_param("width", 255.0, self.efx_function_id)
+            effect_live.set_param("height", 255.0, self.efx_function_id)
+        except Exception as e:
+            print(f"[VCXYPad] path apply error: {e}")
+
     def _write_axis(self, state, fid, attr, frac):
         """Schreibt eine Achse (Pan/Tilt). Bei 16-bit zusätzlich den Fine-Kanal
         (``<attr>_fine``); die Engine wertet Coarse+Fine in app_state aus."""
@@ -142,6 +180,38 @@ class VCXYPad(VCWidget):
             self._write_axis(state, fid, self.pan_attr,  self._pan)
             self._write_axis(state, fid, self.tilt_attr, self._tilt)
 
+    # ── MIDI ────────────────────────────────────────────────────────────────────
+
+    def _set_axis_norm(self, which: str, norm: float):
+        """Setzt eine Achse aus einem normierten 0..1-Wert (MIDI). Nur im
+        Positions-Modus — im Feld-Modus sind Pan/Tilt nicht das Live-Ziel."""
+        if self.mode != "position":
+            return
+        norm = max(0.0, min(1.0, norm))
+        if which == "pan":
+            self._pan = norm
+        else:
+            self._tilt = norm
+        self._apply()
+        self.update()
+
+    def handle_midi(self, msg) -> bool:
+        """Eingehende CC auf Pan/Tilt mappen (absolut, data2/127). Liefert True,
+        wenn die Nachricht zu einer gebundenen Achse passt."""
+        if getattr(msg, "msg_type", None) != "cc":
+            return False
+        if self.midi_ch != 0 and self.midi_ch != getattr(msg, "channel", 0):
+            return False
+        cc = getattr(msg, "data1", -1)
+        val = getattr(msg, "data2", 0) / 127.0
+        if self.midi_cc_pan >= 0 and cc == self.midi_cc_pan:
+            self._set_axis_norm("pan", val)
+            return True
+        if self.midi_cc_tilt >= 0 and cc == self.midi_cc_tilt:
+            self._set_axis_norm("tilt", val)
+            return True
+        return False
+
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
@@ -157,6 +227,10 @@ class VCXYPad(VCWidget):
                 self._area_drag = start
                 self._area = (start[0], start[1], start[0], start[1])
                 self.update()
+            elif self.mode == "path":
+                self._path_drawing = True
+                self._path_pts = [self._norm(event.position().toPoint())]
+                self.update()
             else:
                 self._dragging_pad = True
                 self._pos_to_value(event.position().toPoint())
@@ -170,6 +244,13 @@ class VCXYPad(VCWidget):
             cur = self._norm(event.position().toPoint())
             self._area = (self._area_drag[0], self._area_drag[1], cur[0], cur[1])
             self.update()
+        elif self.mode == "path" and self._path_drawing:
+            cur = self._norm(event.position().toPoint())
+            if not self._path_pts or (
+                    abs(cur[0] - self._path_pts[-1][0])
+                    + abs(cur[1] - self._path_pts[-1][1]) > 0.02):
+                self._path_pts.append(cur)
+                self.update()
         elif self._dragging_pad:
             self._pos_to_value(event.position().toPoint())
         event.accept()
@@ -181,6 +262,9 @@ class VCXYPad(VCWidget):
         if self.mode == "area" and self._area_drag is not None:
             self._area_drag = None
             self._apply_area()      # markiertes Feld -> EFX-Zentrum/Größe
+        elif self.mode == "path" and self._path_drawing:
+            self._path_drawing = False
+            self._apply_path()      # gezeichnete Bahn -> Custom-EfxPath
         self._dragging_pad = False
         event.accept()
 
@@ -222,6 +306,28 @@ class VCXYPad(VCWidget):
                 p.setFont(QFont("Segoe UI", 8))
                 p.drawText(pr, Qt.AlignmentFlag.AlignCenter,
                            "Feld aufziehen →\nEFX fährt hier")
+        elif self.mode == "path":
+            # F4: gezeichnete Bahn als Polyline zeichnen (Live-Feedback).
+            pts = self._path_pts
+            if len(pts) >= 2:
+                p.setPen(QPen(QColor("#58a6ff"), 2))
+                prev = None
+                for (nx, ny) in pts:
+                    px = int(pr.x() + nx * pr.width())
+                    py = int(pr.y() + ny * pr.height())
+                    if prev is not None:
+                        p.drawLine(prev[0], prev[1], px, py)
+                    prev = (px, py)
+                sx, sy = pts[0]
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor("#3fb950"))
+                p.drawEllipse(QPoint(int(pr.x() + sx * pr.width()),
+                                     int(pr.y() + sy * pr.height())), 4, 4)
+            else:
+                p.setPen(QColor("#3a4a6a"))
+                p.setFont(QFont("Segoe UI", 8))
+                p.drawText(pr, Qt.AlignmentFlag.AlignCenter,
+                           "Bahn zeichnen →\nMH fährt sie ab")
         else:
             # Crosshair lines
             cp = self._cursor_pos()
@@ -236,9 +342,10 @@ class VCXYPad(VCWidget):
         # Labels
         p.setPen(self._fg_color)
         p.setFont(QFont("Segoe UI", 8))
-        title = self.caption + ("  [Feld]" if self.mode == "area" else "")
+        title = self.caption + ("  [Feld]" if self.mode == "area"
+                                else "  [Pfad]" if self.mode == "path" else "")
         p.drawText(QRect(0, 0, self.width(), 20), Qt.AlignmentFlag.AlignCenter, title)
-        if self.mode != "area":
+        if self.mode == "position":
             pan_pct  = int(self._pan * 100)
             tilt_pct = int(self._tilt * 100)
             p.setFont(QFont("Segoe UI", 7))
@@ -251,7 +358,7 @@ class VCXYPad(VCWidget):
     # ── Properties ───────────────────────────────────────────────────────────
 
     def _open_properties(self):
-        from PySide6.QtWidgets import QComboBox, QCheckBox
+        from PySide6.QtWidgets import QComboBox, QCheckBox, QSpinBox
         dlg = QDialog(self)
         dlg.setWindowTitle("XY Pad Einstellungen")
         form = QFormLayout(dlg)
@@ -260,7 +367,8 @@ class VCXYPad(VCWidget):
         mode_cb = QComboBox()
         mode_cb.addItem("Position (Pan/Tilt live)", "position")
         mode_cb.addItem("Feld (EFX-Bereich aufziehen)", "area")
-        mode_cb.setCurrentIndex(1 if self.mode == "area" else 0)
+        mode_cb.addItem("Pfad zeichnen (Live, EFX)", "path")
+        mode_cb.setCurrentIndex({"position": 0, "area": 1, "path": 2}.get(self.mode, 0))
         form.addRow("Modus:", mode_cb)
         pan_a = QLineEdit(self.pan_attr)
         form.addRow("Pan-Attribut:", pan_a)
@@ -276,6 +384,24 @@ class VCXYPad(VCWidget):
         efx = QLineEdit("" if self.efx_function_id is None else str(self.efx_function_id))
         efx.setToolTip("Ziel-EFX-ID für den Feld-Modus. Leer = aktiver Effekt.")
         form.addRow("EFX-ID (Feld-Modus):", efx)
+        # Aufklappbare „Steuert"-Liste (Feld-/Pfad-Modus): Ziel-EFX nach Namen waehlen
+        # statt ID tippen. Befuellt -> maßgeblich; leer -> ID-Feld/aktiver Effekt.
+        from .target_list_editor import TargetListEditor
+        efx_editor = TargetListEditor(with_params=False, title="Steuert (EFX)")
+        efx_editor.set_targets([self.efx_function_id] if self.efx_function_id is not None else [])
+        efx_editor.setToolTip("Ziel-EFX (Feld-/Pfad-Modus) — per Dropdown wählen oder ✕ "
+                              "entfernen. Leer = aktiver Effekt.")
+        form.addRow("Steuert:", efx_editor)
+        # MIDI CC Bindung (nur Positions-Modus): je ein absoluter CC für Pan/Tilt.
+        cc_pan = QSpinBox(); cc_pan.setRange(-1, 127); cc_pan.setSpecialValueText("keine")
+        cc_pan.setValue(self.midi_cc_pan)
+        form.addRow("MIDI CC Pan:", cc_pan)
+        cc_tilt = QSpinBox(); cc_tilt.setRange(-1, 127); cc_tilt.setSpecialValueText("keine")
+        cc_tilt.setValue(self.midi_cc_tilt)
+        form.addRow("MIDI CC Tilt:", cc_tilt)
+        mch = QSpinBox(); mch.setRange(0, 16); mch.setSpecialValueText("Alle")
+        mch.setValue(self.midi_ch)
+        form.addRow("MIDI-Kanal:", mch)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -289,9 +415,16 @@ class VCXYPad(VCWidget):
                 self._fixture_ids = [int(x.strip()) for x in fids.text().split(",") if x.strip()]
             except ValueError:
                 pass
-            t = efx.text().strip()
-            self.efx_function_id = int(t) if t.lstrip("-").isdigit() else None
+            _eids = efx_editor.ids()
+            if _eids:
+                self.efx_function_id = _eids[0]
+            else:
+                t = efx.text().strip()
+                self.efx_function_id = int(t) if t.lstrip("-").isdigit() else None
             self.bits16 = bits16_cb.isChecked()
+            self.midi_cc_pan = cc_pan.value()
+            self.midi_cc_tilt = cc_tilt.value()
+            self.midi_ch = mch.value()
             self.update()
 
     # ── Serialization ─────────────────────────────────────────────────────────
@@ -306,6 +439,9 @@ class VCXYPad(VCWidget):
         d["mode"] = self.mode
         d["bits16"] = self.bits16
         d["efx_function_id"] = self.efx_function_id
+        d["midi_cc_pan"] = self.midi_cc_pan
+        d["midi_cc_tilt"] = self.midi_cc_tilt
+        d["midi_ch"] = self.midi_ch
         if self._area is not None:
             d["area"] = list(self._area)
         return d
@@ -320,5 +456,8 @@ class VCXYPad(VCWidget):
         self.mode = d.get("mode", "position")
         self.bits16 = bool(d.get("bits16", False))
         self.efx_function_id = d.get("efx_function_id")
+        self.midi_cc_pan = int(d.get("midi_cc_pan", -1))
+        self.midi_cc_tilt = int(d.get("midi_cc_tilt", -1))
+        self.midi_ch = int(d.get("midi_ch", 0))
         a = d.get("area")
         self._area = tuple(a) if isinstance(a, (list, tuple)) and len(a) == 4 else None

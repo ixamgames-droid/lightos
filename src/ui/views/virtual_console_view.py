@@ -1,12 +1,13 @@
 """Virtual Console tab — toolbar + canvas + Bibliothek-Sidebar."""
 from __future__ import annotations
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QPushButton,
+    QWidget, QVBoxLayout, QScrollArea, QPushButton,
     QLabel, QSizePolicy, QSplitter,
 )
 from PySide6.QtCore import Qt, QPoint, QSize, QTimer
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
+from src.ui.widgets.flow_layout import FlowLayout
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,7 +48,10 @@ class SnapshotSidebar(QWidget):
         # Gemeinsame Bibliothek (snap_file_panel) im Drag-auf-Canvas-Modus
         # wiederverwenden — eine Quelle fuer Programmer UND Virtual Console.
         from src.ui.views.snap_file_panel import SnapFilePanel
-        self._panel = SnapFilePanel(drag_to_canvas=True, canvas=self._canvas)
+        # show_header=False: die Sidebar liefert oben bereits den "Bibliothek"-
+        # Header + Hinweis -> den panel-eigenen Header unterdruecken (kein Doppel).
+        self._panel = SnapFilePanel(drag_to_canvas=True, canvas=self._canvas,
+                                    show_header=False)
         layout.addWidget(self._panel, 1)
 
     # ── Kompatible API (von VirtualConsoleView aufgerufen) ────────────────────
@@ -82,11 +86,20 @@ class VirtualConsoleView(QWidget):
 
         # ── Toolbar ──────────────────────────────────────────────────────────
         toolbar = QWidget()
-        toolbar.setFixedHeight(36)
         toolbar.setStyleSheet("background:#161b22; border-bottom:1px solid #30363d;")
-        tb_layout = QHBoxLayout(toolbar)
-        tb_layout.setContentsMargins(8, 2, 8, 2)
-        tb_layout.setSpacing(6)
+        # Umbrechende Toolbar: bei 200 %-Display-Skalierung / schmalem Fenster
+        # passen im Bearbeiten-Modus nicht alle Buttons in eine Zeile. Das
+        # FlowLayout bricht dann in die nächste Zeile um, statt die Buttons (und
+        # damit ihren Text) unter die Wunschbreite zusammenzuquetschen. Passt
+        # alles in eine Zeile (Live-Modus), bleibt es einzeilig.
+        toolbar.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum
+        )
+        _tb_sp = toolbar.sizePolicy()
+        _tb_sp.setHeightForWidth(True)
+        toolbar.setSizePolicy(_tb_sp)
+        tb_layout = FlowLayout(toolbar, margin=0, h_spacing=6, v_spacing=4)
+        tb_layout.setContentsMargins(8, 3, 8, 3)
 
         self._btn_edit = QPushButton("Bearbeiten")
         self._btn_edit.setCheckable(True)
@@ -121,8 +134,6 @@ class VirtualConsoleView(QWidget):
         self._btn_snap.toggled.connect(self._toggle_snap)
         tb_layout.addWidget(self._btn_snap)
 
-        tb_layout.addSpacing(8)
-
         # Widget quick-add buttons
         widget_buttons = [
             ("Button",    "VCButton"),
@@ -134,8 +145,12 @@ class VirtualConsoleView(QWidget):
             ("Farbe",     "VCColor"),
             ("Chase-Liste", "VCColorList"),
             ("Chase Builder", "VCChaseBuilder"),
+            ("Effekt-Farben", "VCEffectColors"),
             ("Label",     "VCLabel"),
             ("Frame",     "VCFrame"),
+            ("Musik",     "VCSongInfo"),
+            ("BPM",       "VCBpmDisplay"),
+            ("Tempo-Bus", "VCBusSelector"),
         ]
         for label, wtype in widget_buttons:
             btn = QPushButton(label)
@@ -168,7 +183,25 @@ class VirtualConsoleView(QWidget):
             eb.setVisible(False)
             tb_layout.addWidget(eb)
 
-        tb_layout.addSpacing(16)
+        # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only. Strg+Z / Strg+Y.
+        for _glyph, _tip, _slot in [("↶", "Rückgängig (Strg+Z)", self._vc_undo),
+                                    ("↷", "Wiederholen (Strg+Y)", self._vc_redo)]:
+            ub = QPushButton(_glyph)
+            ub.setFixedHeight(26)
+            ub.setToolTip(_tip)
+            ub.setStyleSheet("""
+                QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
+                              border-radius:3px; font-size:14px; padding:0 8px; }
+                QPushButton:hover { background:#30363d; }
+            """)
+            ub.clicked.connect(lambda checked=False, s=_slot: s())
+            ub.setProperty("edit_only", True)
+            ub.setVisible(False)
+            tb_layout.addWidget(ub)
+        from PySide6.QtGui import QShortcut, QKeySequence
+        QShortcut(QKeySequence("Ctrl+Z"), self, activated=self._vc_undo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self._vc_redo)
+        QShortcut(QKeySequence("Ctrl+Shift+Z"), self, activated=self._vc_redo)
 
         # MIDI-Learn-Button
         self._btn_midi_learn = QPushButton("MIDI Lernen")
@@ -244,7 +277,6 @@ class VirtualConsoleView(QWidget):
 
         # Bank-Umschaltung (= Executor-Page): bestimmt, welche Widgets/Pads aktiv
         # sind. APC-Page-Buttons schalten dieselbe Bank. Immer sichtbar.
-        tb_layout.addSpacing(12)
         _bank_btn_css = """
             QPushButton { background:#21262d; color:#58a6ff; border:1px solid #30363d;
                           border-radius:3px; font-size:12px; font-weight:bold; }
@@ -283,8 +315,6 @@ class VirtualConsoleView(QWidget):
         """)
         self._btn_popout.clicked.connect(self._popout_canvas)
         tb_layout.addWidget(self._btn_popout)
-
-        tb_layout.addStretch()
 
         btn_clear = QPushButton("Alle löschen")
         btn_clear.setFixedHeight(26)
@@ -627,8 +657,8 @@ class VirtualConsoleView(QWidget):
         """Fuegt vorkonfigurierte Widget-Dicts auf die aktuell sichtbare Bank ein."""
         if not self._edit_mode or not self._canvas_alive():
             from PySide6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Bearbeiten noetig",
-                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann erneut einfuegen.")
+            QMessageBox.information(self, "Bearbeiten nötig",
+                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann erneut einfügen.")
             return 0
         from PySide6.QtCore import QPoint
         bank = self._canvas.active_bank
@@ -649,14 +679,14 @@ class VirtualConsoleView(QWidget):
         keys = list(CONTROLLERS.keys())
         labels = [CONTROLLERS[k]["label"] for k in keys]
         label, ok = QInputDialog.getItem(self, "Controller-Vorlage",
-                                         "MIDI-Controller waehlen:", labels, 0, False)
+                                         "MIDI-Controller wählen:", labels, 0, False)
         if not ok:
             return
         kind = keys[labels.index(label)]
         n = self._insert_widgets(controller_template(kind))
         if n:
             QMessageBox.information(self, "Controller-Vorlage",
-                                   f"{n} Elemente eingefuegt. Pads per Rechtsklick mit "
+                                   f"{n} Elemente eingefügt. Pads per Rechtsklick mit "
                                    "Funktionen/Farben belegen, Fader-Modus im Properties-Dialog.")
 
     def _insert_color_chase_kit(self):
@@ -664,19 +694,11 @@ class VirtualConsoleView(QWidget):
         (legt zugleich eine COLORFADE-Funktion an, gebunden an die Pads/Fader)."""
         from PySide6.QtWidgets import QMessageBox
         from src.ui.virtualconsole.controller_templates import color_chase_kit
+        label, fids = self._choose_chase_target()
+        if label is None:
+            return            # abgebrochen
         try:
-            from src.core.engine.function_manager import get_function_manager
-            from src.core.engine.rgb_matrix import RgbAlgorithm
-            from src.core.app_state import get_state
-            fm = get_function_manager()
-            m = fm.new_rgb_matrix("Color-Chase")
-            m.algorithm = RgbAlgorithm.COLORFADE
-            m.matrix_speed = 2.0
-            m.params = {"hold": 0.25}
-            fids = [f.fid for f in get_state().get_patched_fixtures()]
-            if fids:
-                m.fixture_grid = fids
-                m.cols, m.rows = len(fids), 1
+            m = self._new_colorfade_function(fids=fids, label=label)
         except Exception as e:
             QMessageBox.warning(self, "Fehler",
                                 f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
@@ -684,23 +706,54 @@ class VirtualConsoleView(QWidget):
         n = self._insert_widgets(color_chase_kit(m.id))
         if n:
             QMessageBox.information(self, "Color-Chase-Baukasten",
-                                   f"{n} Elemente + Funktion 'Color-Chase' angelegt.\n"
-                                   "Ablauf: Clear -> Farben antippen -> Start. "
+                                   f"{n} Elemente + Funktion '{m.name}' angelegt "
+                                   f"(Ziel: {label}).\nAblauf: Clear -> Farben antippen -> Start. "
                                    "Den Pads/Fadern per 'MIDI Lernen' APC-Tasten zuweisen.")
 
-    def _new_colorfade_function(self):
-        """Legt eine COLORFADE-RGB-Matrix ueber die gepatchten Fixtures an (Chase-Ziel)."""
+    def _choose_chase_target(self):
+        """Fragt die Ziel-Gruppe fuer einen Color-Chase ab.
+        Liefert (label, fids) oder (None, None) bei Abbruch. 'Alle Fixtures'
+        -> ('Alle', alle gepatchten fids); sonst (Gruppenname, Gruppen-fids)."""
+        from PySide6.QtWidgets import QInputDialog
+        from src.core.app_state import get_state
+        state = get_state()
+        names = []
+        try:
+            from sqlalchemy import select
+            from src.core.database.models import FixtureGroup
+            with state._session() as s:
+                names = [r[0] for r in s.execute(select(FixtureGroup.name)).all()]
+        except Exception:
+            names = []
+        options = ["Alle Fixtures"] + names
+        choice, ok = QInputDialog.getItem(
+            self, "Color-Chase — Ziel",
+            "Auf welche Gruppe soll der Chase wirken?", options, 0, False)
+        if not ok:
+            return None, None
+        if choice == "Alle Fixtures":
+            return "Alle", [f.fid for f in state.get_patched_fixtures()]
+        return choice, state.group_fids_by_name(choice)
+
+    def _new_colorfade_function(self, fids=None, label=""):
+        """Legt eine COLORFADE-RGB-Matrix ueber die gewuenschten Fixtures an (Chase-Ziel).
+        fids=None -> alle gepatchten Fixtures; label -> Funktionsname-Suffix."""
         from src.core.engine.function_manager import get_function_manager
         from src.core.engine.rgb_matrix import RgbAlgorithm
         from src.core.app_state import get_state
         fm = get_function_manager()
-        m = fm.new_rgb_matrix("Color-Chase")
+        name = f"Color-Chase – {label}" if label and label != "Alle" else "Color-Chase"
+        from src.core.engine.rgb_matrix import MatrixStyle
+        m = fm.new_rgb_matrix(name)
         m.algorithm = RgbAlgorithm.COLORFADE
+        m.style = MatrixStyle.RGB        # nur Farbe (kein Dimmer/Shutter) — explizit, nicht Default-abhaengig
+        m.drive_intensity = False
         m.matrix_speed = 2.0
         m.params = {"hold": 0.25}
-        fids = [f.fid for f in get_state().get_patched_fixtures()]
+        if fids is None:
+            fids = [f.fid for f in get_state().get_patched_fixtures()]
         if fids:
-            m.fixture_grid = fids
+            m.fixture_grid = list(fids)
             m.cols, m.rows = len(fids), 1
         return m
 
@@ -709,10 +762,20 @@ class VirtualConsoleView(QWidget):
         einen Bereich auf, in den ein Live-Color-Chase eingesetzt wird."""
         from PySide6.QtWidgets import QMessageBox
         if not self._edit_mode or not self._canvas_alive():
-            QMessageBox.information(self, "Bearbeiten noetig",
+            QMessageBox.information(self, "Bearbeiten nötig",
                                    "Bitte zuerst 'Bearbeiten' aktivieren, dann einen Bereich aufziehen.")
             return
         self._canvas.arm_area_tool("color_chase")
+
+    def _vc_undo(self):
+        """Letzte VC-Bearbeitung rueckgaengig (Strg+Z / ↶-Knopf)."""
+        if self._canvas_alive():
+            self._canvas.undo()
+
+    def _vc_redo(self):
+        """Rueckgaengig gemachte VC-Bearbeitung wiederholen (Strg+Y / ↷-Knopf)."""
+        if self._canvas_alive():
+            self._canvas.redo()
 
     def _on_area_selected(self, tool, x, y, w, h):
         """Callback: aufgezogener Bereich -> Color-Chase hineinlegen (+ Funktion anlegen)."""
@@ -720,8 +783,11 @@ class VirtualConsoleView(QWidget):
             return
         from PySide6.QtWidgets import QMessageBox
         from src.ui.virtualconsole.controller_templates import color_chase_kit_in_rect
+        label, fids = self._choose_chase_target()
+        if label is None:
+            return            # abgebrochen
         try:
-            m = self._new_colorfade_function()
+            m = self._new_colorfade_function(fids=fids, label=label)
         except Exception as e:
             QMessageBox.warning(self, "Fehler",
                                 f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
@@ -729,8 +795,9 @@ class VirtualConsoleView(QWidget):
         n = self._insert_widgets(color_chase_kit_in_rect(m.id, x, y, w, h))
         if n:
             QMessageBox.information(self, "Color-Chase-Bereich",
-                                   f"{n} Elemente im Bereich + Funktion 'Color-Chase' angelegt.\n"
-                                   "Clear -> Farben antippen -> Start. Per 'MIDI Lernen' zuweisen.")
+                                   f"{n} Elemente im Bereich + Funktion '{m.name}' "
+                                   f"(Ziel: {label}).\nClear -> Farben antippen -> Start. "
+                                   "Per 'MIDI Lernen' zuweisen.")
 
     def _clear_all(self):
         if self._edit_mode:

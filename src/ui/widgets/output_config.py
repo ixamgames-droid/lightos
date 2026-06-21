@@ -138,7 +138,7 @@ class OutputConfigDialog(QDialog):
         input_tab = QWidget()
         if_l = QVBoxLayout(input_tab)
         if_l.addWidget(QLabel(
-            "Empfaengt DMX-Daten via Art-Net (Port 6454) oder sACN (Port 5568)\n"
+            "Empfängt DMX-Daten via Art-Net (Port 6454) oder sACN (Port 5568)\n"
             "und mergt sie in lokale Universen (HTP / LTP / REPLACE)."
         ))
 
@@ -162,7 +162,7 @@ class OutputConfigDialog(QDialog):
         self._combo_artnet_in_mode.addItems(["HTP", "LTP", "REPLACE"])
         ain_l.addRow("Merge-Modus:", self._combo_artnet_in_mode)
 
-        ain_btn = QPushButton("Uebernehmen")
+        ain_btn = QPushButton("Übernehmen")
         ain_btn.clicked.connect(self._apply_artnet_input)
         self._lbl_artnet_in_status = QLabel("Inaktiv")
         ain_l.addRow("", ain_btn)
@@ -189,7 +189,7 @@ class OutputConfigDialog(QDialog):
         self._combo_sacn_in_mode.addItems(["HTP", "LTP", "REPLACE"])
         sin_l.addRow("Merge-Modus:", self._combo_sacn_in_mode)
 
-        sin_btn = QPushButton("Uebernehmen")
+        sin_btn = QPushButton("Übernehmen")
         sin_btn.clicked.connect(self._apply_sacn_input)
         self._lbl_sacn_in_status = QLabel("Inaktiv")
         sin_l.addRow("", sin_btn)
@@ -218,9 +218,9 @@ class OutputConfigDialog(QDialog):
         uf.addWidget(self._univ_table, 1)
 
         uf_btns = QHBoxLayout()
-        b_add = QPushButton("+ Universe hinzufuegen")
+        b_add = QPushButton("+ Universe hinzufügen")
         b_add.clicked.connect(self._univ_add)
-        b_del = QPushButton("Loeschen")
+        b_del = QPushButton("Löschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._univ_delete)
         b_save = QPushButton("Speichern")
@@ -255,7 +255,7 @@ class OutputConfigDialog(QDialog):
     def _connect_enttec(self):
         port = self._combo_port.currentData()
         if not port:
-            self._lbl_enttec_status.setText("Kein Port gewaehlt")
+            self._lbl_enttec_status.setText("Kein Port gewählt")
             return
         univ = self._spin_enttec_univ.value()
         state = get_state()

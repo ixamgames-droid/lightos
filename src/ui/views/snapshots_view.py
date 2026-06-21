@@ -215,7 +215,7 @@ class SnapshotButton(QPushButton):
             a_ignore = menu.addAction("Kanäle ignorieren...")
             a_ignore.triggered.connect(lambda: self._view.edit_ignored(self._index))
             menu.addSeparator()
-            a_del = menu.addAction("Loeschen")
+            a_del = menu.addAction("Löschen")
             a_del.triggered.connect(lambda: self._view.delete(self._index))
         menu.exec(QCursor.pos())
 
@@ -241,7 +241,7 @@ class SnapshotsView(QWidget):
 
         info = QLabel(
             "Klick auf leeren Slot: aktuellen Programmer speichern. "
-            "Klick auf gefuellten Slot: anwenden. Rechtsklick: Menue."
+            "Klick auf gefüllten Slot: anwenden. Rechtsklick: Menü."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color: #888; font-size: 11px;")
@@ -319,7 +319,7 @@ class SnapshotsView(QWidget):
                 return
             name, ok = QInputDialog.getText(
                 self, "Snapshot speichern",
-                f"Name fuer Snapshot {index + 1}:",
+                f"Name für Snapshot {index + 1}:",
                 text=f"Snap {index + 1}"
             )
             if not ok:
@@ -334,7 +334,7 @@ class SnapshotsView(QWidget):
                 vals = chan_dlg.filter_programmer(vals)
                 if not vals:
                     QMessageBox.information(self, "Snapshot",
-                        "Keine Kanaele ausgewaehlt - Snapshot nicht gespeichert.")
+                        "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
                     return
             except Exception as e:
                 print(f"[snapshots] channel select error: {e}")
@@ -386,8 +386,8 @@ class SnapshotsView(QWidget):
 
     def delete(self, index: int):
         reply = QMessageBox.question(
-            self, "Snapshot loeschen",
-            f"Snapshot {index + 1} '{self._snapshots[index].name}' wirklich loeschen?",
+            self, "Snapshot löschen",
+            f"Snapshot {index + 1} '{self._snapshots[index].name}' wirklich löschen?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -422,7 +422,7 @@ class SnapshotsView(QWidget):
                 slot = i
                 break
         if slot < 0:
-            QMessageBox.warning(self, "Import", "Keine leeren Slots verfuegbar.")
+            QMessageBox.warning(self, "Import", "Keine leeren Slots verfügbar.")
             return
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -435,8 +435,8 @@ class SnapshotsView(QWidget):
 
     def _clear_all(self):
         reply = QMessageBox.question(
-            self, "Alle Snapshots loeschen",
-            "Alle 48 Snapshots wirklich loeschen?",
+            self, "Alle Snapshots löschen",
+            "Alle 48 Snapshots wirklich löschen?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:

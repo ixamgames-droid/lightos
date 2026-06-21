@@ -7,6 +7,8 @@ if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
     from src.core.database.models import PatchedFixture
 
+from .fade_curve import eval_named   # ARC-04/FW-4: Form der Hüllkurve (Leaf-Modul)
+
 
 class FunctionType(Enum):
     Scene = "Scene"
@@ -74,6 +76,33 @@ class Function:
         # Bibliotheks-Ordner (verschachtelbar, "/"-getrennt). "" = Wurzel.
         # Pro Show gespeichert; siehe docs/PROGRAMMER_REBUILD.md (Phase 1).
         self.folder: str = ""
+        # F-17: Layer-Prioritaet beim Engine-Merge. Hoehere Prioritaet gewinnt bei
+        # Kanal-/Attribut-Ueberschneidung (tickt zuletzt -> LTP). Gleiche Prioritaet
+        # faellt auf die Start-Reihenfolge zurueck (Verhalten wie bisher, Default 0).
+        self.priority: int = 0
+        # ARC-04: zeitbasierte Ein-/Ausblend-Huellkurve (Sekunden, 0 = aus). Wirkt als
+        # Output-Multiplikator ueber ALLE Kanaele der Funktion (nicht nur Dimmer),
+        # angewandt im FunctionManager.tick. Eigene Namen (env_*), um Scene.fade_in
+        # (kurvenbasierte Wert-Interpolation, andere Semantik) NICHT zu kollidieren.
+        self.env_fade_in: float = 0.0
+        self.env_fade_out: float = 0.0
+        self._env_elapsed: float = 0.0     # laeuft seit (Re-)Start -> Fade-In
+        self._releasing: bool = False      # True = Fade-Out laeuft (nach release())
+        self._release_elapsed: float = 0.0
+        # FW-4: Form der Hüllkurve (kurzer Name aus fade_curve.CURVE_NAMES;
+        # "linear" = unveränderter, gerader Verlauf).
+        self.env_curve: str = "linear"
+        # WP-Tempo: Anbindung an einen Tempo-Bus (core/engine/tempo_bus.py +
+        # docs/TEMPO_SYNC_PLAN.md). "" = Free-Run wie bisher (Subtyp liest KEINEN Bus).
+        # Sonst leitet ein zeitbasierter Subtyp seine Phase aus der Bus-Position ab:
+        #   effect_pos = (bus.position - _beat_anchor) * tempo_multiplier + phase_offset
+        # tempo_multiplier = harmonisches Verhältnis (×¼…×4), phase_offset in Beats,
+        # sync_group bündelt Effekte, die per "Sync" gemeinsam re-ankern.
+        self.tempo_bus_id: str = ""
+        self.tempo_multiplier: float = 1.0
+        self.phase_offset: float = 0.0
+        self.sync_group: str = ""
+        self._beat_anchor: float = 0.0     # Bus-Position beim letzten Sync/Start (privat, nicht serialisiert)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -81,12 +110,17 @@ class Function:
         """Called when function is started."""
         self._running = True
         self._elapsed = 0.0
+        self._env_elapsed = 0.0
+        self._releasing = False
+        self._release_elapsed = 0.0
         self._on_start()
 
     def stop(self):
         """Called when function is stopped."""
         self._running = False
         self._elapsed = 0.0
+        self._releasing = False
+        self._release_elapsed = 0.0
         self._on_stop()
 
     def _on_start(self):
@@ -98,6 +132,38 @@ class Function:
     @property
     def is_running(self) -> bool:
         return self._running
+
+    # ── ARC-04: Ein-/Ausblend-Huellkurve ───────────────────────────────────────
+
+    def release(self):
+        """Fade-Out einleiten — die Funktion bleibt laufend und blendet ueber
+        env_fade_out Sekunden aus (vom FunctionManager getickt), statt sofort zu
+        stoppen. Ohne env_fade_out wirkungslos (der Caller stoppt dann hart)."""
+        if not self._releasing:
+            self._releasing = True
+            self._release_elapsed = 0.0
+
+    def env_factor(self, dt: float) -> float:
+        """Output-Multiplikator 0..1 fuer diesen Frame; treibt die Huellkurven-Uhr
+        um dt weiter. MUSS pro Frame genau einmal aufgerufen werden. Fade-In rampt
+        nach (Re-)Start ueber env_fade_in hoch; Fade-Out rampt nach release() ueber
+        env_fade_out auf 0."""
+        if self._releasing:
+            if self.env_fade_out <= 0.0:
+                return 0.0
+            self._release_elapsed += dt
+            remaining = max(0.0, 1.0 - self._release_elapsed / self.env_fade_out)
+            return eval_named(self.env_curve, remaining)   # FW-4: Form anwenden
+        self._env_elapsed += dt
+        if self.env_fade_in <= 0.0:
+            return 1.0
+        prog = max(0.0, min(1.0, self._env_elapsed / self.env_fade_in))
+        return eval_named(self.env_curve, prog)            # FW-4: Form anwenden
+
+    def env_release_done(self) -> bool:
+        """True, wenn der Fade-Out fertig ist (Funktion darf entfernt werden)."""
+        return self._releasing and (self.env_fade_out <= 0.0
+                                    or self._release_elapsed >= self.env_fade_out)
 
     # ── Per-frame tick ────────────────────────────────────────────────────────
 
@@ -122,6 +188,14 @@ class Function:
             "intensity": self.intensity,
             "speed": self.speed,
             "folder": self.folder,
+            "priority": self.priority,
+            "env_fade_in": self.env_fade_in,
+            "env_fade_out": self.env_fade_out,
+            "env_curve": self.env_curve,
+            "tempo_bus_id": self.tempo_bus_id,
+            "tempo_multiplier": self.tempo_multiplier,
+            "phase_offset": self.phase_offset,
+            "sync_group": self.sync_group,
         }
 
     @classmethod

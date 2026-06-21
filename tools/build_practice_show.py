@@ -118,9 +118,9 @@ state._rebuild_render_plan()
 # ── 2) GRUPPEN MIT ORDNERN (P5-Dogfooding) ──────────────────────────────────
 with state._session() as s:
     s.execute(delete(FixtureGroup))
-    s.add(FixtureGroup(name="PARs", cols=4, rows=1, folder="Buehne",
+    s.add(FixtureGroup(name="PARs", cols=4, rows=1, folder="Bühne",
                        positions_json=json.dumps({f"{i},0": par_fids[i] for i in range(4)})))
-    s.add(FixtureGroup(name="Moving Heads", cols=2, rows=1, folder="Buehne",
+    s.add(FixtureGroup(name="Moving Heads", cols=2, rows=1, folder="Bühne",
                        positions_json=json.dumps({"0,0": mh_left, "1,0": mh_right})))
     s.add(FixtureGroup(name="Alle", cols=6, rows=1, folder="Spezial",
                        positions_json=json.dumps({f"{i},0": fid for i, fid in
@@ -168,12 +168,12 @@ def chaser(name, step_ids, hold=0.4, fade=0.0, order=RunOrder.Loop):
 
 
 # Farben (PARs) — Weiss-Vergleich ist der P6-Praxistest:
-sc_white_w = par_scene("Weiss (W-Kanal)", intensity=255,
+sc_white_w = par_scene("Weiß (W-Kanal)", intensity=255,
                        color_r=0, color_g=0, color_b=0, color_w=255)
-sc_white_rgb = par_scene("Weiss (RGB)", intensity=255,
+sc_white_rgb = par_scene("Weiß (RGB)", intensity=255,
                          color_r=255, color_g=255, color_b=255, color_w=0)
 sc_red = par_scene("Rot", intensity=255, color_r=255, color_g=0, color_b=0, color_w=0)
-sc_grn = par_scene("Gruen", intensity=255, color_g=255, color_r=0, color_b=0, color_w=0)
+sc_grn = par_scene("Grün", intensity=255, color_g=255, color_r=0, color_b=0, color_w=0)
 sc_blu = par_scene("Blau", intensity=255, color_b=255, color_r=0, color_g=0, color_w=0)
 sc_amb = par_scene("Amber", intensity=255, color_r=255, color_g=140, color_b=0, color_w=0)
 sc_cya = par_scene("Cyan", intensity=255, color_g=255, color_b=255, color_r=0, color_w=0)
@@ -217,7 +217,7 @@ dim_funcs = [ch_run, ch_ping, ch_strobe]
 # MH-Positionen:
 pos_center = mh_scene("Pos Center", pan=128, tilt=128, intensity=255, shutter=4)
 pos_aud = mh_scene("Pos Publikum", pan=128, tilt=70, intensity=255, shutter=4)
-pos_stage = mh_scene("Pos Buehne", pan=128, tilt=180, intensity=255, shutter=4)
+pos_stage = mh_scene("Pos Bühne", pan=128, tilt=180, intensity=255, shutter=4)
 pos_left = mh_scene("Pos Links", pan=60, tilt=128, intensity=255, shutter=4)
 pos_right = mh_scene("Pos Rechts", pan=196, tilt=128, intensity=255, shutter=4)
 mh_pos_funcs = [pos_center, pos_aud, pos_stage, pos_left, pos_right]
@@ -390,22 +390,22 @@ label("BANK 1  GRUPPEN  -  Reihe 1: PARs an / MHs Beam auf / Alle (Look). "
       X0, 28, 1100, B_GRP, fg="#9DFF52")
 
 # ── BANK 2 — FARBEN ─────────────────────────────────────────────────────────
-_grund = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+_grund = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
           ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0),
           ("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0)]
 for i, (nm, r, g, b, w) in enumerate(_grund):
     color_tile(nm, 56 + i, B_COL, r, g, b, w)
 # Weiss-Vergleich (P6): Kachel "Weiss (W)" nutzt NUR den W-Kanal.
-color_tile("Weiss (W)", 48, B_COL, 0, 0, 0, w=255)
-color_tile("Weiss (RGB)", 49, B_COL, 255, 255, 255, w=0)
-color_tile("Warmweiss", 50, B_COL, 255, 130, 40, w=60)
+color_tile("Weiß (W)", 48, B_COL, 0, 0, 0, w=255)
+color_tile("Weiß (RGB)", 49, B_COL, 255, 255, 255, w=0)
+color_tile("Warmweiß", 50, B_COL, 255, 130, 40, w=60)
 color_tile("Kaltweiss", 51, B_COL, 180, 200, 255, w=120)
 for i, fn in enumerate(mh_cw_funcs):
     func_btn(fn, 40 + i, B_COL, "#3a2a5a", style="solid")
 for i, fn in enumerate(mh_split_funcs):
     func_btn(fn, 43 + i, B_COL, "#5a2a5a", style="solid")
 func_btn(ch_color, 32, B_COL, "#3a2150")
-label("BANK 2  FARBEN  -  oben Grundfarben (PARs), Reihe 2: Weiss-Test "
+label("BANK 2  FARBEN  -  oben Grundfarben (PARs), Reihe 2: Weiß-Test "
       "(W-Kanal vs. RGB!), Reihe 3: MH-Farbrad inkl. 2 SPLIT-Farben, "
       "links unten Farb-Chaser.", X0, 28, 1100, B_COL, fg="#9DFF52")
 
@@ -426,8 +426,8 @@ for i, fn in enumerate(mh_pos_funcs):
 action_btn("Stop All", ButtonAction.STOP_ALL, 63, B_POS, "#4a1010")
 fader("Pan", 0, B_POS, SliderMode.PROGRAMMER, programmer_attr="pan", midi_cc=48, value=128)
 fader("Tilt", 1, B_POS, SliderMode.PROGRAMMER, programmer_attr="tilt", midi_cc=49, value=128)
-label("BANK 4  MH POSITION  -  Center/Publikum/Buehne/Links/Rechts. "
-      "F1/F2 = Pan/Tilt von Hand (Programmer; MHs vorher im Programmer waehlen).",
+label("BANK 4  MH POSITION  -  Center/Publikum/Bühne/Links/Rechts. "
+      "F1/F2 = Pan/Tilt von Hand (Programmer; MHs vorher im Programmer wählen).",
       X0, 28, 1100, B_POS, fg="#9DFF52")
 
 # ── BANK 5 — EFX ────────────────────────────────────────────────────────────
@@ -436,7 +436,7 @@ for i, fn in enumerate(efx_funcs):
 fader("EFX-Sp", 0, B_EFX, SliderMode.EFFECT_SPEED,
       function_ids=[f.id for f in efx_funcs], midi_cc=48, value=70)
 label("BANK 5  EFX  -  Kreis (Fan 50%) / Sweep (gespiegelt) / Acht / Bounce. "
-      "Alle oeffnen den Beam automatisch. F1 = EFX-Speed.",
+      "Alle öffnen den Beam automatisch. F1 = EFX-Speed.",
       X0, 28, 1100, B_EFX, fg="#9DFF52")
 
 # ── BANK 6 — LOOKS ──────────────────────────────────────────────────────────
@@ -469,12 +469,12 @@ func_btn(mx_rainbow, 58, B_TEST, "#7a5b00")
 func_btn(efx_circle, 59, B_TEST, "#1f3a6a")
 func_btn(ch_run, 60, B_TEST, "#1f4a28")
 fader("Rot", 0, B_TEST, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
-fader("Weiss", 1, B_TEST, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=49, value=0)
-label("BANK 8  TEST  -  Pad 1/2: Weiss ueber W-KANAL vs. RGB (am Geraet vergleichen!). "
-      "Slider-Sync-Test: Farbe klicken -> Programmer-Slider muessen folgen.",
+fader("Weiß", 1, B_TEST, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=49, value=0)
+label("BANK 8  TEST  -  Pad 1/2: Weiß ueber W-KANAL vs. RGB (am Gerät vergleichen!). "
+      "Slider-Sync-Test: Farbe klicken -> Programmer-Slider müssen folgen.",
       X0, 28, 1100, B_TEST, fg="#9DFF52")
 label("Weitere Tests: Live View Fixture verschieben -> Auto-Save (5 min) sichert; "
-      "Patch->Gruppen: Ordner 'Buehne'/'Spezial' muessen im Programmer erscheinen.",
+      "Patch->Gruppen: Ordner 'Bühne'/'Spezial' müssen im Programmer erscheinen.",
       X0, 48, 1100, B_TEST)
 
 state._vc_layout = {"widgets": widgets}
@@ -510,7 +510,7 @@ print("Patch OK: " + ", ".join(f"[{f.fid}]{f.label}@{f.address}" for f in fx2))
 with state._session() as s:
     groups = list(s.execute(select(FixtureGroup)).scalars().all())
 folders = {g.name: g.folder for g in groups}
-assert folders == {"PARs": "Buehne", "Moving Heads": "Buehne", "Alle": "Spezial"}, folders
+assert folders == {"PARs": "Bühne", "Moving Heads": "Bühne", "Alle": "Spezial"}, folders
 print(f"Gruppen+Ordner OK: {folders}")
 
 # Live-View-Meta (P4)
@@ -521,13 +521,13 @@ print(f"Live-View OK: 6 Positionen + Meta {state.live_view_meta}")
 # Weiss-Szenen (P6): W-Kanal-Szene hat color_w=255 und RGB=0
 from src.core.engine.scene import Scene
 scenes = {f.name: f for f in fm.all() if isinstance(f, Scene)}
-ww = scenes["Weiss (W-Kanal)"]
+ww = scenes["Weiß (W-Kanal)"]
 cm1 = chan_of[1]
 vals = {(v.fixture_id, v.channel): v.value for v in ww._values}
 w_val = vals.get((1, cm1["color_w"]))
 r_val = vals.get((1, cm1["color_r"]))
-assert w_val == 255 and r_val == 0, f"Weiss (W-Kanal): w={w_val} r={r_val}"
-print("Weiss-Test OK: 'Weiss (W-Kanal)' nutzt color_w=255, RGB=0")
+assert w_val == 255 and r_val == 0, f"Weiß (W-Kanal): w={w_val} r={r_val}"
+print("Weiß-Test OK: 'Weiß (W-Kanal)' nutzt color_w=255, RGB=0")
 
 # Split-Farben (P10)
 split_names = [n for n in scenes if n.startswith("MH Split ")]

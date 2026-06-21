@@ -57,7 +57,6 @@ class APCMiniFeedback:
         self._state = None
         self._timer = None
         self._cache: dict[int, int] = {}
-        self._excluded: set[int] = set()  # von VC-Widgets verwaltete Notes
         self._open()
 
     # ── Port oeffnen ─────────────────────────────────────────────────────────
@@ -78,13 +77,13 @@ class APCMiniFeedback:
                 print(f"[APCMiniFeedback] Output geoeffnet: {ports[idx]}")
                 return True
             except Exception as e:
-                print(f"[APCMiniFeedback] Fehler beim Oeffnen: {e}")
+                print(f"[APCMiniFeedback] Fehler beim Öffnen: {e}")
                 return False
         # WinMM-Fallback (kein Compiler noetig, laeuft nativ auf ARM64)
         try:
             from .midi_backend_winmm import WINMM_OK, list_outputs as _wm_out, WinMMOutput as _WMOut
             if not WINMM_OK:
-                print("[APCMiniFeedback] Weder rtmidi noch WinMM verfuegbar.")
+                print("[APCMiniFeedback] Weder rtmidi noch WinMM verfügbar.")
                 return False
             ports = _wm_out()
             idx = next((i for i, p in enumerate(ports)
@@ -141,16 +140,6 @@ class APCMiniFeedback:
             _instance = None
         print("[APCMiniFeedback] Geschlossen.")
 
-    # ── Exclude-Mechanismus fuer VC-Widget-Notes ─────────────────────────────
-
-    def exclude_note(self, note: int):
-        """Verhindert, dass der Feedback-Loop diese Note ueberschreibt."""
-        self._excluded.add(note)
-
-    def include_note(self, note: int):
-        """Gibt eine Note wieder fuer den Feedback-Loop frei."""
-        self._excluded.discard(note)
-
     # ── LED senden ───────────────────────────────────────────────────────────
 
     def set_led(self, note: int, velocity: int):
@@ -190,39 +179,32 @@ class APCMiniFeedback:
                 note_back  = self.TRACK_BTNS[i]
 
                 if ex is None:
-                    if note_go    not in self._excluded:
-                        self.set_led(note_go,    LED_OFF)
-                    if note_flash not in self._excluded:
-                        self.set_led(note_flash, LED_OFF)
-                    if note_back  not in self._excluded:
-                        self.set_led(note_back,  LED_OFF)
+                    self.set_led(note_go,    LED_OFF)
+                    self.set_led(note_flash, LED_OFF)
+                    self.set_led(note_back,  LED_OFF)
                     continue
 
                 # Flash-Reihe: rot wenn Flash gehalten
-                if note_flash not in self._excluded:
-                    self.set_led(note_flash,
-                                 LED_RED if ex._flash_active else LED_OFF)
+                self.set_led(note_flash,
+                             LED_RED if ex._flash_active else LED_OFF)
 
                 # GO-Reihe: gruen wenn Stack aktiv und Output hat
-                if note_go not in self._excluded:
-                    if ex.stack is not None and ex.get_output():
-                        self.set_led(note_go, LED_GREEN)
-                    elif ex.stack is not None:
-                        self.set_led(note_go, LED_GREEN_BLINK)
-                    else:
-                        self.set_led(note_go, LED_OFF)
+                if ex.stack is not None and ex.get_output():
+                    self.set_led(note_go, LED_GREEN)
+                elif ex.stack is not None:
+                    self.set_led(note_go, LED_GREEN_BLINK)
+                else:
+                    self.set_led(note_go, LED_OFF)
 
                 # BACK-Reihe: gedimmtes Gruen wenn Stack geladen
-                if note_back not in self._excluded:
-                    self.set_led(note_back,
-                                 LED_GREEN if ex.stack else LED_OFF)
+                self.set_led(note_back,
+                             LED_GREEN if ex.stack else LED_OFF)
 
             # Seiten-Buttons: aktive Seite gelb
             for i in range(8):
                 note = self.SIDE_BTNS[i]
-                if note not in self._excluded:
-                    self.set_led(note,
-                                 LED_YELLOW if i == page else LED_OFF)
+                self.set_led(note,
+                             LED_YELLOW if i == page else LED_OFF)
 
         except Exception as e:
             print(f"[APCMiniFeedback] Update-Fehler: {e}")

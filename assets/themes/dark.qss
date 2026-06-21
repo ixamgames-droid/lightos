@@ -272,6 +272,8 @@ QPushButton#blackoutBtn {
         stop:0 #7a1a1a, stop:1 #4f0f0f);
     border-color: #3a0a0a;
     font-weight: bold;
+    font-size: 11px;
+    padding: 2px 9px;
     color: #ff4444;
 }
 QPushButton#blackoutBtn:checked {

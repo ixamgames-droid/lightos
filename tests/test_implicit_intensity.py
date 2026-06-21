@@ -142,6 +142,23 @@ class ImplicitIntensityTest(unittest.TestCase):
         st._render_frame(0.02)
         self.assertEqual(self._val(st, 10), 0)
 
+    # ── implicit_brightness=False: strikte Trennung Farbe/Dimmer ──────────────
+    def test_flag_off_color_only_stays_dark(self):
+        st = _make_state(_DIMMED)
+        st.implicit_brightness = False             # Farb-Seite rührt den Dimmer nicht an
+        st.programmer = {1: {"color_r": 200}}
+        st._render_frame(0.02)
+        self.assertEqual(self._val(st, 10), 0)     # Dimmer bleibt dunkel (kein implizites Voll)
+        self.assertEqual(self._val(st, 11), 200)   # Farbe ist trotzdem gesetzt
+
+    def test_flag_off_dimmer_effect_still_lights(self):
+        st = _make_state(_DIMMED)
+        st.implicit_brightness = False
+        st.function_manager.writes = {11: 180, 10: 220}   # Dimmer-Effekt treibt Intensitaet
+        st._render_frame(0.02)
+        self.assertEqual(self._val(st, 10), 220)   # Dimmer-Effekt hellt auf
+        self.assertEqual(self._val(st, 11), 180)
+
 
 if __name__ == "__main__":
     unittest.main()

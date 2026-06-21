@@ -229,8 +229,8 @@ for name, key, note in ACTIONS:
 
 # Reihe 6 (notes 48-55, OBEN): LIVE-FARBEN -> aktive Sequence-Farbe des Effekts
 for i, (cname, r, g, b) in enumerate([
-        ("Rot", 255, 0, 0), ("Gruen", 0, 255, 0), ("Blau", 0, 0, 255),
-        ("Weiss", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
+        ("Rot", 255, 0, 0), ("Grün", 0, 255, 0), ("Blau", 0, 0, 255),
+        ("Weiß", 255, 255, 255), ("Amber", 255, 140, 0), ("Cyan", 0, 255, 255),
         ("Magenta", 255, 0, 255), ("Gelb", 255, 255, 0)]):
     color_tile(cname, 48 + i, r, g, b)
 
@@ -269,14 +269,14 @@ encoder("Count", "count", mx_rand.id, EX + 104, 58)  # Random-Count
 # ── Beschriftungen ───────────────────────────────────────────────────────────────
 for text, x, y, ww, hh in [
     ("LightOS — LIVE-PROGRAMMING Demo (RGB-Matrix)", X0, 12, 760, 26),
-    ("Reihe 1 (unten): Effekt WAEHLEN (exklusiv) -> wird der 'aktive Effekt'.  "
+    ("Reihe 1 (unten): Effekt WÄHLEN (exklusiv) -> wird der 'aktive Effekt'.  "
      "Reihe 2: eigenstaendige Texturen.", X0, 42, 1100, 20),
     ("Reihe 3: LIVE-AKTIONEN (Farbe +/- , + Farbe, Umkehren, Freeze, Reset, Commit, Tap) "
      "auf dem aktiven Effekt.", X0, 64, 1100, 20),
     ("Obere Reihe: LIVE-FARBEN faerben die aktive Sequence-Farbe.  "
      "Fader: Speed/Fill-Lvl/Count/Rate/Density/Spread/Hold + FX-Speed + Master.  "
      "Encoder (rechts): relativ feinjustieren.", X0, 86, 1250, 20),
-    ("So testen: 1) Effekt-Pad unten druecken  2) Fader/Buttons/Farben/Encoder bewegen -> wirkt SOFORT live.  "
+    ("So testen: 1) Effekt-Pad unten drücken  2) Fader/Buttons/Farben/Encoder bewegen -> wirkt SOFORT live.  "
      "Die 2 Matrix-Luecken bleiben leer.", X0, 108, 1250, 20),
 ]:
     add_widget(VCLabel(text), x, y, ww, hh)

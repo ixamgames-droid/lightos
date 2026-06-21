@@ -152,11 +152,11 @@ lk_cold = par_look("Cold Wash", r=0, g=60, b=255, w=80)
 lk_sunset = par_look("Sonnenuntergang", r=255, g=70, b=0, w=30)
 lk_ocean = par_look("Ozean", g=120, b=255)
 lk_party = par_look("Party", r=255, g=0, b=180, w=20)
-lk_white = par_look("Vollweiss", r=255, g=255, b=255, w=255)
+lk_white = par_look("Vollweiß", r=255, g=255, b=255, w=255)
 look_funcs = [lk_warm, lk_cold, lk_sunset, lk_ocean, lk_party, lk_white]
 
 lk_red = par_look("Rot voll", r=255)
-lk_grn = par_look("Gruen voll", g=255)
+lk_grn = par_look("Grün voll", g=255)
 lk_blu = par_look("Blau voll", b=255)
 lk_amb = par_look("Amber voll", r=255, g=140)
 lk_cya = par_look("Cyan voll", g=255, b=255)
@@ -291,9 +291,9 @@ mh_pos_funcs = [pos_center, pos_aud, pos_up, pos_cross]
 
 # Farbrad: exakte ZQ02001-Slots (0-9 weiss, 10-19 rot, 20-29 gruen, 30-39 blau,
 # 40-49 gelb, 50-59 orange, 60-69 hellblau, 70-79 rosa, 140-255 Farbwechsel).
-cw_white = mh_scene("MH Weiss", color_wheel=4, intensity=255, shutter=4)
+cw_white = mh_scene("MH Weiß", color_wheel=4, intensity=255, shutter=4)
 cw_red = mh_scene("MH Rot", color_wheel=14, intensity=255, shutter=4)
-cw_green = mh_scene("MH Gruen", color_wheel=24, intensity=255, shutter=4)
+cw_green = mh_scene("MH Grün", color_wheel=24, intensity=255, shutter=4)
 cw_blue = mh_scene("MH Blau", color_wheel=34, intensity=255, shutter=4)
 cw_yellow = mh_scene("MH Gelb", color_wheel=44, intensity=255, shutter=4)
 mh_color_funcs = [cw_white, cw_red, cw_green, cw_blue, cw_yellow]
@@ -376,7 +376,7 @@ def beat_look(name, r, g, b, w, wheel):
     return sc
 
 
-bl_specs = [("Beat Rot", 255, 0, 0, 0, 14), ("Beat Gruen", 0, 255, 0, 0, 24),
+bl_specs = [("Beat Rot", 255, 0, 0, 0, 14), ("Beat Grün", 0, 255, 0, 0, 24),
             ("Beat Blau", 0, 0, 255, 0, 34), ("Beat Gelb", 255, 220, 0, 0, 44),
             ("Beat Hellblau", 0, 160, 255, 0, 64), ("Beat Rosa", 255, 0, 120, 0, 74)]
 beat_look_scenes = [beat_look(*sp) for sp in bl_specs]
@@ -406,10 +406,10 @@ beat_funcs = [bt_looks, bt_flash, bt_mh, bt_pulse]
 # ════════════════════════════════════════════════════════════════════════════
 lib.clear()
 lib.add_folder("Farben"); lib.add_folder("Looks"); lib.add_folder("MH-Positionen")
-_COLORS = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-           ("Weiss", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-           ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60),
-           ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_COLORS = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+           ("Weiß", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+           ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60),
+           ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
            ("Orange", 255, 80, 0, 0), ("Violett", 140, 0, 255, 0)]
 for nm, r, g, b, w in _COLORS:
     values = {fid: {a: v for a, v in (("color_r", r), ("color_g", g),
@@ -418,7 +418,7 @@ for nm, r, g, b, w in _COLORS:
     lib.add_snap(nm, "Farben", values)
 _look_specs = [("Warm Wash", 255, 120, 20, 120), ("Cold Wash", 0, 60, 255, 80),
                ("Sonnenuntergang", 255, 70, 0, 30), ("Ozean", 0, 120, 255, 0),
-               ("Party", 255, 0, 180, 20), ("Vollweiss", 255, 255, 255, 255)]
+               ("Party", 255, 0, 180, 20), ("Vollweiß", 255, 255, 255, 255)]
 look_snaps = {}
 for nm, r, g, b, w in _look_specs:
     values = {fid: {a: v for a, v in (("intensity", 255), ("color_r", r), ("color_g", g),
@@ -543,7 +543,7 @@ fader("Speed", 6, BANK_ALL, SliderMode.SPEED, midi_cc=54, value=64)
 fader("Master", 8, BANK_ALL, SliderMode.GRANDMASTER, midi_cc=56, value=255)
 
 label("APC mini  -  8x8 Pads (Note 0 = unten links).  SCENE-Tasten rechts = Seite 1-8. "
-      "TRACK-Tasten unten = Clear/Stop/Blackout/Tap/Musik-BPM (ueberall aktiv).",
+      "TRACK-Tasten unten = Clear/Stop/Blackout/Tap/Musik-BPM (überall aktiv).",
       X0, 6, 1150, BANK_ALL, hh=18, fg="#88c0ff")
 label("Fader F1-F9 = CC48-56.  F6 Dimmer | F7 Speed global | F9 Master immer aktiv, "
       "F1-F5/F8 je nach Seite.", X0, Y_FAD + FAD_H + 4, 1150, BANK_ALL, hh=18, fg="#88c0ff")
@@ -552,12 +552,12 @@ for i, nm in enumerate(PAGE_NAMES):
 
 
 # ── SEITE 1 — FARBEN & LOOKS ────────────────────────────────────────────────
-_row7 = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-         ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-         ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60)]
+_row7 = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+         ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+         ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60)]
 for i, (nm, r, g, b, w) in enumerate(_row7):
     color_tile(nm, 56 + i, B_COLOR, r, g, b, w)
-_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
          ("Violett", 140, 0, 255, 0), ("Hellblau", 0, 160, 255, 0), ("Limette", 160, 255, 0, 0),
          ("Rosa", 255, 80, 120, 0), ("Gelb", 255, 220, 0, 0)]
 for i, (nm, r, g, b, w) in enumerate(_row6):
@@ -587,7 +587,7 @@ fader("Sp Strobe", 3, B_DIM, SliderMode.EFFECT_SPEED, function_id=dim_strobe.id,
 fader("FX-Level", 4, B_DIM, SliderMode.EFFECT_INTENSITY,
       function_ids=[f.id for f in dimmer_funcs], midi_cc=52, value=255)
 label("SEITE 2  DIMMER-EFFEKTE  -  ueberschreiben die Grundhelligkeit (echtes Lauflicht). "
-      "Farbe oben waehlen -> Effekt laeuft in dieser Farbe.  F1-F4 Speed, F5 FX-Level.",
+      "Farbe oben wählen -> Effekt laeuft in dieser Farbe.  F1-F4 Speed, F5 FX-Level.",
       X0, 28, 1100, B_DIM, fg="#9DFF52")
 
 # ── SEITE 3 — MATRIX ────────────────────────────────────────────────────────
@@ -619,7 +619,7 @@ fader("EFX-Sp", 0, B_MH, SliderMode.EFFECT_SPEED,
       function_ids=[f.id for f in mh_efx_funcs], midi_cc=48, value=70)
 fader("Pan", 1, B_MH, SliderMode.PROGRAMMER, programmer_attr="pan", midi_cc=49, value=128)
 fader("Tilt", 2, B_MH, SliderMode.PROGRAMMER, programmer_attr="tilt", midi_cc=50, value=128)
-label("SEITE 4  MOVING HEADS  -  Reihe 1 EFX (Kreis/Acht/Sweep/Bounce, oeffnen den Beam), "
+label("SEITE 4  MOVING HEADS  -  Reihe 1 EFX (Kreis/Acht/Sweep/Bounce, öffnen den Beam), "
       "Reihe 2 Positionen, Reihe 3 Farbrad, Reihe 4 Gobos, Reihe 5 Shutter + Reset (halten!).",
       X0, 28, 1100, B_MH, fg="#9DFF52")
 label("F1 = EFX-Speed, F2/F3 = Pan/Tilt von Hand (Programmer).",
@@ -642,21 +642,21 @@ label("SEITE 5  AUTOPLAY  -  Pad 1 (oben links) = AUTO-SHOW: 72-s-Timeline, loop
       "ganze Show (PARs + Moving Heads), stoppt alles andere beim Start.",
       X0, 28, 1100, B_AUTO, fg="#9DFF52")
 label("Beat-Funktionen (Pads 3-6) schalten NUR im Beat weiter: Tempo per 'Tap' (4x "
-      "druecken) ODER 'Musik-BPM' = automatische BPM-Erkennung vom Audio-Eingang.",
+      "drücken) ODER 'Musik-BPM' = automatische BPM-Erkennung vom Audio-Eingang.",
       X0, 48, 1100, B_AUTO)
-label("F1 = BPM von Hand setzen, F5 = Level der Beat-Effekte. Audio-Geraet waehlen: "
+label("F1 = BPM von Hand setzen, F5 = Level der Beat-Effekte. Audio-Gerät wählen: "
       "Ansicht 'Audio-Eingang' in der App.", X0, GRID_BOTTOM - 28, 1100, B_AUTO)
 
 # ── SEITE 6 — LIVE-MATRIX (Live Programming) ────────────────────────────────
 _chase_colors = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                 ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                 ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                  ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors):
     color_tile(nm, 56 + i, B_LIVE, r, g, b, w, target=ColorTarget.EFFECT_ADD,
                function_id=live_chase.id)
-_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
-                  ("Limette", 160, 255, 0, 0), ("Warmweiss", 255, 130, 40, 60),
-                  ("Weiss", 255, 255, 255, 255)]
+_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
+                  ("Limette", 160, 255, 0, 0), ("Warmweiß", 255, 130, 40, 60),
+                  ("Weiß", 255, 255, 255, 255)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors2):
     color_tile(nm, 48 + i, B_LIVE, r, g, b, w, target=ColorTarget.EFFECT_ADD,
                function_id=live_chase.id)
@@ -667,13 +667,13 @@ effect_action_btn("Farbe +", 3, B_LIVE, "#333355", "next_color", live_chase.id)
 effect_action_btn("Richtung", 4, B_LIVE, "#335533", "reverse_direction", live_chase.id)
 effect_action_btn("Freeze", 5, B_LIVE, "#553333", "toggle_freeze", live_chase.id)
 fader("Speed", 0, B_LIVE, SliderMode.EFFECT_SPEED, function_id=live_chase.id, midi_cc=48, value=70)
-fader("Uebergang", 1, B_LIVE, SliderMode.EFFECT_PARAM, function_id=live_chase.id,
+fader("Übergang", 1, B_LIVE, SliderMode.EFFECT_PARAM, function_id=live_chase.id,
       param_key="hold", midi_cc=49, value=64)
 label("SEITE 6  LIVE-MATRIX  -  1) 'Clear Chase' leert die Farbliste  2) oben Farben "
-      "antippen = der Reihe nach anhaengen  3) Pad 1 = Start/Stop.",
+      "antippen = der Reihe nach anhängen  3) Pad 1 = Start/Stop.",
       X0, 28, 1100, B_LIVE, fg="#9DFF52")
 label("Pad 5 = Richtung umkehren, Pad 6 = Freeze (einfrieren/weiter). F1 = Speed, "
-      "F2 = Uebergang (0 = weich faden, hoch = hart halten).", X0, 48, 1100, B_LIVE)
+      "F2 = Übergang (0 = weich faden, hoch = hart halten).", X0, 48, 1100, B_LIVE)
 
 # ── SEITE 7 — MIX (Ebenen kombinieren) ──────────────────────────────────────
 for i, (nm, r, g, b, w) in enumerate(_row7[:6]):
@@ -694,7 +694,7 @@ fader("FX-Level", 4, B_MIX, SliderMode.EFFECT_INTENSITY,
 fader("Mtx-Mst", 7, B_MIX, SliderMode.EFFECT_INTENSITY,
       function_ids=[m.id for m in matrix_funcs], midi_cc=55, value=255)
 label("SEITE 7  MIX  -  Farbe (oben) + Dimmer-FX (unten links) = farbiges Lauflicht. "
-      "Matrix (Clear zuerst!) + MH-EFX + MH-Farbe/Gobo = komplette Buehne aus Ebenen.",
+      "Matrix (Clear zuerst!) + MH-EFX + MH-Farbe/Gobo = komplette Bühne aus Ebenen.",
       X0, 28, 1100, B_MIX, fg="#9DFF52")
 
 # ── SEITE 8 — RGBW VON HAND + FIXTURE-PROGRAMME ─────────────────────────────
@@ -705,11 +705,11 @@ func_btn(sc_macro, 1, B_RGBW, "#503010", style="solid")
 func_btn(dim_full, 2, B_RGBW, "#3a3a14", style="solid")
 func_btn(mh_reset, 3, B_RGBW, "#401010", style="solid", flash=True)
 fader("Rot", 0, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
-fader("Gruen", 1, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
+fader("Grün", 1, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
 fader("Blau", 2, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_b", midi_cc=50, value=0)
-fader("Weiss", 3, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
+fader("Weiß", 3, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
 fader("Intens.", 4, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
-label("SEITE 8  RGBW VON HAND  -  F1-F5 = Rot/Gruen/Blau/Weiss/Intensitaet (Programmer). "
+label("SEITE 8  RGBW VON HAND  -  F1-F5 = Rot/Grün/Blau/Weiß/Intensität (Programmer). "
       "Pad 1 = PAR Fixt-Strobe, Pad 2 = PAR Auto-Programm (Makro-Kanal), Pad 4 = MH Reset.",
       X0, 28, 1100, B_RGBW, fg="#9DFF52")
 

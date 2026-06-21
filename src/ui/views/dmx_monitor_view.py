@@ -2,11 +2,13 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,
-    QSpinBox, QCheckBox, QLineEdit,
+    QSpinBox, QCheckBox, QLineEdit, QToolTip,
 )
-from PySide6.QtCore import Qt, QTimer, QRect, QSize
+from PySide6.QtCore import Qt, QTimer, QRect, QSize, QEvent
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.app_state import get_state
+# U-4/SD-03: Kanal-Funktion (Kürzel + Farbe) — dieselben Helfer wie der Simple Desk.
+from src.ui.views.simple_desk import channel_function_color, channel_function_abbrev
 
 
 COLS = 32
@@ -23,6 +25,8 @@ class DmxGrid(QWidget):
         self._values = [0] * 512
         self._patched_addrs: set[int] = set()  # DMX addresses occupied by patched fixtures
         self._highlighted: set[int] = set()    # filter highlights
+        # U-4/SD-03: addr -> (Geräte-Kürzel, Attribut, voller Tooltip-Text)
+        self._cell_info: dict[int, tuple[str, str, str]] = {}
         self.setMinimumSize(COLS * CELL_W, ROWS * CELL_H)
         self.setSizePolicy(self.sizePolicy().horizontalPolicy(),
                            self.sizePolicy().verticalPolicy())
@@ -42,8 +46,34 @@ class DmxGrid(QWidget):
         self._highlighted = set(addrs)
         self.update()
 
+    def set_cell_info(self, info: dict[int, tuple[str, str, str]]):
+        """U-4/SD-03: Patch-Kontext je Adresse (Geräte-Kürzel, Attribut, Tooltip)."""
+        self._cell_info = dict(info)
+        self.update()
+
     def sizeHint(self) -> QSize:
         return QSize(COLS * CELL_W, ROWS * CELL_H)
+
+    def event(self, e):
+        # U-4/SD-03: voller Kanalname (Gerät + Kanal) als Tooltip pro Zelle.
+        if e.type() == QEvent.Type.ToolTip:
+            cw = self.width() / COLS
+            chh = self.height() / ROWS
+            pos = e.pos()
+            col = int(pos.x() // cw) if cw else -1
+            row = int(pos.y() // chh) if chh else -1
+            if 0 <= col < COLS and 0 <= row < ROWS:
+                chan_no = row * COLS + col + 1
+                val = self._values[chan_no - 1] if chan_no - 1 < len(self._values) else 0
+                info = self._cell_info.get(chan_no)
+                if info:
+                    QToolTip.showText(e.globalPos(), f"CH {chan_no}: {info[2]}  =  {val}", self)
+                else:
+                    QToolTip.showText(e.globalPos(), f"CH {chan_no}  =  {val}", self)
+            else:
+                QToolTip.hideText()
+            return True
+        return super().event(e)
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -60,6 +90,8 @@ class DmxGrid(QWidget):
             x = col * cw
             y = row * ch
             val = self._values[ch_idx]
+            chan_no = ch_idx + 1
+            info = self._cell_info.get(chan_no)   # (Kürzel, Attribut, Tooltip) o. None
             # Background
             shade = int(val * 0.85)
             if val == 0:
@@ -70,8 +102,13 @@ class DmxGrid(QWidget):
                 bg = QColor(shade, shade, shade)
             p.fillRect(int(x), int(y), int(cw) + 1, int(ch) + 1, bg)
 
+            # U-4/SD-03: gepatchte Zelle dezent in der Kanal-Funktionsfarbe tönen.
+            if info:
+                tint = QColor(channel_function_color(info[1]))
+                tint.setAlpha(40)
+                p.fillRect(int(x), int(y), int(cw) + 1, int(ch) + 1, tint)
+
             # Border (patched/normal)
-            chan_no = ch_idx + 1
             if chan_no in self._highlighted:
                 p.setPen(QPen(QColor("#FFD700"), 2))
             elif chan_no in self._patched_addrs:
@@ -87,11 +124,24 @@ class DmxGrid(QWidget):
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
                        str(chan_no))
 
-            # Value (center, big)
+            # Value (center, big) — bei Patch-Kontext unten Platz für die Kürzel-Zeile.
+            label_h = 11 if info else 0
             p.setFont(big_font)
             p.setPen(QColor("#ffffff") if val > 80 else QColor("#aaaaaa"))
-            p.drawText(int(x), int(y) + 10, int(cw), int(ch) - 10,
+            p.drawText(int(x), int(y), int(cw), int(ch) - label_h,
                        Qt.AlignmentFlag.AlignCenter, str(val))
+
+            # U-4/SD-03: Geräte-Kürzel + Kanal-Funktion (z. B. 'PAR 1 R') unten,
+            # in der Funktionsfarbe; voller Name steckt im Tooltip.
+            if info:
+                short, attr = info[0], info[1]
+                abbrev = channel_function_abbrev(attr)
+                text = f"{short} {abbrev}".strip()
+                p.setFont(small_font)
+                p.setPen(QColor(channel_function_color(attr)))
+                p.drawText(int(x) + 1, int(y) + int(ch) - 11, int(cw) - 2, 10,
+                           Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                           text)
         p.end()
 
 
@@ -134,7 +184,7 @@ class DmxMonitorView(QWidget):
         top.addWidget(self._combo_univ)
 
         top.addSpacing(20)
-        top.addWidget(QLabel("Hervorgehobene Kanaele:"))
+        top.addWidget(QLabel("Hervorgehobene Kanäle:"))
         self._edit_filter = QLineEdit()
         self._edit_filter.setPlaceholderText("z.B. 1,5,10-20")
         self._edit_filter.setFixedWidth(160)
@@ -143,7 +193,8 @@ class DmxMonitorView(QWidget):
 
         top.addStretch(1)
         self._lbl_legend = QLabel(
-            'Blauer Rahmen = gepatcht  |  Gelber Rahmen = hervorgehoben'
+            'Blauer Rahmen = gepatcht  |  Gelber Rahmen = hervorgehoben  |  '
+            'Farbe + Kürzel = Kanalfunktion (Gerät · Funktion)'
         )
         self._lbl_legend.setStyleSheet("color: #888; font-size: 11px;")
         top.addWidget(self._lbl_legend)
@@ -158,16 +209,34 @@ class DmxMonitorView(QWidget):
     def _refresh_patched(self):
         univ = self._combo_univ.currentData() or 1
         addrs = set()
+        info: dict[int, tuple[str, str, str]] = {}
+        # Lazy-Import (analog Simple Desk), damit Tests get_channels_for_patched mocken können.
+        from src.core.app_state import get_channels_for_patched
         try:
             for f in self._state.get_patched_fixtures():
-                if f.universe == univ:
-                    for off in range(f.channel_count):
-                        a = f.address + off
-                        if 1 <= a <= 512:
-                            addrs.add(a)
+                if f.universe != univ:
+                    continue
+                for off in range(getattr(f, "channel_count", 0) or 0):
+                    a = f.address + off
+                    if 1 <= a <= 512:
+                        addrs.add(a)
+                # U-4/SD-03: pro Kanal Kürzel + Attribut + voller Name (Tooltip).
+                label = (getattr(f, "label", "") or "").strip() or f"Fixture {getattr(f, 'fid', '?')}"
+                short = label[:6]
+                try:
+                    for cobj in get_channels_for_patched(f):
+                        a = f.address + cobj.channel_number - 1
+                        if not (1 <= a <= 512):
+                            continue
+                        attr = (getattr(cobj, "attribute", "") or "")
+                        cname = cobj.name if (getattr(cobj, "name", None) and cobj.name.strip()) else attr
+                        info[a] = (short, attr, f"{label} — {cname}")
+                except Exception:
+                    pass
         except Exception:
             pass
         self._grid.set_patched_addrs(addrs)
+        self._grid.set_cell_info(info)
 
     def _on_filter_changed(self, txt: str):
         addrs = set()

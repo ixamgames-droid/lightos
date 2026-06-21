@@ -15,7 +15,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QCheckBox, QGridLayout, QPushButton, QLineEdit,
-    QDoubleSpinBox, QWidget, QScrollArea, QFrame,
+    QDoubleSpinBox, QSpinBox, QWidget, QScrollArea, QFrame,
 )
 
 # (key, Label, Beschreibung, braucht_farben, default_farben, default_beat)
@@ -34,6 +34,10 @@ PRESETS = [
     ("twinkle", "Twinkle", "Zufälliges Funkeln einzelner Lampen", True, ["white"], False),
     ("fire", "Fire", "Warmes Feuer-Flackern", False, [], False),
     ("theater", "Theater", "Abwechselnd Gruppen (aussen/mitte)", True, ["white"], True),
+    ("wipe", "Wipe", "Farbe wischt über die Lampen (füllt auf)", True, ["blue"], True),
+    ("comet", "Komet", "Heller Kopf mit nachziehendem Schweif", True, ["white"], True),
+    ("random_strobe", "Random-Strobe", "Zufällige Lampen blitzen weiß", False, ["white"], False),
+    ("vu", "VU-Meter", "Pegel-Balken grün→rot, auf und ab", False, [], True),
 ]
 
 SWATCHES = [
@@ -87,6 +91,36 @@ class _FixturePage(QWizardPage):
             # Vorauswahl aus dem Programmer (R2): liegen gewählte Geräte vor, nur
             # diese vorab ankreuzen; sonst (leer) wie bisher alle.
             sel = set(state.get_selected_fids())
+            # EA-01: Gruppen-Schnellauswahl — ein Klick kreuzt die Mitglieder der
+            # Gruppe zusaetzlich an (Union; hebt andere Haken nicht auf).
+            try:
+                from sqlalchemy import select
+                from src.core.database.models import FixtureGroup
+                with state._session() as s:
+                    group_names = [g.name for g in s.execute(
+                        select(FixtureGroup).order_by(
+                            FixtureGroup.folder, FixtureGroup.name)).scalars()]
+                # Doppelte Namen entfernen (group_fids_by_name matcht per Name; bei
+                # Duplikaten liefert es [] -> die Gruppe verschwaende sonst ganz).
+                group_names = list(dict.fromkeys(group_names))
+                # Hinweis: selected_fids() folgt der Checkbox-/Patch-Reihenfolge, nicht
+                # der Gruppen-Raster-Reihenfolge — richtungsabhaengige Sweeps nutzen
+                # also Patch-Order. Fuer den Grundfall (Gruppe waehlen) unkritisch.
+                grp = [(n, state.group_fids_by_name(n)) for n in group_names]
+                grp = [(n, f) for (n, f) in grp if f]
+            except Exception:
+                grp = []
+            if grp:
+                grow = QHBoxLayout()
+                grow.addWidget(QLabel("Gruppen:"))
+                for gname, gfids in grp:
+                    gb = QPushButton(f"{gname} ({len(gfids)})")
+                    gb.setToolTip("Mitglieder dieser Gruppe zusätzlich auswählen")
+                    gb.clicked.connect(
+                        lambda _=False, fl=list(gfids): self._select_group(fl))
+                    grow.addWidget(gb)
+                grow.addStretch(1)
+                lay.addLayout(grow)
             for f in state.get_patched_fixtures():
                 cb = QCheckBox(f"{getattr(f,'label','Fixture')}  (ID {f.fid}, U{f.universe} @{f.address})")
                 cb.setChecked(f.fid in sel if sel else True)
@@ -100,6 +134,14 @@ class _FixturePage(QWizardPage):
     def _set_all(self, on):
         for cb in self.checks:
             cb.setChecked(on)
+
+    def _select_group(self, fids):
+        """EA-01: Mitglieder einer Gruppe zusätzlich ankreuzen (Union — bestehende
+        Haken bleiben). Nicht gepatchte fids haben keine Checkbox und entfallen."""
+        want = set(fids)
+        for cb in self.checks:
+            if cb.fid in want:
+                cb.setChecked(True)
 
     def selected_fids(self):
         return [cb.fid for cb in self.checks if cb.isChecked()]
@@ -128,6 +170,22 @@ class _ColorPage(QWizardPage):
             self.swatch_btns.append(b)
             grid.addWidget(b, i // 5, i % 5)
         lay.addLayout(grid)
+        # EA-02: optionale Farb-Zwischenstufen (sanfte Verläufe).
+        ir = QHBoxLayout()
+        self._interp_chk = QCheckBox("Zwischenstufen einfügen")
+        self._interp_chk.setToolTip(
+            "Interpoliert zwischen den gewählten Farben N Zwischenfarben — sanfter "
+            "Verlauf für Farb-Chase / Rainbow / Farb-Lauflicht.")
+        self._interp_spin = QSpinBox()
+        self._interp_spin.setRange(1, 16)
+        self._interp_spin.setValue(4)
+        self._interp_spin.setPrefix("× ")
+        self._interp_spin.setEnabled(False)
+        self._interp_chk.toggled.connect(self._interp_spin.setEnabled)
+        ir.addWidget(self._interp_chk)
+        ir.addWidget(self._interp_spin)
+        ir.addStretch(1)
+        lay.addLayout(ir)
         lay.addStretch(1)
 
     def initializePage(self):
@@ -147,6 +205,25 @@ class _ColorPage(QWizardPage):
     def selected_colors(self):
         cols = [b.rgb for b in self.swatch_btns if b.isChecked()]
         return cols or [(255, 255, 255)]
+
+    def expanded_colors(self):
+        """EA-02: optional N Zwischenfarben zwischen aufeinanderfolgenden Farben
+        (mit Wrap last→first für nahtlose Loops). Ohne Aktivierung = selected_colors."""
+        cols = self.selected_colors()
+        if not (self._interp_chk.isChecked() and len(cols) >= 2):
+            return cols
+        n = int(self._interp_spin.value())
+        if n <= 0:
+            return cols
+        from src.core.engine.rgb_matrix import lerp_color
+        out = []
+        for i in range(len(cols)):
+            a = cols[i]
+            b = cols[(i + 1) % len(cols)]
+            out.append(a)
+            for k in range(1, n + 1):
+                out.append(lerp_color(a, b, k / (n + 1)))
+        return out
 
 
 class _OptionsPage(QWizardPage):
@@ -180,7 +257,9 @@ class _OptionsPage(QWizardPage):
             self.beat.setChecked(bool(preset[5]))
             # sinnvolle Defaults pro Typ
             defaults = {"strobe": (0.05, 0.0), "police": (0.13, 0.0), "rainbow": (0.3, 0.7),
-                        "pulse": (0.5, 0.6), "fire": (0.1, 0.06), "twinkle": (0.12, 0.04)}
+                        "pulse": (0.5, 0.6), "fire": (0.1, 0.06), "twinkle": (0.12, 0.04),
+                        "wipe": (0.15, 0.1), "comet": (0.1, 0.05),
+                        "random_strobe": (0.05, 0.0), "vu": (0.1, 0.05)}
             h, f = defaults.get(key, (0.4, 0.2))
             self.hold.setValue(h); self.fade.setValue(f)
             self._hint.setText("Tipp: Bei 'Im Beat' bestimmt das TAP-Tempo das Schalt-Tempo.")
@@ -221,6 +300,7 @@ class EffectWizard(QWizard):
         key = self.page(0).selected_key()
         fids = self.page(1).selected_fids()
         colors = self.page(2).selected_colors()
+        colors_seq = self.page(2).expanded_colors()   # EA-02: optional interpoliert
         name = self.page(3).name.text().strip() or "Effekt"
         hold = float(self.page(3).hold.value())
         fade = float(self.page(3).fade.value())
@@ -263,9 +343,9 @@ class EffectWizard(QWizard):
         steps, order = [], RunOrder.Loop
 
         if key in ("color_chase", "rainbow"):
-            steps = [scene(f"{name} · {i+1}", rgb=c).id for i, c in enumerate(colors)]
+            steps = [scene(f"{name} · {i+1}", rgb=c).id for i, c in enumerate(colors_seq)]
         elif key == "color_run":
-            steps = [scene(f"{name} · P{i+1}", rgb=colors[i % len(colors)], only=[fid]).id
+            steps = [scene(f"{name} · P{i+1}", rgb=colors_seq[i % len(colors_seq)], only=[fid]).id
                      for i, fid in enumerate(fids)]
         elif key == "run":
             steps = [scene(f"{name} · P{i+1}", rgb=(0, 0, 0), white=255, only=[fid]).id
@@ -296,8 +376,59 @@ class EffectWizard(QWizard):
                 steps = [a.id, b.id]
             else:
                 steps = [scene(f"{name} · A", rgb=colors[0]).id, off.id]
+        elif key == "wipe":
+            col = colors[0]
+            steps = [scene(f"{name} · W{i+1}", rgb=col, only=fids[:i+1]).id
+                     for i in range(len(fids))]
+        elif key == "comet":
+            col = colors[0]
+            tail = 3
+            for i in range(len(fids)):
+                s = fm.new_scene(f"{name} · K{i+1}")
+                for t in range(tail + 1):
+                    j = i - t
+                    if not (0 <= j < len(fids)):
+                        continue
+                    frac = 1.0 - t / (tail + 1)
+                    chan = _chan_for(fids[j])
+                    r, g, b = (int(c * frac) for c in col)
+                    if "intensity" in chan:
+                        s.set_value(fids[j], chan["intensity"], int(255 * frac))
+                    for a, v in (("color_r", r), ("color_g", g), ("color_b", b)):
+                        if a in chan:
+                            s.set_value(fids[j], chan[a], v)
+                    if "color_w" in chan and col == (255, 255, 255):
+                        s.set_value(fids[j], chan["color_w"], int(255 * frac))
+                steps.append(s.id)
+        elif key == "random_strobe":
+            steps = [scene(f"{name} · R{i+1}", rgb=(0, 0, 0), white=255, only=[fid]).id
+                     for i, fid in enumerate(fids)]
+            order = RunOrder.Random
+        elif key == "vu":
+            from src.core.engine.rgb_matrix import lerp_color
+            n = len(fids)
+
+            def _vu_color(frac):
+                if frac < 0.5:
+                    return lerp_color((0, 255, 0), (255, 255, 0), frac * 2)
+                return lerp_color((255, 255, 0), (255, 0, 0), (frac - 0.5) * 2)
+
+            levels = list(range(1, n + 1)) + list(range(n - 1, 0, -1))
+            for k in levels:
+                s = fm.new_scene(f"{name} · VU{k}")
+                for idx in range(k):
+                    fid = fids[idx]
+                    chan = _chan_for(fid)
+                    frac = idx / (n - 1) if n > 1 else 0.0
+                    r, g, b = _vu_color(frac)
+                    if "intensity" in chan:
+                        s.set_value(fid, chan["intensity"], 255)
+                    for a, v in (("color_r", r), ("color_g", g), ("color_b", b)):
+                        if a in chan:
+                            s.set_value(fid, chan[a], v)
+                steps.append(s.id)
         else:
-            steps = [scene(f"{name} · {i+1}", rgb=c).id for i, c in enumerate(colors)]
+            steps = [scene(f"{name} · {i+1}", rgb=c).id for i, c in enumerate(colors_seq)]
 
         ch = fm.new_chaser(name)
         ch.run_order = order

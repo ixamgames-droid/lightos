@@ -134,7 +134,7 @@ def par_look(name, r=0, g=0, b=0, w=0, intensity=255):
 lk_warm = par_look("Warm Wash", r=255, g=120, b=20, w=120)
 lk_cold = par_look("Cold Wash", r=0, g=60, b=255, w=80)
 lk_party = par_look("Party", r=255, g=0, b=180)
-lk_white = par_look("Vollweiss", r=255, g=255, b=255, w=255)
+lk_white = par_look("Vollweiß", r=255, g=255, b=255, w=255)
 
 
 def par_dim(name, on_fids):
@@ -225,9 +225,9 @@ def mh_colorwheel(name, wheel_val):
 
 # Exakte ZQ02001-Werte (reale Geraetedaten, docs/MOVING_HEADS.md):
 # 0-9 weiss/offen, 10-19 rot, 20-29 gruen, 30-39 blau, 40-49 gelb.
-cw_white = mh_colorwheel("Farbe Weiss", 4)
+cw_white = mh_colorwheel("Farbe Weiß", 4)
 cw_red = mh_colorwheel("Farbe Rot", 14)
-cw_green = mh_colorwheel("Farbe Gruen", 24)
+cw_green = mh_colorwheel("Farbe Grün", 24)
 cw_blue = mh_colorwheel("Farbe Blau", 34)
 cw_yellow = mh_colorwheel("Farbe Gelb", 44)
 mh_color_funcs = [cw_white, cw_red, cw_green, cw_blue, cw_yellow]
@@ -273,8 +273,8 @@ mh_shutter_funcs = [sh_open, sh_strobe]
 lib.clear()
 lib.add_folder("PAR-Farben")
 lib.add_folder("MH-Positionen")
-for nm, r, g, b, w in [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0),
-                       ("Blau", 0, 0, 255, 0), ("Weiss", 0, 0, 0, 255),
+for nm, r, g, b, w in [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0),
+                       ("Blau", 0, 0, 255, 0), ("Weiß", 0, 0, 0, 255),
                        ("Warm", 255, 130, 40, 60), ("Pink", 255, 0, 120, 0)]:
     values = {fid: {a: v for a, v in (("color_r", r), ("color_g", g),
                                       ("color_b", b), ("color_w", w))
@@ -374,8 +374,8 @@ for i, nm in enumerate(PAGE_NAMES):
     label(f"Scene {i + 1}: {nm}", X0 + 8 * STEP + 16, Y0 + i * 26, 160, BANK_ALL, hh=22, fg="#7aa0c0")
 
 # ── SEITE 1: PAR-Farben + Looks ─────────────────────────────────────────────
-_cols = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-         ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+_cols = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+         ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
          ("Magenta", 255, 0, 255, 0), ("Warm", 255, 130, 40, 60)]
 for i, (nm, r, g, b, w) in enumerate(_cols):
     color_tile(nm, 56 + i, B_PAR, r, g, b, w)

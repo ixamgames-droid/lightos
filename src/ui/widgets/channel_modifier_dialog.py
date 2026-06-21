@@ -23,8 +23,8 @@ class ChannelModifierDialog(QDialog):
         layout = QVBoxLayout(self)
         info = QLabel(
             "Pro DMX-Channel kann eine Curve zugewiesen werden, die beim Output "
-            "angewandt wird. Z.B. Gamma 2.2 fuer LED-Wahrnehmungs-Helligkeit, "
-            "Inverse fuer invertierte Dimmer."
+            "angewandt wird. Z.B. Gamma 2.2 für LED-Wahrnehmungs-Helligkeit, "
+            "Inverse für invertierte Dimmer."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -58,10 +58,10 @@ class ChannelModifierDialog(QDialog):
             self._combo_curve.addItem(c.value, c)
         add_row.addWidget(QLabel("Curve:"))
         add_row.addWidget(self._combo_curve)
-        btn_add = QPushButton("+ Hinzufuegen")
+        btn_add = QPushButton("+ Hinzufügen")
         btn_add.clicked.connect(self._add_modifier)
         add_row.addWidget(btn_add)
-        btn_del = QPushButton("Loeschen")
+        btn_del = QPushButton("Löschen")
         btn_del.setStyleSheet("background:#a02020;color:white;")
         btn_del.clicked.connect(self._delete_modifier)
         add_row.addWidget(btn_del)

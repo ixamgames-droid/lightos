@@ -151,7 +151,7 @@ def test_validate_overlap():
         GenRange(15, 40, "B", "gobo"),   # ueberlappt A
     ])])
     issues = validate_model(GeneratorModel(modes=[m]))
-    assert any("ueberlappen" in t for _, t in issues)
+    assert any("überlappen" in t for _, t in issues)
 
 
 def test_validate_gap():
@@ -160,7 +160,7 @@ def test_validate_gap():
         GenRange(50, 60, "B", "gobo"),   # Luecke 11..49
     ])])
     issues = validate_model(GeneratorModel(modes=[m]))
-    assert any("Luecke" in t for _, t in issues)
+    assert any("Lücke" in t for _, t in issues)
 
 
 def test_validate_out_of_range():
@@ -168,7 +168,7 @@ def test_validate_out_of_range():
         GenRange(0, 300, "zu hoch", ""),    # 300 > 255
     ])])
     issues = validate_model(GeneratorModel(modes=[m]))
-    assert any(s == "error" and "ausserhalb 0" in t for s, t in issues)
+    assert any(s == "error" and "außerhalb 0" in t for s, t in issues)
 
 
 def test_validate_reversed_range():

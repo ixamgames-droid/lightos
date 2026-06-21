@@ -58,7 +58,7 @@ class InputProfileEditor(QDialog):
         b = QPushButton("APC mini Default")
         b.clicked.connect(self._create_apc_default)
         prof_row.addWidget(b)
-        b = QPushButton("Loeschen")
+        b = QPushButton("Löschen")
         b.setStyleSheet("background:#a02020;color:white;")
         b.clicked.connect(self._delete_profile)
         prof_row.addWidget(b)
@@ -67,7 +67,7 @@ class InputProfileEditor(QDialog):
 
         # Description
         desc_row = QHBoxLayout()
-        desc_row.addWidget(QLabel("Geraet (Filter):"))
+        desc_row.addWidget(QLabel("Gerät (Filter):"))
         self._device_hint = QLineEdit()
         self._device_hint.setPlaceholderText("z.B. APC, X-Touch, ...")
         self._device_hint.textChanged.connect(self._save_meta)
@@ -96,7 +96,7 @@ class InputProfileEditor(QDialog):
         b = QPushButton("MIDI Lernen")
         b.clicked.connect(self._learn_mapping)
         btn_row.addWidget(b)
-        b = QPushButton("Loeschen")
+        b = QPushButton("Löschen")
         b.setStyleSheet("background:#a02020;color:white;")
         b.clicked.connect(self._delete_mapping)
         btn_row.addWidget(b)
@@ -246,7 +246,7 @@ class InputProfileEditor(QDialog):
         name = self._combo.currentText()
         if not name:
             return
-        if QMessageBox.question(self, "Profil loeschen", f"'{name}' wirklich loeschen?") \
+        if QMessageBox.question(self, "Profil löschen", f"'{name}' wirklich löschen?") \
                 != QMessageBox.StandardButton.Yes:
             return
         delete_profile(name)
@@ -271,7 +271,7 @@ class InputProfileEditor(QDialog):
                 from src.core.midi.midi_mapper import get_midi_mapper
                 state.midi_mapper = get_midi_mapper(state)
             QMessageBox.information(self, "MIDI Lernen",
-                                    "Druecke jetzt eine Taste/Note auf deinem MIDI-Geraet ...")
+                                    "Drücke jetzt eine Taste/Note auf deinem MIDI-Gerät ...")
 
             def learned(msg):
                 try:
@@ -320,7 +320,7 @@ class InputProfileEditor(QDialog):
             mapper.save("data/midi_mappings.json")
             QMessageBox.information(
                 self, "Aktiviert",
-                f"{len(self._profile.mappings)} Mappings aktiv. Auto-Load beim naechsten Start."
+                f"{len(self._profile.mappings)} Mappings aktiv. Auto-Load beim nächsten Start."
             )
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))

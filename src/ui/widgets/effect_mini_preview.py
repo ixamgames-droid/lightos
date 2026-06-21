@@ -114,3 +114,27 @@ class EffectMiniPreview(QWidget):
         if label is not None:
             self._lbl.setText(f"Effekt-Vorschau - {label}")
         self._inst.start()
+
+    def set_grid(self, cols: int, rows: int = 1, fixture_grid=None):
+        """Vorschau-Raster an die ECHTE Geraetegeometrie eines Effekts anpassen
+        (statt der festen Demo-Groesse). Algorithmus/Farben/Tempo der bisherigen
+        Vorschau bleiben erhalten. Behebt die feste 8x4-Matrix in der Editor-Box."""
+        cols = max(1, int(cols))
+        rows = max(1, int(rows))
+        grid = list(fixture_grid) if fixture_grid else list(range(cols * rows))
+        old = self._inst
+        inst = RgbMatrixInstance(
+            name="preview", cols=cols, rows=rows, fixture_grid=grid,
+            algorithm=getattr(old, "algorithm", RgbAlgorithm.RAINBOW),
+            speed=getattr(old, "matrix_speed", 2.0),
+        )
+        for attr in ("color1", "color2"):
+            if hasattr(old, attr):
+                try:
+                    setattr(inst, attr, getattr(old, attr))
+                except Exception:
+                    pass
+        inst.start()
+        self._inst = inst
+        self._grid._inst = inst
+        self._grid.update()

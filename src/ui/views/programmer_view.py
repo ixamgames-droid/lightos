@@ -11,7 +11,7 @@ import json
 import os
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
-    QListWidget, QListWidgetItem, QGroupBox, QScrollArea, QFrame,
+    QListWidget, QListWidgetItem, QLineEdit, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
     QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
     QWhatsThis
@@ -106,32 +106,10 @@ COLOR_ATTRS = {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv"
 PAN_TILT_ATTRS = {"pan", "tilt", "pan_fine", "tilt_fine"}
 INTENSITY_ATTRS = {"intensity", "dimmer", "master"}
 
-# Attribut-Gruppen (Name -> Set of attribute names oder Substring-Match)
-ATTR_GROUPS = {
-    # Shutter/Strobe liegt bewusst im Intensity-Tab neben dem Dimmer
-    # (Moving-Head-Initiative 2026-06-10) — NICHT in INTENSITY_ATTRS aufnehmen,
-    # sonst wuerde der Grand Master den Strobe mit skalieren.
-    "Intensity": {"intensity", "dimmer", "master", "shutter", "strobe"},
-    "Color":     {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
-                  "cyan", "magenta", "yellow", "color_wheel", "colour_wheel", "color"},
-    "Position":  {"pan", "tilt", "pan_fine", "tilt_fine"},
-    "Beam":      {"zoom", "focus", "frost", "iris", "prism"},
-    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo_fx", "gobo1",
-                  "gobo2", "gobo_rot"},
-    "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "animation"},
-}
-
-
-def _classify_attribute(attr: str) -> str:
-    """Ordnet ein Attribut einer Gruppe zu. Default: 'Other'."""
-    a = (attr or "").lower()
-    for grp, names in ATTR_GROUPS.items():
-        if a in names:
-            return grp
-        for n in names:
-            if n in a:
-                return grp
-    return "Other"
+# Attribut-Gruppen + Klassifikation: kanonisch aus src/core/attr_groups,
+# gemeinsam mit dem Save-Kanal-Dialog (snap_file_panel) -> kein Auseinanderdriften
+# mehr (siehe Bug E: Strobe wurde im Save-Dialog faelschlich "Beam" genannt).
+from src.core.attr_groups import ATTR_GROUPS, classify_attr as _classify_attribute
 
 
 class ProgrammerView(QWidget):
@@ -311,7 +289,7 @@ class ProgrammerView(QWidget):
     def _make_fixture_panel(self) -> QWidget:
         """LINKS: Fixture-Liste + Alle/Keine + Gruppen-Box (LAYOUT-02)."""
         left = QVBoxLayout()
-        hdr = QLabel("Geraete")
+        hdr = QLabel("Geräte")
         hdr.setObjectName("label_header")
         left.addWidget(hdr)
         self._fixture_list = QListWidget()
@@ -334,12 +312,19 @@ class ProgrammerView(QWidget):
         grp_layout = QVBoxLayout(grp_box)
         grp_layout.setContentsMargins(4, 6, 4, 4)
         grp_layout.setSpacing(4)
+        # F-1: Such-/Filterfeld fuer die Gruppen-Liste (filtert nach Name/Ordner).
+        self._group_search = QLineEdit()
+        self._group_search.setPlaceholderText("Gruppe suchen…")
+        self._group_search.setClearButtonEnabled(True)
+        self._group_search.setStyleSheet("font-size: 11px; padding: 2px 4px;")
+        self._group_search.textChanged.connect(lambda *_: self._refresh_group_list())
+        grp_layout.addWidget(self._group_search)
         self._group_list = QListWidget()
         self._group_list.setMaximumHeight(130)
         self._group_list.itemClicked.connect(self._on_group_clicked)
         self._group_list.itemDoubleClicked.connect(self._on_group_add_clicked)
         grp_layout.addWidget(self._group_list)
-        grp_hint = QLabel("Klick = Gruppe waehlen · Doppelklick = zur Auswahl addieren")
+        grp_hint = QLabel("Klick = Gruppe wählen · Doppelklick = zur Auswahl addieren")
         grp_hint.setWordWrap(True)
         grp_hint.setStyleSheet("color: #888; font-size: 10px;")
         grp_layout.addWidget(grp_hint)
@@ -366,7 +351,7 @@ class ProgrammerView(QWidget):
         al.setContentsMargins(0, 0, 0, 0)
         al.setSpacing(4)
 
-        self._lbl_selection = QLabel("Kein Geraet ausgewaehlt")
+        self._lbl_selection = QLabel("Kein Gerät ausgewählt")
         self._lbl_selection.setObjectName("label_header")
         al.addWidget(self._lbl_selection)
 
@@ -418,7 +403,10 @@ class ProgrammerView(QWidget):
         # Funktions-Tabs (einmalig gebaut).
         self._main_tabs.addTab(self._make_effects_page(), "Helper")
         self._main_tabs.addTab(self._make_efx_page(), "EFX")
-        self._main_tabs.addTab(self._make_rgb_page(), "Matrix")
+        # F-1: Matrix-Tab-Index merken, damit ein Gruppenklick direkt dorthin springt.
+        self._rgb_page = self._make_rgb_page()
+        self._main_tabs.addTab(self._rgb_page, "Matrix")
+        self._matrix_tab_index = self._main_tabs.indexOf(self._rgb_page)
         self._main_tabs.addTab(self._make_palette_page(), "Paletten")
 
         al.addWidget(self._main_tabs, stretch=1)
@@ -550,7 +538,7 @@ class ProgrammerView(QWidget):
             return self._embedded_efx
         except Exception as e:
             print(f"[programmer_view] efx embed error: {e}")
-            return QLabel(f"EFX nicht verfuegbar: {e}")
+            return QLabel(f"EFX nicht verfügbar: {e}")
 
     def _make_rgb_page(self) -> QWidget:
         """RGB-Matrix-Editor eingebettet (arbeitet via 'Aus Auswahl' auf der
@@ -571,7 +559,7 @@ class ProgrammerView(QWidget):
             return self._embedded_palette
         except Exception as e:
             print(f"[programmer_view] palette embed error: {e}")
-            return QLabel(f"Paletten nicht verfuegbar: {e}")
+            return QLabel(f"Paletten nicht verfügbar: {e}")
 
     # ── Effekte-Seite: Logik ──────────────────────────────────────────────────
 
@@ -664,7 +652,7 @@ class ProgrammerView(QWidget):
             dlg.resize(720, 560)
             lay = QVBoxLayout(dlg)
             lay.addWidget(editor)
-            btn = QPushButton("Schliessen")
+            btn = QPushButton("Schließen")
             btn.clicked.connect(dlg.accept)
             lay.addWidget(btn)
             dlg.exec()
@@ -693,7 +681,8 @@ class ProgrammerView(QWidget):
             return
         try:
             from src.ui.views.snap_file_panel import ChannelSelectDialog
-            dlg = ChannelSelectDialog(prog, self)
+            scope = state.active_scope_fids() if hasattr(state, "active_scope_fids") else None
+            dlg = ChannelSelectDialog(prog, self, scope_fids=scope)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)
@@ -806,6 +795,8 @@ class ProgrammerView(QWidget):
         s = self._session()
         if s is None:
             return
+        q = (self._group_search.text().strip().lower()
+             if hasattr(self, "_group_search") else "")
         try:
             from src.core.database.models import FixtureGroup
             from sqlalchemy import select
@@ -818,6 +809,22 @@ class ProgrammerView(QWidget):
                               .order_by(FixtureGroup.folder, FixtureGroup.name)
                               ).scalars()
                 )
+                if q:
+                    # F-1: bei aktiver Suche eine gefilterte Flach-Liste zeigen
+                    # (Name oder Ordner), ohne Ordner-Kopfzeilen/Einklappen — so
+                    # erscheinen alle Treffer unabhaengig vom Collapse-Zustand.
+                    for g in groups:
+                        name = g.name or ""
+                        folder = (getattr(g, "folder", "") or "").strip()
+                        if q not in name.lower() and q not in folder.lower():
+                            continue
+                        fids = self._group_fids(g)
+                        suffix = f"   📁 {folder}" if folder else ""
+                        it = QListWidgetItem(f"{name}  ({len(fids)}){suffix}")
+                        it.setData(Qt.ItemDataRole.UserRole, fids)
+                        it.setData(Qt.ItemDataRole.UserRole + 1, g.id)
+                        self._group_list.addItem(it)
+                    return
                 # Ordner-Kopfzeilen sind antippbar und klappen ihre Gruppen
                 # ein/aus; der Zustand überlebt Neustarts (ui_prefs.json).
                 collapsed = set(_load_prefs().get(
@@ -868,6 +875,13 @@ class ProgrammerView(QWidget):
         except Exception:
             pass
         self._select_fids(item.data(Qt.ItemDataRole.UserRole) or [], add=False)
+        # F-1: Gruppenklick oeffnet direkt die Matrix-Ansicht der Gruppe.
+        try:
+            idx = getattr(self, "_matrix_tab_index", -1)
+            if idx is not None and idx >= 0:
+                self._main_tabs.setCurrentIndex(idx)
+        except Exception:
+            pass
 
     def _on_group_add_clicked(self, item: QListWidgetItem):
         # Additive Auswahl = gemischte Auswahl → keine einzelne Gruppe aktiv
@@ -925,7 +939,7 @@ class ProgrammerView(QWidget):
             fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
             selected = [fixtures[fid] for fid in self._selected_fids if fid in fixtures]
             if not selected:
-                self._lbl_selection.setText("Kein Geraet ausgewaehlt")
+                self._lbl_selection.setText("Kein Gerät ausgewählt")
                 self._color_preview.set_fixtures([])
                 self._template_channels = []
                 for cont in self._attr_group_tabs.values():
@@ -935,7 +949,7 @@ class ProgrammerView(QWidget):
                 return
 
             self._lbl_selection.setText(
-                f"{len(selected)} Geraet(e): " +
+                f"{len(selected)} Gerät(e): " +
                 ", ".join(f"[{f.fid}] {f.label}" for f in selected[:3]) +
                 ("..." if len(selected) > 3 else "")
             )
@@ -984,7 +998,7 @@ class ProgrammerView(QWidget):
         layout.setContentsMargins(6, 6, 6, 6)
         layout.setSpacing(6)
 
-        # Sub-Toolbar
+        # Sub-Toolbar (bleibt FEST oben, scrollt nicht mit)
         sub_tb = QHBoxLayout()
         b_fan = QPushButton(f"Fan {group_name}...")
         b_fan.clicked.connect(lambda: self._open_fan_tool_for_group(group_name))
@@ -1001,8 +1015,21 @@ class ProgrammerView(QWidget):
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
 
+        # EIN äußerer Scroll für den GESAMTEN Tab-Inhalt (Schnellwahl + Tools +
+        # Slider). Früher hingen Schnellwahl/Auto-Bar fix ÜBER dem Slider-Scroll
+        # und konnten unter --touch abgeschnitten werden; jetzt scrollt alles
+        # zusammen (wie der Matrix-Editor), nichts wird mehr geklippt.
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        inner = QWidget()
+        ilay = QVBoxLayout(inner)
+        ilay.setContentsMargins(0, 0, 0, 0)
+        ilay.setSpacing(6)
+        ilay.setAlignment(Qt.AlignmentFlag.AlignTop)
+
         # Capability-Schnellwahl (M2.2/M2.4): Kacheln aus den Fixture-Daten.
-        self._add_quick_select(layout, group_name, fixtures)
+        self._add_quick_select(ilay, group_name, fixtures)
 
         # P8: Position-Tool fest als Aufklapp-Bereich im Layoutfluss — ersetzt
         # den frueheren "einbetten"-Toggle (dynamisches add/delete verschob das
@@ -1016,18 +1043,13 @@ class ProgrammerView(QWidget):
                 section = CollapsibleSection(
                     "Position-Tool (XY-Pad)", pt, collapsed=True,
                     prefs_key="programmer_position_tool")
-                layout.addWidget(section)
+                ilay.addWidget(section)
             except Exception as e:
                 print(f"[programmer_view] position tool embed error: {e}")
 
         # Slider-Liste
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        inner = QWidget()
-        ilay = QVBoxLayout(inner)
-        ilay.setAlignment(Qt.AlignmentFlag.AlignTop)
         if not channels:
-            ilay.addWidget(QLabel(f"Keine {group_name}-Kanaele gefunden."))
+            ilay.addWidget(QLabel(f"Keine {group_name}-Kanäle gefunden."))
         else:
             for ch in channels:
                 # Reset/Rekalibrierung bekommt bewusst KEINEN Dauer-Slider —
@@ -1035,6 +1057,8 @@ class ProgrammerView(QWidget):
                 if ch.attribute == "reset":
                     continue
                 ilay.addWidget(AttributeSlider(ch, fixtures, self._state, owner=self))
+        ilay.addStretch(1)
+
         scroll.setWidget(inner)
         layout.addWidget(scroll, stretch=1)
 
@@ -1343,7 +1367,7 @@ class _ToolDialog(QDialog):
 
     def set_content(self, widget: QWidget):
         self._layout.addWidget(widget)
-        btn = QPushButton("Schliessen")
+        btn = QPushButton("Schließen")
         btn.clicked.connect(self.accept)
         self._layout.addWidget(btn)
 
@@ -1415,7 +1439,7 @@ class AttributeSlider(QWidget):
 
         btn_reset = QPushButton("↺")
         btn_reset.setFixedSize(24, 24)
-        btn_reset.setToolTip("Auf Standard zuruecksetzen")
+        btn_reset.setToolTip("Auf Standard zurücksetzen")
         btn_reset.clicked.connect(self._reset)
         layout.addWidget(btn_reset)
 

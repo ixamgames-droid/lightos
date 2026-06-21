@@ -197,10 +197,10 @@ lk_ocean = look("Ozean", g=120, b=255)
 lk_forest = look("Wald", r=20, g=255, b=40)
 lk_party = look("Party", r=255, g=0, b=180, w=20)
 lk_candle = look("Kerzenlicht", r=255, g=90, b=10, w=40, intensity=160)
-lk_white = look("Vollweiss", r=255, g=255, b=255, w=255)
+lk_white = look("Vollweiß", r=255, g=255, b=255, w=255)
 look_funcs = [lk_warm, lk_cold, lk_sunset, lk_ocean, lk_forest, lk_party, lk_candle, lk_white]
 
-lk_red = look("Rot voll", r=255); lk_grn = look("Gruen voll", g=255); lk_blu = look("Blau voll", b=255)
+lk_red = look("Rot voll", r=255); lk_grn = look("Grün voll", g=255); lk_blu = look("Blau voll", b=255)
 lk_amb = look("Amber voll", r=255, g=140); lk_cya = look("Cyan voll", g=255, b=255); lk_mag = look("Magenta voll", r=255, b=255)
 ch_color = chaser("Color-Chase", [lk_red.id, lk_grn.id, lk_blu.id, lk_amb.id, lk_cya.id, lk_mag.id], hold=0.55, fade=0.25)
 ch_police = chaser("Police", [lk_red.id, lk_blu.id], hold=0.16, fade=0.0)
@@ -228,10 +228,10 @@ sc_macro = macro_scene("Auto-Programm", macro=200, fspeed=160)
 # ════════════════════════════════════════════════════════════════════════════════
 lib.clear()
 lib.add_folder("Farben"); lib.add_folder("Looks")
-_COLORS = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-           ("Weiss", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-           ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60),
-           ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_COLORS = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+           ("Weiß", 0, 0, 0, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+           ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60),
+           ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
            ("Orange", 255, 80, 0, 0), ("Violett", 140, 0, 255, 0)]
 for nm, r, g, b, w in _COLORS:
     values = {fid: {a: v for a, v in (("color_r", r), ("color_g", g), ("color_b", b), ("color_w", w)) if a in chan_of[fid]}
@@ -351,12 +351,12 @@ for i, nm in enumerate(PAGE_NAMES):
 
 
 # ── SEITE 1 (Bank 0) — FARBEN & LOOKS ───────────────────────────────────────────
-_row7 = [("Rot", 255, 0, 0, 0), ("Gruen", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
-         ("Weiss", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
-         ("Magenta", 255, 0, 255, 0), ("Warmweiss", 255, 130, 40, 60)]
+_row7 = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0),
+         ("Weiß", 255, 255, 255, 255), ("Amber", 255, 140, 0, 0), ("Cyan", 0, 255, 255, 0),
+         ("Magenta", 255, 0, 255, 0), ("Warmweiß", 255, 130, 40, 60)]
 for i, (nm, r, g, b, w) in enumerate(_row7):
     color_tile(nm, 56 + i, B_COLOR, r, g, b, w)
-_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0),
+_row6 = [("Orange", 255, 80, 0, 0), ("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0),
          ("Violett", 140, 0, 255, 0), ("Hellblau", 0, 160, 255, 0), ("Limette", 160, 255, 0, 0),
          ("Rosa", 255, 80, 120, 0), ("Gelb", 255, 220, 0, 0)]
 for i, (nm, r, g, b, w) in enumerate(_row6):
@@ -381,7 +381,7 @@ fader("Sp Wave", 2, B_DIM, SliderMode.EFFECT_SPEED, function_id=dim_wave.id, mid
 fader("Sp Strobe", 3, B_DIM, SliderMode.EFFECT_SPEED, function_id=dim_strobe.id, midi_cc=51, value=90)
 fader("FX-Level", 4, B_DIM, SliderMode.EFFECT_INTENSITY, function_ids=[f.id for f in dimmer_funcs], midi_cc=52, value=255)
 label("SEITE 2  DIMMER-EFFEKTE  -  ueberschreiben die Grundhelligkeit (echtes Lauflicht). "
-      "Farbe oben waehlen -> Effekt laeuft in dieser Farbe.   F1-F4 Speed, F5 FX-Level.", X0, 28, 1100, B_DIM, fg="#9DFF52")
+      "Farbe oben wählen -> Effekt laeuft in dieser Farbe.   F1-F4 Speed, F5 FX-Level.", X0, 28, 1100, B_DIM, fg="#9DFF52")
 
 # ── SEITE 3 (Bank 2) — MATRIX ───────────────────────────────────────────────────
 for i, fn in enumerate(matrix_funcs[:8]):
@@ -389,7 +389,7 @@ for i, fn in enumerate(matrix_funcs[:8]):
 for i, fn in enumerate(matrix_funcs[8:]):
     func_btn(fn, 8 + i, B_MTX, "#6a4f00")
 fader("Mtx-Mst", 7, B_MTX, SliderMode.EFFECT_INTENSITY, function_ids=[m.id for m in matrix_funcs], midi_cc=55, value=255)
-label("SEITE 3  MATRIX-EFFEKTE  -  bringen ihre Farbe SELBST mit -> vorher 'Clear' druecken! "
+label("SEITE 3  MATRIX-EFFEKTE  -  bringen ihre Farbe SELBST mit -> vorher 'Clear' drücken! "
       "F8 = Matrix-Master, F7 = Speed global.", X0, 28, 1100, B_MTX, fg="#9DFF52")
 
 # ── SEITE 4 (Bank 3) — MIX ──────────────────────────────────────────────────────
@@ -414,23 +414,23 @@ func_btn(sc_fstrobe, 0, B_RGBW, "#503010", style="solid")
 func_btn(sc_macro, 1, B_RGBW, "#503010", style="solid")
 func_btn(dim_full, 2, B_RGBW, "#3a3a14", style="solid")
 fader("Rot", 0, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
-fader("Gruen", 1, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
+fader("Grün", 1, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
 fader("Blau", 2, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_b", midi_cc=50, value=0)
-fader("Weiss", 3, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
+fader("Weiß", 3, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="color_w", midi_cc=51, value=0)
 fader("Intens.", 4, B_RGBW, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
-label("SEITE 5  RGBW VON HAND  -  Fader F1-F4 = Rot/Gruen/Blau/Weiss, F5 = Intensitaet "
+label("SEITE 5  RGBW VON HAND  -  Fader F1-F4 = Rot/Grün/Blau/Weiß, F5 = Intensität "
       "(Programmer). Pad 1 = Fixt-Strobe (Shutter), Pad 2 = Auto-Programm (Makro).", X0, 28, 1100, B_RGBW, fg="#9DFF52")
 
 # ── SEITE 6 (Bank 5) — LIVE COLOR-CHASE (Farben live anwaehlen -> durchchasen) ───
 # Farb-Pads im 'Farbe hinzufuegen'-Modus: jeder Druck haengt die Farbe an die
 # Sequence des COLORFADE-Effekts 'Live Color-Chase' an.
 _chase_colors = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0),
-                 ("Gruen", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
+                 ("Grün", 0, 255, 0, 0), ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0),
                  ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors):
     color_tile(nm, 56 + i, B_CHASE, r, g, b, w, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
-_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Tuerkis", 0, 220, 180, 0), ("Limette", 160, 255, 0, 0),
-                  ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255)]
+_chase_colors2 = [("Pink", 255, 0, 120, 0), ("Türkis", 0, 220, 180, 0), ("Limette", 160, 255, 0, 0),
+                  ("Warmweiß", 255, 130, 40, 60), ("Weiß", 255, 255, 255, 255)]
 for i, (nm, r, g, b, w) in enumerate(_chase_colors2):
     color_tile(nm, 48 + i, B_CHASE, r, g, b, w, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
 # Steuer-Pads unten: Start/Stop, Clear, naechste/vorige Farbe
@@ -440,10 +440,10 @@ effect_action_btn("Farbe -", 2, B_CHASE, "#333355", "prev_color", live_chase.id)
 effect_action_btn("Farbe +", 3, B_CHASE, "#333355", "next_color", live_chase.id)
 # Fader: F1 = Speed (Wechselrate), F2 = Uebergang (hold; hoch = haerter/laenger halten)
 fader("Speed", 0, B_CHASE, SliderMode.EFFECT_SPEED, function_id=live_chase.id, midi_cc=48, value=70)
-fader("Uebergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=live_chase.id, param_key="hold", midi_cc=49, value=64)
+fader("Übergang", 1, B_CHASE, SliderMode.EFFECT_PARAM, function_id=live_chase.id, param_key="hold", midi_cc=49, value=64)
 label("SEITE 6  LIVE COLOR-CHASE  -  1) 'Clear Chase' (Pad 2) leert die Farbliste  "
-      "2) oben Farben antippen = der Reihe nach hinzufuegen  3) Pad 1 = Start.", X0, 28, 1100, B_CHASE, fg="#9DFF52")
-label("F1 = Speed (wie schnell die Farben wechseln) - F2 = Uebergang (0 = weiches Faden, "
+      "2) oben Farben antippen = der Reihe nach hinzufügen  3) Pad 1 = Start.", X0, 28, 1100, B_CHASE, fg="#9DFF52")
+label("F1 = Speed (wie schnell die Farben wechseln) - F2 = Übergang (0 = weiches Faden, "
       "hoch = Farbe haelt, dann schneller Wechsel). 'Farbe +/-' springt manuell.", X0, 48, 1100, B_CHASE)
 
 state._vc_layout = {"widgets": widgets}
@@ -481,5 +481,5 @@ print(f"VC-Widgets: {len(vc)}  Typen={dict(Counter(w['type'] for w in vc))}")
 print(f"VC-Bank-Verteilung: {dict(sorted(Counter(w.get('bank') for w in vc).items()))}")
 # Max-Y der sichtbaren Elemente (muss < 800 = Canvas-Min sein)
 maxy = max((w.get('y', 0) + w.get('h', 0)) for w in vc)
-print(f"Max-Y der Widgets: {maxy}  (Canvas-Min-Hoehe 800)")
+print(f"Max-Y der Widgets: {maxy}  (Canvas-Min-Höhe 800)")
 print("FERTIG")

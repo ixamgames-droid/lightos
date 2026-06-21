@@ -4,7 +4,19 @@ import json
 import zipfile
 import os
 
+from src.core.strict import strict_mode
+
 SHOW_VERSION = "1.1"
+
+
+def _lenient(msg: str, exc: Exception) -> None:
+    """Strukturelle Schluck-Punkte im Lade-Pfad: druckt wie bisher und laesst den
+    Loader weitermachen (toleranter Default) — AUSSER im Strict-Modus
+    (LIGHTOS_STRICT), dann re-raised es den Fehler laut an der exakten Stelle.
+    Phase 6, siehe src/core/strict.py + SecondBrain entry_show_validation."""
+    print(f"[show_file] {msg}: {exc}")
+    if strict_mode():
+        raise exc
 
 
 def _to_int(value, default: int) -> int:
@@ -87,50 +99,61 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
 
 
 def _replace_patch_from_data(state, patch_data: list[dict]):
-    # Remove old fixtures first. FLD-FID: hart ueber clear_patch() leeren, damit
-    # auch verwaiste DB-Zeilen (Cache/DB-Desync) verschwinden — sonst kollidieren
-    # neue fids mit Altzeilen (IntegrityError: UNIQUE constraint patched_fixtures.fid).
-    cleared = False
+    # BUG-01: Patch verlustfrei ersetzen und dabei ALLE State-Emits unterdrücken.
+    # Jedes clear_patch()/clear_programmer()/add_fixture() würde sonst synchron
+    # ein Event feuern → die Views (programmer_view._refresh_effects_list)
+    # refreshen re-entrant mitten im noch inkonsistenten Patch →
+    # QListWidget.clear() → AccessViolation. Die Aufrufer (load_show/reset_show)
+    # machen nach dem vollständigen Aufbau EINEN gebündelten Refresh.
+    _prev_suppress = getattr(state, "_suppress_emits", False)
+    state._suppress_emits = True
     try:
-        state.clear_patch()
-        cleared = True
-    except AttributeError:
-        cleared = False  # aeltere AppState-API ohne clear_patch
-    except Exception as e:
-        print(f"[show_file] clear_patch failed: {e}")
-    if not cleared:
-        old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
-        for fid in [f for f in old_fids if f is not None]:
-            try:
-                state.remove_fixture(fid, undoable=False)
-            except TypeError:
-                state.remove_fixture(fid)
-            except Exception as e:
-                print(f"[show_file] remove fixture {fid} failed: {e}")
-
-    # Clear stale programmer values referencing old patch
-    try:
-        state.clear_programmer()
-    except Exception as e:
-        print(f"[show_file] clear programmer failed: {e}")
-
-    # Add imported fixtures, dedupe duplicate FIDs
-    next_fid = 1
-    used_fids = set()
-    for entry in patch_data:
-        if not isinstance(entry, dict):
-            continue
-        pf = _patched_fixture_from_data(entry, next_fid)
-        if pf.fid in used_fids:
-            pf.fid = max(used_fids) + 1
-        used_fids.add(pf.fid)
-        next_fid = max(next_fid, pf.fid + 1)
+        # Remove old fixtures first. FLD-FID: hart ueber clear_patch() leeren, damit
+        # auch verwaiste DB-Zeilen (Cache/DB-Desync) verschwinden — sonst kollidieren
+        # neue fids mit Altzeilen (IntegrityError: UNIQUE constraint patched_fixtures.fid).
+        cleared = False
         try:
-            state.add_fixture(pf, undoable=False)
-        except TypeError:
-            state.add_fixture(pf)
+            state.clear_patch()
+            cleared = True
+        except AttributeError:
+            cleared = False  # aeltere AppState-API ohne clear_patch
         except Exception as e:
-            print(f"[show_file] add fixture {pf.fid} failed: {e}")
+            print(f"[show_file] clear_patch failed: {e}")
+        if not cleared:
+            old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
+            for fid in [f for f in old_fids if f is not None]:
+                try:
+                    state.remove_fixture(fid, undoable=False)
+                except TypeError:
+                    state.remove_fixture(fid)
+                except Exception as e:
+                    print(f"[show_file] remove fixture {fid} failed: {e}")
+
+        # Clear stale programmer values referencing old patch
+        try:
+            state.clear_programmer()
+        except Exception as e:
+            print(f"[show_file] clear programmer failed: {e}")
+
+        # Add imported fixtures, dedupe duplicate FIDs
+        next_fid = 1
+        used_fids = set()
+        for entry in patch_data:
+            if not isinstance(entry, dict):
+                continue
+            pf = _patched_fixture_from_data(entry, next_fid)
+            if pf.fid in used_fids:
+                pf.fid = max(used_fids) + 1
+            used_fids.add(pf.fid)
+            next_fid = max(next_fid, pf.fid + 1)
+            try:
+                state.add_fixture(pf, undoable=False)
+            except TypeError:
+                state.add_fixture(pf)
+            except Exception as e:
+                print(f"[show_file] add fixture {pf.fid} failed: {e}")
+    finally:
+        state._suppress_emits = _prev_suppress
 
 
 def _collect_fixture_groups(state) -> list:
@@ -251,18 +274,30 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "meta": dict(getattr(state, "live_view_meta", {}) or {}),
     }
 
+    # WP-Tempo: benannte Tempo-Buses der Show sichern (Default-Bus wird NICHT
+    # gespeichert; fehlt der Block beim Laden -> [] = alt-kompatibel).
+    try:
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        tempo_buses_data = get_tempo_bus_manager().to_dict()
+        tempo_grandmaster_data = get_tempo_bus_manager().grandmaster_to_dict()
+    except Exception:
+        tempo_buses_data = []
+        tempo_grandmaster_data = {}
     show = {
         "version": SHOW_VERSION,
         "name": getattr(state, "show_name", "Neue Show"),
         "patch": patch_data,
         "programmer": getattr(state, "programmer", {}) or {},
         "base_levels": getattr(state, "base_levels", {}) or {},
+        "implicit_brightness": bool(getattr(state, "implicit_brightness", True)),
         "cue_stacks": stacks_data,
         "executors": executors_data,
         "palettes": palettes_data,
         "curves": curves_data,
         "efx_paths": efx_paths_data,
         "functions": functions_data,
+        "tempo_buses": tempo_buses_data,
+        "tempo_grandmaster": tempo_grandmaster_data,
         "efx": efx_data,
         "rgb_matrix": rgb_data,
         "virtual_console": vc_data,
@@ -321,6 +356,7 @@ def reset_show():
 
     state.programmer = {}
     state.base_levels = {}
+    state.implicit_brightness = True
     # DMX-Puffer aller Universes nullen. Sonst sendet der Output-Thread nach
     # "Neue Show" weiter die ALTEN Werte (die Strahler bleiben an): ein leerer
     # Patch hat keinen Default-Frame mehr, und _render_frame fasst die Buffer der
@@ -359,6 +395,13 @@ def reset_show():
         get_efx_path_library().from_dict({})
     except Exception as e:
         print(f"[show_file] reset efx_paths error: {e}")
+
+    try:
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        get_tempo_bus_manager().load_dict([])
+        get_tempo_bus_manager().load_grandmaster({})
+    except Exception as e:
+        print(f"[show_file] reset tempo buses error: {e}")
 
     try:
         state.cue_stacks.clear()
@@ -453,7 +496,7 @@ def load_show(path: str | os.PathLike):
             raw = zf.read("show.json").decode("utf-8")
         data = json.loads(raw)
     except Exception as e:
-        return False, f"Oeffnen fehlgeschlagen: {e}"
+        return False, f"Öffnen fehlgeschlagen: {e}"
 
     state = get_state()
     pm = get_palette_manager()
@@ -479,7 +522,7 @@ def load_show(path: str | os.PathLike):
         state.programmer = cleaned
         state._flush_all_to_dmx()
     except Exception as e:
-        print(f"[show_file] load programmer error: {e}")
+        _lenient("load programmer error", e)
         state.programmer = {}
 
     # Basis-Level (PAR-Grundhelligkeit o. ä.) NACH dem Patch laden und den
@@ -490,36 +533,52 @@ def load_show(path: str | os.PathLike):
             int(k): {str(a): int(v) for a, v in (vals or {}).items()}
             for k, vals in bl.items() if isinstance(vals, dict)
         }
+        state.implicit_brightness = bool(data.get("implicit_brightness", True))
         state._rebuild_render_plan()
     except Exception as e:
-        print(f"[show_file] load base_levels error: {e}")
+        _lenient("load base_levels error", e)
         state.base_levels = {}
+        state.implicit_brightness = True
 
     if "palettes" in data:
         try:
             pm.from_dict(data["palettes"])
         except Exception as e:
-            print(f"[show_file] load palettes error: {e}")
+            _lenient("load palettes error", e)
 
     try:
         from src.core.engine.curve_library import get_curve_library
         get_curve_library().from_dict(data.get("curves", {}) or {})
     except Exception as e:
-        print(f"[show_file] load curves error: {e}")
+        _lenient("load curves error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library
         get_efx_path_library().from_dict(data.get("efx_paths", {}) or {})
     except Exception as e:
-        print(f"[show_file] load efx_paths error: {e}")
+        _lenient("load efx_paths error", e)
+
+    try:
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        get_tempo_bus_manager().load_dict(data.get("tempo_buses", []) or [])
+        get_tempo_bus_manager().load_grandmaster(data.get("tempo_grandmaster") or {})
+    except Exception as e:
+        _lenient("load tempo buses error", e)
 
     try:
         state.cue_stacks.clear()
         for sd in data.get("cue_stacks", []) or []:
-            if isinstance(sd, dict):
+            if not isinstance(sd, dict):
+                continue
+            try:                       # eine kaputte Cueliste darf nicht ALLE verwerfen
                 state.cue_stacks.append(CueStack.from_dict(sd))
+            except Exception as e:
+                _lenient("skip bad cue stack", e)
+        # F-16: jeder Cueliste den Sub-Cuelisten-Resolver geben.
+        if hasattr(state, "wire_cue_stack_resolvers"):
+            state.wire_cue_stack_resolvers()
     except Exception as e:
-        print(f"[show_file] load cue stacks error: {e}")
+        _lenient("load cue stacks error", e)
 
     # Executor-/Page-Bindung wiederherstellen (nach den cue_stacks, da die
     # Stack-Referenzen als Index in cue_stacks abgelegt sind). Wird auch bei
@@ -529,7 +588,7 @@ def load_show(path: str | os.PathLike):
         try:
             pe.from_dict(data.get("executors", {}) or {}, state.cue_stacks)
         except Exception as e:
-            print(f"[show_file] load executors error: {e}")
+            _lenient("load executors error", e)
 
     try:
         fm = getattr(state, "function_manager", None)
@@ -539,7 +598,7 @@ def load_show(path: str | os.PathLike):
                 functions_payload = {"functions": []}
             fm.from_dict(functions_payload)
     except Exception as e:
-        print(f"[show_file] load function manager error: {e}")
+        _lenient("load function manager error", e)
 
     # Snap-Bibliothek pro Show. Hat die Show einen "library"-Block, ist er
     # maßgeblich. Alt-Shows ohne Block erben einmalig die globalen Snap-Dateien.
@@ -551,7 +610,7 @@ def load_show(path: str | os.PathLike):
         else:
             lib.migrate_from_disk(replace=True)
     except Exception as e:
-        print(f"[show_file] load snap library error: {e}")
+        _lenient("load snap library error", e)
 
     # Abwaertskompatibilitaet: Alt-Shows speicherten EFX/RGB-Matrix in separaten
     # Bloecken (nicht als Funktionen). Diese werden hier einmalig in echte
@@ -565,14 +624,14 @@ def load_show(path: str | os.PathLike):
             if isinstance(ed, dict):
                 state.function_manager.add(EfxInstance.from_dict(ed))
     except Exception as e:
-        print(f"[show_file] migrate legacy efx error: {e}")
+        _lenient("migrate legacy efx error", e)
     try:
         from src.core.engine.rgb_matrix import RgbMatrixInstance
         for md in (data.get("rgb_matrix", []) or []):
             if isinstance(md, dict):
                 state.function_manager.add(RgbMatrixInstance.from_dict(md))
     except Exception as e:
-        print(f"[show_file] migrate legacy rgb matrix error: {e}")
+        _lenient("migrate legacy rgb matrix error", e)
 
     state._vc_layout = data.get("virtual_console", {}) or {}
 
@@ -614,7 +673,7 @@ def load_show(path: str | os.PathLike):
             docks = {fid: sid for fid, sid in docks.items() if sid in valid_ids}
         state.visualizer_docks = docks
     except Exception as e:
-        print(f"[show_file] load visualizer error: {e}")
+        _lenient("load visualizer error", e)
         state.visualizer_positions = {}
         state.visualizer_rotations = {}
         state.visualizer_docks = {}
@@ -636,14 +695,14 @@ def load_show(path: str | os.PathLike):
         meta = lv.get("meta", {})
         state.live_view_meta = dict(meta) if isinstance(meta, dict) else {}
     except Exception as e:
-        print(f"[show_file] load live_view error: {e}")
+        _lenient("load live_view error", e)
         state.live_view_positions = {}
         state.live_view_meta = {}
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}
     except Exception as e:
-        print(f"[show_file] layout store error: {e}")
+        _lenient("layout store error", e)
 
     state.show_name = data.get("name", "Show")
 
@@ -654,7 +713,7 @@ def load_show(path: str | os.PathLike):
         from src.core.audio.media_player import get_media_player
         get_media_player().set_playlist_dicts(state.playlist)
     except Exception as e:
-        print(f"[show_file] playlist load error: {e}")
+        _lenient("playlist load error", e)
 
     # Auto-Show an Musik koppeln (welche Funktionen beim Play starten).
     try:
@@ -672,7 +731,7 @@ def load_show(path: str | os.PathLike):
             "slots": slots,
         }
     except Exception as e:
-        print(f"[show_file] music_autoshow load error: {e}")
+        _lenient("music_autoshow load error", e)
         state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
 
     # Notify listeners after full replacement

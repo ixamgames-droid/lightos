@@ -172,11 +172,106 @@ class EfxInstance(Function):
                             float(tilt if tilt is not None else self.y_offset))
             except Exception:
                 self._centers = {}
+        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern, damit der
+        # Effekt bei local_beats=0 beginnt (gemeinsamer Start mit der sync_group).
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+            except Exception:
+                pass
+
+    def sync_phase(self):
+        """WP-Tempo / Speed-Dial-Sync: bus-synchron -> auf die aktuelle Bus-Position
+        re-ankern (local_beats startet bei 0, gemeinsam mit der sync_group). Frei ->
+        Phase/Random-Walk auf 0 zuruecksetzen (wie do_action('reset'))."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if bus_id:
+            try:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                bus = get_tempo_bus_manager().get(bus_id)
+                if bus is not None:
+                    self._beat_anchor = bus.take_anchor()
+                    return
+            except Exception:
+                pass
+        self._phase = 1.0 if (not self.loop and self.direction == "backward") else 0.0
+        self._rand_progress = 0.0
+
+    def _sync_from_bus(self) -> bool:
+        """WP-Tempo: Liegt dieser EFX auf einem LAUFENDEN Tempo-Bus, wird die Phase
+        direkt aus der Bus-Position abgeleitet (phasenkohaerent, exakte ×-Verhaeltnisse)
+        statt aus dt akkumuliert. Liefert True, wenn so behandelt; sonst False — dann
+        laeuft der normale dt-Pfad in _advance byte-identisch weiter (Free-Run).
+
+        effect_pos = (bus.position - _beat_anchor) * tempo_multiplier + phase_offset
+        (Einheit Beats; bei mult=1 ist 1 Beat eine volle Figur-Umrundung). direction/
+        loop/bounce werden auf effect_pos abgebildet:
+          forward loop  -> _phase = effect_pos % 1
+          backward loop -> _phase = (-effect_pos) % 1
+          bounce        -> Dreieck 0->1->0 ueber 2 Beats
+          one-shot      -> einmal 0->1 (bzw. 1->0 backward), dann am Ende gehalten
+          RANDOM        -> _rand_progress = ±effect_pos (unbeschraenkter Walk)."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if not bus_id:
+            return False
+        _tbm = None
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            _tbm = get_tempo_bus_manager()
+            bus = _tbm.get(bus_id)
+        except Exception:
+            bus = None
+        if bus is None:
+            return False
+        bpm, _bc, _bp, pos = bus.snapshot()
+        if bpm <= 0:
+            # F5: nur bei AKTIVEM Freeze die Phase HALTEN (True = dt-Pfad ueberspringen);
+            # sonst Free-Run-Fallback wie bisher (Bus nur noch nicht gestartet).
+            return bool(_tbm is not None and _tbm.is_frozen())
+        mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+        off = getattr(self, "phase_offset", 0.0) or 0.0
+        anchor = getattr(self, "_beat_anchor", 0.0)
+        # round(...,9) gegen Float-Kanten (Polygon-Ecken / Bounce-Umkehrpunkte).
+        effect_pos = round((pos - anchor) * mult + off, 9)
+        if self.algorithm == EfxAlgorithm.RANDOM:
+            self._rand_progress = -effect_pos if self.direction == "backward" else effect_pos
+            return True
+        if not self.loop and self.direction != "bounce":
+            if self.direction == "backward":
+                self._phase = max(0.0, 1.0 - effect_pos)
+            else:
+                # auf [0,1] klemmen (negativer phase_offset darf nicht unter 0 ziehen).
+                self._phase = max(0.0, min(1.0, effect_pos))
+            return True
+        if self.direction == "bounce":
+            if self.loop:
+                tri = effect_pos % 2.0
+                self._phase = tri if tri <= 1.0 else (2.0 - tri)
+            else:
+                # One-Shot-Bounce: einmal 0->1->0, dann am Ende bei 0.0 HALTEN —
+                # wie der Free-Run-Pfad (_bounce_dir=0 nach einer Runde), statt endlos
+                # weiterzuschwingen.
+                e = min(2.0, max(0.0, effect_pos))
+                self._phase = e if e <= 1.0 else (2.0 - e)
+            return True
+        if self.direction == "backward":
+            self._phase = (-effect_pos) % 1.0
+        else:
+            self._phase = effect_pos % 1.0
+        return True
 
     def _advance(self, dt: float):
         """Treibt die Phase um dt Sekunden voran (Richtung beachtet).
         Effektive Rate = speed_hz × Function.speed-Master, damit VC-Slider
         (EFFECT_SPEED / globaler SPEED) das EFX-Tempo steuern."""
+        # WP-Tempo: bus-synchron? -> Phase direkt aus der Bus-Position ableiten
+        # (statt dt zu akkumulieren). Free-Run laeuft sonst unveraendert weiter.
+        if self._sync_from_bus():
+            return
         delta = self.speed_hz * max(0.0, float(self.speed)) * dt
         if self.algorithm == EfxAlgorithm.RANDOM:
             # Random ignoriert Loop/Bounce/Phase: kontinuierlicher, nie endender
@@ -350,13 +445,27 @@ class EfxInstance(Function):
                     attrs["shutter"] = open_value_for(fx, "shutter")
             # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden.
             attrs = apply_pan_tilt_orientation(fx, attrs)
+            # Mehrkopf (X-6): Fixtures mit ZWEI Tilt-Kanaelen (Spider: zwei Bars)
+            # schwenken den 2. Kopf GEGENPHASIG -> die Lichtleisten schwenken zu-/
+            # voneinander weg statt parallel.
+            if "tilt" in attrs and sum(1 for c in chans if (c.attribute or "") == "tilt") >= 2:
+                attrs = dict(attrs)
+                attrs["tilt#1"] = 255 - int(max(0, min(255, attrs["tilt"])))
+            seen: dict[str, int] = {}
             for ch in chans:
-                attr = ch.attribute
-                if attr not in attrs:
+                a = ch.attribute
+                head = seen.get(a, 0)
+                seen[a] = head + 1
+                key = a if head == 0 else f"{a}#{head}"
+                if key in attrs:
+                    val = attrs[key]
+                elif a in attrs:
+                    val = attrs[a]      # Kopf>0 spiegelt Kopf 0, falls nicht separat
+                else:
                     continue
                 addr = fx.address + ch.channel_number - 1
                 if 1 <= addr <= 512:
-                    universe.set_channel(addr, max(0, min(255, int(attrs[attr]))))
+                    universe.set_channel(addr, max(0, min(255, int(val))))
 
     def _calc(self, phase: float, cx: float | None = None,
               cy: float | None = None) -> tuple[float, float]:
@@ -510,6 +619,16 @@ class EfxInstance(Function):
                               "(geschmeidigere Bewegung; Geräte ohne Fine ignorieren es)"),
             ParamSpec("algorithm", "Form", "select", EfxAlgorithm.CIRCLE.value,
                       options=algos),
+            # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei/eigene
+            # Geschwindigkeit. Eigene Keys (NICHT phase_offset_deg/speed-Kollision).
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
+                      options=("", "Global", "A", "B", "C", "D"),
+                      tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
+                              "Global = Master-BPM, A–D = eigene Buses)"),
+            ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,
+                      "Verhältnis zum Bus (frei, z. B. 0.5 halb, 2 doppelt, 3 dreifach)"),
+            ParamSpec("phase_offset", "Tempo-Versatz (Beats)", "float", 0.0, 0.0, 1.0, 0.05,
+                      "Phasen-Versatz in Beats (versetzter Start auf dem Bus)"),
         ]
         if path_names:
             specs.append(ParamSpec("path", "Custom Path", "select",
@@ -533,6 +652,12 @@ class EfxInstance(Function):
                    "spread", "direction", "loop", "mirror", "open_beam", "relative",
                    "bit16", "phase_mode", "phase_offset_deg", "counter_rotate"):
             return getattr(self, key)
+        if key == "tempo_bus_id":
+            return getattr(self, "tempo_bus_id", "")
+        if key == "tempo_multiplier":
+            return getattr(self, "tempo_multiplier", 1.0)
+        if key == "phase_offset":
+            return getattr(self, "phase_offset", 0.0)
         return None
 
     def set_param(self, key: str, value) -> bool:
@@ -593,6 +718,20 @@ class EfxInstance(Function):
             if p is None:
                 return False
             self.set_custom_path(p)
+            return True
+        if key == "tempo_bus_id":
+            self.tempo_bus_id = str(value or "").strip(); return True
+        if key == "tempo_multiplier":
+            try:
+                self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "phase_offset":
+            try:
+                self.phase_offset = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                pass
             return True
         return False
 

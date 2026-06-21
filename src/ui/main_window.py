@@ -15,6 +15,7 @@ from src.core.dmx.enttec_pro import find_enttec_port
 from src.ui.views.patch_view import PatchView
 from src.ui.views.programmer_view import ProgrammerView
 from src.ui.views.playback_view import PlaybackView
+from src.ui.views.curve_library_view import CurveLibraryView
 from src.ui.views.output_view import OutputView
 from src.ui.views.midi_view import MidiView
 from src.ui.views.virtual_console_view import VirtualConsoleView
@@ -98,6 +99,8 @@ class SectionButton(QPushButton):
 class MainWindow(QMainWindow):
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
+    # Modus/Quelle/Lock-Aenderung des BPM-Leaders -> Badge in der Top-Bar.
+    _bpm_state_sig = Signal()
     # Page-Wechsel meldet die PlaybackEngine ggf. aus dem MIDI-Thread -> Signal
     # marshallt die Label-Aktualisierung in den UI-Thread (crash.log 2026-06-14:
     # MIDI-Thread fasste Widgets direkt an -> Access Violation).
@@ -235,7 +238,7 @@ class MainWindow(QMainWindow):
         a.setShortcut(QKeySequence.StandardKey.New)
         a.triggered.connect(self._new_show)
 
-        a = fm.addAction("Oeffnen...")
+        a = fm.addAction("Öffnen...")
         a.setShortcut(QKeySequence.StandardKey.Open)
         a.triggered.connect(self._open_show)
 
@@ -259,7 +262,7 @@ class MainWindow(QMainWindow):
 
         # Show pruefen & reparieren
         fm.addSeparator()
-        a = fm.addAction("Show pruefen && reparieren...")
+        a = fm.addAction("Show prüfen && reparieren...")
         a.setShortcut("Ctrl+Shift+R")
         a.triggered.connect(self._validate_show)
 
@@ -272,14 +275,14 @@ class MainWindow(QMainWindow):
 
         # Bearbeiten (Undo/Redo)
         em = mb.addMenu("&Bearbeiten")
-        self._act_undo = em.addAction("Rueckgaengig")
+        self._act_undo = em.addAction("Rückgängig")
         self._act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         self._act_undo.triggered.connect(self._do_undo)
         self._act_redo = em.addAction("Wiederherstellen")
         self._act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         self._act_redo.triggered.connect(self._do_redo)
         em.addSeparator()
-        a = em.addAction("Verlauf loeschen")
+        a = em.addAction("Verlauf löschen")
         a.triggered.connect(self._clear_undo_history)
         try:
             from src.core.undo import get_undo_stack
@@ -304,7 +307,7 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._quick_record_cue)
 
         # Page-Wechsel (T0.1 Multi-Page)
-        a = sm.addAction("Naechste Page")
+        a = sm.addAction("Nächste Page")
         a.setShortcut("Ctrl+PgDown")
         a.triggered.connect(self._page_next)
         a = sm.addAction("Vorherige Page")
@@ -326,7 +329,7 @@ class MainWindow(QMainWindow):
         a = pm.addAction("Selektion kopieren")
         a.setShortcut("Ctrl+C")
         a.triggered.connect(self._global_copy_programmer)
-        a = pm.addAction("Selektion einfuegen")
+        a = pm.addAction("Selektion einfügen")
         a.setShortcut("Ctrl+V")
         a.triggered.connect(self._global_paste_programmer)
         pm.addSeparator()
@@ -363,8 +366,8 @@ class MainWindow(QMainWindow):
 
         # Visualizer
         vm = mb.addMenu("&Visualizer")
-        vm.addAction("3D Visualizer oeffnen").triggered.connect(self._open_visualizer)
-        vm.addAction("Visualizer schliessen").triggered.connect(self._close_visualizer)
+        vm.addAction("3D Visualizer öffnen").triggered.connect(self._open_visualizer)
+        vm.addAction("Visualizer schließen").triggered.connect(self._close_visualizer)
 
         # Command-Line (T1.1)
         cm = mb.addMenu("&Command")
@@ -377,7 +380,7 @@ class MainWindow(QMainWindow):
 
         # Hilfe
         hm = mb.addMenu("&Hilfe")
-        hm.addAction("Ueber LightOS").triggered.connect(self._about)
+        hm.addAction("Über LightOS").triggered.connect(self._about)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -415,6 +418,7 @@ class MainWindow(QMainWindow):
             ("Simple Desk",          "#8F8F8F"),
             ("Playback",             "#FF6B35"),
             ("Eingabe / Ausgabe",    "#6F6F6F"),
+            ("BPM",                  "#FF3CAC"),
         ]
 
         self._section_btns: list[SectionButton] = []
@@ -481,7 +485,7 @@ class MainWindow(QMainWindow):
         # / Alle Nicht-VC-Werte). Loescht nur aktive Werte, nie gespeicherte Daten.
         self._btn_clear_nonvc = QPushButton("✖ Clear ▾")
         self._btn_clear_nonvc.setFixedHeight(22)
-        self._btn_clear_nonvc.setToolTip("Aktive Werte zuruecksetzen (Programmer / Simple Desk / Alle Nicht-VC)")
+        self._btn_clear_nonvc.setToolTip("Aktive Werte zurücksetzen (Programmer / Simple Desk / Alle Nicht-VC)")
         self._btn_clear_nonvc.setStyleSheet(
             "QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;"
             " border-radius:3px; padding:0 8px; }"
@@ -499,14 +503,14 @@ class MainWindow(QMainWindow):
 
         self._lbl_page = QLabel("Page 1")
         self._lbl_page.setStyleSheet("color:#ffd700; font-weight:bold; padding:0 6px; min-width:60px;")
-        self._lbl_page.setToolTip("Klick fuer Page-Auswahl")
+        self._lbl_page.setToolTip("Klick für Page-Auswahl")
         self._lbl_page.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_page.mousePressEvent = lambda _ev: self._select_page_dialog()
         bar_layout.addWidget(self._lbl_page)
 
         page_next = QPushButton(">")
         page_next.setFixedSize(22, 22)
-        page_next.setToolTip("Naechste Page (Ctrl+Page Down)")
+        page_next.setToolTip("Nächste Page (Ctrl+Page Down)")
         page_next.clicked.connect(self._page_next)
         bar_layout.addWidget(page_next)
 
@@ -525,12 +529,21 @@ class MainWindow(QMainWindow):
         self._lbl_bpm.mousePressEvent = lambda _ev: self._set_bpm_manually()
         bar_layout.addWidget(self._lbl_bpm)
 
+        # AUTO/MANUAL/Lock-Badge — zeigt, welcher Modus/welche Quelle den Leader
+        # treibt. Klick togglet AUTO/MANUAL.
+        self._lbl_bpm_mode = QLabel("AUTO")
+        self._lbl_bpm_mode.setFixedHeight(22)
+        self._lbl_bpm_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_bpm_mode.setToolTip("BPM-Modus (Klick: AUTO/MANUAL umschalten)")
+        self._lbl_bpm_mode.mousePressEvent = lambda _ev: self._toggle_bpm_mode()
+        bar_layout.addWidget(self._lbl_bpm_mode)
+
         # BPM-Pulse Indikator — groesserer runder Beat-Punkt (deutlich sichtbar)
         self._BPM_DOT_IDLE = ("background:#1c1c1c; border:1px solid #333;"
                               " border-radius:13px; margin:2px 4px;")
         self._bpm_indicator = QLabel(" ")
         self._bpm_indicator.setFixedSize(26, 26)
-        self._bpm_indicator.setToolTip("Beat-Indikator (Takt 1 gelb, sonst gruen)")
+        self._bpm_indicator.setToolTip("Beat-Indikator (Takt 1 gelb, sonst grün)")
         self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE)
         bar_layout.addWidget(self._bpm_indicator)
         self._bpm_indicator_timer = QTimer(self)
@@ -547,14 +560,28 @@ class MainWindow(QMainWindow):
             # BPM-Aenderung (Tap/APC/Audio) -> Label sofort aktualisieren.
             self._bpm_changed_sig.connect(self._update_bpm_label)
             self._bpm_mgr.subscribe_bpm_change(lambda b: self._bpm_changed_sig.emit(b))
+            # Modus/Quelle/Lock -> Badge marshallen (Audio-Thread fasst kein Widget an).
+            self._bpm_state_sig.connect(self._update_bpm_mode_badge)
+            self._bpm_mgr.subscribe_state_change(lambda: self._bpm_state_sig.emit())
         except Exception as e:
             print(f"[main_window] bpm subscribe error: {e}")
             self._bpm_mgr = None
 
+        # AUTO standardmaessig an: Einstellungen laden/anwenden und (sofern nicht
+        # via LIGHTOS_NO_AUDIO_AUTOSTART unterdrueckt) den Audio-Capture starten.
+        try:
+            from src.core.audio import bpm_settings
+            bpm_settings.boot()
+        except Exception as e:
+            print(f"[main_window] bpm boot error: {e}")
+        self._update_bpm_mode_badge()
+
         btn_stop = QPushButton("STOP ALL")
         btn_stop.setObjectName("blackoutBtn")
         btn_stop.setFixedHeight(26)
-        btn_stop.setFixedWidth(80)
+        # Keine feste Breite: der Button passt sich an seinen Text an, sonst
+        # wird „STOP ALL" bei großer Schrift/Skalierung beidseitig abgeschnitten.
+        btn_stop.setMinimumWidth(78)
         btn_stop.clicked.connect(self._stop_all)
         bar_layout.addWidget(btn_stop)
 
@@ -562,7 +589,8 @@ class MainWindow(QMainWindow):
         btn_blackout.setObjectName("blackoutBtn")
         btn_blackout.setCheckable(True)
         btn_blackout.setFixedHeight(26)
-        btn_blackout.setFixedWidth(90)
+        # Keine feste Breite (s. STOP ALL): „BLACKOUT" sonst rechts abgeschnitten.
+        btn_blackout.setMinimumWidth(88)
         btn_blackout.clicked.connect(self._toggle_blackout)
         self._btn_blackout = btn_blackout
         bar_layout.addWidget(btn_blackout)
@@ -605,12 +633,29 @@ class MainWindow(QMainWindow):
             print(f"[main_window] ChannelGroupsView init error: {e}")
             self._channel_groups_view = QWidget()
         sd_tabs.addTab(self._simple_desk, "Simple Desk")
-        sd_tabs.addTab(self._channel_groups_view, "Channel Groups")
+        sd_tabs.addTab(self._channel_groups_view, "Submaster/Kanal-Gruppen")
         self._stack.addWidget(sd_tabs)
         # Sektion 5: Playback
         self._stack.addWidget(self._build_section_playback())
         # Sektion 6: Eingabe / Ausgabe
         self._stack.addWidget(self._build_section_io())
+        # Sektion 7: BPM (Manager | Generator)
+        bpm_tabs = _SubTabs()
+        try:
+            from src.ui.views.bpm_manager_view import BpmManagerView
+            self._bpm_manager_view = BpmManagerView()
+        except Exception as e:
+            print(f"[main_window] BpmManagerView init error: {e}")
+            self._bpm_manager_view = QWidget()
+        bpm_tabs.addTab(self._bpm_manager_view, "Manager")
+        try:
+            from src.ui.views.bpm_generator_view import BpmGeneratorView
+            self._bpm_generator_view = BpmGeneratorView()
+        except Exception as e:
+            print(f"[main_window] BpmGeneratorView init error: {e}")
+            self._bpm_generator_view = QWidget()
+        bpm_tabs.addTab(self._bpm_generator_view, "Generator")
+        self._stack.addWidget(bpm_tabs)
 
         # Verbindung Buttons <-> Stack
         self._btn_group.idClicked.connect(self._stack.setCurrentIndex)
@@ -662,7 +707,7 @@ class MainWindow(QMainWindow):
             print(f"[main_window] FixtureGroupView init error: {e}")
             self._fixture_group_view = QWidget()
         tabs.addTab(self._patch_view,             "Patch")
-        tabs.addTab(self._fixture_group_view,     "Gruppen")
+        tabs.addTab(self._fixture_group_view,     "Fixture-Gruppen")
         return tabs
 
     def _build_section_programmer(self) -> QWidget:
@@ -692,6 +737,8 @@ class MainWindow(QMainWindow):
         self._show_manager_view = ShowManagerView()
         tabs.addTab(self._playback_view,      "Playback")
         tabs.addTab(self._show_manager_view,  "Show Manager")
+        self._curve_library_view = CurveLibraryView()
+        tabs.addTab(self._curve_library_view, "Kurven")
         return tabs
 
     def _build_section_io(self) -> QWidget:
@@ -736,7 +783,7 @@ class MainWindow(QMainWindow):
         sb = self.statusBar()
         self._lbl_enttec   = QLabel("Enttec: --")
         self._lbl_web      = QLabel("Web: aus")
-        self._lbl_fixtures = QLabel("0 Geraete")
+        self._lbl_fixtures = QLabel("0 Geräte")
         self._lbl_mock     = QLabel("")
         self._lbl_universe = QLabel("Universe 1")
 
@@ -783,7 +830,7 @@ class MainWindow(QMainWindow):
         if self._undo_stack:
             ok = self._undo_stack.undo()
             if ok:
-                self.statusBar().showMessage("Rueckgaengig", 1500)
+                self.statusBar().showMessage("Rückgängig", 1500)
 
     def _do_redo(self):
         if self._undo_stack:
@@ -794,14 +841,14 @@ class MainWindow(QMainWindow):
     def _clear_undo_history(self):
         if self._undo_stack:
             self._undo_stack.clear()
-            self.statusBar().showMessage("Undo-Verlauf geleert", 1500)
+            self.statusBar().showMessage("Rückgängig-Verlauf geleert", 1500)
 
     def _refresh_undo_labels(self):
         if not getattr(self, "_undo_stack", None):
             return
         u = self._undo_stack.undo_label()
         r = self._undo_stack.redo_label()
-        self._act_undo.setText(f"Rueckgaengig: {u}" if u else "Rueckgaengig")
+        self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
         self._act_undo.setEnabled(self._undo_stack.can_undo())
         self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
         self._act_redo.setEnabled(self._undo_stack.can_redo())
@@ -827,7 +874,7 @@ class MainWindow(QMainWindow):
     def _on_beat(self, idx: int):
         """Wird vom BPM-Manager im Background-Thread aufgerufen → in UI dispatchen."""
         try:
-            QTimer.singleShot(0, self._flash_bpm_indicator)
+            QTimer.singleShot(0, lambda i=idx: self._flash_bpm_indicator(i))
         except Exception:
             pass
 
@@ -843,9 +890,10 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    def _flash_bpm_indicator(self):
-        # Akzent auf Beat 1 (alle 4)
-        col = "#FFD700" if (self._bpm_mgr and self._bpm_mgr._beat_index % 4 == 1) else "#9DFF52"
+    def _flash_bpm_indicator(self, idx: int = 0):
+        # Akzent auf Beat 1 (alle 4) — Index kommt direkt vom Beat-Callback,
+        # kein Re-Read des privaten Zaehlers (war off-by-one).
+        col = "#FFD700" if (idx % 4 == 0) else "#9DFF52"
         self._bpm_indicator.setStyleSheet(
             f"background:{col}; border:1px solid {col}; border-radius:13px; margin:2px 4px;")
         self._bpm_indicator_timer.start()
@@ -864,13 +912,46 @@ class MainWindow(QMainWindow):
             current, 0.0, 999.0, 1
         )
         if ok:
-            self._bpm_mgr.set_bpm(val)
+            if val > 0:
+                self._bpm_mgr.set_manual_bpm(val)
+            else:
+                self._bpm_mgr.reset()
             if val > 0:
                 self._lbl_bpm.setText(f"BPM: {val:.1f}")
                 self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
             else:
                 self._lbl_bpm.setText("BPM: --")
                 self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
+
+    def _toggle_bpm_mode(self):
+        if not self._bpm_mgr:
+            return
+        try:
+            from src.core.engine.bpm_manager import BpmMode
+            new = BpmMode.MANUAL if self._bpm_mgr.mode == BpmMode.AUTO else BpmMode.AUTO
+            self._bpm_mgr.set_mode(new)
+        except Exception as e:
+            print(f"[main_window] toggle bpm mode error: {e}")
+
+    def _update_bpm_mode_badge(self):
+        """Aktualisiert das AUTO/MANUAL/Lock-Badge in der Top-Bar (UI-Thread)."""
+        if not getattr(self, "_lbl_bpm_mode", None) or not self._bpm_mgr:
+            return
+        try:
+            from src.core.engine.bpm_manager import BpmMode
+            mgr = self._bpm_mgr
+            if mgr.is_locked:
+                txt, bg, fg = "🔒 LOCK", "#3a2a00", "#ffb000"
+            elif mgr.mode == BpmMode.AUTO:
+                txt, bg, fg = "AUTO", "#10331a", "#9DFF52"
+            else:
+                txt, bg, fg = "MAN", "#33210f", "#f0883e"
+            self._lbl_bpm_mode.setText(txt)
+            self._lbl_bpm_mode.setStyleSheet(
+                f"QLabel {{ background:{bg}; color:{fg}; font-weight:bold;"
+                f" border-radius:3px; padding:0 6px; }}")
+        except Exception:
+            pass
 
     def _toggle_blackout(self, checked: bool):
         self._state.output_manager.set_blackout(checked)
@@ -911,7 +992,7 @@ class MainWindow(QMainWindow):
             return
         items = [f"Page {i+1}" for i in range(pe.MAX_PAGES)]
         item, ok = QInputDialog.getItem(
-            self, "Page waehlen", "Page:", items, pe.current_page, False
+            self, "Page wählen", "Page:", items, pe.current_page, False
         )
         if ok and item:
             pe.set_page(items.index(item))
@@ -1021,7 +1102,7 @@ class MainWindow(QMainWindow):
                     break
             if free_idx is None:
                 QMessageBox.warning(self, "Snapshot",
-                    "Alle 48 Slots belegt. Bitte einen leeren oder den Snapshots-Tab oeffnen.")
+                    "Alle 48 Slots belegt. Bitte einen leeren oder den Snapshots-Tab öffnen.")
                 return
             # Programmer pruefen
             if not self._state.programmer:
@@ -1031,15 +1112,32 @@ class MainWindow(QMainWindow):
             # Name abfragen + capture
             name, ok = QInputDialog.getText(
                 self, "Snapshot speichern",
-                f"Name fuer Snapshot Slot {free_idx + 1}:",
+                f"Name für Snapshot Slot {free_idx + 1}:",
                 text=f"Snap {free_idx + 1}"
             )
             if not ok or not name.strip():
                 return
-            # Direkter Capture (umgeht den eigenen Dialog von SnapshotsView)
+            # Kanal-Auswahl wie im Snapshots-Tab / in der Snap-Bibliothek: NICHT
+            # den ganzen Programmer (inkl. eines evtl. mit-scharfen Dimmers) blind
+            # speichern, sondern fragen, WELCHE Attribut-Gruppen (Farbe / Dimmer /
+            # …) in den Snapshot wandern. So kommt ein Dimmer nur mit, wenn man ihn
+            # bewusst angehakt laesst (loest Davids "Color speichert Dimmer mit").
             import copy
+            from src.ui.views.snap_file_panel import ChannelSelectDialog
+            from PySide6.QtWidgets import QDialog
+            vals = copy.deepcopy(self._state.programmer)
+            scope = (self._state.active_scope_fids()
+                     if hasattr(self._state, "active_scope_fids") else None)
+            dlg = ChannelSelectDialog(vals, self, scope_fids=scope)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            vals = dlg.filter_programmer(vals)
+            if not vals:
+                QMessageBox.information(self, "Snapshot",
+                    "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
+                return
             sv._snapshots[free_idx].name = name.strip()
-            sv._snapshots[free_idx].values = copy.deepcopy(self._state.programmer)
+            sv._snapshots[free_idx].values = vals
             sv._buttons[free_idx].refresh()
             sv._save_to_disk()
             self.statusBar().showMessage(
@@ -1105,9 +1203,9 @@ class MainWindow(QMainWindow):
             print(f"[MainWindow] Visualizer start error: {e}")
             QMessageBox.warning(
                 self,
-                "Visualizer nicht verfuegbar",
+                "Visualizer nicht verfügbar",
                 "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
-                "Bitte pruefe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+                "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
             )
 
     def _close_visualizer(self):
@@ -1145,7 +1243,7 @@ class MainWindow(QMainWindow):
 
     def _open_show(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Show oeffnen", "", "LightOS Show (*.lshow);;Alle Dateien (*)"
+            self, "Show öffnen", "", "LightOS Show (*.lshow);;Alle Dateien (*)"
         )
         if not path:
             return
@@ -1204,7 +1302,7 @@ class MainWindow(QMainWindow):
             self, "QLC+ Import",
             result.get("message", "") +
             "\n\nHinweis: Funktionen / VC-Widgets werden geparst, "
-            "aber das vollstaendige Mapping in LightOS-Strukturen "
+            "aber das vollständige Mapping in LightOS-Strukturen "
             "ist nicht automatisch (Profil-IDs unterscheiden sich)."
         )
 
@@ -1271,7 +1369,7 @@ class MainWindow(QMainWindow):
                 self._lbl_web.setText("Web: :5000 OK")
                 self._lbl_web.setStyleSheet("color: #9DFF52;")
                 QMessageBox.information(self, "Web-Interface",
-                    "Web-Interface laeuft auf http://localhost:5000")
+                    "Web-Interface läuft auf http://localhost:5000")
             except Exception as e:
                 self._act_web.setChecked(False)
                 QMessageBox.warning(self, "Web-Interface Fehler", str(e))
@@ -1344,7 +1442,7 @@ class MainWindow(QMainWindow):
 
     def _about(self):
         QMessageBox.about(
-            self, "Ueber LightOS",
+            self, "Über LightOS",
             "<b>LightOS v1.0</b><br>"
             "Professionelle DMX-Lichtsteuerung<br><br>"
             "Windows x64 &amp; ARM64<br>"
@@ -1366,7 +1464,7 @@ class MainWindow(QMainWindow):
     def _on_state_event(self, event: str, _data):
         if event == "patch_changed":
             count = len(self._state.get_patched_fixtures())
-            self._lbl_fixtures.setText(f"{count} Geraet(e)")
+            self._lbl_fixtures.setText(f"{count} Gerät(e)")
         elif event == "programmer_changed":
             self._refresh_foreign_badges()
 
@@ -1434,7 +1532,7 @@ class MainWindow(QMainWindow):
         try:
             self._check_hardware()
             count = len(self._state.get_patched_fixtures())
-            self._lbl_fixtures.setText(f"{count} Geraet(e)")
+            self._lbl_fixtures.setText(f"{count} Gerät(e)")
         except Exception as e:
             print(f"[main_window] refresh_all error: {e}")
 
@@ -1631,7 +1729,7 @@ class MainWindow(QMainWindow):
         if self._has_unsaved_changes():
             reply = QMessageBox.question(
                 self, "Show speichern?",
-                "Es gibt moeglicherweise ungespeicherte Aenderungen "
+                "Es gibt möglicherweise ungespeicherte Änderungen "
                 "(Cuelisten, VC-Layout, Snapshots).\n\n"
                 "Vor dem Beenden speichern?",
                 QMessageBox.StandardButton.Save |

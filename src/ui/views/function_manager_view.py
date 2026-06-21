@@ -197,7 +197,7 @@ class FunctionManagerView(QWidget):
         self._btn_learn.clicked.connect(self._learn_midi_for_selected)
         toolbar.addWidget(self._btn_learn)
 
-        self._btn_del = QPushButton("Loeschen")
+        self._btn_del = QPushButton("Löschen")
         self._btn_del.setFixedHeight(26)
         self._btn_del.clicked.connect(self._delete_selected)
         toolbar.addWidget(self._btn_del)
@@ -227,7 +227,7 @@ class FunctionManagerView(QWidget):
 
         # Right — stacked editor
         self._stack = QStackedWidget()
-        self._stack.addWidget(_placeholder("Funktion auswaehlen oder erstellen"))
+        self._stack.addWidget(_placeholder("Funktion auswählen oder erstellen"))
         splitter.addWidget(self._stack)
 
         splitter.setSizes([250, 750])
@@ -408,8 +408,8 @@ class FunctionManagerView(QWidget):
         if f is None:
             return
         reply = QMessageBox.question(
-            self, "Loeschen",
-            f'Funktion "{f.name}" wirklich loeschen?',
+            self, "Löschen",
+            f'Funktion "{f.name}" wirklich löschen?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -613,7 +613,7 @@ class FunctionManagerView(QWidget):
                 menu.addAction("🎹 MIDI lernen (Pad/Fader drücken)",
                                self._learn_midi_for_selected)
                 menu.addAction("Umbenennen", self._rename_selected)
-                menu.addAction("Loeschen",   self._delete_selected)
+                menu.addAction("Löschen",   self._delete_selected)
 
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
@@ -668,7 +668,19 @@ def create_function_editor(f) -> QWidget:
     if f.function_type == FunctionType.Show:
         return _placeholder(
             f"Show: {f.name}\n\nBearbeiten in 'Playback' → 'Show Manager'.")
-    return _placeholder(f"{f.function_type.value}: {f.name}\n\nEditor kommt bald.")
+    if f.function_type == FunctionType.EFX:
+        return _placeholder(
+            f"EFX: {f.name}\n\nBearbeiten im 'Programmer' → Tab 'EFX'\n"
+            "(Gerät/Gruppe wählen, Effekt aktivieren und live anpassen).")
+    if f.function_type == FunctionType.RGBMatrix:
+        return _placeholder(
+            f"RGB-Matrix: {f.name}\n\nBearbeiten im 'Programmer' → Tab 'Matrix'\n"
+            "(Gruppe wählen, dann Algorithmus und Parameter anpassen).")
+    # Fallback nur fuer kuenftige/unbekannte FunctionType-Werte ohne eigenen
+    # Editor — alle aktuell existierenden Typen sind oben abgedeckt.
+    return _placeholder(
+        f"{f.function_type.value}: {f.name}\n\n"
+        "Für diesen Funktionstyp gibt es hier keinen eigenen Editor.")
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────

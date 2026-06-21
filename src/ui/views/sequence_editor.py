@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QDoubleSpinBox, QComboBox,
     QGroupBox, QListWidget, QListWidgetItem, QAbstractItemView,
-    QMessageBox, QInputDialog,
+    QMessageBox, QInputDialog, QScrollArea,
 )
 from PySide6.QtCore import Qt
 from src.core.engine.sequence import Sequence, SequenceStep
@@ -15,8 +15,8 @@ from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from PySide6.QtWidgets import QDialog
 
 
-COLS = ["#", "Werte (FID → Attr=Wert)", "Fade In", "In-Kurve",
-        "Hold", "Fade Out", "Out-Kurve", "Notiz"]
+COLS = ["#", "Schritt", "Fade In", "In-Kurve",
+        "Hold", "Fade Out", "Out-Kurve", "Werte"]
 
 
 class SequenceEditor(QWidget):
@@ -30,15 +30,42 @@ class SequenceEditor(QWidget):
         self._refresh()
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        # ── Top-Level: nur Header (Pop-out) + EIN Scrollbereich + Platzhalter ──
+        # Loest das alte Platzproblem: der ganze Editor liegt jetzt in EINEM
+        # scrollbaren Koerper (kein Stauchen/Abschneiden mehr) und laesst sich per
+        # Knopf komplett in ein grosses, frei vergroesserbares Fenster auskoppeln.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
+        self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
+        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setToolTip(
+            "Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
+        self._btn_editor_popout.setStyleSheet(
+            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            "border-radius:3px;font-size:10px;padding:1px 8px;} "
+            "QPushButton:hover{background:#30363d;}")
+        self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
+        header.addWidget(self._btn_editor_popout)
+        outer.addLayout(header)
+
+        # ── Editor-Koerper (alles ausser dem Header; wandert komplett ins Pop-out) ─
+        self._editor_body = QWidget()
+        root = QVBoxLayout(self._editor_body)
+        root.setContentsMargins(4, 4, 4, 4)
+        root.setSpacing(6)
 
         title = QLabel(f"Sequence: {self._seq.name}")
         title.setStyleSheet("font-size: 15px; font-weight: bold; color: #58a6ff;")
         root.addWidget(title)
 
-        # Name + Properties
-        prop_row = QHBoxLayout()
+        # ── Gruppe: Grundeinstellungen (Name / Order / Dir / Speed) ───────────
+        grp_general = QGroupBox("Grundeinstellungen")
+        prop_row = QHBoxLayout(grp_general)
         prop_row.addWidget(QLabel("Name:"))
         self._edit_name = QLineEdit(self._seq.name)
         self._edit_name.editingFinished.connect(self._on_name_changed)
@@ -67,10 +94,10 @@ class SequenceEditor(QWidget):
         self._sp_speed.setSingleStep(0.1)
         self._sp_speed.valueChanged.connect(self._on_props_changed)
         prop_row.addWidget(self._sp_speed)
-        root.addLayout(prop_row)
+        root.addWidget(grp_general)
 
         # Bound fixtures
-        bound_box = QGroupBox("Verknuepfte Fixtures")
+        bound_box = QGroupBox("Verknüpfte Fixtures")
         bb_layout = QVBoxLayout(bound_box)
         self._lst_fixtures = QListWidget()
         self._lst_fixtures.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -95,6 +122,7 @@ class SequenceEditor(QWidget):
         st_layout = QVBoxLayout(steps_box)
         self._tbl = QTableWidget(0, len(COLS))
         self._tbl.setHorizontalHeaderLabels(COLS)
+        self._tbl.setMinimumHeight(200)
         self._tbl.horizontalHeader().setSectionResizeMode(
             1, QHeaderView.ResizeMode.Stretch)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -104,7 +132,7 @@ class SequenceEditor(QWidget):
         st_btn_row = QHBoxLayout()
         btn_add = QPushButton("+ Step (aus Programmer)")
         btn_add.setToolTip("Erstellt neuen Step mit aktuellen Programmer-Werten "
-                           "der verknuepften Fixtures")
+                           "der verknüpften Fixtures")
         btn_add.clicked.connect(self._add_step_from_programmer)
         btn_add_empty = QPushButton("+ Leerer Step")
         btn_add_empty.clicked.connect(self._add_empty_step)
@@ -135,6 +163,69 @@ class SequenceEditor(QWidget):
         tr_row.addStretch(1)
         root.addLayout(tr_row)
 
+        # ── Aeusserer Scrollbereich + Pop-out-Verwaltung ──────────────────────
+        self._editor_window = None
+        self._editor_window_scroll = None
+        self._editor_scroll = QScrollArea()
+        self._editor_scroll.setWidgetResizable(True)
+        self._editor_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._editor_scroll.setWidget(self._editor_body)
+        self._editor_scroll.setStyleSheet("QScrollArea{border:none;}")
+        outer.addWidget(self._editor_scroll, 1)
+
+        self._editor_placeholder = QLabel(
+            "⤢ Der Editor ist in einem eigenen großen Fenster geöffnet.\n\n"
+            "Zum Andocken das Fenster schließen oder erneut auf »Großes Fenster« tippen.")
+        self._editor_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._editor_placeholder.setWordWrap(True)
+        self._editor_placeholder.setStyleSheet("color:#8b949e; font-size:11px; padding:24px;")
+        self._editor_placeholder.setVisible(False)
+        outer.addWidget(self._editor_placeholder, 1)
+
+    def _toggle_editor_popout(self):
+        """Koppelt den GANZEN Sequenz-Editor in ein grosses, scrollbares Fenster
+        aus / dockt ihn zurueck (loest das Platzproblem bei vielen Step-Zeilen)."""
+        if self._editor_window is not None:
+            self._editor_window.close()
+            return
+        body = self._editor_scroll.takeWidget()
+        if body is None:
+            return
+        win = QDialog(self)
+        win.setWindowTitle("Sequenz-Editor")
+        win.setModal(False)
+        wl = QVBoxLayout(win)
+        wl.setContentsMargins(6, 6, 6, 6)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setFrameShape(QScrollArea.Shape.NoFrame)
+        sc.setWidget(body)
+        sc.setStyleSheet("QScrollArea{border:none;}")
+        wl.addWidget(sc)
+        win.resize(760, 980)
+        win.finished.connect(lambda *_: self._redock_editor())
+        self._editor_window = win
+        self._editor_window_scroll = sc
+        self._btn_editor_popout.setText("⤡ Andocken")
+        self._editor_scroll.setVisible(False)
+        self._editor_placeholder.setVisible(True)
+        win.show()
+
+    def _redock_editor(self):
+        """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
+        if self._editor_window is None:
+            return
+        try:
+            body = self._editor_window_scroll.takeWidget()
+            if body is not None:
+                self._editor_scroll.setWidget(body)
+            self._editor_scroll.setVisible(True)
+            self._editor_placeholder.setVisible(False)
+            self._btn_editor_popout.setText("⤢ Großes Fenster")
+        except RuntimeError:
+            pass
+        self._editor_window = None
+
     # ── Refresh ──────────────────────────────────────────────────────────────
 
     def _refresh(self):
@@ -157,24 +248,29 @@ class SequenceEditor(QWidget):
         self._tbl.setRowCount(len(self._seq.steps))
         for i, st in enumerate(self._seq.steps):
             vals_txt = self._format_values(st.values)
-            # Text-Spalten: 0 #, 1 Werte, 2 Fade In, 4 Hold, 5 Fade Out, 7 Notiz
+            # Spalte 1 zeigt den Step-NAMEN (Davids Wunsch: NICHT die Roh-Werte
+            # '0 0 0 … 255' je Step). Die Werte stehen im Tooltip + im Werte-Button.
+            name = st.note or f"Schritt {i + 1}"
             text_cols = {
-                0: str(i + 1), 1: vals_txt,
+                0: str(i + 1), 1: name,
                 2: f"{st.fade_in:.2f}", 4: f"{st.hold:.2f}",
-                5: f"{st.fade_out:.2f}", 7: st.note,
+                5: f"{st.fade_out:.2f}",
             }
             for col, txt in text_cols.items():
                 item = QTableWidgetItem(txt)
                 if col == 0:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 if col == 1:
-                    item.setToolTip(
-                        "Format: FID:attr=wert[, attr=wert]; FID:attr=wert ...\n"
-                        "z.B. '3:dimmer=255, red=200; 5:dimmer=128'")
+                    item.setToolTip(vals_txt or "(keine Werte)")
                 self._tbl.setItem(i, col, item)
             # Kurven-Spalten: 3 In-Kurve, 6 Out-Kurve
             self._tbl.setCellWidget(i, 3, self._make_curve_cell(i, "fade_in_curve"))
             self._tbl.setCellWidget(i, 6, self._make_curve_cell(i, "fade_out_curve"))
+            # Werte-Spalte (7): Button oeffnet den Werte-Editor (statt Inline-Dump).
+            vbtn = QPushButton("Werte…")
+            vbtn.setToolTip("Die programmierten Kanalwerte dieses Steps bearbeiten")
+            vbtn.clicked.connect(lambda _=False, r=i: self._edit_values(r))
+            self._tbl.setCellWidget(i, 7, vbtn)
         self._building = False
 
     def _make_curve_cell(self, row: int, attr: str) -> CurveThumbnail:
@@ -268,28 +364,35 @@ class SequenceEditor(QWidget):
         st = self._seq.steps[row]
         try:
             if col == 1:
-                parsed = self._parse_values(item.text())
-                if parsed is None:
-                    QMessageBox.warning(
-                        self, "Ungueltiges Format",
-                        "Erwartet: 'FID:attr=wert, attr=wert; FID:attr=wert'\n"
-                        "z.B. '3:dimmer=255, red=200'")
-                    # Zurueck auf alten Wert
-                    self._building = True
-                    item.setText(self._format_values(st.values))
-                    self._building = False
-                else:
-                    st.values = parsed
+                st.note = item.text()       # Spalte 1 ist jetzt der Step-NAME
             elif col == 2:
                 st.fade_in = max(0.0, float(item.text()))
             elif col == 4:
                 st.hold = max(0.0, float(item.text()))
             elif col == 5:
                 st.fade_out = max(0.0, float(item.text()))
-            elif col == 7:
-                st.note = item.text()
         except ValueError:
             pass
+
+    def _edit_values(self, row: int):
+        """Werte-Editor fuer EINEN Step (statt Inline-Dump in der Step-Liste)."""
+        if not (0 <= row < len(self._seq.steps)):
+            return
+        st = self._seq.steps[row]
+        text, ok = QInputDialog.getMultiLineText(
+            self, f"Werte – {st.note or f'Schritt {row + 1}'}",
+            "Format: FID:attr=wert[, attr=wert]; FID:attr=wert …\n"
+            "z.B. '3:dimmer=255, red=200; 5:dimmer=128'",
+            self._format_values(st.values))
+        if not ok:
+            return
+        parsed = self._parse_values(text)
+        if parsed is None:
+            QMessageBox.warning(self, "Ungültiges Format",
+                                "Erwartet: 'FID:attr=wert, attr=wert; FID:attr=wert'")
+            return
+        st.values = parsed
+        self._refresh_steps()
 
     # ── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -298,14 +401,14 @@ class SequenceEditor(QWidget):
         pfs = state.get_patched_fixtures()
         if not pfs:
             QMessageBox.information(self, "Keine Fixtures",
-                                    "Erst Geraete im Patch hinzufuegen.")
+                                    "Erst Geräte im Patch hinzufügen.")
             return
         options = [f"FID {f.fid}: {f.label}" for f in pfs
                    if f.fid not in self._seq.bound_fixtures]
         if not options:
             return
         sel, ok = QInputDialog.getItem(
-            self, "Fixture hinzufuegen", "Auswaehlen:", options, 0, False)
+            self, "Fixture hinzufügen", "Auswählen:", options, 0, False)
         if ok and sel:
             try:
                 fid = int(sel.split(":")[0].replace("FID", "").strip())
@@ -332,7 +435,7 @@ class SequenceEditor(QWidget):
         state = get_state()
         if not self._seq.bound_fixtures:
             QMessageBox.information(self, "Keine Fixtures",
-                                    "Erst Fixtures verknuepfen.")
+                                    "Erst Fixtures verknüpfen.")
             return
         self._seq.add_step_from_programmer(state.programmer,
                                            fade_in=0.5, hold=1.0, fade_out=0.0)

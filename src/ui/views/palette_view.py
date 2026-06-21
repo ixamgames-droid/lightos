@@ -2,7 +2,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
                                 QScrollArea, QGridLayout, QPushButton, QLabel,
-                                QInputDialog, QMessageBox, QSizePolicy)
+                                QLineEdit, QInputDialog, QMessageBox, QSizePolicy)
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPainter, QFont
 from src.core.engine.palette import PaletteManager, Palette, PaletteType, get_palette_manager
@@ -76,6 +76,16 @@ class PalettePage(QWidget):
         btn_new.clicked.connect(self._record_new)
         tbar.addWidget(btn_new)
         tbar.addStretch()
+        # F-1: Such-/Filterfeld (filtert nach Paletten-Name und Ordner).
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Suchen…")
+        self._search.setClearButtonEnabled(True)
+        self._search.setFixedWidth(160)
+        self._search.setStyleSheet(
+            "QLineEdit { background:#0d1117; color:#e6edf3; border:1px solid #30363d;"
+            " border-radius:3px; font-size:10px; padding:2px 6px; }")
+        self._search.textChanged.connect(self._refresh)
+        tbar.addWidget(self._search)
         layout.addLayout(tbar)
 
         scroll = QScrollArea()
@@ -91,7 +101,7 @@ class PalettePage(QWidget):
 
         self._refresh()
 
-    def _refresh(self):
+    def _refresh(self, _=None):
         # Clear grid
         for i in reversed(range(self._grid.count())):
             item = self._grid.itemAt(i)
@@ -101,6 +111,12 @@ class PalettePage(QWidget):
         palettes = list(self.manager.get_by_type(self.ptype))
         palettes.sort(key=lambda p: ((getattr(p, "folder", "") or "").lower(),
                                      (p.name or "").lower()))
+        # F-1: Filter nach Suchtext (Name oder Ordner).
+        q = self._search.text().strip().lower() if hasattr(self, "_search") else ""
+        if q:
+            palettes = [p for p in palettes
+                        if q in (p.name or "").lower()
+                        or q in (getattr(p, "folder", "") or "").lower()]
         col_count = 6
         row = 0
         col = 0

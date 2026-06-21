@@ -24,6 +24,12 @@ def _register():
     from .vc_color_list import VCColorList
     from .vc_chase_builder import VCChaseBuilder
     from .vc_song_info import VCSongInfo
+    from .vc_bpm_display import VCBpmDisplay
+    from .vc_bus_selector import VCBusSelector
+    from .vc_effect_colors import VCEffectColors
+    from .vc_stepper import VCStepper
+    from .vc_effect_editor import VCEffectEditor
+    from .vc_effect_display import VCEffectDisplay
     WIDGET_REGISTRY.update({
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
@@ -32,11 +38,17 @@ def _register():
         "VCCueList":  VCCueList,
         "VCSpeedDial":VCSpeedDial,
         "VCEncoder":  VCEncoder,
+        "VCStepper":  VCStepper,
         "VCColor":    VCColor,
         "VCColorList":VCColorList,
         "VCChaseBuilder": VCChaseBuilder,
         "VCSongInfo": VCSongInfo,
+        "VCBpmDisplay": VCBpmDisplay,
+        "VCBusSelector": VCBusSelector,
+        "VCEffectColors": VCEffectColors,
         "VCFrame":    VCFrame,
+        "VCEffectEditor": VCEffectEditor,
+        "VCEffectDisplay": VCEffectDisplay,
     })
 
 _register()
@@ -64,6 +76,11 @@ class VCCanvas(QWidget):
         self._edit_mode = False
         self._snap_to_grid = False
         self._active_bank = 0
+        # Undo/Redo: Snapshot-Verlauf der VC-Layouts (Hinzufuegen/Loeschen/…).
+        self._undo_stack: list[dict] = []
+        self._redo_stack: list[dict] = []
+        self._restoring = False
+        self._UNDO_MAX = 50
         self.setMinimumSize(QSize(1200, 800))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -423,6 +440,9 @@ class VCCanvas(QWidget):
             self.cancel_snap_assign()
             return
 
+        # Klick ins Leere (kein Widget) -> Effekt-Gruppen-Hervorhebung aufheben.
+        if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
+            self.clear_effect_highlight()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -527,7 +547,7 @@ class VCCanvas(QWidget):
             except (ValueError, UnicodeDecodeError):
                 event.ignore()
                 return
-            self.apply_drop(function_id=fid, pos=pos, target=target)
+            self.apply_drop(function_id=fid, pos=pos, target=target, interactive=True)
 
         elif md.hasFormat(self._MIME_SNAPSHOT):
             try:
@@ -560,12 +580,15 @@ class VCCanvas(QWidget):
         from .vc_encoder import VCEncoder
         from .vc_xypad import VCXYPad
         from .vc_speedial import VCSpeedDial
-        return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial)
+        from .vc_stepper import VCStepper
+        from .vc_effect_display import VCEffectDisplay
+        return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial,
+                VCStepper, VCEffectDisplay)
 
     # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
 
     def apply_drop(self, *, function_id=None, snapshot_index=None, snap_id=None,
-                   pos=None, target=None):
+                   pos=None, target=None, interactive: bool = False):
         """Fuehrt den Drop aus: Funktion, Snapshot oder Bibliothek-Snap (Farbe/Look)
         auf ein Ziel-Widget oder das leere Canvas anwenden.
 
@@ -582,6 +605,20 @@ class VCCanvas(QWidget):
         from .vc_slider import VCSlider, SliderMode
 
         if function_id is not None:
+            # WS1: gefuehrter Smart-Drop auf leeres Canvas (statt fixem Toggle-Button).
+            # Nur im interaktiven Pfad (echter Drag&Drop); Direktaufrufe/Tests bleiben
+            # beim alten, stummen Verhalten (interactive=False).
+            if interactive and target is None:
+                # Drop aufs leere Canvas -> Checkbox-Karte (Mehrfachauswahl), je
+                # angekreuztem Aspekt ein vorverdrahtetes Widget in EINEM Undo.
+                from .vc_drop_panel import VCDropPanel
+                panel = VCDropPanel(function_id, parent=self)
+                results = panel.run()
+                if not results:
+                    return
+                self.build_from_smart_results(results, pos=pos,
+                                              box=getattr(panel, "box_mode", False))
+                return
             # Funktionsnamen fuer Caption ermitteln
             fn_name: str | None = None
             try:
@@ -592,19 +629,36 @@ class VCCanvas(QWidget):
                 pass
 
             if isinstance(target, VCSlider):
-                # Effekt-Parameter-Fader konfigurieren
-                target.mode = SliderMode.EFFECT_PARAM
-                target.function_id = function_id
-                try:
-                    from src.core.engine import effect_live
-                    default_key = effect_live.default_param_key(function_id)
-                    if default_key:
-                        target.param_key = default_key
-                except Exception:
-                    pass
-                if fn_name and getattr(target, "caption", None) in (None, "", "Fader"):
-                    target.caption = fn_name
-                target.update()
+                # Phase E: haelt der Fader schon einen Effekt, wird der neue
+                # ANGEHAENGT (gekoppelt) statt ersetzt; sonst frisch binden.
+                already_bound = (target.function_id is not None) or bool(target.function_ids)
+                if already_bound:
+                    # Doppelbelegungs-Schutz: statt stumm zu koppeln entscheidet der
+                    # Resolver. Phase 2/nicht-interaktiv -> Default 'couple' (Verhalten
+                    # unveraendert); Phase 3 reicht die Erklaer-Karten-Wahl ein.
+                    if not self._resolve_coupling_conflict(
+                            target, function_id, aspect=self._widget_aspect(target),
+                            interactive=interactive):
+                        return
+                    if target.mode not in (SliderMode.EFFECT_INTENSITY,
+                                           SliderMode.EFFECT_SPEED,
+                                           SliderMode.EFFECT_PARAM):
+                        target.mode = SliderMode.EFFECT_PARAM
+                    target.update()
+                else:
+                    # Effekt-Parameter-Fader konfigurieren
+                    target.mode = SliderMode.EFFECT_PARAM
+                    target.function_id = function_id
+                    try:
+                        from src.core.engine import effect_live
+                        default_key = effect_live.default_param_key(function_id)
+                        if default_key:
+                            target.param_key = default_key
+                    except Exception:
+                        pass
+                    if fn_name and getattr(target, "caption", None) in (None, "", "Fader"):
+                        target.caption = fn_name
+                    target.update()
 
             elif isinstance(target, VCButton):
                 # Vorhandenen Button auf Funktion umbiegen
@@ -614,7 +668,8 @@ class VCCanvas(QWidget):
                     target.caption = fn_name
                 target.update()
 
-            elif self._apply_function_to_special(target, function_id, fn_name):
+            elif self._apply_function_to_special(target, function_id, fn_name,
+                                                 interactive=interactive):
                 # Farbe / Encoder / XY-Pad / SpeedDial haben den Drop verarbeitet.
                 pass
 
@@ -656,11 +711,94 @@ class VCCanvas(QWidget):
                     w.setVisible(self.on_active_bank(w))
                     w.show()
 
-    def _apply_function_to_special(self, target, function_id, fn_name) -> bool:
+    def _build_from_smart_result(self, res, pos):
+        """WS1: erzeugt aus einem SmartDropResult ein vorverdrahtetes VC-Widget."""
+        from .vc_button import VCButton, ButtonAction
+        from .vc_slider import VCSlider, SliderMode
+        drop_pos = pos if pos is not None else QPoint(40, 40)
+
+        # Sammel-Option: alle Live-Regler des Effekts erzeugen (kein Einzel-Widget).
+        if res.widget_type == "BULK":
+            try:
+                from src.core.engine import effect_live
+                pkeys = [getattr(s, "key", "")
+                         for s in effect_live.list_params(res.function_id)
+                         if getattr(s, "kind", "") in ("int", "float")
+                         and getattr(s, "live_editable", True)
+                         and getattr(s, "mappable", True)]
+                akeys = [k for k, _l in effect_live.list_actions(res.function_id)]
+                self.add_live_controls(res.function_id, pkeys, akeys,
+                                       origin=None if pos is None else None)
+            except Exception as e:
+                print(f"[VCCanvas] smart-drop bulk error: {e}")
+            return
+
+        w = self._add_widget(res.widget_type, drop_pos)
+        if w is None:
+            return
+        fid = res.function_id
+        wt = res.widget_type
+        if wt == "VCButton":
+            w.action = res.action or ButtonAction.FUNCTION_TOGGLE
+            w.function_id = fid
+            if res.effect_action_key:
+                w.effect_action_key = res.effect_action_key
+        elif wt == "VCSlider":
+            w.mode = res.slider_mode or SliderMode.EFFECT_INTENSITY
+            w.function_id = fid
+            if res.param_key:
+                w.param_key = res.param_key
+        elif wt == "VCEncoder":
+            w.function_id = fid
+            if res.param_key:
+                w.param_key = res.param_key
+        elif wt == "VCStepper":
+            w.function_id = fid
+            if res.param_key:
+                w.param_key = res.param_key
+        elif wt == "VCSpeedDial":
+            from .vc_speedial import SpeedTarget
+            w.target_mode = getattr(res, "speed_target", None) or SpeedTarget.FUNCTION
+            w.function_id = fid
+        elif wt == "VCEffectColors":
+            w.function_id = fid
+        elif wt == "VCXYPad":
+            # Bewegungs-Aspekt (EFX): Feld-Modus steuert Zentrum/Groesse.
+            w.mode = "area"
+            w.efx_function_id = fid
+        # VCBusSelector: kein Funktions-Ziel.
+        # Phase E: optionale Multi-Effekt-Kopplung aus dem SmartDropResult
+        # uebernehmen (nur Widgets, die die Felder kennen).
+        _extra_ids = [int(i) for i in getattr(res, "function_ids", []) if str(i).lstrip("-").isdigit()]
+        if _extra_ids and hasattr(w, "function_ids"):
+            _existing = list(getattr(w, "function_ids", []) or [])
+            for _i in _extra_ids:
+                if _i != fid and _i not in _existing:
+                    _existing.append(_i)
+            w.function_ids = _existing
+        _pkpi = getattr(res, "param_keys_per_id", None)
+        if _pkpi and hasattr(w, "param_keys_per_id"):
+            _clean: dict[int, str] = {}
+            for _k, _v in _pkpi.items():
+                try:
+                    _clean[int(_k)] = str(_v)
+                except (TypeError, ValueError):
+                    pass
+            w.param_keys_per_id = _clean
+        if res.caption:
+            w.caption = res.caption
+        w.setVisible(self.on_active_bank(w))
+        w.show()
+        return w
+
+    def _apply_function_to_special(self, target, function_id, fn_name,
+                                   interactive: bool = False) -> bool:
         """Funktions-Drop auf Farbe / Encoder / XY-Pad / SpeedDial anwenden.
         Gibt True zurück, wenn der Drop von einem dieser Typen verarbeitet wurde."""
         from .vc_color import VCColor, ColorTarget
         from .vc_encoder import VCEncoder
+        from .vc_stepper import VCStepper
+        from .vc_effect_display import VCEffectDisplay
         from .vc_xypad import VCXYPad
         from .vc_speedial import VCSpeedDial, SpeedTarget
 
@@ -688,6 +826,29 @@ class VCCanvas(QWidget):
             target.update()
             return True
 
+        if isinstance(target, VCStepper):
+            # Schrittzaehler verstellt einen ganzzahligen Parameter dieses Effekts.
+            target.function_id = function_id
+            try:
+                from src.core.engine import effect_live
+                dk = effect_live.default_param_key(function_id)
+                if dk:
+                    target.param_key = dk
+            except Exception:
+                pass
+            if fn_name and getattr(target, "caption", None) in (None, "", "Anzahl"):
+                target.caption = fn_name
+            target.update()
+            return True
+
+        if isinstance(target, VCEffectDisplay):
+            # Live-Anzeige rendert genau diesen Effekt (keine Bedien-Aspekte).
+            target.function_id = function_id
+            if fn_name and getattr(target, "caption", None) in (None, "", "Effekt"):
+                target.caption = fn_name
+            target.update()
+            return True
+
         if isinstance(target, VCXYPad):
             # XY-Pad im Feld-Modus steuert Zentrum/Größe dieses EFX.
             target.mode = "area"
@@ -699,14 +860,380 @@ class VCCanvas(QWidget):
 
         if isinstance(target, VCSpeedDial):
             # Speed-Dial steuert das Tempo dieser Funktion/dieses Effekts.
-            target.target_mode = SpeedTarget.FUNCTION
-            target.function_id = function_id
-            if fn_name and getattr(target, "caption", None) in (None, "", "Speed"):
-                target.caption = fn_name
+            # Phase E: haelt der Dial schon einen Effekt, neuen ANHAENGEN statt
+            # ersetzen (so koppelt man mehrere Effekte an EINEN Tempo-Regler).
+            already_bound = (target.function_id is not None) or bool(target.function_ids)
+            if already_bound:
+                # Doppelbelegungs-Schutz wie beim Slider; Rueckgabewert wird jetzt
+                # beachtet (frueher ignoriert -> latenter Bug).
+                if not self._resolve_coupling_conflict(
+                        target, function_id, aspect="tempo", interactive=interactive):
+                    return True   # Drop verarbeitet (No-op/abgelehnt), kein neues Widget
+                if target.target_mode not in (SpeedTarget.FUNCTION,
+                                               SpeedTarget.TEMPO_BUS_MULT):
+                    target.target_mode = SpeedTarget.FUNCTION
+            else:
+                target.target_mode = SpeedTarget.FUNCTION
+                target.function_id = function_id
+                if fn_name and getattr(target, "caption", None) in (None, "", "Speed"):
+                    target.caption = fn_name
             target.update()
             return True
 
         return False
+
+    def _couple_effect(self, target, function_id) -> bool:
+        """Phase E: haengt einen weiteren Effekt an ein bereits gebundenes Multi-
+        Effekt-Widget (VCSlider/VCSpeedDial) an. Dedupliziert gegen die
+        Primaer-ID und die bestehende Liste. Gibt False zurueck, wenn der Effekt
+        schon gekoppelt ist (nichts zu tun)."""
+        try:
+            fid = int(function_id)
+        except (TypeError, ValueError):
+            return False
+        ids = list(getattr(target, "function_ids", []) or [])
+        primary = getattr(target, "function_id", None)
+        if fid == primary or fid in ids:
+            return False
+        ids.append(fid)
+        target.function_ids = ids
+        return True
+
+    # ── Doppelbelegungs-Schutz + Widget-Typ-Tausch (Phase 2) ──────────────────
+
+    def _widget_aspect(self, w):
+        """Welchen EFFEKT-Aspekt steuert ``w``? -> Vokabular wie ControlKind
+        ('tempo'/'intensity'/'colors'/'movement'/'param'/'tempo_bus'/'toggle'/
+        'action'); None = keine (relevante) Effekt-Bindung. Basis fuer
+        Konflikt-Erkennung + bindungserhaltenden Typ-Tausch."""
+        from .vc_slider import VCSlider, SliderMode
+        from .vc_speedial import VCSpeedDial, SpeedTarget
+        from .vc_encoder import VCEncoder
+        from .vc_stepper import VCStepper
+        from .vc_effect_colors import VCEffectColors
+        from .vc_color import VCColor, ColorTarget
+        from .vc_xypad import VCXYPad
+        from .vc_bus_selector import VCBusSelector
+        from .vc_button import VCButton, ButtonAction
+        if isinstance(w, VCSlider):
+            return {SliderMode.EFFECT_SPEED: "tempo",
+                    SliderMode.EFFECT_INTENSITY: "intensity",
+                    SliderMode.EFFECT_PARAM: "param",
+                    SliderMode.TEMPO_BUS: "tempo_bus"}.get(getattr(w, "mode", None))
+        if isinstance(w, VCSpeedDial):
+            if getattr(w, "target_mode", None) == SpeedTarget.TEMPO_BUS_MULT:
+                return "tempo_bus"
+            return "tempo"
+        if isinstance(w, VCEncoder):
+            return "param"
+        if isinstance(w, VCStepper):
+            return "param"
+        if isinstance(w, VCEffectColors):
+            return "colors"
+        if isinstance(w, VCColor):
+            return "colors" if getattr(w, "target", None) == ColorTarget.EFFECT else None
+        if isinstance(w, VCXYPad):
+            return "movement" if getattr(w, "mode", None) == "area" else None
+        if isinstance(w, VCBusSelector):
+            return "tempo_bus"
+        if isinstance(w, VCButton):
+            a = getattr(w, "action", None)
+            if a in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+                return "toggle"
+            if a == ButtonAction.EFFECT_ACTION:
+                return "action"
+        return None
+
+    def _effect_ids_of(self, w) -> set:
+        """Alle Effekt-/Funktions-IDs, die ``w`` bindet (function_id +
+        function_ids + efx_function_id)."""
+        ids = set()
+        # effect_id: die VCEffectEditor-Box bindet ihren Effekt hierueber (nicht
+        # ueber function_id) -> aufnehmen, damit die Box als Einheit mit-leuchtet.
+        for attr in ("function_id", "efx_function_id", "effect_id"):
+            v = getattr(w, attr, None)
+            if isinstance(v, int):
+                ids.add(v)
+        for v in (getattr(w, "function_ids", None) or []):
+            if isinstance(v, int):
+                ids.add(v)
+        return ids
+
+    def effect_binding_owners(self, function_id, aspect=None, exclude=None) -> list:
+        """Captions aller Widgets, die ``function_id`` bereits steuern — optional
+        nur fuer einen bestimmten ``aspect`` (siehe _widget_aspect). Vorbild:
+        key_binding_owners. Basis fuer den Doppelbelegungs-Schutz (Phase-3-Karte:
+        „Tempo -> liegt schon auf Fader 3")."""
+        owners: list = []
+        try:
+            fid = int(function_id)
+        except (TypeError, ValueError):
+            return owners
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return owners
+        for w in widgets:
+            if w is exclude:
+                continue
+            if fid not in self._effect_ids_of(w):
+                continue
+            if aspect is not None and self._widget_aspect(w) != aspect:
+                continue
+            owners.append(getattr(w, "caption", "") or w.__class__.__name__)
+        return owners
+
+    def highlight_effects(self, fids, exclude=None):
+        """Hebt alle Widgets hervor (oranger Glow), die einen der Effekte aus
+        ``fids`` steuern — macht die Gruppe „was beeinflusst diesen Effekt"
+        sichtbar (Antippen eines Widgets ODER Auswahl eines Effekts in der
+        Bibliothek). Leeres/None ``fids`` -> Hervorhebung komplett aufheben.
+        Nur im Bearbeiten-Modus aktiv — im Betrieb stoert der Glow live laufende
+        Widgets nicht."""
+        want: set = set()
+        if self._edit_mode:
+            for f in (fids or []):
+                try:
+                    want.add(int(f))
+                except (TypeError, ValueError):
+                    pass
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return
+        for w in widgets:
+            on = False if w is exclude else (bool(want) and bool(self._effect_ids_of(w) & want))
+            try:
+                w.set_effect_highlight(on)
+            except Exception:
+                pass
+
+    def clear_effect_highlight(self):
+        """Hebt jede Effekt-Gruppen-Hervorhebung auf."""
+        self.highlight_effects(None)
+
+    def _rebind_widget_to(self, target, function_id):
+        """Konflikt-Aufloesung 'Ersetzen': biegt ein Multi-Effekt-Widget komplett
+        auf EINEN Effekt um (leert function_ids + param_keys_per_id)."""
+        try:
+            fid = int(function_id)
+        except (TypeError, ValueError):
+            return
+        if hasattr(target, "function_ids"):
+            target.function_ids = []
+        if hasattr(target, "param_keys_per_id"):
+            target.param_keys_per_id = {}
+        target.function_id = fid
+        target.update()
+
+    def _resolve_coupling_conflict(self, target, function_id, aspect=None, *,
+                                   interactive: bool = False,
+                                   resolution: "str | None" = None) -> bool:
+        """Entscheidet, was beim Drop eines Effekts auf einen BEREITS gebundenen
+        Slider/SpeedDial passiert — statt stumm zu koppeln:
+          'couple'  -> bestehendes _couple_effect (heutiges Verhalten)
+          'replace' -> Ziel auf den neuen Effekt umbiegen
+          'new'     -> Ziel unangetastet (Aufrufer legt ein neues Widget an)
+          'cancel'  -> nichts tun
+        Nicht-interaktiv/programmatisch (Tests): ohne ``resolution`` -> Default
+        'couple' (Verhalten unveraendert). Interaktiv: ohne ``resolution`` wird die
+        Erklaer-Karte (VCConflictCard) gezeigt; „Neues Widget" legt einen
+        gleichartigen Regler DANEBEN an (kein stummes Koppeln mehr). Rueckgabe:
+        True, wenn am ZIEL etwas gebunden/geaendert wurde (sonst No-op)."""
+        if resolution is None:
+            if interactive:
+                resolution = self._ask_coupling_resolution(target, function_id)
+                if resolution == "new":
+                    self._spawn_sibling_control(target, function_id)
+                    return False        # Ziel unangetastet, neues Widget daneben
+                if resolution is None:
+                    return False        # Abbruch
+            else:
+                resolution = "couple"
+        if resolution in ("cancel", "new"):
+            return False                # explizites 'new' (Tests): reiner No-op
+        if resolution == "replace":
+            self._rebind_widget_to(target, function_id)
+            return True
+        return self._couple_effect(target, function_id)
+
+    def _ask_coupling_resolution(self, target, function_id):
+        """Zeigt die Erklaer-Karte und liefert 'replace'/'couple'/'new'/None
+        (None = Abbruch). Bei UI-Fehlern defensiv 'couple' (nicht blockieren)."""
+        try:
+            from .vc_conflict_card import VCConflictCard
+            from .vc_effect_meta import effect_name
+            owners = [getattr(target, "caption", "") or target.__class__.__name__]
+            return VCConflictCard(effect_name(function_id), owners, parent=self).run()
+        except Exception:
+            return "couple"
+
+    def _spawn_sibling_control(self, target, function_id, aspect=None):
+        """Konflikt-Aufloesung 'Neues Widget': legt einen GLEICHARTIGEN Regler
+        (selber Typ + Aspekt) fuer den neuen Effekt direkt unter dem Ziel an.
+        Ein Undo-Schritt."""
+        new_type = target.__class__.__name__
+        if WIDGET_REGISTRY.get(new_type) is None:
+            return None
+        if aspect is None:
+            aspect = self._widget_aspect(target)
+        pos = QPoint(target.x(), target.y() + target.height() + self.GRID)
+        self.push_undo_snapshot(self.to_dict())
+        _prev = self._restoring
+        self._restoring = True
+        try:
+            w = self._add_widget(new_type, pos)
+            if w is None:
+                return None
+            try:
+                w.function_id = int(function_id)
+            except (TypeError, ValueError):
+                pass
+            if hasattr(w, "param_key") and not getattr(w, "param_key", ""):
+                try:
+                    from src.core.engine import effect_live
+                    dk = effect_live.default_param_key(function_id)
+                    if dk:
+                        w.param_key = dk
+                except Exception:
+                    pass
+            self._prime_widget_for_aspect(w, aspect)
+            if not getattr(w, "caption", ""):
+                try:
+                    from .vc_effect_meta import effect_name
+                    w.caption = effect_name(function_id)
+                except Exception:
+                    pass
+            w.setVisible(self.on_active_bank(w))
+            w.show()
+            w.update()
+        finally:
+            self._restoring = _prev
+        return w
+
+    def _prime_widget_for_aspect(self, w, aspect):
+        """Belegt Modus/Ziel eines (frisch getauschten) Widgets so, dass die
+        erhaltene Effekt-Bindung fuer ``aspect`` wirkt."""
+        from .vc_slider import VCSlider, SliderMode
+        from .vc_speedial import VCSpeedDial, SpeedTarget
+        from .vc_xypad import VCXYPad
+        from .vc_button import VCButton, ButtonAction
+        if isinstance(w, VCSlider):
+            w.mode = {"tempo": SliderMode.EFFECT_SPEED,
+                      "intensity": SliderMode.EFFECT_INTENSITY,
+                      "param": SliderMode.EFFECT_PARAM,
+                      "tempo_bus": SliderMode.TEMPO_BUS}.get(aspect, SliderMode.EFFECT_PARAM)
+        elif isinstance(w, VCSpeedDial):
+            w.target_mode = SpeedTarget.FUNCTION
+        elif isinstance(w, VCXYPad):
+            w.mode = "area"
+        elif isinstance(w, VCButton):
+            w.action = (ButtonAction.EFFECT_ACTION if aspect == "action"
+                        else ButtonAction.FUNCTION_TOGGLE)
+
+    def replace_widget_type(self, widget, new_type, aspect=None):
+        """Tauscht den Widget-TYP eines Bedienelements und ERHAELT die Effekt-
+        Bindung (function_id(s), param_key(s), efx_function_id, Caption, Position,
+        Bank). Fuer die grafische Widget-Galerie / „↔ Widget aendern". Ein
+        Undo-Schritt. Gibt das neue Widget zurueck (oder None)."""
+        if widget is None or WIDGET_REGISTRY.get(new_type) is None:
+            return None
+        if widget.__class__.__name__ == new_type:
+            return widget
+        if aspect is None:
+            aspect = self._widget_aspect(widget)
+        pos = widget.pos()
+        carry = {}
+        for attr in ("function_id", "function_ids", "param_keys_per_id",
+                     "param_key", "efx_function_id", "caption", "bank"):
+            if hasattr(widget, attr):
+                carry[attr] = getattr(widget, attr)
+        self.push_undo_snapshot(self.to_dict())
+        _prev = self._restoring
+        self._restoring = True
+        try:
+            new = self._add_widget(new_type, pos)
+            if new is None:
+                return None
+            for attr, val in carry.items():
+                if hasattr(new, attr):
+                    try:
+                        setattr(new, attr, val)
+                    except Exception:
+                        pass
+            self._prime_widget_for_aspect(new, aspect)
+            new.setVisible(self.on_active_bank(new))
+            new.show()
+            new.update()
+            self._remove_widget(widget)
+        finally:
+            self._restoring = _prev
+        return new
+
+    def build_from_smart_results(self, results, pos=None, origin=None, box=False) -> list:
+        """Phase 2: baut aus MEHREREN SmartDropResults je ein vorverdrahtetes
+        Widget (ueber _build_from_smart_result) und legt sie in einer Reihe ab —
+        alles als EIN Undo-Schritt (Muster add_live_controls). ``origin`` =
+        Anker-Widget (Reihe darunter), sonst ``pos``. Gibt die erzeugten Widgets
+        zurueck (BULK-Results erzeugen eigene Regler und liefern kein Einzel-W)."""
+        results = [r for r in (results or []) if r is not None]
+        if not results:
+            return []
+        if origin is not None:
+            x0 = origin.x()
+            y0 = origin.y() + origin.height() + self.GRID
+        elif pos is not None:
+            x0, y0 = pos.x(), pos.y()
+        else:
+            x0, y0 = 40, 40
+        created: list = []
+        self.push_undo_snapshot(self.to_dict())
+        _prev = self._restoring
+        self._restoring = True
+        try:
+            if box:
+                created = self._build_box(results, x0, y0)
+            else:
+                x = x0
+                for res in results:
+                    w = self._build_from_smart_result(res, QPoint(x, y0))
+                    if w is None:
+                        continue
+                    created.append(w)
+                    x += w.width() + self.GRID
+        finally:
+            self._restoring = _prev
+        return created
+
+    def _build_box(self, results, x0, y0) -> list:
+        """Welle 4 (L/N): erzeugt eine VCEffectEditor-Box, baut ALLE gewaehlten
+        Widgets DARIN (auto-gelabelt via aspect_caption) und bettet eine Live-
+        Vorschau ein. Snap-out + Teil-Entfernen erbt die Box von VCFrame.
+        BULK (None) bleibt bewusst lose ausserhalb der Box."""
+        frame = self._add_widget("VCEffectEditor", QPoint(x0, y0))
+        if frame is None:
+            return []
+        prim = next((r.function_id for r in results
+                     if getattr(r, "function_id", None) is not None), None)
+        if prim is not None:
+            frame.set_effect(int(prim))
+        children: list = []
+        for res in results:
+            w = self._build_from_smart_result(res, QPoint(0, 0))
+            if w is not None:               # BULK liefert None -> bleibt lose
+                children.append(w)
+        pad = self.GRID
+        band = (frame._tab_height if frame._show_header else 0) + 2 + frame._preview_h
+        total_w = sum(c.width() + pad for c in children) + pad
+        max_h = max((c.height() for c in children), default=40)
+        frame.resize(max(240, total_w), band + max_h + 2 * pad)
+        cx, cy = pad, band + pad
+        for w in children:
+            frame.add_effect_child(w, frame._current_page)
+            w.move(cx, cy)
+            cx += w.width() + pad
+        frame.setVisible(self.on_active_bank(frame))
+        return [frame] + children
 
     def _assign_snap_to_button(self, btn, snap_id):
         """Macht einen VCButton zur Bibliothek-Farb-/Snap-Taste (Standard: Umschalten).
@@ -758,6 +1285,8 @@ class VCCanvas(QWidget):
         cls = WIDGET_REGISTRY.get(wtype)
         if cls is None:
             return
+        if d is None and not self._restoring:
+            self._push_undo()      # Benutzer legt ein NEUES Widget an -> Undo-Punkt
         w = cls(parent=self)
         w.set_edit_mode(self._edit_mode)
         w.set_snap_grid(self.GRID if self._snap_to_grid else 0)
@@ -801,35 +1330,44 @@ class VCCanvas(QWidget):
         gap = self.GRID
         created = []
 
-        x = x0
-        for key in (param_keys or []):
-            w = self._add_widget("VCSlider", QPoint(x, y0))
-            if w is None:
-                continue
-            w.mode = SliderMode.EFFECT_PARAM
-            w.function_id = function_id
-            w.param_key = key
-            w.caption = labels.get(key, key)
-            w.update()
-            w.show()
-            created.append(w)
-            x += w.width() + gap
-
-        if action_keys:
+        # Das ganze Kit soll EIN Undo-Schritt sein: einmal den Vorher-Stand sichern,
+        # dann die Pro-Widget-Undo-Punkte waehrend des Aufbaus unterdruecken
+        # (_restoring deaktiviert die _push_undo-Hooks in _add_widget).
+        self.push_undo_snapshot(self.to_dict())
+        _prev_restoring = self._restoring
+        self._restoring = True
+        try:
             x = x0
-            yb = y0 + 200 + gap     # Reihe unter den Fadern
-            for akey in action_keys:
-                w = self._add_widget("VCButton", QPoint(x, yb))
+            for key in (param_keys or []):
+                w = self._add_widget("VCSlider", QPoint(x, y0))
                 if w is None:
                     continue
-                w.action = ButtonAction.EFFECT_ACTION
+                w.mode = SliderMode.EFFECT_PARAM
                 w.function_id = function_id
-                w.effect_action_key = akey
-                w.caption = ACTION_LABELS.get(akey, akey)
+                w.param_key = key
+                w.caption = labels.get(key, key)
                 w.update()
                 w.show()
                 created.append(w)
                 x += w.width() + gap
+
+            if action_keys:
+                x = x0
+                yb = y0 + 200 + gap     # Reihe unter den Fadern
+                for akey in action_keys:
+                    w = self._add_widget("VCButton", QPoint(x, yb))
+                    if w is None:
+                        continue
+                    w.action = ButtonAction.EFFECT_ACTION
+                    w.function_id = function_id
+                    w.effect_action_key = akey
+                    w.caption = ACTION_LABELS.get(akey, akey)
+                    w.update()
+                    w.show()
+                    created.append(w)
+                    x += w.width() + gap
+        finally:
+            self._restoring = _prev_restoring
         return created
 
     def handle_drag_drop(self, widget):
@@ -874,6 +1412,8 @@ class VCCanvas(QWidget):
             widget.show()
 
     def _remove_widget(self, widget: VCWidget):
+        if not self._restoring:
+            self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
@@ -883,6 +1423,51 @@ class VCCanvas(QWidget):
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
             child.setParent(None)
             child.deleteLater()
+
+    # ── Undo/Redo ───────────────────────────────────────────────────────────────
+    def _push_undo(self):
+        """Aktuellen VC-Stand vor einer Aenderung auf den Undo-Stapel legen."""
+        self.push_undo_snapshot(self.to_dict())
+
+    def push_undo_snapshot(self, snapshot: dict):
+        """Einen (ggf. vor der Aenderung erfassten) Stand auf den Undo-Stapel legen.
+        Fuer Move/Resize/Eigenschafts-Edits, die den Vorher-Stand selbst erfassen.
+        No-op waehrend Restore/Laden; dedupliziert identische Folge-Stände; cappt + leert Redo."""
+        if self._restoring or not isinstance(snapshot, dict):
+            return
+        if self._undo_stack and self._undo_stack[-1] == snapshot:
+            return
+        self._undo_stack.append(snapshot)
+        if len(self._undo_stack) > self._UNDO_MAX:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+
+    def can_undo(self) -> bool:
+        return bool(self._undo_stack)
+
+    def can_redo(self) -> bool:
+        return bool(self._redo_stack)
+
+    def undo(self):
+        """Letzte Aenderung rueckgaengig (Strg+Z)."""
+        if not self._undo_stack:
+            return
+        self._redo_stack.append(self.to_dict())
+        self._restore(self._undo_stack.pop())
+
+    def redo(self):
+        """Rueckgaengig gemachte Aenderung wiederholen (Strg+Y / Strg+Umschalt+Z)."""
+        if not self._redo_stack:
+            return
+        self._undo_stack.append(self.to_dict())
+        self._restore(self._redo_stack.pop())
+
+    def _restore(self, layout: dict):
+        self._restoring = True
+        try:
+            self.from_dict(layout)
+        finally:
+            self._restoring = False
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -894,10 +1479,20 @@ class VCCanvas(QWidget):
         return {"widgets": widgets}
 
     def from_dict(self, d: dict):
+        if not self._restoring:
+            # Echtes Laden einer Show -> Undo-Verlauf zuruecksetzen (nicht beim Restore).
+            self._undo_stack.clear()
+            self._redo_stack.clear()
         self._clear()
         for wd in d.get("widgets", []):
             wtype = wd.get("type", "")
-            self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
+            # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
+            # unbekannte Aktion/Feld aus einer anderen Version) darf NICHT das Laden der
+            # restlichen VC abbrechen (sonst verschwindet fast die ganze Konsole).
+            try:
+                self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
+            except Exception as e:
+                print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
         if getattr(self, "_pe", None) is not None:
