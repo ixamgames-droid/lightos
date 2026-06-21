@@ -140,6 +140,76 @@ class RgbMatrixView(QWidget):
         return [f for f in self._fm.all()
                 if f.function_type == FunctionType.RGBMatrix]
 
+    def _group_context(self):
+        """(Name der aktiven Gruppe, set ALLER Gruppen-Namen) fuer die Listen-
+        Filterung im Programmer-Folgemodus.
+
+        Die Bindung der Matrizen erfolgt per Gruppen-NAME (stabil ueber Show-
+        Save/Load — DB-ids aendern sich beim Neuladen). Liefert (None, set()),
+        wenn keine Gruppe aktiv ist oder kein Show-Engine vorhanden ist."""
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            gid = state.get_selected_group_id()
+            eng = getattr(state, "_show_engine", None)
+            if eng is None:
+                return None, set()
+            from sqlalchemy import select
+            from sqlalchemy.orm import Session
+            from src.core.database.models import FixtureGroup
+            with Session(eng) as s:
+                names = {g.name for g in s.execute(select(FixtureGroup)).scalars().all()}
+                cur = None
+                if gid is not None:
+                    g = s.get(FixtureGroup, gid)
+                    cur = g.name if g is not None else None
+            return cur, names
+        except Exception:
+            return None, set()
+
+    def _visible_instances(self) -> list[RgbMatrixInstance]:
+        """Die im aktuellen Kontext anzuzeigenden Matrizen.
+
+        - Bibliothek (kein Folgemodus): ALLE Matrizen.
+        - Programmer (Folgemodus) mit aktiver Gruppe: nur Matrizen DIESER Gruppe
+          plus ungebundene (source_group=None) und „verwaiste" (Gruppe existiert
+          nicht mehr, z. B. nach Umbenennen) — die erscheinen ueberall, damit nie
+          ein Effekt unsichtbar „verloren" geht.
+        - Folgemodus ohne aktive Gruppe (lose Auswahl): ALLE Matrizen (Alt-Verhalten)."""
+        insts = self._instances
+        if not self._follow_selection:
+            return insts
+        gname, known = self._group_context()
+        if gname is None:
+            return insts
+        out = []
+        for m in insts:
+            sg = getattr(m, "source_group", None) or None
+            if sg is None or sg not in known:   # ungebunden ODER verwaist -> ueberall
+                out.append(m)
+            elif sg == gname:                   # genau dieser Gruppe zugeordnet
+                out.append(m)
+        return out
+
+    def _update_group_header(self):
+        """Aktualisiert die Kopfzeile ueber der Liste: zeigt im Programmer, fuer
+        welche Gruppe die aufgelisteten Matrizen gelten (Nutzer-Wunsch: sehen,
+        welche Matrix-Programme auf welcher Gruppe liegen)."""
+        if not getattr(self, "_group_header", None):
+            return
+        if not self._follow_selection:
+            self._group_header.setVisible(False)
+            return
+        gname, _ = self._group_context()
+        if gname:
+            txt = f"Matrizen der Gruppe „{gname}“"
+            if not self._visible_instances():
+                txt += " — noch keine. „+ Neu“ erstellt eine."
+        else:
+            txt = "Alle Matrizen (keine Gruppe gewählt)"
+        self._group_header.setText(txt)
+        self._group_header.setVisible(True)
+
     def _connect_sync(self):
         try:
             from src.core.sync import get_sync, SyncEvent
@@ -164,21 +234,36 @@ class RgbMatrixView(QWidget):
                 pass
 
     def _rebuild_from_state(self):
-        """Liste aus self._instances neu aufbauen (nach Show-Load / Tab-Wechsel)."""
+        """Liste aus den sichtbaren Matrizen neu aufbauen (nach Show-Load /
+        Tab-Wechsel / Gruppenwechsel). Im Programmer-Folgemodus ist die Liste auf
+        die aktive Gruppe gefiltert (siehe _visible_instances). Die Selektion wird
+        ueber die Matrix-id (nicht den Zeilenindex) erhalten, weil sich die Indizes
+        beim Gruppenwechsel verschieben."""
         try:
-            prev = self._list.currentRow()
+            vis = self._visible_instances()
+            prev_id = self._saved.id if self._saved is not None else None
             self._list.blockSignals(True)
             self._list.clear()
-            for m in self._instances:
-                self._list.addItem(m.name)
+            for m in vis:
+                label = m.name
+                # In der Bibliothek (kein Folgemodus) die Gruppen-Bindung mit
+                # anzeigen, damit man auf einen Blick sieht, welche Matrix zu
+                # welcher Gruppe gehoert. Im Programmer ist die Liste ohnehin
+                # schon pro Gruppe gefiltert -> dort kein Suffix.
+                sg = getattr(m, "source_group", None) or None
+                if not self._follow_selection and sg:
+                    label = f"{m.name}   · {sg}"
+                self._list.addItem(label)
             self._list.blockSignals(False)
-            n = len(self._instances)
-            if n == 0:
+            if not vis:
                 self._saved = None
                 self._current = None
                 self._preview.set_matrix(None)
+                self._update_group_header()
                 return
-            self._list.setCurrentRow(prev if 0 <= prev < n else 0)
+            target = next((i for i, m in enumerate(vis) if m.id == prev_id), -1)
+            self._list.setCurrentRow(target if target >= 0 else 0)
+            self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
@@ -211,6 +296,14 @@ class RgbMatrixView(QWidget):
         left = QWidget()
         ll = QVBoxLayout(left)
         ll.setContentsMargins(0, 0, 0, 0)
+
+        # Kopfzeile: zeigt im Programmer, fuer welche Gruppe die Liste gilt.
+        self._group_header = QLabel("")
+        self._group_header.setWordWrap(True)
+        self._group_header.setStyleSheet(
+            "color:#8b949e; font-size:10px; font-weight:bold; padding:2px 2px 4px 2px;")
+        self._group_header.setVisible(False)
+        ll.addWidget(self._group_header)
 
         self._list = QListWidget()
         self._list.setStyleSheet("""
@@ -555,30 +648,43 @@ class RgbMatrixView(QWidget):
 
     def _add(self):
         m = self._fm.new_rgb_matrix(name=f"Matrix {len(self._instances)+1}")
+        # Programmer-Folgemodus: die neue Matrix sofort an die aktuell gewaehlte
+        # Gruppe binden, damit sie nur unter DIESER Gruppe gelistet wird (Nutzer-
+        # Wunsch: pro Gruppe sehen, welche Matrix-Effekte es gibt). Ohne aktive
+        # Gruppe bleibt sie ungebunden (erscheint ueberall).
+        if self._follow_selection:
+            gname, _ = self._group_context()
+            if gname:
+                m.source_group = gname
         # new_rgb_matrix() -> FunctionManager.add() emittiert FUNCTION_CHANGED;
-        # die Liste ist via _rebuild_from_state bereits aktuell. Nur noch die neue
-        # Matrix selektieren (kein manuelles addItem -> sonst Doppel-Eintrag).
-        for i, inst in enumerate(self._instances):
+        # Liste (gefiltert) neu aufbauen und die neue Matrix selektieren.
+        self._rebuild_from_state()
+        for i, inst in enumerate(self._visible_instances()):
             if inst.id == m.id:
                 self._list.setCurrentRow(i)
                 break
+        # Folgemodus: die neue Matrix sofort mit dem Gruppen-Grid versorgen, damit
+        # nie die leere 8x4-Standardmatrix als „Phantom" sichtbar bleibt.
+        if self._follow_selection and self._current is not None:
+            self._assign_from_selection()
 
     def _delete(self):
         row = self._list.currentRow()
-        insts = self._instances
-        if row < 0 or row >= len(insts):
+        vis = self._visible_instances()
+        if row < 0 or row >= len(vis):
             return
         # remove() emittiert FUNCTION_CHANGED -> _rebuild_from_state aktualisiert die
         # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
-        self._fm.remove(insts[row].id)
+        self._fm.remove(vis[row].id)
 
     def _select(self, row: int):
-        if row < 0 or row >= len(self._instances):
+        vis = self._visible_instances()
+        if row < 0 or row >= len(vis):
             self._saved = None
             self._current = None
             self._preview.set_matrix(None)
             return
-        self._saved = self._instances[row]
+        self._saved = vis[row]
         self._make_draft()
         self._preview.set_matrix(self._current)
         self._load_ui(self._current)
@@ -992,6 +1098,15 @@ class RgbMatrixView(QWidget):
         if self._saved is None or self._current is None:
             return
         self._saved.apply_dict(self._current.to_dict())
+        # Im Programmer-Folgemodus beim Speichern an die aktuell gewaehlte Gruppe
+        # binden. So „organisiert" man auch bestehende (ungebundene) Matrizen: unter
+        # einer Gruppe oeffnen + speichern -> die Matrix erscheint danach nur noch
+        # unter dieser Gruppe. Bindung per Name (stabil ueber Show-Save/Load).
+        if self._follow_selection:
+            gname, _ = self._group_context()
+            if gname:
+                self._saved.source_group = gname
+                self._current.source_group = gname  # Draft synchron (kein dirty)
         self._update_dirty()
         self._notify_change()
 
@@ -1026,8 +1141,12 @@ class RgbMatrixView(QWidget):
         self._btn_auto_assign.setVisible(False)
         self._grid_box.setTitle("Geräte (folgen der Programmer-Auswahl)")
         self._grid_label.setText("Folgt automatisch der links gewählten Gruppe.")
-        if not self._instances:
-            self._add()  # eine Standard-Matrix, damit sofort programmierbar
+        # KEIN Auto-Anlegen mehr: frueher wurde hier eine 8x4-Standardmatrix erzeugt.
+        # Solange noch keine Gruppe/Geraete gewaehlt waren (oder die Grid-Uebernahme
+        # nicht griff), blieb diese leere Standardmatrix als „Phantom" sichtbar.
+        # Stattdessen bleibt die Liste leer (mit Hinweis im Kopf), bis der Nutzer mit
+        # „+ Neu" eine Matrix fuer die aktive Gruppe anlegt — diese bekommt dann
+        # sofort das Gruppen-Grid (kein Phantom mehr).
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().subscribe(
@@ -1039,13 +1158,24 @@ class RgbMatrixView(QWidget):
         self._sync_follow_selection()
 
     def _sync_follow_selection(self):
-        """Übernimmt die aktuelle Programmer-Auswahl in die aktive Matrix."""
+        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und das
+        Grid der ausgewaehlten Matrix aus der Gruppe uebernehmen.
+
+        Wichtig: Es wird NICHT mehr blind irgendeine Matrix auf die neue Gruppe
+        umgeschrieben. Die Liste zeigt nur Matrizen der aktiven Gruppe (+ ungebundene);
+        die ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
+        sodass die Grid-Uebernahme korrekt ist."""
         try:
-            if self._saved is None and self._instances:
+            # Gefilterte Liste neu aufbauen (setzt _saved auf eine Matrix der Gruppe).
+            self._rebuild_from_state()
+            vis = self._visible_instances()
+            if self._saved is None and vis:
                 self._list.setCurrentRow(0)
             if self._saved is None:
+                self._update_group_header()
                 return
             self._assign_from_selection()
+            self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
