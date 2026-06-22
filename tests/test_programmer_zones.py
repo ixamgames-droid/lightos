@@ -73,6 +73,69 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     pv._tile_preview.set_fixtures([1, 2, 3])
 
 
+def test_mapping_tab_visible_for_movinghead(tmp_path, monkeypatch):
+    """Regression (M-Map): Der „Mapping"-Tab erscheint, sobald ein Pan/Tilt-Geraet
+    (Moving Head/Spider) ausgewaehlt ist, und bleibt bei PAR / ohne Auswahl
+    versteckt. Frueher fehlte der Einblend-Schalter -> Tab blieb dauerhaft weg."""
+    _app()
+    _isolate_prefs(tmp_path, monkeypatch)
+    import src.ui.views.programmer_view as pvmod
+    from src.ui.views.programmer_view import ProgrammerView
+    from PySide6.QtWidgets import QLabel
+
+    class _Ch:
+        def __init__(self, attr, num):
+            self.attribute = attr
+            self.channel_number = num
+
+    class _FX:
+        def __init__(self, fid, label, chans):
+            self.fid = fid
+            self.label = label
+            self.universe = 1
+            self.address = 1
+            self._chans = chans
+
+    fixtures = {
+        1: _FX(1, "MH", [_Ch("pan", 1), _Ch("tilt", 2), _Ch("color_r", 3)]),
+        2: _FX(2, "Spider", [_Ch("tilt", 1), _Ch("tilt", 2), _Ch("color_r", 3)]),
+        3: _FX(3, "PAR", [_Ch("dimmer", 1), _Ch("color_r", 2)]),
+    }
+    monkeypatch.setattr(pvmod, "get_channels_for_patched", lambda f: f._chans)
+
+    pv = ProgrammerView()
+    monkeypatch.setattr(pv._state, "get_patched_fixtures",
+                        lambda: list(fixtures.values()))
+    # Schwergewichtige Bau-Schritte isolieren — getestet wird die Tab-Sichtbarkeit.
+    monkeypatch.setattr(pv, "_build_group_tab", lambda *a, **k: QLabel("x"))
+    monkeypatch.setattr(pv, "_push_selection_to_preview", lambda *a, **k: None)
+    monkeypatch.setattr(pv, "_update_fixture_combo", lambda *a, **k: None)
+    monkeypatch.setattr(pv._color_preview, "set_fixtures", lambda *a, **k: None)
+
+    idx = pv._mapping_tab_index
+    assert pv._main_tabs.isTabVisible(idx) is False        # nichts ausgewaehlt
+
+    pv._selected_fids = [1]
+    pv._rebuild_attr_editor()
+    assert pv._main_tabs.isTabVisible(idx) is True         # Moving Head (pan/tilt)
+
+    pv._selected_fids = [2]
+    pv._rebuild_attr_editor()
+    assert pv._main_tabs.isTabVisible(idx) is True         # Spider (2x tilt)
+
+    pv._selected_fids = [3]
+    pv._rebuild_attr_editor()
+    assert pv._main_tabs.isTabVisible(idx) is False        # PAR (kein pan/tilt)
+
+    pv._selected_fids = [3, 1]
+    pv._rebuild_attr_editor()
+    assert pv._main_tabs.isTabVisible(idx) is True         # gemischt, MH dabei
+
+    pv._selected_fids = []
+    pv._rebuild_attr_editor()
+    assert pv._main_tabs.isTabVisible(idx) is False
+
+
 def test_programmer_layout_toggle_roundtrip(tmp_path, monkeypatch):
     _app()
     _isolate_prefs(tmp_path, monkeypatch)

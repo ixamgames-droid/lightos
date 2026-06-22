@@ -12,8 +12,8 @@ Renderer -> kein Drift zwischen Vorschau und echtem Ausgang.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QTimer, QPointF
+from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QComboBox,
     QSpinBox, QCheckBox, QPushButton, QListWidget, QGroupBox, QFrame,
@@ -34,6 +34,95 @@ from src.core.engine.mapped_channel import (
 _SRC_LABELS = {SOURCE_TILT: "Tilt (Y)", SOURCE_PAN: "Pan (X)", SOURCE_XY: "X-Y (2D)"}
 
 
+class _LivePreview(QWidget):
+    """Moving-Head mit kippendem, gefaerbtem Beam + grosses Farb-Feld rechts.
+    ``on=False`` (Strobe-Aus-Phase) dimmt die Ausgabe stark ab."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._color = (0, 0, 0)
+        self._rot = 0.0
+        self._on = True
+        self.setFixedSize(168, 80)
+
+    def set_values(self, color, rot, on):
+        self._color = color
+        self._rot = float(rot)
+        self._on = bool(on)
+        self.update()
+
+    def paintEvent(self, _e):
+        r, g, b = self._color
+        if not self._on:
+            r, g, b = r // 6, g // 6, b // 6
+        col = QColor(r, g, b)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        cx, cy = 36, 36
+        p.setPen(QPen(QColor("#000")))
+        p.setBrush(QColor("#222"))
+        p.drawRect(12, 60, 48, 8)                       # Sockel
+        p.setBrush(QColor("#444"))
+        p.drawRect(20, 22, 4, 38)                        # Yoke links
+        p.drawRect(48, 22, 4, 38)                        # Yoke rechts
+        p.save()                                          # Beam (rotiert)
+        p.translate(cx, cy)
+        p.rotate(self._rot)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(r, g, b, 200))
+        p.drawPolygon(QPolygonF([QPointF(0, 0), QPointF(-13, -32), QPointF(13, -32)]))
+        p.restore()
+        p.setPen(QPen(QColor("#666")))                   # Kopf
+        p.setBrush(QColor("#1a1a1a"))
+        p.drawEllipse(QPointF(cx, cy), 9, 9)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(col)
+        p.drawEllipse(QPointF(cx, cy), 5, 5)             # Linse
+        p.setPen(QPen(QColor("#000")))                   # Farb-Feld
+        p.setBrush(col)
+        p.drawRect(80, 14, 80, 48)
+        p.end()
+
+
+class _MappingBar(QWidget):
+    """Horizontale Leiste, die den Ausgang ueber den ganzen Eingang zeigt (Kurve/
+    Range/Invert sichtbar) + einen Marker an der aktuellen Quell-Position."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._colors: list[tuple[int, int, int]] = []
+        self._caret = 0.5
+        self.setFixedHeight(28)
+        self.setMinimumWidth(120)
+
+    def set_data(self, colors, caret: float):
+        self._colors = colors
+        self._caret = max(0.0, min(1.0, float(caret)))
+        self.update()
+
+    def paintEvent(self, _e):
+        p = QPainter(self)
+        w, h = self.width(), self.height()
+        bar_h = h - 7
+        n = len(self._colors)
+        if n == 0:
+            p.fillRect(0, 0, w, bar_h, QColor("#232323"))
+        else:
+            for i, (r, g, b) in enumerate(self._colors):
+                x0 = int(i * w / n)
+                x1 = int((i + 1) * w / n)
+                p.fillRect(x0, 0, max(1, x1 - x0), bar_h, QColor(r, g, b))
+        p.setPen(QPen(QColor("#161616")))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(0, 0, w - 1, bar_h)
+        cx = int(self._caret * w)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor("#ffffff"))
+        p.drawPolygon(QPolygonF([QPointF(cx - 5, h), QPointF(cx + 5, h),
+                                 QPointF(cx, bar_h)]))
+        p.end()
+
+
 class MappedChannelEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -44,6 +133,18 @@ class MappedChannelEditor(QWidget):
         self._live_fid: int | None = None   # laufende Live-Test-Funktion
 
         self._build_ui()
+
+        # Strobe-Blink-Uhr fuer die Live-Vorschau (kein Date — Frame-Akkumulation).
+        self._strobe_active = False
+        self._strobe_rate = 1.0
+        self._strobe_phase = 0.0
+        self._cur_color = (0, 0, 0)
+        self._cur_rot = 0.0
+        self._blink_timer = QTimer(self)
+        self._blink_timer.setInterval(33)
+        self._blink_timer.timeout.connect(self._on_strobe_tick)
+        self._blink_timer.start()
+
         try:
             self._state.sync.subscribe_widget(
                 SyncEvent.SELECTION_CHANGED, self,
@@ -182,11 +283,43 @@ class MappedChannelEditor(QWidget):
         g.addWidget(flags_w, r, 0, 1, 2)
         col.addWidget(self._editor_box)
 
-        # Live-Vorschau (nutzt dieselbe evaluate() wie der Renderer)
+        # Live-Vorschau (nutzt dieselbe evaluate() wie der Renderer): Beam kippt,
+        # Farb-Feld + Mapping-Leiste mit Marker, Strobe blinkt.
         prev_box = QGroupBox("Live-Vorschau")
         pv = QVBoxLayout(prev_box)
+        top = QHBoxLayout()
+        self._live = _LivePreview()
+        top.addWidget(self._live)
+        info = QVBoxLayout()
+        self._prev_angle = QLabel("Tilt 0°")
+        self._prev_angle.setStyleSheet("color:#00ccff;font-weight:bold;")
+        self._prev_out = QLabel("—")
+        self._prev_out.setStyleSheet("color:#ddd;")
+        self._prev_dmx = QLabel("—")
+        self._prev_dmx.setStyleSheet("color:#888;font-family:monospace;")
+        info.addWidget(self._prev_angle)
+        info.addWidget(self._prev_out)
+        info.addWidget(self._prev_dmx)
+        info.addStretch(1)
+        top.addLayout(info, stretch=1)
+        pv.addLayout(top)
+        self._bar = _MappingBar()
+        pv.addWidget(self._bar)
+        lbls = QHBoxLayout()
+        self._bar_lo = QLabel("—")
+        self._bar_mid = QLabel("")
+        self._bar_hi = QLabel("—")
+        for w in (self._bar_lo, self._bar_mid, self._bar_hi):
+            w.setStyleSheet("color:#888;")
+        self._bar_mid.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._bar_hi.setAlignment(Qt.AlignmentFlag.AlignRight)
+        lbls.addWidget(self._bar_lo)
+        lbls.addWidget(self._bar_mid, stretch=1)
+        lbls.addWidget(self._bar_hi)
+        pv.addLayout(lbls)
         sld = QHBoxLayout()
-        sld.addWidget(QLabel("Quelle simulieren:"))
+        self._prev_src_lbl = QLabel("Quelle simulieren:")
+        sld.addWidget(self._prev_src_lbl)
         self._prev_slider = QSlider(Qt.Orientation.Horizontal)
         self._prev_slider.setRange(0, 255)
         self._prev_slider.setValue(128)
@@ -196,16 +329,6 @@ class MappedChannelEditor(QWidget):
         self._prev_val.setMinimumWidth(34)
         sld.addWidget(self._prev_val)
         pv.addLayout(sld)
-        res = QHBoxLayout()
-        self._prev_swatch = QFrame()
-        self._prev_swatch.setFixedSize(54, 30)
-        self._prev_swatch.setStyleSheet("background:#000;border:1px solid #000;")
-        res.addWidget(self._prev_swatch)
-        self._prev_out = QLabel("—")
-        self._prev_out.setStyleSheet("color:#aaa;")
-        res.addWidget(self._prev_out)
-        res.addStretch(1)
-        pv.addLayout(res)
         col.addWidget(prev_box)
         col.addStretch(1)
 
@@ -451,26 +574,100 @@ class MappedChannelEditor(QWidget):
 
     # ── Live-Vorschau ───────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _value_color(target: str, v: int) -> tuple[int, int, int]:
+        t = (target or "").lower()
+        if t == "color_r":
+            return (v, 0, 0)
+        if t == "color_g":
+            return (0, v, 0)
+        if t == "color_b":
+            return (0, 0, v)
+        if t == "color_a":
+            return (v, int(v * 0.6), 0)
+        if t == "color_uv":
+            return (int(v * 0.55), 0, v)
+        return (v, v, v)
+
+    @staticmethod
+    def _angle_for(source: str, v: int) -> int:
+        if source == SOURCE_PAN:
+            return round(-270 + v / 255 * 540)
+        if source == SOURCE_XY:
+            return round(v / 255 * 100)
+        return round(-90 + v / 255 * 180)
+
+    @classmethod
+    def _angle_label(cls, source: str, v: int) -> str:
+        a = cls._angle_for(source, v)
+        return f"{a}%" if source == SOURCE_XY else f"{a}°"
+
+    def _eval_color(self, rule: MappedRule, src_value: float) -> tuple[int, int, int]:
+        res = rule.evaluate(src_value)
+        if "rgb" in res:
+            return res["rgb"]
+        return self._value_color(rule.target, res["value"])
+
     def _update_preview(self, *_):
         v = self._prev_slider.value()
         self._prev_val.setText(str(v))
         rule = self._current_rule()
         if rule is None:
-            self._prev_swatch.setStyleSheet("background:#000;border:1px solid #000;")
+            self._strobe_active = False
+            self._cur_color = (0, 0, 0)
+            self._live.set_values((0, 0, 0), 0, True)
+            self._bar.set_data([], 0.5)
+            self._prev_angle.setText("—")
             self._prev_out.setText("—")
+            self._prev_dmx.setText("—")
+            self._bar_lo.setText("")
+            self._bar_hi.setText("")
             return
+        src = rule.source
+        self._prev_src_lbl.setText(
+            {SOURCE_TILT: "Tilt ziehen:", SOURCE_PAN: "Pan ziehen:",
+             SOURCE_XY: "X-Y (Y) ziehen:"}.get(src, "Quelle:"))
+        self._prev_angle.setText(
+            {SOURCE_TILT: "Tilt ", SOURCE_PAN: "Pan ",
+             SOURCE_XY: "Auslenkung "}.get(src, "") + self._angle_label(src, v))
+
         res = rule.evaluate(v)
         if "rgb" in res:
-            r, g, b = res["rgb"]
-            self._prev_swatch.setStyleSheet(
-                f"background:rgb({r},{g},{b});border:1px solid #000;")
-            self._prev_out.setText(f"RGB {r},{g},{b}")
+            color = res["rgb"]
+            self._prev_out.setText("Farbverlauf")
+            self._prev_dmx.setText(f"R{color[0]} G{color[1]} B{color[2]}")
+            self._strobe_active = False
         else:
             val = res["value"]
-            self._prev_swatch.setStyleSheet(
-                f"background:rgb({val},{val},{val});border:1px solid #000;")
+            color = self._value_color(rule.target, val)
             self._prev_out.setText(
                 f"{attr_label(rule.target)} = {val}  ({round(val / 255 * 100)}%)")
+            self._prev_dmx.setText(f"{rule.target} = {val}")
+            self._strobe_active = (rule.target == "strobe" and val > 20)
+            self._strobe_rate = 1.0 + val / 255 * 14.0
+
+        self._cur_color = color
+        self._cur_rot = (v / 255.0 - 0.5) * 100.0
+
+        # Mapping-Leiste ueber den ganzen Eingang abtasten (zeigt Kurve/Range/Invert)
+        n = 48
+        cols = [self._eval_color(rule, i / (n - 1) * 255.0) for i in range(n)]
+        self._bar.set_data(cols, v / 255.0)
+        self._bar_lo.setText(self._angle_label(src, 0))
+        self._bar_hi.setText(self._angle_label(src, 255))
+
+        if not self._strobe_active:
+            self._live.set_values(color, self._cur_rot, True)
+
+    def _on_strobe_tick(self):
+        if not getattr(self, "_strobe_active", False):
+            return
+        self._strobe_phase = (self._strobe_phase + 0.033 * self._strobe_rate) % 1.0
+        on = self._strobe_phase < 0.5
+        try:
+            self._live.set_values(self._cur_color, self._cur_rot, on)
+        except RuntimeError:
+            pass
 
     # ── Speichern / Live-Test ───────────────────────────────────────────────────
 
