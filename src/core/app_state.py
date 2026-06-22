@@ -56,6 +56,13 @@ class AppState:
         # Wird VOR set_selected_fids gesetzt, damit die Matrix beim SELECTION_CHANGED
         # bereits die korrekte Gruppen-ID vorfindet.
         self.selected_group_id: int | None = None
+        # ENG-02: Aktiver Programmer-Tab ("Intensity"/"Color"/"Matrix"/…). Entscheidet
+        # bei Dimmer-Konflikten, WER den Dimmer einer SELEKTIERTEN Lampe besitzt: auf
+        # dem Intensity-Tab gewinnt die manuelle Programmer-Intensitaet, sonst die
+        # Funktion (Dimmer-Matrix/EFX). Von der ProgrammerView (_main_tabs) gesetzt;
+        # None = kein Fokus -> Funktion besitzt einen direkt getriebenen Dimmer
+        # (Default). Wird nur lesend im Output-Thread benutzt -> einfaches Attribut.
+        self.programmer_focus: str | None = None
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
         self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
@@ -694,6 +701,13 @@ class AppState:
     def get_selected_group_id(self):
         return getattr(self, "selected_group_id", None)
 
+    def set_programmer_focus(self, key: str | None):
+        """ENG-02: Merkt den aktiven Programmer-Tab (z. B. "Intensity", "Matrix").
+        Auf "Intensity" gewinnt fuer SELEKTIERTE Lampen die manuelle Intensitaet ueber
+        einen laufenden Dimmer-Effekt; sonst besitzt der Effekt den direkt getriebenen
+        Dimmer. Wird von der ProgrammerView bei Tab-Wechsel gesetzt."""
+        self.programmer_focus = str(key) if key else None
+
     def active_scope_fids(self) -> list[int]:
         """Geraete im aktiven Speicher-Scope = die gemeinsame Auswahl.
 
@@ -1035,14 +1049,46 @@ class AppState:
             except Exception as exc:
                 print(f"[AppState] render executors error: {exc}")
 
-        # 4. Programmer (LTP, hoechste Prioritaet) — ABER Intensitaets-Attribute
-        #    multiplizieren einen laufenden EFFEKT, statt ihn zu ersetzen
-        #    (EE-02 "Programmer-Dimmer multipliziert"). Ohne Effekt: LTP-Ersatz.
+        # 4. Programmer (LTP, hoechste Prioritaet).
+        #
+        # ENG-02 „Aktiver Tab gewinnt": Treibt eine FUNKTION (Dimmer-Matrix/EFX) den
+        # Intensitaets-/Dimmer-Kanal eines Fixtures DIREKT (Write-Log, WERT-unabhaengig
+        # — auch im Nulldurchgang/bei dunklem Pixel!), gehoert ihr der Kanal. Der
+        # per-Fixture Programmer-Intensity-Wert darf ihn dann NICHT antasten — weder
+        # ersetzen (LTP) noch EE-02-multiplizieren. Sonst killt ein (oft beim Auswaehlen
+        # auto-gesetztes) intensity=0 die Dimmer-Matrix, bzw. ein hochgezogener Wert
+        # invertiert den Effekt (gerade dunkle Pixel bekaemen den Programmer-Wert).
+        # AUSNAHME: ist der Intensity-Tab aktiv UND das Fixture selektiert, will der
+        # Nutzer manuell dimmen -> die Programmer-Intensitaet gewinnt absolut (ersetzt
+        # den Effekt-Dimmer). Globaler Submaster/Grand-Master/Fixture-Dimmer (4b) bleiben
+        # in BEIDEN Faellen als echte Master erhalten. Farb-Effekte fassen den Intensity-
+        # Kanal nicht an -> nicht betroffen, der EE-02-Multiply bleibt dort erhalten.
+        func_inten_fids: set[int] = set()
+        for fidi, dims in dim_addrs.items():
+            if not dims:
+                continue
+            entry = self._fix_index.get(fidi)
+            if not entry:
+                continue
+            touched = func_touched.get(entry[0].universe, ())
+            if any(a in touched for a in dims):
+                func_inten_fids.add(fidi)
+        # Intensity-Tab aktiv + Fixture selektiert -> manuelle Intensitaet gewinnt.
+        intensity_wins: set[int] = set()
+        if getattr(self, "programmer_focus", None) == "Intensity" and func_inten_fids:
+            sel = set(getattr(self, "selected_fids", None) or ())
+            intensity_wins = func_inten_fids & sel
+        owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
+
         prog_factor: dict[int, float] = {}
         for fid, attrs in programmer.items():
             try:
                 fidi = int(fid)
             except (TypeError, ValueError):
+                continue
+            # Funktions-getriebener Dimmer: KEIN EE-02-Multiply. (intensity_wins wird
+            # weiter unten absolut geschrieben statt multipliziert.)
+            if fidi in func_inten_fids:
                 continue
             if not effect_present.get(fidi):
                 continue
@@ -1053,8 +1099,24 @@ class AppState:
                     except (TypeError, ValueError):
                         continue
                     prog_factor[fidi] = min(prog_factor.get(fidi, 1.0), f)
-        self._apply_fixture_map(scratch, programmer, skip_intensity_for=set(prog_factor),
-                                protect_addrs=func_driven)
+        # owned_by_func: Intensitaet weder ersetzen noch multiplizieren (skip).
+        # intensity_wins: Intensitaet ABSOLUT schreiben -> NICHT skippen UND die
+        # Intensity-Adresse aus dem func-driven Schutz nehmen (sonst blockt protect den
+        # Programmer-Ersatz). Farb-Kanaele des Effekts bleiben weiter geschuetzt.
+        protect = func_driven
+        if intensity_wins:
+            protect = {u: set(a) for u, a in func_driven.items()}
+            for fidi in intensity_wins:
+                entry = self._fix_index.get(fidi)
+                if not entry:
+                    continue
+                univ = entry[0].universe
+                if univ in protect:
+                    for a in dim_addrs.get(fidi, ()):
+                        protect[univ].discard(a)
+        self._apply_fixture_map(scratch, programmer,
+                                skip_intensity_for=set(prog_factor) | owned_by_func,
+                                protect_addrs=protect)
 
         # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
         #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch
