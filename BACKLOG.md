@@ -36,3 +36,5 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **ENG-02** · Dimmer-Matrix vom Programmer-Intensity entkoppeln („aktiver Tab gewinnt"): Dimmer-Effekt besitzt seinen Kanal wert-unabhängig; Intensity-Tab+Auswahl gewinnt manuell. [PR #9](https://github.com/ixamgames-droid/lightos/pull/9)
