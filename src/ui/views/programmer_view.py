@@ -424,8 +424,31 @@ class ProgrammerView(QWidget):
         self._matrix_tab_index = self._main_tabs.indexOf(self._rgb_page)
         self._main_tabs.addTab(self._make_palette_page(), "Paletten")
 
+        # ENG-02: aktiven Tab an app_state melden — der Renderer entscheidet damit bei
+        # Dimmer-Konflikten, ob die manuelle Intensitaet oder ein laufender Dimmer-
+        # Effekt (Matrix/EFX) gewinnt („aktiver Tab gewinnt", scoped auf die Auswahl).
+        self._main_tabs.currentChanged.connect(self._on_main_tab_changed)
+
         al.addWidget(self._main_tabs, stretch=1)
         return area
+
+    def _on_main_tab_changed(self, idx: int):
+        """ENG-02: Aktiven Programmer-Tab als Key an app_state weiterreichen
+        (Attribut-Tabs ueber ihren Key, Funktions-Tabs ueber ihr Label, z. B.
+        "Intensity"/"Matrix"). Nur "Intensity" hat Sonderwirkung (manuelle Intensitaet
+        gewinnt fuer selektierte Lampen ueber einen laufenden Dimmer-Effekt)."""
+        try:
+            w = self._main_tabs.widget(idx)
+            key = None
+            for k, cont in self._attr_group_tabs.items():
+                if cont is w:
+                    key = k
+                    break
+            if key is None:
+                key = self._main_tabs.tabText(idx) or None
+            self._state.set_programmer_focus(key)
+        except Exception as e:
+            print(f"[programmer_view] tab-focus error: {e}")
 
     def _make_snap_panel(self) -> QWidget:
         """RECHTS: Snap-/Datei-Browser (LAYOUT-04)."""

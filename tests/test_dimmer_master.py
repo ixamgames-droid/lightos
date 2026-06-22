@@ -1,10 +1,17 @@
-"""EE-02: Multiplikativer Dimmer-Master ueber dem Effekt-Layer.
+"""Dimmer-Master ueber dem Effekt-Layer + Programmer-Intensity (EE-02 / ENG-02).
 
-Deckt die drei Dimmer-Quellen ab, die laufende Effekte herunterregeln sollen:
+Echte Master, die laufende Effekte herunterregeln (multiplikativ):
   - globaler Submaster (VC-Fader)
   - Gruppen-/Fixture-Dimmer (state.fixture_dimmers)
-  - Programmer-Dimmer multipliziert den Effekt (statt LTP-Ersatz), wenn ein
-    Effekt die Intensitaet treibt; ohne Effekt bleibt der Programmer absolut.
+
+ENG-02 „Aktiver Tab gewinnt": Treibt eine FUNKTION (Dimmer-Matrix/EFX) den Dimmer
+eines Fixtures DIREKT, besitzt sie ihn — der per-Fixture Programmer-Intensity-Wert
+wirkt dann NICHT (weder multiplizierend noch ersetzend; ein auto-gesetztes
+intensity=0 darf die Matrix nicht killen). AUSNAHME: aktiver Intensity-Tab +
+selektiertes Fixture -> manuelle Intensitaet gewinnt absolut. Submaster/Fixture-
+Dimmer bleiben in beiden Faellen echte Master. (Frueheres EE-02: der Programmer-
+Dimmer multiplizierte einen intensitaets-treibenden Effekt — siehe ENG-02-Tests in
+test_matrix_dimmer_master.py.)
 """
 import os
 import unittest
@@ -92,12 +99,16 @@ class TestDimmerMaster(unittest.TestCase):
         st._render_frame(0.02)
         self.assertAlmostEqual(self._val(st), 100, delta=1)
 
-    def test_programmer_dimmer_multiplies_running_effect(self):
+    def test_effect_owns_dimmer_no_programmer_multiply(self):
+        # ENG-02: Treibt der Effekt den Dimmer direkt, ignoriert der Renderer den
+        # per-Fixture Programmer-Intensity-Wert (kein EE-02-Multiply mehr) — bei
+        # Default-Fokus besitzt der Effekt den Kanal. Frueher: 200*(128/255)≈100.
+        # Die volle Tab-Logik (Intensity-Tab gewinnt) steht in
+        # test_matrix_dimmer_master.py.
         st = _make_state()
         st.programmer = {1: {"intensity": 128}}
         st._render_frame(0.02)
-        # Effekt 200 * (128/255) ≈ 100  — NICHT hart auf 128 ersetzt.
-        self.assertAlmostEqual(self._val(st), 100, delta=2)
+        self.assertEqual(self._val(st), 200)
 
     def test_programmer_dimmer_absolute_without_effect(self):
         st = _make_state(effect_active=False)
