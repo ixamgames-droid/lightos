@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton,
                                 QGroupBox, QFormLayout, QDoubleSpinBox, QSpinBox,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
-                                QSizePolicy, QScrollArea, QDialog)
+                                QSizePolicy, QScrollArea, QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture
@@ -990,6 +990,12 @@ class EfxView(QWidget):
             if inst.id == efx.id:
                 self._list.setCurrentRow(i)
                 break
+        # UI-04: Im Standalone-EFX-Tab bekommt eine frische Bewegung sofort
+        # Geraete (aktuelle Auswahl, sonst alle gepatchten Movingheads) — sonst
+        # laeuft ein spaeteres ▶ Start stumm (write() bricht bei leerer Liste ab).
+        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung.
+        if not self._follow:
+            self._auto_assign_if_empty(allow_all=True)
 
     def _delete_efx(self):
         row = self._list.currentRow()
@@ -1521,9 +1527,86 @@ class EfxView(QWidget):
         self._refresh_path_combo()
         self._notify_change()
 
+    # ── UI-04: Auto-Geraetezuweisung (gegen "▶ Start laeuft stumm") ────────────
+
+    def _patched_movers(self, restrict_fids=None) -> list[int]:
+        """fids aller beweglichen Geraete (Moving Heads mit Pan UND Tilt oder
+        Dual-Tilt-Spider). ``restrict_fids`` (z. B. die aktuelle Auswahl) grenzt
+        ein und BEWAHRT deren Reihenfolge (wichtig fuer Fan/Spread); sonst alle
+        gepatchten in Patch-Reihenfolge."""
+        try:
+            from src.core.app_state import (get_state, get_channels_for_patched,
+                                            is_dual_tilt_fixture)
+            patched = {f.fid: f for f in get_state().get_patched_fixtures()}
+        except Exception:
+            return []
+        if restrict_fids is not None:
+            seq = [patched[int(f)] for f in restrict_fids if int(f) in patched]
+        else:
+            seq = list(patched.values())
+        movers: list[int] = []
+        for fx in seq:
+            try:
+                attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
+            except Exception:
+                continue
+            if ("pan" in attrs and "tilt" in attrs) or is_dual_tilt_fixture(fx):
+                movers.append(fx.fid)
+        return movers
+
+    def _selected_movers(self) -> list[int]:
+        """Bewegliche Geraete in der aktuellen Auswahl (leer, wenn nichts/keine
+        Mover ausgewaehlt sind)."""
+        try:
+            from src.core.app_state import get_state
+            sel = [int(f) for f in get_state().get_selected_fids()]
+        except Exception:
+            sel = []
+        return self._patched_movers(sel) if sel else []
+
+    def _auto_assign_if_empty(self, allow_all: bool = True) -> int:
+        """Weist der aktiven EFX bewegliche Geraete zu, falls ihre Liste leer ist:
+        zuerst die aktuelle Auswahl, sonst (nur wenn ``allow_all``) alle gepatchten
+        Movingheads. Hat sie bereits Geraete, bleibt sie unberuehrt. Gibt die
+        Geraeteanzahl danach zurueck (0 = keine beweglichen Geraete verfuegbar)."""
+        if self._current is None:
+            return 0
+        if self._current.fixtures:
+            return len(self._current.fixtures)
+        movers = self._selected_movers()
+        if not movers and allow_all:
+            movers = self._patched_movers()
+        if movers:
+            self._current.fixtures = [EfxFixture(fid=fid) for fid in movers]
+            self._fx_list.clear()
+            for fid in movers:
+                self._fx_list.addItem(f"Fixture #{fid}")
+            if not self._follow:
+                self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
+            self._notify_timer.start()  # Bibliothek/2. Ansicht aktualisieren
+        return len(self._current.fixtures)
+
     def _start_efx(self):
-        if self._current:
-            self._fm.start(self._current.id)
+        if not self._current:
+            return
+        # UI-04: Vor dem Start sicherstellen, dass Geraete zugewiesen sind — sonst
+        # liefe write() stumm (kein DMX, nichts im Simple Desk). Im Standalone-Tab
+        # darf als Fallback die gesamte Movinghead-Patchung ran; im Follow-Modus
+        # nur die Auswahl (die _assign_from_selection ohnehin pflegt).
+        self._auto_assign_if_empty(allow_all=not self._follow)
+        if not self._current.fixtures:
+            self._fx_box.setTitle("Geräte: keine beweglichen Geräte vorhanden")
+            try:
+                QMessageBox.warning(
+                    self, "EFX – keine Geräte",
+                    "Diese Bewegung hat keine Geräte und es sind keine "
+                    "Movingheads (Pan/Tilt) gepatcht oder ausgewählt.\n\n"
+                    "Patche bzw. wähle zuerst ein bewegliches Gerät, dann "
+                    "erneut ▶ Start.")
+            except Exception:
+                pass
+            return
+        self._fm.start(self._current.id)
 
     def _stop_efx(self):
         if self._current:
