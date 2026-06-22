@@ -7,11 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-06-22 — Fix: Dimmer-Matrix nicht mehr vom Programmer-Intensity blockiert (ENG-02)
+### 2026-06-22 — Fixes
 
 #### Behoben
 
 - **Dimmer-Matrix wirkt ohne Master-Hochziehen (ENG-02):** Treibt eine Funktion (Dimmer-Matrix/EFX) einen Intensitaets-/Dimmer-Kanal DIREKT, besitzt sie ihn jetzt wert-unabhaengig (Write-Log) — der per-Fixture Programmer-Intensity-Wert greift nicht mehr ein. Vorher wurde eine reine Dimmer-Matrix unsichtbar, sobald der Programmer (oft beim Auswaehlen auto-gesetzt) `intensity=0` hielt, und ein hochgezogener Master invertierte den Chase (gerade dunkle Pixel leuchteten voll). „Aktiver Tab gewinnt": nur wenn der **Intensity-Tab** aktiv UND die Lampe **selektiert** ist, gewinnt die manuelle Intensitaet absolut. Globaler Submaster/Grand-Master/Fixture-Dimmer bleiben echte Master; reine Farb-Effekte unveraendert (EE-02-Multiply dort erhalten). Bewusste Semantik-Aenderung: das alte EE-02 „Programmer-Dimmer multipliziert einen intensitaets-treibenden Effekt" entfaellt zugunsten der Tab-Regel. `src/core/app_state.py`, `src/ui/views/programmer_view.py`, `tests/test_matrix_dimmer_master.py`, `tests/test_dimmer_master.py` (PR #9).
+- **EFX-Tab: „▶ Start" lief stumm ohne Geräte (UI-04):** Eine im Standalone-EFX-Tab neu angelegte Bewegung (z. B. Kreis/Circle) hatte keine Geräte zugewiesen; `EfxInstance.write()` bricht bei leerer Fixture-Liste sofort ab → **null DMX-Output, nichts im Simple Desk, keine Bewegung** (Symptom in „Test 1 2 3": Circle erzeugte keine Ausgabe). Neu: `_add_efx` befüllt eine frische Bewegung sofort mit Geräten (aktuelle Auswahl, sonst alle gepatchten Movingheads mit Pan+Tilt bzw. Dual-Tilt-Spider), und `_start_efx` weist vor dem Start sicherheitshalber nach; sind gar keine beweglichen Geräte gepatcht/ausgewählt, erscheint eine klare Warnung statt eines stummen No-Ops. `src/ui/views/efx_view.py`, `tests/test_efx_autoassign.py`.
 
 ### 2026-06-21 — Grosses Update: zentraler BPM-Leader & Tempo-Buses, BPM-Generator mit Beatgrid, geführte Virtuelle Konsole, Effekt-Sync & Multikopf, Capability-Validierung, neues Anleitungs-Kit
 
