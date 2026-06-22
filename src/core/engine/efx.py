@@ -119,7 +119,10 @@ class EfxInstance(Function):
         # 255-tilt-Spiegelung). 0 = alle Koepfe synchron, 1 = gleichmaessig ueber
         # einen vollen Figur-Zyklus verteilt. Orthogonal zur Geraete-Phase
         # (phase_mode/spread, die wirkt ZWISCHEN Geraeten).
-        self.head_spread = 0.5
+        # Default 1.0 = die klassische gegengleiche Schere: bei 2 Tilt-Koepfen
+        # liegt Kopf 1 um (1/2)*1.0 = 0.5 Zyklus = 180 Grad versetzt, die Bars
+        # schwenken also GEGENPHASIG (Modul-Docstring) statt nur 90 Grad versetzt.
+        self.head_spread = 1.0
         # T-9: 16-bit-Ausgabe. Wenn True und das Geraet hat pan_fine/tilt_fine,
         # wird die Sub-Step-Praezision der berechneten Float-Position in die
         # Fine-Kanaele geschrieben (geschmeidige Bewegung statt 256 Stufen).
@@ -383,7 +386,7 @@ class EfxInstance(Function):
         fx = self.fixtures[i]
         ta = fx.tilt_attr
         cx, cy = self._fixture_center(fx)
-        hs = max(0.0, float(getattr(self, "head_spread", 0.5)))
+        hs = max(0.0, float(getattr(self, "head_spread", 1.0)))
         counter = bool(getattr(self, "counter_rotate", False))
         is_random = (self.algorithm == EfxAlgorithm.RANDOM)
         base_phase = self._fixture_phase(i, n, fx)  # bei RANDOM ungenutzt
@@ -661,7 +664,7 @@ class EfxInstance(Function):
             ParamSpec("spread", "Streuung (Fan)", "float", 1.0, 0.0, 1.0, 0.05,
                       "Phasen-Verteilung über die Gruppe (nur bei Verhältnis 'Fächer')"),
             ParamSpec("head_spread", "Welle über Köpfe (Spider)", "float",
-                      0.5, 0.0, 1.0, 0.05,
+                      1.0, 0.0, 1.0, 0.05,
                       "Dual-Tilt-Spider: Phasen-Versatz der einzelnen Tilt-Köpfe "
                       "zueinander (0 = alle synchron, 1 = volle Welle über die Bars)"),
             ParamSpec("phase_mode", "Verhältnis der Geräte", "select", "fan",

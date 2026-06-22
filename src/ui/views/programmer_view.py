@@ -971,6 +971,8 @@ class ProgrammerView(QWidget):
                     _clear(cont).addWidget(QLabel("Kein Gerät ausgewählt"))
                 if getattr(self, "_gobo_tab_index", -1) >= 0:
                     self._main_tabs.setTabVisible(self._gobo_tab_index, False)
+                if getattr(self, "_mapping_tab_index", -1) >= 0:
+                    self._main_tabs.setTabVisible(self._mapping_tab_index, False)
                 return
 
             self._lbl_selection.setText(
@@ -1012,6 +1014,15 @@ class ProgrammerView(QWidget):
             if getattr(self, "_gobo_tab_index", -1) >= 0:
                 self._main_tabs.setTabVisible(
                     self._gobo_tab_index, bool(groups.get("Gobo")))
+            # M-Map: Mapping-Tab sichtbar, sobald EIN Pan/Tilt-Geraet (Moving Head/
+            # Spider) in der Auswahl ist — gegen alle selektierten Geraete geprueft,
+            # nicht nur das Template (sonst bleibt es bei MH-an-2.-Stelle versteckt).
+            if getattr(self, "_mapping_tab_index", -1) >= 0:
+                cap = any(
+                    any((getattr(ch, "attribute", "") or "") in ("pan", "tilt")
+                        for ch in get_channels_for_patched(f))
+                    for f in selected)
+                self._main_tabs.setTabVisible(self._mapping_tab_index, cap)
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
 

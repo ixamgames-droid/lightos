@@ -415,7 +415,7 @@ class SpiderEfxPreview(QWidget):
             return
         try:
             _p0, t0 = e._calc(self._phase)
-            hs = max(0.0, float(getattr(e, "head_spread", 0.5)))
+            hs = max(0.0, float(getattr(e, "head_spread", 1.0)))
             # 2-Bar-Vorschau: Kopf 1 liegt bei k/N = 1/2, also 0.5*head_spread
             # versetzt — exakt wie EfxInstance._spider_head_tilts es fuer
             # head_count=2 berechnet (Vorschau spiegelt den Render).
@@ -1233,7 +1233,7 @@ class EfxView(QWidget):
             self._spider_amp_spin.setValue(int(round(cur.height)))
             self._spider_center_spin.setValue(int(round(cur.y_offset)))
             self._spider_spread_spin.setValue(
-                int(round(float(getattr(cur, "head_spread", 0.5)) * 100)))
+                int(round(float(getattr(cur, "head_spread", 1.0)) * 100)))
         finally:
             for w in spins:
                 w.blockSignals(False)

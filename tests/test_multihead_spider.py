@@ -186,6 +186,11 @@ class MultiHeadSpiderTest(unittest.TestCase):
         e.open_beam = True
         e.speed_hz = 1.0
         e.width = e.height = 200.0
+        # Gegenphase ("Schere") = expliziter head_spread=1.0 (180-Grad-Welle).
+        # Seit der per-Kopf-Phasenwelle (2026-06-22) ist der Default head_spread=0.5
+        # eine 90-Grad-Welle (Bars laufen versetzt, NICHT gegenphasig); die alte
+        # starre tilt#1=255-tilt-Schere ist als head_spread=1.0 back-compat erhalten.
+        e.head_spread = 1.0
         self.fm.start(e.id)
         # ein paar Frames rendern, dann Tilt-Kanaele lesen
         for _ in range(6):
