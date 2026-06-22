@@ -20,6 +20,7 @@ class FunctionType(Enum):
     RGBMatrix = "RGBMatrix"
     Audio = "Audio"
     Script = "Script"
+    MappedChannelChange = "MappedChannelChange"
 
 
 class RunOrder(Enum):

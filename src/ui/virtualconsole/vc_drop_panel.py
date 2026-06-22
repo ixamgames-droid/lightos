@@ -83,12 +83,16 @@ class _AspectRow:
 class VCDropPanel(QDialog):
     """Checkbox-Karte: waehle, was der gedroppte Effekt koennen soll."""
 
-    def __init__(self, function_id, parent=None):
+    def __init__(self, function_id, parent=None, for_box: bool = False):
         super().__init__(parent)
         self._fid = int(function_id)
+        self._for_box = bool(for_box)
+        self.box_mode = False
         caps = function_capabilities(self._fid)
         self._name = caps.name or f"#{self._fid}"
-        self.setWindowTitle("Effekt einrichten")
+        # Aus einer bestehenden Effekt-Box heraus (⚙) ist die Box-Gruppierung schon
+        # gegeben -> Titel + ausgeblendete Gruppieren-Checkbox.
+        self.setWindowTitle("Bedienelemente wählen" if self._for_box else "Effekt einrichten")
         self.setMinimumWidth(360)
 
         # BULK (Sammel-Option) passt nicht ins Aspekt-Ankreuz-Modell -> raus.
@@ -128,11 +132,14 @@ class VCDropPanel(QDialog):
 
         # Welle 4 (N): Wahl Box vs. einzelne Regler. Angekreuzt -> alle erzeugten
         # Widgets landen in einem beweglichen Effekt-Editor-Container mit Live-Vorschau.
-        from PySide6.QtWidgets import QCheckBox
-        self._box_cb = QCheckBox("Als Effekt-Box gruppieren (verschiebbar, mit Live-Vorschau)")
-        self._box_cb.setToolTip("Alle gewählten Bedien-Elemente in EINEN beweglichen "
-                                "Container mit Live-Vorschau legen — statt einzeln aufs Canvas.")
-        v.addWidget(self._box_cb)
+        # Aus einer bestehenden Box heraus (for_box) entfaellt die Wahl.
+        self._box_cb = None
+        if not self._for_box:
+            from PySide6.QtWidgets import QCheckBox
+            self._box_cb = QCheckBox("Als Effekt-Box gruppieren (verschiebbar, mit Live-Vorschau)")
+            self._box_cb.setToolTip("Alle gewählten Bedien-Elemente in EINEN beweglichen "
+                                    "Container mit Live-Vorschau legen — statt einzeln aufs Canvas.")
+            v.addWidget(self._box_cb)
 
         btns = QDialogButtonBox()
         ok = btns.addButton("Erstellen", QDialogButtonBox.ButtonRole.AcceptRole)
@@ -156,6 +163,6 @@ class VCDropPanel(QDialog):
 
     def run(self) -> "list | None":
         if self.exec() == QDialog.DialogCode.Accepted:
-            self.box_mode = bool(self._box_cb.isChecked())
+            self.box_mode = bool(self._box_cb is not None and self._box_cb.isChecked())
             return self.results()
         return None

@@ -11,13 +11,49 @@ import os
 import tempfile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-# Tests auf eine SEPARATE Show-DB umlenken (app_state.SHOW_DB_PATH liest
-# LIGHTOS_SHOW_DB). So fasst kein Test je die echte data/current_show.db der
-# laufenden App an — man kann parallel eine Show bauen, ohne Konflikt/„database
-# locked"/Datenverlust. MUSS vor dem ersten app_state-Import gesetzt sein.
+# Tests auf SEPARATE, PRO-PROZESS-EINDEUTIGE Datenbanken umlenken. So fasst kein
+# Test je die echten DBs der laufenden App an UND zwei gleichzeitige pytest-Laeufe
+# (oder ein abgebrochener Vorlauf) teilen sich NICHTS mehr.
+#
+# WARUM eindeutig statt fest: Frueher lag hier ein FESTER Pfad
+# (lightos_test_show.db), der ueber Laeufe hinweg bestehen blieb und von allen
+# parallelen Prozessen geteilt wurde. Lief der Suite-Lauf gleichzeitig ein
+# zweites Mal (oder gegen eine offene App), leerte/fuellte ein Prozess den
+# SQLite-Patch, waehrend ein anderer mitten in load_show() steckte -> dieser sah
+# eine FALSCHE Fixture-Zahl (z. B. test_musik_show_2026::test_patch_8_par_2_mh:
+# 7/9/12 != 10) oder leere Fixture-Lookups (StopIteration). Die PID im Dateinamen
+# entkoppelt die Laeufe vollstaendig. MUSS vor dem ersten app_state-Import stehen
+# (app_state.SHOW_DB_PATH liest LIGHTOS_SHOW_DB beim Import EINMAL).
+_TEST_TMP = tempfile.gettempdir()
+_TEST_PID = os.getpid()
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
-    os.path.join(tempfile.gettempdir(), "lightos_test_show.db"))
+    os.path.join(_TEST_TMP, f"lightos_test_show_{_TEST_PID}.db"))
+# Hinweis: Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT
+# umgelenkt. Die committeten shows/*.lshow referenzieren feste
+# fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
+# geseedete Eigen-DB vergibt andere Auto-IDs -> Kanal-Lookups (Dimmer/Farbe)
+# liefen ins Leere (test_color_fx_show_render/test_strict_dimmer_render). Sie ist
+# zudem reine LESE-/idempotente Seed-Last und damit nicht die Flaky-Quelle.
+
+
+def _purge_test_dbs():
+    """Die prozess-eigene Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
+    loeschen. Garantiert einen WIRKLICH leeren Start, falls ein frueherer Lauf
+    mit derselben (recycelten) PID Altzeilen hinterlassen hat."""
+    _base = os.environ.get("LIGHTOS_SHOW_DB")
+    if not _base:
+        return
+    for _suffix in ("", "-wal", "-shm"):
+        try:
+            os.remove(_base + _suffix)
+        except OSError:
+            pass
+
+
+# Beim conftest-Import (Sammelphase, VOR dem ersten get_state()/engine())
+# etwaige Altdateien derselben PID wegraeumen -> jeder Lauf startet garantiert leer.
+_purge_test_dbs()
 # Den 44-Hz-DMX-Output-Thread in Tests gar nicht erst autostarten (siehe
 # app_state.get_state): er rendert in _render_frame und emittiert Sync-Events,
 # die cross-thread in Qt marshallt werden -> race mit dem pytest-Teardown
@@ -64,6 +100,20 @@ def _stop_background_threads_at_end():
             mgr.close_all()
     except Exception:
         pass
+    # Prozess-eigene Show-Test-DB am Suite-Ende abraeumen. Vorher die SQLAlchemy-
+    # Engine schliessen (dispose), damit die Datei auf Windows ueberhaupt loeschbar
+    # ist (sonst „WinError 32: in use"). Schlaegt das fehl, bleibt nur eine
+    # (harmlose) Temp-Leiche zurueck — die Isolation (PID im Namen) haengt nicht
+    # davon ab.
+    try:
+        from src.core import app_state as _A2
+        st = getattr(_A2, "_state", None)
+        eng = getattr(st, "_show_engine", None) if st is not None else None
+        if eng is not None:
+            eng.dispose()
+    except Exception:
+        pass
+    _purge_test_dbs()
 
 
 @pytest.fixture(autouse=True)

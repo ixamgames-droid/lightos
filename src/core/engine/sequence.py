@@ -165,7 +165,7 @@ class Sequence(Function):
         mix = max(0.0, min(1.0, mix))
 
         # Apply values
-        from src.core.app_state import get_channels_for_patched
+        from src.core.app_state import get_channels_for_patched, resolve_attr_channels
         # Build fid -> PF lookup
         pf_by_fid = {f.fid: f for f in patch_cache}
         for fid_str, attrs in step.values.items():
@@ -177,14 +177,18 @@ class Sequence(Function):
             if pf is None or pf.universe not in universes:
                 continue
             channels = get_channels_for_patched(pf)
-            for ch in channels:
-                if ch.attribute in attrs:
-                    target = attrs[ch.attribute]
-                    prev = self._prev_values.get(fid, {}).get(ch.attribute, 0)
-                    val = int(prev + (target - prev) * mix)
-                    dmx_addr = pf.address + ch.channel_number - 1
-                    if 1 <= dmx_addr <= 512:
-                        universes[pf.universe].set_channel(dmx_addr, val)
+            prev_attrs = self._prev_values.get(fid, {})
+            # Mehrkopf (X-6): Schluessel wie "color_r#1" pro Kanal-Vorkommen
+            # aufloesen, statt nur den schlichten ``ch.attribute`` zu matchen —
+            # sonst gehen Pro-Kopf-Farben verloren (beide Spider-Bars zeigten nur
+            # Kopf 0). ``mkey`` ist der getroffene Schluessel -> der Vorwert fuer
+            # den Crossfade muss mit DEMSELBEN Schluessel gelesen werden.
+            for ch_no, mkey, target in resolve_attr_channels(channels, attrs):
+                prev = prev_attrs.get(mkey, 0)
+                val = int(prev + (target - prev) * mix)
+                dmx_addr = pf.address + ch_no - 1
+                if 1 <= dmx_addr <= 512:
+                    universes[pf.universe].set_channel(dmx_addr, val)
 
         self._step_elapsed += effective_dt
         self._elapsed += effective_dt

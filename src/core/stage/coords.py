@@ -50,3 +50,28 @@ _DEFAULT_Y_FALLBACK: float = 0.6
 def default_height_for(fixture_type: str | None) -> float:
     """Sinnvolle 3D-Default-Hoehe (Meter) fuer einen Fixture-Typ."""
     return _DEFAULT_Y.get((fixture_type or "").lower(), _DEFAULT_Y_FALLBACK)
+
+
+def normalize_rotation(val) -> tuple[float, float, float]:
+    """Fixture-Ausrichtung als (rx, ry, rz) in Grad zurueckgeben.
+
+    Multi-Achsen-Rotation: rx = Kippen (Pitch, Boden->Decke), ry = Drehen um die
+    Hochachse (Yaw, frueher die EINZIGE Achse), rz = Roll. Akzeptiert beide
+    Formate, damit alte Shows weiter laden:
+      * ``None``                       -> (0, 0, 0)
+      * einzelner Float/Int (Alt-Show) -> (0, val, 0)   # nur Y-Drehung
+      * Sequenz mit >=3 Werten         -> (val[0], val[1], val[2])
+      * Sequenz mit genau 1 Wert       -> (0, val[0], 0)
+    """
+    if val is None:
+        return (0.0, 0.0, 0.0)
+    if isinstance(val, (int, float)):
+        return (0.0, float(val), 0.0)
+    try:
+        if len(val) >= 3:
+            return (float(val[0]), float(val[1]), float(val[2]))
+        if len(val) == 1:
+            return (0.0, float(val[0]), 0.0)
+    except Exception:
+        pass
+    return (0.0, 0.0, 0.0)

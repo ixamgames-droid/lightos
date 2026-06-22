@@ -474,6 +474,9 @@ class FunctionManager:
                         continue
                 elif ftype == FunctionType.RGBMatrix.value:
                     f = RgbMatrixInstance.from_dict(fd)
+                elif ftype == FunctionType.MappedChannelChange.value:
+                    from .mapped_channel import MappedChannelChange
+                    f = MappedChannelChange.from_dict(fd)
                 else:
                     continue
             except Exception as exc:

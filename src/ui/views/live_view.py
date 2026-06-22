@@ -15,7 +15,8 @@ from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMim
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
-from src.core.app_state import get_state, get_channels_for_patched
+from src.core.app_state import get_state, get_channels_for_patched, is_spider_fixture
+from src.ui.widgets import mini_icons as _mini
 
 
 # ── UI-Praeferenzen (analog zu programmer_view.py) ───────────────────────────
@@ -172,6 +173,111 @@ class FixtureRenderer:
             painter.setPen(QPen(QColor("#444"), 1))
             painter.drawEllipse(QPointF(0, 0), size*0.35, size*0.35)
             label_prefix = "DIM"
+
+        elif "spider" in ft:
+            # Spider: zwei parallele, leicht schraege Balken (Scheren-Symbol)
+            from math import cos, sin, pi
+            # Oberer Balken: leicht nach rechts geneigt
+            painter.setBrush(QBrush(color))
+            painter.setPen(QPen(color.darker(120), 1))
+            angle1 = 0.35  # ~20 Grad
+            bw = size * 0.7
+            bh = size * 0.18
+            painter.save()
+            painter.rotate(-angle1 * 180.0 / pi)
+            painter.drawRoundedRect(QRectF(-bw*0.5, -size*0.45, bw, bh), 2, 2)
+            painter.restore()
+            # Unterer Balken: leicht nach links geneigt (Spiegel)
+            painter.save()
+            painter.rotate(angle1 * 180.0 / pi)
+            painter.drawRoundedRect(QRectF(-bw*0.5, size*0.27, bw, bh), 2, 2)
+            painter.restore()
+            # Verbindungs-Mittelstreifen (Gehaeuse)
+            painter.setBrush(QBrush(QColor("#2a2a2a")))
+            painter.setPen(QPen(QColor("#666"), 1))
+            painter.drawRoundedRect(QRectF(-size*0.18, -size*0.22, size*0.36, size*0.44), 3, 3)
+            # Glow-Punkte an Balken-Enden
+            glow_c = QColor(color)
+            glow_c.setAlpha(intensity_alpha)
+            painter.setBrush(QBrush(glow_c))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(-size*0.38, -size*0.35), size*0.07, size*0.07)
+            painter.drawEllipse(QPointF(size*0.38, -size*0.35), size*0.07, size*0.07)
+            painter.drawEllipse(QPointF(-size*0.38, size*0.35), size*0.07, size*0.07)
+            painter.drawEllipse(QPointF(size*0.38, size*0.35), size*0.07, size*0.07)
+            label_prefix = "SPI"
+
+        elif "scanner" in ft:
+            # Scanner: Sockel-Box + gekippter Spiegel-Flap + abgelenkter Strahlstreifen
+            from math import cos, sin, pi
+            # Sockel
+            painter.setBrush(QBrush(QColor("#2a2a2a")))
+            painter.setPen(QPen(QColor("#666"), 1))
+            painter.drawRoundedRect(QRectF(-size*0.45, size*0.05, size*0.9, size*0.4), 3, 3)
+            # Spiegel-Flap (gekippt ~45 Grad)
+            painter.setBrush(QBrush(QColor("#888888")))
+            painter.setPen(QPen(QColor("#aaa"), 1.5))
+            painter.save()
+            painter.rotate(-45)
+            painter.drawRoundedRect(QRectF(-size*0.08, -size*0.32, size*0.16, size*0.45), 2, 2)
+            painter.restore()
+            # Abgelenkter Strahl (vom Spiegel nach oben-rechts)
+            pan_rad = (pan - 128) / 128.0 * 1.5708  # +-90 Grad
+            beam_ex = cos(pan_rad - 0.785) * size * 0.7
+            beam_ey = sin(pan_rad - 0.785) * size * 0.7
+            painter.setPen(QPen(color, 2))
+            painter.drawLine(QPointF(0, -size*0.05), QPointF(beam_ex, beam_ey - size*0.05))
+            label_prefix = "SCAN"
+
+        elif "laser" in ft:
+            # Laser: kleines Emitter-Gehaeuse + Faecher aus 4 Strahlen
+            from math import cos, sin, pi
+            # Emitter-Box
+            painter.setBrush(QBrush(QColor("#1a1a1a")))
+            painter.setPen(QPen(QColor("#888"), 1))
+            painter.drawRoundedRect(QRectF(-size*0.2, -size*0.2, size*0.4, size*0.4), 3, 3)
+            # Emitter-Punkt
+            painter.setBrush(QBrush(color.lighter(160)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(0, 0), size*0.09, size*0.09)
+            # Strahlen-Faecher (4 Strahlen, symmetrisch aufgefaechert)
+            n_beams = 4
+            spread = 1.2  # Gesamtwinkel in Rad
+            base_angle = -1.5708  # nach oben zeigend
+            painter.setPen(QPen(color, 1.5))
+            for i in range(n_beams):
+                a = base_angle - spread/2 + spread * i / max(1, n_beams - 1)
+                ex = cos(a) * size * 0.75
+                ey = sin(a) * size * 0.75
+                beam_col = QColor(color)
+                beam_col.setAlpha(max(60, intensity_alpha - i * 20))
+                painter.setPen(QPen(beam_col, 1.5))
+                painter.drawLine(QPointF(0, 0), QPointF(ex, ey))
+            label_prefix = "LSR"
+
+        elif "smoke" in ft or "hazer" in ft or "fog" in ft:
+            # Smoke/Hazer/Fog: Maschinen-Box + Duese + Puff-Boegen
+            from math import cos, sin, pi
+            # Geraete-Box
+            painter.setBrush(QBrush(QColor("#1e1e28")))
+            painter.setPen(QPen(QColor("#555"), 1.5))
+            painter.drawRoundedRect(QRectF(-size*0.35, -size*0.25, size*0.7, size*0.5), 4, 4)
+            # Duese oben
+            painter.setBrush(QBrush(QColor("#333")))
+            painter.setPen(QPen(QColor("#777"), 1))
+            painter.drawRoundedRect(QRectF(-size*0.08, -size*0.45, size*0.16, size*0.22), 2, 2)
+            # Puff-Arcs (helle Boegen ueber der Duese)
+            fog_col = QColor(color)
+            fog_col.setAlpha(max(30, intensity_alpha // 2))
+            painter.setPen(QPen(fog_col, 1.5))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            for i in range(1, 3):
+                r_puff = size * (0.22 + i * 0.14)
+                painter.drawArc(
+                    QRectF(-r_puff, -size*0.55 - r_puff, r_puff*2, r_puff*2),
+                    30 * 16, 120 * 16
+                )
+            label_prefix = "FOG"
 
         else:
             # Unbekannt: Quadrat
@@ -844,8 +950,15 @@ class StageCanvas(QWidget):
             strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running)
             effects = self._get_active_effects(fixture.fid, strobe_hz, running)
             label = f"{fixture.fid}"
+            # Verfeinerten Render-Typ berechnen: Spider wird von moving_head getrennt
+            # (spiegelt die 3D-Logik aus _viz_model_for in visualizer_view.py).
+            _base_type = fixture.fixture_type or "par"
+            try:
+                _render_type = "spider" if is_spider_fixture(fixture) else _base_type
+            except Exception:
+                _render_type = _base_type
             FixtureRenderer.draw(
-                painter, fixture.fixture_type or "par", x, y,
+                painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
                 selected=(fixture.fid in self._selected_fids),
                 pan=pan, tilt=tilt,
@@ -1652,7 +1765,7 @@ class LiveView(QWidget):
             QPushButton:pressed { background: #0e2014; }
         """)
         btn_add_sel.setMinimumHeight(30)
-        btn_add_sel.setToolTip("Fügt die aktuell in der Live View ausgewählten Geräte dieser Gruppe hinzu.")
+        btn_add_sel.setToolTip("Fügt die aktuell im Bühnen-Layout ausgewählten Geräte dieser Gruppe hinzu.")
         btn_add_sel.clicked.connect(self._on_add_selection_to_group_clicked)
         detail_layout.addWidget(btn_add_sel)
 
@@ -1884,6 +1997,7 @@ class LiveView(QWidget):
                 label = getattr(f, "label", None) or getattr(f, "fixture_type", "?") or "?"
                 child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {label}"])
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
+                child.setIcon(0, _mini.fixture_icon_for(f))
         self._apply_fixture_filter()
 
     def _apply_fixture_filter(self):
@@ -1928,6 +2042,7 @@ class LiveView(QWidget):
                         n = 0
                     item = QListWidgetItem(f"{g.name} ({n})")
                     item.setData(Qt.ItemDataRole.UserRole, g.id)
+                    item.setIcon(_mini.folder_icon())
                     self._group_list.addItem(item)
         except Exception as e:
             print(f"[live_view] _refresh_group_list error: {e}")
@@ -2028,7 +2143,7 @@ class LiveView(QWidget):
         if not to_add:
             QMessageBox.information(
                 self, "Zur Gruppe hinzufügen",
-                "Erst Fixtures in der Live View auswählen — 'Mehrfachauswahl' oben "
+                "Erst Fixtures im Bühnen-Layout auswählen — 'Mehrfachauswahl' oben "
                 "einschalten und antippen, oder auf leerer Fläche einen Rahmen ziehen."
             )
             return
@@ -2166,12 +2281,16 @@ class LiveView(QWidget):
                     label_map = {f.fid: (getattr(f, "label", None) or
                                          getattr(f, "fixture_type", "?") or "?")
                                  for f in fixtures}
+                    fixture_map = {f.fid: f for f in fixtures}
                 except Exception:
                     label_map = {}
+                    fixture_map = {}
                 for fid in fids:
                     lbl = label_map.get(fid, "?")
                     member_item = QListWidgetItem(f"[{fid:03d}] {lbl}")
                     member_item.setData(Qt.ItemDataRole.UserRole, fid)
+                    if fid in fixture_map:
+                        member_item.setIcon(_mini.fixture_icon_for(fixture_map[fid]))
                     self._group_members.addItem(member_item)
                 self._group_detail_box.setVisible(True)
         except Exception as e:

@@ -521,7 +521,7 @@ class FixtureGroupView(QWidget):
                 # (kein zusätzliches addChild → sonst qWarning "already owned").
                 child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {f.label}"])
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
-                child.setIcon(0, _mini.fixture_icon(getattr(f, "fixture_type", "other")))
+                child.setIcon(0, _mini.fixture_icon_for(f))
                 labels[f.fid] = f.label
 
         self._grid_widget.update_fixture_labels(labels)

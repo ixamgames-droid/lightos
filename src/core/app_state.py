@@ -59,9 +59,12 @@ class AppState:
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
         self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
-        # T-VIZ-03: Y-Rotation (Grad) je Fixture im 3D-Visualizer; getrennt von
-        # positions, damit die (x,y,z)-Tupelform unveraendert bleibt (keine Migration).
-        self.visualizer_rotations: dict[int, float] = {}
+        # Multi-Achsen-Ausrichtung (rx, ry, rz) in GRAD je Fixture im 3D-Visualizer:
+        # rx = Kippen (Pitch, Boden->Decke), ry = Drehen um die Hochachse (Yaw),
+        # rz = Roll. Getrennt von positions. Abwaertskompatibel zu Alt-Shows, die
+        # nur einen Y-Float gespeichert haben (siehe coords.normalize_rotation +
+        # show_file.load_show). Erlaubt spaeter MH-Auto-Aim (volle Montage-Lage).
+        self.visualizer_rotations: dict[int, tuple[float, float, float]] = {}
         # Andock-Beziehungen: {fid: stage_element_id} — Strahler haengt an/auf
         # diesem Buehnen-Element (Trasse/Plattform/Boden). Bewegt sich das
         # Element, wandert der Strahler mit. Geht mit in die .lshow.
@@ -270,6 +273,8 @@ class AppState:
             "address", "channel_count", "manufacturer_name",
             "fixture_name", "fixture_type", "invert_pan",
             "invert_tilt", "swap_pan_tilt", "dimmer_curve",
+            "spider_mirrored",
+            "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
         if not values:
@@ -284,7 +289,8 @@ class AppState:
             return False
 
         # Normalize common numeric fields to stable types for DB + compare.
-        for key in ("fixture_profile_id", "universe", "address", "channel_count"):
+        for key in ("fixture_profile_id", "universe", "address", "channel_count",
+                    "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx"):
             if key in values:
                 values[key] = int(values[key])
 
@@ -327,6 +333,11 @@ class AppState:
             "invert_tilt": f.invert_tilt,
             "swap_pan_tilt": f.swap_pan_tilt,
             "dimmer_curve": f.dimmer_curve,
+            "spider_mirrored": getattr(f, "spider_mirrored", True),
+            "pan_range_deg": getattr(f, "pan_range_deg", 540),
+            "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
+            "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
+            "tilt_zero_dmx": getattr(f, "tilt_zero_dmx", 128),
             "manufacturer_name": f.manufacturer_name,
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
@@ -344,6 +355,11 @@ class AppState:
             invert_tilt=d.get("invert_tilt", False),
             swap_pan_tilt=d.get("swap_pan_tilt", False),
             dimmer_curve=d.get("dimmer_curve", "linear"),
+            spider_mirrored=d.get("spider_mirrored", True),
+            pan_range_deg=d.get("pan_range_deg", 540),
+            tilt_range_deg=d.get("tilt_range_deg", 270),
+            pan_zero_dmx=d.get("pan_zero_dmx", 128),
+            tilt_zero_dmx=d.get("tilt_zero_dmx", 128),
             manufacturer_name=d.get("manufacturer_name", ""),
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),
@@ -844,6 +860,21 @@ class AppState:
 
     def subscribe(self, callback):
         self._callbacks.append(callback)
+
+    def unsubscribe(self, callback):
+        """Gegenstueck zu subscribe: meldet einen Callback wieder ab.
+
+        Defensiv — entfernt nur, wenn vorhanden (kein Fehler sonst), und ist
+        damit idempotent (doppeltes/unsubscribe-ohne-subscribe ist ein No-Op).
+        Ohne dies leakt jeder Subscriber, der sich nicht abmeldet (z. B. eine
+        geschlossene VisualizerBridge): der gebundene Callback bliebe in
+        ``_callbacks`` und liefe bei jedem Event auf einem toten Objekt weiter.
+        ``_emit_impl`` iteriert ueber eine Kopie, daher ist Abmelden auch
+        waehrend eines Emits sicher."""
+        try:
+            self._callbacks.remove(callback)
+        except ValueError:
+            pass
 
     # ── Playback ──────────────────────────────────────────────────────────────
 
@@ -1456,6 +1487,93 @@ def get_channels_for_patched(fixture: PatchedFixture):
         s.expunge_all()
         _channel_cache[key] = result
         return result
+
+
+def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:
+    """Loest einen attribut-gekeyten Wert-Dict gegen die Kanal-Liste eines
+    Fixtures auf — mit DERSELBEN Mehrkopf-Vorkommens-Logik wie
+    ``_flush_programmer_to_dmx`` und ``efx.py``.
+
+    Hintergrund (X-6 / Spider): wiederholte Attribute (z. B. ``color_r`` zweimal
+    bei zwei RGBW-Baenken) werden im Programmer/Snap pro Kopf als ``"attr#N"``
+    gespeichert (Kopf 0 = ``"attr"``, Kopf 1 = ``"attr#1"`` …). Ein simples
+    ``{attr: channel}``-Dict KOLLIDIERT dann (nur das letzte Vorkommen ueberlebt)
+    und ein ``ch.attribute in values``-Match findet die ``#N``-Schluessel nie.
+
+    Diese Funktion fuehrt beim Iterieren ueber ``channels`` einen per-Attribut
+    ``seen``-Zaehler, bildet ``key = a if head==0 else f"{a}#{head}"`` und schlaegt
+    den per-Kopf-Schluessel nach — mit Fallback auf den schlichten Attributnamen
+    (Kopf>0 spiegelt Kopf 0, falls nicht separat gesetzt). Kanaele ohne passenden
+    Schluessel werden uebersprungen (kein Default geschrieben).
+
+    Rueckgabe: Liste ``(channel_number, matched_key, value)`` in Kanal-Reihenfolge.
+    ``matched_key`` ist der tatsaechlich getroffene Dict-Schluessel (``"color_r"``
+    oder ``"color_r#1"``) — Aufrufer mit Crossfade (Sequence) brauchen ihn, um den
+    Vorwert mit DEMSELBEN Schluessel nachzuschlagen.
+    """
+    seen: dict[str, int] = {}
+    out: list[tuple[int, str, int]] = []
+    if not isinstance(values, dict):
+        return out
+    for ch in channels:
+        a = ch.attribute
+        head = seen.get(a, 0)
+        seen[a] = head + 1
+        key = a if head == 0 else f"{a}#{head}"
+        if key in values:
+            out.append((ch.channel_number, key, values[key]))
+        elif a in values:
+            out.append((ch.channel_number, a, values[a]))
+    return out
+
+
+def is_spider_fixture(fixture) -> bool:
+    """True fuer Doppel-Bar-/Multi-Emitter-Spider. Definierendes Merkmal ist
+    **>=2 RGBW-Banks** (zwei `color_r` = zwei unabhaengig gefaerbte Emitter) —
+    NICHT die Tilt-Anzahl. Damit greift es sowohl beim klassischen Doppelbar
+    (2 Tilt + 2 Banks) als auch beim Einzelkopf-Spider wie 'Speider 14ch'
+    (nur 1 Pan + 1 Tilt, ABER zwei Farb-Banken), der sonst als normaler Moving
+    Head durchgeht. Steuert den 3D-'spider'-Render (zwei getrennt gefaerbte
+    Bars), das 2D-Spider-Symbol/-Icon und die Patch-Spiegel-Option. KONSISTENT
+    mit dem Multi-Head-DMX-Pfad (`push_dmx_update`), dessen `heads`-Array auf
+    `color_r#1` reagiert.
+    Hinweis: ein reiner Tilt-only-Bar OHNE zweite Farb-Bank (Mini-Spider/
+    Twinscan) ist BEWUSST kein `is_spider_fixture` — dafuer ist
+    `is_dual_tilt_fixture` (Bewegung/Steuerung, >=2 Tilt + kein Pan) zustaendig."""
+    try:
+        chans = get_channels_for_patched(fixture)
+        banks = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "color_r")
+        return banks >= 2
+    except Exception:
+        return False
+
+
+def tilt_head_count(fixture) -> int:
+    """Anzahl separater Tilt-Motoren/Koepfe (Kanaele mit attribute == 'tilt').
+    Fine-Kanaele heissen 'tilt_fine' und zaehlen NICHT mit — ein 16-bit-Single-
+    Head bleibt 1, ein Doppelbar-Spider ergibt 2."""
+    try:
+        return sum(1 for c in get_channels_for_patched(fixture)
+                   if (getattr(c, "attribute", "") or "") == "tilt")
+    except Exception:
+        return 0
+
+
+def is_dual_tilt_fixture(fixture) -> bool:
+    """True fuer ALLE spider-/doppeltilter-artigen Geraete: >=2 separate Tilt-
+    Kanaele UND KEIN Pan. Solche Geraete bewegen sich ausschliesslich ueber Tilt
+    — das normale XY-Pan/Tilt-Pad ist fuer sie unbrauchbar, daher schalten
+    Position- und FX-Tab auf die Spider-Bedienung um (mehrere Tilt-Regler +
+    Bewegungsmuster). Breiter als `is_spider_fixture`: greift auch bei Spidern
+    mit nur EINER Farbreihe, Farbrad oder ganz ohne Farbe (z. B. Mini-Spider,
+    Twinscan, Butterfly) und bei >2 Tilt-Koepfen."""
+    try:
+        chans = get_channels_for_patched(fixture)
+        tilts = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
+        pans = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
+        return tilts >= 2 and pans == 0
+    except Exception:
+        return False
 
 
 def find_channel(fixture, attribute: str):

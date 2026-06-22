@@ -68,7 +68,7 @@ class Visualizer3DView(QWidget):
         self._btn_move.setStyleSheet(_style)
         self._btn_move.setToolTip(
             "Aus: nur Kamera drehen/zoomen (Ansehen).\n"
-            "An: Strahler per Drag im 3D verschieben (X/Z wandert in die Live View).\n"
+            "An: Strahler per Drag im 3D verschieben (X/Z wandert ins Bühnen-Layout).\n"
             "Bühne/Trassen bearbeiten: dafür das separate 3D-Editor-Fenster nutzen."
         )
         self._btn_move.toggled.connect(self._on_move_toggled)
@@ -91,7 +91,7 @@ class Visualizer3DView(QWidget):
         bar.addWidget(self._sld_brightness)
 
         bar.addStretch()
-        self._lbl_hint = QLabel("3D — in der Live View platzierte Strahler erscheinen automatisch")
+        self._lbl_hint = QLabel("3D — im Bühnen-Layout platzierte Strahler erscheinen automatisch")
         self._lbl_hint.setStyleSheet("color:#666; font-size:10px;")
         bar.addWidget(self._lbl_hint)
         root.addLayout(bar)
@@ -116,6 +116,15 @@ class Visualizer3DView(QWidget):
         self._channel = QWebChannel(self)
         self._channel.registerObject("bridge", self._bridge)
         self._view.page().setWebChannel(self._channel)
+        # Leak-Schutz: beim Zerstoeren des Widgets den State-Subscriber der Bridge
+        # abmelden — als Backstop, falls das Widget zerstoert wird ohne vorher
+        # on_hidden() zu sehen. Destruction-safe: wir capturen nur die State-
+        # Referenz + den gebundenen Callback (NICHT self), damit der Slot waehrend
+        # ~QWidget nicht auf ein halb-zerstoertes Objekt zugreift. unsubscribe ist
+        # defensiv -> doppelt (on_hidden + destroyed) ist ein No-Op.
+        _state = self._state
+        _on_state = self._bridge._on_state
+        self.destroyed.connect(lambda *_: _state.unsubscribe(_on_state))
         try:
             url = QUrl.fromLocalFile(HTML_PATH)
             url.setQuery(f"v={int(time.time() * 1000)}")
@@ -178,17 +187,28 @@ class Visualizer3DView(QWidget):
                     continue
                 universe = self._state.universes[fixture.universe]
                 attrs: dict[str, int] = {}
+                seen: dict[str, int] = {}
                 for ch in get_channels_for_patched(fixture):
                     addr = fixture.address + ch.channel_number - 1
                     if 1 <= addr <= 512:
-                        attrs[ch.attribute] = universe.get_channel(addr)
+                        # Mehrkopf (Spider): N-tes Vorkommen = Kopf N ("attr#N").
+                        a = ch.attribute
+                        h = seen.get(a, 0)
+                        seen[a] = h + 1
+                        key = a if h == 0 else f"{a}#{h}"
+                        attrs[key] = universe.get_channel(addr)
                 self._bridge.push_dmx_update(fixture.fid, attrs)
         except Exception as e:
             print(f"[Visualizer3DView] dmx update error: {e}")
 
     # ── oeffentliche API (von der Live View aufgerufen) ─────────────────────
     def on_shown(self):
-        """Beim Einblenden: Timer starten + Fixtures aus der Live View (re)sync."""
+        """Beim Einblenden: State-Subscriber (re)aktivieren, Timer starten +
+        Fixtures aus der Live View (re)sync."""
+        try:
+            self._bridge._activate()        # idempotent re-arm nach on_hidden()
+        except Exception:
+            pass
         if not self._dmx_timer.isActive():
             self._dmx_timer.start(33)
         if self._loaded:
@@ -198,9 +218,15 @@ class Visualizer3DView(QWidget):
                 pass
 
     def on_hidden(self):
-        """Beim Ausblenden: Timer stoppen (Ressourcen schonen)."""
+        """Beim Ausblenden: Timer stoppen + State-Subscriber abmelden
+        (Ressourcen schonen, kein toter Callback in AppState._callbacks). Die
+        3D-Szene rendert nur sichtbar; on_shown() resynct ohnehin komplett."""
         if self._dmx_timer.isActive():
             self._dmx_timer.stop()
+        try:
+            self._bridge.dispose()
+        except Exception:
+            pass
 
     # ── Steuerung ───────────────────────────────────────────────────────────
     def _on_move_toggled(self, checked: bool):

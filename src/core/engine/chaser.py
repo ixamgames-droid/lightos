@@ -378,7 +378,8 @@ class Chaser(Function):
         haengt sie als Schritt an. Gibt den Step-Index zurueck oder None, wenn
         der Programmer leer ist bzw. kein State verfuegbar (Live-Step-Capture)."""
         try:
-            from src.core.app_state import get_state, get_channels_for_patched
+            from src.core.app_state import (
+                get_state, get_channels_for_patched, resolve_attr_channels)
             from .function_manager import get_function_manager
         except Exception:
             return None
@@ -395,11 +396,12 @@ class Chaser(Function):
             fx = patched.get(fid)
             if fx is None:
                 continue
-            chan_of = {c.attribute: c.channel_number for c in get_channels_for_patched(fx)}
-            for attr, val in attrs.items():
-                ch = chan_of.get(attr)
-                if ch is not None:
-                    scene.set_value(fid, ch, int(val))
+            # Mehrkopf (X-6): vorkommens-bewusst aufloesen statt eines
+            # ``{attribute: channel}``-Dicts, das bei wiederholten Attributen
+            # (zwei ``color_r`` beim Spider) kollidiert — sonst landet der
+            # Kopf-0-Wert auf dem ZWEITEN Kanal und ``color_r#1`` verfaellt.
+            for ch_no, _mkey, val in resolve_attr_channels(get_channels_for_patched(fx), attrs):
+                scene.set_value(fid, ch_no, int(val))
         return self.add_step(scene.id, fade_in=fade_in, hold=hold,
                              fade_out=fade_out, note="captured")
 

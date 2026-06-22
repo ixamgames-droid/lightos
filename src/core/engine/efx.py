@@ -112,6 +112,14 @@ class EfxInstance(Function):
         # Gegenlaeufig: jedes 2. Geraet durchlaeuft die Figur in umgekehrter
         # Richtung (z. B. zwei Koepfe, einer im Uhrzeigersinn, einer dagegen).
         self.counter_rotate = False
+        # Dual-Tilt-Spider (>=2 Tilt-Koepfe, kein Pan): WIE die einzelnen Tilt-
+        # Koepfe INNERHALB eines Geraets zueinander laufen. Jeder Kopf k bekommt
+        # die Tilt-Komponente der Figur bei Phasen-Versatz (k/head_count)*head_spread
+        # -> eine Welle/Chase rollt ueber die Bars (ersetzt die frueher starre
+        # 255-tilt-Spiegelung). 0 = alle Koepfe synchron, 1 = gleichmaessig ueber
+        # einen vollen Figur-Zyklus verteilt. Orthogonal zur Geraete-Phase
+        # (phase_mode/spread, die wirkt ZWISCHEN Geraeten).
+        self.head_spread = 0.5
         # T-9: 16-bit-Ausgabe. Wenn True und das Geraet hat pan_fine/tilt_fine,
         # wird die Sub-Step-Praezision der berechneten Float-Position in die
         # Fine-Kanaele geschrieben (geschmeidige Bewegung statt 256 Stufen).
@@ -316,6 +324,23 @@ class EfxInstance(Function):
             return i * (float(getattr(self, "phase_offset_deg", 0.0)) / 360.0)
         return (i / n) * self.spread   # "fan"
 
+    def _fixture_center(self, fx: "EfxFixture") -> tuple[float, float]:
+        """Mitte, um die das Geraet die Figur faehrt: im Relativ-Modus das beim
+        Start geschnappte Zentrum (To-Do #7), sonst die feste Mitte
+        (x_offset/y_offset)."""
+        if self.relative and fx.fid in self._centers:
+            return self._centers[fx.fid]
+        return self.x_offset, self.y_offset
+
+    def _fixture_phase(self, i: int, n: int, fx: "EfxFixture") -> float:
+        """Figur-Phase 0..1 des i-ten Geraets: globale Phase (+ Gegenlauf bei
+        jedem 2. Geraet) + Einzelgeraete-Offset + Geraete-Faecher (phase_mode).
+        Einzige Quelle fuer _values UND die Spider-Kopf-Welle (_spider_head_tilts)
+        — bei Aenderung wirkt beides konsistent."""
+        counter = bool(getattr(self, "counter_rotate", False))
+        base = -self._phase if (counter and i % 2 == 1) else self._phase
+        return (base + fx.start_offset + self._fan_for(i, n)) % 1.0
+
     def _values(self) -> dict[int, dict[str, int]]:
         """{fid: {pan_attr: val, tilt_attr: val}} fuer die aktuelle Phase."""
         result = {}
@@ -323,11 +348,7 @@ class EfxInstance(Function):
         is_random = (self.algorithm == EfxAlgorithm.RANDOM)
         counter = bool(getattr(self, "counter_rotate", False))
         for i, fx in enumerate(self.fixtures):
-            # To-Do #7: relativ um das geschnappte Geraete-Zentrum, sonst feste Mitte.
-            if self.relative and fx.fid in self._centers:
-                cx, cy = self._centers[fx.fid]
-            else:
-                cx, cy = self.x_offset, self.y_offset
+            cx, cy = self._fixture_center(fx)
             if is_random:
                 # Kontinuierlicher Random-Walk im Feld; spread>0 dekorreliert die
                 # Geraete (jeder faehrt eine andere Zufallsbahn), spread=0 synchron.
@@ -338,16 +359,47 @@ class EfxInstance(Function):
                 pan = max(0, min(255, cx + x))
                 tilt = max(0, min(255, cy + y))
             else:
-                # Geraete-Verhaeltnis: Versatz pro Kopf (sync/fan/offset).
-                fan = self._fan_for(i, n)
-                # Gegenlaeufig: jedes 2. Geraet durchlaeuft die Figur rueckwaerts.
-                base = -self._phase if (counter and i % 2 == 1) else self._phase
-                phase = (base + fx.start_offset + fan) % 1.0
-                pan, tilt = self._calc(phase, cx, cy)
+                pan, tilt = self._calc(self._fixture_phase(i, n, fx), cx, cy)
             if self.mirror and (i % 2 == 1):
                 pan = 255 - pan
             result[fx.fid] = self._pan_tilt_attrs(fx, pan, tilt)
         return result
+
+    def _spider_head_tilts(self, fid: int,
+                           head_count: int) -> list[tuple[str, str, float]]:
+        """Tilt-Werte der ZUSAETZLICHEN Tilt-Koepfe (k=1..head_count-1) eines
+        Dual-Tilt-Spiders bei der aktuellen Phase. Jeder Kopf bekommt die
+        Tilt-Komponente der Figur um (k/head_count)*head_spread phasenversetzt
+        -> eine Welle/Chase rollt ueber die Bars (ersetzt die alte starre
+        255-tilt-Spiegelung). Liefert (coarse_key, fine_key, tilt_float) je
+        Zusatzkopf; Kopf 0 steckt schon in den Basis-Attrs aus _values()."""
+        out: list[tuple[str, str, float]] = []
+        if head_count < 2:
+            return out
+        n = len(self.fixtures)
+        i = next((idx for idx, f in enumerate(self.fixtures) if f.fid == fid), None)
+        if i is None:
+            return out
+        fx = self.fixtures[i]
+        ta = fx.tilt_attr
+        cx, cy = self._fixture_center(fx)
+        hs = max(0.0, float(getattr(self, "head_spread", 0.5)))
+        counter = bool(getattr(self, "counter_rotate", False))
+        is_random = (self.algorithm == EfxAlgorithm.RANDOM)
+        base_phase = self._fixture_phase(i, n, fx)  # bei RANDOM ungenutzt
+        for k in range(1, head_count):
+            if is_random:
+                # Jeder Kopf wandert eine eigene Zufallsbahn (wie die Geraete-
+                # Dekorrelation in _values); Gegenlauf kehrt jeden 2. Kopf um.
+                prog = -self._rand_progress if (counter and k % 2 == 1) else self._rand_progress
+                _x, y = self._random_xy(prog + k * 1.7 * hs)
+                tval = cy + y
+            else:
+                phase = (base_phase + (k / head_count) * hs) % 1.0
+                _pan, tval = self._calc(phase, cx, cy)
+            out.append((f"{ta}#{k}", f"{ta}_fine#{k}",
+                        max(0.0, min(255.0, tval))))
+        return out
 
     @staticmethod
     def _polygon(phase: float, verts) -> tuple[float, float]:
@@ -445,12 +497,25 @@ class EfxInstance(Function):
                     attrs["shutter"] = open_value_for(fx, "shutter")
             # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden.
             attrs = apply_pan_tilt_orientation(fx, attrs)
-            # Mehrkopf (X-6): Fixtures mit ZWEI Tilt-Kanaelen (Spider: zwei Bars)
-            # schwenken den 2. Kopf GEGENPHASIG -> die Lichtleisten schwenken zu-/
-            # voneinander weg statt parallel.
-            if "tilt" in attrs and sum(1 for c in chans if (c.attribute or "") == "tilt") >= 2:
+            # Mehrkopf-Spider (>=2 Tilt-Kanaele, kein Pan): jeder weitere Tilt-Kopf
+            # faehrt die Figur-Tilt-Komponente um head_spread phasenversetzt -> eine
+            # Welle/Chase rollt ueber die Bars (ersetzt die fruehere starre
+            # 255-tilt-Spiegelung). invert_tilt wird je Zusatzkopf gleich angewandt
+            # wie an Kopf 0 (apply_pan_tilt_orientation oben); Pan/Swap sind bei
+            # Spidern (kein Pan-Kanal) ohne Wirkung.
+            tilt_heads = sum(1 for c in chans if (c.attribute or "") == "tilt")
+            if "tilt" in attrs and tilt_heads >= 2:
                 attrs = dict(attrs)
-                attrs["tilt#1"] = 255 - int(max(0, min(255, attrs["tilt"])))
+                inv_tilt = bool(getattr(fx, "invert_tilt", False))
+                for ckey, fkey, tval in self._spider_head_tilts(fid, tilt_heads):
+                    if inv_tilt:
+                        tval = 255.0 - tval
+                    if self.bit16:
+                        tc, tf = self._split16(max(0.0, min(255.0, tval)))
+                        attrs[ckey] = tc
+                        attrs[fkey] = tf
+                    else:
+                        attrs[ckey] = int(max(0, min(255, tval)))
             seen: dict[str, int] = {}
             for ch in chans:
                 a = ch.attribute
@@ -595,6 +660,10 @@ class EfxInstance(Function):
             ParamSpec("rotation", "Rotation", "float", 0.0, 0.0, 360.0, 5.0),
             ParamSpec("spread", "Streuung (Fan)", "float", 1.0, 0.0, 1.0, 0.05,
                       "Phasen-Verteilung über die Gruppe (nur bei Verhältnis 'Fächer')"),
+            ParamSpec("head_spread", "Welle über Köpfe (Spider)", "float",
+                      0.5, 0.0, 1.0, 0.05,
+                      "Dual-Tilt-Spider: Phasen-Versatz der einzelnen Tilt-Köpfe "
+                      "zueinander (0 = alle synchron, 1 = volle Welle über die Bars)"),
             ParamSpec("phase_mode", "Verhältnis der Geräte", "select", "fan",
                       options=("sync", "fan", "offset"),
                       tooltip="sync = alle Köpfe gleich · fan = gleichmäßig verteilt "
@@ -649,8 +718,9 @@ class EfxInstance(Function):
             p = self._resolve_path()
             return p.name if p is not None else None
         if key in ("width", "height", "x_offset", "y_offset", "rotation",
-                   "spread", "direction", "loop", "mirror", "open_beam", "relative",
-                   "bit16", "phase_mode", "phase_offset_deg", "counter_rotate"):
+                   "spread", "head_spread", "direction", "loop", "mirror",
+                   "open_beam", "relative", "bit16", "phase_mode",
+                   "phase_offset_deg", "counter_rotate"):
             return getattr(self, key)
         if key == "tempo_bus_id":
             return getattr(self, "tempo_bus_id", "")
@@ -678,6 +748,8 @@ class EfxInstance(Function):
             self.rotation = float(value) % 360.0; return True
         if key == "spread":
             self.spread = max(0.0, min(1.0, float(value))); return True
+        if key == "head_spread":
+            self.head_spread = max(0.0, min(1.0, float(value))); return True
         if key == "phase_mode":
             s = str(value).lower()
             self.phase_mode = s if s in ("sync", "fan", "offset") else "fan"
@@ -863,6 +935,7 @@ class EfxInstance(Function):
             "x_phase": self.x_phase, "y_phase": self.y_phase,
             "speed_hz": self.speed_hz, "direction": self.direction,
             "open_beam": self.open_beam, "spread": self.spread,
+            "head_spread": self.head_spread,
             "mirror": self.mirror,
             "phase_mode": self.phase_mode,
             "phase_offset_deg": self.phase_offset_deg,
@@ -888,7 +961,8 @@ class EfxInstance(Function):
             or (not isinstance(f, dict) and getattr(f, "fid", None) is not None)
         ]
         for k in ("width","height","x_offset","y_offset","rotation",
-                  "x_freq","y_freq","x_phase","y_phase","speed_hz","spread"):
+                  "x_freq","y_freq","x_phase","y_phase","speed_hz","spread",
+                  "head_spread"):
             if k in d:
                 setattr(e, k, float(d[k]))
         e.direction = d.get("direction", "forward")

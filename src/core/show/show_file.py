@@ -5,6 +5,7 @@ import zipfile
 import os
 
 from src.core.strict import strict_mode
+from src.core.stage.coords import normalize_rotation
 
 SHOW_VERSION = "1.1"
 
@@ -43,6 +44,11 @@ def _fixture_to_dict(pf) -> dict:
             "invert_tilt": bool(pf.get("invert_tilt", False)),
             "swap_pan_tilt": bool(pf.get("swap_pan_tilt", False)),
             "dimmer_curve": str(pf.get("dimmer_curve", "linear") or "linear"),
+            "spider_mirrored": bool(pf.get("spider_mirrored", True)),
+            "pan_range_deg": _to_int(pf.get("pan_range_deg", 540), 540),
+            "tilt_range_deg": _to_int(pf.get("tilt_range_deg", 270), 270),
+            "pan_zero_dmx": _to_int(pf.get("pan_zero_dmx", 128), 128),
+            "tilt_zero_dmx": _to_int(pf.get("tilt_zero_dmx", 128), 128),
             "manufacturer_name": str(pf.get("manufacturer_name", "") or ""),
             "fixture_name": str(pf.get("fixture_name", "") or ""),
             "fixture_type": str(pf.get("fixture_type", "other") or "other"),
@@ -61,6 +67,11 @@ def _fixture_to_dict(pf) -> dict:
         "invert_tilt": bool(getattr(pf, "invert_tilt", False)),
         "swap_pan_tilt": bool(getattr(pf, "swap_pan_tilt", False)),
         "dimmer_curve": str(getattr(pf, "dimmer_curve", "linear") or "linear"),
+        "spider_mirrored": bool(getattr(pf, "spider_mirrored", True)),
+        "pan_range_deg": _to_int(getattr(pf, "pan_range_deg", 540), 540),
+        "tilt_range_deg": _to_int(getattr(pf, "tilt_range_deg", 270), 270),
+        "pan_zero_dmx": _to_int(getattr(pf, "pan_zero_dmx", 128), 128),
+        "tilt_zero_dmx": _to_int(getattr(pf, "tilt_zero_dmx", 128), 128),
         "manufacturer_name": str(getattr(pf, "manufacturer_name", "") or ""),
         "fixture_name": str(getattr(pf, "fixture_name", "") or ""),
         "fixture_type": str(getattr(pf, "fixture_type", "other") or "other"),
@@ -92,6 +103,11 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         invert_tilt=bool(d.get("invert_tilt", False)),
         swap_pan_tilt=bool(d.get("swap_pan_tilt", False)),
         dimmer_curve=str(d.get("dimmer_curve", "linear") or "linear"),
+        spider_mirrored=bool(d.get("spider_mirrored", True)),
+        pan_range_deg=_to_int(d.get("pan_range_deg", 540), 540),
+        tilt_range_deg=_to_int(d.get("tilt_range_deg", 270), 270),
+        pan_zero_dmx=_to_int(d.get("pan_zero_dmx", 128), 128),
+        tilt_zero_dmx=_to_int(d.get("tilt_zero_dmx", 128), 128),
         manufacturer_name=str(d.get("manufacturer_name", "") or ""),
         fixture_name=str(d.get("fixture_name", "") or ""),
         fixture_type=str(d.get("fixture_type", "other") or "other"),
@@ -250,10 +266,11 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
             str(fid): [float(p[0]), float(p[1]), float(p[2])]
             for fid, p in (getattr(state, "visualizer_positions", {}) or {}).items()
         },
-        # T-VIZ-03: Y-Rotation (Grad) je Fixture
+        # Multi-Achsen-Ausrichtung (rx, ry, rz) in Grad je Fixture. normalize_rotation
+        # akzeptiert auch das Alt-Format (einzelner Y-Float) -> immer als Liste speichern.
         "rotations": {
-            str(fid): float(deg)
-            for fid, deg in (getattr(state, "visualizer_rotations", {}) or {}).items()
+            str(fid): list(normalize_rotation(rot))
+            for fid, rot in (getattr(state, "visualizer_rotations", {}) or {}).items()
         },
         # Andock-Beziehungen {fid: stage_element_id}
         "docks": {
@@ -651,10 +668,12 @@ def load_show(path: str | os.PathLike):
             except Exception:
                 continue
         state.visualizer_positions = positions
-        rotations: dict[int, float] = {}
-        for fid_raw, deg in (viz.get("rotations", {}) or {}).items():
+        # Multi-Achsen-Ausrichtung (rx, ry, rz) in Grad. normalize_rotation laedt
+        # auch Alt-Shows korrekt, die nur einen einzelnen Y-Float gespeichert haben.
+        rotations: dict[int, tuple[float, float, float]] = {}
+        for fid_raw, val in (viz.get("rotations", {}) or {}).items():
             try:
-                rotations[int(fid_raw)] = float(deg)
+                rotations[int(fid_raw)] = normalize_rotation(val)
             except Exception:
                 continue
         state.visualizer_rotations = rotations

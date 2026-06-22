@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
-from src.core.app_state import get_state, AppState
+from src.core.app_state import get_state, AppState, is_spider_fixture
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
 from src.ui.widgets.fixture_browser import FixtureBrowserDialog
@@ -20,6 +20,10 @@ TYPE_COLORS = {
     "led_bar":     "#4a3a00",
     "strobe":      "#5c2020",
     "dimmer":      "#2a2a2a",
+    "scanner":     "#1a3a5c",
+    "laser":       "#2a0a3a",
+    "smoke":       "#2e2e2e",
+    "hazer":       "#263030",
     "other":       "#222233",
 }
 
@@ -91,6 +95,43 @@ class PatchFixtureEditDialog(QDialog):
             form.addRow("Ausrichtung:", self._chk_inv_pan)
             form.addRow("", self._chk_inv_tilt)
             form.addRow("", self._chk_swap)
+            # Physischer Pan/Tilt-Bereich (Grad) + DMX-Mitte — fuers Auto-Aim
+            # ("Auf Punkt zielen") UND den 3D-Beam. Typisch 540/270, Mitte 128.
+            self._spin_pan_range = QSpinBox(); self._spin_pan_range.setRange(1, 1080)
+            self._spin_pan_range.setSuffix(" °")
+            self._spin_pan_range.setValue(int(getattr(self._fixture, "pan_range_deg", 540) or 540))
+            self._spin_pan_range.setToolTip("Physischer Pan-Schwenkbereich des Geräts (z.B. 540°).")
+            self._spin_tilt_range = QSpinBox(); self._spin_tilt_range.setRange(1, 540)
+            self._spin_tilt_range.setSuffix(" °")
+            self._spin_tilt_range.setValue(int(getattr(self._fixture, "tilt_range_deg", 270) or 270))
+            self._spin_tilt_range.setToolTip("Physischer Tilt-Bereich des Geräts (z.B. 270°).")
+            self._spin_pan_zero = QSpinBox(); self._spin_pan_zero.setRange(0, 255)
+            self._spin_pan_zero.setValue(int(getattr(self._fixture, "pan_zero_dmx", 128) or 128))
+            self._spin_pan_zero.setToolTip("DMX-Wert, bei dem der Pan in der Mitte steht (meist 128).")
+            self._spin_tilt_zero = QSpinBox(); self._spin_tilt_zero.setRange(0, 255)
+            self._spin_tilt_zero.setValue(int(getattr(self._fixture, "tilt_zero_dmx", 128) or 128))
+            self._spin_tilt_zero.setToolTip("DMX-Wert, bei dem der Tilt in der Mitte steht (meist 128).")
+            form.addRow("Pan-Bereich:", self._spin_pan_range)
+            form.addRow("Tilt-Bereich:", self._spin_tilt_range)
+            form.addRow("Pan-Mitte (DMX):", self._spin_pan_zero)
+            form.addRow("Tilt-Mitte (DMX):", self._spin_tilt_zero)
+
+        # Spider-Doppelbar (nur fuer Spider): ist die 2. Farbreihe gespiegelt
+        # (W,B,G,R) oder parallel zur ersten (R,G,B,W)? Rein visuell (3D).
+        self._combo_spider = None
+        if is_spider_fixture(self._fixture):
+            self._combo_spider = QComboBox()
+            self._combo_spider.addItem("Gespiegelt (W, B, G, R)", True)
+            self._combo_spider.addItem("Parallel (R, G, B, W)", False)
+            self._combo_spider.setCurrentIndex(
+                0 if bool(getattr(self._fixture, "spider_mirrored", True)) else 1)
+            self._combo_spider.setToolTip(
+                "Anordnung der 2. LED-Bar im 3D-Visualizer (gleicher Controller,\n"
+                "leicht andere Bauweise).\n"
+                "Gespiegelt: 2. Bar = W, B, G, R (Standard).\n"
+                "Parallel:   2. Bar = R, G, B, W (wie die erste)."
+            )
+            form.addRow("Spider-Anordnung:", self._combo_spider)
 
         layout.addLayout(form)
 
@@ -170,7 +211,13 @@ class PatchFixtureEditDialog(QDialog):
                 "invert_pan": self._chk_inv_pan.isChecked(),
                 "invert_tilt": self._chk_inv_tilt.isChecked(),
                 "swap_pan_tilt": self._chk_swap.isChecked(),
+                "pan_range_deg": self._spin_pan_range.value(),
+                "tilt_range_deg": self._spin_tilt_range.value(),
+                "pan_zero_dmx": self._spin_pan_zero.value(),
+                "tilt_zero_dmx": self._spin_tilt_zero.value(),
             })
+        if self._combo_spider is not None:
+            self.result_updates["spider_mirrored"] = bool(self._combo_spider.currentData())
         self.accept()
 
 
@@ -289,7 +336,7 @@ class PatchView(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, f.fid)
                 # Geraetetyp-Icon links neben das Label (Spalte 1) setzen.
                 if col == 1:
-                    item.setIcon(_mini.fixture_icon(f.fixture_type))
+                    item.setIcon(_mini.fixture_icon_for(f))
                 self._table.setItem(row, col, item)
 
         self._refresh_univ_bar(fixtures)

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTreeWidget,
     QAbstractItemView, QTreeWidgetItem, QLabel, QInputDialog, QMessageBox,
     QDialog, QCheckBox, QMenu, QFormLayout, QLineEdit,
-    QDoubleSpinBox, QComboBox, QDialogButtonBox,
+    QDoubleSpinBox, QComboBox, QDialogButtonBox, QToolButton,
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QColor
@@ -36,6 +36,7 @@ from src.core.attr_groups import (
     ATTR_GROUPS as _ATTR_GROUPS,
     ATTR_GROUP_ORDER as _ATTR_GROUP_ORDER,
     classify_attr as _classify_attr,
+    attr_label as _attr_label,
 )
 
 
@@ -44,13 +45,26 @@ from src.core.attr_groups import (
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class ChannelSelectDialog(QDialog):
-    """Zeigt Checkboxen pro Attribut-Gruppe. Nutzer waehlt, was gespeichert wird."""
+    """Auswahl, WAS beim Speichern (Snap/Szene) uebernommen wird.
+
+    Zwei Ebenen (David-Wunsch 2026-06-22):
+      * **Gruppen-Checkbox** je Attribut-Gruppe (Intensity/Color/…) wie bisher —
+        schnell „nur Farbe / nur Dimmer".
+      * **Kanal-Drilldown** je Gruppe (aufklappbar): einzelne Kanaele an-/abwaehlen
+        (z. B. nur Shutter statt Dimmer, nur R/G/B ohne W). Eine Gruppe mit nur
+        einem unterscheidbaren Attribut bekommt keinen Aufklapper.
+
+    Ein Kanal wird gespeichert, wenn **seine Gruppe** UND **sein Kanal** angehakt
+    sind. ``_checks`` (Gruppen) bleibt erhalten — aeltere Aufrufer/Tests greifen
+    direkt darauf zu.
+    """
 
     def __init__(self, programmer: dict, parent=None, *, scope_fids=None):
         super().__init__(parent)
         self.setWindowTitle("Kanäle auswählen")
-        self.setMinimumWidth(300)
-        self._checks: dict[str, QCheckBox] = {}
+        self.setMinimumWidth(320)
+        self._checks: dict[str, QCheckBox] = {}        # Gruppe -> Checkbox (back-compat)
+        self._attr_checks: dict[str, QCheckBox] = {}   # Attribut -> Checkbox (Kanal-Ebene)
         # scope_fids: nur diese Geraete (aktive Gruppe/Auswahl) beruecksichtigen,
         # damit liegengebliebene Werte zuvor gewaehlter Gruppen NICHT mitgespeichert
         # werden. None/leer -> kein Scope (alle Programmer-Werte, Alt-Verhalten).
@@ -78,21 +92,59 @@ class ChannelSelectDialog(QDialog):
             info.setStyleSheet("color: #8b949e; font-size: 11px;")
             layout.addWidget(info)
 
-        # Zaehle Werte pro Gruppe (nur Geraete im aktiven Scope)
-        counts: dict[str, int] = {}
+        # Werte pro Gruppe -> pro Attribut zaehlen (nur Geraete im aktiven Scope).
+        group_attr_counts: dict[str, dict[str, int]] = {}
         for attrs in scoped.values():
             for attr in attrs:
                 grp = _classify_attr(attr)
-                counts[grp] = counts.get(grp, 0) + 1
+                per = group_attr_counts.setdefault(grp, {})
+                per[attr] = per.get(attr, 0) + 1
 
         for grp in _ATTR_GROUP_ORDER:
-            count = counts.get(grp, 0)
-            if count == 0:
+            attr_counts = group_attr_counts.get(grp)
+            if not attr_counts:
                 continue
-            cb = QCheckBox(f"{grp}  ({count} Wert{'e' if count != 1 else ''})")
+            total = sum(attr_counts.values())
+
+            row = QHBoxLayout()
+            row.setSpacing(4)
+            cb = QCheckBox(f"{grp}  ({total} Wert{'e' if total != 1 else ''})")
             cb.setChecked(True)
-            layout.addWidget(cb)
             self._checks[grp] = cb
+            row.addWidget(cb)
+            row.addStretch(1)
+
+            multi = len(attr_counts) > 1
+            toggle = None
+            if multi:
+                toggle = QToolButton()
+                toggle.setText("Kanäle ▾")
+                toggle.setCheckable(True)
+                toggle.setAutoRaise(True)
+                toggle.setStyleSheet("QToolButton { border: none; color: #8b949e; }")
+                row.addWidget(toggle)
+            layout.addLayout(row)
+
+            # Eingerueckter Kind-Container mit den Einzelkanaelen (default eingeklappt).
+            child_box = QWidget()
+            cbl = QVBoxLayout(child_box)
+            cbl.setContentsMargins(22, 0, 0, 4)
+            cbl.setSpacing(2)
+            for attr in sorted(attr_counts, key=lambda a: _attr_label(a).lower()):
+                c = attr_counts[attr]
+                acb = QCheckBox(f"{_attr_label(attr)}  ({c})")
+                acb.setChecked(True)
+                self._attr_checks[attr] = acb
+                cbl.addWidget(acb)
+            child_box.setVisible(False)
+            layout.addWidget(child_box)
+
+            # Verdrahtung: Aufklapper zeigt/versteckt; Gruppe (de)aktiviert Kinder.
+            if toggle is not None:
+                toggle.toggled.connect(child_box.setVisible)
+                toggle.toggled.connect(
+                    lambda on, t=toggle: t.setText("Kanäle ▴" if on else "Kanäle ▾"))
+            cb.toggled.connect(child_box.setEnabled)
 
         if not self._checks:
             layout.addWidget(QLabel("Keine Werte im Programmer."))
@@ -101,6 +153,7 @@ class ChannelSelectDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_ok = QPushButton("OK")
         btn_ok.setDefault(True)
+        btn_ok.setEnabled(bool(self._checks))   # nichts im Scope -> nichts zu bestätigen
         btn_ok.clicked.connect(self.accept)
         btn_cancel = QPushButton("Abbrechen")
         btn_cancel.clicked.connect(self.reject)
@@ -110,17 +163,35 @@ class ChannelSelectDialog(QDialog):
         layout.addLayout(btn_row)
 
     def get_selected_groups(self) -> set[str]:
+        """Gruppen mit angehakter Gruppen-Checkbox (back-compat-API)."""
         return {grp for grp, cb in self._checks.items() if cb.isChecked()}
 
+    def _attr_is_selected(self, attr: str) -> bool:
+        """Ein Kanal wird uebernommen, wenn seine GRUPPE UND sein KANAL aktiv sind.
+        Unbekannte Kanaele (kein eigener Haken) folgen ihrer Gruppe.
+
+        **Single Source of Truth** fuer die Auswahl: das Abwaehlen einer Gruppe
+        deaktiviert die Kind-Checkboxen nur optisch (ihr ``isChecked`` bleibt) —
+        weil hier die Gruppe ZUERST geprueft wird, ist das korrekt. Wer kuenftig
+        ``_attr_checks`` direkt liest, muss diese Reihenfolge nachbilden."""
+        gcb = self._checks.get(_classify_attr(attr))
+        if gcb is not None and not gcb.isChecked():
+            return False
+        acb = self._attr_checks.get(attr)
+        return acb.isChecked() if acb is not None else True
+
+    def get_selected_attrs(self) -> set[str]:
+        """Alle angehakten Einzelkanaele (Gruppe + Kanal beide aktiv)."""
+        return {a for a in self._attr_checks if self._attr_is_selected(a)}
+
     def filter_programmer(self, programmer: dict) -> dict:
-        """Gibt gefilterte Kopie des Programmers zurueck (nur gewaehlte Attribut-
-        Gruppen UND nur Geraete im aktiven Scope)."""
-        selected = self.get_selected_groups()
+        """Gefilterte Kopie des Programmers: nur angehakte Kanaele UND nur Geraete
+        im aktiven Scope."""
         result: dict = {}
         for fid, attrs in self._in_scope(programmer).items():
             filtered = {
                 attr: val for attr, val in attrs.items()
-                if _classify_attr(attr) in selected
+                if self._attr_is_selected(attr)
             }
             if filtered:
                 result[fid] = filtered

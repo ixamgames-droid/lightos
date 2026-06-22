@@ -28,7 +28,9 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QTimer, Signal, Slot, QObject
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
-from src.core.app_state import AppState, get_state, get_channels_for_patched
+from src.core.app_state import (
+    AppState, get_state, get_channels_for_patched, is_spider_fixture,
+)
 from src.core.database.models import PatchedFixture
 from src.core.stage.stage_definition import (
     StageDefinition, StageElement,
@@ -37,7 +39,11 @@ from src.core.stage.stage_definition import (
     DEFAULT_PRESETS,
 )
 from src.core.stage.coords import (
-    live_to_world3d, world3d_to_live, default_height_for,
+    live_to_world3d, world3d_to_live, default_height_for, normalize_rotation,
+)
+from src.core.stage.aim import (
+    aim_pan_tilt, aim_orientation, plane_basis,
+    circle_points, rect_points, line_points, trace_pan_tilt,
 )
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -91,6 +97,10 @@ class VisualizerBridge(QObject):
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
+    pyFixtureRotated        = Signal(int, float, float, float)  # fid, rx, ry, rz (Grad)
+    pyAimApplied            = Signal(int, int, float, float, float)  # n_mh, n_static, x, y, z
+    pyTraceChanged          = Signal(bool, int, int)  # running, n_fixtures, n_points
+    pyTraceSaved            = Signal(str, int)         # sequence name, n_steps
     pyFixtureSelection      = Signal(list)
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list)
@@ -101,7 +111,36 @@ class VisualizerBridge(QObject):
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
         self._state = state
-        self._state.subscribe(self._on_state)
+        self._subscribed = False
+        self._trace_timer = None      # QTimer fuers Formen-Nachfahren (Live-Trace)
+        self._trace_state = None      # {"seqs": {fid: [(pan,tilt),...]}, "i": int, "n": int}
+        self._activate()
+
+    # ── Lebenszyklus: State-Subscription ────────────────────────────────────
+    # Die Bridge abonniert den AppState (``_on_state`` prunt bei ``patch_changed``
+    # geloeschte Fixtures aus der Szene). Das MUSS beim Schliessen/Verstecken des
+    # besitzenden Fensters/Widgets wieder abgemeldet werden — sonst bleibt der
+    # gebundene Callback in ``AppState._callbacks`` haengen, haelt die (tote)
+    # Bridge am Leben und prunt bei jedem ``patch_changed`` weiter. Jedes erneute
+    # Visualizer-Open addierte sonst einen weiteren Leak.
+
+    def _activate(self):
+        """Abonniere den State (idempotent — doppelt = No-Op)."""
+        if not self._subscribed:
+            self._state.subscribe(self._on_state)
+            self._subscribed = True
+
+    def dispose(self):
+        """Melde den State-Subscriber wieder ab (idempotent). Vom Owner beim
+        Schliessen/Verstecken/Zerstoeren aufrufen (VisualizerWindow.closeEvent,
+        Visualizer3DView)."""
+        self.stop_trace()
+        if self._subscribed:
+            try:
+                self._state.unsubscribe(self._on_state)
+            except Exception as e:
+                print(f"[Visualizer] bridge dispose error: {e}")
+            self._subscribed = False
 
     # ── Slots aufgerufen durch JavaScript ───────────────────────────────────
 
@@ -181,6 +220,228 @@ class VisualizerBridge(QObject):
             self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
         except Exception as e:
             print(f"[Visualizer] fixturePositionChanged error: {e}")
+
+    @Slot(str, float, float, float)
+    def fixtureRotationChanged(self, fid_str: str, rx: float, ry: float, rz: float):
+        """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-Drag."""
+        try:
+            fid = int(fid_str)
+            self._state.visualizer_rotations[fid] = (float(rx), float(ry), float(rz))
+            self.pyFixtureRotated.emit(fid, float(rx), float(ry), float(rz))
+        except Exception as e:
+            print(f"[Visualizer] fixtureRotationChanged error: {e}")
+
+    def _is_moving_head(self, f) -> bool:
+        """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
+        Doppelbar -> der wird hier nicht auto-geaimt)."""
+        try:
+            if is_spider_fixture(f):
+                return False
+            attrs = {ch.attribute for ch in get_channels_for_patched(f)}
+            return "pan" in attrs and "tilt" in attrs
+        except Exception:
+            return False
+
+    @Slot(str)
+    def aimFixturesAt(self, json_str: str):
+        """JS meldet einen angetippten 3D-Zielpunkt (Aim-Werkzeug) + die im 3D
+        ausgewaehlten Fixtures. Richtet sie darauf aus:
+          * Moving Head -> Pan/Tilt per IK in den Programmer (jeder Kopf bekommt
+            EIGENE Werte je nach Standort/Montage — auch fuer „beide auf 1 Punkt").
+          * statisch (PAR etc.) -> Montage-Ausrichtung (visualizer_rotations).
+        """
+        try:
+            d = json.loads(json_str) or {}
+            target = (float(d["x"]), float(d["y"]), float(d["z"]))
+            fids = [int(x) for x in (d.get("fids") or [])]
+            if not fids:
+                return
+            fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
+            n_mh = n_static = 0
+            for fid in fids:
+                f = fixtures.get(fid)
+                if f is None:
+                    continue
+                pos = self._state.visualizer_positions.get(fid)
+                if not pos:
+                    continue
+                if self._is_moving_head(f):
+                    rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
+                    pan, tilt = aim_pan_tilt(
+                        pos, target, rot,
+                        pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
+                        tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
+                        pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
+                        tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
+                        invert_pan=bool(getattr(f, "invert_pan", False)),
+                        invert_tilt=bool(getattr(f, "invert_tilt", False)),
+                        swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
+                    )
+                    self._state.set_programmer_value(fid, "pan", pan)
+                    self._state.set_programmer_value(fid, "tilt", tilt)
+                    self._state.set_programmer_value(fid, "pan_fine", 0)
+                    self._state.set_programmer_value(fid, "tilt_fine", 0)
+                    n_mh += 1
+                else:
+                    rx, ry, rz = aim_orientation(pos, target)
+                    self._state.visualizer_rotations[fid] = (rx, ry, rz)
+                    self.push_apply_fixture_transform(fid, pos[0], pos[1], pos[2], rx, ry, rz)
+                    self.pyFixtureRotated.emit(fid, rx, ry, rz)
+                    n_static += 1
+            self.pyAimApplied.emit(n_mh, n_static, target[0], target[1], target[2])
+        except Exception as e:
+            print(f"[Visualizer] aimFixturesAt error: {e}")
+
+    # ── Formen-Nachfahren (Live-Trace) ──────────────────────────────────────
+    def _build_trace_seqs(self, shape: str, center, normal, radius: float,
+                          count: int, fids: list[int]) -> dict[int, list]:
+        """Pro Moving-Head die Pan/Tilt-Folge entlang der Form berechnen."""
+        nrm = normal if any(normal) else (0.0, 1.0, 0.0)
+        if shape == "rect":
+            pts = rect_points(center, radius * 2, radius * 2, nrm,
+                              per_side=max(2, count // 4))
+        elif shape == "line":
+            u, _v = plane_basis(nrm)
+            p0 = (center[0] - u[0]*radius, center[1] - u[1]*radius, center[2] - u[2]*radius)
+            p1 = (center[0] + u[0]*radius, center[1] + u[1]*radius, center[2] + u[2]*radius)
+            pts = line_points(p0, p1, count)
+        else:  # circle (default)
+            pts = circle_points(center, radius, nrm, count)
+        seqs: dict[int, list] = {}
+        fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
+        for fid in fids:
+            f = fixtures.get(fid)
+            pos = self._state.visualizer_positions.get(fid)
+            if f is None or not pos or not self._is_moving_head(f):
+                continue
+            rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
+            seqs[fid] = trace_pan_tilt(
+                pos, pts, rot,
+                pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
+                tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
+                pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
+                tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
+                invert_pan=bool(getattr(f, "invert_pan", False)),
+                invert_tilt=bool(getattr(f, "invert_tilt", False)),
+                swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
+            )
+        return seqs
+
+    @Slot(str)
+    def startTrace(self, json_str: str):
+        """JS startet ein Live-Formen-Nachfahren: ausgewaehlte Moving Heads fahren
+        eine Form (Kreis/Linie/Rechteck) auf der Zielflaeche ab (Pan/Tilt -> Programmer)."""
+        try:
+            d = json.loads(json_str) or {}
+            shape = str(d.get("shape", "circle"))
+            center = (float(d["x"]), float(d["y"]), float(d["z"]))
+            normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
+            radius = float(d.get("radius", 1.0))
+            count = max(4, int(d.get("count", 48)))
+            interval = max(20, int(d.get("intervalMs", 60)))
+            fids = [int(x) for x in (d.get("fids") or [])]
+            seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
+            self.stop_trace()
+            if not seqs:
+                self.pyTraceChanged.emit(False, 0, 0)
+                return
+            self._trace_state = {"seqs": seqs, "i": 0, "n": count}
+            self._trace_timer = QTimer(self)
+            self._trace_timer.timeout.connect(self._trace_tick)
+            self._trace_timer.start(interval)
+            self.pyTraceChanged.emit(True, len(seqs), count)
+        except Exception as e:
+            print(f"[Visualizer] startTrace error: {e}")
+
+    def _trace_tick(self):
+        st = self._trace_state
+        if not st:
+            return
+        i = st["i"]
+        for fid, seq in st["seqs"].items():
+            if not seq:
+                continue
+            pan, tilt = seq[i % len(seq)]
+            try:
+                self._state.set_programmer_value(fid, "pan", pan)
+                self._state.set_programmer_value(fid, "tilt", tilt)
+            except Exception:
+                pass
+        st["i"] = i + 1
+
+    @Slot()
+    def stop_trace(self):
+        """Live-Trace stoppen (idempotent)."""
+        if self._trace_timer is not None:
+            try:
+                self._trace_timer.stop()
+                self._trace_timer.deleteLater()
+            except Exception:
+                pass
+            self._trace_timer = None
+        was_running = self._trace_state is not None
+        self._trace_state = None
+        if was_running:
+            try:
+                self.pyTraceChanged.emit(False, 0, 0)
+            except Exception:
+                pass
+
+    @Slot()
+    def stopTrace(self):
+        """JS-Alias fuer stop_trace."""
+        self.stop_trace()
+
+    @Slot(str)
+    def saveTraceSequence(self, json_str: str):
+        """Die aktuelle Form + Auswahl als abspielbare **Sequence** speichern: ein
+        Step pro Form-Punkt, je Step die Pan/Tilt-Werte aller Moving Heads. Die
+        Sequence loopt -> die Koepfe fahren die Form ab. Wird mit der Show gespeichert."""
+        try:
+            d = json.loads(json_str) or {}
+            shape = str(d.get("shape", "circle"))
+            center = (float(d["x"]), float(d["y"]), float(d["z"]))
+            normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
+            radius = float(d.get("radius", 1.0))
+            count = max(4, int(d.get("count", 48)))
+            step_time = max(0.02, float(d.get("intervalMs", 60)) / 1000.0)
+            fids = [int(x) for x in (d.get("fids") or [])]
+            seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
+            n = max((len(s) for s in seqs.values()), default=0)
+            if not seqs or n == 0:
+                self.pyTraceSaved.emit("", 0)
+                return
+            from src.core.engine.function_manager import get_function_manager
+            from src.core.engine.sequence import SequenceStep
+            try:
+                from src.core.engine.function import RunOrder, Direction
+            except Exception:
+                RunOrder = Direction = None
+            shape_name = {"circle": "Kreis", "line": "Linie", "rect": "Rechteck"}.get(shape, shape)
+            fm = get_function_manager()
+            seq = fm.new_sequence(f"Trace {shape_name}")
+            try:
+                if RunOrder is not None:
+                    seq.run_order = RunOrder.Loop
+                if Direction is not None:
+                    seq.direction = Direction.Forward
+            except Exception:
+                pass
+            for i in range(n):
+                step_values = {}
+                for fid, seq_list in seqs.items():
+                    if i < len(seq_list):
+                        pan, tilt = seq_list[i]
+                        step_values[str(fid)] = {"pan": int(pan), "tilt": int(tilt)}
+                if step_values:
+                    seq.steps.append(SequenceStep(
+                        values=step_values, fade_in=step_time, hold=0.0,
+                        fade_out=0.0, note=f"{shape_name} {i + 1}",
+                    ))
+            seq.bound_fixtures = sorted(seqs.keys())
+            self.pyTraceSaved.emit(getattr(seq, "name", f"Trace {shape_name}"), len(seq.steps))
+        except Exception as e:
+            print(f"[Visualizer] saveTraceSequence error: {e}")
 
     def _write_back_to_live_view(self, fid: int, x: float, z: float):
         """3D-Top-Down-(x,z) -> Live-View-Pixel zurueckschreiben + melden."""
@@ -282,7 +543,7 @@ class VisualizerBridge(QObject):
             intensity = attrs.get("intensity", 255)
             pan = attrs.get("pan", 128)
             tilt = attrs.get("tilt", 128)
-            payload = {
+            payload: dict[str, object] = {
                 "fid": fid,
                 "r": min(255, r + w),
                 "g": min(255, g + w),
@@ -291,6 +552,47 @@ class VisualizerBridge(QObject):
                 "pan": pan,
                 "tilt": tilt,
             }
+            # ── Mehrkopf (Spider): zweite Bar separat senden ────────────────
+            # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N".
+            # Ein Spider hat zwei Tilts + zwei RGBW-Banks -> je Bar eine eigene
+            # Farbe + eigener Tilt. JS rendert daraus zwei einzeln tiltbare Bars.
+            if ("tilt#1" in attrs) or ("color_r#1" in attrs):
+                heads = []
+                head_count = 2
+                # ── Tilt-Quelle pro Bar bestimmen ───────────────────────────
+                # Ein Spider hat zwei Tilt-Motoren, aber je nach Profil kommen
+                # sie UNTERSCHIEDLICH an:
+                #   * builtin SPIDER14 -> zwei `tilt`-Kanaele (tilt + tilt#1)
+                #   * viele QLC+-Importe ("Speider", "Mini Spider ZQ-B20", …)
+                #     mappen die zwei Tilt-Motoren als `pan` + `tilt`
+                #     (PositionPan/PositionTilt bzw. PositionXAxis/PositionYAxis).
+                # Ohne Sonderbehandlung faellt Bar 1 mangels `tilt#1` auf den
+                # einzigen `tilt` zurueck -> BEIDE Bars folgen demselben Motor
+                # (genau der Bug: nur „Tilt 2" bewegt die 3D-Bars). Darum den
+                # `pan`-Kanal als Tilt des ERSTEN Bars verwenden.
+                tilt_keys = ["tilt"] + [f"tilt#{h}" for h in range(1, head_count)]
+                tilt_sources = [attrs[k] for k in tilt_keys if k in attrs]
+                if len(tilt_sources) < head_count and "pan" in attrs:
+                    tilt_sources = [attrs["pan"]] + tilt_sources
+                while len(tilt_sources) < head_count:
+                    tilt_sources.append(tilt_sources[-1] if tilt_sources else tilt)
+                for h in range(head_count):
+                    sfx = "" if h == 0 else f"#{h}"
+                    hr = attrs.get(f"color_r{sfx}", 0)
+                    hg = attrs.get(f"color_g{sfx}", 0)
+                    hb = attrs.get(f"color_b{sfx}", 0)
+                    hw = attrs.get(f"color_w{sfx}", 0)
+                    heads.append({
+                        # Summenfarbe (Top-Down-Icon / Rueckwaerts-Kompat)
+                        "r": min(255, hr + hw),
+                        "g": min(255, hg + hw),
+                        "b": min(255, hb + hw),
+                        # Roh-Einzelkanaele: der Spider hat pro Bar 4 EINZELFARBEN-
+                        # LEDs (R/G/B/W), jede leuchtet nach ihrem eigenen Kanal.
+                        "cr": hr, "cg": hg, "cb": hb, "cw": hw,
+                        "tilt": tilt_sources[h],
+                    })
+                payload["heads"] = heads
             self.dmxUpdated.emit(json.dumps(payload))
         except Exception as e:
             print(f"[Visualizer] push_dmx_update error: {e}")
@@ -337,22 +639,50 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_select_stage_object error: {e}")
 
-    def push_apply_fixture_transform(self, fid: int, x: float, y: float, z: float, rot_y: float = 0.0):
+    def push_apply_fixture_transform(self, fid: int, x: float, y: float, z: float,
+                                     rot_x: float = 0.0, rot_y: float = 0.0,
+                                     rot_z: float = 0.0):
+        """Transform an JS schicken. Rotationen in GRAD (JS wandelt in Radiant)."""
         try:
-            payload = {"fid": fid, "x": x, "y": y, "z": z, "rotY": rot_y}
+            payload = {"fid": fid, "x": x, "y": y, "z": z,
+                       "rotX": rot_x, "rotY": rot_y, "rotZ": rot_z}
             self.applyFixtureTransform.emit(json.dumps(payload))
         except Exception as e:
             print(f"[Visualizer] push_apply_fixture_transform error: {e}")
 
     # ── interne helpers ─────────────────────────────────────────────────────
 
+    def _viz_model_for(self, f: PatchedFixture) -> str:
+        """Render-Modell fuer das 3D-JS bestimmen (unabhaengig vom fixture_type).
+
+        Ein **Spider** (z.B. U King SPIDER14) ist zwar als ``moving_head``
+        gepatcht (echte Tilt-Motoren), sieht aber anders aus: zwei separate
+        Lichtleisten/Bars mit je eigenem Tilt + eigenem RGBW, **kein Pan**.
+        Erkennung rein aus dem Kanal-Layout (zentrale ``is_spider_fixture``):
+        >=2 Tilt-Kanaele UND >=2 RGBW-Banks -> 'spider'. Sonst der fixture_type.
+        """
+        if is_spider_fixture(f):
+            return "spider"
+        return f.fixture_type
+
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
+        rot = normalize_rotation(self._state.visualizer_rotations.get(f.fid))
         return {
             "fid": f.fid,
             "label": f.label,
             "type": f.fixture_type,
+            "model": self._viz_model_for(f),
+            # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
+            "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],
+            # Multi-Achsen-Ausrichtung in GRAD (JS wandelt -> Radiant beim Erzeugen).
+            "rotX": rot[0], "rotY": rot[1], "rotZ": rot[2],
+            # Pan/Tilt-Bereich (Grad) + Nullpunkt-DMX -> JS-Beam = Hardware-Abbildung.
+            "panRange": getattr(f, "pan_range_deg", 540),
+            "tiltRange": getattr(f, "tilt_range_deg", 270),
+            "panZero": getattr(f, "pan_zero_dmx", 128),
+            "tiltZero": getattr(f, "tilt_zero_dmx", 128),
             "dockedTo": self._state.visualizer_docks.get(f.fid, ""),
             "r": 0, "g": 0, "b": 0, "intensity": 0,
             "pan": 128, "tilt": 128,
@@ -607,17 +937,27 @@ class VisualizerWindow(QMainWindow):
         self._spin_x = QDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
         self._spin_y = QDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
         self._spin_z = QDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
-        # T-VIZ-03: Y-Rotation (Ausrichtung um die Hochachse), in 3D + 2D sinnvoll
+        # Multi-Achsen-Ausrichtung (Grad): Drehen (Yaw Y), Kippen (Pitch X,
+        # Boden->Decke), Roll (Z). Alle in 3D sinnvoll; Yaw auch im 2D.
         self._spin_rot_y = QDoubleSpinBox()
         self._spin_rot_y.setRange(-180, 180); self._spin_rot_y.setSingleStep(15)
         self._spin_rot_y.setSuffix(" °"); self._spin_rot_y.setWrapping(True)
-        for sp in (self._spin_x, self._spin_y, self._spin_z, self._spin_rot_y):
+        self._spin_rot_x = QDoubleSpinBox()
+        self._spin_rot_x.setRange(-180, 180); self._spin_rot_x.setSingleStep(15)
+        self._spin_rot_x.setSuffix(" °"); self._spin_rot_x.setWrapping(True)
+        self._spin_rot_z = QDoubleSpinBox()
+        self._spin_rot_z.setRange(-180, 180); self._spin_rot_z.setSingleStep(15)
+        self._spin_rot_z.setSuffix(" °"); self._spin_rot_z.setWrapping(True)
+        for sp in (self._spin_x, self._spin_y, self._spin_z,
+                   self._spin_rot_y, self._spin_rot_x, self._spin_rot_z):
             sp.setMinimumHeight(38)
             sp.valueChanged.connect(self._on_fixture_pos_spin_changed)
         form.addRow("X (links/rechts):", self._spin_x)
         form.addRow("Y (Höhe):",        self._spin_y)
         form.addRow("Z (vorne/hinten):", self._spin_z)
-        form.addRow("Drehung Y:",        self._spin_rot_y)
+        form.addRow("Drehen (Hochachse Y):", self._spin_rot_y)
+        form.addRow("Kippen (auf/ab X):",    self._spin_rot_x)
+        form.addRow("Roll (seitlich Z):",    self._spin_rot_z)
         layout.addWidget(box)
 
         return w
@@ -855,6 +1195,10 @@ class VisualizerWindow(QMainWindow):
 
         # Python <- JS bridge signals
         self._bridge.pyFixtureMoved.connect(self._on_fixture_moved_from_js)
+        self._bridge.pyFixtureRotated.connect(self._on_fixture_rotated_from_js)
+        self._bridge.pyAimApplied.connect(self._on_aim_applied)
+        self._bridge.pyTraceChanged.connect(self._on_trace_changed)
+        self._bridge.pyTraceSaved.connect(self._on_trace_saved)
         self._bridge.pyFixtureSelection.connect(self._on_fixture_selection_from_js)
         self._bridge.pyFixtureDeleted.connect(self._on_fixture_deleted_from_js)
         self._bridge.pyStageListChanged.connect(self._on_stage_list_from_js)
@@ -919,10 +1263,18 @@ class VisualizerWindow(QMainWindow):
                 universe = self._state.universes[fixture.universe]
                 channels = get_channels_for_patched(fixture)
                 attrs: dict[str, int] = {}
+                seen: dict[str, int] = {}
                 for ch in channels:
                     dmx_addr = fixture.address + ch.channel_number - 1
                     if 1 <= dmx_addr <= 512:
-                        attrs[ch.attribute] = universe.get_channel(dmx_addr)
+                        # Mehrkopf (Spider): N-tes Vorkommen eines Attributs =
+                        # Kopf N -> Key "attr#N" (Kopf 0 = "attr"). So bleiben
+                        # die zwei Tilts / zwei RGBW-Banks getrennt.
+                        a = ch.attribute
+                        h = seen.get(a, 0)
+                        seen[a] = h + 1
+                        key = a if h == 0 else f"{a}#{h}"
+                        attrs[key] = universe.get_channel(dmx_addr)
                 self._bridge.push_dmx_update(fixture.fid, attrs)
         except Exception as e:
             print(f"[Visualizer] _push_dmx_updates error: {e}")
@@ -953,7 +1305,10 @@ class VisualizerWindow(QMainWindow):
                 self._spin_x.setValue(x)
                 self._spin_y.setValue(y)
                 self._spin_z.setValue(z)
-                self._spin_rot_y.setValue(self._state.visualizer_rotations.get(fid, 0.0))
+                rx, ry, rz = normalize_rotation(self._state.visualizer_rotations.get(fid))
+                self._spin_rot_x.setValue(rx)
+                self._spin_rot_y.setValue(ry)
+                self._spin_rot_z.setValue(rz)
             finally:
                 self._suppress_property_signals = False
 
@@ -963,7 +1318,7 @@ class VisualizerWindow(QMainWindow):
             return
         fid = item.data(Qt.ItemDataRole.UserRole)
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
-        rot = self._spin_rot_y.value()
+        rot = (self._spin_rot_x.value(), self._spin_rot_y.value(), self._spin_rot_z.value())
         # Andock-Modus: Hoehe automatisch aus dem Buehnen-Element unter (x, z) ziehen.
         dock_id = ""
         dock_name = ""
@@ -981,8 +1336,8 @@ class VisualizerWindow(QMainWindow):
                     self._suppress_property_signals = False
         self._bridge.place_fixture_at(fid, x, y, z, dock_id or None)
         self._state.visualizer_rotations[fid] = rot
-        if rot:
-            self._bridge.push_apply_fixture_transform(fid, x, y, z, rot)
+        if any(rot):
+            self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot)
         self._refresh_patch_list()
         # T-VIZ-11: sichtbares Platzierungs-Feedback (nach refresh, der _lbl_info setzt)
         if dock_id:
@@ -1012,13 +1367,13 @@ class VisualizerWindow(QMainWindow):
         if fid not in self._state.visualizer_positions:
             return
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
-        rot = self._spin_rot_y.value()
+        rot = (self._spin_rot_x.value(), self._spin_rot_y.value(), self._spin_rot_z.value())
         self._state.visualizer_positions[fid] = (x, y, z)
         self._state.visualizer_rotations[fid] = rot
         # Manuelle Positionseingabe loest eine bestehende Andock-Beziehung.
         if self._state.visualizer_docks.pop(fid, None) is not None:
             self._bridge.fixtureDockChanged(str(fid), "")
-        self._bridge.push_apply_fixture_transform(fid, x, y, z, rot)
+        self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot)
 
     def _clear_positions(self):
         # T-VIZ-04 (B-6): Sicherheitsabfrage — Loeschen aller Positionen ist nicht
@@ -1051,6 +1406,54 @@ class VisualizerWindow(QMainWindow):
                 self._spin_z.setValue(z)
             finally:
                 self._suppress_property_signals = False
+
+    def _on_fixture_rotated_from_js(self, fid: int, rx: float, ry: float, rz: float):
+        # Drehen-Drag im 3D -> Rotations-Spinboxen aktualisieren (wenn ausgewählt).
+        item = self._patch_list.currentItem()
+        if item and item.data(Qt.ItemDataRole.UserRole) == fid:
+            self._suppress_property_signals = True
+            try:
+                self._spin_rot_x.setValue(rx)
+                self._spin_rot_y.setValue(ry)
+                self._spin_rot_z.setValue(rz)
+            finally:
+                self._suppress_property_signals = False
+
+    def _on_aim_applied(self, n_mh: int, n_static: int, x: float, y: float, z: float):
+        """Status nach „Auf Punkt zielen" anzeigen."""
+        parts = []
+        if n_mh:
+            parts.append(f"{n_mh} Moving Head(s) → Pan/Tilt")
+        if n_static:
+            parts.append(f"{n_static} statische → ausgerichtet")
+        if not parts:
+            self._lbl_info.setText("Zielen: keine passenden Fixtures ausgewählt.")
+        else:
+            self._lbl_info.setText(
+                f"⌖ Ziel ({x:.1f}, {y:.1f}, {z:.1f}) m  |  " + " · ".join(parts)
+            )
+
+    def _on_trace_changed(self, running: bool, n_fixtures: int, n_points: int):
+        """Status fuers Formen-Nachfahren (Live-Trace)."""
+        if running:
+            self._lbl_info.setText(
+                f"○ Nachfahren läuft — {n_fixtures} Moving Head(s), {n_points} Punkte. "
+                "Werkzeug wechseln = Stopp."
+            )
+        else:
+            self._lbl_info.setText("○ Nachfahren gestoppt.")
+
+    def _on_trace_saved(self, name: str, n_steps: int):
+        """Status nach „Als Sequenz speichern"."""
+        if name and n_steps:
+            self._lbl_info.setText(
+                f"💾 Sequenz '{name}' mit {n_steps} Schritten gespeichert "
+                "(im Funktions-Manager / Playback abspielbar)."
+            )
+        else:
+            self._lbl_info.setText(
+                "Als Sequenz speichern: keine Moving Heads ausgewählt / kein Ziel."
+            )
 
     def _on_fixture_selection_from_js(self, fids: list):
         if not fids:
@@ -1616,3 +2019,36 @@ class VisualizerWindow(QMainWindow):
                 self._refresh_patch_list()
             except Exception as e:
                 print(f"[Visualizer] show_loaded handling error: {e}")
+
+    # ── Aufraeumen ──────────────────────────────────────────────────────────
+
+    def _release_state(self):
+        """Meldet ALLE State-Subscriber des Fensters ab + stoppt den DMX-Timer.
+
+        Das Fenster abonniert den State doppelt: einmal die ``_bridge`` (in
+        ``VisualizerBridge.__init__``) und einmal sein eigenes ``_on_state`` (in
+        ``_setup_update_timer``). Ohne Abmelden bliebe nach jedem Schliessen je
+        ein toter Callback in ``AppState._callbacks`` haengen und liefe bei jedem
+        Event weiter — jedes erneute Open addierte einen Leak. Idempotent."""
+        try:
+            self._state.unsubscribe(self._on_state)
+        except Exception as e:
+            print(f"[Visualizer] unsubscribe error: {e}")
+        try:
+            bridge = getattr(self, "_bridge", None)
+            if bridge is not None:
+                bridge.dispose()
+        except Exception as e:
+            print(f"[Visualizer] bridge dispose error: {e}")
+        try:
+            timer = getattr(self, "_dmx_timer", None)
+            if timer is not None and timer.isActive():
+                timer.stop()
+        except Exception as e:
+            print(f"[Visualizer] timer stop error: {e}")
+
+    def closeEvent(self, event):
+        """Beim Schliessen alle State-Subscriber abmelden (siehe
+        ``_release_state``), dann normal weiterschliessen."""
+        self._release_state()
+        super().closeEvent(event)

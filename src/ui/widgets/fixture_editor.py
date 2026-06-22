@@ -21,7 +21,7 @@ from src.core.database.models import (
 
 FIXTURE_TYPES = [
     "dimmer", "par", "led_bar", "moving_head", "scanner",
-    "strobe", "laser", "smoke", "other",
+    "strobe", "laser", "smoke", "hazer", "other",
 ]
 
 CHANNEL_ATTRS = [

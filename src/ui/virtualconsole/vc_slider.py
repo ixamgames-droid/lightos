@@ -684,8 +684,20 @@ class VCSlider(VCWidget):
         else:
             slot_text = ""
         slot = QLineEdit(slot_text)
-        form.addRow("Slot/Funktions-ID (Playback/Effekt):", slot)
-        form.addRow(QLabel("  ↳ Effekt-Modi: leer = aktiver Effekt · mehrere IDs mit Komma = Gruppe"))
+        # Roh-Slot/ID-Feld -> unter „Erweitert" (David: Effekte per Name via „Steuert"
+        # waehlen, nicht per Slot-Zahl). Bei Playback/Submaster ist es der einzige
+        # Eingang und wird automatisch aufgeklappt (siehe _update_slider_fields).
+        from src.ui.widgets.collapsible_section import CollapsibleSection
+        from PySide6.QtWidgets import QWidget as _QWidget, QVBoxLayout as _QVBoxLayout
+        _adv_inner = _QWidget()
+        _adv_lay = _QVBoxLayout(_adv_inner)
+        _adv_lay.setContentsMargins(0, 0, 0, 0)
+        _adv_lay.addWidget(QLabel("Slot/Funktions-ID (Playback/Effekt):"))
+        _adv_lay.addWidget(slot)
+        _adv_lay.addWidget(QLabel("↳ Effekt-Modi: leer = aktiver Effekt · mehrere IDs mit Komma = Gruppe"))
+        adv_section = CollapsibleSection("Erweitert (Slot / Roh-ID)", _adv_inner,
+                                         collapsed=True, prefs_key="vc_slider_advanced")
+        form.addRow(adv_section)
 
         # ── Kontextabhängige Feld-Sichtbarkeit ──
         # Zeigt je Modus nur die passenden Felder; Beschriftung/Modus + Leitplanken
@@ -704,12 +716,15 @@ class VCSlider(VCWidget):
                 autostart_cb:    eff,
                 univ:            m == SliderMode.LEVEL,
                 ch:              m == SliderMode.LEVEL,
-                slot:            eff or m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER),
+                adv_section:     eff or m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER),
                 bus_cb:          m == SliderMode.TEMPO_BUS,
                 target_editor:   eff,
             }
             for widget, show in vis.items():
                 form.setRowVisible(widget, bool(show))
+            # Playback/Submaster: das Roh-Slot-Feld ist der einzige Eingang -> aufklappen.
+            if m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER):
+                adv_section.set_expanded(True)
 
         mode_cb.currentIndexChanged.connect(lambda _i: _update_slider_fields())
         _update_slider_fields()

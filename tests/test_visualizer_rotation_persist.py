@@ -1,7 +1,8 @@
-"""T-VIZ-03: Y-Rotation je Fixture im 3D-Visualizer wandert mit der Show (.lshow)
-und wird beim Laden wiederhergestellt. Alte Shows ohne den ``rotations``-Block
-laden fehlerfrei (Fallback = keine Rotationen). Positionen bleiben unveraendert
-3-Tupel (keine Migration noetig).
+"""Multi-Achsen-Ausrichtung (rx, ry, rz) je Fixture im 3D-Visualizer wandert mit
+der Show (.lshow) und wird beim Laden wiederhergestellt. Alte Shows ohne den
+``rotations``-Block laden fehlerfrei (Fallback = keine Rotationen). Alte Shows mit
+EINEM Y-Float pro Fixture werden abwaertskompatibel als (0, y, 0) geladen.
+Positionen bleiben unveraendert 3-Tupel (keine Migration noetig).
 """
 import json
 import os
@@ -20,7 +21,8 @@ class VisualizerRotationPersistTest(unittest.TestCase):
     def test_rotation_roundtrip(self):
         state = get_state()
         state.visualizer_positions = {7: (1.0, 6.5, -2.0)}
-        state.visualizer_rotations = {7: 90.0}
+        # Multi-Achsen: Kippen X, Drehen Y, Roll Z (Grad)
+        state.visualizer_rotations = {7: (15.0, 90.0, -5.0)}
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "viz_rot.lshow")
             save_show(path)
@@ -29,12 +31,12 @@ class VisualizerRotationPersistTest(unittest.TestCase):
             state.visualizer_rotations = {}
             load_show(path)
             self.assertEqual(state.visualizer_positions.get(7), (1.0, 6.5, -2.0))
-            self.assertEqual(state.visualizer_rotations.get(7), 90.0)
+            self.assertEqual(state.visualizer_rotations.get(7), (15.0, 90.0, -5.0))
 
     def test_old_show_without_rotations_loads(self):
         state = get_state()
         state.visualizer_positions = {3: (0.0, 6.5, 0.0)}
-        state.visualizer_rotations = {3: 45.0}
+        state.visualizer_rotations = {3: (0.0, 45.0, 0.0)}
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "old.lshow")
             save_show(path)
@@ -44,11 +46,30 @@ class VisualizerRotationPersistTest(unittest.TestCase):
             data["visualizer"].pop("rotations", None)
             with zipfile.ZipFile(path, "w") as zf:
                 zf.writestr("show.json", json.dumps(data))
-            state.visualizer_rotations = {3: 999.0}   # muss geleert werden
+            state.visualizer_rotations = {3: (0.0, 999.0, 0.0)}   # muss geleert werden
             load_show(path)
             self.assertEqual(state.visualizer_rotations, {})
             # Positionen unveraendert wiederhergestellt
             self.assertEqual(state.visualizer_positions.get(3), (0.0, 6.5, 0.0))
+
+    def test_legacy_scalar_rotation_migrates(self):
+        """Alt-Show speicherte EINEN Y-Float pro Fixture. Laden muss das als
+        (0, y, 0)-Tupel normalisieren (Yaw-only), nicht crashen oder verwerfen."""
+        state = get_state()
+        state.visualizer_positions = {5: (2.0, 6.5, 1.0)}
+        state.visualizer_rotations = {5: (0.0, 30.0, 0.0)}
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "legacy.lshow")
+            save_show(path)
+            # rotations als ALT-Format (Skalar) zurueckschreiben
+            with zipfile.ZipFile(path) as zf:
+                data = json.loads(zf.read("show.json"))
+            data["visualizer"]["rotations"] = {"5": 90.0}
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("show.json", json.dumps(data))
+            state.visualizer_rotations = {}
+            load_show(path)
+            self.assertEqual(state.visualizer_rotations.get(5), (0.0, 90.0, 0.0))
 
 
 if __name__ == "__main__":

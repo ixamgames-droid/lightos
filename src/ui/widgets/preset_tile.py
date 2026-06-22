@@ -258,6 +258,14 @@ class _ApplyMixin:
             adapted = adapt_color_payload(fixture_attr_set(f), payload)
             for attr, value in adapted.items():
                 self._state.set_programmer_value(f.fid, attr, int(value))
+                # Mehrkopf (Spider): etwaige Pro-Kopf-Overrides dieser Farbe
+                # ("attr#N") entfernen, damit ein Preset das GANZE Geraet faerbt
+                # (Flush spiegelt Kopf 0). Einzelkopf-Geraet/Test-Double -> No-op.
+                progmap = getattr(self._state, "programmer", None)
+                if progmap is not None:
+                    for k in [k for k in progmap.get(f.fid, {})
+                              if k.startswith(f"{attr}#")]:
+                        self._state.clear_programmer_value(f.fid, k)
 
 
 class ColorQuickBar(QWidget, _ApplyMixin):

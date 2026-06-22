@@ -24,6 +24,11 @@ class _FakePatchedFixture:
     invert_tilt: bool = False
     swap_pan_tilt: bool = False
     dimmer_curve: str = "linear"
+    spider_mirrored: bool = True
+    pan_range_deg: int = 540
+    tilt_range_deg: int = 270
+    pan_zero_dmx: int = 128
+    tilt_zero_dmx: int = 128
     manufacturer_name: str = ""
     fixture_name: str = ""
     fixture_type: str = "other"

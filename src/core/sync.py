@@ -149,7 +149,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
         from sqlalchemy import select, update
         from sqlalchemy.orm import Session
         from src.core.database.fixture_db import engine as fdb_engine
-        from src.core.database.models import FixtureMode, PatchedFixture
+        from src.core.database.models import FixtureMode, FixtureProfile, PatchedFixture
 
         # Hole alle PatchedFixtures
         try:
@@ -235,6 +235,55 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                 'error', location,
                                 f"FixtureProfile {profile_id} hat keine Modes",
                             ))
+
+                    # 2b. fixture_type re-sync: copy from FixtureProfile when the
+                    #     patched type is missing or the generic default ('other').
+                    #     NEVER overwrites an already-specific type (e.g. 'moving_head',
+                    #     'par') to avoid clobbering deliberate user choices.
+                    try:
+                        current_type = getattr(f, "fixture_type", None)
+                        _GENERIC_TYPES = {None, "", "other"}
+                        if current_type in _GENERIC_TYPES and profile_id is not None:
+                            profile = s_fix.get(FixtureProfile, profile_id)
+                            if profile is not None:
+                                profile_type = getattr(profile, "fixture_type", None)
+                                if profile_type not in _GENERIC_TYPES:
+                                    # Profile has a more specific type — apply it.
+                                    if fix:
+                                        try:
+                                            with state._session() as s_show:
+                                                s_show.execute(
+                                                    update(PatchedFixture)
+                                                    .where(PatchedFixture.fid == fid)
+                                                    .values(fixture_type=profile_type)
+                                                )
+                                                s_show.commit()
+                                            # Update in-memory object so subsequent
+                                            # checks within this pass see the new value.
+                                            f.fixture_type = profile_type
+                                            issues.append(ValidationIssue(
+                                                'info', location,
+                                                f"fixture_type '{current_type}' -> '{profile_type}' "
+                                                f"(aus FixtureProfile {profile_id} übernommen)",
+                                                auto_fixed=True,
+                                            ))
+                                        except Exception as e_type_fix:
+                                            issues.append(ValidationIssue(
+                                                'warn', location,
+                                                f"fixture_type-Fix fehlgeschlagen: {e_type_fix}",
+                                            ))
+                                    else:
+                                        issues.append(ValidationIssue(
+                                            'info', location,
+                                            f"fixture_type '{current_type}' wäre -> '{profile_type}' "
+                                            f"(aus FixtureProfile {profile_id})",
+                                        ))
+                    except Exception as e_type:
+                        # Defensive: profile lookup failure must not interrupt validation.
+                        issues.append(ValidationIssue(
+                            'warn', location,
+                            f"fixture_type-Sync übersprungen: {e_type}",
+                        ))
 
                     # 3. Universe gueltig?
                     if universe < 1 or universe > 32:

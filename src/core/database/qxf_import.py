@@ -169,14 +169,14 @@ TYPE_MAP = {
     "Dimmer":           "dimmer",
     "Fan":              "other",
     "Flower":           "moving_head",   # Spider/Flower haben Pan/Tilt-Motoren
-    "Hazer":            "other",
+    "Hazer":            "hazer",
     "Laser":            "laser",
     "LED Bar (Beams)":  "led_bar",
     "LED Bar (Pixels)": "led_bar",
     "Moving Head":      "moving_head",
     "Other":            "other",
-    "Scanner":          "moving_head",
-    "Smoke":            "other",
+    "Scanner":          "scanner",
+    "Smoke":            "smoke",
     "Strobe":           "strobe",
     "Effect":           "other",
 }
@@ -282,6 +282,41 @@ def _text(element, tag: str, default: str = "") -> str:
     return el.text.strip() if el is not None and el.text else default
 
 
+# Namens-Heuristik (spezifisch → grob): Kanalname -> Attribut-Kuerzel. EINE Quelle,
+# genutzt von _resolve_attribute (letzter Fallback) UND _make_channel (wenn die
+# <Channel>-Definition fehlt -> rettet z. B. "Green" -> color_g statt "raw", sonst
+# faellt der Kanal aus Farb-/Tab-/Render-Logik heraus).
+_NAME_ATTR_RULES: list[tuple[str, str]] = [
+    ("master dimmer", "intensity"), ("dimmer", "intensity"),
+    ("intensity", "intensity"),
+    ("red", "color_r"), ("rot", "color_r"),
+    ("green", "color_g"), ("gruen", "color_g"), ("grün", "color_g"),
+    ("blue", "color_b"), ("blau", "color_b"),
+    ("white", "color_w"), ("weiss", "color_w"), ("weiß", "color_w"),
+    ("amber", "color_a"),
+    ("uv", "color_uv"),
+    ("pan fine", "pan_fine"), ("pan", "pan"),
+    ("tilt fine", "tilt_fine"), ("tilt", "tilt"),
+    ("strobe", "shutter"), ("shutter", "shutter"),
+    ("gobo rot", "gobo_rotation"), ("gobo", "gobo_wheel"),
+    ("zoom", "zoom"), ("focus", "focus"), ("fokus", "focus"),
+    ("iris", "iris"), ("prism", "prism"), ("prisma", "prism"),
+    ("frost", "frost"),
+    ("colour", "color_wheel"), ("color", "color_wheel"), ("farb", "color_wheel"),
+    ("speed", "speed"), ("geschw", "speed"),
+    ("reset", "reset"),
+]
+
+
+def _attr_from_name(name: str | None) -> str:
+    """Attribut-Kuerzel allein aus einem Kanalnamen; ``"raw"`` wenn nichts passt."""
+    n = (name or "").lower()
+    for keyword, attr in _NAME_ATTR_RULES:
+        if keyword in n:
+            return attr
+    return "raw"
+
+
 def _resolve_attribute(channel_el) -> str:
     """Bestimmt unser Attribut-Kürzel aus einem QLC+ Channel-Element."""
     # 1. Direkt-Preset auf dem Channel-Tag
@@ -301,30 +336,7 @@ def _resolve_attribute(channel_el) -> str:
                                       GROUP_MAP[group_name])
 
     # 3. Name-Heuristik als letzter Fallback (Reihenfolge: spezifisch → grob)
-    name = channel_el.get("Name", "").lower()
-    for keyword, attr in [
-        ("master dimmer", "intensity"), ("dimmer", "intensity"),
-        ("intensity", "intensity"),
-        ("red", "color_r"), ("rot", "color_r"),
-        ("green", "color_g"), ("gruen", "color_g"), ("grün", "color_g"),
-        ("blue", "color_b"), ("blau", "color_b"),
-        ("white", "color_w"), ("weiss", "color_w"), ("weiß", "color_w"),
-        ("amber", "color_a"),
-        ("uv", "color_uv"),
-        ("pan fine", "pan_fine"), ("pan", "pan"),
-        ("tilt fine", "tilt_fine"), ("tilt", "tilt"),
-        ("strobe", "shutter"), ("shutter", "shutter"),
-        ("gobo rot", "gobo_rotation"), ("gobo", "gobo_wheel"),
-        ("zoom", "zoom"), ("focus", "focus"), ("fokus", "focus"),
-        ("iris", "iris"), ("prism", "prism"), ("prisma", "prism"),
-        ("frost", "frost"),
-        ("colour", "color_wheel"), ("color", "color_wheel"), ("farb", "color_wheel"),
-        ("speed", "speed"), ("geschw", "speed"),
-        ("reset", "reset"),
-    ]:
-        if keyword in name:
-            return attr
-    return "raw"
+    return _attr_from_name(channel_el.get("Name", ""))
 
 
 def _cap_kind(preset: str, name: str) -> str:
@@ -461,12 +473,21 @@ def import_qxf_file(path: str, session: Session,
 
     def _make_channel(mode_obj, num, ch_name, ch_el):
         if ch_el is None:
+            # Mode referenziert einen Kanal ohne <Channel>-Definition: Attribut
+            # wenigstens aus dem Namen retten (z. B. "Green" -> color_g), sonst
+            # faellt der Kanal aus Farb-/Tab-/Render-Logik (galt frueher als "raw").
+            attr = _attr_from_name(ch_name)
+            default, highlight = _defaults_for(attr, None)
             session.add(FixtureChannel(
                 mode=mode_obj, channel_number=num,
-                name=ch_name or f"CH{num}", attribute="raw",
-                default_value=0, highlight_value=0,
+                name=ch_name or f"CH{num}", attribute=attr,
+                default_value=default, highlight_value=highlight,
             ))
             return
+        # Hat die Definition ein konkretes Attribut (Preset/Group/Name), gilt das
+        # — KEIN Namens-Override: PRESET_MAP setzt manche Kanaele bewusst auf
+        # "raw" (z. B. *Fine-Farbbytes, ColorCTO/CTB/CTC), deren Name aber ein
+        # Farbwort enthaelt; ein Override wuerde sie fehl als Farbe deuten.
         attr = _resolve_attribute(ch_el)
         default, highlight = _defaults_for(attr, ch_el)
         ch = FixtureChannel(

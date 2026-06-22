@@ -35,12 +35,17 @@ _SCRIPT    = "#88ddcc"   # teal
 _MATRIX    = "#ffd166"   # gold-orange (Rahmen der Mini-Matrix)
 
 # Fixture-Typ-Farben (heller als die dunklen Tabellen-Hintergruende in patch_view)
-_FX_MOVING = "#4aa3ff"
-_FX_PAR    = "#5fd35f"
-_FX_BAR    = "#e0c64a"
-_FX_STROBE = "#ff6b6b"
-_FX_DIMMER = "#b8b8b8"
-_FX_OTHER  = "#8a8aa0"
+_FX_MOVING  = "#4aa3ff"
+_FX_PAR     = "#5fd35f"
+_FX_BAR     = "#e0c64a"
+_FX_STROBE  = "#ff6b6b"
+_FX_DIMMER  = "#b8b8b8"
+_FX_OTHER   = "#8a8aa0"
+_FX_SCANNER = "#5ab4e8"
+_FX_LASER   = "#cc55ff"
+_FX_SMOKE   = "#a0a8b0"
+_FX_HAZER   = "#88b8b0"
+_FX_SPIDER  = "#5ab0ff"
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -314,6 +319,120 @@ def _draw_dimmer(p: QPainter, s: int, color):
     p.drawLine(QPointF(s * 0.57, s * 0.7), QPointF(s * 0.57, s * 0.82))
 
 
+def _draw_scanner(p: QPainter, s: int, color):
+    """Scanner: Spiegel auf Sockel mit Lichtstrahl."""
+    col = _qc(color)
+    # Sockel
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.06)))
+    p.setBrush(QBrush(col.darker(130)))
+    p.drawRoundedRect(QRectF(s * 0.2, s * 0.72, s * 0.6, s * 0.14), s * 0.04, s * 0.04)
+    # Spiegel (geneigtes Oval)
+    p.setBrush(QBrush(col))
+    p.save()
+    p.translate(s * 0.5, s * 0.5)
+    p.rotate(-35)
+    p.drawEllipse(QRectF(-s * 0.22, -s * 0.1, s * 0.44, s * 0.2))
+    p.restore()
+    # Lichtstrahl (Keil nach rechts-oben)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(col.lighter(160)))
+    beam = QPolygonF([
+        QPointF(s * 0.56, s * 0.44),
+        QPointF(s * 0.88, s * 0.12),
+        QPointF(s * 0.82, s * 0.18),
+    ])
+    p.drawPolygon(beam)
+
+
+def _draw_laser(p: QPainter, s: int, color):
+    """Laser: Geraet mit Strahlenfaecher."""
+    col = _qc(color)
+    # Geraetegehaeuse
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.05)))
+    p.setBrush(QBrush(col.darker(115)))
+    p.drawRoundedRect(QRectF(s * 0.12, s * 0.58, s * 0.32, s * 0.26), s * 0.06, s * 0.06)
+    # Strahlenfaecher (3 duenne Linien von Emitter-Punkt aus)
+    pen = QPen(col.lighter(150), max(1.0, s * 0.055))
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    p.setPen(pen)
+    origin = QPointF(s * 0.44, s * 0.71)
+    targets = [
+        QPointF(s * 0.88, s * 0.18),
+        QPointF(s * 0.76, s * 0.12),
+        QPointF(s * 0.62, s * 0.10),
+    ]
+    for t in targets:
+        p.drawLine(origin, t)
+
+
+def _draw_smoke(p: QPainter, s: int, color):
+    """Smoke: Maschinengehaeuse mit Duese und Rauchwolke."""
+    col = _qc(color)
+    # Gehaeuse
+    p.setPen(QPen(col.darker(150), max(1.0, s * 0.06)))
+    p.setBrush(QBrush(col.darker(110)))
+    p.drawRoundedRect(QRectF(s * 0.14, s * 0.52, s * 0.5, s * 0.34), s * 0.06, s * 0.06)
+    # Duese (kleines Rechteck rechts)
+    p.setBrush(QBrush(col))
+    p.drawRoundedRect(QRectF(s * 0.64, s * 0.60, s * 0.12, s * 0.16), s * 0.03, s * 0.03)
+    # Rauchwolke (3 kleine Kreise oben)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(col.lighter(130)))
+    for cx, cy, r in (
+        (s * 0.38, s * 0.38, s * 0.12),
+        (s * 0.52, s * 0.30, s * 0.10),
+        (s * 0.26, s * 0.33, s * 0.09),
+    ):
+        p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+
+
+def _draw_spider(p: QPainter, s: int, color):
+    """Spider / Dual-LED-Bar: zwei parallele horizontale Balken mit Kreis-Enden."""
+    col = _qc(color)
+    bar_h = s * 0.14
+    gap = s * 0.16
+    # Beide Balken vertikal zentriert mit 'gap' Abstand zwischen ihnen
+    y_top = s * 0.5 - gap / 2 - bar_h
+    y_bot = s * 0.5 + gap / 2
+    x0 = s * 0.14
+    x1 = s * 0.86
+    bar_w = x1 - x0
+    for y in (y_top, y_bot):
+        # Balken-Rechteck
+        p.setPen(QPen(col.darker(160), max(1.0, s * 0.05)))
+        p.setBrush(QBrush(col.darker(115)))
+        p.drawRoundedRect(QRectF(x0, y, bar_w, bar_h), bar_h * 0.4, bar_h * 0.4)
+        # Kleiner Kreis an jedem Balkenende
+        r = s * 0.07
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(col.lighter(150)))
+        cy = y + bar_h / 2
+        p.drawEllipse(QRectF(x0 - r, cy - r, r * 2, r * 2))
+        p.drawEllipse(QRectF(x1 - r, cy - r, r * 2, r * 2))
+
+
+def _draw_hazer(p: QPainter, s: int, color):
+    """Hazer: Maschinengehaeuse mit Duese und feinerer Nebelwolke."""
+    col = _qc(color)
+    # Gehaeuse
+    p.setPen(QPen(col.darker(150), max(1.0, s * 0.06)))
+    p.setBrush(QBrush(col.darker(110)))
+    p.drawRoundedRect(QRectF(s * 0.12, s * 0.50, s * 0.52, s * 0.36), s * 0.07, s * 0.07)
+    # Duese (oben rechts am Gehaeuse)
+    p.setBrush(QBrush(col))
+    p.drawRoundedRect(QRectF(s * 0.64, s * 0.46, s * 0.14, s * 0.12), s * 0.03, s * 0.03)
+    # Nebelwolke: 4 kleine halbdurchsichtige Kreise, breiter gestreut
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(col.lighter(145)))
+    for cx, cy, r in (
+        (s * 0.72, s * 0.34, s * 0.09),
+        (s * 0.82, s * 0.26, s * 0.08),
+        (s * 0.64, s * 0.28, s * 0.07),
+        (s * 0.78, s * 0.18, s * 0.07),
+    ):
+        p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+
+
 # ── kind -> (Maler, Farbe) ────────────────────────────────────────────────────
 _PAINTERS = {
     "snap":       (_draw_dot,      _SNAP),
@@ -335,6 +454,11 @@ _PAINTERS = {
     "fx_led_bar":     (_draw_bar,         _FX_BAR),
     "fx_strobe":      (_draw_strobe,      _FX_STROBE),
     "fx_dimmer":      (_draw_dimmer,      _FX_DIMMER),
+    "fx_scanner":     (_draw_scanner,     _FX_SCANNER),
+    "fx_laser":       (_draw_laser,       _FX_LASER),
+    "fx_smoke":       (_draw_smoke,       _FX_SMOKE),
+    "fx_hazer":       (_draw_hazer,       _FX_HAZER),
+    "fx_spider":      (_draw_spider,      _FX_SPIDER),
     "fx_other":       (_draw_dot,         _FX_OTHER),
 }
 
@@ -395,3 +519,32 @@ def fixture_icon(fixture_type: str, size: int = 16) -> QIcon:
     ft = (fixture_type or "other").strip().lower()
     kind = f"fx_{ft}" if f"fx_{ft}" in _PAINTERS else "fx_other"
     return icon_for_kind(kind, size)
+
+
+# Module-level cache for the lazy-imported is_spider_fixture callable.
+_is_spider_fixture_fn = None
+_is_spider_fixture_loaded = False
+
+
+def fixture_icon_for(fixture, size: int = 16) -> QIcon:
+    """Icon fuer ein PatchedFixture-Objekt mit Spider-Erkennung.
+
+    Prueft via is_spider_fixture (lazy import aus src.core.app_state), ob das
+    Geraet ein Spider ist, und liefert dann das Spider-Icon. Bei jedem anderen
+    Typ delegiert es an fixture_icon. Schlaegt der Import fehl, wird immer auf
+    das Typ-Icon zurueckgefallen — mini_icons bleibt standalone importierbar.
+    """
+    global _is_spider_fixture_fn, _is_spider_fixture_loaded
+    if not _is_spider_fixture_loaded:
+        _is_spider_fixture_loaded = True
+        try:
+            from src.core.app_state import is_spider_fixture as _fn
+            _is_spider_fixture_fn = _fn
+        except Exception:
+            _is_spider_fixture_fn = None
+    try:
+        if _is_spider_fixture_fn is not None and _is_spider_fixture_fn(fixture):
+            return icon_for_kind("fx_spider", size)
+    except Exception:
+        pass
+    return fixture_icon(getattr(fixture, "fixture_type", "other"), size)

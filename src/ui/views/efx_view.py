@@ -327,6 +327,105 @@ class EfxPreviewWidget(QWidget):
         self.update()
 
 
+# Spider-Bewegungsmuster: kuratierte Presets fuer Doppelbar-Spider (zwei oder
+# mehr Tilts, kein Pan). Alle nutzen eine reine TILT-Figur (width=0, rotation=0
+# -> die Amplitude steckt in `height`). efx.write() faechert die einzelnen
+# Tilt-Koepfe ueber `head_spread` phasenversetzt auf -> eine Welle/Chase rollt
+# ueber die Bars (head_spread 0 = synchron, 1 = volle Welle; bei CIRCLE ergibt
+# 1.0 die klassische gegengleiche Schere).
+# (key, Label, Algorithmus, Tilt-Hub/height, Geschwindigkeit Hz, head_spread)
+SPIDER_PATTERNS = [
+    ("wippe",    "Wippe",    EfxAlgorithm.CIRCLE,   200, 0.4, 1.0),
+    ("welle",    "Welle",    EfxAlgorithm.EIGHT,    200, 0.4, 0.5),
+    ("zacken",   "Zacken",   EfxAlgorithm.TRIANGLE, 220, 0.5, 0.5),
+    ("flackern", "Flackern", EfxAlgorithm.RANDOM,   200, 0.8, 1.0),
+    ("puls",     "Puls",     EfxAlgorithm.CIRCLE,   120, 0.2, 0.0),
+]
+SPIDER_PATTERN_TIPS = {
+    "wippe":    "Sanftes Auf-und-Ab — die Bars schwenken gegengleich (Schere).",
+    "welle":    "Liegende Acht, Köpfe versetzt — eine Welle rollt über die Bars.",
+    "zacken":   "Harte Zickzack-Schwenks (scharfe Umkehrpunkte), als Chase versetzt.",
+    "flackern": "Springt auf zufällige Tilt-Positionen (nervöser „Augen“-Look).",
+    "puls":     "Langsames, kleines Pulsieren — alle Bars gemeinsam (synchron).",
+}
+
+
+class SpiderEfxPreview(QWidget):
+    """Animierte Scheren-Vorschau fuer Spider-EFX.
+
+    Zeigt die beiden Bars (``SpiderBarsView``), wie sie aus der laufenden Tilt-
+    Figur gegenphasig schwenken — Kopf 1 = ``255 - tilt`` exakt wie
+    ``EfxInstance.write()`` es ans DMX gibt. Eigene Phasenfortschreibung wie
+    ``EfxPreviewWidget`` (Vorschau-Doppellogik, bewusst getrennt vom Render)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from src.ui.widgets.spider_bars_view import SpiderBarsView
+        self._efx: EfxInstance | None = None
+        self._phase = 0.0
+        self._bounce_dir = 1.0
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._bars = SpiderBarsView()
+        self._bars.setStyleSheet(
+            "background:#0d1117; border:1px solid #21262d; border-radius:4px;")
+        lay.addWidget(self._bars)
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(40)
+
+    def set_efx(self, efx: EfxInstance | None):
+        self._efx = efx
+        self._phase = 0.0
+        self._bounce_dir = 1.0
+        self._update_bars()
+
+    def _tick(self):
+        e = self._efx
+        if e is None or not self.isVisible():
+            return
+        try:
+            speed = max(0.0, float(getattr(e, "speed", 1.0)))
+        except (TypeError, ValueError):
+            speed = 1.0
+        delta = e.speed_hz * speed * 0.04
+        if not getattr(e, "loop", True) and e.direction != "bounce":
+            if e.direction == "backward":
+                self._phase = max(0.0, self._phase - delta)
+            else:
+                self._phase = min(1.0, self._phase + delta)
+        elif e.direction == "backward":
+            self._phase = (self._phase - delta) % 1.0
+        elif e.direction == "bounce":
+            self._phase += delta * self._bounce_dir
+            if self._phase >= 1.0:
+                self._phase = 1.0
+                self._bounce_dir = -1.0
+            elif self._phase <= 0.0:
+                self._phase = 0.0
+                self._bounce_dir = 1.0
+        else:
+            self._phase = (self._phase + delta) % 1.0
+        self._update_bars()
+
+    def _update_bars(self):
+        e = self._efx
+        if e is None:
+            self._bars.set_tilts(128, 128)
+            return
+        try:
+            _p0, t0 = e._calc(self._phase)
+            hs = max(0.0, float(getattr(e, "head_spread", 0.5)))
+            # 2-Bar-Vorschau: Kopf 1 liegt bei k/N = 1/2, also 0.5*head_spread
+            # versetzt — exakt wie EfxInstance._spider_head_tilts es fuer
+            # head_count=2 berechnet (Vorschau spiegelt den Render).
+            _p1, t1 = e._calc((self._phase + 0.5 * hs) % 1.0)
+        except Exception:
+            t0 = t1 = 128
+        self._bars.set_tilts(int(max(0, min(255, t0))),
+                             int(max(0, min(255, t1))))
+
+
 class EfxView(QWidget):
     """EFX manager: list of EFX instances + editor + preview."""
 
@@ -568,7 +667,65 @@ class EfxView(QWidget):
         form.addRow("Y-Frequenz (Lissajous):", self._yfreq_spin)
         form.addRow("X-Phase (Lissajous °):", self._xphase_spin)
         form.addRow("Y-Phase (Lissajous °):", self._yphase_spin)
+        self._form_box = form_box
         ec.addWidget(form_box)
+
+        # ── Spider-Modus: Bewegungsmuster statt Pan/Tilt-Geometrie ───────
+        # Bei Doppelbar-Spidern (zwei Tilts, kein Pan) ersetzt dieses Panel die
+        # Geometrie-Box: kuratierte Muster + nur die zwei relevanten Regler
+        # (Schwung = Tilt-Hub, Mitte = Tilt-Zentrum). Standardmaessig versteckt;
+        # _apply_spider_mode blendet es ein/aus.
+        self._spider_panel = QGroupBox("Bewegungsmuster (Spider)")
+        self._spider_panel.setStyleSheet(_box_style)
+        spv = QVBoxLayout(self._spider_panel)
+        spv.setSpacing(6)
+        spv.addWidget(QLabel(
+            "<span style='color:#8b949e;font-size:10px'>Muster wählen — die "
+            "Tilt-Köpfe schwenken phasenversetzt, eine Welle rollt über die "
+            "Bars. „Welle (Versatz)“ steuert, wie stark.</span>"))
+        from PySide6.QtWidgets import QGridLayout as _QGrid
+        pat_grid = _QGrid()
+        pat_grid.setSpacing(4)
+        for i, (key, label, _algo, _h, _sp, _hs) in enumerate(SPIDER_PATTERNS):
+            b = QPushButton(label)
+            b.setToolTip(SPIDER_PATTERN_TIPS.get(key, ""))
+            b.setStyleSheet(
+                "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+                "border-radius:3px;font-size:11px;padding:5px;} "
+                "QPushButton:hover{background:#30363d;}")
+            b.clicked.connect(lambda _=False, k=key: self._apply_spider_pattern(k))
+            pat_grid.addWidget(b, i // 3, i % 3)
+        spv.addLayout(pat_grid)
+
+        sp_form = QFormLayout()
+        sp_form.setSpacing(4)
+        self._spider_amp_spin = QSpinBox()
+        self._spider_amp_spin.setRange(0, 255)
+        self._spider_amp_spin.setSingleStep(5)
+        self._spider_amp_spin.setToolTip(
+            "Wie weit die Bars schwenken (Tilt-Hub). 0 = stehen, 255 = voller "
+            "Ausschlag.")
+        self._spider_amp_spin.valueChanged.connect(self._on_spider_amp)
+        sp_form.addRow("Schwung (Tilt-Hub):", self._spider_amp_spin)
+        self._spider_center_spin = QSpinBox()
+        self._spider_center_spin.setRange(0, 255)
+        self._spider_center_spin.setSingleStep(5)
+        self._spider_center_spin.setToolTip(
+            "Mittellage der Schwenkbewegung (Tilt-Zentrum).")
+        self._spider_center_spin.valueChanged.connect(self._on_spider_center)
+        sp_form.addRow("Mitte (Tilt):", self._spider_center_spin)
+        self._spider_spread_spin = QSpinBox()
+        self._spider_spread_spin.setRange(0, 100)
+        self._spider_spread_spin.setSingleStep(5)
+        self._spider_spread_spin.setSuffix(" %")
+        self._spider_spread_spin.setToolTip(
+            "Phasen-Versatz der Tilt-Köpfe zueinander. 0 % = alle Bars synchron, "
+            "100 % = volle Welle/Chase über die Bars (bei „Wippe“ = Schere).")
+        self._spider_spread_spin.valueChanged.connect(self._on_spider_spread)
+        sp_form.addRow("Welle (Versatz):", self._spider_spread_spin)
+        spv.addLayout(sp_form)
+        self._spider_panel.setVisible(False)
+        ec.addWidget(self._spider_panel)
 
         # ── Gruppe 2: Tempo & Richtung ──────────────────────────────────
         tempo_box = QGroupBox("Tempo && Richtung")
@@ -740,8 +897,9 @@ class EfxView(QWidget):
         pv = QVBoxLayout(prev_box)
         pv.setSpacing(4)
         prev_head = QHBoxLayout()
-        prev_head.addWidget(QLabel("<span style='color:#8b949e;font-size:10px'>"
-                                   "Zentrum ziehen · Ecken = Größe</span>"))
+        self._prev_hint = QLabel("<span style='color:#8b949e;font-size:10px'>"
+                                 "Zentrum ziehen · Ecken = Größe</span>")
+        prev_head.addWidget(self._prev_hint)
         prev_head.addStretch(1)
         self._btn_popout = QPushButton("⛶ Großansicht")
         self._btn_popout.setFixedHeight(24)
@@ -759,6 +917,11 @@ class EfxView(QWidget):
         self._preview.setMinimumSize(300, 300)
         self._preview.set_geometry_callback(self._apply_geometry)
         pv.addWidget(self._preview)
+        # Spider-Scheren-Vorschau (gleicher Platz, nur im Spider-Modus sichtbar).
+        self._spider_preview = SpiderEfxPreview()
+        self._spider_preview.setMinimumSize(300, 300)
+        self._spider_preview.setVisible(False)
+        pv.addWidget(self._spider_preview)
         top_row.addWidget(prev_box, stretch=3)
 
         body.addLayout(top_row, stretch=1)
@@ -886,7 +1049,8 @@ class EfxView(QWidget):
                     self._list.setCurrentRow(0)
                 if self._current is None:
                     return
-            from src.core.app_state import get_state, get_channels_for_patched
+            from src.core.app_state import (get_state, get_channels_for_patched,
+                                            is_dual_tilt_fixture)
             state = get_state()
             try:
                 fids = [int(f) for f in state.get_selected_fids()]
@@ -894,20 +1058,33 @@ class EfxView(QWidget):
                 fids = []
             patched = {f.fid: f for f in state.get_patched_fixtures()}
             movers = []
+            spiders = 0
             for fid in fids:
                 fx = patched.get(fid)
                 if fx is None:
                     continue
                 attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
+                # Moving Heads: Pan UND Tilt. Spider/Doppeltilter: >=2 Tilts, KEIN
+                # Pan — die wuerden sonst durchs Raster fallen, obwohl die EFX-
+                # Engine ihren Tilt (mit Auto-Schere) bewegen kann.
                 if "pan" in attrs and "tilt" in attrs:
                     movers.append(fid)
+                elif is_dual_tilt_fixture(fx):
+                    movers.append(fid)
+                    spiders += 1
             self._current.fixtures = [EfxFixture(fid=fid) for fid in movers]
             self._fx_list.clear()
             for fid in movers:
                 self._fx_list.addItem(f"Fixture #{fid}")
-            self._fx_box.setTitle(
-                f"Geräte: {len(movers)} Moving Head(s) (folgen der Auswahl)"
-                if movers else "Geräte: keine Moving Heads in der Auswahl")
+            if not movers:
+                title = "Geräte: keine beweglichen Geräte in der Auswahl"
+            elif spiders == len(movers):
+                title = f"Geräte: {len(movers)} Spider (folgen der Auswahl)"
+            else:
+                title = f"Geräte: {len(movers)} Gerät(e) (folgen der Auswahl)"
+            self._fx_box.setTitle(title)
+            # Editor-Modus (Moving Head vs. Spider) an die neue Auswahl anpassen.
+            self._update_spider_mode()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel geloescht
 
@@ -957,6 +1134,8 @@ class EfxView(QWidget):
                 self._fx_list.addItem(f"Fixture #{fx.fid}  offset={fx.start_offset:.2f}")
         finally:
             self._loading = False
+        # Spider-Modus nach dem Laden anhand der zugewiesenen Geraete setzen.
+        self._update_spider_mode()
 
     def _on_name_change(self, text: str):
         if self._current:
@@ -998,6 +1177,111 @@ class EfxView(QWidget):
         self._current.do_action("reseed")
         self._preview.set_efx(self._current)   # Vorschau-Phase frisch starten
         self._notify_timer.start()
+
+    # ── Spider-Modus (Doppelbar, zwei Tilts) ──────────────────────────────────
+
+    def _current_is_spider(self) -> bool:
+        """True, wenn die der aktuellen EFX zugewiesenen Geraete ausschliesslich
+        spider-/doppeltilter-artig sind (>=2 Tilt, kein Pan — zentrale
+        is_dual_tilt_fixture). Nur dann schaltet der Editor auf Bewegungsmuster
+        statt Pan/Tilt-Geometrie um."""
+        cur = self._current
+        if cur is None or not getattr(cur, "fixtures", None):
+            return False
+        try:
+            from src.core.app_state import get_state, is_dual_tilt_fixture
+            patched = {f.fid: f for f in get_state().get_patched_fixtures()}
+            fids = [fx.fid for fx in cur.fixtures]
+            return bool(fids) and all(
+                patched.get(fid) is not None and is_dual_tilt_fixture(patched[fid])
+                for fid in fids)
+        except Exception:
+            return False
+
+    def _update_spider_mode(self):
+        self._apply_spider_mode(self._current_is_spider())
+
+    def _apply_spider_mode(self, on: bool):
+        """Schaltet den Editor zwischen Moving-Head (Pan/Tilt-Geometrie + 2D-Pad)
+        und Spider (Bewegungsmuster + Scheren-Vorschau) um. Mutiert das Modell
+        NICHT — nur die Sichtbarkeit; die Muster-Knoepfe setzen die Parameter."""
+        on = bool(on)
+        if not hasattr(self, "_spider_panel"):
+            return
+        self._spider_mode = on
+        try:
+            self._form_box.setVisible(not on)
+            self._spider_panel.setVisible(on)
+            self._preview.setVisible(not on)
+            self._spider_preview.setVisible(on)
+            self._prev_hint.setVisible(not on)
+        except RuntimeError:
+            return
+        if on:
+            self._spider_preview.set_efx(self._current)
+            self._sync_spider_spins()
+
+    def _sync_spider_spins(self):
+        cur = self._current
+        if cur is None or not hasattr(self, "_spider_amp_spin"):
+            return
+        spins = (self._spider_amp_spin, self._spider_center_spin,
+                 self._spider_spread_spin)
+        for w in spins:
+            w.blockSignals(True)
+        try:
+            self._spider_amp_spin.setValue(int(round(cur.height)))
+            self._spider_center_spin.setValue(int(round(cur.y_offset)))
+            self._spider_spread_spin.setValue(
+                int(round(float(getattr(cur, "head_spread", 0.5)) * 100)))
+        finally:
+            for w in spins:
+                w.blockSignals(False)
+
+    def _on_spider_amp(self, v: int):
+        if self._loading or self._current is None:
+            return
+        # ueber die (versteckte) Hoehe-Spinbox -> _on_param_change schreibt height.
+        self._height_spin.setValue(v)
+
+    def _on_spider_center(self, v: int):
+        if self._loading or self._current is None:
+            return
+        self._yoff_spin.setValue(v)
+
+    def _on_spider_spread(self, v: int):
+        if self._loading or self._current is None:
+            return
+        # head_spread hat kein verstecktes Editor-Widget -> direkt ueber set_param
+        # ins Modell (zentrale Engine-Validierung), dann Bibliothek/2. Ansicht
+        # informieren. Die Scheren-Vorschau liest head_spread live je Tick.
+        self._current.set_param("head_spread", max(0, min(100, int(v))) / 100.0)
+        self._notify_timer.start()
+
+    def _apply_spider_pattern(self, key: str):
+        """Wendet ein kuratiertes Spider-Bewegungsmuster an: reine Tilt-Figur
+        (width=0, rotation=0), passender Algorithmus + Tilt-Hub + Tempo. Geht
+        ueber die (versteckten) Editor-Widgets, damit _on_param_change das Modell
+        konsistent fuellt und Bibliothek/2. Ansicht informiert werden."""
+        cur = self._current
+        if cur is None:
+            return
+        spec = next((s for s in SPIDER_PATTERNS if s[0] == key), None)
+        if spec is None:
+            return
+        _key, _label, algo, height, speed, head_spread = spec
+        self._loading = True
+        try:
+            self._algo_combo.setCurrentText(algo.value)
+            self._width_spin.setValue(0)       # kein Pan-Hub (Spider hat keinen Pan)
+            self._rot_spin.setValue(0)
+            self._height_spin.setValue(int(height))
+            self._speed_spin.setValue(float(speed))
+        finally:
+            self._loading = False
+        self._on_param_change()                # einmal sauber ins Modell schreiben
+        cur.set_param("head_spread", float(head_spread))   # Kopf-Welle des Musters
+        self._sync_spider_spins()
 
     # ── Geräte-Verhältnis (Phasen zueinander) ─────────────────────────────────
 
@@ -1266,6 +1550,7 @@ class EfxView(QWidget):
                 self._current.fixtures.append(EfxFixture(fid=fid))
                 self._fx_list.addItem(f"Fixture #{fid}")
                 existing.add(fid)
+            self._update_spider_mode()
         except Exception:
             pass
 
@@ -1276,6 +1561,7 @@ class EfxView(QWidget):
         if 0 <= row < len(self._current.fixtures):
             self._current.fixtures.pop(row)
             self._fx_list.takeItem(row)
+            self._update_spider_mode()
 
 
 class EfxPopoutDialog(QDialog):

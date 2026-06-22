@@ -582,8 +582,9 @@ class VCCanvas(QWidget):
         from .vc_speedial import VCSpeedDial
         from .vc_stepper import VCStepper
         from .vc_effect_display import VCEffectDisplay
+        from .vc_effect_editor import VCEffectEditor
         return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial,
-                VCStepper, VCEffectDisplay)
+                VCStepper, VCEffectDisplay, VCEffectEditor)
 
     # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
 
@@ -799,8 +800,35 @@ class VCCanvas(QWidget):
         from .vc_encoder import VCEncoder
         from .vc_stepper import VCStepper
         from .vc_effect_display import VCEffectDisplay
+        from .vc_effect_editor import VCEffectEditor
         from .vc_xypad import VCXYPad
         from .vc_speedial import VCSpeedDial, SpeedTarget
+
+        if isinstance(target, VCEffectEditor):
+            # Effekt auf die Editor-Box gezogen -> Box an den Effekt binden
+            # (Header + Live-Vorschau).
+            # Wird die Box auf einen ANDEREN Effekt umgebunden und hat schon
+            # Bedien-Widgets (die den ALTEN Effekt steuern), diese erst entfernen
+            # (ein Undo-Snapshot, _restoring-Guard) -> keine veralteten Regler,
+            # die unsichtbar den falschen Effekt steuern.
+            try:
+                _old = target.effect_id
+                _had = target._control_children()
+            except Exception:
+                _old, _had = None, []
+            if _old is not None and _old != int(function_id) and _had:
+                self.push_undo_snapshot(self.to_dict())
+                _prev = self._restoring
+                self._restoring = True
+                try:
+                    for _w in list(_had):
+                        target._remove_child(_w)
+                finally:
+                    self._restoring = _prev
+            # Beim interaktiven Drop oeffnet sich gleich das Auswahlmenue
+            # (open_control_chooser baut nur, wenn die Box danach leer ist).
+            target.set_effect(function_id, open_chooser=interactive)
+            return True
 
         if isinstance(target, VCColor):
             # Farb-Kachel färbt live die aktive Sequence-Farbe DIESES Effekts.
@@ -1234,6 +1262,33 @@ class VCCanvas(QWidget):
             cx += w.width() + pad
         frame.setVisible(self.on_active_bank(frame))
         return [frame] + children
+
+    def build_results_into_box(self, box, results) -> list:
+        """Baut die gewaehlten SmartDropResults als Bedien-Widgets IN eine
+        bestehende VCEffectEditor-Box (ein Undo-Schritt) und legt sie unter dem
+        Vorschau-Band in einer Reihe aus. Wird vom ⚙-Auswahlmenue der Box genutzt.
+        BULK (None) bleibt bewusst aussen vor."""
+        results = [r for r in (results or []) if r is not None]
+        if not results:
+            return []
+        self.push_undo_snapshot(self.to_dict())
+        _prev = self._restoring
+        self._restoring = True
+        created: list = []
+        try:
+            for res in results:
+                w = self._build_from_smart_result(res, QPoint(0, 0))
+                if w is None:                 # BULK liefert None -> bleibt lose
+                    continue
+                box.add_effect_child(w, box._current_page)
+                created.append(w)
+            try:
+                box._relayout_controls()
+            except Exception as e:
+                print(f"[VCCanvas] _relayout_controls failed: {e}")
+        finally:
+            self._restoring = _prev
+        return created
 
     def _assign_snap_to_button(self, btn, snap_id):
         """Macht einen VCButton zur Bibliothek-Farb-/Snap-Taste (Standard: Umschalten).

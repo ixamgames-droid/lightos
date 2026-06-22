@@ -32,6 +32,43 @@ ATTR_GROUPS: dict[str, set[str]] = {
 ATTR_GROUP_ORDER: list[str] = ["Intensity", "Color", "Position", "Beam",
                                "Gobo", "Effect", "Other"]
 
+# Menschenlesbare Labels fuer einzelne Attribute (Kanal-Ebene). Wird vom
+# Kanal-Auswahl-Dialog (Snap/Szene speichern) und vom Snap-Editor genutzt, damit
+# beide dieselben Bezeichnungen zeigen. Unbekannte Attribute fallen auf den rohen
+# Attribut-Namen zurueck.
+ATTR_LABELS: dict[str, str] = {
+    "intensity": "Intensität", "dimmer": "Dimmer", "master": "Master",
+    "shutter": "Shutter", "strobe": "Strobe",
+    "color_r": "Rot", "color_g": "Grün", "color_b": "Blau", "color_w": "Weiß",
+    "color_a": "Amber", "color_uv": "UV",
+    "cyan": "Cyan", "magenta": "Magenta", "yellow": "Gelb",
+    "color_wheel": "Farbrad", "colour_wheel": "Farbrad", "color": "Farbe",
+    "pan": "Pan", "tilt": "Tilt", "pan_fine": "Pan (fein)", "tilt_fine": "Tilt (fein)",
+    "pan_speed": "Pan-Speed", "tilt_speed": "Tilt-Speed",
+    "zoom": "Zoom", "focus": "Focus", "frost": "Frost", "iris": "Iris", "prism": "Prisma",
+    "prism_rot": "Prisma-Rotation",
+    "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_rotation": "Gobo-Rotation",
+    "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
+    "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
+    "animation": "Animation",
+}
+
+
+def attr_label(attr: str) -> str:
+    """Menschenlesbares Label fuer ein Attribut, inkl. Mehrkopf-Suffix ``#N``.
+
+    ``"color_r"`` -> ``"Rot"``; ``"color_r#1"`` -> ``"Rot (Kopf 2)"`` (Kopf 0 ist
+    der Basis-Kopf ohne Suffix). Unbekannte Attribute -> roher Name.
+    """
+    base, sep, head = (attr or "").partition("#")
+    label = ATTR_LABELS.get(base.lower(), base or attr)
+    if sep and head:
+        try:
+            return f"{label} (Kopf {int(head) + 1})"
+        except (TypeError, ValueError):
+            return f"{label} (#{head})"
+    return label
+
 
 def classify_attr(attr: str) -> str:
     """Ordnet ein Attribut einer Gruppe zu (exakt, sonst Substring). Default 'Other'."""

@@ -664,10 +664,14 @@ def xy_pad(caption, x, y, bank, fids, mode, efx_function_id=None, ww=180, hh=180
 
 
 def effect_editor_box(caption, x, y, bank, function_id, ww=300, hh=200):
-    """On-Canvas Editor-Box: korrigiert (echte Geraetegroesse) + einstellbar
-    (Speed/Intensitaet-Regler werden beim Laden via set_effect erzeugt)."""
+    """On-Canvas Editor-Box: an einen echten Effekt gebunden (Header + echte
+    Geraetegroesse-Vorschau) + ein sinnvoller Standard-Satz Bedien-Regler
+    (Tempo/Helligkeit) als serialisierte Kinder. Im neuen Modell baut die Box
+    keine Auto-Regler mehr beim Laden — der Generator legt sie daher explizit an
+    (``build_default_controls``); im Live-App betrieb waehlt der Nutzer per ⚙."""
     w = VCEffectEditor(caption)
-    w.effect_id = int(function_id)
+    w.set_effect(int(function_id))
+    w.build_default_controls()
     _add(w, x, y, ww, hh, bank)
 
 

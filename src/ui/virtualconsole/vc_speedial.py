@@ -71,7 +71,10 @@ class VCSpeedDial(VCWidget):
         # Default "speed", Effekt-Multiplier -> Default "tempo_multiplier");
         # fehlt ein Eintrag, gilt der jeweilige Default-Parameter.
         self.param_keys_per_id: dict[int, str] = {}
-        self.target_mode: str = SpeedTarget.EXECUTOR
+        # Default = Funktion/Effekt nach NAME (nicht Executor-Slot): David will mit
+        # Effekt-Namen arbeiten, nicht sich Slot-Zahlen merken. Executor bleibt als
+        # Modus waehlbar (fuer Hardware-Playback-Seiten).
+        self.target_mode: str = SpeedTarget.FUNCTION
         # Ziel-Bus fuer TEMPO_BUS-Modus ("" = aktiver/Default-Bus).
         self.tempo_bus_id: str = ""
         self._bpm: float = 120.0         # 20–600 BPM
@@ -723,27 +726,22 @@ class VCSpeedDial(VCWidget):
         form.addRow("", invert_cb)
 
         mode_cb = QComboBox()
-        mode_cb.addItem("Executor (Playback)", SpeedTarget.EXECUTOR)
-        mode_cb.addItem("Funktion / Effekt", SpeedTarget.FUNCTION)
+        # Funktion/Effekt (nach Name) zuerst = Standardweg; Executor-Slot zuletzt.
+        mode_cb.addItem("Funktion / Effekt (nach Name)", SpeedTarget.FUNCTION)
         mode_cb.addItem("Tempo-Bus (BPM setzen)", SpeedTarget.TEMPO_BUS)
         mode_cb.addItem("Effekt ×½/×2 (Multiplier)", SpeedTarget.TEMPO_BUS_MULT)
         mode_cb.addItem("Speed-Knoten (Master/Sub)", SpeedTarget.SPEED_NODE)
+        mode_cb.addItem("Executor-Slot (Playback)", SpeedTarget.EXECUTOR)
         for i in range(mode_cb.count()):
             if mode_cb.itemData(i) == self.target_mode:
                 mode_cb.setCurrentIndex(i)
                 break
         form.addRow("Ziel:", mode_cb)
-        slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        form.addRow("Executor-Slot / Function-ID:", slot)
 
-        # SPD-04: weitere Ziel-IDs (Komma-getrennt) — Sync/Speed wirken auf alle.
-        extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
-        extra_ids.setToolTip("Weitere Function-IDs (Komma-getrennt) — der Dial/Sync "
-                             "wirkt zusätzlich auf diese Effekte.")
-        form.addRow("Weitere Ziel-IDs:", extra_ids)
-        # Funktion/Chase nach Namen auswaehlen -> fuellt das Function-ID-Feld.
+        # HAUPTWEG: Funktion/Effekt nach NAME auswaehlen (David: nicht mit
+        # Executor-Slot-Zahlen arbeiten). Fuellt unter der Haube das Roh-ID-Feld.
         func_combo = QComboBox()
-        func_combo.addItem("(nach ID/Slot oben)", -1)
+        func_combo.addItem("(per Erweitert / Roh-ID)", -1)
         self._populate_function_combo(func_combo)
         if self.function_id is not None:
             for i in range(func_combo.count()):
@@ -751,11 +749,20 @@ class VCSpeedDial(VCWidget):
                     func_combo.setCurrentIndex(i)
                     break
 
+        # Roh-ID-/Executor-Slot-Felder: nur fuer Power-User -> unter „Erweitert".
+        slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
+        slot.setToolTip("Roh-Function-ID bzw. Executor-Slot-Nummer (Modus 'Executor-Slot'). "
+                        "Normalerweise per Namen oben gewählt.")
+        # SPD-04: weitere Ziel-IDs (Komma-getrennt) — Sync/Speed wirken auf alle.
+        extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
+        extra_ids.setToolTip("Weitere Function-IDs (Komma-getrennt) — der Dial/Sync "
+                             "wirkt zusätzlich auf diese Effekte.")
+
         def _on_func_pick(_i):
             data = func_combo.currentData()
             if data is not None and data >= 0:
                 slot.setText(str(data))
-                # Den Ziel-Modus NUR aus dem Default (Executor) heraus auf
+                # Den Ziel-Modus NUR aus dem Executor-Slot heraus auf
                 # „Funktion/Effekt" stellen. Eine bereits getroffene Wahl
                 # (Multiplier/Tempo-Bus/Speed-Knoten) NICHT ueberschreiben — sonst
                 # kippt das Auswaehlen des Ziel-Effekts den Multiplikator-Modus zurueck.
@@ -765,7 +772,18 @@ class VCSpeedDial(VCWidget):
                             mode_cb.setCurrentIndex(i)
                             break
         func_combo.currentIndexChanged.connect(_on_func_pick)
-        form.addRow("Funktion/Chase (Name):", func_combo)
+        form.addRow("Funktion / Effekt (Name):", func_combo)
+
+        # „Erweitert"-Bereich (Roh-ID / Executor-Slot / weitere IDs) — eingeklappt.
+        from src.ui.widgets.collapsible_section import CollapsibleSection
+        _adv_inner = QWidget()
+        _adv_form = QFormLayout(_adv_inner)
+        _adv_form.setContentsMargins(0, 0, 0, 0)
+        _adv_form.addRow("Executor-Slot / Roh-ID:", slot)
+        _adv_form.addRow("Weitere Ziel-IDs:", extra_ids)
+        adv_section = CollapsibleSection("Erweitert (Roh-ID / Executor-Slot)", _adv_inner,
+                                         collapsed=True, prefs_key="vc_speeddial_advanced")
+        form.addRow(adv_section)
 
         # Tempo-Sync Phase 5: Ziel-Bus (Modi 'Tempo-Bus' und 'Speed-Knoten').
         bus_cb = QComboBox()
@@ -873,8 +891,7 @@ class VCSpeedDial(VCWidget):
             m = mode_cb.currentData() or self.target_mode
             is_node = (m == SpeedTarget.SPEED_NODE)
             vis = {
-                slot:         m in (SpeedTarget.EXECUTOR,) + _EFFECT_TARGETS,
-                extra_ids:    m in _EFFECT_TARGETS,
+                adv_section:  m in (SpeedTarget.EXECUTOR,) + _EFFECT_TARGETS,
                 func_combo:   m in _EFFECT_TARGETS,
                 bus_cb:       m in (SpeedTarget.TEMPO_BUS, SpeedTarget.TEMPO_BUS_MULT,
                                     SpeedTarget.SPEED_NODE),
@@ -886,6 +903,9 @@ class VCSpeedDial(VCWidget):
             }
             for _w, _show in vis.items():
                 form.setRowVisible(_w, bool(_show))
+            # Im Executor-Slot-Modus ist das Roh-ID-Feld der einzige Eingang -> aufklappen.
+            if m == SpeedTarget.EXECUTOR:
+                adv_section.set_expanded(True)
 
         mode_cb.currentIndexChanged.connect(lambda _i: _update_speeddial_fields())
         mult_cb.toggled.connect(lambda _c: _update_speeddial_fields())
@@ -899,7 +919,7 @@ class VCSpeedDial(VCWidget):
             self.caption = cap.text() or self.caption
             self.multiplier_mode = mult_cb.isChecked()
             self.invert = invert_cb.isChecked()
-            self.target_mode = mode_cb.currentData() or SpeedTarget.EXECUTOR
+            self.target_mode = mode_cb.currentData() or SpeedTarget.FUNCTION
             self.tempo_bus_id = bus_cb.currentData() or ""
             self.role = role_cb.currentData() or "master"
             self.parent_bus_id = parent_cb.currentData() or ""
@@ -1006,7 +1026,7 @@ class VCSpeedDial(VCWidget):
                 self.param_keys_per_id[int(k)] = str(v)
             except (TypeError, ValueError):
                 pass
-        self.target_mode = d.get("target_mode", SpeedTarget.EXECUTOR)
+        self.target_mode = d.get("target_mode", SpeedTarget.FUNCTION)
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.multiplier_mode = bool(d.get("multiplier_mode", False))
         self._mult = float(d.get("mult", 1.0))

@@ -1006,12 +1006,16 @@ class VCButton(VCWidget):
                 break
         form.addRow("Aktion:", act)
 
+        # HAUPTWEG: Funktion/Chase nach NAME auswaehlen (David: nicht mit Executor-
+        # Slot-Zahlen arbeiten). Die Namens-Combo + die „Steuert"-Liste sind primaer;
+        # das Roh-ID-/Slot-Feld wandert unter „Erweitert" (weiter unten).
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        form.addRow("Executor-Slot / Function-ID:", slot)
+        slot.setToolTip("Roh-Function-ID bzw. Executor-Slot-Nummer (Aktion 'Executor'). "
+                        "Normalerweise per Namen gewählt.")
 
         # Funktion/Chase nach Namen auswaehlen -> fuellt das Function-ID-Feld.
         func_combo = QComboBox()
-        func_combo.addItem("(nach ID/Slot oben)", -1)
+        func_combo.addItem("(per Erweitert / Roh-ID)", -1)
         self._populate_function_combo(func_combo)
         if self.function_id is not None:
             for i in range(func_combo.count()):
@@ -1023,14 +1027,14 @@ class VCButton(VCWidget):
             if func_combo.currentData() is not None and func_combo.currentData() >= 0
             else None
         )
-        form.addRow("Funktion/Chase (Name):", func_combo)
+        form.addRow("Funktion / Chase (Name):", func_combo)
 
         # Phase E: weitere gekoppelte Funktions-IDs (Komma-getrennt) — der Button
         # schaltet/flasht function_id + diese gemeinsam (FUNCTION_TOGGLE/FLASH).
         extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
         extra_ids.setToolTip("Weitere Funktions-IDs (Komma-getrennt) — Toggle/Flash "
                              "wirkt zusaetzlich auf diese Funktionen (als Gruppe).")
-        form.addRow("Weitere Ziel-IDs:", extra_ids)
+        # (Roh-ID-Felder werden unten unter „Erweitert" gebuendelt.)
 
         # Lesbare, aufklappbare „Steuert"-Liste (wie beim BPM/Speed-Dial): zeigt die
         # gebundenen Funktionen/Effekte nach NAMEN, je Zeile auswaehl- und loeschbar.
@@ -1239,6 +1243,18 @@ class VCButton(VCWidget):
                                  "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
         form.addRow("Long-Press:", long_press_cb)
 
+        # „Erweitert"-Bereich (Roh-ID / Executor-Slot / weitere IDs) — eingeklappt.
+        from src.ui.widgets.collapsible_section import CollapsibleSection
+        from PySide6.QtWidgets import QWidget as _QWidget
+        _adv_inner = _QWidget()
+        _adv_form = QFormLayout(_adv_inner)
+        _adv_form.setContentsMargins(0, 0, 0, 0)
+        _adv_form.addRow("Executor-Slot / Function-ID:", slot)
+        _adv_form.addRow("Weitere Ziel-IDs:", extra_ids)
+        adv_section = CollapsibleSection("Erweitert (Roh-ID / Executor-Slot)", _adv_inner,
+                                         collapsed=True, prefs_key="vc_button_advanced")
+        form.addRow(adv_section)
+
         # ── Kontextabhängige Feld-Sichtbarkeit ──
         # Zeigt je Aktion nur die passenden Felder (statt immer alle ~12 Zeilen).
         # Caption/Aktion/MIDI/Pad bleiben immer sichtbar.
@@ -1253,9 +1269,8 @@ class VCButton(VCWidget):
             a = act.currentData()        # roher Enum-Wert (str)
             func_like = a in (FT, FF, EA, TG, FL, AW)
             vis = {
-                slot:            func_like,
+                adv_section:     func_like,
                 func_combo:      func_like,
-                extra_ids:       a in (FT, FF),
                 target_editor:   a in (FT, FF, EA, AW),
                 snap_combo:      a == SN,
                 lib_combo:       a == LS,

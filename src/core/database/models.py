@@ -114,6 +114,16 @@ class PatchedFixture(Base):
     invert_tilt: Mapped[bool] = mapped_column(Boolean, default=False)
     swap_pan_tilt: Mapped[bool] = mapped_column(Boolean, default=False)
     dimmer_curve: Mapped[str] = mapped_column(String(20), default="linear")
+    # Spider-Doppelbar: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel
+    # (R,G,B,W)? Rein visuell (3D-Visualizer) — DMX unveraendert. Default gespiegelt.
+    spider_mirrored: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
+    # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
+    # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
+    pan_range_deg: Mapped[int] = mapped_column(Integer, default=540)
+    tilt_range_deg: Mapped[int] = mapped_column(Integer, default=270)
+    pan_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
+    tilt_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
 
     # Denormalisiert für schnellen Zugriff ohne JOIN
     manufacturer_name: Mapped[str] = mapped_column(String(120), default="")
@@ -147,6 +157,17 @@ def migrate_show_db(engine) -> None:
             if cols and "folder" not in cols:
                 conn.execute(text(
                     "ALTER TABLE fixture_groups ADD COLUMN folder VARCHAR DEFAULT ''"))
+            # Spider-Doppelbar: Spalte spider_mirrored (Default gespiegelt = 1).
+            pcols = {row[1] for row in conn.execute(text("PRAGMA table_info(patched_fixtures)"))}
+            if pcols and "spider_mirrored" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN spider_mirrored BOOLEAN DEFAULT 1"))
+            # Pan/Tilt physische Bereiche + Nullpunkt (Moving-Head-Aim/Visualizer).
+            for _col, _def in (("pan_range_deg", 540), ("tilt_range_deg", 270),
+                               ("pan_zero_dmx", 128), ("tilt_zero_dmx", 128)):
+                if pcols and _col not in pcols:
+                    conn.execute(text(
+                        f"ALTER TABLE patched_fixtures ADD COLUMN {_col} INTEGER DEFAULT {_def}"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 

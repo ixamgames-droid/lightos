@@ -619,19 +619,29 @@ class ColorPicker(QWidget):
             r = self._color.red()
             g = self._color.green()
             b = self._color.blue()
+            def _set(fid, attr, value):
+                # Mehrkopf (Spider): Pro-Kopf-Overrides ("attr#N") der beruehrten
+                # Farbe entfernen, damit der Picker das GANZE Geraet faerbt
+                # (Flush spiegelt Kopf 0). Einzelkopf-Geraet -> No-op.
+                state.set_programmer_value(fid, attr, int(value))
+                progmap = getattr(state, "programmer", None)
+                if progmap is not None:
+                    for k in [k for k in progmap.get(fid, {})
+                              if k.startswith(f"{attr}#")]:
+                        state.clear_programmer_value(fid, k)
             for fid in fids:
                 payload = {"color_r": r, "color_g": g, "color_b": b}
                 fx = fx_by_fid.get(fid)
                 if fx is not None and not self._white:
                     payload = adapt_color_payload(fixture_attr_set(fx), payload)
                 for attr, value in payload.items():
-                    state.set_programmer_value(fid, attr, int(value))
+                    _set(fid, attr, value)
                 if self._white:
-                    state.set_programmer_value(fid, "color_w", self._white)
+                    _set(fid, "color_w", self._white)
                 if self._amber:
-                    state.set_programmer_value(fid, "color_a", self._amber)
+                    _set(fid, "color_a", self._amber)
                 if self._uv:
-                    state.set_programmer_value(fid, "color_uv", self._uv)
+                    _set(fid, "color_uv", self._uv)
         except Exception as e:
             print(f"[color_picker] apply error: {e}")
 

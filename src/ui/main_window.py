@@ -411,7 +411,7 @@ class MainWindow(QMainWindow):
 
         # Sektions-Definitionen: (Label, Icon-Farbe, Index)
         sections = [
-            ("Live View",            "#FFD700"),
+            ("Bühnen-Layout",        "#FFD700"),
             ("Patchen",              "#0978FF"),
             ("Programmer",           "#FFD700"),
             ("Virtual Console",      "#9DFF52"),

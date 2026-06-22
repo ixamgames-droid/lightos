@@ -33,12 +33,16 @@ class _StateStub:
         self.values = {}
         self.set_calls = []
 
-    def get_programmer_value(self, fid, attr):
-        return self.values.get((fid, attr))
+    def get_programmer_value(self, fid, attr, head=0):
+        # Signatur spiegelt AppState.get_programmer_value (Mehrkopf X-6):
+        # head>0 adressiert das N-te Vorkommen via Schluessel "attr#N".
+        key = attr if not head else f"{attr}#{int(head)}"
+        return self.values.get((fid, key))
 
-    def set_programmer_value(self, fid, attr, value):
+    def set_programmer_value(self, fid, attr, value, undoable=False, head=0):
+        key = attr if not head else f"{attr}#{int(head)}"
         self.set_calls.append((fid, attr, value))
-        self.values[(fid, attr)] = value
+        self.values[(fid, key)] = value
 
 
 def _make_slider(state, fixtures):

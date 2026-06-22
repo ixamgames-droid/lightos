@@ -55,11 +55,14 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     # MITTE: WP-5 — EINE Tab-Leiste statt Kategorie-Leiste + Stack.
     # M2.1: "Gobo" als eigener Tab (standardmaessig versteckt, nur bei
     # Gobo-faehigen Fixtures sichtbar) zwischen Position und Weitere.
+    # M-Map: "Mapping" (Kanal-Mapping) zwischen Weitere und Helper, ebenfalls
+    # standardmaessig versteckt (nur bei Pan/Tilt-Geraeten sichtbar).
     labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
     assert labels == ["Intensity", "Color", "Position", "Gobo", "Weitere",
-                      "Helper", "EFX", "Matrix", "Paletten"], labels
-    # Gobo-Tab ist ohne Auswahl ausgeblendet.
+                      "Mapping", "Helper", "EFX", "Matrix", "Paletten"], labels
+    # Gobo- und Mapping-Tab sind ohne Auswahl ausgeblendet.
     assert pv._main_tabs.isTabVisible(pv._gobo_tab_index) is False
+    assert pv._main_tabs.isTabVisible(pv._mapping_tab_index) is False
     assert pv._tile_preview is not None           # UNTEN
 
     # Tab-Wechsel wirft nicht.

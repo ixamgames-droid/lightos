@@ -66,6 +66,45 @@
   #fab-rotate:hover  { background: #3a80b0; }
   #fab-place   { background: #27ae60; color: #fff; }
   #fab-place:hover   { background: #2ecc71; }
+  /* Edit-Werkzeug-Leiste (oben, touch-tauglich) — Verschieben/Höhe/Drehen */
+  #edit-toolbar {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 8px; z-index: 40;
+    background: rgba(10,14,20,0.82); padding: 6px; border-radius: 12px;
+    border: 1px solid #2a4a6a; box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+  }
+  .edit-tool-btn {
+    min-height: 46px; min-width: 96px;
+    padding: 8px 14px; border-radius: 8px;
+    border: 1px solid #2a4a6a; background: #16202c; color: #9acbff;
+    font-size: 15px; font-weight: bold; cursor: pointer;
+    pointer-events: auto; transition: background 0.1s, transform 0.08s;
+  }
+  .edit-tool-btn:hover  { background: #223344; color: #bfe0ff; }
+  .edit-tool-btn:active { transform: scale(0.95); }
+  .edit-tool-btn.active {
+    background: #1f6feb; color: #fff; border-color: #1f6feb;
+    box-shadow: 0 0 0 2px rgba(31,111,235,0.4);
+  }
+  /* Zweite Reihe: Trace-Einstellungen (Form/Größe/Tempo/Speichern) */
+  #trace-panel {
+    position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 8px; align-items: center; z-index: 39;
+    background: rgba(10,14,20,0.82); padding: 5px 8px; border-radius: 10px;
+    border: 1px solid #2a4a6a; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    color: #9acbff; font-size: 13px;
+  }
+  #trace-panel .tp-label { font-weight: bold; padding: 0 2px; }
+  #trace-panel .tp-shape, #trace-panel .tp-save {
+    min-height: 38px; padding: 6px 10px; border-radius: 7px;
+    border: 1px solid #2a4a6a; background: #16202c; color: #9acbff;
+    font-size: 13px; font-weight: bold; cursor: pointer; pointer-events: auto;
+  }
+  #trace-panel .tp-shape.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+  #trace-panel .tp-save { background: #1f6f3a; color: #fff; border-color: #1f6f3a; }
+  #trace-panel .tp-save:hover { background: #28934e; }
+  #trace-panel input[type=range] { width: 90px; pointer-events: auto; }
+  #trace-panel .tp-val { min-width: 46px; display: inline-block; text-align: right; }
   #longpress-ring {
     position: absolute; pointer-events: none; display: none;
     width: 60px; height: 60px; border-radius: 50%;
@@ -83,6 +122,26 @@
 <body>
 <div id="overlay">LightOS Visualizer | <span id="mode-text">3D View</span></div>
 <div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
+<div id="edit-toolbar">
+  <button class="edit-tool-btn active" id="tool-move-xz" onclick="setEditTool('move_xz')" title="Strahler am Boden verschieben (X/Z)">↔ Verschieben</button>
+  <button class="edit-tool-btn" id="tool-move-y" onclick="setEditTool('move_y')" title="Höhe ändern (Y) — hoch/runter ziehen">↕ Höhe</button>
+  <button class="edit-tool-btn" id="tool-rotate" onclick="setEditTool('rotate')" title="Drehen (seitlich=Hochachse) + Kippen (hoch/runter)">⟳ Drehen</button>
+  <button class="edit-tool-btn" id="tool-aim" onclick="setEditTool('aim')" title="Zielen: erst Geräte antippen=auswählen, dann Boden/Wand antippen → Strahler richten sich automatisch dorthin (Moving Heads fahren Pan/Tilt)">⌖ Zielen</button>
+  <button class="edit-tool-btn" id="tool-trace" onclick="setEditTool('trace')" title="Nachfahren: Moving Heads auswählen, dann Boden/Wand antippen → die Köpfe fahren dort live eine Form ab. Werkzeug wechseln stoppt.">○ Nachfahren</button>
+</div>
+<div id="trace-panel">
+  <span class="tp-label">Form:</span>
+  <button class="tp-shape active" id="tp-circle" onclick="setTraceShape('circle')">○ Kreis</button>
+  <button class="tp-shape" id="tp-line" onclick="setTraceShape('line')">— Linie</button>
+  <button class="tp-shape" id="tp-rect" onclick="setTraceShape('rect')">▭ Rechteck</button>
+  <span class="tp-label">Größe:</span>
+  <input type="range" id="trace-radius" min="2" max="60" value="10" oninput="onTraceRadius(this.value)">
+  <span class="tp-val" id="trace-radius-val">1.0 m</span>
+  <span class="tp-label">Tempo:</span>
+  <input type="range" id="trace-speed" min="20" max="250" value="60" oninput="onTraceSpeed(this.value)">
+  <span class="tp-val" id="trace-speed-val">60 ms</span>
+  <button class="tp-save" onclick="saveTraceSeq()" title="Aktuelle Form + Auswahl als abspielbare Sequenz speichern">💾 Als Sequenz</button>
+</div>
 <div id="selection-banner" style="position:absolute; top:42px; left:50%; transform:translateX(-50%);
      color:#ffd700; font-size:14px; font-weight:bold;
      background:rgba(0,0,0,0.6); padding:5px 14px; border-radius:4px;
@@ -145,6 +204,16 @@ orthoCam.up.set(0, 0, -1); // so +Z points down on screen, +X right
 let activeCam = perspectiveCam;
 let viewMode = '3D';      // '2D' | '3D'
 let editMode = 'view';    // 'view' | 'edit' | 'stage'
+// Touch-Edit-Werkzeug (oben in der Leiste wählbar) — was ein 1-Finger-Drag auf
+// einem ausgewählten Strahler im Fixture-Edit-Modus tut:
+//   'move_xz' = am Boden verschieben (X/Z) · 'move_y' = Höhe (Y) · 'rotate' =
+//   drehen (seitlich=Hochachse Y) + kippen (hoch/runter=X).
+let editTool = 'move_xz';
+
+// Grad <-> Radiant (Bridge transportiert Rotationen in GRAD, Three.js nutzt
+// Radiant). Eigene Helfer statt THREE.MathUtils — unabhängig vom Build.
+function deg2rad(d) { return (Number(d) || 0) * Math.PI / 180; }
+function rad2deg(r) { return (Number(r) || 0) * 180 / Math.PI; }
 
 // State
 const settings = {
@@ -831,7 +900,10 @@ function getStageJson() {
       x: f.group.position.x,
       y: f.group.position.y,
       z: f.group.position.z,
+      // Rotationen hier in Radiant (interner JS-Roundtrip, kein Bridge-Grad).
+      rotationX: f.group.rotation.x,
       rotationY: f.group.rotation.y,
+      rotationZ: f.group.rotation.z,
     })),
   };
 }
@@ -859,7 +931,9 @@ function loadStageJson(json) {
         const f = fixtures[fp.fid];
         if (f) {
           f.group.position.set(fp.x || 0, fp.y || 6.5, fp.z || 0);
+          if (typeof fp.rotationX === 'number') f.group.rotation.x = fp.rotationX;
           if (typeof fp.rotationY === 'number') f.group.rotation.y = fp.rotationY;
+          if (typeof fp.rotationZ === 'number') f.group.rotation.z = fp.rotationZ;
         }
       });
     }
@@ -1015,21 +1089,359 @@ function buildStrobe() {
 
 function buildDimmer() {
   const group = new THREE.Group();
-  const bulb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.1 })
+
+  // ── Dark-metal housing ────────────────────────────────────────────────────
+  const housingMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.65, roughness: 0.45 });
+  const housing = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.36, 0.38),
+    housingMat
   );
-  group.add(bulb);
-  return { group, head: group, lamp: bulb };
+  housing.position.y = 0.0;
+  housing.castShadow = true;
+  group.add(housing);
+
+  // ── Mounting-ear flanges (left and right) ─────────────────────────────────
+  const earMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.55, roughness: 0.5 });
+  [-0.28, 0.28].forEach((xOff) => {
+    const ear = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.10, 0.22),
+      earMat
+    );
+    ear.position.set(xOff, 0.13, 0);
+    ear.castShadow = true;
+    group.add(ear);
+  });
+
+  // ── Frosted lens panel (becomes the 'lamp' — emissive-driven) ─────────────
+  const lampMat = new THREE.MeshStandardMaterial({
+    color: 0xfff5e0,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0,
+    roughness: 0.6,
+    transparent: true,
+    opacity: 0.88,
+    side: THREE.DoubleSide,
+  });
+  const lensPanel = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.38, 0.28),
+    lampMat
+  );
+  lensPanel.position.set(0, 0, 0.195);
+  group.add(lensPanel);
+
+  // ── 4×2 grid of emissive LED discs (share lampMat so one update covers all) ─
+  const ledCols = 4;
+  const ledRows = 2;
+  const ledXStep = 0.085;
+  const ledYStep = 0.09;
+  for (let row = 0; row < ledRows; row++) {
+    for (let col = 0; col < ledCols; col++) {
+      const disc = new THREE.Mesh(
+        new THREE.CircleGeometry(0.030, 10),
+        lampMat   // shared material — emissiveIntensity update on lampMat drives all
+      );
+      disc.position.set(
+        (col - (ledCols - 1) / 2) * ledXStep,
+        (row - (ledRows - 1) / 2) * ledYStep,
+        0.198   // just in front of the lens panel to avoid z-fight
+      );
+      group.add(disc);
+    }
+  }
+
+  // ── Barn-door stub panels (top and bottom, non-emissive) ──────────────────
+  const barnMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.7, roughness: 0.4 });
+  [{ yOff: 0.195, rotX:  0.35 }, { yOff: -0.195, rotX: -0.35 }].forEach(({ yOff, rotX }) => {
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.06, 0.14),
+      barnMat
+    );
+    door.position.set(0, yOff, 0.12);
+    door.rotation.x = rotX;
+    door.castShadow = true;
+    group.add(door);
+  });
+
+  return { group, head: group, lamp: lensPanel };
 }
 
-function buildFixtureModel(type) {
+function buildScanner() {
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.4 });
+  // Procedural base: flat box body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.12, 0.5),
+    baseMat
+  );
+  body.position.y = 0.06;
+  body.castShadow = true;
+  group.add(body);
+  // Tilted mirror (flat disc, angled ~45deg)
+  const mirrorMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.95, roughness: 0.05, side: THREE.DoubleSide });
+  const mirror = new THREE.Mesh(
+    new THREE.CircleGeometry(0.18, 20),
+    mirrorMat
+  );
+  mirror.position.set(0, 0.2, 0);
+  mirror.rotation.x = Math.PI / 4;   // ~45 deg tilt
+  group.add(mirror);
+  // Lens (emissive DMX colour feedback)
+  const lens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.08, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.1, side: THREE.DoubleSide })
+  );
+  lens.position.set(0, 0.22, -0.22);
+  lens.rotation.x = -Math.PI / 4;
+  group.add(lens);
+  // Load real model; hide procedural body + mirror on success, keep lens
+  loadModel('assets/models/fixtures/scanner.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.6, y: 0.5, z: 0.6 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    body.visible = false;
+    mirror.visible = false;
+    group.add(model);
+  });
+  return { group, head: group, lamp: lens };
+}
+
+function buildSmoke() {
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.4, roughness: 0.6 });
+  // Procedural fallback: simple box
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.35, 0.38),
+    baseMat
+  );
+  body.castShadow = true;
+  group.add(body);
+  // Nozzle / emissive mesh (small circle at front)
+  const nozzle = new THREE.Mesh(
+    new THREE.CircleGeometry(0.06, 12),
+    new THREE.MeshStandardMaterial({ color: 0xcccccc, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2, side: THREE.DoubleSide })
+  );
+  nozzle.position.set(0, 0, -0.2);
+  nozzle.rotation.x = Math.PI / 2;
+  group.add(nozzle);
+  // Load real model
+  loadModel('assets/models/fixtures/smoke.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.6, y: 0.4, z: 0.4 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    body.visible = false;
+    group.add(model);
+  });
+  return { group, head: group, lamp: nozzle };
+}
+
+function buildHazer() {
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.45, roughness: 0.55 });
+  // Procedural fallback: box slightly taller than smoke
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.45, 0.48),
+    baseMat
+  );
+  body.castShadow = true;
+  group.add(body);
+  // Lamp / indicator mesh on front face
+  const lamp = new THREE.Mesh(
+    new THREE.CircleGeometry(0.07, 12),
+    new THREE.MeshStandardMaterial({ color: 0xaaaaaa, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.15, side: THREE.DoubleSide })
+  );
+  lamp.position.set(0, 0.05, -0.25);
+  lamp.rotation.x = Math.PI / 2;
+  group.add(lamp);
+  // Load real model
+  loadModel('assets/models/fixtures/hazer.dae', (model) => {
+    if (!model) return;
+    fitModelToSize(model, { x: 0.6, y: 0.4, z: 0.5 });
+    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
+    body.visible = false;
+    group.add(model);
+  });
+  return { group, head: group, lamp };
+}
+
+function buildLaser() {
+  const group = new THREE.Group();
+  // Small emitter body
+  const emitterMat = new THREE.MeshStandardMaterial({ color: 0x0d0d0d, metalness: 0.7, roughness: 0.3 });
+  const emitter = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.14, 0.18),
+    emitterMat
+  );
+  emitter.castShadow = true;
+  group.add(emitter);
+  // Aperture lamp (emissive; colour driven by DMX)
+  const lamp = new THREE.Mesh(
+    new THREE.CircleGeometry(0.04, 10),
+    new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.0, roughness: 0.05, side: THREE.DoubleSide })
+  );
+  lamp.position.set(0, 0, -0.1);
+  lamp.rotation.x = Math.PI / 2;
+  group.add(lamp);
+  // Fan of ~5 thin emissive beam lines radiating forward (downward in world-Y when hung)
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0x00ff00,
+    transparent: true,
+    opacity: 0.6,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // radians spread in X
+  FAN_ANGLES.forEach((angle) => {
+    const beamLen = 1.8;
+    const geo = new THREE.CylinderGeometry(0.005, 0.005, beamLen, 4);
+    const beam = new THREE.Mesh(geo, beamMat.clone());
+    // Position: start just below emitter, fan out along Z (forward) with X spread
+    beam.position.set(Math.sin(angle) * beamLen * 0.5, 0, -0.1 - Math.cos(angle) * beamLen * 0.5);
+    beam.rotation.x = Math.PI / 2 - angle * 0.6;  // tilt so beam fans outward
+    beam.rotation.z = angle;
+    group.add(beam);
+  });
+  return { group, head: group, lamp };
+}
+
+// ── Spider (Doppel-Bar Moving Head) ─────────────────────────────────────────
+// Echtes Geraet (z.B. U King SPIDER14): KEIN Pan/Yoke, sondern ZWEI PARALLEL
+// liegende Lichtleisten/Bars mit je EIGENEM Tilt-Motor. Jede Bar traegt 4
+// EINZELFARBEN-LEDs (kein RGBW-Mix pro Linse): Bar L = Rot, Gruen, Blau, Weiss;
+// Bar R ist GESPIEGELT = Weiss, Blau, Gruen, Rot. Jede LED leuchtet einzeln nach
+// ihrem eigenen Kanal (color_r->rote LED, color_g->gruene, color_b->blaue,
+// color_w->weisse). Die zwei Bars schwenken gegeneinander (Tilt um X) = Schere.
+// mirrored (Default true): 2. Bar zeigt die Farben GESPIEGELT (W,B,G,R). Bei
+// false sind beide Bars gleichlaeufig/parallel (R,G,B,W) — selber Controller,
+// leicht andere Bauweise (per-Fixture-Option im Patch-Dialog).
+function buildSpider(mirrored) {
+  const group = new THREE.Group();
+  // ── Nicer central body (replaces plain bracket) ───────────────────────────
+  // Main body block — slightly chamfered look via two layered boxes
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, metalness: 0.7, roughness: 0.38 });
+  const bodyMain = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.18, 0.54), bodyMat);
+  bodyMain.position.y = 0.12;
+  bodyMain.castShadow = true;
+  group.add(bodyMain);
+  // Slim accent strip along the front face of the body
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0x2e2e2e, metalness: 0.8, roughness: 0.3 });
+  const accentStrip = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.03), accentMat);
+  accentStrip.position.set(0, 0.12, 0.275);
+  group.add(accentStrip);
+  // Side ribs for visual detail
+  [-0.38, 0.38].forEach((xOff) => {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.56), bodyMat);
+    rib.position.set(xOff, 0.12, 0);
+    rib.castShadow = true;
+    group.add(rib);
+  });
+
+  // ── Top yoke-mount cap (non-emissive, on root group) ──────────────────────
+  const yokeMat = new THREE.MeshStandardMaterial({ color: 0x252525, metalness: 0.75, roughness: 0.35 });
+  const yokeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.13, 0.10, 14), yokeMat);
+  yokeCap.position.set(0, 0.27, 0);
+  yokeCap.castShadow = true;
+  group.add(yokeCap);
+  // Small bolt detail on top of cap
+  const boltMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.9, roughness: 0.2 });
+  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 8), boltMat);
+  bolt.position.set(0, 0.35, 0);
+  group.add(bolt);
+
+  // Fixfarben der LEDs. ch = Index in [color_r, color_g, color_b, color_w].
+  const LED = {
+    r: { c: new THREE.Color(1.00, 0.00, 0.00), ch: 0 },
+    g: { c: new THREE.Color(0.00, 1.00, 0.00), ch: 1 },
+    b: { c: new THREE.Color(0.10, 0.25, 1.00), ch: 2 },
+    w: { c: new THREE.Color(1.00, 1.00, 1.00), ch: 3 },
+  };
+  // Bar L (Bank 1, vorne): immer R G B W.
+  const barL = [LED.r, LED.g, LED.b, LED.w];
+  // Bar R (Bank 2, hinten): gespiegelt W B G R, oder parallel R G B W.
+  const barR = (mirrored === false)
+    ? [LED.r, LED.g, LED.b, LED.w]
+    : [LED.w, LED.b, LED.g, LED.r];
+  const LAYOUT = [
+    { zoff: -0.17, leds: barL },
+    { zoff:  0.17, leds: barR },
+  ];
+  const XS = [-0.27, -0.09, 0.09, 0.27];   // LED-Positionen entlang der Bar (X)
+
+  const bars = [];
+  LAYOUT.forEach((def) => {
+    // Pivot dreht die ganze Bar um X (Tilt). rotation.x=0 => Beams nach unten.
+    const pivot = new THREE.Group();
+    pivot.position.set(0, 0, def.zoff);
+    group.add(pivot);
+    // Bar-Koerper laeuft entlang X
+    const arm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.07, 0.10),
+      new THREE.MeshStandardMaterial({ color: 0x0d0d0d, metalness: 0.5, roughness: 0.5 })
+    );
+    arm.castShadow = true;
+    pivot.add(arm);
+
+    // ── Cosmetic additions on the pivot (tilt with the bar) ────────────────
+    // Bottom fascia strip — a thin plate below the arm
+    const fasciaMat = new THREE.MeshStandardMaterial({ color: 0x202020, metalness: 0.6, roughness: 0.42 });
+    const fascia = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.018, 0.12), fasciaMat);
+    fascia.position.set(0, -0.07, 0);
+    pivot.add(fascia);
+
+    // End-cap discs at the arm ends (cosmetic, non-emissive)
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.65, roughness: 0.4 });
+    [-0.36, 0.36].forEach((xEnd) => {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.10, 10), capMat);
+      cap.rotation.z = Math.PI / 2;
+      cap.position.set(xEnd, 0, 0);
+      pivot.add(cap);
+    });
+
+    const lenses = [];
+    def.leds.forEach((led, k) => {
+      // Grund-Tint in der LED-Fixfarbe (dezent), damit man die R/G/B/W-Anordnung
+      // auch bei dunkler LED erkennt.
+      const lens = new THREE.Mesh(
+        new THREE.CircleGeometry(0.05, 18),
+        new THREE.MeshStandardMaterial({
+          color: led.c.clone().multiplyScalar(0.22),
+          emissive: 0x000000, roughness: 0.25, side: THREE.DoubleSide,
+        })
+      );
+      lens.position.set(XS[k], -0.05, 0);
+      lens.rotation.x = -Math.PI / 2;        // Flaeche zeigt nach unten
+      lens.userData.ledColor = led.c;
+      lens.userData.ch = led.ch;             // welcher Kanal diese LED treibt
+      pivot.add(lens);
+      lenses.push(lens);
+
+      // Thin bezel ring around each lens (RingGeometry, non-emissive, on pivot)
+      const bezelMat = new THREE.MeshStandardMaterial({ color: 0x303030, metalness: 0.75, roughness: 0.35, side: THREE.DoubleSide });
+      const bezel = new THREE.Mesh(
+        new THREE.RingGeometry(0.051, 0.068, 18),
+        bezelMat
+      );
+      bezel.position.set(XS[k], -0.048, 0);  // same plane as lens, slightly raised
+      bezel.rotation.x = -Math.PI / 2;
+      pivot.add(bezel);
+    });
+    bars.push({ pivot, lenses, beams: [] });
+  });
+  return { group, bars, isSpider: true };
+}
+
+function buildFixtureModel(type, opts) {
+  opts = opts || {};
   switch (type) {
     case 'moving_head': return buildMovingHead();
+    case 'spider':      return buildSpider(opts.mirror);
     case 'par':         return buildPar();
     case 'led_bar':     return buildLedBar();
     case 'strobe':      return buildStrobe();
     case 'dimmer':      return buildDimmer();
+    case 'scanner':     return buildScanner();
+    case 'smoke':       return buildSmoke();
+    case 'hazer':       return buildHazer();
+    case 'laser':       return buildLaser();
     default:            return buildPar();
   }
 }
@@ -1076,6 +1488,20 @@ function buildTopDownIcon(type) {
     );
     body.rotation.x = -Math.PI / 2;
     group.add(body);
+  } else if (type === 'spider') {
+    // zwei kurze parallele Bars (Top-Down)
+    const mkBar = (zoff) => {
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.3, 0.16),
+        new THREE.MeshBasicMaterial({ color: 0x303048, transparent: true, opacity: 0.85 })
+      );
+      m.rotation.x = -Math.PI / 2;
+      m.position.z = zoff;
+      return m;
+    };
+    body = mkBar(-0.22);
+    group.add(body);
+    group.add(mkBar(0.22));
   } else if (type === 'strobe') {
     body = new THREE.Mesh(
       new THREE.PlaneGeometry(0.8, 0.8),
@@ -1091,6 +1517,93 @@ function buildTopDownIcon(type) {
     const xGeo = new THREE.BufferGeometry().setFromPoints(xpts);
     const xLine = new THREE.LineSegments(xGeo, matLine);
     group.add(xLine);
+  } else if (type === 'scanner') {
+    // Square base + diagonal mirror line (top-down view of tilted mirror)
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.8, 0.8),
+      new THREE.MeshBasicMaterial({ color: 0x203040, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    // Diagonal line representing the mirror
+    const mpts = [
+      new THREE.Vector3(-0.28, 0.05, -0.28),
+      new THREE.Vector3(0.28, 0.05, 0.28),
+    ];
+    const mGeo = new THREE.BufferGeometry().setFromPoints(mpts);
+    const mLine = new THREE.Line(mGeo, new THREE.LineBasicMaterial({ color: 0x88ccff }));
+    group.add(mLine);
+    // Arrow showing beam direction
+    const sPts = [
+      new THREE.Vector3(0, 0.05, 0),
+      new THREE.Vector3(0, 0.05, -0.55),
+    ];
+    const sGeo = new THREE.BufferGeometry().setFromPoints(sPts);
+    group.add(new THREE.Line(sGeo, matLine));
+    const stPts = [
+      new THREE.Vector3(-0.12, 0.05, -0.38),
+      new THREE.Vector3(0, 0.05, -0.55),
+      new THREE.Vector3(0.12, 0.05, -0.38),
+    ];
+    const stGeo = new THREE.BufferGeometry().setFromPoints(stPts);
+    group.add(new THREE.Line(stGeo, matLine));
+  } else if (type === 'smoke') {
+    // Rounded rectangle (wider than tall) + cloud-puff arcs suggestion
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.9, 0.55),
+      new THREE.MeshBasicMaterial({ color: 0x3a3a3a, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    // Three small circles suggesting puff output
+    [{ x: -0.22, z: -0.32 }, { x: 0, z: -0.38 }, { x: 0.22, z: -0.32 }].forEach(p => {
+      const puff = new THREE.Mesh(
+        new THREE.CircleGeometry(0.08, 12),
+        new THREE.MeshBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.55 })
+      );
+      puff.rotation.x = -Math.PI / 2;
+      puff.position.set(p.x, 0.04, p.z);
+      group.add(puff);
+    });
+  } else if (type === 'hazer') {
+    // Wide rectangle (landscape) + haze wave lines
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.0, 0.55),
+      new THREE.MeshBasicMaterial({ color: 0x353530, transparent: true, opacity: 0.85 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    // Two parallel wave-suggest lines across the front
+    [-0.12, 0.12].forEach(xOff => {
+      const wPts = [
+        new THREE.Vector3(-0.38, 0.05, xOff),
+        new THREE.Vector3(-0.19, 0.05, xOff - 0.08),
+        new THREE.Vector3(0, 0.05, xOff),
+        new THREE.Vector3(0.19, 0.05, xOff - 0.08),
+        new THREE.Vector3(0.38, 0.05, xOff),
+      ];
+      const wGeo = new THREE.BufferGeometry().setFromPoints(wPts);
+      group.add(new THREE.Line(wGeo, new THREE.LineBasicMaterial({ color: 0xaaaaaa })));
+    });
+  } else if (type === 'laser') {
+    // Small square emitter body + radiating beam lines
+    body = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.4, 0.3),
+      new THREE.MeshBasicMaterial({ color: 0x102010, transparent: true, opacity: 0.9 })
+    );
+    body.rotation.x = -Math.PI / 2;
+    group.add(body);
+    // Fan of 5 beam rays radiating forward (negative Z = forward in top-down)
+    const fanAngles = [-0.4, -0.2, 0, 0.2, 0.4];
+    fanAngles.forEach(a => {
+      const len = 0.75;
+      const rPts = [
+        new THREE.Vector3(0, 0.05, -0.15),
+        new THREE.Vector3(Math.sin(a) * len, 0.05, -0.15 - Math.cos(a) * len),
+      ];
+      const rGeo = new THREE.BufferGeometry().setFromPoints(rPts);
+      group.add(new THREE.Line(rGeo, new THREE.LineBasicMaterial({ color: 0x44ff44 })));
+    });
   } else {
     body = new THREE.Mesh(
       new THREE.CircleGeometry(0.45, 16),
@@ -1159,37 +1672,64 @@ function createFloorSpot(color, intensity, radius) {
 function addFixture(data) {
   const fid = data.fid;
   if (fixtures[fid]) removeFixture(fid);
-  const model = buildFixtureModel(data.type || 'par');
+  // 'model' ist das Render-Modell (von Python bestimmt, z.B. 'spider' fuer
+  // Doppel-Bar-Geraete); faellt auf den fixture_type zurueck.
+  const rtype = data.model || data.type || 'par';
+  const model = buildFixtureModel(rtype, { mirror: data.mirror });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
+  // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
+  root.rotation.set(deg2rad(data.rotX), deg2rad(data.rotY), deg2rad(data.rotZ));
   root.add(model.group);
 
-  const headHost = model.head || model.group;
   const color = new THREE.Color((data.r||0)/255, (data.g||0)/255, (data.b||0)/255);
   const intensity = (data.intensity||0) / 255;
-  const beamLength = data.type === 'led_bar' ? 6.0 : 8.0;
-  const beamAngle = data.type === 'led_bar' ? Math.PI/14 : Math.PI/10;
-  const beam = createBeamCone(color, intensity, beamAngle, beamLength);
-  headHost.add(beam);
 
-  const spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
-  spot.castShadow = true;
-  spot.shadow.mapSize.width = 512;
-  spot.shadow.mapSize.height = 512;
-  root.add(spot);
+  let beam = null, spot = null, spotTarget = null, floorSpot = null;
 
-  const spotTarget = new THREE.Object3D();
-  spotTarget.position.set(0, -root.position.y, 0);
-  scene.add(spotTarget);
-  spot.target = spotTarget;
+  if (model.isSpider) {
+    // Spider: pro Bar 4 schmale Beams in der FIXFARBE der jeweiligen LED, die
+    // dem Tilt der Bar folgen. Kein Yoke/Pan, kein zentraler Spotlight/Floor-
+    // Spot — jede LED strahlt einzeln (Scheren-Look ueber die zwei Bars).
+    const beamLength = 6.5;
+    const beamAngle = Math.PI / 20;
+    model.bars.forEach(bar => {
+      bar.beams = [];
+      bar.lenses.forEach(lens => {
+        const host = new THREE.Group();
+        host.position.copy(lens.position);
+        const bcone = createBeamCone(lens.userData.ledColor.clone(), 0, beamAngle, beamLength);
+        host.add(bcone);
+        bar.pivot.add(host);
+        bar.beams.push(bcone);
+      });
+    });
+  } else {
+    const headHost = model.head || model.group;
+    const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;
+    const beamAngle = rtype === 'led_bar' ? Math.PI/14 : Math.PI/10;
+    beam = createBeamCone(color, intensity, beamAngle, beamLength);
+    headHost.add(beam);
 
-  const floorSpot = createFloorSpot(color, intensity, 1.2);
-  scene.add(floorSpot);
+    spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
+    spot.castShadow = true;
+    spot.shadow.mapSize.width = 512;
+    spot.shadow.mapSize.height = 512;
+    root.add(spot);
+
+    spotTarget = new THREE.Object3D();
+    spotTarget.position.set(0, -root.position.y, 0);
+    scene.add(spotTarget);
+    spot.target = spotTarget;
+
+    floorSpot = createFloorSpot(color, intensity, 1.2);
+    scene.add(floorSpot);
+  }
 
   scene.add(root);
 
   // 2D top-down icon
-  const icon = buildTopDownIcon(data.type || 'par');
+  const icon = buildTopDownIcon(rtype);
   icon.position.set(root.position.x, 0.05, root.position.z);
   icon.userData.fid = Number(fid);
   // Force pickable: tag children
@@ -1207,15 +1747,22 @@ function addFixture(data) {
     head: model.head || null,
     lens: model.lens || null,
     lamp: model.lamp || null,
+    bars: model.bars || null,
+    isSpider: !!model.isSpider,
     beam, spot, spotTarget, floorSpot,
     icon,
-    type: data.type || 'par',
+    type: rtype,
     dockedTo: data.dockedTo || null,
+    // Pan/Tilt physischer Bereich (Grad) + Nullpunkt -> Beam-Abbildung = Hardware.
+    panRange: (data.panRange != null) ? data.panRange : 360,
+    tiltRange: (data.tiltRange != null) ? data.tiltRange : 180,
+    panZero: (data.panZero != null) ? data.panZero : 128,
+    tiltZero: (data.tiltZero != null) ? data.tiltZero : 128,
     data: { ...data },
   };
 
   rebuildFixtureMeshList();
-  updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128);
+  updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128, data.heads||null);
 }
 
 function removeFixture(fid) {
@@ -1235,12 +1782,56 @@ function removeFixture(fid) {
   updateOutlines();
 }
 
-function updateFixture(fid, r, g, b, intensity, pan, tilt) {
+function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   const f = fixtures[fid];
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
   const intNorm = intensity / 255;
   const skipBeam = (viewMode === '2D' && Object.keys(fixtures).length > 50);
+
+  if (heads) f.lastHeads = heads;
+
+  // ── Spider: zwei parallele Bars, je 4 EINZELFARBEN-LEDs ────────────────────
+  // Jede LED leuchtet einzeln nach ihrem eigenen Kanal (cr/cg/cb/cw der Bar);
+  // Master-Dimmer (intensity) ist gemeinsam. Tilt je Bar -> Scheren-Look.
+  if (f.isSpider && f.bars) {
+    const hs = f.lastHeads || [];
+    for (let i = 0; i < f.bars.length; i++) {
+      const bar = f.bars[i];
+      const h = hs[i] || hs[0] || {};
+      const chan = [h.cr || 0, h.cg || 0, h.cb || 0, h.cw || 0];  // [r,g,b,w]-Kanalwerte
+      const tRad = (((h.tilt == null ? 128 : h.tilt) - 128) / 128) * (Math.PI / 2);
+      bar.pivot.rotation.x = tRad;
+      for (let k = 0; k < bar.lenses.length; k++) {
+        const lens = bar.lenses[k];
+        const ledVal = (chan[lens.userData.ch] || 0) / 255;   // dieser LED-Kanal
+        const bright = ledVal * intNorm;                       // * Master-Dimmer
+        if (lens.material) {
+          lens.material.emissive = lens.userData.ledColor;
+          lens.material.emissiveIntensity = bright * 1.9;
+        }
+        const bm = bar.beams[k];
+        if (bm) {
+          bm.material.color = lens.userData.ledColor;
+          bm.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
+          bm.visible = settings.showCones && bright > 0.01 && viewMode === '3D';
+        }
+      }
+    }
+    // Top-Down-Icon: Farbe der linken Bar (Kopf 0) spiegeln
+    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
+      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
+      if (intNorm > 0.05) {
+        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
+        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
+      } else {
+        f.icon.userData.body.material.color.setHex(0x3a3a4a);
+        f.icon.userData.body.material.opacity = 0.85;
+      }
+    }
+    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    return;   // Spider fertig — generische Single-Head-Logik ueberspringen
+  }
 
   if (f.beam) {
     f.beam.material.color = color;
@@ -1277,8 +1868,14 @@ function updateFixture(fid, r, g, b, intensity, pan, tilt) {
 
   // Pan/Tilt
   if (f.type === 'moving_head' && f.yoke && f.head) {
-    const panRad = ((pan - 128) / 128) * Math.PI;
-    const tiltRad = ((tilt - 128) / 128) * (Math.PI / 2);
+    // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
+    // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
+    const panHalf = (f.panRange || 360) * Math.PI / 360;
+    const tiltHalf = (f.tiltRange || 180) * Math.PI / 360;
+    const pZero = (f.panZero == null) ? 128 : f.panZero;
+    const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
+    const panRad = ((pan - pZero) / 128) * panHalf;
+    const tiltRad = ((tilt - tZero) / 128) * tiltHalf;
     f.yoke.rotation.y = panRad;
     f.head.rotation.x = tiltRad;
     // Reflect pan in top-down icon (rotate the whole icon)
@@ -1358,6 +1955,14 @@ function setEditMode(mode) {
     banner.style.display = 'none';
   }
   updateFABs();
+  // Edit-Werkzeug-Leiste nur im Fixture-Edit-Modus zeigen.
+  const etb = document.getElementById('edit-toolbar');
+  if (etb) etb.style.display = (editMode === 'edit') ? 'flex' : 'none';
+  if (editMode === 'edit') {
+    setEditTool(editTool);
+  } else if (bridge && bridge.stopTrace) {
+    try { bridge.stopTrace(); } catch (e) {}   // Nachfahren beim Modus-Verlassen stoppen
+  }
   // Auto-Brightness: edit/stage modes brighten the scene for visibility
   if (settings.autoBrightness && _userBrightnessOverride === null) {
     if (editMode === 'edit' || editMode === 'stage') {
@@ -1374,6 +1979,117 @@ function setEditMode(mode) {
   selectedFids = [];
   selectedStageId = null;
   updateOutlines();
+}
+
+// Edit-Werkzeug umschalten (von den Buttons oben). Aktualisiert Highlight +
+// Hinweis-Banner. Wirkt nur im Fixture-Edit-Modus.
+function setEditTool(tool) {
+  editTool = ['move_xz', 'move_y', 'rotate', 'aim', 'trace'].includes(tool) ? tool : 'move_xz';
+  // Beim Wechsel WEG vom Trace-Werkzeug ein laufendes Nachfahren stoppen.
+  if (editTool !== 'trace' && bridge && bridge.stopTrace) {
+    try { bridge.stopTrace(); } catch (e) {}
+  }
+  const map = [['tool-move-xz','move_xz'], ['tool-move-y','move_y'],
+               ['tool-rotate','rotate'], ['tool-aim','aim'], ['tool-trace','trace']];
+  for (const [id, t] of map) {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', t === editTool);
+  }
+  const tp = document.getElementById('trace-panel');
+  if (tp) tp.style.display = (editMode === 'edit' && editTool === 'trace') ? 'flex' : 'none';
+  const banner = document.getElementById('mode-banner');
+  if (editMode === 'edit' && banner) {
+    banner.style.display = 'block';
+    banner.textContent =
+      editTool === 'move_xz' ? 'VERSCHIEBEN – Strahler ziehen (X/Z am Boden) · Tipp = auswählen'
+      : editTool === 'move_y' ? 'HÖHE – hoch/runter ziehen ändert die Höhe (Y)'
+      : editTool === 'rotate' ? 'DREHEN – seitlich ziehen = drehen (Hochachse) · hoch/runter = kippen'
+      : editTool === 'aim' ? 'ZIELEN – Gerät antippen = auswählen · Boden/Wand antippen → ausrichten (MH fahren Pan/Tilt)'
+      : 'NACHFAHREN – Moving Heads auswählen, dann Boden/Wand antippen → fahren dort eine Form ab (Tool wechseln = Stopp)';
+  }
+}
+
+// ── Trace-Einstellungen (Form / Größe / Tempo / Speichern) ───────────────────
+let traceShape = 'circle';      // 'circle' | 'line' | 'rect'
+let traceRadius = 1.0;          // Meter
+let traceIntervalMs = 60;       // Tempo (ms je Punkt)
+let lastTraceTarget = null;     // {x,y,z,nx,ny,nz} vom letzten Tipp
+
+function setTraceShape(s) {
+  traceShape = (s === 'line' || s === 'rect') ? s : 'circle';
+  for (const [id, sh] of [['tp-circle','circle'], ['tp-line','line'], ['tp-rect','rect']]) {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', sh === traceShape);
+  }
+  restartTraceIfActive();
+}
+function onTraceRadius(v) {
+  traceRadius = Math.max(0.2, Number(v) / 10);
+  const el = document.getElementById('trace-radius-val');
+  if (el) el.textContent = traceRadius.toFixed(1) + ' m';
+  restartTraceIfActive();
+}
+function onTraceSpeed(v) {
+  traceIntervalMs = Math.max(20, parseInt(v, 10));
+  const el = document.getElementById('trace-speed-val');
+  if (el) el.textContent = traceIntervalMs + ' ms';
+  restartTraceIfActive();
+}
+function _traceSpec() {
+  if (!lastTraceTarget) return null;
+  return Object.assign({
+    shape: traceShape, radius: traceRadius, count: 48,
+    intervalMs: traceIntervalMs, fids: selectedFids.slice(),
+  }, lastTraceTarget);
+}
+function restartTraceIfActive() {
+  if (editTool === 'trace' && lastTraceTarget && selectedFids.length > 0 &&
+      bridge && bridge.startTrace) {
+    try { bridge.startTrace(JSON.stringify(_traceSpec())); } catch (e) {}
+  }
+}
+function saveTraceSeq() {
+  const spec = _traceSpec();
+  if (!spec || selectedFids.length === 0) {
+    showEditReadout('Erst Moving Heads wählen + eine Fläche antippen, dann speichern.');
+    return;
+  }
+  if (bridge && bridge.saveTraceSequence) {
+    try { bridge.saveTraceSequence(JSON.stringify(spec)); } catch (e) {}
+  }
+}
+
+// Transientes Mess-/Wert-Readout während eines Edit-Drags (oben rechts).
+function showEditReadout(text) {
+  const ri = document.getElementById('ruler-info');
+  if (!ri) return;
+  ri.textContent = text;
+  ri.style.display = 'block';
+}
+function hideEditReadout() {
+  if (viewMode === '3D') {
+    const ri = document.getElementById('ruler-info');
+    if (ri) ri.style.display = 'none';
+  }
+}
+
+// Mess-Anzeige: bei genau ZWEI ausgewaehlten Fixtures den Abstand (Meter) zeigen.
+// (Grundlage fuers exakte Ausmessen — z.B. wie weit zwei Moving Heads stehen.)
+function updateMeasureReadout() {
+  const ri = document.getElementById('ruler-info');
+  if (!ri) return;
+  if (editMode === 'edit' && selectedFids.length === 2 &&
+      fixtures[selectedFids[0]] && fixtures[selectedFids[1]]) {
+    const a = fixtures[selectedFids[0]].group.position;
+    const b = fixtures[selectedFids[1]].group.position;
+    const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+    const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    ri.textContent = '📏 Abstand: ' + d.toFixed(2) + ' m  (Δx ' + Math.abs(dx).toFixed(2) +
+                     ' · Δy ' + Math.abs(dy).toFixed(2) + ' · Δz ' + Math.abs(dz).toFixed(2) + ')';
+    ri.style.display = 'block';
+  } else if (viewMode === '3D') {
+    ri.style.display = 'none';
+  }
 }
 
 // Direkter Slider-Setter (von Python aufgerufen) - markiert User-Override
@@ -1740,6 +2456,12 @@ function handlePointerDown(clientX, clientY, shiftKey) {
   mouseMovedDuringClick = false;
 
   if (editMode === 'edit') {
+    if (editTool === 'aim' || editTool === 'trace') {
+      // 1-Finger-Drag = Kamera drehen/schwenken; ein Tipp (ohne Bewegung) zielt
+      // bzw. startet das Nachfahren (in handlePointerUp). Kein Fixture-Drag/Marquee.
+      dragMode = (viewMode === '3D') ? 'rotate' : 'pan';
+      return;
+    }
     const fid = pickFixture();
     if (fid != null) {
       const additive = shiftKey;
@@ -1751,9 +2473,13 @@ function handlePointerDown(clientX, clientY, shiftKey) {
       dragStartPositions = {};
       for (const sf of selectedFids) {
         if (fixtures[sf]) {
+          const g = fixtures[sf].group;
           dragStartPositions[sf] = {
-            x: fixtures[sf].group.position.x,
-            z: fixtures[sf].group.position.z,
+            x: g.position.x,
+            y: g.position.y,
+            z: g.position.z,
+            rotXDeg: rad2deg(g.rotation.x),
+            rotYDeg: rad2deg(g.rotation.y),
           };
         }
       }
@@ -1863,6 +2589,39 @@ function handlePointerMove(clientX, clientY) {
     orthoCam.position.x -= dx * wPerPxX;
     orthoCam.position.z -= dy * wPerPxZ;
   } else if (dragMode === 'fixtureDrag') {
+    if (editTool === 'move_y') {
+      // HÖHE: vertikale Fingerbewegung -> Welt-Y (≈50 px = 1 m), je vom Start.
+      const dY = -(clientY - downMouseY) * 0.02;
+      for (const fid of selectedFids) {
+        const start = dragStartPositions[fid];
+        const f = fixtures[fid];
+        if (start && f) {
+          let ny = (start.y != null ? start.y : f.group.position.y) + dY;
+          ny = Math.max(0, Math.min(30, ny));
+          if (settings.snapToGrid) ny = Math.round(ny / settings.gridStep) * settings.gridStep;
+          f.group.position.y = ny;
+          f._pendingDock = null;   // manuelle Höhe löst Andocken
+        }
+      }
+      const rf0 = fixtures[selectedFids[0]];
+      if (rf0) showEditReadout('Höhe Y: ' + rf0.group.position.y.toFixed(2) + ' m');
+    } else if (editTool === 'rotate') {
+      // DREHEN: seitlich = Yaw (Hochachse Y), hoch/runter = Kippen (Pitch X). ~0.5°/px.
+      const dYaw = (clientX - downMouseX) * 0.5;
+      const dPitch = (clientY - downMouseY) * 0.5;
+      for (const fid of selectedFids) {
+        const start = dragStartPositions[fid];
+        const f = fixtures[fid];
+        if (start && f) {
+          f.group.rotation.y = deg2rad(Math.round((start.rotYDeg || 0) + dYaw));
+          f.group.rotation.x = deg2rad(Math.round((start.rotXDeg || 0) + dPitch));
+          if (f.icon) f.icon.rotation.y = f.group.rotation.y;
+        }
+      }
+      const rf1 = fixtures[selectedFids[0]];
+      if (rf1) showEditReadout('Drehen Y: ' + Math.round(rad2deg(rf1.group.rotation.y)) +
+                               '° · Kippen X: ' + Math.round(rad2deg(rf1.group.rotation.x)) + '°');
+    } else {
     const gh = intersectGround();
     if (gh && dragGroundOffset.userData) {
       const refFid = dragGroundOffset.userData.refFid;
@@ -1898,6 +2657,7 @@ function handlePointerMove(clientX, clientY) {
           }
         }
       }
+    }
     }
   } else if (dragMode === 'stageDrag' && selectedStageId) {
     const so = stageObjects[selectedStageId];
@@ -1952,6 +2712,65 @@ function handlePointerMove(clientX, clientY) {
 function handlePointerUp(shiftKey) {
   if (!isLeftDragging) return;
   isLeftDragging = false;
+  // ── Aim-Werkzeug: sauberer Tipp (kein Drag) ─────────────────────────────────
+  if (editMode === 'edit' && (editTool === 'aim' || editTool === 'trace') && !mouseMovedDuringClick) {
+    const fid = pickFixture();
+    if (fid != null) {
+      // Gerät antippen = auswählen (Mehrfach mit Shift)
+      if (shiftKey) { if (!selectedFids.includes(fid)) selectedFids.push(fid); }
+      else { selectedFids = [fid]; }
+      updateOutlines();
+      updateFABs();
+      updateMeasureReadout();
+      if (bridge && bridge.fixtureSelectionChanged) {
+        try { bridge.fixtureSelectionChanged(JSON.stringify(selectedFids)); } catch (e) {}
+      }
+      dragMode = 'none';
+      return;
+    }
+    // Keine Fixture getroffen -> Fläche (Boden/Wand/Plattform) anpeilen
+    const pickable = floorMesh
+      ? [floorMesh, ...Object.values(stageObjects).map(s => s.mesh)]
+      : Object.values(stageObjects).map(s => s.mesh);
+    raycaster.setFromCamera(mouse, activeCam);
+    const hits = raycaster.intersectObjects(pickable, true);
+    if (hits.length > 0 && selectedFids.length > 0) {
+      const point = hits[0].point;
+      let nx = 0, ny = 1, nz = 0;   // Welt-Normale (Default = nach oben)
+      if (hits[0].face) {
+        const ln = hits[0].face.normal;
+        const obj = hits[0].object; obj.updateMatrixWorld(true);
+        const e = obj.matrixWorld.elements;
+        const wx = e[0]*ln.x + e[4]*ln.y + e[8]*ln.z;
+        const wy = e[1]*ln.x + e[5]*ln.y + e[9]*ln.z;
+        const wz = e[2]*ln.x + e[6]*ln.y + e[10]*ln.z;
+        const L = Math.sqrt(wx*wx + wy*wy + wz*wz) || 1;
+        nx = wx/L; ny = wy/L; nz = wz/L;
+      }
+      if (editTool === 'trace') {
+        lastTraceTarget = { x: point.x, y: point.y, z: point.z, nx, ny, nz };
+        if (bridge && bridge.startTrace) {
+          try { bridge.startTrace(JSON.stringify(_traceSpec())); } catch (e) {}
+        }
+        const shp = traceShape === 'line' ? 'Linie' : (traceShape === 'rect' ? 'Rechteck' : 'Kreis');
+        showEditReadout('○ Nachfahren: ' + shp + ' (' + traceRadius.toFixed(1) + ' m) um ' +
+                        point.x.toFixed(1) + ' / ' + point.y.toFixed(1) + ' / ' + point.z.toFixed(1) + ' m');
+      } else {
+        if (bridge && bridge.aimFixturesAt) {
+          try {
+            bridge.aimFixturesAt(JSON.stringify({
+              x: point.x, y: point.y, z: point.z, nx, ny, nz,
+              fids: selectedFids.slice(),
+            }));
+          } catch (e) {}
+        }
+        showEditReadout('⌖ Ziel: ' + point.x.toFixed(2) + ' / ' +
+                        point.y.toFixed(2) + ' / ' + point.z.toFixed(2) + ' m');
+      }
+    }
+    dragMode = 'none';
+    return;
+  }
   if (dragMode === 'fixtureDrag') {
     for (const fid of selectedFids) {
       const f = fixtures[fid];
@@ -1981,9 +2800,21 @@ function handlePointerUp(shiftKey) {
           );
         } catch (err) {}
       }
+      // Beim Drehen-Werkzeug zusätzlich die neue Ausrichtung (GRAD) melden.
+      if (editTool === 'rotate' && bridge && bridge.fixtureRotationChanged) {
+        try {
+          bridge.fixtureRotationChanged(
+            String(fid),
+            rad2deg(f.group.rotation.x),
+            rad2deg(f.group.rotation.y),
+            rad2deg(f.group.rotation.z)
+          );
+        } catch (err) {}
+      }
     }
     clearDockHighlight();
     hideDockBadge();
+    hideEditReadout();
   }
   if (dragMode === 'stageDrag' && selectedStageId) {
     const so = stageObjects[selectedStageId];
@@ -2029,6 +2860,7 @@ function handlePointerUp(shiftKey) {
     updateOutlines();
   }
   dragMode = 'none';
+  updateMeasureReadout();   // Abstand zeigen, wenn jetzt genau 2 ausgewählt sind
 }
 
 // Mouse listeners (thin wrappers)
@@ -2209,6 +3041,24 @@ function fabRotate() {
       moveDockedFixtures(selectedStageId, 0, 0);
       _reportDockedFixturePositions(selectedStageId);
     }
+  } else if (editMode === 'edit' && selectedFids.length > 0) {
+    // Touch-Schnellaktion: ausgewählte Strahler um 90° um die Hochachse drehen.
+    for (const fid of selectedFids) {
+      const f = fixtures[fid];
+      if (!f) continue;
+      f.group.rotation.y += Math.PI / 2;
+      if (f.icon) f.icon.rotation.y = f.group.rotation.y;
+      if (bridge && bridge.fixtureRotationChanged) {
+        try {
+          bridge.fixtureRotationChanged(
+            String(fid),
+            rad2deg(f.group.rotation.x),
+            rad2deg(f.group.rotation.y),
+            rad2deg(f.group.rotation.z)
+          );
+        } catch (err) {}
+      }
+    }
   }
 }
 
@@ -2232,7 +3082,7 @@ function updateFABs() {
   const hasFixtureSel = editMode === 'edit' && selectedFids.length > 0;
   const hasStageSel   = editMode === 'stage' && !!selectedStageId;
   if (btnDelete) btnDelete.style.display = (hasFixtureSel || hasStageSel) ? 'flex' : 'none';
-  if (btnRotate) btnRotate.style.display = hasStageSel ? 'flex' : 'none';
+  if (btnRotate) btnRotate.style.display = (hasFixtureSel || hasStageSel) ? 'flex' : 'none';
   if (btnPlace)  btnPlace.style.display  = (editMode === 'edit') ? 'flex' : 'none';
 }
 
@@ -2353,14 +3203,21 @@ function jsSelectStageObject(id) {
   updateOutlines();
 }
 
-function jsApplyFixtureTransform(fid, x, y, z, rotY) {
+function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ) {
   const f = fixtures[fid];
   if (!f) return;
   if (x != null) f.group.position.x = x;
   if (y != null) f.group.position.y = y;
   if (z != null) f.group.position.z = z;
-  if (rotY != null) f.group.rotation.y = rotY;
-  if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+  // Rotationen kommen in GRAD über die Bridge -> hier in Radiant wandeln.
+  // (Behebt den Alt-Bug, bei dem Grad direkt als Radiant gesetzt wurden.)
+  if (rotX != null) f.group.rotation.x = deg2rad(rotX);
+  if (rotY != null) f.group.rotation.y = deg2rad(rotY);
+  if (rotZ != null) f.group.rotation.z = deg2rad(rotZ);
+  if (f.icon) {
+    f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    if (rotY != null) f.icon.rotation.y = f.group.rotation.y;  // Top-Down spiegelt Yaw
+  }
 }
 
 function jsAlignSelected(mode) {
@@ -2429,7 +3286,7 @@ function tryChannel() {
         if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); });
         if (bridge.dmxUpdated)     bridge.dmxUpdated.connect(j => {
           const d = JSON.parse(j);
-          updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128);
+          updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
         });
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
@@ -2444,7 +3301,7 @@ function tryChannel() {
         if (bridge.selectStageObject) bridge.selectStageObject.connect(id => jsSelectStageObject(id));
         if (bridge.applyFixtureTransform) bridge.applyFixtureTransform.connect(j => {
           const d = JSON.parse(j);
-          jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotY);
+          jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ);
         });
         if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
         if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));

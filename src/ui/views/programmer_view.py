@@ -18,7 +18,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
-from src.core.app_state import get_state, AppState, get_channels_for_patched
+from src.core.app_state import (
+    get_state, AppState, get_channels_for_patched, resolve_attr_channels)
 from src.core.database.models import PatchedFixture, FixtureChannel
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
@@ -57,13 +58,15 @@ def programmer_to_scene_values(filtered_programmer: dict, fixtures) -> list[tupl
             continue
         if fx is None or not isinstance(attrs, dict):
             continue
-        chmap = {c.attribute: c.channel_number for c in get_channels_for_patched(fx)}
-        for attr, val in attrs.items():
-            ch = chmap.get(attr)
-            if ch is None:
-                continue
+        # Mehrkopf (X-6): vorkommens-bewusste Aufloesung statt eines
+        # ``{attribute: channel}``-Dicts. Letzteres KOLLIDIERT bei wiederholten
+        # Attributen (zwei ``color_r`` beim Spider) — nur das letzte Vorkommen
+        # ueberlebt, ``color_r#1`` verfaellt und der Kopf-0-Wert ruschte auf den
+        # ZWEITEN Kanal. resolve_attr_channels mappt jeden ``attr``/``attr#N`` auf
+        # sein eigenes Kanal-Vorkommen (gleiche Logik wie _flush_programmer_to_dmx).
+        for ch_no, _mkey, val in resolve_attr_channels(get_channels_for_patched(fx), attrs):
             try:
-                out.append((int(fid), int(ch), max(0, min(255, int(val)))))
+                out.append((int(fid), int(ch_no), max(0, min(255, int(val)))))
             except (TypeError, ValueError):
                 continue
     return out
@@ -360,6 +363,10 @@ class ProgrammerView(QWidget):
 
         # Gruppen-Modus-Leiste (M5.2): Linked / Einzeln / Relativ + Fixture-Wahl.
         self._group_mode = _load_prefs().get("programmer_group_mode", "linked")
+        # Farb-Kopf-Modus (Spider & Co.): "sync" = ein Regler je Farbe treibt alle
+        # Koepfe gemeinsam; "separate" = ein Regler je Kopf (linke/rechte Bar usw.).
+        self._color_head_mode = _load_prefs().get(
+            "programmer_color_head_mode", "sync")
         self._active_fixture_idx = 0
         mode_row = QHBoxLayout()
         mode_row.addWidget(QLabel("Gruppe:"))
@@ -399,6 +406,14 @@ class ProgrammerView(QWidget):
         # Gobo-Tab nur sichtbar, wenn das Geraet Gobos hat (M2.1).
         self._gobo_tab_index = self._main_tabs.indexOf(self._attr_group_tabs["Gobo"])
         self._main_tabs.setTabVisible(self._gobo_tab_index, False)
+
+        # Mapping-Tab (Kanal-Mapping, M-Map): bildet eine Live-Position (Tilt/Pan/
+        # X-Y) auf beliebige Ziel-Kanaele ab. Nur sichtbar, wenn die Auswahl
+        # Pan/Tilt hat (Moving Heads / Spider) — gesetzt in _rebuild_attr_editor.
+        self._mapping_page = self._make_mapping_page()
+        self._main_tabs.addTab(self._mapping_page, "Mapping")
+        self._mapping_tab_index = self._main_tabs.indexOf(self._mapping_page)
+        self._main_tabs.setTabVisible(self._mapping_tab_index, False)
 
         # Funktions-Tabs (einmalig gebaut).
         self._main_tabs.addTab(self._make_effects_page(), "Helper")
@@ -539,6 +554,16 @@ class ProgrammerView(QWidget):
         except Exception as e:
             print(f"[programmer_view] efx embed error: {e}")
             return QLabel(f"EFX nicht verfügbar: {e}")
+
+    def _make_mapping_page(self) -> QWidget:
+        """Kanal-Mapping-Editor eingebettet (folgt der Auswahl, M-Map)."""
+        try:
+            from src.ui.widgets.mapped_channel_editor import MappedChannelEditor
+            self._embedded_mapping = MappedChannelEditor()
+            return self._embedded_mapping
+        except Exception as e:
+            print(f"[programmer_view] mapping embed error: {e}")
+            return QLabel(f"Mapping nicht verfügbar: {e}")
 
     def _make_rgb_page(self) -> QWidget:
         """RGB-Matrix-Editor eingebettet (arbeitet via 'Aus Auswahl' auf der
@@ -1012,6 +1037,22 @@ class ProgrammerView(QWidget):
             b_ct.toggled.connect(lambda chk: self._toggle_embedded_color(tab, chk))
             tab._cp_button = b_ct
             sub_tb.addWidget(b_ct)
+            # Mehrkopf-Farbgeraet (z. B. Spider mit 2 RGBW-Baenken): Umschalter
+            # Synchron <-> Getrennt fuer die Farbregler.
+            if self._color_head_count() > 1:
+                sub_tb.addWidget(QLabel("Köpfe:"))
+                head_combo = QComboBox()
+                head_combo.addItem("Synchron (beide gleich)", "sync")
+                head_combo.addItem("Getrennt (pro Kopf)", "separate")
+                head_combo.setCurrentIndex(
+                    0 if self.color_head_mode() == "sync" else 1)
+                head_combo.setToolTip(
+                    "Synchron: ein Regler je Farbe steuert alle Köpfe gemeinsam.\n"
+                    "Getrennt: jeder Kopf (z. B. linke/rechte Spider-Bar) hat "
+                    "eigene Farbregler.")
+                head_combo.currentIndexChanged.connect(
+                    lambda i, c=head_combo: self._set_color_head_mode(c.itemData(i)))
+                sub_tb.addWidget(head_combo)
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
 
@@ -1034,15 +1075,29 @@ class ProgrammerView(QWidget):
         # P8: Position-Tool fest als Aufklapp-Bereich im Layoutfluss — ersetzt
         # den frueheren "einbetten"-Toggle (dynamisches add/delete verschob das
         # Layout und konnte ueberlappen). Zustand merkt sich ui_prefs.
+        # Spider (Doppelbar, zwei separate Tilts, kein Pan) bekommen ein eigenes
+        # Tool: das XY-Pad waere irrefuehrend (Pan tut nichts, beide Bars sind nur
+        # ueber den Mehrkopf-Schluessel tilt/tilt#1 getrennt steuerbar).
         if group_name == "Position":
+            spider = self._selection_is_spider(fixtures)
             try:
-                from src.ui.widgets.position_tool import PositionTool
                 from src.ui.widgets.collapsible_section import CollapsibleSection
-                pt = PositionTool()
-                pt.set_live(True)   # M3.1: eingebettet wirkt das Pad sofort
-                section = CollapsibleSection(
-                    "Position-Tool (XY-Pad)", pt, collapsed=True,
-                    prefs_key="programmer_position_tool")
+                if spider:
+                    from src.ui.widgets.spider_position_tool import SpiderPositionTool
+                    from src.core.app_state import tilt_head_count
+                    heads = tilt_head_count(fixtures[0]) if fixtures else 2
+                    spt = SpiderPositionTool(head_count=heads)
+                    spt.set_live(True)
+                    section = CollapsibleSection(
+                        f"Spider-Position ({heads} Tilts)", spt, collapsed=False,
+                        prefs_key="programmer_spider_position_tool")
+                else:
+                    from src.ui.widgets.position_tool import PositionTool
+                    pt = PositionTool()
+                    pt.set_live(True)   # M3.1: eingebettet wirkt das Pad sofort
+                    section = CollapsibleSection(
+                        "Position-Tool (XY-Pad)", pt, collapsed=True,
+                        prefs_key="programmer_position_tool")
                 ilay.addWidget(section)
             except Exception as e:
                 print(f"[programmer_view] position tool embed error: {e}")
@@ -1050,11 +1105,23 @@ class ProgrammerView(QWidget):
         # Slider-Liste
         if not channels:
             ilay.addWidget(QLabel(f"Keine {group_name}-Kanäle gefunden."))
+        elif group_name == "Color" and self._color_head_count() > 1:
+            # Mehrkopf-Farbgeraet (Spider): je nach Modus Synchron-/Pro-Kopf-Regler
+            # statt der pro Attribut deduplizierten Standard-Slider.
+            self._add_color_head_sliders(ilay, fixtures)
         else:
+            # Spider-Position: die generischen Pan/Tilt-Slider entfallen (ein
+            # einzelner "tilt"-Slider koennte die zwei Bars nicht trennen) — das
+            # SpiderPositionTool oben uebernimmt beide Tilts.
+            spider_pos = (group_name == "Position"
+                          and self._selection_is_spider(fixtures))
             for ch in channels:
                 # Reset/Rekalibrierung bekommt bewusst KEINEN Dauer-Slider —
                 # nur den sicheren Button (ResetActionButton, _add_quick_select).
                 if ch.attribute == "reset":
+                    continue
+                if spider_pos and ch.attribute in ("pan", "tilt",
+                                                   "pan_fine", "tilt_fine"):
                     continue
                 ilay.addWidget(AttributeSlider(ch, fixtures, self._state, owner=self))
         ilay.addStretch(1)
@@ -1117,6 +1184,136 @@ class ProgrammerView(QWidget):
                 return ch
         return None
 
+    def _selection_is_spider(self, fixtures) -> bool:
+        """True, wenn die uebergebene Auswahl ausschliesslich aus spider-/doppel-
+        tilter-artigen Geraeten besteht (>=2 Tilt, KEIN Pan — egal ob mit/ohne
+        Farbe). Nur dann schalten Position-/FX-Tab auf die Spider-Bedienung um;
+        gemischte oder Moving-Head-Auswahlen bleiben unveraendert (zentrale
+        is_dual_tilt_fixture — breiter als is_spider_fixture)."""
+        try:
+            from src.core.app_state import is_dual_tilt_fixture
+            return bool(fixtures) and all(is_dual_tilt_fixture(f) for f in fixtures)
+        except Exception:
+            return False
+
+    # ── Farb-Kopf-Modus (Spider & Co.: Synchron vs. Getrennt) ──────────────────
+
+    def color_head_mode(self) -> str:
+        return getattr(self, "_color_head_mode", "sync")
+
+    def _selected_fixtures(self) -> list:
+        """Die aktuell ausgewaehlten Fixture-Objekte (in Auswahl-Reihenfolge)."""
+        by_fid = {f.fid: f for f in self._state.get_patched_fixtures()}
+        return [by_fid[fid] for fid in getattr(self, "_selected_fids", [])
+                if fid in by_fid]
+
+    @staticmethod
+    def _color_head_counts(fixture) -> dict:
+        """Vorkommen je RGB(W)-Farb-Attribut in DIESEM Fixture (= Farb-Koepfe)."""
+        counts: dict[str, int] = {}
+        for ch in get_channels_for_patched(fixture):
+            if ch.attribute in COLOR_ATTRS:
+                counts[ch.attribute] = counts.get(ch.attribute, 0) + 1
+        return counts
+
+    def _color_head_count(self) -> int:
+        """Maximale Farb-Kopf-Zahl ueber ALLE ausgewaehlten Fixtures (nicht nur
+        das Template selected[0]). >1 => mind. ein Mehrkopf-Farbgeraet ist dabei
+        (z. B. Spider mit zwei RGBW-Baenken) -> Synchron/Getrennt-Umschalter."""
+        best = 1
+        for f in self._selected_fixtures():
+            c = self._color_head_counts(f)
+            if c:
+                best = max(best, max(c.values()))
+        return best
+
+    def _set_color_head_mode(self, key: str):
+        if key not in ("sync", "separate") or key == self.color_head_mode():
+            return
+        self._color_head_mode = key
+        try:
+            prefs = _load_prefs()
+            prefs["programmer_color_head_mode"] = key
+            _save_prefs(prefs)
+        except Exception:
+            pass
+        # Synchron: vorhandene Pro-Kopf-Abweichungen entfernen, damit alle Koepfe
+        # wieder dem einfachen Schluessel folgen. Getrennt braucht KEIN Seeding —
+        # die Pro-Kopf-Regler lesen den effektiven Wert (Kopf N, sonst Kopf 0),
+        # es entstehen also keine toten "attr#N"-Schluessel.
+        if key == "sync":
+            self._normalize_color_heads_to_sync()
+        self._rebuild_attr_editor()
+
+    def _normalize_color_heads_to_sync(self):
+        """Entfernt die "attr#N"-Pro-Kopf-Farbwerte der Auswahl (pro Fixture nur
+        bis zu dessen echter Kopf-Zahl), sodass alle Koepfe wieder dem einfachen
+        Schluessel folgen (Flush-Fallback) — so wirken auch Schnellwahl/Picker
+        wieder auf beide Koepfe."""
+        for f in self._selected_fixtures():
+            prog = self._state.programmer.get(f.fid, {})
+            for attr, cnt in self._color_head_counts(f).items():
+                for h in range(1, cnt):
+                    if f"{attr}#{h}" in prog:
+                        self._state.clear_programmer_value(f.fid, f"{attr}#{h}")
+
+    def _add_color_head_sliders(self, ilay, fixtures):
+        """Baut die Farbregler eines Mehrkopf-Geraets je nach color_head_mode:
+        - "sync": ein Regler je Farbe, treibt alle Koepfe gemeinsam.
+        - "separate": ein Regler je Kopf (N-tes Vorkommen).
+        Kanal-Vorlage ist das farb-reichste Geraet der Auswahl (nicht zwingend
+        selected[0]); jeder Pro-Kopf-Regler bekommt NUR die Fixtures, die diesen
+        Kopf wirklich besitzen (kein "attr#N" auf Einzelkopf-Geraeten)."""
+        if not fixtures:
+            return
+        template = max(
+            fixtures,
+            key=lambda f: max(self._color_head_counts(f).values(), default=0))
+        # Farb-Kanaele der Vorlage in Reihenfolge, mit Kopf-Index (Vorkommen).
+        occ: dict[str, int] = {}
+        color_chs = []   # (channel, head_index)
+        for ch in get_channels_for_patched(template):
+            if ch.attribute in COLOR_ATTRS:
+                h = occ.get(ch.attribute, 0)
+                occ[ch.attribute] = h + 1
+                color_chs.append((ch, h))
+        if not color_chs:
+            return
+        if self.color_head_mode() == "separate":
+            for ch, h in color_chs:
+                owners = [f for f in fixtures
+                          if self._color_head_counts(f).get(ch.attribute, 0) > h]
+                if owners:
+                    ilay.addWidget(AttributeSlider(
+                        ch, owners, self._state, owner=self, head=h))
+        else:   # sync — ein Regler je Farbe (erstes Vorkommen), treibt alle Koepfe
+            for ch, h in color_chs:
+                if h != 0:
+                    continue
+                ilay.addWidget(AttributeSlider(
+                    ch, fixtures, self._state, owner=self,
+                    sync_heads=occ.get(ch.attribute, 1),
+                    display_name=self._color_label(ch)))
+
+    _COLOR_LABELS = {
+        "color_r": "Rot", "color_g": "Grün", "color_b": "Blau",
+        "color_w": "Weiß", "color_a": "Amber", "color_uv": "UV",
+    }
+
+    def _color_label(self, ch) -> str:
+        """Head-agnostisches Farb-Label fuer den Synchron-Regler — aus dem Attribut
+        abgeleitet (robust gegen Kanalnamen wie "Seg.1 Rot"), Fallback Kanalname."""
+        return self._COLOR_LABELS.get(ch.attribute,
+                                      self._strip_head_suffix(ch.name))
+
+    @staticmethod
+    def _strip_head_suffix(name: str) -> str:
+        """ "Rot 1" -> "Rot" (haengende Kopf-Nummer entfernen; sonst unveraendert)."""
+        parts = (name or "").rsplit(" ", 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            return parts[0]
+        return name
+
     def _add_quick_select(self, layout, group_name: str, fixtures):
         """Fuegt die capability-basierten Schnellwahl-Kacheln zum Tab hinzu."""
         touch = self._is_touch()
@@ -1142,13 +1339,17 @@ class ProgrammerView(QWidget):
                     layout.addWidget(QLabel("Gobo-Auswahl:"))
                     layout.addWidget(GoboQuickBar(gw, fixtures, self._state, touch=touch))
             elif group_name == "Position":
-                if self._template_channel_in(("pan", "tilt")) is not None:
+                spider = self._selection_is_spider(fixtures)
+                # Pan/Tilt-Invert/Swap ist nur fuer echte Pan/Tilt-Moving-Heads
+                # sinnvoll — beim Spider (kein Pan) blendet es aus.
+                if not spider and self._template_channel_in(("pan", "tilt")) is not None:
                     bar = self._build_orientation_bar(fixtures)
                     if bar is not None:
                         layout.addWidget(bar)
                 sp = self._template_channel_in(("speed",))
                 if sp is not None:
-                    layout.addWidget(QLabel("Pan/Tilt-Speed:"))
+                    layout.addWidget(QLabel("Bewegungs-Speed:" if spider
+                                            else "Pan/Tilt-Speed:"))
                     layout.addWidget(AttributeSlider(sp, fixtures, self._state, owner=self))
             elif group_name == "Weitere":
                 rs = self._template_channel_in(("reset",))
@@ -1394,12 +1595,22 @@ class AttributeSlider(QWidget):
     }
 
     def __init__(self, channel: FixtureChannel, fixtures: list[PatchedFixture],
-                 state: AppState, owner=None, parent=None):
+                 state: AppState, owner=None, parent=None,
+                 head: int = 0, sync_heads: int = 0,
+                 display_name: str | None = None):
         super().__init__(parent)
         self._channel = channel
         self._fixtures = fixtures
         self._state = state
         self._owner = owner   # ProgrammerView (Gruppen-Modus); None = Linked
+        # Mehrkopf (X-6): head = welches Attribut-Vorkommen (Kopf) dieser Slider
+        # steuert. sync_heads>0 => Synchron-Regler, der die Koepfe 0..N-1 GEMEINSAM
+        # ueber den einfachen Schluessel treibt (und etwaige "attr#N"-Abweichungen
+        # der anderen Koepfe aufraeumt, damit der Flush-Fallback spiegelt).
+        # Default (0/0) = byte-genau wie bisher (Einzelkopf).
+        self._head = int(head)
+        self._sync_heads = int(sync_heads)
+        self._display_name = display_name
         self._last_value = channel.default_value
         self._setup_ui()
         self._load_current_value()
@@ -1415,9 +1626,10 @@ class AttributeSlider(QWidget):
         indicator.setStyleSheet(f"background: {color}; border-radius: 3px;")
         layout.addWidget(indicator)
 
-        lbl = QLabel(self._channel.name)
+        _name = self._display_name or self._channel.name
+        lbl = QLabel(_name)
         lbl.setMinimumWidth(120)
-        lbl.setToolTip(self._channel.name)
+        lbl.setToolTip(_name)
         layout.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
@@ -1454,9 +1666,16 @@ class AttributeSlider(QWidget):
             pass
 
     def _values_per_fixture(self) -> list[int]:
+        h = self._base_head()
         out = []
         for f in self._fixtures:
-            v = self._state.get_programmer_value(f.fid, self._channel.attribute)
+            v = self._state.get_programmer_value(
+                f.fid, self._channel.attribute, head=h)
+            # Getrennt: ein noch nicht separat gesetzter Kopf>0 spiegelt Kopf 0
+            # (wie der DMX-Flush) -> der Regler zeigt den echten Ausgabewert.
+            if v is None and h > 0:
+                v = self._state.get_programmer_value(
+                    f.fid, self._channel.attribute, head=0)
             out.append(self._channel.default_value if v is None else v)
         return out
 
@@ -1493,24 +1712,44 @@ class AttributeSlider(QWidget):
         return 0
 
     def _on_value_changed(self, value: int):
-        attr = self._channel.attribute
         mode = self._mode()
         if mode == "individual":
             idx = self._active_index()
             if 0 <= idx < len(self._fixtures):
-                self._state.set_programmer_value(self._fixtures[idx].fid, attr, value)
+                self._apply_value(self._fixtures[idx].fid, value)
             self._update_labels(value)
         elif mode == "relative":
             delta = value - self._last_value
             for f, cur in zip(self._fixtures, self._values_per_fixture()):
-                self._state.set_programmer_value(
-                    f.fid, attr, max(0, min(255, cur + delta)))
+                self._apply_value(f.fid, max(0, min(255, cur + delta)))
             self._update_labels(value)
         else:  # linked
             for f in self._fixtures:
-                self._state.set_programmer_value(f.fid, attr, value)
+                self._apply_value(f.fid, value)
             self._update_labels(value)
         self._last_value = value
+
+    def _base_head(self) -> int:
+        """Kopf, dessen Wert dieser Slider anzeigt/liest (Synchron liest Kopf 0)."""
+        return 0 if self._sync_heads > 0 else self._head
+
+    def _apply_value(self, fid: int, value: int):
+        """Schreibt den Wert in den/die Ziel-Kopf-Schluessel.
+
+        Synchron (sync_heads>0): einfacher Schluessel (Kopf 0) + entfernt etwaige
+        "attr#N"-Abweichungen der anderen Koepfe, sodass der DMX-Flush-Fallback und
+        auch Schnellwahl/Color-Picker (die nur Kopf 0 schreiben) beide Koepfe
+        gleich treiben. Getrennt: genau das N-te Vorkommen ("attr#N"; Kopf 0 =
+        einfacher Schluessel)."""
+        attr = self._channel.attribute
+        if self._sync_heads > 0:
+            self._state.set_programmer_value(fid, attr, value, head=0)
+            prog = self._state.programmer.get(fid, {})
+            for h in range(1, self._sync_heads):
+                if f"{attr}#{h}" in prog:
+                    self._state.clear_programmer_value(fid, f"{attr}#{h}")
+        else:
+            self._state.set_programmer_value(fid, attr, value, head=self._head)
 
     def _reset(self):
         self._slider.setValue(self._channel.default_value)

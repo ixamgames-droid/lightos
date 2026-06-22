@@ -73,6 +73,112 @@ class MultiHeadSpiderTest(unittest.TestCase):
         self.assertEqual(self.u.get_channel(10), 200)
         self.assertEqual(self.u.get_channel(6), 0)
 
+    def test_visualizer_sends_per_head_color_and_tilt(self):
+        """3D-Visualizer: Spider wird als 'spider' erkannt und die DMX-Bruecke
+        sendet pro Bar eigene Farbe + eigenen Tilt (heads-Array) — sonst zeigt
+        der Visualizer beide Bars in EINER Farbe / EINEM Tilt.
+
+        Wie test_visualizer_autopatch: KEIN echter VisualizerBridge (dessen
+        __init__ subscribt am State-Singleton -> Leak ueber die Suite), sondern
+        Aufruf der Methoden mit Fake-self.
+        """
+        import json
+        from types import SimpleNamespace
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        f = next(x for x in self.state.get_patched_fixtures() if x.fid == 1)
+        self.assertEqual(VisualizerBridge._viz_model_for(SimpleNamespace(), f), "spider")
+        # Bar L = rot + Tilt 200, Bar R = blau + Tilt 55 (CH1/2 Tilts, CH6 Rot1,
+        # CH12 Blau2, CH4 Master-Dimmer)
+        self.u.set_channel(1, 200)
+        self.u.set_channel(2, 55)
+        self.u.set_channel(4, 255)
+        self.u.set_channel(6, 255)
+        self.u.set_channel(12, 255)
+        attrs, seen = {}, {}
+        for ch in get_channels_for_patched(f):
+            addr = f.address + ch.channel_number - 1
+            if 1 <= addr <= 512:
+                a = ch.attribute
+                h = seen.get(a, 0)
+                seen[a] = h + 1
+                attrs[a if h == 0 else f"{a}#{h}"] = self.u.get_channel(addr)
+        cap = {}
+        fake = SimpleNamespace(
+            dmxUpdated=SimpleNamespace(emit=lambda j: cap.update(json.loads(j))))
+        VisualizerBridge.push_dmx_update(fake, 1, attrs)
+        heads = cap.get("heads")
+        assert heads is not None and len(heads) == 2, f"heads fehlt: {cap}"
+        self.assertEqual((heads[0]["tilt"], heads[1]["tilt"]), (200, 55))
+        # Summenfarbe (Icon/Kompat)
+        self.assertEqual((heads[0]["r"], heads[0]["b"]), (255, 0))  # Bar L rot
+        self.assertEqual((heads[1]["r"], heads[1]["b"]), (0, 255))  # Bar R blau
+        # Roh-Einzelkanaele pro LED: Bar L nur rote LED (cr), Bar R nur blaue (cb)
+        self.assertEqual(
+            (heads[0]["cr"], heads[0]["cg"], heads[0]["cb"], heads[0]["cw"]),
+            (255, 0, 0, 0))
+        self.assertEqual(
+            (heads[1]["cr"], heads[1]["cg"], heads[1]["cb"], heads[1]["cw"]),
+            (0, 0, 255, 0))
+
+    def test_visualizer_pan_tilt_spider_independent_bars(self):
+        """QLC+-Importe (z. B. 'Speider', 'Mini Spider ZQ-B20') mappen die ZWEI
+        Tilt-Motoren des Geraets als pan + tilt (nur EIN `tilt`-Kanal, KEIN
+        `tilt#1`), weil die QXF die Motoren als PositionPan/PositionTilt bzw.
+        PositionXAxis/PositionYAxis fuehrt. Der 3D-Spider muss Bar 0 dann aus
+        `pan` und Bar 1 aus `tilt` speisen — sonst faellt Bar 1 auf denselben
+        `tilt` zurueck und BEIDE Bars folgen nur "Tilt 2" (der gemeldete Bug).
+        """
+        import json
+        from types import SimpleNamespace
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        # Reales Speider/Mini-Layout: pan (Motor 1 / "Tilt 1") + tilt (Motor 2 /
+        # "Tilt 2") + zwei Farb-Banks. pan=60, tilt=200 -> die zwei Bars MUESSEN
+        # unterschiedlich kippen.
+        attrs = {
+            "pan": 60, "tilt": 200, "intensity": 255,
+            "color_r": 255, "color_g": 0, "color_b": 0, "color_w": 0,         # Bank 1
+            "color_r#1": 0, "color_g#1": 0, "color_b#1": 255, "color_w#1": 0,  # Bank 2
+        }
+        cap = {}
+        fake = SimpleNamespace(
+            dmxUpdated=SimpleNamespace(emit=lambda j: cap.update(json.loads(j))))
+        VisualizerBridge.push_dmx_update(fake, 7, attrs)
+        heads = cap.get("heads")
+        assert heads is not None and len(heads) == 2, f"heads fehlt: {cap}"
+        # Bar 0 <- pan (Motor 1), Bar 1 <- tilt (Motor 2): UNABHAENGIG.
+        self.assertEqual((heads[0]["tilt"], heads[1]["tilt"]), (60, 200))
+        self.assertNotEqual(heads[0]["tilt"], heads[1]["tilt"])
+        # Farbe bleibt pro Bar getrennt (Bank 1 rot, Bank 2 blau).
+        self.assertEqual((heads[0]["cr"], heads[1]["cb"]), (255, 255))
+
+    def test_spider_mirror_option(self):
+        """Spider-Anordnung (gespiegelt/parallel): Erkennung, update_fixture-
+        Whitelist, Show-Serialisierung-Roundtrip und Visualizer-`mirror`-Flag."""
+        from types import SimpleNamespace
+        from src.core.app_state import is_spider_fixture
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        from src.core.show.show_file import (
+            _fixture_to_dict as pf_to_dict, _patched_fixture_from_data,
+        )
+        f = next(x for x in self.state.get_patched_fixtures() if x.fid == 1)
+        # 1. Erkennung + Default = gespiegelt
+        self.assertTrue(is_spider_fixture(f))
+        self.assertTrue(bool(getattr(f, "spider_mirrored", True)))
+        # 2. update_fixture-Whitelist
+        self.state.update_fixture(1, spider_mirrored=False, undoable=False)
+        f = next(x for x in self.state.get_patched_fixtures() if x.fid == 1)
+        self.assertFalse(bool(f.spider_mirrored))
+        # 3. Show-Serialisierung-Roundtrip (.lshow)
+        d = pf_to_dict(f)
+        self.assertEqual(d["spider_mirrored"], False)
+        f2 = _patched_fixture_from_data(d, 99)
+        self.assertFalse(bool(f2.spider_mirrored))
+        # 4. Visualizer-Dict: mirror-Flag (Fake-self, kein echter Bridge)
+        fake = SimpleNamespace(_state=self.state, _viz_model_for=lambda ff: "spider")
+        vd = VisualizerBridge._fixture_to_dict(fake, f)
+        self.assertEqual(vd["model"], "spider")
+        self.assertEqual(vd["mirror"], False)
+
     def test_efx_swings_bars_counter(self):
         e = self.fm.new_efx("Spider Schwenk")
         e.algorithm = EfxAlgorithm.CIRCLE
