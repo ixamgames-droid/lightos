@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-22 — Fix: Dimmer-Matrix nicht mehr vom Programmer-Intensity blockiert (ENG-02)
+
+#### Behoben
+
+- **Dimmer-Matrix wirkt ohne Master-Hochziehen (ENG-02):** Treibt eine Funktion (Dimmer-Matrix/EFX) einen Intensitaets-/Dimmer-Kanal DIREKT, besitzt sie ihn jetzt wert-unabhaengig (Write-Log) — der per-Fixture Programmer-Intensity-Wert greift nicht mehr ein. Vorher wurde eine reine Dimmer-Matrix unsichtbar, sobald der Programmer (oft beim Auswaehlen auto-gesetzt) `intensity=0` hielt, und ein hochgezogener Master invertierte den Chase (gerade dunkle Pixel leuchteten voll). „Aktiver Tab gewinnt": nur wenn der **Intensity-Tab** aktiv UND die Lampe **selektiert** ist, gewinnt die manuelle Intensitaet absolut. Globaler Submaster/Grand-Master/Fixture-Dimmer bleiben echte Master; reine Farb-Effekte unveraendert (EE-02-Multiply dort erhalten). Bewusste Semantik-Aenderung: das alte EE-02 „Programmer-Dimmer multipliziert einen intensitaets-treibenden Effekt" entfaellt zugunsten der Tab-Regel. `src/core/app_state.py`, `src/ui/views/programmer_view.py`, `tests/test_matrix_dimmer_master.py`, `tests/test_dimmer_master.py` (PR #9).
+
 ### 2026-06-21 — Grosses Update: zentraler BPM-Leader & Tempo-Buses, BPM-Generator mit Beatgrid, geführte Virtuelle Konsole, Effekt-Sync & Multikopf, Capability-Validierung, neues Anleitungs-Kit
 
 Dieses Update überarbeitet das Tempo/BPM-Subsystem von Grund auf (zentraler Leader, Tempo-Buses, Offline-Beatgrid-Analyse), baut die Virtuelle Konsole zu einem geführten Drag&Drop-Werkzeug mit Multi-Effekt-Steuerung aus und führt eine neue Capability-Ebene ein, die Shows vor stillen Lade-Fehlern schützt. Dazu kommen tiefgreifende Engine-Erweiterungen (Tempo-Sync, Layer-Priorität, Hüllkurven, Mehrkopf-Geräte), zahlreiche Robustheits- und Touch-Fixes sowie ein komplett neues bebildertes Anleitungs-Kit.
