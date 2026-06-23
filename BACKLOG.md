@@ -22,14 +22,13 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 | ID | Prio | Status | Titel | Stand |
 |----|------|--------|-------|-------|
-| STAB-02 | P1 | wip | AV beim Beenden: DMX-Output schreibt nach Serial-Close | **Umgesetzt, Chat-Review:** `OutputManager.stop()` schließt Geräte nur nach bestätigtem Thread-Ende (`is_alive()`-Check) — hängt der Thread, bleibt der Port offen (OS gibt ihn frei) statt CloseHandle-neben-WriteFile → AV. `EnttecPro`: `is_open`-Guard in `send_dmx`, Output-Puffer-Purge vor `close()`, idempotent. 9 neue Tests (`test_enttec_pro.py` + stop-Safety). Branch `fix/dmx-shutdown-av`. |
+| STAB-03 | P1 | wip | AV in programmer_view-Refresh (Zombie-Subscriber) defensiv absichern | **Umgesetzt:** Befund — der Zombie-Fall war in `sync.emit` (RuntimeError-Selbstheilung) + `subscribe_widget`(destroyed) schon abgedeckt, und `efx_view._notify_change` läuft via `QTimer` ohnehin im GUI-Thread (kein cross-thread). Verbleibende Lücke: Qt löscht das C++-Objekt mitunter VOR dem destroyed-Signal → nativer Zugriff = AV. Fix: **Validitäts-Guard** in `subscribe_widget` (schwache Ref + `shiboken6.isValid`) überspringt + meldet tote Widgets ab. Rein additiv (lebende Views unverändert). 2 neue Tests. Branch `fix/sync-widget-validity-guard`. |
 | UI-02 | P1 | review | Undo im Patch | **Verifiziert:** Fixture-Löschen ist bereits via globalem Ctrl+Z rückgängig (`remove_fixture` pusht Undo+Redo, `patch_view._delete_selected` ruft es undoable). Fehlender Test ergänzt: `tests/test_patch_undo.py` (4 Tests). Branch `feature/patch-undo-test`. |
 
 ## 📋 Offen
 
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
-| STAB-03 | P1 | todo | AV in programmer_view-Refresh (Zombie-Subscriber / cross-thread) | `sync.emit` ruft Subscriber synchron ohne GUI-Marshalling; `clear()` auf bereits gelöschtem QListWidget → AV (crash.log 21.+23.6.). Fix: `_refresh_*_list` mit `try/except RuntimeError` absichern (wie `_refresh_sliders_from_state`); `efx_view._notify_change` über `app_state._emit` marshallen. Aus crash.log-Analyse 23.6. |
 | UI-03  | P2 | todo | Fixture-Kopieren mit Offset | Mehrere Geräte mit Adress-Abstand patchen; Dialog (Anzahl + Offset) + Test |
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
 | OUT-02 | P2 | todo | Enttec Open DMX USB Stabilisierung | Kein Drift/Hang über lange Sessions (>8h); Reconnect-Logik; Doku |
@@ -37,6 +36,7 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
 
+- **STAB-02** · Access Violation beim Beenden behoben: `OutputManager.stop()` schließt DMX-Geräte nur nach bestätigtem Thread-Ende (sonst CloseHandle neben WriteFile → AV); `EnttecPro` mit `is_open`-Guard + Purge vor close. +8 Tests. [PR #36](https://github.com/ixamgames-droid/lightos/pull/36)
 - **STAB-01** · Crash-Logging „ausgereift": man erkennt jetzt **wann/wie** abgestürzt — Start-/Clean-Exit-Marker, „vorige Sitzung abgestürzt"-Erkennung (deckt native Crashes ab), Standby≠Freeze, `threading.excepthook`, Sturm-Drossel, Qt-Message-Handler, Rotation. Neu `src/core/crash_logging.py` + 18 Tests. [PR #33](https://github.com/ixamgames-droid/lightos/pull/33)
 - **UI-01** · Preset-Browser: ein Suchfeld über Paletten **+** Fixture-Gruppen (Name/Typ/Ordner/Tag, Mehrwort-UND), Doppelklick/Enter wendet an. Filterlogik Qt-frei + getestet. [PR #13](https://github.com/ixamgames-droid/lightos/pull/13)
 - **OUT-01** · sACN / E1.31: echter UDP-Loopback-Test für die Universe-Ausgabe (`tests/test_sacn_loopback.py`). [PR #14](https://github.com/ixamgames-droid/lightos/pull/14)

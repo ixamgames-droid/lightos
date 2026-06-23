@@ -7,8 +7,15 @@ Wird beim Show-Laden automatisch ausgefuehrt; kann manuell via
 Menue "Show pruefen & reparieren..." oder F5 angestossen werden.
 """
 from __future__ import annotations
+import weakref
 from typing import Callable
 from enum import Enum
+
+try:
+    # Prueft, ob das C++-Backing eines Qt-Widgets noch lebt (STAB-03-Guard unten).
+    from shiboken6 import isValid as _qt_is_valid
+except Exception:  # pragma: no cover - PySide6/shiboken ist im App-Run immer da
+    _qt_is_valid = None
 
 
 # =============================================================================
@@ -61,10 +68,37 @@ class StateSync:
         jedem Programmer-Layout-Wechsel neu gebaut werden (eingebettete
         EFX-/Matrix-/Paletten-Seiten, SnapFilePanel), subscriben mit Lambdas
         und wurden nie abgemeldet. Der naechste Emit lief dann in geloeschte
-        Qt-Objekte (RuntimeError bis Access Violation)."""
-        self.subscribe(event, callback)
+        Qt-Objekte (RuntimeError bis Access Violation).
+
+        STAB-03: Qt loescht das C++-Objekt mitunter, BEVOR sein destroyed-Signal
+        die Abmeldung ausloest. Ein Emit in genau diesem Fenster fasst ein totes
+        Qt-Objekt an -> native Access Violation, die KEIN try/except faengt. Darum
+        prueft ein Guard vor jedem Aufruf die Gueltigkeit des Widgets und ueber-
+        springt + entfernt den Subscriber, wenn es schon weg ist. Rein additiv:
+        fuer lebende Widgets unveraendert; ohne shiboken faellt es aufs alte
+        Verhalten zurueck."""
+        # WICHTIG: nur eine SCHWACHE Referenz aufs Widget halten — eine starke
+        # (z. B. als Default-Arg) wuerde das Widget am Leben halten, dessen
+        # destroyed nie feuern und ein Leak erzeugen.
+        _wref = None
+        if _qt_is_valid is not None:
+            try:
+                _wref = weakref.ref(widget)
+            except TypeError:
+                _wref = None  # nicht referenzierbar -> Verhalten wie subscribe()
+        if _wref is not None and _qt_is_valid is not None:
+            def guarded(ev, data, _ref=_wref, _valid=_qt_is_valid):
+                w = _ref()
+                if w is None or not _valid(w):
+                    self.unsubscribe(event, guarded)
+                    return
+                callback(ev, data)
+            registered = guarded
+        else:
+            registered = callback
+        self.subscribe(event, registered)
         try:
-            widget.destroyed.connect(lambda *_: self.unsubscribe(event, callback))
+            widget.destroyed.connect(lambda *_: self.unsubscribe(event, registered))
         except Exception:
             pass  # kein Qt-Objekt -> Verhalten wie subscribe()
 

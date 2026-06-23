@@ -42,6 +42,52 @@ class SubscribeWidgetTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
 
+class WidgetValidityGuardTest(unittest.TestCase):
+    """STAB-03: Selbst wenn das destroyed-Signal die Abmeldung NICHT rechtzeitig
+    ausloest (Qt loescht das C++-Objekt vorher), darf der naechste Emit den
+    Callback nicht in das tote Widget laufen lassen (sonst native Access
+    Violation). Der Guard prueft die Gueltigkeit und ueberspringt + meldet ab."""
+
+    def test_guard_skips_and_unsubscribes_when_invalid(self):
+        import src.core.sync as sync_mod
+
+        class _FakeWidget:        # schwach referenzierbar, aber kein destroyed-Signal
+            pass
+
+        sync = StateSync()
+        calls = []
+        state = {"valid": True}
+        orig = sync_mod._qt_is_valid
+        sync_mod._qt_is_valid = lambda _w: state["valid"]
+        fake = _FakeWidget()                  # starke Ref halten (Weakref im Guard)
+        try:
+            # Fake ohne destroyed-Pfad -> NUR der Guard schuetzt.
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, fake,
+                                  lambda *_: calls.append(1))
+            sync.emit(SyncEvent.PATCH_CHANGED)                 # gueltig -> feuert
+            self.assertEqual(len(calls), 1)
+            state["valid"] = False                            # Widget "stirbt"
+            sync.emit(SyncEvent.PATCH_CHANGED)                # Guard -> skip
+            self.assertEqual(len(calls), 1,
+                             "Callback feuerte auf totem Widget (Guard wirkungslos)")
+            self.assertEqual(sync._subscribers[SyncEvent.PATCH_CHANGED], [],
+                             "toter Subscriber wurde nicht abgemeldet")
+        finally:
+            sync_mod._qt_is_valid = orig
+
+    def test_live_widget_still_fires(self):
+        from PySide6.QtWidgets import QApplication, QWidget
+        _ = QApplication.instance() or QApplication([])
+        sync = StateSync()
+        calls = []
+        w = QWidget()
+        sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, w,
+                              lambda *_: calls.append(1))
+        sync.emit(SyncEvent.FUNCTION_CHANGED)
+        sync.emit(SyncEvent.FUNCTION_CHANGED)
+        self.assertEqual(len(calls), 2, "lebendes Widget muss normal beliefert werden")
+
+
 class SelfHealingEmitTest(unittest.TestCase):
     def test_dead_subscriber_removed(self):
         sync = StateSync()
