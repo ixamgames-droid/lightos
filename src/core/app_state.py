@@ -757,6 +757,37 @@ class AppState:
         self.set_selected_fids(fids)
         return True
 
+    def list_fixture_groups(self) -> list[dict]:
+        """[{name, folder, fids}] aller Fixture-Gruppen (UI-01 Preset-Browser).
+        fids in Raster-Reihenfolge (col,row), Duplikate entfernt. Leere Liste bei
+        Fehler/fehlender Show-DB."""
+        import json
+        out: list[dict] = []
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup
+            with self._session() as s:
+                groups = list(s.execute(select(FixtureGroup)).scalars())
+                for g in groups:
+                    items = []
+                    try:
+                        for key, fid in (json.loads(g.positions_json or "{}") or {}).items():
+                            c, r = str(key).split(",")
+                            items.append((int(r), int(c), int(fid)))
+                    except Exception:
+                        items = []
+                    items.sort()
+                    fids: list[int] = []
+                    for _r, _c, fid in items:
+                        if fid not in fids:
+                            fids.append(fid)
+                    out.append({"name": g.name or "",
+                                "folder": getattr(g, "folder", "") or "",
+                                "fids": fids})
+        except Exception:
+            return []
+        return out
+
     def _flush_programmer_to_dmx(self, fid: int):
         fixture = next((f for f in self._patch_cache if f.fid == fid), None)
         if not fixture or fixture.universe not in self.universes:

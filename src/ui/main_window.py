@@ -728,6 +728,12 @@ class MainWindow(QMainWindow):
             tabs.addTab(self._snapshots_view, "Snapshots")
         except Exception as e:
             print(f"[main_window] SnapshotsView init error: {e}")
+        try:
+            from src.ui.views.preset_browser_view import PresetBrowserView
+            self._preset_browser_view = PresetBrowserView()
+            tabs.addTab(self._preset_browser_view, "Preset-Browser")
+        except Exception as e:
+            print(f"[main_window] PresetBrowserView init error: {e}")
         return tabs
 
     def _build_section_playback(self) -> QWidget:
