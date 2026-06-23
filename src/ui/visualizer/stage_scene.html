@@ -1731,6 +1731,10 @@ function addFixture(data) {
         bar.beams.push(bcone);
       });
     });
+  } else if (rtype === 'smoke' || rtype === 'hazer') {
+    // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
+    // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
+    // faelschlich einen Lichtkegel + schattenwerfenden SpotLight.
   } else {
     const headHost = model.head || model.group;
     const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;
@@ -1828,7 +1832,11 @@ function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
       const bar = f.bars[i];
       const h = hs[i] || hs[0] || {};
       const chan = [h.cr || 0, h.cg || 0, h.cb || 0, h.cw || 0];  // [r,g,b,w]-Kanalwerte
-      const tRad = (((h.tilt == null ? 128 : h.tilt) - 128) / 128) * (Math.PI / 2);
+      // Tilt ueber den physischen Bereich des Geraets (wie der Moving-Head-Pfad),
+      // statt fix 128/±90°; Default 180 ergibt PI/2 wie zuvor.
+      const tHalf = (f.tiltRange || 180) * Math.PI / 360;
+      const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
+      const tRad = (((h.tilt == null ? tZero : h.tilt) - tZero) / 128) * tHalf;
       bar.pivot.rotation.x = tRad;
       for (let k = 0; k < bar.lenses.length; k++) {
         const lens = bar.lenses[k];
@@ -2377,7 +2385,7 @@ function _stageIdFromObject(obj) {
 }
 
 // Liefert {stageId, y, kind} fuer das oberste andockbare Element ueber (x,z) oder null.
-function findDockTarget(x, z, ignoreFid) {
+function findDockTarget(x, z) {
   const meshes = [];
   for (const id in stageObjects) meshes.push(stageObjects[id].mesh);
   if (meshes.length === 0) return null;
@@ -2441,7 +2449,7 @@ function moveDockedFixtures(sid, dxw, dzw) {
     if (!f || f.dockedTo !== sid) continue;
     f.group.position.x += dxw;
     f.group.position.z += dzw;
-    const dock = findDockTarget(f.group.position.x, f.group.position.z, Number(fid));
+    const dock = findDockTarget(f.group.position.x, f.group.position.z);
     if (dock && dock.stageId === sid) {
       f.group.position.y = dock.y;
     }
@@ -2677,7 +2685,7 @@ function handlePointerMove(clientX, clientY) {
             f.group.position.x = start.x + dxw;
             f.group.position.z = start.z + dzw;
             if (settings.dockEnabled) {
-              const dt = findDockTarget(f.group.position.x, f.group.position.z, Number(fid));
+              const dt = findDockTarget(f.group.position.x, f.group.position.z);
               f._pendingDock = dt ? dt.stageId : null;
               if (dt) f.group.position.y = dt.y;
               if (Number(fid) === Number(refFid)) refDock = dt;
@@ -3354,9 +3362,6 @@ function tryChannel() {
         });
         if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
         if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));
-        if (bridge.requestSaveStage) bridge.requestSaveStage.connect(() => {
-          try { bridge.saveStage(JSON.stringify(getStageJson())); } catch (e) {}
-        });
         if (bridge.cameraReset)    bridge.cameraReset.connect(() => resetCameraView());
         if (bridge.brightnessSignal) bridge.brightnessSignal.connect(v => setBrightnessManual(v));
         if (bridge.brightnessAutoSignal) bridge.brightnessAutoSignal.connect(() => resetBrightnessAuto());
