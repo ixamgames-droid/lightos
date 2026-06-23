@@ -21,11 +21,12 @@ from PySide6.QtWidgets import (
     QSplitter, QGroupBox, QFormLayout, QSlider, QCheckBox,
     QDoubleSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem,
     QColorDialog, QInputDialog, QMessageBox, QLineEdit, QSizePolicy,
+    QAbstractSpinBox,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtCore import QUrl, Qt, QTimer, Signal, Slot, QObject
+from PySide6.QtCore import QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
@@ -715,6 +716,24 @@ class VisualizerBridge(QObject):
 # Hauptfenster
 # ============================================================================
 
+# Einzeltasten-Shortcuts des Visualizers — duerfen Texteingabe nicht kapern.
+_SINGLE_KEY_SHORTCUTS = frozenset({
+    Qt.Key.Key_V, Qt.Key.Key_E, Qt.Key.Key_F, Qt.Key.Key_S, Qt.Key.Key_D,
+})
+
+
+def _should_pass_key_to_text(focus_widget, key, modifiers) -> bool:
+    """True, wenn ein Einzeltasten-Shortcut stattdessen als Texteingabe an das
+    fokussierte Feld gehen soll (Eingabefeld/Spinbox + reine Buchstabentaste,
+    kein Strg/Alt)."""
+    return (
+        isinstance(focus_widget, (QLineEdit, QAbstractSpinBox))
+        and key in _SINGLE_KEY_SHORTCUTS
+        and modifiers in (Qt.KeyboardModifier.NoModifier,
+                          Qt.KeyboardModifier.ShiftModifier)
+    )
+
+
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
@@ -892,6 +911,17 @@ class VisualizerWindow(QMainWindow):
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.activated.connect(fn)
+
+    def event(self, e):
+        # Einzelbuchstaben-Shortcuts (V/E/F/S/D) duerfen die Texteingabe in
+        # Feldern (z.B. Buehnenname) NICHT kapern: bei fokussiertem Text-Widget
+        # den ShortcutOverride akzeptieren, damit der Buchstabe normal getippt
+        # wird statt einen Modus-Wechsel auszuloesen.
+        if e.type() == QEvent.Type.ShortcutOverride:
+            if _should_pass_key_to_text(self.focusWidget(), e.key(), e.modifiers()):
+                e.accept()
+                return True
+        return super().event(e)
 
     def _on_dock_mode_toggled(self, checked: bool):
         """Andock-Modus an/aus -> an JS pushen + Status anzeigen."""
@@ -1825,8 +1855,30 @@ class VisualizerWindow(QMainWindow):
             self, "Löschen", f"Bühne '{name}' löschen?"
         ) != QMessageBox.StandardButton.Yes:
             return
-        delete_stage(name)
+        if not delete_stage(name):
+            QMessageBox.warning(
+                self, "Fehler", f"Bühne '{name}' konnte nicht gelöscht werden."
+            )
+            return
+        was_active = (getattr(self._state, "active_stage_name", None) == name)
         self._reload_stage_combo()
+        if was_active:
+            # Die aktive Buehne wurde geloescht -> auf leere Default-Buehne
+            # zuruecksetzen, sonst rendert die Szene weiter die geloeschte Buehne
+            # und active_stage_name zeigt auf einen nicht mehr ladbaren Namen
+            # (beim naechsten Laden stiller Fallback auf 'simple').
+            self._current_stage = get_default_simple()
+            self._selected_stage_id = ""
+            self._state.active_stage_name = "simple"
+            self._apply_stage(self._current_stage)
+            self._refresh_patch_list()
+            self._select_stage_in_combo("default", "simple")
+        else:
+            # Eine andere Buehne ist aktiv -> deren Combo-Auswahl wiederherstellen
+            # (sonst zeigt das Combo nach dem Rebuild faelschlich "Leer").
+            active = getattr(self._state, "active_stage_name", "simple") or "simple"
+            kind = "default" if active in DEFAULT_PRESETS else "user"
+            self._select_stage_in_combo(kind, active)
 
     # ── Stage-Bridge-Slots (JS -> Python) ───────────────────────────────────
 
