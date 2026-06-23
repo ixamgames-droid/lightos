@@ -46,6 +46,18 @@ def _save_prefs(updates: dict) -> None:
         print(f"[live_view] save prefs error: {e}")
 
 
+# ── Pan/Tilt-Winkel (EINE Quelle fuer 2D-Glyph, Info-Box UND 3D-Visualizer) ──
+
+def dmx_to_angle_deg(dmx: float, zero_dmx: float = 128.0,
+                     range_deg: float = 540.0) -> float:
+    """DMX-Wert (0..255) -> Auslenkung in Grad ueber den physischen Bereich des
+    Geraets. Spiegelt exakt aim.py / stage_scene.html:
+    ``winkel = (dmx - zero)/128 * (range_deg/2)``. Dadurch zeigen 2D-Beam-Glyph,
+    Info-Box und 3D-Visualizer denselben Winkel fuer denselben DMX-Wert."""
+    half = max(1.0, range_deg) / 2.0
+    return (dmx - zero_dmx) / 128.0 * half
+
+
 # ── Fixture-Renderer ──────────────────────────────────────────────────────────
 
 class FixtureRenderer:
@@ -57,7 +69,9 @@ class FixtureRenderer:
              selected: bool = False, pan: int = 128, tilt: int = 128,
              effects: list | None = None, anim_phase: float = 0.0,
              blink_off: bool = False, highlighted: bool = False,
-             zoom: float = 1.0):
+             zoom: float = 1.0, pan_range_deg: float = 540.0,
+             tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
+             tilt_zero_dmx: float = 128.0):
         effects = effects or []
         painter.save()
         painter.translate(x, y)
@@ -114,9 +128,10 @@ class FixtureRenderer:
             painter.setBrush(QBrush(grad))
             painter.setPen(QPen(QColor("#888"), 1.5))
             painter.drawEllipse(QPointF(0, 0), size*0.4, size*0.4)
-            # Beam-Richtung (Pan)
-            pan_rad = (pan - 128) / 128.0 * 3.14159
+            # Beam-Richtung (Pan) — Winkel ueber den ECHTEN Pan-Bereich, damit
+            # 2D-Glyph, Info-Box und 3D-Visualizer uebereinstimmen.
             from math import cos, sin
+            pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
             beam_x = cos(pan_rad - 1.5708) * size * 0.6
             beam_y = sin(pan_rad - 1.5708) * size * 0.6
             painter.setPen(QPen(color, 2))
@@ -221,8 +236,9 @@ class FixtureRenderer:
             painter.rotate(-45)
             painter.drawRoundedRect(QRectF(-size*0.08, -size*0.32, size*0.16, size*0.45), 2, 2)
             painter.restore()
-            # Abgelenkter Strahl (vom Spiegel nach oben-rechts)
-            pan_rad = (pan - 128) / 128.0 * 1.5708  # +-90 Grad
+            # Abgelenkter Strahl (vom Spiegel) — Auslenkung ueber den ECHTEN
+            # Pan-Bereich des Geraets (statt fix +-90 Grad).
+            pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
             beam_ex = cos(pan_rad - 0.785) * size * 0.7
             beam_ey = sin(pan_rad - 0.785) * size * 0.7
             painter.setPen(QPen(color, 2))
@@ -820,10 +836,17 @@ class StageCanvas(QWidget):
         painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL, f"Intensität: {pct}%")
         ty += line_h
 
-        # Pan/Tilt
+        # Pan/Tilt — Grad ueber den ECHTEN Bereich des Geraets (gleiche Quelle wie
+        # 2D-Beam-Glyph und 3D-Visualizer), nicht mehr fix +-270/+-135.
         if has_pantilt:
-            pan_deg = int((pan - 128) / 128 * 270)
-            tilt_deg = int((tilt - 128) / 128 * 135)
+            pan_rng = float(getattr(fixture, "pan_range_deg", 540) or 540)
+            tilt_rng = float(getattr(fixture, "tilt_range_deg", 270) or 270)
+            pan_z = getattr(fixture, "pan_zero_dmx", 128)
+            tilt_z = getattr(fixture, "tilt_zero_dmx", 128)
+            pan_z = 128 if pan_z is None else pan_z
+            tilt_z = 128 if tilt_z is None else tilt_z
+            pan_deg = int(dmx_to_angle_deg(pan, pan_z, pan_rng))
+            tilt_deg = int(dmx_to_angle_deg(tilt, tilt_z, tilt_rng))
             painter.setPen(QColor("#aaaaaa"))
             painter.setFont(_font(9))
             painter.drawText(QRectF(tx, ty, inner_w, line_h), _AL,
@@ -853,15 +876,24 @@ class StageCanvas(QWidget):
             channels = get_channels_for_patched(fixture)
             r = g = b = w = 0
             intensity = 255
+            # Mehrkopf-Geraete (Spider) liefern mehrere color_r/g/b-Kanaele —
+            # wie der 3D-Top-Down-Icon den ERSTEN Satz (Kopf 0) verwenden, sonst
+            # weicht die 2D-Farbe von der 3D-Farbe ab (letzter-gewinnt = Bank 2).
+            seen: set[str] = set()
             for ch in channels:
                 addr = fixture.address + ch.channel_number - 1
-                if 1 <= addr <= 512:
-                    val = universe.get_channel(addr)
-                    if ch.attribute == "color_r": r = val
-                    elif ch.attribute == "color_g": g = val
-                    elif ch.attribute == "color_b": b = val
-                    elif ch.attribute == "color_w": w = val
-                    elif ch.attribute == "intensity": intensity = val
+                if not (1 <= addr <= 512):
+                    continue
+                attr = ch.attribute
+                if attr in ("color_r", "color_g", "color_b", "color_w", "intensity") \
+                        and attr in seen:
+                    continue
+                val = universe.get_channel(addr)
+                if attr == "color_r": r = val; seen.add(attr)
+                elif attr == "color_g": g = val; seen.add(attr)
+                elif attr == "color_b": b = val; seen.add(attr)
+                elif attr == "color_w": w = val; seen.add(attr)
+                elif attr == "intensity": intensity = val; seen.add(attr)
             # Weiss zu RGB
             r = min(255, r + w)
             g = min(255, g + w)
@@ -957,6 +989,12 @@ class StageCanvas(QWidget):
                 _render_type = "spider" if is_spider_fixture(fixture) else _base_type
             except Exception:
                 _render_type = _base_type
+            _pr = float(getattr(fixture, "pan_range_deg", 540) or 540)
+            _tr = float(getattr(fixture, "tilt_range_deg", 270) or 270)
+            _pz = getattr(fixture, "pan_zero_dmx", 128)
+            _tz = getattr(fixture, "tilt_zero_dmx", 128)
+            _pz = 128 if _pz is None else _pz
+            _tz = 128 if _tz is None else _tz
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
@@ -965,7 +1003,9 @@ class StageCanvas(QWidget):
                 effects=effects, anim_phase=anim_phase,
                 blink_off=not blink_on,
                 highlighted=(fixture.fid in self._highlight_fids),
-                zoom=self.zoom
+                zoom=self.zoom,
+                pan_range_deg=_pr, tilt_range_deg=_tr,
+                pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
