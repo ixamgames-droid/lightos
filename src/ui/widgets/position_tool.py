@@ -1,8 +1,11 @@
 """Position Tool - QLC+ PositionTool aequivalent fuer Moving-Heads.
 
-  - 2D Pad fuer Pan/Tilt (Klick + Drag)
-  - Pan / Tilt Slider (8 Bit, 0-255)
-  - Pan-Fine / Tilt-Fine Slider (16 Bit Praezision)
+  - 2D Pad fuer Pan/Tilt (Klick + Drag) -- steuert NUR die groben
+    Pan/Tilt-Kanaele (0-255), nicht die Fine-Kanaele.
+  - Pan / Tilt Slider (grob, 0-255)
+  - Pan-Fine / Tilt-Fine Slider: separate, manuell bediente Feinkanaele
+    (0-255). Sie sind unabhaengig von Pan/Tilt -- es gibt KEINE
+    gekoppelte 16-bit-Position; das Pad bewegt die Fine-Werte nicht mit.
   - Preset-Buttons (Center, Top, Front, Back, Audience, etc.)
   - Apply to Selection via Programmer
 """
@@ -179,13 +182,21 @@ class PositionTool(QWidget):
         left.addWidget(self._lbl_values)
 
         # Fine-Sliders
-        fine_box = QGroupBox("16-Bit Fein")
+        fine_box = QGroupBox("Feinkanal (separat)")
+        fine_box.setToolTip(
+            "Separate Fine-Kanaele (manuell). Das Pad steuert nur den groben "
+            "Pan/Tilt-Kanal; diese Regler werden dadurch NICHT mitbewegt."
+        )
         fine_l = QVBoxLayout(fine_box)
 
+        _pf_tip = "Separater Pan-Feinkanal (manuell, unabhaengig vom Pad/Pan)."
         pf_row = QHBoxLayout()
-        pf_row.addWidget(QLabel("Pan (fein)"))
+        _lbl_pan_fine = QLabel("Pan (fein)")
+        _lbl_pan_fine.setToolTip(_pf_tip)
+        pf_row.addWidget(_lbl_pan_fine)
         self._slider_pan_fine = QSlider(Qt.Orientation.Horizontal)
         self._slider_pan_fine.setRange(0, 255)
+        self._slider_pan_fine.setToolTip(_pf_tip)
         self._slider_pan_fine.valueChanged.connect(self._on_pan_fine)
         pf_row.addWidget(self._slider_pan_fine, stretch=1)
         self._lbl_pf = QLabel("0")
@@ -193,10 +204,14 @@ class PositionTool(QWidget):
         pf_row.addWidget(self._lbl_pf)
         fine_l.addLayout(pf_row)
 
+        _tf_tip = "Separater Tilt-Feinkanal (manuell, unabhaengig vom Pad/Tilt)."
         tf_row = QHBoxLayout()
-        tf_row.addWidget(QLabel("Tilt (fein)"))
+        _lbl_tilt_fine = QLabel("Tilt (fein)")
+        _lbl_tilt_fine.setToolTip(_tf_tip)
+        tf_row.addWidget(_lbl_tilt_fine)
         self._slider_tilt_fine = QSlider(Qt.Orientation.Horizontal)
         self._slider_tilt_fine.setRange(0, 255)
+        self._slider_tilt_fine.setToolTip(_tf_tip)
         self._slider_tilt_fine.valueChanged.connect(self._on_tilt_fine)
         tf_row.addWidget(self._slider_tilt_fine, stretch=1)
         self._lbl_tf = QLabel("0")

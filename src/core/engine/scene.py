@@ -103,6 +103,25 @@ class Scene(Function):
         else:
             t = 1.0
 
+        # Ausblend-Phase: laeuft nach Ablauf von hold ueber fade_out Sekunden.
+        # out_factor rampt von 1.0 -> 0.0 (mit derselben Kurvenform wie fade_in,
+        # auf die umgekehrte Progression angewandt) und wird auf den fertig
+        # eingeblendeten Szenenwert multipliziert. Erst NACH Ablauf von fade_out
+        # wird die Szene gestoppt; fade_out<=0 verhaelt sich wie bisher (sofort).
+        out_factor = 1.0
+        fade_out_done = False
+        if t >= 1.0 and self.hold > 0.0:
+            hold_elapsed = self._elapsed - self.fade_in
+            if hold_elapsed >= self.hold:
+                if self.fade_out > 0.0:
+                    out_elapsed = hold_elapsed - self.hold
+                    prog = min(1.0, out_elapsed / self.fade_out)
+                    # gleiche Kurvenform, auf den verbleibenden Anteil angewandt
+                    out_factor = self.fade_in_curve.eval(1.0 - prog)
+                    fade_out_done = out_elapsed >= self.fade_out
+                else:
+                    fade_out_done = True
+
         # Write interpolated values to DMX
         for sv in self._values:
             fixture = _find_fixture(patch_cache, sv.fixture_id)
@@ -115,15 +134,13 @@ class Scene(Function):
             if not (1 <= dmx_addr <= 512):
                 continue
             start = self._start_vals.get((sv.fixture_id, sv.channel), 0)
-            current = int(start + (sv.value - start) * t)
+            current = int((start + (sv.value - start) * t) * out_factor)
             universe.set_channel(dmx_addr, max(0, min(255, current)))
 
-        # Handle hold + auto-stop
-        if t >= 1.0 and self.hold > 0.0:
-            hold_elapsed = self._elapsed - self.fade_in
-            if hold_elapsed >= self.hold:
-                self._running = False
-                self._done = True
+        # Handle hold + auto-stop (erst NACH abgeschlossener Ausblend-Phase)
+        if fade_out_done:
+            self._running = False
+            self._done = True
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

@@ -46,7 +46,7 @@ class RgbAlgorithm(str, Enum):
     WAVE       = "Wave"       # Welle: origin links/rechts/oben/unten/center/radial (ex-Welle H / Diagonal-Welle / Ripple)
     GRADIENT   = "Gradient"   # Farbverlauf ueber die Color-Sequence: axis · blend smooth/steps (ex-Gradient H/V / Color Scroll)
     RAINBOW    = "Rainbow"    # Phase 4: + movement/spread/saturation/value
-    FILL       = "Fill"       # Phase 4: fuellt die Matrix anteilig — level 0..100 % (live), Richtung, Kante
+    FILL       = "Fill"       # Phase 4: zeitlicher Aufbau ueber fill_speed/loop_mode, Richtung, Kante
     RANDOM     = "Random"     # Phase 4: vereinheitlicht — mode dimmer/color/strobe/flash/sparkle/pulse, nur echte Fixtures (ex-Sparkle)
     COLORFADE  = "Color Fade" # Phase 4: Multi-Color-Crossfade ueber die Color-Sequence (deaktivierte Farben werden uebersprungen)
     STROBE     = "Strobe"     # ganzes Feld an/aus (Tempo = Speed)
@@ -342,7 +342,9 @@ class RgbMatrixInstance(Function):
         self.drive_intensity = bool(drive_intensity)
         # Style-Felder (Phase 3)
         self.style: MatrixStyle = MatrixStyle.RGB
-        self.white_amount: int = 100       # 0–100 %, RGBW-Weissanteil
+        # Legacy/No-op: RGBW-Weiss wird in write() aus rgbw_split abgeleitet; Feld nur
+        # fuer Back-compat-Serialisierung, nicht in der UI/VC exponiert.
+        self.white_amount: int = 100       # 0–100 %, RGBW-Weissanteil (Legacy)
         self.intensity_min: int = 0        # Dimmer-Style Untergrenze
         self.intensity_max: int = 255      # Dimmer-Style Obergrenze
         self.shutter_min: int = 0          # Shutter-Style Untergrenze
@@ -878,18 +880,20 @@ class RgbMatrixInstance(Function):
                     head = span - abs((int(p) % (2 * span)) - span)
                     bright = 1.0 if abs(pos - head) < width else 0.0
                 else:  # normal
+                    # runner_width = vollwertiger solider Kopf (unabhaengig vom After-
+                    # Fade); danach NUR bei fade>0 ein linearer Schweif. Mehrere
+                    # Laeufer akkumulieren via max(); solider Kopf darf brechen.
                     spacing = length / count
-                    taillen = max(float(width), fade * length)
+                    fadelen = fade * length
                     bright = 0.0
                     for k in range(count):
                         head = (p + k * spacing) % length
                         dist = (head - pos) % length      # wie weit pos HINTER dem Kopf liegt
-                        if fade > 0.0:
-                            if dist < taillen:
-                                bright = max(bright, 1.0 - dist / taillen)
-                        elif dist < width:
+                        if dist < width:                  # solider Kopf
                             bright = 1.0
                             break
+                        if fade > 0.0 and dist < width + fadelen:   # linearer Schweif
+                            bright = max(bright, 1.0 - (dist - width) / max(1.0, fadelen))
                 if invert:
                     bright = 1.0 - bright
                 pixels[row * cols + col] = _scale(base, bright)
