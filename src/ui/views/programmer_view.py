@@ -1336,9 +1336,12 @@ class ProgrammerView(QWidget):
             for ch, h in color_chs:
                 owners = [f for f in fixtures
                           if self._color_head_counts(f).get(ch.attribute, 0) > h]
-                if owners:
-                    ilay.addWidget(AttributeSlider(
-                        ch, owners, self._state, owner=self, head=h))
+                if not owners:
+                    continue
+                if h > 0:
+                    self._seed_separate_head(owners, ch, h)
+                ilay.addWidget(AttributeSlider(
+                    ch, owners, self._state, owner=self, head=h))
         else:   # sync — ein Regler je Farbe (erstes Vorkommen), treibt alle Koepfe
             for ch, h in color_chs:
                 if h != 0:
@@ -1347,6 +1350,28 @@ class ProgrammerView(QWidget):
                     ch, fixtures, self._state, owner=self,
                     sync_heads=occ.get(ch.attribute, 1),
                     display_name=self._color_label(ch)))
+
+    def _seed_separate_head(self, owners, ch, head: int):
+        """Getrennt-Modus: verankert den aktuell EFFEKTIVEN Wert eines Kopf>0
+        (Wert von Kopf 0, sonst Kanal-Default) als eigenen "attr#head"-Schluessel,
+        falls er noch keinen hat.
+
+        Ohne das spiegelt ein noch nie separat gesetzter Kopf weiter Kopf 0 — in
+        Anzeige (``_values_per_fixture``-Fallback) UND DMX-Ausgabe (``_flush_…``-
+        Fallback). Folge: Bewegt man Kopf 0, zieht es die anderen Koepfe mit, bis
+        man sie einmal selbst anfasst. Das Verankern macht jeden Kopf ab dem ersten
+        Zug unabhaengig; die Ausgabe bleibt im Moment des Verankerns byte-genau
+        gleich (gleicher Wert, nur jetzt explizit pro Kopf). ``owners`` sind bereits
+        owner-gefiltert (nur Fixtures mit diesem Kopf) -> keine toten "attr#N"-
+        Schluessel auf Einzelkopf-Geraeten. Rueckweg via _normalize_color_heads_to_sync."""
+        attr = ch.attribute
+        for f in owners:
+            if self._state.get_programmer_value(f.fid, attr, head=head) is not None:
+                continue
+            base = self._state.get_programmer_value(f.fid, attr, head=0)
+            if base is None:
+                base = ch.default_value
+            self._state.set_programmer_value(f.fid, attr, base, head=head)
 
     _COLOR_LABELS = {
         "color_r": "Rot", "color_g": "Grün", "color_b": "Blau",

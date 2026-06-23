@@ -137,22 +137,58 @@ class ProgrammerColorHeadModeTest(_SpiderBase):
         self.assertEqual(ProgrammerView._strip_head_suffix("Master Dimmer"),
                          "Master Dimmer")
 
-    def test_switch_to_separate_no_seed_but_fallback_display(self):
+    def test_switch_to_separate_seeds_per_head_for_independence(self):
+        # Getrennt verankert den effektiven Wert PRO KOPF, damit ein Kopf>0 nicht
+        # laenger Kopf 0 spiegelt (Bug: Bewegen von Regler 1 zog Regler 2 mit).
         v = self._view()
-        self.state.set_programmer_value(1, "color_r", 100, head=0)
+        # Sauber in Synchron starten (Prefs koennten "separate" persistiert haben
+        # -> dann haette _view() Kopf 1 schon auf Default verankert).
         v._color_head_mode = "sync"
+        v._normalize_color_heads_to_sync()
+        self.state.set_programmer_value(1, "color_r", 100, head=0)
+        self.assertIsNone(self.state.get_programmer_value(1, "color_r", head=1))
         v._set_color_head_mode("separate")
         self.assertEqual(v.color_head_mode(), "separate")
-        # KEIN Seeding -> kein toter "color_r#1"-Schluessel entsteht ...
-        self.assertIsNone(self.state.get_programmer_value(1, "color_r", head=1))
-        self.assertNotIn("color_r#1", self.state.programmer.get(1, {}))
-        # ... DMX bleibt unveraendert (Flush spiegelt Kopf 0) ...
+        # Kopf 1 bekommt jetzt einen EIGENEN Schluessel (= effektiver Wert 100) ...
+        self.assertEqual(self.state.get_programmer_value(1, "color_r", head=1), 100)
+        # ... die Ausgabe bleibt im Moment des Verankerns byte-genau gleich ...
         self.assertEqual(self.u.get_channel(6), 100)
         self.assertEqual(self.u.get_channel(10), 100)
-        # ... und der Pro-Kopf-Regler ZEIGT den effektiven Wert (Fallback Kopf 0).
+        # ... und der Pro-Kopf-Regler ZEIGT den verankerten Wert.
         ch = self._color_channel("color_r", occurrence=1)
         sl = AttributeSlider(ch, [self._fx()], self.state, owner=None, head=1)
         self.assertEqual(sl._slider.value(), 100)
+        # Kernpunkt: Bewegen von Kopf 0 zieht Kopf 1 NICHT mehr mit.
+        ch0 = self._color_channel("color_r", occurrence=0)
+        sl0 = AttributeSlider(ch0, [self._fx()], self.state, owner=None, head=0)
+        sl0._slider.setValue(200)
+        self.assertEqual(self.u.get_channel(6), 200)    # Kopf 0 neu
+        self.assertEqual(self.u.get_channel(10), 100)   # Kopf 1 bleibt verankert
+        v.deleteLater()
+
+    def test_separate_head1_does_not_follow_head0_via_built_sliders(self):
+        # Davids Report (frischer Spider): im Getrennt-Modus zog das Bewegen von
+        # Regler 1 (Kopf 0) den Regler 2 (Kopf 1) mit, bis Kopf 1 einmal selbst
+        # bewegt wurde. Mit Pro-Kopf-Seeding ist Kopf 1 ab dem ersten Zug stabil.
+        v = self._view()
+        v._color_head_mode = "separate"
+        host = QWidget()
+        lay = QVBoxLayout(host)
+        v._add_color_head_sliders(lay, [self._fx()])
+        sliders = [w for w in (lay.itemAt(i).widget() for i in range(lay.count()))
+                   if isinstance(w, AttributeSlider)]
+        r0 = next(s for s in sliders
+                  if s._channel.attribute == "color_r" and s._head == 0)
+        r1 = next(s for s in sliders
+                  if s._channel.attribute == "color_r" and s._head == 1)
+        # Kopf 1 wurde beim Aufbau auf den Default (0) verankert.
+        self.assertEqual(self.state.get_programmer_value(1, "color_r", head=1), 0)
+        r0._slider.setValue(180)
+        self.assertEqual(self.u.get_channel(6), 180)    # Kopf 0
+        self.assertEqual(self.u.get_channel(10), 0)     # Kopf 1 bleibt
+        # Der Live-Refresh zieht Regler 2 nicht mehr mit.
+        r1._load_current_value()
+        self.assertEqual(r1._slider.value(), 0)
         v.deleteLater()
 
     def test_switch_to_sync_clears_head_overrides(self):
