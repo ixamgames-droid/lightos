@@ -116,5 +116,51 @@ class TestOutputManagerThreading(unittest.TestCase):
         self.assertFalse(self.om._thread, "Thread-Referenz nach stop() geloescht")
 
 
+class TestOutputManagerStopSafety(unittest.TestCase):
+    """STAB-02: stop() schliesst Geraete NUR, wenn der Output-Thread sicher
+    beendet ist. Schliesst er trotz noch laufendem Thread, kollidiert CloseHandle()
+    unter Windows mit einem ausstehenden WriteFile -> Access Violation beim Beenden
+    (crash.log 21.+22.06.)."""
+
+    def test_stop_closes_devices_when_thread_exits(self):
+        om = OutputManager()
+        om.add_universe(1)
+        dev = _FakeDev()
+        om._enttec_outputs[1] = dev
+        om.start()
+        time.sleep(0.05)
+        om.stop()
+        self.assertTrue(dev.closed, "sauber beendeter Thread -> Geraet wird geschlossen")
+        self.assertEqual(om._enttec_outputs, {}, "Registry nach stop() geleert")
+
+    def test_stop_skips_close_when_thread_hangs(self):
+        om = OutputManager()
+        om._stop_join_s = 0.1
+        dev = _FakeDev()
+        om._enttec_outputs[1] = dev
+        release = threading.Event()
+        stuck = threading.Thread(target=lambda: release.wait(3.0), daemon=True)
+        stuck.start()
+        om._thread = stuck
+        t0 = time.perf_counter()
+        om.stop()
+        elapsed = time.perf_counter() - t0
+        self.assertLess(elapsed, 1.0, "stop() darf bei haengendem Thread nicht blockieren")
+        self.assertFalse(dev.closed,
+                         "haengender Thread -> Geraet NICHT schliessen (AV-Schutz)")
+        release.set()
+        stuck.join(timeout=3.0)
+
+    def test_second_stop_does_not_double_close(self):
+        om = OutputManager()
+        dev = _FakeDev()
+        om._enttec_outputs[1] = dev
+        om.stop()                       # kein Thread -> schliesst direkt
+        self.assertTrue(dev.closed)
+        dev.closed = False
+        om.stop()                       # zweites Mal -> Registry leer
+        self.assertFalse(dev.closed, "zweites stop() darf nicht erneut schliessen")
+
+
 if __name__ == "__main__":
     unittest.main()
