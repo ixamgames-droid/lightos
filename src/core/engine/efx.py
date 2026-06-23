@@ -653,7 +653,9 @@ class EfxInstance(Function):
             ParamSpec("speed", "Geschwindigkeit (Hz)", "float", 0.5, 0.01, 10.0, 0.1,
                       "Umdrehungen pro Sekunde"),
             ParamSpec("intensity", "Intensität", "float", 1.0, 0.0, 1.0, 0.01,
-                      "Per-Effekt-Master (0..1)"),
+                      "Per-Effekt-Master (0..1) — wirkt nur auf Dimmer/Shutter "
+                      "(bei aktivem 'Dimmer/Shutter öffnen'); auf reine "
+                      "Pan/Tilt-Bewegung ohne Dimmer hat der Master keinen Effekt"),
             ParamSpec("size", "Größe", "float", 100.0, 0.0, 255.0, 5.0,
                       "setzt Pan- und Tilt-Hub gemeinsam"),
             ParamSpec("width", "Breite (Pan-Hub)", "float", 100.0, 0.0, 255.0, 5.0),

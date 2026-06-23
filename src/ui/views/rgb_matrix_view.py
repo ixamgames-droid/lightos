@@ -769,8 +769,20 @@ class RgbMatrixView(QWidget):
                 # Color-Sequence-/Action-UI folgt in Phase 5.
                 w = QComboBox()
                 for opt in spec.options:
-                    w.addItem(str(opt))
-                w.setCurrentText(str(spec.default))
+                    # ParamSpec.options koennen interne Werte ODER
+                    # (wert, label)-Paare sein (rgb_matrix_meta.py): den
+                    # internen Wert IMMER als userData mitgeben, damit das
+                    # Datenmodell den Wert (nicht das Label) erhaelt.
+                    if isinstance(opt, (tuple, list)) and len(opt) == 2:
+                        w.addItem(str(opt[1]), opt[0])
+                    else:
+                        w.addItem(str(opt), opt)
+                # Default ueber userData treffen (Fallback: angezeigter Text).
+                _idx = w.findData(spec.default)
+                if _idx >= 0:
+                    w.setCurrentIndex(_idx)
+                else:
+                    w.setCurrentText(str(spec.default))
                 if spec.tooltip:
                     w.setToolTip(spec.tooltip)
                 w.currentTextChanged.connect(self._param_change)
@@ -802,7 +814,13 @@ class RgbMatrixView(QWidget):
             elif spec.kind == "int":
                 w.setValue(int(val))
             elif spec.kind == "select":
-                w.setCurrentText(str(val))
+                # Index ueber userData (interner Wert) treffen; Fallback Text,
+                # falls der gespeicherte Wert nicht als userData existiert.
+                _idx = w.findData(val)
+                if _idx >= 0:
+                    w.setCurrentIndex(_idx)
+                else:
+                    w.setCurrentText(str(val))
             else:
                 w.setValue(float(val))
             w.blockSignals(False)
@@ -979,7 +997,10 @@ class RgbMatrixView(QWidget):
             if isinstance(w, QCheckBox):
                 self._current.params[key] = w.isChecked()
             elif isinstance(w, QComboBox):
-                self._current.params[key] = w.currentText()
+                # Internen Wert (userData) schreiben; Fallback auf den
+                # angezeigten Text, falls keine userData gesetzt ist.
+                _data = w.currentData()
+                self._current.params[key] = _data if _data is not None else w.currentText()
             elif isinstance(w, QSpinBox):
                 self._current.params[key] = w.value()
             elif isinstance(w, QDoubleSpinBox):

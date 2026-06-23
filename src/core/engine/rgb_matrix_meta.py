@@ -147,10 +147,6 @@ def _color_interval():
                              "langsamer)")
 
 # ── Bausteine fuer die Phase-4-Algorithmen (Fill / Random / ColorFade / Rainbow) ──
-def _level():
-    return ParamSpec("level", "Füll-Level", "float", 100.0, 0.0, 100.0, 1.0,
-                     "Anteil aktiver echter Fixtures (0..100 %) — live steuerbar")
-
 def _fill_dir():
     return ParamSpec("fill_dir", "Reihenfolge", "select", "left",
                      options=("left", "right", "top", "bottom",
