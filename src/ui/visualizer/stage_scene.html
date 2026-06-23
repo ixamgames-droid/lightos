@@ -1007,17 +1007,12 @@ function buildMovingHead() {
   lens.rotation.z = Math.PI / 2;
   lens.position.x = 0.19;
   head.add(lens);
-  // Optional real model overlay - replaces yoke arms + head body, keeps procedural lens for emissive.
-  loadModel('assets/models/fixtures/moving_head.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.6, y: 0.8, z: 0.6 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    // Hide procedural body parts (keep lens visible for emissive feedback)
-    base.visible = false;
-    yoke.children.forEach(arm => { arm.visible = false; });
-    headBody.visible = false;
-    group.add(model);
-  });
+  // BEWUSST KEIN .dae-Overlay: das geladene moving_head.dae wurde an die statische
+  // Root-Group gehaengt (nicht an yoke/head) -> es pante/tiltete NICHT mit und der
+  // Moving Head stand optisch still. Die prozedurale Geometrie (yoke pant um Y,
+  // head tiltet um X) bewegt sich korrekt — bei einem Bewegungs-Visualizer ist
+  // genau das der Sinn. (Ein optisch schoeneres Modell muesste sauber in yoke/head
+  // gesplittet werden, sonst wuerde der Sockel mitkippen.)
   return { group, yoke, head, lens };
 }
 
@@ -1054,13 +1049,20 @@ function buildLedBar() {
   );
   body.castShadow = true;
   group.add(body);
-  const pxMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4 });
+  // Pixel-LEDs teilen EIN emissives Material; lamp zeigt darauf -> updateFixture
+  // faerbt ueber f.lamp.material ALLE Pixel. Das dunkle Gehaeuse (body) bleibt
+  // unbeleuchtet (vorher leuchtete faelschlich das Gehaeuse, Pixel blieben grau).
+  const pxMat = new THREE.MeshStandardMaterial({
+    color: 0x222222, emissive: 0x000000, emissiveIntensity: 0.0, roughness: 0.4,
+  });
+  let firstPx = null;
   for (let i = 0; i < 8; i++) {
     const px = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.02), pxMat);
     px.position.set(-0.5 + i * 0.14, 0, 0.1);
     group.add(px);
+    if (!firstPx) firstPx = px;
   }
-  return { group, head: group, lamp: body };
+  return { group, head: group, lamp: firstPx };
 }
 
 function buildStrobe() {
@@ -1290,6 +1292,7 @@ function buildLaser() {
     depthWrite: false,
   });
   const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // radians spread in X
+  const laserBeams = [];
   FAN_ANGLES.forEach((angle) => {
     const beamLen = 1.8;
     const geo = new THREE.CylinderGeometry(0.005, 0.005, beamLen, 4);
@@ -1299,8 +1302,11 @@ function buildLaser() {
     beam.rotation.x = Math.PI / 2 - angle * 0.6;  // tilt so beam fans outward
     beam.rotation.z = angle;
     group.add(beam);
+    laserBeams.push(beam);
   });
-  return { group, head: group, lamp };
+  // laserBeams zurueckgeben, damit updateFixture sie per DMX faerbt/dimmt
+  // (vorher fix gruen 0x00ff00 / opacity 0.6, unabhaengig von Farbe/Intensitaet).
+  return { group, head: group, lamp, laserBeams };
 }
 
 // ── Spider (Doppel-Bar Moving Head) ─────────────────────────────────────────
@@ -1747,6 +1753,7 @@ function addFixture(data) {
     head: model.head || null,
     lens: model.lens || null,
     lamp: model.lamp || null,
+    laserBeams: model.laserBeams || null,
     bars: model.bars || null,
     isSpider: !!model.isSpider,
     beam, spot, spotTarget, floorSpot,
@@ -1854,6 +1861,16 @@ function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   if (f.lamp && f.lamp.material) {
     f.lamp.material.emissive = color;
     f.lamp.material.emissiveIntensity = intNorm * 1.5;
+  }
+  // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
+  if (f.laserBeams) {
+    const laserVis = settings.showCones && intNorm > 0.01 && viewMode === '3D';
+    for (const bm of f.laserBeams) {
+      if (!bm.material) continue;
+      bm.material.color = color;
+      bm.material.opacity = Math.max(0.0, intNorm * 0.6);
+      bm.visible = laserVis;
+    }
   }
   // Top-down icon color reflects active output color (only when bright)
   if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
