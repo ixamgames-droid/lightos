@@ -66,7 +66,7 @@ class VisualizerBridge(QObject):
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
         applyFixtureTransform(json), alignSelected(mode),
-        distributeSelected(axis), requestSaveStage(), cameraReset()
+        distributeSelected(axis), cameraReset()
 
     Slots <- JS
         requestFixtures(), placeFixture(json), fixturePositionChanged(...),
@@ -89,7 +89,6 @@ class VisualizerBridge(QObject):
     applyFixtureTransform   = Signal(str)
     alignSelected           = Signal(str)
     distributeSelected      = Signal(str)
-    requestSaveStage        = Signal()
     cameraReset             = Signal()
     brightnessSignal        = Signal(float)   # 0.0 - 1.0
     brightnessAutoSignal    = Signal()        # Reset auto-mode
