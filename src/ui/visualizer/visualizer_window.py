@@ -864,8 +864,8 @@ class VisualizerWindow(QMainWindow):
         self._act_dock.setToolTip(
             "Andock-Modus (Taste D):\n"
             "AN  – Strahler rasten an Trassen (hängen unten) bzw.\n"
-            "       Plattform/Boden (stehen oben drauf) ein und wandern\n"
-            "       mit, wenn das Element verschoben wird.\n"
+            "       Plattform/Boden/Speaker/Publikum/DJ-Booth (stehen oben\n"
+            "       drauf) ein und wandern mit, wenn das Element verschoben wird.\n"
             "AUS – freie Platzierung auf fester Höhe (wie bisher)."
         )
         self._act_dock.toggled.connect(self._on_dock_mode_toggled)

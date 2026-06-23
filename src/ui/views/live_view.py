@@ -16,6 +16,7 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
 from src.core.app_state import get_state, get_channels_for_patched, is_spider_fixture
+from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 
 
@@ -138,7 +139,7 @@ class FixtureRenderer:
             painter.drawLine(QPointF(0, 0), QPointF(beam_x, beam_y))
             label_prefix = "MH"
 
-        elif "par" in ft or fixture_type == "par":
+        elif any(_t.startswith("par") for _t in ft.split()):  # nicht bloss "par" in ft (sonst matcht z.B. "Sparkular")
             # PAR: Kreis (von oben gesehen)
             painter.setBrush(QBrush(QColor("#1a1a1a")))
             painter.setPen(QPen(QColor("#555"), 2))
@@ -631,7 +632,9 @@ class StageCanvas(QWidget):
             if f.fid not in self._positions and f.fid in viz:
                 try:
                     x3d, _y3d, z3d = viz[f.fid]
-                    self._positions[f.fid] = (x3d * 20 + 300, z3d * 20 + 200)
+                    # EINE Quelle fuer die 2D<->3D-Umrechnung (coords), statt die
+                    # Konstanten PX_PER_M/ORIGIN_PX hier ein drittes Mal zu verdrahten.
+                    self._positions[f.fid] = world3d_to_live(x3d, z3d)
                 except Exception:
                     pass
         # 3) Auto-Layout (Halbkreis vor der Buehne) fuer den Rest
@@ -715,7 +718,7 @@ class StageCanvas(QWidget):
         """Gibt Liste der aktiven Effekt-/Funktionsnamen zurück, die dieses Fixture betreffen."""
         effects = []
         if strobe_hz > 0.0:
-            effects.append(f"Strobe  {strobe_hz:.1f} Hz")
+            effects.append(f"Strobe {strobe_hz:.1f} Hz")
         try:
             funcs = running if running is not None else self._running_functions()
             for func in funcs:
@@ -1401,7 +1404,7 @@ class LiveView(QWidget):
         header.addWidget(self._lbl_info)
         header.addStretch()
 
-        legend = QLabel("PAR  Bar  Moving-Head  Strobe  Dimmer")
+        legend = QLabel("PAR  Bar  Moving-Head  Spider  Scanner  Laser  Strobe  Dimmer  Fog")
         legend.setStyleSheet("color:#666; font-size:10px;")
         header.addWidget(legend)
         root.addLayout(header)
