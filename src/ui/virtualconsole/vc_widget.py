@@ -1,7 +1,7 @@
 """VCWidget — Basisklasse aller Virtual-Console-Widgets."""
 from __future__ import annotations
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QMenu, QSizePolicy
-from PySide6.QtCore import Qt, QPoint, QRect, Signal
+from PySide6.QtCore import Qt, QPoint, QRect, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 
 
@@ -24,8 +24,11 @@ def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> 
 class VCWidget(QFrame):
     """Basisklasse — abstrakt, nicht direkt instanziieren."""
 
-    HANDLE_SIZE = 8
+    HANDLE_SIZE = 8            # praezise Greifzone (Maus) — immer aktiv
+    TOUCH_HANDLE_SIZE = 24     # grosse Greifzone (Finger) — erst nach Verweilen
     MIN_SIZE = (40, 30)
+    _DWELL_MS = 500            # so lange „draufbleiben" enthuellt die grossen Griffe
+    _DWELL_MOVE_TOL = 6        # ab dieser Bewegung gilt es als Verschieben (kein Reveal)
 
     # Globaler Touch-/Maus-Lock im Run-Modus: True = nur Anzeige, keine Steuerung
     # ueber den Touchscreen (APC/MIDI steuert weiter). Vom VC-Toolbar gesetzt.
@@ -48,17 +51,23 @@ class VCWidget(QFrame):
         self._edit_mode = False
         self._dragging = False
         self._resizing = False
+        self._resize_zone = None         # aktive Resize-Zone (tl/tr/bl/br/t/b/l/r)
+        self._big_handles = False        # grosse Greifbaender enthuellt (Touch/Verweilen)
         self._selected = False
         self._effect_highlight = False   # Glow: „gehoert zum selben Effekt"
         self._snap_grid = 0      # 0 = kein Snap, sonst Grid-Größe in Pixel
         self._drag_start = QPoint()
         self._orig_rect = QRect()
+        self._dwell_timer = None         # Single-Shot: enthuellt nach Verweilen die Griffe
         self._pre_edit_snapshot = None   # Canvas-Stand vor Move/Resize (fuer Undo)
         self._bg_color = QColor("#2a2a2a")
         self._fg_color = QColor("#ffffff")
         self.setFrameShape(QFrame.Shape.Box)
         self.setFrameShadow(QFrame.Shadow.Raised)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        # Hover-Tracking, damit der Resize-Cursor schon beim Drueberfahren (ohne
+        # Klick) erscheint und die Maus an der Ecke sofort skalieren kann.
+        self.setMouseTracking(True)
 
     # ── Edit Mode ─────────────────────────────────────────────────────────────
 
@@ -66,6 +75,8 @@ class VCWidget(QFrame):
         self._edit_mode = enabled
         if not enabled:
             self._selected = False
+            self._big_handles = False          # grosse Greifbaender ausblenden
+            self._cancel_dwell()
             self.set_effect_highlight(False)   # keine Hervorhebung im Betrieb
         self.setCursor(Qt.CursorShape.SizeAllCursor if enabled else Qt.CursorShape.ArrowCursor)
         self.update()
@@ -104,12 +115,21 @@ class VCWidget(QFrame):
             self.update()
             self._notify_effect_highlight()    # Gruppe „beeinflusst denselben Effekt"
             pos = event.position().toPoint()
-            if self._is_resize_handle(pos):
-                self._resizing = True
-            else:
-                self._dragging = True
             self._drag_start = event.globalPosition().toPoint()
             self._orig_rect = self.geometry()
+            zone = self._zone_at(pos)
+            if zone is not None:
+                # Ecke/Kante getroffen -> SOFORT skalieren (Maus an die Ecke = direkt,
+                # ohne Verweilen). Funktioniert mit der praezisen kleinen Zone ebenso
+                # wie mit den grossen, per Verweilen enthuellten Greifbaendern.
+                self._resizing = True
+                self._resize_zone = zone
+                self._cancel_dwell()
+            else:
+                # Koerper gedrueckt: Verschieben. Bleibt der Finger ruhig liegen,
+                # enthuellt der Dwell-Timer die grossen Greifbaender (Touch-Betrieb).
+                self._dragging = True
+                self._start_dwell()
             # Vorher-Stand fuer Undo erfassen (erst bei echter Geometrie-Aenderung
             # auf Release tatsaechlich auf den Undo-Stapel gelegt).
             self._pre_edit_snapshot = None
@@ -124,8 +144,16 @@ class VCWidget(QFrame):
     def mouseMoveEvent(self, event):
         if not self._edit_mode:
             return
+        pos = event.position().toPoint()
+        if not self._dragging and not self._resizing:
+            # Hover (ohne gedrueckte Taste): Resize-Cursor an Ecke/Kante zeigen.
+            self._update_hover_cursor(pos)
+            return
         delta = event.globalPosition().toPoint() - self._drag_start
         if self._dragging and self.parent():
+            # Echte Bewegung -> es ist ein Verschieben, also kein „Verweilen"-Reveal.
+            if abs(delta.x()) > self._DWELL_MOVE_TOL or abs(delta.y()) > self._DWELL_MOVE_TOL:
+                self._cancel_dwell()
             nx = max(0, self._orig_rect.x() + delta.x())
             ny = max(0, self._orig_rect.y() + delta.y())
             if self._snap_grid > 0:
@@ -134,13 +162,7 @@ class VCWidget(QFrame):
             self.move(nx, ny)
             self.moved.emit(nx, ny)
         elif self._resizing:
-            nw = max(self.MIN_SIZE[0], self._orig_rect.width() + delta.x())
-            nh = max(self.MIN_SIZE[1], self._orig_rect.height() + delta.y())
-            if self._snap_grid > 0:
-                nw = round(nw / self._snap_grid) * self._snap_grid
-                nh = round(nh / self._snap_grid) * self._snap_grid
-            self.resize(nw, nh)
-            self.resized.emit(nw, nh)
+            self._apply_resize(delta)
         event.accept()
 
     def mouseDoubleClickEvent(self, event):
@@ -155,19 +177,23 @@ class VCWidget(QFrame):
         was_resizing = self._resizing
         self._dragging = False
         self._resizing = False
+        self._resize_zone = None
+        self._cancel_dwell()
+        geom_changed = self.geometry() != self._orig_rect
         # Verschieben/Groesse ist ein Undo-Punkt — aber nur bei wirklicher
         # Geometrie-Aenderung (reiner Auswahl-Klick erzeugt keinen).
-        if (was_dragging or was_resizing) and self._edit_mode \
-                and self.geometry() != self._orig_rect:
+        if (was_dragging or was_resizing) and self._edit_mode and geom_changed:
             _snap = getattr(self, "_pre_edit_snapshot", None)
             _canvas = self._find_canvas()
             if _canvas is not None and _snap is not None \
                     and hasattr(_canvas, "push_undo_snapshot"):
                 _canvas.push_undo_snapshot(_snap)
         self._pre_edit_snapshot = None
-        # FRM-01: nach einem Drag pruefen, ob das Widget in einen Frame hinein
-        # oder aus einem Frame heraus gezogen wurde (Reparenting per Hit-Test).
-        if was_dragging and self._edit_mode:
+        # FRM-01: nach einem ECHTEN Drag (mit Positionsaenderung) pruefen, ob das
+        # Widget in einen Frame hinein oder heraus gezogen wurde (Reparent per Hit-
+        # Test). Ohne Bewegung NICHT reparenten — sonst rutschte ein nur per
+        # Verweilen angetipptes Widget in einen darunterliegenden Frame.
+        if was_dragging and self._edit_mode and geom_changed:
             canvas = self._find_canvas()
             if canvas is not None and hasattr(canvas, "handle_drag_drop"):
                 try:
@@ -177,18 +203,139 @@ class VCWidget(QFrame):
         event.accept()
 
     def _deselect_siblings(self):
-        """Deselektiert alle anderen VCWidgets im selben Parent."""
+        """Deselektiert alle anderen VCWidgets im selben Parent (und blendet deren
+        grosse Greifbaender wieder aus)."""
         if self.parent() is not None:
             for sibling in self.parent().findChildren(VCWidget):
-                if sibling is not self and sibling._selected:
+                if sibling is not self and (sibling._selected or sibling._big_handles):
                     sibling._selected = False
+                    sibling._big_handles = False
+                    sibling._cancel_dwell()
                     sibling.update()
 
     def _is_resize_handle(self, pos: QPoint) -> bool:
+        """Back-Compat: True, wenn ``pos`` in einer Resize-Zone (Ecke/Kante) liegt."""
+        return self._zone_at(pos) is not None
+
+    def _effective_handle_margin(self) -> int:
+        """Greif-Breite: praezise (klein) im Normalfall, gross sobald die
+        Greifbaender per Verweilen/Touch enthuellt sind. So skaliert die Maus an
+        der Ecke sofort, der Finger nach kurzem Draufbleiben bequem."""
+        return self.TOUCH_HANDLE_SIZE if self._big_handles else self.HANDLE_SIZE
+
+    def _zone_at(self, pos: QPoint):
+        """Resize-Zone unter ``pos`` (``tl/tr/bl/br/t/b/l/r``) oder ``None`` (=
+        Koerper/Verschieben). Ecken haben Vorrang vor Kanten. Die Greif-Breite ist
+        gedeckelt, damit bei kleinen Widgets die Mitte zum Verschieben frei bleibt."""
         r = self.rect()
-        hs = self.HANDLE_SIZE
-        return (r.right() - hs <= pos.x() <= r.right() and
-                r.bottom() - hs <= pos.y() <= r.bottom())
+        m = self._effective_handle_margin()
+        m = max(1, min(m, min(r.width(), r.height()) // 3))
+        left = pos.x() <= r.left() + m
+        right = pos.x() >= r.right() - m
+        top = pos.y() <= r.top() + m
+        bottom = pos.y() >= r.bottom() - m
+        if top and left:
+            return "tl"
+        if top and right:
+            return "tr"
+        if bottom and left:
+            return "bl"
+        if bottom and right:
+            return "br"
+        if top:
+            return "t"
+        if bottom:
+            return "b"
+        if left:
+            return "l"
+        if right:
+            return "r"
+        return None
+
+    def _apply_resize(self, delta: QPoint):
+        """Skaliert anhand der aktiven Zone — die gegenueberliegende Ecke/Kante
+        bleibt fix. Beachtet Snap-Grid und MIN_SIZE; Position bleibt >= 0."""
+        zone = self._resize_zone or "br"
+        o = self._orig_rect
+        x, y, w, h = o.x(), o.y(), o.width(), o.height()
+        left, top, right, bottom = x, y, x + w, y + h
+        if "l" in zone:
+            left = x + delta.x()
+        if "r" in zone:
+            right = x + w + delta.x()
+        if "t" in zone:
+            top = y + delta.y()
+        if "b" in zone:
+            bottom = y + h + delta.y()
+        g = self._snap_grid
+        if g > 0:
+            if "l" in zone:
+                left = round(left / g) * g
+            if "r" in zone:
+                right = round(right / g) * g
+            if "t" in zone:
+                top = round(top / g) * g
+            if "b" in zone:
+                bottom = round(bottom / g) * g
+        minw, minh = self.MIN_SIZE
+        if right - left < minw:
+            if "l" in zone:
+                left = right - minw
+            else:
+                right = left + minw
+        if bottom - top < minh:
+            if "t" in zone:
+                top = bottom - minh
+            else:
+                bottom = top + minh
+        if left < 0 and "l" in zone:
+            left = 0
+        if top < 0 and "t" in zone:
+            top = 0
+        self.setGeometry(int(left), int(top), int(right - left), int(bottom - top))
+        self.resized.emit(self.width(), self.height())
+
+    _ZONE_CURSORS = {
+        "tl": Qt.CursorShape.SizeFDiagCursor, "br": Qt.CursorShape.SizeFDiagCursor,
+        "tr": Qt.CursorShape.SizeBDiagCursor, "bl": Qt.CursorShape.SizeBDiagCursor,
+        "l": Qt.CursorShape.SizeHorCursor, "r": Qt.CursorShape.SizeHorCursor,
+        "t": Qt.CursorShape.SizeVerCursor, "b": Qt.CursorShape.SizeVerCursor,
+    }
+
+    def _update_hover_cursor(self, pos: QPoint):
+        """Zeigt beim Drueberfahren den passenden Resize-Cursor (Maus-Feedback)."""
+        zone = self._zone_at(pos)
+        cur = (self._ZONE_CURSORS.get(zone, Qt.CursorShape.SizeAllCursor)
+               if zone else Qt.CursorShape.SizeAllCursor)
+        self.setCursor(cur)
+
+    # ── Dwell: „Draufbleiben" enthuellt die grossen Greifbaender (Touch) ────────
+
+    def _start_dwell(self):
+        if self._dwell_timer is None:
+            self._dwell_timer = QTimer(self)
+            self._dwell_timer.setSingleShot(True)
+            self._dwell_timer.timeout.connect(self._on_dwell)
+        self._dwell_timer.start(self._DWELL_MS)
+
+    def _cancel_dwell(self):
+        if self._dwell_timer is not None:
+            self._dwell_timer.stop()
+
+    def _on_dwell(self):
+        """Timer-Ablauf: Finger/Maus lag ruhig auf dem Widget -> grosse Greif-
+        baender einblenden (bleiben, bis ein anderes Widget gewaehlt wird oder die
+        Maus das Widget verlaesst). Der ruhende Druck zaehlt dann NICHT als Move."""
+        if self._dragging and self.geometry() == self._orig_rect:
+            self._dragging = False
+            self._big_handles = True
+            self.update()
+
+    def leaveEvent(self, event):
+        if self._big_handles and not self._dragging and not self._resizing:
+            self._big_handles = False
+            self.update()
+        super().leaveEvent(event)
 
     def _show_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
@@ -454,15 +601,37 @@ class VCWidget(QFrame):
         p = QPainter(self)
         p.fillRect(self.rect(), self._bg_color)
         if self._edit_mode:
-            hs = self.HANDLE_SIZE
             r = self.rect()
-            p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
+            if self._big_handles:
+                self._paint_resize_handles(p, r)   # grosse Greifbaender (Touch)
+            else:
+                hs = self.HANDLE_SIZE              # praeziser Eck-Griff (Maus)
+                p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
             if self._selected:
                 p.setPen(QPen(QColor("#58d68d"), 2, Qt.PenStyle.SolidLine))
             else:
                 p.setPen(QPen(QColor("#0088ff"), 1, Qt.PenStyle.DashLine))
             p.drawRect(r.adjusted(0, 0, -1, -1))
         p.end()
+
+    def _paint_resize_handles(self, p: QPainter, r: QRect):
+        """Zeichnet die grossen Greifbaender (4 Ecken + 4 Kantenmitten), sobald sie
+        per Verweilen/Touch enthuellt sind — halbtransparentes Blau."""
+        m = self.TOUCH_HANDLE_SIZE
+        m = max(4, min(m, min(r.width(), r.height()) // 3))
+        fill = QColor(0, 136, 255, 90)
+        w, h = r.width(), r.height()
+        em = max(2, m // 2)
+        rects = [
+            (0, 0, m, m), (w - m, 0, m, m),                 # Ecken oben
+            (0, h - m, m, m), (w - m, h - m, m, m),         # Ecken unten
+            ((w - m) // 2, 0, m, em),                       # Kante oben
+            ((w - m) // 2, h - em, m, em),                  # Kante unten
+            (0, (h - m) // 2, em, m),                       # Kante links
+            (w - em, (h - m) // 2, em, m),                  # Kante rechts
+        ]
+        for (rx, ry, rw, rh) in rects:
+            p.fillRect(rx, ry, rw, rh, fill)
 
     # ── Serialisierung ────────────────────────────────────────────────────────
 

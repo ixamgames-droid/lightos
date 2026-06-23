@@ -99,6 +99,7 @@ class VCFrame(VCWidget):
             return
         child = cls(parent=self)
         child.set_edit_mode(self._edit_mode)
+        child.set_snap_grid(self._snap_grid)   # Snap des Frames an neues Kind weitergeben
         cr = self._content_rect()
         if pos is not None:
             child.move(pos)
@@ -213,6 +214,27 @@ class VCFrame(VCWidget):
                     p.setPen(QColor("#e6edf3") if i == self._current_page else self._fg_color)
                     p.setFont(QFont("Segoe UI", 8))
                     p.drawText(tab, Qt.AlignmentFlag.AlignCenter, f"P{i+1}")
+
+        # Snap-Grid in der Content-Flaeche zeichnen (Edit-Modus) — gespiegelt vom
+        # Canvas (gleiche 32-px-Teilung GRID*4, gleiche Farbe), auf die Content-
+        # Flaeche geclippt, damit Header/Rahmen frei bleiben. Dasselbe Raster, an
+        # dem die Kinder per Snap einrasten (set_snap_grid).
+        if self._edit_mode:
+            cr = self._content_rect()
+            if cr.width() > 0 and cr.height() > 0:
+                p.save()
+                p.setClipRect(cr)
+                p.setPen(QColor("#1f2937"))
+                g = 32
+                gx = cr.left()
+                while gx <= cr.right():
+                    p.drawLine(gx, cr.top(), gx, cr.bottom())
+                    gx += g
+                gy = cr.top()
+                while gy <= cr.bottom():
+                    p.drawLine(cr.left(), gy, cr.right(), gy)
+                    gy += g
+                p.restore()
 
         # Hinweis wenn Frame leer und im Edit-Modus
         if self._edit_mode:

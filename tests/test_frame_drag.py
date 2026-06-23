@@ -81,5 +81,38 @@ class FrameDragTest(_CanvasTest):
         self.assertIn("InFrame", caps)           # serialisiert unter dem Frame
 
 
+class FrameDragHighlightTest(_CanvasTest):
+    """FRM-02: ein Widget mit aktivem Effekt-Glow (QGraphicsDropShadowEffect) darf
+    beim Reinziehen NICHT verschwinden. Der Glow ueberlebt setParent() sonst mit
+    einem veralteten Offscreen-Clip -> das Widget zeichnet nichts mehr."""
+
+    def test_drag_into_frame_with_highlight_stays_visible(self):
+        canvas, frame = self._canvas_with_frame()
+        btn = canvas._add_widget("VCButton", QPoint(20, 20))
+        btn.set_effect_highlight(True)
+        eff_before = btn.graphicsEffect()
+        self.assertIsNotNone(eff_before)          # Glow aktiv -> Vanish-Trigger
+        btn.move(300, 120)                        # Mittelpunkt im Frame
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), frame)
+        self.assertFalse(btn.isHidden())          # nicht „wie geloescht"
+        eff_after = btn.graphicsEffect()
+        # Glow bleibt sichtbar, aber als FRISCHES Objekt (frischer Clip unterm Frame).
+        self.assertIsNotNone(eff_after)
+        self.assertIsNot(eff_after, eff_before)
+
+    def test_drag_into_frame_raises_above_existing_child(self):
+        canvas, frame = self._canvas_with_frame()
+        first = canvas._add_widget("VCButton", QPoint(300, 120))
+        canvas.handle_drag_drop(first)            # schon im Frame
+        self.assertIs(first.parent(), frame)
+        second = canvas._add_widget("VCButton", QPoint(20, 20))
+        second.move(310, 130)
+        canvas.handle_drag_drop(second)           # neu hinein -> muss zuoberst liegen
+        self.assertIs(second.parent(), frame)
+        kids = [c for c in frame.children() if isinstance(c, VCButton)]
+        self.assertEqual(kids[-1], second)        # raise_(): zuletzt = oberste Lage
+
+
 if __name__ == "__main__":
     unittest.main()

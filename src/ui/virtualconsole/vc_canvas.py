@@ -1429,7 +1429,15 @@ class VCCanvas(QWidget):
         """FRM-01: Reparenting nach einem Drag. Liegt der Widget-Mittelpunkt über
         einem Frame, wird das Widget dessen Kind (Position relativ zum Frame); wird
         es aus einem Frame heraus gezogen, kehrt es auf den Canvas zurück. Frames
-        selbst werden nicht verschachtelt."""
+        selbst werden nicht verschachtelt.
+
+        FRM-02: Ein aktiver Effekt-Glow (``QGraphicsDropShadowEffect`` aus
+        ``set_effect_highlight``) ueberlebt das ``setParent()`` — Qt rendert das
+        Widget dann ueber ein Offscreen-Pixmap mit einem unter dem ALTEN Parent
+        berechneten Clip-Rechteck, das nie neu berechnet wird → das Widget zeichnet
+        nichts mehr und wirkt geloescht. Darum den Glow VOR dem Umhaengen loesen,
+        danach ``raise_()`` (Z-Order) + Frame neu zeichnen und den Glow frisch
+        setzen. Beim Drop wird die Position zusaetzlich aufs Grid gerundet."""
         from .vc_frame import VCFrame
         if isinstance(widget, VCFrame):
             return
@@ -1450,21 +1458,59 @@ class VCCanvas(QWidget):
             cr = target._content_rect()
             lx = min(max(local.x(), cr.x()), max(cr.x(), cr.right() - widget.width()))
             ly = min(max(local.y(), cr.y()), max(cr.y(), cr.bottom() - widget.height()))
+            if grid > 0:
+                lx = round(lx / grid) * grid
+                ly = round(ly / grid) * grid
+            had_hl = self._detach_highlight(widget)        # FRM-02: Glow loesen
             target.add_child_to_page(widget, target._current_page)
             widget.set_snap_grid(grid)
             widget.move(lx, ly)
+            widget.raise_()                                # sonst unten im Stapel -> verdeckt
+            self._reattach_highlight(widget, had_hl)       # frisches Effekt-Objekt
             widget.update()
+            target.update()                                # Frame-Backing-Store auffrischen
         elif target is None and isinstance(parent, VCFrame):
             # Aus dem Frame heraus -> zurück auf den Canvas.
             canvas_tl = self.mapFromGlobal(widget.mapToGlobal(QPoint(0, 0)))
+            nx, ny = max(0, canvas_tl.x()), max(0, canvas_tl.y())
+            if grid > 0:
+                nx = round(nx / grid) * grid
+                ny = round(ny / grid) * grid
+            had_hl = self._detach_highlight(widget)        # FRM-02: Glow loesen
             widget.setParent(self)
             widget.setProperty("vc_page", None)
             widget.set_edit_mode(self._edit_mode)
             widget.set_snap_grid(grid)
             widget.bank = self._active_bank
-            widget.move(max(0, canvas_tl.x()), max(0, canvas_tl.y()))
+            widget.move(nx, ny)
+            widget.raise_()
             widget.setVisible(self.on_active_bank(widget))
+            self._reattach_highlight(widget, had_hl)
             widget.show()
+            widget.update()
+
+    @staticmethod
+    def _detach_highlight(widget) -> bool:
+        """Entfernt einen aktiven Effekt-Glow VOR einem Reparent (FRM-02) und meldet,
+        ob er an war. Der ``QGraphicsDropShadowEffect`` wuerde ``setParent()`` sonst
+        mit einem veralteten Offscreen-Clip ueberleben und das Widget verschwindet."""
+        had = bool(getattr(widget, "_effect_highlight", False))
+        if had:
+            try:
+                widget.set_effect_highlight(False)
+            except Exception:
+                pass
+        return had
+
+    @staticmethod
+    def _reattach_highlight(widget, had: bool):
+        """Setzt den Effekt-Glow nach dem Reparent neu — frisches Effekt-Objekt unter
+        dem neuen Parent (korrektes Clip-Rechteck)."""
+        if had:
+            try:
+                widget.set_effect_highlight(True)
+            except Exception:
+                pass
 
     def _remove_widget(self, widget: VCWidget):
         if not self._restoring:
