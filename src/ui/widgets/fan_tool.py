@@ -222,7 +222,9 @@ class FanTool(QWidget):
             return
         try:
             state = get_state()
-            self._selected_fids = list(state.programmer.keys())
+            # bevorzugt die aktuelle Programmer-Auswahl (wie Position-/Spider-Tool),
+            # erst dann Fallback auf bereits angefasste Programmer-Geraete.
+            self._selected_fids = list(state.get_selected_fids()) or list(state.programmer.keys())
             self._refresh_table()
         except Exception as e:
             print(f"[fan_tool] reload error: {e}")
@@ -235,11 +237,12 @@ class FanTool(QWidget):
         vmin = self._slider_min.value()
         vmax = self._slider_max.value()
 
-        # Default falls keine Selection: nimm fids aus programmer
+        # Default falls keine Selection: erst Programmer-Auswahl, dann programmer-Keys
         fids = list(self._selected_fids)
         if not fids and get_state is not None:
             try:
-                fids = list(get_state().programmer.keys())
+                st = get_state()
+                fids = list(st.get_selected_fids()) or list(st.programmer.keys())
             except Exception:
                 fids = []
         self._selected_fids = fids
