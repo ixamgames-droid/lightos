@@ -17,7 +17,7 @@
 - **EncoderMidiMode**: `Absolut`, `Relativ`
 
 ## Funktionen
-- **FunctionType** (9): `Audio`, `Chaser`, `Collection`, `EFX`, `RGBMatrix`, `Scene`, `Script`, `Sequence`, `Show`
+- **FunctionType** (10): `Audio`, `Chaser`, `Collection`, `EFX`, `MappedChannelChange`, `RGBMatrix`, `Scene`, `Script`, `Sequence`, `Show`
 - **RunOrder**: `Loop`, `PingPong`, `Random`, `SingleShot` · **Direction**: `Backward`, `Forward`
 - **CarouselPattern**: `Chase`, `Circle`, `Pulse`, `Sweep`, `Wave`
 - **CueStack-Modi**: `bounce`, `loop`, `pingpong`, `single`
@@ -48,7 +48,7 @@
 
 ## EFX (Pan/Tilt-Bewegung)
 - **Algorithmen**: `Circle`, `Custom Path`, `Diamond`, `Eight`, `Line`, `Lissajous`, `Random`, `Square`, `Trapez`, `Triangle`
-- **Live-Parameter** (22): `speed`, `intensity`, `size`, `width`, `height`, `x_offset`, `y_offset`, `rotation`, `spread`, `phase_mode`, `phase_offset_deg`, `counter_rotate`, `direction`, `loop`, `mirror`, `relative`, `open_beam`, `bit16`, `algorithm`, `tempo_bus_id`, `tempo_multiplier`, `phase_offset`
+- **Live-Parameter** (23): `speed`, `intensity`, `size`, `width`, `height`, `x_offset`, `y_offset`, `rotation`, `spread`, `head_spread`, `phase_mode`, `phase_offset_deg`, `counter_rotate`, `direction`, `loop`, `mirror`, `relative`, `open_beam`, `bit16`, `algorithm`, `tempo_bus_id`, `tempo_multiplier`, `phase_offset`
 
 ## Tempo / Kurven
 - **Tempo-Buses (immer gültig)**: ``, `A`, `B`, `C`, `D`, `Global`, `default`, `global` (weitere via `ensure_bus` möglich — offener Satz)

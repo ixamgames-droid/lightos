@@ -3106,6 +3106,15 @@
       ]
     },
     {
+      "key": "head_spread",
+      "label": "Welle über Köpfe (Spider)",
+      "kind": "float",
+      "range": [
+        0.0,
+        1.0
+      ]
+    },
+    {
       "key": "phase_mode",
       "label": "Verhältnis der Geräte",
       "kind": "select",
@@ -3225,6 +3234,7 @@
     "Chaser",
     "Collection",
     "EFX",
+    "MappedChannelChange",
     "RGBMatrix",
     "Scene",
     "Script",
