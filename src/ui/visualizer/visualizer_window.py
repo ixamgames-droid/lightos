@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QSplitter, QGroupBox, QFormLayout, QSlider, QCheckBox,
     QDoubleSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem,
     QColorDialog, QInputDialog, QMessageBox, QLineEdit, QSizePolicy,
-    QAbstractSpinBox,
+    QAbstractSpinBox, QToolButton, QMenu,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
@@ -827,6 +827,34 @@ class VisualizerWindow(QMainWindow):
 
         tb.addSeparator()
 
+        # Ausrichten/Verteilen der AUSGEWAEHLTEN Fixtures (Multi-Select per Marquee).
+        # Die JS-Handler (jsAlignSelected/jsDistributeSelected) sind vorhanden; hier
+        # werden sie ueber die Signale alignSelected/distributeSelected angestossen.
+        self._btn_align = QToolButton()
+        self._btn_align.setText("⬄ Ausrichten")
+        self._btn_align.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._btn_align.setToolTip(
+            "Ausgewählte Fixtures ausrichten/verteilen\n"
+            "(mehrere per Rahmen-Auswahl markieren — Ausrichten ab 2, Verteilen ab 3)."
+        )
+        _menu_align = QMenu(self._btn_align)
+        for _label, _mode in (
+            ("⬅ Links (X min)", "left"), ("➡ Rechts (X max)", "right"),
+            ("⬆ Vorne (Z max)", "front"), ("⬇ Hinten (Z min)", "back"),
+            ("↔ Zentriert X", "center_x"), ("↕ Zentriert Z", "center_z"),
+        ):
+            _a = _menu_align.addAction(_label)
+            _a.triggered.connect(lambda _checked=False, m=_mode: self._emit_align(m))
+        _menu_align.addSeparator()
+        for _label, _axis in (("⇿ Gleichmäßig X", "x"), ("⇕ Gleichmäßig Z", "z")):
+            _a = _menu_align.addAction(_label)
+            _a.triggered.connect(lambda _checked=False, ax=_axis: self._emit_distribute(ax))
+        self._btn_align.setMenu(_menu_align)
+        self._btn_align.setEnabled(False)   # erst ab >=2 selektierten Fixtures
+        tb.addWidget(self._btn_align)
+
+        tb.addSeparator()
+
         # Andock-Modus (opt-in): Strahler rasten beim Platzieren/Ziehen an
         # Trassen (haengen unten) bzw. Plattform/Boden (oben drauf) ein.
         # Default AUS -> freie Platzierung wie bisher.
@@ -922,6 +950,20 @@ class VisualizerWindow(QMainWindow):
                 e.accept()
                 return True
         return super().event(e)
+
+    def _emit_align(self, mode: str):
+        """Stoesst das Ausrichten der ausgewaehlten Fixtures in JS an."""
+        try:
+            self._bridge.alignSelected.emit(mode)
+        except Exception as e:
+            print(f"[Visualizer] alignSelected emit error: {e}")
+
+    def _emit_distribute(self, axis: str):
+        """Stoesst das gleichmaessige Verteilen der ausgewaehlten Fixtures an."""
+        try:
+            self._bridge.distributeSelected.emit(axis)
+        except Exception as e:
+            print(f"[Visualizer] distributeSelected emit error: {e}")
 
     def _on_dock_mode_toggled(self, checked: bool):
         """Andock-Modus an/aus -> an JS pushen + Status anzeigen."""
@@ -1497,6 +1539,10 @@ class VisualizerWindow(QMainWindow):
             )
 
     def _on_fixture_selection_from_js(self, fids: list):
+        # Ausrichten/Verteilen erst ab 2 selektierten Fixtures sinnvoll -> Button
+        # entsprechend (de)aktivieren (auch bei leerer Auswahl, daher vor return).
+        if hasattr(self, "_btn_align"):
+            self._btn_align.setEnabled(len(fids) >= 2)
         if not fids:
             return
         # Highlight first one in list

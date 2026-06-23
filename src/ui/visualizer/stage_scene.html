@@ -910,6 +910,7 @@ function getStageJson() {
     objects: Object.values(stageObjects).map(s => ({
       id: s.data.id,
       type: s.data.type,
+      name: s.data.name || '',
       position: { ...s.data.position },
       size: { ...s.data.size },
       rotation: s.data.rotation,
