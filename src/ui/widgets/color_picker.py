@@ -676,13 +676,13 @@ class ColorPicker(QWidget):
             print(f"[color_picker] save palette error: {e}")
 
     def _get_selected_fids(self, state) -> list[int]:
-        # Versuche selektierte Fixtures aus dem ProgrammerView zu holen
+        """Aktuelle Programmer-Auswahl; faellt auf bereits angefasste Programmer-
+        Geraete zurueck. BEWUSST KEIN Fallback auf alle gepatchten Fixtures —
+        sonst faerbt der Picker bei leerer Auswahl + leerem Programmer
+        versehentlich die ganze Anlage. (Frueher: toter findChild-Loop, der das
+        Ergebnis nie nutzte und immer auf programmer.keys()/alle zurueckfiel.)"""
         try:
-            from PySide6.QtWidgets import QApplication
-            for win in QApplication.topLevelWidgets():
-                pv = win.findChild(QWidget, "ProgrammerView") if hasattr(win, "findChild") else None
-                # ProgrammerView nicht named -> direkter Lookup
-            # Fallback: alle Fixtures die in programmer drin sind
-            return list(state.programmer.keys()) or [f.fid for f in state.get_patched_fixtures()]
+            fids = list(state.get_selected_fids())
+            return fids if fids else list(state.programmer.keys())
         except Exception:
             return []

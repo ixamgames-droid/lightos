@@ -146,7 +146,10 @@ class PalettePage(QWidget):
                 row += 1
 
     def _target_fids(self) -> list[int] | None:
-        """Programmer-Auswahl (R2); None = alle Geräte (Fallback, wenn nichts gewählt)."""
+        """Aktuelle Programmer-Auswahl; None = keine Auswahl.
+        Anwenden (_apply) bricht bei None bewusst ab (sonst wuerde apply_to_programmer(None)
+        die Palette auf das GANZE Rig schreiben); Aufzeichnen nimmt bei None den
+        gesamten Programmer."""
         try:
             from src.core.app_state import get_state
             fids = get_state().get_selected_fids()
@@ -155,14 +158,24 @@ class PalettePage(QWidget):
             return None
 
     def _apply(self, pal: Palette):
-        pal.apply_to_programmer(self._target_fids())
+        fids = self._target_fids()
+        if not fids:
+            # Sicherheitsnetz: leere Auswahl wuerde sonst per apply_to_programmer(None)
+            # die Palette auf ALLE gepatchten Geraete schreiben (ganzes Rig).
+            QMessageBox.information(
+                self, "Palette",
+                "Keine Geräte ausgewählt — bitte zuerst die Fixtures auswählen, "
+                "auf die die Palette wirken soll.")
+            return
+        pal.apply_to_programmer(fids)
 
     def _record_new(self):
         name, ok = QInputDialog.getText(self, "Palette aufzeichnen", "Name:")
         if not ok or not name:
             return
         pal = Palette(name=name, type=self.ptype)
-        pal.record_from_programmer()
+        # aus der Auswahl aufzeichnen (None = gesamter Programmer, falls nichts gewaehlt)
+        pal.record_from_programmer(self._target_fids())
         self.manager.add(pal)
         self._refresh()
 
@@ -171,7 +184,7 @@ class PalettePage(QWidget):
         menu = QMenu(self)
         menu.addAction("Anwenden").triggered.connect(lambda: self._apply(pal))
         menu.addAction("Überschreiben (Programmer)").triggered.connect(
-            lambda: (pal.record_from_programmer(), self._refresh())
+            lambda: (pal.record_from_programmer(self._target_fids()), self._refresh())
         )
         menu.addAction("In Ordner verschieben…").triggered.connect(
             lambda: self._set_folder(pal)
