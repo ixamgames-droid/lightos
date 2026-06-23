@@ -85,8 +85,8 @@ class SpiderPositionTool(QWidget):
         left_col = QVBoxLayout()
 
         self._bars = SpiderBarsView(count=self._n)
-        self._bars.set_labels(["L", "R"] if self._n == 2
-                              else [str(i + 1) for i in range(self._n)])
+        # Gleiche Beschriftung wie die Slider-Kopfzeilen (Anzeige-Konsistenz).
+        self._bars.set_labels(self._labels())
         self._bars.setMinimumHeight(150)
         left_col.addWidget(self._bars, stretch=1)
 

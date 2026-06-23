@@ -86,21 +86,21 @@ def _save_prefs(updates: dict) -> None:
 # U-3 (P-08): Hilfetexte fuer den Hilfe-Modus (Qt "What's This?"). Per setWhatsThis
 # an die Bedienelemente gehaengt; der Hilfe-Modus zeigt sie statt die Aktion auszuloesen.
 _PROGRAMMER_HELP = {
-    "Highlight": "Setzt die ausgewählten Fixtures vorübergehend auf volle "
+    "Hervorheben": "Setzt die ausgewählten Fixtures vorübergehend auf volle "
                  "Helligkeit, um sie auf der Bühne zu lokalisieren.",
-    "Lowlight": "Dimmt alle NICHT ausgewählten Fixtures ab, damit die aktuelle "
+    "Abdunkeln": "Dimmt alle NICHT ausgewählten Fixtures ab, damit die aktuelle "
                 "Auswahl hervorsticht.",
-    "Clear": "Leert den Programmer (alle hier manuell gesetzten Werte). "
+    "Löschen": "Leert den Programmer (alle hier manuell gesetzten Werte). "
              "Gespeicherte Funktionen, Cues und Snapshots bleiben unberührt.",
-    "Copy": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
-    "Paste": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
-    "Undo": "Macht die letzte Programmer-Änderung rückgängig.",
-    "Redo": "Stellt eine rückgängig gemachte Programmer-Änderung wieder her.",
-    "Color Tool...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
+    "Kopieren": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
+    "Einfügen": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
+    "Rückgängig": "Macht die letzte Programmer-Änderung rückgängig.",
+    "Wiederholen": "Stellt eine rückgängig gemachte Programmer-Änderung wieder her.",
+    "Farb-Werkzeug...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
                      "für die ausgewählten Fixtures.",
-    "Position Tool...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "
+    "Positions-Werkzeug...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "
                         "(Position live setzen, inkl. Fine-Kanäle).",
-    "Fan...": "Verteilt einen Wert fächerförmig über die ausgewählten Fixtures "
+    "Fächer...": "Verteilt einen Wert fächerförmig über die ausgewählten Fixtures "
               "(z. B. Pan-Fächer oder Farbverlauf über die Gruppe).",
 }
 
@@ -192,13 +192,13 @@ class ProgrammerView(QWidget):
         """Gemeinsame Toolbar (beide Layouts) inkl. Layout-Umschalter."""
         tb = QHBoxLayout()
         for label, slot, color in [
-            ("Highlight", self._highlight, "#FFD700"),
-            ("Lowlight",  self._lowlight,  "#888888"),
-            ("Clear",     self._clear_programmer, "#ff5555"),
-            ("Copy",      self._copy_to_clipboard, "#88aaff"),
-            ("Paste",     self._paste_from_clipboard, "#88ffaa"),
-            ("Undo",      self._undo, "#cccccc"),
-            ("Redo",      self._redo, "#cccccc"),
+            ("Hervorheben", self._highlight, "#FFD700"),
+            ("Abdunkeln",  self._lowlight,  "#888888"),
+            ("Löschen",     self._clear_programmer, "#ff5555"),
+            ("Kopieren",      self._copy_to_clipboard, "#88aaff"),
+            ("Einfügen",     self._paste_from_clipboard, "#88ffaa"),
+            ("Rückgängig",      self._undo, "#cccccc"),
+            ("Wiederholen",      self._redo, "#cccccc"),
         ]:
             b = QPushButton(label)
             b.setFixedHeight(26)
@@ -212,9 +212,9 @@ class ProgrammerView(QWidget):
 
         # Tool-Buttons (Color, Position, Fan)
         for label, slot in [
-            ("Color Tool...",    self._open_color_tool),
-            ("Position Tool...", self._open_position_tool),
-            ("Fan...",           self._open_fan_tool),
+            ("Farb-Werkzeug...",    self._open_color_tool),
+            ("Positions-Werkzeug...", self._open_position_tool),
+            ("Fächer...",           self._open_fan_tool),
         ]:
             b = QPushButton(label)
             b.setFixedHeight(26)
@@ -372,7 +372,7 @@ class ProgrammerView(QWidget):
         mode_row.addWidget(QLabel("Gruppe:"))
         self._mode_btn_group = QButtonGroup(self)
         for label, key, tip in (
-            ("Linked", "linked", "Ein Regler wirkt auf alle Geräte gleich"),
+            ("Verknüpft", "linked", "Ein Regler wirkt auf alle Geräte gleich"),
             ("Einzeln", "individual", "Nur das gewählte Fixture ändern"),
             ("Relativ", "relative", "Relative Änderung — Unterschiede bleiben erhalten"),
         ):
@@ -415,8 +415,10 @@ class ProgrammerView(QWidget):
         self._mapping_tab_index = self._main_tabs.indexOf(self._mapping_page)
         self._main_tabs.setTabVisible(self._mapping_tab_index, False)
 
-        # Funktions-Tabs (einmalig gebaut).
-        self._main_tabs.addTab(self._make_effects_page(), "Helper")
+        # Funktions-Tabs (einmalig gebaut). "Hilfe" ist reine Anzeige — der an
+        # set_programmer_focus gemeldete Tab-Text wird nur gegen "Intensity"
+        # verglichen (app_state), nie gegen "Helper"/"Hilfe".
+        self._main_tabs.addTab(self._make_effects_page(), "Hilfe")
         self._main_tabs.addTab(self._make_efx_page(), "EFX")
         # F-1: Matrix-Tab-Index merken, damit ein Gruppenklick direkt dorthin springt.
         self._rgb_page = self._make_rgb_page()
@@ -1059,7 +1061,15 @@ class ProgrammerView(QWidget):
 
         # Sub-Toolbar (bleibt FEST oben, scrollt nicht mit)
         sub_tb = QHBoxLayout()
-        b_fan = QPushButton(f"Fan {group_name}...")
+        # Anzeige-Label fuer den Fan-Button: group_name bleibt der interne Routing-
+        # Key (durchgereicht an _open_fan_tool_for_group), nur die ANZEIGE wird
+        # eingedeutscht.
+        _fan_group_labels = {
+            "Intensity": "Intensität", "Color": "Farbe", "Position": "Position",
+            "Gobo": "Gobo", "Weitere": "Weitere",
+        }
+        b_fan = QPushButton(
+            f"Fächern: {_fan_group_labels.get(group_name, group_name)}...")
         b_fan.clicked.connect(lambda: self._open_fan_tool_for_group(group_name))
         sub_tb.addWidget(b_fan)
 
@@ -1403,8 +1413,8 @@ class ProgrammerView(QWidget):
         box = QGroupBox("Ausrichtung (pro Fixture)")
         row = QHBoxLayout(box)
         f0 = fixtures[0]
-        for label, attr in (("Pan invert", "invert_pan"),
-                            ("Tilt invert", "invert_tilt"),
+        for label, attr in (("Pan invertieren", "invert_pan"),
+                            ("Tilt invertieren", "invert_tilt"),
                             ("Pan/Tilt tauschen", "swap_pan_tilt")):
             cb = QCheckBox(label)
             cb.setChecked(bool(getattr(f0, attr, False)))

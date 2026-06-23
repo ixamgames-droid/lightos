@@ -10,6 +10,15 @@ from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture
 
+# Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
+# NUR fuer die Anzeige (Vorschau-Statuszeile) — der gespeicherte Wert bleibt
+# der Enum-Wert.
+DIRECTION_LABELS = {
+    "forward":  "Vorwärts",
+    "backward": "Rückwärts",
+    "bounce":   "Pendel",
+}
+
 # Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
 PHASE_MODE_LABELS = [
     ("sync",   "Synchron (alle Köpfe gleich)"),
@@ -228,7 +237,8 @@ class EfxPreviewWidget(QWidget):
         f = QFont()
         f.setPixelSize(10)
         p.setFont(f)
-        info = f"{e.algorithm.value} · {e.speed_hz:.2f} Hz · {e.direction}"
+        _dir = DIRECTION_LABELS.get(e.direction, e.direction)
+        info = f"{e.algorithm.value} · {e.speed_hz:.2f} Hz · {_dir}"
         if e.mirror:
             info += " · gespiegelt"
         if len(fixtures) > 1:
@@ -735,8 +745,12 @@ class EfxView(QWidget):
         self._speed_spin = dspin(0.01, 10, 0.1, 0.5)
         tform.addRow("Geschwindigkeit (Hz):", self._speed_spin)
         self._dir_combo = QComboBox()
-        self._dir_combo.addItems(["forward", "backward", "bounce"])
-        self._dir_combo.currentTextChanged.connect(self._on_param_change)
+        # Anzeige deutsch, interner Wert bleibt der Enum-Wert (forward/backward/
+        # bounce) — Lese-/Setzstellen nutzen currentData()/findData().
+        self._dir_combo.addItem("Vorwärts", "forward")
+        self._dir_combo.addItem("Rückwärts", "backward")
+        self._dir_combo.addItem("Pendel", "bounce")
+        self._dir_combo.currentIndexChanged.connect(self._on_param_change)
         tform.addRow("Richtung:", self._dir_combo)
         self._loop_chk = QCheckBox("Endlos wiederholen")
         self._loop_chk.setChecked(True)
@@ -1121,7 +1135,8 @@ class EfxView(QWidget):
             self._yfreq_spin.setValue(efx.y_freq)
             self._xphase_spin.setValue(efx.x_phase)
             self._yphase_spin.setValue(efx.y_phase)
-            self._dir_combo.setCurrentText(efx.direction)
+            _di = self._dir_combo.findData(efx.direction)
+            self._dir_combo.setCurrentIndex(_di if _di >= 0 else 0)
             for w, v in ((self._open_beam_chk, efx.open_beam),
                          (self._relative_chk, efx.relative),
                          (self._bit16_chk, getattr(efx, "bit16", True))):
@@ -1165,7 +1180,7 @@ class EfxView(QWidget):
         self._current.y_freq   = self._yfreq_spin.value()
         self._current.x_phase  = self._xphase_spin.value()
         self._current.y_phase  = self._yphase_spin.value()
-        self._current.direction = self._dir_combo.currentText()
+        self._current.direction = self._dir_combo.currentData() or "forward"
         self._current.open_beam = self._open_beam_chk.isChecked()
         self._current.relative  = self._relative_chk.isChecked()
         self._current.bit16     = self._bit16_chk.isChecked()

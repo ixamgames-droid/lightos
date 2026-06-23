@@ -1457,7 +1457,7 @@
         },
         {
           "key": "mode",
-          "label": "Random Color Mode",
+          "label": "Farb-Modus",
           "kind": "select",
           "options": [
             "color",
@@ -1466,7 +1466,7 @@
         },
         {
           "key": "mode",
-          "label": "Random Intensity Mode",
+          "label": "Helligkeits-Modus",
           "kind": "select",
           "options": [
             "dimmer",

@@ -238,8 +238,8 @@ class ColorPicker(QWidget):
         # Tabs — jede Seite scrollt fuer sich, damit bei kleiner Fensterhoehe
         # keine Gruppen (CMY / White-UV-Amber) abgeschnitten werden.
         self._tabs = QTabWidget()
-        self._tabs.addTab(self._wrap_scroll(self._build_basic_tab()), "Basic")
-        self._tabs.addTab(self._wrap_scroll(self._build_full_tab()), "Full")
+        self._tabs.addTab(self._wrap_scroll(self._build_basic_tab()), "Einfach")
+        self._tabs.addTab(self._wrap_scroll(self._build_full_tab()), "Vollständig")
         self._tabs.addTab(self._wrap_scroll(self._build_filter_tab()), "Filter")
         root.addWidget(self._tabs, stretch=1)
 
@@ -255,7 +255,7 @@ class ColorPicker(QWidget):
 
         # Button row
         btn_row = QHBoxLayout()
-        self._btn_apply = QPushButton("Apply to Selection")
+        self._btn_apply = QPushButton("Auf Auswahl anwenden")
         self._btn_apply.setObjectName("btn_primary")
         self._btn_apply.clicked.connect(self._apply_to_selection)
         btn_row.addWidget(self._btn_apply)
@@ -265,11 +265,11 @@ class ColorPicker(QWidget):
         self._btn_live.toggled.connect(self._toggle_live)
         btn_row.addWidget(self._btn_live)
 
-        btn_black = QPushButton("Black")
+        btn_black = QPushButton("Schwarz")
         btn_black.clicked.connect(lambda: self.set_color(QColor(0, 0, 0)))
         btn_row.addWidget(btn_black)
 
-        btn_white = QPushButton("White")
+        btn_white = QPushButton("Weiß")
         btn_white.clicked.connect(lambda: self.set_color(QColor(255, 255, 255)))
         btn_row.addWidget(btn_white)
 
@@ -336,7 +336,7 @@ class ColorPicker(QWidget):
         layout.addWidget(self._wheel, stretch=1)
 
         b_row = QHBoxLayout()
-        b_row.addWidget(QLabel("Brightness"))
+        b_row.addWidget(QLabel("Helligkeit"))
         self._slider_bright = QSlider(Qt.Orientation.Horizontal)
         self._slider_bright.setRange(0, 100)
         self._slider_bright.setValue(100)
@@ -400,7 +400,7 @@ class ColorPicker(QWidget):
         layout.addWidget(cmy_box)
 
         # White / UV / Amber
-        wua_box = QGroupBox("White / UV / Amber (HTP)")
+        wua_box = QGroupBox("Weiß / UV / Amber (HTP)")
         wua_l = QVBoxLayout(wua_box)
         self._slider_w, self._spin_w = self._make_slider_row(wua_l, "W", 0, 255, 0,
                                                              "#ffffff",

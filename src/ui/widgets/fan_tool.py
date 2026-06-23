@@ -24,16 +24,31 @@ except Exception:
     get_state = None  # type: ignore
 
 
-FAN_MODES = ["Symmetric", "Asymmetric", "Start", "End"]
-FAN_CURVES = ["Linear", "Sine", "Square", "Triangle", "Exponential"]
+# (Anzeige-Label, interner Wert). Der interne Wert wird an
+# compute_fan_values() durchgereicht und darf NICHT uebersetzt werden.
+FAN_MODES = [
+    ("Symmetrisch", "Symmetric"),
+    ("Asymmetrisch", "Asymmetric"),
+    ("Start", "Start"),
+    ("Ende", "End"),
+]
+FAN_CURVES = [
+    ("Linear", "Linear"),
+    ("Sinus", "Sine"),
+    ("Rechteck", "Square"),
+    ("Dreieck", "Triangle"),
+    ("Exponential", "Exponential"),
+]
+# (Anzeige-Label, interner Attribut-Key). Der Key (z.B. color_r) wird
+# an set_programmer_value() / emit durchgereicht und bleibt intern.
 FAN_ATTRIBUTES = [
     ("Pan", "pan"),
     ("Tilt", "tilt"),
-    ("Intensity", "intensity"),
-    ("Red", "color_r"),
-    ("Green", "color_g"),
-    ("Blue", "color_b"),
-    ("White", "color_w"),
+    ("Intensität", "intensity"),
+    ("Rot", "color_r"),
+    ("Grün", "color_g"),
+    ("Blau", "color_b"),
+    ("Weiß", "color_w"),
     ("Amber", "color_a"),
     ("UV", "color_uv"),
     ("Shutter", "shutter"),
@@ -125,9 +140,10 @@ class FanTool(QWidget):
         # Top: Mode + Attribute + Curve
         top = QHBoxLayout()
 
-        top.addWidget(QLabel("Mode:"))
+        top.addWidget(QLabel("Modus:"))
         self._combo_mode = QComboBox()
-        self._combo_mode.addItems(FAN_MODES)
+        for label, value in FAN_MODES:
+            self._combo_mode.addItem(label, value)
         self._combo_mode.currentIndexChanged.connect(self._refresh_table)
         top.addWidget(self._combo_mode)
 
@@ -139,7 +155,8 @@ class FanTool(QWidget):
 
         top.addWidget(QLabel("Kurve:"))
         self._combo_curve = QComboBox()
-        self._combo_curve.addItems(FAN_CURVES)
+        for label, value in FAN_CURVES:
+            self._combo_curve.addItem(label, value)
         self._combo_curve.currentIndexChanged.connect(self._refresh_table)
         top.addWidget(self._combo_curve)
 
@@ -195,11 +212,11 @@ class FanTool(QWidget):
 
         # Buttons
         br = QHBoxLayout()
-        b_apply = QPushButton("Apply Fan")
+        b_apply = QPushButton("Fächer anwenden")
         b_apply.setObjectName("btn_primary")
         b_apply.clicked.connect(self._apply)
         br.addWidget(b_apply)
-        b_reload = QPushButton("Selection neu laden")
+        b_reload = QPushButton("Auswahl neu laden")
         b_reload.clicked.connect(self._reload_from_programmer)
         br.addWidget(b_reload)
         br.addStretch(1)
@@ -232,8 +249,8 @@ class FanTool(QWidget):
     # ── Refresh / Apply ──────────────────────────────────────────────────────
 
     def _refresh_table(self):
-        mode = self._combo_mode.currentText()
-        curve = self._combo_curve.currentText()
+        mode = self._combo_mode.currentData()
+        curve = self._combo_curve.currentData()
         vmin = self._slider_min.value()
         vmax = self._slider_max.value()
 
@@ -273,8 +290,8 @@ class FanTool(QWidget):
         return out
 
     def _apply(self):
-        mode = self._combo_mode.currentText()
-        curve = self._combo_curve.currentText()
+        mode = self._combo_mode.currentData()
+        curve = self._combo_curve.currentData()
         vmin = self._slider_min.value()
         vmax = self._slider_max.value()
         attr = self._combo_attr.currentData()

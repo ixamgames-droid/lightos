@@ -196,12 +196,12 @@ def _mode(options):
 # WP-2/Abschnitt 3: style-gefilterte Random-Modi (gleicher Key "mode", aber je
 # Style nur der passende sichtbar -> kein Cross-Overwrite Dimmer/Color).
 def _mode_color():
-    return ParamSpec("mode", "Random Color Mode", "select", "color",
+    return ParamSpec("mode", "Farb-Modus", "select", "color",
                      options=("color", "flash"), styles=("RGB", "RGBW"),
                      tooltip="zufällige Farbe aus der Color-Sequence / kurzer Farb-Blitz")
 
 def _mode_intensity():
-    return ParamSpec("mode", "Random Intensity Mode", "select", "dimmer",
+    return ParamSpec("mode", "Helligkeits-Modus", "select", "dimmer",
                      options=("dimmer", "strobe", "pulse", "sparkle"),
                      styles=("Dimmer", "Shutter"),
                      tooltip="zufällige Helligkeit / Strobe / Puls / Funkeln")
