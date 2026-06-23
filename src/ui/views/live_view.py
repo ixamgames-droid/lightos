@@ -1327,6 +1327,11 @@ class LiveView(QWidget):
 
     def _on_patch_changed(self):
         """Wird bei PATCH_CHANGED und REFRESH_ALL aufgerufen."""
+        # Hinweis: live_view_positions werden hier BEWUSST nicht geprunt — das
+        # Event feuert auch beim Laden einer Show (vor/waehrend dem Wiederher-
+        # stellen), ein Prune wuerde gerade geladene Positionen loeschen. Das
+        # Aufraeumen verwaister Eintraege beim echten Unpatch macht die
+        # VisualizerBridge (_on_state, dort ist `stale` beim Laden leer).
         self._refresh_fixture_list()
         self._refresh_group_list()
 

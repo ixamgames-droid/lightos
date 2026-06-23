@@ -47,8 +47,14 @@ class HeightRowVisibilityTest(unittest.TestCase):
 class ClearPositionsTest(unittest.TestCase):
     """B-6: _clear_positions fragt nach und löscht nur bei Bestätigung."""
     def _fake(self, positions):
+        # Echte AppState hat positions + docks + rotations; _clear_positions leert
+        # jetzt alle drei (sonst bleiben Docks/Rotationen verwaist).
         return SimpleNamespace(
-            _state=SimpleNamespace(visualizer_positions=dict(positions)),
+            _state=SimpleNamespace(
+                visualizer_positions=dict(positions),
+                visualizer_docks={fid: f"t{fid}" for fid in positions},
+                visualizer_rotations={fid: 0.0 for fid in positions},
+            ),
             _bridge=MagicMock(),
             _refresh_patch_list=MagicMock(),
         )
@@ -73,6 +79,8 @@ class ClearPositionsTest(unittest.TestCase):
                           return_value=VW.QMessageBox.StandardButton.Yes):
             VW.VisualizerWindow._clear_positions(fake)
         self.assertEqual(len(fake._state.visualizer_positions), 0)
+        self.assertEqual(len(fake._state.visualizer_docks), 0)
+        self.assertEqual(len(fake._state.visualizer_rotations), 0)
         self.assertEqual(fake._bridge.remove_fixture_from_scene.call_count, 2)
         fake._refresh_patch_list.assert_called_once()
 

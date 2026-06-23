@@ -481,6 +481,7 @@ class VisualizerBridge(QObject):
             fid = int(fid_str)
             self._state.visualizer_positions.pop(fid, None)
             self._state.visualizer_docks.pop(fid, None)
+            self._state.visualizer_rotations.pop(fid, None)
             self.pyFixtureDeleted.emit(fid)
         except Exception as e:
             print(f"[Visualizer] fixtureDeleted error: {e}")
@@ -531,7 +532,12 @@ class VisualizerBridge(QObject):
             self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(fixtures[fid])))
 
     def remove_fixture_from_scene(self, fid: int):
+        # Alle per-fid Visualizer-Zustaende zusammen entfernen — sonst bleiben
+        # Dock-/Rotations-Eintraege verwaist (wachsen in die Show und werden bei
+        # fid-Wiederverwendung faelschlich erneut angewendet).
         self._state.visualizer_positions.pop(fid, None)
+        self._state.visualizer_docks.pop(fid, None)
+        self._state.visualizer_rotations.pop(fid, None)
         self.fixtureRemoved.emit(fid)
 
     def push_dmx_update(self, fid: int, attrs: dict[str, int]):
@@ -700,8 +706,9 @@ class VisualizerBridge(QObject):
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
+                # remove_fixture_from_scene poppt jetzt positions+docks+rotations
                 self.remove_fixture_from_scene(fid)
-                self._state.visualizer_docks.pop(fid, None)
+                self._state.live_view_positions.pop(fid, None)
 
 
 # ============================================================================
@@ -1390,7 +1397,11 @@ class VisualizerWindow(QMainWindow):
             return
         for fid in list(self._state.visualizer_positions):
             self._bridge.remove_fixture_from_scene(fid)
+        # Alle per-fid Visualizer-Dicts leeren (nicht nur positions), damit keine
+        # verwaisten Docks/Rotationen zurueckbleiben.
         self._state.visualizer_positions.clear()
+        self._state.visualizer_docks.clear()
+        self._state.visualizer_rotations.clear()
         self._refresh_patch_list()
 
     # ── Fixture-Bridge-Slots (JS -> Python) ─────────────────────────────────
@@ -1467,7 +1478,11 @@ class VisualizerWindow(QMainWindow):
                 break
 
     def _on_fixture_deleted_from_js(self, fid: int):
+        # Konsistent mit remove_fixture_from_scene / fixtureDeleted: alle
+        # per-fid Visualizer-Zustaende entfernen (idempotent).
         self._state.visualizer_positions.pop(fid, None)
+        self._state.visualizer_docks.pop(fid, None)
+        self._state.visualizer_rotations.pop(fid, None)
         self._refresh_patch_list()
 
     # ── Stage-Tab actions ───────────────────────────────────────────────────
