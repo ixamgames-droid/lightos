@@ -82,21 +82,23 @@ class StageElement:
         }
 
     @classmethod
-    def from_js_dict(cls, d: dict) -> "StageElement":
-        pos = d.get("position") or {}
-        size = d.get("size") or {}
+    def from_js_dict(cls, data: dict) -> "StageElement":
+        # Param 'data' (nicht 'd') — sonst kollidiert es optisch mit dem
+        # Tiefen-Feld 'd=' weiter unten.
+        pos = data.get("position") or {}
+        size = data.get("size") or {}
         return cls(
-            id=d.get("id", ""),
-            type=d.get("type", "platform"),
-            x=float(pos.get("x", d.get("x", 0.0))),
-            y=float(pos.get("y", d.get("y", 0.0))),
-            z=float(pos.get("z", d.get("z", 0.0))),
-            w=float(size.get("x", d.get("w", 4.0))),
-            h=float(size.get("y", d.get("h", 0.4))),
-            d=float(size.get("z", d.get("d", 4.0))),
-            rotation=float(d.get("rotation", 0.0)),
-            color=d.get("color", "#2a2a3a"),
-            name=d.get("name", ""),
+            id=data.get("id", ""),
+            type=data.get("type", "platform"),
+            x=float(pos.get("x", data.get("x", 0.0))),
+            y=float(pos.get("y", data.get("y", 0.0))),
+            z=float(pos.get("z", data.get("z", 0.0))),
+            w=float(size.get("x", data.get("w", 4.0))),
+            h=float(size.get("y", data.get("h", 0.4))),
+            d=float(size.get("z", data.get("d", 4.0))),
+            rotation=float(data.get("rotation", 0.0)),
+            color=data.get("color", "#2a2a3a"),
+            name=data.get("name", ""),
         )
 
     # --- Geometrie-Helfer (Andocken) -----------------------------------------
@@ -169,11 +171,16 @@ class StageDefinition:
                         ) -> Optional[dict]:
         """Findet das Buehnen-Element, an das ein Strahler bei (px, pz) andockt.
 
-        Spiegelt das JS-Verhalten (vertikaler Raycast von oben): unter allen
+        Naehert das JS-Verhalten an (vertikaler Raycast von oben): unter allen
         andockbaren Elementen, deren Grundflaeche den Punkt enthaelt, wird das
         mit der hoechsten Oberkante gewaehlt (das ein Strahl von oben zuerst
         traefe). Trusses -> Strahler haengt unten dran ('hang'), Plattform/
         Boden -> oben drauf ('top'). Waende/LED-Walls docken nicht an.
+
+        Hinweis: bei in XZ ueberlappenden Elementen ODER Trass-Gittern mit
+        Luecken kann das JS-Raycast (echte Dreiecksgeometrie) ein anderes Ziel
+        treffen als diese Bounding-Box-Heuristik — fuer normale Layouts decken
+        sie sich.
 
         Rueckgabe: {"id", "kind", "y"} oder None.
         """
@@ -210,7 +217,7 @@ class StageDefinition:
 
     @classmethod
     def from_dict(cls, d: dict) -> "StageDefinition":
-        sd = cls(name=d.get("name", "Bühne"))
+        sd = cls(name=d.get("name", "Neue Bühne"))  # konsistent mit dem Dataclass-Default
         # Native format
         for el_data in d.get("elements", []) or []:
             sd.elements.append(StageElement(**el_data))
