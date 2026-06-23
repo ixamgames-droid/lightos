@@ -50,6 +50,11 @@ class EnttecPro:
     def send_dmx(self, dmx_data: bytes):
         """Sendet 512 Bytes DMX-Daten an den Enttec Pro."""
         assert len(dmx_data) == 512
+        # Port wurde evtl. gerade (Reconnect/Shutdown) geschlossen -> NICHT auf
+        # einem toten Handle schreiben: das loest unter Windows eine native Access
+        # Violation aus statt einer fangbaren Python-Exception.
+        if not self._ser.is_open:
+            return
         packet = _build_packet(dmx_data)
         try:
             self._ser.write(packet)
@@ -60,13 +65,28 @@ class EnttecPro:
                 self._ser.reset_output_buffer()
             except Exception:
                 pass
+        except (serial.SerialException, OSError, ValueError):
+            # Port wurde mitten im Senden geschlossen/abgezogen -> Frame verwerfen,
+            # nicht propagieren (sonst beendet sich der Output-Thread bzw. crasht).
+            pass
 
     def is_open(self) -> bool:
         return self._ser.is_open
 
     def close(self):
-        if self._ser.is_open:
+        """Schliesst den Port. Vorher den Output-Puffer abbrechen/leeren — sonst kann
+        CloseHandle() unter Windows mit einem noch ausstehenden WriteFile kollidieren
+        (Access Violation beim Beenden, crash.log 22.06.). Idempotent + fehlertolerant."""
+        if not self._ser.is_open:
+            return
+        try:
+            self._ser.reset_output_buffer()
+        except Exception:
+            pass
+        try:
             self._ser.close()
+        except Exception:
+            pass
 
     def __enter__(self):
         return self

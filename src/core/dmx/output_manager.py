@@ -23,6 +23,9 @@ class OutputManager:
         # der Output-Thread mitten im send_dmx() steckt, unter Windows (pyserial)
         # zum Deadlock und damit zum kompletten Einfrieren der App.
         self._io_lock = threading.RLock()
+        # Wartezeit beim Stop auf das saubere Ende des Output-Threads, bevor Geraete
+        # geschlossen werden (testbar ueberschreibbar).
+        self._stop_join_s = 2.0
         self._blackout = False
         self._submasters: dict[int, float] = {}  # slot → 0.0–1.0
         self._sacn_outputs: dict[int, SACNSender] = {}  # universe → sender
@@ -135,12 +138,26 @@ class OutputManager:
 
     def stop(self):
         self._running = False
-        if self._thread:
-            # Laenger als der Enttec-write_timeout (0.5 s), damit der Output-Thread
-            # ein evtl. haengendes write() sauber beenden kann, BEVOR wir die
-            # Geraete schliessen (sonst close() waehrend write() -> Deadlock).
-            self._thread.join(timeout=2.0)
+        t = self._thread
+        if t is not None:
+            # Auf das saubere Thread-Ende WARTEN, bevor wir Geraete schliessen.
+            # Ein evtl. haengendes write() loest sich nach spaetestens write_timeout
+            # (0.5 s); die 2 s sind reichlich Reserve.
+            t.join(timeout=self._stop_join_s)
+            if t.is_alive():
+                # Thread haengt weiterhin (blockierender Treiber / totes Geraet).
+                # Geraete dann BEWUSST NICHT schliessen: ein CloseHandle() neben
+                # einem noch laufenden WriteFile loest unter Windows eine Access
+                # Violation aus (crash.log 21.+22.06.). Der Prozess endet ohnehin
+                # gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen.
+                import sys
+                print("[OutputManager] DMX-Output-Thread reagiert nicht — Geraete "
+                      "bleiben offen (Schutz vor Access Violation beim Beenden).",
+                      file=sys.stderr)
+                self._thread = None
+                return
         self._thread = None
+        # Thread ist sicher beendet -> kein gleichzeitiges write() mehr moeglich.
         with self._io_lock:
             for registry in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
                 for dev in registry.values():
@@ -148,6 +165,7 @@ class OutputManager:
                         dev.close()
                     except Exception:
                         pass
+                registry.clear()   # zweites stop() -> kein Doppel-Close
 
     def _loop(self):
         while self._running:
