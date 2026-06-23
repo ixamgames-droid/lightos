@@ -594,11 +594,11 @@ class RgbMatrixInstance(Function):
             # RGBW: echtes Weiss -> Weissanteil cw=min(r,g,b) auf den W-Kanal, RGB
             # nur der Rest (r-cw, g-cw, b-cw). Pures Weiss laeuft damit rein ueber
             # den weissen Chip (R=G=B=0), nicht zusaetzlich ueber RGB. RGB-Style:
-            # r,g,b unveraendert, der W-Kanal wird nie angefasst. (Gleiche Konvention
-            # wie color_utils.color_attrs_for_fixture -> test_color_white_channel.)
+            # r,g,b unveraendert, der W-Kanal wird nie angefasst. Gemeinsame Quelle
+            # fuer die Subtraktion: color_utils.rgbw_split (siehe test_color_white_channel).
             if self.style == MatrixStyle.RGBW:
-                cw = min(r, g, b)
-                cr, cg, cb = r - cw, g - cw, b - cw
+                from src.core.color_utils import rgbw_split
+                cr, cg, cb, cw = rgbw_split(r, g, b)
             else:
                 cw = 0
                 cr, cg, cb = r, g, b

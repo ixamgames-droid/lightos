@@ -78,6 +78,11 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
          Mittelpunkt (range_from+range_to)//2. → {"color": wert}.
       3) sonst color_w/white-Kanal falls vorhanden → Helligkeit max(r,g,b).
       4) sonst {} (leer).
+
+    Hinweis: In Fall 1 ist ``color_w`` der ADDITIVE Weissanteil — die eigentliche
+    RGBW-Reduktion (RGB minus Weiss; reines Weiss -> RGB=0, vgl. Modul-Doku) macht
+    erst ``adapt_color_payload`` (gemeinsame Quelle: ``rgbw_split``). Aufrufer
+    schicken den Payload daher durch ``adapt_color_payload``.
     """
     chans = list(channels or ())
     attrs = {getattr(c, "attribute", None) for c in chans}
@@ -140,6 +145,23 @@ def fixture_attr_set(fx) -> set[str]:
         return set()
 
 
+def rgbw_split(r: int, g: int, b: int) -> tuple[int, int, int, int]:
+    """Zerlegt eine RGB-Farbe in ihren RGBW-Anteil: der gemeinsame Weissanteil
+    ``w = min(r, g, b)`` wandert auf den Weiss-Kanal, RGB behaelt nur den Rest
+    (``r-w, g-w, b-w``). Reines Weiss (255,255,255) -> (0,0,0,255).
+
+    EINE Quelle fuer die RGBW-Weiss-Subtraktion. Frueher war diese Logik mehrfach
+    dupliziert (``adapt_color_payload`` UND ``rgb_matrix.write``) -> bei Divergenz
+    drohten widerspruechliche Farben zwischen Picker/Schnellwahl und Matrix-Effekt.
+    Eingaben werden auf 0..255 geklemmt.
+    """
+    r = max(0, min(255, int(r)))
+    g = max(0, min(255, int(g)))
+    b = max(0, min(255, int(b)))
+    w = min(r, g, b)
+    return r - w, g - w, b - w, w
+
+
 def adapt_color_payload(attrs: set[str], payload: dict) -> dict:
     """Passt einen Farb-Payload ({attr: 0..255}) an die Faehigkeiten eines
     Fixtures an (siehe Modul-Doku). Payloads ohne RGB-Anteil werden
@@ -154,11 +176,8 @@ def adapt_color_payload(attrs: set[str], payload: dict) -> dict:
     except (TypeError, ValueError):
         return out
     if "color_w" in attrs:
-        w = min(r, g, b)
-        out["color_r"] = r - w
-        out["color_g"] = g - w
-        out["color_b"] = b - w
-        out["color_w"] = w
+        out["color_r"], out["color_g"], out["color_b"], out["color_w"] = \
+            rgbw_split(r, g, b)
     else:
         out["color_r"], out["color_g"], out["color_b"] = r, g, b
         out.pop("color_w", None)
