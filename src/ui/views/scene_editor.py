@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QDialog, QGroupBox,
 )
 from PySide6.QtCore import Qt
-from src.core.app_state import get_state, get_channels_for_patched
+from src.core.app_state import get_state, get_channels_for_patched, resolve_attr_channels
 from src.core.engine.scene import Scene
 
 
@@ -271,10 +271,14 @@ class SceneEditor(QWidget):
             if f.fid not in prog:
                 continue
             chs = get_channels_for_patched(f)
-            for ch in chs:
-                val = prog[f.fid].get(ch.attribute)
-                if val is not None:
-                    self._scene.set_value(f.fid, ch.channel_number, val)
+            # Mehrkopf (X-6/Spider): vorkommens-bewusste Aufloesung statt
+            # prog[fid].get(ch.attribute). Letzteres trifft nur den nackten
+            # Attributnamen — beide ``color_r``-Kanaele bekaemen den Kopf-0-Wert,
+            # ``color_r#1`` ginge verloren. resolve_attr_channels mappt jeden
+            # ``attr``/``attr#N`` auf sein eigenes Kanal-Vorkommen (gleiche Logik
+            # wie programmer_to_scene_values / _flush_programmer_to_dmx).
+            for ch_no, _key, val in resolve_attr_channels(chs, prog[f.fid]):
+                self._scene.set_value(f.fid, ch_no, val)
         self._load_scene()
 
     def _send_preview(self):

@@ -316,27 +316,37 @@ class EffectWizard(QWizard):
         # (er bewegte sich statt die Farbe zu wechseln). Jetzt: pro fid die echte
         # {attr: channel_number}-Map des jeweiligen Geraets.
         fx_by_fid = {f.fid: f for f in st.get_patched_fixtures()}
-        chan_cache: dict[int, dict[str, int]] = {}
+        chan_cache: dict[int, dict[str, list[int]]] = {}
 
         def _chan_for(fid):
             m = chan_cache.get(fid)
             if m is None:
                 fx = fx_by_fid.get(fid)
-                m = ({c.attribute: c.channel_number
-                      for c in get_channels_for_patched(fx)} if fx is not None else {})
+                # Mehrkopf (Spider): pro Attribut ALLE Kanal-Vorkommen sammeln, nicht
+                # nur das letzte. Ein ``{attr: channel}``-Dict KOLLIDIERT bei zwei
+                # gleichnamigen Kanaelen (zwei ``color_r``-Baenke) — der erste Bank
+                # bliebe dunkel. Multimap ``{attr: [channel_number, ...]}`` faerbt
+                # alle Koepfe (Wizard-Effekte sind ueber alle Baenke uniform gewollt).
+                m = {}
+                if fx is not None:
+                    for c in get_channels_for_patched(fx):
+                        m.setdefault(c.attribute, []).append(c.channel_number)
                 chan_cache[fid] = m
             return m
+
+        def _set(s, fid, attr, value):
+            """Schreibt ``value`` auf ALLE Kanal-Vorkommen von ``attr`` (alle Koepfe);
+            tut nichts, wenn das Fixture den Kanal nicht hat."""
+            for cn in _chan_for(fid).get(attr, ()):
+                s.set_value(fid, cn, value)
 
         def scene(sname, rgb=(0, 0, 0), intensity=255, only=None, white=0):
             s = fm.new_scene(sname)
             r, g, b = rgb
             for fid in (only if only is not None else fids):
-                chan = _chan_for(fid)
-                if "intensity" in chan:
-                    s.set_value(fid, chan["intensity"], intensity)
+                _set(s, fid, "intensity", intensity)
                 for a, v in (("color_r", r), ("color_g", g), ("color_b", b), ("color_w", white)):
-                    if a in chan:
-                        s.set_value(fid, chan[a], v)
+                    _set(s, fid, a, v)
             return s
 
         off = scene(f"{name} · Aus", intensity=0)
@@ -390,15 +400,12 @@ class EffectWizard(QWizard):
                     if not (0 <= j < len(fids)):
                         continue
                     frac = 1.0 - t / (tail + 1)
-                    chan = _chan_for(fids[j])
                     r, g, b = (int(c * frac) for c in col)
-                    if "intensity" in chan:
-                        s.set_value(fids[j], chan["intensity"], int(255 * frac))
+                    _set(s, fids[j], "intensity", int(255 * frac))
                     for a, v in (("color_r", r), ("color_g", g), ("color_b", b)):
-                        if a in chan:
-                            s.set_value(fids[j], chan[a], v)
-                    if "color_w" in chan and col == (255, 255, 255):
-                        s.set_value(fids[j], chan["color_w"], int(255 * frac))
+                        _set(s, fids[j], a, v)
+                    if col == (255, 255, 255):
+                        _set(s, fids[j], "color_w", int(255 * frac))
                 steps.append(s.id)
         elif key == "random_strobe":
             steps = [scene(f"{name} · R{i+1}", rgb=(0, 0, 0), white=255, only=[fid]).id
@@ -418,14 +425,11 @@ class EffectWizard(QWizard):
                 s = fm.new_scene(f"{name} · VU{k}")
                 for idx in range(k):
                     fid = fids[idx]
-                    chan = _chan_for(fid)
                     frac = idx / (n - 1) if n > 1 else 0.0
                     r, g, b = _vu_color(frac)
-                    if "intensity" in chan:
-                        s.set_value(fid, chan["intensity"], 255)
+                    _set(s, fid, "intensity", 255)
                     for a, v in (("color_r", r), ("color_g", g), ("color_b", b)):
-                        if a in chan:
-                            s.set_value(fid, chan[a], v)
+                        _set(s, fid, a, v)
                 steps.append(s.id)
         else:
             steps = [scene(f"{name} · {i+1}", rgb=c).id for i, c in enumerate(colors_seq)]

@@ -62,7 +62,13 @@ class Palette:
         for fid in targets:
             vals = self.get_values_for_fixture(fid)
             for attr, val in vals.items():
-                state.set_programmer_value(fid, attr, val)
+                # Mehrkopf (Spider): gespeicherte Schluessel koennen ``attr#N``
+                # sein (Kopf N). In Basisname + Kopf-Index aufspalten und ueber das
+                # head-Argument schreiben, sonst landet der Wert nie auf dem N-ten
+                # Kanal-Vorkommen.
+                base, _, suffix = attr.partition("#")
+                head = int(suffix) if suffix.isdigit() else 0
+                state.set_programmer_value(fid, base, val, head=head)
 
     def record_from_programmer(self, fixture_ids: list[int] | None = None):
         """Capture current programmer state into this palette."""
@@ -75,7 +81,12 @@ class Palette:
             prog = state.programmer.get(fid, {})
             fx_vals = {}
             for attr, val in prog.items():
-                if allowed is None or attr in allowed:
+                # Mehrkopf (Spider): Filter gegen den BASISnamen (``color_r#1`` ->
+                # ``color_r``), aber den vollen Schluessel ``attr#N`` als Key behalten,
+                # sonst fallen die Werte der 2./3. Bank durchs Set-Filter und gehen
+                # bei Aufzeichnung verloren.
+                base = attr.split("#", 1)[0]
+                if allowed is None or base in allowed:
                     fx_vals[attr] = val
                     generic_accum.setdefault(attr, []).append(val)
             if fx_vals:
