@@ -71,11 +71,22 @@ def attr_label(attr: str) -> str:
 
 
 def classify_attr(attr: str) -> str:
-    """Ordnet ein Attribut einer Gruppe zu (exakt, sonst Substring). Default 'Other'."""
+    """Ordnet ein Attribut einer Gruppe zu. Erst EXAKTE Mitgliedschaft ueber ALLE
+    Gruppen, dann erst Substring-Fallback ueber alle Gruppen. Default 'Other'.
+
+    Die Zwei-Pass-Reihenfolge ist wichtig: bei einem kombinierten Durchlauf
+    (exakt+Substring pro Gruppe) greift sonst ein Substring einer FRUEHEREN Gruppe,
+    bevor die exakte Mitgliedschaft der richtigen Gruppe geprueft wird. Konkret:
+    ``prism_rot`` ist exakt in Effect, enthaelt aber den Substring ``prism`` (Beam,
+    steht davor) -> wurde faelschlich als Beam klassifiziert (Snap/Szenen-Label).
+    """
     a = (attr or "").lower()
+    # Pass 1: exakte Mitgliedschaft hat IMMER Vorrang (ueber alle Gruppen).
     for grp, names in ATTR_GROUPS.items():
         if a in names:
             return grp
+    # Pass 2: Substring-Fallback (Gruppen-Reihenfolge entscheidet bei Mehrdeutigkeit).
+    for grp, names in ATTR_GROUPS.items():
         for n in names:
             if n in a:
                 return grp

@@ -19,6 +19,9 @@ def test_core_classification():
     assert classify_attr("color_w") == "Color"
     assert classify_attr("pan") == "Position"
     assert classify_attr("prism") == "Beam"
+    # Regression: prism_rot ist exakt in Effect und darf NICHT ueber den
+    # Beam-Substring "prism" als Beam klassifiziert werden (Zwei-Pass-Reihenfolge).
+    assert classify_attr("prism_rot") == "Effect"
     assert classify_attr("gobo_wheel") == "Gobo"
     assert classify_attr("unknown_attr") == "Other"
 
