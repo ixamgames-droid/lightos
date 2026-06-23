@@ -22,19 +22,19 @@ except Exception:
 
 # Pan / Tilt presets (0-255 / 0-255). Tilt 127 = horizontal, 255 = Pan oder Tilt max
 POSITION_PRESETS = [
-    ("Center",        127, 127),
-    ("Top",           127,   0),
-    ("Bottom",        127, 255),
-    ("Front (down)",  127, 200),
-    ("Back",          127,  50),
-    ("Left",            0, 127),
-    ("Right",         255, 127),
-    ("Audience C",    127, 180),
-    ("Audience L",     60, 180),
-    ("Audience R",    200, 180),
-    ("Ceiling",       127,  20),
-    ("Floor",         127, 240),
-    ("Reset 0/0",       0,   0),
+    ("Mitte",            127, 127),
+    ("Oben",             127,   0),
+    ("Unten",            127, 255),
+    ("Vorne (runter)",   127, 200),
+    ("Hinten",           127,  50),
+    ("Links",              0, 127),
+    ("Rechts",           255, 127),
+    ("Publikum M",       127, 180),
+    ("Publikum L",        60, 180),
+    ("Publikum R",       200, 180),
+    ("Decke",            127,  20),
+    ("Boden",            127, 240),
+    ("Nullstellung",       0,   0),
 ]
 
 
@@ -179,11 +179,11 @@ class PositionTool(QWidget):
         left.addWidget(self._lbl_values)
 
         # Fine-Sliders
-        fine_box = QGroupBox("16-Bit Fine")
+        fine_box = QGroupBox("16-Bit Fein")
         fine_l = QVBoxLayout(fine_box)
 
         pf_row = QHBoxLayout()
-        pf_row.addWidget(QLabel("Pan Fine"))
+        pf_row.addWidget(QLabel("Pan (fein)"))
         self._slider_pan_fine = QSlider(Qt.Orientation.Horizontal)
         self._slider_pan_fine.setRange(0, 255)
         self._slider_pan_fine.valueChanged.connect(self._on_pan_fine)
@@ -194,7 +194,7 @@ class PositionTool(QWidget):
         fine_l.addLayout(pf_row)
 
         tf_row = QHBoxLayout()
-        tf_row.addWidget(QLabel("Tilt Fine"))
+        tf_row.addWidget(QLabel("Tilt (fein)"))
         self._slider_tilt_fine = QSlider(Qt.Orientation.Horizontal)
         self._slider_tilt_fine.setRange(0, 255)
         self._slider_tilt_fine.valueChanged.connect(self._on_tilt_fine)
@@ -208,7 +208,7 @@ class PositionTool(QWidget):
 
         # Apply / Reset Buttons
         btn_row = QHBoxLayout()
-        b_apply = QPushButton("Apply to Selection")
+        b_apply = QPushButton("Auf Auswahl anwenden")
         b_apply.setObjectName("btn_primary")
         b_apply.clicked.connect(self._apply_to_selection)
         btn_row.addWidget(b_apply)
@@ -216,10 +216,10 @@ class PositionTool(QWidget):
         self._chk_live.setToolTip("Pad-Bewegung wirkt sofort auf die Auswahl")
         self._chk_live.toggled.connect(self.set_live)
         btn_row.addWidget(self._chk_live)
-        b_center = QPushButton("Center")
+        b_center = QPushButton("Mitte")
         b_center.clicked.connect(lambda: self.set_position(127, 127))
         btn_row.addWidget(b_center)
-        b_reset = QPushButton("Reset")
+        b_reset = QPushButton("Zurücksetzen")
         b_reset.clicked.connect(lambda: self.set_position(0, 0, 0, 0))
         btn_row.addWidget(b_reset)
         left.addLayout(btn_row)
@@ -227,7 +227,7 @@ class PositionTool(QWidget):
         root.addLayout(left, stretch=1)
 
         # Rechte Spalte: Presets
-        right_box = QGroupBox("Presets")
+        right_box = QGroupBox("Voreinstellungen")
         right_l = QVBoxLayout(right_box)
         self._preset_list = QListWidget()
         for name, pan, tilt in POSITION_PRESETS:

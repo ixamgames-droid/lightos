@@ -42,10 +42,14 @@ def test_toolbar_buttons_have_whatsthis(tmp_path, monkeypatch):
     _isolate_prefs(tmp_path, monkeypatch)
     from src.ui.views.programmer_view import ProgrammerView, _PROGRAMMER_HELP
     pv = ProgrammerView()
-    by_text = {b.text(): b for b in pv.findChildren(QPushButton)}
-    for label in ("Highlight", "Clear", "Color Tool...", "Fan..."):
-        assert label in by_text, f"Button '{label}' fehlt"
-        assert by_text[label].whatsThis() == _PROGRAMMER_HELP[label]
+    buttons = pv.findChildren(QPushButton)
+    for label in ("Hervorheben", "Löschen", "Farb-Werkzeug...", "Fächer..."):
+        matches = [b for b in buttons if b.text() == label]
+        assert matches, f"Button '{label}' fehlt"
+        # Mehrere Buttons koennen denselben Text tragen (z.B. "Löschen" in der
+        # Toolbar UND in eingebetteten Panels) -> mind. einer hat den Hilfetext.
+        assert any(b.whatsThis() == _PROGRAMMER_HELP[label] for b in matches), \
+            f"WhatsThis fehlt fuer '{label}'"
 
 
 def test_help_mode_can_be_entered_and_left(tmp_path, monkeypatch):

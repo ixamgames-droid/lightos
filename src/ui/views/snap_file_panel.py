@@ -199,7 +199,7 @@ class ChannelSelectDialog(QDialog):
 
 
 class ChaseCreateDialog(QDialog):
-    """Dialog for turning multiple snaps into one sequence chase."""
+    """Dialog, um mehrere Snaps in einen Sequence-Chase umzuwandeln."""
 
     def __init__(self, default_name: str = "Snap Chase", parent=None):
         super().__init__(parent)
@@ -218,33 +218,38 @@ class ChaseCreateDialog(QDialog):
         self._fade_in.setRange(0.0, 30.0)
         self._fade_in.setDecimals(2)
         self._fade_in.setValue(0.15)
-        form.addRow("Fade In (s):", self._fade_in)
+        form.addRow("Einblenden (s):", self._fade_in)
 
         self._hold = QDoubleSpinBox()
         self._hold.setRange(0.01, 120.0)
         self._hold.setDecimals(2)
         self._hold.setValue(0.80)
-        form.addRow("Hold (s):", self._hold)
+        form.addRow("Halten (s):", self._hold)
 
         self._fade_out = QDoubleSpinBox()
         self._fade_out.setRange(0.0, 30.0)
         self._fade_out.setDecimals(2)
         self._fade_out.setValue(0.10)
-        form.addRow("Fade Out (s):", self._fade_out)
+        form.addRow("Ausblenden (s):", self._fade_out)
 
         self._speed = QDoubleSpinBox()
         self._speed.setRange(0.05, 20.0)
         self._speed.setDecimals(2)
         self._speed.setValue(1.0)
-        form.addRow("Speed Multiplier:", self._speed)
+        form.addRow("Geschwindigkeitsfaktor:", self._speed)
 
         self._order = QComboBox()
-        self._order.addItems(["Loop", "SingleShot", "PingPong"])
-        form.addRow("Run Order:", self._order)
+        # Anzeige deutsch, interner Wert = RunOrder-Enum-Wert (per currentData gelesen).
+        self._order.addItem("Schleife", "Loop")
+        self._order.addItem("Einmal", "SingleShot")
+        self._order.addItem("Hin und Her", "PingPong")
+        form.addRow("Ablauf:", self._order)
 
         self._direction = QComboBox()
-        self._direction.addItems(["Forward", "Backward"])
-        form.addRow("Direction:", self._direction)
+        # Anzeige deutsch, interner Wert = Direction-Enum-Wert (per currentData gelesen).
+        self._direction.addItem("Vorwärts", "Forward")
+        self._direction.addItem("Rückwärts", "Backward")
+        form.addRow("Richtung:", self._direction)
 
         layout.addLayout(form)
 
@@ -263,8 +268,8 @@ class ChaseCreateDialog(QDialog):
             "hold": float(self._hold.value()),
             "fade_out": float(self._fade_out.value()),
             "speed": float(self._speed.value()),
-            "order": self._order.currentText(),
-            "direction": self._direction.currentText(),
+            "order": self._order.currentData(),
+            "direction": self._direction.currentData(),
         }
 
 
@@ -946,9 +951,9 @@ class SnapFilePanel(QWidget):
             "Chase erstellt",
             (
                 f"Sequence '{seq.name}' erstellt.\n"
-                f"Function-ID: {seq.id}\n"
-                f"Steps: {len(seq.steps)}\n\n"
-                "Virtual Console Tipp:\n"
+                f"Funktions-ID: {seq.id}\n"
+                f"Schritte: {len(seq.steps)}\n\n"
+                "Virtuelle Konsole – Tipp:\n"
                 "Im Button-Dialog Aktion 'FunctionToggle' wählen und die Funktion\n"
                 "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswählen.\n"
                 "Beim SpeedDial dieselbe Funktion im Namens-Dropdown wählen\n"

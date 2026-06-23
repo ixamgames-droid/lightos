@@ -410,7 +410,7 @@ class RgbMatrixView(QWidget):
         for s in MatrixStyle:
             self._style_combo.addItem(s.value)
         self._style_combo.currentTextChanged.connect(self._on_style_change)
-        fg.addRow("Style:", self._style_combo)
+        fg.addRow("Stil:", self._style_combo)
 
         self._cols_spin = QSpinBox()
         self._cols_spin.setRange(1, 64)
