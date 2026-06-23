@@ -473,6 +473,76 @@ class EfxView(QWidget):
         from src.core.engine.efx import EfxInstance as _Efx
         return [f for f in self._fm.all() if isinstance(f, _Efx)]
 
+    def _group_context(self):
+        """(Name der aktiven Gruppe, set ALLER Gruppen-Namen) fuer die Listen-
+        Filterung im Programmer-Folgemodus.
+
+        Die Bindung der EFX erfolgt per Gruppen-NAME (stabil ueber Show-Save/Load
+        — DB-ids aendern sich beim Neuladen). Liefert (None, set()), wenn keine
+        Gruppe aktiv ist oder kein Show-Engine vorhanden ist. Spiegelt
+        rgb_matrix_view._group_context."""
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            gid = state.get_selected_group_id()
+            eng = getattr(state, "_show_engine", None)
+            if eng is None:
+                return None, set()
+            from sqlalchemy.orm import Session
+            from sqlalchemy import select
+            from src.core.database.models import FixtureGroup
+            with Session(eng) as s:
+                names = {g.name for g in s.execute(select(FixtureGroup)).scalars().all()}
+                cur = None
+                if gid is not None:
+                    g = s.get(FixtureGroup, gid)
+                    cur = g.name if g is not None else None
+            return cur, names
+        except Exception:
+            return None, set()
+
+    def _visible_instances(self) -> list[EfxInstance]:
+        """Die im aktuellen Kontext anzuzeigenden EFX.
+
+        - Bibliothek (kein Folgemodus): ALLE EFX.
+        - Programmer (Folgemodus) mit aktiver Gruppe: nur EFX DIESER Gruppe plus
+          ungebundene (source_group=None) und „verwaiste" (Gruppe existiert nicht
+          mehr, z. B. nach Umbenennen) — die erscheinen ueberall, damit nie ein
+          Effekt unsichtbar „verloren" geht.
+        - Folgemodus ohne aktive Gruppe (lose Auswahl): ALLE EFX (Alt-Verhalten)."""
+        insts = self._instances
+        if not self._follow:
+            return insts
+        gname, known = self._group_context()
+        if gname is None:
+            return insts
+        out = []
+        for e in insts:
+            sg = getattr(e, "source_group", None) or None
+            if sg is None or sg not in known:   # ungebunden ODER verwaist -> ueberall
+                out.append(e)
+            elif sg == gname:                   # genau dieser Gruppe zugeordnet
+                out.append(e)
+        return out
+
+    def _update_group_header(self):
+        """Aktualisiert die Kopfzeile ueber der Liste: zeigt im Programmer, fuer
+        welche Gruppe die aufgelisteten EFX gelten."""
+        if not getattr(self, "_group_header", None):
+            return
+        if not self._follow:
+            self._group_header.setVisible(False)
+            return
+        gname, _ = self._group_context()
+        if gname:
+            txt = f"EFX-Effekte der Gruppe „{gname}“"
+            if not self._visible_instances():
+                txt += " — noch keine. „+ Neu“ erstellt eine."
+        else:
+            txt = "Alle EFX (keine Gruppe gewählt)"
+        self._group_header.setText(txt)
+        self._group_header.setVisible(True)
+
     def _notify_change(self):
         try:
             from src.core.sync import get_sync, SyncEvent
@@ -494,24 +564,54 @@ class EfxView(QWidget):
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte EFX erscheinen sofort
             # in beiden EFX-Ansichten (Programmer-Seite + Sub-Tab).
             sync.subscribe_widget(SyncEvent.FUNCTION_CHANGED, self, lambda *_: self._rebuild_from_state())
+            # Geaenderte/gewechselte Gruppe -> im Folgemodus die Liste neu auf die
+            # aktive Gruppe filtern und das Grid uebernehmen (Spiegelt Matrix).
+            sync.subscribe_widget(SyncEvent.GROUP_CHANGED, self, lambda *_: self._on_group_changed())
         except Exception as e:
             print(f"[efx_view] sync subscribe error: {e}")
 
+    def _on_group_changed(self):
+        """GROUP_CHANGED: im Folgemodus die gefilterte Liste + Geraete-Zuweisung
+        aus der (ggf. geaenderten) aktiven Gruppe neu ableiten."""
+        if self._follow:
+            try:
+                self._sync_follow_selection()
+            except RuntimeError:
+                pass
+
     def _rebuild_from_state(self):
-        """Liste aus self._instances neu aufbauen (nach Show-Load / Tab-Wechsel)."""
+        """Liste aus den sichtbaren EFX neu aufbauen (nach Show-Load / Tab-Wechsel /
+        Gruppenwechsel). Im Programmer-Folgemodus ist die Liste auf die aktive
+        Gruppe gefiltert (siehe _visible_instances). Die Selektion wird ueber die
+        EFX-id (nicht den Zeilenindex) erhalten, weil sich die Indizes beim
+        Gruppenwechsel verschieben."""
         try:
-            prev = self._list.currentRow()
+            vis = self._visible_instances()
+            prev_id = self._current.id if self._current is not None else None
             self._list.blockSignals(True)
             self._list.clear()
-            for efx in self._instances:
-                self._list.addItem(efx.name)
+            for efx in vis:
+                label = efx.name
+                # In der Bibliothek (kein Folgemodus) die Gruppen-Bindung mit
+                # anzeigen, damit man auf einen Blick sieht, welcher EFX zu welcher
+                # Gruppe gehoert. Im Programmer ist die Liste ohnehin schon pro
+                # Gruppe gefiltert -> dort kein Suffix.
+                sg = getattr(efx, "source_group", None) or None
+                if not self._follow and sg:
+                    label = f"{efx.name}   · {sg}"
+                self._list.addItem(label)
             self._list.blockSignals(False)
-            n = len(self._instances)
-            if n == 0:
+            if not vis:
                 self._current = None
                 self._preview.set_efx(None)
+                self._update_group_header()
                 return
-            self._list.setCurrentRow(prev if 0 <= prev < n else 0)
+            # Nach clear() steht die Zeile auf -1 -> setCurrentRow feuert immer
+            # currentRowChanged -> _select_efx setzt _current auf die richtige
+            # (gefilterte) Instanz, auch wenn der Index gleich bleibt.
+            target = next((i for i, e in enumerate(vis) if e.id == prev_id), -1)
+            self._list.setCurrentRow(target if target >= 0 else 0)
+            self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
@@ -520,6 +620,14 @@ class EfxView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
+        # Folgemodus: die gefilterte Liste + Geraete-Zuweisung sofort aus der
+        # aktiven Gruppe ableiten, sobald die EFX-Ansicht sichtbar wird (analog
+        # rgb_matrix_view.showEvent — set_selected_group_id feuert kein Event).
+        if self._follow:
+            try:
+                self._sync_follow_selection()
+            except RuntimeError:
+                pass
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -532,6 +640,15 @@ class EfxView(QWidget):
         left = QWidget()
         ll = QVBoxLayout(left)
         ll.setContentsMargins(0, 0, 0, 0)
+
+        # Kopfzeile: zeigt im Programmer, fuer welche Gruppe die Liste gilt
+        # (Folgemodus). In der Bibliothek ausgeblendet. Spiegelt rgb_matrix_view.
+        self._group_header = QLabel("")
+        self._group_header.setWordWrap(True)
+        self._group_header.setStyleSheet(
+            "color:#8b949e; font-size:10px; font-weight:bold; padding:2px 2px 4px 2px;")
+        self._group_header.setVisible(False)
+        ll.addWidget(self._group_header)
 
         self._list = QListWidget()
         self._list.setStyleSheet("""
@@ -997,37 +1114,46 @@ class EfxView(QWidget):
 
     def _add_efx(self):
         efx = self._fm.new_efx(name=f"EFX {len(self._instances)+1}")
-        # new_efx() -> FunctionManager.add() emittiert FUNCTION_CHANGED; die Liste
-        # ist via _rebuild_from_state bereits aktuell. Nur noch neu Selektieren
-        # (kein manuelles addItem -> sonst Doppel-Eintrag).
-        for i, inst in enumerate(self._instances):
+        # Programmer-Folgemodus: die neue EFX sofort an die aktuell gewaehlte
+        # Gruppe binden, damit sie nur unter DIESER Gruppe gelistet wird (Nutzer-
+        # Wunsch: pro Gruppe sehen, welche EFX-Effekte es gibt). Ohne aktive
+        # Gruppe bleibt sie ungebunden (erscheint ueberall). Bindung per Name.
+        if self._follow:
+            gname, _ = self._group_context()
+            if gname:
+                efx.source_group = gname
+        # new_efx() -> FUNCTION_CHANGED; gefilterte Liste neu aufbauen und die neue
+        # EFX selektieren (kein manuelles addItem -> sonst Doppel-Eintrag).
+        self._rebuild_from_state()
+        for i, inst in enumerate(self._visible_instances()):
             if inst.id == efx.id:
                 self._list.setCurrentRow(i)
                 break
         # UI-04: Im Standalone-EFX-Tab bekommt eine frische Bewegung sofort
         # Geraete (aktuelle Auswahl, sonst alle gepatchten Movingheads) — sonst
         # laeuft ein spaeteres ▶ Start stumm (write() bricht bei leerer Liste ab).
-        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung.
+        # Im Follow-Modus uebernimmt _assign_from_selection (via _select_efx) die Zuweisung.
         if not self._follow:
             self._auto_assign_if_empty(allow_all=True)
 
     def _delete_efx(self):
         row = self._list.currentRow()
-        insts = self._instances
-        if row < 0 or row >= len(insts):
+        vis = self._visible_instances()
+        if row < 0 or row >= len(vis):
             return
         # remove() emittiert FUNCTION_CHANGED -> _rebuild_from_state aktualisiert die
         # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
-        self._fm.remove(insts[row].id)
+        self._fm.remove(vis[row].id)
 
     def _select_efx(self, row: int):
-        if row < 0 or row >= len(self._instances):
+        vis = self._visible_instances()
+        if row < 0 or row >= len(vis):
             self._current = None
             self._preview.set_efx(None)
             if self._popout is not None:
                 self._popout.bind(None)
             return
-        self._current = self._instances[row]
+        self._current = vis[row]
         self._preview.set_efx(self._current)
         self._load_to_ui(self._current)
         if self._popout is not None:
@@ -1040,24 +1166,48 @@ class EfxView(QWidget):
 
     def _enable_follow_selection(self):
         """EFX folgt automatisch der Programmer-Geraeteauswahl; manuelle
-        Fixture-Zuweisung wird ausgeblendet."""
+        Fixture-Zuweisung wird ausgeblendet. Die Liste ist auf die aktive Gruppe
+        gefiltert (siehe _visible_instances)."""
         try:
             self._btn_fx_add.setVisible(False)
             self._btn_fx_rem.setVisible(False)
             self._fx_box.setTitle("Geräte (folgen der Auswahl)")
         except Exception:
             pass
-        if not self._instances:
-            self._add_efx()  # eine Standard-EFX, sofort programmierbar
-        if self._instances and self._current is None:
-            self._list.setCurrentRow(0)
+        # KEIN Auto-Anlegen mehr: frueher wurde hier eine Standard-EFX erzeugt.
+        # Mit der Gruppen-Filterung waere diese (ungebundene) Phantom-EFX in JEDER
+        # Gruppe sichtbar. Stattdessen bleibt die Liste leer (mit Hinweis im Kopf),
+        # bis der Nutzer „+ Neu" drueckt — die neue EFX bindet dann an die aktive
+        # Gruppe (analog zum Matrix-Phantom-Fix in rgb_matrix_view).
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().subscribe(SyncEvent.SELECTION_CHANGED,
-                                 lambda *_: self._assign_from_selection())
+                                 lambda *_: self._sync_follow_selection())
         except Exception as e:
             print(f"[efx_view] follow subscribe error: {e}")
-        self._assign_from_selection()
+        self._sync_follow_selection()
+
+    def _sync_follow_selection(self):
+        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und der
+        ausgewaehlten EFX die Geraete der Auswahl/Gruppe zuweisen.
+
+        Die Liste zeigt nur EFX der aktiven Gruppe (+ ungebundene/verwaiste); die
+        ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
+        sodass die Geraete-Zuweisung korrekt ist. Spiegelt
+        rgb_matrix_view._sync_follow_selection."""
+        try:
+            # Gefilterte Liste neu aufbauen (setzt _current auf eine EFX der Gruppe).
+            self._rebuild_from_state()
+            vis = self._visible_instances()
+            if self._current is None and vis:
+                self._list.setCurrentRow(0)
+            if self._current is None:
+                self._update_group_header()
+                return
+            self._assign_from_selection()
+            self._update_group_header()
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel geloescht
 
     def _assign_from_selection(self):
         """Baut die Fixture-Liste der aktiven EFX aus der aktuellen Auswahl —
@@ -1065,7 +1215,7 @@ class EfxView(QWidget):
         Gruppenreihenfolge (wichtig fuer Fan/Spread)."""
         try:
             if self._current is None:
-                if self._instances:
+                if self._visible_instances():
                     self._list.setCurrentRow(0)
                 if self._current is None:
                     return

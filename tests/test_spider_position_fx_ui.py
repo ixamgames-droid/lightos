@@ -185,7 +185,13 @@ class ProgrammerSpiderDetectionTest(_SpiderBase):
 class SpiderEfxModeTest(_SpiderBase):
     def _view(self):
         from src.ui.views.efx_view import EfxView
-        return EfxView(follow_selection=True)
+        v = EfxView(follow_selection=True)
+        # Seit dem Gruppen-Scope (source_group, analog Matrix) legt der Follow-
+        # Modus KEINE Default-EFX mehr an — sonst waere die ungebundene EFX als
+        # „Phantom" in jeder Gruppe sichtbar. Der Nutzer erstellt sie per „+ Neu";
+        # hier explizit simuliert, damit eine EFX zum Programmieren existiert.
+        v._add_efx()
+        return v
 
     def test_follow_includes_spider_and_enables_mode(self):
         self._add_spider()
