@@ -23,12 +23,12 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 | ID | Prio | Status | Titel | Stand |
 |----|------|--------|-------|-------|
 | UI-02 | P1 | review | Undo im Patch | **Verifiziert:** Fixture-Löschen ist bereits via globalem Ctrl+Z rückgängig (`remove_fixture` pusht Undo+Redo, `patch_view._delete_selected` ruft es undoable). Fehlender Test ergänzt: `tests/test_patch_undo.py` (4 Tests). Branch `feature/patch-undo-test`. |
+| UI-01 | P1 | review | Preset-Browser | **Umgesetzt:** Sub-Tab „Preset-Browser" (Programmer-Sektion) mit Suchfeld über Paletten **+** Fixture-Gruppen; Doppelklick/Enter wendet an (Palette → Programmer auf Auswahl/alle, Gruppe → Fixtures auswählen). Filterlogik Qt-frei in `preset_search.py` (Name/Typ/Ordner/Tag, Mehrwort-UND), 14 Tests grün. `src/core/engine/preset_search.py`, `src/core/app_state.py` (`list_fixture_groups`), `src/ui/views/preset_browser_view.py`, `src/ui/main_window.py`, `tests/test_preset_browser.py`. Branch `feature/preset-browser`. |
 
 ## 📋 Offen
 
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
-| UI-01  | P1 | todo | Preset-Browser | Suchfeld über Paletten + Gruppen; Treffer per Doppelklick anwenden; Test deckt Filterlogik ab |
 | UI-03  | P2 | todo | Fixture-Kopieren mit Offset | Mehrere Geräte mit Adress-Abstand patchen; Dialog (Anzahl + Offset) + Test |
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
 | OUT-01 | P1 | todo | sACN / E1.31 Ausgabe | Universe per sACN senden; Ziel-IP + Universe konfigurierbar; Loopback-Test |

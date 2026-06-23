@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-23 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **Preset-Browser: Paletten & Gruppen durchsuchen (UI-01):** Neuer Sub-Tab „Preset-Browser" in der Programmer-Sektion mit einem Suchfeld über **Paletten UND Fixture-Gruppen** zugleich. Live-Filter über Name, Typ (Color/Position/…), Ordner und Tags (mehrere Begriffe = UND, case-insensitiv); Doppelklick oder Enter wendet den Treffer an — eine Palette geht in den Programmer (aktuelle Auswahl, sonst alle Geräte), eine Gruppe wählt ihre Fixtures aus. Die Filterlogik liegt Qt-frei in `preset_search.py` und ist mit 14 Tests headless abgedeckt. `src/core/engine/preset_search.py`, `src/core/app_state.py` (`list_fixture_groups`), `src/ui/views/preset_browser_view.py`, `src/ui/main_window.py`, `tests/test_preset_browser.py`.
+
 ### 2026-06-22 — Fixes
 
 #### Behoben
