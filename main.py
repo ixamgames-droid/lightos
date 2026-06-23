@@ -4,14 +4,31 @@ import os
 import argparse
 import faulthandler
 import datetime
+import threading
+
+# src/ frueh auf den Pfad, damit die Crash-Logging-Infrastruktur (STAB-01) schon
+# fuer die pythonw-Umleitung unten zur Verfuegung steht.
+sys.path.insert(0, os.path.dirname(__file__))
+from src.core import crash_logging as _cl
+
+APP_VERSION = "1.0.0"
+
+
+def _appdata_dir() -> str:
+    d = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    os.makedirs(d, exist_ok=True)
+    return d
+
 
 # pythonw.exe (Start ohne Konsolenfenster) liefert kein stdout/stderr -> print()
-# wuerde dann crashen. Ausgaben in diesem Fall in eine Logdatei umleiten.
+# wuerde dann crashen. Ausgaben in diesem Fall in eine Logdatei umleiten (mit
+# Rotation, sonst waechst lightos.log unbegrenzt).
 if sys.stdout is None or sys.stderr is None:
     try:
-        _ld = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
-        os.makedirs(_ld, exist_ok=True)
-        _lf = open(os.path.join(_ld, "lightos.log"), "a", encoding="utf-8", buffering=1)
+        _ld = _appdata_dir()
+        _lf_path = os.path.join(_ld, "lightos.log")
+        _cl.rotate_if_large(_lf_path, max_bytes=5 * 1024 * 1024, backups=2)
+        _lf = open(_lf_path, "a", encoding="utf-8", buffering=1)
         if sys.stdout is None:
             sys.stdout = _lf
         if sys.stderr is None:
@@ -23,46 +40,107 @@ if sys.stdout is None or sys.stderr is None:
         if sys.stderr is None:
             sys.stderr = io.StringIO()
 
-sys.path.insert(0, os.path.dirname(__file__))
-
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
 from src.ui.main_window import MainWindow
 
 
 _crash_log_handle = None
 _crash_log_path = None        # F-9: Pfad fuer den Crash-Report-Dialog
 _crash_reporter = None        # F-9: haelt die Referenz (sonst raeumt GC ihn weg)
+_last_alive_path = None       # STAB-01: "zuletzt lebendig"-Marker
+_running_flag_path = None     # STAB-01: liegt noch da -> vorige Sitzung abgestuerzt
+_dedup = _cl.ExceptionDedup(min_interval=5.0)   # STAB-01: Fehler-Sturm-Drossel
+
+
+def _write_exception(exc_type, exc_value, exc_tb, thread_name=None):
+    """Schreibt einen Python-Fehler (gedrosselt) in crash.log. Gemeinsam von
+    sys.excepthook (Main-Thread) und threading.excepthook (Worker) genutzt."""
+    if _crash_log_handle is None:
+        return
+    try:
+        import time
+        sig = _cl.exc_signature(exc_type, exc_tb)
+        write_full, suppressed = _dedup.decide(sig, time.monotonic())
+        if not write_full:
+            return
+        if suppressed:
+            _crash_log_handle.write(
+                f"=== (… {suppressed}× gleichartiger Fehler '{sig}' unterdrueckt) ===\n")
+        _crash_log_handle.write(
+            _cl.format_python_exception(exc_type, exc_value, exc_tb,
+                                        thread_name=thread_name))
+    except Exception:
+        pass
 
 
 def _setup_crash_logging():
     """Schreibt native Crashes (faulthandler) + ungefangene Python-Fehler in eine
-    Logdatei (%APPDATA%/LightOS/crash.log).
+    Logdatei (%APPDATA%/LightOS/crash.log) und macht erkennbar, WANN und WIE die
+    App endete (Start-/Exit-Marker, Vorige-Sitzung-Absturz-Erkennung).
 
     Hintergrund: MIDI-bezogene Abstuerze waren teils native Crashes ohne Python-
     Traceback (leere err.txt). faulthandler dumpt den C-Stack, sodass solche
     Faelle kuenftig nachvollziehbar sind.
     """
-    global _crash_log_handle, _crash_log_path
+    global _crash_log_handle, _crash_log_path, _last_alive_path, _running_flag_path
     try:
-        log_dir = os.path.join(
-            os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-        )
-        os.makedirs(log_dir, exist_ok=True)
+        log_dir = _appdata_dir()
         _crash_log_path = os.path.join(log_dir, "crash.log")
-        _crash_log_handle = open(
-            _crash_log_path, "a", encoding="utf-8", buffering=1
-        )
+        _last_alive_path = os.path.join(log_dir, "last_alive.txt")
+        _running_flag_path = os.path.join(log_dir, "lightos_running.flag")
+
+        # Rotation, BEVOR wir anhaengen -> Log bleibt lesbar und begrenzt.
+        _cl.rotate_if_large(_crash_log_path, max_bytes=2 * 1024 * 1024, backups=3)
+
+        _crash_log_handle = open(_crash_log_path, "a", encoding="utf-8", buffering=1)
+        # WICHTIG: faulthandler schreibt per Datei-Deskriptor (nicht ueber Python
+        # write()) -> der rohe Handle muss durchgereicht werden, ein Wrapper wuerde
+        # den nativen Dump verschlucken. Darum bekommt der native Crash auch keinen
+        # eigenen Zeitstempel; stattdessen verortet ihn die Vorige-Sitzung-Erkennung
+        # beim naechsten Start ueber last_alive.txt.
         faulthandler.enable(file=_crash_log_handle)
 
-        def _hook(exc_type, exc_value, exc_tb):
-            import traceback
-            ts = datetime.datetime.now().isoformat(timespec="seconds")
-            _crash_log_handle.write(f"\n=== Python Exception {ts} ===\n")
-            traceback.print_exception(exc_type, exc_value, exc_tb, file=_crash_log_handle)
-            sys.__excepthook__(exc_type, exc_value, exc_tb)
+        # Hat die VORHERIGE Sitzung sauber beendet? running.flag bleibt liegen,
+        # wenn atexit nicht lief (nativer Crash/Kill/Stromausfall).
+        if os.path.exists(_running_flag_path):
+            _crash_log_handle.write(
+                _cl.previous_crash_notice(_cl.read_last_alive(_last_alive_path)))
 
+        # Start-Banner + Running-Flag + erstes Lebenszeichen.
+        _crash_log_handle.write(_cl.session_banner(APP_VERSION))
+        _cl.mark_running(_running_flag_path)
+        _cl.write_last_alive(_last_alive_path)
+
+        def _hook(exc_type, exc_value, exc_tb):
+            _write_exception(exc_type, exc_value, exc_tb)
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
         sys.excepthook = _hook
+
+        # Worker-Thread-Fehler (MIDI/Audio/DMX/OSC): ohne threading.excepthook
+        # terminiert ein Daemon-Thread bei einem ungefangenen Fehler still — KEIN
+        # crash.log-Eintrag, kein Dialog. Ab Python 3.8 faengt das dieser Hook.
+        def _thread_hook(args):
+            if args.exc_type is SystemExit:
+                return
+            name = getattr(args.thread, "name", None)
+            _write_exception(args.exc_type, args.exc_value, args.exc_traceback,
+                             thread_name=name)
+        threading.excepthook = _thread_hook
+
+        # Sauberer-Exit-Marker. Laeuft bei sys.exit(), NICHT bei nativem Crash/
+        # os._exit() -> sein Fehlen im Log bedeutet "abgestuerzt".
+        import atexit
+
+        def _on_exit():
+            try:
+                if _crash_log_handle is not None:
+                    _crash_log_handle.write(_cl.clean_exit_marker())
+                    _crash_log_handle.flush()
+            except Exception:
+                pass
+            _cl.clear_running(_running_flag_path)
+        atexit.register(_on_exit)
+
     except Exception:
         try:
             faulthandler.enable()
@@ -71,34 +149,89 @@ def _setup_crash_logging():
 
 
 def _install_crash_dialog():
-    """F-9: Haengt einen nutzersichtbaren Fehler-Dialog an sys.excepthook an.
-    Wird NACH der QApplication aufgerufen. Der vorhandene Hook (crash.log) bleibt
-    erhalten — der Dialog kommt zusaetzlich obendrauf."""
+    """F-9: Haengt einen nutzersichtbaren Fehler-Dialog an sys.excepthook UND
+    threading.excepthook an. Wird NACH der QApplication aufgerufen. Die vorhandenen
+    Hooks (crash.log) bleiben erhalten — der Dialog kommt zusaetzlich obendrauf."""
     global _crash_reporter
     try:
         from src.ui.widgets.crash_dialog import CrashReporter
         _crash_reporter = CrashReporter(_crash_log_path or "")
-        prev_hook = sys.excepthook
+
+        prev_excepthook = sys.excepthook
 
         def _hook(exc_type, exc_value, exc_tb):
             try:
-                prev_hook(exc_type, exc_value, exc_tb)   # crash.log + Default
+                prev_excepthook(exc_type, exc_value, exc_tb)   # crash.log + Default
             finally:
                 try:
-                    _crash_reporter.report(exc_type, exc_value, exc_tb)
+                    if _crash_reporter is not None:
+                        _crash_reporter.report(exc_type, exc_value, exc_tb)
                 except Exception:
                     pass
-
         sys.excepthook = _hook
+
+        # Auch Worker-Thread-Fehler sollen den Dialog zeigen (CrashReporter
+        # marshallt thread-sicher per QueuedConnection in den GUI-Thread).
+        prev_threadhook = threading.excepthook
+
+        def _thook(args):
+            try:
+                prev_threadhook(args)                          # crash.log
+            finally:
+                try:
+                    if _crash_reporter is not None:
+                        _crash_reporter.report(args.exc_type, args.exc_value,
+                                               args.exc_traceback)
+                except Exception:
+                    pass
+        threading.excepthook = _thook
     except Exception as e:
         print(f"[main] crash dialog setup error: {e}")
+
+
+def _install_qt_message_handler():
+    """Leitet Qt-eigene Warnungen/Fehler (qWarning/qCritical/qFatal) in crash.log.
+
+    Diese Meldungen sind KEINE Python-Exceptions und landen sonst nirgends sichtbar
+    (unter pythonw.exe verschwindet Qts Default-Ausgabe via OutputDebugString). Genau
+    hier steht aber der entscheidende Hinweis VOR vielen nativen Crashes, z. B.
+    'QObject: Cannot create children for a parent in a different thread'."""
+    try:
+        from PySide6.QtCore import qInstallMessageHandler, QtMsgType
+        levels = {
+            QtMsgType.QtDebugMsg: "DEBUG",
+            QtMsgType.QtInfoMsg: "INFO",
+            QtMsgType.QtWarningMsg: "WARNING",
+            QtMsgType.QtCriticalMsg: "CRITICAL",
+            QtMsgType.QtFatalMsg: "FATAL",
+        }
+        loud = (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg)
+
+        def _handler(msg_type, _context, message):
+            try:
+                if _crash_log_handle is not None and msg_type in loud:
+                    ts = datetime.datetime.now().isoformat(timespec="seconds")
+                    _crash_log_handle.write(
+                        f"[Qt/{levels.get(msg_type, '?')} {ts}] {message}\n")
+            except Exception:
+                pass
+            # weiterhin auf stderr ausgeben (Konsolen-Debugging unveraendert).
+            try:
+                if sys.stderr is not None:
+                    sys.stderr.write(message + "\n")
+            except Exception:
+                pass
+        qInstallMessageHandler(_handler)
+    except Exception as e:
+        print(f"[main] qt message handler setup error: {e}")
 
 
 _watchdog_timer = None  # Referenz halten, sonst raeumt Qt den Timer weg
 
 
 def _start_freeze_watchdog():
-    """Erkennt UI-Freezes und dumpt dann die Stacks ALLER Threads in crash.log.
+    """Erkennt UI-Freezes und dumpt dann die Stacks ALLER Threads in crash.log —
+    und unterscheidet dabei einen echten Freeze von System-Standby/Resume.
 
     Hintergrund: Ein eingefrorenes UI (Event-Loop verarbeitet nichts mehr,
     Fenster "Keine Rueckmeldung") hinterlaesst KEINEN crash.log-Eintrag —
@@ -106,11 +239,14 @@ def _start_freeze_watchdog():
     diagnostizierbar: Ein 1-s-QTimer im UI-Thread setzt einen Herzschlag;
     bleibt er >10 s aus, schreibt ein Daemon-Thread einen kompletten
     Thread-Dump (einmal pro Freeze-Episode).
+
+    STAB-01: War der Daemon-Thread SELBST viel laenger als seine 2-s-Schleife weg,
+    war der ganze Prozess suspendiert (Standby) — das wird als solches markiert und
+    der Heartbeat zurueckgesetzt, statt einen stundenlangen Fake-Freeze zu melden.
+    Ausserdem schreibt der Thread periodisch last_alive.txt (Crash-Zeit-Verortung).
     """
     global _watchdog_timer
-    import threading
     import time
-    import faulthandler
     from PySide6.QtCore import QTimer
 
     beat = {"t": time.monotonic()}
@@ -122,19 +258,40 @@ def _start_freeze_watchdog():
 
     def _watch():
         dumped = False
+        prev_mono = time.monotonic()
+        last_alive_write = 0.0
         while True:
             time.sleep(2.0)
-            stall = time.monotonic() - beat["t"]
-            if stall > 10.0:
+            mono = time.monotonic()
+            loop_gap = mono - prev_mono
+            prev_mono = mono
+
+            # Lebenszeichen fuer die "wann zuletzt lebendig?"-Erkennung beim Start.
+            if mono - last_alive_write >= 4.0:
+                _cl.write_last_alive(_last_alive_path)
+                last_alive_write = mono
+
+            # Stand der Watch-Thread selbst lange still -> Standby, kein Freeze.
+            if _cl.is_suspend(loop_gap):
+                try:
+                    fh = _crash_log_handle
+                    if fh is not None:
+                        fh.write(_cl.suspend_notice(loop_gap))
+                        fh.flush()
+                except Exception:
+                    pass
+                beat["t"] = mono
+                dumped = False
+                continue
+
+            stall = mono - beat["t"]
+            if _cl.is_freeze(stall):
                 if not dumped:
                     dumped = True
                     try:
                         fh = _crash_log_handle
                         if fh is not None:
-                            ts = datetime.datetime.now().isoformat(timespec="seconds")
-                            fh.write(f"\n=== UI-FREEZE erkannt {ts} "
-                                     f"({stall:.0f}s ohne Event-Loop) — "
-                                     f"Stacks aller Threads: ===\n")
+                            fh.write(_cl.freeze_header(stall))
                             faulthandler.dump_traceback(file=fh)
                             fh.flush()
                     except Exception:
@@ -168,12 +325,14 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("LightOS")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion(APP_VERSION)
     app.setOrganizationName("LightOS")
 
     # F-9: nutzersichtbarer Crash-Report-Dialog (nach der QApplication, da er
     # QMessageBox nutzt). Ergaenzt das stille crash.log-Logging.
     _install_crash_dialog()
+    # STAB-01: Qt-Warnungen/-Fehler ebenfalls ins crash.log (Vorboten nativer Crashes).
+    _install_qt_message_handler()
 
     # App-/Fenster-Icon (assets/icons/lightos.png, .ico fuer den Installer-Shortcut)
     try:
