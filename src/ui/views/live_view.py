@@ -87,6 +87,18 @@ class FixtureRenderer:
             color = QColor(18, 18, 22)
             intensity = 0
 
+        # 2D-Helligkeit an die Intensitaet koppeln (wie 3D): bei niedriger
+        # Intensitaet die Fixture-Farbe Richtung dunkel mischen, statt sie immer
+        # voll gesaettigt zu zeichnen — ein auf 0% geparktes Geraet sieht dann
+        # auch im 2D dunkel aus (3D faerbt das Icon bei ~0% nach 0x3a3a4a).
+        _inorm = max(0.0, min(1.0, intensity / 255.0))
+        _off = QColor(0x3a, 0x3a, 0x4a)
+        color = QColor(
+            int(_off.red()   + (color.red()   - _off.red())   * _inorm),
+            int(_off.green() + (color.green() - _off.green()) * _inorm),
+            int(_off.blue()  + (color.blue()  - _off.blue())  * _inorm),
+        )
+
         # Effekt-Ring (pulsierend, blau) — hinter Selection-Ring
         if effects:
             pulse = 0.5 + 0.5 * math.sin(anim_phase * 2 * math.pi)
@@ -108,7 +120,7 @@ class FixtureRenderer:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(QRectF(-size*0.7, -size*0.7, size*1.4, size*1.4))
 
-        intensity_alpha = max(40, min(255, intensity))
+        intensity_alpha = max(0, min(255, intensity))  # kein Floor mehr: 0% -> kein Glow
         glow_color = QColor(color)
         glow_color.setAlpha(intensity_alpha // 2)
 
@@ -310,7 +322,7 @@ class FixtureRenderer:
         text_rect = QRectF(-size, size*0.55, size*2, 16)
         painter.drawText(text_rect,
                          Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
-                         label or label_prefix)
+                         (f"{label_prefix} {label}" if label else label_prefix))
 
         # Intensity-Wert oben
         if intensity > 0:

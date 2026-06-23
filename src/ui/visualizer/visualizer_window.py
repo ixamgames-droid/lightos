@@ -2158,6 +2158,24 @@ class VisualizerWindow(QMainWindow):
                 timer.stop()
         except Exception as e:
             print(f"[Visualizer] timer stop error: {e}")
+        self._dmx_released = True   # showEvent darf den Timer danach nicht neu starten
+
+    def showEvent(self, event):
+        # DMX-Push wieder aufnehmen, wenn das Fenster sichtbar wird (war es nur
+        # versteckt). Nach echtem Schliessen (_release_state) NICHT neu starten.
+        t = getattr(self, "_dmx_timer", None)
+        if t is not None and not t.isActive() and not getattr(self, "_dmx_released", False):
+            t.start(33)
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        # Nur versteckt (nicht geschlossen): den 33ms-DMX-Push pausieren -> spart
+        # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden). Der
+        # event-getriebene State-Subscriber bleibt (billig, feuert nur bei Aenderung).
+        t = getattr(self, "_dmx_timer", None)
+        if t is not None and t.isActive():
+            t.stop()
+        super().hideEvent(event)
 
     def closeEvent(self, event):
         """Beim Schliessen alle State-Subscriber abmelden (siehe

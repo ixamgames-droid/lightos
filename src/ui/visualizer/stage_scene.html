@@ -1925,16 +1925,21 @@ function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     f.yoke.rotation.y = panRad;
     f.head.rotation.x = tiltRad;
     // Reflect pan in top-down icon (rotate the whole icon)
+    f._lastPanRad = panRad;   // fuer konsistente Icon-Yaw in den Rotate-Pfaden
     if (f.icon) f.icon.rotation.y = panRad + f.group.rotation.y;
   }
 
   // Floor spot follow direction
   if (!skipBeam && f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
-    if (f.type === 'moving_head') {
-      f.head.updateMatrixWorld();
+    // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
+    // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
+    // Vorher blieb der Boden-Pool bei getilteten PARs/Scannern senkrecht drunter.
+    const aimObj = (f.type === 'moving_head' && f.head) ? f.head : f.group;
+    if (aimObj) {
+      aimObj.updateMatrixWorld();
       const wq = new THREE.Quaternion();
-      f.head.getWorldQuaternion(wq);
+      aimObj.getWorldQuaternion(wq);
       dir.applyQuaternion(wq);
     }
     const origin = new THREE.Vector3();
@@ -2347,6 +2352,11 @@ function _pickStageObjectNear(tolPx) {
   const v = new THREE.Vector3();
   for (const id in stageObjects) {
     const so = stageObjects[id];
+    // Naehe-Fallback NUR fuer duenne Trassen (Finger treffen die Gitterstreben
+    // schwer). Grossflaechige Elemente (Plattform/Boden/...) brauchen ihn nicht —
+    // sonst zaehlen leere Taps daneben als Treffer und brechen den Doppeltipp-
+    // Reset / das Deselektieren.
+    if (so.data.type !== 'truss_h' && so.data.type !== 'truss_v') continue;
     v.set(so.data.position.x, so.data.position.y, so.data.position.z).project(activeCam);
     if (v.z > 1) continue;  // hinter der Kamera
     const sx = (v.x + 1) / 2 * rect.width;
@@ -2661,7 +2671,7 @@ function handlePointerMove(clientX, clientY) {
         if (start && f) {
           f.group.rotation.y = deg2rad(Math.round((start.rotYDeg || 0) + dYaw));
           f.group.rotation.x = deg2rad(Math.round((start.rotXDeg || 0) + dPitch));
-          if (f.icon) f.icon.rotation.y = f.group.rotation.y;
+          if (f.icon) f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);
         }
       }
       const rf1 = fixtures[selectedFids[0]];
@@ -3104,7 +3114,7 @@ function fabRotate() {
       const f = fixtures[fid];
       if (!f) continue;
       f.group.rotation.y += Math.PI / 2;
-      if (f.icon) f.icon.rotation.y = f.group.rotation.y;
+      if (f.icon) f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);
       if (bridge && bridge.fixtureRotationChanged) {
         try {
           bridge.fixtureRotationChanged(
@@ -3273,7 +3283,7 @@ function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ) {
   if (rotZ != null) f.group.rotation.z = deg2rad(rotZ);
   if (f.icon) {
     f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-    if (rotY != null) f.icon.rotation.y = f.group.rotation.y;  // Top-Down spiegelt Yaw
+    if (rotY != null) f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);  // Top-Down: Yaw + Pan
   }
 }
 
