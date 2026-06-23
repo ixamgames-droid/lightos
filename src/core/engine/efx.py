@@ -79,6 +79,12 @@ class EfxInstance(Function):
         super().__init__(name, fid)
         self.algorithm: EfxAlgorithm = EfxAlgorithm.CIRCLE
         self.fixtures: list[EfxFixture] = []
+        # Gruppen-Bindung (NUR Programmer-Listen-Scope): unter welcher Fixture-
+        # Gruppe dieser EFX im Programmer aufgelistet wird. Bewusst per Gruppen-
+        # NAME (stabil ueber Show-Save/Load — DB-ids aendern sich beim Neuladen,
+        # siehe rgb_matrix.source_group). None = ungebunden -> erscheint in jeder
+        # Gruppe. Beeinflusst NICHT das Rendering/DMX.
+        self.source_group: str | None = None
         # Geometrie
         self.width = 100.0   # 0–255
         self.height = 100.0
@@ -932,6 +938,8 @@ class EfxInstance(Function):
         d.update({
             "motion": True,  # Diskriminator ggü. LayeredEffect/Carousel (gleicher Typ)
             "algorithm": self.algorithm.value,
+            # Gruppen-Bindung (Programmer-Listen-Scope) — per Name, stabil ueber Save/Load.
+            "source_group": self.source_group,
             "fixtures": [{"fid": f.fid, "offset": f.start_offset} for f in self.fixtures],
             "width": self.width, "height": self.height,
             "x_offset": self.x_offset, "y_offset": self.y_offset,
@@ -958,6 +966,10 @@ class EfxInstance(Function):
     def from_dict(cls, d: dict) -> "EfxInstance":
         e = cls(name=d.get("name", "EFX"), fid=d.get("id"))
         e.algorithm = EfxAlgorithm(d.get("algorithm", "Circle"))
+        # Gruppen-Bindung (Programmer-Listen-Scope). Fehlender Key (Alt-Shows) ODER
+        # leerer String = ungebunden (None) -> erscheint in jeder Gruppe.
+        _sg = d.get("source_group")
+        e.source_group = str(_sg) if _sg else None
         e.fixtures = [
             EfxFixture(fid=f.get("fid") if isinstance(f, dict) else getattr(f, "fid", None),
                        start_offset=(f.get("offset", 0) if isinstance(f, dict) else getattr(f, "start_offset", 0)))
