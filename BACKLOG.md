@@ -23,7 +23,6 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 | ID | Prio | Status | Titel | Stand |
 |----|------|--------|-------|-------|
 | UI-02 | P1 | review | Undo im Patch | **Verifiziert:** Fixture-Löschen ist bereits via globalem Ctrl+Z rückgängig (`remove_fixture` pusht Undo+Redo, `patch_view._delete_selected` ruft es undoable). Fehlender Test ergänzt: `tests/test_patch_undo.py` (4 Tests). Branch `feature/patch-undo-test`. |
-| UI-01 | P1 | review | Preset-Browser | **Umgesetzt:** Sub-Tab „Preset-Browser" (Programmer-Sektion) mit Suchfeld über Paletten **+** Fixture-Gruppen; Doppelklick/Enter wendet an (Palette → Programmer auf Auswahl/alle, Gruppe → Fixtures auswählen). Filterlogik Qt-frei in `preset_search.py` (Name/Typ/Ordner/Tag, Mehrwort-UND), 14 Tests grün. `src/core/engine/preset_search.py`, `src/core/app_state.py` (`list_fixture_groups`), `src/ui/views/preset_browser_view.py`, `src/ui/main_window.py`, `tests/test_preset_browser.py`. Branch `feature/preset-browser`. |
 
 ## 📋 Offen
 
@@ -31,11 +30,12 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 |----|------|--------|-------|------------------------------------------|
 | UI-03  | P2 | todo | Fixture-Kopieren mit Offset | Mehrere Geräte mit Adress-Abstand patchen; Dialog (Anzahl + Offset) + Test |
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
-| OUT-01 | P1 | todo | sACN / E1.31 Ausgabe | Universe per sACN senden; Ziel-IP + Universe konfigurierbar; Loopback-Test |
 | OUT-02 | P2 | todo | Enttec Open DMX USB Stabilisierung | Kein Drift/Hang über lange Sessions (>8h); Reconnect-Logik; Doku |
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
 
+- **UI-01** · Preset-Browser: ein Suchfeld über Paletten **+** Fixture-Gruppen (Name/Typ/Ordner/Tag, Mehrwort-UND), Doppelklick/Enter wendet an. Filterlogik Qt-frei + getestet. [PR #13](https://github.com/ixamgames-droid/lightos/pull/13)
+- **OUT-01** · sACN / E1.31: echter UDP-Loopback-Test für die Universe-Ausgabe (`tests/test_sacn_loopback.py`). [PR #14](https://github.com/ixamgames-droid/lightos/pull/14)
 - **UI-04** · EFX-Tab: „▶ Start" lief stumm ohne Geräte — neue Bewegung bekommt automatisch Geräte (Auswahl → sonst alle Movingheads), klare Warnung statt No-Op. Root-Cause: `fixtures=[]` → `write()` bricht ab. [PR #11](https://github.com/ixamgames-droid/lightos/pull/11)
 - **ENG-02** · Dimmer-Matrix vom Programmer-Intensity entkoppeln („aktiver Tab gewinnt"): Dimmer-Effekt besitzt seinen Kanal wert-unabhängig; Intensity-Tab+Auswahl gewinnt manuell. [PR #9](https://github.com/ixamgames-droid/lightos/pull/9)
