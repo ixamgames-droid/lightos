@@ -1008,20 +1008,29 @@ class ProgrammerView(QWidget):
             self._color_preview.set_fixtures(selected)
             self._update_fixture_combo(selected)   # M5: Einzelmodus-Auswahl
 
-            # Kanaele des Templates nach Gruppe sortieren. "Weitere" buendelt
-            # Beam+Gobo+Effect+Other (eine Stelle, keine Doppelung — Abschnitt 7).
-            template = selected[0]
-            channels = get_channels_for_patched(template)
-            self._template_channels = list(channels)
+            # Kanaele ALLER selektierten Geraete vereinigen (NICHT nur selected[0]),
+            # damit Tabs (z.B. Gobo) UND die Schnellwahl-Bars erscheinen, sobald
+            # IRGENDEIN selektiertes Geraet die Faehigkeit hat — unabhaengig von der
+            # Auswahl-Reihenfolge. Vorher entschied nur das erste Geraet: stand ein
+            # PAR vorne, blieben Gobo/Color/Shutter-Bars trotz Moving Heads versteckt
+            # (dieselbe Template-Schwaeche wurde fuer den Mapping-Tab schon behoben).
+            # Dedup pro Attribut; ein Kanal MIT ranges/kind wird als Repraesentant
+            # bevorzugt (fuer die Slot-/Kind-Schnellwahl, z.B. Gobo-Bilder).
+            # "Weitere" buendelt Beam+Effect+Other (eine Stelle, keine Doppelung).
+            union: dict[str, FixtureChannel] = {}
+            for f in selected:
+                for ch in get_channels_for_patched(f):
+                    prev = union.get(ch.attribute)
+                    if prev is None or (
+                            not getattr(prev, "ranges", None)
+                            and getattr(ch, "ranges", None)):
+                        union[ch.attribute] = ch
+            self._template_channels = list(union.values())
             groups: dict[str, list[FixtureChannel]] = {
                 "Intensity": [], "Color": [], "Position": [], "Gobo": [],
                 "Weitere": []
             }
-            seen_attrs: set[str] = set()
-            for ch in channels:
-                if ch.attribute in seen_attrs:
-                    continue
-                seen_attrs.add(ch.attribute)
+            for ch in self._template_channels:
                 grp = _classify_attribute(ch.attribute)
                 if grp in ("Intensity", "Color", "Position", "Gobo"):
                     groups[grp].append(ch)
@@ -1410,16 +1419,29 @@ class ProgrammerView(QWidget):
         if not fixtures:
             return None
         from PySide6.QtWidgets import QCheckBox, QGroupBox
+        from PySide6.QtCore import Qt
         box = QGroupBox("Ausrichtung (pro Fixture)")
         row = QHBoxLayout(box)
-        f0 = fixtures[0]
         for label, attr in (("Pan invertieren", "invert_pan"),
                             ("Tilt invertieren", "invert_tilt"),
                             ("Pan/Tilt tauschen", "swap_pan_tilt")):
             cb = QCheckBox(label)
-            cb.setChecked(bool(getattr(f0, attr, False)))
-            cb.toggled.connect(
-                lambda chk, a=attr, fx=fixtures: self._set_orientation(a, chk, fx))
+            vals = [bool(getattr(f, attr, False)) for f in fixtures]
+            if all(vals):
+                cb.setChecked(True)
+            elif not any(vals):
+                cb.setChecked(False)
+            else:
+                # Divergente Flags ueber die Auswahl -> Tri-State sichtbar machen,
+                # statt nur fixtures[0] zu zeigen und beim ersten Klick blind alle
+                # gleichzusetzen. clicked() feuert nur bei echtem Nutzer-Klick und
+                # liefert den (binaeren) Zielzustand, der dann einheitlich auf ALLE
+                # geschrieben wird; danach Tri-State aus (verhaelt sich binaer).
+                cb.setTristate(True)
+                cb.setCheckState(Qt.CheckState.PartiallyChecked)
+            cb.clicked.connect(
+                lambda chk, a=attr, fx=fixtures, c=cb: (
+                    c.setTristate(False), self._set_orientation(a, chk, fx)))
             row.addWidget(cb)
         row.addStretch(1)
         return box
