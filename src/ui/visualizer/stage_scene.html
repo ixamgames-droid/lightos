@@ -611,6 +611,26 @@ function updateStageObjectProps(id, props) {
         so.mesh.traverse(disposeObj);
         scene.add(newGroup);
         so.mesh = newGroup;
+        // Auswahl-BoxHelper zeigte noch auf das alte (entfernte/disposte) Mesh ->
+        // INLINE fuer newGroup neu aufbauen, sonst friert der gelbe Auswahlrahmen
+        // auf der alten Geometrie ein. (Bewusst NICHT updateOutlines() — das wuerde
+        // pro Rasterschritt Selektions-Signale an Python feuern + den Banner-DOM neu
+        // bauen.) Sichtbarkeit des alten Helpers uebernehmen (selektiert vs. nicht).
+        if (so._helper) {
+          const wasVisible = so._helper.visible;
+          scene.remove(so._helper);
+          if (so._helper.geometry) so._helper.geometry.dispose();
+          if (so._helper.material) so._helper.material.dispose();
+          so._helper = new THREE.BoxHelper(so.mesh, 0xffd700);
+          if (so._helper.material) {
+            so._helper.material.depthTest = false;
+            so._helper.material.transparent = true;
+            so._helper.material.opacity = 1.0;
+          }
+          so._helper.visible = wasVisible;
+          scene.add(so._helper);
+          so._helper.update();
+        }
       }
     }
   }
@@ -2704,13 +2724,24 @@ function handlePointerMove(clientX, clientY) {
       const newSizeZ = Math.max(0.2, Math.abs(newGripZ - fz));
       const newCX = (fx + newGripX) / 2;
       const newCZ = (fz + newGripZ) / 2;
-      updateStageObjectProps(selectedStageId, {
-        size: {x: newSizeX, z: newSizeZ},
-        position: {x: newCX, z: newCZ},
-      });
-      moveDockedFixtures(selectedStageId, 0, 0);
+      // Truss/Platform-Groups werden in updateStageObjectProps komplett neu
+      // gebaut (dispose + Modell-Clone). Die GESNAPPTEN Werte aendern sich nur
+      // beim Ueberqueren einer Rasterlinie -> nur dann neu aufbauen, statt pro
+      // Mausbewegung (verhindert den GC-/Perf-Churn beim Resizen).
+      if (newSizeX !== dragResizeStart.lastSizeX || newSizeZ !== dragResizeStart.lastSizeZ
+          || newCX !== dragResizeStart.lastCX || newCZ !== dragResizeStart.lastCZ) {
+        dragResizeStart.lastSizeX = newSizeX;
+        dragResizeStart.lastSizeZ = newSizeZ;
+        dragResizeStart.lastCX = newCX;
+        dragResizeStart.lastCZ = newCZ;
+        updateStageObjectProps(selectedStageId, {
+          size: {x: newSizeX, z: newSizeZ},
+          position: {x: newCX, z: newCZ},
+        });
+        moveDockedFixtures(selectedStageId, 0, 0);
+        updateResizeHandles();
+      }
       if (so._helper) so._helper.update();
-      updateResizeHandles();
     }
   } else if (dragMode === 'marquee') {
     const m = document.getElementById('marquee');
