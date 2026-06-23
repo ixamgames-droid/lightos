@@ -22,6 +22,7 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 | ID | Prio | Status | Titel | Stand |
 |----|------|--------|-------|-------|
+| UI-04 | P1 | review | EFX-Tab: ▶ Start lief stumm ohne Geräte | **Root-Cause:** Live-EFX `Circle` hatte `fixtures=[]` (verifiziert via `auto_save.lshow`) → `EfxInstance.write()` bricht bei leerer Liste ab → null Output. **Fix:** `_add_efx`/`_start_efx` weisen Geräte automatisch zu (Auswahl → sonst alle Movingheads), klare Warnung wenn keine vorhanden. Test: `tests/test_efx_autoassign.py` (6 Tests). Branch `fix/efx-start-autoassign`. |
 | UI-02 | P1 | review | Undo im Patch | **Verifiziert:** Fixture-Löschen ist bereits via globalem Ctrl+Z rückgängig (`remove_fixture` pusht Undo+Redo, `patch_view._delete_selected` ruft es undoable). Fehlender Test ergänzt: `tests/test_patch_undo.py` (4 Tests). Branch `feature/patch-undo-test`. |
 
 ## 📋 Offen
