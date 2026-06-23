@@ -117,6 +117,53 @@ def _stop_background_threads_at_end():
 
 
 @pytest.fixture(autouse=True)
+def _reset_sync_subscribers():
+    """Verhindert, dass geleakte View-Subscriber des globalen Event-Bus
+    (``src.core.sync``) sich ueber die Suite anhaeufen — Kern-Ursache des
+    nichtdeterministischen Voll-Suite-Haengers.
+
+    URSACHE (per Timeout-Stack belegt): Etliche Views abonnieren den Bus mit
+    einem Lambda, das ``self`` faengt, und nutzen NICHT ``subscribe_widget()``
+    (z. B. ``simple_desk.py``: ``sync.subscribe(PATCH_CHANGED,
+    lambda *_: self._on_patch_changed())``). Das Lambda haelt die View am Leben
+    -> sie wird nie zerstoert, meldet sich nie ab (die Selbstheilung in
+    ``StateSync.emit`` greift nur bei BEREITS geloeschten Qt-Objekten, nicht bei
+    lebenden Zombies) und baut bei JEDEM ``patch_changed`` ihre komplette
+    Uebersicht neu auf. Ueber die Suite sammeln sich Dutzende solcher Zombies; ein
+    spaeterer ``reset_show()``/``_emit('patch_changed')`` (z. B. in
+    ``test_snap_editor.tearDown``) faechert dann quadratisch auf -> der Lauf
+    ueberschreitet 60 s und der Watchdog schlaegt zu.
+
+    FIX (rein test-seitig, ohne App-Code anzufassen): den Subscriber-Stand des
+    Bus pro Test schnappschuss-sichern und am Testende EXAKT wiederherstellen. So
+    uebersteht KEIN Test-Leak die Test-Grenze; persistente/Modul-Subscriber aus
+    dem Schnappschuss bleiben unangetastet. Bewusst OHNE erzwungenes gc.collect ---
+    die jetzt unreferenzierten Views sammelt Python regulaer + gefahrlos ein."""
+    from src.core import sync as _S
+    sync = getattr(_S, "_sync", None)   # NICHT get_sync() -> Singleton nicht erzwingen
+    snapshot = None
+    if sync is not None:
+        try:
+            snapshot = {ev: list(cbs) for ev, cbs in sync._subscribers.items()}
+        except Exception:
+            snapshot = None
+    yield
+    sync = getattr(_S, "_sync", None)
+    if sync is None:
+        return
+    try:
+        if snapshot is None:
+            # Singleton entstand erst WAEHREND des Tests -> alle Subscriber sind Leaks
+            for ev in list(sync._subscribers):
+                sync._subscribers[ev] = []
+        else:
+            for ev in list(sync._subscribers):
+                sync._subscribers[ev] = list(snapshot.get(ev, []))
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
 def _cleanup_vc_canvases():
     yield
     try:
