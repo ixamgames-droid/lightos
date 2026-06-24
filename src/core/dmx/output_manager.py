@@ -132,6 +132,20 @@ class OutputManager:
     def start(self):
         if self._running and self._thread and self._thread.is_alive():
             return  # bereits laufend -> kein zweiter Thread
+        # STAB-04: Ein FRUEHERER Output-Thread kann den stop()-Join-Timeout
+        # ueberlebt haben (blockierender Treiber) und noch laufen. Dann KEINEN
+        # zweiten Thread daneben starten — zwei Threads wuerden gleichzeitig
+        # seriell schreiben (konkurrierende Writes -> Access Violation, Folgebug
+        # aus STAB-02). Stattdessen _running reaktivieren: der noch lebende Thread
+        # nimmt seine Schleife wieder auf, sobald sein haengendes write()
+        # zurueckkommt (Selbstheilung statt Thread-Verdopplung).
+        if self._thread is not None and self._thread.is_alive():
+            self._running = True
+            import sys
+            print("[OutputManager] frueherer DMX-Output-Thread laeuft noch — "
+                  "reaktiviert statt zweiten Thread zu starten (STAB-04).",
+                  file=sys.stderr)
+            return
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True, name="DMX-Output")
         self._thread.start()
@@ -154,7 +168,12 @@ class OutputManager:
                 print("[OutputManager] DMX-Output-Thread reagiert nicht — Geraete "
                       "bleiben offen (Schutz vor Access Violation beim Beenden).",
                       file=sys.stderr)
-                self._thread = None
+                # STAB-04: Referenz auf den noch lebenden Thread BEHALTEN (nicht
+                # auf None setzen). Sonst startet ein folgender start() einen
+                # zweiten DMX-Thread daneben, der gleichzeitig seriell schreibt
+                # (konkurrierende Writes / Access Violation). So erkennt start()
+                # den Zombie ueber is_alive() und das naechste stop() joint ihn
+                # erneut, sobald sein write() zurueckkommt.
                 return
         self._thread = None
         # Thread ist sicher beendet -> kein gleichzeitiges write() mehr moeglich.
