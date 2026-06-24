@@ -122,6 +122,11 @@ class FunctionManager:
     def start(self, fid: int):
         f = self._functions.get(fid)
         if f is None:
+            # Tote Bindung: VC-Button/Executor/MIDI zeigt auf eine geloeschte oder
+            # nie existierende Funktions-ID. Frueher still -> "Button tut nichts"
+            # ganz ohne Hinweis. Jetzt laut im Log (UI-Hinweis via start_problem).
+            print(f"[function_manager] WARN: start({fid}) ignoriert — keine Funktion "
+                  f"mit dieser ID (tote Bindung? Ziel geloescht oder neu angelegt?).")
             return
         f.start()
         with self._lock:
@@ -132,6 +137,30 @@ class FunctionManager:
             except ValueError:
                 pass
             self._start_order.append(fid)
+        # EFX-Bewegung ohne Geraete: write() ist ein stiller No-Op (efx.py) -> kein
+        # Pan/Tilt-DMX, der Moving Head bleibt stehen, der Simple Desk zeigt nichts.
+        # Einmal beim Start laut warnen (statt frustfreiem "nichts passiert").
+        prob = self.start_problem(fid)
+        if prob:
+            print(f"[function_manager] WARN: {prob}")
+
+    def start_problem(self, fid: int) -> str | None:
+        """Diagnose, warum ``start(fid)`` wirkungslos bleiben koennte — fuer
+        UI-Hinweise (z. B. VC-Button-Statusleiste). ``None`` = kein erkanntes
+        Problem. Reine Abfrage ohne Seiteneffekte.
+
+        Erkennt: (1) tote Bindung (ID existiert nicht) und (2) EFX-Bewegung ohne
+        Geraete (eigene ``fixtures``-Liste leer -> ``EfxInstance.write()`` No-Op).
+        Andere Typen (Scene/Chaser/RGB-Matrix) haben keine ``fixtures``-Liste und
+        loesen hier bewusst keinen Fehlalarm aus."""
+        f = self._functions.get(fid)
+        if f is None:
+            return f"Funktion #{fid} existiert nicht (tote Bindung)."
+        if hasattr(f, "fixtures") and not getattr(f, "fixtures"):
+            name = getattr(f, "name", None) or f"#{fid}"
+            return (f"„{name}“ hat keine Geräte — kein Pan/Tilt-DMX "
+                    f"(write() bleibt ein No-Op).")
+        return None
 
     def stop(self, fid: int, allow_release: bool = True):
         f = self._functions.get(fid)
