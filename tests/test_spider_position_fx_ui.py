@@ -191,6 +191,10 @@ class SpiderEfxModeTest(_SpiderBase):
         # „Phantom" in jeder Gruppe sichtbar. Der Nutzer erstellt sie per „+ Neu";
         # hier explizit simuliert, damit eine EFX zum Programmieren existiert.
         v._add_efx()
+        # Seit dem Wurzel-Fix (2026-06-24) wirkt das Follow-Assignment NUR, wenn
+        # der Editor sichtbar/aktiv ist (sonst wuerde er im Hintergrund die Geraete
+        # der gespielten EFX leeren). Im Test daher sichtbar machen.
+        v.show()
         return v
 
     def test_follow_includes_spider_and_enables_mode(self):
