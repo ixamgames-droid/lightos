@@ -60,9 +60,11 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
     assert labels == ["Intensity", "Color", "Position", "Gobo", "Weitere",
                       "Mapping", "Hilfe", "EFX", "Matrix", "Paletten"], labels
-    # Gobo- und Mapping-Tab sind ohne Auswahl ausgeblendet.
+    # Gobo-, Mapping-, Position- und EFX-Tab sind ohne Auswahl ausgeblendet.
     assert pv._main_tabs.isTabVisible(pv._gobo_tab_index) is False
     assert pv._main_tabs.isTabVisible(pv._mapping_tab_index) is False
+    assert pv._main_tabs.isTabVisible(pv._position_tab_index) is False
+    assert pv._main_tabs.isTabVisible(pv._efx_tab_index) is False
     assert pv._tile_preview is not None           # UNTEN
 
     # Tab-Wechsel wirft nicht.
