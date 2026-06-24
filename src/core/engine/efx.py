@@ -485,7 +485,8 @@ class EfxInstance(Function):
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             apply_pan_tilt_orientation,
-                                            open_value_for)
+                                            open_value_for,
+                                            resolve_attr_channels)
         except Exception:
             return
         values = self._values()
@@ -525,19 +526,12 @@ class EfxInstance(Function):
                         attrs[fkey] = tf
                     else:
                         attrs[ckey] = int(max(0, min(255, tval)))
-            seen: dict[str, int] = {}
-            for ch in chans:
-                a = ch.attribute
-                head = seen.get(a, 0)
-                seen[a] = head + 1
-                key = a if head == 0 else f"{a}#{head}"
-                if key in attrs:
-                    val = attrs[key]
-                elif a in attrs:
-                    val = attrs[a]      # Kopf>0 spiegelt Kopf 0, falls nicht separat
-                else:
-                    continue
-                addr = fx.address + ch.channel_number - 1
+            # Mehrkopf-Vorkommens-Aufloesung zentral (eine Quelle, identisch zur
+            # frueheren Inline-seen-Schleife): resolve_attr_channels mappt jedes
+            # attr/attr#N auf sein Kanal-Vorkommen, Kopf>0 spiegelt Kopf 0 als
+            # Fallback. Kanaele ohne passenden Wert werden uebersprungen.
+            for ch_no, _key, val in resolve_attr_channels(chans, attrs):
+                addr = fx.address + ch_no - 1
                 if 1 <= addr <= 512:
                     universe.set_channel(addr, max(0, min(255, int(val))))
 

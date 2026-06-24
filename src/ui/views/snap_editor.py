@@ -65,7 +65,11 @@ def fixture_channel_keys(channels) -> list[str]:
 
     Spiegelt ``AppState.set_programmer_value`` (head>0 -> ``"attr#head"``): ein
     Spider mit zwei ``color_r``-Kanaelen liefert ``["color_r", "color_r#1", …]``.
-    So lassen sich beim „Kanal hinzufuegen" auch zweite Koepfe nachtragen."""
+    So lassen sich beim „Kanal hinzufuegen" auch zweite Koepfe nachtragen.
+
+    Gleiche Vorkommens-Logik wie ``app_state.channel_occurrence_keys`` (die kanonische
+    Quelle); hier zusaetzlich ``.lower()`` + ``"raw"``/leer-Filter fuer die Editor-
+    Anzeige — daher eine eigene, bewusst defensive Schleife statt direktem Aufruf."""
     seen: dict[str, int] = {}
     keys: list[str] = []
     for ch in channels:
