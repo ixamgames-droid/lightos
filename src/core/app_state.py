@@ -290,7 +290,7 @@ class AppState:
             "address", "channel_count", "manufacturer_name",
             "fixture_name", "fixture_type", "invert_pan",
             "invert_tilt", "swap_pan_tilt", "dimmer_curve",
-            "spider_mirrored",
+            "spider_mirrored", "spider_dual_tilt",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
@@ -351,6 +351,7 @@ class AppState:
             "swap_pan_tilt": f.swap_pan_tilt,
             "dimmer_curve": f.dimmer_curve,
             "spider_mirrored": getattr(f, "spider_mirrored", True),
+            "spider_dual_tilt": getattr(f, "spider_dual_tilt", False),
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -373,6 +374,7 @@ class AppState:
             swap_pan_tilt=d.get("swap_pan_tilt", False),
             dimmer_curve=d.get("dimmer_curve", "linear"),
             spider_mirrored=d.get("spider_mirrored", True),
+            spider_dual_tilt=d.get("spider_dual_tilt", False),
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),
@@ -1535,14 +1537,56 @@ def clear_channel_cache():
     _channel_cache.clear()
 
 
+class _AttrOverrideChannel:
+    """Leichter Proxy um ein ``FixtureChannel`` mit ueberschriebenem
+    ``attribute`` (Spider-Dual-Tilt: Pan-Motor als zweiter Tilt). Alle anderen
+    Felder/Methoden (channel_number, name, ranges, default_value, …) werden ans
+    Original delegiert; das gecachte ORM-Objekt selbst bleibt UNVERAENDERT, damit
+    ungeflaggte Geraete desselben Profils nicht mitgezogen werden."""
+    __slots__ = ("_ch", "attribute")
+
+    def __init__(self, ch, attribute):
+        object.__setattr__(self, "_ch", ch)
+        object.__setattr__(self, "attribute", attribute)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_ch"), name)
+
+
+# Pan-Motoren eines Dual-Tilt-Spiders werden als zusaetzliche Tilt-Koepfe gedeutet.
+_DUAL_TILT_REMAP = {"pan": "tilt", "pan_fine": "tilt_fine"}
+
+
+def _as_dual_tilt_channels(channels):
+    """Deutet die Pan-Bewegungskanaele als Tilt um (pan->tilt, pan_fine->tilt_fine),
+    damit die GESAMTE Dual-Tilt-Maschinerie greift: is_dual_tilt_fixture/
+    tilt_head_count (Erkennung), das SpiderPositionTool + der EFX-Spider-Modus
+    (UI), der per-Kopf-Schluessel tilt/tilt#1 (channel_occurrence_keys) und die
+    Auto-Scheren-Spiegelung in efx.write(). Reihenfolge bleibt = Kanalreihenfolge,
+    der erste (ehemalige Pan-)Motor wird so Kopf 0. Nicht-Bewegungskanaele
+    bleiben unangetastet."""
+    out = []
+    for ch in channels:
+        a = (getattr(ch, "attribute", "") or "")
+        new_a = _DUAL_TILT_REMAP.get(a)
+        out.append(_AttrOverrideChannel(ch, new_a) if new_a else ch)
+    return out
+
+
 def get_channels_for_patched(fixture: PatchedFixture):
     """Laedt die Channel-Objekte fuer ein gepatchtes Geraet (gecached).
     Fallback: Wenn der exakte Mode-Name nicht existiert, wird der erste Mode
     des Profils mit passender Kanalanzahl verwendet (oder einfach der erste).
-    """
+
+    Spider-Dual-Tilt (``fixture.spider_dual_tilt``): der Pan-Motor wird als
+    zweiter Tilt-Kopf ausgegeben (siehe ``_as_dual_tilt_channels``). Das Flag ist
+    Teil des Cache-Keys, damit dasselbe Profil fuer ungeflaggte Geraete unveraendert
+    bleibt."""
+    spider_dual = bool(getattr(fixture, "spider_dual_tilt", False))
     key = (getattr(fixture, "fixture_profile_id", None),
            getattr(fixture, "mode_name", None),
-           getattr(fixture, "channel_count", None))
+           getattr(fixture, "channel_count", None),
+           spider_dual)
     cached = _channel_cache.get(key)
     if cached is not None:
         return cached
@@ -1588,6 +1632,8 @@ def get_channels_for_patched(fixture: PatchedFixture):
             .options(selectinload(FixtureChannel.ranges))
         ).scalars().all()
         s.expunge_all()
+        if spider_dual:
+            result = _as_dual_tilt_channels(result)
         _channel_cache[key] = result
         return result
 

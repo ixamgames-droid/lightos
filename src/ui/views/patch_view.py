@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
-from src.core.app_state import get_state, AppState, is_spider_fixture
+from src.core.app_state import (get_state, AppState, is_spider_fixture,
+                                 get_channels_for_patched)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
 from src.ui.widgets.fixture_browser import FixtureBrowserDialog
@@ -133,6 +134,29 @@ class PatchFixtureEditDialog(QDialog):
             )
             form.addRow("Spider-Anordnung:", self._combo_spider)
 
+        # Spider/Dual-Tilt-Marker: fuer Butterfly-/Derby-Spider, deren zwei
+        # Motoren in Wahrheit zwei Tilt-Bars sind (kein echtes Pan) — beim QXF-
+        # Import oft faelschlich als pan/tilt gemappt. Auto-Erkennung unmoeglich
+        # (echte Pan+Tilt-Mover sehen strukturell gleich aus), daher hier bewusst
+        # setzbar, wenn das Geraet Pan UND Tilt hat. Aktiviert die Spider-Bedienung
+        # (Position-Tab: Motoren statt XY-Pad, EFX-Tab: Bewegungsmuster statt Kreise).
+        self._chk_spider_dual = None
+        try:
+            _attrs = {(ch.attribute or "") for ch in get_channels_for_patched(self._fixture)}
+        except Exception:
+            _attrs = set()
+        _already = bool(getattr(self._fixture, "spider_dual_tilt", False))
+        if ("pan" in _attrs and "tilt" in _attrs) or _already:
+            self._chk_spider_dual = QCheckBox("Spider: zwei Tilt-Bars (kein Pan)")
+            self._chk_spider_dual.setChecked(_already)
+            self._chk_spider_dual.setToolTip(
+                "Für Butterfly-/Derby-Spider, deren zwei Motoren in Wahrheit zwei\n"
+                "Tilt-Bars sind (kein echtes Pan). Aktiviert die Spider-Bedienung:\n"
+                "Position-Tab zeigt die Motoren-Regler statt XY-Pad, EFX-Tab zeigt\n"
+                "Spider-Bewegungsmuster statt Kreis/Acht/Lissajous. Der als Pan\n"
+                "importierte Motor wird dabei als zweiter Tilt-Bar angesteuert.")
+            form.addRow("Spider-Steuerung:", self._chk_spider_dual)
+
         layout.addLayout(form)
 
         self._lbl_warn = QLabel("")
@@ -218,6 +242,8 @@ class PatchFixtureEditDialog(QDialog):
             })
         if self._combo_spider is not None:
             self.result_updates["spider_mirrored"] = bool(self._combo_spider.currentData())
+        if self._chk_spider_dual is not None:
+            self.result_updates["spider_dual_tilt"] = self._chk_spider_dual.isChecked()
         self.accept()
 
 

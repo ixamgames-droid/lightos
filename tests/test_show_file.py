@@ -25,6 +25,7 @@ class _FakePatchedFixture:
     swap_pan_tilt: bool = False
     dimmer_curve: str = "linear"
     spider_mirrored: bool = True
+    spider_dual_tilt: bool = False
     pan_range_deg: int = 540
     tilt_range_deg: int = 270
     pan_zero_dmx: int = 128
