@@ -1592,10 +1592,29 @@ def get_channels_for_patched(fixture: PatchedFixture):
         return result
 
 
+def channel_occurrence_keys(channels):
+    """Pro Kanal sein vorkommens-bewusster Programmer-Schluessel als ``(channel,
+    key)``-Paare: das erste Vorkommen eines Attributs ist der Basis-Name, jedes
+    weitere bekommt ``"attr#N"`` (N = Kopf-Index, X-6/Spider).
+
+    EINE Quelle der Mehrkopf-Vorkommens-Logik (frueher in ``resolve_attr_channels``,
+    ``efx.write`` und ``snap_editor.fixture_channel_keys`` je separat ausprogrammiert).
+    Spiegelt ``set_programmer_value`` (head>0 -> ``"attr#head"``)."""
+    seen: dict[str, int] = {}
+    out: list[tuple] = []
+    for ch in channels:
+        a = ch.attribute
+        head = seen.get(a, 0)
+        seen[a] = head + 1
+        out.append((ch, a if head == 0 else f"{a}#{head}"))
+    return out
+
+
 def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:
     """Loest einen attribut-gekeyten Wert-Dict gegen die Kanal-Liste eines
     Fixtures auf — mit DERSELBEN Mehrkopf-Vorkommens-Logik wie
-    ``_flush_programmer_to_dmx`` und ``efx.py``.
+    ``_flush_programmer_to_dmx`` und ``efx.py`` (gemeinsame Quelle:
+    ``channel_occurrence_keys``).
 
     Hintergrund (X-6 / Spider): wiederholte Attribute (z. B. ``color_r`` zweimal
     bei zwei RGBW-Baenken) werden im Programmer/Snap pro Kopf als ``"attr#N"``
@@ -1614,19 +1633,14 @@ def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:
     oder ``"color_r#1"``) — Aufrufer mit Crossfade (Sequence) brauchen ihn, um den
     Vorwert mit DEMSELBEN Schluessel nachzuschlagen.
     """
-    seen: dict[str, int] = {}
     out: list[tuple[int, str, int]] = []
     if not isinstance(values, dict):
         return out
-    for ch in channels:
-        a = ch.attribute
-        head = seen.get(a, 0)
-        seen[a] = head + 1
-        key = a if head == 0 else f"{a}#{head}"
+    for ch, key in channel_occurrence_keys(channels):
         if key in values:
             out.append((ch.channel_number, key, values[key]))
-        elif a in values:
-            out.append((ch.channel_number, a, values[a]))
+        elif ch.attribute in values:
+            out.append((ch.channel_number, ch.attribute, values[ch.attribute]))
     return out
 
 
