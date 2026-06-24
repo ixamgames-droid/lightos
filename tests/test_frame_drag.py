@@ -173,5 +173,58 @@ class FrameDropTargetBankTest(_CanvasTest):
         self.assertIs(btn.parent(), upper)                        # oberstes (zuletzt erstellt)
 
 
+class FrameBankReassignTest(_CanvasTest):
+    """Frame nachtraeglich einer Bank zuweisen (Kontextmenue → _set_bank): der
+    Frame folgt der Bank-Sichtbarkeit und wird auf seiner Bank wieder Drop-Ziel."""
+
+    def _canvas(self):
+        canvas = VCCanvas()
+        self._canvases.append(canvas)
+        canvas.set_edit_mode(True)
+        return canvas
+
+    def test_set_bank_moves_frame_visibility(self):
+        canvas = self._canvas()
+        canvas.set_active_bank(0)
+        frame = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame.resize(300, 200)
+        self.assertEqual(frame.bank, 0)
+        frame._set_bank(2)                       # auf Bank 2 verschieben
+        self.assertEqual(frame.bank, 2)
+        self.assertFalse(canvas.on_active_bank(frame))  # Bank 0 aktiv -> nicht sichtbar
+        self.assertTrue(frame.isHidden())
+        canvas.set_active_bank(2)                # zur Bank des Frames
+        self.assertTrue(canvas.on_active_bank(frame))
+        self.assertFalse(frame.isHidden())
+
+    def test_all_banks_reassign(self):
+        canvas = self._canvas()
+        canvas.set_active_bank(3)
+        frame = canvas._add_widget("VCFrame", QPoint(200, 60))
+        self.assertEqual(frame.bank, 3)
+        frame._set_bank(-1)                      # „Alle Banks"
+        self.assertEqual(frame.bank, -1)
+        canvas.set_active_bank(7)
+        self.assertTrue(canvas.on_active_bank(frame))   # auf jeder Bank sichtbar
+
+    def test_reassigned_frame_is_drop_target_on_its_bank(self):
+        canvas = self._canvas()
+        canvas.set_active_bank(0)
+        frame = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame.resize(300, 200)
+        frame._set_bank(2)
+        canvas.set_active_bank(2)
+        btn = canvas._add_widget("VCButton", QPoint(300, 120))   # bank=2
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), frame)       # FRM-03 + Reassign: jetzt gueltiges Ziel
+
+    def test_frame_bank_persists_in_serialization(self):
+        canvas = self._canvas()
+        canvas.set_active_bank(0)
+        frame = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame._set_bank(4)
+        self.assertEqual(frame.to_dict().get("bank"), 4)   # bleibt in der Show erhalten
+
+
 if __name__ == "__main__":
     unittest.main()
