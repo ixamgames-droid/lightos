@@ -406,6 +406,10 @@ class ProgrammerView(QWidget):
         # Gobo-Tab nur sichtbar, wenn das Geraet Gobos hat (M2.1).
         self._gobo_tab_index = self._main_tabs.indexOf(self._attr_group_tabs["Gobo"])
         self._main_tabs.setTabVisible(self._gobo_tab_index, False)
+        # Position-Tab: Index merken — wird in _rebuild_attr_editor ausgeblendet,
+        # wenn die Auswahl keine Pan/Tilt-Kanaele hat.
+        self._position_tab_index = self._main_tabs.indexOf(self._attr_group_tabs["Position"])
+        self._main_tabs.setTabVisible(self._position_tab_index, False)
 
         # Mapping-Tab (Kanal-Mapping, M-Map): bildet eine Live-Position (Tilt/Pan/
         # X-Y) auf beliebige Ziel-Kanaele ab. Nur sichtbar, wenn die Auswahl
@@ -419,7 +423,11 @@ class ProgrammerView(QWidget):
         # set_programmer_focus gemeldete Tab-Text wird nur gegen "Intensity"
         # verglichen (app_state), nie gegen "Helper"/"Hilfe".
         self._main_tabs.addTab(self._make_effects_page(), "Hilfe")
-        self._main_tabs.addTab(self._make_efx_page(), "EFX")
+        # EFX-Tab: Widget merken, damit der Index via indexOf ermittelt werden kann.
+        self._efx_page = self._make_efx_page()
+        self._main_tabs.addTab(self._efx_page, "EFX")
+        self._efx_tab_index = self._main_tabs.indexOf(self._efx_page)
+        self._main_tabs.setTabVisible(self._efx_tab_index, False)
         # F-1: Matrix-Tab-Index merken, damit ein Gruppenklick direkt dorthin springt.
         self._rgb_page = self._make_rgb_page()
         self._main_tabs.addTab(self._rgb_page, "Matrix")
@@ -998,6 +1006,10 @@ class ProgrammerView(QWidget):
                     self._main_tabs.setTabVisible(self._gobo_tab_index, False)
                 if getattr(self, "_mapping_tab_index", -1) >= 0:
                     self._main_tabs.setTabVisible(self._mapping_tab_index, False)
+                if getattr(self, "_position_tab_index", -1) >= 0:
+                    self._main_tabs.setTabVisible(self._position_tab_index, False)
+                if getattr(self, "_efx_tab_index", -1) >= 0:
+                    self._main_tabs.setTabVisible(self._efx_tab_index, False)
                 return
 
             self._lbl_selection.setText(
@@ -1057,6 +1069,14 @@ class ProgrammerView(QWidget):
                         for ch in get_channels_for_patched(f))
                     for f in selected)
                 self._main_tabs.setTabVisible(self._mapping_tab_index, cap)
+            # Position- und EFX-Tab: nur sichtbar, wenn die Auswahl Pan/Tilt-
+            # Kanaele enthaelt. Strahler/RGB-Spider (keine Bewegung) -> ausgeblendet;
+            # Moving Heads / Tilt-Spider -> eingeblendet.
+            has_pos = bool(groups.get("Position"))
+            if getattr(self, "_position_tab_index", -1) >= 0:
+                self._main_tabs.setTabVisible(self._position_tab_index, has_pos)
+            if getattr(self, "_efx_tab_index", -1) >= 0:
+                self._main_tabs.setTabVisible(self._efx_tab_index, has_pos)
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
 
