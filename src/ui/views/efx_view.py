@@ -501,14 +501,42 @@ class EfxView(QWidget):
         except Exception:
             return None, set()
 
+    def _active_group_fids(self) -> set[int]:
+        """Fid-Set der aktuell gewaehlten Gruppe — fuer den Geraete-Zugehoerigkeits-
+        Filter UNGEBUNDENER/verwaister EFX (so werden bestehende EFX, die es ohne
+        💾-Button nicht zu binden gibt, trotzdem korrekt der richtigen Gruppe
+        zugeordnet). Leeres Set, wenn keine Gruppe aktiv / Engine fehlt."""
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            gid = state.get_selected_group_id()
+            eng = getattr(state, "_show_engine", None)
+            if gid is None or eng is None:
+                return set()
+            import json
+            from sqlalchemy.orm import Session
+            from src.core.database.models import FixtureGroup
+            with Session(eng) as s:
+                g = s.get(FixtureGroup, gid)
+                pos = json.loads(g.positions_json or "{}") if g is not None else {}
+            return {int(v) for v in pos.values()}
+        except Exception:
+            return set()
+
     def _visible_instances(self) -> list[EfxInstance]:
         """Die im aktuellen Kontext anzuzeigenden EFX.
 
         - Bibliothek (kein Folgemodus): ALLE EFX.
-        - Programmer (Folgemodus) mit aktiver Gruppe: nur EFX DIESER Gruppe plus
-          ungebundene (source_group=None) und „verwaiste" (Gruppe existiert nicht
-          mehr, z. B. nach Umbenennen) — die erscheinen ueberall, damit nie ein
-          Effekt unsichtbar „verloren" geht.
+        - Programmer (Folgemodus) mit aktiver Gruppe:
+          * **gebunden** (`source_group` = eine existierende Gruppe): nur unter
+            GENAU dieser Gruppe (explizite Bindung gewinnt).
+          * **ungebunden** (None) ODER **verwaist** (Gruppe gibt's nicht mehr):
+            nach **Geraete-Zugehoerigkeit** — der EFX erscheint unter der Gruppe,
+            deren Fixtures er steuert (Schnittmenge der EFX-Fixtures mit den
+            Gruppen-Fixtures). So landen bestehende/alte EFX (die mangels
+            💾-Button nicht gebunden werden koennen) automatisch bei der richtigen
+            Gruppe, statt in JEDER aufzutauchen. EFX OHNE Geraete (frisch, noch
+            nicht zugewiesen) bleiben ueberall sichtbar, damit nichts verloren geht.
         - Folgemodus ohne aktive Gruppe (lose Auswahl): ALLE EFX (Alt-Verhalten)."""
         insts = self._instances
         if not self._follow:
@@ -516,13 +544,20 @@ class EfxView(QWidget):
         gname, known = self._group_context()
         if gname is None:
             return insts
+        gfids = self._active_group_fids()
         out = []
         for e in insts:
             sg = getattr(e, "source_group", None) or None
-            if sg is None or sg not in known:   # ungebunden ODER verwaist -> ueberall
-                out.append(e)
-            elif sg == gname:                   # genau dieser Gruppe zugeordnet
-                out.append(e)
+            if sg and sg in known:                       # explizit gebunden
+                if sg == gname:
+                    out.append(e)
+            else:                                        # ungebunden ODER verwaist
+                efx_fids = {fx.fid for fx in getattr(e, "fixtures", [])
+                            if getattr(fx, "fid", None) is not None}
+                # Ohne Geraete ODER Gruppen-Fids unbekannt -> ueberall (kein Verlust).
+                # Sonst: nur wenn der EFX Geraete dieser Gruppe steuert.
+                if not efx_fids or not gfids or (efx_fids & gfids):
+                    out.append(e)
         return out
 
     def _update_group_header(self):

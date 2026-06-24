@@ -71,9 +71,12 @@ class VisibleFilterTest(unittest.TestCase):
             if f.id not in self._pre:
                 self.fm.remove(f.id)
 
-    def _mk(self, name, group=None):
+    def _mk(self, name, group=None, fids=()):
         e = self.fm.new_efx(name=name)
         e.source_group = group
+        if fids:
+            from src.core.engine.efx import EfxFixture
+            e.fixtures = [EfxFixture(fid=f) for f in fids]
         return e
 
     def test_standalone_shows_all(self):
@@ -87,7 +90,7 @@ class VisibleFilterTest(unittest.TestCase):
         self.view._group_context = lambda: ("G1", {"G1", "G2"})
         ids = {x.id for x in self.view._visible_instances()}
         self.assertIn(a.id, ids)        # gebunden an G1 -> sichtbar
-        self.assertIn(c.id, ids)        # ungebunden -> ueberall sichtbar
+        self.assertIn(c.id, ids)        # ungebunden OHNE Geraete -> ueberall sichtbar
         self.assertNotIn(b.id, ids)     # gebunden an G2 -> ausgeblendet
 
     def test_orphan_binding_shows_everywhere(self):
@@ -118,6 +121,33 @@ class VisibleFilterTest(unittest.TestCase):
         new = [e for e in self.view._instances if e.id not in before]
         self.assertEqual(len(new), 1)
         self.assertEqual(new[0].source_group, "Strahler")
+
+    def test_unbound_with_fixtures_filters_by_group_membership(self):
+        # Backfix-2: Bestehende/ungebundene EFX (kein 💾-Bind moeglich) erscheinen
+        # NUR unter der Gruppe, deren Geraete sie steuern — nicht mehr ueberall.
+        a = self._mk("Alt-L", None, fids=[1, 2])
+        self.view._follow = True
+        self.view._group_context = lambda: ("MH-Links", {"MH-Links", "MH-Rechts"})
+        self.view._active_group_fids = lambda: {1, 2}
+        self.assertIn(a.id, {x.id for x in self.view._visible_instances()})   # steuert L
+        self.view._active_group_fids = lambda: {3, 4}
+        self.assertNotIn(a.id, {x.id for x in self.view._visible_instances()})  # nicht R
+
+    def test_unbound_without_fixtures_shows_everywhere(self):
+        # Frisch angelegte EFX (noch ohne Geraete) duerfen nicht verschwinden.
+        a = self._mk("frisch", None)  # keine fixtures
+        self.view._follow = True
+        self.view._group_context = lambda: ("MH-Links", {"MH-Links"})
+        self.view._active_group_fids = lambda: {1, 2}
+        self.assertIn(a.id, {x.id for x in self.view._visible_instances()})
+
+    def test_orphan_with_fixtures_filters_by_membership(self):
+        # Verwaiste Bindung (Gruppe weg) -> ebenfalls nach Geraete-Zugehoerigkeit.
+        a = self._mk("Ghost-L", "GoneGroup", fids=[1, 2])
+        self.view._follow = True
+        self.view._group_context = lambda: ("MH-Rechts", {"MH-Rechts"})
+        self.view._active_group_fids = lambda: {3, 4}
+        self.assertNotIn(a.id, {x.id for x in self.view._visible_instances()})
 
 
 if __name__ == "__main__":
