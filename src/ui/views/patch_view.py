@@ -31,6 +31,86 @@ TYPE_COLORS = {
 COLS = ["FID", "Label", "Hersteller", "Gerät", "Modus", "Univ.", "Adresse", "Kanäle", "Typ"]
 
 
+# ── UI-03: Fixture-Kopieren mit Offset ──────────────────────────────────────
+def plan_offset_copies(source, count: int, offset: int, base_fid: int,
+                       univ_size: int = 512) -> tuple[list[dict], int]:
+    """Plant ``count`` Kopien von ``source`` mit Adress-Abstand ``offset`` im
+    selben Universum. Reine Logik (testbar, kein Qt/DB).
+
+    Liefert ``(specs, skipped)``: ``specs`` = Liste ``{fid, universe, address}``;
+    Kopien, deren Adressbereich ueber ``univ_size`` liefe (oder < 1), werden
+    uebersprungen und in ``skipped`` gezaehlt. fids werden ab ``base_fid``
+    LUECKENLOS nur fuer tatsaechlich geplante Kopien vergeben (kein Loch durch
+    uebersprungene)."""
+    ch = max(1, int(getattr(source, "channel_count", 1)))
+    base_addr = int(source.address)
+    universe = int(source.universe)
+    specs: list[dict] = []
+    skipped = 0
+    for i in range(1, int(count) + 1):
+        addr = base_addr + i * int(offset)
+        if addr < 1 or addr + ch - 1 > univ_size:
+            skipped += 1
+            continue
+        specs.append({"fid": base_fid + len(specs),
+                      "universe": universe, "address": addr})
+    return specs, skipped
+
+
+def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
+                  address: int) -> PatchedFixture:
+    """Vollstaendige Kopie von ``src`` mit neuer fid/Universe/Adresse (Profil,
+    Modus, Typ und alle Pan/Tilt/Spider-Einstellungen werden uebernommen)."""
+    return PatchedFixture(
+        fid=fid,
+        label=src.label,
+        fixture_profile_id=src.fixture_profile_id,
+        mode_name=src.mode_name,
+        universe=universe,
+        address=address,
+        channel_count=src.channel_count,
+        manufacturer_name=src.manufacturer_name,
+        fixture_name=src.fixture_name,
+        fixture_type=src.fixture_type,
+        invert_pan=src.invert_pan,
+        invert_tilt=src.invert_tilt,
+        swap_pan_tilt=src.swap_pan_tilt,
+        spider_mirrored=src.spider_mirrored,
+        pan_range_deg=src.pan_range_deg,
+        tilt_range_deg=src.tilt_range_deg,
+        pan_zero_dmx=src.pan_zero_dmx,
+        tilt_zero_dmx=src.tilt_zero_dmx,
+    )
+
+
+class CopyWithOffsetDialog(QDialog):
+    """Fragt Anzahl der Kopien + Adress-Abstand (Offset) ab (UI-03)."""
+
+    def __init__(self, default_offset: int, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Mit Offset kopieren")
+        form = QFormLayout(self)
+        self._spin_count = QSpinBox()
+        self._spin_count.setRange(1, 512)
+        self._spin_count.setValue(1)
+        self._spin_offset = QSpinBox()
+        self._spin_offset.setRange(1, 512)
+        self._spin_offset.setValue(max(1, int(default_offset)))
+        form.addRow("Anzahl Kopien:", self._spin_count)
+        form.addRow("Adress-Abstand:", self._spin_offset)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def count(self) -> int:
+        return self._spin_count.value()
+
+    def offset(self) -> int:
+        return self._spin_offset.value()
+
+
 class PatchFixtureEditDialog(QDialog):
     """Dialog zum Bearbeiten eines gepatchten Geraets."""
 
@@ -274,6 +354,11 @@ class PatchView(QWidget):
         btn_delete = QPushButton("Löschen")
         btn_delete.setObjectName("btn_danger")
         btn_delete.clicked.connect(self._delete_selected)
+        btn_copy = QPushButton("Mit Offset kopieren…")
+        btn_copy.setToolTip(
+            "Ausgewählte(s) Gerät(e) mehrfach mit festem Adress-Abstand patchen "
+            "(Anzahl + Offset).")
+        btn_copy.clicked.connect(self._copy_with_offset)
         btn_autopatch = QPushButton("Auto-Patch")
         btn_autopatch.clicked.connect(self._auto_patch)
         btn_generator = QPushButton("Gerät erstellen…")
@@ -287,6 +372,7 @@ class PatchView(QWidget):
 
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
+        toolbar.addWidget(btn_copy)
         toolbar.addWidget(btn_autopatch)
         toolbar.addWidget(btn_generator)
         toolbar.addStretch()
@@ -437,6 +523,38 @@ class PatchView(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             for f in to_delete:
                 self._state.remove_fixture(f.fid)
+
+    def _copy_with_offset(self):
+        """UI-03: ausgewaehlte Geraete mehrfach mit festem Adress-Abstand patchen.
+        Jede Kopie ist (wie add_fixture) einzeln per Ctrl+Z ruecknehmbar."""
+        rows = {idx.row() for idx in self._table.selectedIndexes()}
+        by_fid = {f.fid: f for f in self._state.get_patched_fixtures()}
+        sources = [by_fid[fid] for r in sorted(rows)
+                   if (fid := self._fid_at_row(r)) in by_fid]
+        if not sources:
+            QMessageBox.information(self, "Mit Offset kopieren",
+                                    "Bitte zuerst mind. ein Gerät auswählen.")
+            return
+        default_offset = max((s.channel_count for s in sources), default=1)
+        dlg = CopyWithOffsetDialog(default_offset, self)
+        if not dlg.exec():
+            return
+        count, offset = dlg.count(), dlg.offset()
+        made = skipped = 0
+        for src in sources:
+            # next_fid() je Quelle frisch lesen: nach den Kopien der vorigen Quelle
+            # ist die naechste freie fid bereits weitergewandert.
+            specs, sk = plan_offset_copies(src, count, offset, self._state.next_fid())
+            skipped += sk
+            for spec in specs:
+                self._state.add_fixture(
+                    _copy_fixture(src, spec["fid"], spec["universe"], spec["address"]))
+                made += 1
+        if skipped:
+            QMessageBox.warning(
+                self, "Mit Offset kopieren",
+                f"{made} Kopie(n) angelegt, {skipped} übersprungen "
+                "(Adresse läge außerhalb 1–512).")
 
     def _auto_patch(self):
         fixtures = self._state.get_patched_fixtures()
