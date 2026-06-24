@@ -674,11 +674,16 @@ class VisualizerBridge(QObject):
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
         rot = normalize_rotation(self._state.visualizer_rotations.get(f.fid))
+        model = self._viz_model_for(f)
+        # VIZ-04: Spider tilten physisch ±90° (Gesamt 180°). Der generische
+        # 270°-Default liesse die JS-Bars als ±135° rendern. Fuer Spider daher
+        # 180° als Default, wenn kein expliziter tilt_range_deg gesetzt ist.
+        tilt_default = 180 if model == "spider" else 270
         return {
             "fid": f.fid,
             "label": f.label,
             "type": f.fixture_type,
-            "model": self._viz_model_for(f),
+            "model": model,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],
@@ -686,7 +691,7 @@ class VisualizerBridge(QObject):
             "rotX": rot[0], "rotY": rot[1], "rotZ": rot[2],
             # Pan/Tilt-Bereich (Grad) + Nullpunkt-DMX -> JS-Beam = Hardware-Abbildung.
             "panRange": getattr(f, "pan_range_deg", 540),
-            "tiltRange": getattr(f, "tilt_range_deg", 270),
+            "tiltRange": getattr(f, "tilt_range_deg", tilt_default) or tilt_default,
             "panZero": getattr(f, "pan_zero_dmx", 128),
             "tiltZero": getattr(f, "tilt_zero_dmx", 128),
             "dockedTo": self._state.visualizer_docks.get(f.fid, ""),
@@ -709,6 +714,16 @@ class VisualizerBridge(QObject):
                 # remove_fixture_from_scene poppt jetzt positions+docks+rotations
                 self.remove_fixture_from_scene(fid)
                 self._state.live_view_positions.pop(fid, None)
+            # VIZ-01: Nur in 2D platzierte Fixtures haben evtl. KEINEN
+            # visualizer_positions-Eintrag und werden von der Schleife oben daher
+            # NICHT erfasst -> sie blieben als Leiche in live_view_positions liegen
+            # (werden gespeichert und bei fid-Wiederverwendung faelschlich
+            # reaktiviert). live_view_positions zusaetzlich direkt gegen die
+            # aktuellen Patch-fids abgleichen.
+            lv = getattr(self._state, "live_view_positions", None)
+            if isinstance(lv, dict):
+                for fid in [f for f in list(lv) if f not in current_fids]:
+                    lv.pop(fid, None)
 
 
 # ============================================================================

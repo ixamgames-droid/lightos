@@ -9,10 +9,12 @@ redo() loescht es erneut.
 """
 import os
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,7 @@ from src.core.database.models import PatchedFixture, FixtureProfile
 from src.core.engine.function_manager import get_function_manager
 from src.core.show.show_file import reset_show
 from src.core.undo import get_undo_stack
+from src.ui.views.patch_view import PatchView
 
 
 def _app() -> QApplication:
@@ -106,6 +109,47 @@ class PatchUndoTest(unittest.TestCase):
         # Nach dem Undo darf KEIN weiteres Undo moeglich sein.
         self.assertFalse(self.undo.can_undo(),
                          "undo() darf die Gegenoperation nicht erneut pushen")
+
+    def test_delete_selected_ui_path_is_undoable(self):
+        """QA-03: den ECHTEN UI-Pfad patch_view._delete_selected durchlaufen
+        (gemocktes QMessageBox.Yes), nicht nur remove_fixture direkt. So faellt
+        auf, falls dort versehentlich undoable=False stuende. Aufruf ueber ein
+        Fake-`self` (kein Voll-UI-Aufbau noetig — _delete_selected braucht nur
+        _table-Selektion, _fid_at_row und _state)."""
+        self._add(9, addr=5)
+        self.assertIn(9, self._fids())
+
+        fake = SimpleNamespace(
+            _table=SimpleNamespace(
+                selectedIndexes=lambda: [SimpleNamespace(row=lambda: 0)]),
+            _fid_at_row=lambda r: 9,
+            _state=self.state,
+        )
+        with mock.patch.object(QMessageBox, "question",
+                               return_value=QMessageBox.StandardButton.Yes) as q:
+            PatchView._delete_selected(fake)
+        q.assert_called_once()
+        self.assertNotIn(9, self._fids(), "_delete_selected muss das Fixture loeschen")
+        self.assertTrue(self.undo.can_undo(),
+                        "_delete_selected -> remove_fixture muss undoable=True nutzen")
+        self.undo.undo()
+        self.assertIn(9, self._fids(),
+                      "Undo muss das via _delete_selected geloeschte Fixture wiederherstellen")
+
+    def test_delete_selected_aborts_on_no(self):
+        """Gegenprobe: QMessageBox.No -> nichts geloescht, kein Undo gepusht."""
+        self._add(11)
+        fake = SimpleNamespace(
+            _table=SimpleNamespace(
+                selectedIndexes=lambda: [SimpleNamespace(row=lambda: 0)]),
+            _fid_at_row=lambda r: 11,
+            _state=self.state,
+        )
+        with mock.patch.object(QMessageBox, "question",
+                               return_value=QMessageBox.StandardButton.No):
+            PatchView._delete_selected(fake)
+        self.assertIn(11, self._fids(), "Abbruch (No) darf nichts loeschen")
+        self.assertFalse(self.undo.can_undo())
 
 
 if __name__ == "__main__":

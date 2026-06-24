@@ -83,6 +83,15 @@ def clean_exit_marker(now: datetime.datetime | None = None) -> str:
     return f"=== LightOS CLOSED (sauberer Exit) {_ts(now)} ===\n"
 
 
+def fatal_exit_marker(now: datetime.datetime | None = None) -> str:
+    """STAB-05: Wird per ``atexit`` geschrieben, wenn die Sitzung NACH einer
+    ungefangenen (Main-Thread-)Exception endet. BEWUSST kein Clean-Marker — sonst
+    wuerde die Vorige-Sitzung-Erkennung den Absturz beim naechsten Start nicht
+    sehen (der Clean-Marker bzw. die geloeschte Running-Flag wuerde 'sauber'
+    suggerieren)."""
+    return f"=== LightOS ABGESTUERZT (ungefangene Exception) {_ts(now)} ===\n"
+
+
 def previous_crash_notice(last_alive_ts: str | None,
                           now: datetime.datetime | None = None) -> str:
     """Beim Start geschrieben, wenn die vorige Sitzung nicht sauber endete."""
@@ -222,3 +231,151 @@ def clear_running(flag_path: str | None) -> None:
             os.remove(flag_path)
     except Exception:
         pass
+
+
+def finalize_exit(log_handle, flag_path: str | None, had_fatal: bool,
+                  now: datetime.datetime | None = None) -> None:
+    """STAB-05: atexit-Finalisierung als reine, GUI-freie Logik (damit
+    ``main._on_exit`` nur noch verdrahtet und testbar bleibt).
+
+    - ``had_fatal`` (es lief eine ungefangene Main-Thread-Exception): KEIN
+      Clean-Marker, und die Running-Flag BLEIBT liegen -> der naechste Start
+      erkennt den Absturz, genau wie bei einem nativen Crash.
+    - sonst: Clean-Marker schreiben + Running-Flag entfernen (sauberer Exit).
+    """
+    try:
+        if log_handle is not None:
+            log_handle.write(fatal_exit_marker(now) if had_fatal
+                             else clean_exit_marker(now))
+            log_handle.flush()
+    except Exception:
+        pass
+    if not had_fatal:
+        clear_running(flag_path)
+
+
+# --- Multi-Instanz: per-PID-Running-Flags + Liveness (STAB-06) --------------
+def pid_is_alive(pid) -> bool:
+    """Lebt der Prozess mit dieser PID noch? Plattform-sicher.
+
+    WICHTIG: auf Windows NICHT ``os.kill(pid, 0)`` nutzen — fuer Signal 0 ruft
+    CPython dort ``TerminateProcess`` auf und wuerde den Prozess TATSAECHLICH
+    beenden. Daher ``OpenProcess`` + ``GetExitCodeProcess`` (STILL_ACTIVE). Auf
+    POSIX ist ``os.kill(pid, 0)`` der uebliche, gefahrlose Existenz-Check.
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            # use_last_error=True -> der Fehlercode wird DIREKT nach dem Call
+            # gesichert und ist via ctypes.get_last_error() zuverlaessig lesbar
+            # (ein separater GetLastError()-Aufruf koennte schon ueberschrieben sein).
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            # HANDLE explizit als Zeiger typisieren -> keine Truncation des
+            # 64-Bit-Handles auf Win64 (ctypes-Default-restype waere c_int = 32 Bit,
+            # was Handle-Wahrheitswert UND CloseHandle verfaelschen koennte).
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE,
+                                                    ctypes.POINTER(wintypes.DWORD)]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            ERROR_ACCESS_DENIED = 5
+            STILL_ACTIVE = 259
+            h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not h:
+                # Kein Handle: Prozess existiert nicht (INVALID_PARAMETER) -> tot.
+                # Nur fehlende Rechte (ACCESS_DENIED) -> existiert -> lebt.
+                return ctypes.get_last_error() == ERROR_ACCESS_DENIED
+            try:
+                code = wintypes.DWORD()
+                if kernel32.GetExitCodeProcess(h, ctypes.byref(code)):
+                    return code.value == STILL_ACTIVE
+                return True
+            finally:
+                kernel32.CloseHandle(h)
+        except Exception:
+            # Im Zweifel als lebend behandeln -> lieber einen verpassten
+            # Crash-Hinweis als einen FALSCHEN gegen eine laufende Instanz.
+            return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def read_flag_pid(flag_path: str) -> int | None:
+    """PID aus einer Running-Flag lesen (Inhalt = PID als Text). ``None`` bei
+    unlesbarer/leerer Flag."""
+    try:
+        with open(flag_path, encoding="utf-8") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def find_running_flags(log_dir: str) -> list[str]:
+    """Alle Running-Flag-Dateien im Verzeichnis: per-PID
+    (``lightos_running_<pid>.flag``) UND die Legacy-Einzeldatei
+    (``lightos_running.flag``)."""
+    out: list[str] = []
+    try:
+        for name in os.listdir(log_dir):
+            if name == "lightos_running.flag" or (
+                    name.startswith("lightos_running_") and name.endswith(".flag")):
+                out.append(os.path.join(log_dir, name))
+    except OSError:
+        pass
+    return out
+
+
+def find_crashed_sessions(log_dir: str, own_pid: int | None = None,
+                          own_flag_path: str | None = None) -> list[str]:
+    """STAB-06: Pfade der Running-Flags, deren Prozess nicht mehr lebt -> jeweils
+    eine NICHT sauber beendete Vorsitzung.
+
+    Per-PID-Flags (statt einer globalen Flag) machen die Erkennung
+    multi-instanz-sicher: eine zweite Instanz ueberschreibt/loescht die Flag der
+    ersten nicht mehr, und eine PARALLEL laufende Instanz wird ueber den
+    Liveness-Check NICHT faelschlich als Absturz gemeldet.
+
+    ``own_flag_path`` (der eigene per-PID-Flag-Pfad): Diese Funktion laeuft VOR
+    ``mark_running``, die eigene Flag existiert also normal noch nicht. Liegt unter
+    diesem EXAKTEN Pfad dennoch eine Flag, hat das OS uns die PID einer abgestuerzten
+    Vorsitzung neu vergeben (PID-Reuse) -> als Absturz melden. Eine Liveness-Pruefung
+    saehe hier nur UNS selbst als lebend und wuerde den Absturz sonst verschlucken."""
+    own = os.getpid() if own_pid is None else int(own_pid)
+    own_norm = (os.path.normcase(os.path.abspath(own_flag_path))
+                if own_flag_path else None)
+    crashed: list[str] = []
+    for path in find_running_flags(log_dir):
+        if own_norm is not None and os.path.normcase(os.path.abspath(path)) == own_norm:
+            # PID-Reuse-Leftover unter dem eigenen Pfad (s.o.) -> Absturz.
+            crashed.append(path)
+            continue
+        pid = read_flag_pid(path)
+        if pid is None:
+            # Unlesbare/leere (Legacy-)Flag -> als abgestuerzt werten, damit kein
+            # Crash verschluckt wird.
+            crashed.append(path)
+            continue
+        if pid == own:
+            # Gleiche PID, aber NICHT die eigene Flag-Datei (per-PID unmoeglich;
+            # nur eine Legacy-Koinzidenz) -> wir leben, also kein Crash.
+            continue
+        if not pid_is_alive(pid):
+            crashed.append(path)
+    return crashed

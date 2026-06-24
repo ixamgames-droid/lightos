@@ -1975,6 +1975,14 @@ function setViewMode(mode) {
     if (f.icon) f.icon.visible = (viewMode === '2D');
     // Hide beam cones in 2D
     if (f.beam) f.beam.visible = (viewMode === '3D') && settings.showCones && f.beam.material.opacity > 0.01;
+    // VIZ-03: Laser-Faecher-Sichtbarkeit am View-Wechsel ebenfalls neu setzen —
+    // sonst bleibt sie auf dem letzten (2D-)Stand 'false' kleben, bis das naechste
+    // DMX-Update updateFixture() erneut durchlaeuft.
+    if (f.laserBeams) {
+      for (const bm of f.laserBeams) {
+        if (bm.material) bm.visible = (viewMode === '3D') && settings.showCones && bm.material.opacity > 0.01;
+      }
+    }
   }
   // Hide preset 3D scenery in 2D top-down to reduce clutter
   presetObjects.forEach(o => {
@@ -3251,6 +3259,9 @@ function applySettings(s) {
     const f = fixtures[fid];
     if (f.beam) f.beam.visible = settings.showCones && (viewMode === '3D') && f.beam.material.opacity > 0.01;
     if (f.floorSpot) f.floorSpot.visible = settings.showFloorSpots && f.floorSpot.material.opacity > 0.01;
+    // VIZ-03: Laser-Faecher analog zu beam/floorSpot neu setzen (z. B. nach
+    // showCones-Toggle), nicht erst beim naechsten DMX-Update.
+    if (f.laserBeams) for (const bm of f.laserBeams) { if (bm.material) bm.visible = settings.showCones && (viewMode === '3D') && bm.material.opacity > 0.01; }
   }
 }
 
@@ -3332,6 +3343,15 @@ function pushTransformsToPython() {
     const f = fixtures[fid];
     if (!f) continue;
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    // VIZ-02: Ausrichten/Verteilen positioniert das Geraet FREI um. Eine noch
+    // bestehende Andock-Bindung wuerde es beim naechsten Bewegen des
+    // Buehnenelements zurueckspringen lassen -> Dock loesen (wie am Drag-Ende).
+    if (f.dockedTo) {
+      f.dockedTo = null;
+      if (bridge && bridge.fixtureDockChanged) {
+        try { bridge.fixtureDockChanged(String(fid), ''); } catch (err) {}
+      }
+    }
     if (bridge && bridge.fixturePositionChanged) {
       try {
         bridge.fixturePositionChanged(String(fid), f.group.position.x, f.group.position.y, f.group.position.z);

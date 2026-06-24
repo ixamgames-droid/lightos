@@ -162,5 +162,79 @@ class TestOutputManagerStopSafety(unittest.TestCase):
         self.assertFalse(dev.closed, "zweites stop() darf nicht erneut schliessen")
 
 
+class TestOutputManagerThreadTimeoutTracking(unittest.TestCase):
+    """STAB-04: Endet der Output-Thread beim stop() nicht im Join-Timeout
+    (haengender Treiber), wurde die Referenz frueher trotzdem auf None gesetzt.
+    Ein folgender start() startete dann einen ZWEITEN Thread daneben -> zwei
+    Threads schreiben gleichzeitig seriell (konkurrierende Writes / Access
+    Violation, Folgebug aus STAB-02). Diese Tests sichern: Referenz bleibt
+    erhalten, kein zweiter Thread, und nach echtem Thread-Ende wieder ein frischer.
+    """
+
+    @staticmethod
+    def _hanging_thread(started: threading.Event, release: threading.Event):
+        def hang():
+            started.set()
+            release.wait(3.0)   # ignoriert _running -> Join laeuft in den Timeout
+        return threading.Thread(target=hang, daemon=True, name="DMX-Output")
+
+    def test_timeout_keeps_thread_reference(self):
+        om = OutputManager()
+        om._stop_join_s = 0.05
+        started, release = threading.Event(), threading.Event()
+        om._thread = self._hanging_thread(started, release)
+        om._running = True
+        om._thread.start()
+        self.assertTrue(started.wait(1.0))
+        t1 = om._thread
+        om.stop()                       # Join timeoutet -> Thread lebt noch
+        self.assertTrue(t1.is_alive(), "Testvoraussetzung: Thread haengt noch")
+        self.assertIs(om._thread, t1,
+                      "STAB-04: Referenz auf den noch lebenden Thread muss erhalten bleiben")
+        release.set()
+        t1.join(timeout=3.0)
+
+    def test_start_does_not_spawn_second_thread_while_old_alive(self):
+        om = OutputManager()
+        om._stop_join_s = 0.05
+        started, release = threading.Event(), threading.Event()
+        om._thread = self._hanging_thread(started, release)
+        om._running = True
+        om._thread.start()
+        self.assertTrue(started.wait(1.0))
+        t1 = om._thread
+        om.stop()                       # Timeout -> t1 lebt weiter
+        self.assertTrue(t1.is_alive())
+        om.start()                      # darf KEINEN zweiten Thread starten
+        self.assertIs(om._thread, t1,
+                      "STAB-04: kein zweiter DMX-Thread neben dem haengenden")
+        self.assertTrue(om._running,
+                        "noch lebender Thread wird reaktiviert (_running=True)")
+        release.set()
+        t1.join(timeout=3.0)
+
+    def test_start_spawns_fresh_after_old_thread_died(self):
+        om = OutputManager()
+        om._stop_join_s = 0.05
+        started, release = threading.Event(), threading.Event()
+        om._thread = self._hanging_thread(started, release)
+        om._running = True
+        om._thread.start()
+        self.assertTrue(started.wait(1.0))
+        t1 = om._thread
+        om.stop()                       # Timeout, t1 lebt
+        release.set()
+        t1.join(timeout=3.0)
+        self.assertFalse(t1.is_alive())
+        om.start()                      # alter Thread tot -> frischer Thread
+        try:
+            self.assertIsNotNone(om._thread)
+            self.assertIsNot(om._thread, t1,
+                             "nach Thread-Ende startet start() einen frischen Thread")
+            self.assertTrue(om._thread.is_alive())
+        finally:
+            om.stop()
+
+
 if __name__ == "__main__":
     unittest.main()

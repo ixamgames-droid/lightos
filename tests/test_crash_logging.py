@@ -6,6 +6,7 @@ Freeze-/Standby-Klassifikation, Exception-Signatur + Sturm-Drossel und die
 "zuletzt lebendig"/Running-Flag-Mechanik.
 """
 import datetime
+import io
 import os
 import tempfile
 import unittest
@@ -164,6 +165,126 @@ class LivenessTest(unittest.TestCase):
             cl.clear_running(flag)                      # sauberer Exit.
             self.assertFalse(os.path.exists(flag))
             cl.clear_running(flag)                      # doppelt -> kein Fehler.
+
+
+class FinalizeExitTest(unittest.TestCase):
+    """STAB-05: finalize_exit schreibt nur bei SAUBEREM Exit den Clean-Marker und
+    entfernt die Running-Flag. Nach einer fatalen Exception bleibt die Flag liegen
+    (Absturz beim naechsten Start erkennbar) und der Crash-Marker wird geschrieben."""
+
+    def test_clean_exit_marks_clean_and_clears_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_123.flag")
+            cl.mark_running(flag)
+            buf = io.StringIO()
+            cl.finalize_exit(buf, flag, had_fatal=False)
+            self.assertIn("sauberer Exit", buf.getvalue())
+            self.assertNotIn("ABGESTUERZT", buf.getvalue())
+            self.assertFalse(os.path.exists(flag), "sauberer Exit -> Flag entfernt")
+
+    def test_fatal_exit_marks_crash_and_keeps_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_123.flag")
+            cl.mark_running(flag)
+            buf = io.StringIO()
+            cl.finalize_exit(buf, flag, had_fatal=True)
+            self.assertIn("ABGESTUERZT", buf.getvalue())
+            self.assertNotIn("sauberer Exit", buf.getvalue())
+            self.assertTrue(os.path.exists(flag),
+                            "fataler Exit -> Flag BLEIBT (naechster Start erkennt Absturz)")
+
+    def test_handle_none_is_safe(self):
+        """Fehlt das Log-Handle (Setup-Fehler), darf finalize_exit nicht crashen;
+        die Flag-Logik greift trotzdem."""
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_9.flag")
+            cl.mark_running(flag)
+            cl.finalize_exit(None, flag, had_fatal=False)
+            self.assertFalse(os.path.exists(flag))
+
+
+class PerPidFlagTest(unittest.TestCase):
+    """STAB-06: per-PID-Running-Flags + Liveness machen die Crash-Erkennung
+    multi-instanz-sicher (keine globale Flag, die eine 2. Instanz ueberschreibt/
+    loescht; laufende Parallel-Instanzen werden NICHT als Absturz gemeldet)."""
+
+    @staticmethod
+    def _dead_pid() -> int:
+        """Eine PID, deren Prozess garantiert beendet ist."""
+        import subprocess
+        import sys
+        p = subprocess.Popen([sys.executable, "-c", "pass"])
+        p.wait()                       # Kind beendet (+ unter POSIX reaped)
+        return p.pid
+
+    def test_pid_is_alive_for_self(self):
+        self.assertTrue(cl.pid_is_alive(os.getpid()))
+
+    def test_pid_is_alive_false_for_dead_process(self):
+        self.assertFalse(cl.pid_is_alive(self._dead_pid()))
+
+    def test_pid_is_alive_rejects_garbage(self):
+        self.assertFalse(cl.pid_is_alive(None))
+        self.assertFalse(cl.pid_is_alive(-1))
+        self.assertFalse(cl.pid_is_alive("nope"))
+
+    def test_read_flag_pid_round_trip(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(flag)
+            self.assertEqual(cl.read_flag_pid(flag), os.getpid())
+            self.assertIsNone(cl.read_flag_pid(os.path.join(td, "fehlt.flag")))
+
+    def test_find_running_flags_matches_perpid_and_legacy(self):
+        with tempfile.TemporaryDirectory() as td:
+            cl.mark_running(os.path.join(td, "lightos_running_111.flag"))
+            cl.mark_running(os.path.join(td, "lightos_running.flag"))  # Legacy
+            with open(os.path.join(td, "andere.txt"), "w", encoding="utf-8") as f:
+                f.write("x")
+            found = {os.path.basename(p) for p in cl.find_running_flags(td)}
+            self.assertEqual(found, {"lightos_running_111.flag", "lightos_running.flag"})
+
+    def test_find_crashed_sessions_reports_dead_skips_self_and_alive(self):
+        with tempfile.TemporaryDirectory() as td:
+            # eigene (lebende) Flag -> NICHT als Crash melden
+            own = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own)
+            # tote Vorsitzung -> ALS Crash melden
+            dead_pid = self._dead_pid()
+            dead = os.path.join(td, f"lightos_running_{dead_pid}.flag")
+            with open(dead, "w", encoding="utf-8") as f:
+                f.write(str(dead_pid))
+            crashed = cl.find_crashed_sessions(td, own_pid=os.getpid())
+            self.assertIn(dead, crashed)
+            self.assertNotIn(own, crashed)
+
+    def test_find_crashed_sessions_reports_unreadable_legacy_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            legacy = os.path.join(td, "lightos_running.flag")
+            with open(legacy, "w", encoding="utf-8") as f:
+                f.write("")            # leer/unlesbare PID -> als Absturz werten
+            self.assertIn(legacy, cl.find_crashed_sessions(td, own_pid=os.getpid()))
+
+    def test_find_crashed_sessions_reports_pid_reuse_leftover(self):
+        """PID-Reuse: Liegt unter dem EIGENEN per-PID-Flag-Pfad beim Start (vor
+        mark_running) schon eine Flag, ist es die STALE Crash-Flag einer
+        Vorsitzung, deren PID das OS uns neu vergeben hat -> trotz 'lebt' (= wir)
+        als Absturz melden (sonst der Befund, den die Review fand)."""
+        with tempfile.TemporaryDirectory() as td:
+            own_flag = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own_flag)              # simuliert das Reuse-Leftover
+            crashed = cl.find_crashed_sessions(
+                td, own_pid=os.getpid(), own_flag_path=own_flag)
+            self.assertIn(own_flag, crashed,
+                          "Reuse-Leftover unter eigenem Pfad muss als Absturz gelten")
+
+    def test_find_crashed_sessions_without_own_path_skips_live_self(self):
+        """Ohne own_flag_path bleibt das alte Verhalten: die eigene LEBENDE
+        PID-Flag wird NICHT als Absturz gemeldet (Liveness/own_pid)."""
+        with tempfile.TemporaryDirectory() as td:
+            own = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own)
+            self.assertNotIn(own, cl.find_crashed_sessions(td, own_pid=os.getpid()))
 
 
 if __name__ == "__main__":
