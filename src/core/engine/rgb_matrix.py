@@ -469,7 +469,12 @@ class RgbMatrixInstance(Function):
 
     def tick(self) -> dict[int, dict[str, int]]:
         """Nur fuer die Vorschau (zeitbasiert via monotonic). Treibt _step voran
-        und liefert {fid: {color_r/g/b}}. Der echte Output laeuft ueber write()."""
+        und liefert {fid: {color_r/g/b}}. Der echte Output laeuft ueber write().
+
+        Achtung: liefert IMMER rohe color_r/g/b — die Style-Kanalmaske (write()
+        schreibt bei DIMMER/SHUTTER intensity/shutter statt Farbe) wird hier NICHT
+        beruecksichtigt. Wer style-aware Pixel braucht, nutzt preview_pixels()
+        (style-gemappte Graustufen)."""
         if not self._running or not self.fixture_grid:
             return {}
         now = time.monotonic()

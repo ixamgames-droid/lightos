@@ -27,9 +27,12 @@ class _DemoGrid(QWidget):
         )
 
     def refresh(self):
-        # tick() treibt den internen Schritt voran; _generate() liefert die Pixel.
+        # tick() treibt den internen Schritt voran; preview_pixels() liefert die
+        # STYLE-AWARE Pixel (RGB/RGBW roh, DIMMER/SHUTTER als Graustufen) — sonst
+        # zeigte die Mini-Vorschau fuer Dimmer-/Shutter-Matrizen bunte Farben,
+        # waehrend Hauptvorschau UND echter Output Graustufen liefern.
         self._inst.tick()
-        self._grid = self._inst._generate()
+        self._grid = self._inst.preview_pixels()
         self.update()
 
     def paintEvent(self, _event):
