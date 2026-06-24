@@ -1442,13 +1442,18 @@ class VCCanvas(QWidget):
         if isinstance(widget, VCFrame):
             return
         center_canvas = self.mapFromGlobal(widget.mapToGlobal(widget.rect().center()))
+        # FRM-03: Ziel-Frame NUR unter den auf der aktiven Bank sichtbaren Frames
+        # suchen. Frames anderer Baenke liegen (unsichtbar) an derselben Geometrie —
+        # ohne diesen Filter gewann immer das zuerst erstellte (= Bank 1), egal auf
+        # welcher Bank man wirklich ablegt. Bei Ueberlappung auf DERSELBEN Bank das
+        # OBERSTE waehlen: kein `break`, der letzte Treffer in der Kind-/Stapel-
+        # reihenfolge liegt zuoberst (raise_() haengt das Widget hinten an).
         target = None
         for f in self.findChildren(VCFrame, options=Qt.FindChildOption.FindDirectChildrenOnly):
-            if f is widget:
+            if f is widget or not self.on_active_bank(f):
                 continue
             if f.geometry().contains(center_canvas):
                 target = f
-                break
         parent = widget.parent()
         grid = self.GRID if self._snap_to_grid else 0
 
