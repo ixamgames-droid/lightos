@@ -1203,6 +1203,18 @@ class EfxView(QWidget):
         ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
         sodass die Geraete-Zuweisung korrekt ist. Spiegelt
         rgb_matrix_view._sync_follow_selection."""
+        # WURZEL-FIX (2026-06-24): Follow-Assignment NUR, waehrend diese
+        # eingebettete EFX-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
+        # eine Auswahländerung in einem ANDEREN Tab (z. B. Virtual Console) die
+        # Geraeteliste der gespielten EFX im Hintergrund ueberschreiben/leeren
+        # (self._current.fixtures = Auswahl) -> der per VC getriggerte Effekt liefe
+        # stumm. Beim Sichtbarwerden holt showEvent den Sync nach. War die wahre
+        # Wurzel hinter #45/#50 (dort nur Symptom sichtbar gemacht/abgefangen).
+        try:
+            if not self.isVisible():
+                return
+        except Exception:
+            pass
         try:
             # Gefilterte Liste neu aufbauen (setzt _current auf eine EFX der Gruppe).
             self._rebuild_from_state()
