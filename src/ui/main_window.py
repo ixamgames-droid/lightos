@@ -336,6 +336,18 @@ class MainWindow(QMainWindow):
         a = pm.addAction("Snapshot aufnehmen")
         a.setShortcut("Ctrl+Shift+S")
         a.triggered.connect(self._quick_snapshot)
+        pm.addSeparator()
+        # Strikte Trennung Farbe/Dimmer: ist der Schalter AUS, macht eine reine Farbe
+        # den Dimmer NICHT automatisch auf (Helligkeit kommt nur aus Dimmer-Snaps/
+        # -Effekten/Mastern). AN = altes Verhalten "Farbe heisst sichtbar" (4a²).
+        self._act_implicit = pm.addAction("Farbe macht automatisch hell")
+        self._act_implicit.setCheckable(True)
+        self._act_implicit.setToolTip(
+            "AN: eine gesetzte Farbe ohne eigenen Dimmer wird automatisch sichtbar "
+            "(Dimmer auf voll).\nAUS (Standard): strikte Trennung — Farbe setzt nur "
+            "Farbe, Helligkeit kommt aus Dimmer-Snaps/-Effekten/Master.")
+        self._act_implicit.setChecked(bool(getattr(self._state, "implicit_brightness", False)))
+        self._act_implicit.toggled.connect(self._on_toggle_implicit_brightness)
 
         # Datenbank
         dbm = mb.addMenu("&Datenbank")
@@ -1047,6 +1059,28 @@ class MainWindow(QMainWindow):
         if pv and hasattr(pv, "_paste_from_clipboard"):
             pv._paste_from_clipboard()
 
+    def _on_toggle_implicit_brightness(self, checked: bool):
+        """Schaltet die implizite Grundhelligkeit (4a²) um. AUS = strikte Trennung
+        Farbe/Dimmer: eine reine Farbe macht den Dimmer NICHT automatisch auf. Der
+        Renderer liest das Flag live pro Frame, die Aenderung greift also sofort."""
+        self._state.implicit_brightness = bool(checked)
+        msg = ("Farbe macht automatisch hell: AN"
+               if checked else
+               "Strikte Trennung Farbe/Dimmer: AN (Farbe macht NICHT automatisch hell)")
+        try:
+            self.statusBar().showMessage(msg, 4000)
+        except Exception:
+            pass
+
+    def _sync_render_toggles(self):
+        """Spiegelt zustands-abhaengige Menue-Schalter nach Laden/Neue-Show wider
+        (ohne erneut das toggled-Signal auszuloesen)."""
+        act = getattr(self, "_act_implicit", None)
+        if act is not None:
+            act.blockSignals(True)
+            act.setChecked(bool(getattr(self._state, "implicit_brightness", False)))
+            act.blockSignals(False)
+
     # ── Validation-Banner (Section-Bar) ───────────────────────────────────────
 
     def _refresh_validation_banner(self):
@@ -1246,6 +1280,7 @@ class MainWindow(QMainWindow):
             reset_show()
             self._current_show_path = None
             self.setWindowTitle("LightOS")
+            self._sync_render_toggles()
 
     def _open_show(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1264,6 +1299,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(msg, 4000)
             _add_recent_file(path)
             self._rebuild_recent_menu()
+            self._sync_render_toggles()
         else:
             QMessageBox.warning(self, "Fehler", msg)
 

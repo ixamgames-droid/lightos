@@ -102,8 +102,11 @@ class AppState:
         # Implizite Grundhelligkeit (4a²): True = eine aktive Farbe ohne getriebenen
         # Dimmer wird auf voll gesetzt ("Farbe heisst sichtbar"). False = strikte
         # Trennung Farbe ↔ Dimmer (reine Farbe bleibt dunkel; Helligkeit kommt NUR
-        # aus Dimmer-Effekten/Mastern). Mit der Show gespeichert.
-        self.implicit_brightness: bool = True
+        # aus Dimmer-Effekten/Mastern/-Snaps). Mit der Show gespeichert und per
+        # Menue-Schalter umschaltbar. Default seit 2026-06-24: False (strikte
+        # Trennung) — ein Farb-Snap soll den Dimmer NICHT mehr selbst hochziehen.
+        # Alt-Shows ohne den Schluessel laden weiter mit True (Look bleibt erhalten).
+        self.implicit_brightness: bool = False
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)

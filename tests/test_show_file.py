@@ -322,6 +322,36 @@ class ShowFileTests(unittest.TestCase):
                              {2: {"intensity": 255}, 3: {"intensity": 200}})
             self.assertGreaterEqual(self.state.render_rebuilds, 1)
 
+    def test_implicit_brightness_roundtrip(self):
+        """implicit_brightness wird gespeichert und beim Laden exakt (beide
+        Richtungen) wiederhergestellt — der Schalter ueberlebt Save/Load."""
+        for saved in (False, True):
+            self.state.implicit_brightness = saved
+            with tempfile.TemporaryDirectory() as td:
+                path = os.path.join(td, "ib.lshow")
+                self.show_file.save_show(path)
+                with zipfile.ZipFile(path, "r") as zf:
+                    data = json.loads(zf.read("show.json").decode("utf-8"))
+                self.assertEqual(data["implicit_brightness"], saved)
+                self.state.implicit_brightness = not saved   # vor dem Laden verschmutzen
+                ok, msg = self.show_file.load_show(path)
+                self.assertTrue(ok, msg)
+                self.assertEqual(self.state.implicit_brightness, saved)
+
+    def test_load_legacy_show_without_key_keeps_implicit_on(self):
+        """Alt-Show OHNE implicit_brightness-Schluessel laedt mit True — der Look
+        bestehender Shows bleibt erhalten; nur NEUE Shows starten strikt getrennt."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "legacy_ib.lshow")
+            payload = {"version": "1.1", "name": "Legacy", "patch": [],
+                       "functions": {"functions": []}}
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("show.json", json.dumps(payload))
+            self.state.implicit_brightness = False   # verschmutzen
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+            self.assertTrue(self.state.implicit_brightness)
+
     def test_load_legacy_patch_schema(self):
         legacy_payload = {
             "version": "1.0",
@@ -484,6 +514,8 @@ class ResetGroupsTest(unittest.TestCase):
         # Weitere Reset-Zustaende pruefen
         self.assertEqual(self.state.programmer, {})
         self.assertEqual(self.state.live_view_positions, {})
+        # Neue Show startet strikt getrennt (Farbe macht Dimmer NICHT auf).
+        self.assertFalse(self.state.implicit_brightness)
 
     def test_reset_show_zeroes_universes(self):
         """Nach reset_show() muessen alle DMX-Universe-Puffer auf 0 stehen, damit
