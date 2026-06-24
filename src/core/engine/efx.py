@@ -66,6 +66,34 @@ def _find_fixture(patch_cache, fid):
     return None
 
 
+def advance_phase(phase: float, bounce_dir: float, delta: float,
+                  direction: str, loop: bool) -> tuple[float, float]:
+    """Schreibt eine 0..1-Phase um ``delta`` fort, gibt ``(phase, bounce_dir)``
+    zurueck. EINE Quelle der Richtungs-/Bounce-Logik fuer ``EfxInstance._advance``
+    UND die Vorschau-Widgets (``efx_view``), damit Vorschau und echte Bewegung
+    IDENTISCH sind — inklusive One-Shot-Bounce: einmal hin und zurueck, dann HALTEN
+    (``bounce_dir`` -> 0), statt in der Vorschau endlos weiterzuschwingen.
+    RANDOM und Bus-Sync behandelt der Aufrufer separat (vor diesem Aufruf)."""
+    if not loop and direction != "bounce":
+        # One-Shot (Loop aus): Phase klemmt am Ende, Position wird gehalten.
+        if direction == "backward":
+            return max(0.0, phase - delta), bounce_dir
+        return min(1.0, phase + delta), bounce_dir
+    if direction == "backward":
+        return (phase - delta) % 1.0, bounce_dir
+    if direction == "bounce":
+        if bounce_dir == 0.0 and loop:
+            bounce_dir = 1.0  # nach beendetem One-Shot wieder loopen
+        phase += delta * bounce_dir
+        if phase >= 1.0:
+            return 1.0, -1.0
+        if phase <= 0.0:
+            # One-Shot-Bounce: einmal hin und zurueck, dann halten.
+            return 0.0, (1.0 if loop else 0.0)
+        return phase, bounce_dir
+    return (phase + delta) % 1.0, bounce_dir
+
+
 class EfxInstance(Function):
     """EFX-Bewegung als echte Funktion.
 
@@ -295,31 +323,9 @@ class EfxInstance(Function):
             # Walk durch eine unendliche Zufalls-Wegpunkt-Sequenz.
             self._rand_progress += (-delta if self.direction == "backward" else delta)
             return
-        if not self.loop and self.direction != "bounce":
-            # One-Shot (Loop aus): Phase klemmt am Ende, Position wird gehalten.
-            if self.direction == "backward":
-                self._phase = max(0.0, self._phase - delta)
-            else:
-                self._phase = min(1.0, self._phase + delta)
-            return
-        if self.direction == "backward":
-            self._phase = (self._phase - delta) % 1.0
-        elif self.direction == "bounce":
-            if self._bounce_dir == 0.0 and self.loop:
-                self._bounce_dir = 1.0  # nach beendetem One-Shot wieder loopen
-            # Kein Modulo: an den Umkehrpunkten wird geklemmt. Frueher lief
-            # nach dem Klemmen auf 1.0 noch "%= 1.0" -> Phase sprang auf 0.0
-            # und der Bounce wurde zum Saegezahn (sichtbarer Sprung).
-            self._phase += delta * self._bounce_dir
-            if self._phase >= 1.0:
-                self._phase = 1.0
-                self._bounce_dir = -1.0
-            elif self._phase <= 0.0:
-                self._phase = 0.0
-                # One-Shot-Bounce: einmal hin und zurueck, dann halten.
-                self._bounce_dir = 1.0 if self.loop else 0.0
-        else:
-            self._phase = (self._phase + delta) % 1.0
+        # Richtungs-/Bounce-Logik zentral (eine Quelle, identisch zur Vorschau):
+        self._phase, self._bounce_dir = advance_phase(
+            self._phase, self._bounce_dir, delta, self.direction, self.loop)
 
     def _fan_for(self, i: int, n: int) -> float:
         """Phasen-Versatz (0..) des i-ten Geraets gemaess Geraete-Verhaeltnis

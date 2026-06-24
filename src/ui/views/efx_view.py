@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QSizePolicy, QScrollArea, QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
-from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture
+from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
 # NUR fuer die Anzeige (Vorschau-Statuszeile) — der gespeicherte Wert bleibt
@@ -88,27 +88,12 @@ class EfxPreviewWidget(QWidget):
         except (TypeError, ValueError):
             speed = 1.0
         delta = e.speed_hz * speed * 0.04
-        # E3: One-Shot (Loop aus) — Phase klemmt am Ende wie in EfxInstance._advance,
-        # statt in der Vorschau endlos weiterzulaufen (bounce loopt weiterhin).
-        if not getattr(e, "loop", True) and e.direction != "bounce":
-            if e.direction == "backward":
-                self._phase = max(0.0, self._phase - delta)
-            else:
-                self._phase = min(1.0, self._phase + delta)
-            self.update()
-            return
-        if e.direction == "backward":
-            self._phase = (self._phase - delta) % 1.0
-        elif e.direction == "bounce":
-            self._phase += delta * self._bounce_dir
-            if self._phase >= 1.0:
-                self._phase = 1.0
-                self._bounce_dir = -1.0
-            elif self._phase <= 0.0:
-                self._phase = 0.0
-                self._bounce_dir = 1.0
-        else:
-            self._phase = (self._phase + delta) % 1.0
+        # Phasenfortschreibung zentral (eine Quelle mit EfxInstance._advance) —
+        # inkl. One-Shot-Bounce-Halten: frueher loopte der Bounce in der Vorschau
+        # endlos weiter, waehrend die Engine am Endpunkt haelt (Befund [33]).
+        self._phase, self._bounce_dir = advance_phase(
+            self._phase, self._bounce_dir, delta, e.direction,
+            bool(getattr(e, "loop", True)))
         self.update()
 
     # ── Geometrie-Helfer ─────────────────────────────────────────────────────
@@ -399,23 +384,11 @@ class SpiderEfxPreview(QWidget):
         except (TypeError, ValueError):
             speed = 1.0
         delta = e.speed_hz * speed * 0.04
-        if not getattr(e, "loop", True) and e.direction != "bounce":
-            if e.direction == "backward":
-                self._phase = max(0.0, self._phase - delta)
-            else:
-                self._phase = min(1.0, self._phase + delta)
-        elif e.direction == "backward":
-            self._phase = (self._phase - delta) % 1.0
-        elif e.direction == "bounce":
-            self._phase += delta * self._bounce_dir
-            if self._phase >= 1.0:
-                self._phase = 1.0
-                self._bounce_dir = -1.0
-            elif self._phase <= 0.0:
-                self._phase = 0.0
-                self._bounce_dir = 1.0
-        else:
-            self._phase = (self._phase + delta) % 1.0
+        # Phasenfortschreibung zentral (eine Quelle mit EfxInstance._advance),
+        # inkl. One-Shot-Bounce-Halten (Befund [33]).
+        self._phase, self._bounce_dir = advance_phase(
+            self._phase, self._bounce_dir, delta, e.direction,
+            bool(getattr(e, "loop", True)))
         self._update_bars()
 
     def _update_bars(self):
