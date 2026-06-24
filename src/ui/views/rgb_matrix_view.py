@@ -1186,6 +1186,18 @@ class RgbMatrixView(QWidget):
         umgeschrieben. Die Liste zeigt nur Matrizen der aktiven Gruppe (+ ungebundene);
         die ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
         sodass die Grid-Uebernahme korrekt ist."""
+        # WURZEL-FIX (2026-06-24): Follow-Grid-Uebernahme NUR, waehrend diese
+        # eingebettete Matrix-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
+        # eine Auswahländerung in einem ANDEREN Tab (z. B. Virtual Console) das
+        # fixture_grid der gespielten Matrix im Hintergrund ueberschreiben/leeren
+        # (_assign_from_selection setzt _current.fixture_grid = Auswahl/Gruppe) ->
+        # eine per VC getriggerte RGB-Matrix verloere ihr Grid. Beim Sichtbarwerden
+        # holt showEvent den Sync nach. Spiegelt efx_view._sync_follow_selection.
+        try:
+            if not self.isVisible():
+                return
+        except Exception:
+            pass
         try:
             # Gefilterte Liste neu aufbauen (setzt _saved auf eine Matrix der Gruppe).
             self._rebuild_from_state()
