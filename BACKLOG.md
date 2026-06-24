@@ -32,6 +32,8 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 | UI-03  | P2 | todo | Fixture-Kopieren mit Offset | Mehrere Geräte mit Adress-Abstand patchen; Dialog (Anzahl + Offset) + Test |
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
 | OUT-02 | P2 | todo | Enttec Open DMX USB Stabilisierung | Kein Drift/Hang über lange Sessions (>8h); Reconnect-Logik; Doku |
+| UI-10 | P3 | todo | EFX-Vorschau: RANDOM als Live-Walk statt geschlossener Schleife | `ui/views/efx_view.py` — RANDOM zeichnet den `_calc`-8-Wegpunkt-Loop; die Engine fährt einen endlosen `_random_xy`-Walk (dekorreliert über `i*1.7*spread`, Counter-Sign). Fix: Vorschau-Punkte/Pfad über `_random_xy(progress+offs)` wie `EfxInstance._values`; eigener `_rand_progress`-Akkumulator (beide Vorschau-Widgets). **Rein visuell → Sichtprüfung in laufender App nötig.** (Programmer-Audit 2026-06-23, [18]) |
+| UI-11 | P3 | todo | EFX-Vorschau-Fan-Fallback `phase_mode` beachten | `ui/views/efx_view.py` — der except-Fallback der Fan-Berechnung nutzt `(i/n)*spread` und ignoriert `phase_mode` (sync/offset) → bei einem `_fan_for`-Fehler falsches Vorschaubild. Fix: Fallback an Semantik anpassen (sync→0, offset→Gradversatz) oder try/except entfernen. (Programmer-Audit 2026-06-23, [34]) |
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
