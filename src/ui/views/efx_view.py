@@ -1733,26 +1733,13 @@ class EfxView(QWidget):
         """fids aller beweglichen Geraete (Moving Heads mit Pan UND Tilt oder
         Dual-Tilt-Spider). ``restrict_fids`` (z. B. die aktuelle Auswahl) grenzt
         ein und BEWAHRT deren Reihenfolge (wichtig fuer Fan/Spread); sonst alle
-        gepatchten in Patch-Reihenfolge."""
+        gepatchten in Patch-Reihenfolge. Delegiert an ``app_state.mover_fids`` —
+        EINE Quelle fuer Editor UND VC-Auto-Assign (sonst Drift)."""
         try:
-            from src.core.app_state import (get_state, get_channels_for_patched,
-                                            is_dual_tilt_fixture)
-            patched = {f.fid: f for f in get_state().get_patched_fixtures()}
+            from src.core.app_state import mover_fids
+            return mover_fids(restrict_fids)
         except Exception:
             return []
-        if restrict_fids is not None:
-            seq = [patched[int(f)] for f in restrict_fids if int(f) in patched]
-        else:
-            seq = list(patched.values())
-        movers: list[int] = []
-        for fx in seq:
-            try:
-                attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
-            except Exception:
-                continue
-            if ("pan" in attrs and "tilt" in attrs) or is_dual_tilt_fixture(fx):
-                movers.append(fx.fid)
-        return movers
 
     def _selected_movers(self) -> list[int]:
         """Bewegliche Geraete in der aktuellen Auswahl (leer, wenn nichts/keine
