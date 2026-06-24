@@ -289,6 +289,113 @@ class ColorSequence:
         return seq
 
 
+class DimmerSequence:
+    """Geordnete, live-editierbare Dimmerwert-Liste — das Pendant zu
+    :class:`ColorSequence` fuer den Dimmer-Style (ENG-08).
+
+    Jeder Eintrag ist ``[level, enabled]`` mit ``level`` 0..255. Deaktivierte
+    Stufen werden von der Sequenz **uebersprungen**, bleiben aber erhalten
+    (Live-Toggle). ``active_index`` = aktuell ausgewaehlte Stufe (fuer
+    next/prev/selected). So kann ein Dimmer-Chase pro Runde durch beliebig
+    viele *explizite* Helligkeitswerte schalten (z. B. 255, 50, 100) — genau
+    wie die Farbauswahl bei einer Color-Matrix, nur mit Dimmerwerten.
+    """
+    __slots__ = ("entries", "active_index")
+
+    def __init__(self, levels=None):
+        self.entries: list[list] = []
+        for v in (levels or []):
+            self.add(v)
+        self.active_index = 0
+
+    # ── Editieren ──────────────────────────────────────────────────────────
+    def add(self, level, enabled: bool = True, index: int | None = None) -> int:
+        entry = [_clamp8(level), bool(enabled)]
+        if index is None or index >= len(self.entries):
+            self.entries.append(entry)
+        else:
+            self.entries.insert(max(0, index), entry)
+        return len(self.entries) - 1
+
+    def remove(self, index: int):
+        if 0 <= index < len(self.entries):
+            self.entries.pop(index)
+            if self.active_index >= len(self.entries):
+                self.active_index = max(0, len(self.entries) - 1)
+
+    def toggle(self, index: int):
+        if 0 <= index < len(self.entries):
+            self.entries[index][1] = not self.entries[index][1]
+
+    def set_enabled(self, index: int, on: bool):
+        if 0 <= index < len(self.entries):
+            self.entries[index][1] = bool(on)
+
+    def set_level(self, index: int, level):
+        if 0 <= index < len(self.entries):
+            self.entries[index][0] = _clamp8(level)
+
+    def move(self, src: int, dst: int):
+        if 0 <= src < len(self.entries) and 0 <= dst < len(self.entries):
+            e = self.entries.pop(src)
+            self.entries.insert(dst, e)
+
+    # ── Lesen ──────────────────────────────────────────────────────────────
+    def level_at(self, index: int, default: int = 0) -> int:
+        """Stufe an Position ``index``. Out-of-range faellt graceful auf die
+        letzte vorhandene Stufe zurueck."""
+        if 0 <= index < len(self.entries):
+            return self.entries[index][0]
+        if self.entries:
+            return self.entries[-1][0] if index >= 0 else self.entries[0][0]
+        return default
+
+    def enabled_levels(self) -> list[int]:
+        """Nur aktive Stufen (fuer die Runden-Sequenz). Garantiert mind. 1."""
+        out = [v for v, on in self.entries if on]
+        if out:
+            return out
+        if self.entries:
+            return [self.entries[0][0]]
+        return [255]
+
+    def all_levels(self) -> list[int]:
+        return [v for v, _on in self.entries]
+
+    def selected(self, default: int = 255) -> int:
+        return self.level_at(self.active_index, default)
+
+    def next(self) -> int:
+        if self.entries:
+            self.active_index = (self.active_index + 1) % len(self.entries)
+        return self.active_index
+
+    def prev(self) -> int:
+        if self.entries:
+            self.active_index = (self.active_index - 1) % len(self.entries)
+        return self.active_index
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    # ── Persistenz ───────────────────────────────────────────────────────────
+    def to_list(self) -> list:
+        return [{"level": int(v), "on": bool(on)} for v, on in self.entries]
+
+    @classmethod
+    def from_list(cls, data) -> "DimmerSequence":
+        seq = cls()
+        for item in data or []:
+            try:
+                if isinstance(item, dict):
+                    seq.add(item.get("level", 0), item.get("on", True))
+                else:
+                    seq.add(item, True)
+            except Exception:
+                continue
+        return seq
+
+
 class RgbMatrixInstance(Function):
     """RGB-Matrix als echte Funktion.
 
@@ -345,8 +452,12 @@ class RgbMatrixInstance(Function):
         # Legacy/No-op: RGBW-Weiss wird in write() aus rgbw_split abgeleitet; Feld nur
         # fuer Back-compat-Serialisierung, nicht in der UI/VC exponiert.
         self.white_amount: int = 100       # 0–100 %, RGBW-Weissanteil (Legacy)
-        self.intensity_min: int = 0        # Dimmer-Style Untergrenze
-        self.intensity_max: int = 255      # Dimmer-Style Obergrenze
+        self.intensity_min: int = 0        # Dimmer-Style Untergrenze (ohne dimmer_cycle)
+        self.intensity_max: int = 255      # Dimmer-Style Obergrenze (ohne dimmer_cycle)
+        # ENG-08: explizite Dimmerwert-Sequenz fuer den Dimmer-Chase. Aktiv nur,
+        # wenn params["dimmer_cycle"] True ist (sonst greift intensity_min/max).
+        # Pendant zur ColorSequence: pro Runde die naechste explizite Stufe.
+        self.dimmer_levels = DimmerSequence([255, 128, 64])
         self.shutter_min: int = 0          # Shutter-Style Untergrenze
         self.shutter_max: int = 255        # Shutter-Style Obergrenze
         # Phase 4: unbeschraenkte Phase (kein % max(cols,rows) mehr)
@@ -443,6 +554,20 @@ class RgbMatrixInstance(Function):
         L = self._pixel_brightness(rgb)
         return max(0, min(255, int(round(lo + (hi - lo) * L))))
 
+    def _dimmer_output(self, rgb: Color) -> int:
+        """Dimmer-Kanalwert fuer ein gerendertes Pixel (ENG-08).
+
+        Bei aktivem ``dimmer_cycle`` (nur CHASE) liefert ``_render`` bereits
+        explizite Grau-Stufen ``(lvl, lvl, lvl)`` aus der ``DimmerSequence`` —
+        dann den Wert *direkt* durchreichen: die programmierten Stufen SIND die
+        Ausgabe, ``intensity_min``/``intensity_max`` werden bewusst ignoriert
+        (sonst wuerde der gewuenschte Wert verschoben). Sonst das bisherige
+        Verhalten: Pixel-Helligkeit linear in ``[intensity_min, intensity_max]``.
+        """
+        if self.algorithm == RgbAlgorithm.CHASE and self.params.get("dimmer_cycle"):
+            return max(0, min(255, int(round(self._pixel_brightness(rgb) * 255))))
+        return self._scalar_level(rgb, self.intensity_min, self.intensity_max)
+
     def preview_pixels(self) -> list[Color]:
         """Style-aware Pixelliste fuer die Vorschau (ruft intern _generate()).
 
@@ -456,7 +581,7 @@ class RgbMatrixInstance(Function):
         if self.style == MatrixStyle.DIMMER:
             result = []
             for rgb in grid:
-                v = self._scalar_level(rgb, self.intensity_min, self.intensity_max)
+                v = self._dimmer_output(rgb)
                 result.append((v, v, v))
             return result
         if self.style == MatrixStyle.SHUTTER:
@@ -635,7 +760,7 @@ class RgbMatrixInstance(Function):
                         val = int(val * inten)
                 elif self.style == MatrixStyle.DIMMER:
                     if attr in ("intensity", "dimmer", "master"):
-                        val = self._scalar_level(rgb, self.intensity_min, self.intensity_max)
+                        val = self._dimmer_output(rgb)
                     else:
                         continue  # Farb-/Shutter-Kanaele unangetastet lassen
                 elif self.style == MatrixStyle.SHUTTER:
@@ -840,9 +965,31 @@ class RgbMatrixInstance(Function):
         n = cols * rows
         pixels: list[Color] = [(0, 0, 0)] * n
 
+        # ENG-08: Dimmer-Style-Chase mit eigener Dimmerwert-Sequenz — pro Runde
+        # die naechste explizite Stufe (0..255) statt einer Farbe. base wird ein
+        # Grau (lvl,lvl,lvl); _dimmer_output/write() reichen den Wert direkt auf
+        # den Dimmer-Kanal durch (intensity_min/max werden dann ignoriert).
+        # Reihenfolge normal / zufaellig / Ping-Pong (dimmer_order), Intervall
+        # wie bei der Color-Sequence (dimmer_interval).
+        if self.style == MatrixStyle.DIMMER and params.get("dimmer_cycle"):
+            levels = self.dimmer_levels.enabled_levels()
+            length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+            interval = max(1, int(params.get("dimmer_interval", 1)))
+            rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
+            nl = len(levels)
+            order = str(params.get("dimmer_order", "normal"))
+            if order == "random":
+                lvl = levels[random.Random((rnd * 2654435761) & 0x7FFFFFFF).randrange(nl)]
+            elif order == "pingpong" and nl > 2:
+                period = 2 * (nl - 1)
+                pos = rnd % period
+                lvl = levels[pos if pos < nl else period - pos]
+            else:  # normal
+                lvl = levels[rnd % nl]
+            base = (lvl, lvl, lvl)
         # Farbe: optional pro Runde durch die Color-Sequence wechselnd (Abschnitt 6).
         # Reihenfolge normal / zufällig / Ping-Pong (color_order).
-        if params.get("color_cycle") and enabled:
+        elif params.get("color_cycle") and enabled:
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
             # MXP-01: Farbe erst alle N Durchlaeufe wechseln (Default 1 = jeder Lauf).
             interval = max(1, int(params.get("color_interval", 1)))
@@ -1298,6 +1445,8 @@ class RgbMatrixInstance(Function):
             return self.algorithm.value
         if key in ("colors", "color_sequence"):
             return self.colors
+        if key in ("dimmer_sequence", "dimmer_levels"):
+            return self.dimmer_levels
         if key in ("color1", "color2", "color3"):
             return getattr(self, key)
         if key == "offset":
@@ -1355,6 +1504,15 @@ class RgbMatrixInstance(Function):
                     self.colors = ColorSequence.from_list(value)
                 else:
                     self.colors = ColorSequence(value)
+            return True
+        if key in ("dimmer_sequence", "dimmer_levels"):
+            if isinstance(value, DimmerSequence):
+                self.dimmer_levels = value
+            elif isinstance(value, list):
+                if value and isinstance(value[0], dict):
+                    self.dimmer_levels = DimmerSequence.from_list(value)
+                else:
+                    self.dimmer_levels = DimmerSequence(value)
             return True
         if key in ("color1", "color2", "color3"):
             setattr(self, key, tuple(value)); return True
@@ -1545,6 +1703,9 @@ class RgbMatrixInstance(Function):
             # Kanonisches Farbmodell (beliebig lang, aktiv/inaktiv je Farbe).
             "color_sequence": self.colors.to_list(),
             "color_active": self.colors.active_index,
+            # ENG-08: explizite Dimmerwert-Sequenz (Dimmer-Chase, dimmer_cycle).
+            "dimmer_sequence": self.dimmer_levels.to_list(),
+            "dimmer_active": self.dimmer_levels.active_index,
             # Abgeleitet fuer Alt-Leser (Rueckwaertskompatibilitaet): erste 3 Farben.
             "color1": list(self.color1),
             "color2": list(self.color2),
@@ -1608,6 +1769,17 @@ class RgbMatrixInstance(Function):
             self.colors.active_index = int(d.get("color_active", 0))
         except (TypeError, ValueError):
             self.colors.active_index = 0
+        # ENG-08: Dimmerwert-Sequenz; Alt-Shows ohne Key bekommen den Default.
+        if "dimmer_sequence" in d:
+            self.dimmer_levels = DimmerSequence.from_list(d.get("dimmer_sequence") or [])
+            if len(self.dimmer_levels) == 0:
+                self.dimmer_levels = DimmerSequence([255, 128, 64])
+        else:
+            self.dimmer_levels = DimmerSequence([255, 128, 64])
+        try:
+            self.dimmer_levels.active_index = int(d.get("dimmer_active", 0))
+        except (TypeError, ValueError):
+            self.dimmer_levels.active_index = 0
         # Animationsrate: neuer Key "matrix_speed"; Alt-Shows hatten "speed".
         self.matrix_speed = float(d.get("matrix_speed", d.get("speed", 1.0)))
         self.direction = d.get("direction", "forward")

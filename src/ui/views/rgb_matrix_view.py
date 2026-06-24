@@ -10,6 +10,14 @@ from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
 from src.core.engine.rgb_matrix_meta import ALGO_META
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
+from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
+
+
+# UI-12 / ENG-08: Parameter, die NICHT mehr dynamisch im "Bewegung & Parameter"-
+# Block erscheinen, sondern als feste Bedienelemente in der "Farben"-Gruppe leben
+# (direkt beim jeweiligen Sequence-Editor). Sie werden aus visible_specs heraus-
+# gefiltert, damit sie nicht doppelt auftauchen.
+_PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle"})
 
 
 class MatrixPreview(QWidget):
@@ -518,6 +526,17 @@ class RgbMatrixView(QWidget):
         self._seq_label = QLabel("Color Sequence:")
         fc.addRow(self._seq_label, self._seq_editor)
 
+        # UI-12: "Farbe pro Runde wechseln" (color_cycle) lebt jetzt direkt hier
+        # bei der Color-Sequence statt ganz unten im dynamischen Param-Block.
+        # Die abhaengigen Felder (Farb-Reihenfolge/Intervall) bleiben konditional
+        # im "Bewegung & Parameter"-Block (when=color_cycle).
+        self._cb_color_cycle = QCheckBox("Farbe pro Runde wechseln")
+        self._cb_color_cycle.setToolTip(
+            "Läufer wechselt pro Durchlauf durch die Color-Sequence")
+        self._cb_color_cycle.toggled.connect(self._param_change)
+        self._color_cycle_label = QLabel("")
+        fc.addRow(self._color_cycle_label, self._cb_color_cycle)
+
         # Dimmer-Bereich (nur DIMMER)
         dim_row = QHBoxLayout()
         self._imin_spin = QSpinBox()
@@ -534,6 +553,22 @@ class RgbMatrixView(QWidget):
         dim_row.addWidget(self._imax_spin)
         self._dim_form_label = QLabel("Dimmer-Bereich:")
         fc.addRow(self._dim_form_label, dim_row)
+
+        # ENG-08: "Dimmer pro Runde wechseln" (dimmer_cycle) + Dimmerwert-Sequenz —
+        # das Dimmer-Pendant zu color_cycle + Color-Sequence. Nur beim Dimmer-Chase
+        # sichtbar; ersetzt dann den festen Min/Max-Bereich durch explizite Stufen.
+        self._cb_dimmer_cycle = QCheckBox("Dimmer pro Runde wechseln")
+        self._cb_dimmer_cycle.setToolTip(
+            "Läufer wechselt pro Durchlauf durch die Dimmerwert-Sequenz "
+            "(explizite Helligkeitsstufen statt fester Min/Max-Bereich)")
+        self._cb_dimmer_cycle.toggled.connect(self._param_change)
+        self._dimmer_cycle_label = QLabel("")
+        fc.addRow(self._dimmer_cycle_label, self._cb_dimmer_cycle)
+
+        self._dimmer_seq_editor = DimmerSequenceField(title="Dimmer Sequence")
+        self._dimmer_seq_editor.changed.connect(self._on_dimmer_sequence_changed)
+        self._dimmer_seq_label = QLabel("Dimmer Sequence:")
+        fc.addRow(self._dimmer_seq_label, self._dimmer_seq_editor)
 
         # Shutter-Bereich (nur SHUTTER)
         shut_row = QHBoxLayout()
@@ -742,6 +777,9 @@ class RgbMatrixView(QWidget):
         style_value = self._style_combo.currentText()
         cur_params = dict(self._current.params) if self._current is not None else {}
         specs = visible_specs(algo, style_value, cur_params)
+        # UI-12: hochgezogene Params (color_cycle) nicht im dynamischen Block bauen
+        # — sie leben als feste Bedienelemente in der Farben-Gruppe.
+        specs = [s for s in specs if s.key not in _PROMOTED_PARAM_KEYS]
         self._param_specs = specs
         if not specs:
             # Keine Algo-Parameter -> Box nur zeigen, wenn wenigstens die Richtung
@@ -884,6 +922,27 @@ class RgbMatrixView(QWidget):
         self._color_label.setVisible(is_color and (not use_seq) and n_colors >= 1)
         self._seq_editor.setVisible(use_seq)
         self._seq_label.setVisible(use_seq)
+        # UI-12: Die "Farbe pro Runde wechseln"-Checkbox ist nur fuer den Farb-Chase
+        # relevant (RGB/RGBW + CHASE). Sie sitzt direkt in der Farben-Gruppe beim
+        # Color-Sequence-Editor.
+        cc_relevant = (is_color and algo == RgbAlgorithm.CHASE)
+        self._cb_color_cycle.setVisible(cc_relevant)
+        self._color_cycle_label.setVisible(cc_relevant)
+        # ENG-08: "Dimmer pro Runde wechseln" + Dimmerwert-Sequenz sind das Pendant
+        # fuer den Dimmer-Chase (DIMMER + CHASE). Bei aktivem dimmer_cycle ersetzt
+        # die Sequenz den festen Min/Max-Bereich (der wird dann ausgeblendet).
+        is_dimmer = (style == MatrixStyle.DIMMER)
+        dc_relevant = (is_dimmer and algo == RgbAlgorithm.CHASE)
+        dc_active = (dc_relevant and self._current is not None
+                     and bool(self._current.params.get("dimmer_cycle")))
+        self._cb_dimmer_cycle.setVisible(dc_relevant)
+        self._dimmer_cycle_label.setVisible(dc_relevant)
+        self._dimmer_seq_editor.setVisible(dc_active)
+        self._dimmer_seq_label.setVisible(dc_active)
+        # Min/Max-Bereich nur ohne aktive Dimmer-Sequenz (sonst irrelevant).
+        self._dim_form_label.setVisible(is_dimmer and not dc_active)
+        self._imin_spin.setVisible(is_dimmer and not dc_active)
+        self._imax_spin.setVisible(is_dimmer and not dc_active)
         # Die ganze "Farben"-Gruppe ausblenden, wenn nichts darin sichtbar ist
         # (z. B. Rainbow ohne Farben bei RGB) — kein leerer Gruppenkasten.
         any_color = (
@@ -892,6 +951,9 @@ class RgbMatrixView(QWidget):
             or (not self._color_label.isHidden())
             or (not self._dim_form_label.isHidden())
             or (not self._shut_form_label.isHidden())
+            or (not self._cb_color_cycle.isHidden())
+            or (not self._cb_dimmer_cycle.isHidden())
+            or (not self._dimmer_seq_editor.isHidden())
         )
         self._grp_colors.setVisible(any_color)
 
@@ -937,6 +999,16 @@ class RgbMatrixView(QWidget):
             self._c3_btn._color = m.color3; self._c3_btn._update_style()
             # Color-Sequence-Editor an die Draft-Sequence binden (mutiert sie direkt).
             self._seq_editor.set_sequence(m.colors)
+            # UI-12: "Farbe pro Runde wechseln" sitzt jetzt fest in der Farben-
+            # Gruppe (nicht mehr im dynamischen Param-Block) -> hier laden.
+            self._cb_color_cycle.blockSignals(True)
+            self._cb_color_cycle.setChecked(bool(m.params.get("color_cycle", False)))
+            self._cb_color_cycle.blockSignals(False)
+            # ENG-08: Dimmer-Sequenz an die Draft-Sequence binden + Checkbox laden.
+            self._dimmer_seq_editor.set_sequence(m.dimmer_levels)
+            self._cb_dimmer_cycle.blockSignals(True)
+            self._cb_dimmer_cycle.setChecked(bool(m.params.get("dimmer_cycle", False)))
+            self._cb_dimmer_cycle.blockSignals(False)
             self._apply_style_visibility(m.style)
             # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
             self._dir_combo.blockSignals(True)
@@ -1005,6 +1077,15 @@ class RgbMatrixView(QWidget):
                 self._current.params[key] = w.value()
             elif isinstance(w, QDoubleSpinBox):
                 self._current.params[key] = float(w.value())
+        # UI-12 / ENG-08: color_cycle (Farb-Chase) bzw. dimmer_cycle (Dimmer-Chase)
+        # leben als feste Checkboxen in der Farben-Gruppe. Nur fuer den passenden
+        # Style + CHASE schreiben, damit fremde Algorithmen/Styles keinen toten Key
+        # bekommen (und sich Farb-/Dimmer-Zyklus nicht gegenseitig setzen).
+        if self._current.algorithm == RgbAlgorithm.CHASE:
+            if self._current.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
+                self._current.params["color_cycle"] = self._cb_color_cycle.isChecked()
+            elif self._current.style == MatrixStyle.DIMMER:
+                self._current.params["dimmer_cycle"] = self._cb_dimmer_cycle.isChecked()
         # Sichtbarkeit kann sich durch die eben geschriebenen Werte aendern
         # (z. B. mode=strobe -> Strobe-Rate, color_cycle=an -> Farb-Reihenfolge +
         # Color-Sequence). Felder bei Bedarf neu aufbauen.
@@ -1022,8 +1103,12 @@ class RgbMatrixView(QWidget):
         except ValueError:
             return
         from src.core.engine.rgb_matrix_meta import visible_specs
+        # UI-12: color_cycle ist hochgezogen (feste Checkbox) -> beim Soll/Ist-
+        # Vergleich der dynamischen Keys herausfiltern, sonst rebuildet die Form
+        # endlos (Key in visible_specs, aber nie als Widget gebaut).
         new_keys = [s.key for s in visible_specs(
-            algo, self._style_combo.currentText(), self._current.params)]
+            algo, self._style_combo.currentText(), self._current.params)
+            if s.key not in _PROMOTED_PARAM_KEYS]
         if new_keys != list(self._param_widgets.keys()):
             self._rebuild_param_fields(algo)
             self._load_params_into_widgets(self._current)
@@ -1049,6 +1134,13 @@ class RgbMatrixView(QWidget):
         for i, btn in enumerate(self._color_btns):
             btn._color = self._current.colors.color_at(i)
             btn._update_style()
+        self._update_dirty()
+
+    def _on_dimmer_sequence_changed(self):
+        """ENG-08: Der Dimmer-Sequence-Editor hat die Draft-Stufenliste (per
+        Referenz) veraendert -> nur Dirty-State aktualisieren."""
+        if self._current is None:
+            return
         self._update_dirty()
 
     def _toggle_editor_popout(self):

@@ -95,7 +95,7 @@ def _color_order():
     # WP-4/Abschnitt 6: Reihenfolge des Farbwechsels pro Runde (nur wenn aktiv).
     return ParamSpec("color_order", "Farb-Reihenfolge", "select", "normal",
                      options=("normal", "random", "pingpong"),
-                     when=(("color_cycle", (True,)),),
+                     when=(("color_cycle", (True,)),), styles=("RGB", "RGBW"),
                      tooltip="Reihenfolge, in der pro Runde durch die Color-Sequence gewechselt wird")
 
 def _turns():
@@ -134,17 +134,39 @@ def _spread():
                      "Breite der hellen Wellenbänder")
 
 def _color_cycle():
+    # Nur Farb-Styles: bei Dimmer/Shutter greift stattdessen _dimmer_cycle (ENG-08).
     return ParamSpec("color_cycle", "Farbe pro Runde wechseln", "bool", False,
+                     styles=("RGB", "RGBW"),
                      tooltip="Läufer wechselt pro Durchlauf durch die Farb-Sequence")
 
 def _color_interval():
     # MXP-01 (Abschnitt 10): Farbe erst alle N Durchlaeufe wechseln. 1 = jeder
     # Durchlauf (= bisheriges Verhalten). Default 1 -> Alt-Shows unveraendert.
     return ParamSpec("color_interval", "Farbwechsel-Intervall", "int", 1, 1, 16, 1,
-                     when=(("color_cycle", (True,)),),
+                     when=(("color_cycle", (True,)),), styles=("RGB", "RGBW"),
                      tooltip="Farbe bleibt N Durchläufe gleich, bevor sie zur nächsten "
                              "Farbe der Sequence wechselt (1 = jeder Durchlauf, 2/4/8 = "
                              "langsamer)")
+
+# ── ENG-08: Dimmerwert-Sequenz fuer den Dimmer-Chase (Pendant zu color_cycle) ──
+def _dimmer_cycle():
+    # Nur Dimmer-Style: Laeufer wechselt pro Runde durch die Dimmerwert-Sequenz.
+    return ParamSpec("dimmer_cycle", "Dimmer pro Runde wechseln", "bool", False,
+                     styles=("Dimmer",),
+                     tooltip="Läufer wechselt pro Durchlauf durch die Dimmerwert-Sequenz "
+                             "(explizite Helligkeitsstufen statt fester Min/Max-Bereich)")
+
+def _dimmer_order():
+    return ParamSpec("dimmer_order", "Dimmer-Reihenfolge", "select", "normal",
+                     options=("normal", "random", "pingpong"),
+                     when=(("dimmer_cycle", (True,)),), styles=("Dimmer",),
+                     tooltip="Reihenfolge, in der pro Runde durch die Dimmerwert-Sequenz gewechselt wird")
+
+def _dimmer_interval():
+    return ParamSpec("dimmer_interval", "Dimmerwechsel-Intervall", "int", 1, 1, 16, 1,
+                     when=(("dimmer_cycle", (True,)),), styles=("Dimmer",),
+                     tooltip="Dimmerwert bleibt N Durchläufe gleich, bevor er zur nächsten "
+                             "Stufe der Sequenz wechselt (1 = jeder Durchlauf, 2/4/8 = langsamer)")
 
 # ── Bausteine fuer die Phase-4-Algorithmen (Fill / Random / ColorFade / Rainbow) ──
 def _fill_dir():
@@ -262,15 +284,19 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
     RgbAlgorithm.PLAIN:        AlgoMeta("Volle Fläche in C1.", False, (), colors=1),
     # ── Konsolidierte Grundalgorithmen (Phase 3) ──────────────────────────────
     RgbAlgorithm.CHASE:        AlgoMeta(
-        "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farbwechsel pro Runde.",
+        "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farb- bzw. "
+        "Dimmerwechsel pro Runde (je nach Style).",
         True,
         (_axis(), _movement(("normal", "bounce", "center_out", "outside_in")),
          # Läufer-Anzahl + After Fade wertet die Engine NUR bei movement=normal aus
          # (bounce/center_out/outside_in ignorieren sie) -> nur dann anzeigen,
          # statt tote Regler zu zeigen.
          _runner_count(when=(("movement", ("normal",)),)), _runner_width(),
-         _after_fade(when=(("movement", ("normal",)),)), _color_cycle(), _color_order(),
-         _color_interval(), _invert()),
+         _after_fade(when=(("movement", ("normal",)),)),
+         # Farb-Styles: Farbwechsel pro Runde. Dimmer-Style: Dimmerwert pro Runde
+         # (ENG-08) — style-gefiltert, daher nie beide gleichzeitig sichtbar.
+         _color_cycle(), _color_order(), _color_interval(),
+         _dimmer_cycle(), _dimmer_order(), _dimmer_interval(), _invert()),
         colors=1),
     RgbAlgorithm.WIPE:         AlgoMeta(
         "Wisch über die Matrix (Achse, Bewegung, Kanten-Fade).",
