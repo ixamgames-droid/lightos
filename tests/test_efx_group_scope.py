@@ -108,19 +108,32 @@ class VisibleFilterTest(unittest.TestCase):
         ids = {x.id for x in self.view._visible_instances()}
         self.assertIn(a.id, ids)
 
-    def test_add_binds_new_efx_to_active_group(self):
-        # „+ Neu" im Folgemodus bindet die neue EFX sofort an die aktive Gruppe.
+    def test_add_creates_unbound_draft_save_binds_to_active_group(self):
+        # „Entwurf bis Speichern": „+ Neu" im Folgemodus erzeugt einen UNGEBUNDENEN
+        # Live-Entwurf (committed=False, source_group=None). Erst „💾 Speichern"
+        # bindet an die aktive Gruppe und committed.
         self.view._follow = True
         self.view._group_context = lambda: ("Strahler", {"Strahler"})
-        # Die nachgelagerten Schritte brauchen Programmer-Zustand/DB -> stubben,
-        # damit der Test die Bindung isoliert prueft.
-        self.view._rebuild_from_state = lambda: None
+        # Nur die DB-/Programmer-abhaengige Geraete-Zuweisung stubben. Den echten
+        # Listen-Rebuild laufen lassen, damit setCurrentRow auf die Entwurfs-Zeile
+        # zeigt (sonst wuerde _select_efx ueber eine stale Zeile den frischen
+        # Entwurf sofort verwerfen).
         self.view._assign_from_selection = lambda: None
         before = {f.id for f in self.fm.all()}
         self.view._add_efx()
         new = [e for e in self.view._instances if e.id not in before]
         self.assertEqual(len(new), 1)
-        self.assertEqual(new[0].source_group, "Strahler")
+        draft = new[0]
+        # Entwurf: noch nicht gebunden, noch nicht committed.
+        self.assertFalse(draft.committed)
+        self.assertIsNone(draft.source_group)
+        self.assertEqual(self.view._draft_id, draft.id)
+        # _save_efx braucht das selektierte _current als Entwurf.
+        self.view._current = draft
+        self.view._save_efx()
+        self.assertTrue(draft.committed)
+        self.assertEqual(draft.source_group, "Strahler")
+        self.assertIsNone(self.view._draft_id)
 
     def test_unbound_with_fixtures_filters_by_group_membership(self):
         # Backfix-2: Bestehende/ungebundene EFX (kein 💾-Bind moeglich) erscheinen

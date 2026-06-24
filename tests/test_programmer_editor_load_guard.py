@@ -85,8 +85,13 @@ def test_switching_efx_does_not_corrupt_params():
     _app()
     from src.ui.views.efx_view import EfxView
     view = EfxView()  # follow_selection=False -> kein Auswahl-Override
+    # „Entwurf bis Speichern": „+ Neu" erzeugt nur EINEN fluechtigen Entwurf pro
+    # View (ein zweites „+ Neu" verwirft den ersten). Fuer den Lade-Guard-Test
+    # zwei BLEIBENDE EFX brauchen -> jeden Entwurf sofort speichern (committed).
     view._add_efx()
+    view._save_efx()
     view._add_efx()
+    view._save_efx()
     row_b = view._list.count() - 1
     row_a = row_b - 1
     assert row_a >= 0

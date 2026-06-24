@@ -464,8 +464,13 @@ class FunctionManager:
     # ── Serialisation ─────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
+        # Entwuerfe (committed==False, EFX-„Entwurf bis Speichern") NICHT
+        # serialisieren -- sie laufen nur live zur Vorschau. getattr-Default True
+        # haelt alle anderen Funktionstypen (ohne committed-Attribut) unveraendert
+        # serialisierbar.
         return {
-            "functions": [f.to_dict() for f in self._functions.values()]
+            "functions": [f.to_dict() for f in self._functions.values()
+                          if getattr(f, "committed", True)]
         }
 
     def from_dict(self, d: dict):
