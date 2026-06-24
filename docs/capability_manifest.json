@@ -439,6 +439,30 @@
           ]
         },
         {
+          "key": "dimmer_cycle",
+          "label": "Dimmer pro Runde wechseln",
+          "kind": "bool"
+        },
+        {
+          "key": "dimmer_order",
+          "label": "Dimmer-Reihenfolge",
+          "kind": "select",
+          "options": [
+            "normal",
+            "random",
+            "pingpong"
+          ]
+        },
+        {
+          "key": "dimmer_interval",
+          "label": "Dimmerwechsel-Intervall",
+          "kind": "int",
+          "range": [
+            1,
+            16
+          ]
+        },
+        {
           "key": "invert",
           "label": "Invertieren",
           "kind": "bool"

@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-24 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **Dimmer-Sequenz für den Dimmer-Chase (ENG-08):** Ein Dimmer-Chase kann jetzt durch **explizite Dimmerwerte** (z. B. 255, 50, 100) schalten — pro Runde die nächste Stufe, genau wie die Color-Sequence pro Runde die Farbe wechselt. Neue Engine-Klasse `DimmerSequence` (Liste `[level 0–255, an/aus]`, `active_index`, `enabled_levels/next/prev/toggle/move`), eine Checkbox „Dimmer pro Runde wechseln" (`dimmer_cycle`) mit `dimmer_order` (normal/random/pingpong) + `dimmer_interval`, und ein neues Graustufen-Widget `DimmerSequenceField` (Popout, Eingabe 0–255) in der Farben-Gruppe — nur beim Dimmer-Chase sichtbar; bei aktiver Sequenz wird der feste Min/Max-Bereich ausgeblendet. Im Cycle-Modus werden die Stufen **direkt** auf den Dimmer geschrieben (kein Min/Max-Remap, kein Doppel-Dimmen); ohne Cycle bleibt exakt das alte Verhalten → abwärtskompatibel. Persistenz über `dimmer_sequence`/`dimmer_active`. `src/core/engine/rgb_matrix.py`, `src/core/engine/rgb_matrix_meta.py`, `src/ui/widgets/dimmer_sequence_editor.py`, `src/ui/views/rgb_matrix_view.py`, `tests/test_matrix_dimmer_sequence.py` (PR #60).
+
+#### Geaendert
+
+- **„Farbe pro Runde wechseln" in die Farben-Gruppe (UI-12):** Die `color_cycle`-Checkbox sitzt jetzt fest direkt beim Color-Sequence-Editor (statt ganz unten im dynamischen Param-Block „Bewegung & Parameter") und ist auf Farb-Styles (RGB/RGBW) gegated. Wirkt identisch im eingebetteten Tab und im „großen Fenster". `src/ui/views/rgb_matrix_view.py`, `tests/test_matrix_meta_view.py` (PR #60).
+
 ### 2026-06-23 — Neu
 
 #### Neu / Hinzugefuegt

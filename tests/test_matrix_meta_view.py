@@ -49,14 +49,17 @@ def test_spiral_widget_keys():
 
 def test_chase_widget_keys():
     """CHASE: alle konsolidierten Parameter als Widgets (color_order ist
-    bedingt — nur bei aktivem color_cycle — daher hier nicht erwartet)."""
+    bedingt — nur bei aktivem color_cycle — daher hier nicht erwartet).
+    UI-12: color_cycle ist hochgezogen in die Farben-Gruppe und taucht NICHT
+    mehr im dynamischen Param-Form auf."""
     _app()
     view = _make_view_with_matrix()
     view._rebuild_param_fields(RgbAlgorithm.CHASE)
     assert set(view._param_widgets.keys()) == {
         "axis", "movement", "runner_count", "runner_width", "after_fade",
-        "color_cycle", "invert",
+        "invert",
     }
+    assert "color_cycle" not in view._param_widgets
 
 
 def test_chase_select_ist_combobox():
@@ -215,8 +218,63 @@ def test_sequence_editor_bearbeitet_draft():
 # ── _param_box rowCount ───────────────────────────────────────────────────────
 
 def test_param_box_rowcount_chase():
-    """CHASE hat 7 Parameter => 7 Zeilen im Form-Layout."""
+    """CHASE: 6 dynamische Parameter-Zeilen im Form-Layout (UI-12: color_cycle
+    ist hochgezogen in die Farben-Gruppe, daher eine Zeile weniger)."""
     _app()
     view = _make_view_with_matrix()
     view._rebuild_param_fields(RgbAlgorithm.CHASE)
-    assert view._param_form.rowCount() == 7
+    assert view._param_form.rowCount() == 6
+
+
+def test_color_cycle_in_farben_gruppe():
+    """UI-12: 'Farbe pro Runde wechseln' lebt als feste Checkbox in der Farben-
+    Gruppe (nicht im dynamischen Param-Block). Sie ist beim Chase sichtbar,
+    schreibt color_cycle in den Draft und blendet die abhaengigen Felder
+    (Farb-Reihenfolge / Intervall) ein."""
+    _app()
+    view = _make_view_with_matrix()
+    view._algo_combo.setCurrentText(RgbAlgorithm.CHASE.value)
+    # Checkbox existiert, ist beim Chase sichtbar, nicht im Param-Form
+    assert hasattr(view, "_cb_color_cycle")
+    assert "color_cycle" not in view._param_widgets
+    assert "color_interval" not in view._param_widgets  # erst bei color_cycle=an
+    # Einschalten -> Draft-Param + abhaengige Felder erscheinen
+    view._cb_color_cycle.setChecked(True)
+    assert view._current.params.get("color_cycle") is True
+    assert "color_interval" in view._param_widgets
+    assert "color_order" in view._param_widgets
+    # Ausschalten -> abhaengige Felder verschwinden wieder
+    view._cb_color_cycle.setChecked(False)
+    assert view._current.params.get("color_cycle") is False
+    assert "color_interval" not in view._param_widgets
+
+
+def test_dimmer_cycle_in_farben_gruppe():
+    """ENG-08: 'Dimmer pro Runde wechseln' + Dimmer-Sequenz leben als feste
+    Bedienelemente in der Farben-Gruppe (analog UI-12). Beim Dimmer-Chase:
+    Checkbox da, nicht im Param-Form; An schreibt dimmer_cycle + zeigt
+    Reihenfolge/Intervall; der Editor mutiert die Draft-Stufenliste."""
+    from src.core.engine.rgb_matrix import MatrixStyle
+    _app()
+    view = _make_view_with_matrix()
+    view._algo_combo.setCurrentText(RgbAlgorithm.CHASE.value)
+    view._style_combo.setCurrentText(MatrixStyle.DIMMER.value)
+    assert hasattr(view, "_cb_dimmer_cycle")
+    assert "dimmer_cycle" not in view._param_widgets
+    assert "dimmer_interval" not in view._param_widgets   # erst bei dimmer_cycle=an
+    # color_cycle ist beim Dimmer-Style nicht relevant (style-gefiltert)
+    assert "color_cycle" not in view._param_widgets
+    # Einschalten -> Draft-Param + abhaengige Felder erscheinen
+    view._cb_dimmer_cycle.setChecked(True)
+    assert view._current.params.get("dimmer_cycle") is True
+    assert "dimmer_interval" in view._param_widgets
+    assert "dimmer_order" in view._param_widgets
+    # Der Dimmer-Sequence-Editor mutiert die Draft-Stufenliste (per Referenz)
+    before = len(view._current.dimmer_levels)
+    view._dimmer_seq_editor._seq.add(200)     # wie der ＋-Knopf
+    view._dimmer_seq_editor.changed.emit()
+    assert len(view._current.dimmer_levels) == before + 1
+    # Ausschalten -> abhaengige Felder verschwinden wieder
+    view._cb_dimmer_cycle.setChecked(False)
+    assert view._current.params.get("dimmer_cycle") is False
+    assert "dimmer_interval" not in view._param_widgets

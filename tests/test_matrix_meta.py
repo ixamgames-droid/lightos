@@ -30,6 +30,8 @@ ALLOWED_KEYS = {
     "after_fade", "color_order",
     # MXP-01 (Abschnitt 10): Farbwechsel-Intervall (alle N Durchlaeufe)
     "color_interval",
+    # ENG-08: Dimmerwert-Sequenz fuer den Dimmer-Chase (Pendant zu color_cycle)
+    "dimmer_cycle", "dimmer_order", "dimmer_interval",
     # WP-3 (Abschnitt 4): zeitlicher Fill
     "fill_mode", "fill_speed", "loop_mode",
     # F1 (CHECKER / Schachbrett): Kachelgroesse + Pro-Beat-Umschalten
@@ -59,12 +61,26 @@ def test_plain_hat_keine_params():
 
 def test_chase_params():
     """CHASE: Achse/Bewegung/Laeufer/After-Fade/Farb-Cycle/Farb-Reihenfolge/
-    Farbwechsel-Intervall/Invert."""
+    Farbwechsel-Intervall + Dimmer-Pendants (ENG-08, style-gefiltert)/Invert."""
     meta = ALGO_META[RgbAlgorithm.CHASE]
     assert meta.direction is True
     keys = {s.key for s in meta.params}
     assert keys == {"axis", "movement", "runner_count", "runner_width",
-                    "after_fade", "color_cycle", "color_order", "color_interval", "invert"}
+                    "after_fade", "color_cycle", "color_order", "color_interval",
+                    "dimmer_cycle", "dimmer_order", "dimmer_interval", "invert"}
+
+
+def test_chase_cycle_specs_style_gated():
+    """ENG-08: color_cycle & abhaengige nur bei RGB/RGBW, dimmer_cycle & abhaengige
+    nur bei Dimmer (visible_specs filtert per styles=) — nie beide gleichzeitig."""
+    from src.core.engine.rgb_matrix_meta import visible_specs
+    on = {"color_cycle": True, "dimmer_cycle": True}
+    rgb = {s.key for s in visible_specs(RgbAlgorithm.CHASE, "RGB", on)}
+    assert {"color_cycle", "color_order", "color_interval"} <= rgb
+    assert not ({"dimmer_cycle", "dimmer_order", "dimmer_interval"} & rgb)
+    dim = {s.key for s in visible_specs(RgbAlgorithm.CHASE, "Dimmer", on)}
+    assert {"dimmer_cycle", "dimmer_order", "dimmer_interval"} <= dim
+    assert not ({"color_cycle", "color_order", "color_interval"} & dim)
 
 
 def test_wave_params():
