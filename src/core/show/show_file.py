@@ -376,7 +376,10 @@ def reset_show():
 
     state.programmer = {}
     state.base_levels = {}
-    state.implicit_brightness = True
+    # Neue Show: strikte Trennung Farbe/Dimmer (Default seit 2026-06-24). Eine reine
+    # Farbe macht den Dimmer NICHT automatisch auf — Helligkeit kommt aus Dimmer-
+    # Snaps/-Effekten/Mastern. Per Menue-Schalter umschaltbar.
+    state.implicit_brightness = False
     # DMX-Puffer aller Universes nullen. Sonst sendet der Output-Thread nach
     # "Neue Show" weiter die ALTEN Werte (die Strahler bleiben an): ein leerer
     # Patch hat keinen Default-Frame mehr, und _render_frame fasst die Buffer der
