@@ -50,6 +50,9 @@ _crash_reporter = None        # F-9: haelt die Referenz (sonst raeumt GC ihn weg
 _last_alive_path = None       # STAB-01: "zuletzt lebendig"-Marker
 _running_flag_path = None     # STAB-01: liegt noch da -> vorige Sitzung abgestuerzt
 _dedup = _cl.ExceptionDedup(min_interval=5.0)   # STAB-01: Fehler-Sturm-Drossel
+_had_fatal_exception = False  # STAB-05: True nach ungefangener Main-Thread-Exception
+                              # -> _on_exit schreibt KEINEN Clean-Marker und laesst
+                              #    die Running-Flag liegen (Absturz erkennbar)
 
 
 def _write_exception(exc_type, exc_value, exc_tb, thread_name=None):
@@ -112,6 +115,12 @@ def _setup_crash_logging():
         _cl.write_last_alive(_last_alive_path)
 
         def _hook(exc_type, exc_value, exc_tb):
+            global _had_fatal_exception
+            # STAB-05: Eine ECHTE ungefangene Exception (kein sauberer SystemExit,
+            # kein Strg+C) markiert die Sitzung als abgestuerzt -> _on_exit schreibt
+            # dann keinen Clean-Marker und laesst die Running-Flag liegen.
+            if not issubclass(exc_type, (KeyboardInterrupt, SystemExit)):
+                _had_fatal_exception = True
             _write_exception(exc_type, exc_value, exc_tb)
             sys.__excepthook__(exc_type, exc_value, exc_tb)
         sys.excepthook = _hook
@@ -132,13 +141,11 @@ def _setup_crash_logging():
         import atexit
 
         def _on_exit():
-            try:
-                if _crash_log_handle is not None:
-                    _crash_log_handle.write(_cl.clean_exit_marker())
-                    _crash_log_handle.flush()
-            except Exception:
-                pass
-            _cl.clear_running(_running_flag_path)
+            # STAB-05: Bei _had_fatal_exception KEINEN Clean-Marker schreiben und
+            # die Running-Flag liegen lassen -> der naechste Start erkennt den
+            # Absturz (wie bei nativem Crash). Sonst sauberer Exit-Marker + Flag weg.
+            _cl.finalize_exit(_crash_log_handle, _running_flag_path,
+                              _had_fatal_exception)
         atexit.register(_on_exit)
 
     except Exception:

@@ -83,6 +83,15 @@ def clean_exit_marker(now: datetime.datetime | None = None) -> str:
     return f"=== LightOS CLOSED (sauberer Exit) {_ts(now)} ===\n"
 
 
+def fatal_exit_marker(now: datetime.datetime | None = None) -> str:
+    """STAB-05: Wird per ``atexit`` geschrieben, wenn die Sitzung NACH einer
+    ungefangenen (Main-Thread-)Exception endet. BEWUSST kein Clean-Marker — sonst
+    wuerde die Vorige-Sitzung-Erkennung den Absturz beim naechsten Start nicht
+    sehen (der Clean-Marker bzw. die geloeschte Running-Flag wuerde 'sauber'
+    suggerieren)."""
+    return f"=== LightOS ABGESTUERZT (ungefangene Exception) {_ts(now)} ===\n"
+
+
 def previous_crash_notice(last_alive_ts: str | None,
                           now: datetime.datetime | None = None) -> str:
     """Beim Start geschrieben, wenn die vorige Sitzung nicht sauber endete."""
@@ -222,3 +231,24 @@ def clear_running(flag_path: str | None) -> None:
             os.remove(flag_path)
     except Exception:
         pass
+
+
+def finalize_exit(log_handle, flag_path: str | None, had_fatal: bool,
+                  now: datetime.datetime | None = None) -> None:
+    """STAB-05: atexit-Finalisierung als reine, GUI-freie Logik (damit
+    ``main._on_exit`` nur noch verdrahtet und testbar bleibt).
+
+    - ``had_fatal`` (es lief eine ungefangene Main-Thread-Exception): KEIN
+      Clean-Marker, und die Running-Flag BLEIBT liegen -> der naechste Start
+      erkennt den Absturz, genau wie bei einem nativen Crash.
+    - sonst: Clean-Marker schreiben + Running-Flag entfernen (sauberer Exit).
+    """
+    try:
+        if log_handle is not None:
+            log_handle.write(fatal_exit_marker(now) if had_fatal
+                             else clean_exit_marker(now))
+            log_handle.flush()
+    except Exception:
+        pass
+    if not had_fatal:
+        clear_running(flag_path)

@@ -6,6 +6,7 @@ Freeze-/Standby-Klassifikation, Exception-Signatur + Sturm-Drossel und die
 "zuletzt lebendig"/Running-Flag-Mechanik.
 """
 import datetime
+import io
 import os
 import tempfile
 import unittest
@@ -164,6 +165,42 @@ class LivenessTest(unittest.TestCase):
             cl.clear_running(flag)                      # sauberer Exit.
             self.assertFalse(os.path.exists(flag))
             cl.clear_running(flag)                      # doppelt -> kein Fehler.
+
+
+class FinalizeExitTest(unittest.TestCase):
+    """STAB-05: finalize_exit schreibt nur bei SAUBEREM Exit den Clean-Marker und
+    entfernt die Running-Flag. Nach einer fatalen Exception bleibt die Flag liegen
+    (Absturz beim naechsten Start erkennbar) und der Crash-Marker wird geschrieben."""
+
+    def test_clean_exit_marks_clean_and_clears_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_123.flag")
+            cl.mark_running(flag)
+            buf = io.StringIO()
+            cl.finalize_exit(buf, flag, had_fatal=False)
+            self.assertIn("sauberer Exit", buf.getvalue())
+            self.assertNotIn("ABGESTUERZT", buf.getvalue())
+            self.assertFalse(os.path.exists(flag), "sauberer Exit -> Flag entfernt")
+
+    def test_fatal_exit_marks_crash_and_keeps_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_123.flag")
+            cl.mark_running(flag)
+            buf = io.StringIO()
+            cl.finalize_exit(buf, flag, had_fatal=True)
+            self.assertIn("ABGESTUERZT", buf.getvalue())
+            self.assertNotIn("sauberer Exit", buf.getvalue())
+            self.assertTrue(os.path.exists(flag),
+                            "fataler Exit -> Flag BLEIBT (naechster Start erkennt Absturz)")
+
+    def test_handle_none_is_safe(self):
+        """Fehlt das Log-Handle (Setup-Fehler), darf finalize_exit nicht crashen;
+        die Flag-Logik greift trotzdem."""
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, "lightos_running_9.flag")
+            cl.mark_running(flag)
+            cl.finalize_exit(None, flag, had_fatal=False)
+            self.assertFalse(os.path.exists(flag))
 
 
 if __name__ == "__main__":
