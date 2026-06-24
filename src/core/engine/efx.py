@@ -113,6 +113,13 @@ class EfxInstance(Function):
         # siehe rgb_matrix.source_group). None = ungebunden -> erscheint in jeder
         # Gruppe. Beeinflusst NICHT das Rendering/DMX.
         self.source_group: str | None = None
+        # Entwurfs-/Commit-Status (Programmer „Entwurf bis Speichern"). True =
+        # dauerhaft (serialisiert, an source_group gebunden). False = Live-Entwurf:
+        # laeuft zur Vorschau im FunctionManager, wird aber NICHT in die Show
+        # serialisiert und beim Wechsel/Verwerfen entfernt. Default True ->
+        # geladene/bestehende EFX sind automatisch committed (back-compat);
+        # from_dict erbt diesen Default (kein Key, bewusst nicht serialisiert).
+        self.committed: bool = True
         # Geometrie
         self.width = 100.0   # 0–255
         self.height = 100.0

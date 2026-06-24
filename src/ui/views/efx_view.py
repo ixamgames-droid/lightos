@@ -476,6 +476,11 @@ class EfxView(QWidget):
         from src.core.engine.function_manager import get_function_manager
         self._fm = get_function_manager()
         self._current: EfxInstance | None = None
+        # „Entwurf bis Speichern": id des aktuell ausstehenden, noch nicht
+        # gespeicherten EFX-Entwurfs dieser View (committed==False). None = kein
+        # Entwurf offen. Pro View eigenes Feld (zwei EfxView teilen den FM, nicht
+        # dieses Feld).
+        self._draft_id: int | None = None
         self._popout: "EfxPopoutDialog | None" = None   # Großansicht-Fenster
         # Guard: True während _load_to_ui die Widgets aus dem Modell befüllt —
         # verhindert, dass Widget-Signale die Werte zurück ins (frisch geladene)
@@ -623,7 +628,7 @@ class EfxView(QWidget):
             # Lambdas sammelten sich bei jedem Programmer-Rebuild Zombie-Subscriber
             # an -> jede FUNCTION_CHANGED-Aktualisierung (auch die VC-Bibliothek)
             # wurde mit der Zeit immer langsamer. Spiegelt rgb_matrix_view._connect_sync.
-            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._on_show_loaded())
             sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._rebuild_from_state())
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte EFX erscheinen sofort
             # in beiden EFX-Ansichten (Programmer-Seite + Sub-Tab).
@@ -633,6 +638,13 @@ class EfxView(QWidget):
             sync.subscribe_widget(SyncEvent.GROUP_CHANGED, self, lambda *_: self._on_group_changed())
         except Exception as e:
             print(f"[efx_view] sync subscribe error: {e}")
+
+    def _on_show_loaded(self):
+        """SHOW_LOADED: FM.from_dict hat via _functions.clear() einen evtl.
+        offenen Entwurf bereits entfernt -> nur _draft_id nullen (KEIN remove, die
+        id kann beim Laden neu vergeben sein), dann die Liste neu aufbauen."""
+        self._draft_id = None
+        self._rebuild_from_state()
 
     def _on_group_changed(self):
         """GROUP_CHANGED: im Folgemodus die gefilterte Liste + Geraete-Zuweisung
@@ -663,12 +675,17 @@ class EfxView(QWidget):
                 sg = getattr(efx, "source_group", None) or None
                 if not self._follow and sg:
                     label = f"{efx.name}   · {sg}"
+                # „Entwurf bis Speichern": ungespeicherten eigenen Entwurf mit
+                # Punkt-Praefix markieren (source_group-Suffix bleibt erhalten).
+                if efx.id == self._draft_id:
+                    label = "● " + label
                 self._list.addItem(label)
             self._list.blockSignals(False)
             if not vis:
                 self._current = None
                 self._preview.set_efx(None)
                 self._update_group_header()
+                self._update_save_state()
                 return
             # Nach clear() steht die Zeile auf -1 -> setCurrentRow feuert immer
             # currentRowChanged -> _select_efx setzt _current auf die richtige
@@ -676,6 +693,7 @@ class EfxView(QWidget):
             target = next((i for i, e in enumerate(vis) if e.id == prev_id), -1)
             self._list.setCurrentRow(target if target >= 0 else 0)
             self._update_group_header()
+            self._update_save_state()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
@@ -692,6 +710,12 @@ class EfxView(QWidget):
                 self._sync_follow_selection()
             except RuntimeError:
                 pass
+
+    def hideEvent(self, event):
+        # Beim Wegschalten/Layout-Wechsel (View wird unsichtbar/zerstoert) den
+        # ungespeicherten Live-Entwurf verwerfen — Entwuerfe sind fluechtig.
+        super().hideEvent(event)
+        self._discard_draft()
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -725,10 +749,11 @@ class EfxView(QWidget):
 
         btn_row = QHBoxLayout()
         btn_add = QPushButton("+ Neu")
+        btn_save = QPushButton("💾 Speichern")
         btn_del = QPushButton("Löschen")
         btn_start = QPushButton("▶ Start")
         btn_stop  = QPushButton("■ Stop")
-        for btn in (btn_add, btn_del, btn_start, btn_stop):
+        for btn in (btn_add, btn_save, btn_del, btn_start, btn_stop):
             btn.setFixedHeight(26)
             btn.setStyleSheet("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
@@ -737,9 +762,14 @@ class EfxView(QWidget):
             """)
             btn_row.addWidget(btn)
         btn_add.clicked.connect(self._add_efx)
+        btn_save.clicked.connect(self._save_efx)
         btn_del.clicked.connect(self._delete_efx)
         btn_start.clicked.connect(self._start_efx)
         btn_stop.clicked.connect(self._stop_efx)
+        # „Entwurf bis Speichern": nur aktiv, wenn ein eigener Entwurf offen +
+        # selektiert ist (siehe _update_save_state).
+        self._btn_save = btn_save
+        self._btn_save.setEnabled(False)
         ll.addLayout(btn_row)
 
         left.setMaximumWidth(200)
@@ -1177,15 +1207,20 @@ class EfxView(QWidget):
     # ── List management ───────────────────────────────────────────────────────
 
     def _add_efx(self):
+        # „Entwurf bis Speichern": einen evtl. noch offenen eigenen Entwurf zuerst
+        # verwerfen (genau ein ausstehender Entwurf pro View).
+        self._discard_draft()
         efx = self._fm.new_efx(name=f"EFX {len(self._instances)+1}")
-        # Programmer-Folgemodus: die neue EFX sofort an die aktuell gewaehlte
-        # Gruppe binden, damit sie nur unter DIESER Gruppe gelistet wird (Nutzer-
-        # Wunsch: pro Gruppe sehen, welche EFX-Effekte es gibt). Ohne aktive
-        # Gruppe bleibt sie ungebunden (erscheint ueberall). Bindung per Name.
-        if self._follow:
-            gname, _ = self._group_context()
-            if gname:
-                efx.source_group = gname
+        # Die neue EFX ist ein LIVE-ENTWURF: laeuft sofort zur Vorschau, wird aber
+        # NICHT gebunden und NICHT serialisiert, bis der Nutzer „💾 Speichern"
+        # drueckt (dort bindet _save_efx im Folgemodus an die aktive Gruppe).
+        efx.committed = False
+        self._draft_id = efx.id
+        # _current schon hier auf den Entwurf setzen, damit der folgende
+        # _rebuild_from_state die Selektion ueber prev_id auf den Entwurf erhaelt
+        # (sonst behaelt er die alte Selektion -> _select_efx wuerde den frischen
+        # Entwurf sofort wieder verwerfen, weil new_id != _draft_id).
+        self._current = efx
         # new_efx() -> FUNCTION_CHANGED; gefilterte Liste neu aufbauen und die neue
         # EFX selektieren (kein manuelles addItem -> sonst Doppel-Eintrag).
         self._rebuild_from_state()
@@ -1199,11 +1234,62 @@ class EfxView(QWidget):
         # Im Follow-Modus uebernimmt _assign_from_selection (via _select_efx) die Zuweisung.
         if not self._follow:
             self._auto_assign_if_empty(allow_all=True)
+        self._update_save_state()
+
+    def _discard_draft(self):
+        """Verwirft den ungespeicherten Live-Entwurf dieser View (falls offen).
+
+        Idempotent. _draft_id wird ZUERST genullt (Re-Entrancy: _fm.remove feuert
+        synchron FUNCTION_CHANGED -> _rebuild_from_state, das reselektiert und
+        _select_efx erneut aufruft). Das committed-Gate schuetzt davor, einen
+        inzwischen gespeicherten EFX (gleiche id) zu loeschen."""
+        did = self._draft_id
+        if did is None:
+            return
+        self._draft_id = None
+        f = self._fm.get(did)
+        if f is not None and not getattr(f, "committed", True):
+            self._fm.remove(did)
+
+    def _save_efx(self):
+        """„💾 Speichern": macht aus dem aktuellen Entwurf einen dauerhaften EFX.
+
+        Setzt committed=True, bindet im Folgemodus source_group an die aktive
+        Gruppe, loescht _draft_id und feuert FUNCTION_CHANGED (serialisierbar +
+        in beiden Ansichten sichtbar)."""
+        cur = self._current
+        if cur is None or self._draft_id != getattr(cur, "id", None):
+            return
+        cur.committed = True
+        if self._follow:
+            gname, _ = self._group_context()
+            if gname:
+                cur.source_group = gname
+        self._draft_id = None
+        self._notify_change()
+        self._rebuild_from_state()
+        self._update_save_state()
+
+    def _update_save_state(self):
+        """💾-Button nur aktiv, wenn der aktuell selektierte EFX der eigene,
+        noch nicht gespeicherte Entwurf ist."""
+        try:
+            self._btn_save.setEnabled(
+                self._draft_id is not None
+                and self._current is not None
+                and self._current.id == self._draft_id)
+        except Exception:
+            pass
 
     def _delete_efx(self):
         row = self._list.currentRow()
         vis = self._visible_instances()
         if row < 0 or row >= len(vis):
+            return
+        # Ist die geloeschte Zeile der eigene Entwurf -> zentral verwerfen (nullt
+        # _draft_id vor dem remove).
+        if vis[row].id == self._draft_id:
+            self._discard_draft()
             return
         # remove() emittiert FUNCTION_CHANGED -> _rebuild_from_state aktualisiert die
         # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
@@ -1211,11 +1297,28 @@ class EfxView(QWidget):
 
     def _select_efx(self, row: int):
         vis = self._visible_instances()
+        # „Entwurf bis Speichern": wechselt die Auswahl WEG vom eigenen Entwurf,
+        # wird dieser verworfen (fluechtig). Rekursion terminiert, weil _draft_id
+        # beim durch den Rebuild ausgeloesten erneuten _select_efx schon None ist.
+        new_id = vis[row].id if 0 <= row < len(vis) else None
+        if self._draft_id is not None and new_id != self._draft_id:
+            # Zielauswahl schon VOR dem Verwerfen setzen: _discard_draft loest
+            # synchron _rebuild_from_state aus, das ueber prev_id (= _current.id)
+            # reselektiert. Stuende _current noch auf dem gerade entfernten
+            # Entwurf, markierte die Liste den Nachbarn statt des geklickten EFX.
+            # Danach Liste/Row gegen die frische (um den Entwurf gekuerzte) Liste
+            # neu aufloesen.
+            if new_id is not None:
+                self._current = vis[row]
+            self._discard_draft()
+            vis = self._visible_instances()
+            row = next((i for i, e in enumerate(vis) if e.id == new_id), -1)
         if row < 0 or row >= len(vis):
             self._current = None
             self._preview.set_efx(None)
             if self._popout is not None:
                 self._popout.bind(None)
+            self._update_save_state()
             return
         self._current = vis[row]
         self._preview.set_efx(self._current)
@@ -1225,6 +1328,7 @@ class EfxView(QWidget):
         # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl.
         if self._follow:
             self._assign_from_selection()
+        self._update_save_state()
 
     # ── Follow-Selection (M0.1, eingebettet im Programmer) ────────────────────
 
