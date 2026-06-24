@@ -9,15 +9,25 @@ from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .debug_log import debug_swallow
+from .attr_groups import ATTR_GROUPS
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
 SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
 
-# Attribut-Klassen fuer den multiplikativen Dimmer-Layer (EE-02). Wird ein
-# dedizierter Dimmer/Intensitaets-Kanal gefunden, skaliert der Dimmer-Master nur
-# diesen (kein Doppel-Dimmen); sonst die Farbkanaele. Pan/Tilt/Gobo bleiben unberuehrt.
-_DIM_INTENSITY_ATTRS = frozenset({"intensity", "dimmer", "master"})
+# Echte Dimmer-/Intensitaets-Kanaele. Dieser Sentinel ist mehrfach load-bearing:
+#   (a) Grand-Master + EE-02 skalieren NUR diese Kanaele (kein Doppel-Dimmen; sonst
+#       die Farbkanaele); Pan/Tilt/Gobo bleiben unberuehrt.
+#   (b) er entscheidet, ob ein Fixture als "Programmer-Dimmer gesetzt" gilt und damit
+#       die implizite Grundhelligkeit (4a²) ueberspringt.
+#   (c) ob ein Cue den Dimmer besitzt (exec_dimmer_fids).
+# BEWUSST OHNE shutter/strobe, obwohl attr_groups diese dem "Intensity"-Tab zuordnet:
+# der Grand Master darf einen Strobe nicht herunterdimmen, und 4a² soll nur am
+# ECHTEN Dimmer entfallen (Shutter/Strobe oeffnen ist kein Helligkeitswert).
+# Aus der kanonischen attr_groups-"Intensity"-Gruppe ABGELEITET (eine Quelle, kein
+# Drift mehr): genau diese Gruppe MINUS shutter/strobe. Die Beziehung lockt
+# tests/test_dim_intensity_sentinel.py -> aendert jemand attr_groups, schlaegt er an.
+_DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter", "strobe"})
 _DIM_COLOR_ATTRS = frozenset({
     "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
     "red", "green", "blue", "white", "amber", "uv",
