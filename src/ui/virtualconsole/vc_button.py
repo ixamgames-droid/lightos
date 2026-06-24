@@ -771,6 +771,18 @@ class VCButton(VCWidget):
                         fm.stop_others_sharing_fixtures(fid)
                     except Exception:
                         pass
+                # Auto-Assign (VC-Pfad, analog UI-04 im EFX-Tab): ein EFX ohne
+                # Geraete bekommt beim Start bewegliche Geraete (aktuelle Auswahl
+                # -> sonst alle Movingheads), damit der Button-getriggerte Effekt
+                # sofort faehrt statt stumm zu bleiben (write()-No-Op). Nur EFX
+                # (duck-typed assign_movers_auto); andere Typen bleiben unberuehrt.
+                try:
+                    _f = fm.get(fid)
+                    if (_f is not None and hasattr(_f, "assign_movers_auto")
+                            and not getattr(_f, "fixtures", None)):
+                        _f.assign_movers_auto(allow_all=True)
+                except Exception:
+                    pass
                 fm.start(fid)
                 # Wirkungslosen Start sichtbar machen: tote ID oder EFX ohne
                 # Geraete (write()-No-Op) -> kurzer Hinweis statt "Button tut

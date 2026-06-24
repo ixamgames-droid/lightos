@@ -480,6 +480,32 @@ class EfxInstance(Function):
         self._advance(dt)
         return self._values()
 
+    def assign_movers_auto(self, allow_all: bool = True) -> int:
+        """Weist bewegliche Geraete zu, falls die eigene ``fixtures``-Liste leer
+        ist: zuerst die aktuelle Auswahl, sonst (nur wenn ``allow_all``) alle
+        gepatchten Movingheads. Mover-Erkennung via ``app_state.mover_fids`` —
+        gemeinsame Quelle mit dem EFX-Editor (``_patched_movers``). Hat sie bereits
+        Geraete, bleibt sie unberuehrt. Gibt die Geraeteanzahl danach zurueck.
+
+        Fuer den VC-Trigger-Pfad gedacht (analog UI-04 im EFX-Tab): ein per Button
+        gestarteter EFX ohne Geraete laeuft sonst stumm (``write()`` No-Op)."""
+        if self.fixtures:
+            return len(self.fixtures)
+        try:
+            from src.core.app_state import get_state, mover_fids
+        except Exception:
+            return 0
+        try:
+            sel = [int(f) for f in get_state().get_selected_fids()]
+        except Exception:
+            sel = []
+        movers = mover_fids(sel) if sel else []
+        if not movers and allow_all:
+            movers = mover_fids(None)
+        if movers:
+            self.fixtures = [EfxFixture(fid=fid) for fid in movers]
+        return len(self.fixtures)
+
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
               dt: float,

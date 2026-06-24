@@ -1693,6 +1693,34 @@ def is_dual_tilt_fixture(fixture) -> bool:
         return False
 
 
+def is_mover_fixture(fixture) -> bool:
+    """True, wenn ``fixture`` ein bewegliches Geraet ist, das eine EFX-Bewegung
+    ansteuern kann: klassischer Moving Head (Pan UND Tilt) ODER Dual-Tilt-Spider
+    (>=2 Tilt, kein Pan). EINE Quelle fuer alle Mover-Erkennungen (EFX-Editor +
+    VC-Auto-Assign), damit beide nicht auseinanderdriften."""
+    try:
+        attrs = {ch.attribute for ch in get_channels_for_patched(fixture)}
+    except Exception:
+        return False
+    return ("pan" in attrs and "tilt" in attrs) or is_dual_tilt_fixture(fixture)
+
+
+def mover_fids(restrict_fids=None) -> list[int]:
+    """fids aller beweglichen Geraete (siehe ``is_mover_fixture``).
+    ``restrict_fids`` (z. B. die aktuelle Auswahl) grenzt ein und BEWAHRT deren
+    Reihenfolge (wichtig fuer Fan/Spread); sonst alle gepatchten in
+    Patch-Reihenfolge. Bei Fehlern defensiv leer."""
+    try:
+        patched = {f.fid: f for f in get_state().get_patched_fixtures()}
+    except Exception:
+        return []
+    if restrict_fids is not None:
+        seq = [patched[int(f)] for f in restrict_fids if int(f) in patched]
+    else:
+        seq = list(patched.values())
+    return [fx.fid for fx in seq if is_mover_fixture(fx)]
+
+
 def find_channel(fixture, attribute: str):
     """Erstes FixtureChannel-Objekt eines Geraets mit diesem ``attribute``
     (oder None). Zentraler Ersatz fuer die ueberall duplizierte
