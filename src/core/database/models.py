@@ -117,6 +117,14 @@ class PatchedFixture(Base):
     # Spider-Doppelbar: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel
     # (R,G,B,W)? Rein visuell (3D-Visualizer) — DMX unveraendert. Default gespiegelt.
     spider_mirrored: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Spider/Dual-Tilt: dieses Geraet explizit als Doppel-Tilt-Spider behandeln
+    # (zwei Tilt-Bars, KEIN echtes Pan). Wenn True, deutet get_channels_for_patched
+    # den Pan-Motor als zweiten Tilt-Kopf um -> Position-/EFX-Tab schalten auf die
+    # Spider-Bedienung (Motoren-Regler statt XY-Pad, Bewegungsmuster statt Kreise).
+    # Fuer fehl-importierte QXF-Spider, deren zwei Motoren als pan/tilt statt
+    # tilt/tilt gemappt wurden. Auto-Erkennung ist unmoeglich (echte Pan+Tilt-Mover
+    # sehen strukturell identisch aus), daher setzt der Nutzer es bewusst im Patch.
+    spider_dual_tilt: Mapped[bool] = mapped_column(Boolean, default=False)
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
@@ -162,6 +170,10 @@ def migrate_show_db(engine) -> None:
             if pcols and "spider_mirrored" not in pcols:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN spider_mirrored BOOLEAN DEFAULT 1"))
+            # Spider/Dual-Tilt-Marker (Pan-Motor als zweiter Tilt umdeuten).
+            if pcols and "spider_dual_tilt" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN spider_dual_tilt BOOLEAN DEFAULT 0"))
             # Pan/Tilt physische Bereiche + Nullpunkt (Moving-Head-Aim/Visualizer).
             for _col, _def in (("pan_range_deg", 540), ("tilt_range_deg", 270),
                                ("pan_zero_dmx", 128), ("tilt_zero_dmx", 128)):
