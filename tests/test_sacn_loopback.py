@@ -46,7 +46,12 @@ class SacnLoopbackTest(unittest.TestCase):
                 except socket.timeout:
                     continue
             if pkt is None:
-                self.skipTest("kein Paket empfangen (Loopback evtl. blockiert)")
+                # QA-02: Der Bind ist geglueckt -> der UDP-Loopback funktioniert in
+                # dieser Umgebung. Kommt das Paket trotzdem nicht an, ist das eine
+                # ECHTE Sender-Regression (kein Umgebungsproblem) -> failen statt
+                # skippen, sonst bliebe ein kaputter sACN-Sender gruen/unsichtbar.
+                self.fail("sACN-Paket trotz erfolgreichem Bind nicht empfangen "
+                          "(Sender-Regression)")
 
             # ── Roh-Wire-Format pruefen (nicht nur Parser-Symmetrie) ──────────
             self.assertEqual(len(pkt), 638)                          # 512 DMX -> 638 B
@@ -81,7 +86,10 @@ class SacnLoopbackTest(unittest.TestCase):
                 try:
                     pkt, _addr = rx.recvfrom(2048)
                 except socket.timeout:
-                    self.skipTest("kein Paket empfangen (Loopback evtl. blockiert)")
+                    # QA-02: Bind ok -> ausbleibendes Paket ist eine Sender-
+                    # Regression, kein Umgebungsproblem -> failen statt skippen.
+                    self.fail("sACN-Paket trotz erfolgreichem Bind nicht empfangen "
+                              "(Sender-Regression)")
                 seqs.append(pkt[111])
             # Streng monoton (mod 256) — hier einfach +1 pro Frame.
             self.assertEqual(seqs[1], (seqs[0] + 1) & 0xFF)
