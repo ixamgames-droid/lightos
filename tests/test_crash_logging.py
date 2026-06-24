@@ -265,6 +265,27 @@ class PerPidFlagTest(unittest.TestCase):
                 f.write("")            # leer/unlesbare PID -> als Absturz werten
             self.assertIn(legacy, cl.find_crashed_sessions(td, own_pid=os.getpid()))
 
+    def test_find_crashed_sessions_reports_pid_reuse_leftover(self):
+        """PID-Reuse: Liegt unter dem EIGENEN per-PID-Flag-Pfad beim Start (vor
+        mark_running) schon eine Flag, ist es die STALE Crash-Flag einer
+        Vorsitzung, deren PID das OS uns neu vergeben hat -> trotz 'lebt' (= wir)
+        als Absturz melden (sonst der Befund, den die Review fand)."""
+        with tempfile.TemporaryDirectory() as td:
+            own_flag = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own_flag)              # simuliert das Reuse-Leftover
+            crashed = cl.find_crashed_sessions(
+                td, own_pid=os.getpid(), own_flag_path=own_flag)
+            self.assertIn(own_flag, crashed,
+                          "Reuse-Leftover unter eigenem Pfad muss als Absturz gelten")
+
+    def test_find_crashed_sessions_without_own_path_skips_live_self(self):
+        """Ohne own_flag_path bleibt das alte Verhalten: die eigene LEBENDE
+        PID-Flag wird NICHT als Absturz gemeldet (Liveness/own_pid)."""
+        with tempfile.TemporaryDirectory() as td:
+            own = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own)
+            self.assertNotIn(own, cl.find_crashed_sessions(td, own_pid=os.getpid()))
+
 
 if __name__ == "__main__":
     unittest.main()

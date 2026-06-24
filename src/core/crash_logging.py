@@ -273,15 +273,28 @@ def pid_is_alive(pid) -> bool:
         try:
             import ctypes
             from ctypes import wintypes
-            kernel32 = ctypes.windll.kernel32
+            # use_last_error=True -> der Fehlercode wird DIREKT nach dem Call
+            # gesichert und ist via ctypes.get_last_error() zuverlaessig lesbar
+            # (ein separater GetLastError()-Aufruf koennte schon ueberschrieben sein).
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            # HANDLE explizit als Zeiger typisieren -> keine Truncation des
+            # 64-Bit-Handles auf Win64 (ctypes-Default-restype waere c_int = 32 Bit,
+            # was Handle-Wahrheitswert UND CloseHandle verfaelschen koennte).
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE,
+                                                    ctypes.POINTER(wintypes.DWORD)]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
             PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
             ERROR_ACCESS_DENIED = 5
             STILL_ACTIVE = 259
             h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
             if not h:
-                # Kein Handle: existiert der Prozess gar nicht (INVALID_PARAMETER)
-                # -> tot. Nur fehlende Rechte (ACCESS_DENIED) -> existiert -> lebt.
-                return kernel32.GetLastError() == ERROR_ACCESS_DENIED
+                # Kein Handle: Prozess existiert nicht (INVALID_PARAMETER) -> tot.
+                # Nur fehlende Rechte (ACCESS_DENIED) -> existiert -> lebt.
+                return ctypes.get_last_error() == ERROR_ACCESS_DENIED
             try:
                 code = wintypes.DWORD()
                 if kernel32.GetExitCodeProcess(h, ctypes.byref(code)):
@@ -329,17 +342,30 @@ def find_running_flags(log_dir: str) -> list[str]:
     return out
 
 
-def find_crashed_sessions(log_dir: str, own_pid: int | None = None) -> list[str]:
-    """STAB-06: Pfade der Running-Flags, deren Prozess nicht mehr lebt (und nicht
-    der eigene ist) -> jeweils eine NICHT sauber beendete Vorsitzung.
+def find_crashed_sessions(log_dir: str, own_pid: int | None = None,
+                          own_flag_path: str | None = None) -> list[str]:
+    """STAB-06: Pfade der Running-Flags, deren Prozess nicht mehr lebt -> jeweils
+    eine NICHT sauber beendete Vorsitzung.
 
     Per-PID-Flags (statt einer globalen Flag) machen die Erkennung
     multi-instanz-sicher: eine zweite Instanz ueberschreibt/loescht die Flag der
     ersten nicht mehr, und eine PARALLEL laufende Instanz wird ueber den
-    Liveness-Check NICHT faelschlich als Absturz gemeldet."""
+    Liveness-Check NICHT faelschlich als Absturz gemeldet.
+
+    ``own_flag_path`` (der eigene per-PID-Flag-Pfad): Diese Funktion laeuft VOR
+    ``mark_running``, die eigene Flag existiert also normal noch nicht. Liegt unter
+    diesem EXAKTEN Pfad dennoch eine Flag, hat das OS uns die PID einer abgestuerzten
+    Vorsitzung neu vergeben (PID-Reuse) -> als Absturz melden. Eine Liveness-Pruefung
+    saehe hier nur UNS selbst als lebend und wuerde den Absturz sonst verschlucken."""
     own = os.getpid() if own_pid is None else int(own_pid)
+    own_norm = (os.path.normcase(os.path.abspath(own_flag_path))
+                if own_flag_path else None)
     crashed: list[str] = []
     for path in find_running_flags(log_dir):
+        if own_norm is not None and os.path.normcase(os.path.abspath(path)) == own_norm:
+            # PID-Reuse-Leftover unter dem eigenen Pfad (s.o.) -> Absturz.
+            crashed.append(path)
+            continue
         pid = read_flag_pid(path)
         if pid is None:
             # Unlesbare/leere (Legacy-)Flag -> als abgestuerzt werten, damit kein
@@ -347,6 +373,8 @@ def find_crashed_sessions(log_dir: str, own_pid: int | None = None) -> list[str]
             crashed.append(path)
             continue
         if pid == own:
+            # Gleiche PID, aber NICHT die eigene Flag-Datei (per-PID unmoeglich;
+            # nur eine Legacy-Koinzidenz) -> wir leben, also kein Crash.
             continue
         if not pid_is_alive(pid):
             crashed.append(path)

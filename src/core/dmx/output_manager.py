@@ -139,14 +139,19 @@ class OutputManager:
         # aus STAB-02). Stattdessen _running reaktivieren: der noch lebende Thread
         # nimmt seine Schleife wieder auf, sobald sein haengendes write()
         # zurueckkommt (Selbstheilung statt Thread-Verdopplung).
-        if self._thread is not None and self._thread.is_alive():
-            self._running = True
+        reactivate = self._thread is not None and self._thread.is_alive()
+        self._running = True
+        if reactivate and self._thread is not None and self._thread.is_alive():
+            # Race-Absicherung: _running ist hier BEREITS True gesetzt, bevor wir
+            # erneut pruefen. Lebt der Zombie noch, nimmt er seine Schleife wieder
+            # auf (kein zweiter Thread). Ist er im engen Fenster doch gerade
+            # beendet, fallen wir durch und starten frisch -> nie _running=True
+            # ohne laufenden Loop.
             import sys
             print("[OutputManager] frueherer DMX-Output-Thread laeuft noch — "
                   "reaktiviert statt zweiten Thread zu starten (STAB-04).",
                   file=sys.stderr)
             return
-        self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True, name="DMX-Output")
         self._thread.start()
 

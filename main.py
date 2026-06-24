@@ -111,7 +111,8 @@ def _setup_crash_logging():
         # Crash/Kill/Stromausfall). Multi-instanz-sicher: parallel laufende
         # Instanzen werden ueber den Liveness-Check nicht als Absturz gemeldet.
         # VOR mark_running() ausgewertet -> die eigene Flag existiert noch nicht.
-        crashed_flags = _cl.find_crashed_sessions(log_dir, own_pid=os.getpid())
+        crashed_flags = _cl.find_crashed_sessions(
+            log_dir, own_pid=os.getpid(), own_flag_path=_running_flag_path)
         if crashed_flags:
             _crash_log_handle.write(
                 _cl.previous_crash_notice(_cl.read_last_alive(_last_alive_path)))
