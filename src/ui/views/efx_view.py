@@ -49,6 +49,7 @@ class EfxPreviewWidget(QWidget):
         self._efx: EfxInstance | None = None
         self._phase = 0.0
         self._bounce_dir = 1.0
+        self._rand_progress = 0.0   # RANDOM: kontinuierlicher Walk-Progress (Befund [18])
         # Editier-Modus: Zentrum per Drag verschieben, Eck-Griffe = Groesse.
         # Ein Callback meldet Geometrie-Aenderungen ({attr: wert}) an die EfxView,
         # die Spinboxen/Modell/zweite Vorschau synchron haelt.
@@ -76,6 +77,7 @@ class EfxPreviewWidget(QWidget):
         self._efx = efx
         self._phase = 0.0
         self._bounce_dir = 1.0
+        self._rand_progress = 0.0
         self.update()
 
     def _tick(self):
@@ -89,11 +91,14 @@ class EfxPreviewWidget(QWidget):
             speed = 1.0
         delta = e.speed_hz * speed * 0.04
         # Phasenfortschreibung zentral (eine Quelle mit EfxInstance._advance) —
-        # inkl. One-Shot-Bounce-Halten: frueher loopte der Bounce in der Vorschau
-        # endlos weiter, waehrend die Engine am Endpunkt haelt (Befund [33]).
-        self._phase, self._bounce_dir = advance_phase(
-            self._phase, self._bounce_dir, delta, e.direction,
-            bool(getattr(e, "loop", True)))
+        # inkl. One-Shot-Bounce-Halten (Befund [33]). RANDOM kennt kein Loop/Bounce:
+        # kontinuierlicher Walk-Progress wie EfxInstance._advance (Befund [18]).
+        if e.algorithm == EfxAlgorithm.RANDOM:
+            self._rand_progress += (-delta if e.direction == "backward" else delta)
+        else:
+            self._phase, self._bounce_dir = advance_phase(
+                self._phase, self._bounce_dir, delta, e.direction,
+                bool(getattr(e, "loop", True)))
         self.update()
 
     # ── Geometrie-Helfer ─────────────────────────────────────────────────────
@@ -128,13 +133,26 @@ class EfxPreviewWidget(QWidget):
             p.end()
             return
 
-        # 1) Kompletter Pfad aus den ECHTEN Parametern (keine Hardcodes)
+        # 1) Pfad: bei RANDOM die zuletzt gelaufene Walk-SPUR (wandernd, KEINE
+        #    geschlossene Schleife — die Engine faehrt einen endlosen _random_xy-Walk,
+        #    Befund [18]); sonst die komplette Figur aus den echten Parametern.
+        is_random = (e.algorithm == EfxAlgorithm.RANDOM)
         samples = 128
         pts = []
         try:
-            for i in range(samples + 1):
-                pan, tilt = e._calc(i / samples)
-                pts.append(self._to_px(pan, tilt, m, w, h))
+            if is_random:
+                rp = self._rand_progress
+                window = 4.0   # letzte ~4 Wegpunkte als Spur
+                for k in range(samples + 1):
+                    pr = rp - window * (1.0 - k / samples)
+                    rx, ry = e._random_xy(pr)
+                    pan = max(0, min(255, e.x_offset + rx))
+                    tilt = max(0, min(255, e.y_offset + ry))
+                    pts.append(self._to_px(pan, tilt, m, w, h))
+            else:
+                for i in range(samples + 1):
+                    pan, tilt = e._calc(i / samples)
+                    pts.append(self._to_px(pan, tilt, m, w, h))
         except Exception:
             pts = []
         if len(pts) > 1:
@@ -142,44 +160,65 @@ class EfxPreviewWidget(QWidget):
             for i in range(1, len(pts)):
                 p.drawLine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1])
 
-            # 2) Richtungspfeil bei Phase ~0.06 entlang der Laufrichtung
-            sgn = -1.0 if e.direction == "backward" else 1.0
-            try:
-                a0 = e._calc(0.05)
-                a1 = e._calc(0.05 + sgn * 0.02)
-                x0, y0 = self._to_px(a0[0], a0[1], m, w, h)
-                x1, y1 = self._to_px(a1[0], a1[1], m, w, h)
-                ang = math.atan2(y1 - y0, x1 - x0)
-                p.setPen(QPen(QColor("#79c0ff"), 2))
-                for off in (math.radians(150), math.radians(-150)):
-                    p.drawLine(x1, y1,
-                               int(x1 + 9 * math.cos(ang + off)),
-                               int(y1 + 9 * math.sin(ang + off)))
-            except Exception:
-                pass
+            # 2) Richtungspfeil bei Phase ~0.06 entlang der Laufrichtung — nur fuer
+            #    geschlossene Figuren (bei RANDOM zeigen Spur + Punkte die Richtung).
+            if not is_random:
+                sgn = -1.0 if e.direction == "backward" else 1.0
+                try:
+                    a0 = e._calc(0.05)
+                    a1 = e._calc(0.05 + sgn * 0.02)
+                    x0, y0 = self._to_px(a0[0], a0[1], m, w, h)
+                    x1, y1 = self._to_px(a1[0], a1[1], m, w, h)
+                    ang = math.atan2(y1 - y0, x1 - x0)
+                    p.setPen(QPen(QColor("#79c0ff"), 2))
+                    for off in (math.radians(150), math.radians(-150)):
+                        p.drawLine(x1, y1,
+                                   int(x1 + 9 * math.cos(ang + off)),
+                                   int(y1 + 9 * math.sin(ang + off)))
+                except Exception:
+                    pass
 
-        # 3) Fixture-Punkte: Verhaeltnis (sync/fan/offset) + Gegenlauf + Mirror —
-        #    exakt die Phasenlogik aus EfxInstance._values / _fan_for (Werte-gleich).
+        # 3) Fixture-Punkte: bei RANDOM der echte _random_xy-Walk (wie
+        #    EfxInstance._values, dekorreliert ueber i*1.7*spread + Counter-Sign,
+        #    Befund [18]); sonst Verhaeltnis (sync/fan/offset) + Gegenlauf + Mirror.
         fixtures = list(getattr(e, "fixtures", None) or [])
         n = max(1, len(fixtures))
         counter = bool(getattr(e, "counter_rotate", False))
         for i in range(n):
-            try:
-                fan = e._fan_for(i, n)
-            except Exception:
-                fan = (i / n) * e.spread if n > 1 else 0.0
-            offset = 0.0
-            if i < len(fixtures):
-                offset = float(getattr(fixtures[i], "start_offset", 0.0) or 0.0)
-            base = -self._phase if (counter and i % 2 == 1) else self._phase
-            ph = (base + offset + fan) % 1.0
-            try:
-                pan, tilt = e._calc(ph)
-            except Exception:
-                continue
-            mirrored = bool(e.mirror and (i % 2 == 1))
-            if mirrored:
-                pan = 255 - pan
+            if is_random:
+                mode = getattr(e, "phase_mode", "fan")
+                offs = 0.0 if mode == "sync" else (i * 1.7 * e.spread if n > 1 else 0.0)
+                progress = -self._rand_progress if (counter and i % 2 == 1) else self._rand_progress
+                try:
+                    rx, ry = e._random_xy(progress + offs)
+                except Exception:
+                    continue
+                pan = max(0, min(255, e.x_offset + rx))
+                tilt = max(0, min(255, e.y_offset + ry))
+            else:
+                try:
+                    fan = e._fan_for(i, n)
+                except Exception:
+                    # [34]: Fallback phase_mode-bewusst (spiegelt _fan_for) statt
+                    # blind einen Faecher anzunehmen.
+                    _mode = getattr(e, "phase_mode", "fan")
+                    if n <= 1 or _mode == "sync":
+                        fan = 0.0
+                    elif _mode == "offset":
+                        fan = i * (float(getattr(e, "phase_offset_deg", 0.0)) / 360.0)
+                    else:
+                        fan = (i / n) * e.spread
+                offset = 0.0
+                if i < len(fixtures):
+                    offset = float(getattr(fixtures[i], "start_offset", 0.0) or 0.0)
+                base = -self._phase if (counter and i % 2 == 1) else self._phase
+                ph = (base + offset + fan) % 1.0
+                try:
+                    pan, tilt = e._calc(ph)
+                except Exception:
+                    continue
+                if e.mirror and (i % 2 == 1):
+                    pan = 255 - pan
             x, y = self._to_px(pan, tilt, m, w, h)
             color = QColor(self._DOT_COLORS[i % len(self._DOT_COLORS)])
             p.setBrush(color)
@@ -359,6 +398,7 @@ class SpiderEfxPreview(QWidget):
         self._efx: EfxInstance | None = None
         self._phase = 0.0
         self._bounce_dir = 1.0
+        self._rand_progress = 0.0   # RANDOM: kontinuierlicher Walk-Progress (Befund [18])
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         self._bars = SpiderBarsView()
@@ -373,6 +413,7 @@ class SpiderEfxPreview(QWidget):
         self._efx = efx
         self._phase = 0.0
         self._bounce_dir = 1.0
+        self._rand_progress = 0.0
         self._update_bars()
 
     def _tick(self):
@@ -385,10 +426,13 @@ class SpiderEfxPreview(QWidget):
             speed = 1.0
         delta = e.speed_hz * speed * 0.04
         # Phasenfortschreibung zentral (eine Quelle mit EfxInstance._advance),
-        # inkl. One-Shot-Bounce-Halten (Befund [33]).
-        self._phase, self._bounce_dir = advance_phase(
-            self._phase, self._bounce_dir, delta, e.direction,
-            bool(getattr(e, "loop", True)))
+        # inkl. One-Shot-Bounce-Halten (Befund [33]). RANDOM: Walk-Progress (Befund [18]).
+        if e.algorithm == EfxAlgorithm.RANDOM:
+            self._rand_progress += (-delta if e.direction == "backward" else delta)
+        else:
+            self._phase, self._bounce_dir = advance_phase(
+                self._phase, self._bounce_dir, delta, e.direction,
+                bool(getattr(e, "loop", True)))
         self._update_bars()
 
     def _update_bars(self):
@@ -397,12 +441,24 @@ class SpiderEfxPreview(QWidget):
             self._bars.set_tilts(128, 128)
             return
         try:
-            _p0, t0 = e._calc(self._phase)
             hs = max(0.0, float(getattr(e, "head_spread", 1.0)))
-            # 2-Bar-Vorschau: Kopf 1 liegt bei k/N = 1/2, also 0.5*head_spread
-            # versetzt — exakt wie EfxInstance._spider_head_tilts es fuer
-            # head_count=2 berechnet (Vorschau spiegelt den Render).
-            _p1, t1 = e._calc((self._phase + 0.5 * hs) % 1.0)
+            if e.algorithm == EfxAlgorithm.RANDOM:
+                # RANDOM-Walk wie EfxInstance._values/_spider_head_tilts: Tilt aus der
+                # y-Komponente; Kopf 1 (k=1) um 1*1.7*head_spread versetzt, Gegenlauf
+                # kehrt ihn um (Befund [18]). cy = Figur-Zentrum (y_offset).
+                counter = bool(getattr(e, "counter_rotate", False))
+                cy = e.y_offset
+                _x0, ry0 = e._random_xy(self._rand_progress)
+                prog1 = -self._rand_progress if counter else self._rand_progress
+                _x1, ry1 = e._random_xy(prog1 + 1.7 * hs)
+                t0 = cy + ry0
+                t1 = cy + ry1
+            else:
+                _p0, t0 = e._calc(self._phase)
+                # 2-Bar-Vorschau: Kopf 1 liegt bei k/N = 1/2, also 0.5*head_spread
+                # versetzt — exakt wie EfxInstance._spider_head_tilts es fuer
+                # head_count=2 berechnet (Vorschau spiegelt den Render).
+                _p1, t1 = e._calc((self._phase + 0.5 * hs) % 1.0)
         except Exception:
             t0 = t1 = 128
         self._bars.set_tilts(int(max(0, min(255, t0))),
