@@ -29,13 +29,16 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
-| UI-03  | P2 | todo | Fixture-Kopieren mit Offset | Mehrere Geräte mit Adress-Abstand patchen; Dialog (Anzahl + Offset) + Test |
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
 | OUT-02 | P2 | todo | Enttec Open DMX USB Stabilisierung | Kein Drift/Hang über lange Sessions (>8h); Reconnect-Logik; Doku |
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
 
+- **STAB-04 / STAB-05 / STAB-06** · DMX-Output- & Crash-Erkennungs-Stabilität gehärtet: getimeouteten Output-Thread weitertracken (kein zweiter, konkurrierender DMX-Thread → AV), fatale Exception wird nicht mehr als „sauberer Exit" markiert (Absturz beim nächsten Start erkennbar), Running-Flag pro PID + Windows-sicherer Liveness-Check (OpenProcess statt os.kill). +15 Tests. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
+- **QA-01 / QA-02 / QA-03** · Test-Gate/CI gehärtet: `pytest-timeout` in den CI-Install-Pfad, sACN-Loopback `fail` statt `skip` nach erfolgreichem Bind, `_delete_selected`-UI-Pfad direkt getestet. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
+- **VIZ-01 / VIZ-02 / VIZ-03 / VIZ-04** · Visualizer-Lows: 2D-Live-View-Positionen beim Unpatch aufräumen, Spider-Tilt-Default 180° statt 270°, Dock beim Ausrichten/Verteilen lösen, Laser-Fächer-Sichtbarkeit bei View-/Settings-Wechsel reapplien. +5 Tests. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
+- **UI-03** · Fixture-Kopieren mit Offset: Toolbar-Button „Mit Offset kopieren…" (Dialog Anzahl + Offset), testbare `plan_offset_copies`-Logik (Universe-Überlauf übersprungen), jede Kopie einzeln undoable. +6 Tests. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
 - **UI-10 / UI-11** · EFX-RANDOM-Vorschau folgt jetzt dem echten `_random_xy`-Walk (wandernde Spur statt geschlossener Schleife; Fixture-Punkte + Spider-Bars numerisch == `EfxInstance._values`) + Fan-Fallback `phase_mode`-bewusst. Letzte Punkte des Programmer-Audits 2026-06-23. _Rein visuelle Feinabnahme im laufenden Programm noch offen._ [PR #51](https://github.com/ixamgames-droid/lightos/pull/51)
 - **STAB-02** · Access Violation beim Beenden behoben: `OutputManager.stop()` schließt DMX-Geräte nur nach bestätigtem Thread-Ende (sonst CloseHandle neben WriteFile → AV); `EnttecPro` mit `is_open`-Guard + Purge vor close. +8 Tests. [PR #36](https://github.com/ixamgames-droid/lightos/pull/36)
 - **STAB-01** · Crash-Logging „ausgereift": man erkennt jetzt **wann/wie** abgestürzt — Start-/Clean-Exit-Marker, „vorige Sitzung abgestürzt"-Erkennung (deckt native Crashes ab), Standby≠Freeze, `threading.excepthook`, Sturm-Drossel, Qt-Message-Handler, Rotation. Neu `src/core/crash_logging.py` + 18 Tests. [PR #33](https://github.com/ixamgames-droid/lightos/pull/33)
