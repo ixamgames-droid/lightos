@@ -142,6 +142,20 @@ class VCFrame(VCWidget):
 
         menu.addSeparator()
         menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
+        # Bank-Zuweisung — wie bei normalen Widgets (VCWidget._set_bank). Erlaubt,
+        # einen bestehenden Frame nachtraeglich auf eine andere Bank zu legen; der
+        # Frame folgt als EINHEIT der Bank-Sichtbarkeit (Kinder blenden mit aus/ein).
+        bank_menu = menu.addMenu("Bank")
+        act_all = bank_menu.addAction("Alle Banks")
+        act_all.setCheckable(True)
+        act_all.setChecked(self.bank < 0)
+        act_all.triggered.connect(lambda: self._set_bank(-1))
+        bank_menu.addSeparator()
+        for i in range(10):
+            a = bank_menu.addAction(f"Bank {i + 1}")
+            a.setCheckable(True)
+            a.setChecked(self.bank == i)
+            a.triggered.connect(lambda checked=False, b=i: self._set_bank(b))
         menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
         menu.addSeparator()
         menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
