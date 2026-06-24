@@ -772,6 +772,15 @@ class VCButton(VCWidget):
                     except Exception:
                         pass
                 fm.start(fid)
+                # Wirkungslosen Start sichtbar machen: tote ID oder EFX ohne
+                # Geraete (write()-No-Op) -> kurzer Hinweis statt "Button tut
+                # nichts" ohne Rueckmeldung. Best effort (Statusleiste/Log).
+                try:
+                    prob = fm.start_problem(fid)
+                except Exception:
+                    prob = None
+                if prob:
+                    self._show_status(prob)
                 # Dieser Effekt wird das aktive Bearbeitungsziel des Slots.
                 if self.edit_slot:
                     try:
@@ -869,6 +878,37 @@ class VCButton(VCWidget):
             ed.raise_()
         except Exception:
             pass
+
+    def _binding_unresolved(self) -> bool:
+        """True, wenn dieser Funktions-Button auf eine ID zeigt, die der
+        FunctionManager nicht (mehr) kennt — eine tote Bindung (z. B. Effekt
+        geloescht/neu angelegt, Button behaelt die alte ID). Quelle des roten
+        „ungebunden"-Markers im paintEvent. Nur Toggle/Flash mit gesetzter ID;
+        bei Lookup-Fehlern defensiv False (kein Fehlalarm beim Laden)."""
+        if self.action not in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+            return False
+        if self.function_id is None:
+            return False
+        try:
+            from src.core.app_state import get_state
+            fm = get_state().function_manager
+            return fm.get(int(self.function_id)) is None
+        except Exception:
+            return False
+
+    def _show_status(self, msg: str, ms: int = 4000):
+        """Kurzer Hinweis fuer den Nutzer — bevorzugt in der Statusleiste des
+        Hauptfensters, sonst (Popout/ohne Statusleiste) als Log. Best effort,
+        nie eine Exception nach aussen."""
+        try:
+            win = self.window()
+            sb = win.statusBar() if hasattr(win, "statusBar") else None
+            if sb is not None:
+                sb.showMessage(f"⚠ {msg}", ms)
+                return
+        except Exception:
+            pass
+        print(f"[vc_button] {msg}")
 
     def _function_running(self) -> bool:
         """True, wenn dieser Button eine Funktion steuert, die gerade laeuft.
@@ -977,6 +1017,21 @@ class VCButton(VCWidget):
             p.drawText(QRect(kx, 0, self.width() - kx - 10, 10),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                        f"⌨{self.key_binding}")
+
+        # Tote Bindung: zeigt der Button auf eine nicht (mehr) existierende
+        # Funktions-ID, einen roten gestrichelten Rahmen + ⚠ zeichnen, damit der
+        # Klick nicht still ins Leere geht (statt frustfreiem "passiert nichts").
+        if self._binding_unresolved():
+            pen = QPen(QColor("#ff5555"), 2)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            p.setPen(pen)
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            p.setPen(QColor("#ff5555"))
+            p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            p.drawText(self.rect().adjusted(0, 2, -4, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight, "⚠")
+            self.setToolTip(f"Funktion #{self.function_id} nicht gefunden — "
+                            f"tote Bindung. Funktion neu zuweisen.")
 
         # BTN-01: Multi-Action-Indikator oben links (Anzahl Zusatz-Aktionen)
         if self.actions:
