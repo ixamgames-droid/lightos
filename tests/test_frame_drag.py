@@ -114,5 +114,64 @@ class FrameDragHighlightTest(_CanvasTest):
         self.assertEqual(kids[-1], second)        # raise_(): zuletzt = oberste Lage
 
 
+class FrameDropTargetBankTest(_CanvasTest):
+    """FRM-03: in das Frame der AKTIVEN Bank ablegen, nicht ins zuerst erstellte.
+    Frames anderer Baenke liegen unsichtbar an gleicher Geometrie -> ohne Bank-
+    Filter gewann immer das aelteste (Bank 1)."""
+
+    def _canvas(self):
+        canvas = VCCanvas()
+        self._canvases.append(canvas)
+        canvas.set_edit_mode(True)
+        return canvas
+
+    def test_drop_targets_active_bank_frame_not_first(self):
+        canvas = self._canvas()
+        canvas._active_bank = 0
+        frame0 = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame0.resize(300, 200)
+        canvas._active_bank = 1
+        frame1 = canvas._add_widget("VCFrame", QPoint(200, 60))   # gleiche Geometrie, Bank 1
+        frame1.resize(300, 200)
+        self.assertEqual(frame0.bank, 0)
+        self.assertEqual(frame1.bank, 1)
+        btn = canvas._add_widget("VCButton", QPoint(20, 20))      # neu auf Bank 1
+        btn.move(300, 120)                                        # Mitte ueber BEIDEN Frames
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), frame1)                       # NICHT frame0 (Bank 0)
+
+    def test_drop_ignores_offbank_frame(self):
+        canvas = self._canvas()
+        canvas._active_bank = 0
+        frame0 = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame0.resize(300, 200)
+        canvas._active_bank = 1                                   # Frame ist nun off-bank
+        btn = canvas._add_widget("VCButton", QPoint(300, 120))
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), canvas)                       # kein gueltiges Ziel -> bleibt
+
+    def test_allbanks_frame_is_valid_target(self):
+        canvas = self._canvas()
+        canvas._active_bank = 2
+        frame = canvas._add_widget("VCFrame", QPoint(200, 60))
+        frame.resize(300, 200)
+        frame.bank = -1                                           # „Alle Banks"
+        btn = canvas._add_widget("VCButton", QPoint(300, 120))
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), frame)
+
+    def test_overlapping_same_bank_picks_topmost(self):
+        canvas = self._canvas()
+        canvas._active_bank = 0
+        lower = canvas._add_widget("VCFrame", QPoint(200, 60))
+        lower.resize(300, 200)
+        upper = canvas._add_widget("VCFrame", QPoint(200, 60))    # gleiche Bank/Geometrie, spaeter = oben
+        upper.resize(300, 200)
+        btn = canvas._add_widget("VCButton", QPoint(20, 20))
+        btn.move(300, 120)
+        canvas.handle_drag_drop(btn)
+        self.assertIs(btn.parent(), upper)                        # oberstes (zuletzt erstellt)
+
+
 if __name__ == "__main__":
     unittest.main()
