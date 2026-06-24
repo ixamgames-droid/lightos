@@ -90,7 +90,10 @@ def _setup_crash_logging():
         log_dir = _appdata_dir()
         _crash_log_path = os.path.join(log_dir, "crash.log")
         _last_alive_path = os.path.join(log_dir, "last_alive.txt")
-        _running_flag_path = os.path.join(log_dir, "lightos_running.flag")
+        # STAB-06: per-PID-Flag statt einer globalen Datei -> eine zweite Instanz
+        # ueberschreibt/loescht die Flag der ersten nicht mehr (deren Crash bliebe
+        # sonst unerkannt). Die Vorige-Sitzung-Erkennung scannt unten ALLE Flags.
+        _running_flag_path = os.path.join(log_dir, f"lightos_running_{os.getpid()}.flag")
 
         # Rotation, BEVOR wir anhaengen -> Log bleibt lesbar und begrenzt.
         _cl.rotate_if_large(_crash_log_path, max_bytes=2 * 1024 * 1024, backups=3)
@@ -103,11 +106,17 @@ def _setup_crash_logging():
         # beim naechsten Start ueber last_alive.txt.
         faulthandler.enable(file=_crash_log_handle)
 
-        # Hat die VORHERIGE Sitzung sauber beendet? running.flag bleibt liegen,
-        # wenn atexit nicht lief (nativer Crash/Kill/Stromausfall).
-        if os.path.exists(_running_flag_path):
+        # Hat eine VORHERIGE Sitzung NICHT sauber beendet? Per-PID-Flags, deren
+        # Prozess nicht mehr lebt, bleiben liegen, wenn atexit nicht lief (nativer
+        # Crash/Kill/Stromausfall). Multi-instanz-sicher: parallel laufende
+        # Instanzen werden ueber den Liveness-Check nicht als Absturz gemeldet.
+        # VOR mark_running() ausgewertet -> die eigene Flag existiert noch nicht.
+        crashed_flags = _cl.find_crashed_sessions(log_dir, own_pid=os.getpid())
+        if crashed_flags:
             _crash_log_handle.write(
                 _cl.previous_crash_notice(_cl.read_last_alive(_last_alive_path)))
+            for _flag in crashed_flags:
+                _cl.clear_running(_flag)   # tote Flag wegraeumen -> kein Dauer-Report
 
         # Start-Banner + Running-Flag + erstes Lebenszeichen.
         _crash_log_handle.write(_cl.session_banner(APP_VERSION))

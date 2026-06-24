@@ -203,5 +203,68 @@ class FinalizeExitTest(unittest.TestCase):
             self.assertFalse(os.path.exists(flag))
 
 
+class PerPidFlagTest(unittest.TestCase):
+    """STAB-06: per-PID-Running-Flags + Liveness machen die Crash-Erkennung
+    multi-instanz-sicher (keine globale Flag, die eine 2. Instanz ueberschreibt/
+    loescht; laufende Parallel-Instanzen werden NICHT als Absturz gemeldet)."""
+
+    @staticmethod
+    def _dead_pid() -> int:
+        """Eine PID, deren Prozess garantiert beendet ist."""
+        import subprocess
+        import sys
+        p = subprocess.Popen([sys.executable, "-c", "pass"])
+        p.wait()                       # Kind beendet (+ unter POSIX reaped)
+        return p.pid
+
+    def test_pid_is_alive_for_self(self):
+        self.assertTrue(cl.pid_is_alive(os.getpid()))
+
+    def test_pid_is_alive_false_for_dead_process(self):
+        self.assertFalse(cl.pid_is_alive(self._dead_pid()))
+
+    def test_pid_is_alive_rejects_garbage(self):
+        self.assertFalse(cl.pid_is_alive(None))
+        self.assertFalse(cl.pid_is_alive(-1))
+        self.assertFalse(cl.pid_is_alive("nope"))
+
+    def test_read_flag_pid_round_trip(self):
+        with tempfile.TemporaryDirectory() as td:
+            flag = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(flag)
+            self.assertEqual(cl.read_flag_pid(flag), os.getpid())
+            self.assertIsNone(cl.read_flag_pid(os.path.join(td, "fehlt.flag")))
+
+    def test_find_running_flags_matches_perpid_and_legacy(self):
+        with tempfile.TemporaryDirectory() as td:
+            cl.mark_running(os.path.join(td, "lightos_running_111.flag"))
+            cl.mark_running(os.path.join(td, "lightos_running.flag"))  # Legacy
+            with open(os.path.join(td, "andere.txt"), "w", encoding="utf-8") as f:
+                f.write("x")
+            found = {os.path.basename(p) for p in cl.find_running_flags(td)}
+            self.assertEqual(found, {"lightos_running_111.flag", "lightos_running.flag"})
+
+    def test_find_crashed_sessions_reports_dead_skips_self_and_alive(self):
+        with tempfile.TemporaryDirectory() as td:
+            # eigene (lebende) Flag -> NICHT als Crash melden
+            own = os.path.join(td, f"lightos_running_{os.getpid()}.flag")
+            cl.mark_running(own)
+            # tote Vorsitzung -> ALS Crash melden
+            dead_pid = self._dead_pid()
+            dead = os.path.join(td, f"lightos_running_{dead_pid}.flag")
+            with open(dead, "w", encoding="utf-8") as f:
+                f.write(str(dead_pid))
+            crashed = cl.find_crashed_sessions(td, own_pid=os.getpid())
+            self.assertIn(dead, crashed)
+            self.assertNotIn(own, crashed)
+
+    def test_find_crashed_sessions_reports_unreadable_legacy_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            legacy = os.path.join(td, "lightos_running.flag")
+            with open(legacy, "w", encoding="utf-8") as f:
+                f.write("")            # leer/unlesbare PID -> als Absturz werten
+            self.assertIn(legacy, cl.find_crashed_sessions(td, own_pid=os.getpid()))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -252,3 +252,102 @@ def finalize_exit(log_handle, flag_path: str | None, had_fatal: bool,
         pass
     if not had_fatal:
         clear_running(flag_path)
+
+
+# --- Multi-Instanz: per-PID-Running-Flags + Liveness (STAB-06) --------------
+def pid_is_alive(pid) -> bool:
+    """Lebt der Prozess mit dieser PID noch? Plattform-sicher.
+
+    WICHTIG: auf Windows NICHT ``os.kill(pid, 0)`` nutzen — fuer Signal 0 ruft
+    CPython dort ``TerminateProcess`` auf und wuerde den Prozess TATSAECHLICH
+    beenden. Daher ``OpenProcess`` + ``GetExitCodeProcess`` (STILL_ACTIVE). Auf
+    POSIX ist ``os.kill(pid, 0)`` der uebliche, gefahrlose Existenz-Check.
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            ERROR_ACCESS_DENIED = 5
+            STILL_ACTIVE = 259
+            h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not h:
+                # Kein Handle: existiert der Prozess gar nicht (INVALID_PARAMETER)
+                # -> tot. Nur fehlende Rechte (ACCESS_DENIED) -> existiert -> lebt.
+                return kernel32.GetLastError() == ERROR_ACCESS_DENIED
+            try:
+                code = wintypes.DWORD()
+                if kernel32.GetExitCodeProcess(h, ctypes.byref(code)):
+                    return code.value == STILL_ACTIVE
+                return True
+            finally:
+                kernel32.CloseHandle(h)
+        except Exception:
+            # Im Zweifel als lebend behandeln -> lieber einen verpassten
+            # Crash-Hinweis als einen FALSCHEN gegen eine laufende Instanz.
+            return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def read_flag_pid(flag_path: str) -> int | None:
+    """PID aus einer Running-Flag lesen (Inhalt = PID als Text). ``None`` bei
+    unlesbarer/leerer Flag."""
+    try:
+        with open(flag_path, encoding="utf-8") as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def find_running_flags(log_dir: str) -> list[str]:
+    """Alle Running-Flag-Dateien im Verzeichnis: per-PID
+    (``lightos_running_<pid>.flag``) UND die Legacy-Einzeldatei
+    (``lightos_running.flag``)."""
+    out: list[str] = []
+    try:
+        for name in os.listdir(log_dir):
+            if name == "lightos_running.flag" or (
+                    name.startswith("lightos_running_") and name.endswith(".flag")):
+                out.append(os.path.join(log_dir, name))
+    except OSError:
+        pass
+    return out
+
+
+def find_crashed_sessions(log_dir: str, own_pid: int | None = None) -> list[str]:
+    """STAB-06: Pfade der Running-Flags, deren Prozess nicht mehr lebt (und nicht
+    der eigene ist) -> jeweils eine NICHT sauber beendete Vorsitzung.
+
+    Per-PID-Flags (statt einer globalen Flag) machen die Erkennung
+    multi-instanz-sicher: eine zweite Instanz ueberschreibt/loescht die Flag der
+    ersten nicht mehr, und eine PARALLEL laufende Instanz wird ueber den
+    Liveness-Check NICHT faelschlich als Absturz gemeldet."""
+    own = os.getpid() if own_pid is None else int(own_pid)
+    crashed: list[str] = []
+    for path in find_running_flags(log_dir):
+        pid = read_flag_pid(path)
+        if pid is None:
+            # Unlesbare/leere (Legacy-)Flag -> als abgestuerzt werten, damit kein
+            # Crash verschluckt wird.
+            crashed.append(path)
+            continue
+        if pid == own:
+            continue
+        if not pid_is_alive(pid):
+            crashed.append(path)
+    return crashed
