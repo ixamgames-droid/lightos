@@ -4,7 +4,7 @@ import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
                                 QMessageBox, QInputDialog, QSizePolicy, QRubberBand)
 from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
-from PySide6.QtGui import QPainter, QColor, QAction
+from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
 from .vc_widget import VCWidget
 
@@ -54,6 +54,42 @@ def _register():
 _register()
 
 
+class _DragTargetOverlay(QWidget):
+    """Transientes Overlay fuers Drag-Feedback: zeichnet einen farbigen Rahmen
+    ueber dem Widget, ueber das gerade ein Effekt gezogen wird.
+      gruen (#22c55e) = der Effekt bindet hier (gueltiges Ziel),
+      rot  (#ef4444) = dieses Widget nimmt den Effekt nicht an.
+    ``WA_TransparentForMouseEvents`` haelt es aus jedem Hit-Test heraus — weder
+    ``childAt`` (Drop-Ziel-Suche) noch der Drop selbst sehen das Overlay, und es
+    faengt keine Maus-/Drag-Events ab."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self._valid = True
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.hide()
+
+    def show_over(self, rect: QRect, valid: bool):
+        self._valid = bool(valid)
+        self.setGeometry(rect)
+        self.raise_()
+        self.show()
+        self.update()
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        col = QColor("#22c55e") if self._valid else QColor("#ef4444")
+        fill = QColor(col)
+        fill.setAlpha(40)
+        r = self.rect().adjusted(1, 1, -2, -2)
+        p.setPen(QPen(col, 2))
+        p.setBrush(fill)
+        p.drawRoundedRect(r, 6, 6)
+
+
 class VCCanvas(QWidget):
     """The free-form canvas. Widgets are placed as direct children."""
 
@@ -87,6 +123,12 @@ class VCCanvas(QWidget):
         self.customContextMenuRequested.connect(self._context_menu)
         self._bg = QColor("#0d1117")
         self.setAcceptDrops(True)
+
+        # Drag-Feedback: Overlay, das beim Effekt-Drag das Ziel-Widget gruen
+        # (bindet hier) bzw. rot (nimmt der Effekt nicht an) umrahmt. Lazy erzeugt.
+        self._drag_overlay: _DragTargetOverlay | None = None
+        self._drag_caps_fid: int | None = None   # gecachte Capabilities pro Drag
+        self._drag_caps = None
 
         # MIDI-Learn-Modus
         self._midi_learn_btn = None       # VCButton das auf MIDI wartet
@@ -513,10 +555,21 @@ class VCCanvas(QWidget):
     def dragMoveEvent(self, event):
         if self._accepts(event.mimeData()):
             event.acceptProposedAction()
+            self._update_drag_highlight(event)
         else:
             event.ignore()
+            self._clear_drag_highlight()
+
+    def dragLeaveEvent(self, event):
+        # Verlaesst der Drag die Canvas (oder wird er abgebrochen), das Ziel-
+        # Highlight ausblenden.
+        self._clear_drag_highlight()
+        super().dragLeaveEvent(event)
 
     def dropEvent(self, event):
+        # Beim Loslassen das Drag-Highlight in jedem Fall ausblenden (auch wenn der
+        # Drop gleich verworfen wird) — sonst bliebe der Rahmen stehen.
+        self._clear_drag_highlight()
         if not self._edit_mode:
             event.ignore()
             return
@@ -585,6 +638,117 @@ class VCCanvas(QWidget):
         from .vc_effect_editor import VCEffectEditor
         return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial,
                 VCStepper, VCEffectDisplay, VCEffectEditor)
+
+    # ── Drag-Feedback: Ziel-Widget gruen/rot umrahmen ─────────────────────────
+    #
+    # Beim Ziehen eines Effekts (Funktions-MIME) ueber die Canvas zeigt ein
+    # transientes Overlay, ob der Drop auf dem Widget unterm Cursor sinnvoll
+    # bindet (gruen) oder nicht (rot) — bevor man loslaesst.
+
+    def _update_drag_highlight(self, event):
+        """dragMove-Handler: Ziel unterm Cursor ermitteln und gruen/rot umrahmen.
+        Nur fuer Effekt-(Funktions-)Drops im Bearbeiten-Modus — Snapshot/Snap und
+        der Betriebs-Modus zeigen kein Feedback (dort gilt die alte, stumme Logik)."""
+        md = event.mimeData()
+        if not self._edit_mode or not md.hasFormat(self._MIME_FUNCTION):
+            self._clear_drag_highlight()
+            return
+        try:
+            fid = int(md.data(self._MIME_FUNCTION).data().decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            self._clear_drag_highlight()
+            return
+        target, valid = self._drag_highlight_info(event.position().toPoint(), fid)
+        if target is None:
+            self._clear_drag_highlight()      # leere Flaeche -> kein Rahmen
+        else:
+            self._show_drag_highlight(target, valid)
+
+    def _drag_highlight_info(self, pos, fid):
+        """``(ziel_widget, gueltig)`` fuers Drag-Feedback an Position ``pos``.
+        ``ziel_widget`` ist das naechste VCWidget unterm Cursor (oder None ueber
+        leerer Flaeche); ``gueltig`` = der Effekt ``fid`` bindet dort sinnvoll."""
+        w = self._vc_widget_under(pos)
+        if w is None:
+            return None, False
+        return w, self._drag_target_valid(w, fid)
+
+    def _vc_widget_under(self, pos):
+        """Naechstes VCWidget unter ``pos`` (Qt-Innenkinder wie QSlider hochlaufen)."""
+        w = self.childAt(pos)
+        while w is not None and not isinstance(w, VCWidget):
+            w = w.parent()
+        return w if isinstance(w, VCWidget) else None
+
+    def _drag_target_valid(self, w, fid) -> bool:
+        """Nimmt das Widget ``w`` den Effekt ``fid`` sinnvoll an? Erst die
+        Typ-Huerde (``_droppable_types``), dann der Capability-Abgleich gegen die
+        Live-Faehigkeiten des Effekts."""
+        if not isinstance(w, self._droppable_types()):
+            return False
+        return self._effect_fits_widget(w, self._drag_caps_for(fid))
+
+    def _drag_caps_for(self, fid):
+        """Capabilities des gezogenen Effekts — pro Drag gecacht, weil dragMove
+        sehr oft feuert. ``_clear_drag_highlight`` setzt den Cache zurueck."""
+        if self._drag_caps_fid != fid or self._drag_caps is None:
+            from .vc_effect_meta import function_capabilities
+            self._drag_caps_fid = fid
+            self._drag_caps = function_capabilities(fid)
+        return self._drag_caps
+
+    @staticmethod
+    def _caps_have_numeric_param(caps) -> bool:
+        """Hat der Effekt einen live-steuerbaren Zahl-Parameter (Speed/Helligkeit/
+        beliebiger int/float)? -> Fader/Encoder/Stepper koennen sinnvoll binden."""
+        if getattr(caps, "has_speed", False) or getattr(caps, "has_intensity", False):
+            return True
+        for s in getattr(caps, "param_specs", []):
+            if (getattr(s, "kind", "") in ("int", "float")
+                    and getattr(s, "live_editable", True)
+                    and getattr(s, "mappable", True)):
+                return True
+        return False
+
+    def _effect_fits_widget(self, w, caps) -> bool:
+        """Capability-Abgleich Effekt<->Widget-Typ (vgl. _apply_function_to_special):
+        spiegelt, was der Drop tatsaechlich binden wuerde."""
+        from .vc_button import VCButton
+        from .vc_slider import VCSlider
+        from .vc_color import VCColor
+        from .vc_encoder import VCEncoder
+        from .vc_xypad import VCXYPad
+        from .vc_speedial import VCSpeedDial
+        from .vc_stepper import VCStepper
+        from .vc_effect_display import VCEffectDisplay
+        from .vc_effect_editor import VCEffectEditor
+        if isinstance(w, (VCButton, VCEffectDisplay)):
+            return True                                  # togglen / anzeigen: jede Funktion
+        if isinstance(w, VCEffectEditor):
+            return bool(getattr(caps, "has_params", False))
+        if isinstance(w, (VCSlider, VCEncoder, VCStepper)):
+            return self._caps_have_numeric_param(caps)   # braucht steuerbaren Zahl-Param
+        if isinstance(w, VCSpeedDial):
+            return bool(getattr(caps, "has_speed", False))
+        if isinstance(w, VCColor):
+            return bool(getattr(caps, "has_colors", False))
+        if isinstance(w, VCXYPad):
+            return bool(getattr(caps, "has_movement", False))
+        return False
+
+    def _show_drag_highlight(self, target, valid: bool):
+        """Overlay ueber ``target`` (in Canvas-Koordinaten) positionieren + zeigen."""
+        if self._drag_overlay is None:
+            self._drag_overlay = _DragTargetOverlay(self)
+        tl = target.mapTo(self, QPoint(0, 0))
+        self._drag_overlay.show_over(QRect(tl, target.size()), valid)
+
+    def _clear_drag_highlight(self):
+        """Drag-Feedback ausblenden und den Capability-Cache zuruecksetzen."""
+        self._drag_caps_fid = None
+        self._drag_caps = None
+        if self._drag_overlay is not None:
+            self._drag_overlay.hide()
 
     # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
 
