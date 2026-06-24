@@ -51,6 +51,8 @@ _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
 
+- **UI-12 / ENG-08** · Programmer-Matrix: „Farbe pro Runde wechseln" (`color_cycle`) hoch in die Farben-Gruppe (auf RGB/RGBW gegated) **und** neue **Dimmer-Sequenz** für den Dimmer-Chase — explizite Dimmerwerte (z. B. 255/50/100) pro Runde, Pendant zur Farbauswahl: `DimmerSequence` + Checkbox „Dimmer pro Runde wechseln" + Graustufen-Editor, `dimmer_order`/`dimmer_interval`, Cycle-Werte ohne Min/Max-Remap (abwärtskompatibel). +29 Tests, Manifest regeneriert. [PR #60](https://github.com/ixamgames-droid/lightos/pull/60)
+
 - **STAB-04 / STAB-05 / STAB-06** · DMX-Output- & Crash-Erkennungs-Stabilität gehärtet: getimeouteten Output-Thread weitertracken (kein zweiter, konkurrierender DMX-Thread → AV), fatale Exception wird nicht mehr als „sauberer Exit" markiert (Absturz beim nächsten Start erkennbar), Running-Flag pro PID + Windows-sicherer Liveness-Check (OpenProcess statt os.kill). +15 Tests. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
 - **QA-01 / QA-02 / QA-03** · Test-Gate/CI gehärtet: `pytest-timeout` in den CI-Install-Pfad, sACN-Loopback `fail` statt `skip` nach erfolgreichem Bind, `_delete_selected`-UI-Pfad direkt getestet. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
 - **VIZ-01 / VIZ-02 / VIZ-03 / VIZ-04** · Visualizer-Lows: 2D-Live-View-Positionen beim Unpatch aufräumen, Spider-Tilt-Default 180° statt 270°, Dock beim Ausrichten/Verteilen lösen, Laser-Fächer-Sichtbarkeit bei View-/Settings-Wechsel reapplien. +5 Tests. [PR #55](https://github.com/ixamgames-droid/lightos/pull/55)
