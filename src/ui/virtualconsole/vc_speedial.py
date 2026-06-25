@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QDoubleSpinBox, QLineEdit, QDialogButtonBox,
-    QSizePolicy, QComboBox, QCheckBox, QLabel, QWidget, QVBoxLayout, QHBoxLayout,
+    QComboBox, QCheckBox, QWidget,
 )
 from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
@@ -220,9 +220,20 @@ class VCSpeedDial(VCWidget):
         if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
             try:
                 from src.core.engine import effect_live
+                f = self._effective_mult()
                 for fid in self._targets():
-                    effect_live.set_param(self._key_for(fid, "tempo_multiplier"),
-                                          self._effective_mult(), fid)
+                    key = self._key_for(fid, "tempo_multiplier")
+                    effect_live.set_param(key, f, fid)
+                    # Free-Run-Fallback: ein frei laufender Effekt (kein laufender
+                    # Tempo-Bus, bpm 0) liest tempo_multiplier NICHT -> der Dial waere
+                    # sonst ein stiller No-op. Beim Default-Parameter den Faktor
+                    # zusaetzlich auf die freie Geschwindigkeit (speed) legen. Zur
+                    # Laufzeit nutzt der Bus-Pfad NUR tempo_multiplier, Free-Run NUR
+                    # speed -> beide Felder sind disjunkt, das Setzen beider ist
+                    # konfliktfrei. Einen eigenen per-Effekt-Parameter (Phase E) NICHT
+                    # anfassen (bewusste Wahl des Nutzers).
+                    if key == "tempo_multiplier":
+                        effect_live.set_param("speed", f, fid)
             except Exception:
                 pass
             return
@@ -738,49 +749,28 @@ class VCSpeedDial(VCWidget):
                 break
         form.addRow("Ziel:", mode_cb)
 
-        # HAUPTWEG: Funktion/Effekt nach NAME auswaehlen (David: nicht mit
-        # Executor-Slot-Zahlen arbeiten). Fuellt unter der Haube das Roh-ID-Feld.
-        func_combo = QComboBox()
-        func_combo.addItem("(per Erweitert / Roh-ID)", -1)
-        self._populate_function_combo(func_combo)
-        if self.function_id is not None:
-            for i in range(func_combo.count()):
-                if func_combo.itemData(i) == self.function_id:
-                    func_combo.setCurrentIndex(i)
-                    break
+        # HAUPTWEG (wie beim Fader): aufklappbare „Steuert"-Liste — MEHRERE
+        # Effekte/Funktionen NACH NAMEN, je Zeile optional ein eigener Parameter,
+        # mit ✕ entfernen / „+“ hinzufuegen. In den Effekt-Modi (Funktion/Effekt,
+        # Effekt-Multiplier) ist sie maßgeblich fuer function_id + function_ids +
+        # param_keys_per_id (loest das frueher versteckte „Weitere Ziel-IDs"-Feld ab).
+        from .target_list_editor import TargetListEditor
+        target_editor = TargetListEditor(with_params=True, title="Steuert")
+        target_editor.set_targets(self._targets(), dict(self.param_keys_per_id))
+        target_editor.setToolTip("Effekte/Funktionen, die dieser Dial steuert — je Zeile "
+                                 "den Parameter wählen, mit ✕ entfernen, „+“ hinzufügen. "
+                                 "In den Effekt-Modi maßgeblich (überschreibt das Slot-Feld).")
+        form.addRow("Steuert:", target_editor)
 
-        # Roh-ID-/Executor-Slot-Felder: nur fuer Power-User -> unter „Erweitert".
+        # Roh-Function-ID / Executor-Slot: nur fuer den Executor-Modus -> „Erweitert".
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
-        slot.setToolTip("Roh-Function-ID bzw. Executor-Slot-Nummer (Modus 'Executor-Slot'). "
-                        "Normalerweise per Namen oben gewählt.")
-        # SPD-04: weitere Ziel-IDs (Komma-getrennt) — Sync/Speed wirken auf alle.
-        extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
-        extra_ids.setToolTip("Weitere Function-IDs (Komma-getrennt) — der Dial/Sync "
-                             "wirkt zusätzlich auf diese Effekte.")
-
-        def _on_func_pick(_i):
-            data = func_combo.currentData()
-            if data is not None and data >= 0:
-                slot.setText(str(data))
-                # Den Ziel-Modus NUR aus dem Executor-Slot heraus auf
-                # „Funktion/Effekt" stellen. Eine bereits getroffene Wahl
-                # (Multiplier/Tempo-Bus/Speed-Knoten) NICHT ueberschreiben — sonst
-                # kippt das Auswaehlen des Ziel-Effekts den Multiplikator-Modus zurueck.
-                if mode_cb.currentData() == SpeedTarget.EXECUTOR:
-                    for i in range(mode_cb.count()):
-                        if mode_cb.itemData(i) == SpeedTarget.FUNCTION:
-                            mode_cb.setCurrentIndex(i)
-                            break
-        func_combo.currentIndexChanged.connect(_on_func_pick)
-        form.addRow("Funktion / Effekt (Name):", func_combo)
-
-        # „Erweitert"-Bereich (Roh-ID / Executor-Slot / weitere IDs) — eingeklappt.
+        slot.setToolTip("Executor-Slot-Nummer (Modus 'Executor-Slot') bzw. rohe Function-ID. "
+                        "Normalerweise per Namen oben (Steuert) gewählt.")
         from src.ui.widgets.collapsible_section import CollapsibleSection
         _adv_inner = QWidget()
         _adv_form = QFormLayout(_adv_inner)
         _adv_form.setContentsMargins(0, 0, 0, 0)
         _adv_form.addRow("Executor-Slot / Roh-ID:", slot)
-        _adv_form.addRow("Weitere Ziel-IDs:", extra_ids)
         adv_section = CollapsibleSection("Erweitert (Roh-ID / Executor-Slot)", _adv_inner,
                                          collapsed=True, prefs_key="vc_speeddial_advanced")
         form.addRow(adv_section)
@@ -840,45 +830,8 @@ class VCSpeedDial(VCWidget):
         form.addRow("", show_sync_cb)
         form.addRow("", show_bpm_cb)
 
-        # ── Phase E: Gekoppelte Effekte (je Effekt gesteuerten Parameter) ──
-        # Greift in den Effekt-Modi (Funktion/Effekt-Multiplier). (Standard) =
-        # Default-Parameter des Modus (speed bzw. tempo_multiplier).
-        coupled_box = QWidget()
-        coupled_lay = QVBoxLayout(coupled_box)
-        coupled_lay.setContentsMargins(0, 0, 0, 0)
-        coupled_combos: list[tuple[int, QComboBox]] = []
-        try:
-            from .vc_effect_meta import mappable_param_choices, effect_name
-            for _fid in self._targets():
-                row = QWidget()
-                rl = QHBoxLayout(row)
-                rl.setContentsMargins(0, 0, 0, 0)
-                rl.addWidget(QLabel(effect_name(_fid)))
-                pcombo = QComboBox()
-                pcombo.setEditable(True)
-                pcombo.addItem("(Standard)", "")
-                _keys = [k for k, _l in mappable_param_choices(_fid)]
-                for _k, _l in mappable_param_choices(_fid):
-                    pcombo.addItem(f"{_l}  ({_k})", _k)
-                _cur = self.param_keys_per_id.get(int(_fid), "")
-                if _cur and _cur not in _keys:
-                    pcombo.addItem(_cur, _cur)
-                _idx = next((i for i in range(pcombo.count())
-                             if pcombo.itemData(i) == _cur), -1)
-                if _idx >= 0:
-                    pcombo.setCurrentIndex(_idx)
-                elif _cur:
-                    pcombo.setCurrentText(_cur)
-                else:
-                    pcombo.setCurrentIndex(0)
-                rl.addWidget(pcombo, 1)
-                coupled_lay.addWidget(row)
-                coupled_combos.append((int(_fid), pcombo))
-        except Exception:
-            pass
-        if coupled_combos:
-            form.addRow(QLabel("── Gekoppelte Effekte ──"))
-            form.addRow("Je Effekt steuern:", coupled_box)
+        # (Phase E „Gekoppelte Effekte" steckt jetzt in der „Steuert"-Liste oben:
+        #  je Zeile eine Parameter-Combo — kein separater Block mehr noetig.)
 
         # ── Kontextabhaengige Feld-Sichtbarkeit (Muster wie VCSlider): je Ziel-
         # Modus nur die passenden Felder zeigen. Allgemeine Felder (Beschriftung/
@@ -891,8 +844,10 @@ class VCSpeedDial(VCWidget):
             m = mode_cb.currentData() or self.target_mode
             is_node = (m == SpeedTarget.SPEED_NODE)
             vis = {
-                adv_section:  m in (SpeedTarget.EXECUTOR,) + _EFFECT_TARGETS,
-                func_combo:   m in _EFFECT_TARGETS,
+                # „Steuert"-Liste in den Effekt-Modi; das rohe Slot-/Roh-ID-Feld nur
+                # im Executor-Modus (dort ist es der einzige Eingang).
+                target_editor: m in _EFFECT_TARGETS,
+                adv_section:   m == SpeedTarget.EXECUTOR,
                 bus_cb:       m in (SpeedTarget.TEMPO_BUS, SpeedTarget.TEMPO_BUS_MULT,
                                     SpeedTarget.SPEED_NODE),
                 role_cb:      is_node,
@@ -940,49 +895,26 @@ class VCSpeedDial(VCWidget):
             # der Anzeigeoption noetig, die bewusste Wahl des Nutzers bleibt erhalten.
             self.show_sync = show_sync_cb.isChecked()
             self.show_bpm = show_bpm_cb.isChecked()
-            try:
-                self.function_id = int(slot.text())
-            except ValueError:
-                self.function_id = None
-            ids = []
-            for part in extra_ids.text().split(","):
-                part = part.strip()
-                if part:
-                    try:
-                        ids.append(int(part))
-                    except ValueError:
-                        pass
-            self.function_ids = ids
-            # Phase E: je-Effekt-Parameter aus den Combos — nur noch gekoppelte IDs.
-            _final_ids = set(self._targets())
-            new_pkpi: dict[int, str] = {}
-            for _fid, _pc in coupled_combos:
-                if _fid not in _final_ids:
-                    continue
-                _hit = _pc.findText(_pc.currentText().strip())
-                _val = _pc.itemData(_hit) if _hit >= 0 else None
-                if _val is None:
-                    _val = _pc.currentText().strip()
-                if _val:
-                    new_pkpi[int(_fid)] = str(_val)
-            self.param_keys_per_id = new_pkpi
+            # Ziel-Effekte: in den Effekt-Modi ist die „Steuert"-Liste maßgeblich
+            # (IDs in Reihenfolge + je-Effekt-Parameter); sonst zaehlt das rohe
+            # Slot-/Executor-Feld. function_id = erstes Ziel, Rest -> function_ids.
+            if self.target_mode in _EFFECT_TARGETS:
+                _eids = target_editor.ids()
+                self.function_id = _eids[0] if _eids else None
+                self.function_ids = _eids[1:]
+                self.param_keys_per_id = target_editor.param_keys()
+            else:
+                try:
+                    self.function_id = int(slot.text())
+                except ValueError:
+                    self.function_id = None
+                self.function_ids = []
             self._bpm = max(self._min_bpm, min(self._max_bpm, bpm_sb.value()))
             self._mult = max(self._min_mult, min(self._max_mult, mult_sb.value()))
             if self.target_mode == SpeedTarget.SPEED_NODE:
                 self._ensure_node_config()
             self._apply()
             self.update()
-
-    def _populate_function_combo(self, combo: QComboBox):
-        """Listet alle Funktionen (Chases/Sequences/Scenes...) nach Namen auf."""
-        try:
-            from src.core.app_state import get_state
-            funcs = get_state().function_manager.all()
-            for f in sorted(funcs, key=lambda x: (x.name or "").lower()):
-                ftype = getattr(f.function_type, "value", str(f.function_type))
-                combo.addItem(f"{f.name}  [{ftype} #{f.id}]", int(f.id))
-        except Exception as e:
-            print(f"[VCSpeedDial] function combo error: {e}")
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
