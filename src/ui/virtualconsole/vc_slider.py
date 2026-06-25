@@ -8,6 +8,16 @@ from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from .vc_widget import VCWidget
 
 
+def _clear_submaster_slot(slot):
+    """Raeumt den Submaster-Slot eines geloeschten oder umgestellten Faders im
+    OutputManager (sonst dimmt sein letzter Wert als Geist weiter)."""
+    try:
+        from src.core.app_state import get_state
+        get_state().output_manager.clear_submaster(slot)
+    except Exception:
+        pass
+
+
 class SliderMode(str):
     LEVEL    = "Level"
     PLAYBACK = "Playback"
@@ -120,6 +130,10 @@ class VCSlider(VCWidget):
         self.range_min: int = 0       # 0–255
         self.range_max: int = 255     # 0–255
         self.resize(60, 200)
+        # Zuweisbarer Submaster: jeder Fader ist ein eigener Submaster-Slot (eindeutig
+        # pro Widget, id(self)). Wird der Fader geloescht, muss sein Slot im
+        # OutputManager geraeumt werden — sonst dimmt sein letzter Wert weiter.
+        self.destroyed.connect(lambda *_, s=id(self): _clear_submaster_slot(s))
 
     # ── Value ─────────────────────────────────────────────────────────────────
 
@@ -251,7 +265,14 @@ class VCSlider(VCWidget):
             if slot < len(executors):
                 executors[slot].fader_value = v / 255.0
         elif self.mode == SliderMode.SUBMASTER:
-            state.output_manager.set_submaster(self.function_id or 0, v / 255.0)
+            # Zuweisbarer Submaster: eigener Slot pro Fader (id(self)), optional auf
+            # bestimmte Geraete/Gruppen beschraenkt (Reichweite). fids=None ->
+            # globaler Submaster (wirkt auf alles, bisheriges Verhalten).
+            try:
+                fids = self._submaster_target_fids(state)
+                state.output_manager.set_submaster(id(self), v / 255.0, fids)
+            except Exception:
+                pass
         elif self.mode == SliderMode.GROUP_DIMMER:
             # F-25: multiplikativer Gruppen-Dimmer über set_group_dimmer().
             try:
@@ -268,6 +289,21 @@ class VCSlider(VCWidget):
             return state.group_fids_by_name(group_name)
         except Exception:
             return []
+
+    def _submaster_target_fids(self, state):
+        """Reichweite eines Submaster-Faders -> Ziel-fids oder None (= global/alle).
+        'all' -> None (wirkt auf alles, bisheriges Verhalten); 'group' -> fids der
+        festen Gruppe; 'selected' -> aktuelle Programmer-Auswahl (Snapshot). Leere
+        Aufloesung -> [] (Fader ohne Wirkung, statt versehentlich alles zu dimmen)."""
+        scope = self.programmer_scope or "all"
+        if scope == "group" and self.programmer_group:
+            return self._group_fids(state, self.programmer_group)
+        if scope == "selected":
+            try:
+                return list(state.get_selected_fids())
+            except Exception:
+                return []
+        return None
 
     def _resolved_effect_fid(self):
         """Einzel-Ziel-fid für Effekt-Modi: feste function_id, sonst der Live-Edit-Slot
@@ -536,6 +572,7 @@ class VCSlider(VCWidget):
     # ── Properties ───────────────────────────────────────────────────────────
 
     def _open_properties(self):
+        _old_mode = self.mode      # fuer Submaster-Slot-Aufraeumen bei Moduswechsel
         dlg = QDialog(self)
         dlg.setWindowTitle("Fader Einstellungen")
         form = QFormLayout(dlg)
@@ -602,10 +639,11 @@ class VCSlider(VCWidget):
         scope_cb.addItem("Feste Gruppe", "group")
         _scope_idx = {"selected": 1, "group": 2}.get(self.programmer_scope, 0)
         scope_cb.setCurrentIndex(_scope_idx)
-        scope_cb.setToolTip("Modus Programmer: auf welche Fixtures der Fader wirkt "
-                            "(alle gepatchten, die aktuelle Auswahl, oder eine fest "
-                            "gewählte Gruppe — unabhängig von der Live-Auswahl).")
-        form.addRow("Reichweite (Programmer):", scope_cb)
+        scope_cb.setToolTip("Modus Programmer/Submaster: auf welche Fixtures der Fader "
+                            "wirkt (alle gepatchten, die aktuelle Auswahl, oder eine fest "
+                            "gewählte Gruppe — unabhängig von der Live-Auswahl). Beim "
+                            "Submaster = 'Alle Geräte' ist der bisherige globale Submaster.")
+        form.addRow("Reichweite (Programmer/Submaster):", scope_cb)
 
         # Feste Gruppe (nur scope == "group"): Auswahl aus den vorhandenen Gruppen.
         group_cb = QComboBox()
@@ -622,7 +660,7 @@ class VCSlider(VCWidget):
             pass
         group_cb.setCurrentText(self.programmer_group or "")
         group_cb.setToolTip("Fixture-Gruppe für Reichweite = 'Feste Gruppe' "
-                            "(PROGRAMMER) bzw. für den Modus 'GroupDimmer'.")
+                            "(Programmer/Submaster) bzw. für den Modus 'GroupDimmer'.")
         form.addRow("Feste Gruppe:", group_cb)
 
         # Live-Edit-Slot: bei EFFECT-Modi ohne feste Funktions-ID den Effekt aus
@@ -710,20 +748,21 @@ class VCSlider(VCWidget):
             eff = m in _EFFECT_MODES
             vis = {
                 param_key_combo: m == SliderMode.EFFECT_PARAM,
-                scope_cb:        m == SliderMode.PROGRAMMER,
-                group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER),
+                scope_cb:        m in (SliderMode.PROGRAMMER, SliderMode.SUBMASTER),
+                group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER,
+                                       SliderMode.SUBMASTER),
                 edit_slot_edit:  eff,
                 autostart_cb:    eff,
                 univ:            m == SliderMode.LEVEL,
                 ch:              m == SliderMode.LEVEL,
-                adv_section:     eff or m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER),
+                adv_section:     eff or m == SliderMode.PLAYBACK,
                 bus_cb:          m == SliderMode.TEMPO_BUS,
                 target_editor:   eff,
             }
             for widget, show in vis.items():
                 form.setRowVisible(widget, bool(show))
-            # Playback/Submaster: das Roh-Slot-Feld ist der einzige Eingang -> aufklappen.
-            if m in (SliderMode.PLAYBACK, SliderMode.SUBMASTER):
+            # Playback: das Roh-Slot-Feld ist der einzige Eingang -> aufklappen.
+            if m == SliderMode.PLAYBACK:
                 adv_section.set_expanded(True)
 
         mode_cb.currentIndexChanged.connect(lambda _i: _update_slider_fields())
@@ -800,6 +839,13 @@ class VCSlider(VCWidget):
             self.midi_cc = midi_cc_spin.value()
             self.midi_ch = midi_ch_spin.value()
             self.update()
+            # Submaster sofort synchronisieren (nicht erst beim naechsten Ziehen):
+            # neuer/geaenderter Submaster -> Slot mit aktueller Reichweite setzen;
+            # weg vom Submaster -> alten Slot raeumen (sonst dimmt er als Geist weiter).
+            if self.mode == SliderMode.SUBMASTER:
+                self._apply()
+            elif _old_mode == SliderMode.SUBMASTER:
+                _clear_submaster_slot(id(self))
 
     # ── Serialization ─────────────────────────────────────────────────────────
 

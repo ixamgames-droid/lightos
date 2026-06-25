@@ -27,7 +27,12 @@ class OutputManager:
         # geschlossen werden (testbar ueberschreibbar).
         self._stop_join_s = 2.0
         self._blackout = False
-        self._submasters: dict[int, float] = {}  # slot → 0.0–1.0
+        # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
+        # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
+        # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
+        # (zuweisbarer Submaster). Jeder VC-Submaster-Fader belegt einen eigenen
+        # Slot (Widget-ID), damit sich mehrere Submaster nicht ueberschreiben.
+        self._submasters: dict = {}
         self._sacn_outputs: dict[int, SACNSender] = {}  # universe → sender
         self._tick_callbacks: list = []   # callables(dt: float)
         self.grand_master: float = 1.0  # 0.0–1.0 — globale Helligkeit
@@ -71,16 +76,46 @@ class OutputManager:
     def set_blackout(self, enabled: bool):
         self._blackout = enabled
 
-    def set_submaster(self, slot: int, level: float):
-        self._submasters[slot] = max(0.0, min(1.0, level))
+    def set_submaster(self, slot, level: float, fids=None):
+        """Setzt einen Submaster-Slot (multiplikativer Dimmer-Faktor 0.0–1.0).
+        ``fids=None`` -> GLOBALER Submaster (wirkt auf alle Fixtures, bisheriges
+        Verhalten). Ein iterierbares von Fixture-fids beschraenkt den Submaster auf
+        genau diese Geraete (zuweisbarer Submaster)."""
+        lvl = max(0.0, min(1.0, float(level)))
+        tgt = None if fids is None else frozenset(int(f) for f in fids)
+        self._submasters[slot] = (lvl, tgt)
+
+    def clear_submaster(self, slot):
+        """Entfernt einen Submaster-Slot — z. B. wenn der zugehoerige VC-Fader
+        geloescht wird oder den Modus wechselt. Sonst dimmt sein letzter Wert als
+        Geist weiter."""
+        self._submasters.pop(slot, None)
 
     def effective_submaster(self) -> float:
-        """Globaler Submaster-Faktor = Produkt aller gesetzten Submaster-Slots
-        (0.0–1.0). Ohne Submaster: 1.0. Wird vom Renderer als multiplikativer
-        Dimmer-Master ueber den Effekt-/Funktions-Output gelegt (EE-02)."""
+        """GLOBALER Submaster-Faktor = Produkt aller GLOBALEN Submaster-Slots
+        (target_fids is None), 0.0–1.0. Ohne globalen Submaster: 1.0. Wird vom
+        Renderer als multiplikativer Dimmer-Master ueber ALLE Fixtures gelegt
+        (EE-02). Zugewiesene (gezielte) Submaster zaehlen hier NICHT mit — die
+        liefert ``submaster_factor_for(fid)`` pro Fixture."""
         f = 1.0
-        for v in self._submasters.values():
-            f *= max(0.0, min(1.0, v))
+        for lvl, tgt in list(self._submasters.values()):
+            if tgt is None:
+                f *= max(0.0, min(1.0, lvl))
+        return f
+
+    def submaster_factor_for(self, fid) -> float:
+        """Produkt aller ZUGEWIESENEN Submaster, deren Ziel-fids ``fid`` enthalten
+        (1.0 wenn keiner zutrifft). Multipliziert sich im Renderer mit dem globalen
+        Faktor (effective_submaster): ein zugewiesener Submaster dimmt nur seine
+        Geraete, kombiniert aber sauber mit Grand-Master und globalem Submaster."""
+        try:
+            fid = int(fid)
+        except (TypeError, ValueError):
+            return 1.0
+        f = 1.0
+        for lvl, tgt in list(self._submasters.values()):
+            if tgt is not None and fid in tgt:
+                f *= max(0.0, min(1.0, lvl))
         return f
 
     def add_universe(self, number: int) -> Universe:
