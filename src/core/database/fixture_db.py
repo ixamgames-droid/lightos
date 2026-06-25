@@ -645,6 +645,95 @@ def _add_eurolite_gross(s, mfr):
                  _eurolite_gross_modes_data())
 
 
+# ── ADJ Flat Par QWH12X (12x5W RGBW, Art.-Nr. 1226100244, 2026-06-25) ────────
+# Faithful aus dem ADJ-Handbuch der baugleichen QA12X-Serie (gleiche Platine,
+# nur Amber→Weiß): 8 DMX-Modi (1–8 Kanal). Hier modelliert sind die für die
+# Software-Farbmischung nutzbaren Direkt-RGBW-Modi 4/5/7/8 — die reinen
+# Makro-Modi 1/2/3/6 mischen nur über Farb-Makros (kein freies RGBW) und sind
+# als Makro-Range im color_wheel der Modi 7/8 bereits abgebildet.
+# Strobe 0–15 = aus (Dauerlicht) → kind "open", damit Default 0 leuchtet.
+_FLATPAR_STROBE = [
+    (0,  15,  "Aus (kein Strobe)",        "open"),
+    (16, 255, "Strobe langsam → schnell", "strobe"),
+]
+# Farb-Makros (Kanal-Werte aus dem 1-Kanal-Modus, Amber→Weiß für die RGBW-
+# Variante). Bilden im Programmer Farbrad-Kacheln (kind "color"/"open").
+_FLATPAR_MACROS = [
+    (0,   15,  "Aus",                      "open"),
+    (16,  31,  "Rot",                      "color"),
+    (32,  47,  "Grün",                     "color"),
+    (48,  63,  "Blau",                     "color"),
+    (64,  79,  "Weiß",                     "color"),
+    (80,  95,  "Rot + Grün",               "color"),
+    (96,  111, "Rot + Blau",               "color"),
+    (112, 127, "Rot + Weiß",               "color"),
+    (128, 143, "Grün + Blau",              "color"),
+    (144, 159, "Grün + Weiß",              "color"),
+    (160, 175, "Blau + Weiß",              "color"),
+    (176, 191, "Rot + Grün + Blau",        "color"),
+    (192, 207, "Rot + Grün + Weiß",        "color"),
+    (208, 223, "Rot + Blau + Weiß",        "color"),
+    (224, 239, "Grün + Blau + Weiß",       "color"),
+    (240, 255, "Rot + Grün + Blau + Weiß", "color"),
+]
+# 8-Kanal CH7: wählt aus, was CH1–4/CH6/CH8 tun (Default 0 = Dimmer-Modus →
+# direktes RGBW + Strobe auf CH6 aktiv, wie in den kleineren Modi).
+_FLATPAR_MODESEL = [
+    (0,   51,  "Dimmer-Modus (RGBW direkt)", ""),
+    (52,  102, "Farb-Makro-Modus",           ""),
+    (103, 153, "Color-Change-Modus",         ""),
+    (154, 204, "Color-Fade-Modus",           ""),
+    (205, 255, "Sound-Active-Modus",         ""),
+]
+
+
+def _flatpar_qwh12x_modes_data():
+    """ADJ Flat Par QWH12X — DMX-Traits aus dem ADJ-Handbuch (QA12X-Serie,
+    baugleich, Amber→Weiß). Reihenfolge je Modus exakt laut Handbuch:
+    4ch=RGBW · 5ch=RGBW+Dimmer · 7ch=RGBW+Dimmer+Strobe+Makros ·
+    8ch=RGBW+Dimmer+Strobe/Speed/Sound+Modus-Wahl+Makros/Programme."""
+    return [
+        ("4-Kanal RGBW", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Weiß", "color_w", 0, 255),
+        ]),
+        ("5-Kanal RGBW + Dimmer", [
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Weiß",          "color_w",   0, 255),
+            ("Master Dimmer", "intensity", 0, 255),
+        ]),
+        ("7-Kanal RGBW + Strobe", [
+            ("Rot",           "color_r",     0, 255),
+            ("Grün",          "color_g",     0, 255),
+            ("Blau",          "color_b",     0, 255),
+            ("Weiß",          "color_w",     0, 255),
+            ("Master Dimmer", "intensity",   0, 255),
+            ("Strobe",        "shutter",     0, 0,   _FLATPAR_STROBE),
+            ("Farb-Makros",   "color_wheel", 0, 0,   _FLATPAR_MACROS),
+        ]),
+        ("8-Kanal Voll", [
+            ("Rot",                 "color_r",     0, 255),
+            ("Grün",                "color_g",     0, 255),
+            ("Blau",                "color_b",     0, 255),
+            ("Weiß",                "color_w",     0, 255),
+            ("Master Dimmer",       "intensity",   0, 255),
+            ("Strobe/Speed/Sound",  "shutter",     0, 0,   _FLATPAR_STROBE),
+            ("Modus-Wahl",          "macro",       0, 0,   _FLATPAR_MODESEL),
+            ("Farb-Makros/Prog.",   "color_wheel", 0, 0,   _FLATPAR_MACROS),
+        ]),
+    ]
+
+
+def _add_adj_flatpar(s, mfr):
+    """ADJ Flat Par QWH12X (12x5W RGBW) — Layout siehe _flatpar_qwh12x_modes_data()."""
+    _add_fixture(s, mfr, "Flat Par QWH12X", "FPQWH12X", "par", 80,
+                 _flatpar_qwh12x_modes_data())
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -740,6 +829,9 @@ def ensure_builtins():
             changed = True
         if "EUROGROSS" not in have:
             _add_eurolite_gross(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
+            changed = True
+        if "FPQWH12X" not in have:
+            _add_adj_flatpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -929,6 +1021,7 @@ def _seed(s: Session):
             ("UV",    "color_uv", 0, 255),
         ]),
     ])
+    _add_adj_flatpar(s, adj)
 
     # ── Generic Stage Light CQ6136 ────────────────────────────────────────────
     # Tested and confirmed working via Enttec Pro DMX

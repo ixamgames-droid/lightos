@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-25 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **ADJ Flat Par QWH12X in der Fixture-Library:** Der 12×5 W RGBW-PAR von ADJ (Art.-Nr. 1226100244) ist jetzt als Builtin-Profil hinterlegt. DMX-Layout faithful aus dem ADJ-Handbuch der baugleichen QA12X-Serie (gleiche Platine, Amber→Weiß) verifiziert. Modelliert sind die für die Software-Farbmischung nutzbaren Direkt-RGBW-Modi: **4-Kanal** (RGBW), **5-Kanal** (RGBW+Dimmer), **7-Kanal** (RGBW+Dimmer+Strobe+Farb-Makros) und **8-Kanal Voll** (zusätzlich Modus-Wahl + Programme). Strobe 0–15 = aus (Dauerlicht, kind `open`), 16–255 = langsam→schnell; 16 Farb-Makros als `color_wheel`-Slots → Farbrad-Kacheln im Programmer. Registriert in `_seed()` und `ensure_builtins()` (rüstet bestehende DBs idempotent nach). `src/core/database/fixture_db.py`, `tests/test_adj_flatpar_profile.py`.
+
 ### 2026-06-24 — Neu
 
 #### Neu / Hinzugefuegt
