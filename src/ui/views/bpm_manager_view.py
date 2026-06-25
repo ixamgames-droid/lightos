@@ -407,6 +407,29 @@ class BpmManagerView(QWidget):
         gm.addStretch(1)
         lay.addLayout(gm)
 
+        # Auto-Sync + Einmal-Sync — Effekte unterschiedlicher Geschwindigkeit
+        # starten taktgleich (gemeinsamer Beat-Raster-Ursprung). Spiegelt die
+        # VC-Aktionen „Auto-Sync" / „Sync (Bus)", aber als fester, auffindbarer
+        # Schalter (ohne dass ein VC-Button gelegt sein muss).
+        sy = QHBoxLayout()
+        self._chk_auto_sync = QCheckBox("Auto-Sync")
+        self._chk_auto_sync.setToolTip(
+            "An: neu (oder erneut) gestartete bus-gekoppelte Effekte übernehmen "
+            "denselben Beat-Raster-Ursprung → sie starten taktgleich, egal wann "
+            "ausgelöst (z. B. Dimmer ×½ und Farbe ×1 bleiben phasengleich). "
+            "Aus = jeder Effekt startet bei seiner eigenen Null.")
+        self._chk_auto_sync.toggled.connect(self._on_auto_sync_toggled)
+        sy.addWidget(self._chk_auto_sync)
+        b_sync_now = QPushButton("Jetzt synchronisieren")
+        b_sync_now.setToolTip(
+            "Re-ankert alle laufenden Effekte auf den aktuellen Downbeat (die Eins): "
+            "sie beginnen ihren Zyklus gemeinsam auf demselben Schlag, auch bei "
+            "unterschiedlichem Multiplikator.")
+        b_sync_now.clicked.connect(self._on_sync_now)
+        sy.addWidget(b_sync_now)
+        sy.addStretch(1)
+        lay.addLayout(sy)
+
         # Bus-Tabelle (Anzeige).
         self._bus_table = QTableWidget(0, 5)
         self._bus_table.setHorizontalHeaderLabels(["Bus", "Rolle", "Folgt", "Faktor", "BPM"])
@@ -472,6 +495,11 @@ class BpmManagerView(QWidget):
         active = mgr.grandmaster_armed and mgr.grandmaster_bpm > 0
         self._gm_status.setText("scharf" if active else "aus")
         self._gm_status.setStyleSheet("color:#3fb950;" if active else "color:#8b949e;")
+
+        # Auto-Sync-Toggle spiegeln (ohne Signal-Echo).
+        self._chk_auto_sync.blockSignals(True)
+        self._chk_auto_sync.setChecked(bool(mgr.auto_sync))
+        self._chk_auto_sync.blockSignals(False)
 
         # Parent-Auswahl = Default + benannte Master.
         self._edit_parent.blockSignals(True)
@@ -582,6 +610,24 @@ class BpmManagerView(QWidget):
             except (TypeError, ValueError):
                 pass
         self._refresh_speeds()
+
+    def _on_auto_sync_toggled(self, checked: bool):
+        """Auto-Sync an/aus (global, alle Tempo-Buses) — spiegelt die VC-Aktion."""
+        self._tbm().set_auto_sync(bool(checked))
+
+    def _on_sync_now(self):
+        """Einmal-Sync wie der VC-'Sync'-Knopf, aber für ALLE Buses: jeder Bus
+        setzt seinen Downbeat neu und re-ankert seine Effekte auf 'jetzt' — sie
+        beginnen ihren Zyklus gemeinsam auf demselben Schlag."""
+        mgr = self._tbm()
+        try:
+            for b in mgr.all_buses():
+                try:
+                    b.sync(reset_downbeat=True)
+                except Exception as e:
+                    print(f"[BpmManagerView] sync bus {getattr(b, 'bus_id', '?')}: {e}")
+        except Exception as e:
+            print(f"[BpmManagerView] sync-now error: {e}")
 
     @staticmethod
     def _phase_style(active: bool, accent: bool) -> str:

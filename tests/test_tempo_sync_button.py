@@ -111,3 +111,44 @@ def test_auto_sync_button_action_exists():
     from src.ui.virtualconsole.vc_button import ButtonAction, BUTTON_ACTION_LABELS
     assert ButtonAction.AUTO_SYNC
     assert ButtonAction.AUTO_SYNC in {a for a, _ in BUTTON_ACTION_LABELS}
+
+
+# ── BPM-Manager-Tab: fester Auto-Sync-Toggle + „Jetzt synchronisieren" ──────────
+def test_bpm_view_auto_sync_toggle_drives_and_reflects_manager():
+    reset_tempo_bus_manager()
+    from src.ui.views.bpm_manager_view import BpmManagerView
+    tbm = get_tempo_bus_manager()
+    tbm.set_auto_sync(False)
+    view = BpmManagerView()
+    try:
+        assert view._chk_auto_sync.isChecked() is False   # spiegelt Aus-Zustand
+        view._chk_auto_sync.setChecked(True)              # User-Toggle treibt Manager
+        assert tbm.auto_sync is True
+        view._chk_auto_sync.setChecked(False)
+        assert tbm.auto_sync is False
+        # umgekehrt: Backend-Zustand wird beim Refresh gespiegelt (ohne Echo)
+        tbm.set_auto_sync(True)
+        view._refresh_speeds()
+        assert view._chk_auto_sync.isChecked() is True
+    finally:
+        view.deleteLater()
+
+
+def test_bpm_view_sync_now_reanchors_all_buses():
+    reset_tempo_bus_manager()
+    from src.ui.views.bpm_manager_view import BpmManagerView
+    tbm = get_tempo_bus_manager(); fm = get_function_manager(); mgr = get_bpm_manager()
+    view = BpmManagerView()
+    try:
+        mgr.set_manual_bpm(120.0)
+        d = tbm.get("default")
+        a = _matrix(fm, "A", "Global", 1.0)
+        b = _matrix(fm, "B", "Global", 0.5)
+        a.start(); d.advance_frame(0.7); b.start(); d.advance_frame(0.7)
+        a._advance_step(0.0); b._advance_step(0.0)
+        assert abs(a._step - b._step) > 1e-6, "Vorbedingung: ohne Sync verschiedene Phase"
+        view._on_sync_now()                                # Button „Jetzt synchronisieren"
+        a._advance_step(0.0); b._advance_step(0.0)
+        assert abs(a._step) < 1e-6 and abs(b._step) < 1e-6, "sync-now: nicht beide am Zyklusstart"
+    finally:
+        view.deleteLater()
