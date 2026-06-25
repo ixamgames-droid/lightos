@@ -1220,9 +1220,10 @@ class AppState:
             for a in dims:
                 su.set_channel(a, 255)
 
-        # 4b. Multiplikativer Dimmer-Master: submaster * Gruppen-/Fixture-Dimmer *
-        #     Programmer-Dimmer (nur wo Effekt aktiv). Skaliert pro Fixture die
-        #     Intensitaets- bzw. (ersatzweise) Farbkanaele.
+        # 4b. Multiplikativer Dimmer-Master: (globaler Submaster * je-Fixture
+        #     zugewiesener Submaster) * Gruppen-/Fixture-Dimmer * Programmer-Dimmer
+        #     (nur wo Effekt aktiv). Skaliert pro Fixture die Intensitaets- bzw.
+        #     (ersatzweise) Farbkanaele.
         submaster = 1.0
         om = getattr(self, "output_manager", None)
         if om is not None and hasattr(om, "effective_submaster"):
@@ -1230,10 +1231,19 @@ class AppState:
                 submaster = om.effective_submaster()
             except Exception:
                 submaster = 1.0
+        # Zugewiesene (gezielte) Submaster wirken nur auf ihre Fixture-fids — pro
+        # Fixture abgefragt. hasattr einmal aufloesen (Hot Path).
+        sub_for = getattr(om, "submaster_factor_for", None) if om is not None else None
         fixture_dimmers = getattr(self, "fixture_dimmers", {}) or {}
         global_sub = max(0.0, min(1.0, float(getattr(self, "submaster_level", 1.0)))) * submaster
         for fidi, addrs in inten_addrs.items():
-            factor = global_sub * float(fixture_dimmers.get(fidi, 1.0)) * prog_factor.get(fidi, 1.0)
+            sub_t = 1.0
+            if sub_for is not None:
+                try:
+                    sub_t = sub_for(fidi)
+                except Exception:
+                    sub_t = 1.0
+            factor = global_sub * sub_t * float(fixture_dimmers.get(fidi, 1.0)) * prog_factor.get(fidi, 1.0)
             if factor >= 0.999 or not addrs:
                 continue
             entry = self._fix_index.get(fidi)
