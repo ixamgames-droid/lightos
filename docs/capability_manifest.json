@@ -167,8 +167,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -299,8 +299,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -541,8 +541,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -711,8 +711,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -883,8 +883,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1042,8 +1042,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1216,8 +1216,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1421,8 +1421,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1615,8 +1615,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1770,8 +1770,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -1902,8 +1902,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2048,8 +2048,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2212,8 +2212,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2376,8 +2376,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2517,8 +2517,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2672,8 +2672,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2804,8 +2804,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -2936,8 +2936,8 @@
           "label": "Tempo-Bus",
           "kind": "select",
           "options": [
-            "",
             "Global",
+            "",
             "A",
             "B",
             "C",
@@ -3219,8 +3219,8 @@
       "label": "Tempo-Bus",
       "kind": "select",
       "options": [
-        "",
         "Global",
+        "",
         "A",
         "B",
         "C",

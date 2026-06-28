@@ -224,7 +224,8 @@ def test_free_run_unchanged_exact():
     _step += matrix_speed * max(0, Function.speed) * dt — float-exakt."""
     F = RgbMatrixInstance(cols=4, rows=1, algorithm=RgbAlgorithm.COLORFADE,
                           fixture_grid=[1, 2, 3, 4], speed=3.0)
-    assert F.tempo_bus_id == ""            # Default = Free-Run
+    F.tempo_bus_id = ""                    # bewusste Abwahl des Global-Defaults
+    assert F.tempo_bus_id == ""
     assert F.matrix_speed == 3.0
     assert F.speed == 1.0                  # Function-Master Default
     assert F._frozen is False

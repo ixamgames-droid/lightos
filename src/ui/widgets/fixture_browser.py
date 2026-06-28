@@ -197,6 +197,8 @@ class FixtureBrowserDialog(QDialog):
         mode_name = self._combo_mode.currentText().split(" (")[0]
         channels = fdb.get_channels(mode_id) if mode_id else []
         ch_count = len(channels)
+        auto_dual_tilt = fdb.should_auto_mark_dual_tilt(
+            self._selected_profile, channels)
         count = self._spin_count.value()
         universe = self._spin_universe.value()
         address = self._spin_address.value()
@@ -216,6 +218,7 @@ class FixtureBrowserDialog(QDialog):
             manufacturer_name=self._selected_profile.manufacturer.name if self._selected_profile.manufacturer else "",
             fixture_name=self._selected_profile.name,
             fixture_type=self._selected_profile.fixture_type,
+            spider_dual_tilt=auto_dual_tilt,
         )
         # Zusatz-Geräte als Liste mitgeben. Laeuft die Adresse ueber 512, wird
         # ins naechste Universe gerollt (statt Geraete still zu verwerfen).
@@ -244,5 +247,6 @@ class FixtureBrowserDialog(QDialog):
                 manufacturer_name=self._selected_profile.manufacturer.name if self._selected_profile.manufacturer else "",
                 fixture_name=self._selected_profile.name,
                 fixture_type=self._selected_profile.fixture_type,
+                spider_dual_tilt=auto_dual_tilt,
             ))
         self.accept()

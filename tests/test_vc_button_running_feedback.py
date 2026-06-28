@@ -59,6 +59,20 @@ class ButtonRunningFeedbackTest(unittest.TestCase):
         b.function_id = None
         self.assertFalse(b._function_running())
 
+    def test_extra_running_function_lights_group_button(self):
+        extra = self.fm.new_efx("FeedbackExtra")
+        try:
+            self.btn.function_ids = [extra.id]
+            self.fm.start(extra.id)
+            self.assertTrue(self.btn._function_running())
+        finally:
+            self.fm.stop(extra.id)
+            self.fm.remove(extra.id)
+
+    def test_missing_extra_binding_is_reported(self):
+        self.btn.function_ids = [987654321]
+        self.assertTrue(self.btn._binding_unresolved())
+
 
 if __name__ == "__main__":
     unittest.main()

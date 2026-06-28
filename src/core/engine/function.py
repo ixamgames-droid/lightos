@@ -62,6 +62,10 @@ class Function:
     """Abstract base for all QLC+ function types."""
 
     function_type: FunctionType = FunctionType.Scene  # overridden by subclasses
+    # Zeitbasierte Effekt-Subtypen setzen dies auf True. Neue Effekte folgen dann
+    # standardmaessig der globalen BPM; statische Funktionen bleiben unberuehrt.
+    # Alt-Shows ohne tempo_bus_id laedt FunctionManager weiterhin als Free-Run.
+    tempo_sync_default: bool = False
 
     def __init__(self, name: str = "Neue Funktion", fid: int | None = None):
         self.id: int = fid if fid is not None else _alloc_id()
@@ -94,12 +98,13 @@ class Function:
         # "linear" = unveränderter, gerader Verlauf).
         self.env_curve: str = "linear"
         # WP-Tempo: Anbindung an einen Tempo-Bus (core/engine/tempo_bus.py +
-        # docs/TEMPO_SYNC_PLAN.md). "" = Free-Run wie bisher (Subtyp liest KEINEN Bus).
+        # docs/TEMPO_SYNC_PLAN.md). Neue zeitbasierte Effekte folgen standardmaessig
+        # "Global"; "" ist die bewusste Abwahl = Free-Run (Subtyp liest KEINEN Bus).
         # Sonst leitet ein zeitbasierter Subtyp seine Phase aus der Bus-Position ab:
         #   effect_pos = (bus.position - _beat_anchor) * tempo_multiplier + phase_offset
         # tempo_multiplier = harmonisches Verhältnis (×¼…×4), phase_offset in Beats,
         # sync_group bündelt Effekte, die per "Sync" gemeinsam re-ankern.
-        self.tempo_bus_id: str = ""
+        self.tempo_bus_id: str = "Global" if self.tempo_sync_default else ""
         self.tempo_multiplier: float = 1.0
         self.phase_offset: float = 0.0
         self.sync_group: str = ""

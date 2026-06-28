@@ -96,6 +96,39 @@ def get_channels(mode_id: int) -> list[FixtureChannel]:
         return result
 
 
+_DUAL_TILT_SPIDER_NAME_HINTS = (
+    "spider", "speider", "butterfly", "derby", "flower", "twinscan",
+)
+
+
+def should_auto_mark_dual_tilt(profile, channels) -> bool:
+    """Erkennt fehlgemappte QLC+-Spider mit zwei Tilt-Bars.
+
+    Manche QXF-Dateien beschreiben die beiden Bar-Motoren als ``pan`` und
+    ``tilt``. Fuer echte Moving Heads ist dieses Layout korrekt und darf nicht
+    pauschal umgedeutet werden. Die automatische Korrektur greift deshalb nur
+    bei QLC+-Importen mit spider-typischem Namen und mindestens zwei getrennten
+    Farbbanken. Manuelle/User-Profile bleiben beim expliziten Patch-Schalter.
+    """
+    try:
+        if str(getattr(profile, "source", "") or "").lower() != "qlcplus":
+            return False
+        identity = " ".join((
+            str(getattr(profile, "name", "") or ""),
+            str(getattr(profile, "short_name", "") or ""),
+        )).lower()
+        if not any(hint in identity for hint in _DUAL_TILT_SPIDER_NAME_HINTS):
+            return False
+        attrs = [str(getattr(ch, "attribute", "") or "") for ch in channels]
+        return (
+            attrs.count("pan") == 1
+            and attrs.count("tilt") >= 1
+            and attrs.count("color_r") >= 2
+        )
+    except Exception:
+        return False
+
+
 def search_fixtures(query: str) -> list[FixtureProfile]:
     q = f"%{query}%"
     with Session(engine()) as s:
@@ -734,6 +767,97 @@ def _add_adj_flatpar(s, mfr):
                  _flatpar_qwh12x_modes_data())
 
 
+# -- ADJ Dotz TPar System (4x 30W RGB COB, Manual Rev. 2/15) -----------------
+# Official ADJ layout: 3/5/9/12/18 DMX channels. The 12/18-channel modes
+# control the four PAR heads individually; repeated RGB attributes are handled
+# by LightOS as multi-head channels (color_r, color_r#1, ...).
+_DOTZ_TPAR_LIGHT = [
+    (0, 127, "Aus", "closed"),
+    (128, 255, "An", "open"),
+]
+_DOTZ_TPAR_MACROS = [
+    (0, 15, "Manuelle RGB-Steuerung", "open"),
+    (16, 23, "Rot", "color"),
+    (24, 31, "Gruen", "color"),
+    (32, 39, "Blau", "color"),
+    (40, 47, "Rot + Gruen", "color"),
+    (48, 55, "Gruen + Blau", "color"),
+    (56, 63, "Rot + Blau", "color"),
+    (64, 71, "Rot + Gruen + Blau", "color"),
+    (72, 79, "Farbe 1", "color"),
+    (80, 87, "Farbe 2", "color"),
+    (88, 95, "Farbe 3", "color"),
+    (96, 103, "Farbe 4", "color"),
+    (104, 111, "Farbe 5", "color"),
+    (112, 119, "Farbe 6", "color"),
+    (120, 127, "Farbe 7", "color"),
+    (128, 135, "Farbe 8", "color"),
+    (136, 143, "Color Fade 1", ""),
+    (144, 151, "Color Snake", ""),
+    (152, 159, "Color Fade 2", ""),
+    (160, 167, "Color Change", ""),
+    (168, 175, "Color Flow 1", ""),
+    (176, 183, "Color Flow 2", ""),
+    (184, 191, "Color Flow 3", ""),
+    (192, 199, "Color Flow 4", ""),
+    (200, 207, "Color Flow 5", ""),
+    (208, 215, "Color Flow 6", ""),
+    (216, 223, "Color Flow 7", ""),
+    (224, 231, "Color Flow 8", ""),
+    (232, 239, "Color Flow 9", ""),
+    (240, 255, "Sound Active", "sound"),
+]
+_DOTZ_TPAR_DIM_CURVES = [
+    (0, 41, "Standard", ""),
+    (42, 84, "Stage", ""),
+    (85, 127, "TV", ""),
+    (128, 170, "Architectural", ""),
+    (171, 213, "Theater", ""),
+    (214, 255, "Geraete-Einstellung", ""),
+]
+
+
+def _dotz_tpar_rgb_heads(count):
+    channels = []
+    for head in range(1, count + 1):
+        channels.extend([
+            (f"Kopf {head} Rot", "color_r", 0, 255),
+            (f"Kopf {head} Gruen", "color_g", 0, 255),
+            (f"Kopf {head} Blau", "color_b", 0, 255),
+        ])
+    return channels
+
+
+def _dotz_tpar_modes_data():
+    """ADJ Dotz TPar System, channel order and ranges per official manual."""
+    rgb = _dotz_tpar_rgb_heads(1)
+    rgb4 = _dotz_tpar_rgb_heads(4)
+    controls = [
+        ("Farb-Makros/Programme", "color_wheel", 0, 0, _DOTZ_TPAR_MACROS),
+        ("Master Dimmer/Programm-Speed/Sound", "intensity", 0, 255),
+        ("Strobe langsam-schnell", "shutter", 0, 0),
+        ("Dimmerkurve", "raw", 0, 0, _DOTZ_TPAR_DIM_CURVES),
+        ("Zusatzlicht 1", "raw", 0, 255, _DOTZ_TPAR_LIGHT),
+        ("Zusatzlicht 2", "raw", 0, 255, _DOTZ_TPAR_LIGHT),
+    ]
+    return [
+        ("3-Kanal RGB", rgb),
+        ("5-Kanal RGB + Zusatzlicht", rgb + [
+            ("Zusatzlicht 1", "raw", 0, 255, _DOTZ_TPAR_LIGHT),
+            ("Zusatzlicht 2", "raw", 0, 255, _DOTZ_TPAR_LIGHT),
+        ]),
+        ("9-Kanal Voll", rgb + controls),
+        ("12-Kanal 4x RGB", rgb4),
+        ("18-Kanal 4x RGB Voll", rgb4 + controls),
+    ]
+
+
+def _add_adj_dotz_tpar(s, mfr):
+    """ADJ Dotz TPar System (4x 30W RGB COB), complete five-mode profile."""
+    _add_fixture(s, mfr, "Dotz TPar System", "DOTZTPAR", "led_bar", 144,
+                 _dotz_tpar_modes_data())
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -832,6 +956,9 @@ def ensure_builtins():
             changed = True
         if "FPQWH12X" not in have:
             _add_adj_flatpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+            changed = True
+        if "DOTZTPAR" not in have:
+            _add_adj_dotz_tpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -1022,6 +1149,7 @@ def _seed(s: Session):
         ]),
     ])
     _add_adj_flatpar(s, adj)
+    _add_adj_dotz_tpar(s, adj)
 
     # ── Generic Stage Light CQ6136 ────────────────────────────────────────────
     # Tested and confirmed working via Enttec Pro DMX

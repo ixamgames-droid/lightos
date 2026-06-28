@@ -472,6 +472,9 @@ class ApcMk2Feedback:
                 return False
             fid = int(fid)
             if w.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+                running = getattr(w, "_function_running", None)
+                if callable(running):
+                    return bool(running())
                 return bool(st.function_manager.is_running(fid))
             if w.action in (ButtonAction.TOGGLE, ButtonAction.FLASH):
                 execs = st.playback_engine.executors if st.playback_engine else []

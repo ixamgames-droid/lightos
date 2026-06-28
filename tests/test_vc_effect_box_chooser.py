@@ -130,6 +130,40 @@ def test_box_no_auto_sliders_on_bind():
     assert kids == []                              # keine ungewollten Regler
 
 
+def test_box_preview_mirrors_existing_matrix_without_rgb_defaults():
+    _app()
+    from src.core.engine.function_manager import get_function_manager
+    from src.core.engine.rgb_matrix import (
+        RgbMatrixInstance, RgbAlgorithm, MatrixStyle, ColorSequence,
+    )
+    from src.ui.virtualconsole.vc_canvas import VCCanvas
+
+    fm = get_function_manager()
+    matrix = RgbMatrixInstance(
+        "Dimmer exact", cols=3, rows=1, fixture_grid=[1, None, 2],
+        algorithm=RgbAlgorithm.CHASE,
+    )
+    matrix.style = MatrixStyle.DIMMER
+    matrix.colors = ColorSequence([(255, 0, 0), (0, 0, 255)])
+    matrix.intensity_min = 17
+    matrix.intensity_max = 203
+    fm.add(matrix)
+    try:
+        canvas = VCCanvas()
+        box = canvas._add_widget("VCEffectEditor", QPoint(0, 0))
+        before = {fn.id for fn in fm.all()}
+        box.set_effect(matrix.id)
+        preview = box._preview._inst
+        assert preview is not matrix
+        assert preview.style == MatrixStyle.DIMMER
+        assert preview.fixture_grid == [1, None, 2]
+        assert preview.intensity_min == 17
+        assert preview.intensity_max == 203
+        assert {fn.id for fn in fm.all()} == before
+    finally:
+        fm.remove(matrix.id)
+
+
 def test_effect_editor_in_droppable_types():
     _app()
     from src.ui.virtualconsole.vc_canvas import VCCanvas

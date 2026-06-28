@@ -1591,10 +1591,10 @@ def get_channels_for_patched(fixture: PatchedFixture):
     Fallback: Wenn der exakte Mode-Name nicht existiert, wird der erste Mode
     des Profils mit passender Kanalanzahl verwendet (oder einfach der erste).
 
-    Spider-Dual-Tilt (``fixture.spider_dual_tilt``): der Pan-Motor wird als
-    zweiter Tilt-Kopf ausgegeben (siehe ``_as_dual_tilt_channels``). Das Flag ist
-    Teil des Cache-Keys, damit dasselbe Profil fuer ungeflaggte Geraete unveraendert
-    bleibt."""
+    Spider-Dual-Tilt: Bei explizitem ``fixture.spider_dual_tilt`` ODER einem
+    sicher erkannten, fehlgemappten QLC+-Spider wird der Pan-Motor als zweiter
+    Tilt-Kopf ausgegeben (siehe ``_as_dual_tilt_channels``). Die automatische
+    Erkennung ist profilbezogen und wird nach dem Laden der Rohkanaele bestimmt."""
     spider_dual = bool(getattr(fixture, "spider_dual_tilt", False))
     key = (getattr(fixture, "fixture_profile_id", None),
            getattr(fixture, "mode_name", None),
@@ -1605,8 +1605,8 @@ def get_channels_for_patched(fixture: PatchedFixture):
         return cached
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from .database.fixture_db import engine
-    from .database.models import FixtureMode, FixtureChannel
+    from .database.fixture_db import engine, should_auto_mark_dual_tilt
+    from .database.models import FixtureProfile, FixtureMode, FixtureChannel
     with Session(engine()) as s:
         # 1. Versuch: exakter Match
         mode = s.execute(
@@ -1644,8 +1644,10 @@ def get_channels_for_patched(fixture: PatchedFixture):
             # sonst per Lazy-Load zu und crashen im Per-Frame-Renderer.
             .options(selectinload(FixtureChannel.ranges))
         ).scalars().all()
+        profile = s.get(FixtureProfile, fixture.fixture_profile_id)
+        auto_dual = should_auto_mark_dual_tilt(profile, result)
         s.expunge_all()
-        if spider_dual:
+        if spider_dual or auto_dual:
             result = _as_dual_tilt_channels(result)
         _channel_cache[key] = result
         return result

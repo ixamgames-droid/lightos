@@ -18,18 +18,21 @@ Es gibt zwei Arten, ein Bedien-Element auf die virtuelle Konsole zu bekommen:
 
 Wenn du einen Effekt auf eine freie Stelle ziehst, erscheint diese Karte. Oben steht der Effektname (im Bild „Matrix 1"). Darunter ist **eine Zeile je Aspekt**, den dieser Effekt steuerbar macht — als **Ankreuz-Kästchen** links und dem dazu passenden **Widget** rechts. Du kannst mehrere Häkchen setzen: jedes angekreuzte Kästchen wird zu einem eigenen, fertig verdrahteten Bedien-Element, und alles entsteht in **einem** Arbeitsschritt (ein gemeinsames Rückgängig).
 
+> **Wichtig:** Smart-Drop erzeugt dabei **keinen zweiten Effekt**. Alle Regler werden direkt an die vorhandene Funktion gebunden. Bei Matrix-Effekten zeigt die Karte zusätzlich den Kanalbereich: **nur Farbe**, **nur Dimmer**, **nur Shutter** oder bewusst **Farbe + Dimmer**. Unpassende Regler und Aktionen werden ausgeblendet.
+
 **An/Aus (Toggle)** ist von Anfang an vorangekreuzt — das ist der Standardfall. Wenn du sonst nichts änderst und auf **„Erstellen"** klickst, bekommst du genau einen An/Aus-Button. Welche Zeilen erscheinen, hängt vom Effekt ab; mögliche Aspekte sind:
 
 - **An/Aus (Toggle)** — Button, der den Effekt startet/stoppt (vorangekreuzt).
 - **Flash (nur gehalten)** — Button, der den Effekt nur läuft, solange du ihn gedrückt hältst.
 - **Tempo (Geschwindigkeit)** — direkte Effekt-Geschwindigkeit. Standard-Widget ist das **Speed-Rad**, alternativ ein Fader.
-- **Helligkeit** — Effekt-Intensität als Fader (oder Drehrad).
+- **Farb-Pegel / Dimmer-Pegel / Helligkeit** — passend zum tatsächlichen Kanalbereich des Effekts; ein reiner Farbeffekt bekommt dadurch keinen Dimmerkanal.
 - **Farben ändern…** — öffnet den **Farb-Editor** (Farbpalette des Effekts bearbeiten).
 - **Bewegung (XY-Feld)…** — nur bei EFX: ein XY-Feld, das Zentrum/Größe der Bewegung steuert.
 - **Tempo-Bus zuweisen…** — **Bus-Auswahl**: hängt den Effekt an einen gemeinsamen Tempo-Bus (A/B/C …).
 - **Tempo-Multiplikator (×½ ×2)…** — ein **Speed-Rad** im Multiplikator-Modus: das Effekt-Tempo läuft relativ zum Tempo-Bus (z. B. halb oder doppelt so schnell).
 
 Selten gebrauchte Einzel-Parameter und Aktionen stehen nicht direkt in der Liste, sondern aufgeklappt unter **„Mehr Parameter (…)"** ganz unten — die Zahl in Klammern sagt, wie viele es sind.
+Diskrete Werte wie Richtung, Modus oder An/Aus-Optionen erhalten eine **+/−-Schrittwahl** statt eines ungenauen Faders. Abhängige Parameter erscheinen erst, wenn sie im Effekt aktiv sind (z. B. das Farbwechsel-Intervall erst nach Aktivierung von „Farbe pro Runde wechseln").
 
 Ganz unten gibt es zusätzlich das Kästchen **„Als Effekt-Box gruppieren"**: damit landen alle gewählten Elemente in **einem** beweglichen Container mit Live-Vorschau, statt einzeln verstreut auf die Canvas.
 

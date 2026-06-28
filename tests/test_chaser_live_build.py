@@ -99,7 +99,9 @@ class ChaserLiveBuildTest(unittest.TestCase):
         # Kern-Params muessen enthalten sein; Tempo-Bus-Params (tempo_bus_id/
         # tempo_multiplier/phase_offset) sind zusaetzlich erlaubt -> Subset-Check
         # statt exakter Menge (sonst bricht jede neue Param-Erweiterung diesen Test).
-        self.assertTrue({"speed", "direction", "run_order"} <= params)
+        self.assertTrue({"speed", "direction", "run_order",
+                         "step_duration", "step_hold",
+                         "step_fade", "step_fade_in", "step_fade_out"} <= params)
 
     def test_dispatcher_set_param_and_action(self):
         from src.core.engine import effect_live
@@ -109,6 +111,45 @@ class ChaserLiveBuildTest(unittest.TestCase):
                          RunOrder.Loop.value)
         actions = dict(effect_live.list_actions(function_id=self.c.id))
         self.assertIn("capture_step", actions)
+
+    def test_step_timing_params_are_live_mappable(self):
+        from src.core.engine import effect_live
+
+        a = self.fm.new_scene("a")
+        b = self.fm.new_scene("b")
+        self.c.add_step(a.id, fade_in=0.1, hold=0.4, fade_out=0.2)
+        self.c.add_step(b.id, fade_in=0.2, hold=0.6, fade_out=0.3)
+
+        self.assertTrue(effect_live.set_param("step_fade_in", 1.25,
+                                              function_id=self.c.id))
+        self.assertTrue(all(abs(s.fade_in - 1.25) < 1e-9 for s in self.c.steps))
+
+        self.assertTrue(effect_live.set_param("step_fade_out", 0.75,
+                                              function_id=self.c.id))
+        self.assertTrue(all(abs(s.fade_out - 0.75) < 1e-9 for s in self.c.steps))
+
+        self.assertTrue(effect_live.set_param("step_hold", 2.0,
+                                              function_id=self.c.id))
+        self.assertTrue(all(abs(s.hold - 2.0) < 1e-9 for s in self.c.steps))
+        self.assertAlmostEqual(effect_live.get_param("step_duration",
+                                                     function_id=self.c.id),
+                               4.0)
+
+    def test_normalized_step_duration_scales_to_param_range(self):
+        from src.core.engine import effect_live
+
+        sc = self.fm.new_scene("look")
+        self.c.add_step(sc.id, fade_in=0.5, hold=1.0, fade_out=0.5)
+
+        self.assertTrue(effect_live.set_param_normalized("step_duration", 0.0,
+                                                         function_id=self.c.id))
+        self.assertAlmostEqual(self.c.steps[0].total_duration(), 0.05, places=6)
+        self.assertAlmostEqual(self.c.steps[0].hold, 0.0, places=6)
+
+        self.assertTrue(effect_live.set_param_normalized("step_fade", 0.5,
+                                                         function_id=self.c.id))
+        self.assertAlmostEqual(self.c.steps[0].fade_in, 5.0, places=6)
+        self.assertAlmostEqual(self.c.steps[0].fade_out, 5.0, places=6)
 
 
 if __name__ == "__main__":

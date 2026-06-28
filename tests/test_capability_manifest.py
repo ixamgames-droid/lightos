@@ -62,3 +62,4 @@ def test_manifest_has_core_sets():
     chase = m["matrix_algorithms"]["Chase"]["params"]
     keys = {p["key"] for p in chase}
     assert {"axis", "runner_count", "movement"} <= keys
+    assert {"intensity_min", "shutter_min", "color_interval", "dimmer_interval"} <= keys

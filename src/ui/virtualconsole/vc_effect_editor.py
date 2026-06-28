@@ -91,19 +91,20 @@ class VCEffectEditor(VCFrame):
         self._ensure_preview()
         if self._preview is not None:
             try:
-                cols = int(getattr(fn, "cols", 8) or 8)
-                rows = int(getattr(fn, "rows", 1) or 1)
-                grid = list(getattr(fn, "fixture_grid", []) or [])
-                self._preview.set_grid(cols, rows, grid or None)
-            except Exception:
-                pass
-            try:
-                self._preview.play(
-                    algorithm=getattr(fn, "algorithm", None),
-                    color1=getattr(fn, "color1", None),
-                    color2=getattr(fn, "color2", None),
-                    speed=getattr(fn, "matrix_speed", None),
-                    label=self.caption)
+                from src.core.engine.rgb_matrix import RgbMatrixInstance
+                if isinstance(fn, RgbMatrixInstance):
+                    self._preview.play_effect(fn, label=self.caption)
+                else:
+                    cols = int(getattr(fn, "cols", 8) or 8)
+                    rows = int(getattr(fn, "rows", 1) or 1)
+                    grid = list(getattr(fn, "fixture_grid", []) or [])
+                    self._preview.set_grid(cols, rows, grid or None)
+                    self._preview.play(
+                        algorithm=getattr(fn, "algorithm", None),
+                        color1=getattr(fn, "color1", None),
+                        color2=getattr(fn, "color2", None),
+                        speed=getattr(fn, "matrix_speed", None),
+                        label=self.caption)
             except Exception:
                 pass
         self._reposition_chrome()

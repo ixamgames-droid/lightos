@@ -636,8 +636,9 @@ class VCCanvas(QWidget):
         from .vc_stepper import VCStepper
         from .vc_effect_display import VCEffectDisplay
         from .vc_effect_editor import VCEffectEditor
+        from .vc_bus_selector import VCBusSelector
         return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial,
-                VCStepper, VCEffectDisplay, VCEffectEditor)
+                VCStepper, VCEffectDisplay, VCEffectEditor, VCBusSelector)
 
     # ── Drag-Feedback: Ziel-Widget gruen/rot umrahmen ─────────────────────────
     #
@@ -710,6 +711,16 @@ class VCCanvas(QWidget):
                 return True
         return False
 
+    @staticmethod
+    def _caps_have_step_param(caps) -> bool:
+        """Hat der Effekt einen diskreten int/bool/select-Parameter?"""
+        return any(
+            getattr(spec, "kind", "") in ("int", "bool", "select")
+            and getattr(spec, "live_editable", True)
+            and getattr(spec, "mappable", True)
+            for spec in getattr(caps, "param_specs", [])
+        )
+
     def _effect_fits_widget(self, w, caps) -> bool:
         """Capability-Abgleich Effekt<->Widget-Typ (vgl. _apply_function_to_special):
         spiegelt, was der Drop tatsaechlich binden wuerde."""
@@ -722,14 +733,19 @@ class VCCanvas(QWidget):
         from .vc_stepper import VCStepper
         from .vc_effect_display import VCEffectDisplay
         from .vc_effect_editor import VCEffectEditor
+        from .vc_bus_selector import VCBusSelector
         if isinstance(w, (VCButton, VCEffectDisplay)):
             return True                                  # togglen / anzeigen: jede Funktion
         if isinstance(w, VCEffectEditor):
             return bool(getattr(caps, "has_params", False))
-        if isinstance(w, (VCSlider, VCEncoder, VCStepper)):
+        if isinstance(w, (VCSlider, VCEncoder)):
             return self._caps_have_numeric_param(caps)   # braucht steuerbaren Zahl-Param
+        if isinstance(w, VCStepper):
+            return self._caps_have_step_param(caps)
         if isinstance(w, VCSpeedDial):
             return bool(getattr(caps, "has_speed", False))
+        if isinstance(w, VCBusSelector):
+            return bool(getattr(caps, "is_tempo_syncable", False))
         if isinstance(w, VCColor):
             return bool(getattr(caps, "has_colors", False))
         if isinstance(w, VCXYPad):
@@ -826,9 +842,26 @@ class VCCanvas(QWidget):
                     target.update()
 
             elif isinstance(target, VCButton):
-                # Vorhandenen Button auf Funktion umbiegen
-                target.action = ButtonAction.FUNCTION_TOGGLE
-                target.function_id = function_id
+                # Funktions-Buttons koennen wie Slider mehrere Ziele koppeln:
+                # ein weiterer Drop wird angehaengt statt die erste Bindung zu
+                # ersetzen. Andere Button-Arten (Executor, Snapshot, …) werden
+                # weiterhin bewusst in einen Funktions-Toggle umgewandelt.
+                function_button = target.action in (
+                    ButtonAction.FUNCTION_TOGGLE,
+                    ButtonAction.FUNCTION_FLASH,
+                )
+                already_bound = function_button and (
+                    target.function_id is not None or bool(target.function_ids)
+                )
+                if already_bound:
+                    if not self._resolve_coupling_conflict(
+                            target, function_id, aspect="toggle",
+                            interactive=interactive):
+                        return
+                else:
+                    target.action = ButtonAction.FUNCTION_TOGGLE
+                    target.function_id = function_id
+                    target.function_ids = []
                 if fn_name and getattr(target, "caption", None) in (None, "", "Button"):
                     target.caption = fn_name
                 target.update()
@@ -887,10 +920,10 @@ class VCCanvas(QWidget):
             try:
                 from src.core.engine import effect_live
                 pkeys = [getattr(s, "key", "")
-                         for s in effect_live.list_params(res.function_id)
-                         if getattr(s, "kind", "") in ("int", "float")
-                         and getattr(s, "live_editable", True)
-                         and getattr(s, "mappable", True)]
+                          for s in effect_live.list_params(res.function_id)
+                          if getattr(s, "kind", "") in ("int", "float", "bool", "select")
+                          and getattr(s, "live_editable", True)
+                          and getattr(s, "mappable", True)]
                 akeys = [k for k, _l in effect_live.list_actions(res.function_id)]
                 self.add_live_controls(res.function_id, pkeys, akeys,
                                        origin=None if pos is None else None)
@@ -931,7 +964,8 @@ class VCCanvas(QWidget):
             # Bewegungs-Aspekt (EFX): Feld-Modus steuert Zentrum/Groesse.
             w.mode = "area"
             w.efx_function_id = fid
-        # VCBusSelector: kein Funktions-Ziel.
+        elif wt == "VCBusSelector":
+            w.function_id = fid
         # Phase E: optionale Multi-Effekt-Kopplung aus dem SmartDropResult
         # uebernehmen (nur Widgets, die die Felder kennen).
         _extra_ids = [int(i) for i in getattr(res, "function_ids", []) if str(i).lstrip("-").isdigit()]
@@ -965,6 +999,7 @@ class VCCanvas(QWidget):
         from .vc_stepper import VCStepper
         from .vc_effect_display import VCEffectDisplay
         from .vc_effect_editor import VCEffectEditor
+        from .vc_bus_selector import VCBusSelector
         from .vc_xypad import VCXYPad
         from .vc_speedial import VCSpeedDial, SpeedTarget
 
@@ -994,6 +1029,13 @@ class VCCanvas(QWidget):
             target.set_effect(function_id, open_chooser=interactive)
             return True
 
+        if isinstance(target, VCBusSelector):
+            target.function_id = function_id
+            if fn_name and getattr(target, "caption", None) in (None, "", "Tempo-Bus"):
+                target.caption = f"{fn_name} Tempo-Bus"
+            target.update()
+            return True
+
         if isinstance(target, VCColor):
             # Farb-Kachel färbt live die aktive Sequence-Farbe DIESES Effekts.
             target.target = ColorTarget.EFFECT
@@ -1019,11 +1061,19 @@ class VCCanvas(QWidget):
             return True
 
         if isinstance(target, VCStepper):
-            # Schrittzaehler verstellt einen ganzzahligen Parameter dieses Effekts.
+            # Schrittwahl braucht einen diskreten int/bool/select-Parameter.
             target.function_id = function_id
             try:
                 from src.core.engine import effect_live
-                dk = effect_live.default_param_key(function_id)
+                dk = next(
+                    (
+                        spec.key for spec in effect_live.list_params(function_id)
+                        if spec.kind in ("int", "bool", "select")
+                        and getattr(spec, "live_editable", True)
+                        and getattr(spec, "mappable", True)
+                    ),
+                    None,
+                )
                 if dk:
                     target.param_key = dk
             except Exception:
@@ -1076,7 +1126,7 @@ class VCCanvas(QWidget):
 
     def _couple_effect(self, target, function_id) -> bool:
         """Phase E: haengt einen weiteren Effekt an ein bereits gebundenes Multi-
-        Effekt-Widget (VCSlider/VCSpeedDial) an. Dedupliziert gegen die
+        Effekt-Widget (z. B. VCButton/VCSlider/VCSpeedDial) an. Dedupliziert gegen die
         Primaer-ID und die bestehende Liste. Gibt False zurueck, wenn der Effekt
         schon gekoppelt ist (nichts zu tun)."""
         try:
@@ -1222,7 +1272,7 @@ class VCCanvas(QWidget):
                                    interactive: bool = False,
                                    resolution: "str | None" = None) -> bool:
         """Entscheidet, was beim Drop eines Effekts auf einen BEREITS gebundenen
-        Slider/SpeedDial passiert — statt stumm zu koppeln:
+        Multi-Ziel-Widget passiert — statt stumm zu koppeln:
           'couple'  -> bestehendes _couple_effect (heutiges Verhalten)
           'replace' -> Ziel auf den neuen Effekt umbiegen
           'new'     -> Ziel unangetastet (Aufrufer legt ein neues Widget an)
@@ -1460,13 +1510,37 @@ class VCCanvas(QWidget):
         from .vc_button import ButtonAction
         if snap_id is None:
             return
+        sid = int(snap_id)
+        already_library_snap = getattr(btn, "action", None) == ButtonAction.LIBRARY_SNAP
+        already_bound = already_library_snap and (
+            getattr(btn, "snap_id", None) is not None or bool(getattr(btn, "snap_ids", []))
+        )
         btn.action = ButtonAction.LIBRARY_SNAP
-        btn.snap_id = int(snap_id)
+        if already_bound:
+            primary = getattr(btn, "snap_id", None)
+            try:
+                primary = int(primary) if primary is not None else None
+            except (TypeError, ValueError):
+                primary = None
+            ids = []
+            for raw in (getattr(btn, "snap_ids", []) or []):
+                try:
+                    iv = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if iv != primary and iv not in ids:
+                    ids.append(iv)
+            if sid != primary and sid not in ids:
+                ids.append(sid)
+            btn.snap_ids = ids
+        else:
+            btn.snap_id = sid
+            btn.snap_ids = []
         btn._snap_active = False
         btn._snap_prev = {}
         try:
             from src.core.engine.snap_library import get_snap_library
-            snap = get_snap_library().get(int(snap_id))
+            snap = get_snap_library().get(sid)
             if snap is not None and getattr(btn, "caption", None) in (None, "", "Button"):
                 btn.caption = snap.name
         except Exception:
@@ -1524,17 +1598,17 @@ class VCCanvas(QWidget):
         return w
 
     def add_live_controls(self, function_id, param_keys, action_keys, origin=None):
-        """MLV-02: erzeugt aus gewaehlten Effekt-Parametern Fader (EFFECT_PARAM) und
-        aus Aktionen Tasten (EFFECT_ACTION), gebunden an function_id, und legt sie
-        ordentlich unter dem Ursprungs-Widget ab. Persistenz: normale VC-Serialisierung."""
+        """MLV-02: erzeugt passende Regler und Tasten, fest an function_id gebunden."""
         from .vc_button import VCButton, ButtonAction
         from .vc_slider import VCSlider, SliderMode
 
         labels = {}
+        specs = {}
         try:
             from src.core.engine import effect_live
             for s in effect_live.list_params(function_id):
                 labels[s.key] = getattr(s, "label", s.key)
+                specs[s.key] = s
         except Exception:
             pass
         try:
@@ -1558,10 +1632,21 @@ class VCCanvas(QWidget):
         try:
             x = x0
             for key in (param_keys or []):
-                w = self._add_widget("VCSlider", QPoint(x, y0))
+                spec = specs.get(key)
+                kind = getattr(spec, "kind", "float")
+                try:
+                    small_int = (kind == "int"
+                                 and (float(spec.max) - float(spec.min)) <= 64)
+                except (TypeError, ValueError, AttributeError):
+                    small_int = False
+                widget_type = ("VCStepper"
+                               if kind in ("bool", "select") or small_int
+                               else "VCSlider")
+                w = self._add_widget(widget_type, QPoint(x, y0))
                 if w is None:
                     continue
-                w.mode = SliderMode.EFFECT_PARAM
+                if isinstance(w, VCSlider):
+                    w.mode = SliderMode.EFFECT_PARAM
                 w.function_id = function_id
                 w.param_key = key
                 w.caption = labels.get(key, key)

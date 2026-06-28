@@ -48,14 +48,15 @@ class PlanOffsetCopiesTest(unittest.TestCase):
             label="Wash", fixture_profile_id=7, mode_name="8ch", channel_count=8,
             manufacturer_name="ACME", fixture_name="W8", fixture_type="moving_head",
             invert_pan=True, invert_tilt=False, swap_pan_tilt=True, spider_mirrored=False,
+            spider_dual_tilt=True,
             pan_range_deg=540, tilt_range_deg=180, pan_zero_dmx=128, tilt_zero_dmx=120)
         c = pv._copy_fixture(src, fid=42, universe=3, address=100)
         self.assertEqual((c.fid, c.universe, c.address), (42, 3, 100))
         self.assertEqual((c.fixture_profile_id, c.mode_name, c.channel_count),
                          (7, "8ch", 8))
         self.assertEqual((c.fixture_type, c.invert_pan, c.swap_pan_tilt,
-                          c.tilt_range_deg, c.tilt_zero_dmx),
-                         ("moving_head", True, True, 180, 120))
+                          c.tilt_range_deg, c.tilt_zero_dmx, c.spider_dual_tilt),
+                         ("moving_head", True, True, 180, 120, True))
 
 
 class CopyWithOffsetUITest(unittest.TestCase):

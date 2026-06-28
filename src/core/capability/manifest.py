@@ -43,11 +43,17 @@ def _spec_to_dict(spec) -> dict:
 
 
 def _matrix_algorithms() -> dict:
-    """Pro Matrix-Algorithmus die ECHTEN list_params() (universell + algo-spezifisch
-    + direction/colors) als rich specs — durch Treiben einer Wegwerf-Instanz."""
+    """Pro Matrix-Algorithmus alle gueltigen rich ParamSpecs.
+
+    ``RgbMatrixInstance.list_params()`` ist bewusst UI-dynamisch (Style + when).
+    Das Manifest ist dagegen ein Bauvertrag und muss die UNION aller Styles und
+    bedingten Parameter enthalten, damit legitime Show-Dateien nicht abgelehnt
+    werden."""
     out: dict = {}
     try:
-        from src.core.engine.rgb_matrix import RgbAlgorithm, RgbMatrixInstance
+        from src.core.engine.rgb_matrix import (
+            RgbAlgorithm, RgbMatrixInstance, MatrixStyle,
+        )
         from src.core.engine.rgb_matrix_meta import ALGO_META
     except Exception:
         return out
@@ -64,7 +70,24 @@ def _matrix_algorithms() -> dict:
         if m is not None:
             try:
                 m.algorithm = algo
-                entry["params"] = [_spec_to_dict(s) for s in m.list_params()]
+                by_key = {}
+                for style in MatrixStyle:
+                    m.style = style
+                    m.params = {}
+                    for spec in m.list_params():
+                        by_key.setdefault(spec.key, spec)
+                ordered_keys = (
+                    "speed", "intensity", "offset",
+                    "intensity_min", "intensity_max",
+                    "shutter_min", "shutter_max",
+                    "tempo_bus_id", "tempo_multiplier", "phase_offset",
+                    "env_fade_in", "env_fade_out", "env_fade",
+                    "direction", "colors",
+                )
+                specs = [by_key[key] for key in ordered_keys if key in by_key]
+                if meta is not None:
+                    specs.extend(meta.params)
+                entry["params"] = [_spec_to_dict(spec) for spec in specs]
             except Exception:
                 entry["params"] = []
         out[algo.value] = entry

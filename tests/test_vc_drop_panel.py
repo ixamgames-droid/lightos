@@ -67,8 +67,13 @@ class DropPanelTest(unittest.TestCase):
         for f in (self.m, self.efx, self.sc):
             self.fm.remove(f.id)
 
+    def _panel(self, function_id):
+        panel = VCDropPanel(function_id)
+        self.addCleanup(panel.deleteLater)
+        return panel
+
     def test_default_is_single_toggle_button(self):
-        panel = VCDropPanel(self.m.id)
+        panel = self._panel(self.m.id)
         res = panel.results()
         self.assertEqual(len(res), 1)
         from src.ui.virtualconsole.vc_button import ButtonAction
@@ -76,7 +81,7 @@ class DropPanelTest(unittest.TestCase):
         self.assertEqual(res[0].action, ButtonAction.FUNCTION_TOGGLE)
 
     def test_multi_select_creates_one_result_per_aspect(self):
-        panel = VCDropPanel(self.m.id)
+        panel = self._panel(self.m.id)
         _row(panel, ControlKind.TOGGLE).check.setChecked(False)
         _row(panel, ControlKind.TEMPO).check.setChecked(True)
         _row(panel, ControlKind.COLORS).check.setChecked(True)
@@ -84,7 +89,7 @@ class DropPanelTest(unittest.TestCase):
         self.assertEqual(types, {"VCSpeedDial", "VCEffectColors"})
 
     def test_tempo_default_is_speeddial_with_alternatives(self):
-        panel = VCDropPanel(self.m.id)
+        panel = self._panel(self.m.id)
         row = _row(panel, ControlKind.TEMPO)
         self.assertEqual(row.widget_type, "VCSpeedDial")   # Default
         self.assertIn("VCSlider", row.choices)             # Galerie-Alternative
@@ -92,21 +97,21 @@ class DropPanelTest(unittest.TestCase):
 
     def test_dimmer_matrix_has_no_colors_row(self):
         self.m.style = MatrixStyle.DIMMER
-        panel = VCDropPanel(self.m.id)
+        panel = self._panel(self.m.id)
         self.assertNotIn(ControlKind.COLORS, _kinds(panel))
         self.assertIn(ControlKind.TEMPO, _kinds(panel))
 
     def test_efx_has_movement_row(self):
-        panel = VCDropPanel(self.efx.id)
+        panel = self._panel(self.efx.id)
         self.assertIn(ControlKind.MOVEMENT, _kinds(panel))
         self.assertEqual(_row(panel, ControlKind.MOVEMENT).widget_type, "VCXYPad")
 
     def test_scene_only_toggle_and_flash(self):
-        panel = VCDropPanel(self.sc.id)
+        panel = self._panel(self.sc.id)
         self.assertEqual(_kinds(panel), {ControlKind.TOGGLE, ControlKind.FLASH})
 
     def test_nothing_checked_yields_empty(self):
-        panel = VCDropPanel(self.m.id)
+        panel = self._panel(self.m.id)
         for r in panel._rows:
             r.check.setChecked(False)
         self.assertEqual(panel.results(), [])

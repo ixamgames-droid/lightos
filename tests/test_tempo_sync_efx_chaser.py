@@ -249,7 +249,8 @@ def test_efx_free_run_byte_identity():
     e.algorithm = EfxAlgorithm.CIRCLE
     e.direction = "forward"
     e.loop = True
-    assert e.tempo_bus_id == ""          # Default = Free-Run
+    e.tempo_bus_id = ""                  # bewusste Abwahl des Global-Defaults
+    assert e.tempo_bus_id == ""
     e.speed_hz = 0.7
     e.speed = 1.5                         # Function-Master
     e._running = True
@@ -371,6 +372,7 @@ def test_chaser_free_run_and_audio_unchanged():
     c.run_order = RunOrder.Loop
     c.steps = [ChaserStep(function_id=1, hold=0.5),
                ChaserStep(function_id=2, hold=0.5)]
+    c.tempo_bus_id = ""                  # bewusste Abwahl des Global-Defaults
     assert c.tempo_bus_id == ""
     c._running = True
     c._step_idx = 0
@@ -493,6 +495,7 @@ def test_sequence_free_run_unchanged():
     sq.run_order = RunOrder.Loop
     sq.steps = [SequenceStep(values={}, fade_in=0.0, hold=0.5, fade_out=0.0),
                 SequenceStep(values={}, fade_in=0.0, hold=0.5, fade_out=0.0)]
+    sq.tempo_bus_id = ""                 # bewusste Abwahl des Global-Defaults
     assert sq.tempo_bus_id == ""
     assert sq._bus_steps_to_advance() is None   # frei -> Zeit-Pfad
 

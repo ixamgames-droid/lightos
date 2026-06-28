@@ -101,7 +101,13 @@ class VCDropPanel(QDialog):
         advanced = [o for o in opts if o.kind not in _PRIMARY_KINDS]
 
         v = QVBoxLayout(self)
-        v.addWidget(QLabel(f'„{self._name}" — was soll dieser Effekt können?'))
+        intro = (f'„{self._name}" direkt verknüpfen — es wird kein neuer Effekt '
+                 "erzeugt. Welche Bedienelemente brauchst du?")
+        if caps.channel_scope:
+            intro += f"\nKanalbereich: {caps.channel_scope}."
+        label = QLabel(intro)
+        label.setWordWrap(True)
+        v.addWidget(label)
 
         self._rows: list[_AspectRow] = []
 

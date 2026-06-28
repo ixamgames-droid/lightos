@@ -62,6 +62,7 @@ class CapabilitiesTest(unittest.TestCase):
         self.assertTrue(caps.has_colors)          # CHASE nutzt die Farbliste
         self.assertTrue(caps.is_tempo_syncable)   # tempo_bus_id-Param vorhanden
         self.assertTrue(caps.actions)             # next_color etc.
+        self.assertEqual(caps.channel_scope, "Nur Farbe (Dimmer bleibt unangetastet)")
 
     def test_scene_caps(self):
         caps = function_capabilities(self.sc.id)
@@ -135,6 +136,8 @@ class ControlOptionsTest(unittest.TestCase):
         big_int = ControlOption(ControlKind.PARAM, "P", param_key="level",
                                 param_kind="int", param_small_int=False)
         flt = ControlOption(ControlKind.PARAM, "P", param_key="density", param_kind="float")
+        sel = ControlOption(ControlKind.PARAM, "P", param_key="direction", param_kind="select")
+        flag = ControlOption(ControlKind.PARAM, "P", param_key="pingpong", param_kind="bool")
         # Zähler (kleiner int): Stepper als Default
         self.assertEqual(widget_choices(small_int), ["VCStepper", "VCEncoder", "VCSlider"])
         self.assertEqual(recommended_widget(small_int), "VCStepper")
@@ -143,6 +146,8 @@ class ControlOptionsTest(unittest.TestCase):
         # float: KEIN Stepper
         self.assertEqual(widget_choices(flt), ["VCSlider", "VCEncoder"])
         self.assertEqual(recommended_widget(flt), "VCSlider")
+        self.assertEqual(widget_choices(sel), ["VCStepper"])
+        self.assertEqual(widget_choices(flag), ["VCStepper"])
 
 
 def _opt(kind):
@@ -257,7 +262,9 @@ class SmartDropBuildTest(unittest.TestCase):
     def test_build_bus_selector(self):
         from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
         self.canvas._build_from_smart_result(self._res(widget_type="VCBusSelector"), QPoint(10, 10))
-        self.assertEqual(len(self.canvas.findChildren(VCBusSelector)), 1)
+        widgets = self.canvas.findChildren(VCBusSelector)
+        self.assertEqual(len(widgets), 1)
+        self.assertEqual(widgets[0].function_id, self.m.id)
 
     def test_build_bulk_creates_controls(self):
         from src.ui.virtualconsole.vc_slider import VCSlider
@@ -308,10 +315,46 @@ class StyleAwareColorsTest(unittest.TestCase):
         self.assertFalse(caps.has_colors)
         self.assertNotIn(ControlKind.COLORS, {o.kind for o in control_options(caps)})
         self.assertTrue(caps.has_speed)   # Tempo bleibt — nur "Farben" faellt weg
+        self.assertEqual(caps.channel_scope, "Nur Dimmer (Farben bleiben unangetastet)")
+        self.assertFalse({"next_color", "prev_color", "add_color", "toggle_color"}
+                         & {key for key, _label in caps.actions})
+        keys = {spec.key for spec in caps.param_specs}
+        self.assertIn("intensity_min", keys)
+        self.assertNotIn("shutter_min", keys)
 
     def test_shutter_style_no_colors(self):
         self.m.style = MatrixStyle.SHUTTER
-        self.assertFalse(function_capabilities(self.m.id).has_colors)
+        caps = function_capabilities(self.m.id)
+        self.assertFalse(caps.has_colors)
+        self.assertFalse(caps.has_intensity)
+        self.assertEqual(caps.channel_scope,
+                         "Nur Shutter (Farbe/Dimmer bleiben unangetastet)")
+
+    def test_rgb_style_hides_dimmer_and_shutter_params(self):
+        self.m.style = MatrixStyle.RGB
+        keys = {spec.key for spec in function_capabilities(self.m.id).param_specs}
+        self.assertNotIn("intensity_min", keys)
+        self.assertNotIn("shutter_min", keys)
+
+    def test_building_editor_controls_does_not_create_function(self):
+        before = {fn.id for fn in self.fm.all()}
+        options = control_options(function_capabilities(self.m.id))
+        selected = [
+            option for option in options
+            if option.kind in (ControlKind.TOGGLE, ControlKind.TEMPO, ControlKind.COLORS)
+        ]
+        from src.ui.virtualconsole.smart_drop_dialog import SmartDropDialog
+        results = [
+            SmartDropDialog(self.m.id)._result_for(
+                option, recommended_widget(option), self.m.name
+            )
+            for option in selected
+        ]
+        from src.ui.virtualconsole.vc_canvas import VCCanvas
+        canvas = VCCanvas()
+        canvas.set_edit_mode(True)
+        canvas.build_from_smart_results(results, QPoint(10, 10), box=True)
+        self.assertEqual({fn.id for fn in self.fm.all()}, before)
 
 
 class MovementAspectTest(unittest.TestCase):

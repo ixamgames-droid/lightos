@@ -38,6 +38,12 @@ class TestChaserCrossfade(unittest.TestCase):
         self.b = _scene(50)
         self.reg = {self.a.id: self.a, self.b.id: self.b}
         self.ch = Chaser("c")
+        # EE-01 prueft die ZEITbasierte Blende. Seit zeitbasierte Effekte per
+        # Default dem Tempo-Bus folgen (tempo_sync_default), startet ein frischer
+        # Chaser auf "Global"; ein global laufender BPM (auch aus Vortests) wuerde
+        # ihn auf den Bus-Step-Pfad zwingen. Fuer diesen Crossfade-Test pinnen wir
+        # daher bewusst Free-Run.
+        self.ch.tempo_bus_id = ""
         self.ch.run_order = RunOrder.Loop
         self.ch.steps = [
             ChaserStep(function_id=self.a.id, fade_in=1.0, hold=1.0, fade_out=0.0),

@@ -78,6 +78,8 @@ class VCEffectColors(VCWidget):
         cur = seq.color_at(idx)
         c = QColorDialog.getColor(QColor(*cur), self, "Farbe wählen")
         if c.isValid():
+            from src.core.engine import effect_live
+            effect_live.begin_live_edit(self._fid())
             seq.set_color(idx, (c.red(), c.green(), c.blue()))
             seq.active_index = idx
             self.update()
@@ -95,6 +97,8 @@ class VCEffectColors(VCWidget):
             super().mousePressEvent(event)
             return
         if event.button() == Qt.MouseButton.RightButton:
+            from src.core.engine import effect_live
+            effect_live.begin_live_edit(self._fid())
             seq.toggle(idx)
             self.update()
             event.accept()

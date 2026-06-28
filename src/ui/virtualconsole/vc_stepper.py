@@ -1,8 +1,8 @@
-"""VCStepper — +/- Schrittzaehler fuer ganzzahlige Effekt-Parameter.
+"""VCStepper — +/- Schrittwahl fuer diskrete Effekt-Parameter.
 
 Fuer diskrete Zaehl-Parameter (z. B. Laeufer-Anzahl/Segmente: runner_count,
-runner_width), wo ein Fader unpraezise ist: zwei Tasten [−]/[+] plus der aktuelle
-Wert. Setzt den Wert ABSOLUT ueber den gemeinsamen Dispatcher
+runner_width), Auswahlwerte und boolesche Schalter, wo ein Fader unpraezise ist:
+zwei Tasten [−]/[+] plus der aktuelle Wert. Setzt den Wert ABSOLUT ueber den Dispatcher
 (``effect_live.set_param``, server-seitig auf den ParamSpec-Bereich geklemmt) —
 gebundener Effekt ueber ``function_id``/Edit-Slot oder der aktive Effekt, wenn leer.
 Binde-Plumbing analog zu VCEncoder (function_id/function_ids/param_keys_per_id).
@@ -16,7 +16,7 @@ from .vc_widget import VCWidget
 
 
 class VCStepper(VCWidget):
-    """+/- Schrittzaehler fuer einen ganzzahligen Effekt-Parameter."""
+    """+/- Schrittwahl fuer int/select/bool-Effekt-Parameter."""
 
     def __init__(self, caption: str = "Anzahl", parent=None):
         super().__init__(caption, parent)
@@ -87,14 +87,37 @@ class VCStepper(VCWidget):
             return None
 
     def step_by(self, delta: int):
-        """Wert um delta*step verstellen (absolut, je gekoppeltem Effekt geklemmt)."""
+        """Diskreten Wert verstellen (absolut, je gekoppeltem Effekt geklemmt)."""
         try:
             from src.core.engine import effect_live
             for fid in (self._all_fids() or [None]):
                 key = self._key_for(fid)
                 spec = self._spec_for(fid, key)
+                kind = getattr(spec, "kind", "int") if spec is not None else "int"
+                current = effect_live.get_param(key, fid)
+                if kind == "select":
+                    options = list(getattr(spec, "options", ()) or ())
+                    if not options:
+                        continue
+                    try:
+                        index = options.index(current)
+                    except ValueError:
+                        try:
+                            index = [str(v) for v in options].index(str(current))
+                        except ValueError:
+                            index = 0
+                    index = max(0, min(
+                        len(options) - 1,
+                        index + int(delta) * int(self.step),
+                    ))
+                    effect_live.set_param(key, options[index], fid)
+                    continue
+                if kind == "bool":
+                    if int(delta):
+                        effect_live.set_param(key, not bool(current), fid)
+                    continue
                 try:
-                    cur = int(round(float(effect_live.get_param(key, fid))))
+                    cur = int(round(float(current)))
                 except (TypeError, ValueError):
                     cur = int(spec.min) if spec is not None else 0
                 new = cur + int(delta) * int(self.step)
@@ -162,6 +185,12 @@ class VCStepper(VCWidget):
         val = self._current_value()
         if val is None:
             return "—"
+        spec = self._spec()
+        kind = getattr(spec, "kind", "") if spec is not None else ""
+        if kind == "bool":
+            return "An" if bool(val) else "Aus"
+        if kind == "select":
+            return str(val)
         try:
             return str(int(round(float(val))))
         except (TypeError, ValueError):
@@ -177,7 +206,15 @@ class VCStepper(VCWidget):
         cur = self._current_value()
         at_min = at_max = False
         try:
-            if spec is not None and cur is not None:
+            if spec is not None and cur is not None and spec.kind == "select":
+                options = list(spec.options or ())
+                idx = options.index(cur) if cur in options else 0
+                at_min = idx <= 0
+                at_max = idx >= len(options) - 1
+            elif spec is not None and cur is not None and spec.kind == "bool":
+                at_min = not bool(cur)
+                at_max = bool(cur)
+            elif spec is not None and cur is not None:
                 at_min = float(cur) <= float(spec.min)
                 at_max = float(cur) >= float(spec.max)
         except (TypeError, ValueError):
@@ -210,12 +247,13 @@ class VCStepper(VCWidget):
 
     def _open_properties(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Schrittzaehler Einstellungen")
+        dlg.setWindowTitle("Schrittwahl Einstellungen")
         form = QFormLayout(dlg)
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
         key_edit = QLineEdit(self.param_key)
-        key_edit.setToolTip("Ganzzahliger Effekt-Parameter, z. B. runner_count, runner_width")
+        key_edit.setToolTip("Diskreter Effekt-Parameter (int/select/bool), z. B. "
+                            "runner_count, direction oder pingpong.")
         form.addRow("Parameter-Key:", key_edit)
         fid_edit = QLineEdit("" if self.function_id is None else str(self.function_id))
         fid_edit.setToolTip("Funktions-ID des Ziel-Effekts. Leer = aktiver Effekt.")

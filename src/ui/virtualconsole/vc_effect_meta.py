@@ -43,6 +43,9 @@ class Capabilities:
     has_colors: bool = False
     has_movement: bool = False
     is_tempo_syncable: bool = False
+    matrix_style: str = ""
+    channel_scope: str = ""
+    intensity_label: str = "Helligkeit"
 
 
 def function_capabilities(function_id) -> Capabilities:
@@ -65,6 +68,19 @@ def function_capabilities(function_id) -> Capabilities:
         caps.name = getattr(fn, "name", "") or ""
         ft = getattr(fn, "function_type", None)
         caps.function_type = getattr(ft, "value", "") or ""
+        caps.matrix_style = getattr(getattr(fn, "style", None), "value", "") or ""
+        if caps.function_type == "RGBMatrix":
+            if caps.matrix_style in ("RGB", "RGBW"):
+                drives_dimmer = bool(getattr(fn, "drive_intensity", False))
+                caps.channel_scope = ("Farbe + Dimmer" if drives_dimmer
+                                      else "Nur Farbe (Dimmer bleibt unangetastet)")
+                caps.intensity_label = ("Helligkeit (Farbe + Dimmer)" if drives_dimmer
+                                        else "Farb-Pegel (kein Dimmer)")
+            elif caps.matrix_style == "Dimmer":
+                caps.channel_scope = "Nur Dimmer (Farben bleiben unangetastet)"
+                caps.intensity_label = "Dimmer-Pegel"
+            elif caps.matrix_style == "Shutter":
+                caps.channel_scope = "Nur Shutter (Farbe/Dimmer bleiben unangetastet)"
 
     # Parameter/Aktionen ueber effect_live (kapselt _supports + Fehlerbehandlung).
     specs: list = []
@@ -148,7 +164,7 @@ def control_options(caps: Capabilities) -> list[ControlOption]:
     if caps.has_speed:
         opts.append(ControlOption(ControlKind.TEMPO, "Tempo (Geschwindigkeit)"))
     if caps.has_intensity:
-        opts.append(ControlOption(ControlKind.INTENSITY, "Helligkeit"))
+        opts.append(ControlOption(ControlKind.INTENSITY, caps.intensity_label))
     if caps.has_colors:
         opts.append(ControlOption(ControlKind.COLORS, "Farben ändern…"))
     if caps.has_movement:
@@ -156,12 +172,12 @@ def control_options(caps: Capabilities) -> list[ControlOption]:
     if caps.is_tempo_syncable:
         opts.append(ControlOption(ControlKind.TEMPO_BUS, "Tempo-Bus zuweisen…"))
         opts.append(ControlOption(ControlKind.TEMPO_MULT, "Tempo-Multiplikator (×½ ×2)…"))
-    # Einzelne numerische Live-Parameter (speed/intensity sind schon oben abgedeckt).
+    # Einzelne Live-Parameter. Bool/Select werden diskret per +/- bedient.
     for spec in caps.param_specs:
-        if getattr(spec, "kind", "") not in ("int", "float"):
+        if getattr(spec, "kind", "") not in ("int", "float", "bool", "select"):
             continue
         key = getattr(spec, "key", "")
-        if key in ("speed", "intensity", "tempo_multiplier", "phase_offset"):
+        if key in ("speed", "intensity", "tempo_bus_id", "tempo_multiplier", "phase_offset"):
             continue
         if not getattr(spec, "live_editable", True):
             continue
@@ -239,6 +255,8 @@ def widget_choices(option: ControlOption) -> list[str]:
         return ["VCSlider", "VCEncoder"]
     if k == ControlKind.PARAM:
         # „Vom Widget": die Param-Art bestimmt die passenden Bedien-Widgets.
+        if getattr(option, "param_kind", "") in ("bool", "select"):
+            return ["VCStepper"]
         if getattr(option, "param_small_int", False):
             return ["VCStepper", "VCEncoder", "VCSlider"]   # Zähler -> Stepper als Default
         if getattr(option, "param_kind", "") == "int":

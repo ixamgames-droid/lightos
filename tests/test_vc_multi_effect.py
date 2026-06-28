@@ -98,6 +98,115 @@ class AppendOnDropTest(unittest.TestCase):
         self.assertEqual(sd.function_ids, [])
         self.assertEqual(sd.target_mode, SpeedTarget.FUNCTION)
 
+    def test_button_append_not_replace(self):
+        btn = VCButton("B", parent=self.canvas)
+        btn.action = ButtonAction.FUNCTION_TOGGLE
+        btn.function_id = self.m1.id
+        self.canvas.apply_drop(function_id=self.m2.id, target=btn)
+        self.assertEqual(btn.function_id, self.m1.id)
+        self.assertIn(self.m2.id, btn.function_ids)
+
+        # Der gekoppelte Button schaltet anschließend beide Funktionen gemeinsam.
+        btn._trigger(True)
+        self.assertTrue(self.fm.is_running(self.m1.id))
+        self.assertTrue(self.fm.is_running(self.m2.id))
+        btn._trigger(True)
+        self.assertFalse(self.fm.is_running(self.m1.id))
+        self.assertFalse(self.fm.is_running(self.m2.id))
+
+        # Gleiche Funktion erneut droppen -> kein Duplikat.
+        self.canvas.apply_drop(function_id=self.m2.id, target=btn)
+        self.assertEqual(btn.function_ids.count(self.m2.id), 1)
+
+    def test_empty_button_binds_as_before(self):
+        btn = VCButton("B", parent=self.canvas)
+        self.canvas.apply_drop(function_id=self.m1.id, target=btn)
+        self.assertEqual(btn.action, ButtonAction.FUNCTION_TOGGLE)
+        self.assertEqual(btn.function_id, self.m1.id)
+        self.assertEqual(btn.function_ids, [])
+
+    def test_button_group_with_edit_slot_keeps_all_effects_running(self):
+        from src.core.engine import effect_live
+        effect_live.clear_edit_targets()
+        btn = VCButton("Gruppe")
+        btn.action = ButtonAction.FUNCTION_TOGGLE
+        btn.function_id = self.m1.id
+        btn.function_ids = [self.m2.id]
+        btn.edit_slot = "MX"
+
+        btn._trigger(True)
+
+        self.assertTrue(self.fm.is_running(self.m1.id))
+        self.assertTrue(self.fm.is_running(self.m2.id))
+        self.assertEqual(effect_live.get_edit_target("MX"), self.m1.id)
+        effect_live.clear_edit_targets()
+
+    def test_button_group_exclusive_starts_whole_group(self):
+        outsider = _matrix("exclusive-outsider")
+        self.fm.add(outsider)
+        try:
+            self.fm.start(outsider.id)
+            btn = VCButton("Gruppe")
+            btn.action = ButtonAction.FUNCTION_TOGGLE
+            btn.function_id = self.m1.id
+            btn.function_ids = [self.m2.id]
+            btn.exclusive = True
+
+            btn._trigger(True)
+
+            self.assertFalse(self.fm.is_running(outsider.id))
+            self.assertTrue(self.fm.is_running(self.m1.id))
+            self.assertTrue(self.fm.is_running(self.m2.id))
+        finally:
+            self.fm.stop(outsider.id)
+            self.fm.remove(outsider.id)
+
+    def test_button_group_fixture_solo_protects_group_members(self):
+        outsider = _matrix("solo-outsider")
+        self.fm.add(outsider)
+        try:
+            self.fm.start(outsider.id)
+            btn = VCButton("Gruppe")
+            btn.action = ButtonAction.FUNCTION_TOGGLE
+            btn.function_id = self.m1.id
+            btn.function_ids = [self.m2.id]
+            btn.solo_fixtures = True
+
+            btn._trigger(True)
+
+            self.assertFalse(self.fm.is_running(outsider.id))
+            self.assertTrue(self.fm.is_running(self.m1.id))
+            self.assertTrue(self.fm.is_running(self.m2.id))
+        finally:
+            self.fm.stop(outsider.id)
+            self.fm.remove(outsider.id)
+
+    def test_button_effect_action_runs_for_all_targets(self):
+        from src.core.engine import effect_live
+        calls = []
+        orig = effect_live.do_action
+
+        def _spy(key, function_id=None):
+            calls.append((key, function_id))
+            return True
+
+        effect_live.do_action = _spy
+        try:
+            btn = VCButton("Aktion")
+            btn.action = ButtonAction.EFFECT_ACTION
+            btn.function_id = self.m1.id
+            btn.function_ids = [self.m2.id]
+            btn.effect_action_key = "toggle_freeze"
+
+            btn._trigger(True)
+
+            self.assertEqual(calls, [
+                ("toggle_freeze", self.m1.id),
+                ("toggle_freeze", self.m2.id),
+            ])
+        finally:
+            effect_live.do_action = orig
+
 
 # ── (b) function_ids-Roundtrip fuer Button/Encoder ───────────────────────────
 

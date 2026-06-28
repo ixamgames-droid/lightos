@@ -89,7 +89,7 @@ def test_no_auto_sync_anchor_follows_position():
     tbm = get_tempo_bus_manager(); mgr = get_bpm_manager()
     mgr.set_manual_bpm(120.0)
     d = tbm.get("default")
-    tbm.set_auto_sync(False)                    # Default
+    tbm.set_auto_sync(False)                    # bewusste Abwahl
     a1 = d.take_anchor()
     d.advance_frame(0.5)
     a2 = d.take_anchor()

@@ -153,6 +153,21 @@ class EnvelopePersistenceTest(unittest.TestCase):
         self.assertEqual((m2.env_fade_in, m2.env_fade_out), (3.0, 4.0))
         self.assertEqual(m2.env_curve, "snap")
 
+    def test_matrix_apply_dict_tempo_roundtrip(self):
+        # Matrix-Editor-Drafts duerfen die Tempo-Sync-Bindung nicht verlieren.
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        m = RgbMatrixInstance(name="MXtempo")
+        m.tempo_bus_id = "Global"
+        m.tempo_multiplier = 2.0
+        m.phase_offset = 0.25
+        m.sync_group = "Farben"
+        m2 = RgbMatrixInstance(name="x")
+        m2.apply_dict(m.to_dict())
+        self.assertEqual(m2.tempo_bus_id, "Global")
+        self.assertEqual(m2.tempo_multiplier, 2.0)
+        self.assertEqual(m2.phase_offset, 0.25)
+        self.assertEqual(m2.sync_group, "Farben")
+
     def test_old_show_defaults_zero(self):
         fm = FunctionManager()
         fm.new_scene("Old")

@@ -456,6 +456,37 @@ class RgbMatrixView(QWidget):
         self._speed_spin.valueChanged.connect(self._param_change)
         ft.addRow("Geschwindigkeit:", self._speed_spin)
 
+        self._tempo_bus_combo = QComboBox()
+        self._tempo_bus_combo.addItem("Global (taktgleich, Standard)", "Global")
+        self._tempo_bus_combo.addItem("Frei (nicht taktgebunden)", "")
+        for _bus_id in ("A", "B", "C", "D"):
+            self._tempo_bus_combo.addItem(f"Bus {_bus_id}", _bus_id)
+        self._tempo_bus_combo.setToolTip(
+            "Global = folgt der Master-/Musik-BPM und startet mit Auto-Sync "
+            "taktgleich zu anderen Effekten. Frei = bewusster eigener Lauf.")
+        self._tempo_bus_combo.currentIndexChanged.connect(self._param_change)
+        ft.addRow("Tempo-Bus:", self._tempo_bus_combo)
+
+        self._tempo_mult_spin = QDoubleSpinBox()
+        self._tempo_mult_spin.setRange(0.0625, 16.0)
+        self._tempo_mult_spin.setSingleStep(0.25)
+        self._tempo_mult_spin.setDecimals(4)
+        self._tempo_mult_spin.setValue(1.0)
+        self._tempo_mult_spin.setToolTip(
+            "Geschwindigkeit relativ zum Tempo-Bus, z. B. 0,5 = halb, 2 = doppelt.")
+        self._tempo_mult_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Tempo ×:", self._tempo_mult_spin)
+
+        self._tempo_phase_spin = QDoubleSpinBox()
+        self._tempo_phase_spin.setRange(0.0, 1.0)
+        self._tempo_phase_spin.setSingleStep(0.05)
+        self._tempo_phase_spin.setDecimals(2)
+        self._tempo_phase_spin.setValue(0.0)
+        self._tempo_phase_spin.setToolTip(
+            "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
+        self._tempo_phase_spin.valueChanged.connect(self._param_change)
+        ft.addRow("Tempo-Versatz:", self._tempo_phase_spin)
+
         self._priority_spin = QSpinBox()
         self._priority_spin.setRange(-99, 99)
         self._priority_spin.setValue(0)
@@ -976,6 +1007,12 @@ class RgbMatrixView(QWidget):
             self._cols_spin.setValue(m.cols)
             self._rows_spin.setValue(m.rows)
             self._speed_spin.setValue(m.matrix_speed)
+            _bi = self._tempo_bus_combo.findData(getattr(m, "tempo_bus_id", "Global"))
+            self._tempo_bus_combo.setCurrentIndex(_bi if _bi >= 0 else 0)
+            self._tempo_mult_spin.setValue(
+                float(getattr(m, "tempo_multiplier", 1.0)))
+            self._tempo_phase_spin.setValue(
+                float(getattr(m, "phase_offset", 0.0)))
             self._priority_spin.setValue(int(getattr(m, "priority", 0)))
             self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))
@@ -1048,6 +1085,10 @@ class RgbMatrixView(QWidget):
         self._current.cols  = self._cols_spin.value()
         self._current.rows  = self._rows_spin.value()
         self._current.matrix_speed = self._speed_spin.value()
+        self._current.tempo_bus_id = str(
+            self._tempo_bus_combo.currentData() or "")
+        self._current.tempo_multiplier = self._tempo_mult_spin.value()
+        self._current.phase_offset = self._tempo_phase_spin.value()
         # drive_intensity wird nicht mehr aus UI gesetzt (bleibt im Datenmodell).
         # Farben werden separat ueber _on_color_button / _on_sequence_changed
         # geschrieben (nicht hier, sonst wuerde eine laengere Color-Sequence bei

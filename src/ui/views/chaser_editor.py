@@ -141,6 +141,42 @@ class ChaserEditor(QWidget):
         self._spin_bps.setMinimumWidth(70)
         self._spin_bps.valueChanged.connect(self._on_props_changed)
         play_form.addRow(self._lbl_bps, self._spin_bps)
+
+        # Tempo-Bus: beatgenau an einen Tempo-Bus koppeln (folgt der globalen BPM)
+        # ODER bewusst frei laufen lassen (dann zeitbasierter Crossfade zwischen den
+        # Schritten). Spiegelt das Tempo-Panel der Matrix-/EFX-Editoren.
+        self._tempo_bus_combo = QComboBox()
+        self._tempo_bus_combo.addItem("Global (taktgleich, Standard)", "Global")
+        self._tempo_bus_combo.addItem("Frei (nicht taktgebunden)", "")
+        for _bus_id in ("A", "B", "C", "D"):
+            self._tempo_bus_combo.addItem(f"Bus {_bus_id}", _bus_id)
+        self._tempo_bus_combo.setToolTip(
+            "Beatgenau an einen Tempo-Bus koppeln (folgt der globalen BPM) oder "
+            "'Frei' für zeitbasiertes Überblenden zwischen den Schritten.")
+        self._tempo_bus_combo.currentIndexChanged.connect(self._on_props_changed)
+        play_form.addRow("Tempo-Bus:", self._tempo_bus_combo)
+
+        self._tempo_mult_spin = QDoubleSpinBox()
+        self._tempo_mult_spin.setRange(0.0625, 16.0)
+        self._tempo_mult_spin.setSingleStep(0.25)
+        self._tempo_mult_spin.setDecimals(4)
+        self._tempo_mult_spin.setValue(1.0)
+        self._tempo_mult_spin.setMinimumWidth(70)
+        self._tempo_mult_spin.setToolTip(
+            "Geschwindigkeit relativ zum Tempo-Bus, z. B. 0,5 = halb, 2 = doppelt.")
+        self._tempo_mult_spin.valueChanged.connect(self._on_props_changed)
+        play_form.addRow("Tempo ×:", self._tempo_mult_spin)
+
+        self._tempo_phase_spin = QDoubleSpinBox()
+        self._tempo_phase_spin.setRange(0.0, 1.0)
+        self._tempo_phase_spin.setSingleStep(0.05)
+        self._tempo_phase_spin.setDecimals(2)
+        self._tempo_phase_spin.setValue(0.0)
+        self._tempo_phase_spin.setMinimumWidth(70)
+        self._tempo_phase_spin.setToolTip(
+            "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
+        self._tempo_phase_spin.valueChanged.connect(self._on_props_changed)
+        play_form.addRow("Tempo-Versatz:", self._tempo_phase_spin)
         root.addWidget(grp_play)
 
         # Schritte — Tabelle + Aktions-Buttons
@@ -285,6 +321,10 @@ class ChaserEditor(QWidget):
         trig_idx = 1 if getattr(self._chaser, "audio_triggered", False) else 0
         self._combo_trigger.setCurrentIndex(trig_idx)
         self._spin_bps.setValue(max(1, int(getattr(self._chaser, "beats_per_step", 1))))
+        _bi = self._tempo_bus_combo.findData(getattr(self._chaser, "tempo_bus_id", "Global"))
+        self._tempo_bus_combo.setCurrentIndex(_bi if _bi >= 0 else 0)
+        self._tempo_mult_spin.setValue(float(getattr(self._chaser, "tempo_multiplier", 1.0)))
+        self._tempo_phase_spin.setValue(float(getattr(self._chaser, "phase_offset", 0.0)))
         self._update_trigger_visibility()
         self._rebuild_table()
         self._refresh_picker()
@@ -349,6 +389,9 @@ class ChaserEditor(QWidget):
         self._chaser.speed = self._spin_speed.value()
         self._chaser.audio_triggered = bool(self._combo_trigger.currentData())
         self._chaser.beats_per_step = int(self._spin_bps.value())
+        self._chaser.tempo_bus_id = str(self._tempo_bus_combo.currentData() or "")
+        self._chaser.tempo_multiplier = self._tempo_mult_spin.value()
+        self._chaser.phase_offset = self._tempo_phase_spin.value()
         self._update_trigger_visibility()
 
     def _update_trigger_visibility(self):

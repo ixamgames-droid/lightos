@@ -587,7 +587,9 @@ class TempoBusManager:
         self._gm_taps: list[float] = []
         # Auto-Sync: neu startende bus-gekoppelte Effekte uebernehmen den gemeinsamen
         # Beat-Raster-Ursprung ihres Bus -> phasengleich, egal wann gedrueckt.
-        self._auto_sync: bool = False
+        # Taktgleich ist der sichere Show-Default. Bewusst frei laufende Effekte
+        # waehlen Tempo-Bus ""; Auto-Sync selbst bleibt im BPM-Tab abschaltbar.
+        self._auto_sync: bool = True
         self._ensure_default()
 
     def _ensure_default(self) -> None:
@@ -786,11 +788,15 @@ class TempoBusManager:
                     "auto_sync": self._auto_sync}
 
     def load_grandmaster(self, data) -> None:
-        """Lädt den Grand-Master-Zustand (oder setzt ihn zurück bei {}/None)."""
+        """Lädt den Grand-Master-Zustand.
+
+        Fehlt ``auto_sync`` (Alt-Show/neue leere Show), gilt der sichere Default
+        True. Ein explizit gespeichertes False bleibt eine bewusste Abwahl.
+        """
         d = data if isinstance(data, dict) else {}
         self.set_grandmaster_bpm(d.get("bpm", 0.0))
         self.set_grandmaster_armed(bool(d.get("armed", False)))
-        self.set_auto_sync(bool(d.get("auto_sync", False)))
+        self.set_auto_sync(bool(d.get("auto_sync", True)))
 
     def advance_frame(self, dt: float) -> None:
         """Schreibt ALLE Buses um ``dt`` fort (einmal pro Frame, Render-Thread)."""

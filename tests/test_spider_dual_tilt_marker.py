@@ -55,11 +55,12 @@ _MISMAPPED_SPIDER_ATTRS = [
 ]
 
 
-def _make_mismapped_spider_profile() -> int:
+def _make_mismapped_spider_profile(*, source="user", name="TEST Speider DualTilt") -> int:
     payload = {
         "manufacturer": "TEST-DualTilt",
-        "name": "TEST Speider DualTilt",
+        "name": name,
         "fixture_type": "moving_head",
+        "source": source,
         "modes": [{
             "name": "14ch",
             "channel_count": len(_MISMAPPED_SPIDER_ATTRS),
@@ -119,10 +120,13 @@ class _DbBase(unittest.TestCase):
     def setUpClass(cls):
         _app()
         cls.pid = _make_mismapped_spider_profile()
+        cls.qlc_pid = _make_mismapped_spider_profile(
+            source="qlcplus", name="TEST QLC Speider DualTilt")
 
     @classmethod
     def tearDownClass(cls):
         _delete_profile(cls.pid)
+        _delete_profile(cls.qlc_pid)
 
     def setUp(self):
         reset_show()
@@ -134,9 +138,10 @@ class _DbBase(unittest.TestCase):
     def tearDown(self):
         self.fm.stop_all()
 
-    def _add(self, fid, *, dual: bool, addr=1):
+    def _add(self, fid, *, dual: bool, addr=1, pid=None):
+        profile_id = self.pid if pid is None else pid
         self.state.add_fixture(PatchedFixture(
-            fid=fid, label="Speider", fixture_profile_id=self.pid,
+            fid=fid, label="Speider", fixture_profile_id=profile_id,
             mode_name="14ch", universe=1, address=addr, channel_count=14,
             manufacturer_name="TEST-DualTilt", fixture_name="TEST Speider DualTilt",
             fixture_type="moving_head", spider_dual_tilt=dual), undoable=False)
@@ -161,6 +166,14 @@ class ChannelRemapIntegrationTest(_DbBase):
         self.assertEqual(attrs[:2], ["pan", "tilt"])
         self.assertFalse(is_dual_tilt_fixture(plain))
         self.assertEqual(tilt_head_count(plain), 1)
+
+    def test_unflagged_qlc_spider_is_detected_automatically(self):
+        auto = self._add(4, dual=False, addr=120, pid=self.qlc_pid)
+        attrs = [c.attribute for c in get_channels_for_patched(auto)]
+        self.assertEqual(attrs[:2], ["tilt", "tilt"])
+        self.assertNotIn("pan", attrs)
+        self.assertTrue(is_dual_tilt_fixture(auto))
+        self.assertEqual(tilt_head_count(auto), 2)
 
     def test_both_flagged_and_unflagged_coexist(self):
         dual = self._add(1, dual=True)
