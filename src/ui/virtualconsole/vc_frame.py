@@ -37,12 +37,10 @@ class VCFrame(VCWidget):
         for c in self.findChildren(VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
             if c is child:
                 continue
-            if getattr(c, "_pressed", False):
+            deactivate = getattr(c, "deactivate_for_solo", None)
+            if callable(deactivate):
                 try:
-                    c._pressed = False
-                    if hasattr(c, "_trigger"):
-                        c._trigger(False)
-                    c.update()
+                    deactivate()
                 except Exception:
                     pass
 

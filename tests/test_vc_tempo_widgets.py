@@ -134,10 +134,39 @@ class VcBusSelectorTest(unittest.TestCase):
         from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
         w = VCBusSelector()
         w.buses = ["A", "B", "X"]
+        w.function_id = 42
         d = w.to_dict()
         w2 = VCBusSelector()
         w2.apply_dict(d)
         self.assertEqual(w2.buses, ["A", "B", "X"])
+        self.assertEqual(w2.function_id, 42)
+
+    def test_bound_selector_changes_only_effect_bus(self):
+        from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtCore import Qt, QPointF, QEvent
+
+        fm = get_function_manager()
+        matrix = RgbMatrixInstance("Bus target")
+        fm.add(matrix)
+        try:
+            self.mgr.armed_bus_id = "A"
+            widget = VCBusSelector()
+            widget.function_id = matrix.id
+            widget.resize(220, 84)
+            x = int(220 / 4 * 2) + 10
+            event = QMouseEvent(
+                QEvent.Type.MouseButtonPress, QPointF(x, 40),
+                Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            widget.mousePressEvent(event)
+            self.assertEqual(matrix.tempo_bus_id, "C")
+            self.assertEqual(self.mgr.armed_bus_id, "A")
+        finally:
+            fm.remove(matrix.id)
 
 
 class VcBpmDisplayBusTest(unittest.TestCase):

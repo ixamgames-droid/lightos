@@ -410,6 +410,7 @@ class RgbMatrixInstance(Function):
     """
 
     function_type = FunctionType.RGBMatrix
+    tempo_sync_default = True
 
     def __init__(self, name: str = "RGB Matrix", fid: int | None = None, *,
                  cols: int = 8, rows: int = 4,
@@ -495,7 +496,8 @@ class RgbMatrixInstance(Function):
 
         Bus-synchron (``tempo_bus_id`` gesetzt): re-ankert auf die aktuelle Bus-Position
         (``_beat_anchor = bus.position``), sodass ``local_beats`` wieder bei 0 startet —
-        so beginnen alle Effekte derselben ``sync_group`` GEMEINSAM. Frei: ``_step = 0``."""
+        so beginnen alle Effekte derselben ``sync_group`` GEMEINSAM. ``_step`` wird
+        in beiden Faellen auf 0 gesetzt (gemeinsamer Animations-Startpunkt)."""
         bus_id = getattr(self, "tempo_bus_id", "") or ""
         if bus_id:
             try:
@@ -504,6 +506,7 @@ class RgbMatrixInstance(Function):
                 if bus is not None:
                     self._beat_anchor = bus.take_anchor()
                     self._last_tick = time.monotonic()
+                    self._step = 0.0
                     return
             except Exception:
                 pass
@@ -1382,30 +1385,43 @@ class RgbMatrixInstance(Function):
 
     def list_params(self) -> list:
         """ParamSpecs aller live steuerbaren Parameter des aktuellen Algorithmus:
-        universell (speed, intensity, ggf. direction) + Farben + algo-spezifisch."""
-        from .rgb_matrix_meta import ALGO_META, ParamSpec  # lazy: Import-Zyklus vermeiden
+        universell (speed, intensity, ggf. direction) + Farben + algo-spezifisch.
+
+        VC und MIDI sehen dieselbe Style-/when-Auswahl wie der Matrix-Programmer:
+        RGB bietet keine Dimmer-/Shutter-Grenzen an, Dimmer/Shutter keine Farben."""
+        from .rgb_matrix_meta import ALGO_META, ParamSpec, visible_specs
         specs = [
             ParamSpec("speed", "Geschwindigkeit", "float", 1.0, 0.01, 20.0, 0.1,
                       "Animationsrate (Schritte/s)"),
-            ParamSpec("intensity", "Helligkeit", "float", 1.0, 0.0, 1.0, 0.01,
-                      "Effekt-Master 0..1"),
-            # MXP-02: Phasen-Versatz (für versetzte Effekte), live steuerbar.
+        ]
+        if self.style != MatrixStyle.SHUTTER:
+            specs.append(
+                ParamSpec("intensity", "Helligkeit", "float", 1.0, 0.0, 1.0, 0.01,
+                          "Effekt-Master 0..1")
+            )
+        specs.append(
             ParamSpec("offset", "Versatz", "float", 0.0, 0.0, 16.0, 0.1,
-                      "Phasen-Versatz in Schritten (versetzte Effekte)"),
-            # MXP-03: Dimmer-/Shutter-Grenzen live steuerbar. (Weissanteil entfaellt:
-            # RGBW erzeugt echtes Weiss automatisch ueber den W-Kanal.)
-            ParamSpec("intensity_min", "Dimmer min", "int", 0, 0, 255, 1,
-                      "Untergrenze des Dimmer-Styles"),
-            ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
-                      "Obergrenze des Dimmer-Styles"),
-            ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
-                      "Untergrenze des Shutter-Styles"),
-            ParamSpec("shutter_max", "Shutter max", "int", 255, 0, 255, 1,
-                      "Obergrenze des Shutter-Styles"),
+                      "Phasen-Versatz in Schritten (versetzte Effekte)")
+        )
+        if self.style == MatrixStyle.DIMMER:
+            specs.extend([
+                ParamSpec("intensity_min", "Dimmer min", "int", 0, 0, 255, 1,
+                          "Untergrenze des Dimmer-Styles"),
+                ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
+                          "Obergrenze des Dimmer-Styles"),
+            ])
+        elif self.style == MatrixStyle.SHUTTER:
+            specs.extend([
+                ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
+                          "Untergrenze des Shutter-Styles"),
+                ParamSpec("shutter_max", "Shutter max", "int", 255, 0, 255, 1,
+                          "Obergrenze des Shutter-Styles"),
+            ])
+        specs.extend([
             # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei/eigene
             # Geschwindigkeit. Multiplier frei (×0.5/×2/×3…), Versatz in Beats.
-            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
-                      options=("", "Global", "A", "B", "C", "D"),
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "Global",
+                      options=("Global", "", "A", "B", "C", "D"),
                       tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
                               "Global = Master-BPM, A–D = eigene Buses)"),
             ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,
@@ -1420,17 +1436,17 @@ class RgbMatrixInstance(Function):
                       "Ausblendzeit des Effekts in Sekunden"),
             ParamSpec("env_fade", "Fade ein+aus (s)", "float", 0.0, 0.0, 10.0, 0.1,
                       "Setzt Ein- und Ausblendzeit gemeinsam"),
-        ]
+        ])
         meta = ALGO_META.get(self.algorithm)
         if meta and meta.direction:
             specs.append(ParamSpec("direction", "Richtung", "select", "forward",
                                    options=("forward", "reverse"), tooltip="Laufrichtung"))
         n_colors = meta.colors if meta else 1
-        if n_colors > 0:
+        if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW) and n_colors > 0:
             specs.append(ParamSpec("colors", "Farben", "color_sequence", None,
                                    tooltip="Farbliste (aktiv/inaktiv, hinzufügen/entfernen)"))
         if meta:
-            specs.extend(meta.params)
+            specs.extend(visible_specs(self.algorithm, self.style.value, self.params))
         return specs
 
     def get_param(self, key: str):
@@ -1653,21 +1669,40 @@ class RgbMatrixInstance(Function):
         return False
 
     def list_actions(self) -> list[tuple[str, str]]:
-        """(key, label) der Matrix-Live-Aktionen für die Bindungs-UI (VC/MIDI)."""
-        return [
-            ("next_color",          "Farbe +"),
-            ("prev_color",          "Farbe −"),
-            ("add_color",           "+ Farbe"),
-            ("toggle_color",        "Farbe an/aus"),
-            ("next_algorithm",      "Form +"),
-            ("prev_algorithm",      "Form −"),
-            ("reverse_direction",   "Richtung"),
-            ("toggle_bounce",       "Bounce"),
+        """Aktuell sinnvolle Matrix-Live-Aktionen für VC/MIDI."""
+        from .rgb_matrix_meta import ALGO_META, visible_specs
+
+        meta = ALGO_META.get(self.algorithm)
+        actions: list[tuple[str, str]] = []
+        if (self.style in (MatrixStyle.RGB, MatrixStyle.RGBW)
+                and meta is not None and meta.colors > 0):
+            actions.extend([
+                ("next_color",   "Farbe +"),
+                ("prev_color",   "Farbe −"),
+                ("add_color",    "+ Farbe"),
+                ("toggle_color", "Farbe an/aus"),
+            ])
+        actions.extend([
+            ("next_algorithm", "Form +"),
+            ("prev_algorithm", "Form −"),
+        ])
+        if meta is not None and meta.direction:
+            actions.append(("reverse_direction", "Richtung"))
+        movement = next(
+            (spec for spec in visible_specs(
+                self.algorithm, self.style.value, self.params
+            ) if spec.key == "movement"),
+            None,
+        )
+        if movement is not None and "bounce" in tuple(movement.options or ()):
+            actions.append(("toggle_bounce", "Bounce"))
+        actions.extend([
             ("toggle_freeze",       "Freeze"),
             ("clear_live_override", "Reset Live"),
             ("commit_live",         "Commit"),
             ("tap",                 "Tap"),
-        ]
+        ])
+        return actions
 
     # ── Live-Override-Modell (Phase 6, #17) ───────────────────────────────────
     # Die VC veraendert die laufenden Felder direkt (sofort sichtbar). Der
@@ -1687,10 +1722,14 @@ class RgbMatrixInstance(Function):
             self.apply_dict(self._preset)
             self._running = running
             self._step = step
+            from . import effect_live
+            effect_live.discard_live_override_tracking(self.id)
 
     def commit_live_to_preset(self) -> None:
         """Uebernimmt die aktuellen (live geaenderten) Werte als neuen Preset."""
         self._preset = self.to_dict()
+        from . import effect_live
+        effect_live.commit_live_override(self.id)
 
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
@@ -1800,6 +1839,23 @@ class RgbMatrixInstance(Function):
             self.env_fade_in = self.env_fade_out = 0.0
         self.env_curve = str(d.get("env_curve",
                                    getattr(self, "env_curve", "linear")) or "linear")
+        # Tempo-Sync-Felder gehoeren ebenfalls zur Function-Basis. Der Matrix-
+        # Editor erzeugt seinen Draft via from_dict(to_dict()); ohne diesen
+        # Roundtrip verlor der Draft die Bus-Bindung und blieb faelschlich dirty.
+        self.tempo_bus_id = str(d.get(
+            "tempo_bus_id", getattr(self, "tempo_bus_id", "")) or "")
+        try:
+            self.tempo_multiplier = float(d.get(
+                "tempo_multiplier", getattr(self, "tempo_multiplier", 1.0)))
+        except (TypeError, ValueError):
+            self.tempo_multiplier = 1.0
+        try:
+            self.phase_offset = float(d.get(
+                "phase_offset", getattr(self, "phase_offset", 0.0)))
+        except (TypeError, ValueError):
+            self.phase_offset = 0.0
+        self.sync_group = str(d.get(
+            "sync_group", getattr(self, "sync_group", "")) or "")
         # drive_intensity: R1-Default True fuer Alt-Shows (ohne Key) bleibt hell.
         self.drive_intensity = bool(d.get("drive_intensity", True))
         # Phase-3-Style-Felder (Default RGB damit Alt-Shows unveraendert bleiben).

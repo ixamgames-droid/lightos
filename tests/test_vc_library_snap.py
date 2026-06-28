@@ -34,13 +34,17 @@ class VcLibrarySnapTest(unittest.TestCase):
         self.lib = get_snap_library()
         snap = self.lib.add_snap("TEST_rot", "", {1: {"color_r": 255, "color_g": 0}})
         self.sid = snap.id
+        snap2 = self.lib.add_snap("TEST_strobe", "Dimmer",
+                                  {2: {"shutter": 210}, 3: {"shutter": 220}})
+        self.sid2 = snap2.id
 
     def tearDown(self):
         self.state.clear_programmer()
-        try:
-            self.lib.remove_snap(self.sid)
-        except Exception:
-            pass
+        for sid in (self.sid, self.sid2):
+            try:
+                self.lib.remove_snap(sid)
+            except Exception:
+                pass
 
     # ── Drop / Assign ─────────────────────────────────────────────────────────
 
@@ -74,6 +78,22 @@ class VcLibrarySnapTest(unittest.TestCase):
 
         self.assertEqual(btn.action, ButtonAction.LIBRARY_SNAP)
         self.assertEqual(btn.snap_id, self.sid)
+
+    def test_snap_to_existing_library_button_appends_not_replaces(self):
+        """Zweiter Snap auf Snap-Button -> wird gekoppelt, nicht ersetzt."""
+        from src.ui.virtualconsole.vc_canvas import VCCanvas
+        from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
+
+        canvas = VCCanvas()
+        canvas.set_edit_mode(True)
+        btn = VCButton(parent=canvas)
+        canvas.apply_drop(snap_id=self.sid, target=btn)
+        canvas.apply_drop(snap_id=self.sid2, target=btn)
+        canvas.apply_drop(snap_id=self.sid2, target=btn)
+
+        self.assertEqual(btn.action, ButtonAction.LIBRARY_SNAP)
+        self.assertEqual(btn.snap_id, self.sid)
+        self.assertEqual(btn.snap_ids, [self.sid2])
 
     # ── Tastenverhalten ───────────────────────────────────────────────────────
 
@@ -119,6 +139,38 @@ class VcLibrarySnapTest(unittest.TestCase):
         self.assertIsNone(self.state.get_programmer_value(1, "color_g"))
         self.assertFalse(btn._snap_active)
 
+    def test_multi_snap_flash_applies_and_restores_all_targets(self):
+        """Mehrere Snaps auf einem Button: Flash setzt alle und stellt alle zurueck."""
+        self.state.set_programmer_value(1, "color_r", 50)
+        self.state.set_programmer_value(2, "shutter", 0)
+        btn = self._make_button("flash")
+        btn.snap_ids = [self.sid2]
+
+        btn._trigger(True)
+        self.assertEqual(self.state.get_programmer_value(1, "color_r"), 255)
+        self.assertEqual(self.state.get_programmer_value(2, "shutter"), 210)
+        self.assertEqual(self.state.get_programmer_value(3, "shutter"), 220)
+
+        btn._trigger(False)
+        self.assertEqual(self.state.get_programmer_value(1, "color_r"), 50)
+        self.assertEqual(self.state.get_programmer_value(2, "shutter"), 0)
+        self.assertIsNone(self.state.get_programmer_value(3, "shutter"))
+
+    def test_multi_snap_toggle_restores_original_before_group(self):
+        """Ueberlappende Snap-Werte merken den Zustand vor der gesamten Gruppe."""
+        overlap = self.lib.add_snap("TEST_overlap", "", {1: {"color_r": 99}})
+        try:
+            self.state.set_programmer_value(1, "color_r", 50)
+            btn = self._make_button("toggle")
+            btn.snap_ids = [overlap.id]
+
+            btn._trigger(True)
+            self.assertEqual(self.state.get_programmer_value(1, "color_r"), 99)
+            btn._trigger(True)
+            self.assertEqual(self.state.get_programmer_value(1, "color_r"), 50)
+        finally:
+            self.lib.remove_snap(overlap.id)
+
     # ── Serialisierung ────────────────────────────────────────────────────────
 
     def test_roundtrip_serialization(self):
@@ -131,6 +183,16 @@ class VcLibrarySnapTest(unittest.TestCase):
         self.assertEqual(btn2.action, ButtonAction.LIBRARY_SNAP)
         self.assertEqual(btn2.snap_id, self.sid)
         self.assertEqual(btn2.snap_mode, "flash")
+
+    def test_multi_snap_roundtrip_serialization(self):
+        from src.ui.virtualconsole.vc_button import VCButton
+        btn = self._make_button("flash")
+        btn.snap_ids = [self.sid2]
+        d = btn.to_dict()
+        btn2 = VCButton()
+        btn2.apply_dict(d)
+        self.assertEqual(btn2.snap_id, self.sid)
+        self.assertEqual(btn2.snap_ids, [self.sid2])
 
     # ── Bibliothek-Panel im VC-Modus ──────────────────────────────────────────
 

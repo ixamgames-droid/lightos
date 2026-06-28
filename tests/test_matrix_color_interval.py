@@ -57,6 +57,8 @@ class ColorIntervalTest(unittest.TestCase):
 
     def test_live_param_listed_and_clamped(self):
         m = RgbMatrixInstance(name="t", cols=4, rows=1, algorithm=RgbAlgorithm.CHASE)
+        self.assertNotIn("color_interval", [s.key for s in m.list_params()])
+        m.params["color_cycle"] = True
         keys = [s.key for s in m.list_params()]
         self.assertIn("color_interval", keys)        # live steuerbar
         self.assertTrue(m.set_param("color_interval", 4))

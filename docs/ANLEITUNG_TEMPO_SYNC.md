@@ -76,7 +76,9 @@ Tempo-Einstellungen:
 - **Phase** — Versatz in Beats (0…1), um den Effekt gegen andere zu „verschieben".
 
 Du setzt das an zwei Stellen:
-1. **In den Effekt-Einstellungen** selbst (Tempo-Bus / Multiplikator / Phase als Parameter).
+1. **Direkt im Programmer-Editor** der Matrix- und Bewegungseffekte
+   (Tempo-Bus / Multiplikator / Phase). Neue Effekte stehen standardmäßig auf
+   **Global · 1× · Phase 0**.
 2. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Tempo-Bus-Multiplikator"** —
    das ist das „Multiplikator-Fenster", mit dem du den Faktor eines Effekts (oder mehrerer,
    per Komma-Liste) im Betrieb auf **Half/Double** ziehst.
@@ -106,9 +108,10 @@ bleiben dauerhaft im Raster.
 
 Du hast **drei Werkzeuge** dafür:
 
-### a) Auto-Sync (Dauer-Toggle) — *empfohlen*
+### a) Auto-Sync (Dauer-Toggle) — *Standard*
 **BPM-Tab (Strg+8) → Panel „Tempo-Speeds & Grand-Master" → ☑ Auto-Sync.**
-Solange aktiv, übernimmt **jeder neu (oder erneut) gestartete** bus-gekoppelte Effekt
+Bei neuen Shows ist Auto-Sync bereits aktiv. Solange aktiv, übernimmt
+**jeder neu (oder erneut) gestartete** bus-gekoppelte Effekt
 denselben Beat-Raster-Ursprung → er fällt automatisch in den gemeinsamen Takt, **egal wann**
 du ihn auslöst. Einmal anhaken und vergessen. (Wird mit der Show gespeichert.)
 

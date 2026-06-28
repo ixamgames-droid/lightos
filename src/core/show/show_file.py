@@ -404,8 +404,9 @@ def reset_show():
     try:
         from src.core.engine import effect_live
         effect_live.clear_edit_targets()
+        effect_live.clear_live_overrides()
     except Exception as e:
-        print(f"[show_file] reset edit targets error: {e}")
+        print(f"[show_file] reset live edit state error: {e}")
 
     try:
         from src.core.engine.curve_library import get_curve_library

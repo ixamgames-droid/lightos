@@ -16,6 +16,7 @@ from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
+from src.ui.virtualconsole.vc_stepper import VCStepper
 from src.ui.widgets.matrix_live_dialog import MatrixLiveDialog
 
 _app = QApplication.instance() or QApplication([])
@@ -63,8 +64,8 @@ class DialogTest(_Base):
         action_keys = [k for _cb, k in dlg._action_boxes]
         self.assertIn("speed", param_keys)      # universeller Fader-Param
         self.assertIn("next_color", action_keys)
-        # speed/intensity sind vorausgewaehlt (haeufigste Live-Regler).
-        self.assertIn("speed", dlg.selected_param_keys())
+        # Nichts wird automatisch erzeugt: der Nutzer waehlt bewusst.
+        self.assertEqual(dlg.selected_param_keys(), [])
 
     def test_dialog_selection_reflects_checkboxes(self):
         dlg = MatrixLiveDialog(self.fid)
@@ -82,13 +83,17 @@ class AddLiveControlsTest(_Base):
         created = canvas.add_live_controls(
             self.fid, ["speed", "runner_count"], ["next_color", "tap"])
         sliders = [w for w in created if isinstance(w, VCSlider)]
+        steppers = [w for w in created if isinstance(w, VCStepper)]
         buttons = [w for w in created if isinstance(w, VCButton)]
-        self.assertEqual(len(sliders), 2)
+        self.assertEqual(len(sliders), 1)
+        self.assertEqual(len(steppers), 1)
         self.assertEqual(len(buttons), 2)
         for s in sliders:
             self.assertEqual(s.mode, SliderMode.EFFECT_PARAM)
             self.assertEqual(s.function_id, self.fid)
-        self.assertEqual({s.param_key for s in sliders}, {"speed", "runner_count"})
+        self.assertEqual({s.param_key for s in sliders}, {"speed"})
+        self.assertEqual(steppers[0].param_key, "runner_count")
+        self.assertEqual(steppers[0].function_id, self.fid)
         for b in buttons:
             self.assertEqual(b.action, ButtonAction.EFFECT_ACTION)
             self.assertEqual(b.function_id, self.fid)
@@ -98,7 +103,7 @@ class AddLiveControlsTest(_Base):
         # End-to-end: ein erzeugter EFFECT_PARAM-Fader setzt den Parameter live.
         canvas = VCCanvas()
         created = canvas.add_live_controls(self.fid, ["runner_count"], [])
-        slider = next(w for w in created if isinstance(w, VCSlider))
+        slider = next(w for w in created if isinstance(w, VCStepper))
         from src.core.engine import effect_live
         effect_live.set_param_normalized(slider.param_key, 1.0, slider.function_id)
         self.assertEqual(self.m.params["runner_count"], 16)   # max der Spec

@@ -102,6 +102,7 @@ class EfxInstance(Function):
     """
 
     function_type = FunctionType.EFX
+    tempo_sync_default = True
 
     def __init__(self, name: str = "EFX", fid: int | None = None):
         super().__init__(name, fid)
@@ -734,8 +735,8 @@ class EfxInstance(Function):
                       options=algos),
             # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei/eigene
             # Geschwindigkeit. Eigene Keys (NICHT phase_offset_deg/speed-Kollision).
-            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
-                      options=("", "Global", "A", "B", "C", "D"),
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "Global",
+                      options=("Global", "", "A", "B", "C", "D"),
                       tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
                               "Global = Master-BPM, A–D = eigene Buses)"),
             ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,

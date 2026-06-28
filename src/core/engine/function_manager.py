@@ -278,24 +278,36 @@ class FunctionManager:
                         pass
         return out
 
-    def stop_others_sharing_fixtures(self, fid: int) -> int:
-        """Stoppt alle ANDEREN laufenden Funktionen, die mindestens ein Geraet mit
-        ``fid`` gemeinsam haben. Gibt die Anzahl gestoppter Funktionen zurueck.
+    def stop_others_sharing_fixture_group(self, fids) -> int:
+        """Stoppt laufende Funktionen, die Geraete mit einer Zielgruppe teilen.
 
-        Fuer die VC-Pad-Option „andere Effekte auf gleichen Geraeten ersetzen":
-        ein neuer Effekt loest die alten auf denselben Strahlern ab (auch aus einer
-        anderen Bank), waehrend Effekte auf anderen Geraeten weiterlaufen."""
-        own = self.affected_fids(fid)
+        Die Funktionen in ``fids`` selbst bleiben geschuetzt. Dadurch kann ein
+        einzelner VC-Switch mehrere Effekte als atomare Gruppe starten, auch wenn
+        diese Effekte dieselben Fixtures verwenden.
+        """
+        targets: set[int] = set()
+        for fid in fids:
+            try:
+                targets.add(int(fid))
+            except (TypeError, ValueError):
+                pass
+        own: set[int] = set()
+        for fid in targets:
+            own |= self.affected_fids(fid)
         if not own:
             return 0
         stopped = 0
         for other in self.running_ids():
-            if other == fid:
+            if other in targets:
                 continue
             if self.affected_fids(other) & own:
                 self.stop(other)
                 stopped += 1
         return stopped
+
+    def stop_others_sharing_fixtures(self, fid: int) -> int:
+        """Rueckwaertskompatibler Einzelziel-Wrapper fuer Geraete-Solo."""
+        return self.stop_others_sharing_fixture_group([fid])
 
     def is_running(self, fid: int) -> bool:
         f = self._functions.get(fid)
@@ -468,8 +480,10 @@ class FunctionManager:
         # serialisieren -- sie laufen nur live zur Vorschau. getattr-Default True
         # haelt alle anderen Funktionstypen (ohne committed-Attribut) unveraendert
         # serialisierbar.
+        from . import effect_live
         return {
-            "functions": [f.to_dict() for f in self._functions.values()
+            "functions": [effect_live.serialization_dict(f)
+                          for f in self._functions.values()
                           if getattr(f, "committed", True)]
         }
 

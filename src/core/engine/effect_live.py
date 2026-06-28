@@ -12,6 +12,8 @@ Dadurch koennen VC und MIDI (und spaeter andere Hardware) dieselben Parameter
 und Aktionen steuern, ohne dass irgendwo hartkodiertes Effekt-Wissen liegt.
 """
 from __future__ import annotations
+from copy import deepcopy
+from weakref import WeakKeyDictionary
 
 
 # ── Live-Edit-Slots (benannte Bearbeitungsziele) ───────────────────────────────
@@ -20,6 +22,12 @@ from __future__ import annotations
 # Slots bearbeiten dann GENAU diesen Effekt — pro Quadrant/Slot unabhängig,
 # ohne dass jeder Fader fest an eine function_id gebunden werden muss.
 _edit_targets: dict[str, int] = {}
+
+# Erster serialisierbarer Zustand vor einer Live-Aenderung. Die laufenden
+# Effektobjekte duerfen fuer die direkte Vorschau weiter mutiert werden; beim
+# Show-Save liefert ``serialization_dict`` jedoch diese Basis zurueck. So bleiben
+# VC-/MIDI-Aenderungen auf die aktuelle Show-Sitzung begrenzt.
+_live_baselines: WeakKeyDictionary = WeakKeyDictionary()
 
 
 def set_edit_target(slot: str, function_id) -> None:
@@ -43,6 +51,11 @@ def get_edit_target(slot: str):
 def clear_edit_targets() -> None:
     """Alle Slots leeren (z. B. bei neuer Show)."""
     _edit_targets.clear()
+
+
+def clear_live_overrides() -> None:
+    """Vergisst alle Laufzeit-Baselines (beim Laden/Anlegen einer Show)."""
+    _live_baselines.clear()
 
 
 def resolve_target(function_id=None):
@@ -71,6 +84,57 @@ def _spec_for(fn, key):
     return None
 
 
+def _serialized(fn) -> dict:
+    """Tiefe Kopie, weil mehrere ``to_dict``-Implementierungen Listen/Dicts des
+    lebenden Effekts direkt zurueckgeben."""
+    return deepcopy(fn.to_dict())
+
+
+def _apply_live_mutation(fn, mutation) -> bool:
+    """Mutation ausfuehren und nur bei einer persistent sichtbaren Aenderung den
+    Zustand DAVOR als Sitzungs-Baseline merken."""
+    if fn in _live_baselines:
+        return bool(mutation())
+    before = _serialized(fn)
+    changed = bool(mutation())
+    if changed and _serialized(fn) != before:
+        _live_baselines[fn] = before
+    return changed
+
+
+def begin_live_edit(function_id=None) -> bool:
+    """Baseline vor einer direkten Mutation eines verschachtelten Objekts sichern.
+
+    Wird z. B. vom Farb-Swatch benutzt, das eine ``ColorSequence`` direkt aendert.
+    """
+    fn = resolve_target(function_id)
+    if not _supports(fn):
+        return False
+    if fn not in _live_baselines:
+        _live_baselines[fn] = _serialized(fn)
+    return True
+
+
+def serialization_dict(fn) -> dict:
+    """Persistierbaren Zustand liefern: Preset-Basis statt laufendem Live-Override."""
+    baseline = _live_baselines.get(fn)
+    return deepcopy(baseline) if baseline is not None else fn.to_dict()
+
+
+def commit_live_override(function_id=None) -> bool:
+    """Aktuellen Live-Zustand wieder als normal speicherbar markieren."""
+    fn = resolve_target(function_id)
+    if fn is None:
+        return False
+    _live_baselines.pop(fn, None)
+    return True
+
+
+def discard_live_override_tracking(function_id=None) -> bool:
+    """Tracking entfernen, nachdem ein Effekt selbst auf sein Preset zurueckfiel."""
+    return commit_live_override(function_id)
+
+
 def list_params(function_id=None) -> list:
     """ParamSpecs des Zieleffekts (fuer eine dynamische Bindungs-UI)."""
     fn = resolve_target(function_id)
@@ -85,7 +149,9 @@ def get_param(key, function_id=None):
 def set_param(key, value, function_id=None) -> bool:
     """Absoluter Wert (z. B. Color-Picker, Select)."""
     fn = resolve_target(function_id)
-    return bool(fn.set_param(key, value)) if _supports(fn) else False
+    if not _supports(fn):
+        return False
+    return _apply_live_mutation(fn, lambda: fn.set_param(key, value))
 
 
 def set_param_normalized(key, norm, function_id=None) -> bool:
@@ -99,22 +165,22 @@ def set_param_normalized(key, norm, function_id=None) -> bool:
     norm = max(0.0, min(1.0, float(norm)))
     spec = _spec_for(fn, key)
     if spec is None:
-        return bool(fn.set_param(key, norm))
+        return _apply_live_mutation(fn, lambda: fn.set_param(key, norm))
     if spec.kind == "bool":
-        return bool(fn.set_param(key, norm >= 0.5))
+        return _apply_live_mutation(fn, lambda: fn.set_param(key, norm >= 0.5))
     if spec.kind == "select":
         opts = spec.options or ()
         if not opts:
             return False
         i = min(len(opts) - 1, int(norm * len(opts)))
-        return bool(fn.set_param(key, opts[i]))
+        return _apply_live_mutation(fn, lambda: fn.set_param(key, opts[i]))
     lo, hi = float(spec.min), float(spec.max)
     if hi <= lo:
         hi = lo + 1.0
     val = lo + (hi - lo) * norm
     if spec.kind == "int":
         val = int(round(val))
-    return bool(fn.set_param(key, val))
+    return _apply_live_mutation(fn, lambda: fn.set_param(key, val))
 
 
 def adjust_param(key, delta_norm, function_id=None) -> bool:
@@ -135,7 +201,7 @@ def adjust_param(key, delta_norm, function_id=None) -> bool:
     val = max(lo, min(hi, cur + (hi - lo) * float(delta_norm)))
     if spec.kind == "int":
         val = int(round(val))
-    return bool(fn.set_param(key, val))
+    return _apply_live_mutation(fn, lambda: fn.set_param(key, val))
 
 
 def do_action(action, function_id=None, **kw) -> bool:
@@ -143,7 +209,7 @@ def do_action(action, function_id=None, **kw) -> bool:
     fn = resolve_target(function_id)
     if fn is None or not hasattr(fn, "do_action"):
         return False
-    return bool(fn.do_action(action, **kw))
+    return _apply_live_mutation(fn, lambda: fn.do_action(action, **kw))
 
 
 def list_actions(function_id=None) -> list:
@@ -214,9 +280,11 @@ def set_selected_color(rgb, function_id=None) -> bool:
     fn = resolve_target(function_id)
     if not _supports(fn) or not hasattr(fn, "colors"):
         return False
-    seq = fn.colors
-    if len(seq) == 0:
-        seq.add(tuple(rgb))
-    else:
-        seq.set_color(seq.active_index, tuple(rgb))
-    return True
+    def _set_color():
+        seq = fn.colors
+        if len(seq) == 0:
+            seq.add(tuple(rgb))
+        else:
+            seq.set_color(seq.active_index, tuple(rgb))
+        return True
+    return _apply_live_mutation(fn, _set_color)

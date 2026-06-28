@@ -118,6 +118,23 @@ class EffectMiniPreview(QWidget):
             self._lbl.setText(f"Effekt-Vorschau - {label}")
         self._inst.start()
 
+    def play_effect(self, source: RgbMatrixInstance, label: str | None = None):
+        """Spiegelt eine vorhandene Matrix vollstaendig in die lokale Vorschau.
+
+        Die Vorschau-Instanz ist nicht im FunctionManager registriert und schreibt
+        kein DMX. Style, Parameter, Farb-/Dimmer-Sequenzen und Kanalmaske stammen
+        aber exakt vom Original statt aus RGB/Rot-Defaults."""
+        try:
+            inst = RgbMatrixInstance.from_dict(source.to_dict())
+        except Exception:
+            return
+        inst.start()
+        self._inst = inst
+        self._grid._inst = inst
+        if label is not None:
+            self._lbl.setText(f"Effekt-Vorschau - {label}")
+        self._grid.refresh()
+
     def set_grid(self, cols: int, rows: int = 1, fixture_grid=None):
         """Vorschau-Raster an die ECHTE Geraetegeometrie eines Effekts anpassen
         (statt der festen Demo-Groesse). Algorithmus/Farben/Tempo der bisherigen

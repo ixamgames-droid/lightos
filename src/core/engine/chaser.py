@@ -33,6 +33,7 @@ class Chaser(Function):
     """
 
     function_type = FunctionType.Chaser
+    tempo_sync_default = True
 
     def __init__(self, name: str = "Neuer Chaser", fid: int | None = None):
         super().__init__(name, fid)
@@ -412,13 +413,23 @@ class Chaser(Function):
         return [
             ParamSpec("speed", "Tempo", "float", 1.0, 0.05, 8.0, 0.05,
                       "Geschwindigkeits-Faktor"),
+            ParamSpec("step_duration", "Schritt-Dauer (s)", "float", 1.0, 0.05, 60.0, 0.05,
+                      "Gesamtdauer pro Chaser-Schritt; passt Hold/Fades aller Schritte an"),
+            ParamSpec("step_hold", "Schritt halten (s)", "float", 1.0, 0.0, 60.0, 0.05,
+                      "Haltezeit aller Chaser-Schritte"),
+            ParamSpec("step_fade", "Schritt-Fade ein+aus (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Setzt Fade-In und Fade-Out aller Chaser-Schritte gemeinsam"),
+            ParamSpec("step_fade_in", "Schritt Fade-In (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Einblendzeit aller Chaser-Schritte"),
+            ParamSpec("step_fade_out", "Schritt Fade-Out (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Ausblendzeit aller Chaser-Schritte"),
             ParamSpec("direction", "Richtung", "select", Direction.Forward.value,
                       options=tuple(d.value for d in Direction)),
             ParamSpec("run_order", "Modus", "select", RunOrder.Loop.value,
                       options=tuple(r.value for r in RunOrder)),
             # WP-Tempo: Anbindung an einen Tempo-Bus (A/B/C/D) — leer = frei.
-            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "",
-                      options=("", "Global", "A", "B", "C", "D"),
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "Global",
+                      options=("Global", "", "A", "B", "C", "D"),
                       tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
                               "Global = Master-BPM, A–D = eigene Buses)"),
             ParamSpec("tempo_multiplier", "Tempo ×", "float", 1.0, 0.0625, 16.0, 0.25,
@@ -427,9 +438,57 @@ class Chaser(Function):
                       "Phasen-Versatz in Beats (versetzter Start auf dem Bus)"),
         ]
 
+    def _avg_step_attr(self, attr: str, default: float = 0.0) -> float:
+        if not self.steps:
+            return default
+        vals = [float(getattr(s, attr, default)) for s in self.steps]
+        return sum(vals) / len(vals)
+
+    def _avg_step_duration(self) -> float:
+        if not self.steps:
+            return 0.0
+        return sum(float(s.total_duration()) for s in self.steps) / len(self.steps)
+
+    def _set_all_step_attr(self, attr: str, value: float, lo: float, hi: float) -> bool:
+        if not self.steps:
+            return False
+        v = max(lo, min(hi, float(value)))
+        for step in self.steps:
+            setattr(step, attr, v)
+        return True
+
+    def _set_all_step_duration(self, value: float) -> bool:
+        if not self.steps:
+            return False
+        total = max(0.05, min(60.0, float(value)))
+        for step in self.steps:
+            fade_in = max(0.0, float(getattr(step, "fade_in", 0.0)))
+            fade_out = max(0.0, float(getattr(step, "fade_out", 0.0)))
+            fade_sum = fade_in + fade_out
+            if fade_sum <= total:
+                step.hold = total - fade_sum
+                continue
+            if fade_sum > 0.0:
+                scale = total / fade_sum
+                step.fade_in = fade_in * scale
+                step.fade_out = fade_out * scale
+            step.hold = 0.0
+        return True
+
     def get_param(self, key: str):
         if key == "speed":
             return self.speed
+        if key == "step_duration":
+            return self._avg_step_duration()
+        if key == "step_hold":
+            return self._avg_step_attr("hold", 1.0)
+        if key == "step_fade":
+            return max(self._avg_step_attr("fade_in", 0.0),
+                       self._avg_step_attr("fade_out", 0.0))
+        if key == "step_fade_in":
+            return self._avg_step_attr("fade_in", 0.0)
+        if key == "step_fade_out":
+            return self._avg_step_attr("fade_out", 0.0)
         if key == "direction":
             return self.direction.value
         if key == "run_order":
@@ -446,6 +505,18 @@ class Chaser(Function):
         if key == "speed":
             self.speed = max(0.05, min(8.0, float(value)))
             return True
+        if key == "step_duration":
+            return self._set_all_step_duration(value)
+        if key == "step_hold":
+            return self._set_all_step_attr("hold", value, 0.0, 60.0)
+        if key == "step_fade":
+            ok_in = self._set_all_step_attr("fade_in", value, 0.0, 10.0)
+            ok_out = self._set_all_step_attr("fade_out", value, 0.0, 10.0)
+            return ok_in or ok_out
+        if key == "step_fade_in":
+            return self._set_all_step_attr("fade_in", value, 0.0, 10.0)
+        if key == "step_fade_out":
+            return self._set_all_step_attr("fade_out", value, 0.0, 10.0)
         if key == "direction":
             try:
                 self.direction = Direction(str(value))

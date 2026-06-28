@@ -123,6 +123,9 @@ class VCButton(VCWidget):
         # Bibliothek-Snap (ButtonAction.LIBRARY_SNAP): Referenz auf einen Snap der
         # Show-Bibliothek (src.core.engine.snap_library) + Tastenverhalten.
         self.snap_id: int | None = None
+        # Weitere Bibliothek-Snaps, die gemeinsam mit snap_id geschaltet werden.
+        # Analog function_ids: snap_id bleibt das Primaerziel, snap_ids sind Extras.
+        self.snap_ids: list[int] = []
         self.snap_mode: str = "toggle"      # "set" | "flash" | "toggle"
         self._snap_active: bool = False     # Laufzeit-Zustand fuer toggle
         # Vorherige Programmer-Werte (fuer Toggle/Flash-Ruecknahme):
@@ -221,6 +224,95 @@ class VCButton(VCWidget):
             if iv not in ids:
                 ids.append(iv)
         return ids
+
+    def _all_snap_ids(self) -> list[int]:
+        """Alle gekoppelten Bibliothek-Snap-IDs (snap_id + snap_ids),
+        snap_id zuerst, dedupliziert. Leer = keine Snap-Bindung."""
+        ids: list[int] = []
+        if self.snap_id is not None:
+            try:
+                ids.append(int(self.snap_id))
+            except (TypeError, ValueError):
+                pass
+        for i in self.snap_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in ids:
+                ids.append(iv)
+        return ids
+
+    def _start_function_group(self, state, fids: list[int]):
+        """Startet alle gebundenen Funktionen als atomare Button-Gruppe.
+
+        Startregeln wie Edit-Slot, Exklusivitaet und Geraete-Solo werden einmal
+        auf die gesamte Gruppe angewendet. Sonst wuerde der zweite Effekt den
+        gerade gestarteten ersten Effekt sofort wieder stoppen.
+        """
+        fm = state.function_manager
+
+        if self.clear_programmer:
+            try:
+                state.clear_programmer()
+            except Exception:
+                pass
+
+        # EFX-Ziele vor der Konfliktpruefung automatisch mit Moving-Heads
+        # belegen. Erst dann kennt Geraete-Solo ihre tatsaechlichen Fixtures.
+        for fid in fids:
+            try:
+                fn = fm.get(fid)
+                if (fn is not None and hasattr(fn, "assign_movers_auto")
+                        and not getattr(fn, "fixtures", None)):
+                    fn.assign_movers_auto(allow_all=True)
+            except Exception:
+                pass
+
+        if self.edit_slot:
+            try:
+                from src.core.engine import effect_live
+                previous = effect_live.get_edit_target(self.edit_slot)
+                if (previous is not None and previous not in fids
+                        and fm.is_running(previous)):
+                    fm.stop(previous)
+            except Exception:
+                pass
+        elif self.exclusive:
+            try:
+                fm.stop_all()
+            except Exception:
+                pass
+
+        if self.solo_fixtures:
+            try:
+                stop_group = getattr(fm, "stop_others_sharing_fixture_group", None)
+                if callable(stop_group):
+                    stop_group(fids)
+                else:
+                    for fid in fids:
+                        fm.stop_others_sharing_fixtures(fid)
+            except Exception:
+                pass
+
+        for fid in fids:
+            fm.start(fid)
+            try:
+                problem = fm.start_problem(fid)
+            except Exception:
+                problem = None
+            if problem:
+                self._show_status(problem)
+
+        # Ein Edit-Slot kann genau ein Live-Bearbeitungsziel halten. Bei einer
+        # Gruppe ist das erste erfolgreich gestartete Ziel der stabile Master.
+        if self.edit_slot:
+            try:
+                from src.core.engine import effect_live
+                edit_fid = next((fid for fid in fids if fm.is_running(fid)), None)
+                effect_live.set_edit_target(self.edit_slot, edit_fid)
+            except Exception:
+                pass
 
     # ── MIDI Teach (siehe VCWidget) ────────────────────────────────────────────
 
@@ -326,21 +418,41 @@ class VCButton(VCWidget):
             print(f"[VCButton] Snap-Lookup-Fehler: {e}")
             return None
 
+    def _library_snaps(self) -> list:
+        """Alle referenzierten Bibliothek-Snaps in Schalt-Reihenfolge."""
+        ids = self._all_snap_ids()
+        if not ids:
+            return []
+        out: list = []
+        try:
+            from src.core.engine.snap_library import get_snap_library
+            lib = get_snap_library()
+            for sid in ids:
+                snap = lib.get(int(sid))
+                if snap is not None:
+                    out.append(snap)
+        except Exception as e:
+            print(f"[VCButton] Snap-Gruppen-Lookup-Fehler: {e}")
+        return out
+
     def _apply_library_snap(self):
-        """Schreibt die Werte des Bibliothek-Snaps in den Programmer und merkt
+        """Schreibt die Werte der Bibliothek-Snaps in den Programmer und merkt
         sich die vorherigen Werte, damit Toggle/Flash sie zuruecknehmen koennen."""
-        snap = self._library_snap()
-        if snap is None:
+        snaps = self._library_snaps()
+        if not snaps:
             return
         try:
             from src.core.app_state import get_state
             state = get_state()
             self._snap_prev = {}
-            for fid, attrs in snap.values.items():
-                for attr, val in attrs.items():
-                    fid_i = int(fid)
-                    self._snap_prev[(fid_i, attr)] = state.get_programmer_value(fid_i, attr)
-                    state.set_programmer_value(fid_i, attr, int(val))
+            for snap in snaps:
+                for fid, attrs in snap.values.items():
+                    for attr, val in attrs.items():
+                        fid_i = int(fid)
+                        key = (fid_i, attr)
+                        if key not in self._snap_prev:
+                            self._snap_prev[key] = state.get_programmer_value(fid_i, attr)
+                        state.set_programmer_value(fid_i, attr, int(val))
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
 
@@ -361,15 +473,52 @@ class VCButton(VCWidget):
         finally:
             self._snap_prev = {}
 
+    def deactivate_for_solo(self):
+        """Schaltet diesen Button fuer einen Solo-Frame gezielt aus.
+
+        ``_pressed`` beschreibt nur den physischen Tastendruck. Toggle-Buttons
+        bleiben dagegen ueber den laufenden Effekt bzw. ``_snap_active`` aktiv.
+        Ein blosses ``_trigger(False)`` kann diese Zustaende nicht beenden, weil
+        FUNCTION_TOGGLE und Library-Snap-Toggle nur auf den Druck reagieren.
+        """
+        was_pressed = self._pressed
+        self._pressed = False
+
+        if self.action in (ButtonAction.FUNCTION_TOGGLE,
+                           ButtonAction.FUNCTION_FLASH):
+            try:
+                from src.core.app_state import get_state
+                fm = get_state().function_manager
+                for fid in self._all_function_ids():
+                    if fm.is_running(fid):
+                        # Solo bedeutet wirklich nur ein aktiver Button. Ein
+                        # Fade-Out duerfte den alten Effekt sonst parallel zum
+                        # neu gestarteten weiterlaufen lassen.
+                        fm.stop(fid, allow_release=False)
+            except Exception:
+                pass
+        elif self.action == ButtonAction.LIBRARY_SNAP:
+            if self._snap_active or was_pressed:
+                self._restore_library_snap()
+            self._snap_active = False
+        elif was_pressed:
+            # Moment-Aktionen wie Blackout, AllWhite, Executor-Flash usw.
+            # benoetigen ihr normales Release, wenn waehrend des Haltens ein
+            # anderer Button im Solo-Frame gedrueckt wird.
+            try:
+                self._trigger_primary(False)
+            except Exception:
+                pass
+
+        self.update()
+
     def _snap_swatch_color(self) -> QColor | None:
         """Repraesentative Farbe des Snaps (erstes Fixture mit RGB) fuer die Kachel."""
-        snap = self._library_snap()
-        if snap is None:
-            return None
-        for attrs in snap.values.values():
-            r = attrs.get("color_r"); g = attrs.get("color_g"); b = attrs.get("color_b")
-            if r is not None or g is not None or b is not None:
-                return QColor(int(r or 0), int(g or 0), int(b or 0))
+        for snap in self._library_snaps():
+            for attrs in snap.values.values():
+                r = attrs.get("color_r"); g = attrs.get("color_g"); b = attrs.get("color_b")
+                if r is not None or g is not None or b is not None:
+                    return QColor(int(r or 0), int(g or 0), int(b or 0))
         return None
 
     def _gobo_icon(self):
@@ -379,7 +528,7 @@ class VCButton(VCWidget):
         (FUNCTION_TOGGLE/FLASH): findet einen ``gobo_wheel``-Wert, schlaegt im
         Fixture-Profil den Range-Namen nach und zeichnet ihn ueber gobo_icons.
         Ergebnis wird pro Bindung gecacht (paintEvent laeuft oft)."""
-        key = (self.action, self.snap_id, self.function_id)
+        key = (self.action, tuple(self._all_snap_ids()), self.function_id)
         if getattr(self, "_gobo_cache_key", None) == key:
             return getattr(self, "_gobo_cache_pm", None)
         pm = self._resolve_gobo_icon()
@@ -391,8 +540,7 @@ class VCButton(VCWidget):
         cands: list[tuple[int, int]] = []   # (fid, gobo_wheel-Wert)
         try:
             if self.action == ButtonAction.LIBRARY_SNAP:
-                snap = self._library_snap()
-                if snap is not None:
+                for snap in self._library_snaps():
                     for fid, attrs in snap.values.items():
                         if "gobo_wheel" in attrs:
                             cands.append((int(fid), int(attrs["gobo_wheel"])))
@@ -560,13 +708,15 @@ class VCButton(VCWidget):
             # F3: Moment-Override "alles weiss 100%". Blitzt die gebundene
             # (hochpriore) Weiss-Szene; beim Loslassen zurueck. Korrekt pro Gerät
             # (PAR/Spider RGBW, MH Farbrad-Weiss) -> die Szene weiss das, nicht der Button.
-            fid = self.function_id
-            if fid is not None:
+            fids = self._all_function_ids()
+            if fids:
                 fm = state.function_manager
                 if press:
-                    fm.start(fid)
+                    for fid in fids:
+                        fm.start(fid)
                 else:
-                    fm.stop(fid)
+                    for fid in fids:
+                        fm.stop(fid)
             return
 
         if self.action == ButtonAction.FREEZE:
@@ -726,8 +876,13 @@ class VCButton(VCWidget):
             if press:
                 try:
                     from src.core.engine import effect_live
-                    fid = self.function_id
-                    if fid is None and self.edit_slot:
+                    fids = self._all_function_ids()
+                    if fids:
+                        for fid in fids:
+                            effect_live.do_action(self.effect_action_key, fid)
+                        return
+                    fid = None
+                    if self.edit_slot:
                         fid = effect_live.get_edit_target(self.edit_slot)
                     effect_live.do_action(self.effect_action_key, fid)
                 except Exception:
@@ -740,82 +895,20 @@ class VCButton(VCWidget):
                 return
             fm = state.function_manager
 
-            def _begin(fid: int):
-                # Manuelle Farben/Snaps freigeben + ggf. andere Funktionen stoppen,
-                # damit der Effekt sichtbar wird bzw. nur einer laeuft.
-                if self.clear_programmer:
-                    try:
-                        state.clear_programmer()
-                    except Exception:
-                        pass
-                # Live-Edit-Slot: pro Slot nur EIN Effekt — den vorigen Slot-Effekt
-                # stoppen (quadrantenweise exklusiv, ohne globales stop_all).
-                if self.edit_slot:
-                    try:
-                        from src.core.engine import effect_live
-                        prev = effect_live.get_edit_target(self.edit_slot)
-                        if prev is not None and prev != fid and fm.is_running(prev):
-                            fm.stop(prev)
-                    except Exception:
-                        pass
-                elif self.exclusive:
-                    try:
-                        fm.stop_all()
-                    except Exception:
-                        pass
-                # Solo auf gleichen Geraeten: andere laufende Effekte, die
-                # DIESELBEN Strahler benutzen, werden ersetzt (auch aus einer
-                # anderen Bank). Effekte auf anderen Geraeten laufen weiter.
-                if self.solo_fixtures:
-                    try:
-                        fm.stop_others_sharing_fixtures(fid)
-                    except Exception:
-                        pass
-                # Auto-Assign (VC-Pfad, analog UI-04 im EFX-Tab): ein EFX ohne
-                # Geraete bekommt beim Start bewegliche Geraete (aktuelle Auswahl
-                # -> sonst alle Movingheads), damit der Button-getriggerte Effekt
-                # sofort faehrt statt stumm zu bleiben (write()-No-Op). Nur EFX
-                # (duck-typed assign_movers_auto); andere Typen bleiben unberuehrt.
-                try:
-                    _f = fm.get(fid)
-                    if (_f is not None and hasattr(_f, "assign_movers_auto")
-                            and not getattr(_f, "fixtures", None)):
-                        _f.assign_movers_auto(allow_all=True)
-                except Exception:
-                    pass
-                fm.start(fid)
-                # Wirkungslosen Start sichtbar machen: tote ID oder EFX ohne
-                # Geraete (write()-No-Op) -> kurzer Hinweis statt "Button tut
-                # nichts" ohne Rueckmeldung. Best effort (Statusleiste/Log).
-                try:
-                    prob = fm.start_problem(fid)
-                except Exception:
-                    prob = None
-                if prob:
-                    self._show_status(prob)
-                # Dieser Effekt wird das aktive Bearbeitungsziel des Slots.
-                if self.edit_slot:
-                    try:
-                        from src.core.engine import effect_live
-                        effect_live.set_edit_target(self.edit_slot, fid)
-                    except Exception:
-                        pass
-
             if self.action == ButtonAction.FUNCTION_TOGGLE:
-                # Phase E: alle gekoppelten Funktionen gemeinsam umschalten. Als
-                # Gruppe behandeln — laeuft IRGENDEINE, stoppe alle; sonst starte alle.
+                # Laeuft irgendein Gruppenmitglied, schaltet der naechste Druck
+                # die komplette Gruppe aus. Nur eine komplett inaktive Gruppe
+                # wird gemeinsam gestartet.
                 if press:
                     if any(fm.is_running(fid) for fid in fids):
                         for fid in fids:
                             if fm.is_running(fid):
                                 fm.stop(fid)
                     else:
-                        for fid in fids:
-                            _begin(fid)
+                        self._start_function_group(state, fids)
             else:  # FUNCTION_FLASH
                 if press:
-                    for fid in fids:
-                        _begin(fid)
+                    self._start_function_group(state, fids)
                 else:
                     for fid in fids:
                         fm.stop(fid)
@@ -897,14 +990,16 @@ class VCButton(VCWidget):
         geloescht/neu angelegt, Button behaelt die alte ID). Quelle des roten
         „ungebunden"-Markers im paintEvent. Nur Toggle/Flash mit gesetzter ID;
         bei Lookup-Fehlern defensiv False (kein Fehlalarm beim Laden)."""
-        if self.action not in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
+        if self.action not in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH,
+                               ButtonAction.EFFECT_ACTION, ButtonAction.ALL_WHITE):
             return False
-        if self.function_id is None:
+        fids = self._all_function_ids()
+        if not fids:
             return False
         try:
             from src.core.app_state import get_state
             fm = get_state().function_manager
-            return fm.get(int(self.function_id)) is None
+            return any(fm.get(fid) is None for fid in fids)
         except Exception:
             return False
 
@@ -929,11 +1024,13 @@ class VCButton(VCWidget):
         des Laufzustands (UI-Thread-Timer)."""
         if self.action not in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
             return False
-        if self.function_id is None:
+        fids = self._all_function_ids()
+        if not fids:
             return False
         try:
             from src.core.app_state import get_state
-            return get_state().function_manager.is_running(int(self.function_id))
+            fm = get_state().function_manager
+            return any(fm.is_running(fid) for fid in fids)
         except Exception:
             return False
 
@@ -1094,8 +1191,6 @@ class VCButton(VCWidget):
             if func_combo.currentData() is not None and func_combo.currentData() >= 0
             else None
         )
-        form.addRow("Funktion / Chase (Name):", func_combo)
-
         # Phase E: weitere gekoppelte Funktions-IDs (Komma-getrennt) — der Button
         # schaltet/flasht function_id + diese gemeinsam (FUNCTION_TOGGLE/FLASH).
         extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
@@ -1106,14 +1201,14 @@ class VCButton(VCWidget):
         # Lesbare, aufklappbare „Steuert"-Liste (wie beim BPM/Speed-Dial): zeigt die
         # gebundenen Funktionen/Effekte nach NAMEN, je Zeile auswaehl- und loeschbar.
         # Ist sie befuellt, hat sie beim Speichern Vorrang vor Slot/Weitere-IDs.
-        from .target_list_editor import TargetListEditor
-        target_editor = TargetListEditor(with_params=False, title="Steuert")
+        from .target_list_editor import TargetListEditor, SnapListEditor
+        target_editor = TargetListEditor(with_params=False, title="Schaltet mit")
         _t0 = ([int(self.function_id)] if self.function_id is not None else []) \
             + [int(i) for i in self.function_ids]
         target_editor.set_targets(_t0)
         target_editor.setToolTip("Funktionen/Effekte, die dieser Button schaltet — "
                                  "per Dropdown auswählen, mit ✕ entfernen, „+\" hinzufügen.")
-        form.addRow("Steuert:", target_editor)
+        form.addRow("Ziele:", target_editor)
 
         # Snapshot-Auswahl
         snap_combo = QComboBox()
@@ -1136,6 +1231,13 @@ class VCButton(VCWidget):
                     lib_combo.setCurrentIndex(i)
                     break
         form.addRow("Bibliothek-Farbe/Snap:", lib_combo)
+
+        snap_editor = SnapListEditor(title="Schaltet Snaps")
+        snap_editor.set_targets(self._all_snap_ids())
+        snap_editor.setToolTip("Bibliothek-Snaps/Looks, die dieser Button gemeinsam "
+                               "setzt, flasht oder toggelt. Ideal fuer mehrere "
+                               "Strobe-Snaps aus verschiedenen Dimmer-Gruppen.")
+        form.addRow("Snap-Ziele:", snap_editor)
 
         snap_mode_combo = QComboBox()
         _SNAP_MODES = [("toggle", "Umschalten (an/aus)"),
@@ -1316,8 +1418,9 @@ class VCButton(VCWidget):
         _adv_inner = _QWidget()
         _adv_form = QFormLayout(_adv_inner)
         _adv_form.setContentsMargins(0, 0, 0, 0)
+        _adv_form.addRow("Funktion / Chase (Name):", func_combo)
         _adv_form.addRow("Executor-Slot / Function-ID:", slot)
-        _adv_form.addRow("Weitere Ziel-IDs:", extra_ids)
+        _adv_form.addRow("Weitere Schalt-IDs:", extra_ids)
         adv_section = CollapsibleSection("Erweitert (Roh-ID / Executor-Slot)", _adv_inner,
                                          collapsed=True, prefs_key="vc_button_advanced")
         form.addRow(adv_section)
@@ -1335,12 +1438,16 @@ class VCButton(VCWidget):
         def _update_field_visibility():
             a = act.currentData()        # roher Enum-Wert (str)
             func_like = a in (FT, FF, EA, TG, FL, AW)
+            if a == EA:
+                target_editor.set_title("Aktion auf")
+            else:
+                target_editor.set_title("Schaltet mit")
             vis = {
                 adv_section:     func_like,
-                func_combo:      func_like,
                 target_editor:   a in (FT, FF, EA, AW),
                 snap_combo:      a == SN,
-                lib_combo:       a == LS,
+                lib_combo:       False,
+                snap_editor:     a == LS,
                 snap_mode_combo: a == LS,
                 eff_action_combo: a == EA,
                 group_combo:     a == SG,
@@ -1389,13 +1496,17 @@ class VCButton(VCWidget):
             # restliche -> function_ids (nur bei funktionsgebundenen Aktionen).
             if self.action in (FT, FF, EA, AW):
                 _tids = target_editor.ids()
-                if _tids:
-                    self.function_id = _tids[0]
-                    self.function_ids = _tids[1:]
+                self.function_id = _tids[0] if _tids else None
+                self.function_ids = _tids[1:]
             snap_idx = snap_combo.currentData()
             self.snapshot_index = snap_idx if snap_idx >= 0 else None
             lib_id = lib_combo.currentData()
             self.snap_id = lib_id if lib_id is not None and lib_id >= 0 else None
+            self.snap_ids = []
+            if self.action == LS:
+                _sids = snap_editor.ids()
+                self.snap_id = _sids[0] if _sids else None
+                self.snap_ids = _sids[1:]
             self.snap_mode = snap_mode_combo.currentData() or "toggle"
             self._snap_active = False
             self._snap_prev = {}
@@ -1458,6 +1569,7 @@ class VCButton(VCWidget):
         d["function_ids"] = list(self.function_ids)
         d["snapshot_index"] = self.snapshot_index
         d["snap_id"] = self.snap_id
+        d["snap_ids"] = list(self.snap_ids)
         d["snap_mode"] = self.snap_mode
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
@@ -1493,7 +1605,20 @@ class VCButton(VCWidget):
                 pass
         self.function_ids = _fids
         self.snapshot_index = d.get("snapshot_index")
-        self.snap_id = d.get("snap_id")
+        try:
+            _sid0 = d.get("snap_id")
+            self.snap_id = int(_sid0) if _sid0 is not None else None
+        except (TypeError, ValueError):
+            self.snap_id = None
+        _sids = []
+        for i in d.get("snap_ids", []):
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv != self.snap_id and iv not in _sids:
+                _sids.append(iv)
+        self.snap_ids = _sids
         self.snap_mode = d.get("snap_mode", "toggle")
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")

@@ -16,6 +16,7 @@ class EffectLiveTest(unittest.TestCase):
     def setUp(self):
         self.fm = get_function_manager()
         self.fm.stop_all()
+        effect_live.clear_live_overrides()
         self.m = RgbMatrixInstance(name="live", cols=4, rows=1,
                                    algorithm=RgbAlgorithm.CHASE, fixture_grid=[1, 2, 3, 4])
         self.fm.add(self.m)
@@ -23,6 +24,7 @@ class EffectLiveTest(unittest.TestCase):
     def tearDown(self):
         self.fm.stop_all()
         self.fm.remove(self.m.id)
+        effect_live.clear_live_overrides()
 
     # ── Ziel-Aufloesung ───────────────────────────────────────────────────────
     def test_resolve_explicit_and_active(self):
@@ -87,6 +89,30 @@ class EffectLiveTest(unittest.TestCase):
         self.fm.start(self.m.id)
         effect_live.set_param_normalized("speed", 1.0, None)   # aktiver Effekt
         self.assertGreater(self.m.matrix_speed, 15)
+
+    def test_live_param_is_not_serialized_by_function_manager(self):
+        self.m.matrix_speed = 1.25
+        effect_live.set_param("speed", 7.0, self.m.id)
+        self.assertEqual(self.m.matrix_speed, 7.0)              # live sofort aktiv
+        saved = next(d for d in self.fm.to_dict()["functions"]
+                     if d["id"] == self.m.id)
+        self.assertEqual(saved["matrix_speed"], 1.25)           # Show bleibt sauber
+
+    def test_live_color_is_not_serialized_by_function_manager(self):
+        self.m.colors = ColorSequence([(255, 0, 0), (0, 0, 255)])
+        effect_live.set_selected_color((9, 9, 9), self.m.id)
+        self.assertEqual(self.m.colors.color_at(0), (9, 9, 9))
+        saved = next(d for d in self.fm.to_dict()["functions"]
+                     if d["id"] == self.m.id)
+        self.assertEqual(saved["color_sequence"][0]["rgb"], [255, 0, 0])
+
+    def test_commit_makes_live_value_persistent(self):
+        self.m.matrix_speed = 1.0
+        effect_live.set_param("speed", 7.0, self.m.id)
+        effect_live.commit_live_override(self.m.id)
+        saved = next(d for d in self.fm.to_dict()["functions"]
+                     if d["id"] == self.m.id)
+        self.assertEqual(saved["matrix_speed"], 7.0)
 
     # ── Live-Override-Modell (#17) ──────────────────────────────────────────────
     def test_clear_live_override_restores_preset(self):

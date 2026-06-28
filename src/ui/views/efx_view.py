@@ -955,6 +955,34 @@ class EfxView(QWidget):
         tform.setSpacing(4)
         self._speed_spin = dspin(0.01, 10, 0.1, 0.5)
         tform.addRow("Geschwindigkeit (Hz):", self._speed_spin)
+        self._tempo_bus_combo = QComboBox()
+        self._tempo_bus_combo.addItem("Global (taktgleich, Standard)", "Global")
+        self._tempo_bus_combo.addItem("Frei (nicht taktgebunden)", "")
+        for _bus_id in ("A", "B", "C", "D"):
+            self._tempo_bus_combo.addItem(f"Bus {_bus_id}", _bus_id)
+        self._tempo_bus_combo.setToolTip(
+            "Global = folgt der Master-/Musik-BPM und startet mit Auto-Sync "
+            "taktgleich. Frei = bewusster eigener Lauf.")
+        self._tempo_bus_combo.currentIndexChanged.connect(self._on_param_change)
+        tform.addRow("Tempo-Bus:", self._tempo_bus_combo)
+        self._tempo_mult_spin = QDoubleSpinBox()
+        self._tempo_mult_spin.setRange(0.0625, 16.0)
+        self._tempo_mult_spin.setSingleStep(0.25)
+        self._tempo_mult_spin.setDecimals(4)
+        self._tempo_mult_spin.setValue(1.0)
+        self._tempo_mult_spin.setToolTip(
+            "Geschwindigkeit relativ zum Tempo-Bus, z. B. 0,5 = halb, 2 = doppelt.")
+        self._tempo_mult_spin.valueChanged.connect(self._on_param_change)
+        tform.addRow("Tempo ×:", self._tempo_mult_spin)
+        self._tempo_phase_spin = QDoubleSpinBox()
+        self._tempo_phase_spin.setRange(0.0, 1.0)
+        self._tempo_phase_spin.setSingleStep(0.05)
+        self._tempo_phase_spin.setDecimals(2)
+        self._tempo_phase_spin.setValue(0.0)
+        self._tempo_phase_spin.setToolTip(
+            "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
+        self._tempo_phase_spin.valueChanged.connect(self._on_param_change)
+        tform.addRow("Tempo-Versatz:", self._tempo_phase_spin)
         self._dir_combo = QComboBox()
         # Anzeige deutsch, interner Wert bleibt der Enum-Wert (forward/backward/
         # bounce) — Lese-/Setzstellen nutzen currentData()/findData().
@@ -1456,6 +1484,13 @@ class EfxView(QWidget):
             self._yoff_spin.setValue(efx.y_offset)
             self._rot_spin.setValue(efx.rotation)
             self._speed_spin.setValue(efx.speed_hz)
+            _bi = self._tempo_bus_combo.findData(
+                getattr(efx, "tempo_bus_id", "Global"))
+            self._tempo_bus_combo.setCurrentIndex(_bi if _bi >= 0 else 0)
+            self._tempo_mult_spin.setValue(
+                float(getattr(efx, "tempo_multiplier", 1.0)))
+            self._tempo_phase_spin.setValue(
+                float(getattr(efx, "phase_offset", 0.0)))
             self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
             self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
@@ -1506,6 +1541,10 @@ class EfxView(QWidget):
         self._current.y_offset = self._yoff_spin.value()
         self._current.rotation = self._rot_spin.value()
         self._current.speed_hz = self._speed_spin.value()
+        self._current.tempo_bus_id = str(
+            self._tempo_bus_combo.currentData() or "")
+        self._current.tempo_multiplier = self._tempo_mult_spin.value()
+        self._current.phase_offset = self._tempo_phase_spin.value()
         self._current.x_freq   = self._xfreq_spin.value()
         self._current.y_freq   = self._yfreq_spin.value()
         self._current.x_phase  = self._xphase_spin.value()

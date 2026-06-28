@@ -32,6 +32,21 @@ def _all_functions() -> list[tuple[int, str]]:
     return out
 
 
+def _all_snaps() -> list[tuple[int, str]]:
+    """(id, Anzeigename) aller Show-Bibliothek-Snaps, nach Ordner/Name sortiert."""
+    out: list[tuple[int, str]] = []
+    try:
+        from src.core.engine.snap_library import get_snap_library
+        for s in get_snap_library().snaps_sorted():
+            name = getattr(s, "name", None) or f"#{s.id}"
+            folder = getattr(s, "folder", "") or ""
+            label = f"{folder}/{name}  [Snap #{s.id}]" if folder else f"{name}  [Snap #{s.id}]"
+            out.append((int(s.id), label))
+    except Exception:
+        pass
+    return out
+
+
 class TargetListEditor(QWidget):
     """Aufklappbare Liste der gesteuerten Funktionen/Effekte (+ optional Parameter).
 
@@ -92,6 +107,11 @@ class TargetListEditor(QWidget):
         self._title_n = n
         self._toggle.setText(f"{self._title} ({n})")
         self._empty_lbl.setVisible(n == 0)
+
+    def set_title(self, title: str):
+        """Aendert die sichtbare Kopfzeile, ohne die aktuelle Auswahl anzufassen."""
+        self._title = title or self._title
+        self._refresh_title()
 
     # ── Zeilen ──────────────────────────────────────────────────────────────────
     def _add_row(self, fid, param_key: str):
@@ -246,3 +266,20 @@ class TargetListEditor(QWidget):
             if key:
                 out[fid] = key
         return out
+
+
+class SnapListEditor(TargetListEditor):
+    """Aufklappbare Liste fuer Show-Bibliothek-Snaps.
+
+    Gleiche kleine API wie ``TargetListEditor`` (`set_targets`, `ids`), aber die
+    Dropdowns zeigen Snap-Namen statt Funktionen. So kann ein Button mehrere
+    Looks/Snaps als eine gemeinsame Schaltgruppe behandeln.
+    """
+
+    def __init__(self, title: str = "Schaltet Snaps", parent=None):
+        super().__init__(with_params=False, title=title, parent=parent)
+        self._func_choices = _all_snaps()
+        try:
+            self.findChild(QPushButton).setText("+ Snap hinzufuegen")
+        except Exception:
+            pass

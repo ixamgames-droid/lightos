@@ -38,6 +38,7 @@ class Sequence(Function):
     """
 
     function_type = FunctionType.Sequence
+    tempo_sync_default = True
 
     def __init__(self, name: str = "Neue Sequence", fid: int | None = None):
         super().__init__(name, fid)
@@ -245,6 +246,146 @@ class Sequence(Function):
         return True
 
     # ── Serialisation ─────────────────────────────────────────────────────────
+
+    def list_params(self) -> list:
+        from .rgb_matrix_meta import ParamSpec  # lazy: Import-Zyklus vermeiden
+        return [
+            ParamSpec("speed", "Tempo", "float", 1.0, 0.05, 8.0, 0.05,
+                      "Geschwindigkeits-Faktor"),
+            ParamSpec("step_duration", "Schritt-Dauer (s)", "float", 1.0, 0.05, 60.0, 0.05,
+                      "Gesamtdauer pro Sequence-Schritt; passt Hold/Fades aller Schritte an"),
+            ParamSpec("step_hold", "Schritt halten (s)", "float", 1.0, 0.0, 60.0, 0.05,
+                      "Haltezeit aller Sequence-Schritte"),
+            ParamSpec("step_fade", "Schritt-Fade ein+aus (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Setzt Fade-In und Fade-Out aller Sequence-Schritte gemeinsam"),
+            ParamSpec("step_fade_in", "Schritt Fade-In (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Einblendzeit aller Sequence-Schritte"),
+            ParamSpec("step_fade_out", "Schritt Fade-Out (s)", "float", 0.0, 0.0, 10.0, 0.05,
+                      "Ausblendzeit aller Sequence-Schritte"),
+            ParamSpec("direction", "Richtung", "select", Direction.Forward.value,
+                      options=tuple(d.value for d in Direction)),
+            ParamSpec("run_order", "Modus", "select", RunOrder.Loop.value,
+                      options=tuple(r.value for r in RunOrder)),
+            ParamSpec("tempo_bus_id", "Tempo-Bus", "select", "Global",
+                      options=("Global", "", "A", "B", "C", "D"),
+                      tooltip="Auf welchen Tempo-Bus synchronisieren (leer = frei, "
+                              "Global = Master-BPM, A-D = eigene Buses)"),
+            ParamSpec("tempo_multiplier", "Tempo x", "float", 1.0, 0.0625, 16.0, 0.25,
+                      "Verhaeltnis zum Bus (frei, z. B. 0.5 halb, 2 doppelt, 3 dreifach)"),
+            ParamSpec("phase_offset", "Tempo-Versatz (Beats)", "float", 0.0, 0.0, 1.0, 0.05,
+                      "Phasen-Versatz in Beats (versetzter Start auf dem Bus)"),
+        ]
+
+    def _avg_step_attr(self, attr: str, default: float = 0.0) -> float:
+        if not self.steps:
+            return default
+        vals = [float(getattr(s, attr, default)) for s in self.steps]
+        return sum(vals) / len(vals)
+
+    def _avg_step_duration(self) -> float:
+        if not self.steps:
+            return 0.0
+        return sum(float(s.total_duration()) for s in self.steps) / len(self.steps)
+
+    def _set_all_step_attr(self, attr: str, value: float, lo: float, hi: float) -> bool:
+        if not self.steps:
+            return False
+        v = max(lo, min(hi, float(value)))
+        for step in self.steps:
+            setattr(step, attr, v)
+        return True
+
+    def _set_all_step_duration(self, value: float) -> bool:
+        if not self.steps:
+            return False
+        total = max(0.05, min(60.0, float(value)))
+        for step in self.steps:
+            fade_in = max(0.0, float(getattr(step, "fade_in", 0.0)))
+            fade_out = max(0.0, float(getattr(step, "fade_out", 0.0)))
+            fade_sum = fade_in + fade_out
+            if fade_sum <= total:
+                step.hold = total - fade_sum
+                continue
+            if fade_sum > 0.0:
+                scale = total / fade_sum
+                step.fade_in = fade_in * scale
+                step.fade_out = fade_out * scale
+            step.hold = 0.0
+        return True
+
+    def get_param(self, key: str):
+        if key == "speed":
+            return self.speed
+        if key == "step_duration":
+            return self._avg_step_duration()
+        if key == "step_hold":
+            return self._avg_step_attr("hold", 1.0)
+        if key == "step_fade":
+            return max(self._avg_step_attr("fade_in", 0.0),
+                       self._avg_step_attr("fade_out", 0.0))
+        if key == "step_fade_in":
+            return self._avg_step_attr("fade_in", 0.0)
+        if key == "step_fade_out":
+            return self._avg_step_attr("fade_out", 0.0)
+        if key == "direction":
+            return self.direction.value
+        if key == "run_order":
+            return self.run_order.value
+        if key == "tempo_bus_id":
+            return getattr(self, "tempo_bus_id", "")
+        if key == "tempo_multiplier":
+            return getattr(self, "tempo_multiplier", 1.0)
+        if key == "phase_offset":
+            return getattr(self, "phase_offset", 0.0)
+        return None
+
+    def set_param(self, key: str, value) -> bool:
+        if key == "speed":
+            self.speed = max(0.05, min(8.0, float(value)))
+            return True
+        if key == "step_duration":
+            return self._set_all_step_duration(value)
+        if key == "step_hold":
+            return self._set_all_step_attr("hold", value, 0.0, 60.0)
+        if key == "step_fade":
+            ok_in = self._set_all_step_attr("fade_in", value, 0.0, 10.0)
+            ok_out = self._set_all_step_attr("fade_out", value, 0.0, 10.0)
+            return ok_in or ok_out
+        if key == "step_fade_in":
+            return self._set_all_step_attr("fade_in", value, 0.0, 10.0)
+        if key == "step_fade_out":
+            return self._set_all_step_attr("fade_out", value, 0.0, 10.0)
+        if key == "direction":
+            try:
+                self.direction = Direction(str(value))
+            except ValueError:
+                s = str(value).lower()
+                self.direction = (Direction.Backward
+                                  if s.startswith(("back", "rueck", "ruck", "rev"))
+                                  else Direction.Forward)
+            return True
+        if key == "run_order":
+            try:
+                self.run_order = RunOrder(str(value))
+                return True
+            except ValueError:
+                return False
+        if key == "tempo_bus_id":
+            self.tempo_bus_id = str(value or "").strip()
+            return True
+        if key == "tempo_multiplier":
+            try:
+                self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "phase_offset":
+            try:
+                self.phase_offset = max(0.0, min(1.0, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        return False
 
     def to_dict(self) -> dict:
         d = super().to_dict()

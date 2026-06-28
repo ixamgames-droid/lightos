@@ -39,10 +39,8 @@ ACTION_LABELS = {
     "apply_selection":    "Auf Auswahl",
 }
 
-# Parameter-Kinds, die sich sinnvoll auf einen Fader (EFFECT_PARAM) abbilden lassen.
-_FADER_KINDS = ("int", "float", "bool", "select")
-# Parameter, die per Default vorausgewaehlt sind (haeufigste Live-Regler).
-_PRECHECK = ("speed", "intensity")
+# Parameter-Kinds, fuer die die VC passende Live-Regler bauen kann.
+_CONTROL_KINDS = ("int", "float", "bool", "select")
 
 
 class MatrixLiveDialog(QDialog):
@@ -73,8 +71,9 @@ class MatrixLiveDialog(QDialog):
         root.setSpacing(6)
 
         head = QLabel(f"<b>{eff_name}</b><br>"
-                      "Wähle Parameter (→ Fader) und Aktionen (→ Tasten), die als "
-                      "VC-Bedienelemente erzeugt werden.")
+                      "Der vorhandene Effekt wird direkt verknüpft; es wird kein neuer "
+                      "Effekt erzeugt. Wähle nur die Parameter und Aktionen, die du als "
+                      "VC-Bedienelemente brauchst.")
         head.setWordWrap(True)
         head.setStyleSheet("color:#e6edf3; font-size:11px;")
         root.addWidget(head)
@@ -86,17 +85,15 @@ class MatrixLiveDialog(QDialog):
         col.setContentsMargins(2, 2, 2, 2)
         col.setSpacing(2)
 
-        col.addWidget(self._section_label("Parameter (Fader)"))
+        col.addWidget(self._section_label("Parameter (Regler)"))
         added_param = False
         for s in specs:
-            if getattr(s, "kind", None) not in _FADER_KINDS:
+            if getattr(s, "kind", None) not in _CONTROL_KINDS:
                 continue          # color_sequence/color/action sind keine Fader
             if not getattr(s, "live_editable", True):
                 continue
             cb = QCheckBox(f"{getattr(s, 'label', s.key)}  ({s.key})")
             cb.setStyleSheet("color:#e6edf3;")
-            if s.key in _PRECHECK:
-                cb.setChecked(True)
             col.addWidget(cb)
             self._param_boxes.append((cb, s.key))
             added_param = True

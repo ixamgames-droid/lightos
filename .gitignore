@@ -21,6 +21,7 @@ data/*.json
 # Eigene Shows (user-spezifisch, nicht versioniert)
 shows/*.lshow
 shows/*.lshow.layout.json
+shows/*.lshow.bak*
 # Demo-Shows werden versioniert
 !shows/demo_*.lshow
 

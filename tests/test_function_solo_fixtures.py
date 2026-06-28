@@ -103,6 +103,20 @@ class StopOthersSharingFixturesTest(unittest.TestCase):
         self.assertEqual(self.fm.stop_others_sharing_fixtures(empty.id), 0)
         self.assertTrue(self.fm.is_running(self.b.id))
 
+    def test_group_members_do_not_stop_each_other(self):
+        external = self.fm.new_efx("External")
+        external.fixtures = [EfxFixture(fid=3)]
+        for fn in (self.a, self.b, self.c, external):
+            self.fm.start(fn.id)
+
+        stopped = self.fm.stop_others_sharing_fixture_group([self.a.id, self.b.id])
+
+        self.assertEqual(stopped, 1)
+        self.assertTrue(self.fm.is_running(self.a.id))
+        self.assertTrue(self.fm.is_running(self.b.id))
+        self.assertTrue(self.fm.is_running(self.c.id))
+        self.assertFalse(self.fm.is_running(external.id))
+
 
 class ButtonSoloFixturesTest(unittest.TestCase):
     """End-to-end über den echten VC-Button + den globalen FunctionManager."""

@@ -1,4 +1,4 @@
-"""VCBusSelector — schaltet in der Virtuellen Konsole den 'aktiven' Tempo-Bus scharf.
+"""VCBusSelector — waehlt global oder fuer einen gebundenen Effekt den Tempo-Bus.
 
 Tempo-Sync Phase 5: zeigt die benannten Tempo-Buses (Default A/B/C/D) als Chips.
 Ein Klick (Run-Modus) setzt ``get_tempo_bus_manager().armed_bus_id`` — alle
@@ -6,8 +6,9 @@ Tap/Sync/Tempo-Widgets mit leerem ``tempo_bus_id`` wirken danach auf diesen Bus
 (``resolve("")`` = armed-or-default). Pro Chip wird zusaetzlich die aktuelle Bus-BPM
 dezent eingeblendet (Schnappschuss beim Zeichnen).
 
-Im Edit-Modus verhaelt sich das Widget wie jedes andere (Verschieben/Skalieren/
-Eigenschaften); im Run-Modus ist es interaktiv (Chip = Bus scharf schalten).
+Wird das Widget per Smart-Drop fuer einen Effekt erzeugt, setzt ein Klick DIREKT
+dessen ``tempo_bus_id``. Ohne ``function_id`` bleibt das bisherige globale
+Verhalten (Chip = Bus fuer Tap/Sync scharf schalten).
 """
 from __future__ import annotations
 from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
@@ -22,6 +23,7 @@ class VCBusSelector(VCWidget):
     def __init__(self, caption: str = "Tempo-Bus", parent=None):
         super().__init__(caption, parent)
         self.buses: list[str] = ["A", "B", "C", "D"]
+        self.function_id: int | None = None
         self._bg_color = QColor("#101820")
         self._fg_color = QColor("#e8e8e8")
         self.resize(220, 84)
@@ -36,8 +38,20 @@ class VCBusSelector(VCWidget):
             return None
 
     def _armed(self) -> str:
+        if self.function_id is not None:
+            try:
+                from src.core.engine import effect_live
+                return str(effect_live.get_param("tempo_bus_id", self.function_id) or "")
+            except Exception:
+                return ""
         mgr = self._manager()
         return mgr.armed_bus_id if mgr is not None else ""
+
+    def is_effect_bound(self) -> bool:
+        return self.function_id is not None
+
+    def live_effect_function_id(self):
+        return self.function_id
 
     # ── Interaktion (Run-Modus) ──────────────────────────────────────────────────
 
@@ -60,12 +74,20 @@ class VCBusSelector(VCWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             idx = self._chip_at(event.position().toPoint())
             if idx >= 0:
-                mgr = self._manager()
-                if mgr is not None:
+                if self.function_id is not None:
                     try:
-                        mgr.armed_bus_id = self.buses[idx]
+                        from src.core.engine import effect_live
+                        effect_live.set_param("tempo_bus_id", self.buses[idx],
+                                              self.function_id)
                     except Exception:
                         pass
+                else:
+                    mgr = self._manager()
+                    if mgr is not None:
+                        try:
+                            mgr.armed_bus_id = self.buses[idx]
+                        except Exception:
+                            pass
                 self.update()
                 event.accept()
                 return
@@ -137,6 +159,10 @@ class VCBusSelector(VCWidget):
         buses_edit = QLineEdit(", ".join(self.buses))
         buses_edit.setToolTip("Bus-IDs (mit Komma getrennt), z. B. A, B, C, D.")
         form.addRow("Buses:", buses_edit)
+        fid_edit = QLineEdit("" if self.function_id is None else str(self.function_id))
+        fid_edit.setToolTip("Optional: Funktions-ID. Mit Ziel wird dessen tempo_bus_id "
+                            "gesetzt; leer = globalen Tap/Sync-Bus scharf schalten.")
+        form.addRow("Effekt-ID (leer=global):", fid_edit)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -148,6 +174,8 @@ class VCBusSelector(VCWidget):
             ids = [s for s in ids if s]
             if ids:
                 self.buses = ids
+            raw_fid = fid_edit.text().strip()
+            self.function_id = int(raw_fid) if raw_fid.lstrip("-").isdigit() else None
             self.update()
 
     # ── Serialisierung ────────────────────────────────────────────────────────────
@@ -155,9 +183,15 @@ class VCBusSelector(VCWidget):
     def to_dict(self) -> dict:
         d = super().to_dict()
         d["buses"] = list(self.buses)
+        d["function_id"] = self.function_id
         return d
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
         b = d.get("buses", ["A", "B", "C", "D"])
         self.buses = [str(x) for x in b] if isinstance(b, (list, tuple)) and b else ["A", "B", "C", "D"]
+        raw_fid = d.get("function_id")
+        try:
+            self.function_id = int(raw_fid) if raw_fid is not None else None
+        except (TypeError, ValueError):
+            self.function_id = None

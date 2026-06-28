@@ -256,7 +256,8 @@ class VCSpeedDial(VCWidget):
                     # klassische Funktionen haben ein .speed-Attribut.
                     # Phase E: je Effekt darf ein eigener Parameter gesteuert werden.
                     if hasattr(fn, "set_param") and hasattr(fn, "list_params"):
-                        fn.set_param(self._key_for(fid, "speed"), factor)
+                        from src.core.engine import effect_live
+                        effect_live.set_param(self._key_for(fid, "speed"), factor, fid)
                     elif hasattr(fn, "speed"):
                         fn.speed = factor
                 else:

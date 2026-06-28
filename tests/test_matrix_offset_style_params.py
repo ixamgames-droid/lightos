@@ -8,7 +8,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm
+from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle
 
 
 def _m():
@@ -17,14 +17,31 @@ def _m():
 
 
 class ListedTest(unittest.TestCase):
-    def test_keys_listed(self):
-        keys = [s.key for s in _m().list_params()]
-        for k in ("offset", "intensity_min", "intensity_max",
-                  "shutter_min", "shutter_max"):
-            self.assertIn(k, keys)
+    def test_style_keys_listed_only_for_active_channel_mask(self):
+        rgb = _m()
+        rgb_keys = {s.key for s in rgb.list_params()}
+        self.assertIn("offset", rgb_keys)
+        self.assertNotIn("intensity_min", rgb_keys)
+        self.assertNotIn("shutter_min", rgb_keys)
+
+        dim = _m()
+        dim.style = MatrixStyle.DIMMER
+        dim_keys = {s.key for s in dim.list_params()}
+        self.assertIn("intensity_min", dim_keys)
+        self.assertIn("intensity_max", dim_keys)
+        self.assertNotIn("shutter_min", dim_keys)
+        self.assertNotIn("colors", dim_keys)
+
+        shutter = _m()
+        shutter.style = MatrixStyle.SHUTTER
+        shutter_keys = {s.key for s in shutter.list_params()}
+        self.assertIn("shutter_min", shutter_keys)
+        self.assertIn("shutter_max", shutter_keys)
+        self.assertNotIn("intensity_min", shutter_keys)
+        self.assertNotIn("intensity", shutter_keys)
         # white_amount entfaellt aus list_params: RGBW erzeugt echtes Weiss
         # automatisch ueber den W-Kanal (kein "Weissanteil"-Regler mehr).
-        self.assertNotIn("white_amount", keys)
+        self.assertNotIn("white_amount", rgb_keys)
 
 
 class SetGetClampTest(unittest.TestCase):

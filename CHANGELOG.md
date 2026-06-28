@@ -7,11 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-28 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **Tempo standardmäßig taktgleich + direkt im Programmer:** Neue RGB-/Dimmer-Matrizen, EFX-Bewegungen, Chaser und Sequenzen folgen standardmäßig dem globalen Tempo-Bus; Auto-Sync ist bei neuen bzw. nicht ausdrücklich anders gespeicherten Shows aktiv. Matrix- und EFX-Programmer zeigen Tempo-Bus, Multiplikator und Phasenversatz direkt. Bewusste Abwahl bleibt über „Frei (nicht taktgebunden)" möglich.
+- **Tempo-Bedienfeld jetzt auch im Chaser- und Sequence-Editor:** Beide Editoren bekommen — wie Matrix/EFX — **Tempo-Bus**, **Tempo-Multiplikator (×)** und **Phasenversatz** direkt im Editor. Damit lässt sich pro Chaser/Sequenz bewusst zwischen **beatgenau** (an einen Tempo-Bus gekoppelt) und **Free-Run** (zeitbasierter Crossfade zwischen den Schritten) umschalten. Default neuer Funktionen bleibt „Global". `src/ui/views/chaser_editor.py`, `src/ui/views/sequence_editor.py`, `tests/test_chaser_sequence_tempo_editor.py`.
+
+#### Behoben
+
+- **Speed-Dial „Jetzt synchronisieren" greift auch bei bus-gekoppelten Effekten:** `RgbMatrixInstance.sync_phase()` setzt die Animationsphase (`_step`) jetzt auch im Bus-Zweig auf 0 zurück — vorher übersprang der Bus-Re-Anchor das Reset, sodass bus-synchrone Effekte beim Sync nicht auf den gemeinsamen Startpunkt sprangen. `src/core/engine/rgb_matrix.py`, `tests/test_speed_dial.py`.
+- **Chaser crossfadet wieder verlässlich im Free-Run:** Der Render-Probe-Diagnosehelfer (`render_probe.render_diff`) gibt den nur für die Probe gesetzten Tempo (`request_bpm(..., "diag")`) wieder frei, statt ihn in Folge-Tests/-Läufe leaken zu lassen; der Crossfade-Test ist zusätzlich explizit auf Free-Run gepinnt. `src/core/capability/render_probe.py`, `tests/test_chaser_crossfade.py`.
+- **Capability-Manifest neu erzeugt:** `docs/capability_manifest.json` + `docs/CAPABILITIES.md` an die geänderte Tempo-Bus-Optionsreihenfolge angeglichen (`tools/gen_capabilities.py`).
+- **Fixture-Kopieren überträgt `spider_dual_tilt`:** `_copy_fixture` kopiert das Dual-Tilt-Flag mit (ging beim Kopieren bisher verloren). `src/ui/views/patch_view.py`, `tests/test_patch_copy_offset.py`.
+
 ### 2026-06-25 — Neu
 
 #### Neu / Hinzugefuegt
 
+- **ADJ Dotz TPar System in der Fixture-Library:** Das komplette 4-fach RGB-COB-T-Bar-System ist als Builtin-Profil mit allen offiziellen DMX-Modi hinterlegt: **3, 5, 9, 12 und 18 Kanaele**. Die Pixel-Modi steuern alle vier PAR-Koepfe einzeln; Vollmodi enthalten zusaetzlich Farbmakros/Programme, Master-Dimmer/Programm-Speed, Strobe, Dimmerkurven und die zwei schaltbaren Zusatzlicht-Ausgaenge. Bestehende Fixture-Datenbanken werden durch `ensure_builtins()` idempotent nachgeruestet. `src/core/database/fixture_db.py`, `tests/test_adj_dotz_tpar_profile.py`.
+
 - **ADJ Flat Par QWH12X in der Fixture-Library:** Der 12×5 W RGBW-PAR von ADJ (Art.-Nr. 1226100244) ist jetzt als Builtin-Profil hinterlegt. DMX-Layout faithful aus dem ADJ-Handbuch der baugleichen QA12X-Serie (gleiche Platine, Amber→Weiß) verifiziert. Modelliert sind die für die Software-Farbmischung nutzbaren Direkt-RGBW-Modi: **4-Kanal** (RGBW), **5-Kanal** (RGBW+Dimmer), **7-Kanal** (RGBW+Dimmer+Strobe+Farb-Makros) und **8-Kanal Voll** (zusätzlich Modus-Wahl + Programme). Strobe 0–15 = aus (Dauerlicht, kind `open`), 16–255 = langsam→schnell; 16 Farb-Makros als `color_wheel`-Slots → Farbrad-Kacheln im Programmer. Registriert in `_seed()` und `ensure_builtins()` (rüstet bestehende DBs idempotent nach). `src/core/database/fixture_db.py`, `tests/test_adj_flatpar_profile.py`.
+
+#### Behoben
+
+- **Solo-Frame schaltet wirklich auf genau einen aktiven Button um:** Der Container wertet nicht mehr nur den kurzzeitigen Tastendruck (`_pressed`) aus, sondern deaktiviert laufende Funktions-Toggles und aktive Bibliothek-Snaps gezielt. Beim Wechsel Rot → Grün wird Rot sofort beendet/zurückgenommen und nur Grün bleibt aktiv; ein erneuter Druck auf Grün schaltet es weiterhin aus. Gilt zentral für alle Shows, Banks sowie Maus-, MIDI- und Tastaturauslösung. Multi-Effekt-Buttons werden vollständig gestoppt. `src/ui/virtualconsole/vc_button.py`, `src/ui/virtualconsole/vc_frame.py`, `tests/test_vc_frame_solo.py`.
 
 ### 2026-06-24 — Neu
 

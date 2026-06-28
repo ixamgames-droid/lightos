@@ -38,8 +38,9 @@ Die **Vorschau** zeigt die Helligkeit als Graustufen-Lauflicht (weiße Balken = 
 
 ## 3. Geschwindigkeit: fest einstellen oder ans Tempo koppeln
 
-Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** nur diese Felder:
-**Geschwindigkeit**, **Layer-Priorität**, **Einblenden**, **Ausblenden** und **Hüllkurven-Form**.
+Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** jetzt direkt:
+**Geschwindigkeit**, **Tempo-Bus**, **Tempo ×**, **Tempo-Versatz**,
+**Layer-Priorität**, **Einblenden**, **Ausblenden** und **Hüllkurven-Form**.
 
 - Über **Geschwindigkeit** stellst du das Tempo der Matrix als festen Faktor ein (1,0 = normal,
   2,0 = doppelt so schnell). So läuft der Dimmer-Puls z. B. schneller als der Farb-Chase, indem
@@ -49,14 +50,15 @@ Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** nur diese Felder:
 - **Einblenden / Ausblenden** sind die Ein-/Ausblendzeiten (in Sekunden) beim Start/Stopp; die
   **Hüllkurven-Form** bestimmt deren Verlauf.
 
-> **Wichtig:** Eine **Tempo-Bus-Zuweisung**, einen **„Tempo ×"-Multiplikator** oder eine
-> **Phasen-Synchronisation** gibt es im Matrix-Editor **nicht**. Wer die Matrix taktgenau ans
-> Lied oder an andere Effekte koppeln will, macht das in der **Virtuellen Konsole** bzw. der
-> **BPM-Sektion** (siehe unten).
+Neue Matrix-Effekte stehen standardmäßig auf **Tempo-Bus = Global**,
+**Tempo × = 1** und **Tempo-Versatz = 0**. Damit laufen sie automatisch im gemeinsamen
+Taktraster. Nur wenn ein Effekt bewusst unabhängig laufen soll, wählst du
+**Frei (nicht taktgebunden)**.
 
-### Ans Tempo koppeln (Virtuelle Konsole / BPM)
+### Ans Tempo koppeln (Programmer / Virtuelle Konsole / BPM)
 
-Die eigentliche Tempo-Kopplung läuft über die **Virtuelle Konsole**:
+Die dauerhafte Grundkonfiguration stellst du direkt im **Programmer-Matrix-Editor** ein.
+Die Virtuelle Konsole dient anschließend zum Live-Umschalten der Faktoren:
 
 - **Effekt per Smart-Drop** auf eine VC-Seite ziehen → im geführten Dialog die Tempo-Steuerung
   wählen (z. B. ein **SpeedDial** für die Matrix).

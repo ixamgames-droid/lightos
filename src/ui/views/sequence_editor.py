@@ -96,6 +96,49 @@ class SequenceEditor(QWidget):
         prop_row.addWidget(self._sp_speed)
         root.addWidget(grp_general)
 
+        # ── Gruppe: Tempo (beatgenau via Bus vs. Free-Run/Crossfade) ──────────
+        # Spiegelt das Tempo-Panel der Matrix-/EFX-/Chaser-Editoren. Werte werden
+        # VOR connect gesetzt (wie Order/Dir/Speed oben), damit das Setup kein
+        # _on_props_changed feuert.
+        grp_tempo = QGroupBox("Tempo")
+        tempo_row = QHBoxLayout(grp_tempo)
+        tempo_row.addWidget(QLabel("Tempo-Bus:"))
+        self._tempo_bus_combo = QComboBox()
+        self._tempo_bus_combo.addItem("Global (taktgleich, Standard)", "Global")
+        self._tempo_bus_combo.addItem("Frei (nicht taktgebunden)", "")
+        for _bus_id in ("A", "B", "C", "D"):
+            self._tempo_bus_combo.addItem(f"Bus {_bus_id}", _bus_id)
+        _bi = self._tempo_bus_combo.findData(getattr(self._seq, "tempo_bus_id", "Global"))
+        self._tempo_bus_combo.setCurrentIndex(_bi if _bi >= 0 else 0)
+        self._tempo_bus_combo.setToolTip(
+            "Beatgenau an einen Tempo-Bus koppeln (folgt der globalen BPM) oder "
+            "'Frei' für zeitbasiertes Überblenden zwischen den Schritten.")
+        self._tempo_bus_combo.currentIndexChanged.connect(self._on_props_changed)
+        tempo_row.addWidget(self._tempo_bus_combo, 1)
+
+        tempo_row.addWidget(QLabel("×:"))
+        self._tempo_mult_spin = QDoubleSpinBox()
+        self._tempo_mult_spin.setRange(0.0625, 16.0)
+        self._tempo_mult_spin.setSingleStep(0.25)
+        self._tempo_mult_spin.setDecimals(4)
+        self._tempo_mult_spin.setValue(float(getattr(self._seq, "tempo_multiplier", 1.0)))
+        self._tempo_mult_spin.setToolTip(
+            "Geschwindigkeit relativ zum Tempo-Bus, z. B. 0,5 = halb, 2 = doppelt.")
+        self._tempo_mult_spin.valueChanged.connect(self._on_props_changed)
+        tempo_row.addWidget(self._tempo_mult_spin)
+
+        tempo_row.addWidget(QLabel("Versatz:"))
+        self._tempo_phase_spin = QDoubleSpinBox()
+        self._tempo_phase_spin.setRange(0.0, 1.0)
+        self._tempo_phase_spin.setSingleStep(0.05)
+        self._tempo_phase_spin.setDecimals(2)
+        self._tempo_phase_spin.setValue(float(getattr(self._seq, "phase_offset", 0.0)))
+        self._tempo_phase_spin.setToolTip(
+            "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
+        self._tempo_phase_spin.valueChanged.connect(self._on_props_changed)
+        tempo_row.addWidget(self._tempo_phase_spin)
+        root.addWidget(grp_tempo)
+
         # Bound fixtures
         bound_box = QGroupBox("Verknüpfte Fixtures")
         bb_layout = QVBoxLayout(bound_box)
@@ -353,6 +396,9 @@ class SequenceEditor(QWidget):
         self._seq.run_order = self._cb_order.currentData()
         self._seq.direction = self._cb_dir.currentData()
         self._seq.speed = self._sp_speed.value()
+        self._seq.tempo_bus_id = str(self._tempo_bus_combo.currentData() or "")
+        self._seq.tempo_multiplier = self._tempo_mult_spin.value()
+        self._seq.phase_offset = self._tempo_phase_spin.value()
 
     def _on_table_changed(self, item: QTableWidgetItem):
         if self._building:

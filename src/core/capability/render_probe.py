@@ -28,22 +28,36 @@ def render_diff(state, function_ids, *, bpm: float = 128.0, warmup: int = 3,
     ``moved`` = irgendein Kanal ändert sich über die Zeit."""
     from src.core.engine.function_manager import get_function_manager
     fm = get_function_manager()
+    _mgr = None
+    _prev_bpm = 0.0
     try:
         from src.core.engine.bpm_manager import get_bpm_manager
-        get_bpm_manager().request_bpm(bpm, "diag")
+        _mgr = get_bpm_manager()
+        _prev_bpm = _mgr.bpm
+        _mgr.request_bpm(bpm, "diag")
     except Exception:
         pass
-    for fid in function_ids:
-        fm.start(int(fid))
-    for _ in range(max(0, warmup)):
-        state._render_frame(1 / 44.0)
-    a = universe_snapshot(state, universe, channels)
-    for _ in range(max(1, frames)):
-        state._render_frame(1 / 44.0)
-    b = universe_snapshot(state, universe, channels)
-    changed = sorted(c for c in a if a[c] != b[c])
-    lit = any(v > 0 for v in b.values())
-    return lit, bool(changed), changed
+    try:
+        for fid in function_ids:
+            fm.start(int(fid))
+        for _ in range(max(0, warmup)):
+            state._render_frame(1 / 44.0)
+        a = universe_snapshot(state, universe, channels)
+        for _ in range(max(1, frames)):
+            state._render_frame(1 / 44.0)
+        b = universe_snapshot(state, universe, channels)
+        changed = sorted(c for c in a if a[c] != b[c])
+        lit = any(v > 0 for v in b.values())
+        return lit, bool(changed), changed
+    finally:
+        # Test-Isolation: den NUR fuer diese Probe gesetzten Diag-BPM wieder
+        # freigeben, sonst leakt er in nachfolgende Tests (bus-default Effekte
+        # wie Chaser liefen dann faelschlich bus-getrieben statt zeitbasiert).
+        if _mgr is not None:
+            try:
+                _mgr.request_bpm(_prev_bpm, "diag")
+            except Exception:
+                pass
 
 
 def assert_not_inert(state, function_id, *, require_motion: bool = False, **kw):

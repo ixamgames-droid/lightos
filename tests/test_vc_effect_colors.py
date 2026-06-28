@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor
 
 from src.core.engine.function_manager import get_function_manager
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, ColorSequence
+from src.core.engine import effect_live
 
 
 def _app() -> QApplication:
@@ -27,6 +28,7 @@ class VcEffectColorsTest(unittest.TestCase):
         _app()
         self.fm = get_function_manager()
         self.fm.stop_all()
+        effect_live.clear_live_overrides()
         self.m = RgbMatrixInstance(name="ec", cols=4, rows=1,
                                    algorithm=RgbAlgorithm.CHASE, fixture_grid=[1, 2, 3, 4])
         self.m.colors = ColorSequence([(255, 0, 0), (0, 255, 0), (0, 0, 255)])
@@ -35,6 +37,7 @@ class VcEffectColorsTest(unittest.TestCase):
     def tearDown(self):
         self.fm.stop_all()
         self.fm.remove(self.m.id)
+        effect_live.clear_live_overrides()
 
     def _widget(self):
         from src.ui.virtualconsole.vc_effect_colors import VCEffectColors
@@ -58,6 +61,9 @@ class VcEffectColorsTest(unittest.TestCase):
             w._pick_color(1, seq)
         self.assertEqual(self.m.colors.color_at(1), (10, 20, 30))
         self.assertEqual(self.m.colors.active_index, 1)
+        saved = next(d for d in self.fm.to_dict()["functions"]
+                     if d["id"] == self.m.id)
+        self.assertEqual(saved["color_sequence"][1]["rgb"], [0, 255, 0])
 
     def test_right_click_toggles_enabled(self):
         from PySide6.QtGui import QMouseEvent
