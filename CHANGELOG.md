@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-29 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **Cue-Verzögerung pro Attribut jetzt auch beim Ausfaden (ENG-01):** Cues hatten bereits eine Pro-Attribut-Verzögerung beim Hineinfaden (`attr_delays`); neu ist das symmetrische Gegenstück `attr_delays_out` für den Rückwärts-/Ausfade-Pfad (BACK). `CueStack._fade_to` wählt jetzt **richtungsabhängig** Fade-Zeit, Cue-Delay-Basis **und** die Pro-Attribut-Delays: GO nutzt `fade_in`/`delay_in`/`attr_delays`, BACK nutzt `fade_out`/`delay_out`/`attr_delays_out`. Die Attribut-Ebene ergänzt sich damit spiegelbildlich zu den schon vorhandenen Cue-Delays `delay_in`/`delay_out`. Nebenbei behoben: der BACK-Fade nahm bisher fälschlich `delay_in` (statt `delay_out`) als Verzögerungs-Basis. Alt-Shows ohne den neuen Schlüssel verhalten sich unverändert (defensive Deserialisierung). `src/core/engine/cue.py`, `src/core/engine/cue_stack.py`, `tests/test_cue_substack_and_attrdelay.py`.
+
 ### 2026-06-28 — Neu
 
 #### Neu / Hinzugefuegt

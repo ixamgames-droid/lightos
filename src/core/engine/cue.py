@@ -63,9 +63,15 @@ class Cue:
     sub_stack_mode: str = "merge"
     # {fid: {attribute: value}}
     values: dict[int, dict[str, int]] = field(default_factory=dict)
-    # F-6: optionale PRO-ATTRIBUT-Verzögerung (Sekunden) ZUSÄTZLICH zum Cue-Delay.
-    #   {fid: {attribute: extra_delay_sekunden}}  — leer = bisheriges Verhalten.
+    # F-6: optionale PRO-ATTRIBUT-Verzögerung (Sekunden) ZUSÄTZLICH zum Cue-Delay,
+    #   beim Hinein-Faden (GO/Vorwärts). {fid: {attribute: extra_delay_sekunden}}
+    #   — leer = bisheriges Verhalten.
     attr_delays: dict[int, dict[str, float]] = field(default_factory=dict)
+    # ENG-01: dieselbe Pro-Attribut-Verzögerung für den AUSWÄRTS-Fade (BACK / Fade-Out).
+    #   Symmetrisch zu den Cue-Delays delay_in/delay_out: ``attr_delays`` gilt beim
+    #   GO (Basis delay_in), ``attr_delays_out`` beim BACK (Basis delay_out).
+    #   Leer = wie bisher (BACK nutzt dann nur die Cue-Delay-Basis).
+    attr_delays_out: dict[int, dict[str, float]] = field(default_factory=dict)
 
     def __post_init__(self):
         self.number = round(float(self.number), 3)
@@ -86,6 +92,10 @@ class Cue:
             "attr_delays": {
                 str(k): {a: float(d) for a, d in v.items()}
                 for k, v in self.attr_delays.items()
+            },
+            "attr_delays_out": {
+                str(k): {a: float(d) for a, d in v.items()}
+                for k, v in self.attr_delays_out.items()
             },
         }
 
@@ -114,4 +124,5 @@ class Cue:
         )
         c.values = _coerce_values(d.get("values"))
         c.attr_delays = _coerce_attr_delays(d.get("attr_delays"))
+        c.attr_delays_out = _coerce_attr_delays(d.get("attr_delays_out"))
         return c
