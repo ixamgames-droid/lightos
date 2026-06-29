@@ -151,7 +151,18 @@ def set_param(key, value, function_id=None) -> bool:
     fn = resolve_target(function_id)
     if not _supports(fn):
         return False
-    return _apply_live_mutation(fn, lambda: fn.set_param(key, value))
+    ok = _apply_live_mutation(fn, lambda: fn.set_param(key, value))
+    # Live-Bus-Wechsel taktgleich machen: aendert sich tempo_bus_id an einem
+    # LAUFENDEN Effekt (VC-Bus-Selector, Command-Line, MIDI …), sofort sauber auf
+    # das neue Beat-Raster re-ankern — sonst springt der Effekt mit stehengebliebenem
+    # _beat_anchor auf eine zufaellige Phase, bis das naechste Sync kommt.
+    if ok and key == "tempo_bus_id":
+        try:
+            if getattr(fn, "is_running", False) and hasattr(fn, "sync_phase"):
+                fn.sync_phase()
+        except Exception:
+            pass
+    return ok
 
 
 def set_param_normalized(key, norm, function_id=None) -> bool:

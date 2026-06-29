@@ -252,7 +252,7 @@ class EfxInstance(Function):
         if bus_id:
             try:
                 from src.core.engine.tempo_bus import get_tempo_bus_manager
-                bus = get_tempo_bus_manager().get(bus_id)
+                bus = get_tempo_bus_manager().bus_for_effect(bus_id)
                 if bus is not None:
                     self._beat_anchor = bus.take_anchor()
                     return
