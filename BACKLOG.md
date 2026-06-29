@@ -29,7 +29,6 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
 | ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
-| OUT-02 | P2 | todo | Enttec Open DMX USB Stabilisierung | Kein Drift/Hang über lange Sessions (>8h); Reconnect-Logik; Doku |
 
 ### 🤖 Aus Codex-Reviews (Stand 2026-06-24 — noch offene Befunde)
 _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft. Der STAB-/QA-/VIZ-Teil dieses Audits ist via [PR #55](https://github.com/ixamgames-droid/lightos/pull/55) bereits erledigt (siehe „Erledigt" unten) — hier bleiben die 10 noch offenen UI-/ENG-Punkte. Verschieb einzelne Zeilen nach oben in die „Offen"-Liste, um sie für den Loop zu priorisieren._
@@ -49,6 +48,8 @@ _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **OUT-02** · Enttec-Serial-Stabilisierung (Fehler-Watchdog): nach `FAIL_LIMIT` (20) aufeinanderfolgenden Schreib-Fehlern wird der Port geschlossen + als tot markiert → kein 44-Hz-Hammern auf ein abgezogenes/wackliges USB-Gerät (drastisch weniger native Access-Violation-Gelegenheiten); ein erfolgreicher Frame resettet den Zähler. Gedrosselter Reconnect (alle 3 s) reaktiviert die Ausgabe automatisch, sobald das USB zurück ist; `is_disabled()` für UI-Status. Reines Python kann eine native Kerneltreiber-AV nicht fangen — der Fix senkt die Exposition. +6 Tests. [PR #73](https://github.com/ixamgames-droid/lightos/pull/73)
 
 - **STAB-07** · Häufigste native Access Violation (crash.log Jun 2026, GUI-Thread im Programmer-Refresh) **ursächlich** behoben: `programmer_view._refresh_fixture_list` kapselt `clear()`+Neuaufbau in `blockSignals` → keine re-entrante `itemSelectionChanged`→`_rebuild_attr_editor`-Kaskade mehr; **und** `_on_state_change` behandelt `patch_changed` nicht mehr → kein Doppel-Rebuild über Legacy- **und** Sync-Pfad. Befund nebenbei: die BUG-01-Bremse `_suppress_emits` ist inert (nie auf `True`). +4 Regressionstests. [PR #70](https://github.com/ixamgames-droid/lightos/pull/70)
 - **NET-01 / QA-04** · Quick Wins aus der crash.log-Analyse: Web-Remote startet wieder (`allow_unsafe_werkzeug=True` an `sio.run` — der `WebServer`-Thread starb sonst still beim Start, Remote nie erreichbar) + RGB-Matrix-Style-Sichtbarkeit gegen `AttributeError`-Regression abgesichert (Prod war längst gefixt: `_shut_form_label`; neuer Headless-Test über **alle** `MatrixStyle`×`RgbAlgorithm`). [PR #71](https://github.com/ixamgames-droid/lightos/pull/71)
