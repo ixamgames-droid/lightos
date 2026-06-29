@@ -21,6 +21,11 @@ import sys
 
 # src importierbar machen (innerer Root) + headless Qt — VOR den src-Imports.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# DEMO-02: spawn-sichere Env-Schalter (LIGHTOS_SERIAL_INPROC etc.) setzen, BEVOR
+# app_state/output_manager importiert wird — sonst re-importiert ein
+# multiprocessing-'spawn'-Kindprozess den guardlosen Generator als __mp_main__ und
+# baut die Show ein zweites Mal (-> halber Patch). Siehe tools/_gen_env.py.
+import _gen_env  # noqa: F401,E402
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:

@@ -16,6 +16,11 @@ Aufruf:  venv/Scripts/python.exe tools/build_demo_show.py
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# DEMO-02: spawn-sichere Env-Schalter setzen, BEVOR app_state importiert wird.
+# Ohne diese Zeile re-importiert ein multiprocessing-'spawn'-Kindprozess dieses
+# guardlose Skript als __mp_main__ und baut die Show ein zweites Mal -> halber
+# Patch. Siehe tools/_gen_env.py.
+import _gen_env  # noqa: F401
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication

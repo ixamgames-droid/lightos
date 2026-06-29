@@ -27,6 +27,7 @@ os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 
 import json
+import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
 from PySide6.QtWidgets import QApplication
 _app = QApplication.instance() or QApplication([])
 

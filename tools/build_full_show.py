@@ -16,6 +16,7 @@ Aufruf: venv/Scripts/python.exe tools/build_full_show.py
 import os, sys, json, shutil
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QColor
 _app = QApplication.instance() or QApplication([])
