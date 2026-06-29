@@ -364,6 +364,20 @@ def reset_show():
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
 
+    # DEMO-03: zusaetzlich HART die Patch-Tabelle leeren (DELETE), wie es load_show
+    # ueber clear_patch() tut. Schlaegt das clear_patch() in _replace_patch_from_data
+    # fehl (z.B. nach abgestuerztem Generator-Lauf), faellt es dort auf remove_fixture
+    # ueber den CACHE zurueck — verwaiste DB-Zeilen, die NICHT im Cache stehen, bleiben
+    # dann liegen und lassen den FLD-FID-Guard in add_fixture auf next_fid() ausweichen
+    # (ueberraschend verschobene Fixture-IDs beim naechsten Patch). Ein direkter,
+    # eigenstaendig abgesicherter clear_patch()-Aufruf garantiert die leere Tabelle.
+    try:
+        state.clear_patch()
+    except AttributeError:
+        pass  # aeltere AppState-API ohne clear_patch
+    except Exception as e:
+        print(f"[show_file] reset clear_patch error: {e}")
+
     # Fixture-Gruppen aus der Show-DB leeren (SSOT — sonst bleiben Gruppen nach Neue Show)
     try:
         from sqlalchemy import delete

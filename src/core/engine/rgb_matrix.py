@@ -271,6 +271,18 @@ class ColorSequence:
     def __len__(self) -> int:
         return len(self.entries)
 
+    def __iter__(self):
+        """Iteriert ueber ALLE Eintraege und liefert deren ``(r,g,b)``-Tupel
+        (konsistent mit ``len()``, das ebenfalls alle Eintraege zaehlt). So gilt
+        ``list(seq) == seq.all_colors()`` und ``len(list(seq)) == len(seq)``."""
+        return iter(rgb for rgb, _on in self.entries)
+
+    def __getitem__(self, index: int) -> Color:
+        """``(r,g,b)``-Tupel an ``index`` mit normaler Listen-Index-Semantik
+        (negative Indizes erlaubt, Out-of-range wirft ``IndexError`` — anders als
+        das graceful ``color_at()``, damit Iteration/Slicing korrekt terminiert)."""
+        return self.entries[index][0]
+
     # ── Persistenz ───────────────────────────────────────────────────────────
     def to_list(self) -> list:
         return [{"rgb": list(rgb), "on": bool(on)} for rgb, on in self.entries]
