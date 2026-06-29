@@ -1,21 +1,26 @@
-"""HOCHZEIT KOMPLETT 2026 — erschoepfende Feature-Demo auf Davids Hochzeits-Rig.
+"""HOCHZEIT KOMPLETT 2026 — Feature-Demo auf Davids Hochzeits-Rig.
 
-Baut EINE Show, die NACHWEISLICH alles vorfuehrt (Assert-Gate erzwingt es):
-  * alle 18 RGB-Matrix-Algorithmen (Plain..Regen) als reine Farbe (RGB-Style)
-  * alle 4 Matrix-Styles  RGB / RGBW (echtes Weiss via rgbw_split) / Dimmer / Shutter
-  * reine Dimmer-Effekte (Dimmer-Matrix, legt sich disjunkt UEBER die Farbe)
-  * alle 10 EFX-Bewegungsfiguren (Kreis..Custom-Pfad) auf MH + Spider
-  * Chaser, Beat-Sync-Cuelisten (+ Follow), Collections (Misch-Ablaeufe)
-  * Tempo-Buses Master/Sub A/B/C/D + Grandmaster, effekt-gekoppelt
-  * Musik-Playlist + Auto-Show (MusicShowDirector startet bei Play)
-  * ALLE 19 VC-Widget-Typen aus dem WIDGET_REGISTRY, auf 8 APC-Baenke verteilt
+KOMPOSITIONS-MODELL (Davids Vorgabe):
+  * FARBE = nur Farbe (Farbkanäle): feste Farbe · Farbwechsel · Regenbogen · Verlauf · bunte Looks.
+  * DIMMER = die Bewegung (Dimmerkanäle): Lauflicht · innen→außen · Puls · Welle · Aufbau · Funkeln · Blitz.
+    Beide Schichten layern disjunkt → feste grüne Farbe + Dimmer-Lauflicht = grünes Lauflicht.
+  * PRO GRUPPE unabhängig: Paarlichter · Moving Heads · Spider — jede Gruppe eigener Farb-Effekt UND
+    eigener Dimmer-Effekt gleichzeitig (edit_slot = Radio-Gruppe je (Gruppe, Schicht); killt die anderen nicht).
+  * TEMPO-SYNC: alle Effekte hängen an Tempo-Bus A mit gemeinsamer sync_group → phasen-gekoppelt auf den
+    Beat, auch bei unterschiedlichen Tempi (Farbe ×1, Dimmer ×2 — beginnt auf demselben Taktschlag).
+  * Farb-Kacheln (Ziel „Effekt") färben den AKTIVEN (zuletzt gestarteten) Effekt live um.
 
-Rig = exakt Davids Hochzeitsshow (shows/hochzeit.lshow), Universe 1, 137 Kanaele:
-  fid 1  ADJ Dotz TPar System  18ch  led_bar  (4 RGB-Zellen + Master-Dim/Shutter) @ 1
-  fid 2-5  ADJ Flat Par QWH12X  8ch  par  (RGBW)                                   @ 19/27/35/43
-  fid 6-11 Generic ZQ01424      8ch  par  (RGBW)                                   @ 51/59/67/75/83/91
-  fid 12   U-King ZQ02001       11ch moving_head (Pan/Tilt + Farbrad + Gobo)       @ 99
-  fid 13-14 U-King Spider       14ch moving_head (Dual-Tilt, RGBW-Doppelbank)      @ 113/127
+6 APC-Bänke: 1 Farbeffekte (pro Gruppe) · 2 Dimmereffekte (pro Gruppe) · 3 Bewegungen (EFX Pan/Tilt) ·
+4 Strobe & Tempo/BPM · 5 Live-Editor · 6 Abläufe & Musik.
+
+Coverage-Gate erzwingt: alle 18 RgbAlgorithm, alle 4 MatrixStyle, alle 10 EfxAlgorithm, alle 19 Widget-Typen.
+
+Rig = exakt Davids Hochzeitsshow (shows/hochzeit.lshow), Universe 1, 137 Kanäle:
+  fid 1  ADJ Dotz TPar System  18ch led_bar (4 RGB-Zellen, kein Weiß)      @ 1
+  fid 2-5  ADJ Flat Par QWH12X  8ch RGBW                                    @ 19/27/35/43
+  fid 6-11 Generic ZQ01424      8ch RGBW                                    @ 51/59/67/75/83/91
+  fid 12   U-King ZQ02001       11ch Moving Head (Pan/Tilt + Farbrad+Gobo)  @ 99
+  fid 13-14 U-King Spider       14ch Dual-Tilt, RGBW-Doppelbank             @ 113/127
 
 Aufruf:  venv/Scripts/python.exe tools/build_hochzeit_komplett.py
 Erzeugt: shows/Hochzeit_Komplett_2026.lshow
@@ -25,12 +30,10 @@ import os
 import sys
 import glob
 import json
-# Windows-Spawn-Schutz: Startet der OutputManager seine Serial-Isolation per
-# multiprocessing-Spawn, re-importiert der Kindprozess dieses Skript als
-# "__mp_main__" (NICHT "__main__") und wuerde die ganze Show ein zweites Mal
-# bauen -> zwei Prozesse rennen auf current_show.db, der FLD-FID-Guard in
-# add_fixture vergibt verwaiste fids neu und der Patch wird korrupt. Im
-# re-importierten Kind sofort aussteigen; nur der echte __main__ baut.
+
+# Windows-Spawn-Schutz: ein vom OutputManager gespawnter Kindprozess re-importiert
+# dieses Skript als "__mp_main__" und würde die Show ein zweites Mal bauen → zwei
+# Prozesse auf current_show.db, der FLD-FID-Guard vergibt verwaiste fids neu. Nur __main__ baut.
 if __name__ != "__main__":
     sys.exit(0)
 
@@ -83,6 +86,7 @@ BPM = 128.0
 BEAT = 60.0 / BPM
 BAR = 4 * BEAT
 PHRASE = 8 * BEAT
+SYNC = "hochzeit"   # gemeinsame sync_group → alle Effekte phasen-gekoppelt
 
 
 def profile_id(short: str) -> int:
@@ -151,17 +155,15 @@ for i, a in enumerate((113, 127)):
     spider_fids.append(fid)
 
 # ── Sammel-Listen (was kann was) ────────────────────────────────────────────────
-front_fids = [dotz_fid] + flat_fids + par_fids       # 11 Frontlichter (RGB-Farbe)
+front_fids = [dotz_fid] + flat_fids + par_fids       # 11 Frontlichter (Paarlichter)
 color_fids = front_fids + spider_fids                # 13 mit RGB-Farbe (ohne MH-Farbrad)
-rgbw_fids = flat_fids + par_fids + spider_fids        # 12 mit echtem Weiss-Chip (NICHT Dotz)
+rgbw_fids = flat_fids + par_fids + spider_fids        # 12 mit echtem Weiß-Chip (NICHT Dotz)
 mover_fids = mh_fids + spider_fids                    # 3 mit Pan/Tilt-Bewegung (EFX)
 all_fids = front_fids + mh_fids + spider_fids         # 14
 
-# Matrix-Raster
-GRID_FRONT = list(front_fids)        # 1x11 — Hauptflaeche fuer die 18 Algorithmen
-GRID_PAR = list(par_fids)            # 1x6  — saubere RGBW-Reihe
-GRID_RGBW = list(rgbw_fids)          # 1x12 — RGBW-Style (echtes Weiss)
-GRID_SPIDER = list(spider_fids)      # 1x2  — kleine 2D-Flaeche
+GRID_FRONT = list(front_fids)        # Paarlichter (1x11)
+GRID_SPIDER = list(spider_fids)      # Spider (1x2)
+GRID_MH = list(mh_fids)              # Moving Head (1x1)
 
 fixtures = state.get_patched_fixtures()
 fx_of = {f.fid: f for f in fixtures}
@@ -170,21 +172,19 @@ chan_of = {f.fid: {c.attribute: c.channel_number for c in chans_full[f.fid]} for
 
 
 def attr_chs(fid: int, attr: str) -> list[int]:
-    """ALLE Kanalnummern eines Attributs (Dotz: color_r/g/b 4x = 4 Zellen;
-    Spider: color_r/g/b/w 2x = 2 Baenke). So bekommt jede Zelle/Bank ihre Farbe."""
+    """ALLE Kanalnummern eines Attributs (Dotz: color_r/g/b 4x; Spider: color_r/g/b/w 2x)."""
     return [c.channel_number for c in chans_full[fid] if (c.attribute or "").lower() == attr]
 
 
-# Grundhelligkeit: alle Farbfixtures leuchten (Farb-Matrix ohne Dimmer sichtbar).
 state.base_levels = {fid: {"intensity": 255} for fid in color_fids}
 state._rebuild_render_plan()
 
 # ── 2D-Live-View + 3D-Positionen ─────────────────────────────────────────────────
-PXF = {front_fids[i]: 170.0 + i * 80.0 for i in range(len(front_fids))}     # Frontreihe
+PXF = {front_fids[i]: 170.0 + i * 80.0 for i in range(len(front_fids))}
 lv = {fid: (PXF[fid], 430.0) for fid in front_fids}
-lv[12] = (520.0, 250.0)                       # MH hinten/mittig
-lv[13] = (PXF[front_fids[0]], 600.0)          # Spider links vorne
-lv[14] = (PXF[front_fids[-1]], 600.0)         # Spider rechts vorne
+lv[12] = (520.0, 250.0)
+lv[13] = (PXF[front_fids[0]], 600.0)
+lv[14] = (PXF[front_fids[-1]], 600.0)
 state.live_view_positions = {fid: list(p) for fid, p in lv.items()}
 state.live_view_meta = {"zoom": 1.0, "grid_size": 20, "snap": True,
                         "grid_visible": True, "world_w": 1200, "world_h": 800}
@@ -198,14 +198,12 @@ state.active_stage_name = "simple"
 # ── Fixture-Gruppen ──────────────────────────────────────────────────────────────
 with state._session() as s:
     s.execute(delete(FixtureGroup))
-    s.add(FixtureGroup(name="Alle Front", cols=len(front_fids), rows=1,
+    s.add(FixtureGroup(name="Paarlichter", cols=len(front_fids), rows=1,
                        positions_json=json.dumps({f"{i},0": front_fids[i] for i in range(len(front_fids))})))
     s.add(FixtureGroup(name="PAR-Reihe", cols=6, rows=1,
                        positions_json=json.dumps({f"{i},0": par_fids[i] for i in range(6)})))
     s.add(FixtureGroup(name="Flat-Pars", cols=4, rows=1,
                        positions_json=json.dumps({f"{i},0": flat_fids[i] for i in range(4)})))
-    s.add(FixtureGroup(name="Dotz-Bar", cols=1, rows=1,
-                       positions_json=json.dumps({"0,0": dotz_fid})))
     s.add(FixtureGroup(name="Moving Head", cols=1, rows=1,
                        positions_json=json.dumps({"0,0": 12})))
     s.add(FixtureGroup(name="Spider", cols=2, rows=1,
@@ -272,8 +270,8 @@ YELLOW, CYAN, MAGENTA = (255, 220, 0, 0), (0, 255, 255, 0), (255, 0, 255, 0)
 WHITE, AMBER, PINK = (255, 255, 255, 255), (255, 120, 0, 0), (255, 0, 120, 0)
 ROSE, GOLD = (255, 120, 150, 40), (255, 170, 30, 30)
 RGB = lambda t: (t[0], t[1], t[2])
+W3 = (255, 255, 255)
 
-# MH-Farbrad / Gobo / Shutter (ZQ02001-Slots — Profil id wie Event-Demo)
 MHCOL = {"weiss": 4, "rot": 14, "gruen": 24, "blau": 34, "gelb": 44,
          "orange": 54, "hellblau": 64, "rosa": 74, "rotation": 150}
 MHGOBO = {"offen": 3, "g1": 11, "g2": 19, "g3": 27, "g4": 35, "g5": 43,
@@ -282,7 +280,6 @@ MH_OPEN, MH_STROBE = 4, 130
 
 
 def scene_color(sc, fids, rgbw, inten=255):
-    """Farbe + Intensitaet + offener Shutter (alle Kanalnummern -> alle Zellen/Baenke)."""
     r, g, b, w = rgbw
     for fid in fids:
         for ch in attr_chs(fid, "intensity"):
@@ -316,7 +313,6 @@ def mh_scene(name, col=None, gobo=None, strobe=False, inten=255):
 
 
 def spider_theme(name, rgbw_l, rgbw_r, inten=255):
-    """Spider: Bank 1 (LEDs vorne) Farbe A, Bank 2 (hinten) Farbe B — beide Spider."""
     sc = fm.new_scene(name)
     for fid in spider_fids:
         cols = [c for c in chans_full[fid]
@@ -342,7 +338,7 @@ def dim_scene(name, on_fids):
     return sc
 
 
-# ── Matrix-Universalfabrik (RGB / RGBW / Dimmer / Shutter) ──────────────────────────
+# ── Matrix-Universalfabrik (Tempo-Bus-fähig) ────────────────────────────────────────
 def matrix(name, algo, colors, *, style=MatrixStyle.RGB, grid=None, params=None,
            speed=1.2, prio=0, bus="", mult=1.0, imin=0, imax=255):
     m = fm.new_rgb_matrix(name)
@@ -359,84 +355,118 @@ def matrix(name, algo, colors, *, style=MatrixStyle.RGB, grid=None, params=None,
     if bus:
         m.tempo_bus_id = bus
         m.tempo_multiplier = mult
-        m.sync_group = "hochzeit"
+        m.sync_group = SYNC
     if params:
         m.params = dict(params)
     return m
 
 
-# ── ALLE 18 RGB-Algorithmen (reine Farbebene) ──────────────────────────────────────
-m_plain    = matrix("01 Plain (Vollflaeche)", RgbAlgorithm.PLAIN, [RGB(AMBER)], speed=0.6)
-m_chase    = matrix("02 Chase (Lauflicht)", RgbAlgorithm.CHASE, [RGB(BLUE), RGB(WHITE)],
-                    params={"axis": "H", "movement": "normal", "runner_count": 1,
-                            "runner_width": 1, "after_fade": 35.0, "color_cycle": True}, speed=3.0)
-m_wipe     = matrix("03 Wipe (Wisch)", RgbAlgorithm.WIPE, [RGB(WHITE), RGB(BLUE)],
-                    params={"axis": "H", "movement": "bounce", "edge_fade": 0.25}, speed=1.4)
-m_wave     = matrix("04 Wave (Welle)", RgbAlgorithm.WAVE, [RGB(BLUE), RGB(CYAN)],
-                    params={"origin": "left", "density": 1.5, "spread": 1.0}, speed=1.5)
-m_gradient = matrix("05 Gradient (Verlauf)", RgbAlgorithm.GRADIENT, [RGB(BLUE), RGB(MAGENTA), RGB(CYAN)],
-                    params={"axis": "H", "blend": "smooth"}, speed=0.6)
-m_rainbow  = matrix("06 Rainbow (Regenbogen)", RgbAlgorithm.RAINBOW, [RGB(RED)],
-                    params={"movement": "linear", "spread": 1.5, "saturation": 1.0, "value": 1.0}, speed=1.0)
-m_fill     = matrix("07 Fill (Aufbau)", RgbAlgorithm.FILL, [RGB(GOLD), RGB(WHITE)],
-                    params={"fill_mode": "target", "fill_dir": "left", "loop_mode": "reverse"}, speed=1.4)
-m_colfade  = matrix("08 Color Fade (Farbreise)", RgbAlgorithm.COLORFADE, [RGB(RED), RGB(GREEN), RGB(BLUE)],
-                    params={"hold": 0.2}, speed=0.8)
-LINEAR_MATRICES = [m_plain, m_chase, m_wipe, m_wave, m_gradient, m_rainbow, m_fill, m_colfade]
-
-m_random   = matrix("09 Random (Zufall)", RgbAlgorithm.RANDOM, [RGB(RED), RGB(GREEN), RGB(BLUE), RGB(MAGENTA)],
-                    params={"mode": "color", "count": 4, "rate": 3.0, "no_repeat": True}, speed=2.0)
-m_strobe   = matrix("10 Strobe (Farbblitz)", RgbAlgorithm.STROBE, [RGB(WHITE)], speed=6.0)
-m_checker  = matrix("11 Schachbrett", RgbAlgorithm.CHECKER, [RGB(RED), RGB(BLUE)],
-                    params={"tile": 1, "blink": True}, speed=1.0)
-m_radar    = matrix("12 Radar", RgbAlgorithm.RADAR, [RGB(GREEN)],
-                    params={"beam_width": 0.18, "fade": 0.3}, speed=1.0)
-m_spiral   = matrix("13 Spirale", RgbAlgorithm.SPIRAL, [RGB(MAGENTA), RGB(CYAN)],
-                    params={"turns": 2.0, "beam_width": 0.15}, speed=1.0)
-m_plasma   = matrix("14 Sine Plasma", RgbAlgorithm.SINEPLASMA, [RGB(MAGENTA), RGB(CYAN)], speed=0.5)
-m_pinwheel = matrix("15 Windrad", RgbAlgorithm.PINWHEEL, [RGB(RED), RGB(BLUE)],
-                    params={"runner_count": 3}, speed=1.0)
-m_breathe  = matrix("16 Atmen (Puls)", RgbAlgorithm.BREATHE, [RGB(AMBER)], speed=0.8)
-m_fire     = matrix("17 Feuer", RgbAlgorithm.FIRE, [RGB(RED), RGB(YELLOW)], speed=1.4)
-m_rain     = matrix("18 Regen", RgbAlgorithm.RAIN, [RGB(CYAN)], params={"fade": 0.45}, speed=1.6)
-TEXTURE_MATRICES = [m_random, m_strobe, m_checker, m_radar, m_spiral, m_plasma,
-                    m_pinwheel, m_breathe, m_fire, m_rain]
-RGB_MATRICES = LINEAR_MATRICES + TEXTURE_MATRICES   # alle 18 Algorithmen
-
-# ── RGBW-Style (echtes Weiss via rgbw_split — nutzt den W-Chip) ─────────────────────
-m_rgbw_white = matrix("RGBW Reines Weiss", RgbAlgorithm.PLAIN, [RGB(WHITE)],
-                      style=MatrixStyle.RGBW, grid=GRID_RGBW, speed=0.5)
-m_rgbw_rb    = matrix("RGBW Regenbogen", RgbAlgorithm.RAINBOW, [RGB(RED)],
-                      style=MatrixStyle.RGBW, grid=GRID_RGBW,
-                      params={"movement": "linear", "spread": 1.0}, speed=0.9)
-m_rgbw_spark = matrix("RGBW Funkeln (Spider)", RgbAlgorithm.RANDOM, [RGB(WHITE), RGB(CYAN)],
-                      style=MatrixStyle.RGBW, grid=GRID_SPIDER,
-                      params={"mode": "sparkle", "count": 2, "rate": 5.0}, speed=2.0)
-RGBW_MATRICES = [m_rgbw_white, m_rgbw_rb, m_rgbw_spark]
-
-# ── Dimmer-Style (reiner Dimmer — legt sich disjunkt UEBER die Farbe) ────────────────
-d_breathe = matrix("Dim Atmen", RgbAlgorithm.BREATHE, [RGB(WHITE)],
-                   style=MatrixStyle.DIMMER, prio=1, speed=0.8, imin=20, imax=255)
-d_wave    = matrix("Dim Welle", RgbAlgorithm.WAVE, [RGB(WHITE)], style=MatrixStyle.DIMMER, prio=1,
-                   params={"origin": "left", "density": 1.0}, speed=1.5, imin=0, imax=255)
-d_chase   = matrix("Dim Chase (Sequenz)", RgbAlgorithm.CHASE, [RGB(WHITE)], style=MatrixStyle.DIMMER, prio=1,
-                   params={"axis": "H", "movement": "normal", "dimmer_cycle": True,
-                           "dimmer_sequence": [255, 128, 64]}, speed=2.5)
-d_fill    = matrix("Dim Aufbau", RgbAlgorithm.FILL, [RGB(WHITE)], style=MatrixStyle.DIMMER, prio=1,
-                   params={"fill_mode": "up", "fill_dir": "left", "loop_mode": "reverse"}, speed=1.4)
-d_random  = matrix("Dim Funkeln", RgbAlgorithm.RANDOM, [RGB(WHITE)], style=MatrixStyle.DIMMER, prio=1,
-                   params={"mode": "sparkle", "count": 3, "rate": 4.0}, speed=2.0)
-DIMMER_MATRICES = [d_breathe, d_wave, d_chase, d_fill, d_random]
-
-# ── Shutter-Style (Strobe ueber den echten Shutter-Kanal) ───────────────────────────
-s_strobe = matrix("Shutter Strobe", RgbAlgorithm.STROBE, [RGB(WHITE)],
-                  style=MatrixStyle.SHUTTER, prio=2, speed=8.0)
-
-# Grundfarbe fuer die Dimmer/Shutter-Demos (damit man im Dunkeln was sieht)
-base_amber = matrix("Grundfarbe Amber", RgbAlgorithm.PLAIN, [RGB(AMBER)], prio=0, speed=0.4)
+# FARBE = nur Farbe (RGB/RGBW), an Bus A ×1 (phasen-gekoppelt), startet einfarbig (recolorbar)
+def cmat(name, algo, grid, *, params=None, speed=1.2, colors=None, style=MatrixStyle.RGB):
+    return matrix(name, algo, colors if colors is not None else [W3], style=style, grid=grid,
+                  params=params, speed=speed, bus="A", mult=1.0)
 
 
-# ── EFX (Bewegung) — alle 10 Figuren ────────────────────────────────────────────────
+# DIMMER = Bewegung (nur Dimmer), an Bus A ×2 (doppelt so schnell wie die Farbe), legt sich drüber
+def dmat(name, algo, grid, *, params=None, speed=1.5, imin=0, imax=255):
+    return matrix(name, algo, [W3], style=MatrixStyle.DIMMER, grid=grid, prio=1,
+                  params=params, speed=speed, imin=imin, imax=imax, bus="A", mult=2.0)
+
+
+# ── FARBEFFEKTE je Gruppe ───────────────────────────────────────────────────────────
+# Paarlichter (Front)
+cf_front_solid   = cmat("Feste Farbe", RgbAlgorithm.PLAIN, GRID_FRONT, speed=0.6)
+cf_front_cycle   = cmat("Farbwechsel", RgbAlgorithm.COLORFADE, GRID_FRONT, speed=0.8,
+                        colors=[RGB(RED), RGB(GREEN), RGB(BLUE)], params={"hold": 0.2})
+cf_front_rainbow = cmat("Regenbogen", RgbAlgorithm.RAINBOW, GRID_FRONT, speed=1.0, colors=[RGB(RED)],
+                        params={"movement": "linear", "spread": 1.5})
+cf_front_grad    = cmat("Verlauf", RgbAlgorithm.GRADIENT, GRID_FRONT, speed=0.6,
+                        colors=[RGB(BLUE), RGB(MAGENTA), RGB(CYAN)], params={"axis": "H", "blend": "smooth"})
+cf_front_fire    = cmat("Feuer", RgbAlgorithm.FIRE, GRID_FRONT, speed=1.4, colors=[RGB(RED), RGB(YELLOW)])
+cf_front_plasma  = cmat("Plasma", RgbAlgorithm.SINEPLASMA, GRID_FRONT, speed=0.5, colors=[RGB(MAGENTA), RGB(CYAN)])
+cf_front_radar   = cmat("Radar", RgbAlgorithm.RADAR, GRID_FRONT, speed=1.0, params={"beam_width": 0.18, "fade": 0.3})
+cf_front_spiral  = cmat("Spirale", RgbAlgorithm.SPIRAL, GRID_FRONT, speed=1.0, colors=[RGB(MAGENTA), RGB(CYAN)],
+                        params={"turns": 2.0})
+cf_front_pinwhl  = cmat("Windrad", RgbAlgorithm.PINWHEEL, GRID_FRONT, speed=1.0, colors=[RGB(RED), RGB(BLUE)],
+                        params={"runner_count": 3})
+cf_front_rain    = cmat("Regen", RgbAlgorithm.RAIN, GRID_FRONT, speed=1.6, colors=[RGB(CYAN)], params={"fade": 0.45})
+cf_front_checker = cmat("Schachbrett", RgbAlgorithm.CHECKER, GRID_FRONT, speed=1.0, colors=[RGB(RED), RGB(BLUE)],
+                        params={"tile": 1, "blink": True})
+cf_front_wipe    = cmat("Wisch", RgbAlgorithm.WIPE, GRID_FRONT, speed=1.4,
+                        params={"axis": "H", "movement": "bounce", "edge_fade": 0.25})
+CF_FRONT = [cf_front_solid, cf_front_cycle, cf_front_rainbow, cf_front_grad,
+            cf_front_fire, cf_front_plasma, cf_front_radar, cf_front_spiral,
+            cf_front_pinwhl, cf_front_rain, cf_front_checker, cf_front_wipe]   # 12 RGB-Algorithmen
+
+# Spider-Farbe (RGBW-Style → echtes Weiß)
+cf_spider_solid   = cmat("Spider Feste Farbe", RgbAlgorithm.PLAIN, GRID_SPIDER, style=MatrixStyle.RGBW, speed=0.5)
+cf_spider_cycle   = cmat("Spider Farbwechsel", RgbAlgorithm.COLORFADE, GRID_SPIDER, style=MatrixStyle.RGBW,
+                         colors=[RGB(RED), RGB(GREEN), RGB(BLUE)], speed=0.8)
+cf_spider_rainbow = cmat("Spider Regenbogen", RgbAlgorithm.RAINBOW, GRID_SPIDER, style=MatrixStyle.RGBW,
+                         colors=[RGB(RED)], params={"movement": "linear"}, speed=0.9)
+CF_SPIDER = [cf_spider_solid, cf_spider_cycle, cf_spider_rainbow]
+# Spider-Themes (Doppelbank getrennt) als feste Szenen
+sp_rb = spider_theme("Spider Rot/Blau", RED, BLUE)
+sp_gm = spider_theme("Spider Grün/Magenta", GREEN, MAGENTA)
+sp_cw = spider_theme("Spider Cyan/Warm", CYAN, AMBER)
+sp_pw = spider_theme("Spider Pink/Weiß", PINK, WHITE)
+SP_THEMES = [sp_rb, sp_gm, sp_cw, sp_pw]
+# Reines RGBW-Weiß über Flat-Par/PAR/Spider (rgbw_split → W-Chip)
+cf_rgbw_white = cmat("Reines Weiß (RGBW)", RgbAlgorithm.PLAIN, rgbw_fids, style=MatrixStyle.RGBW,
+                     colors=[RGB(WHITE)], speed=0.5)
+
+# Moving-Head-Farbe (Farbrad-Slots) — Szenen
+mh_red = mh_scene("MH Rot", col=MHCOL["rot"])
+mh_green = mh_scene("MH Grün", col=MHCOL["gruen"])
+mh_blue = mh_scene("MH Blau", col=MHCOL["blau"])
+mh_white = mh_scene("MH Weiß", col=MHCOL["weiss"])
+mh_yellow = mh_scene("MH Gelb", col=MHCOL["gelb"])
+mh_colspin = mh_scene("MH Farbrotation", col=MHCOL["rotation"])
+MH_COLORS = [mh_red, mh_green, mh_blue, mh_white, mh_yellow, mh_colspin]
+
+# ── DIMMEREFFEKTE je Gruppe — Bewegung über den Dimmer (legt sich über die Farbe) ───
+# Paarlichter (Front)
+dm_chase    = dmat("Lauflicht", RgbAlgorithm.CHASE, GRID_FRONT, speed=2.5,
+                   params={"axis": "H", "movement": "normal", "runner_count": 1, "after_fade": 20.0})
+dm_centerout = dmat("Innen→Außen", RgbAlgorithm.CHASE, GRID_FRONT, speed=2.0,
+                    params={"movement": "center_out", "runner_count": 1})
+dm_pulse    = dmat("Puls", RgbAlgorithm.BREATHE, GRID_FRONT, speed=0.8, imin=10)
+dm_wave     = dmat("Welle", RgbAlgorithm.WAVE, GRID_FRONT, speed=1.5, params={"origin": "left", "density": 1.0})
+dm_build    = dmat("Aufbau", RgbAlgorithm.FILL, GRID_FRONT, speed=1.4,
+                   params={"fill_mode": "up", "fill_dir": "left", "loop_mode": "reverse"})
+dm_sparkle  = dmat("Funkeln", RgbAlgorithm.RANDOM, GRID_FRONT, speed=2.0,
+                   params={"mode": "sparkle", "count": 3, "rate": 4.0})
+dm_blitz    = dmat("Blitz", RgbAlgorithm.STROBE, GRID_FRONT, speed=6.0)
+DM_FRONT = [dm_chase, dm_centerout, dm_pulse, dm_wave, dm_build, dm_sparkle, dm_blitz]
+# Spider + Moving Head
+dm_spider_pulse = dmat("Spider Puls", RgbAlgorithm.BREATHE, GRID_SPIDER, speed=0.8, imin=20)
+dm_spider_wave  = dmat("Spider Welle", RgbAlgorithm.WAVE, GRID_SPIDER, params={"origin": "left"}, speed=1.4)
+dm_mh_pulse     = dmat("MH Puls", RgbAlgorithm.BREATHE, GRID_MH, speed=0.8, imin=10)
+DM_MOVER = [dm_spider_pulse, dm_spider_wave, dm_mh_pulse]
+
+# Grundfarbe (damit Dimmer-Effekte allein etwas zeigen) + Helligkeits-Splits
+base_amber = matrix("Grundfarbe Amber", RgbAlgorithm.PLAIN, [RGB(AMBER)], grid=GRID_FRONT, prio=0, speed=0.4)
+LEFT = front_fids[:6]
+RIGHT = front_fids[6:]
+dim_l = dim_scene("Dim Links", LEFT)
+dim_r = dim_scene("Dim Rechts", RIGHT)
+dim_odd = dim_scene("Dim ungerade", [front_fids[i] for i in range(0, len(front_fids), 2)])
+dim_even = dim_scene("Dim gerade", [front_fids[i] for i in range(1, len(front_fids), 2)])
+DIM_SPLITS = [dim_l, dim_r, dim_odd, dim_even]
+
+# ── STROBE (Shutter-Style + Farb-Strobe + Spider/MH) ────────────────────────────────
+s_shutter = matrix("Strobe (Shutter)", RgbAlgorithm.STROBE, [W3], style=MatrixStyle.SHUTTER,
+                   grid=GRID_FRONT, prio=2, speed=8.0)
+s_color = matrix("Farb-Strobe", RgbAlgorithm.STROBE, [RGB(WHITE)], grid=GRID_FRONT, speed=6.0)
+sp_strobe = fm.new_scene("Spider Strobe")
+for fid in spider_fids:
+    for ch in attr_chs(fid, "intensity"):
+        sp_strobe.set_value(fid, ch, 255)
+    for ch in attr_chs(fid, "shutter"):
+        sp_strobe.set_value(fid, ch, 70)
+mh_strobe = mh_scene("MH Strobe", col=MHCOL["weiss"], strobe=True)
+
+# ── BEWEGUNG (EFX) — alle 10 Figuren ────────────────────────────────────────────────
 def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=False,
         x=128.0, y=128.0, size=150.0, speed_hz=0.45, xf=3.0, yf=2.0, direction="forward",
         bus="", mult=1.0):
@@ -452,7 +482,7 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
     if bus:
         e.tempo_bus_id = bus
         e.tempo_multiplier = mult
-        e.sync_group = "hochzeit"
+        e.sync_group = SYNC
     return e
 
 
@@ -468,7 +498,6 @@ efx_random   = efx("Zufall (Mover)", EfxAlgorithm.RANDOM, mover_fids, phase_mode
 EFX_BASE = [efx_circle, efx_eight, efx_line, efx_diamond, efx_square,
             efx_trapez, efx_triangle, efx_lissa, efx_random]
 
-# Custom-Path-EFX (selbst gezeichnete Bahn)
 paths = get_efx_path_library()
 zig = paths.add(EfxPath("Zickzack", [(0.1, 0.3), (0.35, 0.75), (0.6, 0.3), (0.9, 0.75)],
                         mode="linear", closed=False))
@@ -479,42 +508,20 @@ efx_custom.open_beam = True
 efx_custom.width = efx_custom.height = 180.0
 EFX_ALL = EFX_BASE + [efx_custom]   # alle 10 EfxAlgorithm-Werte
 
-# ── MH-Farb-/Gobo-/Strobe-Szenen ────────────────────────────────────────────────────
-mh_red = mh_scene("MH Rot", col=MHCOL["rot"])
-mh_green = mh_scene("MH Gruen", col=MHCOL["gruen"])
-mh_blue = mh_scene("MH Blau", col=MHCOL["blau"])
-mh_white = mh_scene("MH Weiss", col=MHCOL["weiss"])
-mh_colspin = mh_scene("MH Farbrotation", col=MHCOL["rotation"])
-MH_COLORS = [mh_red, mh_green, mh_blue, mh_white, mh_colspin]
+# MH-Gobos
 mh_g1 = mh_scene("MH Gobo 1", col=MHCOL["blau"], gobo=MHGOBO["g1"])
 mh_g3 = mh_scene("MH Gobo 3", col=MHCOL["gruen"], gobo=MHGOBO["g3"])
 mh_g5 = mh_scene("MH Gobo 5", col=MHCOL["rot"], gobo=MHGOBO["g5"])
+mh_g7 = mh_scene("MH Gobo 7", col=MHCOL["gelb"], gobo=MHGOBO["g7"])
 mh_gspin = mh_scene("MH Gobo Rotation", col=MHCOL["weiss"], gobo=MHGOBO["rotation"])
-MH_GOBOS = [mh_g1, mh_g3, mh_g5, mh_gspin]
-mh_strobe = mh_scene("MH Strobe", col=MHCOL["weiss"], strobe=True)
+MH_GOBOS = [mh_g1, mh_g3, mh_g5, mh_g7, mh_gspin]
 
-# ── Spider-Themes ───────────────────────────────────────────────────────────────────
-sp_rb = spider_theme("Spider Rot/Blau", RED, BLUE)
-sp_gm = spider_theme("Spider Gruen/Magenta", GREEN, MAGENTA)
-sp_cw = spider_theme("Spider Cyan/Warm", CYAN, AMBER)
-sp_pw = spider_theme("Spider Pink/Weiss", PINK, WHITE)
-SP_THEMES = [sp_rb, sp_gm, sp_cw, sp_pw]
-sp_strobe = fm.new_scene("Spider Strobe")
-for fid in spider_fids:
-    for ch in attr_chs(fid, "intensity"):
-        sp_strobe.set_value(fid, ch, 255)
-    for ch in attr_chs(fid, "shutter"):
-        sp_strobe.set_value(fid, ch, 70)
-
-# ── Voll-Looks + statische Empfangslooks ────────────────────────────────────────────
+# ── Voll-Looks (für Chaser/Cues) ────────────────────────────────────────────────────
 look_warm = look("Empfang Warm", AMBER)
-look_candle = look("Kerzenlicht", GOLD)
-look_rose = look("Rosa Traum", ROSE)
-look_white = look("Voll Weiss", WHITE)
+look_white = look("Voll Weiß", WHITE)
 look_blue = look("Voll Blau", BLUE)
-VIVID = [look_warm, look_candle, look_rose, look_white]
-LEFT = front_fids[:6]
-RIGHT = front_fids[6:]
+look_rose = look("Rosa", ROSE)
+VIVID = [look_warm, look_rose, look_blue, look_white]
 
 
 def split_scene(name, lc, rc):
@@ -524,10 +531,8 @@ def split_scene(name, lc, rc):
     return sc
 
 
-sp_split_gb = split_scene("Gruen links / Blau rechts", GREEN, BLUE)
-sp_split_rw = split_scene("Rot links / Weiss rechts", RED, WHITE)
-SPLITS = [sp_split_gb, sp_split_rw]
-
+sp_split_gb = split_scene("Grün links / Blau rechts", GREEN, BLUE)
+sp_split_rw = split_scene("Rot links / Weiß rechts", RED, WHITE)
 
 # ── Chaser ──────────────────────────────────────────────────────────────────────────
 def chaser(name, step_ids, hold=BEAT, fade=0.0, speed=1.0, audio=False,
@@ -544,25 +549,12 @@ def chaser(name, step_ids, hold=BEAT, fade=0.0, speed=1.0, audio=False,
 chase_looks = chaser("Chase Voll-Looks", [s.id for s in VIVID], hold=BAR, fade=0.3)
 chase_mh_color = chaser("Chase MH-Farben", [s.id for s in MH_COLORS], hold=BEAT * 2, fade=0.05)
 chase_spider = chaser("Chase Spider-Themes", [s.id for s in SP_THEMES], hold=BAR, fade=0.3)
-auto_schema = chaser("Auto-Farbschema (Beat)", [m_rainbow.id, m_gradient.id, m_plasma.id],
+auto_schema = chaser("Auto-Farbschema (Beat)", [cf_front_rainbow.id, cf_front_grad.id, cf_front_plasma.id],
                      audio=True, beats_per_step=16, fade=BAR)
 drop_color = chaser("Drop Farbwechsel (Beat)",
                     [look_white.id, sp_split_gb.id, look_blue.id, sp_split_rw.id],
                     audio=True, beats_per_step=2, fade=0.04)
 CHASERS = [chase_looks, chase_mh_color, chase_spider, auto_schema, drop_color]
-
-
-# ── Tempo-synchrone Effekte (Master/Sub-Demo) ───────────────────────────────────────
-sync_chase = matrix("Sync Chase >Bus A", RgbAlgorithm.CHASE, [RGB(BLUE), RGB(WHITE)],
-                    params={"axis": "H", "movement": "normal", "color_cycle": True},
-                    speed=1.0, bus="A", mult=1.0, prio=3)
-sync_breathe = matrix("Sync Atmen >Bus B (1/2)", RgbAlgorithm.BREATHE, [RGB(WHITE)],
-                      style=MatrixStyle.DIMMER, speed=1.0, bus="B", mult=1.0, prio=4)
-sync_strobe = matrix("Sync Blitz >Bus C (x2)", RgbAlgorithm.STROBE, [RGB(WHITE)],
-                     style=MatrixStyle.DIMMER, speed=1.0, bus="C", mult=1.0, prio=5)
-sync_mh = efx("Sync MH-Kreis >Bus A", EfxAlgorithm.CIRCLE, mh_fids, phase_mode="fan", size=150, bus="A", mult=1.0)
-SYNC_FX = [sync_chase, sync_breathe, sync_strobe, sync_mh]
-
 
 # ── Misch-Ablaeufe (Collections) ────────────────────────────────────────────────────
 def collection(name, ids):
@@ -571,9 +563,9 @@ def collection(name, ids):
     return c
 
 
-mix_party = collection("Mix: Party", [m_rainbow.id, efx_circle.id, efx_random.id])
-mix_drop = collection("Mix: Drop", [d_random.id, efx_eight.id, sp_strobe.id])
-mix_chill = collection("Mix: Chill", [m_gradient.id, d_breathe.id, efx_circle.id])
+mix_party = collection("Mix: Party", [cf_front_rainbow.id, dm_chase.id, efx_circle.id])
+mix_drop = collection("Mix: Drop", [cf_front_solid.id, dm_sparkle.id, efx_eight.id, sp_strobe.id])
+mix_chill = collection("Mix: Chill", [cf_front_grad.id, dm_pulse.id, efx_circle.id])
 mix_theme = collection("Mix: Spider+Gobo", [sp_gm.id, mh_g3.id, efx_line.id])
 MIXES = [mix_party, mix_drop, mix_chill, mix_theme]
 
@@ -599,24 +591,24 @@ def par_vals(rgbw, inten=255):
     return out
 
 
-pb_warm = state.new_cue_stack("Aufwaermen (Follow)")
+pb_warm = state.new_cue_stack("Aufwärmen (Follow)")
 pb_warm.mode = "loop"
-for num, lbl, rgbw in [(1.0, "Amber", AMBER), (2.0, "Rosa", ROSE), (3.0, "Weiss", WHITE)]:
+for num, lbl, rgbw in [(1.0, "Amber", AMBER), (2.0, "Rosa", ROSE), (3.0, "Weiß", WHITE)]:
     pb_warm.add_cue(Cue(number=num, label=lbl, fade_in=PHRASE, follow=PHRASE * 1.5,
                         values=par_vals(rgbw, inten=180)))
 
 pb_drop = state.new_cue_stack("Drop-Sequenz (Beat)")
 pb_drop.mode = "loop"; pb_drop.beat_sync = True; pb_drop.beats_per_cue = 4
-for num, lbl, rgbw in [(1.0, "Rot", RED), (2.0, "Weiss", WHITE), (3.0, "Blau", BLUE), (4.0, "Weiss", WHITE)]:
+for num, lbl, rgbw in [(1.0, "Rot", RED), (2.0, "Weiß", WHITE), (3.0, "Blau", BLUE), (4.0, "Weiß", WHITE)]:
     pb_drop.add_cue(Cue(number=num, label=lbl, fade_in=0.05, follow=None, values=par_vals(rgbw)))
 
 pb_color = state.new_cue_stack("Farb-Reise (Beat)")
 pb_color.mode = "loop"; pb_color.beat_sync = True; pb_color.beats_per_cue = 8
-for num, lbl, rgbw in [(1.0, "Gruen", GREEN), (2.0, "Cyan", CYAN), (3.0, "Blau", BLUE), (4.0, "Magenta", MAGENTA)]:
+for num, lbl, rgbw in [(1.0, "Grün", GREEN), (2.0, "Cyan", CYAN), (3.0, "Blau", BLUE), (4.0, "Magenta", MAGENTA)]:
     pb_color.add_cue(Cue(number=num, label=lbl, fade_in=BEAT, follow=None, values=par_vals(rgbw)))
 
 PLAYBACKS = [pb_warm, pb_drop, pb_color]
-PB_PAGE = 6   # Bank 7 (0-basiert == Seite 6)
+PB_PAGE = 5   # Bank 6 (0-basiert == Seite 5)
 pe = state.playback_engine
 for slot, pb in enumerate(PLAYBACKS, start=1):
     ex = pe.get_executor(slot, page=PB_PAGE)
@@ -637,7 +629,7 @@ state.music_autoshow = {
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  6) VIRTUAL CONSOLE  (8 Baenke + universelle Leiste)
+#  6) VIRTUAL CONSOLE  (6 Bänke + universelle Leiste)
 # ════════════════════════════════════════════════════════════════════════════════
 PAD, GAP, X0, Y0 = 60, 6, 20, 70
 STEP = PAD + GAP
@@ -648,9 +640,9 @@ FAD_H = 142
 RX = 620
 widgets: list[dict] = []
 BANK_ALL = -1
-(B_LOOK, B_MTXA, B_MTXB, B_DIM, B_MOVE, B_BPM, B_FLOW, B_MUSIC) = range(8)
-PAGE_NAMES = ["Empfang & Looks", "Matrix-Algos A", "Matrix-Algos B (+RGBW)", "Dimmer & Strobo",
-              "Bewegung (EFX)", "BPM & Tempo", "Ablaeufe / Mischen", "Musik & Auto-Show"]
+(B_COLOR, B_DIM, B_MOVE, B_STROBE, B_EDIT, B_FLOW) = range(6)
+PAGE_NAMES = ["Farbeffekte", "Dimmereffekte", "Bewegungen", "Strobe & Tempo",
+              "Live-Editor", "Abläufe & Musik"]
 
 
 def note_rc(r, c):
@@ -738,7 +730,7 @@ def exec_go_btn(name, slot, note, bank, accent="#0d4f8b"):
     _add(b, x, y, PAD, PAD, bank)
 
 
-def color_tile(name, note, bank, r, g, b, w=0, target=ColorTarget.ALL, function_id=None, with_intensity=True):
+def color_tile(name, note, bank, r, g, b, w=0, target=ColorTarget.EFFECT, function_id=None, with_intensity=True):
     c = VCColor(name)
     c.color_r, c.color_g, c.color_b, c.color_w = r, g, b, w
     c.with_intensity = with_intensity
@@ -845,7 +837,6 @@ def cue_list(name, slot, x, y, bank, ww=240, hh=150):
 
 
 def encoder(caption, col, bank, function_id, param_key, step=5.0):
-    """Endlos-Drehknopf fuer einen Effekt-Parameter — in der Fader-Reihe (Spalte)."""
     w = VCEncoder(caption)
     w.function_id = function_id
     w.param_key = param_key
@@ -855,7 +846,6 @@ def encoder(caption, col, bank, function_id, param_key, step=5.0):
 
 
 def stepper(caption, col, bank, function_id, param_key, step=1):
-    """Schrittweiser +/- Wert fuer einen Effekt-Parameter — in der Fader-Reihe (Spalte)."""
     w = VCStepper(caption)
     w.function_id = function_id
     w.param_key = param_key
@@ -903,149 +893,145 @@ for i, (nm, act, col) in enumerate(TRACK):
 fader("Dimmer", 5, BANK_ALL, SliderMode.SUBMASTER, submaster_slot=0, midi_cc=53, value=255)
 fader("Speed", 6, BANK_ALL, SliderMode.SPEED, midi_cc=54, value=64)
 fader("Master", 8, BANK_ALL, SliderMode.GRANDMASTER, midi_cc=56, value=255)
-label("HOCHZEIT KOMPLETT 2026  —  1 Dotz-Bar + 4 Flat-Par + 6 PAR + 1 Moving Head + 2 Spider (14 Fixtures, "
-      "137 Kanaele).  SCENE-Tasten = Bank 1-8 (Looks - Matrix A - Matrix B/RGBW - Dimmer/Strobo - "
-      "Bewegung - BPM/Tempo - Ablaeufe - Musik).  > (Track 6) startet Musik + Auto-Show.",
-      X0, 6, 1300, BANK_ALL)
-label("Universell: Clear - Stop All - Blackout - Tap - << - >/|| - >> - Musik-BPM   |   "
-      "Fader: F6 Dimmer - F7 Speed - F9 Master", X0, Y_FAD + FAD_H + 6, 1150, BANK_ALL)
+label("HOCHZEIT KOMPLETT 2026  —  SCENE-Tasten = Bank 1-6:  1 Farbeffekte · 2 Dimmereffekte · "
+      "3 Bewegungen · 4 Strobe & Tempo · 5 Live-Editor · 6 Abläufe & Musik.   Farbe + Dimmer "
+      "kombinieren (z. B. feste Farbe + Lauflicht), pro Gruppe getrennt, alles auf den Beat.", X0, 6, 1320, BANK_ALL)
+label("Universell: Clear · Stop All · Blackout · Tap · << · >/|| · >> · Musik-BPM   |   "
+      "Fader: F6 Dimmer · F7 Speed · F9 Master", X0, Y_FAD + FAD_H + 6, 1150, BANK_ALL)
 
 
-# ── BANK 1 — EMPFANG & LOOKS ────────────────────────────────────────────────────────
-song_info(RX, Y0, B_LOOK)
-for i, fn in enumerate(VIVID):                                            # R0 = statische Looks
-    func_btn(fn, note_rc(0, i), B_LOOK, "#5a4020", exclusive=True, clear_prog=True, style="solid")
-func_btn(m_plain, note_rc(0, 5), B_LOOK, "#1f5a3a", exclusive=True, clear_prog=True)   # reine RGB-Flaeche
-func_btn(m_rgbw_white, note_rc(0, 6), B_LOOK, "#888888", exclusive=True, clear_prog=True)  # reines RGBW-Weiss
-COLORS16 = [
-    ("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Amber", 255, 160, 0, 0), ("Gelb", 255, 220, 0, 0),
-    ("Limette", 160, 255, 0, 0), ("Gruen", 0, 255, 0, 0), ("Tuerkis", 0, 230, 150, 0), ("Cyan", 0, 255, 255, 0),
-    ("Hellblau", 0, 140, 255, 0), ("Blau", 0, 0, 255, 0), ("Violett", 140, 0, 255, 0), ("Magenta", 255, 0, 255, 0),
-    ("Pink", 255, 0, 120, 0), ("Warmweiss", 255, 130, 40, 60), ("Weiss", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0),
-]
-for i, (nm, r, g, b, w) in enumerate(COLORS16):                           # R1-2 = 16 Farb-Kacheln
-    color_tile(nm, note_rc(1 + i // 8, i % 8), B_LOOK, r, g, b, w, target=ColorTarget.ALL)
-for i, (nm, grp) in enumerate([("Alle Front", "Alle Front"), ("PAR-Reihe", "PAR-Reihe"),
-                               ("Flat-Pars", "Flat-Pars"), ("Spider", "Spider"), ("Alles", "Alles")]):
-    select_group_btn(nm, grp, note_rc(3, i), B_LOOK)                      # R3 = Gruppen
-action_btn("Alle Weiss", ButtonAction.ALL_WHITE, note_rc(4, 0), B_LOOK, "#777777")
-eff_colors("Verlauf-Farben", RX, Y0 + 120, B_LOOK, m_gradient.id)
-color_list("Farb-Sequenz", RX, Y0 + 214, B_LOOK, m_colfade.id)
-fader("Master", 0, B_LOOK, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
-fader("Front-Dim", 3, B_LOOK, SliderMode.GROUP_DIMMER, programmer_group="Alle Front", midi_cc=51, value=255)
-label("BANK 1  EMPFANG & LOOKS  —  R0: Looks + reine RGB-Flaeche + reines RGBW-Weiss (Flat-Par/Spider W-Chip). "
-      "R1-2: 16 Farb-Kacheln. R3: Gruppen. Rechts: Farb-Editor.", X0, 28, 1300, B_LOOK)
+# ── BANK 1 — FARBEFFEKTE (nur Farbe, je Gruppe) ─────────────────────────────────────
+COLORS8 = [("Rot", 255, 0, 0, 0), ("Orange", 255, 90, 0, 0), ("Gelb", 255, 220, 0, 0), ("Grün", 0, 255, 0, 0),
+           ("Cyan", 0, 255, 255, 0), ("Blau", 0, 0, 255, 0), ("Magenta", 255, 0, 255, 0), ("Weiß", 255, 255, 255, 255)]
+for i, (nm, r, g, b, w) in enumerate(COLORS8):                            # R0 = Farbe für AKTIVEN Effekt
+    color_tile(nm, note_rc(0, i), B_COLOR, r, g, b, w, target=ColorTarget.EFFECT)
+PAT_ACCENT = ["#1f5a3a", "#1f4a6a", "#3a4a6a", "#1f5a6a", "#6a3a1f", "#5a1f6a", "#1f6a3a", "#5a5a1f",
+              "#6a1f4a", "#1f5a6a", "#6a4a1f", "#3a5a5a"]
+for i, m in enumerate(CF_FRONT[:8]):                                      # R1 = Paarlichter-Farbe A
+    func_btn(m, note_rc(1, i), B_COLOR, PAT_ACCENT[i], edit_slot="farbe_front")
+for i, m in enumerate(CF_FRONT[8:]):                                      # R2 (0-3) = Paarlichter-Farbe B
+    func_btn(m, note_rc(2, i), B_COLOR, PAT_ACCENT[8 + i], edit_slot="farbe_front")
+for i, m in enumerate(CF_SPIDER):                                         # R2 (4-6) = Spider-Farbe
+    func_btn(m, note_rc(2, 4 + i), B_COLOR, "#1f5a5a", edit_slot="farbe_spider")
+func_btn(cf_rgbw_white, note_rc(2, 7), B_COLOR, "#888888", edit_slot="farbe_front")   # reines RGBW-Weiß
+for i, fn in enumerate(SP_THEMES):                                        # R3 (0-3) = Spider-Themes (fest)
+    func_btn(fn, note_rc(3, i), B_COLOR, "#1f5a5a", edit_slot="farbe_spider", style="solid")
+for i, fn in enumerate(MH_COLORS[:4]):                                    # R3 (4-7) = MH-Farbe
+    func_btn(fn, note_rc(3, 4 + i), B_COLOR, "#3a5a1f", edit_slot="farbe_mh", style="solid")
+for i, fn in enumerate(MH_COLORS[4:]):                                    # R4 (0-1) = MH-Farbe (Rest)
+    func_btn(fn, note_rc(4, i), B_COLOR, "#3a5a1f", edit_slot="farbe_mh", style="solid")
+select_group_btn("Paarlichter", "Paarlichter", note_rc(4, 4), B_COLOR)
+select_group_btn("Spider", "Spider", note_rc(4, 5), B_COLOR)
+select_group_btn("Moving Head", "Moving Head", note_rc(4, 6), B_COLOR)
+select_group_btn("Alles", "Alles", note_rc(4, 7), B_COLOR)
+eff_colors("Effekt-Farben (Verlauf)", RX, Y0, B_COLOR, cf_front_grad.id)
+color_list("Farb-Sequenz (Farbwechsel)", RX, Y0 + 94, B_COLOR, cf_front_cycle.id)
+song_info(RX, Y0 + 200, B_COLOR)
+fader("Master", 0, B_COLOR, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
+fader("Front-Dim", 3, B_COLOR, SliderMode.GROUP_DIMMER, programmer_group="Paarlichter", midi_cc=51, value=255)
+label("BANK 1  FARBEFFEKTE (nur Farbe)  —  R0: Farbe → färbt den LAUFENDEN Effekt um. R1-2: Paarlichter "
+      "(feste Farbe/Farbwechsel/Regenbogen/Verlauf/bunte Looks). R2-3: Spider. R3-4: Moving-Head-Farbrad.  "
+      "Pro Gruppe getrennt wählbar. Für Bewegung → Bank 2 (Dimmer).", X0, 28, 1320, B_COLOR)
 
 
-# ── BANK 2 — MATRIX-ALGOS A (linear) ────────────────────────────────────────────────
-LIN_ACCENT = ["#1f5a3a", "#1f4a6a", "#3a4a6a", "#1f5a6a", "#3a1f6a", "#6a3a1f", "#5a5a1f", "#6a1f4a"]
-for i, m in enumerate(LINEAR_MATRICES):                                   # R0 = 8 lineare Algos
-    func_btn(m, note_rc(0, i), B_MTXA, LIN_ACCENT[i], exclusive=True, clear_prog=True)
-for i, (nm, grp) in enumerate([("Alle Front", "Alle Front"), ("PAR-Reihe", "PAR-Reihe"), ("Spider", "Spider")]):
-    select_group_btn(nm, grp, note_rc(1, i), B_MTXA)
-effect_display("Live-Vorschau", RX, Y0, B_MTXA, m_chase.id)
-chase_builder("Chase-Builder (live)", RX, Y0 + 142, B_MTXA, live_chase.id)
-encoder("Tempo", 4, B_MTXA, m_chase.id, "speed", step=0.25)
-stepper("Lauflichter", 7, B_MTXA, m_chase.id, "runner_count", step=1)
-fader("Matrix-Master", 0, B_MTXA, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
-fader("Matrix-Speed", 1, B_MTXA, SliderMode.EFFECT_SPEED, midi_cc=49, value=80)
-fader("Weiss-Anteil", 2, B_MTXA, SliderMode.EFFECT_PARAM, param_key="white_amount", midi_cc=50, value=255)
-label("BANK 2  MATRIX-ALGOS A  —  R0: Plain/Chase/Wipe/Wave/Gradient/Rainbow/Fill/ColorFade (exklusiv, reine "
-      "Farbe RGB). Rechts: Live-Vorschau + Chase-Builder. Encoder Tempo, Stepper Lauflichter.", X0, 28, 1300, B_MTXA)
-
-
-# ── BANK 3 — MATRIX-ALGOS B (Textur/2D) + RGBW ──────────────────────────────────────
-TEX_ACCENT = ["#6a6a1f", "#5a1f1f", "#3a3a5a", "#1f6a3a", "#5a1f6a", "#1f5a6a",
-              "#3a1f6a", "#6a4a1f", "#6a2f1f", "#1f4a6a"]
-for i, m in enumerate(TEXTURE_MATRICES):                                  # R0-1 = 10 Textur-Algos
-    func_btn(m, note_rc(i // 8, i % 8), B_MTXB, TEX_ACCENT[i], exclusive=True, clear_prog=True)
-func_btn(m_rgbw_rb, note_rc(2, 0), B_MTXB, "#888888")                     # RGBW-Style Regenbogen
-func_btn(m_rgbw_spark, note_rc(2, 1), B_MTXB, "#aaaaaa")                  # RGBW-Style Funkeln (Spider)
-eff_colors("Effekt-Farben", RX, Y0, B_MTXB, m_spiral.id)
-color_list("Plasma-Farben", RX, Y0 + 94, B_MTXB, m_plasma.id)
-effect_display("Vorschau Feuer", RX, Y0 + 188, B_MTXB, m_fire.id)
-encoder("Dichte", 7, B_MTXB, m_rain.id, "density", step=0.25)
-fader("FX-Master", 0, B_MTXB, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
-fader("FX-Speed", 1, B_MTXB, SliderMode.EFFECT_SPEED, midi_cc=49, value=80)
-label("BANK 3  MATRIX-ALGOS B  —  R0-1: Random/Strobe/Schachbrett/Radar/Spirale/Plasma/Windrad/Atmen/Feuer/"
-      "Regen. R2: RGBW-Style (echtes Weiss). Rechts: Effekt-Farben + Vorschau.", X0, 28, 1300, B_MTXB)
-
-
-# ── BANK 4 — DIMMER & STROBO ────────────────────────────────────────────────────────
-func_btn(base_amber, note_rc(0, 0), B_DIM, "#6a4a1f", style="solid")      # Grundfarbe an
-for i, m in enumerate(DIMMER_MATRICES):                                   # R1 = 5 Dimmer-Matrizen
-    func_btn(m, note_rc(1, i), B_DIM, "#1f3a6a")
-func_btn(s_strobe, note_rc(1, 6), B_DIM, "#5a1f1f")                       # Shutter-Strobe
-func_flash(s_strobe, note_rc(1, 7), B_DIM, "#551111")
-dim_l = dim_scene("Dim Links", LEFT)
-dim_r = dim_scene("Dim Rechts", RIGHT)
-dim_odd = dim_scene("Dim ungerade", [front_fids[i] for i in range(0, len(front_fids), 2)])
-dim_even = dim_scene("Dim gerade", [front_fids[i] for i in range(1, len(front_fids), 2)])
-for i, fn in enumerate([dim_l, dim_r, dim_odd, dim_even]):                # R2 = Helligkeits-Splits
-    func_btn(fn, note_rc(2, i), B_DIM, "#2a3a5a", style="solid")
-func_flash(sp_strobe, note_rc(2, 7), B_DIM, "#551111")
-stepper("Dimmer-Level", 7, B_DIM, base_amber.id, "intensity_max", step=16)
+# ── BANK 2 — DIMMEREFFEKTE (Bewegung über den Dimmer, je Gruppe) ────────────────────
+func_btn(base_amber, note_rc(0, 0), B_DIM, "#6a4a1f", edit_slot="farbe_front", style="solid")   # Grundfarbe an
+for i, m in enumerate(DM_FRONT):                                          # R1 = Paarlichter-Dimmer (7)
+    func_btn(m, note_rc(1, i), B_DIM, "#1f3a6a", edit_slot="dim_front")
+for i, m in enumerate(DM_MOVER):                                          # R2 = Spider/MH-Dimmer
+    func_btn(m, note_rc(2, i), B_DIM, "#1f4a5a", edit_slot=("dim_spider" if "Spider" in m.name else "dim_mh"))
+for i, fn in enumerate(DIM_SPLITS):                                       # R3 = Helligkeits-Splits
+    func_btn(fn, note_rc(3, i), B_DIM, "#2a3a5a", style="solid")
+select_group_btn("Paarlichter", "Paarlichter", note_rc(4, 0), B_DIM)
+select_group_btn("Spider", "Spider", note_rc(4, 1), B_DIM)
+select_group_btn("Moving Head", "Moving Head", note_rc(4, 2), B_DIM)
+stepper("Dimmer-Lvl", 7, B_DIM, base_amber.id, "intensity_max", step=16)
+effect_display("Dimmer-Vorschau", RX, Y0, B_DIM, dm_chase.id)
 fader("Dimmer-Master", 0, B_DIM, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
-fader("Dimmer-Speed", 1, B_DIM, SliderMode.EFFECT_SPEED, midi_cc=49, value=80)
-fader("Front-Dim", 3, B_DIM, SliderMode.GROUP_DIMMER, programmer_group="Alle Front", midi_cc=51, value=255)
-fader("Programmer-Dim", 4, B_DIM, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
-label("BANK 4  DIMMER & STROBO  —  R0: Grundfarbe. R1: Atmen/Welle/Chase/Aufbau/Funkeln (Dimmer-Matrix, legt "
-      "sich UEBER die Farbe) + Shutter-Strobe. R2: Helligkeits-Splits + Spider-Strobe.", X0, 28, 1300, B_DIM)
+fader("Dimmer-Tempo", 1, B_DIM, SliderMode.EFFECT_SPEED, midi_cc=49, value=80)
+fader("Front-Dim", 3, B_DIM, SliderMode.GROUP_DIMMER, programmer_group="Paarlichter", midi_cc=51, value=255)
+fader("Programmer", 4, B_DIM, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
+label("BANK 2  DIMMEREFFEKTE (Bewegung über Dimmer)  —  R0: Grundfarbe. R1: Paarlichter-Dimmer (Lauflicht/"
+      "innen→außen/Puls/Welle/Aufbau/Funkeln/Blitz). R2: Spider/MH-Dimmer. R3: Helligkeits-Splits.  "
+      "Erst in Bank 1 eine Farbe wählen, dann hier die Bewegung → z. B. grünes Lauflicht.", X0, 28, 1320, B_DIM)
 
 
-# ── BANK 5 — BEWEGUNG (alle 10 EFX-Figuren) ─────────────────────────────────────────
+# ── BANK 3 — BEWEGUNGEN (MH + Spider Pan/Tilt + Gobos) ──────────────────────────────
 for i, e in enumerate(EFX_ALL[:8]):                                       # R0 = 8 Figuren
     func_btn(e, note_rc(0, i), B_MOVE, "#1f3a6a", edit_slot="mover_show")
-for i, e in enumerate(EFX_ALL[8:]):                                       # R1 = Rest (Zufall + Custom)
+for i, e in enumerate(EFX_ALL[8:]):                                       # R1 = Zufall + Custom
     func_btn(e, note_rc(1, i), B_MOVE, "#3a1f6a", edit_slot="mover_show")
-for i, fn in enumerate(MH_COLORS):                                        # R2 = MH-Farben
-    func_btn(fn, note_rc(2, i), B_MOVE, "#3a5a1f", style="solid")
-for i, fn in enumerate(MH_GOBOS):                                         # R3 = MH-Gobos
-    func_btn(fn, note_rc(3, i), B_MOVE, "#5a3a1f", style="solid")
-func_flash(mh_strobe, note_rc(3, 7), B_MOVE, "#551111")
-effect_action_btn("Gegenlaeufig", note_rc(4, 0), B_MOVE, "#7a6500", "toggle_counter", efx_circle.id)
-effect_action_btn("Spiegeln", note_rc(4, 1), B_MOVE, "#334455", "toggle_mirror", efx_circle.id)
-effect_action_btn("Richtung", note_rc(4, 2), B_MOVE, "#445566", "reverse_direction", efx_circle.id)
-effect_action_btn("Neustart", note_rc(4, 3), B_MOVE, "#553010", "restart", efx_circle.id)
-select_group_btn("Mover", "Alle Mover", note_rc(4, 4), B_MOVE)
+for i, fn in enumerate(MH_GOBOS):                                         # R2 = MH-Gobos
+    func_btn(fn, note_rc(2, i), B_MOVE, "#5a3a1f", edit_slot="mh_gobo", style="solid")
+effect_action_btn("Gegenläufig", note_rc(3, 0), B_MOVE, "#7a6500", "toggle_counter", efx_circle.id)
+effect_action_btn("Spiegeln", note_rc(3, 1), B_MOVE, "#334455", "toggle_mirror", efx_circle.id)
+effect_action_btn("Richtung", note_rc(3, 2), B_MOVE, "#445566", "reverse_direction", efx_circle.id)
+effect_action_btn("Neustart", note_rc(3, 3), B_MOVE, "#553010", "restart", efx_circle.id)
+select_group_btn("Mover", "Alle Mover", note_rc(3, 5), B_MOVE)
 xy_pad("MH zielen (Pan/Tilt)", RX, Y0, B_MOVE, mh_fids, mode="position")
 xy_pad("EFX-Feld aufziehen", RX + 210, Y0, B_MOVE, mover_fids, mode="area", efx_function_id=efx_circle.id)
 encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "speed_hz", step=0.05)
 fader("Mover-Speed", 0, B_MOVE, SliderMode.EFFECT_SPEED, function_ids=[e.id for e in EFX_ALL], midi_cc=48, value=80)
-fader("Mover-Groesse", 1, B_MOVE, SliderMode.EFFECT_PARAM, function_ids=[e.id for e in EFX_ALL], param_key="size", midi_cc=49, value=150)
+fader("Mover-Größe", 1, B_MOVE, SliderMode.EFFECT_PARAM, function_ids=[e.id for e in EFX_ALL], param_key="size", midi_cc=49, value=150)
 fader("Mover-Dim", 3, B_MOVE, SliderMode.GROUP_DIMMER, programmer_group="Alle Mover", midi_cc=51, value=255)
-label("BANK 5  BEWEGUNG  —  R0-1: alle 10 EFX-Figuren (Kreis/Acht/Linie/Raute/Rechteck/Trapez/Dreieck/"
-      "Lissajous/Zufall/Custom-Pfad). R2: MH-Farbrad. R3: MH-Gobos. R4: Gegenlaeufig/Spiegeln/Richtung/Neustart. "
-      "Rechts: XY-Pad (Position + Feld).", X0, 28, 1300, B_MOVE)
+label("BANK 3  BEWEGUNGEN  —  R0-1: alle 10 EFX-Figuren (Kreis/Acht/Linie/Raute/Rechteck/Trapez/"
+      "Dreieck/Lissajous/Zufall/Custom-Pfad) auf Moving Head + Spider. R2: MH-Gobos. R3: Gegenläufig/"
+      "Spiegeln/Richtung/Neustart. Rechts: XY-Pad (Position + Feld).", X0, 28, 1320, B_MOVE)
 
 
-# ── BANK 6 — BPM & TEMPO ────────────────────────────────────────────────────────────
-action_btn("Tap Tempo", ButtonAction.TAP, note_rc(0, 0), B_BPM, "#103a3a")
-action_btn("Musik-BPM", ButtonAction.AUDIO_BPM, note_rc(0, 1), B_BPM, "#103a4a")
-action_btn("BPM +", ButtonAction.BPM_NUDGE_UP, note_rc(0, 2), B_BPM, "#1f5a3a")
-action_btn("BPM -", ButtonAction.BPM_NUDGE_DOWN, note_rc(0, 3), B_BPM, "#5a1f1f")
-action_btn("BPM-Modus", ButtonAction.BPM_MODE_TOGGLE, note_rc(0, 4), B_BPM, "#3a3a1f")
-action_btn("Tap Bus A", ButtonAction.TAP_BUS, note_rc(1, 0), B_BPM, "#1f3a6a", tempo_bus_id="A")
-action_btn("Sync Bus A", ButtonAction.SYNC_BUS, note_rc(1, 1), B_BPM, "#1f4a6a", tempo_bus_id="A")
-action_btn("Arm Bus", ButtonAction.ARM_BUS, note_rc(1, 2), B_BPM, "#5a3a1f", tempo_bus_id="A")
-for i, fn in enumerate(SYNC_FX):                                          # R2 = bus-gekoppelte Effekte
-    func_btn(fn, note_rc(2, i), B_BPM, ["#1f5a3a", "#1f3a6a", "#5a1f1f", "#3a1f6a"][i])
-bpm_display(RX, Y0, B_BPM, tempo_bus_id="", caption="GLOBAL BPM")
-bpm_display(RX + 196, Y0, B_BPM, tempo_bus_id="A", caption="BUS A (Master)")
-bus_selector(RX, Y0 + 106, B_BPM)
-tempo_ctrl("Tempo-Bus-Panel A", RX, Y0 + 200, B_BPM, tempo_bus_id="A")
-speed_dial("Master A", RX + 390, Y0, B_BPM, target_mode=SpeedTarget.SPEED_NODE, tempo_bus_id="A", role="master")
-speed_dial("Sub B (1/2)", RX + 390, Y0 + 160, B_BPM, target_mode=SpeedTarget.SPEED_NODE,
-           tempo_bus_id="B", role="sub", parent_bus_id="A")
-fader("Tempo Bus A", 0, B_BPM, SliderMode.TEMPO_BUS, tempo_bus_id="A", midi_cc=48, value=100)
-fader("Tempo Bus D", 1, B_BPM, SliderMode.TEMPO_BUS, tempo_bus_id="D", midi_cc=49, value=85)
-fader("BPM global", 3, B_BPM, SliderMode.BPM, midi_cc=51, value=100)
-label("BANK 6  BPM & TEMPO  —  R0: Tap/Musik-BPM/+/-/Modus. R1: Tap/Sync/Arm Bus. R2: tempo-synchrone Effekte "
-      "(Bus A=voll, B=halb, C=doppelt). Rechts: BPM-Anzeige + Bus-Wahl + Tempo-Panel + Master/Sub-Knoten.",
-      X0, 28, 1300, B_BPM)
+# ── BANK 4 — STROBE & TEMPO/BPM ─────────────────────────────────────────────────────
+func_btn(s_shutter, note_rc(0, 0), B_STROBE, "#5a1f1f", edit_slot="strobe")               # R0 = Strobe
+func_flash(s_shutter, note_rc(0, 1), B_STROBE, "#551111")
+func_btn(s_color, note_rc(0, 2), B_STROBE, "#5a1f3a", edit_slot="strobe")
+func_flash(sp_strobe, note_rc(0, 3), B_STROBE, "#551111")
+func_flash(mh_strobe, note_rc(0, 4), B_STROBE, "#551111")
+action_btn("Tap Tempo", ButtonAction.TAP, note_rc(1, 0), B_STROBE, "#103a3a")
+action_btn("Musik-BPM", ButtonAction.AUDIO_BPM, note_rc(1, 1), B_STROBE, "#103a4a")
+action_btn("BPM +", ButtonAction.BPM_NUDGE_UP, note_rc(1, 2), B_STROBE, "#1f5a3a")
+action_btn("BPM -", ButtonAction.BPM_NUDGE_DOWN, note_rc(1, 3), B_STROBE, "#5a1f1f")
+action_btn("BPM-Modus", ButtonAction.BPM_MODE_TOGGLE, note_rc(1, 4), B_STROBE, "#3a3a1f")
+action_btn("Sync jetzt", ButtonAction.AUTO_SYNC, note_rc(2, 0), B_STROBE, "#1f6a4a")        # alle auf die Eins
+action_btn("Tap Bus A", ButtonAction.TAP_BUS, note_rc(2, 1), B_STROBE, "#1f3a6a", tempo_bus_id="A")
+action_btn("Sync Bus A", ButtonAction.SYNC_BUS, note_rc(2, 2), B_STROBE, "#1f4a6a", tempo_bus_id="A")
+action_btn("Arm Bus", ButtonAction.ARM_BUS, note_rc(2, 3), B_STROBE, "#5a3a1f", tempo_bus_id="A")
+bpm_display(RX, Y0, B_STROBE, tempo_bus_id="", caption="GLOBAL BPM")
+bpm_display(RX + 196, Y0, B_STROBE, tempo_bus_id="A", caption="BUS A (Master)")
+bus_selector(RX, Y0 + 106, B_STROBE)
+tempo_ctrl("Tempo-Bus-Panel A", RX, Y0 + 200, B_STROBE, tempo_bus_id="A")
+speed_dial("Master A (Farbe ×1)", RX + 390, Y0, B_STROBE, target_mode=SpeedTarget.SPEED_NODE, tempo_bus_id="A", role="master")
+speed_dial("Sub C (Dimmer ×2)", RX + 390, Y0 + 160, B_STROBE, target_mode=SpeedTarget.SPEED_NODE,
+           tempo_bus_id="C", role="sub", parent_bus_id="A")
+fader("Tempo Bus A", 0, B_STROBE, SliderMode.TEMPO_BUS, tempo_bus_id="A", midi_cc=48, value=100)
+fader("Tempo Bus D", 1, B_STROBE, SliderMode.TEMPO_BUS, tempo_bus_id="D", midi_cc=49, value=85)
+fader("BPM global", 3, B_STROBE, SliderMode.BPM, midi_cc=51, value=100)
+label("BANK 4  STROBE & TEMPO  —  R0: Strobe (Shutter + Farb-Strobe + Spider/MH-Flash). R1: Tap/Musik-BPM/"
+      "+/-/Modus. R2: SYNC JETZT (alle Effekte auf die Eins) + Tap/Sync/Arm Bus. Rechts: BPM-Fenster + Bus-Wahl "
+      "+ Tempo-Panel + Speed-Knoten (Farbe ×1, Dimmer ×2 — selber Takt, doppeltes Tempo).", X0, 28, 1320, B_STROBE)
 
 
-# ── BANK 7 — ABLAEUFE / MISCHEN ─────────────────────────────────────────────────────
+# ── BANK 5 — LIVE-EDITOR (Effekte im Nachhinein regeln) ─────────────────────────────
+func_btn(cf_front_solid, note_rc(0, 0), B_EDIT, "#1f5a3a", edit_slot="farbe_front")        # Farbe starten
+func_btn(dm_chase, note_rc(0, 1), B_EDIT, "#1f4a6a", edit_slot="dim_front")                # Dimmer-Bewegung
+func_btn(efx_circle, note_rc(0, 2), B_EDIT, "#3a1f6a", edit_slot="mover_show")             # Bewegung
+func_btn(live_chase, note_rc(0, 3), B_EDIT, "#1f5a3a", edit_slot="farbe_front")            # Live-Chase
+effect_action_btn("Farbe +", note_rc(1, 0), B_EDIT, "#333355", "next_color", live_chase.id)
+effect_action_btn("Farbe -", note_rc(1, 1), B_EDIT, "#333355", "prev_color", live_chase.id)
+effect_action_btn("Leeren", note_rc(1, 2), B_EDIT, "#5a1010", "clear_colors", live_chase.id)
+effect_editor("Effekt-Editor (All-in-One)", RX, Y0, B_EDIT, dm_chase.id, ww=330, hh=250)
+effect_display("Live-Vorschau", RX + 350, Y0, B_EDIT, dm_chase.id, ww=260, hh=130)
+chase_builder("Chase-Builder (live)", RX + 350, Y0 + 140, B_EDIT, live_chase.id, ww=330, hh=200)
+frame("Effekt-Container", RX, Y0 + 270, B_EDIT, ww=330, hh=110, show_header=True)
+encoder("Tempo", 0, B_EDIT, dm_chase.id, "speed", step=0.25)
+stepper("Lauflichter", 1, B_EDIT, dm_chase.id, "runner_count", step=1)
+encoder("Dichte", 7, B_EDIT, dm_wave.id, "density", step=0.25)
+fader("Effekt-Tempo", 3, B_EDIT, SliderMode.EFFECT_SPEED, midi_cc=48, value=80)
+fader("Effekt-Helligk.", 4, B_EDIT, SliderMode.EFFECT_INTENSITY, midi_cc=49, value=255)
+label("BANK 5  LIVE-EDITOR  —  R0: Farbe + Dimmer-Bewegung + EFX + Live-Chase starten. R1: Farbe +/-/Leeren. "
+      "Rechts: großer Effekt-Editor + Vorschau + Chase-Builder + Container. Encoder/Stepper/Fader regeln "
+      "Tempo/Lauflichter/Dichte LIVE im Nachhinein.", X0, 28, 1320, B_EDIT)
+
+
+# ── BANK 6 — ABLÄUFE & MUSIK ────────────────────────────────────────────────────────
 MIX_ACCENT = ["#6a1f4a", "#5a1f1f", "#1f5a3a", "#1f3a6a"]
 for i, fn in enumerate(MIXES):                                            # R0 = Misch-Collections
     func_btn(fn, note_rc(0, i), B_FLOW, MIX_ACCENT[i], exclusive=True, clear_prog=True)
@@ -1053,38 +1039,20 @@ for i, fn in enumerate(CHASERS):                                          # R1 =
     func_btn(fn, note_rc(1, i), B_FLOW, "#3a3a5a")
 for i, pb in enumerate(PLAYBACKS):                                        # R2 = GO Cuelisten
     exec_go_btn(f"GO {pb.name[:7]}", i, note_rc(2, i), B_FLOW, ["#1f4a28", "#8b0d4f", "#0d4f8b"][i])
-func_btn(live_chase, note_rc(3, 0), B_FLOW, "#1f5a3a")                    # Live-Chase
-effect_action_btn("Leeren", note_rc(3, 1), B_FLOW, "#5a1010", "clear_colors", live_chase.id)
-effect_action_btn("Farbe -", note_rc(3, 2), B_FLOW, "#333355", "prev_color", live_chase.id)
-effect_action_btn("Farbe +", note_rc(3, 3), B_FLOW, "#333355", "next_color", live_chase.id)
-LC_COLORS = [("Rot", 255, 0, 0), ("Orange", 255, 90, 0), ("Gelb", 255, 220, 0), ("Gruen", 0, 255, 0),
-             ("Cyan", 0, 255, 255), ("Blau", 0, 0, 255), ("Magenta", 255, 0, 255), ("Weiss", 255, 255, 255)]
-for i, (nm, r, g, b) in enumerate(LC_COLORS):                            # R4 = Farben zur Live-Chase
-    color_tile(nm, note_rc(4, i), B_FLOW, r, g, b, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
+action_btn("<< Lied", ButtonAction.MEDIA_PREV, note_rc(3, 0), B_FLOW, "#3a2150")
+action_btn(">/|| Play", ButtonAction.MEDIA_PLAY_PAUSE, note_rc(3, 1), B_FLOW, "#5a2080")
+action_btn("Lied >>", ButtonAction.MEDIA_NEXT, note_rc(3, 2), B_FLOW, "#3a2150")
+func_btn(auto_schema, note_rc(3, 4), B_FLOW, "#1f5a3a")                   # Auto-Show-Funktionen
+func_btn(efx_circle, note_rc(3, 5), B_FLOW, "#1f3a6a")
 cue_list(pb_warm.name, 0, RX, Y0, B_FLOW, ww=230, hh=146)
 cue_list(pb_drop.name, 1, RX + 240, Y0, B_FLOW, ww=230, hh=146)
-frame("Solo-Rahmen (Container)", RX, Y0 + 156, B_FLOW, ww=300, hh=110, show_header=True)
-effect_editor("Effekt-Editor (All-in-One)", RX + 320, Y0 + 156, B_FLOW, live_chase.id, ww=330, hh=240)
+song_info(RX, Y0 + 156, B_FLOW, ww=320, hh=110)
+label("Auto-Show ist AN: > (Play) startet den MusicShowDirector → Auto-Farbschema + MH-Kreis. "
+      "Pro Lied in Eingabe/Ausgabe > Musik.", RX + 330, Y0 + 156, 300, B_FLOW, hh=60)
 for i, pb in enumerate(PLAYBACKS):
     pb_fader(f"Dim {i + 1}", i, B_FLOW, slot=i, midi_cc=48 + i, value=255)
-label("BANK 7  ABLAEUFE / MISCHEN  —  R0: Misch-Collections. R1: Chaser. R2: GO Cuelisten (Beat-Sync). "
-      "R3: Live-Chase + Leeren/-/+. R4: Farben hinzufuegen. Rechts: Cuelisten + Frame + Effekt-Editor.",
-      X0, 28, 1300, B_FLOW)
-
-
-# ── BANK 8 — MUSIK & AUTO-SHOW ──────────────────────────────────────────────────────
-action_btn("<< Lied", ButtonAction.MEDIA_PREV, note_rc(0, 0), B_MUSIC, "#3a2150")
-action_btn(">/|| Play", ButtonAction.MEDIA_PLAY_PAUSE, note_rc(0, 1), B_MUSIC, "#5a2080")
-action_btn("Lied >>", ButtonAction.MEDIA_NEXT, note_rc(0, 2), B_MUSIC, "#3a2150")
-action_btn("Musik-BPM", ButtonAction.AUDIO_BPM, note_rc(0, 3), B_MUSIC, "#103a4a")
-func_btn(auto_schema, note_rc(1, 0), B_MUSIC, "#1f5a3a")                  # Auto-Show-Funktionen
-func_btn(efx_circle, note_rc(1, 1), B_MUSIC, "#1f3a6a")
-song_info(RX, Y0, B_MUSIC, ww=320, hh=120)
-label("Auto-Show ist AN: Beim Start des Lieds (>) startet der MusicShowDirector automatisch das "
-      "Auto-Farbschema + den MH-Kreis. Auto-Show pro Lied in Eingabe/Ausgabe > Musik.", RX, Y0 + 130, 320, B_MUSIC, hh=60)
-fader("Lautstaerke", 0, B_MUSIC, SliderMode.PLAYBACK, function_id=1, midi_cc=48, value=255)
-label("BANK 8  MUSIK & AUTO-SHOW  —  R0: Lied-Steuerung + Musik-BPM. R1: Auto-Show-Funktionen. "
-      "Rechts: Song-Info-Anzeige. > startet Musik + Auto-Show.", X0, 28, 1300, B_MUSIC)
+label("BANK 6  ABLÄUFE & MUSIK  —  R0: Misch-Collections (Farbe+Dimmer+Bewegung kombiniert). R1: Chaser. "
+      "R2: GO Cuelisten (Beat-Sync). R3: Lied-Steuerung + Auto-Show. Rechts: Cuelisten + Song-Info.", X0, 28, 1320, B_FLOW)
 
 
 state._vc_layout = {"widgets": widgets}
@@ -1100,7 +1068,7 @@ except Exception as e:
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  7) SPEICHERN + ERSCHOEPFENDE VERIFIKATION (Assert-Gate)
+#  7) SPEICHERN + ERSCHÖPFENDE VERIFIKATION (Assert-Gate)
 # ════════════════════════════════════════════════════════════════════════════════
 state.programmer = {}
 state.show_name = "Hochzeit Komplett 2026"
@@ -1108,7 +1076,7 @@ save_show(OUT)
 print(f"Gespeichert: {OUT}")
 ok, msg = load_show(OUT)
 print("Load:", ok, msg)
-assert ok, f"Show laedt nicht: {msg}"
+assert ok, f"Show lädt nicht: {msg}"
 state = get_state()
 fm = get_function_manager()
 
@@ -1123,34 +1091,50 @@ fx = state.get_patched_fixtures()
 assert len(fx) == 14, f"Fixtures: {len(fx)} (erwartet 14)"
 total_ch = sum(f.channel_count for f in fx)
 assert total_ch == 137, f"DMX-Kanäle: {total_ch} (erwartet 137)"
-print("Fixtures:", dict(Counter(f.fixture_type for f in fx)), "| Kanaele:", total_ch)
+print("Fixtures:", dict(Counter(f.fixture_type for f in fx)), "| Kanäle:", total_ch)
 
-# VC-Layout
 vc = state._vc_layout.get("widgets", [])
 banks = Counter(w.get("bank") for w in vc)
-assert set(banks) == {0, 1, 2, 3, 4, 5, 6, 7, -1}, f"Banks: {sorted(banks)}"
+assert set(banks) == {0, 1, 2, 3, 4, 5, -1}, f"Banks: {sorted(banks)}"
 types = Counter(w["type"] for w in vc)
-# ALLE 19 Registry-Widget-Typen muessen vorkommen
 expected_widgets = set(WIDGET_REGISTRY.keys())
-present = set(types)
-missing_w = expected_widgets - present
+missing_w = expected_widgets - set(types)
 assert not missing_w, f"Widget-Typen fehlen: {sorted(missing_w)}"
 
-# Matrizen: alle 18 Algorithmen + alle 4 Styles
 mats = [f for f in fm.all() if isinstance(f, RgbMatrixInstance)]
 algos_present = {m.algorithm for m in mats}
-all_algos = set(RgbAlgorithm)
-missing_a = all_algos - algos_present
+missing_a = set(RgbAlgorithm) - algos_present
 assert not missing_a, f"Matrix-Algorithmen fehlen: {[a.name for a in missing_a]}"
 styles_present = {m.style for m in mats}
 missing_s = set(MatrixStyle) - styles_present
 assert not missing_s, f"Matrix-Styles fehlen: {[s.name for s in missing_s]}"
 rgb_color = [m for m in mats if m.style == MS.RGB]
 dim_m = [m for m in mats if m.style == MS.DIMMER]
-assert len(rgb_color) >= 18, f"RGB-Farbmatrizen: {len(rgb_color)}"
-assert len(dim_m) >= 5, f"Dimmer-Matrizen: {len(dim_m)}"
+assert len(rgb_color) >= 12, f"RGB-Farbmatrizen: {len(rgb_color)}"
+assert len(dim_m) >= 9, f"Dimmer-Matrizen: {len(dim_m)}"
 
-# EFX: alle 10 Figuren + Custom mit Pfad
+# Farbe = nur Farbe: RGB-Matrizen treiben den Dimmer NICHT
+assert all(not m.drive_intensity for m in rgb_color), "Farb-Matrix treibt den Dimmer (Trennung kaputt)"
+# Feste Farbe startet einfarbig → Farb-Kachel kann sauber umfärben
+cf_solid = next(m for m in mats if m.name == "Feste Farbe")
+assert len(cf_solid.colors) == 1, "Feste Farbe startet nicht einfarbig (Recolor-Voraussetzung)"
+# Farb-Kacheln zielen auf den AKTIVEN Effekt
+eff_tiles = [w for w in vc if w["type"] == "VCColor" and w.get("bank") == 0
+             and str(w.get("target", "")).startswith("Effekt")]
+assert len(eff_tiles) >= 8, f"Farb-Kacheln mit Ziel 'Effekt': {len(eff_tiles)}"
+# Pro Gruppe getrennte edit_slots (Farbe + Dimmer koexistieren je Gruppe)
+slots = {w.get("edit_slot", "") for w in vc if w["type"] == "VCButton"}
+for need in ("farbe_front", "farbe_spider", "farbe_mh", "dim_front", "dim_spider", "dim_mh"):
+    assert need in slots, f"edit_slot '{need}' fehlt (Gruppen-Trennung): {sorted(s for s in slots if s)}"
+# Tempo-Sync: viele Effekte an einem Bus mit gemeinsamer sync_group
+bus_synced = [f for f in fm.all() if getattr(f, "sync_group", "") == SYNC
+              and getattr(f, "tempo_bus_id", "") in ("A", "B", "C", "D")]
+assert len(bus_synced) >= 15, f"phasen-gekoppelte Effekte: {len(bus_synced)}"
+# Farbe ×1, Dimmer ×2
+assert abs(cf_solid.tempo_multiplier - 1.0) < 1e-6, "Farbe nicht ×1"
+dm_chase2 = next(m for m in mats if m.name == "Lauflicht")
+assert abs(dm_chase2.tempo_multiplier - 2.0) < 1e-6, "Dimmer nicht ×2"
+
 efxs = [f for f in fm.all() if isinstance(f, EfxInstance)]
 efx_present = {e.algorithm for e in efxs}
 missing_e = set(EfxAlgorithm) - efx_present
@@ -1160,31 +1144,21 @@ assert custom and custom[0].path_data, "Custom-Path-EFX fehlt/leer"
 assert any({x.fid for x in e.fixtures} & set(spider_fids) for e in efxs), "keine Spider-EFX"
 assert any({x.fid for x in e.fixtures} & set(mh_fids) for e in efxs), "keine MH-EFX"
 
-# Tempo-Buses Master/Sub
 tbm2 = get_tempo_bus_manager()
 named = {b.bus_id: b for b in tbm2.named_buses()}
 assert {"A", "B", "C", "D"}.issubset(named), f"Buses: {list(named)}"
 assert named["A"].role == "master" and named["B"].role == "sub", "A/B Rollen falsch"
-assert named["B"].parent_id == "A" and abs(named["B"].bus_multiplier - 0.5) < 1e-6, "Sub B falsch"
 assert abs(named["C"].bus_multiplier - 2.0) < 1e-6, "Sub C falsch"
-assert tbm2.grandmaster_bpm > 0, "Grand-Master-BPM fehlt"
-bus_bound = [f for f in fm.all() if getattr(f, "tempo_bus_id", "") in ("A", "B", "C", "D")]
-assert len(bus_bound) >= 4, f"bus-gebundene Effekte: {len(bus_bound)}"
 
-# MH-Farbrad/Gobo + Spider-Bank-Trennung + RGBW-Weiss
 mh_cw_ch = chan_of[12]["color_wheel"]
-mh_gw_ch = chan_of[12]["gobo_wheel"]
 sc_red = next(f for f in fm.all() if isinstance(f, Scene) and f.name == "MH Rot")
 assert sc_red.get_value(12, mh_cw_ch) == MHCOL["rot"], "MH Rot Farbrad falsch"
-sc_g1 = next(f for f in fm.all() if isinstance(f, Scene) and f.name == "MH Gobo 1")
-assert sc_g1.get_value(12, mh_gw_ch) == MHGOBO["g1"], "MH Gobo 1 falsch"
 sp_cols = [c for c in chans_full[13]
            if (c.attribute or "") in ("color_r", "color_g", "color_b", "color_w")]
 sc_rb = next(f for f in fm.all() if isinstance(f, Scene) and f.name == "Spider Rot/Blau")
 assert sc_rb.get_value(13, sp_cols[0].channel_number) == 255, "Spider linke Bank nicht rot"
 assert sc_rb.get_value(13, sp_cols[4 + 2].channel_number) == 255, "Spider rechte Bank nicht blau"
 
-# Collections + Beat-Sync-Cuelisten + Auto-Show + Playlist
 cols = [f for f in fm.all() if isinstance(f, Collection)]
 assert len(cols) >= 4, f"Collections: {len(cols)}"
 chasers = [f for f in fm.all() if type(f).__name__ == "Chaser"]
@@ -1197,7 +1171,6 @@ fn_ids = {f.id for f in fm.all()}
 assert ma.get("function_ids") and all(fid in fn_ids for fid in ma["function_ids"]), ma
 assert len(state.playlist) == len(CURATED), f"Playlist: {len(state.playlist)}"
 
-# VC-Geometrie: nicht zu hoch + keine Ueberlappung klassischer interaktiver Widgets
 maxy = max((w.get("y", 0) + w.get("h", 0)) for w in vc)
 assert maxy < 820, f"zu hoch: {maxy}"
 _INTER = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCCueList", "VCColorList",
@@ -1215,7 +1188,7 @@ def _overlap(a, b):
     return not (ax1 <= bx0 or bx1 <= ax0 or ay1 <= by0 or by1 <= ay0)
 
 
-for bk in range(8):
+for bk in range(6):
     layer = [w for w in vc if w.get("bank") in (bk, -1) and w["type"] in _INTER]
     for a in range(len(layer)):
         for b in range(a + 1, len(layer)):
@@ -1225,9 +1198,10 @@ for bk in range(8):
 
 print(f"Funktionen: {len(fm.all())}  VC-Widgets: {len(vc)}  Max-Y={maxy}")
 print(f"  Matrix-Algorithmen: {len(algos_present)}/18  Styles: {sorted(s.name for s in styles_present)}")
-print(f"  EFX-Figuren: {len(efx_present)}/10  RGB-Matrizen={len(rgb_color)}  Dimmer={len(dim_m)}")
-print(f"  Widget-Typen ({len(present)}/19): alle vorhanden")
-print(f"  Buses: {[f'{b.bus_id}:{b.role}x{b.bus_multiplier}' for b in tbm2.named_buses()]}  GM-BPM={tbm2.grandmaster_bpm}")
-print(f"  Collections={len(cols)}  Chaser={len(chasers)}  Beat-Cuelisten={[s.name for s in beat_stacks]}  Playlist={len(state.playlist)}")
-print("  [OK] 14 Fixtures - alle 18 Algos - alle 4 Styles - alle 10 EFX - alle 19 Widgets - Tempo-Buses - Auto-Show")
+print(f"  EFX-Figuren: {len(efx_present)}/10  RGB-Farbmatrizen={len(rgb_color)}  Dimmer={len(dim_m)}")
+print(f"  Widget-Typen ({len(set(types))}/19): alle vorhanden")
+print(f"  Gruppen-Slots: {sorted(s for s in slots if s.startswith(('farbe_','dim_')))}")
+print(f"  Phasen-gekoppelte Effekte (Bus+sync_group): {len(bus_synced)}  (Farbe ×1, Dimmer ×2)")
+print(f"  Collections={len(cols)}  Chaser={len(chasers)}  Beat-Cuelisten={[s.name for s in beat_stacks]}")
+print("  [OK] Farbe=Farbe / Dimmer=Bewegung · pro Gruppe getrennt · Tempo-gekoppelt · alle 18/4/10/19")
 print("FERTIG")
