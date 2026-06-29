@@ -1,4 +1,5 @@
 """Output Manager — koordiniert alle DMX-Ausgabegeräte bei 44 Hz."""
+import os
 import threading
 import time
 from .universe import Universe
@@ -8,6 +9,28 @@ from .sacn import SACNSender
 
 TARGET_HZ = 44
 FRAME_INTERVAL = 1.0 / TARGET_HZ
+
+
+def _make_enttec_device(port: str):
+    """Erzeugt das Enttec-Ausgabegeraet.
+
+    STAB-08: Standardmaessig ein PROZESS-ISOLIERTER Proxy — eine native Access
+    Violation im USB-/FTDI-Treiber (Kabel mitten im WriteFile abgezogen) killt dann
+    nur den Worker-Prozess, nicht LightOS; der Parent respawnt ihn. Mit
+    ``LIGHTOS_SERIAL_INPROC=1`` (Tests/Debug/Fallback) wird stattdessen der direkte
+    In-Prozess-:class:`EnttecPro` benutzt. Schlaegt der Proxy-Start fehl, faellt es
+    ebenfalls auf In-Prozess zurueck — die Isolation darf die Ausgabe nie ganz
+    verhindern."""
+    if os.environ.get("LIGHTOS_SERIAL_INPROC"):
+        return EnttecPro(port)
+    try:
+        from .serial_process import EnttecProcessProxy
+        return EnttecProcessProxy(port)
+    except Exception as e:
+        import sys
+        print(f"[OutputManager] Serial-Prozess-Isolation nicht verfuegbar ({e}) "
+              f"-> In-Prozess-Fallback.", file=sys.stderr)
+        return EnttecPro(port)
 
 
 class OutputManager:
@@ -142,7 +165,7 @@ class OutputManager:
         # zuerst thread-sicher schliessen (ein Port kann nur einmal geoeffnet
         # sein -> sonst "Access denied" beim erneuten Verbinden).
         self.close_enttec_on_port(port)
-        self._swap_device(self._enttec_outputs, universe, EnttecPro(port))
+        self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
 
     def close_enttec_on_port(self, port: str):
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
