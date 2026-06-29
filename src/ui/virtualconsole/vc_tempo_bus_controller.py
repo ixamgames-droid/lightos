@@ -65,6 +65,9 @@ class VCTempoBusController(VCWidget):
         self.factor_buttons: list[float] = list(_DEFAULT_FACTORS)
         self.function_id: int | None = None    # Smart-Drop-Kompat (erstes Ziel)
         self.function_ids: list[int] = []       # gekoppelte Effekte
+        # Pro-Effekt gesteuerter Parameter (fid -> key); fehlt -> "tempo_multiplier".
+        # So kann man je Effekt waehlen, WAS der Faktor steuert (Tempo/Helligkeit/…).
+        self.param_keys_per_id: dict[int, str] = {}
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#e6edf3")
         self.resize(280, 196)
@@ -143,11 +146,18 @@ class VCTempoBusController(VCWidget):
         except Exception:
             pass
 
+    def _key_for(self, fid) -> str:
+        """Gesteuerter Parameter eines Effekts (Default tempo_multiplier)."""
+        try:
+            return self.param_keys_per_id.get(int(fid), "tempo_multiplier")
+        except (TypeError, ValueError):
+            return "tempo_multiplier"
+
     def _apply_factor(self):
         from src.core.engine import effect_live
         for fid in self._targets():
             try:
-                effect_live.set_param("tempo_multiplier", float(self.factor), fid)
+                effect_live.set_param(self._key_for(fid), float(self.factor), fid)
             except Exception:
                 pass
 
@@ -303,9 +313,10 @@ class VCTempoBusController(VCWidget):
                 self.set_factor(f); event.accept(); return
         if self._reset_rect().contains(pos):
             self.set_factor(1.0); event.accept(); return
-        # Effekte-Zeile -> Eigenschaften (Ziel-Liste)
+        # Effekte-Zeile -> Pro-Effekt-Menue (einzeln entfernen / hinzufuegen / Parameter)
         if self._effects_rect().contains(pos):
-            self._open_properties(); event.accept(); return
+            self._open_effects_menu(event.globalPosition().toPoint())
+            event.accept(); return
         # SYNC
         if self._sync_rect().contains(pos):
             self._sync_now(); event.accept(); return
@@ -331,6 +342,42 @@ class VCTempoBusController(VCWidget):
         if chosen is not None:
             self.set_bus(chosen.data())
 
+    def _open_effects_menu(self, global_pos):
+        """Pro-Effekt-Menue: jeden gekoppelten Effekt einzeln entfernen, oder den
+        Eigenschaften-Dialog oeffnen (hinzufuegen + pro Effekt den Parameter waehlen)."""
+        menu = QMenu(self)
+        ids = self._targets()
+        for fid, nm in zip(ids, self._target_names(ids)):
+            key = self._key_for(fid)
+            suffix = "" if key == "tempo_multiplier" else f"  [{key}]"
+            act = menu.addAction(f"✕   {nm}{suffix}  entfernen")
+            act.setData(("remove", fid))
+        if ids:
+            menu.addSeparator()
+        menu.addAction("＋   Effekte hinzufügen / Parameter…").setData(("edit", None))
+        chosen = menu.exec(global_pos)
+        if chosen is None:
+            return
+        kind, fid = chosen.data()
+        if kind == "remove":
+            self.remove_effect(fid)
+        else:
+            self._open_properties()
+
+    def remove_effect(self, fid):
+        """Einen gekoppelten Effekt vom Controller loesen (sein Bus bleibt, wie er ist)."""
+        try:
+            fi = int(fid)
+        except (TypeError, ValueError):
+            return
+        if self.function_id == fi:
+            self.function_id = None
+        self.function_ids = [x for x in self.function_ids if int(x) != fi]
+        if self.function_id is None and self.function_ids:
+            self.function_id = self.function_ids.pop(0)
+        self.param_keys_per_id.pop(fi, None)
+        self.update()
+
     # ── Zeichnen ─────────────────────────────────────────────────────────────────
 
     def _bus_label(self) -> str:
@@ -345,25 +392,26 @@ class VCTempoBusController(VCWidget):
         p.fillRect(self.rect(), self._bg_color)
         W = self.width()
 
-        # ── Kopf ──────────────────────────────────────────────────────────────
+        # ── Kopf ── Caption links · Live-BPM (Bus→Effekt) · Bus-Chip rechts ────
+        bpm = self._bus_bpm()
+        eff = bpm * self.factor
+        br = self._bus_rect()
         p.setPen(QColor("#7fb0ff"))
         p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        p.drawText(QRect(8, 4, W - 110, 22), Qt.AlignmentFlag.AlignVCenter,
-                   self.caption or "Tempo-Bus")
-        br = self._bus_rect()
+        p.drawText(QRect(8, 4, max(20, br.left() - 104), 22),
+                   Qt.AlignmentFlag.AlignVCenter, self.caption or "Tempo-Bus")
+        # Live-BPM direkt links neben dem Bus-Chip (keine Kollision mit der Quelle-Zeile)
+        p.setPen(QColor("#FFD700"))
+        p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        p.drawText(QRect(br.left() - 96, 6, 90, 20),
+                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                   f"{bpm:.0f}→{eff:.0f}")
         p.fillRect(br, QColor("#1f2d3d"))
         p.setPen(QColor("#9fd0ff"))
         p.drawRect(br)
+        p.setPen(QColor("#cfe6ff"))
         p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
         p.drawText(br, Qt.AlignmentFlag.AlignCenter, f"{self._bus_label()} ▾")
-
-        # Live-BPM (gross, rechtsbuendig unter dem Kopf wandert in die Quelle-Zeile)
-        bpm = self._bus_bpm()
-        eff = bpm * self.factor
-        p.setPen(QColor("#FFD700"))
-        p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        p.drawText(QRect(W - 110, 30, 102, 18), Qt.AlignmentFlag.AlignRight,
-                   f"{bpm:.0f}→{eff:.0f}")
 
         # ── Quelle ────────────────────────────────────────────────────────────
         p.setPen(QColor("#8b949e"))
@@ -465,8 +513,10 @@ class VCTempoBusController(VCWidget):
         bpm_sb.setSuffix(" BPM")
         form.addRow("Feste BPM:", bpm_sb)
         from .target_list_editor import TargetListEditor
-        targets = TargetListEditor(with_params=False, title="Gekoppelte Effekte")
-        targets.set_targets(self._targets(), {})
+        targets = TargetListEditor(with_params=True, title="Gekoppelte Effekte")
+        targets.set_targets(self._targets(), dict(self.param_keys_per_id))
+        targets.setToolTip("Effekte hinzufügen/entfernen — je Zeile optional waehlen, WAS "
+                           "der Faktor steuert (Default: Tempo ×).")
         form.addRow("Effekte:", targets)
         fac_edit = QLineEdit(", ".join(_fmt_factor(f) for f in self.factor_buttons))
         fac_edit.setToolTip("Faktor-Buttons, Komma-getrennt, z. B. ¼, ½, 1, 2, 4.")
@@ -484,6 +534,7 @@ class VCTempoBusController(VCWidget):
             ids = targets.ids()
             self.function_id = ids[0] if ids else None
             self.function_ids = ids[1:]
+            self.param_keys_per_id = targets.param_keys()
             facs = []
             from .vc_speedial import _parse_factor_token
             for tok in fac_edit.text().split(","):
@@ -507,6 +558,7 @@ class VCTempoBusController(VCWidget):
         d["factor_buttons"] = list(self.factor_buttons)
         d["function_id"] = self.function_id
         d["function_ids"] = list(self.function_ids)
+        d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
         return d
 
     def apply_dict(self, d: dict):
@@ -541,3 +593,10 @@ class VCTempoBusController(VCWidget):
             except (TypeError, ValueError):
                 continue
         self.function_ids = ids
+        pk = {}
+        for k, v in (d.get("param_keys_per_id", {}) or {}).items():
+            try:
+                pk[int(k)] = str(v)
+            except (TypeError, ValueError):
+                continue
+        self.param_keys_per_id = pk
