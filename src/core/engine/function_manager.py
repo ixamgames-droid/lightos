@@ -581,6 +581,11 @@ class FunctionManager:
                 f.sync_group = str(fd.get("sync_group", "") or "")
             except (TypeError, ValueError):
                 f.sync_group = ""
+            # WP-Tempo „taktgleich"-Flag generisch laden. Fehlt der Key (Alt-Show),
+            # gilt True: ein bus-gebundener Effekt startet taktgleich auf dem
+            # gemeinsamen Beat-Raster (Free-Run-Effekte mit leerer tempo_bus_id
+            # bleiben davon unberuehrt).
+            f.align_on_start = bool(fd.get("align_on_start", True))
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

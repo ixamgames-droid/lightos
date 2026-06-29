@@ -109,6 +109,12 @@ class Function:
         self.phase_offset: float = 0.0
         self.sync_group: str = ""
         self._beat_anchor: float = 0.0     # Bus-Position beim letzten Sync/Start (privat, nicht serialisiert)
+        # WP-Tempo „taktgleich": startet dieser Effekt auf dem gemeinsamen Beat-Raster
+        # seines Bus (True, Default) oder bewusst frei bei seinem eigenen Null (False)?
+        # Wirkt nur, wenn der Effekt auf einem Bus liegt (tempo_bus_id != ""); Free-Run
+        # bleibt unberuehrt. Alt-Shows ohne Key laden als True -> ein bus-gebundener
+        # Effekt wird damit taktgleich (siehe FunctionManager.from_dict).
+        self.align_on_start: bool = True
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -202,6 +208,7 @@ class Function:
             "tempo_multiplier": self.tempo_multiplier,
             "phase_offset": self.phase_offset,
             "sync_group": self.sync_group,
+            "align_on_start": self.align_on_start,
         }
 
     @classmethod

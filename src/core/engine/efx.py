@@ -225,15 +225,22 @@ class EfxInstance(Function):
                             float(tilt if tilt is not None else self.y_offset))
             except Exception:
                 self._centers = {}
-        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern, damit der
-        # Effekt bei local_beats=0 beginnt (gemeinsamer Start mit der sync_group).
+        # WP-Tempo: bei Bus-Sync ankern. „Taktgleich" (align_on_start, Default) klinkt
+        # den Effekt auf das gemeinsame Beat-Raster seines Bus ein (note_groove_start
+        # legt bei frischer Groove den Downbeat auf jetzt); bewusst frei (False) ankert
+        # auf die eigene aktuelle Bus-Position. bus_for_effect erzeugt feste Buses A-D
+        # bei Bedarf, damit eine gespeicherte/zugewiesene A-D-Bindung sofort greift.
         bus_id = getattr(self, "tempo_bus_id", "") or ""
         if bus_id:
             try:
                 from src.core.engine.tempo_bus import get_tempo_bus_manager
-                bus = get_tempo_bus_manager().get(bus_id)
+                bus = get_tempo_bus_manager().bus_for_effect(bus_id)
                 if bus is not None:
-                    self._beat_anchor = bus.take_anchor()
+                    if getattr(self, "align_on_start", True):
+                        bus.note_groove_start(self)
+                        self._beat_anchor = bus.take_anchor()
+                    else:
+                        self._beat_anchor = bus.position()
             except Exception:
                 pass
 
