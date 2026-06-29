@@ -166,7 +166,7 @@ class VCSpeedDial(VCWidget):
             from src.core.engine.tempo_bus import get_tempo_bus_manager
             tbm = get_tempo_bus_manager()
             if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
-                mb = tbm.get("")
+                mb = self._mult_base_bus()
                 return round((mb.bpm if mb is not None else 0.0) * self._active_factor, 2)
             if self.target_mode == SpeedTarget.TEMPO_BUS:
                 b = tbm.get(self.tempo_bus_id)
@@ -365,6 +365,49 @@ class VCSpeedDial(VCWidget):
         except Exception:
             return None
 
+    def _mult_base_bus(self):
+        """TEMPO_BUS_MULT: der Bus, dessen BPM die Basis fuer „BPM × Faktor" ist —
+        der explizit gewaehlte ``tempo_bus_id``, sonst der Bus des ERSTEN gekoppelten
+        Effekts, sonst der Default-Bus. So zeigt die Anzeige das Tempo, dem die Effekte
+        wirklich folgen (statt frueher IMMER dem Default-Bus)."""
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            mgr = get_tempo_bus_manager()
+        except Exception:
+            return None
+        if self.tempo_bus_id:
+            return mgr.bus_for_effect(self.tempo_bus_id)
+        for fid in self._targets():
+            try:
+                from src.core.engine.function_manager import get_function_manager
+                fn = get_function_manager().get(int(fid))
+                bid = (getattr(fn, "tempo_bus_id", "") or "").strip()
+                if bid:
+                    return mgr.bus_for_effect(bid)
+            except Exception:
+                continue
+        return mgr.get("")
+
+    def _mult_bus_label(self) -> str:
+        """Kurz-Label des Multiplier-Basis-Bus fuer die Anzeige (Haupt-BPM / Bus X)."""
+        mb = self._mult_base_bus()
+        if mb is None or mb.bus_id in ("", "default"):
+            return "Haupt-BPM"
+        return f"Bus {mb.bus_id}"
+
+    def _apply_mult_bus_coupling(self):
+        """TEMPO_BUS_MULT mit gewaehltem ``tempo_bus_id``: die gekoppelten Effekte
+        taktgleich diesem Bus ZUWEISEN (sie folgen dem Dial-Bus, der Faktor
+        multipliziert sie relativ dazu). ``""`` laesst den Bus der Effekte unberuehrt
+        (nur ×). Aus der Properties-Uebernahme (und kuenftig Smart-Drop) aufgerufen."""
+        if self.target_mode != SpeedTarget.TEMPO_BUS_MULT or not self.tempo_bus_id:
+            return
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            get_tempo_bus_manager().assign_effects_to_bus(self._targets(), self.tempo_bus_id)
+        except Exception:
+            pass
+
     def _ensure_node_config(self):
         """Drueckt Rolle/Parent (und bei Sub den aktuellen Faktor) auf den Ziel-Bus.
         Der reservierte Default-Bus wird NIE zum Sub gemacht."""
@@ -531,15 +574,11 @@ class VCSpeedDial(VCWidget):
             br = self._node_bpm_rect()
             p.fillRect(br, QColor("#161b22"))
             if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
-                # Effektives Effekt-Tempo = Master-BPM (Default-Bus) × Faktor.
-                try:
-                    from src.core.engine.tempo_bus import get_tempo_bus_manager
-                    mb = get_tempo_bus_manager().get("")
-                    master = mb.bpm if mb is not None else 0.0
-                except Exception:
-                    master = 0.0
+                # Effektives Effekt-Tempo = Bus-BPM (gewaehlter/gekoppelter Bus) × Faktor.
+                mb = self._mult_base_bus()
+                master = mb.bpm if mb is not None else 0.0
                 bpm = master * self._active_factor
-                right = f"Master · {_fmt_factor(self._active_factor)}"
+                right = f"{self._mult_bus_label()} · {_fmt_factor(self._active_factor)}"
             else:
                 bus = self._node_bus()
                 bpm = bus.bpm if bus is not None else 0.0
@@ -904,6 +943,9 @@ class VCSpeedDial(VCWidget):
                 self.function_id = _eids[0] if _eids else None
                 self.function_ids = _eids[1:]
                 self.param_keys_per_id = target_editor.param_keys()
+                # Multiplier-Dial mit gewaehltem Tempo-Bus: gekoppelte Effekte folgen
+                # diesem Bus (taktgleich), der Faktor multipliziert relativ dazu.
+                self._apply_mult_bus_coupling()
             else:
                 try:
                     self.function_id = int(slot.text())

@@ -24,6 +24,8 @@ class VCBusSelector(VCWidget):
         super().__init__(caption, parent)
         self.buses: list[str] = ["A", "B", "C", "D"]
         self.function_id: int | None = None
+        # Mehrere gekoppelte Effekte: ein Chip-Klick haengt ALLE taktgleich auf den Bus.
+        self.function_ids: list[int] = []
         self._bg_color = QColor("#101820")
         self._fg_color = QColor("#e8e8e8")
         self.resize(220, 84)
@@ -37,21 +39,40 @@ class VCBusSelector(VCWidget):
         except Exception:
             return None
 
-    def _armed(self) -> str:
+    def _effect_ids(self) -> list[int]:
+        """Alle gekoppelten Effekt-IDs (function_id zuerst, dann function_ids)."""
+        ids: list[int] = []
         if self.function_id is not None:
             try:
+                ids.append(int(self.function_id))
+            except (TypeError, ValueError):
+                pass
+        for fid in self.function_ids:
+            try:
+                fi = int(fid)
+            except (TypeError, ValueError):
+                continue
+            if fi not in ids:
+                ids.append(fi)
+        return ids
+
+    def _armed(self) -> str:
+        ids = self._effect_ids()
+        if ids:
+            try:
                 from src.core.engine import effect_live
-                return str(effect_live.get_param("tempo_bus_id", self.function_id) or "")
+                return str(effect_live.get_param("tempo_bus_id", ids[0]) or "")
             except Exception:
                 return ""
         mgr = self._manager()
         return mgr.armed_bus_id if mgr is not None else ""
 
     def is_effect_bound(self) -> bool:
-        return self.function_id is not None
+        return bool(self._effect_ids())
 
     def live_effect_function_id(self):
-        return self.function_id
+        ids = self._effect_ids()
+        return ids[0] if ids else None
 
     # ── Interaktion (Run-Modus) ──────────────────────────────────────────────────
 
@@ -74,20 +95,20 @@ class VCBusSelector(VCWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             idx = self._chip_at(event.position().toPoint())
             if idx >= 0:
-                if self.function_id is not None:
+                mgr = self._manager()
+                ids = self._effect_ids()
+                if ids and mgr is not None:
+                    # Mehrere gekoppelte Effekte taktgleich auf den Bus haengen
+                    # (assign re-ankert via sync_phase -> sauberer gemeinsamer Start).
                     try:
-                        from src.core.engine import effect_live
-                        effect_live.set_param("tempo_bus_id", self.buses[idx],
-                                              self.function_id)
+                        mgr.assign_effects_to_bus(ids, self.buses[idx])
                     except Exception:
                         pass
-                else:
-                    mgr = self._manager()
-                    if mgr is not None:
-                        try:
-                            mgr.armed_bus_id = self.buses[idx]
-                        except Exception:
-                            pass
+                elif mgr is not None:
+                    try:
+                        mgr.armed_bus_id = self.buses[idx]
+                    except Exception:
+                        pass
                 self.update()
                 event.accept()
                 return
@@ -159,10 +180,11 @@ class VCBusSelector(VCWidget):
         buses_edit = QLineEdit(", ".join(self.buses))
         buses_edit.setToolTip("Bus-IDs (mit Komma getrennt), z. B. A, B, C, D.")
         form.addRow("Buses:", buses_edit)
-        fid_edit = QLineEdit("" if self.function_id is None else str(self.function_id))
-        fid_edit.setToolTip("Optional: Funktions-ID. Mit Ziel wird dessen tempo_bus_id "
-                            "gesetzt; leer = globalen Tap/Sync-Bus scharf schalten.")
-        form.addRow("Effekt-ID (leer=global):", fid_edit)
+        fid_edit = QLineEdit(", ".join(str(i) for i in self._effect_ids()))
+        fid_edit.setToolTip("Optional: eine ODER mehrere Funktions-IDs (Komma-getrennt). "
+                            "Mit Ziel haengt ein Chip-Klick ALLE taktgleich auf den Bus; "
+                            "leer = globalen Tap/Sync-Bus scharf schalten.")
+        form.addRow("Effekt-IDs (leer=global):", fid_edit)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -174,8 +196,13 @@ class VCBusSelector(VCWidget):
             ids = [s for s in ids if s]
             if ids:
                 self.buses = ids
-            raw_fid = fid_edit.text().strip()
-            self.function_id = int(raw_fid) if raw_fid.lstrip("-").isdigit() else None
+            ids: list[int] = []
+            for tok in fid_edit.text().replace(";", ",").split(","):
+                tok = tok.strip()
+                if tok.lstrip("-").isdigit():
+                    ids.append(int(tok))
+            self.function_id = ids[0] if ids else None
+            self.function_ids = ids[1:]
             self.update()
 
     # ── Serialisierung ────────────────────────────────────────────────────────────
@@ -184,6 +211,7 @@ class VCBusSelector(VCWidget):
         d = super().to_dict()
         d["buses"] = list(self.buses)
         d["function_id"] = self.function_id
+        d["function_ids"] = list(self.function_ids)
         return d
 
     def apply_dict(self, d: dict):
@@ -195,3 +223,12 @@ class VCBusSelector(VCWidget):
             self.function_id = int(raw_fid) if raw_fid is not None else None
         except (TypeError, ValueError):
             self.function_id = None
+        raw_ids = d.get("function_ids", [])
+        out: list[int] = []
+        if isinstance(raw_ids, (list, tuple)):
+            for x in raw_ids:
+                try:
+                    out.append(int(x))
+                except (TypeError, ValueError):
+                    continue
+        self.function_ids = out
