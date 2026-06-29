@@ -25,7 +25,11 @@ ATTR_GROUPS: dict[str, set[str]] = {
     "Beam":      {"zoom", "focus", "frost", "iris", "prism"},
     "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo_fx", "gobo1",
                   "gobo2", "gobo_rot"},
-    "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "animation"},
+    # "prism_rot" = synthetische Kurzform; "prism_rotation" = real emittierter
+    # Name (QXF-Import, eingebauter Generic-MH) -> BEIDE exakt in Effect, damit der
+    # Beam-Substring "prism" sie nicht faelschlich als Beam klassifiziert (ENG-07).
+    "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "prism_rotation",
+                  "animation"},
 }
 
 # Anzeige-/Sortierreihenfolge inkl. Auffang-Gruppe "Other".
@@ -46,7 +50,7 @@ ATTR_LABELS: dict[str, str] = {
     "pan": "Pan", "tilt": "Tilt", "pan_fine": "Pan (fein)", "tilt_fine": "Tilt (fein)",
     "pan_speed": "Pan-Speed", "tilt_speed": "Tilt-Speed",
     "zoom": "Zoom", "focus": "Focus", "frost": "Frost", "iris": "Iris", "prism": "Prisma",
-    "prism_rot": "Prisma-Rotation",
+    "prism_rot": "Prisma-Rotation", "prism_rotation": "Prisma-Rotation",
     "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_rotation": "Gobo-Rotation",
     "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
     "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
@@ -77,8 +81,9 @@ def classify_attr(attr: str) -> str:
     Die Zwei-Pass-Reihenfolge ist wichtig: bei einem kombinierten Durchlauf
     (exakt+Substring pro Gruppe) greift sonst ein Substring einer FRUEHEREN Gruppe,
     bevor die exakte Mitgliedschaft der richtigen Gruppe geprueft wird. Konkret:
-    ``prism_rot`` ist exakt in Effect, enthaelt aber den Substring ``prism`` (Beam,
-    steht davor) -> wurde faelschlich als Beam klassifiziert (Snap/Szenen-Label).
+    ``prism_rotation`` (so emittiert von QXF-Import/Generic-MH) ist exakt in Effect,
+    enthaelt aber den Substring ``prism`` (Beam, steht davor) -> wurde sonst
+    faelschlich als Beam klassifiziert (Snap/Szenen-Label).
     """
     a = (attr or "").lower()
     # Pass 1: exakte Mitgliedschaft hat IMMER Vorrang (ueber alle Gruppen).
