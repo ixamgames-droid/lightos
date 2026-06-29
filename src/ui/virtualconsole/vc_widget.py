@@ -114,6 +114,7 @@ class VCWidget(QFrame):
             self._selected = True
             self.update()
             self._notify_effect_highlight()    # Gruppe „beeinflusst denselben Effekt"
+            self._notify_selected()            # Inspector-Panel auf dieses Widget binden
             pos = event.position().toPoint()
             self._drag_start = event.globalPosition().toPoint()
             self._orig_rect = self.geometry()
@@ -567,6 +568,20 @@ class VCWidget(QFrame):
                 return p
             p = p.parent()
         return None
+
+    def _notify_selected(self):
+        """Meldet die Auswahl dieses Widgets an den naechsten Vorfahren mit einem
+        ``_on_widget_selected``-Hook (VCCanvas) — fuer das Inspector-Panel. Nur ein
+        Routing-Hop, keine UI-Arbeit hier (die macht das Panel)."""
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, "_on_widget_selected"):
+                try:
+                    p._on_widget_selected(self)
+                except Exception:
+                    pass
+                return
+            p = p.parent()
 
     def _open_live_editor(self, function_id):
         """Oeffnet den Matrix-Live-Editor-Dialog und laesst die ausgewaehlten

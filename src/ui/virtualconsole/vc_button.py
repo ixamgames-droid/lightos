@@ -1153,13 +1153,16 @@ class VCButton(VCWidget):
 
     # ── Properties dialog ────────────────────────────────────────────────────
 
-    def _open_properties(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Button Einstellungen")
-        form = QFormLayout(dlg)
+    def _build_settings(self, host, live=False):
+        """Baut alle Eigenschafts-Felder + Apply-/Sichtbarkeits-Logik EINMAL und gibt
+        eine Struktur zurueck, aus der sowohl der modale Dialog (``_open_properties``)
+        als auch das Inspector-Panel (``build_inspector_body``) ihr Layout
+        zusammensetzen. ``live=True`` = jede Aenderung wird sofort angewendet
+        (Inspector); ``live=False`` = erst beim OK (modaler Dialog)."""
+        from PySide6.QtWidgets import QPushButton, QColorDialog
+        from .target_list_editor import TargetListEditor, SnapListEditor
 
         cap = QLineEdit(self.caption)
-        form.addRow("Beschriftung:", cap)
 
         act = QComboBox()
         for a, lbl in BUTTON_ACTION_LABELS:
@@ -1168,16 +1171,12 @@ class VCButton(VCWidget):
             if act.itemData(i) == self.action.value:
                 act.setCurrentIndex(i)
                 break
-        form.addRow("Aktion:", act)
 
-        # HAUPTWEG: Funktion/Chase nach NAME auswaehlen (David: nicht mit Executor-
-        # Slot-Zahlen arbeiten). Die Namens-Combo + die „Steuert"-Liste sind primaer;
-        # das Roh-ID-/Slot-Feld wandert unter „Erweitert" (weiter unten).
+        # HAUPTWEG: Funktion/Chase nach NAME auswaehlen; Roh-ID/Slot liegt unter „Erweitert".
         slot = QLineEdit(str(self.function_id) if self.function_id is not None else "")
         slot.setToolTip("Roh-Function-ID bzw. Executor-Slot-Nummer (Aktion 'Executor'). "
                         "Normalerweise per Namen gewählt.")
 
-        # Funktion/Chase nach Namen auswaehlen -> fuellt das Function-ID-Feld.
         func_combo = QComboBox()
         func_combo.addItem("(per Erweitert / Roh-ID)", -1)
         self._populate_function_combo(func_combo)
@@ -1191,26 +1190,18 @@ class VCButton(VCWidget):
             if func_combo.currentData() is not None and func_combo.currentData() >= 0
             else None
         )
-        # Phase E: weitere gekoppelte Funktions-IDs (Komma-getrennt) — der Button
-        # schaltet/flasht function_id + diese gemeinsam (FUNCTION_TOGGLE/FLASH).
+
         extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
         extra_ids.setToolTip("Weitere Funktions-IDs (Komma-getrennt) — Toggle/Flash "
                              "wirkt zusaetzlich auf diese Funktionen (als Gruppe).")
-        # (Roh-ID-Felder werden unten unter „Erweitert" gebuendelt.)
 
-        # Lesbare, aufklappbare „Steuert"-Liste (wie beim BPM/Speed-Dial): zeigt die
-        # gebundenen Funktionen/Effekte nach NAMEN, je Zeile auswaehl- und loeschbar.
-        # Ist sie befuellt, hat sie beim Speichern Vorrang vor Slot/Weitere-IDs.
-        from .target_list_editor import TargetListEditor, SnapListEditor
         target_editor = TargetListEditor(with_params=False, title="Schaltet mit")
         _t0 = ([int(self.function_id)] if self.function_id is not None else []) \
             + [int(i) for i in self.function_ids]
         target_editor.set_targets(_t0)
         target_editor.setToolTip("Funktionen/Effekte, die dieser Button schaltet — "
                                  "per Dropdown auswählen, mit ✕ entfernen, „+\" hinzufügen.")
-        form.addRow("Ziele:", target_editor)
 
-        # Snapshot-Auswahl
         snap_combo = QComboBox()
         snap_combo.addItem("(keiner)", -1)
         self._populate_snapshot_combo(snap_combo)
@@ -1219,25 +1210,15 @@ class VCButton(VCWidget):
                 if snap_combo.itemData(i) == self.snapshot_index:
                     snap_combo.setCurrentIndex(i)
                     break
-        form.addRow("Snapshot:", snap_combo)
 
-        # Bibliothek-Snap (Farbe/Look) — Aktion = LibrarySnap
-        lib_combo = QComboBox()
-        lib_combo.addItem("(keiner)", -1)
-        self._populate_library_combo(lib_combo)
-        if self.snap_id is not None:
-            for i in range(lib_combo.count()):
-                if lib_combo.itemData(i) == self.snap_id:
-                    lib_combo.setCurrentIndex(i)
-                    break
-        form.addRow("Bibliothek-Farbe/Snap:", lib_combo)
-
+        # Bibliothek-Snap (Aktion = LibrarySnap): der SnapListEditor verwaltet
+        # Einzel- UND Mehrfach-Snaps; die fruehere, immer unsichtbare Einzel-Combo
+        # (lib_combo) entfaellt (Audit-Bug: Einzel-Snap war nicht mehr waehlbar).
         snap_editor = SnapListEditor(title="Schaltet Snaps")
         snap_editor.set_targets(self._all_snap_ids())
         snap_editor.setToolTip("Bibliothek-Snaps/Looks, die dieser Button gemeinsam "
-                               "setzt, flasht oder toggelt. Ideal fuer mehrere "
-                               "Strobe-Snaps aus verschiedenen Dimmer-Gruppen.")
-        form.addRow("Snap-Ziele:", snap_editor)
+                               "setzt, flasht oder toggelt. Auch fuer einen einzelnen "
+                               "Snap. Ideal fuer mehrere Strobe-Snaps verschiedener Gruppen.")
 
         snap_mode_combo = QComboBox()
         _SNAP_MODES = [("toggle", "Umschalten (an/aus)"),
@@ -1249,11 +1230,7 @@ class VCButton(VCWidget):
             if key == self.snap_mode:
                 snap_mode_combo.setCurrentIndex(i)
                 break
-        form.addRow("Tasten-Modus (Snap):", snap_mode_combo)
 
-        # Phase 6: Effekt-Aktion (nur bei Aktion = EffectAction) — Auswahl mit
-        # deutschen Labels statt Freitext. Aktionen eines gebundenen Effekts
-        # (list_actions) werden ergänzt; der gespeicherte Key bleibt immer erhalten.
         eff_action_combo = QComboBox()
         _eff_keys: list[str] = []
         for _k, _lbl in EFFECT_ACTION_LABELS:
@@ -1275,9 +1252,7 @@ class VCButton(VCWidget):
                 eff_action_combo.setCurrentIndex(i)
                 break
         eff_action_combo.setToolTip("Welche Live-Aktion der gebundene Effekt ausführt.")
-        form.addRow("Effekt-Aktion (EffectAction):", eff_action_combo)
 
-        # F-24: Gruppenname (nur bei Aktion = SelectGroup).
         group_combo = QComboBox()
         group_combo.setEditable(True)
         group_combo.addItem("")
@@ -1292,9 +1267,7 @@ class VCButton(VCWidget):
             pass
         group_combo.setCurrentText(self.group_name or "")
         group_combo.setToolTip("Fixture-Gruppe für Aktion = SelectGroup.")
-        form.addRow("Gruppe (SelectGroup):", group_combo)
 
-        # Tempo-Sync Phase 5: Ziel-Bus (nur Aktionen TAP_BUS/SYNC_BUS/ARM_BUS).
         bus_combo = QComboBox()
         for _bid, _blbl in (("", "(aktiver/Default-Bus)"), ("A", "Bus A"),
                             ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
@@ -1304,22 +1277,16 @@ class VCButton(VCWidget):
                 bus_combo.setCurrentIndex(i)
                 break
         bus_combo.setToolTip("Auf welchen Tempo-Bus Tap/Sync/Scharfschalten wirkt.")
-        form.addRow("Tempo-Bus:", bus_combo)
 
-        # Live-Edit-Slot (FUNCTION_TOGGLE/FLASH): macht den Effekt zum aktiven
-        # Bearbeitungsziel des Slots; Fader/Farben mit gleichem Slot editieren ihn.
         edit_slot_edit = QLineEdit(self.edit_slot)
         edit_slot_edit.setToolTip("Live-Edit-Slot (Freitext, z. B. MH oder MX). Beim Start "
                                   "wird dieser Effekt das Bearbeitungsziel des Slots; Fader/"
                                   "Farb-Kacheln mit demselben Slot bearbeiten ihn (pro Quadrant).")
-        form.addRow("Live-Edit-Slot:", edit_slot_edit)
 
-        # Start-Verhalten (nur Funktions-Aktionen): exklusiv + Programmer leeren.
         exclusive_cb = QCheckBox("Andere Funktionen stoppen (nur diese aktiv)")
         exclusive_cb.setChecked(self.exclusive)
         exclusive_cb.setToolTip("Beim Start dieser Funktion alle anderen laufenden "
                                 "Funktionen stoppen (Solo). Nur FUNCTION-Aktionen.")
-        form.addRow("Exklusiv:", exclusive_cb)
         solo_fix_cb = QCheckBox("Andere Effekte auf denselben Geräten stoppen")
         solo_fix_cb.setChecked(self.solo_fixtures)
         solo_fix_cb.setToolTip("Beim Start nur die Effekte stoppen, die DIESELBEN "
@@ -1327,34 +1294,24 @@ class VCButton(VCWidget):
                                "neue Effekt löst den alten auf diesen Geräten ab. "
                                "Effekte auf anderen Geräten laufen weiter. "
                                "Nur FUNCTION-Aktionen.")
-        form.addRow("Geräte-Solo:", solo_fix_cb)
         clear_prog_cb = QCheckBox("Programmer vorher leeren")
         clear_prog_cb.setChecked(self.clear_programmer)
         clear_prog_cb.setToolTip("Vor dem Start den Programmer leeren — manuelle "
                                  "Farben/Snaps haben sonst Vorrang und überdecken den "
                                  "Effekt. Nur FUNCTION-Aktionen.")
-        form.addRow("Programmer leeren:", clear_prog_cb)
-
-        form.addRow(QLabel("── MIDI-Bindung ──"))
 
         midi_type_combo = QComboBox()
         midi_type_combo.addItems(["note_on", "cc"])
         midi_type_combo.setCurrentText(self.midi_type)
-        form.addRow("MIDI-Typ:", midi_type_combo)
-
         midi_ch_spin = QSpinBox()
         midi_ch_spin.setRange(0, 16)
         midi_ch_spin.setValue(self.midi_ch)
         midi_ch_spin.setSpecialValueText("Alle")
-        form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
-
         midi_note_spin = QSpinBox()
         midi_note_spin.setRange(-1, 127)
         midi_note_spin.setValue(self.midi_data1)
         midi_note_spin.setSpecialValueText("keine")
-        form.addRow("Note / CC (-1=keine):", midi_note_spin)
 
-        form.addRow(QLabel("── APC-Pad-Anzeige ──"))
         pad_style_combo = QComboBox()
         _PAD_STYLES = [("mirror", "Spiegel (Effekt-Farbe)"), ("solid", "Feste Farbe"),
                        ("pulse", "Pulsieren"), ("alternate", "Zwei Farben im Wechsel"),
@@ -1365,11 +1322,7 @@ class VCButton(VCWidget):
             if key == self.pad_style:
                 pad_style_combo.setCurrentIndex(i)
                 break
-        form.addRow("Pad-Stil:", pad_style_combo)
 
-        # Zweite Wechselfarbe (nur Pad-Stil = "Zwei Farben im Wechsel").
-        from PySide6.QtWidgets import QPushButton
-        from PySide6.QtWidgets import QColorDialog
         _pad2 = {"rgb": tuple(self.pad_color2)}
         pad_color2_btn = QPushButton()
 
@@ -1380,54 +1333,35 @@ class VCButton(VCWidget):
 
         def _pick_pad2():
             r, g, b = _pad2["rgb"]
-            c = QColorDialog.getColor(QColor(r, g, b), dlg, "Zweite Pad-Farbe")
+            c = QColorDialog.getColor(QColor(r, g, b), host, "Zweite Pad-Farbe")
             if c.isValid():
                 _pad2["rgb"] = (c.red(), c.green(), c.blue())
                 _refresh_pad2_btn()
+                _live()
 
         _refresh_pad2_btn()
         pad_color2_btn.clicked.connect(_pick_pad2)
         pad_color2_btn.setToolTip("Zweite Farbe für Pad-Stil 'Zwei Farben im Wechsel'.")
-        form.addRow("2. Pad-Farbe (Wechsel):", pad_color2_btn)
 
-        # BTN-01: zusaetzliche Aktionen (Multi-Action) bearbeiten.
         _edited = {"list": [dict(a) for a in self.actions]}
         actions_btn = QPushButton(f"Mehrfach-Aktionen… ({len(self.actions)})")
 
         def _edit_actions():
             from src.ui.widgets.multi_action_dialog import MultiActionDialog
-            d2 = MultiActionDialog(_edited["list"], dlg)
+            d2 = MultiActionDialog(_edited["list"], host)
             if d2.exec() == QDialog.DialogCode.Accepted:
                 _edited["list"] = d2.get_actions()
                 actions_btn.setText(f"Mehrfach-Aktionen… ({len(_edited['list'])})")
+                _live()
 
         actions_btn.clicked.connect(_edit_actions)
-        form.addRow("Zusatz-Aktionen:", actions_btn)
 
-        # Welle 4 (O): Long-Press im Live-Modus oeffnet den Effekt-Mini-Editor.
-        from PySide6.QtWidgets import QCheckBox as _QCheckBox
-        long_press_cb = _QCheckBox("Lang drücken → Live-Einstellungen (erst Anwenden sendet)")
+        long_press_cb = QCheckBox("Lang drücken → Live-Einstellungen (erst Anwenden sendet)")
         long_press_cb.setChecked(self.long_press_editor)
         long_press_cb.setToolTip("Im Live-Modus den Button lange halten, um die Effekt-"
                                  "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
-        form.addRow("Long-Press:", long_press_cb)
 
-        # „Erweitert"-Bereich (Roh-ID / Executor-Slot / weitere IDs) — eingeklappt.
-        from src.ui.widgets.collapsible_section import CollapsibleSection
-        from PySide6.QtWidgets import QWidget as _QWidget
-        _adv_inner = _QWidget()
-        _adv_form = QFormLayout(_adv_inner)
-        _adv_form.setContentsMargins(0, 0, 0, 0)
-        _adv_form.addRow("Funktion / Chase (Name):", func_combo)
-        _adv_form.addRow("Executor-Slot / Function-ID:", slot)
-        _adv_form.addRow("Weitere Schalt-IDs:", extra_ids)
-        adv_section = CollapsibleSection("Erweitert (Roh-ID / Executor-Slot)", _adv_inner,
-                                         collapsed=True, prefs_key="vc_button_advanced")
-        form.addRow(adv_section)
-
-        # ── Kontextabhängige Feld-Sichtbarkeit ──
-        # Zeigt je Aktion nur die passenden Felder (statt immer alle ~12 Zeilen).
-        # Caption/Aktion/MIDI/Pad bleiben immer sichtbar.
+        # ── Aktions-Konstanten (Sichtbarkeit) ──
         FT, FF = ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH
         EA, SG = ButtonAction.EFFECT_ACTION, ButtonAction.SELECT_GROUP
         LS, SN = ButtonAction.LIBRARY_SNAP, ButtonAction.SNAPSHOT
@@ -1435,45 +1369,7 @@ class VCButton(VCWidget):
         TB, SB, AB = ButtonAction.TAP_BUS, ButtonAction.SYNC_BUS, ButtonAction.ARM_BUS
         AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
 
-        def _update_field_visibility():
-            a = act.currentData()        # roher Enum-Wert (str)
-            func_like = a in (FT, FF, EA, TG, FL, AW)
-            if a == EA:
-                target_editor.set_title("Aktion auf")
-            else:
-                target_editor.set_title("Schaltet mit")
-            vis = {
-                adv_section:     func_like,
-                target_editor:   a in (FT, FF, EA, AW),
-                snap_combo:      a == SN,
-                lib_combo:       False,
-                snap_editor:     a == LS,
-                snap_mode_combo: a == LS,
-                eff_action_combo: a == EA,
-                group_combo:     a == SG,
-                edit_slot_edit:  a in (FT, FF, EA),
-                exclusive_cb:    a in (FT, FF),
-                solo_fix_cb:     a in (FT, FF),
-                clear_prog_cb:   a in (FT, FF),
-                long_press_cb:   a in (FT, EA),
-                bus_combo:       a in (TB, SB, AB),
-                pad_color2_btn:  self.pad_style == "alternate" or
-                                 pad_style_combo.currentData() == "alternate",
-            }
-            for widget, show in vis.items():
-                form.setRowVisible(widget, bool(show))
-
-        act.currentIndexChanged.connect(lambda _i: _update_field_visibility())
-        pad_style_combo.currentIndexChanged.connect(lambda _i: _update_field_visibility())
-        _update_field_visibility()
-
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
-                                QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-        form.addRow(btns)
-
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        def apply():
             self.caption = cap.text() or self.caption
             self.action = ButtonAction(act.currentData() or self.action.value)
             try:
@@ -1481,7 +1377,6 @@ class VCButton(VCWidget):
                 self.function_id = _fid if _fid >= 0 else None
             except ValueError:
                 self.function_id = None
-            # Phase E: weitere gekoppelte Funktions-IDs.
             _eids = []
             for part in extra_ids.text().split(","):
                 part = part.strip()
@@ -1492,16 +1387,13 @@ class VCButton(VCWidget):
                 except ValueError:
                     pass
             self.function_ids = _eids
-            # „Steuert"-Liste hat Vorrang, wenn befuellt: erste Zeile -> function_id,
-            # restliche -> function_ids (nur bei funktionsgebundenen Aktionen).
+            # „Schaltet mit"-Liste hat Vorrang, wenn befuellt (nur Funktions-Aktionen).
             if self.action in (FT, FF, EA, AW):
                 _tids = target_editor.ids()
                 self.function_id = _tids[0] if _tids else None
                 self.function_ids = _tids[1:]
             snap_idx = snap_combo.currentData()
             self.snapshot_index = snap_idx if snap_idx >= 0 else None
-            lib_id = lib_combo.currentData()
-            self.snap_id = lib_id if lib_id is not None and lib_id >= 0 else None
             self.snap_ids = []
             if self.action == LS:
                 _sids = snap_editor.ids()
@@ -1525,6 +1417,228 @@ class VCButton(VCWidget):
             self.long_press_editor = long_press_cb.isChecked()
             self.actions = _edited["list"]
             self.update()
+
+        def _live():
+            if live:
+                apply()
+
+        def update_visibility(set_row_visible, set_section_visible=None):
+            a = act.currentData()        # roher Enum-Wert (str)
+            func_like = a in (FT, FF, EA, TG, FL, AW)
+            target_editor.set_title("Aktion auf" if a == EA else "Schaltet mit")
+            rows = {
+                target_editor:    a in (FT, FF, EA, AW),
+                snap_combo:       a == SN,
+                snap_editor:      a == LS,
+                snap_mode_combo:  a == LS,
+                eff_action_combo: a == EA,
+                group_combo:      a == SG,
+                bus_combo:        a in (TB, SB, AB),
+                edit_slot_edit:   a in (FT, FF, EA),
+                exclusive_cb:     a in (FT, FF),
+                solo_fix_cb:      a in (FT, FF),
+                clear_prog_cb:    a in (FT, FF),
+                long_press_cb:    a in (FT, EA),
+                actions_btn:      True,
+                pad_style_combo:  True,
+                pad_color2_btn:   pad_style_combo.currentData() == "alternate",
+                midi_type_combo:  True,
+                midi_ch_spin:     True,
+                midi_note_spin:   True,
+            }
+            for widget, show in rows.items():
+                set_row_visible(widget, bool(show))
+            if set_section_visible is not None:
+                set_section_visible("advanced", func_like)
+
+        # Live-Modus: jede Aenderung sofort anwenden (Inspector-Panel).
+        if live:
+            cap.textChanged.connect(lambda *_: _live())
+            act.currentIndexChanged.connect(lambda *_: _live())
+            slot.textChanged.connect(lambda *_: _live())
+            extra_ids.textChanged.connect(lambda *_: _live())
+            func_combo.currentIndexChanged.connect(lambda *_: _live())
+            target_editor.changed.connect(lambda *_: _live())
+            snap_combo.currentIndexChanged.connect(lambda *_: _live())
+            snap_editor.changed.connect(lambda *_: _live())
+            snap_mode_combo.currentIndexChanged.connect(lambda *_: _live())
+            eff_action_combo.currentIndexChanged.connect(lambda *_: _live())
+            group_combo.currentTextChanged.connect(lambda *_: _live())
+            bus_combo.currentIndexChanged.connect(lambda *_: _live())
+            edit_slot_edit.textChanged.connect(lambda *_: _live())
+            exclusive_cb.toggled.connect(lambda *_: _live())
+            solo_fix_cb.toggled.connect(lambda *_: _live())
+            clear_prog_cb.toggled.connect(lambda *_: _live())
+            long_press_cb.toggled.connect(lambda *_: _live())
+            midi_type_combo.currentIndexChanged.connect(lambda *_: _live())
+            midi_ch_spin.valueChanged.connect(lambda *_: _live())
+            midi_note_spin.valueChanged.connect(lambda *_: _live())
+            pad_style_combo.currentIndexChanged.connect(lambda *_: _live())
+
+        return {
+            "apply": apply,
+            "update_visibility": update_visibility,
+            "action_combo": act,
+            "pad_combo": pad_style_combo,
+            "top": [("Beschriftung:", cap), ("Aktion:", act)],
+            "sections": [
+                ("target", "Ziel und Verhalten", False, "vc_button_sec_target", [
+                    ("Ziele:", target_editor),
+                    ("Snapshot:", snap_combo),
+                    ("Snap-Ziele:", snap_editor),
+                    ("Tasten-Modus (Snap):", snap_mode_combo),
+                    ("Effekt-Aktion:", eff_action_combo),
+                    ("Gruppe (SelectGroup):", group_combo),
+                    ("Tempo-Bus:", bus_combo),
+                    ("Live-Edit-Slot:", edit_slot_edit),
+                    ("Exklusiv:", exclusive_cb),
+                    ("Geräte-Solo:", solo_fix_cb),
+                    ("Programmer leeren:", clear_prog_cb),
+                    ("Long-Press:", long_press_cb),
+                    ("Zusatz-Aktionen:", actions_btn),
+                ]),
+                ("apc", "APC-Pad", False, "vc_button_sec_apc", [
+                    ("Pad-Stil:", pad_style_combo),
+                    ("2. Pad-Farbe (Wechsel):", pad_color2_btn),
+                ]),
+                ("midi", "MIDI und Tastatur", True, "vc_button_sec_midi", [
+                    ("MIDI-Typ:", midi_type_combo),
+                    ("MIDI-Kanal (0=alle):", midi_ch_spin),
+                    ("Note / CC (-1=keine):", midi_note_spin),
+                ]),
+                ("advanced", "Erweitert (Roh-ID / Executor-Slot)", True, "vc_button_advanced", [
+                    ("Funktion / Chase (Name):", func_combo),
+                    ("Executor-Slot / Function-ID:", slot),
+                    ("Weitere Schalt-IDs:", extra_ids),
+                ]),
+            ],
+        }
+
+    def _open_properties(self):
+        """Modaler Eigenschaften-Dialog (Fallback / Doppelklick ausserhalb des
+        Inspector-Panels). Baut die Felder ueber ``_build_settings`` und legt sie als
+        flaches Formular mit Sektions-Trennern + „Erweitert"-Klappbereich aus."""
+        from PySide6.QtWidgets import QWidget as _QWidget, QVBoxLayout  # noqa: F401
+        from src.ui.widgets.collapsible_section import CollapsibleSection
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Button Einstellungen")
+        form = QFormLayout(dlg)
+        S = self._build_settings(dlg, live=False)
+
+        for label, w in S["top"]:
+            form.addRow(label, w)
+
+        adv_section = None
+        for key, title, _collapsed, prefs, rows in S["sections"]:
+            if key == "advanced":
+                inner = _QWidget()
+                inner_form = QFormLayout(inner)
+                inner_form.setContentsMargins(0, 0, 0, 0)
+                for label, w in rows:
+                    inner_form.addRow(label, w)
+                adv_section = CollapsibleSection(title, inner, collapsed=True, prefs_key=prefs)
+                form.addRow(adv_section)
+            else:
+                form.addRow(QLabel(f"── {title} ──"))
+                for label, w in rows:
+                    form.addRow(label, w)
+
+        def set_row_visible(w, show):
+            try:
+                form.setRowVisible(w, bool(show))
+            except Exception:
+                w.setVisible(bool(show))
+
+        def set_section_visible(k, show):
+            if k == "advanced" and adv_section is not None:
+                try:
+                    form.setRowVisible(adv_section, bool(show))
+                except Exception:
+                    adv_section.setVisible(bool(show))
+
+        def refresh():
+            S["update_visibility"](set_row_visible, set_section_visible)
+
+        S["action_combo"].currentIndexChanged.connect(lambda _i: refresh())
+        S["pad_combo"].currentIndexChanged.connect(lambda _i: refresh())
+        refresh()
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        form.addRow(btns)
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            S["apply"]()
+
+    def build_inspector_body(self, host=None):
+        """Liefert den in Sektionen gegliederten Einstellungs-Inhalt fuer das
+        Inspector-Panel (Live-Bearbeitung). Speichert die Apply-Funktion unter
+        ``self._inspector_apply``, damit das Panel beim Verlassen ein letztes Mal
+        anwenden und einen Undo-Punkt setzen kann."""
+        from PySide6.QtWidgets import QWidget as _QWidget, QVBoxLayout
+        from src.ui.widgets.collapsible_section import CollapsibleSection
+        host = host or self
+        S = self._build_settings(host, live=True)
+        self._inspector_apply = S["apply"]
+
+        container = _QWidget()
+        v = QVBoxLayout(container)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(6)
+
+        top_inner = _QWidget()
+        top_form = QFormLayout(top_inner)
+        top_form.setContentsMargins(0, 0, 0, 0)
+        for label, w in S["top"]:
+            top_form.addRow(label, w)
+        v.addWidget(top_inner)
+
+        row_form_of = {}
+        sections = []   # (key, CollapsibleSection, [row_widgets])
+        for key, title, collapsed, prefs, rows in S["sections"]:
+            inner = _QWidget()
+            f = QFormLayout(inner)
+            f.setContentsMargins(0, 0, 0, 0)
+            row_widgets = []
+            for label, w in rows:
+                f.addRow(label, w)
+                row_form_of[w] = f
+                row_widgets.append(w)
+            sec = CollapsibleSection(title, inner, collapsed=collapsed, prefs_key=prefs)
+            v.addWidget(sec)
+            sections.append((key, sec, row_widgets))
+        v.addStretch(1)
+
+        shown = {}
+
+        def set_row_visible(w, show):
+            shown[w] = bool(show)
+            f = row_form_of.get(w)
+            if f is not None:
+                try:
+                    f.setRowVisible(w, bool(show))
+                except Exception:
+                    w.setVisible(bool(show))
+
+        def set_section_visible(k, show):
+            for key, sec, _rws in sections:
+                if key == k:
+                    sec.setVisible(bool(show))
+
+        def refresh():
+            S["update_visibility"](set_row_visible, set_section_visible)
+            # Leere Sektionen ausblenden (advanced wird per Predicate gesteuert).
+            for key, sec, row_widgets in sections:
+                if key == "advanced":
+                    continue
+                sec.setVisible(any(shown.get(w, True) for w in row_widgets))
+
+        S["action_combo"].currentIndexChanged.connect(lambda _i: refresh())
+        S["pad_combo"].currentIndexChanged.connect(lambda _i: refresh())
+        refresh()
+        return container
 
     def _populate_function_combo(self, combo: QComboBox):
         """Listet alle Funktionen (Chases/Sequences/Scenes...) nach Namen auf."""
