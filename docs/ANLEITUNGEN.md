@@ -42,8 +42,9 @@ Die Looks sind **getrennte Ebenen** über denselben Geräten und lassen sich fre
 
 ## Verwandte Dokumente
 
-- **Hochzeit-Show: Farbwechsel und Dimmer taktgleich** (unterschiedliche Geschwindigkeit · gemeinsamer Taktstart · Auto-Sync, passend zu Bank 4): [anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md)
-- **Tempo & Synchronisierung — Gesamtüberblick** (BPM · Tempo-Buses · Multiplikatoren · **Auto-Sync/Phasen-Sync**; mit Rezept „Dimmer ½ zur Farbe, taktgleich"): [ANLEITUNG_TEMPO_SYNC.md](ANLEITUNG_TEMPO_SYNC.md)
+- **Tempo-Controller-Widget** (All-in-One: Bus + Quelle Sound/Tap/Fix + Faktor ×¼…×4 + gekoppelte Effekte in einem VC-Panel; Effekt draufziehen): [anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)
+- **Hochzeit-Show: Farbwechsel und Dimmer taktgleich** (drei **Tempo-Controller** auf Bus A/B/C · unterschiedliche Geschwindigkeit · gemeinsamer Taktstart): [anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md)
+- **Tempo & Synchronisierung — Gesamtüberblick** (BPM · Tempo-Buses · Multiplikatoren · „Taktgleich"-Haken · **Auto-Sync/Phasen-Sync** · Panel „Effekte je Bus"): [ANLEITUNG_TEMPO_SYNC.md](ANLEITUNG_TEMPO_SYNC.md)
 - **BPM-Manager — neue Funktionen** (BPM-Quelle, Genre-Presets, Takt-Raster, **Generator**: ganzes Lied → Beatgrid, Analyse-Engines, Beatgrid-Editor, „Taktgenau"): [anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)
 - **Event-Demo-2026-Anleitungen** (Moving Heads · Spider · Speed/BPM · VC live bearbeiten): [ANLEITUNGEN_EVENT_DEMO.md](ANLEITUNGEN_EVENT_DEMO.md)
 - Komplette Oberflächen-Anleitung (alle 8 Sektionen): [ANLEITUNG.md](ANLEITUNG.md)

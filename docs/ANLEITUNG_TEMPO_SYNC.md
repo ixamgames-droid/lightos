@@ -75,12 +75,17 @@ Tempo-Einstellungen:
 - **Multiplikator** — wie schnell relativ zum Bus: **¼ · ½ · 1× · 2× · 4×** (bis ×16 fein einstellbar).
 - **Phase** — Versatz in Beats (0…1), um den Effekt gegen andere zu „verschieben".
 
-Du setzt das an zwei Stellen:
-1. **Direkt im Programmer-Editor** der Matrix- und Bewegungseffekte
-   (Tempo-Bus / Multiplikator / Phase). Neue Effekte stehen standardmäßig auf
-   **Global · 1× · Phase 0**.
-2. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Tempo-Bus-Multiplikator"** —
-   das ist das „Multiplikator-Fenster", mit dem du den Faktor eines Effekts (oder mehrerer,
+Du setzt das an drei Stellen:
+1. **Direkt im Effekt-Editor** (RGB-Matrix, EFX, Chaser, Sequence): **Tempo-Bus /
+   Multiplikator / Phase** und die Checkbox **„Taktgleich starten"**. Neue Effekte stehen
+   standardmäßig auf **Global · 1× · Phase 0 · Taktgleich an** — sie starten also direkt
+   im gemeinsamen Raster. Nur für einen bewusst frei laufenden Effekt den Haken weg
+   (oder **Tempo-Bus = Frei**).
+2. **Tempo-Controller-Widget** in der VC — der bequeme Weg: **ein Bus + Quelle
+   (Sound/Tap/Fix) + Faktor + gekoppelte Effekte** in einem Panel. Effekt einfach
+   drauf­ziehen. → **[Tempo-Controller-Anleitung](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)**.
+3. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Tempo-Bus-Multiplikator"** —
+   das „Multiplikator-Fenster", mit dem du den Faktor eines Effekts (oder mehrerer,
    per Komma-Liste) im Betrieb auf **Half/Double** ziehst.
 
 > ⚠️ **Falle:** Der **Multiplikator wirkt nur, wenn der Effekt an einem Bus hängt.** Bei
@@ -125,6 +130,18 @@ Pro Bus: das **SYNC**-Feld eines Speed-Dials bzw. ein VC-Button mit Aktion **„
 setzt den Downbeat dieses Bus neu („jetzt ist die Eins"). Für Live-Performance auf eine
 Taste/ein Pad legbar (auch **„Auto-Sync an/aus"** gibt es als VC-Button-Aktion).
 
+### d) „Effekte je Bus" im BPM-Tab — Übersicht + Häkchen pro Effekt
+**BPM-Tab (Strg+8) → Panel „Effekte je Bus — taktgleich".** Listet **alle** Effekte,
+gruppiert nach ihrem Bus (Haupt-BPM · A–D · Frei). Pro Effekt-Zeile: **Typ**, ein
+**Bus-Dropdown** (verschiebt den Effekt taktgleich auf einen anderen Bus), **Tempo ×**
+und das Häkchen **„Taktgleich"** (= startet auf dem gemeinsamen Raster). Pro Bus ein
+**[ Sync jetzt ]**. Hier siehst und reparierst du **auf einen Blick**, warum etwas „nicht
+im Takt" läuft — falscher Bus, Häkchen aus oder abweichender Faktor.
+
+> ✅ **Zuverlässig taktgleich:** Eine frisch gestartete Gruppe rastet automatisch auf
+> einen **sauberen Downbeat** ein (kein „auf zufälligem Schritt" mehr nach Stop/Neustart),
+> und auf **Bus A–D** gespeicherte Zuordnungen greifen auch direkt nach dem Show-Reload.
+
 > 🔑 **Die eine Voraussetzung, die alles entscheidet:** Sync re-ankert **nur Effekte, die
 > am SELBEN Bus hängen.** Dimmer und Farbe müssen also beide auf **„Global"** (oder beide
 > auf demselben Master) liegen. Liegen sie auf verschiedenen Buses, passiert beim Sync nichts.
@@ -167,7 +184,8 @@ Eine ausführlich bebilderte Variante steht in
 
 ## Verwandte Anleitungen
 
-- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Quelle, Genre-Presets, Takt-Raster, Generator (Lied → Beatgrid), Beatgrid-Editor.
+- **[Tempo-Controller-Widget](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)** — das All-in-One-Tempo-Widget (Bus + Quelle + Faktor + gekoppelte Effekte) in der VC.
+- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Quelle, Genre-Presets, Takt-Raster, Generator (Lied → Beatgrid), Beatgrid-Editor, Panel „Effekte je Bus".
 - **[Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md)** — Tempo aus der VC, Verhältnisse koppeln.
 - **[Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)** — phasen-gekoppeltes ×2/×½ in der Praxis.
 - **[Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md)** — Playlist → Play startet die Show, Tempo folgt der Musik.

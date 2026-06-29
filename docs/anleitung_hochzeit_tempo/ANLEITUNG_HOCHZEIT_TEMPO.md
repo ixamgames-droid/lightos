@@ -1,91 +1,70 @@
 # Hochzeit-Show: Farbwechsel und Dimmer taktgleich starten
 
-Diese Anleitung gilt für `shows/hochzeit.lshow`. Auf **Bank 4** bleiben Farbwechsel und
-Dimmer unterschiedlich schnell einstellbar, beginnen ihre Zyklen aber auf demselben
-Taktschlag.
+Diese Anleitung gilt für `shows/hochzeit.lshow`. Die drei Effektgruppen bleiben
+unterschiedlich schnell einstellbar, beginnen ihre Zyklen aber auf demselben Taktschlag.
+
+> **Umgebaut auf die neuen Tempo-Controller.** Die früheren Multiplikator-SpeedDials
+> („Farb Wechsel" / „An Aus") sind durch das **All-in-One Tempo-Controller-Widget** ersetzt —
+> ein Panel pro Gruppe, das Bus, Quelle, Tempo **und** die gekoppelten Effekte vereint.
+> Allgemeine Bedienung: **[Tempo-Controller-Anleitung](../anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)**.
 
 ## Was bereits eingerichtet ist
 
-![Bank 4 der Hochzeit-Show](img/01_bank4_uebersicht.png)
+Drei **Tempo-Controller** (in der VC, auf der Tempo-Bank — dort, wo zuvor die
+Multiplikator-Fenster lagen):
 
-Die beiden wichtigen Multiplikator-Fenster sind:
+| Controller | Bus | Gekoppelte Effekte |
+|---|---|---|
+| **Farb Wechsel** | **Bus A** | die drei Farbwechsel-Effekte (Hintergrund / LED-Bar / Strahler) |
+| **An Aus** | **Bus B** | die sieben Dimmer-Effekte (An/Aus + Lauflicht von Strahlern, Spider, Moving Heads, LED-Bar, Hintergrund) |
+| **Innen Aussen** | **Bus C** | der Innen/Außen-Effekt |
 
-| Fenster | Gekoppelte Effekte |
-|---|---|
-| **Farb Wechsel** | `Back Ground/Faben – Farb Wechsel`, `Led Bar/Farbe – Farb Wchsel`, `Strahler/Faben – Fabwchsel` |
-| **An Aus** | sieben Dimmer-Effekte: An/Aus und Lauflicht von Strahlern, Spider, Moving Heads, LED-Bar und Hintergrund |
+Alle drei stehen auf **Quelle = Sound** (folgen also der Musik) und **Tempo = 1×**.
+Weil „Sound" jeden Bus als **Sub der Haupt-BPM** führt, laufen die drei Gruppen
+**untereinander taktgleich** — du kannst aber jede Gruppe unabhängig schneller/langsamer
+stellen, ohne dass sie aus dem Takt fällt.
 
-Alle zehn Effekte sind bereits auf denselben **Tempo-Bus Global** gelegt. Ihr
-**Tempo-Versatz** steht auf `0`, und **Auto-Sync** ist in der Show eingeschaltet.
+## 1. Tempo einer Gruppe ändern
 
-## 1. Zielgruppen auf Bank 4 kontrollieren
+1. **Virtuelle Konsole** öffnen (Bearbeiten **aus** — zum Bedienen).
+2. Am gewünschten Controller im **Tempo**-Gitter den Faktor wählen:
+   **¼ · ½ · 1× · 2× · 4×** (⟲ = zurück auf 1×).
 
-1. **Virtuelle Konsole → Bank 4** öffnen.
-2. **Bearbeiten** einschalten.
-3. Rechtsklick auf **Farb Wechsel** → **Einstellungen…**.
-4. Unter **Steuert (3)** müssen die drei Farbeffekte stehen.
+Beispiel: **Farb Wechsel = 1×**, **An Aus = ½** → bei 128 BPM wechselt die Farbe mit
+128 BPM, der Dimmer geht mit 64 BPM an/aus. Beide beginnen trotzdem auf derselben Eins —
+es bleibt z. B. sauber **rot/aus/rot/aus**.
 
-![Drei Farbeffekte im Farb-Regler](img/02_speed_farbe_ziele.png)
+## 2. Effekte prüfen / ergänzen
 
-Danach Rechtsklick auf **An Aus** → **Einstellungen…**. Unter **Steuert (7)** müssen
-die sieben Dimmer-Effekte stehen.
+- **Welche Effekte hängen dran?** Klick auf die **Effekt-Zeile** des Controllers →
+  Menü listet jeden gekoppelten Effekt (mit **„✕ entfernen"**).
+- **Neuen Effekt ankoppeln:** Effekt aus der **Bibliothek** auf den Controller **ziehen** →
+  er wird dem Bus **taktgleich** zugewiesen und läuft sofort mit.
 
-![Sieben Dimmer-Effekte im Dimmer-Regler](img/03_speed_dimmer_ziele.png)
+Ein neuer Effekt, den du im Editor anlegst, steht ohnehin standardmäßig auf
+**Tempo-Bus = Global · Taktgleich an** — er fällt also automatisch ins Raster. Nur für
+einen bewusst unabhängigen Effekt nimmst du im Editor den Haken **„Taktgleich starten"**
+weg oder wählst **Tempo-Bus = Frei**.
 
-Bei beiden Fenstern muss **Ziel: Effekt ×½/×2 (Multiplier)** eingestellt sein.
+## 3. Quelle umstellen (optional)
 
-## 2. Gemeinsamen Takt eines Effekts kontrollieren
+Standard ist **Sound** (folgt der Musik). Brauchst du ein **festes** Tempo:
+- Am Controller **Fix** wählen, mit dem **Mausrad** die BPM einstellen.
+- Oder **Tap** und den Takt mitklicken.
 
-Für eine neue oder nachträglich ergänzte Funktion:
+## 4. Gemeinsamen Takt erzwingen
 
-1. Im **Programmer** den Matrix- oder Bewegungseffekt öffnen.
-2. In **Tempo & Blende** bzw. **Tempo & Richtung** folgende Werte setzen:
-   - **Tempo-Bus:** `Global`
-   - **Tempo-Versatz (Beats):** `0,00`
-   - **Tempo ×:** gewünschter Startfaktor, normalerweise `1,00`
-3. Den Effekt mit **Speichern** dauerhaft übernehmen.
-
-Neue Effekte beginnen bereits mit diesen sicheren Standardwerten. Nur für einen
-bewusst unabhängigen Effekt wählst du **Frei (nicht taktgebunden)**.
-
-![Live-Parameter mit Tempo-Bus Global](img/04_effekt_tempo_bus_global.png)
-
-Alternativ kann der Bus weiterhin über **⚡ Live-Parameter…** kontrolliert werden.
-Entscheidend ist der Bus am Effekt selbst. Das Tempo-Bus-Feld im SpeedDial-Dialog
-weist den Ziel-Effekten nicht automatisch einen Bus zu.
-
-## 3. Gemeinsame Phase aktivieren
-
-1. Den **BPM-Tab** öffnen, am schnellsten mit **Strg+8**.
-2. Im Panel **Tempo-Speeds & Grand-Master** **Auto-Sync** eingeschaltet lassen.
-3. Wenn Effekte bereits laufen oder verrutscht wirken, einmal
-   **Jetzt synchronisieren** drücken.
-
-![Auto-Sync und Jetzt synchronisieren](img/05_bpm_auto_sync.png)
-
-`Auto-Sync` sorgt dafür, dass später eingeschaltete Effekte in das gemeinsame Raster
-einsteigen. `Jetzt synchronisieren` setzt alle bereits laufenden busgekoppelten Effekte
-gemeinsam auf eine neue Eins.
-
-## 4. Unterschiedliche Geschwindigkeiten wählen
-
-Auf Bank 4 wählst du anschließend unabhängig voneinander:
-
-- **Farb Wechsel:** beispielsweise `1×`
-- **An Aus:** beispielsweise `½`
-
-Bei einer Master-BPM von 128 läuft der Farbwechsel dann mit 128 BPM und der Dimmer mit
-64 BPM. Beide beginnen trotzdem auf derselben Eins.
-
-![Farbe 1× und Dimmer ½ bei gemeinsamer Master-BPM](img/06_fertig_128_bpm.png)
-
-Die Faktoren `¼`, `½`, `1×`, `2×` und `4×` dürfen jederzeit geändert werden. Sie ändern
-nur das Geschwindigkeitsverhältnis, nicht den gemeinsamen Taktursprung.
+Wirkt etwas verrutscht (z. B. nach manuellem Umstellen):
+- Am betroffenen Controller **[ SYNC jetzt ]** drücken → die ganze Gruppe springt
+  gemeinsam auf die Eins.
+- Alternativ im **BPM-Tab (Strg+8)** das Panel **„Effekte je Bus"** öffnen und dort pro
+  Bus **[ Sync jetzt ]** drücken bzw. die **„Taktgleich"**-Häkchen prüfen.
 
 ## Wenn etwas nicht synchron läuft
 
-1. Beim betroffenen Effekt **Tempo-Bus = Global** prüfen.
-2. **Tempo-Versatz = 0,00** prüfen.
-3. **Auto-Sync** einschalten.
-4. **Jetzt synchronisieren** drücken.
-5. Im Bank-4-SpeedDial prüfen, ob der Effekt wirklich unter **Steuert** aufgeführt ist.
+1. **Regler reagieren nicht?** → **Bearbeiten-Modus aus.**
+2. Steht der Controller auf dem richtigen **Bus** (A/B/C) und der Effekt **gelistet**
+   (Klick auf die Effekt-Zeile)?
+3. Im **BPM-Tab → „Effekte je Bus"**: hängt der Effekt am erwarteten Bus, ist das
+   **„Taktgleich"**-Häkchen an, stimmt der **Faktor**?
+4. **[ SYNC jetzt ]** drücken.
