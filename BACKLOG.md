@@ -22,7 +22,6 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 | ID | Prio | Status | Titel | Stand |
 |----|------|--------|-------|-------|
-| STAB-03 | P1 | wip | AV in programmer_view-Refresh (Zombie-Subscriber) defensiv absichern | **Umgesetzt:** Befund — der Zombie-Fall war in `sync.emit` (RuntimeError-Selbstheilung) + `subscribe_widget`(destroyed) schon abgedeckt, und `efx_view._notify_change` läuft via `QTimer` ohnehin im GUI-Thread (kein cross-thread). Verbleibende Lücke: Qt löscht das C++-Objekt mitunter VOR dem destroyed-Signal → nativer Zugriff = AV. Fix: **Validitäts-Guard** in `subscribe_widget` (schwache Ref + `shiboken6.isValid`) überspringt + meldet tote Widgets ab. Rein additiv (lebende Views unverändert). 2 neue Tests. Branch `fix/sync-widget-validity-guard`. |
 | UI-02 | P1 | review | Undo im Patch | **Verifiziert:** Fixture-Löschen ist bereits via globalem Ctrl+Z rückgängig (`remove_fixture` pusht Undo+Redo, `patch_view._delete_selected` ruft es undoable). Fehlender Test ergänzt: `tests/test_patch_undo.py` (4 Tests). Branch `feature/patch-undo-test`. |
 
 ## 📋 Offen
@@ -50,6 +49,10 @@ _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **STAB-07** · Häufigste native Access Violation (crash.log Jun 2026, GUI-Thread im Programmer-Refresh) **ursächlich** behoben: `programmer_view._refresh_fixture_list` kapselt `clear()`+Neuaufbau in `blockSignals` → keine re-entrante `itemSelectionChanged`→`_rebuild_attr_editor`-Kaskade mehr; **und** `_on_state_change` behandelt `patch_changed` nicht mehr → kein Doppel-Rebuild über Legacy- **und** Sync-Pfad. Befund nebenbei: die BUG-01-Bremse `_suppress_emits` ist inert (nie auf `True`). +4 Regressionstests. [PR #70](https://github.com/ixamgames-droid/lightos/pull/70)
+- **NET-01 / QA-04** · Quick Wins aus der crash.log-Analyse: Web-Remote startet wieder (`allow_unsafe_werkzeug=True` an `sio.run` — der `WebServer`-Thread starb sonst still beim Start, Remote nie erreichbar) + RGB-Matrix-Style-Sichtbarkeit gegen `AttributeError`-Regression abgesichert (Prod war längst gefixt: `_shut_form_label`; neuer Headless-Test über **alle** `MatrixStyle`×`RgbAlgorithm`). [PR #71](https://github.com/ixamgames-droid/lightos/pull/71)
+- **STAB-03** · AV im `programmer_view`-Refresh (Zombie-Subscriber) defensiv abgesichert: `subscribe_widget` mit `weakref` + `shiboken6.isValid`-Guard überspringt/meldet tote Widgets ab. (Die verbleibende **re-entrante** Refresh-Ursache wurde separat als STAB-07 gelöst.) +2 Tests. [PR #37](https://github.com/ixamgames-droid/lightos/pull/37)
 
 - **UI-12 / ENG-08** · Programmer-Matrix: „Farbe pro Runde wechseln" (`color_cycle`) hoch in die Farben-Gruppe (auf RGB/RGBW gegated) **und** neue **Dimmer-Sequenz** für den Dimmer-Chase — explizite Dimmerwerte (z. B. 255/50/100) pro Runde, Pendant zur Farbauswahl: `DimmerSequence` + Checkbox „Dimmer pro Runde wechseln" + Graustufen-Editor, `dimmer_order`/`dimmer_interval`, Cycle-Werte ohne Min/Max-Remap (abwärtskompatibel). +29 Tests, Manifest regeneriert. [PR #60](https://github.com/ixamgames-droid/lightos/pull/60)
 
