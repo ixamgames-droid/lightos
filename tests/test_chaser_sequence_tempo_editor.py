@@ -54,6 +54,11 @@ def test_chaser_editor_loads_and_writes_tempo():
         ed._tempo_phase_spin.setValue(0.5)
         assert abs(ch.tempo_multiplier - 0.5) < 1e-6
         assert abs(ch.phase_offset - 0.5) < 1e-6
+
+        # Taktgleich-Haken: laedt True (Default), schreibt False zurueck
+        assert ed._tempo_align_check.isChecked() is True
+        ed._tempo_align_check.setChecked(False)
+        assert ch.align_on_start is False
     finally:
         _close(ed)
 
@@ -90,6 +95,11 @@ def test_sequence_editor_loads_and_writes_tempo():
         ed._tempo_phase_spin.setValue(0.75)
         assert abs(seq.tempo_multiplier - 2.0) < 1e-6
         assert abs(seq.phase_offset - 0.75) < 1e-6
+
+        # Taktgleich-Haken: laedt True (Default), schreibt False zurueck
+        assert ed._tempo_align_check.isChecked() is True
+        ed._tempo_align_check.setChecked(False)
+        assert seq.align_on_start is False
     finally:
         _close(ed)
 
@@ -103,3 +113,35 @@ def test_sequence_editor_default_is_global():
         assert ed._tempo_bus_combo.currentData() == "Global"
     finally:
         _close(ed)
+
+
+def test_efx_view_taktgleich_loads():
+    _app()
+    from src.ui.views.efx_view import EfxView
+    from src.core.engine.efx import EfxInstance
+    v = EfxView()
+    try:
+        e1 = EfxInstance("E1"); e1.align_on_start = False
+        v._load_to_ui(e1)
+        assert v._tempo_align_check.isChecked() is False
+        e2 = EfxInstance("E2"); e2.align_on_start = True
+        v._load_to_ui(e2)
+        assert v._tempo_align_check.isChecked() is True
+    finally:
+        _close(v)
+
+
+def test_matrix_view_taktgleich_loads():
+    _app()
+    from src.ui.views.rgb_matrix_view import RgbMatrixView
+    from src.core.engine.rgb_matrix import RgbMatrixInstance
+    v = RgbMatrixView()
+    try:
+        m1 = RgbMatrixInstance("M1"); m1.align_on_start = False
+        v._load_ui(m1)
+        assert v._tempo_align_check.isChecked() is False
+        m2 = RgbMatrixInstance("M2"); m2.align_on_start = True
+        v._load_ui(m2)
+        assert v._tempo_align_check.isChecked() is True
+    finally:
+        _close(v)

@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QDoubleSpinBox, QComboBox,
     QGroupBox, QListWidget, QListWidgetItem, QAbstractItemView,
-    QMessageBox, QInputDialog, QScrollArea,
+    QMessageBox, QInputDialog, QScrollArea, QCheckBox,
 )
 from PySide6.QtCore import Qt
 from src.core.engine.sequence import Sequence, SequenceStep
@@ -137,6 +137,13 @@ class SequenceEditor(QWidget):
             "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
         self._tempo_phase_spin.valueChanged.connect(self._on_props_changed)
         tempo_row.addWidget(self._tempo_phase_spin)
+        self._tempo_align_check = QCheckBox("Taktgleich")
+        self._tempo_align_check.setToolTip(
+            "An (Standard): startet auf dem gemeinsamen Beat-Raster des Bus, zusammen "
+            "mit allen anderen taktgleichen Effekten. Aus: startet bewusst frei.")
+        self._tempo_align_check.setChecked(bool(getattr(self._seq, "align_on_start", True)))
+        self._tempo_align_check.toggled.connect(self._on_props_changed)
+        tempo_row.addWidget(self._tempo_align_check)
         root.addWidget(grp_tempo)
 
         # Bound fixtures
@@ -399,6 +406,7 @@ class SequenceEditor(QWidget):
         self._seq.tempo_bus_id = str(self._tempo_bus_combo.currentData() or "")
         self._seq.tempo_multiplier = self._tempo_mult_spin.value()
         self._seq.phase_offset = self._tempo_phase_spin.value()
+        self._seq.align_on_start = self._tempo_align_check.isChecked()
 
     def _on_table_changed(self, item: QTableWidgetItem):
         if self._building:

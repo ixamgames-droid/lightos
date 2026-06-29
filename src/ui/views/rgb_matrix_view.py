@@ -486,6 +486,12 @@ class RgbMatrixView(QWidget):
             "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
         self._tempo_phase_spin.valueChanged.connect(self._param_change)
         ft.addRow("Tempo-Versatz:", self._tempo_phase_spin)
+        self._tempo_align_check = QCheckBox("Taktgleich starten")
+        self._tempo_align_check.setToolTip(
+            "An (Standard): startet auf dem gemeinsamen Beat-Raster des Bus, zusammen "
+            "mit allen anderen taktgleichen Effekten. Aus: startet bewusst frei.")
+        self._tempo_align_check.toggled.connect(self._param_change)
+        ft.addRow("", self._tempo_align_check)
 
         self._priority_spin = QSpinBox()
         self._priority_spin.setRange(-99, 99)
@@ -1013,6 +1019,7 @@ class RgbMatrixView(QWidget):
                 float(getattr(m, "tempo_multiplier", 1.0)))
             self._tempo_phase_spin.setValue(
                 float(getattr(m, "phase_offset", 0.0)))
+            self._tempo_align_check.setChecked(bool(getattr(m, "align_on_start", True)))
             self._priority_spin.setValue(int(getattr(m, "priority", 0)))
             self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))
@@ -1089,6 +1096,7 @@ class RgbMatrixView(QWidget):
             self._tempo_bus_combo.currentData() or "")
         self._current.tempo_multiplier = self._tempo_mult_spin.value()
         self._current.phase_offset = self._tempo_phase_spin.value()
+        self._current.align_on_start = self._tempo_align_check.isChecked()
         # drive_intensity wird nicht mehr aus UI gesetzt (bleibt im Datenmodell).
         # Farben werden separat ueber _on_color_button / _on_sequence_changed
         # geschrieben (nicht hier, sonst wuerde eine laengere Color-Sequence bei

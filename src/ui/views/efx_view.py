@@ -983,6 +983,12 @@ class EfxView(QWidget):
             "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
         self._tempo_phase_spin.valueChanged.connect(self._on_param_change)
         tform.addRow("Tempo-Versatz:", self._tempo_phase_spin)
+        self._tempo_align_check = QCheckBox("Taktgleich starten")
+        self._tempo_align_check.setToolTip(
+            "An (Standard): startet auf dem gemeinsamen Beat-Raster des Bus, zusammen "
+            "mit allen anderen taktgleichen Effekten. Aus: startet bewusst frei.")
+        self._tempo_align_check.toggled.connect(self._on_param_change)
+        tform.addRow("", self._tempo_align_check)
         self._dir_combo = QComboBox()
         # Anzeige deutsch, interner Wert bleibt der Enum-Wert (forward/backward/
         # bounce) — Lese-/Setzstellen nutzen currentData()/findData().
@@ -1491,6 +1497,7 @@ class EfxView(QWidget):
                 float(getattr(efx, "tempo_multiplier", 1.0)))
             self._tempo_phase_spin.setValue(
                 float(getattr(efx, "phase_offset", 0.0)))
+            self._tempo_align_check.setChecked(bool(getattr(efx, "align_on_start", True)))
             self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
             self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
@@ -1545,6 +1552,7 @@ class EfxView(QWidget):
             self._tempo_bus_combo.currentData() or "")
         self._current.tempo_multiplier = self._tempo_mult_spin.value()
         self._current.phase_offset = self._tempo_phase_spin.value()
+        self._current.align_on_start = self._tempo_align_check.isChecked()
         self._current.x_freq   = self._xfreq_spin.value()
         self._current.y_freq   = self._yfreq_spin.value()
         self._current.x_phase  = self._xphase_spin.value()

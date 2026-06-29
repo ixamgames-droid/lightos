@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem,
     QComboBox, QDialog, QListWidget, QListWidgetItem,
     QDialogButtonBox, QHeaderView, QAbstractItemView, QSizePolicy,
-    QScrollArea, QGroupBox, QFormLayout,
+    QScrollArea, QGroupBox, QFormLayout, QCheckBox,
 )
 from PySide6.QtCore import Qt
 from src.core.engine.chaser import Chaser, ChaserStep
@@ -177,6 +177,14 @@ class ChaserEditor(QWidget):
             "Phasenversatz in Beats. 0 = gemeinsamer Start auf der Eins.")
         self._tempo_phase_spin.valueChanged.connect(self._on_props_changed)
         play_form.addRow("Tempo-Versatz:", self._tempo_phase_spin)
+
+        self._tempo_align_check = QCheckBox("Taktgleich starten")
+        self._tempo_align_check.setToolTip(
+            "An (Standard): startet auf dem gemeinsamen Beat-Raster des Bus, zusammen "
+            "mit allen anderen taktgleichen Effekten. Aus: startet bewusst frei bei "
+            "seinem eigenen Null. (Wirkt nur mit gewähltem Tempo-Bus.)")
+        self._tempo_align_check.toggled.connect(self._on_props_changed)
+        play_form.addRow("", self._tempo_align_check)
         root.addWidget(grp_play)
 
         # Schritte — Tabelle + Aktions-Buttons
@@ -325,6 +333,7 @@ class ChaserEditor(QWidget):
         self._tempo_bus_combo.setCurrentIndex(_bi if _bi >= 0 else 0)
         self._tempo_mult_spin.setValue(float(getattr(self._chaser, "tempo_multiplier", 1.0)))
         self._tempo_phase_spin.setValue(float(getattr(self._chaser, "phase_offset", 0.0)))
+        self._tempo_align_check.setChecked(bool(getattr(self._chaser, "align_on_start", True)))
         self._update_trigger_visibility()
         self._rebuild_table()
         self._refresh_picker()
@@ -392,6 +401,7 @@ class ChaserEditor(QWidget):
         self._chaser.tempo_bus_id = str(self._tempo_bus_combo.currentData() or "")
         self._chaser.tempo_multiplier = self._tempo_mult_spin.value()
         self._chaser.phase_offset = self._tempo_phase_spin.value()
+        self._chaser.align_on_start = self._tempo_align_check.isChecked()
         self._update_trigger_visibility()
 
     def _update_trigger_visibility(self):
