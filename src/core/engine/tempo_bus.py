@@ -764,6 +764,76 @@ class TempoBusManager:
             return self.ensure_bus(bid)
         return self.get(bid)
 
+    def list_effects_by_bus(self) -> "dict[str, list]":
+        """Gruppiert alle ZEITBASIERTEN Funktionen nach ihrem AUFGELOESTEN Tempo-Bus.
+
+        Liefert ``{canonical_bus_id: [Function, ...]}`` — Aliase ``""``/``"Global"``/
+        ``"default"`` landen gemeinsam unter ``DEFAULT_BUS``, Free-Run (leere
+        ``tempo_bus_id``) unter ``""``. „Zeitbasiert" = Subtyp mit
+        ``tempo_sync_default`` ODER explizit gesetztem ``tempo_bus_id`` (statische
+        Scenes/Collections fallen raus). Die festen Buses A-D werden vorab erzeugt,
+        damit eine gespeicherte A-D-Zuordnung sichtbar ist. Daten-Quelle des
+        BPM-Fenster-Panels „Effekte je Bus"."""
+        for b in self.FIXED_BUSES:
+            self.ensure_bus(b)
+        out: "dict[str, list]" = {}
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+        except Exception:
+            return out
+        for f in fm.all():
+            is_tempo = (getattr(type(f), "tempo_sync_default", False)
+                        or bool((getattr(f, "tempo_bus_id", "") or "").strip()))
+            if not is_tempo:
+                continue
+            raw = (getattr(f, "tempo_bus_id", "") or "").strip()
+            if not raw:
+                key = ""  # Free-Run
+            else:
+                bus = self.get(raw)
+                key = bus.bus_id if bus is not None else raw
+            out.setdefault(key, []).append(f)
+        return out
+
+    def assign_effects_to_bus(self, fids, bus_id) -> None:
+        """Weist die genannten Funktionen (per id) einem Tempo-Bus zu und re-ankert
+        NUR sie via ``sync_phase`` — sie klinken sich phasengleich auf das laufende
+        Beat-Raster ein (und Chaser/Sequence setzen ihr ``_synced_target_prev`` sauber
+        zurueck). Andere, bereits laufende Effekte auf dem Ziel-Bus bleiben unberuehrt
+        (im Gegensatz zu ``bus.sync()``, das den GANZEN Bus neu ankert). ``bus_id=""``
+        bedeutet Free-Run. Setzt ``tempo_bus_id`` ueber ``set_param`` (so greift z. B.
+        die Chaser-Exklusivitaet gegen ``audio_triggered``)."""
+        bid = (bus_id or "")
+        if isinstance(bid, str):
+            bid = bid.strip()
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+        except Exception:
+            return
+        if bid:
+            self.bus_for_effect(bid)  # festen Ziel-Bus (A-D) vorab sichern
+        for fid in fids:
+            f = fm.get(fid)
+            if f is None:
+                continue
+            try:
+                if hasattr(f, "set_param"):
+                    f.set_param("tempo_bus_id", bid)
+                else:
+                    f.tempo_bus_id = bid
+            except Exception:
+                try:
+                    f.tempo_bus_id = bid
+                except Exception:
+                    continue
+            try:
+                if hasattr(f, "sync_phase"):
+                    f.sync_phase()
+            except Exception:
+                pass
+
     def remove_bus(self, bus_id: str) -> None:
         if not bus_id or bus_id == self.DEFAULT_BUS:
             return

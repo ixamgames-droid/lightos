@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QRadioButton, QButtonGroup, QComboBox, QSpinBox, QSlider, QGroupBox,
     QProgressBar, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QDoubleSpinBox,
-    QCheckBox,
+    QCheckBox, QTreeWidget, QTreeWidgetItem,
 )
 
 from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
@@ -88,9 +88,19 @@ class BpmManagerView(QWidget):
 
         root.addWidget(self._build_monitor())
         root.addWidget(self._build_speeds())
+        root.addWidget(self._build_effects_panel())
         root.addWidget(self._build_settings())
         root.addStretch(1)
         self._refresh_speeds()
+        self._refresh_effects_panel()
+        # Live-Refresh, wenn Funktionen erstellt/gestartet/gestoppt werden.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().subscribe_widget(
+                SyncEvent.FUNCTION_CHANGED, self,
+                lambda *_a: self._refresh_effects_panel())
+        except Exception:
+            pass
 
     def _build_monitor(self) -> QGroupBox:
         box = QGroupBox("Monitor")
@@ -156,6 +166,181 @@ class BpmManagerView(QWidget):
         else:
             self._spectrum = None
         return box
+
+    # ── Effekte je Bus (taktgleich-Panel) ───────────────────────────────────────
+    # Feste Bus-Buckets in Anzeige-Reihenfolge: Haupt-BPM, A-D, Free-Run.
+    # Schluessel = kanonische bus_id (Default-Bus ist "default"; die Aliase
+    # ""/"Global" loesen dorthin auf — list_effects_by_bus gruppiert nach bus_id).
+    _BUS_BUCKETS = [
+        ("default", "Haupt-BPM (Global)"),
+        ("A", "Bus A"),
+        ("B", "Bus B"),
+        ("C", "Bus C"),
+        ("D", "Bus D"),
+        ("", "Frei (kein Bus)"),
+    ]
+    _TYPE_LABELS = {
+        "RGBMatrix": "Matrix", "EFX": "Bewegung/EFX", "Chaser": "Chaser",
+        "Sequence": "Sequence", "Scene": "Szene", "Collection": "Sammlung",
+        "Audio": "Audio", "Script": "Skript", "Show": "Show",
+    }
+
+    def _build_effects_panel(self) -> QGroupBox:
+        box = QGroupBox("Effekte je Bus — taktgleich")
+        lay = QVBoxLayout(box)
+        info = QLabel(
+            "Welche Effekte folgen welchem Tempo-Bus. Haken = startet taktgleich auf "
+            "dem gemeinsamen Beat-Raster. Per Dropdown den Bus wechseln, „Tempo ×\" als "
+            "Verhältnis (½ / 2 …). „Sync jetzt\" rastet alle Effekte eines Bus gemeinsam "
+            "auf die Eins.")
+        info.setWordWrap(True)
+        info.setStyleSheet("color:#999;")
+        lay.addWidget(info)
+
+        bar = QHBoxLayout()
+        btn_refresh = QPushButton("⟳ Aktualisieren")
+        btn_refresh.clicked.connect(self._refresh_effects_panel)
+        bar.addWidget(btn_refresh)
+        bar.addStretch(1)
+        lay.addLayout(bar)
+
+        self._fx_tree = QTreeWidget()
+        self._fx_tree.setColumnCount(5)
+        self._fx_tree.setHeaderLabels(
+            ["Effekt", "Typ", "Bus", "Tempo ×", "Taktgleich"])
+        self._fx_tree.setAlternatingRowColors(True)
+        self._fx_tree.setMinimumHeight(220)
+        hdr = self._fx_tree.header()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for c in (1, 2, 3, 4):
+            hdr.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        lay.addWidget(self._fx_tree)
+        self._fx_empty = QLabel("Noch keine zeitbasierten Effekte angelegt.")
+        self._fx_empty.setStyleSheet("color:#777; font-style:italic;")
+        lay.addWidget(self._fx_empty)
+        return box
+
+    def _type_label(self, f) -> str:
+        try:
+            v = f.function_type.value
+        except Exception:
+            v = ""
+        return self._TYPE_LABELS.get(v, v or "?")
+
+    def _refresh_effects_panel(self):
+        tree = getattr(self, "_fx_tree", None)
+        if tree is None:
+            return
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            groups = get_tempo_bus_manager().list_effects_by_bus()
+        except Exception:
+            groups = {}
+        tree.clear()
+        total = 0
+        for bus_id, label in self._BUS_BUCKETS:
+            effects = groups.get(bus_id, [])
+            top = QTreeWidgetItem(tree)
+            top.setText(0, f"{label}  ({len(effects)})")
+            f0 = top.font(0); f0.setBold(True); top.setFont(0, f0)
+            if bus_id != "":   # Free-Run hat keinen gemeinsamen Sync
+                btn = QPushButton("Sync jetzt")
+                btn.setToolTip("Alle Effekte dieses Bus gemeinsam auf die Eins re-ankern.")
+                btn.clicked.connect(lambda _c=False, b=bus_id: self._on_bus_sync_now(b))
+                tree.setItemWidget(top, 4, btn)
+            for f in effects:
+                total += 1
+                self._add_effect_row(top, f, bus_id)
+            top.setExpanded(True)
+        self._fx_empty.setVisible(total == 0)
+        tree.setVisible(total > 0)
+
+    def _add_effect_row(self, top, f, bus_id):
+        tree = self._fx_tree
+        fid = int(getattr(f, "id", 0))
+        row = QTreeWidgetItem(top)
+        row.setData(0, Qt.ItemDataRole.UserRole, fid)
+        row.setText(0, getattr(f, "name", f"#{fid}"))
+        row.setText(1, self._type_label(f))
+
+        combo = QComboBox()
+        for bid, lbl in self._BUS_BUCKETS:
+            combo.addItem(lbl, bid)
+        i = combo.findData(bus_id)
+        if i >= 0:
+            combo.setCurrentIndex(i)
+        combo.currentIndexChanged.connect(
+            lambda _i, fi=fid, c=combo: self._on_row_bus_changed(fi, c.currentData()))
+        tree.setItemWidget(row, 2, combo)
+
+        spin = QDoubleSpinBox()
+        spin.setRange(0.0625, 16.0)
+        spin.setSingleStep(0.25)
+        spin.setDecimals(4)
+        spin.setValue(float(getattr(f, "tempo_multiplier", 1.0) or 1.0))
+        spin.valueChanged.connect(lambda v, fi=fid: self._on_row_mult_changed(fi, v))
+        tree.setItemWidget(row, 3, spin)
+
+        chk = QCheckBox()
+        chk.setChecked(bool(getattr(f, "align_on_start", True)))
+        chk.setEnabled(bus_id != "")   # Free-Run kann nicht taktgleich sein
+        chk.setToolTip(
+            "Startet dieser Effekt taktgleich auf dem gemeinsamen Beat-Raster seines Bus?")
+        chk.toggled.connect(lambda c, fi=fid: self._on_taktgleich_toggled(fi, c))
+        wrap = QWidget(); wl = QHBoxLayout(wrap)
+        wl.setContentsMargins(0, 0, 0, 0)
+        wl.addStretch(1); wl.addWidget(chk); wl.addStretch(1)
+        tree.setItemWidget(row, 4, wrap)
+
+    # ── Handler ──────────────────────────────────────────────────────────────
+    def _fn(self, fid):
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            return get_function_manager().get(int(fid))
+        except Exception:
+            return None
+
+    def _on_taktgleich_toggled(self, fid, checked):
+        f = self._fn(fid)
+        if f is None:
+            return
+        f.align_on_start = bool(checked)
+        try:   # laeuft der Effekt, sofort sauber neu ankern -> Haken wirkt sofort
+            if getattr(f, "is_running", False) and hasattr(f, "sync_phase"):
+                f.sync_phase()
+        except Exception:
+            pass
+
+    def _on_row_mult_changed(self, fid, value):
+        f = self._fn(fid)
+        if f is None:
+            return
+        try:
+            if hasattr(f, "set_param"):
+                f.set_param("tempo_multiplier", float(value))
+            else:
+                f.tempo_multiplier = float(value)
+        except Exception:
+            pass
+
+    def _on_row_bus_changed(self, fid, new_bus):
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            get_tempo_bus_manager().assign_effects_to_bus([int(fid)], new_bus or "")
+        except Exception:
+            pass
+        # Tree erst NACH dem Signal neu bauen (loescht das ausloesende Combo) — sonst
+        # wird das gerade feuernde Widget synchron zerstoert (Crash-Gefahr).
+        QTimer.singleShot(0, self._refresh_effects_panel)
+
+    def _on_bus_sync_now(self, bus_id):
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().bus_for_effect(bus_id)
+            if bus is not None:
+                bus.sync(reset_downbeat=True)
+        except Exception:
+            pass
 
     def _build_settings(self) -> QGroupBox:
         box = QGroupBox("Einstellungen")
@@ -1043,6 +1228,7 @@ class BpmManagerView(QWidget):
         self._poll.start()
         self._reflect_state()
         self._refresh_speeds()
+        self._refresh_effects_panel()
         super().showEvent(e)
 
     def hideEvent(self, e):
