@@ -104,6 +104,7 @@ class VCCanvas(QWidget):
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     area_selected = Signal(str, int, int, int, int)  # (tool, x, y, w, h) aufgezogener Bereich
+    widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
     # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
@@ -484,9 +485,11 @@ class VCCanvas(QWidget):
             self.cancel_snap_assign()
             return
 
-        # Klick ins Leere (kein Widget) -> Effekt-Gruppen-Hervorhebung aufheben.
+        # Klick ins Leere (kein Widget) -> Effekt-Gruppen-Hervorhebung + Inspector-
+        # Auswahl aufheben.
         if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
             self.clear_effect_highlight()
+            self._on_widget_selected(None)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -529,7 +532,15 @@ class VCCanvas(QWidget):
         self._edit_mode = enabled
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
+        if not enabled:
+            self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
         self.update()
+
+    def _on_widget_selected(self, w):
+        """Von einem VCWidget beim Anklicken (oder vom Canvas bei Klick ins Leere mit
+        ``None``) aufgerufen; reicht die Auswahl als Signal an den VC-Host
+        (Inspector-Panel) weiter."""
+        self.widget_selected.emit(w)
 
     def set_snap_to_grid(self, enabled: bool):
         self._snap_to_grid = enabled

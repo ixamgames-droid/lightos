@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QPoint, QSize, QTimer
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
+from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 from src.ui.widgets.flow_layout import FlowLayout
 
 
@@ -80,6 +81,7 @@ class VirtualConsoleView(QWidget):
         self._popout_window = None
         self._pop_scroll = None
         self._apc_feedback = None
+        self._inspector = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -366,6 +368,22 @@ class VirtualConsoleView(QWidget):
         self._btn_sidebar.toggled.connect(self._toggle_sidebar)
         tb_layout.addWidget(self._btn_sidebar)
 
+        # Inspector-Panel ein-/ausblenden (nur im Bearbeiten-Modus sichtbar).
+        self._btn_inspector = QPushButton("⚙ Inspector ✓")
+        self._btn_inspector.setCheckable(True)
+        self._btn_inspector.setChecked(True)
+        self._btn_inspector.setFixedHeight(26)
+        self._btn_inspector.setProperty("edit_only", True)
+        self._btn_inspector.setVisible(False)
+        self._btn_inspector.setStyleSheet("""
+            QPushButton { background:#21262d; color:#58d68d; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_inspector.toggled.connect(self._toggle_inspector)
+        tb_layout.addWidget(self._btn_inspector)
+
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
 
@@ -395,9 +413,18 @@ class VirtualConsoleView(QWidget):
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
         self._canvas.area_selected.connect(self._on_area_selected)
+        self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
         splitter.addWidget(self._main_scroll)
+
+        # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).
+        self._inspector = VCInspectorPanel()
+        self._inspector.setStyleSheet(
+            "QWidget { background:#0d1117; border-left:1px solid #21262d; }"
+        )
+        self._inspector.setVisible(False)
+        splitter.addWidget(self._inspector)
 
         # Sidebar
         self._sidebar = SnapshotSidebar(self._canvas)
@@ -406,9 +433,11 @@ class VirtualConsoleView(QWidget):
         )
         splitter.addWidget(self._sidebar)
 
-        # Größenverhältnis: Canvas viel breiter als Sidebar
+        # Größenverhältnis: Canvas viel breiter als Inspector/Sidebar
         splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(1, 0)
+        splitter.setStretchFactor(2, 1)
+        splitter.setCollapsible(1, True)
         self._splitter = splitter
 
         # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
@@ -503,6 +532,13 @@ class VirtualConsoleView(QWidget):
         for btn in self._toolbar_widget.findChildren(QPushButton):
             if btn.property("edit_only"):
                 btn.setVisible(enabled)
+        # Inspector-Panel folgt dem Edit-Modus; beim Verlassen Auswahl loesen.
+        if self._inspector is not None:
+            if enabled:
+                self._inspector.setVisible(self._btn_inspector.isChecked())
+            else:
+                self._inspector.clear()
+                self._inspector.setVisible(False)
 
     def _toggle_snap(self, checked: bool):
         self._canvas.set_snap_to_grid(checked)
@@ -645,6 +681,21 @@ class VirtualConsoleView(QWidget):
         self._btn_sidebar.setText("◀ Bibliothek" if checked else "▶ Bibliothek")
         if checked:
             self._sidebar.refresh()
+
+    def _toggle_inspector(self, checked: bool):
+        self._btn_inspector.setText("⚙ Inspector ✓" if checked else "⚙ Inspector")
+        if self._inspector is not None:
+            self._inspector.setVisible(checked and self._edit_mode)
+
+    def _on_canvas_widget_selected(self, w):
+        """Auswahl auf der Canvas -> Inspector binden (nur im Bearbeiten-Modus,
+        wenn das Panel sichtbar ist; sonst nur intern merken)."""
+        if self._inspector is None:
+            return
+        if self._edit_mode and self._btn_inspector.isChecked():
+            self._inspector.bind(w)
+        elif w is None:
+            self._inspector.clear()
 
     # ── Widget actions ────────────────────────────────────────────────────────
 
@@ -816,4 +867,7 @@ class VirtualConsoleView(QWidget):
         return self._canvas.to_dict()
 
     def from_dict(self, d: dict):
+        # Auswahl loesen, bevor die alten Widgets beim Laden zerstoert werden.
+        if self._inspector is not None:
+            self._inspector.clear()
         self._canvas.from_dict(d)
