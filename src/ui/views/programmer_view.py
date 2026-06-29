@@ -788,11 +788,27 @@ class ProgrammerView(QWidget):
     # ── Fixture List ─────────────────────────────────────────────────────────
 
     def _refresh_fixture_list(self):
-        self._fixture_list.clear()
-        for f in self._state.get_patched_fixtures():
-            it = QListWidgetItem(f"[{f.fid:03d}] {f.label}")
-            it.setData(Qt.ItemDataRole.UserRole, f.fid)
-            self._fixture_list.addItem(it)
+        # STAB-07: Signale waehrend clear()+Neuaufbau blocken. Sonst feuert
+        # QListWidget.clear() synchron itemSelectionChanged -> _on_fixture_selected
+        # -> _rebuild_attr_editor MITTEN im Neuaufbau (re-entrant) und loescht/
+        # ersetzt dabei Geschwister-Widgets, waehrend die Liste noch inkonsistent
+        # ist -> Zugriff auf halb-geloeschte Qt-Objekte -> native Access Violation
+        # (haeufigste Crash-Klasse, crash.log Jun 2026).
+        lst = self._fixture_list
+        blocked = lst.blockSignals(True)
+        try:
+            lst.clear()
+            for f in self._state.get_patched_fixtures():
+                it = QListWidgetItem(f"[{f.fid:03d}] {f.label}")
+                it.setData(Qt.ItemDataRole.UserRole, f.fid)
+                lst.addItem(it)
+        finally:
+            lst.blockSignals(blocked)
+        # clear() hat die Auswahl geleert. Die Auswahl-Folgelogik (Auswahl
+        # publizieren + Attr-Editor neu bauen) GENAU EINMAL auf der fertig
+        # aufgebauten, konsistenten Liste ausfuehren — statt re-entrant je
+        # clear()/addItem. Reproduziert den bisherigen Endzustand ohne den Crash.
+        self._on_fixture_selected()
 
     def _select_all(self):
         self._fixture_list.selectAll()
@@ -1661,10 +1677,12 @@ class ProgrammerView(QWidget):
     # ── Legacy State Events ──────────────────────────────────────────────────
 
     def _on_state_change(self, event: str, _data):
-        if event == "patch_changed":
-            self._refresh_fixture_list()
-            self._rebuild_attr_editor()
-        elif event == "programmer_changed":
+        # STAB-07: patch_changed wird zentral ueber den Sync-Pfad behandelt
+        # (_sync_refresh, SyncEvent.PATCH_CHANGED in __init__). Hier NICHT
+        # zusaetzlich refreshen — sonst laufen Fixture-Liste + Attr-Editor pro
+        # Patch-Aenderung DOPPELT (Legacy-Callback UND Sync-Emit feuern beide aus
+        # app_state._emit_impl), was die re-entrante Refresh-Kaskade verdoppelt.
+        if event == "programmer_changed":
             if hasattr(self, "_color_preview"):
                 self._color_preview.update_colors()
 
