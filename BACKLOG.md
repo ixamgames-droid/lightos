@@ -28,6 +28,15 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 _Aktuell keine frei eingereihten Items — die nächsten Kandidaten stehen unten unter „Aus Codex-Reviews". Einzelne Zeilen nach hier oben ziehen, um sie für den Loop zu priorisieren (oder eine neue Idee anhängen)._
 
+### 🔎 Aus Demo-/Anleitungs-Bau (Findings, Session 2026-06-29)
+_Beim Bauen der `Hochzeit_Komplett_2026`-Show + Minianleitungen entdeckt. Volle Details (Problem/Fix/DoD) in [`docs/LOOP_FINDINGS_DEMO_BUILD.md`](docs/LOOP_FINDINGS_DEMO_BUILD.md) — wird laufend ergänzt._
+
+| ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
+|----|------|--------|-------|------------------------------------------|
+| DEMO-02 | P2 | todo | Generatoren ohne `__main__`-Guard → Windows-Spawn korrumpiert Patch | `tools/build_*.py` ohne Guard werden vom OutputManager-Spawn als `__mp_main__` re-importiert → FLD-FID-Reassign, unvollständiger Patch. Fix: Guard in alle Generatoren (oder Spawn beim Headless-Build unterdrücken). DoD: jeder Generator headless = vollständiger Patch, Test. Siehe [LOOP_FINDINGS_DEMO_BUILD.md](docs/LOOP_FINDINGS_DEMO_BUILD.md). |
+| DEMO-03 | P2 | todo | `reset_show()` räumt verwaiste `current_show.db`-Patch-Zeilen nicht hart | Nach Absturz bleiben Patch-Zeilen; `reset_show()` löscht sie nicht hart → FLD-FID weicht auf `next_fid()` aus. Fix: `reset_show()` ruft `clear_patch()`. DoD: Test mit verwaistem Eintrag. |
+| DEMO-04 | P2 | todo | Bus-gekoppelte Dimmer-Effekte gehen dunkel, wenn der Bus nicht läuft | Gekoppelte Dimmer-Matrix friert bei stehendem Bus auf Intensität 0 (dunkel). Fix: Free-Run-Fallback (`matrix_speed`) bei gestopptem Bus. DoD: animiert auch ohne laufenden Bus, Test. |
+
 ### 🤖 Aus Codex-Reviews (Stand 2026-06-24 — noch offene Befunde)
 _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft. Der STAB-/QA-/VIZ-Teil dieses Audits ist via [PR #55](https://github.com/ixamgames-droid/lightos/pull/55) bereits erledigt (siehe „Erledigt" unten) — hier bleiben die 10 noch offenen UI-/ENG-Punkte. Verschieb einzelne Zeilen nach oben in die „Offen"-Liste, um sie für den Loop zu priorisieren._
 
