@@ -23,6 +23,7 @@
     "VCSongInfo",
     "VCSpeedDial",
     "VCStepper",
+    "VCTempoBusController",
     "VCXYPad"
   ],
   "button_actions": [

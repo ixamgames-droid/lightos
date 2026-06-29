@@ -26,6 +26,7 @@ def _register():
     from .vc_song_info import VCSongInfo
     from .vc_bpm_display import VCBpmDisplay
     from .vc_bus_selector import VCBusSelector
+    from .vc_tempo_bus_controller import VCTempoBusController
     from .vc_effect_colors import VCEffectColors
     from .vc_stepper import VCStepper
     from .vc_effect_editor import VCEffectEditor
@@ -45,6 +46,7 @@ def _register():
         "VCSongInfo": VCSongInfo,
         "VCBpmDisplay": VCBpmDisplay,
         "VCBusSelector": VCBusSelector,
+        "VCTempoBusController": VCTempoBusController,
         "VCEffectColors": VCEffectColors,
         "VCFrame":    VCFrame,
         "VCEffectEditor": VCEffectEditor,
@@ -637,8 +639,10 @@ class VCCanvas(QWidget):
         from .vc_effect_display import VCEffectDisplay
         from .vc_effect_editor import VCEffectEditor
         from .vc_bus_selector import VCBusSelector
+        from .vc_tempo_bus_controller import VCTempoBusController
         return (VCButton, VCSlider, VCColor, VCEncoder, VCXYPad, VCSpeedDial,
-                VCStepper, VCEffectDisplay, VCEffectEditor, VCBusSelector)
+                VCStepper, VCEffectDisplay, VCEffectEditor, VCBusSelector,
+                VCTempoBusController)
 
     # ── Drag-Feedback: Ziel-Widget gruen/rot umrahmen ─────────────────────────
     #
@@ -745,6 +749,9 @@ class VCCanvas(QWidget):
         if isinstance(w, VCSpeedDial):
             return bool(getattr(caps, "has_speed", False))
         if isinstance(w, VCBusSelector):
+            return bool(getattr(caps, "is_tempo_syncable", False))
+        from .vc_tempo_bus_controller import VCTempoBusController
+        if isinstance(w, VCTempoBusController):
             return bool(getattr(caps, "is_tempo_syncable", False))
         if isinstance(w, VCColor):
             return bool(getattr(caps, "has_colors", False))
@@ -1033,6 +1040,16 @@ class VCCanvas(QWidget):
             target.function_id = function_id
             if fn_name and getattr(target, "caption", None) in (None, "", "Tempo-Bus"):
                 target.caption = f"{fn_name} Tempo-Bus"
+            target.update()
+            return True
+
+        from .vc_tempo_bus_controller import VCTempoBusController
+        if isinstance(target, VCTempoBusController):
+            # Effekt auf den Controller ziehen -> taktgleich an dessen Bus koppeln
+            # (mehrfach moeglich; couple_effect haengt an statt zu ersetzen).
+            target.couple_effect(function_id)
+            if fn_name and getattr(target, "caption", None) in (None, "", "Tempo-Bus"):
+                target.caption = f"{fn_name} Tempo"
             target.update()
             return True
 
