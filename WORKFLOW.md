@@ -64,6 +64,34 @@ fix/midi-apc-detection     Bugfix
 - Geaenderte Module einmal importieren
 - Bei UI-Aenderungen: betroffene View instanziieren
 
+## Test-Gate (Loop-Modus)
+
+Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
+
+```
+./tools/verify_loop.ps1                        # Syntax-Check (compileall src) + VOLLE Suite
+./tools/verify_loop.ps1 tests/test_efx_path.py # Syntax-Check + nur diese Tests
+```
+
+- **Voll-Suite immer ueber den sitzungsuebergreifenden Lock-Runner.** `verify_loop.ps1` ruft
+  fuer die volle Suite `../run_tests.ps1 -Isolate` auf. Dieser Runner liegt im **aeusseren**
+  Projektordner (NICHT im Repo, daher von allen Worktrees/Sessions erreichbar) und serialisiert
+  pytest-Laeufe ueber **alle** parallelen Claude-/Cowork-Sessions per Sperrdatei
+  `.pytest_lock.json`. Direktes `pytest tests/` NIE parallel starten — auf diesem Setup
+  (Python 3.14 + PySide6 offscreen) fuehren mehrere gleichzeitige Suiten zu Speicher-Stau,
+  minutenlangen Haengern und nativen Qt-Segfaults (Exit 139).
+- **Warum `-Isolate`:** jede Testdatei laeuft in einem eigenen Prozess. So bricht ein einzelner
+  Qt-Segfault nicht die ganze Suite ab; der Runner zaehlt Crashes (Exit 139) als
+  Umgebungs-Flakiness, NICHT als Test-Fail, und liefert einen echten Pass/Fail-Zaehler.
+- **Belegt?** Laeuft bereits eine andere Session, wartet der Runner (Default, alle 15 s) bzw.
+  meldet das. Exit 98 = Timeout beim Warten auf die Sperre, Exit 99 = uebersprungen (`-NoWait`).
+- **Fallback:** Fehlt `../run_tests.ps1`, faellt `verify_loop.ps1` mit deutlicher Warnung auf
+  direktes `pytest` zurueck (OHNE Sperre — nur Notnagel, nicht bei parallelen Sessions nutzen).
+- **Gate-Kriterium:** Exit 0 = gruen. Keine neuen Fehler ggue. Baseline; rot → selbst fixen,
+  nicht mit kaputtem Stand committen/reporten.
+
+Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
+
 ## Token-schonende Regeln fuer Agents
 
 - Bei groesseren Implementierungen **Sub-Tasks parallelisieren**
