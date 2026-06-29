@@ -474,9 +474,14 @@ class RgbMatrixInstance(Function):
         # Phase 6: Freeze/Pause — friert die Animation ein (Phase laeuft nicht weiter),
         # Ausgabe bleibt aber bestehen. Per VC-Button (do_action "toggle_freeze").
         self._frozen: bool = False
+        # DEMO-04: zuletzt gesehene Bus-Position (Stall-Erkennung in _advance_step).
+        # None = noch keine; ein nicht-vorrueckender Bus (bpm>0, gleiche Position) loest
+        # Free-Run statt Einfrieren aus.
+        self._last_bus_pos: float | None = None
 
     def _on_start(self):
         self._step = 0.0
+        self._last_bus_pos = None
         self._last_tick = time.monotonic()
         # WP-Tempo: bei Bus-Sync ankern. „Taktgleich" (align_on_start, Default) klinkt
         # den Effekt auf das gemeinsame Beat-Raster seines Bus ein (note_groove_start
@@ -638,7 +643,16 @@ class RgbMatrixInstance(Function):
         Bus exakt (z. B. Farbe ×1, Dimmer ×2 phasengleich), unabhaengig von Frame-Jitter
         und Startzeitpunkt, weil beide aus derselben Bus-Position + demselben Anker ableiten.
         Sonst Free-Run wie bisher: ``matrix_speed × Function.speed × dt`` (byte-identisch).
-        ``_frozen`` haelt die Animation in beiden Modi an."""
+        ``_frozen`` haelt die Animation in beiden Modi an.
+
+        DEMO-04: Ein gekoppelter Bus mit ``bpm>0``, dessen **Position nicht vorrueckt**
+        (keine laufende ``advance_frame``-Schleife — Vorschau-/Probe-/Validierungs-Render,
+        pausierte Bus-Uhr), friert NICHT mehr ein: er faellt auf Free-Run zurueck, statt
+        dunkel zu erstarren (bei Dimmer-Style = Black-out). Erkannt am Positions-Delta
+        seit dem letzten Frame; bei Bus-Wiederanlauf snappt der naechste Frame zurueck auf
+        Bus-Sync. Live (Render-Thread tickt ``advance_frame`` jeden Frame) bleibt
+        byte-identisch, weil die Position dort immer vorrueckt. Globaler Freeze (F5) haelt
+        bewusst weiter an."""
         if self._frozen:
             return
         bus_id = getattr(self, "tempo_bus_id", "") or ""
@@ -654,21 +668,38 @@ class RgbMatrixInstance(Function):
             if bus is not None:
                 bpm, _bc, _bp, pos = bus.snapshot()
                 if bpm > 0:
-                    mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
-                    off = getattr(self, "phase_offset", 0.0) or 0.0
-                    anchor = getattr(self, "_beat_anchor", 0.0)
-                    # round(...,9) killt die Float-Kante an ganzzahligen Beats: die
-                    # Bus-Position landet oft als N-1e-16, und int(N-1e-16)=N-1 → ein
-                    # STROBE (on=int(p)%2==0) liefe genau am Beat 1 Frame falsch. 9
-                    # Nachkommastellen sind fuers Rendering mehr als genug; betrifft
-                    # NUR den bus-synchronen Pfad (Free-Run bleibt byte-identisch).
-                    self._step = round((pos - anchor) * mult + off, 9)
-                    return
-                # F5: nur bei AKTIVEM Freeze die Position HALTEN; sonst Free-Run.
-                # Ein Bus, der nur "noch nicht gestartet" ist (bpm 0, kein Freeze),
-                # laesst den Effekt frei weiterlaufen (rueckwaerts-kompatibel).
-                if _tbm is not None and _tbm.is_frozen():
-                    return
+                    last = getattr(self, "_last_bus_pos", None)
+                    self._last_bus_pos = pos
+                    # Bus-Sync, wenn der Bus vorrueckt (``pos != last``), beim ersten
+                    # Frame (``last is None``) ODER bei einer Null-dt-Re-Evaluation
+                    # (``dt <= 0`` — z. B. direkt nach ``sync()`` neu auswerten): dann den
+                    # bus-synchronen Wert frisch aus Position + Anker berechnen.
+                    if last is None or pos != last or dt <= 0.0:
+                        # Echte Bus-Synchronitaet: zwei Matrizen auf demselben Bus koppeln
+                        # exakt (z. B. Farbe ×1, Dimmer ×2 phasengleich).
+                        mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+                        off = getattr(self, "phase_offset", 0.0) or 0.0
+                        anchor = getattr(self, "_beat_anchor", 0.0)
+                        # round(...,9) killt die Float-Kante an ganzzahligen Beats: die
+                        # Bus-Position landet oft als N-1e-16, und int(N-1e-16)=N-1 → ein
+                        # STROBE (on=int(p)%2==0) liefe genau am Beat 1 Frame falsch. 9
+                        # Nachkommastellen sind fuers Rendering mehr als genug; betrifft
+                        # NUR den bus-synchronen Pfad (Free-Run bleibt byte-identisch).
+                        self._step = round((pos - anchor) * mult + off, 9)
+                        return
+                    # bpm>0, aber Position steht ueber einen echten Zeitschritt (dt>0):
+                    # Bus rueckt nicht vor (keine advance_frame-Schleife) → DEMO-04:
+                    # nicht einfrieren, frei weiterlaufen. Nur globaler Freeze haelt an.
+                    if _tbm is not None and _tbm.is_frozen():
+                        return
+                else:
+                    # bpm 0 (Bus noch nicht gestartet): Free-Run, ausser globalem Freeze.
+                    # Anker-Position vergessen, damit der Bus-Wiederanlauf sauber re-synct.
+                    self._last_bus_pos = None
+                    if _tbm is not None and _tbm.is_frozen():
+                        return
+            else:
+                self._last_bus_pos = None
         # Free-Run (alt-Verhalten, byte-identisch).
         rate = self.matrix_speed * max(0.0, float(self.speed))
         self._step = self._step + rate * dt
