@@ -135,6 +135,26 @@ def test_roundtrip():
     assert w2.function_id == 5 and w2.function_ids == [6, 7]
 
 
+def test_remove_effect_unbinds_single():
+    w = VCTempoBusController(); w.tempo_bus_id = "A"
+    a = _matrix("A", "Global"); b = _matrix("B", "Global")
+    w.couple_effect(a.id); w.couple_effect(b.id)
+    assert set(w._targets()) == {a.id, b.id}
+    w.remove_effect(a.id)
+    assert a.id not in w._targets()
+    assert b.id in w._targets()
+
+
+def test_per_effect_param_key_default_and_roundtrip():
+    w = VCTempoBusController(); w.tempo_bus_id = "A"
+    m = _matrix("M", "Global"); w.couple_effect(m.id)
+    assert w._key_for(m.id) == "tempo_multiplier"     # Default: Faktor steuert Tempo
+    w.param_keys_per_id[m.id] = "speed"               # je Effekt waehlbar
+    assert w._key_for(m.id) == "speed"
+    w2 = VCTempoBusController(); w2.apply_dict(w.to_dict())
+    assert w2.param_keys_per_id.get(m.id) == "speed"
+
+
 def test_wheel_adjusts_fixed_bpm():
     w = VCTempoBusController(); w.source = "fix"; w.fixed_bpm = 128.0
     from PySide6.QtGui import QWheelEvent
