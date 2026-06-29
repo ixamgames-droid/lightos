@@ -396,11 +396,22 @@ class CueStack:
         # Fade startet vom EIGENEN Stand (ohne Sub-Cueliste), damit Sub-Kanäle beim
         # Cue-Wechsel nicht nachhängen; ohne Sub ist _own_output == _output.
         from_vals = dict(self._own_output)
-        fade_time = cue.fade_out if use_fade_out else cue.fade_in
+        # ENG-01: Richtung wählt Fade-Zeit, Cue-Delay-Basis UND die Pro-Attribut-
+        # Delays symmetrisch — GO nutzt fade_in/delay_in/attr_delays, BACK (Fade-Out)
+        # nutzt fade_out/delay_out/attr_delays_out. (Vorher nahm der Back-Fade immer
+        # delay_in als Basis und die In-Attr-Delays — die Out-Seite griff nie.)
+        if use_fade_out:
+            fade_time = cue.fade_out
+            base_delay = cue.delay_out
+            attr_delays = getattr(cue, "attr_delays_out", None)
+        else:
+            fade_time = cue.fade_in
+            base_delay = cue.delay_in
+            attr_delays = getattr(cue, "attr_delays", None)
         self._fade = FadeState(
-            from_vals, cue.values, fade_time, cue.delay_in,
+            from_vals, cue.values, fade_time, base_delay,
             getattr(cue, "fade_curve", "scurve"),
-            getattr(cue, "attr_delays", None),
+            attr_delays,
         )
         self._current_idx = idx
         self._beat_count = 0          # Beat-Sync zählt ab dieser Cue neu

@@ -70,6 +70,24 @@ class AttrDelayTest(unittest.TestCase):
     def test_cue_old_show_defaults_empty(self):
         c = Cue.from_dict({"number": 1.0})
         self.assertEqual(c.attr_delays, {})
+        self.assertEqual(c.attr_delays_out, {})   # ENG-01: Out-Seite ebenso leer
+
+    def test_cue_roundtrip_attr_delays_out(self):
+        # ENG-01: In- und Out-Pro-Attribut-Delays überleben getrennt to_dict/from_dict.
+        c = Cue(1.0, values={5: {"pan": 128}},
+                attr_delays={5: {"pan": 0.3}},
+                attr_delays_out={5: {"pan": 0.7}})
+        c2 = Cue.from_dict(c.to_dict())
+        self.assertEqual(c2.attr_delays, {5: {"pan": 0.3}})
+        self.assertEqual(c2.attr_delays_out, {5: {"pan": 0.7}})
+
+    def test_from_dict_skips_malformed_attr_delays_out(self):
+        # ENG-01: Out-Seite ist genauso defensiv wie die In-Seite (kein Cuelisten-Verlust).
+        c = Cue.from_dict({"number": 1.0, "attr_delays_out": "oops"})
+        self.assertEqual(c.attr_delays_out, {})
+        c = Cue.from_dict({"number": 1.0,
+                           "attr_delays_out": {"5": {"pan": "fast", "tilt": 0.2}}})
+        self.assertEqual(c.attr_delays_out, {5: {"tilt": 0.2}})
 
     def test_from_dict_skips_malformed_attr_delays(self):
         # Hand-editierte/kaputte Shows dürfen NICHT werfen (sonst Cuelisten-Verlust).
@@ -215,6 +233,67 @@ class AttrDelayViaFadeToTest(unittest.TestCase):
         vals = s._fade.current_values()
         self.assertAlmostEqual(vals[1]["a"], 50, delta=6)  # a fadet (scurve@0.5≈0.5)
         self.assertEqual(vals[1]["b"], 0)                  # b noch verzögert
+
+
+class AttrDelayOutViaFadeToTest(unittest.TestCase):
+    """ENG-01: Der BACK-Fade (use_fade_out) nutzt symmetrisch fade_out/delay_out und
+    die Out-Pro-Attribut-Delays — nicht mehr die In-Seite."""
+
+    def _two_cue_stack(self, **cue1_kw):
+        s = CueStack("S")
+        # Cue 1 ist das BACK-Ziel; sein fade_out/delay_out/attr_delays_out steuern den
+        # Rückwärts-Fade. Linear, damit Mid-Fade-Werte deterministisch sind.
+        s.add_cue(Cue(1.0, values={1: {"a": 100, "b": 100}},
+                      fade_in=0.0, fade_out=1.0, fade_curve="linear", **cue1_kw))
+        s.add_cue(Cue(2.0, values={1: {"a": 0, "b": 0}},
+                      fade_in=0.0, fade_curve="linear"))
+        s.go()                       # -> Cue 1
+        _settle(s); s.tick()
+        s.go()                       # -> Cue 2 (own_output = {1:{a:0,b:0}})
+        _settle(s); s.tick()
+        s.back()                     # -> zurück zu Cue 1 (use_fade_out=True)
+        self.assertIsNotNone(s._fade)
+        return s
+
+    def test_back_uses_attr_delays_out(self):
+        s = self._two_cue_stack(attr_delays_out={1: {"b": 1.0}})
+        self.assertEqual(s._fade.attr_delays, {1: {"b": 1.0}})   # Out-Set, nicht In
+        s._fade.start_time = time.monotonic() - 0.5     # 0.5 s in den 1-s-Fade-Out
+        vals = s._fade.current_values()
+        self.assertAlmostEqual(vals[1]["a"], 50, delta=4)  # a fadet 0->100 linear
+        self.assertEqual(vals[1]["b"], 0)                  # b: Out-Delay 1 s -> hält
+
+    def test_back_ignores_in_attr_delays(self):
+        # In-Seite gesetzt, Out-Seite leer: der BACK-Fade darf die In-Delays NICHT sehen.
+        s = self._two_cue_stack(attr_delays={1: {"b": 5.0}})
+        self.assertEqual(s._fade.attr_delays, {})       # leer = bisheriges Verhalten
+        s._fade.start_time = time.monotonic() - 0.5
+        vals = s._fade.current_values()
+        self.assertAlmostEqual(vals[1]["a"], 50, delta=4)
+        self.assertAlmostEqual(vals[1]["b"], 50, delta=4)  # b NICHT verzögert
+
+    def test_back_uses_delay_out_base_not_delay_in(self):
+        # delay_out verzögert den ganzen BACK-Fade; delay_in (=0) darf nicht greifen.
+        s = self._two_cue_stack(delay_in=0.0, delay_out=1.0)
+        self.assertAlmostEqual(s._fade.delay, 1.0)      # delay_out als Basis
+        s._fade.start_time = time.monotonic() - 0.5     # noch in der delay_out-Phase
+        vals = s._fade.current_values()
+        self.assertEqual(vals[1]["a"], 0)               # from-Wert: Fade noch nicht los
+        self.assertEqual(vals[1]["b"], 0)
+
+    def test_forward_still_uses_in_side(self):
+        # Gegenprobe: GO (Vorwärts) nutzt weiterhin attr_delays/delay_in, nicht die Out-Seite.
+        s = CueStack("S")
+        s.add_cue(Cue(1.0, values={1: {"a": 100, "b": 100}}, fade_in=1.0,
+                      fade_curve="linear",
+                      attr_delays={1: {"b": 1.0}},
+                      attr_delays_out={1: {"b": 5.0}}))
+        s.go()
+        self.assertEqual(s._fade.attr_delays, {1: {"b": 1.0}})   # In-Set
+        s._fade.start_time = time.monotonic() - 0.5
+        vals = s._fade.current_values()
+        self.assertAlmostEqual(vals[1]["a"], 50, delta=4)
+        self.assertEqual(vals[1]["b"], 0)
 
 
 class ResolverInjectionTest(unittest.TestCase):
