@@ -241,7 +241,7 @@ class _OptionsPage(QWizardPage):
         self.fade.setSingleStep(0.05); self.fade.setSuffix(" s Fade")
         r1.addWidget(self.hold); r1.addWidget(self.fade)
         form.addLayout(r1)
-        self.beat = QCheckBox("Im Beat laufen (folgt dem globalen Tempo / TAP)")
+        self.beat = QCheckBox("Taktgleich zur Haupt-BPM laufen (sonst frei/zeitbasiert)")
         form.addWidget(self.beat)
         form.addStretch(1)
         self._hint = QLabel(""); self._hint.setStyleSheet("color:#888;")
@@ -436,7 +436,14 @@ class EffectWizard(QWizard):
 
         ch = fm.new_chaser(name)
         ch.run_order = order
-        ch.audio_triggered = beat
+        # WP-Tempo: „Im Beat" = taktgleich an die Haupt-BPM koppeln (moderner Bus-Pfad
+        # statt des alten audio_triggered). Sonst frei laufen (zeitbasierter Crossfade).
+        if beat:
+            ch.tempo_bus_id = "Global"
+            ch.align_on_start = True
+            ch.audio_triggered = False
+        else:
+            ch.tempo_bus_id = ""
         ch.beats_per_step = 1
         for sid in steps:
             ch.steps.append(ChaserStep(function_id=sid, fade_in=fade, hold=hold, fade_out=0.0))
