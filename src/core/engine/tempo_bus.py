@@ -420,12 +420,16 @@ class TempoBus:
     def take_anchor(self) -> float:
         """Anker fuer einen STARTENDEN Effekt auf diesem Bus.
 
-        Auto-Sync AUS (Default): liefert die aktuelle Bus-Position -> der Effekt
-        beginnt bei seinem eigenen Null (altes Verhalten, byte-identisch).
-        Auto-Sync AN: liefert den gemeinsamen ``_sync_origin`` -> der erste Effekt legt
-        ihn fest, spaeter startende Effekte uebernehmen ihn und liegen damit automatisch
+        Auto-Sync AN (Default seit 2026-06-26, ``TempoBusManager._auto_sync=True``):
+        liefert den gemeinsamen ``_sync_origin``. Der erste Effekt einer frischen
+        Groove legt ihn fest (``note_groove_start`` setzt ihn beim ersten (Re-)Start
+        auf diesem Bus zuvor auf ``None`` zurueck -> er rastet auf ``jetzt`` neu ein),
+        spaeter dazukommende Effekte uebernehmen ihn und liegen damit automatisch
         phasengleich auf demselben Beat-Raster (egal wann sie gedrueckt werden). Der
-        SYNC-Knopf (``sync()``) re-basiert den Ursprung auf ``jetzt``."""
+        SYNC-Knopf (``sync()``) re-basiert den Ursprung explizit auf ``jetzt``.
+
+        Auto-Sync AUS (bewusste Abwahl): liefert die aktuelle Bus-Position -> der
+        Effekt beginnt bei seinem eigenen Null (altes Verhalten, byte-identisch)."""
         try:
             auto = get_tempo_bus_manager().auto_sync
         except Exception:
@@ -435,6 +439,49 @@ class TempoBus:
         if self._sync_origin is None:
             self._sync_origin = self.position()
         return self._sync_origin
+
+    def _has_other_aligned_running(self, requesting=None) -> bool:
+        """True, wenn AUSSER ``requesting`` noch ein anderer taktgleicher Effekt
+        (``align_on_start`` True) auf DIESEM Bus laeuft. Grundlage fuer
+        :meth:`note_groove_start`: nur wenn keiner mehr laeuft, gilt eine neu
+        gestartete Groove als 'frisch' und der gemeinsame Ursprung wird neu gelegt.
+        Free-Run-Effekte (leere ``tempo_bus_id``) zaehlen NICHT als Bus-Mitglieder."""
+        try:
+            mgr = get_tempo_bus_manager()
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+        except Exception:
+            return False
+        for f in fm.all():
+            if f is requesting:
+                continue
+            if not getattr(f, "is_running", False):
+                continue
+            if not getattr(f, "align_on_start", True):
+                continue
+            bid = (getattr(f, "tempo_bus_id", "") or "").strip()
+            if not bid:
+                continue  # Free-Run: kein Bus-Mitglied
+            try:
+                if mgr.get(bid) is self:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def note_groove_start(self, requesting=None) -> None:
+        """Vom ``_on_start`` eines taktgleichen Effekts VOR :meth:`take_anchor`
+        aufgerufen. Ist ``requesting`` der erste (wieder) laufende taktgleiche Effekt
+        auf diesem Bus (kein anderer laeuft mehr), wird der evtl. VERALTETE gemeinsame
+        Ursprung verworfen (``_sync_origin=None``), sodass die frische Groove ihren
+        Downbeat auf ``jetzt`` neu einrastet. So starten Effekte — besonders
+        Chaser/Sequenzen — sauber auf der Eins statt auf einem 'zufaelligen' Schritt
+        eines uralten, laengst gestoppten Ursprungs. Laeuft bereits ein Bus-Effekt,
+        bleibt der gemeinsame Ursprung erhalten und der Neue klinkt sich phasengleich
+        ein. No-op bei Auto-Sync AUS (dann gibt es keinen gemeinsamen Ursprung)."""
+        if not self._has_other_aligned_running(requesting):
+            with self._lock:
+                self._sync_origin = None
 
     # ── Master/Sub-Konfiguration ──────────────────────────────────────────────────
 
@@ -692,6 +739,27 @@ class TempoBusManager:
         (A/B/C/D) werden bei Bedarf erzeugt. Das ist der Haupt-Hook fuer die VC:
         ``get_tempo_bus_manager().resolve(widget.tempo_bus_id).tap()/.sync()/.set_bpm(x)``."""
         bid = (bus_id or "").strip() or self._armed_bus_id or self.DEFAULT_BUS
+        if bid in self.FIXED_BUSES:
+            return self.ensure_bus(bid)
+        return self.get(bid)
+
+    def bus_for_effect(self, bus_id: "str | None") -> "TempoBus | None":
+        """Loest die ``tempo_bus_id`` eines EFFEKTS auf seinen Tempo-Bus auf.
+
+        Im Gegensatz zu :meth:`resolve` (fuer VC-Widgets, faellt auf den scharfen
+        Bus zurueck) bedeutet hier eine LEERE id bewusst FREE-RUN -> ``None`` (der
+        Effekt liest keinen Bus). Aliase ``default``/``global`` -> Default-Bus. Die
+        festen Buses A-D werden bei Bedarf ERZEUGT (``ensure_bus``), damit ein auf
+        'A' gespeicherter Effekt nach Show-Reload (oder direkt nach dem Anlegen)
+        nicht still frei laeuft, nur weil noch kein VC-Widget Bus A angefasst hat.
+        Andere Namen werden nachgeschlagen (``None`` wenn unbekannt)."""
+        bid = (bus_id or "")
+        if isinstance(bid, str):
+            bid = bid.strip()
+        if not bid:
+            return None  # Free-Run
+        if isinstance(bid, str) and bid.lower() in ("default", "global"):
+            return self.get(self.DEFAULT_BUS)
         if bid in self.FIXED_BUSES:
             return self.ensure_bus(bid)
         return self.get(bid)

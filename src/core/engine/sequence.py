@@ -47,6 +47,10 @@ class Sequence(Function):
         self.run_order: RunOrder = RunOrder.Loop
         self.direction: Direction = Direction.Forward
         self.speed: float = 1.0
+        # WP-Tempo: bei Bus-Sync 1 Step je N Beats (parity mit Chaser; <=0 -> 1).
+        # Wird in _bus_steps_to_advance gelesen; ohne Feld lief jede Sequence still
+        # auf 1 Beat/Step (nicht einstellbar/persistent).
+        self.beats_per_step: int = 1
         self._step_idx: int = 0
         self._step_elapsed: float = 0.0
         self._ping_pong_dir: int = 1
@@ -62,16 +66,23 @@ class Sequence(Function):
         self._step_elapsed = 0.0
         self._ping_pong_dir = 1 if self.direction == Direction.Forward else -1
         self._prev_values = {}
-        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern + Step-Zaehler
-        # zuruecksetzen, damit die Sequence gemeinsam mit der sync_group bei 0 startet.
+        # WP-Tempo: Step-Zaehler zuruecksetzen + ankern. „Taktgleich" (align_on_start,
+        # Default) klinkt auf das gemeinsame Beat-Raster des Bus ein (note_groove_start
+        # legt bei frischer Groove den Downbeat auf jetzt -> sauberer Start auf der Eins);
+        # bewusst frei (False) ankert auf die eigene aktuelle Bus-Position. bus_for_effect
+        # erzeugt feste Buses A-D bei Bedarf, damit eine A-D-Bindung sofort greift.
         self._synced_target_prev = None
         bus_id = getattr(self, "tempo_bus_id", "") or ""
         if bus_id:
             try:
                 from src.core.engine.tempo_bus import get_tempo_bus_manager
-                bus = get_tempo_bus_manager().get(bus_id)
+                bus = get_tempo_bus_manager().bus_for_effect(bus_id)
                 if bus is not None:
-                    self._beat_anchor = bus.take_anchor()
+                    if getattr(self, "align_on_start", True):
+                        bus.note_groove_start(self)
+                        self._beat_anchor = bus.take_anchor()
+                    else:
+                        self._beat_anchor = bus.position()
             except Exception:
                 pass
 
@@ -394,6 +405,7 @@ class Sequence(Function):
             "run_order": self.run_order.value,
             "direction": self.direction.value,
             "speed": self.speed,
+            "beats_per_step": self.beats_per_step,
             "steps": [self._step_to_dict(s) for s in self.steps],
         })
         return d
@@ -420,6 +432,10 @@ class Sequence(Function):
         sq.run_order = RunOrder(d.get("run_order", "Loop"))
         sq.direction = Direction(d.get("direction", "Forward"))
         sq.speed = float(d.get("speed", 1.0))
+        try:
+            sq.beats_per_step = max(1, int(d.get("beats_per_step", 1)))
+        except (TypeError, ValueError):
+            sq.beats_per_step = 1
         for sd in d.get("steps", []):
             step = SequenceStep(
                 values=sd.get("values", {}),

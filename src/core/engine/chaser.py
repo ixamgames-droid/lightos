@@ -79,16 +79,23 @@ class Chaser(Function):
                     bm.set_bpm(120.0)
             except Exception:
                 pass
-        # WP-Tempo: bei Bus-Sync auf die aktuelle Bus-Position ankern + Step-Zaehler
-        # zuruecksetzen, damit der Chaser gemeinsam mit der sync_group bei 0 startet.
+        # WP-Tempo: Step-Zaehler zuruecksetzen + ankern. „Taktgleich" (align_on_start,
+        # Default) klinkt auf das gemeinsame Beat-Raster des Bus ein (note_groove_start
+        # legt bei frischer Groove den Downbeat auf jetzt -> sauberer Start auf der Eins);
+        # bewusst frei (False) ankert auf die eigene aktuelle Bus-Position. bus_for_effect
+        # erzeugt feste Buses A-D bei Bedarf, damit eine A-D-Bindung sofort greift.
         self._synced_target_prev = None
         bus_id = getattr(self, "tempo_bus_id", "") or ""
         if bus_id:
             try:
                 from src.core.engine.tempo_bus import get_tempo_bus_manager
-                bus = get_tempo_bus_manager().get(bus_id)
+                bus = get_tempo_bus_manager().bus_for_effect(bus_id)
                 if bus is not None:
-                    self._beat_anchor = bus.take_anchor()
+                    if getattr(self, "align_on_start", True):
+                        bus.note_groove_start(self)
+                        self._beat_anchor = bus.take_anchor()
+                    else:
+                        self._beat_anchor = bus.position()
             except Exception:
                 pass
 
@@ -533,7 +540,13 @@ class Chaser(Function):
             except ValueError:
                 return False
         if key == "tempo_bus_id":
-            self.tempo_bus_id = str(value or "").strip(); return True
+            self.tempo_bus_id = str(value or "").strip()
+            # Exklusiv: ein bus-gebundener Chaser steppt ueber den Tempo-Bus; der alte
+            # audio_triggered-Pfad (BPMManager-Beat) wuerde sonst parallel mitzaehlen.
+            # Der Bus gewinnt -> audio_triggered abschalten.
+            if self.tempo_bus_id:
+                self.audio_triggered = False
+            return True
         if key == "tempo_multiplier":
             try:
                 self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
