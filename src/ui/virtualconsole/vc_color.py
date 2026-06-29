@@ -145,13 +145,21 @@ class VCColor(VCWidget):
                 pass
         return None
 
+    def _effect_rgb(self) -> tuple[int, int, int]:
+        """RGB fuer Effekt-Color-Ziele: eine Color-Sequence kennt KEINEN W-Kanal,
+        also den Weissanteil additiv in RGB falten (``rgbw_to_display``). Sonst
+        landet eine als RGBW-Weiss (W=255, RGB=0) definierte Kachel als **schwarz**
+        in der Sequence (und der Effekt waere unsichtbar/schwarz)."""
+        from src.core.color_utils import rgbw_to_display
+        return rgbw_to_display(self.color_r, self.color_g, self.color_b, self.color_w)
+
     def _apply(self):
         if self.target == ColorTarget.EFFECT_ADD:
             # Live-Color-Chase: Farbe an die Color-Sequence des Ziel-Effekts anhaengen.
             try:
                 from src.core.engine import effect_live
                 effect_live.do_action("add_color", self._effect_fid(),
-                                      rgb=(self.color_r, self.color_g, self.color_b))
+                                      rgb=self._effect_rgb())
             except Exception as e:
                 print(f"[VCColor] effect add color error: {e}")
             return
@@ -159,8 +167,7 @@ class VCColor(VCWidget):
             # Phase 6: Live in die aktive Sequence-Farbe des Effekts faerben.
             try:
                 from src.core.engine import effect_live
-                effect_live.set_selected_color(
-                    (self.color_r, self.color_g, self.color_b), self._effect_fid())
+                effect_live.set_selected_color(self._effect_rgb(), self._effect_fid())
             except Exception as e:
                 print(f"[VCColor] effect color error: {e}")
             return
@@ -169,7 +176,7 @@ class VCColor(VCWidget):
             try:
                 from src.core.engine import effect_live
                 effect_live.set_param(_EFFECT_COLOR_SLOTS[self.target],
-                                      (self.color_r, self.color_g, self.color_b),
+                                      self._effect_rgb(),
                                       self._effect_fid())
             except Exception as e:
                 print(f"[VCColor] effect color-slot error: {e}")
