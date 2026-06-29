@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-06-30 — Neu
+
+#### Neu / Hinzugefuegt
+
+- **VC-Button: quadratische Standard-Größe (UI-13):** Neu hinzugefügte Buttons sind jetzt **quadratisch** (72×72, grid-aligned) statt länglich (120×60) — der Pad-Look, den der Demo-Show-Generator schon immer baut, ist damit die Standardgröße beim Hand-Platzieren. Bestehende Shows laden ihre eigene Geometrie und bleiben unverändert (nur die Neuanlage betroffen). `src/ui/virtualconsole/vc_button.py`.
+- **VC-Button: Farb-/Effekt-Vorschau-Badge oben rechts (UI-13):** Ein Button mit gebundenem Farb-Effekt oder Farb-Snap zeigt jetzt — analog zum Gobo-Icon — oben rechts einen kleinen Farb-Kreis. Steuert der Effekt **mehrere Farben** (Farbwechsel), **wechselt das Eck-Icon zyklisch** durch die Farben (animiert, Timer nur aktiv solange das Widget sichtbar UND mehrfarbig ist → keine Off-Bank-CPU). Nicht-farbige Effekte (Dimmer-/Shutter-Style → `has_colors=False`) bekommen bewusst kein Badge. `src/ui/virtualconsole/vc_button.py`, `tests/test_vc_button_color_badge.py`.
+
+#### Behoben
+
+- **Weiß-Erkennung bei RGBW (UI-13):** Reines RGBW-Weiß (W-Kanal=255, RGB=0) wurde als **schwarzer Knopf** dargestellt, weil die Kachel-/Swatch-Farbe nur `color_r/g/b` las und den Weiß-Kanal ignorierte. Neuer zentraler Qt-freier Helfer `color_utils.rgbw_to_display`/`display_rgb_from_attrs` faltet den Weißanteil additiv zurück in die Anzeige-RGB → Weiß erscheint als Weiß (Snap-Swatch + neues Badge). Zusätzlich faltet die **VC-Farbkachel beim Senden an Effekt-Farb-Ziele** (`add_color`/`set_selected_color`/`color1..3`) den Weiß-Kanal ein — eine als RGBW-Weiß definierte Kachel landete sonst als Schwarz in der Color-Sequence (Wurzel von „weißer Effekt = schwarzer Knopf"). `src/core/color_utils.py`, `src/ui/virtualconsole/vc_button.py`, `src/ui/virtualconsole/vc_color.py`, `tests/test_vc_button_color_badge.py`.
+
 ### 2026-06-29 — Neu
 
 #### Neu / Hinzugefuegt

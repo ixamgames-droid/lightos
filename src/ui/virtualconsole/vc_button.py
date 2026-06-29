@@ -14,6 +14,12 @@ _SNAPSHOTS_FILE = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
 )
 
+# Quadratische Standard-Groesse fuer NEU angelegte Buttons (Pad-Look wie im
+# Demo-Show-Generator, PAD=56 → hier etwas grosszuegiger fuer Hand-Platzierung).
+# GRID-aligned (8 px) damit der Button beim Anlegen sauber einrastet. Bestehende
+# Shows laden ihre eigene Geometrie aus to_dict → unveraendert (nur Neuanlage).
+DEFAULT_BUTTON_SIZE = 72
+
 
 class ButtonAction(str, Enum):
     TOGGLE   = "Toggle"
@@ -184,7 +190,20 @@ class VCButton(VCWidget):
         self._live_editor = None
         self._bg_color = QColor("#1a3a5c")
         self._fg_color = QColor("#ffffff")
-        self.resize(120, 60)
+
+        # Farb-Vorschau-Badge (oben rechts): zeigt die Farbe(n) des gebundenen
+        # Farb-Effekts/-Snaps. Mehrere Farben (Farbwechsel) => Eck-Icon wechselt
+        # zyklisch durch (animiert). Aufloesung pro Bindung gecacht (paintEvent
+        # laeuft oft); Timer nur aktiv, solange das Widget sichtbar UND mehrfarbig
+        # ist (off-bank/einfarbig = keine CPU).
+        self._badge_colors: list[QColor] = []
+        self._badge_cache_key = None
+        self._badge_index = 0
+        self._badge_timer = QTimer(self)
+        self._badge_timer.setInterval(900)   # ~0.9 s pro Farbe
+        self._badge_timer.timeout.connect(self._advance_badge)
+
+        self.resize(DEFAULT_BUTTON_SIZE, DEFAULT_BUTTON_SIZE)
 
     # ── MIDI-Learn ───────────────────────────────────────────────────────────
 
@@ -513,13 +532,111 @@ class VCButton(VCWidget):
         self.update()
 
     def _snap_swatch_color(self) -> QColor | None:
-        """Repraesentative Farbe des Snaps (erstes Fixture mit RGB) fuer die Kachel."""
+        """Repraesentative Farbe des Snaps (erstes Fixture mit Farbe) fuer die Kachel.
+
+        Faltet ueber ``display_rgb_from_attrs`` den Weiss-Kanal (RGBW) additiv in
+        die Anzeige-RGB — reines Weiss (``color_w=255``, RGB=0) wird damit **weiss**
+        statt schwarz (frueher las diese Methode nur ``color_r/g/b``)."""
+        from src.core.color_utils import display_rgb_from_attrs
         for snap in self._library_snaps():
             for attrs in snap.values.values():
-                r = attrs.get("color_r"); g = attrs.get("color_g"); b = attrs.get("color_b")
-                if r is not None or g is not None or b is not None:
-                    return QColor(int(r or 0), int(g or 0), int(b or 0))
+                rgb = display_rgb_from_attrs(attrs)
+                if rgb is not None:
+                    return QColor(*rgb)
         return None
+
+    # ── Farb-Vorschau-Badge (oben rechts) ────────────────────────────────────
+    def _color_badge_colors(self) -> list:
+        """Anzeige-Farben des gebundenen Farb-Effekts/-Snaps (gecacht pro Bindung).
+
+        Eine Farbe => einfarbiges Badge; mehrere => Farbwechsel (animiert). Leer =>
+        kein Badge (Button steuert keine Farbe)."""
+        key = (self.action, tuple(self._all_snap_ids()), self.function_id)
+        if getattr(self, "_badge_cache_key", None) == key:
+            return self._badge_colors
+        cols = self._resolve_badge_colors()
+        self._badge_cache_key = key
+        self._badge_colors = cols
+        if self._badge_index >= len(cols):
+            self._badge_index = 0
+        self._sync_badge_timer()
+        return cols
+
+    def _resolve_badge_colors(self) -> list:
+        """Loest die Vorschau-Farben auf: aus Bibliothek-Snaps (LIBRARY_SNAP, mit
+        W-Faltung) oder aus der Color-Sequence eines gebundenen Farb-Effekts
+        (FUNCTION_TOGGLE/FLASH/EFFECT_ACTION). Nicht-farbige Effekte (Dimmer-/
+        Shutter-Style → ``has_colors=False``) liefern bewusst KEIN Badge."""
+        out: list = []
+        seen: set = set()
+
+        def _push(qc: QColor):
+            n = qc.name()
+            if n not in seen:
+                seen.add(n)
+                out.append(qc)
+
+        try:
+            from src.core.color_utils import display_rgb_from_attrs
+            if self.action == ButtonAction.LIBRARY_SNAP:
+                for snap in self._library_snaps():
+                    for attrs in snap.values.values():
+                        rgb = display_rgb_from_attrs(attrs)
+                        if rgb is not None:
+                            _push(QColor(*rgb))
+            elif (self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH,
+                                  ButtonAction.EFFECT_ACTION)
+                  and self.function_id is not None):
+                fid = int(self.function_id)
+                # Nur fuer Effekte, die wirklich Farbe steuern (Style-Guard spiegeln).
+                from src.ui.virtualconsole.vc_effect_meta import function_capabilities
+                caps = function_capabilities(fid)
+                if not getattr(caps, "has_colors", False):
+                    return []
+                from src.core.engine import effect_live
+                seq = effect_live.get_param("colors", fid)
+                rgbs = []
+                if seq is not None and hasattr(seq, "enabled_colors"):
+                    rgbs = list(seq.enabled_colors())
+                elif isinstance(seq, (list, tuple)):
+                    rgbs = [c for c in seq
+                            if isinstance(c, (list, tuple)) and len(c) >= 3]
+                for rgb in rgbs:
+                    _push(QColor(int(rgb[0]), int(rgb[1]), int(rgb[2])))
+        except Exception:
+            return []
+        return out[:8]   # mehr als 8 Zyklus-Farben braucht das Eck-Icon nicht
+
+    def _sync_badge_timer(self):
+        """Cycle-Timer nur laufen lassen, wenn sichtbar UND mehrfarbig."""
+        multi = len(self._badge_colors) > 1
+        if multi and self.isVisible():
+            if not self._badge_timer.isActive():
+                self._badge_timer.start()
+        else:
+            if self._badge_timer.isActive():
+                self._badge_timer.stop()
+            if not multi:
+                self._badge_index = 0
+
+    def _advance_badge(self):
+        n = len(self._badge_colors)
+        if n <= 1:
+            self._badge_timer.stop()
+            return
+        self._badge_index = (self._badge_index + 1) % n
+        self.update()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Beim Sichtbarwerden (Bank-Wechsel) Farben frisch aufloesen + Timer steuern.
+        self._color_badge_colors()
+        self._sync_badge_timer()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        if self._badge_timer.isActive():
+            self._badge_timer.stop()
 
     def _gobo_icon(self):
         """Gobo-Icon (QPixmap) wenn dieser Button einen Gobo setzt, sonst None.
@@ -1093,6 +1210,25 @@ class VCButton(VCWidget):
         _gpm = self._gobo_icon()
         if _gpm is not None and not _gpm.isNull():
             p.drawPixmap(self.width() - _gpm.width() - 4, 4, _gpm)
+
+        # Farb-Vorschau-Badge (oben rechts): kleiner Kreis in der aktuellen
+        # Effekt-/Snap-Farbe. Mehrere Farben (Farbwechsel) => der Kreis wechselt
+        # zyklisch durch (Timer). Liegt schon ein Gobo oben rechts, wird das Badge
+        # darunter gestapelt, damit beide sichtbar bleiben.
+        _badge = self._color_badge_colors()
+        if _badge:
+            d = 16
+            bx = self.width() - d - 4
+            by = 4
+            if _gpm is not None and not _gpm.isNull():
+                by = 4 + _gpm.height() + 2
+            idx = self._badge_index if self._badge_index < len(_badge) else 0
+            cur = _badge[idx]
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.setPen(QPen(QColor(0, 0, 0, 170), 1))   # dunkler Ring → helle Farben sichtbar
+            p.setBrush(cur)
+            p.drawEllipse(bx, by, d, d)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
         # Farbbalken unten je nach Aktion
         if self.action == ButtonAction.FLASH:

@@ -162,6 +162,46 @@ def rgbw_split(r: int, g: int, b: int) -> tuple[int, int, int, int]:
     return r - w, g - w, b - w, w
 
 
+# Attribut-Keys, die eine (RGB-)Farbe in einem Programmer-/Snap-Wertdict tragen.
+_COLOR_ATTR_KEYS = ("color_r", "color_g", "color_b", "color_w")
+
+
+def rgbw_to_display(r, g, b, w=0) -> tuple[int, int, int]:
+    """Wahrgenommene Anzeige-RGB aus einem RGBW-Wert: der Weissanteil ``w`` wird
+    **additiv** zurueck in RGB gefaltet, damit reines RGBW-Weiss
+    (``w=255``, ``r=g=b=0``) als **weiss** statt schwarz erscheint.
+
+    Das ist die Anzeige-Umkehrung von :func:`rgbw_split` (das ``min(r,g,b)`` auf den
+    W-Kanal schiebt). Genutzt fuer **Vorschauen/Kacheln** (VC-Button-Swatch +
+    Farb-Badge) sowie beim Senden einer Farbe an eine Effekt-Color-Sequence, die
+    keinen eigenen W-Kanal kennt — sonst ginge der Weissanteil verloren und die
+    Farbe wuerde schwarz. Werte werden auf 0..255 geklemmt."""
+    w = max(0, min(255, int(w or 0)))
+    r = max(0, min(255, int(r or 0) + w))
+    g = max(0, min(255, int(g or 0) + w))
+    b = max(0, min(255, int(b or 0) + w))
+    return r, g, b
+
+
+def display_rgb_from_attrs(attrs, default=None):
+    """Anzeige-RGB ``(r,g,b)`` aus einem Attribut-Wertdict (``color_r/g/b`` plus
+    optional ``color_w``), mit additiver W-Faltung via :func:`rgbw_to_display`.
+
+    Gibt ``default`` zurueck, wenn das Dict gar keinen Farb-Kanal traegt (damit
+    Aufrufer „keine Farbe" von „schwarz" unterscheiden koennen). Reines Weiss
+    (``color_w=255``) liefert ``(255,255,255)`` — fixt die „Weiss wird als
+    schwarzer Knopf dargestellt"-Erkennung."""
+    try:
+        has_color = any(k in attrs for k in _COLOR_ATTR_KEYS)
+    except TypeError:
+        return default
+    if not has_color:
+        return default
+    return rgbw_to_display(
+        attrs.get("color_r"), attrs.get("color_g"),
+        attrs.get("color_b"), attrs.get("color_w"))
+
+
 def adapt_color_payload(attrs: set[str], payload: dict) -> dict:
     """Passt einen Farb-Payload ({attr: 0..255}) an die Faehigkeiten eines
     Fixtures an (siehe Modul-Doku). Payloads ohne RGB-Anteil werden
