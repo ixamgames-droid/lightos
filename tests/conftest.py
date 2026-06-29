@@ -63,6 +63,11 @@ os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 # AUTO-Start der Audio-BPM-Erkennung (AUTO ist standardmaessig an) in Tests
 # unterdruecken: kein Test soll je den WASAPI-Loopback-Capture hochfahren.
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
+# STAB-08: Enttec-Serial-Ausgabe in Tests NICHT in einen eigenen Prozess auslagern
+# (kein multiprocessing-spawn pro add_enttec). Die Prozess-Isolation selbst ist
+# gezielt in tests/test_serial_process.py abgedeckt. MUSS vor dem ersten
+# output_manager-Import stehen -> hier am conftest-Kopf.
+os.environ.setdefault("LIGHTOS_SERIAL_INPROC", "1")
 
 import pytest
 
