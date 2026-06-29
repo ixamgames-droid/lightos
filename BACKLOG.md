@@ -26,9 +26,7 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 ## 📋 Offen
 
-| ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
-|----|------|--------|-------|------------------------------------------|
-| ENG-01 | P2 | todo | Cue-Delay In/Out auf Attribut-Ebene | Pro-Attribut `delay_in`/`delay_out` (Cue-Ebene existiert bereits); Render-Test |
+_Aktuell keine frei eingereihten Items — die nächsten Kandidaten stehen unten unter „Aus Codex-Reviews". Einzelne Zeilen nach hier oben ziehen, um sie für den Loop zu priorisieren (oder eine neue Idee anhängen)._
 
 ### 🤖 Aus Codex-Reviews (Stand 2026-06-24 — noch offene Befunde)
 _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft. Der STAB-/QA-/VIZ-Teil dieses Audits ist via [PR #55](https://github.com/ixamgames-droid/lightos/pull/55) bereits erledigt (siehe „Erledigt" unten) — hier bleiben die 10 noch offenen UI-/ENG-Punkte. Verschieb einzelne Zeilen nach oben in die „Offen"-Liste, um sie für den Loop zu priorisieren._
@@ -48,6 +46,8 @@ _Befunde der Codex-CLI unter den PR-Kommentaren, gegen aktuellen `main` geprüft
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **ENG-01** · Cue-Delay **In/Out auf Attribut-Ebene**: Cues hatten bereits eine Pro-Attribut-Verzögerung beim Hineinfaden (`attr_delays`); neu ist das symmetrische `attr_delays_out` fürs Ausfaden. `CueStack._fade_to` wählt jetzt **richtungsabhängig** Fade-Zeit, Cue-Delay-Basis **und** die Pro-Attribut-Delays (GO → `fade_in`/`delay_in`/`attr_delays`, BACK → `fade_out`/`delay_out`/`attr_delays_out`). Nebenbei behoben: der BACK-Fade nahm bisher fälschlich `delay_in` statt `delay_out` als Verzögerungs-Basis. Alt-Shows ohne den neuen Schlüssel verhalten sich unverändert (defensive Deserialisierung). +6 Tests. [PR #78](https://github.com/ixamgames-droid/lightos/pull/78)
 
 - **STAB-08** · Serial-Ausgabe **prozess-isoliert**: die Enttec-Ausgabe läuft jetzt in einem eigenen Prozess (`EnttecProcessProxy` + `serial_process`-Worker). Eine native, in Python **unfangbare** Access Violation im USB-/FTDI-Kerneltreiber killt damit nur den Worker; der Parent respawnt ihn gedrosselt, GUI/Engine laufen weiter. Parent schreibt latest-wins in einen shared `Array` → der 44-Hz-Thread hängt nie mehr an einem Serial-Write. Default an, `LIGHTOS_SERIAL_INPROC=1` erzwingt den In-Prozess-Pfad, Fallback bei Spawn-Fehler. +10 Tests. [PR #75](https://github.com/ixamgames-droid/lightos/pull/75)
 
