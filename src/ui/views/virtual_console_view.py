@@ -151,6 +151,7 @@ class VirtualConsoleView(QWidget):
             ("Musik",     "VCSongInfo"),
             ("BPM",       "VCBpmDisplay"),
             ("Tempo-Bus", "VCBusSelector"),
+            ("Tempo-Controller", "VCTempoBusController"),
         ]
         for label, wtype in widget_buttons:
             btn = QPushButton(label)

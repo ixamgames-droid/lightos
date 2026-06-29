@@ -299,3 +299,20 @@ def _reset_bpm_manager():
             mgr._mode = _BM.BpmMode.AUTO
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def _reset_tempo_bus_manager_global():
+    """Setzt nach JEDEM Test den Tempo-Bus-Manager-Singleton zurueck (Pendant zum
+    BPM-Leader-Reset oben). Ohne dies behaelt der Default-Bus seine zuletzt
+    integrierte ``_bpm`` (z. B. 120 aus einem Tempo-Test, der ihn fortschrieb) —
+    ein spaeterer Test mit einem frischen, auf 'Global' laufenden Effekt sieht dann
+    faelschlich einen laufenden Bus statt Free-Run (driftete je nach Reihenfolge in
+    Phase-0). Modul-Global pruefen, damit hier kein Singleton lazy entsteht."""
+    yield
+    try:
+        from src.core.engine import tempo_bus as _TB
+        if getattr(_TB, "_mgr", None) is not None:
+            _TB.reset_tempo_bus_manager()
+    except Exception:
+        pass
