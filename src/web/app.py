@@ -161,8 +161,15 @@ def start_server(port: int = 5000):
     app, sio = create_app()
     _running = True
     _thread = threading.Thread(
+        # allow_unsafe_werkzeug=True: neuere flask-socketio/werkzeug verweigern
+        # den Dev-Server sonst mit RuntimeError ("not designed to run in
+        # production") -> der WebServer-Thread starb still beim Start und das
+        # Remote-Control war nie erreichbar (crash.log 2026-06). LightOS ist ein
+        # lokaler LAN-Controller, kein Internet-Dienst -> der Dev-Server ist hier
+        # bewusst akzeptabel.
         target=lambda: sio.run(app, host="0.0.0.0", port=port,
-                               use_reloader=False, log_output=False),
+                               use_reloader=False, log_output=False,
+                               allow_unsafe_werkzeug=True),
         daemon=True,
         name="WebServer"
     )
