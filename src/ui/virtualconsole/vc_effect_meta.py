@@ -221,6 +221,11 @@ def mappable_param_choices(function_id) -> list[tuple[str, str]]:
             key = getattr(spec, "key", "")
             if not key:
                 continue
+            # VCI-06: tempo_multiplier/phase_offset haben dedizierte Tempo-Controls
+            # (TEMPO_BUS/TEMPO_MULT) und werden auch in control_options ausgeschlossen
+            # -> hier konsistent aus der „gesteuerter Parameter"-Combo nehmen.
+            if key in ("tempo_multiplier", "phase_offset"):
+                continue
             label = getattr(spec, "label", key) or key
             out.append((key, label))
     except Exception:
@@ -304,10 +309,10 @@ def aspect_caption(option, effect_name: str = "") -> str:
         return effect_name
     if k == ControlKind.PARAM:
         lbl = getattr(option, "label", "") or ""
-        return lbl.split("Parameter: ", 1)[-1] if "Parameter:" in lbl else (lbl or effect_name)
+        return lbl.split("Parameter: ", 1)[-1] if "Parameter: " in lbl else (lbl or effect_name)
     if k == ControlKind.ACTION:
         lbl = getattr(option, "label", "") or ""
-        return lbl.split("Aktion: ", 1)[-1] if "Aktion:" in lbl else (lbl or effect_name)
+        return lbl.split("Aktion: ", 1)[-1] if "Aktion: " in lbl else (lbl or effect_name)
     return _ASPECT_CAPTIONS.get(k, effect_name)
 
 

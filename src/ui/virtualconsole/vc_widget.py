@@ -545,7 +545,11 @@ class VCWidget(QFrame):
         steuern wie dieses (Selektion -> Gruppe sichtbar). Ohne Effekt-Bindung
         wird eine bestehende Hervorhebung aufgehoben."""
         canvas = self._find_canvas()
-        if canvas is None or not hasattr(canvas, "highlight_effects"):
+        # VCI-12: auch _effect_ids_of explizit pruefen (nicht nur highlight_effects),
+        # damit ein Canvas-aehnlicher Parent ohne diese Methode keinen AttributeError
+        # wirft (bisher nur durch das try/except unten abgefangen).
+        if (canvas is None or not hasattr(canvas, "highlight_effects")
+                or not hasattr(canvas, "_effect_ids_of")):
             return
         try:
             ids = canvas._effect_ids_of(self)
