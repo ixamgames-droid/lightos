@@ -569,6 +569,18 @@ class VCWidget(QFrame):
             p = p.parent()
         return None
 
+    def _notify_effect_colors_changed(self, function_id):
+        """UI-14b: nach einem Live-Color-Edit die Vorschau-Badges aller VCButtons
+        repainten, die diesen Effekt binden (sie zeigen sonst die alte Farbe bis zu
+        einem unabhaengigen Repaint/Bank-Wechsel). No-op, wenn kein Canvas/keine
+        Methode da ist."""
+        try:
+            canvas = self._find_canvas()
+            if canvas is not None and hasattr(canvas, "refresh_effect_badges"):
+                canvas.refresh_effect_badges(function_id)
+        except Exception:
+            pass
+
     def _notify_selected(self):
         """Meldet die Auswahl dieses Widgets an den naechsten Vorfahren mit einem
         ``_on_widget_selected``-Hook (VCCanvas) — fuer das Inspector-Panel. Nur ein
@@ -670,7 +682,20 @@ class VCWidget(QFrame):
             self.bank = -1
         self.setGeometry(d.get("x", 0), d.get("y", 0),
                          d.get("w", 120), d.get("h", 60))
+        # VCB-22: eine korrupte/handbearbeitete Show mit w=0/h=0 erzeugte sonst ein
+        # unsichtbares, nicht klickbares Widget (der interaktive Resize erzwingt
+        # MIN_SIZE, der Lade-Pfad umging das).
+        try:
+            _mw, _mh = self.MIN_SIZE
+            if self.width() < _mw or self.height() < _mh:
+                self.resize(max(self.width(), _mw), max(self.height(), _mh))
+        except Exception:
+            pass
         if "bg" in d:
-            self._bg_color = QColor(d["bg"])
+            _c = QColor(d["bg"])
+            if _c.isValid():   # VCB-21: korrupter Hex -> nicht zu transparentem Schwarz
+                self._bg_color = _c
         if "fg" in d:
-            self._fg_color = QColor(d["fg"])
+            _c = QColor(d["fg"])
+            if _c.isValid():
+                self._fg_color = _c

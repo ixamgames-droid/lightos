@@ -846,6 +846,18 @@ class VCSlider(VCWidget):
                 self._apply()
             elif _old_mode == SliderMode.SUBMASTER:
                 _clear_submaster_slot(id(self))
+            elif self.mode == SliderMode.GROUP_DIMMER:
+                self._apply()
+            elif _old_mode == SliderMode.GROUP_DIMMER:
+                # VCB-19: weg vom Gruppen-Dimmer -> die Fixture-Dimmer der Gruppe auf
+                # 1.0 zuruecksetzen, sonst dimmt der Fader als Geist weiter.
+                try:
+                    from src.core.app_state import get_state
+                    _st = get_state()
+                    _st.set_group_dimmer(
+                        self._group_fids(_st, self.programmer_group), 1.0)
+                except Exception:
+                    pass
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -893,8 +905,12 @@ class VCSlider(VCWidget):
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.effect_autostart = bool(d.get("effect_autostart", False))
         self.invert = bool(d.get("invert", False))
-        self.range_min = int(d.get("range_min", 0))
-        self.range_max = int(d.get("range_max", 255))
-        self._value = d.get("value", 0)
+        # VCB-27: JSON-null (Key vorhanden, Wert null) -> d.get(default) liefert None
+        # -> int(None) crasht. `or default` faengt das ab.
+        self.range_min = int(d.get("range_min") or 0)
+        self.range_max = int(d.get("range_max") or 255)
+        # VCB-23: Direktzuweisung umging den @value.setter-Clamp -> Ratio>1.0/undef.
+        # DMX bei Out-of-Range. Hier klemmen (0..255, int).
+        self._value = max(0, min(255, int(d.get("value", 0) or 0)))
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)

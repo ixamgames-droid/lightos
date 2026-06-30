@@ -162,6 +162,7 @@ class VCColor(VCWidget):
                                       rgb=self._effect_rgb())
             except Exception as e:
                 print(f"[VCColor] effect add color error: {e}")
+            self._notify_effect_colors_changed(self._effect_fid())  # UI-14b
             return
         if self.target == ColorTarget.EFFECT:
             # Phase 6: Live in die aktive Sequence-Farbe des Effekts faerben.
@@ -170,6 +171,7 @@ class VCColor(VCWidget):
                 effect_live.set_selected_color(self._effect_rgb(), self._effect_fid())
             except Exception as e:
                 print(f"[VCColor] effect color error: {e}")
+            self._notify_effect_colors_changed(self._effect_fid())  # UI-14b
             return
         if self.target in _EFFECT_COLOR_SLOTS:
             # To-Do #5: gezielt color1/2/3 des Effekts setzen (Feuer/Plasma/Windrad).
@@ -180,6 +182,7 @@ class VCColor(VCWidget):
                                       self._effect_fid())
             except Exception as e:
                 print(f"[VCColor] effect color-slot error: {e}")
+            self._notify_effect_colors_changed(self._effect_fid())  # UI-14b
             return
         try:
             from src.core.app_state import get_state

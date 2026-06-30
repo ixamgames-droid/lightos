@@ -1282,6 +1282,32 @@ class VCCanvas(QWidget):
         """Hebt jede Effekt-Gruppen-Hervorhebung auf."""
         self.highlight_effects(None)
 
+    def refresh_effect_badges(self, function_id):
+        """UI-14b: Nach einem Live-Color-Edit (ein SEPARATES Farb-Widget mutiert die
+        ColorSequence eines Effekts) die Vorschau-Badges aller VCButtons, die diesen
+        Effekt binden, neu aufloesen + repainten. Die UI-14-Cache-Invalidierung
+        (Sequence-Signatur im Cache-Key) greift sonst erst beim naechsten
+        unabhaengigen Repaint/Bank-Wechsel — der gebundene Button zeigt bis dahin die
+        alte Farbe. Duck-typed (kein VCButton-Import noetig)."""
+        try:
+            fid = int(function_id)
+        except (TypeError, ValueError):
+            return
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return
+        for w in widgets:
+            if not hasattr(w, "_color_badge_colors"):
+                continue
+            if fid not in self._effect_ids_of(w):
+                continue
+            try:
+                w._color_badge_colors()   # re-resolve (Sig geaendert) + Timer-Sync
+                w.update()                # Repaint mit den neuen Farben
+            except Exception:
+                pass
+
     def _rebind_widget_to(self, target, function_id):
         """Konflikt-Aufloesung 'Ersetzen': biegt ein Multi-Effekt-Widget komplett
         auf EINEN Effekt um (leert function_ids + param_keys_per_id)."""

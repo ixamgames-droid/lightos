@@ -83,6 +83,7 @@ class VCEffectColors(VCWidget):
             seq.set_color(idx, (c.red(), c.green(), c.blue()))
             seq.active_index = idx
             self.update()
+            self._notify_effect_colors_changed(self._fid())  # UI-14b
 
     def mousePressEvent(self, event):
         if self._edit_mode:
@@ -102,6 +103,7 @@ class VCEffectColors(VCWidget):
             effect_live.begin_live_edit(self._fid())
             seq.toggle(idx)
             self.update()
+            self._notify_effect_colors_changed(self._fid())  # UI-14b
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:

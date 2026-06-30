@@ -1911,4 +1911,9 @@ class VCButton(VCWidget):
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")
         self.key_binding = d.get("key_binding", "") or ""
+        # VCB-18: Laufzeit-Snap-Toggle-Zustand zuruecksetzen. Wird eine Show neu
+        # geladen, waehrend ein LIBRARY_SNAP-Toggle aktiv war, schriebe der naechste
+        # Druck sonst ueber stale _snap_prev alte DMX-Werte in den Programmer.
+        self._snap_active = False
+        self._snap_prev = {}
         self.long_press_editor = bool(d.get("long_press_editor", False))
