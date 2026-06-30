@@ -41,19 +41,26 @@ def palette_entries(palettes: Iterable[Any]) -> list[PresetEntry]:
 
 def group_entries(groups: Iterable[Any]) -> list[PresetEntry]:
     """Fixture-Gruppen → Einträge. ``groups`` sind Dicts
-    ``{"name", "folder", "fids"}`` oder Tupel ``(name, folder, fids)``."""
+    ``{"id", "name", "folder", "fids"}`` oder Tupel ``(name, folder, fids)``.
+
+    ENG-05: ``ref`` traegt ``(gid, name)`` statt nur den Namen, damit gleichnamige
+    Gruppen beim Anwenden EINDEUTIG per ID aufgeloest werden (``select_group_by_name``
+    bevorzugt die gid; faellt ohne gid auf den Namen zurueck).
+    """
     out: list[PresetEntry] = []
     for g in groups:
         if isinstance(g, dict):
             name = g.get("name", "") or ""
             folder = g.get("folder", "") or ""
             fids = g.get("fids", []) or []
+            gid = g.get("id")
         else:
             name, folder, fids = g
             name, folder, fids = (name or ""), (folder or ""), (fids or [])
+            gid = None
         n = len(fids)
         subtitle = " · ".join(x for x in (folder, f"{n} Geräte") if x)
-        out.append(PresetEntry("group", name, subtitle, (), ref=name))
+        out.append(PresetEntry("group", name, subtitle, (), ref=(gid, name)))
     return out
 
 

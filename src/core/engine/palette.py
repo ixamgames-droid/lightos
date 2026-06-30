@@ -46,8 +46,9 @@ class Palette:
 
     def apply_to_programmer(self, fixture_ids: list[int] | None = None):
         """Push palette values into the programmer."""
-        from src.core.app_state import get_state
+        from src.core.app_state import get_state, get_channels_for_patched
         state = get_state()
+        patched = {getattr(f, "fid", None): f for f in state.get_patched_fixtures()}
         if fixture_ids:
             targets = fixture_ids
         else:
@@ -60,6 +61,17 @@ class Palette:
                 if fid is not None:
                     targets.append(fid)
         for fid in targets:
+            # ENG-03: Kopf-Vorkommen je Attribut der ZIELleuchte zaehlen, damit
+            # Mehrkopf-Keys (``attr#N``) NICHT als Bogus-Schluessel auf eine
+            # Einkopf-Fixture landen (sie wuerden sonst spaeter ueber
+            # record_from_programmer in Snaps/Paletten weiterwandern).
+            fx = patched.get(fid)
+            head_counts: dict[str, int] = {}
+            if fx is not None:
+                for ch in get_channels_for_patched(fx):
+                    a = getattr(ch, "attribute", None)
+                    if a is not None:
+                        head_counts[a] = head_counts.get(a, 0) + 1
             vals = self.get_values_for_fixture(fid)
             for attr, val in vals.items():
                 # Mehrkopf (Spider): gespeicherte Schluessel koennen ``attr#N``
@@ -68,6 +80,10 @@ class Palette:
                 # Kanal-Vorkommen.
                 base, _, suffix = attr.partition("#")
                 head = int(suffix) if suffix.isdigit() else 0
+                # ENG-03: Kopf>0 nur schreiben, wenn die Ziel-Leuchte so viele
+                # Vorkommen dieses Attributs wirklich hat (sonst Bogus-``attr#N``).
+                if head > 0 and head_counts.get(base, 0) <= head:
+                    continue
                 state.set_programmer_value(fid, base, val, head=head)
 
     def record_from_programmer(self, fixture_ids: list[int] | None = None):
@@ -76,6 +92,13 @@ class Palette:
         state = get_state()
         allowed = self.ATTR_GROUPS.get(self.type)
         targets = fixture_ids or list(state.programmer.keys())
+        # ENG-04: bei selektivem Overwrite die alten Pro-Fixture-Werte der
+        # Ziel-fids ZUERST raeumen. Sonst merged das Aufzeichnen nur — Werte, die
+        # nicht mehr im aktuellen Programmer stehen, bleiben in fixture_values
+        # liegen und werden spaeter ueber get_values_for_fixture wieder angewendet
+        # (stale Override gewinnt). fids ausserhalb der Auswahl bleiben unberuehrt.
+        for fid in targets:
+            self.fixture_values.pop(fid, None)
         generic_accum: dict[str, list[int]] = {}
         for fid in targets:
             prog = state.programmer.get(fid, {})

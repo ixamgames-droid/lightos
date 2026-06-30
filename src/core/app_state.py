@@ -734,17 +734,32 @@ class AppState:
         return list(self.selected_fids)
 
     # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
-    def _group_lookup(self, name: str):
-        """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe per Name.
-        (None, []) wenn die Gruppe nicht existiert."""
+    def _group_lookup(self, name_or_ref):
+        """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe.
+
+        ENG-05: Akzeptiert einen Namen (str) ODER einen ``(gid, name)``-Ref aus
+        dem Preset-Browser. Bei vorhandener gid wird EINDEUTIG per ID aufgeloest
+        (gleichnamige Gruppen → kein faelschliches „Gruppe ohne Geraete"). Sonst
+        per Name: ``scalar_one_or_none`` bleibt der Normalpfad; nur wenn es
+        WIRKLICH mehrere gleichnamige Gruppen gibt (``MultipleResultsFound``), wird
+        die erste genommen statt zu crashen. (None, []) wenn nicht da.
+        """
         import json
+        from sqlalchemy.exc import MultipleResultsFound
+        gid_hint, name = (name_or_ref if isinstance(name_or_ref, tuple)
+                          else (None, name_or_ref))
         try:
             from sqlalchemy import select
             from .database.models import FixtureGroup
             with self._session() as s:
-                g = s.execute(
-                    select(FixtureGroup).where(FixtureGroup.name == name)
-                ).scalar_one_or_none()
+                if gid_hint is not None:
+                    g = s.get(FixtureGroup, gid_hint)
+                else:
+                    stmt = select(FixtureGroup).where(FixtureGroup.name == name)
+                    try:
+                        g = s.execute(stmt).scalar_one_or_none()
+                    except MultipleResultsFound:
+                        g = s.execute(stmt).scalars().first()
             if g is None:
                 return None, []
             items = []
@@ -763,9 +778,14 @@ class AppState:
         """Fids einer Gruppe (Name) in Raster-Reihenfolge; [] wenn unbekannt."""
         return self._group_lookup(name)[1]
 
-    def select_group_by_name(self, name: str) -> bool:
-        """Wählt die Fixtures einer Gruppe in den Programmer (F-24). True bei Erfolg."""
-        gid, fids = self._group_lookup(name)
+    def select_group_by_name(self, name_or_ref) -> bool:
+        """Wählt die Fixtures einer Gruppe in den Programmer (F-24). True bei Erfolg.
+
+        ENG-05: ``name_or_ref`` ist ein Gruppenname (str, z. B. von VCButton) ODER
+        ein ``(gid, name)``-Ref aus dem Preset-Browser (eindeutige Aufloesung bei
+        gleichnamigen Gruppen).
+        """
+        gid, fids = self._group_lookup(name_or_ref)
         if gid is None or not fids:
             return False
         self.set_selected_group_id(gid)
@@ -796,7 +816,8 @@ class AppState:
                     for _r, _c, fid in items:
                         if fid not in fids:
                             fids.append(fid)
-                    out.append({"name": g.name or "",
+                    out.append({"id": g.id,
+                                "name": g.name or "",
                                 "folder": getattr(g, "folder", "") or "",
                                 "fids": fids})
         except Exception:
