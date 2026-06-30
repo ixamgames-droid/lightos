@@ -971,7 +971,7 @@ effect_action_btn("Neustart", note_rc(3, 3), B_MOVE, "#553010", "restart", efx_c
 select_group_btn("Mover", "Alle Mover", note_rc(3, 5), B_MOVE)
 xy_pad("MH zielen (Pan/Tilt)", RX, Y0, B_MOVE, mh_fids, mode="position")
 xy_pad("EFX-Feld aufziehen", RX + 210, Y0, B_MOVE, mover_fids, mode="area", efx_function_id=efx_circle.id)
-encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "speed_hz", step=0.05)
+encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "speed", step=0.05)
 fader("Mover-Speed", 0, B_MOVE, SliderMode.EFFECT_SPEED, function_ids=[e.id for e in EFX_ALL], midi_cc=48, value=80)
 fader("Mover-Größe", 1, B_MOVE, SliderMode.EFFECT_PARAM, function_ids=[e.id for e in EFX_ALL], param_key="size", midi_cc=49, value=150)
 fader("Mover-Dim", 3, B_MOVE, SliderMode.GROUP_DIMMER, programmer_group="Alle Mover", midi_cc=51, value=255)
