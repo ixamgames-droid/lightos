@@ -1289,6 +1289,17 @@ class VCCanvas(QWidget):
         (Sequence-Signatur im Cache-Key) greift sonst erst beim naechsten
         unabhaengigen Repaint/Bank-Wechsel — der gebundene Button zeigt bis dahin die
         alte Farbe. Duck-typed (kein VCButton-Import noetig)."""
+        # UI-14c: Im Aktiv-Effekt-Modus (VCColor/VCEffectColors ohne feste
+        # function_id und ohne Edit-Slot) liefert der Aufrufer function_id=None.
+        # effect_live mutiert dann den aktiven Effekt — also hier dieselbe Aufloesung
+        # nachziehen, sonst greift der int(None)-Guard unten und KEIN Badge repaintet.
+        if function_id is None:
+            try:
+                from src.core.engine import effect_live
+                _act = effect_live.resolve_target(None)
+                function_id = getattr(_act, "id", None)
+            except Exception:
+                function_id = None
         try:
             fid = int(function_id)
         except (TypeError, ValueError):
