@@ -187,6 +187,16 @@ class ENG06SpiderModeAfterAutoAssign(unittest.TestCase):
 
     def tearDown(self):
         _A.get_channels_for_patched = self._orig_gcp
+        # Codex #96 P2: AppState-Singleton-Instanz-Monkeypatches explizit
+        # zuruecknehmen. Die autouse-conftest-Fixture _restore_app_state_singleton
+        # raeumt sie zwar ohnehin nach jedem Test ab (entfernt Instanz-Attribute,
+        # die Klassenmethoden ueberdecken) — explizit ist robuster + selbsterklaerend.
+        st = _A.get_state()
+        for _name in ("get_patched_fixtures", "get_selected_fids"):
+            try:
+                delattr(st, _name)
+            except AttributeError:
+                pass
         try:
             for inst in list(self.v._instances):
                 if inst.id not in self._pre_ids:
