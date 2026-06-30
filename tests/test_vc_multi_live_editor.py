@@ -271,6 +271,36 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         self.assertFalse(ctl.isHidden())         # angehakt -> Regler sichtbar
         self.assertEqual(len(self.ed._checked_keys(m.id)), 1)   # Param gemerkt
 
+    def test_preview_follows_current_effect(self):
+        a = self._new_matrix("PV-A")
+        b = self._new_matrix("PV-B")
+        self.ed.add_effect(a.id)
+        self.ed.add_effect(b.id)
+        self.assertEqual(self.ed._preview._fid, b.id)    # zuletzt gewaehlt
+        self.ed._step(1)                                 # 2 Effekte: wrap -> a
+        self.assertEqual(self.ed._preview._fid, a.id)
+
+    def test_preview_renders_each_type_without_crash(self):
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        fm = get_function_manager()
+        m = self._new_matrix("PV-M")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        self.ed._preview._tick()
+        self.ed._preview.grab()          # erzwingt paintEvent -> Matrix-Pfad
+        for mk in ("new_efx", "new_chaser"):
+            if not hasattr(fm, mk):
+                continue
+            try:
+                fn = getattr(fm, mk)(f"PV-{mk}")
+            except Exception:
+                continue
+            self.ed.add_effect(fn.id)
+            self.ed._preview._tick()
+            self.ed._preview.grab()      # EFX- bzw. Chaser-Pfad
+
     def test_not_in_widget_registry(self):
         """Darf NICHT serialisierbar/in der Show landen."""
         from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
