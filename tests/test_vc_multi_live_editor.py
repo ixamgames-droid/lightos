@@ -49,6 +49,11 @@ class VCMultiLiveEditorTest(unittest.TestCase):
     def setUp(self):
         _app()
         effect_live.clear_live_overrides()
+        try:
+            from src.core.engine.tempo_bus import reset_tempo_bus_manager
+            reset_tempo_bus_manager()        # Bus-Zustand pro Test isolieren
+        except Exception:
+            pass
         self.fm = get_function_manager()
         self.ed = VCMultiLiveEditor()
 
@@ -300,6 +305,63 @@ class VCMultiLiveEditorTest(unittest.TestCase):
             self.ed.add_effect(fn.id)
             self.ed._preview._tick()
             self.ed._preview.grab()      # EFX- bzw. Chaser-Pfad
+
+    def test_tempo_modes_set_tempo_bus_id(self):
+        m = self._new_matrix("TM-Modes")
+        self.ed.add_effect(m.id)
+        t = self.ed._tempo
+        self.assertFalse(t.isHidden())                  # Matrix hat Tempo -> sichtbar
+        t._set_mode("aus")
+        self.assertEqual(effect_live.get_param("tempo_bus_id", m.id), "")
+        t._set_mode("bpm")
+        self.assertEqual(effect_live.get_param("tempo_bus_id", m.id), "Global")
+        t._set_mode("tap")
+        self.assertEqual(effect_live.get_param("tempo_bus_id", m.id), "A")
+
+    def test_tempo_changes_not_persisted(self):
+        m = self._new_matrix("TM-Persist")
+        self.ed.add_effect(m.id)
+        base = effect_live.serialization_dict(m)
+        self.ed._tempo._set_mode("tap")                 # tempo_bus_id -> 'A' (live)
+        self.assertEqual(effect_live.get_param("tempo_bus_id", m.id), "A")
+        self.assertEqual(effect_live.serialization_dict(m), base)   # nicht gespeichert
+
+    def test_tap_masters_bus_on_tap(self):
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        m = self._new_matrix("TM-Tap")
+        self.ed.add_effect(m.id)
+        self.ed._tempo._set_mode("tap")
+        bus = get_tempo_bus_manager().ensure_bus("A")
+        if hasattr(bus, "set_role"):
+            bus.set_role("sub")             # bewusst als Sub konfiguriert
+        self.ed._tempo._on_tap()            # Tap muss ihn zum Master machen + nicht crashen
+        self.assertEqual(getattr(bus, "role", None), "master")
+        self.ed._tempo._poll()
+
+    def test_existing_fixed_bus_is_tap_mode(self):
+        """Ein Effekt schon auf Bus 'B' -> beim Drop als Tap erkannt, nicht BPM."""
+        m = self._new_matrix("TM-PreB")
+        from src.core.engine import effect_live
+        effect_live.set_param("tempo_bus_id", "B", m.id)
+        self.ed.add_effect(m.id)
+        self.assertEqual(self.ed._tempo._mode.get(m.id), "tap")
+        self.assertEqual(self.ed._tempo._tap_bus.get(m.id), "B")
+
+    def test_tempo_hidden_for_paramless_effect(self):
+        from src.core.engine.function_manager import get_function_manager
+        fm = get_function_manager()
+        sc = None
+        for mk in ("new_scene", "new_snapshot"):
+            if hasattr(fm, mk):
+                try:
+                    sc = getattr(fm, mk)("TM-NoTempo")
+                    break
+                except Exception:
+                    continue
+        if sc is None:
+            self.skipTest("kein parameterloser Funktionstyp")
+        self.ed.add_effect(sc.id)
+        self.assertTrue(self.ed._tempo.isHidden())      # Szene -> kein Tempo-Bereich
 
     def test_not_in_widget_registry(self):
         """Darf NICHT serialisierbar/in der Show landen."""

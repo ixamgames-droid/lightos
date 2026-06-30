@@ -48,6 +48,10 @@ _EXCLUDE_KEYS = frozenset({
     "tempo_bus_id", "tempo_multiplier", "phase_offset", "speed", "algorithm",
 })
 
+# Tempo-Modus (separater Bereich): Multiplikator-Raster + die festen Tap-Buses.
+_MULT_CHOICES = (("¼", 0.25), ("½", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0))
+_TAP_BUSES = ("A", "B", "C", "D")
+
 _DIR_LABELS = {"forward": "vorwärts", "reverse": "rückwärts",
                "backward": "rückwärts", "bounce": "Ping-Pong"}
 
@@ -210,6 +214,254 @@ class _EffectPreview(QWidget):
                        f"{n} Schritte")
 
 
+class _TempoControl(QWidget):
+    """Tempo-Modus des gewaehlten Effekts: Aus (freie Geschwindigkeit) / BPM
+    (Master-Bus) / Tap (eigener Takt pro Effekt auf einem festen Bus A-D).
+
+    Live + nicht-persistent: die ``tempo_bus_id`` des Effekts wird via effect_live
+    gesetzt und ist baseline-geschuetzt (revertiert beim Show-Reload). Die getappte
+    Bus-BPM ist – wie ueberall in der App – eine geteilte, reale Bus-Groesse; der
+    Effekt loest sich beim Reload aber wieder von ihr (tempo_bus_id revertiert).
+    Es werden bewusst nur die bestehenden festen Buses A-D benutzt (kein neuer
+    Laufzeit-Bus → keine zusaetzliche Show-Serialisierung)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._fid = None
+        self._mode: dict = {}        # fid -> 'aus' | 'bpm' | 'tap'
+        self._tap_bus: dict = {}     # fid -> Bus-Buchstabe (A-D)
+        self._readout = None
+        self._timer = QTimer(self)       # vor _build(), damit showEvent es sicher kennt
+        self._timer.setInterval(120)
+        self._timer.timeout.connect(self._poll)
+        self._build()
+
+    def _build(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 6, 10, 10)
+        root.setSpacing(7)
+        head = QHBoxLayout()
+        head.setSpacing(6)
+        cap = QLabel("Tempo")
+        cap.setProperty("muted", "true")
+        head.addWidget(cap)
+        self._btns = {}
+        for key, txt in (("aus", "Aus"), ("bpm", "BPM"), ("tap", "Tap")):
+            b = QPushButton(txt)
+            b.setCheckable(True)
+            b.setFixedHeight(24)
+            b.clicked.connect(lambda _checked=False, k=key: self._set_mode(k))
+            head.addWidget(b)
+            self._btns[key] = b
+        head.addStretch(1)
+        root.addLayout(head)
+        self._sub = QWidget()
+        self._sublay = QHBoxLayout(self._sub)
+        self._sublay.setContentsMargins(0, 0, 0, 0)
+        self._sublay.setSpacing(8)
+        root.addWidget(self._sub)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._timer.stop()
+
+    def set_fid(self, fid):
+        new = int(fid) if fid is not None else None
+        if new == self._fid:
+            return                   # gleicher Effekt -> Tempo-Bereich unveraendert
+        self._fid = new
+        if self._fid is None:
+            self.setVisible(False)
+            return
+        from src.core.engine import effect_live
+        keys = [getattr(s, "key", "") for s in effect_live.list_params(self._fid)]
+        if "tempo_bus_id" not in keys:
+            self.setVisible(False)   # z. B. Szene -> kein Tempo
+            return
+        self.setVisible(True)
+        if self._fid not in self._mode:
+            cur = effect_live.get_param("tempo_bus_id", self._fid) or ""
+            if cur == "":
+                self._mode[self._fid] = "aus"
+            elif cur in _TAP_BUSES:          # bereits auf einem festen Bus -> Tap
+                self._mode[self._fid] = "tap"
+                self._tap_bus[self._fid] = cur
+            else:                            # "Global"/"default"/... -> Master-BPM
+                self._mode[self._fid] = "bpm"
+        self._render_mode()
+
+    def _set_mode(self, mode):
+        if self._fid is None:
+            return
+        self._mode[self._fid] = mode
+        from src.core.engine import effect_live
+        if mode == "aus":
+            effect_live.set_param("tempo_bus_id", "", self._fid)
+        elif mode == "bpm":
+            effect_live.set_param("tempo_bus_id", "Global", self._fid)
+        else:
+            bus = self._tap_bus.get(self._fid, "A")
+            self._ensure_bus(bus)
+            effect_live.set_param("tempo_bus_id", bus, self._fid)
+        self._render_mode()
+
+    def _ensure_bus(self, bus):
+        """Stellt sicher, dass der Bus existiert — OHNE seine Rolle zu aendern
+        (master/sub bleibt, wie anderswo konfiguriert). Die Master-Rolle setzt nur
+        _on_tap direkt vor dem eigentlichen Tap (sonst wuerde blosses Tap-Mode-
+        Auswaehlen einen bewusst als Sub konfigurierten Bus A-D umkonfigurieren)."""
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            return get_tempo_bus_manager().ensure_bus(bus)
+        except Exception:
+            return None
+
+    def _render_mode(self):
+        mode = self._mode.get(self._fid, "aus")
+        for k, b in self._btns.items():
+            b.setChecked(k == mode)
+        while self._sublay.count():
+            it = self._sublay.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._readout = None
+        if mode == "aus":
+            lbl = QLabel("Geschwindigkeit")
+            lbl.setProperty("muted", "true")
+            self._sublay.addWidget(lbl)
+            self._sublay.addWidget(self._speed_slider(), 1)
+        elif mode == "bpm":
+            lbl = QLabel("folgt Master-BPM  ·  Tempo ×")
+            lbl.setProperty("muted", "true")
+            self._sublay.addWidget(lbl)
+            self._sublay.addWidget(self._mult_combo())
+            self._sublay.addStretch(1)
+        else:
+            lbl = QLabel("Bus")
+            lbl.setProperty("muted", "true")
+            self._sublay.addWidget(lbl)
+            self._sublay.addWidget(self._bus_combo())
+            tap = QPushButton("TAP")
+            tap.setFixedHeight(24)
+            tap.clicked.connect(self._on_tap)
+            self._sublay.addWidget(tap)
+            self._readout = QLabel("– BPM")
+            self._readout.setProperty("muted", "true")
+            self._readout.setMinimumWidth(60)
+            self._sublay.addWidget(self._readout)
+            self._sublay.addStretch(1)
+            self._poll()
+
+    def _speed_slider(self):
+        from src.core.engine import effect_live
+        cont = QWidget()
+        hl = QHBoxLayout(cont)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(8)
+        spec = next((s for s in effect_live.list_params(self._fid)
+                     if getattr(s, "key", "") == "speed"), None)
+        lo = float(getattr(spec, "min", 0.0)) if spec else 0.0
+        hi = float(getattr(spec, "max", 0.0)) if spec else 20.0
+        if hi <= lo:
+            hi = lo + 20.0
+        steps = 200
+        sl = QSlider(Qt.Orientation.Horizontal)
+        sl.setRange(0, steps)
+        try:
+            val = float(effect_live.get_param("speed", self._fid))
+        except (TypeError, ValueError):
+            val = lo
+        sl.setValue(int(round(max(0.0, min(1.0, (val - lo) / (hi - lo))) * steps)))
+        ro = QLabel(self._fmt(val))
+        ro.setMinimumWidth(46)
+        ro.setProperty("muted", "true")
+
+        def on_slide(sv, lo=lo, hi=hi, n=steps, ro=ro):
+            v = lo + (hi - lo) * (sv / n if n else 0.0)
+            effect_live.set_param("speed", v, self._fid)
+            ro.setText(self._fmt(v))
+
+        sl.valueChanged.connect(on_slide)
+        hl.addWidget(sl, 1)
+        hl.addWidget(ro)
+        return cont
+
+    def _mult_combo(self):
+        from src.core.engine import effect_live
+        c = QComboBox()
+        for txt, val in _MULT_CHOICES:
+            c.addItem(txt, val)
+        try:
+            cur = float(effect_live.get_param("tempo_multiplier", self._fid))
+        except (TypeError, ValueError):
+            cur = 1.0
+        idx = next((i for i, (_t, v) in enumerate(_MULT_CHOICES) if abs(v - cur) < 1e-6), -1)
+        if idx < 0:                        # echter Live-Wert (z. B. 3×) -> Extra-Eintrag
+            c.addItem(f"{self._fmt(cur)}×", cur)
+            idx = c.count() - 1
+        c.setCurrentIndex(idx)
+        c.currentIndexChanged.connect(
+            lambda i, c=c: effect_live.set_param("tempo_multiplier", c.itemData(i), self._fid))
+        return c
+
+    def _bus_combo(self):
+        c = QComboBox()
+        for b in _TAP_BUSES:
+            c.addItem(b, b)
+        cur = self._tap_bus.get(self._fid, "A")
+        try:
+            c.setCurrentIndex(_TAP_BUSES.index(cur))
+        except ValueError:
+            c.setCurrentIndex(0)
+        c.currentIndexChanged.connect(lambda i, c=c: self._on_bus(c.itemData(i)))
+        return c
+
+    def _on_bus(self, bus):
+        from src.core.engine import effect_live
+        self._tap_bus[self._fid] = bus
+        self._ensure_bus(bus)
+        effect_live.set_param("tempo_bus_id", bus, self._fid)
+        self._poll()
+
+    def _on_tap(self):
+        bus = self._tap_bus.get(self._fid, "A")
+        b = self._ensure_bus(bus)
+        try:
+            if b is not None:
+                if hasattr(b, "set_role"):
+                    b.set_role("master")   # Tap macht DIESEN Bus zum Master (sonst No-op)
+                b.tap()
+        except Exception:
+            pass
+        self._poll()
+
+    def _poll(self):
+        if self._readout is None or self._fid is None:
+            return
+        bus = self._tap_bus.get(self._fid, "A")
+        bpm = 0.0
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            b = get_tempo_bus_manager().get(bus)
+            bpm = float(getattr(b, "bpm", 0.0)) if b is not None else 0.0
+        except Exception:
+            bpm = 0.0
+        self._readout.setText(f"{bpm:.0f} BPM" if bpm > 0 else "– BPM")
+
+    @staticmethod
+    def _fmt(v):
+        try:
+            return ("%.2f" % float(v)).rstrip("0").rstrip(".")
+        except (TypeError, ValueError):
+            return "—"
+
+
 class VCMultiLiveEditor(QWidget):
     """Nicht-persistentes Multi-Effekt-Live-Edit-Fenster (Branch 4: + Param-Editor)."""
 
@@ -264,6 +516,10 @@ class VCMultiLiveEditor(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setObjectName("mle_scroll")
         root.addWidget(self._scroll, 1)
+
+        # Tempo-Modus (Aus / BPM / Tap) — eigener persistenter Bereich unten.
+        self._tempo = _TempoControl()
+        root.addWidget(self._tempo)
 
         self.setStyleSheet("""
             QWidget { background:#0d1117; color:#e6edf3; }
@@ -384,6 +640,7 @@ class VCMultiLiveEditor(QWidget):
 
     def _refresh_body(self) -> None:
         self._preview.set_fid(self._current_fid())
+        self._tempo.set_fid(self._current_fid())
         content = QWidget()
         v = QVBoxLayout(content)
         v.setContentsMargins(10, 10, 10, 10)
