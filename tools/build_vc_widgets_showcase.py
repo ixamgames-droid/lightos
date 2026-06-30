@@ -39,7 +39,6 @@ from src.ui.virtualconsole.vc_speedial import VCSpeedDial, SpeedTarget
 from src.ui.virtualconsole.vc_encoder import VCEncoder
 from src.ui.virtualconsole.vc_stepper import VCStepper
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_song_info import VCSongInfo
 from src.ui.virtualconsole.vc_bpm_display import VCBpmDisplay
 from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
@@ -171,8 +170,6 @@ xy = VCXYPad("Pan/Tilt"); xy.mode = "position"; xy._fixture_ids = list(par_fids)
 place(xy, "VCXYPad", "XY-Pad (VCXYPad)", 30, 210, 160, 160)
 cl = VCCueList("Cueliste"); cl.stack_slot = 0
 place(cl, "VCCueList", "Cue-Liste (VCCueList)", 230, 210, 210, 160)
-cb = VCChaseBuilder("Chase-Builder"); cb.function_id = mtx.id
-place(cb, "VCChaseBuilder", "Chase-Builder (VCChaseBuilder)", 480, 210, 230, 160)
 ccl = VCColorList("Farb-Sequenz"); ccl.function_id = mtx.id
 place(ccl, "VCColorList", "Chase-Liste (VCColorList)", 750, 210, 230, 80)
 ec = VCEffectColors("Effekt-Farben"); ec.function_id = mtx.id
@@ -222,8 +219,8 @@ from collections import Counter
 types = Counter(w["type"] for w in vc)
 print("Widget-Typen:", dict(types))
 need = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCSpeedDial", "VCEncoder", "VCStepper",
-        "VCCueList", "VCSongInfo", "VCColorList", "VCChaseBuilder", "VCEffectColors",
+        "VCCueList", "VCSongInfo", "VCColorList", "VCEffectColors",
         "VCBpmDisplay", "VCBusSelector", "VCFrame", "VCLabel", "VCEffectEditor", "VCEffectDisplay"}
 missing = need - set(types)
 assert not missing, f"fehlend: {missing}"
-print("FERTIG — alle 18 Typen vorhanden")
+print("FERTIG — alle 17 Typen vorhanden")

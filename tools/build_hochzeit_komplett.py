@@ -70,7 +70,6 @@ from src.ui.virtualconsole.vc_bpm_display import VCBpmDisplay
 from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
 from src.ui.virtualconsole.vc_effect_colors import VCEffectColors
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 from src.ui.virtualconsole.vc_encoder import VCEncoder
 from src.ui.virtualconsole.vc_stepper import VCStepper
@@ -570,7 +569,7 @@ mix_chill = collection("Mix: Chill", [cf_front_grad.id, dm_pulse.id, efx_circle.
 mix_theme = collection("Mix: Spider+Gobo", [sp_gm.id, mh_g3.id, efx_line.id])
 MIXES = [mix_party, mix_drop, mix_chill, mix_theme]
 
-# ── Live-Chase (per VCChaseBuilder/VCColorList bedienbar) ────────────────────────────
+# ── Live-Chase (per VCColorList bedienbar) ────────────────────────────────────────────
 live_chase = matrix("Live-Chase", RgbAlgorithm.COLORFADE, [RGB(GREEN), RGB(WHITE), RGB(BLUE)],
                     grid=GRID_FRONT, speed=1.0)
 
@@ -815,11 +814,6 @@ def color_list(caption, x, y, bank, function_id, ww=300, hh=84):
     _add(w, x, y, ww, hh, bank)
 
 
-def chase_builder(caption, x, y, bank, function_id, ww=340, hh=240):
-    w = VCChaseBuilder(caption)
-    w.function_id = function_id
-    _add(w, x, y, ww, hh, bank)
-
 
 def xy_pad(caption, x, y, bank, fids, mode="position", efx_function_id=None, ww=190, hh=190):
     w = VCXYPad(caption)
@@ -1020,7 +1014,6 @@ effect_action_btn("Farbe -", note_rc(1, 1), B_EDIT, "#333355", "prev_color", liv
 effect_action_btn("Leeren", note_rc(1, 2), B_EDIT, "#5a1010", "clear_colors", live_chase.id)
 effect_editor("Effekt-Editor (All-in-One)", RX, Y0, B_EDIT, dm_chase.id, ww=330, hh=250)
 effect_display("Live-Vorschau", RX + 350, Y0, B_EDIT, dm_chase.id, ww=260, hh=130)
-chase_builder("Chase-Builder (live)", RX + 350, Y0 + 140, B_EDIT, live_chase.id, ww=330, hh=200)
 frame("Effekt-Container", RX, Y0 + 270, B_EDIT, ww=330, hh=110, show_header=True)
 encoder("Tempo", 0, B_EDIT, dm_chase.id, "speed", step=0.25)
 stepper("Lauflichter", 1, B_EDIT, dm_chase.id, "runner_count", step=1)
@@ -1175,7 +1168,7 @@ assert len(state.playlist) == len(CURATED), f"Playlist: {len(state.playlist)}"
 maxy = max((w.get("y", 0) + w.get("h", 0)) for w in vc)
 assert maxy < 820, f"zu hoch: {maxy}"
 _INTER = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCCueList", "VCColorList",
-          "VCChaseBuilder", "VCSpeedDial", "VCSongInfo", "VCBpmDisplay", "VCBusSelector",
+          "VCSpeedDial", "VCSongInfo", "VCBpmDisplay", "VCBusSelector",
           "VCEffectColors", "VCEffectDisplay", "VCEncoder"}
 
 

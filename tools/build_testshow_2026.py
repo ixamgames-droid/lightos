@@ -819,7 +819,7 @@ assert maxy < 820, f"zu hoch: {maxy}"
 
 # Keine Überlappung interaktiver Widgets je Bank (Bank-Layer + BANK_ALL).
 _INTER = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCCueList",
-          "VCColorList", "VCChaseBuilder", "VCSpeedDial", "VCSongInfo"}
+          "VCColorList", "VCSpeedDial", "VCSongInfo"}
 
 
 def _rect(w):

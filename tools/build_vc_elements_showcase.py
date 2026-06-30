@@ -29,7 +29,6 @@ from src.ui.virtualconsole.vc_cuelist import VCCueList
 from src.ui.virtualconsole.vc_speedial import VCSpeedDial, SpeedTarget
 from src.ui.virtualconsole.vc_encoder import VCEncoder
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_song_info import VCSongInfo
 from src.ui.virtualconsole.vc_bpm_display import VCBpmDisplay
 from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
@@ -109,8 +108,6 @@ si = VCSongInfo("Musik")
 place(si, "Musik", COL[2], ROWY[1], 210, 90, "VCSongInfo — Musik-Info")
 ccl = VCColorList("Farb-Sequenz"); ccl.function_id = mtx.id
 place(ccl, "Farb-Sequenz", COL[3], ROWY[1], 210, 72, "VCColorList — Farb-Sequenz")
-cb = VCChaseBuilder("Chase-Builder"); cb.function_id = mtx.id
-place(cb, "Chase-Builder", COL[4], ROWY[1], 220, 150, "VCChaseBuilder — Chase-Baukasten")
 # Reihe 2
 ec = VCEffectColors("Effekt-Farben"); ec.function_id = mtx.id
 place(ec, "Effekt-Farben", COL[0], ROWY[2], 210, 80, "VCEffectColors — Farb-Editor")
@@ -136,8 +133,8 @@ types = Counter(w["type"] for w in vc)
 print("Widget-Typen:", dict(types))
 # Jeder der 15 Typen genau einmal (VCLabel mehrfach: 14 Typ-Labels + 1 Beispiel)
 need = {"VCButton","VCSlider","VCColor","VCXYPad","VCSpeedDial","VCEncoder","VCCueList",
-        "VCSongInfo","VCColorList","VCChaseBuilder","VCEffectColors","VCBpmDisplay",
+        "VCSongInfo","VCColorList","VCEffectColors","VCBpmDisplay",
         "VCBusSelector","VCFrame","VCLabel"}
 missing = need - set(types)
 assert not missing, f"fehlend: {missing}"
-print("FERTIG — alle 15 Typen vorhanden")
+print("FERTIG — alle 14 Typen vorhanden")

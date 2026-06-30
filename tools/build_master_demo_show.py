@@ -50,7 +50,6 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -354,15 +353,10 @@ label("SEITE 3  MATRIX BUILDER  -  Start + 'Form -/+' blättert durch ALLE Algor
       X0, 28, 1100, B_MATRIX)
 
 
-# ── SEITE 4 — CHASE BUILDER (#1, All-in-One-Fenster) ────────────────────────
-cb = VCChaseBuilder("Chase Builder"); cb.function_id = chase_builder.id
-_add(cb, X0, Y0, 340, 250, B_CHASE)
-func_btn(chase_builder, slot_note(0), B_CHASE, "#1f6a4a", clear_prog=True)  # zusätzlicher Start-Pad
-label("SEITE 4  CHASE BUILDER  -  EIN Fenster: Farb-Palette antippen = anhängen, "
-      "gebaute Liste, Aktionen (Start/Clear/C-/C+/Richtung/Freeze/Commit), Speed/Hold.",
+# ── SEITE 4 — CHASE BUILDER (#1) ────────────────────────────────────────────
+func_btn(chase_builder, slot_note(0), B_CHASE, "#1f6a4a", clear_prog=True)
+label("SEITE 4  CHASE BUILDER  -  Start-Pad für den Chase-Builder-Effekt.",
       X0, 28, 1100, B_CHASE)
-label("(Das Builder-Fenster ist ein eigenes VC-Widget — frei platzierbar, Touch-bedienbar.)",
-      X0, Y0 + 256, 700, B_CHASE)
 
 
 # ── SEITE 5 — MOVING HEADS (#7 relativ + #8 Feld) ───────────────────────────
@@ -412,7 +406,6 @@ types = Counter(w["type"] for w in vc)
 
 # Neue VC-Fenster-Widgets vorhanden?
 assert types.get("VCColorList", 0) == 1, "VCColorList fehlt"
-assert types.get("VCChaseBuilder", 0) == 1, "VCChaseBuilder fehlt"
 assert types.get("VCXYPad", 0) == 2, f"VCXYPad: {types.get('VCXYPad', 0)}"
 # F-24 SELECT_GROUP-Pads
 sel = [w for w in vc if w.get("action") == "SelectGroup"]
@@ -431,5 +424,5 @@ assert maxy < 820, f"zu hoch: {maxy}"
 print(f"Funktionen: {len(fm.all())}  VC-Widgets: {len(vc)}  Typen={dict(types)}")
 print(f"Banks: {dict(sorted(banks.items()))}  Max-Y={maxy}")
 print(f"  SELECT_GROUP={len(sel)}  GROUP_DIMMER={len(gd)}  Effekte(exkl)={len(excl)}")
-print("  [OK] 5 Banks · APC mini · 4 PAR + 2 MH · VCColorList/VCChaseBuilder/VCXYPad · F-24/F-25")
+print("  [OK] 5 Banks · APC mini · 4 PAR + 2 MH · VCColorList/VCXYPad · F-24/F-25")
 print("FERTIG")

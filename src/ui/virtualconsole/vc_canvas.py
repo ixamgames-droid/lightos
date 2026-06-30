@@ -22,7 +22,6 @@ def _register():
     from .vc_color    import VCColor
     from .vc_encoder  import VCEncoder
     from .vc_color_list import VCColorList
-    from .vc_chase_builder import VCChaseBuilder
     from .vc_song_info import VCSongInfo
     from .vc_bpm_display import VCBpmDisplay
     from .vc_bus_selector import VCBusSelector
@@ -42,7 +41,6 @@ def _register():
         "VCStepper":  VCStepper,
         "VCColor":    VCColor,
         "VCColorList":VCColorList,
-        "VCChaseBuilder": VCChaseBuilder,
         "VCSongInfo": VCSongInfo,
         "VCBpmDisplay": VCBpmDisplay,
         "VCBusSelector": VCBusSelector,

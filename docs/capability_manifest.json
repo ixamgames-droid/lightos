@@ -9,7 +9,6 @@
     "VCBpmDisplay",
     "VCBusSelector",
     "VCButton",
-    "VCChaseBuilder",
     "VCColor",
     "VCColorList",
     "VCCueList",
@@ -409,7 +408,7 @@
         },
         {
           "key": "after_fade",
-          "label": "After Fade",
+          "label": "Schweif (%)",
           "kind": "float",
           "range": [
             0.0,

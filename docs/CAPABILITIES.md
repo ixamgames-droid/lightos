@@ -8,7 +8,7 @@
 - Daher beim Bauen IMMER das echte Enum-Member konstruieren (RgbAlgorithm.FIRE, EfxAlgorithm.CIRCLE, MatrixStyle.RGBW) — ein falscher Enum-NAME wirft sofort AttributeError, bevor der stille Loader den Wert je sieht.
 
 ## Virtuelle Konsole
-- **Widget-Typen** (19): `VCBpmDisplay`, `VCBusSelector`, `VCButton`, `VCChaseBuilder`, `VCColor`, `VCColorList`, `VCCueList`, `VCEffectColors`, `VCEffectDisplay`, `VCEffectEditor`, `VCEncoder`, `VCFrame`, `VCLabel`, `VCSlider`, `VCSongInfo`, `VCSpeedDial`, `VCStepper`, `VCTempoBusController`, `VCXYPad`
+- **Widget-Typen** (18): `VCBpmDisplay`, `VCBusSelector`, `VCButton`, `VCColor`, `VCColorList`, `VCCueList`, `VCEffectColors`, `VCEffectDisplay`, `VCEffectEditor`, `VCEncoder`, `VCFrame`, `VCLabel`, `VCSlider`, `VCSongInfo`, `VCSpeedDial`, `VCStepper`, `VCTempoBusController`, `VCXYPad`
 - **ButtonAction** (26): `AllWhite`, `ArmBus`, `AudioBpm`, `AutoSync`, `Blackout`, `BpmModeToggle`, `BpmNudgeDown`, `BpmNudgeUp`, `Clear`, `EffectAction`, `Flash`, `Freeze`, `FunctionFlash`, `FunctionToggle`, `LibrarySnap`, `MediaNext`, `MediaPlayPause`, `MediaPrev`, `SelectGroup`, `Snapshot`, `StopAll`, `StopEffects`, `SyncBus`, `Tap`, `TapBus`, `Toggle`
 - **SliderMode** (13): `BPM`, `EffectIntensity`, `EffectParam`, `EffectSpeed`, `FeatureDimmer`, `GrandMaster`, `GroupDimmer`, `Level`, `Playback`, `Programmer`, `Speed`, `Submaster`, `TempoBus`
 - **SpeedTarget** (5): `Executor`, `Function`, `SpeedNode`, `TempoBus`, `TempoBusMult`

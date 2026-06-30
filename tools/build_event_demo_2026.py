@@ -56,7 +56,6 @@ from src.ui.virtualconsole.vc_bpm_display import VCBpmDisplay
 from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
 from src.ui.virtualconsole.vc_effect_colors import VCEffectColors
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -542,7 +541,7 @@ mix_theme = collection("Mix: Theme (Spider+Gobo)", [sp_gm.id, mh_g3.id, efx_spid
 MIXES = [mix_party, mix_drop, mix_chill, mix_theme]
 
 
-# ── Live-Chase (per VCChaseBuilder/VCColorList bedienbar) ────────────────────────────
+# ── Live-Chase (per VCColorList bedienbar) ────────────────────────────────────────────
 live_chase = fm.new_rgb_matrix("Live-Chase")
 live_chase.algorithm = RgbAlgorithm.COLORFADE
 live_chase.fixture_grid = list(rgb_fids)
@@ -793,11 +792,6 @@ def color_list(caption, x, y, bank, function_id, ww=300, hh=84):
     _add(w, x, y, ww, hh, bank)
 
 
-def chase_builder(caption, x, y, bank, function_id, ww=340, hh=250):
-    w = VCChaseBuilder(caption)
-    w.function_id = function_id
-    _add(w, x, y, ww, hh, bank)
-
 
 def xy_pad(caption, x, y, bank, fids, mode="position", efx_function_id=None, ww=200, hh=200):
     w = VCXYPad(caption)
@@ -988,7 +982,6 @@ for i, (nm, r, g, b) in enumerate(LC_COLORS):                             # R4 =
     color_tile(nm, note_rc(4, i), B_MIX, r, g, b, target=ColorTarget.EFFECT_ADD, function_id=live_chase.id)
 for i, pb in enumerate(PLAYBACKS):
     cue_list(pb.name, i, RX + i * 250 if i < 2 else RX, Y0 if i < 2 else Y0 + 158, B_MIX, ww=240, hh=150)
-chase_builder("Chase-Builder (live)", RX + 500, Y0, B_MIX, live_chase.id)
 for i, pb in enumerate(PLAYBACKS):
     pb_fader(f"Dim {i+1}", i, B_MIX, slot=i, midi_cc=48 + i, value=255)
 label("BANK 7  ABLÄUFE / MISCHEN  —  R0: Misch-Collections (Party/Drop/Chill/Theme). R1: Chaser. "
@@ -1130,7 +1123,7 @@ assert len(state.playlist) == len(CURATED), f"Playlist: {len(state.playlist)}"
 
 # VC-Plausibilitaet
 new_widgets = {"VCSpeedDial", "VCBpmDisplay", "VCBusSelector", "VCEffectColors",
-               "VCColorList", "VCChaseBuilder", "VCXYPad", "VCCueList", "VCSongInfo"}
+               "VCColorList", "VCXYPad", "VCCueList", "VCSongInfo"}
 for t in new_widgets:
     assert types.get(t, 0) >= 1, f"Widget fehlt: {t} ({dict(types)})"
 maxy = max((w.get("y", 0) + w.get("h", 0)) for w in vc)
@@ -1138,7 +1131,7 @@ assert maxy < 820, f"zu hoch: {maxy}"
 
 # Keine Ueberlappung interaktiver Widgets je Bank
 _INTER = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCCueList", "VCColorList",
-          "VCChaseBuilder", "VCSpeedDial", "VCSongInfo", "VCBpmDisplay", "VCBusSelector",
+          "VCSpeedDial", "VCSongInfo", "VCBpmDisplay", "VCBusSelector",
           "VCEffectColors"}
 
 
