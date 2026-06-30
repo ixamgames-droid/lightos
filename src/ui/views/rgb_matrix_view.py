@@ -13,11 +13,15 @@ from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 
 
-# UI-12 / ENG-08: Parameter, die NICHT mehr dynamisch im "Bewegung & Parameter"-
-# Block erscheinen, sondern als feste Bedienelemente in der "Farben"-Gruppe leben
-# (direkt beim jeweiligen Sequence-Editor). Sie werden aus visible_specs heraus-
-# gefiltert, damit sie nicht doppelt auftauchen.
-_PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle"})
+# UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
+# Parameter"-Block erscheinen, sondern als feste Bedienelemente in der "Farben"-
+# Gruppe leben (direkt beim jeweiligen Sequence-Editor / Farb-Cycle-Schalter).
+# Sie werden aus visible_specs heraus-gefiltert, damit sie nicht doppelt auftauchen.
+# color_order/color_interval ziehen mit color_cycle in die Farben-Gruppe um, damit
+# alle Farb-Sequenz-Steuerungen beieinander stehen (statt verstreut im Bewegungs-
+# Block). engineseitig (list_params/VC) bleiben sie unveraendert verfuegbar.
+_PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
+                                  "color_order", "color_interval"})
 
 
 class MatrixPreview(QWidget):
@@ -586,6 +590,30 @@ class RgbMatrixView(QWidget):
         self._color_cycle_label = QLabel("")
         fc.addRow(self._color_cycle_label, self._cb_color_cycle)
 
+        # #6: Die von color_cycle abhaengigen Regler (Farb-Reihenfolge + Farbwechsel-
+        # Intervall) leben jetzt ebenfalls hier in der Farben-Gruppe, direkt unter
+        # dem Schalter — statt im dynamischen "Bewegung & Parameter"-Block (sie sind
+        # logisch Farb-Sequenz-Steuerung). Aus visible_specs herausgefiltert
+        # (_PROMOTED_PARAM_KEYS); nur sichtbar, wenn der Farb-Chase aktiv ist.
+        self._color_order_combo = QComboBox()
+        for _co_val in ("normal", "random", "pingpong"):
+            self._color_order_combo.addItem(_co_val, _co_val)
+        self._color_order_combo.setToolTip(
+            "Reihenfolge, in der pro Runde durch die Color-Sequence gewechselt wird")
+        self._color_order_combo.currentIndexChanged.connect(self._param_change)
+        self._color_order_label = QLabel("Farb-Reihenfolge:")
+        fc.addRow(self._color_order_label, self._color_order_combo)
+
+        self._color_interval_spin = QSpinBox()
+        self._color_interval_spin.setRange(1, 16)
+        self._color_interval_spin.setValue(1)
+        self._color_interval_spin.setToolTip(
+            "Farbe bleibt N Durchläufe gleich, bevor sie zur nächsten Farbe der "
+            "Sequence wechselt (1 = jeder Durchlauf, 2/4/8 = langsamer)")
+        self._color_interval_spin.valueChanged.connect(self._param_change)
+        self._color_interval_label = QLabel("Farbwechsel-Intervall:")
+        fc.addRow(self._color_interval_label, self._color_interval_spin)
+
         # Dimmer-Bereich (nur DIMMER)
         dim_row = QHBoxLayout()
         self._imin_spin = QSpinBox()
@@ -996,6 +1024,15 @@ class RgbMatrixView(QWidget):
         cc_relevant = (is_color and algo == RgbAlgorithm.CHASE)
         self._cb_color_cycle.setVisible(cc_relevant)
         self._color_cycle_label.setVisible(cc_relevant)
+        # #6: Farb-Reihenfolge + Intervall nur, wenn der Farb-Chase wirklich aktiv
+        # ist (color_cycle an) — entspricht der when=color_cycle-Bedingung, die
+        # diese Specs frueher im dynamischen Block hatten.
+        cc_active = (cc_relevant and self._current is not None
+                     and bool(self._current.params.get("color_cycle")))
+        self._color_order_combo.setVisible(cc_active)
+        self._color_order_label.setVisible(cc_active)
+        self._color_interval_spin.setVisible(cc_active)
+        self._color_interval_label.setVisible(cc_active)
         # ENG-08: "Dimmer pro Runde wechseln" + Dimmerwert-Sequenz sind das Pendant
         # fuer den Dimmer-Chase (DIMMER + CHASE). Bei aktivem dimmer_cycle ersetzt
         # die Sequenz den festen Min/Max-Bereich (der wird dann ausgeblendet).
@@ -1082,6 +1119,14 @@ class RgbMatrixView(QWidget):
             self._cb_color_cycle.blockSignals(True)
             self._cb_color_cycle.setChecked(bool(m.params.get("color_cycle", False)))
             self._cb_color_cycle.blockSignals(False)
+            # #6: Farb-Reihenfolge + Intervall (jetzt fest in der Farben-Gruppe).
+            self._color_order_combo.blockSignals(True)
+            _coi = self._color_order_combo.findData(m.params.get("color_order", "normal"))
+            self._color_order_combo.setCurrentIndex(_coi if _coi >= 0 else 0)
+            self._color_order_combo.blockSignals(False)
+            self._color_interval_spin.blockSignals(True)
+            self._color_interval_spin.setValue(int(m.params.get("color_interval", 1)))
+            self._color_interval_spin.blockSignals(False)
             # ENG-08: Dimmer-Sequenz an die Draft-Sequence binden + Checkbox laden.
             self._dimmer_seq_editor.set_sequence(m.dimmer_levels)
             self._cb_dimmer_cycle.blockSignals(True)
@@ -1167,6 +1212,10 @@ class RgbMatrixView(QWidget):
         if self._current.algorithm == RgbAlgorithm.CHASE:
             if self._current.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
                 self._current.params["color_cycle"] = self._cb_color_cycle.isChecked()
+                # #6: abhaengige Farb-Cycle-Regler (fest in der Farben-Gruppe).
+                self._current.params["color_order"] = (
+                    self._color_order_combo.currentData() or "normal")
+                self._current.params["color_interval"] = self._color_interval_spin.value()
             elif self._current.style == MatrixStyle.DIMMER:
                 self._current.params["dimmer_cycle"] = self._cb_dimmer_cycle.isChecked()
         # Sichtbarkeit kann sich durch die eben geschriebenen Werte aendern

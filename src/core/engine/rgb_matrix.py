@@ -1492,7 +1492,9 @@ class RgbMatrixInstance(Function):
             ParamSpec("env_fade_out", "Fade aus (s)", "float", 0.0, 0.0, 10.0, 0.1,
                       "Ausblendzeit des Effekts in Sekunden"),
             ParamSpec("env_fade", "Fade ein+aus (s)", "float", 0.0, 0.0, 10.0, 0.1,
-                      "Setzt Ein- und Ausblendzeit gemeinsam"),
+                      "Komfort-Fader: setzt Einblend- UND Ausblendzeit gemeinsam auf "
+                      "denselben Wert. Wer beide getrennt steuern will, nutzt „Fade ein“ "
+                      "und „Fade aus“."),
         ])
         meta = ALGO_META.get(self.algorithm)
         if meta and meta.direction:

@@ -227,26 +227,41 @@ def test_param_box_rowcount_chase():
 
 
 def test_color_cycle_in_farben_gruppe():
-    """UI-12: 'Farbe pro Runde wechseln' lebt als feste Checkbox in der Farben-
-    Gruppe (nicht im dynamischen Param-Block). Sie ist beim Chase sichtbar,
-    schreibt color_cycle in den Draft und blendet die abhaengigen Felder
-    (Farb-Reihenfolge / Intervall) ein."""
+    """UI-12 / #6: 'Farbe pro Runde wechseln' UND ihre abhaengigen Regler
+    (Farb-Reihenfolge / Intervall) leben als FESTE Bedienelemente in der Farben-
+    Gruppe (nicht im dynamischen Param-Block). Beim Chase sichtbar; Einschalten
+    schreibt color_cycle in den Draft und blendet die abhaengigen Felder ein.
+    (isHidden() statt isVisible(), damit der Check ohne show() der View greift.)"""
     _app()
     view = _make_view_with_matrix()
     view._algo_combo.setCurrentText(RgbAlgorithm.CHASE.value)
-    # Checkbox existiert, ist beim Chase sichtbar, nicht im Param-Form
+    # Checkbox + abhaengige Regler existieren, sind NICHT im dynamischen Param-Form
+    # (alle drei sind seit #6 feste Widgets der Farben-Gruppe).
     assert hasattr(view, "_cb_color_cycle")
     assert "color_cycle" not in view._param_widgets
-    assert "color_interval" not in view._param_widgets  # erst bei color_cycle=an
-    # Einschalten -> Draft-Param + abhaengige Felder erscheinen
+    assert "color_interval" not in view._param_widgets
+    assert "color_order" not in view._param_widgets
+    # Aus -> abhaengige Felder versteckt
+    view._cb_color_cycle.setChecked(False)
+    assert view._color_order_combo.isHidden()
+    assert view._color_interval_spin.isHidden()
+    # Einschalten -> Draft-Param gesetzt + abhaengige (statische) Felder sichtbar
     view._cb_color_cycle.setChecked(True)
     assert view._current.params.get("color_cycle") is True
-    assert "color_interval" in view._param_widgets
-    assert "color_order" in view._param_widgets
+    assert not view._color_order_combo.isHidden()
+    assert not view._color_interval_spin.isHidden()
+    # Werte landen im Draft-params
+    view._color_order_combo.setCurrentIndex(
+        view._color_order_combo.findData("pingpong"))
+    view._color_interval_spin.setValue(4)
+    view._param_change()
+    assert view._current.params.get("color_order") == "pingpong"
+    assert view._current.params.get("color_interval") == 4
     # Ausschalten -> abhaengige Felder verschwinden wieder
     view._cb_color_cycle.setChecked(False)
     assert view._current.params.get("color_cycle") is False
-    assert "color_interval" not in view._param_widgets
+    assert view._color_order_combo.isHidden()
+    assert view._color_interval_spin.isHidden()
 
 
 def test_dimmer_cycle_in_farben_gruppe():

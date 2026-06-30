@@ -263,7 +263,11 @@ def _saturation():
     return ParamSpec("saturation", "Sättigung", "float", 1.0, 0.0, 1.0, 0.05, "Farbsättigung")
 
 def _value():
-    return ParamSpec("value", "Helligkeit", "float", 1.0, 0.0, 1.0, 0.05, "Farb-Helligkeit")
+    # Label „Farb-Helligkeit" (nicht „Helligkeit"), damit es in der VC-Faderliste
+    # NICHT mit dem Effekt-Master „Helligkeit" (intensity) kollidiert — der wirkt
+    # NACH dem Rendern als Output-Master, value setzt die HSV-Helligkeit der Pixel.
+    return ParamSpec("value", "Farb-Helligkeit", "float", 1.0, 0.0, 1.0, 0.05,
+                     "HSV-Helligkeit der Regenbogen-Farben (vor dem Effekt-Master „Helligkeit“)")
 
 def _hue_spread():
     return ParamSpec("spread", "Spread", "float", 1.0, 0.25, 8.0, 0.25,
