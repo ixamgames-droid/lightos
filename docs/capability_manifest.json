@@ -409,7 +409,7 @@
         },
         {
           "key": "after_fade",
-          "label": "After Fade",
+          "label": "Schweif (%)",
           "kind": "float",
           "range": [
             0.0,
@@ -1137,7 +1137,7 @@
         },
         {
           "key": "value",
-          "label": "Helligkeit",
+          "label": "Farb-Helligkeit",
           "kind": "float",
           "range": [
             0.0,
