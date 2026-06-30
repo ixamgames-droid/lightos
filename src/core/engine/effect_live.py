@@ -185,6 +185,11 @@ def set_param_normalized(key, norm, function_id=None) -> bool:
             return False
         i = min(len(opts) - 1, int(norm * len(opts)))
         return _apply_live_mutation(fn, lambda: fn.set_param(key, opts[i]))
+    # VCB-07: nicht-numerische Kinds (color/color_sequence/action) haben kein
+    # .min/.max -> float(spec.min) wuerfe AttributeError. Ein Fader/MIDI-CC kann sie
+    # nicht sinnvoll normalisiert setzen (symmetrisch zur Guard in adjust_param).
+    if spec.kind in ("color", "color_sequence", "action"):
+        return False
     lo, hi = float(spec.min), float(spec.max)
     if hi <= lo:
         hi = lo + 1.0

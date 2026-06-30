@@ -407,7 +407,9 @@ class VCButton(VCWidget):
         try:
             with open(_SNAPSHOTS_FILE, encoding="utf-8") as f:
                 payload = json.load(f)
-            if not isinstance(payload, list) or index >= len(payload):
+            # VCB-09: auch negativen Index abfangen — sonst laedt payload[-1] den
+            # letzten Snapshot statt abzubrechen.
+            if not isinstance(payload, list) or not (0 <= index < len(payload)):
                 return
             snap_data = payload[index]
             if not snap_data:
@@ -1057,7 +1059,9 @@ class VCButton(VCWidget):
             return
         slot = self.function_id
         executors = state.playback_engine.executors
-        if slot >= len(executors):
+        # VCB-08: negativer slot (z. B. aus korrupter Show) wuerde sonst executors[-1]
+        # (den letzten Executor) treffen statt zu stoppen.
+        if slot < 0 or slot >= len(executors):
             return
         ex = executors[slot]
         if self.action == ButtonAction.FLASH:
