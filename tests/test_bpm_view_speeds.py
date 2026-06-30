@@ -142,3 +142,52 @@ def test_cannot_delete_default(qapp, _isolated_prefs, _clean_tempo):
     v._on_delete_bus()                       # darf den Default nicht entfernen
     assert mgr.get(TempoBusManager.DEFAULT_BUS) is not None
     v.deleteLater(); qapp.processEvents()
+
+
+def _bpm_cell(view, busid: str) -> str:
+    r = _row_for(view, busid)
+    if r < 0:
+        return ""
+    it = view._bus_table.item(r, 4)          # Spalte "BPM"
+    return it.text() if it is not None else ""
+
+
+def test_bpm_column_follows_sound_bpm_live(qapp, _isolated_prefs, _clean_tempo):
+    """Regression: Ändert sich die Sound-BPM (Leader), zieht die BPM-Spalte der
+    Bus-Tabelle live nach (über den Poll-Refresh). Vorher blieb sie bis zum
+    nächsten vollen Refresh stehen — der eigentliche Bug-Report."""
+    mgr = get_tempo_bus_manager()
+    leader = get_bpm_manager()
+    # Bus A als Sub, der der Sound-BPM (Default) folgt.
+    a = mgr.ensure_bus("A")
+    a.set_role("sub")
+    a.set_parent("")                         # "" → Default/Sound-BPM
+    a.set_bus_multiplier(1.0)
+    # Anfangs-Sound-BPM setzen + in den Default-Bus integrieren (Render-Tick).
+    leader.request_bpm(120.0, "audio")
+    mgr.advance_frame(0.05)
+
+    v = _make_view(qapp)
+    assert _bpm_cell(v, TempoBusManager.DEFAULT_BUS) == "120"
+    assert _bpm_cell(v, "A") == "120"
+
+    # Sound-BPM ändert sich live — ohne ein UI-Event auszulösen.
+    leader.request_bpm(150.0, "audio")
+    mgr.advance_frame(0.05)
+    v._refresh_bus_bpm_live()                # Poll-Tick simulieren (statt 150 ms warten)
+    assert _bpm_cell(v, TempoBusManager.DEFAULT_BUS) == "150"
+    assert _bpm_cell(v, "A") == "150"
+    v.deleteLater(); qapp.processEvents()
+
+
+def test_bpm_live_refresh_rebuilds_on_bus_count_change(qapp, _isolated_prefs, _clean_tempo):
+    """Kommt zwischen zwei Polls ein Bus dazu, baut der Live-Refresh die Tabelle
+    einmal voll neu auf (Zeilenanzahl ≠ Busanzahl → _refresh_speeds)."""
+    mgr = get_tempo_bus_manager()
+    v = _make_view(qapp)
+    assert _row_for(v, "Bass") < 0              # noch nicht in der Tabelle
+    mgr.ensure_bus("Bass").set_role("master")   # ohne UI → Tabelle noch nicht informiert
+    v._refresh_bus_bpm_live()                   # Zeilen ≠ Buses → voller Rebuild
+    assert v._bus_table.rowCount() == len(mgr.all_buses())
+    assert _row_for(v, "Bass") >= 0
+    v.deleteLater(); qapp.processEvents()
