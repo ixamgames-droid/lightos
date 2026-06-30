@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "id": "arturia_keylab_essential_mk3",
+  "manufacturer": "Arturia",
+  "model": "KeyLab Essential mk3",
+  "device_type": "midi_keyboard",
+  "connections": [
+    "USB-MIDI",
+    "DIN-MIDI"
+  ],
+  "buttons": 12,
+  "faders": 9,
+  "encoders": 9,
+  "pad_matrix": [
+    4,
+    2
+  ],
+  "banks": "2 Pad-Baenke (A/B), umschaltbar per Bank-Taste -> 16 triggerbare Noten/CCs aus 8 Pads. Geraeteweit 3 Hardware-Programme/Modi per Prog-Taste: Arturia, DAW, User (bis zu 6 User-Programme/Templates). MIDI Control Center (MCC) verwaltet Factory- und User-Templates/Device-Settings; nahezu alles editierbar. Weitere Hardware-Tasten neben den 12 DAW/Command-Tasten: Bank, Prog, Part, Oct-/Oct+, Hold, Chord, Scale, Arp sowie 4 Display-Soft-Buttons und der clickbare Main-Encoder. Werks-Defaults hier modelliert.",
+  "controls": [
+    {
+      "name": "Keyboard keys",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        36,
+        84
+      ],
+      "layout": "Anschlagdynamische Synth-Action-Tasten (49 Keys: C1-C5, MIDI 36-84). Senden auf dem Main/Keyboard-Channel (Werks-Default Kanal 1 = 0-basiert 0); via MIDI-Channel-Taste + Taste auf 1-16 umstellbar. Octave +/- und Semitone-Transpose verschieben den Notenbereich. 61-Key-Variante: 36-96; separates 88-Key-Modell (KeyLab Essential 88 mk3) tiefer beginnend. Genaue MIDI-Zahlen sind Standard-Arturia-Layout, im Handbuchtext nicht als Tabelle abgedruckt."
+    },
+    {
+      "name": "Pads Bank A",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        36,
+        43
+      ],
+      "layout": "8 velocity-/druckempfindliche RGB-Pads, 4x2. Default-MIDI-Kanal = 'Keyboard' (Main Channel, Werks-Default Kanal 1 = 0-basiert 0), NICHT fest Kanal 10 (das ist nur die GM-Drum-Konvention / ein User-Wunsch, in MCC einstellbar). Pad 1-8 senden Noten als zusammenhaengender Block 36-43 (physisch: obere Reihe E1-G1 = 40-43, untere Reihe C1-D#1 = 36-39). Pads ignorieren Octave/Transpose. In MCC pro Pad/Bank auf Note ODER CC editierbar."
+    },
+    {
+      "name": "Pads Bank B",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        44,
+        51
+      ],
+      "layout": "Zweite Pad-Bank (Bank-Taste), ebenfalls Default 'Keyboard'/Main Channel (0-basiert 0). Pad 1-8: Block 44-51 (G#1-D#2). Handbuch zeigt fuer Bank-B-Pad1/Pad2 beide '48' - vermutlich Druckfehler fuer 48/49 (C2/C#2). In MCC frei editierbar (Note/CC, 42 Farben, Gate/Toggle)."
+    },
+    {
+      "name": "Pitch bend wheel",
+      "type": "pitchbend",
+      "channel": 0,
+      "range": [
+        0,
+        127
+      ],
+      "layout": "Federzentriertes physisches Pitch-Bend-Rad links; sendet Pitch-Bend auf dem gewaehlten Kanal (Default Keyboard/Main Channel). Mittelstellung MIDI-Wert 64. In MCC invertierbar (Min>Max) und in Min/Max-Werten anpassbar."
+    },
+    {
+      "name": "Modulation wheel",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        1,
+        1
+      ],
+      "layout": "Physisches Modulationsrad rechts; sendet per Default CC 1 (Modulation) auf dem Keyboard/Main Channel (MCC-Handbuch Abschn. 3.5 bestaetigt 'CC 1 is the [default]'). CC-Nummer und Kanal in MCC aenderbar."
+    },
+    {
+      "name": "Encoders 1-9 (+ clickbarer Main-Encoder)",
+      "type": "encoder",
+      "channel": -1,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "9 Endlos-Rotary-Encoder; zusaetzlich 1 clickbarer/gerasterter Main-Encoder fuer Navigation (Arturia zaehlt '9 rotary encoders plus 1 clickable encoder'). Senden CC (relativ/absolut) oder NRPN; im Arturia-Mode dynamisch auf Analog-Lab-Macros, im DAW-Mode via MCU/HUI. Konkrete Default-CC-Nummern werden in keinem Handbuch abgedruckt -> nicht belegbar."
+    },
+    {
+      "name": "Faders 1-9",
+      "type": "fader",
+      "channel": -1,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "9 Fader (9x30mm; der 9. dient oft Master/selected track). Senden MIDI-CC (oder NRPN) auf waehlbarem Kanal (Default 'Keyboard'/Main Channel), im Arturia-Mode auf Analog-Lab-Macros, im DAW-Mode via MCU/HUI. Konkrete Default-CC-Nummern in keinem Handbuch dokumentiert -> nicht belegbar."
+    },
+    {
+      "name": "DAW/Transport & Command buttons",
+      "type": "cc",
+      "channel": -1,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "12 Tasten links des Displays (Handbuch: 'Twelve buttons to the left of the Display are all DAW related'; MusicRadar: 8 Transport- + 4 Command-Tasten), z.B. Save, Quantize, Undo, Loop, Rewind, Fast-forward, Metronome, Stop, Play/Pause, Record. Default via Mackie MCU/HUI (DAW-Mode), kein fester CC dokumentiert; in MCC als CC/Note/Mackie re-konfigurierbar -> Default-Nummern nicht belegbar."
+    }
+  ],
+  "led_feedback": {
+    "type": "rgb",
+    "notes": "8 RGB-Pads: in MCC pro Pad Led On/Off, Farbe aus 42 waehlbaren Farben, Type Gate/Toggle. Globaler Backlight-Schalter (on/off) bestimmt, ob Pads/Buttons standardmaessig leuchten; bei Druck leuchten sie ohnehin. 2.5\"-Display (LCD) zeigt beruehrte Controls/Werte und Bank-Auswahl. Es gibt KEIN dokumentiertes velocity-gesteuertes RGB-Protokoll; Farb-/LED-Status wird ueber MCC-Settings bzw. Geraete-Logik gesetzt. Genaues externes LED-Ansteuerungsprotokoll oeffentlich nicht spezifiziert."
+  },
+  "features": [
+    "Keyboard Main-Channel via MIDI-Channel-Taste 1-16 waehlbar (Werks-Default Kanal 1)",
+    "Octave +/- und Semitone-Transpose (nur Tastatur, nicht Pads)",
+    "2 Pad-Baenke (A/B) -> bis 16 Noten/CCs; Default-Kanal = Keyboard/Main Channel (NICHT fest Kanal 10)",
+    "Pads pro Pad/Bank auf Note- oder CC-Output umschaltbar (MCC), 42 LED-Farben, Gate/Toggle",
+    "Modulationsrad Default CC 1",
+    "Pitch-Bend (Mitte=64), invertierbar, Min/Max in MCC",
+    "9 Fader + 9 Endlos-Encoder + 1 clickbarer Main-Encoder; im Arturia-Mode auf Analog-Lab-Macros",
+    "3 Hardware-Modi (Arturia / DAW / User) per Prog-Taste; bis zu 6 User-Programme",
+    "DAW-Control via Mackie MCU/HUI; Scripts fuer Ableton Live, Logic Pro, Cubase, FL Studio, Bitwig; NKS-kompatibel",
+    "Arpeggiator, Chord-, Scale-, Hold-Modus; 2-Part Keyboard-Split",
+    "Class-compliant USB-C MIDI, treiberfrei, bus-powered",
+    "5-pin DIN MIDI-Out; Pedal-Eingang (Sustain/Expression/Footswitch)",
+    "Verfuegbar als 49 & 61 (sowie separates 88-Tasten-Modell)"
+  ],
+  "source": "PRIMAER: Arturia 'User Manual KeyLab Essential mk3' (downloads.arturia.net/products/keylab-essential-49-mk3/manual/keylab-essential-mk3_Manual_1_1_6_EN.pdf bzw. _1_0_0_EN.pdf). ZWEITQUELLEN (Gegenpruefung): (1) Offizielles 'MIDI Control Center for KeyLab Essential mk3' v1.15.0 (downloads.arturia.net/products/keylab-essential-49-mk3/manual/mcc-for-keylab-essential-mk3_Manual_1_15_1_EN.pdf): Abschn.3.3 belegt Default-Kanal jedes Controls = 'Keyboard'/Main Channel (kein fester Kanal 10); Abschn.3.5 Mod-Wheel Default CC 1; Pads Note/CC + 42 Farben; MCU/HUI. (2) Arturia-Produktseite (arturia.com/products/hybrid-synths/keylab-essential-mk3/overview): 9x30mm Fader, 9 rotary encoders + 1 clickable encoder, 2 Baenke RGB-Pads, MCU/HUI, Arpeggiator/Chord/Scale/Hold. (3) MusicRadar-Review: '8 transport and 4 command buttons', 1 main + 9 rotary encoders, 9 Fader. (4) SoundOnSound, B&H eXplora, ManualsLib (manualslib.com/manual/3092667): 'Twelve buttons to the left of the Display are all DAW related', Pad-Notenblock ab 36. (5) Arturia-Legacy-Forum (legacy-forum.arturia.com/index.php?topic=102198.0): Pads im Read-only/Arturia-Mode standardmaessig auf Kanal 1. Alle Werte sind editierbare Werks-Defaults; Encoder-/Fader-/Transport-CC-Nummern werden in keinem Handbuch abgedruckt.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

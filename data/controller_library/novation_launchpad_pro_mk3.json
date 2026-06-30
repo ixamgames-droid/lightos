@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "id": "novation_launchpad_pro_mk3",
+  "manufacturer": "Novation",
+  "model": "Launchpad Pro MK3",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI",
+    "DIN-MIDI"
+  ],
+  "buttons": 42,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": [
+    8,
+    8
+  ],
+  "banks": "Mehrere Hardware-Layouts per SysEx (Header F0 00 20 29 02 0E ...). Layout-Auswahl ueber Command 00h, Layout-IDs: 00h Session (nur im DAW-Modus), 01h Fader, 02h Chord, 03h Custom Mode (8 Custom-Mode-Seiten, editierbar in Novation Components), 04h Note/Drum, 05h-10h diverse Sequencer-/Settings-Seiten, 11h(17) Programmer Mode, 12h Settings Menu, 13h Custom Mode Settings. Programmer Mode (per SysEx 0E 0E 01 oder Setup halten + unterste Scene-Launch-Taste) liefert die hier modellierte feste, NICHT editierbare Werks-Note/CC-Belegung. Drei USB-MIDI-Ports: MIDI, DIN, DAW.",
+  "controls": [
+    {
+      "name": "8x8 Pad Grid",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        11,
+        88
+      ],
+      "layout": "8x8 RGB-Pad-Matrix. Note = 10*Zeile + Spalte (Zeile 1 = unten, Spalte 1 = links). Unten-links = 11, unten-rechts = 18, oben-links = 81, oben-rechts = 88. Pads anschlagdynamisch (Velocity) und polyphon-aftertouch-faehig. Note-On 90h auf Kanal 1; Note-Off als Note-On Velocity 0. Belegt: PDF-Beispiele 0Bh(11)=unten-links, 51h(81)=oben-links; identisch in FMMT666/launchpad.py LaunchpadProMk3-Raw-Diagramm."
+    },
+    {
+      "name": "Top Row Buttons (8 runde Tasten ueber dem Grid)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        91,
+        98
+      ],
+      "layout": "Obere Reihe runder Funktionstasten, links nach rechts CC 91..98. Control Change auf Kanal 1."
+    },
+    {
+      "name": "Shift Button (runde Taste oben-links, neben der Top Row)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        90,
+        90
+      ],
+      "layout": "Einzelne runde Taste oben-links (Shift), CC 90. Belegt durch PDF S.18 (Session-/Note-Mode-Tastenliste) und launchpad.py-Raw-Diagramm (Position 90)."
+    },
+    {
+      "name": "Right Column Buttons (Scene Launch, 8 Tasten)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        19,
+        89
+      ],
+      "layout": "Rechte Spalte (Spalte 9), von unten nach oben CC 19, 29, 39, 49, 59, 69, 79, 89 (10*Zeile + 9). Control Change auf Kanal 1."
+    },
+    {
+      "name": "Left Column Buttons (8 Tasten)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        10,
+        80
+      ],
+      "layout": "Linke Spalte (Spalte 0), von unten nach oben CC 10, 20, 30, 40, 50, 60, 70, 80 (10*Zeile + 0). Control Change auf Kanal 1."
+    },
+    {
+      "name": "Track Select Buttons (untere von zwei Tastenreihen unter dem Grid)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        101,
+        108
+      ],
+      "layout": "Track-Select-Reihe direkt unter dem Grid, links nach rechts CC 101..108. Belegt durch PDF S.18 (Track select buttons CC 101-108) und launchpad.py-Raw-Diagramm (Reihe 101..108). Control Change auf Kanal 1."
+    },
+    {
+      "name": "Track Control / Bottom Row Buttons (unterste Tastenreihe)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        1,
+        8
+      ],
+      "layout": "Unterste Reihe runder Funktionstasten (Track control), links nach rechts CC 1..8. Control Change auf Kanal 1."
+    },
+    {
+      "name": "Logo LED",
+      "type": "other",
+      "channel": 0,
+      "range": [
+        99,
+        99
+      ],
+      "layout": "Beleuchtetes Novation-Logo oben rechts, nur Ausgang/LED, ansteuerbar als CC 99. Keine Taste (nicht in buttons-Count enthalten)."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "Pads/Tasten werden durch dieselbe Note/CC-Nummer beleuchtet, die sie senden. Der MIDI-Kanal waehlt den Beleuchtungsmodus (PDF S.8): Kanal 1 (90h/B0h, dez 144/176) = statische Farbe, Kanal 2 (91h/B1h, dez 145/177) = blinkend (sync zur MIDI-Clock), Kanal 3 (92h/B2h, dez 146/178) = pulsierend. Velocity- bzw. CC-Wert (0-127) ist der Index in eine feste 128-Eintraege-Farbpalette (0 = aus). Echtes RGB (je 7 Bit R/G/B) ist nur ueber die LED-Lighting-SysEx-Nachricht moeglich: F0 00 20 29 02 0E 03 <ColourSpec...> F7, Lighting-Type 03 = RGB; bis zu 106 LEDs (= alle LEDs) pro Nachricht. Universal Device Inquiry liefert Manufacturer-ID 00 20 29 (Focusrite/Novation), Family 13h(19), App 01h / Bootloader 11h."
+  },
+  "features": [
+    "8x8 RGB-Pad-Matrix (64 Pads) mit Velocity und polyphonem Aftertouch",
+    "42 runde, beleuchtete Tactile-Click-Funktions-/Scene-Tasten (Top, Shift, links, rechts/Scene Launch, zwei untere Reihen) plus beleuchtetes Logo (LED, CC 99)",
+    "Programmer Mode mit fester, nicht editierbarer Note/CC-Belegung (Grid Note 11-88, Umrandung/Funktionstasten als CC)",
+    "Mehrere Layouts per SysEx waehlbar (Session/DAW=0, Fader=1, Chord=2, Custom=3, Note/Drum=4, diverse Sequencer, Programmer=17)",
+    "8 editierbare Custom Modes (Mapping via Novation Components)",
+    "RGB-LED-Feedback ueber Velocity-Palette (statisch Ch1 / blinkend Ch2 / pulsierend Ch3) und Voll-RGB via SysEx (Type 03)",
+    "DAW-Faders (virtuelle Fader per SysEx/CC) im Fader-Layout - keine physischen Fader",
+    "Eigenstaendiger Step-Sequencer (mehrere Spuren/Patterns), Scale/Chord-Modi",
+    "Drei MIDI-Ports ueber USB (MIDI/DIN/DAW) plus MIDI-DIN per TRS-Minijack-Adaptern",
+    "106 RGB-LEDs; standalone-faehig (externe Stromversorgung)"
+  ],
+  "source": "Primaer: offizielle 'Launchpad Pro [MK3] Programmer's reference manual' (Novation/Focusrite), https://fael-downloads-prod.focusrite.com/customer/prod/s3fs-public/downloads/LPP3_prog_ref_guide_200415.pdf -- PDF-Text via pypdf extrahiert: S.8 Lighting-Kanaele 1/2/3 (static/flashing/pulsing, 90h/91h/92h), S.6 Device Inquiry 00 20 29 13(19) 01/11 + drei MIDI-Ports, S.7 Layout-Liste (Programmer=11h), S.18 Tasten-CC-Liste (linke Tasten CC 10..60, Track select CC 101-108, Track control CC 1-8, Shift CC 90, Logo CC 99), S.18/19 Programmer-Mode-Umschaltung + Beispiele Note 11/81. Layout-Grafik S.19 bleibt ein Bild. UNABHAENGIGE ZWEITQUELLE zur Verifikation der vollstaendigen Programmer-Mode-Zahlen: FMMT666/launchpad.py (Klasse LaunchpadProMk3, Raw-LED/Button-Diagramm), https://github.com/FMMT666/launchpad.py -- bestaetigt Grid 11-88 (10*Zeile+Spalte), Top 91-98, Shift 90, untere Reihen 101-108 und 1-8, linke Spalte 10-80, rechte Spalte 19-89, Logo 99. Buttons-Gesamtzahl 42 aus offizieller Novation-Produktspec ('42 Backlit Tactile-Click Buttons', 64 Pads), https://novationmusic.com/products/launchpad-pro . Programmer Mode = feste Werksbelegung (nicht editierbar); Custom Modes editierbar.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

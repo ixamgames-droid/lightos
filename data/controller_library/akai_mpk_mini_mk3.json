@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "akai_mpk_mini_mk3",
+  "manufacturer": "Akai Professional",
+  "model": "MPK Mini MK3",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI"
+  ],
+  "buttons": 0,
+  "faders": 0,
+  "encoders": 8,
+  "pad_matrix": [
+    4,
+    2
+  ],
+  "banks": "Hardware speichert mehrere Programme (1-8), umschaltbar per Prog Select + Pad. Programm 1 = Werks-Default (auf MPC Beats abgestimmt). Pads zusaetzlich umschaltbar Bank A (rot) / Bank B per Bank A/B-Taste -> insgesamt 16 Pad-Belegungen. Alle Note-/CC-Zuordnungen, MIDI-Kanal und Joystick-Modi sind im 'MPK mini 3 Program Editor' frei editierbar; hier ist die Werkseinstellung modelliert. WICHTIG: Im Werks-Default liegen Keys/Knobs/Joystick auf MIDI-Kanal 1 (0-basiert 0), die Pads dagegen auf MIDI-Kanal 10 (0-basiert 9) - offiziell von Akai dokumentiert.",
+  "controls": [
+    {
+      "name": "Keyboard (25 Mini-Keys)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        36,
+        84
+      ],
+      "layout": "Eine Reihe, 25 anschlagdynamische Mini-Tasten auf MIDI-Kanal 1 (0-basiert 0). Oktav-Buttons verschieben den Bereich (10-Oktaven-Gesamtumfang, bis 4 Oktaven hoch/runter; beide Buttons = Reset auf Center-Oktave). Note-On/Off mit Velocity 0-127. UNBESTAETIGT: Die exakte tiefste Default-Note der Center-Oktave (C1=36 vs C2=48) ist in keiner autoritativen Akai-Tabelle belegt; das hier angegebene range ist ein grober Platzhalter und sollte ggf. mit dem Program Editor verifiziert werden."
+    },
+    {
+      "name": "Pads Bank A",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        36,
+        43
+      ],
+      "layout": "4x2 anschlag- und druckdynamische Pads (untere Reihe Pad1-4 = 36-39, obere Reihe Pad5-8 = 40-43, C1-G#1). Werks-Default Programm 1 (MPC-Beats-Layout). MIDI-Kanal 10 (0-basiert 9) - offiziell von Akai dokumentiert (Pads getrennt von den Keys). Note-On/Off. Einfarbig rote Hintergrundbeleuchtung, kein RGB."
+    },
+    {
+      "name": "Pads Bank B",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        44,
+        51
+      ],
+      "layout": "4x2 Pads in der zweiten Bank, ebenfalls MIDI-Kanal 10 (0-basiert 9). Werks-Default vermutlich Fortsetzung des Note-Blocks 44-51 (MPC-Layout). Note-On/Off. UNBESTAETIGT: Die exakten Bank-B-Note-Nummern sind aus keiner autoritativen Default-Tabelle belegt (nur als MPC-uebliche Fortsetzung angenommen)."
+    },
+    {
+      "name": "Knobs K1-K8",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        70,
+        77
+      ],
+      "layout": "8 endlose 360-Grad-Regler, eine Reihe, MIDI-Kanal 1 (0-basiert 0). Werks-Default: K1=CC70 ... K8=CC77, absolute Werte 0-127. Bestaetigt via Reverse-Engineering des MK3-Programmformats (joonas.fi). (Hinweis: MK2-Default war CC1-8.)"
+    },
+    {
+      "name": "Joystick X (links/rechts)",
+      "type": "pitchbend",
+      "channel": 0,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "4-Wege-Thumbstick, horizontale Achse, MIDI-Kanal 1 (0-basiert 0). Default-Modus: Pitch Bend (zentriert). Editierbar; alternative Modi (Modulation 1/2, frei zuweisbare CC-Endpunkte) im Editor."
+    },
+    {
+      "name": "Joystick Y (auf/ab)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        1,
+        1
+      ],
+      "layout": "Vertikale Achse des Thumbsticks, MIDI-Kanal 1 (0-basiert 0). Default: Modulation (Mod-Wheel). Der Modulations-Default ist offiziell bestaetigt; die konkrete CC-Nummer 1 ist Konvention/Annahme (CC frei zuweisbar). Editierbar."
+    }
+  ],
+  "led_feedback": {
+    "type": "",
+    "notes": "Die 8 Pads sind hintergrundbeleuchtet, aber NICHT RGB - einfarbig ROT (MusicRadar-Review woertlich: 'the MPK minis are always red'). Die Beleuchtung ist lokale Anzeige (Bank-Status, Velocity-Anzeige beim Anschlag). Es ist KEINE dokumentierte externe LED-Ansteuerung per eingehendem MIDI fuer das MK3 belegt. Fuer eine Lichtsteuerung kein nutzbares Farb-/LED-Feedback einplanen."
+  },
+  "features": [
+    "25 anschlagdynamische Mini-Keys, 10-Oktaven-Bereich via Oktav-Buttons",
+    "8 anschlag- und druckdynamische Pads (4x2), 2 Baenke A/B",
+    "8 endlose 360-Grad-Knobs (Default CC70-77, Kanal 1)",
+    "4-Wege-Joystick: X=Pitch Bend, Y=Modulation (Default)",
+    "Werks-Default-Kanaele: Keys/Knobs/Joystick = Kanal 1, Pads = Kanal 10 (von Akai offiziell dokumentiert)",
+    "Onboard-Arpeggiator, Note Repeat, Tap Tempo, Full Level",
+    "8 speicherbare Programme, per Prog Select + Pad umschaltbar",
+    "Pads alternativ als CC- oder Program-Change-Sender",
+    "Komplett editierbar via MPK mini 3 Program Editor (CC-Nummern, Kanal, Joystick-Modi, Pad-Notes)",
+    "USB-Bus-powered, 1/4\" Sustain-Pedal-Eingang",
+    "Pads NICHT RGB (einfarbig rot) / keine dokumentierte externe LED-Ansteuerung"
+  ],
+  "source": "Primaer (Layout, Joystick-Modi): Akai MPK Mini MK3 User Guide v1.x (offiziell) und Akai FAQ (https://support.akaipro.com/en/support/solutions/articles/69000798861). ZWEITQUELLEN der Gegenpruefung: (1) Akai-Support-Artikel 'MPK Mini MK3 | How To Play Both Pads And Keys At The Same Time In MPC Beats' (https://support.akaipro.com/en/support/solutions/articles/69000863197) - belegt offiziell Default Pad-Kanal=10, Keybed-Kanal=1. (2) MusicRadar-Review (https://www.musicradar.com/reviews/akai-mpk-mini-mk3) - belegt 25 Keys / 8 Pads / 8 Knobs / Joystick=PitchBend+Modulation und Pads einfarbig ROT, kein RGB. (3) joonas.fi Reverse-Engineering des MK3-Programmformats (https://joonas.fi/2021/02/reverse-engineering-midi-devices-akai-mpk-mini-mk3/) - belegt Knobs CC70-77 und Pads ab Note 36. Alle Belegungen sind Werks-Default (Programm 1) und im MPK mini 3 Program Editor frei editierbar.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

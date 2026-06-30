@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "id": "m_audio_oxygen_pro_49",
+  "manufacturer": "M-Audio",
+  "model": "Oxygen Pro 49",
+  "device_type": "midi_keyboard",
+  "connections": [
+    "USB-MIDI",
+    "DIN-MIDI"
+  ],
+  "buttons": 8,
+  "faders": 9,
+  "encoders": 8,
+  "pad_matrix": [
+    4,
+    4
+  ],
+  "banks": "Hardware-Banks: 4 Banks pro Control-Sektion (Bank-Buttons schalten Fader/Knobs/Pads/Function-Buttons um) -> 36 Fader-Slots (9x4, CC 0-35), 32 Knob-Slots (8x4, CC 70-101), 64 Pad-Slots (16x4, Note 36-99), 32 Function-Button-Slots (8x4). Zwei globale Modi: 'Preset Mode' (16 editierbare Presets) und 'DAW Mode' (DAW-Profile mit Mackie/HUI, z.B. Pro Tools, Ableton, Studio One, Cubase, Logic, Bitwig, Reason, Reaper, FL Studio, MPC Beats, User DAW). Hier modelliert: das Werks-User-Preset (sequentielle Default-Belegung, jeweils Bank 1). Werks-Reset der Oktavlage: Octave - und Octave + gleichzeitig.",
+  "controls": [
+    {
+      "name": "Keys (49 keys, velocity + channel aftertouch)",
+      "type": "key",
+      "channel": -1,
+      "range": [
+        48,
+        96
+      ],
+      "layout": "49-Tasten semi-weighted Keybed, velocity-sensitiv mit Channel Aftertouch. Default-Oktavlage laut offiziellem Manual C2-C6 (= MIDI 48-96 in der M-Audio-eigenen Konvention, in der Pad-Note 36 = 'C1' / C-2=MIDI 0). Live um +4/-3 Oktaven und +/-12 Halbtoene transponierbar; der Note-Bereich verschiebt sich entsprechend mit den Octave-Buttons. Sendet auf dem Global-Kanal (Default), pro Zone/Kanal editierbar."
+    },
+    {
+      "name": "Pitch Bend Wheel",
+      "type": "pitchbend",
+      "channel": -1,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Federzentriertes Rad links, Standard Pitch-Bend, sendet auf Global-Kanal"
+    },
+    {
+      "name": "Modulation Wheel",
+      "type": "cc",
+      "channel": -1,
+      "range": [
+        1,
+        1
+      ],
+      "layout": "Rad links, Default CC 1 (Modulation) - offiziell bestaetigt. Sendet auf Global-Kanal."
+    },
+    {
+      "name": "Pads Bank 1 (16 RGB pads)",
+      "type": "note",
+      "channel": -1,
+      "range": [
+        36,
+        51
+      ],
+      "layout": "4x4 RGB-Pad-Matrix, velocity-sensitiv (kein Aftertouch), Note-Mode. Werks-Default Bank 1 = Note 36-51 (aus dekodiertem Werks-Preset, Note-Feld @offset 0x64). Banks 2-4 setzen sequentiell fort: Bank2 52-67, Bank3 68-83, Bank4 84-99. Kanal: CHAN-Byte im Dump = 0 (= Global-Kanal-Option), nicht zuverlaessig als fester Kanal 1 belegbar -> beliebig (-1)."
+    },
+    {
+      "name": "Faders Bank 1 (9 faders)",
+      "type": "fader",
+      "channel": -1,
+      "range": [
+        0,
+        8
+      ],
+      "layout": "9 zuweisbare Fader, Default CC. Werks-Default Bank 1 = CC 0-8 (direkt aus Werks-Preset dekodiert). 4 Banks total (36 Slots, CC 0-35 sequentiell). Soft-Takeover aktiv. Sendet auf Global-Kanal (Default)."
+    },
+    {
+      "name": "Knobs Bank 1 (8 knobs)",
+      "type": "encoder",
+      "channel": -1,
+      "range": [
+        70,
+        77
+      ],
+      "layout": "8 zuweisbare Poti-Knobs, Default CC. Werks-Default Bank 1 = CC 70-77 (direkt aus Werks-Preset dekodiert). 4 Banks total (32 Slots, CC 70-101 sequentiell). Soft-Takeover aktiv. Sendet auf Global-Kanal (Default)."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "16 RGB-hinterleuchtete Pads. Die Pad-Farbe wird im Preset/Preset-Editor pro Pad als zwei Farb-Indizes gesetzt (COLOR 1 = Primary/Press, COLOR 2 = Secondary/Release). Feste 14-Werte-Palette (Index 0x00..0x0d): 0=Off, 1=Chartreuse, 2=Green, 3=Aquamarine, 4=Cyan, 5=Azure, 6=Blue, 7=Violet, 8=Magenta, 9=Rose, 10=Red, 11=Orange, 12=Yellow, 13=White (Manual-Liste woertlich bestaetigt). Werks-Default laut dekodiertem Preset: COLOR1=2 (Green), COLOR2=6 (Blue). KEINE freie 0-127-Velocity-RGB-Ansteuerung wie Launchpad/APC; die Farbe folgt der Preset-Definition, nicht der gespielten Velocity. Im DAW-Mode steuert das Mackie/HUI-/DAW-Script die Pad-LEDs. Exakte SysEx/Note-Velocity-Tabelle zur Host-LED-Ansteuerung ist in der offiziellen Doku NICHT enthalten."
+  },
+  "features": [
+    "49 velocity-sensitive semi-weighted keys mit Channel Aftertouch, Default-Lage C2-C6 (MIDI 48-96)",
+    "16 RGB-hinterleuchtete velocity-sensitive Pads (4x4), ohne Aftertouch",
+    "8 zuweisbare Knobs",
+    "9 zuweisbare Fader",
+    "8 zuweisbare Function-Buttons (frei als Note/CC/Program/Shortcut)",
+    "Pitch-Bend- und Modulationsrad (Mod = CC1)",
+    "Transport-/Bank-/Back-Tasten und Select/Scroll-Encoder",
+    "Note Repeat, Arpeggiator, Chord Mode, Scale Mode",
+    "4 Banks pro Control-Sektion (Fader/Knobs/Pads/Function-Buttons)",
+    "Preset Mode (16 editierbare Presets) + DAW Mode (Mackie/HUI DAW-Profile)",
+    "Soft-Takeover fuer Fader und Knobs",
+    "+4/-3 Oktaven und +/-12 Halbtoene Transponierung",
+    "Voll editierbar via On-Board-Display und Oxygen Pro Preset Editor (Note/CC/Program/Channel/Min/Max pro Control)",
+    "USB-busbetrieben, zusaetzlich 5-Pin MIDI-DIN-Out und Sustain-Pedal-Eingang"
+  ],
+  "source": "Primaerquelle: M-Audio 'Oxygen Pro Series - User Guide v1.1' (offiziell). Default-Note/CC-Nummern aus dem dekodierten Werks-'control.OxygenPro49UserPreset' (LarsNorlander/maconfig, github.com/LarsNorlander/maconfig). ZWEITQUELLEN-Gegenpruefung: (1) dasselbe Manual ueber unabhaengigen B&H-Spiegel bhphotovideo.com/lit_files/914194.pdf -> bestaetigt 49 keys+Aftertouch, Mod=CC1, Default-Oktavlage C2-C6, +4/-3 Oktaven, 14-Farben-Palette woertlich, Channel-Enum Global/1-16/Zone/Omni; (2) Sound on Sound Review soundonsound.com/reviews/m-audio-oxygen-pro-49 -> 9 Fader, 8 Knobs, 16 Pads (4x4), 49 Keys+Aftertouch (Pads ohne), 4 Banks; (3) eigenstaendige Roh-Byte-Dekodierung der Werks-Preset-Binaerdatei raw.githubusercontent.com/LarsNorlander/maconfig/master/examples/control.OxygenPro49UserPreset -> Fader-CC 0-35, Knob-CC 70-101, Pad-Note @0x64 = 36-99, CHAN-Byte=0 (Global-Option), COLOR1=2/COLOR2=6. Geraet ist vollstaendig editierbar - dies ist die sequentielle Werks-Default-Belegung, kein fester Wert.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

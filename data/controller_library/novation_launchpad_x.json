@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "novation_launchpad_x",
+  "manufacturer": "Novation",
+  "model": "Launchpad X",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI"
+  ],
+  "buttons": 17,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": [
+    8,
+    8
+  ],
+  "banks": "Layouts waehlbar per SysEx (F0 00 20 29 02 0C 00 <layout> F7): 00h Session (nur DAW-Mode), 01h Note, 04h Custom1 (Drum Rack), 05h Custom2 (Keys), 06h Custom3 (Lighting/Drum-Layout, Werks-Default), 07h Custom4 (Lighting/Session-Layout, Werks-Default), 0Dh DAW Faders (nur DAW-Mode), 7Fh Programmer-Mode. Zwei USB-MIDI-Ports: 'LPX DAW In/Out' (DAW/Session) und 'LPX MIDI In/Out' (Note/Custom/Programmer, externes Light-Control). Programmer/Live-Toggle: F0 00 20 29 02 0C 0E <0=Live|1=Programmer> F7. Die unten gelisteten controls modellieren das Programmer-Mode-Layout (fester Werks-Koordinatenraster, ideal fuer Lichtsteuerung); die 4 Custom-Modes sind frei editierbar. Out-of-the-box startet das Geraet im Session-/Note-Mode, NICHT im Programmer-Mode.",
+  "controls": [
+    {
+      "name": "8x8 Pad-Matrix (Programmer-Mode)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        11,
+        88
+      ],
+      "layout": "XY-Koordinatenraster: Note = (Reihe 1..8)*10 + (Spalte 1..8). Unten-links=11, unten-rechts=18, oben-links=81, oben-rechts=88. Pro Reihe also 11-18, 21-28, ... 81-88. (Beleg: offizielle PDF nennt unten-links=11, oben-links=81, unten-rechts=18; FMMT666-Lib bestaetigt das ganze Raster und die Formel led=90-10*y+x.) Velocity-sensitiv beim Spielen; als LED-Steuerung gibt Velocity den Farb-Palettenindex an (0=aus)."
+    },
+    {
+      "name": "Top-Reihe (8 runde Tasten: Session/Note/Custom/Capture-MIDI + Pfeile)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        91,
+        98
+      ],
+      "layout": "CC 91..98 von links nach rechts (Reihe 9 des Koordinatenrasters). Senden CC beim Druck und leuchten bei eingehendem CC. (Alternativ als Note 28-35 beleuchtbar.) Belegt durch Novation User Guides."
+    },
+    {
+      "name": "Rechte Spalte (8 Scene-Launch-Tasten, Programmer-Mode)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        19,
+        89
+      ],
+      "layout": "Spalte 9 des Rasters: Note = (Reihe 1..8)*10 + 9. Von unten nach oben: 19, 29, 39, 49, 59, 69, 79, 89. Belegt durch FMMT666-Lib (ASCII-Layout) und die LedCtrlXY-Formel. HINWEIS: Im Session-Mode (Werks-Default) sendet die rechte Spalte stattdessen Note 100-107 (oben->unten) - das hier modellierte 19..89 gilt nur im Programmer-Mode."
+    },
+    {
+      "name": "Novation-Logo (LED)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        99,
+        99
+      ],
+      "layout": "Logo-LED, ansteuerbar via CC 99 (alternativ Note 27). Nur Ausgabe/Beleuchtung, keine physische Taste. Belegt durch Novation User Guides."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "LEDs werden ueber dieselben Note-/CC-Adressen wie die Pads angesteuert (Programmer-Mode bzw. Lighting Custom Modes). MIDI-Kanal waehlt den Lichtmodus (offizielle PDF, woertlich): Kanal 1 (90h/B0h)=statische Farbe, Kanal 2 (91h/B1h)=Blinken (flashing, synchron zur MIDI-Clock), Kanal 3 (92h/B2h)=Pulsieren. Velocity bzw. CC-Value = Index in die 128er-Farbpalette (0=aus). Voll-RGB ist per SysEx moeglich: F0 00 20 29 02 0C 03 <colourspec...> F7, colourspec = [Typ, LED-Index, Daten]; Typ 0=Palette(1B), 1=Flash(2B A/B), 2=Pulse(1B), 3=RGB(3B je 0..127). Bis zu 81 colourspec-Eintraege pro Nachricht. LED-Indizes folgen immer dem Programmer-Mode-Raster, unabhaengig vom aktiven Layout. (FMMT666-Source bestaetigt RGB-SysEx-Aufbau [0,32,41,2,12,3,3,n,r,g,b].)"
+  },
+  "features": [
+    "8x8 druckempfindliche RGB-Pads (velocity- und aftertouch-faehig)",
+    "Programmer-Mode (SysEx-aktiviert) liefert festen Werks-Koordinatenraster fuer Skript-/Lichtsteuerung",
+    "RGB-LED-Steuerung pro Pad: Palette (128 Farben), 24-Bit-RGB via SysEx, Flashing/Pulsing ueber Kanal 2/3",
+    "Universal Device Inquiry SysEx zur Geraeteerkennung (Antwort enthaelt Manufacturer 00 20 29, Familie 13 01)",
+    "Text-Scrolling ueber die Pad-Flaeche per SysEx (Top-Reihe und Logo bleiben vom Scroll unberuehrt)",
+    "4 frei editierbare Custom-Modes (werksseitig Drum Rack, Keys, 2x Lighting)",
+    "Note-Mode mit Chromatic/Scale, Aftertouch (poly/channel), waehlbare Velocity-Kurve",
+    "Zwei USB-MIDI-Ports (DAW + MIDI); reines USB-Bus-Powered Geraet"
+  ],
+  "source": "Primaer: Novation/Focusrite 'Launchpad X - Programmer's Reference Manual' (PDF), https://fael-downloads-prod.focusrite.com/customer/prod/s3fs-public/downloads/Launchpad%20X%20-%20Programmers%20Reference%20Manual.pdf (Volltext extrahiert: SysEx-Header F0 00 20 29 02 0C, Layout-Indizes, Programmer/Live-Toggle Cmd 0Eh, Lichtmodi Kanal 1/2/3 woertlich, Palette/RGB-SysEx Cmd 03h, Anker unten-links=11/oben-links=81/unten-rechts=18, Werks-Default = Session/Note + Custom3/4 als Lighting). ZWEITQUELLEN (unabhaengig): (1) Novation User Guides 'Controlling the Launchpad X surface' und 'Launchpad X's default MIDI mappings', https://userguides.novationmusic.com/hc/en-gb/articles/24001475492498-Controlling-the-Launchpad-X-surface bzw. https://userguides.novationmusic.com/hc/en-gb/articles/23731456402962-Launchpad-X-s-default-MIDI-mappings (Top-Reihe CC 91-98 / alt Note 28-35, Logo CC 99 / alt Note 27, rechte Spalte im Session-Mode Note 100-107). (2) FMMT666/launchpad.py (unabhaengige Python-Lib), https://github.com/FMMT666/launchpad.py (Klasse LaunchpadLPX: Programmer-Raster mit rechter Spalte 19..89, RGB-SysEx-Aufbau, Layout-/Toggle-Commands, dual USB-Ports 'LPX DAW'/'LPX MIDI'). (3) Loopy-Pro-Forum (Header-Bytes 00 20 29 02 0C, Layout-Indizes). Modelliert ist die WERKS-Programmer-Mode-Belegung (fest, nicht editierbar); die 4 Custom-Modes sind frei umbelegbar.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

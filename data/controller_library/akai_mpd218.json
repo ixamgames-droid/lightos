@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "id": "akai_mpd218",
+  "manufacturer": "Akai Professional",
+  "model": "MPD218",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI"
+  ],
+  "buttons": 6,
+  "faders": 0,
+  "encoders": 6,
+  "pad_matrix": [
+    4,
+    4
+  ],
+  "banks": "3 Pad-Bänke (A/B/C, je 16 Pads = 48 Pads gesamt) und 3 Control-Bänke (A/B/C, je 6 Knobs = 18 Parameter). Umschaltung am Gerät über die Tasten \"Pad Bank\" bzw. \"Ctrl Bank\" (zyklisch). WICHTIG: Im Werks-Default (Programm/Preset 1) senden Pads und Knobs auf UNTERSCHIEDLICHEN MIDI-Kanälen — Pads auf Kanal 10 (0-basiert 9, GM-Drum-Kanal), Knobs auf Kanal 1 (0-basiert 0). Jede Bank sendet ihren eigenen Notenblock/CC-Block auf ihrem jeweiligen Kanal. Zusätzlich bis zu 16 frei editierbare Programme (Presets), die per Prog-Select + Pad aufgerufen werden (z.B. Preset 2 sendet alles nur auf Kanal 1); modelliert ist hier das Werks-Default-Layout (Programm 1). Banken sind reine Hardware-Umschaltung.",
+  "controls": [
+    {
+      "name": "Pads Bank A (1-16)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        36,
+        51
+      ],
+      "layout": "4x4 Pad-Matrix, Werks-Default. Pad 1 = Note 36, fortlaufend +1 bis Pad 16 = Note 51. MIDI-Kanal 10 (0-basiert 9). Velocity- und druckempfindlich; Note-On bei Anschlag, Note-Off beim Loslassen."
+    },
+    {
+      "name": "Pads Bank B (1-16)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        52,
+        67
+      ],
+      "layout": "Gleiche 4x4-Matrix, zweite Pad-Bank, MIDI-Kanal 10 (0-basiert 9). Werks-Default fortlaufend Note 52..67."
+    },
+    {
+      "name": "Pads Bank C (1-16)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        68,
+        83
+      ],
+      "layout": "Gleiche 4x4-Matrix, dritte Pad-Bank, MIDI-Kanal 10 (0-basiert 9). Werks-Default fortlaufend Note 68..83."
+    },
+    {
+      "name": "Knobs Ctrl-Bank A (1-6)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        10,
+        15
+      ],
+      "layout": "6 endlose 360°-Potis (oben links angeordnet). Werks-Default: CC 10,11,12,13,14,15 auf MIDI-Kanal 1 (0-basiert 0), Wertebereich 0-127 (absolute CC)."
+    },
+    {
+      "name": "Knobs Ctrl-Bank B (1-6)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        16,
+        21
+      ],
+      "layout": "Gleiche 6 Potis, zweite Control-Bank, MIDI-Kanal 1 (0-basiert 0). Werks-Default CC 16..21, 0-127."
+    },
+    {
+      "name": "Knobs Ctrl-Bank C (1-6)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        22,
+        27
+      ],
+      "layout": "Gleiche 6 Potis, dritte Control-Bank, MIDI-Kanal 1 (0-basiert 0). Werks-Default CC 22..27, 0-127."
+    }
+  ],
+  "led_feedback": {
+    "type": "",
+    "notes": "Kein host-adressierbares LED-Feedback. Die 16 Pads sind einfarbig rot hintergrundbeleuchtet und leuchten hardwareseitig beim Anschlag auf; es gibt keine RGB-Palette und kein dokumentiertes MIDI-Protokoll, um die Pad-LEDs vom Host aus per Note/CC zu setzen. Für eine Lichtsteuerung also rein als Eingabegerät zu behandeln (kein Status-Echo zurück an die Pads)."
+  },
+  "features": [
+    "16 velocity- und druckempfindliche Pads (4x4)",
+    "3 Pad-Bänke (48 Pads gesamt)",
+    "6 endlose 360°-Potentiometer",
+    "3 Control-Bänke (18 Parameter)",
+    "USB-bus-powered, USB-MIDI (Class Compliant, kein Treiber nötig)",
+    "Werks-Default Preset 1 sendet auf GEMISCHTEN Kanälen: Pads Kanal 10, Knobs Kanal 1 (per MPD218 Editor frei änderbar; Preset 2 sendet z.B. alles auf Kanal 1)",
+    "Alle Pad-/Knob-Zuordnungen via 'MPD218 Editor' frei editierbar (Note 0-127, beliebiger MIDI-Kanal, CC- oder Note-Modus, Min/Max)",
+    "Pads können Note-On/Off ODER Program-Change senden, aber KEIN CC; Knobs senden CC (oder Aftertouch)",
+    "Full-Level-Modus (Pads immer Velocity 127), Note Repeat, Tap-Tempo/Swing/Time-Division als Geräte-interne Funktionen (NR Config), kein MIDI-Output",
+    "6 Funktionstasten (Ctrl Bank, Pad Bank, Full Level, Note Repeat, NR Config, Prog Select) -- nur Gerätefunktionen, senden selbst kein MIDI",
+    "Pad-LEDs einfarbig rot, nur hardwareseitig (kein Host-Feedback)"
+  ],
+  "source": "Hardware-Topologie (16 Pads/4x4, 3 Pad-Bänke, 6 Knobs/3 Control-Bänke, 6 Tasten, 1 USB, USB-Power; Pads senden Note oder Program-Change, kein CC; Knobs senden CC): offizielles Akai 'MPD218 User Guide' v1.0 (PDF, inMusic CDN: https://cdn.inmusicbrands.com/akai/attachments/MPD218/MPD218-UserGuide-v1.0.pdf, Technical Specifications S.18). Exakte Werks-Default-Note-/CC-Nummern UND Kanäle: dekodierte MPD218-Werks-Preset-SysEx 'example.mpd218' aus mungewell/mpd-utils (https://github.com/mungewell/mpd-utils) — Datei direkt geladen und Byte-für-Byte geparst: 48 Pad-Records Note 0x24..0x53 (36-83, Bank A/B/C) mit Channel-Byte 0x0a (1-basiert = Kanal 10), 18 Knob-Records CC 0x0a..0x1b (10-27) mit Channel-Byte 0x01 (= Kanal 1), Max 0x7f=127. ZWEITE/UNABHÄNGIGE QUELLE für den Pad-Kanal-10-Default: 1010music-Forum-Thread (https://forum.1010music.com/forum/products/blackbox/support-blackbox/17261-mpd218-pad-set-up) sowie Akai-Konsens: 'Preset 1 sends messages on both MIDI channels 1 and 10', Pads default Kanal 10 (GM-Drum). HINWEIS: Gerät komplett editierbar — dies ist Werks-Default Programm 1.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

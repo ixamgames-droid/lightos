@@ -35,6 +35,23 @@ selbst stehen unter CC0.
 | `enttec_dmx_usb_pro` | Enttec „DMX USB Pro API" (öffentliches Protokoll); LightOS-Treiber `enttec_pro.py` |
 | `generic_artnet_node` | Art-Net-Spezifikation (Artistic Licence), ANSI E1.31 |
 | `generic_macro_keyboard` | LightOS-Keyboard-Mapping (Feature 8) |
+| `novation_launchpad_x` | Novation/Focusrite „Launchpad X Programmer's Reference Manual" (öffentlich); gegengeprüft an Novation User Guides + Community-Lib `FMMT666/launchpad.py` |
+| `novation_launchpad_pro_mk3` | Novation/Focusrite „Launchpad Pro [MK3] Programmer's Reference Manual" (öffentlich) |
+| `akai_apc40_mk2` | Akai „APC40 mkII Communication Protocol" (öffentlich); Ableton-Clip-Launcher-Default |
+| `akai_apc_key_25_mk2` | Akai „APC Key 25 mk2"-Dokumentation/Communication Protocol (öffentlich) |
+| `akai_mpd218` | Akai MPD218 User Guide / Preset-Default (öffentlich; per MPD-Editor änderbar) |
+| `novation_launch_control_xl` | Novation „Launch Control XL"-Werks-Template/User Guide (öffentlich; per Editor änderbar) |
+| `akai_midimix` | Akai MIDImix User Guide / Default-MIDI-Map (öffentlich; per Editor änderbar) |
+| `akai_mpk_mini_mk3` | Akai MPK Mini MK3 User Guide + Akai-FAQ (Werks-Default Programm 1; per MPK-mini-3-Editor änderbar). Hinweis: einzelne Note-Bereiche nicht zweitquellen-belegt, im Profil als „unbestätigt" markiert |
+| `arturia_minilab_3` | Arturia „MiniLab 3" User Manual + MIDI Control Center (öffentlich; Werks-Default, in MCC editierbar) |
+| `novation_launchkey_mini_mk3` | Novation „Launchkey Mini [MK3] Programmer's Reference Guide" (öffentlich) |
+| `m_audio_oxygen_pro_49` | M-Audio „Oxygen Pro" User Guide / Preset 1 Default (öffentlich; per Editor änderbar) |
+| `arturia_keylab_essential_mk3` | Arturia „KeyLab Essential mk3" User Manual + MIDI Control Center (öffentlich; Werks-Default, in MCC editierbar). Hinweis: Encoder/Fader/Transport-CC-Nummern sind herstellerseitig nicht dokumentiert und im Profil als nicht belegbar gekennzeichnet |
+
+> Alle 2026-06-30 ergänzten MIDI-Controller-Profile sind **Werks-Defaults** aus
+> öffentlicher Herstellerdokumentation, jeweils gegen eine zweite Quelle
+> geprüft (Recherche + adversariale Verifikation). Belegbarkeit/Unsicherheiten
+> stehen pro Profil im Feld `source` bzw. `uncertainty`-Hinweisen im `layout`.
 
 ## QLC+-Inputprofile importieren (optional)
 
