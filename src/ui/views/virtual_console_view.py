@@ -169,22 +169,6 @@ class VirtualConsoleView(QWidget):
             btn.setVisible(False)
             tb_layout.addWidget(btn)
 
-        # Editor-Bausteine: Controller-Vorlage + Color-Chase-Baukasten (edit-only)
-        for _lbl, _slot in [("⌗ Controller", self._insert_controller_template),
-                            ("🎨 Color-Chase", self._insert_color_chase_kit),
-                            ("🟦 Chase-Bereich", self._arm_chase_area)]:
-            eb = QPushButton(_lbl)
-            eb.setFixedHeight(26)
-            eb.setStyleSheet("""
-                QPushButton { background:#21262d; color:#58d68d; border:1px solid #30363d;
-                              border-radius:3px; font-size:10px; padding:0 8px; }
-                QPushButton:hover { background:#30363d; color:#e6edf3; }
-            """)
-            eb.clicked.connect(lambda checked=False, s=_slot: s())
-            eb.setProperty("edit_only", True)
-            eb.setVisible(False)
-            tb_layout.addWidget(eb)
-
         # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only. Strg+Z / Strg+Y.
         for _glyph, _tip, _slot in [("↶", "Rückgängig (Strg+Z)", self._vc_undo),
                                     ("↷", "Wiederholen (Strg+Y)", self._vc_redo)]:
@@ -411,7 +395,6 @@ class VirtualConsoleView(QWidget):
         self._canvas = VCCanvas()
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
-        self._canvas.area_selected.connect(self._on_area_selected)
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
@@ -704,120 +687,6 @@ class VirtualConsoleView(QWidget):
         center = QPoint(self._canvas.width() // 2, self._canvas.height() // 2)
         self._canvas._add_widget(wtype, center)
 
-    def _insert_widgets(self, dicts) -> int:
-        """Fuegt vorkonfigurierte Widget-Dicts auf die aktuell sichtbare Bank ein."""
-        if not self._edit_mode or not self._canvas_alive():
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Bearbeiten nötig",
-                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann erneut einfügen.")
-            return 0
-        from PySide6.QtCore import QPoint
-        bank = self._canvas.active_bank
-        n = 0
-        for wd in dicts:
-            d = dict(wd)
-            d["bank"] = bank          # auf die gerade sichtbare Seite legen
-            w = self._canvas._add_widget(d.get("type", "VCButton"),
-                                         QPoint(d.get("x", 0), d.get("y", 0)), d)
-            if w is not None:
-                n += 1
-        return n
-
-    def _insert_controller_template(self):
-        """Toolbar: ein MIDI-Panel als beschriftetes Raster auf die aktuelle Seite legen."""
-        from PySide6.QtWidgets import QInputDialog, QMessageBox
-        from src.ui.virtualconsole.controller_templates import controller_template, CONTROLLERS
-        keys = list(CONTROLLERS.keys())
-        labels = [CONTROLLERS[k]["label"] for k in keys]
-        label, ok = QInputDialog.getItem(self, "Controller-Vorlage",
-                                         "MIDI-Controller wählen:", labels, 0, False)
-        if not ok:
-            return
-        kind = keys[labels.index(label)]
-        n = self._insert_widgets(controller_template(kind))
-        if n:
-            QMessageBox.information(self, "Controller-Vorlage",
-                                   f"{n} Elemente eingefügt. Pads per Rechtsklick mit "
-                                   "Funktionen/Farben belegen, Fader-Modus im Properties-Dialog.")
-
-    def _insert_color_chase_kit(self):
-        """Toolbar: einen wiederverwendbaren Live-Color-Chase-Baustein einfuegen
-        (legt zugleich eine COLORFADE-Funktion an, gebunden an die Pads/Fader)."""
-        from PySide6.QtWidgets import QMessageBox
-        from src.ui.virtualconsole.controller_templates import color_chase_kit
-        label, fids = self._choose_chase_target()
-        if label is None:
-            return            # abgebrochen
-        try:
-            m = self._new_colorfade_function(fids=fids, label=label)
-        except Exception as e:
-            QMessageBox.warning(self, "Fehler",
-                                f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
-            return
-        n = self._insert_widgets(color_chase_kit(m.id))
-        if n:
-            QMessageBox.information(self, "Color-Chase-Baukasten",
-                                   f"{n} Elemente + Funktion '{m.name}' angelegt "
-                                   f"(Ziel: {label}).\nAblauf: Clear -> Farben antippen -> Start. "
-                                   "Den Pads/Fadern per 'MIDI Lernen' APC-Tasten zuweisen.")
-
-    def _choose_chase_target(self):
-        """Fragt die Ziel-Gruppe fuer einen Color-Chase ab.
-        Liefert (label, fids) oder (None, None) bei Abbruch. 'Alle Fixtures'
-        -> ('Alle', alle gepatchten fids); sonst (Gruppenname, Gruppen-fids)."""
-        from PySide6.QtWidgets import QInputDialog
-        from src.core.app_state import get_state
-        state = get_state()
-        names = []
-        try:
-            from sqlalchemy import select
-            from src.core.database.models import FixtureGroup
-            with state._session() as s:
-                names = [r[0] for r in s.execute(select(FixtureGroup.name)).all()]
-        except Exception:
-            names = []
-        options = ["Alle Fixtures"] + names
-        choice, ok = QInputDialog.getItem(
-            self, "Color-Chase — Ziel",
-            "Auf welche Gruppe soll der Chase wirken?", options, 0, False)
-        if not ok:
-            return None, None
-        if choice == "Alle Fixtures":
-            return "Alle", [f.fid for f in state.get_patched_fixtures()]
-        return choice, state.group_fids_by_name(choice)
-
-    def _new_colorfade_function(self, fids=None, label=""):
-        """Legt eine COLORFADE-RGB-Matrix ueber die gewuenschten Fixtures an (Chase-Ziel).
-        fids=None -> alle gepatchten Fixtures; label -> Funktionsname-Suffix."""
-        from src.core.engine.function_manager import get_function_manager
-        from src.core.engine.rgb_matrix import RgbAlgorithm
-        from src.core.app_state import get_state
-        fm = get_function_manager()
-        name = f"Color-Chase – {label}" if label and label != "Alle" else "Color-Chase"
-        from src.core.engine.rgb_matrix import MatrixStyle
-        m = fm.new_rgb_matrix(name)
-        m.algorithm = RgbAlgorithm.COLORFADE
-        m.style = MatrixStyle.RGB        # nur Farbe (kein Dimmer/Shutter) — explizit, nicht Default-abhaengig
-        m.drive_intensity = False
-        m.matrix_speed = 2.0
-        m.params = {"hold": 0.25}
-        if fids is None:
-            fids = [f.fid for f in get_state().get_patched_fixtures()]
-        if fids:
-            m.fixture_grid = list(fids)
-            m.cols, m.rows = len(fids), 1
-        return m
-
-    def _arm_chase_area(self):
-        """Toolbar: Aufzieh-Modus an — der naechste Maus-Zug auf der Canvas spannt
-        einen Bereich auf, in den ein Live-Color-Chase eingesetzt wird."""
-        from PySide6.QtWidgets import QMessageBox
-        if not self._edit_mode or not self._canvas_alive():
-            QMessageBox.information(self, "Bearbeiten nötig",
-                                   "Bitte zuerst 'Bearbeiten' aktivieren, dann einen Bereich aufziehen.")
-            return
-        self._canvas.arm_area_tool("color_chase")
-
     def _vc_undo(self):
         """Letzte VC-Bearbeitung rueckgaengig (Strg+Z / ↶-Knopf)."""
         if self._canvas_alive():
@@ -827,28 +696,6 @@ class VirtualConsoleView(QWidget):
         """Rueckgaengig gemachte VC-Bearbeitung wiederholen (Strg+Y / ↷-Knopf)."""
         if self._canvas_alive():
             self._canvas.redo()
-
-    def _on_area_selected(self, tool, x, y, w, h):
-        """Callback: aufgezogener Bereich -> Color-Chase hineinlegen (+ Funktion anlegen)."""
-        if tool != "color_chase" or not self._canvas_alive():
-            return
-        from PySide6.QtWidgets import QMessageBox
-        from src.ui.virtualconsole.controller_templates import color_chase_kit_in_rect
-        label, fids = self._choose_chase_target()
-        if label is None:
-            return            # abgebrochen
-        try:
-            m = self._new_colorfade_function(fids=fids, label=label)
-        except Exception as e:
-            QMessageBox.warning(self, "Fehler",
-                                f"Konnte Color-Chase-Funktion nicht anlegen:\n{e}")
-            return
-        n = self._insert_widgets(color_chase_kit_in_rect(m.id, x, y, w, h))
-        if n:
-            QMessageBox.information(self, "Color-Chase-Bereich",
-                                   f"{n} Elemente im Bereich + Funktion '{m.name}' "
-                                   f"(Ziel: {label}).\nClear -> Farben antippen -> Start. "
-                                   "Per 'MIDI Lernen' zuweisen.")
 
     def _clear_all(self):
         if self._edit_mode:
