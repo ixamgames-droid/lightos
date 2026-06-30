@@ -144,6 +144,13 @@ class ProgrammerView(QWidget):
             self._slider_sync_timer.timeout.connect(self._refresh_sliders_from_state)
             sync.subscribe_widget(SyncEvent.PROGRAMMER_CHANGED, self,
                                   lambda *_: self._slider_sync_timer.start())
+            # UI-09: externe Selektion (z. B. Preset-Browser-Gruppenauswahl ueber
+            # select_group_by_name -> set_selected_fids) in den Attribut-Tab
+            # spiegeln. Ohne dies bleibt der Tab auf der alten Auswahl stehen, die
+            # Gruppenauswahl wirkt im Programmer unsichtbar. _sync_follow_selection
+            # publisht NICHT zurueck (Guard) -> kein SELECTION_CHANGED-Ping-Pong.
+            sync.subscribe_widget(SyncEvent.SELECTION_CHANGED, self,
+                                  lambda *_: self._sync_follow_selection())
         except Exception as e:
             print(f"[programmer_view] sync subscribe error: {e}")
 
@@ -438,6 +445,14 @@ class ProgrammerView(QWidget):
         # Dimmer-Konflikten, ob die manuelle Intensitaet oder ein laufender Dimmer-
         # Effekt (Matrix/EFX) gewinnt („aktiver Tab gewinnt", scoped auf die Auswahl).
         self._main_tabs.currentChanged.connect(self._on_main_tab_changed)
+        # UI-05: QTabWidget.currentChanged feuert NICHT fuer den initial aktiven Tab
+        # (Index 0 = "Intensity" ist schon current). Ohne diesen Bootstrap bliebe
+        # programmer_focus auf None, bis der Nutzer einmal den Tab wechselt — d. h.
+        # "aktiver Tab gewinnt" (ENG-02) greift beim Start nicht, ein laufender
+        # Dimmer-Effekt schlaegt die manuelle Intensitaet trotz sichtbarem
+        # Intensity-Tab. Einmal manuell feuern stellt den Fokus passend zum sichtbaren
+        # Tab her.
+        self._on_main_tab_changed(self._main_tabs.currentIndex())
 
         al.addWidget(self._main_tabs, stretch=1)
         return area
@@ -992,6 +1007,37 @@ class ProgrammerView(QWidget):
         self._publish_selection()
         self._rebuild_attr_editor()
 
+    def _sync_follow_selection(self):
+        """UI-09: externe SELECTION_CHANGED in die Fixture-Liste + Attribut-Tabs
+        spiegeln, OHNE selbst neu zu publishen (sonst Ping-Pong).
+
+        Greift, wenn z. B. der Preset-Browser eine Gruppe waehlt
+        (``set_selected_fids``). Der Gleichheits-Guard verhindert, dass das eigene
+        Echo (nach ``_publish_selection``) einen ueberfluessigen Rebuild ausloest.
+        """
+        try:
+            new_fids = list(getattr(self._state, "selected_fids", []) or [])
+        except Exception:
+            return
+        if new_fids == self._selected_fids:
+            return  # eigenes Echo oder keine Aenderung
+        present = {
+            self._fixture_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(self._fixture_list.count())
+        }
+        # Visuelle Selektion ohne _on_fixture_selected-Trigger (kein Re-Publish).
+        self._fixture_list.blockSignals(True)
+        self._fixture_list.clearSelection()
+        want = set(new_fids)
+        for i in range(self._fixture_list.count()):
+            it = self._fixture_list.item(i)
+            if it.data(Qt.ItemDataRole.UserRole) in want:
+                it.setSelected(True)
+        self._fixture_list.blockSignals(False)
+        # Interne Auswahl in der vom Publisher vorgegebenen Reihenfolge uebernehmen.
+        self._selected_fids = [f for f in new_fids if f in present]
+        self._rebuild_attr_editor()
+
     # ── Attr Tabs Build ──────────────────────────────────────────────────────
 
     def _rebuild_attr_editor(self):
@@ -1435,9 +1481,13 @@ class ProgrammerView(QWidget):
             if group_name == "Intensity":
                 sh = self._template_channel_in(("shutter", "strobe"))
                 if sh is not None:
-                    from src.ui.widgets.preset_tile import ShutterQuickBar
-                    layout.addWidget(QLabel("Shutter / Strobe:"))
-                    layout.addWidget(ShutterQuickBar(sh, fixtures, self._state, touch=touch))
+                    # UI-07: nur range-kompatible Fixtures fuettern (sonst landet der
+                    # Vorlagen-Range-Mittelwert in einem inkompatiblen Shutter-Kanal).
+                    sh_fixtures = self._range_compatible_fixtures(sh, fixtures)
+                    if sh_fixtures:
+                        from src.ui.widgets.preset_tile import ShutterQuickBar
+                        layout.addWidget(QLabel("Shutter / Strobe:"))
+                        layout.addWidget(ShutterQuickBar(sh, sh_fixtures, self._state, touch=touch))
             elif group_name == "Color":
                 attrs_present = {c.attribute for c in getattr(self, "_template_channels", [])}
                 cw = self._template_channel_in(("color_wheel",))
@@ -1449,9 +1499,12 @@ class ProgrammerView(QWidget):
             elif group_name == "Gobo":
                 gw = self._template_channel_in(("gobo_wheel",))
                 if gw is not None:
-                    from src.ui.widgets.preset_tile import GoboQuickBar
-                    layout.addWidget(QLabel("Gobo-Auswahl:"))
-                    layout.addWidget(GoboQuickBar(gw, fixtures, self._state, touch=touch))
+                    # UI-07: nur range-kompatible Fixtures (Gobo-Wheel-Slots) fuettern.
+                    gw_fixtures = self._range_compatible_fixtures(gw, fixtures)
+                    if gw_fixtures:
+                        from src.ui.widgets.preset_tile import GoboQuickBar
+                        layout.addWidget(QLabel("Gobo-Auswahl:"))
+                        layout.addWidget(GoboQuickBar(gw, gw_fixtures, self._state, touch=touch))
             elif group_name == "Position":
                 spider = self._selection_is_spider(fixtures)
                 # Pan/Tilt-Invert/Swap ist nur fuer echte Pan/Tilt-Moving-Heads
@@ -1474,9 +1527,50 @@ class ProgrammerView(QWidget):
         except Exception as e:
             print(f"[programmer_view] quick-select error: {e}")
 
+    @staticmethod
+    def _range_signature(ch):
+        """Stabile Signatur des Range-Layouts eines Kanals (Grenzen + kind).
+        Zwei Kanaele sind range-kompatibel <=> gleiche Signatur. Range-lose Kanaele
+        haben die leere Signatur und sind untereinander kompatibel."""
+        rs = getattr(ch, "ranges", None) or []
+        return tuple(sorted(
+            (int(getattr(r, "range_from", 0)), int(getattr(r, "range_to", 0)),
+             (getattr(r, "kind", "") or ""))
+            for r in rs))
+
+    def _range_compatible_fixtures(self, template_channel, fixtures):
+        """UI-07: nur Fixtures, deren Kanal fuer dieses Attribut DASSELBE Range-
+        Layout hat wie die Vorlage. Eine range-basierte QuickBar (Shutter/Gobo)
+        backt die DMX-Werte aus den Vorlagen-Ranges fest ein und schreibt denselben
+        Literal-Wert auf ALLE Fixtures (``_set_on_fixtures``); ein Fixture mit
+        abweichendem Range-Layout bekaeme so den Vorlagen-Mittelwert in einen
+        semantisch fremden Kanal. Die Vorlage selbst (und alle Fixtures mit gleichem
+        Layout) bleiben erhalten."""
+        attr = getattr(template_channel, "attribute", None)
+        sig = self._range_signature(template_channel)
+        out = []
+        for f in fixtures:
+            ch = next((c for c in get_channels_for_patched(f)
+                       if c.attribute == attr), None)
+            if ch is not None and self._range_signature(ch) == sig:
+                out.append(f)
+        return out
+
     def _build_orientation_bar(self, fixtures):
         """Invert/Swap-Toggles fuer Pan/Tilt (M3.3). Schreibt die Flags pro
         Fixture via update_fixture (persistiert + im Renderer wirksam)."""
+        if not fixtures:
+            return None
+        # UI-08: nur Pan/Tilt-faehige Fixtures beruecksichtigen. Statische Geraete
+        # (PAR/Wash ohne Pan/Tilt) in einer gemischten Auswahl verfaelschen sonst
+        # den Tri-State (ihr Spalten-Default invert_*=False mischt sich in die
+        # Mehrheit der Mover) UND bekaemen beim Klick bedeutungslose Orientierungs-
+        # Flags persistiert.
+        fixtures = [
+            f for f in fixtures
+            if any(getattr(ch, "attribute", "") in ("pan", "tilt")
+                   for ch in get_channels_for_patched(f))
+        ]
         if not fixtures:
             return None
         from PySide6.QtWidgets import QCheckBox, QGroupBox
