@@ -1106,8 +1106,8 @@
           ]
         },
         {
-          "key": "movement",
-          "label": "Bewegung",
+          "key": "rainbow_movement",
+          "label": "Ausbreitung",
           "kind": "select",
           "options": [
             "linear",
@@ -1117,8 +1117,8 @@
           ]
         },
         {
-          "key": "spread",
-          "label": "Spread",
+          "key": "hue_spread",
+          "label": "Farbzyklen",
           "kind": "float",
           "range": [
             0.25,
@@ -1320,8 +1320,8 @@
           ]
         },
         {
-          "key": "fade",
-          "label": "Fade pro Fixture",
+          "key": "fixture_fade",
+          "label": "Übergang pro Fixture",
           "kind": "float",
           "range": [
             0.0,
@@ -1684,8 +1684,8 @@
           "kind": "color_sequence"
         },
         {
-          "key": "hold",
-          "label": "Halte-Zeit",
+          "key": "crossfade_hold",
+          "label": "Übergangs-Pause",
           "kind": "float",
           "range": [
             0.0,
@@ -2586,7 +2586,7 @@
           "kind": "color_sequence"
         },
         {
-          "key": "runner_count",
+          "key": "segment_count",
           "label": "Segmente",
           "kind": "int",
           "range": [

@@ -196,7 +196,10 @@ def _fill_speed():
                      "wie schnell die Fixtures nacheinander gefüllt werden")
 
 def _fill_fade():
-    return ParamSpec("fade", "Fade pro Fixture", "float", 0.4, 0.0, 1.0, 0.05,
+    # #5: eigener Key fixture_fade (NICHT "fade") + Label „Übergang pro Fixture" —
+    # "fade" gehoert sonst dem raeumlichen Schweif (RADAR/RAIN) und wuerde beim
+    # Algo-Wechsel durchbluten. Engine liest fixture_fade mit Fallback auf "fade".
+    return ParamSpec("fixture_fade", "Übergang pro Fixture", "float", 0.4, 0.0, 1.0, 0.05,
                      "weicher Übergang je Fixture (0=harter Schritt, 1=über den ganzen Schritt)")
 
 def _fill_hold():
@@ -252,7 +255,10 @@ def _strobe_rate():
                      when=(("mode", ("strobe",)),))
 
 def _hold():
-    return ParamSpec("hold", "Halte-Zeit", "float", 0.0, 0.0, 0.95, 0.05,
+    # #5: eigener Key crossfade_hold (NICHT "hold") — FILL nutzt "hold" als Halte-
+    # Schritte (0..20), ColorFade aber als Anteil (0..0.95). Geteilter Key liess den
+    # Wert beim Algo-Wechsel durchbluten. Engine liest crossfade_hold, Fallback "hold".
+    return ParamSpec("crossfade_hold", "Übergangs-Pause", "float", 0.0, 0.0, 0.95, 0.05,
                      "Anteil pro Farbe, bevor übergeblendet wird")
 
 def _pingpong():
@@ -270,11 +276,18 @@ def _value():
                      "HSV-Helligkeit der Regenbogen-Farben (vor dem Effekt-Master „Helligkeit“)")
 
 def _hue_spread():
-    return ParamSpec("spread", "Spread", "float", 1.0, 0.25, 8.0, 0.25,
+    # #5: eigener Key hue_spread (NICHT "spread") + Label „Farbzyklen" — sonst
+    # blutet die WAVE-„Breite" (spread) beim Algo-Wechsel in die Regenbogen-
+    # Farbzyklen. Engine liest hue_spread mit Fallback auf spread.
+    return ParamSpec("hue_spread", "Farbzyklen", "float", 1.0, 0.25, 8.0, 0.25,
                      "Farbzyklen über die Matrix")
 
 def _rainbow_movement():
-    return ParamSpec("movement", "Bewegung", "select", "linear",
+    # #5: eigener Key rainbow_movement (NICHT "movement") + Label „Ausbreitung" —
+    # die Regenbogen-Modi (linear/radial/…) sind andere als CHASE/WIPE
+    # (normal/bounce/…); geteilter Key liess Werte beim Algo-Wechsel durchbluten.
+    # Engine liest rainbow_movement mit Fallback auf movement.
+    return ParamSpec("rainbow_movement", "Ausbreitung", "select", "linear",
                      options=("linear", "radial", "center_out", "outside_in"),
                      tooltip="Ausbreitung des Regenbogens")
 
@@ -350,7 +363,11 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
     RgbAlgorithm.SPIRAL:       AlgoMeta("Rotierender Spiralarm.",  True,  (_turns(), _beam_width("Armbreite"), _invert()), colors=1),
     RgbAlgorithm.SINEPLASMA:   AlgoMeta("Sinus-Plasma C1↔C2.",     True,  (), colors=2),
     RgbAlgorithm.PINWHEEL:     AlgoMeta("Rotierende Segmente C1/C2.", True,
-                                        (ParamSpec("runner_count", "Segmente", "int", 1, 1, 16, 1,
+                                        # #5: eigener Key segment_count (NICHT runner_count) —
+                                        # sonst blutet die CHASE-„Läufer-Anzahl" beim Algo-Wechsel
+                                        # in die Windrad-Segmente (geteilter Param-Key). Engine
+                                        # liest segment_count mit Fallback auf runner_count.
+                                        (ParamSpec("segment_count", "Segmente", "int", 1, 1, 16, 1,
                                                    "Anzahl Segment-Paare (1..16)"),
                                          _invert()), colors=2),
     RgbAlgorithm.BREATHE:      AlgoMeta("Ganzes Feld pulsiert in C1.", False, (), colors=1),
