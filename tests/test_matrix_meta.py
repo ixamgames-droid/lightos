@@ -36,6 +36,9 @@ ALLOWED_KEYS = {
     "fill_mode", "fill_speed", "loop_mode",
     # F1 (CHECKER / Schachbrett): Kachelgroesse + Pro-Beat-Umschalten
     "tile", "blink",
+    # #5: eigene Keys pro Algorithmus (kein Bleed beim Algo-Wechsel; Engine liest
+    # mit Fallback auf den alten geteilten Key): PINWHEEL/RAINBOW/COLORFADE/FILL.
+    "segment_count", "hue_spread", "rainbow_movement", "crossfade_hold", "fixture_fade",
 }
 ALLOWED_KINDS = {"int", "float", "bool", "select", "color", "color_sequence", "action"}
 

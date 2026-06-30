@@ -965,7 +965,9 @@ class RgbMatrixInstance(Function):
                 elif algo == RgbAlgorithm.PINWHEEL:
                     # Rotierende Segmente (Windrad) abwechselnd c1/c2.
                     cx, cy = (cols - 1) / 2.0, (rows - 1) / 2.0
-                    seg = max(1, int(self.params.get("runner_count", 1)))
+                    # #5: segment_count (Fallback runner_count fuer Alt-Shows/VC).
+                    seg = max(1, int(self.params.get("segment_count",
+                                                     self.params.get("runner_count", 1))))
                     invert = bool(self.params.get("invert", False))
                     ang = math.atan2(row - cy, col - cx)
                     a = (ang / (2 * math.pi) + p * 0.05) % 1.0
@@ -1204,8 +1206,10 @@ class RgbMatrixInstance(Function):
         """Regenbogen. params: movement(linear/radial/center_out/outside_in),
         spread(Hue-Zyklen ueber die Matrix), saturation, value."""
         params = self.params
-        movement = str(params.get("movement", "linear"))
-        spread = float(params.get("spread", 1.0))
+        # #5: eigene Keys rainbow_movement/hue_spread (Fallback movement/spread fuer
+        # Alt-Shows/VC) — verhindert Param-Bleed von CHASE/WIPE bzw. WAVE.
+        movement = str(params.get("rainbow_movement", params.get("movement", "linear")))
+        spread = float(params.get("hue_spread", params.get("spread", 1.0)))
         sat = max(0.0, min(1.0, float(params.get("saturation", 1.0))))
         val = max(0.0, min(1.0, float(params.get("value", 1.0))))
         n = cols * rows
@@ -1264,7 +1268,9 @@ class RgbMatrixInstance(Function):
             return pixels
         order = self._fill_order(real, str(params.get("fill_dir", "left")), cols, rows)
         speed = max(0.05, float(params.get("fill_speed", 1.0)))
-        fade = max(0.0, min(1.0, float(params.get("fade", 0.4))))
+        # #5: fixture_fade (Fallback "fade" fuer Alt-Shows/VC). FILL-„hold" bleibt
+        # „hold" (Halte-Schritte) — nur ColorFade-hold heisst jetzt crossfade_hold.
+        fade = max(0.0, min(1.0, float(params.get("fixture_fade", params.get("fade", 0.4)))))
         hold = max(0.0, float(params.get("hold", 0.0)))
         loop_mode = str(params.get("loop_mode", "restart"))
         is_intensity = self.style in (MatrixStyle.DIMMER, MatrixStyle.SHUTTER)
@@ -1408,7 +1414,9 @@ class RgbMatrixInstance(Function):
         pingpong. Deaktivierte Farben sind in enabled gar nicht enthalten →
         werden automatisch uebersprungen (#8.7)."""
         params = self.params
-        hold = max(0.0, min(0.95, float(params.get("hold", 0.0))))
+        # #5: crossfade_hold (Fallback "hold" fuer Alt-Shows/VC) — eigener Key, weil
+        # FILL „hold" als Halte-Schritte (0..20) nutzt, ColorFade als Anteil (0..0.95).
+        hold = max(0.0, min(0.95, float(params.get("crossfade_hold", params.get("hold", 0.0)))))
         pingpong = bool(params.get("pingpong", False))
         n = cols * rows
         cnt = len(enabled)
@@ -1940,6 +1948,21 @@ class RgbMatrixInstance(Function):
             except (TypeError, ValueError):
                 self.params["after_fade"] = 30.0
             self.params.pop("fade", None)
+        # #5: Param-Key-Disambiguierung — eigene Keys pro Algorithmus, damit kein
+        # geteilter Key beim Algo-Wechsel durchblutet. Alt-Shows speicherten den
+        # alten (geteilten) Key; hier auf den neuen umziehen, wenn der neue fehlt.
+        # (Die Renderer lesen zusaetzlich mit Fallback auf den alten Key, falls die
+        # params per API direkt gesetzt wurden und nie durch apply_dict liefen.)
+        _key_migration = {
+            RgbAlgorithm.PINWHEEL:  (("segment_count", "runner_count"),),
+            RgbAlgorithm.RAINBOW:   (("hue_spread", "spread"),
+                                     ("rainbow_movement", "movement")),
+            RgbAlgorithm.COLORFADE: (("crossfade_hold", "hold"),),
+            RgbAlgorithm.FILL:      (("fixture_fade", "fade"),),
+        }
+        for _new_key, _old_key in _key_migration.get(self.algorithm, ()):
+            if _new_key not in self.params and _old_key in self.params:
+                self.params[_new_key] = self.params.pop(_old_key)
 
     @classmethod
     def from_dict(cls, d: dict) -> "RgbMatrixInstance":
