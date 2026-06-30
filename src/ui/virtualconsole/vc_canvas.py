@@ -305,10 +305,24 @@ class VCCanvas(QWidget):
         return self._active_bank
 
     def on_active_bank(self, w) -> bool:
-        """True, wenn das Widget auf der aktuell aktiven Bank sichtbar/aktiv ist
-        (Bank < 0 = auf allen Banks)."""
-        bnk = getattr(w, "bank", -1)
-        return bnk is None or bnk < 0 or bnk == self._active_bank
+        """True, wenn das Widget auf der aktuell aktiven Bank sichtbar/aktiv ist.
+
+        Bank < 0 (Default) = „kein eigener Bank-Pin". VCB-04: Widgets in einem
+        VCFrame erben dessen Bank — ihr eigenes ``bank=-1`` heisst „von der
+        Eltern-Bank erben", NICHT „auf allen Banks". Wir laufen daher die
+        Parent-Kette hoch bis zum naechsten Vorfahren (Frame) mit fester Bank
+        (``bank>=0``); dessen Bank entscheidet. Kein fester Vorfahre bis zur
+        Canvas = wirklich alle Banks. Fixt: Frame-Kinder feuerten nach einem
+        Bank-Wechsel weiter MIDI/Hotkey, obwohl der Frame (auf fester Bank)
+        verdeckt war.
+        """
+        obj = w
+        while obj is not None and obj is not self:
+            bnk = getattr(obj, "bank", -1)
+            if bnk is not None and bnk >= 0:
+                return bnk == self._active_bank
+            obj = obj.parent()
+        return True
 
     def _apply_bank_visibility(self):
         for child in self.findChildren(
