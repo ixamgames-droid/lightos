@@ -146,7 +146,6 @@ class VirtualConsoleView(QWidget):
             ("Encoder",   "VCEncoder"),
             ("Farbe",     "VCColor"),
             ("Chase-Liste", "VCColorList"),
-            ("Chase Builder", "VCChaseBuilder"),
             ("Effekt-Farben", "VCEffectColors"),
             ("Label",     "VCLabel"),
             ("Frame",     "VCFrame"),

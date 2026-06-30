@@ -55,7 +55,6 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 from src.ui.virtualconsole.vc_cuelist import VCCueList
 from src.ui.virtualconsole.vc_speedial import VCSpeedDial, SpeedTarget
@@ -524,8 +523,6 @@ label("BANK 2  MATRIX-LOOKS  —  alle 16 RGB-Matrix-Algorithmen auf den 4 PARs,
 
 
 # ── BANK 3 — BUILDER (Live-Programming) ─────────────────────────────────────
-cb = VCChaseBuilder("Chase Builder"); cb.function_id = chase_builder.id
-_add(cb, X0, Y0, 320, 250, B_BUILD)
 MB = matrix_builder.id
 func_btn(matrix_builder, note_rc(0, 5), B_BUILD, "#7a5b00", clear_prog=True)
 effect_action_btn("Form -", note_rc(0, 6), B_BUILD, "#5a4a00", "prev_algorithm", MB)
@@ -545,8 +542,7 @@ _add(clw, RIGHT_X, Y0, 210, 100, B_BUILD)
 widgets[-1]["function_id"] = MB
 fader("MB-Speed", 0, B_BUILD, SliderMode.EFFECT_SPEED, function_ids=[MB], midi_cc=48, value=64)
 fader("MB-Master", 1, B_BUILD, SliderMode.EFFECT_INTENSITY, function_ids=[MB], midi_cc=49, value=255)
-label("BANK 3  BUILDER  —  LINKS Chase-Builder-Fenster (Palette antippen = anhängen).  "
-      "RECHTS Matrix-Builder: Start + 'Form ±' blättert ALLE Algorithmen, C1/Seq-Farben live, Commit.",
+label("BANK 3  BUILDER  —  Matrix-Builder: Start + 'Form ±' blättert ALLE Algorithmen, C1/Seq-Farben live, Commit.",
       X0, 28, 1100, B_BUILD)
 
 
@@ -642,7 +638,6 @@ assert {b.name for b in bound} == names, [b.name for b in bound]
 # VC-Fenster-Widgets vorhanden?
 assert types.get("VCCueList", 0) == 3, f"VCCueList: {types.get('VCCueList')}"
 assert types.get("VCXYPad", 0) == 2, f"VCXYPad: {types.get('VCXYPad')}"
-assert types.get("VCChaseBuilder", 0) == 1, "VCChaseBuilder fehlt"
 assert types.get("VCColorList", 0) == 1, "VCColorList fehlt"
 assert types.get("VCSpeedDial", 0) == 1, "VCSpeedDial fehlt"
 # Quadranten-Bank: 16 Programmer-Farben + 16 exklusive Effekte + 16 Attribute (aktiv)
@@ -664,7 +659,7 @@ assert maxy < 820, f"zu hoch: {maxy}"
 
 # Keine Überlappung interaktiver Widgets je Bank (Bank-Layer + BANK_ALL).
 _INTER = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCCueList",
-          "VCColorList", "VCChaseBuilder", "VCSpeedDial"}
+          "VCColorList", "VCSpeedDial"}
 
 
 def _rect(w):

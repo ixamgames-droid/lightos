@@ -54,7 +54,6 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_color_list import VCColorList
-from src.ui.virtualconsole.vc_chase_builder import VCChaseBuilder
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "APC_Probier.lshow")
@@ -383,12 +382,6 @@ def color_list(name, x, y, ww, hh, bank, function_id):
     _add(cl, x, y, ww, hh, bank)
 
 
-def chase_builder_widget(name, x, y, ww, hh, bank, function_id):
-    """To-Do #1: All-in-One-Builder (Palette + Liste + Aktionen + Speed/Hold)."""
-    cb = VCChaseBuilder(name)
-    cb.function_id = function_id
-    _add(cb, x, y, ww, hh, bank)
-
 
 # ── Universell: Track-Tasten (auf JEDER Seite) ──────────────────────────────
 for i, (nm, act, col) in enumerate([
@@ -492,12 +485,6 @@ label("SEITE 3  CHASE BUILDER  -  1) Pad unten links = Start  2) oben Farben "
 label("Untere Reihe: Start/Stop | Clear | Farbe -/+ | Richtung | Bounce | Freeze | "
       "Commit (Live als Preset übernehmen).  F1 Speed, F2 Übergang (0 weich..hart).",
       X0, 48, 1100, B_CHASE)
-# To-Do #1: All-in-One-Builder-Widget rechts neben dem Pad-Grid — bündelt Palette
-# (antippen = anhängen), gebaute Liste (Feedback #6), Aktionen und Speed/Hold in
-# EINEM Element. Alternative/Ergänzung zu den verstreuten Pads links.
-RIGHT_X = X0 + 8 * STEP + 16
-chase_builder_widget("Chase Builder", RIGHT_X, Y0 + 4 * 26 + 6, 210, 250, B_CHASE,
-                     chase_builder.id)
 
 
 # ── BANK 4 — MATRIX BUILDER (EINE Matrix + Form-Blaettern + Live-Recolor) ────
@@ -633,10 +620,6 @@ assert len(slot_tiles) == 12, f"color1/2/3-Recolor-Kacheln: {len(slot_tiles)}"
 color_lists = [w for w in vc if w.get("type") == "VCColorList"]
 assert len(color_lists) == 1, f"VCColorList-Feedbackfenster: {len(color_lists)}"
 assert color_lists[0].get("function_id") == matrix_builder.id
-# To-Do #1: All-in-One Chase-Builder-Widget auf Bank 3.
-builders = [w for w in vc if w.get("type") == "VCChaseBuilder"]
-assert len(builders) == 1, f"VCChaseBuilder: {len(builders)}"
-assert builders[0].get("function_id") == chase_builder.id
 
 maxy = max((w.get("y", 0) + w.get("h", 0)) for w in vc)
 assert maxy < 800, f"Widgets ragen unter Canvas-Min: {maxy}"
