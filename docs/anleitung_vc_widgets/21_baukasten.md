@@ -1,5 +1,7 @@
 # Smart-Drop & Baukasten (Elemente schnell anlegen)
 
+> ⚠️ **Veraltet (entfernt 2026-07):** Die hier beschriebenen Editor-Bausteine (Controller-Vorlage, Color-Chase, Chase-Bereich) wurden aus der virtuellen Konsole entfernt. Stattdessen gibt es jetzt das **Live-Edit-Fenster** (siehe `docs/LIVE_EDIT_FENSTER.md`).
+
 > Statt Bedien-Elemente einzeln von Hand aufzubauen und zu verdrahten, zieht LightOS einen Effekt aus dem Funktions-Baum auf die Konsole und schlägt dir die passenden, schon fertig verkabelten Regler vor — oder setzt auf Knopfdruck ganze Blöcke (MIDI-Controller, Color-Chase).
 
 ## Zwei Wege, ein Element anzulegen (Toolbar-Knopf vs. Effekt auf die Canvas ziehen)

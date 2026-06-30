@@ -91,7 +91,7 @@ _**Stand 2026-06-30:** P1 (VCB-01..10) → [PR #100]; **P2 (VCB-11/12/13/14/15/1
 - **UI-06** · Color-Tab Getrennt-Modus → **Save-Filter:** beim Snap/Szene/Palette-Speichern Kopf>0-Farbwerte verwerfen, die exakt dem aktuellen effektiven Kopf-0-Wert entsprechen (lebenszyklus-freier Gleichheits-Filter; Ansatz mit David noch final abzunicken). Kopf-Unabhängigkeit bleibt. Save-Pfade: `programmer_to_scene_values`, `palette.record_from_programmer`, Snap-Capture.
 - **DQ-3** · VCStepper **absoluter MIDI-Modus** (analog Encoder `midi_mode`).
 - **DQ-4** · VCFrame-Kontextmenü **MIDI/Key-Teach + Live-Param**.
-- **DQ-5** · VCColorList/VCChaseBuilder **als Drop-Ziele** (`_droppable_types`/`_effect_fits_widget`).
+- **DQ-5** · ~~VCColorList/VCChaseBuilder als Drop-Ziele~~ — **hinfällig:** `VCChaseBuilder` wurde 2026-07 komplett entfernt (Davids VC-Umbau, [PR #116](https://github.com/ixamgames-droid/lightos/pull/116)). `VCColorList` bleibt reine Anzeige.
 
 ### ⏳ Noch offen / niedrige Prio
 - **DQ-1** · FUNCTION_TOGGLE Multi-Gruppe — Ausschalten nimmt clear_programmer/exclusive/solo NICHT zurück. Default: als **bewusst mechanisches Stop dokumentieren** (kein Code-Change), außer David will Symmetrie.
@@ -101,6 +101,8 @@ _**Stand 2026-06-30:** P1 (VCB-01..10) → [PR #100]; **P2 (VCB-11/12/13/14/15/1
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **VC-Umbau · Live-Edit-Fenster + 3 Entfernungen** (Davids Auftrag 2026-06-30/07-01, 6 PRs): **Entfernt** — Chase Builder (`VCChaseBuilder`, [PR #116](https://github.com/ixamgames-droid/lightos/pull/116)); Color-Chase + Chase-Bereich + Controller-Knopf inkl. Canvas-Aufzieh-Werkzeug ([PR #118](https://github.com/ixamgames-droid/lightos/pull/118)). **Neu** — `VCMultiLiveEditor`: frei schwebendes, **nicht-persistentes** Live-Edit-Fenster — Effekte per Drag&Drop, Navigation (–/Dropdown/+), Vorschau je Typ (Matrix/EFX/Chaser), Checkbox-Parameter-Editor (live über `effect_live`, baseline-geschützt), Tempo-Modus Aus/BPM/Tap. Foundation [PR #119](https://github.com/ixamgames-droid/lightos/pull/119), Parameter [PR #120](https://github.com/ixamgames-droid/lightos/pull/120), Vorschau [PR #121](https://github.com/ixamgames-droid/lightos/pull/121), Tempo [PR #122](https://github.com/ixamgames-droid/lightos/pull/122). Doku: `docs/LIVE_EDIT_FENSTER.md`. Je Branch adversariale 3-Lens-Review + grünes Gate. _(Erste voll-autonome Loop-Strecke ohne Zwischen-„go".)_
 
 - **F-26 / F-26b** · Feature-Dimmer-Master (Backend + VC-Bindung, 1 PR): effekt-unabhängiger per-Slot-Master, der eine wählbare Feature-Gruppe (Intensity/Color/Gobo/Beam/Position/Effect) einer festen Gruppe multiplikativ am fertigen Output skaliert (Render 4b²). Backend `b8b43f3` cherry-gepickt auf aktuellen main (konfliktfrei, 13 Tests). VC-Bindung: `SliderMode.FEATURE_DIMMER`, feature_attr-ComboBox aus Fixture-Capabilities, Slot-Sync (enter/leave), Re-Apply beim Laden, `clear_feature_dimmers` bei reset/load, destroyed-Cleanup, Capability-Manifest regeneriert. +9 VC-Tests, Suite 277/277 grün. [PR #109](https://github.com/ixamgames-droid/lightos/pull/109)
 
