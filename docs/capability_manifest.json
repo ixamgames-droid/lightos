@@ -59,6 +59,7 @@
     "EffectIntensity",
     "EffectParam",
     "EffectSpeed",
+    "FeatureDimmer",
     "GrandMaster",
     "GroupDimmer",
     "Level",

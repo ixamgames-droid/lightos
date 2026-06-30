@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import threading
+from dataclasses import dataclass
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from .database.models import PatchedFixture, create_all_idempotent
@@ -9,7 +10,7 @@ from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .debug_log import debug_swallow
-from .attr_groups import ATTR_GROUPS
+from .attr_groups import ATTR_GROUPS, classify_attr
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
@@ -33,6 +34,23 @@ _DIM_COLOR_ATTRS = frozenset({
     "red", "green", "blue", "white", "amber", "uv",
     "cyan", "magenta", "yellow",
 })
+
+# Feature-Dimmer-Master (F-26): ein per-Slot multiplikativer Master, der die
+# Helligkeit (bzw. gewaehlte Feature-Kanaele) einer Fixture-Menge skaliert —
+# effekt-UNABHAENGIG, weil er am fertig gerenderten Output ansetzt (Render-Schritt
+# 4b²), NACH allen Effekten/Programmer. Default-Feature = "Intensity" (Helligkeit).
+# Anders als fixture_dimmers (flach, fid->float, "last writer wins") hat jeder Slot
+# eine eigene Identitaet -> mehrere unabhaengige Submaster koexistieren und stapeln
+# multiplikativ (Produkt). Wird pro Frame vom VC-Slider gesetzt (Gruppen-/Auswahl-
+# fids LIVE aufgeloest), NICHT in der Show persistiert (der Slider persistiert).
+_DEFAULT_FEATURE_SET = frozenset({"Intensity"})
+
+
+@dataclass
+class FeatureDimmer:
+    fids: frozenset = frozenset()
+    features: frozenset = frozenset()   # leer = {"Intensity"} (Helligkeit)
+    level: float = 1.0
 
 
 class AppState:
@@ -146,6 +164,9 @@ class AppState:
         # zu ersetzen (siehe _render_frame).
         self.submaster_level: float = 1.0
         self.fixture_dimmers: dict[int, float] = {}
+        # F-26: Feature-Dimmer-Master pro Slot (stabile Slider-ID -> FeatureDimmer).
+        # Effekt-unabhaengiger Helligkeits-/Feature-Master, s. Render-Schritt 4b².
+        self.feature_dimmers: dict = {}
         # EFX-/RGB-Matrix-Effekt-Instanzen — Single Source of Truth.
         # EfxView und RgbMatrixView lesen/schreiben direkt diese Listen
         # (gemeinsame Referenz), show/show_file.py persistiert sie in der .lshow.
@@ -1276,6 +1297,49 @@ class AppState:
             for a in addrs:
                 su.set_channel(a, int(su.get_channel(a) * factor))
 
+        # 4b². Feature-Dimmer-Master (F-26): per-Slot multiplikativer Master ueber
+        #      eine Fixture-Menge, effekt-UNABHAENGIG (greift am fertigen Output,
+        #      nach allen Effekten/Programmer). "Intensity"-Feature trifft die
+        #      Helligkeits-Adressen (inten_addrs = echter Dimmer, sonst Farb-
+        #      Fallback) — wie der globale Submaster; andere Features (Color/Gobo/
+        #      Beam/Position/Effect) ihre via classify_attr klassifizierten Kanaele.
+        #      Jede Adresse wird GENAU EINMAL mit dem Produkt aller sie treffenden
+        #      Slots skaliert (kein Doppel-Dimmen). Shutter/Strobe wird ueber
+        #      'Intensity' NICHT mitgedimmt (nicht in inten_addrs — konsistent zum
+        #      Grand Master). Nur aktiv, wenn ueberhaupt Slots existieren.
+        fd_slots = getattr(self, "feature_dimmers", None)
+        if fd_slots:
+            active = [s for s in fd_slots.values()
+                      if getattr(s, "level", 1.0) < 0.999 and s.fids]
+            target_fids: set[int] = set()
+            for s in active:
+                target_fids |= set(s.fids)
+            for fidi in target_fids:
+                entry = self._fix_index.get(fidi)
+                if not entry:
+                    continue
+                fx, chans = entry
+                su = scratch.get(fx.universe)
+                if su is None:
+                    continue
+                hit = [s for s in active if fidi in s.fids]
+                inten = set(inten_addrs.get(fidi, ()))
+                for ch in chans:
+                    attr = (getattr(ch, "attribute", "") or "").lower()
+                    addr = fx.address + ch.channel_number - 1
+                    if not (1 <= addr <= 512):
+                        continue
+                    grp = classify_attr(attr)
+                    f = 1.0
+                    for s in hit:
+                        feats = s.features or _DEFAULT_FEATURE_SET
+                        if "Intensity" in feats and addr in inten:
+                            f *= s.level
+                        elif grp != "Intensity" and grp in feats:
+                            f *= s.level
+                    if f < 0.999:
+                        su.set_channel(addr, int(su.get_channel(addr) * f))
+
         # 4b-Input. F-20: Art-Net/sACN-EINGANG als Schicht. Extern empfangene DMX-
         #     Werte (Puffer input_layer, vom RX-Thread gefuellt) je Universe mit dem
         #     konfigurierten Modus einmischen: HTP (Hoechstwert), LTP/REPLACE (ersetzt).
@@ -1442,6 +1506,34 @@ class AppState:
         """Setzt denselben Dimmer-Faktor fuer mehrere Fixtures (Gruppen-Dimmer)."""
         for fid in fids or ():
             self.set_fixture_dimmer(fid, factor)
+
+    def set_feature_dimmer(self, slot, fids, features=None, level: float = 1.0):
+        """F-26: setzt/aktualisiert den Feature-Dimmer-Master eines Slots (stabile
+        Slider-ID). ``fids`` = Ziel-Fixtures (Gruppe/Auswahl LIVE aufgeloest),
+        ``features`` = Menge der Feature-Gruppen-Namen (leer/None = {'Intensity'} =
+        Helligkeit), ``level`` 0.0-1.0 multiplikativ. ``level`` >= 0.999 ODER keine
+        ``fids`` entfernt den Slot (kein unnoetiges Skalieren). Wirkt im Render-
+        Schritt 4b² effekt-unabhaengig auf den fertigen Output."""
+        try:
+            level = max(0.0, min(1.0, float(level)))
+        except (TypeError, ValueError):
+            return
+        fid_set: set[int] = set()
+        for f in fids or ():
+            try:
+                fid_set.add(int(f))
+            except (TypeError, ValueError):
+                continue
+        feat_set = frozenset(str(x) for x in (features or ()))
+        if level >= 0.999 or not fid_set:
+            self.feature_dimmers.pop(slot, None)
+        else:
+            self.feature_dimmers[slot] = FeatureDimmer(frozenset(fid_set), feat_set, level)
+
+    def clear_feature_dimmers(self):
+        """Alle Feature-Dimmer-Slots leeren (z. B. bei neuer/geladener Show, damit
+        keine Slots zerstoerter Slider stehen bleiben)."""
+        self.feature_dimmers.clear()
 
     def _fixture_intensity_addrs(self, fx, chans) -> list[int]:
         """Adressen, die der Dimmer-Master fuer dieses Fixture skaliert: der

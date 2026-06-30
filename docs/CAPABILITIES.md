@@ -10,7 +10,7 @@
 ## Virtuelle Konsole
 - **Widget-Typen** (19): `VCBpmDisplay`, `VCBusSelector`, `VCButton`, `VCChaseBuilder`, `VCColor`, `VCColorList`, `VCCueList`, `VCEffectColors`, `VCEffectDisplay`, `VCEffectEditor`, `VCEncoder`, `VCFrame`, `VCLabel`, `VCSlider`, `VCSongInfo`, `VCSpeedDial`, `VCStepper`, `VCTempoBusController`, `VCXYPad`
 - **ButtonAction** (26): `AllWhite`, `ArmBus`, `AudioBpm`, `AutoSync`, `Blackout`, `BpmModeToggle`, `BpmNudgeDown`, `BpmNudgeUp`, `Clear`, `EffectAction`, `Flash`, `Freeze`, `FunctionFlash`, `FunctionToggle`, `LibrarySnap`, `MediaNext`, `MediaPlayPause`, `MediaPrev`, `SelectGroup`, `Snapshot`, `StopAll`, `StopEffects`, `SyncBus`, `Tap`, `TapBus`, `Toggle`
-- **SliderMode** (12): `BPM`, `EffectIntensity`, `EffectParam`, `EffectSpeed`, `GrandMaster`, `GroupDimmer`, `Level`, `Playback`, `Programmer`, `Speed`, `Submaster`, `TempoBus`
+- **SliderMode** (13): `BPM`, `EffectIntensity`, `EffectParam`, `EffectSpeed`, `FeatureDimmer`, `GrandMaster`, `GroupDimmer`, `Level`, `Playback`, `Programmer`, `Speed`, `Submaster`, `TempoBus`
 - **SpeedTarget** (5): `Executor`, `Function`, `SpeedNode`, `TempoBus`, `TempoBusMult`
 - **ColorTarget** (7): `Alle Fixtures`, `Effekt (Farbe hinzufügen)`, `Effekt (aktive Farbe)`, `Effekt Farbe 1`, `Effekt Farbe 2`, `Effekt Farbe 3`, `Programmer/Selektion`
   - _ColorTarget-Werte sind deutsche Anzeige-Strings (z. B. 'Effekt Farbe 1'), NICHT die Attribut-Namen._
