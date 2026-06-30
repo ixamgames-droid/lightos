@@ -163,6 +163,114 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         self.ed.add_effect(987654321)
         self.assertEqual(self.ed._fids, [])
 
+    def test_picker_excludes_tempo_speed_algorithm(self):
+        m = self._new_matrix("LE-Filter")
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        for ex in ("tempo_bus_id", "tempo_multiplier", "phase_offset", "speed", "algorithm"):
+            self.assertNotIn(ex, keys)
+        # Universelle Fade-Params (Davids Ein-/Ausblenden) sind da:
+        self.assertIn("env_fade_in", keys)
+        self.assertIn("env_fade_out", keys)
+
+    def test_editor_write_is_live_and_not_persisted(self):
+        m = self._new_matrix("LE-Write")
+        self.ed.add_effect(m.id)
+        baseline = effect_live.serialization_dict(m)
+        spec = next((s for s in self.ed._editable_specs(m.id) if s.kind == "int"), None)
+        if spec is None:
+            self.skipTest("kein int-Param vorhanden")
+        cur = int(effect_live.get_param(spec.key, m.id) or int(spec.min))
+        new = int(spec.max) if cur != int(spec.max) else int(spec.min)
+        self.ed._write(spec.key, new, m.id)
+        self.assertEqual(effect_live.get_param(spec.key, m.id), new)     # live geaendert
+        self.assertEqual(effect_live.serialization_dict(m), baseline)    # nicht gespeichert
+
+    def test_checked_state_is_per_fid(self):
+        a = self._new_matrix("LE-CkA")
+        b = self._new_matrix("LE-CkB")
+        self.ed.add_effect(a.id)
+        self.ed.add_effect(b.id)
+        self.ed._checked_keys(a.id).add("env_fade_in")
+        self.assertIn("env_fade_in", self.ed._checked_keys(a.id))
+        self.assertNotIn("env_fade_in", self.ed._checked_keys(b.id))
+
+    def test_movement_change_rebuilds_visible_params(self):
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("LE-Move")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)            # baut den Body
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        if "movement" not in keys or "runner_count" not in keys:
+            self.skipTest("Algo ohne movement/runner_count")
+        self.assertIn("runner_count", self.ed._visible_keys)
+        self.ed._on_choice("movement", "bounce", m.id)
+        QApplication.processEvents()        # deferred Rebuild ausfuehren lassen
+        self.assertNotIn("runner_count", self.ed._visible_keys)  # ausgeblendet nach Rebuild
+
+    def test_real_combo_signal_writes_and_rebuilds_safely(self):
+        """Echtes currentIndexChanged eines movement-Combos schreibt den Wert UND
+        loest den deferred Rebuild aus, ohne Use-after-free-Crash."""
+        from PySide6.QtWidgets import QComboBox
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("LE-Combo")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        combo = None
+        for c in self.ed._scroll.widget().findChildren(QComboBox):
+            data = [c.itemData(i) for i in range(c.count())]
+            if "bounce" in data:           # der movement-Combo
+                combo = c
+                break
+        if combo is None:
+            self.skipTest("kein movement-Combo")
+        idx = [combo.itemData(i) for i in range(combo.count())].index("bounce")
+        combo.setCurrentIndex(idx)         # echtes Signal -> _on_choice
+        self.assertEqual(effect_live.get_param("movement", m.id), "bounce")
+        QApplication.processEvents()       # deferred Rebuild ausfuehren
+        self.assertNotIn("runner_count", self.ed._visible_keys)
+
+    def test_real_slider_signal_writes_live_not_persisted(self):
+        from PySide6.QtWidgets import QSlider
+        m = self._new_matrix("LE-Slider")
+        self.ed.add_effect(m.id)
+        base = effect_live.serialization_dict(m)
+        sliders = self.ed._scroll.widget().findChildren(QSlider)
+        if not sliders:
+            self.skipTest("kein float-Param/Slider")
+        s = sliders[0]
+        before = m.to_dict()
+        s.setValue(s.maximum() if s.value() != s.maximum() else s.minimum())
+        self.assertNotEqual(m.to_dict(), before)                  # live geaendert
+        self.assertEqual(effect_live.serialization_dict(m), base)  # nicht gespeichert
+
+    def test_chaser_effect_is_editable_cross_type(self):
+        from src.core.engine.function_manager import get_function_manager
+        fm = get_function_manager()
+        if not hasattr(fm, "new_chaser"):
+            self.skipTest("kein Chaser-Konstruktor")
+        try:
+            ch = fm.new_chaser("LE-Chaser")
+        except Exception:
+            self.skipTest("Chaser-Konstruktor inkompatibel")
+        self.ed.add_effect(ch.id)
+        self.assertIn(ch.id, self.ed._fids)        # cross-type: kein Crash beim Bauen
+        keys = [s.key for s in self.ed._editable_specs(ch.id)]
+        self.assertNotIn("speed", keys)
+        self.assertNotIn("tempo_bus_id", keys)
+
+    def test_checkbox_reveals_and_records_param(self):
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Reveal")
+        self.ed.add_effect(m.id)
+        cb = self.ed._scroll.widget().findChildren(QCheckBox)[0]
+        ctl = cb.parentWidget().layout().itemAt(1).widget()
+        self.assertTrue(ctl.isHidden())          # unangehakt -> Regler versteckt
+        cb.setChecked(True)
+        self.assertFalse(ctl.isHidden())         # angehakt -> Regler sichtbar
+        self.assertEqual(len(self.ed._checked_keys(m.id)), 1)   # Param gemerkt
+
     def test_not_in_widget_registry(self):
         """Darf NICHT serialisierbar/in der Show landen."""
         from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
