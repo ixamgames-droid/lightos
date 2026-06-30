@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
-                                QMessageBox, QInputDialog, QSizePolicy, QRubberBand)
+                                QMessageBox, QInputDialog, QSizePolicy)
 from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
@@ -101,7 +101,6 @@ class VCCanvas(QWidget):
     function_assign_done = Signal()     # Funktions-Assign abgeschlossen
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
-    area_selected = Signal(str, int, int, int, int)  # (tool, x, y, w, h) aufgezogener Bereich
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
@@ -141,10 +140,6 @@ class VCCanvas(QWidget):
         # Bibliothek-Snap-Assign-Modus (Farbe/Look auf VC-Button legen)
         self._assign_snap_id: int | None = None
         self._awaiting_button_click_for: str | None = None
-        # Canvas-Editor: Bereich aufziehen (Rubber-Band) fuer z. B. Color-Chase
-        self._area_tool: str | None = None
-        self._area_origin: QPoint | None = None
-        self._rubber: QRubberBand | None = None
 
         # MIDI aus dem Dispatch-Thread sicher in den UI-Thread marshallen.
         # (Cross-Thread-Signal -> automatisch QueuedConnection -> _handle_midi laeuft im UI-Thread)
@@ -425,14 +420,6 @@ class VCCanvas(QWidget):
     # ── Mausereignisse für Learn/Assign ──────────────────────────────────────
 
     def mousePressEvent(self, event):
-        # Canvas-Editor: Bereich aufziehen (nur wenn ein Area-Tool armiert ist).
-        if self._area_tool and self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
-            self._area_origin = event.position().toPoint()
-            if self._rubber is None:
-                self._rubber = QRubberBand(QRubberBand.Shape.Rectangle, self)
-            self._rubber.setGeometry(QRect(self._area_origin, QSize()))
-            self._rubber.show()
-            return
         mode = getattr(self, "_awaiting_button_click_for", None)
         if mode and event.button() == Qt.MouseButton.LeftButton:
             child = self.childAt(event.position().toPoint())
@@ -505,38 +492,10 @@ class VCCanvas(QWidget):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self._rubber is not None and self._area_origin is not None:
-            self._rubber.setGeometry(QRect(self._area_origin,
-                                           event.position().toPoint()).normalized())
-            return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if self._rubber is not None and self._area_origin is not None:
-            rect = QRect(self._area_origin, event.position().toPoint()).normalized()
-            tool = self._area_tool
-            self._rubber.hide()
-            self._area_origin = None
-            self._area_tool = None          # Tool nach einem Zug wieder entwaffnen
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            if rect.width() >= 60 and rect.height() >= 60:
-                self.area_selected.emit(tool or "", rect.x(), rect.y(),
-                                        rect.width(), rect.height())
-            return
         super().mouseReleaseEvent(event)
-
-    def arm_area_tool(self, name: str):
-        """Aktiviert das Aufziehen eines Bereichs (z. B. 'color_chase'). Der naechste
-        Maus-Zug auf der Canvas loest ``area_selected`` aus."""
-        self._area_tool = name
-        self.setCursor(Qt.CursorShape.CrossCursor)
-
-    def cancel_area_tool(self):
-        self._area_tool = None
-        self._area_origin = None
-        if self._rubber is not None:
-            self._rubber.hide()
-        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
