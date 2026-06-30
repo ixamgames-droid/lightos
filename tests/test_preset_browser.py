@@ -54,8 +54,9 @@ class GroupEntriesTest(unittest.TestCase):
         self.assertIn("Front", e[0].subtitle)
         self.assertIn("2 Geräte", e[0].subtitle)
         self.assertIn("3 Geräte", e[1].subtitle)
-        # ref = Gruppenname (für select_group_by_name)
-        self.assertEqual(e[0].ref, "Movingheads")
+        # ENG-05: ref = (gid, name) fuer eindeutige Gruppen-Aufloesung
+        # (gid=None bei den id-losen Test-Dicts hier).
+        self.assertEqual(e[0].ref, (None, "Movingheads"))
 
     def test_tuple_shape(self):
         e = group_entries([("G1", "F", [1])])

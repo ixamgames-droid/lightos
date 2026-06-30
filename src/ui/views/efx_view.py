@@ -1268,6 +1268,11 @@ class EfxView(QWidget):
         # Im Follow-Modus uebernimmt _assign_from_selection (via _select_efx) die Zuweisung.
         if not self._follow:
             self._auto_assign_if_empty(allow_all=True)
+            # ENG-06: nach der Auto-Zuweisung den Spider-Modus aktualisieren. Bei der
+            # vorigen _update_spider_mode-Auswertung war die Fixture-Liste noch leer
+            # (_current_is_spider() -> False), sodass die Spider-Controls versteckt
+            # blieben, obwohl jetzt ausschliesslich Spider-Fixtures zugewiesen sind.
+            self._update_spider_mode()
         self._update_save_state()
 
     def _discard_draft(self):
@@ -1973,6 +1978,9 @@ class EfxView(QWidget):
         # darf als Fallback die gesamte Movinghead-Patchung ran; im Follow-Modus
         # nur die Auswahl (die _assign_from_selection ohnehin pflegt).
         self._auto_assign_if_empty(allow_all=not self._follow)
+        # ENG-06: Spider-Controls an die ggf. erst jetzt (Auto-Zuweisung) zugewiesenen
+        # Fixtures anpassen — sonst bleiben sie beim Start aus leerer Liste versteckt.
+        self._update_spider_mode()
         if not self._current.fixtures:
             self._fx_box.setTitle("Geräte: keine beweglichen Geräte vorhanden")
             try:
