@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-01 — Live-Edit-Fenster + VC-Aufräumen (Davids VC-Umbau)
+
+#### Neu / Hinzugefuegt
+
+- **Live-Edit-Fenster (`VCMultiLiveEditor`):** ein frei schwebendes, größenveränderliches, **nicht in der Show gespeichertes** Fenster (Toolbar-Knopf „Live-Edit", auch im Live-Betrieb), in das man mehrere Effekte (Matrix / EFX-Bewegung / Chaser) per Drag&Drop zieht und mit Dropdown + „– / +" durchblättert. Pro Effekt: **Vorschau je Typ** (Matrix-Pixel / EFX-Bewegungspfad mit laufendem Punkt / Chaser-Schrittleiste), ein **Checkbox-Parameter-Editor** (anhaken → nur dafür erscheint ein Regler; live über `effect_live`, baseline-geschützt = flüchtig) und ein **Tempo-Modus** (Aus = freie Geschwindigkeit direkt, BPM = Master-Bus + Tempo-×-Faktor, Tap = eigener Takt pro Effekt auf festem Bus A–D). Alle Änderungen sind LIVE, aber **nicht persistent** (Show-Speichern schreibt die Preset-Werte). 4 PRs: [#119](https://github.com/ixamgames-droid/lightos/pull/119), [#120](https://github.com/ixamgames-droid/lightos/pull/120), [#121](https://github.com/ixamgames-droid/lightos/pull/121), [#122](https://github.com/ixamgames-droid/lightos/pull/122). Doku `docs/LIVE_EDIT_FENSTER.md`. `src/ui/virtualconsole/vc_multi_live_editor.py`.
+
+#### Entfernt
+
+- **Chase Builder (`VCChaseBuilder`):** das All-in-One-Chase-Widget komplett entfernt (Widget + Registry + Toolbar-Quick-Add + Inspector-Label + 10 Show-Generatoren + Doku). Alte Shows laden tolerant (unbekannter Widget-Typ wird beim Laden übersprungen). [#116](https://github.com/ixamgames-droid/lightos/pull/116)
+- **Editor-Bausteine „⌗ Controller / 🎨 Color-Chase / 🟦 Chase-Bereich":** die drei edit-only Toolbar-Knöpfe oben rechts + ihre Handler und das Canvas-Aufzieh-Werkzeug (Rubber-Band/`area_selected`) entfernt; `controller_templates.py` auf das APC-Pad-Panel reduziert (Color-Chase-Baukasten gestrippt). [#118](https://github.com/ixamgames-droid/lightos/pull/118)
+
 ### 2026-06-30 — Neu
 
 #### Neu / Hinzugefuegt

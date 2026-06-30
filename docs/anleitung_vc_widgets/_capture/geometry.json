@@ -112,17 +112,6 @@
       "ww": 210,
       "wh": 160
     },
-    "VCChaseBuilder": {
-      "title": "Chase-Builder (VCChaseBuilder)",
-      "x": 480,
-      "y": 210,
-      "w": 230,
-      "h": 184,
-      "wx": 480,
-      "wy": 234,
-      "ww": 230,
-      "wh": 160
-    },
     "VCColorList": {
       "title": "Chase-Liste (VCColorList)",
       "x": 750,

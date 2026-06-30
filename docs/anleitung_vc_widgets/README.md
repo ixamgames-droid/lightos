@@ -69,7 +69,6 @@ Antippen) — **MIDI/APC steuert weiter**.
 | 07 | **Stepper** (`VCStepper`) | +/− Schrittzähler für ganzzahlige Parameter | [07_stepper.md](07_stepper.md) |
 | 08 | **Cue-Liste** (`VCCueList`) | GO / BACK / STOP-Transport für eine Cueliste | [08_cue_liste.md](08_cue_liste.md) |
 | 09 | **Chase-Liste** (`VCColorList`) | Farb-Sequenz eines Effekts an/aus schalten | [09_chase_liste.md](09_chase_liste.md) |
-| 10 | **Chase-Builder** (`VCChaseBuilder`) | Live-Chase aus einer Farbpalette bauen | [10_chase_builder.md](10_chase_builder.md) |
 | 11 | **Effekt-Farben** (`VCEffectColors`) | Farb-Sequenz eines Effekts editieren | [11_effekt_farben.md](11_effekt_farben.md) |
 | 12 | **BPM-Anzeige** (`VCBpmDisplay`) | Live-Anzeige von Tempo + Quelle | [12_bpm_anzeige.md](12_bpm_anzeige.md) |
 | 13 | **Tempo-Bus** (`VCBusSelector`) | Aktiven Tempo-Bus (A/B/C/D) wählen | [13_tempo_bus.md](13_tempo_bus.md) |

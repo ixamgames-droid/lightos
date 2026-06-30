@@ -12,15 +12,17 @@ Verbindliche Arbeitsweise fuer KI-/Agent-gestuetzte Aenderungen am Projekt.
 
 ## Standard-Ablauf fuer jede Aenderung
 
+> **Voll autonom (seit 2026-07-01):** Claude treibt die Runden selbst durch, ohne auf eine Freigabe zu warten (siehe CLAUDE.md / Second-Brain-Memory `feedback_lightos_loop_autonomous`). Schritt 3/6 sind damit **keine harten Stopps** mehr — Claude postet Zusammenfassung + Diff nur zur Info und macht weiter. Pflicht bleibt: grünes Test-Gate vor jedem Merge.
+
 1. **Analyse** — bestehende Codebasis verstehen, betroffene Dateien finden
 2. **Plan** — kurze Etappen-Liste mit 3-5 Schritten
-3. **Bestaetigung** abwarten welcher Schritt zuerst
+3. **Auswahl** — Claude pickt selbst die nächste Etappe (kein Warten auf Bestätigung)
 4. **Umsetzung** genau einer Etappe
 5. **Zusammenfassung** mit:
    - Was geaendert wurde
    - Betroffene Dateien
    - Offene Folgeaufgaben
-6. **Stopp** — nicht direkt mit dem naechsten grossen Block weitermachen
+6. **Weiter** — nach grünem Gate + Merge direkt die nächste Runde (kein harter Stopp)
 
 ## Priorisierung pro Aufgabe
 
