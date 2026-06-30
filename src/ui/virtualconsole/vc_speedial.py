@@ -997,7 +997,12 @@ class VCSpeedDial(VCWidget):
         # VCB-12: BPM-Bereich VOR _bpm lesen (Defaults = bisheriges Verhalten).
         self._min_bpm = float(d.get("min_bpm", 20.0))
         self._max_bpm = float(d.get("max_bpm", 600.0))
-        self._bpm = d.get("bpm", 120.0)
+        # VCB-28: _bpm robust nach float wandeln — eine aeltere Show kann den Wert als
+        # String gespeichert haben; ohne Coercion crasht spaeter die Dial-Arithmetik.
+        try:
+            self._bpm = float(d.get("bpm", 120.0))
+        except (TypeError, ValueError):
+            self._bpm = 120.0
         self.function_id = d.get("function_id")
         _fids = []
         for i in d.get("function_ids", []):

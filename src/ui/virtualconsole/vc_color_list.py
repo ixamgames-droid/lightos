@@ -88,8 +88,22 @@ class VCColorList(VCWidget):
             return None
         gap = 2
         sw = max(6, (area.width() - gap * (n - 1)) / n)
-        i = int((pos.x() - area.x()) / (sw + gap))
-        return i if 0 <= i < n else None
+        # VCB-26: dieselben GERUNDETEN Swatch-Grenzen wie paintEvent verwenden
+        # (paint: rx = int(round(x)), x += sw + gap). Eine gleichfoermige
+        # Float-Division traf an den Raendern den NACHBAR-Swatch statt den
+        # sichtbar markierten.
+        px = pos.x()
+        x = float(area.x())
+        starts = []
+        for _ in range(n):
+            starts.append(int(round(x)))
+            x += sw + gap
+        for i in range(n):
+            lo = starts[i]
+            hi = starts[i + 1] if i + 1 < n else area.x() + area.width()
+            if lo <= px < hi:
+                return i
+        return None
 
     def _do_color_action(self, action, index):
         try:

@@ -78,9 +78,14 @@ def _supports(fn) -> bool:
 
 
 def _spec_for(fn, key):
-    for s in fn.list_params():
-        if s.key == key:
-            return s
+    # VCB-25: list_params() einiger Funktionstypen kann werfen — die Aufrufer
+    # (VC-Parametersteuerung) erwarten ein None statt einer Exception.
+    try:
+        for s in fn.list_params():
+            if s.key == key:
+                return s
+    except Exception:
+        pass
     return None
 
 

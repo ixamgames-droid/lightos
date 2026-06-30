@@ -434,7 +434,11 @@ class VCWidget(QFrame):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             b = dlg.result_binding
             if b is None:
-                self.apply_midi_binding(None, 0, -1)
+                # VCB-24: Sentinel "none" statt None als msg_type — die Subklassen
+                # raeumen zwar schon am data1<0-Guard, aber ein None-msg_type ist eine
+                # stille Falle fuer kuenftige/super()-aufrufende Overrides (eine Pruefung
+                # auf msg_type kaeme sonst durcheinander). data1=-1 = "entfernen".
+                self.apply_midi_binding("none", 0, -1)
             else:
                 self.apply_midi_binding(b[0], b[1], b[2])
             self.update()
