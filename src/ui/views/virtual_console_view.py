@@ -302,6 +302,20 @@ class VirtualConsoleView(QWidget):
         self._btn_popout.clicked.connect(self._popout_canvas)
         tb_layout.addWidget(self._btn_popout)
 
+        # Live-Edit-Fenster (nicht edit-only -> auch im Live-Betrieb nutzbar)
+        self._btn_live_editor = QPushButton("Live-Edit")
+        self._btn_live_editor.setFixedHeight(26)
+        self._btn_live_editor.setToolTip(
+            "Live-Edit-Fenster öffnen: Effekte hineinziehen und ihre Parameter "
+            "live anpassen (wird nicht in der Show gespeichert).")
+        self._btn_live_editor.setStyleSheet("""
+            QPushButton { background:#21262d; color:#58d68d; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:hover { background:#30363d; color:#e6edf3; }
+        """)
+        self._btn_live_editor.clicked.connect(self._open_live_editor)
+        tb_layout.addWidget(self._btn_live_editor)
+
         btn_clear = QPushButton("Alle löschen")
         btn_clear.setFixedHeight(26)
         btn_clear.setStyleSheet("""
@@ -613,6 +627,24 @@ class VirtualConsoleView(QWidget):
         self._lbl_bank.setText(f"Bank {int(b) + 1}")
 
     # ── Popout ────────────────────────────────────────────────────────────────
+
+    def _open_live_editor(self):
+        """Live-Edit-Fenster öffnen (frei schwebend, nicht in der Show gespeichert).
+
+        Bei geschlossenem Fenster startet jeder Aufruf mit leerer Effektliste;
+        ein bereits offenes Fenster wird nur nach vorne geholt."""
+        ed = getattr(self, "_live_editor", None)
+        if ed is not None and ed.isVisible():
+            ed.raise_()
+            ed.activateWindow()
+            return
+        from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
+        if ed is not None:
+            ed.deleteLater()
+        self._live_editor = VCMultiLiveEditor(self)
+        self._live_editor.show()
+        self._live_editor.raise_()
+        self._live_editor.activateWindow()
 
     def _popout_canvas(self):
         if self._popout_window is not None:
