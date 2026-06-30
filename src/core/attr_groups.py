@@ -86,6 +86,12 @@ def classify_attr(attr: str) -> str:
     faelschlich als Beam klassifiziert (Snap/Szenen-Label).
     """
     a = (attr or "").lower()
+    # ENG-09: Mehrkopf-Suffix (``attr#N``) vor der Klassifikation strippen. Der
+    # Kopf-Index aendert die Gruppe nie, aber z. B. ``prism_rotation#1`` wuerde
+    # sonst den Exact-Match (Pass 1) verfehlen und ueber den Substring ``prism``
+    # faelschlich in Beam statt Effect fallen -> 2. Kopf landet im falschen
+    # Snap/Szenen-Label. Gilt generell fuer ALLE Multi-Head-Attribute.
+    a = a.split("#", 1)[0]
     # Pass 1: exakte Mitgliedschaft hat IMMER Vorrang (ueber alle Gruppen).
     for grp, names in ATTR_GROUPS.items():
         if a in names:

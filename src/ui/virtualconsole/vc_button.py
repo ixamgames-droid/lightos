@@ -551,7 +551,29 @@ class VCButton(VCWidget):
 
         Eine Farbe => einfarbiges Badge; mehrere => Farbwechsel (animiert). Leer =>
         kein Badge (Button steuert keine Farbe)."""
-        key = (self.action, tuple(self._all_snap_ids()), self.function_id)
+        # UI-14: Die ColorSequence eines gebundenen Farb-Effekts kann LIVE geaendert
+        # werden (VCColor EFFECT/EFFECT_ADD, add_color/toggle_color ueber
+        # effect_live), OHNE dass sich Bindung (action/snap_ids/function_id) aendert.
+        # Eine Signatur der aktuellen Effekt-Farben in den Cache-Key aufnehmen, sonst
+        # liefert der Cache (auch in showEvent) das alte _badge_colors zurueck und
+        # das Badge zeigt entfernte/alte Farben + falschen Cycle-Zustand bis zum
+        # naechsten Bindungswechsel.
+        sig = None
+        if (self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH,
+                            ButtonAction.EFFECT_ACTION)
+                and self.function_id is not None):
+            try:
+                from src.core.engine import effect_live
+                seq = effect_live.get_param("colors", int(self.function_id))
+                if seq is not None and hasattr(seq, "enabled_colors"):
+                    sig = tuple(tuple(int(x) for x in c)
+                                for c in seq.enabled_colors())
+                elif isinstance(seq, (list, tuple)):
+                    sig = tuple(tuple(c) for c in seq
+                                if isinstance(c, (list, tuple)))
+            except Exception:
+                sig = None
+        key = (self.action, tuple(self._all_snap_ids()), self.function_id, sig)
         if getattr(self, "_badge_cache_key", None) == key:
             return self._badge_colors
         cols = self._resolve_badge_colors()
