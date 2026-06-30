@@ -56,7 +56,12 @@ class VCFrame(VCWidget):
 
     def switch_page(self, page: int):
         self._current_page = max(0, min(self._page_count - 1, page))
-        for child in self.findChildren(VCWidget):
+        # VCB-01: nur DIREKTE Kinder umschalten — sonst versteckt der Seitenwechsel
+        # eines aeusseren Frames auch die Kinder verschachtelter innerer Frames
+        # (deren vc_page auf den INNEREN Frame bezogen ist). Konsistent mit
+        # to_dict/on_child_activated/paintEvent.
+        for child in self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
             p = child.property("vc_page") or 0
             child.setVisible(p == self._current_page)
         self.update()
@@ -77,7 +82,9 @@ class VCFrame(VCWidget):
         except (TypeError, RuntimeError):
             pass
         widget.delete_requested.connect(lambda w=widget: self._remove_child(w))
-        widget.show()
+        # VCB-02: KEIN bedingungsloses widget.show() — das ueberschrieb das
+        # setVisible(page == _current_page) oben und liess das Widget auf der
+        # falschen Seite erscheinen. Die Sichtbarkeit ist bereits korrekt gesetzt.
 
     # ── Child widget management ───────────────────────────────────────────────
 
@@ -287,7 +294,10 @@ class VCFrame(VCWidget):
             self._page_count = pages.value()
             self._show_header = header.isChecked()
             self._solo = solo.isChecked()
-            self.update()
+            # VCB-03: die Seitenanzahl koennte reduziert worden sein -> _current_page
+            # ueber den neuen Bereich hinaus. switch_page klemmt selbst und wendet die
+            # Sichtbarkeit neu an (statt nur update(), das den alten Index liesse).
+            self.switch_page(self._current_page)
 
     # ── Serialization ─────────────────────────────────────────────────────────
 

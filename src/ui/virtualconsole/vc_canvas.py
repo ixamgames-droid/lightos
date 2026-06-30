@@ -1597,6 +1597,7 @@ class VCCanvas(QWidget):
         if chosen is None:
             return
         if chosen == act_clear:
+            self._push_undo()      # VCB-06: "Alle loeschen" per Strg+Z rueckgaengig
             self._clear()
         elif chosen.data():
             wtype, pos = chosen.data()

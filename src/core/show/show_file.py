@@ -401,6 +401,9 @@ def reset_show():
 
     state.programmer = {}
     state.base_levels = {}
+    # VCB-05: Gruppen-/Fixture-Dimmer (F-25 GROUP_DIMMER-Fader) leeren — sonst dimmt
+    # ein Fader der vorigen Show die Fixtures der neuen Show weiter herunter.
+    state.fixture_dimmers = {}
     # Neue Show: strikte Trennung Farbe/Dimmer (Default seit 2026-06-24). Eine reine
     # Farbe macht den Dimmer NICHT automatisch auf — Helligkeit kommt aus Dimmer-
     # Snaps/-Effekten/Mastern. Per Menue-Schalter umschaltbar.
@@ -553,6 +556,9 @@ def load_show(path: str | os.PathLike):
     patch_entries = data.get("patch", [])
     if isinstance(patch_entries, list):
         _replace_patch_from_data(state, patch_entries)
+
+    # VCB-05: Gruppen-/Fixture-Dimmer der vorigen Show verwerfen (sonst Ghost-Dimmer).
+    state.fixture_dimmers = {}
 
     # Spatial-Gruppen wiederherstellen (sonst fehlt die MH-/PAR-Gruppe nach Load).
     _restore_fixture_groups(state, data.get("fixture_groups", []) or [])

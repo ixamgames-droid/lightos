@@ -89,6 +89,7 @@ class VCEffectColors(VCWidget):
             super().mousePressEvent(event)
             return
         if self._run_input_blocked():
+            event.accept()   # VCB-10: Klick schlucken, sonst propagiert er an den Canvas
             return
         seq = self._seq()
         n = len(seq) if seq is not None else 0
