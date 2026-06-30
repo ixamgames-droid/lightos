@@ -20,9 +20,7 @@ dann trage ich es ein. Reihenfolge = Priorität (verschieb Zeilen nach oben/unte
 
 ## 🔧 In Arbeit / Review
 
-| ID | Prio | Status | Titel | Stand |
-|----|------|--------|-------|-------|
-| F-26 | P2 | wip | Feature-Dimmer-Master (Pro-Feature-Dimmer-Submaster) | **Backend fertig & getestet** (FeatureDimmer-Dataclass, `AppState.feature_dimmers`, Render-Schritt 4b², `set_feature_dimmer`/`clear_feature_dimmers`; 13 Tests `tests/test_feature_dimmer.py`) auf lokalem Branch `feature/feature-dimmer-master` (Worktree `wt-featdim`, **nicht gepusht**). **Fehlt für Merge** (sonst toter Code): VC-Bindung — `SliderMode.FEATURE_DIMMER` in `vc_slider.py` `_tick` (analog `GROUP_DIMMER`), `SLIDER_MODE_LABELS`, Drop-Schutz `smart_drop_dialog.py`, `clear_feature_dimmers()` beim Show-Laden/Neu, Modus-Serialisierung `show_file.py`. Audit 2026-06-30: Backend solide, niedriges Render-Risiko (hinter `if fd_slots:`). |
+_Aktuell nichts in Arbeit. **F-26/F-26b** (Feature-Dimmer-Master) ist erledigt → [PR #109](https://github.com/ixamgames-droid/lightos/pull/109) (siehe „Erledigt"). Hinweis: der alte Worktree `wt-featdim` (toter Parallel-Branch) ist damit redundant — das Backend liegt jetzt auf `main`; kann aufgeräumt werden._
 
 ## 📋 Offen
 
@@ -85,13 +83,15 @@ _**Stand 2026-06-30:** P1 (VCB-01..10) → [PR #100]; **P2 (VCB-11/12/13/14/15/1
 
 ## 🎨 Design-Entscheidungen
 
-### ✅ Von David entschieden (2026-06-30) — in Umsetzung
-- **UI-06** · Color-Tab Getrennt-Modus → **Save-Filter (Option 2):** beim Snap/Szene/Palette-Speichern Köpfe ausschließen, die exakt dem Seed-Default entsprechen und nie angefasst wurden („Touched"-Tracking). Kopf-Unabhängigkeit bleibt, keine Default-Pollution. _(Aufgabe offen)_
-- **DQ-3** · VCStepper **absoluter MIDI-Modus ergänzen** (analog Encoder `midi_mode`). _(Aufgabe offen)_
-- **DQ-4** · VCFrame-Kontextmenü **MIDI/Key-Teach + Live-Param ergänzen**. _(Aufgabe offen)_
-- **DQ-5** · VCColorList/VCChaseBuilder **als Drop-Ziele unterstützen** (`_droppable_types`/`_effect_fits_widget`). _(Aufgabe offen)_
-- **DQ-6 / F-26 `feature_attr`** → **ComboBox aus Fixture-Capabilities** (bestimmt F-26b-Schritt 1+6).
-- **F-26 / F-26b** · Feature-Dimmer-Master → **komplett umsetzen**: Backend (`b8b43f3` von `feature/feature-dimmer-master`, app_state.py +94, 13 Tests) koordiniert auf main bringen (Cherry-Pick + Konflikt-Auflösung), dann VC-Bindung F-26b (SliderMode.FEATURE_DIMMER, Properties-UI mit Capability-ComboBox, Drop-Schutz, `clear_feature_dimmers` bei load/reset, Serialisierung). _(Aufgabe offen)_
+### ✅ Von David entschieden (2026-06-30)
+**Erledigt:**
+- **F-26 / F-26b + DQ-6** · Feature-Dimmer-Master komplett: Backend (`b8b43f3`) cherry-gepickt auf main + VC-Bindung (`SliderMode.FEATURE_DIMMER`, feature_attr = **ComboBox aus Capabilities**, Slot-Sync/Re-Apply/clear bei load/reset). → [PR #109](https://github.com/ixamgames-droid/lightos/pull/109).
+
+**Freigegeben, offen (nächste Session):**
+- **UI-06** · Color-Tab Getrennt-Modus → **Save-Filter:** beim Snap/Szene/Palette-Speichern Kopf>0-Farbwerte verwerfen, die exakt dem aktuellen effektiven Kopf-0-Wert entsprechen (lebenszyklus-freier Gleichheits-Filter; Ansatz mit David noch final abzunicken). Kopf-Unabhängigkeit bleibt. Save-Pfade: `programmer_to_scene_values`, `palette.record_from_programmer`, Snap-Capture.
+- **DQ-3** · VCStepper **absoluter MIDI-Modus** (analog Encoder `midi_mode`).
+- **DQ-4** · VCFrame-Kontextmenü **MIDI/Key-Teach + Live-Param**.
+- **DQ-5** · VCColorList/VCChaseBuilder **als Drop-Ziele** (`_droppable_types`/`_effect_fits_widget`).
 
 ### ⏳ Noch offen / niedrige Prio
 - **DQ-1** · FUNCTION_TOGGLE Multi-Gruppe — Ausschalten nimmt clear_programmer/exclusive/solo NICHT zurück. Default: als **bewusst mechanisches Stop dokumentieren** (kein Code-Change), außer David will Symmetrie.
@@ -101,6 +101,8 @@ _**Stand 2026-06-30:** P1 (VCB-01..10) → [PR #100]; **P2 (VCB-11/12/13/14/15/1
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **F-26 / F-26b** · Feature-Dimmer-Master (Backend + VC-Bindung, 1 PR): effekt-unabhängiger per-Slot-Master, der eine wählbare Feature-Gruppe (Intensity/Color/Gobo/Beam/Position/Effect) einer festen Gruppe multiplikativ am fertigen Output skaliert (Render 4b²). Backend `b8b43f3` cherry-gepickt auf aktuellen main (konfliktfrei, 13 Tests). VC-Bindung: `SliderMode.FEATURE_DIMMER`, feature_attr-ComboBox aus Fixture-Capabilities, Slot-Sync (enter/leave), Re-Apply beim Laden, `clear_feature_dimmers` bei reset/load, destroyed-Cleanup, Capability-Manifest regeneriert. +9 VC-Tests, Suite 277/277 grün. [PR #109](https://github.com/ixamgames-droid/lightos/pull/109)
 
 - **VCI-01..08/10/11/12/14** · VC-Audit-Verbesserungen (1 PR): Lit-Indikator für Tempo-Toggles (VCI-01), Assign-Overlay-Hinweise (VCI-02), `normalize_color_target`-Log (VCI-03), Encoder-/Slider-Modus-Validierung (VCI-04/05), `mappable_param_choices`-Konsistenz (VCI-06), totes `_lp_fired` raus (VCI-07), `aspect_caption`-Token (VCI-08), VCColor-W-Fold im Swatch (VCI-10), Kommentar+Guard (VCI-11/12), `snap_ids`-Dedup beim Save (VCI-14). **VCI-09** verifizierter False-Positive, **VCI-13** bewusst ausgelassen. +14 Tests, Suite 275/275 grün. [PR #107](https://github.com/ixamgames-droid/lightos/pull/107)
 - **VCB-24/25/26/28/29/30/31** · VC-Audit P3-Bugfix-Batch (1 PR): _teach_midi-Sentinel, `_spec_for` try/except, ColorList-Hit-Test spiegelt Paint-Layout, SpeedDial-`_bpm` float-coerce, `add_live_controls` dynamischer y-Offset, `replace_widget_type` Undo-erst-nach-Erfolg (außerhalb `_restoring`), VCButton snap_id-Cleanup. +10 Tests, 274/274 grün. [PR #106](https://github.com/ixamgames-droid/lightos/pull/106)
