@@ -59,6 +59,24 @@ _Beim Harvesten der Codex-Kommentare auf den frisch gemergten PRs #87–#90 entd
 
 > **Geprüfte False-Positives (NICHT wieder öffnen):** PR #91 (reine Docs-PR) erhielt 2 Codex-„Reopen"-Kommentare (DEMO-02/04 + ENG-07), weil die `docs/backlog-sync`-Branch die Merges #88/#89/#90 noch nicht enthielt (stale Review-Base). Gegen aktuellen `main` am 2026-06-30 verifiziert: `tools/_gen_env.py` + `import _gen_env`, `prism_rotation` exakt in `attr_groups.ATTR_GROUPS['Effect']`, und die `_last_bus_pos`-Stall-Logik in `rgb_matrix.py` existieren alle → DEMO-02/04 + ENG-07 sind korrekt erledigt.
 
+### 🖥️ Aus VC-Code-Audit (Stand 2026-06-30)
+_10-Agent-Audit des `src/ui/virtualconsole/*`-Subsystems (+ `effect_live.py`, `show_file.py`-VC-Teil). **Volle Details, alle 31 Bugs + 14 Verbesserungen + Design-Fragen + F-26b-Plan:** [`docs/VC_AUDIT_2026_06_30.md`](docs/VC_AUDIT_2026_06_30.md). Gesamtbild: Code strukturell solide; Schwerpunkte = VCFrame-Seitensteuerung, Bank-Propagierung, zu nachsichtige `apply_dict`-Pfade. Die **10 P1-Bugs** (alle Aufwand S) werden vom Loop zuerst gefixt:_
+
+| ID | Prio | Status | Titel | Stelle |
+|----|------|--------|-------|--------|
+| VCB-01 | P1 | todo | VCFrame.switch_page traversiert Grandchildren → versteckt Kinder innerer Frames | `vc_frame.py:switch_page` |
+| VCB-02 | P1 | todo | add_child_to_page: `widget.show()` überschreibt `setVisible` (falsche Seite sichtbar) | `vc_frame.py:add_child_to_page` |
+| VCB-03 | P1 | todo | _open_properties: Seitenzahl-Reduktion klemmt `_current_page` nicht | `vc_frame.py:_open_properties` |
+| VCB-04 | P1 | todo | VCFrame-Kinder erben Bank-Index statt -1 → MIDI/Hotkey stumm nach Bank-Wechsel | `vc_canvas.py:_add_widget` / `vc_frame` |
+| VCB-05 | P1 | todo | `fixture_dimmers`/`feature_dimmers` bei reset/load nicht geleert → Ghost-Dimmer | `show_file.py:reset_show`/`load_show` |
+| VCB-06 | P1 | todo | „Alle löschen" (Kontextmenü) nicht Undo-bar | `vc_canvas.py:_context_menu` |
+| VCB-07 | P1 | todo | `set_param_normalized`: color/action-Kinds → AttributeError (`spec.min/max`) | `effect_live.py:set_param_normalized` |
+| VCB-08 | P1 | todo | Negativer `function_id` → letzter Executor statt Stop | `vc_button.py:_trigger_primary` |
+| VCB-09 | P1 | todo | Negativer `snapshot_index` → letzter Snapshot statt Abbruch | `vc_button.py:_apply_snapshot` |
+| VCB-10 | P1 | todo | VCEffectColors.mousePressEvent: fehlendes `event.accept()` → Klick verschiebt Widget | `vc_effect_colors.py:mousePressEvent` |
+
+_P2/P3-Bugs (VCB-11..31) + Verbesserungen (VCI-01..14) + 6 Design-Fragen + F-26b: siehe das Doc. Die VC-Design-Entscheidungen stehen unten._
+
 ## 🎨 Design-Entscheidungen (brauchen Davids Input — bewusst ans Ende gestellt)
 
 - **UI-06** · Color-Tab Getrennt-Modus: saubere Programmer-State **vs.** robuste Kopf-Unabhängigkeit. Codex meldet (zu Recht), dass das Tab-Bau-Seeding `color_*#N = default` in den Programmer schreibt → Default/Null landet in Snaps/Szenen/Paletten. ABER: genau dieses Seeding ist der einzig robuste Weg, dass Bewegen von Kopf 0 die anderen Köpfe nicht mitzieht (Davids gemeldeter Bug; deckt Slider/Picker/Palette/VC ab, da der DMX-Flush sonst auf Kopf 0 zurückfällt). Lazy-Anchoring (nur beim Slider-Move) wäre unvollständig. **Optionen:**
@@ -66,6 +84,16 @@ _Beim Harvesten der Codex-Kommentare auf den frisch gemergten PRs #87–#90 entd
   2. **Save-Filter** — beim Snap/Szene/Palette-Speichern Köpfe ausschließen, die exakt dem Seed-Default entsprechen und nie vom Nutzer angefasst wurden (mittlerer Aufwand, „Touched"-Tracking nötig).
   3. **Codex-Fix** (nur Anzeige-Fallback) — Snap sauber, aber Kopf-Unabhängigkeit auf frischen Fixtures geht verloren (Davids Bug kehrt zurück).
   → **Empfehlung: Option 2.** Welche Variante, David?
+
+- **VC-Audit-Design-Fragen** (Details + Optionen in [`docs/VC_AUDIT_2026_06_30.md`](docs/VC_AUDIT_2026_06_30.md)):
+  1. **FUNCTION_TOGGLE Multi-Gruppe** — Ausschalten nimmt clear_programmer/exclusive/solo NICHT zurück (bewusst mechanisches Stop oder symmetrisch?).
+  2. **VCSlider PLAYBACK** — `function_id` als Executor-Slot missbraucht (eigenes `playback_slot`-Feld oder nur dokumentieren?).
+  3. **VCStepper** — kein absoluter MIDI-Modus (ergänzen oder als Lücke akzeptieren?).
+  4. **VCFrame-Kontextmenü** — ohne MIDI/Key-Teach/Live-Param (übernehmen oder bewusst ausschließen?).
+  5. **VCColorList/VCChaseBuilder** — nicht in `_droppable_types` (Drop klären+ergänzen oder aus Registry nehmen?).
+  6. **F-26 `feature_attr`** — freier String vs. ComboBox aus Capabilities vs. festes Enum (bestimmt F-26b-Schritt 1+6).
+
+- **F-26 / F-26b** · Feature-Dimmer-Master: das **Backend** liegt als 2 ungepushte Commits auf dem lokalen Branch `feature/feature-dimmer-master` (Worktree `wt-featdim`) einer **parallelen, inzwischen toten Session** (`app_state.py` +94, 13 Tests). Der Loop fasst diesen Branch NICHT an (CLAUDE.md: ein Branch zur Zeit, dokumentierte Loop-Kollisionen). **Entscheidung nötig:** Backend von David/Owner koordiniert auf main bringen → dann die **VC-Bindung F-26b** (12 Schritte, im Doc) umsetzen. Bis dahin ist der Render-Schritt 4b² toter Code (hinter `if fd_slots:`, kein Risiko).
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
