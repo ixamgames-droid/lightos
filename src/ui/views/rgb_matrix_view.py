@@ -448,11 +448,18 @@ class RgbMatrixView(QWidget):
         grp_time.setStyleSheet(_grp_style)
         ft = QFormLayout(grp_time)
         ft.setSpacing(6)
+        # Referenz fuer _update_tempo_mode_visibility (blendet bus-spezifische
+        # Regler aus, wenn kein Tempo-Bus gewaehlt ist).
+        self._tempo_form = ft
 
         self._speed_spin = QDoubleSpinBox()
         self._speed_spin.setRange(0.01, 20)
         self._speed_spin.setSingleStep(0.1)
         self._speed_spin.setValue(1.0)
+        self._speed_spin.setToolTip(
+            "Eigene Animationsrate (Schritte/s) im Frei-Lauf. Wirkt, wenn KEIN "
+            "Tempo-Bus gewählt ist — und als Rückfall, solange ein gewählter Bus "
+            "noch nicht läuft. Bei laufendem Bus bestimmt stattdessen „Tempo ד das Tempo.")
         self._speed_spin.valueChanged.connect(self._param_change)
         ft.addRow("Geschwindigkeit:", self._speed_spin)
 
@@ -465,6 +472,11 @@ class RgbMatrixView(QWidget):
             "Global = folgt der Master-/Musik-BPM und startet mit Auto-Sync "
             "taktgleich zu anderen Effekten. Frei = bewusster eigener Lauf.")
         self._tempo_bus_combo.currentIndexChanged.connect(self._param_change)
+        # Bus-spezifische Regler (Tempo ×, Tempo-Versatz, Taktgleich starten) nur
+        # zeigen, wenn ein Bus gewaehlt ist — im Frei-Lauf sind sie wirkungslos
+        # (rgb_matrix.py _advance_step: Free-Run nutzt nur matrix_speed).
+        self._tempo_bus_combo.currentIndexChanged.connect(
+            self._update_tempo_mode_visibility)
         ft.addRow("Tempo-Bus:", self._tempo_bus_combo)
 
         self._tempo_mult_spin = QDoubleSpinBox()
@@ -683,6 +695,7 @@ class RgbMatrixView(QWidget):
         # Initial-Sichtbarkeit (RGB ist Standard) + Param-Felder fuer Default-Algo.
         self._apply_style_visibility(MatrixStyle.RGB)
         self._rebuild_param_fields(RgbAlgorithm.CHASE)
+        self._update_tempo_mode_visibility()
 
         # ── Aeusserer Scrollbereich + Pop-out-Verwaltung ──────────────────────
         # Der ganze Editor-Koerper liegt in EINEM Scrollbereich (kein Stauchen mehr)
@@ -780,6 +793,24 @@ class RgbMatrixView(QWidget):
         if self._current is not None:
             self._load_params_into_widgets(self._current)
         self._param_change()
+
+    def _update_tempo_mode_visibility(self):
+        """Blendet die bus-spezifischen Tempo-Regler aus, wenn kein Tempo-Bus
+        gewaehlt ist (Frei-Lauf). „Tempo ×", „Tempo-Versatz" und „Taktgleich
+        starten" wirken NUR im Bus-Sync-Pfad (rgb_matrix.py::_advance_step); im
+        Frei-Lauf zaehlt allein „Geschwindigkeit" — die bleibt darum immer sichtbar.
+        Reine Sichtbarkeit: die Werte bleiben im Modell erhalten (werden in
+        _param_change unbedingt geschrieben) und tauchen unveraendert wieder auf,
+        sobald wieder ein Bus gewaehlt wird — kein Datenverlust."""
+        bus_active = bool(self._tempo_bus_combo.currentData())  # "" (Frei) -> False
+        ft = getattr(self, "_tempo_form", None)
+        for w in (self._tempo_mult_spin, self._tempo_phase_spin,
+                  self._tempo_align_check):
+            if ft is not None:
+                lbl = ft.labelForField(w)
+                if lbl is not None:
+                    lbl.setVisible(bus_active)
+            w.setVisible(bus_active)
 
     def _on_algo_change(self, text: str):
         """Algorithmus-Combo hat sich geaendert: Param-Felder dynamisch neu aufbauen."""
@@ -1020,6 +1051,9 @@ class RgbMatrixView(QWidget):
             self._tempo_phase_spin.setValue(
                 float(getattr(m, "phase_offset", 0.0)))
             self._tempo_align_check.setChecked(bool(getattr(m, "align_on_start", True)))
+            # Bus-spezifische Regler je nach geladenem Tempo-Bus ein-/ausblenden
+            # (setCurrentIndex feuert das Signal nicht, wenn der Index gleich bleibt).
+            self._update_tempo_mode_visibility()
             self._priority_spin.setValue(int(getattr(m, "priority", 0)))
             self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))

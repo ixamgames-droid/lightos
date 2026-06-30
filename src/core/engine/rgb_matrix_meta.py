@@ -84,11 +84,16 @@ def _fade():
                      "Schweif-Länge hinter dem Strahl (0..1)")
 
 def _after_fade(when=()):
-    # WP-4/Abschnitt 5: ex-"Schweif" am Chase, jetzt "After Fade" in Prozent.
-    # 0 % = harter Wechsel, 100 % = langer weicher Übergang. Eigener Key
-    # (after_fade) -> eindeutige Migration der alten 0..1-Werte (siehe apply_dict).
-    return ParamSpec("after_fade", "After Fade", "float", 30.0, 0.0, 100.0, 5.0,
-                     "Nachfaden hinter dem Läufer in % (0=harter Wechsel, 100=langer weicher Übergang)",
+    # WP-4/Abschnitt 5: räumlicher Schweif (Komet) HINTER dem Lauflicht, in Prozent.
+    # 0 % = harte Kante ohne Schweif, 100 % = langer Schweif über die volle Achse.
+    # Label bewusst "Schweif (%)" (nicht "After Fade"), damit es NICHT mit dem
+    # zeitlichen "Ausblenden" (env_fade_out, Hüllkurve beim Stoppen) verwechselt
+    # wird — das ist ein anderer Mechanismus. Eigener Key (after_fade) -> eindeutige
+    # Migration der alten 0..1-Werte (siehe apply_dict).
+    return ParamSpec("after_fade", "Schweif (%)", "float", 30.0, 0.0, 100.0, 5.0,
+                     "Räumlicher Schweif hinter dem Läufer in % (0 = harte Kante ohne "
+                     "Schweif, 100 = langer Schweif). Rein räumlich — NICHT das zeitliche "
+                     "Ausblenden des Effekts (das ist „Ausblenden“ unter Tempo & Blende).",
                      when=when)
 
 def _color_order():
@@ -284,11 +289,11 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
     RgbAlgorithm.PLAIN:        AlgoMeta("Volle Fläche in C1.", False, (), colors=1),
     # ── Konsolidierte Grundalgorithmen (Phase 3) ──────────────────────────────
     RgbAlgorithm.CHASE:        AlgoMeta(
-        "Lauflicht: Achse, Bewegung, After Fade (Nachfaden in %), optional Farb- bzw. "
-        "Dimmerwechsel pro Runde (je nach Style).",
+        "Lauflicht: Achse, Bewegung, Schweif (räumliche Nachzieh-Länge in %), optional "
+        "Farb- bzw. Dimmerwechsel pro Runde (je nach Style).",
         True,
         (_axis(), _movement(("normal", "bounce", "center_out", "outside_in")),
-         # Läufer-Anzahl + After Fade wertet die Engine NUR bei movement=normal aus
+         # Läufer-Anzahl + Schweif wertet die Engine NUR bei movement=normal aus
          # (bounce/center_out/outside_in ignorieren sie) -> nur dann anzeigen,
          # statt tote Regler zu zeigen.
          _runner_count(when=(("movement", ("normal",)),)), _runner_width(),
