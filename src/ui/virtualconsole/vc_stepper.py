@@ -82,7 +82,11 @@ class VCStepper(VCWidget):
     def _current_value(self):
         try:
             from src.core.engine import effect_live
-            return effect_live.get_param(self.param_key, self._fid())
+            # VCB-14: den per-Fixture-Key nutzen (wie step_by/_spec), nicht den
+            # generischen param_key — sonst zeigt das Label bei Multi-Fixture-
+            # Bindungen mit eigenem Key je Effekt den falschen Wert.
+            fid = self._fid()
+            return effect_live.get_param(self._key_for(fid), fid)
         except Exception:
             return None
 

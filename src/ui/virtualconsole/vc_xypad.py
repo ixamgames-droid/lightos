@@ -152,7 +152,10 @@ class VCXYPad(VCWidget):
             state.set_programmer_value(fid, attr, v >> 8)
             state.set_programmer_value(fid, f"{attr}_fine", v & 0xFF)
         else:
-            state.set_programmer_value(fid, attr, int(frac * 255))
+            # VCB-11: runden statt abschneiden — int(frac*255) erzeugte einen
+            # systematischen -0.5-LSB-Bias ueber den ganzen Pad-Bereich (analog zum
+            # 16-bit-Pfad oben, der schon round() nutzt).
+            state.set_programmer_value(fid, attr, int(round(frac * 255)))
 
     def _resolve_fids(self, state) -> list[int]:
         """Ziel-Fixtures: feste Zuweisung, sonst aktuelle Auswahl, sonst alle

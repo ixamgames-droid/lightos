@@ -33,7 +33,9 @@ class XYPad16BitTest(unittest.TestCase):
         pad._tilt = 1.0
         pad._apply()
         prog = self.state.programmer.get(1, {})
-        self.assertEqual(prog.get("pan"), 127)
+        # VCB-11: 0.5*255=127.5 wird gerundet (128), nicht abgeschnitten (127) —
+        # konsistent mit dem 16-bit-Pfad (0.5 -> coarse 128, siehe Test unten).
+        self.assertEqual(prog.get("pan"), 128)
         self.assertEqual(prog.get("tilt"), 255)
         self.assertNotIn("pan_fine", prog)
         self.assertNotIn("tilt_fine", prog)
