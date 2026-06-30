@@ -42,6 +42,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Widget-Typ-Tausch: kein Phantom-Undo bei Fehlschlag (VCB-30):** `VCCanvas.replace_widget_type` pushte den Undo-Snapshot vor `_add_widget`; schlug das Anlegen fehl (`new is None`), blieb ein leerer Undo-Schritt zurück. Der Snapshot wird jetzt erst nach erfolgreichem `_add_widget` gepusht. `src/ui/virtualconsole/vc_canvas.py`.
 - **VC-Button: kein stale snap_id beim Action-Wechsel (VCB-31):** `apply()` leerte beim Wechsel weg von `LIBRARY_SNAP` nur `snap_ids`, nicht `snap_id` → eine Phantom-Snap-ID wanderte in `to_dict` (Show-Korruption). Neuer Helfer `_snap_binding_for_action` leitet beide zentral aus der Aktion ab. `src/ui/virtualconsole/vc_button.py`.
 
+#### Verbessert (VC-Audit)
+
+- **Tempo-Toggle-Pads zeigen ihren Zustand (VCI-01):** `FREEZE`/`AUTO_SYNC`/`BPM_MODE_TOGGLE`-Buttons bekommen — wie `AUDIO_BPM` — einen Aktiv-Indikator (amber Rahmen + aufgehellter Hintergrund), abgeleitet aus `is_frozen()`/`auto_sync`/`mode==MANUAL`. `src/ui/virtualconsole/vc_button.py`.
+- **Assign-Modus-Hinweise vervollständigt (VCI-02):** Der Canvas zeigt jetzt auch im **Funktions-** und **Bibliothek-Snap-Assign** einen Overlay-Hinweis („Klicke einen Button an…"), bisher nur bei MIDI-Learn/Snapshot. `src/ui/virtualconsole/vc_canvas.py`.
+- **`normalize_color_target` meldet Unbekanntes (VCI-03):** ein nicht auflösbarer Ziel-String wird jetzt geloggt (statt still tote Kachel) und fällt sicher auf den Default-RGB-Pfad. `src/ui/virtualconsole/vc_color.py`.
+- **Encoder `midi_mode` validiert (VCI-04):** ein korrupter/zukünftiger Wert fällt auf `RELATIVE` zurück statt undefiniertes Verhalten zu aktivieren. `src/ui/virtualconsole/vc_encoder.py`.
+- **Slider: unbekannter Modus sichtbar (VCI-05):** `apply_dict` meldet einen unbekannten `mode` und fällt auf `LEVEL` zurück, statt ein wirkungsloses Widget zu erzeugen. `src/ui/virtualconsole/vc_slider.py`.
+- **`mappable_param_choices` konsistent (VCI-06):** schließt `tempo_multiplier`/`phase_offset` aus (haben dedizierte Tempo-Controls), wie `control_options`. `src/ui/virtualconsole/vc_effect_meta.py`.
+- **Toter Code entfernt (VCI-07):** das nie gelesene `VCButton._lp_fired` ist raus. `src/ui/virtualconsole/vc_button.py`.
+- **`aspect_caption`: konsistenter Präfix-Check (VCI-08):** `in`-Prüfung nutzt denselben Token (`"Parameter: "`/`"Aktion: "`) wie der Split. `src/ui/virtualconsole/vc_effect_meta.py`.
+- **VCColor-Swatch faltet Weiß (VCI-10):** `color()` faltet den W-Kanal additiv in die Anzeige-RGB → reines RGBW-Weiß erscheint im Picker/Swatch nicht mehr schwarz. `src/ui/virtualconsole/vc_color.py`.
+- **Kommentar + Guard (VCI-11/VCI-12):** `VCCanvas.to_dict` erklärt das `FindDirectChildrenOnly` (kein Doppel-Serialisieren von Frame-Kindern); `VCWidget._notify_effect_highlight` prüft `_effect_ids_of` explizit per `hasattr`. `src/ui/virtualconsole/vc_canvas.py`, `src/ui/virtualconsole/vc_widget.py`.
+- **`snap_ids` auch beim Speichern dedupliziert (VCI-14):** `VCButton.to_dict` entfernt Duplikate + die `snap_id` selbst, konsistent zum Lade-Pfad. `src/ui/virtualconsole/vc_button.py`.
+- _Nicht umgesetzt:_ **VCI-09** (gegen den Code als False-Positive verifiziert — `set_param_normalized` hat keine Loop-Closure) und **VCI-13** (bewusst ausgelassen: `_result_for` ist Instanz-Methode mit vielen Test-/internen Callern; ein statischer Umbau wäre unverhältnismäßig riskant für eine vernachlässigbare Einsparung).
+
 ### 2026-06-29 — Neu
 
 #### Neu / Hinzugefuegt

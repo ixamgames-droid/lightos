@@ -186,7 +186,6 @@ class VCButton(VCWidget):
         self._lp_timer.setSingleShot(True)
         self._lp_timer.setInterval(500)
         self._lp_timer.timeout.connect(self._open_live_mini_editor)
-        self._lp_fired = False
         self._live_editor = None
         self._bg_color = QColor("#1a3a5c")
         self._fg_color = QColor("#ffffff")
@@ -1116,13 +1115,11 @@ class VCButton(VCWidget):
         if (self.long_press_editor
                 and self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.EFFECT_ACTION)
                 and self.live_effect_function_id() is not None):
-            self._lp_fired = False
             self._lp_timer.start()
 
     def _open_live_mini_editor(self):
         """Timer-Callback: oeffnet den nicht-modalen Deferred-Apply-Editor fuer den
         gebundenen Effekt (Werte werden erst beim Klick auf „Anwenden" gesendet)."""
-        self._lp_fired = True
         fid = self.live_effect_function_id()
         if fid is None:
             ids = self._all_function_ids()
@@ -1202,11 +1199,26 @@ class VCButton(VCWidget):
                 audio_on = get_bpm_manager().audio_active
             except Exception:
                 audio_on = False
+        # VCI-01: Aktiv-Zustand der Tempo-Toggle-Pads sichtbar machen (analog AUDIO_BPM),
+        # damit Freeze/Auto-Sync/BPM-Modus auf einen Blick erkennbar sind.
+        action_on = False
+        try:
+            if self.action == ButtonAction.FREEZE:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                action_on = get_tempo_bus_manager().is_frozen()
+            elif self.action == ButtonAction.AUTO_SYNC:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                action_on = bool(get_tempo_bus_manager().auto_sync)
+            elif self.action == ButtonAction.BPM_MODE_TOGGLE:
+                from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
+                action_on = (get_bpm_manager().mode == BpmMode.MANUAL)
+        except Exception:
+            action_on = False
         # Laufzustand der gebundenen Funktion: ein Toggle-Pad bleibt „an", solange
         # sein Effekt laeuft — nicht nur waehrend des Drucks. Sonst sah es aus, als
         # liefe nichts mehr, obwohl die Geraete sich noch bewegten (Anzeige-Desync).
         func_on = self._function_running()
-        lit = self._pressed or snap_on or audio_on or func_on
+        lit = self._pressed or snap_on or audio_on or func_on or action_on
         bg = self._bg_color.lighter(160) if lit else self._bg_color
         p.fillRect(self.rect(), bg)
 
@@ -1225,6 +1237,10 @@ class VCButton(VCWidget):
         elif audio_on:
             # Musik-Modus aktiv: cyaner Rahmen (BPM kommt vom Audio-Eingang).
             p.setPen(QPen(QColor("#00d4ff"), 2))
+            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+        elif action_on:
+            # VCI-01: Tempo-Toggle aktiv (Freeze/Auto-Sync/BPM-Modus): amber Rahmen.
+            p.setPen(QPen(QColor("#ffb000"), 2))
             p.drawRect(self.rect().adjusted(1, 1, -2, -2))
 
         # MIDI-Learn-Arm: orange Rahmen pulsieren
@@ -1856,7 +1872,18 @@ class VCButton(VCWidget):
         d["function_ids"] = list(self.function_ids)
         d["snapshot_index"] = self.snapshot_index
         d["snap_id"] = self.snap_id
-        d["snap_ids"] = list(self.snap_ids)
+        # VCI-14: snap_ids auch beim Speichern deduplizieren (snap_id + Doppelte raus),
+        # konsistent zum Lade-Pfad in apply_dict — sonst persistieren zur Laufzeit
+        # angesammelte Duplikate in die Show-Datei.
+        _save_sids = []
+        for i in self.snap_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv != self.snap_id and iv not in _save_sids:
+                _save_sids.append(iv)
+        d["snap_ids"] = _save_sids
         d["snap_mode"] = self.snap_mode
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name

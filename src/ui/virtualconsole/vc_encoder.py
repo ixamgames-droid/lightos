@@ -460,6 +460,11 @@ class VCEncoder(VCWidget):
                 pass
         self.edit_slot = d.get("edit_slot", "")
         self.step = float(d.get("step", 0.05))
-        self.midi_mode = d.get("midi_mode", EncoderMidiMode.RELATIVE)
+        # VCI-04: midi_mode gegen die bekannten Modi validieren — ein korrupter oder
+        # zukuenftiger Wert faellt auf RELATIVE zurueck statt undefiniertes Verhalten
+        # zu aktivieren.
+        _mm = d.get("midi_mode", EncoderMidiMode.RELATIVE)
+        self.midi_mode = (_mm if _mm in (EncoderMidiMode.RELATIVE, EncoderMidiMode.ABSOLUTE)
+                          else EncoderMidiMode.RELATIVE)
         self.midi_cc = int(d.get("midi_cc", -1))
         self.midi_ch = int(d.get("midi_ch", 0))

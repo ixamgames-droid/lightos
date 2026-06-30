@@ -67,7 +67,14 @@ def normalize_color_target(value):
     if value in valid:
         return value
     folded = {_ascii_fold(v): v for v in valid}
-    return folded.get(_ascii_fold(value), value)
+    mapped = folded.get(_ascii_fold(value))
+    if mapped is not None:
+        return mapped
+    # VCI-03: unbekannter Ziel-String -> sichtbar machen (sonst still tote Kachel).
+    # Der Wert bleibt unveraendert (kein zukuenftiger/unbekannter Wert wird
+    # verschluckt) -> _apply faellt auf den Default-Pfad (RGB auf Fixtures).
+    print(f"[VCColor] WARN: unbekanntes ColorTarget {value!r} -> Default-Pfad (RGB).")
+    return value
 
 
 class VCColor(VCWidget):
@@ -107,7 +114,12 @@ class VCColor(VCWidget):
     # ── Farbe als QColor ───────────────────────────────────────────────────────
 
     def color(self) -> QColor:
-        return QColor(self.color_r, self.color_g, self.color_b)
+        # VCI-10: den Weiss-Kanal additiv in die Anzeige-RGB falten (wie _effect_rgb),
+        # sonst erscheint reines RGBW-Weiss (W=255, RGB=0) im Picker/Swatch als SCHWARZ.
+        # Reine Anzeige-Funktion (Picker-Init + Paint-Swatch) — kein Persistenz-Pfad.
+        from src.core.color_utils import rgbw_to_display
+        r, g, b = rgbw_to_display(self.color_r, self.color_g, self.color_b, self.color_w)
+        return QColor(r, g, b)
 
     def set_color(self, c: QColor):
         self.color_r, self.color_g, self.color_b = c.red(), c.green(), c.blue()

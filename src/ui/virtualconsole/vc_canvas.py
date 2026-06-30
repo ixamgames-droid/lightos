@@ -1907,6 +1907,10 @@ class VCCanvas(QWidget):
 
     def to_dict(self) -> dict:
         widgets = []
+        # VCI-11: NUR direkte Kinder serialisieren. Kinder, die in einem VCFrame
+        # liegen, schreibt der Frame selbst in seinem to_dict (verschachtelt) — ohne
+        # FindDirectChildrenOnly wuerden Frame-Kinder doppelt (einmal hier flach,
+        # einmal im Frame) gespeichert.
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
             widgets.append(child.to_dict())
@@ -1976,5 +1980,18 @@ class VCCanvas(QWidget):
             p.setPen(QColor("#ffd700"))
             p.drawText(self.rect().adjusted(8, 4, -8, 0),
                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
-                       f"Snapshot zuweisen: Klicke einen Button an...")
+                       "Snapshot zuweisen: Klicke einen Button an...")
+        elif mode == "function":
+            # VCI-02: auch der Funktions-Assign-Modus bekommt einen Hinweis (vorher
+            # zeigte nur snapshot/midi_learn einen Overlay-Text -> Modus unsichtbar).
+            p.setPen(QColor("#3fb950"))
+            p.drawText(self.rect().adjusted(8, 4, -8, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                       "Funktion zuweisen: Klicke einen Button an...")
+        elif mode == "library_snap":
+            # VCI-02: dito fuer den Bibliothek-Snap-Assign-Modus.
+            p.setPen(QColor("#b388ff"))
+            p.drawText(self.rect().adjusted(8, 4, -8, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                       "Snap zuweisen: Klicke einen Button an...")
         p.end()

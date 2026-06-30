@@ -55,6 +55,10 @@ SLIDER_MODE_LABELS: list[tuple[str, str]] = [
     (SliderMode.LEVEL,            "DMX-Kanal (Level)"),
 ]
 
+# VCI-05: gueltige Modi (SliderMode ist kein echtes Enum) — fuer die Validierung
+# beim Laden, damit ein unbekannter Modus nicht still ein wirkungsloses Widget ergibt.
+_VALID_SLIDER_MODES = frozenset(m for m, _ in SLIDER_MODE_LABELS)
+
 
 class VCSlider(VCWidget):
     """Vertikaler Fader — Level / Playback / Submaster."""
@@ -916,7 +920,13 @@ class VCSlider(VCWidget):
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
-        self.mode = d.get("mode", SliderMode.LEVEL)
+        # VCI-05: unbekannten Modus nicht still schlucken (sonst wirkungsloses Widget),
+        # sondern melden und auf LEVEL zurueckfallen.
+        _mode = d.get("mode", SliderMode.LEVEL)
+        if _mode not in _VALID_SLIDER_MODES:
+            print(f"[VCSlider] WARN: unbekannter Modus {_mode!r} -> LEVEL")
+            _mode = SliderMode.LEVEL
+        self.mode = _mode
         self.function_id = d.get("function_id")
         self.function_ids = [int(i) for i in d.get("function_ids", []) if str(i).strip().lstrip("-").isdigit()]
         self.dmx_channel = d.get("dmx_channel", 1)
