@@ -67,9 +67,13 @@ class BpmManagerView(QWidget):
         self._loading = False
 
         # Monitor-Poll-Timer (Confidence/Status) — nur bei Sichtbarkeit aktiv.
+        # Frischt zusätzlich die BPM-Spalte der Bus-Tabelle auf (TempoBus hat keine
+        # Subscribe-API → live nur per Poll), damit Sound-BPM-Änderungen und ihr
+        # folgende Buses in der Übersicht nicht stehenbleiben.
         self._poll = QTimer(self)
         self._poll.setInterval(150)
         self._poll.timeout.connect(self._refresh_monitor)
+        self._poll.timeout.connect(self._refresh_bus_bpm_live)
 
     # ── Aufbau ────────────────────────────────────────────────────────────────
 
@@ -715,6 +719,32 @@ class BpmManagerView(QWidget):
                 it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._bus_table.setItem(r, c, it)
         self._bus_table.blockSignals(False)
+
+    def _refresh_bus_bpm_live(self):
+        """Zieht nur die BPM-Spalte der bestehenden Bus-Zeilen live nach — billig,
+        ohne Tabellen-Rebuild (Auswahl/Combos/Editor bleiben erhalten). Hängt am
+        150-ms-Poll, weil ein TempoBus keine Subscribe-API hat (gleicher Ansatz
+        wie ``vc_bpm_display``): Default/Sound-BPM und Subs, die ihr folgen,
+        ändern ihren Wert live im Render-Thread, ohne ein UI-Event auszulösen.
+        Bei geänderter Bus-Anzahl einmal voll neu aufbauen (Struktur-Änderung)."""
+        table = getattr(self, "_bus_table", None)
+        if table is None:
+            return
+        mgr = self._tbm()
+        buses = sorted(mgr.all_buses(),
+                       key=lambda b: (b.bus_id != mgr.DEFAULT_BUS, b.bus_id))
+        if table.rowCount() != len(buses):
+            self._refresh_speeds()   # Buses dazu/entfernt → voller Rebuild
+            return
+        for r, b in enumerate(buses):
+            text = f"{b.bpm:.0f}" if b.bpm > 0 else "—"
+            it = table.item(r, 4)
+            if it is None:
+                it = QTableWidgetItem(text)
+                it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                table.setItem(r, 4, it)
+            elif it.text() != text:
+                it.setText(text)
 
     def _selected_bus_id(self) -> str:
         items = self._bus_table.selectedItems()
