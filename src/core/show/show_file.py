@@ -371,12 +371,23 @@ def reset_show():
     # dann liegen und lassen den FLD-FID-Guard in add_fixture auf next_fid() ausweichen
     # (ueberraschend verschobene Fixture-IDs beim naechsten Patch). Ein direkter,
     # eigenstaendig abgesicherter clear_patch()-Aufruf garantiert die leere Tabelle.
+    # STAB-09: den harten clear_patch() im _suppress_emits-Fenster ausfuehren.
+    # _replace_patch_from_data hat _suppress_emits in seinem finally wieder auf
+    # False gesetzt; ein ungedrosseltes clear_patch() wuerde hier synchron
+    # patch_changed feuern, waehrend programmer/functions/VC/Snaps noch ALT sind
+    # -> re-entranter Refresh mitten im Reset (genau der STAB-07/BUG-01-Pfad ->
+    # native Access Violation). Der finale gebuendelte patch_changed-Emit unten
+    # bleibt die einzige Notification.
+    _prev_suppress = getattr(state, "_suppress_emits", False)
+    state._suppress_emits = True
     try:
         state.clear_patch()
     except AttributeError:
         pass  # aeltere AppState-API ohne clear_patch
     except Exception as e:
         print(f"[show_file] reset clear_patch error: {e}")
+    finally:
+        state._suppress_emits = _prev_suppress
 
     # Fixture-Gruppen aus der Show-DB leeren (SSOT — sonst bleiben Gruppen nach Neue Show)
     try:
