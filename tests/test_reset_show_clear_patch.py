@@ -163,6 +163,48 @@ class ResetShowClearPatchTest(unittest.TestCase):
         reset_show()
         self.assertEqual(self._db_count(), 0)
 
+    def test_reset_show_emits_patch_changed_once(self):
+        """STAB-09: reset_show() darf patch_changed nur EINMAL feuern — den
+        finalen, gebuendelten Emit am Ende.
+
+        Der DEMO-03-clear_patch() laeuft NACH _replace_patch_from_data, das
+        _suppress_emits in seinem finally wieder auf False setzt. Ohne die
+        STAB-09-Unterdrueckung feuerte dieser harte clear_patch() ein ZWEITES,
+        re-entrantes patch_changed MITTEN im Reset — waehrend programmer,
+        Funktionen, VC-Layout und Snap-Bibliothek noch den ALTEN Stand haben.
+        Genau dieser re-entrante Refresh ist der STAB-07/BUG-01-Pfad (native
+        Access Violation im Programmer-Refresh). Vor dem Fix: 2 Emits, danach
+        genau 1.
+        """
+        # Etwas Patch-/Programmer-State anlegen, damit der Reset real raeumt.
+        pf = PatchedFixture(
+            fid=1, label="X", fixture_profile_id=_any_pid(),
+            mode_name="", universe=1, address=1, channel_count=1,
+            manufacturer_name="Test", fixture_name="Test", fixture_type="dimmer")
+        self.state.add_fixture(pf, undoable=False)
+        self.state.set_programmer_value(1, "dimmer", 200)
+
+        events: list[str] = []
+
+        def _cb(event, *_args):
+            if event == "patch_changed":
+                events.append(event)
+
+        self.state.subscribe(_cb)
+        try:
+            reset_show()
+        finally:
+            try:
+                self.state._callbacks.remove(_cb)
+            except (ValueError, AttributeError):
+                pass
+
+        self.assertEqual(
+            len(events), 1,
+            "reset_show() muss patch_changed GENAU einmal feuern (finaler "
+            "gebuendelter Emit); ein zweiter, re-entranter Emit aus dem harten "
+            "clear_patch() ist die STAB-09-Regression (siehe STAB-07/BUG-01)")
+
 
 if __name__ == "__main__":
     unittest.main()
