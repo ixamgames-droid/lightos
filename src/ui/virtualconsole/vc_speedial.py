@@ -167,7 +167,11 @@ class VCSpeedDial(VCWidget):
             tbm = get_tempo_bus_manager()
             if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
                 mb = self._mult_base_bus()
-                return round((mb.bpm if mb is not None else 0.0) * self._active_factor, 2)
+                # VCB-13: _apply() schreibt _effective_mult() (invert-bewusst) als
+                # tempo_multiplier — die Anzeige muss denselben Faktor nutzen, sonst
+                # weicht sie bei aktivem Invert vom tatsaechlich geschriebenen Wert ab.
+                # Ohne Invert ist _effective_mult()==_mult==_active_factor (unveraendert).
+                return round((mb.bpm if mb is not None else 0.0) * self._effective_mult(), 2)
             if self.target_mode == SpeedTarget.TEMPO_BUS:
                 b = tbm.get(self.tempo_bus_id)
                 return round(b.bpm if b is not None else 0.0, 2)
@@ -964,6 +968,10 @@ class VCSpeedDial(VCWidget):
     def to_dict(self) -> dict:
         d = super().to_dict()
         d["bpm"] = self._bpm
+        # VCB-12: konfigurierten BPM-Bereich persistieren (sonst Reset auf 20..600
+        # beim Reload, da apply_dict ihn sonst nie zuruecklas).
+        d["min_bpm"] = self._min_bpm
+        d["max_bpm"] = self._max_bpm
         d["function_id"] = self.function_id
         d["function_ids"] = list(self.function_ids)
         d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
@@ -986,6 +994,9 @@ class VCSpeedDial(VCWidget):
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
+        # VCB-12: BPM-Bereich VOR _bpm lesen (Defaults = bisheriges Verhalten).
+        self._min_bpm = float(d.get("min_bpm", 20.0))
+        self._max_bpm = float(d.get("max_bpm", 600.0))
         self._bpm = d.get("bpm", 120.0)
         self.function_id = d.get("function_id")
         _fids = []

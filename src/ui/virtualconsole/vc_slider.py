@@ -339,8 +339,11 @@ class VCSlider(VCWidget):
         try:
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
-            if self.function_ids:
-                return [f for f in (fm.get(i) for i in self.function_ids) if f is not None]
+            # VCB-20: function_id UND function_ids zusammenfuehren (wie _all_target_fids),
+            # statt function_id zu verwerfen, sobald function_ids gesetzt ist.
+            ids = self._all_target_fids()
+            if ids:
+                return [f for f in (fm.get(i) for i in ids) if f is not None]
         except Exception:
             return []
         f = self._effect_target()
@@ -371,7 +374,9 @@ class VCSlider(VCWidget):
         if not self.effect_autostart:
             return
         _fid = self._resolved_effect_fid()
-        ids = self.function_ids or ([_fid] if _fid is not None else [])
+        # VCB-20: function_id + function_ids zusammenfuehren; nur wenn beide leer
+        # sind, auf den aufgeloesten (aktiven/Edit-Slot-)Effekt zurueckfallen.
+        ids = self._all_target_fids() or ([_fid] if _fid is not None else [])
         if not ids:
             return
         try:
@@ -490,8 +495,12 @@ class VCSlider(VCWidget):
         if self._drag_y is not None:
             dy = self._drag_y - event.position().toPoint().y()
             tr = self._track_rect()
-            delta = int(dy / tr.height() * 255)
-            self.value = self._drag_start_val + delta
+            # VCB-15: _track_rect()-Hoehe = height - 40; bei einem auf <=40 px
+            # geschrumpften Fader wird sie 0/negativ -> ZeroDivisionError beim Ziehen.
+            th = tr.height()
+            if th > 0:
+                delta = int(dy / th * 255)
+                self.value = self._drag_start_val + delta
         event.accept()
 
     def mouseReleaseEvent(self, event):

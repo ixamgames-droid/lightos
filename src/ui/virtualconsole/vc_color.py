@@ -153,11 +153,22 @@ class VCColor(VCWidget):
         from src.core.color_utils import rgbw_to_display
         return rgbw_to_display(self.color_r, self.color_g, self.color_b, self.color_w)
 
+    @staticmethod
+    def _parse_function_id(text):
+        """function_id aus dem Eingabefeld: nicht-negative Ganzzahl oder None.
+        VCB-17: ``isdigit()`` lehnt leere Eingabe UND negative IDs ab — frueher
+        strippte ``lstrip("-")`` das Minus, sodass „-5" als gueltig durchging
+        (function_ids sind immer >= 0; ein negativer Wert ist eine ungueltige
+        Bindung). Symmetrisch zu VCEffectColors."""
+        t = (text or "").strip()
+        return int(t) if t.isdigit() else None
+
     def _apply(self):
         if self.target == ColorTarget.EFFECT_ADD:
             # Live-Color-Chase: Farbe an die Color-Sequence des Ziel-Effekts anhaengen.
             try:
                 from src.core.engine import effect_live
+                effect_live.begin_live_edit(self._effect_fid())   # VCB-16: Live-Edit-Baseline (wie VCEffectColors)
                 effect_live.do_action("add_color", self._effect_fid(),
                                       rgb=self._effect_rgb())
             except Exception as e:
@@ -168,6 +179,7 @@ class VCColor(VCWidget):
             # Phase 6: Live in die aktive Sequence-Farbe des Effekts faerben.
             try:
                 from src.core.engine import effect_live
+                effect_live.begin_live_edit(self._effect_fid())   # VCB-16
                 effect_live.set_selected_color(self._effect_rgb(), self._effect_fid())
             except Exception as e:
                 print(f"[VCColor] effect color error: {e}")
@@ -177,6 +189,7 @@ class VCColor(VCWidget):
             # To-Do #5: gezielt color1/2/3 des Effekts setzen (Feuer/Plasma/Windrad).
             try:
                 from src.core.engine import effect_live
+                effect_live.begin_live_edit(self._effect_fid())   # VCB-16
                 effect_live.set_param(_EFFECT_COLOR_SLOTS[self.target],
                                       self._effect_rgb(),
                                       self._effect_fid())
@@ -532,8 +545,7 @@ class VCColor(VCWidget):
             self.color_a = a_spin.value()
             self.color_uv = uv_spin.value()
             self.target = target_cb.currentText()
-            _ftxt = fid_edit.text().strip()
-            self.function_id = int(_ftxt) if _ftxt.lstrip("-").isdigit() else None
+            self.function_id = self._parse_function_id(fid_edit.text())
             self.edit_slot = edit_slot_edit.text().strip()
             self.head = head_spin.value()
             self.midi_type = midi_type_combo.currentText()
