@@ -531,6 +531,13 @@ class RgbMatrixInstance(Function):
                     self._beat_anchor = bus.take_anchor()
                     self._last_tick = time.monotonic()
                     self._step = 0.0
+                    # ENG-10: Stall-Cache loeschen. Hatte die Matrix vorher gegen
+                    # einen STEHENDEN Bus gerendert, gilt ``_last_bus_pos == pos``;
+                    # ohne Reset wuerde der DEMO-04-Stall-Check (``dt>0`` + ``pos==last``)
+                    # im naechsten Frame die Bus-Sync ueberspringen und free-runnen
+                    # -> der gerade gesetzte Anker/Phasen-Offset (Sync-Aktion) wuerde
+                    # ignoriert, bis der Bus vorrueckt.
+                    self._last_bus_pos = None
                     return
             except Exception:
                 pass
