@@ -18,6 +18,16 @@ def _clear_submaster_slot(slot):
         pass
 
 
+def _clear_feature_dimmer_slot(slot):
+    """F-26b: raeumt den Feature-Dimmer-Slot eines geloeschten/umgestellten Faders
+    in AppState.feature_dimmers (sonst dimmt sein letzter Wert als Geist weiter)."""
+    try:
+        from src.core.app_state import get_state
+        get_state().feature_dimmers.pop(slot, None)
+    except Exception:
+        pass
+
+
 class SliderMode(str):
     LEVEL    = "Level"
     PLAYBACK = "Playback"
@@ -34,6 +44,10 @@ class SliderMode(str):
     # F-25: multiplikativer Gruppen-Dimmer — der Fader skaliert die Helligkeit
     # einer festen Fixture-Gruppe (programmer_group) über set_group_dimmer().
     GROUP_DIMMER     = "GroupDimmer"
+    # F-26b: Feature-Dimmer-Master — wie GROUP_DIMMER, aber dimmt eine WAEHLBARE
+    # Feature-Gruppe (feature_attr: Intensity/Color/Gobo/Beam/Position/Effect) statt
+    # nur der Helligkeit; effekt-unabhaengig via set_feature_dimmer (Render 4b²).
+    FEATURE_DIMMER   = "FeatureDimmer"
     # Tempo-Sync Phase 5: steuert die BPM EINES benannten Tempo-Bus (A/B/C/D),
     # unabhaengig vom globalen Leader (tempo_bus_id, "" = aktiver/Default-Bus).
     TEMPO_BUS        = "TempoBus"
@@ -46,6 +60,7 @@ SLIDER_MODE_LABELS: list[tuple[str, str]] = [
     (SliderMode.EFFECT_PARAM,     "Effekt-Parameter"),
     (SliderMode.PROGRAMMER,       "Programmer-Attribut"),
     (SliderMode.GROUP_DIMMER,     "Gruppen-Dimmer"),
+    (SliderMode.FEATURE_DIMMER,   "Feature-Dimmer (Gruppe)"),
     (SliderMode.SUBMASTER,        "Submaster"),
     (SliderMode.GRANDMASTER,      "Grand Master"),
     (SliderMode.SPEED,            "Speed (alle Effekte)"),
@@ -95,6 +110,9 @@ class VCSlider(VCWidget):
         # (APC-Probier To-Do #4: PAR-Dim trifft die PARs ohne vorher anzuklicken).
         self.programmer_scope: str = "all"
         self.programmer_group: str = ""           # Gruppenname fuer scope == "group"
+        # F-26b: zu dimmende Feature-Gruppe im FEATURE_DIMMER-Modus (classify_attr-
+        # Gruppenname: Intensity/Color/Gobo/Beam/Position/Effect). "" = Intensity.
+        self.feature_attr: str = "Intensity"
         self.param_key: str = "speed"             # fuer EFFECT_PARAM-Modus
         # Phase E (Multi-Effekt): je gekoppeltem Effekt ein eigener gesteuerter
         # Parameter (Map fid -> param_key). Fehlt ein Eintrag -> param_key (Default).
@@ -138,6 +156,8 @@ class VCSlider(VCWidget):
         # pro Widget, id(self)). Wird der Fader geloescht, muss sein Slot im
         # OutputManager geraeumt werden — sonst dimmt sein letzter Wert weiter.
         self.destroyed.connect(lambda *_, s=id(self): _clear_submaster_slot(s))
+        # F-26b: ebenso den Feature-Dimmer-Slot raeumen (sonst Geister-Feature-Dimmer).
+        self.destroyed.connect(lambda *_, s=id(self): _clear_feature_dimmer_slot(s))
 
     # ── Value ─────────────────────────────────────────────────────────────────
 
@@ -284,6 +304,18 @@ class VCSlider(VCWidget):
                 state.set_group_dimmer(fids, v / 255.0)
             except Exception:
                 pass
+        elif self.mode == SliderMode.FEATURE_DIMMER:
+            # F-26b: per-Slot Feature-Dimmer ueber set_feature_dimmer (Render 4b²).
+            # Dimmt die gewaehlte Feature-Gruppe (feature_attr) einer festen Gruppe;
+            # leeres/"Intensity" feature_attr -> Default = Helligkeit.
+            try:
+                fids = self._group_fids(state, self.programmer_group)
+                feats = ({self.feature_attr}
+                         if self.feature_attr and self.feature_attr != "Intensity"
+                         else None)
+                state.set_feature_dimmer(id(self), fids, feats, v / 255.0)
+            except Exception:
+                pass
 
     @staticmethod
     def _group_fids(state, group_name: str) -> list[int]:
@@ -293,6 +325,34 @@ class VCSlider(VCWidget):
             return state.group_fids_by_name(group_name)
         except Exception:
             return []
+
+    @staticmethod
+    def _available_feature_groups(group_name: str) -> list[str]:
+        """F-26b: die in den Fixtures der gewaehlten Gruppe tatsaechlich vorhandenen
+        classify_attr-Feature-Gruppen (Capabilities), in sinnvoller Reihenfolge,
+        Intensity immer zuerst. Ohne Gruppe / ohne Treffer -> Standardliste. Qt-frei."""
+        _ORDER = ["Intensity", "Color", "Position", "Gobo", "Beam", "Effect"]
+        try:
+            from src.core.app_state import get_state
+            from src.core.attr_groups import classify_attr
+            st = get_state()
+            fids = st.group_fids_by_name(group_name) if group_name else []
+            present = set()
+            for fid in fids:
+                entry = st._fix_index.get(fid)
+                if not entry:
+                    continue
+                _fx, chans = entry
+                for ch in chans:
+                    attr = (getattr(ch, "attribute", "") or "").lower()
+                    if attr:
+                        present.add(classify_attr(attr))
+            avail = [g for g in _ORDER if g in present]
+            if avail:
+                return avail if "Intensity" in avail else (["Intensity"] + avail)
+        except Exception:
+            pass
+        return list(_ORDER)
 
     def _submaster_target_fids(self, state):
         """Reichweite eines Submaster-Faders -> Ziel-fids oder None (= global/alle).
@@ -674,8 +734,21 @@ class VCSlider(VCWidget):
             pass
         group_cb.setCurrentText(self.programmer_group or "")
         group_cb.setToolTip("Fixture-Gruppe für Reichweite = 'Feste Gruppe' "
-                            "(Programmer/Submaster) bzw. für den Modus 'GroupDimmer'.")
+                            "(Programmer/Submaster) bzw. für 'GroupDimmer'/'FeatureDimmer'.")
         form.addRow("Feste Gruppe:", group_cb)
+
+        # F-26b: Feature-Auswahl fuer den FEATURE_DIMMER-Modus — aus den Capabilities
+        # der gewaehlten Gruppe (vorhandene classify_attr-Feature-Gruppen) befuellt,
+        # Fallback Standardliste. Nicht-editierbare ComboBox -> keine Tippfehler.
+        feature_attr_cb = QComboBox()
+        for _fg in self._available_feature_groups(self.programmer_group):
+            feature_attr_cb.addItem(_fg, _fg)
+        _fa_idx = feature_attr_cb.findData(self.feature_attr or "Intensity")
+        if _fa_idx >= 0:
+            feature_attr_cb.setCurrentIndex(_fa_idx)
+        feature_attr_cb.setToolTip("Welche Feature-Gruppe der Feature-Dimmer skaliert "
+                                   "(Intensity = Helligkeit) — aus den Faehigkeiten der Gruppe.")
+        form.addRow("Feature (Feature-Dimmer):", feature_attr_cb)
 
         # Live-Edit-Slot: bei EFFECT-Modi ohne feste Funktions-ID den Effekt aus
         # diesem Slot bearbeiten (von einem Effekt-Pad gesetzt).
@@ -764,7 +837,8 @@ class VCSlider(VCWidget):
                 param_key_combo: m == SliderMode.EFFECT_PARAM,
                 scope_cb:        m in (SliderMode.PROGRAMMER, SliderMode.SUBMASTER),
                 group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER,
-                                       SliderMode.SUBMASTER),
+                                       SliderMode.SUBMASTER, SliderMode.FEATURE_DIMMER),
+                feature_attr_cb: m == SliderMode.FEATURE_DIMMER,
                 edit_slot_edit:  eff,
                 autostart_cb:    eff,
                 univ:            m == SliderMode.LEVEL,
@@ -846,6 +920,7 @@ class VCSlider(VCWidget):
             self.tempo_bus_id = bus_cb.currentData() or ""
             self.programmer_scope = scope_cb.currentData() or "all"
             self.programmer_group = group_cb.currentText().strip()
+            self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
             self.effect_autostart = autostart_cb.isChecked()
             self.invert = invert_cb.isChecked()
             self.range_min = rmin.value()
@@ -892,6 +967,10 @@ class VCSlider(VCWidget):
             self._apply()
         elif _old_mode == SliderMode.GROUP_DIMMER:
             self._reset_group_dimmer(_old_group)         # VCB-19
+        elif self.mode == SliderMode.FEATURE_DIMMER:
+            self._apply()                                # F-26b: Slot sofort setzen
+        elif _old_mode == SliderMode.FEATURE_DIMMER:
+            _clear_feature_dimmer_slot(id(self))         # F-26b: weg -> Slot raeumen
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -905,6 +984,8 @@ class VCSlider(VCWidget):
         d["programmer_attr"] = self.programmer_attr
         d["programmer_scope"] = self.programmer_scope
         d["programmer_group"] = self.programmer_group
+        d["feature_attr"] = self.feature_attr      # F-26b
+
         d["param_key"] = self.param_key
         d["param_keys_per_id"] = {str(k): v for k, v in self.param_keys_per_id.items()}
         d["edit_slot"] = self.edit_slot
@@ -934,6 +1015,7 @@ class VCSlider(VCWidget):
         self.programmer_attr = d.get("programmer_attr", "intensity")
         self.programmer_scope = d.get("programmer_scope", "all")
         self.programmer_group = d.get("programmer_group", "")
+        self.feature_attr = d.get("feature_attr", "Intensity") or "Intensity"   # F-26b
         self.param_key = d.get("param_key", "speed")
         self.param_keys_per_id = {}
         for k, v in (d.get("param_keys_per_id") or {}).items():
@@ -964,7 +1046,8 @@ class VCSlider(VCWidget):
         # fixture_dimmers, SUBMASTER einen Output-Slot) muessen ihren geladenen Wert
         # beim Show-Laden aktiv setzen — sonst kommt die Show zu hell hoch, bis der
         # Nutzer den Fader bewegt (fixture_dimmers wird bei load/reset geleert, VCB-05).
-        if self.mode in (SliderMode.GROUP_DIMMER, SliderMode.SUBMASTER):
+        if self.mode in (SliderMode.GROUP_DIMMER, SliderMode.SUBMASTER,
+                         SliderMode.FEATURE_DIMMER):
             try:
                 self._apply()
             except Exception:
