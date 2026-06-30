@@ -59,6 +59,12 @@ _Beim Harvesten der Codex-Kommentare auf den frisch gemergten PRs #87–#90 entd
 
 > **Geprüfte False-Positives (NICHT wieder öffnen):** PR #91 (reine Docs-PR) erhielt 2 Codex-„Reopen"-Kommentare (DEMO-02/04 + ENG-07), weil die `docs/backlog-sync`-Branch die Merges #88/#89/#90 noch nicht enthielt (stale Review-Base). Gegen aktuellen `main` am 2026-06-30 verifiziert: `tools/_gen_env.py` + `import _gen_env`, `prism_rotation` exakt in `attr_groups.ATTR_GROUPS['Effect']`, und die `_last_bus_pos`-Stall-Logik in `rgb_matrix.py` existieren alle → DEMO-02/04 + ENG-07 sind korrekt erledigt.
 
+### 🧪 Test-Infrastruktur
+
+| ID | Prio | Status | Titel | Akzeptanzkriterium |
+|----|------|--------|-------|--------------------|
+| QA-06 | P2 | todo | `test_vc_tempo_live_coupling` flaket über `fixtures.db`-Setup-Kollision | `test_set_param_tempo_bus_reanchors_running_effect` wirft sporadisch/state-abhängig `OperationalError: table manufacturers already exists` — die **Fixture-Definitions-DB** (`~/AppData/Roaming/LightOS/fixtures.db`) ist bewusst nicht pro-PID/Test isoliert, sodass ein `create_all` ohne `checkfirst` mit existierenden Tabellen kollidiert. **Vorbestehend** (schon in der 2026-06-30-Baseline rot, unabhängig vom Loop). Fix: Test/conftest auf eine isolierte (temp/in-memory) Fixtures-DB legen ODER `create_all` idempotent (`checkfirst=True`) im betroffenen Setup. Bis dahin „passt beim Retry". |
+
 ### 🖥️ Aus VC-Code-Audit (Stand 2026-06-30)
 _10-Agent-Audit des `src/ui/virtualconsole/*`-Subsystems (+ `effect_live.py`, `show_file.py`-VC-Teil). **Volle Details, alle 31 Bugs + 14 Verbesserungen + Design-Fragen + F-26b-Plan:** [`docs/VC_AUDIT_2026_06_30.md`](docs/VC_AUDIT_2026_06_30.md). Gesamtbild: Code strukturell solide; Schwerpunkte = VCFrame-Seitensteuerung, Bank-Propagierung, zu nachsichtige `apply_dict`-Pfade. Die **10 P1-Bugs** (alle Aufwand S) werden vom Loop zuerst gefixt:_
 
