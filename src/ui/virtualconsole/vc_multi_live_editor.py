@@ -28,7 +28,8 @@ Vorschau je Typ und Tempo-Modus (Aus/BPM/Tap) folgen in spaeteren Branches.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QPointF, QRectF
+from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QSlider, QSpinBox,
                                QVBoxLayout, QWidget)
@@ -49,6 +50,164 @@ _EXCLUDE_KEYS = frozenset({
 
 _DIR_LABELS = {"forward": "vorwärts", "reverse": "rückwärts",
                "backward": "rückwärts", "bounce": "Ping-Pong"}
+
+
+class _EffectPreview(QWidget):
+    """Kompakte Live-Vorschau des gewaehlten Effekts — EIGENER Renderer je Typ:
+    Matrix (Pixel), EFX (Bewegungs-Pfad), Chaser (Schritte). Read-only: mutiert den
+    Effekt NICHT (laeuft er, animiert die Engine; sonst zeigt Matrix ein Standbild,
+    EFX/Chaser werden ueber eine lokale Phase animiert)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(132)
+        self._fid = None
+        self._phase = 0.0                    # lokale Animations-Phase (EFX-Punkt / Draft)
+        self._timer = QTimer(self)
+        self._timer.setInterval(60)          # ~16 Hz, an Sichtbarkeit gekoppelt
+        self._timer.timeout.connect(self._tick)
+
+    def set_fid(self, fid) -> None:
+        new = int(fid) if fid is not None else None
+        if new != self._fid:
+            self._fid = new
+            self._phase = 0.0
+        self.update()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._timer.stop()
+
+    def _tick(self):
+        if not self.isVisible():
+            return
+        self._phase = (self._phase + 0.012) % 1.0
+        self.update()
+
+    def _fn(self):
+        if self._fid is None:
+            return None
+        try:
+            from src.core.engine import effect_live
+            return effect_live.resolve_target(self._fid)
+        except Exception:
+            return None
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.fillRect(self.rect(), QColor("#0d1117"))
+        p.setPen(QPen(QColor("#30363d"), 1))
+        p.drawRoundedRect(self.rect().adjusted(0, 0, -1, -1), 6, 6)
+        area = self.rect().adjusted(9, 9, -9, -9)
+        fn = self._fn()
+        if fn is None:
+            self._placeholder(p, area, "Kein Effekt geladen")
+        else:
+            try:
+                if hasattr(fn, "preview_pixels"):
+                    self._paint_matrix(p, area, fn)
+                elif hasattr(fn, "_calc"):
+                    self._paint_efx(p, area, fn)
+                elif hasattr(fn, "steps"):
+                    self._paint_chaser(p, area, fn)
+                else:
+                    self._placeholder(p, area, "keine Vorschau für diesen Typ")
+            except Exception:
+                self._placeholder(p, area, "Vorschau nicht verfügbar")
+        p.end()
+
+    def _placeholder(self, p, area, msg):
+        p.setPen(QColor("#484f58"))
+        p.setFont(QFont("Segoe UI", 9))
+        p.drawText(area, Qt.AlignmentFlag.AlignCenter, msg)
+
+    def _paint_matrix(self, p, area, fn):
+        pixels = list(fn.preview_pixels())
+        cols = int(getattr(fn, "cols", 0))
+        rows = int(getattr(fn, "rows", 0))
+        grid = getattr(fn, "fixture_grid", []) or []
+        if not pixels or cols <= 0 or rows <= 0:
+            self._placeholder(p, area, "keine Pixel-Vorschau")
+            return
+        from src.core.engine.rgb_matrix import is_gap
+        cw = area.width() / cols
+        ch = area.height() / rows
+        for row in range(rows):
+            for col in range(cols):
+                idx = row * cols + col
+                if idx >= len(pixels):
+                    break
+                x = int(area.x() + col * cw)
+                y = int(area.y() + row * ch)
+                w = max(1, int(cw) - 1)
+                h = max(1, int(ch) - 1)
+                if is_gap(grid, idx):
+                    p.setBrush(Qt.BrushStyle.NoBrush)
+                    p.setPen(QPen(QColor("#30363d"), 1, Qt.PenStyle.DotLine))
+                    p.drawRect(x, y, w - 1, h - 1)
+                    continue
+                r, g, b = pixels[idx]
+                p.fillRect(x, y, w, h, QColor(int(r), int(g), int(b)))
+
+    def _paint_efx(self, p, area, fn):
+        N = 96
+        pts = []
+        for i in range(N + 1):
+            pts.append(fn._calc(i / N))
+        xs = [q[0] for q in pts]
+        ys = [q[1] for q in pts]
+        cx = (min(xs) + max(xs)) / 2.0
+        cy = (min(ys) + max(ys)) / 2.0
+        span = max(max(xs) - min(xs), max(ys) - min(ys)) or 1.0
+        size = min(area.width(), area.height()) - 6
+        ox = area.x() + (area.width() - size) / 2.0
+        oy = area.y() + (area.height() - size) / 2.0
+
+        def to_px(x, y):
+            nx = (x - cx) / span + 0.5
+            ny = (y - cy) / span + 0.5
+            return QPointF(ox + nx * size, oy + (1.0 - ny) * size)   # Tilt oben = oben
+
+        path = QPainterPath()
+        path.moveTo(to_px(*pts[0]))
+        for q in pts[1:]:
+            path.lineTo(to_px(*q))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor("#58a6ff"), 2))
+        p.drawPath(path)
+        dx, dy = fn._calc(self._phase)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor("#f0a32a"))
+        p.drawEllipse(to_px(dx, dy), 5.0, 5.0)
+
+    def _paint_chaser(self, p, area, fn):
+        steps = getattr(fn, "steps", []) or []
+        n = len(steps)
+        if n == 0:
+            self._placeholder(p, area, "Chaser ohne Schritte")
+            return
+        running = bool(getattr(fn, "_running", False))
+        cur = int(getattr(fn, "_step_idx", 0)) if running else int(self._phase * n) % n
+        shown = min(n, 16)
+        gap = 5
+        bw = (area.width() - (shown - 1) * gap) / shown
+        bh = min(area.height() - 4, 44)
+        y = area.y() + (area.height() - bh) / 2.0
+        for i in range(shown):
+            x = area.x() + i * (bw + gap)
+            active = (i == cur) and (cur < shown)
+            p.fillRect(QRectF(x, y, bw, bh),
+                       QColor("#378add") if active else QColor("#30363d"))
+        if n > shown:
+            p.setPen(QColor("#8b949e"))
+            p.setFont(QFont("Segoe UI", 8))
+            p.drawText(area, int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom),
+                       f"{n} Schritte")
 
 
 class VCMultiLiveEditor(QWidget):
@@ -95,6 +254,10 @@ class VCMultiLiveEditor(QWidget):
         nav.addWidget(self._combo, 1)
         nav.addWidget(self._next)
         root.addLayout(nav)
+
+        # Live-Vorschau des gewaehlten Effekts (eigener Renderer je Typ).
+        self._preview = _EffectPreview()
+        root.addWidget(self._preview)
 
         # Body: scrollbarer Editor-Bereich; Inhalt wird je Effekt neu gebaut.
         self._scroll = QScrollArea()
@@ -220,6 +383,7 @@ class VCMultiLiveEditor(QWidget):
         return self._checked.setdefault(int(fid), set())
 
     def _refresh_body(self) -> None:
+        self._preview.set_fid(self._current_fid())
         content = QWidget()
         v = QVBoxLayout(content)
         v.setContentsMargins(10, 10, 10, 10)
