@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "id": "novation_launchkey_mini_mk3",
+  "manufacturer": "Novation",
+  "model": "Launchkey Mini MK3",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI",
+    "TRS MIDI Out (3.5mm Type A, nur Performance-Daten)"
+  ],
+  "buttons": 8,
+  "faders": 0,
+  "encoders": 8,
+  "pad_matrix": [
+    8,
+    2
+  ],
+  "banks": "Geraet startet in Standalone (MIDI) mode. Pad-Modi per Shift umschaltbar: Drum / Session / Custom (Pad Custom Mode 0). Knob-Modi: Volume/Device/Pan/SendsA/SendsB sowie Knob Custom Mode. Pads und Knobs sind ueber Novation Components (Custom Modes) frei editierbar (Note-/CC-Nummern, Kanal, Momentary/Toggle, On/Off-Farbe). DAW-Mode (zweiter USB-Port) wird per Note On Ch16 Note 12 (9Fh 0Ch 7Fh) aktiviert, per 9Fh 0Ch 00h verlassen; darin liefern die Pads Session-Layout (Ch1) bzw. Drum-Layout (Ch10). Pad-Modus-Wechsel werden via Ch16 CC 03h gemeldet/gesetzt (01h=Drum, 02h=Session). Werks-Custom-Mode = identisch mit einem frisch erstellten Custom Mode.",
+  "controls": [
+    {
+      "name": "Keys (25 Mini-Tasten)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        0,
+        127
+      ],
+      "layout": "25 anschlagdynamische Mini-Tasten. Note On/Off auf MIDI-Kanal 1 (Default, per Shift+Transpose auf andere Kanaele umstellbar). Werks-Oktavlage: mittleres C = C3 = Note 60. Per Oktav-Tasten ueber 7 Oktaven verschiebbar (C-1 bis C5). range = voller moeglicher Notenbereich, da durch Oktav-Shift erreichbar."
+    },
+    {
+      "name": "Pads (Drum-Layout, Standalone-Default)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        36,
+        51
+      ],
+      "layout": "16 RGB-Pads (8x2). Im Drum-Modus Note-Events auf MIDI-Kanal 10 (Status 9Ah). Werks-Drum-Belegung (zweitquellen-belegt, llimllib-Gist): obere Reihe 40,41,42,43,48,49,50,51 / untere Reihe 36,37,38,39,44,45,46,47 (zwei 4x2-Bloecke, klassisches Novation-Drum-Layout) → Bereich 36-51. Note-Nummern in Novation Components frei editierbar."
+    },
+    {
+      "name": "Pads (Session-Layout, DAW-Mode)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        96,
+        119
+      ],
+      "layout": "Im DAW-/Session-Modus melden die 16 Pads Note-Events (Status 90h) auf MIDI-Kanal 1. Notenraster 96-119 (0x60-0x77): obere Reihe 96-103 (links->rechts), untere Reihe 112-119. Klartext-belegt durch offizielle Programmer's Reference (Note 60h=96 oben-links, 70h=112 unten-links). Dieselben Notennummern dienen zum LED-Coloring."
+    },
+    {
+      "name": "Rotary Knobs (8 Encoder)",
+      "type": "cc",
+      "channel": 15,
+      "range": [
+        21,
+        28
+      ],
+      "layout": "8 Drehregler. Senden Control Change auf MIDI-Kanal 16 (Status BFh), CC 21-28 (links nach rechts). CC-Nummern in Novation Components editierbar. Wertbereich 0-127. Zweitquellen-belegt (giezu-Repo + offizielle PR-Guide: alle Pot-Modi senden auf Ch16)."
+    },
+    {
+      "name": "Scene Up / Scene Down Buttons",
+      "type": "cc",
+      "channel": 15,
+      "range": [
+        104,
+        105
+      ],
+      "layout": "Die beiden Pfeil-/Scene-Tasten melden CC 104 (Up) und CC 105 (Down) auf MIDI-Kanal 16. Klartext-belegt durch offizielle Programmer's Reference: 'Scene Up and Scene Down buttons also report back CC 68h (104) and 69h (105) respectively on Channel 16' (Mini-MK3-Kompatibilitaetshinweis). Press=127, Release=0."
+    },
+    {
+      "name": "Funktions-/Transport-Tasten (Shift, Arp, Fixed Chord, Transpose, Octave +/-)",
+      "type": "cc",
+      "channel": 15,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "Restliche Bedien-Tasten melden im Standalone-Mode Control-Change-Events auf MIDI-Kanal 16 (PR-Guide: 'they do send MIDI Control Change events on Channel 16'). Einzel-CC-Nummern stehen in der Programmer's Reference nur als Grafik-Tabelle (nicht klartextlich extrahierbar) – Kanal belegt, Einzelnummern nicht. range [-1,-1] = Nummer unbekannt/nicht zweitquellen-belegbar."
+    },
+    {
+      "name": "Pitch Bend Touch Strip",
+      "type": "pitchbend",
+      "channel": 0,
+      "range": [
+        0,
+        127
+      ],
+      "layout": "Kapazitiver Touch-Streifen fuer Pitch Bend, MIDI-Kanal 1 (folgt Tasten-Kanal). Pitch-Bend-Message (Status E0h)."
+    },
+    {
+      "name": "Modulation Touch Strip",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        1,
+        1
+      ],
+      "layout": "Kapazitiver Touch-Streifen fuer Modulation, sendet CC 1 (Mod Wheel) auf MIDI-Kanal 1 (folgt Tasten-Kanal). Wird auch fuer Strum-Mode genutzt."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "RGB-Pads. LEDs werden im DAW-Mode per Note On (oder CC) an die jeweilige Pad-Notennummer angesteuert; die Velocity (bzw. der CC-Wert) waehlt die Farbe aus einer 128er-Farbpalette (Index 0-127). Der MIDI-KANAL bestimmt den Leuchtmodus (offiziell belegt): Session-Layout Ch1=statisch, Ch2=blinkend, Ch3=pulsierend; Drum-Layout Ch10=statisch, Ch11=blinkend, Ch12=pulsierend; Ch16=stationaere Graustufe (nur CC-gebundene Controls). Pulsing ist an die MIDI-Beat-Clock gekoppelt. Beispiel (offiz. Ref.): 90h 70h 05h faerbt unten-links statisch rot (Session). Vegas-Mode (Idle-Lightshow) vorhanden. LED-Steuerung erfordert i.d.R. aktiven DAW-Mode (9Fh 0Ch 7Fh)."
+  },
+  "features": [
+    "25 anschlagdynamische Mini-Keys",
+    "16 velocity-sensitive RGB-Pads (8x2)",
+    "8 Drehregler (CC 21-28, Ch16)",
+    "Pitch- und Modulation-Touch-Strips (kein Rad)",
+    "Arpeggiator mit eigenen Knob-/Pad-Steuerungen",
+    "Fixed Chord Mode",
+    "Strum Mode (ueber Modulation-Strip)",
+    "Scale Mode",
+    "Custom Modes fuer Pads und Knobs (editierbar in Novation Components, WebMIDI)",
+    "Standalone-Mode (powert hinein) + separater DAW-Mode (zweiter USB-Port, via 9Fh 0Ch 7Fh)",
+    "DIN/TRS MIDI Out (Type A, nur Performance-Daten)",
+    "Ableton-Live-/Logic-Pro-Integration",
+    "Vegas-Mode Idle-Lightshow",
+    "Werks-Default ist editierbar – modelliert ist die Werkseinstellung"
+  ],
+  "source": "(1) Offizielle Novation 'Launchkey [MK3] Programmer's Reference Guide v1' (https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launchkey_mk3_programmer_s_reference_guide_v1_en.pdf) – Volltext gegengeprueft: Pots Ch16 (BFh), Session-Pads Ch1 Note 60h(96)=oben-links/70h(112)=unten-links → Raster 96-119, Drum-Pads Ch10 (9Ah), Scene Up/Down CC104/105 EXPLIZIT auf Ch16 (Mini-Kompatibilitaetshinweis), Standalone-Tasten CC auf Ch16, DAW-Entry 9Fh 0Ch 7Fh, Fader nur bei Launchkey 49/61/88. (2) ZWEITQUELLE llimllib-Gist 'Setting pad colors on the Novation LaunchKey Mini MK3' (https://gist.github.com/llimllib/13a391bc52aea9af3c8e81a315647240) – hands-on belegt Drum-Note-Layout obere Reihe 40-43/48-51, untere Reihe 36-39/44-47 (→36-51) und 0-basierte Kanaele (Ch15=MIDI16). (3) ZWEITQUELLE giezu/LaunchkeyMiniMK3 Reverse-Engineering (https://github.com/giezu/LaunchkeyMiniMK3) – Knobs CC21-28 Ch16, Drum Ch10/Session Ch1, LED-Palette, Mode-Select Ch16 CC3. (4) Offizielles 'Launchkey Mini MK3 User Guide 1.1' – 25 Keys + 16 RGB-Pads + 8 Knobs, C-1..C5, Pitch/Mod Touch-Strips, editierbar via Components. HINWEIS: Geraet editierbar; modelliert ist der WERKS-DEFAULT. Einzel-CC der Funktionstasten liegen nur als Grafik vor.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

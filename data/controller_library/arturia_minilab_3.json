@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "id": "arturia_minilab_3",
+  "manufacturer": "Arturia",
+  "model": "MiniLab 3",
+  "device_type": "midi_keyboard",
+  "connections": [
+    "USB-MIDI",
+    "MIDI out via 3.5mm TRS (MIDI Type A) adapter included",
+    "Sustain/expression/footswitch pedal input (3.5mm)"
+  ],
+  "buttons": 6,
+  "faders": 4,
+  "encoders": 9,
+  "pad_matrix": [
+    4,
+    2
+  ],
+  "banks": "8 Pads physisch als 2x4-Raster. 2 Pad-Banks (A und B), umgeschaltet via Shift. Bank A = Pad-Noten 36-43 auf MIDI-Kanal 10 (an Zweitquelle bestaetigt). Bank B = andere Noten, ebenfalls Kanal 10 (exakte Nummern NICHT belegt). Bis zu 8 User-Templates/Device-Memories editierbar im Arturia MIDI Control Center (MCC). Zwei Betriebsmodi: ARTURIA-Mode (Analog-Lab-Steuerung) und User-/MIDI-Mode. Separater MCU/HUI-DAW-Modus fuer Mackie-Control ueber eigenen Port.",
+  "controls": [
+    {
+      "name": "Keyboard (25 slim keys)",
+      "type": "key",
+      "channel": 0,
+      "range": [
+        36,
+        60
+      ],
+      "layout": "25 anschlagsdynamische Slim-Keys, oktavierbar ueber den gesamten Notenbereich; Default Keyboard Channel = 1 (0-basiert 0). Range 36-60 ist nur die Default-Oktavlage, per Oktav-Tasten verschiebbar."
+    },
+    {
+      "name": "Pads Bank A (8 RGB)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        36,
+        43
+      ],
+      "layout": "2 Reihen x 4 Spalten (2x4), RGB, velocity- und druckempfindlich; Default-Noten 36-43 (Pad1=36 ... Pad8=43, links nach rechts) auf MIDI-Kanal 10 (0-basiert 9). An Zweitquelle (MiniDexed) bestaetigt."
+    },
+    {
+      "name": "Pads Bank B (8 RGB)",
+      "type": "note",
+      "channel": 9,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "Zweite Bank derselben 8 Pads (per Shift). Andere Default-Noten auf Kanal 10, exakte Nummern NICHT belegt (frueher als 44-51 geraten - nun bewusst offen gelassen, range [-1,-1]). In MCC frei editierbar; eine Drittquelle deutet abweichendes Verhalten an."
+    },
+    {
+      "name": "Knobs/Encoders 1-8",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        16,
+        93
+      ],
+      "layout": "8 Endlos-Drehencoder. Default-CCs (Werks-User-Template): K1=74, K2=71, K3=76, K4=77, K5=93, K6=18, K7=19, K8=16. MIDI-Kanal nicht hart belegt - als Default Keyboard Channel 1 (0-basiert 0) modelliert. CCs NICHT zusammenhaengend - range-Feld nur Min/Max, echte Liste hier im layout."
+    },
+    {
+      "name": "Faders 1-4",
+      "type": "fader",
+      "channel": 0,
+      "range": [
+        17,
+        85
+      ],
+      "layout": "4 physische Fader, senden CC. Default-CCs: F1=82, F2=83, F3=85, F4=17. MIDI-Kanal nicht hart belegt (als Kanal 1, 0-basiert 0, modelliert). CCs NICHT zusammenhaengend - range-Feld nur Min/Max, echte Liste hier im layout."
+    },
+    {
+      "name": "Main Encoder (Big Knob / Browser)",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "Grosser klickbarer Push-Encoder oben rechts; im ARTURIA/Analog-Lab-Mode Browser-/Preset-Navigation (mit Shift Kategorie-Wechsel), im User-Mode als CC editierbar. Werks-CC nicht belegbar."
+    },
+    {
+      "name": "Modulation touch strip",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        1,
+        1
+      ],
+      "layout": "Beruehrungsempfindlicher Mod-Streifen (statt Rad), sendet per Default CC 1 (Modulation) auf dem Keyboard-Kanal."
+    },
+    {
+      "name": "Pitch bend touch strip",
+      "type": "pitchbend",
+      "channel": 0,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "Beruehrungsempfindlicher Pitch-Streifen (statt Rad), Pitch-Bend mit Mittelwert 64; auf dem Keyboard-Kanal."
+    },
+    {
+      "name": "Sustain/expression pedal input",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        64,
+        64
+      ],
+      "layout": "Pedalbuchse (Sustain/Expression/Footswitch); Switch-Pedal sendet per Default CC 64 (Sustain) auf dem Keyboard-Kanal."
+    }
+  ],
+  "led_feedback": {
+    "type": "rgb_per_pad",
+    "notes": "8 Pads mit RGB-LEDs, in MCC pro Pad/pro Bank aus einer Farbpalette waehlbar (Led On/Off + Color). LEDs werden NICHT automatisch per Note-Velocity gesteuert wie bei klassischen Grid-Controllern; Default ist eine statische, in MCC gesetzte Farbe pro Pad. Hintergrundbeleuchtung global an/aus (Device Setting). Eingehendes LED-Feedback vom Host laeuft ueber Arturias eigenes Protokoll/Template, nicht ueber simples Note-On-Velocity. Pad-Velocity-Kurven (inkl. Fixed) und Pad-Aftertouch (Channel Aftertouch) global einstellbar."
+  },
+  "features": [
+    "25 anschlagsdynamische Slim-Keys",
+    "8 RGB-Pads (velocity- + druckempfindlich) als 2x4-Raster, 2 Banks (effektiv 16 Pad-Belegungen)",
+    "8 Endlos-Encoder + 1 grosser klickbarer Push-/Browser-Encoder",
+    "4 Fader",
+    "Touch-Streifen fuer Pitch und Modulation (statt Raedern)",
+    "OLED-Display",
+    "Oktav +/-, Shift, Hold/Chord, Arpeggiator",
+    "USB-C class-compliant USB-MIDI",
+    "MIDI-Out via TRS-/DIN-Adapter",
+    "Sustain/Expression/Footswitch-Pedal-Eingang",
+    "MCU/HUI-DAW-Modus ueber separaten Port",
+    "Analog Lab Intro / Ableton Live Lite gebundelt",
+    "voll editierbar via Arturia MIDI Control Center (MCC), 8 Device-Memories/Templates"
+  ],
+  "source": "Werks-Default/editierbar. PRIMAER: Pad-Default Noten 36-43 auf MIDI-Kanal 10 - Arturia FAQ + ZWEITQUELLE: MiniDexed-GitHub-Diskussion zeigt 'MIDI 36 to 43 for the pads left to right' mit 'MIDIButtonCh=10' (https://github.com/probonopd/MiniDexed/discussions/668). Knob-/Fader-Default-CCs aus Spectrasonics Omnisphere-3-Hardware-Guide, der die Werks-User-Template-Map dokumentiert: Knobs CC 74/71/76/77/93/18/19/16, Fader CC 82/83/85/17 (https://support.spectrasonics.net/manual/Omnisphere3HW/3/en/topic/setting-up-the-minilab-mk3) - HINWEIS: keine zweite unabhaengige CC-Quelle gefunden, offizielle Arturia-MIDI-Chart per 403 geblockt. Element-Zahlen (25 Keys, 8 Pads/2 Banks, 8 Encoder + 1 Browser-Encoder, 4 Fader, 2 Touch-Strips) via offizielle Arturia-Overview (https://www.arturia.com/products/hybrid-synths/minilab-3/overview) und Reviews MusicRadar/SoundOnSound. Pad-Layout 2x4 abgeleitet aus 'MiniLab 37 2x4 rows'-Vergleich (https://synthanatomy.com/2026/06/arturia-minilab-37-midi-keyboard-controller-with-more-keys-and-new-layout.html) und Layout-Reviews. MCC-Manual fuer Velocity/Aftertouch/Farben (https://dl.arturia.net/products/minilab-3/manual/minilab-3-mcc_Manual_1_14_1_EN.pdf). Alle Belegungen in der Arturia MIDI Control Center Software frei editierbar.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

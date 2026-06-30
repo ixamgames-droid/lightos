@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "id": "novation_launch_control_xl",
+  "manufacturer": "Novation",
+  "model": "Launch Control XL",
+  "device_type": "midi_fader_controller",
+  "connections": [
+    "USB-MIDI",
+    "midi"
+  ],
+  "buttons": 24,
+  "faders": 8,
+  "encoders": 24,
+  "pad_matrix": null,
+  "banks": "16 Templates: 8 User-Templates (Slots 00h-07h / 0-7, editierbar) + 8 Factory-Templates (Slots 08h-0Fh / 8-15, nicht editierbar). Template-Wechsel per SysEx (F0 00 20 29 02 11 77 <template> F7) oder am Geraet ueber die User/Factory- + Pfeiltasten. Dieses Profil beschreibt die Werks-/Default-Belegung. Jeder Regler/Fader/Taste ist im User-Template ueber den Novation Launch Control XL Editor frei auf beliebige CC-/Note-Nummer und MIDI-Kanal umbelegbar (offiziell belegt).",
+  "controls": [
+    {
+      "name": "Faders 1-8 (Volume)",
+      "type": "fader",
+      "channel": 0,
+      "range": [
+        77,
+        84
+      ],
+      "layout": "Reihe von 8 Fadern unten, links nach rechts (CC 77..84 = 4Dh..54h). Zweitquellen-bestaetigt (jdachtera Bitwig-Script + BespokeSynth)."
+    },
+    {
+      "name": "Knobs Send A (obere Reihe)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        13,
+        20
+      ],
+      "layout": "Obere Drehregler-Reihe, 8 Knobs links nach rechts (CC 13..20 = 0Dh..14h). Zweitquellen-bestaetigt."
+    },
+    {
+      "name": "Knobs Send B (mittlere Reihe)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        29,
+        36
+      ],
+      "layout": "Mittlere Drehregler-Reihe, 8 Knobs links nach rechts (CC 29..36 = 1Dh..24h). Zweitquellen-bestaetigt."
+    },
+    {
+      "name": "Knobs Pan/Device (untere Reihe)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        49,
+        56
+      ],
+      "layout": "Untere Drehregler-Reihe, 8 Knobs links nach rechts (CC 49..56 = 31h..38h). Zweitquellen-bestaetigt."
+    },
+    {
+      "name": "Track Focus Tasten (obere Reihe)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        41,
+        60
+      ],
+      "layout": "Obere Reihe der 8 Channel-Tasten. Nicht zusammenhaengend: Note 41,42,43,44 (29h-2Ch) dann 57,58,59,60 (39h-3Ch). range ist Min/Max-Spanne, NICHT lueckenlos. EXAKT bestaetigt durch jdachtera + BespokeSynth."
+    },
+    {
+      "name": "Track Control Tasten (untere Reihe)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        73,
+        92
+      ],
+      "layout": "Untere Reihe der 8 Channel-Tasten. Nicht zusammenhaengend: Note 73,74,75,76 (49h-4Ch) dann 89,90,91,92 (59h-5Ch). range ist Min/Max-Spanne, NICHT lueckenlos. EXAKT bestaetigt durch jdachtera + BespokeSynth."
+    },
+    {
+      "name": "Device / Mute / Solo / Record Arm",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        96,
+        103
+      ],
+      "layout": "Vier Funktionstasten rechts. UNSICHER: Quellen widersprechen sich. VirtualDJ: Mute 96 (60h), Solo 97 (61h), Record Arm 98 (62h), Device 103 (67h). jdachtera (Bitwig): Device 105, Mute 106, Solo 107, Record 108. Nachrichtentyp (Note vs CC) und exakte Nummern NICHT zweitquellen-konsistent. range = grobe Min/Max-Spanne der VirtualDJ-Variante, nicht hart belegt."
+    },
+    {
+      "name": "Up / Down / Left / Right (Send Select / Track Select)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        104,
+        107
+      ],
+      "layout": "Vier Pfeiltasten rechts: Up 104 (68h), Down 105 (69h), Left 106 (6Ah), Right 107 (6Bh). Nummern durch jdachtera bestaetigt, ABER dort als CC gelistet, nicht Note. Nachrichtentyp im Werks-Default zwischen Quellen uneinheitlich - type=note ist Annahme, unsicher."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity",
+    "notes": "Offiziell belegt (Programmer's Reference Guide v2). Die 16 Channel-Tasten haben je eine zweifarbige LED (rotes + gruenes Element, mischbar zu Amber). Die 4 Pfeiltasten je eine einzelne rote LED; Device/Mute/Solo/Record Arm je eine einzelne gelbe LED. LED-Ansteuerung auf zwei Wegen: (1) Launchpad-Protokoll via Note-On/Off auf dem aktuellen Template - Velocity codiert Farbe/Helligkeit: Velocity = 16*Green + Red + Flags (Flags=12/0Ch normal, 8 fuer Blinken, 0 fuer Double-Buffering); Green/Red je 0-3. Vorberechnete Werte: 12=Off, 13=Rot Low, 15=Rot Full, 29=Amber Low, 63=Amber Full, 62=Yellow Full, 28=Gruen Low, 60=Gruen Full. (2) SysEx (empfohlen, template-unabhaengig): F0 00 20 29 02 11 78h <Template> <Index> <Value> F7. LED-Indizes: 0-7 obere Knob-Reihe, 8-15 mittlere, 16-23 untere, 24-31 obere Channel-Tasten, 32-39 untere Channel-Tasten, 40-43 Device/Mute/Solo/RecArm, 44-47 Up/Down/Left/Right. Zusaetzlich: Double-Buffering + Blink (Bnh 00h 20h-3Dh), Reset (Bnh 00h 00h), All-LED-Test (Bnh 00h 7Dh-7Fh)."
+  },
+  "features": [
+    "8 Fader (100mm), 24 Drehregler in 3 Reihen (Send A / Send B / Pan-Device)",
+    "24 programmierbare Tasten gesamt (offiziell): 16 zweifarbige Channel-Tasten (rot/gruen, Amber mischbar) + 4 rote Pfeiltasten + 4 gelbe Funktionstasten (Device/Mute/Solo/Record Arm)",
+    "Keine Pad-Matrix - reiner Fader/Knob/Taster-Controller",
+    "Class-compliant USB (kein Treiber); kein DIN-MIDI, nur USB-MIDI",
+    "16 Templates (8 editierbare User + 8 fixe Factory)",
+    "Alle Bedienelemente im User-Template frei umbelegbar (CC/Note + Kanal + Min/Max + LED-Farbe) per Launch Control XL Editor (offiziell belegt)",
+    "Werks-Default sendet auf MIDI-Kanal 1 (0-basiert n=0; Kanal ist laut PDF 'zero-indexed')",
+    "Tasten koennen wahlweise Note- ODER CC-Nachrichten senden (Editor-abhaengig; offiziell belegt)",
+    "LED-Feedback via Launchpad-Note-Protokoll oder Novation-SysEx",
+    "Tastendruck: Velocity 7Fh beim Druecken, 0 beim Loslassen (offiziell belegt)"
+  ],
+  "source": "Primaer: Novation/Focusrite 'Launch Control XL Programmer's Reference Guide' Version 2 (offizielles PDF, Volltext extrahiert: https://fael-downloads-prod.focusrite.com/customer/prod/downloads/launch_control_xl_programmer_s_reference_guide.pdf) - belegt HART: Geometrie (24 pots, 8 faders, 24 programmable buttons), Template-System (Factory = Slots 8-15, nicht editierbar), Button = Note ODER CC auf 0-basiertem MIDI-Kanal, Velocity 7Fh/0 bei Druck/Release, LED-Farb-/Velocity-Tabelle und SysEx-/Launchpad-LED-Protokoll inkl. LED-Index-Tabelle (0-47). ZWEITQUELLEN fuer Default-CC-/Note-Belegung (unabhaengig von der Originalrecherche): (1) jdachtera Bitwig-Controller-Script 'Layout.js' (https://github.com/jdachtera/bitwig-novation-launch-control-xl) und (2) BespokeSynth Issue #606 (https://github.com/BespokeSynth/BespokeSynth/issues/606) - beide bestaetigen unabhaengig Fader-CC 77-84, Knob-CC 13-20/29-36/49-56 sowie Channel-Tasten-Noten 41-44/57-60 und 73-76/89-92. Originalrecherche-Quelle (VirtualDJ-Definition) zusaetzlich vorhanden. HINWEIS: Die Device/Mute/Solo/RecArm-Noten und der Pfeiltasten-Nachrichtentyp sind zwischen Community-Quellen WIDERSPRUECHLICH und damit nicht hart belegt. User-Templates sind editierbar - dies ist die Werks-/Default-Map.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

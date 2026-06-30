@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "id": "akai_apc_key_25_mk2",
+  "manufacturer": "Akai Professional",
+  "model": "APC Key 25 mk2",
+  "device_type": "midi_grid_controller",
+  "connections": [
+    "USB-MIDI"
+  ],
+  "buttons": 16,
+  "faders": 0,
+  "encoders": 8,
+  "pad_matrix": [
+    8,
+    5
+  ],
+  "banks": "Keine On-Device-Banks/Pages im klassischen Sinn. Werks-Mapping ist fix laut Akai Communication Protocol (v1.0 und v1.1 stimmen bei allen Note-/CC-Nummern, Kanaelen und Ports ueberein). Die 8 Knobs sind als Relative-Encoder belegt. Die Tastatur ist via Oct Down / Oct Up um Oktaven transponierbar (Oct-Tasten senden selbst keine Note On/Off; Default-Startnote laut User Guide C2/Note 36, im Protokoll nur 'full range 0x00-0x7f' angegeben). Zwei getrennte USB-MIDI-Ports: Port 1 = Pads/UI-Buttons/Knobs (Steuer-Surface), Port 0 = Keybed + Sustain (Spiel-Daten). Die SysEx-Introduction-Response des Protokolls listet generische 'Fader'-Werte (geteilter APC-Familien-Header) - das Geraet hat physisch KEINE Fader.",
+  "controls": [
+    {
+      "name": "Clip Launch Pads (8x5 RGB)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        0,
+        39
+      ],
+      "layout": "8 Spalten x 5 Reihen RGB-Pad-Matrix; nummeriert unten-links nach oben-rechts (Pad 0 = unten links, Pad 39 = oben rechts), Note 0x00-0x27. Note-On/Off auf Port 1, Kanal 1 (0-basiert 0). MIDI-Kanal des Note-On (0x90-0x9F) steuert LED-Helligkeit/Blink/Pulse."
+    },
+    {
+      "name": "Track Buttons 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        64,
+        71
+      ],
+      "layout": "Reihe mit 8 Buttons unter der Pad-Matrix (eine pro Spalte). Note 0x40-0x47, Kanal 0, Port 1. Rote Einzel-LED (Single-Color)."
+    },
+    {
+      "name": "Scene Launch Buttons 1-5",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        82,
+        86
+      ],
+      "layout": "Spalte mit 5 Buttons rechts der Pad-Matrix (eine pro Reihe). Note 0x52-0x56, Kanal 0, Port 1. Gruene Einzel-LED (Single-Color)."
+    },
+    {
+      "name": "Stop All Clips",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        81,
+        81
+      ],
+      "layout": "Einzeltaste; Note 0x51, Kanal 0, Port 1; keine LED (in v1.0 und v1.1 als 'None' gelistet)."
+    },
+    {
+      "name": "Play",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        91,
+        91
+      ],
+      "layout": "Transport-Taste; Note 0x5b, Kanal 0, Port 1. LED: v1.0-Protokoll listet Gruen, v1.1 listet None (Versionskonflikt)."
+    },
+    {
+      "name": "Record",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        93,
+        93
+      ],
+      "layout": "Transport-Taste; Note 0x5d, Kanal 0, Port 1. LED: v1.0-Protokoll listet Rot, v1.1 listet None (Versionskonflikt)."
+    },
+    {
+      "name": "Shift",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        98,
+        98
+      ],
+      "layout": "Modifier-Taste; Note 0x62, Kanal 0, Port 1; keine LED. Wird in 'buttons'=16 NICHT mitgezaehlt."
+    },
+    {
+      "name": "Knobs 1-8",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        48,
+        55
+      ],
+      "layout": "8 Endlos-Drehregler (Relative-Encoder laut Protokoll), CC 0x30-0x37, Kanal 0, Port 1. Senden relative Werte."
+    },
+    {
+      "name": "Keybed (25 Mini-Keys)",
+      "type": "key",
+      "channel": 0,
+      "range": [
+        0,
+        127
+      ],
+      "layout": "25 anschlagdynamische Mini-Tasten auf Port 0, Kanal 1 (0-basiert 0). Protokoll: Notenbereich 0x00-0x7f, voller Bereich ueber Oct Down / Oct Up erreichbar. Default-Startnote laut User Guide C2/Note 36 (nicht im Protokoll belegt). Oct-Tasten senden selbst keine Note On/Off."
+    },
+    {
+      "name": "Sustain Pedal",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        64,
+        64
+      ],
+      "layout": "Sustain-Pedal-Eingang, CC 0x40 (64) auf Port 0, Kanal 0; keine LED."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity_rgb",
+    "notes": "Pads (Note 0x00-0x27): RGB-LEDs. Velocity (Byte 3) waehlt die Farbe aus einer FESTEN, nicht aenderbaren 128-Farben-Palette (Velocity 0..127 -> definierte Hexwerte, z.B. 0=#000000 aus, 5=#FF0000 Rot, 9=#FF5400 Orange, 13=#FFFF00 Gelb, 21=#00FF00 Gruen, 45=#0000FF Blau, 53=#FF00FF Magenta - exakte Tabelle im Protokoll). Der MIDI-KANAL des Note-On (Status 0x90-0x9F) bestimmt Helligkeit/Verhalten: CH0=10%, CH1=25%, CH2=50%, CH3=65%, CH4=75%, CH5=90%, CH6=100% Helligkeit; CH7-10=Pulsing 1/16..1/2; CH11-15=Blinking 1/24..1/2. Alternativ exakte RGB-Farbe per SysEx (F0 47 7F 4E 24 <MSB> <LSB> <StartPad 0x00-0x3F> <EndPad> dann je 8-bit R/G/B als MSB/LSB, abgeschlossen mit 0xF7). UI-Buttons sind Single-Color-LEDs, immer Kanal 0 (Status 0x90): Track-Buttons rot, Scene-Launch gruen; Velocity 0x00=aus, 0x01/0x03-0x7F=an, 0x02=blink (RGB-Blink/Pulse-Werte gelten hier NICHT). Play/Record: v1.0 listet Play=gruen, Record=rot; v1.1 listet beide als None (Versionskonflikt). Stop All Clips und Shift haben in beiden Versionen keine LED. LED-Steuerung erfolgt auf Port 1."
+  },
+  "features": [
+    "8x5 = 40 RGB-Velocity-Pads (Clip-Matrix, Note 0x00-0x27, unten-links nummeriert)",
+    "25 anschlagdynamische Mini-Keys (separater USB-Port 0)",
+    "8 Endlos-Knobs als Relative-Encoder (CC 0x30-0x37 = 48-55)",
+    "8 Track-Buttons (0x40-0x47) + 5 Scene-Launch-Buttons (0x52-0x56) + Stop All Clips/Play/Record/Shift",
+    "Keine physischen Fader (8 Knobs only; 'Fader'-Werte in der SysEx-Introduction-Response sind generischer APC-Familien-Header)",
+    "Oktav-Transponierung der Tastatur via Oct Down/Up (senden keine Note)",
+    "RGB-LED-Feedback ueber 128-Farben-Velocity-Palette + Kanal-basierte Helligkeit/Blink/Pulse",
+    "Exakte RGB-Farbsteuerung der Pads per SysEx (8-bit R/G/B, Msg-Type 0x24)",
+    "Sustain-Pedal-Eingang (CC 0x40 auf Port 0)",
+    "Zwei getrennte USB-MIDI-Ports: Port 1 = Control-Surface (Pads/Buttons/Knobs), Port 0 = Keybed/Sustain",
+    "USB-bus-powered; MMC Device Enquiry + Introduction SysEx",
+    "Werks-Default-Mapping fix (kein editierbares User-Mapping laut Protokoll); CC/Notes hardware-konstant"
+  ],
+  "source": "Primaer: Akai Professional 'APC Key 25 mk2 - Communication Protocol v1.1' (https://cdn.inmusicbrands.com/akai/attachments/APC%20Key%2025%20mk2%20-%20Communication%20Protocol%20-%20v1.1.pdf). UNABHAENGIGE ZWEITE QUELLE (Gegenpruefung): Akai 'APC Key 25 mk2 - Communication Protocol v1.0' (https://cdn.inmusicbrands.com/akai/attachments/APC%20Key%2025%20mk2%20-%20Communication%20Protocol%20-%20v1.0.pdf), Abschnitt 'Control Mapping' (Seiten 14-15) - bestaetigt Pads 0x00-0x27, Track 0x40-0x47, Scene 0x52-0x56, Stop 0x51 / Play 0x5b / Record 0x5d / Shift 0x62, Knobs CC 0x30-0x37 (Relative), Sustain CC 0x40 Port 0, Keybed 0x00-0x7f Port 0, alle Kanal 0; LED-Tabellen (128-Farben-Palette, Kanal-Helligkeit/Blink, SysEx 0x24) auf Seiten 2-8. Element-Anzahlen (40 Pads, 8 Knobs, 25 Keys, KEINE Fader) zusaetzlich bestaetigt durch Akai-Produktseite (akaipro.com/apc-key-25-mk2) und Haendler-Specs (Amazon B0BPC1SRKM, Perfect Circuit). Default-Startnote C2/Note 36 aus APC Key 25 mk2 User Guide v1.2.",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}

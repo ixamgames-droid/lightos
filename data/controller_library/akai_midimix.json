@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "id": "akai_midimix",
+  "manufacturer": "Akai Professional",
+  "model": "MIDImix",
+  "device_type": "midi_fader_controller",
+  "connections": [
+    "USB-MIDI"
+  ],
+  "buttons": 19,
+  "faders": 9,
+  "encoders": 24,
+  "pad_matrix": null,
+  "banks": "Werks-Default-Belegung (Factory Default). Das Geraet ist KEIN festes Bank-System: Alle CC-/Note-IDs und Kanaele jedes Knobs, Faders und Buttons sind ueber den kostenlosen \"MIDImix Editor\" (SysEx-Konfiguration) frei editierbar; Buttons koennen per Klick im Editor zwischen Note (NT) und CC umgeschaltet werden. Der MIDI-Kanal ist pro Element im Editor einstellbar (die urspruengliche Firmware war fest auf Kanal 1). Eine pseudo-zweite 'Bank/Page' entsteht physisch durch die SOLO-Taste: solange SOLO gehalten wird, senden die 8 MUTE-Tasten ihre eigenen SOLO+MUTE-Note-IDs (Notes 2,5,8,11,14,17,20,23) statt der MUTE-IDs. Die BANK LEFT/RIGHT-Tasten senden selbst nur Notes (25/26) und schalten von Haus aus nichts auf dem Geraet um; Paging muss der Host (z.B. Ableton-Skript) implementieren. SEND ALL sendet beim Druck einen Sammel-Dump der aktuellen Werte aller Dials+Slider (kein eigener Note/CC).",
+  "controls": [
+    {
+      "name": "Knobs Top-Reihe (Strips 1-8)",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        16,
+        58
+      ],
+      "layout": "Obere Knob-Reihe ueber 8 Channel-Strips: CC 16,20,24,28 (Strips 1-4), dann 46,50,54,58 (Strips 5-8). Schritt 4 innerhalb 1-4, Sprung auf 46 bei Strip 5."
+    },
+    {
+      "name": "Knobs Mittel-Reihe (Strips 1-8)",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        17,
+        59
+      ],
+      "layout": "Mittlere Knob-Reihe: CC 17,21,25,29 (Strips 1-4), 47,51,55,59 (Strips 5-8)."
+    },
+    {
+      "name": "Knobs Unten-Reihe (Strips 1-8)",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        18,
+        60
+      ],
+      "layout": "Untere Knob-Reihe: CC 18,22,26,30 (Strips 1-4), 48,52,56,60 (Strips 5-8). Pro Strip also Knobs oben/mitte/unten = z.B. Strip1=16/17/18, Strip5=46/47/48; der Fader des Strips ist der jeweils +1/+2 hoehere CC (19/23/... bzw. 49/53/...)."
+    },
+    {
+      "name": "Fader Strips 1-4",
+      "type": "fader",
+      "channel": 0,
+      "range": [
+        19,
+        31
+      ],
+      "layout": "Channel-Faders 1-4: CC 19,23,27,31 (jeweils hoechster CC im Strip-Block)."
+    },
+    {
+      "name": "Fader Strips 5-8",
+      "type": "fader",
+      "channel": 0,
+      "range": [
+        49,
+        61
+      ],
+      "layout": "Channel-Faders 5-8: CC 49,53,57,61."
+    },
+    {
+      "name": "Master-Fader",
+      "type": "fader",
+      "channel": 0,
+      "range": [
+        62,
+        62
+      ],
+      "layout": "9. Fader rechts, CC62."
+    },
+    {
+      "name": "MUTE-Tasten (8, je Channel-Strip)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        1,
+        22
+      ],
+      "layout": "Pro Strip 1 MUTE-Taste. Notes (Schrittweite 3): Strip1=1, Strip2=4, Strip3=7, Strip4=10, Strip5=13, Strip6=16, Strip7=19, Strip8=22. Werks-Default = Note-On Velocity 127. (Bestaetigt an zweiter Quelle.)"
+    },
+    {
+      "name": "REC ARM-Tasten (8, je Channel-Strip)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        3,
+        24
+      ],
+      "layout": "Pro Strip 1 REC-ARM-Taste. Notes (Schrittweite 3): Strip1=3, Strip2=6, Strip3=9, Strip4=12, Strip5=15, Strip6=18, Strip7=21, Strip8=24."
+    },
+    {
+      "name": "SOLO+MUTE (8 virtuelle Tasten, aktiv waehrend SOLO gehalten wird)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        2,
+        23
+      ],
+      "layout": "Solange SOLO gedrueckt ist, senden die MUTE-Tasten diese IDs: Strip1=2, Strip2=5, Strip3=8, Strip4=11, Strip5=14, Strip6=17, Strip7=20, Strip8=23 (Schrittweite 3)."
+    },
+    {
+      "name": "SOLO-Taste",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        27,
+        27
+      ],
+      "layout": "Globale SOLO-Taste, Note 27 (0x1B). Keine eigene physische LED."
+    },
+    {
+      "name": "BANK LEFT",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        25,
+        25
+      ],
+      "layout": "Note 25 (0x19). Eigene LED (per Note-On Velocity!=0 steuerbar)."
+    },
+    {
+      "name": "BANK RIGHT",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        26,
+        26
+      ],
+      "layout": "Note 26 (0x1A). Eigene LED."
+    },
+    {
+      "name": "SEND ALL",
+      "type": "key",
+      "channel": 0,
+      "range": [
+        -1,
+        -1
+      ],
+      "layout": "Sendet KEINE eigene Note/CC; loest stattdessen einen Sammel-Dump (CC-Schwung) der aktuellen Werte aller 24 Dials + 9 Slider aus. Keine physische LED."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_on_velocity_onoff",
+    "notes": "LEDs hinter den 8 MUTE- und 8 REC-ARM-Tasten sowie BANK LEFT/RIGHT sind ansteuerbar. Der Host sendet ein Note-On (Status 0x90, Kanal 1) an die ORIGINAL-Note-ID der Taste: Velocity != 0 = LED an, Velocity 0 = LED aus (nur an/aus, einfarbig, keine Helligkeits-/Farbstufen). Beispiel BANK LEFT an: [0x90, 0x19, 0x7F]. Waehrend SOLO gehalten wird, reagieren die MUTE-LEDs auf ihre SOLO+MUTE-IDs (Notes 2,5,8,11,14,17,20,23). SOLO- und SEND-ALL-Taste haben keine physische LED. (LED-Verhalten von zweiter Quelle bestaetigt.)"
+  },
+  "features": [
+    "9 Fader (8 Channel + 1 Master), 24 Drehregler (3 Reihen x 8 Strips)",
+    "Pro Channel-Strip: MUTE + REC-ARM-Taste mit LED",
+    "Globale Tasten: SOLO, BANK LEFT, BANK RIGHT, SEND ALL",
+    "Alle Knobs/Fader senden Control Change auf MIDI-Kanal 1 (0-basiert 0)",
+    "Buttons senden per Default Note-On/Off (Velocity 127 / 0); per Editor auf CC umstellbar",
+    "SOLO als 'zweite Ebene': MUTE-Tasten senden waehrend SOLO andere Note-IDs (SOLO+MUTE)",
+    "Voll editierbar via USB-SysEx (MIDImix Editor): CC/Note-ID, MIDI-Kanal und Note-vs-CC-Mode pro Element",
+    "LED-Feedback fuer MUTE/REC-ARM/BANK ueber eingehende Note-On auf der ORIGINAL-Note-ID",
+    "USB-Bus-powered, Class-Compliant (kein Treiber noetig)",
+    "Keine Pads / kein Grid"
+  ],
+  "source": "Werks-Default, voll editierbar via MIDImix Editor (SysEx). Primaer: '(Unofficial) Akai Professional MidiMix Communications Protocol Guide' von Julian Ceipek. ZWEITQUELLEN-GEGENGEPRUEFT: (1) oldmachinery.blogspot.com 'AKAI MidiMIX & Processing Midibus' (http://oldmachinery.blogspot.com/2018/04/akai-midimix-processing-midibus.html) - bestaetigt unabhaengig Knob-CCs (16/20/24/28/46/50/54/58 Top, 17/21/25/29/47/51/55/59 Mid, 18/22/26/30/48/52/56/60 Bottom), Fader-CCs 19/23/27/31/49/53/57/61 + Master 62, Button-Notes (MUTE 1/4/7/10/13/16/19/22, REC ARM 3/6/9/12/15/18/21/24, BANK 25/26, SOLO 27), MIDI-Kanal 1 und LED-Regel (Note-On Vel!=0=an). (2) Sound on Sound Review (https://www.soundonsound.com/reviews/akai-midimix) - bestaetigt 24 Knobs (3x8), 9 Fader, kein Pad/Grid. (3) Akai-Support-Artikel 'Using the Editor for Customisation' (https://support.akaipro.com/en/support/solutions/articles/69000856691) - bestaetigt CC/Note-Mode + Kanal-Editierbarkeit. (4) Carnelian MIDImix Control-Mapping (https://bobobo-git.github.io/AkaiMidiMixDubVersion/MidiMixControlAllKnobsNosoftTakeover.txt).",
+  "license": "Faktendaten (MIDI-Notes/CCs sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-06-30",
+  "vc_template": "",
+  "mapping_template": ""
+}
