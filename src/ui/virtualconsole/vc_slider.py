@@ -573,6 +573,7 @@ class VCSlider(VCWidget):
 
     def _open_properties(self):
         _old_mode = self.mode      # fuer Submaster-Slot-Aufraeumen bei Moduswechsel
+        _old_group = self.programmer_group   # VCB-34: alte Gruppe vor Form-Overwrite
         dlg = QDialog(self)
         dlg.setWindowTitle("Fader Einstellungen")
         form = QFormLayout(dlg)
@@ -839,25 +840,45 @@ class VCSlider(VCWidget):
             self.midi_cc = midi_cc_spin.value()
             self.midi_ch = midi_ch_spin.value()
             self.update()
-            # Submaster sofort synchronisieren (nicht erst beim naechsten Ziehen):
-            # neuer/geaenderter Submaster -> Slot mit aktueller Reichweite setzen;
-            # weg vom Submaster -> alten Slot raeumen (sonst dimmt er als Geist weiter).
-            if self.mode == SliderMode.SUBMASTER:
-                self._apply()
-            elif _old_mode == SliderMode.SUBMASTER:
-                _clear_submaster_slot(id(self))
-            elif self.mode == SliderMode.GROUP_DIMMER:
-                self._apply()
-            elif _old_mode == SliderMode.GROUP_DIMMER:
-                # VCB-19: weg vom Gruppen-Dimmer -> die Fixture-Dimmer der Gruppe auf
-                # 1.0 zuruecksetzen, sonst dimmt der Fader als Geist weiter.
-                try:
-                    from src.core.app_state import get_state
-                    _st = get_state()
-                    _st.set_group_dimmer(
-                        self._group_fids(_st, self.programmer_group), 1.0)
-                except Exception:
-                    pass
+            self._post_dialog_mode_sync(_old_mode, _old_group)
+
+    def _reset_group_dimmer(self, group_name: str):
+        """Setzt die Fixture-Dimmer einer (alten) Gruppe auf 1.0 zurueck — sonst
+        bleibt sie als Geist gedimmt, weil set_group_dimmer pro-fid in
+        state.fixture_dimmers schreibt (VCB-19/VCB-34). Tolerant bei fehlender
+        Gruppe/State."""
+        if not group_name:
+            return
+        try:
+            from src.core.app_state import get_state
+            _st = get_state()
+            _st.set_group_dimmer(self._group_fids(_st, group_name), 1.0)
+        except Exception:
+            pass
+
+    def _post_dialog_mode_sync(self, _old_mode, _old_group):
+        """Nach dem Properties-Dialog die Submaster-/Gruppen-Dimmer-Slots sofort
+        synchronisieren (nicht erst beim naechsten Ziehen). Ausgelagert aus
+        _open_properties, damit der Retarget-Pfad (VCB-34) ohne modalen Dialog
+        testbar ist.
+
+        - neuer/geaenderter Submaster -> Slot mit aktueller Reichweite setzen;
+          weg vom Submaster -> alten Slot raeumen (sonst Geister-Dimmer).
+        - GROUP_DIMMER: bei Retarget A->B (beide GROUP_DIMMER, Gruppe gewechselt)
+          die alte Gruppe A zuerst zuruecksetzen (VCB-34), dann B anwenden;
+          weg vom GROUP_DIMMER -> die (alte) Gruppe zuruecksetzen (VCB-19).
+        """
+        if self.mode == SliderMode.SUBMASTER:
+            self._apply()
+        elif _old_mode == SliderMode.SUBMASTER:
+            _clear_submaster_slot(id(self))
+        elif self.mode == SliderMode.GROUP_DIMMER:
+            if (_old_mode == SliderMode.GROUP_DIMMER
+                    and _old_group and _old_group != self.programmer_group):
+                self._reset_group_dimmer(_old_group)   # VCB-34
+            self._apply()
+        elif _old_mode == SliderMode.GROUP_DIMMER:
+            self._reset_group_dimmer(_old_group)         # VCB-19
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -906,11 +927,26 @@ class VCSlider(VCWidget):
         self.effect_autostart = bool(d.get("effect_autostart", False))
         self.invert = bool(d.get("invert", False))
         # VCB-27: JSON-null (Key vorhanden, Wert null) -> d.get(default) liefert None
-        # -> int(None) crasht. `or default` faengt das ab.
+        # -> int(None) crasht. range_min: 0 ist zugleich der Default, `or 0` harmlos.
         self.range_min = int(d.get("range_min") or 0)
-        self.range_max = int(d.get("range_max") or 255)
+        # VCB-33: range_max=0 ist eine GUELTIGE Konfiguration (Fader kappt/mutet die
+        # Ausgabe; _effective_value erlaubt min==max). `or 255` wuerde die bewusste 0
+        # als „fehlt" behandeln und auf 255 hochsetzen -> Ausgabe nach Reload statt
+        # stummem Fader. Nur echtes None/Fehlen faellt auf 255 zurueck.
+        _rm = d.get("range_max")
+        self.range_max = int(_rm if _rm is not None else 255)
         # VCB-23: Direktzuweisung umging den @value.setter-Clamp -> Ratio>1.0/undef.
         # DMX bei Out-of-Range. Hier klemmen (0..255, int).
         self._value = max(0, min(255, int(d.get("value", 0) or 0)))
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)
+        # VCB-32: Die Direktzuweisung an self._value (oben) umgeht den @value.setter,
+        # der _apply() ruft. Modi mit persistentem App-State (GROUP_DIMMER schreibt
+        # fixture_dimmers, SUBMASTER einen Output-Slot) muessen ihren geladenen Wert
+        # beim Show-Laden aktiv setzen — sonst kommt die Show zu hell hoch, bis der
+        # Nutzer den Fader bewegt (fixture_dimmers wird bei load/reset geleert, VCB-05).
+        if self.mode in (SliderMode.GROUP_DIMMER, SliderMode.SUBMASTER):
+            try:
+                self._apply()
+            except Exception:
+                pass
