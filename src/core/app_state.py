@@ -4,7 +4,7 @@ import os
 import threading
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from .database.models import Base, PatchedFixture
+from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
@@ -192,7 +192,7 @@ class AppState:
         import os
         os.makedirs(os.path.dirname(path), exist_ok=True)
         self._show_engine = create_engine(f"sqlite:///{path}", echo=False)
-        Base.metadata.create_all(self._show_engine)
+        create_all_idempotent(self._show_engine)   # QA-06: TOCTOU-toleranter create_all
         # FLD-01b: fehlende Spalten in bestehenden Show-DBs nachziehen.
         try:
             from .database.models import migrate_show_db

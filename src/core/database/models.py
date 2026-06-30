@@ -199,8 +199,29 @@ def migrate_fixtures_db(engine) -> None:
         print(f"[models] migrate_fixtures_db error: {e}")
 
 
+def create_all_idempotent(engine) -> None:
+    """``Base.metadata.create_all``, aber tolerant gegen ein bereits vorhandenes
+    Schema (QA-06).
+
+    ``create_all(checkfirst=True)`` reflektiert vor jedem ``CREATE`` das
+    ``sqlite_master``. Greifen zwei Verbindungen/Laeufe auf dieselbe SQLite-Datei
+    zu (z. B. eine frisch neu aufgebaute Engine, waehrend eine alte ihre
+    Verbindung noch haelt, oder ein paralleler Lauf), liegt zwischen Reflexion
+    und ``CREATE`` ein Zeitfenster (TOCTOU): die Reflexion sieht die Tabelle noch
+    nicht, der eigene ``CREATE`` kollidiert dann mit ``table ... already exists``.
+    Die Tabellen sind in diesem Fall bereits da -> der Fehler ist harmlos und
+    wird geschluckt. Jeder andere ``OperationalError`` (z. B. ``disk I/O``)
+    fliegt unveraendert weiter."""
+    from sqlalchemy.exc import OperationalError
+    try:
+        Base.metadata.create_all(engine)
+    except OperationalError as e:
+        if "already exists" not in str(e).lower():
+            raise
+
+
 def create_db(path: str):
     engine = create_engine(f"sqlite:///{path}", echo=False)
-    Base.metadata.create_all(engine)
+    create_all_idempotent(engine)
     migrate_show_db(engine)
     return engine

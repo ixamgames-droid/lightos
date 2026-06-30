@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
-from .models import (Base, Manufacturer, FixtureProfile, FixtureMode,
-                     FixtureChannel, ChannelRange, migrate_fixtures_db)
+from .models import (Manufacturer, FixtureProfile, FixtureMode,
+                     FixtureChannel, ChannelRange, migrate_fixtures_db,
+                     create_all_idempotent)
 
 DB_PATH = os.path.join(
     os.path.expanduser("~"), "AppData", "Roaming", "LightOS", "fixtures.db"
@@ -14,7 +15,7 @@ DB_PATH = os.path.join(
 def get_engine(path: str = DB_PATH):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     engine = create_engine(f"sqlite:///{path}", echo=False)
-    Base.metadata.create_all(engine)
+    create_all_idempotent(engine)   # QA-06: TOCTOU-toleranter create_all
     migrate_fixtures_db(engine)
     return engine
 
