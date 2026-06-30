@@ -262,6 +262,17 @@ class VCButton(VCWidget):
                 ids.append(iv)
         return ids
 
+    @staticmethod
+    def _snap_binding_for_action(action, sids):
+        """snap_id/snap_ids fuer eine Aktion bestimmen: nur LIBRARY_SNAP traegt
+        Snaps, jede andere Aktion -> (None, []). VCB-31: verhindert ein stale
+        snap_id, das beim Wechsel WEG von LIBRARY_SNAP sonst in to_dict/Trigger
+        zurueckbliebe (Show-Serialisierung mit Phantom-ID)."""
+        if action == ButtonAction.LIBRARY_SNAP:
+            ids = list(sids or [])
+            return (ids[0] if ids else None, ids[1:])
+        return (None, [])
+
     def _start_function_group(self, state, fids: list[int]):
         """Startet alle gebundenen Funktionen als atomare Button-Gruppe.
 
@@ -1556,11 +1567,11 @@ class VCButton(VCWidget):
                 self.function_ids = _tids[1:]
             snap_idx = snap_combo.currentData()
             self.snapshot_index = snap_idx if snap_idx >= 0 else None
-            self.snap_ids = []
-            if self.action == LS:
-                _sids = snap_editor.ids()
-                self.snap_id = _sids[0] if _sids else None
-                self.snap_ids = _sids[1:]
+            # VCB-31: snap_id/snap_ids zentral aus der Aktion ableiten — bei einem
+            # Wechsel WEG von LIBRARY_SNAP wird snap_id jetzt geleert (vorher blieb
+            # es als Phantom-ID stehen und wanderte in to_dict).
+            _sids = snap_editor.ids() if self.action == LS else []
+            self.snap_id, self.snap_ids = self._snap_binding_for_action(self.action, _sids)
             self.snap_mode = snap_mode_combo.currentData() or "toggle"
             self._snap_active = False
             self._snap_prev = {}

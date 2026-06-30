@@ -1455,9 +1455,15 @@ class VCCanvas(QWidget):
                      "param_key", "efx_function_id", "caption", "bank"):
             if hasattr(widget, attr):
                 carry[attr] = getattr(widget, attr)
-        self.push_undo_snapshot(self.to_dict())
+        # VCB-30: Vorher-Stand erst SICHERN, aber den Undo-Schritt erst NACH
+        # erfolgreichem _add_widget pushen — sonst bleibt bei fehlgeschlagenem
+        # Typ-Tausch (new is None) ein Phantom-Undo-Eintrag auf dem Stack. Der Push
+        # MUSS ausserhalb des _restoring-Fensters liegen (push_undo_snapshot ist bei
+        # _restoring=True ein No-op).
+        _pre_snapshot = self.to_dict()
         _prev = self._restoring
         self._restoring = True
+        _ok = False
         try:
             new = self._add_widget(new_type, pos)
             if new is None:
@@ -1473,8 +1479,11 @@ class VCCanvas(QWidget):
             new.show()
             new.update()
             self._remove_widget(widget)
+            _ok = True
         finally:
             self._restoring = _prev
+        if _ok:
+            self.push_undo_snapshot(_pre_snapshot)   # _restoring wieder aus -> wirkt; nur bei Erfolg
         return new
 
     def build_from_smart_results(self, results, pos=None, origin=None, box=False) -> list:
@@ -1723,7 +1732,11 @@ class VCCanvas(QWidget):
 
             if action_keys:
                 x = x0
-                yb = y0 + 200 + gap     # Reihe unter den Fadern
+                # VCB-29: Reihe dynamisch unter die TATSAECHLICHE Faderhoehe legen
+                # (created enthaelt bisher nur die erste Reihe = Fader/Stepper) statt
+                # fix +200 — sonst Ueberlappung (hohe Fader) oder Leerraum (kleine).
+                _row_h = max((w.height() for w in created), default=0)
+                yb = y0 + _row_h + gap     # Reihe unter den Fadern
                 for akey in action_keys:
                     w = self._add_widget("VCButton", QPoint(x, yb))
                     if w is None:
