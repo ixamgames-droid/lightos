@@ -215,12 +215,12 @@ class MidiView(QWidget):
     # ── Geräteverwaltung ──────────────────────────────────────────────────────
 
     def _open_controller_browser(self):
-        """Controller-Bibliothek öffnen (Feature 6: Controller-Datenbank)."""
+        """Controller-Profile öffnen (MIDI-Geräte; Feature 6: Controller-DB)."""
         try:
             from src.ui.widgets.controller_browser import ControllerBrowserDialog
-            ControllerBrowserDialog(self).exec()
+            ControllerBrowserDialog(self, midi_only=True).exec()
         except Exception as e:
-            QMessageBox.warning(self, "Controller-Bibliothek", str(e))
+            QMessageBox.warning(self, "Controller-Profile", str(e))
 
     def _refresh_ports(self):
         # Aktuelle Auswahl merken um sie wiederherzustellen

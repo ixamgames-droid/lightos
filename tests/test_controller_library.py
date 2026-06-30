@@ -82,6 +82,56 @@ class TestBuiltinLibrary:
         assert len(lib.all()) == before
 
 
+class TestMidiOnlyFilter:
+    """Controller-Browser im MIDI-Kontext: nur MIDI-Geräte, schön sortiert."""
+
+    @staticmethod
+    def _profiles():
+        mk = lambda i, man, mod, dt: ControllerProfile(
+            id=i, manufacturer=man, model=mod, device_type=dt)
+        return [
+            mk("grid_b", "Bravo", "Pad", "midi_grid_controller"),
+            mk("grid_a", "Alpha", "Pad", "midi_grid_controller"),
+            mk("fader", "Korg", "nano", "midi_fader_controller"),
+            mk("keys", "M-Audio", "Keys", "midi_keyboard"),
+            mk("enttec", "Enttec", "DMX USB Pro", "dmx_interface"),
+            mk("node", "Generic", "Art-Net", "network_node"),
+            mk("macro", "Generic", "Makro", "keyboard_macro"),
+        ]
+
+    def test_excludes_non_midi(self):
+        from src.ui.widgets.controller_browser import _sorted_midi_profiles
+        out = _sorted_midi_profiles(self._profiles(), midi_only=True)
+        # kein DMX-Interface / Netzwerk-Node / Makro-Tastatur
+        assert all(p.device_type.startswith("midi_") for p in out)
+        assert {p.id for p in out} == {"grid_a", "grid_b", "fader", "keys"}
+
+    def test_grouped_sort_order(self):
+        from src.ui.widgets.controller_browser import _sorted_midi_profiles
+        out = _sorted_midi_profiles(self._profiles(), midi_only=True)
+        # Gruppen: Grid (alphabetisch Alpha vor Bravo) → Fader → Keyboard
+        assert [p.id for p in out] == ["grid_a", "grid_b", "fader", "keys"]
+
+    def test_midi_only_false_keeps_all(self):
+        from src.ui.widgets.controller_browser import _sorted_midi_profiles
+        out = _sorted_midi_profiles(self._profiles(), midi_only=False)
+        assert len(out) == 7
+
+    def test_builtin_library_midi_filter_hides_enttec(self):
+        """Realdaten: Enttec/Art-Net/Makro raus, APC & nanoKONTROL drin."""
+        from src.ui.widgets.controller_browser import _sorted_midi_profiles
+        lib = ControllerLibrary()
+        lib.ensure_loaded()
+        out = _sorted_midi_profiles(lib.all(), midi_only=True)
+        ids = {p.id for p in out}
+        assert "akai_apc_mini" in ids
+        assert "korg_nanokontrol2" in ids
+        assert "enttec_dmx_usb_pro" not in ids
+        assert all(p.device_type in
+                   ("midi_grid_controller", "midi_fader_controller",
+                    "midi_keyboard") for p in out)
+
+
 class TestQxiDecode:
     def test_cc(self):
         assert _decode_channel(7) == ("cc", 0, 7, "")

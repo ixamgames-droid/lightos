@@ -1,7 +1,12 @@
 """Controller-Browser — UI für die Controller-Bibliothek (Feature 6).
 
-Zeigt alle Controller-Profile (Builtins + Nutzer-Importe), Details inkl.
+Zeigt Controller-Profile (Builtins + Nutzer-Importe), Details inkl.
 MIDI-Belegung/LED-Feedback/Quelle, und bietet:
+
+Standard ist ``midi_only=True`` (Aufruf aus der MIDI-Konsole): dann werden
+nur echte MIDI-Eingabegeräte gelistet — DMX-Interfaces (Enttec), Netzwerk-
+Nodes, Pulte und Makro-Tastaturen bleiben in der Bibliothek, werden hier aber
+ausgeblendet. ``midi_only=False`` zeigt die komplette Bibliothek.
 
 - „QLC+ .qxi importieren…" — konvertiert QLC+-Inputprofile in unsere
   Bibliothek (Kern: src/core/controllers/qxi_import.py, Apache-2.0-Quelle
@@ -33,6 +38,34 @@ _TYPE_LABELS = {
     "other": "Sonstiges",
 }
 
+# Geräte-Typen, die echte MIDI-Eingabegeräte sind. Im MIDI-Kontext
+# (Aufruf aus der MIDI-Konsole) zeigt der Browser NUR diese — DMX-Interfaces
+# (Enttec), Netzwerk-Nodes, Pulte und Makro-Tastaturen gehören nicht hierher.
+MIDI_DEVICE_TYPES = (
+    "midi_grid_controller",
+    "midi_fader_controller",
+    "midi_keyboard",
+)
+
+# Gruppen-Reihenfolge für die "schön sortierte" MIDI-Liste:
+# Grid-Controller → Fader/Encoder → Keyboards (innerhalb je alphabetisch).
+_MIDI_TYPE_ORDER = {t: i for i, t in enumerate(MIDI_DEVICE_TYPES)}
+
+
+def _sorted_midi_profiles(profiles, midi_only: bool = True):
+    """Filtert (optional) auf MIDI-Controller und sortiert für die Anzeige.
+
+    ``midi_only=True`` (Default, MIDI-Konsole): nur MIDI-Eingabegeräte,
+    gruppiert nach Typ (Grid → Fader/Encoder → Keyboard), darin alphabetisch
+    nach Anzeigename. ``midi_only=False``: alle Profile, wie bisher nach
+    (device_type, label) sortiert.
+    """
+    if midi_only:
+        midi = [p for p in profiles if p.device_type in MIDI_DEVICE_TYPES]
+        return sorted(midi, key=lambda p: (_MIDI_TYPE_ORDER.get(p.device_type, 99),
+                                           p.label.lower()))
+    return sorted(profiles, key=lambda p: (p.device_type, p.label.lower()))
+
 _BTN_STYLE = """
     QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                   border-radius:4px; font-size:11px; padding:6px 12px; }
@@ -42,9 +75,11 @@ _BTN_STYLE = """
 
 
 class ControllerBrowserDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, midi_only: bool = True):
         super().__init__(parent)
-        self.setWindowTitle("Controller-Bibliothek")
+        self._midi_only = midi_only
+        self.setWindowTitle("MIDI-Controller-Profile" if midi_only
+                            else "Controller-Bibliothek")
         self.setModal(True)
         self.setStyleSheet("QDialog { background:#161b22; } "
                            "QLabel { color:#8b949e; font-size:11px; }")
@@ -59,7 +94,8 @@ class ControllerBrowserDialog(QDialog):
 
         # Links: Liste
         left = QVBoxLayout()
-        left.addWidget(QLabel("Profile (Builtins + Importe):"))
+        left.addWidget(QLabel("MIDI-Controller (Builtins + Importe):"
+                              if midi_only else "Profile (Builtins + Importe):"))
         self._list = QListWidget()
         self._list.setMinimumSize(260, 360)
         self._list.setStyleSheet(
@@ -106,8 +142,7 @@ class ControllerBrowserDialog(QDialog):
 
     def _reload_list(self, select_id: str | None = None):
         self._list.clear()
-        profiles = sorted(self._lib.all(),
-                          key=lambda p: (p.device_type, p.label.lower()))
+        profiles = _sorted_midi_profiles(self._lib.all(), self._midi_only)
         for p in profiles:
             it = QListWidgetItem(
                 f"{p.label}\n   {_TYPE_LABELS.get(p.device_type, p.device_type)}")
