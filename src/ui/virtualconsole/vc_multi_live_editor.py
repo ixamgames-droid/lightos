@@ -1,38 +1,44 @@
-"""VCMultiLiveEditor — frei schwebendes Live-Edit-Fenster fuer mehrere Effekte.
+"""VCMultiLiveEditor — Live-Edit-Panel als Widget auf der VC-Flaeche.
 
-Davids Wunsch: ein grosses, frei skalierbares Fenster, in das man mehrere Effekte
-(Matrix, Chaser, EFX …) per Drag&Drop hineinzieht. Oben blaettert man mit Dropdown
-und -/+ durch die zugewiesenen Effekte; der Body zeigt einen Live-Editor fuer den
-gerade gewaehlten Effekt: man hakt an, WAS man steuern will, und nur dafuer
-erscheint ein Regler.
+Davids Wunsch: ein grosses, frei skalierbares Panel, das man wie jedes andere
+VC-Widget auf die Canvas-Flaeche der Virtuellen Konsole setzt und dort platziert/
+groesst. In das Panel zieht man mehrere Effekte (Matrix, Chaser, EFX …) per
+Drag&Drop hinein. Oben blaettert man mit Dropdown und -/+ durch die zugewiesenen
+Effekte; der Body zeigt einen Live-Editor fuer den gerade gewaehlten Effekt: man
+hakt an, WAS man steuern will, und nur dafuer erscheint ein Regler. Dazu je Typ
+eine Vorschau und ein Tempo-Modus (Aus/BPM/Tap).
 
-NICHT-PERSISTENZ (Kern): Das Fenster ist KEIN ``VCWidget`` und steht NICHT im
-``WIDGET_REGISTRY`` — es hat kein ``to_dict`` und landet damit nie in der Show.
-Die Effekt-Parameter werden live ueber ``effect_live`` gesetzt; dessen
-Sitzungs-Baseline-Mechanismus (``begin_live_edit`` / ``serialization_dict``) sorgt
-dafuer, dass ein Show-Save den urspruenglichen Preset-Zustand schreibt, NICHT die
-Live-Werte. Es wird daher bewusst NIE ``commit_live_override`` /
-``discard_live_override_tracking`` aufgerufen — beide wuerden die Live-Werte
-speicherbar machen. Die Baseline wird beim Drop EINMAL gepinnt (``begin_live_edit``);
-Edits laufen ueber ``effect_live.set_param`` / ``set_param_normalized``.
+PERSISTENZ-SEMANTIK (Kern): Das Panel IST ein ``VCWidget`` (steht im
+``WIDGET_REGISTRY``) — Layout/Geometrie UND die Zuweisung, WELCHE Effekte
+bearbeitet werden (``to_dict``/``apply_dict`` ueber die ``fids``-Liste), werden mit
+der Show gespeichert. Die editierten Live-Parameter selbst bleiben aber FLUECHTIG:
+sie werden live ueber ``effect_live`` gesetzt; dessen Sitzungs-Baseline-Mechanismus
+(``begin_live_edit`` / ``serialization_dict``) sorgt dafuer, dass ein Show-Save den
+urspruenglichen Preset-Zustand schreibt, NICHT die Live-Werte. Es wird daher bewusst
+NIE ``commit_live_override`` / ``discard_live_override_tracking`` aufgerufen — beide
+wuerden die Live-Werte speicherbar machen. Die Baseline wird beim Drop EINMAL gepinnt
+(``begin_live_edit``); Edits laufen ueber ``effect_live.set_param`` /
+``set_param_normalized``. Ergebnis: Panel + welche Effekte drin haengen bleiben nach
+Reload erhalten, die konkret gedrehten Werte fallen auf das Preset zurueck.
 
-Grenze: ``_live_baselines`` ist global pro Effektobjekt (nicht fenster-eigen).
+Edit-/Run-Modus: Im Bearbeiten-Modus wird der Inhalts-Container deaktiviert, damit
+Klicks an das ``VCWidget`` (Verschieben/Groessen) durchgereicht werden; im Run-Modus
+ist der Inhalt aktiv und die Live-Parameter sind bedienbar.
+
+Grenze: ``_live_baselines`` ist global pro Effektobjekt (nicht panel-eigen).
 Ruft eine ANDERE Oberflaeche bewusst ``Commit``/``Reset Live`` auf demselben Effekt
 auf (z. B. ein dafuer gebundener VC-Button), wird die geteilte Baseline nach Absicht
 uebernommen/verworfen — gewolltes App-weites Verhalten, keine Garantie dieses
-Fensters dagegen.
-
-Branch 4 (dieses File): Drag-In, Navigation, Nicht-Persistenz UND der Parameter-
-Editor (Checkbox-Picker -> generische Regler je ``ParamSpec.kind``, live verdrahtet).
-Vorschau je Typ und Tempo-Modus (Aus/BPM/Tap) folgen in spaeteren Branches.
+Panels dagegen.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, QPointF, QRectF
+from PySide6.QtCore import Qt, QTimer, QPointF, QRect, QRectF
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QSlider, QSpinBox,
                                QVBoxLayout, QWidget)
+from .vc_widget import VCWidget
 
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
 _MIME_FUNCTION = "application/x-lightos-function"
@@ -462,19 +468,32 @@ class _TempoControl(QWidget):
             return "—"
 
 
-class VCMultiLiveEditor(QWidget):
-    """Nicht-persistentes Multi-Effekt-Live-Edit-Fenster (Branch 4: + Param-Editor)."""
+class VCMultiLiveEditor(VCWidget):
+    """Multi-Effekt-Live-Edit-Panel als VC-Canvas-Widget.
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        # Eigenes Top-Level-Fenster trotz parent (Lebensdauer/Stacking am View).
-        self.setWindowFlag(Qt.WindowType.Window, True)
-        self.setWindowTitle("Live-Edit")
+    Sitzt wie ein normales VC-Widget auf der Canvas (verschiebbar/skalierbar,
+    bank-gebunden, im Layout gespeichert). Man zieht mehrere Effekte hinein und
+    bearbeitet ihre Parameter LIVE. Gespeichert wird NUR das Panel + welche Effekte
+    zugewiesen sind (``fids``) — die Parameter-Aenderungen selbst bleiben ueber die
+    ``effect_live``-Baseline FLUECHTIG (fallen beim Show-Reload aufs Preset zurueck;
+    ``begin_live_edit`` pinnt beim Drop, NIE ``commit_live_override``).
+
+    Der Editor-Inhalt (Vorschau/Checkbox-Regler/Tempo) liegt in einem plain-Qt
+    Content-Container (KEINE VCWidget-Kinder -> nicht mit-serialisiert). Im
+    Edit-Modus ist der Container deaktiviert, damit das Panel ueberall greif- und
+    verschiebbar ist; im Run-Modus ist er live bedienbar.
+    """
+
+    MIN_SIZE = (320, 260)
+    _HEADER_H = 22
+
+    def __init__(self, caption: str = "Live-Edit", parent=None):
+        super().__init__(caption, parent)
         self.setAcceptDrops(True)
-        self.setMinimumSize(440, 360)
-        self.resize(580, 520)
+        self._bg_color = QColor("#0d1117")
+        self.resize(560, 500)
 
-        self._fids: list[int] = []          # zugewiesene Effekt-IDs (Reihenfolge = Drop)
+        self._fids: list = []               # zugewiesene Effekt-IDs (Reihenfolge = Drop)
         self._current: int = -1             # Index des gerade gezeigten Effekts
         self._checked: dict[int, set] = {}  # fid -> angehakte Param-Keys (default: keiner)
         self._visible_keys: list = []       # zuletzt gerenderte Param-Keys (Rebuild-Diff)
@@ -485,8 +504,10 @@ class VCMultiLiveEditor(QWidget):
 
     # ── Aufbau ────────────────────────────────────────────────────────────────
     def _build(self) -> None:
-        root = QVBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
+        # Content-Container: plain QWidget (KEIN VCWidget) -> nicht serialisiert.
+        self._content = QWidget(self)
+        root = QVBoxLayout(self._content)
+        root.setContentsMargins(8, 6, 8, 8)
         root.setSpacing(8)
 
         nav = QHBoxLayout()
@@ -521,7 +542,7 @@ class VCMultiLiveEditor(QWidget):
         self._tempo = _TempoControl()
         root.addWidget(self._tempo)
 
-        self.setStyleSheet("""
+        self._content.setStyleSheet("""
             QWidget { background:#0d1117; color:#e6edf3; }
             QScrollArea#mle_scroll { border:1px solid #30363d; border-radius:6px; }
             QLabel { color:#e6edf3; font-size:12px; }
@@ -537,6 +558,48 @@ class VCMultiLiveEditor(QWidget):
             QPushButton:hover:enabled { background:#30363d; }
             QPushButton:disabled { color:#484f58; }
         """)
+        self._reposition_content()
+
+    # ── Canvas-Widget-Rahmen (Header / Content / Serialisierung) ────────────────
+    def _reposition_content(self):
+        self._content.setGeometry(2, self._HEADER_H,
+                                  max(10, self.width() - 4),
+                                  max(10, self.height() - self._HEADER_H - 2))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if getattr(self, "_content", None) is not None:
+            self._reposition_content()
+
+    def set_edit_mode(self, enabled: bool):
+        super().set_edit_mode(enabled)
+        # Edit-Modus: Content deaktivieren -> Klicks gehen ans Panel (verschieben/
+        # skalieren, ganzflaechig greifbar). Run-Modus: Regler live bedienbar.
+        if getattr(self, "_content", None) is not None:
+            self._content.setEnabled(not enabled)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)          # bg + Edit-Resize-Griff/Auswahlrahmen
+        p = QPainter(self)
+        head = QRect(0, 0, self.width(), self._HEADER_H)
+        p.fillRect(head, QColor("#161b22"))
+        p.setPen(QColor("#8b949e"))
+        p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        p.drawText(head, Qt.AlignmentFlag.AlignCenter, self.caption or "Live-Edit")
+        p.setPen(QPen(QColor("#30363d"), 1))
+        p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        p.end()
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()              # type/caption/bank/geometry/colors
+        d["fids"] = [int(f) for f in self._fids]
+        return d
+
+    def apply_dict(self, d: dict):
+        super().apply_dict(d)
+        self._reposition_content()
+        for fid in d.get("fids", []):      # zugewiesene Effekte wiederherstellen
+            self.add_effect(fid)           # (nicht mehr existierende fids werden abgewiesen)
 
     # ── Drag & Drop ────────────────────────────────────────────────────────────
     def dragEnterEvent(self, event) -> None:

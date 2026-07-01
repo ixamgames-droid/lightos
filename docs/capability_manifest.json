@@ -18,6 +18,7 @@
     "VCEncoder",
     "VCFrame",
     "VCLabel",
+    "VCMultiLiveEditor",
     "VCSlider",
     "VCSongInfo",
     "VCSpeedDial",
