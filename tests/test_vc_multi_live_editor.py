@@ -215,25 +215,26 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         QApplication.processEvents()        # deferred Rebuild ausfuehren lassen
         self.assertNotIn("runner_count", self.ed._visible_keys)  # ausgeblendet nach Rebuild
 
-    def test_real_combo_signal_writes_and_rebuilds_safely(self):
-        """Echtes currentIndexChanged eines movement-Combos schreibt den Wert UND
-        loest den deferred Rebuild aus, ohne Use-after-free-Crash."""
-        from PySide6.QtWidgets import QComboBox
+    def test_real_segmented_signal_writes_and_rebuilds_safely(self):
+        """Echter Klick auf einen movement-Segment-Button (visuelle Auswahl) schreibt
+        den Wert UND loest den deferred Rebuild aus, ohne Use-after-free-Crash."""
+        from PySide6.QtWidgets import QPushButton
         from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
-        m = self._new_matrix("LE-Combo")
+        m = self._new_matrix("LE-Seg")
         m.algorithm = RgbAlgorithm.CHASE
         m.style = MatrixStyle.RGB
         self.ed.add_effect(m.id)
-        combo = None
-        for c in self.ed._scroll.widget().findChildren(QComboBox):
-            data = [c.itemData(i) for i in range(c.count())]
-            if "bounce" in data:           # der movement-Combo
-                combo = c
+        if "movement" not in [s.key for s in self.ed._editable_specs(m.id)]:
+            self.skipTest("kein movement-Param")
+        self.ed.set_edit_mode(True)        # Bearbeiten-Modus: Regler gebaut
+        btn = None
+        for b in self.ed._scroll.widget().findChildren(QPushButton):
+            if b.property("seg") and "Ping-Pong" in b.text():   # movement=bounce
+                btn = b
                 break
-        if combo is None:
-            self.skipTest("kein movement-Combo")
-        idx = [combo.itemData(i) for i in range(combo.count())].index("bounce")
-        combo.setCurrentIndex(idx)         # echtes Signal -> _on_choice
+        if btn is None:
+            self.skipTest("kein movement-Segment-Button")
+        btn.click()                        # echter Klick -> pick() -> set_param
         self.assertEqual(effect_live.get_param("movement", m.id), "bounce")
         QApplication.processEvents()       # deferred Rebuild ausfuehren
         self.assertNotIn("runner_count", self.ed._visible_keys)
@@ -242,6 +243,7 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         from PySide6.QtWidgets import QSlider
         m = self._new_matrix("LE-Slider")
         self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)        # Bearbeiten-Modus: Regler gebaut
         base = effect_live.serialization_dict(m)
         sliders = self.ed._scroll.widget().findChildren(QSlider)
         if not sliders:
@@ -268,9 +270,11 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         self.assertNotIn("tempo_bus_id", keys)
 
     def test_checkbox_reveals_and_records_param(self):
+        """Bearbeiten-Modus: Haken zeigt/versteckt den Regler und merkt den Param."""
         from PySide6.QtWidgets import QCheckBox
         m = self._new_matrix("LE-Reveal")
         self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)              # Haken erscheinen nur im Edit-Modus
         cb = self.ed._scroll.widget().findChildren(QCheckBox)[0]
         ctl = cb.parentWidget().layout().itemAt(1).widget()
         self.assertTrue(ctl.isHidden())          # unangehakt -> Regler versteckt
@@ -426,13 +430,64 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         fresh.apply_dict(d)
         self.assertEqual(fresh._fids, [m.id])
 
-    def test_edit_mode_toggles_content_interactivity(self):
-        """Edit-Modus: Inhalt deaktiviert (Klicks -> Drag/Resize des Widgets);
-        Run-Modus: Inhalt aktiv (Live-Parameter bedienbar)."""
+    def test_edit_mode_shows_picker_run_shows_only_chosen(self):
+        """Bearbeiten-Modus (VC-Edit) = Haken-Auswahl; Run-Modus = NUR die
+        angehakten Regler, keine Haken. Content bleibt in beiden Modi bedienbar."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Modes")
+        self.ed.add_effect(m.id)
+        # Edit-Modus: Haken sichtbar, Content bedienbar.
         self.ed.set_edit_mode(True)
-        self.assertFalse(self.ed._content.isEnabled())
+        self.assertTrue(self.ed._content.isEnabled())
+        self.assertGreater(len(self.ed._scroll.widget().findChildren(QCheckBox)), 0)
+        # Ein Param anhaken, dann in den Run-Modus.
+        self.ed._checked_keys(m.id).add("intensity")
         self.ed.set_edit_mode(False)
         self.assertTrue(self.ed._content.isEnabled())
+        self.assertEqual(len(self.ed._scroll.widget().findChildren(QCheckBox)), 0)
+
+    def test_run_mode_uses_visual_controls(self):
+        """Run-Modus baut je Param-Typ das passende visuelle Widget:
+        Richtung -> Pfeil-Segment-Buttons, int -> –/+ -Stepper, float -> Slider."""
+        from PySide6.QtWidgets import QPushButton, QSlider
+        m = self._new_matrix("LE-Visual")
+        self.ed.add_effect(m.id)
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        for k in ("intensity", "runner_count", "direction"):
+            if k in keys:
+                self.ed._checked_keys(m.id).add(k)
+        self.ed.set_edit_mode(False)                 # Run: nur gewählte Regler
+        w = self.ed._scroll.widget()
+        segs = [b for b in w.findChildren(QPushButton) if b.property("seg")]
+        steps = [b for b in w.findChildren(QPushButton) if b.property("step")]
+        if "intensity" in keys:
+            self.assertGreaterEqual(len(w.findChildren(QSlider)), 1)   # float -> Slider
+        if "runner_count" in keys:
+            self.assertGreaterEqual(len(steps), 2)                     # int -> –/+ -Stepper
+        if "direction" in keys:
+            texts = " ".join(b.text() for b in segs)
+            self.assertIn("→", texts)                                  # Richtung -> Pfeile
+
+    def test_checked_selection_is_saved_and_restored(self):
+        """Die AUSWAHL, welche Regler ein Effekt zeigt, wird mitgespeichert
+        (to_dict.checked) und beim apply_dict wiederhergestellt."""
+        m = self._new_matrix("LE-SaveSel")
+        self.ed.add_effect(m.id)
+        self.ed._checked_keys(m.id).update({"intensity", "runner_count"})
+        d = self.ed.to_dict()
+        self.assertEqual(d.get("checked"), {str(m.id): ["intensity", "runner_count"]})
+        fresh = VCMultiLiveEditor()
+        fresh.apply_dict(d)
+        self.assertEqual(fresh._checked.get(m.id), {"intensity", "runner_count"})
+
+    def test_apply_dict_drops_orphan_checked_for_rejected_fid(self):
+        """Eine gespeicherte Auswahl fuer einen inzwischen geloeschten Effekt darf
+        KEINEN Waisen-Eintrag hinterlassen (sonst waechst die Show-Datei zu)."""
+        fresh = VCMultiLiveEditor()
+        fresh.apply_dict({"fids": [987654321],
+                          "checked": {"987654321": ["intensity"]}})
+        self.assertEqual(fresh._fids, [])
+        self.assertNotIn(987654321, fresh._checked)
 
 
 if __name__ == "__main__":
