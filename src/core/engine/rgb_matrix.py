@@ -1512,6 +1512,10 @@ class RgbMatrixInstance(Function):
         if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW) and n_colors > 0:
             specs.append(ParamSpec("colors", "Farben", "color_sequence", None,
                                    tooltip="Farbliste (aktiv/inaktiv, hinzufügen/entfernen)"))
+        if (self.style == MatrixStyle.DIMMER and self.algorithm == RgbAlgorithm.CHASE
+                and bool(self.params.get("dimmer_cycle"))):
+            specs.append(ParamSpec("dimmer_levels", "Dimmer-Stufen", "dimmer_sequence", None,
+                                   tooltip="Stufenliste des Dimmer-Wechsels (aktiv/inaktiv, hinzufügen/entfernen)"))
         if meta:
             specs.extend(visible_specs(self.algorithm, self.style.value, self.params))
         return specs

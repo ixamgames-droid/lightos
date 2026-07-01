@@ -27,7 +27,13 @@ Oben im Panel zeigt eine Live-Vorschau den gewählten Effekt passend zu seinem T
 - **EFX** — der **Bewegungs-Pfad** mit einem darauf laufenden Punkt.
 - **Chaser** — eine **Schritt-Leiste** mit dem aktuell aktiven Schritt.
 
-Die Vorschau ist reine Anzeige und verändert den laufenden Effekt nicht.
+Die Vorschau ist reine Anzeige und verändert den laufenden Effekt nicht. Sie **animiert immer** — auch wenn der Effekt (noch) nicht gestartet ist, dreht die Matrix-Vorschau leise weiter, damit du das Muster schon vor dem Start beurteilen kannst. Läuft der Effekt bereits, zeigt die Vorschau ganz normal seinen echten, laufenden Zustand.
+
+## Farben und Dimmer-Stufen wählen
+
+Bei einer Matrix mit Farbwechsel (RGB/RGBW) bekommst du im Bearbeiten-Modus eine Häkchen-Zeile **„Farben"**: aktivierst du sie, erscheint ein Farbfeld, in dem du die Farben der Wechsel-Sequenz **auswählst, änderst oder einzeln an-/abschaltest** (z. B. nur Rot und Blau aktiv lassen) — Klick auf ein Farbfeld öffnet die Farbauswahl, „Bearbeiten…" öffnet den vollen Editor mit Hinzufügen/Entfernen/Verschieben.
+
+Bei einer **Dimmer**-Matrix mit Wechsel-Algorithmus („Farbe pro Runde wechseln"-Pendant für Helligkeit) erscheint analog eine Zeile **„Dimmer-Stufen"** mit einem Stufen-Feld (z. B. 100 %, 50 %, …), das du genauso an-/abwählen und bearbeiten kannst.
 
 ## Parameter-Editor — Bearbeiten vs. Bedienen
 
@@ -45,16 +51,30 @@ Die Regler sind **visuell** und passen zum Parameter-Typ:
 - **Richtung** → **Pfeil-Buttons** (`→ vorwärts`, `← rückwärts`, `↔ Ping-Pong`, `Mitte↔außen`)
 - **Bewegung / andere Auswahl** → **Segment-Buttons** (bei vielen Optionen ein Dropdown)
 - **An/Aus-Parameter** → **Schalter**
+- **Farben / Dimmer-Stufen** → das Sequenz-Feld (siehe oben)
 
 Bewusst **nicht** steuerbar (weil strukturell, nicht live veränderbar): **Algorithmus**, **Stil**, **Spalten/Reihen**.
 
+## Vorschau und Tempo an-/abwählen
+
+Ganz oben im Bearbeiten-Modus zeigt eine muted Zeile **„Anzeige:"** zwei zusätzliche Häkchen — **„Vorschau"** und **„Tempo-Kontrolle"** — mit denen du **pro Effekt** festlegst, ob die Live-Vorschau bzw. der Tempo-Bereich im Betriebs-Modus überhaupt angezeigt werden sollen. Standardmäßig sind beide angehakt (alles sichtbar). Brauchst du bei einem bestimmten Effekt z. B. keine Vorschau, hakst du sie hier ab — die Auswahl wird wie die Regler-Häkchen mit der Show gespeichert.
+
 ## Tempo-Modus
 
-Unten im Panel legt ein Tempo-Modus fest, wie die Geschwindigkeit des Effekts läuft. Drei Modi stehen zur Wahl:
+Unten im Panel legt ein Tempo-Modus fest, wie die Geschwindigkeit des Effekts läuft — die Beschriftung **„Tempo (dieser Effekt)"** macht klar (mit Tooltip-Erklärung), dass Modus, Bus und Multiplikator **nur für den gerade gewählten Effekt** gelten, nicht global. Drei Modi stehen zur Wahl:
 
 - **Aus** — freie Geschwindigkeit über einen eigenen **Slider**, der die Geschwindigkeit **direkt** setzt (kein Faktor).
 - **BPM** — der Effekt folgt der **Master-BPM**, zusätzlich einstellbar über einen **Tempo-×-Faktor** (z. B. halb/doppelt so schnell).
 - **Tap** — der Effekt bekommt einen **eigenen Takt** auf einem festen Tempo-Bus (**A–D**): Du tippst den **TAP**-Knopf im Rhythmus an, eine **BPM-Anzeige** zeigt das errechnete Tempo.
+
+## Responsives Layout
+
+Das Panel passt seine Anordnung an die Größe an, mit der du es auf die Canvas gezogen hast:
+
+- **Schmal** (Standard) — Vorschau über dem Regler-Bereich, Tempo-Zeile zweizeilig (Aus/BPM/Tap-Knöpfe oben, Multiplikator/Bus-Zeile darunter).
+- **Breit** (Panel entsprechend größer skaliert) — die Vorschau rückt **neben** den Regler-Bereich (links, fest ~260 px breit), und die Tempo-Zeile wird **einzeilig**: Multiplikator bzw. Bus/Tap-Anzeige stehen direkt neben den Aus/BPM/Tap-Knöpfen statt darunter. So nutzt ein groß gezogenes Panel die Breite sinnvoll aus, statt nur in die Höhe zu wachsen.
+
+Der Regler-Bereich selbst ist **rahmenlos** — die Regler wirken „einfach darunter geclustert" statt in einer umrandeten Box zu stecken.
 
 ## Was flüchtig bleibt
 

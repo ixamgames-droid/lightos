@@ -53,13 +53,17 @@ from .vc_widget import VCWidget
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
 _MIME_FUNCTION = "application/x-lightos-function"
 
-# Nur diese ParamSpec-Arten bekommen einen generischen Regler.
-_EDITABLE_KINDS = ("int", "float", "bool", "select")
+# Nur diese ParamSpec-Arten bekommen einen generischen Regler. color_sequence/
+# dimmer_sequence (Etappe B): eigene Felder (ColorSequenceField/DimmerSequenceField),
+# keine Slider/Stepper/Segmente wie bei den skalaren Kinds.
+_EDITABLE_KINDS = ("int", "float", "bool", "select", "color_sequence", "dimmer_sequence")
 
 # Aus dem Param-Picker ausgeschlossen: Tempo/Geschwindigkeit gehoeren in den
 # separaten Tempo-Modus (spaeterer Branch); `algorithm` ist die Effekt-Form/-Art
-# (Davids „Algorithmus/Stil nicht aendern"). Farben/Aktionen sind keine
-# _EDITABLE_KINDS und fallen schon dadurch raus (Farben -> Programmer).
+# (Davids „Algorithmus/Stil nicht aendern"). Einzelfarben (kind=="color") und
+# Aktionen (kind=="action") sind keine _EDITABLE_KINDS und fallen schon dadurch
+# raus; ColorSequence/DimmerSequence (kind=="color_sequence"/"dimmer_sequence")
+# sind seit Etappe B dagegen bewusst waehlbar (Davids Wunsch #1/#2).
 _EXCLUDE_KEYS = frozenset({
     "tempo_bus_id", "tempo_multiplier", "phase_offset", "speed", "algorithm",
 })
@@ -118,6 +122,17 @@ class _EffectPreview(QWidget):
         if not self.isVisible():
             return
         self._phase = (self._phase + 0.012) % 1.0
+        # Immer-Vorschau (Etappe C, Davids Wunsch #7): eine Matrix, die NICHT laeuft,
+        # soll trotzdem animiert wirken -> die Engine selbst einen Schritt weiterdrehen
+        # (nur _step, kein DMX-Write; write() bleibt durch _running geschuetzt). Laeuft
+        # der Effekt bereits, animiert er sich selbst -> hier NICHT zusaetzlich advancen
+        # (Doppel-Phasen-Falle).
+        fn = self._fn()
+        if fn is not None and hasattr(fn, "preview_pixels") and not getattr(fn, "_running", False):
+            try:
+                fn._advance_step(0.06)
+            except Exception:
+                pass
         self.update()
 
     def _fn(self):
@@ -259,35 +274,60 @@ class _TempoControl(QWidget):
         self._mode: dict = {}        # fid -> 'aus' | 'bpm' | 'tap'
         self._tap_bus: dict = {}     # fid -> Bus-Buchstabe (A-D)
         self._readout = None
+        self._supported = False      # aktueller Effekt hat tempo_bus_id (set_fid pflegt es)
+        self._wide = False           # Etappe C: einzeilig (True) vs. zweizeilig (False)
         self._timer = QTimer(self)       # vor _build(), damit showEvent es sicher kennt
         self._timer.setInterval(120)
         self._timer.timeout.connect(self._poll)
         self._build()
 
     def _build(self):
-        root = QVBoxLayout(self)
-        root.setContentsMargins(10, 6, 10, 10)
-        root.setSpacing(7)
-        head = QHBoxLayout()
-        head.setSpacing(6)
-        cap = QLabel("Tempo")
+        self._root = QVBoxLayout(self)
+        self._root.setContentsMargins(10, 6, 10, 10)
+        self._root.setSpacing(7)
+        self._head = QHBoxLayout()
+        self._head.setSpacing(6)
+        cap = QLabel("Tempo (dieser Effekt)")
+        cap.setToolTip("Modus, Bus und Multiplikator gelten nur für den gerade "
+                       "gewählten Effekt.")
         cap.setProperty("muted", "true")
-        head.addWidget(cap)
+        self._head.addWidget(cap)
+        self._head_cap = cap        # fuer Tests/Introspektion (Etappe C #6)
         self._btns = {}
         for key, txt in (("aus", "Aus"), ("bpm", "BPM"), ("tap", "Tap")):
             b = QPushButton(txt)
             b.setCheckable(True)
             b.setFixedHeight(24)
             b.clicked.connect(lambda _checked=False, k=key: self._set_mode(k))
-            head.addWidget(b)
+            self._head.addWidget(b)
             self._btns[key] = b
-        head.addStretch(1)
-        root.addLayout(head)
+        self._head_narrow_stretch = 1     # nur narrow noetig (wide: _sub uebernimmt stretch=1)
+        self._head.addStretch(self._head_narrow_stretch)
+        self._root.addLayout(self._head)
         self._sub = QWidget()
         self._sublay = QHBoxLayout(self._sub)
         self._sublay.setContentsMargins(0, 0, 0, 0)
         self._sublay.setSpacing(8)
-        root.addWidget(self._sub)
+        self._root.addWidget(self._sub)
+
+    def set_wide(self, wide: bool) -> None:
+        """Etappe C (Davids Wunsch #3): breites Panel -> Multiplikator/Bus-Zeile
+        NEBEN Aus/BPM/Tap statt darunter (einzeilig). Umhaengen des ``_sub``-
+        Widgets zwischen eigener Zeile (narrow) und Ende der Kopf-HBox (wide)."""
+        wide = bool(wide)
+        if wide == self._wide:
+            return
+        self._wide = wide
+        if wide:
+            # Stretch am Zeilenende entfernen (sonst haengt er VOR dem umgehaengten
+            # _sub und drueckt es an den rechten Rand statt es einzureihen).
+            self._head.takeAt(self._head.count() - 1)
+            self._root.removeWidget(self._sub)
+            self._head.addWidget(self._sub, 1)
+        else:
+            self._head.removeWidget(self._sub)
+            self._head.addStretch(self._head_narrow_stretch)
+            self._root.addWidget(self._sub)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -303,13 +343,16 @@ class _TempoControl(QWidget):
             return                   # gleicher Effekt -> Tempo-Bereich unveraendert
         self._fid = new
         if self._fid is None:
+            self._supported = False
             self.setVisible(False)
             return
         from src.core.engine import effect_live
         keys = [getattr(s, "key", "") for s in effect_live.list_params(self._fid)]
         if "tempo_bus_id" not in keys:
+            self._supported = False
             self.setVisible(False)   # z. B. Szene -> kein Tempo
             return
+        self._supported = True
         self.setVisible(True)
         if self._fid not in self._mode:
             cur = effect_live.get_param("tempo_bus_id", self._fid) or ""
@@ -520,6 +563,11 @@ class VCMultiLiveEditor(VCWidget):
         self._checked: dict[int, set] = {}  # fid -> angehakte Param-Keys (default: keiner)
         self._visible_keys: list = []       # zuletzt gerenderte Param-Keys (Rebuild-Diff)
         self._rebuild_pending = False       # ein deferred Rebuild ist bereits eingeplant
+        # Etappe C: pro Effekt an-/abwaehlbare Anzeige-Elemente. Werte-Teilmenge von
+        # {"preview","tempo"}; leer/fehlend = alles sichtbar (Default/Back-Compat).
+        self._hidden: dict[int, set] = {}
+        self._wide = False                  # responsives Body-Layout (Etappe C #3/#5)
+        self._relayout_pending = False      # ein deferred Re-Layout ist bereits eingeplant
 
         self._build()
         self._refresh_nav()
@@ -552,13 +600,40 @@ class VCMultiLiveEditor(VCWidget):
 
         # Live-Vorschau des gewaehlten Effekts (eigener Renderer je Typ).
         self._preview = _EffectPreview()
-        root.addWidget(self._preview)
+        self._preview.setFixedWidth(260)    # nur wirksam, solange sie im wide-Body haengt
 
-        # Body: scrollbarer Editor-Bereich; Inhalt wird je Effekt neu gebaut.
+        # Body: Vorschau + scrollbarer Editor-Bereich. Schmal (Default): gestapelt in
+        # einer VBox (Vorschau oben). Breit (>= 560px, Etappe C #3/#5): nebeneinander
+        # in einer HBox (Vorschau links fest ~260px, Scroll rechts mit Stretch).
+        # ZWEI feste Container-Widgets (narrow/wide), BEIDE dauerhaft in `root` --
+        # Umschalten NUR ueber setVisible (kein Umhaengen/Zerstoeren von Layouts,
+        # das waere fragil: Qt erlaubt kein Re-Parenting eines Layouts auf ein Widget,
+        # das schon eines hat, ohne das alte C++-Objekt zu invalidieren). Ein
+        # verstecktes Widget beansprucht in einer QBoxLayout keinen Platz.
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setObjectName("mle_scroll")
-        root.addWidget(self._scroll, 1)
+
+        self._body_narrow_w = QWidget()
+        self._body_narrow = QVBoxLayout(self._body_narrow_w)
+        self._body_narrow.setContentsMargins(0, 0, 0, 0)
+        self._body_narrow.setSpacing(8)
+
+        self._body_wide_w = QWidget()
+        self._body_wide = QHBoxLayout(self._body_wide_w)
+        self._body_wide.setContentsMargins(0, 0, 0, 0)
+        self._body_wide.setSpacing(8)
+
+        # Initial (narrow, Default): Vorschau + Scroll gestapelt. Beim Wechsel zu
+        # wide werden BEIDE Widgets in `_body_wide` umgehaengt (Qt reparented ein
+        # Widget beim addWidget in ein anderes Layout automatisch, OHNE das alte
+        # Layout-Objekt zu zerstoeren) und zurueck.
+        self._body_narrow.addWidget(self._preview)
+        self._body_narrow.addWidget(self._scroll, 1)
+
+        root.addWidget(self._body_narrow_w, 1)
+        root.addWidget(self._body_wide_w, 1)
+        self._body_wide_w.setVisible(False)
 
         # Tempo-Modus (Aus / BPM / Tap) — eigener persistenter Bereich unten.
         self._tempo = _TempoControl()
@@ -566,7 +641,7 @@ class VCMultiLiveEditor(VCWidget):
 
         self._content.setStyleSheet("""
             QWidget { background:#0d1117; color:#e6edf3; }
-            QScrollArea#mle_scroll { border:1px solid #30363d; border-radius:6px; }
+            QScrollArea#mle_scroll { border:none; }
             QLabel { color:#e6edf3; font-size:12px; }
             QLabel[muted="true"] { color:#8b949e; }
             QComboBox, QSpinBox { background:#161b22; color:#e6edf3; border:1px solid #30363d;
@@ -604,6 +679,58 @@ class VCMultiLiveEditor(VCWidget):
         super().resizeEvent(event)
         if getattr(self, "_content", None) is not None:
             self._reposition_content()
+            self._maybe_relayout()
+
+    # Schwellen fuer responsives Layout (Etappe C #3/#5). Content-Breite, nicht
+    # Panel-Breite (Randring/Header sind bereits abgezogen).
+    _WIDE_BODY_PX = 560
+    _WIDE_TEMPO_PX = 430
+
+    def _maybe_relayout(self) -> None:
+        """Bei Schwellen-Wechsel deferred neu anordnen (kein synchroner Umbau aus
+        resizeEvent heraus — analog zum Rebuild-Deferred-Muster der Datei)."""
+        w = self._content.width()
+        want_wide_body = w >= self._WIDE_BODY_PX
+        want_wide_tempo = w >= self._WIDE_TEMPO_PX
+        if want_wide_body == self._wide and want_wide_tempo == self._tempo._wide:
+            return
+        if not self._relayout_pending:
+            self._relayout_pending = True
+            QTimer.singleShot(0, self._deferred_relayout)
+
+    def _deferred_relayout(self) -> None:
+        self._relayout_pending = False
+        try:
+            import shiboken6
+            if not shiboken6.isValid(self) or not shiboken6.isValid(self._content):
+                return      # Fenster zwischenzeitlich zerstoert -> nichts tun
+        except Exception:
+            pass
+        w = self._content.width()
+        self._set_wide(w >= self._WIDE_BODY_PX)
+        self._tempo.set_wide(w >= self._WIDE_TEMPO_PX)
+
+    def _set_wide(self, wide: bool) -> None:
+        """Body-Split (Etappe C #5): Vorschau links neben dem Scroll-Bereich
+        (>= 560px) statt darueber gestapelt. Umhaengen der zwei Kind-Widgets
+        (Vorschau + Scroll) zwischen den zwei FEST bestehenden Container-Widgets
+        `_body_narrow_w`/`_body_wide_w` (Qt reparented ein Widget beim addWidget
+        automatisch, OHNE das alte Layout-Objekt zu zerstoeren); nur der jeweils
+        aktive Container ist sichtbar -> ein verstecktes Widget beansprucht in der
+        umschliessenden QVBoxLayout keinen Platz. Kein Neuaufbau der Kinder selbst,
+        Signale/Zustand des Scroll-Inhalts bleiben unberuehrt."""
+        wide = bool(wide)
+        if wide == self._wide:
+            return
+        self._wide = wide
+        if wide:
+            self._body_wide.addWidget(self._preview)
+            self._body_wide.addWidget(self._scroll, 1)
+        else:
+            self._body_narrow.addWidget(self._preview)
+            self._body_narrow.addWidget(self._scroll, 1)
+        self._body_wide_w.setVisible(wide)
+        self._body_narrow_w.setVisible(not wide)
 
     def set_edit_mode(self, enabled: bool):
         super().set_edit_mode(enabled)
@@ -634,6 +761,10 @@ class VCMultiLiveEditor(VCWidget):
         # bleiben fluechtig (effect_live-Baseline), die Auswahl nicht.
         d["checked"] = {str(int(f)): sorted(ks)
                         for f, ks in self._checked.items() if ks}
+        # Etappe C: pro Effekt versteckte Anzeige-Elemente (Vorschau/Tempo). Leer =
+        # alles sichtbar -> kein Eintrag (Back-Compat, kleinere Show-Datei).
+        d["hidden"] = {str(int(f)): sorted(vs)
+                       for f, vs in self._hidden.items() if vs}
         return d
 
     def apply_dict(self, d: dict):
@@ -648,6 +779,13 @@ class VCMultiLiveEditor(VCWidget):
                 continue
             if fid in self._fids:          # nur fuer real zugewiesene Effekte (kein Waisen-
                 self._checked[fid] = set(keys or ())   # Eintrag fuer abgewiesene fids)
+        for fid_s, vals in (d.get("hidden") or {}).items():
+            try:
+                fid = int(fid_s)
+            except (TypeError, ValueError):
+                continue
+            if fid in self._fids:          # gleicher Waisen-Guard wie bei "checked"
+                self._hidden[fid] = set(vals or ())
         self._refresh_body()               # gespeicherte Auswahl sichtbar machen
 
     # ── Drag & Drop ────────────────────────────────────────────────────────────
@@ -750,9 +888,55 @@ class VCMultiLiveEditor(VCWidget):
     def _checked_keys(self, fid) -> set:
         return self._checked.setdefault(int(fid), set())
 
+    def _hidden_set(self, fid) -> set:
+        return self._hidden.setdefault(int(fid), set())
+
+    def _apply_display_visibility(self, fid) -> None:
+        """Etappe C #2: Vorschau/Tempo je Effekt an-/abgewaehlt sichtbar machen.
+        Entscheidet in BEIDE Richtungen (auch Wieder-Anhaken muss zeigen — Review-
+        Befund: nur-verstecken liess Tempo nach ab- und wieder anhaken dauerhaft
+        unsichtbar, weil ``_tempo.set_fid`` bei gleichem Effekt early-returned).
+        Tempo ist nur sichtbar, wenn der Effekt es ueberhaupt kann
+        (``_TempoControl._supported``, von ``set_fid`` gepflegt) UND es nicht
+        abgewaehlt wurde."""
+        hidden = self._hidden_set(fid) if fid is not None else set()
+        self._preview.setVisible(fid is not None and "preview" not in hidden)
+        self._tempo.setVisible(fid is not None and self._tempo._supported
+                               and "tempo" not in hidden)
+
+    def _build_display_toggles(self, fid) -> QWidget:
+        """Bearbeiten-Modus, ganz oben im Scroll-Inhalt: muted Zeile „Anzeige:" mit
+        Checkboxen fuer Vorschau/Tempo-Kontrolle (pro Effekt, checked=sichtbar)."""
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+        cap = QLabel("Anzeige:")
+        cap.setProperty("muted", "true")
+        h.addWidget(cap)
+        hidden = self._hidden_set(fid)
+
+        def make(key, text):
+            cb = QCheckBox(text)
+            cb.setChecked(key not in hidden)
+
+            def on_toggle(on, key=key, fid=fid):
+                hs = self._hidden_set(fid)
+                (hs.discard if on else hs.add)(key)
+                self._apply_display_visibility(fid)
+
+            cb.toggled.connect(on_toggle)
+            return cb
+
+        h.addWidget(make("preview", "Vorschau"))
+        h.addWidget(make("tempo", "Tempo-Kontrolle"))
+        h.addStretch(1)
+        return row
+
     def _refresh_body(self) -> None:
         self._preview.set_fid(self._current_fid())
         self._tempo.set_fid(self._current_fid())
+        self._apply_display_visibility(self._current_fid())
         content = QWidget()
         v = QVBoxLayout(content)
         v.setContentsMargins(10, 10, 10, 10)
@@ -786,12 +970,19 @@ class VCMultiLiveEditor(VCWidget):
             v.addStretch(1)
             self._scroll.setWidget(content)
             self._visible_keys = []
+            if edit:
+                # Zeile wird bewusst NACH den (hier: keinen) Param-Zeilen erzeugt und
+                # erst danach ganz nach oben insertiert -> Objekt-Erzeugungsreihenfolge
+                # (und damit findChildren(QCheckBox)-Reihenfolge) bleibt: erst Param-
+                # Haken, dann Anzeige-Haken; NUR die visuelle Position aendert sich.
+                v.insertWidget(0, self._build_display_toggles(fid))
             return
 
         if edit:
             # Bearbeiten-Modus (VC-Edit): Haken-Auswahl, was gesteuert werden soll.
             for spec in specs:
                 v.addWidget(self._build_pick_row(spec, fid))
+            v.insertWidget(0, self._build_display_toggles(fid))
         else:
             # Run-Modus: NUR die angehakten Regler, aufgeraeumt, ohne Haken-Liste.
             chosen = [s for s in specs if s.key in self._checked_keys(fid)]
@@ -843,7 +1034,7 @@ class VCMultiLiveEditor(VCWidget):
         key = getattr(spec, "key", "")
         label = getattr(spec, "label", key) or key
         control = self._build_control(spec, fid)
-        if getattr(spec, "kind", "") == "select":
+        if getattr(spec, "kind", "") in ("select", "color_sequence", "dimmer_sequence"):
             box = QWidget()
             v = QVBoxLayout(box)
             v.setContentsMargins(0, 2, 0, 2)
@@ -889,7 +1080,44 @@ class VCMultiLiveEditor(VCWidget):
             return self._build_toggle(spec, fid)
         if kind == "int":
             return self._build_stepper(spec, fid)
+        if kind == "color_sequence":
+            return self._build_color_sequence(spec, fid)
+        if kind == "dimmer_sequence":
+            return self._build_dimmer_sequence(spec, fid)
         return self._build_slider(spec, fid)
+
+    def _build_color_sequence(self, spec, fid) -> QWidget:
+        """color_sequence (z. B. Matrix-``colors``): wiederverwendbares
+        ColorSequenceField, das die LIVE-ColorSequence per Referenz mutiert
+        (Farben waehlen/aendern/aktivieren — Davids Wunsch #1). Titel leer, weil die
+        Beschriftung schon aus der Haken-/Operate-Row kommt (kein Doppel-Label)."""
+        from src.core.engine import effect_live
+        from src.ui.widgets.color_sequence_editor import ColorSequenceField
+        key = getattr(spec, "key", "")
+        field = ColorSequenceField(title=getattr(spec, "label", key) or key)
+        # Defensiv pinnen: add_effect tut dies bereits beim Drop, aber ein direkter
+        # Zugriff auf die Sequence darf niemals ohne gepinnte Baseline erfolgen.
+        effect_live.begin_live_edit(fid)
+        field.set_sequence(effect_live.get_param(key, fid))
+
+        def on_changed(fid=fid):
+            # UI-14b: Vorschau-Badges der VCButtons, die diesen Effekt binden,
+            # sofort nachziehen (Vorschau hier im Panel liest die Sequence live).
+            self._notify_effect_colors_changed(fid)
+
+        field.changed.connect(on_changed)
+        return field
+
+    def _build_dimmer_sequence(self, spec, fid) -> QWidget:
+        """dimmer_sequence (Matrix-``dimmer_levels``): analog zu color_sequence,
+        aber ohne Badge-Notify (kein Farb-Preview an den VCButtons betroffen)."""
+        from src.core.engine import effect_live
+        from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
+        key = getattr(spec, "key", "")
+        field = DimmerSequenceField(title=getattr(spec, "label", key) or key)
+        effect_live.begin_live_edit(fid)
+        field.set_sequence(effect_live.get_param(key, fid))
+        return field
 
     def _build_segmented(self, spec, fid, pairs, arrows=False) -> QWidget:
         """Auswahl als Buttongruppe (visuell): Richtung mit Pfeil-Glyphen, sonst

@@ -15,8 +15,11 @@ from PySide6.QtWidgets import QApplication
 
 from src.core.engine import effect_live
 from src.core.engine.function_manager import get_function_manager
+from src.core.engine.rgb_matrix import ColorSequence, MatrixStyle, RgbAlgorithm
 from src.ui.virtualconsole.vc_multi_live_editor import (VCMultiLiveEditor,
                                                         _MIME_FUNCTION)
+from src.ui.widgets.color_sequence_editor import ColorSequenceField
+from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 
 
 def _app():
@@ -488,6 +491,262 @@ class VCMultiLiveEditorTest(unittest.TestCase):
                           "checked": {"987654321": ["intensity"]}})
         self.assertEqual(fresh._fids, [])
         self.assertNotIn(987654321, fresh._checked)
+
+    # ── Etappe B: Farb-/Dimmer-Sequenz-Regler ───────────────────────────────────
+    def test_edit_mode_has_colors_checkbox_for_rgb_matrix(self):
+        """RGB-Matrix im Bearbeiten-Modus: eine Haken-Zeile „Farben“ mit
+        ColorSequenceField, das versteckt bleibt bis angehakt."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Colors")
+        m.colors = ColorSequence([(255, 0, 0), (0, 0, 255)])
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        cbs = w.findChildren(QCheckBox)
+        labels = [cb.text() for cb in cbs]
+        self.assertIn("Farben", labels)
+        fields = w.findChildren(ColorSequenceField)
+        self.assertEqual(len(fields), 1)
+        self.assertTrue(fields[0].isHidden())   # nicht angehakt -> versteckt
+        cb = next(cb for cb in cbs if cb.text() == "Farben")
+        cb.setChecked(True)
+        self.assertFalse(fields[0].isHidden())
+
+    def test_run_mode_shows_color_field_only_when_checked(self):
+        """Run-Modus: das Feld erscheint nur, wenn „Farben“ vorher angehakt wurde."""
+        m = self._new_matrix("LE-Colors-Run")
+        m.colors = ColorSequence([(255, 0, 0), (0, 0, 255)])
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(False)
+        w = self.ed._scroll.widget()
+        self.assertEqual(len(w.findChildren(ColorSequenceField)), 0)
+        self.ed._checked_keys(m.id).add("colors")
+        self.ed.set_edit_mode(False)
+        w = self.ed._scroll.widget()
+        self.assertEqual(len(w.findChildren(ColorSequenceField)), 1)
+
+    def test_color_sequence_field_mutation_is_live_and_not_persisted(self):
+        """Eine Mutation ueber die im Feld gehaltene Sequence aendert sofort
+        effect_live.get_param("colors", fid); serialization_dict() liefert trotzdem
+        weiter die Preset-Farben (Fluechtigkeit-Naht, Kern-Contract des Panels)."""
+        m = self._new_matrix("LE-Colors-Mut")
+        m.colors = ColorSequence([(255, 0, 0), (0, 0, 255)])
+        preset_colors = effect_live.serialization_dict(m)["color_sequence"]
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        field = w.findChildren(ColorSequenceField)[0]
+        seq = effect_live.get_param("colors", m.id)
+        self.assertIs(seq, field._seq)            # gleiche Live-Sequence, keine Kopie
+        seq.set_color(0, (0, 255, 0))
+        field.changed.emit()
+        self.assertEqual(effect_live.get_param("colors", m.id).color_at(0), (0, 255, 0))
+        # Serialisierung bleibt beim urspruenglichen Preset (Baseline-Schutz).
+        self.assertEqual(effect_live.serialization_dict(m)["color_sequence"], preset_colors)
+
+    def test_edit_mode_has_dimmer_levels_checkbox_for_dimmer_chase(self):
+        """DIMMER + CHASE + dimmer_cycle=True: Haken-Zeile „Dimmer-Stufen“ mit
+        DimmerSequenceField (Etappe A macht den Spec ueberhaupt erst sichtbar)."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Dimmer")
+        m.style = MatrixStyle.DIMMER
+        m.algorithm = RgbAlgorithm.CHASE
+        m.params["dimmer_cycle"] = True
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        labels = [cb.text() for cb in w.findChildren(QCheckBox)]
+        self.assertIn("Dimmer-Stufen", labels)
+        self.assertEqual(len(w.findChildren(DimmerSequenceField)), 1)
+
+    def test_dimmer_cycle_false_hides_dimmer_row_after_rebuild(self):
+        """dimmer_cycle=False (Renderer-Gate spiegelnd, Etappe A): kein Spec ->
+        keine Zeile, auch nach einem Rebuild (deferred via processEvents)."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Dimmer-Off")
+        m.style = MatrixStyle.DIMMER
+        m.algorithm = RgbAlgorithm.CHASE
+        m.params["dimmer_cycle"] = False
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        QApplication.processEvents()
+        w = self.ed._scroll.widget()
+        labels = [cb.text() for cb in w.findChildren(QCheckBox)]
+        self.assertNotIn("Dimmer-Stufen", labels)
+        self.assertEqual(len(w.findChildren(DimmerSequenceField)), 0)
+
+    # ── Etappe C: Immer-Vorschau, Anzeige-Toggles, responsives Layout ───────────
+    def test_preview_tick_advances_stopped_matrix_not_running(self):
+        """_EffectPreview._tick: eine gestoppte Matrix wird bei jedem Tick per
+        _advance_step(0.06) weitergedreht (Immer-Vorschau, Davids Wunsch #7);
+        eine LAUFENDE Matrix wird NICHT zusaetzlich advanced (Doppel-Phasen-Falle)."""
+        m = self._new_matrix("LE-AlwaysPreview")
+        self.ed.add_effect(m.id)
+        self.ed.show()
+        QApplication.processEvents()
+        self.assertTrue(self.ed._preview.isVisible())
+        step0 = m._step
+        self.ed._preview._tick()
+        self.ed._preview._tick()
+        self.assertNotEqual(m._step, step0)   # gestoppt -> Step ist weitergelaufen
+
+        m._running = True
+        calls = {"n": 0}
+        orig = m._advance_step
+
+        def spy(dt, orig=orig, calls=calls):
+            calls["n"] += 1
+            return orig(dt)
+
+        m._advance_step = spy
+        self.ed._preview._tick()
+        self.assertEqual(calls["n"], 0)       # laeuft bereits -> KEIN externes Advance
+
+    def test_display_toggle_checkboxes_exist_in_edit_mode(self):
+        """Bearbeiten-Modus: eine muted Zeile „Anzeige:" mit zwei Checkboxen
+        „Vorschau" und „Tempo-Kontrolle", beide default angehakt."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-Toggles")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        labels = [cb.text() for cb in w.findChildren(QCheckBox)]
+        self.assertIn("Vorschau", labels)
+        self.assertIn("Tempo-Kontrolle", labels)
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        self.assertTrue(by_label["Vorschau"].isChecked())
+        self.assertTrue(by_label["Tempo-Kontrolle"].isChecked())
+
+    def test_unchecking_preview_toggle_hides_preview_in_run_mode(self):
+        """Abwahl „Vorschau" im Edit-Modus -> im Run-Modus ist die Vorschau
+        versteckt (isHidden), Default (nichts abgewaehlt) bleibt sichtbar."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-HidePreview")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Vorschau"].setChecked(False)
+        self.ed.set_edit_mode(False)
+        self.assertTrue(self.ed._preview.isHidden())
+
+    def test_unchecking_tempo_toggle_hides_tempo_in_run_mode(self):
+        """Abwahl „Tempo-Kontrolle" im Edit-Modus -> im Run-Modus ist der
+        Tempo-Bereich versteckt (isHidden)."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-HideTempo")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Tempo-Kontrolle"].setChecked(False)
+        self.ed.set_edit_mode(False)
+        self.assertTrue(self.ed._tempo.isHidden())
+
+    def test_rechecking_tempo_toggle_shows_tempo_again(self):
+        """Regression (Review-Befund): „Tempo-Kontrolle" ab- und WIEDER anhaken
+        muss den Tempo-Bereich wieder zeigen — auch ohne Effektwechsel
+        (``_TempoControl.set_fid`` early-returned bei gleicher fid, der Recovery
+        laeuft daher ueber ``_apply_display_visibility``)."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-ReshowTempo")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Tempo-Kontrolle"].setChecked(False)
+        self.assertTrue(self.ed._tempo.isHidden())
+        by_label["Tempo-Kontrolle"].setChecked(True)
+        self.assertFalse(self.ed._tempo.isHidden())
+        self.ed.set_edit_mode(False)
+        self.assertFalse(self.ed._tempo.isHidden())
+        # Analog fuer die Vorschau (war schon korrekt, bleibt abgesichert).
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Vorschau"].setChecked(False)
+        self.assertTrue(self.ed._preview.isHidden())
+        by_label["Vorschau"].setChecked(True)
+        self.assertFalse(self.ed._preview.isHidden())
+
+    def test_tempo_stays_hidden_for_effect_without_tempo_even_if_not_deselected(self):
+        """Positiv-Logik darf Tempo NICHT faelschlich zeigen, wenn der Effekt gar
+        kein tempo_bus_id hat (z. B. Szene): _supported gated die Sichtbarkeit."""
+        m = self._new_matrix("LE-NoTempoGuard")
+        self.ed.add_effect(m.id)
+        self.ed._tempo._supported = False          # simuliert param-losen Effekt
+        self.ed._apply_display_visibility(m.id)
+        self.assertTrue(self.ed._tempo.isHidden())
+
+    def test_hidden_roundtrip_via_to_dict_apply_dict_with_orphan_guard(self):
+        """to_dict/apply_dict-Roundtrip von "hidden" inkl. Waisen-Guard fuer
+        einen inzwischen geloeschten Effekt (analog "checked")."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-HiddenRoundtrip")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Vorschau"].setChecked(False)
+        d = self.ed.to_dict()
+        self.assertEqual(d.get("hidden"), {str(m.id): ["preview"]})
+
+        fresh = VCMultiLiveEditor()
+        fresh.apply_dict(d)
+        self.assertEqual(fresh._hidden.get(m.id), {"preview"})
+        self.assertTrue(fresh._preview.isHidden())
+
+        # Waisen-Guard: hidden-Eintrag fuer eine nicht mehr existierende fid darf
+        # keinen Eintrag hinterlassen (analog dem "checked"-Waisen-Test).
+        orphan = VCMultiLiveEditor()
+        orphan.apply_dict({"fids": [987654322],
+                           "hidden": {"987654322": ["preview"]}})
+        self.assertEqual(orphan._fids, [])
+        self.assertNotIn(987654322, orphan._hidden)
+
+    def test_existing_show_without_hidden_key_loads_with_everything_visible(self):
+        """Bestands-Show ohne "hidden"-Key (Back-Compat, aeltere Panels) laedt mit
+        Vorschau UND Tempo-Kontrolle sichtbar (Default-Verhalten unveraendert)."""
+        m = self._new_matrix("LE-BackCompat")
+        self.ed.add_effect(m.id)
+        d = self.ed.to_dict()
+        self.assertEqual(d.get("hidden"), {})     # nichts abgewaehlt -> leeres dict
+        d.pop("hidden", None)                      # wie eine aeltere Show ohne Key
+        fresh = VCMultiLiveEditor()
+        fresh.apply_dict(d)
+        self.assertFalse(fresh._preview.isHidden())
+        self.assertFalse(fresh._tempo.isHidden())
+        # Kein fid hat einen NICHT-leeren hidden-Eintrag -> nichts ist abgewaehlt
+        # (ein leerer Set-Eintrag ist erlaubt, semantisch identisch zu "kein Eintrag").
+        self.assertFalse(any(fresh._hidden.values()))
+
+    def test_resize_wide_splits_body_and_makes_tempo_row_single_line(self):
+        """Responsives Layout (Etappe C #3/#5): nach ed.resize(900,500) +
+        processEvents ist ed._wide True und die Tempo-Zeile einzeilig
+        (_tempo._wide); nach ed.resize(360,500) wieder False."""
+        m = self._new_matrix("LE-Responsive")
+        self.ed.add_effect(m.id)
+        self.ed.show()
+        QApplication.processEvents()
+        self.ed.resize(900, 500)
+        QApplication.processEvents()
+        self.assertTrue(self.ed._wide)
+        self.assertTrue(self.ed._tempo._wide)
+        self.ed.resize(360, 500)
+        QApplication.processEvents()
+        self.assertFalse(self.ed._wide)
+        self.assertFalse(self.ed._tempo._wide)
+
+    def test_tempo_caption_mentions_per_effect_scope(self):
+        """Tempo-Beschriftung macht klar, dass Modus/Bus/Multiplikator NUR fuer
+        den aktuell gewaehlten Effekt gelten (Davids Nachfrage, Etappe C #6)."""
+        self.assertIn("dieser Effekt", self.ed._tempo._head_cap.text())
+        self.assertTrue(self.ed._tempo._head_cap.toolTip())
+
+    def test_scroll_area_is_frameless(self):
+        """Rahmenlos (Etappe C #3): der Scroll-Bereich traegt keinen Rahmen mehr
+        (Regler wirken „drunter geclustert" statt in einer umrandeten Box)."""
+        self.assertIn("border:none", self.ed._content.styleSheet())
 
 
 if __name__ == "__main__":
