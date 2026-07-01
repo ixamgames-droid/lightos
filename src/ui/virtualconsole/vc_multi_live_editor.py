@@ -4,14 +4,23 @@ Davids Wunsch: ein grosses, frei skalierbares Panel, das man wie jedes andere
 VC-Widget auf die Canvas-Flaeche der Virtuellen Konsole setzt und dort platziert/
 groesst. In das Panel zieht man mehrere Effekte (Matrix, Chaser, EFX …) per
 Drag&Drop hinein. Oben blaettert man mit Dropdown und -/+ durch die zugewiesenen
-Effekte; der Body zeigt einen Live-Editor fuer den gerade gewaehlten Effekt: man
-hakt an, WAS man steuern will, und nur dafuer erscheint ein Regler. Dazu je Typ
-eine Vorschau und ein Tempo-Modus (Aus/BPM/Tap).
+Effekte; der Body zeigt einen Live-Editor fuer den gerade gewaehlten Effekt. Dazu je
+Typ eine Vorschau und ein Tempo-Modus (Aus/BPM/Tap) — beides PRO Effekt.
+
+BEARBEITEN vs. BEDIENEN (Davids Wunsch): Der Editor haengt am **VC-Bearbeiten-Modus**.
+- **VC im Bearbeiten-Modus** -> Haken-AUSWAHL: alle live-steuerbaren Params als
+  Kaestchen; man hakt an, WAS man am Effekt steuern will (pro Effekt einzeln).
+- **VC-Bearbeiten aus (Run)** -> nur die ANGEHAKTEN Regler, aufgeraeumt, ohne die
+  Kaestchen-Liste — bereit zum Bedienen.
+Die Regler sind je Typ **visuell**: float -> Slider, int -> –/+ -Stepper, bool ->
+An/Aus-Schalter, select -> Buttongruppe; **Richtung** als Pfeil-Buttons (→ vorwaerts,
+← rueckwaerts, ↔ Ping-Pong, Mitte↔außen …, siehe ``_DIR_ARROWS``).
 
 PERSISTENZ-SEMANTIK (Kern): Das Panel IST ein ``VCWidget`` (steht im
-``WIDGET_REGISTRY``) — Layout/Geometrie UND die Zuweisung, WELCHE Effekte
-bearbeitet werden (``to_dict``/``apply_dict`` ueber die ``fids``-Liste), werden mit
-der Show gespeichert. Die editierten Live-Parameter selbst bleiben aber FLUECHTIG:
+``WIDGET_REGISTRY``) — Layout/Geometrie, die Zuweisung WELCHE Effekte bearbeitet
+werden (``fids``) UND die AUSWAHL welche Regler ein Effekt zeigt (``checked``) werden
+via ``to_dict``/``apply_dict`` mit der Show gespeichert. Die editierten Live-Parameter
+selbst bleiben aber FLUECHTIG:
 sie werden live ueber ``effect_live`` gesetzt; dessen Sitzungs-Baseline-Mechanismus
 (``begin_live_edit`` / ``serialization_dict``) sorgt dafuer, dass ein Show-Save den
 urspruenglichen Preset-Zustand schreibt, NICHT die Live-Werte. Es wird daher bewusst
@@ -21,9 +30,10 @@ wuerden die Live-Werte speicherbar machen. Die Baseline wird beim Drop EINMAL ge
 ``set_param_normalized``. Ergebnis: Panel + welche Effekte drin haengen bleiben nach
 Reload erhalten, die konkret gedrehten Werte fallen auf das Preset zurueck.
 
-Edit-/Run-Modus: Im Bearbeiten-Modus wird der Inhalts-Container deaktiviert, damit
-Klicks an das ``VCWidget`` (Verschieben/Groessen) durchgereicht werden; im Run-Modus
-ist der Inhalt aktiv und die Live-Parameter sind bedienbar.
+Verschieben/Skalieren: Der Content-Container ist STETS bedienbar (damit man im
+Bearbeiten-Modus Haken setzen kann). Das Panel wird ueber den **Header** (oben)
+verschoben und ueber den ``HANDLE_SIZE``-breiten **Randring** skaliert — dort liegen
+die Resize-Zonen des VCWidget frei (``_reposition_content`` rueckt den Content ein).
 
 Grenze: ``_live_baselines`` ist global pro Effektobjekt (nicht panel-eigen).
 Ruft eine ANDERE Oberflaeche bewusst ``Commit``/``Reset Live`` auf demselben Effekt
@@ -36,7 +46,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QTimer, QPointF, QRect, QRectF
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QSlider, QSpinBox,
+                               QPushButton, QScrollArea, QSlider,
                                QVBoxLayout, QWidget)
 from .vc_widget import VCWidget
 
@@ -59,7 +69,19 @@ _MULT_CHOICES = (("¼", 0.25), ("½", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 
 _TAP_BUSES = ("A", "B", "C", "D")
 
 _DIR_LABELS = {"forward": "vorwärts", "reverse": "rückwärts",
-               "backward": "rückwärts", "bounce": "Ping-Pong"}
+               "backward": "rückwärts", "bounce": "Ping-Pong",
+               "left": "links", "right": "rechts", "up": "hoch", "down": "runter",
+               "in": "nach innen", "out": "nach außen",
+               "center_out": "Mitte→außen", "out_center": "außen→Mitte",
+               "inside_out": "Mitte→außen", "outside_in": "außen→Mitte",
+               "cw": "im Uhrzeigersinn", "ccw": "gegen Uhrzeigersinn"}
+
+# Visuelle Richtungs-Auswahl: Options-Wert -> Pfeil-Glyph. Ein select-Param, dessen
+# Options ALLE hier auftauchen, wird als Pfeil-Buttongruppe statt Dropdown gezeigt.
+_DIR_ARROWS = {"forward": "→", "reverse": "←", "backward": "←", "bounce": "↔",
+               "left": "←", "right": "→", "up": "↑", "down": "↓",
+               "in": "→←", "out": "←→", "center_out": "←‧→", "out_center": "→‧←",
+               "cw": "↻", "ccw": "↺"}
 
 
 class _EffectPreview(QWidget):
@@ -557,14 +579,26 @@ class VCMultiLiveEditor(VCWidget):
                           border-radius:3px; font-size:13px; min-height:24px; }
             QPushButton:hover:enabled { background:#30363d; }
             QPushButton:disabled { color:#484f58; }
+            QPushButton[seg="true"] { background:#161b22; padding:4px 6px; font-size:13px; }
+            QPushButton[seg="true"]:hover:enabled { background:#30363d; }
+            QPushButton[seg="true"]:checked { background:#1f6feb; color:#ffffff;
+                                              border:1px solid #1f6feb; font-weight:bold; }
+            QPushButton[step="true"] { background:#161b22; font-size:17px; font-weight:bold;
+                                       min-height:26px; }
+            QPushButton[step="true"]:hover:enabled { background:#30363d; }
         """)
         self._reposition_content()
 
     # ── Canvas-Widget-Rahmen (Header / Content / Serialisierung) ────────────────
     def _reposition_content(self):
-        self._content.setGeometry(2, self._HEADER_H,
-                                  max(10, self.width() - 4),
-                                  max(10, self.height() - self._HEADER_H - 2))
+        # Ringrand in HANDLE_SIZE-Breite freilassen: dort liegen die Resize-Zonen des
+        # VCWidget (Content ist bedienbar und wuerde die Klicks sonst schlucken); oben
+        # bleibt der Header als Zieh-Griff. So bleibt das Panel im Bearbeiten-Modus
+        # greif- und skalierbar, obwohl die Haken/Regler im Inneren klickbar sind.
+        m = self.HANDLE_SIZE
+        self._content.setGeometry(m, self._HEADER_H,
+                                  max(10, self.width() - 2 * m),
+                                  max(10, self.height() - self._HEADER_H - m))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -573,10 +607,12 @@ class VCMultiLiveEditor(VCWidget):
 
     def set_edit_mode(self, enabled: bool):
         super().set_edit_mode(enabled)
-        # Edit-Modus: Content deaktivieren -> Klicks gehen ans Panel (verschieben/
-        # skalieren, ganzflaechig greifbar). Run-Modus: Regler live bedienbar.
+        # KEIN Sperren des Contents mehr: im Bearbeiten-Modus sollen die Haken
+        # anklickbar sein (Davids Wunsch: Auswahl der Regler passiert im VC-Edit).
+        # Der Body wird je Modus neu gebaut — Edit = Haken-Auswahl, Run = nur die
+        # gewaehlten Regler. Verschieben/Skalieren laeuft ueber Header + Randzonen.
         if getattr(self, "_content", None) is not None:
-            self._content.setEnabled(not enabled)
+            self._refresh_body()
 
     def paintEvent(self, event):
         super().paintEvent(event)          # bg + Edit-Resize-Griff/Auswahlrahmen
@@ -593,6 +629,11 @@ class VCMultiLiveEditor(VCWidget):
     def to_dict(self) -> dict:
         d = super().to_dict()              # type/caption/bank/geometry/colors
         d["fids"] = [int(f) for f in self._fids]
+        # Welche Regler pro Effekt angehakt sind, wird MITGESPEICHERT (Davids Wunsch):
+        # das Panel ist nach Reload sofort eingerichtet. NUR die eingestellten WERTE
+        # bleiben fluechtig (effect_live-Baseline), die Auswahl nicht.
+        d["checked"] = {str(int(f)): sorted(ks)
+                        for f, ks in self._checked.items() if ks}
         return d
 
     def apply_dict(self, d: dict):
@@ -600,6 +641,14 @@ class VCMultiLiveEditor(VCWidget):
         self._reposition_content()
         for fid in d.get("fids", []):      # zugewiesene Effekte wiederherstellen
             self.add_effect(fid)           # (nicht mehr existierende fids werden abgewiesen)
+        for fid_s, keys in (d.get("checked") or {}).items():
+            try:
+                fid = int(fid_s)
+            except (TypeError, ValueError):
+                continue
+            if fid in self._fids:          # nur fuer real zugewiesene Effekte (kein Waisen-
+                self._checked[fid] = set(keys or ())   # Eintrag fuer abgewiesene fids)
+        self._refresh_body()               # gespeicherte Auswahl sichtbar machen
 
     # ── Drag & Drop ────────────────────────────────────────────────────────────
     def dragEnterEvent(self, event) -> None:
@@ -722,8 +771,10 @@ class VCMultiLiveEditor(VCWidget):
 
         from .vc_effect_meta import effect_name
         specs = self._editable_specs(fid)
-        head = QLabel(f"„{effect_name(fid)}“  ({self._current + 1}/{len(self._fids)}) "
-                      "— anhaken, was du steuern willst:")
+        edit = bool(getattr(self, "_edit_mode", False))
+        pos = f"({self._current + 1}/{len(self._fids)})"
+        head = QLabel(f"„{effect_name(fid)}“  {pos}  — hak an, was du steuern willst:"
+                      if edit else f"„{effect_name(fid)}“  {pos}")
         head.setProperty("muted", "true")
         head.setWordWrap(True)
         v.addWidget(head)
@@ -737,10 +788,22 @@ class VCMultiLiveEditor(VCWidget):
             self._visible_keys = []
             return
 
-        for spec in specs:
-            v.addWidget(self._build_row(spec, fid))
+        if edit:
+            # Bearbeiten-Modus (VC-Edit): Haken-Auswahl, was gesteuert werden soll.
+            for spec in specs:
+                v.addWidget(self._build_pick_row(spec, fid))
+        else:
+            # Run-Modus: NUR die angehakten Regler, aufgeraeumt, ohne Haken-Liste.
+            chosen = [s for s in specs if s.key in self._checked_keys(fid)]
+            if not chosen:
+                v.addWidget(self._hint(
+                    "Noch keine Regler gewählt. Schalte die virtuelle Konsole auf "
+                    "„Bearbeiten“ und hak an, was du hier live steuern willst."))
+            for spec in chosen:
+                v.addWidget(self._build_operate_row(spec, fid))
         v.addStretch(1)
         self._scroll.setWidget(content)
+        # Fuer die when-Gating-Erkennung in _after_edit immer die VOLLE Spec-Menge.
         self._visible_keys = [s.key for s in specs]
 
     def _hint(self, text: str) -> QLabel:
@@ -750,14 +813,16 @@ class VCMultiLiveEditor(VCWidget):
         lbl.setAlignment(Qt.AlignmentFlag.AlignTop)
         return lbl
 
-    def _build_row(self, spec, fid) -> QWidget:
+    def _build_pick_row(self, spec, fid) -> QWidget:
+        """Bearbeiten-Modus: Haken + (bei gesetztem Haken) der echte Regler als
+        Vorschau. Der Haken landet in ``_checked`` (wird mitgespeichert)."""
         row = QWidget()
         h = QHBoxLayout(row)
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(10)
         key = getattr(spec, "key", "")
         cb = QCheckBox(getattr(spec, "label", key) or key)
-        cb.setMinimumWidth(150)
+        cb.setMinimumWidth(140)
         cb.setChecked(key in self._checked_keys(fid))
         control = self._build_control(spec, fid)
         control.setVisible(cb.isChecked())
@@ -772,54 +837,173 @@ class VCMultiLiveEditor(VCWidget):
         h.addWidget(control, 1)
         return row
 
+    def _build_operate_row(self, spec, fid) -> QWidget:
+        """Run-Modus: NUR Beschriftung + Regler (keine Haken). Pfeil-/Auswahl-
+        Gruppen stehen unter der Beschriftung (mehr Platz), Slider/Stepper daneben."""
+        key = getattr(spec, "key", "")
+        label = getattr(spec, "label", key) or key
+        control = self._build_control(spec, fid)
+        if getattr(spec, "kind", "") == "select":
+            box = QWidget()
+            v = QVBoxLayout(box)
+            v.setContentsMargins(0, 2, 0, 2)
+            v.setSpacing(4)
+            cap = QLabel(label)
+            cap.setProperty("muted", "true")
+            v.addWidget(cap)
+            v.addWidget(control)
+            return box
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+        cap = QLabel(label)
+        cap.setMinimumWidth(120)
+        h.addWidget(cap)
+        h.addWidget(control, 1)
+        return row
+
+    # ── Visuelle Regler je Parameter-Typ ─────────────────────────────────────────
+    def _option_pairs(self, spec):
+        """ParamSpec.options -> [(wert, beschriftung)] (normalisiert Tupel/Skalar)."""
+        pairs = []
+        for o in (getattr(spec, "options", ()) or ()):
+            if isinstance(o, (tuple, list)):
+                val = o[0] if o else None
+                lbl = str(o[1]) if len(o) > 1 else _DIR_LABELS.get(val, str(val))
+            else:
+                val, lbl = o, _DIR_LABELS.get(o, str(o))
+            pairs.append((val, lbl))
+        return pairs
+
     def _build_control(self, spec, fid) -> QWidget:
-        from src.core.engine import effect_live
         kind = getattr(spec, "kind", "")
+        if kind == "select":
+            pairs = self._option_pairs(spec)
+            if pairs and all(v in _DIR_ARROWS for v, _ in pairs):
+                return self._build_segmented(spec, fid, pairs, arrows=True)
+            if 0 < len(pairs) <= 5:
+                return self._build_segmented(spec, fid, pairs, arrows=False)
+            return self._build_combo(spec, fid, pairs)
+        if kind == "bool":
+            return self._build_toggle(spec, fid)
+        if kind == "int":
+            return self._build_stepper(spec, fid)
+        return self._build_slider(spec, fid)
+
+    def _build_segmented(self, spec, fid, pairs, arrows=False) -> QWidget:
+        """Auswahl als Buttongruppe (visuell): Richtung mit Pfeil-Glyphen, sonst
+        Text. Ein Button ist aktiv; Klick schreibt live + loest ggf. Rebuild aus."""
+        from src.core.engine import effect_live
         key = getattr(spec, "key", "")
         cur = effect_live.get_param(key, fid)
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(5)
+        btns = []
 
-        if kind == "select":
-            combo = QComboBox()
-            vals = []
-            for o in (getattr(spec, "options", ()) or ()):
-                if isinstance(o, (tuple, list)):
-                    val = o[0]
-                    lbl = str(o[1]) if len(o) > 1 else _DIR_LABELS.get(o[0], str(o[0]))
-                else:
-                    val, lbl = o, _DIR_LABELS.get(o, str(o))
-                vals.append(val)
-                combo.addItem(lbl, val)
-            try:
-                combo.setCurrentIndex(vals.index(cur))
-            except ValueError:
-                combo.setCurrentIndex(0)
-            combo.currentIndexChanged.connect(
-                lambda i, key=key, c=combo, fid=fid: self._on_choice(key, c.itemData(i), fid))
-            return combo
+        def pick(val):
+            effect_live.set_param(key, val, fid)
+            for b, bv in btns:
+                b.setChecked(bv == val)
+            self._after_edit(fid)
 
-        if kind == "bool":
-            chk = QCheckBox()
-            chk.setChecked(bool(cur))
-            chk.toggled.connect(
-                lambda on, key=key, fid=fid: self._on_choice(key, bool(on), fid))
-            return chk
+        for val, lbl in pairs:
+            b = QPushButton(f"{_DIR_ARROWS.get(val, '')}\n{lbl}" if arrows else lbl)
+            b.setCheckable(True)
+            b.setChecked(val == cur)
+            b.setProperty("seg", "true")
+            if arrows:
+                b.setMinimumHeight(42)
+                b.setToolTip(lbl)
+            b.clicked.connect(lambda _checked=False, v=val: pick(v))
+            h.addWidget(b, 1)
+            btns.append((b, val))
+        return box
 
-        if kind == "int":
-            sb = QSpinBox()
-            lo, hi = int(getattr(spec, "min", 0)), int(getattr(spec, "max", 0))
-            if hi <= lo:
-                hi = lo + 100
-            sb.setRange(lo, hi)
-            sb.setSingleStep(max(1, int(getattr(spec, "step", 1) or 1)))
-            try:
-                sb.setValue(int(cur))
-            except (TypeError, ValueError):
-                sb.setValue(lo)
-            sb.valueChanged.connect(
-                lambda val, key=key, fid=fid: self._write(key, int(val), fid))
-            return sb
+    def _build_combo(self, spec, fid, pairs) -> QWidget:
+        """Fallback fuer viele Auswahlen: klassisches Dropdown."""
+        from src.core.engine import effect_live
+        key = getattr(spec, "key", "")
+        cur = effect_live.get_param(key, fid)
+        combo = QComboBox()
+        vals = []
+        for val, lbl in pairs:
+            vals.append(val)
+            combo.addItem(lbl, val)
+        try:
+            combo.setCurrentIndex(vals.index(cur))
+        except ValueError:
+            combo.setCurrentIndex(0)
+        combo.currentIndexChanged.connect(
+            lambda i, key=key, c=combo, fid=fid: self._on_choice(key, c.itemData(i), fid))
+        return combo
 
-        # float -> Slider (0..steps) + Wert-Anzeige; geschrieben via set_param_normalized.
+    def _build_toggle(self, spec, fid) -> QWidget:
+        """bool -> An/Aus-Schalter (visuell) statt nacktem Kaestchen."""
+        from src.core.engine import effect_live
+        key = getattr(spec, "key", "")
+        cur = bool(effect_live.get_param(key, fid))
+        btn = QPushButton("An" if cur else "Aus")
+        btn.setCheckable(True)
+        btn.setChecked(cur)
+        btn.setProperty("seg", "true")
+        btn.setFixedWidth(72)
+        btn.toggled.connect(
+            lambda on, key=key, fid=fid, b=btn:
+            (b.setText("An" if on else "Aus"), self._on_choice(key, bool(on), fid)))
+        return btn
+
+    def _build_stepper(self, spec, fid) -> QWidget:
+        """int -> –/+ -Stepper (visuell) statt Zahlenfeld; auf min/max geklemmt."""
+        from src.core.engine import effect_live
+        key = getattr(spec, "key", "")
+        lo, hi = int(getattr(spec, "min", 0)), int(getattr(spec, "max", 0))
+        if hi <= lo:
+            hi = lo + 100
+        step = max(1, int(getattr(spec, "step", 1) or 1))
+        try:
+            cur = int(effect_live.get_param(key, fid))
+        except (TypeError, ValueError):
+            cur = lo
+        cur = max(lo, min(hi, cur))
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(0)
+        h.addStretch(1)
+        minus = QPushButton("–")
+        minus.setProperty("step", "true")
+        minus.setFixedWidth(36)
+        val_lbl = QLabel(str(cur))
+        val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val_lbl.setMinimumWidth(46)
+        plus = QPushButton("+")
+        plus.setProperty("step", "true")
+        plus.setFixedWidth(36)
+        state = {"v": cur}
+
+        def bump(delta, key=key, fid=fid, ro=val_lbl):
+            nv = max(lo, min(hi, state["v"] + delta * step))
+            if nv == state["v"]:
+                return
+            state["v"] = nv
+            ro.setText(str(nv))
+            self._write(key, nv, fid)
+
+        minus.clicked.connect(lambda: bump(-1))
+        plus.clicked.connect(lambda: bump(+1))
+        h.addWidget(minus)
+        h.addWidget(val_lbl)
+        h.addWidget(plus)
+        return box
+
+    def _build_slider(self, spec, fid) -> QWidget:
+        """float -> Slider (0..steps) + Wert-Anzeige; via set_param_normalized."""
+        from src.core.engine import effect_live
+        key = getattr(spec, "key", "")
+        cur = effect_live.get_param(key, fid)
         container = QWidget()
         hl = QHBoxLayout(container)
         hl.setContentsMargins(0, 0, 0, 0)
