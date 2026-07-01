@@ -38,6 +38,7 @@ _TYPE_LABELS = {
     "VCEffectDisplay": "Effekt-Vorschau", "VCColorList": "Farbliste",
     "VCEffectColors": "Effekt-Farben", "VCCuelist": "Cue-Liste",
     "VCBpmDisplay": "BPM-Anzeige", "VCSongInfo": "Song-Info",
+    "VCMultiLiveEditor": "Live-Edit",
 }
 
 

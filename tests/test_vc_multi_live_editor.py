@@ -1,8 +1,10 @@
-"""Tests fuer VCMultiLiveEditor (Grundgeruest, Branch 3).
+"""Tests fuer VCMultiLiveEditor (VC-Canvas-Widget).
 
-Deckt ab: leeres Fenster, Drag-In via Funktions-MIME, +/- - und Dropdown-
+Deckt ab: leerer Zustand, Drag-In via Funktions-MIME, +/- - und Dropdown-
 Navigation, Dedup, die Nicht-Persistenz-Naht (Live-set_param aendert NICHT den
-gespeicherten Zustand) und dass das Fenster NICHT in der Show-Registry steht.
+gespeicherten Zustand). Als VC-Canvas-Widget wird das Panel samt zugewiesener
+Effekte (fids) in der Show gespeichert, die editierten Live-Parameter bleiben
+jedoch fluechtig; Edit-Modus schaltet die Bedienbarkeit des Inhalts um.
 """
 import os
 import unittest
@@ -363,11 +365,74 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         self.ed.add_effect(sc.id)
         self.assertTrue(self.ed._tempo.isHidden())      # Szene -> kein Tempo-Bereich
 
-    def test_not_in_widget_registry(self):
-        """Darf NICHT serialisierbar/in der Show landen."""
+    def test_aus_speed_slider_writes_direct_speed_not_multiplier(self):
+        """Im 'Aus'-Modus steuert der Regler die Geschwindigkeit DIREKT
+        (Param 'speed'/matrix_speed), NICHT den Tempo-Multiplikator — und bleibt
+        fluechtig. Deckt die Anforderung 'Geschwindigkeit = direkt, kein
+        Multiplikator' ab (Regression-Guard gegen versehentliches Vertauschen)."""
+        from PySide6.QtWidgets import QSlider
+        m = self._new_matrix("LE-AusSpeed")
+        self.ed.add_effect(m.id)
+        t = self.ed._tempo
+        t._set_mode("aus")                                   # -> direkter Speed-Regler
+        self.assertEqual(effect_live.get_param("tempo_bus_id", m.id), "")
+        base = effect_live.serialization_dict(m)
+        mult_before = effect_live.get_param("tempo_multiplier", m.id)
+        spec = next((s for s in effect_live.list_params(m.id)
+                     if getattr(s, "key", "") == "speed"), None)
+        self.assertIsNotNone(spec, "Matrix muss einen 'speed'-Param haben")
+        lo = float(getattr(spec, "min", 0.0))
+        hi = float(getattr(spec, "max", 20.0))
+        if hi <= lo:
+            hi = lo + 20.0
+        sliders = t.findChildren(QSlider)
+        self.assertTrue(sliders, "Aus-Modus zeigt einen Geschwindigkeits-Slider")
+        sl = sliders[0]
+        sl.setValue(sl.minimum())                            # sicher eine Aenderung ausloesen
+        sl.setValue(sl.maximum())                            # -> speed = hi (direkt)
+        self.assertAlmostEqual(float(effect_live.get_param("speed", m.id)), hi, places=3)
+        # Der Aus-Regler fasst den Multiplikator NICHT an:
+        self.assertEqual(effect_live.get_param("tempo_multiplier", m.id), mult_before)
+        # ... und die Live-Aenderung bleibt fluechtig:
+        self.assertEqual(effect_live.serialization_dict(m), base)
+
+    def test_is_registered_canvas_widget(self):
+        """Ist ein VC-Canvas-Widget: in der Registry + serialisierbar (VCWidget)."""
         from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
-        self.assertNotIn("VCMultiLiveEditor", WIDGET_REGISTRY)
-        self.assertFalse(hasattr(self.ed, "to_dict"))
+        from src.ui.virtualconsole.vc_widget import VCWidget
+        self.assertIn("VCMultiLiveEditor", WIDGET_REGISTRY)
+        self.assertIs(WIDGET_REGISTRY["VCMultiLiveEditor"], VCMultiLiveEditor)
+        self.assertIsInstance(self.ed, VCWidget)
+        self.assertTrue(hasattr(self.ed, "to_dict"))
+
+    def test_panel_and_effects_persist_but_edits_do_not(self):
+        """Panel + zugewiesene Effekte werden gespeichert (to_dict.fids), die
+        Live-Parameter selbst bleiben fluechtig (serialization_dict unveraendert)."""
+        m = self._new_matrix("LE-Serialize")
+        self.ed.add_effect(m.id)
+        base = effect_live.serialization_dict(m)
+        d = self.ed.to_dict()
+        self.assertEqual(d.get("type"), "VCMultiLiveEditor")
+        self.assertEqual(d.get("fids"), [m.id])            # Zuweisung wird gespeichert
+        for k in ("x", "y", "w", "h"):
+            self.assertIn(k, d)                            # Layout/Geometrie gespeichert
+        self.assertEqual(effect_live.serialization_dict(m), base)  # Edit fluechtig
+
+    def test_apply_dict_restores_assigned_effects(self):
+        m = self._new_matrix("LE-Restore")
+        self.ed.add_effect(m.id)
+        d = self.ed.to_dict()
+        fresh = VCMultiLiveEditor()
+        fresh.apply_dict(d)
+        self.assertEqual(fresh._fids, [m.id])
+
+    def test_edit_mode_toggles_content_interactivity(self):
+        """Edit-Modus: Inhalt deaktiviert (Klicks -> Drag/Resize des Widgets);
+        Run-Modus: Inhalt aktiv (Live-Parameter bedienbar)."""
+        self.ed.set_edit_mode(True)
+        self.assertFalse(self.ed._content.isEnabled())
+        self.ed.set_edit_mode(False)
+        self.assertTrue(self.ed._content.isEnabled())
 
 
 if __name__ == "__main__":

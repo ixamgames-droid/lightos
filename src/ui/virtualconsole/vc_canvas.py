@@ -30,6 +30,7 @@ def _register():
     from .vc_stepper import VCStepper
     from .vc_effect_editor import VCEffectEditor
     from .vc_effect_display import VCEffectDisplay
+    from .vc_multi_live_editor import VCMultiLiveEditor
     WIDGET_REGISTRY.update({
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
@@ -49,6 +50,7 @@ def _register():
         "VCFrame":    VCFrame,
         "VCEffectEditor": VCEffectEditor,
         "VCEffectDisplay": VCEffectDisplay,
+        "VCMultiLiveEditor": VCMultiLiveEditor,
     })
 
 _register()
