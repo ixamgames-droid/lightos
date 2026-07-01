@@ -53,13 +53,17 @@ from .vc_widget import VCWidget
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
 _MIME_FUNCTION = "application/x-lightos-function"
 
-# Nur diese ParamSpec-Arten bekommen einen generischen Regler.
-_EDITABLE_KINDS = ("int", "float", "bool", "select")
+# Nur diese ParamSpec-Arten bekommen einen generischen Regler. color_sequence/
+# dimmer_sequence (Etappe B): eigene Felder (ColorSequenceField/DimmerSequenceField),
+# keine Slider/Stepper/Segmente wie bei den skalaren Kinds.
+_EDITABLE_KINDS = ("int", "float", "bool", "select", "color_sequence", "dimmer_sequence")
 
 # Aus dem Param-Picker ausgeschlossen: Tempo/Geschwindigkeit gehoeren in den
 # separaten Tempo-Modus (spaeterer Branch); `algorithm` ist die Effekt-Form/-Art
-# (Davids „Algorithmus/Stil nicht aendern"). Farben/Aktionen sind keine
-# _EDITABLE_KINDS und fallen schon dadurch raus (Farben -> Programmer).
+# (Davids „Algorithmus/Stil nicht aendern"). Einzelfarben (kind=="color") und
+# Aktionen (kind=="action") sind keine _EDITABLE_KINDS und fallen schon dadurch
+# raus; ColorSequence/DimmerSequence (kind=="color_sequence"/"dimmer_sequence")
+# sind seit Etappe B dagegen bewusst waehlbar (Davids Wunsch #1/#2).
 _EXCLUDE_KEYS = frozenset({
     "tempo_bus_id", "tempo_multiplier", "phase_offset", "speed", "algorithm",
 })
@@ -843,7 +847,7 @@ class VCMultiLiveEditor(VCWidget):
         key = getattr(spec, "key", "")
         label = getattr(spec, "label", key) or key
         control = self._build_control(spec, fid)
-        if getattr(spec, "kind", "") == "select":
+        if getattr(spec, "kind", "") in ("select", "color_sequence", "dimmer_sequence"):
             box = QWidget()
             v = QVBoxLayout(box)
             v.setContentsMargins(0, 2, 0, 2)
@@ -889,7 +893,44 @@ class VCMultiLiveEditor(VCWidget):
             return self._build_toggle(spec, fid)
         if kind == "int":
             return self._build_stepper(spec, fid)
+        if kind == "color_sequence":
+            return self._build_color_sequence(spec, fid)
+        if kind == "dimmer_sequence":
+            return self._build_dimmer_sequence(spec, fid)
         return self._build_slider(spec, fid)
+
+    def _build_color_sequence(self, spec, fid) -> QWidget:
+        """color_sequence (z. B. Matrix-``colors``): wiederverwendbares
+        ColorSequenceField, das die LIVE-ColorSequence per Referenz mutiert
+        (Farben waehlen/aendern/aktivieren — Davids Wunsch #1). Titel leer, weil die
+        Beschriftung schon aus der Haken-/Operate-Row kommt (kein Doppel-Label)."""
+        from src.core.engine import effect_live
+        from src.ui.widgets.color_sequence_editor import ColorSequenceField
+        key = getattr(spec, "key", "")
+        field = ColorSequenceField(title=getattr(spec, "label", key) or key)
+        # Defensiv pinnen: add_effect tut dies bereits beim Drop, aber ein direkter
+        # Zugriff auf die Sequence darf niemals ohne gepinnte Baseline erfolgen.
+        effect_live.begin_live_edit(fid)
+        field.set_sequence(effect_live.get_param(key, fid))
+
+        def on_changed(fid=fid):
+            # UI-14b: Vorschau-Badges der VCButtons, die diesen Effekt binden,
+            # sofort nachziehen (Vorschau hier im Panel liest die Sequence live).
+            self._notify_effect_colors_changed(fid)
+
+        field.changed.connect(on_changed)
+        return field
+
+    def _build_dimmer_sequence(self, spec, fid) -> QWidget:
+        """dimmer_sequence (Matrix-``dimmer_levels``): analog zu color_sequence,
+        aber ohne Badge-Notify (kein Farb-Preview an den VCButtons betroffen)."""
+        from src.core.engine import effect_live
+        from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
+        key = getattr(spec, "key", "")
+        field = DimmerSequenceField(title=getattr(spec, "label", key) or key)
+        effect_live.begin_live_edit(fid)
+        field.set_sequence(effect_live.get_param(key, fid))
+        return field
 
     def _build_segmented(self, spec, fid, pairs, arrows=False) -> QWidget:
         """Auswahl als Buttongruppe (visuell): Richtung mit Pfeil-Glyphen, sonst
