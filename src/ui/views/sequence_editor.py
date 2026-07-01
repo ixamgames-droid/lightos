@@ -504,6 +504,11 @@ class SequenceEditor(QWidget):
         for r in rows:
             if 0 <= r < len(self._seq.steps):
                 del self._seq.steps[r]
+        # Laeuft die Sequence gerade, darf _step_idx nicht auf einen nun
+        # entfernten Schritt zeigen -> sonst IndexError beim naechsten
+        # Engine-Tick. Auf den neuen letzten Schritt begrenzen (0 bei leer).
+        n = len(self._seq.steps)
+        self._seq._step_idx = min(self._seq._step_idx, n - 1) if n else 0
         self._refresh_steps()
 
     def _move_step(self, dir: int):

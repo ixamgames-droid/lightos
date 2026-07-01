@@ -151,9 +151,29 @@ class Sequence(Function):
         self._step_idx = max(0, len(self.steps) - 1) if self.direction == Direction.Backward else 0
         self._step_elapsed = 0.0
 
+    def _clamp_step_idx(self) -> None:
+        """Haelt _step_idx im gueltigen Bereich [0, len(steps)-1].
+
+        Wird eine LAUFENDE Sequence live verkuerzt (Schritt im Sequence-Editor
+        geloescht -> ``del steps[row]``), kann _step_idx auf einen nicht mehr
+        existierenden Schritt zeigen. Der naechste Engine-Tick griffe dann in
+        ``write()`` (``self.steps[self._step_idx]``) out-of-range zu ->
+        IndexError / Crash. Defensiv vor jedem Step-Zugriff aufrufen
+        (Parity mit ``Chaser._clamp_step_idx``)."""
+        n = len(self.steps)
+        if n == 0:
+            self._step_idx = 0
+        elif self._step_idx >= n:
+            self._step_idx = n - 1
+        elif self._step_idx < 0:
+            self._step_idx = 0
+
     def write(self, universes, patch_cache, dt, function_registry=None):
         if not self._running or not self.steps:
             return
+        # Step-Liste kann sich live geaendert haben (Editor loescht Schritte,
+        # ohne _step_idx zu begrenzen) -> vor jedem Zugriff clampen.
+        self._clamp_step_idx()
 
         effective_dt = dt * self.speed
         step = self.steps[self._step_idx]
