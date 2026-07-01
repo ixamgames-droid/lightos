@@ -274,6 +274,7 @@ class _TempoControl(QWidget):
         self._mode: dict = {}        # fid -> 'aus' | 'bpm' | 'tap'
         self._tap_bus: dict = {}     # fid -> Bus-Buchstabe (A-D)
         self._readout = None
+        self._supported = False      # aktueller Effekt hat tempo_bus_id (set_fid pflegt es)
         self._wide = False           # Etappe C: einzeilig (True) vs. zweizeilig (False)
         self._timer = QTimer(self)       # vor _build(), damit showEvent es sicher kennt
         self._timer.setInterval(120)
@@ -342,13 +343,16 @@ class _TempoControl(QWidget):
             return                   # gleicher Effekt -> Tempo-Bereich unveraendert
         self._fid = new
         if self._fid is None:
+            self._supported = False
             self.setVisible(False)
             return
         from src.core.engine import effect_live
         keys = [getattr(s, "key", "") for s in effect_live.list_params(self._fid)]
         if "tempo_bus_id" not in keys:
+            self._supported = False
             self.setVisible(False)   # z. B. Szene -> kein Tempo
             return
+        self._supported = True
         self.setVisible(True)
         if self._fid not in self._mode:
             cur = effect_live.get_param("tempo_bus_id", self._fid) or ""
@@ -889,13 +893,16 @@ class VCMultiLiveEditor(VCWidget):
 
     def _apply_display_visibility(self, fid) -> None:
         """Etappe C #2: Vorschau/Tempo je Effekt an-/abgewaehlt sichtbar machen.
-        Reihenfolge wichtig: ``_tempo.set_fid`` kann selbst setVisible(False) setzen
-        (Effekt ohne tempo_bus_id) -> danach ggf. ZUSAETZLICH verstecken, nie
-        faelschlich wieder zeigen."""
+        Entscheidet in BEIDE Richtungen (auch Wieder-Anhaken muss zeigen — Review-
+        Befund: nur-verstecken liess Tempo nach ab- und wieder anhaken dauerhaft
+        unsichtbar, weil ``_tempo.set_fid`` bei gleichem Effekt early-returned).
+        Tempo ist nur sichtbar, wenn der Effekt es ueberhaupt kann
+        (``_TempoControl._supported``, von ``set_fid`` gepflegt) UND es nicht
+        abgewaehlt wurde."""
         hidden = self._hidden_set(fid) if fid is not None else set()
         self._preview.setVisible(fid is not None and "preview" not in hidden)
-        if fid is not None and "tempo" in hidden:
-            self._tempo.setVisible(False)
+        self._tempo.setVisible(fid is not None and self._tempo._supported
+                               and "tempo" not in hidden)
 
     def _build_display_toggles(self, fid) -> QWidget:
         """Bearbeiten-Modus, ganz oben im Scroll-Inhalt: muted Zeile „Anzeige:" mit

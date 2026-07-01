@@ -643,6 +643,41 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         self.ed.set_edit_mode(False)
         self.assertTrue(self.ed._tempo.isHidden())
 
+    def test_rechecking_tempo_toggle_shows_tempo_again(self):
+        """Regression (Review-Befund): „Tempo-Kontrolle" ab- und WIEDER anhaken
+        muss den Tempo-Bereich wieder zeigen — auch ohne Effektwechsel
+        (``_TempoControl.set_fid`` early-returned bei gleicher fid, der Recovery
+        laeuft daher ueber ``_apply_display_visibility``)."""
+        from PySide6.QtWidgets import QCheckBox
+        m = self._new_matrix("LE-ReshowTempo")
+        self.ed.add_effect(m.id)
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Tempo-Kontrolle"].setChecked(False)
+        self.assertTrue(self.ed._tempo.isHidden())
+        by_label["Tempo-Kontrolle"].setChecked(True)
+        self.assertFalse(self.ed._tempo.isHidden())
+        self.ed.set_edit_mode(False)
+        self.assertFalse(self.ed._tempo.isHidden())
+        # Analog fuer die Vorschau (war schon korrekt, bleibt abgesichert).
+        self.ed.set_edit_mode(True)
+        w = self.ed._scroll.widget()
+        by_label = {cb.text(): cb for cb in w.findChildren(QCheckBox)}
+        by_label["Vorschau"].setChecked(False)
+        self.assertTrue(self.ed._preview.isHidden())
+        by_label["Vorschau"].setChecked(True)
+        self.assertFalse(self.ed._preview.isHidden())
+
+    def test_tempo_stays_hidden_for_effect_without_tempo_even_if_not_deselected(self):
+        """Positiv-Logik darf Tempo NICHT faelschlich zeigen, wenn der Effekt gar
+        kein tempo_bus_id hat (z. B. Szene): _supported gated die Sichtbarkeit."""
+        m = self._new_matrix("LE-NoTempoGuard")
+        self.ed.add_effect(m.id)
+        self.ed._tempo._supported = False          # simuliert param-losen Effekt
+        self.ed._apply_display_visibility(m.id)
+        self.assertTrue(self.ed._tempo.isHidden())
+
     def test_hidden_roundtrip_via_to_dict_apply_dict_with_orphan_guard(self):
         """to_dict/apply_dict-Roundtrip von "hidden" inkl. Waisen-Guard fuer
         einen inzwischen geloeschten Effekt (analog "checked")."""
