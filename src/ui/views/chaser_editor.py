@@ -452,6 +452,11 @@ class ChaserEditor(QWidget):
         row = self._table.currentRow()
         if 0 <= row < len(self._chaser.steps):
             self._chaser.steps.pop(row)
+            # Laeuft der Chaser gerade, darf _step_idx nicht auf einen nun
+            # entfernten Schritt zeigen -> sonst IndexError beim naechsten
+            # Engine-Tick. Auf den neuen letzten Schritt begrenzen (0 bei leer).
+            n = len(self._chaser.steps)
+            self._chaser._step_idx = min(self._chaser._step_idx, n - 1) if n else 0
             self._rebuild_table()
 
     def _move_up(self):

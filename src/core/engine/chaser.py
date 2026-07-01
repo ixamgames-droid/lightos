@@ -180,12 +180,31 @@ class Chaser(Function):
         self._step_idx = (len(self.steps) - 1) if self.direction == Direction.Backward else 0
         self._step_elapsed = 0.0
 
+    def _clamp_step_idx(self) -> None:
+        """Haelt _step_idx im gueltigen Bereich [0, len(steps)-1].
+
+        Wird ein LAUFENDER Chaser live verkuerzt (Schritt im Chaser-Editor
+        geloescht -> ``steps.pop(row)``), kann _step_idx auf einen nicht mehr
+        existierenden Schritt zeigen. Der naechste Engine-Tick griffe dann in
+        ``write()`` / ``_render_and_blend()`` out-of-range zu -> IndexError /
+        Crash. Defensiv vor jedem Step-Zugriff aufrufen."""
+        n = len(self.steps)
+        if n == 0:
+            self._step_idx = 0
+        elif self._step_idx >= n:
+            self._step_idx = n - 1
+        elif self._step_idx < 0:
+            self._step_idx = 0
+
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
               dt: float,
               function_registry: dict[int, Function] | None = None):
         if not self._running or not self.steps:
             return
+        # Step-Liste kann sich live geaendert haben (Editor loescht Schritte,
+        # ohne _step_idx zu begrenzen) -> vor jedem Zugriff clampen.
+        self._clamp_step_idx()
         # Re-Entrancy-Schutz: Referenziert ein Schritt (direkt oder zyklisch über
         # weitere Chaser) diesen Chaser selbst, würde _render_child_target ->
         # child.write() endlos rekursiv aufrufen (Absturz). Ist dieser Chaser
@@ -248,6 +267,9 @@ class Chaser(Function):
         das Ergebnis als _cur_output fuer die naechste Blende."""
         if not function_registry or not self.steps:
             return
+        # Auch direkt (aus _advance_from_bus) erreichbar -> hier ebenfalls clampen,
+        # falls die Step-Liste seit dem letzten Tick verkuerzt wurde.
+        self._clamp_step_idx()
         step = self.steps[self._step_idx]
         child = function_registry.get(step.function_id)
         target = self._render_child_target(
