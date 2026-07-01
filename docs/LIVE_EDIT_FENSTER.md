@@ -16,8 +16,8 @@ Das Live-Edit-Panel fügst du wie jedes andere VC-Element über den Schnell-Butt
 
 ## Bearbeiten- vs. Betriebs-Modus
 
-- Im **Bearbeiten-Modus** verschiebst und skalierst du das Panel als Ganzes (die Regler im Inneren sind dann bewusst inaktiv, damit du das Widget überall anfassen kannst).
-- Im **laufenden Betrieb** sind die Regler, das Dropdown und der Tempo-Bereich live bedienbar.
+- Im **Bearbeiten-Modus** zeigt das Panel die **Häkchen-Auswahl** (welche Regler du steuern willst). Verschieben/Skalieren des Panels läuft über die **Kopfleiste** und den **Rand**.
+- Im **laufenden Betrieb** zeigt das Panel **nur die angehakten Regler** — Dropdown, Regler und Tempo-Bereich sind live bedienbar.
 
 ## Vorschau je Effekt-Typ
 
@@ -29,17 +29,22 @@ Oben im Panel zeigt eine Live-Vorschau den gewählten Effekt passend zu seinem T
 
 Die Vorschau ist reine Anzeige und verändert den laufenden Effekt nicht.
 
-## Parameter-Editor (Anhaken)
+## Parameter-Editor — Bearbeiten vs. Bedienen
 
-Darunter listet das Panel die **live-steuerbaren Parameter** des Effekts. Du hakst an, was du steuern willst — für jeden angehakten Parameter erscheint ein passender Regler (Auswahl, Zahlenfeld, Slider oder Schalter, je nach Parameter-Typ). Nicht angehakte Parameter bleiben unsichtbar, der Editor bleibt also so aufgeräumt wie nötig.
+Welche Regler ein Effekt zeigt, wählst du im **Bearbeiten-Modus der virtuellen Konsole** aus — pro Effekt einzeln:
 
-Beispiele beim Matrix-Chase:
+- **Konsole im Bearbeiten-Modus** → das Panel zeigt die **Häkchen-Auswahl** aller live-steuerbaren Parameter. Du hakst an, was du steuern willst. Diese Auswahl wird mit der Show gespeichert.
+- **Bearbeiten-Modus aus (Betrieb)** → das Panel zeigt **nur noch die angehakten Regler**, aufgeräumt, ohne die Häkchen-Liste.
 
-- **Richtung**
-- **Bewegung**
-- **Läuferzahl**
-- **Läuferbreite**
-- **Einblenden / Ausblenden**
+Brauchst du später einen Regler mehr, gehst du kurz zurück in den Bearbeiten-Modus, hakst ihn an und wieder raus.
+
+Die Regler sind **visuell** und passen zum Parameter-Typ:
+
+- **Helligkeit, Ein-/Ausblenden, Schweif** → **Slider**
+- **Läuferzahl, Läuferbreite** → **−/+ ‑Stepper**
+- **Richtung** → **Pfeil-Buttons** (`→ vorwärts`, `← rückwärts`, `↔ Ping-Pong`, `Mitte↔außen`)
+- **Bewegung / andere Auswahl** → **Segment-Buttons** (bei vielen Optionen ein Dropdown)
+- **An/Aus-Parameter** → **Schalter**
 
 Bewusst **nicht** steuerbar (weil strukturell, nicht live veränderbar): **Algorithmus**, **Stil**, **Spalten/Reihen**.
 
