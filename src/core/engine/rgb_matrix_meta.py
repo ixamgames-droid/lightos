@@ -15,7 +15,8 @@ from .rgb_matrix import RgbAlgorithm
 class ParamSpec:
     key: str
     label: str
-    # "int" | "float" | "bool" | "select" | "color" | "color_sequence" | "action"
+    # "int" | "float" | "bool" | "select" | "color" | "color_sequence" |
+    # "dimmer_sequence" | "action"
     kind: str
     default: object
     min: float = 0.0

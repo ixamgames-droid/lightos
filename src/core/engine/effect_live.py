@@ -193,7 +193,7 @@ def set_param_normalized(key, norm, function_id=None) -> bool:
     # VCB-07: nicht-numerische Kinds (color/color_sequence/action) haben kein
     # .min/.max -> float(spec.min) wuerfe AttributeError. Ein Fader/MIDI-CC kann sie
     # nicht sinnvoll normalisiert setzen (symmetrisch zur Guard in adjust_param).
-    if spec.kind in ("color", "color_sequence", "action"):
+    if spec.kind in ("color", "color_sequence", "dimmer_sequence", "action"):
         return False
     lo, hi = float(spec.min), float(spec.max)
     if hi <= lo:
@@ -210,7 +210,8 @@ def adjust_param(key, delta_norm, function_id=None) -> bool:
     if not _supports(fn):
         return False
     spec = _spec_for(fn, key)
-    if spec is None or spec.kind in ("bool", "select", "color", "color_sequence", "action"):
+    if spec is None or spec.kind in ("bool", "select", "color", "color_sequence",
+                                      "dimmer_sequence", "action"):
         return False
     lo, hi = float(spec.min), float(spec.max)
     if hi <= lo:
