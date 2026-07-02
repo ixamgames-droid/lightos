@@ -76,6 +76,13 @@ class SceneNode:
     size_m: tuple[float, float, float] | None = None  # (w, h, d)
     color: str | None = None
     name: str | None = None
+    # Facetten-Flag (nur kind==FIXTURE, Review-Fix): True, sobald die Position
+    # EXPLIZIT gesetzt wurde (set_world_pos/set_transform(pos_m=...)/from_legacy).
+    # Ein Fixture-Node, der NUR wegen einer Rotations-Zuweisung entstanden ist
+    # (siehe scene_adapters._SceneBackedDict), bleibt pos_set=False -> gilt
+    # NICHT als "hat eine Position" (kein Phantom-Eintrag bei (0,0,0), siehe
+    # docs/VIZ11_SCENEGRAPH_DESIGN.md Review-Runde).
+    pos_set: bool = False
 
 
 def _fixture_node_id(fid: int) -> str:
@@ -194,6 +201,7 @@ class SceneGraph:
             return
         if pos_m is not None:
             node.transform.pos_m = tuple(map(float, pos_m))
+            node.pos_set = True
         if rot_deg is not None:
             node.transform.rot_deg = tuple(map(float, rot_deg))
         if scale is not None:
@@ -212,6 +220,7 @@ class SceneGraph:
             node.transform.pos_m = local.pos_m
         else:
             node.transform.pos_m = tuple(map(float, world_pos))
+        node.pos_set = True
 
     def set_world_rot_deg(self, node_id: str, world_rot_deg: tuple[float, float, float]) -> None:
         """Setzt die WELT-Rotation eines Knotens (rechnet bei geparentetem
@@ -359,6 +368,13 @@ class SceneGraph:
                 parent_id=None,
                 mount_type=mount_type,
                 fixture_id=fid,
+                # from_legacy legt fuer JEDE fid (auch rotation-/dock-only)
+                # bewusst eine (ggf. defaultete) Position an -- Legacy-
+                # Migrations-Verhalten, das der Migrations-Gate-Test 1:1
+                # nachbildet (_legacy_world_transforms_from_raw). Anders als
+                # die direkte Adapter-Zuweisung (state.visualizer_rotations[fid]
+                # = ...) gilt diese Position hier als bewusst gesetzt.
+                pos_set=True,
             )
             graph.add(node)
             if parent is not None:
@@ -368,7 +384,10 @@ class SceneGraph:
         return graph
 
     def to_legacy_positions(self) -> dict:
-        return {n.fixture_id: self.world_pos(n.id) for n in self.fixtures()}
+        # Nur Fixtures mit EXPLIZIT gesetzter Position (Review-Fix: kein
+        # Phantom-(0,0,0)-Eintrag fuer Nodes, die nur wegen einer Rotations-
+        # Zuweisung entstanden sind, siehe SceneNode.pos_set).
+        return {n.fixture_id: self.world_pos(n.id) for n in self.fixtures() if n.pos_set}
 
     def to_legacy_rotations(self) -> dict:
         return {n.fixture_id: self.world_rot_deg(n.id) for n in self.fixtures()}
@@ -406,6 +425,7 @@ class SceneGraph:
             }
             if n.fixture_id is not None:
                 entry["fixture_id"] = n.fixture_id
+                entry["pos_set"] = n.pos_set
             if n.size_m is not None:
                 entry["size_m"] = list(n.size_m)
             if n.color is not None:
@@ -433,6 +453,12 @@ class SceneGraph:
                 mount_type = MountType(entry.get("mount_type", "floor"))
             except ValueError:
                 mount_type = MountType.FLOOR
+            fixture_id = entry.get("fixture_id")
+            # Rueckwaerts-kompatibel: Dateien ohne "pos_set" (vor dem Review-
+            # Fix geschrieben) hatten IMMER eine echte, gewollte Position ->
+            # Default True. Nur bei explizit gespeichertem pos_set=False
+            # (Phantom-Node, die dieser Fix nun verhindert) bleibt es False.
+            pos_set = bool(entry.get("pos_set", True)) if fixture_id is not None else False
             node = SceneNode(
                 id=entry["id"],
                 kind=kind,
@@ -443,10 +469,11 @@ class SceneGraph:
                 ),
                 parent_id=entry.get("parent_id"),
                 mount_type=mount_type,
-                fixture_id=entry.get("fixture_id"),
+                fixture_id=fixture_id,
                 size_m=tuple(map(float, size_m)) if size_m is not None else None,
                 color=entry.get("color"),
                 name=entry.get("name"),
+                pos_set=pos_set,
             )
             graph.add(node)
         # Ungueltige parent_id-Referenzen verwerfen (stale Docks aus defekten

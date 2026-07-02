@@ -30,6 +30,7 @@ Zuweisung in den Graphen zurueck) -- siehe ``app_state.py``.
 from __future__ import annotations
 
 import weakref
+from contextlib import contextmanager
 
 from .coords import live_to_world3d, normalize_rotation, world3d_to_live
 from .scene_graph import MountType, NodeKind, SceneGraph, SceneNode
@@ -38,6 +39,13 @@ from .stage_definition import DOCK_HANG_TYPES
 
 def _fixture_node_id(fid) -> str:
     return f"fix_{fid}"
+
+
+def _warn_ghost_placeholder(sid) -> None:
+    """Warnt, wenn ``_DockView`` eine Platzhalter-Stage-Node anlegen muss
+    (Dock auf eine nicht-existente Stage-Element-ID) -- Review-Fix: statt
+    stillem Anlegen soll das sichtbar sein (Geister-Node-Diagnose)."""
+    print(f"[scene_adapters] WARNUNG: Dock auf unbekannte Stage-Element-ID '{sid}' -- lege Platzhalter-Node an")
 
 
 class _SceneBackedDict(dict):
@@ -59,7 +67,12 @@ class _SceneBackedDict(dict):
 
     def _snapshot(self) -> dict:
         if self._facet == "pos":
-            return {n.fixture_id: self._scene.world_pos(n.id) for n in self._scene.fixtures()}
+            # Review-Fix (Phantom-Fixture): nur Nodes mit EXPLIZIT gesetzter
+            # Position (pos_set) zaehlen als "hat eine Position". Ein Node, der
+            # nur wegen einer Rotations-Zuweisung entstanden ist (siehe
+            # __setitem__/_ensure_node), bleibt pos_set=False und taucht daher
+            # NICHT in visualizer_positions auf ("fid in positions" == False).
+            return {n.fixture_id: self._scene.world_pos(n.id) for n in self._scene.fixtures() if n.pos_set}
         # Rotation (0,0,0) gilt als "keine explizite Rotation gesetzt" und wird
         # ausgeblendet -- deckt sich mit der Legacy-Semantik (getrenntes dict:
         # ein Fixture konnte in positions sein, OHNE einen rotations-Eintrag zu
@@ -95,7 +108,16 @@ class _SceneBackedDict(dict):
 
     def pop(self, fid, *default):
         nid = _fixture_node_id(fid)
-        if self._scene.get(nid) is not None:
+        node = self._scene.get(nid)
+        # Review-Fix: "pop" darf nur einen Eintrag entfernen, der laut
+        # _snapshot() ueberhaupt sichtbar war (pos_set fuer "pos", != (0,0,0)
+        # fuer "rot") -- sonst koennte man einen rotation-only-Phantom-Node
+        # per positions.pop(fid) "erfolgreich" entfernen, obwohl `fid in
+        # positions` vorher False war (Widerspruch zu dict-Semantik).
+        present = node is not None and (
+            node.pos_set if self._facet == "pos" else self._scene.world_rot_deg(nid) != (0.0, 0.0, 0.0)
+        )
+        if present:
             self._scene.remove(nid)
             self._registry.resync_all()
             return default[0] if default else None
@@ -140,8 +162,12 @@ class _DockView(dict):
     def _ensure_parent_node(self, sid) -> None:
         """Stellt sicher, dass ``sid`` im Graphen existiert (echte Stage-Node
         ODER minimaler Platzhalter), damit ``reparent``/``to_legacy_docks``
-        den Eintrag nicht stillschweigend verwirft."""
+        den Eintrag nicht stillschweigend verwirft. Review-Fix: das Anlegen
+        eines Platzhalters (Geister-Node-Quelle) wird jetzt geloggt statt
+        still zu passieren -- Aufraeumen passiert in show_file.py
+        (_prune_ghost_placeholder_nodes, beim Laden UND beim Speichern)."""
         if self._scene.get(sid) is None:
+            _warn_ghost_placeholder(sid)
             self._scene.add(SceneNode(id=sid, kind=NodeKind.PLATFORM))
 
     def _mount_type_for(self, sid) -> MountType:
@@ -276,14 +302,43 @@ class _ViewRegistry:
     """Schwache Referenzliste lebender ``_SceneBackedDict``/``_DockView``/
     ``_LiveViewDict``-Instanzen einer AppState. Wird der Graph DIREKT (nicht
     ueber eine View) mutiert, ruft ``resync_all()`` alle lebenden Views
-    frisch -- siehe Design (b), Konsistenzregel."""
+    frisch -- siehe Design (b), Konsistenzregel.
+
+    Review-Fix (O(n^2)-Resync): eine Ganz-Dict-Zuweisung (z.B.
+    ``state.visualizer_positions = {...}``) schrieb frueher JEDEN Eintrag
+    einzeln per ``view[fid] = val`` -- jeder einzelne Schreibzugriff loeste
+    ``resync_all()`` (O(n) ueber ALLE Views) aus, macht die Ganz-Zuweisung
+    insgesamt O(n^2). ``suspend()`` ist ein wiedereintritts-sicherer
+    Kontextmanager: waehrend er aktiv ist, sammelt ``resync_all()`` nur einen
+    "dirty"-Merker statt sofort zu resyncen; beim Verlassen des AEUSSERSTEN
+    ``with``-Blocks laeuft genau EIN gebuendelter Resync."""
 
     def __init__(self) -> None:
         self._views: "weakref.WeakSet" = weakref.WeakSet()
+        self._suspend_depth: int = 0
+        self._dirty: bool = False
 
     def register(self, view) -> None:
         self._views.add(view)
 
     def resync_all(self) -> None:
+        if self._suspend_depth > 0:
+            self._dirty = True
+            return
         for view in list(self._views):
             view._resync()
+
+    @contextmanager
+    def suspend(self):
+        """Buendelt beliebig viele ``resync_all()``-Aufrufe waehrend des
+        ``with``-Blocks zu HOECHSTENS einem finalen Resync beim Verlassen
+        (wiedereintritts-sicher: nur der aeusserste Block loest aus)."""
+        self._suspend_depth += 1
+        try:
+            yield self
+        finally:
+            self._suspend_depth -= 1
+            if self._suspend_depth == 0 and self._dirty:
+                self._dirty = False
+                for view in list(self._views):
+                    view._resync()

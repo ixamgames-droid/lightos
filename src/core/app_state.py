@@ -235,6 +235,22 @@ class AppState:
         sind (siehe Design (b), Konsistenzregel)."""
         self._view_registry.resync_all()
 
+    def set_scene(self, scene: SceneGraph) -> None:
+        """Review-Fix (state._scene-Ersetzung desynct lebende Views): einzige
+        erlaubte Stelle, um ``state._scene`` komplett durch ein NEUES
+        SceneGraph-Objekt zu ersetzen (load_show/reset_show). Ein blosses
+        ``state._scene = neuer_graph`` liesse alle bereits konstruierten
+        ``_SceneBackedDict``/``_DockView``/``_LiveViewDict``-Instanzen (die
+        ihre ``self._scene``-Referenz im Konstruktor binden) permanent am
+        ALTEN, verwaisten Graphen haengen. ``set_scene`` haengt daher zuerst
+        die Registry-Views auf den neuen Graphen um (jede lebende View bindet
+        ``_scene`` neu) und resynct danach EINMAL gebuendelt."""
+        self._scene = scene
+        with self._view_registry.suspend():
+            for view in list(self._view_registry._views):
+                view._scene = scene
+            self._view_registry.resync_all()
+
     @property
     def visualizer_positions(self) -> dict:
         return _SceneBackedDict(self._scene, "pos", self._view_registry)
@@ -247,10 +263,14 @@ class AppState:
         # siehe show_file.load_show/reset_show + Tests): visualizer_positions
         # wird vor visualizer_rotations/visualizer_docks zugewiesen, sonst
         # wuerden hier bereits gesetzte Rotationen/Docks mit verloren gehen.
+        # Review-Fix (O(n^2)-Resync): die gesamte Bulk-Schreibschleife laeuft
+        # unter EINEM suspend()-Block -> genau EIN resync_all() am Ende statt
+        # einem pro Eintrag.
         view = _SceneBackedDict(self._scene, "pos", self._view_registry)
-        view.clear()
-        for fid, pos in dict(value or {}).items():
-            view[fid] = pos
+        with self._view_registry.suspend():
+            view.clear()
+            for fid, pos in dict(value or {}).items():
+                view[fid] = pos
 
     @property
     def visualizer_rotations(self) -> dict:
@@ -259,14 +279,15 @@ class AppState:
     @visualizer_rotations.setter
     def visualizer_rotations(self, value: dict) -> None:
         view = _SceneBackedDict(self._scene, "rot", self._view_registry)
-        for fid, rot in dict(value or {}).items():
-            view[fid] = rot
-        # Fixtures, die im neuen Dict fehlen, auf (0,0,0) zuruecksetzen (Ganz-
-        # Dict-Zuweisung ist eine vollstaendige Ersetzung, kein Merge).
-        stale = [n.fixture_id for n in self._scene.fixtures()
-                 if n.fixture_id not in dict(value or {})]
-        for fid in stale:
-            view[fid] = (0.0, 0.0, 0.0)
+        with self._view_registry.suspend():
+            for fid, rot in dict(value or {}).items():
+                view[fid] = rot
+            # Fixtures, die im neuen Dict fehlen, auf (0,0,0) zuruecksetzen (Ganz-
+            # Dict-Zuweisung ist eine vollstaendige Ersetzung, kein Merge).
+            stale = [n.fixture_id for n in self._scene.fixtures()
+                     if n.fixture_id not in dict(value or {})]
+            for fid in stale:
+                view[fid] = (0.0, 0.0, 0.0)
 
     @property
     def visualizer_docks(self) -> dict:
@@ -275,9 +296,10 @@ class AppState:
     @visualizer_docks.setter
     def visualizer_docks(self, value: dict) -> None:
         view = _DockView(self._scene, self._view_registry)
-        view.clear()
-        for fid, sid in dict(value or {}).items():
-            view[fid] = sid
+        with self._view_registry.suspend():
+            view.clear()
+            for fid, sid in dict(value or {}).items():
+                view[fid] = sid
 
     @property
     def live_view_positions(self) -> dict:
@@ -286,9 +308,10 @@ class AppState:
     @live_view_positions.setter
     def live_view_positions(self, value: dict) -> None:
         view = _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
-        view.clear()
-        for fid, pos in dict(value or {}).items():
-            view[fid] = pos
+        with self._view_registry.suspend():
+            view.clear()
+            for fid, pos in dict(value or {}).items():
+                view[fid] = pos
 
     @property
     def active_stage_name(self) -> str:
