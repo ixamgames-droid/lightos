@@ -282,6 +282,16 @@ class VisualizerBridge(QObject):
         self._subscribed = False
         self._trace_timer = None      # QTimer fuers Formen-Nachfahren (Live-Trace)
         self._trace_state = None      # {"seqs": {fid: [(pan,tilt),...]}, "i": int, "n": int}
+        # VIZ-11 (Schritt 7): Reload-Churn-Guard (Design-Risiko "RELOAD-CHURN").
+        # JS raeumt beim Bühnen-Reload (clearStageObjects -> loadStageJson) alle
+        # alten Stage-Objekte weg und meldet dabei PRO angedockter Fixture ein
+        # fixtureDockChanged(fid, '') (Undock) zurueck an Python — BEVOR die
+        # neue Buehne ueberhaupt geladen ist. Ohne Guard wuerden echte Docks
+        # aus dem Graphen fliegen, obwohl sie in der neuen/gleichen Buehne
+        # weiter bestehen sollen. Waehrend eines Reloads (zwischen Push der
+        # Stage-Definition und dem finalen stageListChanged-Echo von JS) wird
+        # ein leeres fixtureDockChanged deshalb ignoriert.
+        self._reloading_stage = False
         self._activate()
 
     # ── Lebenszyklus: State-Subscription ────────────────────────────────────
@@ -404,6 +414,13 @@ class VisualizerBridge(QObject):
         _scmd.push_rotate_fixtures(
             self._state, [(fid, old_rot, new_rot)], label="Fixture drehen",
         )
+        # E1-Autosave-Luecke (Design (d)): Rotation aendert live_view_positions
+        # NICHT (nur X/Z), muss aber trotzdem als Show-Aenderung gelten.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
@@ -629,9 +646,15 @@ class VisualizerBridge(QObject):
     @_bridge_slot_guard
     def fixtureDockChanged(self, fid_str: str, sid: str):
         """JS meldet eine geaenderte Andock-Beziehung (leerer sid = loesen)."""
+        new_dock = str(sid) if sid else None
+        if new_dock is None and self._reloading_stage:
+            # Reload-Churn-Guard (Schritt 7): JS raeumt gerade die alte Buehne
+            # weg (clearStageObjects) und meldet dabei fuer jede vorher
+            # gedockte Fixture ein Undock -- kein echter User-Vorgang. Bis
+            # das finale stageListChanged-Echo eintrifft, ignorieren.
+            return
         fid = int(fid_str)
         old_dock = self._state.visualizer_docks.get(fid)
-        new_dock = str(sid) if sid else None
         if new_dock:
             self._state.visualizer_docks[fid] = new_dock
         else:
@@ -640,6 +663,15 @@ class VisualizerBridge(QObject):
             self._state, fid, old_dock, new_dock,
             label="Fixture andocken" if new_dock else "Fixture abdocken",
         )
+        # E1-Autosave-Luecke (Design (d)): Dock-Aenderungen aendern die Welt-
+        # Position der Fixture nicht direkt, wohl aber ihre effektive Welt-
+        # Transform-Abstammung (naechste Elternbewegung wirkt anders) -> Show
+        # muss als dirty gelten, damit ein Autosave/Speichern-Hinweis greift.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     @Slot(str)
     @_bridge_slot_guard
@@ -660,6 +692,11 @@ class VisualizerBridge(QObject):
     @Slot(str)
     @_bridge_slot_guard
     def stageListChanged(self, json_str: str):
+        # Reload-Churn-Guard aufheben: JS schickt dieses Signal als EINZIGES,
+        # finales Echo nach loadStageJson (siehe notifyStageListChanged in
+        # stage_scene.html, in dessen finally-Block) -- ab hier sind
+        # fixtureDockChanged-Events wieder echte User-Vorgaenge.
+        self._reloading_stage = False
         data = json.loads(json_str) or []
         self.pyStageListChanged.emit(data)
 
@@ -786,10 +823,17 @@ class VisualizerBridge(QObject):
             print(f"[Visualizer] push_edit_mode error: {e}")
 
     def push_stage_definition(self, definition: StageDefinition):
+        # Reload-Churn-Guard scharf schalten: JS raeumt jetzt die alte Buehne
+        # weg (Undock-Echos fuer bereits gedockte Fixtures sind Nebeneffekt
+        # des Rebuilds, kein echter User-Undock) und laedt die neue. Das
+        # finale stageListChanged-Echo (siehe fixtureDockChanged/stageListChanged
+        # unten) hebt den Guard wieder auf.
+        self._reloading_stage = True
         try:
             self.stageLoaded.emit(json.dumps(definition.to_js_dict()))
         except Exception as e:
             print(f"[Visualizer] push_stage_definition error: {e}")
+            self._reloading_stage = False
 
     def push_add_stage_object(self, type_: str):
         try:
@@ -2286,6 +2330,8 @@ class VisualizerWindow(QMainWindow):
         self._current_stage = StageDefinition(name=name.strip())
         self._selected_stage_id = ""
         # JS explizit eine LEERE Stage senden (clearStageObjects wird in JS gerufen)
+        # -> selber Reload-Churn-Guard wie push_stage_definition.
+        self._bridge._reloading_stage = True
         try:
             self._bridge.stageLoaded.emit(json.dumps({
                 "name": name.strip(),
@@ -2294,6 +2340,7 @@ class VisualizerWindow(QMainWindow):
             }))
         except Exception as e:
             print(f"[Visualizer] _on_new_stage stageLoaded error: {e}")
+            self._bridge._reloading_stage = False
         # Tree-Panel und Patch-Liste neu aufbauen
         self._refresh_stage_tree()
         self._refresh_patch_list()
@@ -2369,6 +2416,7 @@ class VisualizerWindow(QMainWindow):
                 self._current_stage.elements.append(el)
                 tree_needs_rebuild = True
                 self._stage_dirty = True   # VIZ-10: neues Element aus JS -> ungespeichert
+                self._sync_stage_node_to_scene(el)
                 continue
             pos = it.get("position") or {}
             size = it.get("size") or {}
@@ -2380,19 +2428,29 @@ class VisualizerWindow(QMainWindow):
             new_d = float(size.get("z", el.d))
             new_rotation = float(it.get("rotation", el.rotation))
             new_color = it.get("color", el.color)
-            if (new_x, new_y, new_z, new_w, new_h, new_d, new_rotation, new_color) != (
-                    el.x, el.y, el.z, el.w, el.h, el.d, el.rotation, el.color):
+            changed = (new_x, new_y, new_z, new_w, new_h, new_d, new_rotation, new_color) != (
+                    el.x, el.y, el.z, el.w, el.h, el.d, el.rotation, el.color)
+            if changed:
                 self._stage_dirty = True   # VIZ-10: JS-Drag hat effektiv etwas geaendert
             el.x, el.y, el.z = new_x, new_y, new_z
             el.w, el.h, el.d = new_w, new_h, new_d
             el.rotation = new_rotation
             el.color = new_color
+            if changed:
+                # VIZ-11 (Schritt 7, Design-Entscheidung 4): Drag-Ende macht
+                # Python zur autoritativen Quelle -- Graph-Knoten nachziehen
+                # und gedockte Nachfahren ggf. korrigieren (Translation lief
+                # waehrend des Drags bereits fluessig JS-seitig, Rotation NIE
+                # -> hier greift der einzige autoritative Kinder-Push).
+                self._sync_stage_node_to_scene(el)
+                self._push_stage_rotation_to_children(el)
 
         # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht) entfernen
         py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
         if py_ids_to_remove:
             for pid in py_ids_to_remove:
                 self._current_stage.remove(pid)
+                self._remove_stage_node_from_scene(pid)
                 if self._selected_stage_id == pid:
                     self._selected_stage_id = ""
             tree_needs_rebuild = True
