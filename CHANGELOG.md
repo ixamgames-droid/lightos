@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-02 — Laser-Support: Ehaho-L2600-Builtin + Laser-Vokabular (LAS-01)
+
+#### Neu / Hinzugefuegt
+
+- **Ehaho L2600 („3D Partylight") als Builtin-Fixture:** Modi „6-Kanal (Simple DMX)" und „34-Kanal (Professional DMX)" mit allen Wertebereichen aus dem offiziellen Manual (ManualsLib #3494357; DMXControl-DDF als Gegenprobe). Im 34ch-Modus sind Mustergruppe A (Ch1-17) und B (Ch18-34) über die Mehrkopf-Konvention als Kopf 1/Kopf 2 getrennt steuerbar. **Laser-Safety-Default:** On/Off-Kanäle defaulten auf 0 (aus) — ein frisch gepatchter Laser feuert nicht. `src/core/database/fixture_db.py` (Seed + idempotentes `ensure_builtins`), Tests `tests/test_ehaho_l2600_profile.py`.
+- **Laser-Attribut-Vokabular:** 13 neue Kanal-Attribute (`laser_boundary`, `laser_bank`, `laser_x/y`, `laser_zoom_x/y`, `laser_color`, `laser_color_change`, `laser_dots`, `laser_draw`, `laser_draw_mode`, `laser_twist`, `laser_grating`) in `CHANNEL_ATTRS`, exakt in `ATTR_GROUPS['Effect']` (Schutz vor Color-Substring-Fehlklassifikation → kein Feature-Dimmer auf Range-Select-Kanälen) und mit deutschen Labels. `src/ui/widgets/fixture_editor.py`, `src/core/attr_groups.py`.
+- **Fixture-Klassen-Audit festgenagelt:** Test sichert, dass jedes Builtin eine echte Klasse trägt (nie `other`) und Schlüsselgeräte (PAR/Moving-Head/LED-Bar/Laser) korrekt klassifiziert sind.
+- **Laser-Fahrplan:** `docs/LASER_PLAN.md` (L2600-Recherche, Netzwerk-Protokoll-Marktlage Ether Dream/IDN/Pangolin/ShowNET, Zwei-Klassen-Architektur DMX vs. Punkt-Streaming, Safety-Konzept) + Backlog-Epic LAS-01…LAS-09.
+
 ### 2026-07-01 — Live-Edit-Fenster + VC-Aufräumen (Davids VC-Umbau)
 
 #### Neu / Hinzugefuegt

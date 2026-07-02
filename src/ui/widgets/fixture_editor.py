@@ -30,6 +30,9 @@ CHANNEL_ATTRS = [
     "pan", "pan_fine", "tilt", "tilt_fine",
     "speed", "shutter", "strobe", "gobo_wheel", "gobo_rotation", "gobo_fx",
     "prism", "prism_rotation", "frost", "iris", "zoom", "focus", "macro",
+    "laser_boundary", "laser_bank", "laser_x", "laser_y", "laser_zoom_x",
+    "laser_zoom_y", "laser_color", "laser_color_change", "laser_dots",
+    "laser_draw", "laser_draw_mode", "laser_twist", "laser_grating",
     "reset", "raw",
 ]
 
