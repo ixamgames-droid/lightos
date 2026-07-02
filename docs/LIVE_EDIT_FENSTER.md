@@ -76,6 +76,14 @@ Das Panel passt seine Anordnung an die Größe an, mit der du es auf die Canvas 
 
 Der Regler-Bereich selbst ist **rahmenlos** — die Regler wirken „einfach darunter geclustert" statt in einer umrandeten Box zu stecken.
 
+## Auto-Refresh bei Fremd-Änderungen
+
+Ändert eine **andere Fläche** denselben Effekt — z. B. der VC-Bus-Selector, MIDI oder die Kommandozeile — zieht das Panel Tempo-Modus und angezeigte Regler automatisch nach: Beim Zurückkehren auf die Bank/den Tab (oder Wiedersichtbarwerden) wird der Stand sofort neu geladen, zusätzlich läuft im Hintergrund ein leiser Abgleich (alle 500 ms, nur solange das Panel sichtbar ist). Ein laufender Slider-/Maus-Vorgang wird dabei nie unterbrochen — der Abgleich wartet, bis keine Maustaste mehr gedrückt ist.
+
+## Touch-Griffe am Rand
+
+Verweilst du im Bearbeiten-Modus kurz mit dem Finger/der Maus auf dem Panel, klappen sich am Rand größere Touch-Greifzonen zum Skalieren auf — der Innenbereich (Content) rückt dabei automatisch mit ein, damit die vergrößerten Griffe nicht unter den Reglern verschwinden und weiterhin erreichbar bleiben.
+
 ## Was flüchtig bleibt
 
 Alle Live-Änderungen im Panel — Parameter-Werte, Tempo-Modus, BPM/Faktor — wirken nur **zur Laufzeit**. Beim Speichern der Show werden weiterhin die **ursprünglichen Preset-Werte** des Effekts geschrieben, nicht deine Live-Anpassungen. Gespeichert bleiben nur das Panel und seine Effekt-Zuweisung. Willst du eine Änderung **dauerhaft** übernehmen, bearbeite den Effekt stattdessen im **Programmer**.

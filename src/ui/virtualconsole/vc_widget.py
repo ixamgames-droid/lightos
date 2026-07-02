@@ -71,11 +71,20 @@ class VCWidget(QFrame):
 
     # ── Edit Mode ─────────────────────────────────────────────────────────────
 
+    def _handle_mode_changed(self) -> None:
+        """Hook: wird aufgerufen, sobald ``_big_handles`` WIRKLICH kippt (klein <->
+        gross). No-op hier — Subklassen, deren Content-Container den Randring der
+        aktiven Greif-Breite freihalten muss (z. B. VCMultiLiveEditor), koennen
+        hier ihr Layout nachziehen (VCL-02)."""
+        pass
+
     def set_edit_mode(self, enabled: bool):
         self._edit_mode = enabled
         if not enabled:
             self._selected = False
-            self._big_handles = False          # grosse Greifbaender ausblenden
+            if self._big_handles:
+                self._big_handles = False      # grosse Greifbaender ausblenden
+                self._handle_mode_changed()
             self._cancel_dwell()
             self.set_effect_highlight(False)   # keine Hervorhebung im Betrieb
         self.setCursor(Qt.CursorShape.SizeAllCursor if enabled else Qt.CursorShape.ArrowCursor)
@@ -210,8 +219,11 @@ class VCWidget(QFrame):
             for sibling in self.parent().findChildren(VCWidget):
                 if sibling is not self and (sibling._selected or sibling._big_handles):
                     sibling._selected = False
+                    was_big = sibling._big_handles
                     sibling._big_handles = False
                     sibling._cancel_dwell()
+                    if was_big:
+                        sibling._handle_mode_changed()
                     sibling.update()
 
     def _is_resize_handle(self, pos: QPoint) -> bool:
@@ -330,11 +342,13 @@ class VCWidget(QFrame):
         if self._dragging and self.geometry() == self._orig_rect:
             self._dragging = False
             self._big_handles = True
+            self._handle_mode_changed()
             self.update()
 
     def leaveEvent(self, event):
         if self._big_handles and not self._dragging and not self._resizing:
             self._big_handles = False
+            self._handle_mode_changed()
             self.update()
         super().leaveEvent(event)
 
