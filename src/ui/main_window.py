@@ -1329,7 +1329,14 @@ class MainWindow(QMainWindow):
         try:
             if self._visualizer_window is not None:
                 try:
-                    self._visualizer_window.close()
+                    # close() kann seit VIZ-10 ueber den "Buehne speichern?"-Dialog
+                    # abgebrochen werden (event.ignore() -> False): dann das bestehende
+                    # Fenster BEHALTEN (kein deleteLater — sonst Leak + Datenverlust
+                    # trotz "Abbrechen") und nur nach vorn holen.
+                    if not self._visualizer_window.close():
+                        self._visualizer_window.raise_()
+                        self._visualizer_window.activateWindow()
+                        return
                     self._visualizer_window.deleteLater()
                 except Exception as e:
                     print(f"[MainWindow] _open_visualizer cleanup error: {e}")
@@ -1875,6 +1882,16 @@ class MainWindow(QMainWindow):
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
+        # Visualizer ZUERST schliessen: sein "Buehne speichern?"-Dialog (VIZ-10) kann
+        # abbrechen (close() -> False) — dann muss der App-Exit stoppen, BEVOR
+        # Output/Playback/MIDI heruntergefahren werden.
+        if self._visualizer_window:
+            try:
+                if not self._visualizer_window.close():
+                    event.ignore()
+                    return
+            except Exception:
+                pass
         # Warnung wenn Show ungespeicherte Aenderungen hat
         if self._has_unsaved_changes():
             reply = QMessageBox.question(
@@ -1903,8 +1920,6 @@ class MainWindow(QMainWindow):
                 self._state.midi_mapper.close()
         except Exception:
             pass
-        if self._visualizer_window:
-            self._visualizer_window.close()
         super().closeEvent(event)
 
     def _has_unsaved_changes(self) -> bool:

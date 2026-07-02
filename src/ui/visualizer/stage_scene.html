@@ -183,8 +183,16 @@ scene.fog = new THREE.FogExp2(0x080808, 0.025);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Bundle ist three.js r128 (siehe three_local.js REVISION) - dort heisst die
+// Farbraum-API noch outputEncoding/sRGBEncoding, nicht outputColorSpace.
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// >1.0, damit die Szene nach dem Tone-Mapping heller wirkt als vorher (ACES
+// dunkelt sonst v.a. additive Beam-/Emissive-Materialien sichtbar ab).
+renderer.toneMappingExposure = 1.2;
 document.body.appendChild(renderer.domElement);
 
 // Two cameras
@@ -217,7 +225,9 @@ function rad2deg(r) { return (Number(r) || 0) * 180 / Math.PI; }
 
 // State
 const settings = {
-  beamOpacity: 0.7,
+  // Angehoben (VIZ-10): ACES-Tone-Mapping dunkelt additive Beam-Materialien
+  // sichtbar ab - ohne diese Anhebung war bei Dimmer=voll fast nichts zu sehen.
+  beamOpacity: 0.85,
   showCones: true,
   showFloorSpots: true,
   showFog: true,
@@ -232,9 +242,12 @@ const settings = {
 // ============================================================================
 // Lights (always) - intensity modulated via settings.brightness
 // ============================================================================
-const ambient = new THREE.AmbientLight(0x222233, 0.35);
+// Grundhelligkeit angehoben (VIZ-10): vorher wirkten Fixtures/Raum bei
+// Default-Brightness als "winzige Klötzchen im Nichts". Werte hier sind die
+// Basis bei brightness=0 - applyBrightness() skaliert weiterhin linear drauf.
+const ambient = new THREE.AmbientLight(0x282838, 0.55);
 scene.add(ambient);
-const hemi = new THREE.HemisphereLight(0x404060, 0x101010, 0.2);
+const hemi = new THREE.HemisphereLight(0x50607a, 0x18181c, 0.35);
 scene.add(hemi);
 // Additional directional light only used when brightness > 0.4 (edit mode helper)
 const editLight = new THREE.DirectionalLight(0xffffff, 0);
@@ -253,10 +266,11 @@ function applyBrightness(b) {
   if (settings.showFog && viewMode === '3D') {
     scene.fog = new THREE.FogExp2(bgColor.getHex(), Math.max(0.005, 0.025 * (1 - b)));
   }
-  // Ambient: 0.35 (default dark) -> 1.4 (very bright)
-  ambient.intensity = 0.35 + b * 1.05;
-  // Hemisphere: 0.2 -> 1.0
-  hemi.intensity = 0.2 + b * 0.8;
+  // Ambient: 0.55 (default dark) -> 1.6 (very bright) - Basis angehoben (VIZ-10),
+  // damit Fixtures/Raum auch bei niedriger brightness klar erkennbar bleiben.
+  ambient.intensity = 0.55 + b * 1.05;
+  // Hemisphere: 0.35 -> 1.15
+  hemi.intensity = 0.35 + b * 0.8;
   // Edit-helper directional light kicks in above 40% brightness
   editLight.intensity = Math.max(0, (b - 0.4) * 1.5);
   // Beam visibility: in bright mode beams become less visible naturally
@@ -301,12 +315,13 @@ function trackPreset(obj) {
 }
 
 function buildGridAndFloor() {
-  gridHelper = new THREE.GridHelper(60, 60, 0x444444, 0x1a1a1a);
+  // Grid-Kontrast angehoben (VIZ-10): vorher auf dunklem Boden kaum sichtbar.
+  gridHelper = new THREE.GridHelper(60, 60, 0x686870, 0x303038);
   scene.add(gridHelper);
   // Floor
   floorMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(80, 80),
-    new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95, metalness: 0.0 })
+    new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.95, metalness: 0.0 })
   );
   floorMesh.rotation.x = -Math.PI / 2;
   floorMesh.position.y = -0.002;
@@ -2938,9 +2953,20 @@ function handlePointerUp(shiftKey) {
   updateMeasureReadout();   // Abstand zeigen, wenn jetzt genau 2 ausgewählt sind
 }
 
+// VIZ-10: Fixture-Tooltip ausblenden - bei Drag-Start, bei jeder programmatischen
+// Transform-Aenderung (jsApplyFixtureTransform-Pfad) und beim Mausverlassen des
+// Canvas. Ohne das blieb der zuletzt gezeigte Text (inkl. veralteter Koordinaten)
+// stehen, solange sich die Maus nicht bewegt - auch nach einer Verschiebung ueber
+// das Properties-Panel.
+function hideTooltip() {
+  const tt = document.getElementById('tooltip');
+  if (tt) tt.style.display = 'none';
+}
+
 // Mouse listeners (thin wrappers)
 renderer.domElement.addEventListener('mousedown', function(e) {
   if (e.button !== 0) return;
+  hideTooltip();
   handlePointerDown(e.clientX, e.clientY, e.shiftKey);
 }, false);
 
@@ -2968,6 +2994,8 @@ window.addEventListener('mousemove', function(e) {
     }
   }
 });
+
+renderer.domElement.addEventListener('mouseleave', hideTooltip);
 
 renderer.domElement.addEventListener('wheel', function(e) {
   if (viewMode === '3D') {
@@ -3229,6 +3257,9 @@ window.addEventListener('resize', function() {
   perspectiveCam.updateProjectionMatrix();
   resizeOrtho();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  // Monitor-Wechsel kann devicePixelRatio aendern (z.B. Fenster auf anderen
+  // Bildschirm mit anderer Skalierung verschoben) - hier mitziehen.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 });
 
 // ============================================================================
@@ -3284,6 +3315,7 @@ function jsSelectStageObject(id) {
 function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ) {
   const f = fixtures[fid];
   if (!f) return;
+  hideTooltip();   // VIZ-10: Panel-Eingabe darf keinen veralteten Tooltip stehen lassen
   if (x != null) f.group.position.x = x;
   if (y != null) f.group.position.y = y;
   if (z != null) f.group.position.z = z;
@@ -3414,22 +3446,36 @@ setTimeout(tryChannel, 200);
 // ============================================================================
 // Render loop
 // ============================================================================
+// Dedup-Set fuer Frame-Fehler: verhindert 60x/s-Spam im DevTools-Log, wenn
+// ein einzelner Frame wiederholt am selben Fehler scheitert.
+const _loggedAnimateErrors = new Set();
 function animate() {
+  // rAF-Aufruf steht bewusst VOR dem try/catch: die Ketten darf auch bei
+  // einem Fehler im Frame-Body niemals abreissen.
   requestAnimationFrame(animate);
-  // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
-  if (selectedStageId && stageObjects[selectedStageId]) {
-    const so = stageObjects[selectedStageId];
-    const t = Date.now() * 0.005;
-    const pulse = 0.5 + 0.5 * Math.sin(t);
-    applyStageEmissive(so.mesh, pulse * 0.7, pulse * 0.45, 0.0);
-    // Resize-Handles pulsen ebenfalls (Skala leicht moduliert)
-    const handleScale = 1.0 + 0.15 * Math.sin(t * 1.4);
-    for (const h of resizeHandles) {
-      h.scale.set(handleScale, handleScale, handleScale);
+  try {
+    // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
+    if (selectedStageId && stageObjects[selectedStageId]) {
+      const so = stageObjects[selectedStageId];
+      const t = Date.now() * 0.005;
+      const pulse = 0.5 + 0.5 * Math.sin(t);
+      applyStageEmissive(so.mesh, pulse * 0.7, pulse * 0.45, 0.0);
+      // Resize-Handles pulsen ebenfalls (Skala leicht moduliert)
+      const handleScale = 1.0 + 0.15 * Math.sin(t * 1.4);
+      for (const h of resizeHandles) {
+        h.scale.set(handleScale, handleScale, handleScale);
+      }
+      if (so._helper) so._helper.update();
     }
-    if (so._helper) so._helper.update();
+    renderer.render(scene, activeCam);
+  } catch (err) {
+    const msg = String(err && err.message || err);
+    if (!_loggedAnimateErrors.has(msg)) {
+      _loggedAnimateErrors.add(msg);
+      console.error('animate() frame error (weitere gleiche Fehler werden unterdrueckt):', err);
+    }
+    // Frame ueberspringen - naechster rAF-Tick versucht es erneut.
   }
-  renderer.render(scene, activeCam);
 }
 animate();
 
