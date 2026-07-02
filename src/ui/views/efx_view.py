@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
+from src.ui.widgets.flow_layout import FlowLayout
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
 # NUR fuer die Anzeige (Vorschau-Statuszeile) — der gespeicherte Wert bleibt
@@ -747,7 +748,12 @@ class EfxView(QWidget):
         self._list.currentRowChanged.connect(self._select_efx)
         ll.addWidget(self._list)
 
-        btn_row = QHBoxLayout()
+        # UI-17 (Visual-Audit 2026-07-02): die 5 Buttons quetschten sich in ein
+        # QHBoxLayout unter der 200px-Spaltenbreite zusammen (Text abgeschnitten,
+        # "Ne/eic/sch/Sta/St") -> FlowLayout (wie Matrix-View) legt jeden Button
+        # mit seiner echten sizeHint-Breite an und bricht bei Platzmangel
+        # zweizeilig um, statt zu clippen.
+        btn_row = FlowLayout(h_spacing=4, v_spacing=4)
         btn_add = QPushButton("+ Neu")
         btn_save = QPushButton("💾 Speichern")
         btn_del = QPushButton("Löschen")
@@ -757,7 +763,7 @@ class EfxView(QWidget):
             btn.setFixedHeight(26)
             btn.setStyleSheet("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
-                              border-radius:3px; font-size:10px; }
+                              border-radius:3px; font-size:10px; padding:0 6px; }
                 QPushButton:hover { background:#30363d; }
             """)
             btn_row.addWidget(btn)

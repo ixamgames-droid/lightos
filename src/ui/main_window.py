@@ -85,8 +85,19 @@ class SectionButton(QPushButton):
     Sektions-Toolbar-Button:
     Transparenter Hintergrund, gelbe Unterstreichung wenn aktiv.
     """
+    # Kleiner Klick-Floor, damit der Button nie auf Null-Breite schrumpft
+    # (nur Sicherheitsnetz fuer Touch/Maus-Trefferflaeche, siehe Review-Fix
+    # unten - KEIN Text-Mindestbedarf mehr, siehe resizeEvent).
+    _CLICK_FLOOR_PX = 56
+
     def __init__(self, text: str, icon_color: str = "#6F6F6F"):
         super().__init__(text)
+        # UI-15/Review-Fix (2026-07-02): voller Titel wird fuer sizeHint/Tooltip
+        # und als Elide-Quelle in resizeEvent gebraucht - der aktuell angezeigte
+        # Text() darf dafuer NICHT herangezogen werden, sonst entsteht eine
+        # Schrumpf-Spirale (elidierter Text -> kleinere sizeHint -> noch mehr
+        # Elide, ...).
+        self._full_text = text
         self.setObjectName("sectionBtn")
         self.setCheckable(True)
         self.setFlat(True)
@@ -94,6 +105,66 @@ class SectionButton(QPushButton):
         self.setIcon(_colored_icon(icon_color, 14))
         self.setIconSize(QSize(14, 14))
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setToolTip(text)
+        self.setMinimumWidth(self._CLICK_FLOOR_PX)
+
+    def _full_text_size_hint(self) -> QSize:
+        # Nutzt Qts EIGENE sizeHint()-Berechnung (beruecksichtigt QSS-Padding,
+        # Icon-Abstand, Checkable/Flat-Extras exakt so wie Qt sie tatsaechlich
+        # anwendet) - dafuer den aktuell GESETZTEN Text() kurz gegen den vollen
+        # Titel tauschen. Robuster als eine eigene, von QSS-Werten abgeleitete
+        # Naeherungsrechnung (die bei 1440px zu 1-6px Diskrepanz gegenueber der
+        # tatsaechlichen Layout-Zuteilung fuehrte -> unnoetiges Elide trotz
+        # eigentlich ausreichend Platz).
+        current = self.text()
+        if current == self._full_text:
+            return super().sizeHint()
+        QPushButton.setText(self, self._full_text)
+        try:
+            return super().sizeHint()
+        finally:
+            QPushButton.setText(self, current)
+
+    def sizeHint(self):  # noqa: N802
+        # Breite aus dem VOLLEN Titel, nicht aus dem aktuell ggf. bereits
+        # elidierten self.text() - sonst wuerde die sizeHint mit jedem
+        # Elide-Zyklus weiter schrumpfen (Feedback-Schleife).
+        return self._full_text_size_hint()
+
+    def minimumSizeHint(self):  # noqa: N802
+        # QPushButtons Basis-minimumSizeHint() haengt am aktuell GESETZTEN
+        # Text() (nicht an unserem sizeHint()-Override) - QHBoxLayout kann sich
+        # bei der Groessenzuteilung an minimumSizeHint() statt sizeHint()
+        # orientieren, was sonst zu einem Rundungsfehler ggue. sizeHint()
+        # fuehrt (bei 1440px beobachtet: Buttons zu schmal -> letztes Zeichen
+        # elidiert, obwohl eigentlich ausreichend Platz vorhanden war). Fix:
+        # identisch zu sizeHint().
+        return self.sizeHint()
+
+    # Review-Fix (2026-07-02, Befund 1/HIGH): die vorherige harte
+    # setMinimumWidth(sizeHint) in showEvent() erzwang bei 900-1439px (Fenster
+    # erlaubt setMinimumSize(900,600)) eine Summe an Mindestbreiten, die groesser
+    # war als die verfuegbare Bar-Breite -> QHBoxLayout konnte die Buttons NICHT
+    # mehr auf ihre Mindestbreite bringen und positionierte sie enger als deren
+    # Summe -> sichtbare Ueberlappung (gemessen 1024x900: bis 47px, GM-Gruppe
+    # ueberdeckte den letzten Button). Fix: KEIN harter Text-Mindestbreiten-Floor
+    # mehr - stattdessen elidiert der Button seinen Text graceful auf die vom
+    # Layout tatsaechlich zugewiesene Breite (nie Ueberlappung, nur "..."-Kuerzung
+    # unterhalb ~1440px). Tooltip zeigt weiterhin immer den vollen Titel.
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        # "Chrome"-Breite (QSS-Padding, Icon+Abstand, Checkable/Flat-Extras) =
+        # Differenz zwischen Qts eigener sizeHint() fuer den vollen Titel und
+        # der reinen Textbreite - so bleibt das Elide-Budget konsistent mit
+        # sizeHint()/minimumSizeHint() oben (kein zweiter, potenziell
+        # abweichender Naeherungswert).
+        full_text_w = self.fontMetrics().horizontalAdvance(self._full_text)
+        chrome = max(self._full_text_size_hint().width() - full_text_w, 0)
+        avail = self.width() - chrome
+        shown = self.fontMetrics().elidedText(
+            self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
+        if shown != self.text():
+            self.setText(shown)
 
 
 class MainWindow(QMainWindow):
@@ -422,20 +493,28 @@ class MainWindow(QMainWindow):
         self._btn_group.setExclusive(True)
 
         # Sektions-Definitionen: (Label, Icon-Farbe, Index)
+        # UI-15: "Bühnen-Layout"/"Eingabe / Ausgabe" gekuerzt ("Bühne"/"E/A") -
+        # das sind bei 1440px die beiden breitesten Labels, die den Bar-Platz
+        # sprengen; alle anderen bleiben unveraendert (Kuerzung nur wo noetig).
         sections = [
-            ("Bühnen-Layout",        "#FFD700"),
+            ("Bühne",                "#FFD700"),
             ("Patchen",              "#0978FF"),
             ("Programmer",           "#FFD700"),
             ("Virtual Console",      "#9DFF52"),
             ("Simple Desk",          "#8F8F8F"),
             ("Playback",             "#FF6B35"),
-            ("Eingabe / Ausgabe",    "#6F6F6F"),
+            ("E/A",                  "#6F6F6F"),
             ("BPM",                  "#FF3CAC"),
         ]
+
+        # Volle Bezeichnung fuer Tooltip der gekuerzten Buttons (UI-15).
+        _section_full_names = {"Bühne": "Bühnen-Layout", "E/A": "Eingabe / Ausgabe"}
 
         self._section_btns: list[SectionButton] = []
         for i, (label, color) in enumerate(sections):
             btn = SectionButton(label, color)
+            if label in _section_full_names:
+                btn.setToolTip(_section_full_names[label])
             self._btn_group.addButton(btn, i)
             bar_layout.addWidget(btn)
             self._section_btns.append(btn)
@@ -444,19 +523,44 @@ class MainWindow(QMainWindow):
         bar_layout.addStretch(1)
 
         # Grand Master Slider (rechts neben Stretch, vor BPM)
+        # UI-16 (Visual-Audit 2026-07-02): GM-Label/Slider standen direkt als
+        # Einzel-Items in `bar_layout`. Bei knappem Bar-Platz (viele
+        # Section-Buttons + GM + TAP + Validation/Clear-Widgets) komprimiert
+        # QHBoxLayout gestauchte Items nicht nur in der Breite, sondern kann sie
+        # auch VOR das Ende ihres direkten Vorgaengers positionieren (Qt-
+        # Startvations-Artefakt) -> Slider-Griff ueberlappte die erste Ziffer
+        # ("00%"). Fix: GM-Gruppe (Label "GM" + Slider + Prozent-Label) in einen
+        # EIGENEN Container mit eigenem Layout kapseln - dessen interne Geometrie
+        # ist von der Bar-Starvation isoliert (der Container selbst kann als Ganzes
+        # schrumpfen, aber Slider und Prozent-Label bleiben zueinander korrekt
+        # positioniert, da ihr Mini-Layout nur sich selbst versorgen muss).
+        gm_group = QWidget()
+        gm_layout = QHBoxLayout(gm_group)
+        gm_layout.setContentsMargins(0, 0, 0, 0)
+        gm_layout.setSpacing(4)
         lbl_gm = QLabel("GM")
         lbl_gm.setStyleSheet("color: #cccccc; padding: 0 4px; font-weight: bold;")
-        bar_layout.addWidget(lbl_gm)
+        gm_layout.addWidget(lbl_gm)
         self._slider_gm = QSlider(Qt.Orientation.Horizontal)
         self._slider_gm.setRange(0, 100)
         self._slider_gm.setValue(100)
         self._slider_gm.setFixedWidth(110)
         self._slider_gm.setToolTip("Grand Master (0–100 %)")
         self._slider_gm.valueChanged.connect(self._on_grand_master_changed)
-        bar_layout.addWidget(self._slider_gm)
+        gm_layout.addWidget(self._slider_gm)
         self._lbl_gm_val = QLabel("100%")
-        self._lbl_gm_val.setStyleSheet("color: #aaaaaa; padding: 0 4px; min-width:36px;")
-        bar_layout.addWidget(self._lbl_gm_val)
+        self._lbl_gm_val.setStyleSheet("color: #aaaaaa; padding: 0 4px;")
+        # Fixe "min-width:36px" im Stylesheet war zu schmal fuer "100%" in
+        # Fettschrift-Nachbarschaft -> harte Mindestbreite aus fontMetrics
+        # ("100%") + Puffer, als setMinimumWidth (Layout-Floor, siehe SectionButton).
+        gm_val_min_w = self._lbl_gm_val.fontMetrics().horizontalAdvance("100%") + 8
+        self._lbl_gm_val.setMinimumWidth(gm_val_min_w)
+        gm_layout.addWidget(self._lbl_gm_val)
+        gm_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        # Container selbst braucht ebenfalls einen Layout-Floor (sonst wandert das
+        # Starvations-Problem nur eine Ebene nach aussen, siehe SectionButton).
+        gm_group.setMinimumWidth(gm_group.sizeHint().width())
+        bar_layout.addWidget(gm_group)
 
         # Tap-Tempo + BPM (klickbares Label)
         self._btn_tap = QPushButton("TAP")
