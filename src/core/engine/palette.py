@@ -10,6 +10,7 @@ class PaletteType(str, Enum):
     POSITION = "Position"
     BEAM     = "Beam"
     EFFECT   = "Effect"
+    LASER    = "Laser"
     ALL      = "All"
 
 
@@ -34,6 +35,16 @@ class Palette:
         PaletteType.BEAM:     {"zoom", "focus", "iris", "shutter", "gobo_wheel",
                                "gobo_rotation", "prism", "frost"},
         PaletteType.EFFECT:   {"speed", "macro"},
+        # Laser-Muster (LAS-02/03): alle laser_*-Kanaele plus die auf Lasern
+        # mitgenutzten Standard-Attribute (Musterauswahl=gobo_wheel usw.).
+        # Ueberschneidung mit BEAM ist gewollt — der Filter gilt je Palette-Typ.
+        PaletteType.LASER:    {"laser_boundary", "laser_bank", "laser_x",
+                               "laser_y", "laser_zoom_x", "laser_zoom_y",
+                               "laser_color", "laser_color_change",
+                               "laser_dots", "laser_draw", "laser_draw_mode",
+                               "laser_twist", "laser_grating",
+                               "shutter", "gobo_wheel", "gobo_rotation",
+                               "zoom", "color_wheel", "macro", "speed"},
         PaletteType.ALL:      None,   # includes everything
     }
 

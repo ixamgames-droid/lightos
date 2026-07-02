@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-02 — Laser-Support: Laser-Tab im Programmer (LAS-02 + LAS-03-Grundlage)
+
+#### Neu / Hinzugefuegt
+
+- **Laser-Tab im Programmer (`LaserView`):** neue Steuerseite `src/ui/views/laser_view.py`, eingebettet als Programmer-Tab nach dem EFX/Matrix-Muster (`follow_selection=True`), sichtbar nur wenn die Auswahl Laser enthält (`fixture_type='laser'` oder `laser_*`-Kanäle). Inhalt: **Mustergruppe A/B/A+B**-Umschalter (Mehrkopf `attr#N`, Kopf-B-Schreibschutz für Einzel-Attribute nach ENG-03-Muster), **Modus-Schnellwahl** (Shutter-Ranges Aus/Auto/Sound/Muster als Kacheln), **Range-beschriftete Regler** je Laser-Kanal (Slider + Spin + Bereichs-Combo aus den ChannelRanges) und **Muster-Paletten**. `src/ui/views/programmer_view.py` (Tab + Sichtbarkeit in `_rebuild_attr_editor`), Tests `tests/test_laser_view.py`.
+- **Laser-Muster-Paletten (`PaletteType.LASER`):** neuer Paletten-Typ in der Palette-Engine (erfasst `laser_*` + Shutter/Muster/Zoom/Rotation/Farbrad/Makro/Speed), eigener „Laser"-Tab in der Paletten-View, „💾 Muster speichern…" direkt in der LaserView (speichert pro Mustergruppe/Kopf). `src/core/engine/palette.py`, `src/ui/views/palette_view.py`.
+
 ### 2026-07-02 — Laser-Support: Ehaho-L2600-Builtin + Laser-Vokabular (LAS-01)
 
 #### Neu / Hinzugefuegt
