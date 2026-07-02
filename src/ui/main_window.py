@@ -95,6 +95,23 @@ class SectionButton(QPushButton):
         self.setIconSize(QSize(14, 14))
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
+    # UI-15 (Visual-Audit 2026-07-02): bei knappem Platz in der Section-Bar
+    # komprimiert QHBoxLayout Fixed-Policy-Widgets unter ihren sizeHint, wenn die
+    # Summe aller Items die Bar-Breite uebersteigt (bei 1440px ~159px zu wenig)
+    # -> Titel wurden abgeschnitten ("Bühnen-Lay", "Virtual Cons"). Fix: harte
+    # Mindestbreite = Text+Icon-Breite, damit der Button NIE unter seinen
+    # eigenen Textbedarf schrumpft (kein Qt-Elide noetig). WICHTIG: sizeHint()
+    # NICHT im __init__ abfragen - das QSS (padding/Icon-Abstand) ist zu diesem
+    # Zeitpunkt noch nicht aufgeloest (Button noch nicht in die Bar eingehaengt/
+    # gepolished), sizeHint() liefert dann einen zu kleinen, falschen Wert
+    # (beobachtet: 98px statt korrekt 107px -> "Programmer" clippte trotz Fix).
+    # showEvent() laeuft garantiert NACH dem Einhaengen+Polish.
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        need = self.sizeHint().width()
+        if need > self.minimumWidth():
+            self.setMinimumWidth(need)
+
 
 class MainWindow(QMainWindow):
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
@@ -422,20 +439,28 @@ class MainWindow(QMainWindow):
         self._btn_group.setExclusive(True)
 
         # Sektions-Definitionen: (Label, Icon-Farbe, Index)
+        # UI-15: "Bühnen-Layout"/"Eingabe / Ausgabe" gekuerzt ("Bühne"/"E/A") -
+        # das sind bei 1440px die beiden breitesten Labels, die den Bar-Platz
+        # sprengen; alle anderen bleiben unveraendert (Kuerzung nur wo noetig).
         sections = [
-            ("Bühnen-Layout",        "#FFD700"),
+            ("Bühne",                "#FFD700"),
             ("Patchen",              "#0978FF"),
             ("Programmer",           "#FFD700"),
             ("Virtual Console",      "#9DFF52"),
             ("Simple Desk",          "#8F8F8F"),
             ("Playback",             "#FF6B35"),
-            ("Eingabe / Ausgabe",    "#6F6F6F"),
+            ("E/A",                  "#6F6F6F"),
             ("BPM",                  "#FF3CAC"),
         ]
+
+        # Volle Bezeichnung fuer Tooltip der gekuerzten Buttons (UI-15).
+        _section_full_names = {"Bühne": "Bühnen-Layout", "E/A": "Eingabe / Ausgabe"}
 
         self._section_btns: list[SectionButton] = []
         for i, (label, color) in enumerate(sections):
             btn = SectionButton(label, color)
+            if label in _section_full_names:
+                btn.setToolTip(_section_full_names[label])
             self._btn_group.addButton(btn, i)
             bar_layout.addWidget(btn)
             self._section_btns.append(btn)
@@ -444,19 +469,44 @@ class MainWindow(QMainWindow):
         bar_layout.addStretch(1)
 
         # Grand Master Slider (rechts neben Stretch, vor BPM)
+        # UI-16 (Visual-Audit 2026-07-02): GM-Label/Slider standen direkt als
+        # Einzel-Items in `bar_layout`. Bei knappem Bar-Platz (viele
+        # Section-Buttons + GM + TAP + Validation/Clear-Widgets) komprimiert
+        # QHBoxLayout gestauchte Items nicht nur in der Breite, sondern kann sie
+        # auch VOR das Ende ihres direkten Vorgaengers positionieren (Qt-
+        # Startvations-Artefakt) -> Slider-Griff ueberlappte die erste Ziffer
+        # ("00%"). Fix: GM-Gruppe (Label "GM" + Slider + Prozent-Label) in einen
+        # EIGENEN Container mit eigenem Layout kapseln - dessen interne Geometrie
+        # ist von der Bar-Starvation isoliert (der Container selbst kann als Ganzes
+        # schrumpfen, aber Slider und Prozent-Label bleiben zueinander korrekt
+        # positioniert, da ihr Mini-Layout nur sich selbst versorgen muss).
+        gm_group = QWidget()
+        gm_layout = QHBoxLayout(gm_group)
+        gm_layout.setContentsMargins(0, 0, 0, 0)
+        gm_layout.setSpacing(4)
         lbl_gm = QLabel("GM")
         lbl_gm.setStyleSheet("color: #cccccc; padding: 0 4px; font-weight: bold;")
-        bar_layout.addWidget(lbl_gm)
+        gm_layout.addWidget(lbl_gm)
         self._slider_gm = QSlider(Qt.Orientation.Horizontal)
         self._slider_gm.setRange(0, 100)
         self._slider_gm.setValue(100)
         self._slider_gm.setFixedWidth(110)
         self._slider_gm.setToolTip("Grand Master (0–100 %)")
         self._slider_gm.valueChanged.connect(self._on_grand_master_changed)
-        bar_layout.addWidget(self._slider_gm)
+        gm_layout.addWidget(self._slider_gm)
         self._lbl_gm_val = QLabel("100%")
-        self._lbl_gm_val.setStyleSheet("color: #aaaaaa; padding: 0 4px; min-width:36px;")
-        bar_layout.addWidget(self._lbl_gm_val)
+        self._lbl_gm_val.setStyleSheet("color: #aaaaaa; padding: 0 4px;")
+        # Fixe "min-width:36px" im Stylesheet war zu schmal fuer "100%" in
+        # Fettschrift-Nachbarschaft -> harte Mindestbreite aus fontMetrics
+        # ("100%") + Puffer, als setMinimumWidth (Layout-Floor, siehe SectionButton).
+        gm_val_min_w = self._lbl_gm_val.fontMetrics().horizontalAdvance("100%") + 8
+        self._lbl_gm_val.setMinimumWidth(gm_val_min_w)
+        gm_layout.addWidget(self._lbl_gm_val)
+        gm_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        # Container selbst braucht ebenfalls einen Layout-Floor (sonst wandert das
+        # Starvations-Problem nur eine Ebene nach aussen, siehe SectionButton).
+        gm_group.setMinimumWidth(gm_group.sizeHint().width())
+        bar_layout.addWidget(gm_group)
 
         # Tap-Tempo + BPM (klickbares Label)
         self._btn_tap = QPushButton("TAP")

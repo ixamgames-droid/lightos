@@ -146,7 +146,11 @@ QPushButton#sectionBtn {
     color: #aaaaaa;
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 0px 14px;
+    /* UI-15 (Visual-Audit 2026-07-02): 14px->11px - schafft bei 1440px genug
+       Luft, damit die Section-Bar (8 Buttons + GM-Slider/Label/TAP/BPM) nicht
+       mehr knapp an die Bar-Breite stoesst (sonst quetscht QHBoxLayout
+       Fixed-Widgets unter ihre sizeHint, siehe SectionButton.setMinimumWidth). */
+    padding: 0px 11px;
     font-weight: bold;
     font-size: 12px;
     min-height: 34px;

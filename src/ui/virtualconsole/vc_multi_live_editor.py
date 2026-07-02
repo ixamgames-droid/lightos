@@ -741,7 +741,10 @@ class VCMultiLiveEditor(VCWidget):
             QComboBox, QSpinBox { background:#161b22; color:#e6edf3; border:1px solid #30363d;
                                   border-radius:3px; padding:2px 6px; min-height:24px; }
             QCheckBox { color:#e6edf3; font-size:13px; spacing:7px; }
-            QCheckBox::indicator { width:15px; height:15px; }
+            QCheckBox::indicator { width:15px; height:15px; border:1px solid #8b949e;
+                                   border-radius:3px; background:#161b22; }
+            QCheckBox::indicator:checked { background:#1f6feb; border-color:#1f6feb; }
+            QCheckBox::indicator:hover { border-color:#c9d1d9; }
             QSlider::groove:horizontal { height:4px; background:#30363d; border-radius:2px; }
             QSlider::handle:horizontal { width:14px; margin:-6px 0; background:#58d68d; border-radius:7px; }
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
@@ -828,7 +831,11 @@ class VCMultiLiveEditor(VCWidget):
             return
         self._wide = wide
         if wide:
-            self._body_wide.addWidget(self._preview)
+            # UI-23 (Visual-Audit 2026-07-02): die Vorschau wurde von QHBoxLayout
+            # vertikal zentriert (Leerraum wirkte "unfertig", wenn der Scroll-
+            # Bereich hoeher ist als die Vorschau). AlignTop klebt sie oben; der
+            # Scroll-Bereich (stretch=1) fuellt weiter die volle Hoehe.
+            self._body_wide.addWidget(self._preview, 0, Qt.AlignmentFlag.AlignTop)
             self._body_wide.addWidget(self._scroll, 1)
         else:
             self._body_narrow.addWidget(self._preview)
