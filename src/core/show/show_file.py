@@ -748,9 +748,26 @@ def load_show(path: str | os.PathLike):
     state._channel_groups_data = data.get("channel_groups", []) or []
 
     # Visualizer: Fixture-Positionen + aktive Stage wiederherstellen
+    # WICHTIG (Schritt 8 Migrations-Gate-Fund): die rohen Legacy-Dicts
+    # (positions/rotations/docks/lv_pos) werden HIER als lokale Python-dicts
+    # gesammelt und weiter unten UNVERAENDERT an SceneGraph.from_legacy
+    # gereicht -- NICHT erneut aus state.visualizer_positions/live_view_
+    # positions zurueckgelesen. Grund: state.visualizer_positions = positions
+    # baut den Graph sofort; der anschliessende state.live_view_positions =
+    # lv_pos-Write (Zeile weiter unten) haette sonst ueber den bestehenden
+    # _LiveViewDict-Adapter die bereits gesetzte 3D-X/Z-Weltposition JEDER
+    # Fixture mit der aus dem 2D-Pixel-Raster abgeleiteten Position
+    # ueberschrieben (Adapter kennt beim reinen dict-Write keine Prioritaet
+    # "3D vor 2D") -- der Migrations-Algorithmus (Design (c)) verlangt aber
+    # positions als FUEHREND. Die state.*-Zuweisungen bleiben unten stehen
+    # (Abwaertskompatibilitaet fuer Konsumenten, die die Legacy-Properties direkt
+    # lesen), sind fuer die Graph-Migration selbst aber nur noch Nebeneffekt.
+    positions: dict[int, tuple[float, float, float]] = {}
+    rotations: dict[int, tuple[float, float, float]] = {}
+    docks: dict[int, str] = {}
+    lv_pos: dict[int, tuple[float, float]] = {}
     try:
         viz = data.get("visualizer", {}) or {}
-        positions: dict[int, tuple[float, float, float]] = {}
         for fid_raw, p in (viz.get("positions", {}) or {}).items():
             try:
                 positions[int(fid_raw)] = (float(p[0]), float(p[1]), float(p[2]))
@@ -759,7 +776,6 @@ def load_show(path: str | os.PathLike):
         state.visualizer_positions = positions
         # Multi-Achsen-Ausrichtung (rx, ry, rz) in Grad. normalize_rotation laedt
         # auch Alt-Shows korrekt, die nur einen einzelnen Y-Float gespeichert haben.
-        rotations: dict[int, tuple[float, float, float]] = {}
         for fid_raw, val in (viz.get("rotations", {}) or {}).items():
             try:
                 rotations[int(fid_raw)] = normalize_rotation(val)
@@ -769,7 +785,6 @@ def load_show(path: str | os.PathLike):
         state.active_stage_name = str(viz.get("active_stage", "simple") or "simple")
         # Andock-Beziehungen {fid: stage_element_id}. Stale-Eintraege (Element der
         # aktiven Buehne existiert nicht mehr) verwerfen, falls die Buehne aufloesbar.
-        docks: dict[int, str] = {}
         for fid_raw, sid in (viz.get("docks", {}) or {}).items():
             try:
                 if sid:
@@ -782,6 +797,9 @@ def load_show(path: str | os.PathLike):
         state.visualizer_docks = docks
     except Exception as e:
         _lenient("load visualizer error", e)
+        positions = {}
+        rotations = {}
+        docks = {}
         state.visualizer_positions = {}
         state.visualizer_rotations = {}
         state.visualizer_docks = {}
@@ -790,7 +808,6 @@ def load_show(path: str | os.PathLike):
     # Live View: 2D-Fixture-Positionen (eigene Persistenz, entkoppelt vom 3D-Viz)
     try:
         lv = data.get("live_view", {}) or {}
-        lv_pos: dict[int, tuple[float, float]] = {}
         for fid_raw, p in (lv.get("positions", {}) or {}).items():
             try:
                 lv_pos[int(fid_raw)] = (float(p[0]), float(p[1]))
@@ -804,6 +821,7 @@ def load_show(path: str | os.PathLike):
         state.live_view_meta = dict(meta) if isinstance(meta, dict) else {}
     except Exception as e:
         _lenient("load live_view error", e)
+        lv_pos = {}
         state.live_view_positions = {}
         state.live_view_meta = {}
 
@@ -842,12 +860,17 @@ def load_show(path: str | os.PathLike):
             else:
                 from src.core.stage.scene_graph import SceneGraph
                 stage_def = _resolve_stage_definition(state.active_stage_name)
+                # Die rohen, oben lokal gesammelten Legacy-dicts sind hier
+                # FUEHREND (nicht state.visualizer_positions/live_view_positions
+                # erneut lesen -- die wurden durch den zwischenzeitlichen
+                # live_view_positions-Write bereits mit 2D-abgeleiteten X/Z-
+                # Werten ueberschrieben, siehe Kommentar oben).
                 state._scene = SceneGraph.from_legacy(
-                    positions=dict(state.visualizer_positions),
-                    rotations=dict(state.visualizer_rotations),
-                    docks=dict(state.visualizer_docks),
+                    positions=positions,
+                    rotations=rotations,
+                    docks=docks,
                     active_stage_name=state.active_stage_name,
-                    live_view_positions=dict(state.live_view_positions),
+                    live_view_positions=lv_pos,
                     stage_def=stage_def,
                 )
         except Exception as e:
