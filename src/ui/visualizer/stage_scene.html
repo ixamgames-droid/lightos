@@ -949,10 +949,19 @@ function getStageJson() {
 // melden – das löst sonst N×Tree-Rebuilds aus.
 let _isLoadingStage = false;
 
+// Review-Fix (Stage-Echo-Race): Sequenz-Token aus der zuletzt per
+// loadStageJson() empfangenen Buehnen-Definition ("_reloadToken", von
+// push_stage_definition() vergeben). JEDES notifyStageListChanged()-Echo
+// traegt diesen Token zurueck an Python, damit ein spaet eintreffendes Echo
+// aus einem inzwischen ueberholten Reload dort als STALE erkannt und dessen
+// destruktiver Loesch-Abgleich uebersprungen werden kann.
+let _currentStageReloadToken = null;
+
 function loadStageJson(json) {
   _isLoadingStage = true;
   try {
     const data = typeof json === 'string' ? JSON.parse(json) : json;
+    if (typeof data._reloadToken === 'number') _currentStageReloadToken = data._reloadToken;
     clearStageObjects();
     selectedStageId = null;
     clearResizeHandles();
@@ -986,7 +995,11 @@ function loadStageJson(json) {
 function notifyStageListChanged() {
   if (_isLoadingStage) return;  // unterdrücken während Bulk-Load
   if (bridge && bridge.stageListChanged) {
-    try { bridge.stageListChanged(JSON.stringify(Object.values(stageObjects).map(s => s.data))); } catch (e) {}
+    const payload = {
+      objects: Object.values(stageObjects).map(s => s.data),
+      _reloadToken: _currentStageReloadToken,
+    };
+    try { bridge.stageListChanged(JSON.stringify(payload)); } catch (e) {}
   }
 }
 
@@ -2873,33 +2886,54 @@ function handlePointerUp(shiftKey) {
       } else {
         newDock = null;
       }
-      if ((newDock || null) !== (f.dockedTo || null)) {
-        f.dockedTo = newDock || null;
-        if (bridge && bridge.fixtureDockChanged) {
+      const hasDockChange = (newDock || null) !== (f.dockedTo || null);
+      if (hasDockChange) f.dockedTo = newDock || null;
+      delete f._pendingDock;
+      const hasRotation = (editTool === 'rotate');
+      // Review-Fix (Undo-Gestik-Buendelung): EIN kombiniertes Event fuer das
+      // Drag-Ende statt 2-3 einzelner Bridge-Aufrufe (Position/Dock/Rotation)
+      // -- Python buendelt sie zu GENAU EINEM Undo-Command (Design (e): "EIN
+      // Command pro Gestik"). Faellt auf die alten Einzel-Slots zurueck, falls
+      // eine aeltere Bridge (ohne fixtureGestureEnd) im WebChannel haengt.
+      if (bridge && bridge.fixtureGestureEnd) {
+        const payload = {
+          fid: Number(fid),
+          x: f.group.position.x, y: f.group.position.y, z: f.group.position.z,
+          hasRotation,
+          hasDockChange,
+          dock: f.dockedTo || '',
+        };
+        if (hasRotation) {
+          payload.rx = rad2deg(f.group.rotation.x);
+          payload.ry = rad2deg(f.group.rotation.y);
+          payload.rz = rad2deg(f.group.rotation.z);
+        }
+        try { bridge.fixtureGestureEnd(JSON.stringify(payload)); } catch (e) {}
+      } else {
+        if (hasDockChange && bridge && bridge.fixtureDockChanged) {
           try { bridge.fixtureDockChanged(String(fid), f.dockedTo || ''); } catch (e) {}
         }
-      }
-      delete f._pendingDock;
-      if (bridge && bridge.fixturePositionChanged) {
-        try {
-          bridge.fixturePositionChanged(
-            String(fid),
-            f.group.position.x,
-            f.group.position.y,
-            f.group.position.z
-          );
-        } catch (err) {}
-      }
-      // Beim Drehen-Werkzeug zusätzlich die neue Ausrichtung (GRAD) melden.
-      if (editTool === 'rotate' && bridge && bridge.fixtureRotationChanged) {
-        try {
-          bridge.fixtureRotationChanged(
-            String(fid),
-            rad2deg(f.group.rotation.x),
-            rad2deg(f.group.rotation.y),
-            rad2deg(f.group.rotation.z)
-          );
-        } catch (err) {}
+        if (bridge && bridge.fixturePositionChanged) {
+          try {
+            bridge.fixturePositionChanged(
+              String(fid),
+              f.group.position.x,
+              f.group.position.y,
+              f.group.position.z
+            );
+          } catch (err) {}
+        }
+        // Beim Drehen-Werkzeug zusätzlich die neue Ausrichtung (GRAD) melden.
+        if (hasRotation && bridge && bridge.fixtureRotationChanged) {
+          try {
+            bridge.fixtureRotationChanged(
+              String(fid),
+              rad2deg(f.group.rotation.x),
+              rad2deg(f.group.rotation.y),
+              rad2deg(f.group.rotation.z)
+            );
+          } catch (err) {}
+        }
       }
     }
     clearDockHighlight();
