@@ -45,8 +45,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, QPointF, QRect, QRectF
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QSlider,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QHBoxLayout,
+                               QLabel, QPushButton, QScrollArea, QSlider,
                                QVBoxLayout, QWidget)
 from .vc_widget import VCWidget
 
@@ -86,6 +86,51 @@ _DIR_ARROWS = {"forward": "→", "reverse": "←", "backward": "←", "bounce": 
                "left": "←", "right": "→", "up": "↑", "down": "↓",
                "in": "→←", "out": "←→", "center_out": "←‧→", "out_center": "→‧←",
                "cw": "↻", "ccw": "↺"}
+
+# VCL-03: deutsche Labels fuer die restlichen select-Options-Tokens (Superset-
+# Ergaenzung zu _DIR_LABELS, das fuer die Pfeil-Beschriftung reserviert bleibt).
+# Inventur per Wegwerf-Skript ueber ALGO_META (rgb_matrix_meta.py) + EFX-/Chaser-
+# list_params: alle kind=="select"-Tokens ohne explizites (wert, label)-Tupel und
+# ohne Eintrag in _DIR_LABELS. tempo_bus_id/algorithm sind hier NICHT gelistet —
+# beide Keys sind in _EXCLUDE_KEYS und erreichen den Picker nie.
+_OPTION_LABELS = {
+    # Achse (axis)
+    "H": "Horizontal", "V": "Vertikal", "Diag": "Diagonal",
+    # Auswahl (scope)
+    "all": "Alle", "row": "Reihe", "col": "Spalte",
+    # Ursprung (origin) — top/bottom/center/radial hier, "left/right/up/down"
+    # deckt bereits _DIR_LABELS ab (gemeinsam genutzte Tokens).
+    "top": "oben", "bottom": "unten", "center": "Mitte", "radial": "Radial",
+    # Reihenfolge (fill_dir) — "diag"/"random" zusaetzlich zu Richtungen oben.
+    "diag": "diagonal", "random": "Zufällig",
+    # Farb-/Helligkeits-/Dimmer-/Loop-/Blend-/Fuell-Modus etc.
+    "color": "Farbe", "flash": "Blitz",
+    "dimmer": "Dimmer", "strobe": "Strobe", "pulse": "Puls", "sparkle": "Funkeln",
+    "restart": "Neu starten", "stay": "Stehen bleiben",
+    "fadeout": "Ausfaden",
+    "linear": "Linear",
+    "normal": "Normal", "pingpong": "Ping-Pong",
+    "smooth": "Weich", "steps": "Bänder",
+    # "up"/"down"/"reverse" stehen hier bewusst NICHT: die Tokens deckt _DIR_LABELS
+    # ab; wo ein Param ihnen eine ANDERE Bedeutung gibt, gehoert das Label in
+    # _OPTION_LABELS_BY_KEY (sonst totes Schatten-Mapping, Review-Befund).
+    "target": "Zielfarbe", "sequence": "Sequenz",
+    # EFX phase_mode (Verhaeltnis der Geraete)
+    "fan": "Fächer", "offset": "Versatz", "sync": "Synchron",
+    # EFX Formen (algorithm ist zwar ausgeschlossen, aber falls andernorts
+    # gebraucht schadet ein Eintrag nicht — bewusst NICHT ergaenzt, siehe oben).
+    # Chaser Direction/RunOrder (Enum-Werte gross geschrieben)
+    "Forward": "Vorwärts", "Backward": "Rückwärts",
+    "Loop": "Schleife", "SingleShot": "Einmalig", "PingPong": "Ping-Pong",
+    "Random": "Zufällig",
+}
+
+# Kontextabhaengige Labels: derselbe Token bedeutet je Param etwas anderes —
+# diese Map hat VORRANG vor _DIR_LABELS/_OPTION_LABELS (Review-Befund VCL-03:
+# loop_mode="reverse" heisst "rueckwaerts LEEREN", nicht die Laufrichtung).
+_OPTION_LABELS_BY_KEY = {
+    "loop_mode": {"reverse": "Rückwärts leeren"},
+}
 
 
 class _EffectPreview(QWidget):
@@ -365,6 +410,25 @@ class _TempoControl(QWidget):
                 self._mode[self._fid] = "bpm"
         self._render_mode()
 
+    def refresh_from_engine(self) -> None:
+        """VCL-01: Modus/Bus NEU aus der Engine ableiten (Drift-Sync), wenn
+        ``tempo_bus_id`` von ANDERER Stelle (VCBusSelector, MIDI, CLI) geaendert
+        wurde. Gleiche Ableitung wie im ``set_fid``-Block, aber OHNE early-return
+        bei bekannter fid und OHNE etwas in die Engine zurueckzuschreiben — reiner
+        Lese-Abgleich, danach ``_render_mode()``."""
+        if self._fid is None or not self._supported:
+            return
+        from src.core.engine import effect_live
+        cur = effect_live.get_param("tempo_bus_id", self._fid) or ""
+        if cur == "":
+            self._mode[self._fid] = "aus"
+        elif cur in _TAP_BUSES:
+            self._mode[self._fid] = "tap"
+            self._tap_bus[self._fid] = cur
+        else:
+            self._mode[self._fid] = "bpm"
+        self._render_mode()
+
     def _set_mode(self, mode):
         if self._fid is None:
             return
@@ -568,9 +632,39 @@ class VCMultiLiveEditor(VCWidget):
         self._hidden: dict[int, set] = {}
         self._wide = False                  # responsives Body-Layout (Etappe C #3/#5)
         self._relayout_pending = False      # ein deferred Re-Layout ist bereits eingeplant
+        # VCL-01: Drift-Sync — Anzeige mit der Engine abgleichen, falls Tempo/Params
+        # von ANDERER Stelle (VCBusSelector, MIDI, CLI) geaendert wurden. Kein
+        # Change-Signal in effect_live (Qt-frei) -> leichter Poll statt Signal-Umbau.
+        self._rendered_values: dict = {}    # Werte-Snapshot beim letzten _refresh_body
+        self._drift_timer = QTimer(self)
+        self._drift_timer.setInterval(500)
+        self._drift_timer.timeout.connect(self._poll_external_drift)
 
         self._build()
         self._refresh_nav()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if getattr(self, "_content", None) is not None:
+            QTimer.singleShot(0, self._deferred_show_refresh)
+        self._drift_timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._drift_timer.stop()
+
+    def _deferred_show_refresh(self) -> None:
+        """Beim Sichtbarwerden (Bank-/Tab-Rueckkehr) einmalig neu synchronisieren —
+        deferred + isValid-Guard, analog zum Rebuild-Muster der Datei."""
+        try:
+            import shiboken6
+            if not shiboken6.isValid(self):
+                return
+        except Exception:
+            pass
+        if not self.isVisible():
+            return
+        self._refresh_body()
 
     # ── Aufbau ────────────────────────────────────────────────────────────────
     def _build(self) -> None:
@@ -666,14 +760,24 @@ class VCMultiLiveEditor(VCWidget):
 
     # ── Canvas-Widget-Rahmen (Header / Content / Serialisierung) ────────────────
     def _reposition_content(self):
-        # Ringrand in HANDLE_SIZE-Breite freilassen: dort liegen die Resize-Zonen des
-        # VCWidget (Content ist bedienbar und wuerde die Klicks sonst schlucken); oben
-        # bleibt der Header als Zieh-Griff. So bleibt das Panel im Bearbeiten-Modus
-        # greif- und skalierbar, obwohl die Haken/Regler im Inneren klickbar sind.
-        m = self.HANDLE_SIZE
+        # Ringrand in der AKTIVEN Griff-Breite freilassen: dort liegen die Resize-
+        # Zonen des VCWidget (Content ist bedienbar und wuerde die Klicks sonst
+        # schlucken); oben bleibt der Header als Zieh-Griff. So bleibt das Panel im
+        # Bearbeiten-Modus greif- und skalierbar, obwohl die Haken/Regler im
+        # Inneren klickbar sind. VCL-02: NICHT stur HANDLE_SIZE — sobald die
+        # grossen Touch-Griffe enthuellt sind (_big_handles), liegen sie sonst
+        # UNTER dem Content und sind unerreichbar.
+        m = self._effective_handle_margin()
         self._content.setGeometry(m, self._HEADER_H,
                                   max(10, self.width() - 2 * m),
                                   max(10, self.height() - self._HEADER_H - m))
+
+    def _handle_mode_changed(self) -> None:
+        """VCL-02: kleine <-> grosse Griffe gekippt -> Randbreite des Content-
+        Containers nachziehen (sonst liegen die enthuellten Touch-Griffe unter dem
+        Content) UND ggf. neu relayouten (die Content-Breite aendert sich)."""
+        self._reposition_content()
+        self._maybe_relayout()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -951,10 +1055,20 @@ class VCMultiLiveEditor(VCWidget):
             v.addStretch(1)
             self._scroll.setWidget(content)
             self._visible_keys = []
+            self._rendered_values = {}
             return
 
         from .vc_effect_meta import effect_name
         specs = self._editable_specs(fid)
+        # VCL-01: Werte-Snapshot fuer den Drift-Poll. Sequenz-Kinds (color_sequence/
+        # dimmer_sequence) sind BEWUSST ausgenommen — Live-Objekte, kein sinnvoller
+        # Vergleich per Snapshot (das Objekt selbst bleibt identisch, nur sein Inhalt
+        # mutiert per Referenz).
+        from src.core.engine import effect_live as _el
+        self._rendered_values = {
+            s.key: _el.get_param(s.key, fid) for s in specs
+            if getattr(s, "kind", "") in ("int", "float", "bool", "select")
+        }
         edit = bool(getattr(self, "_edit_mode", False))
         pos = f"({self._current + 1}/{len(self._fids)})"
         head = QLabel(f"„{effect_name(fid)}“  {pos}  — hak an, was du steuern willst:"
@@ -1055,15 +1169,40 @@ class VCMultiLiveEditor(VCWidget):
         return row
 
     # ── Visuelle Regler je Parameter-Typ ─────────────────────────────────────────
+    @staticmethod
+    def _prettify_option(val) -> str:
+        """Letzter Fallback (VCL-03): rohen Token lesbar machen — Unterstriche zu
+        Leerzeichen, erster Buchstabe gross (kein Woerterbuch-Eintrag noetig)."""
+        s = str(val).replace("_", " ")
+        return s[:1].upper() + s[1:] if s else s
+
+    def _option_labeled(self, val, key: str = "") -> str:
+        """Fallback-Kette fuer einen einzelnen Options-Wert OHNE explizites Tupel-
+        Label: _OPTION_LABELS_BY_KEY (kontextabhaengig, hoechste Praezedenz —
+        derselbe Token kann je Param anderes bedeuten, z. B. loop_mode="reverse")
+        -> _DIR_LABELS (Pfeil-Richtungen) -> _OPTION_LABELS (VCL-03, restliche
+        deutsche Labels) -> Prettify (rohes Token lesbar gemacht)."""
+        by_key = _OPTION_LABELS_BY_KEY.get(key)
+        if by_key and val in by_key:
+            return by_key[val]
+        if val in _DIR_LABELS:
+            return _DIR_LABELS[val]
+        if val in _OPTION_LABELS:
+            return _OPTION_LABELS[val]
+        return self._prettify_option(val)
+
     def _option_pairs(self, spec):
-        """ParamSpec.options -> [(wert, beschriftung)] (normalisiert Tupel/Skalar)."""
+        """ParamSpec.options -> [(wert, beschriftung)] (normalisiert Tupel/Skalar).
+        Fallback-Kette (VCL-03): explizites Tupel-Label -> _OPTION_LABELS_BY_KEY ->
+        _DIR_LABELS -> _OPTION_LABELS -> Prettify (kein roher Token mehr sichtbar)."""
+        key = getattr(spec, "key", "")
         pairs = []
         for o in (getattr(spec, "options", ()) or ()):
             if isinstance(o, (tuple, list)):
                 val = o[0] if o else None
-                lbl = str(o[1]) if len(o) > 1 else _DIR_LABELS.get(val, str(val))
+                lbl = str(o[1]) if len(o) > 1 else self._option_labeled(val, key)
             else:
-                val, lbl = o, _DIR_LABELS.get(o, str(o))
+                val, lbl = o, self._option_labeled(o, key)
             pairs.append((val, lbl))
         return pairs
 
@@ -1132,10 +1271,12 @@ class VCMultiLiveEditor(VCWidget):
         btns = []
 
         def pick(val):
-            effect_live.set_param(key, val, fid)
+            # VCL-01: ueber _on_choice statt direktem set_param + _after_edit —
+            # Verhalten identisch, aber ein Schreibtrichter (haelt den Drift-
+            # Snapshot mit, verhindert einen Selbst-Trigger des Drift-Polls).
+            self._on_choice(key, val, fid)
             for b, bv in btns:
                 b.setChecked(bv == val)
-            self._after_edit(fid)
 
         for val, lbl in pairs:
             b = QPushButton(f"{_DIR_ARROWS.get(val, '')}\n{lbl}" if arrows else lbl)
@@ -1254,7 +1395,12 @@ class VCMultiLiveEditor(VCWidget):
 
         def on_slide(sv, key=key, fid=fid, ro=readout, n=steps):
             effect_live.set_param_normalized(key, (sv / n) if n else 0.0, fid)
-            ro.setText(self._fmt(effect_live.get_param(key, fid)))
+            new_val = effect_live.get_param(key, fid)
+            ro.setText(self._fmt(new_val))
+            # VCL-01: eigener Edit darf keinen Drift-Rebuild ausloesen -> Snapshot
+            # sofort mitziehen (analog _write/_on_choice).
+            if fid == self._current_fid():
+                self._rendered_values[key] = new_val
 
         sl.valueChanged.connect(on_slide)
         hl.addWidget(sl, 1)
@@ -1265,6 +1411,8 @@ class VCMultiLiveEditor(VCWidget):
     def _write(self, key, value, fid) -> None:
         from src.core.engine import effect_live
         effect_live.set_param(key, value, fid)
+        if fid == self._current_fid():
+            self._rendered_values[key] = effect_live.get_param(key, fid)
         self._after_edit(fid)
 
     def _on_choice(self, key, value, fid) -> None:
@@ -1272,20 +1420,89 @@ class VCMultiLiveEditor(VCWidget):
         die Sichtbarkeit anderer Params aendert (z. B. movement -> runner_count)."""
         from src.core.engine import effect_live
         effect_live.set_param(key, value, fid)
+        if fid == self._current_fid():
+            self._rendered_values[key] = effect_live.get_param(key, fid)
         self._after_edit(fid)
+
+    # ── VCL-01: Drift-Sync-Poll (Fremd-Aenderungen von anderer Stelle) ───────────
+    def _drift_rebuild_allowed(self) -> bool:
+        """Kein Rebuild, waehrend eine Maustaste gedrueckt ist (kein Yank unterm
+        Finger/Slider-Drag) — eigene Methode, damit der Guard headless testbar ist
+        (QApplication.mouseButtons() laesst sich im Test kaum steuern)."""
+        return QApplication.mouseButtons() == Qt.MouseButton.NoButton
+
+    def _poll_external_drift(self) -> None:
+        """500-ms-Timer (nur waehrend sichtbar): erkennt Aenderungen, die eine
+        ANDERE Flaeche (VCBusSelector, MIDI, CLI) an Tempo/Params desselben
+        Effekts vorgenommen hat, und synchronisiert die Anzeige. effect_live hat
+        kein Change-Signal (Qt-frei) -> bewusst ein leichter Poll statt Signal-
+        Umbau (kleinerer Blast-Radius)."""
+        fid = self._current_fid()
+        if fid is None:
+            return
+        from src.core.engine import effect_live
+        # Tempo-Drift: erwarteten Modus aus der Engine ableiten und mit der
+        # aktuell angezeigten Tempo-Kontrolle vergleichen.
+        if self._tempo._supported:
+            cur_bus = effect_live.get_param("tempo_bus_id", fid) or ""
+            if cur_bus == "":
+                expected_mode = "aus"
+            elif cur_bus in _TAP_BUSES:
+                expected_mode = "tap"
+            else:
+                expected_mode = "bpm"
+            shown_mode = self._tempo._mode.get(fid)
+            drifted = expected_mode != shown_mode or (
+                expected_mode == "tap" and cur_bus != self._tempo._tap_bus.get(fid))
+            if drifted:
+                self._tempo.refresh_from_engine()
+
+        # Param-Drift: aktuelle Werte gegen den beim letzten Body-Bau angelegten
+        # Snapshot vergleichen (float mit Epsilon, Rest exakt).
+        param_drift = False
+        for key, snapshot_val in self._rendered_values.items():
+            live_val = effect_live.get_param(key, fid)
+            if isinstance(snapshot_val, float) or isinstance(live_val, float):
+                try:
+                    if abs(float(live_val) - float(snapshot_val)) > 1e-9:
+                        param_drift = True
+                        break
+                except (TypeError, ValueError):
+                    param_drift = True
+                    break
+            elif live_val != snapshot_val:
+                param_drift = True
+                break
+
+        if param_drift and self._drift_rebuild_allowed():
+            self._after_edit_force_rebuild(fid)
+
+    def _after_edit_force_rebuild(self, fid) -> None:
+        """Wie ``_after_edit``, aber OHNE die Visible-Keys-Diff-Kurzschluss-
+        Pruefung — Param-Drift kann Werte aendern, ohne die SICHTBARE Param-Menge
+        zu aendern (z. B. ein reiner Wert-Update), soll aber trotzdem den Body neu
+        bauen (der Snapshot-Vergleich in ``_poll_external_drift`` hat den Drift
+        bereits festgestellt)."""
+        if fid != self._current_fid():
+            return
+        self._schedule_rebuild()
 
     def _after_edit(self, fid) -> None:
         """Nach jedem int/select/bool-Schreibvorgang: aendert sich dadurch die
-        SICHTBARE Param-Menge (eine `when`-Bedingung), den Body neu bauen.
-
-        DEFERRED in die Event-Loop, weil wir im currentIndexChanged/valueChanged/
-        toggled GENAU des Controls stehen, das beim Rebuild via QScrollArea.setWidget
-        geloescht wuerde — den Sender mitten in seiner Signalemission synchron zu
-        zerstoeren ist ein Use-after-free. Pending-Flag entkoppelt Mehrfach-Edits."""
+        SICHTBARE Param-Menge (eine `when`-Bedingung), den Body neu bauen."""
         if fid != self._current_fid():
             return
         if [s.key for s in self._editable_specs(fid)] == self._visible_keys:
             return
+        self._schedule_rebuild()
+
+    def _schedule_rebuild(self) -> None:
+        """DEFERRED in die Event-Loop, weil wir im currentIndexChanged/valueChanged/
+        toggled GENAU des Controls stehen, das beim Rebuild via QScrollArea.setWidget
+        geloescht wuerde — den Sender mitten in seiner Signalemission synchron zu
+        zerstoeren ist ein Use-after-free. Pending-Flag entkoppelt Mehrfach-Edits
+        (sowohl eigene Edits als auch den Drift-Poll, die sich denselben Trichter
+        teilen)."""
         if not self._rebuild_pending:
             self._rebuild_pending = True
             QTimer.singleShot(0, self._deferred_rebuild)

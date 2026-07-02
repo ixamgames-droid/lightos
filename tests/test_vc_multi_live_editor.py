@@ -11,7 +11,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QByteArray, QMimeData
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 
 from src.core.engine import effect_live
 from src.core.engine.function_manager import get_function_manager
@@ -747,6 +747,210 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         """Rahmenlos (Etappe C #3): der Scroll-Bereich traegt keinen Rahmen mehr
         (Regler wirken „drunter geclustert" statt in einer umrandeten Box)."""
         self.assertIn("border:none", self.ed._content.styleSheet())
+
+    # ── VCL-01: Drift-Sync-Poll (Fremd-Aenderungen von anderer Stelle) ───────────
+    def test_external_tempo_change_updates_mode_buttons(self):
+        """Aendert eine ANDERE Stelle tempo_bus_id direkt ueber effect_live (nicht
+        ueber die Tempo-Kontrolle des Panels), zieht _poll_external_drift die
+        Anzeige (Modus-Buttons + Bus) nach."""
+        m = self._new_matrix("Drift-Tempo")
+        self.ed.add_effect(m.id)
+        self.assertEqual(self.ed._tempo._mode.get(m.id), "bpm")   # Default: Global -> bpm
+        effect_live.set_param("tempo_bus_id", "A", m.id)          # extern (nicht ueber Panel)
+        self.ed._poll_external_drift()
+        self.assertEqual(self.ed._tempo._mode.get(m.id), "tap")
+        self.assertTrue(self.ed._tempo._btns["tap"].isChecked())
+        self.assertEqual(self.ed._tempo._tap_bus.get(m.id), "A")
+
+    def test_external_param_change_triggers_deferred_rebuild(self):
+        """Ein extern (nicht ueber das Panel) geaenderter, angezeigter Param loest
+        nach _poll_external_drift + processEvents einen Rebuild aus, der Wert wird
+        im neu gebauten Body sichtbar."""
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("Drift-Param")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        if "runner_count" not in keys:
+            self.skipTest("Algo ohne runner_count")
+        self.ed._checked_keys(m.id).add("runner_count")
+        self.ed.set_edit_mode(False)               # Run-Modus: Stepper sichtbar
+
+        spec = next(s for s in self.ed._editable_specs(m.id) if s.key == "runner_count")
+        old = int(effect_live.get_param("runner_count", m.id) or spec.default)
+        new = int(spec.max) if old != int(spec.max) else int(spec.min)
+        effect_live.set_param("runner_count", new, m.id)   # extern, NICHT ueber das Panel
+
+        self.ed._poll_external_drift()
+        QApplication.processEvents()               # deferred Rebuild ausfuehren
+        w = self.ed._scroll.widget()
+        labels = [lb.text() for lb in w.findChildren(QLabel)]
+        self.assertIn(str(new), labels)             # Stepper-Wert-Label zeigt neuen Wert
+
+    def test_own_edit_does_not_trigger_rebuild(self):
+        """Ein eigener Schreibpfad (_write) darf keinen Drift-Rebuild ausloesen —
+        der Snapshot wird dabei mitgezogen, _poll_external_drift sieht keinen Drift."""
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("Drift-OwnEdit")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        if "runner_count" not in keys:
+            self.skipTest("Algo ohne runner_count")
+        spec = next(s for s in self.ed._editable_specs(m.id) if s.key == "runner_count")
+        old = int(effect_live.get_param("runner_count", m.id) or spec.default)
+        new = int(spec.max) if old != int(spec.max) else int(spec.min)
+
+        self.ed._write("runner_count", new, m.id)   # eigener Schreibpfad (Panel)
+
+        calls = {"n": 0}
+        orig_rebuild = self.ed._refresh_body
+
+        def spy(*a, **kw):
+            calls["n"] += 1
+            return orig_rebuild(*a, **kw)
+
+        self.ed._refresh_body = spy
+        self.ed._poll_external_drift()
+        QApplication.processEvents()
+        self.assertEqual(calls["n"], 0)             # kein zusaetzlicher Rebuild ausgeloest
+
+    def test_drift_poll_skipped_while_mouse_pressed(self):
+        """Guard _drift_rebuild_allowed() gekapselt testbar (QApplication.
+        mouseButtons() ist headless schlecht steuerbar): bei gedrueckter Maus
+        wird kein Rebuild geplant, auch wenn ein echter Param-Drift vorliegt."""
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("Drift-MousePressed")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        keys = [s.key for s in self.ed._editable_specs(m.id)]
+        if "runner_count" not in keys:
+            self.skipTest("Algo ohne runner_count")
+        spec = next(s for s in self.ed._editable_specs(m.id) if s.key == "runner_count")
+        old = int(effect_live.get_param("runner_count", m.id) or spec.default)
+        new = int(spec.max) if old != int(spec.max) else int(spec.min)
+        effect_live.set_param("runner_count", new, m.id)
+
+        self.ed._drift_rebuild_allowed = lambda: False   # simuliert gedrueckte Maus
+        self.ed._poll_external_drift()
+        self.assertFalse(self.ed._rebuild_pending)        # kein Rebuild geplant
+
+    def test_drift_rebuild_allowed_reflects_mouse_buttons(self):
+        """Direkter Unit-Test des Guards: True, solange QApplication.mouseButtons()
+        NoButton meldet (Standardfall im Test ohne gedrueckte Maustaste)."""
+        from PySide6.QtCore import Qt as _Qt
+        self.assertEqual(QApplication.mouseButtons(), _Qt.MouseButton.NoButton)
+        self.assertTrue(self.ed._drift_rebuild_allowed())
+
+    def test_show_event_refreshes_body_and_starts_drift_timer(self):
+        """showEvent: Timer laeuft, sobald sichtbar; hideEvent stoppt ihn wieder."""
+        m = self._new_matrix("Drift-ShowHide")
+        self.ed.add_effect(m.id)
+        self.assertFalse(self.ed._drift_timer.isActive())
+        self.ed.show()
+        QApplication.processEvents()
+        self.assertTrue(self.ed._drift_timer.isActive())
+        self.ed.hide()
+        self.assertFalse(self.ed._drift_timer.isActive())
+
+    # ── VCL-02: Touch-Griffe nicht mehr auf HANDLE_SIZE geklemmt ────────────────
+    def test_reposition_content_follows_active_handle_margin(self):
+        """_reposition_content nutzt die AKTIVE Griff-Breite (klein/gross), nicht
+        stur HANDLE_SIZE — sonst liegen die grossen Touch-Griffe unter dem Content."""
+        self.ed.resize(400, 300)
+        self.ed._big_handles = False
+        self.ed._reposition_content()
+        self.assertEqual(self.ed._content.x(), self.ed.HANDLE_SIZE)
+
+        self.ed._big_handles = True
+        self.ed._handle_mode_changed()
+        self.assertEqual(self.ed._content.x(), self.ed.TOUCH_HANDLE_SIZE)
+
+        self.ed._big_handles = False
+        self.ed._handle_mode_changed()
+        self.assertEqual(self.ed._content.x(), self.ed.HANDLE_SIZE)
+
+    def test_handle_mode_changed_hook_called_on_dwell_reveal(self):
+        """Die Basisklasse ruft den Hook wirklich beim Kippen auf (Dwell-Pfad):
+        _on_dwell -> _big_handles=True -> _handle_mode_changed()."""
+        calls = {"n": 0}
+        orig = self.ed._handle_mode_changed
+
+        def spy():
+            calls["n"] += 1
+            return orig()
+
+        self.ed._handle_mode_changed = spy
+        self.ed.resize(400, 300)
+        self.ed._dragging = True
+        self.ed._orig_rect = self.ed.geometry()
+        self.ed._on_dwell()                 # simuliert Timer-Ablauf nach Verweilen
+        self.assertTrue(self.ed._big_handles)
+        self.assertEqual(calls["n"], 1)
+
+    # ── VCL-03: deutsche Labels fuer select-Optionen ─────────────────────────────
+    def test_normal_option_gets_german_label_not_raw_token(self):
+        """Ein Effekt mit einer 'normal'-Option (z. B. movement/color_order) zeigt
+        im Segment-/Combo-Label KEIN rohes 'normal' mehr, sondern das deutsche
+        Label aus _OPTION_LABELS."""
+        from src.core.engine.rgb_matrix import RgbAlgorithm, MatrixStyle
+        m = self._new_matrix("Labels-Normal")
+        m.algorithm = RgbAlgorithm.CHASE
+        m.style = MatrixStyle.RGB
+        self.ed.add_effect(m.id)
+        spec = next((s for s in self.ed._editable_specs(m.id)
+                     if s.kind == "select" and any(v == "normal" for v, _ in
+                                                    self.ed._option_pairs(s))), None)
+        self.assertIsNotNone(spec, "Matrix (CHASE) muss eine 'normal'-Option haben")
+        pairs = self.ed._option_pairs(spec)
+        labels = [lbl for _v, lbl in pairs]
+        self.assertNotIn("normal", labels)          # kein roher Token mehr
+        normal_label = next(lbl for v, lbl in pairs if v == "normal")
+        self.assertEqual(normal_label, "Normal")
+
+    def test_option_pairs_prettify_fallback_for_unknown_token(self):
+        """Fantasie-Token ohne Eintrag in _DIR_LABELS/_OPTION_LABELS faellt auf die
+        Prettify-Regel zurueck: Unterstriche zu Leerzeichen, erster Buchstabe gross."""
+        class _FakeSpec:
+            kind = "select"
+            options = ("some_fantasy_token",)
+
+        pairs = self.ed._option_pairs(_FakeSpec())
+        self.assertEqual(pairs, [("some_fantasy_token", "Some fantasy token")])
+
+    def test_option_pairs_respects_explicit_tuple_label(self):
+        """Ein explizites (wert, label)-Tupel wird unveraendert uebernommen (hat
+        Vorrang vor der gesamten Fallback-Kette)."""
+        class _FakeSpec:
+            kind = "select"
+            options = (("raw", "Eigenes Label"),)
+
+        pairs = self.ed._option_pairs(_FakeSpec())
+        self.assertEqual(pairs, [("raw", "Eigenes Label")])
+
+    def test_option_labels_are_key_context_aware_for_loop_mode_reverse(self):
+        """Review-Befund VCL-03: derselbe Token bedeutet je Param etwas anderes.
+        loop_mode="reverse" (FILL) = "Rückwärts leeren" (_OPTION_LABELS_BY_KEY,
+        hoechste Praezedenz), waehrend direction="reverse" die Laufrichtung
+        "rückwärts" bleibt (_DIR_LABELS unveraendert)."""
+        class _LoopSpec:
+            kind = "select"
+            key = "loop_mode"
+            options = ("restart", "stay", "reverse", "fadeout")
+
+        class _DirSpec:
+            kind = "select"
+            key = "direction"
+            options = ("forward", "reverse")
+
+        loop_pairs = dict(self.ed._option_pairs(_LoopSpec()))
+        dir_pairs = dict(self.ed._option_pairs(_DirSpec()))
+        self.assertEqual(loop_pairs["reverse"], "Rückwärts leeren")
+        self.assertEqual(loop_pairs["restart"], "Neu starten")
+        self.assertEqual(dir_pairs["reverse"], "rückwärts")
 
 
 if __name__ == "__main__":
