@@ -38,7 +38,7 @@ from src.core.stage.stage_definition import (
     StageDefinition, StageElement,
     list_stages, load_stage, save_stage, delete_stage,
     get_default_simple,
-    DEFAULT_PRESETS,
+    DEFAULT_PRESETS, resolve_active_stage,
 )
 from src.core.stage.coords import (
     live_to_world3d, world3d_to_live, default_height_for, normalize_rotation,
@@ -125,6 +125,21 @@ def _bridge_slot_guard(fn):
                 pass
             return None
     return wrapper
+
+
+def _pop_fixture_scene_state(state, fid) -> None:
+    """EIN atomarer Pfad fuer das Loeschen aller per-fid Visualizer-Zustaende
+    (VIZ-11 Schritt 9, Design (b)/(9a); vorher 4-5 duplizierte Cross-Dict-
+    Delete-Bloecke). ``positions.pop`` loescht bei echten SceneGraph-Adaptern
+    bereits den kompletten Node (Pos+Rot+Dock in einem) -- die zusaetzlichen
+    Pops sind dort ein No-op. Bewusst dict-only (KEIN ``state._scene``-Zugriff):
+    die Invariante verlangt, dass diese Funktion auch gegen plain-dict-Fakes
+    (SimpleNamespace-State in Tests, s. test_visualizer_state_leaks.py) korrekt
+    aufraeumt, wo die drei Felder NICHT ueber einen gemeinsamen Node verknuepft
+    sind."""
+    state.visualizer_positions.pop(fid, None)
+    state.visualizer_docks.pop(fid, None)
+    state.visualizer_rotations.pop(fid, None)
 
 
 # ============================================================================
@@ -684,9 +699,7 @@ class VisualizerBridge(QObject):
     def fixtureDeleted(self, fid_str: str):
         fid = int(fid_str)
         _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        _pop_fixture_scene_state(self._state, fid)
         self.pyFixtureDeleted.emit(fid)
 
     @Slot(str)
@@ -732,13 +745,8 @@ class VisualizerBridge(QObject):
             self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(fixtures[fid])))
 
     def remove_fixture_from_scene(self, fid: int):
-        # Alle per-fid Visualizer-Zustaende zusammen entfernen — sonst bleiben
-        # Dock-/Rotations-Eintraege verwaist (wachsen in die Show und werden bei
-        # fid-Wiederverwendung faelschlich erneut angewendet).
         _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        _pop_fixture_scene_state(self._state, fid)
         self.fixtureRemoved.emit(fid)
 
     def push_dmx_update(self, fid: int, attrs: dict[str, int]):
@@ -919,7 +927,8 @@ class VisualizerBridge(QObject):
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
-                # remove_fixture_from_scene poppt jetzt positions+docks+rotations
+                # remove_fixture_from_scene raeumt Pos+Rot+Dock ueber den
+                # gemeinsamen Helper auf (VIZ-11 Schritt 9).
                 self.remove_fixture_from_scene(fid)
                 self._state.live_view_positions.pop(fid, None)
             # VIZ-01: Nur in 2D platzierte Fixtures haben evtl. KEINEN
@@ -1570,22 +1579,9 @@ class VisualizerWindow(QMainWindow):
         """Setzt die in AppState gespeicherte Buehne (Preset-Key oder User-Name)
         als aktuelle Stage und synchronisiert die Combo-Auswahl."""
         name = getattr(self._state, "active_stage_name", "simple") or "simple"
-        stage = None
-        combo_kind = combo_name = None
-        if name in DEFAULT_PRESETS:
-            try:
-                stage = DEFAULT_PRESETS[name]()
-                combo_kind, combo_name = "default", name
-            except Exception as e:
-                print(f"[Visualizer] default stage '{name}' error: {e}")
-        else:
-            loaded = load_stage(name)
-            if loaded:
-                stage = loaded
-                combo_kind, combo_name = "user", name
-        if stage is None:
-            stage = get_default_simple()
-            combo_kind, combo_name = "default", "simple"
+        # VIZ-11 Schritt 9 (Design (b)): dieselbe Resolve-Quelle wie
+        # Visualizer3DView._apply_active_stage — s. stage_definition.py.
+        stage, combo_kind, combo_name = resolve_active_stage(name)
         self._current_stage = stage
         self._selected_stage_id = ""
         self._select_stage_in_combo(combo_kind, combo_name)
@@ -1775,8 +1771,9 @@ class VisualizerWindow(QMainWindow):
             return
         for fid in list(self._state.visualizer_positions):
             self._bridge.remove_fixture_from_scene(fid)
-        # Alle per-fid Visualizer-Dicts leeren (nicht nur positions), damit keine
-        # verwaisten Docks/Rotationen zurueckbleiben.
+        # Sicherheitsnetz (Test-Doubles/Mocks fuer self._bridge haben keine
+        # Wirkung auf self._state): alle drei Dicts explizit leeren, damit auch
+        # dort garantiert keine verwaisten Docks/Rotationen zurueckbleiben.
         self._state.visualizer_positions.clear()
         self._state.visualizer_docks.clear()
         self._state.visualizer_rotations.clear()
@@ -1866,11 +1863,9 @@ class VisualizerWindow(QMainWindow):
                 break
 
     def _on_fixture_deleted_from_js(self, fid: int):
-        # Konsistent mit remove_fixture_from_scene / fixtureDeleted: alle
-        # per-fid Visualizer-Zustaende entfernen (idempotent).
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,
+        # VIZ-11 Schritt 9: gemeinsamer Helper statt dupliziertem Cross-Dict-Pop).
+        _pop_fixture_scene_state(self._state, fid)
         self._refresh_patch_list()
 
     # ── Stage-Tab actions ───────────────────────────────────────────────────

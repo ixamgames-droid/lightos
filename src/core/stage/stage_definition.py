@@ -316,3 +316,28 @@ def get_default(name: str) -> StageDefinition:
     # bewusst auf die leere Buehne zurueck.
     fn = DEFAULT_PRESETS.get((name or "simple").lower())
     return fn() if fn else get_default_simple()
+
+
+def resolve_active_stage(name: str | None) -> tuple[StageDefinition, str, str]:
+    """Loest ``AppState.active_stage_name`` konsistent zu einer Buehne auf.
+
+    EINE Quelle fuer die frueher doppelt implementierte Resolve-Logik
+    (VisualizerWindow._apply_active_stage_from_state UND
+    Visualizer3DView._apply_active_stage, VIZ-11 Schritt 9 Design (b)):
+    Preset-Key -> DEFAULT_PRESETS, sonst User-Stage per ``load_stage``, sonst
+    Fallback auf die leere Default-Buehne. Gibt zusaetzlich ``(kind, name)``
+    zurueck (``"default"``/``"user"``), das der Editor fuer die Combo-Box-
+    Auswahl braucht -- die schlanke Live-View-Einbettung ignoriert das Tupel
+    einfach.
+    """
+    key = name or "simple"
+    if key in DEFAULT_PRESETS:
+        try:
+            return DEFAULT_PRESETS[key](), "default", key
+        except Exception as e:
+            print(f"[stage] default stage '{key}' error: {e}")
+    else:
+        loaded = load_stage(key)
+        if loaded:
+            return loaded, "user", key
+    return get_default_simple(), "default", "simple"
