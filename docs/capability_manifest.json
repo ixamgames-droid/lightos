@@ -1,6 +1,6 @@
 {
   "_about": "GENERATED — nicht von Hand editieren. Neu erzeugen mit tools/gen_capabilities.py. Quelle: src/core/capability/reflect.py.",
-  "show_version": "1.1",
+  "show_version": "1.2",
   "asymmetry_warnings": [
     "Falscher RGB-Matrix-Algorithmus -> laedt STILL als flaches PLAIN (rgb_matrix.py:1569). Falscher EFX-Algorithmus (efx.py:882) ODER Matrix-Style (rgb_matrix.py:1612) -> wirft beim Laden, die GANZE Funktion faellt weg. Gegensaetzlich, beide unsichtbar.",
     "Daher beim Bauen IMMER das echte Enum-Member konstruieren (RgbAlgorithm.FIRE, EfxAlgorithm.CIRCLE, MatrixStyle.RGBW) — ein falscher Enum-NAME wirft sofort AttributeError, bevor der stille Loader den Wert je sieht."
