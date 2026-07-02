@@ -28,8 +28,15 @@ ATTR_GROUPS: dict[str, set[str]] = {
     # "prism_rot" = synthetische Kurzform; "prism_rotation" = real emittierter
     # Name (QXF-Import, eingebauter Generic-MH) -> BEIDE exakt in Effect, damit der
     # Beam-Substring "prism" sie nicht faelschlich als Beam klassifiziert (ENG-07).
+    # laser_color/laser_color_change MUESSEN exakt hier stehen, sonst zieht sie
+    # der Color-Substring-Fallback in die Color-Gruppe (Range-Select-Kanaele
+    # duerfen nicht vom Color-Feature-Dimmer skaliert werden).
     "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "prism_rotation",
-                  "animation"},
+                  "animation",
+                  "laser_boundary", "laser_bank", "laser_x", "laser_y",
+                  "laser_zoom_x", "laser_zoom_y", "laser_color",
+                  "laser_color_change", "laser_dots", "laser_draw",
+                  "laser_draw_mode", "laser_twist", "laser_grating"},
 }
 
 # Anzeige-/Sortierreihenfolge inkl. Auffang-Gruppe "Other".
@@ -55,6 +62,13 @@ ATTR_LABELS: dict[str, str] = {
     "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
     "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
     "animation": "Animation",
+    "laser_boundary": "Grenzverhalten", "laser_bank": "Musterbank",
+    "laser_x": "X-Bewegung", "laser_y": "Y-Bewegung",
+    "laser_zoom_x": "X-Zoom", "laser_zoom_y": "Y-Zoom",
+    "laser_color": "Punktfarbe", "laser_color_change": "Muster-Farbwechsel",
+    "laser_dots": "Punkte", "laser_draw": "Zeichnen-Anteil",
+    "laser_draw_mode": "Zeichenmodus", "laser_twist": "Verdrehung",
+    "laser_grating": "Raster",
 }
 
 

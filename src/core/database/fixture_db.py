@@ -658,6 +658,199 @@ def _add_party_laser(s, mfr):
                  _party_laser_modes_data())
 
 
+def _l2600_head_channels(p, third_channel, group_on_255):
+    """Kopf-Kanäle (1-4 bzw. 18-21) einer L2600-Mustergruppe. ``p`` = Namens-
+    Präfix ("A: "/"B: "), ``third_channel`` = Bank-Kanal (nur Gruppe A) bzw.
+    Leerkanal (Gruppe B), ``group_on_255`` = Range-Name für Wert 255.
+    Shutter-Default bewusst 0 (Laser AUS beim Patchen — Laser-Safety, anders
+    als der Offen-Default bei Scheinwerfern)."""
+    return [
+        (p + "Laser An/Aus", "shutter", 0, 255 if p == "A: " else 0, [
+            (0, 0,     "Aus",                 "closed"),
+            (1, 99,    "Auto-Programm",       ""),
+            (100, 199, "Sound-Modus",         "sound"),
+            (200, 254, "Speichern",           ""),
+            (255, 255, group_on_255,          "open"),
+        ]),
+        (p + "Grenzverhalten", "laser_boundary", 0, 0, [
+            (0, 49,    "Rand: durchlaufen",           ""),
+            (50, 99,   "Rand: wiedereintreten",       ""),
+            (100, 149, "Rand: ausblenden",            ""),
+            (150, 199, "Rand: Zoom-out + ausblenden", ""),
+            (200, 255, "Speichern",                   ""),
+        ]),
+        third_channel,
+        (p + "Musterauswahl", "gobo_wheel", 0, 0, [
+            (0, 255, "Muster (1 Wert = 1 Muster)", "gobo"),
+        ]),
+    ]
+
+
+def _l2600_pattern_block(p):
+    """Muster-Steuerblock (Kanäle 5-17 bzw. 22-34) einer L2600-Mustergruppe —
+    Gruppe B wiederholt exakt dieselben Attribute wie A (Mehrkopf X-6:
+    2. Vorkommen = Kopf 1 = ``attr#1``). Y-Wellen/-Verzerrungen sind laut
+    Manual seitenvertauscht zu X (rechts/links statt auf/ab)."""
+    return [
+        (p + "Muster-Zoom", "zoom", 0, 0, [
+            (0, 127,   "Größe statisch",          ""),
+            (128, 159, "Dyn. Zoom out",           ""),
+            (160, 191, "Dyn. Zoom in",            ""),
+            (192, 223, "Dyn. Zoom in/out",        ""),
+            (224, 255, "Dyn. Zoom + Rotation",    ""),
+        ]),
+        (p + "Muster-Rotation", "gobo_rotation", 0, 0, [
+            (0, 127,   "Winkel statisch",              ""),
+            (128, 159, "Dyn. 2 Kreise CW+CCW",         "rotate"),
+            (160, 191, "Dyn. 1 Kreis CCW",             "rotate"),
+            (192, 223, "Dyn. im Uhrzeigersinn",        "rotate"),
+            (224, 255, "Dyn. gegen Uhrzeigersinn",     "rotate"),
+        ]),
+        (p + "X-Bewegung", "laser_x", 64, 64, [
+            (0, 127,   "Position statisch", ""),
+            (128, 159, "Welle aufwärts",    ""),
+            (160, 191, "Welle abwärts",     ""),
+            (192, 223, "Lauf links",        ""),
+            (224, 255, "Lauf rechts",       ""),
+        ]),
+        (p + "Y-Bewegung", "laser_y", 64, 64, [
+            (0, 127,   "Position statisch", ""),
+            (128, 159, "Welle rechts",      ""),
+            (160, 191, "Welle links",       ""),
+            (192, 223, "Lauf abwärts",      ""),
+            (224, 255, "Lauf aufwärts",     ""),
+        ]),
+        (p + "X-Zoom", "laser_zoom_x", 0, 0, [
+            (0, 127,   "Größe statisch",        ""),
+            (128, 159, "Verzerrung aufwärts",   ""),
+            (160, 191, "Verzerrung abwärts",    ""),
+            (192, 223, "Dyn. Zoom in/out",      ""),
+            (224, 255, "Dyn. Rotation + Zoom",  ""),
+        ]),
+        (p + "Y-Zoom", "laser_zoom_y", 0, 0, [
+            (0, 127,   "Größe statisch",        ""),
+            (128, 159, "Verzerrung rechts",     ""),
+            (160, 191, "Verzerrung links",      ""),
+            (192, 223, "Dyn. Zoom in/out",      ""),
+            (224, 255, "Dyn. Rotation + Zoom",  ""),
+        ]),
+        (p + "Punktfarbe", "laser_color", 0, 0, [
+            (0, 0,   "Originalfarben",                            ""),
+            (1, 255, "Farbwechsel je Punktgruppe (Wert = Tempo)", ""),
+        ]),
+        (p + "Muster-Farbwechsel", "laser_color_change", 0, 0, [
+            (0, 7,     "Originalfarbe",          ""),
+            (8, 15,    "Rot",                    "color"),
+            (16, 23,   "Gelb",                   "color"),
+            (24, 31,   "Grün",                   "color"),
+            (32, 39,   "Cyan",                   "color"),
+            (40, 47,   "Blau",                   "color"),
+            (48, 55,   "Pink",                   "color"),
+            (56, 63,   "Weiß",                   "color"),
+            (64, 95,   "Muster RGB-Wechsel",     ""),
+            (96, 127,  "Muster YCP-Wechsel",     ""),
+            (128, 159, "Muster RGBYCPW-Wechsel", ""),
+            (160, 191, "7-Farben-Wechsel",       ""),
+            (192, 223, "Sinus-Chasing",          ""),
+            (224, 255, "Cosinus-Chasing",        ""),
+        ]),
+        (p + "Punkte", "laser_dots", 0, 0, [
+            (0, 63,    "Original-Punkte",           ""),
+            (64, 127,  "Sweep-Linie mit Blanking",  ""),
+            (128, 159, "Sweep-Linie ohne Blanking", ""),
+            (160, 255, "Speichern",                 ""),
+        ]),
+        (p + "Zeichnen-Anteil", "laser_draw", 0, 0, [
+            (0, 127,   "Muster komplett sichtbar",                     ""),
+            (128, 255, "Anteil der gezeichneten Linie (m. Zeichenmodus)", ""),
+        ]),
+        (p + "Zeichenmodus", "laser_draw_mode", 0, 0, [
+            (0, 63,    "Manuell: Sinus",   ""),
+            (64, 127,  "Manuell: Cosinus", ""),
+            (128, 159, "Dynamisch A",      ""),
+            (160, 191, "Dynamisch B",      ""),
+            (192, 223, "Dynamisch C",      ""),
+            (224, 255, "Dynamisch D",      ""),
+        ]),
+        (p + "Verdrehung", "laser_twist", 255, 255, [
+            (0, 255, "Twist (größer = weniger Verdrehung)", ""),
+        ]),
+        (p + "Raster", "laser_grating", 0, 0, [
+            (0, 255, "Rastergruppen (größer = kleineres Muster)", ""),
+        ]),
+    ]
+
+
+def _l2600_modes_data():
+    """Ehaho L2600 („3D Partylight" / 3D Animation RGB Laser) — Charts aus dem
+    offiziellen Manual (ManualsLib #3494357, S. 7-11; DMXControl-DDF als
+    Gegenprobe). Nur 6ch (Simple) + 34ch (Professional) existieren am Gerät.
+    ACHTUNG: der 6ch-Modus hat ein EIGENES Layout, NICHT die ersten 6 Kanäle
+    des 34ch-Charts. 34ch: Ch1-17 = Mustergruppe A, Ch18-34 = Gruppe B
+    (identische Attribute -> Kopf 0/1, Ch20 ist leer). Unverifiziert am
+    Gerät: Ch18-Wert-0-Semantik (B aus vs. alles aus) und 6ch-Ch5 -> LAS-09."""
+    return [
+        ("6-Kanal (Simple DMX)", [
+            ("Laser An/Aus", "shutter", 0, 255, [
+                (0, 0,   "Aus", "closed"),
+                (1, 255, "An",  "open"),
+            ]),
+            ("Programm", "macro", 0, 0, [
+                (0, 31,    "Auto: Preset-Effekte",  ""),
+                (32, 63,   "Auto: Preset seriell",  ""),
+                (64, 95,   "Auto: Preset gemischt", ""),
+                (96, 127,  "Speichern",             ""),
+                (128, 159, "Sound: Preset-Effekte", "sound"),
+                (160, 191, "Sound: Preset seriell", "sound"),
+                (192, 223, "Sound: Preset gemischt", "sound"),
+                (224, 255, "Speichern",             ""),
+            ]),
+            ("Musterbank", "laser_bank", 0, 0, [
+                (0, 223,   "Bänke 1-14", ""),
+                (224, 255, "Bank 0",     ""),
+            ]),
+            ("Farbe", "color_wheel", 0, 0, [
+                (0, 31,    "Vollfarbe", "color"),
+                (32, 63,   "Rot",       "color"),
+                (64, 95,   "Gelb",      "color"),
+                (96, 127,  "Grün",      "color"),
+                (128, 159, "Cyan",      "color"),
+                (160, 191, "Blau",      "color"),
+                (192, 223, "Pink",      "color"),
+                (224, 255, "Weiß",      "color"),
+            ]),
+            ("Auto/Sound-Feinwahl", "raw", 0, 0, [
+                (0, 255, "Undokumentiert (Manual unvollständig)", ""),
+            ]),
+            ("Geschwindigkeit", "speed", 0, 0, [
+                (0, 0,   "Keine Bewegung",   ""),
+                (1, 255, "Langsam → schnell", ""),
+            ]),
+        ]),
+        ("34-Kanal (Professional DMX)",
+         _l2600_head_channels(
+             "A: ",
+             ("A: Musterbank", "laser_bank", 0, 0, [
+                 (0, 223,   "Animations-Bänke 1-14",     ""),
+                 (224, 243, "Übergang (undokumentiert)", ""),
+                 (244, 255, "Beam-Bank 0",               ""),
+             ]),
+             "Muster-Modus (DMX-Steuerung)")
+         + _l2600_pattern_block("A: ")
+         + _l2600_head_channels(
+             "B: ",
+             ("B: Ohne Funktion", "raw", 0, 0),
+             "Gruppe B an (A aus)")
+         + _l2600_pattern_block("B: ")),
+    ]
+
+
+def _add_ehaho_l2600(s, mfr):
+    """Ehaho L2600 3D-Animations-Laser — Layout siehe _l2600_modes_data()."""
+    _add_fixture(s, mfr, "L2600 3D Animation RGB Laser", "L2600LASER", "laser",
+                 30, _l2600_modes_data())
+
+
 def _eurolite_gross_modes_data():
     """Eurolite „Großer Straler" 5ch RGB Color Changer —
     Eurolite-Großer-Straler.qxf. Kanal-Reihenfolge laut Mode: R,G,B,Dimmer,
@@ -961,6 +1154,9 @@ def ensure_builtins():
         if "DOTZTPAR" not in have:
             _add_adj_dotz_tpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
             changed = True
+        if "L2600LASER" not in have:
+            _add_ehaho_l2600(s, _get_or_create_mfr(s, "Ehaho", "EHAHO"))
+            changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
             # 9-Kanal-Modus hatte faelschlich Fine-Kanaele statt FX/Reset.
@@ -1196,3 +1392,8 @@ def _seed(s: Session):
     party = Manufacturer(name="Party Lights", short_name="PARTYLT")
     s.add(party)
     _add_party_laser(s, party)
+
+    # ── Ehaho ────────────────────────────────────────────────────────────────
+    ehaho = Manufacturer(name="Ehaho", short_name="EHAHO")
+    s.add(ehaho)
+    _add_ehaho_l2600(s, ehaho)
