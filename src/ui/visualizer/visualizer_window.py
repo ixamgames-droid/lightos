@@ -47,6 +47,8 @@ from src.core.stage.aim import (
     aim_pan_tilt, aim_orientation, plane_basis,
     circle_points, rect_points, line_points, trace_pan_tilt,
 )
+from src.core.stage import scene_commands as _scmd
+from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -373,21 +375,35 @@ class VisualizerBridge(QObject):
     @Slot(str, float, float, float)
     @_bridge_slot_guard
     def fixturePositionChanged(self, fid_str: str, x: float, y: float, z: float):
-        """JS meldet neue Fixture-Position (nach Drag)."""
+        """JS meldet neue Fixture-Position (nach Drag). JS ruft dies NUR bei
+        Drag-ENDE auf (nicht pro Frame, siehe stage_scene.html handlePointerUp)
+        -> der hier gelesene Alt-Wert IST bereits der Gestik-Start-Snapshot
+        (VIZ-11 Design-Entscheidung 5: EIN Command pro Drag-Gestik)."""
         fid = int(fid_str)
-        self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
+        old_pos = self._state.visualizer_positions.get(fid, (float(x), float(y), float(z)))
+        new_pos = (float(x), float(y), float(z))
+        self._state.visualizer_positions[fid] = new_pos
         # Top-Down-X/Z zurueck in die Live View (Single Source of Truth) — so
         # spiegelt die 2D-Ansicht eine 3D-Verschiebung; Y bleibt 3D-eigen.
         self._write_back_to_live_view(fid, float(x), float(z))
         self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
+        _scmd.push_transform_fixtures(
+            self._state, [(fid, old_pos, new_pos)], label="Fixture bewegen",
+        )
 
     @Slot(str, float, float, float)
     @_bridge_slot_guard
     def fixtureRotationChanged(self, fid_str: str, rx: float, ry: float, rz: float):
-        """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-Drag."""
+        """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-
+        Drag (ebenfalls nur bei Drag-ENDE, s.o.)."""
         fid = int(fid_str)
-        self._state.visualizer_rotations[fid] = (float(rx), float(ry), float(rz))
+        old_rot = self._state.visualizer_rotations.get(fid, (float(rx), float(ry), float(rz)))
+        new_rot = (float(rx), float(ry), float(rz))
+        self._state.visualizer_rotations[fid] = new_rot
         self.pyFixtureRotated.emit(fid, float(rx), float(ry), float(rz))
+        _scmd.push_rotate_fixtures(
+            self._state, [(fid, old_rot, new_rot)], label="Fixture drehen",
+        )
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
@@ -614,10 +630,16 @@ class VisualizerBridge(QObject):
     def fixtureDockChanged(self, fid_str: str, sid: str):
         """JS meldet eine geaenderte Andock-Beziehung (leerer sid = loesen)."""
         fid = int(fid_str)
-        if sid:
-            self._state.visualizer_docks[fid] = str(sid)
+        old_dock = self._state.visualizer_docks.get(fid)
+        new_dock = str(sid) if sid else None
+        if new_dock:
+            self._state.visualizer_docks[fid] = new_dock
         else:
             self._state.visualizer_docks.pop(fid, None)
+        _scmd.push_dock_fixture(
+            self._state, fid, old_dock, new_dock,
+            label="Fixture andocken" if new_dock else "Fixture abdocken",
+        )
 
     @Slot(str)
     @_bridge_slot_guard
@@ -629,6 +651,7 @@ class VisualizerBridge(QObject):
     @_bridge_slot_guard
     def fixtureDeleted(self, fid_str: str):
         fid = int(fid_str)
+        _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
         self._state.visualizer_positions.pop(fid, None)
         self._state.visualizer_docks.pop(fid, None)
         self._state.visualizer_rotations.pop(fid, None)
@@ -675,6 +698,7 @@ class VisualizerBridge(QObject):
         # Alle per-fid Visualizer-Zustaende zusammen entfernen — sonst bleiben
         # Dock-/Rotations-Eintraege verwaist (wachsen in die Show und werden bei
         # fid-Wiederverwendung faelschlich erneut angewendet).
+        _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
         self._state.visualizer_positions.pop(fid, None)
         self._state.visualizer_docks.pop(fid, None)
         self._state.visualizer_rotations.pop(fid, None)
@@ -1115,6 +1139,25 @@ class VisualizerWindow(QMainWindow):
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.activated.connect(fn)
+
+        # VIZ-11 (Schritt 6): Strg+Z/Y muss auch im eigenstaendigen
+        # Visualizer-Fenster wirken (getrennter Top-Level-QMainWindow, das
+        # Hauptfenster-Menue-Shortcuts erreichen ihn nicht). Gemeinsamer
+        # globaler UndoStack (kein zweiter Stack, siehe Design (e)).
+        sc_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
+        sc_undo.activated.connect(self._do_undo)
+        sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
+        sc_redo.activated.connect(self._do_redo)
+
+    def _do_undo(self):
+        ok = get_undo_stack().undo()
+        if ok and hasattr(self, "_lbl_info"):
+            self._lbl_info.setText("Rückgängig")
+
+    def _do_redo(self):
+        ok = get_undo_stack().redo()
+        if ok and hasattr(self, "_lbl_info"):
+            self._lbl_info.setText("Wiederhergestellt")
 
     def event(self, e):
         # Einzelbuchstaben-Shortcuts (V/E/F/S/D) duerfen die Texteingabe in
@@ -1644,14 +1687,34 @@ class VisualizerWindow(QMainWindow):
         fid = item.data(Qt.ItemDataRole.UserRole)
         if fid not in self._state.visualizer_positions:
             return
+        old_pos = self._state.visualizer_positions.get(fid, (0.0, 0.0, 0.0))
+        old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
+        old_dock = self._state.visualizer_docks.get(fid)
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
         rot = (self._spin_rot_x.value(), self._spin_rot_y.value(), self._spin_rot_z.value())
         self._state.visualizer_positions[fid] = (x, y, z)
         self._state.visualizer_rotations[fid] = rot
         # Manuelle Positionseingabe loest eine bestehende Andock-Beziehung.
-        if self._state.visualizer_docks.pop(fid, None) is not None:
-            self._bridge.fixtureDockChanged(str(fid), "")
+        # (Direkte State-Mutation — NICHT ueber den fixtureDockChanged-Bridge-
+        # Slot, der selbst einen SetParent-Command pushen wuerde: Doppel-Push.
+        # JS erfaehrt vom geloesten Dock beim naechsten Property-/Stage-Sync,
+        # genau wie im bisherigen Verhalten.)
+        new_dock = old_dock
+        if old_dock is not None:
+            self._state.visualizer_docks.pop(fid, None)
+            new_dock = None
         self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot)
+        # VIZ-11 (Schritt 6): EIN TransformNode/SetParent-Command fuer den
+        # gesamten Spinbox-Commit (Position + Rotation + evtl. Undock).
+        _scmd.push_transform_and_dock_fixture(
+            self._state, fid,
+            old_pos=old_pos, new_pos=(x, y, z),
+            old_rot=old_rot, new_rot=rot,
+            old_dock=old_dock, new_dock=new_dock,
+            label="Fixture bearbeiten",
+            apply_push=lambda fid_, pos_, rot_: self._bridge.push_apply_fixture_transform(
+                fid_, pos_[0], pos_[1], pos_[2], *rot_),
+        )
 
     def _clear_positions(self):
         # T-VIZ-04 (B-6): Sicherheitsabfrage — Loeschen aller Positionen ist nicht
@@ -1813,6 +1876,61 @@ class VisualizerWindow(QMainWindow):
         self._apply_stage(self._current_stage)
         self._refresh_patch_list()
 
+    # ── VIZ-11 (Schritt 6): Stage-Element <-> SceneGraph-Sync ───────────────
+    # _current_stage (StageDefinition) ist die UI-seitige Quelle fuer
+    # Buehnen-Elemente; state._scene bekommt Stage-Nodes bisher nur beim
+    # Laden/Migrieren einer Show (active_stage_name-Wechsel). Damit
+    # Rotationsvererbung (Constraint 2) UND Undo (StageElementProperty/
+    # AddNode/RemoveNode) auf echten Graph-Knoten arbeiten koennen, wird der
+    # betroffene Knoten hier gezielt (nicht komplett neu gebaut) nachgezogen.
+    def _sync_stage_node_to_scene(self, el: StageElement) -> None:
+        from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
+        scene = self._state._scene
+        try:
+            kind = NodeKind(el.type)
+        except ValueError:
+            kind = NodeKind.PLATFORM
+        node = scene.get(el.id)
+        transform = Transform(
+            pos_m=(float(el.x), float(el.y), float(el.z)),
+            rot_deg=(0.0, math.degrees(el.rotation), 0.0),
+        )
+        if node is None:
+            scene.add(SceneNode(
+                id=el.id, kind=kind, transform=transform, parent_id=None,
+                size_m=(float(el.w), float(el.h), float(el.d)),
+                color=el.color, name=el.name,
+            ))
+        else:
+            node.kind = kind
+            node.transform = transform
+            node.size_m = (float(el.w), float(el.h), float(el.d))
+            node.color = el.color
+            node.name = el.name
+        self._state._notify_scene_changed()
+
+    def _remove_stage_node_from_scene(self, element_id: str) -> None:
+        self._state._scene.remove(element_id)
+        self._state._notify_scene_changed()
+
+    def _push_stage_rotation_to_children(self, el: StageElement) -> None:
+        """Nach einer Transform-Aenderung eines Buehnen-Elements: Welt-
+        Transform aller gedockten Fixture-Nachfahren neu berechnen und per
+        bestehendem Push-Pfad an JS senden (Design (d)/(e): Teil desselben
+        StageElementProperty-do/undo, kein Pro-Frame-Push)."""
+        try:
+            world = self._state._scene.descendant_world_transforms(el.id)
+        except Exception as e:
+            print(f"[Visualizer] descendant_world_transforms error: {e}")
+            return
+        for fid, transform in world.items():
+            x, y, z = transform.pos_m
+            rx, ry, rz = transform.rot_deg
+            try:
+                self._bridge.push_apply_fixture_transform(fid, x, y, z, rx, ry, rz)
+            except Exception as e:
+                print(f"[Visualizer] child transform push error: {e}")
+
     def _apply_stage(self, definition: StageDefinition):
         """Sende komplette Buehnen-Definition an JS."""
         try:
@@ -1888,8 +2006,22 @@ class VisualizerWindow(QMainWindow):
                         break
         except Exception as e:
             print(f"[Visualizer] _add_stage_element mode-switch error: {e}")
-        # Komplettes Stage-Update senden -> JS legt das neue Element an
-        self._apply_stage(self._current_stage)
+
+        def _on_add_change():
+            if self._current_stage.get(el.id) is not None:
+                self._sync_stage_node_to_scene(el)
+            else:
+                self._remove_stage_node_from_scene(el.id)
+            self._apply_stage(self._current_stage)
+
+        # VIZ-11 (Schritt 6): AddNode-Undo — Element ist bereits angelegt
+        # (execute=False), Undo entfernt es wieder (inkl. Graph-Knoten).
+        _scmd.push_add_stage_element(
+            self._state, self._current_stage, el,
+            label=f"{type_label} hinzufügen",
+            on_change=_on_add_change,
+        )
+        _on_add_change()
         # Auto-Selektion (sowohl im Tree als auch im JS) -> Drag/Resize sofort moeglich
         self._selected_stage_id = el.id
         for i in range(self._stage_tree.topLevelItemCount()):
@@ -1950,23 +2082,16 @@ class VisualizerWindow(QMainWindow):
         finally:
             self._suppress_property_signals = False
 
-    def _on_stage_property_changed(self, *_):
-        if self._suppress_property_signals:
-            return
-        el = self._selected_stage_element()
-        if not el:
-            return
-        el.name     = self._stage_name_edit.text()
-        el.x        = self._stage_spin_x.value()
-        el.y        = self._stage_spin_y.value()
-        el.z        = self._stage_spin_z.value()
-        el.w        = self._stage_spin_w.value()
-        el.h        = self._stage_spin_h.value()
-        el.d        = self._stage_spin_d.value()
-        el.rotation = math.radians(self._stage_spin_rot.value())
-        self._stage_dirty = True   # VIZ-10: Element-Eigenschaft geaendert
+    _STAGE_PROP_KEYS = ("name", "x", "y", "z", "w", "h", "d", "rotation")
 
-        # Gezieltes Update an JS senden (kein kompletter Rebuild -> kein Selection-Swap)
+    def _stage_element_props(self, el: StageElement) -> dict:
+        return {k: getattr(el, k) for k in self._STAGE_PROP_KEYS}
+
+    def _apply_stage_element_props(self, el: StageElement, props: dict) -> None:
+        """Sendet ein gezieltes JS-Update (kein Rebuild -> kein Selection-Swap),
+        synct den Graph-Knoten und pusht die Welt-Transform an gedockte
+        Fixture-Nachfahren (Design (d)/(e): Rotationsvererbung, Teil desselben
+        StageElementProperty-do/undo)."""
         try:
             payload = json.dumps({
                 "id": el.id,
@@ -1982,8 +2107,62 @@ class VisualizerWindow(QMainWindow):
 
         # Tree-Label aktualisieren (Name kann sich geaendert haben) ohne Rebuild
         item = self._stage_tree.currentItem()
-        if item:
+        if item and item.data(0, Qt.ItemDataRole.UserRole) == el.id:
             item.setText(1, el.name or el.id)
+        elif self._selected_stage_id == el.id:
+            for i in range(self._stage_tree.topLevelItemCount()):
+                it = self._stage_tree.topLevelItem(i)
+                if it.data(0, Qt.ItemDataRole.UserRole) == el.id:
+                    it.setText(1, el.name or el.id)
+                    break
+
+        # Falls das Element gerade selektiert ist: Spinboxen synchron halten
+        # (Undo/Redo aendert Werte ohne User-Tipp-Interaktion).
+        if self._selected_stage_element() is el:
+            self._suppress_property_signals = True
+            try:
+                self._stage_name_edit.setText(el.name)
+                self._stage_spin_x.setValue(el.x)
+                self._stage_spin_y.setValue(el.y)
+                self._stage_spin_z.setValue(el.z)
+                self._stage_spin_w.setValue(el.w)
+                self._stage_spin_h.setValue(el.h)
+                self._stage_spin_d.setValue(el.d)
+                self._stage_spin_rot.setValue(math.degrees(el.rotation))
+            finally:
+                self._suppress_property_signals = False
+
+        self._sync_stage_node_to_scene(el)
+        self._push_stage_rotation_to_children(el)
+
+    def _on_stage_property_changed(self, *_):
+        if self._suppress_property_signals:
+            return
+        el = self._selected_stage_element()
+        if not el:
+            return
+        old_props = self._stage_element_props(el)
+
+        el.name     = self._stage_name_edit.text()
+        el.x        = self._stage_spin_x.value()
+        el.y        = self._stage_spin_y.value()
+        el.z        = self._stage_spin_z.value()
+        el.w        = self._stage_spin_w.value()
+        el.h        = self._stage_spin_h.value()
+        el.d        = self._stage_spin_d.value()
+        el.rotation = math.radians(self._stage_spin_rot.value())
+        new_props = self._stage_element_props(el)
+        self._stage_dirty = True   # VIZ-10: Element-Eigenschaft geaendert
+
+        # VIZ-11 (Schritt 6): StageElementProperty-Undo. Werte sind bereits
+        # angewendet (execute=False); apply_props uebernimmt JS-Update +
+        # Graph-Sync + Kinder-Push fuer do() UND undo() gleichermassen.
+        _scmd.push_stage_element_property(
+            self._state, el, old_props, new_props,
+            label=f"{el.name or el.id} ändern",
+            apply_props=lambda _props: self._apply_stage_element_props(el, _props),
+        )
+        self._apply_stage_element_props(el, new_props)
 
     def _on_resize_mode_toggled(self, checked: bool):
         """Toggle Resize-Handles im JS. AUS = nur Verschieben moeglich (default)."""
@@ -2047,9 +2226,23 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
+
+        def _on_delete_change():
+            if self._current_stage.get(el.id) is None:
+                self._remove_stage_node_from_scene(el.id)
+            else:
+                self._sync_stage_node_to_scene(el)
+            self._apply_stage(self._current_stage)
+
+        # VIZ-11 (Schritt 6): RemoveNode-Undo — Snapshot VOR dem Loeschen.
+        _scmd.push_remove_stage_element(
+            self._state, self._current_stage, el,
+            label=f"{el.name or el.id} löschen",
+            on_change=_on_delete_change,
+        )
         self._current_stage.remove(el.id)
         self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
-        self._apply_stage(self._current_stage)
+        _on_delete_change()
 
     def _on_save_stage(self):
         name, ok = QInputDialog.getText(
