@@ -39,6 +39,19 @@ def test_reflect_smoke():
     assert caps.show_version  # "1.1"
 
 
+def test_linter_widget_types_match_registry():
+    """REGRESSION (2026-07-02): Der Linter muss EXAKT die echte WIDGET_REGISTRY
+    kennen. Scheitert der Import in reflect() (except: pass → leeres Set),
+    deaktiviert sich die VC-TYPE-Regel still; driftet die Quelle, meldet der
+    Linter Falsches. Beides knallt hier laut."""
+    from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
+    caps = get_capabilities()
+    assert caps.widget_types, \
+        "Linter kennt KEINE Widget-Typen (Registry-Import in reflect() gescheitert?)"
+    assert caps.widget_types == frozenset(WIDGET_REGISTRY), \
+        f"Linter/Registry-Drift: {sorted(caps.widget_types ^ set(WIDGET_REGISTRY))}"
+
+
 def test_validator_catches_broken_show():
     """ACCEPTANCE: Fake-Matrix-Algo + unbekanntes Widget + Fake-param_key →
     drei laute ERROR-Findings mit den richtigen Codes."""
@@ -146,8 +159,14 @@ def test_vccolor_loads_ascii_target():
 
 
 def test_committed_shows_have_no_errors(capsys):
-    """PHASE 5 HARD-GATE: alle committeten Shows MÜSSEN frei von ERROR-Findings
-    sein (Warnungen erlaubt). Blockiert ab jetzt (Report→Fail)."""
+    """PHASE 5 HARD-GATE: alle LOKALEN shows/*.lshow MÜSSEN frei von
+    ERROR-Findings sein (Warnungen erlaubt). Blockiert ab jetzt (Report→Fail).
+
+    Trotz des Namens: gelint wird ALLES, was lokal in shows/ liegt — die
+    meisten .lshow sind gitignored (user-spezifisch), committet sind nur die
+    demo_*-Ausnahmen. Wird eine per Generator gebaute Show nach einem
+    Code-Umbau stale (z. B. entfernter Widget-Typ), den Generator fixen und
+    die Show LOKAL neu erzeugen (tools/build_*.py) — nicht den Linter lockern."""
     paths = sorted(glob.glob(os.path.join(_SHOWS, "*.lshow")))
     if not paths:
         return  # keine Shows committet

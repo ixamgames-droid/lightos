@@ -7,7 +7,7 @@
 > Vorlage zum Anschauen: `shows/VC_Elemente_Showcase.lshow` (Generator
 > `tools/build_vc_elements_showcase.py`) — legt jeden Typ einmal beschriftet ab.
 
-![Alle 15 VC-Elemente](img/01_alle_elemente.png)
+![Alle 14 VC-Elemente](img/01_alle_elemente.png)
 
 ---
 
@@ -72,7 +72,7 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
 
 ---
 
-## Die 15 Elemente im Detail
+## Die 14 Elemente im Detail
 
 | Element | Was es ist | Bedienung (Betrieb) | Wichtigste Einstellungen (Doppelklick) |
 |---|---|---|---|
@@ -85,14 +85,13 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
 | **Cue List** (VCCueList) | Cue-Transport | GO / BACK / STOP schaltet Cues | **Executor-Slot** (welche Cueliste) |
 | **Musik** (VCSongInfo) | Musik-Info-Anzeige | nur Anzeige (aktuelles + nächstes Lied) | Beschriftung, Schriftgröße |
 | **Chase-Liste** (VCColorList) | Live-Farb-Sequenz | Klick = Farbe an/aus, Rechtsklick = entfernen | **Effekt-ID** (zeigt dessen Farb-Sequenz) |
-| **Chase Builder** (VCChaseBuilder) | Chase-Baukasten | Palette tippen + Clear/Start/Reverse/Freeze | **Effekt-ID**, Palette, Speed/Hold |
 | **Effekt-Farben** (VCEffectColors) | Farb-Sequenz-Editor | Feld klicken = Farbwähler, Rechtsklick = aktiv | **Effekt-ID**, Edit-Slot |
 | **BPM** (VCBpmDisplay) | Live-Tempo-Anzeige | nur Anzeige (BPM + Quelle) | **Tempo-Bus** (leer = global), Schriftgröße |
 | **Tempo-Bus** (VCBusSelector) | Bus-Auswahl (A/B/C/D) | Chip klicken = aktiven Bus schärfen | Bus-Liste |
 | **Text** (VCLabel) | Beschriftung/Titel | nur Anzeige | Text, Schriftgröße |
 | **Container** (VCFrame) | Rahmen/Gruppe | nimmt Kind-Widgets auf, optional Tabs | Seiten-Anzahl, Header anzeigen, Solo |
 
-> **Hinweis „braucht eine Bindung":** **Chase-Liste, Chase Builder, Effekt-Farben** zeigen
+> **Hinweis „braucht eine Bindung":** **Chase-Liste, Effekt-Farben** zeigen
 > erst etwas, wenn sie an einen Effekt gebunden sind (Effekt-ID im Dialog). Frisch und
 > ungebunden zeigen sie nur einen Platzhalter — sie stürzen aber nicht ab.
 
@@ -130,9 +129,10 @@ Fixture-Gruppe** der Chase wirken soll:
 
 ## Stand / Nutzbarkeit (Kurz)
 
-- **Alle 15 Typen** sind jetzt über die Toolbar anlegbar (vorher 11; +Effekt-Farben, Musik, BPM, Tempo-Bus).
+- **Alle 14 Typen** sind über die Toolbar anlegbar (der frühere „Chase Builder"/VCChaseBuilder
+  wurde 2026-07 komplett entfernt, PR #116).
 - **Sofort nutzbar ohne Bindung:** Button, Fader, Farbe, XY Pad, SpeedDial, Encoder, Musik,
   BPM, Tempo-Bus, Text, Container, Cue List (mit Executor-Slot).
-- **Erst mit Effekt-Bindung sinnvoll:** Chase-Liste, Chase Builder, Effekt-Farben — am
+- **Erst mit Effekt-Bindung sinnvoll:** Chase-Liste, Effekt-Farben — am
   bequemsten über den **🎨 Color-Chase**-Baukasten (legt Effekt + Bindung in einem Rutsch an,
   jetzt wahlweise auf eine Gruppe).

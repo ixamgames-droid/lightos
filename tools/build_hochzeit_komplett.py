@@ -77,6 +77,7 @@ from src.ui.virtualconsole.vc_tempo_bus_controller import VCTempoBusController
 from src.ui.virtualconsole.vc_frame import VCFrame
 from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
+from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "Hochzeit_Komplett_2026.lshow")
@@ -873,6 +874,13 @@ def effect_display(caption, x, y, bank, function_id, ww=260, hh=130):
     _add(w, x, y, ww, hh, bank)
 
 
+def multi_live_editor(caption, x, y, bank, fids, ww=300, hh=240):
+    w = VCMultiLiveEditor(caption)
+    for fid in fids:
+        w.add_effect(fid)
+    _add(w, x, y, ww, hh, bank)
+
+
 # ── Universell (BANK_ALL) ─────────────────────────────────────────────────────────
 TRACK = [("Clear", ButtonAction.CLEAR, "#4a3a10"), ("Stop All", ButtonAction.STOP_ALL, "#4a1010"),
          ("Blackout", ButtonAction.BLACKOUT, "#2a0000"), ("Tap", ButtonAction.TAP, "#103a3a"),
@@ -1015,13 +1023,15 @@ effect_action_btn("Leeren", note_rc(1, 2), B_EDIT, "#5a1010", "clear_colors", li
 effect_editor("Effekt-Editor (All-in-One)", RX, Y0, B_EDIT, dm_chase.id, ww=330, hh=250)
 effect_display("Live-Vorschau", RX + 350, Y0, B_EDIT, dm_chase.id, ww=260, hh=130)
 frame("Effekt-Container", RX, Y0 + 270, B_EDIT, ww=330, hh=110, show_header=True)
+multi_live_editor("Multi-Live-Edit", RX + 350, Y0 + 140, B_EDIT,
+                  [dm_chase.id, efx_circle.id])
 encoder("Tempo", 0, B_EDIT, dm_chase.id, "speed", step=0.25)
 stepper("Lauflichter", 1, B_EDIT, dm_chase.id, "runner_count", step=1)
 encoder("Dichte", 7, B_EDIT, dm_wave.id, "density", step=0.25)
 fader("Effekt-Tempo", 3, B_EDIT, SliderMode.EFFECT_SPEED, midi_cc=48, value=80)
 fader("Effekt-Helligk.", 4, B_EDIT, SliderMode.EFFECT_INTENSITY, midi_cc=49, value=255)
 label("BANK 5  LIVE-EDITOR  —  R0: Farbe + Dimmer-Bewegung + EFX + Live-Chase starten. R1: Farbe +/-/Leeren. "
-      "Rechts: großer Effekt-Editor + Vorschau + Chase-Builder + Container. Encoder/Stepper/Fader regeln "
+      "Rechts: großer Effekt-Editor + Vorschau + Multi-Live-Edit + Container. Encoder/Stepper/Fader regeln "
       "Tempo/Lauflichter/Dichte LIVE im Nachhinein.", X0, 28, 1320, B_EDIT)
 
 
