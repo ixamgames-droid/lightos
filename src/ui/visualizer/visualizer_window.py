@@ -9,6 +9,7 @@ Features:
 """
 from __future__ import annotations
 
+import functools
 import json
 import math
 import os
@@ -46,11 +47,176 @@ from src.core.stage.aim import (
     aim_pan_tilt, aim_orientation, plane_basis,
     circle_points, rect_points, line_points, trace_pan_tilt,
 )
+from src.core import crash_logging as _cl
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 
 # Fixture-Positionen leben in AppState.visualizer_positions ({fid: (x, y, z)})
 # und werden mit der Show (.lshow) persistiert. Zugriff ueber self._state.
+
+
+# ============================================================================
+# VIZ-10: Fehler-Logging fuer die Bridge (statt nacktem print(str(e)))
+# ============================================================================
+# Eigener, lazy geoeffneter Append-Handle auf dasselbe %APPDATA%/LightOS/
+# crash.log wie main.py — bewusst UNABHAENGIG vom dortigen Handle (main._hook
+# ist privat/nicht importierbar, und ein Modul-Import von main.py wuerde dessen
+# Top-Level-Code erneut anstossen). Gleiche Datei, gleiche Dedup-Logik.
+_viz_log_handle = None
+_viz_log_dedup = _cl.ExceptionDedup(min_interval=5.0)
+
+
+def _viz_crash_log_path() -> str:
+    d = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, "crash.log")
+
+
+def _viz_log_write(text: str) -> None:
+    """Haengt ``text`` ans gemeinsame crash.log an. Oeffnet den Handle beim
+    ersten Aufruf (lazy) und haelt ihn offen. Darf NIE selbst crashen."""
+    global _viz_log_handle
+    try:
+        if _viz_log_handle is None:
+            _viz_log_handle = open(_viz_crash_log_path(), "a", encoding="utf-8",
+                                   buffering=1)
+        _viz_log_handle.write(text)
+    except Exception:
+        pass
+
+
+def log_bridge_exception(context: str, exc: BaseException) -> None:
+    """Ein im Bridge-Slot/Renderer abgefangener Fehler -> gedrosselt (STAB-01-
+    Dedup) ins crash.log statt nur print(). ``context`` z. B. Slot-Name."""
+    try:
+        exc_type, exc_value, exc_tb = type(exc), exc, exc.__traceback__
+        sig = f"{context}:{_cl.exc_signature(exc_type, exc_tb)}"
+        write_full, suppressed = _viz_log_dedup.decide(sig, time.monotonic())
+        if not write_full:
+            return
+        if suppressed:
+            _viz_log_write(
+                f"=== (… {suppressed}× gleichartiger Visualizer-Fehler "
+                f"'{sig}' unterdrueckt) ===\n")
+        _viz_log_write(_cl.format_python_exception(
+            exc_type, exc_value, exc_tb, thread_name=f"Visualizer/{context}"))
+    except Exception:
+        pass
+
+
+def _bridge_slot_guard(fn):
+    """Ersetzt die individuellen ``try/except Exception as e: print(...)``-
+    Bloecke der @Slot-Methoden: Fehler werden weiterhin verschluckt (die Bridge
+    darf JS/die App nicht crashen), aber jetzt via ``log_bridge_exception``
+    diagnostizierbar (crash.log, gedrosselt) statt nur auf stdout verloren zu
+    gehen. Erhaelt den Rueckgabewert-Vertrag (Slots geben hier durchweg nichts
+    zurueck; bei Fehler entsprechend ``None``)."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            print(f"[Visualizer] {fn.__name__} error: {e}")
+            try:
+                log_bridge_exception(fn.__name__, e)
+            except Exception:
+                pass
+            return None
+    return wrapper
+
+
+# ============================================================================
+# VIZ-10: renderProcessTerminated-Selbstheilung
+# ============================================================================
+# Der Chromium-Renderprozess hinter QWebEngineView kann unabhaengig vom
+# LightOS-Prozess abstuerzen (GPU-Treiber, OOM, ...) — bisher blieb die 3D-
+# Ansicht danach dauerhaft schwarz/tot, ohne jeden Hinweis. Jetzt: Ereignis
+# loggen, Seite automatisch neu laden (derselbe Cache-Buster-Pfad wie beim
+# Erst-Load) und ueber loadFinished denselben Re-Sync ausloesen. Schutz gegen
+# Crash-Schleifen als REINE, Qt-freie Logik (RenderCrashGuard) — so ohne
+# laufende GUI testbar.
+
+RENDER_CRASH_MAX_RESTARTS = 3
+RENDER_CRASH_WINDOW_S = 60.0
+
+
+class RenderCrashGuard:
+    """Zaehlt Renderer-Abstuerze in einem gleitenden Zeitfenster. Erlaubt
+    hoechstens ``max_restarts`` automatische Neustarts innerhalb
+    ``window_s`` Sekunden — danach ``should_restart()`` == False (aufgeben,
+    sichtbare Statusmeldung statt Endlosschleife toter Neustarts)."""
+
+    def __init__(self, max_restarts: int = RENDER_CRASH_MAX_RESTARTS,
+                 window_s: float = RENDER_CRASH_WINDOW_S):
+        self.max_restarts = max_restarts
+        self.window_s = window_s
+        self._timestamps: list[float] = []
+
+    def should_restart(self, now: float) -> bool:
+        """``now`` (monotone Zeit) registriert EINEN Absturz und meldet, ob
+        noch ein automatischer Neustart erlaubt ist (Fenster gleitet mit)."""
+        self._timestamps = [t for t in self._timestamps if now - t < self.window_s]
+        self._timestamps.append(now)
+        return len(self._timestamps) <= self.max_restarts
+
+    def reset(self) -> None:
+        """Nach einem stabilen Reload (loadFinished ok) die Historie leeren —
+        ein spaeterer, neuer Absturz startet wieder bei voller Kontingent."""
+        self._timestamps = []
+
+
+def _render_status_name(status) -> str:
+    try:
+        return status.name
+    except AttributeError:
+        return str(status)
+
+
+def load_stage_html(view) -> None:
+    """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
+    auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
+    aus einem alten Chromium-Cache kommt."""
+    try:
+        url = QUrl.fromLocalFile(HTML_PATH)
+        url.setQuery(f"v={int(time.time() * 1000)}")
+        view.load(url)
+    except Exception as e:
+        print(f"[Visualizer] HTML load error: {e}")
+        view.load(QUrl.fromLocalFile(HTML_PATH))
+
+
+def install_render_crash_guard(view, status_cb=None) -> RenderCrashGuard:
+    """Verbindet ``page().renderProcessTerminated`` mit Logging + Auto-Reload.
+    ``status_cb(text)`` (optional) zeigt eine Statusmeldung nach dem Aufgeben.
+    Der Re-Sync nach dem Reload laeuft ueber den ohnehin vorhandenen
+    ``loadFinished``-Pfad (view.loadFinished ist bereits mit dem State-Push
+    verbunden) — hier wird NUR neu geladen, kein zweiter Sync-Mechanismus."""
+    guard = RenderCrashGuard()
+
+    def _on_terminated(status, exit_code):
+        try:
+            status_name = _render_status_name(status)
+            log_bridge_exception(
+                "renderProcessTerminated",
+                RuntimeError(f"status={status_name} exit_code={exit_code}"))
+        except Exception:
+            pass
+        if guard.should_restart(time.monotonic()):
+            try:
+                load_stage_html(view)
+            except Exception as e:
+                print(f"[Visualizer] renderer restart error: {e}")
+        else:
+            msg = "3D-Renderer abgestürzt — Fenster neu öffnen"
+            print(f"[Visualizer] {msg}")
+            if status_cb is not None:
+                try:
+                    status_cb(msg)
+                except Exception:
+                    pass
+
+    view.page().renderProcessTerminated.connect(_on_terminated)
+    return guard
 
 
 # ============================================================================
@@ -145,13 +311,11 @@ class VisualizerBridge(QObject):
     # ── Slots aufgerufen durch JavaScript ───────────────────────────────────
 
     @Slot()
+    @_bridge_slot_guard
     def requestFixtures(self):
-        try:
-            self._sync_positions_from_live_view()
-            fixtures = self._build_fixture_list()
-            self.allFixtures.emit(json.dumps(fixtures))
-        except Exception as e:
-            print(f"[Visualizer] requestFixtures error: {e}")
+        self._sync_positions_from_live_view()
+        fixtures = self._build_fixture_list()
+        self.allFixtures.emit(json.dumps(fixtures))
 
     def _sync_positions_from_live_view(self) -> bool:
         """Auto-Patch: Top-Down-X/Z aus der Live View ins 3D uebernehmen.
@@ -183,53 +347,47 @@ class VisualizerBridge(QObject):
         return changed
 
     @Slot(str)
+    @_bridge_slot_guard
     def placeFixture(self, pos_json: str):
         """JS sendet Rechtsklick-Position - platziert den naechsten
         noch unplatzierten Fixture an dieser Stelle. Optionales 'dock'-Feld
         (stage_element_id) haelt die Andock-Beziehung fest."""
-        try:
-            pos = json.loads(pos_json)
-            dock_id = pos.get("dock") or ""
-            for f in self._state.get_patched_fixtures():
-                if f.fid not in self._state.visualizer_positions:
-                    self._state.visualizer_positions[f.fid] = (
-                        float(pos["x"]),
-                        float(pos.get("y", 6.5)),
-                        float(pos["z"]),
-                    )
-                    if dock_id:
-                        self._state.visualizer_docks[f.fid] = str(dock_id)
-                    else:
-                        self._state.visualizer_docks.pop(f.fid, None)
-                    self._write_back_to_live_view(f.fid, float(pos["x"]), float(pos["z"]))
-                    data = self._fixture_to_dict(f)
-                    self.fixtureAdded.emit(json.dumps(data))
-                    return
-        except Exception as e:
-            print(f"[Visualizer] placeFixture error: {e}")
+        pos = json.loads(pos_json)
+        dock_id = pos.get("dock") or ""
+        for f in self._state.get_patched_fixtures():
+            if f.fid not in self._state.visualizer_positions:
+                self._state.visualizer_positions[f.fid] = (
+                    float(pos["x"]),
+                    float(pos.get("y", 6.5)),
+                    float(pos["z"]),
+                )
+                if dock_id:
+                    self._state.visualizer_docks[f.fid] = str(dock_id)
+                else:
+                    self._state.visualizer_docks.pop(f.fid, None)
+                self._write_back_to_live_view(f.fid, float(pos["x"]), float(pos["z"]))
+                data = self._fixture_to_dict(f)
+                self.fixtureAdded.emit(json.dumps(data))
+                return
 
     @Slot(str, float, float, float)
+    @_bridge_slot_guard
     def fixturePositionChanged(self, fid_str: str, x: float, y: float, z: float):
         """JS meldet neue Fixture-Position (nach Drag)."""
-        try:
-            fid = int(fid_str)
-            self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
-            # Top-Down-X/Z zurueck in die Live View (Single Source of Truth) — so
-            # spiegelt die 2D-Ansicht eine 3D-Verschiebung; Y bleibt 3D-eigen.
-            self._write_back_to_live_view(fid, float(x), float(z))
-            self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
-        except Exception as e:
-            print(f"[Visualizer] fixturePositionChanged error: {e}")
+        fid = int(fid_str)
+        self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
+        # Top-Down-X/Z zurueck in die Live View (Single Source of Truth) — so
+        # spiegelt die 2D-Ansicht eine 3D-Verschiebung; Y bleibt 3D-eigen.
+        self._write_back_to_live_view(fid, float(x), float(z))
+        self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
 
     @Slot(str, float, float, float)
+    @_bridge_slot_guard
     def fixtureRotationChanged(self, fid_str: str, rx: float, ry: float, rz: float):
         """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-Drag."""
-        try:
-            fid = int(fid_str)
-            self._state.visualizer_rotations[fid] = (float(rx), float(ry), float(rz))
-            self.pyFixtureRotated.emit(fid, float(rx), float(ry), float(rz))
-        except Exception as e:
-            print(f"[Visualizer] fixtureRotationChanged error: {e}")
+        fid = int(fid_str)
+        self._state.visualizer_rotations[fid] = (float(rx), float(ry), float(rz))
+        self.pyFixtureRotated.emit(fid, float(rx), float(ry), float(rz))
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
@@ -243,6 +401,7 @@ class VisualizerBridge(QObject):
             return False
 
     @Slot(str)
+    @_bridge_slot_guard
     def aimFixturesAt(self, json_str: str):
         """JS meldet einen angetippten 3D-Zielpunkt (Aim-Werkzeug) + die im 3D
         ausgewaehlten Fixtures. Richtet sie darauf aus:
@@ -250,47 +409,44 @@ class VisualizerBridge(QObject):
             EIGENE Werte je nach Standort/Montage — auch fuer „beide auf 1 Punkt").
           * statisch (PAR etc.) -> Montage-Ausrichtung (visualizer_rotations).
         """
-        try:
-            d = json.loads(json_str) or {}
-            target = (float(d["x"]), float(d["y"]), float(d["z"]))
-            fids = [int(x) for x in (d.get("fids") or [])]
-            if not fids:
-                return
-            fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
-            n_mh = n_static = 0
-            for fid in fids:
-                f = fixtures.get(fid)
-                if f is None:
-                    continue
-                pos = self._state.visualizer_positions.get(fid)
-                if not pos:
-                    continue
-                if self._is_moving_head(f):
-                    rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
-                    pan, tilt = aim_pan_tilt(
-                        pos, target, rot,
-                        pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
-                        tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
-                        pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
-                        tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                        invert_pan=bool(getattr(f, "invert_pan", False)),
-                        invert_tilt=bool(getattr(f, "invert_tilt", False)),
-                        swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
-                    )
-                    self._state.set_programmer_value(fid, "pan", pan)
-                    self._state.set_programmer_value(fid, "tilt", tilt)
-                    self._state.set_programmer_value(fid, "pan_fine", 0)
-                    self._state.set_programmer_value(fid, "tilt_fine", 0)
-                    n_mh += 1
-                else:
-                    rx, ry, rz = aim_orientation(pos, target)
-                    self._state.visualizer_rotations[fid] = (rx, ry, rz)
-                    self.push_apply_fixture_transform(fid, pos[0], pos[1], pos[2], rx, ry, rz)
-                    self.pyFixtureRotated.emit(fid, rx, ry, rz)
-                    n_static += 1
-            self.pyAimApplied.emit(n_mh, n_static, target[0], target[1], target[2])
-        except Exception as e:
-            print(f"[Visualizer] aimFixturesAt error: {e}")
+        d = json.loads(json_str) or {}
+        target = (float(d["x"]), float(d["y"]), float(d["z"]))
+        fids = [int(x) for x in (d.get("fids") or [])]
+        if not fids:
+            return
+        fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
+        n_mh = n_static = 0
+        for fid in fids:
+            f = fixtures.get(fid)
+            if f is None:
+                continue
+            pos = self._state.visualizer_positions.get(fid)
+            if not pos:
+                continue
+            if self._is_moving_head(f):
+                rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
+                pan, tilt = aim_pan_tilt(
+                    pos, target, rot,
+                    pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
+                    tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
+                    pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
+                    tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
+                    invert_pan=bool(getattr(f, "invert_pan", False)),
+                    invert_tilt=bool(getattr(f, "invert_tilt", False)),
+                    swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
+                )
+                self._state.set_programmer_value(fid, "pan", pan)
+                self._state.set_programmer_value(fid, "tilt", tilt)
+                self._state.set_programmer_value(fid, "pan_fine", 0)
+                self._state.set_programmer_value(fid, "tilt_fine", 0)
+                n_mh += 1
+            else:
+                rx, ry, rz = aim_orientation(pos, target)
+                self._state.visualizer_rotations[fid] = (rx, ry, rz)
+                self.push_apply_fixture_transform(fid, pos[0], pos[1], pos[2], rx, ry, rz)
+                self.pyFixtureRotated.emit(fid, rx, ry, rz)
+                n_static += 1
+        self.pyAimApplied.emit(n_mh, n_static, target[0], target[1], target[2])
 
     # ── Formen-Nachfahren (Live-Trace) ──────────────────────────────────────
     def _build_trace_seqs(self, shape: str, center, normal, radius: float,
@@ -328,30 +484,28 @@ class VisualizerBridge(QObject):
         return seqs
 
     @Slot(str)
+    @_bridge_slot_guard
     def startTrace(self, json_str: str):
         """JS startet ein Live-Formen-Nachfahren: ausgewaehlte Moving Heads fahren
         eine Form (Kreis/Linie/Rechteck) auf der Zielflaeche ab (Pan/Tilt -> Programmer)."""
-        try:
-            d = json.loads(json_str) or {}
-            shape = str(d.get("shape", "circle"))
-            center = (float(d["x"]), float(d["y"]), float(d["z"]))
-            normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
-            radius = float(d.get("radius", 1.0))
-            count = max(4, int(d.get("count", 48)))
-            interval = max(20, int(d.get("intervalMs", 60)))
-            fids = [int(x) for x in (d.get("fids") or [])]
-            seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
-            self.stop_trace()
-            if not seqs:
-                self.pyTraceChanged.emit(False, 0, 0)
-                return
-            self._trace_state = {"seqs": seqs, "i": 0, "n": count}
-            self._trace_timer = QTimer(self)
-            self._trace_timer.timeout.connect(self._trace_tick)
-            self._trace_timer.start(interval)
-            self.pyTraceChanged.emit(True, len(seqs), count)
-        except Exception as e:
-            print(f"[Visualizer] startTrace error: {e}")
+        d = json.loads(json_str) or {}
+        shape = str(d.get("shape", "circle"))
+        center = (float(d["x"]), float(d["y"]), float(d["z"]))
+        normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
+        radius = float(d.get("radius", 1.0))
+        count = max(4, int(d.get("count", 48)))
+        interval = max(20, int(d.get("intervalMs", 60)))
+        fids = [int(x) for x in (d.get("fids") or [])]
+        seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
+        self.stop_trace()
+        if not seqs:
+            self.pyTraceChanged.emit(False, 0, 0)
+            return
+        self._trace_state = {"seqs": seqs, "i": 0, "n": count}
+        self._trace_timer = QTimer(self)
+        self._trace_timer.timeout.connect(self._trace_tick)
+        self._trace_timer.start(interval)
+        self.pyTraceChanged.emit(True, len(seqs), count)
 
     def _trace_tick(self):
         st = self._trace_state
@@ -370,6 +524,7 @@ class VisualizerBridge(QObject):
         st["i"] = i + 1
 
     @Slot()
+    @_bridge_slot_guard
     def stop_trace(self):
         """Live-Trace stoppen (idempotent)."""
         if self._trace_timer is not None:
@@ -388,60 +543,59 @@ class VisualizerBridge(QObject):
                 pass
 
     @Slot()
+    @_bridge_slot_guard
     def stopTrace(self):
         """JS-Alias fuer stop_trace."""
         self.stop_trace()
 
     @Slot(str)
+    @_bridge_slot_guard
     def saveTraceSequence(self, json_str: str):
         """Die aktuelle Form + Auswahl als abspielbare **Sequence** speichern: ein
         Step pro Form-Punkt, je Step die Pan/Tilt-Werte aller Moving Heads. Die
         Sequence loopt -> die Koepfe fahren die Form ab. Wird mit der Show gespeichert."""
+        d = json.loads(json_str) or {}
+        shape = str(d.get("shape", "circle"))
+        center = (float(d["x"]), float(d["y"]), float(d["z"]))
+        normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
+        radius = float(d.get("radius", 1.0))
+        count = max(4, int(d.get("count", 48)))
+        step_time = max(0.02, float(d.get("intervalMs", 60)) / 1000.0)
+        fids = [int(x) for x in (d.get("fids") or [])]
+        seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
+        n = max((len(s) for s in seqs.values()), default=0)
+        if not seqs or n == 0:
+            self.pyTraceSaved.emit("", 0)
+            return
+        from src.core.engine.function_manager import get_function_manager
+        from src.core.engine.sequence import SequenceStep
         try:
-            d = json.loads(json_str) or {}
-            shape = str(d.get("shape", "circle"))
-            center = (float(d["x"]), float(d["y"]), float(d["z"]))
-            normal = (float(d.get("nx", 0.0)), float(d.get("ny", 1.0)), float(d.get("nz", 0.0)))
-            radius = float(d.get("radius", 1.0))
-            count = max(4, int(d.get("count", 48)))
-            step_time = max(0.02, float(d.get("intervalMs", 60)) / 1000.0)
-            fids = [int(x) for x in (d.get("fids") or [])]
-            seqs = self._build_trace_seqs(shape, center, normal, radius, count, fids)
-            n = max((len(s) for s in seqs.values()), default=0)
-            if not seqs or n == 0:
-                self.pyTraceSaved.emit("", 0)
-                return
-            from src.core.engine.function_manager import get_function_manager
-            from src.core.engine.sequence import SequenceStep
-            try:
-                from src.core.engine.function import RunOrder, Direction
-            except Exception:
-                RunOrder = Direction = None
-            shape_name = {"circle": "Kreis", "line": "Linie", "rect": "Rechteck"}.get(shape, shape)
-            fm = get_function_manager()
-            seq = fm.new_sequence(f"Trace {shape_name}")
-            try:
-                if RunOrder is not None:
-                    seq.run_order = RunOrder.Loop
-                if Direction is not None:
-                    seq.direction = Direction.Forward
-            except Exception:
-                pass
-            for i in range(n):
-                step_values = {}
-                for fid, seq_list in seqs.items():
-                    if i < len(seq_list):
-                        pan, tilt = seq_list[i]
-                        step_values[str(fid)] = {"pan": int(pan), "tilt": int(tilt)}
-                if step_values:
-                    seq.steps.append(SequenceStep(
-                        values=step_values, fade_in=step_time, hold=0.0,
-                        fade_out=0.0, note=f"{shape_name} {i + 1}",
-                    ))
-            seq.bound_fixtures = sorted(seqs.keys())
-            self.pyTraceSaved.emit(getattr(seq, "name", f"Trace {shape_name}"), len(seq.steps))
-        except Exception as e:
-            print(f"[Visualizer] saveTraceSequence error: {e}")
+            from src.core.engine.function import RunOrder, Direction
+        except Exception:
+            RunOrder = Direction = None
+        shape_name = {"circle": "Kreis", "line": "Linie", "rect": "Rechteck"}.get(shape, shape)
+        fm = get_function_manager()
+        seq = fm.new_sequence(f"Trace {shape_name}")
+        try:
+            if RunOrder is not None:
+                seq.run_order = RunOrder.Loop
+            if Direction is not None:
+                seq.direction = Direction.Forward
+        except Exception:
+            pass
+        for i in range(n):
+            step_values = {}
+            for fid, seq_list in seqs.items():
+                if i < len(seq_list):
+                    pan, tilt = seq_list[i]
+                    step_values[str(fid)] = {"pan": int(pan), "tilt": int(tilt)}
+            if step_values:
+                seq.steps.append(SequenceStep(
+                    values=step_values, fade_in=step_time, hold=0.0,
+                    fade_out=0.0, note=f"{shape_name} {i + 1}",
+                ))
+        seq.bound_fixtures = sorted(seqs.keys())
+        self.pyTraceSaved.emit(getattr(seq, "name", f"Trace {shape_name}"), len(seq.steps))
 
     def _write_back_to_live_view(self, fid: int, x: float, z: float):
         """3D-Top-Down-(x,z) -> Live-View-Pixel zurueckschreiben + melden."""
@@ -456,66 +610,52 @@ class VisualizerBridge(QObject):
             pass
 
     @Slot(str, str)
+    @_bridge_slot_guard
     def fixtureDockChanged(self, fid_str: str, sid: str):
         """JS meldet eine geaenderte Andock-Beziehung (leerer sid = loesen)."""
-        try:
-            fid = int(fid_str)
-            if sid:
-                self._state.visualizer_docks[fid] = str(sid)
-            else:
-                self._state.visualizer_docks.pop(fid, None)
-        except Exception as e:
-            print(f"[Visualizer] fixtureDockChanged error: {e}")
-
-    @Slot(str)
-    def fixtureSelectionChanged(self, fids_json: str):
-        try:
-            fids = json.loads(fids_json) or []
-            self.pyFixtureSelection.emit([int(x) for x in fids])
-        except Exception as e:
-            print(f"[Visualizer] fixtureSelectionChanged error: {e}")
-
-    @Slot(str)
-    def fixtureDeleted(self, fid_str: str):
-        try:
-            fid = int(fid_str)
-            self._state.visualizer_positions.pop(fid, None)
+        fid = int(fid_str)
+        if sid:
+            self._state.visualizer_docks[fid] = str(sid)
+        else:
             self._state.visualizer_docks.pop(fid, None)
-            self._state.visualizer_rotations.pop(fid, None)
-            self.pyFixtureDeleted.emit(fid)
-        except Exception as e:
-            print(f"[Visualizer] fixtureDeleted error: {e}")
 
     @Slot(str)
+    @_bridge_slot_guard
+    def fixtureSelectionChanged(self, fids_json: str):
+        fids = json.loads(fids_json) or []
+        self.pyFixtureSelection.emit([int(x) for x in fids])
+
+    @Slot(str)
+    @_bridge_slot_guard
+    def fixtureDeleted(self, fid_str: str):
+        fid = int(fid_str)
+        self._state.visualizer_positions.pop(fid, None)
+        self._state.visualizer_docks.pop(fid, None)
+        self._state.visualizer_rotations.pop(fid, None)
+        self.pyFixtureDeleted.emit(fid)
+
+    @Slot(str)
+    @_bridge_slot_guard
     def stageListChanged(self, json_str: str):
-        try:
-            data = json.loads(json_str) or []
-            self.pyStageListChanged.emit(data)
-        except Exception as e:
-            print(f"[Visualizer] stageListChanged error: {e}")
+        data = json.loads(json_str) or []
+        self.pyStageListChanged.emit(data)
 
     @Slot(str)
+    @_bridge_slot_guard
     def stageSelectionChanged(self, sid: str):
-        try:
-            self.pyStageSelection.emit(sid or "")
-        except Exception as e:
-            print(f"[Visualizer] stageSelectionChanged error: {e}")
+        self.pyStageSelection.emit(sid or "")
 
     @Slot(str)
+    @_bridge_slot_guard
     def saveStage(self, json_str: str):
-        try:
-            data = json.loads(json_str) or {}
-            self.pyStageSaved.emit(data)
-        except Exception as e:
-            print(f"[Visualizer] saveStage error: {e}")
+        data = json.loads(json_str) or {}
+        self.pyStageSaved.emit(data)
 
     @Slot(float)
+    @_bridge_slot_guard
     def brightnessChanged(self, value: float):
         """JS meldet wenn Auto-Brightness die Helligkeit aendert."""
-        try:
-            self.pyBrightnessChanged.emit(float(value))
-        except Exception as e:
-            print(f"[Visualizer] brightnessChanged error: {e}")
+        self.pyBrightnessChanged.emit(float(value))
 
     # ── Python -> JS helpers ────────────────────────────────────────────────
 
@@ -736,6 +876,21 @@ _SINGLE_KEY_SHORTCUTS = frozenset({
 })
 
 
+def _any_focused(*widgets) -> bool:
+    """VIZ-10: True, wenn EINE der Spinboxen gerade den Tastatur-Fokus haelt.
+    Schuetzt vor der Race: JS-Echo (fixturePositionChanged/-RotationChanged,
+    Stage-Drag) ueberschreibt sonst per setValue() einen bereits getippten,
+    noch nicht bestaetigten Wert - der User tippt "-8", druesst Enter, und das
+    Feld springt auf den alten (Echo-)Wert zurueck."""
+    for w in widgets:
+        try:
+            if w is not None and w.hasFocus():
+                return True
+        except RuntimeError:
+            continue
+    return False
+
+
 def _should_pass_key_to_text(focus_widget, key, modifiers) -> bool:
     """True, wenn ein Einzeltasten-Shortcut stattdessen als Texteingabe an das
     fokussierte Feld gehen soll (Eingabefeld/Spinbox + reine Buchstabentaste,
@@ -772,6 +927,8 @@ class VisualizerWindow(QMainWindow):
         self._stage_elements_cache: list[dict] = []   # spiegel der JS-stageObjects
         self._selected_stage_id: str = ""
         self._suppress_property_signals = False
+        self._stage_dirty = False   # VIZ-10: ungespeicherte Buehnen-Aenderungen
+        self._suppress_tab_mode_sync = False   # VIZ-10: Reentrancy-Schutz Tab<->Modus
 
         self._setup_ui()
         self._setup_channel()
@@ -783,15 +940,19 @@ class VisualizerWindow(QMainWindow):
         # -------- Toolbar (touch-optimiert) --------
         tb = QToolBar("Visualizer")
         tb.setMovable(False)
+        # VIZ-10: KEIN hartes min-width mehr auf QToolButton - das zwang den Text
+        # bei knappem Platz zum Eliden ("S...ern" statt "Speichern"). Buttons
+        # sollen ihre eigene sizeHint (Text + Padding) nutzen; reicht der Platz
+        # nicht, blendet Qt automatisch den Overflow-Pfeil der Toolbar ein.
         tb.setStyleSheet(
             "QToolBar { spacing: 6px; padding: 4px; }"
-            "QToolButton { min-height: 38px; min-width: 38px;"
-            "              padding: 6px 12px; font-size: 12px; }"
+            "QToolButton { min-height: 38px; padding: 6px 12px; font-size: 12px; }"
             "QComboBox   { min-height: 36px; padding: 4px 8px;"
             "              font-size: 12px; min-width: 130px; }"
             "QComboBox QAbstractItemView::item { min-height: 32px; padding: 4px; }"
             "QToolBar QLabel { padding: 0 4px; font-weight: bold; }"
         )
+        tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self.addToolBar(tb)
 
         tb.addWidget(QLabel("Ansicht:"))
@@ -835,7 +996,8 @@ class VisualizerWindow(QMainWindow):
         act_reset_cam.triggered.connect(self._reset_camera)
         tb.addAction(act_reset_cam)
 
-        act_clear_fx = QAction("✖ Alle Fixtures", self)
+        act_clear_fx = QAction("✖ Alle entfernen", self)
+        act_clear_fx.setToolTip("Alle platzierten Fixtures aus der Szene entfernen")
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
@@ -1000,6 +1162,11 @@ class VisualizerWindow(QMainWindow):
         self._tabs.addTab(self._build_fixture_tab(), "Fixtures")
         self._tabs.addTab(self._build_stage_tab(),   "Bühne")
         self._tabs.addTab(self._build_settings_tab(), "Einstellungen")
+        # VIZ-10: bidirektional halten — Tab-Klick auf Fixtures/Bühne setzt den
+        # passenden Bearbeitungsmodus; Einstellungen laesst den Modus unveraendert
+        # (kein 3. Modus im Combo). _suppress_tab_mode_sync verhindert die
+        # Rueckkopplungsschleife mit _on_edit_mode_changed (Modus -> Tab).
+        self._tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self._tabs)
         return panel
 
@@ -1275,15 +1442,13 @@ class VisualizerWindow(QMainWindow):
         self._channel = QWebChannel(self)
         self._channel.registerObject("bridge", self._bridge)
         self._view.page().setWebChannel(self._channel)
+        # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s, siehe
+        # RenderCrashGuard); der Re-Sync danach laeuft ueber loadFinished unten.
+        self._render_crash_guard = install_render_crash_guard(
+            self._view, status_cb=self._on_render_crash_giveup)
         # ── CACHE FIX: Cache-Buster an URL anhaengen, damit QWebEngineView die
         # HTML bei jedem Visualizer-Open frisch laedt ────────────────────────
-        try:
-            url = QUrl.fromLocalFile(HTML_PATH)
-            url.setQuery(f"v={int(time.time() * 1000)}")
-            self._view.load(url)
-        except Exception as e:
-            print(f"[Visualizer] HTML load error: {e}")
-            self._view.load(QUrl.fromLocalFile(HTML_PATH))
+        load_stage_html(self._view)
         self._view.loadFinished.connect(self._on_load_finished)
 
         # Python <- JS bridge signals
@@ -1302,7 +1467,17 @@ class VisualizerWindow(QMainWindow):
     def _on_load_finished(self, ok: bool):
         if not ok:
             return
+        guard = getattr(self, "_render_crash_guard", None)
+        if guard is not None:
+            guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(400, self._push_initial_state)
+
+    def _on_render_crash_giveup(self, message: str):
+        """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
+        Statusmeldung statt stiller Endlosschleife toter Reloads."""
+        lbl = getattr(self, "_lbl_info", None)
+        if lbl is not None:
+            lbl.setText(message)
 
     def _apply_active_stage_from_state(self):
         """Setzt die in AppState gespeicherte Buehne (Preset-Key oder User-Name)
@@ -1382,9 +1557,19 @@ class VisualizerWindow(QMainWindow):
             item = QListWidgetItem(f"{mark}[{f.fid:03d}] {f.label} ({f.fixture_type})")
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
-        count = len(self._state.visualizer_positions)
-        self._lbl_info.setText(f"{count} Fixture(s) in Szene  |  {len(self._current_stage.elements)} Bühnen-Elemente")
         self._patch_list.blockSignals(False)
+        self._update_status_counts()
+
+    def _update_status_counts(self):
+        """VIZ-10: zentrale Statuszeile - an JEDE Aenderung gehaengt (Fixture
+        platziert/entfernt, Buehne geladen/gewechselt, Element hinzugefuegt/
+        geloescht), statt nur bei _refresh_patch_list() zu aktualisieren -
+        sonst blieb die Zeile nach reinen Buehnen-Aenderungen stehen ("stale")."""
+        count = len(self._state.visualizer_positions)
+        self._lbl_info.setText(
+            f"{count} Fixture(s) in Szene  |  "
+            f"{len(self._current_stage.elements)} Bühnen-Elemente"
+        )
 
     def _on_patch_list_selected(self):
         item = self._patch_list.currentItem()
@@ -1496,6 +1681,10 @@ class VisualizerWindow(QMainWindow):
         # Update spinner if this is the selected fixture
         item = self._patch_list.currentItem()
         if item and item.data(Qt.ItemDataRole.UserRole) == fid:
+            # VIZ-10: waehrend der User tippt (Feld hat Fokus) NICHT ueberschreiben -
+            # sonst gewinnt das JS-Echo gegen die gerade eingegebene Zahl.
+            if _any_focused(self._spin_x, self._spin_y, self._spin_z):
+                return
             self._suppress_property_signals = True
             try:
                 self._spin_x.setValue(x)
@@ -1508,6 +1697,8 @@ class VisualizerWindow(QMainWindow):
         # Drehen-Drag im 3D -> Rotations-Spinboxen aktualisieren (wenn ausgewählt).
         item = self._patch_list.currentItem()
         if item and item.data(Qt.ItemDataRole.UserRole) == fid:
+            if _any_focused(self._spin_rot_x, self._spin_rot_y, self._spin_rot_z):
+                return
             self._suppress_property_signals = True
             try:
                 self._spin_rot_x.setValue(rx)
@@ -1629,6 +1820,10 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] _apply_stage push error: {e}")
         self._refresh_stage_tree()
+        # VIZ-10: zentraler Pfad fuer Buehnen-Wechsel/-Neuaufbau -> Statuszeile
+        # (Bühnen-Elemente-Zaehler) hier statt an jedem Aufrufer einzeln pflegen.
+        if hasattr(self, "_lbl_info"):
+            self._update_status_counts()
 
     def _refresh_stage_tree(self):
         # Aktuelle Selektion merken um sie nach Rebuild wiederherzustellen (T4.3)
@@ -1680,6 +1875,7 @@ class VisualizerWindow(QMainWindow):
         type_label = dict(self.STAGE_TYPES).get(type_, type_)
         kwargs.setdefault("name", type_label)
         el = self._current_stage.add(type_, **kwargs)
+        self._stage_dirty = True   # VIZ-10: neues Element -> ungespeichert
         # Sicherstellen, dass wir in "Stage"-EditMode sind (sonst kann User
         # das neue Element nicht direkt anfassen)
         try:
@@ -1705,6 +1901,11 @@ class VisualizerWindow(QMainWindow):
             self._bridge.push_select_stage_object(el.id)
         except Exception as e:
             print(f"[Visualizer] auto-select stage object error: {e}")
+        # VIZ-10: sichtbares Feedback - vorher stiller No-op-Eindruck, wenn der
+        # Modus-Wechsel oben unbemerkt blieb.
+        lbl = getattr(self, "_lbl_info", None)
+        if lbl is not None:
+            lbl.setText(f"{type_label} hinzugefügt.")
 
     def _selected_stage_element(self) -> Optional[StageElement]:
         it = self._stage_tree.currentItem()
@@ -1763,6 +1964,7 @@ class VisualizerWindow(QMainWindow):
         el.h        = self._stage_spin_h.value()
         el.d        = self._stage_spin_d.value()
         el.rotation = math.radians(self._stage_spin_rot.value())
+        self._stage_dirty = True   # VIZ-10: Element-Eigenschaft geaendert
 
         # Gezieltes Update an JS senden (kein kompletter Rebuild -> kein Selection-Swap)
         try:
@@ -1813,6 +2015,8 @@ class VisualizerWindow(QMainWindow):
         original = el.color
 
         def _set(hex_color: str):
+            if hex_color != el.color:
+                self._stage_dirty = True   # VIZ-10: Farbe geaendert
             el.color = hex_color
             self._stage_color_preview.setStyleSheet(
                 f"background:{el.color}; border:1px solid #555;"
@@ -1844,6 +2048,7 @@ class VisualizerWindow(QMainWindow):
         if not el:
             return
         self._current_stage.remove(el.id)
+        self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
         self._apply_stage(self._current_stage)
 
     def _on_save_stage(self):
@@ -1856,6 +2061,7 @@ class VisualizerWindow(QMainWindow):
         self._current_stage.name = name.strip()
         path = save_stage(self._current_stage)
         if path:
+            self._stage_dirty = False   # VIZ-10: erfolgreich gespeichert
             QMessageBox.information(self, "Gespeichert", f"Bühne '{name}' gespeichert.")
             # Combo neu aufbauen UND die soeben gespeicherte Buehne auswaehlen
             self._reload_stage_combo()
@@ -1969,17 +2175,25 @@ class VisualizerWindow(QMainWindow):
                 )
                 self._current_stage.elements.append(el)
                 tree_needs_rebuild = True
+                self._stage_dirty = True   # VIZ-10: neues Element aus JS -> ungespeichert
                 continue
             pos = it.get("position") or {}
             size = it.get("size") or {}
-            el.x = float(pos.get("x", el.x))
-            el.y = float(pos.get("y", el.y))
-            el.z = float(pos.get("z", el.z))
-            el.w = float(size.get("x", el.w))
-            el.h = float(size.get("y", el.h))
-            el.d = float(size.get("z", el.d))
-            el.rotation = float(it.get("rotation", el.rotation))
-            el.color = it.get("color", el.color)
+            new_x = float(pos.get("x", el.x))
+            new_y = float(pos.get("y", el.y))
+            new_z = float(pos.get("z", el.z))
+            new_w = float(size.get("x", el.w))
+            new_h = float(size.get("y", el.h))
+            new_d = float(size.get("z", el.d))
+            new_rotation = float(it.get("rotation", el.rotation))
+            new_color = it.get("color", el.color)
+            if (new_x, new_y, new_z, new_w, new_h, new_d, new_rotation, new_color) != (
+                    el.x, el.y, el.z, el.w, el.h, el.d, el.rotation, el.color):
+                self._stage_dirty = True   # VIZ-10: JS-Drag hat effektiv etwas geaendert
+            el.x, el.y, el.z = new_x, new_y, new_z
+            el.w, el.h, el.d = new_w, new_h, new_d
+            el.rotation = new_rotation
+            el.color = new_color
 
         # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht) entfernen
         py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
@@ -1989,13 +2203,20 @@ class VisualizerWindow(QMainWindow):
                 if self._selected_stage_id == pid:
                     self._selected_stage_id = ""
             tree_needs_rebuild = True
+            self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
 
         if tree_needs_rebuild:
             self._refresh_stage_tree()
+            self._update_status_counts()   # VIZ-10: Element per JS hinzugefuegt/geloescht
 
         # Properties-Panel updaten OHNE Tree-Rebuild
         cur = self._selected_stage_element()
-        if cur:
+        # VIZ-10: waehrend der User in einem der Felder tippt, nicht per JS-Drag-
+        # Echo ueberschreiben (dieselbe Race wie bei den Fixture-Spinboxen).
+        if cur and not _any_focused(
+                self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
+                self._stage_spin_w, self._stage_spin_h, self._stage_spin_d,
+                self._stage_spin_rot):
             self._suppress_property_signals = True
             try:
                 self._stage_spin_x.setValue(cur.x)
@@ -2023,7 +2244,9 @@ class VisualizerWindow(QMainWindow):
         name = data.get("name") or "CustomStage"
         sd = StageDefinition.from_dict(data)
         sd.name = name
-        save_stage(sd)
+        path = save_stage(sd)
+        if path:
+            self._stage_dirty = False   # VIZ-10: erfolgreich gespeichert
         self._reload_stage_combo()
 
     # ── View / Edit Mode ────────────────────────────────────────────────────
@@ -2051,11 +2274,38 @@ class VisualizerWindow(QMainWindow):
     def _on_edit_mode_changed(self, idx: int):
         mode = self._combo_edit.itemData(idx) or "view"
         self._bridge.push_edit_mode(mode)
-        # Switch right-panel tab to match
-        if mode == "stage":
-            self._tabs.setCurrentIndex(1)
-        elif mode == "edit":
-            self._tabs.setCurrentIndex(0)
+        # Switch right-panel tab to match (Einstellungen-Tab bleibt unberuehrt -
+        # es gibt keinen passenden Modus dafuer). Guard verhindert, dass
+        # _on_tab_changed den Modus gleich wieder zurueckschreibt.
+        if self._suppress_tab_mode_sync:
+            return
+        self._suppress_tab_mode_sync = True
+        try:
+            if mode == "stage":
+                self._tabs.setCurrentIndex(1)
+            elif mode == "edit":
+                self._tabs.setCurrentIndex(0)
+        finally:
+            self._suppress_tab_mode_sync = False
+
+    def _on_tab_changed(self, idx: int):
+        """VIZ-10: Klick auf Fixtures-/Bühne-Tab setzt den passenden
+        Bearbeitungsmodus (bidirektional zu _on_edit_mode_changed). Der
+        Einstellungen-Tab (idx 2) hat keinen entsprechenden Modus -> Combo
+        bleibt unveraendert, der Tab selbst ist immer normal anklickbar."""
+        if self._suppress_tab_mode_sync:
+            return
+        target_mode = {0: "edit", 1: "stage"}.get(idx)
+        if target_mode is None:
+            return
+        self._suppress_tab_mode_sync = True
+        try:
+            for i in range(self._combo_edit.count()):
+                if self._combo_edit.itemData(i) == target_mode:
+                    self._combo_edit.setCurrentIndex(i)
+                    break
+        finally:
+            self._suppress_tab_mode_sync = False
 
     def _reset_camera(self):
         self._bridge.cameraReset.emit()
@@ -2192,8 +2442,40 @@ class VisualizerWindow(QMainWindow):
             t.stop()
         super().hideEvent(event)
 
+    def _confirm_close_with_unsaved_stage(self) -> bool:
+        """VIZ-10: fragt bei ungespeicherten Buehnen-Aenderungen nach, BEVOR
+        geschliessen wird. Rueckgabe: True = weiter schliessen, False = Schliessen
+        abbrechen. Eigene Methode (statt inline in closeEvent) -> in Tests mockbar
+        ohne einen echten Dialog anzuzeigen."""
+        if not self._stage_dirty:
+            return True
+        choice = QMessageBox.question(
+            self, "Bühne speichern?",
+            "Es gibt ungespeicherte Änderungen an der Bühne.\n"
+            "Vor dem Schließen speichern?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+        if choice == QMessageBox.StandardButton.Cancel:
+            return False
+        if choice == QMessageBox.StandardButton.Save:
+            self._on_save_stage()
+            if self._stage_dirty:
+                # Save-Dialog wurde abgebrochen (kein Name eingegeben) oder
+                # ist fehlgeschlagen -> Schliessen ebenfalls abbrechen, sonst
+                # gehen die Aenderungen ohne Rueckfrage verloren.
+                return False
+        return True
+
     def closeEvent(self, event):
-        """Beim Schliessen alle State-Subscriber abmelden (siehe
-        ``_release_state``), dann normal weiterschliessen."""
+        """Fragt bei ungespeicherten Buehnen-Aenderungen nach (VOR dem
+        Aufraeumen — siehe ``_confirm_close_with_unsaved_stage``), meldet
+        danach alle State-Subscriber ab (``_release_state``) und schliesst
+        normal weiter."""
+        if not self._confirm_close_with_unsaved_stage():
+            event.ignore()
+            return
         self._release_state()
         super().closeEvent(event)

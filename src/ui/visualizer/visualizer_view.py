@@ -16,21 +16,21 @@ X/Z dort zurueck.
 """
 from __future__ import annotations
 
-import time
-
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtCore import QUrl, Qt, QTimer
+from PySide6.QtCore import Qt, QTimer
 
 from src.core.app_state import get_state, get_channels_for_patched
 from src.core.stage.stage_definition import (
     load_stage, get_default_simple, DEFAULT_PRESETS,
 )
-from src.ui.visualizer.visualizer_window import VisualizerBridge, HTML_PATH
+from src.ui.visualizer.visualizer_window import (
+    VisualizerBridge, load_stage_html, install_render_crash_guard,
+)
 
 
 class Visualizer3DView(QWidget):
@@ -125,19 +125,26 @@ class Visualizer3DView(QWidget):
         _state = self._state
         _on_state = self._bridge._on_state
         self.destroyed.connect(lambda *_: _state.unsubscribe(_on_state))
-        try:
-            url = QUrl.fromLocalFile(HTML_PATH)
-            url.setQuery(f"v={int(time.time() * 1000)}")
-            self._view.load(url)
-        except Exception:
-            self._view.load(QUrl.fromLocalFile(HTML_PATH))
+        # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s), derselbe
+        # Mechanismus wie im VisualizerWindow (siehe RenderCrashGuard dort).
+        self._render_crash_guard = install_render_crash_guard(
+            self._view, status_cb=self._on_render_crash_giveup)
+        load_stage_html(self._view)
         self._view.loadFinished.connect(self._on_load_finished)
 
     def _on_load_finished(self, ok: bool):
         if not ok:
             return
         self._loaded = True
+        guard = getattr(self, "_render_crash_guard", None)
+        if guard is not None:
+            guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(300, self._push_initial_state)
+
+    def _on_render_crash_giveup(self, message: str):
+        """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
+        Statusmeldung statt stiller Endlosschleife toter Reloads."""
+        self._lbl_hint.setText(message)
 
     def _push_initial_state(self):
         try:

@@ -165,6 +165,33 @@ def _setup_crash_logging():
             pass
 
 
+def _setup_webengine_diagnostics():
+    """VIZ-10: Chromium-Flags fuer QWebEngine (3D-Visualizer) minimal-invasiv
+    diagnostizierbar machen — OHNE eigene Default-Flags zu erzwingen.
+
+    - Ein bereits gesetztes ``QTWEBENGINE_CHROMIUM_FLAGS`` bleibt UNVERAENDERT
+      (z. B. vom Nutzer oder einer .bat gesetzt) — wir ueberschreiben es nie.
+    - Optionales ``LIGHTOS_WEBENGINE_FLAGS`` wird angehaengt (fuer gezieltes
+      Debugging, z. B. ``--disable-gpu``), OHNE dass die App das je selbst setzt.
+    - Die effektiven Flags landen einmalig im crash.log, damit man beim
+      Nachstellen eines 3D-Renderer-Absturzes sieht, welche Flags aktiv waren.
+    """
+    try:
+        existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        extra = os.environ.get("LIGHTOS_WEBENGINE_FLAGS", "").strip()
+        if extra:
+            combined = f"{existing} {extra}".strip() if existing else extra
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
+        effective = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        if _crash_log_handle is not None:
+            ts = datetime.datetime.now().isoformat(timespec="seconds")
+            _crash_log_handle.write(
+                f"[WebEngine {ts}] QTWEBENGINE_CHROMIUM_FLAGS = "
+                f"'{effective}'\n")
+    except Exception:
+        pass
+
+
 def _install_crash_dialog():
     """F-9: Haengt einen nutzersichtbaren Fehler-Dialog an sys.excepthook UND
     threading.excepthook an. Wird NACH der QApplication aufgerufen. Die vorhandenen
@@ -339,6 +366,8 @@ def main():
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LightOS.DMX.Control.1")
         except Exception:
             pass
+
+    _setup_webengine_diagnostics()
 
     app = QApplication(sys.argv)
     app.setApplicationName("LightOS")
