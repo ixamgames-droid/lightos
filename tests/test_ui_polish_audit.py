@@ -75,12 +75,120 @@ class TestSectionButtonsNotClipped(unittest.TestCase):
                 f"< Textbedarf={need}")
 
     def test_section_button_min_width_matches_size_hint_floor(self):
-        """Die Mindestbreite ist ein Layout-Floor = sizeHint bei Konstruktion,
-        damit QHBoxLayout den Button bei Platzmangel NICHT unter die eigene
-        sizeHint quetschen kann (Kernursache des Bugs)."""
+        """Review-Fix (Befund 1/HIGH): die Mindestbreite ist NUR noch ein
+        kleiner Klick-Floor (nicht mehr die volle Textbreite) - sonst erzwingt
+        QHBoxLayout bei knappem Platz (900-1439px) eine Positionierung ENGER
+        als die Summe der Mindestbreiten -> Buttons ueberlappen sich. Der
+        Button darf trotzdem nie unter seinen Klick-Floor schrumpfen."""
         for btn in self.win._section_btns:
             self.assertGreater(btn.minimumWidth(), 0)
+            full_need = btn._full_text_size_hint().width()
+            self.assertLessEqual(
+                btn.minimumWidth(), full_need,
+                "Mindestbreite darf nicht mehr die volle Textbreite erzwingen "
+                "(Ueberlapp-Ursache, Review-Fix Befund 1)")
             self.assertGreaterEqual(btn.width(), btn.minimumWidth())
+
+
+class TestSectionButtonsDoNotOverlap(unittest.TestCase):
+    """Review-Fix (Befund 1/HIGH, CONFIRMED): bei 900-1439px erzwang die alte
+    harte Mindestbreite (= sizeHint) in SectionButton.showEvent eine
+    Layout-Anforderung, die groesser war als die verfuegbare Bar-Breite ->
+    QHBoxLayout positionierte die Buttons ENGER als deren Mindestbreiten-Summe
+    -> sichtbare Ueberlappung (gemessen bei 1024x900: bis 47px, GM-Gruppe
+    ueberdeckte den letzten Button). Fix: graceful Elide statt hartem
+    Text-Mindestbreiten-Floor (siehe SectionButton.resizeEvent)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+        from src.ui.main_window import MainWindow
+        cls.win = MainWindow()
+        cls.win.resize(1024, 900)
+        cls.win.show()
+        cls.app.processEvents()
+        cls.app.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls.win.close()
+            cls.win.deleteLater()
+        except Exception:
+            pass
+        cls.app.processEvents()
+        from src.core.show.show_file import reset_show
+        reset_show()
+        cls.app.processEvents()
+
+    def test_section_buttons_do_not_overlap_at_1024x900(self):
+        widgets = list(self.win._section_btns)
+        # GM-Gruppe (Label+Slider+Prozent) gehoert ebenfalls in die Bar und
+        # war Teil des urspruenglichen Befunds ("GM-Gruppe ueberdeckt den
+        # letzten Button") - als eigener Container mitpruefen.
+        gm_group = self.win._slider_gm.parentWidget()
+        widgets.append(gm_group)
+
+        spans = []
+        for w in widgets:
+            g = w.geometry()
+            spans.append((w, g.x(), g.x() + g.width()))
+
+        for i in range(len(spans)):
+            for j in range(i + 1, len(spans)):
+                w_a, a0, a1 = spans[i]
+                w_b, b0, b1 = spans[j]
+                overlap = min(a1, b1) - max(a0, b0)
+                self.assertLessEqual(
+                    overlap, 0,
+                    f"Section-Buttons/GM-Gruppe ueberlappen bei 1024x900: "
+                    f"{a0, a1} vs {b0, b1} (Ueberlapp={overlap}px)")
+
+    def test_section_button_texts_are_elided_not_overlapping_at_1024x900(self):
+        """Bei knappem Platz duerfen Buttons graceful eliden ('...'), aber
+        NIE unter ihren Klick-Floor schrumpfen bzw. sich ueberlappen."""
+        for btn in self.win._section_btns:
+            self.assertGreaterEqual(btn.width(), btn.minimumWidth())
+            # Tooltip zeigt immer einen nicht-leeren, nicht abgeschnittenen
+            # Titel (voller Text oder - fuer die zwei gekuerzten Labels
+            # "Bühne"/"E/A" - die noch laengere offizielle Bezeichnung, siehe
+            # `_section_full_names` in main_window._build_ui). Nie leer.
+            self.assertTrue(btn.toolTip())
+            self.assertGreaterEqual(len(btn.toolTip()), len(btn._full_text))
+
+
+class TestSectionButtonsFullTextAt1440(unittest.TestCase):
+    """Bei ausreichend Platz (>=1440px, nach den bereits gekuerzten Titeln)
+    zeigen alle Section-Buttons ihren vollen Titel, kein Elide."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+        from src.ui.main_window import MainWindow
+        cls.win = MainWindow()
+        cls.win.resize(1440, 900)
+        cls.win.show()
+        cls.app.processEvents()
+        cls.app.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            cls.win.close()
+            cls.win.deleteLater()
+        except Exception:
+            pass
+        cls.app.processEvents()
+        from src.core.show.show_file import reset_show
+        reset_show()
+        cls.app.processEvents()
+
+    def test_section_buttons_show_full_text_at_1440(self):
+        for btn in self.win._section_btns:
+            self.assertEqual(
+                btn.text(), btn._full_text,
+                f"Button zeigt bei 1440px nicht den vollen Titel: "
+                f"text={btn.text()!r} != full={btn._full_text!r}")
 
 
 class TestGrandMasterLabelReadable(unittest.TestCase):

@@ -85,8 +85,19 @@ class SectionButton(QPushButton):
     Sektions-Toolbar-Button:
     Transparenter Hintergrund, gelbe Unterstreichung wenn aktiv.
     """
+    # Kleiner Klick-Floor, damit der Button nie auf Null-Breite schrumpft
+    # (nur Sicherheitsnetz fuer Touch/Maus-Trefferflaeche, siehe Review-Fix
+    # unten - KEIN Text-Mindestbedarf mehr, siehe resizeEvent).
+    _CLICK_FLOOR_PX = 56
+
     def __init__(self, text: str, icon_color: str = "#6F6F6F"):
         super().__init__(text)
+        # UI-15/Review-Fix (2026-07-02): voller Titel wird fuer sizeHint/Tooltip
+        # und als Elide-Quelle in resizeEvent gebraucht - der aktuell angezeigte
+        # Text() darf dafuer NICHT herangezogen werden, sonst entsteht eine
+        # Schrumpf-Spirale (elidierter Text -> kleinere sizeHint -> noch mehr
+        # Elide, ...).
+        self._full_text = text
         self.setObjectName("sectionBtn")
         self.setCheckable(True)
         self.setFlat(True)
@@ -94,23 +105,66 @@ class SectionButton(QPushButton):
         self.setIcon(_colored_icon(icon_color, 14))
         self.setIconSize(QSize(14, 14))
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setToolTip(text)
+        self.setMinimumWidth(self._CLICK_FLOOR_PX)
 
-    # UI-15 (Visual-Audit 2026-07-02): bei knappem Platz in der Section-Bar
-    # komprimiert QHBoxLayout Fixed-Policy-Widgets unter ihren sizeHint, wenn die
-    # Summe aller Items die Bar-Breite uebersteigt (bei 1440px ~159px zu wenig)
-    # -> Titel wurden abgeschnitten ("Bühnen-Lay", "Virtual Cons"). Fix: harte
-    # Mindestbreite = Text+Icon-Breite, damit der Button NIE unter seinen
-    # eigenen Textbedarf schrumpft (kein Qt-Elide noetig). WICHTIG: sizeHint()
-    # NICHT im __init__ abfragen - das QSS (padding/Icon-Abstand) ist zu diesem
-    # Zeitpunkt noch nicht aufgeloest (Button noch nicht in die Bar eingehaengt/
-    # gepolished), sizeHint() liefert dann einen zu kleinen, falschen Wert
-    # (beobachtet: 98px statt korrekt 107px -> "Programmer" clippte trotz Fix).
-    # showEvent() laeuft garantiert NACH dem Einhaengen+Polish.
-    def showEvent(self, event) -> None:  # noqa: N802
-        super().showEvent(event)
-        need = self.sizeHint().width()
-        if need > self.minimumWidth():
-            self.setMinimumWidth(need)
+    def _full_text_size_hint(self) -> QSize:
+        # Nutzt Qts EIGENE sizeHint()-Berechnung (beruecksichtigt QSS-Padding,
+        # Icon-Abstand, Checkable/Flat-Extras exakt so wie Qt sie tatsaechlich
+        # anwendet) - dafuer den aktuell GESETZTEN Text() kurz gegen den vollen
+        # Titel tauschen. Robuster als eine eigene, von QSS-Werten abgeleitete
+        # Naeherungsrechnung (die bei 1440px zu 1-6px Diskrepanz gegenueber der
+        # tatsaechlichen Layout-Zuteilung fuehrte -> unnoetiges Elide trotz
+        # eigentlich ausreichend Platz).
+        current = self.text()
+        if current == self._full_text:
+            return super().sizeHint()
+        QPushButton.setText(self, self._full_text)
+        try:
+            return super().sizeHint()
+        finally:
+            QPushButton.setText(self, current)
+
+    def sizeHint(self):  # noqa: N802
+        # Breite aus dem VOLLEN Titel, nicht aus dem aktuell ggf. bereits
+        # elidierten self.text() - sonst wuerde die sizeHint mit jedem
+        # Elide-Zyklus weiter schrumpfen (Feedback-Schleife).
+        return self._full_text_size_hint()
+
+    def minimumSizeHint(self):  # noqa: N802
+        # QPushButtons Basis-minimumSizeHint() haengt am aktuell GESETZTEN
+        # Text() (nicht an unserem sizeHint()-Override) - QHBoxLayout kann sich
+        # bei der Groessenzuteilung an minimumSizeHint() statt sizeHint()
+        # orientieren, was sonst zu einem Rundungsfehler ggue. sizeHint()
+        # fuehrt (bei 1440px beobachtet: Buttons zu schmal -> letztes Zeichen
+        # elidiert, obwohl eigentlich ausreichend Platz vorhanden war). Fix:
+        # identisch zu sizeHint().
+        return self.sizeHint()
+
+    # Review-Fix (2026-07-02, Befund 1/HIGH): die vorherige harte
+    # setMinimumWidth(sizeHint) in showEvent() erzwang bei 900-1439px (Fenster
+    # erlaubt setMinimumSize(900,600)) eine Summe an Mindestbreiten, die groesser
+    # war als die verfuegbare Bar-Breite -> QHBoxLayout konnte die Buttons NICHT
+    # mehr auf ihre Mindestbreite bringen und positionierte sie enger als deren
+    # Summe -> sichtbare Ueberlappung (gemessen 1024x900: bis 47px, GM-Gruppe
+    # ueberdeckte den letzten Button). Fix: KEIN harter Text-Mindestbreiten-Floor
+    # mehr - stattdessen elidiert der Button seinen Text graceful auf die vom
+    # Layout tatsaechlich zugewiesene Breite (nie Ueberlappung, nur "..."-Kuerzung
+    # unterhalb ~1440px). Tooltip zeigt weiterhin immer den vollen Titel.
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        # "Chrome"-Breite (QSS-Padding, Icon+Abstand, Checkable/Flat-Extras) =
+        # Differenz zwischen Qts eigener sizeHint() fuer den vollen Titel und
+        # der reinen Textbreite - so bleibt das Elide-Budget konsistent mit
+        # sizeHint()/minimumSizeHint() oben (kein zweiter, potenziell
+        # abweichender Naeherungswert).
+        full_text_w = self.fontMetrics().horizontalAdvance(self._full_text)
+        chrome = max(self._full_text_size_hint().width() - full_text_w, 0)
+        avail = self.width() - chrome
+        shown = self.fontMetrics().elidedText(
+            self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
+        if shown != self.text():
+            self.setText(shown)
 
 
 class MainWindow(QMainWindow):
