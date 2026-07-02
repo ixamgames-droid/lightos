@@ -522,13 +522,23 @@ class SnapFilePanel(QWidget):
         self._tree.itemDoubleClicked.connect(self._on_double_click)
         # VC: Auswahl eines Effekts im Baum -> dessen VC-Widgets hervorheben.
         self._tree.itemSelectionChanged.connect(self._on_selection_highlight)
-        self._tree.itemExpanded.connect(
-            lambda it: self._on_folder_toggled(it, expanded=True))
-        self._tree.itemCollapsed.connect(
-            lambda it: self._on_folder_toggled(it, expanded=False))
+        # Gebundene Methoden statt Lambdas: einen Lambda-Slot haelt die
+        # C++-Connection des Baums STARK und fuer die Python-GC unsichtbar ->
+        # das gefangene `self` (dieses Panel) bleibt uneinsammelbar, waehrend
+        # sein C++-Objekt ueber die Qt-Eltern-Kaskade sterben kann -> Wrapper
+        # auf freiem Speicher = native AV beim GC-Teardown. Bound-Method-Slots
+        # bindet PySide6 dagegen schwach an den Receiver.
+        self._tree.itemExpanded.connect(self._on_item_expanded)
+        self._tree.itemCollapsed.connect(self._on_item_collapsed)
         layout.addWidget(self._tree, stretch=1)
 
     # ── Ordner-Zustand (auf-/zugeklappt) ──────────────────────────────────────
+
+    def _on_item_expanded(self, item):
+        self._on_folder_toggled(item, expanded=True)
+
+    def _on_item_collapsed(self, item):
+        self._on_folder_toggled(item, expanded=False)
 
     @staticmethod
     def _prefs_path() -> str:

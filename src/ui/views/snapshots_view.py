@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import json
 import copy
+import weakref
 from typing import Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QAction, QCursor
@@ -160,17 +161,31 @@ class SnapshotButton(QPushButton):
     def __init__(self, index: int, parent: "SnapshotsView"):
         super().__init__(parent)
         self._index = index
-        self._view = parent
+        # SCHWACHE Referenz auf die View: eine starke Ref macht
+        # view -> _buttons -> Button -> view zu einem Referenz-Zyklus, den erst
+        # die ZYKLISCHE GC abraeumt. Dealloziert die den Owner-Wrapper (die View
+        # besitzt ihr C++-Objekt), laeuft die Qt-Eltern-Kaskade mitten in der GC
+        # in beliebiger Dealloc-Reihenfolge -> native Access Violation
+        # (PySide6 6.11/Python 3.14; deterministischer Teardown-Crash von
+        # tests/test_snapshot_ignore.py). Ohne Zyklus stirbt der Baum per
+        # Refcount geordnet und die GC fasst ihn nie an.
+        self._view_ref = weakref.ref(parent)
         self.setMinimumSize(80, 56)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._on_context_menu)
         self.clicked.connect(self._on_click)
         self.refresh()
 
+    @property
+    def _view(self) -> "SnapshotsView":
+        return self._view_ref()
+
     def index(self) -> int:
         return self._index
 
     def refresh(self):
+        if self._view is None:      # View bereits zerstoert (Teardown-Fenster)
+            return
         snap = self._view.get_snapshot(self._index)
         if snap.is_empty():
             self.setText(f"{self._index + 1}\n(leer)")
@@ -192,6 +207,8 @@ class SnapshotButton(QPushButton):
             )
 
     def _on_click(self):
+        if self._view is None:
+            return
         snap = self._view.get_snapshot(self._index)
         if snap.is_empty():
             # Capture aktuellen Programmer
@@ -200,6 +217,8 @@ class SnapshotButton(QPushButton):
             self._view.apply(self._index)
 
     def _on_context_menu(self, _pos):
+        if self._view is None:
+            return
         menu = QMenu(self)
         snap = self._view.get_snapshot(self._index)
         if snap.is_empty():
