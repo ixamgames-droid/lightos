@@ -488,6 +488,16 @@ def reset_show():
     state._vc_layout = {}
     state._snapshots_data = []
     state._channel_groups_data = []
+    # VIZ-11: Szenegraph komplett neu (deckt den echten AppState, dessen 5
+    # Legacy-Felder Views auf state._scene sind, siehe app_state.py). Die
+    # expliziten Feld-Resets darunter bleiben zusaetzlich bestehen, damit
+    # Fake-States ohne Property-Adapter (z. B. tests/test_show_file.py
+    # _FakeState) weiterhin korrekt geleert werden.
+    if hasattr(state, "_scene"):
+        from src.core.stage.scene_graph import SceneGraph
+        state._scene = SceneGraph()
+    if hasattr(state, "_live_view_transient"):
+        state._live_view_transient = {}
     state.visualizer_positions = {}
     state.visualizer_rotations = {}
     state.visualizer_docks = {}

@@ -11,6 +11,8 @@ from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, classify_attr
+from .stage.scene_graph import SceneGraph
+from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
@@ -92,22 +94,36 @@ class AppState:
         # (Default). Wird nur lesend im Output-Thread benutzt -> einfaches Attribut.
         self.programmer_focus: str | None = None
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
+        # VIZ-11 (Schritt 3+4): kanonischer Store ist ab jetzt der SceneGraph
+        # (state._scene); die 5 Legacy-Felder darunter sind schreibende
+        # dict-Views/ein str-Attribut, die den Graphen durchreichen (siehe
+        # docs/VIZ11_SCENEGRAPH_DESIGN.md (b) + src/core/stage/scene_adapters.py).
+        # _view_registry haelt eine schwache Referenzliste aller lebenden
+        # dict-Views, damit eine direkte Graph-Mutation (nicht ueber die View)
+        # per _notify_scene_changed() alle Views frisch resyncen kann.
+        self._scene: SceneGraph = SceneGraph()
+        self._view_registry: _ViewRegistry = _ViewRegistry()
+        self._active_stage_name: str = "simple"
+        # Transientes Backing-dict fuer schema-fremde live_view_positions-Werte
+        # (Test-Sentinel, s. scene_adapters._LiveViewDict) -- lebt in AppState,
+        # damit es zwischen zwei Property-Zugriffen ueberlebt (der Getter
+        # erzeugt bei jedem Aufruf eine frische View-Instanz).
+        self._live_view_transient: dict = {}
         # positions: {fid: (x, y, z)} ; active_stage_name: preset-key oder User-Stage-Name
-        self.visualizer_positions: dict[int, tuple[float, float, float]] = {}
+        # (Property weiter unten; Backing-Store ist state._scene.)
         # Multi-Achsen-Ausrichtung (rx, ry, rz) in GRAD je Fixture im 3D-Visualizer:
         # rx = Kippen (Pitch, Boden->Decke), ry = Drehen um die Hochachse (Yaw),
         # rz = Roll. Getrennt von positions. Abwaertskompatibel zu Alt-Shows, die
         # nur einen Y-Float gespeichert haben (siehe coords.normalize_rotation +
         # show_file.load_show). Erlaubt spaeter MH-Auto-Aim (volle Montage-Lage).
-        self.visualizer_rotations: dict[int, tuple[float, float, float]] = {}
+        # (Property weiter unten; Backing-Store ist state._scene.)
         # Andock-Beziehungen: {fid: stage_element_id} — Strahler haengt an/auf
         # diesem Buehnen-Element (Trasse/Plattform/Boden). Bewegt sich das
         # Element, wandert der Strahler mit. Geht mit in die .lshow.
-        self.visualizer_docks: dict[int, str] = {}
-        self.active_stage_name: str = "simple"
+        # (Property weiter unten; Backing-Store ist state._scene.)
         # Live-View-Positionen (2D, {fid: (x, y)}) — eigene Persistenz, entkoppelt
         # vom 3D-Visualizer. Migration aus visualizer_positions beim Laden, falls leer.
-        self.live_view_positions: dict[int, tuple[float, float]] = {}
+        # (Property weiter unten; Backing-Store ist state._scene.)
         # P4: Show-spezifische Live-View-Einstellungen (zoom, grid_size, snap,
         # grid_visible, world_w/h) — von der Live View gepflegt, wandert mit
         # save_show/load_show. Leer = ui_prefs-Defaults (alte Shows).
@@ -206,6 +222,82 @@ class AppState:
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
+
+    # ── VIZ-11: SceneGraph-Adapter (Schritt 3+4) ────────────────────────────────
+    # Die 5 Legacy-Felder sind Properties ueber state._scene. Getter liefern
+    # eine frische View-Instanz (dict-Subklasse, siehe scene_adapters.py);
+    # Setter fangen Ganz-Dict-/Ganz-Wert-Zuweisung ab und speisen sie in den
+    # Graphen ein. isinstance(x, dict) bleibt fuer alle 4 dict-Felder True.
+
+    def _notify_scene_changed(self) -> None:
+        """Muss aufgerufen werden, wenn state._scene DIREKT (nicht ueber eine
+        der 4 dict-Views) mutiert wurde, damit lebende Views wieder synchron
+        sind (siehe Design (b), Konsistenzregel)."""
+        self._view_registry.resync_all()
+
+    @property
+    def visualizer_positions(self) -> dict:
+        return _SceneBackedDict(self._scene, "pos", self._view_registry)
+
+    @visualizer_positions.setter
+    def visualizer_positions(self, value: dict) -> None:
+        # Ganz-Dict-Zuweisung = vollstaendige Ersetzung: Fixtures, die im neuen
+        # Dict fehlen, verlieren ihre Node komplett (pos+rot+dock in EINEM,
+        # wie ein einzelnes pop). ANNAHME (von allen realen Call-Sites erfuellt,
+        # siehe show_file.load_show/reset_show + Tests): visualizer_positions
+        # wird vor visualizer_rotations/visualizer_docks zugewiesen, sonst
+        # wuerden hier bereits gesetzte Rotationen/Docks mit verloren gehen.
+        view = _SceneBackedDict(self._scene, "pos", self._view_registry)
+        view.clear()
+        for fid, pos in dict(value or {}).items():
+            view[fid] = pos
+
+    @property
+    def visualizer_rotations(self) -> dict:
+        return _SceneBackedDict(self._scene, "rot", self._view_registry)
+
+    @visualizer_rotations.setter
+    def visualizer_rotations(self, value: dict) -> None:
+        view = _SceneBackedDict(self._scene, "rot", self._view_registry)
+        for fid, rot in dict(value or {}).items():
+            view[fid] = rot
+        # Fixtures, die im neuen Dict fehlen, auf (0,0,0) zuruecksetzen (Ganz-
+        # Dict-Zuweisung ist eine vollstaendige Ersetzung, kein Merge).
+        stale = [n.fixture_id for n in self._scene.fixtures()
+                 if n.fixture_id not in dict(value or {})]
+        for fid in stale:
+            view[fid] = (0.0, 0.0, 0.0)
+
+    @property
+    def visualizer_docks(self) -> dict:
+        return _DockView(self._scene, self._view_registry)
+
+    @visualizer_docks.setter
+    def visualizer_docks(self, value: dict) -> None:
+        view = _DockView(self._scene, self._view_registry)
+        view.clear()
+        for fid, sid in dict(value or {}).items():
+            view[fid] = sid
+
+    @property
+    def live_view_positions(self) -> dict:
+        return _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
+
+    @live_view_positions.setter
+    def live_view_positions(self, value: dict) -> None:
+        view = _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
+        view.clear()
+        for fid, pos in dict(value or {}).items():
+            view[fid] = pos
+
+    @property
+    def active_stage_name(self) -> str:
+        return self._active_stage_name
+
+    @active_stage_name.setter
+    def active_stage_name(self, value: str) -> None:
+        self._active_stage_name = value or "simple"
+        self._scene.stage_snapshot["name"] = self._active_stage_name
 
     # ── Show-Datenbank ────────────────────────────────────────────────────────
 
