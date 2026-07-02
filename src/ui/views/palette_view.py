@@ -33,6 +33,9 @@ class PaletteButton(QPushButton):
         elif p.type == PaletteType.BEAM:
             bg = "#1a4a2a"
             text_color = "#3fb950"
+        elif p.type == PaletteType.LASER:
+            bg = "#2a0a3a"
+            text_color = "#e879f9"
         else:
             bg = "#2a1a4a"
             text_color = "#bc8cff"
@@ -235,6 +238,7 @@ class PaletteView(QWidget):
             (PaletteType.POSITION, "Position"),
             (PaletteType.BEAM,     "Beam"),
             (PaletteType.EFFECT,   "Effekte"),
+            (PaletteType.LASER,    "Laser"),
         ]:
             page = PalettePage(ptype, self._manager)
             tabs.addTab(page, label)

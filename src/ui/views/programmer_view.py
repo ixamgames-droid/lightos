@@ -439,6 +439,12 @@ class ProgrammerView(QWidget):
         self._rgb_page = self._make_rgb_page()
         self._main_tabs.addTab(self._rgb_page, "Matrix")
         self._matrix_tab_index = self._main_tabs.indexOf(self._rgb_page)
+        # LAS-02: Laser-Tab — nur sichtbar, wenn die Auswahl Laser-Geraete
+        # enthaelt (gesetzt in _rebuild_attr_editor, analog EFX).
+        self._laser_page = self._make_laser_page()
+        self._main_tabs.addTab(self._laser_page, "Laser")
+        self._laser_tab_index = self._main_tabs.indexOf(self._laser_page)
+        self._main_tabs.setTabVisible(self._laser_tab_index, False)
         self._main_tabs.addTab(self._make_palette_page(), "Paletten")
 
         # ENG-02: aktiven Tab an app_state melden — der Renderer entscheidet damit bei
@@ -623,6 +629,16 @@ class ProgrammerView(QWidget):
         except Exception as e:
             print(f"[programmer_view] rgb embed error: {e}")
             return QLabel(f"Matrix nicht verfügbar: {e}")
+
+    def _make_laser_page(self) -> QWidget:
+        """Laser-Steuerseite eingebettet (LAS-02, folgt der Auswahl)."""
+        try:
+            from src.ui.views.laser_view import LaserView
+            self._embedded_laser = LaserView(follow_selection=True)
+            return self._embedded_laser
+        except Exception as e:
+            print(f"[programmer_view] laser embed error: {e}")
+            return QLabel(f"Laser nicht verfügbar: {e}")
 
     def _make_palette_page(self) -> QWidget:
         """Paletten-Manager eingebettet (Anwenden wirkt auf die Auswahl, R2)."""
@@ -1139,6 +1155,18 @@ class ProgrammerView(QWidget):
                 self._main_tabs.setTabVisible(self._position_tab_index, has_pos)
             if getattr(self, "_efx_tab_index", -1) >= 0:
                 self._main_tabs.setTabVisible(self._efx_tab_index, has_pos)
+            # LAS-02: Laser-Tab sichtbar, sobald EIN Laser-Geraet in der
+            # Auswahl ist (gegen alle selektierten Geraete geprueft, wie beim
+            # Mapping-Tab — nicht nur gegen das Template).
+            if getattr(self, "_laser_tab_index", -1) >= 0:
+                try:
+                    from src.ui.views.laser_view import (
+                        fixture_has_laser_capability)
+                    has_laser = any(fixture_has_laser_capability(f)
+                                    for f in selected)
+                except Exception:
+                    has_laser = False
+                self._main_tabs.setTabVisible(self._laser_tab_index, has_laser)
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
 
