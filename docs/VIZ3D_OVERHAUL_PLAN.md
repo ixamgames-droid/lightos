@@ -20,10 +20,11 @@
 ### Architektur (Kernursache der Instabilität)
 - **Zwei komplett unabhängige 3D-Engines**: `VisualizerWindow` (Vollfenster) und
   `Visualizer3DView` (eingebettet in der Live View) laden je eine eigene
-  `stage_scene.html`-Instanz mit eigener `VisualizerBridge`, eigener AppState-Subscription
-  und eigenem 33-ms-Push-Timer (`visualizer_window.py:1274` / `visualizer_view.py:115`;
-  `_push_dmx_updates` ist Copy-Paste-Duplikat). Laufen beide, rendern zwei Chromium-Prozesse
-  dieselbe Szene doppelt.
+  `stage_scene.html`-Instanz mit eigener `VisualizerBridge` (erzeugt in `_setup_channel`,
+  `visualizer_window.py:1274` / `visualizer_view.py:115`), eigener AppState-Subscription
+  und eigenem 33-ms-Push-Timer (`visualizer_window.py:1344-1346` / `visualizer_view.py:46,213`);
+  `_push_dmx_updates` (`visualizer_window.py:1349` / `visualizer_view.py:181`) ist
+  Copy-Paste-Duplikat. Laufen beide, rendern zwei Chromium-Prozesse dieselbe Szene doppelt.
 - **Fenster wird bei jedem Öffnen zerstört + neu gebaut** (`main_window.py:1326`:
   `close()`+`deleteLater()`+Neuaufbau mit Cache-Buster). Ein Dauerfenster ist damit
   unmöglich; Kamera/Modus/Helligkeit gehen bei jedem Öffnen verloren (live verifiziert).
@@ -72,7 +73,7 @@
   Tone-Mapping, kein `setPixelRatio`, Szene extrem dunkel, Fixtures = winzige Klötzchen im
   Nichts (kein Raum, kaum Grid-Bezug). Moving Head = bewusst grobe Platzhalter-Primitive
   (das vorhandene `.dae` liegt ungenutzt, weil es nicht mit Yoke/Head animierte).
-- `stage_scene.html` = 3275-Zeilen-Monolith ohne Module/Buildstep; 2D-Top-Down ist ein
+- `stage_scene.html` = ~3450-Zeilen-Monolith ohne Module/Buildstep; 2D-Top-Down ist ein
   komplett **paralleles zweites Objektmodell** statt einer Kameraprojektion.
 
 ## 2. Was die Konkurrenz besser macht (Kern-Patterns)
@@ -151,8 +152,11 @@ Quick Wins ohne Architekturänderung:
    live_view_positions als Fallback) + Migrationstests.
 5. **Undo/Redo**: `QUndoStack` in Python, Command pro Transform/Add/Remove/Dock (Multi-
    Select-Drag = EIN Command), Strg+Z/Y in Qt UND aus der WebView durchgereicht.
-- **Akzeptanz:** Truss-Rotation nimmt gedockte Fixtures mit; alte Shows laden korrekt;
-  .lshow auf frischem Rechner bringt Bühne mit; Undo über alle Editier-Operationen.
+- **Akzeptanz:** Truss-Rotation nimmt gedockte Fixtures mit; **Migrations-Gate:** ALLE
+  committeten Shows aus `shows/` (≥35) laden nach Migration fehlerfrei UND ein
+  automatisierter Vergleichstest bestätigt äquivalente Welt-Transforms (Position in m,
+  Rotation, Docks) vorher/nachher — Referenz-Realshow „david test 2.lshow"; .lshow auf
+  frischem Rechner bringt Bühne mit; Undo über alle Editier-Operationen.
 
 ### Phase 2 — Ein Service, ein Dauerfenster (VIZ-12, P1)
 1. `VisualizerService` (Singleton): EINE Bridge, EIN Push-Takt, **Dirty-Tracking**
@@ -163,7 +167,8 @@ Quick Wins ohne Architekturänderung:
    bleiben erhalten.
 3. Eingebettete Live-View-3D wird durch einen Button „3D-Fenster öffnen" ersetzt ODER
    dockt als reines Spiegel-Target ohne eigenen Timer/Bridge an den Service
-   (Entscheidung David, s. §7).
+   (Entscheidung David, s. §7 — **Achtung: die Spiegel-Variante vergrößert Phase 2
+   deutlich**; die Button-Variante ist eine Runde, die Spiegel-Variante eher zwei).
 4. Zentrales `reset_interaction_state()` bei `show_loaded`/Stage-Wechsel (stoppt Trace usw.);
    `screenChanged`→`setPixelRatio`-Durchreichung (Zweitmonitor/DPI).
 - **Akzeptanz:** Fenster überlebt Öffnen/Schließen ohne Rebuild (Kamera bleibt); nur noch
@@ -171,6 +176,11 @@ Quick Wins ohne Architekturänderung:
   parallel flüssig.
 
 ### Phase 3 — JS-Neuaufbau (VIZ-13, P1)
+> **Größte Phase — bewusst in DREI mergebare Teilrunden geschnitten** (der ~3450-Zeilen-
+> Monolith wird graduell ersetzt, nicht in einem Rutsch): **3a** Build-Step + Modul-
+> Extraktion OHNE Verhaltensänderung (reines Refactoring, Verhaltens-Checkliste),
+> **3b** OrbitControls/TransformControls + Kamera-Presets/Fit, **3c** Ortho-2D +
+> FixtureType-Registry + On-Demand-Rendering. Jede Teilrunde einzeln gate-fähig.
 1. ES-Module + leichter Build-Step (esbuild; Output lokal, kein Netzzugriff zur Laufzeit):
    `scene/`, `fixtures/`, `stage/`, `interaction/`, `bridge/`.
 2. **OrbitControls** (Damping, Orbit um Klickpunkt via Raycast-Target) +
