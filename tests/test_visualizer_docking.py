@@ -153,9 +153,14 @@ class DockPersistenceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "old.lshow")
             save_show(path)
+            # VIZ-11: scene_graph-Block ebenfalls entfernen (save_show schreibt
+            # ihn seit v1.2 dual) -- sonst greift die Direkt-Migration
+            # (from_dict) statt from_legacy und der manipulierte Legacy-Block
+            # wird ignoriert (s. test_stale_dock_discarded_on_load-Nachbarn).
             with zipfile.ZipFile(path) as zf:
                 data = json.loads(zf.read("show.json"))
             data["visualizer"].pop("docks", None)
+            data.pop("scene_graph", None)
             with zipfile.ZipFile(path, "w") as zf:
                 zf.writestr("show.json", json.dumps(data))
             state.visualizer_docks = {3: 999}   # muss geleert werden

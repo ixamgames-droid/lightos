@@ -1478,6 +1478,15 @@ class MainWindow(QMainWindow):
     def _do_save(self, path: str):
         from src.core.show.show_file import save_show
         try:
+            # VIZ-11 (Schritt 5, Orchestrator-Entscheidung 2): vor dem
+            # destruktiven Overwrite ein Backup der Alt-Datei ziehen, aber
+            # NUR wenn sie noch VOR dem SceneGraph-Format geladen wurde
+            # (Version < 1.2) -- idempotent (ueberschreibt ein bestehendes
+            # .pre-viz11.bak nicht nochmal).
+            try:
+                self._backup_pre_viz11_show(path)
+            except Exception as e:
+                print(f"[main_window] pre-viz11 backup error: {e}")
             # VC-Layout (Buttons/Fader) aus dem aktuellen Canvas uebernehmen
             try:
                 self._state._vc_layout = self._vc_view.to_dict()
@@ -1511,6 +1520,32 @@ class MainWindow(QMainWindow):
             self._rebuild_recent_menu()
         except Exception as e:
             QMessageBox.warning(self, "Speicherfehler", str(e))
+
+    @staticmethod
+    def _backup_pre_viz11_show(path: str) -> None:
+        """VIZ-11 (Schritt 5, Orchestrator-Entscheidung 2): legt ``<name>.pre-
+        viz11.bak`` neben ``path`` an, falls die dort AKTUELL liegende Datei
+        (vor dem gleich folgenden Overwrite) noch kein SceneGraph-Format
+        hatte (Version < 1.2). Idempotent: ueberschreibt ein bereits
+        bestehendes Backup nicht. Kein Backup fuer neue Dateien (Pfad
+        existiert noch nicht -- "Speichern unter") oder unlesbare Versionen."""
+        if not path or not os.path.exists(path):
+            return
+        bak_path = path + ".pre-viz11.bak"
+        if os.path.exists(bak_path):
+            return
+        from src.core.show.show_file import read_show_version
+        version = read_show_version(path)
+        if version is None:
+            return
+        try:
+            parts = tuple(int(p) for p in version.split("."))
+        except (ValueError, AttributeError):
+            return
+        if parts >= (1, 2):
+            return
+        import shutil
+        shutil.copy2(path, bak_path)
 
     # ── Web / OSC ─────────────────────────────────────────────────────────────
 

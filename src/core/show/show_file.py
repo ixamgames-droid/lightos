@@ -7,7 +7,7 @@ import os
 from src.core.strict import strict_mode
 from src.core.stage.coords import normalize_rotation
 
-SHOW_VERSION = "1.1"
+SHOW_VERSION = "1.2"
 
 
 def _lenient(msg: str, exc: Exception) -> None:
@@ -284,6 +284,16 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "active_stage": getattr(state, "active_stage_name", "simple") or "simple",
     }
 
+    # VIZ-11 (Schritt 5): SceneGraph-Block additiv dazuschreiben — EINE Quelle
+    # (state._scene), die Legacy-Bloecke oben werden bereits aus den Adapter-
+    # Views (state.visualizer_positions/_rotations/_docks) gebaut, die selbst
+    # nur Sichten auf denselben Graphen sind -> kein Drift zwischen beiden
+    # Bloecken moeglich. Fehlt state._scene (z. B. Fake-States in Tests ohne
+    # Adapter), wird der Block einfach weggelassen (Dual-Write ist additiv,
+    # kein Pflichtfeld beim Laden -- siehe load_show-Migrationsgate).
+    scene = getattr(state, "_scene", None)
+    scene_graph_data = scene.to_dict() if scene is not None else None
+
     # Live-View-2D-Positionen (eigene Persistenz, entkoppelt vom 3D-Visualizer)
     live_view_data = {
         "positions": {
@@ -333,6 +343,8 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     }
     if layout:
         show["layout"] = layout
+    if scene_graph_data is not None:
+        show["scene_graph"] = scene_graph_data
 
     path = os.fspath(path)
     parent = os.path.dirname(path)
@@ -531,22 +543,45 @@ def reset_show():
         print(f"[show_file] reset post events error: {e}")
 
 
-def _resolve_stage_element_ids(stage_name: str) -> set[str] | None:
-    """Element-IDs der aktiven Buehne (Preset-Key oder User-Stage), oder None
-    wenn die Buehne nicht aufloesbar ist (dann keine Dock-Bereinigung)."""
+def _resolve_stage_definition(stage_name: str):
+    """Loest die aktive Buehne (Preset-Key oder User-Stage, %APPDATA%) auf.
+    None, wenn nicht aufloesbar (z.B. User-Stage-Datei fehlt) — dann werden
+    beim VIZ-11-Migrations-Fallback Fixtures zu Root-Nodes (siehe
+    SceneGraph.from_legacy, docs/VIZ11_SCENEGRAPH_DESIGN.md (c) Schritt 2)."""
     try:
         from src.core.stage.stage_definition import DEFAULT_PRESETS, load_stage
         name = stage_name or "simple"
-        stage = None
         if name in DEFAULT_PRESETS:
-            stage = DEFAULT_PRESETS[name]()
-        else:
-            stage = load_stage(name)
-        if stage is None:
-            return None
-        return {e.id for e in stage.elements}
+            return DEFAULT_PRESETS[name]()
+        return load_stage(name)
     except Exception as e:
-        print(f"[show_file] resolve stage ids error: {e}")
+        print(f"[show_file] resolve stage definition error: {e}")
+        return None
+
+
+def _resolve_stage_element_ids(stage_name: str) -> set[str] | None:
+    """Element-IDs der aktiven Buehne (Preset-Key oder User-Stage), oder None
+    wenn die Buehne nicht aufloesbar ist (dann keine Dock-Bereinigung)."""
+    stage = _resolve_stage_definition(stage_name)
+    if stage is None:
+        return None
+    return {e.id for e in stage.elements}
+
+
+def read_show_version(path: str | os.PathLike) -> str | None:
+    """Liest NUR das ``version``-Feld einer .lshow, ohne den App-State
+    anzufassen. Fuer den VIZ-11-Backup-Entscheid in main_window._do_save
+    (Orchestrator-Entscheidung 2): Backup nur, wenn die auf der Platte
+    liegende Datei NOCH kein scene_graph-Format hat (Version < 1.2).
+    None bei jeglichem Lesefehler (z.B. Datei existiert noch nicht -> "Speichern
+    unter" auf neuen Pfad) oder fehlendem "version"-Schluessel."""
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            raw = zf.read("show.json").decode("utf-8")
+        data = json.loads(raw)
+        version = data.get("version")
+        return str(version) if version is not None else None
+    except Exception:
         return None
 
 
@@ -771,6 +806,52 @@ def load_show(path: str | os.PathLike):
         _lenient("load live_view error", e)
         state.live_view_positions = {}
         state.live_view_meta = {}
+
+    # VIZ-11 (Schritt 5): SceneGraph aufbauen -- entweder direkt aus dem
+    # "scene_graph"-Block (bereits migrierte v1.2+ Show, Graph fuehrend) oder
+    # einmalig aus den soeben geladenen Legacy-Feldern (Alt-Show v<=1.1,
+    # siehe docs/VIZ11_SCENEGRAPH_DESIGN.md (c) Migrations-Algorithmus).
+    # hasattr-Guard: Fake-States in Tests ohne Adapter (kein state._scene)
+    # ueberspringen die Migration einfach -- sie kennen die 5 Felder eh nur
+    # als plain-dict-Attribute.
+    if hasattr(state, "_scene"):
+        try:
+            if "scene_graph" in data:
+                from src.core.stage.scene_graph import SceneGraph
+                state._scene = SceneGraph.from_dict(data["scene_graph"])
+                # Stale-Dock-Filter (dieselbe Regel wie im Legacy-Pfad, Design
+                # (d)) auch hier anwenden: from_dict verwirft nur STRUKTURELL
+                # ungueltige parent_id-Referenzen (Ziel-Node fehlt komplett
+                # im geladenen Datensatz). Ein Dock auf eine Platzhalter-Node
+                # (von _DockView beim blossen Setzen ohne Existenzpruefung
+                # angelegt, siehe scene_adapters.py) WIRD mitgespeichert und
+                # ist damit strukturell gueltig, aber kein echtes Element der
+                # aktuell aufgeloesten Buehne mehr -> ohne diesen Zusatz-Filter
+                # wuerde ein geloeschtes Buehnen-Element nach dem Laden wieder
+                # als Dock-Ziel auftauchen (test_stale_dock_discarded_on_load).
+                valid_ids = _resolve_stage_element_ids(state.active_stage_name)
+                if valid_ids is not None:
+                    # Erst sammeln, dann reparenten (nicht waehrend der
+                    # dict-Iteration mutieren).
+                    stale_node_ids = [
+                        n.id for n in state._scene._nodes.values()
+                        if n.parent_id is not None and n.parent_id not in valid_ids
+                    ]
+                    for nid in stale_node_ids:
+                        state._scene.reparent(nid, None, keep_world=True)
+            else:
+                from src.core.stage.scene_graph import SceneGraph
+                stage_def = _resolve_stage_definition(state.active_stage_name)
+                state._scene = SceneGraph.from_legacy(
+                    positions=dict(state.visualizer_positions),
+                    rotations=dict(state.visualizer_rotations),
+                    docks=dict(state.visualizer_docks),
+                    active_stage_name=state.active_stage_name,
+                    live_view_positions=dict(state.live_view_positions),
+                    stage_def=stage_def,
+                )
+        except Exception as e:
+            _lenient("load scene_graph error", e)
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}
