@@ -57,14 +57,19 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     # Gobo-faehigen Fixtures sichtbar) zwischen Position und Weitere.
     # M-Map: "Mapping" (Kanal-Mapping) zwischen Weitere und Helper, ebenfalls
     # standardmaessig versteckt (nur bei Pan/Tilt-Geraeten sichtbar).
+    # LAS-02: "Laser" zwischen Matrix und Paletten, standardmaessig versteckt
+    # (nur bei Laser-Geraeten sichtbar).
     labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
     assert labels == ["Intensity", "Color", "Position", "Gobo", "Weitere",
-                      "Mapping", "Hilfe", "EFX", "Matrix", "Paletten"], labels
-    # Gobo-, Mapping-, Position- und EFX-Tab sind ohne Auswahl ausgeblendet.
+                      "Mapping", "Hilfe", "EFX", "Matrix", "Laser",
+                      "Paletten"], labels
+    # Gobo-, Mapping-, Position-, EFX- und Laser-Tab sind ohne Auswahl
+    # ausgeblendet.
     assert pv._main_tabs.isTabVisible(pv._gobo_tab_index) is False
     assert pv._main_tabs.isTabVisible(pv._mapping_tab_index) is False
     assert pv._main_tabs.isTabVisible(pv._position_tab_index) is False
     assert pv._main_tabs.isTabVisible(pv._efx_tab_index) is False
+    assert pv._main_tabs.isTabVisible(pv._laser_tab_index) is False
     assert pv._tile_preview is not None           # UNTEN
 
     # Tab-Wechsel wirft nicht.
