@@ -1598,10 +1598,14 @@ class MainWindow(QMainWindow):
                 apply_layout(self, layout)
         except Exception as e:
             print(f"[main_window] apply_layout error: {e}")
-        # VC-Layout (Buttons/Fader) in den Canvas laden
+        # VC-Layout (Buttons/Fader) in den Canvas laden. WICHTIG (VCL-04): auch ein
+        # LEERES Layout-Dict muss durch from_dict() (raeumt intern via _clear() den
+        # alten Canvas) — sonst ueberleben die VC-Widgets der VORIGEN Show ein
+        # "Neue Show" bzw. das Laden einer Show ohne VC-Widgets. Nur ein fehlendes/
+        # kaputtes _vc_layout (kein dict) laesst den Canvas unangetastet.
         try:
             vc = getattr(self._state, "_vc_layout", None)
-            if vc and getattr(vc, "get", None) and vc.get("widgets"):
+            if isinstance(vc, dict):
                 self._vc_view.from_dict(vc)
         except Exception as e:
             print(f"[main_window] vc layout restore error: {e}")
