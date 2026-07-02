@@ -106,12 +106,14 @@ _OPTION_LABELS = {
     # Farb-/Helligkeits-/Dimmer-/Loop-/Blend-/Fuell-Modus etc.
     "color": "Farbe", "flash": "Blitz",
     "dimmer": "Dimmer", "strobe": "Strobe", "pulse": "Puls", "sparkle": "Funkeln",
-    "restart": "Neu starten", "stay": "Stehen bleiben", "reverse": "Rückwärts leeren",
+    "restart": "Neu starten", "stay": "Stehen bleiben",
     "fadeout": "Ausfaden",
     "linear": "Linear",
     "normal": "Normal", "pingpong": "Ping-Pong",
     "smooth": "Weich", "steps": "Bänder",
-    "up": "Aufwärts", "down": "Abwärts",
+    # "up"/"down"/"reverse" stehen hier bewusst NICHT: die Tokens deckt _DIR_LABELS
+    # ab; wo ein Param ihnen eine ANDERE Bedeutung gibt, gehoert das Label in
+    # _OPTION_LABELS_BY_KEY (sonst totes Schatten-Mapping, Review-Befund).
     "target": "Zielfarbe", "sequence": "Sequenz",
     # EFX phase_mode (Verhaeltnis der Geraete)
     "fan": "Fächer", "offset": "Versatz", "sync": "Synchron",
@@ -121,6 +123,13 @@ _OPTION_LABELS = {
     "Forward": "Vorwärts", "Backward": "Rückwärts",
     "Loop": "Schleife", "SingleShot": "Einmalig", "PingPong": "Ping-Pong",
     "Random": "Zufällig",
+}
+
+# Kontextabhaengige Labels: derselbe Token bedeutet je Param etwas anderes —
+# diese Map hat VORRANG vor _DIR_LABELS/_OPTION_LABELS (Review-Befund VCL-03:
+# loop_mode="reverse" heisst "rueckwaerts LEEREN", nicht die Laufrichtung).
+_OPTION_LABELS_BY_KEY = {
+    "loop_mode": {"reverse": "Rückwärts leeren"},
 }
 
 
@@ -1167,10 +1176,15 @@ class VCMultiLiveEditor(VCWidget):
         s = str(val).replace("_", " ")
         return s[:1].upper() + s[1:] if s else s
 
-    def _option_labeled(self, val) -> str:
+    def _option_labeled(self, val, key: str = "") -> str:
         """Fallback-Kette fuer einen einzelnen Options-Wert OHNE explizites Tupel-
-        Label: _DIR_LABELS (Pfeil-Richtungen) -> _OPTION_LABELS (VCL-03, restliche
+        Label: _OPTION_LABELS_BY_KEY (kontextabhaengig, hoechste Praezedenz —
+        derselbe Token kann je Param anderes bedeuten, z. B. loop_mode="reverse")
+        -> _DIR_LABELS (Pfeil-Richtungen) -> _OPTION_LABELS (VCL-03, restliche
         deutsche Labels) -> Prettify (rohes Token lesbar gemacht)."""
+        by_key = _OPTION_LABELS_BY_KEY.get(key)
+        if by_key and val in by_key:
+            return by_key[val]
         if val in _DIR_LABELS:
             return _DIR_LABELS[val]
         if val in _OPTION_LABELS:
@@ -1179,15 +1193,16 @@ class VCMultiLiveEditor(VCWidget):
 
     def _option_pairs(self, spec):
         """ParamSpec.options -> [(wert, beschriftung)] (normalisiert Tupel/Skalar).
-        Fallback-Kette (VCL-03): explizites Tupel-Label -> _DIR_LABELS ->
-        _OPTION_LABELS -> Prettify (kein roher Token mehr sichtbar)."""
+        Fallback-Kette (VCL-03): explizites Tupel-Label -> _OPTION_LABELS_BY_KEY ->
+        _DIR_LABELS -> _OPTION_LABELS -> Prettify (kein roher Token mehr sichtbar)."""
+        key = getattr(spec, "key", "")
         pairs = []
         for o in (getattr(spec, "options", ()) or ()):
             if isinstance(o, (tuple, list)):
                 val = o[0] if o else None
-                lbl = str(o[1]) if len(o) > 1 else self._option_labeled(val)
+                lbl = str(o[1]) if len(o) > 1 else self._option_labeled(val, key)
             else:
-                val, lbl = o, self._option_labeled(o)
+                val, lbl = o, self._option_labeled(o, key)
             pairs.append((val, lbl))
         return pairs
 

@@ -931,6 +931,27 @@ class VCMultiLiveEditorTest(unittest.TestCase):
         pairs = self.ed._option_pairs(_FakeSpec())
         self.assertEqual(pairs, [("raw", "Eigenes Label")])
 
+    def test_option_labels_are_key_context_aware_for_loop_mode_reverse(self):
+        """Review-Befund VCL-03: derselbe Token bedeutet je Param etwas anderes.
+        loop_mode="reverse" (FILL) = "Rückwärts leeren" (_OPTION_LABELS_BY_KEY,
+        hoechste Praezedenz), waehrend direction="reverse" die Laufrichtung
+        "rückwärts" bleibt (_DIR_LABELS unveraendert)."""
+        class _LoopSpec:
+            kind = "select"
+            key = "loop_mode"
+            options = ("restart", "stay", "reverse", "fadeout")
+
+        class _DirSpec:
+            kind = "select"
+            key = "direction"
+            options = ("forward", "reverse")
+
+        loop_pairs = dict(self.ed._option_pairs(_LoopSpec()))
+        dir_pairs = dict(self.ed._option_pairs(_DirSpec()))
+        self.assertEqual(loop_pairs["reverse"], "Rückwärts leeren")
+        self.assertEqual(loop_pairs["restart"], "Neu starten")
+        self.assertEqual(dir_pairs["reverse"], "rückwärts")
+
 
 if __name__ == "__main__":
     unittest.main()
