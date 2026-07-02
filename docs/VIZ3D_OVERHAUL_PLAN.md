@@ -247,11 +247,15 @@ MVR-Import/Export; abdockbare Zweitfenster-Views pro Kamera.
 - WebEngine bleibt die Render-Basis (kein Engine-Wechsel) — Aufwand kalkulierbar, alle
   Verbesserungen sind additiv in Three.js machbar.
 
-## 7. Offene Design-Entscheidungen (David)
+## 7. Design-Entscheidungen (David, 2026-07-02 — ✅ ENTSCHIEDEN)
 
-1. **Eingebettete 3D-Ansicht in der Live View**: ersetzen durch „3D-Fenster öffnen"-Button
-   (einfacher, empfohlen) oder als Spiegel-Target behalten (mehr Aufwand, Phase 2)?
-2. **Render-Stil-Default**: lesbar-stilisiert (Lightkey-Prinzip, performant) mit
-   optionalem „Schön"-Modus — oder direkt der Bloom-Look als Default?
-3. **2D-Top-Down im Visualizer-Fenster**: nach Phase 3 (Ortho-Projektion) behalten oder
-   die 2D-Rolle komplett der Live View überlassen?
+1. **Eingebettete 3D-Ansicht in der Live View: BEHALTEN als Spiegel.** Sie dockt in
+   Phase 2 als reines Spiegel-Target (ohne eigenen Timer/eigene Bridge) an den
+   VisualizerService an → Phase 2 läuft in der größeren Variante (~2 Runden).
+2. **Render-Default: „schön UND einfach".** Ansprechender Default-Look (Tone-Mapping ab
+   Phase 0, Bloom/Beam-Shader in Phase 5) MIT Qualitätsstufen; Lesbarkeit und einfache
+   Bedienung (Labels, Identify, klare Modi) bleiben gleichrangige Pflicht — Optik darf
+   Bedienbarkeit nie verdrängen.
+3. **2D-Top-Down im Visualizer-Fenster: BEHALTEN.** Wird in Phase 3c zur Ortho-Projektion
+   derselben Szene (kein paralleles Objektmodell mehr) und in der Bedienung deutlich
+   vereinfacht.
