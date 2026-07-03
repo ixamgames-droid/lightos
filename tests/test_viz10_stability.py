@@ -379,7 +379,11 @@ class MainWindowRespectsVetoTest(unittest.TestCase):
     Fenster nur noch show()/raise_()/activateWindow(), nie close())."""
 
     def _fake_viz(self, close_result):
+        # Review-Blocker-Fix VIZ-12: MainWindow.closeEvent fragt das Veto jetzt
+        # ueber confirm_app_exit() ab (close() liefert beim Dauerfenster IMMER
+        # False und taugt nicht mehr als Signal).
         return SimpleNamespace(
+            confirm_app_exit=MagicMock(return_value=close_result),
             close=MagicMock(return_value=close_result),
             deleteLater=MagicMock(),
             raise_=MagicMock(),
@@ -444,6 +448,10 @@ class MainWindowRespectsVetoTest(unittest.TestCase):
         MW.MainWindow.closeEvent(fake, event)
         self.assertFalse(event.isAccepted())
         output_manager.stop.assert_not_called()
+        viz.confirm_app_exit.assert_called_once()
+        # Dauerfenster: close() darf im Veto-Pfad NICHT benutzt werden
+        # (liefert immer False -> App liesse sich nie beenden).
+        viz.close.assert_not_called()
 
 
 if __name__ == "__main__":

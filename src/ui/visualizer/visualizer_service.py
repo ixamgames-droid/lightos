@@ -294,7 +294,13 @@ class VisualizerService:
         eigentliche ``load_stage_html``-Aufruf + RenderCrashGuard-Reset bleibt
         Sache des Targets (Invariante 2) — der Service stoesst nur an +
         resynct danach."""
-        targets = self._targets if target is None else [target]
+        # Review-Fix (Entscheidung 4): nur AKTIVE Targets reloaden — der
+        # dauerhaft angedockte, aber unsichtbare Live-View-Spiegel (active=False
+        # bei 2D-Modus/anderem Tab) soll keinen Chromium-Reload abbekommen.
+        # Er holt sich den vollen Bestand ohnehin via needs_full beim naechsten
+        # Aktivieren.
+        targets = ([t for t in self._targets if t.active]
+                   if target is None else [target])
         for t in targets:
             cb = t.on_reload
             if cb is None:

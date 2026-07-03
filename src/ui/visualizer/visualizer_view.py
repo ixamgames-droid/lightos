@@ -120,7 +120,8 @@ class Visualizer3DView(QWidget):
         # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s), derselbe
         # Mechanismus wie im VisualizerWindow (siehe RenderCrashGuard dort).
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=self._on_render_crash_giveup)
+            self._view, status_cb=self._on_render_crash_giveup,
+            on_reloaded=self._force_full_resync_after_crash)
         load_stage_html(self._view)
         self._view.loadFinished.connect(self._on_load_finished)
 
@@ -160,6 +161,15 @@ class Visualizer3DView(QWidget):
         _service = self._service
         _target = self._target
         self.destroyed.connect(lambda *_: _service.detach_target(_target))
+
+    def _force_full_resync_after_crash(self) -> None:
+        """VIZ-12 Review-Fix: nach der RenderCrashGuard-Selbstheilung den
+        Service-Dirty-Cache fuer DIESES Target invalidieren — sonst bleiben
+        seit dem Crash unveraenderte Fixtures auf der frischen Page schwarz."""
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
 
     def _reset_own_interaction_state(self) -> None:
         """VIZ-12 Schritt 6: vom Service ueber ``on_reset_interaction`` bei

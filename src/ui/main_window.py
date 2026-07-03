@@ -1914,13 +1914,15 @@ class MainWindow(QMainWindow):
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        # Visualizer ZUERST anfragen: sein "Buehne speichern?"-Dialog (VIZ-10) kann
-        # abbrechen (close() -> False, VIZ-12: close() versteckt das Fenster nur noch
-        # statt es zu zerstoeren) — dann muss der App-Exit stoppen, BEVOR
-        # Output/Playback/MIDI heruntergefahren werden.
+        # Visualizer ZUERST anfragen: sein "Buehne speichern?"-Dialog (VIZ-10)
+        # kann abbrechen — dann muss der App-Exit stoppen, BEVOR Output/
+        # Playback/MIDI heruntergefahren werden. NICHT close() nutzen: das
+        # Dauerfenster (VIZ-12) ignoriert das Close-Event IMMER (hide statt
+        # destroy) -> close() liefert IMMER False, die App liesse sich nie
+        # mehr beenden (Review-Blocker). confirm_app_exit() fragt NUR das Veto.
         if self._visualizer_window:
             try:
-                if not self._visualizer_window.close():
+                if not self._visualizer_window.confirm_app_exit():
                     event.ignore()
                     return
             except Exception:

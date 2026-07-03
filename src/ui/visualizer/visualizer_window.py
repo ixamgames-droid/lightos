@@ -203,12 +203,14 @@ def load_stage_html(view) -> None:
         view.load(QUrl.fromLocalFile(HTML_PATH))
 
 
-def install_render_crash_guard(view, status_cb=None) -> RenderCrashGuard:
+def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> RenderCrashGuard:
     """Verbindet ``page().renderProcessTerminated`` mit Logging + Auto-Reload.
     ``status_cb(text)`` (optional) zeigt eine Statusmeldung nach dem Aufgeben.
-    Der Re-Sync nach dem Reload laeuft ueber den ohnehin vorhandenen
-    ``loadFinished``-Pfad (view.loadFinished ist bereits mit dem State-Push
-    verbunden) — hier wird NUR neu geladen, kein zweiter Sync-Mechanismus."""
+    ``on_reloaded()`` (optional, VIZ-12) laeuft nach erfolgreichem Auto-Reload:
+    der Service-Dirty-Cache haelt unveraenderte Fixtures sonst fuer aktuell,
+    obwohl die frische Page sie nie gesehen hat — ohne force_full_resync
+    blieben sie nach der Selbstheilung dauerhaft schwarz/zentriert.
+    Positions-/Stage-Re-Sync laeuft weiter ueber den ``loadFinished``-Pfad."""
     guard = RenderCrashGuard()
 
     def _on_terminated(status, exit_code):
@@ -222,6 +224,8 @@ def install_render_crash_guard(view, status_cb=None) -> RenderCrashGuard:
         if guard.should_restart(time.monotonic()):
             try:
                 load_stage_html(view)
+                if on_reloaded is not None:
+                    on_reloaded()
             except Exception as e:
                 print(f"[Visualizer] renderer restart error: {e}")
         else:
@@ -1720,7 +1724,8 @@ class VisualizerWindow(QMainWindow):
         # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s, siehe
         # RenderCrashGuard); der Re-Sync danach laeuft ueber loadFinished unten.
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=self._on_render_crash_giveup)
+            self._view, status_cb=self._on_render_crash_giveup,
+            on_reloaded=self._force_full_resync_after_crash)
         # ── CACHE FIX: Cache-Buster an URL anhaengen, damit QWebEngineView die
         # HTML bei jedem Visualizer-Open frisch laedt ────────────────────────
         load_stage_html(self._view)
@@ -1820,6 +1825,16 @@ class VisualizerWindow(QMainWindow):
         )
         self._service.attach_target(self._target)
         self._state.subscribe(self._on_state)
+
+    def _force_full_resync_after_crash(self) -> None:
+        """Review-Blocker-Nachbar (VIZ-12): nach der RenderCrashGuard-Selbst-
+        heilung haelt der Service-Dirty-Cache unveraenderte Fixtures fuer
+        aktuell — die frisch geladene Page hat sie aber nie gesehen. Ohne
+        force_full_resync blieben sie dauerhaft schwarz/zentriert."""
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
 
     def _reset_own_interaction_state(self) -> None:
         """VIZ-12 Schritt 5: vom Service ueber ``on_reset_interaction`` bei
@@ -3017,6 +3032,15 @@ class VisualizerWindow(QMainWindow):
                 return False
         return True
 
+    def confirm_app_exit(self) -> bool:
+        """Fuer ``MainWindow.closeEvent``: NUR das Buehnen-Dirty-Veto abfragen
+        (VIZ-10), OHNE das Fenster zu verstecken. Seit dem Dauerfenster taugt
+        ``close()`` NICHT mehr als Veto-Signal — ``closeEvent`` ruft immer
+        ``event.ignore()`` (auch im Erfolgsfall, um hide statt destroy zu
+        erzwingen), wodurch ``close()`` IMMER False liefert und die App sich
+        sonst nie mehr beenden liesse (Review-Blocker)."""
+        return self._confirm_close_with_unsaved_stage()
+
     def closeEvent(self, event):
         """VIZ-12 Schritt 4 (Dauerfenster): fragt bei ungespeicherten
         Buehnen-Aenderungen nach (VOR dem Verstecken — siehe
@@ -3025,7 +3049,7 @@ class VisualizerWindow(QMainWindow):
         Modus und Helligkeit bleiben erhalten; Target bleibt am Service
         angedockt (nur inaktiv, s. ``hideEvent``). Der einzige noch
         verbleibende echte Teardown-Pfad ist ``service.shutdown()`` beim
-        echten App-Ende (``MainWindow.closeEvent``)."""
+        echten App-Ende (``MainWindow.closeEvent``, via ``confirm_app_exit``)."""
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
