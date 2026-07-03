@@ -209,6 +209,10 @@ class Visualizer3DView(QWidget):
         if guard is not None:
             guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(300, self._push_initial_state)
+        # Live-Befund VIZ-12: Voll-Resync erst wenn die Page wirklich bereit
+        # ist (s. VisualizerWindow._on_load_finished) — sonst verpufft der
+        # needs_full-Erstpush und der Dirty-Diff schweigt dauerhaft.
+        QTimer.singleShot(350, self._force_full_resync_after_crash)
 
     def _on_render_crash_giveup(self, message: str):
         """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare

@@ -1751,6 +1751,11 @@ class VisualizerWindow(QMainWindow):
         if guard is not None:
             guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(400, self._push_initial_state)
+        # Live-Befund VIZ-12: der needs_full-Erstpush beim attach verpufft,
+        # wenn er VOR dem JS-Ready tickt (Page laedt noch, dmxBatch-Connect
+        # existiert noch nicht) — danach schweigt der Dirty-Diff dauerhaft.
+        # Voll-Resync gehoert HIERHER: die Page ist jetzt wirklich bereit.
+        QTimer.singleShot(450, self._force_full_resync_after_crash)
 
     def _on_render_crash_giveup(self, message: str):
         """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
