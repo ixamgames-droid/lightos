@@ -867,6 +867,18 @@ class VisualizerBridge(QObject):
         self._last_stage_echo_token = echo_token
         self.pyStageListChanged.emit(data, is_stale)
 
+    @Slot()
+    @_bridge_slot_guard
+    def requestFullResync(self):
+        """VIZ-12 (Live-Befund): JS ruft das im allFixtures-Handler NACH dem
+        Bau der Fixture-Objekte. Erst ab dann koennen dmxBatch-Updates
+        greifen — zeitgesteuerte Erstpushes (needs_full beim attach oder
+        loadFinished+Delay) koennen VOR dem Fixture-Bau eintreffen und
+        verpuffen, waehrend der Dirty-Cache die Werte fuer zugestellt haelt."""
+        cb = getattr(self, "full_resync_cb", None)
+        if cb is not None:
+            cb()
+
     @Slot(str)
     @_bridge_slot_guard
     def stageSelectionChanged(self, sid: str):
@@ -1829,6 +1841,10 @@ class VisualizerWindow(QMainWindow):
             on_reload=self._reload_own_page,
         )
         self._service.attach_target(self._target)
+        # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
+        # vollen DMX-Bestand an (requestFullResync-Slot) — ereignisgesteuert
+        # statt Timing-Raten.
+        self._bridge.full_resync_cb = self._force_full_resync_after_crash
         self._state.subscribe(self._on_state)
 
     def _force_full_resync_after_crash(self) -> None:

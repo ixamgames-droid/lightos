@@ -3450,6 +3450,14 @@ function tryChannel() {
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
           list.forEach(f => addFixture(f));
+          // VIZ-12: JETZT sind die Fixture-Objekte gebaut — Service um den
+          // vollen DMX-Bestand bitten. Ein zeitgesteuerter Push von Python
+          // aus kann VOR diesem Punkt eintreffen und verpufft dann (kein
+          // Fixture-Objekt -> updateFixture no-op, Dirty-Cache haelt die
+          // Werte trotzdem fuer zugestellt). Ereignisgesteuert statt Timing.
+          if (bridge.requestFullResync) {
+            try { bridge.requestFullResync(); } catch (e) {}
+          }
         });
         if (bridge.settingsChanged) bridge.settingsChanged.connect(j => applySettings(JSON.parse(j)));
         if (bridge.viewModeChanged) bridge.viewModeChanged.connect(name => setViewMode(name));
