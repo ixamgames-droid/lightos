@@ -50,6 +50,7 @@ from src.core.stage.aim import (
 from src.core.stage import scene_commands as _scmd
 from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
+from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -203,12 +204,14 @@ def load_stage_html(view) -> None:
         view.load(QUrl.fromLocalFile(HTML_PATH))
 
 
-def install_render_crash_guard(view, status_cb=None) -> RenderCrashGuard:
+def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> RenderCrashGuard:
     """Verbindet ``page().renderProcessTerminated`` mit Logging + Auto-Reload.
     ``status_cb(text)`` (optional) zeigt eine Statusmeldung nach dem Aufgeben.
-    Der Re-Sync nach dem Reload laeuft ueber den ohnehin vorhandenen
-    ``loadFinished``-Pfad (view.loadFinished ist bereits mit dem State-Push
-    verbunden) — hier wird NUR neu geladen, kein zweiter Sync-Mechanismus."""
+    ``on_reloaded()`` (optional, VIZ-12) laeuft nach erfolgreichem Auto-Reload:
+    der Service-Dirty-Cache haelt unveraenderte Fixtures sonst fuer aktuell,
+    obwohl die frische Page sie nie gesehen hat — ohne force_full_resync
+    blieben sie nach der Selbstheilung dauerhaft schwarz/zentriert.
+    Positions-/Stage-Re-Sync laeuft weiter ueber den ``loadFinished``-Pfad."""
     guard = RenderCrashGuard()
 
     def _on_terminated(status, exit_code):
@@ -222,6 +225,8 @@ def install_render_crash_guard(view, status_cb=None) -> RenderCrashGuard:
         if guard.should_restart(time.monotonic()):
             try:
                 load_stage_html(view)
+                if on_reloaded is not None:
+                    on_reloaded()
             except Exception as e:
                 print(f"[Visualizer] renderer restart error: {e}")
         else:
@@ -246,6 +251,7 @@ class VisualizerBridge(QObject):
 
     Signals -> JS
         fixtureAdded(json), fixtureRemoved(fid), dmxUpdated(json),
+        dmxBatch(json) (VIZ-12: Array-Batch, Kompat-Signal dmxUpdated bleibt),
         allFixtures(json), settingsChanged(json),
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
@@ -264,6 +270,7 @@ class VisualizerBridge(QObject):
     fixtureAdded            = Signal(str)
     fixtureRemoved          = Signal(int)
     dmxUpdated              = Signal(str)
+    dmxBatch                = Signal(str)     # VIZ-12: Array-Batch-Push (Service-Kern), dmxUpdated bleibt Kompat/Test-API
     allFixtures             = Signal(str)
     settingsChanged         = Signal(str)
     viewModeChanged         = Signal(str)
@@ -280,6 +287,7 @@ class VisualizerBridge(QObject):
     brightnessAutoSignal    = Signal()        # Reset auto-mode
     updateStageObject       = Signal(str)     # JSON: gezieltes Update eines Stage-Elements
     resizeModeSignal        = Signal(bool)    # Toggle Resize-Handles im JS
+    pixelRatioSignal        = Signal(float)   # VIZ-12 Schritt 5: screenChanged -> JS setPixelRatio
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
@@ -860,6 +868,18 @@ class VisualizerBridge(QObject):
         self._last_stage_echo_token = echo_token
         self.pyStageListChanged.emit(data, is_stale)
 
+    @Slot()
+    @_bridge_slot_guard
+    def requestFullResync(self):
+        """VIZ-12 (Live-Befund): JS ruft das im allFixtures-Handler NACH dem
+        Bau der Fixture-Objekte. Erst ab dann koennen dmxBatch-Updates
+        greifen — zeitgesteuerte Erstpushes (needs_full beim attach oder
+        loadFinished+Delay) koennen VOR dem Fixture-Bau eintreffen und
+        verpuffen, waehrend der Dirty-Cache die Werte fuer zugestellt haelt."""
+        cb = getattr(self, "full_resync_cb", None)
+        if cb is not None:
+            cb()
+
     @Slot(str)
     @_bridge_slot_guard
     def stageSelectionChanged(self, sid: str):
@@ -994,6 +1014,18 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_stage_definition error: {e}")
             self._reloading_stage = False
+
+    def push_pixel_ratio(self, ratio: float):
+        """VIZ-12 Schritt 5: Bildschirmwechsel (anderer devicePixelRatio, z.B.
+        Fenster auf einen Monitor mit anderer Skalierung verschoben) an JS
+        durchreichen. JS setzt bereits bei ``window resize`` selbst neu (s.
+        ``stage_scene.html``), das deckt aber nicht jeden Monitorwechsel ohne
+        Groessenaenderung ab -- daher zusaetzlich explizit von
+        ``QWindow.screenChanged`` aus getriggert (s. VisualizerWindow)."""
+        try:
+            self.pixelRatioSignal.emit(float(ratio))
+        except Exception as e:
+            print(f"[Visualizer] push_pixel_ratio error: {e}")
 
     def push_add_stage_object(self, type_: str):
         try:
@@ -1161,7 +1193,7 @@ class VisualizerWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_channel()
-        self._setup_update_timer()
+        self._setup_service_target()
 
     # ── UI ──────────────────────────────────────────────────────────────────
 
@@ -1224,6 +1256,18 @@ class VisualizerWindow(QMainWindow):
         act_reset_cam = QAction("⌖ Kamera", self)
         act_reset_cam.triggered.connect(self._reset_camera)
         tb.addAction(act_reset_cam)
+
+        # VIZ-12 Schritt 5: "Szene neu laden" ersetzt den frueheren
+        # Cache-Buster-Zwang bei jedem show() -- expliziter Menuepunkt statt
+        # implizitem Neubau (Design (b) Punkt 3). Laedt BEIDE Pages frisch
+        # (Fenster + aktives Spiegel-Target, Orchestrator-Entscheidung 4).
+        act_reload_scene = QAction("↻ Szene neu laden", self)
+        act_reload_scene.setToolTip(
+            "Lädt die 3D-Szene (Fenster + ggf. Live-View-Spiegel) komplett neu.\n"
+            "Nützlich nach Renderer-Problemen oder Grafiktreiber-Updates."
+        )
+        act_reload_scene.triggered.connect(self._on_reload_scene)
+        tb.addAction(act_reload_scene)
 
         act_clear_fx = QAction("✖ Alle entfernen", self)
         act_clear_fx.setToolTip("Alle platzierten Fixtures aus der Szene entfernen")
@@ -1695,7 +1739,10 @@ class VisualizerWindow(QMainWindow):
         # weak_slot_fwd statt Bound-Method: self -> guard -> self waere ein
         # GC-Zyklus um den Owner (STAB-10, native AV-Klasse beim GC-Teardown).
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup))
+            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup),
+            # on_reloaded ebenfalls weak (STAB-10-Muster): der Guard-Closure
+            # darf keinen GC-Zyklus um das Fenster aufspannen.
+            on_reloaded=weak_slot_fwd(self._force_full_resync_after_crash))
         # ── CACHE FIX: Cache-Buster an URL anhaengen, damit QWebEngineView die
         # HTML bei jedem Visualizer-Open frisch laedt ────────────────────────
         load_stage_html(self._view)
@@ -1721,6 +1768,11 @@ class VisualizerWindow(QMainWindow):
         if guard is not None:
             guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(400, self._push_initial_state)
+        # Live-Befund VIZ-12: der needs_full-Erstpush beim attach verpufft,
+        # wenn er VOR dem JS-Ready tickt (Page laedt noch, dmxBatch-Connect
+        # existiert noch nicht) — danach schweigt der Dirty-Diff dauerhaft.
+        # Voll-Resync gehoert HIERHER: die Page ist jetzt wirklich bereit.
+        QTimer.singleShot(450, self._force_full_resync_after_crash)
 
     def _on_render_crash_giveup(self, message: str):
         """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
@@ -1765,37 +1817,84 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] _push_initial_state error: {e}")
 
-    def _setup_update_timer(self):
-        self._dmx_timer = QTimer(self)
-        self._dmx_timer.timeout.connect(self._push_dmx_updates)
-        self._dmx_timer.start(33)
+    def _setup_service_target(self):
+        """VIZ-12 Schritt 3: das Fenster dockt NICHT mehr eigenen Timer +
+        eigenes DMX-Push-State-Subscribe an, sondern das EINE
+        ``VisualizerService``-Singleton (am ``AppState`` gehalten, s.
+        ``get_visualizer_service``). Der Service pusht Batch-Updates ueber
+        ``self._target.emit_batch`` -> laeuft auf ``self._bridge.dmxBatch.emit``
+        (Signatur der Bridge bleibt unveraendert, nur die Quelle des Takts
+        wechselt). Sichtbarkeit steuert NICHT mehr Start/Stop eines eigenen
+        QTimer, sondern ``service.set_target_active`` (s. showEvent/hideEvent).
+
+        Das Fenster-eigene ``_on_state`` (UI-Refresh bei patch_changed/
+        show_loaded — KEIN Push-Takt) bleibt separat abonniert: es macht
+        UI-Arbeit (Patch-Liste, aktive Buehne), die nicht in den page-freien
+        Service gehoert (der kennt keine Widgets). Vormals wurde dasselbe
+        Subscribe in ``_setup_update_timer`` mitgezogen; die Zustaendigkeit
+        bleibt dieselbe, nur der DMX-Takt ist ausgezogen.
+
+        VIZ-12 Schritt 5: ``on_reset_interaction``/``on_reload`` sind duenne
+        Callbacks, die der pro-Target-Zustand (Trace/Reload-Token/RenderCrash-
+        Guard bleibt in der Bridge/im Fenster, Invariante 2) dem page-freien
+        Service zur Verfuegung stellt, statt dass der Service selbst etwas
+        davon kennt."""
+        self._service = get_visualizer_service(self._state)
+        self._target = VisualizerTarget(
+            "window", self._bridge.dmxBatch.emit,
+            on_reset_interaction=self._reset_own_interaction_state,
+            on_reload=self._reload_own_page,
+        )
+        self._service.attach_target(self._target)
+        # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
+        # vollen DMX-Bestand an (requestFullResync-Slot) — ereignisgesteuert
+        # statt Timing-Raten. getattr: SimpleNamespace-Test-Fakes haben die
+        # gebundene Methode nicht.
+        self._bridge.full_resync_cb = getattr(
+            self, "_force_full_resync_after_crash", None)
         self._state.subscribe(self._on_state)
 
-    def _push_dmx_updates(self):
+    def _force_full_resync_after_crash(self) -> None:
+        """Review-Blocker-Nachbar (VIZ-12): nach der RenderCrashGuard-Selbst-
+        heilung haelt der Service-Dirty-Cache unveraenderte Fixtures fuer
+        aktuell — die frisch geladene Page hat sie aber nie gesehen. Ohne
+        force_full_resync blieben sie dauerhaft schwarz/zentriert."""
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
+
+    def _reset_own_interaction_state(self) -> None:
+        """VIZ-12 Schritt 5: vom Service ueber ``on_reset_interaction`` bei
+        ``service.reset_interaction_state()`` aufgerufen (s. ``_on_state``
+        ``show_loaded``/Stage-Wechsel). Stoppt eine laufende Live-Trace
+        (Bridge-eigener Zustand) und setzt den Reload-Churn-Guard zurueck,
+        damit ein Stage-/Show-Wechsel keinen alten Trace-Timer oder haengen-
+        gebliebenen Reload-Guard aus der VORHERIGEN Szene mitschleppt."""
+        bridge = getattr(self, "_bridge", None)
+        if bridge is None:
+            return
         try:
-            for fixture in self._state.get_patched_fixtures():
-                if fixture.fid not in self._state.visualizer_positions:
-                    continue
-                if fixture.universe not in self._state.universes:
-                    continue
-                universe = self._state.universes[fixture.universe]
-                channels = get_channels_for_patched(fixture)
-                attrs: dict[str, int] = {}
-                seen: dict[str, int] = {}
-                for ch in channels:
-                    dmx_addr = fixture.address + ch.channel_number - 1
-                    if 1 <= dmx_addr <= 512:
-                        # Mehrkopf (Spider): N-tes Vorkommen eines Attributs =
-                        # Kopf N -> Key "attr#N" (Kopf 0 = "attr"). So bleiben
-                        # die zwei Tilts / zwei RGBW-Banks getrennt.
-                        a = ch.attribute
-                        h = seen.get(a, 0)
-                        seen[a] = h + 1
-                        key = a if h == 0 else f"{a}#{h}"
-                        attrs[key] = universe.get_channel(dmx_addr)
-                self._bridge.push_dmx_update(fixture.fid, attrs)
+            bridge.stop_trace()
         except Exception as e:
-            print(f"[Visualizer] _push_dmx_updates error: {e}")
+            print(f"[Visualizer] reset_interaction_state stop_trace error: {e}")
+        try:
+            bridge._cancel_reload_guard_fallback()
+            bridge._reloading_stage = False
+        except Exception as e:
+            print(f"[Visualizer] reset_interaction_state reload-guard error: {e}")
+
+    def _reload_own_page(self) -> None:
+        """VIZ-12 Schritt 5: vom Service ueber ``on_reload`` bei
+        ``service.reload_all_targets()`` aufgerufen ("Szene neu laden"-
+        Menuepunkt). Einziger noch verbleibender Ort, der ``load_stage_html``
+        mit Cache-Buster fuer DIESES Target faehrt (Design (b) Punkt 3) —
+        RenderCrashGuard-Selbstheilung + Erst-Load laufen weiterhin ueber
+        denselben ``loadFinished``-Pfad wie beim initialen Laden."""
+        view = getattr(self, "_view", None)
+        if view is None:
+            return
+        load_stage_html(view)
 
     # ── Fixture-Tab actions ─────────────────────────────────────────────────
 
@@ -2139,6 +2238,17 @@ class VisualizerWindow(QMainWindow):
 
     def _apply_stage(self, definition: StageDefinition):
         """Sende komplette Buehnen-Definition an JS."""
+        # VIZ-12 Schritt 5: zentraler Buehnen-Wechsel-Pfad -> Interaktions-
+        # Zustand (Live-Trace, Reload-Guard) ueber ALLE Targets zuruecksetzen,
+        # BEVOR die neue Definition raus geht. Sonst wuerde eine laufende
+        # Trace aus der vorherigen Buehne mit Fixture-Positionen der neuen
+        # Buehne weiterlaufen.
+        svc = getattr(self, "_service", None)
+        if svc is not None:
+            try:
+                svc.reset_interaction_state()
+            except Exception as e:
+                print(f"[Visualizer] _apply_stage reset_interaction_state error: {e}")
         try:
             self._bridge.push_stage_definition(definition)
         except Exception as e:
@@ -2746,6 +2856,24 @@ class VisualizerWindow(QMainWindow):
     def _reset_camera(self):
         self._bridge.cameraReset.emit()
 
+    def _on_reload_scene(self):
+        """VIZ-12 Schritt 5: "Szene neu laden"-Menuepunkt. Ruft
+        ``service.reload_all_targets()`` — mehrtargetfaehig von Anfang an
+        (Orchestrator-Entscheidung 4: Fenster + aktives Spiegel-Target, sofern
+        vorhanden; in diesem Schritt existiert nur das Fenster-Target, der
+        Service-Aufruf ist aber bereits fuer mehrere Targets ausgelegt). Der
+        eigentliche ``load_stage_html``-Reload + RenderCrashGuard-Reset laeuft
+        pro Target ueber den registrierten ``on_reload``-Callback
+        (``_reload_own_page``), der Service leert danach den Dirty-Cache
+        (``force_full_resync``), damit der naechste Tick wieder ALLES pusht."""
+        svc = getattr(self, "_service", None)
+        if svc is None:
+            return
+        try:
+            svc.reload_all_targets()
+        except Exception as e:
+            print(f"[Visualizer] reload_all_targets error: {e}")
+
     # ── Settings ────────────────────────────────────────────────────────────
 
     def _collect_settings(self) -> dict:
@@ -2836,13 +2964,17 @@ class VisualizerWindow(QMainWindow):
     # ── Aufraeumen ──────────────────────────────────────────────────────────
 
     def _release_state(self):
-        """Meldet ALLE State-Subscriber des Fensters ab + stoppt den DMX-Timer.
+        """Meldet ALLE State-Subscriber des Fensters ab + dockt vom Service ab.
 
-        Das Fenster abonniert den State doppelt: einmal die ``_bridge`` (in
-        ``VisualizerBridge.__init__``) und einmal sein eigenes ``_on_state`` (in
-        ``_setup_update_timer``). Ohne Abmelden bliebe nach jedem Schliessen je
-        ein toter Callback in ``AppState._callbacks`` haengen und liefe bei jedem
-        Event weiter — jedes erneute Open addierte einen Leak. Idempotent."""
+        VIZ-12 Schritt 4: kein Aufruf mehr aus ``closeEvent`` (das Fenster ist
+        jetzt ein Dauerfenster — ``closeEvent`` ruft nur noch ``hide()``).
+        Verbleibender Zweck: Sicherheitsnetz fuer Tests/Sonderfaelle, die einen
+        echten, vollstaendigen Teardown des EINEN Fensters brauchen, ohne die
+        gesamte App zu beenden. Der reguläre App-Ende-Teardown laeuft über
+        ``service.shutdown()`` (meldet den EINEN Service-Subscriber ab) im
+        ``MainWindow.closeEvent``-Erfolgspfad — ``hide()``/``detach_target``
+        melden bewusst NICHTS ab, Hintergrund-Updates fuer andere Targets
+        bleiben moeglich. Idempotent."""
         try:
             self._state.unsubscribe(self._on_state)
         except Exception as e:
@@ -2854,28 +2986,64 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] bridge dispose error: {e}")
         try:
-            timer = getattr(self, "_dmx_timer", None)
-            if timer is not None and timer.isActive():
-                timer.stop()
+            svc = getattr(self, "_service", None)
+            target = getattr(self, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
         except Exception as e:
-            print(f"[Visualizer] timer stop error: {e}")
-        self._dmx_released = True   # showEvent darf den Timer danach nicht neu starten
+            print(f"[Visualizer] service detach error: {e}")
 
     def showEvent(self, event):
         # DMX-Push wieder aufnehmen, wenn das Fenster sichtbar wird (war es nur
-        # versteckt). Nach echtem Schliessen (_release_state) NICHT neu starten.
-        t = getattr(self, "_dmx_timer", None)
-        if t is not None and not t.isActive() and not getattr(self, "_dmx_released", False):
-            t.start(33)
+        # versteckt). VIZ-12: kein eigener QTimer mehr -- der Service steuert
+        # den EINEN app-weiten Takt, das Fenster meldet nur noch "mein Target
+        # ist wieder aktiv" (Timer laeuft service-seitig hart nur bei >=1
+        # aktivem Target, s. VisualizerService._update_timer_gate).
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, True)
+        self._connect_screen_changed()
         super().showEvent(event)
 
+    def _connect_screen_changed(self) -> None:
+        """VIZ-12 Schritt 5: ``QWindow.screenChanged`` -> ``setPixelRatio``-
+        Durchreichung an JS (Zweitmonitor/DPI, Design (b) Punkt 4). Das echte
+        ``QWindow`` existiert erst nach dem ersten ``show()`` -- deshalb hier
+        statt in ``__init__``, idempotent (mehrfaches showEvent verbindet
+        nicht mehrfach). JS setzt ``devicePixelRatio`` bereits selbst bei
+        ``window resize`` (s. stage_scene.html); das deckt aber nicht jeden
+        Monitorwechsel OHNE Groessenaenderung ab, daher zusaetzlich explizit."""
+        if getattr(self, "_screen_changed_connected", False):
+            return
+        win = self.windowHandle()
+        if win is None:
+            return
+        try:
+            win.screenChanged.connect(self._on_screen_changed)
+            self._screen_changed_connected = True
+        except Exception as e:
+            print(f"[Visualizer] screenChanged connect error: {e}")
+
+    def _on_screen_changed(self, screen) -> None:
+        try:
+            ratio = screen.devicePixelRatio() if screen is not None else 1.0
+            self._bridge.push_pixel_ratio(ratio)
+        except Exception as e:
+            print(f"[Visualizer] screenChanged handling error: {e}")
+
     def hideEvent(self, event):
-        # Nur versteckt (nicht geschlossen): den 33ms-DMX-Push pausieren -> spart
-        # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden). Der
-        # event-getriebene State-Subscriber bleibt (billig, feuert nur bei Aenderung).
-        t = getattr(self, "_dmx_timer", None)
-        if t is not None and t.isActive():
-            t.stop()
+        # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart
+        # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden).
+        # Das Target bleibt am Service angedockt (kein detach), Page/Bridge
+        # leben weiter -- VIZ-12 Schritt 4: closeEvent ruft jetzt selbst nur
+        # noch hide() (Dauerfenster), es gibt KEIN implizites Voll-Teardown
+        # mehr. Der einzige echte Teardown ist service.shutdown() beim
+        # App-Ende (MainWindow.closeEvent).
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, False)
         super().hideEvent(event)
 
     def _confirm_close_with_unsaved_stage(self) -> bool:
@@ -2905,13 +3073,26 @@ class VisualizerWindow(QMainWindow):
                 return False
         return True
 
+    def confirm_app_exit(self) -> bool:
+        """Fuer ``MainWindow.closeEvent``: NUR das Buehnen-Dirty-Veto abfragen
+        (VIZ-10), OHNE das Fenster zu verstecken. Seit dem Dauerfenster taugt
+        ``close()`` NICHT mehr als Veto-Signal — ``closeEvent`` ruft immer
+        ``event.ignore()`` (auch im Erfolgsfall, um hide statt destroy zu
+        erzwingen), wodurch ``close()`` IMMER False liefert und die App sich
+        sonst nie mehr beenden liesse (Review-Blocker)."""
+        return self._confirm_close_with_unsaved_stage()
+
     def closeEvent(self, event):
-        """Fragt bei ungespeicherten Buehnen-Aenderungen nach (VOR dem
-        Aufraeumen — siehe ``_confirm_close_with_unsaved_stage``), meldet
-        danach alle State-Subscriber ab (``_release_state``) und schliesst
-        normal weiter."""
+        """VIZ-12 Schritt 4 (Dauerfenster): fragt bei ungespeicherten
+        Buehnen-Aenderungen nach (VOR dem Verstecken — siehe
+        ``_confirm_close_with_unsaved_stage``, VIZ-10-Veto UNVERAENDERT), dann
+        NUR NOCH ``hide()`` statt vollstaendigem Teardown. Fenster, Kamera,
+        Modus und Helligkeit bleiben erhalten; Target bleibt am Service
+        angedockt (nur inaktiv, s. ``hideEvent``). Der einzige noch
+        verbleibende echte Teardown-Pfad ist ``service.shutdown()`` beim
+        echten App-Ende (``MainWindow.closeEvent``, via ``confirm_app_exit``)."""
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
-        self._release_state()
-        super().closeEvent(event)
+        event.ignore()
+        self.hide()

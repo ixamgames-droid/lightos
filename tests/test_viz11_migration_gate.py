@@ -31,6 +31,14 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
+
+# Der Show-Sweep laedt ALLE .lshow des Haupt-Checkouts headless (inzwischen
+# 60+, waechst mit jeder Demo-Show) — das sprengt den 60s-Watchdog aus
+# pytest.ini im Gate-Runner. Grosszuegiges, aber endliches Limit fuer das
+# ganze Modul.
+pytestmark = pytest.mark.timeout(300)
+
 from PySide6.QtWidgets import QApplication
 
 from src.core.app_state import get_state

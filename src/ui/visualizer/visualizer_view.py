@@ -2,9 +2,12 @@
 
 Im Gegensatz zum vollen ``VisualizerWindow`` (Stage-Builder, Tabs, Toolbar)
 ist dies ein schlankes Widget: WebView + die wiederverwendbare
-``VisualizerBridge`` + DMX-Push-Timer. Es wird in der **Live View** eingebettet,
-damit man dort zwischen 2D-Top-Down und 3D umschalten kann, ohne ein eigenes
-Fenster zu oeffnen.
+``VisualizerBridge``. Es wird in der **Live View** eingebettet, damit man dort
+zwischen 2D-Top-Down und 3D umschalten kann, ohne ein eigenes Fenster zu
+oeffnen.
+
+VIZ-12 Schritt 6: reines Spiegel-Target am ``VisualizerService``-Singleton
+(kein eigener DMX-Push-Timer mehr) — s. ``_setup_service_target``.
 
 Modus: Ansehen (Kamera) + Fixtures per Drag bewegen. Buehne/Trassen bauen bleibt
 bewusst dem dedizierten ``VisualizerWindow`` vorbehalten.
@@ -24,11 +27,12 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import Qt, QTimer
 
-from src.core.app_state import get_state, get_channels_for_patched
+from src.core.app_state import get_state
 from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
 )
+from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot_fwd
 
 
@@ -42,8 +46,7 @@ class Visualizer3DView(QWidget):
         self._edit_mode = "view"          # 'view' | 'edit' (kein 'stage')
         self._setup_ui()
         self._setup_channel()
-        self._dmx_timer = QTimer(self)
-        self._dmx_timer.timeout.connect(self._push_dmx_updates)
+        self._setup_service_target()
 
     # ── UI ──────────────────────────────────────────────────────────────────
     def _setup_ui(self):
@@ -115,23 +118,97 @@ class Visualizer3DView(QWidget):
         self._channel = QWebChannel(self)
         self._channel.registerObject("bridge", self._bridge)
         self._view.page().setWebChannel(self._channel)
-        # Leak-Schutz: beim Zerstoeren des Widgets den State-Subscriber der Bridge
-        # abmelden — als Backstop, falls das Widget zerstoert wird ohne vorher
-        # on_hidden() zu sehen. Destruction-safe: wir capturen nur die State-
-        # Referenz + den gebundenen Callback (NICHT self), damit der Slot waehrend
-        # ~QWidget nicht auf ein halb-zerstoertes Objekt zugreift. unsubscribe ist
-        # defensiv -> doppelt (on_hidden + destroyed) ist ein No-Op.
-        _state = self._state
-        _on_state = self._bridge._on_state
-        self.destroyed.connect(lambda *_: _state.unsubscribe(_on_state))
         # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s), derselbe
         # Mechanismus wie im VisualizerWindow (siehe RenderCrashGuard dort).
         # weak_slot_fwd statt Bound-Method: self -> guard -> self waere ein
         # GC-Zyklus um den Owner (STAB-10, native AV-Klasse beim GC-Teardown).
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup))
+            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup),
+            # on_reloaded ebenfalls weak (STAB-10-Muster, s. VisualizerWindow).
+            on_reloaded=weak_slot_fwd(self._force_full_resync_after_crash))
         load_stage_html(self._view)
         self._view.loadFinished.connect(self._on_load_finished)
+
+    def _setup_service_target(self):
+        """VIZ-12 Schritt 6: die Spiegel-View dockt — genau wie das Fenster
+        (``VisualizerWindow._setup_service_target``) — an das EINE
+        ``VisualizerService``-Singleton an, statt einen eigenen
+        ``QTimer``/``_push_dmx_updates`` zu betreiben. Der Service liefert
+        Batch-Updates ueber ``self._target.emit_batch`` -> laeuft auf
+        ``self._bridge.dmxBatch.emit`` (Bridge-Signatur unveraendert).
+
+        Pro-Target-Zustand (Reload-Token/Echo-Guard/RenderCrashGuard, Trace)
+        bleibt in der Bridge/im Widget (Invariante 2) — der Service kennt nur
+        die duennen ``on_reset_interaction``/``on_reload``-Callbacks.
+
+        Attach passiert bereits im ``__init__`` (nicht erst bei ``on_shown``),
+        damit der Service als Singleton EIN dauerhaftes Ziel kennt; Aktivierung
+        (Push-Relevanz) steuert weiterhin ``on_shown``/``on_hidden`` ueber
+        ``set_target_active`` — der Service ueberlebt das Widget (Design (a):
+        "Fenster/Live-View sind beide nur Konsumenten und duerfen den Service
+        ueberleben"), deshalb ``destroyed`` -> nur noch ``detach_target`` als
+        Backstop (kein State-Unsubscribe mehr noetig, das laeuft zentral im
+        Service, s. ``VisualizerService.shutdown``)."""
+        self._service = get_visualizer_service(self._state)
+        self._target = VisualizerTarget(
+            "live_view_mirror", self._bridge.dmxBatch.emit,
+            on_reset_interaction=self._reset_own_interaction_state,
+            on_reload=self._reload_own_page,
+        )
+        self._service.attach_target(self._target)
+        # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
+        # vollen DMX-Bestand an (requestFullResync-Slot der Bridge). getattr:
+        # SimpleNamespace-Test-Fakes haben die gebundene Methode nicht.
+        self._bridge.full_resync_cb = getattr(
+            self, "_force_full_resync_after_crash", None)
+        # Leak-Schutz: beim Zerstoeren des Widgets vom Service abdocken — als
+        # Backstop, falls das Widget zerstoert wird ohne vorher on_hidden() zu
+        # sehen. Destruction-safe: wir capturen nur Service+Target (NICHT
+        # self), damit der Slot waehrend ~QWidget nicht auf ein halb-
+        # zerstoertes Objekt zugreift. detach_target ist defensiv -> doppelt
+        # (on_hidden + destroyed) ist ein No-Op.
+        _service = self._service
+        _target = self._target
+        self.destroyed.connect(lambda *_: _service.detach_target(_target))
+
+    def _force_full_resync_after_crash(self) -> None:
+        """VIZ-12 Review-Fix: nach der RenderCrashGuard-Selbstheilung den
+        Service-Dirty-Cache fuer DIESES Target invalidieren — sonst bleiben
+        seit dem Crash unveraenderte Fixtures auf der frischen Page schwarz."""
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
+
+    def _reset_own_interaction_state(self) -> None:
+        """VIZ-12 Schritt 6: vom Service ueber ``on_reset_interaction`` bei
+        ``service.reset_interaction_state()`` aufgerufen (Stage-Wechsel/
+        show_loaded). Stoppt eine laufende Live-Trace (Bridge-eigener Zustand)
+        und setzt den Reload-Churn-Guard zurueck — identisches Muster zu
+        ``VisualizerWindow._reset_own_interaction_state``."""
+        bridge = getattr(self, "_bridge", None)
+        if bridge is None:
+            return
+        try:
+            bridge.stop_trace()
+        except Exception as e:
+            print(f"[Visualizer3DView] reset_interaction_state stop_trace error: {e}")
+        try:
+            bridge._cancel_reload_guard_fallback()
+            bridge._reloading_stage = False
+        except Exception as e:
+            print(f"[Visualizer3DView] reset_interaction_state reload-guard error: {e}")
+
+    def _reload_own_page(self) -> None:
+        """VIZ-12 Schritt 6: vom Service ueber ``on_reload`` bei
+        ``service.reload_all_targets()`` aufgerufen ("Szene neu laden" laedt
+        laut Orchestrator-Entscheidung 4 BEIDE Pages). Faehrt ``load_stage_html``
+        mit Cache-Buster fuer DIESES Target — identisches Muster zu
+        ``VisualizerWindow._reload_own_page``."""
+        view = getattr(self, "_view", None)
+        if view is None:
+            return
+        load_stage_html(view)
 
     def _on_load_finished(self, ok: bool):
         if not ok:
@@ -141,6 +218,10 @@ class Visualizer3DView(QWidget):
         if guard is not None:
             guard.reset()   # stabiler Load -> Absturz-Kontingent wieder voll
         QTimer.singleShot(300, self._push_initial_state)
+        # Live-Befund VIZ-12: Voll-Resync erst wenn die Page wirklich bereit
+        # ist (s. VisualizerWindow._on_load_finished) — sonst verpufft der
+        # needs_full-Erstpush und der Dirty-Diff schweigt dauerhaft.
+        QTimer.singleShot(350, self._force_full_resync_after_crash)
 
     def _on_render_crash_giveup(self, message: str):
         """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
@@ -181,40 +262,22 @@ class Visualizer3DView(QWidget):
             "dockEnabled":    False,
         }
 
-    # ── DMX-Push (nur waehrend sichtbar) ────────────────────────────────────
-    def _push_dmx_updates(self):
-        try:
-            for fixture in self._state.get_patched_fixtures():
-                if fixture.fid not in self._state.visualizer_positions:
-                    continue
-                if fixture.universe not in self._state.universes:
-                    continue
-                universe = self._state.universes[fixture.universe]
-                attrs: dict[str, int] = {}
-                seen: dict[str, int] = {}
-                for ch in get_channels_for_patched(fixture):
-                    addr = fixture.address + ch.channel_number - 1
-                    if 1 <= addr <= 512:
-                        # Mehrkopf (Spider): N-tes Vorkommen = Kopf N ("attr#N").
-                        a = ch.attribute
-                        h = seen.get(a, 0)
-                        seen[a] = h + 1
-                        key = a if h == 0 else f"{a}#{h}"
-                        attrs[key] = universe.get_channel(addr)
-                self._bridge.push_dmx_update(fixture.fid, attrs)
-        except Exception as e:
-            print(f"[Visualizer3DView] dmx update error: {e}")
-
     # ── oeffentliche API (von der Live View aufgerufen) ─────────────────────
     def on_shown(self):
-        """Beim Einblenden: State-Subscriber (re)aktivieren, Timer starten +
-        Fixtures aus der Live View (re)sync."""
+        """Beim Einblenden: Bridge-State-Subscriber (re)aktivieren, Service-
+        Target aktiv schalten (Push-Relevanz -> Service-Timer laeuft nur bei
+        >=1 aktivem Target, s. VisualizerService._update_timer_gate) +
+        Fixtures aus der Live View (re)sync. VIZ-12 Schritt 6: kein eigener
+        QTimer/_push_dmx_updates mehr — der Service pusht ueber
+        ``self._target.emit_batch``."""
         try:
             self._bridge._activate()        # idempotent re-arm nach on_hidden()
         except Exception:
             pass
-        if not self._dmx_timer.isActive():
-            self._dmx_timer.start(33)
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, True)
         if self._loaded:
             try:
                 self._bridge.requestFixtures()
@@ -222,11 +285,15 @@ class Visualizer3DView(QWidget):
                 pass
 
     def on_hidden(self):
-        """Beim Ausblenden: Timer stoppen + State-Subscriber abmelden
-        (Ressourcen schonen, kein toter Callback in AppState._callbacks). Die
-        3D-Szene rendert nur sichtbar; on_shown() resynct ohnehin komplett."""
-        if self._dmx_timer.isActive():
-            self._dmx_timer.stop()
+        """Beim Ausblenden: Service-Target inaktiv schalten (kein Push mehr an
+        dieses Target) + Bridge-State-Subscriber abmelden (Ressourcen schonen,
+        kein toter Callback in AppState._callbacks). Das Service-Target BLEIBT
+        angedockt (kein detach) — Page/Bridge leben weiter, on_shown()
+        resynct ohnehin komplett (needs_full wird beim Reaktivieren gesetzt)."""
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, False)
         try:
             self._bridge.dispose()
         except Exception:

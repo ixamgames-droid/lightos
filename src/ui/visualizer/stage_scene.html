@@ -3441,9 +3441,23 @@ function tryChannel() {
           const d = JSON.parse(j);
           updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
         });
+        if (bridge.dmxBatch)       bridge.dmxBatch.connect(j => {
+          const arr = JSON.parse(j);
+          for (const d of arr) {
+            updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
+          }
+        });
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
           list.forEach(f => addFixture(f));
+          // VIZ-12: JETZT sind die Fixture-Objekte gebaut — Service um den
+          // vollen DMX-Bestand bitten. Ein zeitgesteuerter Push von Python
+          // aus kann VOR diesem Punkt eintreffen und verpufft dann (kein
+          // Fixture-Objekt -> updateFixture no-op, Dirty-Cache haelt die
+          // Werte trotzdem fuer zugestellt). Ereignisgesteuert statt Timing.
+          if (bridge.requestFullResync) {
+            try { bridge.requestFullResync(); } catch (e) {}
+          }
         });
         if (bridge.settingsChanged) bridge.settingsChanged.connect(j => applySettings(JSON.parse(j)));
         if (bridge.viewModeChanged) bridge.viewModeChanged.connect(name => setViewMode(name));
@@ -3468,6 +3482,12 @@ function tryChannel() {
           } catch (err) { console.log('updateStageObject err:', err); }
         });
         if (bridge.resizeModeSignal) bridge.resizeModeSignal.connect(on => setResizeModeEnabled(on));
+        if (bridge.pixelRatioSignal) bridge.pixelRatioSignal.connect(r => {
+          // VIZ-12 Schritt 5: expliziter Bildschirmwechsel (Qt screenChanged)
+          // -> Renderer-Pixelratio neu setzen, unabhaengig vom 'resize'-Event
+          // (das feuert nicht garantiert bei jedem Monitorwechsel).
+          renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, 2));
+        });
         if (bridge.requestFixtures) bridge.requestFixtures();
       }
     });
