@@ -214,10 +214,13 @@ class PlaybackEngine:
         self._flush_to_dmx(self.compute_merged())
 
     def _flush_to_dmx(self, merged: dict[int, dict[str, int]]):
-        from src.core.app_state import get_channels_for_patched
+        from src.core.app_state import get_channels_for_patched, fixture_uses_dmx
         for fixture in self._state.get_patched_fixtures():
             fid = fixture.fid
             if fid not in merged:
+                continue
+            # LAS-04: Netzwerk-Laser haben keinen DMX-Adressraum.
+            if not fixture_uses_dmx(fixture):
                 continue
             attrs = merged[fid]
             # Programmer hat Priorität (LTP)

@@ -33,6 +33,7 @@ class _FakePatchedFixture:
     manufacturer_name: str = ""
     fixture_name: str = ""
     fixture_type: str = "other"
+    protocol: str = "dmx"
 
 
 class _FakeCueStack:
@@ -225,7 +226,7 @@ class ShowFileTests(unittest.TestCase):
 
             with zipfile.ZipFile(path, "r") as zf:
                 data = json.loads(zf.read("show.json").decode("utf-8"))
-            self.assertEqual(data["version"], "1.1")
+            self.assertEqual(data["version"], "1.2")
             self.assertIn("patch", data)
             self.assertEqual(data["patch"][0]["fixture_profile_id"], 100)
             self.assertIn("functions", data)
@@ -532,6 +533,228 @@ class ResetGroupsTest(unittest.TestCase):
 
         self.assertEqual(u1.get_all(), bytes(Universe.SIZE))
         self.assertEqual(u2.get_all(), bytes(Universe.SIZE))
+
+
+class _SceneAwareFakeState(_FakeState):
+    """_FakeState erweitert um einen ECHTEN SceneGraph + die 5 Adapter-
+    Properties (siehe src/core/stage/scene_adapters.py) — deckt den echten
+    AppState-Vertrag ab (VIZ-11 Schritt 5), waehrend der Rest der
+    show_file-Umgebung (Patch, Paletten, ...) weiter gefaked bleibt."""
+
+    def __init__(self):
+        super().__init__()
+        from src.core.stage.scene_graph import SceneGraph
+        from src.core.stage.scene_adapters import _ViewRegistry
+        self._scene = SceneGraph()
+        self._view_registry = _ViewRegistry()
+        self._active_stage_name = "simple"
+        self._live_view_transient: dict = {}
+        self.live_view_meta: dict = {}
+
+    @property
+    def visualizer_positions(self):
+        from src.core.stage.scene_adapters import _SceneBackedDict
+        return _SceneBackedDict(self._scene, "pos", self._view_registry)
+
+    @visualizer_positions.setter
+    def visualizer_positions(self, value):
+        from src.core.stage.scene_adapters import _SceneBackedDict
+        view = _SceneBackedDict(self._scene, "pos", self._view_registry)
+        view.clear()
+        for fid, pos in dict(value or {}).items():
+            view[fid] = pos
+
+    @property
+    def visualizer_rotations(self):
+        from src.core.stage.scene_adapters import _SceneBackedDict
+        return _SceneBackedDict(self._scene, "rot", self._view_registry)
+
+    @visualizer_rotations.setter
+    def visualizer_rotations(self, value):
+        from src.core.stage.scene_adapters import _SceneBackedDict
+        view = _SceneBackedDict(self._scene, "rot", self._view_registry)
+        for fid, rot in dict(value or {}).items():
+            view[fid] = rot
+        stale = [n.fixture_id for n in self._scene.fixtures()
+                 if n.fixture_id not in dict(value or {})]
+        for fid in stale:
+            view[fid] = (0.0, 0.0, 0.0)
+
+    @property
+    def visualizer_docks(self):
+        from src.core.stage.scene_adapters import _DockView
+        return _DockView(self._scene, self._view_registry)
+
+    @visualizer_docks.setter
+    def visualizer_docks(self, value):
+        from src.core.stage.scene_adapters import _DockView
+        view = _DockView(self._scene, self._view_registry)
+        view.clear()
+        for fid, sid in dict(value or {}).items():
+            view[fid] = sid
+
+    @property
+    def live_view_positions(self):
+        from src.core.stage.scene_adapters import _LiveViewDict
+        return _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
+
+    @live_view_positions.setter
+    def live_view_positions(self, value):
+        from src.core.stage.scene_adapters import _LiveViewDict
+        view = _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
+        view.clear()
+        for fid, pos in dict(value or {}).items():
+            view[fid] = pos
+
+    @property
+    def active_stage_name(self):
+        return self._active_stage_name
+
+    @active_stage_name.setter
+    def active_stage_name(self, value):
+        self._active_stage_name = value or "simple"
+        self._scene.stage_snapshot["name"] = self._active_stage_name
+
+
+class SceneGraphPersistenceTests(unittest.TestCase):
+    """VIZ-11 Schritt 5: .lshow scene_graph-Block (Dual-Write) + Einmal-
+    Migration von Alt-Shows ohne den Block."""
+
+    def setUp(self):
+        self._orig_modules = {}
+        self.state = _SceneAwareFakeState()
+        self.palette_manager = _FakePaletteManager()
+
+        mod_app_state = types.ModuleType("src.core.app_state")
+        mod_app_state.get_state = lambda: self.state
+
+        mod_palette = types.ModuleType("src.core.engine.palette")
+        mod_palette.get_palette_manager = lambda: self.palette_manager
+
+        mod_cue_stack = types.ModuleType("src.core.engine.cue_stack")
+        mod_cue_stack.CueStack = _FakeCueStack
+
+        mod_models = types.ModuleType("src.core.database.models")
+        mod_models.PatchedFixture = _FakePatchedFixture
+
+        mod_efx = types.ModuleType("src.core.engine.efx")
+        mod_efx.EfxInstance = _FakeEfxInstance
+
+        mod_rgb = types.ModuleType("src.core.engine.rgb_matrix")
+        mod_rgb.RgbMatrixInstance = _FakeRgbMatrixInstance
+
+        self._install_module("src.core.app_state", mod_app_state)
+        self._install_module("src.core.engine.palette", mod_palette)
+        self._install_module("src.core.engine.cue_stack", mod_cue_stack)
+        self._install_module("src.core.database.models", mod_models)
+        self._install_module("src.core.engine.efx", mod_efx)
+        self._install_module("src.core.engine.rgb_matrix", mod_rgb)
+
+        self.show_file = importlib.import_module("src.core.show.show_file")
+        self.show_file = importlib.reload(self.show_file)
+
+    def tearDown(self):
+        for name, old in self._orig_modules.items():
+            if old is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = old
+
+    def _install_module(self, name: str, module):
+        self._orig_modules[name] = sys.modules.get(name)
+        sys.modules[name] = module
+
+    def test_save_writes_scene_graph_block_and_roundtrips(self):
+        """save_show schreibt zusaetzlich zu den Legacy-Bloecken einen
+        scene_graph-Block; load_show baut den Graphen beim v1.2-Format
+        DIREKT aus diesem Block (from_dict), nicht ueber from_legacy."""
+        self.state.visualizer_positions = {1: (2.0, 6.0, -3.0)}
+        self.state.visualizer_rotations = {1: (0.0, 45.0, 0.0)}
+        self.state.active_stage_name = "simple"
+
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "scene.lshow")
+            self.show_file.save_show(path)
+
+            with zipfile.ZipFile(path, "r") as zf:
+                data = json.loads(zf.read("show.json").decode("utf-8"))
+            self.assertEqual(data["version"], "1.2")
+            self.assertIn("scene_graph", data)
+            self.assertIn("nodes", data["scene_graph"])
+            node_ids = {n["id"] for n in data["scene_graph"]["nodes"]}
+            self.assertIn("fix_1", node_ids)
+            # Legacy-Bloecke bleiben unveraendert (Dual-Write, kein Drift).
+            self.assertEqual(data["visualizer"]["positions"]["1"], [2.0, 6.0, -3.0])
+
+            # Dirty state vor dem Laden.
+            self.state.visualizer_positions = {}
+            self.state.visualizer_rotations = {}
+            self.state._scene.stage_snapshot = {}
+
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+            self.assertIn(1, dict(self.state.visualizer_positions))
+            pos = dict(self.state.visualizer_positions)[1]
+            for a, b in zip(pos, (2.0, 6.0, -3.0)):
+                self.assertAlmostEqual(a, b, places=6)
+            rot = dict(self.state.visualizer_rotations)[1]
+            for a, b in zip(rot, (0.0, 45.0, 0.0)):
+                self.assertAlmostEqual(a, b, places=6)
+            # Graph ist beim v1.2-Format fuehrend: from_dict statt from_legacy.
+            self.assertEqual(
+                self.state._scene.to_dict()["nodes"],
+                data["scene_graph"]["nodes"],
+            )
+
+    def test_load_legacy_show_without_scene_graph_migrates_from_legacy(self):
+        """Alt-Show (kein scene_graph-Block) -> der geladene Graph muss
+        identisch zu SceneGraph.from_legacy(...) mit denselben Legacy-Werten
+        sein (Migrations-Algorithmus, Design (c))."""
+        legacy_payload = {
+            "version": "1.1",
+            "name": "Legacy Viz",
+            "patch": [],
+            "visualizer": {
+                "positions": {"7": [1.0, 0.6, 2.0]},
+                "rotations": {"7": [0.0, 30.0, 0.0]},
+                "docks": {},
+                "active_stage": "simple",
+            },
+            "live_view": {"positions": {}, "meta": {}},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "legacy_viz.lshow")
+            with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("show.json", json.dumps(legacy_payload))
+
+            ok, msg = self.show_file.load_show(path)
+            self.assertTrue(ok, msg)
+
+            from src.core.stage.scene_graph import SceneGraph
+            from src.core.stage.stage_definition import DEFAULT_PRESETS
+
+            expected = SceneGraph.from_legacy(
+                positions={7: (1.0, 0.6, 2.0)},
+                rotations={7: (0.0, 30.0, 0.0)},
+                docks={},
+                active_stage_name="simple",
+                live_view_positions={},
+                stage_def=DEFAULT_PRESETS["simple"](),
+            )
+            self.assertEqual(
+                self.state._scene.to_legacy_positions(),
+                expected.to_legacy_positions(),
+            )
+            self.assertEqual(
+                self.state._scene.to_legacy_rotations(),
+                expected.to_legacy_rotations(),
+            )
+            # Kein sofortiges Zurueckschreiben: die geladenen Rohdaten (data)
+            # auf Disk haben weiterhin KEINEN scene_graph-Block (Migration ist
+            # rein in-memory, landet erst beim naechsten save_show).
+            with zipfile.ZipFile(path, "r") as zf:
+                reloaded = json.loads(zf.read("show.json").decode("utf-8"))
+            self.assertNotIn("scene_graph", reloaded)
 
 
 if __name__ == "__main__":

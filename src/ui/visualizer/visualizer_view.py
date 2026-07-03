@@ -25,9 +25,7 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import Qt, QTimer
 
 from src.core.app_state import get_state, get_channels_for_patched
-from src.core.stage.stage_definition import (
-    load_stage, get_default_simple, DEFAULT_PRESETS,
-)
+from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
 )
@@ -162,13 +160,9 @@ class Visualizer3DView(QWidget):
     def _apply_active_stage(self):
         """Aktive Buehne (read-only Anzeige) anhand AppState laden."""
         name = getattr(self._state, "active_stage_name", "simple") or "simple"
-        stage = None
-        if name in DEFAULT_PRESETS:
-            stage = DEFAULT_PRESETS[name]()
-        else:
-            stage = load_stage(name)
-        if stage is None:
-            stage = get_default_simple()
+        # VIZ-11 Schritt 9 (Design (b)): dieselbe Resolve-Quelle wie
+        # VisualizerWindow._apply_active_stage_from_state — s. stage_definition.py.
+        stage, _combo_kind, _combo_name = resolve_active_stage(name)
         try:
             self._bridge.push_stage_definition(stage)
         except Exception as e:

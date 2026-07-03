@@ -87,38 +87,12 @@ class StateSync:
             except TypeError:
                 _wref = None  # nicht referenzierbar -> Verhalten wie subscribe()
         if _wref is not None and _qt_is_valid is not None:
-            # Auch den CALLBACK nur schwach halten. Fast alle Call-Sites uebergeben
-            # ein Lambda, das `self` (das Widget) faengt — haelt der global lebende
-            # Bus das Lambda stark, ist das Widget ueber Bus->Lambda->self
-            # UNSTERBLICH fuer die GC. Sein C++-Objekt kann ueber die Qt-Eltern-
-            # Kaskade trotzdem sterben -> lebender Python-Wrapper auf freigegebenem
-            # Speicher = native Access Violation beim GC-Teardown (deterministischer
-            # Crash von tests/test_snapshot_ignore.py, 2026-07). Damit das Lambda
-            # nicht sofort stirbt, wird es am Widget selbst verankert: Lebenszeit
-            # Callback == Lebenszeit Widget, und der entstehende Zyklus
-            # (Widget -> Pin -> Lambda -> Widget) ist fuer die GC als Ganzes
-            # einsammelbar.
-            _cbref = None
-            try:
-                widget.__dict__.setdefault("_sync_cb_pins", []).append(callback)
-                _cbref = weakref.ref(callback)
-            except (AttributeError, TypeError):
-                _cbref = None  # kein __dict__/nicht referenzierbar -> stark halten
-            if _cbref is not None:
-                def guarded(ev, data, _ref=_wref, _cb=_cbref, _valid=_qt_is_valid):
-                    w = _ref()
-                    cb = _cb()
-                    if w is None or cb is None or not _valid(w):
-                        self.unsubscribe(event, guarded)
-                        return
-                    cb(ev, data)
-            else:
-                def guarded(ev, data, _ref=_wref, _valid=_qt_is_valid):
-                    w = _ref()
-                    if w is None or not _valid(w):
-                        self.unsubscribe(event, guarded)
-                        return
-                    callback(ev, data)
+            def guarded(ev, data, _ref=_wref, _valid=_qt_is_valid):
+                w = _ref()
+                if w is None or not _valid(w):
+                    self.unsubscribe(event, guarded)
+                    return
+                callback(ev, data)
             registered = guarded
         else:
             registered = callback

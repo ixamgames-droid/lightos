@@ -7,7 +7,51 @@ import os
 from src.core.strict import strict_mode
 from src.core.stage.coords import normalize_rotation
 
-SHOW_VERSION = "1.1"
+SHOW_VERSION = "1.2"
+
+
+def _replace_scene(state, scene) -> None:
+    """Review-Fix (state._scene-Ersetzung desynct lebende Views): einzige
+    Stelle in show_file.py, die ``state._scene`` durch ein NEUES SceneGraph-
+    Objekt ersetzt. Nutzt ``state.set_scene()`` (haengt lebende Registry-Views
+    auf den neuen Graphen um + resynct), falls vorhanden -- echter AppState
+    UND tests/test_show_file.py::_SceneAwareFakeState (die den echten
+    Adapter-Vertrag nachbildet) haben das. Fake-States ohne Adapter (z. B.
+    ``_FakeState`` ohne ``_scene``) erreichen diese Funktion gar nicht erst
+    (Aufrufer prueft ``hasattr(state, "_scene")`` vorher). Fallback auf
+    direkte Zuweisung nur fuer den unwahrscheinlichen Fall eines State-Objekts
+    mit ``_scene``, aber ohne ``set_scene``-Methode."""
+    set_scene = getattr(state, "set_scene", None)
+    if callable(set_scene):
+        set_scene(scene)
+    else:
+        state._scene = scene
+
+
+def _prune_ghost_placeholder_nodes(scene) -> None:
+    """Review-Fix (Geister-Platzhalter-Nodes): entfernt Platzhalter-Stage-
+    Nodes, die ``_DockView._ensure_parent_node`` (scene_adapters.py) bei
+    einem Dock auf eine (damals) unbekannte Stage-Element-ID angelegt hat --
+    minimale ``SceneNode(id=sid, kind=PLATFORM)`` OHNE Geometrie-Facette
+    (``size_m``/``color``/``name`` alle ``None``) UND ohne fixture_id. Ein
+    solcher Node ist nur dann ein reiner Ueberrest (kein echtes Buehnen-
+    Element), wenn er zusaetzlich KEINE Kinder (mehr) hat -- ein noch
+    gedocktes Fixture haengt daran und darf nicht mitgerissen werden (der
+    Stale-Dock-Filter vor diesem Aufruf reparent'et solche Faelle bereits auf
+    ``None``, keep_world=True, s. Aufrufer)."""
+    from src.core.stage.scene_graph import NodeKind
+
+    ghost_ids = [
+        n.id for n in scene._nodes.values()
+        if n.kind == NodeKind.PLATFORM
+        and n.fixture_id is None
+        and n.size_m is None
+        and n.color is None
+        and n.name is None
+        and not scene.children_of(n.id)
+    ]
+    for nid in ghost_ids:
+        scene.remove(nid)
 
 
 def _lenient(msg: str, exc: Exception) -> None:
@@ -53,6 +97,7 @@ def _fixture_to_dict(pf) -> dict:
             "manufacturer_name": str(pf.get("manufacturer_name", "") or ""),
             "fixture_name": str(pf.get("fixture_name", "") or ""),
             "fixture_type": str(pf.get("fixture_type", "other") or "other"),
+            "protocol": str(pf.get("protocol", "dmx") or "dmx"),
         }
     return {
         "fid": _to_int(getattr(pf, "fid", getattr(pf, "id", 0)), 0),
@@ -77,6 +122,7 @@ def _fixture_to_dict(pf) -> dict:
         "manufacturer_name": str(getattr(pf, "manufacturer_name", "") or ""),
         "fixture_name": str(getattr(pf, "fixture_name", "") or ""),
         "fixture_type": str(getattr(pf, "fixture_type", "other") or "other"),
+        "protocol": str(getattr(pf, "protocol", "dmx") or "dmx"),
     }
 
 
@@ -114,6 +160,8 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         manufacturer_name=str(d.get("manufacturer_name", "") or ""),
         fixture_name=str(d.get("fixture_name", "") or ""),
         fixture_type=str(d.get("fixture_type", "other") or "other"),
+        # LAS-04: Alt-Shows ohne Feld laden als klassisches DMX-Geraet.
+        protocol=str(d.get("protocol", "dmx") or "dmx"),
     )
 
 
@@ -284,6 +332,25 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "active_stage": getattr(state, "active_stage_name", "simple") or "simple",
     }
 
+    # VIZ-11 (Schritt 5): SceneGraph-Block additiv dazuschreiben — EINE Quelle
+    # (state._scene), die Legacy-Bloecke oben werden bereits aus den Adapter-
+    # Views (state.visualizer_positions/_rotations/_docks) gebaut, die selbst
+    # nur Sichten auf denselben Graphen sind -> kein Drift zwischen beiden
+    # Bloecken moeglich. Fehlt state._scene (z. B. Fake-States in Tests ohne
+    # Adapter), wird der Block einfach weggelassen (Dual-Write ist additiv,
+    # kein Pflichtfeld beim Laden -- siehe load_show-Migrationsgate).
+    scene = getattr(state, "_scene", None)
+    if scene is not None:
+        # Review-Fix (Geister-Platzhalter-Nodes): vor jedem Speichern
+        # verwaiste Dock-Platzhalter (kein echtes Stage-Element, keine
+        # Kinder mehr) aus dem LEBENDEN Graphen entfernen -- sonst wuerden sie
+        # sich ueber wiederholte Save-Zyklen unbegrenzt in der .lshow
+        # ansammeln (s. _prune_ghost_placeholder_nodes). In-place auf dem
+        # echten state._scene (keine Kopie) -- konsistent mit load_show, wo
+        # dieselbe Aufraeumfunktion nach dem Graph-Aufbau laeuft.
+        _prune_ghost_placeholder_nodes(scene)
+    scene_graph_data = scene.to_dict() if scene is not None else None
+
     # Live-View-2D-Positionen (eigene Persistenz, entkoppelt vom 3D-Visualizer)
     live_view_data = {
         "positions": {
@@ -333,6 +400,8 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     }
     if layout:
         show["layout"] = layout
+    if scene_graph_data is not None:
+        show["scene_graph"] = scene_graph_data
 
     path = os.fspath(path)
     parent = os.path.dirname(path)
@@ -488,6 +557,16 @@ def reset_show():
     state._vc_layout = {}
     state._snapshots_data = []
     state._channel_groups_data = []
+    # VIZ-11: Szenegraph komplett neu (deckt den echten AppState, dessen 5
+    # Legacy-Felder Views auf state._scene sind, siehe app_state.py). Die
+    # expliziten Feld-Resets darunter bleiben zusaetzlich bestehen, damit
+    # Fake-States ohne Property-Adapter (z. B. tests/test_show_file.py
+    # _FakeState) weiterhin korrekt geleert werden.
+    if hasattr(state, "_scene"):
+        from src.core.stage.scene_graph import SceneGraph
+        _replace_scene(state, SceneGraph())
+    if hasattr(state, "_live_view_transient"):
+        state._live_view_transient = {}
     state.visualizer_positions = {}
     state.visualizer_rotations = {}
     state.visualizer_docks = {}
@@ -521,22 +600,45 @@ def reset_show():
         print(f"[show_file] reset post events error: {e}")
 
 
-def _resolve_stage_element_ids(stage_name: str) -> set[str] | None:
-    """Element-IDs der aktiven Buehne (Preset-Key oder User-Stage), oder None
-    wenn die Buehne nicht aufloesbar ist (dann keine Dock-Bereinigung)."""
+def _resolve_stage_definition(stage_name: str):
+    """Loest die aktive Buehne (Preset-Key oder User-Stage, %APPDATA%) auf.
+    None, wenn nicht aufloesbar (z.B. User-Stage-Datei fehlt) — dann werden
+    beim VIZ-11-Migrations-Fallback Fixtures zu Root-Nodes (siehe
+    SceneGraph.from_legacy, docs/VIZ11_SCENEGRAPH_DESIGN.md (c) Schritt 2)."""
     try:
         from src.core.stage.stage_definition import DEFAULT_PRESETS, load_stage
         name = stage_name or "simple"
-        stage = None
         if name in DEFAULT_PRESETS:
-            stage = DEFAULT_PRESETS[name]()
-        else:
-            stage = load_stage(name)
-        if stage is None:
-            return None
-        return {e.id for e in stage.elements}
+            return DEFAULT_PRESETS[name]()
+        return load_stage(name)
     except Exception as e:
-        print(f"[show_file] resolve stage ids error: {e}")
+        print(f"[show_file] resolve stage definition error: {e}")
+        return None
+
+
+def _resolve_stage_element_ids(stage_name: str) -> set[str] | None:
+    """Element-IDs der aktiven Buehne (Preset-Key oder User-Stage), oder None
+    wenn die Buehne nicht aufloesbar ist (dann keine Dock-Bereinigung)."""
+    stage = _resolve_stage_definition(stage_name)
+    if stage is None:
+        return None
+    return {e.id for e in stage.elements}
+
+
+def read_show_version(path: str | os.PathLike) -> str | None:
+    """Liest NUR das ``version``-Feld einer .lshow, ohne den App-State
+    anzufassen. Fuer den VIZ-11-Backup-Entscheid in main_window._do_save
+    (Orchestrator-Entscheidung 2): Backup nur, wenn die auf der Platte
+    liegende Datei NOCH kein scene_graph-Format hat (Version < 1.2).
+    None bei jeglichem Lesefehler (z.B. Datei existiert noch nicht -> "Speichern
+    unter" auf neuen Pfad) oder fehlendem "version"-Schluessel."""
+    try:
+        with zipfile.ZipFile(path, "r") as zf:
+            raw = zf.read("show.json").decode("utf-8")
+        data = json.loads(raw)
+        version = data.get("version")
+        return str(version) if version is not None else None
+    except Exception:
         return None
 
 
@@ -702,65 +804,181 @@ def load_show(path: str | os.PathLike):
     # SDK-02: Kanal-Gruppen pro Show (ChannelGroupsView spielt sie zurück).
     state._channel_groups_data = data.get("channel_groups", []) or []
 
-    # Visualizer: Fixture-Positionen + aktive Stage wiederherstellen
+    # Visualizer: Fixture-Positionen + aktive Stage wiederherstellen.
+    # Review-Fix (Zwischenmutationen): die rohen Legacy-Dicts (positions/
+    # rotations/docks/lv_pos) werden HIER NUR als lokale Python-dicts
+    # gesammelt -- OHNE zwischenzeitlich state.visualizer_* zu schreiben.
+    # Das vermied fruehere Zwischenmutationen des ALTEN Graphen (state._scene
+    # zeigte hier noch auf den Graphen der VORIGEN Show): schlug der weiter
+    # unten folgende SceneGraph-Aufbau fehl (Exception), blieb state._scene
+    # sonst auf einem Teil-migrierten Zwischenstand haengen (neue Positionen/
+    # Rotationen bereits geschrieben, aber KEINE Docks -- from_legacy braucht
+    # dafuer mehr als den blossen state.visualizer_docks=docks-Write). Jetzt:
+    # erst NACH dem erfolgreichen (oder fehlgeschlagenen) Graph-Aufbau werden
+    # die Legacy-Properties gesetzt -- entweder redundant in den bereits
+    # korrekten NEUEN Graphen (Abwaertskompatibilitaet fuer Konsumenten, die
+    # die Legacy-Properties direkt lesen) oder, fuer Fake-States OHNE
+    # state._scene (z. B. tests/test_show_file.py::_FakeState), als einzige
+    # Schreibquelle (deren Reihenfolge fuer sie irrelevant ist, da plain-dict-
+    # Attribute ohne Graph-Kopplung).
+    positions: dict[int, tuple[float, float, float]] = {}
+    rotations: dict[int, tuple[float, float, float]] = {}
+    docks: dict[int, str] = {}
+    lv_pos: dict[int, tuple[float, float]] = {}
+    active_stage_name = "simple"
+    live_view_meta: dict = {}
+    visualizer_load_error: Exception | None = None
     try:
         viz = data.get("visualizer", {}) or {}
-        positions: dict[int, tuple[float, float, float]] = {}
         for fid_raw, p in (viz.get("positions", {}) or {}).items():
             try:
                 positions[int(fid_raw)] = (float(p[0]), float(p[1]), float(p[2]))
             except Exception:
                 continue
-        state.visualizer_positions = positions
         # Multi-Achsen-Ausrichtung (rx, ry, rz) in Grad. normalize_rotation laedt
         # auch Alt-Shows korrekt, die nur einen einzelnen Y-Float gespeichert haben.
-        rotations: dict[int, tuple[float, float, float]] = {}
         for fid_raw, val in (viz.get("rotations", {}) or {}).items():
             try:
                 rotations[int(fid_raw)] = normalize_rotation(val)
             except Exception:
                 continue
-        state.visualizer_rotations = rotations
-        state.active_stage_name = str(viz.get("active_stage", "simple") or "simple")
+        active_stage_name = str(viz.get("active_stage", "simple") or "simple")
         # Andock-Beziehungen {fid: stage_element_id}. Stale-Eintraege (Element der
         # aktiven Buehne existiert nicht mehr) verwerfen, falls die Buehne aufloesbar.
-        docks: dict[int, str] = {}
         for fid_raw, sid in (viz.get("docks", {}) or {}).items():
             try:
                 if sid:
                     docks[int(fid_raw)] = str(sid)
             except Exception:
                 continue
-        valid_ids = _resolve_stage_element_ids(state.active_stage_name)
+        valid_ids = _resolve_stage_element_ids(active_stage_name)
         if valid_ids is not None:
             docks = {fid: sid for fid, sid in docks.items() if sid in valid_ids}
-        state.visualizer_docks = docks
     except Exception as e:
-        _lenient("load visualizer error", e)
-        state.visualizer_positions = {}
-        state.visualizer_rotations = {}
-        state.visualizer_docks = {}
-        state.active_stage_name = "simple"
+        visualizer_load_error = e
+        positions = {}
+        rotations = {}
+        docks = {}
+        active_stage_name = "simple"
 
     # Live View: 2D-Fixture-Positionen (eigene Persistenz, entkoppelt vom 3D-Viz)
+    live_view_load_error: Exception | None = None
     try:
         lv = data.get("live_view", {}) or {}
-        lv_pos: dict[int, tuple[float, float]] = {}
         for fid_raw, p in (lv.get("positions", {}) or {}).items():
             try:
                 lv_pos[int(fid_raw)] = (float(p[0]), float(p[1]))
             except Exception:
                 continue
-        state.live_view_positions = lv_pos
         # P4: Show-spezifische View-Einstellungen (Zoom/Grid/Snap/Weltgroesse).
         # Alte Shows ohne "meta" -> leeres Dict; die Live View faellt dann auf
         # die ui_prefs-Defaults zurueck (Fallback, kein Fehler).
         meta = lv.get("meta", {})
-        state.live_view_meta = dict(meta) if isinstance(meta, dict) else {}
+        live_view_meta = dict(meta) if isinstance(meta, dict) else {}
     except Exception as e:
-        _lenient("load live_view error", e)
-        state.live_view_positions = {}
+        live_view_load_error = e
+        lv_pos = {}
+        live_view_meta = {}
+
+    # active_stage_name wird VOR dem Graph-Aufbau gesetzt (from_dict/from_legacy
+    # sowie der Stale-Dock-Filter brauchen die aufgeloeste Buehne).
+    state.active_stage_name = active_stage_name
+
+    # VIZ-11 (Schritt 5): SceneGraph aufbauen -- entweder direkt aus dem
+    # "scene_graph"-Block (bereits migrierte v1.2+ Show, Graph fuehrend) oder
+    # einmalig aus den soeben geladenen Legacy-Feldern (Alt-Show v<=1.1,
+    # siehe docs/VIZ11_SCENEGRAPH_DESIGN.md (c) Migrations-Algorithmus).
+    # hasattr-Guard: Fake-States in Tests ohne Adapter (kein state._scene)
+    # ueberspringen die Migration einfach -- sie kennen die 5 Felder eh nur
+    # als plain-dict-Attribute.
+    if hasattr(state, "_scene"):
+        try:
+            if "scene_graph" in data:
+                from src.core.stage.scene_graph import SceneGraph
+                new_scene = SceneGraph.from_dict(data["scene_graph"])
+                # Stale-Dock-Filter (dieselbe Regel wie im Legacy-Pfad, Design
+                # (d)) auch hier anwenden: from_dict verwirft nur STRUKTURELL
+                # ungueltige parent_id-Referenzen (Ziel-Node fehlt komplett
+                # im geladenen Datensatz). Ein Dock auf eine Platzhalter-Node
+                # (von _DockView beim blossen Setzen ohne Existenzpruefung
+                # angelegt, siehe scene_adapters.py) WIRD mitgespeichert und
+                # ist damit strukturell gueltig, aber kein echtes Element der
+                # aktuell aufgeloesten Buehne mehr -> ohne diesen Zusatz-Filter
+                # wuerde ein geloeschtes Buehnen-Element nach dem Laden wieder
+                # als Dock-Ziel auftauchen (test_stale_dock_discarded_on_load).
+                valid_ids = _resolve_stage_element_ids(state.active_stage_name)
+                if valid_ids is not None:
+                    # Erst sammeln, dann reparenten (nicht waehrend der
+                    # dict-Iteration mutieren).
+                    stale_node_ids = [
+                        n.id for n in new_scene._nodes.values()
+                        if n.parent_id is not None and n.parent_id not in valid_ids
+                    ]
+                    for nid in stale_node_ids:
+                        new_scene.reparent(nid, None, keep_world=True)
+                # Geister-Platzhalter-Nodes (Review-Fix): reine Platzhalter, die
+                # _DockView._ensure_parent_node bei einem Dock auf eine
+                # (damals) unbekannte Stage-Element-ID angelegt hat, OHNE echte
+                # Stage-Referenz UND ohne (mehr) verbleibende Kinder, raeumen
+                # wir beim Laden auf -- sonst akkumulieren sie unbegrenzt ueber
+                # wiederholte Save/Load-Zyklen in der .lshow.
+                _prune_ghost_placeholder_nodes(new_scene)
+                _replace_scene(state, new_scene)
+            else:
+                from src.core.stage.scene_graph import SceneGraph
+                stage_def = _resolve_stage_definition(state.active_stage_name)
+                # Die rohen, oben lokal gesammelten Legacy-dicts sind hier
+                # FUEHREND (nicht state.visualizer_positions/live_view_positions
+                # zurueckgelesen -- die werden erst NACH dem Graph-Aufbau als
+                # Legacy-Properties gesetzt, s. Kommentar oben).
+                new_scene = SceneGraph.from_legacy(
+                    positions=positions,
+                    rotations=rotations,
+                    docks=docks,
+                    active_stage_name=state.active_stage_name,
+                    live_view_positions=lv_pos,
+                    stage_def=stage_def,
+                )
+                _replace_scene(state, new_scene)
+        except Exception as e:
+            _lenient("load scene_graph error", e)
+
+    # Legacy-Properties setzen. Fuer einen Adapter-State (state._scene
+    # vorhanden, s.o.) ist der frisch gebaute Graph bereits die alleinige
+    # Wahrheit -- die 5 Legacy-Felder LESEN live aus genau diesem Graphen
+    # (Property-Getter, siehe app_state.py), ein redundanter Write wuerde
+    # hier NICHT nur nichts bringen, sondern waere sogar SCHAEDLICH: ein
+    # nachtraeglicher ``state.live_view_positions = lv_pos``-Write wuerde
+    # ueber den bestehenden _LiveViewDict-Adapter die bereits korrekte 3D-X/Z-
+    # Weltposition JEDER Fixture mit der aus dem 2D-Pixel-Raster abgeleiteten
+    # Position ueberschreiben (Adapter kennt beim reinen dict-Write keine
+    # Prioritaet "3D vor 2D") -- der Migrations-Algorithmus (Design (c))
+    # verlangt aber positions als FUEHREND. Fake-States OHNE Adapter (kein
+    # state._scene, z. B. tests/test_show_file.py::_FakeState) kennen die 5
+    # Felder nur als plain-dict-Attribute OHNE Graph-Kopplung -- fuer die
+    # bleibt dieser Write die einzige Schreibquelle.
+    has_adapter = hasattr(state, "_scene")
+    if visualizer_load_error is not None:
+        _lenient("load visualizer error", visualizer_load_error)
+        if not has_adapter:
+            state.visualizer_positions = {}
+            state.visualizer_rotations = {}
+            state.visualizer_docks = {}
+        state.active_stage_name = "simple"
+    elif not has_adapter:
+        state.visualizer_positions = positions
+        state.visualizer_rotations = rotations
+        state.visualizer_docks = docks
+
+    if live_view_load_error is not None:
+        _lenient("load live_view error", live_view_load_error)
+        if not has_adapter:
+            state.live_view_positions = {}
         state.live_view_meta = {}
+    else:
+        if not has_adapter:
+            state.live_view_positions = lv_pos
+        state.live_view_meta = live_view_meta
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}

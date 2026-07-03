@@ -133,6 +133,13 @@ class PatchedFixture(Base):
     pan_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
     tilt_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
 
+    # LAS-04: Ausgabe-Protokoll des Geraets. "dmx" (Default) = klassischer
+    # DMX-Adressraum (universe/address gelten). Netzwerk-Laser ("etherdream",
+    # "idn") haben KEINEN DMX-Adressraum: universe/address sind bedeutungslos,
+    # die Render-/Flush-Pfade ueberspringen sie (fixture_uses_dmx) — ihre
+    # Programmer-Werte liest spaeter ein eigener LaserOutputManager (LAS-05).
+    protocol: Mapped[str] = mapped_column(String(20), default="dmx")
+
     # Denormalisiert für schnellen Zugriff ohne JOIN
     manufacturer_name: Mapped[str] = mapped_column(String(120), default="")
     fixture_name: Mapped[str] = mapped_column(String(120), default="")
@@ -180,6 +187,11 @@ def migrate_show_db(engine) -> None:
                 if pcols and _col not in pcols:
                     conn.execute(text(
                         f"ALTER TABLE patched_fixtures ADD COLUMN {_col} INTEGER DEFAULT {_def}"))
+            # LAS-04: Ausgabe-Protokoll (dmx | etherdream | idn).
+            if pcols and "protocol" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN protocol "
+                    "VARCHAR(20) DEFAULT 'dmx'"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 

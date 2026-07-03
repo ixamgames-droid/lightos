@@ -183,6 +183,13 @@ class DirtyFlagTransitionsTest(unittest.TestCase):
     """Ruft die (ungebundenen) VisualizerWindow-Methoden auf einem leichten
     Fake auf — dasselbe Muster wie test_visualizer_controls.py."""
 
+    def tearDown(self):
+        # _add_stage_element/_delete_selected_stage_element pushen seit
+        # VIZ-11 (Schritt 6) auf den GLOBALEN UndoStack-Singleton — nicht in
+        # nachfolgende Tests im selben Prozess durchsickern lassen.
+        from src.core.undo import get_undo_stack
+        get_undo_stack().clear()
+
     def _fake_stage(self, elements=None):
         from src.core.stage.stage_definition import StageDefinition
         stage = StageDefinition(name="Test")
@@ -190,8 +197,16 @@ class DirtyFlagTransitionsTest(unittest.TestCase):
         return stage
 
     def _fake_window(self, stage_dirty=False):
+        # VIZ-11 (Schritt 6): _add_stage_element/_delete_selected_stage_element
+        # pushen jetzt einen Undo-Command (scene_commands.push_add_stage_element/
+        # push_remove_stage_element) und synchronisieren den SceneGraph-Knoten
+        # (self._state._scene) -- der Fake braucht dafuer einen echten
+        # (leeren) SceneGraph statt eines reinen MagicMock.
+        from src.core.stage.scene_graph import SceneGraph
         stage = self._fake_stage()
+        fake_state = SimpleNamespace(_scene=SceneGraph(), _notify_scene_changed=lambda: None)
         fake = SimpleNamespace(
+            _state=fake_state,
             _current_stage=stage,
             _stage_dirty=stage_dirty,
             STAGE_TYPES=VW.VisualizerWindow.STAGE_TYPES,
@@ -199,6 +214,9 @@ class DirtyFlagTransitionsTest(unittest.TestCase):
             _apply_stage=MagicMock(),
             _stage_tree=MagicMock(topLevelItemCount=MagicMock(return_value=0)),
             _bridge=MagicMock(),
+            _selected_stage_id="",
+            _sync_stage_node_to_scene=MagicMock(),
+            _remove_stage_node_from_scene=MagicMock(),
         )
         fake._combo_edit.currentData.return_value = "stage"
         return fake
