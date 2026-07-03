@@ -1142,14 +1142,18 @@ class AppState:
                 print(f"[AppState] laser output start error: {e}")
 
     def ensure_laser_output(self):
-        """Startet den Laser-Streaming-Thread (LAS-05) bei Bedarf und liefert
-        den Manager. Tickt leer, solange keine Netzwerk-Laser gepatcht sind."""
+        """Liefert den Laser-Streaming-Manager (LAS-05), erzeugt ihn bei Bedarf.
+        Der Sende-Thread startet NUR, wenn `LIGHTOS_NO_OUTPUT_THREAD` nicht
+        gesetzt ist (gleiche Bremse wie der DMX-Output-Thread) — so kann die UI
+        `set_armed`/`set_figure`/`estop_all` auch in Tests am Manager aufrufen,
+        ohne einen echten Netzwerk-Thread (Cross-Thread-Qt-AV-Risiko) zu starten.
+        Der Manager tickt leer, solange keine Netzwerk-Laser gepatcht sind."""
         lo = getattr(self, "_laser_output", None)
         if lo is None:
             from .laser.laser_output import LaserOutputManager
             lo = LaserOutputManager(self)
             self._laser_output = lo
-        if not lo.running:
+        if not lo.running and not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
             lo.start()
         return lo
 

@@ -385,7 +385,14 @@ class LaserView(QWidget):
     def _on_estop(self):
         lo = self._laser_output()
         if lo is not None:
+            # Reihenfolge ist sicherheitskritisch: (1) estop_all() setzt sofort
+            # das Verriegelungs-Flag (Tick sendet nichts mehr), (2) EXPLIZIT
+            # entwaffnen — NICHT nur implizit über setChecked→toggled, damit die
+            # Sicherheit nicht an der Qt-Signal-Synchronität hängt, (3) erst
+            # DANACH die Geräte-Verriegelung lösen. So bleibt der Laser dunkel
+            # (unscharf), auch nachdem clear_estop_all die Session wieder öffnet.
             lo.estop_all()
+            lo.set_armed(False)
         # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten nötig.
         self._btn_arm.setChecked(False)
         self._update_arm_button()

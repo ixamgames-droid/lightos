@@ -132,7 +132,10 @@ class LaserOutputManager:
         return self._armed
 
     def set_armed(self, value: bool):
-        """Scharf/unscharf schalten. Unscharf blankt sofort jede Ausgabe."""
+        """Scharf/unscharf schalten. Unscharf blankt die Ausgabe ab dem
+        NÄCHSTEN Tick — ein bereits laufender Tick kann noch mit dem alten
+        Wert fertig senden, d. h. garantiert dunkel spätestens nach einer
+        Tick-Periode (~1/TARGET_FPS ≈ 33 ms). Für sofortiges Dunkel: estop_all."""
         self._armed = bool(value)
 
     def set_figure(self, fid: int, figure):
