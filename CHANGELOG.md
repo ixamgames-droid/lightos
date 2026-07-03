@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-04 — Laser-Support: Zeichenmodus-Fundament — Arming-Safety + Figuren (LAS-07a)
+
+#### Neu / Hinzugefuegt
+
+- **Laser-Scharfschalten (Safety-Ebene):** Die Netzwerk-Laser-Ausgabe startet jetzt **unscharf** — solange nicht bewusst scharf geschaltet, wird jeder Streaming-Frame geblankt (Vorschau ohne Lichtaustritt). Umgesetzt im `LaserOutputManager` (`armed`/`set_armed`, im `_tick`-`dark`-Flag neben BLACKOUT und Not-Aus). In der Laser-Steuerseite gibt es dafür eine **Sicherheits-Sektion** (nur bei Netzwerk-Lasern): großer Scharf/Unscharf-Umschalter mit Warnfarbe, prominenter **Not-Aus-Button** (löst `estop_all` aus und schaltet zurück auf unscharf) und ein Warnhinweis. Ein Show-Load entwaffnet automatisch. `src/core/laser/laser_output.py`, `src/ui/views/laser_view.py`.
+- **Laser-Zeichenfiguren (`LaserFigure`):** neues Modell `src/core/laser/figure.py` — eine benannte, normierte Punktliste (Position −1..+1, Farbe je Punkt, Blank-Segmente, offen/geschlossen) mit `to_frame`-Resampling (gleichmäßige Abtastung + Offset/Scale aus den Programmer-Werten), Serialisierung und eingebauten Startfiguren (Kreis/Dreieck/Quadrat/Linie). Der `LaserOutputManager` kann per `set_figure(fid, …)` eine Figur als Framequelle setzen (statt des Kreis-Testmusters); die Laser-Steuerseite bietet die Auswahl an. Grundlage für den interaktiven Zeichen-Canvas (LAS-07b). Tests `tests/test_laser_figure.py`.
+
 ### 2026-07-03 — Laser-Support: IDN-Stream-Backend (LAS-06)
 
 #### Neu / Hinzugefuegt

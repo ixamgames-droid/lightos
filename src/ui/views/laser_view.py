@@ -147,6 +147,7 @@ class LaserView(QWidget):
         super().__init__(parent)
         self._follow = bool(follow_selection)
         self._fixtures: list = []
+        self._network_fids: list[int] = []
         self._rows: dict[str, _ChannelRow] = {}
         self._template_sig: tuple = ()
         self._head_mode: str = "A"          # "A" | "B" | "AB"
@@ -164,6 +165,50 @@ class LaserView(QWidget):
         self._info = QLabel("Kein Laser in der Auswahl.")
         self._info.setStyleSheet("color:#8b949e;")
         root.addWidget(self._info)
+
+        # ── Sicherheit (Netzwerk-Streaming-Laser) ─────────────────────────
+        # Scharfschalten + Not-Aus + Framequelle. Nur sichtbar, wenn ein
+        # Netzwerk-Laser (Ether Dream / IDN) in der Auswahl ist — DMX-Laser
+        # geben über die normale DMX-Pipeline aus, nicht über den Streamer.
+        self._safety_box = QGroupBox("Laser-Ausgabe (Netzwerk)")
+        sb = QVBoxLayout(self._safety_box)
+        arm_row = QHBoxLayout()
+        self._btn_arm = QPushButton("🔒 UNSCHARF — Ausgabe geblockt")
+        self._btn_arm.setCheckable(True)
+        self._btn_arm.setMinimumHeight(40)
+        self._btn_arm.toggled.connect(weak_slot(self._on_arm_toggled))
+        arm_row.addWidget(self._btn_arm, stretch=1)
+        self._btn_estop = QPushButton("⏹ NOT-AUS")
+        self._btn_estop.setMinimumHeight(40)
+        self._btn_estop.setStyleSheet(
+            "QPushButton{background:#8b0000;color:#fff;font-weight:bold;"
+            "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
+            "QPushButton:hover{background:#b30000;}")
+        self._btn_estop.clicked.connect(weak_slot(self._on_estop))
+        arm_row.addWidget(self._btn_estop)
+        sb.addLayout(arm_row)
+        src_row = QHBoxLayout()
+        src_row.addWidget(QLabel("Ausgabe:"))
+        self._combo_figure = QComboBox()
+        self._combo_figure.addItem("Testmuster (Kreis)", None)
+        try:
+            from src.core.laser.figure import builtin_figures
+            for fig in builtin_figures():
+                self._combo_figure.addItem(f"Figur: {fig.name}", fig)
+        except Exception as e:
+            print(f"[laser_view] builtin figures error: {e}")
+        self._combo_figure.currentIndexChanged.connect(
+            weak_slot(self._on_figure_changed))
+        src_row.addWidget(self._combo_figure, stretch=1)
+        sb.addLayout(src_row)
+        self._arm_hint = QLabel(
+            "Beim Scharfschalten tritt echtes Laserlicht aus. "
+            "Publikum/Augen schützen, Not-Aus bereithalten.")
+        self._arm_hint.setWordWrap(True)
+        self._arm_hint.setStyleSheet("color:#8b949e;font-size:10px;")
+        sb.addWidget(self._arm_hint)
+        root.addWidget(self._safety_box)
+        self._update_arm_button()
 
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
@@ -225,9 +270,24 @@ class LaserView(QWidget):
             sync.subscribe_widget(SyncEvent.PALETTE_CHANGED, self,
                                   lambda *_: self._rebuild_palettes())
             sync.subscribe_widget(SyncEvent.SHOW_LOADED, self,
-                                  lambda *_: self.refresh_from_selection())
+                                  lambda *_: self._on_show_loaded())
         except Exception as e:
             print(f"[laser_view] sync subscribe error: {e}")
+
+    def _on_show_loaded(self):
+        # Safety: eine neu geladene Show startet UNSCHARF und ohne aktive
+        # Figuren — Scharfschalten ist immer eine bewusste Nutzeraktion.
+        lo = self._laser_output()
+        if lo is not None:
+            lo.set_armed(False)
+            lo.clear_figures()
+        try:
+            self._btn_arm.setChecked(False)
+            self._combo_figure.setCurrentIndex(0)
+            self._update_arm_button()
+        except RuntimeError:
+            pass
+        self.refresh_from_selection()
 
     # ---------------------------------------------------------- Selection --
     def _on_selection_changed(self):
@@ -276,6 +336,15 @@ class LaserView(QWidget):
                 + (f" … (+{more})" if more > 0 else ""))
             self._head_box.setVisible(self._max_head_count() > 1)
 
+        # Safety-Box nur für Netzwerk-Streaming-Laser in der Auswahl.
+        self._network_fids = [
+            int(getattr(f, "fid"))
+            for f in self._fixtures
+            if (getattr(f, "protocol", "") or "").lower()
+            in ("etherdream", "idn")]
+        self._safety_box.setVisible(bool(self._network_fids))
+        self._apply_figure_to_selection()
+
         template = self._template_channels()
         sig = tuple((ch.attribute, int(getattr(ch, "channel_number", 0) or 0))
                     for ch in template)
@@ -285,6 +354,56 @@ class LaserView(QWidget):
             self._rebuild_mode_tiles(template)
         self._load_values()
         self._rebuild_palettes()
+
+    # ── Safety / Framequelle (LAS-07) ─────────────────────────────────────
+    def _laser_output(self):
+        try:
+            return get_state().ensure_laser_output()
+        except Exception as e:
+            print(f"[laser_view] laser output unavailable: {e}")
+            return None
+
+    def _update_arm_button(self):
+        armed = self._btn_arm.isChecked()
+        if armed:
+            self._btn_arm.setText("🔓 SCHARF — Laser gibt Licht aus")
+            self._btn_arm.setStyleSheet(
+                "QPushButton{background:#8a6d00;color:#fff;font-weight:bold;"
+                "border:1px solid #d4a200;border-radius:5px;padding:6px 14px;}")
+        else:
+            self._btn_arm.setText("🔒 UNSCHARF — Ausgabe geblockt")
+            self._btn_arm.setStyleSheet(
+                "QPushButton{background:#21262d;color:#8b949e;"
+                "border:1px solid #30363d;border-radius:5px;padding:6px 14px;}")
+
+    def _on_arm_toggled(self, checked: bool):
+        lo = self._laser_output()
+        if lo is not None:
+            lo.set_armed(bool(checked))
+        self._update_arm_button()
+
+    def _on_estop(self):
+        lo = self._laser_output()
+        if lo is not None:
+            lo.estop_all()
+        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten nötig.
+        self._btn_arm.setChecked(False)
+        self._update_arm_button()
+        if lo is not None:
+            lo.clear_estop_all()
+
+    def _on_figure_changed(self, _idx: int):
+        self._apply_figure_to_selection()
+
+    def _apply_figure_to_selection(self):
+        """Setzt die gewählte Figur (oder Testmuster=None) als Framequelle für
+        alle Netzwerk-Laser der aktuellen Auswahl."""
+        lo = self._laser_output()
+        if lo is None:
+            return
+        figure = self._combo_figure.currentData()
+        for fid in getattr(self, "_network_fids", []):
+            lo.set_figure(fid, figure)
 
     def _template_channels(self) -> list:
         """Vereinigung der Laser-Kanäle aller selektierten Laser (ein Kanal je
