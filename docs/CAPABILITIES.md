@@ -1,7 +1,7 @@
 # LightOS — Capability-Manifest (Agenten-Vertrag)
 
 > **GENERIERT — nicht von Hand editieren.** Neu erzeugen mit `tools/gen_capabilities.py`. Diese Datei listet, welche Bausteine in LightOS WIRKLICH existieren. Beim Bauen einer Show NUR diese nutzen — alles andere wird beim Laden still verschluckt (inert) oder droppt die ganze Funktion.
-> Show-Version: `1.1`
+> Show-Version: `1.2`
 
 ## ⚠️ Zuerst lesen — die zwei Asymmetrien
 - Falscher RGB-Matrix-Algorithmus -> laedt STILL als flaches PLAIN (rgb_matrix.py:1569). Falscher EFX-Algorithmus (efx.py:882) ODER Matrix-Style (rgb_matrix.py:1612) -> wirft beim Laden, die GANZE Funktion faellt weg. Gegensaetzlich, beide unsichtbar.

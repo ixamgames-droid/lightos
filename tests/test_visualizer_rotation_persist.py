@@ -40,10 +40,15 @@ class VisualizerRotationPersistTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "old.lshow")
             save_show(path)
-            # rotations-Block entfernen = altes Show-Format simulieren
+            # rotations-Block entfernen = altes Show-Format simulieren. VIZ-11:
+            # zusaetzlich den scene_graph-Block entfernen (save_show schreibt
+            # ihn seit v1.2 dual) -- sonst ist die Datei kein echtes Alt-Show-
+            # Abbild mehr und load_show wuerde den (unveraenderten) Graphen
+            # statt der manipulierten Legacy-Daten fuehren.
             with zipfile.ZipFile(path) as zf:
                 data = json.loads(zf.read("show.json"))
             data["visualizer"].pop("rotations", None)
+            data.pop("scene_graph", None)
             with zipfile.ZipFile(path, "w") as zf:
                 zf.writestr("show.json", json.dumps(data))
             state.visualizer_rotations = {3: (0.0, 999.0, 0.0)}   # muss geleert werden
@@ -61,10 +66,14 @@ class VisualizerRotationPersistTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "legacy.lshow")
             save_show(path)
-            # rotations als ALT-Format (Skalar) zurueckschreiben
+            # rotations als ALT-Format (Skalar) zurueckschreiben. VIZ-11:
+            # scene_graph-Block ebenfalls entfernen (s. test_old_show_without_
+            # rotations_loads) -- sonst greift die Direkt-Migration (from_dict)
+            # statt from_legacy und der manipulierte Legacy-Block wird ignoriert.
             with zipfile.ZipFile(path) as zf:
                 data = json.loads(zf.read("show.json"))
             data["visualizer"]["rotations"] = {"5": 90.0}
+            data.pop("scene_graph", None)
             with zipfile.ZipFile(path, "w") as zf:
                 zf.writestr("show.json", json.dumps(data))
             state.visualizer_rotations = {}

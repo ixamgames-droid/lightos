@@ -38,7 +38,7 @@ from src.core.stage.stage_definition import (
     StageDefinition, StageElement,
     list_stages, load_stage, save_stage, delete_stage,
     get_default_simple,
-    DEFAULT_PRESETS,
+    DEFAULT_PRESETS, resolve_active_stage,
 )
 from src.core.stage.coords import (
     live_to_world3d, world3d_to_live, default_height_for, normalize_rotation,
@@ -47,6 +47,8 @@ from src.core.stage.aim import (
     aim_pan_tilt, aim_orientation, plane_basis,
     circle_points, rect_points, line_points, trace_pan_tilt,
 )
+from src.core.stage import scene_commands as _scmd
+from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -123,6 +125,21 @@ def _bridge_slot_guard(fn):
                 pass
             return None
     return wrapper
+
+
+def _pop_fixture_scene_state(state, fid) -> None:
+    """EIN atomarer Pfad fuer das Loeschen aller per-fid Visualizer-Zustaende
+    (VIZ-11 Schritt 9, Design (b)/(9a); vorher 4-5 duplizierte Cross-Dict-
+    Delete-Bloecke). ``positions.pop`` loescht bei echten SceneGraph-Adaptern
+    bereits den kompletten Node (Pos+Rot+Dock in einem) -- die zusaetzlichen
+    Pops sind dort ein No-op. Bewusst dict-only (KEIN ``state._scene``-Zugriff):
+    die Invariante verlangt, dass diese Funktion auch gegen plain-dict-Fakes
+    (SimpleNamespace-State in Tests, s. test_visualizer_state_leaks.py) korrekt
+    aufraeumt, wo die drei Felder NICHT ueber einen gemeinsamen Node verknuepft
+    sind."""
+    state.visualizer_positions.pop(fid, None)
+    state.visualizer_docks.pop(fid, None)
+    state.visualizer_rotations.pop(fid, None)
 
 
 # ============================================================================
@@ -236,6 +253,8 @@ class VisualizerBridge(QObject):
 
     Slots <- JS
         requestFixtures(), placeFixture(json), fixturePositionChanged(...),
+        fixtureRotationChanged(...), fixtureGestureEnd(json) (gebuendeltes
+        Drag-Ende: Position+Rotation+Dock in EINEM Undo-Command),
         fixtureSelectionChanged(json), fixtureDeleted(fid),
         stageListChanged(json), stageSelectionChanged(id), saveStage(json)
     """
@@ -269,7 +288,7 @@ class VisualizerBridge(QObject):
     pyTraceSaved            = Signal(str, int)         # sequence name, n_steps
     pyFixtureSelection      = Signal(list)
     pyFixtureDeleted        = Signal(int)
-    pyStageListChanged      = Signal(list)
+    pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
@@ -280,6 +299,31 @@ class VisualizerBridge(QObject):
         self._subscribed = False
         self._trace_timer = None      # QTimer fuers Formen-Nachfahren (Live-Trace)
         self._trace_state = None      # {"seqs": {fid: [(pan,tilt),...]}, "i": int, "n": int}
+        # VIZ-11 (Schritt 7): Reload-Churn-Guard (Design-Risiko "RELOAD-CHURN").
+        # JS raeumt beim Bühnen-Reload (clearStageObjects -> loadStageJson) alle
+        # alten Stage-Objekte weg und meldet dabei PRO angedockter Fixture ein
+        # fixtureDockChanged(fid, '') (Undock) zurueck an Python — BEVOR die
+        # neue Buehne ueberhaupt geladen ist. Ohne Guard wuerden echte Docks
+        # aus dem Graphen fliegen, obwohl sie in der neuen/gleichen Buehne
+        # weiter bestehen sollen. Waehrend eines Reloads (zwischen Push der
+        # Stage-Definition und dem finalen stageListChanged-Echo von JS) wird
+        # ein leeres fixtureDockChanged deshalb ignoriert.
+        self._reloading_stage = False
+        # Review-Fix (Stage-Echo-Race): Sequenz-Token gegen stale/partielle
+        # stageListChanged-Echos. push_stage_definition() (und _on_new_stage())
+        # inkrementieren den Zaehler und schicken ihn als "_reloadToken" mit
+        # der Buehnen-Definition an JS; JS echot denselben Token in JEDEM
+        # stageListChanged-Aufruf zurueck. Kommt ein Echo mit einem AELTEREN
+        # Token an (z.B. ein spaet eintreffendes Echo aus einem vorherigen,
+        # bereits ueberholten Reload), gilt es als stale: der destruktive
+        # Loesch-Abgleich (py_ids_to_remove) in _on_stage_list_from_js wird
+        # dafuer uebersprungen (verhindert, dass ein frisch angelegtes
+        # Buehnen-Element durch ein veraltetes Echo wieder geloescht wird).
+        # Echos OHNE Token (Legacy/Tests, z.B. stageListChanged("[]")) gelten
+        # immer als aktuell -- Rueckwaertskompatibilitaet.
+        self._stage_reload_token = 0
+        self._last_stage_echo_token = None
+        self._reload_guard_timer = None
         self._activate()
 
     # ── Lebenszyklus: State-Subscription ────────────────────────────────────
@@ -301,6 +345,7 @@ class VisualizerBridge(QObject):
         Schliessen/Verstecken/Zerstoeren aufrufen (VisualizerWindow.closeEvent,
         Visualizer3DView)."""
         self.stop_trace()
+        self._cancel_reload_guard_fallback()
         if self._subscribed:
             try:
                 self._state.unsubscribe(self._on_state)
@@ -373,21 +418,118 @@ class VisualizerBridge(QObject):
     @Slot(str, float, float, float)
     @_bridge_slot_guard
     def fixturePositionChanged(self, fid_str: str, x: float, y: float, z: float):
-        """JS meldet neue Fixture-Position (nach Drag)."""
+        """JS meldet neue Fixture-Position (nach Drag). JS ruft dies NUR bei
+        Drag-ENDE auf (nicht pro Frame, siehe stage_scene.html handlePointerUp)
+        -> der hier gelesene Alt-Wert IST bereits der Gestik-Start-Snapshot
+        (VIZ-11 Design-Entscheidung 5: EIN Command pro Drag-Gestik)."""
         fid = int(fid_str)
-        self._state.visualizer_positions[fid] = (float(x), float(y), float(z))
+        old_pos = self._state.visualizer_positions.get(fid, (float(x), float(y), float(z)))
+        new_pos = (float(x), float(y), float(z))
+        self._state.visualizer_positions[fid] = new_pos
         # Top-Down-X/Z zurueck in die Live View (Single Source of Truth) — so
         # spiegelt die 2D-Ansicht eine 3D-Verschiebung; Y bleibt 3D-eigen.
         self._write_back_to_live_view(fid, float(x), float(z))
         self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
+        _scmd.push_transform_fixtures(
+            self._state, [(fid, old_pos, new_pos)], label="Fixture bewegen",
+        )
 
     @Slot(str, float, float, float)
     @_bridge_slot_guard
     def fixtureRotationChanged(self, fid_str: str, rx: float, ry: float, rz: float):
-        """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-Drag."""
+        """JS meldet neue Fixture-Ausrichtung (rx, ry, rz) in GRAD nach Drehen-
+        Drag (ebenfalls nur bei Drag-ENDE, s.o.)."""
         fid = int(fid_str)
-        self._state.visualizer_rotations[fid] = (float(rx), float(ry), float(rz))
+        old_rot = self._state.visualizer_rotations.get(fid, (float(rx), float(ry), float(rz)))
+        new_rot = (float(rx), float(ry), float(rz))
+        self._state.visualizer_rotations[fid] = new_rot
         self.pyFixtureRotated.emit(fid, float(rx), float(ry), float(rz))
+        _scmd.push_rotate_fixtures(
+            self._state, [(fid, old_rot, new_rot)], label="Fixture drehen",
+        )
+        # E1-Autosave-Luecke (Design (d)): Rotation aendert live_view_positions
+        # NICHT (nur X/Z), muss aber trotzdem als Show-Aenderung gelten.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
+
+    @Slot(str)
+    @_bridge_slot_guard
+    def fixtureGestureEnd(self, json_str: str):
+        """Review-Fix (Undo-Gestik-Buendelung): EIN gebuendeltes Event fuer
+        das Ende einer 3D-Drag-Gestik (Position + optional Rotation + optional
+        Dock-Aenderung), statt 2-3 einzelner Bridge-Aufrufe
+        (fixturePositionChanged/fixtureDockChanged/fixtureRotationChanged),
+        die je einen EIGENEN Undo-Command pushen wuerden. Widerspricht sonst
+        dem Design-Prinzip 'EIN Command pro Gestik' (docs/VIZ11_SCENEGRAPH_
+        DESIGN.md (e)) -- ein einzelnes Strg+Z muss Position UND Dock UND
+        (falls vorhanden) Rotation gemeinsam zurueckrollen.
+
+        Erwartetes JSON: {"fid": int, "x","y","z": float,
+        "rx","ry","rz": float (nur wenn "hasRotation" true), "dock": str
+        (Stage-Element-ID oder "" fuer 'kein Dock'),
+        "hasDockChange": bool}. JS sendet dies NUR am Drag-ENDE (siehe
+        stage_scene.html handlePointerUp) -- die hier gelesenen Alt-Werte
+        SIND bereits der Gestik-Start-Snapshot (Design-Entscheidung 5).
+
+        Die alten Einzel-Slots (fixturePositionChanged/fixtureDockChanged/
+        fixtureRotationChanged) bleiben UNVERAENDERT bestehen (Kompatibilitaet
+        zu bestehenden Tests/Aufrufern, z.B. Spinbox-Commits) -- nur der
+        JS-Drag-Ende-Pfad wechselt auf dieses Buendel-Event."""
+        d = json.loads(json_str) or {}
+        fid = int(d["fid"])
+        has_rotation = bool(d.get("hasRotation"))
+        has_dock_change = bool(d.get("hasDockChange"))
+
+        old_pos = self._state.visualizer_positions.get(
+            fid, (float(d["x"]), float(d["y"]), float(d["z"])))
+        new_pos = (float(d["x"]), float(d["y"]), float(d["z"]))
+
+        old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
+        if has_rotation:
+            new_rot = (float(d.get("rx", 0.0)), float(d.get("ry", 0.0)), float(d.get("rz", 0.0)))
+        else:
+            new_rot = old_rot
+
+        old_dock = self._state.visualizer_docks.get(fid)
+        if has_dock_change:
+            raw_dock = d.get("dock") or ""
+            new_dock = str(raw_dock) if raw_dock else None
+        else:
+            new_dock = old_dock
+
+        # State bereits VOR dem Undo-Push anwenden (gleiche Reihenfolge wie
+        # die bisherigen Einzel-Slots: JS-Echo ist schon "wahr", der Command
+        # protokolliert nur, execute=False).
+        self._state.visualizer_positions[fid] = new_pos
+        if has_rotation:
+            self._state.visualizer_rotations[fid] = new_rot
+        if has_dock_change:
+            if new_dock:
+                self._state.visualizer_docks[fid] = new_dock
+            else:
+                self._state.visualizer_docks.pop(fid, None)
+
+        self._write_back_to_live_view(fid, new_pos[0], new_pos[2])
+        self.pyFixtureMoved.emit(fid, new_pos[0], new_pos[1], new_pos[2])
+        if has_rotation:
+            self.pyFixtureRotated.emit(fid, new_rot[0], new_rot[1], new_rot[2])
+
+        _scmd.push_transform_and_dock_fixture(
+            self._state, fid,
+            old_pos=old_pos, new_pos=new_pos,
+            old_rot=old_rot, new_rot=new_rot,
+            old_dock=old_dock, new_dock=new_dock,
+            label="Fixture bearbeiten",
+        )
+
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
@@ -609,15 +751,72 @@ class VisualizerBridge(QObject):
         except Exception:
             pass
 
+    # ── Reload-Churn-Guard: Timeout-Fallback (Review-Fix) ───────────────────
+    # _reloading_stage haengt sonst fuer immer auf True, wenn das finale
+    # stageListChanged-Echo ausbleibt (z.B. Renderer-Crash MITTEN im Reload,
+    # bei dem RenderCrashGuard nach 3 Neustarts/60s aufgibt -- kein weiterer
+    # push_stage_definition, das den Guard zuruecksetzen koennte). Ein
+    # QTimer.singleShot-Fallback (~3s) setzt den Guard notfalls selbst
+    # zurueck, damit echte Undocks nicht dauerhaft stillschweigend verworfen
+    # werden (siehe fixtureDockChanged unten).
+    _RELOAD_GUARD_FALLBACK_MS = 3000
+
+    def _arm_reload_guard_fallback(self) -> None:
+        self._cancel_reload_guard_fallback()
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(self._on_reload_guard_fallback_timeout)
+        timer.start(self._RELOAD_GUARD_FALLBACK_MS)
+        self._reload_guard_timer = timer
+
+    def _cancel_reload_guard_fallback(self) -> None:
+        timer = getattr(self, "_reload_guard_timer", None)
+        if timer is not None:
+            try:
+                timer.stop()
+                timer.deleteLater()
+            except Exception:
+                pass
+            self._reload_guard_timer = None
+
+    def _on_reload_guard_fallback_timeout(self) -> None:
+        """Das erwartete finale stageListChanged-Echo ist NICHT innerhalb der
+        Frist eingetroffen -- Guard notfalls selbst aufheben, statt echte
+        User-Undocks fuer den Rest der Session zu verlieren."""
+        self._reload_guard_timer = None
+        if self._reloading_stage:
+            self._reloading_stage = False
+
     @Slot(str, str)
     @_bridge_slot_guard
     def fixtureDockChanged(self, fid_str: str, sid: str):
         """JS meldet eine geaenderte Andock-Beziehung (leerer sid = loesen)."""
+        new_dock = str(sid) if sid else None
+        if new_dock is None and self._reloading_stage:
+            # Reload-Churn-Guard (Schritt 7): JS raeumt gerade die alte Buehne
+            # weg (clearStageObjects) und meldet dabei fuer jede vorher
+            # gedockte Fixture ein Undock -- kein echter User-Vorgang. Bis
+            # das finale stageListChanged-Echo eintrifft, ignorieren.
+            return
         fid = int(fid_str)
-        if sid:
-            self._state.visualizer_docks[fid] = str(sid)
+        old_dock = self._state.visualizer_docks.get(fid)
+        if new_dock:
+            self._state.visualizer_docks[fid] = new_dock
         else:
             self._state.visualizer_docks.pop(fid, None)
+        _scmd.push_dock_fixture(
+            self._state, fid, old_dock, new_dock,
+            label="Fixture andocken" if new_dock else "Fixture abdocken",
+        )
+        # E1-Autosave-Luecke (Design (d)): Dock-Aenderungen aendern die Welt-
+        # Position der Fixture nicht direkt, wohl aber ihre effektive Welt-
+        # Transform-Abstammung (naechste Elternbewegung wirkt anders) -> Show
+        # muss als dirty gelten, damit ein Autosave/Speichern-Hinweis greift.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     @Slot(str)
     @_bridge_slot_guard
@@ -629,16 +828,36 @@ class VisualizerBridge(QObject):
     @_bridge_slot_guard
     def fixtureDeleted(self, fid_str: str):
         fid = int(fid_str)
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
+        _pop_fixture_scene_state(self._state, fid)
         self.pyFixtureDeleted.emit(fid)
 
     @Slot(str)
     @_bridge_slot_guard
     def stageListChanged(self, json_str: str):
-        data = json.loads(json_str) or []
-        self.pyStageListChanged.emit(data)
+        # Reload-Churn-Guard aufheben: JS schickt dieses Signal als EINZIGES,
+        # finales Echo nach loadStageJson (siehe notifyStageListChanged in
+        # stage_scene.html, in dessen finally-Block) -- ab hier sind
+        # fixtureDockChanged-Events wieder echte User-Vorgaenge.
+        self._reloading_stage = False
+        self._cancel_reload_guard_fallback()
+        raw = json.loads(json_str)
+        # Payload-Formen: reines Array (Legacy/Tests, z.B. stageListChanged("[]"))
+        # ODER {"objects":[...], "_reloadToken": N} (JS haengt seit dem
+        # Stage-Echo-Race-Fix den zuletzt per loadStageJson erhaltenen Token
+        # an JEDES Echo an, auch ausserhalb eines Reloads). Ein Token wird nur
+        # als STALE gewertet, wenn er explizit vorhanden UND kleiner als der
+        # zuletzt VERGEBENE Token ist -- ein fehlender Token gilt immer als
+        # aktuell (Rueckwaertskompatibilitaet zu Tests/Alt-JS).
+        if isinstance(raw, dict):
+            data = raw.get("objects") or []
+            echo_token = raw.get("_reloadToken")
+        else:
+            data = raw or []
+            echo_token = None
+        is_stale = (echo_token is not None and echo_token < self._stage_reload_token)
+        self._last_stage_echo_token = echo_token
+        self.pyStageListChanged.emit(data, is_stale)
 
     @Slot(str)
     @_bridge_slot_guard
@@ -672,12 +891,8 @@ class VisualizerBridge(QObject):
             self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(fixtures[fid])))
 
     def remove_fixture_from_scene(self, fid: int):
-        # Alle per-fid Visualizer-Zustaende zusammen entfernen — sonst bleiben
-        # Dock-/Rotations-Eintraege verwaist (wachsen in die Show und werden bei
-        # fid-Wiederverwendung faelschlich erneut angewendet).
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        _scmd.push_remove_fixture(self._state, fid, label="Fixture löschen")
+        _pop_fixture_scene_state(self._state, fid)
         self.fixtureRemoved.emit(fid)
 
     def push_dmx_update(self, fid: int, attrs: dict[str, int]):
@@ -762,10 +977,22 @@ class VisualizerBridge(QObject):
             print(f"[Visualizer] push_edit_mode error: {e}")
 
     def push_stage_definition(self, definition: StageDefinition):
+        # Reload-Churn-Guard scharf schalten: JS raeumt jetzt die alte Buehne
+        # weg (Undock-Echos fuer bereits gedockte Fixtures sind Nebeneffekt
+        # des Rebuilds, kein echter User-Undock) und laedt die neue. Das
+        # finale stageListChanged-Echo (siehe fixtureDockChanged/stageListChanged
+        # unten) hebt den Guard wieder auf.
+        self._reloading_stage = True
+        self._stage_reload_token += 1
+        token = self._stage_reload_token
+        self._arm_reload_guard_fallback()
         try:
-            self.stageLoaded.emit(json.dumps(definition.to_js_dict()))
+            payload = definition.to_js_dict()
+            payload["_reloadToken"] = token
+            self.stageLoaded.emit(json.dumps(payload))
         except Exception as e:
             print(f"[Visualizer] push_stage_definition error: {e}")
+            self._reloading_stage = False
 
     def push_add_stage_object(self, type_: str):
         try:
@@ -851,7 +1078,8 @@ class VisualizerBridge(QObject):
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
-                # remove_fixture_from_scene poppt jetzt positions+docks+rotations
+                # remove_fixture_from_scene raeumt Pos+Rot+Dock ueber den
+                # gemeinsamen Helper auf (VIZ-11 Schritt 9).
                 self.remove_fixture_from_scene(fid)
                 self._state.live_view_positions.pop(fid, None)
             # VIZ-01: Nur in 2D platzierte Fixtures haben evtl. KEINEN
@@ -1115,6 +1343,25 @@ class VisualizerWindow(QMainWindow):
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.activated.connect(fn)
+
+        # VIZ-11 (Schritt 6): Strg+Z/Y muss auch im eigenstaendigen
+        # Visualizer-Fenster wirken (getrennter Top-Level-QMainWindow, das
+        # Hauptfenster-Menue-Shortcuts erreichen ihn nicht). Gemeinsamer
+        # globaler UndoStack (kein zweiter Stack, siehe Design (e)).
+        sc_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
+        sc_undo.activated.connect(self._do_undo)
+        sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
+        sc_redo.activated.connect(self._do_redo)
+
+    def _do_undo(self):
+        ok = get_undo_stack().undo()
+        if ok and hasattr(self, "_lbl_info"):
+            self._lbl_info.setText("Rückgängig")
+
+    def _do_redo(self):
+        ok = get_undo_stack().redo()
+        if ok and hasattr(self, "_lbl_info"):
+            self._lbl_info.setText("Wiederhergestellt")
 
     def event(self, e):
         # Einzelbuchstaben-Shortcuts (V/E/F/S/D) duerfen die Texteingabe in
@@ -1474,7 +1721,20 @@ class VisualizerWindow(QMainWindow):
 
     def _on_render_crash_giveup(self, message: str):
         """VIZ-10: nach 3 automatischen Neustarts in 60s aufgeben — sichtbare
-        Statusmeldung statt stiller Endlosschleife toter Reloads."""
+        Statusmeldung statt stiller Endlosschleife toter Reloads.
+
+        Review-Fix (Reload-Guard-Fallback): stirbt der Renderer MITTEN in
+        einem Stage-Reload und RenderCrashGuard gibt danach auf (kein
+        weiterer automatischer Neustart -> kein weiteres push_stage_definition,
+        das den Guard zuruecksetzen wuerde), bleibt _reloading_stage sonst
+        fuer den Rest der Session auf True haengen -- echte Undocks wuerden
+        stillschweigend verworfen. Hier zusaetzlich zum Timer-Fallback
+        (_arm_reload_guard_fallback) sofort zuruecksetzen, sobald feststeht,
+        dass kein weiterer Reload-Versuch mehr kommt."""
+        bridge = getattr(self, "_bridge", None)
+        if bridge is not None:
+            bridge._cancel_reload_guard_fallback()
+            bridge._reloading_stage = False
         lbl = getattr(self, "_lbl_info", None)
         if lbl is not None:
             lbl.setText(message)
@@ -1483,22 +1743,9 @@ class VisualizerWindow(QMainWindow):
         """Setzt die in AppState gespeicherte Buehne (Preset-Key oder User-Name)
         als aktuelle Stage und synchronisiert die Combo-Auswahl."""
         name = getattr(self._state, "active_stage_name", "simple") or "simple"
-        stage = None
-        combo_kind = combo_name = None
-        if name in DEFAULT_PRESETS:
-            try:
-                stage = DEFAULT_PRESETS[name]()
-                combo_kind, combo_name = "default", name
-            except Exception as e:
-                print(f"[Visualizer] default stage '{name}' error: {e}")
-        else:
-            loaded = load_stage(name)
-            if loaded:
-                stage = loaded
-                combo_kind, combo_name = "user", name
-        if stage is None:
-            stage = get_default_simple()
-            combo_kind, combo_name = "default", "simple"
+        # VIZ-11 Schritt 9 (Design (b)): dieselbe Resolve-Quelle wie
+        # Visualizer3DView._apply_active_stage — s. stage_definition.py.
+        stage, combo_kind, combo_name = resolve_active_stage(name)
         self._current_stage = stage
         self._selected_stage_id = ""
         self._select_stage_in_combo(combo_kind, combo_name)
@@ -1644,14 +1891,34 @@ class VisualizerWindow(QMainWindow):
         fid = item.data(Qt.ItemDataRole.UserRole)
         if fid not in self._state.visualizer_positions:
             return
+        old_pos = self._state.visualizer_positions.get(fid, (0.0, 0.0, 0.0))
+        old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
+        old_dock = self._state.visualizer_docks.get(fid)
         x, y, z = self._spin_x.value(), self._spin_y.value(), self._spin_z.value()
         rot = (self._spin_rot_x.value(), self._spin_rot_y.value(), self._spin_rot_z.value())
         self._state.visualizer_positions[fid] = (x, y, z)
         self._state.visualizer_rotations[fid] = rot
         # Manuelle Positionseingabe loest eine bestehende Andock-Beziehung.
-        if self._state.visualizer_docks.pop(fid, None) is not None:
-            self._bridge.fixtureDockChanged(str(fid), "")
+        # (Direkte State-Mutation — NICHT ueber den fixtureDockChanged-Bridge-
+        # Slot, der selbst einen SetParent-Command pushen wuerde: Doppel-Push.
+        # JS erfaehrt vom geloesten Dock beim naechsten Property-/Stage-Sync,
+        # genau wie im bisherigen Verhalten.)
+        new_dock = old_dock
+        if old_dock is not None:
+            self._state.visualizer_docks.pop(fid, None)
+            new_dock = None
         self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot)
+        # VIZ-11 (Schritt 6): EIN TransformNode/SetParent-Command fuer den
+        # gesamten Spinbox-Commit (Position + Rotation + evtl. Undock).
+        _scmd.push_transform_and_dock_fixture(
+            self._state, fid,
+            old_pos=old_pos, new_pos=(x, y, z),
+            old_rot=old_rot, new_rot=rot,
+            old_dock=old_dock, new_dock=new_dock,
+            label="Fixture bearbeiten",
+            apply_push=lambda fid_, pos_, rot_: self._bridge.push_apply_fixture_transform(
+                fid_, pos_[0], pos_[1], pos_[2], *rot_),
+        )
 
     def _clear_positions(self):
         # T-VIZ-04 (B-6): Sicherheitsabfrage — Loeschen aller Positionen ist nicht
@@ -1668,8 +1935,9 @@ class VisualizerWindow(QMainWindow):
             return
         for fid in list(self._state.visualizer_positions):
             self._bridge.remove_fixture_from_scene(fid)
-        # Alle per-fid Visualizer-Dicts leeren (nicht nur positions), damit keine
-        # verwaisten Docks/Rotationen zurueckbleiben.
+        # Sicherheitsnetz (Test-Doubles/Mocks fuer self._bridge haben keine
+        # Wirkung auf self._state): alle drei Dicts explizit leeren, damit auch
+        # dort garantiert keine verwaisten Docks/Rotationen zurueckbleiben.
         self._state.visualizer_positions.clear()
         self._state.visualizer_docks.clear()
         self._state.visualizer_rotations.clear()
@@ -1759,11 +2027,9 @@ class VisualizerWindow(QMainWindow):
                 break
 
     def _on_fixture_deleted_from_js(self, fid: int):
-        # Konsistent mit remove_fixture_from_scene / fixtureDeleted: alle
-        # per-fid Visualizer-Zustaende entfernen (idempotent).
-        self._state.visualizer_positions.pop(fid, None)
-        self._state.visualizer_docks.pop(fid, None)
-        self._state.visualizer_rotations.pop(fid, None)
+        # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,
+        # VIZ-11 Schritt 9: gemeinsamer Helper statt dupliziertem Cross-Dict-Pop).
+        _pop_fixture_scene_state(self._state, fid)
         self._refresh_patch_list()
 
     # ── Stage-Tab actions ───────────────────────────────────────────────────
@@ -1812,6 +2078,61 @@ class VisualizerWindow(QMainWindow):
         self._state.active_stage_name = name
         self._apply_stage(self._current_stage)
         self._refresh_patch_list()
+
+    # ── VIZ-11 (Schritt 6): Stage-Element <-> SceneGraph-Sync ───────────────
+    # _current_stage (StageDefinition) ist die UI-seitige Quelle fuer
+    # Buehnen-Elemente; state._scene bekommt Stage-Nodes bisher nur beim
+    # Laden/Migrieren einer Show (active_stage_name-Wechsel). Damit
+    # Rotationsvererbung (Constraint 2) UND Undo (StageElementProperty/
+    # AddNode/RemoveNode) auf echten Graph-Knoten arbeiten koennen, wird der
+    # betroffene Knoten hier gezielt (nicht komplett neu gebaut) nachgezogen.
+    def _sync_stage_node_to_scene(self, el: StageElement) -> None:
+        from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
+        scene = self._state._scene
+        try:
+            kind = NodeKind(el.type)
+        except ValueError:
+            kind = NodeKind.PLATFORM
+        node = scene.get(el.id)
+        transform = Transform(
+            pos_m=(float(el.x), float(el.y), float(el.z)),
+            rot_deg=(0.0, math.degrees(el.rotation), 0.0),
+        )
+        if node is None:
+            scene.add(SceneNode(
+                id=el.id, kind=kind, transform=transform, parent_id=None,
+                size_m=(float(el.w), float(el.h), float(el.d)),
+                color=el.color, name=el.name,
+            ))
+        else:
+            node.kind = kind
+            node.transform = transform
+            node.size_m = (float(el.w), float(el.h), float(el.d))
+            node.color = el.color
+            node.name = el.name
+        self._state._notify_scene_changed()
+
+    def _remove_stage_node_from_scene(self, element_id: str) -> None:
+        self._state._scene.remove(element_id)
+        self._state._notify_scene_changed()
+
+    def _push_stage_rotation_to_children(self, el: StageElement) -> None:
+        """Nach einer Transform-Aenderung eines Buehnen-Elements: Welt-
+        Transform aller gedockten Fixture-Nachfahren neu berechnen und per
+        bestehendem Push-Pfad an JS senden (Design (d)/(e): Teil desselben
+        StageElementProperty-do/undo, kein Pro-Frame-Push)."""
+        try:
+            world = self._state._scene.descendant_world_transforms(el.id)
+        except Exception as e:
+            print(f"[Visualizer] descendant_world_transforms error: {e}")
+            return
+        for fid, transform in world.items():
+            x, y, z = transform.pos_m
+            rx, ry, rz = transform.rot_deg
+            try:
+                self._bridge.push_apply_fixture_transform(fid, x, y, z, rx, ry, rz)
+            except Exception as e:
+                print(f"[Visualizer] child transform push error: {e}")
 
     def _apply_stage(self, definition: StageDefinition):
         """Sende komplette Buehnen-Definition an JS."""
@@ -1888,8 +2209,22 @@ class VisualizerWindow(QMainWindow):
                         break
         except Exception as e:
             print(f"[Visualizer] _add_stage_element mode-switch error: {e}")
-        # Komplettes Stage-Update senden -> JS legt das neue Element an
-        self._apply_stage(self._current_stage)
+
+        def _on_add_change():
+            if self._current_stage.get(el.id) is not None:
+                self._sync_stage_node_to_scene(el)
+            else:
+                self._remove_stage_node_from_scene(el.id)
+            self._apply_stage(self._current_stage)
+
+        # VIZ-11 (Schritt 6): AddNode-Undo — Element ist bereits angelegt
+        # (execute=False), Undo entfernt es wieder (inkl. Graph-Knoten).
+        _scmd.push_add_stage_element(
+            self._state, self._current_stage, el,
+            label=f"{type_label} hinzufügen",
+            on_change=_on_add_change,
+        )
+        _on_add_change()
         # Auto-Selektion (sowohl im Tree als auch im JS) -> Drag/Resize sofort moeglich
         self._selected_stage_id = el.id
         for i in range(self._stage_tree.topLevelItemCount()):
@@ -1950,23 +2285,16 @@ class VisualizerWindow(QMainWindow):
         finally:
             self._suppress_property_signals = False
 
-    def _on_stage_property_changed(self, *_):
-        if self._suppress_property_signals:
-            return
-        el = self._selected_stage_element()
-        if not el:
-            return
-        el.name     = self._stage_name_edit.text()
-        el.x        = self._stage_spin_x.value()
-        el.y        = self._stage_spin_y.value()
-        el.z        = self._stage_spin_z.value()
-        el.w        = self._stage_spin_w.value()
-        el.h        = self._stage_spin_h.value()
-        el.d        = self._stage_spin_d.value()
-        el.rotation = math.radians(self._stage_spin_rot.value())
-        self._stage_dirty = True   # VIZ-10: Element-Eigenschaft geaendert
+    _STAGE_PROP_KEYS = ("name", "x", "y", "z", "w", "h", "d", "rotation")
 
-        # Gezieltes Update an JS senden (kein kompletter Rebuild -> kein Selection-Swap)
+    def _stage_element_props(self, el: StageElement) -> dict:
+        return {k: getattr(el, k) for k in self._STAGE_PROP_KEYS}
+
+    def _apply_stage_element_props(self, el: StageElement, props: dict) -> None:
+        """Sendet ein gezieltes JS-Update (kein Rebuild -> kein Selection-Swap),
+        synct den Graph-Knoten und pusht die Welt-Transform an gedockte
+        Fixture-Nachfahren (Design (d)/(e): Rotationsvererbung, Teil desselben
+        StageElementProperty-do/undo)."""
         try:
             payload = json.dumps({
                 "id": el.id,
@@ -1982,8 +2310,62 @@ class VisualizerWindow(QMainWindow):
 
         # Tree-Label aktualisieren (Name kann sich geaendert haben) ohne Rebuild
         item = self._stage_tree.currentItem()
-        if item:
+        if item and item.data(0, Qt.ItemDataRole.UserRole) == el.id:
             item.setText(1, el.name or el.id)
+        elif self._selected_stage_id == el.id:
+            for i in range(self._stage_tree.topLevelItemCount()):
+                it = self._stage_tree.topLevelItem(i)
+                if it.data(0, Qt.ItemDataRole.UserRole) == el.id:
+                    it.setText(1, el.name or el.id)
+                    break
+
+        # Falls das Element gerade selektiert ist: Spinboxen synchron halten
+        # (Undo/Redo aendert Werte ohne User-Tipp-Interaktion).
+        if self._selected_stage_element() is el:
+            self._suppress_property_signals = True
+            try:
+                self._stage_name_edit.setText(el.name)
+                self._stage_spin_x.setValue(el.x)
+                self._stage_spin_y.setValue(el.y)
+                self._stage_spin_z.setValue(el.z)
+                self._stage_spin_w.setValue(el.w)
+                self._stage_spin_h.setValue(el.h)
+                self._stage_spin_d.setValue(el.d)
+                self._stage_spin_rot.setValue(math.degrees(el.rotation))
+            finally:
+                self._suppress_property_signals = False
+
+        self._sync_stage_node_to_scene(el)
+        self._push_stage_rotation_to_children(el)
+
+    def _on_stage_property_changed(self, *_):
+        if self._suppress_property_signals:
+            return
+        el = self._selected_stage_element()
+        if not el:
+            return
+        old_props = self._stage_element_props(el)
+
+        el.name     = self._stage_name_edit.text()
+        el.x        = self._stage_spin_x.value()
+        el.y        = self._stage_spin_y.value()
+        el.z        = self._stage_spin_z.value()
+        el.w        = self._stage_spin_w.value()
+        el.h        = self._stage_spin_h.value()
+        el.d        = self._stage_spin_d.value()
+        el.rotation = math.radians(self._stage_spin_rot.value())
+        new_props = self._stage_element_props(el)
+        self._stage_dirty = True   # VIZ-10: Element-Eigenschaft geaendert
+
+        # VIZ-11 (Schritt 6): StageElementProperty-Undo. Werte sind bereits
+        # angewendet (execute=False); apply_props uebernimmt JS-Update +
+        # Graph-Sync + Kinder-Push fuer do() UND undo() gleichermassen.
+        _scmd.push_stage_element_property(
+            self._state, el, old_props, new_props,
+            label=f"{el.name or el.id} ändern",
+            apply_props=lambda _props: self._apply_stage_element_props(el, _props),
+        )
+        self._apply_stage_element_props(el, new_props)
 
     def _on_resize_mode_toggled(self, checked: bool):
         """Toggle Resize-Handles im JS. AUS = nur Verschieben moeglich (default)."""
@@ -2047,9 +2429,23 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
+
+        def _on_delete_change():
+            if self._current_stage.get(el.id) is None:
+                self._remove_stage_node_from_scene(el.id)
+            else:
+                self._sync_stage_node_to_scene(el)
+            self._apply_stage(self._current_stage)
+
+        # VIZ-11 (Schritt 6): RemoveNode-Undo — Snapshot VOR dem Loeschen.
+        _scmd.push_remove_stage_element(
+            self._state, self._current_stage, el,
+            label=f"{el.name or el.id} löschen",
+            on_change=_on_delete_change,
+        )
         self._current_stage.remove(el.id)
         self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
-        self._apply_stage(self._current_stage)
+        _on_delete_change()
 
     def _on_save_stage(self):
         name, ok = QInputDialog.getText(
@@ -2093,14 +2489,10 @@ class VisualizerWindow(QMainWindow):
         self._current_stage = StageDefinition(name=name.strip())
         self._selected_stage_id = ""
         # JS explizit eine LEERE Stage senden (clearStageObjects wird in JS gerufen)
-        try:
-            self._bridge.stageLoaded.emit(json.dumps({
-                "name": name.strip(),
-                "objects": [],
-                "fixtures": [],
-            }))
-        except Exception as e:
-            print(f"[Visualizer] _on_new_stage stageLoaded error: {e}")
+        # -> ueber push_stage_definition, damit derselbe Reload-Churn-Guard UND
+        # dasselbe Sequenz-Token (Stage-Echo-Race-Fix) wie beim normalen
+        # Buehnenwechsel greifen (kein separater Emit-Pfad mehr noetig).
+        self._bridge.push_stage_definition(self._current_stage)
         # Tree-Panel und Patch-Liste neu aufbauen
         self._refresh_stage_tree()
         self._refresh_patch_list()
@@ -2148,10 +2540,22 @@ class VisualizerWindow(QMainWindow):
 
     # ── Stage-Bridge-Slots (JS -> Python) ───────────────────────────────────
 
-    def _on_stage_list_from_js(self, items: list):
+    def _on_stage_list_from_js(self, items: list, is_stale: bool = False):
         """Wird ausgeloest wenn JS Stage-Objekte aendert (z.B. Drag im 3D-View).
         Aktualisiert nur die Datenmodelle - KEIN Tree-Rebuild (verhindert Selection-Swap),
-        ausser ein Element wurde hinzugefuegt ODER entfernt."""
+        ausser ein Element wurde hinzugefuegt ODER entfernt.
+
+        ``is_stale`` (Review-Fix Stage-Echo-Race): kommt von der Bridge, wenn
+        das Echo einen AELTEREN Sequenz-Token als den zuletzt vergebenen
+        traegt -- z.B. ein spaet eintreffendes Echo aus einem Reload, der
+        inzwischen von einem NEUEREN push_stage_definition ueberholt wurde.
+        Ein solches Echo spiegelt einen Zwischenstand, NICHT den aktuellen
+        Soll-Zustand -- der destruktive Loesch-Abgleich (py_ids_to_remove)
+        wird dafuer uebersprungen, sonst wuerden frisch angelegte Elemente
+        (die im stale Snapshot noch fehlen) faelschlich wieder entfernt.
+        Neuanlage/Update pro Element bleibt harmlos (idempotent) und laeuft
+        weiter, damit z.B. Positions-Updates aus demselben Echo nicht verloren
+        gehen."""
         tree_needs_rebuild = False
         js_ids = set()
         for it in items:
@@ -2176,6 +2580,7 @@ class VisualizerWindow(QMainWindow):
                 self._current_stage.elements.append(el)
                 tree_needs_rebuild = True
                 self._stage_dirty = True   # VIZ-10: neues Element aus JS -> ungespeichert
+                self._sync_stage_node_to_scene(el)
                 continue
             pos = it.get("position") or {}
             size = it.get("size") or {}
@@ -2187,23 +2592,38 @@ class VisualizerWindow(QMainWindow):
             new_d = float(size.get("z", el.d))
             new_rotation = float(it.get("rotation", el.rotation))
             new_color = it.get("color", el.color)
-            if (new_x, new_y, new_z, new_w, new_h, new_d, new_rotation, new_color) != (
-                    el.x, el.y, el.z, el.w, el.h, el.d, el.rotation, el.color):
+            changed = (new_x, new_y, new_z, new_w, new_h, new_d, new_rotation, new_color) != (
+                    el.x, el.y, el.z, el.w, el.h, el.d, el.rotation, el.color)
+            if changed:
                 self._stage_dirty = True   # VIZ-10: JS-Drag hat effektiv etwas geaendert
             el.x, el.y, el.z = new_x, new_y, new_z
             el.w, el.h, el.d = new_w, new_h, new_d
             el.rotation = new_rotation
             el.color = new_color
+            if changed:
+                # VIZ-11 (Schritt 7, Design-Entscheidung 4): Drag-Ende macht
+                # Python zur autoritativen Quelle -- Graph-Knoten nachziehen
+                # und gedockte Nachfahren ggf. korrigieren (Translation lief
+                # waehrend des Drags bereits fluessig JS-seitig, Rotation NIE
+                # -> hier greift der einzige autoritative Kinder-Push).
+                self._sync_stage_node_to_scene(el)
+                self._push_stage_rotation_to_children(el)
 
-        # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht) entfernen
-        py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
-        if py_ids_to_remove:
-            for pid in py_ids_to_remove:
-                self._current_stage.remove(pid)
-                if self._selected_stage_id == pid:
-                    self._selected_stage_id = ""
-            tree_needs_rebuild = True
-            self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
+        # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht)
+        # entfernen -- NUR bei einem AKTUELLEN Echo (Stage-Echo-Race-Fix): ein
+        # stale Echo (aus einem ueberholten Reload) listet ggf. nicht alle
+        # gerade erst angelegten Elemente, das darf NICHT als "in JS geloescht"
+        # missverstanden werden.
+        if not is_stale:
+            py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
+            if py_ids_to_remove:
+                for pid in py_ids_to_remove:
+                    self._current_stage.remove(pid)
+                    self._remove_stage_node_from_scene(pid)
+                    if self._selected_stage_id == pid:
+                        self._selected_stage_id = ""
+                tree_needs_rebuild = True
+                self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
 
         if tree_needs_rebuild:
             self._refresh_stage_tree()

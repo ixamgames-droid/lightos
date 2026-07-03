@@ -111,6 +111,12 @@ class TabModeSyncTest(unittest.TestCase):
 # ============================================================================
 
 class AddStageElementAutoModeTest(unittest.TestCase):
+    def tearDown(self):
+        # _add_stage_element pusht seit VIZ-11 (Schritt 6) auf den GLOBALEN
+        # UndoStack-Singleton — nicht in nachfolgende Tests durchsickern lassen.
+        from src.core.undo import get_undo_stack
+        get_undo_stack().clear()
+
     def _fake(self, cur_mode="view"):
         combo = QComboBox()
         combo.addItem("Ansehen", "view")
@@ -121,6 +127,7 @@ class AddStageElementAutoModeTest(unittest.TestCase):
         tree.topLevelItemCount.return_value = 0
         lbl = MagicMock()
         return SimpleNamespace(
+            _state=SimpleNamespace(),
             _current_stage=StageDefinition(),
             _combo_edit=combo,
             _stage_tree=tree,
@@ -130,6 +137,8 @@ class AddStageElementAutoModeTest(unittest.TestCase):
             _selected_stage_id="",
             STAGE_TYPES=VW.VisualizerWindow.STAGE_TYPES,
             _apply_stage=MagicMock(),
+            _sync_stage_node_to_scene=MagicMock(),
+            _remove_stage_node_from_scene=MagicMock(),
         )
 
     def test_switches_from_view_to_stage_mode(self):
