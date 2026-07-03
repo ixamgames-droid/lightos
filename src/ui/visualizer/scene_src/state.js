@@ -1,24 +1,25 @@
-// VIZ-13 Schritt 3a-3: geteilter globaler State als eigenes ES-Modul.
-//
-// WICHTIG (Design-Dokument Abschnitt (a), "Kern-Gotcha beim Split" + Risiko 1
-// aus dem Auftrag): dieses Modul wird in 3a-3 NUR angelegt und 1:1 spiegel-
-// gleich zum bestehenden State-Block in stage_scene.html befuellt - es wird
-// hier noch NICHT importiert/genutzt. stage_scene.html bleibt in diesem
-// Schritt der EINE <script>-Block mit ihren eigenen `let`/`const`-Bindings.
-// Der eigentliche Umzug (stage_scene.html importiert von hier, eigene
-// Bindings werden entfernt) passiert in 3a-4, damit dieser Diff klein und
-// pruefbar bleibt und 3a-3 allein gruen ist (keine Verhaltensaenderung).
+// VIZ-13 Schritt 3a-4: geteilter globaler State als eigenes ES-Modul - JETZT
+// tatsaechlich genutzt (Umzug aus stage_scene.html abgeschlossen).
 //
 // Warum kein `export let mode` fuer viewMode/activeCam: ein re-exportiertes
 // `let` ist in ES-Modulen zwar live bindend fuer andere Module, aber NICHT
 // von aussen zuweisbar (`import { x } from './state.js'; x = 1` ist ein
 // SyntaxError - Import-Bindings sind read-only). viewMode/activeCam werden
-// im bestehenden Code jedoch direkt neu zugewiesen (stage_scene.html:1995-96,
-// `viewMode = ...; activeCam = ...`), nicht nur mutiert. Deshalb: Getter/
-// Setter-Objekt `view` (siehe unten) statt zweier re-exportierter `let`.
-// selectedFids/selectedStageId haben dasselbe Zuweisungsmuster (komplette
-// Ersetzung, z.B. `selectedFids = [fid]`, `selectedStageId = null`) - daher
-// ebenfalls ueber `view`-Getter/Setter statt eigener re-exportierter `let`.
+// im bestehenden Code jedoch direkt neu zugewiesen (ehem. stage_scene.html
+// 1995-96, `viewMode = ...; activeCam = ...`), nicht nur mutiert. Deshalb:
+// Getter/Setter-Objekt `view` (siehe unten) statt re-exportierter `let`s.
+// selectedFids/selectedStageId/editMode/editTool haben dasselbe Zuweisungs-
+// muster (komplette Ersetzung, z.B. `selectedFids = [fid]`) - daher
+// ebenfalls ueber `view`-Getter/Setter statt eigener re-exportierter `let`s.
+//
+// 3a-4-Erweiterung ggue. 3a-3: zusaetzlich zu mode/activeCam/selectedFids/
+// selectedStageId haelt `view` jetzt auch editMode/editTool (ehem. globale
+// `let`s bei stage_scene.html:214/219) sowie die Kamera-Sphaerik theta/phi/
+// radius (ehem. stage_scene.html:3273) - alle werden von mehreren Modulen
+// (interaction/*, camera/cameras.js, bridge/bridge.js) gelesen UND komplett
+// neu zugewiesen, genau das Zuweisungsmuster, fuer das dieses Getter/Setter-
+// Pattern gebaut wurde. Das haelt die Modul-Abhaengigkeiten sternfoermig auf
+// state.js statt N-zu-N zwischen den Interaction-/Kamera-Modulen.
 //
 // fixtures/stageObjects/topDownIcons/settings bleiben dagegen `const`-Objekte:
 // der bestehende Code mutiert nur ihren Inhalt (`fixtures[fid] = {...}`,
@@ -61,14 +62,16 @@ export const settings = {
 // re-exportiertem `let` (Design-Risiko 1 - siehe Kommentar oben).
 // ----------------------------------------------------------------------------
 
-let _viewMode = '3D';        // '2D' | '3D' (stage_scene.html:213)
-let _activeCam = null;       // wird von aussen mit perspectiveCam/orthoCam
-                              // befuellt, sobald die Kamera-Objekte existieren
-                              // (Kamera-Erzeugung wandert erst in einem
-                              // spaeteren 3a-Schritt hierher - state.js kennt
-                              // in 3a-3 noch keine THREE-Objekte).
-let _selectedFids = [];      // fid numbers (stage_scene.html:2207)
-let _selectedStageId = null; // stage_scene.html:2208
+let _viewMode = '3D';        // '2D' | '3D' (ehem. stage_scene.html:213)
+let _activeCam = null;       // perspectiveCam|orthoCam, von camera/cameras.js befuellt
+let _selectedFids = [];      // fid numbers (ehem. stage_scene.html:2207)
+let _selectedStageId = null; // ehem. stage_scene.html:2208
+let _editMode = 'view';      // 'view' | 'edit' | 'stage' (ehem. stage_scene.html:214)
+let _editTool = 'move_xz';   // 'move_xz'|'move_y'|'rotate'|'aim'|'trace' (ehem. :219)
+
+// Kamera-Sphaerik (Eigenbau-Orbit, ehem. stage_scene.html:3273) - kommt erst
+// in 3b durch OrbitControls-Objekt-State ab; in 3a bleibt es primitive State.
+let _theta = 0.3, _phi = 1.1, _radius = 22;
 
 export const view = {
   get mode() { return _viewMode; },
@@ -82,4 +85,19 @@ export const view = {
 
   get selectedStageId() { return _selectedStageId; },
   set selectedStageId(v) { _selectedStageId = v; },
+
+  get editMode() { return _editMode; },
+  set editMode(v) { _editMode = v; },
+
+  get editTool() { return _editTool; },
+  set editTool(v) { _editTool = v; },
+
+  get theta() { return _theta; },
+  set theta(v) { _theta = v; },
+
+  get phi() { return _phi; },
+  set phi(v) { _phi = v; },
+
+  get radius() { return _radius; },
+  set radius(v) { _radius = v; },
 };

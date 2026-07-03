@@ -11,14 +11,21 @@
   (b) "Laderei-Gotcha"):
     1) qwebchannel.js als klassisches qrc://-Script (Qt-WebChannel-Bruecke)
     2) three_local.js als klassisches Script (setzt window.THREE, UMD r128)
-    3) <script type="module"> app.js (implizit defer - laeuft NACH 1+2)
+    3) <script type="module"> ein TEST-ONLY Einstiegspunkt (implizit defer -
+       laeuft NACH 1+2)
   Kein WebGL-Renderer wird instanziiert (offscreen-Testlauf hat kein GL) -
   der Beleg pruefst nur den THREE-Namespace-Zugriff aus dem Modul heraus.
-  Diese Datei ist NICHT die Produktiv-Page - sie wird nur vom neuen
+  Diese Datei ist NICHT die Produktiv-Page - sie wird nur vom
   Smoke-Test (tests/test_viz13_esm_smoke.py) geladen.
+
+  WICHTIG (seit Schritt 3a-4): laedt bewusst NICHT mehr scene_src/app.js -
+  das ist seit 3a-4 das ECHTE Produktiv-Entry-Modul (instanziiert u.a.
+  THREE.WebGLRenderer, was offscreen ohne GL fehlschlaegt). Stattdessen ein
+  eigenes Test-Modul (probe_entry.js), das nur probe_util.js importiert -
+  identisch zum bisherigen Beleg-Umfang dieser Probe-Page.
 -->
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="three_local.js"></script>
-<script type="module" src="scene_src/app.js"></script>
+<script type="module" src="scene_src/probe_entry.js"></script>
 </body>
 </html>
