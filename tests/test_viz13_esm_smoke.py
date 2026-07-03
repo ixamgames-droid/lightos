@@ -1,5 +1,6 @@
-"""VIZ-13 Schritt 3a-1: ESM-Machbarkeits-Beleg (Build-Strategie empirisch
-fixieren, siehe docs/VIZ13_JS_NEUAUFBAU_DESIGN.md Abschnitt (b)).
+"""VIZ-13 Schritt 3a-1/3a-2: ESM-Machbarkeits-Beleg (Build-Strategie
+empirisch fixieren, siehe docs/VIZ13_JS_NEUAUFBAU_DESIGN.md Abschnitt (b))
++ three-Wrapper-Modul-Beleg (Abschnitt (a), ``three/three.js``).
 
 Laedt die TEST-ONLY Probe-Page (``stage_scene_esm_probe.html``) in einer
 ECHTEN ``QWebEngineView`` (offscreen) und prueft:
@@ -16,10 +17,15 @@ ECHTEN ``QWebEngineView`` (offscreen) und prueft:
      Scripts inkl. ``qwebchannel.js``); das bestaetigt, dass ein
      ``tryChannel()``-artiges Poll-Muster (``setTimeout(fn, 200)``) im
      Bridge-Modul mit dieser Ladereihenfolge klarkommt.
+  4) ``window.__lightosEsmProbe.wrapperSceneOk`` — ein Modul, das
+     ``{ Scene }`` ueber den neuen Wrapper (``scene_src/three/three.js``)
+     importiert, kann fehlerfrei ``new Scene()`` instanziieren und das
+     Ergebnis ist eine echte ``window.THREE.Scene``-Instanz (3a-2).
 
 Bewusst OHNE Renderer-Instanziierung: WebGL ist im offscreen-Testlauf
 (``QT_QPA_PLATFORM=offscreen``) nicht verfuegbar — ``probe_util.js`` fasst
-nur den THREE-Namespace an, niemals ``new THREE.WebGLRenderer(...)``.
+nur den THREE-Namespace an bzw. instanziiert ein ``THREE.Scene`` (kein GL
+noetig), niemals ``new THREE.WebGLRenderer(...)``.
 
 Kein Python-Compile-Check haette einen Bruch der Lade-Konstellation
 gefangen (Design-Dokument, Leitprinzip) — deshalb dieser dedizierte
@@ -149,6 +155,9 @@ class EsmProbeSmokeTest(unittest.TestCase):
         self.assertIsInstance(probe, dict, f"unerwartete Probe-Form: {probe_raw!r}")
         self.assertTrue(probe.get("hasThree"), f"THREE-Namespace fehlt: {probe!r}")
         self.assertTrue(probe.get("hasVector3"), f"THREE.Vector3 fehlt: {probe!r}")
+        self.assertTrue(
+            probe.get("wrapperSceneOk"),
+            f"three-Wrapper-Modul: new Scene() ueber Scene-Import fehlgeschlagen: {probe!r}")
 
         # 3) Kein Renderer wurde instanziiert (WebGL im offscreen-Lauf nicht
         #    verfuegbar) - nur Namespace-Zugriff, kein renderer/domElement.
