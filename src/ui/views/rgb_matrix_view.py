@@ -11,6 +11,7 @@ from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixSt
 from src.core.engine.rgb_matrix_meta import ALGO_META
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -562,7 +563,10 @@ class RgbMatrixView(QWidget):
         for i, b in enumerate(self._color_btns):
             # Farb-Buttons schreiben gezielt nur ihre Sequence-Position (nicht ueber
             # _param_change, das sonst c1/2/3 ueberschreiben wuerde).
-            b.color_changed = lambda c, idx=i: self._on_color_button(idx, c)
+            # weak_slot_fwd statt Lambda: Button -> Lambda -> View waere ein
+            # GC-Zyklus um den Owner (STAB-10, native AV-Klasse; genau dieser
+            # Zyklus crashte die Matrix-Testdateien unter dem weak-sync-Stand).
+            b.color_changed = weak_slot_fwd(self._on_color_button, i)
             lbl = QLabel(f"C{i+1}:")
             self._c_labels.append(lbl)
             color_row.addWidget(lbl)
@@ -1296,7 +1300,7 @@ class RgbMatrixView(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")
@@ -1394,9 +1398,12 @@ class RgbMatrixView(QWidget):
         # sofort das Gruppen-Grid (kein Phantom mehr).
         try:
             from src.core.sync import get_sync, SyncEvent
+            # weak_slot statt Lambda: der globale Bus hielte das self-fangende
+            # Lambda sonst fuer immer -> Wrapper-Pin ueber den C++-Tod hinaus
+            # (STAB-03-Falle). Nach dem View-Tod ist der Callback ein No-Op.
             get_sync().subscribe(
                 SyncEvent.SELECTION_CHANGED,
-                lambda *_: self._sync_follow_selection(),
+                weak_slot(self._sync_follow_selection),
             )
         except Exception as e:
             print(f"[rgb_matrix_view] follow subscribe error: {e}")

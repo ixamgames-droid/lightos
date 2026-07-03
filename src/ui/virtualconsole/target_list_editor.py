@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
+from src.ui.weak_slots import weak_slot
+
 
 def _all_functions() -> list[tuple[int, str]]:
     """(id, Anzeigename) aller Funktionen, nach Name sortiert. Qt-frei nutzbar."""
@@ -90,11 +92,16 @@ class TargetListEditor(QWidget):
         self._rows_lay.addWidget(self._empty_lbl)
 
         add = QPushButton("+ Funktion/Effekt hinzufügen")
-        add.clicked.connect(lambda: (self._add_row(None, ""), self._refresh_title(),
-                                     self.changed.emit()))
+        add.clicked.connect(self._on_add_clicked)
         self._rows_lay.addWidget(add)
 
         self._refresh_title()
+
+    def _on_add_clicked(self):
+        # STAB-09: gehobener Lambda-Body — Connection soll self nicht pinnen.
+        self._add_row(None, "")
+        self._refresh_title()
+        self.changed.emit()
 
     # ── Aufklappen ────────────────────────────────────────────────────────────
     def _on_toggle(self, checked: bool):
@@ -151,8 +158,8 @@ class TargetListEditor(QWidget):
 
         if param is not None:
             self._reload_params(row, param_key)
-        func.currentIndexChanged.connect(lambda _i, r=row: self._on_func_changed(r))
-        dele.clicked.connect(lambda _c=False, r=row: self._remove_row(r))
+        func.currentIndexChanged.connect(weak_slot(self._on_func_changed, row))
+        dele.clicked.connect(weak_slot(self._remove_row, row))
         return row
 
     def _on_func_changed(self, row):

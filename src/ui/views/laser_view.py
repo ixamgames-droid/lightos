@@ -27,6 +27,7 @@ from PySide6.QtCore import Qt
 
 from src.core.app_state import get_state, get_channels_for_patched
 from src.core.attr_groups import attr_label
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
@@ -174,8 +175,7 @@ class LaserView(QWidget):
             rb = QRadioButton(label)
             rb.setChecked(key == "A")
             self._head_group.addButton(rb)
-            rb.toggled.connect(
-                lambda on, k=key: self._set_head_mode(k) if on else None)
+            rb.toggled.connect(weak_slot_fwd(self._on_head_mode_toggled, key))
             hb.addWidget(rb)
         hb.addStretch(1)
         root.addWidget(self._head_box)
@@ -366,8 +366,7 @@ class LaserView(QWidget):
                 name, _range_value(r),
                 color=kind_colors.get(getattr(r, "kind", "") or ""),
                 tooltip=f"Shutter → {_range_value(r)}")
-            tile.clicked.connect(
-                lambda value, a="shutter": self._write_value(a, int(value)))
+            tile.clicked.connect(weak_slot_fwd(self._on_mode_tile_clicked))
             self._mode_lay.addWidget(tile)
         self._mode_lay.addStretch(1)
 
@@ -389,8 +388,7 @@ class LaserView(QWidget):
             tile = PresetTile(p.name, p.name, color="#2a0a3a",
                               tooltip="Muster auf die ausgewählten Laser "
                                       "anwenden")
-            tile.clicked.connect(
-                lambda _payload, pal=p: self._apply_palette(pal))
+            tile.clicked.connect(weak_slot(self._apply_palette, p))
             self._pal_grid.addWidget(tile, i // 4, i % 4)
         self._pal_box.setVisible(True)
 
@@ -433,6 +431,16 @@ class LaserView(QWidget):
             except Exception:
                 val = None
             row.set_value(int(val) if val is not None else 0)
+
+    def _on_head_mode_toggled(self, key: str, on: bool):
+        """Bound-Slot statt Lambda (STAB-10): nur der AKTIV werdende
+        Radio-Button schaltet die Mustergruppe."""
+        if on:
+            self._set_head_mode(key)
+
+    def _on_mode_tile_clicked(self, value):
+        """Bound-Slot statt Lambda (STAB-10): Shutter-Kachel schreibt den Wert."""
+        self._write_value("shutter", int(value))
 
     def _set_head_mode(self, mode: str):
         self._head_mode = mode

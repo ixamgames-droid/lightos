@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 from src.core.engine.effect_layers import EffectLayer, LayerType
 from src.core.engine.effect_func import LayeredEffect
+from src.ui.weak_slots import weak_slot_fwd
 
 
 class EffectLayerEditor(QWidget):
@@ -49,9 +50,7 @@ class EffectLayerEditor(QWidget):
         grund = QGroupBox("Grundeinstellungen")
         top = QFormLayout(grund)
         self._name_edit = QLineEdit(self._effect.name)
-        self._name_edit.textChanged.connect(
-            lambda s: setattr(self._effect, "name", s)
-        )
+        self._name_edit.textChanged.connect(self._on_name_changed)
         top.addRow("Name:", self._name_edit)
 
         self._target_combo = QComboBox()
@@ -59,18 +58,14 @@ class EffectLayerEditor(QWidget):
                   "pan", "tilt", "zoom", "focus"]:
             self._target_combo.addItem(a)
         self._target_combo.setCurrentText(self._effect.target_attribute)
-        self._target_combo.currentTextChanged.connect(
-            lambda t: setattr(self._effect, "target_attribute", t)
-        )
+        self._target_combo.currentTextChanged.connect(self._on_target_changed)
         top.addRow("Target:", self._target_combo)
 
         self._base_spin = QDoubleSpinBox()
         self._base_spin.setRange(0.0, 1.0)
         self._base_spin.setSingleStep(0.05)
         self._base_spin.setValue(self._effect.base_value)
-        self._base_spin.valueChanged.connect(
-            lambda v: setattr(self._effect, "base_value", v)
-        )
+        self._base_spin.valueChanged.connect(self._on_base_value_changed)
         top.addRow("Base Value (0-1):", self._base_spin)
 
         # Fixture-Liste (Komma-getrennte IDs)
@@ -151,9 +146,7 @@ class EffectLayerEditor(QWidget):
                          (self._spin_min, "min_val"),
                          (self._spin_max, "max_val"),
                          (self._spin_fphase, "fixture_phase_step")]:
-            sp.valueChanged.connect(
-                lambda v, a=attr: self._set_layer_prop(a, v)
-            )
+            sp.valueChanged.connect(weak_slot_fwd(self._set_layer_prop, attr))
 
         self._props_form.addRow("Amplitude:", self._spin_amp)
         self._props_form.addRow("Frequency (Hz):", self._spin_freq)
@@ -194,6 +187,16 @@ class EffectLayerEditor(QWidget):
         self._editor_placeholder.setVisible(False)
         outer.addWidget(self._editor_placeholder, 1)
 
+    # Adapter-Slots (bound statt Lambda — vermeidet GC-Pin, STAB-09)
+    def _on_name_changed(self, s):
+        setattr(self._effect, "name", s)
+
+    def _on_target_changed(self, t):
+        setattr(self._effect, "target_attribute", t)
+
+    def _on_base_value_changed(self, v):
+        setattr(self._effect, "base_value", v)
+
     def _toggle_editor_popout(self):
         """Koppelt den GANZEN Layer-Editor in ein grosses, scrollbares Fenster
         aus / dockt ihn zurueck."""
@@ -215,7 +218,7 @@ class EffectLayerEditor(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")

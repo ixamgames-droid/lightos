@@ -16,6 +16,8 @@ Option->Result-Abbildung aus ``SmartDropDialog._result_for`` (eine Quelle).
 """
 from __future__ import annotations
 
+import weakref
+
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QLabel,
                                QCheckBox, QPushButton, QWidget, QDialogButtonBox,
                                QScrollArea)
@@ -37,7 +39,10 @@ class _AspectRow:
         self.option = option
         self.choices = widget_choices(option)
         self.widget_type = recommended_widget(option)
-        self._parent = parent
+        # SCHWACH: parent ist der Dialog, der diese Zeile in _rows hält — eine
+        # starke Ref wäre ein Referenz-Zyklus (Dialog stirbt dann nur über die
+        # zyklische GC statt per Refcount; Crash-Klasse STAB-09).
+        self._parent_ref = weakref.ref(parent)
 
         self.check = QCheckBox(option.label)
         if option.kind == ControlKind.TOGGLE:
@@ -66,7 +71,7 @@ class _AspectRow:
     def _pick(self):
         from .vc_widget_gallery import VCWidgetGallery
         chosen = VCWidgetGallery(self.choices, current=self.widget_type,
-                                 parent=self._parent).run()
+                                 parent=self._parent_ref()).run()
         if chosen:
             self.widget_type = chosen
             self._refresh_btn()

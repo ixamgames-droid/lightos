@@ -148,7 +148,7 @@ class SceneEditor(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")

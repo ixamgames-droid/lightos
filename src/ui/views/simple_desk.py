@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
                                 QFrame, QCheckBox)
 from PySide6.QtCore import Qt, QTimer, Signal, QRectF
 from PySide6.QtGui import QColor, QPainter, QFont, QBrush, QPen, QFontMetrics
+from src.ui.weak_slots import weak_slot
 
 # ── Farb-Konstanten (Dark-Theme) ──────────────────────────────────────────────
 _C_BG        = "#0d1117"
@@ -698,7 +699,7 @@ class SimpleDeskView(QWidget):
 
         self._btn_full = QPushButton("Alles auf 255")
         self._btn_full.setFixedHeight(24)
-        self._btn_full.clicked.connect(lambda: self._set_all(255))
+        self._btn_full.clicked.connect(weak_slot(self._set_all, 255))
         self._btn_full.setStyleSheet(self._btn_all_zero.styleSheet().replace("#f85149", "#3fb950"))
         header.addWidget(self._btn_full)
 

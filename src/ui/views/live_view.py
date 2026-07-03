@@ -18,6 +18,7 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
 from src.core.app_state import get_state, get_channels_for_patched, is_spider_fixture
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
+from src.ui.weak_slots import weak_slot
 
 
 # ── UI-Praeferenzen (analog zu programmer_view.py) ───────────────────────────
@@ -1472,8 +1473,8 @@ class LiveView(QWidget):
         self._view_mode_group.setExclusive(True)
         self._view_mode_group.addButton(self._btn_view2d, 0)
         self._view_mode_group.addButton(self._btn_view3d, 1)
-        self._btn_view2d.clicked.connect(lambda: self._set_view_3d(False))
-        self._btn_view3d.clicked.connect(lambda: self._set_view_3d(True))
+        self._btn_view2d.clicked.connect(weak_slot(self._set_view_3d, False))
+        self._btn_view3d.clicked.connect(weak_slot(self._set_view_3d, True))
         toolbar.addWidget(self._btn_view2d)
         toolbar.addWidget(self._btn_view3d)
         root.addLayout(toolbar)
@@ -1748,10 +1749,8 @@ class LiveView(QWidget):
         zo.addWidget(self._lbl_zoom)
 
         self._zoom_overlay.adjustSize()
-        self._btn_zoom_out.clicked.connect(
-            lambda: self._zoom_slider.setValue(self._zoom_slider.value() - 10))
-        self._btn_zoom_in.clicked.connect(
-            lambda: self._zoom_slider.setValue(self._zoom_slider.value() + 10))
+        self._btn_zoom_out.clicked.connect(weak_slot(self._zoom_step, -10))
+        self._btn_zoom_in.clicked.connect(weak_slot(self._zoom_step, +10))
         self._zoom_overlay.raise_()
 
         right_layout.addWidget(gb)
@@ -1873,8 +1872,7 @@ class LiveView(QWidget):
         self._cb_grid_vis.toggled.connect(self._on_grid_vis_toggled)
         self._zoom_slider.valueChanged.connect(self._on_zoom_changed)
         # Strg+Mausrad auf der Canvas -> Slider setzen (treibt set_zoom + Persistenz)
-        self._canvas.zoom_requested.connect(
-            lambda p: self._zoom_slider.setValue(int(p)))
+        self._canvas.zoom_requested.connect(self._on_zoom_requested)
 
         # Refresh-Timer fuer Status-Texte
         self._info_timer = QTimer(self)
@@ -1920,6 +1918,12 @@ class LiveView(QWidget):
         self._canvas.grid_visible = checked
         self._canvas.update()
         self._persist_live_view_prefs()
+
+    def _zoom_step(self, delta: int):
+        self._zoom_slider.setValue(self._zoom_slider.value() + delta)
+
+    def _on_zoom_requested(self, p):
+        self._zoom_slider.setValue(int(p))
 
     def _on_zoom_changed(self, value: int):
         self._canvas.set_zoom(value / 100.0)

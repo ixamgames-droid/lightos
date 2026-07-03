@@ -23,6 +23,8 @@ try:
 except Exception:
     get_state = None  # type: ignore
 
+from src.ui.weak_slots import weak_slot
+
 
 # Color filter database (Lee / Rosco subset)
 COLOR_FILTERS = [
@@ -266,11 +268,11 @@ class ColorPicker(QWidget):
         btn_row.addWidget(self._btn_live)
 
         btn_black = QPushButton("Schwarz")
-        btn_black.clicked.connect(lambda: self.set_color(QColor(0, 0, 0)))
+        btn_black.clicked.connect(weak_slot(self.set_color, QColor(0, 0, 0)))
         btn_row.addWidget(btn_black)
 
         btn_white = QPushButton("Weiß")
-        btn_white.clicked.connect(lambda: self.set_color(QColor(255, 255, 255)))
+        btn_white.clicked.connect(weak_slot(self.set_color, QColor(255, 255, 255)))
         btn_row.addWidget(btn_white)
 
         self._btn_palette = QPushButton("Als Palette…")
@@ -304,7 +306,7 @@ class ColorPicker(QWidget):
         wl.setContentsMargins(6, 6, 6, 6)
         wl.addWidget(self._tabs)
         win.resize(620, 880)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._btn_editor_popout.setText("⤡ Andocken")
         self._editor_placeholder.setVisible(True)

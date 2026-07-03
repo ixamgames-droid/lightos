@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from src.core.app_state import get_state
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 
 _PERSIST_PATH = os.path.join("data", "channel_groups.json")
@@ -122,17 +123,19 @@ class ChannelGroupsView(QWidget):
         for row, g in enumerate(self._groups):
             # Name
             name_edit = QLineEdit(g.name)
-            name_edit.editingFinished.connect(lambda r=row, w=name_edit: self._on_name_changed(r, w.text()))
+            name_edit.setProperty("row", row)
+            name_edit.editingFinished.connect(self._on_name_edit_finished)
             self._table.setCellWidget(row, 0, name_edit)
 
             # Universe
             spin_u = QSpinBox(); spin_u.setRange(1, 16); spin_u.setValue(g.universe)
-            spin_u.valueChanged.connect(lambda v, r=row: self._on_universe_changed(r, v))
+            spin_u.valueChanged.connect(weak_slot_fwd(self._on_universe_changed, row))
             self._table.setCellWidget(row, 1, spin_u)
 
             # Channels
             ch_edit = QLineEdit(_format_channels(g.channels))
-            ch_edit.editingFinished.connect(lambda r=row, w=ch_edit: self._on_channels_changed(r, w.text()))
+            ch_edit.setProperty("row", row)
+            ch_edit.editingFinished.connect(self._on_channels_edit_finished)
             self._table.setCellWidget(row, 2, ch_edit)
 
             # Slider + value
@@ -142,7 +145,7 @@ class ChannelGroupsView(QWidget):
             sld = QSlider(Qt.Orientation.Horizontal)
             sld.setRange(0, 255)
             sld.setValue(g.value)
-            sld.valueChanged.connect(lambda v, r=row: self._on_value_changed(r, v))
+            sld.valueChanged.connect(weak_slot_fwd(self._on_value_changed, row))
             lbl = QLabel(str(g.value))
             lbl.setFixedWidth(36)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -158,11 +161,22 @@ class ChannelGroupsView(QWidget):
             # Touch-Schrift (14px) sprengte die feste 60px-Breite -> Text knapp.
             b_apply.setStyleSheet("QPushButton { font-size:12px; padding:2px 8px; }")
             b_apply.setMinimumWidth(60)
-            b_apply.clicked.connect(lambda _, r=row: self._apply_value(r))
+            b_apply.clicked.connect(weak_slot(self._apply_value, row))
             self._table.setCellWidget(row, 4, b_apply)
         self._table.blockSignals(False)
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
+
+    def _on_name_edit_finished(self):
+        # sender()-Adapter statt Lambda (STAB-09): Zeile haengt als Property am Edit.
+        w = self.sender()
+        if w is not None:
+            self._on_name_changed(w.property("row"), w.text())
+
+    def _on_channels_edit_finished(self):
+        w = self.sender()
+        if w is not None:
+            self._on_channels_changed(w.property("row"), w.text())
 
     def _on_name_changed(self, row, text: str):
         if 0 <= row < len(self._groups):

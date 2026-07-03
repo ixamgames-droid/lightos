@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout
                                QComboBox, QCheckBox, QMessageBox, QGroupBox,
                                QFormLayout)
 from PySide6.QtCore import Qt, Signal, QTimer
+from src.ui.weak_slots import weak_slot
 
 
 def _contrast(hex_color: str) -> str:
@@ -555,7 +556,7 @@ class ShutterQuickBar(QWidget, _ApplyMixin):
             tiles = [PresetTile("Auf", 255, color="#1f6f3f", touch=touch),
                      PresetTile("Zu", 0, color="#5a1f1f", touch=touch)]
         for t in tiles:
-            t.clicked.connect(lambda v: self._set_on_fixtures(self._attr, v))
+            t.clicked.connect(self._on_tile_clicked)
         lay.addWidget(_grid(tiles, cols=3))
 
         # Strobe-Geschwindigkeit stufenlos (innerhalb des Strobe-Bereichs).
@@ -566,8 +567,7 @@ class ShutterQuickBar(QWidget, _ApplyMixin):
             sl = QSlider(Qt.Orientation.Horizontal)
             sl.setRange(int(strobe_r.range_from), int(strobe_r.range_to))
             sl.setValue(int(strobe_r.range_from))
-            sl.valueChanged.connect(
-                lambda v: self._set_on_fixtures(self._attr, v))
+            sl.valueChanged.connect(self._on_tile_clicked)
             if touch:
                 sl.setMinimumHeight(30)
             row.addWidget(sl, stretch=1)
@@ -577,6 +577,10 @@ class ShutterQuickBar(QWidget, _ApplyMixin):
         legend = _ranges_legend(channel)
         if legend:
             lay.addWidget(_legend_label(legend))
+
+    def _on_tile_clicked(self, v):
+        # bound statt Lambda — vermeidet GC-Pin (STAB-09)
+        self._set_on_fixtures(self._attr, v)
 
 
 class GoboQuickBar(QWidget, _ApplyMixin):
@@ -609,7 +613,7 @@ class GoboQuickBar(QWidget, _ApplyMixin):
             tiles = []
             for label, val in wheel_slots(channel):
                 t = PresetTile(label, val, touch=touch)
-                t.clicked.connect(lambda v: self._set_on_fixtures(self._attr, v))
+                t.clicked.connect(self._on_tile_clicked)
                 tiles.append(t)
             if tiles:
                 lay.addWidget(_grid(tiles, cols=4))
@@ -635,7 +639,7 @@ class GoboQuickBar(QWidget, _ApplyMixin):
                   if gobo_pixmap_for_name else None)
             t = PresetTile("Kein Gobo", o["value"], pixmap=pm, touch=touch,
                            tooltip=f"DMX {o['from']}–{o['to']}")
-            t.clicked.connect(lambda v: self._set_on_fixtures(self._attr, v))
+            t.clicked.connect(self._on_tile_clicked)
             tiles.append(t)
         for s in static:
             pm = (gobo_pixmap_for_name(s["label"], size=icon_size)
@@ -693,14 +697,17 @@ class GoboQuickBar(QWidget, _ApplyMixin):
             b_stop = QPushButton("Stopp")
             b_stop.setToolTip("Zurück auf 'Kein Gobo'")
             stop_val = opens[0]["value"] if opens else 0
-            b_stop.clicked.connect(
-                lambda: self._set_on_fixtures(self._attr, stop_val))
+            b_stop.clicked.connect(weak_slot(self._on_tile_clicked, stop_val))
             row.addWidget(b_stop)
             lay.addLayout(row)
 
         legend = _ranges_legend(channel)
         if legend:
             lay.addWidget(_legend_label(legend))
+
+    def _on_tile_clicked(self, v):
+        # bound statt Lambda — vermeidet GC-Pin (STAB-09)
+        self._set_on_fixtures(self._attr, v)
 
     def _on_static_clicked(self, value):
         self._active_shake = None

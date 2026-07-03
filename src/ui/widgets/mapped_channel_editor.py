@@ -30,6 +30,7 @@ from src.core.engine.mapped_channel import (
     SOURCE_TILT, SOURCE_PAN, SOURCE_XY,
     MODE_VALUE, MODE_GRADIENT,
 )
+from src.ui.weak_slots import weak_slot
 
 _SRC_LABELS = {SOURCE_TILT: "Tilt (Y)", SOURCE_PAN: "Pan (X)", SOURCE_XY: "X-Y (2D)"}
 
@@ -247,9 +248,9 @@ class MappedChannelEditor(QWidget):
         og = QHBoxLayout(self._out_grad_w)
         og.setContentsMargins(0, 0, 0, 0)
         self._colA_btn = QPushButton("Farbe A")
-        self._colA_btn.clicked.connect(lambda: self._pick_color("a"))
+        self._colA_btn.clicked.connect(weak_slot(self._pick_color, "a"))
         self._colB_btn = QPushButton("Farbe B")
-        self._colB_btn.clicked.connect(lambda: self._pick_color("b"))
+        self._colB_btn.clicked.connect(weak_slot(self._pick_color, "b"))
         og.addWidget(self._colA_btn)
         og.addWidget(QLabel("→"))
         og.addWidget(self._colB_btn)
