@@ -45,8 +45,8 @@ _PROBE_HTML = os.path.join(
     "stage_scene_esm_probe.html")
 _PROBE_HTML = os.path.normpath(_PROBE_HTML)
 
-_LOAD_TIMEOUT_S = 20.0
-_POLL_TIMEOUT_S = 20.0
+_LOAD_TIMEOUT_S = 40.0
+_POLL_TIMEOUT_S = 10.0
 _POLL_INTERVAL_S = 0.05
 
 
