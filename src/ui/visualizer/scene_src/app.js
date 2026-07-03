@@ -15,6 +15,7 @@ import { view, fixtures, stageObjects, settings } from './state.js';
 
 import './camera/cameras.js';
 import { setViewMode } from './stage/view_mode.js';
+import { setCameraPreset, fitAll, fitSelected, setFpsVisible, fpsTick } from './camera/presets.js';
 
 import {
   updateResizeHandles, resizeHandles, getStageJson, loadStageJson,
@@ -70,6 +71,7 @@ function animate() {
       }
       if (so._helper) so._helper.update();
     }
+    fpsTick();
     renderer.render(scene, view.activeCam);
   } catch (err) {
     const msg = String(err && err.message || err);
@@ -112,6 +114,8 @@ window.__lightos = {
   addStageObject: jsAddStageObject,
   clearStageObjects, updateResizeHandles, resizeHandles: () => resizeHandles,
   setBrightnessManual, resetBrightnessAuto, applyBrightness,
+  // VIZ-13 Schritt 3b-K-1: Kamera-Presets + Fit/Fit-Selected + FPS-Overlay
+  setCameraPreset, fitAll, fitSelected, setFpsVisible,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett
