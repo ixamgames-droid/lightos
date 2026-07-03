@@ -1843,8 +1843,10 @@ class VisualizerWindow(QMainWindow):
         self._service.attach_target(self._target)
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
         # vollen DMX-Bestand an (requestFullResync-Slot) — ereignisgesteuert
-        # statt Timing-Raten.
-        self._bridge.full_resync_cb = self._force_full_resync_after_crash
+        # statt Timing-Raten. getattr: SimpleNamespace-Test-Fakes haben die
+        # gebundene Methode nicht.
+        self._bridge.full_resync_cb = getattr(
+            self, "_force_full_resync_after_crash", None)
         self._state.subscribe(self._on_state)
 
     def _force_full_resync_after_crash(self) -> None:

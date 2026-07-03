@@ -153,8 +153,10 @@ class Visualizer3DView(QWidget):
         )
         self._service.attach_target(self._target)
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
-        # vollen DMX-Bestand an (requestFullResync-Slot der Bridge).
-        self._bridge.full_resync_cb = self._force_full_resync_after_crash
+        # vollen DMX-Bestand an (requestFullResync-Slot der Bridge). getattr:
+        # SimpleNamespace-Test-Fakes haben die gebundene Methode nicht.
+        self._bridge.full_resync_cb = getattr(
+            self, "_force_full_resync_after_crash", None)
         # Leak-Schutz: beim Zerstoeren des Widgets vom Service abdocken — als
         # Backstop, falls das Widget zerstoert wird ohne vorher on_hidden() zu
         # sehen. Destruction-safe: wir capturen nur Service+Target (NICHT
