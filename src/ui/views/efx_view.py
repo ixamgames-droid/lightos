@@ -1397,8 +1397,11 @@ class EfxView(QWidget):
         # Gruppe (analog zum Matrix-Phantom-Fix in rgb_matrix_view).
         try:
             from src.core.sync import get_sync, SyncEvent
+            # weak_slot statt Lambda: der globale Bus hielte das self-fangende
+            # Lambda sonst fuer immer -> Wrapper-Pin ueber den C++-Tod hinaus
+            # (STAB-03-Falle). Nach dem View-Tod ist der Callback ein No-Op.
             get_sync().subscribe(SyncEvent.SELECTION_CHANGED,
-                                 lambda *_: self._sync_follow_selection())
+                                 weak_slot(self._sync_follow_selection))
         except Exception as e:
             print(f"[efx_view] follow subscribe error: {e}")
         self._sync_follow_selection()
