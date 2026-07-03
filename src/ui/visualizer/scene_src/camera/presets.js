@@ -49,6 +49,15 @@ export function setCameraPreset(name) {
     applyNamedCamera(name.slice(6));
     return;
   }
+  // "applycam:<json>" (VIZ-13 3b-K Fix): Python schickt den VOLLEN Kamera-Dict
+  // (autoritativer AppState.visualizer_named_cameras), damit das Anwenden NICHT
+  // von der JS-lokalen _namedCameras-Liste abhaengt (deren Py->JS-Push-Sync
+  // sich als unzuverlaessig erwies - Live-Befund). applyNamedCamera nimmt ein
+  // dict direkt.
+  if (typeof name === 'string' && name.indexOf('applycam:') === 0) {
+    try { applyNamedCamera(JSON.parse(name.slice(9))); } catch (e) {}
+    return;
+  }
   const p = PRESETS[name];
   if (!p) return;
 

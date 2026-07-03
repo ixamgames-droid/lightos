@@ -2,7 +2,7 @@
 benannte Kameras.
 
 Deckt (siehe docs/VIZ13_JS_NEUAUFBAU_DESIGN.md "3b-Nachtrag" + Abschnitt (c)):
-  1. Bridge-Signal-Emits: ``cameraPreset``/``setNamedCameras`` existieren als
+  1. Bridge-Signal-Emits: ``cameraPreset``/``namedCamerasChanged`` existieren als
      echte Qt-Signale und liefern den Payload unveraendert an verbundene
      Slots (Signal-Spy per connect(), analog test_viz12_bridge_batch.py).
   2. ``cameraSaved``-Slot: JS meldet eine gespeicherte Kamera zurueck -> landet
@@ -55,7 +55,7 @@ class CameraBridgeSignalsTest(unittest.TestCase):
         self.assertTrue(hasattr(VW.VisualizerBridge, "cameraPreset"))
 
     def test_set_named_cameras_signal_present(self):
-        self.assertTrue(hasattr(VW.VisualizerBridge, "setNamedCameras"))
+        self.assertTrue(hasattr(VW.VisualizerBridge, "namedCamerasChanged"))
 
     def test_camera_reset_signal_still_present(self):
         """Kompat: bestehendes cameraReset() bleibt unveraendert (additiv)."""
@@ -75,14 +75,14 @@ class CameraBridgeSignalsTest(unittest.TestCase):
 
     def test_set_named_cameras_emit_roundtrip(self):
         received = []
-        self.bridge.setNamedCameras.connect(lambda j: received.append(j))
+        self.bridge.namedCamerasChanged.connect(lambda j: received.append(j))
         payload = json.dumps([{"name": "Weitwinkel", "mode": "3D"}])
-        self.bridge.setNamedCameras.emit(payload)
+        self.bridge.namedCamerasChanged.emit(payload)
         self.assertEqual(received, [payload])
 
     def test_push_named_cameras_helper_emits_json(self):
         received = []
-        self.bridge.setNamedCameras.connect(lambda j: received.append(j))
+        self.bridge.namedCamerasChanged.connect(lambda j: received.append(j))
         cams = [{"name": "Overview", "mode": "3D", "theta": 0.3}]
         self.bridge.push_named_cameras(cams)
         self.assertEqual(len(received), 1)
@@ -133,7 +133,7 @@ class CameraSavedSlotTest(unittest.TestCase):
 
     def test_camera_saved_pushes_updated_list_to_js(self):
         received = []
-        self.bridge.setNamedCameras.connect(lambda j: received.append(json.loads(j)))
+        self.bridge.namedCamerasChanged.connect(lambda j: received.append(json.loads(j)))
         self.bridge.cameraSaved(json.dumps({"name": "A"}))
         self.assertEqual(len(received), 1)
         self.assertEqual(received[0][0]["name"], "A")
@@ -260,7 +260,7 @@ class JsCameraModulesBraceBalanceTest(unittest.TestCase):
 
     def test_bridge_js_connects_new_signals(self):
         self.assertIn("bridge.cameraPreset", self.bridge_js)
-        self.assertIn("bridge.setNamedCameras", self.bridge_js)
+        self.assertIn("bridge.namedCamerasChanged", self.bridge_js)
         # Alt-Signal bleibt verbunden (additiv, kein Ersatz).
         self.assertIn("bridge.cameraReset", self.bridge_js)
 

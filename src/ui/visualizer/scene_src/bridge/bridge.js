@@ -205,7 +205,10 @@ export function tryChannel() {
         // VIZ-13 Schritt 3b-K-2: Kamera-Preset-Auswahl aus der Toolbar +
         // gespeicherte-Kameras-Liste (additiv zu cameraReset).
         if (bridge.cameraPreset)  bridge.cameraPreset.connect(name => setCameraPreset(name));
-        if (bridge.setNamedCameras) bridge.setNamedCameras.connect(j => {
+        // Python-Signal heisst namedCamerasChanged (NICHT "setX" — QWebChannel
+        // exponiert "set"-praefigierte Signale nicht). Der JS-Handler ist die
+        // importierte presets.js-Funktion setNamedCameras (lokal, kein Signal).
+        if (bridge.namedCamerasChanged) bridge.namedCamerasChanged.connect(j => {
           try { setNamedCameras(JSON.parse(j)); } catch (e) {}
         });
         if (bridge.brightnessSignal) bridge.brightnessSignal.connect(v => setBrightnessManual(v));

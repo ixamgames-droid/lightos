@@ -258,7 +258,7 @@ class VisualizerBridge(QObject):
         applyFixtureTransform(json), alignSelected(mode),
         distributeSelected(axis), cameraReset(),
         cameraPreset(name) (VIZ-13 3b-K: Top/Front/Seite/Perspektive/Frei),
-        setNamedCameras(json) (VIZ-13 3b-K: gespeicherte Kamera-Liste push)
+        namedCamerasChanged(json) (VIZ-13 3b-K: gespeicherte Kamera-Liste push)
 
     Slots <- JS
         requestFixtures(), placeFixture(json), fixturePositionChanged(...),
@@ -292,7 +292,12 @@ class VisualizerBridge(QObject):
     resizeModeSignal        = Signal(bool)    # Toggle Resize-Handles im JS
     pixelRatioSignal        = Signal(float)   # VIZ-12 Schritt 5: screenChanged -> JS setPixelRatio
     cameraPreset            = Signal(str)     # VIZ-13 3b-K: 'top'|'front'|'side'|'persp'|'free'
-    setNamedCameras         = Signal(str)     # VIZ-13 3b-K: JSON-Liste gespeicherter Kameras -> JS
+    # VIZ-13 3b-K: JSON-Liste gespeicherter Kameras -> JS. NAME OHNE "set"-
+    # Praefix: QWebChannel exponiert ein Signal namens "setX" NICHT als Signal
+    # (Qt behandelt "setX" als Property-Setter) -> JS-Connect lief ins Leere
+    # (Live-Befund: gespeicherte Kamera erschien nie im JS). namedCamerasChanged
+    # entspricht auch dem urspruenglichen Design.
+    namedCamerasChanged     = Signal(str)
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
@@ -1065,7 +1070,7 @@ class VisualizerBridge(QObject):
         """VIZ-13 Schritt 3b-K-2: aktuelle Liste benannter Kameras an JS
         pushen (nach Laden der Show bzw. nach cameraSaved-Slot)."""
         try:
-            self.setNamedCameras.emit(json.dumps(list(cameras or [])))
+            self.namedCamerasChanged.emit(json.dumps(list(cameras or [])))
         except Exception as e:
             print(f"[Visualizer] push_named_cameras error: {e}")
 
@@ -1295,42 +1300,27 @@ class VisualizerWindow(QMainWindow):
 
         tb.addSeparator()
 
-        act_reset_cam = QAction("⌖ Kamera", self)
-        act_reset_cam.triggered.connect(self._reset_camera)
-        tb.addAction(act_reset_cam)
-
-        # VIZ-13 Schritt 3b-K-2: Kamera-Preset-Dropdown + Fit/Fit-Auswahl +
-        # "Kamera speichern..." + gespeicherte Kameras (Design-Dokument (c)
-        # "Kamera-Presets / Fit / gespeicherte Kameras"). Eigenbau-Orbit-
-        # Kamera in JS (camera/presets.js), additiv zum bestehenden
-        # "⌖ Kamera"-Reset-Button (Alt-Verhalten unveraendert).
-        tb.addWidget(QLabel("Kamera:"))
-        self._combo_cam_preset = QComboBox()
-        for _label, _key in (
-            ("Top", "top"), ("Front", "front"), ("Seite", "side"),
-            ("Perspektive", "persp"), ("Frei", "free"),
-        ):
-            self._combo_cam_preset.addItem(_label, _key)
-        self._combo_cam_preset.setToolTip("Kamera-Preset anwenden (Top/Front/Seite/Perspektive/Frei)")
-        self._combo_cam_preset.activated.connect(self._on_camera_preset_selected)
-        tb.addWidget(self._combo_cam_preset)
-
-        act_fit = QAction("⛶ Fit", self)
-        act_fit.setToolTip("Kamera so setzen, dass alle Fixtures ins Bild passen")
-        act_fit.triggered.connect(self._on_fit_all)
-        tb.addAction(act_fit)
-
-        act_fit_sel = QAction("⛶ Fit Auswahl", self)
-        act_fit_sel.setToolTip("Kamera auf die ausgewählten Fixtures zentrieren (Taste F)")
-        act_fit_sel.triggered.connect(self._on_fit_selected)
-        tb.addAction(act_fit_sel)
-
+        # VIZ-13 3b-K: EIN kompakter "Kamera"-Menuebutton statt frueher 6
+        # separater Toolbar-Widgets (Reset-Action + Label + Preset-Combo + Fit
+        # + Fit-Auswahl + Kameras-Button). Die vielen Einzel-Widgets liessen die
+        # Toolbar bei normaler Fensterbreite ueberlaufen -> Presets landeten im
+        # unerreichbaren Ueberlaufmenue (Live-Befund). Ein einziger Popup-Button
+        # haelt Presets + Fit + Zuruecksetzen + Speichern + gespeicherte Kameras
+        # und bleibt immer sichtbar. Eigenbau-Orbit-Kamera in camera/presets.js.
         self._btn_cam_saved = QToolButton()
-        self._btn_cam_saved.setText("📷 Kameras")
+        self._btn_cam_saved.setText("⌖ Kamera ▾")
         self._btn_cam_saved.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self._btn_cam_saved.setToolTip("Aktuelle Kamera speichern oder eine gespeicherte Kamera anwenden")
+        self._btn_cam_saved.setToolTip(
+            "Kamera-Presets (Top/Front/Seite/Perspektive), Fit, Zurücksetzen "
+            "und gespeicherte Kameras")
         self._menu_cam_saved = QMenu(self._btn_cam_saved)
         self._btn_cam_saved.setMenu(self._menu_cam_saved)
+        # EIN robuster triggered(QAction)-Bound-Method-Handler statt pro-Action-
+        # weak_slot-Closures: letztere koennen bei QMenu-Actions von PySide6
+        # weg-GC't werden -> Menuepunkt feuert stumm nicht. Dispatch ueber
+        # action.data(). Bleibt ueber _rebuild_camera_menu()-Neuaufbauten
+        # bestehen (Signal am Menue, nicht an den Einzel-Actions).
+        self._menu_cam_saved.triggered.connect(self._on_cam_menu_triggered)
         self._rebuild_camera_menu()
         tb.addWidget(self._btn_cam_saved)
 
@@ -2944,10 +2934,6 @@ class VisualizerWindow(QMainWindow):
 
     # ── VIZ-13 Schritt 3b-K-2: Kamera-Presets / Fit / benannte Kameras ──────
 
-    def _on_camera_preset_selected(self, index: int):
-        key = self._combo_cam_preset.itemData(index) or "free"
-        self._bridge.push_camera_preset(str(key))
-
     def _on_fit_all(self):
         self._bridge.push_camera_preset("fit")
 
@@ -2955,13 +2941,28 @@ class VisualizerWindow(QMainWindow):
         self._bridge.push_camera_preset("fit_selected")
 
     def _rebuild_camera_menu(self):
-        """Baut das "📷 Kameras"-Menue neu auf: "Kamera speichern..." oben,
-        darunter je ein Eintrag pro in AppState.visualizer_named_cameras
-        gespeicherter Kamera (Auswahl -> anwenden)."""
+        """Baut das kompakte "⌖ Kamera"-Menue neu auf: Presets (Top/Front/
+        Seite/Perspektive/Frei) → Fit/Fit-Auswahl → Zuruecksetzen → "Kamera
+        speichern…" → je ein Eintrag pro in AppState.visualizer_named_cameras
+        gespeicherter Kamera (Auswahl → anwenden). VIZ-13 3b-K: ersetzt die
+        frueher ueber die Toolbar verstreuten Einzel-Widgets."""
         menu = self._menu_cam_saved
         menu.clear()
-        act_save = menu.addAction("💾 Kamera speichern…")
-        act_save.triggered.connect(self._on_save_named_camera)
+        # Jede Action traegt ihre Aktion als data()-Tupel; der EINE
+        # triggered-Handler (_on_cam_menu_triggered) dispatcht darueber.
+        for _label, _key in (
+            ("⭡ Top (von oben)", "top"), ("⬒ Front", "front"),
+            ("◧ Seite", "side"), ("⬔ Perspektive", "persp"),
+            ("✋ Frei", "free"),
+        ):
+            menu.addAction(_label).setData(("preset", _key))
+        menu.addSeparator()
+        menu.addAction("⛶ Fit (alle)").setData(("fit", None))
+        menu.addAction("⛶ Fit Auswahl  (F)").setData(("fit_sel", None))
+        menu.addSeparator()
+        menu.addAction("↺ Zurücksetzen").setData(("reset", None))
+        menu.addSeparator()
+        menu.addAction("💾 Kamera speichern…").setData(("save", None))
         cams = list(getattr(self._state, "visualizer_named_cameras", []) or [])
         if cams:
             menu.addSeparator()
@@ -2969,8 +2970,33 @@ class VisualizerWindow(QMainWindow):
                 name = (cam or {}).get("name")
                 if not name:
                     continue
-                a = menu.addAction(f"↦ {name}")
-                a.triggered.connect(weak_slot(self._on_apply_named_camera, name))
+                menu.addAction(f"↦ {name}").setData(("apply", name))
+
+    def _on_cam_menu_triggered(self, action):
+        """VIZ-13 3b-K: EIN robuster Dispatcher fuer alle Kamera-Menuepunkte
+        (Bound-Method-Connection am Menue, kein pro-Action-weak_slot). Liest
+        die Aktion aus action.data()."""
+        data = action.data()
+        if not data:
+            return
+        kind, arg = data
+        if kind == "preset":
+            self._apply_camera_preset(arg)
+        elif kind == "fit":
+            self._on_fit_all()
+        elif kind == "fit_sel":
+            self._on_fit_selected()
+        elif kind == "reset":
+            self._reset_camera()
+        elif kind == "save":
+            self._on_save_named_camera()
+        elif kind == "apply":
+            self._on_apply_named_camera(arg)
+
+    def _apply_camera_preset(self, key: str):
+        """VIZ-13 3b-K: Kamera-Preset aus dem Menue anwenden (Top/Front/Seite/
+        Perspektive/Frei) — Eigenbau-Orbit-Kamera in camera/presets.js."""
+        self._bridge.push_camera_preset(str(key))
 
     def _on_save_named_camera(self):
         name, ok = QInputDialog.getText(self, "Kamera speichern", "Name der Kamera:")
@@ -2978,7 +3004,7 @@ class VisualizerWindow(QMainWindow):
         if not ok or not name:
             return
         # KEIN eigenes Bridge-Signal fuer den Speichern-Trigger (Auftrag nennt
-        # nur cameraPreset/setNamedCameras/cameraSaved) - "save:"/"apply:"-
+        # nur cameraPreset/namedCamerasChanged/cameraSaved) - "save:"/"apply:"-
         # Praefixe reisen ueber dasselbe additive cameraPreset-Signal wie die
         # 'fit'/'fit_selected'-Sondernamen (presets.js#setCameraPreset ruft
         # bei diesen Praefixen saveNamedCamera()/applyNamedCamera() auf; der
@@ -2987,7 +3013,16 @@ class VisualizerWindow(QMainWindow):
         self._bridge.push_camera_preset(f"save:{name}")
 
     def _on_apply_named_camera(self, name: str):
-        self._bridge.push_camera_preset(f"apply:{name}")
+        # VIZ-13 3b-K Fix: den VOLLEN Kamera-Dict aus dem autoritativen
+        # AppState mitschicken ("applycam:<json>"), statt JS nur den Namen
+        # nachschlagen zu lassen — die JS-lokale Kamera-Liste ist auf den
+        # unzuverlaessigen Py->JS-Push angewiesen (Live-Befund) und ggf. leer.
+        cams = getattr(self._state, "visualizer_named_cameras", []) or []
+        cam = next((c for c in cams if (c or {}).get("name") == name), None)
+        if cam is not None:
+            self._bridge.push_camera_preset("applycam:" + json.dumps(cam))
+        else:
+            self._bridge.push_camera_preset(f"apply:{name}")
 
     def _on_camera_saved_from_js(self, name: str):
         """Bridge meldet (ueber cameraSaved-Slot -> pyCameraSaved) eine neu
