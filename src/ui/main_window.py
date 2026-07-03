@@ -1324,25 +1324,17 @@ class MainWindow(QMainWindow):
             print(f"[main_window] music window error: {e}")
 
     def _open_visualizer(self):
-        # IMMER neu instanziieren -> HTML/JS wird frisch geladen (kein Stale-Cache).
-        # Altes Fenster sauber schliessen falls noch offen.
-        try:
-            if self._visualizer_window is not None:
-                try:
-                    # close() kann seit VIZ-10 ueber den "Buehne speichern?"-Dialog
-                    # abgebrochen werden (event.ignore() -> False): dann das bestehende
-                    # Fenster BEHALTEN (kein deleteLater — sonst Leak + Datenverlust
-                    # trotz "Abbrechen") und nur nach vorn holen.
-                    if not self._visualizer_window.close():
-                        self._visualizer_window.raise_()
-                        self._visualizer_window.activateWindow()
-                        return
-                    self._visualizer_window.deleteLater()
-                except Exception as e:
-                    print(f"[MainWindow] _open_visualizer cleanup error: {e}")
-                self._visualizer_window = None
-        except Exception:
-            self._visualizer_window = None
+        # VIZ-12 Schritt 4 (Dauerfenster): existiert das Fenster bereits,
+        # NICHT mehr schliessen/neu bauen -- nur nach vorn holen. Kamera/
+        # Modus/Helligkeit bleiben so ueber mehrfaches Oeffnen erhalten.
+        # Neubau nur noch, wenn es das Fenster nie gab (None). Ein expliziter
+        # "Szene neu laden"-Menuepunkt (Schritt 5) uebernimmt den Cache-Buster-
+        # Reload, der frueher bei jedem Open erzwungen wurde.
+        if self._visualizer_window is not None:
+            self._visualizer_window.show()
+            self._visualizer_window.raise_()
+            self._visualizer_window.activateWindow()
+            return
         try:
             from src.ui.visualizer.visualizer_window import VisualizerWindow
             self._visualizer_window = VisualizerWindow(self)
@@ -1917,8 +1909,9 @@ class MainWindow(QMainWindow):
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):
-        # Visualizer ZUERST schliessen: sein "Buehne speichern?"-Dialog (VIZ-10) kann
-        # abbrechen (close() -> False) — dann muss der App-Exit stoppen, BEVOR
+        # Visualizer ZUERST anfragen: sein "Buehne speichern?"-Dialog (VIZ-10) kann
+        # abbrechen (close() -> False, VIZ-12: close() versteckt das Fenster nur noch
+        # statt es zu zerstoeren) — dann muss der App-Exit stoppen, BEVOR
         # Output/Playback/MIDI heruntergefahren werden.
         if self._visualizer_window:
             try:
@@ -1955,6 +1948,14 @@ class MainWindow(QMainWindow):
                 self._state.midi_mapper.close()
         except Exception:
             pass
+        # VIZ-12 Schritt 4: einziger echter Teardown-Pfad fuer den
+        # VisualizerService (State-Unsubscribe) — laeuft NUR beim echten
+        # App-Ende, NICHT beim Visualizer-Fenster-hide().
+        try:
+            from src.ui.visualizer.visualizer_service import get_visualizer_service
+            get_visualizer_service(self._state).shutdown()
+        except Exception as e:
+            print(f"[MainWindow] visualizer service shutdown error: {e}")
         super().closeEvent(event)
 
     def _has_unsaved_changes(self) -> bool:

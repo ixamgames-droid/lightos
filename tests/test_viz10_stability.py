@@ -342,36 +342,41 @@ class _MinimalVisualizerWindow(VW.VisualizerWindow):
 
 
 class CloseEventIntegrationTest(unittest.TestCase):
-    """closeEvent: Reihenfolge Abfrage VOR _release_state-Cleanup."""
+    """closeEvent (VIZ-12 Schritt 4, Dauerfenster): Reihenfolge Abfrage VOR
+    ``hide()``. Confirmed close versteckt das Fenster (KEIN Voll-Teardown
+    mehr); cancel ignoriert das Event und laesst das Fenster unangetastet."""
 
     def _fake(self, confirm_result):
         win = _MinimalVisualizerWindow()
         win._confirm_close_with_unsaved_stage = MagicMock(return_value=confirm_result)
-        win._release_state = MagicMock()
+        win.hide = MagicMock()
         return win
 
-    def test_confirmed_close_runs_release_state(self):
+    def test_confirmed_close_hides_window(self):
         from PySide6.QtGui import QCloseEvent
         win = self._fake(confirm_result=True)
         event = QCloseEvent()
         VW.VisualizerWindow.closeEvent(win, event)
-        win._release_state.assert_called_once()
-        self.assertTrue(event.isAccepted())
+        win.hide.assert_called_once()
+        self.assertFalse(event.isAccepted(), "Fenster wird versteckt, nicht destruktiv geschlossen")
 
-    def test_cancelled_close_skips_release_state(self):
+    def test_cancelled_close_skips_hide(self):
         from PySide6.QtGui import QCloseEvent
         win = self._fake(confirm_result=False)
         event = QCloseEvent()
         VW.VisualizerWindow.closeEvent(win, event)
-        win._release_state.assert_not_called()
+        win.hide.assert_not_called()
         self.assertFalse(event.isAccepted())
 
 
 class MainWindowRespectsVetoTest(unittest.TestCase):
-    """Review-Blocker VIZ-10: main_window darf ein per Dialog abgebrochenes
-    close() (Rueckgabe False) nicht ignorieren — sonst wird das Fenster trotz
-    'Abbrechen' per deleteLater() zerstoert (Subscriber-/Timer-Leak + stiller
-    Verlust der ungespeicherten Buehne)."""
+    """Review-Blocker VIZ-10 (Veto-Semantik unveraendert seit VIZ-12 Schritt 4):
+    main_window darf ein per Dialog abgebrochenes close() (Rueckgabe False,
+    kommt jetzt aus dem Dauerfenster-``closeEvent``s ``event.ignore()``) beim
+    ECHTEN App-Ende nicht ignorieren — sonst faehrt die App trotz 'Abbrechen'
+    runter und die ungespeicherte Buehne geht still verloren. ``_open_visualizer``
+    selbst kennt seit Schritt 4 gar kein Veto mehr (ruft bei existierendem
+    Fenster nur noch show()/raise_()/activateWindow(), nie close())."""
 
     def _fake_viz(self, close_result):
         return SimpleNamespace(
@@ -381,25 +386,26 @@ class MainWindowRespectsVetoTest(unittest.TestCase):
             activateWindow=MagicMock(),
         )
 
-    def test_open_visualizer_keeps_window_on_cancel(self):
+    def test_open_visualizer_shows_existing_window(self):
+        """VIZ-12 Schritt 4 (Dauerfenster): existiert das Fenster bereits,
+        wird es NUR noch gezeigt/nach vorn geholt — kein close()/deleteLater()/
+        Neubau mehr (Kamera/Modus/Helligkeit bleiben erhalten)."""
         import src.ui.main_window as MW
-        viz = self._fake_viz(close_result=False)
+        viz = SimpleNamespace(
+            show=MagicMock(),
+            raise_=MagicMock(),
+            activateWindow=MagicMock(),
+            deleteLater=MagicMock(),
+            close=MagicMock(),
+        )
         fake = SimpleNamespace(_visualizer_window=viz)
         MW.MainWindow._open_visualizer(fake)
-        viz.deleteLater.assert_not_called()
+        viz.show.assert_called_once()
         viz.raise_.assert_called_once()
         viz.activateWindow.assert_called_once()
+        viz.close.assert_not_called()
+        viz.deleteLater.assert_not_called()
         self.assertIs(fake._visualizer_window, viz)
-
-    def test_open_visualizer_replaces_window_on_confirmed_close(self):
-        import src.ui.main_window as MW
-        viz = self._fake_viz(close_result=True)
-        fake = SimpleNamespace(_visualizer_window=viz)
-        with patch.object(MW, "QMessageBox"):
-            # VisualizerWindow-Import/Neuaufbau schlaegt mit Fake-self fehl und
-            # landet im except-Zweig — hier zaehlt nur der Cleanup-Pfad davor.
-            MW.MainWindow._open_visualizer(fake)
-        viz.deleteLater.assert_called_once()
 
     def test_main_close_event_ignored_when_visualizer_vetoes(self):
         import src.ui.main_window as MW

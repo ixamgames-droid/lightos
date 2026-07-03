@@ -485,6 +485,47 @@ class WindowAsServiceTargetTest(_ServiceTestCase):
                 svc.detach_target(target)
             state.unsubscribe(win._on_state)
 
+    def test_close_event_hides_and_keeps_target_attached(self):
+        """VIZ-12 Schritt 4 (Dauerfenster): confirmed closeEvent versteckt nur
+        (hide() -> hideEvent -> Target inaktiv), detacht aber NICHT. Fenster
+        bleibt ohne Neubau wiederoeffenbar."""
+        from src.ui.visualizer.visualizer_window import VisualizerWindow
+        from PySide6.QtWidgets import QMainWindow
+        from PySide6.QtGui import QCloseEvent
+
+        class _MinimalWindow(VisualizerWindow):
+            def __init__(self):
+                QMainWindow.__init__(self)
+
+        state = _make_state([], {})
+        win = _MinimalWindow()
+        win._state = state
+        win._bridge = SimpleNamespace(dmxBatch=SimpleNamespace(emit=lambda s: None))
+        win._confirm_close_with_unsaved_stage = lambda: True
+        try:
+            VisualizerWindow._setup_service_target(win)
+            svc = win._service
+            # Echtes show() (nicht nur ein synthetisches QShowEvent) noetig,
+            # damit Qt beim spaeteren hide() auch wirklich ein echtes
+            # hideEvent feuert (sonst: kein sichtbarer->unsichtbar-Uebergang).
+            win.show()
+            self.assertTrue(win._target.active)
+
+            event = QCloseEvent()
+            VisualizerWindow.closeEvent(win, event)
+
+            self.assertFalse(event.isAccepted(), "hide() statt destruktivem close()")
+            self.assertFalse(win.isVisible(), "Fenster ist versteckt")
+            self.assertFalse(win._target.active, "hideEvent lief -> Target inaktiv")
+            self.assertIn(win._target, svc._targets, "KEIN detach beim Schliessen (Dauerfenster)")
+            self.assertIn(win._on_state, state._callbacks, "KEIN Unsubscribe beim Schliessen")
+        finally:
+            svc = getattr(win, "_service", None)
+            target = getattr(win, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
+            state.unsubscribe(win._on_state)
+
     def test_release_state_detaches_target_from_service(self):
         from src.ui.visualizer.visualizer_window import VisualizerWindow
 

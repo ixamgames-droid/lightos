@@ -15,8 +15,9 @@ Diese Tests weisen nach:
      wiederholtes Open+Close akkumuliert NICHTS.
   3. Der on_shown/on_hidden-Zyklus (eingebettete ``Visualizer3DView``) ist
      symmetrisch — kein Doppel-Subscribe, kein Rest nach Hide.
-  4. ``VisualizerWindow._release_state`` meldet BEIDE Subscriber des Fensters
-     ab (eigener ``_on_state`` + Bridge).
+  4. ``VisualizerService.shutdown`` (VIZ-12 Schritt 4: der einzige echte
+     Teardown-Pfad, App-Ende) meldet ALLE Service-Subscriber ab — ``hide()``/
+     ``detach_target`` melden bewusst NICHTS ab (Dauerfenster).
 
 Bewusst ohne QWebEngineView/echtes Fenster — getestet wird die reine
 Subscriber-Buchhaltung (wie die uebrigen ``test_visualizer_*``).
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.core.app_state import get_state
 from src.ui.visualizer.visualizer_window import VisualizerBridge, VisualizerWindow
+from src.ui.visualizer.visualizer_service import VisualizerService, VisualizerTarget
 
 
 def _app():
@@ -126,42 +128,45 @@ class BridgeDisposeTest(unittest.TestCase):
         self.assertEqual(self.state._callbacks, baseline)
 
 
-class WindowReleaseStateTest(unittest.TestCase):
-    """``VisualizerWindow`` abonniert den State DOPPELT (eigener ``_on_state`` +
-    Bridge). ``_release_state`` muss beide abmelden. Per Fake-self getestet (wie
-    ``test_visualizer_autopatch``), damit kein echtes QWebEngine-Fenster noetig
-    ist; der ``super().closeEvent``-Teil wird hier bewusst ausgeklammert."""
+class ServiceShutdownUnsubscribesTest(unittest.TestCase):
+    """VIZ-12 Schritt 4: ``VisualizerWindow.closeEvent`` ruft nur noch
+    ``hide()`` (Dauerfenster) — es gibt keinen Fenster-seitigen Voll-Teardown
+    mehr. Der einzige verbleibende echte Teardown-Pfad ist
+    ``VisualizerService.shutdown()`` (App-Ende, s. ``MainWindow.closeEvent``):
+    meldet den EINEN Service-Subscriber ab. ``detach_target`` (z.B. via
+    ``VisualizerWindow._release_state``, weiterhin als Sicherheitsnetz
+    vorhanden) meldet bewusst NICHTS vom Service ab."""
 
     def setUp(self):
         _app()
         self.state = get_state()
 
-    def test_release_state_unsubscribes_both(self):
+    def test_shutdown_unsubscribes_the_one_service_subscriber(self):
         baseline = list(self.state._callbacks)
+        svc = VisualizerService(self.state)
+        target = VisualizerTarget("t", lambda s: None)
+        svc.attach_target(target)
+        self.assertEqual(len(self.state._callbacks), len(baseline) + 1)
 
-        # Bridge (subscribt sich selbst) + der eigene _on_state des Fensters
-        bridge = VisualizerBridge(self.state)
+        svc.shutdown()
+        self.assertEqual(self.state._callbacks, baseline)
+        self.assertFalse(svc.timer_running)
 
-        def window_on_state(event, data):
-            pass
-
-        self.state.subscribe(window_on_state)        # wie _setup_update_timer
-        self.assertEqual(len(self.state._callbacks), len(baseline) + 2)
-
-        fake_window = SimpleNamespace(
-            _state=self.state,
-            _on_state=window_on_state,
-            _bridge=bridge,
-            _dmx_timer=None,
-        )
+    def test_attach_detach_multiple_times_single_subscriber_no_leak(self):
+        baseline = list(self.state._callbacks)
+        svc = VisualizerService(self.state)
+        t1 = VisualizerTarget("t1", lambda s: None)
+        t2 = VisualizerTarget("t2", lambda s: None)
         try:
-            VisualizerWindow._release_state(fake_window)
-            self.assertNotIn(window_on_state, self.state._callbacks)
-            self.assertNotIn(bridge._on_state, self.state._callbacks)
-            self.assertEqual(self.state._callbacks, baseline)
+            svc.attach_target(t1)
+            svc.attach_target(t2)
+            svc.detach_target(t1)
+            svc.attach_target(t1)
+            self.assertEqual(len(self.state._callbacks), len(baseline) + 1,
+                              "genau ein Service-Subscriber, egal wie viele Targets")
         finally:
-            bridge.dispose()
-            self.state.unsubscribe(window_on_state)
+            svc.shutdown()
+        self.assertEqual(self.state._callbacks, baseline)
 
 
 if __name__ == "__main__":

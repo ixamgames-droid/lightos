@@ -2814,20 +2814,15 @@ class VisualizerWindow(QMainWindow):
     def _release_state(self):
         """Meldet ALLE State-Subscriber des Fensters ab + dockt vom Service ab.
 
-        Das Fenster abonniert den State doppelt: einmal die ``_bridge`` (in
-        ``VisualizerBridge.__init__``) und einmal sein eigenes ``_on_state``
-        (UI-Refresh, s. ``_setup_service_target``). Ohne Abmelden bliebe nach
-        jedem Schliessen je ein toter Callback in ``AppState._callbacks``
-        haengen und liefe bei jedem Event weiter — jedes erneute Open addierte
-        einen Leak. Idempotent.
-
-        VIZ-12 Schritt 3: zusaetzlich wird das Fenster-``VisualizerTarget`` vom
-        ``VisualizerService`` abgedockt (``detach_target`` — Timer-Gate
-        reagiert automatisch, s. ``_update_timer_gate``). Uebergangsweise
-        (bis Schritt 4 ``test_visualizer_leak`` umschreibt) bleiben BEIDE
-        Abmeldewege aktiv, auch wenn im Zwischenstand kein eigener DMX-Timer
-        mehr existiert — ``getattr``-defensiv, falls ``_dmx_timer``/``_target``/
-        ``_service`` (Fake-Selfs in Tests, altes Attribut) fehlen."""
+        VIZ-12 Schritt 4: kein Aufruf mehr aus ``closeEvent`` (das Fenster ist
+        jetzt ein Dauerfenster — ``closeEvent`` ruft nur noch ``hide()``).
+        Verbleibender Zweck: Sicherheitsnetz fuer Tests/Sonderfaelle, die einen
+        echten, vollstaendigen Teardown des EINEN Fensters brauchen, ohne die
+        gesamte App zu beenden. Der reguläre App-Ende-Teardown laeuft über
+        ``service.shutdown()`` (meldet den EINEN Service-Subscriber ab) im
+        ``MainWindow.closeEvent``-Erfolgspfad — ``hide()``/``detach_target``
+        melden bewusst NICHTS ab, Hintergrund-Updates fuer andere Targets
+        bleiben moeglich. Idempotent."""
         try:
             self._state.unsubscribe(self._on_state)
         except Exception as e:
@@ -2839,19 +2834,12 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] bridge dispose error: {e}")
         try:
-            timer = getattr(self, "_dmx_timer", None)
-            if timer is not None and timer.isActive():
-                timer.stop()
-        except Exception as e:
-            print(f"[Visualizer] timer stop error: {e}")
-        try:
             svc = getattr(self, "_service", None)
             target = getattr(self, "_target", None)
             if svc is not None and target is not None:
                 svc.detach_target(target)
         except Exception as e:
             print(f"[Visualizer] service detach error: {e}")
-        self._dmx_released = True   # showEvent darf den Timer danach nicht neu starten
 
     def showEvent(self, event):
         # DMX-Push wieder aufnehmen, wenn das Fenster sichtbar wird (war es nur
@@ -2869,7 +2857,10 @@ class VisualizerWindow(QMainWindow):
         # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart
         # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden).
         # Das Target bleibt am Service angedockt (kein detach), Page/Bridge
-        # leben weiter -- erst closeEvent/_release_state raeumt endgueltig auf.
+        # leben weiter -- VIZ-12 Schritt 4: closeEvent ruft jetzt selbst nur
+        # noch hide() (Dauerfenster), es gibt KEIN implizites Voll-Teardown
+        # mehr. Der einzige echte Teardown ist service.shutdown() beim
+        # App-Ende (MainWindow.closeEvent).
         svc = getattr(self, "_service", None)
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
@@ -2904,12 +2895,16 @@ class VisualizerWindow(QMainWindow):
         return True
 
     def closeEvent(self, event):
-        """Fragt bei ungespeicherten Buehnen-Aenderungen nach (VOR dem
-        Aufraeumen — siehe ``_confirm_close_with_unsaved_stage``), meldet
-        danach alle State-Subscriber ab (``_release_state``) und schliesst
-        normal weiter."""
+        """VIZ-12 Schritt 4 (Dauerfenster): fragt bei ungespeicherten
+        Buehnen-Aenderungen nach (VOR dem Verstecken — siehe
+        ``_confirm_close_with_unsaved_stage``, VIZ-10-Veto UNVERAENDERT), dann
+        NUR NOCH ``hide()`` statt vollstaendigem Teardown. Fenster, Kamera,
+        Modus und Helligkeit bleiben erhalten; Target bleibt am Service
+        angedockt (nur inaktiv, s. ``hideEvent``). Der einzige noch
+        verbleibende echte Teardown-Pfad ist ``service.shutdown()`` beim
+        echten App-Ende (``MainWindow.closeEvent``)."""
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
-        self._release_state()
-        super().closeEvent(event)
+        event.ignore()
+        self.hide()
