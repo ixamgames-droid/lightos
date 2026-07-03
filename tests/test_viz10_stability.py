@@ -393,6 +393,8 @@ class MainWindowRespectsVetoTest(unittest.TestCase):
         import src.ui.main_window as MW
         viz = SimpleNamespace(
             show=MagicMock(),
+            showNormal=MagicMock(),
+            isMinimized=MagicMock(return_value=False),
             raise_=MagicMock(),
             activateWindow=MagicMock(),
             deleteLater=MagicMock(),
@@ -406,6 +408,27 @@ class MainWindowRespectsVetoTest(unittest.TestCase):
         viz.close.assert_not_called()
         viz.deleteLater.assert_not_called()
         self.assertIs(fake._visualizer_window, viz)
+
+    def test_open_visualizer_restores_minimized_window(self):
+        """Live-Befund VIZ-12: show() restauriert ein MINIMIERTES Fenster
+        nicht (Qt-WindowMinimized-State bleibt) -> _open_visualizer muss
+        showNormal() nutzen, sonst holt das Menue das Fenster nie zurueck."""
+        import src.ui.main_window as MW
+        viz = SimpleNamespace(
+            show=MagicMock(),
+            showNormal=MagicMock(),
+            isMinimized=MagicMock(return_value=True),
+            raise_=MagicMock(),
+            activateWindow=MagicMock(),
+            deleteLater=MagicMock(),
+            close=MagicMock(),
+        )
+        fake = SimpleNamespace(_visualizer_window=viz)
+        MW.MainWindow._open_visualizer(fake)
+        viz.showNormal.assert_called_once()
+        viz.show.assert_not_called()
+        viz.raise_.assert_called_once()
+        viz.activateWindow.assert_called_once()
 
     def test_main_close_event_ignored_when_visualizer_vetoes(self):
         import src.ui.main_window as MW

@@ -1331,7 +1331,12 @@ class MainWindow(QMainWindow):
         # "Szene neu laden"-Menuepunkt (Schritt 5) uebernimmt den Cache-Buster-
         # Reload, der frueher bei jedem Open erzwungen wurde.
         if self._visualizer_window is not None:
-            self._visualizer_window.show()
+            # show() restauriert ein MINIMIERTES Top-Level-Fenster nicht
+            # (Qt laesst den WindowMinimized-State stehen) -> showNormal().
+            if self._visualizer_window.isMinimized():
+                self._visualizer_window.showNormal()
+            else:
+                self._visualizer_window.show()
             self._visualizer_window.raise_()
             self._visualizer_window.activateWindow()
             return
