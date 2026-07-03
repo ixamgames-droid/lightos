@@ -50,6 +50,7 @@ from src.core.stage.aim import (
 from src.core.stage import scene_commands as _scmd
 from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
+from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 
@@ -1162,7 +1163,7 @@ class VisualizerWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_channel()
-        self._setup_update_timer()
+        self._setup_service_target()
 
     # ── UI ──────────────────────────────────────────────────────────────────
 
@@ -1764,37 +1765,26 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] _push_initial_state error: {e}")
 
-    def _setup_update_timer(self):
-        self._dmx_timer = QTimer(self)
-        self._dmx_timer.timeout.connect(self._push_dmx_updates)
-        self._dmx_timer.start(33)
-        self._state.subscribe(self._on_state)
+    def _setup_service_target(self):
+        """VIZ-12 Schritt 3: das Fenster dockt NICHT mehr eigenen Timer +
+        eigenes DMX-Push-State-Subscribe an, sondern das EINE
+        ``VisualizerService``-Singleton (am ``AppState`` gehalten, s.
+        ``get_visualizer_service``). Der Service pusht Batch-Updates ueber
+        ``self._target.emit_batch`` -> laeuft auf ``self._bridge.dmxBatch.emit``
+        (Signatur der Bridge bleibt unveraendert, nur die Quelle des Takts
+        wechselt). Sichtbarkeit steuert NICHT mehr Start/Stop eines eigenen
+        QTimer, sondern ``service.set_target_active`` (s. showEvent/hideEvent).
 
-    def _push_dmx_updates(self):
-        try:
-            for fixture in self._state.get_patched_fixtures():
-                if fixture.fid not in self._state.visualizer_positions:
-                    continue
-                if fixture.universe not in self._state.universes:
-                    continue
-                universe = self._state.universes[fixture.universe]
-                channels = get_channels_for_patched(fixture)
-                attrs: dict[str, int] = {}
-                seen: dict[str, int] = {}
-                for ch in channels:
-                    dmx_addr = fixture.address + ch.channel_number - 1
-                    if 1 <= dmx_addr <= 512:
-                        # Mehrkopf (Spider): N-tes Vorkommen eines Attributs =
-                        # Kopf N -> Key "attr#N" (Kopf 0 = "attr"). So bleiben
-                        # die zwei Tilts / zwei RGBW-Banks getrennt.
-                        a = ch.attribute
-                        h = seen.get(a, 0)
-                        seen[a] = h + 1
-                        key = a if h == 0 else f"{a}#{h}"
-                        attrs[key] = universe.get_channel(dmx_addr)
-                self._bridge.push_dmx_update(fixture.fid, attrs)
-        except Exception as e:
-            print(f"[Visualizer] _push_dmx_updates error: {e}")
+        Das Fenster-eigene ``_on_state`` (UI-Refresh bei patch_changed/
+        show_loaded — KEIN Push-Takt) bleibt separat abonniert: es macht
+        UI-Arbeit (Patch-Liste, aktive Buehne), die nicht in den page-freien
+        Service gehoert (der kennt keine Widgets). Vormals wurde dasselbe
+        Subscribe in ``_setup_update_timer`` mitgezogen; die Zustaendigkeit
+        bleibt dieselbe, nur der DMX-Takt ist ausgezogen."""
+        self._service = get_visualizer_service(self._state)
+        self._target = VisualizerTarget("window", self._bridge.dmxBatch.emit)
+        self._service.attach_target(self._target)
+        self._state.subscribe(self._on_state)
 
     # ── Fixture-Tab actions ─────────────────────────────────────────────────
 
@@ -2822,13 +2812,22 @@ class VisualizerWindow(QMainWindow):
     # ── Aufraeumen ──────────────────────────────────────────────────────────
 
     def _release_state(self):
-        """Meldet ALLE State-Subscriber des Fensters ab + stoppt den DMX-Timer.
+        """Meldet ALLE State-Subscriber des Fensters ab + dockt vom Service ab.
 
         Das Fenster abonniert den State doppelt: einmal die ``_bridge`` (in
-        ``VisualizerBridge.__init__``) und einmal sein eigenes ``_on_state`` (in
-        ``_setup_update_timer``). Ohne Abmelden bliebe nach jedem Schliessen je
-        ein toter Callback in ``AppState._callbacks`` haengen und liefe bei jedem
-        Event weiter — jedes erneute Open addierte einen Leak. Idempotent."""
+        ``VisualizerBridge.__init__``) und einmal sein eigenes ``_on_state``
+        (UI-Refresh, s. ``_setup_service_target``). Ohne Abmelden bliebe nach
+        jedem Schliessen je ein toter Callback in ``AppState._callbacks``
+        haengen und liefe bei jedem Event weiter — jedes erneute Open addierte
+        einen Leak. Idempotent.
+
+        VIZ-12 Schritt 3: zusaetzlich wird das Fenster-``VisualizerTarget`` vom
+        ``VisualizerService`` abgedockt (``detach_target`` — Timer-Gate
+        reagiert automatisch, s. ``_update_timer_gate``). Uebergangsweise
+        (bis Schritt 4 ``test_visualizer_leak`` umschreibt) bleiben BEIDE
+        Abmeldewege aktiv, auch wenn im Zwischenstand kein eigener DMX-Timer
+        mehr existiert — ``getattr``-defensiv, falls ``_dmx_timer``/``_target``/
+        ``_service`` (Fake-Selfs in Tests, altes Attribut) fehlen."""
         try:
             self._state.unsubscribe(self._on_state)
         except Exception as e:
@@ -2845,23 +2844,36 @@ class VisualizerWindow(QMainWindow):
                 timer.stop()
         except Exception as e:
             print(f"[Visualizer] timer stop error: {e}")
+        try:
+            svc = getattr(self, "_service", None)
+            target = getattr(self, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
+        except Exception as e:
+            print(f"[Visualizer] service detach error: {e}")
         self._dmx_released = True   # showEvent darf den Timer danach nicht neu starten
 
     def showEvent(self, event):
         # DMX-Push wieder aufnehmen, wenn das Fenster sichtbar wird (war es nur
-        # versteckt). Nach echtem Schliessen (_release_state) NICHT neu starten.
-        t = getattr(self, "_dmx_timer", None)
-        if t is not None and not t.isActive() and not getattr(self, "_dmx_released", False):
-            t.start(33)
+        # versteckt). VIZ-12: kein eigener QTimer mehr -- der Service steuert
+        # den EINEN app-weiten Takt, das Fenster meldet nur noch "mein Target
+        # ist wieder aktiv" (Timer laeuft service-seitig hart nur bei >=1
+        # aktivem Target, s. VisualizerService._update_timer_gate).
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, True)
         super().showEvent(event)
 
     def hideEvent(self, event):
-        # Nur versteckt (nicht geschlossen): den 33ms-DMX-Push pausieren -> spart
-        # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden). Der
-        # event-getriebene State-Subscriber bleibt (billig, feuert nur bei Aenderung).
-        t = getattr(self, "_dmx_timer", None)
-        if t is not None and t.isActive():
-            t.stop()
+        # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart
+        # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden).
+        # Das Target bleibt am Service angedockt (kein detach), Page/Bridge
+        # leben weiter -- erst closeEvent/_release_state raeumt endgueltig auf.
+        svc = getattr(self, "_service", None)
+        target = getattr(self, "_target", None)
+        if svc is not None and target is not None:
+            svc.set_target_active(target, False)
         super().hideEvent(event)
 
     def _confirm_close_with_unsaved_stage(self) -> bool:

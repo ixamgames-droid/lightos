@@ -408,6 +408,123 @@ class PatchChangedPruneTest(_ServiceTestCase):
         self.assertIn(2, svc._last_payload)
 
 
+class WindowAsServiceTargetTest(_ServiceTestCase):
+    """VIZ-12 Schritt 3: ``VisualizerWindow`` dockt als EIN Service-Target an,
+    statt einen eigenen Timer + eigenes DMX-Push-State-Subscribe zu bauen.
+    Getestet per Fake-Self (wie ``WindowReleaseStateTest`` in
+    ``test_visualizer_leak.py``) — kein echtes QWebEngine-Fenster noetig, nur
+    die reine Andock-/Abdock-Buchhaltung."""
+
+    def setUp(self):
+        super().setUp()
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+
+    def _fake_window(self, state):
+        from types import SimpleNamespace as _NS
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+
+        bridge = VisualizerBridge(state)
+        fake = _NS(
+            _state=state,
+            _bridge=bridge,
+            _on_state=lambda event, data: None,
+        )
+        return fake, bridge
+
+    def test_attach_window_target_yields_single_service_subscriber(self):
+        from src.ui.visualizer.visualizer_window import VisualizerWindow
+
+        state = _make_state([], {})
+        fake, bridge = self._fake_window(state)
+        try:
+            VisualizerWindow._setup_service_target(fake)
+            svc = get_visualizer_service(state)
+            self.assertEqual(len(state._callbacks), 3,
+                              "Bridge-_on_state + Service-Subscriber (Prune) + Fenster-_on_state (UI-Refresh)")
+            self.assertIn(fake._target, svc._targets)
+            self.assertFalse(fake._target.active, "Target startet inaktiv (erst showEvent aktiviert)")
+        finally:
+            VisualizerWindow._release_state(fake)
+            bridge.dispose()
+
+    def test_show_hide_toggles_target_active_without_detach(self):
+        """showEvent/hideEvent rufen am Ende ``super().showEvent/hideEvent`` —
+        das braucht ein ECHTES QMainWindow-Objekt vom Typ ``VisualizerWindow``
+        (wie ``_MinimalVisualizerWindow`` in ``test_viz10_stability.py``:
+        ueberspringt das schwere ``__init__`` mit QWebEngineView/Toolbars)."""
+        from src.ui.visualizer.visualizer_window import VisualizerWindow
+        from PySide6.QtWidgets import QMainWindow
+        from PySide6.QtGui import QShowEvent, QHideEvent
+
+        class _MinimalWindow(VisualizerWindow):
+            def __init__(self):
+                QMainWindow.__init__(self)
+
+        state = _make_state([], {})
+        win = _MinimalWindow()
+        win._state = state
+        win._bridge = SimpleNamespace(dmxBatch=SimpleNamespace(emit=lambda s: None))
+        try:
+            VisualizerWindow._setup_service_target(win)
+            svc = win._service
+
+            VisualizerWindow.showEvent(win, QShowEvent())
+            self.assertTrue(win._target.active)
+            self.assertTrue(svc.timer_running)
+            self.assertIn(win._target, svc._targets, "hideEvent darf NICHT detachen")
+
+            VisualizerWindow.hideEvent(win, QHideEvent())
+            self.assertFalse(win._target.active)
+            self.assertFalse(svc.timer_running, "kein aktives Target mehr -> Timer stoppt hart")
+            self.assertIn(win._target, svc._targets, "Target bleibt angedockt (nur inaktiv)")
+        finally:
+            svc = getattr(win, "_service", None)
+            target = getattr(win, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
+            state.unsubscribe(win._on_state)
+
+    def test_release_state_detaches_target_from_service(self):
+        from src.ui.visualizer.visualizer_window import VisualizerWindow
+
+        state = _make_state([], {})
+        fake, bridge = self._fake_window(state)
+        VisualizerWindow._setup_service_target(fake)
+        svc = fake._service
+        target = fake._target
+
+        VisualizerWindow._release_state(fake)
+
+        self.assertNotIn(target, svc._targets, "_release_state muss das Fenster-Target abdocken")
+        self.assertNotIn(fake._on_state, state._callbacks)
+        bridge.dispose()
+
+    def test_repeated_open_close_does_not_accumulate_service_subscriber(self):
+        """Kern-Regression analog test_visualizer_leak: mehrfaches
+        Setup/Release darf keinen Service-Subscriber akkumulieren. Der EINE
+        Service-Subscriber selbst bleibt nach dem ersten attach dauerhaft
+        bestehen (Orchestrator-Entscheidung: nur ``service.shutdown()`` meldet
+        ihn ab, nicht ``detach_target`` — Hintergrund-Updates fuer andere
+        Targets sollen moeglich bleiben) -> Baseline hier ist "Service-
+        Subscriber + 0 Fenster-Subscriber", nicht die urspruengliche Baseline."""
+        from src.ui.visualizer.visualizer_window import VisualizerWindow
+
+        state = _make_state([], {})
+        baseline = len(state._callbacks)
+        service_baseline = None
+        for _ in range(5):
+            fake, bridge = self._fake_window(state)
+            VisualizerWindow._setup_service_target(fake)
+            self.assertEqual(len(state._callbacks), baseline + 3)
+            VisualizerWindow._release_state(fake)
+            bridge.dispose()
+            if service_baseline is None:
+                service_baseline = len(state._callbacks)
+            self.assertEqual(len(state._callbacks), service_baseline,
+                              "nach dem ersten Zyklus nur noch der eine Service-Subscriber uebrig")
+
+
 class ShutdownUnsubscribesTest(_ServiceTestCase):
     def test_shutdown_unsubscribes_the_one_service_subscriber(self):
         state = _make_state([], {})
