@@ -28,7 +28,7 @@ _POINT = struct.Struct("<HhhHHHHHH")
 # point_rate/point_count (je u32) -> 20 Bytes.
 _STATUS = struct.Struct("<BBBBHHHHII")
 # dac_broadcast: mac(6) + hw_rev u16 + sw_rev u16 + buffer_capacity u16 +
-# max_point_rate u32 + dac_status(20) -> 36 Bytes.
+# max_point_rate u32 (Header 16 Bytes) + dac_status(20) -> 36 Bytes.
 _BROADCAST_HEAD = struct.Struct("<6sHHHI")
 
 ACK = ord("a")

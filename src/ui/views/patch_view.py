@@ -81,6 +81,10 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
         tilt_zero_dmx=src.tilt_zero_dmx,
+        # LAS-05: sonst wuerde die Kopie eines Netzwerk-Lasers still zum
+        # DMX-Geraet (ORM-Default 'dmx') und verloere ihre Ziel-IP.
+        protocol=getattr(src, "protocol", "dmx") or "dmx",
+        net_host=getattr(src, "net_host", "") or "",
     )
 
 
