@@ -35,6 +35,20 @@ _DIM_COLOR_ATTRS = frozenset({
     "cyan", "magenta", "yellow",
 })
 
+# LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
+LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
+
+
+def fixture_uses_dmx(fx) -> bool:
+    """True, wenn das Geraet ueber den DMX-Adressraum ausgegeben wird.
+    Netzwerk-Laser (protocol in LASER_NETWORK_PROTOCOLS) haben universe/address
+    nur als bedeutungslose Platzhalter — JEDE Stelle, die
+    ``fx.address + ch.channel_number`` rechnet, MUSS vorher hier fragen, sonst
+    schreibt der Platzhalter in die Spans echter Geraete. Fehlendes/leeres
+    Feld (Alt-Objekte, Mocks) zaehlt als DMX."""
+    proto = (getattr(fx, "protocol", "") or "dmx").lower()
+    return proto not in LASER_NETWORK_PROTOCOLS
+
 # Feature-Dimmer-Master (F-26): ein per-Slot multiplikativer Master, der die
 # Helligkeit (bzw. gewaehlte Feature-Kanaele) einer Fixture-Menge skaliert —
 # effekt-UNABHAENGIG, weil er am fertig gerenderten Output ansetzt (Render-Schritt
@@ -316,6 +330,7 @@ class AppState:
             "invert_tilt", "swap_pan_tilt", "dimmer_curve",
             "spider_mirrored", "spider_dual_tilt",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
+            "protocol",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
         if not values:
@@ -383,6 +398,7 @@ class AppState:
             "manufacturer_name": f.manufacturer_name,
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
+            "protocol": getattr(f, "protocol", "dmx") or "dmx",
         }
 
     def _restore_fixture_dict(self, d: dict):
@@ -406,6 +422,7 @@ class AppState:
             manufacturer_name=d.get("manufacturer_name", ""),
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),
+            protocol=d.get("protocol", "dmx") or "dmx",
         )
         self.add_fixture(f, undoable=False)
 
@@ -441,6 +458,11 @@ class AppState:
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
             fix_index[fx.fid] = (fx, chans)
+            # LAS-04: Netzwerk-Laser bleiben im fix_index (Programmer/Effekte
+            # adressieren sie per fid), bekommen aber KEINE Defaults/Spans —
+            # ihre Platzhalter-Adresse darf nie ins Live-Universe committen.
+            if not fixture_uses_dmx(fx):
+                continue
             for ch in chans:
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -499,6 +521,8 @@ class AppState:
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
         gm_mask: dict[int, set] = {}
         for fid, (fx, chans) in fix_index.items():
+            if not fixture_uses_dmx(fx):
+                continue
             for addr in self._fixture_intensity_addrs(fx, chans):
                 gm_mask.setdefault(fx.universe, set()).add(addr)
         try:
@@ -848,6 +872,10 @@ class AppState:
     def _flush_programmer_to_dmx(self, fid: int):
         fixture = next((f for f in self._patch_cache if f.fid == fid), None)
         if not fixture or fixture.universe not in self.universes:
+            return
+        # LAS-04: Netzwerk-Laser haben keinen DMX-Adressraum — ihre Werte
+        # bleiben im Programmer (liest spaeter der LaserOutputManager).
+        if not fixture_uses_dmx(fixture):
             return
         universe = self.universes[fixture.universe]
         prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
@@ -1445,6 +1473,10 @@ class AppState:
             if not entry:
                 continue
             fx, chans = entry
+            # LAS-04: Netzwerk-Laser nie in die Scratch-Universen malen (ihre
+            # Platzhalter-Adresse laege sonst in den Spans echter Geraete).
+            if not fixture_uses_dmx(fx):
+                continue
             # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden, bevor geschrieben
             # wird (wirkt damit auf Programmer + Cues gleichermassen).
             attrs = apply_pan_tilt_orientation(fx, attrs)

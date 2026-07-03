@@ -33,6 +33,7 @@ class _FakePatchedFixture:
     manufacturer_name: str = ""
     fixture_name: str = ""
     fixture_type: str = "other"
+    protocol: str = "dmx"
 
 
 class _FakeCueStack:

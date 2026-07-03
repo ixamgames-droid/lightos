@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-02 — Laser-Support: Netzwerk-Laser-Grundlagen (LAS-04)
+
+#### Neu / Hinzugefuegt
+
+- **`PatchedFixture.protocol`** (`'dmx'` Default | `'etherdream'` | `'idn'`): Fundament für die zweite Laser-Klasse (Netzwerk-Laser ohne DMX-Adressraum). Idempotente ALTER-TABLE-Migration, `.lshow`-Serialisierung beidseitig (Alt-Shows laden als `'dmx'`), Undo-/`update_fixture`-Integration. Neuer Helper **`fixture_uses_dmx()`** gated ALLE vier Adress-Schreibstellen (`_rebuild_render_plan` Defaults/Spans/GM-Maske, `_flush_programmer_to_dmx`, `_apply_fixture_map`, Executor-`_flush_to_dmx`): Die Platzhalter-Adresse eines Netzwerk-Lasers kann nie in die DMX-Spans echter Geräte schreiben; seine Programmer-Werte bleiben erhalten und werden später vom `LaserOutputManager` (LAS-05) gelesen. `src/core/database/models.py`, `src/core/app_state.py`, `src/core/show/show_file.py`, `src/core/engine/executor.py`, Tests `tests/test_laser_protocol_field.py`.
+
 ### 2026-07-02 — Laser-Support: Laser-Tab im Programmer (LAS-02 + LAS-03-Grundlage)
 
 #### Neu / Hinzugefuegt

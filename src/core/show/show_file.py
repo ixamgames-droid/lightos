@@ -53,6 +53,7 @@ def _fixture_to_dict(pf) -> dict:
             "manufacturer_name": str(pf.get("manufacturer_name", "") or ""),
             "fixture_name": str(pf.get("fixture_name", "") or ""),
             "fixture_type": str(pf.get("fixture_type", "other") or "other"),
+            "protocol": str(pf.get("protocol", "dmx") or "dmx"),
         }
     return {
         "fid": _to_int(getattr(pf, "fid", getattr(pf, "id", 0)), 0),
@@ -77,6 +78,7 @@ def _fixture_to_dict(pf) -> dict:
         "manufacturer_name": str(getattr(pf, "manufacturer_name", "") or ""),
         "fixture_name": str(getattr(pf, "fixture_name", "") or ""),
         "fixture_type": str(getattr(pf, "fixture_type", "other") or "other"),
+        "protocol": str(getattr(pf, "protocol", "dmx") or "dmx"),
     }
 
 
@@ -114,6 +116,8 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         manufacturer_name=str(d.get("manufacturer_name", "") or ""),
         fixture_name=str(d.get("fixture_name", "") or ""),
         fixture_type=str(d.get("fixture_type", "other") or "other"),
+        # LAS-04: Alt-Shows ohne Feld laden als klassisches DMX-Geraet.
+        protocol=str(d.get("protocol", "dmx") or "dmx"),
     )
 
 
