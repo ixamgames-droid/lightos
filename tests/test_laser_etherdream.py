@@ -318,6 +318,7 @@ class LaserOutputManagerTest(unittest.TestCase):
         m, state = _manager([_Fx(1), _Fx(2, protocol="dmx"),
                              _Fx(3, net_host="")])
         state.programmer[1] = {"shutter": 255}
+        m.set_armed(True)                        # LAS-07: sonst alles geblankt
         m._tick()
         conns = list(m._connections.values())
         self.assertEqual(len(conns), 1)          # nur fid 1 ist Netzwerk+Host

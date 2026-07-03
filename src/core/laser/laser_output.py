@@ -105,6 +105,14 @@ class LaserOutputManager:
         self._conn_proto: dict[int, str] = {}
         self._retry_at: dict[int, float] = {}
         self._estopped = False
+        # LAS-07 Safety: Laser-Ausgabe startet UNSCHARF. Solange nicht scharf
+        # geschaltet, wird JEDER Streaming-Frame geblankt (Vorschau ohne
+        # Lichtaustritt) — der freie Zeichenmodus darf erst nach bewusstem
+        # Arming echtes Licht ausgeben. Gilt global für alle Netzwerk-Laser.
+        self._armed = False
+        # Aktive gezeichnete Figur je fid (LaserFigure). Ohne Eintrag fällt der
+        # Tick auf das Kreis-Testmuster (build_test_frame) zurück.
+        self._figures: dict[int, object] = {}
         self._running = False
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
@@ -117,6 +125,31 @@ class LaserOutputManager:
     @property
     def estopped(self) -> bool:
         return self._estopped
+
+    # ── Safety: Scharfschalten ────────────────────────────────────────────
+    @property
+    def armed(self) -> bool:
+        return self._armed
+
+    def set_armed(self, value: bool):
+        """Scharf/unscharf schalten. Unscharf blankt die Ausgabe ab dem
+        NÄCHSTEN Tick — ein bereits laufender Tick kann noch mit dem alten
+        Wert fertig senden, d. h. garantiert dunkel spätestens nach einer
+        Tick-Periode (~1/TARGET_FPS ≈ 33 ms). Für sofortiges Dunkel: estop_all."""
+        self._armed = bool(value)
+
+    def set_figure(self, fid: int, figure):
+        """Gezeichnete Figur als Framequelle für ein Fixture setzen (``None``
+        entfernt sie → zurück zum Testmuster)."""
+        with self._lock:
+            if figure is None:
+                self._figures.pop(int(fid), None)
+            else:
+                self._figures[int(fid)] = figure
+
+    def clear_figures(self):
+        with self._lock:
+            self._figures.clear()
 
     def start(self):
         if self._running:
@@ -214,18 +247,37 @@ class LaserOutputManager:
         except Exception:
             return False
 
+    def _frame_for(self, fx, fid: int) -> LaserFrame:
+        """Framequelle für ein Fixture: aktive gezeichnete Figur (per Programmer
+        laser_x/y/zoom positioniert/skaliert), sonst das Kreis-Testmuster."""
+        figure = self._figures.get(fid)
+        if figure is None:
+            return build_test_frame(self._state, fx, self.limits,
+                                    self.TARGET_FPS)
+        pps = min(20000, int(self.limits.max_pps))
+        n = max(int(self.limits.min_points),
+                min(int(self.limits.max_points), pps // max(1, self.TARGET_FPS)))
+        ox = (_prog_value(self._state, fid, "laser_x", 128) - 128) / 127.0
+        oy = (_prog_value(self._state, fid, "laser_y", 128) - 128) / 127.0
+        scale = _prog_value(self._state, fid, "zoom", 255) / 255.0
+        lit = _prog_value(self._state, fid, "shutter", 0) >= 128
+        frame = figure.to_frame(n, pps, offset_x=ox, offset_y=oy, scale=scale)
+        # Shutter-Gate wie beim Testmuster: unter 128 komplett dunkel.
+        return frame if lit else frame.blank_copy()
+
     def _tick(self):
         fixtures = self._network_fixtures()
         if not fixtures:
             return
-        dark = self._blackout_active() or self._estopped
+        # Nicht scharf geschaltet ⇒ Ausgabe geblankt (LAS-07-Safety), ebenso
+        # bei BLACKOUT oder aktivem Not-Aus.
+        dark = self._blackout_active() or self._estopped or not self._armed
         for fx in fixtures:
             conn = self._conn_for(fx)
             if conn is None:
                 continue
             fid = int(getattr(fx, "fid", 0) or 0)
-            frame = build_test_frame(self._state, fx, self.limits,
-                                     self.TARGET_FPS)
+            frame = self._frame_for(fx, fid)
             if dark:
                 frame = frame.blank_copy()
             frame = clamp_frame(frame, self.limits)
