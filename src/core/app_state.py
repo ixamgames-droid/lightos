@@ -142,6 +142,15 @@ class AppState:
         # grid_visible, world_w/h) — von der Live View gepflegt, wandert mit
         # save_show/load_show. Leer = ui_prefs-Defaults (alte Shows).
         self.live_view_meta: dict = {}
+        # VIZ-13 Schritt 3b-K-2: benannte Kamerapositionen des 3D-Visualizers
+        # (View-State, NICHT Szenegraph -- siehe docs/VIZ13_JS_NEUAUFBAU_DESIGN.md
+        # Abschnitt (c) "Persistenz-Schnitt"). Liste von
+        # {name, mode, theta, phi, radius, target:[x,y,z], orthoSize, orthoPan:[x,z]}.
+        # Additiver Show-Block (visualizer.named_cameras), KEIN SHOW_VERSION-
+        # Bump -- alte Shows ohne den Block laden mit leerer Liste (siehe
+        # show_file.py). Einfaches plain-list-Attribut wie live_view_meta,
+        # kein SceneGraph-Backing (keine Fixture-Topologie).
+        self.visualizer_named_cameras: list = []
         self._patch_cache: list[PatchedFixture] = []
         # Basis-Level pro Fixture: {fid: {attr: 0-255}}. Wird in den Default-Frame
         # gelegt (siehe _rebuild_render_plan) und mit der Show gespeichert. Typisch:

@@ -333,6 +333,10 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
             if sid
         },
         "active_stage": getattr(state, "active_stage_name", "simple") or "simple",
+        # VIZ-13 Schritt 3b-K-2: benannte Kamerapositionen -- additiv, View-
+        # State (nicht Szenegraph). Liste roher dicts (JS liefert das Format
+        # bereits fertig ueber bridge.cameraSaved), hier nur defensiv kopiert.
+        "named_cameras": list(getattr(state, "visualizer_named_cameras", []) or []),
     }
 
     # VIZ-11 (Schritt 5): SceneGraph-Block additiv dazuschreiben — EINE Quelle
@@ -576,6 +580,7 @@ def reset_show():
     state.active_stage_name = "simple"
     state.live_view_positions = {}
     state.live_view_meta = {}
+    state.visualizer_named_cameras = []
     state._last_loaded_layout = {}
     state.show_name = "Neue Show"
     state.playlist = []
@@ -830,6 +835,7 @@ def load_show(path: str | os.PathLike):
     lv_pos: dict[int, tuple[float, float]] = {}
     active_stage_name = "simple"
     live_view_meta: dict = {}
+    named_cameras: list = []
     visualizer_load_error: Exception | None = None
     try:
         viz = data.get("visualizer", {}) or {}
@@ -863,6 +869,18 @@ def load_show(path: str | os.PathLike):
         rotations = {}
         docks = {}
         active_stage_name = "simple"
+
+    # VIZ-13 Schritt 3b-K-2: benannte Kamerapositionen -- additiv, eigener
+    # Fehler-Isolierungsblock (ein kaputter named_cameras-Eintrag darf
+    # positions/rotations/docks oben nicht mit zu Fall bringen). Alte Shows
+    # ohne den Key -> leere Liste (kein SHOW_VERSION-Bump noetig).
+    try:
+        viz = data.get("visualizer", {}) or {}
+        raw_cams = viz.get("named_cameras", []) or []
+        named_cameras = [dict(c) for c in raw_cams if isinstance(c, dict)]
+    except Exception as e:
+        _lenient("load named_cameras error", e)
+        named_cameras = []
 
     # Live View: 2D-Fixture-Positionen (eigene Persistenz, entkoppelt vom 3D-Viz)
     live_view_load_error: Exception | None = None
@@ -982,6 +1000,11 @@ def load_show(path: str | os.PathLike):
         if not has_adapter:
             state.live_view_positions = lv_pos
         state.live_view_meta = live_view_meta
+
+    # VIZ-13 Schritt 3b-K-2: plain-list-Attribut, kein SceneGraph-Adapter ->
+    # unabhaengig von has_adapter immer direkt gesetzt (gleiches Muster wie
+    # live_view_meta).
+    state.visualizer_named_cameras = named_cameras
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}

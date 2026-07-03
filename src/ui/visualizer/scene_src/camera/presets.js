@@ -27,8 +27,28 @@ const PRESETS = {
 
 // Radius bleibt beim Preset-Wechsel unangetastet (nur Blickrichtung aendert
 // sich) - der User kann danach weiter zoomen wie gewohnt.
+//
+// Sonder-Namen 'fit'/'fit_selected' (VIZ-13 3b-K-2): die Toolbar hat KEINEN
+// eigenen Bridge-Kanal fuer Fit/Fit-Auswahl - sie reisen ueber dasselbe
+// additive cameraPreset-Signal wie die Achsen-Presets (haelt den Bridge-
+// Vertrag bei den 3 im Auftrag genannten Signalen: cameraPreset/
+// setNamedCameras/cameraSaved). fitAll/fitSelected sind bereits vorhanden
+// (Schritt 3b-K-1) und werden hier nur zusaetzlich verdrahtet.
 export function setCameraPreset(name) {
   if (name === 'free') return; // No-Op: aktuelle Orbit-Stellung bleibt stehen
+  if (name === 'fit') { fitAll(); return; }
+  if (name === 'fit_selected') { fitSelected(); return; }
+  // "save:<name>"/"apply:<name>" (Toolbar "Kamera speichern..."/gespeicherte
+  // Kamera anwenden) - reisen ueber denselben additiven cameraPreset-Kanal,
+  // s. visualizer_window.py#_on_save_named_camera/_on_apply_named_camera.
+  if (typeof name === 'string' && name.indexOf('save:') === 0) {
+    saveNamedCamera(name.slice(5));
+    return;
+  }
+  if (typeof name === 'string' && name.indexOf('apply:') === 0) {
+    applyNamedCamera(name.slice(6));
+    return;
+  }
   const p = PRESETS[name];
   if (!p) return;
 
@@ -180,5 +200,77 @@ export function fpsTick() {
     _fpsLastDisplay = now;
     _fpsAccum = 0;
     _fpsFrames = 0;
+  }
+}
+
+// ============================================================================
+// Benannte Kameras (VIZ-13 Schritt 3b-K-2) - Persistenz laeuft ueber Python
+// (additiver Show-Block visualizer.named_cameras, s. show_file.py). JS haelt
+// nur die aktuell vom Service gepushte Liste + baut/liest das Speicher-JSON
+// ({name, mode, theta, phi, radius, target:[x,y,z], orthoSize, orthoPan:[x,z]}
+// - s. Design-Dokument (c)). `bridgeRef` = Late-Binding wie in
+// interaction/tools.js (verhindert zirkulaeren Import presets.js<->bridge.js).
+// ============================================================================
+export const bridgeRef = { get: () => null };
+
+export function wirePresetsLateBindings({ getBridge }) {
+  bridgeRef.get = getBridge;
+}
+
+let _namedCameras = [];
+
+// Vom Bridge-Connect (setNamedCameras-Signal) aufgerufen, wenn Python nach
+// Show-Laden bzw. nach einem cameraSaved-Echo die volle Liste pusht.
+export function setNamedCameras(list) {
+  _namedCameras = Array.isArray(list) ? list : [];
+}
+
+export function getNamedCameras() {
+  return _namedCameras;
+}
+
+// Baut das Speicher-JSON aus dem aktuellen Kamerastatus (3D: theta/phi/radius
+// + camTarget; 2D: orthoSize + Ortho-Kameraposition als "Pan") und meldet es
+// via bridge.cameraSaved(json) an Python zurueck (Persistenz + Broadcast an
+// den Rest der Bridge-Liste laeuft dort, s. VisualizerBridge.cameraSaved).
+export function saveNamedCamera(name) {
+  const n = String(name || '').trim();
+  if (!n) return;
+  const payload = {
+    name: n,
+    mode: view.mode,
+    theta: view.theta,
+    phi: view.phi,
+    radius: view.radius,
+    target: [camTarget.x, camTarget.y, camTarget.z],
+    orthoSize: orthoState.size,
+    orthoPan: [orthoCam.position.x, orthoCam.position.z],
+  };
+  const bridge = bridgeRef.get && bridgeRef.get();
+  if (bridge && bridge.cameraSaved) {
+    try { bridge.cameraSaved(JSON.stringify(payload)); } catch (e) {}
+  }
+}
+
+// Springt (ohne Animation - Lerp ist ein spaeteres Komfort-Extra, kein
+// Vertragsbestandteil) auf eine zuvor gespeicherte Kamera. Akzeptiert
+// entweder einen Namen (Lookup in _namedCameras) oder direkt ein Kamera-dict.
+export function applyNamedCamera(nameOrCam) {
+  const cam = (typeof nameOrCam === 'string')
+    ? _namedCameras.find(c => c && c.name === nameOrCam)
+    : nameOrCam;
+  if (!cam) return;
+  if (cam.mode === '2D') {
+    if (typeof cam.orthoSize === 'number') orthoState.size = cam.orthoSize;
+    const pan = Array.isArray(cam.orthoPan) ? cam.orthoPan : [0, 0];
+    orthoCam.position.set(pan[0] || 0, 60, (pan[1] || 0) + 0.001);
+    orthoCam.lookAt(pan[0] || 0, 0, pan[1] || 0);
+    resizeOrtho();
+  } else {
+    if (typeof cam.theta === 'number') view.theta = cam.theta;
+    if (typeof cam.phi === 'number') view.phi = cam.phi;
+    if (typeof cam.radius === 'number') view.radius = cam.radius;
+    if (Array.isArray(cam.target)) camTarget.set(cam.target[0] || 0, cam.target[1] || 0, cam.target[2] || 0);
+    updateCamera();
   }
 }

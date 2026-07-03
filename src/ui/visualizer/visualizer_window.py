@@ -256,14 +256,17 @@ class VisualizerBridge(QObject):
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
         applyFixtureTransform(json), alignSelected(mode),
-        distributeSelected(axis), cameraReset()
+        distributeSelected(axis), cameraReset(),
+        cameraPreset(name) (VIZ-13 3b-K: Top/Front/Seite/Perspektive/Frei),
+        setNamedCameras(json) (VIZ-13 3b-K: gespeicherte Kamera-Liste push)
 
     Slots <- JS
         requestFixtures(), placeFixture(json), fixturePositionChanged(...),
         fixtureRotationChanged(...), fixtureGestureEnd(json) (gebuendeltes
         Drag-Ende: Position+Rotation+Dock in EINEM Undo-Command),
         fixtureSelectionChanged(json), fixtureDeleted(fid),
-        stageListChanged(json), stageSelectionChanged(id), saveStage(json)
+        stageListChanged(json), stageSelectionChanged(id), saveStage(json),
+        cameraSaved(json) (VIZ-13 3b-K: JS meldet eine benannte Kamera zurueck)
     """
 
     # ── Signals -> JavaScript ───────────────────────────────────────────────
@@ -288,6 +291,8 @@ class VisualizerBridge(QObject):
     updateStageObject       = Signal(str)     # JSON: gezieltes Update eines Stage-Elements
     resizeModeSignal        = Signal(bool)    # Toggle Resize-Handles im JS
     pixelRatioSignal        = Signal(float)   # VIZ-12 Schritt 5: screenChanged -> JS setPixelRatio
+    cameraPreset            = Signal(str)     # VIZ-13 3b-K: 'top'|'front'|'side'|'persp'|'free'
+    setNamedCameras         = Signal(str)     # VIZ-13 3b-K: JSON-Liste gespeicherter Kameras -> JS
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
@@ -301,6 +306,7 @@ class VisualizerBridge(QObject):
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
+    pyCameraSaved           = Signal(str)     # VIZ-13 3b-K: Name der neu gespeicherten Kamera (Menue-Refresh)
 
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
@@ -897,6 +903,26 @@ class VisualizerBridge(QObject):
         """JS meldet wenn Auto-Brightness die Helligkeit aendert."""
         self.pyBrightnessChanged.emit(float(value))
 
+    @Slot(str)
+    @_bridge_slot_guard
+    def cameraSaved(self, json_str: str):
+        """VIZ-13 Schritt 3b-K-2: JS meldet eine per "Kamera speichern..."
+        angelegte benannte Kamera zurueck ({name, mode, theta, phi, radius,
+        target:[x,y,z], orthoSize, orthoPan:[x,z]} -- s. Design-Dokument (c)).
+        Gleicher Name ersetzt den bestehenden Eintrag (additiv sonst).
+        Persistenz erst beim naechsten save_show (additiver Show-Block,
+        s. show_file.py)."""
+        data = json.loads(json_str) or {}
+        name = str(data.get("name") or "").strip()
+        if not name:
+            return
+        cams = list(getattr(self._state, "visualizer_named_cameras", []) or [])
+        cams = [c for c in cams if (c or {}).get("name") != name]
+        cams.append(data)
+        self._state.visualizer_named_cameras = cams
+        self.push_named_cameras(cams)
+        self.pyCameraSaved.emit(name)
+
     # ── Python -> JS helpers ────────────────────────────────────────────────
 
     def place_fixture_at(self, fid: int, x: float, y: float, z: float,
@@ -1026,6 +1052,22 @@ class VisualizerBridge(QObject):
             self.pixelRatioSignal.emit(float(ratio))
         except Exception as e:
             print(f"[Visualizer] push_pixel_ratio error: {e}")
+
+    def push_camera_preset(self, name: str):
+        """VIZ-13 Schritt 3b-K-2: Kamera-Preset an JS schicken (Toolbar-
+        Auswahl Top/Front/Seite/Perspektive/Frei -> camera/presets.js#setCameraPreset)."""
+        try:
+            self.cameraPreset.emit(str(name))
+        except Exception as e:
+            print(f"[Visualizer] push_camera_preset error: {e}")
+
+    def push_named_cameras(self, cameras: list):
+        """VIZ-13 Schritt 3b-K-2: aktuelle Liste benannter Kameras an JS
+        pushen (nach Laden der Show bzw. nach cameraSaved-Slot)."""
+        try:
+            self.setNamedCameras.emit(json.dumps(list(cameras or [])))
+        except Exception as e:
+            print(f"[Visualizer] push_named_cameras error: {e}")
 
     def push_add_stage_object(self, type_: str):
         try:
@@ -1256,6 +1298,41 @@ class VisualizerWindow(QMainWindow):
         act_reset_cam = QAction("⌖ Kamera", self)
         act_reset_cam.triggered.connect(self._reset_camera)
         tb.addAction(act_reset_cam)
+
+        # VIZ-13 Schritt 3b-K-2: Kamera-Preset-Dropdown + Fit/Fit-Auswahl +
+        # "Kamera speichern..." + gespeicherte Kameras (Design-Dokument (c)
+        # "Kamera-Presets / Fit / gespeicherte Kameras"). Eigenbau-Orbit-
+        # Kamera in JS (camera/presets.js), additiv zum bestehenden
+        # "⌖ Kamera"-Reset-Button (Alt-Verhalten unveraendert).
+        tb.addWidget(QLabel("Kamera:"))
+        self._combo_cam_preset = QComboBox()
+        for _label, _key in (
+            ("Top", "top"), ("Front", "front"), ("Seite", "side"),
+            ("Perspektive", "persp"), ("Frei", "free"),
+        ):
+            self._combo_cam_preset.addItem(_label, _key)
+        self._combo_cam_preset.setToolTip("Kamera-Preset anwenden (Top/Front/Seite/Perspektive/Frei)")
+        self._combo_cam_preset.activated.connect(self._on_camera_preset_selected)
+        tb.addWidget(self._combo_cam_preset)
+
+        act_fit = QAction("⛶ Fit", self)
+        act_fit.setToolTip("Kamera so setzen, dass alle Fixtures ins Bild passen")
+        act_fit.triggered.connect(self._on_fit_all)
+        tb.addAction(act_fit)
+
+        act_fit_sel = QAction("⛶ Fit Auswahl", self)
+        act_fit_sel.setToolTip("Kamera auf die ausgewählten Fixtures zentrieren (Taste F)")
+        act_fit_sel.triggered.connect(self._on_fit_selected)
+        tb.addAction(act_fit_sel)
+
+        self._btn_cam_saved = QToolButton()
+        self._btn_cam_saved.setText("📷 Kameras")
+        self._btn_cam_saved.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._btn_cam_saved.setToolTip("Aktuelle Kamera speichern oder eine gespeicherte Kamera anwenden")
+        self._menu_cam_saved = QMenu(self._btn_cam_saved)
+        self._btn_cam_saved.setMenu(self._menu_cam_saved)
+        self._rebuild_camera_menu()
+        tb.addWidget(self._btn_cam_saved)
 
         # VIZ-12 Schritt 5: "Szene neu laden" ersetzt den frueheren
         # Cache-Buster-Zwang bei jedem show() -- expliziter Menuepunkt statt
@@ -1710,8 +1787,11 @@ class VisualizerWindow(QMainWindow):
         self._chk_cones = QCheckBox("Lichtkegel anzeigen");      self._chk_cones.setChecked(True)
         self._chk_floor = QCheckBox("Bodenpunkte anzeigen");     self._chk_floor.setChecked(True)
         self._chk_fog   = QCheckBox("Nebel/Haze anzeigen");      self._chk_fog.setChecked(True)
+        # VIZ-13 Schritt 3b-K-2: FPS-Debug-Overlay (Design-Dokument (c)).
+        self._chk_fps   = QCheckBox("FPS anzeigen (Debug)");     self._chk_fps.setChecked(False)
+        self._chk_fps.setToolTip("Zeigt ein kleines FPS-Overlay oben rechts in der 3D-Szene (nur Debug).")
         self._chk_snap  = QCheckBox("Snap to Grid (1m)");        self._chk_snap.setChecked(True)
-        for c in (self._chk_cones, self._chk_floor, self._chk_fog, self._chk_snap):
+        for c in (self._chk_cones, self._chk_floor, self._chk_fog, self._chk_snap, self._chk_fps):
             c.toggled.connect(self._on_settings_changed)
             layout.addWidget(c)
 
@@ -1760,6 +1840,7 @@ class VisualizerWindow(QMainWindow):
         self._bridge.pyStageSelection.connect(self._on_stage_selection_from_js)
         self._bridge.pyStageSaved.connect(self._on_stage_saved_from_js)
         self._bridge.pyBrightnessChanged.connect(self._on_brightness_from_js)
+        self._bridge.pyCameraSaved.connect(self._on_camera_saved_from_js)
 
     def _on_load_finished(self, ok: bool):
         if not ok:
@@ -1814,6 +1895,11 @@ class VisualizerWindow(QMainWindow):
             self._apply_active_stage_from_state()
             self._bridge.requestFixtures()
             self._refresh_patch_list()
+            # VIZ-13 Schritt 3b-K-2: gespeicherte Kameras der (ggf. gerade
+            # geladenen) Show an JS pushen + Toolbar-Menue synchronisieren.
+            cams = list(getattr(self._state, "visualizer_named_cameras", []) or [])
+            self._bridge.push_named_cameras(cams)
+            self._rebuild_camera_menu()
         except Exception as e:
             print(f"[Visualizer] _push_initial_state error: {e}")
 
@@ -2856,6 +2942,58 @@ class VisualizerWindow(QMainWindow):
     def _reset_camera(self):
         self._bridge.cameraReset.emit()
 
+    # ── VIZ-13 Schritt 3b-K-2: Kamera-Presets / Fit / benannte Kameras ──────
+
+    def _on_camera_preset_selected(self, index: int):
+        key = self._combo_cam_preset.itemData(index) or "free"
+        self._bridge.push_camera_preset(str(key))
+
+    def _on_fit_all(self):
+        self._bridge.push_camera_preset("fit")
+
+    def _on_fit_selected(self):
+        self._bridge.push_camera_preset("fit_selected")
+
+    def _rebuild_camera_menu(self):
+        """Baut das "📷 Kameras"-Menue neu auf: "Kamera speichern..." oben,
+        darunter je ein Eintrag pro in AppState.visualizer_named_cameras
+        gespeicherter Kamera (Auswahl -> anwenden)."""
+        menu = self._menu_cam_saved
+        menu.clear()
+        act_save = menu.addAction("💾 Kamera speichern…")
+        act_save.triggered.connect(self._on_save_named_camera)
+        cams = list(getattr(self._state, "visualizer_named_cameras", []) or [])
+        if cams:
+            menu.addSeparator()
+            for cam in cams:
+                name = (cam or {}).get("name")
+                if not name:
+                    continue
+                a = menu.addAction(f"↦ {name}")
+                a.triggered.connect(weak_slot(self._on_apply_named_camera, name))
+
+    def _on_save_named_camera(self):
+        name, ok = QInputDialog.getText(self, "Kamera speichern", "Name der Kamera:")
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        # KEIN eigenes Bridge-Signal fuer den Speichern-Trigger (Auftrag nennt
+        # nur cameraPreset/setNamedCameras/cameraSaved) - "save:"/"apply:"-
+        # Praefixe reisen ueber dasselbe additive cameraPreset-Signal wie die
+        # 'fit'/'fit_selected'-Sondernamen (presets.js#setCameraPreset ruft
+        # bei diesen Praefixen saveNamedCamera()/applyNamedCamera() auf; der
+        # eigentliche Bridge-Rueckweg fuer den State-Write ist dann
+        # bridge.cameraSaved(json), wie im Auftrag vorgegeben).
+        self._bridge.push_camera_preset(f"save:{name}")
+
+    def _on_apply_named_camera(self, name: str):
+        self._bridge.push_camera_preset(f"apply:{name}")
+
+    def _on_camera_saved_from_js(self, name: str):
+        """Bridge meldet (ueber cameraSaved-Slot -> pyCameraSaved) eine neu
+        gespeicherte/aktualisierte Kamera zurueck -- Toolbar-Menue neu bauen."""
+        self._rebuild_camera_menu()
+
     def _on_reload_scene(self):
         """VIZ-12 Schritt 5: "Szene neu laden"-Menuepunkt. Ruft
         ``service.reload_all_targets()`` — mehrtargetfaehig von Anfang an
@@ -2887,6 +3025,7 @@ class VisualizerWindow(QMainWindow):
             "brightness":      self._sld_brightness.value() / 100.0,
             "autoBrightness":  self._chk_auto_brightness.isChecked(),
             "dockEnabled":     self._dock_enabled(),
+            "fpsVisible":      self._chk_fps.isChecked(),
         }
 
     def _dock_enabled(self) -> bool:

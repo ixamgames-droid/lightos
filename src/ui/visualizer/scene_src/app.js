@@ -15,7 +15,10 @@ import { view, fixtures, stageObjects, settings } from './state.js';
 
 import './camera/cameras.js';
 import { setViewMode } from './stage/view_mode.js';
-import { setCameraPreset, fitAll, fitSelected, setFpsVisible, fpsTick } from './camera/presets.js';
+import {
+  setCameraPreset, fitAll, fitSelected, setFpsVisible, fpsTick,
+  wirePresetsLateBindings, saveNamedCamera, applyNamedCamera, getNamedCameras,
+} from './camera/presets.js';
 
 import {
   updateResizeHandles, resizeHandles, getStageJson, loadStageJson,
@@ -46,6 +49,7 @@ wirePointerLateBindings({ getBridge });
 wireTouchLateBindings({ getBridge, removeFixture: _removeFixtureForTouch });
 wireDockingLateBindings({ getBridge });
 wireStageObjectsLateBindings({ getBridge, updateOutlines, dockHighlight });
+wirePresetsLateBindings({ getBridge });
 
 // ============================================================================
 // Render loop (ehem. stage_scene.html:3515-3549)
@@ -116,6 +120,8 @@ window.__lightos = {
   setBrightnessManual, resetBrightnessAuto, applyBrightness,
   // VIZ-13 Schritt 3b-K-1: Kamera-Presets + Fit/Fit-Selected + FPS-Overlay
   setCameraPreset, fitAll, fitSelected, setFpsVisible,
+  // VIZ-13 Schritt 3b-K-2: benannte Kameras (Speichern/Anwenden/Auflisten)
+  saveNamedCamera, applyNamedCamera, getNamedCameras,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett
