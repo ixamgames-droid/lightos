@@ -422,14 +422,20 @@ class WindowAsServiceTargetTest(_ServiceTestCase):
 
     def _fake_window(self, state):
         from types import SimpleNamespace as _NS
-        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        from src.ui.visualizer.visualizer_window import VisualizerBridge, VisualizerWindow
 
         bridge = VisualizerBridge(state)
         fake = _NS(
             _state=state,
             _bridge=bridge,
             _on_state=lambda event, data: None,
+            _view=None,
         )
+        # Schritt 5: on_reset_interaction/on_reload sind echte gebundene
+        # Methoden von VisualizerWindow (nicht neu nachgebaut), damit der
+        # Test dieselbe Implementierung wie die Produktion durchlaeuft.
+        fake._reset_own_interaction_state = lambda: VisualizerWindow._reset_own_interaction_state(fake)
+        fake._reload_own_page = lambda: VisualizerWindow._reload_own_page(fake)
         return fake, bridge
 
     def test_attach_window_target_yields_single_service_subscriber(self):
@@ -588,6 +594,158 @@ class ShutdownUnsubscribesTest(_ServiceTestCase):
         svc.detach_target(t1)
         svc.attach_target(t1)
         self.assertEqual(len(state._callbacks), 1, "genau ein Service-Subscriber, egal wie viele Targets")
+
+
+class ResetInteractionStateTest(_ServiceTestCase):
+    """VIZ-12 Schritt 5: ``reset_interaction_state()`` ruft den optionalen
+    ``on_reset_interaction``-Callback jedes Targets auf, kennt aber die
+    konkrete Bridge/den Reload-Token-Mechanismus selbst nicht (Invariante 2 —
+    Pro-Target-Zustand bleibt im Target)."""
+
+    def test_calls_on_reset_interaction_for_every_target(self):
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        calls: list[str] = []
+        t1 = VisualizerTarget("t1", lambda s: None,
+                               on_reset_interaction=lambda: calls.append("t1"))
+        t2 = VisualizerTarget("t2", lambda s: None,
+                               on_reset_interaction=lambda: calls.append("t2"))
+        svc.attach_target(t1)
+        svc.attach_target(t2)
+
+        svc.reset_interaction_state()
+
+        self.assertEqual(sorted(calls), ["t1", "t2"])
+
+    def test_target_without_callback_is_skipped_silently(self):
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        target = VisualizerTarget("t", lambda s: None)  # kein on_reset_interaction
+        svc.attach_target(target)
+
+        svc.reset_interaction_state()  # darf nicht werfen
+
+    def test_one_target_error_does_not_block_others(self):
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        calls: list[str] = []
+
+        def _boom():
+            raise RuntimeError("kaputt")
+
+        t1 = VisualizerTarget("t1", lambda s: None, on_reset_interaction=_boom)
+        t2 = VisualizerTarget("t2", lambda s: None,
+                               on_reset_interaction=lambda: calls.append("t2"))
+        svc.attach_target(t1)
+        svc.attach_target(t2)
+
+        svc.reset_interaction_state()
+
+        self.assertEqual(calls, ["t2"], "t2 muss trotz t1-Fehler aufgerufen werden")
+
+    def test_window_reset_interaction_stops_trace_and_clears_reload_guard(self):
+        """Reale Fenster-Implementierung (kein Fake-Callback): stop_trace()
+        + Reload-Guard-Reset ueber die echte Bridge."""
+        from src.ui.visualizer.visualizer_window import VisualizerBridge, VisualizerWindow
+
+        state = _make_state([], {})
+        bridge = VisualizerBridge(state)
+        bridge._trace_state = {"seqs": {1: [(1, 2)]}, "i": 0, "n": 1}
+        bridge._reloading_stage = True
+        fake_window = SimpleNamespace(_bridge=bridge)
+        try:
+            VisualizerWindow._reset_own_interaction_state(fake_window)
+            self.assertIsNone(bridge._trace_state, "stop_trace muss die Live-Trace beenden")
+            self.assertFalse(bridge._reloading_stage, "Reload-Guard muss zurueckgesetzt werden")
+        finally:
+            bridge.dispose()
+
+
+class ReloadAllTargetsTest(_ServiceTestCase):
+    """VIZ-12 Schritt 5: ``reload_all_targets()`` stoesst pro Target den
+    ``on_reload``-Callback an und leert danach den Dirty-Cache -> naechster
+    Tick pusht wieder ALLES (Design (b) Punkt 3 + (d) force_full_resync)."""
+
+    def test_reload_clears_dirty_cache_so_next_tick_pushes_full(self):
+        fx = _fixture(1, universe=0, address=1, channels=None)
+        chans = [
+            _channel("color_r", 1), _channel("color_g", 2),
+            _channel("color_b", 3), _channel("color_w", 4),
+            _channel("intensity", 5), _channel("pan", 6), _channel("tilt", 7),
+        ]
+        self._install_channels({1: chans})
+        universes = {0: _universe({1: 10, 2: 10, 3: 10, 4: 0, 5: 255,
+                                    6: 128, 7: 128})}
+        state = _make_state([fx], universes, positions={1: (0, 0, 0)})
+        svc = VisualizerService(state)
+        reload_calls: list[str] = []
+        target = VisualizerTarget("t", lambda s: None,
+                                   on_reload=lambda: reload_calls.append("reload"))
+        sink: list = []
+        target.emit_batch = lambda s: sink.append(s)
+        svc.attach_target(target)
+        svc.set_target_active(target, True)
+        svc._tick()  # initial full
+        sink.clear()
+
+        svc._tick()  # unveraendert -> still
+        self.assertEqual(len(sink), 0)
+
+        svc.reload_all_targets()
+        self.assertEqual(reload_calls, ["reload"], "on_reload muss pro Target aufgerufen werden")
+
+        svc._tick()
+        self.assertEqual(len(sink), 1, "nach reload_all_targets muss der naechste Tick wieder voll pushen")
+        import json
+        arr = json.loads(sink[0])
+        self.assertEqual(len(arr), 1)
+        self.assertEqual(arr[0]["fid"], 1)
+
+    def test_reload_single_target_only_resyncs_that_target(self):
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        reload_calls: list[str] = []
+        t1 = VisualizerTarget("t1", lambda s: None,
+                               on_reload=lambda: reload_calls.append("t1"))
+        t2 = VisualizerTarget("t2", lambda s: None,
+                               on_reload=lambda: reload_calls.append("t2"))
+        svc.attach_target(t1)
+        svc.attach_target(t2)
+        t1.needs_full = False
+        t2.needs_full = False
+
+        svc.reload_all_targets(target=t1)
+
+        self.assertEqual(reload_calls, ["t1"], "nur t1s on_reload wird aufgerufen")
+        self.assertTrue(t1.needs_full, "t1 braucht nach seinem Reload den vollen Bestand")
+        self.assertFalse(t2.needs_full, "t2 ist von einem gezielten Reload unberuehrt")
+
+    def test_reload_target_without_callback_still_resyncs(self):
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        target = VisualizerTarget("t", lambda s: None)  # kein on_reload
+        svc.attach_target(target)
+        target.needs_full = False
+
+        svc.reload_all_targets()  # darf nicht werfen
+
+        self.assertTrue(target.needs_full)
+
+    def test_window_reload_own_page_calls_load_stage_html(self):
+        """Reale Fenster-Implementierung: ``_reload_own_page`` ruft
+        ``load_stage_html`` auf der eigenen View (kein Fake-Callback)."""
+        import src.ui.visualizer.visualizer_window as VW
+
+        calls: list = []
+        original = VW.load_stage_html
+        VW.load_stage_html = lambda view: calls.append(view)
+        try:
+            fake_view = object()
+            fake_window = SimpleNamespace(_view=fake_view)
+            VW.VisualizerWindow._reload_own_page(fake_window)
+            self.assertEqual(calls, [fake_view])
+        finally:
+            VW.load_stage_html = original
 
 
 if __name__ == "__main__":

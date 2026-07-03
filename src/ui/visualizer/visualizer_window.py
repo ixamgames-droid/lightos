@@ -282,6 +282,7 @@ class VisualizerBridge(QObject):
     brightnessAutoSignal    = Signal()        # Reset auto-mode
     updateStageObject       = Signal(str)     # JSON: gezieltes Update eines Stage-Elements
     resizeModeSignal        = Signal(bool)    # Toggle Resize-Handles im JS
+    pixelRatioSignal        = Signal(float)   # VIZ-12 Schritt 5: screenChanged -> JS setPixelRatio
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
@@ -997,6 +998,18 @@ class VisualizerBridge(QObject):
             print(f"[Visualizer] push_stage_definition error: {e}")
             self._reloading_stage = False
 
+    def push_pixel_ratio(self, ratio: float):
+        """VIZ-12 Schritt 5: Bildschirmwechsel (anderer devicePixelRatio, z.B.
+        Fenster auf einen Monitor mit anderer Skalierung verschoben) an JS
+        durchreichen. JS setzt bereits bei ``window resize`` selbst neu (s.
+        ``stage_scene.html``), das deckt aber nicht jeden Monitorwechsel ohne
+        Groessenaenderung ab -- daher zusaetzlich explizit von
+        ``QWindow.screenChanged`` aus getriggert (s. VisualizerWindow)."""
+        try:
+            self.pixelRatioSignal.emit(float(ratio))
+        except Exception as e:
+            print(f"[Visualizer] push_pixel_ratio error: {e}")
+
     def push_add_stage_object(self, type_: str):
         try:
             self.addStageObject.emit(type_)
@@ -1226,6 +1239,18 @@ class VisualizerWindow(QMainWindow):
         act_reset_cam = QAction("⌖ Kamera", self)
         act_reset_cam.triggered.connect(self._reset_camera)
         tb.addAction(act_reset_cam)
+
+        # VIZ-12 Schritt 5: "Szene neu laden" ersetzt den frueheren
+        # Cache-Buster-Zwang bei jedem show() -- expliziter Menuepunkt statt
+        # implizitem Neubau (Design (b) Punkt 3). Laedt BEIDE Pages frisch
+        # (Fenster + aktives Spiegel-Target, Orchestrator-Entscheidung 4).
+        act_reload_scene = QAction("↻ Szene neu laden", self)
+        act_reload_scene.setToolTip(
+            "Lädt die 3D-Szene (Fenster + ggf. Live-View-Spiegel) komplett neu.\n"
+            "Nützlich nach Renderer-Problemen oder Grafiktreiber-Updates."
+        )
+        act_reload_scene.triggered.connect(self._on_reload_scene)
+        tb.addAction(act_reload_scene)
 
         act_clear_fx = QAction("✖ Alle entfernen", self)
         act_clear_fx.setToolTip("Alle platzierten Fixtures aus der Szene entfernen")
@@ -1780,11 +1805,53 @@ class VisualizerWindow(QMainWindow):
         UI-Arbeit (Patch-Liste, aktive Buehne), die nicht in den page-freien
         Service gehoert (der kennt keine Widgets). Vormals wurde dasselbe
         Subscribe in ``_setup_update_timer`` mitgezogen; die Zustaendigkeit
-        bleibt dieselbe, nur der DMX-Takt ist ausgezogen."""
+        bleibt dieselbe, nur der DMX-Takt ist ausgezogen.
+
+        VIZ-12 Schritt 5: ``on_reset_interaction``/``on_reload`` sind duenne
+        Callbacks, die der pro-Target-Zustand (Trace/Reload-Token/RenderCrash-
+        Guard bleibt in der Bridge/im Fenster, Invariante 2) dem page-freien
+        Service zur Verfuegung stellt, statt dass der Service selbst etwas
+        davon kennt."""
         self._service = get_visualizer_service(self._state)
-        self._target = VisualizerTarget("window", self._bridge.dmxBatch.emit)
+        self._target = VisualizerTarget(
+            "window", self._bridge.dmxBatch.emit,
+            on_reset_interaction=self._reset_own_interaction_state,
+            on_reload=self._reload_own_page,
+        )
         self._service.attach_target(self._target)
         self._state.subscribe(self._on_state)
+
+    def _reset_own_interaction_state(self) -> None:
+        """VIZ-12 Schritt 5: vom Service ueber ``on_reset_interaction`` bei
+        ``service.reset_interaction_state()`` aufgerufen (s. ``_on_state``
+        ``show_loaded``/Stage-Wechsel). Stoppt eine laufende Live-Trace
+        (Bridge-eigener Zustand) und setzt den Reload-Churn-Guard zurueck,
+        damit ein Stage-/Show-Wechsel keinen alten Trace-Timer oder haengen-
+        gebliebenen Reload-Guard aus der VORHERIGEN Szene mitschleppt."""
+        bridge = getattr(self, "_bridge", None)
+        if bridge is None:
+            return
+        try:
+            bridge.stop_trace()
+        except Exception as e:
+            print(f"[Visualizer] reset_interaction_state stop_trace error: {e}")
+        try:
+            bridge._cancel_reload_guard_fallback()
+            bridge._reloading_stage = False
+        except Exception as e:
+            print(f"[Visualizer] reset_interaction_state reload-guard error: {e}")
+
+    def _reload_own_page(self) -> None:
+        """VIZ-12 Schritt 5: vom Service ueber ``on_reload`` bei
+        ``service.reload_all_targets()`` aufgerufen ("Szene neu laden"-
+        Menuepunkt). Einziger noch verbleibender Ort, der ``load_stage_html``
+        mit Cache-Buster fuer DIESES Target faehrt (Design (b) Punkt 3) —
+        RenderCrashGuard-Selbstheilung + Erst-Load laufen weiterhin ueber
+        denselben ``loadFinished``-Pfad wie beim initialen Laden."""
+        view = getattr(self, "_view", None)
+        if view is None:
+            return
+        load_stage_html(view)
 
     # ── Fixture-Tab actions ─────────────────────────────────────────────────
 
@@ -2128,6 +2195,17 @@ class VisualizerWindow(QMainWindow):
 
     def _apply_stage(self, definition: StageDefinition):
         """Sende komplette Buehnen-Definition an JS."""
+        # VIZ-12 Schritt 5: zentraler Buehnen-Wechsel-Pfad -> Interaktions-
+        # Zustand (Live-Trace, Reload-Guard) ueber ALLE Targets zuruecksetzen,
+        # BEVOR die neue Definition raus geht. Sonst wuerde eine laufende
+        # Trace aus der vorherigen Buehne mit Fixture-Positionen der neuen
+        # Buehne weiterlaufen.
+        svc = getattr(self, "_service", None)
+        if svc is not None:
+            try:
+                svc.reset_interaction_state()
+            except Exception as e:
+                print(f"[Visualizer] _apply_stage reset_interaction_state error: {e}")
         try:
             self._bridge.push_stage_definition(definition)
         except Exception as e:
@@ -2722,6 +2800,24 @@ class VisualizerWindow(QMainWindow):
     def _reset_camera(self):
         self._bridge.cameraReset.emit()
 
+    def _on_reload_scene(self):
+        """VIZ-12 Schritt 5: "Szene neu laden"-Menuepunkt. Ruft
+        ``service.reload_all_targets()`` — mehrtargetfaehig von Anfang an
+        (Orchestrator-Entscheidung 4: Fenster + aktives Spiegel-Target, sofern
+        vorhanden; in diesem Schritt existiert nur das Fenster-Target, der
+        Service-Aufruf ist aber bereits fuer mehrere Targets ausgelegt). Der
+        eigentliche ``load_stage_html``-Reload + RenderCrashGuard-Reset laeuft
+        pro Target ueber den registrierten ``on_reload``-Callback
+        (``_reload_own_page``), der Service leert danach den Dirty-Cache
+        (``force_full_resync``), damit der naechste Tick wieder ALLES pusht."""
+        svc = getattr(self, "_service", None)
+        if svc is None:
+            return
+        try:
+            svc.reload_all_targets()
+        except Exception as e:
+            print(f"[Visualizer] reload_all_targets error: {e}")
+
     # ── Settings ────────────────────────────────────────────────────────────
 
     def _collect_settings(self) -> dict:
@@ -2851,7 +2947,34 @@ class VisualizerWindow(QMainWindow):
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
             svc.set_target_active(target, True)
+        self._connect_screen_changed()
         super().showEvent(event)
+
+    def _connect_screen_changed(self) -> None:
+        """VIZ-12 Schritt 5: ``QWindow.screenChanged`` -> ``setPixelRatio``-
+        Durchreichung an JS (Zweitmonitor/DPI, Design (b) Punkt 4). Das echte
+        ``QWindow`` existiert erst nach dem ersten ``show()`` -- deshalb hier
+        statt in ``__init__``, idempotent (mehrfaches showEvent verbindet
+        nicht mehrfach). JS setzt ``devicePixelRatio`` bereits selbst bei
+        ``window resize`` (s. stage_scene.html); das deckt aber nicht jeden
+        Monitorwechsel OHNE Groessenaenderung ab, daher zusaetzlich explizit."""
+        if getattr(self, "_screen_changed_connected", False):
+            return
+        win = self.windowHandle()
+        if win is None:
+            return
+        try:
+            win.screenChanged.connect(self._on_screen_changed)
+            self._screen_changed_connected = True
+        except Exception as e:
+            print(f"[Visualizer] screenChanged connect error: {e}")
+
+    def _on_screen_changed(self, screen) -> None:
+        try:
+            ratio = screen.devicePixelRatio() if screen is not None else 1.0
+            self._bridge.push_pixel_ratio(ratio)
+        except Exception as e:
+            print(f"[Visualizer] screenChanged handling error: {e}")
 
     def hideEvent(self, event):
         # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart

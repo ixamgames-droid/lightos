@@ -3474,6 +3474,12 @@ function tryChannel() {
           } catch (err) { console.log('updateStageObject err:', err); }
         });
         if (bridge.resizeModeSignal) bridge.resizeModeSignal.connect(on => setResizeModeEnabled(on));
+        if (bridge.pixelRatioSignal) bridge.pixelRatioSignal.connect(r => {
+          // VIZ-12 Schritt 5: expliziter Bildschirmwechsel (Qt screenChanged)
+          // -> Renderer-Pixelratio neu setzen, unabhaengig vom 'resize'-Event
+          // (das feuert nicht garantiert bei jedem Monitorwechsel).
+          renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, 2));
+        });
         if (bridge.requestFixtures) bridge.requestFixtures();
       }
     });

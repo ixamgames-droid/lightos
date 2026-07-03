@@ -42,11 +42,24 @@ class VisualizerTarget:
 
     Pro-Target-Zustand wie Reload-Token/Echo-Guard/RenderCrashGuard gehoert
     NICHT hierher (bleibt in der jeweiligen Bridge/im jeweiligen Fenster).
-    """
 
-    def __init__(self, name: str, emit_batch: Callable[[str], None]):
+    ``on_reset_interaction`` (Schritt 5, optional): Callback ohne Argumente,
+    den der Besitzer (Fenster/View) registrieren kann, damit
+    ``VisualizerService.reset_interaction_state()`` pro Target aufraeumen
+    kann (stop_trace + Reload-Guard-Reset) — bleibt bewusst ein duck-typed
+    Slot wie ``emit_batch``, der Service kennt den Bridge-Typ nicht.
+    ``on_reload`` (Schritt 5, optional): Callback ohne Argumente, den
+    ``VisualizerService.reload_all_targets()`` pro Target aufruft, um die
+    Page mit Cache-Buster neu zu laden (der eigentliche ``load_stage_html``-
+    Aufruf bleibt Sache des Targets/Fensters, s. Design (b) Punkt 3)."""
+
+    def __init__(self, name: str, emit_batch: Callable[[str], None],
+                 on_reset_interaction: Optional[Callable[[], None]] = None,
+                 on_reload: Optional[Callable[[], None]] = None):
         self.name = name
         self.emit_batch = emit_batch
+        self.on_reset_interaction = on_reset_interaction
+        self.on_reload = on_reload
         self.active: bool = False
         self.needs_full: bool = True
 
@@ -252,6 +265,45 @@ class VisualizerService:
                 t.needs_full = True
         else:
             target.needs_full = True
+
+    # ── Interaktions-Reset (Schritt 5) ───────────────────────────────────────
+    def reset_interaction_state(self) -> None:
+        """Zentral bei ``show_loaded``/Stage-Wechsel aufrufen: stoppt pro
+        Target laufende Interaktionen (Live-Trace) und setzt pro-Target
+        Reload-Guards zurueck. Der Service kennt die konkrete Bridge/den
+        Reload-Token-Mechanismus NICHT (Invariante 2 — Pro-Target-Zustand
+        bleibt im Target) — er ruft nur den optionalen, vom Target
+        registrierten ``on_reset_interaction``-Callback auf. Fehler in einem
+        Target duerfen die anderen Targets nicht blockieren."""
+        for target in self._targets:
+            cb = target.on_reset_interaction
+            if cb is None:
+                continue
+            try:
+                cb()
+            except Exception:
+                pass
+
+    # ── Szene neu laden (Schritt 5) ──────────────────────────────────────────
+    def reload_all_targets(self, target: Optional[VisualizerTarget] = None) -> None:
+        """"Szene neu laden": laedt die Page(s) frisch (Cache-Buster) neu und
+        leert danach den Dirty-Cache, damit der naechste Tick wieder ALLES
+        pusht statt nur das Diff. Mehrtarget-faehig von Anfang an (Design-
+        Entscheidung 4): ohne ``target`` alle angedockten Targets mit
+        registriertem ``on_reload``, mit ``target`` nur dieses eine. Der
+        eigentliche ``load_stage_html``-Aufruf + RenderCrashGuard-Reset bleibt
+        Sache des Targets (Invariante 2) — der Service stoesst nur an +
+        resynct danach."""
+        targets = self._targets if target is None else [target]
+        for t in targets:
+            cb = t.on_reload
+            if cb is None:
+                continue
+            try:
+                cb()
+            except Exception:
+                pass
+        self.force_full_resync(target)
 
     # ── State-Subscribe (aus der Bridge gehobene Prune-Logik, dict-only) ────
     def _on_state(self, event: str, data) -> None:
