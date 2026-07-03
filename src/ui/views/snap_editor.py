@@ -34,6 +34,7 @@ from src.core.attr_groups import (  # kanonisch, kein Zyklus
     classify_attr as _classify_attr,
     attr_label as _attr_label,
 )
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 
 _COLS = ["Gerät", "Kanal", "Gruppe", "DMX", "Wert", ""]
@@ -431,7 +432,7 @@ class SnapEditor(QWidget):
             b_chan.setFixedHeight(22)
             b_chan.setToolTip("Einen vergessenen Kanal (z. B. Shutter/Rot) bei allen "
                               "Geräten dieses Typs nachtragen.")
-            b_chan.clicked.connect(lambda _=False, k=tkey, f=tuple(fids): self._add_channel(k, list(f)))
+            b_chan.clicked.connect(weak_slot(self._add_channel, tkey, list(fids)))
             head.addWidget(b_chan)
         cv.addLayout(head)
 
@@ -464,13 +465,12 @@ class SnapEditor(QWidget):
             sp = QSpinBox()
             sp.setRange(0, 255)
             sp.setValue(int(val))
-            sp.valueChanged.connect(
-                lambda value, f=fid, a=attr: self._on_value(f, a, value))
+            sp.valueChanged.connect(weak_slot_fwd(self._on_value, fid, attr))
             tbl.setCellWidget(r, 4, sp)
             btn = QPushButton("✕")
             btn.setFixedWidth(28)
             btn.setToolTip("Diesen Kanal aus dem Snap entfernen")
-            btn.clicked.connect(lambda _=False, f=fid, a=attr: self._remove(f, a))
+            btn.clicked.connect(weak_slot(self._remove, fid, attr))
             tbl.setCellWidget(r, 5, btn)
 
         # Tabelle auf Inhaltshoehe fixieren (kein verschachtelter Scroll).

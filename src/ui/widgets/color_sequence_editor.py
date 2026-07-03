@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
                                 QDialog, QLabel)
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QColor, QPainter, QPen
+from src.ui.weak_slots import weak_slot
 
 
 _BTN_STYLE = (
@@ -57,7 +58,7 @@ class ColorSequenceEditor(QWidget):
             "border-radius:3px;font-size:10px;} QListWidget::item:selected{outline:2px solid #1f6feb;}"
         )
         self._list.currentRowChanged.connect(self._on_row)
-        self._list.itemDoubleClicked.connect(lambda *_: self._edit())
+        self._list.itemDoubleClicked.connect(weak_slot(self._edit))
         root.addWidget(self._list)
 
         bar = QHBoxLayout()
@@ -277,7 +278,7 @@ class ColorSequenceField(QWidget):
         btn_close.clicked.connect(dlg.accept)
         lay.addWidget(btn_close)
         dlg.resize(340, 440)
-        dlg.finished.connect(lambda *_: self._on_popout_closed())
+        dlg.finished.connect(self._on_popout_closed)
         self._dlg = dlg
         self._editor = editor
         dlg.show()

@@ -22,6 +22,8 @@ try:
 except Exception:
     get_state = None  # type: ignore
 
+from src.ui.weak_slots import weak_slot
+
 
 # Pan / Tilt presets (0-255 / 0-255). Tilt 127 = horizontal, 255 = Pan oder Tilt max
 POSITION_PRESETS = [
@@ -232,10 +234,10 @@ class PositionTool(QWidget):
         self._chk_live.toggled.connect(self.set_live)
         btn_row.addWidget(self._chk_live)
         b_center = QPushButton("Mitte")
-        b_center.clicked.connect(lambda: self.set_position(127, 127))
+        b_center.clicked.connect(weak_slot(self.set_position, 127, 127))
         btn_row.addWidget(b_center)
         b_reset = QPushButton("Zurücksetzen")
-        b_reset.clicked.connect(lambda: self.set_position(0, 0, 0, 0))
+        b_reset.clicked.connect(weak_slot(self.set_position, 0, 0, 0, 0))
         btn_row.addWidget(b_reset)
         left.addLayout(btn_row)
 

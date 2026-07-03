@@ -324,9 +324,13 @@ class VCColor(VCWidget):
         dlg.setModal(False)
         dlg.setWindowTitle(f"Farbe — {self.caption}")
         dlg.currentColorChanged.connect(self._on_live_color)
-        dlg.finished.connect(lambda *_: setattr(self, "_color_picker", None))
+        dlg.finished.connect(self._on_color_picker_closed)
         self._color_picker = dlg
         dlg.show()
+
+    def _on_color_picker_closed(self):
+        # STAB-09: bound-method statt Lambda (Connection wuerde self pinnen).
+        self._color_picker = None
 
     def _on_live_color(self, c: QColor):
         if c is None or not c.isValid():

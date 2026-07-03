@@ -48,6 +48,7 @@ from src.core.stage.aim import (
     circle_points, rect_points, line_points, trace_pan_tilt,
 )
 from src.core import crash_logging as _cl
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 
@@ -1020,11 +1021,11 @@ class VisualizerWindow(QMainWindow):
             ("↔ Zentriert X", "center_x"), ("↕ Zentriert Z", "center_z"),
         ):
             _a = _menu_align.addAction(_label)
-            _a.triggered.connect(lambda _checked=False, m=_mode: self._emit_align(m))
+            _a.triggered.connect(weak_slot(self._emit_align, _mode))
         _menu_align.addSeparator()
         for _label, _axis in (("⇿ Gleichmäßig X", "x"), ("⇕ Gleichmäßig Z", "z")):
             _a = _menu_align.addAction(_label)
-            _a.triggered.connect(lambda _checked=False, ax=_axis: self._emit_distribute(ax))
+            _a.triggered.connect(weak_slot(self._emit_distribute, _axis))
         self._btn_align.setMenu(_menu_align)
         self._btn_align.setEnabled(False)   # erst ab >=2 selektierten Fixtures
         tb.addWidget(self._btn_align)
@@ -1250,7 +1251,7 @@ class VisualizerWindow(QMainWindow):
         for type_, label in self.STAGE_TYPES:
             btn = QPushButton("+ " + label)
             btn.setMinimumHeight(40)
-            btn.clicked.connect(lambda _checked=False, t=type_: self._add_stage_element(t))
+            btn.clicked.connect(weak_slot(self._add_stage_element, type_))
             row.addWidget(btn)
             col_count += 1
             if col_count == 2:
@@ -1397,7 +1398,7 @@ class VisualizerWindow(QMainWindow):
                            ("Vollhell (100%)", 100)]:
             btn = QPushButton(label)
             btn.setFixedHeight(22)
-            btn.clicked.connect(lambda _, v=val: self._sld_brightness.setValue(v))
+            btn.clicked.connect(weak_slot(self._sld_brightness.setValue, val))
             preset_row.addWidget(btn)
         bg_layout.addLayout(preset_row)
 
@@ -1444,8 +1445,10 @@ class VisualizerWindow(QMainWindow):
         self._view.page().setWebChannel(self._channel)
         # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s, siehe
         # RenderCrashGuard); der Re-Sync danach laeuft ueber loadFinished unten.
+        # weak_slot_fwd statt Bound-Method: self -> guard -> self waere ein
+        # GC-Zyklus um den Owner (STAB-10, native AV-Klasse beim GC-Teardown).
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=self._on_render_crash_giveup)
+            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup))
         # ── CACHE FIX: Cache-Buster an URL anhaengen, damit QWebEngineView die
         # HTML bei jedem Visualizer-Open frisch laedt ────────────────────────
         load_stage_html(self._view)
@@ -2012,36 +2015,49 @@ class VisualizerWindow(QMainWindow):
 
         # T-VIZ-15: nicht-modaler Dialog mit Live-Preview — die Farbe wirkt sofort
         # beim Durchscrollen. OK uebernimmt, Abbrechen stellt die Ausgangsfarbe her.
-        original = el.color
-
-        def _set(hex_color: str):
-            if hex_color != el.color:
-                self._stage_dirty = True   # VIZ-10: Farbe geaendert
-            el.color = hex_color
-            self._stage_color_preview.setStyleSheet(
-                f"background:{el.color}; border:1px solid #555;"
-            )
-            try:
-                self._bridge.updateStageObject.emit(json.dumps({
-                    "id": el.id, "color": el.color,
-                }))
-            except Exception as e:
-                print(f"[Visualizer] update stage color error: {e}")
-
-        def _live(c):
-            # Nur das beim Oeffnen gewaehlte Element faerben — der Dialog ist
-            # nicht-modal, die Baum-Auswahl kann sich zwischenzeitlich aendern.
-            if c.isValid() and self._selected_stage_element() is el:
-                _set(c.name())
-
+        # STAB-10: gebundene Slots statt lokaler Closures — die C++-Connection
+        # des Dialogs wuerde ein self-fangendes Lambda stark und GC-unsichtbar
+        # pinnen. Element + Ausgangsfarbe haengen als Attribute am Dialog.
         dlg = QColorDialog(QColor(el.color), self)
         dlg.setWindowTitle(f"Element-Farbe — {getattr(el, 'name', '') or el.id}")
         dlg.setModal(False)
-        dlg.currentColorChanged.connect(_live)
-        dlg.rejected.connect(lambda: _set(original))   # Abbruch -> Ausgangsfarbe
-        dlg.finished.connect(lambda *_: setattr(self, "_stage_color_picker", None))
+        dlg._stage_el = el
+        dlg._stage_original = el.color
+        dlg.currentColorChanged.connect(self._on_stage_color_live)
+        dlg.rejected.connect(self._on_stage_color_rejected)   # Abbruch -> Ausgangsfarbe
+        dlg.finished.connect(self._on_stage_color_picker_closed)
         self._stage_color_picker = dlg
         dlg.show()
+
+    def _set_stage_color(self, el, hex_color: str):
+        if hex_color != el.color:
+            self._stage_dirty = True   # VIZ-10: Farbe geaendert
+        el.color = hex_color
+        self._stage_color_preview.setStyleSheet(
+            f"background:{el.color}; border:1px solid #555;"
+        )
+        try:
+            self._bridge.updateStageObject.emit(json.dumps({
+                "id": el.id, "color": el.color,
+            }))
+        except Exception as e:
+            print(f"[Visualizer] update stage color error: {e}")
+
+    def _on_stage_color_live(self, c):
+        # Nur das beim Oeffnen gewaehlte Element faerben — der Dialog ist
+        # nicht-modal, die Baum-Auswahl kann sich zwischenzeitlich aendern.
+        dlg = self.sender()
+        if dlg is not None and c.isValid() \
+                and self._selected_stage_element() is dlg._stage_el:
+            self._set_stage_color(dlg._stage_el, c.name())
+
+    def _on_stage_color_rejected(self):
+        dlg = self.sender()
+        if dlg is not None:
+            self._set_stage_color(dlg._stage_el, dlg._stage_original)
+
+    def _on_stage_color_picker_closed(self, _result):
+        self._stage_color_picker = None
 
     def _delete_selected_stage_element(self):
         el = self._selected_stage_element()

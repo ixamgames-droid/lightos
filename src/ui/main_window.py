@@ -29,6 +29,7 @@ from src.ui.views.dmx_monitor_view import DmxMonitorView
 from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
+from src.ui.weak_slots import weak_slot
 
 
 # Recent files storage
@@ -665,8 +666,7 @@ class MainWindow(QMainWindow):
         self._bpm_indicator_timer = QTimer(self)
         self._bpm_indicator_timer.setInterval(110)
         self._bpm_indicator_timer.setSingleShot(True)
-        self._bpm_indicator_timer.timeout.connect(
-            lambda: self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE))
+        self._bpm_indicator_timer.timeout.connect(self._on_bpm_indicator_idle)
 
         # BPM-Manager Subscribe
         try:
@@ -784,7 +784,7 @@ class MainWindow(QMainWindow):
         for i, btn in enumerate(self._section_btns):
             act = QAction(f"Sektion {i+1}", self)
             act.setShortcut(f"Ctrl+{i+1}")
-            act.triggered.connect(lambda _, idx=i: self._switch_section(idx))
+            act.triggered.connect(weak_slot(self._switch_section, i))
             self.addAction(act)
 
         # Globale Shortcuts
@@ -800,7 +800,7 @@ class MainWindow(QMainWindow):
 
         act_clear = QAction("Clear Programmer", self)
         act_clear.setShortcut("Escape")
-        act_clear.triggered.connect(lambda: self._state.clear_programmer())
+        act_clear.triggered.connect(weak_slot(self._state.clear_programmer))
         self.addAction(act_clear)
 
     def _switch_section(self, idx: int):
@@ -1011,6 +1011,9 @@ class MainWindow(QMainWindow):
                 self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
         except Exception:
             pass
+
+    def _on_bpm_indicator_idle(self):
+        self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE)
 
     def _flash_bpm_indicator(self, idx: int = 0):
         # Akzent auf Beat 1 (alle 4) — Index kommt direkt vom Beat-Callback,
@@ -1427,7 +1430,7 @@ class MainWindow(QMainWindow):
             short = os.path.basename(path) or path
             act = self._recent_menu.addAction(short)
             act.setToolTip(path)
-            act.triggered.connect(lambda _=False, p=path: self._open_show_path(p))
+            act.triggered.connect(weak_slot(self._open_show_path, path))
         self._recent_menu.addSeparator()
         clear_act = self._recent_menu.addAction("Liste leeren")
         clear_act.triggered.connect(self._clear_recent_files)

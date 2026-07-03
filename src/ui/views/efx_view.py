@@ -1,6 +1,7 @@
 """EFX Editor — GUI for creating and editing EFX movement patterns."""
 from __future__ import annotations
 import math
+import weakref
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton,
                                 QGroupBox, QFormLayout, QDoubleSpinBox, QSpinBox,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.flow_layout import FlowLayout
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
@@ -920,7 +922,7 @@ class EfxView(QWidget):
                 "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
                 "border-radius:3px;font-size:11px;padding:5px;} "
                 "QPushButton:hover{background:#30363d;}")
-            b.clicked.connect(lambda _=False, k=key: self._apply_spider_pattern(k))
+            b.clicked.connect(weak_slot(self._apply_spider_pattern, key))
             pat_grid.addWidget(b, i // 3, i % 3)
         spv.addLayout(pat_grid)
 
@@ -1062,8 +1064,7 @@ class EfxView(QWidget):
             "(2 Köpfe = 180° auseinander).\n"
             "• Fester Versatz: jeder Kopf um die eingestellten Grad später.")
         self._phase_mode_combo.currentIndexChanged.connect(
-            lambda *_: self._set_relationship(
-                "phase_mode", self._phase_mode_combo.currentData()))
+            self._on_phase_mode_combo_changed)
         relf.addRow("Verhältnis:", self._phase_mode_combo)
 
         self._spread_spin = QDoubleSpinBox()
@@ -1076,7 +1077,7 @@ class EfxView(QWidget):
             "0 = praktisch synchron · 1 = voller Fächer über die ganze Figur "
             "(bei 2 Köpfen gegenphasig).")
         self._spread_spin.valueChanged.connect(
-            lambda v: self._set_relationship("spread", v))
+            weak_slot_fwd(self._set_relationship, "spread"))
         relf.addRow("Fächer-Streuung:", self._spread_spin)
 
         self._offset_spin = QDoubleSpinBox()
@@ -1088,7 +1089,7 @@ class EfxView(QWidget):
             "Nur bei „Fester Versatz“: jeder weitere Kopf läuft um so viel Grad "
             "versetzt (z. B. 15° leichter Nachlauf, 180° gegenphasig).")
         self._offset_spin.valueChanged.connect(
-            lambda v: self._set_relationship("phase_offset_deg", v))
+            weak_slot_fwd(self._set_relationship, "phase_offset_deg"))
         relf.addRow("Versatz pro Gerät:", self._offset_spin)
 
         self._counter_chk = QCheckBox("jedes 2. Gerät entgegengesetzt")
@@ -1096,7 +1097,7 @@ class EfxView(QWidget):
             "Gegenläufig: jeder zweite Kopf durchläuft die Figur rückwärts — "
             "z. B. zwei Köpfe gegenläufig im Kreis (einer cw, einer ccw).")
         self._counter_chk.toggled.connect(
-            lambda v: self._set_relationship("counter_rotate", v))
+            weak_slot_fwd(self._set_relationship, "counter_rotate"))
         relf.addRow("Gegenläufig:", self._counter_chk)
 
         self._mirror_chk = QCheckBox("jedes 2. Gerät spiegeln (Pan)")
@@ -1104,7 +1105,7 @@ class EfxView(QWidget):
             "Spiegelt bei jedem zweiten Kopf die Pan-Achse — symmetrische "
             "(spiegelbildliche) Bewegung statt versetzter.")
         self._mirror_chk.toggled.connect(
-            lambda v: self._set_relationship("mirror", v))
+            weak_slot_fwd(self._set_relationship, "mirror"))
         relf.addRow("Spiegeln:", self._mirror_chk)
         ec.addWidget(rel_box)
 
@@ -1180,7 +1181,9 @@ class EfxView(QWidget):
         pv.addLayout(prev_head)
         self._preview = EfxPreviewWidget(editable=True)
         self._preview.setMinimumSize(300, 300)
-        self._preview.set_geometry_callback(self._apply_geometry)
+        # weak_slot_fwd statt Bound-Method: das Kind (Preview) hielte die View
+        # sonst stark -> GC-Zyklus um den Owner (STAB-10, native AV-Klasse).
+        self._preview.set_geometry_callback(weak_slot_fwd(self._apply_geometry))
         pv.addWidget(self._preview)
         # Spider-Scheren-Vorschau (gleicher Platz, nur im Spider-Modus sichtbar).
         self._spider_preview = SpiderEfxPreview()
@@ -1712,6 +1715,9 @@ class EfxView(QWidget):
             pass
         self._notify_timer.start()   # Bibliothek/2. Ansicht aktualisieren
 
+    def _on_phase_mode_combo_changed(self, _index):
+        self._set_relationship("phase_mode", self._phase_mode_combo.currentData())
+
     def _sync_relationship_widgets(self) -> None:
         """Schreibt das Geräte-Verhältnis des aktuellen EFX in die Editor-Widgets
         (Signale blockiert → kein Rück-Schreiben)."""
@@ -1792,7 +1798,7 @@ class EfxView(QWidget):
             self._popout.activateWindow()
             return
         self._popout = EfxPopoutDialog(self, parent=self)
-        self._popout.finished.connect(lambda *_: self._on_popout_closed())
+        self._popout.finished.connect(self._on_popout_closed)
         self._popout.show()
 
     def _on_popout_closed(self):
@@ -1822,7 +1828,7 @@ class EfxView(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(940, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")
@@ -2052,7 +2058,13 @@ class EfxPopoutDialog(QDialog):
 
     def __init__(self, view: "EfxView", parent=None):
         super().__init__(parent)
-        self._view = view
+        # SCHWACHE Referenz auf die View: view._popout -> Dialog -> view wäre
+        # sonst ein Referenz-Zyklus, den erst die ZYKLISCHE GC abräumt.
+        # Dealloziert die den Owner-Wrapper (die View besitzt ihr C++-Objekt),
+        # läuft die Qt-Eltern-Kaskade mitten in der GC -> native Access
+        # Violation (PySide6 6.11/Python 3.14, Crash-Klasse STAB-09). Ohne
+        # Zyklus stirbt der Baum per Refcount geordnet.
+        self._view_ref = weakref.ref(view)
         self.setWindowTitle("EFX – Großansicht (Figur && Geräte-Verhältnis)")
         self.setModal(False)
         self.resize(780, 740)
@@ -2064,7 +2076,9 @@ class EfxPopoutDialog(QDialog):
 
         self.preview = EfxPreviewWidget(editable=True)
         self.preview.setMinimumSize(420, 420)
-        self.preview.set_geometry_callback(view._apply_geometry)
+        # Kein view._apply_geometry direkt hinterlegen: die gebundene Methode
+        # hielte die View stark (derselbe Zyklus wie oben) — Adapter am Dialog.
+        self.preview.set_geometry_callback(self._on_preview_geometry)
         lay.addWidget(self.preview, stretch=1)
 
         _grp_style = "QGroupBox { color:#8b949e; font-size:11px; }"
@@ -2088,8 +2102,7 @@ class EfxPopoutDialog(QDialog):
             s.setRange(lo, hi)
             s.setSingleStep(step)
             s.setDecimals(0)
-            s.valueChanged.connect(
-                lambda v, k=key: self._view._apply_geometry({k: int(v)}))
+            s.valueChanged.connect(weak_slot_fwd(self._on_geom_spin, key))
             form.addRow(label, s)
             self._spins[key] = s
         controls.addWidget(box, stretch=1)
@@ -2107,9 +2120,7 @@ class EfxPopoutDialog(QDialog):
             "• Synchron: alle gleichzeitig dieselbe Figur.\n"
             "• Gleichmäßig verteilt: gefächert (2 Köpfe = 180°).\n"
             "• Fester Versatz: jeder Kopf um die eingestellten Grad später.")
-        self._mode_combo.currentIndexChanged.connect(
-            lambda *_: self._view._set_relationship(
-                "phase_mode", self._mode_combo.currentData()))
+        self._mode_combo.currentIndexChanged.connect(self._on_mode_combo_changed)
         rform.addRow("Verhältnis:", self._mode_combo)
 
         self._rel_spread = QDoubleSpinBox()
@@ -2119,7 +2130,7 @@ class EfxPopoutDialog(QDialog):
         self._rel_spread.setToolTip("Nur bei „Gleichmäßig verteilt“: Fächer-Anteil "
                                     "(0 = synchron, 1 = voller Fächer).")
         self._rel_spread.valueChanged.connect(
-            lambda v: self._view._set_relationship("spread", v))
+            weak_slot_fwd(self._on_relationship_changed, "spread"))
         rform.addRow("Fächer-Streuung:", self._rel_spread)
 
         self._rel_offset = QDoubleSpinBox()
@@ -2130,21 +2141,21 @@ class EfxPopoutDialog(QDialog):
         self._rel_offset.setToolTip("Nur bei „Fester Versatz“: jeder weitere Kopf "
                                     "um so viel Grad versetzt (z. B. 15°, 180°).")
         self._rel_offset.valueChanged.connect(
-            lambda v: self._view._set_relationship("phase_offset_deg", v))
+            weak_slot_fwd(self._on_relationship_changed, "phase_offset_deg"))
         rform.addRow("Versatz pro Gerät:", self._rel_offset)
 
         self._rel_counter = QCheckBox("jedes 2. Gerät entgegengesetzt")
         self._rel_counter.setToolTip("Gegenläufig: jeder zweite Kopf durchläuft die "
                                      "Figur rückwärts (z. B. Kreis cw/ccw).")
         self._rel_counter.toggled.connect(
-            lambda v: self._view._set_relationship("counter_rotate", v))
+            weak_slot_fwd(self._on_relationship_changed, "counter_rotate"))
         rform.addRow("Gegenläufig:", self._rel_counter)
 
         self._rel_mirror = QCheckBox("jedes 2. Gerät spiegeln (Pan)")
         self._rel_mirror.setToolTip("Spiegelt die Pan-Achse jedes zweiten Kopfes "
                                     "(spiegelbildliche statt versetzter Bewegung).")
         self._rel_mirror.toggled.connect(
-            lambda v: self._view._set_relationship("mirror", v))
+            weak_slot_fwd(self._on_relationship_changed, "mirror"))
         rform.addRow("Spiegeln:", self._rel_mirror)
         controls.addWidget(rel, stretch=1)
 
@@ -2165,6 +2176,33 @@ class EfxPopoutDialog(QDialog):
 
         self.bind(view._current)
 
+    @property
+    def _view(self) -> "EfxView":
+        """Die besitzende EfxView — None, wenn sie bereits zerstört ist."""
+        return self._view_ref()
+
+    # ── Slot-Adapter (halten die View nur schwach, s. o.) ────────────────────
+
+    def _on_preview_geometry(self, updates: dict):
+        view = self._view
+        if view is not None:
+            view._apply_geometry(updates)
+
+    def _on_geom_spin(self, key: str, value):
+        view = self._view
+        if view is not None:
+            view._apply_geometry({key: int(value)})
+
+    def _on_mode_combo_changed(self, _index):
+        view = self._view
+        if view is not None:
+            view._set_relationship("phase_mode", self._mode_combo.currentData())
+
+    def _on_relationship_changed(self, key: str, value):
+        view = self._view
+        if view is not None:
+            view._set_relationship(key, value)
+
     def bind(self, efx):
         """Bindet den Dialog an eine EFX-Instanz (oder None bei Abwahl)."""
         self.preview.set_efx(efx)
@@ -2173,7 +2211,10 @@ class EfxPopoutDialog(QDialog):
 
     def sync_from_model(self):
         """Geometrie-Spinboxen aus dem aktuellen Modell auffrischen (blockiert)."""
-        cur = self._view._current
+        view = self._view
+        if view is None:          # View bereits zerstört (Teardown-Fenster)
+            return
+        cur = view._current
         for key, spin in self._spins.items():
             spin.blockSignals(True)
             spin.setValue(getattr(cur, key) if cur is not None else 0)
@@ -2185,7 +2226,10 @@ class EfxPopoutDialog(QDialog):
 
     def sync_relationship(self):
         """Verhältnis-Widgets aus dem aktuellen Modell auffrischen (blockiert)."""
-        cur = self._view._current
+        view = self._view
+        if view is None:          # View bereits zerstört (Teardown-Fenster)
+            return
+        cur = view._current
         widgets = (self._mode_combo, self._rel_spread, self._rel_offset,
                    self._rel_counter, self._rel_mirror)
         for w in widgets:

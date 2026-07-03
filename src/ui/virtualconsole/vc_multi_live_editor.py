@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QHBoxLayout,
                                QLabel, QPushButton, QScrollArea, QSlider,
                                QVBoxLayout, QWidget)
 from .vc_widget import VCWidget
+from src.ui.weak_slots import weak_slot
 
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
 _MIME_FUNCTION = "application/x-lightos-function"
@@ -343,7 +344,7 @@ class _TempoControl(QWidget):
             b = QPushButton(txt)
             b.setCheckable(True)
             b.setFixedHeight(24)
-            b.clicked.connect(lambda _checked=False, k=key: self._set_mode(k))
+            b.clicked.connect(weak_slot(self._set_mode, key))
             self._head.addWidget(b)
             self._btns[key] = b
         self._head_narrow_stretch = 1     # nur narrow noetig (wide: _sub uebernimmt stretch=1)
@@ -541,9 +542,15 @@ class _TempoControl(QWidget):
             c.addItem(f"{self._fmt(cur)}×", cur)
             idx = c.count() - 1
         c.setCurrentIndex(idx)
-        c.currentIndexChanged.connect(
-            lambda i, c=c: effect_live.set_param("tempo_multiplier", c.itemData(i), self._fid))
+        c.currentIndexChanged.connect(self._on_tempo_mult_combo)
         return c
+
+    def _on_tempo_mult_combo(self, i):
+        # STAB-09: sender()-Adapter — Combo und self nicht ins Lambda binden.
+        from src.core.engine import effect_live
+        c = self.sender()
+        if c is not None:
+            effect_live.set_param("tempo_multiplier", c.itemData(i), self._fid)
 
     def _bus_combo(self):
         c = QComboBox()
@@ -554,8 +561,14 @@ class _TempoControl(QWidget):
             c.setCurrentIndex(_TAP_BUSES.index(cur))
         except ValueError:
             c.setCurrentIndex(0)
-        c.currentIndexChanged.connect(lambda i, c=c: self._on_bus(c.itemData(i)))
+        c.currentIndexChanged.connect(self._on_bus_combo)
         return c
+
+    def _on_bus_combo(self, i):
+        # STAB-09: sender()-Adapter statt Lambda.
+        c = self.sender()
+        if c is not None:
+            self._on_bus(c.itemData(i))
 
     def _on_bus(self, bus):
         from src.core.engine import effect_live
@@ -679,14 +692,14 @@ class VCMultiLiveEditor(VCWidget):
         self._prev = QPushButton("–")
         self._prev.setFixedWidth(34)
         self._prev.setToolTip("Vorheriger Effekt")
-        self._prev.clicked.connect(lambda: self._step(-1))
+        self._prev.clicked.connect(weak_slot(self._step, -1))
         self._combo = QComboBox()
         self._combo.setToolTip("Zugewiesene Effekte")
         self._combo.currentIndexChanged.connect(self._on_combo)
         self._next = QPushButton("+")
         self._next.setFixedWidth(34)
         self._next.setToolTip("Naechster Effekt")
-        self._next.clicked.connect(lambda: self._step(1))
+        self._next.clicked.connect(weak_slot(self._step, 1))
         nav.addWidget(self._prev)
         nav.addWidget(self._combo, 1)
         nav.addWidget(self._next)
@@ -1312,9 +1325,16 @@ class VCMultiLiveEditor(VCWidget):
             combo.setCurrentIndex(vals.index(cur))
         except ValueError:
             combo.setCurrentIndex(0)
-        combo.currentIndexChanged.connect(
-            lambda i, key=key, c=combo, fid=fid: self._on_choice(key, c.itemData(i), fid))
+        combo._choice_key = key    # fuer den sender()-Adapter (STAB-09)
+        combo._choice_fid = fid
+        combo.currentIndexChanged.connect(self._on_choice_combo)
         return combo
+
+    def _on_choice_combo(self, i):
+        # STAB-09: sender()-Adapter — key/fid haengen als Python-Attribute an der Combo.
+        c = self.sender()
+        if c is not None:
+            self._on_choice(c._choice_key, c.itemData(i), c._choice_fid)
 
     def _build_toggle(self, spec, fid) -> QWidget:
         """bool -> An/Aus-Schalter (visuell) statt nacktem Kaestchen."""
@@ -1326,10 +1346,18 @@ class VCMultiLiveEditor(VCWidget):
         btn.setChecked(cur)
         btn.setProperty("seg", "true")
         btn.setFixedWidth(72)
-        btn.toggled.connect(
-            lambda on, key=key, fid=fid, b=btn:
-            (b.setText("An" if on else "Aus"), self._on_choice(key, bool(on), fid)))
+        btn._choice_key = key      # fuer den sender()-Adapter (STAB-09)
+        btn._choice_fid = fid
+        btn.toggled.connect(self._on_choice_toggled)
         return btn
+
+    def _on_choice_toggled(self, on):
+        # STAB-09: sender()-Adapter — Text-Update + Schreiben wie im frueheren Lambda.
+        b = self.sender()
+        if b is None:
+            return
+        b.setText("An" if on else "Aus")
+        self._on_choice(b._choice_key, bool(on), b._choice_fid)
 
     def _build_stepper(self, spec, fid) -> QWidget:
         """int -> –/+ -Stepper (visuell) statt Zahlenfeld; auf min/max geklemmt."""

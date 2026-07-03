@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCursor, QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui.weak_slots import weak_slot
 
 try:
     from src.core.app_state import get_state
@@ -1234,7 +1235,7 @@ class SnapFilePanel(QWidget):
         box.setIcon(QMessageBox.Icon.Information)
         box.setText(f'Drücke jetzt das Pad / den Fader für\n„{f.name}" …')
         box.setStandardButtons(QMessageBox.StandardButton.Cancel)
-        box.buttonClicked.connect(lambda *_: self._cancel_learn())
+        box.buttonClicked.connect(weak_slot(self._cancel_learn))
         self._learn_box = box
         mapper.start_learn(self._on_midi_learned)
         box.show()
