@@ -11,13 +11,22 @@ gefixt:
 1. ``SnapshotButton._view`` war eine STARKE Ref auf die View ->
    view -> _buttons -> Button -> view = Zyklus -> Owner nur per GC abraeumbar.
    Jetzt weakref: der Baum stirbt per Refcount, die GC fasst ihn nie an.
-2. ``sync.subscribe_widget`` hielt den Callback stark im GLOBALEN Bus; die
-   Call-Site-Lambdas fangen ``self`` -> Widget unsterblich, sein C++-Objekt
-   stirbt aber ueber die Eltern-Kaskade -> lebender Wrapper auf freiem
-   Speicher. Jetzt: Callback am Widget verankert, Guard haelt nur weakrefs.
-3. ``SnapFilePanel``: Lambda-Slots an ``itemExpanded``/``itemCollapsed`` des
+2. ``SnapFilePanel``: Lambda-Slots an ``itemExpanded``/``itemCollapsed`` des
    Baums werden von der C++-Connection stark und GC-unsichtbar gehalten ->
-   selber Pin. Jetzt gebundene Methoden (bindet PySide6 schwach).
+   externer Wrapper-Pin. Jetzt gebundene Methoden (bindet PySide6 schwach).
+
+BEWUSST ZURUECKGESTELLT (STAB-09-Sweep): ``sync.subscribe_widget`` haelt den
+Callback weiterhin STARK im globalen Bus — die Call-Site-Lambdas fangen
+``self``, das pinnt jedes abonnierende Widget. Dieses Leck ist zugleich eine
+versehentliche SCHUTZSCHICHT: es haelt auch Views mit EIGENEN internen
+Zyklen (Matrix-/Programmer-Views) aus der zyklischen GC heraus. Ein Umbau auf
+schwach gehaltene Callbacks (erprobt, PR #142, wieder zurueckgenommen) laesst
+deren Baeume in die GC fallen -> dieselbe Upstream-AV in 6 anderen
+Testdateien. Reihenfolge daher: ERST alle View-Zyklen brechen (Sweep), DANN
+subscribe_widget auf weakrefs umstellen; Canaries: test_matrix_dirty_save,
+test_matrix_group_scope, test_matrix_meta_view,
+test_programmer_editor_load_guard, test_rgb_matrix_style_visibility,
+test_rgb_matrix_view_controls.
 """
 import gc
 import os
@@ -65,35 +74,11 @@ class ViewTreeRefcountDeathTest(unittest.TestCase):
 
 
 class SubscribeWidgetNoPinTest(unittest.TestCase):
-    """subscribe_widget darf das Widget nicht ueber den Callback unsterblich
-    machen — auch dann nicht, wenn das Lambda ``self`` faengt (Standard-Muster
-    aller Call-Sites)."""
+    """Verhalten rund um den (bewusst noch starken) Callback-Halt des Bus.
 
-    def test_self_capturing_lambda_does_not_pin_widget(self):
-        sync = StateSync()
-
-        # WICHTIG fuers Test-Design: das Abo passiert in einem HELPER, dessen
-        # Frame stirbt — genau wie bei den echten Call-Sites (Abo im __init__
-        # des Widgets). Ein ``del w`` im selben Scope wuerde die Closure-ZELLE
-        # des Lambdas leeren und die Pin-Kette kuenstlich brechen — der Test
-        # wuerde dann auch den ungefixten Stand gruen durchwinken.
-        def _make():
-            w = QWidget()
-            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, w,
-                                  lambda *_: w.objectName())
-            return weakref.ref(w)
-
-        wref = _make()
-        for _ in range(3):
-            gc.collect()
-        self.assertIsNone(
-            wref(),
-            "subscribe_widget pinnt das Widget ueber den stark gehaltenen "
-            "Callback (Bus -> Lambda -> self)")
-        # Toter Subscriber wird beim naechsten Emit uebersprungen + entfernt.
-        sync.emit(SyncEvent.PATCH_CHANGED)
-        self.assertEqual(sync._subscribers.get(SyncEvent.PATCH_CHANGED, []), [],
-                         "toter Subscriber wurde beim Emit nicht abgemeldet")
+    Der eigentliche No-Pin-Test (Widget wird trotz self-fangendem Lambda
+    einsammelbar) kommt ERST mit dem STAB-09-Sweep zurueck — siehe
+    Modul-Docstring, Abschnitt "BEWUSST ZURUECKGESTELLT"."""
 
     def test_callback_lives_as_long_as_widget(self):
         """Der schwach gehaltene Callback darf NICHT vorzeitig sterben: der
