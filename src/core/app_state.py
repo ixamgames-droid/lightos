@@ -445,7 +445,7 @@ class AppState:
             "invert_tilt", "swap_pan_tilt", "dimmer_curve",
             "spider_mirrored", "spider_dual_tilt",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
-            "protocol",
+            "protocol", "net_host",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
         if not values:
@@ -514,6 +514,7 @@ class AppState:
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
             "protocol": getattr(f, "protocol", "dmx") or "dmx",
+            "net_host": getattr(f, "net_host", "") or "",
         }
 
     def _restore_fixture_dict(self, d: dict):
@@ -538,6 +539,7 @@ class AppState:
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),
             protocol=d.get("protocol", "dmx") or "dmx",
+            net_host=d.get("net_host", "") or "",
         )
         self.add_fixture(f, undoable=False)
 
@@ -1130,6 +1132,31 @@ class AppState:
         # EIN zentraler Renderer im 44-Hz-Output-Loop (ersetzt den frueheren
         # zweiten PlaybackEngine-Thread) — behebt Tearing + haengende Werte.
         self.output_manager.add_tick_callback(self._render_frame)
+        # LAS-05: Laser-Streaming-Thread (Netzwerk-Laser) teilt den Lifecycle
+        # mit dem DMX-Output; gleiche Env-Bremse wie der Output-Thread, damit
+        # Tests keine Hintergrund-Threads bekommen.
+        if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
+            try:
+                self.ensure_laser_output()
+            except Exception as e:
+                print(f"[AppState] laser output start error: {e}")
+
+    def ensure_laser_output(self):
+        """Startet den Laser-Streaming-Thread (LAS-05) bei Bedarf und liefert
+        den Manager. Tickt leer, solange keine Netzwerk-Laser gepatcht sind."""
+        lo = getattr(self, "_laser_output", None)
+        if lo is None:
+            from .laser.laser_output import LaserOutputManager
+            lo = LaserOutputManager(self)
+            self._laser_output = lo
+        if not lo.running:
+            lo.start()
+        return lo
+
+    def stop_laser_output(self):
+        lo = getattr(self, "_laser_output", None)
+        if lo is not None:
+            lo.stop()
 
     # ── Zentraler Per-Frame-Renderer ──────────────────────────────────────────
 

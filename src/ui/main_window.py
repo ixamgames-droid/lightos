@@ -1949,6 +1949,11 @@ class MainWindow(QMainWindow):
                 self._save_show()
 
         self._state.output_manager.stop()
+        # LAS-05: Laser-Streaming-Thread mit herunterfahren (Netzwerk-Laser).
+        try:
+            self._state.stop_laser_output()
+        except Exception:
+            pass
         if self._state.playback_engine:
             self._state.playback_engine.stop()
         from src.core.midi.midi_manager import get_midi_manager

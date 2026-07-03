@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-03 — Laser-Support: Ether-Dream-Punkt-Streaming (LAS-05)
+
+#### Neu / Hinzugefuegt
+
+- **Netzwerk-Laser-Streaming (Ether Dream):** neues Paket `src/core/laser/` — `frame.py` (neutrales `LaserFrame`/`LaserPoint`-Modell + **Safety-Clamping** `clamp_frame`/`LaserLimits`: Scan-Ausschlag-, Punktraten- und Helligkeits-Limits, Mindest-Punktzahl gegen stehende Strahlen), `etherdream.py` (vollständiger Treiber für das offene Ether-Dream-Protokoll: TCP-Befehle prepare/begin/data/stop/**E-Stop/Clear**, UDP-Discovery, reine struct/socket-Implementierung, ohne Hardware testbar) und `laser_output.py` (`LaserOutputManager`: eigener 30-fps-Streaming-Thread getrennt von der 44-Hz-DMX-Pipeline; v1-Framequelle = Kreis-Testmuster aus den Programmer-Werten mit **Shutter-Gate**; **BLACKOUT blankt jeden Frame**, `estop_all()` verriegelt; Reconnect-Backoff je Gerät).
+- **`PatchedFixture.net_host`** (IP/Hostname der DAC) mit Migration, `.lshow`-Serialisierung und Undo-Integration; **Protokoll-Auswahl im Patch-Dialog** für Laser (DMX ↔ Ether Dream): bei Netzwerk werden Universe/Adresse deaktiviert, das IP-Feld aktiviert und Adress-Konfliktwarnungen unterdrückt. Lifecycle: Start in `AppState.start_playback` (Env-Gate `LIGHTOS_NO_OUTPUT_THREAD`), Stop im MainWindow-Shutdown. Tests `tests/test_laser_etherdream.py` (Fake-DAC-Server, Clamping, Blackout/E-Stop/Backoff, net_host-Roundtrip).
+
 ### 2026-07-03 — Laser-Support: Pangolin-FB4-Profile (LAS-08-Teil 1)
 
 #### Neu / Hinzugefuegt

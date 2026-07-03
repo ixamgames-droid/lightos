@@ -139,6 +139,8 @@ class PatchedFixture(Base):
     # die Render-/Flush-Pfade ueberspringen sie (fixture_uses_dmx) — ihre
     # Programmer-Werte liest spaeter ein eigener LaserOutputManager (LAS-05).
     protocol: Mapped[str] = mapped_column(String(20), default="dmx")
+    # LAS-05: Zieladresse (IP/Hostname) fuer Netzwerk-Laser; leer bei DMX.
+    net_host: Mapped[str] = mapped_column(String(120), default="")
 
     # Denormalisiert für schnellen Zugriff ohne JOIN
     manufacturer_name: Mapped[str] = mapped_column(String(120), default="")
@@ -192,6 +194,11 @@ def migrate_show_db(engine) -> None:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN protocol "
                     "VARCHAR(20) DEFAULT 'dmx'"))
+            # LAS-05: Netzwerk-Zieladresse fuer Streaming-Laser.
+            if pcols and "net_host" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN net_host "
+                    "VARCHAR(120) DEFAULT ''"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 

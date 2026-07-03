@@ -162,6 +162,34 @@ class PatchFixtureEditDialog(QDialog):
         self._spin_address.valueChanged.connect(self._validate)
         form.addRow("DMX-Adresse:", self._spin_address)
 
+        # LAS-05: Laser koennen statt DMX ueber ein Netzwerk-Protokoll laufen
+        # (Punkt-Streaming, z. B. Ether Dream). Universe/Adresse sind dann
+        # bedeutungslos und werden deaktiviert; stattdessen zaehlt die IP.
+        self._combo_protocol = None
+        self._edit_net_host = None
+        if (self._fixture.fixture_type or "").lower() == "laser":
+            self._combo_protocol = QComboBox()
+            self._combo_protocol.addItem("DMX (Universe/Adresse)", "dmx")
+            self._combo_protocol.addItem("Ether Dream (Netzwerk)", "etherdream")
+            current_proto = (getattr(self._fixture, "protocol", "dmx")
+                             or "dmx").lower()
+            idx = self._combo_protocol.findData(current_proto)
+            self._combo_protocol.setCurrentIndex(idx if idx >= 0 else 0)
+            self._combo_protocol.currentIndexChanged.connect(
+                self._on_protocol_changed)
+            self._combo_protocol.setToolTip(
+                "Wie wird dieser Laser angesteuert?\n"
+                "DMX: klassisch über Universe/Adresse.\n"
+                "Ether Dream: Punkt-Streaming über das Netzwerk an eine\n"
+                "Ether-Dream-DAC (IP unten angeben). Not-Aus/BLACKOUT wirken\n"
+                "auch auf den Netzwerk-Pfad.")
+            form.addRow("Protokoll:", self._combo_protocol)
+            self._edit_net_host = QLineEdit(
+                getattr(self._fixture, "net_host", "") or "")
+            self._edit_net_host.setPlaceholderText("z. B. 192.168.1.50")
+            form.addRow("Netzwerk-Adresse:", self._edit_net_host)
+            self._on_protocol_changed()
+
         self._lbl_channels = QLabel("")
         form.addRow("Kanäle:", self._lbl_channels)
 
@@ -260,6 +288,18 @@ class PatchFixtureEditDialog(QDialog):
     def _on_mode_changed(self, _idx):
         self._validate()
 
+    def _network_protocol_selected(self) -> bool:
+        combo = getattr(self, "_combo_protocol", None)
+        return combo is not None and (combo.currentData() or "dmx") != "dmx"
+
+    def _on_protocol_changed(self, *_):
+        network = self._network_protocol_selected()
+        self._spin_universe.setEnabled(not network)
+        self._spin_address.setEnabled(not network)
+        if self._edit_net_host is not None:
+            self._edit_net_host.setEnabled(network)
+        self._validate()
+
     def _validate(self):
         _mode_name, ch_count = self._selected_mode_and_channels()
         ch_count = max(1, ch_count)
@@ -269,6 +309,11 @@ class PatchFixtureEditDialog(QDialog):
         self._spin_address.setMaximum(max_start)
         if self._spin_address.value() > max_start:
             self._spin_address.setValue(max_start)
+
+        # Netzwerk-Laser belegen keinen DMX-Adressraum -> kein Konflikt.
+        if self._network_protocol_selected():
+            self._lbl_warn.setText("")
+            return
 
         conflicts = self._state.check_address_conflict(
             self._spin_universe.value(),
@@ -289,7 +334,8 @@ class PatchFixtureEditDialog(QDialog):
         universe = self._spin_universe.value()
         address = self._spin_address.value()
 
-        conflicts = self._state.check_address_conflict(
+        network = self._network_protocol_selected()
+        conflicts = [] if network else self._state.check_address_conflict(
             universe, address, ch_count, exclude_fid=self._fixture.fid
         )
         if conflicts:
@@ -311,6 +357,11 @@ class PatchFixtureEditDialog(QDialog):
             "address": address,
             "channel_count": ch_count,
         }
+        if self._combo_protocol is not None:
+            self.result_updates["protocol"] = str(
+                self._combo_protocol.currentData() or "dmx")
+            self.result_updates["net_host"] = (
+                self._edit_net_host.text() or "").strip()
         if self._chk_inv_pan is not None:
             self.result_updates.update({
                 "invert_pan": self._chk_inv_pan.isChecked(),
