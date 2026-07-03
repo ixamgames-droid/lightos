@@ -166,15 +166,16 @@ class PatchFixtureEditDialog(QDialog):
         self._spin_address.valueChanged.connect(self._validate)
         form.addRow("DMX-Adresse:", self._spin_address)
 
-        # LAS-05: Laser koennen statt DMX ueber ein Netzwerk-Protokoll laufen
-        # (Punkt-Streaming, z. B. Ether Dream). Universe/Adresse sind dann
-        # bedeutungslos und werden deaktiviert; stattdessen zaehlt die IP.
+        # LAS-05/06: Laser koennen statt DMX ueber ein Netzwerk-Protokoll
+        # laufen (Punkt-Streaming: Ether Dream oder IDN). Universe/Adresse sind
+        # dann bedeutungslos und werden deaktiviert; stattdessen zaehlt die IP.
         self._combo_protocol = None
         self._edit_net_host = None
         if (self._fixture.fixture_type or "").lower() == "laser":
             self._combo_protocol = QComboBox()
             self._combo_protocol.addItem("DMX (Universe/Adresse)", "dmx")
             self._combo_protocol.addItem("Ether Dream (Netzwerk)", "etherdream")
+            self._combo_protocol.addItem("IDN / ILDA Digital Network", "idn")
             current_proto = (getattr(self._fixture, "protocol", "dmx")
                              or "dmx").lower()
             idx = self._combo_protocol.findData(current_proto)
@@ -184,8 +185,8 @@ class PatchFixtureEditDialog(QDialog):
             self._combo_protocol.setToolTip(
                 "Wie wird dieser Laser angesteuert?\n"
                 "DMX: klassisch über Universe/Adresse.\n"
-                "Ether Dream: Punkt-Streaming über das Netzwerk an eine\n"
-                "Ether-Dream-DAC (IP unten angeben). Not-Aus/BLACKOUT wirken\n"
+                "Ether Dream / IDN: Punkt-Streaming über das Netzwerk an eine\n"
+                "Laser-DAC (IP unten angeben). Not-Aus/BLACKOUT wirken\n"
                 "auch auf den Netzwerk-Pfad.")
             form.addRow("Protokoll:", self._combo_protocol)
             self._edit_net_host = QLineEdit(
