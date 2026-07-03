@@ -204,16 +204,51 @@ class IDNConnectionTest(unittest.TestCase):
 
 
 class ScanResponseTest(unittest.TestCase):
-    def test_parse_scan_response(self):
-        # 4B Hello-Header (0x11) + struct_size + proto + status + unit-id + name
-        # Unit-ID-Block: len=7 (Kategorie 0x01 + 6 MAC-Bytes), dann Hostname.
-        unit_id = b"\x07\x01\xaa\xbb\xcc\xdd\xee\xff"
-        body = bytes([3 + len(unit_id) + 1, 0x01, 0x01]) + unit_id + b"Left\x00"
-        pkt = struct.pack(">BBH", idn.CMD_SCAN_RESPONSE, 0, 0) + body
-        info = idn.parse_scan_response(pkt)
-        self.assertTrue(info["offers_rt"])          # Status Bit0
-        self.assertEqual(info["hostname"], "Left")
-        self.assertTrue(info["unit_id"].startswith("01:aa:bb"))
+    def test_parse_scan_response_fixed_layout(self):
+        # Festes IDNHDR_SCAN_RESPONSE-Layout (DexLogic idn-hello.h):
+        # 4B Hello + structSize/proto/status/RESERVED + unitID[16] + hostName[20].
+        hello = struct.pack(">BBH", idn.CMD_SCAN_RESPONSE, 0, 0)
+        head = bytes([0x2C, 0x01, 0x01, 0x00])       # size, proto, status(RT), reserved
+        # unitID[16]: Byte0=Länge(7 = Kategorie + 6 MAC), Byte1=Kategorie(0x01).
+        unit = (bytes([0x07, 0x01, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])
+                ).ljust(16, b"\x00")
+        hostname = b"Left".ljust(20, b"\x00")
+        info = idn.parse_scan_response(hello + head + unit + hostname)
+        self.assertTrue(info["offers_rt"])           # Status Bit0
+        self.assertEqual(info["hostname"], "Left")   # RESERVED korrekt übersprungen
+        self.assertEqual(info["unit_id"], "01:aa:bb:cc:dd:ee:ff")
+
+    def test_parse_scan_response_rejects_short(self):
+        with self.assertRaises(idn.IDNError):
+            idn.parse_scan_response(struct.pack(">BBH", idn.CMD_SCAN_RESPONSE,
+                                                0, 0) + b"\x00\x00\x00")
+
+
+class GoldenBytesTest(unittest.TestCase):
+    """Spec-UNABHÄNGIGE Golden-Bytes: hart einkodiert aus der ILDA-Spec, NICHT
+    aus den Modul-Konstanten abgeleitet — fängt eine versehentliche Änderung
+    von Tag-Werten/Header-Layout, die ein selbstbezüglicher Test durchließe."""
+
+    def test_full_single_point_packet_bytes(self):
+        # Ein Frame, ein sichtbarer roter Mittelpunkt (0,0). seq=1, ts=0.
+        frame = LaserFrame([LaserPoint(0.0, 0.0, 1.0, 0.0, 0.0)], pps=100000)
+        pkt = idn.build_stream_packet(frame, sequence=1, timestamp_us=0)
+        expected = bytes.fromhex(
+            "40000001"          # Hello: cmd=0x40, flags=0, seq=0x0001
+            "0027"              # totalSize = 39 (8 msg + 20 cfg + 4 chunk + 7 sample)
+            "c0"                # CNL: channelmsg(0x80)|config(0x40)|ch0
+            "02"                # chunkType = frame samples
+            "00000000"          # timestamp = 0
+            "04"                # SCWC = 4 config words
+            "01"                # CFL = routing
+            "00"                # service id = default
+            "02"                # service mode = discrete graphic
+            "4200401042104010"  # dict: X, prec, Y, prec
+            "527e521451cc0000"  # dict: R, G, B, void
+            "0000000a"          # sample-chunk: flags=0, duration=10µs
+            "00000000ff0000"    # sample: x=0, y=0, r=255, g=0, b=0
+        )
+        self.assertEqual(pkt.hex(), expected.hex())
 
 
 # ---------------------------------------------------------------------------

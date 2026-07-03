@@ -99,6 +99,10 @@ class LaserOutputManager:
         self.connection_factory = EtherDreamConnection
         self.idn_connection_factory = IDNConnection
         self._connections: dict[int, object] = {}
+        # Protokoll je offener Verbindung — im Manager geführt (nicht am
+        # Connection-Objekt), damit ein Protokollwechsel erkannt wird, ohne
+        # auf Attribut-Zuweisbarkeit des Backends/Fakes angewiesen zu sein.
+        self._conn_proto: dict[int, str] = {}
         self._retry_at: dict[int, float] = {}
         self._estopped = False
         self._running = False
@@ -131,6 +135,7 @@ class LaserOutputManager:
         with self._lock:
             conns = list(self._connections.values())
             self._connections.clear()
+            self._conn_proto.clear()
         for conn in conns:
             try:
                 conn.stop()
@@ -189,23 +194,18 @@ class LaserOutputManager:
             conn = self._connections.get(fid)
             # Neu verbinden, wenn Host ODER Protokoll gewechselt hat.
             stale = conn is not None and (
-                conn.host != host
-                or getattr(conn, "_lo_proto", None) != proto)
+                conn.host != host or self._conn_proto.get(fid) != proto)
             if stale:
                 conn.close()
                 conn = None
                 self._connections.pop(fid, None)
+                self._conn_proto.pop(fid, None)
             if conn is None:
                 if time.monotonic() < self._retry_at.get(fid, 0.0):
                     return None
                 conn = self._factory_for(proto)(host)
-                # Protokoll am Objekt vermerken, damit ein späterer Wechsel
-                # erkannt wird (Fakes tragen es sonst nicht).
-                try:
-                    conn._lo_proto = proto
-                except Exception:
-                    pass
                 self._connections[fid] = conn
+                self._conn_proto[fid] = proto
         return conn
 
     def _blackout_active(self) -> bool:
@@ -239,6 +239,7 @@ class LaserOutputManager:
                 conn.close()
                 with self._lock:
                     self._connections.pop(fid, None)
+                    self._conn_proto.pop(fid, None)
                 self._retry_at[fid] = time.monotonic() + _RETRY_SECONDS
 
     def _loop(self):

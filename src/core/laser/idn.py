@@ -31,7 +31,7 @@ import socket
 import struct
 import time
 
-from .frame import LaserFrame
+from .frame import LaserFrame, LaserPoint
 
 PORT = 7255
 
@@ -135,7 +135,9 @@ def build_stream_packet(frame: LaserFrame, sequence: int, timestamp_us: int,
     samples = encode_samples(frame)
     n = len(frame.points)
     pps = max(1, int(frame.pps))
-    duration_us = min(0xFFFFFF, max(0, round(n / pps * 1_000_000)))
+    # Untere Schranke 1 µs: ein Chunk mit duration==0 wird von spec-konformen
+    # Empfängern als „minimum chunk length error" verworfen (IDNLaproGraDis).
+    duration_us = min(0xFFFFFF, max(1, round(n / pps * 1_000_000)))
 
     # Sample-Chunk-Header: oberstes Byte = Flags (0), untere 24 Bit = Dauer.
     chunk_header = struct.pack(">I", duration_us & 0xFFFFFF)
@@ -153,22 +155,29 @@ def build_stream_packet(frame: LaserFrame, sequence: int, timestamp_us: int,
     return hello + msg_header + config + chunk_header + samples
 
 
+_SCAN_UNIT_ID_LEN = 16
+_SCAN_HOSTNAME_LEN = 20
+
+
 def parse_scan_response(data: bytes) -> dict:
-    """IDN-Hello ScanResponse (0x11) → dict (Unit-ID + Hostname + RT-Flag)."""
-    if len(data) < 4 + 3 or data[0] != CMD_SCAN_RESPONSE:
-        raise IDNError("kein ScanResponse")
+    """IDN-Hello ScanResponse (0x11) → dict (Unit-ID + Hostname + RT-Flag).
+
+    Festes Layout gemäß ``IDNHDR_SCAN_RESPONSE`` (idn-hello.h, DexLogic):
+    4 B Hello-Header, dann structSize/protocolVersion/status/**reserved**
+    (je 1 B), dann ``unitID[16]`` (Byte0=Länge inkl. Kategorie, 0-gepolstert)
+    und ``hostName[20]`` (UTF-8, 0-gepolstert) — beide FESTE Blöcke, nicht
+    längenverkettet."""
+    header = 4 + 4 + _SCAN_UNIT_ID_LEN + _SCAN_HOSTNAME_LEN
+    if len(data) < header or data[0] != CMD_SCAN_RESPONSE:
+        raise IDNError("ScanResponse zu kurz oder falscher Command")
     proto_ver, status = data[5], data[6]
-    # data[4] = struct_size (Header-Version), hier nicht zur Begrenzung nötig.
-    rest = data[7:]
-    unit_id = b""
-    hostname = ""
-    if rest:
-        # Unit-ID-Block: Byte 0 = Länge der folgenden ID-Octets (inkl.
-        # Kategorie-Byte), danach der Hostname bis zum ersten Null-Byte.
-        id_len = rest[0]
-        unit_id = rest[1:1 + id_len]
-        hostname = rest[1 + id_len:].split(b"\x00", 1)[0].decode(
-            "utf-8", "replace")
+    # data[4] = structSize, data[7] = reserved (überspringen).
+    unit_block = data[8:8 + _SCAN_UNIT_ID_LEN]
+    hostname_block = data[8 + _SCAN_UNIT_ID_LEN:
+                          8 + _SCAN_UNIT_ID_LEN + _SCAN_HOSTNAME_LEN]
+    id_len = min(unit_block[0], _SCAN_UNIT_ID_LEN - 1)
+    unit_id = unit_block[1:1 + id_len]
+    hostname = hostname_block.split(b"\x00", 1)[0].decode("utf-8", "replace")
     return {
         "protocol_version": proto_ver,
         "status": status,
@@ -281,10 +290,15 @@ class IDNConnection:
 
     # ── Not-Aus / Ende (Interface-Parität zu Ether Dream) ─────────────────
     def estop(self):
-        """Sofort dunkel: geblanktes Frame + Abort-Paket."""
+        """Sofort dunkel: ein gültiges geblanktes Frame (2 dunkle Punkte am
+        Ursprung — spec-konform, >= 2 Samples & Dauer > 0, wird also NICHT als
+        „minimum chunk length error" verworfen) + Abort-Paket."""
+        blank = LaserFrame(
+            points=[LaserPoint(0.0, 0.0, blanked=True),
+                    LaserPoint(0.0, 0.0, blanked=True)],
+            pps=20000)
         try:
-            self.stream_frame(LaserFrame(
-                points=[], pps=20000).blank_copy())
+            self.stream_frame(blank)
         except IDNError:
             pass
         try:
