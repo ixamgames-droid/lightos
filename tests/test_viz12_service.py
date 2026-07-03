@@ -572,6 +572,161 @@ class WindowAsServiceTargetTest(_ServiceTestCase):
                               "nach dem ersten Zyklus nur noch der eine Service-Subscriber uebrig")
 
 
+class MirrorViewAsServiceTargetTest(_ServiceTestCase):
+    """VIZ-12 Schritt 6: ``Visualizer3DView`` (Live-View-Spiegel) dockt —
+    genau wie das Fenster (Schritt 3) — als EIN Service-Target an, statt
+    eigenen Timer + eigenes ``_push_dmx_updates`` zu betreiben. Getestet per
+    Fake-Self analog ``WindowAsServiceTargetTest`` — kein echtes QWebEngine
+    noetig, nur die reine Andock-/Aktivierungs-Buchhaltung."""
+
+    def setUp(self):
+        super().setUp()
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+
+    def _fake_mirror(self, state):
+        from types import SimpleNamespace as _NS
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+
+        bridge = VisualizerBridge(state)
+        # Duck-typed 'destroyed'-Signal: der Fake ist kein echtes QWidget, aber
+        # _setup_service_target() verbindet den destroyed-Backstop. connect()
+        # ist hier ein No-Op (der Backstop-Pfad selbst wird separat getestet,
+        # s. test_destroyed_backstop_detaches_target_without_state_unsubscribe).
+        fake = _NS(
+            _state=state,
+            _bridge=bridge,
+            _view=None,
+            destroyed=_NS(connect=lambda *_a, **_k: None),
+        )
+        fake._reset_own_interaction_state = lambda: Visualizer3DView._reset_own_interaction_state(fake)
+        fake._reload_own_page = lambda: Visualizer3DView._reload_own_page(fake)
+        return fake, bridge
+
+    def test_attach_mirror_target_yields_single_service_subscriber(self):
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+
+        state = _make_state([], {})
+        fake, bridge = self._fake_mirror(state)
+        try:
+            Visualizer3DView._setup_service_target(fake)
+            svc = get_visualizer_service(state)
+            self.assertEqual(len(state._callbacks), 2,
+                              "Bridge-_on_state + Service-Subscriber (Prune) — die Spiegel-View hat kein eigenes UI-_on_state")
+            self.assertIn(fake._target, svc._targets)
+            self.assertFalse(fake._target.active, "Target startet inaktiv (erst on_shown aktiviert)")
+        finally:
+            svc = getattr(fake, "_service", None)
+            target = getattr(fake, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
+            bridge.dispose()
+
+    def test_on_shown_hidden_toggles_target_active_without_detach(self):
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+
+        state = _make_state([], {})
+        fake, bridge = self._fake_mirror(state)
+        fake._loaded = False
+        try:
+            Visualizer3DView._setup_service_target(fake)
+            svc = fake._service
+
+            Visualizer3DView.on_shown(fake)
+            self.assertTrue(fake._target.active)
+            self.assertTrue(svc.timer_running)
+            self.assertIn(fake._target, svc._targets, "on_hidden darf NICHT detachen")
+
+            Visualizer3DView.on_hidden(fake)
+            self.assertFalse(fake._target.active)
+            self.assertFalse(svc.timer_running, "kein aktives Target mehr -> Timer stoppt hart")
+            self.assertIn(fake._target, svc._targets, "Target bleibt angedockt (nur inaktiv)")
+        finally:
+            svc = getattr(fake, "_service", None)
+            target = getattr(fake, "_target", None)
+            if svc is not None and target is not None:
+                svc.detach_target(target)
+            bridge.dispose()
+
+    def test_destroyed_backstop_detaches_target_without_state_unsubscribe(self):
+        """VIZ-12 Schritt 6: der ``destroyed``-Backstop docht NUR noch vom
+        Service ab (kein State-Unsubscribe mehr noetig — das Service-Target
+        ueberlebt das Widget, s. Design (a))."""
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+
+        state = _make_state([], {})
+        fake, bridge = self._fake_mirror(state)
+        Visualizer3DView._setup_service_target(fake)
+        svc = fake._service
+        target = fake._target
+
+        svc.detach_target(target)  # simuliert den destroyed-Backstop
+
+        self.assertNotIn(target, svc._targets)
+        # Bridge-Subscribe ist davon unberuehrt (separater Lebenszyklus).
+        self.assertIn(bridge._on_state, state._callbacks)
+        bridge.dispose()
+
+
+class TwoTargetsWindowAndMirrorTest(_ServiceTestCase):
+    """Zwei-Target-Test (Schritt 6, Design-Akzeptanz): Fenster + Spiegel am
+    selben Service angedockt. Beide aktiv -> EINE Serialisierung pro Tick
+    (ein ``_tick``-Aufruf), beide Bridges bekommen den Batch. Eines inaktiv
+    -> nur das aktive Target bekommt den Push."""
+
+    def test_both_active_each_bridge_gets_one_batch_per_tick(self):
+        fx = _fixture(1, universe=0, address=1, channels=None)
+        chans = [
+            _channel("color_r", 1), _channel("color_g", 2),
+            _channel("color_b", 3), _channel("color_w", 4),
+            _channel("intensity", 5), _channel("pan", 6), _channel("tilt", 7),
+        ]
+        self._install_channels({1: chans})
+        universes = {0: _universe({1: 10, 2: 10, 3: 10, 4: 0, 5: 255,
+                                    6: 128, 7: 128})}
+        state = _make_state([fx], universes, positions={1: (0, 0, 0)})
+        svc = VisualizerService(state)
+        window_target, window_sink = self._make_target()
+        mirror_target, mirror_sink = self._make_target()
+        svc.attach_target(window_target)
+        svc.attach_target(mirror_target)
+        svc.set_target_active(window_target, True)
+        svc.set_target_active(mirror_target, True)
+
+        svc._tick()
+
+        self.assertEqual(len(window_sink), 1, "Fenster-Bridge bekommt genau ein Batch")
+        self.assertEqual(len(mirror_sink), 1, "Spiegel-Bridge bekommt genau ein Batch")
+        import json
+        self.assertEqual(json.loads(window_sink[0]), json.loads(mirror_sink[0]),
+                          "beide Targets bekommen denselben serialisierten Bestand (eine Serialisierung)")
+
+    def test_mirror_inactive_only_window_receives_batch(self):
+        fx = _fixture(1, universe=0, address=1, channels=None)
+        chans = [
+            _channel("color_r", 1), _channel("color_g", 2),
+            _channel("color_b", 3), _channel("color_w", 4),
+            _channel("intensity", 5), _channel("pan", 6), _channel("tilt", 7),
+        ]
+        self._install_channels({1: chans})
+        universes = {0: _universe({1: 10, 2: 10, 3: 10, 4: 0, 5: 255,
+                                    6: 128, 7: 128})}
+        state = _make_state([fx], universes, positions={1: (0, 0, 0)})
+        svc = VisualizerService(state)
+        window_target, window_sink = self._make_target()
+        mirror_target, mirror_sink = self._make_target()
+        svc.attach_target(window_target)
+        svc.attach_target(mirror_target)
+        svc.set_target_active(window_target, True)
+        # mirror_target bleibt inaktiv (Live View auf 2D, 3D-Spiegel nicht sichtbar)
+
+        svc._tick()
+
+        self.assertEqual(len(window_sink), 1)
+        self.assertEqual(len(mirror_sink), 0, "inaktiver Spiegel bekommt keinen Push")
+
+
 class ShutdownUnsubscribesTest(_ServiceTestCase):
     def test_shutdown_unsubscribes_the_one_service_subscriber(self):
         state = _make_state([], {})
