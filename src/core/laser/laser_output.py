@@ -1,4 +1,4 @@
-"""LaserOutputManager (LAS-05) — eigener Streaming-Thread für Netzwerk-Laser.
+"""LaserOutputManager (LAS-05/06) — eigener Streaming-Thread für Netzwerk-Laser.
 
 Bewusst GETRENNT von der 44-Hz-DMX-Pipeline (``OutputManager``): Punktlisten
 sind strukturell keine 512-Byte-Universen. Geteilt wird nur der Lifecycle
@@ -6,6 +6,11 @@ sind strukturell keine 512-Byte-Universen. Geteilt wird nur der Lifecycle
 Safety-Verhalten: BLACKOUT des OutputManagers blankt hier JEDEN Frame vor dem
 Senden (Galvos laufen weiter, kein Lichtaustritt), zusätzlich gibt es einen
 verriegelnden Not-Aus (:meth:`estop_all`/:meth:`clear_estop_all`).
+
+Zwei Backends hinter derselben Connection-Schnittstelle (stream_frame/estop/
+clear_estop/stop/close + ``.host``): Ether Dream (``protocol=='etherdream'``,
+TCP) und IDN (``protocol=='idn'``, UDP, LAS-06). Die Protokoll-Weiche sitzt in
+:meth:`_conn_for`; alles andere ist backend-neutral.
 
 v1-Framequelle: ein Testmuster (Kreis) aus den Programmer-Werten des
 Fixtures — shutter (An/Aus), laser_x/laser_y (Position), zoom (Größe),
@@ -20,9 +25,16 @@ import threading
 import time
 
 from .etherdream import EtherDreamConnection, EtherDreamError
+from .idn import IDNConnection, IDNError
 from .frame import LaserFrame, LaserLimits, LaserPoint, clamp_frame
 
 _RETRY_SECONDS = 2.0
+
+# Protokoll → Connection-Fehler, den ein Tick als „Gerät weg" behandelt.
+_CONN_ERRORS = (EtherDreamError, IDNError, OSError)
+
+# Netzwerk-Protokolle, die der LaserOutputManager bedient.
+_STREAM_PROTOCOLS = ("etherdream", "idn")
 
 
 def _prog_value(state, fid: int, attr: str, default: int) -> int:
@@ -81,8 +93,16 @@ class LaserOutputManager:
     def __init__(self, state):
         self._state = state
         self.limits = LaserLimits()
+        # Pro Protokoll eine Factory (Tests überschreiben sie mit Fakes).
+        # `connection_factory` bleibt als Ether-Dream-Alias für Rückwärts-
+        # kompatibilität bestehender Tests erhalten.
         self.connection_factory = EtherDreamConnection
-        self._connections: dict[int, EtherDreamConnection] = {}
+        self.idn_connection_factory = IDNConnection
+        self._connections: dict[int, object] = {}
+        # Protokoll je offener Verbindung — im Manager geführt (nicht am
+        # Connection-Objekt), damit ein Protokollwechsel erkannt wird, ohne
+        # auf Attribut-Zuweisbarkeit des Backends/Fakes angewiesen zu sein.
+        self._conn_proto: dict[int, str] = {}
         self._retry_at: dict[int, float] = {}
         self._estopped = False
         self._running = False
@@ -115,6 +135,7 @@ class LaserOutputManager:
         with self._lock:
             conns = list(self._connections.values())
             self._connections.clear()
+            self._conn_proto.clear()
         for conn in conns:
             try:
                 conn.stop()
@@ -156,24 +177,35 @@ class LaserOutputManager:
         for f in fixtures:
             proto = (getattr(f, "protocol", "") or "").lower()
             host = (getattr(f, "net_host", "") or "").strip()
-            if proto == "etherdream" and host:
+            if proto in _STREAM_PROTOCOLS and host:
                 out.append(f)
         return out
 
-    def _conn_for(self, fx) -> EtherDreamConnection | None:
+    def _factory_for(self, proto: str):
+        if proto == "idn":
+            return self.idn_connection_factory
+        return self.connection_factory   # etherdream (Default)
+
+    def _conn_for(self, fx):
         fid = int(getattr(fx, "fid", 0) or 0)
         host = (getattr(fx, "net_host", "") or "").strip()
+        proto = (getattr(fx, "protocol", "") or "").lower()
         with self._lock:
             conn = self._connections.get(fid)
-            if conn is not None and conn.host != host:
+            # Neu verbinden, wenn Host ODER Protokoll gewechselt hat.
+            stale = conn is not None and (
+                conn.host != host or self._conn_proto.get(fid) != proto)
+            if stale:
                 conn.close()
                 conn = None
                 self._connections.pop(fid, None)
+                self._conn_proto.pop(fid, None)
             if conn is None:
                 if time.monotonic() < self._retry_at.get(fid, 0.0):
                     return None
-                conn = self.connection_factory(host)
+                conn = self._factory_for(proto)(host)
                 self._connections[fid] = conn
+                self._conn_proto[fid] = proto
         return conn
 
     def _blackout_active(self) -> bool:
@@ -203,10 +235,11 @@ class LaserOutputManager:
                     continue
                 conn.stream_frame(frame)
                 self._retry_at.pop(fid, None)
-            except (EtherDreamError, OSError):
+            except _CONN_ERRORS:
                 conn.close()
                 with self._lock:
                     self._connections.pop(fid, None)
+                    self._conn_proto.pop(fid, None)
                 self._retry_at[fid] = time.monotonic() + _RETRY_SECONDS
 
     def _loop(self):

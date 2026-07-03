@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-03 — Laser-Support: IDN-Stream-Backend (LAS-06)
+
+#### Neu / Hinzugefuegt
+
+- **IDN-Netzwerk-Laser (ILDA Digital Network):** zweites Punkt-Streaming-Backend neben Ether Dream, `src/core/laser/idn.py`. Voller IDN-Stream/-Hello-Treiber in reinem `struct`/`socket`-Python, Wire-Format gegen die offizielle ILDA-Spezifikation (IDN-Stream Rev001/Rev002) **und** die DexLogic-Referenzimplementierung (helios_openidn) verifiziert: UDP-Port 7255, 4-Byte-IDN-Hello-Header + Channel-Message-Header + Channel-Configuration mit dem Standard-Tag-Dictionary für X:16/Y:16/R:8/G:8/B:8 + Sample-Chunk, durchgehend Big-Endian; session-freies Streaming (Realtime-Channel-Message 0x40 mit hochzählender Sequence), Graceful Close (0x44) und Abort (0x46) als Not-Aus, optionale Geräte-Discovery per Scan (0x10/0x11). `IDNConnection` teilt die Connection-Schnittstelle mit Ether Dream, sodass der **`LaserOutputManager` beide Backends über eine Protokoll-Weiche** (`_factory_for`) bedient — Safety (BLACKOUT-Blanking, E-Stop, Backoff) und Framequelle bleiben backend-neutral. Der Patch-Dialog bietet Laser nun drei Protokolle (DMX / Ether Dream / **IDN**). v1: ein Frame = ein UDP-Paket; zu punktreiche Frames werden geometrie-erhaltend heruntergerechnet (App-Fragmentierung folgt mit dem Zeichenmodus). Tests `tests/test_laser_idn.py` (Wire-Format-Golden-Bytes, Fake-UDP-Empfänger, Manager-Protokoll-Weiche).
+
 ### 2026-07-03 — Laser-Support: Ether-Dream-Punkt-Streaming (LAS-05)
 
 #### Neu / Hinzugefuegt
