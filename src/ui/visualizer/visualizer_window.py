@@ -245,6 +245,7 @@ class VisualizerBridge(QObject):
 
     Signals -> JS
         fixtureAdded(json), fixtureRemoved(fid), dmxUpdated(json),
+        dmxBatch(json) (VIZ-12: Array-Batch, Kompat-Signal dmxUpdated bleibt),
         allFixtures(json), settingsChanged(json),
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
@@ -263,6 +264,7 @@ class VisualizerBridge(QObject):
     fixtureAdded            = Signal(str)
     fixtureRemoved          = Signal(int)
     dmxUpdated              = Signal(str)
+    dmxBatch                = Signal(str)     # VIZ-12: Array-Batch-Push (Service-Kern), dmxUpdated bleibt Kompat/Test-API
     allFixtures             = Signal(str)
     settingsChanged         = Signal(str)
     viewModeChanged         = Signal(str)

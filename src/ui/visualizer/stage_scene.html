@@ -3441,6 +3441,12 @@ function tryChannel() {
           const d = JSON.parse(j);
           updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
         });
+        if (bridge.dmxBatch)       bridge.dmxBatch.connect(j => {
+          const arr = JSON.parse(j);
+          for (const d of arr) {
+            updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
+          }
+        });
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
           list.forEach(f => addFixture(f));
