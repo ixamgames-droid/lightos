@@ -38,15 +38,15 @@ import weakref
 
 def _unbind(method):
     """(weakref auf Receiver, ungebundener Aufrufer) fuer eine gebundene
-    Methode. Qt-Builtin-Methoden (z. B. ``setValue``) haben kein ``__func__``
-    — dort wird ueber den Methodennamen am lebenden Objekt aufgeloest."""
+    Methode. Aufgeloest wird SPAET ueber den Methodennamen am lebenden Objekt
+    — wie beim ersetzten ``lambda: self.m()``-Muster: Instanz-Overrides (z. B.
+    Test-Monkeypatches) greifen weiterhin, und Qt-Builtin-Methoden ohne
+    ``__func__`` (z. B. ``setValue``) funktionieren identisch."""
     ref = weakref.ref(method.__self__)
-    func = getattr(method, "__func__", None)
-    if func is None:
-        name = method.__name__
+    name = method.__name__
 
-        def func(obj, *a):          # Builtin: spaet am Objekt nachschlagen
-            return getattr(obj, name)(*a)
+    def func(obj, *a):
+        return getattr(obj, name)(*a)
 
     return ref, func
 

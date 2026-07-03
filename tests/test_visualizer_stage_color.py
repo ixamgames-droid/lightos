@@ -25,9 +25,20 @@ import src.ui.visualizer.visualizer_window as VW
 _app = QApplication.instance() or QApplication([])
 
 
+class _Host(QWidget):
+    """Leichter Fake-Host: leiht sich die Stage-Color-Methoden als KLASSEN-
+    Attribute (Instanz-gebundene ``types.MethodType``-Attribute waeren ein
+    Selbst-Zyklus -> der Host stirbt nur in der zyklischen GC = genau die
+    STAB-09/-10-AV-Klasse, die hier getestet wird)."""
+    _set_stage_color = VW.VisualizerWindow._set_stage_color
+    _on_stage_color_live = VW.VisualizerWindow._on_stage_color_live
+    _on_stage_color_rejected = VW.VisualizerWindow._on_stage_color_rejected
+    _on_stage_color_picker_closed = VW.VisualizerWindow._on_stage_color_picker_closed
+
+
 class StageColorLivePreviewTest(unittest.TestCase):
     def _host(self, el):
-        host = QWidget()
+        host = _Host()
         host._selected_stage_element = lambda: el
         host._stage_color_preview = QLabel(host)
         host._bridge = SimpleNamespace(updateStageObject=SimpleNamespace(emit=MagicMock()))
