@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-03 — Laser-Support: Pangolin-FB4-Profile (LAS-08-Teil 1)
+
+#### Neu / Hinzugefuegt
+
+- **Pangolin FB4 als Builtin-Fixture** (`PANGFB4`, Hersteller Pangolin, Typ laser): offizielles **16-Kanal-„FB3"-Profil** (Moduswahl auf Ch1, Seiten/Cues, Dimmer/Zoom/Größe/Position, Scan-Rate, Cue-Freigabe, Farbscrollen) und **39-Kanal-Profil** (Setup-Block Ch2-13 mit 16-bit-Paaren + Playback-Block Ch14-39 inkl. RGB-Override, Punkt-Trimming und Strobe) — Charts aus dem Pangolin-Wiki (`hardware:fb4:dmx16`/`dmx39`). Setup/Playback-Duplikate laufen als Mehrkopf (Kopf 1/2), Feinkanäle als `raw`. **Safety-Defaults:** Ch1 = Blackout/Safe, Dimmer = 0, kontinuierliche Z-Rotation = Stillstand. Damit sind Profi-Laser hinter FB4/QuickShow/BEYOND ab sofort über die bestehende DMX/Art-Net-Pipeline fernsteuerbar (inkl. Laser-Tab). Neues Kanal-Attribut `laser_scan_rate`. `src/core/database/fixture_db.py`, Vokabular-Dateien, Tests `tests/test_pangolin_fb4_profile.py`.
+
 ### 2026-07-03 — Stabilität: Repo-weiter GC-Teardown-Sweep über src/ui (STAB-10)
 
 #### Behoben / Geändert
