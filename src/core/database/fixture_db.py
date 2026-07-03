@@ -851,6 +851,187 @@ def _add_ehaho_l2600(s, mfr):
                  30, _l2600_modes_data())
 
 
+def _fb4_modes_data():
+    """Pangolin FB4 (Profi-Laser-Interface) im DMX/Art-Net-Fernsteuermodus —
+    offizielle Profile aus dem Pangolin-Wiki (hardware:fb4:dmx16 + dmx39,
+    LAS-08). Kein Punkt-Streaming: die Kanäle triggern/formen auf dem FB4
+    gespeicherte Cues (Seiten/Cues wie Bank/Muster beim China-Laser).
+    16ch = "FB3"-Profil (auch von FB3/QuickShow genutzt), Kanal 1 wählt den
+    aktiven Kanalumfang. 39ch = Setup-Block Ch2-13 (nur im Setup-Modus aktiv,
+    16-bit-Paare; Fein-Bytes als raw) + Playback-Block Ch14-39; Setup/Playback-
+    Duplikate (Größe/Winkel/Position) laufen als Mehrkopf (Kopf 0 = Setup,
+    Kopf 1 = Playback). Safety-Defaults: Ch1 = 0 (Blackout/Safe), Dimmer = 0,
+    kontinuierliche Z-Rotation = 128 (0 RPM)."""
+    return [
+        ("16-Kanal (FB3-Profil)", [
+            ("DMX-Modus", "shutter", 0, 255, [
+                (0, 32,    "Blackout",       "closed"),
+                (33, 95,   "4-Kanal-Modus",  ""),
+                (96, 159,  "8-Kanal-Modus",  ""),
+                (160, 224, "12-Kanal-Modus", ""),
+                (225, 255, "16-Kanal-Modus", "open"),
+            ]),
+            ("Seite", "laser_bank", 0, 0, [
+                (0, 255, "Seite 1-9 (je ~16er-Schritt)", ""),
+            ]),
+            ("Cue", "gobo_wheel", 0, 0, [
+                (0, 32,    "Kein Cue aktiv",     ""),
+                (33, 223,  "Cue 1-48",           "gobo"),
+                (224, 255, "Cue wiederholen",    ""),
+            ]),
+            ("Cue-Geschwindigkeit", "speed", 0, 0, [
+                (0, 15,   "Volle Geschwindigkeit", ""),
+                (16, 31,  "Pause",                 ""),
+                (32, 255, "25-200 %",              ""),
+            ]),
+            ("Dimmer", "intensity", 0, 255, [
+                (0, 255, "0-100 %", ""),
+            ]),
+            ("Zoom", "zoom", 255, 255, [
+                (0, 255, "0-100 %", ""),
+            ]),
+            ("Größe X", "laser_zoom_x", 255, 255, [
+                (0, 255, "-100 bis +100 %", ""),
+            ]),
+            ("Größe Y", "laser_zoom_y", 255, 255, [
+                (0, 255, "-100 bis +100 %", ""),
+            ]),
+            ("Winkel Z", "gobo_rotation", 0, 0, [
+                (0, 255, "0-360°", ""),
+            ]),
+            ("Position X", "laser_x", 128, 128, [
+                (0, 255, "links → rechts (128 = Mitte)", ""),
+            ]),
+            ("Position Y", "laser_y", 128, 128, [
+                (0, 255, "oben → unten (128 = Mitte)", ""),
+            ]),
+            ("Sichtbare Punkte", "laser_draw", 255, 255, [
+                (0, 255, "0-100 % der Punkte", ""),
+            ]),
+            ("Scan-Rate", "laser_scan_rate", 0, 0, [
+                (0, 32,    "Cue-Vorgabe",  ""),
+                (33, 223,  "6K-29K pps",   ""),
+                (224, 255, "30K pps",      ""),
+            ]),
+            ("Cue-Freigabe", "macro", 0, 0, [
+                (0, 32,    "Standard", ""),
+                (33, 95,   "Halten",   ""),
+                (96, 159,  "Schleife", ""),
+                (160, 224, "Nächster", ""),
+                (225, 255, "Stopp",    ""),
+            ]),
+            ("Farbscrollen", "laser_color_change", 0, 0, [
+                (0, 32,    "Original-Cue-Farbe", ""),
+                (33, 224,  "Farb-Scroll",        ""),
+                (225, 255, "Weiß",               "color"),
+            ]),
+            ("Reserviert", "raw", 0, 0),
+        ]),
+        ("39-Kanal", [
+            ("Fixture-Modus", "shutter", 0, 251, [
+                (0, 239,   "Blackout/Safe",  "closed"),
+                (240, 250, "Setup-Modus",    ""),
+                (251, 255, "Playback-Modus", "open"),
+            ]),
+            ("Max. Intensität (Setup)", "intensity", 255, 255, [
+                (0, 255, "Helligkeits-Limit 0-100 %", ""),
+            ]),
+            ("Testframes (Setup)", "macro", 0, 0, [
+                (0, 255, "Testframe-Auswahl", ""),
+            ]),
+            ("Größe X (Setup)", "laser_zoom_x", 255, 255, [
+                (0, 255, "-100 bis +100 % (16 bit mit Feinkanal)", ""),
+            ]),
+            ("Größe X fein", "raw", 255, 255),
+            ("Größe Y (Setup)", "laser_zoom_y", 255, 255, [
+                (0, 255, "-100 bis +100 % (16 bit)", ""),
+            ]),
+            ("Größe Y fein", "raw", 255, 255),
+            ("Position X (Setup)", "laser_x", 128, 128, [
+                (0, 255, "-100 bis +100 % (128 = Mitte)", ""),
+            ]),
+            ("Position X fein", "raw", 0, 0),
+            ("Position Y (Setup)", "laser_y", 128, 128, [
+                (0, 255, "-100 bis +100 % (128 = Mitte)", ""),
+            ]),
+            ("Position Y fein", "raw", 0, 0),
+            ("Rotation Z (Setup)", "gobo_rotation", 0, 0, [
+                (0, 255, "0-360° (16 bit)", ""),
+            ]),
+            ("Rotation Z fein", "raw", 0, 0),
+            ("Seite", "laser_bank", 0, 0, [
+                (0, 255, "Seitenindex 1-255", ""),
+            ]),
+            ("Cue", "gobo_wheel", 0, 0, [
+                (0, 255, "Cue-Index 1-255", "gobo"),
+            ]),
+            ("Cue-Geschwindigkeit", "speed", 0, 0, [
+                (0, 0,   "0 %",       ""),
+                (1, 255, "1-255 %",   ""),
+            ]),
+            ("Dimmer (Playback)", "intensity", 0, 255, [
+                (0, 255, "0-100 %", ""),
+            ]),
+            ("Zoom", "zoom", 255, 255, [
+                (0, 255, "0-100 % (16 bit)", ""),
+            ]),
+            ("Zoom fein", "raw", 255, 255),
+            ("Größe X (Playback)", "laser_zoom_x", 255, 255, [
+                (0, 255, "-100 bis +100 % (16 bit)", ""),
+            ]),
+            ("Größe X fein (Playback)", "raw", 255, 255),
+            ("Größe Y (Playback)", "laser_zoom_y", 255, 255, [
+                (0, 255, "-100 bis +100 % (16 bit)", ""),
+            ]),
+            ("Größe Y fein (Playback)", "raw", 255, 255),
+            ("Winkel Z (Playback)", "gobo_rotation", 0, 0, [
+                (0, 255, "0-359° (16 bit)", ""),
+            ]),
+            ("Winkel Z fein (Playback)", "raw", 0, 0),
+            ("Z-Rotation kontinuierlich", "gobo_rotation", 128, 128, [
+                (0, 127,   "gegen Uhrzeigersinn (bis -60 RPM)", "rotate"),
+                (128, 128, "Stillstand (0 RPM)",                ""),
+                (129, 255, "im Uhrzeigersinn (bis +60 RPM)",    "rotate"),
+            ]),
+            ("Z-Rotation fein", "raw", 0, 0),
+            ("Position X (Playback)", "laser_x", 128, 128, [
+                (0, 255, "-100 bis +100 % (128 = Mitte)", ""),
+            ]),
+            ("Position X fein (Playback)", "raw", 0, 0),
+            ("Position Y (Playback)", "laser_y", 128, 128, [
+                (0, 255, "-100 bis +100 % (128 = Mitte)", ""),
+            ]),
+            ("Position Y fein (Playback)", "raw", 0, 0),
+            ("Scan-Rate", "laser_scan_rate", 0, 0, [
+                (0, 255, "5K-30K pps", ""),
+            ]),
+            ("Rot", "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Farb-Blending (Alpha)", "laser_color", 0, 0, [
+                (0, 0,   "Originalfarben",       ""),
+                (1, 255, "Blending 0-100 %",     ""),
+            ]),
+            ("Punkte ab Anfang", "laser_draw", 0, 0, [
+                (0, 255, "Punkte vom Anfang entfernen", ""),
+            ]),
+            ("Punkte ab Ende", "laser_draw", 0, 0, [
+                (0, 255, "Punkte vom Ende entfernen", ""),
+            ]),
+            ("Strobe", "strobe", 0, 0, [
+                (0, 0,   "Aus",       ""),
+                (1, 255, "1-20 Hz",   "strobe"),
+            ]),
+        ]),
+    ]
+
+
+def _add_pangolin_fb4(s, mfr):
+    """Pangolin FB4 (DMX/Art-Net-Fernsteuerung) — Layout siehe _fb4_modes_data()."""
+    _add_fixture(s, mfr, "FB4 (DMX-Modus)", "PANGFB4", "laser", 0,
+                 _fb4_modes_data())
+
+
 def _eurolite_gross_modes_data():
     """Eurolite „Großer Straler" 5ch RGB Color Changer —
     Eurolite-Großer-Straler.qxf. Kanal-Reihenfolge laut Mode: R,G,B,Dimmer,
@@ -1157,6 +1338,9 @@ def ensure_builtins():
         if "L2600LASER" not in have:
             _add_ehaho_l2600(s, _get_or_create_mfr(s, "Ehaho", "EHAHO"))
             changed = True
+        if "PANGFB4" not in have:
+            _add_pangolin_fb4(s, _get_or_create_mfr(s, "Pangolin", "PANG"))
+            changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
             # 9-Kanal-Modus hatte faelschlich Fine-Kanaele statt FX/Reset.
@@ -1397,3 +1581,8 @@ def _seed(s: Session):
     ehaho = Manufacturer(name="Ehaho", short_name="EHAHO")
     s.add(ehaho)
     _add_ehaho_l2600(s, ehaho)
+
+    # ── Pangolin ─────────────────────────────────────────────────────────────
+    pangolin = Manufacturer(name="Pangolin", short_name="PANG")
+    s.add(pangolin)
+    _add_pangolin_fb4(s, pangolin)

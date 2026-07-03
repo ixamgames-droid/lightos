@@ -43,6 +43,7 @@ class Palette:
                                "laser_color", "laser_color_change",
                                "laser_dots", "laser_draw", "laser_draw_mode",
                                "laser_twist", "laser_grating",
+                               "laser_scan_rate",
                                "shutter", "gobo_wheel", "gobo_rotation",
                                "zoom", "color_wheel", "macro", "speed"},
         PaletteType.ALL:      None,   # includes everything
