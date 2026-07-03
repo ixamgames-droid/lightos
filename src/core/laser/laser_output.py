@@ -1,0 +1,222 @@
+"""LaserOutputManager (LAS-05) — eigener Streaming-Thread für Netzwerk-Laser.
+
+Bewusst GETRENNT von der 44-Hz-DMX-Pipeline (``OutputManager``): Punktlisten
+sind strukturell keine 512-Byte-Universen. Geteilt wird nur der Lifecycle
+(Start in ``AppState.start_playback``, Stop im MainWindow-Shutdown) und das
+Safety-Verhalten: BLACKOUT des OutputManagers blankt hier JEDEN Frame vor dem
+Senden (Galvos laufen weiter, kein Lichtaustritt), zusätzlich gibt es einen
+verriegelnden Not-Aus (:meth:`estop_all`/:meth:`clear_estop_all`).
+
+v1-Framequelle: ein Testmuster (Kreis) aus den Programmer-Werten des
+Fixtures — shutter (An/Aus), laser_x/laser_y (Position), zoom (Größe),
+color_r/g/b (Farbe), laser_draw (sichtbarer Anteil). Der freie Zeichenmodus
+(LAS-07) ersetzt diese Quelle später durch echte Punktlisten; die
+:func:`~src.core.laser.frame.clamp_frame`-Stufe bleibt davor Pflicht.
+"""
+from __future__ import annotations
+
+import math
+import threading
+import time
+
+from .etherdream import EtherDreamConnection, EtherDreamError
+from .frame import LaserFrame, LaserLimits, LaserPoint, clamp_frame
+
+_RETRY_SECONDS = 2.0
+
+
+def _prog_value(state, fid: int, attr: str, default: int) -> int:
+    try:
+        v = state.get_programmer_value(fid, attr)
+    except Exception:
+        v = None
+    if v is None:
+        return default
+    try:
+        return max(0, min(255, int(v)))
+    except (TypeError, ValueError):
+        return default
+
+
+def build_test_frame(state, fx, limits: LaserLimits, fps: int) -> LaserFrame:
+    """Kreis-Testmuster aus den Programmer-Werten des Netzwerk-Lasers.
+
+    Punktzahl = pps/fps, damit der DAC-Puffer im Gleichgewicht bleibt
+    (jeder Tick liefert genau eine Frame-Periode an Punkten)."""
+    fid = int(getattr(fx, "fid", 0) or 0)
+    pps = min(20000, int(limits.max_pps))
+    n = max(int(limits.min_points), min(int(limits.max_points), pps // max(1, fps)))
+
+    # Shutter-Gate: unter 128 bleibt der Frame komplett dunkel — deckt den
+    # Laser-Safety-Default (Shutter 0 beim Patchen) ab.
+    lit = _prog_value(state, fid, "shutter", 0) >= 128
+    cx = (_prog_value(state, fid, "laser_x", 128) - 128) / 127.0
+    cy = (_prog_value(state, fid, "laser_y", 128) - 128) / 127.0
+    radius = _prog_value(state, fid, "zoom", 128) / 255.0
+    r = _prog_value(state, fid, "color_r", 255) / 255.0
+    g = _prog_value(state, fid, "color_g", 255) / 255.0
+    b = _prog_value(state, fid, "color_b", 255) / 255.0
+    draw = _prog_value(state, fid, "laser_draw", 255) / 255.0
+
+    points = []
+    for i in range(n):
+        t = i / n
+        ang = t * 2.0 * math.pi
+        points.append(LaserPoint(
+            x=cx + radius * math.cos(ang),
+            y=cy + radius * math.sin(ang),
+            r=r, g=g, b=b,
+            blanked=(not lit) or (t > draw),
+        ))
+    return LaserFrame(points=points, pps=pps)
+
+
+class LaserOutputManager:
+    """Hält je Netzwerk-Laser (fid) eine DAC-Verbindung und schiebt pro Tick
+    einen geclampten Frame. Verbindungsfehler werfen nie in den Thread —
+    betroffene Geräte bekommen einen Reconnect-Backoff."""
+
+    TARGET_FPS = 30
+
+    def __init__(self, state):
+        self._state = state
+        self.limits = LaserLimits()
+        self.connection_factory = EtherDreamConnection
+        self._connections: dict[int, EtherDreamConnection] = {}
+        self._retry_at: dict[int, float] = {}
+        self._estopped = False
+        self._running = False
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────
+    @property
+    def running(self) -> bool:
+        return self._running
+
+    @property
+    def estopped(self) -> bool:
+        return self._estopped
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self._thread = threading.Thread(
+            target=self._loop, name="Laser-Output", daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+        t = self._thread
+        if t is not None and t.is_alive():
+            t.join(timeout=2.0)
+        self._thread = None
+        with self._lock:
+            conns = list(self._connections.values())
+            self._connections.clear()
+        for conn in conns:
+            try:
+                conn.stop()
+            except Exception:
+                pass
+            conn.close()
+
+    # ── Not-Aus (verriegelnd, unabhängig vom BLACKOUT) ────────────────────
+    def estop_all(self):
+        # Flag ZUERST (der Tick-Thread hört sofort auf zu senden), dann die
+        # Netzwerk-Befehle AUSSERHALB des Locks — I/O unterm Lock würde den
+        # Tick-Thread (und damit weitere Geräte) bis zum Timeout blockieren.
+        self._estopped = True
+        with self._lock:
+            conns = list(self._connections.values())
+        for conn in conns:
+            try:
+                conn.estop()
+            except Exception:
+                conn.close()
+
+    def clear_estop_all(self):
+        with self._lock:
+            conns = list(self._connections.values())
+        for conn in conns:
+            try:
+                conn.clear_estop()
+            except Exception:
+                conn.close()
+        self._estopped = False
+
+    # ── Tick ──────────────────────────────────────────────────────────────
+    def _network_fixtures(self) -> list:
+        out = []
+        try:
+            fixtures = self._state.get_patched_fixtures()
+        except Exception:
+            return out
+        for f in fixtures:
+            proto = (getattr(f, "protocol", "") or "").lower()
+            host = (getattr(f, "net_host", "") or "").strip()
+            if proto == "etherdream" and host:
+                out.append(f)
+        return out
+
+    def _conn_for(self, fx) -> EtherDreamConnection | None:
+        fid = int(getattr(fx, "fid", 0) or 0)
+        host = (getattr(fx, "net_host", "") or "").strip()
+        with self._lock:
+            conn = self._connections.get(fid)
+            if conn is not None and conn.host != host:
+                conn.close()
+                conn = None
+                self._connections.pop(fid, None)
+            if conn is None:
+                if time.monotonic() < self._retry_at.get(fid, 0.0):
+                    return None
+                conn = self.connection_factory(host)
+                self._connections[fid] = conn
+        return conn
+
+    def _blackout_active(self) -> bool:
+        try:
+            return bool(getattr(self._state.output_manager, "_blackout", False))
+        except Exception:
+            return False
+
+    def _tick(self):
+        fixtures = self._network_fixtures()
+        if not fixtures:
+            return
+        dark = self._blackout_active() or self._estopped
+        for fx in fixtures:
+            conn = self._conn_for(fx)
+            if conn is None:
+                continue
+            fid = int(getattr(fx, "fid", 0) or 0)
+            frame = build_test_frame(self._state, fx, self.limits,
+                                     self.TARGET_FPS)
+            if dark:
+                frame = frame.blank_copy()
+            frame = clamp_frame(frame, self.limits)
+            try:
+                if self._estopped:
+                    # Verriegelt: nichts senden (DAC ist per estop() gestoppt).
+                    continue
+                conn.stream_frame(frame)
+                self._retry_at.pop(fid, None)
+            except (EtherDreamError, OSError):
+                conn.close()
+                with self._lock:
+                    self._connections.pop(fid, None)
+                self._retry_at[fid] = time.monotonic() + _RETRY_SECONDS
+
+    def _loop(self):
+        interval = 1.0 / float(self.TARGET_FPS)
+        while self._running:
+            t0 = time.monotonic()
+            try:
+                self._tick()
+            except Exception as e:   # Thread darf NIE sterben
+                print(f"[laser_output] tick error: {e}")
+            rest = interval - (time.monotonic() - t0)
+            if rest > 0:
+                time.sleep(rest)

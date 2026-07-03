@@ -34,6 +34,7 @@ class _FakePatchedFixture:
     fixture_name: str = ""
     fixture_type: str = "other"
     protocol: str = "dmx"
+    net_host: str = ""
 
 
 class _FakeCueStack:
