@@ -7,8 +7,8 @@
 // Der eigentliche Modul-Schnitt aus dem Design-Dokument (a) folgt in den
 // naechsten 3a-Schritten - hier passiert bewusst noch keine Verhaltens-
 // Verschiebung aus stage_scene.html.
-import { probeThreeNamespace, probeThreeWrapper } from './probe_util.js';
+import { probeThreeNamespace, probeThreeWrapper, probeState } from './probe_util.js';
 
-const probe = { ...probeThreeNamespace(), ...probeThreeWrapper() };
+const probe = { ...probeThreeNamespace(), ...probeThreeWrapper(), ...probeState() };
 window.__lightosEsmOk = true;
 window.__lightosEsmProbe = probe;

@@ -239,6 +239,18 @@ const settings = {
   dockEnabled: false,      // opt-in: Strahler rasten an Trassen/Plattformen ein
 };
 
+// VIZ-13 3a-3: geteilter State an den Dateianfang konsolidiert (vorher
+// verstreut bei ehem. Zeile 284/1009/1011/2207-2208) - 1:1 spiegelgleich in
+// scene_src/state.js angelegt (dort noch ungenutzt, Umzug folgt in 3a-4).
+// Reine Verschiebung von Deklarationszeilen, keine Verhaltensaenderung:
+// const-Objekte werden weiterhin nur mutiert, nie neu zugewiesen; let-Flags
+// (selectedFids/selectedStageId) werden weiterhin wie bisher reassigned.
+const fixtures = {};        // fid -> {...}
+const stageObjects = {};    // id -> { mesh, data }  - custom editable objects
+const topDownIcons = {};    // fid -> sprite/mesh (Top-Down-Icon-Parallelwelt)
+let selectedFids = [];      // fid numbers
+let selectedStageId = null;
+
 // ============================================================================
 // Lights (always) - intensity modulated via settings.brightness
 // ============================================================================
@@ -280,8 +292,10 @@ function applyBrightness(b) {
 // ============================================================================
 // Stage (preset + custom objects) management
 // ============================================================================
+// stageObjects: State-Deklaration nach oben in den konsolidierten State-Block
+// gewandert (VIZ-13 3a-3, spiegelt scene_src/state.js) - presetObjects/
+// stageObjIdCounter bleiben hier (kein geteilter Modul-State laut Auftrag).
 const presetObjects = [];   // built from "preset" templates - cleared on switch
-const stageObjects = {};    // id -> { mesh, data }  - custom editable objects
 let stageObjIdCounter = 1;
 
 let gridHelper = null;
@@ -1006,9 +1020,10 @@ function notifyStageListChanged() {
 // ============================================================================
 // Fixture management
 // ============================================================================
-const fixtures = {}; // fid -> {...}
+// fixtures/topDownIcons: State-Deklaration nach oben in den konsolidierten
+// State-Block gewandert (VIZ-13 3a-3, spiegelt scene_src/state.js) - hier nur
+// noch fixtureMeshes (Raycast-Cache, kein geteilter Modul-State laut Auftrag).
 const fixtureMeshes = []; // for raycasting
-const topDownIcons = {}; // fid -> sprite/mesh
 
 function rebuildFixtureMeshList() {
   fixtureMeshes.length = 0;
@@ -2204,8 +2219,8 @@ function resizeOrtho() {
 // ============================================================================
 // Selection / outlines
 // ============================================================================
-let selectedFids = []; // fid numbers
-let selectedStageId = null;
+// selectedFids/selectedStageId: State-Deklaration nach oben in den
+// konsolidierten State-Block gewandert (VIZ-13 3a-3, spiegelt scene_src/state.js).
 
 // Apply an emissive RGB (0..1) to a mesh or all child meshes of a Group.
 function applyStageEmissive(target, r, g, b) {

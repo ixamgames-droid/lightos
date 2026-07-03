@@ -21,6 +21,10 @@ ECHTEN ``QWebEngineView`` (offscreen) und prueft:
      ``{ Scene }`` ueber den neuen Wrapper (``scene_src/three/three.js``)
      importiert, kann fehlerfrei ``new Scene()`` instanziieren und das
      Ergebnis ist eine echte ``window.THREE.Scene``-Instanz (3a-2).
+  5) ``window.__lightosEsmProbe.state*Ok`` — das neue ``scene_src/state.js``
+     (VIZ-13 3a-3) ist fehlerfrei importierbar, liefert die erwarteten leeren
+     State-Objekte und der ``view``-Getter/Setter-Accessor (statt eines
+     re-exportierten ``let`` - Design-Risiko 1) ist les- und schreibbar.
 
 Bewusst OHNE Renderer-Instanziierung: WebGL ist im offscreen-Testlauf
 (``QT_QPA_PLATFORM=offscreen``) nicht verfuegbar — ``probe_util.js`` fasst
@@ -158,6 +162,14 @@ class EsmProbeSmokeTest(unittest.TestCase):
         self.assertTrue(
             probe.get("wrapperSceneOk"),
             f"three-Wrapper-Modul: new Scene() ueber Scene-Import fehlgeschlagen: {probe!r}")
+        self.assertTrue(probe.get("stateObjectsOk"), f"state.js Objekt-State fehlerhaft: {probe!r}")
+        self.assertTrue(probe.get("stateViewModeOk"), f"state.js view.mode Getter/Setter fehlerhaft: {probe!r}")
+        self.assertTrue(
+            probe.get("stateViewSelectedFidsOk"),
+            f"state.js view.selectedFids Getter/Setter fehlerhaft: {probe!r}")
+        self.assertTrue(
+            probe.get("stateViewSelectedStageIdOk"),
+            f"state.js view.selectedStageId Getter/Setter fehlerhaft: {probe!r}")
 
         # 3) Kein Renderer wurde instanziiert (WebGL im offscreen-Lauf nicht
         #    verfuegbar) - nur Namespace-Zugriff, kein renderer/domElement.
