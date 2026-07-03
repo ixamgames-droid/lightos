@@ -188,7 +188,13 @@ class PatchFixtureEditDialog(QDialog):
                 getattr(self._fixture, "net_host", "") or "")
             self._edit_net_host.setPlaceholderText("z. B. 192.168.1.50")
             form.addRow("Netzwerk-Adresse:", self._edit_net_host)
-            self._on_protocol_changed()
+            # NUR Enabled-Zustaende syncen — _on_protocol_changed() wuerde
+            # _validate() rufen, aber _lbl_channels/_lbl_warn existieren an
+            # dieser Stelle des Aufbaus noch nicht (kommen weiter unten).
+            network = (self._combo_protocol.currentData() or "dmx") != "dmx"
+            self._spin_universe.setEnabled(not network)
+            self._spin_address.setEnabled(not network)
+            self._edit_net_host.setEnabled(network)
 
         self._lbl_channels = QLabel("")
         form.addRow("Kanäle:", self._lbl_channels)

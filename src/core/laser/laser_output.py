@@ -113,32 +113,38 @@ class LaserOutputManager:
             t.join(timeout=2.0)
         self._thread = None
         with self._lock:
-            for conn in self._connections.values():
-                try:
-                    conn.stop()
-                except Exception:
-                    pass
-                conn.close()
+            conns = list(self._connections.values())
             self._connections.clear()
+        for conn in conns:
+            try:
+                conn.stop()
+            except Exception:
+                pass
+            conn.close()
 
     # ── Not-Aus (verriegelnd, unabhängig vom BLACKOUT) ────────────────────
     def estop_all(self):
+        # Flag ZUERST (der Tick-Thread hört sofort auf zu senden), dann die
+        # Netzwerk-Befehle AUSSERHALB des Locks — I/O unterm Lock würde den
+        # Tick-Thread (und damit weitere Geräte) bis zum Timeout blockieren.
         self._estopped = True
         with self._lock:
-            for conn in self._connections.values():
-                try:
-                    conn.estop()
-                except Exception:
-                    conn.close()
+            conns = list(self._connections.values())
+        for conn in conns:
+            try:
+                conn.estop()
+            except Exception:
+                conn.close()
 
     def clear_estop_all(self):
-        self._estopped = False
         with self._lock:
-            for conn in self._connections.values():
-                try:
-                    conn.clear_estop()
-                except Exception:
-                    conn.close()
+            conns = list(self._connections.values())
+        for conn in conns:
+            try:
+                conn.clear_estop()
+            except Exception:
+                conn.close()
+        self._estopped = False
 
     # ── Tick ──────────────────────────────────────────────────────────────
     def _network_fixtures(self) -> list:
