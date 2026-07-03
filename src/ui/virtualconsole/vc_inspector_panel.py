@@ -123,7 +123,8 @@ class VCInspectorPanel(QWidget):
         info.setStyleSheet("color:#8b949e; font-size:11px;")
         lay.addWidget(info)
         btn = QPushButton("Einstellungen öffnen…")
-        btn.clicked.connect(lambda: self._open_modal(widget))
+        btn._vc_target = widget   # Ziel als Python-Attribut statt Lambda-Capture (STAB-09)
+        btn.clicked.connect(self._on_edit_clicked)
         lay.addWidget(btn)
         lay.addStretch(1)
         return w
@@ -137,6 +138,12 @@ class VCInspectorPanel(QWidget):
     def _open_modal(self, widget):
         if _is_valid(widget) and hasattr(widget, "_edit_properties"):
             widget._edit_properties()
+
+    def _on_edit_clicked(self):
+        # STAB-09: sender()-Adapter — Ziel-Widget haengt als Attribut am Button.
+        b = self.sender()
+        if b is not None:
+            self._open_modal(b._vc_target)
 
     def _set_body(self, body):
         # QScrollArea uebernimmt den Besitz des vorigen Widgets und loescht es.

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
 
 from src.core.engine.curve_library import get_curve_library
 from src.ui.widgets.curve_editor import CurveEditorDialog, CurveThumbnail
+from src.ui.weak_slots import weak_slot
 
 
 class CurveLibraryView(QWidget):
@@ -28,7 +29,7 @@ class CurveLibraryView(QWidget):
 
         body = QHBoxLayout()
         self._list = QListWidget()
-        self._list.currentItemChanged.connect(lambda *_: self._on_selection())
+        self._list.currentItemChanged.connect(weak_slot(self._on_selection))
         body.addWidget(self._list, 1)
         self._preview = CurveThumbnail()
         self._preview.setMinimumSize(150, 120)

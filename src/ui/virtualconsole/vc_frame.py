@@ -81,7 +81,7 @@ class VCFrame(VCWidget):
             widget.delete_requested.disconnect()
         except (TypeError, RuntimeError):
             pass
-        widget.delete_requested.connect(lambda w=widget: self._remove_child(w))
+        widget.delete_requested.connect(self._on_child_delete_requested)
         # VCB-02: KEIN bedingungsloses widget.show() — das ueberschrieb das
         # setVisible(page == _current_page) oben und liess das Widget auf der
         # falschen Seite erscheinen. Die Sichtbarkeit ist bereits korrekt gesetzt.
@@ -114,7 +114,7 @@ class VCFrame(VCWidget):
             child.move(cx, cy)
         child.setProperty("vc_page", self._current_page)
         child.setVisible(True)
-        child.delete_requested.connect(lambda w=child: self._remove_child(w))
+        child.delete_requested.connect(self._on_child_delete_requested)
         child.show()
         return child
 
@@ -131,6 +131,13 @@ class VCFrame(VCWidget):
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
+
+    def _on_child_delete_requested(self):
+        # STAB-09: sender()-Adapter statt Lambda — die C++-Connection wuerde ein
+        # self-fangendes Lambda stark und GC-unsichtbar pinnen.
+        w = self.sender()
+        if w is not None:
+            self._remove_child(w)
 
     # ── Context menu ─────────────────────────────────────────────────────────
 
@@ -336,7 +343,7 @@ class VCFrame(VCWidget):
             # VCCanvas._add_widget) existierten sie noch nicht.
             child.set_edit_mode(self._edit_mode)
             child.set_snap_grid(self._snap_grid)
-            child.delete_requested.connect(lambda w=child: self._remove_child(w))
+            child.delete_requested.connect(self._on_child_delete_requested)
         # Seiten-Sichtbarkeit konsistent setzen. Früher überschrieb ein
         # bedingungsloses child.show() die Seiten-Logik → alle Seiten überlappten
         # nach dem Laden. switch_page() blendet nur die aktuelle Seite ein.

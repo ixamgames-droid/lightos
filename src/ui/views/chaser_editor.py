@@ -12,6 +12,7 @@ from src.core.engine.chaser import Chaser, ChaserStep
 from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
+from src.ui.weak_slots import weak_slot
 
 
 class FunctionSelectorDialog(QDialog):
@@ -288,7 +289,7 @@ class ChaserEditor(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")
@@ -375,7 +376,7 @@ class ChaserEditor(QWidget):
             thumb = CurveThumbnail(step.fade_in_curve)
             thumb.setToolTip(f"Fade-Kurve: {step.fade_in_curve.name}\n"
                              "Klicken zum Bearbeiten")
-            thumb.clicked.connect(lambda r=row: self._edit_curve(r))
+            thumb.clicked.connect(weak_slot(self._edit_curve, row))
             self._table.setCellWidget(row, 3, thumb)
 
             # Note

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPainter, QFont
 from src.core.engine.palette import PaletteManager, Palette, PaletteType, get_palette_manager
+from src.ui.weak_slots import weak_slot
 
 
 class PaletteButton(QPushButton):
@@ -137,16 +138,23 @@ class PalettePage(QWidget):
                 row += 1
                 col = 0
             btn = PaletteButton(pal)
-            btn.clicked.connect(lambda checked=False, p=pal: self._apply(p))
+            btn.clicked.connect(weak_slot(self._apply, pal))
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            btn.customContextMenuRequested.connect(
-                lambda pos, p=pal, b=btn: self._context(p, b)
-            )
+            # Palette als Python-Attribut am Button (setProperty kann keine
+            # beliebigen Python-Objekte) — Aufloesung im sender()-Adapter.
+            btn._pal = pal
+            btn.customContextMenuRequested.connect(self._on_tile_context_menu)
             self._grid.addWidget(btn, row, col)
             col += 1
             if col >= col_count:
                 col = 0
                 row += 1
+
+    def _on_tile_context_menu(self, pos):
+        # sender()-Adapter statt Lambda (STAB-09): Palette haengt als Attribut am Button.
+        b = self.sender()
+        if b is not None:
+            self._context(b._pal, b)
 
     def _target_fids(self) -> list[int] | None:
         """Aktuelle Programmer-Auswahl; None = keine Auswahl.

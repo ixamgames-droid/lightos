@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-03 — Stabilität: Repo-weiter GC-Teardown-Sweep über src/ui (STAB-10)
+
+#### Behoben / Geändert
+
+- **Owner-Zyklen gebrochen (native-AV-Klasse aus STAB-09):** starke Kind→Owner-Referenzen zykelten Top-Level-Views über Shibokens GC-sichtbare Parent→Kind-Wrapper-Kante — der Owner starb dann nur in der zyklischen GC (PySide6 6.11/Py 3.14: Access Violation beim GC-Teardown, faulthandler „Garbage-collecting"). Per weakref + Property + None-Guards gefixt: `EfxPopoutDialog._view` (+ alle internen Slots/Preview-Callback), `AttributeSlider._owner` (programmer_view), `_AspectRow._parent` (vc_drop_panel), `EfxView`-Preview-Geometrie-Callback sowie `status_cb` des RenderCrashGuard (visualizer_view/-window).
+- **Lambda-Slot-Sweep (`src/ui/`):** self-fangende Lambda-Slots in langlebigen, nicht-modalen Widgets werden von der C++-Connection STARK und GC-unsichtbar gehalten (Wrapper-Pin → Leak + Use-after-free-Fenster). Repo-weit durch Bound-Method-Slots (bindet PySide6 schwach), sender()-Adapter bzw. die neuen Helfer `weak_slot`/`weak_slot_fwd` ersetzt (~90 Sites in 38 Dateien; `functools.partial` pinnt übrigens genauso — empirisch verifiziert). Bewusst unangetastet: transiente Kontextmenü-Lambdas (menu.exec), modale exec()-Dialoge und `self.destroyed`-Teardown-Slots (dort ist der Pin gewollt und funktional nötig).
+- **Neu:** `src/ui/weak_slots.py` (Slot-Adapter mit weakref-Receiver, inkl. Fallback für Qt-Builtin-Methoden ohne `__func__`) + Regressionstests `tests/test_ui_teardown_gc.py` (Refcount-Tod von EfxView/Popout und AttributeSlider-Owner per gc.disable-Probe, None-Guards nach View-Tod, weak_slot-Semantik; der EfxView-Test crashte auf dem Stand VOR dem Preview-Callback-Fix nativ und beißt damit nachweislich).
+- **Canary-Verifikation:** Die 6 unter dem weak-sync-Zwischenstand (#142, per #145 zurückgestellt) nativ crashenden Testdateien (Matrix-Views + Programmer-Editor) laufen mit dem Sweep zu 5/6 sogar auf dem weak-sync-Stand grün; `test_matrix_dirty_save` deckt eine verbleibende Zerstörungs-Fragilität der RgbMatrixView auf (unter dem aktuellen starken Bus nicht erreichbar) — dokumentiert als Blocker für das künftige sync-Re-Landing.
+
 ### 2026-07-02 — Laser-Support: Netzwerk-Laser-Grundlagen (LAS-04)
 
 #### Neu / Hinzugefuegt

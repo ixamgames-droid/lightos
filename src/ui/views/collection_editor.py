@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from src.core.engine.collection import Collection
 from src.core.engine.function_manager import get_function_manager
+from src.ui.weak_slots import weak_slot
 
 
 class CollectionEditor(QWidget):
@@ -48,9 +49,9 @@ class CollectionEditor(QWidget):
         btn_remove = QPushButton("- Entfernen")
         btn_remove.clicked.connect(self._remove_selected)
         btn_up = QPushButton("Hoch")
-        btn_up.clicked.connect(lambda: self._move_selected(-1))
+        btn_up.clicked.connect(weak_slot(self._move_selected, -1))
         btn_down = QPushButton("Runter")
-        btn_down.clicked.connect(lambda: self._move_selected(1))
+        btn_down.clicked.connect(weak_slot(self._move_selected, 1))
         btn_row.addWidget(btn_add)
         btn_row.addWidget(btn_remove)
         btn_row.addWidget(btn_up)

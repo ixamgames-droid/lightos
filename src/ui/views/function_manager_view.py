@@ -11,6 +11,7 @@ from src.core.engine.function import FunctionType
 from src.core.engine.function_manager import get_function_manager
 from src.core.engine.script_func import ScriptFunction
 from src.ui.widgets import mini_icons as _mini
+from src.ui.weak_slots import weak_slot
 
 
 FUNCTION_MIME = "application/x-lightos-function"
@@ -170,7 +171,7 @@ class FunctionManagerView(QWidget):
         ]:
             btn = QPushButton(label)
             btn.setFixedHeight(26)
-            btn.clicked.connect(lambda checked=False, t=ftype: self._new_function(t))
+            btn.clicked.connect(weak_slot(self._new_function, ftype))
             toolbar.addWidget(btn)
 
         toolbar.addStretch(1)
@@ -464,7 +465,7 @@ class FunctionManagerView(QWidget):
         box.setIcon(QMessageBox.Icon.Information)
         box.setText(f'Drücke jetzt das Pad / den Fader für\n„{f.name}" …')
         box.setStandardButtons(QMessageBox.StandardButton.Cancel)
-        box.buttonClicked.connect(lambda *_: self._cancel_learn())
+        box.buttonClicked.connect(weak_slot(self._cancel_learn))
         self._learn_box = box
         mapper.start_learn(self._on_midi_learned)
         box.show()

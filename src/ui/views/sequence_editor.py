@@ -12,6 +12,7 @@ from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
 from src.core.app_state import get_state
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
+from src.ui.weak_slots import weak_slot
 from PySide6.QtWidgets import QDialog
 
 
@@ -189,9 +190,9 @@ class SequenceEditor(QWidget):
         btn_del = QPushButton("- Step")
         btn_del.clicked.connect(self._delete_step)
         btn_up = QPushButton("Hoch")
-        btn_up.clicked.connect(lambda: self._move_step(-1))
+        btn_up.clicked.connect(weak_slot(self._move_step, -1))
         btn_down = QPushButton("Runter")
-        btn_down.clicked.connect(lambda: self._move_step(1))
+        btn_down.clicked.connect(weak_slot(self._move_step, 1))
         st_btn_row.addWidget(btn_add)
         st_btn_row.addWidget(btn_add_empty)
         st_btn_row.addWidget(btn_del)
@@ -253,7 +254,7 @@ class SequenceEditor(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")
@@ -319,7 +320,7 @@ class SequenceEditor(QWidget):
             # Werte-Spalte (7): Button oeffnet den Werte-Editor (statt Inline-Dump).
             vbtn = QPushButton("Werte…")
             vbtn.setToolTip("Die programmierten Kanalwerte dieses Steps bearbeiten")
-            vbtn.clicked.connect(lambda _=False, r=i: self._edit_values(r))
+            vbtn.clicked.connect(weak_slot(self._edit_values, i))
             self._tbl.setCellWidget(i, 7, vbtn)
         self._building = False
 
@@ -328,7 +329,7 @@ class SequenceEditor(QWidget):
         thumb = CurveThumbnail(curve)
         label = "Fade-In" if attr == "fade_in_curve" else "Fade-Out"
         thumb.setToolTip(f"{label}-Kurve: {curve.name}\nKlicken zum Bearbeiten")
-        thumb.clicked.connect(lambda r=row, a=attr: self._edit_curve(r, a))
+        thumb.clicked.connect(weak_slot(self._edit_curve, row, attr))
         return thumb
 
     def _edit_curve(self, row: int, attr: str):

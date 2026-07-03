@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.widgets.spider_bars_view import SpiderBarsView, BAR_COLORS
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 try:
     from src.core.app_state import (get_state, is_dual_tilt_fixture,
@@ -109,7 +110,7 @@ class SpiderPositionTool(QWidget):
             sl.setInvertedAppearance(True)   # oben = 0
             sl.setFixedHeight(150)
             sl.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            sl.valueChanged.connect(lambda v, idx=i: self._on_slider(idx, v))
+            sl.valueChanged.connect(weak_slot_fwd(self._on_slider, i))
             val = QLabel("128")
             val.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             val.setStyleSheet("font-family:monospace; color:#ccc;")
@@ -163,7 +164,7 @@ class SpiderPositionTool(QWidget):
                 "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
                 "border-radius:3px;font-size:11px;padding:6px;} "
                 "QPushButton:hover{background:#30363d;}")
-            btn.clicked.connect(lambda _=False, g=gen: self._use_preset(g))
+            btn.clicked.connect(weak_slot(self._use_preset, gen))
             grid.addWidget(btn, i // 2, i % 2)
         pv.addLayout(grid)
         pv.addStretch(1)

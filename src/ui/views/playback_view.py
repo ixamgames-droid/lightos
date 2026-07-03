@@ -13,6 +13,7 @@ from src.core.app_state import get_state, AppState
 from src.core.engine.cue_stack import CueStack
 from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
+from src.ui.weak_slots import weak_slot
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve"]
 
@@ -102,7 +103,7 @@ class PlaybackView(QWidget):
                 "QPushButton:hover { background:#3a4a5a; }"
                 "QPushButton:checked { background:#ffd700; color:#000; font-weight:bold; }"
             )
-            btn.clicked.connect(lambda checked=False, idx=i: self._switch_page(idx))
+            btn.clicked.connect(weak_slot(self._switch_page, i))
             page_row.addWidget(btn)
             self._page_buttons.append(btn)
         page_row.addStretch()
@@ -603,8 +604,8 @@ class ExecutorWidget(QWidget):
         for i in range(3):
             b = QPushButton()
             b.setFixedHeight(22)
-            b.pressed.connect(lambda i=i: self._press(i))
-            b.released.connect(lambda i=i: self._release(i))
+            b.pressed.connect(weak_slot(self._press, i))
+            b.released.connect(weak_slot(self._release, i))
             btn_layout.addWidget(b)
             self._fn_buttons.append(b)
         layout.addLayout(btn_layout)

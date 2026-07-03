@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QPoint, QSize, QTimer
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui.weak_slots import weak_slot
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -164,7 +165,7 @@ class VirtualConsoleView(QWidget):
                 QPushButton:hover { background:#30363d; color:#e6edf3; }
                 QPushButton:disabled { color:#484f58; }
             """)
-            btn.clicked.connect(lambda checked=False, wt=wtype: self._add_widget(wt))
+            btn.clicked.connect(weak_slot(self._add_widget, wtype))
             btn.setProperty("add_btn", True)
             btn.setProperty("edit_only", True)
             btn.setVisible(False)
@@ -181,7 +182,7 @@ class VirtualConsoleView(QWidget):
                               border-radius:3px; font-size:14px; padding:0 8px; }
                 QPushButton:hover { background:#30363d; }
             """)
-            ub.clicked.connect(lambda checked=False, s=_slot: s())
+            ub.clicked.connect(weak_slot(_slot))
             ub.setProperty("edit_only", True)
             ub.setVisible(False)
             tb_layout.addWidget(ub)
@@ -273,7 +274,7 @@ class VirtualConsoleView(QWidget):
         self._btn_bank_prev.setFixedSize(26, 26)
         self._btn_bank_prev.setToolTip("Vorherige Bank (Pad-/Widget-Seite)")
         self._btn_bank_prev.setStyleSheet(_bank_btn_css)
-        self._btn_bank_prev.clicked.connect(lambda: self._step_bank(-1))
+        self._btn_bank_prev.clicked.connect(weak_slot(self._step_bank, -1))
         tb_layout.addWidget(self._btn_bank_prev)
 
         self._lbl_bank = QLabel("Bank 1")
@@ -288,7 +289,7 @@ class VirtualConsoleView(QWidget):
         self._btn_bank_next.setFixedSize(26, 26)
         self._btn_bank_next.setToolTip("Nächste Bank (Pad-/Widget-Seite)")
         self._btn_bank_next.setStyleSheet(_bank_btn_css)
-        self._btn_bank_next.clicked.connect(lambda: self._step_bank(1))
+        self._btn_bank_next.clicked.connect(weak_slot(self._step_bank, 1))
         tb_layout.addWidget(self._btn_bank_next)
 
         # Popout Button

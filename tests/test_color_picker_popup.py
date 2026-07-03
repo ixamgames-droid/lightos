@@ -6,7 +6,6 @@ Getestet wird die Logik von ProgrammerView._toggle_embedded_color /
 _on_color_window_closed auf leichten Fakes (ohne die ganze View zu bauen).
 """
 import os
-import types
 import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -18,12 +17,19 @@ import src.ui.views.programmer_view as PV
 _app = QApplication.instance() or QApplication([])
 
 
+class _Host(QWidget):
+    """Fake-Host (Dialog-Parent statt echter ProgrammerView): leiht sich die
+    Fenster-Callbacks als KLASSEN-Attribute. Seit STAB-10 läuft finished über
+    den Bound-Slot _on_color_window_finished (sender()-Adapter statt
+    self-fangendem Lambda). Instanz-gebundene ``types.MethodType``-Attribute
+    wären ein Selbst-Zyklus -> Host stürbe nur in der zyklischen GC (genau
+    die getestete AV-Klasse)."""
+    _on_color_window_closed = PV.ProgrammerView._on_color_window_closed
+    _on_color_window_finished = PV.ProgrammerView._on_color_window_finished
+
+
 def _host_and_tab():
-    host = QWidget()                       # dient als Dialog-Parent (statt self)
-    # echte ProgrammerView hätte die Methode; am Fake-Host für den finished-Callback
-    # nachbinden, damit win.close() -> finished korrekt zurückräumt.
-    host._on_color_window_closed = types.MethodType(
-        PV.ProgrammerView._on_color_window_closed, host)
+    host = _Host()                         # dient als Dialog-Parent (statt self)
     tab = QWidget()
     btn = QPushButton(); btn.setCheckable(True); btn.setChecked(True)
     tab._cp_button = btn

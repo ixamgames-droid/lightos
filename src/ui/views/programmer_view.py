@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import weakref
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
     QListWidget, QListWidgetItem, QLineEdit, QGroupBox, QScrollArea, QFrame,
@@ -21,6 +22,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels)
 from src.core.database.models import PatchedFixture, FixtureChannel
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = os.path.join(
@@ -327,7 +329,7 @@ class ProgrammerView(QWidget):
         self._group_search.setPlaceholderText("Gruppe suchen…")
         self._group_search.setClearButtonEnabled(True)
         self._group_search.setStyleSheet("font-size: 11px; padding: 2px 4px;")
-        self._group_search.textChanged.connect(lambda *_: self._refresh_group_list())
+        self._group_search.textChanged.connect(weak_slot(self._refresh_group_list))
         grp_layout.addWidget(self._group_search)
         self._group_list = QListWidget()
         self._group_list.setMaximumHeight(130)
@@ -386,7 +388,7 @@ class ProgrammerView(QWidget):
             rb = QRadioButton(label)
             rb.setToolTip(tip)
             rb.setChecked(self._group_mode == key)
-            rb.toggled.connect(lambda chk, k=key: chk and self._set_group_mode(k))
+            rb.toggled.connect(weak_slot_fwd(self._on_group_mode_toggled, key))
             self._mode_btn_group.addButton(rb)
             mode_row.addWidget(rb)
         self._fixture_combo = QComboBox()
@@ -567,11 +569,11 @@ class ProgrammerView(QWidget):
         create_row.addWidget(btn)
         b_scene = QPushButton("+ Szene")
         b_scene.setToolTip("Neue Szene anlegen und direkt bearbeiten")
-        b_scene.clicked.connect(lambda: self._new_effect("scene"))
+        b_scene.clicked.connect(weak_slot(self._new_effect, "scene"))
         create_row.addWidget(b_scene)
         b_chaser = QPushButton("+ Chaser")
         b_chaser.setToolTip("Neuen Chaser anlegen und direkt bearbeiten")
-        b_chaser.clicked.connect(lambda: self._new_effect("chaser"))
+        b_chaser.clicked.connect(weak_slot(self._new_effect, "chaser"))
         create_row.addWidget(b_chaser)
         b_capture = QPushButton("Programmer → Szene")
         b_capture.setToolTip(
@@ -1189,7 +1191,7 @@ class ProgrammerView(QWidget):
         }
         b_fan = QPushButton(
             f"Fächern: {_fan_group_labels.get(group_name, group_name)}...")
-        b_fan.clicked.connect(lambda: self._open_fan_tool_for_group(group_name))
+        b_fan.clicked.connect(weak_slot(self._open_fan_tool_for_group, group_name))
         sub_tb.addWidget(b_fan)
 
         if group_name == "Color":
@@ -1197,7 +1199,8 @@ class ProgrammerView(QWidget):
             b_ct.setCheckable(True)
             b_ct.setToolTip("Öffnet den Color Picker als eigenes, frei platzierbares "
                             "Fenster (statt unten eingebettet/abgeschnitten).")
-            b_ct.toggled.connect(lambda chk: self._toggle_embedded_color(tab, chk))
+            b_ct._cp_tab = tab
+            b_ct.toggled.connect(self._on_cp_button_toggled)
             tab._cp_button = b_ct
             sub_tb.addWidget(b_ct)
             # Mehrkopf-Farbgeraet (z. B. Spider mit 2 RGBW-Baenken): Umschalter
@@ -1214,7 +1217,7 @@ class ProgrammerView(QWidget):
                     "Getrennt: jeder Kopf (z. B. linke/rechte Spider-Bar) hat "
                     "eigene Farbregler.")
                 head_combo.currentIndexChanged.connect(
-                    lambda i, c=head_combo: self._set_color_head_mode(c.itemData(i)))
+                    self._on_color_head_combo_changed)
                 sub_tb.addWidget(head_combo)
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
@@ -1301,6 +1304,12 @@ class ProgrammerView(QWidget):
 
     def active_fixture_index(self) -> int:
         return getattr(self, "_active_fixture_idx", 0)
+
+    def _on_group_mode_toggled(self, key: str, checked: bool):
+        """Bound-Slot statt Lambda (STAB-10): nur der AKTIV werdende Radio-Button
+        schaltet den Modus (toggled feuert auch für den abgewählten)."""
+        if checked:
+            self._set_group_mode(key)
 
     def _set_group_mode(self, key: str):
         self._group_mode = key
@@ -1389,6 +1398,12 @@ class ProgrammerView(QWidget):
             if c:
                 best = max(best, max(c.values()))
         return best
+
+    def _on_color_head_combo_changed(self, index: int):
+        """Bound-Slot statt Lambda (STAB-10): Combo über den Sender auflösen."""
+        combo = self.sender()
+        if combo is not None:
+            self._set_color_head_mode(combo.itemData(index))
 
     def _set_color_head_mode(self, key: str):
         if key not in ("sync", "separate") or key == self.color_head_mode():
@@ -1622,12 +1637,20 @@ class ProgrammerView(QWidget):
                 # geschrieben wird; danach Tri-State aus (verhaelt sich binaer).
                 cb.setTristate(True)
                 cb.setCheckState(Qt.CheckState.PartiallyChecked)
-            cb.clicked.connect(
-                lambda chk, a=attr, fx=fixtures, c=cb: (
-                    c.setTristate(False), self._set_orientation(a, chk, fx)))
+            cb._orient_attr = attr
+            cb._orient_fixtures = fixtures
+            cb.clicked.connect(self._on_orientation_clicked)
             row.addWidget(cb)
         row.addStretch(1)
         return box
+
+    def _on_orientation_clicked(self, checked: bool):
+        """Bound-Slot statt Lambda (STAB-10): Attribut/Fixtures hängen am Sender."""
+        cb = self.sender()
+        if cb is None:
+            return
+        cb.setTristate(False)
+        self._set_orientation(cb._orient_attr, checked, cb._orient_fixtures)
 
     def _set_orientation(self, attr: str, value: bool, fixtures):
         for f in fixtures:
@@ -1650,7 +1673,8 @@ class ProgrammerView(QWidget):
                     win = _ToolDialog("Color Picker", self)
                     win.setModal(False)
                     win.set_content(ColorPicker())
-                    win.finished.connect(lambda *_: self._on_color_window_closed(tab))
+                    win._cp_tab = tab
+                    win.finished.connect(self._on_color_window_finished)
                     tab._cp_window = win
                 except Exception as e:
                     print(f"[programmer_view] color picker window error: {e}")
@@ -1660,6 +1684,18 @@ class ProgrammerView(QWidget):
             win.activateWindow()
         elif win is not None:
             win.close()
+
+    def _on_cp_button_toggled(self, on: bool):
+        """Bound-Slot statt Lambda (STAB-10): der Color-Tab hängt am Button."""
+        btn = self.sender()
+        if btn is not None:
+            self._toggle_embedded_color(btn._cp_tab, on)
+
+    def _on_color_window_finished(self, _result):
+        """Bound-Slot statt Lambda (STAB-10): der Color-Tab hängt am Fenster."""
+        win = self.sender()
+        if win is not None:
+            self._on_color_window_closed(win._cp_tab)
 
     def _on_color_window_closed(self, tab: QWidget):
         """Color-Picker-Fenster wurde geschlossen (X/„Schliessen") → Toggle lösen."""
@@ -1853,7 +1889,12 @@ class AttributeSlider(QWidget):
         self._channel = channel
         self._fixtures = fixtures
         self._state = state
-        self._owner = owner   # ProgrammerView (Gruppen-Modus); None = Linked
+        # SCHWACHE Referenz auf den Owner (ProgrammerView; None = Linked):
+        # eine starke Ref zykelt den Owner über Shibokens Parent->Kind-Kante
+        # (View -> Slider -> View) -> der Owner-Wrapper stirbt nur noch in der
+        # ZYKLISCHEN GC -> native AV beim GC-Teardown (PySide6 6.11/Py 3.14,
+        # Crash-Klasse STAB-09). Ohne Zyklus stirbt die View per Refcount.
+        self._owner_ref = weakref.ref(owner) if owner is not None else None
         # Mehrkopf (X-6): head = welches Attribut-Vorkommen (Kopf) dieser Slider
         # steuert. sync_heads>0 => Synchron-Regler, der die Koepfe 0..N-1 GEMEINSAM
         # ueber den einfachen Schluessel treibt (und etwaige "attr#N"-Abweichungen
@@ -1865,6 +1906,12 @@ class AttributeSlider(QWidget):
         self._last_value = channel.default_value
         self._setup_ui()
         self._load_current_value()
+
+    @property
+    def _owner(self):
+        """Die besitzende ProgrammerView — None im Linked-Modus oder wenn die
+        View bereits zerstört ist (Teardown-Fenster)."""
+        return self._owner_ref() if self._owner_ref is not None else None
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)

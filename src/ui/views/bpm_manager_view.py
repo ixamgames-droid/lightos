@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 
 from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
 from src.core.audio import bpm_settings
+from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 try:
     from src.core.audio.beat_detector import get_beat_detector
@@ -134,7 +135,7 @@ class BpmManagerView(QWidget):
         self._dot_timer = QTimer(self)
         self._dot_timer.setInterval(110)
         self._dot_timer.setSingleShot(True)
-        self._dot_timer.timeout.connect(lambda: self._dot.setStyleSheet(_DOT_IDLE))
+        self._dot_timer.timeout.connect(self._on_dot_idle)
         lay.addLayout(top)
 
         # Takt-Anzeige (dynamisch nach beats_per_bar; max. 16 Zellen sichtbar)
@@ -170,6 +171,11 @@ class BpmManagerView(QWidget):
         else:
             self._spectrum = None
         return box
+
+    def _on_dot_idle(self):
+        # Bound-Method-Slot statt Lambda (STAB-09): Qt-Builtin-Methoden haben
+        # kein __func__ und sind daher kein gueltiger weak_slot-Receiver.
+        self._dot.setStyleSheet(_DOT_IDLE)
 
     # ── Effekte je Bus (taktgleich-Panel) ───────────────────────────────────────
     # Feste Bus-Buckets in Anzeige-Reihenfolge: Haupt-BPM, A-D, Free-Run.
@@ -250,7 +256,7 @@ class BpmManagerView(QWidget):
             if bus_id != "":   # Free-Run hat keinen gemeinsamen Sync
                 btn = QPushButton("Sync jetzt")
                 btn.setToolTip("Alle Effekte dieses Bus gemeinsam auf die Eins re-ankern.")
-                btn.clicked.connect(lambda _c=False, b=bus_id: self._on_bus_sync_now(b))
+                btn.clicked.connect(weak_slot(self._on_bus_sync_now, bus_id))
                 tree.setItemWidget(top, 4, btn)
             for f in effects:
                 total += 1
@@ -273,8 +279,8 @@ class BpmManagerView(QWidget):
         i = combo.findData(bus_id)
         if i >= 0:
             combo.setCurrentIndex(i)
-        combo.currentIndexChanged.connect(
-            lambda _i, fi=fid, c=combo: self._on_row_bus_changed(fi, c.currentData()))
+        combo.setProperty("fid", fid)
+        combo.currentIndexChanged.connect(self._on_row_bus_combo_changed)
         tree.setItemWidget(row, 2, combo)
 
         spin = QDoubleSpinBox()
@@ -282,7 +288,7 @@ class BpmManagerView(QWidget):
         spin.setSingleStep(0.25)
         spin.setDecimals(4)
         spin.setValue(float(getattr(f, "tempo_multiplier", 1.0) or 1.0))
-        spin.valueChanged.connect(lambda v, fi=fid: self._on_row_mult_changed(fi, v))
+        spin.valueChanged.connect(weak_slot_fwd(self._on_row_mult_changed, fid))
         tree.setItemWidget(row, 3, spin)
 
         chk = QCheckBox()
@@ -290,11 +296,17 @@ class BpmManagerView(QWidget):
         chk.setEnabled(bus_id != "")   # Free-Run kann nicht taktgleich sein
         chk.setToolTip(
             "Startet dieser Effekt taktgleich auf dem gemeinsamen Beat-Raster seines Bus?")
-        chk.toggled.connect(lambda c, fi=fid: self._on_taktgleich_toggled(fi, c))
+        chk.toggled.connect(weak_slot_fwd(self._on_taktgleich_toggled, fid))
         wrap = QWidget(); wl = QHBoxLayout(wrap)
         wl.setContentsMargins(0, 0, 0, 0)
         wl.addStretch(1); wl.addWidget(chk); wl.addStretch(1)
         tree.setItemWidget(row, 4, wrap)
+
+    def _on_row_bus_combo_changed(self, _i):
+        # sender()-Adapter statt Lambda (STAB-09): fid haengt als Property am Combo.
+        c = self.sender()
+        if c is not None:
+            self._on_row_bus_changed(c.property("fid"), c.currentData())
 
     # ── Handler ──────────────────────────────────────────────────────────────
     def _fn(self, fid):
@@ -522,7 +534,7 @@ class BpmManagerView(QWidget):
         for _n in (4, 8, 16):
             b = QPushButton(str(_n))
             b.setFixedWidth(34)
-            b.clicked.connect(lambda _=False, v=_n: self._sp_bpb.setValue(v))
+            b.clicked.connect(weak_slot(self._on_bpb_preset, _n))
             meter_row.addWidget(b)
         meter_row.addSpacing(12)
         meter_row.addWidget(QLabel("Unterteilung"))
@@ -543,13 +555,13 @@ class BpmManagerView(QWidget):
         tap_row = QHBoxLayout()
         btn_tap = QPushButton("TAP")
         btn_tap.setFixedWidth(60)
-        btn_tap.clicked.connect(lambda: self._mgr.tap())
+        btn_tap.clicked.connect(weak_slot(self._mgr.tap))
         tap_row.addWidget(btn_tap)
         tap_row.addSpacing(10)
         for delta in (-10, -5, -1, +1, +5, +10):
             b = QPushButton(f"{delta:+d}")
             b.setFixedWidth(44)
-            b.clicked.connect(lambda _=False, d=delta: self._mgr.nudge(d))
+            b.clicked.connect(weak_slot(self._mgr.nudge, delta))
             tap_row.addWidget(b)
         tap_row.addStretch(1)
         grid.addLayout(tap_row, r, 1)
@@ -1110,6 +1122,10 @@ class BpmManagerView(QWidget):
         self._mgr.set_subdivision(int(self._cmb_subdiv.currentData() or 1))
         self._rebuild_phase_cells()
         self._save()
+
+    def _on_bpb_preset(self, v: int):
+        # Adapter statt Lambda (STAB-09); setValue selbst ist Qt-Builtin ohne __func__.
+        self._sp_bpb.setValue(v)
 
     def _on_genre_preset(self):
         """Wendet das gewählte Genre-Preset auf die Erkennung an + zieht die UI nach."""

@@ -390,7 +390,8 @@ class VCEffectEditor(VCFrame):
             widget.delete_requested.disconnect()
         except (TypeError, RuntimeError):
             pass
-        widget.delete_requested.connect(lambda w=widget: self._remove_child(w))
+        # STAB-09: sender()-Adapter (geerbt von VCFrame) statt self-fangendem Lambda.
+        widget.delete_requested.connect(self._on_child_delete_requested)
 
     # ── Serialisierung ────────────────────────────────────
 

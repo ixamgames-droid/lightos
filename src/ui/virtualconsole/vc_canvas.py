@@ -1641,9 +1641,16 @@ class VCCanvas(QWidget):
             w.move(snapped)
             # Neu angelegte Widgets landen auf der aktuell sichtbaren Bank.
             w.bank = self._active_bank
-        w.delete_requested.connect(lambda widget=w: self._remove_widget(widget))
+        w.delete_requested.connect(self._on_widget_delete_requested)
         w.setVisible(self.on_active_bank(w))
         return w
+
+    def _on_widget_delete_requested(self):
+        # STAB-09: sender()-Adapter statt Lambda — die C++-Connection wuerde ein
+        # self-fangendes Lambda stark und GC-unsichtbar pinnen.
+        w = self.sender()
+        if w is not None:
+            self._remove_widget(w)
 
     def add_live_controls(self, function_id, param_keys, action_keys, origin=None):
         """MLV-02: erzeugt passende Regler und Tasten, fest an function_id gebunden."""

@@ -29,6 +29,7 @@ from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
 )
+from src.ui.weak_slots import weak_slot_fwd
 
 
 class Visualizer3DView(QWidget):
@@ -125,8 +126,10 @@ class Visualizer3DView(QWidget):
         self.destroyed.connect(lambda *_: _state.unsubscribe(_on_state))
         # VIZ-10: Renderer-Absturz -> Log + Auto-Reload (max. 3x/60s), derselbe
         # Mechanismus wie im VisualizerWindow (siehe RenderCrashGuard dort).
+        # weak_slot_fwd statt Bound-Method: self -> guard -> self waere ein
+        # GC-Zyklus um den Owner (STAB-10, native AV-Klasse beim GC-Teardown).
         self._render_crash_guard = install_render_crash_guard(
-            self._view, status_cb=self._on_render_crash_giveup)
+            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup))
         load_stage_html(self._view)
         self._view.loadFinished.connect(self._on_load_finished)
 

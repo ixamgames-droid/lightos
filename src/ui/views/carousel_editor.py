@@ -47,9 +47,7 @@ class CarouselEditor(QWidget):
         form_basic = QFormLayout(grp_basic)
 
         self._name_edit = QLineEdit(self._c.name)
-        self._name_edit.textChanged.connect(
-            lambda s: setattr(self._c, "name", s)
-        )
+        self._name_edit.textChanged.connect(self._on_name_changed)
         form_basic.addRow("Name:", self._name_edit)
 
         self._pattern_combo = QComboBox()
@@ -75,25 +73,19 @@ class CarouselEditor(QWidget):
 
         self._sync_chk = QCheckBox("Sync to Beat (BPM-Manager)")
         self._sync_chk.setChecked(self._c.sync_to_beat)
-        self._sync_chk.toggled.connect(
-            lambda v: setattr(self._c, "sync_to_beat", bool(v))
-        )
+        self._sync_chk.toggled.connect(self._on_sync_toggled)
         form_tempo.addRow("Sync:", self._sync_chk)
 
         self._bpc_spin = QSpinBox()
         self._bpc_spin.setRange(1, 64)
         self._bpc_spin.setValue(self._c.beats_per_cycle)
-        self._bpc_spin.valueChanged.connect(
-            lambda v: setattr(self._c, "beats_per_cycle", int(v))
-        )
+        self._bpc_spin.valueChanged.connect(self._on_bpc_changed)
         form_tempo.addRow("Beats/Cycle:", self._bpc_spin)
 
         self._int_spin = QSpinBox()
         self._int_spin.setRange(0, 255)
         self._int_spin.setValue(self._c.intensity_max)
-        self._int_spin.valueChanged.connect(
-            lambda v: setattr(self._c, "intensity_max", int(v))
-        )
+        self._int_spin.valueChanged.connect(self._on_intensity_changed)
         form_tempo.addRow("Intensity Max:", self._int_spin)
 
         root.addWidget(grp_tempo)
@@ -170,6 +162,19 @@ class CarouselEditor(QWidget):
         self._editor_placeholder.setVisible(False)
         outer.addWidget(self._editor_placeholder, 1)
 
+    # Adapter-Slots (bound statt Lambda — vermeidet GC-Pin, STAB-09)
+    def _on_name_changed(self, s):
+        setattr(self._c, "name", s)
+
+    def _on_sync_toggled(self, v):
+        setattr(self._c, "sync_to_beat", bool(v))
+
+    def _on_bpc_changed(self, v):
+        setattr(self._c, "beats_per_cycle", int(v))
+
+    def _on_intensity_changed(self, v):
+        setattr(self._c, "intensity_max", int(v))
+
     def _toggle_editor_popout(self):
         """Koppelt den GANZEN Carousel-Editor in ein grosses, scrollbares Fenster
         aus / dockt ihn zurueck. Loest das Platzproblem bei vielen Einstellwerten:
@@ -192,7 +197,7 @@ class CarouselEditor(QWidget):
         sc.setStyleSheet("QScrollArea{border:none;}")
         wl.addWidget(sc)
         win.resize(760, 980)
-        win.finished.connect(lambda *_: self._redock_editor())
+        win.finished.connect(self._redock_editor)
         self._editor_window = win
         self._editor_window_scroll = sc
         self._btn_editor_popout.setText("⤡ Andocken")
