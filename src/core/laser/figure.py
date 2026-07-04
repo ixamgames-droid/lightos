@@ -12,7 +12,6 @@ gleichmäßig abgetastete Sende-Ergebnis (hunderte Punkte).
 """
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 from .frame import LaserFrame, LaserPoint
@@ -110,20 +109,18 @@ class LaserFigure:
 
 # ── Eingebaute Grundfiguren (Startvorlagen für den Zeichenmodus) ──────────
 
-def _regular_polygon(n: int, name: str) -> LaserFigure:
-    pts = [FigurePoint(x=math.cos(2 * math.pi * k / n - math.pi / 2),
-                       y=math.sin(2 * math.pi * k / n - math.pi / 2))
-           for k in range(n)]
-    return LaserFigure(name=name, points=pts, closed=True)
-
-
 def builtin_figures() -> list[LaserFigure]:
-    """Startvorlagen: Kreis (24-Eck), Dreieck, Quadrat, Linie."""
+    """Startvorlagen: Kreis (24-Eck), Dreieck, Quadrat, Linie. Nutzt die
+    gemeinsamen Geometrie-Generatoren aus :mod:`figure_ops` (eine Quelle für
+    die Formmathematik; lazy import bricht den Modul-Zyklus)."""
+    from .figure_ops import regular_polygon, line
     return [
-        _regular_polygon(24, "Kreis"),
-        _regular_polygon(3, "Dreieck"),
-        _regular_polygon(4, "Quadrat"),
-        LaserFigure(name="Linie",
-                    points=[FigurePoint(-0.9, 0.0), FigurePoint(0.9, 0.0)],
-                    closed=False),
+        LaserFigure(name="Kreis", closed=True,
+                    points=regular_polygon(24, r=1.0)),
+        LaserFigure(name="Dreieck", closed=True,
+                    points=regular_polygon(3, r=1.0)),
+        LaserFigure(name="Quadrat", closed=True,
+                    points=regular_polygon(4, r=1.0)),
+        LaserFigure(name="Linie", closed=False,
+                    points=line(-0.9, 0.0, 0.9, 0.0)),
     ]
