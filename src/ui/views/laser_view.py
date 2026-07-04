@@ -27,6 +27,8 @@ from PySide6.QtCore import Qt
 
 from src.core.app_state import get_state, get_channels_for_patched
 from src.core.attr_groups import attr_label
+from src.core.laser.capability import (laser_capability, LaserClass,
+                                       is_laser_fixture)
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
@@ -53,16 +55,10 @@ _GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
 
 
 def fixture_has_laser_capability(fx) -> bool:
-    """True, wenn das gepatchte Gerät als Laser steuerbar ist: entweder per
-    ``fixture_type == 'laser'`` oder weil es ``laser_*``-Kanäle besitzt."""
-    if (getattr(fx, "fixture_type", "") or "").lower() == "laser":
-        return True
-    try:
-        channels = get_channels_for_patched(fx)
-    except Exception:
-        return False
-    return any((getattr(ch, "attribute", "") or "").startswith("laser_")
-               for ch in channels)
+    """True, wenn das gepatchte Gerät als Laser steuerbar ist. Delegiert an den
+    kanonischen Klassifikator (:func:`capability.is_laser_fixture`); der Name
+    bleibt für die Programmer-Tab-Sichtbarkeit (programmer_view) erhalten."""
+    return is_laser_fixture(fx)
 
 
 def _range_value(rng) -> int:
@@ -361,12 +357,12 @@ class LaserView(QWidget):
                 + (f" … (+{more})" if more > 0 else ""))
             self._head_box.setVisible(self._max_head_count() > 1)
 
-        # Safety-Box nur für Netzwerk-Streaming-Laser in der Auswahl.
+        # Safety-Box nur für Netzwerk-Streaming-Laser (Klasse B) in der Auswahl
+        # — über den Fähigkeits-Klassifikator (LAS-12), eine Wahrheitsquelle.
         self._network_fids = [
-            int(getattr(f, "fid"))
-            for f in self._fixtures
-            if (getattr(f, "protocol", "") or "").lower()
-            in ("etherdream", "idn")]
+            int(getattr(f, "fid")) for f in self._fixtures
+            if (_cap := laser_capability(f)) is not None
+            and _cap.laser_class == LaserClass.NET_STREAM]
         self._safety_box.setVisible(bool(self._network_fids))
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
