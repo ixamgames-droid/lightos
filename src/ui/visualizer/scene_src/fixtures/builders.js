@@ -197,43 +197,48 @@ export function buildDimmer() {
 }
 
 export function buildScanner() {
+  // FM-1: Scanner mit BEWEGLICHER Spiegel-Optik (vorher statisch). Aufbau wie ein
+  // Moving Head: festes Gehaeuse -> yoke (pant um Y) -> head/Spiegel (kippt um X).
+  // Der Strahl haengt (via model.head in fixtures.js#addFixture) am Kopf und
+  // schwenkt so mit Pan/Tilt-DMX. updateFixture animiert Scanner analog zum MH.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.4 });
-  // Procedural base: flat box body
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.12, 0.5),
-    baseMat
-  );
-  body.position.y = 0.06;
+  // Festes Gehaeuse (Lampen-/Elektronik-Kompartment)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.16, 0.34), baseMat);
+  body.position.y = 0.08;
   body.castShadow = true;
   group.add(body);
-  // Tilted mirror (flat disc, angled ~45deg)
-  const mirrorMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.95, roughness: 0.05, side: THREE.DoubleSide });
+  // Pan-Pivot (rotiert um Y) auf dem Gehaeuse
+  const yoke = new THREE.Group();
+  yoke.position.y = 0.16;
+  group.add(yoke);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.12), armMat);
+  arm.position.set(-0.18, 0.09, 0);
+  yoke.add(arm);
+  // Tilt-Pivot (Spiegelkopf, kippt um X)
+  const head = new THREE.Group();
+  head.position.set(0, 0.18, 0);
+  yoke.add(head);
+  // Spiegel: metallische ~45°-Scheibe (die sichtbare bewegte Kernoptik)
   const mirror = new THREE.Mesh(
-    new THREE.CircleGeometry(0.18, 20),
-    mirrorMat
+    new THREE.CircleGeometry(0.16, 24),
+    new THREE.MeshStandardMaterial({ color: 0x99a0aa, metalness: 0.95, roughness: 0.05, side: THREE.DoubleSide })
   );
-  mirror.position.set(0, 0.2, 0);
-  mirror.rotation.x = Math.PI / 4;   // ~45 deg tilt
-  group.add(mirror);
-  // Lens (emissive DMX colour feedback)
+  mirror.rotation.x = -Math.PI / 4;
+  head.add(mirror);
+  // Emissive Lens (DMX-Farb-Feedback) am Kopf -> pant/kippt mit
   const lens = new THREE.Mesh(
-    new THREE.CircleGeometry(0.08, 16),
+    new THREE.CircleGeometry(0.07, 16),
     new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.1, side: THREE.DoubleSide })
   );
-  lens.position.set(0, 0.22, -0.22);
-  lens.rotation.x = -Math.PI / 4;
-  group.add(lens);
-  // Load real model; hide procedural body + mirror on success, keep lens
-  loadModel('assets/models/fixtures/scanner.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.6, y: 0.5, z: 0.6 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    body.visible = false;
-    mirror.visible = false;
-    group.add(model);
-  });
-  return { group, head: group, lamp: lens };
+  lens.position.set(0, -0.02, 0.14);
+  lens.rotation.x = -Math.PI / 2;
+  head.add(lens);
+  // BEWUSST KEIN scanner.dae-Overlay: das statische Modell wuerde den beweglichen
+  // Spiegelkopf verdecken (gleiche Entscheidung wie beim Moving Head). Ein optisch
+  // reicheres Modell muesste sauber in yoke/head gesplittet werden.
+  return { group, yoke, head, lens, mirror };
 }
 
 export function buildSmoke() {
