@@ -82,7 +82,6 @@ class MultiHeadSpiderTest(unittest.TestCase):
         __init__ subscribt am State-Singleton -> Leak ueber die Suite), sondern
         Aufruf der Methoden mit Fake-self.
         """
-        import json
         from types import SimpleNamespace
         from src.ui.visualizer.visualizer_window import VisualizerBridge
         f = next(x for x in self.state.get_patched_fixtures() if x.fid == 1)
@@ -102,10 +101,10 @@ class MultiHeadSpiderTest(unittest.TestCase):
                 h = seen.get(a, 0)
                 seen[a] = h + 1
                 attrs[a if h == 0 else f"{a}#{h}"] = self.u.get_channel(addr)
-        cap = {}
-        fake = SimpleNamespace(
-            dmxUpdated=SimpleNamespace(emit=lambda j: cap.update(json.loads(j))))
-        VisualizerBridge.push_dmx_update(fake, 1, attrs)
+        # VIZ-13 3c-4: Legacy push_dmx_update entfernt — die Pro-Fixture-Payload-
+        # Logik (heads-Array) lebt zentral im Service. Direkt dagegen testen.
+        from src.ui.visualizer.visualizer_service import _build_fixture_payload
+        cap = _build_fixture_payload(f, attrs)
         heads = cap.get("heads")
         assert heads is not None and len(heads) == 2, f"heads fehlt: {cap}"
         self.assertEqual((heads[0]["tilt"], heads[1]["tilt"]), (200, 55))
@@ -128,9 +127,7 @@ class MultiHeadSpiderTest(unittest.TestCase):
         `pan` und Bar 1 aus `tilt` speisen — sonst faellt Bar 1 auf denselben
         `tilt` zurueck und BEIDE Bars folgen nur "Tilt 2" (der gemeldete Bug).
         """
-        import json
         from types import SimpleNamespace
-        from src.ui.visualizer.visualizer_window import VisualizerBridge
         # Reales Speider/Mini-Layout: pan (Motor 1 / "Tilt 1") + tilt (Motor 2 /
         # "Tilt 2") + zwei Farb-Banks. pan=60, tilt=200 -> die zwei Bars MUESSEN
         # unterschiedlich kippen.
@@ -139,10 +136,9 @@ class MultiHeadSpiderTest(unittest.TestCase):
             "color_r": 255, "color_g": 0, "color_b": 0, "color_w": 0,         # Bank 1
             "color_r#1": 0, "color_g#1": 0, "color_b#1": 255, "color_w#1": 0,  # Bank 2
         }
-        cap = {}
-        fake = SimpleNamespace(
-            dmxUpdated=SimpleNamespace(emit=lambda j: cap.update(json.loads(j))))
-        VisualizerBridge.push_dmx_update(fake, 7, attrs)
+        # VIZ-13 3c-4: gegen den zentralen Service-Payload testen (Legacy weg).
+        from src.ui.visualizer.visualizer_service import _build_fixture_payload
+        cap = _build_fixture_payload(SimpleNamespace(fid=7), attrs)
         heads = cap.get("heads")
         assert heads is not None and len(heads) == 2, f"heads fehlt: {cap}"
         # Bar 0 <- pan (Motor 1), Bar 1 <- tilt (Motor 2): UNABHAENGIG.

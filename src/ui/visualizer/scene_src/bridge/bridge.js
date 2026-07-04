@@ -166,10 +166,9 @@ export function tryChannel() {
       if (bridge) {
         if (bridge.fixtureAdded)   bridge.fixtureAdded.connect(j => { addFixture(JSON.parse(j)); });
         if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); });
-        if (bridge.dmxUpdated)     bridge.dmxUpdated.connect(j => {
-          const d = JSON.parse(j);
-          updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-        });
+        // VIZ-13 3c-4: Legacy-Einzel-Handler bridge.dmxUpdated ENTFERNT — der
+        // Service pusht ausschliesslich als Batch-Array ueber dmxBatch (der Body
+        // ruft dasselbe updateFixture pro Element auf).
         if (bridge.dmxBatch)       bridge.dmxBatch.connect(j => {
           const arr = JSON.parse(j);
           for (const d of arr) {

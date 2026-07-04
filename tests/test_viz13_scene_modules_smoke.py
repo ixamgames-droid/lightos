@@ -65,7 +65,7 @@ _POLL_INTERVAL_S = 0.05
 _SIGNAL_SPECS = [
     ("fixtureAdded", (str,)),
     ("fixtureRemoved", (int,)),
-    ("dmxUpdated", (str,)),
+    # VIZ-13 3c-4: dmxUpdated entfernt — Bridge exponiert nur noch dmxBatch.
     ("dmxBatch", (str,)),
     ("allFixtures", (str,)),
     ("settingsChanged", (str,)),

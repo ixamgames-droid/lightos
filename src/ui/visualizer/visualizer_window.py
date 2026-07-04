@@ -51,7 +51,7 @@ from src.core.stage.aim import (
 from src.core.stage import scene_commands as _scmd
 from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
-from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget, _multihead_count
+from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -251,8 +251,9 @@ class VisualizerBridge(QObject):
     """Kommunikationsbruecke Python <-> JavaScript (Three.js).
 
     Signals -> JS
-        fixtureAdded(json), fixtureRemoved(fid), dmxUpdated(json),
-        dmxBatch(json) (VIZ-12: Array-Batch, Kompat-Signal dmxUpdated bleibt),
+        fixtureAdded(json), fixtureRemoved(fid),
+        dmxBatch(json) (VIZ-12: Array-Batch-Push, EINZIGER DMX-Pfad seit 3c-4 —
+        das Legacy-Einzelsignal dmxUpdated wurde entfernt),
         allFixtures(json), settingsChanged(json),
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
@@ -273,8 +274,7 @@ class VisualizerBridge(QObject):
     # ── Signals -> JavaScript ───────────────────────────────────────────────
     fixtureAdded            = Signal(str)
     fixtureRemoved          = Signal(int)
-    dmxUpdated              = Signal(str)
-    dmxBatch                = Signal(str)     # VIZ-12: Array-Batch-Push (Service-Kern), dmxUpdated bleibt Kompat/Test-API
+    dmxBatch                = Signal(str)     # VIZ-12: Array-Batch-Push (Service-Kern) — EINZIGER DMX-Pfad (Legacy dmxUpdated in 3c-4 entfernt)
     allFixtures             = Signal(str)
     settingsChanged         = Signal(str)
     viewModeChanged         = Signal(str)
@@ -948,69 +948,12 @@ class VisualizerBridge(QObject):
         _pop_fixture_scene_state(self._state, fid)
         self.fixtureRemoved.emit(fid)
 
-    def push_dmx_update(self, fid: int, attrs: dict[str, int]):
-        try:
-            r = attrs.get("color_r", 0)
-            g = attrs.get("color_g", 0)
-            b = attrs.get("color_b", 0)
-            w = attrs.get("color_w", 0)
-            intensity = attrs.get("intensity", 255)
-            pan = attrs.get("pan", 128)
-            tilt = attrs.get("tilt", 128)
-            payload: dict[str, object] = {
-                "fid": fid,
-                "r": min(255, r + w),
-                "g": min(255, g + w),
-                "b": min(255, b + w),
-                "intensity": intensity,
-                "pan": pan,
-                "tilt": tilt,
-            }
-            # ── Mehrkopf (Spider): zweite Bar separat senden ────────────────
-            # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N".
-            # Ein Spider hat zwei Tilts + zwei RGBW-Banks -> je Bar eine eigene
-            # Farbe + eigener Tilt. JS rendert daraus zwei einzeln tiltbare Bars.
-            head_count = _multihead_count(attrs)   # FM-2: Kopfzahl abgeleitet (Spider->2)
-            if head_count >= 2:
-                heads = []
-                # ── Tilt-Quelle pro Bar bestimmen ───────────────────────────
-                # Ein Spider hat zwei Tilt-Motoren, aber je nach Profil kommen
-                # sie UNTERSCHIEDLICH an:
-                #   * builtin SPIDER14 -> zwei `tilt`-Kanaele (tilt + tilt#1)
-                #   * viele QLC+-Importe ("Speider", "Mini Spider ZQ-B20", …)
-                #     mappen die zwei Tilt-Motoren als `pan` + `tilt`
-                #     (PositionPan/PositionTilt bzw. PositionXAxis/PositionYAxis).
-                # Ohne Sonderbehandlung faellt Bar 1 mangels `tilt#1` auf den
-                # einzigen `tilt` zurueck -> BEIDE Bars folgen demselben Motor
-                # (genau der Bug: nur „Tilt 2" bewegt die 3D-Bars). Darum den
-                # `pan`-Kanal als Tilt des ERSTEN Bars verwenden.
-                tilt_keys = ["tilt"] + [f"tilt#{h}" for h in range(1, head_count)]
-                tilt_sources = [attrs[k] for k in tilt_keys if k in attrs]
-                if len(tilt_sources) < head_count and "pan" in attrs:
-                    tilt_sources = [attrs["pan"]] + tilt_sources
-                while len(tilt_sources) < head_count:
-                    tilt_sources.append(tilt_sources[-1] if tilt_sources else tilt)
-                for h in range(head_count):
-                    sfx = "" if h == 0 else f"#{h}"
-                    hr = attrs.get(f"color_r{sfx}", 0)
-                    hg = attrs.get(f"color_g{sfx}", 0)
-                    hb = attrs.get(f"color_b{sfx}", 0)
-                    hw = attrs.get(f"color_w{sfx}", 0)
-                    heads.append({
-                        # Summenfarbe (Top-Down-Icon / Rueckwaerts-Kompat)
-                        "r": min(255, hr + hw),
-                        "g": min(255, hg + hw),
-                        "b": min(255, hb + hw),
-                        # Roh-Einzelkanaele: der Spider hat pro Bar 4 EINZELFARBEN-
-                        # LEDs (R/G/B/W), jede leuchtet nach ihrem eigenen Kanal.
-                        "cr": hr, "cg": hg, "cb": hb, "cw": hw,
-                        "pan": attrs.get(f"pan{sfx}", attrs.get("pan", 128)),  # FM-2: pro-Kopf-Pan
-                        "tilt": tilt_sources[h],
-                    })
-                payload["heads"] = heads
-            self.dmxUpdated.emit(json.dumps(payload))
-        except Exception as e:
-            print(f"[Visualizer] push_dmx_update error: {e}")
+    # VIZ-13 3c-4: ``push_dmx_update`` (Legacy-Einzel-Push + ``dmxUpdated``-
+    # Signal) ENTFERNT. Der produktive DMX-Push laeuft ausschliesslich ueber den
+    # ``VisualizerService`` (Batch-Array -> ``dmxBatch``); die Pro-Fixture-Payload-
+    # Logik (inkl. Spider-/Bar-``heads``-Array) lebt zentral in
+    # ``visualizer_service._build_fixture_payload``. Der frueher zur Parallel-
+    # Wartung noetige gespiegelte Zweig hier ist damit weg.
 
     def push_settings(self, s: dict):
         try:
