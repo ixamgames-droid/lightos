@@ -411,6 +411,41 @@ def _draw_spider(p: QPainter, s: int, color):
         p.drawEllipse(QRectF(x1 - r, cy - r, r * 2, r * 2))
 
 
+def _draw_par_bar(p: QPainter, s: int, color):
+    """PAR-Bar (FM-6): Gehaeuse-Balken mit 4 einzelnen PAR-Zellen."""
+    col = _qc(color)
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.05)))
+    p.setBrush(QBrush(col.darker(120)))
+    p.drawRoundedRect(QRectF(s * 0.08, s * 0.34, s * 0.84, s * 0.32), s * 0.06, s * 0.06)
+    p.setPen(Qt.PenStyle.NoPen)
+    n = 4
+    r = s * 0.10
+    for i in range(n):
+        cx = s * 0.20 + i * (s * 0.6 / (n - 1))
+        p.setBrush(QBrush(col.lighter(150)))
+        p.drawEllipse(QRectF(cx - r, s * 0.5 - r, r * 2, r * 2))
+
+
+def _draw_mover_bar(p: QPainter, s: int, color):
+    """Mover-Bar (FM-6): Gehaeuse-Balken mit 4 kleinen Moving-Heads."""
+    col = _qc(color)
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.06)))
+    p.setBrush(QBrush(col.darker(125)))
+    p.drawRoundedRect(QRectF(s * 0.08, s * 0.26, s * 0.84, s * 0.22), s * 0.05, s * 0.05)
+    n = 4
+    r = s * 0.085
+    for i in range(n):
+        cx = s * 0.20 + i * (s * 0.6 / (n - 1))
+        # Kopf
+        p.setPen(QPen(col.darker(160), max(0.8, s * 0.04)))
+        p.setBrush(QBrush(col))
+        p.drawEllipse(QRectF(cx - r, s * 0.52, r * 2, r * 2))
+        # Linse
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(col.lighter(150)))
+        p.drawEllipse(QRectF(cx - r * 0.45, s * 0.52 + r * 0.55, r * 0.9, r * 0.9))
+
+
 def _draw_hazer(p: QPainter, s: int, color):
     """Hazer: Maschinengehaeuse mit Duese und feinerer Nebelwolke."""
     col = _qc(color)
@@ -452,6 +487,8 @@ _PAINTERS = {
     "fx_moving_head": (_draw_moving_head, _FX_MOVING),
     "fx_par":         (_draw_par,         _FX_PAR),
     "fx_led_bar":     (_draw_bar,         _FX_BAR),
+    "fx_par_bar":     (_draw_par_bar,     _FX_PAR),
+    "fx_mover_bar":   (_draw_mover_bar,   _FX_MOVING),
     "fx_strobe":      (_draw_strobe,      _FX_STROBE),
     "fx_dimmer":      (_draw_dimmer,      _FX_DIMMER),
     "fx_scanner":     (_draw_scanner,     _FX_SCANNER),
@@ -521,30 +558,33 @@ def fixture_icon(fixture_type: str, size: int = 16) -> QIcon:
     return icon_for_kind(kind, size)
 
 
-# Module-level cache for the lazy-imported is_spider_fixture callable.
-_is_spider_fixture_fn = None
-_is_spider_fixture_loaded = False
+# Module-level cache for the lazy-imported viz_model_for callable.
+_viz_model_for_fn = None
+_viz_model_for_loaded = False
 
 
 def fixture_icon_for(fixture, size: int = 16) -> QIcon:
-    """Icon fuer ein PatchedFixture-Objekt mit Spider-Erkennung.
+    """Icon fuer ein PatchedFixture-Objekt mit Multi-Emitter-Erkennung (FM-6).
 
-    Prueft via is_spider_fixture (lazy import aus src.core.app_state), ob das
-    Geraet ein Spider ist, und liefert dann das Spider-Icon. Bei jedem anderen
-    Typ delegiert es an fixture_icon. Schlaegt der Import fehl, wird immer auf
+    Nutzt das zentrale ``viz_model_for`` (lazy import aus src.core.app_state) —
+    dieselbe Quelle wie 3D-Modell und 2D-Symbol — und liefert bei 'spider' /
+    'par_bar' / 'mover_bar' das jeweilige Icon. Bei jedem anderen Geraet (Rueckgabe
+    None) delegiert es an fixture_icon. Schlaegt der Import fehl, wird immer auf
     das Typ-Icon zurueckgefallen — mini_icons bleibt standalone importierbar.
     """
-    global _is_spider_fixture_fn, _is_spider_fixture_loaded
-    if not _is_spider_fixture_loaded:
-        _is_spider_fixture_loaded = True
+    global _viz_model_for_fn, _viz_model_for_loaded
+    if not _viz_model_for_loaded:
+        _viz_model_for_loaded = True
         try:
-            from src.core.app_state import is_spider_fixture as _fn
-            _is_spider_fixture_fn = _fn
+            from src.core.app_state import viz_model_for as _fn
+            _viz_model_for_fn = _fn
         except Exception:
-            _is_spider_fixture_fn = None
+            _viz_model_for_fn = None
     try:
-        if _is_spider_fixture_fn is not None and _is_spider_fixture_fn(fixture):
-            return icon_for_kind("fx_spider", size)
+        if _viz_model_for_fn is not None:
+            model = _viz_model_for_fn(fixture)
+            if model in ("spider", "par_bar", "mover_bar"):
+                return icon_for_kind(f"fx_{model}", size)
     except Exception:
         pass
     return fixture_icon(getattr(fixture, "fixture_type", "other"), size)

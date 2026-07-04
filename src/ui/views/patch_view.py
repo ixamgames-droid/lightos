@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
-from src.core.app_state import (get_state, AppState, is_spider_fixture,
-                                 get_channels_for_patched)
+from src.core.app_state import (get_state, AppState,
+                                 get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
 from src.ui.widgets.fixture_browser import FixtureBrowserDialog
@@ -237,10 +237,13 @@ class PatchFixtureEditDialog(QDialog):
             form.addRow("Pan-Mitte (DMX):", self._spin_pan_zero)
             form.addRow("Tilt-Mitte (DMX):", self._spin_tilt_zero)
 
-        # Spider-Doppelbar (nur fuer Spider): ist die 2. Farbreihe gespiegelt
-        # (W,B,G,R) oder parallel zur ersten (R,G,B,W)? Rein visuell (3D).
+        # Spider-Doppelbar (NUR fuer echte Spider, nicht par_bar/mover_bar): ist
+        # die 2. Farbreihe gespiegelt (W,B,G,R) oder parallel (R,G,B,W)? Rein
+        # visuell (3D). Gating ueber die zentrale viz_model_for (FM-7) — die
+        # neuen Bar-Archetypen sind zwar is_spider_fixture (>=2 Banks), haben
+        # aber keine gespiegelte 2. Bar, also keine Spiegel-Option.
         self._combo_spider = None
-        if is_spider_fixture(self._fixture):
+        if viz_model_for(self._fixture) == "spider":
             self._combo_spider = QComboBox()
             self._combo_spider.addItem("Gespiegelt (W, B, G, R)", True)
             self._combo_spider.addItem("Parallel (R, G, B, W)", False)

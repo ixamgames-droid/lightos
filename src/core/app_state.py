@@ -2029,6 +2029,33 @@ def is_spider_fixture(fixture) -> bool:
         return False
 
 
+def viz_model_for(fixture):
+    """Zentrales Render-Modell-Routing fuer Multi-Emitter-Geraete (FM-3..7).
+
+    EINZIGE Quelle, damit 2D-Symbol (``live_view``/``mini_icons``), 3D-Modell
+    (``VisualizerBridge._viz_model_for``) und die Patch-Spiegel-Option NICHT
+    auseinanderdriften. Rein aus dem Kanal-Layout:
+      * kein ``is_spider_fixture`` (>=2 RGBW-Banks) -> ``None`` (Aufrufer nutzt
+        den ``fixture_type``).
+      * >=2 ``pan`` (Pro-Kopf-Pan)         -> ``'mover_bar'`` (FM-4: N Mini-MHs).
+      * keine Bewegung (kein Pan, kein Tilt) -> ``'par_bar'`` (FM-3: N PARs).
+      * sonst (Bewegung, aber kein Pro-Kopf-Pan) -> ``'spider'`` (Doppelbar).
+    """
+    if not is_spider_fixture(fixture):
+        return None
+    try:
+        chans = get_channels_for_patched(fixture)
+    except Exception:
+        return "spider"
+    pan_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
+    tilt_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
+    if pan_count >= 2:
+        return "mover_bar"
+    if pan_count == 0 and tilt_count == 0:
+        return "par_bar"
+    return "spider"
+
+
 def tilt_head_count(fixture) -> int:
     """Anzahl separater Tilt-Motoren/Koepfe (Kanaele mit attribute == 'tilt').
     Fine-Kanaele heissen 'tilt_fine' und zaehlen NICHT mit — ein 16-bit-Single-
