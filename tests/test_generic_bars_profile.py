@@ -195,17 +195,18 @@ class GenericBarsRoutingTest(unittest.TestCase):
                     for c in _channels(_mode(_load(s, short), mode_name))]
 
     def _model_for(self, chans):
-        import src.ui.visualizer.visualizer_window as VW
-        saved_g, saved_s = VW.get_channels_for_patched, VW.is_spider_fixture
-        VW.get_channels_for_patched = lambda f: chans
-        VW.is_spider_fixture = lambda f: sum(
-            1 for c in chans if c.attribute == "color_r") >= 2
+        # _viz_model_for delegiert an das zentrale app_state.viz_model_for
+        # (FM-7), das seinerseits app_state.get_channels_for_patched nutzt (auch
+        # via is_spider_fixture) -> dort patchen, nicht auf Fenster-Ebene.
+        import src.core.app_state as AS
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        saved = AS.get_channels_for_patched
+        AS.get_channels_for_patched = lambda f: chans
         try:
-            return VW.VisualizerBridge._viz_model_for(
+            return VisualizerBridge._viz_model_for(
                 SimpleNamespace(), SimpleNamespace(fixture_type="moving_head"))
         finally:
-            VW.get_channels_for_patched = saved_g
-            VW.is_spider_fixture = saved_s
+            AS.get_channels_for_patched = saved
 
     def test_mover_bar_routes_to_mover_bar(self):
         chans = self._chans_for("MOVBAR4", "22-Kanal 4×Move RGB")

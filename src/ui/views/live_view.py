@@ -15,7 +15,8 @@ from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMim
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
-from src.core.app_state import get_state, get_channels_for_patched, is_spider_fixture
+from src.core.app_state import (
+    get_state, get_channels_for_patched, viz_model_for)
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
@@ -127,7 +128,54 @@ class FixtureRenderer:
 
         ft = (fixture_type or "").lower()
 
-        if "moving" in ft or "head" in ft:
+        if ft == "par_bar":
+            # PAR-Bar (FM-3): Gehaeuse-Balken mit N einzelnen PAR-Zellen
+            # (grandMA3-Lichtplan-Stil). Exakter Match VOR "par"/"bar", sonst
+            # faengt der PAR- bzw. LED-Bar-Zweig es ab.
+            painter.setBrush(QBrush(QColor("#161616")))
+            painter.setPen(QPen(QColor("#555"), 1.5))
+            painter.drawRoundedRect(QRectF(-size*0.95, -size*0.30, size*1.9, size*0.6), 4, 4)
+            n_cells = 4
+            step = size*1.7 / n_cells
+            cell_r = min(size*0.20, step*0.42)
+            for i in range(n_cells):
+                cx = -size*0.85 + step*(i+0.5)
+                grad = QRadialGradient(cx, 0, cell_r)
+                grad.setColorAt(0, color.lighter(180))
+                grad.setColorAt(0.6, color)
+                grad.setColorAt(1, glow_color)
+                painter.setBrush(QBrush(grad))
+                painter.setPen(QPen(QColor("#222"), 1))
+                painter.drawEllipse(QPointF(cx, 0), cell_r, cell_r)
+            label_prefix = "PARBAR"
+
+        elif ft == "mover_bar":
+            # Mover-Bar (FM-4): Gehaeuse-Balken mit N kleinen Moving-Heads, je mit
+            # Beam-Richtung (gemeinsamer Pan im 2D; Pro-Kopf-Pan nur 3D/DMX).
+            from math import cos, sin
+            painter.setBrush(QBrush(QColor("#222")))
+            painter.setPen(QPen(QColor("#666"), 1.5))
+            painter.drawRoundedRect(QRectF(-size*0.95, -size*0.24, size*1.9, size*0.48), 4, 4)
+            n_cells = 4
+            step = size*1.7 / n_cells
+            head_r = min(size*0.16, step*0.36)
+            pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
+            for i in range(n_cells):
+                cx = -size*0.85 + step*(i+0.5)
+                grad = QRadialGradient(cx, 0, head_r)
+                grad.setColorAt(0, color.lighter(150))
+                grad.setColorAt(0.7, color)
+                grad.setColorAt(1, color.darker(120))
+                painter.setBrush(QBrush(grad))
+                painter.setPen(QPen(QColor("#888"), 1))
+                painter.drawEllipse(QPointF(cx, 0), head_r, head_r)
+                bx = cx + cos(pan_rad - 1.5708) * size*0.26
+                by = sin(pan_rad - 1.5708) * size*0.26
+                painter.setPen(QPen(color, 1.5))
+                painter.drawLine(QPointF(cx, 0), QPointF(bx, by))
+            label_prefix = "MOVBAR"
+
+        elif "moving" in ft or "head" in ft:
             # Moving Head: Diamant + Yoke
             painter.setBrush(QBrush(QColor("#2a2a2a")))
             painter.setPen(QPen(QColor("#666"), 1))
@@ -998,11 +1046,12 @@ class StageCanvas(QWidget):
             strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running)
             effects = self._get_active_effects(fixture.fid, strobe_hz, running)
             label = f"{fixture.fid}"
-            # Verfeinerten Render-Typ berechnen: Spider wird von moving_head getrennt
-            # (spiegelt die 3D-Logik aus _viz_model_for in visualizer_view.py).
+            # Verfeinerten Render-Typ berechnen: par_bar/mover_bar/spider werden
+            # von moving_head getrennt — dieselbe zentrale Quelle wie das 3D-Modell
+            # (viz_model_for), damit 2D-Symbol und 3D-Render nicht driften (FM-6/7).
             _base_type = fixture.fixture_type or "par"
             try:
-                _render_type = "spider" if is_spider_fixture(fixture) else _base_type
+                _render_type = viz_model_for(fixture) or _base_type
             except Exception:
                 _render_type = _base_type
             _pr = float(getattr(fixture, "pan_range_deg", 540) or 540)

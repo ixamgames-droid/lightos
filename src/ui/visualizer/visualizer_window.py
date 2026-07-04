@@ -32,6 +32,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
+    viz_model_for,
 )
 from src.core.database.models import PatchedFixture
 from src.core.stage.stage_definition import (
@@ -1120,17 +1121,12 @@ class VisualizerBridge(QObject):
         (Bewegung, aber kein pro-Kopf-Pan — auch die QLC+-Importe, die die Bar-
         Motoren als `pan` statt `tilt` mappen, haben nur EINEN Pan). Sonst der
         fixture_type.
+
+        Delegiert an das zentrale ``viz_model_for`` (app_state) — dieselbe Quelle,
+        die auch das 2D-Symbol (live_view/mini_icons) und die Patch-Spiegel-Option
+        nutzen, damit 2D und 3D nicht auseinanderdriften (FM-7).
         """
-        if is_spider_fixture(f):        # >=2 RGBW-Banks
-            chans = get_channels_for_patched(f)
-            pan_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
-            tilt_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
-            if pan_count >= 2:
-                return "mover_bar"            # pro-Kopf-Pan -> N Moving Heads
-            if pan_count == 0 and tilt_count == 0:
-                return "par_bar"              # keine Bewegung -> statische PAR-Bar
-            return "spider"                   # Bewegung, aber kein pro-Kopf-Pan
-        return f.fixture_type
+        return viz_model_for(f) or f.fixture_type
 
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
         pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
