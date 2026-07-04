@@ -289,6 +289,8 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     stacks_data = [s.to_dict() for s in getattr(state, "cue_stacks", [])]
     palettes_data = pm.to_dict()
     curves_data = get_curve_library().to_dict()
+    # LAS-07b: gezeichnete Laser-Muster.
+    laser_figures_data = [f.to_dict() for f in getattr(state, "laser_figures", [])]
 
     from src.core.engine.efx_path import get_efx_path_library
     efx_paths_data = get_efx_path_library().to_dict()
@@ -384,6 +386,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "executors": executors_data,
         "palettes": palettes_data,
         "curves": curves_data,
+        "laser_figures": laser_figures_data,
         "efx_paths": efx_paths_data,
         "functions": functions_data,
         "tempo_buses": tempo_buses_data,
@@ -534,6 +537,12 @@ def reset_show():
         state.cue_stacks.clear()
     except Exception as e:
         print(f"[show_file] reset cue stacks error: {e}")
+
+    # LAS-07b: gezeichnete Laser-Muster leeren.
+    try:
+        state.laser_figures = []
+    except Exception as e:
+        print(f"[show_file] reset laser figures error: {e}")
 
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
@@ -717,6 +726,14 @@ def load_show(path: str | os.PathLike):
         get_curve_library().from_dict(data.get("curves", {}) or {})
     except Exception as e:
         _lenient("load curves error", e)
+
+    # LAS-07b: gezeichnete Laser-Muster.
+    try:
+        from src.core.laser.figure import LaserFigure
+        state.laser_figures = [LaserFigure.from_dict(d)
+                               for d in (data.get("laser_figures") or [])]
+    except Exception as e:
+        _lenient("load laser figures error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library

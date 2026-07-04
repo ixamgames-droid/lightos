@@ -220,6 +220,13 @@ class ShowFileTests(unittest.TestCase):
         # werden NICHT mehr ueber State-Listen gespeichert (Bloecke bleiben leer).
         self.state._efx_instances = [_FakeEfxInstance("EFX A")]
         self.state._rgb_matrix_instances = [_FakeRgbMatrixInstance("RGB A")]
+        # LAS-07b: gezeichnete Laser-Muster mit-serialisieren.
+        from src.core.laser.figure import FigurePoint, LaserFigure
+        self.state.laser_figures = [
+            LaserFigure(name="Stern", closed=True,
+                        points=[FigurePoint(0.0, 1.0, r=1.0, g=0.0, b=0.0),
+                                FigurePoint(-0.6, -0.8, blank=True),
+                                FigurePoint(0.6, -0.8)])]
 
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "roundtrip.lshow")
@@ -228,6 +235,8 @@ class ShowFileTests(unittest.TestCase):
             with zipfile.ZipFile(path, "r") as zf:
                 data = json.loads(zf.read("show.json").decode("utf-8"))
             self.assertEqual(data["version"], "1.2")
+            self.assertEqual(len(data.get("laser_figures", [])), 1)
+            self.assertEqual(data["laser_figures"][0]["name"], "Stern")
             self.assertIn("patch", data)
             self.assertEqual(data["patch"][0]["fixture_profile_id"], 100)
             self.assertIn("functions", data)
@@ -242,6 +251,7 @@ class ShowFileTests(unittest.TestCase):
             self.state._vc_layout = {"old": True}
             self.state._efx_instances = []
             self.state._rgb_matrix_instances = []
+            self.state.laser_figures = []
             self.state.show_name = "Old Show"
 
             ok, msg = self.show_file.load_show(path)
@@ -259,6 +269,11 @@ class ShowFileTests(unittest.TestCase):
             # Migration.
             self.assertEqual(self.state._efx_instances, [])
             self.assertEqual(self.state._rgb_matrix_instances, [])
+            # LAS-07b: Laser-Figuren wiederhergestellt (inkl. Farbe + Blank).
+            self.assertEqual(len(self.state.laser_figures), 1)
+            self.assertEqual(self.state.laser_figures[0].name, "Stern")
+            self.assertEqual(len(self.state.laser_figures[0].points), 3)
+            self.assertTrue(self.state.laser_figures[0].points[1].blank)
             self.assertEqual(self.state.function_manager.added, [])
             self.assertEqual(self.state.sync.refresh_count, 1)
             emitted_names = [ev[0] for ev in self.state.emitted]

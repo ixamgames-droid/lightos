@@ -190,17 +190,16 @@ class LaserView(QWidget):
         src_row = QHBoxLayout()
         src_row.addWidget(QLabel("Ausgabe:"))
         self._combo_figure = QComboBox()
-        self._combo_figure.addItem("Testmuster (Kreis)", None)
-        try:
-            from src.core.laser.figure import builtin_figures
-            for fig in builtin_figures():
-                self._combo_figure.addItem(f"Figur: {fig.name}", fig)
-        except Exception as e:
-            print(f"[laser_view] builtin figures error: {e}")
         self._combo_figure.currentIndexChanged.connect(
             weak_slot(self._on_figure_changed))
         src_row.addWidget(self._combo_figure, stretch=1)
+        self._btn_draw = QPushButton("✏️ Zeichnen…")
+        self._btn_draw.setToolTip("Eigenes Laser-Muster zeichnen (Punkte, "
+                                  "Farben) — live sichtbar bei scharfem Laser.")
+        self._btn_draw.clicked.connect(weak_slot(self._on_draw))
+        src_row.addWidget(self._btn_draw)
         sb.addLayout(src_row)
+        self._rebuild_figure_combo()
         self._arm_hint = QLabel(
             "Beim Scharfschalten tritt echtes Laserlicht aus. "
             "Publikum/Augen schützen, Not-Aus bereithalten.")
@@ -283,6 +282,7 @@ class LaserView(QWidget):
             lo.clear_figures()
         try:
             self._btn_arm.setChecked(False)
+            self._rebuild_figure_combo()     # neue Show → neue Figuren-Bibliothek
             self._combo_figure.setCurrentIndex(0)
             self._update_arm_button()
         except RuntimeError:
@@ -402,15 +402,82 @@ class LaserView(QWidget):
     def _on_figure_changed(self, _idx: int):
         self._apply_figure_to_selection()
 
-    def _apply_figure_to_selection(self):
-        """Setzt die gewählte Figur (oder Testmuster=None) als Framequelle für
-        alle Netzwerk-Laser der aktuellen Auswahl."""
+    def _apply_figure_to_selection(self, figure=...):
+        """Setzt die Figur (Default: die in der Combo gewählte; ``None`` =
+        Testmuster) als Framequelle für alle Netzwerk-Laser der Auswahl."""
         lo = self._laser_output()
         if lo is None:
             return
-        figure = self._combo_figure.currentData()
+        if figure is ...:
+            figure = self._combo_figure.currentData()
         for fid in getattr(self, "_network_fids", []):
             lo.set_figure(fid, figure)
+
+    def _rebuild_figure_combo(self):
+        """Combo neu füllen: Testmuster + eingebaute Figuren + gespeicherte
+        Show-Figuren. Erhält die aktuelle Auswahl über den Namen, wenn möglich."""
+        prev = self._combo_figure.currentData()
+        prev_name = getattr(prev, "name", None)
+        self._combo_figure.blockSignals(True)
+        self._combo_figure.clear()
+        self._combo_figure.addItem("Testmuster (Kreis)", None)
+        try:
+            from src.core.laser.figure import builtin_figures
+            for fig in builtin_figures():
+                self._combo_figure.addItem(f"Figur: {fig.name}", fig)
+        except Exception as e:
+            print(f"[laser_view] builtin figures error: {e}")
+        try:
+            saved = list(getattr(get_state(), "laser_figures", []) or [])
+        except Exception:
+            saved = []
+        for fig in saved:
+            self._combo_figure.addItem(f"★ {fig.name}", fig)
+        # Auswahl nach Namen wiederherstellen.
+        idx = 0
+        if prev_name:
+            for i in range(self._combo_figure.count()):
+                d = self._combo_figure.itemData(i)
+                if getattr(d, "name", None) == prev_name:
+                    idx = i
+                    break
+        self._combo_figure.setCurrentIndex(idx)
+        self._combo_figure.blockSignals(False)
+
+    def _on_draw(self):
+        """Zeichen-Dialog öffnen. Live-Vorschau streamt die Figur an die
+        Netzwerk-Laser der Auswahl (sichtbar nur bei scharfem Laser). Beim
+        Speichern landet sie in der Show-Figuren-Bibliothek + wird aktiv."""
+        try:
+            from src.ui.widgets.laser_draw_editor import LaserDrawDialog
+        except Exception as e:
+            print(f"[laser_view] draw editor unavailable: {e}")
+            return
+        base = self._combo_figure.currentData()   # ausgewählte Figur als Start
+        dlg = LaserDrawDialog(
+            figure=base, parent=self,
+            on_live_update=lambda fig: self._apply_figure_to_selection(fig))
+        dlg.exec()
+        # Nach dem Dialog: aktive Combo-Figur wieder streamen (Live-Preview end).
+        self._apply_figure_to_selection()
+        fig = getattr(dlg, "result_figure", None)
+        if fig is None or not fig.points:
+            return
+        # In der Show speichern (gleicher Name ersetzt) und aktiv setzen.
+        try:
+            state = get_state()
+            figs = [f for f in getattr(state, "laser_figures", [])
+                    if f.name != fig.name]
+            figs.append(fig)
+            state.laser_figures = figs
+        except Exception as e:
+            print(f"[laser_view] save figure error: {e}")
+        self._rebuild_figure_combo()
+        for i in range(self._combo_figure.count()):
+            d = self._combo_figure.itemData(i)
+            if getattr(d, "name", None) == fig.name:
+                self._combo_figure.setCurrentIndex(i)
+                break
 
     def _template_channels(self) -> list:
         """Vereinigung der Laser-Kanäle aller selektierten Laser (ein Kanal je
