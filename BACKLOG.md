@@ -37,12 +37,12 @@ _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho
 **Noch offen / muss man noch anpassen (entdeckt):**
 | ID | Prio | Status | Titel / Notiz |
 |----|------|--------|---------------|
-| LAS-18b | P2 | **Design geklärt** (Foto-Import) | L2600-**Werksmuster-Picker**. Web-Recherche 2026-07-04 ausgereizt: es gibt KEINE öffentliche „DMX-Wert → Muster"-Tabelle (Muster generisch/unbenannt), Custom-Muster definitiv widerlegt. **Design:** Picker mit nummerierten (Bank,Wert)-Kacheln + **pro-Slot-Foto/Screenshot-Import** — David fotografiert Slots am Gerät. Startbestückung optional per Frame-Analyse aus Demo-Video (Kris Szanto `youtube.com/watch?v=OEdTH9DhGVM`, DMX ab 19:43). |
+| LAS-18b | P2 | **Design geklärt** (Foto-Import) | L2600-**Werksmuster-Picker**. Recherche + Davids Handbuch bestätigen: Muster sind generisch (CH4 „jeder Wert = ein Muster", unbenannt), keine Tabelle. **Design:** Picker mit (Bank CH3, Wert CH4)-Kacheln + **pro-Slot-Foto-Import** — David fotografiert Slots am Gerät. |
 | LAS-18c | P3 | blocked (Hardware) | Figur→Werksmuster-**Näherungs-Matcher** (`pattern_match.py`): Zeichnung → nächstpassendes eingebautes Muster als LASER-Palette. |
-| — | P2 | prüfen | **⚠️ Kanalzahl-Diskrepanz:** Ehaho-Produktseite sagt **32ch** Professional, unser Manual/Builtin **34ch**. An Davids Gerät gegenprüfen (mit LAS-09). |
+| — | P3 | Handbuch offen | **Seite 8 (CH20–28) nachfotografieren** (David hatte Seite 7 doppelt). Danach fixture_db-Kommentare „unverifiziert" entfernen + Y-Bewegungs-Labels (CH8/CH25) ans Handbuch angleichen. |
 | LAS-20 | P3 | blocked (Hardware) | `.ild`-Exporter für ShowNET/ILDA+SD-Laser — nur bauen, wenn solche Hardware da ist (sonst toter Code). |
 | LAS-03-Rest | P3 | todo | Laser-Kanalwerte in **Snap/Szenen-Capture** aufnehmen (Muster-Abruf auch über Snaps/Szenen). |
-| LAS-09 | P2 | blocked (Hardware) | L2600 am Gerät prüfen: Ch18=0-Semantik, 6ch-Ch5. |
+| ~~LAS-09~~ | — | ✅ gelöst (Handbuch) | 34ch bestätigt (nicht 32); CH18: 0=Alle AUS, 255=Gruppe A AUS/B EIN → Shutter-Default 0 korrekt. |
 | — | P3 | blocked | **Hardware-Verifikation** Ether Dream + IDN (nur gegen Fakes getestet, kein DAC/Gerät). ShowNET/Moncha-Profile (Charts fehlen). |
 
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
