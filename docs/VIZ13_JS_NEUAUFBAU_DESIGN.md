@@ -171,3 +171,35 @@ Der Auftrag verlangt die Entfernung des `dmxUpdated`-Einzelsignals (VIZ-12-Entsc
 **Ergebnis: native ESM bestaetigt, KEIN Konkat-Fallback noetig.** Skeleton unter `src/ui/visualizer/scene_src/` (`app.js` importiert `probe_util.js`) + Test-Page `src/ui/visualizer/stage_scene_esm_probe.html`, die exakt die Produktiv-Ladereihenfolge nachstellt (`qwebchannel.js` qrc-Script -> `three_local.js` klassisch -> `<script type="module">`). Neuer Smoke-Test `tests/test_viz13_esm_smoke.py` laedt die Probe-Page in einer echten `QWebEngineView` (offscreen, `LocalContentCanAccessFileUrls=True`, `QWebChannel` registriert wie in `visualizer_view.py`/`visualizer_window.py`) und belegt: `window.__lightosEsmOk === true` (Modul lief), `window.THREE` im Modul sichtbar (`hasThree`/`hasVector3`), `qt.webChannelTransport` existiert bereits beim ersten Poll (Bridge-Timing OK trotz implizitem `defer` von `type=module`). Kein Renderer wird instanziiert (WebGL fehlt offscreen).
 
 **Beobachtete Nebenerkenntnis (test-seitig, kein Produktiv-Risiko):** `QWebEnginePage.runJavaScript()` liefert komplexe JS-Objekte ueber die PySide6-Bruecke nicht zuverlaessig als Python-`dict` — beobachtet wurde ein leerer String `''` trotz existierendem Objekt im Renderer. Workaround im Test: `JSON.stringify(...)` im JS-Ausdruck + `json.loads(...)` in Python. Betrifft nur Test-Introspektion (`runJavaScript`), nicht den Bridge-Vertrag (der laeuft ueber `QWebChannel`-Signale/Slots, nicht `runJavaScript` — 0 Treffer in `src/`, s. Leitprinzip oben).
+
+---
+
+## 3b-Nachtrag (2026-07-04): OHNE externe Controls (Davids Entscheidung)
+
+OrbitControls/TransformControls werden NICHT vendored. Stattdessen Eigenbau auf Basis
+der bereits vorhandenen theta/phi/radius-Orbit-Kamera (camera/cameras.js) + eigenes
+Transform-Gizmo. 3b wird in ZWEI mergebare Runden geteilt:
+
+### 3b-K (Kamera — zuerst, risikoarm, hoher Nutzen)
+- **Presets** Top/Front/Seite/Perspektive/Frei: setzen theta/phi/radius (+Ziel) auf feste
+  Werte; „Frei" = aktuelle freie Orbit-Steuerung. Toolbar-Umschalter im Fenster.
+- **Fit / Fit-Selected**: Bounding-Box aller bzw. selektierter Fixtures berechnen,
+  radius+target so setzen, dass alles ins Bild passt (F-Taste = Fit-Selected).
+- **Benannte Kameras**: theta/phi/radius/target (+ 2D-Ortho-Zustand: orthoSize/pan)
+  speichern/laden. Persistenz: additiver Show-Block `visualizer.named_cameras`
+  (KEIN SHOW_VERSION-Bump; alte Shows → leere Liste). Additive Bridge-Signale
+  `cameraPreset(name)`/`namedCamerasChanged(json)` + Slot `cameraSaved(json)`.
+- **FPS-Debug-Toggle**.
+- Eigenbau-Orbit bleibt; nur Damping/Orbit-um-Klickpunkt optional verbessern.
+
+### 3b-G (Gizmo — danach, eigene sorgfältige Runde)
+- Schlankes, selbstgebautes **Move/Rotate-Gizmo** am selektierten Objekt: 3 Achsen-Handles
+  (X/Y/Z, eingefärbt) für Translation, Rotations-Ringe/Handles für Drehung. Pointer-Down
+  auf ein Handle → Raycast auf Achsen-Ebene → Bewegung auf die Achse projizieren.
+  Snapping via Runden (translationSnap=Rasterschritt, rotationSnap=15°, Snap-Escape mit Strg).
+- Ersetzt die Verschieben/Höhe/Drehen-Buttons UND behebt die Pixel-Faktor-Sprünge
+  strukturell (zoom-korrekte Welt-Deltas statt fixer px-Faktoren).
+- **Gizmo → fixtureGestureEnd**: EIN Undo-Command pro Gestik (Drag-Start-Snapshot,
+  Commit bei Drag-Ende); Docking-Preview live während des Drags, Commit erst am Ende
+  (Muster wie im Haupt-Design beschrieben). Multi-Select-Drag = EIN Command (Composite).
+- Während einer Gizmo-Gestik ist die Orbit-Kamera-Drag gesperrt (kein Konflikt).

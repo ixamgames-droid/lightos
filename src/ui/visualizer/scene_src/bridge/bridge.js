@@ -9,12 +9,14 @@ import { fixtures, settings, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines } from '../interaction/tools.js';
+import { setFpsVisible } from '../camera/presets.js';
 import {
   loadStageJson, createStageObject, removeStageObject, updateStageObjectProps,
   setResizeModeEnabled,
 } from '../stage/stage_objects.js';
 import { hideTooltip } from '../interaction/pointer.js';
 import { resetCameraView } from '../camera/cameras.js';
+import { setCameraPreset, setNamedCameras } from '../camera/presets.js';
 import { deg2rad, rad2deg } from '../scene/renderer.js';
 import { clearDockHighlight } from '../stage/docking.js';
 
@@ -138,6 +140,10 @@ export function applySettings(s) {
     settings.dockEnabled = s.dockEnabled;
     if (!s.dockEnabled) clearDockHighlight();
   }
+  // VIZ-13 Schritt 3b-K-2: FPS-Debug-Overlay-Toggle (Einstellungen-Tab).
+  // Kein eigener Bridge-Vertrag noetig (Design-Dokument (c) "FPS-Debug-
+  // Toggle") - reist additiv im bestehenden settingsChanged-JSON mit.
+  if (typeof s.fpsVisible === 'boolean') setFpsVisible(s.fpsVisible);
   for (const fid in fixtures) {
     const f = fixtures[fid];
     if (f.beam) f.beam.visible = settings.showCones && (view.mode === '3D') && f.beam.material.opacity > 0.01;
@@ -196,6 +202,15 @@ export function tryChannel() {
         if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
         if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));
         if (bridge.cameraReset)    bridge.cameraReset.connect(() => resetCameraView());
+        // VIZ-13 Schritt 3b-K-2: Kamera-Preset-Auswahl aus der Toolbar +
+        // gespeicherte-Kameras-Liste (additiv zu cameraReset).
+        if (bridge.cameraPreset)  bridge.cameraPreset.connect(name => setCameraPreset(name));
+        // Python-Signal heisst namedCamerasChanged (NICHT "setX" — QWebChannel
+        // exponiert "set"-praefigierte Signale nicht). Der JS-Handler ist die
+        // importierte presets.js-Funktion setNamedCameras (lokal, kein Signal).
+        if (bridge.namedCamerasChanged) bridge.namedCamerasChanged.connect(j => {
+          try { setNamedCameras(JSON.parse(j)); } catch (e) {}
+        });
         if (bridge.brightnessSignal) bridge.brightnessSignal.connect(v => setBrightnessManual(v));
         if (bridge.brightnessAutoSignal) bridge.brightnessAutoSignal.connect(() => resetBrightnessAuto());
         if (bridge.updateStageObject) bridge.updateStageObject.connect(j => {

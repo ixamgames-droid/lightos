@@ -58,6 +58,7 @@ export const {
   Raycaster,
   RingGeometry,
   Scene,
+  Sphere,
   SpotLight,
   Sprite,
   SpriteMaterial,

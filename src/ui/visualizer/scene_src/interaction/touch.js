@@ -4,6 +4,7 @@
 import { renderer } from '../scene/renderer.js';
 import { rad2deg } from '../scene/renderer.js';
 import { orthoCam, orthoState, resizeOrtho, panCamera3D, resetCameraView } from '../camera/cameras.js';
+import { fitSelected } from '../camera/presets.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import { setMouseFromCoords, pickFixture, pickStageObject, snap } from './picking.js';
 import { findDockTarget, moveDockedFixtures, _reportDockedFixturePositions } from '../stage/docking.js';
@@ -213,6 +214,9 @@ window.addEventListener('keydown', function(e) {
     view.selectedFids = [];
     view.selectedStageId = null;
     updateOutlines();
+  } else if (e.key === 'f' || e.key === 'F') {
+    // VIZ-13 Schritt 3b-K-1: F-Taste = Fit-Selected (leere Auswahl -> Fit-All)
+    fitSelected();
   }
 });
 
