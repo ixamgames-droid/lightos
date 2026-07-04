@@ -19,7 +19,7 @@ import math
 
 from PySide6.QtCore import Qt, QPoint, QRect
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDialog,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
                                QDialogButtonBox, QFrame, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QSpinBox, QVBoxLayout, QWidget)
@@ -35,21 +35,27 @@ _COLORS = [
     ("Magenta", (1.0, 0.0, 1.0)),
 ]
 
-# Werkzeuge des Studios: „Bearbeiten" (Punkte setzen/ziehen, Default) + Form-
-# werkzeuge (aufziehen = Anker am Druck, Größe per Ziehen). Key → Button-Text.
+# Werkzeuge des Studios: „Bearbeiten" (Punkte setzen/ziehen, Default),
+# „Freihand" (Finger-Strich, wird vereinfacht) + Formwerkzeuge (aufziehen =
+# Anker am Druck, Größe per Ziehen). Key → Button-Text.
 TOOL_EDIT = "edit"
+TOOL_FREEHAND = "freehand"
 _TOOLS = [
-    (TOOL_EDIT,   "✥ Bearbeiten"),
-    ("circle",    "○ Kreis"),
-    ("rectangle", "▭ Rechteck"),
-    ("line",      "／ Linie"),
-    ("polygon",   "⬠ Polygon"),
-    ("star",      "★ Stern"),
+    (TOOL_EDIT,     "✥ Bearbeiten"),
+    (TOOL_FREEHAND, "✎ Freihand"),
+    ("circle",      "○ Kreis"),
+    ("rectangle",   "▭ Rechteck"),
+    ("line",        "／ Linie"),
+    ("polygon",     "⬠ Polygon"),
+    ("star",        "★ Stern"),
 ]
-_SHAPE_TOOLS = {k for k, _ in _TOOLS if k != TOOL_EDIT}
+# Formwerkzeuge = Anker+Ziehen; Freihand hat ein eigenes Strich-Modell.
+_SHAPE_TOOLS = {k for k, _ in _TOOLS if k not in (TOOL_EDIT, TOOL_FREEHAND)}
 # Mindest-Aufziehgröße (normiert), damit ein versehentlicher Tipp keine
 # entartete Form erzeugt.
 _MIN_SHAPE = 0.04
+# Glättungs-Stufen für Freihand (RDP-epsilon, normiert): Name → epsilon.
+_SMOOTH_LEVELS = [("Fein", 0.008), ("Mittel", 0.02), ("Stark", 0.045)]
 
 
 def _qcolor(r: float, g: float, b: float) -> QColor:
@@ -81,6 +87,9 @@ class LaserDrawCanvas(QWidget):
         self.shape_sides = 5                 # Ecken/Zacken für Polygon/Stern
         self._anchor = None                  # (x,y) beim Druck (Formmitte/Start)
         self._cur = None                     # (x,y) aktuell (Ziehen)
+        # Freihand (LAS-15): Roh-Strich beim Ziehen, beim Loslassen vereinfacht.
+        self.smooth_eps = 0.02
+        self._stroke = None                  # list[(x,y)] während des Zeichnens
         self.setMinimumSize(360, 360)
 
     # ── Koordinaten (−1..+1 ↔ Pixel) ──────────────────────────────────────
@@ -115,6 +124,10 @@ class LaserDrawCanvas(QWidget):
     # ── Interaktion ───────────────────────────────────────────────────────
     def mousePressEvent(self, ev):
         px, py = int(ev.position().x()), int(ev.position().y())
+        if self.tool == TOOL_FREEHAND:
+            self._stroke = [self._to_norm(px, py)]   # Strich beginnen
+            self.update()
+            return
         if self.tool in _SHAPE_TOOLS:
             # Formwerkzeug: Anker setzen, Größe folgt beim Ziehen.
             self._anchor = self._to_norm(px, py)
@@ -136,6 +149,12 @@ class LaserDrawCanvas(QWidget):
         self.update()
 
     def mouseMoveEvent(self, ev):
+        if self.tool == TOOL_FREEHAND:
+            if self._stroke is not None:
+                self._stroke.append(self._to_norm(int(ev.position().x()),
+                                                   int(ev.position().y())))
+                self.update()                     # Live-Strich anzeigen
+            return
         if self.tool in _SHAPE_TOOLS:
             if self._anchor is not None:
                 self._cur = self._to_norm(int(ev.position().x()),
@@ -151,6 +170,14 @@ class LaserDrawCanvas(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, ev):
+        if self.tool == TOOL_FREEHAND and self._stroke is not None:
+            stroke = self._stroke
+            self._stroke = None
+            pts = self._stroke_points(stroke)
+            self.update()
+            if pts and self._on_commit_shape is not None:
+                self._on_commit_shape(pts, False)   # Freihand = offener Pfad
+            return
         if self.tool in _SHAPE_TOOLS and self._anchor is not None:
             anchor, cur = self._anchor, self._cur
             self._anchor = self._cur = None
@@ -160,6 +187,20 @@ class LaserDrawCanvas(QWidget):
                 self._on_commit_shape(pts, closed)
             return
         self._dragging = False
+
+    def _stroke_points(self, stroke) -> list:
+        """Roh-Strich (list[(x,y)]) → vereinfachte FigurePoint-Liste (RDP mit
+        ``smooth_eps``). Zu kurzer/kleiner Strich → leer (kein Commit)."""
+        if len(stroke) < 2:
+            return []
+        xs = [x for x, _ in stroke]
+        ys = [y for _, y in stroke]
+        if (max(xs) - min(xs)) < _MIN_SHAPE and (max(ys) - min(ys)) < _MIN_SHAPE:
+            return []
+        r, g, b = self.draw_color
+        raw = [FigurePoint(x=x, y=y, r=r, g=g, b=b) for x, y in stroke]
+        pts = fo.rdp_simplify(raw, self.smooth_eps)
+        return pts if len(pts) >= 2 else []
 
     def _shape_extent(self, anchor, cur) -> float:
         return math.hypot(cur[0] - anchor[0], cur[1] - anchor[1])
@@ -256,11 +297,20 @@ class LaserDrawCanvas(QWidget):
                     x2, y2 = self._to_px(b.x, b.y)
                     p.drawLine(x1, y1, x2, y2)
 
+        # Live-Vorschau des Freihand-Strichs (Rohpunkte, noch nicht vereinfacht).
+        if self.tool == TOOL_FREEHAND and self._stroke and len(self._stroke) >= 2:
+            p.setPen(QPen(QColor("#58a6ff"), 2))
+            prev_px = [self._to_px(x, y) for x, y in self._stroke]
+            for (x1, y1), (x2, y2) in zip(prev_px, prev_px[1:]):
+                p.drawLine(x1, y1, x2, y2)
+
         if not pts:
             p.setPen(QColor("#7d8590"))
             f = QFont(); f.setPixelSize(12); p.setFont(f)
             hint = ("Form aufziehen: klicken und ziehen"
-                    if self.tool in _SHAPE_TOOLS
+                    if self.tool in _SHAPE_TOOLS else
+                    "Mit gedrückter Maus/Finger frei zeichnen"
+                    if self.tool == TOOL_FREEHAND
                     else "Tippen, um Punkte zu setzen")
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, hint)
         p.end()
@@ -369,16 +419,33 @@ class LaserDrawDialog(QDialog):
         self._spin_sides.setToolTip("Anzahl Ecken (Polygon) bzw. Zacken (Stern).")
         self._spin_sides.valueChanged.connect(self._on_sides_changed)
         bar.addWidget(self._spin_sides)
+        bar.addSpacing(14)
+        bar.addWidget(QLabel("Glätten:"))
+        self._combo_smooth = QComboBox()
+        for name, eps in _SMOOTH_LEVELS:
+            self._combo_smooth.addItem(name, eps)
+        self._combo_smooth.setCurrentIndex(1)      # „Mittel" (= canvas-Default)
+        self._combo_smooth.setToolTip(
+            "Freihand-Vereinfachung: weniger/mehr Stützpunkte.")
+        self._combo_smooth.currentIndexChanged.connect(self._on_smooth_changed)
+        bar.addWidget(self._combo_smooth)
         bar.addStretch(1)
         return bar
 
     def _select_tool(self, key: str):
         self._canvas.tool = key
         self._canvas._anchor = self._canvas._cur = None
+        self._canvas._stroke = None
         self._canvas.setCursor(
-            Qt.CursorShape.CrossCursor if key in _SHAPE_TOOLS
+            Qt.CursorShape.CrossCursor
+            if key in _SHAPE_TOOLS or key == TOOL_FREEHAND
             else Qt.CursorShape.ArrowCursor)
         self._canvas.update()
+
+    def _on_smooth_changed(self, _i: int):
+        eps = self._combo_smooth.currentData()
+        if eps is not None:
+            self._canvas.smooth_eps = float(eps)
 
     def _select_edit_tool(self):
         self._tool_buttons[TOOL_EDIT].setChecked(True)

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.core.laser.figure import FigurePoint, LaserFigure
 from src.ui.widgets.laser_draw_editor import (LaserDrawCanvas, LaserDrawDialog,
-                                              TOOL_EDIT)
+                                              TOOL_EDIT, TOOL_FREEHAND)
 
 
 def _app():
@@ -353,6 +353,79 @@ class ShapeToolDialogTest(unittest.TestCase):
         dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
         dlg._select_tool("star")
         self.assertEqual(dlg._canvas.tool, "star")
+
+
+class FreehandToolTest(unittest.TestCase):
+    """LAS-15: Freihand-Strich + RDP-Vereinfachung."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _canvas(self):
+        committed = []
+        c = LaserDrawCanvas(
+            LaserFigure(points=[]), lambda: None, lambda: None,
+            on_commit_shape=lambda p, cl: committed.append((p, cl)))
+        c.resize(400, 400)
+        return c, committed
+
+    def test_stroke_simplifies_collinear(self):
+        c, _ = self._canvas()
+        stroke = [(t / 10.0 - 0.5, 0.0) for t in range(11)]   # gerade
+        pts = c._stroke_points(stroke)
+        self.assertEqual(len(pts), 2)                         # nur Endpunkte
+
+    def test_stroke_tiny_rejected(self):
+        c, _ = self._canvas()
+        self.assertEqual(c._stroke_points([(0.0, 0.0), (0.01, 0.0),
+                                           (0.0, 0.01)]), [])
+
+    def test_stroke_needs_two_points(self):
+        c, _ = self._canvas()
+        self.assertEqual(c._stroke_points([(0.0, 0.0)]), [])
+
+    def test_smoothing_reduces_points(self):
+        c, _ = self._canvas()
+        stroke = [(math.cos(math.pi * t / 20), math.sin(math.pi * t / 20))
+                  for t in range(21)]                          # Halbkreis
+        c.smooth_eps = 0.008
+        fine = len(c._stroke_points(stroke))
+        c.smooth_eps = 0.045
+        strong = len(c._stroke_points(stroke))
+        self.assertGreaterEqual(fine, strong)
+        self.assertGreaterEqual(strong, 2)
+
+    def test_freehand_drag_commits_open_path(self):
+        c, committed = self._canvas()
+        c.tool = TOOL_FREEHAND
+        c.mousePressEvent(_Ev(100, 200))
+        for x in (150, 220, 300):
+            c.mouseMoveEvent(_Ev(x, 205))
+        c.mouseReleaseEvent(_Ev(300, 205))
+        self.assertEqual(len(committed), 1)
+        pts, closed = committed[0]
+        self.assertGreaterEqual(len(pts), 2)
+        self.assertFalse(closed)                              # Freihand = offen
+
+    def test_freehand_tiny_no_commit(self):
+        c, committed = self._canvas()
+        c.tool = TOOL_FREEHAND
+        c.mousePressEvent(_Ev(200, 200))
+        c.mouseReleaseEvent(_Ev(201, 200))
+        self.assertEqual(committed, [])
+
+    def test_smooth_combo_updates_canvas(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._combo_smooth.setCurrentIndex(2)                  # „Stark"
+        self.assertAlmostEqual(dlg._canvas.smooth_eps, 0.045)
+
+    def test_select_freehand_resets_stroke(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._canvas._stroke = [(0.0, 0.0), (0.1, 0.1)]
+        dlg._select_tool(TOOL_FREEHAND)
+        self.assertIsNone(dlg._canvas._stroke)
+        self.assertEqual(dlg._canvas.tool, TOOL_FREEHAND)
 
 
 if __name__ == "__main__":
