@@ -34,6 +34,23 @@ from src.ui.weak_slots import weak_slot, weak_slot_fwd
 LASER_EXTRA_ATTRS = ("shutter", "gobo_wheel", "gobo_rotation", "zoom",
                      "color_wheel", "macro", "speed")
 
+# LAS-11: Die Laser-Regler werden nach Bedeutung gruppiert statt als flache
+# Kanal-Liste gezeigt — die WICHTIGEN Achsen (Muster, Farbe, Geschwindigkeit)
+# prominent, die technischen Kanäle einklappbar. Reihenfolge = Anzeige.
+# `shutter` steckt in den Modus-Kacheln, taucht hier NICHT auf.
+_ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
+    ("Muster", ("gobo_wheel", "laser_bank")),
+    ("Farbe", ("laser_color_change", "laser_color", "color_wheel")),
+    ("Bewegung & Geschwindigkeit",
+     ("speed", "laser_scan_rate", "gobo_rotation", "laser_x", "laser_y",
+      "zoom", "laser_zoom_x", "laser_zoom_y")),
+    ("Zeichnen", ("laser_draw_mode", "laser_draw")),
+]
+# Alles Übrige (laser_boundary, laser_twist, laser_grating, laser_dots, macro,
+# raw, …) landet in der einklappbaren „Weitere Kanäle"-Gruppe.
+_ADVANCED_GROUP = "Weitere Kanäle"
+_GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
+
 
 def fixture_has_laser_capability(fx) -> bool:
     """True, wenn das gepatchte Gerät als Laser steuerbar ist: entweder per
@@ -149,6 +166,7 @@ class LaserView(QWidget):
         self._fixtures: list = []
         self._network_fids: list[int] = []
         self._rows: dict[str, _ChannelRow] = {}
+        self._collapsible_groups: dict[str, list[str]] = {}
         self._template_sig: tuple = ()
         self._head_mode: str = "A"          # "A" | "B" | "AB"
 
@@ -224,8 +242,10 @@ class LaserView(QWidget):
         hb.addStretch(1)
         root.addWidget(self._head_box)
 
-        # Modus-Schnellwahl (Shutter-Ranges als Kacheln).
-        self._mode_box = QGroupBox("Laser-Modus")
+        # Betriebsart-Schnellwahl (Shutter-Ranges als Kacheln: Aus/Auto/Sound/
+        # Muster-an). Bewusst „Betriebsart", damit „Muster" eindeutig die
+        # Musterauswahl meint (nicht den Shutter-Modus).
+        self._mode_box = QGroupBox("Betriebsart")
         self._mode_lay = QHBoxLayout(self._mode_box)
         self._mode_lay.setSpacing(6)
         root.addWidget(self._mode_box)
@@ -550,10 +570,65 @@ class LaserView(QWidget):
             if w is not None:
                 w.deleteLater()
         self._rows = {}
-        for ch in template:
+        self._collapsible_groups = {}
+        by_attr = {getattr(ch, "attribute", ""): ch for ch in template}
+
+        # Kern-Achsen als benannte Gruppen (Muster / Farbe / Bewegung … /
+        # Zeichnen) — in Reihenfolge, nur wenn das Gerät die Attribute hat.
+        for title, attrs in _ROW_GROUPS:
+            present = [by_attr[a] for a in attrs if a in by_attr]
+            if present:
+                box = self._make_row_group(title, present, collapsed=False)
+                self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
+
+        # Alles Übrige = technische Kanäle → eingeklappte „Weitere"-Gruppe.
+        rest = [ch for ch in template
+                if getattr(ch, "attribute", "") not in _GROUPED_ATTRS
+                and getattr(ch, "attribute", "") != "shutter"]
+        if rest:
+            box = self._make_row_group(_ADVANCED_GROUP, rest, collapsed=True)
+            self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
+
+    def _make_row_group(self, title: str, channels: list,
+                        collapsed: bool) -> QGroupBox:
+        """Eine benannte Regler-Gruppe. ``collapsed`` macht sie einklappbar
+        (checkable QGroupBox; die Regler-Zeilen werden bei „zu" versteckt).
+
+        WICHTIG (STAB-09): der Toggle-Slot darf die Regler-Zeilen NICHT in die
+        Signal-Closure binden — jede Zeile hält ``self._write_value`` und damit
+        die View; über die C++-``toggled``-Connection wäre das ein GC-blinder
+        Selbst-Pin. Wir merken uns die Attribut-Namen PRO Gruppe (Titel als
+        Schlüssel) und binden nur diesen String in die Closure; die Zeilen
+        werden zur Laufzeit in ``self._rows`` nachgeschlagen."""
+        box = QGroupBox(title)
+        lay = QVBoxLayout(box)
+        lay.setSpacing(3)
+        lay.setContentsMargins(8, 4, 8, 6)
+        attrs: list[str] = []
+        for ch in channels:
             row = _ChannelRow(ch, self._write_value)
             self._rows[ch.attribute] = row
-            self._rows_lay.insertWidget(self._rows_lay.count() - 1, row)
+            lay.addWidget(row)
+            attrs.append(ch.attribute)
+        if collapsed:
+            box.setCheckable(True)
+            box.setChecked(False)
+            box.setToolTip("Technische Kanäle — zum Aufklappen anhaken.")
+            for a in attrs:
+                self._rows[a].setVisible(False)
+            self._collapsible_groups[title] = list(attrs)
+            box.toggled.connect(weak_slot_fwd(self._toggle_group_named, title))
+        return box
+
+    def _toggle_group_named(self, title: str, checked: bool):
+        for a in getattr(self, "_collapsible_groups", {}).get(title, ()):
+            row = self._rows.get(a)
+            if row is None:
+                continue
+            try:
+                row.setVisible(bool(checked))
+            except RuntimeError:
+                pass
 
     def _rebuild_mode_tiles(self, template: list):
         while self._mode_lay.count():

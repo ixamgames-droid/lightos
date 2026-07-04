@@ -192,13 +192,67 @@ def test_template_rows_and_head_box(monkeypatch):
         monkeypatch, [_FX(1, _l2600ish_channels())])
 
     # Ein Regler je Laser-Attribut (Union, nicht je Kanal-Vorkommen).
-    assert set(view._rows) == {"shutter", "laser_bank", "gobo_wheel",
-                               "laser_x"}
+    # `shutter` steckt in den Betriebsart-Kacheln und bekommt KEINE eigene
+    # Regler-Zeile mehr (LAS-11: keine Doppelung Kachel + Slider).
+    assert set(view._rows) == {"laser_bank", "gobo_wheel", "laser_x"}
+    assert "shutter" not in view._rows
     # Gruppe A/B vorhanden (Attribute doppelt) -> Umschalter sichtbar.
     assert view._max_head_count() == 2
     # Modus-Kacheln aus den Shutter-Ranges.
     tiles = view._mode_lay.count() - 1  # minus Stretch
     assert tiles == 4
+
+
+def _row_group_boxes(view):
+    """Die benannten Regler-Gruppen (QGroupBox) im Scroll-Bereich, in
+    Anzeige-Reihenfolge."""
+    from PySide6.QtWidgets import QGroupBox
+    boxes = []
+    for i in range(view._rows_lay.count()):
+        w = view._rows_lay.itemAt(i).widget()
+        if isinstance(w, QGroupBox):
+            boxes.append(w)
+    return boxes
+
+
+def test_rows_grouped_by_meaning(monkeypatch):
+    """LAS-11: Regler sind nach Bedeutung gruppiert (Muster / Bewegung …),
+    nicht mehr eine flache Kanal-Liste."""
+    _app()
+    view, _state = _make_view(monkeypatch, [_FX(1, _l2600ish_channels())])
+    titles = [b.title() for b in _row_group_boxes(view)]
+    # Muster (gobo_wheel, laser_bank) und Bewegung (laser_x) sind vorhanden;
+    # Reihenfolge: Muster vor Bewegung.
+    assert "Muster" in titles
+    assert "Bewegung & Geschwindigkeit" in titles
+    assert titles.index("Muster") < titles.index(
+        "Bewegung & Geschwindigkeit")
+    # Nur Gruppen mit vorhandenen Attributen tauchen auf — hier keine
+    # Farb-/Zeichnen-Kanäle im Kompakt-Layout.
+    assert "Farbe" not in titles
+
+
+def test_advanced_group_collapsed_and_toggles(monkeypatch):
+    """Technische Kanäle landen in einer eingeklappten, aufklappbaren Gruppe;
+    Umschalten zeigt/versteckt die Regler-Zeilen."""
+    _app()
+    # laser_grating ist in KEINER Kern-Gruppe -> „Weitere Kanäle".
+    chans = _l2600ish_channels() + [_Ch("laser_grating", 8,
+                                        [_Rng(0, 255, "Gitter")], "Gitter")]
+    view, _state = _make_view(monkeypatch, [_FX(1, chans)])
+
+    adv = next((b for b in _row_group_boxes(view)
+                if b.title() == "Weitere Kanäle"), None)
+    assert adv is not None
+    assert adv.isCheckable() is True
+    assert adv.isChecked() is False                      # eingeklappt
+    row = view._rows["laser_grating"]
+    assert row.isVisibleTo(view) is False                # Zeile versteckt
+
+    adv.setChecked(True)                                 # aufklappen
+    assert row.isVisibleTo(view) is True
+    adv.setChecked(False)
+    assert row.isVisibleTo(view) is False
 
 
 def test_write_respects_head_mode(monkeypatch):
