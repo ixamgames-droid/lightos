@@ -110,6 +110,12 @@ class VCSlider(VCWidget):
         # (APC-Probier To-Do #4: PAR-Dim trifft die PARs ohne vorher anzuklicken).
         self.programmer_scope: str = "all"
         self.programmer_group: str = ""           # Gruppenname fuer scope == "group"
+        # LAS-Speed: im PROGRAMMER-Modus 0..100% auf ein Wert-Teilband [min,max]
+        # mappen (Default 0/255 = volle Reichweite = altes Verhalten). Für Laser
+        # z. B. gobo_rotation-Dynamikbereich 192..223 = „Geschwindigkeit im
+        # Uhrzeigersinn-Modus" (Fader hält das Muster im Modus + regelt Tempo).
+        self.programmer_min: int = 0
+        self.programmer_max: int = 255
         # F-26b: zu dimmende Feature-Gruppe im FEATURE_DIMMER-Modus (classify_attr-
         # Gruppenname: Intensity/Color/Gobo/Beam/Position/Effect). "" = Intensity.
         self.feature_attr: str = "Intensity"
@@ -182,6 +188,18 @@ class VCSlider(VCWidget):
         if lo > hi:                       # vertauschte Grenzen tolerieren
             lo, hi = hi, lo
         return max(0, min(255, int(round(lo + ratio * (hi - lo)))))
+
+    def _programmer_mapped(self, v) -> int:
+        """0..255-Faderwert auf das Teilband [programmer_min, programmer_max]
+        abbilden (Default 0/255 = identisch). Für Laser-Speed: der Fader hält den
+        Kanal im gewählten Dynamik-Bereich und regelt darin das Tempo."""
+        lo = max(0, min(255, int(getattr(self, "programmer_min", 0))))
+        hi = max(0, min(255, int(getattr(self, "programmer_max", 255))))
+        if hi < lo:
+            lo, hi = hi, lo
+        if lo == 0 and hi == 255:
+            return int(v)
+        return int(round(lo + (int(v) / 255.0) * (hi - lo)))
 
     def _apply(self):
         from src.core.app_state import get_state
@@ -270,8 +288,9 @@ class VCSlider(VCWidget):
                         fids = [f.fid for f in state.get_patched_fixtures()]
                 else:
                     fids = [f.fid for f in state.get_patched_fixtures()]
+                pv = self._programmer_mapped(v)   # LAS-Speed: 0..255 → [min,max]
                 for fid in fids:
-                    state.set_programmer_value(fid, attr, v)
+                    state.set_programmer_value(fid, attr, pv)
             except Exception:
                 pass
         elif self.mode == SliderMode.LEVEL:
@@ -737,6 +756,20 @@ class VCSlider(VCWidget):
                             "(Programmer/Submaster) bzw. für 'GroupDimmer'/'FeatureDimmer'.")
         form.addRow("Feste Gruppe:", group_cb)
 
+        # LAS-Speed: Wert-Teilband für den PROGRAMMER-Modus (0..100% → [min,max]).
+        prog_min_spin = QSpinBox()
+        prog_min_spin.setRange(0, 255)
+        prog_min_spin.setValue(int(self.programmer_min))
+        prog_min_spin.setToolTip("Kanalwert bei Fader 0 %. Für Laser-Speed = "
+                                 "Anfang des Dynamik-Bereichs (z. B. 192).")
+        form.addRow("Wert bei 0 % (Programmer):", prog_min_spin)
+        prog_max_spin = QSpinBox()
+        prog_max_spin.setRange(0, 255)
+        prog_max_spin.setValue(int(self.programmer_max))
+        prog_max_spin.setToolTip("Kanalwert bei Fader 100 %. Für Laser-Speed = "
+                                 "Ende des Dynamik-Bereichs (z. B. 223).")
+        form.addRow("Wert bei 100 % (Programmer):", prog_max_spin)
+
         # F-26b: Feature-Auswahl fuer den FEATURE_DIMMER-Modus — aus den Capabilities
         # der gewaehlten Gruppe (vorhandene classify_attr-Feature-Gruppen) befuellt,
         # Fallback Standardliste. Nicht-editierbare ComboBox -> keine Tippfehler.
@@ -836,6 +869,8 @@ class VCSlider(VCWidget):
             vis = {
                 param_key_combo: m == SliderMode.EFFECT_PARAM,
                 scope_cb:        m in (SliderMode.PROGRAMMER, SliderMode.SUBMASTER),
+                prog_min_spin:   m == SliderMode.PROGRAMMER,
+                prog_max_spin:   m == SliderMode.PROGRAMMER,
                 group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER,
                                        SliderMode.SUBMASTER, SliderMode.FEATURE_DIMMER),
                 feature_attr_cb: m == SliderMode.FEATURE_DIMMER,
@@ -920,6 +955,8 @@ class VCSlider(VCWidget):
             self.tempo_bus_id = bus_cb.currentData() or ""
             self.programmer_scope = scope_cb.currentData() or "all"
             self.programmer_group = group_cb.currentText().strip()
+            self.programmer_min = prog_min_spin.value()
+            self.programmer_max = prog_max_spin.value()
             self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
             self.effect_autostart = autostart_cb.isChecked()
             self.invert = invert_cb.isChecked()
@@ -983,6 +1020,8 @@ class VCSlider(VCWidget):
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
         d["programmer_scope"] = self.programmer_scope
+        d["programmer_min"] = self.programmer_min
+        d["programmer_max"] = self.programmer_max
         d["programmer_group"] = self.programmer_group
         d["feature_attr"] = self.feature_attr      # F-26b
 
@@ -1014,6 +1053,8 @@ class VCSlider(VCWidget):
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")
         self.programmer_scope = d.get("programmer_scope", "all")
+        self.programmer_min = int(d.get("programmer_min", 0))
+        self.programmer_max = int(d.get("programmer_max", 255))
         self.programmer_group = d.get("programmer_group", "")
         self.feature_attr = d.get("feature_attr", "Intensity") or "Intensity"   # F-26b
         self.param_key = d.get("param_key", "speed")
