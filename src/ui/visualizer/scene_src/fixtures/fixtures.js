@@ -71,7 +71,7 @@ export function addFixture(data) {
   // 'model' ist das Render-Modell (von Python bestimmt, z.B. 'spider' fuer
   // Doppel-Bar-Geraete); faellt auf den fixture_type zurueck.
   const rtype = data.model || data.type || 'par';
-  const model = buildFixtureModel(rtype, { mirror: data.mirror });
+  const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
@@ -99,6 +99,18 @@ export function addFixture(data) {
         bar.pivot.add(host);
         bar.beams.push(bcone);
       });
+    });
+  } else if (model.isParBar) {
+    // FM-3: PAR-Bar — pro PAR ein nach unten gerichteter Beam in der PAR-Farbe.
+    // Kein zentraler Spot/Floor-Spot; jeder PAR strahlt einzeln (wie beim Spider).
+    const beamAngle = Math.PI / 12;
+    model.parHeads.forEach(ph => {
+      const host = new THREE.Group();
+      host.position.copy(ph.lens.position);
+      const bcone = createBeamCone(new THREE.Color(0, 0, 0), 0, beamAngle, 7.0);
+      host.add(bcone);
+      model.group.add(host);
+      ph.beam = bcone;
     });
   } else if (rtype === 'smoke' || rtype === 'hazer') {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
@@ -150,6 +162,8 @@ export function addFixture(data) {
     laserBeams: model.laserBeams || null,
     bars: model.bars || null,
     isSpider: !!model.isSpider,
+    parHeads: model.parHeads || null,   // FM-3: PAR-Bar-Koepfe (je {lens, beam})
+    isParBar: !!model.isParBar,
     beam, spot, spotTarget, floorSpot,
     icon,
     type: rtype,
@@ -236,6 +250,44 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     }
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     return;   // Spider fertig — generische Single-Head-Logik ueberspringen
+  }
+
+  // ── FM-3: PAR-Bar — N einzeln gefaerbte PARs, gemeinsamer Master-Dimmer ─────
+  // Jeder PAR = ein Kopf (heads[i].r/g/b = Summenfarbe inkl. Weiss). Fallback:
+  // Kopf 0 = Basis-Farbe, weitere ohne Head-Daten aus.
+  if (f.isParBar && f.parHeads) {
+    const hs = f.lastHeads || [];
+    for (let i = 0; i < f.parHeads.length; i++) {
+      const ph = f.parHeads[i];
+      const h = hs[i] || {};
+      const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
+      const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
+      const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
+      const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+      const bright = intNorm;   // gemeinsamer Master-Dimmer
+      if (ph.lens && ph.lens.material) {
+        ph.lens.material.color = col;
+        ph.lens.material.emissive = col;
+        ph.lens.material.emissiveIntensity = bright * 1.9;
+      }
+      if (ph.beam && ph.beam.material) {
+        ph.beam.material.color = col;
+        ph.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
+        ph.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
+      }
+    }
+    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
+      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
+      if (intNorm > 0.05) {
+        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
+        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
+      } else {
+        f.icon.userData.body.material.color.setHex(0x3a3a4a);
+        f.icon.userData.body.material.opacity = 0.85;
+      }
+    }
+    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    return;   // PAR-Bar fertig
   }
 
   if (f.beam) {

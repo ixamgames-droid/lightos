@@ -468,3 +468,42 @@ export function buildSpider(mirrored) {
   });
   return { group, bars, isSpider: true };
 }
+
+// FM-3: PAR-Bar — N einzeln faerbbare PARs auf einem horizontalen Balken (z.B.
+// 4er-/8er-PAR-Bar). Jeder PAR = ein Kopf (heads[i]) mit eigener Farbe + eigenem
+// nach unten gerichteten Beam. Statisch (kein Pan/Tilt); dafuer ist die Mover-Bar
+// (FM-4) zustaendig. n aus dem Kanal-Layout (Anzahl RGBW-Banks, via Python nHeads).
+export function buildParBar(n) {
+  n = Math.max(1, Math.min(24, Math.floor(n || 4)));
+  const group = new THREE.Group();
+  const barMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.5 });
+  const spacing = 0.44;
+  const width = (n - 1) * spacing + 0.5;
+  // Horizontaler Traeger-Balken entlang X
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, 0.26), barMat);
+  bar.castShadow = true;
+  group.add(bar);
+  const parHeads = [];
+  const startX = -(n - 1) * spacing / 2;
+  for (let i = 0; i < n; i++) {
+    const x = startX + i * spacing;
+    // PAR-Gehaeuse (kurzer Zylinder, nach unten offen)
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.18, 16), barMat);
+    can.position.set(x, -0.13, 0);
+    can.castShadow = true;
+    group.add(can);
+    // Linse (emissive, faerbbar) — zeigt nach unten
+    const lens = new THREE.Mesh(
+      new THREE.CircleGeometry(0.15, 20),
+      new THREE.MeshStandardMaterial({
+        color: 0x808080, emissive: 0x000000, emissiveIntensity: 0,
+        roughness: 0.2, side: THREE.DoubleSide,
+      })
+    );
+    lens.rotation.x = -Math.PI / 2;          // Normale -Y (nach unten)
+    lens.position.set(x, -0.223, 0);
+    group.add(lens);
+    parHeads.push({ lens, x });
+  }
+  return { group, parHeads, isParBar: true };
+}
