@@ -1210,7 +1210,7 @@ def _dotz_tpar_modes_data():
     controls = [
         ("Farb-Makros/Programme", "color_wheel", 0, 0, _DOTZ_TPAR_MACROS),
         ("Master Dimmer/Programm-Speed/Sound", "intensity", 0, 255),
-        ("Strobe langsam-schnell", "shutter", 0, 0),
+        ("Strobe langsam-schnell", "shutter", 0, 0, _SIMPLE_STROBE),
         ("Dimmerkurve", "raw", 0, 0, _DOTZ_TPAR_DIM_CURVES),
         ("Zusatzlicht 1", "raw", 0, 255, _DOTZ_TPAR_LIGHT),
         ("Zusatzlicht 2", "raw", 0, 255, _DOTZ_TPAR_LIGHT),

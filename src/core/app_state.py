@@ -34,6 +34,9 @@ _DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter
 _DIM_COLOR_ATTRS = frozenset({
     "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
     "red", "green", "blue", "white", "amber", "uv",
+    # cmy_c/m/y = real emittierte CMY-Namen (QXF-Import/Fixture-Editor); ohne sie
+    # kennt die Farb-Feature-Dimmung / GM-Farbmaske CMY-Mover nicht als Farbe.
+    "cmy_c", "cmy_m", "cmy_y",
     "cyan", "magenta", "yellow",
 })
 
@@ -2020,7 +2023,17 @@ def is_spider_fixture(fixture) -> bool:
     `color_r#1` reagiert.
     Hinweis: ein reiner Tilt-only-Bar OHNE zweite Farb-Bank (Mini-Spider/
     Twinscan) ist BEWUSST kein `is_spider_fixture` — dafuer ist
-    `is_dual_tilt_fixture` (Bewegung/Steuerung, >=2 Tilt + kein Pan) zustaendig."""
+    `is_dual_tilt_fixture` (Bewegung/Steuerung, >=2 Tilt + kein Pan) zustaendig.
+    Laser-Ausnahme: ein Geraet mit fixture_type=='laser' ist ein Punkt-Scanner,
+    NIE ein Multi-Emitter-Spider — auch wenn es (wie das PARTYLASER-Builtin mit
+    zwei roten Dioden auf getrennten `color_r`-Kanaelen) zufaellig >=2 Farb-Banken
+    hat. Ohne dieses Gate liefert `_viz_model_for` fuer den Laser 'spider' statt
+    'laser' -> falsches 3D-Modell, 2D-Spider-Symbol und sinnlose Patch-Spiegel-
+    Option. Gilt genauso fuer importierte Laser mit doppelter Farb-Bank."""
+    # Laser = Punkt-Scanner, nie ein Multi-Emitter-Spider (s. Docstring). Vor dem
+    # Bank-Zaehlen greifen, damit auch >=2 color_r ein Laser bleibt.
+    if (getattr(fixture, "fixture_type", "") or "") == "laser":
+        return False
     try:
         chans = get_channels_for_patched(fixture)
         banks = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "color_r")

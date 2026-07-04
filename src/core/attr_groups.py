@@ -19,7 +19,13 @@ ATTR_GROUPS: dict[str, set[str]] = {
     # aufnehmen, die der Grand Master skaliert -> der Strobe darf nicht
     # grand-master-gedimmt werden (die GM-Maske ist davon unabhaengig).
     "Intensity": {"intensity", "dimmer", "master", "shutter", "strobe"},
+    # CMY-Subtraktivmischung: die REAL emittierten Namen sind cmy_c/cmy_m/cmy_y
+    # (QXF-Import IntensityCyan/Magenta/Yellow -> cmy_*, Fixture-Editor
+    # CHANNEL_ATTRS). "cyan/magenta/yellow" emittiert KEIN Pfad — ohne die cmy_*
+    # fiele jeder importierte CMY-Mover ueber den Substring-Fallback auf 'Other'
+    # (kein Color-Tab/Picker). Konsistent mit engine/palette.py (PaletteType.COLOR).
     "Color":     {"color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
+                  "cmy_c", "cmy_m", "cmy_y",
                   "cyan", "magenta", "yellow", "color_wheel", "colour_wheel", "color"},
     "Position":  {"pan", "tilt", "pan_fine", "tilt_fine"},
     "Beam":      {"zoom", "focus", "frost", "iris", "prism"},
