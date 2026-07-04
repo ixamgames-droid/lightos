@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-04 — Laser-Support: Sicherheit von der Virtual Console bedienbar (LAS-10)
+
+#### Neu / Hinzugefuegt
+
+- **Laser Scharfschalten + Not-Aus als VC-Buttons:** zwei neue Aktionen für Virtual-Console-Tasten (auch per MIDI-Pad auslösbar) — „Laser scharf/unscharf" (`LASER_ARM`, Toggle; Farbbalken lila wenn scharf) und „Laser NOT-AUS" (`LASER_ESTOP`, roter Balken). Der Not-Aus verriegelt, entwaffnet und öffnet die Session wieder (dieselbe sichere Reihenfolge wie in der Laser-Steuerseite). Damit lässt sich der Laser-Not-Aus auf eine feste, immer erreichbare Taste legen. Die Laser-Steuerseite spiegelt Scharf/Unscharf-Änderungen von der Konsole (`_sync_arm_from_manager`). `src/ui/virtualconsole/vc_button.py`, `src/ui/views/laser_view.py`, Tests `tests/test_laser_vc_safety.py`.
+
 ### 2026-07-04 — Laser-Support: Interaktiver Zeichen-Editor + Muster-Persistenz (LAS-07b)
 
 #### Neu / Hinzugefuegt

@@ -61,6 +61,9 @@ class ButtonAction(str, Enum):
     FREEZE       = "Freeze"       # BPM einfrieren (alle Buses + globaler Leader -> 0), Toggle; bus-gekoppelte Effekte halten (F5)
     STOP_EFFECTS = "StopEffects"  # alle laufenden Effekt-Funktionen stoppen (Tempo/BPM bleiben) -> Pause/Effekt-Stop
     AUTO_SYNC    = "AutoSync"     # Auto-Sync an/aus: neu startende bus-gekoppelte Effekte phasengleich am gemeinsamen Beat-Raster
+    # ── Laser-Sicherheit (LAS-10): Netzwerk-Laser-Ausgabe von der Konsole ─────
+    LASER_ARM    = "LaserArm"     # Scharf/Unscharf-Toggle des LaserOutputManagers (unscharf = Ausgabe geblankt)
+    LASER_ESTOP  = "LaserEstop"   # Laser-Not-Aus: sofort dunkel + entwaffnen (Trigger)
 
 
 # Benutzerfreundliche deutsche Labels für die Aktions-Auswahl (statt der rohen
@@ -76,6 +79,8 @@ BUTTON_ACTION_LABELS: list[tuple[str, str]] = [
     (ButtonAction.STOP_ALL,        "Alles stoppen"),
     (ButtonAction.STOP_EFFECTS,    "Effekte stoppen (Tempo bleibt)"),
     (ButtonAction.BLACKOUT,        "Blackout"),
+    (ButtonAction.LASER_ARM,       "Laser scharf/unscharf"),
+    (ButtonAction.LASER_ESTOP,     "Laser NOT-AUS"),
     (ButtonAction.ALL_WHITE,       "Alles Weiß (gehalten)"),
     (ButtonAction.FREEZE,          "Freeze (BPM einfrieren)"),
     (ButtonAction.AUTO_SYNC,       "Auto-Sync an/aus"),
@@ -895,6 +900,34 @@ class VCButton(VCWidget):
                 self.update()
             return
 
+        if self.action == ButtonAction.LASER_ARM:
+            # LAS-10: Netzwerk-Laser scharf/unscharf schalten (Toggle). Unscharf
+            # blankt jede Streaming-Ausgabe (Safety-Ebene im LaserOutputManager).
+            if press:
+                try:
+                    lo = state.ensure_laser_output()
+                    lo.set_armed(not lo.armed)
+                except Exception as e:
+                    print(f"[VCButton] laser arm error: {e}")
+                self.update()
+            return
+
+        if self.action == ButtonAction.LASER_ESTOP:
+            # LAS-10: Laser-Not-Aus (Trigger) — sofort dunkel + entwaffnen.
+            # Reihenfolge wie in der Laser-Steuerseite: verriegeln → unscharf →
+            # Verriegelung lösen (armed=False haelt es dunkel, Session bleibt
+            # fuer bewusstes Wieder-Scharfschalten offen).
+            if press:
+                try:
+                    lo = state.ensure_laser_output()
+                    lo.estop_all()
+                    lo.set_armed(False)
+                    lo.clear_estop_all()
+                except Exception as e:
+                    print(f"[VCButton] laser estop error: {e}")
+                self.update()
+            return
+
         if self.action == ButtonAction.SNAPSHOT:
             if press and self.snapshot_index is not None:
                 self._apply_snapshot(self.snapshot_index)
@@ -1212,6 +1245,12 @@ class VCButton(VCWidget):
             elif self.action == ButtonAction.BPM_MODE_TOGGLE:
                 from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
                 action_on = (get_bpm_manager().mode == BpmMode.MANUAL)
+            elif self.action == ButtonAction.LASER_ARM:
+                # LAS-10: scharfer Laser bekommt denselben prominenten Aktiv-
+                # Zustand wie Freeze/Auto-Sync (Safety-Sichtbarkeit).
+                from src.core.app_state import get_state
+                lo = getattr(get_state(), "_laser_output", None)
+                action_on = bool(lo is not None and lo.armed)
         except Exception:
             action_on = False
         # Laufzustand der gebundenen Funktion: ein Toggle-Pad bleibt „an", solange
@@ -1290,6 +1329,19 @@ class VCButton(VCWidget):
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#3fb950"))
         elif self.action == ButtonAction.BLACKOUT:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+        elif self.action == ButtonAction.LASER_ESTOP:
+            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+        elif self.action == ButtonAction.LASER_ARM:
+            # Scharf = leuchtend lila (Laser-Farbe), unscharf = gedämpft.
+            armed = False
+            try:
+                from src.core.app_state import get_state
+                lo = getattr(get_state(), "_laser_output", None)
+                armed = bool(lo is not None and lo.armed)
+            except Exception:
+                armed = False
+            p.fillRect(0, self.height() - 4, self.width(), 4,
+                       QColor("#cc55ff") if armed else QColor("#4a2a5a"))
         elif self.action == ButtonAction.SNAPSHOT:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ffd700"))
         elif self.action == ButtonAction.LIBRARY_SNAP:
