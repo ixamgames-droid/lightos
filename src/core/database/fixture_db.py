@@ -1233,6 +1233,78 @@ def _add_adj_dotz_tpar(s, mfr):
                  _dotz_tpar_modes_data())
 
 
+# ── FM-5: Generische Multi-Head-Bars (patchbar fuer FM-3/FM-4-3D-Modelle) ─────
+# Zwei generische Builtins, damit die neuen 3D-Modelle (par_bar / mover_bar)
+# ueberhaupt gepatcht werden koennen — bisher wurden sie nur aus dem Kanal-Layout
+# ERKANNT (_viz_model_for), aber es gab kein passendes Profil in der Bibliothek.
+# Mehrkopf-Konvention (X-6): wiederholtes Attribut -> N-tes Vorkommen = Kopf N,
+# daraus baut der DMX-Pfad color_r#N / pan#N / tilt#N (FM-2). Namen bewusst
+# GENERISCH ("LED Moving Bar 4×"), damit Nutzer sie unter "Generic" finden.
+
+def _mover_bar_heads(count):
+    """N Mini-Moving-Head-Bloecke (je Pan/Tilt/RGB). Pan zentriert (128),
+    Tilt zentriert (128), Farbe aus. Ergibt pan#0..N-1 / tilt#0..N-1 /
+    color_r#0..N-1 -> _viz_model_for: >=2 Pan -> 'mover_bar' (FM-4)."""
+    channels = []
+    for head in range(1, count + 1):
+        channels.extend([
+            (f"Kopf {head} Pan",  "pan",     128, 128),
+            (f"Kopf {head} Tilt", "tilt",    128, 128),
+            (f"Kopf {head} Rot",  "color_r", 0,   255),
+            (f"Kopf {head} Grün", "color_g", 0,   255),
+            (f"Kopf {head} Blau", "color_b", 0,   255),
+        ])
+    return channels
+
+
+def _mover_bar_modes_data():
+    """Generic 4-Kopf-Moving-Bar: 4×(Pan/Tilt/RGB) + Master-Dimmer + Shutter.
+    22-Kanal. Shutter-Default 0 = offen (_SIMPLE_STROBE), damit die Bar bei
+    aufgezogenem Dimmer/gesetzter Farbe leuchtet statt im Shutter zu haengen."""
+    return [
+        ("22-Kanal 4×Move RGB", _mover_bar_heads(4) + [
+            ("Master Dimmer",  "intensity", 0, 255),
+            ("Shutter/Strobe", "shutter",   0, 0, _SIMPLE_STROBE),
+        ]),
+    ]
+
+
+def _add_mover_bar4(s, mfr):
+    """Generic LED Moving Bar 4× — 4 einzeln pan/tilt/farbbare Moving-Heads (FM-5)."""
+    _add_fixture(s, mfr, "LED Moving Bar 4×", "MOVBAR4", "moving_head", 80,
+                 _mover_bar_modes_data())
+
+
+def _par_bar_heads(count, white=False):
+    """N PAR-Segment-Bloecke (je RGB, optional +W). Ergibt color_r#0..N-1 ohne
+    Pan/Tilt -> _viz_model_for: keine Bewegung -> 'par_bar' (FM-3)."""
+    channels = []
+    for head in range(1, count + 1):
+        block = [
+            (f"Segment {head} Rot",  "color_r", 0, 255),
+            (f"Segment {head} Grün", "color_g", 0, 255),
+            (f"Segment {head} Blau", "color_b", 0, 255),
+        ]
+        if white:
+            block.append((f"Segment {head} Weiß", "color_w", 0, 255))
+        channels.extend(block)
+    return channels
+
+
+def _par_bar_modes_data():
+    """Generic 4-Segment-PAR-Bar: 4×RGB (12ch) / 4×RGBW (16ch)."""
+    return [
+        ("12-Kanal 4×RGB",  _par_bar_heads(4)),
+        ("16-Kanal 4×RGBW", _par_bar_heads(4, white=True)),
+    ]
+
+
+def _add_par_bar4(s, mfr):
+    """Generic LED PAR Bar 4× — 4 einzeln farbbare PAR-Segmente (FM-5)."""
+    _add_fixture(s, mfr, "LED PAR Bar 4×", "PARBAR4", "led_bar", 60,
+                 _par_bar_modes_data())
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -1340,6 +1412,12 @@ def ensure_builtins():
             changed = True
         if "PANGFB4" not in have:
             _add_pangolin_fb4(s, _get_or_create_mfr(s, "Pangolin", "PANG"))
+            changed = True
+        if "MOVBAR4" not in have:                       # FM-5
+            _add_mover_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
+            changed = True
+        if "PARBAR4" not in have:                       # FM-5
+            _add_par_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -1558,6 +1636,10 @@ def _seed(s: Session):
             ("Blau", "color_b", 0, 255),
         ]),
     ])
+
+    # ── FM-5: Generische Multi-Head-Bars (par_bar / mover_bar patchbar) ───────
+    _add_mover_bar4(s, generic)
+    _add_par_bar4(s, generic)
 
     # ── Echte Strahler des Nutzers: ZQ01424 (PAR) + ZQ02001 (Moving Head) ─────
     _add_zq01424(s, generic)

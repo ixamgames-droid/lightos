@@ -223,6 +223,7 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             "CONTIMH": "moving_head",
             "DOTZTPAR": "led_bar",
             "PARTYLASER": "laser", "L2600LASER": "laser", "PANGFB4": "laser",
+            "MOVBAR4": "moving_head", "PARBAR4": "led_bar",   # FM-5
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(
