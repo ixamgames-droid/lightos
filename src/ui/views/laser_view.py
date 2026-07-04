@@ -343,6 +343,7 @@ class LaserView(QWidget):
             if (getattr(f, "protocol", "") or "").lower()
             in ("etherdream", "idn")]
         self._safety_box.setVisible(bool(self._network_fids))
+        self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
 
         template = self._template_channels()
@@ -375,6 +376,21 @@ class LaserView(QWidget):
             self._btn_arm.setStyleSheet(
                 "QPushButton{background:#21262d;color:#8b949e;"
                 "border:1px solid #30363d;border-radius:5px;padding:6px 14px;}")
+
+    def _sync_arm_from_manager(self):
+        """Arm-Button-Zustand vom Manager übernehmen — hält die Anzeige mit
+        einer Scharf/Unscharf-Änderung von anderswo (VC-Button, MIDI) synchron.
+        blockSignals verhindert, dass das Spiegeln ein set_armed rückauslöst."""
+        lo = getattr(get_state(), "_laser_output", None)
+        if lo is None:
+            return
+        try:
+            self._btn_arm.blockSignals(True)
+            self._btn_arm.setChecked(bool(lo.armed))
+            self._btn_arm.blockSignals(False)
+            self._update_arm_button()
+        except RuntimeError:
+            pass
 
     def _on_arm_toggled(self, checked: bool):
         lo = self._laser_output()
