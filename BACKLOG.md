@@ -39,7 +39,7 @@ _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho
 |----|------|--------|---------------|
 | LAS-18b | P2 | **Design geklärt** (Foto-Import) | L2600-**Werksmuster-Picker**. Recherche + Davids Handbuch bestätigen: Muster sind generisch (CH4 „jeder Wert = ein Muster", unbenannt), keine Tabelle. **Design:** Picker mit (Bank CH3, Wert CH4)-Kacheln + **pro-Slot-Foto-Import** — David fotografiert Slots am Gerät. |
 | LAS-18c | P3 | blocked (Hardware) | Figur→Werksmuster-**Näherungs-Matcher** (`pattern_match.py`): Zeichnung → nächstpassendes eingebautes Muster als LASER-Palette. |
-| — | P3 | Handbuch offen | **Seite 8 (CH20–28) nachfotografieren** (David hatte Seite 7 doppelt). Danach fixture_db-Kommentare „unverifiziert" entfernen + Y-Bewegungs-Labels (CH8/CH25) ans Handbuch angleichen. |
+| — | — | ✅ gelöst (Handbuch S. 8) | Chart vollständig gegengelesen: Ch20 = „Keine Funktion"/leer bestätigt, Gruppe B = +17-Wiederholung; **laser_y-Bewegungs-Labels ans Handbuch angeglichen** (= X). Offen nur noch: 6ch-CH5 (nicht in den Fotos). |
 | LAS-20 | P3 | blocked (Hardware) | `.ild`-Exporter für ShowNET/ILDA+SD-Laser — nur bauen, wenn solche Hardware da ist (sonst toter Code). |
 | LAS-03-Rest | P3 | todo | Laser-Kanalwerte in **Snap/Szenen-Capture** aufnehmen (Muster-Abruf auch über Snaps/Szenen). |
 | ~~LAS-09~~ | — | ✅ gelöst (Handbuch) | 34ch bestätigt (nicht 32); CH18: 0=Alle AUS, 255=Gruppe A AUS/B EIN → Shutter-Default 0 korrekt. |
