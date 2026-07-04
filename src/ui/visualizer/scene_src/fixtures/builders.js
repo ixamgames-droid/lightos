@@ -507,3 +507,52 @@ export function buildParBar(n) {
   }
   return { group, parHeads, isParBar: true };
 }
+
+// FM-4: Mover-Bar — N Mini-Moving-Heads auf einem Balken, jeder Kopf einzeln
+// pan/tilt/faerbbar (z.B. Pixel-Beam-Bar mit 4/8 beweglichen Koepfen). Jeder
+// Kopf = Yoke (pant um Y) -> Head (kippt um X) -> Linse. heads[i].pan/tilt/farbe
+// treiben Kopf i (Datenmodell via FM-2 pro-Kopf-Pan). n = RGBW-Bank-Anzahl.
+export function buildMoverBar(n) {
+  n = Math.max(1, Math.min(24, Math.floor(n || 4)));
+  const group = new THREE.Group();
+  const barMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.5 });
+  const yokeMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
+  const spacing = 0.5;
+  const width = (n - 1) * spacing + 0.55;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, 0.28), barMat);
+  bar.castShadow = true;
+  group.add(bar);
+  const moverHeads = [];
+  const startX = -(n - 1) * spacing / 2;
+  for (let i = 0; i < n; i++) {
+    const x = startX + i * spacing;
+    // Pan-Pivot (yoke) unter dem Balken
+    const yoke = new THREE.Group();
+    yoke.position.set(x, -0.1, 0);
+    group.add(yoke);
+    [-0.09, 0.09].forEach(ax => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.05), yokeMat);
+      arm.position.set(ax, -0.11, 0);
+      yoke.add(arm);
+    });
+    // Tilt-Pivot (head)
+    const head = new THREE.Group();
+    head.position.set(0, -0.22, 0);
+    yoke.add(head);
+    const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.2, 14), barMat);
+    head.add(headBody);
+    // Linse (faerbbar), zeigt bei Tilt=0 nach unten (-Y)
+    const lens = new THREE.Mesh(
+      new THREE.CircleGeometry(0.1, 18),
+      new THREE.MeshStandardMaterial({
+        color: 0x808080, emissive: 0x000000, emissiveIntensity: 0,
+        roughness: 0.2, side: THREE.DoubleSide,
+      })
+    );
+    lens.rotation.x = -Math.PI / 2;
+    lens.position.y = -0.11;
+    head.add(lens);
+    moverHeads.push({ yoke, head, lens });
+  }
+  return { group, moverHeads, isMoverBar: true };
+}

@@ -1115,17 +1115,21 @@ class VisualizerBridge(QObject):
         Erkennung rein aus dem Kanal-Layout (zentrale ``is_spider_fixture``):
         >=2 RGBW-Banks -> Multi-Emitter. FM-3: Hat das Geraet GAR KEINE Bewegung
         (kein Tilt UND kein Pan) -> 'par_bar' (statische Bar aus N einzeln
-        gefaerbten PARs). Sonst 'spider' (kippende/pannende Bars — auch die
-        QLC+-Importe, die die Bar-Motoren als `pan` statt `tilt` mappen). Sonst
-        der fixture_type. (Mover-Bar mit pro-Kopf-Pan folgt in FM-4.)
+        gefaerbten PARs). FM-4: >=2 Pan-Kanaele (PRO-KOPF-Pan) -> 'mover_bar'
+        (N einzeln pan/tilt-bare Mini-Moving-Heads auf einer Bar). Sonst 'spider'
+        (Bewegung, aber kein pro-Kopf-Pan — auch die QLC+-Importe, die die Bar-
+        Motoren als `pan` statt `tilt` mappen, haben nur EINEN Pan). Sonst der
+        fixture_type.
         """
         if is_spider_fixture(f):        # >=2 RGBW-Banks
             chans = get_channels_for_patched(f)
-            has_move = any((getattr(c, "attribute", "") or "") in ("tilt", "pan")
-                           for c in chans)
-            if not has_move:
-                return "par_bar"
-            return "spider"
+            pan_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
+            tilt_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
+            if pan_count >= 2:
+                return "mover_bar"            # pro-Kopf-Pan -> N Moving Heads
+            if pan_count == 0 and tilt_count == 0:
+                return "par_bar"              # keine Bewegung -> statische PAR-Bar
+            return "spider"                   # Bewegung, aber kein pro-Kopf-Pan
         return f.fixture_type
 
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
@@ -1140,7 +1144,7 @@ class VisualizerBridge(QObject):
         # Zahl der RGBW-Banks; JS baut damit N PARs bzw. bringt sie zur Deckung
         # mit dem heads-Array (FM-2).
         n_heads = 0
-        if model in ("par_bar", "spider"):
+        if model in ("par_bar", "spider", "mover_bar"):
             try:
                 n_heads = sum(1 for c in get_channels_for_patched(f)
                               if (getattr(c, "attribute", "") or "") == "color_r")

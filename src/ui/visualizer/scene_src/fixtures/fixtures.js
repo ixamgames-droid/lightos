@@ -112,6 +112,17 @@ export function addFixture(data) {
       model.group.add(host);
       ph.beam = bcone;
     });
+  } else if (model.isMoverBar) {
+    // FM-4: Mover-Bar — pro Kopf ein Beam am Tilt-Pivot (pant/kippt mit dem Kopf).
+    const beamAngle = Math.PI / 13;
+    model.moverHeads.forEach(mh => {
+      const host = new THREE.Group();
+      host.position.set(0, -0.11, 0);   // an der Linse im Kopf-Frame
+      mh.head.add(host);
+      const bcone = createBeamCone(new THREE.Color(0, 0, 0), 0, beamAngle, 7.5);
+      host.add(bcone);
+      mh.beam = bcone;
+    });
   } else if (rtype === 'smoke' || rtype === 'hazer') {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
     // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
@@ -164,6 +175,8 @@ export function addFixture(data) {
     isSpider: !!model.isSpider,
     parHeads: model.parHeads || null,   // FM-3: PAR-Bar-Koepfe (je {lens, beam})
     isParBar: !!model.isParBar,
+    moverHeads: model.moverHeads || null,   // FM-4: Mover-Bar-Koepfe (je {yoke, head, lens, beam})
+    isMoverBar: !!model.isMoverBar,
     beam, spot, spotTarget, floorSpot,
     icon,
     type: rtype,
@@ -288,6 +301,50 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     }
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     return;   // PAR-Bar fertig
+  }
+
+  // ── FM-4: Mover-Bar — N Mini-Moving-Heads, jeder Kopf einzeln pan/tilt/farbe ─
+  if (f.isMoverBar && f.moverHeads) {
+    const hs = f.lastHeads || [];
+    const panHalf = (f.panRange || 360) * Math.PI / 360;
+    const tiltHalf = (f.tiltRange || 180) * Math.PI / 360;
+    const pZero = (f.panZero == null) ? 128 : f.panZero;
+    const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
+    for (let i = 0; i < f.moverHeads.length; i++) {
+      const mh = f.moverHeads[i];
+      const h = hs[i] || {};
+      const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
+      const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
+      const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
+      const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+      const bright = intNorm;
+      const hp = (h.pan == null) ? pan : h.pan;    // pro-Kopf-Pan (FM-2)
+      const ht = (h.tilt == null) ? tilt : h.tilt; // pro-Kopf-Tilt
+      mh.yoke.rotation.y = ((hp - pZero) / 128) * panHalf;
+      mh.head.rotation.x = ((ht - tZero) / 128) * tiltHalf;
+      if (mh.lens && mh.lens.material) {
+        mh.lens.material.color = col;
+        mh.lens.material.emissive = col;
+        mh.lens.material.emissiveIntensity = bright * 1.9;
+      }
+      if (mh.beam && mh.beam.material) {
+        mh.beam.material.color = col;
+        mh.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
+        mh.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
+      }
+    }
+    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
+      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
+      if (intNorm > 0.05) {
+        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
+        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
+      } else {
+        f.icon.userData.body.material.color.setHex(0x3a3a4a);
+        f.icon.userData.body.material.opacity = 0.85;
+      }
+    }
+    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+    return;   // Mover-Bar fertig
   }
 
   if (f.beam) {

@@ -3,7 +3,7 @@
 // FixtureType-Registry folgt in 3c (Abschnitt (e)).
 import {
   buildMovingHead, buildSpider, buildPar, buildLedBar, buildStrobe,
-  buildDimmer, buildScanner, buildSmoke, buildHazer, buildLaser, buildParBar,
+  buildDimmer, buildScanner, buildSmoke, buildHazer, buildLaser, buildParBar, buildMoverBar,
 } from './builders.js';
 
 export function buildFixtureModel(type, opts) {
@@ -12,6 +12,7 @@ export function buildFixtureModel(type, opts) {
     case 'moving_head': return buildMovingHead();
     case 'spider':      return buildSpider(opts.mirror);
     case 'par_bar':     return buildParBar(opts.nHeads);   // FM-3: N-PAR-Bar
+    case 'mover_bar':   return buildMoverBar(opts.nHeads);  // FM-4: N-Mover-Bar
     case 'par':         return buildPar();
     case 'led_bar':     return buildLedBar();
     case 'strobe':      return buildStrobe();
