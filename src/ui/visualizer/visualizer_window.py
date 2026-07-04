@@ -1113,9 +1113,18 @@ class VisualizerBridge(QObject):
         gepatcht (echte Tilt-Motoren), sieht aber anders aus: zwei separate
         Lichtleisten/Bars mit je eigenem Tilt + eigenem RGBW, **kein Pan**.
         Erkennung rein aus dem Kanal-Layout (zentrale ``is_spider_fixture``):
-        >=2 Tilt-Kanaele UND >=2 RGBW-Banks -> 'spider'. Sonst der fixture_type.
+        >=2 RGBW-Banks -> Multi-Emitter. FM-3: Hat das Geraet GAR KEINE Bewegung
+        (kein Tilt UND kein Pan) -> 'par_bar' (statische Bar aus N einzeln
+        gefaerbten PARs). Sonst 'spider' (kippende/pannende Bars — auch die
+        QLC+-Importe, die die Bar-Motoren als `pan` statt `tilt` mappen). Sonst
+        der fixture_type. (Mover-Bar mit pro-Kopf-Pan folgt in FM-4.)
         """
-        if is_spider_fixture(f):
+        if is_spider_fixture(f):        # >=2 RGBW-Banks
+            chans = get_channels_for_patched(f)
+            has_move = any((getattr(c, "attribute", "") or "") in ("tilt", "pan")
+                           for c in chans)
+            if not has_move:
+                return "par_bar"
             return "spider"
         return f.fixture_type
 
@@ -1127,11 +1136,22 @@ class VisualizerBridge(QObject):
         # 270°-Default liesse die JS-Bars als ±135° rendern. Fuer Spider daher
         # 180° als Default, wenn kein expliziter tilt_range_deg gesetzt ist.
         tilt_default = 180 if model == "spider" else 270
+        # FM-3: Kopf-/PAR-Anzahl fuer Multi-Emitter-Modelle (par_bar/spider) =
+        # Zahl der RGBW-Banks; JS baut damit N PARs bzw. bringt sie zur Deckung
+        # mit dem heads-Array (FM-2).
+        n_heads = 0
+        if model in ("par_bar", "spider"):
+            try:
+                n_heads = sum(1 for c in get_channels_for_patched(f)
+                              if (getattr(c, "attribute", "") or "") == "color_r")
+            except Exception:
+                n_heads = 0
         return {
             "fid": f.fid,
             "label": f.label,
             "type": f.fixture_type,
             "model": model,
+            "nHeads": n_heads,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],
