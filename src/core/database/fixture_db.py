@@ -787,8 +787,12 @@ def _l2600_modes_data():
     Gegenprobe). Nur 6ch (Simple) + 34ch (Professional) existieren am Gerät.
     ACHTUNG: der 6ch-Modus hat ein EIGENES Layout, NICHT die ersten 6 Kanäle
     des 34ch-Charts. 34ch: Ch1-17 = Mustergruppe A, Ch18-34 = Gruppe B
-    (identische Attribute -> Kopf 0/1, Ch20 ist leer). Unverifiziert am
-    Gerät: Ch18-Wert-0-Semantik (B aus vs. alles aus) und 6ch-Ch5 -> LAS-09."""
+    (identische Attribute -> Kopf 0/1, Ch20 ist leer). Am HANDBUCH bestätigt
+    (Davids Fotos S. 6/7/9, 2026-07-04): 34 Kanäle korrekt (Ehaho-Produktseite
+    „32ch" falsch); Ch18=0 = „Alle AUS", 255 = „Gruppe A AUS, Gruppe B EIN" ->
+    Shutter-Default 0 richtig (LAS-09 CH18 geklärt). Offen: S. 8 (Ch20-28) noch
+    nicht gegengelesen; 6ch-Ch5 weiter unverifiziert; Ch7/Ch8-(X/Y)-Labels im
+    Handbuch identisch, unser laser_y ist vertauscht (kosmetisch)."""
     return [
         ("6-Kanal (Simple DMX)", [
             ("Laser An/Aus", "shutter", 0, 255, [
