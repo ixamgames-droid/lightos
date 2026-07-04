@@ -73,12 +73,13 @@ class LaserDrawCanvas(QWidget):
     POINT_RADIUS = 9
 
     def __init__(self, figure: LaserFigure, on_change, on_select,
-                 on_commit_shape=None):
+                 on_commit_shape=None, on_snapshot=None):
         super().__init__()
         self._fig = figure
         self._on_change = on_change      # Geometrie geändert (Live-Update)
         self._on_select = on_select      # Auswahl geändert (Seitenleiste-Sync)
         self._on_commit_shape = on_commit_shape  # Form aufgezogen (pts, closed)
+        self._on_snapshot = on_snapshot  # LAS-16: vor einer Änderung (Undo)
         self.selected: int = -1
         self._dragging = False
         self.draw_color = (1.0, 1.0, 1.0)   # Farbe neuer Punkte
@@ -90,7 +91,24 @@ class LaserDrawCanvas(QWidget):
         # Freihand (LAS-15): Roh-Strich beim Ziehen, beim Loslassen vereinfacht.
         self.smooth_eps = 0.02
         self._stroke = None                  # list[(x,y)] während des Zeichnens
+        # Raster einrasten (LAS-16): snap = an, grid_div = Teilungen je Achse.
+        self.snap = False
+        self.grid_div = 8
+        self._drag_snapped = False           # Undo-Snapshot pro Zug nur einmal
         self.setMinimumSize(360, 360)
+
+    def _snapshot(self):
+        if self._on_snapshot is not None:
+            self._on_snapshot()
+
+    def _snap(self, x: float, y: float) -> tuple[float, float]:
+        """Rastet (x,y) auf das Gitter, wenn ``snap`` aktiv ist."""
+        if not self.snap or self.grid_div < 1:
+            return x, y
+        step = 2.0 / self.grid_div
+        sx = max(-1.0, min(1.0, round(x / step) * step))
+        sy = max(-1.0, min(1.0, round(y / step) * step))
+        return sx, sy
 
     # ── Koordinaten (−1..+1 ↔ Pixel) ──────────────────────────────────────
     def _frame(self) -> tuple[int, int, int]:
@@ -129,8 +147,8 @@ class LaserDrawCanvas(QWidget):
             self.update()
             return
         if self.tool in _SHAPE_TOOLS:
-            # Formwerkzeug: Anker setzen, Größe folgt beim Ziehen.
-            self._anchor = self._to_norm(px, py)
+            # Formwerkzeug: Anker setzen, Größe folgt beim Ziehen (mit Snap).
+            self._anchor = self._snap(*self._to_norm(px, py))
             self._cur = self._anchor
             self.update()
             return
@@ -138,12 +156,15 @@ class LaserDrawCanvas(QWidget):
         if hit >= 0:
             self.selected = hit
             self._dragging = True
+            self._drag_snapped = False        # Undo erst beim echten Ziehen
         else:
-            x, y = self._to_norm(px, py)
+            self._snapshot()                  # Undo: Punkt hinzufügen
+            x, y = self._snap(*self._to_norm(px, py))
             r, g, b = self.draw_color
             self._fig.points.append(FigurePoint(x=x, y=y, r=r, g=g, b=b))
             self.selected = len(self._fig.points) - 1
             self._dragging = True
+            self._drag_snapped = True         # bereits ein Snapshot gesetzt
             self._on_change()
         self._on_select()
         self.update()
@@ -157,13 +178,17 @@ class LaserDrawCanvas(QWidget):
             return
         if self.tool in _SHAPE_TOOLS:
             if self._anchor is not None:
-                self._cur = self._to_norm(int(ev.position().x()),
-                                          int(ev.position().y()))
+                self._cur = self._snap(*self._to_norm(
+                    int(ev.position().x()), int(ev.position().y())))
                 self.update()                     # Live-Vorschau der Form
             return
         if not self._dragging or not (0 <= self.selected < len(self._fig.points)):
             return
-        x, y = self._to_norm(int(ev.position().x()), int(ev.position().y()))
+        if not self._drag_snapped:
+            self._snapshot()                      # Undo: erster echter Zug
+            self._drag_snapped = True
+        x, y = self._snap(*self._to_norm(int(ev.position().x()),
+                                         int(ev.position().y())))
         p = self._fig.points[self.selected]
         p.x, p.y = x, y
         self._on_change()
@@ -241,6 +266,15 @@ class LaserDrawCanvas(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(self.rect(), QColor("#0d1117"))
         mx, my, s = self._frame()
+
+        # Raster (LAS-16): nur wenn Einrasten aktiv — zeigt, worauf gesnappt wird.
+        if self.snap and self.grid_div >= 1:
+            p.setPen(QPen(QColor("#20262e"), 1))
+            for k in range(1, self.grid_div):
+                gx = mx + int(s * k / self.grid_div)
+                gy = my + int(s * k / self.grid_div)
+                p.drawLine(gx, my, gx, my + s)
+                p.drawLine(mx, gy, mx + s, gy)
 
         # Rahmen + Mittelkreuz
         p.setPen(QColor("#30363d"))
@@ -346,6 +380,9 @@ class LaserDrawDialog(QDialog):
         self._capability = capability     # LaserCapability | None (Ehrlichkeit)
         self._cap_banner = None
         self._did_maximize = False
+        # Undo/Redo (LAS-16): Snapshot-Stacks über LaserFigure.to_dict().
+        self._undo: list[dict] = []
+        self._redo: list[dict] = []
         self.result_figure: LaserFigure | None = None
         self.setWindowTitle("Laser-Zeichen-Studio")
         self.setModal(True)
@@ -354,6 +391,16 @@ class LaserDrawDialog(QDialog):
                            "QLineEdit{background:#0d1117;color:#e6edf3;"
                            "border:1px solid #30363d;border-radius:4px;padding:4px;}")
         self._build_ui()
+        self._install_shortcuts()
+
+    def _install_shortcuts(self):
+        from PySide6.QtGui import QShortcut, QKeySequence
+        self._sc_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
+        self._sc_undo.activated.connect(self._do_undo)
+        self._sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
+        self._sc_redo.activated.connect(self._do_redo)
+        self._sc_redo2 = QShortcut(QKeySequence("Ctrl+Y"), self)   # Windows-Redo
+        self._sc_redo2.activated.connect(self._do_redo)
 
     def showEvent(self, ev):  # noqa: N802 (Qt-API)
         super().showEvent(ev)
@@ -393,6 +440,53 @@ class LaserDrawDialog(QDialog):
         self._cap_banner = lbl
         return lbl
 
+    # ── Undo/Redo (LAS-16) ────────────────────────────────────────────────
+    _UNDO_LIMIT = 60
+
+    def push_undo(self):
+        """Aktuellen Figur-Zustand auf den Undo-Stack legen (vor einer
+        Änderung); Redo verwerfen. Wird vom Canvas und den Dialog-Aktionen
+        VOR der Mutation gerufen."""
+        self._undo.append(self._fig.to_dict())
+        if len(self._undo) > self._UNDO_LIMIT:
+            self._undo.pop(0)
+        self._redo.clear()
+        self._refresh_undo_buttons()
+
+    def _restore(self, snap: dict):
+        """Figur IN PLACE aus einem Snapshot wiederherstellen — der Canvas hält
+        dieselbe LaserFigure-Instanz, daher Attribute ersetzen statt Objekt."""
+        restored = LaserFigure.from_dict(snap)
+        self._fig.points = restored.points
+        self._fig.closed = restored.closed
+        self._canvas.selected = -1
+        self._canvas._anchor = self._canvas._cur = self._canvas._stroke = None
+        self._canvas.update()
+        self._sync_selection_controls()
+        self._chk_closed.blockSignals(True)
+        self._chk_closed.setChecked(self._fig.closed)
+        self._chk_closed.blockSignals(False)
+        self._on_change()
+
+    def _do_undo(self):
+        if not self._undo:
+            return
+        self._redo.append(self._fig.to_dict())
+        self._restore(self._undo.pop())
+        self._refresh_undo_buttons()
+
+    def _do_redo(self):
+        if not self._redo:
+            return
+        self._undo.append(self._fig.to_dict())
+        self._restore(self._redo.pop())
+        self._refresh_undo_buttons()
+
+    def _refresh_undo_buttons(self):
+        if getattr(self, "_btn_undo", None) is not None:
+            self._btn_undo.setEnabled(bool(self._undo))
+            self._btn_redo.setEnabled(bool(self._redo))
+
     # ── Werkzeug-Leiste (LAS-14b) ─────────────────────────────────────────
     def _build_toolbar(self):
         bar = QHBoxLayout()
@@ -411,6 +505,19 @@ class LaserDrawDialog(QDialog):
             self._tool_buttons[key] = b
             bar.addWidget(b)
         self._tool_buttons[TOOL_EDIT].setChecked(True)
+        bar.addSpacing(10)
+        self._btn_undo = QPushButton("↶")
+        self._btn_undo.setToolTip("Rückgängig (Strg+Z)")
+        self._btn_undo.setStyleSheet(_TOOLBTN)
+        self._btn_undo.setEnabled(False)
+        self._btn_undo.clicked.connect(self._do_undo)
+        bar.addWidget(self._btn_undo)
+        self._btn_redo = QPushButton("↷")
+        self._btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        self._btn_redo.setStyleSheet(_TOOLBTN)
+        self._btn_redo.setEnabled(False)
+        self._btn_redo.clicked.connect(self._do_redo)
+        bar.addWidget(self._btn_redo)
         bar.addSpacing(14)
         bar.addWidget(QLabel("Ecken/Zacken:"))
         self._spin_sides = QSpinBox()
@@ -429,8 +536,18 @@ class LaserDrawDialog(QDialog):
             "Freihand-Vereinfachung: weniger/mehr Stützpunkte.")
         self._combo_smooth.currentIndexChanged.connect(self._on_smooth_changed)
         bar.addWidget(self._combo_smooth)
+        bar.addSpacing(14)
+        self._chk_snap = QCheckBox("Raster einrasten")
+        self._chk_snap.setStyleSheet("QCheckBox{color:#c9d1d9;font-size:12px;}")
+        self._chk_snap.setToolTip("Punkte und Formen auf ein Gitter einrasten.")
+        self._chk_snap.toggled.connect(self._on_snap_toggled)
+        bar.addWidget(self._chk_snap)
         bar.addStretch(1)
         return bar
+
+    def _on_snap_toggled(self, on: bool):
+        self._canvas.snap = bool(on)
+        self._canvas.update()
 
     def _select_tool(self, key: str):
         self._canvas.tool = key
@@ -462,6 +579,7 @@ class LaserDrawDialog(QDialog):
         wird dann offen, damit keine Linie über alle Sub-Muster schließt)."""
         if not points:
             return
+        self.push_undo()                          # LAS-16: vor der Übernahme
         if not self._fig.points:
             self._fig.points = [_clone_point(p) for p in points]
             self._fig.closed = bool(closed)
@@ -501,7 +619,8 @@ class LaserDrawDialog(QDialog):
         body.setSpacing(12)
         self._canvas = LaserDrawCanvas(self._fig, self._on_change,
                                        self._on_select,
-                                       on_commit_shape=self._commit_shape)
+                                       on_commit_shape=self._commit_shape,
+                                       on_snapshot=self.push_undo)
         body.addWidget(self._canvas, stretch=1)
 
         side = QVBoxLayout()
@@ -607,6 +726,7 @@ class LaserDrawDialog(QDialog):
         self._canvas.draw_color = rgb
         pt = self._sel_point()
         if pt is not None:
+            self.push_undo()
             pt.r, pt.g, pt.b = rgb
             self._canvas.update()
             self._on_change()
@@ -614,6 +734,7 @@ class LaserDrawDialog(QDialog):
     def _toggle_blank_selected(self, checked: bool):
         pt = self._sel_point()
         if pt is not None:
+            self.push_undo()
             pt.blank = bool(checked)
             self._canvas.update()
             self._on_change()
@@ -621,6 +742,7 @@ class LaserDrawDialog(QDialog):
     def _delete_selected(self):
         i = self._canvas.selected
         if 0 <= i < len(self._fig.points):
+            self.push_undo()
             self._fig.points.pop(i)
             self._canvas.selected = min(i, len(self._fig.points) - 1)
             self._canvas.update()
@@ -628,11 +750,17 @@ class LaserDrawDialog(QDialog):
             self._on_change()
 
     def _toggle_closed(self, checked: bool):
+        if bool(checked) == bool(self._fig.closed):
+            return                                # kein echter Wechsel
+        self.push_undo()
         self._fig.closed = bool(checked)
         self._canvas.update()
         self._on_change()
 
     def _clear_all(self):
+        if not self._fig.points:
+            return                                # nichts zu löschen
+        self.push_undo()
         self._fig.points.clear()
         self._canvas.selected = -1
         self._canvas.update()
