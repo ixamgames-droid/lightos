@@ -70,6 +70,9 @@ class LaserDrawCanvas(QWidget):
         return (max(-1.0, min(1.0, x)), max(-1.0, min(1.0, y)))
 
     def _hit_point(self, px: int, py: int) -> int:
+        # Nächster Punkt im Trefferradius; bei Gleichstand gewinnt der spätere
+        # Index (der zuletzt/oben gezeichnete Punkt) — intuitiv fürs Anfassen
+        # gestapelter Punkte. -1 = kein Treffer.
         best, best_d = -1, self.HIT_RADIUS ** 2
         for i, p in enumerate(self._fig.points):
             qx, qy = self._to_px(p.x, p.y)
@@ -219,11 +222,10 @@ class LaserDrawDialog(QDialog):
             b.clicked.connect(lambda _=False, c=rgb: self._set_draw_color(c))
             cgrid.addWidget(b, i // 4, i % 4)
         side.addLayout(cgrid)
-
-        self._btn_point_color = QPushButton("Ausgewählten Punkt umfärben")
-        self._btn_point_color.setStyleSheet(_BTN)
-        self._btn_point_color.clicked.connect(self._recolor_selected)
-        side.addWidget(self._btn_point_color)
+        chint = QLabel("Färbt neue Punkte — und sofort den ausgewählten.")
+        chint.setWordWrap(True)
+        chint.setStyleSheet("color:#8b949e;font-size:10px;")
+        side.addWidget(chint)
 
         self._chk_blank = QCheckBox("Ausgewählter Punkt: unsichtbarer Sprung")
         self._chk_blank.setStyleSheet("QCheckBox{color:#c9d1d9;font-size:11px;}")
@@ -284,7 +286,6 @@ class LaserDrawDialog(QDialog):
     def _sync_selection_controls(self):
         pt = self._sel_point()
         has = pt is not None
-        self._btn_point_color.setEnabled(has)
         self._btn_del.setEnabled(has)
         self._chk_blank.setEnabled(has)
         self._chk_blank.blockSignals(True)
@@ -293,17 +294,12 @@ class LaserDrawDialog(QDialog):
 
     # ── Werkzeug-Aktionen ─────────────────────────────────────────────────
     def _set_draw_color(self, rgb):
+        """Setzt die Zeichenfarbe (neue Punkte) und färbt sofort den aktuell
+        ausgewählten Punkt um — ein Schritt statt zweier (touch-freundlich)."""
         self._canvas.draw_color = rgb
         pt = self._sel_point()
         if pt is not None:
             pt.r, pt.g, pt.b = rgb
-            self._canvas.update()
-            self._on_change()
-
-    def _recolor_selected(self):
-        pt = self._sel_point()
-        if pt is not None:
-            pt.r, pt.g, pt.b = self._canvas.draw_color
             self._canvas.update()
             self._on_change()
 
