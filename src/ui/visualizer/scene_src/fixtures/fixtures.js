@@ -281,8 +281,8 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     }
   }
 
-  // Pan/Tilt
-  if (f.type === 'moving_head' && f.yoke && f.head) {
+  // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt)
+  if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
     // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
     // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
     const panHalf = (f.panRange || 360) * Math.PI / 360;
@@ -304,7 +304,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
     // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
     // Vorher blieb der Boden-Pool bei getilteten PARs/Scannern senkrecht drunter.
-    const aimObj = (f.type === 'moving_head' && f.head) ? f.head : f.group;
+    const aimObj = ((f.type === 'moving_head' || f.type === 'scanner') && f.head) ? f.head : f.group;
     if (aimObj) {
       aimObj.updateMatrixWorld();
       const wq = new THREE.Quaternion();
