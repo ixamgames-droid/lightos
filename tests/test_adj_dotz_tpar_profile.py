@@ -108,6 +108,20 @@ class DotzTParProfileTest(unittest.TestCase):
         self.assertEqual(aux[(0, 127)], ("Aus", "closed"))
         self.assertEqual(aux[(128, 255)], ("An", "open"))
 
+    def test_strobe_channel_has_open_and_strobe_ranges(self):
+        # Kohaerenz mit allen anderen Fixtures: der Shutter/Strobe-Kanal traegt
+        # einen 'Aus'-Range (kind 'open') bei 0 -> Default 0 = Dauerlicht, plus
+        # den Strobe-Bereich (_SIMPLE_STROBE). Vorher war DOTZTPAR das einzige
+        # Fixture ohne jeden Range an diesem Kanal.
+        with Session(self._eng) as s:
+            channels = _channels(_mode(_load(s), "9-Kanal Voll"))
+            strobe = channels[5]
+            self.assertEqual(strobe.attribute, "shutter")
+            self.assertEqual(strobe.default_value, 0)
+            kinds = {(r.range_from, r.range_to): r.kind for r in strobe.ranges}
+        self.assertEqual(kinds[(0, 0)], "open")
+        self.assertEqual(kinds[(1, 255)], "strobe")
+
 
 class EnsureBuiltinsDotzTParTest(unittest.TestCase):
     def setUp(self):

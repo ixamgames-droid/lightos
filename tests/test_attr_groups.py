@@ -52,3 +52,23 @@ def test_programmer_and_save_dialog_share_one_classifier():
 def test_order_other_last_and_complete():
     assert ATTR_GROUP_ORDER[-1] == "Other"
     assert set(ATTR_GROUP_ORDER) - {"Other"} == set(ATTR_GROUPS.keys())
+
+
+def test_cmy_color_mixing_classifies_as_color():
+    # cmy_c/m/y sind die REAL emittierten Namen (QXF-Import IntensityCyan/... ->
+    # cmy_c, Fixture-Editor CHANNEL_ATTRS). Vorher fielen sie auf 'Other' (kein
+    # Color-Tab/Picker), weil die Color-Menge nur cyan/magenta/yellow fuehrte,
+    # die aber kein Pfad emittiert und die auch kein Substring von cmy_* sind.
+    assert classify_attr("cmy_c") == "Color"
+    assert classify_attr("cmy_m") == "Color"
+    assert classify_attr("cmy_y") == "Color"
+    # Mehrkopf-Suffix aendert die Gruppe nicht.
+    assert classify_attr("cmy_c#1") == "Color"
+
+
+def test_cmy_in_color_feature_dim_set():
+    # Zweite Auspraegung derselben Drift: die Farb-Feature-Dimmung / GM-Farbmaske
+    # muss CMY ebenfalls als Farbe kennen (sonst wird ein CMY-Fixture ohne
+    # Intensity-Kanal nicht ueber Farbe gedimmt).
+    from src.core.app_state import _DIM_COLOR_ATTRS
+    assert {"cmy_c", "cmy_m", "cmy_y"} <= _DIM_COLOR_ATTRS
