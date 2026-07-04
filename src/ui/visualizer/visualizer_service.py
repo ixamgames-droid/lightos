@@ -85,16 +85,19 @@ def _build_fixture_payload(fixture, attrs: dict[str, int]) -> dict[str, object]:
         "pan": pan,
         "tilt": tilt,
     }
-    # ── Mehrkopf (Spider): zweite Bar separat senden ────────────────────────
-    # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N". Ein Spider hat
-    # zwei Tilts + zwei RGBW-Banks -> je Bar eine eigene Farbe + eigener Tilt.
-    # JS rendert daraus zwei einzeln tiltbare Bars. (1:1 aus
-    # VisualizerBridge.push_dmx_update uebernommen, siehe dort fuer Details.)
-    if ("tilt#1" in attrs) or ("color_r#1" in attrs):
+    # ── Mehrkopf (Spider UND Mover-/PAR-Bars): pro Kopf eigene Farbe/Pan/Tilt ──
+    # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N". FM-2: Kopfzahl aus
+    # dem hoechsten vorkommenden #N-Index von color_r/pan/tilt ABGELEITET (nicht mehr
+    # hart 2) -> beliebige N-Kopf-Bars (4er-Mover-Bar / 4er-PAR-Bar). Pro Kopf jetzt
+    # AUCH ein "pan" (fuer echte Mover-Bars). Ein Spider (nur color_r#1/tilt#1) ->
+    # head_count 2, byte-identisch zu vorher; JS-Spider-Render ignoriert h.pan.
+    head_count = _multihead_count(attrs)
+    if head_count >= 2:
         heads = []
-        head_count = 2
         tilt_keys = ["tilt"] + [f"tilt#{h}" for h in range(1, head_count)]
         tilt_sources = [attrs[k] for k in tilt_keys if k in attrs]
+        # Spider-Sonderfall: zwei Tilts aus pan+tilt, wenn zu wenige echte Tilts da
+        # sind (der Spider hat kein zweites Tilt-Attribut, nutzt pan als Bar-0-Tilt).
         if len(tilt_sources) < head_count and "pan" in attrs:
             tilt_sources = [attrs["pan"]] + tilt_sources
         while len(tilt_sources) < head_count:
@@ -110,10 +113,28 @@ def _build_fixture_payload(fixture, attrs: dict[str, int]) -> dict[str, object]:
                 "g": min(255, hg + hw),
                 "b": min(255, hb + hw),
                 "cr": hr, "cg": hg, "cb": hb, "cw": hw,
+                "pan": attrs.get(f"pan{sfx}", pan),   # FM-2: pro-Kopf-Pan (Mover-Bar)
                 "tilt": tilt_sources[h],
             })
         payload["heads"] = heads
     return payload
+
+
+# FM-2: Kopfzahl aus dem hoechsten #N-Index der Multi-Head-Attribute (color_r/pan/
+# tilt) ableiten. 0 relevante #N-Attribute -> 1 (kein heads-Array). Ein color_r#1
+# (Spider) -> 2 (byte-identisch zum alten hart-kodierten head_count=2).
+_MULTIHEAD_BASES = ("color_r", "pan", "tilt")
+
+
+def _multihead_count(attrs: dict[str, int]) -> int:
+    mx = 0
+    for key in attrs:
+        base, sep, idx = key.rpartition("#")
+        if sep and base in _MULTIHEAD_BASES and idx.isdigit():
+            n = int(idx)
+            if n > mx:
+                mx = n
+    return mx + 1
 
 
 class VisualizerService:

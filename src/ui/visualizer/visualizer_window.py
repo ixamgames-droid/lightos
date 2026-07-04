@@ -50,7 +50,7 @@ from src.core.stage.aim import (
 from src.core.stage import scene_commands as _scmd
 from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
-from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
+from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget, _multihead_count
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
@@ -969,9 +969,9 @@ class VisualizerBridge(QObject):
             # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N".
             # Ein Spider hat zwei Tilts + zwei RGBW-Banks -> je Bar eine eigene
             # Farbe + eigener Tilt. JS rendert daraus zwei einzeln tiltbare Bars.
-            if ("tilt#1" in attrs) or ("color_r#1" in attrs):
+            head_count = _multihead_count(attrs)   # FM-2: Kopfzahl abgeleitet (Spider->2)
+            if head_count >= 2:
                 heads = []
-                head_count = 2
                 # ── Tilt-Quelle pro Bar bestimmen ───────────────────────────
                 # Ein Spider hat zwei Tilt-Motoren, aber je nach Profil kommen
                 # sie UNTERSCHIEDLICH an:
@@ -1003,6 +1003,7 @@ class VisualizerBridge(QObject):
                         # Roh-Einzelkanaele: der Spider hat pro Bar 4 EINZELFARBEN-
                         # LEDs (R/G/B/W), jede leuchtet nach ihrem eigenen Kanal.
                         "cr": hr, "cg": hg, "cb": hb, "cw": hw,
+                        "pan": attrs.get(f"pan{sfx}", attrs.get("pan", 128)),  # FM-2: pro-Kopf-Pan
                         "tilt": tilt_sources[h],
                     })
                 payload["heads"] = heads
