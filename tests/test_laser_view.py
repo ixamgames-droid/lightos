@@ -112,7 +112,11 @@ def _make_view(monkeypatch, fixtures):
 def test_fixture_has_laser_capability(monkeypatch):
     _app()
     import src.ui.views.laser_view as lv
-    monkeypatch.setattr(lv, "get_channels_for_patched", lambda f: f._chans)
+    # Die Kanal-Erkennung läuft jetzt über den Klassifikator
+    # (capability.is_laser_fixture → app_state.get_channels_for_patched).
+    import src.core.app_state as app_state
+    monkeypatch.setattr(app_state, "get_channels_for_patched",
+                        lambda f: f._chans, raising=False)
 
     assert lv.fixture_has_laser_capability(
         _FX(1, [], fixture_type="laser")) is True
@@ -307,6 +311,25 @@ def test_no_laser_selected_shows_hint(monkeypatch):
         monkeypatch, [])
     assert "Kein Laser" in view._info.text()
     assert view._head_box.isVisibleTo(view) is False
+
+
+def test_network_laser_shows_safety_box(monkeypatch):
+    """LAS-12: der Fähigkeits-Klassifikator steuert das Safety-Box-Gating —
+    ein Netzwerk-Streaming-Laser (Klasse B) zeigt Scharf/Not-Aus + Figur."""
+    _app()
+    fx = _FX(2, _l2600ish_channels())
+    fx.protocol = "etherdream"
+    view, _state = _make_view(monkeypatch, [fx])
+    assert view._network_fids == [2]
+    assert view._safety_box.isVisibleTo(view) is True
+
+
+def test_dmx_laser_hides_safety_box(monkeypatch):
+    """Reiner DMX-Muster-Laser (Klasse A, L2600) → keine Netzwerk-Safety-Box."""
+    _app()
+    view, _state = _make_view(monkeypatch, [_FX(1, _l2600ish_channels())])
+    assert view._network_fids == []
+    assert view._safety_box.isVisibleTo(view) is False
 
 
 # ---------------------------------------------------------------------------
