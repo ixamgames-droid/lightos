@@ -513,6 +513,7 @@ class LaserView(QWidget):
         # Nach dem Dialog: aktive Combo-Figur wieder streamen (Live-Preview end).
         self._apply_figure_to_selection()
         fig = getattr(dlg, "result_figure", None)
+        dlg.deleteLater()      # Modal-Dialog nicht am Parent ansammeln lassen
         if fig is None or not fig.points:
             return
         # In der Show speichern (gleicher Name ersetzt) und aktiv setzen.

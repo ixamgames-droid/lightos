@@ -15,13 +15,17 @@ Touch: Trefferflächen großzügig (Punkt-Hit-Radius 22 px, Buttons ≥ 34 px).
 """
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import Qt, QPoint, QRect
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox, QFrame,
-                               QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QDialog,
+                               QDialogButtonBox, QFrame, QGridLayout,
+                               QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                               QSpinBox, QVBoxLayout, QWidget)
 
 from src.core.laser.figure import FigurePoint, LaserFigure
+from src.core.laser import figure_ops as fo
 
 # Farbpalette für die Punktfarbe (Name → RGB 0..1). Touch-freundliche Kacheln.
 _COLORS = [
@@ -31,9 +35,29 @@ _COLORS = [
     ("Magenta", (1.0, 0.0, 1.0)),
 ]
 
+# Werkzeuge des Studios: „Bearbeiten" (Punkte setzen/ziehen, Default) + Form-
+# werkzeuge (aufziehen = Anker am Druck, Größe per Ziehen). Key → Button-Text.
+TOOL_EDIT = "edit"
+_TOOLS = [
+    (TOOL_EDIT,   "✥ Bearbeiten"),
+    ("circle",    "○ Kreis"),
+    ("rectangle", "▭ Rechteck"),
+    ("line",      "／ Linie"),
+    ("polygon",   "⬠ Polygon"),
+    ("star",      "★ Stern"),
+]
+_SHAPE_TOOLS = {k for k, _ in _TOOLS if k != TOOL_EDIT}
+# Mindest-Aufziehgröße (normiert), damit ein versehentlicher Tipp keine
+# entartete Form erzeugt.
+_MIN_SHAPE = 0.04
+
 
 def _qcolor(r: float, g: float, b: float) -> QColor:
     return QColor(int(r * 255), int(g * 255), int(b * 255))
+
+
+def _clone_point(p: FigurePoint) -> FigurePoint:
+    return FigurePoint(x=p.x, y=p.y, r=p.r, g=p.g, b=p.b, blank=p.blank)
 
 
 class LaserDrawCanvas(QWidget):
@@ -42,14 +66,21 @@ class LaserDrawCanvas(QWidget):
     HIT_RADIUS = 22
     POINT_RADIUS = 9
 
-    def __init__(self, figure: LaserFigure, on_change, on_select):
+    def __init__(self, figure: LaserFigure, on_change, on_select,
+                 on_commit_shape=None):
         super().__init__()
         self._fig = figure
         self._on_change = on_change      # Geometrie geändert (Live-Update)
         self._on_select = on_select      # Auswahl geändert (Seitenleiste-Sync)
+        self._on_commit_shape = on_commit_shape  # Form aufgezogen (pts, closed)
         self.selected: int = -1
         self._dragging = False
         self.draw_color = (1.0, 1.0, 1.0)   # Farbe neuer Punkte
+        # Werkzeug-Zustand (LAS-14b): TOOL_EDIT = Punkte, sonst Form aufziehen.
+        self.tool = TOOL_EDIT
+        self.shape_sides = 5                 # Ecken/Zacken für Polygon/Stern
+        self._anchor = None                  # (x,y) beim Druck (Formmitte/Start)
+        self._cur = None                     # (x,y) aktuell (Ziehen)
         self.setMinimumSize(360, 360)
 
     # ── Koordinaten (−1..+1 ↔ Pixel) ──────────────────────────────────────
@@ -84,6 +115,12 @@ class LaserDrawCanvas(QWidget):
     # ── Interaktion ───────────────────────────────────────────────────────
     def mousePressEvent(self, ev):
         px, py = int(ev.position().x()), int(ev.position().y())
+        if self.tool in _SHAPE_TOOLS:
+            # Formwerkzeug: Anker setzen, Größe folgt beim Ziehen.
+            self._anchor = self._to_norm(px, py)
+            self._cur = self._anchor
+            self.update()
+            return
         hit = self._hit_point(px, py)
         if hit >= 0:
             self.selected = hit
@@ -99,6 +136,12 @@ class LaserDrawCanvas(QWidget):
         self.update()
 
     def mouseMoveEvent(self, ev):
+        if self.tool in _SHAPE_TOOLS:
+            if self._anchor is not None:
+                self._cur = self._to_norm(int(ev.position().x()),
+                                          int(ev.position().y()))
+                self.update()                     # Live-Vorschau der Form
+            return
         if not self._dragging or not (0 <= self.selected < len(self._fig.points)):
             return
         x, y = self._to_norm(int(ev.position().x()), int(ev.position().y()))
@@ -108,7 +151,48 @@ class LaserDrawCanvas(QWidget):
         self.update()
 
     def mouseReleaseEvent(self, ev):
+        if self.tool in _SHAPE_TOOLS and self._anchor is not None:
+            anchor, cur = self._anchor, self._cur
+            self._anchor = self._cur = None
+            pts, closed = self._gen_shape(anchor, cur)
+            self.update()
+            if pts and self._on_commit_shape is not None:
+                self._on_commit_shape(pts, closed)
+            return
         self._dragging = False
+
+    def _shape_extent(self, anchor, cur) -> float:
+        return math.hypot(cur[0] - anchor[0], cur[1] - anchor[1])
+
+    def _gen_shape(self, anchor, cur):
+        """(FigurePoint-Liste, closed) für das aktive Formwerkzeug aus Anker +
+        aktuellem Punkt. Zu kleines Aufziehen → leere Liste (kein Commit)."""
+        ax, ay = anchor
+        cx, cy = cur
+        col = self.draw_color
+        if self.tool == "line":
+            if self._shape_extent(anchor, cur) < _MIN_SHAPE:
+                return [], False
+            return fo.line(ax, ay, cx, cy, color=col), False
+        if self.tool == "rectangle":
+            if abs(cx - ax) < _MIN_SHAPE or abs(cy - ay) < _MIN_SHAPE:
+                return [], True
+            return fo.rectangle(cx=(ax + cx) / 2, cy=(ay + cy) / 2,
+                                w=abs(cx - ax), h=abs(cy - ay),
+                                color=col), True
+        r = self._shape_extent(anchor, cur)
+        if r < _MIN_SHAPE:
+            return [], True
+        if self.tool == "circle":
+            return fo.circle(cx=ax, cy=ay, r=r, color=col), True
+        if self.tool == "polygon":
+            return fo.regular_polygon(self.shape_sides, cx=ax, cy=ay, r=r,
+                                      rotation=math.pi / 2, color=col), True
+        if self.tool == "star":
+            return fo.star(cx=ax, cy=ay, r_outer=r, r_inner=r * 0.42,
+                           points=self.shape_sides, rotation=math.pi / 2,
+                           color=col), True
+        return [], False
 
     # ── Zeichnen ──────────────────────────────────────────────────────────
     def paintEvent(self, event):
@@ -160,11 +244,25 @@ class LaserDrawCanvas(QWidget):
             p.drawText(QRect(x - rad, y - rad, 2 * rad, 2 * rad),
                        Qt.AlignmentFlag.AlignCenter, str(i + 1))
 
+        # Live-Vorschau der aufgezogenen Form (Werkzeug aktiv, während Ziehen).
+        if self.tool in _SHAPE_TOOLS and self._anchor is not None \
+                and self._cur is not None:
+            prev, closed = self._gen_shape(self._anchor, self._cur)
+            if prev:
+                p.setPen(QPen(QColor("#58a6ff"), 2, Qt.PenStyle.DashLine))
+                seq = list(prev) + ([prev[0]] if closed else [])
+                for a, b in zip(seq, seq[1:]):
+                    x1, y1 = self._to_px(a.x, a.y)
+                    x2, y2 = self._to_px(b.x, b.y)
+                    p.drawLine(x1, y1, x2, y2)
+
         if not pts:
             p.setPen(QColor("#7d8590"))
             f = QFont(); f.setPixelSize(12); p.setFont(f)
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
-                       "Tippen, um Punkte zu setzen")
+            hint = ("Form aufziehen: klicken und ziehen"
+                    if self.tool in _SHAPE_TOOLS
+                    else "Tippen, um Punkte zu setzen")
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, hint)
         p.end()
 
 
@@ -172,6 +270,14 @@ _BTN = ("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
         "border-radius:4px;font-size:11px;padding:6px 10px;min-height:34px;}"
         "QPushButton:hover{background:#30363d;}"
         "QPushButton:disabled{color:#555d68;}")
+
+# Checkable Werkzeug-Kachel: aktiv = blau hervorgehoben (LAS-14b).
+_TOOLBTN = ("QPushButton{background:#21262d;color:#c9d1d9;"
+            "border:1px solid #30363d;border-radius:4px;font-size:12px;"
+            "padding:6px 12px;min-height:34px;}"
+            "QPushButton:hover{background:#30363d;}"
+            "QPushButton:checked{background:#1f6feb;color:#fff;"
+            "border-color:#1f6feb;}")
 
 
 class LaserDrawDialog(QDialog):
@@ -237,6 +343,79 @@ class LaserDrawDialog(QDialog):
         self._cap_banner = lbl
         return lbl
 
+    # ── Werkzeug-Leiste (LAS-14b) ─────────────────────────────────────────
+    def _build_toolbar(self):
+        bar = QHBoxLayout()
+        bar.setContentsMargins(12, 8, 12, 0)
+        bar.setSpacing(6)
+        bar.addWidget(QLabel("Werkzeug:"))
+        self._tool_group = QButtonGroup(self)
+        self._tool_group.setExclusive(True)
+        self._tool_buttons = {}
+        for key, text in _TOOLS:
+            b = QPushButton(text)
+            b.setCheckable(True)
+            b.setStyleSheet(_TOOLBTN)
+            b.clicked.connect(lambda _=False, k=key: self._select_tool(k))
+            self._tool_group.addButton(b)
+            self._tool_buttons[key] = b
+            bar.addWidget(b)
+        self._tool_buttons[TOOL_EDIT].setChecked(True)
+        bar.addSpacing(14)
+        bar.addWidget(QLabel("Ecken/Zacken:"))
+        self._spin_sides = QSpinBox()
+        self._spin_sides.setRange(3, 12)
+        self._spin_sides.setValue(5)
+        self._spin_sides.setToolTip("Anzahl Ecken (Polygon) bzw. Zacken (Stern).")
+        self._spin_sides.valueChanged.connect(self._on_sides_changed)
+        bar.addWidget(self._spin_sides)
+        bar.addStretch(1)
+        return bar
+
+    def _select_tool(self, key: str):
+        self._canvas.tool = key
+        self._canvas._anchor = self._canvas._cur = None
+        self._canvas.setCursor(
+            Qt.CursorShape.CrossCursor if key in _SHAPE_TOOLS
+            else Qt.CursorShape.ArrowCursor)
+        self._canvas.update()
+
+    def _select_edit_tool(self):
+        self._tool_buttons[TOOL_EDIT].setChecked(True)
+        self._select_tool(TOOL_EDIT)
+
+    def _on_sides_changed(self, v: int):
+        self._canvas.shape_sides = int(v)
+        self._canvas.update()
+
+    def _commit_shape(self, points, closed):
+        """Aufgezogene Form in die Figur übernehmen. Leere Figur → die Form wird
+        die Figur; sonst als Sub-Muster anhängen (dunkler Sprung zum Start,
+        geschlossene Formen kehren sichtbar zum Start zurück; die Gesamt-Figur
+        wird dann offen, damit keine Linie über alle Sub-Muster schließt)."""
+        if not points:
+            return
+        if not self._fig.points:
+            self._fig.points = [_clone_point(p) for p in points]
+            self._fig.closed = bool(closed)
+        else:
+            seq = [_clone_point(p) for p in points]
+            seq[0].blank = True
+            if closed:
+                tail = _clone_point(points[0])
+                tail.blank = False
+                seq.append(tail)
+            self._fig.points.extend(seq)
+            self._fig.closed = False
+        self._chk_closed.blockSignals(True)
+        self._chk_closed.setChecked(self._fig.closed)
+        self._chk_closed.blockSignals(False)
+        self._canvas.selected = -1
+        self._canvas.update()
+        self._sync_selection_controls()
+        self._on_change()
+        self._select_edit_tool()
+
     def _build_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -247,11 +426,15 @@ class LaserDrawDialog(QDialog):
         if banner is not None:
             root.addWidget(banner)
 
+        # Werkzeug-Leiste (LAS-14b): Bearbeiten + Formwerkzeuge.
+        root.addLayout(self._build_toolbar())
+
         body = QHBoxLayout()
-        body.setContentsMargins(12, 12, 12, 12)
+        body.setContentsMargins(12, 8, 12, 12)
         body.setSpacing(12)
         self._canvas = LaserDrawCanvas(self._fig, self._on_change,
-                                       self._on_select)
+                                       self._on_select,
+                                       on_commit_shape=self._commit_shape)
         body.addWidget(self._canvas, stretch=1)
 
         side = QVBoxLayout()
