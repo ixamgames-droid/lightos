@@ -22,7 +22,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
                                QDialogButtonBox, QFrame, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QSpinBox, QVBoxLayout, QWidget)
+                               QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
 from src.core.laser.figure import FigurePoint, LaserFigure
 from src.core.laser import figure_ops as fo
@@ -683,6 +683,15 @@ class LaserDrawDialog(QDialog):
         side.addWidget(hint)
         side.addStretch(1)
 
+        # LAS-17: aktuelle Figur in die Bibliothek legen (ohne Dialog zu schließen).
+        self._btn_lib_save = QPushButton("💾 In Bibliothek speichern")
+        self._btn_lib_save.setStyleSheet(_BTN)
+        self._btn_lib_save.setToolTip(
+            "Aktuelle Figur unter dem Namen in die Bibliothek legen "
+            "(gleicher Name ersetzt).")
+        self._btn_lib_save.clicked.connect(self._save_to_library)
+        side.addWidget(self._btn_lib_save)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save
             | QDialogButtonBox.StandardButton.Cancel)
@@ -691,7 +700,91 @@ class LaserDrawDialog(QDialog):
         side.addWidget(buttons)
         body.addLayout(side)
         root.addLayout(body)
+
+        # LAS-17: Bibliotheks-Leiste (Vorlagen + gespeicherte Figuren) unten.
+        root.addWidget(self._build_library())
+        self._rebuild_library()
         self._sync_selection_controls()
+
+    # ── Bibliothek (LAS-17) ───────────────────────────────────────────────
+    def _build_library(self):
+        self._lib_scroll = QScrollArea()
+        self._lib_scroll.setWidgetResizable(True)
+        self._lib_scroll.setFixedHeight(112)
+        self._lib_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._lib_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._lib_scroll.setStyleSheet(
+            "QScrollArea{background:#0d1117;border-top:1px solid #30363d;}")
+        self._lib_host = QWidget()
+        self._lib_lay = QHBoxLayout(self._lib_host)
+        self._lib_lay.setContentsMargins(10, 6, 10, 6)
+        self._lib_lay.setSpacing(8)
+        self._lib_scroll.setWidget(self._lib_host)
+        return self._lib_scroll
+
+    def _library_figures(self) -> list:
+        """Vorlagen (``builtin_figures``) + gespeicherte Show-Figuren."""
+        figs: list = []
+        try:
+            from src.core.laser.figure import builtin_figures
+            figs.extend(builtin_figures())
+        except Exception:
+            pass
+        try:
+            from src.core.app_state import get_state
+            figs.extend(list(getattr(get_state(), "laser_figures", []) or []))
+        except Exception:
+            pass
+        return figs
+
+    def _rebuild_library(self):
+        while self._lib_lay.count():
+            item = self._lib_lay.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        from src.ui.widgets.figure_thumb import FigureTile
+        lbl = QLabel("Bibliothek:")
+        lbl.setStyleSheet("color:#8b949e;font-size:11px;padding:0 4px;")
+        self._lib_lay.addWidget(lbl)
+        for fig in self._library_figures():
+            self._lib_lay.addWidget(FigureTile(fig, self._load_figure))
+        self._lib_lay.addStretch(1)
+
+    def _load_figure(self, fig):
+        """Bibliotheks-Figur als aktuelle Figur laden (undo-fähig, IN PLACE —
+        der Canvas hält dieselbe LaserFigure-Instanz)."""
+        self.push_undo()
+        clone = _clone_figure(fig)
+        self._fig.points = clone.points
+        self._fig.closed = clone.closed
+        self._edit_name.setText(clone.name or "Muster")
+        self._canvas.selected = -1
+        self._canvas._anchor = self._canvas._cur = self._canvas._stroke = None
+        self._chk_closed.blockSignals(True)
+        self._chk_closed.setChecked(self._fig.closed)
+        self._chk_closed.blockSignals(False)
+        self._canvas.update()
+        self._sync_selection_controls()
+        self._on_change()
+
+    def _save_to_library(self):
+        """Aktuelle Figur (mit Namen) in ``app_state.laser_figures`` ablegen
+        (gleicher Name ersetzt) und die Leiste neu aufbauen."""
+        fig = self._current_figure()
+        if not fig.points:
+            return
+        try:
+            from src.core.app_state import get_state
+            state = get_state()
+            figs = [f for f in getattr(state, "laser_figures", [])
+                    if getattr(f, "name", None) != fig.name]
+            figs.append(fig)
+            state.laser_figures = figs
+        except Exception as e:
+            print(f"[laser_draw] save to library error: {e}")
+        self._rebuild_library()
 
     # ── Callbacks vom Canvas ──────────────────────────────────────────────
     def _on_change(self):
