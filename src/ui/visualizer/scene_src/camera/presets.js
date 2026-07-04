@@ -10,6 +10,7 @@ import {
   orthoCam, orthoState, perspectiveCam,
 } from './cameras.js';
 import { fixtureMeshes } from '../fixtures/fixtures.js';
+import { setViewMode } from '../stage/view_mode.js';
 
 // ============================================================================
 // Kamera-Presets (Top/Front/Seite/Perspektive/Frei)
@@ -49,11 +50,12 @@ export function setCameraPreset(name) {
     applyNamedCamera(name.slice(6));
     return;
   }
-  // "applycam:<json>" (VIZ-13 3b-K Fix): Python schickt den VOLLEN Kamera-Dict
-  // (autoritativer AppState.visualizer_named_cameras), damit das Anwenden NICHT
-  // von der JS-lokalen _namedCameras-Liste abhaengt (deren Py->JS-Push-Sync
-  // sich als unzuverlaessig erwies - Live-Befund). applyNamedCamera nimmt ein
-  // dict direkt.
+  // "applycam:<json>": Python schickt den VOLLEN Kamera-Dict aus dem
+  // autoritativen AppState.visualizer_named_cameras mit. Bewusste Design-
+  // Entscheidung (Single Source of Truth): das Anwenden haengt NICHT von der
+  // JS-lokalen _namedCameras-Liste und deren Push-Reihenfolge/-Zeitpunkt ab,
+  // sondern nutzt direkt den Python-Bestand. applyNamedCamera nimmt ein dict
+  // direkt.
   if (typeof name === 'string' && name.indexOf('applycam:') === 0) {
     try { applyNamedCamera(JSON.parse(name.slice(9))); } catch (e) {}
     return;
@@ -95,6 +97,9 @@ function _boundsFromMeshes(meshes) {
   let any = false;
   for (const m of meshes) {
     if (!m || !m.visible) continue;
+    // Beam-Kegel (bis 8 m) nicht ins Fit einrechnen - sonst rahmt Fit die
+    // Lichtstrahlen statt der Fixtures (fixtures.js#createBeamCone taggt sie).
+    if (m.userData && m.userData.excludeFromFit) continue;
     box.expandByObject(m);
     any = true;
   }
@@ -269,6 +274,13 @@ export function applyNamedCamera(nameOrCam) {
     ? _namedCameras.find(c => c && c.name === nameOrCam)
     : nameOrCam;
   if (!cam) return;
+  // Zuerst den gespeicherten View-Modus wiederherstellen: sonst mutiert das
+  // Anwenden nur die INAKTIVE Kamera (z.B. orthoCam waehrend perspektivisch
+  // gerendert wird) und die Ansicht aendert sich sichtbar nicht. setViewMode
+  // schaltet die aktive Kamera + view.mode um, laesst aber theta/phi/radius
+  // bzw. orthoSize/-Position unangetastet (die wir gleich setzen).
+  const targetMode = (cam.mode === '2D') ? '2D' : '3D';
+  if (view.mode !== targetMode) setViewMode(targetMode);
   if (cam.mode === '2D') {
     if (typeof cam.orthoSize === 'number') orthoState.size = cam.orthoSize;
     const pan = Array.isArray(cam.orthoPan) ? cam.orthoPan : [0, 0];

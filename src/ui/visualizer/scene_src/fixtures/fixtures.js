@@ -41,6 +41,10 @@ export function createBeamCone(color, intensity, angle, length) {
   const cone = new THREE.Mesh(geo, mat);
   cone.position.y = -length / 2;
   cone.visible = settings.showCones;
+  // Aus Fit/Fit-Auswahl-Bounds ausschliessen: der Kegel ist bis zu 8 m lang und
+  // wuerde die Bounding-Box sonst dominieren -> Fit zoomt viel zu weit raus
+  // (camera/presets.js#_boundsFromMeshes ueberspringt Meshes mit diesem Flag).
+  cone.userData.excludeFromFit = true;
   return cone;
 }
 

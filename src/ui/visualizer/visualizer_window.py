@@ -3013,10 +3013,10 @@ class VisualizerWindow(QMainWindow):
         self._bridge.push_camera_preset(f"save:{name}")
 
     def _on_apply_named_camera(self, name: str):
-        # VIZ-13 3b-K Fix: den VOLLEN Kamera-Dict aus dem autoritativen
-        # AppState mitschicken ("applycam:<json>"), statt JS nur den Namen
-        # nachschlagen zu lassen — die JS-lokale Kamera-Liste ist auf den
-        # unzuverlaessigen Py->JS-Push angewiesen (Live-Befund) und ggf. leer.
+        # Den VOLLEN Kamera-Dict aus dem autoritativen AppState mitschicken
+        # ("applycam:<json>"), statt JS nur den Namen nachschlagen zu lassen.
+        # Single Source of Truth: unabhaengig davon, ob die JS-lokale
+        # Kamera-Liste schon synchronisiert wurde (Push-Reihenfolge/-Zeitpunkt).
         cams = getattr(self._state, "visualizer_named_cameras", []) or []
         cam = next((c for c in cams if (c or {}).get("name") == name), None)
         if cam is not None:
