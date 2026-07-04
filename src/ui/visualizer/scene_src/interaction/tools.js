@@ -54,14 +54,17 @@ export function setEditMode(mode) {
 // Edit-Werkzeug umschalten (von den Buttons oben). Aktualisiert Highlight +
 // Hinweis-Banner. Wirkt nur im Fixture-Edit-Modus.
 export function setEditTool(tool) {
-  view.editTool = ['move_xz', 'move_y', 'rotate', 'aim', 'trace'].includes(tool) ? tool : 'move_xz';
+  // VIZ-13 3b-G: move_y/rotate entfallen — das Move/Rotate-Gizmo (interaction/
+  // gizmo.js) uebernimmt Hoehe + Rotation zoom-korrekt am selektierten Fixture.
+  // 'move_xz' bleibt der Standard: Auswaehlen + XZ-Ziehen am Boden; das Gizmo
+  // erscheint automatisch bei Auswahl im 3D-Bau-Modus.
+  view.editTool = ['move_xz', 'aim', 'trace'].includes(tool) ? tool : 'move_xz';
   // Beim Wechsel WEG vom Trace-Werkzeug ein laufendes Nachfahren stoppen.
   const bridge0 = bridgeRef.get();
   if (view.editTool !== 'trace' && bridge0 && bridge0.stopTrace) {
     try { bridge0.stopTrace(); } catch (e) {}
   }
-  const map = [['tool-move-xz','move_xz'], ['tool-move-y','move_y'],
-               ['tool-rotate','rotate'], ['tool-aim','aim'], ['tool-trace','trace']];
+  const map = [['tool-move-xz','move_xz'], ['tool-aim','aim'], ['tool-trace','trace']];
   for (const [id, t] of map) {
     const b = document.getElementById(id);
     if (b) b.classList.toggle('active', t === view.editTool);
@@ -72,9 +75,7 @@ export function setEditTool(tool) {
   if (view.editMode === 'edit' && banner) {
     banner.style.display = 'block';
     banner.textContent =
-      view.editTool === 'move_xz' ? 'VERSCHIEBEN – Strahler ziehen (X/Z am Boden) · Tipp = auswählen'
-      : view.editTool === 'move_y' ? 'HÖHE – hoch/runter ziehen ändert die Höhe (Y)'
-      : view.editTool === 'rotate' ? 'DREHEN – seitlich ziehen = drehen (Hochachse) · hoch/runter = kippen'
+      view.editTool === 'move_xz' ? 'BEWEGEN – Gerät antippen = auswählen · am Boden ziehen (X/Z) · Gizmo-Pfeile: Achse/Höhe · Ringe: drehen (Strg = frei)'
       : view.editTool === 'aim' ? 'ZIELEN – Gerät antippen = auswählen · Boden/Wand antippen → ausrichten (MH fahren Pan/Tilt)'
       : 'NACHFAHREN – Moving Heads auswählen, dann Boden/Wand antippen → fahren dort eine Form ab (Tool wechseln = Stopp)';
   }

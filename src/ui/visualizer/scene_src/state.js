@@ -67,7 +67,7 @@ let _activeCam = null;       // perspectiveCam|orthoCam, von camera/cameras.js b
 let _selectedFids = [];      // fid numbers (ehem. stage_scene.html:2207)
 let _selectedStageId = null; // ehem. stage_scene.html:2208
 let _editMode = 'view';      // 'view' | 'edit' | 'stage' (ehem. stage_scene.html:214)
-let _editTool = 'move_xz';   // 'move_xz'|'move_y'|'rotate'|'aim'|'trace' (ehem. :219)
+let _editTool = 'move_xz';   // 'move_xz'|'aim'|'trace' (VIZ-13 3b-G: move_y/rotate -> Gizmo)
 
 // Kamera-Sphaerik (Eigenbau-Orbit, ehem. stage_scene.html:3273) - kommt erst
 // in 3b durch OrbitControls-Objekt-State ab; in 3a bleibt es primitive State.
