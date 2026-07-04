@@ -1245,6 +1245,12 @@ class VCButton(VCWidget):
             elif self.action == ButtonAction.BPM_MODE_TOGGLE:
                 from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
                 action_on = (get_bpm_manager().mode == BpmMode.MANUAL)
+            elif self.action == ButtonAction.LASER_ARM:
+                # LAS-10: scharfer Laser bekommt denselben prominenten Aktiv-
+                # Zustand wie Freeze/Auto-Sync (Safety-Sichtbarkeit).
+                from src.core.app_state import get_state
+                lo = getattr(get_state(), "_laser_output", None)
+                action_on = bool(lo is not None and lo.armed)
         except Exception:
             action_on = False
         # Laufzustand der gebundenen Funktion: ein Toggle-Pad bleibt „an", solange

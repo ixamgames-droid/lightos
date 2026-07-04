@@ -41,6 +41,8 @@
     "Freeze",
     "FunctionFlash",
     "FunctionToggle",
+    "LaserArm",
+    "LaserEstop",
     "LibrarySnap",
     "MediaNext",
     "MediaPlayPause",

@@ -136,7 +136,20 @@ class LaserOutputManager:
         NÄCHSTEN Tick — ein bereits laufender Tick kann noch mit dem alten
         Wert fertig senden, d. h. garantiert dunkel spätestens nach einer
         Tick-Periode (~1/TARGET_FPS ≈ 33 ms). Für sofortiges Dunkel: estop_all."""
+        changed = self._armed != bool(value)
         self._armed = bool(value)
+        if changed:
+            self._notify_armed_changed()
+
+    def _notify_armed_changed(self):
+        """Anzeige-Sync (LAS-10): Laser-Steuerseite + VC-Buttons erfahren eine
+        Scharf/Unscharf-Änderung von irgendeiner Quelle (LaserView, VC, MIDI),
+        damit kein Safety-Indikator stale „unscharf" zeigt, während scharf."""
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LASER_ARMED_CHANGED, self._armed)
+        except Exception:
+            pass
 
     def set_figure(self, fid: int, figure):
         """Gezeichnete Figur als Framequelle für ein Fixture setzen (``None``

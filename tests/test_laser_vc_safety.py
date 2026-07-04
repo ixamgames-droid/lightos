@@ -21,16 +21,20 @@ class _FakeLaserMgr:
         self.estops = 0
         self.clears = 0
         self.arm_calls = []
+        self.calls = []          # geordnete Sequenz für den Reihenfolge-Test
 
     def set_armed(self, v):
         self.armed = bool(v)
         self.arm_calls.append(bool(v))
+        self.calls.append(("arm", bool(v)))
 
     def estop_all(self):
         self.estops += 1
+        self.calls.append(("estop",))
 
     def clear_estop_all(self):
         self.clears += 1
+        self.calls.append(("clear",))
 
 
 class _FakeState:
@@ -78,12 +82,12 @@ class VcLaserButtonTest(unittest.TestCase):
         b = self._btn(ButtonAction.LASER_ESTOP)
         mgr = self.state._laser_output
         mgr.set_armed(True)                  # Laser war scharf
+        mgr.calls.clear()
         b._trigger_primary(True)
-        self.assertEqual(mgr.estops, 1)      # verriegelt
         self.assertFalse(mgr.armed)          # entwaffnet (bleibt dunkel)
-        self.assertEqual(mgr.clears, 1)      # Session wieder offen
-        # Reihenfolge: estop VOR disarm VOR clear — armed endet auf False.
-        self.assertEqual(mgr.arm_calls[-1], False)
+        # Exakte Sicherheits-Reihenfolge: verriegeln → unscharf → Session öffnen.
+        self.assertEqual(mgr.calls,
+                         [("estop",), ("arm", False), ("clear",)])
 
     def test_estop_ignores_release(self):
         b = self._btn(ButtonAction.LASER_ESTOP)
@@ -97,14 +101,33 @@ class VcLaserButtonTest(unittest.TestCase):
         self.assertIn(ButtonAction.LASER_ESTOP, actions)
 
     def test_action_survives_dict_roundtrip(self):
+        # VCButton serialisiert per to_dict/apply_dict (kein from_dict).
         b = self._btn(ButtonAction.LASER_ARM)
-        try:
-            d = b.to_dict()
-            b2 = VCButton()
-            b2.from_dict(d)
-        except Exception:
-            self.skipTest("VCButton hat kein to_dict/from_dict-Paar")
+        d = b.to_dict()
+        b2 = VCButton()
+        b2.apply_dict(d)
         self.assertEqual(b2.action, ButtonAction.LASER_ARM)
+
+
+class ArmedChangeSignalTest(unittest.TestCase):
+    """LAS-10: set_armed feuert LASER_ARMED_CHANGED (Push-Sync gegen stale
+    Safety-Anzeige) — nur bei echter Änderung, mit dem neuen Wert."""
+
+    def test_set_armed_emits_only_on_change(self):
+        from src.core.laser.laser_output import LaserOutputManager
+        from src.core.sync import get_sync, SyncEvent
+
+        seen = []
+        get_sync().subscribe(SyncEvent.LASER_ARMED_CHANGED,
+                             lambda *a: seen.append(a[-1] if a else None))
+        m = LaserOutputManager(_FakeState())
+        m.set_armed(True)
+        self.assertEqual(seen[-1], True)     # Event trägt den neuen Wert
+        n = len(seen)
+        m.set_armed(True)                    # keine Änderung → kein Event
+        self.assertEqual(len(seen), n)
+        m.set_armed(False)
+        self.assertEqual(seen[-1], False)
 
 
 class LaserViewArmSyncTest(unittest.TestCase):

@@ -35,6 +35,7 @@ class SyncEvent(str, Enum):
     SHOW_SAVED = "show_saved"
     SELECTION_CHANGED = "selection_changed"    # Programmer-Geraeteauswahl geaendert
     LIVE_VIEW_CHANGED = "live_view_changed"    # Live-View-Layout (Positionen/Zoom/Grid) geaendert
+    LASER_ARMED_CHANGED = "laser_armed_changed"  # Laser scharf/unscharf/Not-Aus (LAS-10) — Anzeige-Sync
     REFRESH_ALL = "refresh_all"                # Globale "Alle neu laden"
 
 

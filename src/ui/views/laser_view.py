@@ -270,6 +270,11 @@ class LaserView(QWidget):
                                   lambda *_: self._rebuild_palettes())
             sync.subscribe_widget(SyncEvent.SHOW_LOADED, self,
                                   lambda *_: self._on_show_loaded())
+            # LAS-10: Scharf/Unscharf-Änderung von VC/MIDI sofort spiegeln —
+            # sonst könnte der Safety-Indikator stale „unscharf" zeigen, während
+            # der Laser scharf ist (Täuschung in die gefährliche Richtung).
+            sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
+                                  lambda *_: self._sync_arm_from_manager())
         except Exception as e:
             print(f"[laser_view] sync subscribe error: {e}")
 
