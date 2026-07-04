@@ -64,6 +64,7 @@ class ButtonAction(str, Enum):
     # ── Laser-Sicherheit (LAS-10): Netzwerk-Laser-Ausgabe von der Konsole ─────
     LASER_ARM    = "LaserArm"     # Scharf/Unscharf-Toggle des LaserOutputManagers (unscharf = Ausgabe geblankt)
     LASER_ESTOP  = "LaserEstop"   # Laser-Not-Aus: sofort dunkel + entwaffnen (Trigger)
+    LASER_PATTERN = "LaserPattern"  # LAS-18: gespeichertes Laser-Muster (PaletteType.LASER) abrufen
 
 
 # Benutzerfreundliche deutsche Labels für die Aktions-Auswahl (statt der rohen
@@ -81,6 +82,7 @@ BUTTON_ACTION_LABELS: list[tuple[str, str]] = [
     (ButtonAction.BLACKOUT,        "Blackout"),
     (ButtonAction.LASER_ARM,       "Laser scharf/unscharf"),
     (ButtonAction.LASER_ESTOP,     "Laser NOT-AUS"),
+    (ButtonAction.LASER_PATTERN,   "Laser-Muster abrufen"),
     (ButtonAction.ALL_WHITE,       "Alles Weiß (gehalten)"),
     (ButtonAction.FREEZE,          "Freeze (BPM einfrieren)"),
     (ButtonAction.AUTO_SYNC,       "Auto-Sync an/aus"),
@@ -146,6 +148,8 @@ class VCButton(VCWidget):
         self.effect_action_key: str = "next_color"
         # F-24: Gruppenname fuer ButtonAction.SELECT_GROUP.
         self.group_name: str = ""
+        # LAS-18: Name des Laser-Musters (PaletteType.LASER) fuer LASER_PATTERN.
+        self.laser_palette: str = ""
         # Tempo-Sync Phase 5: Ziel-Bus fuer TAP_BUS/SYNC_BUS/ARM_BUS ("" = aktiver/Default-Bus).
         self.tempo_bus_id: str = ""
         # Live-Bearbeitung: macht den gestarteten Effekt zum aktiven Bearbeitungsziel
@@ -928,6 +932,28 @@ class VCButton(VCWidget):
                 self.update()
             return
 
+        if self.action == ButtonAction.LASER_PATTERN:
+            # LAS-18: gespeichertes Laser-Muster abrufen — schreibt die
+            # Programmer-Werte der Palette (Musterauswahl/Bank/Farbe/…) auf die
+            # damals aufgenommenen Laser. Auf DMX-Lasern (L2600) wirkt das direkt
+            # über die normale Ausgabe (kein Arming nötig; das gilt nur für den
+            # Netzwerk-Streamer).
+            if press and self.laser_palette:
+                try:
+                    from src.core.engine.palette import (get_palette_manager,
+                                                         PaletteType)
+                    pal = get_palette_manager().find(self.laser_palette)
+                    # NUR die aufgenommenen Fixtures ansteuern — niemals mit
+                    # leerer Liste/None auf ALLE gepatchten Geräte ausweiten
+                    # (apply_to_programmer würde bei [] / None sonst die
+                    # generischen Palettenwerte über alle Fixtures streuen).
+                    if (pal is not None and pal.type == PaletteType.LASER
+                            and pal.fixture_values):
+                        pal.apply_to_programmer(list(pal.fixture_values.keys()))
+                except Exception as e:
+                    print(f"[VCButton] laser pattern error: {e}")
+            return
+
         if self.action == ButtonAction.SNAPSHOT:
             if press and self.snapshot_index is not None:
                 self._apply_snapshot(self.snapshot_index)
@@ -1331,6 +1357,9 @@ class VCButton(VCWidget):
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
         elif self.action == ButtonAction.LASER_ESTOP:
             p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+        elif self.action == ButtonAction.LASER_PATTERN:
+            # LAS-18: Laser-Muster-Abruf = gedämpftes Lila (Laser-Familie).
+            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#a371f7"))
         elif self.action == ButtonAction.LASER_ARM:
             # Scharf = leuchtend lila (Laser-Farbe), unscharf = gedämpft.
             armed = False
@@ -1509,6 +1538,22 @@ class VCButton(VCWidget):
         group_combo.setCurrentText(self.group_name or "")
         group_combo.setToolTip("Fixture-Gruppe für Aktion = SelectGroup.")
 
+        # LAS-18: Auswahl des Laser-Musters (PaletteType.LASER) für LASER_PATTERN.
+        laser_pal_combo = QComboBox()
+        laser_pal_combo.setEditable(True)
+        laser_pal_combo.addItem("")
+        try:
+            from src.core.engine.palette import (get_palette_manager,
+                                                 PaletteType)
+            for _p in get_palette_manager().get_by_type(PaletteType.LASER):
+                laser_pal_combo.addItem(getattr(_p, "name", "") or "")
+        except Exception:
+            pass
+        laser_pal_combo.setCurrentText(self.laser_palette or "")
+        laser_pal_combo.setToolTip(
+            "Gespeichertes Laser-Muster (im Programmer per Muster-Speichern "
+            "angelegt), das dieser Button abruft.")
+
         bus_combo = QComboBox()
         for _bid, _blbl in (("", "(aktiver/Default-Bus)"), ("A", "Bus A"),
                             ("B", "Bus B"), ("C", "Bus C"), ("D", "Bus D")):
@@ -1609,6 +1654,7 @@ class VCButton(VCWidget):
         TG, FL = ButtonAction.TOGGLE, ButtonAction.FLASH
         TB, SB, AB = ButtonAction.TAP_BUS, ButtonAction.SYNC_BUS, ButtonAction.ARM_BUS
         AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
+        LP = ButtonAction.LASER_PATTERN   # LAS-18: Laser-Muster abrufen
 
         def apply():
             self.caption = cap.text() or self.caption
@@ -1645,6 +1691,7 @@ class VCButton(VCWidget):
             self._snap_prev = {}
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
+            self.laser_palette = laser_pal_combo.currentText().strip()
             self.edit_slot = edit_slot_edit.text().strip()
             self.tempo_bus_id = bus_combo.currentData() or ""
             self.midi_type = midi_type_combo.currentText()
@@ -1674,6 +1721,7 @@ class VCButton(VCWidget):
                 snap_mode_combo:  a == LS,
                 eff_action_combo: a == EA,
                 group_combo:      a == SG,
+                laser_pal_combo:  a == LP,
                 bus_combo:        a in (TB, SB, AB),
                 edit_slot_edit:   a in (FT, FF, EA),
                 exclusive_cb:     a in (FT, FF),
@@ -1705,6 +1753,7 @@ class VCButton(VCWidget):
             snap_mode_combo.currentIndexChanged.connect(lambda *_: _live())
             eff_action_combo.currentIndexChanged.connect(lambda *_: _live())
             group_combo.currentTextChanged.connect(lambda *_: _live())
+            laser_pal_combo.currentTextChanged.connect(lambda *_: _live())
             bus_combo.currentIndexChanged.connect(lambda *_: _live())
             edit_slot_edit.textChanged.connect(lambda *_: _live())
             exclusive_cb.toggled.connect(lambda *_: _live())
@@ -1730,6 +1779,7 @@ class VCButton(VCWidget):
                     ("Tasten-Modus (Snap):", snap_mode_combo),
                     ("Effekt-Aktion:", eff_action_combo),
                     ("Gruppe (SelectGroup):", group_combo),
+                    ("Laser-Muster (Palette):", laser_pal_combo),
                     ("Tempo-Bus:", bus_combo),
                     ("Live-Edit-Slot:", edit_slot_edit),
                     ("Exklusiv:", exclusive_cb),
@@ -1939,6 +1989,7 @@ class VCButton(VCWidget):
         d["snap_mode"] = self.snap_mode
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
+        d["laser_palette"] = self.laser_palette
         d["tempo_bus_id"] = self.tempo_bus_id
         d["edit_slot"] = self.edit_slot
         d["actions"] = [dict(a) for a in self.actions]
@@ -1988,6 +2039,7 @@ class VCButton(VCWidget):
         self.snap_mode = d.get("snap_mode", "toggle")
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
+        self.laser_palette = d.get("laser_palette", "")
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.edit_slot = d.get("edit_slot", "")
         self.actions = [dict(a) for a in d.get("actions", []) if isinstance(a, dict)]

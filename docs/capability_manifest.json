@@ -43,6 +43,7 @@
     "FunctionToggle",
     "LaserArm",
     "LaserEstop",
+    "LaserPattern",
     "LibrarySnap",
     "MediaNext",
     "MediaPlayPause",

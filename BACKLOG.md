@@ -29,6 +29,25 @@ _Aktuell keine frei eingereihten Items — die nächsten Kandidaten stehen unten
 ### 🔦 Laser-Support (Epic, Plan 2026-07-02)
 _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho L2600**, Manual verifiziert: nur 6ch + 34ch existieren) sofort per DMX, perspektivisch Profi-Laser über Netzwerk (Ether Dream → IDN); eigene Programmer-UI mit Muster-Paletten + gut abgesichertem freiem Zeichenmodus. Voller Plan mit Recherche (Manual/Protokolle), Ist-Analyse und Safety-Konzept: [`docs/LASER_PLAN.md`](docs/LASER_PLAN.md). **3D-Viewer bewusst ausgeklammert** (parallele VIZ-Strecke)._
 
+#### 🔎 Stand & entdeckte offene Punkte (Update 2026-07-04, von Claude gepflegt)
+> Feasibility-Verdikt (Research-Workflow, hart belegt): **Der Ehaho L2600 kann über DMX KEINE eigene/gemalte Figur ausgeben** — DMX ~44 Hz vs. ~20–30 kpps nötig, kein Per-Punkt-Galvo-Kanal, kein Upload-Weg (Ehaho-FAQ: „does not support custom homemade image/animation creation"; Gerät hat nur DMX+Strom+Sensitivity-Knob). Eigene Figuren gehen nur auf Netz-/ILDA-Lasern (Punktstrom). Darum: Zeichen-Studio **capability-gated** (LAS-12), L2600 nutzt Werksmuster + Abruf. Details: SecondBrain `project_laser_support_2026_07_02`.
+
+**Erledigt in Session 2026-07-04 (gemerged):** LAS-11 Regler gruppiert ([#160](https://github.com/ixamgames-droid/lightos/pull/160)) · LAS-12 `laser_capability()`-Gate ([#161](https://github.com/ixamgames-droid/lightos/pull/161)) · LAS-13 Vollbild-Zeichen-Studio + Ehrlichkeits-Banner ([#162](https://github.com/ixamgames-droid/lightos/pull/162)) · LAS-14a Formmathematik `figure_ops` ([#163](https://github.com/ixamgames-droid/lightos/pull/163)) · LAS-14b Formwerkzeuge drag-to-draw ([#166](https://github.com/ixamgames-droid/lightos/pull/166)) · LAS-15 Freihand+RDP ([#167](https://github.com/ixamgames-droid/lightos/pull/167)) · LAS-18 VC-Button „Laser-Muster abrufen" (PR offen).
+
+**Noch offen / muss man noch anpassen (entdeckt):**
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| LAS-16 | P2 | todo | **Undo/Redo + Grid-Snap** im Zeichen-Studio (für „schöne UI" praktisch Pflicht; Snapshot-Undo über `LaserFigure.to_dict()`). |
+| LAS-17 | P2 | todo | **Bibliotheks-Leiste** im Studio: Figuren benennen/speichern/laden + Mini-Vorschau über `app_state.laser_figures` (Persistenz existiert, keine Show-Format-Änderung). |
+| LAS-18b | P2 | blocked (Hardware) | L2600-**Werksmuster-Picker** (`gobo_wheel`/`laser_bank` als Kacheln statt Slider). Braucht reale Musterliste vom Gerät (Hardware-Test David). |
+| LAS-18c | P3 | blocked (Hardware) | Figur→Werksmuster-**Näherungs-Matcher** (`pattern_match.py`): Zeichnung → nächstpassendes eingebautes Muster als LASER-Palette. |
+| — | P3 | entdeckt | **Laser-Speed-Abstraktion:** L2600 hat KEINEN Speed-Kanal — Tempo steckt in Dynamik-Bereichen von `gobo_rotation`/`laser_x/y`. „VC-Geschwindigkeit" geht heute nur über generischen Fader-Modus „Programmer-Attribut" auf `gobo_rotation` (funktioniert, wenig auffindbar). Sauber: 0–100%-Speed-Fader, der auf den richtigen Dynamik-Bereich mappt. |
+| LAS-19 | P3 | todo | **Bild-Import → Vektorisierung** (Davids „Bild hochladen und umrechnen") — nur für Netz-/ILDA-Laser sinnvoll. |
+| LAS-20 | P3 | blocked (Hardware) | `.ild`-Exporter für ShowNET/ILDA+SD-Laser — nur bauen, wenn solche Hardware da ist (sonst toter Code). |
+| LAS-03-Rest | P3 | todo | Laser-Kanalwerte in **Snap/Szenen-Capture** aufnehmen (Muster-Abruf auch über Snaps/Szenen). |
+| LAS-09 | P2 | blocked (Hardware) | L2600 am Gerät prüfen: Ch18=0-Semantik, 6ch-Ch5. |
+| — | P3 | blocked | **Hardware-Verifikation** Ether Dream + IDN (nur gegen Fakes getestet, kein DAC/Gerät). ShowNET/Moncha-Profile (Charts fehlen). |
+
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
 | LAS-01 | P1 | done ([PR #140](https://github.com/ixamgames-droid/lightos/pull/140)) | Ehaho-L2600-Builtin + Laser-Attribut-Vokabular + Klassen-Audit | Builtin `L2600LASER` (6ch Simple + 34ch Professional, alle Manual-Ranges, Gruppe A/B als Kopf 0/1, Shutter-Safety-Default 0), 13 `laser_*`-Attribute in `CHANNEL_ATTRS`/`ATTR_GROUPS['Effect']`/`ATTR_LABELS`, Audit-Test „kein Builtin ist `other`". Tests `tests/test_ehaho_l2600_profile.py`. |
