@@ -428,5 +428,115 @@ class FreehandToolTest(unittest.TestCase):
         self.assertEqual(dlg._canvas.tool, TOOL_FREEHAND)
 
 
+class UndoRedoTest(unittest.TestCase):
+    """LAS-16: Undo/Redo über Snapshot-Stacks."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _dlg(self, fig=None):
+        dlg = LaserDrawDialog(figure=fig or LaserFigure(points=[]))
+        dlg._canvas.resize(400, 400)
+        return dlg
+
+    def test_add_point_undo_redo(self):
+        dlg = self._dlg()
+        dlg._canvas.mousePressEvent(_Ev(200, 200))
+        self.assertEqual(len(dlg._fig.points), 1)
+        dlg._do_undo()
+        self.assertEqual(len(dlg._fig.points), 0)
+        dlg._do_redo()
+        self.assertEqual(len(dlg._fig.points), 1)
+
+    def test_undo_keeps_same_figure_instance(self):
+        # Undo mutiert IN PLACE — der Canvas hält dieselbe LaserFigure.
+        dlg = self._dlg()
+        dlg._canvas.mousePressEvent(_Ev(200, 200))
+        dlg._do_undo()
+        self.assertIs(dlg._canvas._fig, dlg._fig)
+
+    def test_delete_is_undoable(self):
+        dlg = self._dlg(LaserFigure(points=[FigurePoint(0, 0),
+                                            FigurePoint(0.5, 0.5)]))
+        dlg._canvas.selected = 0
+        dlg._delete_selected()
+        self.assertEqual(len(dlg._fig.points), 1)
+        dlg._do_undo()
+        self.assertEqual(len(dlg._fig.points), 2)
+
+    def test_shape_commit_is_undoable(self):
+        dlg = self._dlg()
+        dlg._commit_shape([FigurePoint(0, 0), FigurePoint(0.5, 0),
+                           FigurePoint(0.5, 0.5)], True)
+        self.assertEqual(len(dlg._fig.points), 3)
+        dlg._do_undo()
+        self.assertEqual(len(dlg._fig.points), 0)
+
+    def test_new_action_clears_redo(self):
+        dlg = self._dlg()
+        dlg._canvas.mousePressEvent(_Ev(200, 200))
+        dlg._do_undo()
+        self.assertTrue(dlg._redo)
+        dlg._canvas.mousePressEvent(_Ev(150, 150))   # neue Aktion
+        self.assertEqual(dlg._redo, [])
+
+    def test_undo_button_enable_state(self):
+        dlg = self._dlg()
+        self.assertFalse(dlg._btn_undo.isEnabled())
+        dlg._canvas.mousePressEvent(_Ev(200, 200))
+        self.assertTrue(dlg._btn_undo.isEnabled())
+        dlg._do_undo()
+        self.assertFalse(dlg._btn_undo.isEnabled())
+        self.assertTrue(dlg._btn_redo.isEnabled())
+
+    def test_toggle_closed_no_change_no_undo(self):
+        dlg = self._dlg(LaserFigure(points=[], closed=True))
+        dlg._toggle_closed(True)                     # schon geschlossen
+        self.assertEqual(dlg._undo, [])
+
+
+class SnapTest(unittest.TestCase):
+    """LAS-16: Raster einrasten (grid snap)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _canvas(self):
+        c = LaserDrawCanvas(LaserFigure(points=[]), lambda: None, lambda: None)
+        c.resize(400, 400)
+        return c
+
+    def test_snap_off_is_identity(self):
+        c = self._canvas()
+        c.snap = False
+        self.assertEqual(c._snap(0.123, -0.456), (0.123, -0.456))
+
+    def test_snap_on_rounds_to_grid(self):
+        c = self._canvas()
+        c.snap = True
+        c.grid_div = 8                               # Schritt = 0.25
+        x, y = c._snap(0.10, -0.40)
+        self.assertAlmostEqual(x, 0.0)
+        self.assertAlmostEqual(y, -0.5)
+
+    def test_snap_stays_in_field(self):
+        c = self._canvas()
+        c.snap = True
+        x, y = c._snap(1.0, -1.0)
+        self.assertTrue(-1.0 <= x <= 1.0 and -1.0 <= y <= 1.0)
+
+    def test_added_point_snaps_when_enabled(self):
+        c = self._canvas()
+        c.snap = True
+        c.grid_div = 8
+        c.mousePressEvent(_Ev(205, 195))             # nahe Mitte
+        p = c._fig.points[0]
+        step = 2.0 / 8
+        self.assertAlmostEqual(p.x / step, round(p.x / step), places=6)
+        self.assertAlmostEqual(p.y / step, round(p.y / step), places=6)
+
+
 if __name__ == "__main__":
     unittest.main()
