@@ -629,5 +629,41 @@ class LibraryTest(unittest.TestCase):
         self.assertEqual(len(dlg._fig.points), 0)           # zurück zu leer
 
 
+class ImageImportTest(unittest.TestCase):
+    """LAS-19: QImage → 0/1-Gitter → vektorisierte Figur."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _black_square_image(self, size, sq0, sqn):
+        from PySide6.QtGui import QImage, QColor, QPainter
+        img = QImage(size, size, QImage.Format.Format_RGB32)
+        img.fill(QColor("white"))
+        p = QPainter(img)
+        p.fillRect(sq0, sq0, sqn, sqn, QColor("black"))
+        p.end()
+        return img
+
+    def test_grid_center_foreground_corner_background(self):
+        from src.ui.widgets.laser_draw_editor import image_to_grid
+        grid = image_to_grid(self._black_square_image(24, 8, 8), max_dim=24)
+        rows, cols = len(grid), len(grid[0])
+        self.assertEqual(grid[0][0], 0)                 # weiße Ecke = Hintergrund
+        self.assertEqual(grid[rows // 2][cols // 2], 1)  # schwarze Mitte = fg
+
+    def test_null_image_empty_grid(self):
+        from PySide6.QtGui import QImage
+        from src.ui.widgets.laser_draw_editor import image_to_grid
+        self.assertEqual(image_to_grid(QImage()), [])
+
+    def test_import_produces_editable_figure(self):
+        from src.core.laser.image_trace import image_grid_to_figure
+        from src.ui.widgets.laser_draw_editor import image_to_grid
+        grid = image_to_grid(self._black_square_image(40, 10, 20), max_dim=40)
+        fig = image_grid_to_figure(grid, name="Q", epsilon=0.05)
+        self.assertGreaterEqual(len(fig.points), 4)      # Quadrat-Outline
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import Qt, QPoint, QRect
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDialog,
                                QDialogButtonBox, QFrame, QGridLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -64,6 +64,26 @@ def _qcolor(r: float, g: float, b: float) -> QColor:
 
 def _clone_point(p: FigurePoint) -> FigurePoint:
     return FigurePoint(x=p.x, y=p.y, r=p.r, g=p.g, b=p.b, blank=p.blank)
+
+
+def image_to_grid(img: QImage, max_dim: int = 110, threshold: int = 128) -> list:
+    """QImage → 0/1-Gitter für :func:`image_grid_to_figure` (LAS-19). Skaliert
+    auf ``max_dim`` (Seitenverhältnis erhalten), schwellwertet die Helligkeit und
+    nimmt automatisch die MINDERHEITS-Pixel als Vordergrund (so wird sowohl
+    dunkel-auf-hell als auch hell-auf-dunkel sinnvoll getract)."""
+    if img is None or img.isNull():
+        return []
+    scaled = img.scaled(max_dim, max_dim, Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation)
+    w, h = scaled.width(), scaled.height()
+    if w == 0 or h == 0:
+        return []
+    lum = [[QColor(scaled.pixel(c, r)).lightness() for c in range(w)]
+           for r in range(h)]
+    dark = sum(1 for row in lum for v in row if v < threshold)
+    fg_is_dark = dark <= (w * h) / 2.0        # Minderheit = Vordergrund
+    return [[1 if ((v < threshold) == fg_is_dark) else 0 for v in row]
+            for row in lum]
 
 
 class LaserDrawCanvas(QWidget):
@@ -683,6 +703,14 @@ class LaserDrawDialog(QDialog):
         side.addWidget(hint)
         side.addStretch(1)
 
+        # LAS-19: Bild importieren → vektorisieren → als Figur laden.
+        self._btn_img = QPushButton("🖼️ Bild importieren…")
+        self._btn_img.setStyleSheet(_BTN)
+        self._btn_img.setToolTip("Ein Bild als Umriss/Silhouette vektorisieren "
+                                 "(für Netz-/ILDA-Laser mit echter Ausgabe).")
+        self._btn_img.clicked.connect(self._import_image)
+        side.addWidget(self._btn_img)
+
         # LAS-17: aktuelle Figur in die Bibliothek legen (ohne Dialog zu schließen).
         self._btn_lib_save = QPushButton("💾 In Bibliothek speichern")
         self._btn_lib_save.setStyleSheet(_BTN)
@@ -785,6 +813,29 @@ class LaserDrawDialog(QDialog):
         except Exception as e:
             print(f"[laser_draw] save to library error: {e}")
         self._rebuild_library()
+
+    def _import_image(self):
+        """Bild wählen → Silhouette/Outline vektorisieren → als Figur laden
+        (LAS-19, undo-fähig). Nur sinnvoll für Laser mit echter Ausgabe (Netz/
+        ILDA); auf reinen Muster-Lasern sagt das Banner, dass es genähert wird."""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Bild importieren", "",
+            "Bilder (*.png *.jpg *.jpeg *.bmp *.gif *.webp)")
+        if not path:
+            return
+        try:
+            grid = image_to_grid(QImage(path))
+            from src.core.laser.image_trace import image_grid_to_figure
+            import os
+            name = os.path.splitext(os.path.basename(path))[0] or "Bild"
+            fig = image_grid_to_figure(grid, name=name,
+                                       color=self._canvas.draw_color)
+        except Exception as e:
+            print(f"[laser_draw] image import error: {e}")
+            return
+        if fig.points:
+            self._load_figure(fig)
 
     # ── Callbacks vom Canvas ──────────────────────────────────────────────
     def _on_change(self):
