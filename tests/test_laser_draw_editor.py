@@ -538,5 +538,96 @@ class SnapTest(unittest.TestCase):
         self.assertAlmostEqual(p.y / step, round(p.y / step), places=6)
 
 
+class FigureThumbTest(unittest.TestCase):
+    """LAS-17: Mini-Vorschau + anklickbare Kachel."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def test_render_pixmap_size(self):
+        from src.ui.widgets.figure_thumb import render_figure_pixmap
+        pm = render_figure_pixmap(
+            LaserFigure(points=[FigurePoint(0, 0), FigurePoint(0.5, 0.5)]),
+            80, 60)
+        self.assertEqual((pm.width(), pm.height()), (80, 60))
+
+    def test_render_empty_ok(self):
+        from src.ui.widgets.figure_thumb import render_figure_pixmap
+        pm = render_figure_pixmap(LaserFigure(points=[]), 40, 40)
+        self.assertFalse(pm.isNull())
+
+    def test_tile_click_calls_back(self):
+        from src.ui.widgets.figure_thumb import FigureTile
+        got = []
+        fig = LaserFigure(name="X", points=[FigurePoint(0, 0)])
+        tile = FigureTile(fig, lambda f: got.append(f))
+        tile.mousePressEvent(None)
+        self.assertEqual(got, [fig])
+
+
+class LibraryTest(unittest.TestCase):
+    """LAS-17: Bibliotheks-Leiste — Vorlagen + speichern/laden."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    class _FakeState:
+        def __init__(self, figs=None):
+            self.laser_figures = list(figs or [])
+
+    def _with_state(self, st):
+        import src.core.app_state as app_state
+        self._orig = app_state.get_state
+        app_state.get_state = lambda: st
+        self.addCleanup(setattr, app_state, "get_state", self._orig)
+
+    def test_library_includes_builtin_templates(self):
+        self._with_state(self._FakeState([]))
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        names = [getattr(f, "name", "") for f in dlg._library_figures()]
+        self.assertIn("Kreis", names)
+        self.assertIn("Linie", names)
+
+    def test_save_to_library_writes_state(self):
+        st = self._FakeState([])
+        self._with_state(st)
+        dlg = LaserDrawDialog(figure=LaserFigure(
+            name="Mein Muster",
+            points=[FigurePoint(0, 0), FigurePoint(0.5, 0.5)]))
+        dlg._save_to_library()
+        self.assertEqual([f.name for f in st.laser_figures], ["Mein Muster"])
+
+    def test_save_replaces_same_name(self):
+        st = self._FakeState([LaserFigure(name="A", points=[FigurePoint(0, 0)])])
+        self._with_state(st)
+        dlg = LaserDrawDialog(figure=LaserFigure(
+            name="A", points=[FigurePoint(0.5, 0.5), FigurePoint(-0.5, -0.5)]))
+        dlg._save_to_library()
+        self.assertEqual(len(st.laser_figures), 1)          # ersetzt statt Dubl.
+        self.assertEqual(len(st.laser_figures[0].points), 2)
+
+    def test_empty_figure_not_saved(self):
+        st = self._FakeState([])
+        self._with_state(st)
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._save_to_library()
+        self.assertEqual(st.laser_figures, [])
+
+    def test_load_figure_is_undoable(self):
+        self._with_state(self._FakeState([]))
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._load_figure(LaserFigure(
+            name="Stern", closed=True,
+            points=[FigurePoint(0, 0), FigurePoint(0.5, 0.5),
+                    FigurePoint(-0.5, 0.5)]))
+        self.assertEqual(len(dlg._fig.points), 3)
+        self.assertEqual(dlg._edit_name.text(), "Stern")
+        self.assertIs(dlg._canvas._fig, dlg._fig)           # IN PLACE
+        dlg._do_undo()
+        self.assertEqual(len(dlg._fig.points), 0)           # zurück zu leer
+
+
 if __name__ == "__main__":
     unittest.main()
