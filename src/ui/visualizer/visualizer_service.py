@@ -65,10 +65,10 @@ class VisualizerTarget:
 
 
 def _build_fixture_payload(fixture, attrs: dict[str, int]) -> dict[str, object]:
-    """Baut den Pro-Fixture-Payload — 1:1 identisch zur heutigen
-    ``VisualizerBridge.push_dmx_update``-Logik (inkl. Spider-``heads``-Array),
-    nur ohne die JSON-Verpackung/den Signal-Emit (das macht der Service selbst,
-    einmal pro Tick fuer das gesamte Batch-Array statt pro Fixture)."""
+    """Baut den Pro-Fixture-Payload (inkl. Spider-/Bar-``heads``-Array). Seit
+    VIZ-13 3c-4 die EINZIGE Quelle dieser Logik — die frueher parallel gepflegte
+    ``VisualizerBridge.push_dmx_update`` wurde entfernt. Der Service verpackt das
+    Ergebnis pro Tick als ein Batch-Array (``dmxBatch``) statt pro Fixture."""
     r = attrs.get("color_r", 0)
     g = attrs.get("color_g", 0)
     b = attrs.get("color_b", 0)

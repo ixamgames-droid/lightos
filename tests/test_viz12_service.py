@@ -148,58 +148,11 @@ class DirtyDiffTest(_ServiceTestCase):
         self.assertEqual(arr[0]["r"], 99)
 
 
-class BatchPayloadReferenceTest(_ServiceTestCase):
-    """Vergleicht den Service-Payload Feld-fuer-Feld mit der alten
-    ``VisualizerBridge.push_dmx_update``-Logik (Referenzvergleich)."""
-
-    def test_payload_matches_legacy_push_dmx_update(self):
-        from src.ui.visualizer.visualizer_window import VisualizerBridge
-        from src.ui.visualizer.visualizer_service import _build_fixture_payload
-        import json as _json
-
-        legacy_sink: list = []
-
-        class _LegacySelf(SimpleNamespace):
-            pass
-
-        legacy_self = _LegacySelf(dmxUpdated=SimpleNamespace(
-            emit=lambda s: legacy_sink.append(_json.loads(s))))
-
-        attrs = {
-            "color_r": 200, "color_g": 150, "color_b": 100, "color_w": 10,
-            "intensity": 255, "pan": 130, "tilt": 90,
-        }
-        VisualizerBridge.push_dmx_update(legacy_self, 42, attrs)
-        legacy_payload = legacy_sink[0]
-
-        fixture = _fixture(42, universe=0, address=1, channels=None)
-        new_payload = _build_fixture_payload(fixture, attrs)
-
-        self.assertEqual(new_payload, legacy_payload)
-
-    def test_payload_matches_legacy_for_spider_heads(self):
-        from src.ui.visualizer.visualizer_window import VisualizerBridge
-        from src.ui.visualizer.visualizer_service import _build_fixture_payload
-        import json as _json
-
-        legacy_sink: list = []
-        legacy_self = SimpleNamespace(dmxUpdated=SimpleNamespace(
-            emit=lambda s: legacy_sink.append(_json.loads(s))))
-
-        attrs = {
-            "color_r": 200, "color_g": 0, "color_b": 0, "color_w": 0,
-            "color_r#1": 0, "color_g#1": 0, "color_b#1": 255, "color_w#1": 0,
-            "intensity": 255, "pan": 60, "tilt": 90, "tilt#1": 120,
-        }
-        VisualizerBridge.push_dmx_update(legacy_self, 7, attrs)
-        legacy_payload = legacy_sink[0]
-
-        fixture = _fixture(7, universe=0, address=1, channels=None)
-        new_payload = _build_fixture_payload(fixture, attrs)
-
-        self.assertEqual(new_payload, legacy_payload)
-        self.assertIn("heads", new_payload)
-        self.assertEqual(len(new_payload["heads"]), 2)
+# VIZ-13 3c-4: BatchPayloadReferenceTest ENTFERNT. Der Referenzvergleich gegen
+# die Legacy-``push_dmx_update`` ist gegenstandslos, seit diese entfernt wurde.
+# Die exakte ``_build_fixture_payload``-Ausgabe (Single-Head, Spider-2-Kopf,
+# Pan-als-Tilt-Fallback, 4er-Mover-/PAR-Bar) ist in tests/test_viz_multihead_payload.py
+# abgedeckt.
 
 
 class ForceFullResyncTest(_ServiceTestCase):

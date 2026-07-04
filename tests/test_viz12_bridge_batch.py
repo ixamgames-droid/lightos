@@ -4,9 +4,9 @@ Deckt zwei Dinge ab (siehe docs/VIZ12_SERVICE_DESIGN.md Abschnitt (d)):
   1. Emit-Roundtrip: ``VisualizerBridge.dmxBatch`` existiert als echtes Qt-
      Signal(str), laesst sich verbinden und liefert den emittierten JSON-String
      unveraendert an den Slot (Signal-Spy per connect()). Das alte
-     ``dmxUpdated``-Einzelsignal bleibt unveraendert bestehen (Kompat/Test-API,
-     Orchestrator-Entscheidung 3) -- dieser Schritt baut KEINEN Live-Pfad um,
-     der noch am alten Signal haengt.
+     ``dmxUpdated``-Einzelsignal wurde in VIZ-13 3c-4 ENTFERNT (der Service pusht
+     ausschliesslich als Batch ueber ``dmxBatch``) — die Tests hier belegen jetzt
+     auch, dass es weg ist (Signal + JS-Handler).
   2. JS-Klammer-Balance: der neu eingefuegte ``dmxBatch``-Handler-Block in
      stage_scene.html ist syntaktisch balanciert (Klammern/Parens ueber den
      gesamten <script>-Block), damit ein kaputtes additives Snippet nicht erst
@@ -58,9 +58,11 @@ class DmxBatchSignalExistsTest(unittest.TestCase):
         self.assertTrue(hasattr(VW.VisualizerBridge, "dmxBatch"),
                          "VisualizerBridge muss ein dmxBatch-Signal exponieren")
 
-    def test_dmx_updated_signal_still_present(self):
-        """Kompat: Einzelsignal bleibt bestehen (Orchestrator-Entscheidung 3)."""
-        self.assertTrue(hasattr(VW.VisualizerBridge, "dmxUpdated"))
+    def test_dmx_updated_signal_removed(self):
+        """VIZ-13 3c-4: das Legacy-Einzelsignal dmxUpdated wurde ENTFERNT — der
+        Service pusht ausschliesslich als Batch (dmxBatch)."""
+        self.assertFalse(hasattr(VW.VisualizerBridge, "dmxUpdated"),
+                         "dmxUpdated muss entfernt sein (nur dmxBatch bleibt)")
 
     def test_dmx_batch_emit_roundtrip(self):
         received = []
@@ -71,16 +73,6 @@ class DmxBatchSignalExistsTest(unittest.TestCase):
 
         self.assertEqual(len(received), 1, "genau ein Slot-Aufruf pro emit()")
         self.assertEqual(received[0], json_str, "Payload muss unveraendert ankommen")
-
-    def test_dmx_batch_emit_does_not_fire_dmx_updated(self):
-        """dmxBatch und dmxUpdated sind unabhaengige Signale -- ein Batch-Emit
-        darf keinen dmxUpdated-Slot ausloesen (kein versehentliches Aliasing)."""
-        legacy_received = []
-        self.bridge.dmxUpdated.connect(lambda payload: legacy_received.append(payload))
-
-        self.bridge.dmxBatch.emit('[{"fid": 1}]')
-
-        self.assertEqual(len(legacy_received), 0)
 
     def test_dmx_batch_multiple_emits_roundtrip_in_order(self):
         received = []
@@ -106,11 +98,12 @@ class JsBatchHandlerBraceBalanceTest(unittest.TestCase):
         with open(_BRIDGE_JS_PATH, encoding="utf-8") as f:
             self.bridge_js_content = f.read()
 
-    def test_dmx_batch_handler_present_and_additive(self):
+    def test_dmx_batch_handler_present_and_legacy_removed(self):
         self.assertIn("bridge.dmxBatch", self.bridge_js_content,
                        "JS muss bridge.dmxBatch verbinden")
-        self.assertIn("bridge.dmxUpdated", self.bridge_js_content,
-                       "altes dmxUpdated-Handler-Snippet muss erhalten bleiben")
+        # VIZ-13 3c-4: der Legacy-Einzel-Handler bridge.dmxUpdated wurde entfernt.
+        self.assertNotIn("bridge.dmxUpdated.connect", self.bridge_js_content,
+                          "Legacy dmxUpdated-Handler muss entfernt sein")
 
     def test_dmx_batch_handler_calls_unmodified_update_fixture(self):
         match = re.search(

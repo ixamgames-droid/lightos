@@ -2019,8 +2019,8 @@ def is_spider_fixture(fixture) -> bool:
     (nur 1 Pan + 1 Tilt, ABER zwei Farb-Banken), der sonst als normaler Moving
     Head durchgeht. Steuert den 3D-'spider'-Render (zwei getrennt gefaerbte
     Bars), das 2D-Spider-Symbol/-Icon und die Patch-Spiegel-Option. KONSISTENT
-    mit dem Multi-Head-DMX-Pfad (`push_dmx_update`), dessen `heads`-Array auf
-    `color_r#1` reagiert.
+    mit dem Multi-Head-DMX-Pfad (`visualizer_service._build_fixture_payload`),
+    dessen `heads`-Array auf `color_r#1` reagiert.
     Hinweis: ein reiner Tilt-only-Bar OHNE zweite Farb-Bank (Mini-Spider/
     Twinscan) ist BEWUSST kein `is_spider_fixture` — dafuer ist
     `is_dual_tilt_fixture` (Bewegung/Steuerung, >=2 Tilt + kein Pan) zustaendig.
