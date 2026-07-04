@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-04 — Laser-Support: Interaktiver Zeichen-Editor + Muster-Persistenz (LAS-07b)
+
+#### Neu / Hinzugefuegt
+
+- **Laser-Muster zeichnen:** neuer XY-Zeichen-Editor (`src/ui/widgets/laser_draw_editor.py`) — über den „✏️ Zeichnen…"-Knopf in der Laser-Steuerseite. Punkte per Klick setzen, ziehen zum Verschieben, aus einer 7-Farb-Palette einfärben, einzelne Punkte als „unsichtbaren Sprung" (Blank) markieren, offene Linie oder geschlossenes Polygon. Normierte −1..+1-Zeichenfläche (0,0 = Mitte, +y = oben) mit Live-Vorschau der Linien in Punktfarbe. **Beim Zeichnen wird das Muster live an scharf geschaltete Netzwerk-Laser gestreamt** — sichtbar nur, wenn der Laser über die Sicherheits-Sektion bewusst scharf ist (das Arming aus LAS-07a bleibt die alleinige Licht-Freigabe).
+- **Gezeichnete Muster sind Show-persistent:** gespeicherte Figuren (`AppState.laser_figures`) landen in der `.lshow` (save/load/reset in `show_file.py`) und erscheinen mit ★ in der Ausgabe-Auswahl der Laser-Steuerseite — abrufbar wie die eingebauten Grundfiguren. Tests `tests/test_laser_draw_editor.py` + Show-Roundtrip in `test_show_file.py`.
+
 ### 2026-07-04 — Laser-Support: Zeichenmodus-Fundament — Arming-Safety + Figuren (LAS-07a)
 
 #### Neu / Hinzugefuegt

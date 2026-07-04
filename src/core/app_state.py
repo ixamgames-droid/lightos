@@ -207,6 +207,9 @@ class AppState:
         # Cuelisten und Playback
         from .engine.cue_stack import CueStack
         self.cue_stacks: list[CueStack] = []
+        # LAS-07b: gezeichnete Laser-Muster (Show-persistent, Bibliothek für
+        # den Zeichen-Editor + die Figur-Auswahl der Laser-Steuerseite).
+        self.laser_figures: list = []
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
