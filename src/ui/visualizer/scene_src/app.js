@@ -32,6 +32,7 @@ import {
   applyStageEmissive, wireToolsLateBindings,
 } from './interaction/tools.js';
 import { wirePointerLateBindings } from './interaction/pointer.js';
+import { attachGizmoToSelection } from './interaction/gizmo.js';  // VIZ-13 3b-G
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
@@ -75,6 +76,10 @@ function animate() {
       }
       if (so._helper) so._helper.update();
     }
+    // VIZ-13 3b-G: Move/Rotate-Gizmo an die aktuelle Auswahl heften (Sichtbarkeit/
+    // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
+    // Drags, und haelt konstante Bildschirmgroesse).
+    attachGizmoToSelection();
     fpsTick();
     renderer.render(scene, view.activeCam);
   } catch (err) {

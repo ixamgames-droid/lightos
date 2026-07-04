@@ -19,6 +19,9 @@ import {
   _traceSpec, setLastTraceTarget, traceShape, traceRadius, updateFABs,
 } from './tools.js';
 import {
+  pickGizmoHandle, axisParamUnderPointer, rotationAngleUnderPointer, GIZMO_AXES,
+} from './gizmo.js';
+import {
   pickResizeHandle, updateResizeHandles, notifyStageListChanged,
   updateStageObjectProps, resizeHandles,
 } from '../stage/stage_objects.js';
@@ -37,6 +40,13 @@ let dragGroundOffset = { x: 0, y: 0, z: 0, userData: undefined };
 let dragResizeCorner = null;     // 'nw' | 'ne' | 'sw' | 'se'
 let dragResizeStart = null;      // {startCenterX,Z, startSizeX,Z, fixedCornerX,Z}
 let _fabLastPlaceCoords = null;
+// VIZ-13 3b-G: aktive Gizmo-Gestik. { mode:'translate'|'rotate', axis, axisVec,
+// pivot(Vector3), startParam | startAngle }. dragStartPositions[fid] traegt bei
+// Gizmo-Drags zusaetzlich .quat (Start-Quaternion) fuer die Welt-Achsen-Rotation.
+let dragGizmo = null;
+const _gizmoDeltaQuat = new THREE.Quaternion();
+const _gizmoPivot = new THREE.Vector3();
+const _gizmoOffset = new THREE.Vector3();
 
 export function getFabLastPlaceCoords() { return _fabLastPlaceCoords; }
 
@@ -88,6 +98,38 @@ export function handlePointerDown(clientX, clientY, shiftKey) {
   mouseMovedDuringClick = false;
 
   if (view.editMode === 'edit') {
+    // VIZ-13 3b-G: Gizmo-Handles zuerst (schlagen Fixture-Pick/Marquee — wie das
+    // Stage-Resize-Handle im Stage-Modus). Nur wenn das Gizmo sichtbar ist, d.h.
+    // im 3D-Bau-Modus mit Auswahl. Startet die Gizmo-Gestik; Kamera bleibt gesperrt
+    // (eigener dragMode, keine 'rotate'/'pan'-Zweige).
+    const ghandle = pickGizmoHandle();
+    if (ghandle) {
+      const axisVec = GIZMO_AXES[ghandle.axis];
+      dragStartPositions = {};
+      _gizmoPivot.set(0, 0, 0);
+      let n = 0;
+      for (const sf of view.selectedFids) {
+        const f = fixtures[sf];
+        if (f) {
+          const g = f.group;
+          dragStartPositions[sf] = {
+            x: g.position.x, y: g.position.y, z: g.position.z,
+            rotXDeg: rad2deg(g.rotation.x), rotYDeg: rad2deg(g.rotation.y),
+            quat: g.quaternion.clone(),
+          };
+          _gizmoPivot.add(g.position); n++;
+        }
+      }
+      if (n) _gizmoPivot.divideScalar(n);
+      dragGizmo = { mode: ghandle.mode, axis: ghandle.axis, axisVec, pivot: _gizmoPivot.clone() };
+      if (ghandle.mode === 'translate') {
+        dragGizmo.startParam = axisParamUnderPointer(dragGizmo.pivot, axisVec);
+      } else {
+        dragGizmo.startAngle = rotationAngleUnderPointer(dragGizmo.pivot, ghandle.axis);
+      }
+      dragMode = 'gizmoDrag';
+      return;
+    }
     if (view.editTool === 'aim' || view.editTool === 'trace') {
       // 1-Finger-Drag = Kamera drehen/schwenken; ein Tipp (ohne Bewegung) zielt
       // bzw. startet das Nachfahren (in handlePointerUp). Kein Fixture-Drag/Marquee.
@@ -195,7 +237,7 @@ export function handlePointerDown(clientX, clientY, shiftKey) {
   }
 }
 
-export function handlePointerMove(clientX, clientY) {
+export function handlePointerMove(clientX, clientY, ctrlKey) {
   if (Math.abs(clientX - downMouseX) > 3 || Math.abs(clientY - downMouseY) > 3) {
     mouseMovedDuringClick = true;
   }
@@ -223,39 +265,9 @@ export function handlePointerMove(clientX, clientY) {
     orthoCam.position.x -= dx * wPerPxX;
     orthoCam.position.z -= dy * wPerPxZ;
   } else if (dragMode === 'fixtureDrag') {
-    if (view.editTool === 'move_y') {
-      // HÖHE: vertikale Fingerbewegung -> Welt-Y (≈50 px = 1 m), je vom Start.
-      const dY = -(clientY - downMouseY) * 0.02;
-      for (const fid of view.selectedFids) {
-        const start = dragStartPositions[fid];
-        const f = fixtures[fid];
-        if (start && f) {
-          let ny = (start.y != null ? start.y : f.group.position.y) + dY;
-          ny = Math.max(0, Math.min(30, ny));
-          if (settings.snapToGrid) ny = Math.round(ny / settings.gridStep) * settings.gridStep;
-          f.group.position.y = ny;
-          f._pendingDock = null;   // manuelle Höhe löst Andocken
-        }
-      }
-      const rf0 = fixtures[view.selectedFids[0]];
-      if (rf0) showEditReadout('Höhe Y: ' + rf0.group.position.y.toFixed(2) + ' m');
-    } else if (view.editTool === 'rotate') {
-      // DREHEN: seitlich = Yaw (Hochachse Y), hoch/runter = Kippen (Pitch X). ~0.5°/px.
-      const dYaw = (clientX - downMouseX) * 0.5;
-      const dPitch = (clientY - downMouseY) * 0.5;
-      for (const fid of view.selectedFids) {
-        const start = dragStartPositions[fid];
-        const f = fixtures[fid];
-        if (start && f) {
-          f.group.rotation.y = deg2rad(Math.round((start.rotYDeg || 0) + dYaw));
-          f.group.rotation.x = deg2rad(Math.round((start.rotXDeg || 0) + dPitch));
-          if (f.icon) f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);
-        }
-      }
-      const rf1 = fixtures[view.selectedFids[0]];
-      if (rf1) showEditReadout('Drehen Y: ' + Math.round(rad2deg(rf1.group.rotation.y)) +
-                               '° · Kippen X: ' + Math.round(rad2deg(rf1.group.rotation.x)) + '°');
-    } else {
+    // Fixture-Koerper ziehen = XZ-Verschieben am Boden (via Raycast -> schon
+    // zoom-korrekt). Y/Rotation laufen ueber das Gizmo (3b-G), nicht mehr ueber
+    // eigene Werkzeuge/Pixel-Faktoren.
     const gh = intersectGround();
     if (gh && dragGroundOffset.userData) {
       const refFid = dragGroundOffset.userData.refFid;
@@ -292,6 +304,79 @@ export function handlePointerMove(clientX, clientY) {
         }
       }
     }
+  } else if (dragMode === 'gizmoDrag' && dragGizmo) {
+    // VIZ-13 3b-G: Gizmo-Gestik. Strukturell zoom-korrekt (Welt-Delta aus dem
+    // Pointer-Strahl, KEINE Pixel-Faktoren). Snap an/aus ueber snapToGrid + Strg
+    // (Strg = frei, "Snap-Escape"). KEIN Bridge-Call — Commit erst am Drag-Ende.
+    const snapActive = settings.snapToGrid && !ctrlKey;
+    if (dragGizmo.mode === 'translate') {
+      const cur = axisParamUnderPointer(dragGizmo.pivot, dragGizmo.axisVec);
+      let delta = cur - dragGizmo.startParam;
+      if (snapActive) delta = Math.round(delta / settings.gridStep) * settings.gridStep;
+      const ax = dragGizmo.axis;
+      const isVertical = (ax === 'y');
+      let refDock = null;
+      for (const fid of view.selectedFids) {
+        const start = dragStartPositions[fid];
+        const f = fixtures[fid];
+        if (!start || !f) continue;
+        f.group.position.x = start.x + (ax === 'x' ? delta : 0);
+        f.group.position.y = start.y + (ax === 'y' ? delta : 0);
+        f.group.position.z = start.z + (ax === 'z' ? delta : 0);
+        if (isVertical) {
+          // Explizite Hoehe -> Andocken loesen (wie das alte move_y).
+          f._pendingDock = null;
+          f.group.position.y = Math.max(0, Math.min(30, f.group.position.y));
+        } else if (settings.dockEnabled) {
+          const dt = findDockTarget(f.group.position.x, f.group.position.z);
+          f._pendingDock = dt ? dt.stageId : null;
+          if (dt) f.group.position.y = dt.y;
+          if (!refDock && dt) refDock = dt;
+        }
+        if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+      }
+      if (!isVertical && settings.dockEnabled) {
+        if (refDock) {
+          applyDockHighlight(refDock.stageId);
+          showDockBadge((refDock.kind === 'hang' ? 'haengt an ' : 'steht auf ') + _dockNameFor(refDock.stageId));
+        } else { clearDockHighlight(); hideDockBadge(); }
+      }
+      showEditReadout(ax.toUpperCase() + ': ' + (delta >= 0 ? '+' : '') + delta.toFixed(2) + ' m');
+    } else {
+      // Rotation UM die Welt-Achse a: delta-Quaternion mit dem Start-Quaternion
+      // je Fixture komponieren (f.group.rotation folgt automatisch -> die
+      // Gestik-Ende-Payload liest korrekte rx/ry/rz in Grad).
+      const cur = rotationAngleUnderPointer(dragGizmo.pivot, dragGizmo.axis);
+      if (cur != null) {
+        // Kanten-Guard: war der Ring beim Pointer-Down exakt kantenparallel,
+        // blieb startAngle null -> sonst 'cur - null' = grosser Fehlsprung.
+        if (dragGizmo.startAngle == null) dragGizmo.startAngle = cur;
+        let delta = cur - dragGizmo.startAngle;
+        if (snapActive) { const step = deg2rad(15); delta = Math.round(delta / step) * step; }
+        _gizmoDeltaQuat.setFromAxisAngle(dragGizmo.axisVec, delta);
+        for (const fid of view.selectedFids) {
+          const start = dragStartPositions[fid];
+          const f = fixtures[fid];
+          if (!start || !f || !start.quat) continue;
+          f.group.quaternion.multiplyQuaternions(_gizmoDeltaQuat, start.quat);
+          // Multi-Select: die Position um den GEMEINSAMEN Pivot mitdrehen (die
+          // Gruppe orbitet ihren Schwerpunkt — wie grandMA3/Blender-World-Pivot;
+          // der Ring sitzt am Schwerpunkt und hielt das bisher nicht ein). Einzel-
+          // Fixture: start == pivot -> Offset 0 -> keine Positionsaenderung.
+          _gizmoOffset.set(start.x - dragGizmo.pivot.x, start.y - dragGizmo.pivot.y, start.z - dragGizmo.pivot.z);
+          _gizmoOffset.applyQuaternion(_gizmoDeltaQuat);
+          f.group.position.set(
+            dragGizmo.pivot.x + _gizmoOffset.x,
+            dragGizmo.pivot.y + _gizmoOffset.y,
+            dragGizmo.pivot.z + _gizmoOffset.z);
+          if (f.icon) {
+            f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+            f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);
+          }
+        }
+        showEditReadout('Drehen ' + dragGizmo.axis.toUpperCase() + ': ' +
+                        (delta >= 0 ? '+' : '') + Math.round(rad2deg(delta)) + '°');
+      }
     }
   } else if (dragMode === 'stageDrag' && view.selectedStageId) {
     const so = stageObjects[view.selectedStageId];
@@ -417,7 +502,10 @@ export function handlePointerUp(shiftKey) {
     dragMode = 'none';
     return;
   }
-  if (dragMode === 'fixtureDrag') {
+  if (dragMode === 'fixtureDrag' || dragMode === 'gizmoDrag') {
+    // VIZ-13 3b-G: Gizmo-Gestik nutzt EXAKT denselben Commit wie der Koerper-Drag
+    // -> ein fixtureGestureEnd je Fixture, Python buendelt zu EINEM Undo-Command.
+    const gizmoRotate = (dragMode === 'gizmoDrag' && dragGizmo && dragGizmo.mode === 'rotate');
     const bridge = bridgeRef.get();
     for (const fid of view.selectedFids) {
       const f = fixtures[fid];
@@ -433,7 +521,7 @@ export function handlePointerUp(shiftKey) {
       const hasDockChange = (newDock || null) !== (f.dockedTo || null);
       if (hasDockChange) f.dockedTo = newDock || null;
       delete f._pendingDock;
-      const hasRotation = (view.editTool === 'rotate');
+      const hasRotation = gizmoRotate;
       // Review-Fix (Undo-Gestik-Buendelung): EIN kombiniertes Event fuer das
       // Drag-Ende statt 2-3 einzelner Bridge-Aufrufe (Position/Dock/Rotation)
       // -- Python buendelt sie zu GENAU EINEM Undo-Command (Design (e): "EIN
@@ -528,6 +616,7 @@ export function handlePointerUp(shiftKey) {
     updateOutlines();
   }
   dragMode = 'none';
+  dragGizmo = null;         // VIZ-13 3b-G: Gizmo-Gestik beendet
   updateMeasureReadout();   // Abstand zeigen, wenn jetzt genau 2 ausgewählt sind
 }
 
@@ -553,7 +642,7 @@ window.addEventListener('mouseup', function(e) {
 });
 
 window.addEventListener('mousemove', function(e) {
-  handlePointerMove(e.clientX, e.clientY);
+  handlePointerMove(e.clientX, e.clientY, e.ctrlKey);
   // Tooltip (Maus-only, bei Touch irrelevant)
   if (!isLeftDragging) {
     setMouseFromCoords(e.clientX, e.clientY);
