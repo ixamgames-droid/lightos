@@ -689,8 +689,9 @@ def _l2600_head_channels(p, third_channel, group_on_255):
 def _l2600_pattern_block(p):
     """Muster-Steuerblock (Kanäle 5-17 bzw. 22-34) einer L2600-Mustergruppe —
     Gruppe B wiederholt exakt dieselben Attribute wie A (Mehrkopf X-6:
-    2. Vorkommen = Kopf 1 = ``attr#1``). Y-Wellen/-Verzerrungen sind laut
-    Manual seitenvertauscht zu X (rechts/links statt auf/ab)."""
+    2. Vorkommen = Kopf 1 = ``attr#1``). Handbuch-verifiziert (Davids Fotos
+    S. 6/8): nur die Y-ZOOM-Verzerrung ist seitenvertauscht (rechts/links statt
+    auf/ab), die Y-BEWEGUNG trägt dieselben Labels wie X."""
     return [
         (p + "Muster-Zoom", "zoom", 0, 0, [
             (0, 127,   "Größe statisch",          ""),
@@ -714,11 +715,13 @@ def _l2600_pattern_block(p):
             (224, 255, "Lauf rechts",       ""),
         ]),
         (p + "Y-Bewegung", "laser_y", 64, 64, [
+            # Handbuch (S. 6/8, Davids Fotos): CH8/CH25 tragen dieselben Labels
+            # wie X — NICHT seitenvertauscht (nur die Zoom-Verzerrung ist es).
             (0, 127,   "Position statisch", ""),
-            (128, 159, "Welle rechts",      ""),
-            (160, 191, "Welle links",       ""),
-            (192, 223, "Lauf abwärts",      ""),
-            (224, 255, "Lauf aufwärts",     ""),
+            (128, 159, "Welle aufwärts",    ""),
+            (160, 191, "Welle abwärts",     ""),
+            (192, 223, "Lauf links",        ""),
+            (224, 255, "Lauf rechts",       ""),
         ]),
         (p + "X-Zoom", "laser_zoom_x", 0, 0, [
             (0, 127,   "Größe statisch",        ""),
@@ -787,12 +790,13 @@ def _l2600_modes_data():
     Gegenprobe). Nur 6ch (Simple) + 34ch (Professional) existieren am Gerät.
     ACHTUNG: der 6ch-Modus hat ein EIGENES Layout, NICHT die ersten 6 Kanäle
     des 34ch-Charts. 34ch: Ch1-17 = Mustergruppe A, Ch18-34 = Gruppe B
-    (identische Attribute -> Kopf 0/1, Ch20 ist leer). Am HANDBUCH bestätigt
-    (Davids Fotos S. 6/7/9, 2026-07-04): 34 Kanäle korrekt (Ehaho-Produktseite
-    „32ch" falsch); Ch18=0 = „Alle AUS", 255 = „Gruppe A AUS, Gruppe B EIN" ->
-    Shutter-Default 0 richtig (LAS-09 CH18 geklärt). Offen: S. 8 (Ch20-28) noch
-    nicht gegengelesen; 6ch-Ch5 weiter unverifiziert; Ch7/Ch8-(X/Y)-Labels im
-    Handbuch identisch, unser laser_y ist vertauscht (kosmetisch)."""
+    (identische Attribute -> Kopf 0/1, Ch20 ist leer). VOLLSTÄNDIG am HANDBUCH
+    gegengelesen (Davids Fotos S. 6/7/8/9, 2026-07-04): 34 Kanäle korrekt
+    (Ehaho-Produktseite „32ch" falsch); Ch18=0 = „Alle AUS", 255 = „Gruppe A AUS,
+    Gruppe B EIN" -> Shutter-Default 0 richtig (LAS-09 CH18 geklärt); Ch20 =
+    „Keine Funktion"/leer bestätigt; laser_y-Bewegungs-Labels ans Handbuch
+    angeglichen (= X, nicht mehr vertauscht). Offen nur: 6ch-Ch5 (nicht in den
+    Fotos)."""
     return [
         ("6-Kanal (Simple DMX)", [
             ("Laser An/Aus", "shutter", 0, 255, [
