@@ -182,13 +182,16 @@ class LaserDrawDialog(QDialog):
     aufgerufen (Live-Streaming an scharf geschaltete Laser)."""
 
     def __init__(self, figure: LaserFigure | None = None, parent=None,
-                 on_live_update=None):
+                 on_live_update=None, capability=None):
         super().__init__(parent)
         self._fig = _clone_figure(figure) if figure is not None else LaserFigure(
             name="Neues Muster", points=[], closed=True)
         self._on_live_update = on_live_update
+        self._capability = capability     # LaserCapability | None (Ehrlichkeit)
+        self._cap_banner = None
+        self._did_maximize = False
         self.result_figure: LaserFigure | None = None
-        self.setWindowTitle("Laser-Muster zeichnen")
+        self.setWindowTitle("Laser-Zeichen-Studio")
         self.setModal(True)
         self.setStyleSheet("QDialog{background:#161b22;} "
                            "QLabel{color:#8b949e;font-size:11px;} "
@@ -196,14 +199,68 @@ class LaserDrawDialog(QDialog):
                            "border:1px solid #30363d;border-radius:4px;padding:4px;}")
         self._build_ui()
 
+    def showEvent(self, ev):  # noqa: N802 (Qt-API)
+        super().showEvent(ev)
+        # Das Studio füllt beim ersten Anzeigen den Bildschirm — Davids Wunsch
+        # nach einem großen Popout zum Erstellen. Danach per Button umschaltbar.
+        if not self._did_maximize:
+            self._did_maximize = True
+            self.showMaximized()
+
+    def _toggle_fullscreen(self):
+        if self.isFullScreen():
+            self.showMaximized()
+        else:
+            self.showFullScreen()
+
+    def _make_capability_banner(self):
+        """Ehrliches Banner: was passiert mit der Figur auf DIESEM Laser?
+        Grün = exakte Ausgabe (Netz/ILDA), Bernstein = nur Vorlage/Näherung
+        (reiner DMX-Muster-Laser). ``None`` → kein Banner (unbekannt)."""
+        cap = self._capability
+        if cap is None:
+            self._cap_banner = None
+            return None
+        label = getattr(cap, "label", "") or ""
+        if getattr(cap, "can_render_freeform", False):
+            bg, fg, text = "#12361f", "#7ee2a8", f"✓  {label}"
+        else:
+            bg, fg, text = ("#3a2e10", "#f0c674",
+                            "⚠  " + label + "  —  die Zeichnung dient hier als "
+                            "Vorlage (Näherung); sie wird auf diesem Gerät nicht "
+                            "1:1 ausgegeben.")
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet(
+            f"QLabel{{background:{bg};color:{fg};font-size:12px;"
+            "font-weight:bold;padding:9px 14px;}")
+        self._cap_banner = lbl
+        return lbl
+
     def _build_ui(self):
-        root = QHBoxLayout(self)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # Ehrliches Fähigkeits-Banner ganz oben (LAS-13).
+        banner = self._make_capability_banner()
+        if banner is not None:
+            root.addWidget(banner)
+
+        body = QHBoxLayout()
+        body.setContentsMargins(12, 12, 12, 12)
+        body.setSpacing(12)
         self._canvas = LaserDrawCanvas(self._fig, self._on_change,
                                        self._on_select)
-        root.addWidget(self._canvas, stretch=1)
+        body.addWidget(self._canvas, stretch=1)
 
         side = QVBoxLayout()
         side.setSpacing(8)
+        self._btn_full = QPushButton("⛶  Vollbild / Fenster")
+        self._btn_full.setStyleSheet(_BTN)
+        self._btn_full.setToolTip("Zwischen Vollbild und Fenster umschalten.")
+        self._btn_full.clicked.connect(self._toggle_fullscreen)
+        side.addWidget(self._btn_full)
         side.addWidget(QLabel("Name"))
         self._edit_name = QLineEdit(self._fig.name)
         side.addWidget(self._edit_name)
@@ -263,7 +320,8 @@ class LaserDrawDialog(QDialog):
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
         side.addWidget(buttons)
-        root.addLayout(side)
+        body.addLayout(side)
+        root.addLayout(body)
         self._sync_selection_controls()
 
     # ── Callbacks vom Canvas ──────────────────────────────────────────────

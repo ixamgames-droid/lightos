@@ -491,8 +491,23 @@ class LaserView(QWidget):
             print(f"[laser_view] draw editor unavailable: {e}")
             return
         base = self._combo_figure.currentData()   # ausgewählte Figur als Start
+        # Fähigkeit → ehrliches Banner (LAS-12/13). Die Live-Vorschau streamt an
+        # die NETZWERK-Laser der Auswahl → deren Fähigkeit (exakt) ist relevant,
+        # nicht die eines evtl. mitgewählten DMX-Musterlasers.
+        cap = None
+        try:
+            by_fid = {getattr(f, "fid", None): f for f in self._fixtures}
+            for fid in getattr(self, "_network_fids", []):
+                f = by_fid.get(fid)
+                if f is not None:
+                    cap = laser_capability(f)
+                    break
+            if cap is None and self._fixtures:
+                cap = laser_capability(self._fixtures[0])
+        except Exception:
+            cap = None
         dlg = LaserDrawDialog(
-            figure=base, parent=self,
+            figure=base, parent=self, capability=cap,
             on_live_update=lambda fig: self._apply_figure_to_selection(fig))
         dlg.exec()
         # Nach dem Dialog: aktive Combo-Figur wieder streamen (Live-Preview end).

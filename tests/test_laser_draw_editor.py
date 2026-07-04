@@ -176,5 +176,55 @@ class DialogToolsTest(unittest.TestCase):
         self.assertIsInstance(seen[-1], LaserFigure)
 
 
+class StudioTest(unittest.TestCase):
+    """LAS-13: Vollbild-Studio + ehrliches Fähigkeits-Banner."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def test_title_is_studio(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        self.assertIn("Studio", dlg.windowTitle())
+
+    def test_no_banner_without_capability(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        self.assertIsNone(dlg._cap_banner)
+
+    def test_banner_exact_for_network(self):
+        from src.core.laser.capability import LaserCapability, LaserClass
+        cap = LaserCapability(LaserClass.NET_STREAM, True, "exact_stream",
+                              "Netzwerk-Laser — exakt.")
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]), capability=cap)
+        self.assertIsNotNone(dlg._cap_banner)
+        self.assertIn("Netzwerk-Laser", dlg._cap_banner.text())
+        self.assertNotIn("Näherung", dlg._cap_banner.text())
+
+    def test_banner_warns_for_builtin(self):
+        from src.core.laser.capability import LaserCapability, LaserClass
+        cap = LaserCapability(LaserClass.BUILTIN_DMX, False, "builtin_only",
+                              "DMX-Muster-Laser — nur Werksmuster.")
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]), capability=cap)
+        self.assertIsNotNone(dlg._cap_banner)
+        self.assertIn("Näherung", dlg._cap_banner.text())
+
+    def test_toggle_fullscreen_no_crash(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._toggle_fullscreen()      # darf offscreen nicht werfen
+        dlg._toggle_fullscreen()
+
+    def test_contract_preserved_with_capability(self):
+        # result_figure/on_live_update-Kontrakt bleibt auch mit Banner intakt.
+        seen = []
+        from src.core.laser.capability import LaserCapability, LaserClass
+        cap = LaserCapability(LaserClass.NET_STREAM, True, "exact_stream", "X")
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]), capability=cap,
+                              on_live_update=lambda fig: seen.append(fig))
+        dlg._canvas.mousePressEvent(_Ev(200, 200))
+        dlg._on_accept()
+        self.assertTrue(seen)
+        self.assertIsNotNone(dlg.result_figure)
+
+
 if __name__ == "__main__":
     unittest.main()
