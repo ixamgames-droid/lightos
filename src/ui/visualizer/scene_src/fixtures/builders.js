@@ -5,43 +5,55 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 
 // ── Builders ─────────────────────────────────────────────────────────────────
 export function buildMovingHead() {
+  // FM-8: detailliertes PROZEDURALES Moving-Head-Modell (statt des groben
+  // moving_head.dae = flache Platte + Knubbel). Erkennbare Silhouette: runde
+  // Bodenplatte + Hals -> U-Yoke mit Motor-/Lager-Gehaeusen (pant um Y) -> Kopf-
+  // Trommel mit Zier-Ringen + Linsen-Ring + emissiver Linse (kippt um X). Ausgang
+  // ist -Y (deckt sich mit dem Beam aus createBeamCone) -> Linse an der Unterseite.
+  // Pivots/Return-Vertrag unveraendert (yoke pant um Y, head kippt um X, lens =
+  // Farb-Feedback via updateFixture, addFixture haengt den Beam an model.head).
   const group = new THREE.Group();
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.4 });
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.18, 16), baseMat);
-  base.position.y = 0.09;
-  base.castShadow = true;
-  group.add(base);
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x191920, metalness: 0.8, roughness: 0.35 });
+  const midMetal  = new THREE.MeshStandardMaterial({ color: 0x26262e, metalness: 0.7, roughness: 0.30 });
+  const trim      = new THREE.MeshStandardMaterial({ color: 0x3a3a46, metalness: 0.6, roughness: 0.40 });
+
+  // ── Basis: breite Bodenplatte + kegeliger Hals ──
+  const baseP = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.30, 0.07, 28), darkMetal);
+  baseP.position.y = 0.035; baseP.castShadow = true; group.add(baseP);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.26, 0.11, 28), midMetal);
+  neck.position.y = 0.125; group.add(neck);
+
+  // ── Yoke (pant um Y) ──
   const yoke = new THREE.Group();
-  yoke.position.y = 0.18;
+  yoke.position.y = 0.19;
   group.add(yoke);
-  const yokeMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
-  [-0.18, 0.18].forEach(x => {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.08), yokeMat);
-    arm.position.set(x, 0.22, 0);
-    yoke.add(arm);
+  const turn = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.055, 28), trim);
+  turn.position.y = 0.01; yoke.add(turn);
+  [-0.21, 0.21].forEach(x => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.42, 0.13), midMetal);   // U-Arm
+    arm.position.set(x, 0.27, 0); arm.castShadow = true; yoke.add(arm);
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.078, 0.09, 22), darkMetal);
+    motor.rotation.z = Math.PI / 2; motor.position.set(x * 0.82, 0.46, 0); yoke.add(motor);
   });
+
+  // ── Kopf (kippt um X), Lichtausgang -Y ──
   const head = new THREE.Group();
-  head.position.y = 0.4;
+  head.position.y = 0.46;
   yoke.add(head);
-  const headBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.16, 0.16, 0.36, 16),
-    new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.4 })
+  const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.175, 0.34, 28), midMetal);
+  headBody.castShadow = true; head.add(headBody);
+  [0.09, -0.03].forEach(y => {                     // zwei Zier-Ringe (Rillen)
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.179, 0.179, 0.018, 28), trim);
+    ring.position.y = y; head.add(ring);
+  });
+  const lensRing = new THREE.Mesh(new THREE.CylinderGeometry(0.168, 0.152, 0.05, 28), darkMetal);
+  lensRing.position.y = -0.17; head.add(lensRing);
+  const lens = new THREE.Mesh(                      // emissive Linse (Farb-Feedback)
+    new THREE.CylinderGeometry(0.135, 0.135, 0.02, 28),
+    new THREE.MeshStandardMaterial({ color: 0x606060, emissive: 0x000000, metalness: 0.3, roughness: 0.2 })
   );
-  headBody.rotation.z = Math.PI / 2;
-  head.add(headBody);
-  const lens = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.14, 0.14, 0.02, 16),
-    new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.9, roughness: 0.05 })
-  );
-  lens.rotation.z = Math.PI / 2;
-  lens.position.x = 0.19;
-  head.add(lens);
-  // BEWUSST KEIN .dae-Overlay: das geladene moving_head.dae wurde an die statische
-  // Root-Group gehaengt (nicht an yoke/head) -> es pante/tiltete NICHT mit und der
-  // Moving Head stand optisch still. Die prozedurale Geometrie (yoke pant um Y,
-  // head tiltet um X) bewegt sich korrekt — bei einem Bewegungs-Visualizer ist
-  // genau das der Sinn. (Ein optisch schoeneres Modell muesste sauber in yoke/head
-  // gesplittet werden, sonst wuerde der Sockel mitkippen.)
+  lens.position.y = -0.195; head.add(lens);
+
   return { group, yoke, head, lens };
 }
 
