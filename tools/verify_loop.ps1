@@ -39,15 +39,30 @@ try {
         # Immer -Isolate: jede Testdatei laeuft in einem eigenen Prozess. So kippt ein einzelner
         # nativer Qt-Segfault (Exit 139) nicht die ganze Suite, und der Runner liefert einen
         # echten Pass/Fail-Zaehler (Crashes zaehlen als Umgebungs-Flakiness, nicht als Test-Fail).
-        if ($TestArgs) {
-            Write-Host "[verify] 2/2 Tests via Lock-Runner -Isolate (gezielt): $($TestArgs -join ' ') ..."
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -Isolate $TestArgs
+        # $ErrorActionPreference lokal auf 'Continue': ein isolierter nativer
+        # Qt-Teardown-Segfault (rc=0xC0000005) schreibt via faulthandler
+        # "Windows fatal exception: access violation" auf stderr. Unter 'Stop'
+        # wertet PowerShell 5.1 diese native stderr-Zeile des `& powershell`-
+        # Aufrufs als terminierenden NativeCommandError und kippt das Gate (Exit 1)
+        # -- OBWOHL der Lock-Runner den Crash bereits korrekt als tolerierbare
+        # Umgebungs-Flakiness behandelt (er zaehlt rc=139/-1073741819 als CRASH,
+        # nicht als FAIL, und exit't 0). Der Runner-EXIT-CODE ist die Wahrheit;
+        # native stderr darf das Gate nicht kippen. Echte Test-Failures bleiben
+        # rot (Runner exit't dann 1 -> unten switch-default).
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            if ($TestArgs) {
+                Write-Host "[verify] 2/2 Tests via Lock-Runner -Isolate (gezielt): $($TestArgs -join ' ') ..."
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -Isolate $TestArgs
+            }
+            else {
+                Write-Host "[verify] 2/2 VOLLE Suite via Lock-Runner -Isolate ($runner) ..."
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -Isolate
+            }
+            $code = $LASTEXITCODE
         }
-        else {
-            Write-Host "[verify] 2/2 VOLLE Suite via Lock-Runner -Isolate ($runner) ..."
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -Isolate
-        }
-        $code = $LASTEXITCODE
+        finally { $ErrorActionPreference = $prevEAP }
         # Lock-Runner-spezifische Exit-Codes verstaendlich machen (0 = gruen, faellt unten durch).
         switch ($code) {
             0       { }
