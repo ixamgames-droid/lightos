@@ -1,5 +1,6 @@
 """LAS-07b: Laser-Zeichen-Canvas + -Dialog (Punkte setzen/ziehen/löschen,
 Farbe/Blank pro Punkt, geschlossen, Live-Update, result_figure)."""
+import math
 import os
 import unittest
 
@@ -8,7 +9,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from src.core.laser.figure import FigurePoint, LaserFigure
-from src.ui.widgets.laser_draw_editor import LaserDrawCanvas, LaserDrawDialog
+from src.ui.widgets.laser_draw_editor import (LaserDrawCanvas, LaserDrawDialog,
+                                              TOOL_EDIT)
 
 
 def _app():
@@ -224,6 +226,133 @@ class StudioTest(unittest.TestCase):
         dlg._on_accept()
         self.assertTrue(seen)
         self.assertIsNotNone(dlg.result_figure)
+
+
+class ShapeToolCanvasTest(unittest.TestCase):
+    """LAS-14b: Formwerkzeuge auf dem Canvas (aufziehen = Anker + Ziehen)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _canvas(self, fig=None):
+        committed = []
+        c = LaserDrawCanvas(
+            fig or LaserFigure(points=[]), lambda: None, lambda: None,
+            on_commit_shape=lambda p, cl: committed.append((p, cl)))
+        c.resize(400, 400)
+        return c, committed
+
+    def test_gen_circle(self):
+        c, _ = self._canvas()
+        c.tool = "circle"
+        pts, closed = c._gen_shape((0.0, 0.0), (0.5, 0.0))
+        self.assertTrue(closed)
+        self.assertEqual(len(pts), 48)
+        self.assertAlmostEqual(math.hypot(pts[0].x, pts[0].y), 0.5, places=2)
+
+    def test_gen_rectangle(self):
+        c, _ = self._canvas()
+        c.tool = "rectangle"
+        pts, closed = c._gen_shape((-0.5, -0.4), (0.5, 0.4))
+        self.assertTrue(closed)
+        self.assertEqual(len(pts), 4)
+
+    def test_gen_line_is_open(self):
+        c, _ = self._canvas()
+        c.tool = "line"
+        pts, closed = c._gen_shape((-0.5, 0.1), (0.5, 0.1))
+        self.assertFalse(closed)
+        self.assertEqual(len(pts), 2)
+
+    def test_gen_polygon_uses_sides(self):
+        c, _ = self._canvas()
+        c.tool = "polygon"
+        c.shape_sides = 6
+        pts, _cl = c._gen_shape((0.0, 0.0), (0.6, 0.0))
+        self.assertEqual(len(pts), 6)
+
+    def test_gen_star_count(self):
+        c, _ = self._canvas()
+        c.tool = "star"
+        c.shape_sides = 5
+        pts, _cl = c._gen_shape((0.0, 0.0), (0.7, 0.0))
+        self.assertEqual(len(pts), 10)
+
+    def test_min_size_yields_no_shape(self):
+        c, _ = self._canvas()
+        c.tool = "circle"
+        pts, _cl = c._gen_shape((0.0, 0.0), (0.01, 0.0))
+        self.assertEqual(pts, [])
+
+    def test_shape_uses_draw_color(self):
+        c, _ = self._canvas()
+        c.tool = "circle"
+        c.draw_color = (1.0, 0.0, 0.0)
+        pts, _cl = c._gen_shape((0.0, 0.0), (0.5, 0.0))
+        self.assertTrue(all((p.r, p.g, p.b) == (1.0, 0.0, 0.0) for p in pts))
+
+    def test_drag_out_commits_shape(self):
+        c, committed = self._canvas()
+        c.tool = "circle"
+        c.mousePressEvent(_Ev(200, 200))
+        c.mouseMoveEvent(_Ev(300, 200))
+        c.mouseReleaseEvent(_Ev(300, 200))
+        self.assertEqual(len(committed), 1)
+        pts, closed = committed[0]
+        self.assertTrue(pts)
+        self.assertTrue(closed)
+
+    def test_tiny_drag_no_commit(self):
+        c, committed = self._canvas()
+        c.tool = "circle"
+        c.mousePressEvent(_Ev(200, 200))
+        c.mouseReleaseEvent(_Ev(201, 200))
+        self.assertEqual(committed, [])
+
+    def test_edit_mode_still_sets_points(self):
+        c, committed = self._canvas()          # tool default = edit
+        c.mousePressEvent(_Ev(150, 150))
+        self.assertEqual(len(c._fig.points), 1)
+        self.assertEqual(committed, [])
+
+
+class ShapeToolDialogTest(unittest.TestCase):
+    """LAS-14b: Formübernahme in die Figur + Werkzeug-Leiste."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def test_commit_empty_becomes_figure(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        pts = [FigurePoint(0, 0), FigurePoint(0.5, 0), FigurePoint(0.5, 0.5)]
+        dlg._commit_shape(pts, True)
+        self.assertEqual(len(dlg._fig.points), 3)
+        self.assertTrue(dlg._fig.closed)
+        self.assertEqual(dlg._canvas.tool, TOOL_EDIT)     # zurück auf Bearbeiten
+
+    def test_commit_appends_with_blank_jump(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[FigurePoint(0, 0)]))
+        dlg._commit_shape([FigurePoint(0.5, 0.5), FigurePoint(0.7, 0.5)], True)
+        self.assertGreater(len(dlg._fig.points), 3)       # Sprung + Form + Rückkehr
+        self.assertTrue(any(p.blank for p in dlg._fig.points))
+        self.assertFalse(dlg._fig.closed)                 # Composite offen
+
+    def test_commit_ignores_empty(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[FigurePoint(0, 0)]))
+        dlg._commit_shape([], True)
+        self.assertEqual(len(dlg._fig.points), 1)
+
+    def test_sides_spin_updates_canvas(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._spin_sides.setValue(8)
+        self.assertEqual(dlg._canvas.shape_sides, 8)
+
+    def test_select_tool_sets_canvas_tool(self):
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        dlg._select_tool("star")
+        self.assertEqual(dlg._canvas.tool, "star")
 
 
 if __name__ == "__main__":
