@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-04 — Laser-Support: Werksmuster-Picker für DMX-Muster-Laser (LAS-18b)
+
+#### Neu / Hinzugefuegt
+
+- **Werksmuster als Kacheln:** neue Box „Werksmuster (Gerät)" in der Laser-Steuerseite (nur für reine DMX-Muster-Laser wie den Ehaho L2600, Klassen-Gate über `laser_capability`). „➕ Muster merken…" nimmt die aktuellen Bank-/Muster-Programmerwerte, fragt einen Namen und optional ein **Foto vom realen Laser-Output** (die Werksmuster sind herstellerseitig unbenannt — die Vorschau-Bibliothek baut sich der Nutzer selbst). Kacheln zeigen das Foto oder eine B/M-Nummer; Linksklick ruft das Muster ab (kopf-korrekt Gruppe A/B), Rechtsklick löscht den Slot. Show-persistent als additiver `.lshow`-Block. NEU `src/core/laser/pattern_slots.py`; `app_state.py`, `show_file.py`, `laser_view.py`; Tests `tests/test_laser_pattern_picker.py` + Show-Roundtrip.
+
+### 2026-07-04 — Laser-Support: Zeichen-Studio komplett + L2600-Bedienung (LAS-11…LAS-19, Sammel-Eintrag)
+
+#### Neu / Hinzugefuegt
+
+- **Laser-Steuerseite aufgeräumt (LAS-11, PR #160):** Regler nach Bedeutung gruppiert (Muster/Farbe/Bewegung & Geschwindigkeit/Zeichnen + einklappbare „Weitere Kanäle"), Shutter nur noch als „Betriebsart"-Kacheln.
+- **Fähigkeits-Klassifikator (LAS-12, PR #161):** `laser_capability()` entscheidet je Laser ehrlich, ob eine gemalte Figur exakt ausgebbar ist (Netz/ILDA) oder nur Werksmuster gehen (L2600) — eine Wahrheitsquelle für alle Laser-UIs.
+- **Laser-Zeichen-Studio (LAS-13…LAS-17, PRs #162/#163/#166/#167/#171/#173):** Vollbild-Popout mit Ehrlichkeits-Banner, Formwerkzeuge (Kreis/Rechteck/Linie/Polygon/Stern) per Aufziehen mit Live-Vorschau, Freihand mit RDP-Glätten, Undo/Redo (Strg+Z/Y) + Raster-Einrasten, Figuren-Bibliothek mit Vorschau-Kacheln.
+- **VC-Muster-Abruf (LAS-18, PR #169):** ButtonAction „Laser-Muster abrufen" ruft eine gespeicherte Laser-Palette auf Knopfdruck (Sicherheits-Härtung: nur die aufgenommenen Fixtures).
+- **VC-Laser-Speed (PR #175):** der „Programmer-Attribut"-Fader mappt 0–100 % auf ein Wert-Teilband (z. B. `gobo_rotation` 192–223) — hält den L2600 im Dreh-Modus und regelt nur das Tempo.
+- **Bild-Import → Vektor (LAS-19, PR #178):** „🖼️ Bild importieren…" im Studio vektorisiert ein Bild (Komponenten + Moore-Tracing + RDP) zur editierbaren Figur.
+
+#### Geaendert / Verifiziert
+
+- **L2600-Profil vollständig am Handbuch verifiziert (PRs #179/#181):** 34 Kanäle bestätigt (Herstellerseite „32ch" falsch), CH18-Semantik geklärt (Shutter-Default 0 korrekt), CH20 leer bestätigt, `laser_y`-Bewegungs-Labels ans Handbuch angeglichen.
+
 ### 2026-07-04 — Laser-Support: Sicherheit von der Virtual Console bedienbar (LAS-10)
 
 #### Neu / Hinzugefuegt

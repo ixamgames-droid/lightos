@@ -222,6 +222,9 @@ class AppState:
         # LAS-07b: gezeichnete Laser-Muster (Show-persistent, Bibliothek für
         # den Zeichen-Editor + die Figur-Auswahl der Laser-Steuerseite).
         self.laser_figures: list = []
+        # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
+        # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
+        self.laser_patterns: list = []
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird

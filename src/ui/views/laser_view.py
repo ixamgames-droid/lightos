@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (
     QSpinBox, QComboBox, QPushButton, QRadioButton, QButtonGroup,
     QScrollArea, QGroupBox, QInputDialog, QFrame,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRect
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 
 from src.core.app_state import get_state, get_channels_for_patched
 from src.core.attr_groups import attr_label
@@ -153,6 +154,67 @@ class _ChannelRow(QWidget):
         self._sync_widgets(max(0, min(255, int(value))))
 
 
+class _PatternTile(QWidget):
+    """Werksmuster-Kachel (LAS-18b): Nutzer-Foto als Vorschau oder — solange
+    keins zugewiesen ist — eine nummerierte Kachel (Bank/Muster-Wert). Links-
+    klick ruft das Muster ab, Rechtsklick löscht den Slot. Plain-Callbacks
+    statt Qt-Signalen (kein STAB-09-Pin über die C++-Connection)."""
+
+    W, H = 92, 88
+
+    def __init__(self, slot, on_click, on_delete, parent=None):
+        super().__init__(parent)
+        self._slot = slot
+        self._on_click = on_click        # callback(slot)
+        self._on_delete = on_delete      # callback(slot)
+        self._pm = None
+        path = getattr(slot, "image_path", "") or ""
+        if path:
+            pm = QPixmap(path)
+            if not pm.isNull():
+                self._pm = pm.scaled(
+                    self.W - 8, self.H - 26,
+                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation)
+        self.setFixedSize(self.W, self.H)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(f"{slot.label}  (Bank {slot.bank} / Muster "
+                        f"{slot.pattern})\nLinksklick: abrufen · "
+                        "Rechtsklick: Slot löschen")
+
+    def paintEvent(self, event):  # noqa: N802 (Qt-API)
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor("#161b22"))
+        p.setPen(QPen(QColor("#30363d"), 1))
+        thumb = QRect(4, 4, self.W - 8, self.H - 26)
+        p.drawRect(thumb.adjusted(-1, -1, 0, 0))
+        if self._pm is not None:
+            p.setClipRect(thumb)
+            p.drawPixmap(thumb.topLeft(), self._pm)
+            p.setClipping(False)
+        else:
+            # Kein Foto: dunkle Kachel mit Bank/Muster-Nummer.
+            p.fillRect(thumb, QColor("#0d1117"))
+            p.setPen(QColor("#7d8590"))
+            f = QFont(); f.setPixelSize(13); f.setBold(True); p.setFont(f)
+            p.drawText(thumb, Qt.AlignmentFlag.AlignCenter,
+                       f"B{self._slot.bank}\nM{self._slot.pattern}")
+        p.setPen(QColor("#c9d1d9"))
+        f = QFont(); f.setPixelSize(10); p.setFont(f)
+        name = self._slot.label
+        p.drawText(QRect(0, self.H - 20, self.W, 16),
+                   Qt.AlignmentFlag.AlignCenter,
+                   name[:13] + ("…" if len(name) > 13 else ""))
+        p.end()
+
+    def mousePressEvent(self, ev):  # noqa: N802 (Qt-API)
+        if ev is not None and ev.button() == Qt.MouseButton.RightButton:
+            if self._on_delete is not None:
+                self._on_delete(self._slot)
+        elif self._on_click is not None:
+            self._on_click(self._slot)
+
+
 class LaserView(QWidget):
     """Laser-Steuerseite (Programmer-Tab). Arbeitet auf der Programmer-Auswahl."""
 
@@ -262,6 +324,27 @@ class LaserView(QWidget):
         pal_btns.addStretch(1)
         pv.addLayout(pal_btns)
         root.addWidget(self._pal_box)
+
+        # LAS-18b: Werksmuster-Picker für DMX-Muster-Laser (Klasse A) — vom
+        # Nutzer gemerkte (Bank, Muster)-Slots als Kacheln, optional mit Foto
+        # vom realen Laser-Output (die Werksmuster sind herstellerseitig
+        # unbenannt; die Vorschau-Bibliothek baut sich der Nutzer selbst).
+        self._pattern_box = QGroupBox("Werksmuster (Gerät)")
+        pat_v = QVBoxLayout(self._pattern_box)
+        self._pattern_grid = QGridLayout()
+        self._pattern_grid.setSpacing(6)
+        pat_v.addLayout(self._pattern_grid)
+        pat_btns = QHBoxLayout()
+        btn_pat_add = QPushButton("➕ Muster merken…")
+        btn_pat_add.setToolTip(
+            "Aktuelle Bank-/Muster-Werte als Werksmuster-Slot merken — mit "
+            "Name und optionalem Foto vom Laser-Output (Rechtsklick auf eine "
+            "Kachel löscht sie).")
+        btn_pat_add.clicked.connect(self._add_pattern_slot)
+        pat_btns.addWidget(btn_pat_add)
+        pat_btns.addStretch(1)
+        pat_v.addLayout(pat_btns)
+        root.addWidget(self._pattern_box)
 
         # Regler-Bereich (scrollbar).
         scroll = QScrollArea()
@@ -376,6 +459,7 @@ class LaserView(QWidget):
             self._rebuild_mode_tiles(template)
         self._load_values()
         self._rebuild_palettes()
+        self._rebuild_patterns(template)
 
     # ── Safety / Framequelle (LAS-07) ─────────────────────────────────────
     def _laser_output(self):
@@ -692,6 +776,102 @@ class LaserView(QWidget):
             tile.clicked.connect(weak_slot(self._apply_palette, p))
             self._pal_grid.addWidget(tile, i // 4, i % 4)
         self._pal_box.setVisible(True)
+
+    # ── Werksmuster-Picker (LAS-18b) ──────────────────────────────────────
+    def _pattern_picker_applicable(self, template=None) -> bool:
+        """Picker nur für Klasse-A-Laser (BUILTIN_DMX) mit Musterauswahl-Kanal
+        (``gobo_wheel``) in der Auswahl — Netz-Laser haben die Figuren."""
+        if template is None:
+            template = self._template_channels()
+        has_pattern = any(getattr(ch, "attribute", "") == "gobo_wheel"
+                          for ch in template)
+        if not has_pattern:
+            return False
+        for f in self._fixtures:
+            try:
+                cap = laser_capability(f)
+            except Exception:
+                cap = None
+            if cap is not None and cap.laser_class == LaserClass.BUILTIN_DMX:
+                return True
+        return False
+
+    def _rebuild_patterns(self, template=None):
+        while self._pattern_grid.count():
+            item = self._pattern_grid.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        applicable = self._pattern_picker_applicable(template)
+        self._pattern_box.setVisible(applicable)
+        if not applicable:
+            return
+        slots = list(getattr(get_state(), "laser_patterns", []) or [])
+        for i, slot in enumerate(slots):
+            tile = _PatternTile(slot, self._apply_pattern_slot,
+                                self._delete_pattern_slot)
+            self._pattern_grid.addWidget(tile, i // 6, i % 6)
+
+    def _apply_pattern_slot(self, slot):
+        """Werksmuster abrufen: Bank + Muster kopf-korrekt in den Programmer
+        (über ``_write_value`` → ENG-03-Guard greift; Bank existiert am L2600
+        nur in Gruppe A und wird dort geschrieben)."""
+        template = self._template_channels()
+        attrs = {getattr(ch, "attribute", "") for ch in template}
+        if "laser_bank" in attrs:
+            self._write_value("laser_bank", int(slot.bank))
+        self._write_value("gobo_wheel", int(slot.pattern))
+        self._load_values()
+
+    def _add_pattern_slot(self):
+        """Aktuelle Bank-/Muster-Werte als Slot merken (Name + optionales
+        Foto). Liest die Werte des ERSTEN Lasers der Auswahl — kopfgerecht zum
+        aktiven A/B-Modus (wie ``_load_values``)."""
+        if not self._fixtures:
+            return
+        state = get_state()
+        fid = getattr(self._fixtures[0], "fid", None)
+        if fid is None:
+            return
+        read_head = 1 if self._head_mode == "B" else 0
+        try:
+            pattern = state.get_programmer_value(fid, "gobo_wheel",
+                                                 head=read_head)
+        except Exception:
+            pattern = None
+        try:
+            bank = state.get_programmer_value(fid, "laser_bank")
+        except Exception:
+            bank = None
+        from src.core.laser.pattern_slots import PatternSlot
+        slots = list(getattr(state, "laser_patterns", []) or [])
+        name, ok = QInputDialog.getText(
+            self, "Werksmuster merken",
+            "Name für dieses Werksmuster (z. B. Kreis groß):",
+            text=f"Muster {len(slots) + 1}")
+        if not ok:
+            return
+        image_path = ""
+        try:
+            from PySide6.QtWidgets import QFileDialog
+            image_path, _ = QFileDialog.getOpenFileName(
+                self, "Foto vom Laser-Output (optional — Abbrechen = ohne)",
+                "", "Bilder (*.png *.jpg *.jpeg *.bmp *.webp)")
+        except Exception:
+            image_path = ""
+        slot = PatternSlot(name=(name or "").strip(),
+                           bank=int(bank or 0), pattern=int(pattern or 0),
+                           image_path=image_path or "")
+        slots.append(slot)
+        state.laser_patterns = slots
+        self._rebuild_patterns()
+
+    def _delete_pattern_slot(self, slot):
+        state = get_state()
+        slots = [s for s in getattr(state, "laser_patterns", []) or []
+                 if s is not slot]
+        state.laser_patterns = slots
+        self._rebuild_patterns()
 
     # ------------------------------------------------------------- Werte ---
     def _heads_for(self, fx, attr: str) -> list[int]:

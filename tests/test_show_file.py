@@ -227,6 +227,11 @@ class ShowFileTests(unittest.TestCase):
                         points=[FigurePoint(0.0, 1.0, r=1.0, g=0.0, b=0.0),
                                 FigurePoint(-0.6, -0.8, blank=True),
                                 FigurePoint(0.6, -0.8)])]
+        # LAS-18b: gemerkte Werksmuster-Slots mit-serialisieren.
+        from src.core.laser.pattern_slots import PatternSlot
+        self.state.laser_patterns = [
+            PatternSlot(name="Kreis groß", bank=32, pattern=7,
+                        image_path="C:/fotos/kreis.jpg")]
 
         with tempfile.TemporaryDirectory() as td:
             path = os.path.join(td, "roundtrip.lshow")
@@ -237,6 +242,9 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(data["version"], "1.2")
             self.assertEqual(len(data.get("laser_figures", [])), 1)
             self.assertEqual(data["laser_figures"][0]["name"], "Stern")
+            # LAS-18b: Werksmuster-Slots im Show-JSON.
+            self.assertEqual(len(data.get("laser_patterns", [])), 1)
+            self.assertEqual(data["laser_patterns"][0]["bank"], 32)
             self.assertIn("patch", data)
             self.assertEqual(data["patch"][0]["fixture_profile_id"], 100)
             self.assertIn("functions", data)
@@ -252,6 +260,7 @@ class ShowFileTests(unittest.TestCase):
             self.state._efx_instances = []
             self.state._rgb_matrix_instances = []
             self.state.laser_figures = []
+            self.state.laser_patterns = []
             self.state.show_name = "Old Show"
 
             ok, msg = self.show_file.load_show(path)
@@ -274,6 +283,12 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(self.state.laser_figures[0].name, "Stern")
             self.assertEqual(len(self.state.laser_figures[0].points), 3)
             self.assertTrue(self.state.laser_figures[0].points[1].blank)
+            # LAS-18b: Werksmuster-Slots wiederhergestellt (inkl. Foto-Pfad).
+            self.assertEqual(len(self.state.laser_patterns), 1)
+            self.assertEqual(self.state.laser_patterns[0].name, "Kreis groß")
+            self.assertEqual(self.state.laser_patterns[0].pattern, 7)
+            self.assertEqual(self.state.laser_patterns[0].image_path,
+                             "C:/fotos/kreis.jpg")
             self.assertEqual(self.state.function_manager.added, [])
             self.assertEqual(self.state.sync.refresh_count, 1)
             emitted_names = [ev[0] for ev in self.state.emitted]

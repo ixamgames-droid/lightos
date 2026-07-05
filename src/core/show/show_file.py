@@ -291,6 +291,9 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     curves_data = get_curve_library().to_dict()
     # LAS-07b: gezeichnete Laser-Muster.
     laser_figures_data = [f.to_dict() for f in getattr(state, "laser_figures", [])]
+    # LAS-18b: gemerkte Werksmuster-Slots (Bank/Wert + Foto-Pfad).
+    laser_patterns_data = [p.to_dict()
+                           for p in getattr(state, "laser_patterns", [])]
 
     from src.core.engine.efx_path import get_efx_path_library
     efx_paths_data = get_efx_path_library().to_dict()
@@ -391,6 +394,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "palettes": palettes_data,
         "curves": curves_data,
         "laser_figures": laser_figures_data,
+        "laser_patterns": laser_patterns_data,
         "efx_paths": efx_paths_data,
         "functions": functions_data,
         "tempo_buses": tempo_buses_data,
@@ -547,6 +551,12 @@ def reset_show():
         state.laser_figures = []
     except Exception as e:
         print(f"[show_file] reset laser figures error: {e}")
+
+    # LAS-18b: gemerkte Werksmuster-Slots leeren.
+    try:
+        state.laser_patterns = []
+    except Exception as e:
+        print(f"[show_file] reset laser patterns error: {e}")
 
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
@@ -739,6 +749,14 @@ def load_show(path: str | os.PathLike):
                                for d in (data.get("laser_figures") or [])]
     except Exception as e:
         _lenient("load laser figures error", e)
+
+    # LAS-18b: gemerkte Werksmuster-Slots (Alt-Shows: Key fehlt -> leer).
+    try:
+        from src.core.laser.pattern_slots import PatternSlot
+        state.laser_patterns = [PatternSlot.from_dict(d)
+                                for d in (data.get("laser_patterns") or [])]
+    except Exception as e:
+        _lenient("load laser patterns error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library

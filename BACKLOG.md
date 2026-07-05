@@ -37,7 +37,7 @@ _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho
 **Noch offen / muss man noch anpassen (entdeckt):**
 | ID | Prio | Status | Titel / Notiz |
 |----|------|--------|---------------|
-| LAS-18b | P2 | **Design geklärt** (Foto-Import) | L2600-**Werksmuster-Picker**. Recherche + Davids Handbuch bestätigen: Muster sind generisch (CH4 „jeder Wert = ein Muster", unbenannt), keine Tabelle. **Design:** Picker mit (Bank CH3, Wert CH4)-Kacheln + **pro-Slot-Foto-Import** — David fotografiert Slots am Gerät. |
+| LAS-18b | P2 | ✅ done (dieser PR) | L2600-**Werksmuster-Picker**: Box „Werksmuster (Gerät)" in der LaserView (nur Klasse A mit `gobo_wheel`). „➕ Muster merken…" nimmt aktuelle Bank/Muster-Werte + Name + optionales Foto; Kachel = Foto-Thumbnail oder B/M-Nummer; Linksklick ruft ab, Rechtsklick löscht. Persistenz `laser_patterns` in der `.lshow` (NEU `pattern_slots.py`). David befüllt die Bibliothek am Gerät (Foto je Slot). |
 | LAS-18c | P3 | blocked (Hardware) | Figur→Werksmuster-**Näherungs-Matcher** (`pattern_match.py`): Zeichnung → nächstpassendes eingebautes Muster als LASER-Palette. |
 | — | — | ✅ gelöst (Handbuch S. 8) | Chart vollständig gegengelesen: Ch20 = „Keine Funktion"/leer bestätigt, Gruppe B = +17-Wiederholung; **laser_y-Bewegungs-Labels ans Handbuch angeglichen** (= X). Offen nur noch: 6ch-CH5 (nicht in den Fotos). |
 | LAS-20 | P3 | blocked (Hardware) | `.ild`-Exporter für ShowNET/ILDA+SD-Laser — nur bauen, wenn solche Hardware da ist (sonst toter Code). |
