@@ -11,7 +11,7 @@ export function buildFixtureModel(type, opts) {
   switch (type) {
     case 'moving_head': return buildMovingHead();
     case 'spider':      return buildSpider(opts.mirror);
-    case 'par_bar':     return buildParBar(opts.nHeads);   // FM-3: N-PAR-Bar
+    case 'par_bar':     return buildParBar(opts.nHeads, opts.pixelBar);   // FM-3: N-PAR-Bar (FM-8: Pixel-Variante)
     case 'mover_bar':   return buildMoverBar(opts.nHeads);  // FM-4: N-Mover-Bar
     case 'par':         return buildPar();
     case 'led_bar':     return buildLedBar();
