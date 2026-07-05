@@ -103,7 +103,7 @@ def _pump(seconds):
 _FIXTURES_PAYLOAD = json.dumps([
     {"fid": 11, "type": "par", "x": 0, "y": 2, "z": 0,
      "r": 0, "g": 0, "b": 0, "intensity": 0},
-    {"fid": 12, "type": "par", "model": "par_bar", "nHeads": 4,
+    {"fid": 12, "type": "par", "model": "par_bar", "nHeads": 4, "rotY": 90,
      "x": 2, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
     {"fid": 13, "type": "moving_head", "model": "mover_bar", "nHeads": 4,
      "x": 4, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
@@ -203,12 +203,20 @@ class TopDownPolishTest(unittest.TestCase):
                 function info(fid) {
                     const f = F[fid];
                     if (!f || !f.icon) return null;
-                    let outlines = 0;
-                    f.icon.traverse(o => { if (o.userData && o.userData.isIconOutline) outlines++; });
+                    let outlines = 0, opaqueLines = 0;
+                    f.icon.traverse(o => {
+                        if (o.userData && o.userData.isIconOutline) outlines++;
+                        if (o.isLine && o.material && !o.material.transparent) opaqueLines++;
+                    });
                     const cells = f.icon.userData.cells ? f.icon.userData.cells.length : 0;
                     const bodyHex = f.icon.userData.body.material.color.getHex();
-                    const hasRing = !!f.icon.userData.ring;
-                    return { outlines: outlines, cells: cells, bodyHex: bodyHex, hasRing: hasRing };
+                    const ring = f.icon.userData.ring;
+                    const ringNoRaycast = !!ring
+                        && String(ring.raycast).replace(/\\s/g, '').endsWith('{}');
+                    return { outlines: outlines, cells: cells, bodyHex: bodyHex,
+                             hasRing: !!ring, opaqueLines: opaqueLines,
+                             ringNoRaycast: ringNoRaycast,
+                             iconYaw: f.icon.rotation.y };
                 }
                 return JSON.stringify({
                     par: info('11'), parBar: info('12'), moverBar: info('13'),
@@ -221,6 +229,17 @@ class TopDownPolishTest(unittest.TestCase):
             self.assertIsNotNone(d[key], f"Icon fuer {key} fehlt")
             self.assertGreaterEqual(d[key]["outlines"], 1, f"{key}: kein permanenter Umriss")
             self.assertTrue(d[key]["hasRing"], f"{key}: Selektionsring fehlt")
+            # Glyphen im Transparent-Pass: opake Linien wuerden vom
+            # transparenten Body-Fill uebermalt (Review-Finding 3c-1).
+            self.assertEqual(d[key]["opaqueLines"], 0,
+                             f"{key}: opake Glyph-Linien (werden vom Fill uebermalt)")
+            # Unsichtbarer Ring darf keine Picks stehlen.
+            self.assertTrue(d[key]["ringNoRaycast"],
+                            f"{key}: Selektionsring ist nicht vom Raycast ausgenommen")
+        # Yaw-Init: fid 12 kommt mit rotY=90 -> Icon liegt sofort richtig
+        # (vorher erst nach der ersten Rotations-Geste).
+        import math
+        self.assertAlmostEqual(d["parBar"]["iconYaw"], math.pi / 2, places=3)
         # PAR: Aussen-Umriss + Linsen-Ring = 2 Umrisse (Glyph-Unterscheidung
         # vom nackten Default-Kreis).
         self.assertGreaterEqual(d["par"]["outlines"], 2, "PAR-Linsen-Ring fehlt")

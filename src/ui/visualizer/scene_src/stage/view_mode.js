@@ -7,11 +7,12 @@ import { applyStageObject2DStyle, updateResizeHandles } from './stage_objects.js
 
 // 3c-1: Gesten-Hint unten rechts pro Modus — vorher stand DAUERHAFT der
 // 3D-Text da, auch im 2D-Plan (stale Footer-Hint, Reframe-Befund 3).
-// Die 2D-Gesten sind in pointer.js/touch.js verifiziert: Leerflaeche ziehen =
-// schwenken, Geraet ziehen = verschieben, Mausrad/Pinch = Zoom,
-// Doppel-Tipp = Ansicht zuruecksetzen, Lang druecken = platzieren.
+// Drag-Verhalten haengt am editMode (pointer.js): Geraet ziehen verschiebt
+// NUR im Bau-Modus, im Ansehen-Modus schwenkt jeder Drag — der Text nennt
+// deshalb den Modus explizit. Zoom/Doppel-Tipp gelten modusunabhaengig
+// (pointer.js#wheel, touch.js Doppel-Tipp -> resetCameraView inkl. Ortho).
 export const HINT_3D = '3D: 1-Finger drehen · 2-Finger Pinch/Schwenk · Doppel-Tipp = Kamera-Reset · Lang drücken = Fixture platzieren';
-export const HINT_2D = '2D-Plan: Ziehen = schwenken · Gerät ziehen = verschieben · Mausrad/Pinch = Zoom · Doppel-Tipp = Ansicht zurücksetzen';
+export const HINT_2D = '2D-Plan: Mausrad/Pinch = Zoom · Doppel-Tipp = Ansicht zurücksetzen · Ansehen: Ziehen = schwenken · Bauen: Gerät ziehen = verschieben';
 
 export function setViewMode(mode) {
   view.mode = (mode === '2D') ? '2D' : '3D';

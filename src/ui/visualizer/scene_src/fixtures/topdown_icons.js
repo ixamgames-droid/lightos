@@ -45,8 +45,12 @@ function mkOutline(geo, color) {
 
 function mkLine(points, color) {
   const geo = new THREE.BufferGeometry().setFromPoints(points);
+  // transparent:true zieht die Glyph-Linie in den Transparent-Pass — nur
+  // dort greift renderOrder gegen den transparenten Body-Fill; opake Linien
+  // wuerden VOR dem Fill gerendert und bei voller Intensitaet uebermalt.
   return new THREE.Line(geo, new THREE.LineBasicMaterial({
     color: (color == null) ? GLYPH_COLOR : color,
+    transparent: true, opacity: 1.0,
   }));
 }
 
@@ -147,7 +151,9 @@ export function buildTopDownIcon(type, nHeads) {
       new THREE.Vector3(-0.35, 0.05, 0.35), new THREE.Vector3(0.35, 0.05, -0.35),
     ];
     const xGeo = new THREE.BufferGeometry().setFromPoints(xpts);
-    group.add(new THREE.LineSegments(xGeo, new THREE.LineBasicMaterial({ color: GLYPH_COLOR })));
+    group.add(new THREE.LineSegments(xGeo, new THREE.LineBasicMaterial({
+      color: GLYPH_COLOR, transparent: true, opacity: 1.0,
+    })));
   } else if (type === 'scanner') {
     // Quadrat + diagonale Spiegel-Linie + Strahl-Pfeil
     body = mkFill(new THREE.PlaneGeometry(0.8, 0.8));
@@ -208,6 +214,10 @@ export function buildTopDownIcon(type, nHeads) {
   );
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.03;
+  // Vom Raycast ausnehmen: der Ring ist unselektiert unsichtbar (opacity 0),
+  // bliebe aber pickbar — Klicks auf leere Flaeche neben dem Icon (bzw. bei
+  // 1-m-Grid-Abstand auf den NACHBARN) wuerden sonst dieses Fixture treffen.
+  ring.raycast = function () {};
   group.add(ring);
   group.userData.body = body;
   group.userData.ring = ring;

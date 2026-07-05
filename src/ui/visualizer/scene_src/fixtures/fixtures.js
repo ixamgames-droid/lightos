@@ -159,6 +159,10 @@ export function addFixture(data) {
   // 2D top-down icon (3c-1: nHeads fuer die Einzel-Zellen der Bar-Icons)
   const icon = buildTopDownIcon(rtype, data.nHeads);
   icon.position.set(root.position.x, 0.05, root.position.z);
+  // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
+  // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-
+  // Pfade in bridge.js/pointer.js/touch.js laufen nur bei Transform-Edits).
+  icon.rotation.y = root.rotation.y;
   icon.userData.fid = Number(fid);
   // Force pickable: tag children
   icon.traverse(o => { if (o.isMesh) o.userData.fid = Number(fid); });

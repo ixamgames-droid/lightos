@@ -18,7 +18,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Geaendert / Fixes
 
 - **Footer-Gesten-Hint folgt dem Modus:** im 2D-Plan stehen jetzt die 2D-Gesten (Schwenken/Zoom/Verschieben/Reset) statt dauerhaft des 3D-Texts.
-- Selektionsring der Bar-Icons ist größer als die Bar (vorher komplett von der Form überdeckt).
+- Selektionsring der Bar-Icons ist größer als die Bar (vorher komplett von der Form überdeckt) und vom Raycast ausgenommen (der unsichtbare Ring stahl Klicks neben dem Icon).
+- Glyph-Linien rendern im Transparent-Pass — vorher übermalte der Body-Fill die Glyphen bei voller Intensität (vorbestehend, in der adversarialen Review gefunden).
+- Icons übernehmen ihre Y-Rotation schon beim Erzeugen — längliche Icons (Bars/Spider) lagen nach dem Show-Reload quer, bis zur ersten Rotations-Geste (vorbestehend).
 - `scene_src/three/three.js`-Wrapper exportiert zusätzlich `EdgesGeometry`/`LineLoop`.
 - Dateien: `scene_src/fixtures/topdown_icons.js`, `fixtures/fixtures.js`, `stage/view_mode.js`, `stage/stage_objects.js`, `three/three.js`; Tests `tests/test_viz13c1_topdown_polish.py` (echte Page, offscreen QWebEngine).
 
