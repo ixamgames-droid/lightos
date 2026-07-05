@@ -341,6 +341,46 @@ export function applyStageObject2DStyle(id, is2D) {
   if (!so || !so.mesh) return;
   if (so.mesh.isMesh) _setMeshMat2D(so.mesh, is2D);
   else so.mesh.traverse(c => { if (c.isMesh) _setMeshMat2D(c, is2D); });
+  _syncFootprintOutline(so, is2D);
+}
+
+// 3c-1: Grundriss-Umriss — im 2D-Plan bekommt jedes Buehnenobjekt eine klare
+// Aussenkante in seiner Typ-Farbe (STAGE_2D_COLORS.edge, vorher ungenutzt).
+// Der 0.22-Opacity-Fill allein war auf dem dunklen Boden kaum lesbar. Als
+// Kind von so.mesh folgt der Umriss Position/Rotation live; bei Groessen-/
+// Group-Rebuilds wird er hier idempotent neu erzeugt (applyStageObject2DStyle
+// laeuft nach jedem createStageObject/updateStageObjectProps/Modus-Wechsel).
+function _syncFootprintOutline(so, is2D) {
+  if (so._outline2d) {
+    if (so._outline2d.parent) so._outline2d.parent.remove(so._outline2d);
+    if (so._outline2d.geometry) so._outline2d.geometry.dispose();
+    if (so._outline2d.material) so._outline2d.material.dispose();
+    so._outline2d = null;
+  }
+  if (!is2D) return;
+  const sz = (so.data && so.data.size) || {};
+  const hx = (sz.x || 1) / 2, hz = (sz.z || 1) / 2;
+  const y = (sz.y || 0) / 2 + 0.02;   // knapp ueber der Oberkante (depthTest ist eh aus)
+  const pts = [
+    new THREE.Vector3(-hx, y, -hz), new THREE.Vector3(hx, y, -hz),
+    new THREE.Vector3(hx, y, hz), new THREE.Vector3(-hx, y, hz),
+  ];
+  const colors = STAGE_2D_COLORS[so.data && so.data.type];
+  const line = new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({
+      color: (colors && colors.edge) || 0x8a8fa0,
+      transparent: true, opacity: 0.95, depthTest: false,
+    })
+  );
+  line.renderOrder = 2;   // ueber den 2D-Fills (1), unter den Fixture-Icons (3)
+  line.userData.isFootprintOutline = true;
+  // Vom Raycast ausnehmen: pickStageObject/findDockTarget/Zielen laufen
+  // rekursiv ueber so.mesh, und three.js raycastet Lines mit ~1 m Threshold —
+  // der Umriss wuerde Picking/Docking sonst unpraezise machen.
+  line.raycast = function () {};
+  so.mesh.add(line);
+  so._outline2d = line;
 }
 
 export function removeStageObject(id) {
@@ -359,6 +399,8 @@ export function removeStageObject(id) {
     if (so._label.material) so._label.material.dispose();
     so._label = null;
   }
+  // 3c-1: Grundriss-Umriss mit-disposen (disposeObj traversiert nicht)
+  _syncFootprintOutline(so, false);
   scene.remove(so.mesh);
   disposeObj(so.mesh);
   delete stageObjects[id];
