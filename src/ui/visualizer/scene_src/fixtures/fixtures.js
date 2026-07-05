@@ -71,7 +71,12 @@ export function addFixture(data) {
   // 'model' ist das Render-Modell (von Python bestimmt, z.B. 'spider' fuer
   // Doppel-Bar-Geraete); faellt auf den fixture_type zurueck.
   const rtype = data.model || data.type || 'par';
-  const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads });
+  // FM-8: echte PIXEL-Bars (fixture_type 'led_bar' mit vielen Farb-Banks) als
+  // schlanke Bar mit N Einzelsegmenten rendern statt als N PAR-Dosen. Schwelle
+  // >=6: 4er-Bars ("vier einzelne PAR-Lichter", PARBAR4/Dotz TPar) behalten
+  // bewusst den PAR-Dosen-Look; 6/8/12+-Segment-Bars sind Pixel-Bars.
+  const pixelBar = data.type === 'led_bar' && (data.nHeads || 0) >= 6;
+  const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads, pixelBar });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.

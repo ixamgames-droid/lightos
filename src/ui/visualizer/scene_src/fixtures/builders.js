@@ -485,10 +485,40 @@ export function buildSpider(mirrored) {
 // 4er-/8er-PAR-Bar). Jeder PAR = ein Kopf (heads[i]) mit eigener Farbe + eigenem
 // nach unten gerichteten Beam. Statisch (kein Pan/Tilt); dafuer ist die Mover-Bar
 // (FM-4) zustaendig. n aus dem Kanal-Layout (Anzahl RGBW-Banks, via Python nHeads).
-export function buildParBar(n) {
+export function buildParBar(n, pixelStyle) {
   n = Math.max(1, Math.min(24, Math.floor(n || 4)));
   const group = new THREE.Group();
   const barMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.5 });
+
+  if (pixelStyle) {
+    // FM-8: PIXEL-Bar-Variante (fixture_type 'led_bar' mit vielen Segmenten):
+    // schlankes Gehaeuse + N rechteckige, EINZELN faerbbare Segmente an der
+    // Unterseite (Ausgang -Y wie die PAR-Variante -> par_bar-Render-Branch in
+    // fixtures.js passt unveraendert: ph.lens + ph.beam pro Kopf). Gleicher
+    // parHeads-Vertrag wie unten — nur die Optik ist Bar-mit-Pixeln statt
+    // N PAR-Dosen.
+    const spacing = 0.15;
+    const width = (n - 1) * spacing + 0.22;
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(width, 0.09, 0.12), barMat);
+    housing.castShadow = true;
+    group.add(housing);
+    const parHeads = [];
+    const startX = -(n - 1) * spacing / 2;
+    for (let i = 0; i < n; i++) {
+      const x = startX + i * spacing;
+      const lens = new THREE.Mesh(
+        new THREE.BoxGeometry(0.125, 0.02, 0.09),
+        new THREE.MeshStandardMaterial({
+          color: 0x303030, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.3,
+        })
+      );
+      lens.position.set(x, -0.052, 0);       // Unterseite, Ausgang -Y
+      group.add(lens);
+      parHeads.push({ lens, x });
+    }
+    return { group, parHeads, isParBar: true };
+  }
+
   const spacing = 0.44;
   const width = (n - 1) * spacing + 0.5;
   // Horizontaler Traeger-Balken entlang X
