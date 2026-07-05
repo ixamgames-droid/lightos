@@ -5,11 +5,22 @@ import { presetObjects, floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho, perspectiveCam, orthoCam } from '../camera/cameras.js';
 import { applyStageObject2DStyle, updateResizeHandles } from './stage_objects.js';
 
+// 3c-1: Gesten-Hint unten rechts pro Modus — vorher stand DAUERHAFT der
+// 3D-Text da, auch im 2D-Plan (stale Footer-Hint, Reframe-Befund 3).
+// Drag-Verhalten haengt am editMode (pointer.js): Geraet ziehen verschiebt
+// NUR im Bau-Modus, im Ansehen-Modus schwenkt jeder Drag — der Text nennt
+// deshalb den Modus explizit. Zoom/Doppel-Tipp gelten modusunabhaengig
+// (pointer.js#wheel, touch.js Doppel-Tipp -> resetCameraView inkl. Ortho).
+export const HINT_3D = '3D: 1-Finger drehen · 2-Finger Pinch/Schwenk · Doppel-Tipp = Kamera-Reset · Lang drücken = Fixture platzieren';
+export const HINT_2D = '2D-Plan: Mausrad/Pinch = Zoom · Doppel-Tipp = Ansicht zurücksetzen · Ansehen: Ziehen = schwenken · Bauen: Gerät ziehen = verschieben';
+
 export function setViewMode(mode) {
   view.mode = (mode === '2D') ? '2D' : '3D';
   view.activeCam = (view.mode === '2D') ? orthoCam : perspectiveCam;
   document.getElementById('mode-text').textContent = (view.mode === '2D') ? '2D Top View' : '3D View';
   document.getElementById('ruler-info').style.display = (view.mode === '2D') ? 'block' : 'none';
+  const hintEl = document.getElementById('controls');
+  if (hintEl) hintEl.textContent = (view.mode === '2D') ? HINT_2D : HINT_3D;
   // Toggle fixtures visibility
   for (const fid in fixtures) {
     const f = fixtures[fid];

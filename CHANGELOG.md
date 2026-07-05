@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-05 — 3D-Visualizer: 2D-Plan poliert (VIZ-13 3c-1 Ortho-2D-Polish)
+
+#### Neu / Hinzugefuegt
+
+- **2D-Icons überall klar sichtbar:** jede Icon-Form trägt jetzt eine permanente helle Umriss-Linie und unbelichtete Geräte füllen heller (vorher Dunkelgrau auf dunklem Boden = fast unsichtbar). Umrisse/Glyphen zeichnen zuverlässig über den durchscheinenden Bühnenflächen.
+- **Eigene 2D-Symbole für PAR-Bar & Mover-Bar:** Balken mit N Einzel-Zellen (Mover-Bar zusätzlich mit Richtungs-Pfeil), die Zellen färben **pro Kopf** mit dem Live-DMX (Paritaet zu den FM-6-Symbolen der 2D-Live-View; vorher fielen beide auf den namenlosen Default-Kreis). Spider-Icon färbt seine zwei Bars einzeln; PAR bekommt einen Linsen-Ring. Zentrales `tintTopDownIcon()` ersetzt vier kopierte Farb-Blöcke.
+- **Bühnen-Grundriss:** Boden/Plattformen/Trassen/Wände zeigen im 2D-Plan eine klare Footprint-Umriss-Linie in ihrer Typ-Farbe (folgt Position/Rotation live, vom Raycast ausgenommen — Picking/Docking bleiben präzise).
+
+#### Geaendert / Fixes
+
+- **Footer-Gesten-Hint folgt dem Modus:** im 2D-Plan stehen jetzt die 2D-Gesten (Schwenken/Zoom/Verschieben/Reset) statt dauerhaft des 3D-Texts.
+- Selektionsring der Bar-Icons ist größer als die Bar (vorher komplett von der Form überdeckt) und vom Raycast ausgenommen (der unsichtbare Ring stahl Klicks neben dem Icon).
+- Glyph-Linien rendern im Transparent-Pass — vorher übermalte der Body-Fill die Glyphen bei voller Intensität (vorbestehend, in der adversarialen Review gefunden).
+- Icons übernehmen ihre Y-Rotation schon beim Erzeugen — längliche Icons (Bars/Spider) lagen nach dem Show-Reload quer, bis zur ersten Rotations-Geste (vorbestehend).
+- `scene_src/three/three.js`-Wrapper exportiert zusätzlich `EdgesGeometry`/`LineLoop`.
+- Dateien: `scene_src/fixtures/topdown_icons.js`, `fixtures/fixtures.js`, `stage/view_mode.js`, `stage/stage_objects.js`, `three/three.js`; Tests `tests/test_viz13c1_topdown_polish.py` (echte Page, offscreen QWebEngine).
+
 ### 2026-07-04 — Laser-Support: Werksmuster-Picker für DMX-Muster-Laser (LAS-18b)
 
 #### Neu / Hinzugefuegt

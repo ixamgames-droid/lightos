@@ -5,7 +5,7 @@ import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
 import { buildFixtureModel } from './registry.js';
-import { buildTopDownIcon } from './topdown_icons.js';
+import { buildTopDownIcon, tintTopDownIcon } from './topdown_icons.js';
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 
@@ -156,9 +156,13 @@ export function addFixture(data) {
 
   scene.add(root);
 
-  // 2D top-down icon
-  const icon = buildTopDownIcon(rtype);
+  // 2D top-down icon (3c-1: nHeads fuer die Einzel-Zellen der Bar-Icons)
+  const icon = buildTopDownIcon(rtype, data.nHeads);
   icon.position.set(root.position.x, 0.05, root.position.z);
+  // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
+  // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-
+  // Pfade in bridge.js/pointer.js/touch.js laufen nur bei Transform-Edits).
+  icon.rotation.y = root.rotation.y;
   icon.userData.fid = Number(fid);
   // Force pickable: tag children
   icon.traverse(o => { if (o.isMesh) o.userData.fid = Number(fid); });
@@ -255,17 +259,8 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
         }
       }
     }
-    // Top-Down-Icon: Farbe der linken Bar (Kopf 0) spiegeln
-    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
-      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
-      if (intNorm > 0.05) {
-        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
-        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
-      } else {
-        f.icon.userData.body.material.color.setHex(0x3a3a4a);
-        f.icon.userData.body.material.opacity = 0.85;
-      }
-    }
+    // Top-Down-Icon: beide Bars einzeln faerben (cells; 3c-1 zentrales Tinting)
+    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     return;   // Spider fertig — generische Single-Head-Logik ueberspringen
   }
@@ -294,16 +289,8 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
         ph.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
       }
     }
-    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
-      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
-      if (intNorm > 0.05) {
-        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
-        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
-      } else {
-        f.icon.userData.body.material.color.setHex(0x3a3a4a);
-        f.icon.userData.body.material.opacity = 0.85;
-      }
-    }
+    // Top-Down-Icon: N PAR-Zellen einzeln faerben (3c-1 zentrales Tinting)
+    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     return;   // PAR-Bar fertig
   }
@@ -338,16 +325,8 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
         mh.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
       }
     }
-    if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
-      const h0 = (f.lastHeads && f.lastHeads[0]) || { r, g, b };
-      if (intNorm > 0.05) {
-        f.icon.userData.body.material.color.setRGB((h0.r||0)/255, (h0.g||0)/255, (h0.b||0)/255);
-        f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
-      } else {
-        f.icon.userData.body.material.color.setHex(0x3a3a4a);
-        f.icon.userData.body.material.opacity = 0.85;
-      }
-    }
+    // Top-Down-Icon: N Kopf-Zellen einzeln faerben (3c-1 zentrales Tinting)
+    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     return;   // Mover-Bar fertig
   }
@@ -385,15 +364,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     }
   }
   // Top-down icon color reflects active output color (only when bright)
-  if (f.icon && f.icon.userData.body && f.icon.userData.body.material) {
-    if (intNorm > 0.05) {
-      f.icon.userData.body.material.color.copy(color);
-      f.icon.userData.body.material.opacity = Math.min(1.0, 0.5 + intNorm * 0.5);
-    } else {
-      f.icon.userData.body.material.color.setHex(0x3a3a4a);
-      f.icon.userData.body.material.opacity = 0.85;
-    }
-  }
+  tintTopDownIcon(f.icon, color, intNorm);
 
   // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt)
   if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
