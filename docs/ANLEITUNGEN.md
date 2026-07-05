@@ -21,6 +21,7 @@
 | 9 | [APC mini mappen](anleitung_apc_mapping/ANLEITUNG_APC.md) | VC-Widgets auf Pads/Fader legen (MIDI-Learn / Teach), LED-Feedback. |
 | 10 | [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md) | Playlist → Play startet die Show automatisch, Tempo folgt der Musik. |
 | 11 | [Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md) | Tempo aus der VC (QLC+-Stil): Master/Sub × Faktor, Grand-Master, mehrere Effekte je Regler. |
+| 12 | [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen (Bank/Wert), als Muster speichern, Werksmuster-Kacheln mit Foto, VC-Knopf + Tempo-Fader; Netzwerk-Laser: Zeichen-Studio + Sicherheit. |
 
 ## Schichten-Modell (so kombiniert die Show)
 
