@@ -37,11 +37,11 @@ _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho
 **Noch offen / muss man noch anpassen (entdeckt):**
 | ID | Prio | Status | Titel / Notiz |
 |----|------|--------|---------------|
-| LAS-18b | P2 | ✅ done (dieser PR) | L2600-**Werksmuster-Picker**: Box „Werksmuster (Gerät)" in der LaserView (nur Klasse A mit `gobo_wheel`). „➕ Muster merken…" nimmt aktuelle Bank/Muster-Werte + Name + optionales Foto; Kachel = Foto-Thumbnail oder B/M-Nummer; Linksklick ruft ab, Rechtsklick löscht. Persistenz `laser_patterns` in der `.lshow` (NEU `pattern_slots.py`). David befüllt die Bibliothek am Gerät (Foto je Slot). |
+| LAS-18b | P2 | ✅ done ([#184](https://github.com/ixamgames-droid/lightos/pull/184)) | L2600-**Werksmuster-Picker**: Box „Werksmuster (Gerät)" in der LaserView (nur Klasse A mit `gobo_wheel`). „➕ Muster merken…" nimmt aktuelle Bank/Muster-Werte + Name + optionales Foto; Kachel = Foto-Thumbnail oder B/M-Nummer; Linksklick ruft ab, Rechtsklick löscht. Persistenz `laser_patterns` in der `.lshow` (NEU `pattern_slots.py`). David befüllt die Bibliothek am Gerät (Foto je Slot). |
 | LAS-18c | P3 | blocked (Hardware) | Figur→Werksmuster-**Näherungs-Matcher** (`pattern_match.py`): Zeichnung → nächstpassendes eingebautes Muster als LASER-Palette. |
 | — | — | ✅ gelöst (Handbuch S. 8) | Chart vollständig gegengelesen: Ch20 = „Keine Funktion"/leer bestätigt, Gruppe B = +17-Wiederholung; **laser_y-Bewegungs-Labels ans Handbuch angeglichen** (= X). Offen nur noch: 6ch-CH5 (nicht in den Fotos). |
 | LAS-20 | P3 | blocked (Hardware) | `.ild`-Exporter für ShowNET/ILDA+SD-Laser — nur bauen, wenn solche Hardware da ist (sonst toter Code). |
-| LAS-03-Rest | P3 | todo | Laser-Kanalwerte in **Snap/Szenen-Capture** aufnehmen (Muster-Abruf auch über Snaps/Szenen). |
+| LAS-03-Rest | — | ✅ verifiziert (dieser PR) | Laser in **Snaps/Szenen**: war seit LAS-01 implizit komplett (laser_* in `ATTR_GROUPS` → Save-Dialog; `resolve_attr_channels` → Szenen; Apply schreibt `attr#N` 1:1 zurück). Jetzt per `tests/test_laser_snap_scene.py` End-to-End festgenagelt (Dialog-Capture inkl. Kopf-Keys, Gruppen-Abwahl, SnapLibrary-Roundtrip, Szenen-Kanalauflösung Gruppe A/B). |
 | ~~LAS-09~~ | — | ✅ gelöst (Handbuch) | 34ch bestätigt (nicht 32); CH18: 0=Alle AUS, 255=Gruppe A AUS/B EIN → Shutter-Default 0 korrekt. |
 | — | P3 | blocked | **Hardware-Verifikation** Ether Dream + IDN (nur gegen Fakes getestet, kein DAC/Gerät). ShowNET/Moncha-Profile (Charts fehlen). |
 
