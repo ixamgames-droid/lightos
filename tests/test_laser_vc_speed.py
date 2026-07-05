@@ -19,6 +19,17 @@ def _app():
     return QApplication.instance() or QApplication([])
 
 
+def _find_attr_combo(dlg):
+    """Die editierbare Attribut-Combo im Slider-Dialog: eindeutig daran, dass
+    sie einen Eintrag mit itemData == 'gobo_rotation' trägt (UXT-01)."""
+    from PySide6.QtWidgets import QComboBox
+    for cb in dlg.findChildren(QComboBox):
+        for i in range(cb.count()):
+            if cb.itemData(i) == "gobo_rotation":
+                return cb
+    return None
+
+
 class ProgrammerRangeMapTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -94,6 +105,72 @@ class ProgrammerRangeMapTest(unittest.TestCase):
             self.assertIn((7, "gobo_rotation", 223), st.calls)
         finally:
             app_state.get_state = orig
+
+
+class ProgrammerAttrFieldTest(unittest.TestCase):
+    """UXT-01: der Slider-Dialog exponiert das Ziel-Attribut. Ohne dieses Feld
+    blieb der PROGRAMMER-Modus faktisch auf 'intensity' (Laser-Speed-Fader auf
+    gobo_rotation per GUI unbaubar)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+
+    def _open_and(self, slider, action):
+        """Öffnet _open_properties mit gepatchtem exec: ``action(dlg)`` läuft im
+        offenen Dialog, dann Accepted zurückgeben."""
+        from PySide6.QtWidgets import QDialog
+        orig = QDialog.exec
+
+        def fake_exec(dlg):
+            action(dlg)
+            return QDialog.DialogCode.Accepted
+
+        QDialog.exec = fake_exec
+        try:
+            slider._open_properties()
+        finally:
+            QDialog.exec = orig
+
+    def test_field_present_and_prefilled(self):
+        s = VCSlider()
+        s.mode = SliderMode.PROGRAMMER
+        s.programmer_attr = "gobo_rotation"
+        seen = {}
+
+        def check(dlg):
+            cb = _find_attr_combo(dlg)
+            seen["combo"] = cb
+            if cb is not None:
+                seen["current"] = cb.itemData(cb.currentIndex())
+
+        self._open_and(s, check)
+        self.assertIsNotNone(seen.get("combo"), "Attribut-Feld fehlt im Dialog")
+        self.assertEqual(seen.get("current"), "gobo_rotation")
+
+    def test_choosing_attr_writes_back(self):
+        s = VCSlider()
+        s.mode = SliderMode.PROGRAMMER
+        s.programmer_attr = "intensity"
+
+        def choose(dlg):
+            cb = _find_attr_combo(dlg)
+            idx = next(i for i in range(cb.count())
+                       if cb.itemData(i) == "gobo_rotation")
+            cb.setCurrentIndex(idx)
+
+        self._open_and(s, choose)
+        self.assertEqual(s.programmer_attr, "gobo_rotation")
+
+    def test_freetext_attr_survives(self):
+        s = VCSlider()
+        s.mode = SliderMode.PROGRAMMER
+
+        def typ(dlg):
+            _find_attr_combo(dlg).setCurrentText("laser_scan_rate")
+
+        self._open_and(s, typ)
+        self.assertEqual(s.programmer_attr, "laser_scan_rate")
 
 
 if __name__ == "__main__":
