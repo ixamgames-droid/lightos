@@ -107,6 +107,42 @@ class InspectorPanelTest(unittest.TestCase):
         self.panel.bind(slider)                      # kein build_inspector_body -> Fallback
         self.assertIs(self.panel._widget, slider)
 
+    def test_config_survives_rebind_after_switch(self):
+        """UXT-02: Button A konfigurieren, zu B wechseln, zu A zurück — A muss
+        seine Aktion + Beschriftung behalten (Report: einmalig komplett verloren).
+
+        Deckt den Session-Wechsel-Pfad ab: bind(A)→live-edit→bind(B)→bind(A).
+        Der Verlust wäre aufgetreten, wenn ein stale ``_inspector_apply`` gegen
+        die falschen/toten Widgets liefe oder der Rebuild A neu aus Defaults liest.
+        """
+        btn_b = self.canvas._add_widget("VCButton", QPoint(120, 20))
+        self.assertIsInstance(btn_b, VCButton)
+
+        # A binden + konfigurieren (Aktion + Beschriftung) — wie der Techniker.
+        self.panel.bind(self.btn)
+        body_a = self.panel._scroll.widget()
+        cb_a = _action_combo(body_a)
+        for i in range(cb_a.count()):
+            if cb_a.itemData(i) == ButtonAction.LASER_PATTERN.value:
+                cb_a.setCurrentIndex(i)
+                break
+        _caption_edit(body_a, self.btn.caption).setText("Club Kreis")
+        self.assertEqual(self.btn.action, ButtonAction.LASER_PATTERN)
+        self.assertEqual(self.btn.caption, "Club Kreis")
+
+        # Zu B wechseln (schließt A-Sitzung) und B kurz anfassen.
+        self.panel.bind(btn_b)
+        _caption_edit(self.panel._scroll.widget(), btn_b.caption).setText("Not-Aus")
+
+        # Zurück zu A — Konfiguration muss unverändert sein.
+        self.panel.bind(self.btn)
+        self.assertEqual(self.btn.action, ButtonAction.LASER_PATTERN)
+        self.assertEqual(self.btn.caption, "Club Kreis")
+        # Und der wieder aufgebaute Body zeigt A's Werte, nicht Defaults.
+        body_a2 = self.panel._scroll.widget()
+        self.assertEqual(_action_combo(body_a2).currentData(),
+                         ButtonAction.LASER_PATTERN.value)
+
 
 class LibSnapFixTest(unittest.TestCase):
     """Audit-Bug: Einzel-Snap war nicht mehr waehlbar (lib_combo immer unsichtbar).

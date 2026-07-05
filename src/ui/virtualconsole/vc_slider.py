@@ -756,6 +756,37 @@ class VCSlider(VCWidget):
                             "(Programmer/Submaster) bzw. für 'GroupDimmer'/'FeatureDimmer'.")
         form.addRow("Feste Gruppe:", group_cb)
 
+        # UXT-01: Ziel-Attribut für den PROGRAMMER-Modus. Ohne dieses Feld war der
+        # Modus faktisch auf "intensity" festgenagelt (ein Fader auf z. B.
+        # gobo_rotation war per GUI unbaubar → der LAS-Speed-Fader blieb
+        # unerreichbar). Editierbare Combo, befüllt aus den bekannten Attributen
+        # (attr_groups.ATTR_LABELS, Label + roher Key); Freitext für Power-User.
+        prog_attr_combo = QComboBox()
+        prog_attr_combo.setEditable(True)
+        _pa_keys: list[str] = []
+        try:
+            from src.core.attr_groups import ATTR_LABELS
+            for _a in sorted(ATTR_LABELS):
+                prog_attr_combo.addItem(f"{ATTR_LABELS[_a]}  ({_a})", _a)
+                _pa_keys.append(_a)
+        except Exception:
+            pass
+        _cur_attr = self.programmer_attr or "intensity"
+        if _cur_attr not in _pa_keys:
+            prog_attr_combo.addItem(_cur_attr, _cur_attr)
+            _pa_keys.append(_cur_attr)
+        _pa_idx = next((i for i in range(prog_attr_combo.count())
+                        if prog_attr_combo.itemData(i) == _cur_attr), -1)
+        if _pa_idx >= 0:
+            prog_attr_combo.setCurrentIndex(_pa_idx)
+        else:
+            prog_attr_combo.setCurrentText(_cur_attr)
+        prog_attr_combo.setToolTip("Welches Programmer-Attribut dieser Fader setzt "
+                                   "(Modus Programmer-Attribut). Liste = bekannte "
+                                   "Attribute; eigener Name tippbar. Beispiel "
+                                   "Laser-Tempo: gobo_rotation mit Wert 192–223.")
+        form.addRow("Attribut (Programmer):", prog_attr_combo)
+
         # LAS-Speed: Wert-Teilband für den PROGRAMMER-Modus (0..100% → [min,max]).
         prog_min_spin = QSpinBox()
         prog_min_spin.setRange(0, 255)
@@ -869,6 +900,7 @@ class VCSlider(VCWidget):
             vis = {
                 param_key_combo: m == SliderMode.EFFECT_PARAM,
                 scope_cb:        m in (SliderMode.PROGRAMMER, SliderMode.SUBMASTER),
+                prog_attr_combo: m == SliderMode.PROGRAMMER,
                 prog_min_spin:   m == SliderMode.PROGRAMMER,
                 prog_max_spin:   m == SliderMode.PROGRAMMER,
                 group_cb:        m in (SliderMode.PROGRAMMER, SliderMode.GROUP_DIMMER,
@@ -955,6 +987,14 @@ class VCSlider(VCWidget):
             self.tempo_bus_id = bus_cb.currentData() or ""
             self.programmer_scope = scope_cb.currentData() or "all"
             self.programmer_group = group_cb.currentText().strip()
+            # UXT-01: Ziel-Attribut zurücklesen — Auswahl liefert den rohen Key
+            # per itemData, Freitext bleibt wie getippt (leer → alten Wert halten).
+            _pa_text = prog_attr_combo.currentText().strip()
+            _pa_hit = prog_attr_combo.findText(_pa_text)
+            if _pa_hit >= 0 and prog_attr_combo.itemData(_pa_hit):
+                self.programmer_attr = prog_attr_combo.itemData(_pa_hit)
+            else:
+                self.programmer_attr = _pa_text or self.programmer_attr
             self.programmer_min = prog_min_spin.value()
             self.programmer_max = prog_max_spin.value()
             self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
