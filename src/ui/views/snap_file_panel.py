@@ -972,6 +972,69 @@ class SnapFilePanel(QWidget):
             ),
         )
 
+    def _create_scene_from_selection(self):
+        """UXT-03: markierte Snaps in wiederverwendbare **Szenen**-Funktionen
+        wandeln (Brücke Snap→Szene). Anders als „Chase aus Auswahl" entsteht je
+        Snap EINE Szene, die im Chaser-Editor als Schritt (Funktions-Picker)
+        wählbar ist — der bisher fehlende Weg von „schöne Farben gespeichert" zu
+        „Baustein für einen Chaser"."""
+        snap_ids = self._selected_snap_ids()
+        if not snap_ids:
+            return
+        lib = self._lib()
+        fm = self._fm()
+        if lib is None or fm is None or get_state is None:
+            QMessageBox.warning(self, "Snap → Szene",
+                                "Bibliothek/Funktionsmanager nicht verfügbar.")
+            return
+        try:
+            from src.ui.views.programmer_view import programmer_to_scene_values
+            fixtures = get_state().get_patched_fixtures()
+        except Exception as e:
+            QMessageBox.warning(self, "Snap → Szene",
+                                f"Konnte Szene nicht anlegen: {e}")
+            return
+
+        created, skipped, last_id = 0, 0, None
+        for sid in snap_ids:
+            snap = lib.get(sid)
+            if snap is None or not snap.values:
+                skipped += 1
+                continue
+            # snap.values == {fid: {attr: val}} == das filtered_programmer-Format.
+            values = programmer_to_scene_values(snap.values, fixtures)
+            if not values:
+                skipped += 1                 # keine gepatchten Kanäle mehr
+                continue
+            scene = fm.new_scene(f"{snap.name} (Szene)")
+            for fid, ch, val in values:
+                scene.set_value(fid, ch, val)
+            created += 1
+            last_id = scene.id
+
+        if created:
+            try:
+                from src.core.sync import get_sync, SyncEvent
+                sync = get_sync()
+                if last_id is not None:
+                    sync.emit(SyncEvent.FUNCTION_CHANGED, {"id": last_id})
+                sync.emit(SyncEvent.REFRESH_ALL, None)
+            except Exception:
+                pass
+        self._safe_refresh()
+
+        if not created:
+            QMessageBox.warning(
+                self, "Snap → Szene",
+                "Keine Szene erstellt — die Snaps hatten keine gepatchten "
+                "Kanäle (evtl. nach Re-Patch?).")
+            return
+        msg = (f"{created} Szene(n) angelegt — im Chaser-Editor per "
+               "'+ Hinzufügen' als Schritt wählbar.")
+        if skipped:
+            msg += f"\n{skipped} Snap(s) übersprungen (leer / nicht gepatcht)."
+        QMessageBox.information(self, "Snap → Szene", msg)
+
     def _delete_selected(self):
         ref, kind = self._selected()
         if ref is None or not kind:
@@ -1083,6 +1146,9 @@ class SnapFilePanel(QWidget):
             menu.addAction("Anwenden").triggered.connect(self._apply_selected)
             menu.addAction("Chase aus Auswahl erstellen").triggered.connect(
                 self._create_chase_from_selection
+            )
+            menu.addAction("Als Szene(n) übernehmen").triggered.connect(
+                self._create_scene_from_selection
             )
             menu.addSeparator()
             menu.addAction("Umbenennen...").triggered.connect(self._rename_selected)
