@@ -1270,7 +1270,19 @@ class ProgrammerView(QWidget):
 
         # Slider-Liste
         if not channels:
-            ilay.addWidget(QLabel(f"Keine {group_name}-Kanäle gefunden."))
+            msg = f"Keine {group_name}-Kanäle gefunden."
+            # UXT-10: Bei reinen RGBW-Geräten ohne separaten Dimmer sucht der
+            # Einsteiger im Intensity-Tab vergeblich — Helligkeit läuft dort über
+            # die Farbe. Statt einer sackgassigen Meldung ein Hinweis mit Weg.
+            if group_name == "Intensity" and any(
+                    (getattr(ch, "attribute", "") or "").startswith("color_")
+                    for fx in fixtures
+                    for ch in get_channels_for_patched(fx)):
+                msg = ("Dieser Modus hat keinen separaten Dimmer — die "
+                       "Helligkeit läuft über die Farbe (Color-Tab).")
+            lbl = QLabel(msg)
+            lbl.setWordWrap(True)
+            ilay.addWidget(lbl)
         elif group_name == "Color" and self._color_head_count() > 1:
             # Mehrkopf-Farbgeraet (Spider): je nach Modus Synchron-/Pro-Kopf-Regler
             # statt der pro Attribut deduplizierten Standard-Slider.
