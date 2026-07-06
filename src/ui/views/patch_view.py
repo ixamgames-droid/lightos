@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
+from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.core.app_state import (get_state, AppState,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
@@ -95,10 +96,10 @@ class CopyWithOffsetDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Mit Offset kopieren")
         form = QFormLayout(self)
-        self._spin_count = QSpinBox()
+        self._spin_count = SelectAllSpinBox()   # UXT-11a
         self._spin_count.setRange(1, 512)
         self._spin_count.setValue(1)
-        self._spin_offset = QSpinBox()
+        self._spin_offset = SelectAllSpinBox()   # UXT-11a
         self._spin_offset.setRange(1, 512)
         self._spin_offset.setValue(max(1, int(default_offset)))
         form.addRow("Anzahl Kopien:", self._spin_count)

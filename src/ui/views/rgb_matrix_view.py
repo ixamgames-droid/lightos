@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
 from src.core.engine.rgb_matrix_meta import ALGO_META
+from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
@@ -425,13 +426,13 @@ class RgbMatrixView(QWidget):
         self._style_combo.currentTextChanged.connect(self._on_style_change)
         fg.addRow("Stil:", self._style_combo)
 
-        self._cols_spin = QSpinBox()
+        self._cols_spin = SelectAllSpinBox()   # UXT-11a
         self._cols_spin.setRange(1, 64)
         self._cols_spin.setValue(8)
         self._cols_spin.valueChanged.connect(self._param_change)
         fg.addRow("Spalten:", self._cols_spin)
 
-        self._rows_spin = QSpinBox()
+        self._rows_spin = SelectAllSpinBox()   # UXT-11a
         self._rows_spin.setRange(1, 32)
         self._rows_spin.setValue(4)
         self._rows_spin.valueChanged.connect(self._param_change)
