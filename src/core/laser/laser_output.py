@@ -202,6 +202,14 @@ class LaserOutputManager:
                 conn.estop()
             except Exception:
                 conn.close()
+        # UXT-09: zentrale, unmissverständliche NOT-AUS-Bestätigung — egal ob von
+        # der Laser-Steuerseite oder einem VC-Button ausgelöst (beide gehen hier
+        # durch). Das Hauptfenster zeigt darauf einen prominenten Hinweis.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LASER_ESTOP, None)
+        except Exception:
+            pass
 
     def clear_estop_all(self):
         with self._lock:

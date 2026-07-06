@@ -239,6 +239,9 @@ class MainWindow(QMainWindow):
             sync.subscribe(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
+            # UXT-09: Laser-NOT-AUS unmissverständlich bestätigen (egal woher
+            # ausgelöst) — prominenter, nicht-blockierender Statuszeilen-Alarm.
+            sync.subscribe(SyncEvent.LASER_ESTOP, self._on_laser_estop)
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
@@ -1657,6 +1660,28 @@ class MainWindow(QMainWindow):
             self._refresh_foreign_badges()
 
     # ── ISO-01/02: aktive Fremdwerte anzeigen + zentral leeren ─────────────────
+
+    def _on_laser_estop(self, *_):
+        """UXT-09: unmissverständliche, nicht-blockierende NOT-AUS-Bestätigung.
+        Bewusst KEIN modaler Dialog (den müsste man im Ernstfall erst wegklicken)
+        — stattdessen ein prominent rot eingefärbter Statuszeilen-Alarm, der sich
+        nach ein paar Sekunden von selbst zurücksetzt."""
+        try:
+            sb = self.statusBar()
+            sb.showMessage(
+                "⏹  LASER NOT-AUS ausgelöst — Netzwerk-Ausgabe verriegelt "
+                "& unscharf", 6000)
+            sb.setStyleSheet(
+                "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
+            QTimer.singleShot(6000, lambda: self._reset_statusbar_style())
+        except Exception:
+            pass
+
+    def _reset_statusbar_style(self):
+        try:
+            self.statusBar().setStyleSheet("")
+        except Exception:
+            pass
 
     def _refresh_foreign_badges(self):
         """Aktualisiert die Anzeige aktiver Programmer-/Simple-Desk-Werte (ISO-01)."""
