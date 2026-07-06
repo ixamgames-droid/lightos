@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-06 — 3D-Visualizer: DMX-Update-Pfad in die FixtureType-Registry zerlegt (VIZ-13 3c Registry Teil 2)
+
+#### Geaendert / Fixes
+
+- **`updateFixture`-Monolith aufgelöst (reiner Refactor, verhaltens-identisch):** der ~190-Zeilen-DMX-Update-Pfad in `scene_src/fixtures/fixtures.js` ist in **pro-Typ-`updateDmx`-Handler der FixtureType-Registry** zerlegt — `updateSpiderDmx`/`updateParBarDmx`/`updateMoverBarDmx`/`updateMovingHeadDmx` (auch Scanner)/`updateGenericDmx` plus geteilte Helfer (`applyGenericColor`/`applyPanTilt`/`applyFloorAim`/`syncIconPos`) in `builders.js`. Alle 12 Registry-Einträge tragen jetzt `build` **und** `updateDmx`; unbekannte Typen fallen wie bisher auf den PAR-Pfad zurück. Die Fassade `updateFixture(fid, r, g, b, …)` und beide Aufrufer (dmxBatch-Handler, `addFixture`) bleiben unverändert.
+- **Verhaltensgleichheit festgenagelt:** neuer Golden-Parity-Test `tests/test_viz13c_updatedmx_registry.py` (echte Page, offscreen QWebEngine) — 14-Fixture-Rig über alle Typen inkl. Multihead, Pixel-Bar und unbekanntem Fallback-Typ; Beam/Spot/FloorSpot/Lens/Lamp/Laser-Linien, Pan/Tilt-Rotationen, `_lastPanRad` und Icon-Färbung werden gegen die **vor dem Umbau eingefrorenen** Referenzwerte (`tests/test_viz13c_updatedmx_golden.json`) verglichen; gelöschte Golden-Datei friert nie still neu ein (Pflicht-Fail).
+- Vorarbeit für 3c-2 (On-Demand-Render) und die restlichen Registry-Felder (`dispose`/`icon`); Design laut `docs/VIZ3D_OVERHAUL_PLAN.md` §e.
+- Dateien: `scene_src/fixtures/builders.js` (+245), `fixtures/fixtures.js` (−210), `fixtures/registry.js`; Tests neu `tests/test_viz13c_updatedmx_registry.py` + `tests/test_viz13c_updatedmx_golden.json`.
+
 ### 2026-07-05 — 3D-Visualizer: 2D-Plan poliert (VIZ-13 3c-1 Ortho-2D-Polish)
 
 #### Neu / Hinzugefuegt

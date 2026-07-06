@@ -1,0 +1,1400 @@
+{
+ "off": {
+  "20": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 0,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "par",
+   "yokeRotY": null
+  },
+  "21": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 4.2761,
+    "z": -4.2583
+   },
+   "headRotX": -1.1781,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 2.6507
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": 2.6507,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "moving_head",
+   "yokeRotY": 2.6507
+  },
+  "22": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 5.9616,
+    "z": -0.3902
+   },
+   "headRotX": -0.7854,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 1.7671
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": 1.7671,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "scanner",
+   "yokeRotY": 1.7671
+  },
+  "23": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 6,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": {
+    "hex0": 13132850,
+    "n": 5,
+    "op0": 0,
+    "vis0": false
+   },
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "laser",
+   "yokeRotY": null
+  },
+  "24": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 8,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "led_bar",
+   "yokeRotY": null
+  },
+  "25": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 10,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "dimmer",
+   "yokeRotY": null
+  },
+  "26": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 12,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "strobe",
+   "yokeRotY": null
+  },
+  "27": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "smoke",
+   "yokeRotY": null
+  },
+  "28": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "hazer",
+   "yokeRotY": null
+  },
+  "29": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.9,
+     0.9,
+     0.9,
+     0.9
+    ],
+    "cells": [
+     4869726,
+     4869726,
+     4869726,
+     4869726
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16711680,
+     "emInt": 0,
+     "lensHex": 16711680
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 65280,
+     "emInt": 0,
+     "lensHex": 65280
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 255,
+     "emInt": 0,
+     "lensHex": 255
+    },
+    {
+     "beamHex": 7897740,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 7897740,
+     "emInt": 0,
+     "lensHex": 7897740
+    }
+   ],
+   "spot": null,
+   "type": "par_bar",
+   "yokeRotY": null
+  },
+  "30": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.9,
+     0.9,
+     0.9,
+     0.9
+    ],
+    "cells": [
+     4869726,
+     4869726,
+     4869726,
+     4869726
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16711680,
+     "emInt": 0,
+     "headRotX": -0.3927,
+     "lensHex": 16711680,
+     "yokeRotY": -2.3562
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 65280,
+     "emInt": 0,
+     "headRotX": 0.3927,
+     "lensHex": 65280,
+     "yokeRotY": -0.7854
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 255,
+     "emInt": 0,
+     "headRotX": -1.1781,
+     "lensHex": 255,
+     "yokeRotY": 0.7854
+    },
+    {
+     "beamHex": 13158400,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 13158400,
+     "emInt": 0,
+     "headRotX": 0.8836,
+     "lensHex": 13158400,
+     "yokeRotY": 2.3562
+    }
+   ],
+   "parHeads": null,
+   "spot": null,
+   "type": "mover_bar",
+   "yokeRotY": null
+  },
+  "31": {
+   "bars": [
+    {
+     "beamHex": [
+      16711680,
+      65280,
+      1654783,
+      16777215
+     ],
+     "beamOp": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "beamVis": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "lensEmHex": [
+      16711680,
+      65280,
+      1654783,
+      16777215
+     ],
+     "lensEmInt": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "tilt": -0.3927
+    },
+    {
+     "beamHex": [
+      16777215,
+      1654783,
+      65280,
+      16711680
+     ],
+     "beamOp": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "beamVis": [
+      false,
+      false,
+      false,
+      false
+     ],
+     "lensEmHex": [
+      16777215,
+      1654783,
+      65280,
+      16711680
+     ],
+     "lensEmInt": [
+      0,
+      0,
+      0,
+      0
+     ],
+     "tilt": 0.6381
+    }
+   ],
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.9,
+     0.9
+    ],
+    "cells": [
+     4869726,
+     4869726
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "spider",
+   "yokeRotY": null
+  },
+  "32": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0,
+    "vis": false,
+    "x": 24,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 4869726,
+    "bodyOp": 0.9,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 0
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 0
+   },
+   "type": "kaffeemaschine",
+   "yokeRotY": null
+  },
+  "33": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.9,
+     0.9,
+     0.9,
+     0.9,
+     0.9,
+     0.9,
+     0.9,
+     0.9
+    ],
+    "cells": [
+     4869726,
+     4869726,
+     4869726,
+     4869726,
+     4869726,
+     4869726,
+     4869726,
+     4869726
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16711680,
+     "emInt": 0,
+     "lensHex": 16711680
+    },
+    {
+     "beamHex": 16744448,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16744448,
+     "emInt": 0,
+     "lensHex": 16744448
+    },
+    {
+     "beamHex": 16776960,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16776960,
+     "emInt": 0,
+     "lensHex": 16776960
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 65280,
+     "emInt": 0,
+     "lensHex": 65280
+    },
+    {
+     "beamHex": 65535,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 65535,
+     "emInt": 0,
+     "lensHex": 65535
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 255,
+     "emInt": 0,
+     "lensHex": 255
+    },
+    {
+     "beamHex": 8388863,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 8388863,
+     "emInt": 0,
+     "lensHex": 8388863
+    },
+    {
+     "beamHex": 16711935,
+     "beamOp": 0,
+     "beamVis": false,
+     "emHex": 16711935,
+     "emInt": 0,
+     "lensHex": 16711935
+    }
+   ],
+   "spot": null,
+   "type": "par_bar",
+   "yokeRotY": null
+  }
+ },
+ "on": {
+  "20": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 0,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "par",
+   "yokeRotY": null
+  },
+  "21": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 4.2761,
+    "z": -4.2583
+   },
+   "headRotX": -1.1781,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 2.6507
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": 2.6507,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "moving_head",
+   "yokeRotY": 2.6507
+  },
+  "22": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 5.9616,
+    "z": -0.3902
+   },
+   "headRotX": -0.7854,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 1.7671
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": 1.7671,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "scanner",
+   "yokeRotY": 1.7671
+  },
+  "23": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 6,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": {
+    "hex0": 13132850,
+    "n": 5,
+    "op0": 0.4235,
+    "vis0": true
+   },
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "laser",
+   "yokeRotY": null
+  },
+  "24": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 8,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "led_bar",
+   "yokeRotY": null
+  },
+  "25": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 10,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "dimmer",
+   "yokeRotY": null
+  },
+  "26": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 12,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "strobe",
+   "yokeRotY": null
+  },
+  "27": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "smoke",
+   "yokeRotY": null
+  },
+  "28": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "hazer",
+   "yokeRotY": null
+  },
+  "29": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529
+    ],
+    "cells": [
+     16711680,
+     65280,
+     255,
+     7897740
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16711680,
+     "emInt": 1.3412,
+     "lensHex": 16711680
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 65280,
+     "emInt": 1.3412,
+     "lensHex": 65280
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 255,
+     "emInt": 1.3412,
+     "lensHex": 255
+    },
+    {
+     "beamHex": 7897740,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 7897740,
+     "emInt": 1.3412,
+     "lensHex": 7897740
+    }
+   ],
+   "spot": null,
+   "type": "par_bar",
+   "yokeRotY": null
+  },
+  "30": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529
+    ],
+    "cells": [
+     16711680,
+     65280,
+     255,
+     13158400
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16711680,
+     "emInt": 1.3412,
+     "headRotX": -0.3927,
+     "lensHex": 16711680,
+     "yokeRotY": -2.3562
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 65280,
+     "emInt": 1.3412,
+     "headRotX": 0.3927,
+     "lensHex": 65280,
+     "yokeRotY": -0.7854
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 255,
+     "emInt": 1.3412,
+     "headRotX": -1.1781,
+     "lensHex": 255,
+     "yokeRotY": 0.7854
+    },
+    {
+     "beamHex": 13158400,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 13158400,
+     "emInt": 1.3412,
+     "headRotX": 0.8836,
+     "lensHex": 13158400,
+     "yokeRotY": 2.3562
+    }
+   ],
+   "parHeads": null,
+   "spot": null,
+   "type": "mover_bar",
+   "yokeRotY": null
+  },
+  "31": {
+   "bars": [
+    {
+     "beamHex": [
+      16711680,
+      65280,
+      1654783,
+      16777215
+     ],
+     "beamOp": [
+      0.6,
+      0.1506,
+      0,
+      0.0753
+     ],
+     "beamVis": [
+      true,
+      true,
+      false,
+      true
+     ],
+     "lensEmHex": [
+      16711680,
+      65280,
+      1654783,
+      16777215
+     ],
+     "lensEmInt": [
+      1.3412,
+      0.3366,
+      0,
+      0.1683
+     ],
+     "tilt": -0.3927
+    },
+    {
+     "beamHex": [
+      16777215,
+      1654783,
+      65280,
+      16711680
+     ],
+     "beamOp": [
+      0,
+      0.6,
+      0.3012,
+      0
+     ],
+     "beamVis": [
+      false,
+      true,
+      true,
+      false
+     ],
+     "lensEmHex": [
+      16777215,
+      1654783,
+      65280,
+      16711680
+     ],
+     "lensEmInt": [
+      0,
+      1.3412,
+      0.6732,
+      0
+     ],
+     "tilt": 0.6381
+    }
+   ],
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 0,
+    "bodyOp": 0.8529,
+    "cellOps": [
+     0.8529,
+     0.8529
+    ],
+    "cells": [
+     0,
+     0
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": null,
+   "type": "spider",
+   "yokeRotY": null
+  },
+  "32": {
+   "bars": null,
+   "beam": {
+    "hex": 13132850,
+    "op": 0.6,
+    "vis": true
+   },
+   "floorSpot": {
+    "hex": 13132850,
+    "op": 0.3882,
+    "vis": true,
+    "x": 24,
+    "z": 0
+   },
+   "headRotX": 0,
+   "icon": {
+    "bodyHex": 13132850,
+    "bodyOp": 0.8529,
+    "cellOps": null,
+    "cells": null,
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": {
+    "emHex": 13132850,
+    "emInt": 1.0588
+   },
+   "moverHeads": null,
+   "parHeads": null,
+   "spot": {
+    "hex": 13132850,
+    "inten": 2.1176
+   },
+   "type": "kaffeemaschine",
+   "yokeRotY": null
+  },
+  "33": {
+   "bars": null,
+   "beam": null,
+   "floorSpot": null,
+   "headRotX": null,
+   "icon": {
+    "bodyHex": 3356223,
+    "bodyOp": 0.9,
+    "cellOps": [
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529,
+     0.8529
+    ],
+    "cells": [
+     16711680,
+     16744448,
+     16776960,
+     65280,
+     65535,
+     255,
+     8388863,
+     16711935
+    ],
+    "yaw": 0
+   },
+   "lamp": null,
+   "laser": null,
+   "lastPanRad": null,
+   "lens": null,
+   "moverHeads": null,
+   "parHeads": [
+    {
+     "beamHex": 16711680,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16711680,
+     "emInt": 1.3412,
+     "lensHex": 16711680
+    },
+    {
+     "beamHex": 16744448,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16744448,
+     "emInt": 1.3412,
+     "lensHex": 16744448
+    },
+    {
+     "beamHex": 16776960,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16776960,
+     "emInt": 1.3412,
+     "lensHex": 16776960
+    },
+    {
+     "beamHex": 65280,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 65280,
+     "emInt": 1.3412,
+     "lensHex": 65280
+    },
+    {
+     "beamHex": 65535,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 65535,
+     "emInt": 1.3412,
+     "lensHex": 65535
+    },
+    {
+     "beamHex": 255,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 255,
+     "emInt": 1.3412,
+     "lensHex": 255
+    },
+    {
+     "beamHex": 8388863,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 8388863,
+     "emInt": 1.3412,
+     "lensHex": 8388863
+    },
+    {
+     "beamHex": 16711935,
+     "beamOp": 0.6,
+     "beamVis": true,
+     "emHex": 16711935,
+     "emInt": 1.3412,
+     "lensHex": 16711935
+    }
+   ],
+   "spot": null,
+   "type": "par_bar",
+   "yokeRotY": null
+  }
+ }
+}

@@ -1,11 +1,18 @@
 // VIZ-13 Schritt 3a-4: Fixture-Registry + DMX-Apply
 // (ehem. stage_scene.html:1013 rebuildFixtureMeshList, 1708-1741 Beam-Helper,
 // 1742-2004 addFixture/removeFixture/updateFixture). Reines Verschieben.
+// VIZ-13 3c Teil 2: updateFixture ist seither nur noch die dmxBatch-Fassade
+// (Signatur unveraendert, siehe bridge.js + test_viz12_bridge_batch.py) und
+// dispatcht per registry.js#updateFixtureDmx auf die pro-Typ-Handler in
+// builders.js — belegt durch tests/test_viz13c_updatedmx_registry.py.
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
-import { buildFixtureModel } from './registry.js';
-import { buildTopDownIcon, tintTopDownIcon } from './topdown_icons.js';
+// VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
+// Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
+// auch tintTopDownIcon konsumiert wird — nicht mehr hier.
+import { buildFixtureModel, updateFixtureDmx } from './registry.js';
+import { buildTopDownIcon } from './topdown_icons.js';
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 
@@ -225,193 +232,24 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   const color = new THREE.Color(r/255, g/255, b/255);
   const intNorm = intensity / 255;
   const skipBeam = (view.mode === '2D' && Object.keys(fixtures).length > 50);
+  // VIZ-13 3c Teil 2: gebuendelter DMX-Kontext fuer die updateDmx-Handler —
+  // traegt den byte-identischen dmxBatch-Vertrag (r,g,b,intensity,pan,tilt,
+  // heads) plus die abgeleiteten Werte, damit kein Handler sie neu rechnet.
+  // WICHTIG: `color` ist EINE geteilte THREE.Color-Instanz pro Update-Aufruf;
+  // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
+  // Instanz-Sharing-Semantik des Monolithen.
+  const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
 
   if (heads) f.lastHeads = heads;
 
-  // ── Spider: zwei parallele Bars, je 4 EINZELFARBEN-LEDs ────────────────────
-  // Jede LED leuchtet einzeln nach ihrem eigenen Kanal (cr/cg/cb/cw der Bar);
-  // Master-Dimmer (intensity) ist gemeinsam. Tilt je Bar -> Scheren-Look.
-  if (f.isSpider && f.bars) {
-    const hs = f.lastHeads || [];
-    for (let i = 0; i < f.bars.length; i++) {
-      const bar = f.bars[i];
-      const h = hs[i] || hs[0] || {};
-      const chan = [h.cr || 0, h.cg || 0, h.cb || 0, h.cw || 0];  // [r,g,b,w]-Kanalwerte
-      // Tilt ueber den physischen Bereich des Geraets (wie der Moving-Head-Pfad),
-      // statt fix 128/±90°; Default 180 ergibt PI/2 wie zuvor.
-      const tHalf = (f.tiltRange || 180) * Math.PI / 360;
-      const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
-      const tRad = (((h.tilt == null ? tZero : h.tilt) - tZero) / 128) * tHalf;
-      bar.pivot.rotation.x = tRad;
-      for (let k = 0; k < bar.lenses.length; k++) {
-        const lens = bar.lenses[k];
-        const ledVal = (chan[lens.userData.ch] || 0) / 255;   // dieser LED-Kanal
-        const bright = ledVal * intNorm;                       // * Master-Dimmer
-        if (lens.material) {
-          lens.material.emissive = lens.userData.ledColor;
-          lens.material.emissiveIntensity = bright * 1.9;
-        }
-        const bm = bar.beams[k];
-        if (bm) {
-          bm.material.color = lens.userData.ledColor;
-          bm.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-          bm.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
-        }
-      }
-    }
-    // Top-Down-Icon: beide Bars einzeln faerben (cells; 3c-1 zentrales Tinting)
-    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
-    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-    return;   // Spider fertig — generische Single-Head-Logik ueberspringen
-  }
-
-  // ── FM-3: PAR-Bar — N einzeln gefaerbte PARs, gemeinsamer Master-Dimmer ─────
-  // Jeder PAR = ein Kopf (heads[i].r/g/b = Summenfarbe inkl. Weiss). Fallback:
-  // Kopf 0 = Basis-Farbe, weitere ohne Head-Daten aus.
-  if (f.isParBar && f.parHeads) {
-    const hs = f.lastHeads || [];
-    for (let i = 0; i < f.parHeads.length; i++) {
-      const ph = f.parHeads[i];
-      const h = hs[i] || {};
-      const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
-      const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
-      const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
-      const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
-      const bright = intNorm;   // gemeinsamer Master-Dimmer
-      if (ph.lens && ph.lens.material) {
-        ph.lens.material.color = col;
-        ph.lens.material.emissive = col;
-        ph.lens.material.emissiveIntensity = bright * 1.9;
-      }
-      if (ph.beam && ph.beam.material) {
-        ph.beam.material.color = col;
-        ph.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-        ph.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
-      }
-    }
-    // Top-Down-Icon: N PAR-Zellen einzeln faerben (3c-1 zentrales Tinting)
-    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
-    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-    return;   // PAR-Bar fertig
-  }
-
-  // ── FM-4: Mover-Bar — N Mini-Moving-Heads, jeder Kopf einzeln pan/tilt/farbe ─
-  if (f.isMoverBar && f.moverHeads) {
-    const hs = f.lastHeads || [];
-    const panHalf = (f.panRange || 360) * Math.PI / 360;
-    const tiltHalf = (f.tiltRange || 180) * Math.PI / 360;
-    const pZero = (f.panZero == null) ? 128 : f.panZero;
-    const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
-    for (let i = 0; i < f.moverHeads.length; i++) {
-      const mh = f.moverHeads[i];
-      const h = hs[i] || {};
-      const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
-      const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
-      const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
-      const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
-      const bright = intNorm;
-      const hp = (h.pan == null) ? pan : h.pan;    // pro-Kopf-Pan (FM-2)
-      const ht = (h.tilt == null) ? tilt : h.tilt; // pro-Kopf-Tilt
-      mh.yoke.rotation.y = ((hp - pZero) / 128) * panHalf;
-      mh.head.rotation.x = ((ht - tZero) / 128) * tiltHalf;
-      if (mh.lens && mh.lens.material) {
-        mh.lens.material.color = col;
-        mh.lens.material.emissive = col;
-        mh.lens.material.emissiveIntensity = bright * 1.9;
-      }
-      if (mh.beam && mh.beam.material) {
-        mh.beam.material.color = col;
-        mh.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-        mh.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
-      }
-    }
-    // Top-Down-Icon: N Kopf-Zellen einzeln faerben (3c-1 zentrales Tinting)
-    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
-    if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-    return;   // Mover-Bar fertig
-  }
-
-  if (f.beam) {
-    f.beam.material.color = color;
-    f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
-    f.beam.visible = settings.showCones && intNorm > 0.01 && view.mode === '3D';
-  }
-  if (f.spot) {
-    f.spot.color = color;
-    f.spot.intensity = intNorm * 3.0;
-  }
-  if (f.floorSpot) {
-    f.floorSpot.material.color = color;
-    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55);
-    f.floorSpot.visible = settings.showFloorSpots && intNorm > 0.01;
-  }
-  if (f.lens && f.lens.material) {
-    f.lens.material.emissive = color;
-    f.lens.material.emissiveIntensity = intNorm * 1.5;
-  }
-  if (f.lamp && f.lamp.material) {
-    f.lamp.material.emissive = color;
-    f.lamp.material.emissiveIntensity = intNorm * 1.5;
-  }
-  // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
-  if (f.laserBeams) {
-    const laserVis = settings.showCones && intNorm > 0.01 && view.mode === '3D';
-    for (const bm of f.laserBeams) {
-      if (!bm.material) continue;
-      bm.material.color = color;
-      bm.material.opacity = Math.max(0.0, intNorm * 0.6);
-      bm.visible = laserVis;
-    }
-  }
-  // Top-down icon color reflects active output color (only when bright)
-  tintTopDownIcon(f.icon, color, intNorm);
-
-  // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt)
-  if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
-    // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
-    // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
-    const panHalf = (f.panRange || 360) * Math.PI / 360;
-    const tiltHalf = (f.tiltRange || 180) * Math.PI / 360;
-    const pZero = (f.panZero == null) ? 128 : f.panZero;
-    const tZero = (f.tiltZero == null) ? 128 : f.tiltZero;
-    const panRad = ((pan - pZero) / 128) * panHalf;
-    const tiltRad = ((tilt - tZero) / 128) * tiltHalf;
-    f.yoke.rotation.y = panRad;
-    f.head.rotation.x = tiltRad;
-    // Reflect pan in top-down icon (rotate the whole icon)
-    f._lastPanRad = panRad;   // fuer konsistente Icon-Yaw in den Rotate-Pfaden
-    if (f.icon) f.icon.rotation.y = panRad + f.group.rotation.y;
-  }
-
-  // Floor spot follow direction
-  if (!skipBeam && f.floorSpot && f.spotTarget) {
-    const dir = new THREE.Vector3(0, -1, 0);
-    // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
-    // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
-    // Vorher blieb der Boden-Pool bei getilteten PARs/Scannern senkrecht drunter.
-    const aimObj = ((f.type === 'moving_head' || f.type === 'scanner') && f.head) ? f.head : f.group;
-    if (aimObj) {
-      aimObj.updateMatrixWorld();
-      const wq = new THREE.Quaternion();
-      aimObj.getWorldQuaternion(wq);
-      dir.applyQuaternion(wq);
-    }
-    const origin = new THREE.Vector3();
-    f.group.getWorldPosition(origin);
-    if (Math.abs(dir.y) > 0.001) {
-      const t = -origin.y / dir.y;
-      if (t > 0 && t < 100) {
-        const hitX = origin.x + dir.x * t;
-        const hitZ = origin.z + dir.z * t;
-        f.floorSpot.position.set(hitX, 0.01, hitZ);
-        f.spotTarget.position.set(hitX, 0.0, hitZ);
-      }
-    }
-  }
-  // Keep top-down icon position synced
-  if (f.icon) {
-    f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
-  }
+  // Dispatch ueber die FixtureType-Registry (Design (e)) — ersetzt die alte
+  // if-Kette (Spider/ParBar/MoverBar -> Rest) verhaltens-identisch:
+  // f.type ist das Render-Modell aus addFixture (data.model || data.type),
+  // die Multihead-Handler tragen die alten Flag-Guards selbst (Durchfall auf
+  // den generischen Pfad), unbekannte Typen fallen wie beim build auf den
+  // PAR-Eintrag zurueck. Belegt durch tests/test_viz13c_updatedmx_registry.py
+  // (Golden-Parity gegen den eingefrorenen Monolith-Zustand).
+  updateFixtureDmx(f, dmx);
 }
 
 // ── Spaet-Bindung (zirkulaere Abhaengigkeit: removeFixture() ruft im
