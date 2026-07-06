@@ -202,6 +202,14 @@ class LaserOutputManager:
                 conn.estop()
             except Exception:
                 conn.close()
+        # UXT-12: auch DMX-Muster-Laser (L2600 & Co.) hart dunkel schalten — der
+        # obige Netzwerk-Estop erreicht sie nicht. Latch im State setzen; der
+        # Renderer zwingt deren Kanäle dann auf 0, bis bewusst ein neuer Laser-
+        # Wert gesetzt wird.
+        try:
+            self._state.set_laser_estop(True)
+        except Exception:
+            pass
         # UXT-09: zentrale, unmissverständliche NOT-AUS-Bestätigung — egal ob von
         # der Laser-Steuerseite oder einem VC-Button ausgelöst (beide gehen hier
         # durch). Das Hauptfenster zeigt darauf einen prominenten Hinweis.

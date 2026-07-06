@@ -173,6 +173,13 @@ class AppState:
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
         self._commit_spans: dict[int, list[tuple[int, int]]] = {}  # univ -> [(start,len)]
         self._patched_set: dict[int, frozenset] = {}    # univ -> {gepatchte Adressen}
+        # UXT-12: Laser-NOT-AUS für DMX-Muster-Laser (L2600 & Co.). Der Netzwerk-
+        # Streamer wird separat über estop_all/armed verriegelt; DMX-Laser geben
+        # über normale Kanäle aus und würden nach NOT-AUS weiterlaufen. Aktiv =
+        # der Renderer zwingt alle Laser-Kanäle als OBERSTE Ebene auf 0.
+        self.laser_estop_active: bool = False
+        self._laser_estop_addrs: dict[int, frozenset] = {}   # univ -> Laser-Adressen
+        self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
         # Nicht-gepatchte Adressen, die Funktionen (z. B. ScriptFunction setdmx)
         # im letzten Frame geschrieben haben — fuer korrektes Freigeben.
         self._engine_extra_prev: dict[int, set] = {}
@@ -590,6 +597,8 @@ class AppState:
         fix_index: dict[int, tuple] = {}
         defaults: dict[int, bytearray] = {}
         addrs: dict[int, set] = {}
+        laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
+        laser_fids: set = set()
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
             fix_index[fx.fid] = (fx, chans)
@@ -598,6 +607,14 @@ class AppState:
             # ihre Platzhalter-Adresse darf nie ins Live-Universe committen.
             if not fixture_uses_dmx(fx):
                 continue
+            # UXT-12: DMX-Laser erkennen (fixture_type 'laser' ODER laser_*-Kanäle
+            # — dieselbe Definition wie capability.is_laser_fixture, aber mit den
+            # schon geladenen chans, ohne Zweit-Load).
+            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
+                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
+                               for ch in chans))
+            if is_laser:
+                laser_fids.add(fx.fid)
             for ch in chans:
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -609,6 +626,8 @@ class AppState:
                     dv = 0
                 defaults.setdefault(fx.universe, bytearray(512))[addr - 1] = max(0, min(255, dv))
                 addrs.setdefault(fx.universe, set()).add(addr)
+                if is_laser:
+                    laser_addrs.setdefault(fx.universe, set()).add(addr)
         # Adressen pro Universe zu zusammenhaengenden Spans zusammenfassen
         spans: dict[int, list[tuple[int, int]]] = {}
         for univ, aset in addrs.items():
@@ -651,6 +670,8 @@ class AppState:
         self._default_frame = {u: bytes(b) for u, b in defaults.items()}
         self._commit_spans = spans
         self._patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        self._laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
+        self._laser_fids = frozenset(laser_fids)
         self._engine_extra_prev = {}
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
@@ -815,6 +836,18 @@ class AppState:
 
     # ── Programmer ────────────────────────────────────────────────────────────
 
+    def set_laser_estop(self, active: bool):
+        """UXT-12: DMX-Muster-Laser (L2600 & Co.) bei NOT-AUS hart dunkel halten.
+
+        ``estop_all`` verriegelt nur den Netzwerk-Streamer (Ether Dream/IDN);
+        Fixtures, die über normale DMX-Kanäle ein Muster ausgeben, erreicht das
+        nicht. Ist dieser Latch aktiv, zwingt der Renderer alle Laser-Kanäle als
+        oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus). Der Latch wird
+        bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
+        (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
+        stehen (dunkel = sicher)."""
+        self.laser_estop_active = bool(active)
+
     def set_programmer_value(self, fid: int, attribute: str, value: int,
                              undoable: bool = False, head: int = 0):
         # Mehrkopf (X-6): head>0 adressiert das N-te Vorkommen eines Attributs
@@ -828,6 +861,11 @@ class AppState:
             self.programmer[fid][key] = max(0, min(255, value))
             new_val = self.programmer[fid][key]
         self._flush_programmer_to_dmx(fid)
+        # UXT-12: bewusstes Setzen eines Laser-Werts (Muster-Abruf/Regler) hebt
+        # den Laser-NOT-AUS auf („wieder an"). Billiger Guard: nur wenn verriegelt.
+        if (getattr(self, "laser_estop_active", False)
+                and int(fid) in getattr(self, "_laser_fids", frozenset())):
+            self.laser_estop_active = False
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
@@ -1586,6 +1624,20 @@ class AppState:
                 for ch, val in chans.items():
                     if 1 <= ch <= 512:
                         su.set_channel(ch, max(0, min(255, int(val))))
+
+        # 4d. UXT-12: Laser-NOT-AUS — DMX-Muster-Laser (L2600 & Co.) hart dunkel.
+        #     OBERSTE Ebene (nach ALLEN Merges, unmittelbar vor dem Commit): alle
+        #     Laser-Kanäle auf 0 zwingen, unabhängig von Programmer/Effekten. Der
+        #     Netzwerk-Streamer wird separat über estop_all/armed verriegelt; ein
+        #     L2600 gibt über DMX aus und würde sonst nach dem Not-Aus weiterlaufen.
+        #     (Annahme: Betriebsart/Shutter 0 = Laser aus; gilt für den L2600.)
+        if getattr(self, "laser_estop_active", False):
+            for univ, laser_addrs in getattr(self, "_laser_estop_addrs", {}).items():
+                su = scratch.get(univ)
+                if su is None:
+                    continue
+                for addr in laser_addrs:
+                    su.set_channel(addr, 0)
 
         # 5. Atomarer Commit der gepatchten Spans ins Live-Universe.
         for univ, live in live_universes:
