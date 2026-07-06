@@ -1,6 +1,10 @@
 // VIZ-13 Schritt 3a-4: Fixture-Registry + DMX-Apply
 // (ehem. stage_scene.html:1013 rebuildFixtureMeshList, 1708-1741 Beam-Helper,
 // 1742-2004 addFixture/removeFixture/updateFixture). Reines Verschieben.
+// VIZ-13 3c Teil 2: updateFixture ist seither nur noch die dmxBatch-Fassade
+// (Signatur unveraendert, siehe bridge.js + test_viz12_bridge_batch.py) und
+// dispatcht per registry.js#updateFixtureDmx auf die pro-Typ-Handler in
+// builders.js — belegt durch tests/test_viz13c_updatedmx_registry.py.
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
