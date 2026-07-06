@@ -37,6 +37,9 @@ import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interac
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
 import { removeFixture as _removeFixtureForTouch } from './fixtures/fixtures.js';
+import {
+  startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
+} from './scene/render_loop.js';
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -53,45 +56,46 @@ wireStageObjectsLateBindings({ getBridge, updateOutlines, dockHighlight });
 wirePresetsLateBindings({ getBridge });
 
 // ============================================================================
-// Render loop (ehem. stage_scene.html:3515-3549)
+// Render loop (3c-2: On-Demand — Loop-Mechanik lebt in scene/render_loop.js)
 // ============================================================================
-// Dedup-Set fuer Frame-Fehler: verhindert 60x/s-Spam im DevTools-Log, wenn
-// ein einzelner Frame wiederholt am selben Fehler scheitert.
-const _loggedAnimateErrors = new Set();
-function animate() {
-  // rAF-Aufruf steht bewusst VOR dem try/catch: die Ketten darf auch bei
-  // einem Fehler im Frame-Body niemals abreissen.
-  requestAnimationFrame(animate);
-  try {
-    // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
-    if (view.selectedStageId && stageObjects[view.selectedStageId]) {
-      const so = stageObjects[view.selectedStageId];
-      const t = Date.now() * 0.005;
-      const pulse = 0.5 + 0.5 * Math.sin(t);
-      applyStageEmissive(so.mesh, pulse * 0.7, pulse * 0.45, 0.0);
-      // Resize-Handles pulsen ebenfalls (Skala leicht moduliert)
-      const handleScale = 1.0 + 0.15 * Math.sin(t * 1.4);
-      for (const h of resizeHandles) {
-        h.scale.set(handleScale, handleScale, handleScale);
-      }
-      if (so._helper) so._helper.update();
+// perFrameUpdate laeuft bei JEDEM rAF-Tick, auch wenn NICHT gerendert wird:
+// (a) der Selektions-Puls mutiert Emissive/Handle-Skala zeitbasiert (die
+//     zugehoerige Live-Animation-Probe unten haelt den Loop solange am
+//     Rendern, wie ein Stage-Element selektiert ist),
+// (b) attachGizmoToSelection() MUSS vor jedem Render die Gizmo-Transform
+//     aktuell halten (folgt dem Auswahl-Schwerpunkt live, auch im Drag),
+// (c) fpsTick() misst die Frame-Zeiten (No-Op solange Overlay aus).
+function perFrameUpdate() {
+  // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
+  if (view.selectedStageId && stageObjects[view.selectedStageId]) {
+    const so = stageObjects[view.selectedStageId];
+    const t = Date.now() * 0.005;
+    const pulse = 0.5 + 0.5 * Math.sin(t);
+    applyStageEmissive(so.mesh, pulse * 0.7, pulse * 0.45, 0.0);
+    // Resize-Handles pulsen ebenfalls (Skala leicht moduliert)
+    const handleScale = 1.0 + 0.15 * Math.sin(t * 1.4);
+    for (const h of resizeHandles) {
+      h.scale.set(handleScale, handleScale, handleScale);
     }
-    // VIZ-13 3b-G: Move/Rotate-Gizmo an die aktuelle Auswahl heften (Sichtbarkeit/
-    // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
-    // Drags, und haelt konstante Bildschirmgroesse).
-    attachGizmoToSelection();
-    fpsTick();
-    renderer.render(scene, view.activeCam);
-  } catch (err) {
-    const msg = String(err && err.message || err);
-    if (!_loggedAnimateErrors.has(msg)) {
-      _loggedAnimateErrors.add(msg);
-      console.error('animate() frame error (weitere gleiche Fehler werden unterdrueckt):', err);
-    }
-    // Frame ueberspringen - naechster rAF-Tick versucht es erneut.
+    if (so._helper) so._helper.update();
   }
+  // VIZ-13 3b-G: Move/Rotate-Gizmo an die aktuelle Auswahl heften (Sichtbarkeit/
+  // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
+  // Drags, und haelt konstante Bildschirmgroesse).
+  attachGizmoToSelection();
+  fpsTick();
 }
-animate();
+
+// Kontinuierliche Animation (Design (e) Punkt 7): solange ein Stage-Element
+// selektiert ist, pulsiert seine Emissive -> der Loop muss jeden Frame
+// rendern. Nach dem Deselektieren faellt der Loop automatisch in Idle zurueck.
+// (Wirkung erst mit dem Dirty-Gate in render_loop.js Schritt 2.)
+registerLiveAnimation(() => !!(view.selectedStageId && stageObjects[view.selectedStageId]));
+
+startRenderLoop({
+  render: () => renderer.render(scene, view.activeCam),
+  perFrame: perFrameUpdate,
+});
 
 // Initial Brightness anwenden (Default = dunkel fuer Beam-Wiedergabe)
 applyBrightness(settings.brightness);
@@ -127,6 +131,11 @@ window.__lightos = {
   setCameraPreset, fitAll, fitSelected, setFpsVisible,
   // VIZ-13 Schritt 3b-K-2: benannte Kameras (Speichern/Anwenden/Auflisten)
   saveNamedCamera, applyNamedCamera, getNamedCameras,
+  // VIZ-13 Schritt 3c-2: On-Demand-Render-API. requestRender = reiner
+  // Flag-Setter (Parity-Kernannahme); renderStats + __renderTick sind die
+  // deterministischen Test-Hooks (offscreen drosselt rAF + Post-Load-Signale,
+  // s. render_loop.js — Tests treiben die Ticks selbst per runJavaScript).
+  requestRender, renderStats, __renderTick: renderTick,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett
