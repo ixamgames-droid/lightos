@@ -225,6 +225,13 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   const color = new THREE.Color(r/255, g/255, b/255);
   const intNorm = intensity / 255;
   const skipBeam = (view.mode === '2D' && Object.keys(fixtures).length > 50);
+  // VIZ-13 3c Teil 2: gebuendelter DMX-Kontext fuer die updateDmx-Handler —
+  // traegt den byte-identischen dmxBatch-Vertrag (r,g,b,intensity,pan,tilt,
+  // heads) plus die abgeleiteten Werte, damit kein Handler sie neu rechnet.
+  // WICHTIG: `color` ist EINE geteilte THREE.Color-Instanz pro Update-Aufruf;
+  // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
+  // Instanz-Sharing-Semantik des Monolithen.
+  const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
 
   if (heads) f.lastHeads = heads;
 
@@ -331,6 +338,25 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     return;   // Mover-Bar fertig
   }
 
+  // Generischer Single-Head-Pfad (par, led_bar, dimmer, strobe, laser, smoke,
+  // hazer, moving_head, scanner, Fallback). Reihenfolge-Vertrag: Farbe ->
+  // Pan/Tilt -> Floor-Aiming -> Icon-Position (applyFloorAim liest die in
+  // applyPanTilt gesetzte Kopf-Rotation ueber getWorldQuaternion).
+  applyGenericColor(f, dmx);
+  applyPanTilt(f, dmx);
+  applyFloorAim(f, dmx);
+  syncIconPos(f);
+}
+
+// ── updateDmx-Helfer (VIZ-13 3c Teil 2) ─────────────────────────────────────
+// 1:1 aus dem ehemaligen generischen Schlussteil von updateFixture extrahiert
+// (reiner Refactor, keine Verhaltensaenderung).
+
+// Beam/Spot/FloorSpot/Linse/Lampe/Laser-Faecher + Icon-Tint. Alle Zweige sind
+// guard-basiert (nur vorhandene Refs werden angefasst) — dadurch bedient EIN
+// Helfer alle Single-Head-Typen identisch zum alten Durchlauf.
+function applyGenericColor(f, dmx) {
+  const { color, intNorm } = dmx;
   if (f.beam) {
     f.beam.material.color = color;
     f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
@@ -365,9 +391,14 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   }
   // Top-down icon color reflects active output color (only when bright)
   tintTopDownIcon(f.icon, color, intNorm);
+}
 
-  // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt)
+// Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt).
+// Der Typ-Guard bleibt bewusst 1:1 erhalten (Byte-Identitaet): fuer alle
+// anderen Typen ist der Aufruf ein No-Op wie im Monolith.
+function applyPanTilt(f, dmx) {
   if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
+    const { pan, tilt } = dmx;
     // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
     // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
     const panHalf = (f.panRange || 360) * Math.PI / 360;
@@ -382,9 +413,11 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
     f._lastPanRad = panRad;   // fuer konsistente Icon-Yaw in den Rotate-Pfaden
     if (f.icon) f.icon.rotation.y = panRad + f.group.rotation.y;
   }
+}
 
-  // Floor spot follow direction
-  if (!skipBeam && f.floorSpot && f.spotTarget) {
+// Floor spot follow direction
+function applyFloorAim(f, dmx) {
+  if (!dmx.skipBeam && f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
     // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
@@ -408,7 +441,10 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
       }
     }
   }
-  // Keep top-down icon position synced
+}
+
+// Keep top-down icon position synced
+function syncIconPos(f) {
   if (f.icon) {
     f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
   }
