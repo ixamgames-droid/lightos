@@ -203,6 +203,40 @@ def test_editor_popout_und_andocken():
     assert view._editor_scroll.widget() is view._editor_body, "Editor-Körper zurück angedockt"
 
 
+def test_editor_popout_kommt_nach_vorn():
+    """UXT-07: Das große Fenster wird nach dem Öffnen sichtbar UND per
+    raise_()/activateWindow() nach vorn geholt — sonst versteckt es sich hinter
+    dem (maximierten) Hauptfenster und der Button wirkt folgenlos."""
+    from PySide6.QtWidgets import QDialog
+    _app()
+    view = _make_view_with_matrix()
+
+    calls = {"raise": 0, "activate": 0}
+    orig_raise, orig_activate = QDialog.raise_, QDialog.activateWindow
+
+    def spy_raise(self):
+        calls["raise"] += 1
+        return orig_raise(self)
+
+    def spy_activate(self):
+        calls["activate"] += 1
+        return orig_activate(self)
+
+    QDialog.raise_ = spy_raise
+    QDialog.activateWindow = spy_activate
+    try:
+        view._toggle_editor_popout()
+    finally:
+        QDialog.raise_ = orig_raise
+        QDialog.activateWindow = orig_activate
+
+    assert view._editor_window is not None
+    assert view._editor_window.isVisible(), "Fenster muss sichtbar sein"
+    assert calls["raise"] >= 1, "raise_() muss das Fenster nach vorn holen"
+    assert calls["activate"] >= 1, "activateWindow() muss den Fokus setzen"
+    view._toggle_editor_popout()              # aufräumen
+
+
 def test_sequence_editor_bearbeitet_draft():
     """Sequence-Editor mutiert die Draft-Farbliste und markiert dirty."""
     _app()

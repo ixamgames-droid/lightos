@@ -261,6 +261,9 @@ class SequenceEditor(QWidget):
         self._editor_scroll.setVisible(False)
         self._editor_placeholder.setVisible(True)
         win.show()
+        # UXT-07: sonst hinter dem Hauptfenster -> nach vorn holen.
+        win.raise_()
+        win.activateWindow()
 
     def _redock_editor(self):
         """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""

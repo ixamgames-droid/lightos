@@ -1803,6 +1803,9 @@ class EfxView(QWidget):
         self._popout = EfxPopoutDialog(self, parent=self)
         self._popout.finished.connect(self._on_popout_closed)
         self._popout.show()
+        # UXT-07: beim ERSTEN Öffnen auch nach vorn holen (nicht nur beim Re-Fokus).
+        self._popout.raise_()
+        self._popout.activateWindow()
 
     def _on_popout_closed(self):
         self._popout = None
@@ -1838,6 +1841,9 @@ class EfxView(QWidget):
         self._editor_scroll.setVisible(False)
         self._editor_placeholder.setVisible(True)
         win.show()
+        # UXT-07: sonst hinter dem Hauptfenster -> nach vorn holen.
+        win.raise_()
+        win.activateWindow()
 
     def _redock_editor(self):
         """Holt den Editor-Koerper aus dem Fenster zurueck in die Inline-Ansicht."""
