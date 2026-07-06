@@ -140,3 +140,46 @@ def test_virtualconsole_popout_then_edit_no_crash():
     v._popout_canvas(); v._popout_window.close()
     v._popout_canvas(); v._popout_window.close()
     assert v._canvas_alive()
+
+
+def test_toolbar_add_cascades_and_selects():
+    """UXT-06: Zwei Toolbar-Klicks legen VERSETZTE Widgets an (nicht deckungs-
+    gleich in der Mitte) und wählen das jeweils neue aus."""
+    _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    selected = []
+    v._canvas.widget_selected.connect(lambda w: selected.append(w))
+    v._btn_edit.setChecked(True)
+
+    v._add_widget("VCButton")
+    v._add_widget("VCButton")
+    v._add_widget("VCButton")
+
+    widgets = v.to_dict()["widgets"]
+    assert len(widgets) == 3
+    positions = {(w["x"], w["y"]) for w in widgets}
+    assert len(positions) == 3, f"Widgets überlappen: {positions}"
+
+    # Jeder Add wählt das neue Widget aus (Inspector-Bindung).
+    assert selected and selected[-1] is not None
+
+    # Kaskade startet je Bearbeiten-Sitzung neu.
+    v._btn_edit.setChecked(False)
+    v._btn_edit.setChecked(True)
+    assert v._add_cascade == 0
+
+
+def test_toolbar_add_cascade_wraps_on_canvas():
+    """UXT-06: Die Kaskade wächst nicht endlos aus dem Canvas — nach `span`
+    Stufen fängt sie wieder vorn an, alle Positionen bleiben >= 0."""
+    _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    v._btn_edit.setChecked(True)
+    for _ in range(20):
+        v._add_widget("VCButton")
+    for w in v.to_dict()["widgets"]:
+        assert w["x"] >= 0 and w["y"] >= 0

@@ -83,6 +83,9 @@ class VirtualConsoleView(QWidget):
         self._pop_scroll = None
         self._apc_feedback = None
         self._inspector = None
+        # UXT-06: laufende Nummer für das Staffeln (Kaskade) neuer Toolbar-Widgets,
+        # damit ein zweiter Klick nicht deckungsgleich auf dem ersten landet.
+        self._add_cascade = 0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -508,6 +511,7 @@ class VirtualConsoleView(QWidget):
     def _toggle_edit(self, enabled: bool):
         self._edit_mode = enabled
         self._btn_edit.setText("Bearbeiten ✓" if enabled else "Bearbeiten")
+        self._add_cascade = 0      # UXT-06: Kaskade je Bearbeiten-Sitzung neu
         if not self._canvas_alive():
             return
         self._canvas.set_edit_mode(enabled)
@@ -686,8 +690,21 @@ class VirtualConsoleView(QWidget):
     def _add_widget(self, wtype: str):
         if not self._edit_mode or not self._canvas_alive():
             return
-        center = QPoint(self._canvas.width() // 2, self._canvas.height() // 2)
-        self._canvas._add_widget(wtype, center)
+        # UXT-06: Toolbar-Klicks platzierten JEDES neue Widget exakt in der Mitte
+        # → der zweite lag deckungsgleich auf dem ersten (wirkte wie „nichts
+        # passiert"). Jetzt staffeln wir sie diagonal (Kaskade) um die Mitte und
+        # wählen das neue Widget aus, damit der Inspector sofort darauf zeigt.
+        step = self._canvas.GRID * 3        # sichtbarer Versatz je Klick
+        span = 8                            # nach 8 Stufen wieder von vorn
+        i = self._add_cascade % span
+        base_x = self._canvas.width() // 2 - (span * step) // 2
+        base_y = self._canvas.height() // 2 - (span * step) // 2
+        pos = QPoint(max(0, base_x + i * step), max(0, base_y + i * step))
+        self._add_cascade += 1
+        w = self._canvas._add_widget(wtype, pos)
+        # Neues Widget auswählen → Inspector bindet, sichtbare Bestätigung.
+        if w is not None:
+            self._canvas._on_widget_selected(w)
 
     def _vc_undo(self):
         """Letzte VC-Bearbeitung rueckgaengig (Strg+Z / ↶-Knopf)."""
