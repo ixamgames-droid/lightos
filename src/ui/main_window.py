@@ -1398,7 +1398,8 @@ class MainWindow(QMainWindow):
 
     def _open_show(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Show öffnen", "", "LightOS Show (*.lshow);;Alle Dateien (*)"
+            self, "Show öffnen", self._default_show_dir(),
+            "LightOS Show (*.lshow);;Alle Dateien (*)"
         )
         if not path:
             return
@@ -1462,6 +1463,22 @@ class MainWindow(QMainWindow):
             "ist nicht automatisch (Profil-IDs unterscheiden sich)."
         )
 
+    def _default_show_dir(self) -> str:
+        """UXT-11: sinnvolles Start-Verzeichnis für Show-Dialoge — der Ordner der
+        aktuellen Show, sonst ein angelegter ``…/LightOS/shows``-Ordner (statt
+        dem Arbeitsverzeichnis/Repo-Root, wo Test-Shows bisher landeten)."""
+        if self._current_show_path:
+            d = os.path.dirname(self._current_show_path)
+            if d and os.path.isdir(d):
+                return d
+        base = os.path.join(
+            os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "shows")
+        try:
+            os.makedirs(base, exist_ok=True)
+        except Exception:
+            pass
+        return base
+
     def _save_show(self):
         if not self._current_show_path:
             self._save_show_as()
@@ -1470,7 +1487,8 @@ class MainWindow(QMainWindow):
 
     def _save_show_as(self):
         path, _ = QFileDialog.getSaveFileName(
-            self, "Show speichern", "", "LightOS Show (*.lshow)"
+            self, "Show speichern", self._default_show_dir(),
+            "LightOS Show (*.lshow)"
         )
         if path:
             if not path.endswith(".lshow"):

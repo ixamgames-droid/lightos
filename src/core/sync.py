@@ -251,9 +251,19 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                     # In-memory Cache auch updaten
                                     f.mode_name = fallback.name
                                     f.channel_count = fallback.channel_count
+                                    # UXT-08: Ist der alte Name nur eine Kurzform
+                                    # des neuen (z. B. „34-Kanal" ⊂ „34-Kanal
+                                    # (Professional DMX)"), ist das eine harmlose
+                                    # Umbenennung — nicht als „fehlt" alarmieren.
+                                    _renamed = bool(old) and old.strip().lower() in (
+                                        fallback.name or "").strip().lower()
                                     issues.append(ValidationIssue(
                                         'warn', location,
-                                        f"Mode '{old}' fehlt -> ersetzt durch '{fallback.name}'",
+                                        (f"Modus '{old}' zu '{fallback.name}' "
+                                         "aktualisiert (nur umbenannt)."
+                                         if _renamed else
+                                         f"Mode '{old}' fehlt -> ersetzt durch "
+                                         f"'{fallback.name}'"),
                                         auto_fixed=True,
                                     ))
                                 except Exception as e_fix:
@@ -262,9 +272,15 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                         f"Mode-Fix fehlgeschlagen: {e_fix}",
                                     ))
                             else:
+                                _renamed = bool(mode_name) and mode_name.strip().lower() in (
+                                    fallback.name or "").strip().lower()
                                 issues.append(ValidationIssue(
                                     'warn', location,
-                                    f"Mode '{mode_name}' fehlt - wäre ersetzt durch '{fallback.name}'",
+                                    (f"Modus '{mode_name}' wird als "
+                                     f"'{fallback.name}' geführt (umbenannt)."
+                                     if _renamed else
+                                     f"Mode '{mode_name}' fehlt - wäre ersetzt "
+                                     f"durch '{fallback.name}'"),
                                 ))
                         else:
                             issues.append(ValidationIssue(
