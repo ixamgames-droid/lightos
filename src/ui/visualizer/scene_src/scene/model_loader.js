@@ -1,6 +1,7 @@
 // VIZ-13 Schritt 3a-4: Async model loader (OBJ/DAE) + Cache
 // (ehem. stage_scene.html:356-426). Reines Verschieben.
 import * as THREE from '../three/three.js';
+import { requestRender } from './render_loop.js';  // VIZ-13 3c-2
 
 const modelCache = {};           // path -> THREE.Object3D (cloned per use)
 const modelLoadCallbacks = {};   // path -> [callbacks waiting]
@@ -33,6 +34,13 @@ export function loadModel(path, callback) {
     for (const cb of cbs) {
       try { cb(obj ? obj.clone(true) : null); } catch (e) { console.log('model cb err:', e); }
     }
+    // 3c-2: ZENTRALER Async-Nachlade-Frame — die Callbacks haengen frisch
+    // geladene Modelle in die Szene (builders.js: par/strobe/smoke/hazer.dae;
+    // stage_objects.js: Truss-OBJ). Sie kommen NACH dem Frame des ausloesenden
+    // addFixture/createStageObject an; ohne requestRender bliebe bis zum
+    // naechsten fremden Render der Platzhalter/das nackte Prozedural-Modell
+    // sichtbar.
+    requestRender();
   };
 
   const onError = (err) => {

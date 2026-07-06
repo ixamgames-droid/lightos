@@ -4,6 +4,7 @@ import { view, fixtures, stageObjects, settings } from '../state.js';
 import { presetObjects, floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho, perspectiveCam, orthoCam } from '../camera/cameras.js';
 import { applyStageObject2DStyle, updateResizeHandles } from './stage_objects.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 // 3c-1: Gesten-Hint unten rechts pro Modus — vorher stand DAUERHAFT der
 // 3D-Text da, auch im 2D-Plan (stale Footer-Hint, Reframe-Befund 3).
@@ -50,4 +51,8 @@ export function setViewMode(mode) {
   resizeOrtho();
   // Resize-Handles neu generieren (Groesse haengt vom Viewmode ab)
   updateResizeHandles();
+  // 3c-2: Modus-Wechsel schaltet Kamera + Sichtbarkeit ALLER Objekte um
+  // (redundant zu resizeOrtho — explizit fuer den Fall, dass sich die
+  // Aufruf-Kette oben aendert).
+  requestRender();
 }

@@ -2,6 +2,7 @@
 // Reines Verschieben - Funktionssignaturen/Bodies unveraendert.
 import * as THREE from '../three/three.js';
 import { settings } from '../state.js';
+import { requestRender } from './render_loop.js';  // VIZ-13 3c-2
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x080808);
@@ -33,4 +34,5 @@ window.addEventListener('resize', function() {
   // Monitor-Wechsel kann devicePixelRatio aendern (z.B. Fenster auf anderen
   // Bildschirm mit anderer Skalierung verschoben) - hier mitziehen.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  requestRender();  // 3c-2 Dirty-Quelle 5 (Fenster-Resize)
 });

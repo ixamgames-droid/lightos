@@ -80,6 +80,10 @@ export function setEditTool(tool) {
       : view.editTool === 'aim' ? 'ZIELEN – Gerät antippen = auswählen · Boden/Wand antippen → ausrichten (MH fahren Pan/Tilt)'
       : 'NACHFAHREN – Moving Heads auswählen, dann Boden/Wand antippen → fahren dort eine Form ab (Tool wechseln = Stopp)';
   }
+  // 3c-2: das Gizmo-Gate (attachGizmoToSelection, laeuft pro Frame) haengt am
+  // editTool — der Werkzeugwechsel laesst das Gizmo erscheinen/verschwinden
+  // und braucht dafuer einen Frame.
+  requestRender();
 }
 
 // ── Trace-Einstellungen (Form / Größe / Tempo / Speichern) ───────────────────

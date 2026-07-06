@@ -10,8 +10,10 @@
 //
 // Das Gizmo ist ACHSEN-ausgerichtet (Welt-Achsen, nicht objekt-lokal) — wie
 // grandMA3/Blender im World-Modus: vorhersehbare Bewegung. Sichtbarkeit/Position/
-// Skala werden pro Frame in app.js#animate ueber attachGizmoToSelection() gesetzt
-// (kein Wiring in tools.js noetig -> kein Import-Zyklus).
+// Skala werden pro rAF-Tick in app.js#perFrameUpdate ueber attachGizmoToSelection()
+// gesetzt (laeuft seit 3c-2 auch OHNE Render jeden Tick — das Gizmo ist damit
+// beim naechsten tatsaechlichen Render immer aktuell; kein Wiring in tools.js
+// noetig -> kein Import-Zyklus).
 //
 // Siehe docs/VIZ13_JS_NEUAUFBAU_DESIGN.md 3b-G.
 import * as THREE from '../three/three.js';

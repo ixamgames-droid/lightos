@@ -19,6 +19,7 @@ import { resetCameraView } from '../camera/cameras.js';
 import { setCameraPreset, setNamedCameras } from '../camera/presets.js';
 import { deg2rad, rad2deg } from '../scene/renderer.js';
 import { clearDockHighlight } from '../stage/docking.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 // ============================================================================
 // Python bridge actions used externally
@@ -52,6 +53,7 @@ export function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ) {
     f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     if (rotY != null) f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);  // Top-Down: Yaw + Pan
   }
+  requestRender();  // 3c-2: Transform aus dem Python-Properties-Panel
 }
 
 export function jsAlignSelected(mode) {
@@ -79,6 +81,7 @@ export function jsAlignSelected(mode) {
     fs.forEach(f => f.group.position.z = val);
   }
   pushTransformsToPython();
+  requestRender();  // 3c-2: Ausrichten veraendert Fixture-Positionen
 }
 
 export function jsDistributeSelected(axis) {
@@ -92,6 +95,7 @@ export function jsDistributeSelected(axis) {
   const step = (max - min) / (fs.length - 1);
   fs.forEach((f, i) => f.group.position[key] = min + step * i);
   pushTransformsToPython();
+  requestRender();  // 3c-2: Verteilen veraendert Fixture-Positionen
 }
 
 export function pushTransformsToPython() {
@@ -152,6 +156,7 @@ export function applySettings(s) {
     // showCones-Toggle), nicht erst beim naechsten DMX-Update.
     if (f.laserBeams) for (const bm of f.laserBeams) { if (bm.material) bm.visible = settings.showCones && (view.mode === '3D') && bm.material.opacity > 0.01; }
   }
+  requestRender();  // 3c-2 Dirty-Quelle 6 (Settings: Fog/Beam-Sichtbarkeiten)
 }
 
 // ============================================================================
@@ -224,6 +229,7 @@ export function tryChannel() {
           // -> Renderer-Pixelratio neu setzen, unabhaengig vom 'resize'-Event
           // (das feuert nicht garantiert bei jedem Monitorwechsel).
           renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, 2));
+          requestRender();  // 3c-2 Dirty-Quelle 5 (PixelRatio-Wechsel)
         });
         if (bridge.requestFixtures) bridge.requestFixtures();
       }

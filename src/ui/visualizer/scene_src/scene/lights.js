@@ -3,6 +3,7 @@
 import * as THREE from '../three/three.js';
 import { scene } from './renderer.js';
 import { settings, view } from '../state.js';
+import { requestRender } from './render_loop.js';  // VIZ-13 3c-2
 
 // Grundhelligkeit angehoben (VIZ-10): vorher wirkten Fixtures/Raum bei
 // Default-Brightness als "winzige Kloetzchen im Nichts". Werte hier sind die
@@ -37,4 +38,5 @@ export function applyBrightness(b) {
   editLight.intensity = Math.max(0, (b - 0.4) * 1.5);
   // Beam visibility: in bright mode beams become less visible naturally
   // so we keep them but they look more washed out (which is realistic)
+  requestRender();  // 3c-2 Dirty-Quelle 6 (Brightness: BG/Fog/Lichter)
 }
