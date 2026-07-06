@@ -155,6 +155,9 @@ class SceneEditor(QWidget):
         self._editor_scroll.setVisible(False)
         self._editor_placeholder.setVisible(True)
         win.show()
+        # UXT-07: sonst hinter dem Hauptfenster -> nach vorn holen.
+        win.raise_()
+        win.activateWindow()
 
     def _redock_editor(self):
         if self._editor_window is None:
