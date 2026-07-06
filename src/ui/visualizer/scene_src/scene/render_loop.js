@@ -76,12 +76,16 @@ export function renderStats() {
 export function renderTick() {
   try {
     if (_perFrameFn) _perFrameFn();
-    // Schritt 1 (3c-2): Render noch BEDINGUNGSLOS wie vor dem Umbau — das
-    // Dirty-Gate wird in Schritt 2 scharf geschaltet. Zaehler-/Flag-
-    // Bookkeeping laeuft schon identisch zur Gate-Version mit.
-    _renderCount += 1;
-    _dirty = false;
-    if (_renderFn) _renderFn();
+    // Dirty-Gate (Design (e)): rendern NUR, wenn seit dem letzten Render
+    // requestRender() gerufen wurde ODER eine kontinuierliche Animation
+    // laeuft (Puls/FPS-Overlay — deren Probes halten das Gate offen, das
+    // Flag wird dadurch effektiv nicht geloescht). Die rAF-Kette selbst
+    // laeuft ungegated weiter (VIZ-10-Vertrag).
+    if (_dirty || hasLiveAnimation()) {
+      _renderCount += 1;
+      _dirty = false;
+      if (_renderFn) _renderFn();
+    }
   } catch (err) {
     const msg = String(err && err.message || err);
     if (!_loggedTickErrors.has(msg)) {

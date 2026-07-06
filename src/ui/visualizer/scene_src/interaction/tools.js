@@ -8,6 +8,7 @@ import { applyBrightness } from '../scene/lights.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import { updateResizeHandles } from '../stage/stage_objects.js';
 import { wireFixturesLateBindings } from '../fixtures/fixtures.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 let _userBrightnessOverride = null;  // wenn Slider manuell gesetzt
 
@@ -289,6 +290,9 @@ export function updateOutlines() {
     try { bridge.stageSelectionChanged(view.selectedStageId || ''); } catch (e) {}
   }
   updateFABs();
+  // 3c-2 Dirty-Quelle 3 (Selektion/Outlines): Ring-Opacities, Sel-Border,
+  // BoxHelper, Emissive-Reset — alle Selektionswechsel laufen hier durch.
+  requestRender();
 }
 
 // ============================================================================

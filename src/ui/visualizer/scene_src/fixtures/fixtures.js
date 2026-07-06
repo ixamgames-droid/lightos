@@ -15,6 +15,10 @@ import { buildFixtureModel, updateFixtureDmx } from './registry.js';
 import { buildTopDownIcon } from './topdown_icons.js';
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
+// VIZ-13 3c-2: On-Demand-Rendering — jede DMX-/Bestands-Aenderung an
+// Fixtures muss einen Frame anfordern (render_loop.js ist import-frei,
+// kein Zyklus-Risiko).
+import { requestRender } from '../scene/render_loop.js';
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
@@ -224,6 +228,7 @@ export function removeFixture(fid) {
   if (idx >= 0) view.selectedFids.splice(idx, 1);
   rebuildFixtureMeshList();
   updateOutlinesRef.get()();
+  requestRender();  // 3c-2: Objekt aus der Szene entfernt
 }
 
 export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
@@ -250,6 +255,11 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   // PAR-Eintrag zurueck. Belegt durch tests/test_viz13c_updatedmx_registry.py
   // (Golden-Parity gegen den eingefrorenen Monolith-Zustand).
   updateFixtureDmx(f, dmx);
+  // 3c-2 Dirty-Quelle 1 (dmxBatch): der Batch-Handler in bridge.js ruft pro
+  // Element dieses updateFixture — der Aufruf HIER deckt damit den ganzen
+  // Batch UND den addFixture-Initialaufruf ab (reiner Flag-Setter, N-fach
+  // billig; rAF coalesced auf einen Frame).
+  requestRender();
 }
 
 // ── Spaet-Bindung (zirkulaere Abhaengigkeit: removeFixture() ruft im
