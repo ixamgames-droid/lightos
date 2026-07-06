@@ -4,12 +4,10 @@
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
-import { buildFixtureModel } from './registry.js';
-// VIZ-13 3c Teil 2: die pro-Typ-updateDmx-Handler leben bei ihren Buildern
-// (tintTopDownIcon wird seither dort konsumiert, nicht mehr hier).
-import {
-  updateSpiderDmx, updateParBarDmx, updateMoverBarDmx, updateMovingHeadDmx,
-} from './builders.js';
+// VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
+// Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
+// auch tintTopDownIcon konsumiert wird — nicht mehr hier.
+import { buildFixtureModel, updateFixtureDmx } from './registry.js';
 import { buildTopDownIcon } from './topdown_icons.js';
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
@@ -240,19 +238,14 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
 
   if (heads) f.lastHeads = heads;
 
-  // Multihead-Verzweigung — exakt die alte if-Kette. Ab Schritt 5 uebernimmt
-  // der Registry-Dispatch (registry[f.type].updateDmx); die Handler tragen
-  // die Guards dann selbst (mit Durchfall auf den generischen Pfad).
-  if (f.isSpider && f.bars) return updateSpiderDmx(f, dmx);
-  if (f.isParBar && f.parHeads) return updateParBarDmx(f, dmx);
-  if (f.isMoverBar && f.moverHeads) return updateMoverBarDmx(f, dmx);
-
-  // Rest-Pfad des Monolithen fuer ALLE Single-Head-Typen: Farbe -> Pan/Tilt
-  // (intern typ-geguardet, fuer par & Co. ein No-Op wie zuvor) -> Floor-
-  // Aiming -> Icon-Position. Das ist wortwoertlich updateMovingHeadDmx;
-  // updateGenericDmx (ohne PanTilt-Aufruf) uebernimmt ab Schritt 5 die
-  // Nicht-Beweglichen — verhaltensgleich, ein gesparter No-Op-Aufruf.
-  updateMovingHeadDmx(f, dmx);
+  // Dispatch ueber die FixtureType-Registry (Design (e)) — ersetzt die alte
+  // if-Kette (Spider/ParBar/MoverBar -> Rest) verhaltens-identisch:
+  // f.type ist das Render-Modell aus addFixture (data.model || data.type),
+  // die Multihead-Handler tragen die alten Flag-Guards selbst (Durchfall auf
+  // den generischen Pfad), unbekannte Typen fallen wie beim build auf den
+  // PAR-Eintrag zurueck. Belegt durch tests/test_viz13c_updatedmx_registry.py
+  // (Golden-Parity gegen den eingefrorenen Monolith-Zustand).
+  updateFixtureDmx(f, dmx);
 }
 
 // ── Spaet-Bindung (zirkulaere Abhaengigkeit: removeFixture() ruft im
