@@ -129,6 +129,18 @@ class ArmedChangeSignalTest(unittest.TestCase):
         m.set_armed(False)
         self.assertEqual(seen[-1], False)
 
+    def test_estop_all_emits_laser_estop_event(self):
+        """UXT-09: estop_all() feuert den globalen LASER_ESTOP-Event, damit das
+        Hauptfenster unmissverständlich bestätigen kann (egal welche Quelle)."""
+        from src.core.laser.laser_output import LaserOutputManager
+        from src.core.sync import get_sync, SyncEvent
+
+        fired = []
+        get_sync().subscribe(SyncEvent.LASER_ESTOP, lambda *a: fired.append(a))
+        m = LaserOutputManager(_FakeState())
+        m.estop_all()
+        self.assertEqual(len(fired), 1, "genau ein NOT-AUS-Signal")
+
 
 class LaserViewArmSyncTest(unittest.TestCase):
     @classmethod
