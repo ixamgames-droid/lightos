@@ -345,7 +345,77 @@ class VisualizerBridge(QObject):
         self._stage_reload_token = 0
         self._last_stage_echo_token = None
         self._reload_guard_timer = None
+        # VIZ-13 3c-2-Fix (2026-07-07, LIVE per CDP VERIFIZIERT): QtWebEngine
+        # stellt Python->JS-SIGNALE (Push: editModeChanged/cameraReset/dmxBatch/
+        # applyFixtureTransform/...) an die EINGEBETTETE Post-Load-Seite NICHT zu
+        # — auch bei doc.hasFocus()==true nicht; nur der initiale QWebChannel-
+        # Connect-Burst liefert (so laden die Fixtures beim Anzeigen). SLOT-
+        # RUECKGABEN (Antworten auf JS-initiierte Calls) kommen dagegen
+        # zuverlaessig an (Callback feuerte post-init). Darum PULL statt PUSH:
+        # die JS-Seite (bridge.js) pollt periodisch pollControl(); Python gibt den
+        # aktuellen Steuer-Zustand + aufgelaufene Einmal-Events als RUECKGABEWERT
+        # zurueck, JS wendet sie an. Die bestehenden Direkt-Emits/Signale bleiben
+        # unveraendert (Tests/Fokus-Fall) — pollControl ist eine additive
+        # Zustell-Schicht. Ohne diesen Pull war 3D-Bearbeiten/Kamera/DMX tot.
+        self._poll_state = {"editMode": "view", "viewMode": "3D",
+                            "settings": None, "brightness": None}
+        self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
+        self._poll_dmx = None       # letzter dmxBatch-JSON (coalesced); None=nichts Neues
+        # JEDES Python->JS-Signal automatisch in den Poll spiegeln — so muss KEIN
+        # Emit-Aufrufer (Fenster/Live-View/Service) geaendert werden. Der Emit
+        # selbst bleibt (feuert, kommt an der Post-Load-Seite nur nicht an); der
+        # hier verbundene Slot reiht Zustand/Event ein, das pollControl() liefert.
+        self.editModeChanged.connect(lambda m: self._poll_set("editMode", m))
+        self.viewModeChanged.connect(lambda m: self._poll_set("viewMode", m))
+        self.settingsChanged.connect(lambda s: self._poll_set("settings", s))
+        self.stageLoaded.connect(lambda j: self._poll_set("stage", j))
+        self.dmxBatch.connect(self._poll_set_dmx)
+        self.cameraReset.connect(lambda: self._poll_event({"t": "cameraReset"}))
+        self.brightnessSignal.connect(lambda v: self._poll_event({"t": "brightness", "v": v}))
+        self.applyFixtureTransform.connect(lambda j: self._poll_event({"t": "transform", "j": j}))
+        self.addStageObject.connect(lambda t: self._poll_event({"t": "addStage", "stype": t}))
+        self.removeStageObject.connect(lambda i: self._poll_event({"t": "removeStage", "id": i}))
+        self.selectStageObject.connect(lambda i: self._poll_event({"t": "selectStage", "id": i}))
+        self.updateStageObject.connect(lambda j: self._poll_event({"t": "updateStage", "j": j}))
+        self.alignSelected.connect(lambda m: self._poll_event({"t": "align", "mode": m}))
+        self.distributeSelected.connect(lambda a: self._poll_event({"t": "distribute", "axis": a}))
+        self.resizeModeSignal.connect(lambda b: self._poll_event({"t": "resizeMode", "on": bool(b)}))
+        self.cameraPreset.connect(lambda n: self._poll_event({"t": "cameraPreset", "name": n}))
+        self.namedCamerasChanged.connect(lambda j: self._poll_event({"t": "namedCameras", "j": j}))
+        self.brightnessAutoSignal.connect(lambda: self._poll_event({"t": "brightnessAuto"}))
         self._activate()
+
+    # ── Pull-Zustellung: JS pollt pollControl() (s. __init__-Kommentar) ──────
+    def _poll_set(self, key, value):
+        """Steuer-Zustand fuer den naechsten Poll vormerken."""
+        self._poll_state[key] = value
+
+    def _poll_event(self, ev: dict):
+        """Einmal-Event fuer den naechsten Poll einreihen (Kamera-Reset/Transform/
+        Stage-Add ...). JS wendet es an und quittiert per Leerung."""
+        self._poll_events.append(ev)
+
+    def _poll_set_dmx(self, batch_json: str):
+        """Letzten DMX-Batch fuer den Poll vormerken (coalesced)."""
+        self._poll_dmx = batch_json
+
+    @Slot(result=str)
+    @_bridge_slot_guard
+    def pollControl(self) -> str:
+        """JS-Poll (Heartbeat MIT Callback): gibt den Steuer-Zustand + Events +
+        letzten DMX-Batch als RUECKGABEWERT zurueck. Der einzige zuverlaessige
+        Python->JS-Weg an die Post-Load-Seite (s. __init__-Kommentar)."""
+        out = dict(self._poll_state)
+        if self._poll_events:
+            out["events"] = self._poll_events
+            self._poll_events = []
+        if self._poll_dmx is not None:
+            out["dmx"] = self._poll_dmx
+            self._poll_dmx = None
+        try:
+            return json.dumps(out)
+        except Exception:
+            return "{}"
 
     # ── Lebenszyklus: State-Subscription ────────────────────────────────────
     # Die Bridge abonniert den AppState (``_on_state`` prunt bei ``patch_changed``
@@ -957,6 +1027,8 @@ class VisualizerBridge(QObject):
 
     def push_settings(self, s: dict):
         try:
+            # Emit -> auto-connect spiegelt in den Poll (s. __init__), Zustellung
+            # dann via pollControl(); Direkt-Emit bleibt fuer Fokus-Fall/Tests.
             self.settingsChanged.emit(json.dumps(s))
         except Exception as e:
             print(f"[Visualizer] push_settings error: {e}")
