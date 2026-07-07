@@ -74,6 +74,28 @@ def _add_recent_file(path: str) -> list[str]:
     return recents
 
 
+def _recovery_prompt_suppressed() -> bool:
+    """QA-23: Autosave-Recovery-Prompt in headless-/Test-Umgebungen unterdruecken.
+
+    ``_check_autosave_recovery`` oeffnet ein MODALES ``QMessageBox.question``.
+    Unter ``QT_QPA_PLATFORM=offscreen`` (pytest, Tools, CI) beantwortet das
+    niemand -> der MainWindow-Bau haengt bis in den pytest-Timeout, SOBALD auf
+    dem Rechner eine echte ``%APPDATA%/LightOS/auto_save.lshow`` neuer als alle
+    Recents liegt (zustandsabhaengiger Baseline-Bruch; Regressionstest:
+    ``tests/test_autosave_recovery_headless.py``).
+
+    Zwei Netze (analog ``LIGHTOS_NO_OUTPUT_THREAD``):
+    - ``LIGHTOS_NO_RECOVERY_PROMPT`` — tests/conftest.py setzt es explizit;
+    - ``QT_QPA_PLATFORM`` beginnt mit ``offscreen`` — faengt Tools/Skripte
+      ohne conftest ab (deckt auch Varianten wie ``offscreen:...``).
+
+    In der echten App ist beides nie aktiv -> Live-Recovery unveraendert.
+    """
+    if os.environ.get("LIGHTOS_NO_RECOVERY_PROMPT"):
+        return True
+    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+
+
 def _colored_icon(color: str, size: int = 16) -> QIcon:
     """Kleines farbiges Quadrat als Fallback-Icon."""
     px = QPixmap(size, size)
@@ -251,8 +273,11 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(1000, self._refresh_validation_banner)
         # Initial: Fremdwert-Badges (ISO-01) einmal aktualisieren
         QTimer.singleShot(800, self._refresh_foreign_badges)
-        # Beim Start: pruefen ob Wiederherstellung noetig
-        QTimer.singleShot(500, self._check_autosave_recovery)
+        # Beim Start: pruefen ob Wiederherstellung noetig. QA-23: headless/
+        # Tests gar nicht erst schedulen (kein haengender Timer im Teardown);
+        # das autoritative Netz ist der Guard in _check_autosave_recovery.
+        if not _recovery_prompt_suppressed():
+            QTimer.singleShot(500, self._check_autosave_recovery)
         # MIDI-Eingaenge automatisch verbinden (APC mini etc.) — beim Start und
         # periodisch, damit auch nachtraeglich eingestecktes Geraet erkannt wird.
         QTimer.singleShot(800, self._auto_connect_midi)
@@ -1935,6 +1960,10 @@ class MainWindow(QMainWindow):
 
     def _check_autosave_recovery(self):
         """Wenn auto_save existiert und neuer als andere Show ist - Recovery anbieten."""
+        # QA-23: headless/Tests -> NIE ein modales Prompt; VOR jedem Datei-
+        # zugriff returnen, damit die echte auto_save.lshow unangetastet bleibt.
+        if _recovery_prompt_suppressed():
+            return
         try:
             auto = self._autosave_path()
             if not os.path.exists(auto):
