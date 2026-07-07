@@ -128,6 +128,13 @@ _Zwei Computer-Use-Agenten bauten je eine komplette Show über die echte GUI: **
 | UXT-11b | P3 | ✅ done (dieser PR) | **Show-Dialoge starten in sinnvollem Ordner** | `main_window._default_show_dir()`: Speichern/Öffnen starten im Ordner der aktuellen Show, sonst in einem angelegten `…/LightOS/shows` — statt im Arbeitsverzeichnis/Repo-Root (wo Test-Shows neben `main.py` landeten). Test in `test_uxt_kleinvieh.py`. |
 | UXT-11a | P3 | ✅ done (dieser PR) | **Zahlenfelder: selectAll bei Fokus** | NEU `src/ui/widgets/select_all_spinbox.py` (`SelectAllSpinBox`): markiert bei Fokus den ganzen Inhalt (verzögertes selectAll, kein GC-Pin), sodass das erste Eintippen den Wert ersetzt statt anhängt. Gezielt umgestellt: Patch-Kopierdialog (Anzahl/Offset), Matrix (Spalten/Reihen). Wiederverwendbar für weitere Zahlenfelder. Tests `test_select_all_spinbox.py`. |
 
+### 🧱 Aus Live-Show-Bau 2026-07-07 (Patch → Fixture-Gruppen, Grid-Editor)
+_David baute live eine Show (neue Show, 13 Fixtures, PARs/MovingHeads/Spiders-Gruppen im Grid-Editor) und stieß auf zwei reproduzierbare UX-Fallen, die Zeit kosteten. Datei: `src/ui/views/fixture_group_view.py` (Tab „Fixture-Gruppen")._
+
+| ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
+|----|------|--------|-------|------------------------------------------|
+| PATCH-GRP-01 | **P1** | ✅ done (dieser PR) | **Gruppen-Auswahl bleibt stabil + Drag-Drop rastet ein (kein stiller Overwrite)** | `_reload_group_list` sprang bei jedem Neuaufbau auf `groups[0]` (alphabetisch erste) → nach „+ Neu"/„Speichern" (via `GROUP_CHANGED`) traf die Auswahl unbemerkt die falsche Gruppe (Spiders→MovingHeads überschrieben). Fix: Auswahl per ID erhalten (`select_gid`), „+ Neu" selektiert die neue Gruppe. Externer Drop: `place_fixture`/`_nearest_free_cell` weichen belegten Zellen auf die nächste freie aus (kein stilles Überschreiben), Rand geklemmt, grünes Live-Ziel-Highlight (`resolve_drop_cell`). Plus Shortcut „Alle → Raster" (`_add_all_fixtures`). Tests `tests/test_fixture_group_grid_ux.py` (16). |
+
 ### 👁️ Aus UI-Visual-Audit 2026-07-02 (headless MainWindow-Renderpass + 2-Linsen-Panel)
 _Autonome Runde (Davids Auftrag: Optik + Bedienbarkeit). Methode + alle Belege: [`docs/UI_VISUAL_AUDIT_2026_07_02.md`](docs/UI_VISUAL_AUDIT_2026_07_02.md). Alle P1/P2-Befunde am Screenshot verifiziert; interaktiver GUI-Nachpass (Computer Use) stand nicht zur Verfügung (Freigabe-Dialog 2× Timeout) und bleibt offen. **UI-15..18 + UI-23 als Quick-Win-Polish-Runde erledigt** (`tests/test_ui_polish_audit.py`, PR folgt)._
 

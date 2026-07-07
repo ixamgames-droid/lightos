@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-07 — Patch → Fixture-Gruppen (Grid-Editor): Auswahl bleibt stabil, Drop rastet ein (PATCH-GRP-01)
+
+#### Geaendert / Fixes
+
+- **Gewählte Gruppe springt nicht mehr zurück:** `_reload_group_list` setzte die aktive Gruppe bei jedem Neuaufbau hart auf die alphabetisch **erste** (`groups[0]`). Da jedes „Speichern" über `GROUP_CHANGED` genau dort landet und `+ Neu` ebenfalls neu lud, wechselte die Auswahl unbemerkt (z. B. von „Spiders" zurück auf „MovingHeads") — folgende Drags/Speichern trafen dann die **falsche** Gruppe und überschrieben sie. Fix: die gewählte Gruppe wird per **ID** erhalten (`select_gid`), `+ Neu` selektiert gezielt die **frisch angelegte** Gruppe. Damit bleibt die Auswahl über „+ Neu"/Drag/„Speichern" hinweg stabil.
+- **Drag-Drop aufs Raster rastet ein statt still zu überschreiben:** ein externer Drop landet jetzt in einer **freien** Zelle — die Zielzelle unter dem Cursor, oder bei Belegung die per Distanz **nächste freie** (`place_fixture`/`_nearest_free_cell`), statt die vorhandene Belegung lautlos zu ersetzen. Randnahe Drops werden auf die Randzelle **geklemmt** (verpuffen nicht mehr). Ein grünes Live-**Ziel-Highlight** (`resolve_drop_cell`, identisch für Vorschau und echten Drop) zeigt beim Ziehen exakt, wohin es einrastet. Ein einzelner fehlender PAR lässt sich so ohne Überschreiben nachtragen.
+- **Neuer Shortcut „Alle → Raster":** übernimmt alle gepatchten Fixtures in Patch-Reihenfolge ins Raster (freie Zellen zuerst, Reihen wachsen bei Bedarf; bereits platzierte bleiben) — „alle auswählen → in Gruppe übernehmen" mit einem Klick (danach „Speichern").
+- Datei: `src/ui/views/fixture_group_view.py`; Test NEU `tests/test_fixture_group_grid_ux.py` (16 Tests: Zielfindung/Nearest-Free/Clamp/Full-Grid, Auswahl-Stabilität inkl. End-to-End-Save, „Alle → Raster").
+
 ### 2026-07-07 — Tests: Autosave-Recovery-Dialog blockte headless nicht mehr (QA-23)
 
 #### Geaendert / Fixes
