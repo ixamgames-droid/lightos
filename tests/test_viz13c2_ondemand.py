@@ -277,6 +277,17 @@ class OnDemandRenderingTest(unittest.TestCase):
         self.assertEqual(self._stats()["count"], s0["count"] + 1,
                          "Folge-Tick hat ohne neues Dirty gerendert")
 
+    # ── 4b) Brightness (Quelle 6, lights.js) -> genau ein Render ─────────────
+    def test_brightness_triggers_render(self):
+        self._load_and_wait()
+        s0 = self._settle()
+        self._eval("window.__lightos.applyBrightness(0.5); true")
+        self._tick()
+        s1 = self._stats()
+        self.assertEqual(s1["count"], s0["count"] + 1,
+                         "applyBrightness ergab nicht genau EINEN Render")
+        self.assertFalse(s1["dirty"])
+
     # ── 5) Stage-Selektion (Puls) haelt den Loop live, Deselektion -> Idle ────
     def test_stage_selection_pulse_keeps_rendering(self):
         self._load_and_wait()
@@ -316,6 +327,84 @@ class OnDemandRenderingTest(unittest.TestCase):
             self._tick()
         self.assertEqual(self._stats()["count"], s2["count"],
                          "Loop rendert nach Deselektion weiter (kein Idle)")
+
+    # ── Regressions-Netz (3c-2-Nachverdrahtung): DISKRETE Dirty-Quellen, die
+    #    der Ur-Test oben NICHT abdeckte und die beim halb verdrahteten Gate
+    #    einfroren (Properties-Panel-Transform, Settings, Brightness, Edit-Mode,
+    #    Stage-Update, direkter Pan-Drag). Jeder Trigger MUSS das Gate oeffnen —
+    #    sonst friert genau diese Interaktion im echten Fenster ein
+    #    ('kann nichts bewegen/veraendern').
+    def _assert_trigger_renders(self, trigger_fn, label):
+        """Nach settle(): trigger_fn (Signal-Emit ODER JS-Aktion) MUSS einen
+        Render anfordern. Robust gegen parallelen rAF-Tick: dirty ODER bereits
+        erfolgter count-Anstieg zaehlt; dann Tick treiben und count-Anstieg
+        verlangen."""
+        s0 = self._settle()
+        cond = ("(function(){var s=window.__lightos.renderStats();"
+                "return s.dirty || s.count > %d;})()" % s0["count"])
+        self._emit_until_true(trigger_fn, cond, timeout_s=8.0)
+        self._tick()
+        self.assertGreater(self._stats()["count"], s0["count"],
+                           f"{label}: kein Render nach Trigger (Gate blieb zu -> Freeze)")
+
+    # ── Properties-Panel-Transform (applyFixtureTransform) -> Render ──────────
+    def test_apply_fixture_transform_triggers_render(self):
+        self._load_and_wait()
+        self._add_test_fixtures()
+        payload = json.dumps({"fid": 11, "x": 2.0, "y": 3.0, "z": 1.0,
+                              "rotX": 0, "rotY": 30, "rotZ": 0})
+        self._assert_trigger_renders(
+            lambda: self._bridge_obj.applyFixtureTransform.emit(payload),
+            "applyFixtureTransform (Properties-Panel-Bewegung)")
+
+    # ── Settings (Beam/Fog-Sichtbarkeit) -> Render ───────────────────────────
+    def test_settings_change_triggers_render(self):
+        self._load_and_wait()
+        self._add_test_fixtures()
+        self._assert_trigger_renders(
+            lambda: self._bridge_obj.settingsChanged.emit(json.dumps({"showCones": False})),
+            "settingsChanged (showCones-Toggle)")
+
+    # ── Edit-Mode-Wechsel -> Render ──────────────────────────────────────────
+    def test_edit_mode_triggers_render(self):
+        self._load_and_wait()
+        self._assert_trigger_renders(
+            lambda: self._bridge_obj.editModeChanged.emit("edit"),
+            "editModeChanged")
+
+    # ── Stage-Objekt-Update (Resize aus Panel/updateStageObject) -> Render ───
+    def test_update_stage_object_triggers_render(self):
+        self._load_and_wait()
+        sid = self._eval("window.__lightos.addStageObject('platform')")
+        self.assertTrue(sid, "addStageObject('platform') lieferte keine ID")
+        payload = json.dumps({"id": sid, "size": {"x": 9, "y": 0.4, "z": 5}})
+        self._assert_trigger_renders(
+            lambda: self._bridge_obj.updateStageObject.emit(payload),
+            "updateStageObject (Groesse aus Panel)")
+
+    # ── 2D-Pan-Drag (direkte orthoCam-Mutation) -> Render ────────────────────
+    #    Regressions-Netz fuer den handlePointerMove-Sammelpunkt: der 2D-Pan
+    #    mutiert orthoCam.position DIREKT (ohne updateCamera/resizeOrtho) —
+    #    genau der Drag-Pfad, der beim halb verdrahteten Gate einfror. Getrieben
+    #    ueber synthetische DOM-Maus-Events (rein JS, offscreen-tauglich).
+    def test_2d_pan_drag_triggers_render(self):
+        self._load_and_wait()
+        self._emit_until_true(
+            lambda: self._bridge_obj.viewModeChanged.emit("2D"),
+            "(function(){return !!document.querySelector('canvas');})()")
+        s0 = self._settle()
+        self._eval("""(function(){
+            var el = document.querySelector('canvas');
+            var r = el.getBoundingClientRect();
+            var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            el.dispatchEvent(new MouseEvent('mousedown', {clientX: cx, clientY: cy, button: 0, bubbles: true}));
+            window.dispatchEvent(new MouseEvent('mousemove', {clientX: cx + 40, clientY: cy + 25, bubbles: true}));
+            return true;
+        })()""")
+        s1 = self._stats()
+        self.assertTrue(s1["dirty"] or s1["count"] > s0["count"],
+                        "2D-Pan-Drag hat keinen Render angefordert (Sammelpunkt fehlt -> Freeze)")
+        self._eval("window.dispatchEvent(new MouseEvent('mouseup', {button: 0, bubbles: true})); true")
 
 
 if __name__ == "__main__":

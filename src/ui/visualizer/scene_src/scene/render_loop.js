@@ -34,9 +34,40 @@ const _liveAnimProbes = [];
 const _loggedTickErrors = new Set();
 
 // ── Dirty-Flag-API ───────────────────────────────────────────────────────────
-// Von allen visuellen Mutationsquellen gerufen (dmxBatch, Kamera, Selektion/
-// Outlines, Stage-CRUD, Settings/Brightness, Resize, Drags — vollstaendige
-// Liste s. Design (e) "Dirty-Quellen" + Verdrahtungs-Kommentar in app.js).
+// Verdrahtungs-Karte (Design (e) "Dirty-Quellen", Stand 3c-2 Schritt 3):
+//   1. dmxBatch          -> fixtures.js#updateFixture (deckt Batch-Handler +
+//                           addFixture) und #removeFixture
+//   2. Kamera            -> cameras.js#updateCamera + #resizeOrtho (alle
+//                           Orbit/Zoom/Preset/Fit/Named-Pfade) + pointer.js#
+//                           handlePointerMove-Sammelpunkt (direkter 2D-Pan!)
+//   3. Selektion/Outline -> tools.js#updateOutlines (+ view-Setter-Netz)
+//   4. Stage-CRUD/Resize -> stage_objects.js (create/update/remove/Handles/
+//                           2D-Style/loadStageJson) + docking.js (Highlight/
+//                           moveDockedFixtures) + touch.js (fabRotate/'R')
+//   5. Resize/PixelRatio -> renderer.js window-resize + bridge.js
+//                           pixelRatioSignal
+//   6. Brightness/Settings -> lights.js#applyBrightness + bridge.js#
+//                           applySettings
+//   7. Kontinuierlich    -> Live-Probes (unten) statt Flag
+//   +  Async-Nachlader   -> model_loader.js#onLoaded (DAE/OBJ-Callbacks)
+//   +  Bridge-Direktpfade-> bridge.js jsApplyFixtureTransform/jsAlign/
+//                           jsDistribute; tools.js#setEditTool (Gizmo-Gate)
+//   +  Sicherheitsnetz   -> state.js view-Setter (Neuzuweisungen; In-Place-
+//                           push/splice laufen ueber updateOutlines)
+// BEWUSST NICHT verdrahtet: gizmo.js#attachGizmoToSelection (laeuft in
+// perFrame JEDEN Tick — ein requestRender dort waere Endlos-Rendering; seine
+// Eingangsgroessen sind alle quellseitig verdrahtet).
+//
+// ⚠️ FRAGILE DECKUNGEN (adversarialer Vollcheck 3c-2: 0 harte Findings, 3
+// Hinweise — heute korrekt, bei Refactorings NICHT aufweichen):
+//   D1 fixtures.js#removeFixture: der selectedFids-splice ist nur durch das
+//      explizite requestRender() am Funktionsende gedeckt — nie entfernen.
+//   D2 pointer.js: die drei selectedFids.push()-Stellen (Down/Aim/Marquee)
+//      deckt jeweils NUR das updateOutlines() wenige Zeilen tiefer im SELBEN
+//      Funktionslauf — keinen early-return dazwischen einbauen.
+//   D3 app.js#wire*LateBindings: die Default-Getter der Late-Binding-Refs
+//      sind stille No-Ops — eine Bootstrap-Reihenfolge-Aenderung wuerde
+//      Fehler maskieren statt werfen.
 export function requestRender() { _dirty = true; }
 
 // ── Kontinuierliche Animationen (Design (e) Punkt 7) ─────────────────────────
