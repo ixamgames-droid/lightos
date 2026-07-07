@@ -68,6 +68,14 @@ os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 # gezielt in tests/test_serial_process.py abgedeckt. MUSS vor dem ersten
 # output_manager-Import stehen -> hier am conftest-Kopf.
 os.environ.setdefault("LIGHTOS_SERIAL_INPROC", "1")
+# QA-23: Autosave-Recovery-Dialog (main_window._check_autosave_recovery) ist ein
+# MODALES QMessageBox.question beim MainWindow-Bau. Headless beantwortet es
+# niemand -> MainWindow-bauende Tests haengen bis in den pytest-Timeout, SOBALD
+# auf dem Rechner eine echte %APPDATA%/LightOS/auto_save.lshow neuer als alle
+# Recents liegt (zustandsabhaengiger Baseline-Bruch). Explizit unterdruecken —
+# doppeltes Netz zum offscreen-Check in main_window._recovery_prompt_suppressed;
+# Regressionstest: tests/test_autosave_recovery_headless.py.
+os.environ.setdefault("LIGHTOS_NO_RECOVERY_PROMPT", "1")
 
 import pytest
 
