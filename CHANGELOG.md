@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-07 — Tests: Autosave-Recovery-Dialog blockte headless nicht mehr (QA-23)
+
+#### Geaendert / Fixes
+
+- **Grüne Test-Baseline wiederhergestellt:** Lag auf dem Rechner eine `%APPDATA%/LightOS/auto_save.lshow` neuer als alle zuletzt geöffneten Shows, öffnete der Wiederherstellungs-Check beim Start des Hauptfensters ein modales Dialogfeld — headless (offscreen) beantwortet das niemand, sodass die zwei Tests, die das Hauptfenster bauen, in den Timeout liefen (zustandsabhängiger Bruch, unabhängig vom eigentlichen Testinhalt). Fix: `main_window._recovery_prompt_suppressed()` (Env `LIGHTOS_NO_RECOVERY_PROMPT`, von `conftest.py` gesetzt, oder `QT_QPA_PLATFORM=offscreen`) unterdrückt den Prompt in Tests/Tools **vor jedem Dateizugriff** und plant den Start-Timer gar nicht erst. In der echten App ist beides nie aktiv → die Absturz-Wiederherstellung funktioniert unverändert. Neuer Regressionstest `tests/test_autosave_recovery_headless.py` nagelt beides fest (headless fragt nie; Live-Logik fragt genau einmal und stellt bei „Ja" wieder her); die echte Autosave-Datei des Nutzers wird von den Tests nie angefasst.
+- Dateien: `src/ui/main_window.py`, `tests/conftest.py`; Test NEU `tests/test_autosave_recovery_headless.py`.
+
 ### 2026-07-07 — 3D-Visualizer: On-Demand-Rendering (VIZ-13 3c-2 — Phase 3 damit komplett)
 
 #### Geaendert / Fixes
