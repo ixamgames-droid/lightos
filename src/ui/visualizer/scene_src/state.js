@@ -29,6 +29,18 @@
 
 "use strict";
 
+// VIZ-13 3c-2: Sicherheitsnetz fuers On-Demand-Rendering — JEDE Neuzuweisung
+// eines view-Feldes ist eine (potenziell) sichtbare Zustandsaenderung, die
+// einen Frame verdient. render_loop.js ist bewusst ein import-freies Blatt,
+// daher bricht dieser einzige Import das Stern-Muster (alle haengen an
+// state.js, state.js haengt an nichts Zyklusfaehigem) nicht. Primaer sind
+// die Mutations-Quellen explizit verdrahtet (updateCamera/updateOutlines/
+// updateFixture/...); die Setter fangen kuenftige, noch unverdrahtete
+// Codepfade ab. ACHTUNG Grenze: In-Place-Mutationen (selectedFids.push/
+// splice) laufen NICHT durch die Setter — die betroffenen Pfade rufen alle
+// updateOutlines() (explizit verdrahtet).
+import { requestRender } from './scene/render_loop.js';
+
 // ----------------------------------------------------------------------------
 // Objekt-State (Referenzen bleiben stabil, nur Inhalt wird mutiert)
 // ----------------------------------------------------------------------------
@@ -75,29 +87,29 @@ let _theta = 0.3, _phi = 1.1, _radius = 22;
 
 export const view = {
   get mode() { return _viewMode; },
-  set mode(v) { _viewMode = v; },
+  set mode(v) { _viewMode = v; requestRender(); },
 
   get activeCam() { return _activeCam; },
-  set activeCam(v) { _activeCam = v; },
+  set activeCam(v) { _activeCam = v; requestRender(); },
 
   get selectedFids() { return _selectedFids; },
-  set selectedFids(v) { _selectedFids = v; },
+  set selectedFids(v) { _selectedFids = v; requestRender(); },
 
   get selectedStageId() { return _selectedStageId; },
-  set selectedStageId(v) { _selectedStageId = v; },
+  set selectedStageId(v) { _selectedStageId = v; requestRender(); },
 
   get editMode() { return _editMode; },
-  set editMode(v) { _editMode = v; },
+  set editMode(v) { _editMode = v; requestRender(); },
 
   get editTool() { return _editTool; },
-  set editTool(v) { _editTool = v; },
+  set editTool(v) { _editTool = v; requestRender(); },
 
   get theta() { return _theta; },
-  set theta(v) { _theta = v; },
+  set theta(v) { _theta = v; requestRender(); },
 
   get phi() { return _phi; },
-  set phi(v) { _phi = v; },
+  set phi(v) { _phi = v; requestRender(); },
 
   get radius() { return _radius; },
-  set radius(v) { _radius = v; },
+  set radius(v) { _radius = v; requestRender(); },
 };

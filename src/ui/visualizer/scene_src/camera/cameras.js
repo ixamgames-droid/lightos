@@ -7,6 +7,13 @@
 // unten als Objekt-Wrapper, gleiches Getter/Setter-Muster wie state.view).
 import * as THREE from '../three/three.js';
 import { view } from '../state.js';
+// VIZ-13 3c-2: On-Demand-Rendering — updateCamera()/resizeOrtho() sind die
+// Flaschenhaelse, durch die (fast) jede Kamera-Mutation laeuft (Orbit/Zoom/
+// Pinch/Presets/Fit/benannte Kameras/Reset) -> EIN requestRender je Funktion
+// deckt sie alle ab. (Der direkte 2D-Pan in pointer.js/touch.js mutiert
+// orthoCam.position OHNE diese Helfer — dort ist die Quelle separat
+// verdrahtet.)
+import { requestRender } from '../scene/render_loop.js';
 
 export const perspectiveCam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 perspectiveCam.position.set(0, 12, 18);
@@ -38,6 +45,7 @@ export function resizeOrtho() {
   orthoCam.top = _orthoSize;
   orthoCam.bottom = -_orthoSize;
   orthoCam.updateProjectionMatrix();
+  requestRender();  // 3c-2 Dirty-Quelle 2 (Kamera: Ortho-Zoom/Fit/Resize)
 }
 
 // ============================================================================
@@ -52,6 +60,7 @@ export function updateCamera() {
   perspectiveCam.position.y = camTarget.y + view.radius * Math.cos(view.phi);
   perspectiveCam.position.z = camTarget.z + view.radius * Math.sin(view.phi) * Math.cos(view.theta);
   perspectiveCam.lookAt(camTarget);
+  requestRender();  // 3c-2 Dirty-Quelle 2 (Kamera: Orbit/Pan/Zoom/Preset/Fit)
 }
 updateCamera();
 

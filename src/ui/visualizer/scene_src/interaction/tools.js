@@ -8,6 +8,7 @@ import { applyBrightness } from '../scene/lights.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import { updateResizeHandles } from '../stage/stage_objects.js';
 import { wireFixturesLateBindings } from '../fixtures/fixtures.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 let _userBrightnessOverride = null;  // wenn Slider manuell gesetzt
 
@@ -79,6 +80,10 @@ export function setEditTool(tool) {
       : view.editTool === 'aim' ? 'ZIELEN – Gerät antippen = auswählen · Boden/Wand antippen → ausrichten (MH fahren Pan/Tilt)'
       : 'NACHFAHREN – Moving Heads auswählen, dann Boden/Wand antippen → fahren dort eine Form ab (Tool wechseln = Stopp)';
   }
+  // 3c-2: das Gizmo-Gate (attachGizmoToSelection, laeuft pro Frame) haengt am
+  // editTool — der Werkzeugwechsel laesst das Gizmo erscheinen/verschwinden
+  // und braucht dafuer einen Frame.
+  requestRender();
 }
 
 // ── Trace-Einstellungen (Form / Größe / Tempo / Speichern) ───────────────────
@@ -289,6 +294,9 @@ export function updateOutlines() {
     try { bridge.stageSelectionChanged(view.selectedStageId || ''); } catch (e) {}
   }
   updateFABs();
+  // 3c-2 Dirty-Quelle 3 (Selektion/Outlines): Ring-Opacities, Sel-Border,
+  // BoxHelper, Emissive-Reset — alle Selektionswechsel laufen hier durch.
+  requestRender();
 }
 
 // ============================================================================

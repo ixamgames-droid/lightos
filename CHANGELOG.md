@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-07 — 3D-Visualizer: On-Demand-Rendering (VIZ-13 3c-2 — Phase 3 damit komplett)
+
+#### Geaendert / Fixes
+
+- **Der 3D-Visualizer rendert nur noch bei Änderung** statt bedingungslos ~60×/s: neues Modul `scene_src/scene/render_loop.js` mit `requestRender()`-Dirty-Flag und `hasLiveAnimation()`-Proben; die rAF-Kette läuft weiter (Absturz-Selbstheilung aus VIZ-10 bleibt), aber `renderer.render()` feuert nur bei Dirty oder aktiver Dauer-Animation (Stage-Selektions-Puls, FPS-Overlay). Bei statischer Szene fällt die Render-Last damit auf ~0 — passend zur Python-Seite, die seit VIZ-12 nur noch geänderte Fixtures pusht.
+- **Alle Änderungsquellen verdrahtet** (an Wurzel-Flaschenhälsen: `updateCamera`/`resizeOrtho`, `updateOutlines`, `applyBrightness`, dmxBatch-Handler, Stage-CRUD/Resize, View-Mode, Settings, Drag-Zweige, Docking-Highlight, Resize/PixelRatio) inkl. Setter-Sicherheitsnetz; Verdrahtungs-Karte + dokumentierte fragile Deckungspfade (D1–D3) als Kommentarblock in `render_loop.js`.
+- **Beweis-Test** `tests/test_viz13c2_ondemand.py` (11 Tests, echte Page offscreen): Idle rendert nicht, DMX/Kamera/Selektion/Brightness/Settings/Edit-Mode/Stage-Update/Transform/2D-Pan-Drag triggern sofort, Selektions-Puls hält den Loop live, `requestRender` koalesziert. 5 Trigger-Tests stammen aus der Parallel-Session „3D Visualizer placement/movement", die den Zwischenstand-Bug (3D-Editing kurzzeitig eingefroren, Schritt 2 vor Schritt 3) unabhängig diagnostiziert und den Fix verifiziert hat.
+- Dateien (18, +714/−47): NEU `scene_src/scene/render_loop.js`; `app.js`, `bridge/bridge.js`, `state.js`, `camera/cameras.js`+`presets.js`, `fixtures/fixtures.js`, `interaction/pointer.js`+`tools.js`+`touch.js`+`gizmo.js`, `scene/renderer.js`+`lights.js`+`model_loader.js`, `stage/stage_objects.js`+`view_mode.js`+`docking.js`; Tests NEU `tests/test_viz13c2_ondemand.py`.
+
 ### 2026-07-06 — 3D-Visualizer: DMX-Update-Pfad in die FixtureType-Registry zerlegt (VIZ-13 3c Registry Teil 2)
 
 #### Geaendert / Fixes

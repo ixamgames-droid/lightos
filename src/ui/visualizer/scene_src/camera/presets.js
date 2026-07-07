@@ -11,6 +11,7 @@ import {
 } from './cameras.js';
 import { fixtureMeshes } from '../fixtures/fixtures.js';
 import { setViewMode } from '../stage/view_mode.js';
+import { registerLiveAnimation } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 // ============================================================================
 // Kamera-Presets (Top/Front/Seite/Perspektive/Frei)
@@ -194,6 +195,13 @@ export function setFpsVisible(vis) {
   el.style.display = _fpsVisible ? 'block' : 'none';
   if (_fpsVisible) { _fpsAccum = 0; _fpsFrames = 0; _fpsLastT = 0; }
 }
+
+// VIZ-13 3c-2: sichtbares FPS-Overlay = kontinuierliche Animation (Design (e)
+// Punkt 7). Ohne diese Probe wuerde der On-Demand-Loop im Idle nicht mehr
+// rendern und die Anzeige eine irrefuehrende rAF-Tick-Rate statt der echten
+// Render-Rate messen — mit Probe rendert der Loop, solange das Debug-Overlay
+// an ist (Overlay aus = Default = keine Wirkung).
+registerLiveAnimation(() => _fpsVisible);
 
 // Wird pro Frame aus app.js#animate() aufgerufen (kein eigener rAF-Zweig,
 // haengt sich in die bestehende Kette). No-Op solange nicht sichtbar.

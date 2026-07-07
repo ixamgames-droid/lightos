@@ -27,6 +27,7 @@ import {
 } from '../stage/stage_objects.js';
 import { floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho } from '../camera/cameras.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 export let isLeftDragging = false;
 export let dragMode = 'none';  // 'rotate' | 'pan' | 'fixtureDrag' | 'stageDrag' | 'marquee' | 'none'
@@ -436,6 +437,13 @@ export function handlePointerMove(clientX, clientY, ctrlKey) {
     m.style.width = (x2 - x1) + 'px';
     m.style.height = (y2 - y1) + 'px';
   }
+  // 3c-2 Dirty-Quellen (aktive Drag-Gestik): EIN Sammelpunkt fuer alle
+  // Szenen-Drags — 'rotate' (redundant zu updateCamera), 'pan' (mutiert
+  // orthoCam.position DIREKT und laeuft an updateCamera/resizeOrtho vorbei!),
+  // 'fixtureDrag'/'gizmoDrag' (Fixture-Transforms + Dock-Preview),
+  // 'stageDrag'/'stageResize' (Stage-Transforms). 'marquee' ist reine
+  // DOM-Mutation -> kein Render noetig.
+  if (dragMode !== 'none' && dragMode !== 'marquee') requestRender();
   lastMouseX = clientX; lastMouseY = clientY;
 }
 

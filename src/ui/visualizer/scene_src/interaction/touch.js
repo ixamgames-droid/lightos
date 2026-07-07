@@ -14,6 +14,7 @@ import {
   handlePointerDown, handlePointerMove, handlePointerUp,
   getFabLastPlaceCoords, _placeFixtureAtMouse, pointerState,
 } from './pointer.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 let lastTouchDist = 0;
 let lastTouchCx = 0, lastTouchCy = 0;   // Zwei-Finger-Centroid (fuer Pan)
@@ -149,6 +150,7 @@ export function fabRotate() {
       // Angedockte Strahler ggf. neu einhaengen (Footprint hat sich gedreht)
       moveDockedFixtures(view.selectedStageId, 0, 0);
       _reportDockedFixturePositions(view.selectedStageId);
+      requestRender();  // 3c-2: Stage-Rotation direkt (kein verdrahteter Helfer)
     }
   } else if (view.editMode === 'edit' && view.selectedFids.length > 0) {
     // Touch-Schnellaktion: ausgewählte Strahler um 90° um die Hochachse drehen.
@@ -169,6 +171,7 @@ export function fabRotate() {
         } catch (err) {}
       }
     }
+    requestRender();  // 3c-2: Fixture-Rotation direkt (kein verdrahteter Helfer)
   }
 }
 
@@ -209,6 +212,7 @@ window.addEventListener('keydown', function(e) {
       so.mesh.rotation.y += Math.PI / 2;
       so.data.rotation = so.mesh.rotation.y;
       if (so._helper) so._helper.update();
+      requestRender();  // 3c-2: Stage-Rotation direkt (kein verdrahteter Helfer)
     }
   } else if (e.key === 'Escape') {
     view.selectedFids = [];

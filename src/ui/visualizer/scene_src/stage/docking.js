@@ -7,6 +7,7 @@ import * as THREE from '../three/three.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { applyStageEmissive } from '../interaction/tools.js';
 import { _stageIdFromObject } from '../interaction/picking.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 export const DOCK_HANG_TYPES = { truss_h: 1, truss_v: 1 };
 export const DOCK_TOP_TYPES  = { platform: 1, floor: 1, dj_booth: 1, speaker: 1, audience: 1 };
@@ -50,13 +51,18 @@ export function applyDockHighlight(sid) {
   if (_dockHighlightId === sid) return;
   clearDockHighlight();
   const so = stageObjects[sid];
-  if (so) { applyStageEmissive(so.mesh, 0.0, 0.55, 0.18); _dockHighlightId = sid; }
+  if (so) {
+    applyStageEmissive(so.mesh, 0.0, 0.55, 0.18);
+    _dockHighlightId = sid;
+    requestRender();  // 3c-2: Emissive-Highlight geaendert
+  }
 }
 
 export function clearDockHighlight() {
   if (_dockHighlightId && stageObjects[_dockHighlightId] &&
       _dockHighlightId !== view.selectedStageId) {
     applyStageEmissive(stageObjects[_dockHighlightId].mesh, 0, 0, 0);
+    requestRender();  // 3c-2: Emissive-Highlight entfernt
   }
   _dockHighlightId = null;
 }
@@ -92,6 +98,7 @@ export function moveDockedFixtures(sid, dxw, dzw) {
     if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
     if (f.spotTarget) f.spotTarget.position.set(f.group.position.x, 0.0, f.group.position.z);
   }
+  requestRender();  // 3c-2: angedockte Fixtures nachgezogen
 }
 
 export function _reportDockedFixturePositions(sid) {

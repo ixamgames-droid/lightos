@@ -6,6 +6,7 @@ import { disposeObj } from '../scene/grid_floor.js';
 import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { raycaster, mouse } from '../interaction/picking.js';
+import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 // stageObjIdCounter bleibt hier (kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" - nur von createStageObject genutzt).
@@ -64,6 +65,10 @@ export const STAGE_BLUEPRINTS = {
         if (placeholder.geometry) placeholder.geometry.dispose();
         if (placeholder.material) placeholder.material.dispose();
         group.add(model);
+        // 3c-2: ASYNCHRONER Modell-Tausch (Platzhalter -> OBJ) kommt NACH dem
+        // createStageObject-Frame an — ohne eigenen requestRender bliebe der
+        // Platzhalter-Quader bis zum naechsten fremden Render sichtbar.
+        requestRender();
       });
       return group;
     },
@@ -101,6 +106,7 @@ export const STAGE_BLUEPRINTS = {
         if (placeholder.geometry) placeholder.geometry.dispose();
         if (placeholder.material) placeholder.material.dispose();
         group.add(model);
+        requestRender();  // 3c-2: asynchroner Modell-Tausch (s. truss_h)
       });
       return group;
     },
@@ -189,6 +195,7 @@ export function createStageObject(type, position, size, color, rotation, provide
   // Falls aktuell 2D-Ansicht: frisch erzeugtes Objekt sofort 2D-stylen.
   applyStageObject2DStyle(id, view.mode === '2D');
   notifyStageListChanged();
+  requestRender();  // 3c-2 Dirty-Quelle 4 (Stage-CRUD: Objekt hinzugefuegt)
   return id;
 }
 
@@ -282,6 +289,7 @@ export function updateStageObjectProps(id, props) {
 
   // 2D-View Top-Color update
   updateStageObject2D(id);
+  requestRender();  // 3c-2 Dirty-Quelle 4 (Stage-CRUD: Groesse/Farbe/Transform)
   return true;
 }
 
@@ -342,6 +350,7 @@ export function applyStageObject2DStyle(id, is2D) {
   if (so.mesh.isMesh) _setMeshMat2D(so.mesh, is2D);
   else so.mesh.traverse(c => { if (c.isMesh) _setMeshMat2D(c, is2D); });
   _syncFootprintOutline(so, is2D);
+  requestRender();  // 3c-2: Material-Styles/Footprint-Umriss geaendert
 }
 
 // 3c-1: Grundriss-Umriss — im 2D-Plan bekommt jedes Buehnenobjekt eine klare
@@ -422,6 +431,7 @@ export function removeStageObject(id) {
   }
   updateOutlinesRef.get()();
   notifyStageListChanged();
+  requestRender();  // 3c-2 Dirty-Quelle 4 (Stage-CRUD: Objekt entfernt)
 }
 
 export function clearStageObjects() {
@@ -446,6 +456,7 @@ export function setResizeModeEnabled(on) {
 }
 
 export function clearResizeHandles() {
+  if (resizeHandles.length) requestRender();  // 3c-2: Handles verschwinden
   for (const h of resizeHandles) {
     scene.remove(h);
     if (h.geometry) h.geometry.dispose();
@@ -481,6 +492,7 @@ export function updateResizeHandles() {
     scene.add(m);
     resizeHandles.push(m);
   }
+  requestRender();  // 3c-2: Handles neu aufgebaut
 }
 
 export function pickResizeHandle() {
@@ -627,6 +639,9 @@ export function loadStageJson(json) {
     _isLoadingStage = false;
     // EINE einzige finale Sync ans Python schicken (statt N×)
     notifyStageListChanged();
+    // 3c-2: Bulk-Load deckt auch den direkten Fixture-Transform-Zweig oben
+    // (f.group.position/rotation OHNE verdrahteten Helfer) + den Fehlerfall ab.
+    requestRender();
   }
 }
 
