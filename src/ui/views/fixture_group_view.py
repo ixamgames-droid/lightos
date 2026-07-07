@@ -152,6 +152,8 @@ class FixtureGridWidget(QWidget):
         self._drag_from: tuple[int, int] | None = None
         self._drag_fid: int | None = None
         self._drag_current: tuple[int, int] | None = None  # for visual feedback
+        # External drag state (from fixture tree): live "so rastet es ein"-Ziel.
+        self._drop_target: tuple[int, int] | None = None
 
     def update_fixture_labels(self, labels: dict[int, str]):
         self._labels = labels
@@ -177,6 +179,72 @@ class FixtureGridWidget(QWidget):
         col = int(point.x() // cw)
         row = int(point.y() // ch)
         return col, row
+
+    def _cell_at_clamped(self, point: QPoint) -> tuple[int, int]:
+        """Wie _cell_at, aber auf gueltige Zellen geklemmt — ein Drop knapp
+        ueber den Raster-Rand landet dann in der Randzelle statt ins Leere."""
+        col, row = self._cell_at(point)
+        col = max(0, min(col, self.cols - 1))
+        row = max(0, min(row, self.rows - 1))
+        return col, row
+
+    def _nearest_free_cell(self, col: int, row: int) -> tuple[int, int] | None:
+        """Naechste freie Zelle zu (col,row). (col,row) selbst, wenn frei; sonst
+        die per Manhattan-Distanz naechste (Tie-Break row-major). None, wenn das
+        Raster komplett voll ist. So wird beim Drop nie still ueberschrieben."""
+        if 0 <= col < self.cols and 0 <= row < self.rows and (col, row) not in self.positions:
+            return (col, row)
+        best_key = None
+        best_cell = None
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if (c, r) in self.positions:
+                    continue
+                key = (abs(c - col) + abs(r - row), r, c)
+                if best_key is None or key < best_key:
+                    best_key, best_cell = key, (c, r)
+        return best_cell
+
+    def resolve_drop_cell(self, fid: int | None, col: int, row: int) -> tuple[int, int] | None:
+        """Zielzelle fuer einen externen Drop bestimmen (identisch fuer Highlight
+        und echten Drop). Liegt fid schon an (col,row) -> genau dort (No-Op);
+        ist die Zelle von einem ANDEREN fid belegt -> naechste freie Zelle."""
+        col = max(0, min(col, self.cols - 1))
+        row = max(0, min(row, self.rows - 1))
+        if self.positions.get((col, row)) == fid and fid is not None:
+            return (col, row)
+        return self._nearest_free_cell(col, row)
+
+    def place_fixture(self, fid: int, col: int, row: int) -> tuple[int, int] | None:
+        """Platziert fid an/nahe (col,row) und gibt die tatsaechliche Zelle zurueck.
+        Belegte Zielzelle -> naechste freie (kein stilles Ueberschreiben). Raster
+        voll -> None (nichts wird zerstoert). Move-Semantik: eine evtl. vorherige
+        Platzierung desselben fid wird freigegeben."""
+        target = self.resolve_drop_cell(fid, col, row)
+        if target is None:
+            return None
+        if self.positions.get(target) == fid:
+            return target  # steht schon dort
+        # alte Platzierung dieses fid entfernen (Move statt Duplikat)
+        self.positions = {k: v for k, v in self.positions.items() if v != fid}
+        self.positions[target] = fid
+        return target
+
+    def first_free_cells(self, count: int) -> list[tuple[int, int]]:
+        """Liefert `count` freie Zellen in row-major Reihenfolge; erweitert die
+        Reihen bei Bedarf virtuell nach unten. Platziert selbst nichts."""
+        out: list[tuple[int, int]] = []
+        occupied = set(self.positions.keys())
+        r = 0
+        while len(out) < count:
+            for c in range(self.cols):
+                if (c, r) not in occupied:
+                    out.append((c, r))
+                    occupied.add((c, r))
+                    if len(out) >= count:
+                        break
+            r += 1
+        return out
 
     def paintEvent(self, _ev):
         p = QPainter(self)
@@ -227,35 +295,72 @@ class FixtureGridWidget(QWidget):
                 p.setPen(QPen(QColor("#ff8c00"), 2))
                 p.drawRect(tx, ty, tw, th_)
 
+        # Visual feedback: highlight the cell an EXTERNAL drop will snap into
+        # (gruen = frei, hier landet es wirklich). Macht das "Einrasten" sichtbar.
+        if self._drop_target is not None:
+            dc, dr = self._drop_target
+            if 0 <= dc < self.cols and 0 <= dr < self.rows:
+                dx = int(dc * cw) + 2
+                dy = int(dr * ch) + 2
+                dw = int(cw) - 4
+                dh = int(ch) - 4
+                p.fillRect(dx, dy, dw, dh, QBrush(QColor(34, 204, 102, 90)))
+                p.setPen(QPen(QColor("#22cc66"), 3))
+                p.drawRect(dx, dy, dw, dh)
+
         p.end()
 
     # ── External Drag & Drop (from fixture tree) ──────────────────────────────
 
+    @staticmethod
+    def _mime_fid(event) -> int | None:
+        md = event.mimeData()
+        if not md.hasFormat("application/x-fid"):
+            return None
+        try:
+            return int(bytes(md.data("application/x-fid")).decode())
+        except Exception:
+            return None
+
+    @staticmethod
+    def _event_point(event) -> QPoint:
+        return event.position().toPoint() if hasattr(event, "position") else event.pos()
+
+    def _update_drop_target(self, event):
+        """Ziel-Highlight live nachziehen (zeigt exakt, wohin der Drop einrastet)."""
+        fid = self._mime_fid(event)
+        col, row = self._cell_at(self._event_point(event))
+        self._drop_target = self.resolve_drop_cell(fid, col, row)
+        self.update()
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-fid"):
+            self._update_drop_target(event)
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
         if event.mimeData().hasFormat("application/x-fid"):
+            self._update_drop_target(event)
             event.acceptProposedAction()
 
+    def dragLeaveEvent(self, event):
+        self._drop_target = None
+        self.update()
+        super().dragLeaveEvent(event)
+
     def dropEvent(self, event):
-        if not event.mimeData().hasFormat("application/x-fid"):
-            return
-        try:
-            fid = int(bytes(event.mimeData().data("application/x-fid")).decode())
-        except Exception:
-            return
-        cw, ch = self.cell_size()
-        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
-        col = int(pos.x() // cw)
-        row = int(pos.y() // ch)
-        if 0 <= col < self.cols and 0 <= row < self.rows:
-            # Remove any previous placement of this fid
-            self.positions = {k: v for k, v in self.positions.items() if v != fid}
-            self.positions[(col, row)] = fid
+        fid = self._mime_fid(event)
+        self._drop_target = None
+        if fid is None:
             self.update()
-            event.acceptProposedAction()
+            return
+        col, row = self._cell_at(self._event_point(event))
+        # place_fixture klemmt auf gueltige Zellen und weicht belegten Zellen auf
+        # die naechste FREIE aus (kein stilles Ueberschreiben, Rand-Drop landet).
+        target = self.place_fixture(fid, col, row)
+        self.update()
+        event.acceptProposedAction()
+        if target is not None:
             self.positions_changed.emit()
 
     # ── Internal Drag (cell → cell: move or swap) ─────────────────────────────
@@ -434,6 +539,13 @@ class FixtureGroupView(QWidget):
         self._fixture_list = FixtureTreeWithDrag()
         left.addWidget(self._fixture_list, 1)
 
+        btn_all = QPushButton("Alle → Raster")
+        btn_all.setToolTip("Alle gepatchten Fixtures ins Raster übernehmen "
+                           "(freie Zellen zuerst, Reihen wachsen bei Bedarf; "
+                           "bereits platzierte bleiben). Danach Speichern nicht vergessen.")
+        btn_all.clicked.connect(self._add_all_fixtures)
+        left.addWidget(btn_all)
+
         btn_refresh = QPushButton("Fixtures neu laden")
         btn_refresh.clicked.connect(self._refresh_fixtures)
         left.addWidget(btn_refresh)
@@ -555,12 +667,23 @@ class FixtureGroupView(QWidget):
                     child.setForeground(0, QBrush(normal_fg))
                     child.setFont(0, normal_font)
 
-    def _reload_group_list(self):
+    def _reload_group_list(self, select_gid: int | None = None):
+        """Gruppen-Combo neu aufbauen und die GEWAEHLTE Gruppe (per ID) erhalten.
+
+        Frueher sprang die Auswahl bei jedem Neuaufbau hart auf die alphabetisch
+        erste Gruppe (`groups[0]`) — d. h. nach `+ Neu` bzw. nach jedem `Speichern`
+        (das ueber GROUP_CHANGED hier landet) wechselte die aktive Gruppe, und
+        folgende Drags/Speichern trafen die FALSCHE Gruppe. Jetzt bleibt die
+        aktuell selektierte Gruppe stabil; `select_gid` erzwingt gezielt eine
+        (z. B. die frisch angelegte)."""
+        if select_gid is None and self._current_group is not None:
+            select_gid = self._current_group.id
         self._combo_group.blockSignals(True)
         self._combo_group.clear()
         s = self._session()
         if s is None:
             self._combo_group.blockSignals(False)
+            self._current_group = None
             return
         try:
             with s:
@@ -573,12 +696,19 @@ class FixtureGroupView(QWidget):
                     label = f"{folder}/{g.name}" if folder else g.name
                     self._combo_group.addItem(label, g.id)
                 if groups:
-                    self._current_group = groups[0]
+                    # gewaehlte Gruppe per ID wiederfinden, sonst erste.
+                    self._current_group = next(
+                        (g for g in groups if g.id == select_gid), groups[0])
                 else:
                     self._current_group = None
         except Exception as e:
             print(f"[FixtureGroupView] reload error: {e}")
             self._current_group = None
+        # Combo-Anzeige auf die Zielgruppe stellen (Signale noch geblockt).
+        if self._current_group is not None:
+            idx = self._combo_group.findData(self._current_group.id)
+            if idx >= 0:
+                self._combo_group.setCurrentIndex(idx)
         self._combo_group.blockSignals(False)
         if self._current_group is not None:
             self._load_group(self._current_group)
@@ -630,15 +760,18 @@ class FixtureGroupView(QWidget):
         if s is None:
             QMessageBox.warning(self, "Fehler", "Keine Show geöffnet.")
             return
+        new_id = None
         try:
             with s:
                 g = FixtureGroup(name=name.strip(), cols=8, rows=8, positions_json="{}")
                 s.add(g)
                 s.commit()
+                new_id = g.id
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
             return
-        self._reload_group_list()
+        # Die FRISCH angelegte Gruppe selektieren (nicht auf groups[0] zurueckspringen).
+        self._reload_group_list(select_gid=new_id)
         self._notify_groups_changed()
 
     def _set_group_folder(self):
@@ -835,3 +968,32 @@ class FixtureGroupView(QWidget):
         r = self._spin_rows.value()
         self._grid_widget.set_grid(c, r)
         self._highlight_group_members()
+
+    def _add_all_fixtures(self):
+        """Shortcut „alle auswählen → in Gruppe übernehmen": alle gepatchten
+        Fixtures ins Raster legen (freie Zellen zuerst, in Patch-Reihenfolge;
+        Reihen wachsen bei Bedarf). Bereits platzierte Fixtures bleiben. Wie ein
+        Drag speichert das noch nicht — erst „Speichern" schreibt es in die Gruppe."""
+        gw = self._grid_widget
+        fixtures = self._state.get_patched_fixtures()
+        placed = set(gw.positions.values())
+        todo = [f.fid for f in sorted(fixtures, key=lambda x: (x.universe, x.address))
+                if f.fid not in placed]
+        if not todo:
+            QMessageBox.information(
+                self, "Alle → Raster",
+                "Alle gepatchten Fixtures sind bereits im Raster." if fixtures
+                else "Keine Fixtures gepatcht.")
+            return
+        cells = gw.first_free_cells(len(todo))
+        for fid, cell in zip(todo, cells):
+            gw.positions[cell] = fid
+        # Reihenzahl an den tiefsten belegten Punkt anpassen (falls gewachsen).
+        max_row = max(r for (_c, r) in gw.positions)
+        if max_row + 1 > gw.rows:
+            self._spin_rows.blockSignals(True)
+            self._spin_rows.setValue(max_row + 1)
+            self._spin_rows.blockSignals(False)
+            gw.set_grid(gw.cols, max_row + 1)
+        gw.update()
+        gw.positions_changed.emit()
