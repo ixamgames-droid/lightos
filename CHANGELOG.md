@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — DMX-Output-/Netzwerk-Sender-Audit (AUD-03)
+
+#### Doku / Audit
+
+- **Verifizierter Audit des DMX-Output-Pfads** (ArtNet/sACN/Serial/OutputManager): NEU [`docs/DMX_OUTPUT_AUDIT_2026_07_08.md`](docs/DMX_OUTPUT_AUDIT_2026_07_08.md). 5-Dimensionen-Workflow, jedes Finding adversarial verifiziert — **19 Agenten, 6 CONFIRMED + 1 PLAUSIBLE**.
+- **Positiv bestätigt (kein Bug):** Bytes beider Protokolle spec-konform; der 44-Hz-Output-Loop ist **doppelt** gegen Sende-Fehler abgesichert (kein Loop-Tod — Hypothese adversarial widerlegt); Lock-Disziplin robust; Universe→Wire-Abbildung korrekt.
+- **Echte Defekte** als Backlog-Items abgeleitet: **OUT-05** (P2, kein Remove/Disable pro Universe → Typ-Wechsel/„Disabled" sendet weiter + Handle-Leak), **NET-04** (P3, kein explizites Egress-Interface/Broadcast-Default), **SERIAL-01/02** (P3, Port-Diagnose/Reconnect), **OUT-06** (P3, sACN-CID/Stream-Termination). Reine Doku-Änderung.
+
 ### 2026-07-08 — Show-Laden: Farbpaletten bleeden nicht mehr aus der Vorshow (STAB-19a, aus AUD-04)
 
 #### Geaendert / Fixes
