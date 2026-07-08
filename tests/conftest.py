@@ -80,6 +80,51 @@ os.environ.setdefault("LIGHTOS_NO_RECOVERY_PROMPT", "1")
 import pytest
 
 
+# ── viz13-Exit-Härtung (Variante C: begrenzt auf QtWebEngine-Tests) ──────────
+# Auf Davids Setup (PySide6 6.11 / Py 3.14, offscreen) segfaultet der QtWebEngine-
+# Abbau sporadisch beim FINALEN Interpreter-Exit (NACH dem Testlauf) — tearDown-
+# Härtung hilft nicht. Betroffen: Tests, die einen QWebEngineView bauen (die 5
+# test_viz13*-Dateien). Ihre Assertions bestehen, aber der Prozess exit't mit
+# einem nativen Crash-Code → im Isolate-Gate ein „Crash", die Datei läuft nie
+# „grün zu Ende" (Coverage-Lücke).
+#
+# NUR wenn (a) die Session ein Testmodul enthielt, das einen QWebEngineView
+# importiert hat (Auto-Erkennung unten — kein manuelles Markieren, künftige
+# WebEngine-Tests automatisch abgedeckt) UND (b) LIGHTOS_HARDEN_EXIT gesetzt ist
+# (nur vom Lock-Runner im Gate — bei interaktivem pytest NICHT), beenden wir den
+# Prozess nach dem gemeldeten Ergebnis per os._exit und überspringen die
+# crashende Teardown-Phase. So bleibt die Exit-Zeit-Crash-Erkennung für ALLE
+# anderen Tests voll erhalten (kein globales Maskieren — der Unterschied zur
+# verworfenen globalen Variante).
+# ACHTUNG: nicht deterministisch — der QtWebEngine-CrBrowserMain-Thread kann in
+# einem Zeitfenster gegen os._exit rennen (dann doch nativer Crash). Der
+# Lock-Runner toleriert einen solchen Rest-Crash weiterhin als CRASH≠FAIL (QA-24).
+_HARDEN_EXIT_ARMED = False
+
+
+def pytest_collection_modifyitems(session, config, items):
+    global _HARDEN_EXIT_ARMED
+    for it in items:
+        mod = getattr(it, "module", None)
+        # Testmodul, das `from ...QtWebEngineWidgets import QWebEngineView` macht,
+        # hat den Namen im Modul-Namespace -> als WebEngine-Session einstufen.
+        if mod is not None and hasattr(mod, "QWebEngineView"):
+            _HARDEN_EXIT_ARMED = True
+            break
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session, exitstatus):
+    if _HARDEN_EXIT_ARMED and os.environ.get("LIGHTOS_HARDEN_EXIT"):
+        import sys
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
+        os._exit(int(exitstatus))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _stop_background_threads_at_end():
     """Sicherheitsnetz: am Suite-Ende einen ggf. doch laufenden Output-Thread
