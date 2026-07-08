@@ -383,6 +383,15 @@ class VisualizerBridge(QObject):
         self.cameraPreset.connect(lambda n: self._poll_event({"t": "cameraPreset", "name": n}))
         self.namedCamerasChanged.connect(lambda j: self._poll_event({"t": "namedCameras", "j": j}))
         self.brightnessAutoSignal.connect(lambda: self._poll_event({"t": "brightnessAuto"}))
+        # Fixture-Mesh-Signale (VIZ-13 3c-2-Fix Nachtrag 2026-07-07, LIVE gefunden):
+        # OHNE diese rendern LIVE platzierte/entfernte Fixtures NICHT — der Mesh
+        # taucht erst beim Neu-Laden auf (Connect-Burst). Gleiche Ursache wie bei
+        # Stage/Kamera/DMX: der Push an die Post-Load-Seite verpufft. allFixtures =
+        # Voll-Rebuild (idempotent, addFixture ersetzt vorhandene), fixtureAdded/
+        # fixtureRemoved = inkrementell (Platzieren/Entfernen einzelner Geraete).
+        self.allFixtures.connect(lambda j: self._poll_set("fixtures", j))
+        self.fixtureAdded.connect(lambda j: self._poll_event({"t": "fixtureAdded", "j": j}))
+        self.fixtureRemoved.connect(lambda i: self._poll_event({"t": "fixtureRemoved", "fid": i}))
         self._activate()
 
     # ── Pull-Zustellung: JS pollt pollControl() (s. __init__-Kommentar) ──────
@@ -930,6 +939,7 @@ class VisualizerBridge(QObject):
         # finales Echo nach loadStageJson (siehe notifyStageListChanged in
         # stage_scene.html, in dessen finally-Block) -- ab hier sind
         # fixtureDockChanged-Events wieder echte User-Vorgaenge.
+        was_reloading = self._reloading_stage
         self._reloading_stage = False
         self._cancel_reload_guard_fallback()
         raw = json.loads(json_str)
@@ -946,7 +956,17 @@ class VisualizerBridge(QObject):
         else:
             data = raw or []
             echo_token = None
-        is_stale = (echo_token is not None and echo_token < self._stage_reload_token)
+        # Stage-Echo-Race-Fix (2026-07-07, LIVE genagelt): der destruktive
+        # Loesch-Abgleich (py_ids_to_remove in _on_stage_list_from_js) darf NICHT
+        # nur bei einem AELTEREN Token uebersprungen werden, sondern auch waehrend
+        # eines laufenden, von Python angestossenen Reloads. Waehrend eines Reloads
+        # (push_stage_definition -> loadStageJson) ist PYTHON die autoritative
+        # Quelle; ein Echo, das ein frisch gepushtes Element (async gebaute Truss)
+        # transient NICHT listet, wuerde es sonst faelschlich wieder loeschen —
+        # genau das Symptom „+ Truss legt still nichts an" bei geladenen Fixtures.
+        # Echte JS-User-Loeschungen (3D-FAB/Hotkey) passieren NIE waehrend eines
+        # Reloads (was_reloading=False), bleiben also weiter wirksam.
+        is_stale = (echo_token is not None and echo_token < self._stage_reload_token) or was_reloading
         self._last_stage_echo_token = echo_token
         self.pyStageListChanged.emit(data, is_stale)
 

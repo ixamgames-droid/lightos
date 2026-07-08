@@ -240,7 +240,7 @@ export function tryChannel() {
         // Darum pollt die Seite periodisch pollControl() MIT Callback und wendet
         // den zurueckgegebenen Steuer-Zustand + Einmal-Events an.
         if (bridge.pollControl) {
-          let _pEM = null, _pVM = null, _pSet = null, _pStage = null;
+          let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null;
           setInterval(function(){
             try {
               bridge.pollControl(function(js){
@@ -251,6 +251,12 @@ export function tryChannel() {
                   if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
                   if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
                   if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
+                  // Voll-Fixture-Rebuild (allFixtures): nur bei geaenderter Liste
+                  // anwenden. addFixture ist idempotent (ersetzt vorhandene fid).
+                  if (s.fixtures && s.fixtures !== _pFix) {
+                    _pFix = s.fixtures;
+                    try { JSON.parse(s.fixtures).forEach(f => addFixture(f)); } catch (eF) {}
+                  }
                   if (s.dmx) {
                     const arr = JSON.parse(s.dmx);
                     for (const d of arr) {
@@ -274,6 +280,8 @@ export function tryChannel() {
                         else if (ev.t === 'resizeMode') setResizeModeEnabled(ev.on);
                         else if (ev.t === 'cameraPreset') setCameraPreset(ev.name);
                         else if (ev.t === 'namedCameras') setNamedCameras(JSON.parse(ev.j));
+                        else if (ev.t === 'fixtureAdded') { try { addFixture(JSON.parse(ev.j)); } catch (eA) {} }
+                        else if (ev.t === 'fixtureRemoved') removeFixture(ev.fid);
                       } catch (e2) {}
                     }
                   }

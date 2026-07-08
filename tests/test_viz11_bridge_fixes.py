@@ -112,6 +112,11 @@ class StageEchoTokenTest(unittest.TestCase):
 
     def test_current_token_echo_is_not_stale(self):
         self.bridge.push_stage_definition(StageDefinition(name="A"))
+        # Reload abgeschlossen (finales Echo bereits verarbeitet) -> ein
+        # nachfolgendes, SETTLED Echo mit aktuellem Token ist nicht stale.
+        # (Waehrend eines laufenden Reloads gilt jedes Echo als nicht-autoritativ
+        #  fuer Loeschungen -- separat getestet in test_reload_echo_...)
+        self.bridge._reloading_stage = False
         received = {}
         self.bridge.pyStageListChanged.connect(
             lambda items, is_stale: received.update(items=items, is_stale=is_stale))
@@ -139,6 +144,7 @@ class StageEchoTokenTest(unittest.TestCase):
         """Rueckwaertskompatibilitaet: stageListChanged("[]") (wie in
         test_dock_rotation_follow.py) traegt KEINEN Token -> immer aktuell."""
         self.bridge.push_stage_definition(StageDefinition(name="A"))
+        self.bridge._reloading_stage = False  # settled Echo (Reload fertig)
         received = {}
         self.bridge.pyStageListChanged.connect(
             lambda items, is_stale: received.update(items=items, is_stale=is_stale))
@@ -197,9 +203,10 @@ class StaleEchoDoesNotDeleteFreshElementTest(unittest.TestCase):
         self.assertEqual(len(stage.elements), 1)
 
     def test_current_echo_still_removes_elements_deleted_in_js(self):
-        """Gegenprobe: ein AKTUELLES (nicht-stales) Echo muss den Loesch-
-        Abgleich weiterhin ausfuehren (Regressionsschutz fuer den Normalfall,
-        z.B. Element per JS-Hotkey/FAB geloescht)."""
+        """Gegenprobe: ein AKTUELLES, SETTLED Echo (Reload abgeschlossen,
+        _reloading_stage=False) muss den Loesch-Abgleich weiterhin ausfuehren
+        (Regressionsschutz fuer den Normalfall: Element per JS-Hotkey/FAB
+        geloescht -- das passiert IMMER ausserhalb eines laufenden Reloads)."""
         stage = StageDefinition(name="T")
         el = stage.add("platform", x=0.0, y=0.2, z=0.0, name="Weg")
         fake = _fake_window(self.state, stage, bridge=self.bridge)
@@ -208,18 +215,50 @@ class StaleEchoDoesNotDeleteFreshElementTest(unittest.TestCase):
 
         self.bridge.push_stage_definition(stage)
         self.assertEqual(self.bridge._stage_reload_token, 1)
+        # Reload abgeschlossen; DANACH loescht der User das Element in JS.
+        self.bridge._reloading_stage = False
 
         received = {}
         self.bridge.pyStageListChanged.connect(
             lambda items, is_stale: received.update(items=items, is_stale=is_stale))
         import json as _json
-        # AKTUELLES Echo (Token 1, aktueller Token) mit leerer Liste -> JS hat
+        # SETTLED Echo (Token 1, aktueller Token) mit leerer Liste -> JS hat
         # das Element nicht (mehr).
         self.bridge.stageListChanged(_json.dumps({"objects": [], "_reloadToken": 1}))
         self.assertFalse(received["is_stale"])
 
         VW.VisualizerWindow._on_stage_list_from_js(fake, received["items"], received["is_stale"])
         self.assertIsNone(stage.get(el.id))
+
+    def test_reload_echo_missing_fresh_element_is_not_deleted(self):
+        """Fix (2026-07-08): ein Echo mit AKTUELLEM Token, das WAEHREND eines
+        laufenden Python-Reloads (_reloading_stage=True) eintrifft und ein
+        frisch gepushtes async-Element (Truss, dessen OBJ-Modell noch laedt)
+        transient NICHT listet, darf es NICHT loeschen. Waehrend eines Reloads
+        ist PYTHON autoritativ -- sonst verschwaende '+ Truss' bei geladenen
+        Fixtures still (Bruehnen-Tabelle bleibt leer). Regressionsschutz fuer
+        den QWebChannel-Pull-Fixture-Fix, der die Reload-Echo-Frequenz erhoeht."""
+        stage = StageDefinition(name="T")
+        el = stage.add("truss_h", x=0.0, y=6.0, z=0.0, name="Truss")
+        fake = _fake_window(self.state, stage, bridge=self.bridge)
+        fake._sync_stage_node_to_scene(el)
+
+        self.bridge.push_stage_definition(stage)   # _reloading_stage=True, Token 1
+        self.assertTrue(self.bridge._reloading_stage)
+
+        received = {}
+        self.bridge.pyStageListChanged.connect(
+            lambda items, is_stale: received.update(items=items, is_stale=is_stale))
+        import json as _json
+        # Reload-Echo mit AKTUELLEM Token, das die async gebaute Truss (noch)
+        # nicht listet -- mid-reload also NICHT autoritativ fuer Loeschungen.
+        self.bridge.stageListChanged(_json.dumps({"objects": [], "_reloadToken": 1}))
+        self.assertTrue(received["is_stale"])
+
+        VW.VisualizerWindow._on_stage_list_from_js(fake, received["items"], received["is_stale"])
+        # Die frisch gepushte Truss MUSS ueberleben.
+        self.assertIsNotNone(stage.get(el.id))
+        self.assertEqual(len(stage.elements), 1)
 
 
 # ============================================================================
