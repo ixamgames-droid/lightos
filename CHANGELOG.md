@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Output-Typ-Wechsel & „Disabled" schließen den Alt-Adapter (OUT-05, aus AUD-03)
+
+#### Geaendert / Fixes
+
+- **Kein Phantom-/Doppel-Output mehr nach einem Output-Typ-Wechsel, „Disabled" schaltet ein Universe wirklich stumm:** `add_enttec/add_artnet/add_sacn` schrieben nur in ihre **eigene** Adapter-Registry; es gab **kein** Remove/Disable und `apply_output_config` keinen „Disabled"-Zweig. Wer ein Universe von ArtNet auf sACN umstellte, dessen alter ArtNet-Sender blieb offen → `_send_all` sendete dasselbe DMX über **beide** Adapter (und flutete das alte Ziel weiter); ein als „Disabled" markiertes Universe gab **weiter Licht** aus (nur per App-Neustart stoppbar); das Alt-Handle (Socket/Serial) wurde nie geschlossen (Leak). Neu: `OutputManager.remove_output(universe)` popt alle drei Registries unter `_io_lock` und schließt die Geräte (Muster wie `_swap_device`); `apply_output_config` ruft es **vor** dem Einrichten des neuen Typs → pro Universe genau ein (oder bei „Disabled" kein) aktiver Adapter.
+- **Tests:** `tests/test_output_manager.py` (2 neu) — `remove_output` popt+schließt alle Adapter eines Universums (andere unberührt); Typ-Wechsel (ArtNet→sACN via remove+add) lässt genau einen Adapter zurück. Herkunft: AUD-03 (`docs/DMX_OUTPUT_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — DMX-Output-/Netzwerk-Sender-Audit (AUD-03)
 
 #### Doku / Audit
