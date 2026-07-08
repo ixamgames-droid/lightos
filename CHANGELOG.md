@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Render-Pfad-Audit `_render_frame` (AUD-02)
+
+#### Doku / Audit
+
+- **Verifizierter Audit des heißesten Threads** (Per-Frame-Renderer, historische AV-Quelle STAB-07): NEU [`docs/RENDER_AUDIT_2026_07_08.md`](docs/RENDER_AUDIT_2026_07_08.md). 6-Dimensionen-Workflow (Concurrency/Lock · Exception-Isolation · Clamp/Overflow · Merge-Reihenfolge · Commit/Freigabe · Coverage), jedes Finding adversarial gegen den echten Code verifiziert — **36 Agenten, 6 CONFIRMED, 2 PLAUSIBLE, 7 zurückgewiesen**.
+- **Positiv bestätigt (kein Bug):** Clamp lückenlos (`set_channel` zentral), kein Thread-Death (Callback-Isolation), Grand-Master/WP-6-Merge **by design** (2× adversarial widerlegt), und die Test-Coverage ist **breit** (≥8 dedizierte Suiten — die Backlog-Annahme „nur test_render_frame.py" war veraltet; fünf gemeldete „Lücken" waren bereits abgedeckt).
+- **Echte Defekte** als Backlog-Items abgeleitet: **STAB-13** (P2, `feature_dimmers` ungelockt iteriert → Dropped-Frame), **STAB-14** (P2, Engine-Extra-Zombie beim Repatch), **STAB-15** (P3, nicht-atomarer Plan-Swap), **QA-25** (P3, kleine Coverage-Ergänzung). Reine Doku-Änderung.
+
 ### 2026-07-08 — Programmer-Leerzustand: eine Meldung mit Handlungsanweisung (UI-20)
 
 #### Geaendert / Fixes
