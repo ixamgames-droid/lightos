@@ -7,11 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-07-08 — Tests: Mixed-Adapter-Send abgesichert (QA-07)
+### 2026-07-08 — Tests: Multi-Universe-Output abgesichert (QA-07 + QA-08)
 
 #### Tests / QA
 
-- **Der zentrale Multi-Universe-Send-Pfad ist gegen Regression gesichert:** neuer `tests/test_output_manager.py::TestOutputManagerMixedSend` patcht einen Fake-Enttec auf Universe 1 und einen Fake-Art-Net-Sender auf Universe 2, setzt unterschiedliche Kanalwerte und prüft nach einem `_send_all()`-Durchlauf, dass jeder Adapter **genau seine** Universe-Daten bekommt (keiner die fremden) und der Art-Net-Sender die erwartete externe Universe-Nummer (`univ_num - 1`) sieht. Nagelt das Routing in `output_manager._send_all` (Enttec/Art-Net/sACN je Universum) fest. Kein Produktcode geändert.
+- **Der zentrale Multi-Universe-Send-Pfad ist gegen Regression gesichert (QA-07):** neuer `tests/test_output_manager.py::TestOutputManagerMixedSend` patcht einen Fake-Enttec auf Universe 1 und einen Fake-Art-Net-Sender auf Universe 2, setzt unterschiedliche Kanalwerte und prüft nach einem `_send_all()`-Durchlauf, dass jeder Adapter **genau seine** Universe-Daten bekommt (keiner die fremden) und der Art-Net-Sender die erwartete externe Universe-Nummer (`univ_num - 1`) sieht. Nagelt das Routing in `output_manager._send_all` (Enttec/Art-Net/sACN je Universum) fest.
+- **Die Start-Rekonstruktion aus `universes.json` ist abgesichert (QA-08):** `tests/test_output_manager.py::TestApplyOutputConfigRoundtrip` schreibt eine temporäre `universes.json` (Enttec/Art-Net/sACN auf U1/U2/U3) und prüft, dass `AppState.apply_output_config` jeden Adapter im **richtigen** Registry-Dict für sein Universum einrichtet (keine Kreuz-Einträge); ein zweiter Test belegt, dass ein Adapterfehler (Enttec ohne Port) den Loop **nicht abbricht** (die folgenden Adapter werden weiter eingerichtet). Deckt die zuvor ungetestete „Output kommt nach Neustart nicht"-Klasse ab.
+- Kein Produktcode geändert (reine Regressions-Wächter).
 
 ### 2026-07-08 — Tests: Regressions-Wächter für VC-Widget-Drag (VC-WIDGET-DRAG)
 
