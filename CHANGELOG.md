@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — 3D-Panel: Zahlenfelder akzeptieren Punkt und Komma (VIZ-FIX-DECIMAL)
+
+#### Geaendert / Fixes
+
+- **Kein Dezimal-Datenverlust mehr in den 3D-Panels:** Die Zahlenfelder im 3D-Visualizer (Fixture „Position & Ausrichtung", Bühnen-Element-Größe/-Position, Raster) waren Standard-`QDoubleSpinBox` und damit an das System-Locale gebunden. Auf deutschem Locale erwartet die Spinbox das Komma als Dezimaltrenner; tippte man „5.7" mit Punkt, war die Eingabe ungültig und wurde verworfen bzw. geklemmt (stiller Verlust der Nachkommastellen). Neu: ein wiederverwendbares `LocaleTolerantDoubleSpinBox` (`src/ui/widgets/decimal_spinbox.py`) läuft intern auf C-Locale und normalisiert Komma→Punkt beim Validieren und Auslesen — beide Schreibweisen (`5.7` und `5,7`) werden korrekt übernommen. Alle 14 betroffenen Felder in `visualizer_window.py` sind umgestellt.
+- Nebeneffekt: behebt den Dezimal-Aspekt der Stage-Größenfelder aus **VIZ-STAGE-PANEL** (Teilpunkt a); dessen übrige Punkte (ENTER-Commit, Panel-Sync, Resize-Toggle) bleiben offen.
+- Dateien: `src/ui/widgets/decimal_spinbox.py` (NEU), `src/ui/visualizer/visualizer_window.py`; Test NEU `tests/test_decimal_spinbox.py` (5 Tests, deutsches Locale erzwungen, inkl. Regressionsbeleg gegen die Standard-Spinbox).
+
 ### 2026-07-08 — Live-View: Gerätezähler stimmt sofort beim Öffnen (UI-21)
 
 #### Geaendert / Fixes

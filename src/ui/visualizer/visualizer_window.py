@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QComboBox, QToolBar, QListWidget, QListWidgetItem,
     QSplitter, QGroupBox, QFormLayout, QSlider, QCheckBox,
-    QDoubleSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem,
+    QTabWidget, QTreeWidget, QTreeWidgetItem,
     QColorDialog, QInputDialog, QMessageBox, QLineEdit, QSizePolicy,
     QAbstractSpinBox, QToolButton, QMenu,
 )
@@ -35,6 +35,9 @@ from src.core.app_state import (
     viz_model_for,
 )
 from src.core.database.models import PatchedFixture
+# VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
+# Dezimaltrenner (dt. Locale verwarf sonst "5.7" mit Punkt -> stiller Datenverlust).
+from src.ui.widgets.decimal_spinbox import LocaleTolerantDoubleSpinBox
 from src.core.stage.stage_definition import (
     StageDefinition, StageElement,
     list_stages, load_stage, save_stage, delete_stage,
@@ -1609,18 +1612,18 @@ class VisualizerWindow(QMainWindow):
         box = QGroupBox("Position && Ausrichtung")
         form = QFormLayout(box)
         self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
-        self._spin_x = QDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
-        self._spin_y = QDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
-        self._spin_z = QDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
+        self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
+        self._spin_y = LocaleTolerantDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
+        self._spin_z = LocaleTolerantDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
         # Multi-Achsen-Ausrichtung (Grad): Drehen (Yaw Y), Kippen (Pitch X,
         # Boden->Decke), Roll (Z). Alle in 3D sinnvoll; Yaw auch im 2D.
-        self._spin_rot_y = QDoubleSpinBox()
+        self._spin_rot_y = LocaleTolerantDoubleSpinBox()
         self._spin_rot_y.setRange(-180, 180); self._spin_rot_y.setSingleStep(15)
         self._spin_rot_y.setSuffix(" °"); self._spin_rot_y.setWrapping(True)
-        self._spin_rot_x = QDoubleSpinBox()
+        self._spin_rot_x = LocaleTolerantDoubleSpinBox()
         self._spin_rot_x.setRange(-180, 180); self._spin_rot_x.setSingleStep(15)
         self._spin_rot_x.setSuffix(" °"); self._spin_rot_x.setWrapping(True)
-        self._spin_rot_z = QDoubleSpinBox()
+        self._spin_rot_z = LocaleTolerantDoubleSpinBox()
         self._spin_rot_z.setRange(-180, 180); self._spin_rot_z.setSingleStep(15)
         self._spin_rot_z.setSuffix(" °"); self._spin_rot_z.setWrapping(True)
         for sp in (self._spin_x, self._spin_y, self._spin_z,
@@ -1684,13 +1687,13 @@ class VisualizerWindow(QMainWindow):
         self._stage_name_edit.editingFinished.connect(self._on_stage_property_changed)
         prop_form.addRow("Name:", self._stage_name_edit)
 
-        self._stage_spin_x = QDoubleSpinBox(); self._stage_spin_x.setRange(-50, 50); self._stage_spin_x.setSingleStep(0.5)
-        self._stage_spin_y = QDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
-        self._stage_spin_z = QDoubleSpinBox(); self._stage_spin_z.setRange(-30, 30); self._stage_spin_z.setSingleStep(0.5)
-        self._stage_spin_w = QDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
-        self._stage_spin_h = QDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
-        self._stage_spin_d = QDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
-        self._stage_spin_rot = QDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" °")
+        self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-50, 50); self._stage_spin_x.setSingleStep(0.5)
+        self._stage_spin_y = LocaleTolerantDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
+        self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-30, 30); self._stage_spin_z.setSingleStep(0.5)
+        self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
+        self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
+        self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
+        self._stage_spin_rot = LocaleTolerantDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" °")
 
         for sp in (self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
                    self._stage_spin_w, self._stage_spin_h, self._stage_spin_d,
@@ -1843,7 +1846,7 @@ class VisualizerWindow(QMainWindow):
 
         grid_row = QHBoxLayout()
         grid_row.addWidget(QLabel("Grid-Schritt (m):"))
-        self._spin_grid = QDoubleSpinBox()
+        self._spin_grid = LocaleTolerantDoubleSpinBox()
         self._spin_grid.setRange(0.1, 5.0); self._spin_grid.setSingleStep(0.1)
         self._spin_grid.setValue(1.0)
         self._spin_grid.valueChanged.connect(self._on_settings_changed)
