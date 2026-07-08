@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Programmer-Leerzustand: eine Meldung mit Handlungsanweisung (UI-20)
+
+#### Geaendert / Fixes
+
+- **Kein doppeltes „Kein Gerät ausgewählt" mehr:** Im leeren Programmer stand derselbe Text 2× übereinander (Kopf-Label + je aktivem Attribut-Tab ein gleichlautender Platzhalter), ohne Hinweis, was zu tun ist. Der Kopf ist jetzt eine Status-/Handlungszeile („Kein Gerät ausgewählt — links ein Gerät oder eine Gruppe wählen"), der Tab-Platzhalter ein bewusst anders formulierter, beschreibender Hinweis („Attribute erscheinen hier, sobald ein Gerät gewählt ist."). Beide Texte liegen als Konstanten (`_EMPTY_SELECTION_MSG`/`_EMPTY_TAB_HINT`) vor, damit Init und Rebuild synchron bleiben.
+- **Tests:** NEU `tests/test_programmer_empty_state.py` (2 Tests) — Kopf trägt die Handlungsanweisung, kein Tab-Platzhalter wiederholt den Kopf-Text wortgleich.
+- Datei: `src/ui/views/programmer_view.py`. Herkunft: BACKLOG UI-20.
+
 ### 2026-07-08 — Web-Remote: robuster gegen fehlerhafte Requests + Tests (WEB-02/03/04/05, aus AUD-05)
 
 #### Geaendert / Fixes
