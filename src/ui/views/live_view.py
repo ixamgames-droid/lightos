@@ -1390,6 +1390,11 @@ class LiveView(QWidget):
         except Exception as e:
             print(f"[live_view] sync (fixture list) subscribe error: {e}")
 
+        # UI-21: Gerätezähler + Auswahl-Label gleich beim Bau füllen (Initial-Pull),
+        # sonst zeigt die Kopfzeile "0 Geräte im Patch" bis zum ersten 500ms-Tick des
+        # _info_timer — auch wenn beim Bau schon gepatcht ist (Bug-Klasse UI-05/UI-09).
+        self._refresh_info()
+
     def _on_patch_changed(self):
         """Wird bei PATCH_CHANGED und REFRESH_ALL aufgerufen."""
         # Hinweis: live_view_positions werden hier BEWUSST nicht geprunt — das
