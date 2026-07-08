@@ -677,7 +677,9 @@ class AppState:
         self._patched_set = {u: frozenset(s) for u, s in addrs.items()}
         self._laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         self._laser_fids = frozenset(laser_fids)
-        self._engine_extra_prev = {}
+        # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
+        # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
+        self._release_engine_extra()
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
         gm_mask: dict[int, set] = {}
@@ -691,6 +693,37 @@ class AppState:
                 {u: frozenset(s) for u, s in gm_mask.items()})
         except Exception as e:
             print(f"[AppState] set gm mask error: {e}")
+
+    def _release_engine_extra(self):
+        """STAB-14: gibt die zuletzt als Engine-Extra committeten Roh-Kanaele
+        (``ScriptFunction.setdmx`` auf NICHT gepatchte Adressen, gemerkt in
+        ``_engine_extra_prev``) im Live-Universe auf 0 frei und leert das Tracking.
+
+        Wird beim Patch-Rebuild aufgerufen: Frueher wurde ``_engine_extra_prev``
+        dort nur auf ``{}`` gesetzt, ohne die Live-Werte zu nullen — stoppte das
+        Skript danach, blieb ``prev`` im naechsten Frame leer, die ``prev-cur``-
+        Freigabe (Schritt 5) feuerte nie und der Roh-Kanal blieb dauerhaft an
+        (Zombie; bei Strobe/Shutter/Beam sicht-/sicherheitsrelevant). Wird die
+        Adresse jetzt gepatcht oder weiter roh beschrieben, setzt der naechste
+        Frame sie ueber ihren Commit-Span bzw. erneut als Engine-Extra neu —
+        hoechstens 1 Frame Dip waehrend des Umpatchens.
+
+        ``list(...)``-Snapshot, da der Render-Thread ``_engine_extra_prev`` parallel
+        neu bindet (Schritt 5). ``set_channel`` ist per Universe-Lock thread-safe.
+        Defensiv (``getattr``): ``_rebuild_render_plan`` darf — wie die alte reine
+        ``= {}``-Zuweisung — auch laufen, bevor ``_engine_extra_prev``/``universes``
+        existieren (Bau-Reihenfolge/Test-Stubs); dann nur zuruecksetzen, nichts freigeben.
+        """
+        prev = getattr(self, "_engine_extra_prev", None)
+        universes = getattr(self, "universes", None)
+        if prev and universes:
+            for u, prev_addrs in list(prev.items()):
+                uni = universes.get(u)
+                if uni is None:
+                    continue
+                for a in prev_addrs:
+                    uni.set_channel(a, 0)
+        self._engine_extra_prev = {}
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}

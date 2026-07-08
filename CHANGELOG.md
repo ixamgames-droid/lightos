@@ -7,7 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-07-08 — Render-Thread: `feature_dimmers` gegen Dropped-Frame gehärtet (STAB-13, aus AUD-02)
+### 2026-07-08 — Render-Thread: Engine-Extra-Roh-Kanal beim Repatch freigeben (STAB-14, aus AUD-02)
+
+#### Geaendert / Fixes
+
+- **Kein Roh-Kanal-Zombie mehr nach Patch-Change:** Schreibt eine `ScriptFunction` per `setdmx` einen **nicht gepatchten** Roh-Kanal, committet der Renderer ihn und merkt ihn in `_engine_extra_prev`, um ihn später (wenn das Skript stoppt) wieder auf 0 freizugeben. Ein Patch-Rebuild (`_rebuild_render_plan`, `app_state.py`) setzte dieses Tracking bisher **hart auf `{}`** — ohne die Live-Werte zu nullen. Stoppte das Skript danach, blieb `prev` leer, die `prev-cur`-Freigabe feuerte nie → der Roh-Kanal blieb **dauerhaft an** (bei Strobe/Shutter/Beam sicht- und sicherheitsrelevant). **Fix:** neuer Helfer `_release_engine_extra()` gibt die gemerkten Roh-Adressen im Live-Universe aktiv auf 0 frei, bevor das Tracking geleert wird (`list()`-Snapshot gegen den Render-Thread; `set_channel` per Universe-Lock thread-safe). Wird die Adresse jetzt gepatcht/weiter beschrieben, setzt der nächste Frame sie neu — höchstens 1 Frame Dip.
+- **Tests:** `tests/test_render_frame.py::test_engine_extra_released_on_repatch` — Roh-Kanal committen → Repatch → Skript stoppt → Adresse wird auf 0 freigegeben (und bleibt es). Herkunft: AUD-02 (`docs/RENDER_AUDIT_2026_07_08.md`).
+
 
 #### Geaendert / Fixes
 
