@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Show-Laden: Farbpaletten bleeden nicht mehr aus der Vorshow (STAB-19a, aus AUD-04)
+
+#### Geaendert / Fixes
+
+- **Paletten einer palettes-losen Show überschreiben nicht mehr still die vorherigen:** `load_show` lud den `palettes`-Block nur, wenn der Key vorhanden war (`if "palettes" in data`) — **ohne** `else`-Zweig. Beim Laden einer Show ohne `palettes`-Key blieben so die Farbpaletten der **vorigen** Show hängen (Bleed; `palettes` war der einzige Manager mit diesem Muster). Jetzt wird bei fehlendem Key `pm.from_dict({})` aufgerufen (wie in `reset_show`).
+- **Tests:** `tests/test_show_file.py` (2 neu) — Show ohne palettes-Key → Paletten geleert; mit Key → genau diese geladen. Herkunft: AUD-04 (`docs/SHOW_FILE_AUDIT_2026_07_08.md`). Der reset-first/Rollback-Aspekt (STAB-19b) bleibt als P3 mit geringem Restrisiko dokumentiert offen (`load_show` setzt bereits alle State-Felder inline zurück).
+
 ### 2026-07-08 — Show-Laden: robuster gegen alte/korrupte `.lshow` (STAB-20, aus AUD-04)
 
 #### Geaendert / Fixes

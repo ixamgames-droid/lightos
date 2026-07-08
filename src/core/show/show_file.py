@@ -827,6 +827,15 @@ def load_show(path: str | os.PathLike):
             pm.from_dict(data["palettes"])
         except Exception as e:
             _lenient("load palettes error", e)
+    else:
+        # STAB-19: Show OHNE palettes-Key -> Paletten der Vorshow verwerfen. palettes
+        # war der einzige Manager mit reinem if-ohne-else — dadurch blieben beim Laden
+        # einer palettes-losen Show die Farbpaletten der vorigen Show haengen (Bleed).
+        # reset_show leert Paletten ebenfalls via from_dict({}).
+        try:
+            pm.from_dict({})
+        except Exception as e:
+            _lenient("reset palettes (kein Key) error", e)
 
     try:
         from src.core.engine.curve_library import get_curve_library
