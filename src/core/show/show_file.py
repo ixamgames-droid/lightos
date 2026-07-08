@@ -748,7 +748,17 @@ def load_show(path: str | os.PathLike):
                 continue
             if not isinstance(attrs, dict):
                 continue
-            cleaned[fid] = {str(a): int(v) for a, v in attrs.items()}
+            # STAB-18: int(v) PRO Wert kapseln — ein einzelner kaputter Wert
+            # (None/Liste/nicht-numerisch) darf nur diesen Eintrag ueberspringen,
+            # nicht den GESAMTEN Programmer aller Fixtures loeschen (Verlust-
+            # Amplifikation). Analog zur schon vorhandenen fid-/attrs-Isolation.
+            vals = {}
+            for a, v in attrs.items():
+                try:
+                    vals[str(a)] = int(v)
+                except (TypeError, ValueError):
+                    continue
+            cleaned[fid] = vals
         state.programmer = cleaned
         state._flush_all_to_dmx()
     except Exception as e:
@@ -759,16 +769,37 @@ def load_show(path: str | os.PathLike):
     # Render-Plan neu bauen, damit die Basis im Default-Frame landet.
     try:
         bl = data.get("base_levels", {}) or {}
-        state.base_levels = {
-            int(k): {str(a): int(v) for a, v in (vals or {}).items()}
-            for k, vals in bl.items() if isinstance(vals, dict)
-        }
+        parsed = {}
+        for k, vals in bl.items():
+            if not isinstance(vals, dict):
+                continue
+            try:
+                fid = int(k)
+            except (TypeError, ValueError):
+                continue
+            # STAB-18: int(v) pro Wert kapseln (ein kaputter Wert -> nur dieser
+            # faellt, nicht alle Basis-Level).
+            clean = {}
+            for a, v in vals.items():
+                try:
+                    clean[str(a)] = int(v)
+                except (TypeError, ValueError):
+                    continue
+            parsed[fid] = clean
+        state.base_levels = parsed
         state.implicit_brightness = bool(data.get("implicit_brightness", True))
-        state._rebuild_render_plan()
     except Exception as e:
         _lenient("load base_levels error", e)
         state.base_levels = {}
         state.implicit_brightness = True
+    # STAB-18: Render-Plan-Rebuild NACH und AUSSERHALB des base_levels-try. Frueher
+    # stand er IM try nach der base_levels-Zuweisung -> ein aus voellig unabhaengigem
+    # Grund werfender Rebuild landete im except und verwarf die eben geladenen
+    # base_levels + kippte implicit_brightness. Jetzt getrennt behandelt.
+    try:
+        state._rebuild_render_plan()
+    except Exception as e:
+        _lenient("rebuild render plan after base_levels error", e)
 
     if "palettes" in data:
         try:

@@ -487,6 +487,63 @@ class ShowFileTests(unittest.TestCase):
             # _FakeFunctionManager.to_dict liefert eine nicht-leere Funktionsliste.
             self.assertEqual(len(data["functions"]["functions"]), 1)
 
+    def _load_payload(self, td, payload):
+        path = os.path.join(td, "s.lshow")
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("show.json", json.dumps(payload))
+        return self.show_file.load_show(path)
+
+    def test_programmer_bad_value_drops_only_that_value(self):
+        """STAB-18: ein kaputter Programmer-Wert (None) verwirft NUR diesen Wert,
+        nicht den GESAMTEN Programmer aller Fixtures."""
+        self.state._flush_all_to_dmx = lambda: None
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "1.2", "name": "P", "patch": [],
+                "functions": {"functions": []},
+                "programmer": {"5": {"dimmer": 200, "color_r": None},
+                               "6": {"dimmer": 128}}})
+            self.assertTrue(ok, msg)
+            # Fixture 5 behaelt den guten Wert (color_r=None faellt raus),
+            # Fixture 6 bleibt komplett — nichts wird pauschal geloescht.
+            self.assertEqual(self.state.programmer.get(5), {"dimmer": 200})
+            self.assertEqual(self.state.programmer.get(6), {"dimmer": 128})
+
+    def test_base_levels_bad_value_drops_only_that_value(self):
+        """STAB-18: ein kaputter base_levels-Wert verwirft nur diesen, nicht alle."""
+        self.state._flush_all_to_dmx = lambda: None
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "1.2", "name": "B", "patch": [],
+                "functions": {"functions": []},
+                "base_levels": {"2": {"intensity": 255},
+                                "3": {"intensity": None}}})
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.state.base_levels.get(2), {"intensity": 255})
+            self.assertEqual(self.state.base_levels.get(3), {})   # bad value weg
+
+    def test_base_levels_survive_render_plan_error(self):
+        """STAB-18: ein Fehler in _rebuild_render_plan verwirft NICHT mehr die eben
+        geladenen base_levels/implicit_brightness (Rebuild ist aus dem try gezogen)."""
+        self.state._flush_all_to_dmx = lambda: None
+        self.state.base_levels = {}
+
+        def _cond_boom():
+            # Nur NACH dem base_levels-Laden werfen (der Patch-Rebuild bei leerem
+            # base_levels bleibt unberuehrt) — isoliert den 800er-Aufruf.
+            if self.state.base_levels:
+                raise RuntimeError("render plan boom")
+        self.state._rebuild_render_plan = _cond_boom
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "1.2", "name": "B", "patch": [],
+                "functions": {"functions": []},
+                "base_levels": {"2": {"intensity": 255}},
+                "implicit_brightness": False})
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.state.base_levels, {2: {"intensity": 255}})
+            self.assertFalse(self.state.implicit_brightness)   # NICHT auf True gekippt
+
 
 class _FakeStateWithDB(_FakeState):
     """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""
