@@ -305,5 +305,94 @@ class TestOutputManagerMixedSend(unittest.TestCase):
         self.assertNotEqual(art_data[0], 11, "Art-Net bekam fremde (U1-)Daten")
 
 
+class _FakeEnttecDev:
+    """Stub-Enttec ohne echten COM-Port (umgeht das eager serial.Serial-open)."""
+    def __init__(self, port):
+        self.port = port
+
+    def send_dmx(self, data):
+        pass
+
+    def close(self):
+        pass
+
+
+class TestApplyOutputConfigRoundtrip(unittest.TestCase):
+    """QA-08: ``apply_output_config`` liest ``universes.json`` und richtet die
+    Mixed-Adapter beim Start ein — jeder Adapter landet im RICHTIGEN Registry-Dict
+    für sein Universum, und ein Fehler pro Universum bricht den Loop NICHT ab.
+    Sichert die ungetestete Start-Rekonstruktion (Klasse „Output kommt nach
+    Neustart nicht")."""
+
+    def setUp(self):
+        # Enttec-Port-Open umgehen: kein echter COM-Port im Test.
+        import src.core.dmx.output_manager as om_mod
+        self._om_mod = om_mod
+        self._orig_make = om_mod._make_enttec_device
+        om_mod._make_enttec_device = lambda port: _FakeEnttecDev(port)
+
+    def tearDown(self):
+        self._om_mod._make_enttec_device = self._orig_make
+
+    def _apply(self, rows):
+        """Schreibt eine temporäre universes.json und ruft
+        ``AppState.apply_output_config`` auf einem Stub auf (die Methode nutzt nur
+        ``self.output_manager`` + ``self.universes``). Liefert den OutputManager."""
+        import json
+        import os
+        import tempfile
+        import types
+        from src.core.app_state import AppState
+        stub = types.SimpleNamespace()
+        stub.output_manager = OutputManager()
+        stub.universes = stub.output_manager.universes
+        fd, path = tempfile.mkstemp(suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(rows, f)
+            AppState.apply_output_config(stub, path=path)
+        finally:
+            os.remove(path)
+        return stub.output_manager
+
+    def test_mixed_adapters_land_in_right_registry(self):
+        om = self._apply([
+            {"num": 1, "name": "A", "output": "Enttec", "patch": "COM_FAKE"},
+            {"num": 2, "name": "B", "output": "ArtNet", "patch": "127.0.0.1"},
+            {"num": 3, "name": "C", "output": "sACN",   "patch": ""},
+        ])
+        try:
+            for n in (1, 2, 3):
+                self.assertIn(n, om.universes, f"Universum {n} muss angelegt sein")
+            # Jeder Adapter im RICHTIGEN Registry-Dict, genau sein Universum.
+            self.assertIn(1, om._enttec_outputs)
+            self.assertIn(2, om._artnet_outputs)
+            self.assertIn(3, om._sacn_outputs)
+            # Keine Kreuz-Einträge (Adapter im falschen Registry / falschem Universum).
+            self.assertNotIn(1, om._artnet_outputs)
+            self.assertNotIn(1, om._sacn_outputs)
+            self.assertNotIn(2, om._enttec_outputs)
+            self.assertNotIn(3, om._enttec_outputs)
+            self.assertNotIn(3, om._artnet_outputs)
+        finally:
+            om.stop()
+
+    def test_one_adapter_error_does_not_abort_the_rest(self):
+        # Enttec schlägt fehl (Mock wirft) — die folgende ArtNet-Zeile muss trotzdem
+        # eingerichtet werden (Loop bricht nicht ab).
+        self._om_mod._make_enttec_device = (
+            lambda port: (_ for _ in ()).throw(RuntimeError("enttec boom")))
+        om = self._apply([
+            {"num": 1, "name": "A", "output": "Enttec", "patch": "COM_FAKE"},
+            {"num": 2, "name": "B", "output": "ArtNet", "patch": "127.0.0.1"},
+        ])
+        try:
+            self.assertNotIn(1, om._enttec_outputs, "fehlgeschlagener Enttec darf nicht gesetzt sein")
+            self.assertIn(2, om._artnet_outputs, "ArtNet nach Enttec-Fehler muss trotzdem gesetzt sein")
+            self.assertIn(1, om.universes, "Universum 1 wird trotzdem angelegt")
+        finally:
+            om.stop()
+
+
 if __name__ == "__main__":
     unittest.main()
