@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Tests: Regressions-Wächter für VC-Widget-Drag (VC-WIDGET-DRAG)
+
+#### Tests / QA
+
+- **Kern-Drag-Interaktion der Virtual Console abgesichert:** Zum live gemeldeten (aber headless nicht reproduzierbaren) Effekt „VC-Widgets lassen sich im Bearbeiten-Modus nicht ziehen" nagelt ein neuer Guard-Test `tests/test_vc_widget_drag.py` das korrekte Verhalten fest — Fader, Button und SpeedDial (jeweils selbst-gezeichnet, im Edit-Modus an die Basis-`VCWidget`-Drag-Logik delegierend) verschieben sich per simuliertem Press+Move, **auch als Kind eines VCFrame**. Kein Produktcode geändert; der ursprünglich gemeldete Live-Effekt bleibt offen für eine Live-/Computer-Use-Repro (vermutlich szenario-spezifische Event-Zustellung im echten Fenster).
+
 ### 2026-07-08 — 3D-Panel: Zahlenfelder akzeptieren Punkt und Komma (VIZ-FIX-DECIMAL)
 
 #### Geaendert / Fixes
