@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — OSC- & Timecode/MTC-Remote-Eingang-Audit (AUD-08)
+
+#### Doku / Audit
+
+- **Verifizierter Audit des OSC- und MTC-Eingangs** (`osc_server.py`, `mtc_reader.py`, beide 0 Tests): NEU [`docs/OSC_TIMECODE_AUDIT_2026_07_08.md`](docs/OSC_TIMECODE_AUDIT_2026_07_08.md). 4-Dimensionen-Workflow, jedes Finding adversarial verifiziert — **22 Agenten, 7 CONFIRMED**.
+- **Positiv bestätigt (kein Bug, kein neuer P1/P2):** OSC-Handler robust gekapselt (int/float-Guards, geklemmt); Cross-Thread sauber (alle mutierten Ziele gelockt); MTC-Dekodierung spec-konform; MTC-Lifecycle sauber.
+- **Die 2 P2 sind Parität** zu bekannten Web-Items: OSC-01 = **WEB-01** (`/lightos/ch` schreibt am 44-Hz-Renderer vorbei), OSC-02 = **NET-01** (`0.0.0.0:7770` ohne Auth) — beide dort als querschnittliche externe-Eingang-Themen vermerkt (gemeinsamer Fix, Produkt-Entscheidung).
+- **Neu nur P3:** OSC-04 (`_handle_blackout` `bool()`-Inversion bei String-Args), MTC-01 (`+2`-Frame ohne Wrap), MTC-02 (Feuern ohne Vollständigkeitsprüfung), MTC-03 (Torn-Read, latent). Reine Doku-Änderung.
+
 ### 2026-07-08 — DMX-Eingang: RX-Thread erholt sich nach Netz-Blip (NET-06, aus AUD-06)
 
 #### Geaendert / Fixes
