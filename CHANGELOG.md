@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Show-Laden: ein kaputter Wert löscht nicht mehr ganze Blöcke (STAB-18, aus AUD-04)
+
+#### Geaendert / Fixes
+
+- **Ein einzelner falsch-typisierter Wert verwirft nicht mehr den GESAMTEN programmer/base_levels-Block:** Beim Laden wandelten `{str(a): int(v) for …}`-Comprehensions die Werte um — ein einziger `None`/Listen-/nicht-numerischer Wert (z. B. aus hand-editierter oder alter `.lshow`) warf und der äußere `except` setzte `state.programmer = {}` bzw. `state.base_levels = {}` → **alle** Fixtures verloren (still). Jetzt ist `int(v)` **pro Wert** gekapselt (analog zur schon vorhandenen fid-/attrs-Isolation): nur der kaputte Wert fällt weg, der Rest bleibt.
+- **Ein Render-Plan-Fehler verwirft nicht mehr die geladenen base_levels:** `state._rebuild_render_plan()` stand **innerhalb** des `base_levels`-`try` (nach der Zuweisung) → ein aus **unabhängigem** Grund werfender Rebuild landete im `except` und löschte die eben geladenen `base_levels` + kippte `implicit_brightness` auf True. Der Rebuild ist jetzt **aus dem `try` gezogen** (eigener, separat behandelter Aufruf).
+- **Tests:** `tests/test_show_file.py` (3 neu) — kaputter Programmer-/base_levels-Wert lässt die guten Werte/Fixtures stehen; ein werfender `_rebuild_render_plan` lässt `base_levels`/`implicit_brightness` unangetastet. Herkunft: AUD-04 (`docs/SHOW_FILE_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — Show-Speichern: atomar + kein stiller Funktions-Verlust (STAB-16/17, aus AUD-04)
 
 #### Geaendert / Fixes
