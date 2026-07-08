@@ -124,6 +124,25 @@ class RenderFrameTest(unittest.TestCase):
         self.assertEqual(self.live.get_channel(50), 0)     # freigegeben
         self.assertEqual(self.live.get_channel(80), 99)    # weiterhin erhalten
 
+    def test_engine_extra_released_on_repatch(self):
+        """STAB-14: ein per setdmx gesetzter Roh-Kanal (ungepatchte Adresse) wird
+        beim Patch-Rebuild aktiv freigegeben — nicht als Zombie belassen. Frueher
+        setzte _rebuild_render_plan nur _engine_extra_prev={}, ohne live zu nullen
+        -> nach Skript-Stopp blieb der Kanal dauerhaft an."""
+        self.st.function_manager.raw_addr = 100
+        self.st.function_manager.raw_val = 255
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(100), 255)          # Roh committed
+        self.assertEqual(self.st._engine_extra_prev.get(1), {100})
+        # Patch-Change (Umpatchen) UND das Skript stoppt.
+        self.st.function_manager.raw_addr = None
+        self.st._rebuild_render_plan()                             # Repatch
+        self.assertEqual(self.live.get_channel(100), 0)           # STAB-14: frei
+        self.assertEqual(self.st._engine_extra_prev, {})
+        # Bleibt auch im Folgeframe frei (kein Wiederauftauchen als Zombie).
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(100), 0)
+
 
 class BaseLevelsTest(unittest.TestCase):
     """Sichert den Layer-Fix vom 2026-06-02 ab: Basis-Helligkeit macht eine
