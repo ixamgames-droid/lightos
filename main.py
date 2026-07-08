@@ -165,23 +165,51 @@ def _setup_crash_logging():
             pass
 
 
-def _setup_webengine_diagnostics():
-    """VIZ-10: Chromium-Flags fuer QWebEngine (3D-Visualizer) minimal-invasiv
-    diagnostizierbar machen — OHNE eigene Default-Flags zu erzwingen.
+# VIZ-13 3c-2-Fix (2026-07-07): Basis-Flags gegen QtWebEngine-Renderer-Drosselung.
+# HINTERGRUND (Davids "3D-Bearbeiten tot"-Bug, verifiziert 2026-07-07): Seit dem
+# On-Demand-Rendering (PR #198) zeichnet die 3D-Seite bei statischer Szene ~0
+# Frames. Chromium stuft einen so leerlaufenden/verdeckten Renderer als
+# Hintergrund ein und DROSSELT dann die QWebChannel-Zustellung Python->JS:
+# nach dem initialen Lade-Burst kommt KEIN Push-Signal mehr an
+# (editModeChanged/applyFixtureTransform/addStageObject/dmxBatch ...). Folge:
+# Bearbeiten/Hinzufuegen/Verschieben tun nichts, nur die reine JS-Kamera
+# (braucht kein Signal) reagiert noch; Fixtures erscheinen nur beim (Neu-)Laden.
+# Die JS-Pipeline selbst ist intakt — Render/Picking/Edit/Drag wurden JS->JS
+# verifiziert; es ist AUSSCHLIESSLICH eine Zustell-Drosselung. Diese drei
+# Standard-Flags halten den Renderer aktiv, damit die Signal-Zustellung nicht
+# einschlaeft (Standardloesung fuer eingebettete QtWebEngine + QWebChannel-Push).
+# Sie beruehren das On-Demand-Rendering NICHT (Perf-Gewinn bleibt).
+_ANTI_THROTTLE_FLAGS = (
+    "--disable-renderer-backgrounding "
+    "--disable-backgrounding-occluded-windows "
+    "--disable-background-timer-throttling"
+)
 
-    - Ein bereits gesetztes ``QTWEBENGINE_CHROMIUM_FLAGS`` bleibt UNVERAENDERT
-      (z. B. vom Nutzer oder einer .bat gesetzt) — wir ueberschreiben es nie.
-    - Optionales ``LIGHTOS_WEBENGINE_FLAGS`` wird angehaengt (fuer gezieltes
-      Debugging, z. B. ``--disable-gpu``), OHNE dass die App das je selbst setzt.
+
+def _setup_webengine_diagnostics():
+    """VIZ-10 / VIZ-13 3c-2-Fix: Chromium-Flags fuer QWebEngine (3D-Visualizer).
+
+    - Basis-Anti-Drossel-Flags (``_ANTI_THROTTLE_FLAGS``) werden gesetzt, damit
+      der Renderer im Leerlauf nicht gedrosselt wird und die QWebChannel-Push-
+      Signale (Bearbeiten/Hinzufuegen/DMX) zuverlaessig ankommen — s. Kommentar
+      oben. Hat der Nutzer/eine .bat bereits eigene Backgrounding-Flags gesetzt,
+      hat SEINE Wahl Vorrang (wir ueberschreiben sie nicht).
+    - Optionales ``LIGHTOS_WEBENGINE_FLAGS`` wird zusaetzlich angehaengt (fuer
+      gezieltes Debugging, z. B. ``--disable-gpu``).
     - Die effektiven Flags landen einmalig im crash.log, damit man beim
       Nachstellen eines 3D-Renderer-Absturzes sieht, welche Flags aktiv waren.
     """
     try:
-        existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "").strip()
+        # Basis-Flags nur injizieren, wenn der Nutzer nicht bereits selbst
+        # Backgrounding-/Throttling-Flags gewaehlt hat (dann Vorrang fuer ihn).
+        if ("backgrounding" not in existing
+                and "background-timer-throttling" not in existing):
+            existing = (f"{_ANTI_THROTTLE_FLAGS} {existing}".strip()
+                        if existing else _ANTI_THROTTLE_FLAGS)
         extra = os.environ.get("LIGHTOS_WEBENGINE_FLAGS", "").strip()
-        if extra:
-            combined = f"{existing} {extra}".strip() if existing else extra
-            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
+        combined = f"{existing} {extra}".strip() if extra else existing
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
         effective = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
         if _crash_log_handle is not None:
             ts = datetime.datetime.now().isoformat(timespec="seconds")

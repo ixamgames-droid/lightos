@@ -232,6 +232,64 @@ export function tryChannel() {
           requestRender();  // 3c-2 Dirty-Quelle 5 (PixelRatio-Wechsel)
         });
         if (bridge.requestFixtures) bridge.requestFixtures();
+        // VIZ-13 3c-2-Fix (2026-07-07, LIVE verifiziert): PULL statt PUSH.
+        // QtWebEngine stellt Python->JS-SIGNALE (Push) an die eingebettete
+        // Post-Load-Seite NICHT zu (auch fokussiert nicht) — SLOT-RUECKGABEN
+        // (Callback-Antworten auf JS-initiierte Calls) schon. Ohne das war
+        // 3D-Bearbeiten/Kamera/DMX tot (nur der Connect-Burst lud die Fixtures).
+        // Darum pollt die Seite periodisch pollControl() MIT Callback und wendet
+        // den zurueckgegebenen Steuer-Zustand + Einmal-Events an.
+        if (bridge.pollControl) {
+          let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null;
+          setInterval(function(){
+            try {
+              bridge.pollControl(function(js){
+                try {
+                  const s = JSON.parse(js);
+                  // Idempotente Zustaende: nur bei Aenderung anwenden.
+                  if (s.editMode !== undefined && s.editMode !== _pEM) { _pEM = s.editMode; setEditMode(s.editMode); }
+                  if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
+                  if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
+                  if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
+                  // Voll-Fixture-Rebuild (allFixtures): nur bei geaenderter Liste
+                  // anwenden. addFixture ist idempotent (ersetzt vorhandene fid).
+                  if (s.fixtures && s.fixtures !== _pFix) {
+                    _pFix = s.fixtures;
+                    try { JSON.parse(s.fixtures).forEach(f => addFixture(f)); } catch (eF) {}
+                  }
+                  if (s.dmx) {
+                    const arr = JSON.parse(s.dmx);
+                    for (const d of arr) {
+                      updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
+                    }
+                  }
+                  // Einmal-Events: genau einmal ausfuehren (Python leert die Queue).
+                  if (s.events) {
+                    for (const ev of s.events) {
+                      try {
+                        if (ev.t === 'cameraReset') resetCameraView();
+                        else if (ev.t === 'brightness') setBrightnessManual(ev.v);
+                        else if (ev.t === 'brightnessAuto') resetBrightnessAuto();
+                        else if (ev.t === 'transform') { const d = JSON.parse(ev.j); jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ); }
+                        else if (ev.t === 'addStage') jsAddStageObject(ev.stype);
+                        else if (ev.t === 'removeStage') jsRemoveStageObject(ev.id);
+                        else if (ev.t === 'selectStage') jsSelectStageObject(ev.id);
+                        else if (ev.t === 'updateStage') { const d = JSON.parse(ev.j); updateStageObjectProps(d.id, d); }
+                        else if (ev.t === 'align') jsAlignSelected(ev.mode);
+                        else if (ev.t === 'distribute') jsDistributeSelected(ev.axis);
+                        else if (ev.t === 'resizeMode') setResizeModeEnabled(ev.on);
+                        else if (ev.t === 'cameraPreset') setCameraPreset(ev.name);
+                        else if (ev.t === 'namedCameras') setNamedCameras(JSON.parse(ev.j));
+                        else if (ev.t === 'fixtureAdded') { try { addFixture(JSON.parse(ev.j)); } catch (eA) {} }
+                        else if (ev.t === 'fixtureRemoved') removeFixture(ev.fid);
+                      } catch (e2) {}
+                    }
+                  }
+                } catch (e) {}
+              });
+            } catch (e) {}
+          }, 130);
+        }
       }
     });
   } else {
