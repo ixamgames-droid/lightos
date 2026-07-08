@@ -761,6 +761,12 @@ class AppState:
             if num not in self.universes:
                 self.universes[num] = self.output_manager.add_universe(num)
             try:
+                # OUT-05: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen,
+                # damit pro Universe genau ein (oder bei "Disabled" kein) Adapter
+                # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
+                # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
+                # Licht aus.
+                self.output_manager.remove_output(num)
                 if output == "Enttec" and patch:
                     self.output_manager.add_enttec(num, patch)
                 elif output == "ArtNet":

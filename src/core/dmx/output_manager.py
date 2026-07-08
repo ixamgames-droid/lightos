@@ -187,6 +187,27 @@ class OutputManager:
     def add_sacn(self, universe: int, target_ip: str | None = None):
         self._swap_device(self._sacn_outputs, universe, SACNSender(target_ip))
 
+    def remove_output(self, universe: int):
+        """OUT-05: entfernt ALLE Ausgabe-Adapter (Enttec/ArtNet/sACN) fuer ein
+        Universe thread-sicher und schliesst sie. Noetig fuer Output-Typ-Wechsel und
+        "Disabled": frueher schrieben add_enttec/add_artnet/add_sacn nur in ihre
+        EIGENE Registry und es gab kein Remove -> nach einem Typ-Wechsel sendete
+        _send_all ueber BEIDE Adapter (Doppel-Output), ein "deaktiviertes" Universe
+        gab weiter Licht aus, und das Alt-Handle wurde nie geschlossen (Leak).
+        pop unter Lock, close ausserhalb (Muster wie _swap_device)."""
+        victims = []
+        with self._io_lock:
+            for registry in (self._enttec_outputs, self._artnet_outputs,
+                             self._sacn_outputs):
+                dev = registry.pop(universe, None)
+                if dev is not None:
+                    victims.append(dev)
+        for dev in victims:
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     def start(self):
         if self._running and self._thread and self._thread.is_alive():
             return  # bereits laufend -> kein zweiter Thread

@@ -74,6 +74,34 @@ class TestOutputManagerThreading(unittest.TestCase):
         self.assertTrue(d.closed)
         self.assertNotIn(2, self.om._enttec_outputs)
 
+    def test_remove_output_closes_all_adapters(self):
+        """OUT-05: remove_output(u) popt+schliesst Enttec/ArtNet/sACN dieses
+        Universums; andere Universen bleiben unberuehrt."""
+        d_en, d_an, d_sa, other = _FakeDev(), _FakeDev(), _FakeDev(), _FakeDev()
+        self.om._enttec_outputs[1] = d_en
+        self.om._artnet_outputs[1] = d_an
+        self.om._sacn_outputs[1] = d_sa
+        self.om._artnet_outputs[2] = other            # anderes Universe
+        self.om.remove_output(1)
+        self.assertTrue(d_en.closed and d_an.closed and d_sa.closed)
+        self.assertNotIn(1, self.om._enttec_outputs)
+        self.assertNotIn(1, self.om._artnet_outputs)
+        self.assertNotIn(1, self.om._sacn_outputs)
+        self.assertIs(self.om._artnet_outputs.get(2), other)   # U2 unberuehrt
+        self.assertFalse(other.closed)
+
+    def test_type_switch_leaves_single_adapter(self):
+        """OUT-05: der Ablauf, den apply_output_config jetzt faehrt (remove_output
+        VOR add_*), laesst pro Universe genau EINEN Adapter zurueck — kein
+        Doppel-Output nach einem Typ-Wechsel."""
+        self.om.add_artnet(1, "255.255.255.255")
+        self.assertIn(1, self.om._artnet_outputs)
+        self.om.remove_output(1)                      # wie apply_output_config
+        self.om.add_sacn(1, None)
+        self.assertNotIn(1, self.om._artnet_outputs,
+                         "alter ArtNet-Adapter muss beim Typ-Wechsel weg sein")
+        self.assertIn(1, self.om._sacn_outputs)
+
     def test_raising_device_does_not_kill_loop(self):
         self.om._enttec_outputs[1] = _RaisingDev()
         self.om.start()
