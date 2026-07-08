@@ -91,24 +91,30 @@ class ShowBuilder:
         return {k for k, _ in effect_live.list_actions(fid)}
 
     # ── Fixtures / Patch ────────────────────────────────────────────────────────
-    def profile_id(self, short_name: str) -> int:
-        """Fixture-Profil-ID per short_name — wirft BuildError, wenn es das Profil
-        nicht gibt (statt eine inerte Fixture zu patchen)."""
+    def _lookup_profile(self, short_name: str) -> tuple[int, str]:
+        """(id, fixture_type) des Profils per short_name — wirft BuildError, wenn es
+        das Profil nicht gibt (statt eine inerte Fixture zu patchen). fixture_type ist
+        der Bibliotheks-Typ des Profils (Default 'other', wenn nicht gesetzt)."""
         try:
             from sqlalchemy import select
             from sqlalchemy.orm import Session
             from src.core.database.fixture_db import engine as fdb_engine
             from src.core.database.models import FixtureProfile
             with Session(fdb_engine()) as s:
-                pid = s.execute(select(FixtureProfile.id).where(
-                    FixtureProfile.short_name == short_name)).scalar_one_or_none()
+                row = s.execute(select(FixtureProfile.id, FixtureProfile.fixture_type)
+                                .where(FixtureProfile.short_name == short_name)).first()
         except Exception as exc:
             raise BuildError(f"Fixture-DB nicht lesbar: {exc}")
-        if pid is None:
+        if row is None:
             raise BuildError(
                 f"Fixture-Profil '{short_name}' existiert nicht in der Bibliothek "
                 "(short_name) — App einmal starten (ensure_builtins) oder Profil importieren.")
-        return int(pid)
+        return int(row[0]), (row[1] or "other")
+
+    def profile_id(self, short_name: str) -> int:
+        """Fixture-Profil-ID per short_name — wirft BuildError, wenn es das Profil
+        nicht gibt (statt eine inerte Fixture zu patchen)."""
+        return self._lookup_profile(short_name)[0]
 
     def patch(self, short_name: str, *, count: int = 1, channel_count: int,
               mode_name: str = "", universe: int = 1, start_address: int | None = None,
@@ -116,7 +122,11 @@ class ShowBuilder:
         """Patcht ``count`` Fixtures eines Profils fortlaufend. Liefert die fids.
         Validiert das Profil (BuildError, wenn nicht vorhanden)."""
         from src.core.database.models import PatchedFixture
-        pid = self.profile_id(short_name)
+        # VIZ-BUILDER-FIXTYPE: den Bibliotheks-Typ des Profils gleich beim Patchen
+        # mitnehmen (statt Model-Default 'other' zu lassen) — sonst rendert der
+        # 3D-Visualizer Skript-gepatchte Fixtures als PAR-Fallback ohne DMX->Farbe/
+        # Pan/Tilt-Abbildung. Spiegelt die sync.py-Auto-Fix-Semantik, nur schon hier.
+        pid, fixture_type = self._lookup_profile(short_name)
         addr = int(start_address if start_address is not None else
                    self.state.suggest_address(universe, channel_count))
         fids: list[int] = []
@@ -127,7 +137,8 @@ class ShowBuilder:
             self.state.add_fixture(PatchedFixture(
                 fid=fid, label=(label or short_name) + (f" {i + 1}" if count > 1 else ""),
                 fixture_profile_id=pid, mode_name=mode_name, universe=universe,
-                address=addr, channel_count=channel_count), undoable=False)
+                address=addr, channel_count=channel_count,
+                fixture_type=fixture_type), undoable=False)
             fids.append(fid)
             addr += channel_count
         return fids

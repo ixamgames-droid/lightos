@@ -103,3 +103,32 @@ def test_patched_show_renders(tmp_path):
     b.save(out)
     lit, moved, _changed = b.verify_render([mx], channels=range(1, 33))
     assert lit or moved, "gepatchte Matrix erzeugt kein DMX"
+
+
+@pytest.mark.skipif(not _db_seeded(), reason="Fixture-DB nicht geseedet")
+def test_patch_inherits_fixture_type_from_profile():
+    """VIZ-BUILDER-FIXTYPE: patch() übernimmt den fixture_type des Profils, sonst
+    rendert der 3D-Visualizer Skript-gepatchte Fixtures als PAR-Fallback ('other' ->
+    keine DMX->Farbe/Pan/Tilt-Abbildung)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from src.core.database.fixture_db import engine as fdb_engine
+    from src.core.database.models import FixtureProfile
+    from src.core.show.showbuilder import ShowBuilder
+
+    # Profil-Typ unabhängig aus der Bibliothek holen (nicht über den Builder-Helfer,
+    # damit der Test die Auswirkung prüft, nicht die Implementierung).
+    with Session(fdb_engine()) as s:
+        profile_type = s.execute(
+            select(FixtureProfile.fixture_type)
+            .where(FixtureProfile.short_name == "ZQ01424")).scalar_one_or_none()
+    if profile_type in (None, "", "other"):
+        pytest.skip("ZQ01424 fehlt oder hat keinen spezifischen Typ in dieser Bibliothek")
+
+    b = ShowBuilder()
+    fids = b.patch("ZQ01424", count=2, channel_count=8, mode_name="8-Kanal RGBW")
+    patched = {pf.fid: pf for pf in b.state.get_patched_fixtures()}
+    for fid in fids:
+        assert patched[fid].fixture_type == profile_type, (
+            f"patch() ließ fixture_type='{patched[fid].fixture_type}' statt "
+            f"'{profile_type}' (aus FixtureProfile ZQ01424)")

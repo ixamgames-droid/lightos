@@ -35,22 +35,8 @@ def main():
     spider_fids = b.patch("SPIDER14",  count=2, channel_count=14, mode_name="14-Kanal")
     laser_fids  = b.patch("L2600LASER",count=2, channel_count=6,  mode_name="6-Kanal (Simple DMX)")
     print(f"[patch] PAR={par_fids} MH={mh_fids} Spider={spider_fids} Laser={laser_fids}")
-
-    # WICHTIG: builder.patch() laesst fixture_type auf Default 'other' -> der
-    # 3D-Visualizer kann DMX dann nicht auf Farbe/Pan/Tilt mappen (Effekte
-    # faerben/bewegen NICHT). Typ aus dem jeweiligen Profil nachziehen.
-    from sqlalchemy import select as _select
-    from sqlalchemy.orm import Session as _Sess
-    from src.core.database.fixture_db import engine as _fdb_engine
-    from src.core.database.models import FixtureProfile as _FP
-    with _Sess(_fdb_engine()) as _s:
-        _ptypes = dict(_s.execute(_select(_FP.id, _FP.fixture_type)).all())
-    for _f in b.state.get_patched_fixtures():
-        _ft = _ptypes.get(_f.fixture_profile_id)
-        if _ft and _ft != _f.fixture_type:
-            b.state.update_fixture(_f.fid, undoable=False, fixture_type=_ft)
-    print("[type] fixture_type je Profil gesetzt:",
-          {f.fid: f.fixture_type for f in b.state.get_patched_fixtures()})
+    # Hinweis: builder.patch() übernimmt fixture_type jetzt selbst aus dem Profil
+    # (VIZ-BUILDER-FIXTYPE) — der frühere manuelle Nachzieh-Block ist entfallen.
 
     # ---- 2) GRUPPEN (4) ----
     def _grp(session, name, fids):

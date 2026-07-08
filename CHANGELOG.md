@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — ShowBuilder: Skript-gepatchte Fixtures erben den fixture_type des Profils (VIZ-BUILDER-FIXTYPE)
+
+#### Geaendert / Fixes
+
+- **3D-Visualizer färbt/bewegt Skript-gebaute Shows jetzt korrekt:** `ShowBuilder.patch()` ließ `fixture_type` auf dem Model-Default `'other'` — der 3D-Visualizer (`registry.js`) fällt für `'other'` auf den PAR-Builder zurück und mappt DMX **nicht** auf Farbe/Pan/Tilt, sodass Effekte in per-Skript gebauten Shows die Geräte weder färbten noch bewegten. Fix: `patch()` liest über den neuen Helfer `_lookup_profile()` neben der Profil-ID auch den `fixture_type` des `FixtureProfile` und setzt ihn direkt beim Anlegen der `PatchedFixture`. Das spiegelt die bereits existierende `sync.py`-Auto-Fix-Semantik (generischer Typ → Profil-Typ übernehmen), nur schon beim Patchen statt erst bei einer Validierungs-/Sync-Runde.
+- **Aufräumen:** Der dadurch redundante manuelle Nachzieh-Block in `tools/build_grosses_rig.py` (loopte nach `patch()` über alle Fixtures und setzte den Typ per `update_fixture`) wurde entfernt.
+- Dateien: `src/core/show/showbuilder/builder.py`, `tools/build_grosses_rig.py`; Test NEU `tests/test_showbuilder.py::test_patch_inherits_fixture_type_from_profile` (querabgesichert gegen den echten Profil-Typ aus der Bibliothek, unabhängig von der Implementierung).
+
 ### 2026-07-08 — VC-Fader „Playback": dediziertes playback_slot-Feld statt function_id-Zweckentfremdung (DQ-2)
 
 #### Geaendert / Fixes
