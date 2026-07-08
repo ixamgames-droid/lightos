@@ -236,5 +236,74 @@ class TestOutputManagerThreadTimeoutTracking(unittest.TestCase):
             om.stop()
 
 
+class _FakeEnttec:
+    """Enttec-Signatur: send_dmx(data). Zeichnet die empfangenen Frames auf."""
+    def __init__(self):
+        self.frames = []          # je Eintrag: bytes(data)
+
+    def send_dmx(self, data):
+        self.frames.append(bytes(data))
+
+    def close(self):
+        pass
+
+
+class _FakeArtNet:
+    """Art-Net-Signatur: send_dmx(universe, data). Zeichnet (universe, data) auf."""
+    def __init__(self):
+        self.frames = []          # je Eintrag: (universe, bytes(data))
+
+    def send_dmx(self, universe, data):
+        self.frames.append((universe, bytes(data)))
+
+    def close(self):
+        pass
+
+
+class TestOutputManagerMixedSend(unittest.TestCase):
+    """QA-07: Zwei Universen, zwei VERSCHIEDENE Adapter — jeder bekommt genau
+    seine Frames, keiner fremde Daten; der Art-Net-Sender sieht die erwartete
+    externe Universe-Nummer (``univ_num - 1``). Sichert den zentralen Mixed-Send-
+    Pfad ``_send_all`` (output_manager.py) gegen Regression (falsches Routing /
+    Universe-Vertauschung)."""
+
+    def setUp(self):
+        self.om = OutputManager()
+        self.u1 = self.om.add_universe(1)
+        self.u2 = self.om.add_universe(2)
+        # GM/Blackout neutral -> Kanalwerte gehen unveraendert durch (Default ist
+        # bereits GM=1.0/Blackout=False; hier explizit fuer Robustheit).
+        self.om.grand_master = 1.0
+        self.om._blackout = False
+        # Unterscheidbare Kanal-1-Werte je Universum.
+        self.u1.set_channel(1, 11)
+        self.u2.set_channel(1, 22)
+        self.enttec = _FakeEnttec()
+        self.artnet = _FakeArtNet()
+        self.om._enttec_outputs[1] = self.enttec   # Enttec bedient NUR U1
+        self.om._artnet_outputs[2] = self.artnet   # Art-Net bedient NUR U2
+
+    def tearDown(self):
+        self.om.stop()
+
+    def test_each_adapter_gets_only_its_universe(self):
+        self.om._send_all()
+
+        # Enttec (U1): genau EIN Frame, mit U1-Daten (Kanal 1 == 11).
+        self.assertEqual(len(self.enttec.frames), 1, "Enttec muss genau 1 Frame kriegen")
+        self.assertEqual(self.enttec.frames[0][0], 11, "Enttec sah nicht die U1-Daten")
+
+        # Art-Net (U2): genau EIN Frame, mit U2-Daten (Kanal 1 == 22) UND der
+        # erwarteten externen Universe-Nummer (univ_num-1 = 2-1 = 1).
+        self.assertEqual(len(self.artnet.frames), 1, "Art-Net muss genau 1 Frame kriegen")
+        art_univ, art_data = self.artnet.frames[0]
+        self.assertEqual(art_univ, 1, "Art-Net-Universe muss univ_num-1 (=1) sein")
+        self.assertEqual(art_data[0], 22, "Art-Net sah nicht die U2-Daten")
+
+        # Kein Adapter sah die Daten des jeweils ANDEREN Universums.
+        self.assertNotEqual(self.enttec.frames[0][0], 22, "Enttec bekam fremde (U2-)Daten")
+        self.assertNotEqual(art_data[0], 11, "Art-Net bekam fremde (U1-)Daten")
+
+
 if __name__ == "__main__":
     unittest.main()
