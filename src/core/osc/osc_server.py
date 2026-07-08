@@ -86,10 +86,23 @@ class OscServer:
 
     def _handle_blackout(self, address, *args):
         try:
-            val = bool(args[0]) if args else False
+            val = self._as_on(args[0]) if args else False
             self._get_state().output_manager.set_blackout(val)
         except Exception:
             pass
+
+    @staticmethod
+    def _as_on(raw) -> bool:
+        """OSC-04: /blackout typ-tolerant lesen. `bool(args[0])` war falsch, weil ein
+        STRING-Argument '0'/'off' truthy ist (bool('0')==True -> Blackout AN statt AUS).
+        Getypte OSC-int/float (TouchOSC/Lemur) werden numerisch geschwellt, Strings
+        gegen die ueblichen Aus-Token geprueft."""
+        if isinstance(raw, str):
+            return raw.strip().lower() not in ("", "0", "off", "false", "no")
+        try:
+            return float(raw) >= 0.5
+        except (TypeError, ValueError):
+            return bool(raw)
 
     def _handle_clear(self, address, *args):
         try:

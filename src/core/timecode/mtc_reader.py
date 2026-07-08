@@ -34,6 +34,11 @@ class MTCReader:
 
         # Working buffers (8 pieces accumulate one frame)
         self._buf = [0, 0, 0, 0, 0, 0, 0, 0]
+        # MTC-02: Bitmaske der seit dem letzten Feuern empfangenen Quarter-Frame-
+        # Pieces (Bit i = piece i gesehen). Nur bei vollstaendigem 0..7-Satz feuern —
+        # sonst wuerde bei Mid-Stream-Attach/verlorenem Piece ein Frame aus alten +
+        # neuen Nibbles zusammengesetzt (kurz falscher Timecode).
+        self._qf_seen = 0
 
         self._callbacks: list[Callable[[int, int, int, int], None]] = []
         self._midi_input = None
@@ -113,8 +118,17 @@ class MTCReader:
         piece = (data >> 4) & 0x07
         value = data & 0x0F
         self._buf[piece] = value
+        self._qf_seen |= (1 << piece)          # MTC-02: dieses Piece gesehen
         # When we receive piece 7 (the last) -> full frame is available
         if piece == 7:
+            # MTC-02: nur feuern, wenn ALLE 8 Pieces seit dem letzten Feuern kamen —
+            # sonst (Mid-Stream-Attach, verlorenes Piece) haette self._buf gemischte
+            # alte+neue Nibbles. Unvollstaendig -> Fenster verwerfen, naechster
+            # kompletter 0..7-Satz feuert dann mit frischem _buf.
+            complete = self._qf_seen == 0xFF
+            self._qf_seen = 0
+            if not complete:
+                return
             # Frame:        buf[0] = LS nibble of frames, buf[1] = MS nibble (lower 1 bit)
             frames = self._buf[0] | ((self._buf[1] & 0x01) << 4)
             seconds = self._buf[2] | ((self._buf[3] & 0x03) << 4)

@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — OSC-Blackout & MTC-Frame robuster (OSC-04 + MTC-02, aus AUD-08)
+
+#### Geaendert / Fixes
+
+- **OSC `/lightos/blackout` invertiert nicht mehr bei String-Argumenten (OSC-04):** `val = bool(args[0])` machte aus einem String-Typetag „0"/„off" ein `True` (jeder nicht-leere String ist truthy) → Blackout **AN** statt AUS. Neu: `OscServer._as_on()` interpretiert typ-tolerant — numerische Args über die Schwelle `>= 0.5`, Strings gegen die Aus-Token `{"","0","off","false","no"}`. Getypte int/float von TouchOSC/Lemur (0/1) verhalten sich unverändert korrekt.
+- **MTC feuert nur bei vollständigem Quarter-Frame-Satz (MTC-02):** `_handle_quarter_frame` feuerte bedingungslos bei `piece==7` → bei Mid-Stream-Attach oder einem verlorenen Piece wurde ein Frame aus **gemischten** alten+neuen Nibbles zusammengesetzt (kurz falscher Timecode). Neu: eine Bitmaske `_qf_seen` verfolgt die empfangenen Pieces; gefeuert wird nur, wenn alle 8 (`0xFF`) seit dem letzten Feuern kamen — ein unvollständiges Fenster wird verworfen, der nächste komplette 0..7-Satz feuert mit frischem Puffer.
+- **Tests:** NEU `tests/test_osc_mtc_robustness.py` (8) — Blackout-Coercion für String-/typed-Args; MTC feuert nicht bei unvollständigem/lückenhaftem Satz, feuert genau einmal bei vollständigem (Sekunden korrekt dekodiert), erholt sich nach einem unvollständigen Fenster. Herkunft: AUD-08 (`docs/OSC_TIMECODE_AUDIT_2026_07_08.md`). MTC-01 (Frame-Wrap, Drop-Frame) + MTC-03 (Torn-Read) bleiben als dokumentierte P3.
+
 ### 2026-07-08 — OSC- & Timecode/MTC-Remote-Eingang-Audit (AUD-08)
 
 #### Doku / Audit
