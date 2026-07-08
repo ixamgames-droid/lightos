@@ -588,6 +588,29 @@ class ShowFileTests(unittest.TestCase):
         finally:
             _FakeEfxInstance.from_dict = orig
 
+    def test_show_without_palettes_key_clears_previous(self):
+        """STAB-19: eine Show OHNE palettes-Key verwirft die Paletten der Vorshow
+        (Bleed) — pm.from_dict({}) wird aufgerufen, nicht gar nichts."""
+        self.state._flush_all_to_dmx = lambda: None
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "1.2", "name": "NoPalettes", "patch": [],
+                "functions": {"functions": []}})   # KEIN palettes-Key
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.palette_manager.loaded, {})   # geleert, nicht alt
+
+    def test_show_with_palettes_key_loads_them(self):
+        """Gegenprobe: mit palettes-Key werden genau diese geladen."""
+        self.state._flush_all_to_dmx = lambda: None
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "1.2", "name": "P", "patch": [],
+                "functions": {"functions": []},
+                "palettes": {"palettes": [{"name": "X"}]}})
+            self.assertTrue(ok, msg)
+            self.assertEqual(self.palette_manager.loaded,
+                             {"palettes": [{"name": "X"}]})
+
 
 class _FakeStateWithDB(_FakeState):
     """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""
