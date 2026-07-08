@@ -22,6 +22,18 @@ def _get_state():
     return get_state()
 
 
+def _num(data, key, default, cast):
+    """Robuste Zahl-Coercion aus einem (JSON-)Dict: bei fehlendem, nicht-
+    numerischem oder nicht-endlichem (int(inf)/int(NaN)) Wert wird der Default
+    zurückgegeben — kein ungefangener HTTP 500 / Handler-Crash aus einem
+    fehlerhaften Remote-Payload heraus (WEB-02). Die anschließenden Clamps
+    (max/min) bleiben die einzige Wert-Leitplanke."""
+    try:
+        return cast(data.get(key, default))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
 def create_app() -> tuple:
     """Create and configure the Flask app + SocketIO."""
     global _flask_app, _socketio
@@ -50,7 +62,10 @@ def _register_routes(app):
     def status():
         state = _get_state()
         fixtures = state.get_patched_fixtures()
-        stacks = [{"name": s.name, "cues": len(s.cues)} for s in state.cue_stacks]
+        # WEB-05: über eine Kopie iterieren — der Web-Thread läuft nebenläufig zum
+        # UI-/Output-Thread; ein Show-Load darf hier kein „changed size during
+        # iteration" auslösen.
+        stacks = [{"name": s.name, "cues": len(s.cues)} for s in list(state.cue_stacks)]
         return jsonify({
             "fixtures": len(fixtures),
             "universes": list(state.universes.keys()),
@@ -60,16 +75,18 @@ def _register_routes(app):
 
     @app.route("/api/go", methods=["POST"])
     def api_go():
-        state = _get_state()
-        if state.cue_stacks:
-            state.cue_stacks[0].go()
+        # WEB-04: lokale Referenz greifen -> kein TOCTOU-IndexError, falls die
+        # Liste zwischen Prüfung und Index-Zugriff nebenläufig geleert wird.
+        stacks = _get_state().cue_stacks
+        if stacks:
+            stacks[0].go()
         return jsonify({"ok": True})
 
     @app.route("/api/back", methods=["POST"])
     def api_back():
-        state = _get_state()
-        if state.cue_stacks:
-            state.cue_stacks[0].back()
+        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        if stacks:
+            stacks[0].back()
         return jsonify({"ok": True})
 
     @app.route("/api/blackout", methods=["POST"])
@@ -82,7 +99,7 @@ def _register_routes(app):
     @app.route("/api/executor/<int:slot>/fader", methods=["POST"])
     def api_fader(slot: int):
         data = request.get_json(silent=True) or {}
-        level = float(data.get("level", 1.0))
+        level = _num(data, "level", 1.0, float)   # WEB-02: kein 500 bei kaputtem Payload
         state = _get_state()
         executors = state.playback_engine.executors
         idx = slot - 1
@@ -102,7 +119,7 @@ def _register_routes(app):
     @app.route("/api/channel/<int:universe>/<int:channel>", methods=["POST"])
     def api_channel(universe: int, channel: int):
         data = request.get_json(silent=True) or {}
-        value = int(data.get("value", 0))
+        value = _num(data, "value", 0, int)      # WEB-02: kein 500 bei kaputtem Payload
         state = _get_state()
         if universe in state.universes and 1 <= channel <= 512:
             state.universes[universe].set_channel(channel, max(0, min(255, value)))
@@ -123,29 +140,31 @@ def _register_socketio(sio):
 
     @sio.on("go")
     def on_go(data=None):
-        state = _get_state()
-        if state.cue_stacks:
-            state.cue_stacks[0].go()
+        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        if stacks:
+            stacks[0].go()
         sio.emit("ack", {"action": "go"})
 
     @sio.on("back")
     def on_back(data=None):
-        state = _get_state()
-        if state.cue_stacks:
-            state.cue_stacks[0].back()
+        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        if stacks:
+            stacks[0].back()
         sio.emit("ack", {"action": "back"})
 
     @sio.on("fader")
-    def on_fader(data):
-        slot = int(data.get("slot", 1))
-        level = float(data.get("level", 1.0))
+    def on_fader(data=None):
+        data = data or {}                     # WEB-03: leerer Emit -> kein AttributeError
+        slot = _num(data, "slot", 1, int)     # WEB-02: kein Handler-Crash bei kaputtem Payload
+        level = _num(data, "level", 1.0, float)
         state = _get_state()
         idx = slot - 1
         if 0 <= idx < len(state.playback_engine.executors):
             state.playback_engine.executors[idx].fader_value = max(0.0, min(1.0, level))
 
     @sio.on("blackout")
-    def on_blackout(data):
+    def on_blackout(data=None):
+        data = data or {}                     # WEB-03: leerer Emit -> kein AttributeError
         enabled = bool(data.get("enabled", False))
         _get_state().output_manager.set_blackout(enabled)
 

@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Web-Remote: robuster gegen fehlerhafte Requests + Tests (WEB-02/03/04/05, aus AUD-05)
+
+#### Geaendert / Fixes
+
+- **Kaputte Remote-Requests werfen keinen HTTP 500 / Handler-Crash mehr:** Die Web-Remote-Endpunkte konvertierten `level`/`value` aus dem JSON-Body ungeschützt per `float()`/`int()` — ein nicht-numerischer (oder `Infinity`/`NaN`) Wert erzeugte eine ungefangene Exception (WEB-02). Neuer Helfer `_num(...)` fängt das ab und nutzt den Default; verdrahtet in `api_fader`, `api_channel`, `on_fader`. Die SocketIO-Handler `on_fader`/`on_blackout` crashten zudem bei einem Emit **ohne** Payload (`data=None`) — jetzt `data=None`-Default + `data = data or {}` (WEB-03).
+- **Nebenläufigkeit gehärtet:** `/api/go`, `/api/back` und die SocketIO-Pendants greifen die Cue-Stack-Liste über eine lokale Referenz statt `if …: …[0]` (kein TOCTOU-`IndexError`, wenn eine Show währenddessen geladen wird; WEB-04). `/api/status` iteriert die Cue-Stacks über eine Snapshot-Kopie (kein „changed size during iteration"; WEB-05).
+- **Tests:** NEU `tests/test_web_app.py` (17 Tests) — der bislang komplett ungetestete externe Steuer-Eingang ist jetzt gegen Clamping, Bereichs-Guards, Payload-Fehlertoleranz und Routing abgesichert.
+- Datei: `src/web/app.py`. Herkunft: AUD-05-Audit (`docs/WEB_REMOTE_AUDIT_2026_07_08.md`); die Security-Befunde NET-01/02/03 + WEB-01 bleiben als offene Items (brauchen Produkt-Entscheidungen).
+
 ### 2026-07-08 — Ausgabe: Art-Net/sACN „Übernehmen" zerschießt nicht mehr andere Universen (OUT-04)
 
 #### Geaendert / Fixes
