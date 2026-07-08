@@ -97,6 +97,9 @@ class VCSlider(VCWidget):
         super().__init__(caption, parent)
         self.mode = SliderMode.LEVEL
         self.function_id: int | None = None
+        # DQ-2: dedizierter Executor-Slot fuer den PLAYBACK-Modus (frueher wurde
+        # function_id zweckentfremdet). None = nicht gesetzt.
+        self.playback_slot: int | None = None
         # Mehrere Effekt-IDs = Gruppen-Submaster: der Fader regelt in den
         # EFFECT_*-Modi ALLE gelisteten Effekte gemeinsam (Intensitaet/Speed).
         # Leer -> Einzel-Effekt ueber function_id (bzw. aktiver Effekt).
@@ -302,10 +305,10 @@ class VCSlider(VCWidget):
                 u = state.output_manager.add_universe(self.dmx_universe)
                 state.universes[self.dmx_universe] = u
             u.set_channel(self.dmx_channel, v)
-        elif self.mode == SliderMode.PLAYBACK and self.function_id is not None:
-            slot = self.function_id
+        elif self.mode == SliderMode.PLAYBACK and self.playback_slot is not None:
+            slot = self.playback_slot
             executors = state.playback_engine.executors
-            if slot < len(executors):
+            if 0 <= slot < len(executors):
                 executors[slot].fader_value = v / 255.0
         elif self.mode == SliderMode.SUBMASTER:
             # Zuweisbarer Submaster: eigener Slot pro Fader (id(self)), optional auf
@@ -888,6 +891,15 @@ class VCSlider(VCWidget):
                                          collapsed=True, prefs_key="vc_slider_advanced")
         form.addRow(adv_section)
 
+        # DQ-2: dediziertes Playback-Slot-Feld (eigener Eingang statt function_id-
+        # Zweckentfremdung). Nur im PLAYBACK-Modus sichtbar (siehe Sichtbarkeit unten).
+        playback_slot_spin = QSpinBox()
+        playback_slot_spin.setRange(-1, 999)
+        playback_slot_spin.setValue(self.playback_slot if self.playback_slot is not None else -1)
+        playback_slot_spin.setSpecialValueText("nicht gesetzt")
+        playback_slot_spin.setToolTip("Executor-Slot-Index (0-basiert) fuer den Playback-Modus.")
+        form.addRow("Playback Executor-Slot:", playback_slot_spin)
+
         # ── Kontextabhängige Feld-Sichtbarkeit ──
         # Zeigt je Modus nur die passenden Felder; Beschriftung/Modus + Leitplanken
         # (Invert/Min/Max) bleiben immer sichtbar.
@@ -910,15 +922,13 @@ class VCSlider(VCWidget):
                 autostart_cb:    eff,
                 univ:            m == SliderMode.LEVEL,
                 ch:              m == SliderMode.LEVEL,
-                adv_section:     eff or m == SliderMode.PLAYBACK,
-                bus_cb:          m == SliderMode.TEMPO_BUS,
-                target_editor:   eff,
+                adv_section:        eff,
+                playback_slot_spin: m == SliderMode.PLAYBACK,
+                bus_cb:             m == SliderMode.TEMPO_BUS,
+                target_editor:      eff,
             }
             for widget, show in vis.items():
                 form.setRowVisible(widget, bool(show))
-            # Playback: das Roh-Slot-Feld ist der einzige Eingang -> aufklappen.
-            if m == SliderMode.PLAYBACK:
-                adv_section.set_expanded(True)
 
         mode_cb.currentIndexChanged.connect(lambda _i: _update_slider_fields())
         _update_slider_fields()
@@ -977,6 +987,9 @@ class VCSlider(VCWidget):
                                               if k in _keep}
             self.function_ids = ids
             self.function_id = ids[0] if ids else None
+            # DQ-2: Playback-Executor-Slot aus dem dedizierten Feld (>=0), sonst None.
+            _ps = playback_slot_spin.value()
+            self.playback_slot = _ps if _ps >= 0 else None
             _pk_text = param_key_combo.currentText().strip()
             _pk_hit = param_key_combo.findText(_pk_text)
             if _pk_hit >= 0 and param_key_combo.itemData(_pk_hit):
@@ -1056,6 +1069,7 @@ class VCSlider(VCWidget):
         d["mode"] = self.mode
         d["function_id"] = self.function_id
         d["function_ids"] = list(self.function_ids)
+        d["playback_slot"] = self.playback_slot      # DQ-2
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
@@ -1089,6 +1103,15 @@ class VCSlider(VCWidget):
         self.mode = _mode
         self.function_id = d.get("function_id")
         self.function_ids = [int(i) for i in d.get("function_ids", []) if str(i).strip().lstrip("-").isdigit()]
+        # DQ-2: dediziertes playback_slot-Feld. Alt-Shows speicherten den Executor-
+        # Slot im PLAYBACK-Modus in function_id -> migrieren, wenn playback_slot fehlt.
+        _ps = d.get("playback_slot")
+        if _ps is None and self.mode == SliderMode.PLAYBACK:
+            _ps = d.get("function_id")
+        try:
+            self.playback_slot = int(_ps) if _ps is not None else None
+        except (TypeError, ValueError):
+            self.playback_slot = None
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")

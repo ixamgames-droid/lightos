@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — VC-Fader „Playback": dediziertes playback_slot-Feld statt function_id-Zweckentfremdung (DQ-2)
+
+#### Geaendert / Fixes
+
+- **Sauberere Datenhaltung für Playback-Fader:** Ein VC-Fader im Modus „Playback (Executor)" speicherte den Ziel-Executor-Slot bisher in `function_id` — demselben Feld, das alle anderen Modi als echte Funktions-ID nutzen (Zweckentfremdung). Jetzt gibt es ein dediziertes `playback_slot`: eine eigene Spinbox „Playback Executor-Slot" im Eigenschaften-Dialog (nur im Playback-Modus sichtbar, „nicht gesetzt" = leer) mit eigenem Persistenz-Schlüssel. Der `_apply()`-Pfad routet Playback jetzt über `playback_slot` — inkl. Guard `0 <= slot < len(executors)` gegen negative/zu große Slots (vorher nur obere Grenze).
+- **Rückwärtskompatibel:** Alt-Shows, die den Slot noch in `function_id` (im Playback-Modus) hielten, migrieren beim Laden automatisch nach `playback_slot`, falls der neue Schlüssel fehlt. Nicht-Playback-Fader bleiben unberührt (keine Slot-Migration); ein explizit gesetztes `playback_slot` gewinnt immer.
+- Datei: `src/ui/virtualconsole/vc_slider.py`; Test NEU `tests/test_vc_slider_playback_slot.py` (7 Tests: Roundtrip, Migration, Nicht-Playback-unberührt, explizit-gewinnt, Apply-Ziel korrekt, None-/Out-of-Range-Slot safe).
+- _Hinweis: löst die geparkte Design-Entscheidung **DQ-2** zugunsten der sauberen Trennung auf (vorheriger Default war „nur dokumentieren"); trivial revertierbar._
+
 ### 2026-07-07 — Patch → Fixture-Gruppen (Grid-Editor): Auswahl bleibt stabil, Drop rastet ein (PATCH-GRP-01)
 
 #### Geaendert / Fixes
