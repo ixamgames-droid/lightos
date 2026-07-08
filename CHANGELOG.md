@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Live-View: Gerätezähler stimmt sofort beim Öffnen (UI-21)
+
+#### Geaendert / Fixes
+
+- **Kopfzeilen-Gerätezähler wird beim Bau initial gefüllt:** Der Zähler „N Geräte im Patch" oben in der Bühnen-/Live-Ansicht wurde ausschließlich über einen 500 ms-Timer (`_info_timer`) aktualisiert — `LiveView.__init__` rief `_refresh_info()` nie selbst. Öffnete man die Ansicht mit einer bereits gepatchten Show, zeigte die Kopfzeile bis zum ersten Timer-Tick „0 Geräte im Patch". Fix: `__init__` ruft `_refresh_info()` am Ende einmal aktiv auf (Initial-Pull) — der Zähler (und das Auswahl-Label) stimmen ab dem ersten Frame. Gleiche Bug-Klasse wie UI-05/UI-09 (fehlender Initial-Pull nach `__init__`).
+- Datei: `src/ui/views/live_view.py`; Test NEU `tests/test_live_view_fixes.py::test_info_label_initial_pull`.
+
 ### 2026-07-08 — ShowBuilder: Skript-gepatchte Fixtures erben den fixture_type des Profils (VIZ-BUILDER-FIXTYPE)
 
 #### Geaendert / Fixes

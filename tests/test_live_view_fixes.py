@@ -165,3 +165,31 @@ def test_global_selection_mirrors_to_canvas():
     lv = LiveView()
     lv._on_global_selection_changed([5, 6])
     assert lv._canvas._selected_fids == [5, 6]
+
+
+def test_info_label_initial_pull(monkeypatch):
+    """UI-21: Der Gerätezähler in der Kopfzeile wird schon im __init__ gefüllt
+    (Initial-Pull), nicht erst nach dem ersten 500ms-Tick des _info_timer — sonst
+    zeigt er "0 Geräte im Patch", auch wenn beim Bau schon gepatcht ist
+    (Bug-Klasse UI-05/UI-09)."""
+    _app()
+    calls = []
+    orig = LiveView._refresh_info
+
+    def _spy(self):
+        calls.append(1)
+        orig(self)
+
+    monkeypatch.setattr(LiveView, "_refresh_info", _spy)   # Klassen-Attr: sauber restauriert
+    lv = LiveView()
+    # (1) __init__ pullt den Zähler aktiv (ohne Timer-Tick).
+    assert calls, "_refresh_info wurde im __init__ nicht aufgerufen (kein Initial-Pull)"
+    # (2) _refresh_info schreibt die echte Anzahl sofort in den Zähler.
+    fx = [SimpleNamespace(fid=i) for i in range(1, 4)]     # 3 Fake-Fixtures
+    lv._state.get_patched_fixtures = lambda: list(fx)       # Instanz-Override
+    try:
+        lv._refresh_info()
+        assert lv._lbl_info.text() == "3 Geräte im Patch", lv._lbl_info.text()
+    finally:
+        # Instanz-Override abräumen -> Klassenmethode kommt zurück (sonst Test-Leak).
+        lv._state.__dict__.pop("get_patched_fixtures", None)
