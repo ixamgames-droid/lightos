@@ -74,6 +74,7 @@ def _state(fixtures, writes):
     st.fixture_dimmers = {}
     st.feature_dimmers = {}
     st._prog_lock = threading.RLock()
+    st._fd_lock = threading.RLock()   # STAB-13: Setter/Renderer snapshotten darunter
     st.output_manager = types.SimpleNamespace(set_gm_address_mask=lambda m: None)
     return st
 
@@ -166,6 +167,7 @@ class SetFeatureDimmerApiTest(unittest.TestCase):
     def _st(self):
         st = AppState.__new__(AppState)
         st.feature_dimmers = {}
+        st._fd_lock = threading.RLock()   # STAB-13
         return st
 
     def test_stores_featuredimmer(self):
@@ -194,6 +196,48 @@ class SetFeatureDimmerApiTest(unittest.TestCase):
         st.set_feature_dimmer("s", [1], None, 0.5)
         st.clear_feature_dimmers()
         self.assertEqual(st.feature_dimmers, {})
+
+
+class FeatureDimmerConcurrencyTest(unittest.TestCase):
+    """STAB-13: Der Renderer (Schritt 4b²) snapshottet feature_dimmers unter
+    _fd_lock, statt die live .values()-View zu iterieren. Ein anderer Thread darf
+    die dict-Groesse aendern, ohne dass der Frame mit
+    'dict changed size during iteration' abbricht (frueher: Exception steigt auf,
+    Commit entfaellt -> Dropped-Frame-Stutter)."""
+
+    def test_concurrent_slot_mutation_does_not_break_render(self):
+        st = _state(_PAR, {})   # PAR mit echtem Dimmer@1
+        errors = []
+        stop = threading.Event()
+
+        def writer():
+            while not stop.is_set():
+                # Groessen-Oszillation: Slot anlegen (level<0.999) und wieder
+                # entfernen (level>=0.999 -> pop) -> dict waechst/schrumpft.
+                st.set_feature_dimmer("w", [1], {"Intensity"}, 0.5)
+                st.set_feature_dimmer("w", [1], {"Intensity"}, 1.0)
+
+        t = threading.Thread(target=writer, daemon=True)
+        t.start()
+        try:
+            for _ in range(400):
+                try:
+                    st._render_frame(0.02)
+                except Exception as exc:   # noqa: BLE001
+                    errors.append(repr(exc))
+                    break
+        finally:
+            stop.set()
+            t.join(timeout=2.0)
+        self.assertEqual(errors, [], f"Render warf unter Nebenlaeufigkeit: {errors}")
+
+    def test_render_uses_snapshot_not_live_view(self):
+        """Positiv: mit gesetztem Slot dimmt 4b² weiterhin korrekt (Snapshot enthaelt
+        die Slots) — der Lock-Umbau aendert das Ergebnis nicht."""
+        st = _state(_PAR, {1: 200})   # Effekt treibt Dimmer@1 auf 200
+        st.set_feature_dimmer("s", [1], {"Intensity"}, 0.5)
+        st._render_frame(0.02)
+        self.assertEqual(_v(st, 1), 100)   # 200 * 0.5
 
 
 if __name__ == "__main__":

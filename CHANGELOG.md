@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Render-Thread: `feature_dimmers` gegen Dropped-Frame gehärtet (STAB-13, aus AUD-02)
+
+#### Geaendert / Fixes
+
+- **Kein Dropped-Frame-Stutter mehr durch Feature-Dimmer:** Der Per-Frame-Renderer (Schritt 4b², `app_state.py`) iterierte `feature_dimmers` als **einzige** Ebene über die live `.values()`-View (ohne Lock-Snapshot, anders als Programmer/Simple-Desk/Input). Änderte ein UI-Thread währenddessen die dict-**Größe** (Slider-Slot anlegen/entfernen beim Schwellen-Crossing, `clear_feature_dimmers` beim Show-Load), warf CPython `RuntimeError: dictionary changed size during iteration` → der Block war nicht gekapselt, die Exception verwarf den ganzen Frame (Commit entfiel, alle Universen behielten den Vorframe) → sichtbarer Micro-Stutter. **Fix:** neuer `_fd_lock`; `set_feature_dimmer`/`clear_feature_dimmers` schreiben darunter, der Renderer zieht davor **einen** Snapshot (`list(feature_dimmers.values())`) — die Slot-Objekte sind unveränderlich, der Snapshot also stabil.
+- **Tests:** `tests/test_feature_dimmer.py` — neuer `FeatureDimmerConcurrencyTest` (Writer-Thread oszilliert die Slot-Größe, 400 Render-Frames laufen fehlerfrei durch; + Positiv-Test, dass der Snapshot weiterhin korrekt dimmt). Herkunft: AUD-02 (`docs/RENDER_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — Render-Pfad-Audit `_render_frame` (AUD-02)
 
 #### Doku / Audit

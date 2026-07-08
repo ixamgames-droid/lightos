@@ -215,7 +215,12 @@ class AppState:
         self.fixture_dimmers: dict[int, float] = {}
         # F-26: Feature-Dimmer-Master pro Slot (stabile Slider-ID -> FeatureDimmer).
         # Effekt-unabhaengiger Helligkeits-/Feature-Master, s. Render-Schritt 4b².
+        # STAB-13: _fd_lock schuetzt feature_dimmers gegen den lock-freien Renderer
+        # (Schritt 4b² snapshottet unter diesem Lock) — sonst wirft eine GROESSEN-
+        # Aenderung aus dem UI-Thread (Slot anlegen/pop/clear) "dict changed size
+        # during iteration" und verwirft den ganzen Frame.
         self.feature_dimmers: dict = {}
+        self._fd_lock = threading.RLock()
         # EFX-/RGB-Matrix-Effekt-Instanzen — Single Source of Truth.
         # EfxView und RgbMatrixView lesen/schreiben direkt diese Listen
         # (gemeinsame Referenz), show/show_file.py persistiert sie in der .lshow.
@@ -1537,9 +1542,17 @@ class AppState:
         #      Slots skaliert (kein Doppel-Dimmen). Shutter/Strobe wird ueber
         #      'Intensity' NICHT mitgedimmt (nicht in inten_addrs — konsistent zum
         #      Grand Master). Nur aktiv, wenn ueberhaupt Slots existieren.
-        fd_slots = getattr(self, "feature_dimmers", None)
-        if fd_slots:
-            active = [s for s in fd_slots.values()
+        # STAB-13: unter _fd_lock EINEN Snapshot der (unveraenderlichen) Slot-Objekte
+        # ziehen — nicht die live .values()-View iterieren (UI-Thread kann die
+        # dict-Groesse aendern -> "dict changed size during iteration" -> Frame weg).
+        fd_lock = getattr(self, "_fd_lock", None)
+        if fd_lock is not None:
+            with fd_lock:
+                fd_snapshot = list(getattr(self, "feature_dimmers", {}).values())
+        else:
+            fd_snapshot = list((getattr(self, "feature_dimmers", None) or {}).values())
+        if fd_snapshot:
+            active = [s for s in fd_snapshot
                       if getattr(s, "level", 1.0) < 0.999 and s.fids]
             target_fids: set[int] = set()
             for s in active:
@@ -1773,15 +1786,19 @@ class AppState:
             except (TypeError, ValueError):
                 continue
         feat_set = frozenset(str(x) for x in (features or ()))
-        if level >= 0.999 or not fid_set:
-            self.feature_dimmers.pop(slot, None)
-        else:
-            self.feature_dimmers[slot] = FeatureDimmer(frozenset(fid_set), feat_set, level)
+        # STAB-13: Groessen-Aenderung unter _fd_lock (Renderer snapshottet darunter).
+        with self._fd_lock:
+            if level >= 0.999 or not fid_set:
+                self.feature_dimmers.pop(slot, None)
+            else:
+                self.feature_dimmers[slot] = FeatureDimmer(
+                    frozenset(fid_set), feat_set, level)
 
     def clear_feature_dimmers(self):
         """Alle Feature-Dimmer-Slots leeren (z. B. bei neuer/geladener Show, damit
         keine Slots zerstoerter Slider stehen bleiben)."""
-        self.feature_dimmers.clear()
+        with self._fd_lock:
+            self.feature_dimmers.clear()
 
     def _fixture_intensity_addrs(self, fx, chans) -> list[int]:
         """Adressen, die der Dimmer-Master fuer dieses Fixture skaliert: der
