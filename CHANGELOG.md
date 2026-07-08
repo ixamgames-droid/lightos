@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Show-Datei-Persistenz-Audit `.lshow` (AUD-04)
+
+#### Doku / Audit
+
+- **Verifizierter Audit der `.lshow`-Persistenz** (`save_show`/`load_show`/`reset_show`, Datenverlust-Fokus): NEU [`docs/SHOW_FILE_AUDIT_2026_07_08.md`](docs/SHOW_FILE_AUDIT_2026_07_08.md). 5-Dimensionen-Workflow (Round-Trip · `_lenient`-Ganzblock-Verlust · Reset/Stale-State · Schema/Migration · Save-Integrität), jedes Finding adversarial verifiziert — **33 Agenten, 12 CONFIRMED, 2 zurückgewiesen → 9 distinkte Defekte**.
+- **Positiv bestätigt (kein Bug):** der **Round-Trip ist vollständig** (alle 29 Keys + Feld-Ebenen symmetrisch, kein stiller Verlust), `reset_show` leert sauber; das „leer speichern bei to_dict-Fehler"-Muster ist bei `executors`/`tempo_buses` toter Defensiv-Code (kein erreichbarer Wurf).
+- **Echte Defekte** als Backlog-Items abgeleitet: **STAB-16** (P1, nicht-atomarer Save korrumpiert die vorige Show), **STAB-17** (P1, `functions`-Block leer gespeichert bei `to_dict()`-Fehler → Totalverlust inkl. EFX/Matrix), **STAB-18** (P2, ein kaputter Wert löscht ganzen programmer/base_levels-Block), **STAB-19** (P2, `load_show` nicht reset-first/atomar + palettes-Bleed), **STAB-20** (P3, Robustheit gegen alt/korrupt). Reine Doku-Änderung.
+
 ### 2026-07-08 — Render-Thread: Engine-Extra-Roh-Kanal beim Repatch freigeben (STAB-14, aus AUD-02)
 
 #### Geaendert / Fixes
