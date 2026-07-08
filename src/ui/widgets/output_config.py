@@ -96,6 +96,13 @@ class OutputConfigDialog(QDialog):
         self._check_artnet = QCheckBox("Art-Net aktivieren")
         af.addRow(self._check_artnet)
 
+        # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (analog Enttec) — nicht
+        # mehr pauschal ALLE Universen. (Das separate „Startuniversum"-Feld unten ist
+        # die EXTERNE Universe-Nummer und gehört zu OUT-03.)
+        self._spin_artnet_univ = QSpinBox()
+        self._spin_artnet_univ.setRange(1, 16)
+        af.addRow("Universe:", self._spin_artnet_univ)
+
         self._edit_artnet_ip = QLineEdit("255.255.255.255")
         af.addRow("Ziel-IP / Broadcast:", self._edit_artnet_ip)
 
@@ -117,6 +124,11 @@ class OutputConfigDialog(QDialog):
 
         self._check_sacn = QCheckBox("sACN (E1.31) aktivieren")
         sf.addRow(self._check_sacn)
+
+        # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (nicht mehr alle).
+        self._spin_sacn_univ = QSpinBox()
+        self._spin_sacn_univ.setRange(1, 16)
+        sf.addRow("Universe:", self._spin_sacn_univ)
 
         self._check_sacn_multicast = QCheckBox("Multicast (239.255.0.x)")
         self._check_sacn_multicast.setChecked(True)
@@ -281,11 +293,17 @@ class OutputConfigDialog(QDialog):
             self._lbl_artnet_status.setText("Deaktiviert")
             return
         ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
+        univ = self._spin_artnet_univ.value()
         state = get_state()
-        for univ_num in state.universes:
-            state.output_manager.add_artnet(univ_num, ip)
-            _persist_output(univ_num, "ArtNet", ip)
-        self._lbl_artnet_status.setText(f"Aktiv → {ip} (gespeichert)")
+        # OUT-04: NUR das gewählte Universum belegen. Die frühere Schleife über ALLE
+        # Universen überschrieb jede andere Adapter-Zuweisung — live UND in
+        # universes.json (`_persist_output` je Universum) → Mixed-Setups zerstört.
+        # `_persist_output` aktualisiert jetzt nur diese eine Zeile, andere bleiben.
+        if univ not in state.universes:
+            state.universes[univ] = state.output_manager.add_universe(univ)
+        state.output_manager.add_artnet(univ, ip)
+        _persist_output(univ, "ArtNet", ip)
+        self._lbl_artnet_status.setText(f"Aktiv → {ip} · Universe {univ} (gespeichert)")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
 
@@ -357,13 +375,17 @@ class OutputConfigDialog(QDialog):
             return
         ip_text = self._edit_sacn_ip.text().strip()
         target_ip = None if (self._check_sacn_multicast.isChecked() or not ip_text) else ip_text
+        univ = self._spin_sacn_univ.value()
         state = get_state()
         try:
-            for univ_num in state.universes:
-                state.output_manager.add_sacn(univ_num, target_ip)
-                _persist_output(univ_num, "sACN", target_ip or "")
-            mode = f"Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
-            self._lbl_sacn_status.setText(f"Aktiv · {mode} (gespeichert)")
+            # OUT-04: NUR das gewählte Universum belegen (nicht mehr alle über eine
+            # Schleife überschreiben); andere universes.json-Zeilen bleiben erhalten.
+            if univ not in state.universes:
+                state.universes[univ] = state.output_manager.add_universe(univ)
+            state.output_manager.add_sacn(univ, target_ip)
+            _persist_output(univ, "sACN", target_ip or "")
+            mode = "Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
+            self._lbl_sacn_status.setText(f"Aktiv · {mode} · Universe {univ} (gespeichert)")
         except Exception as e:
             self._lbl_sacn_status.setText(f"Fehler: {e}")
 

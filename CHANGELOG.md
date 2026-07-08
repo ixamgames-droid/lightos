@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Ausgabe: Art-Net/sACN „Übernehmen" zerschießt nicht mehr andere Universen (OUT-04)
+
+#### Geaendert / Fixes
+
+- **„Übernehmen" wirkt jetzt nur auf das gewählte Universum:** In der Ausgabe-Konfiguration überschrieben die Art-Net- und sACN-„Übernehmen"-Buttons bisher **alle** Universen — sie liefen in einer Schleife über `state.universes` und setzten für jedes den Adapter (live UND in `universes.json`). Wer z. B. einen Enttec auf Universe 1 und dann Art-Net auf Universe 2 einrichten wollte, dessen Enttec-Zuweisung (und jede andere) wurde beim Art-Net-„Übernehmen" mit überschrieben. Neu: Art-Net- und sACN-Tab haben je ein **„Universe:"-Feld** (wie der Enttec-Tab); `_apply_artnet`/`_apply_sacn` belegen nur dieses eine Universum (legen es bei Bedarf an), und `_persist_output` aktualisiert nur dessen Zeile in `universes.json` — bestehende Zuweisungen anderer Universen bleiben erhalten.
+- Datei: `src/ui/widgets/output_config.py`; Test NEU `tests/test_output_config.py` (4 Tests: Art-Net/sACN nur ein Universum, deaktiviert = No-op, fehlendes Zieluniversum wird angelegt).
+
 ### 2026-07-08 — Tests: Multi-Universe-Output abgesichert (QA-07 + QA-08)
 
 #### Tests / QA
