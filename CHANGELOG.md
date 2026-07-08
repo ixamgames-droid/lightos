@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — DMX-Eingang: RX-Thread erholt sich nach Netz-Blip (NET-06, aus AUD-06)
+
+#### Geaendert / Fixes
+
+- **Kein dauerhaft stummer DMX-Eingang mehr nach einem transienten Netzwerkfehler:** Starb der RX-`_loop` eines Receivers über einen `break` (transienter `OSError` aus `recvfrom` — Adapter-Reset, VPN-Toggle, Kabel raus/rein — oder ein unerwarteter Fehler), wurde `self._running` **nicht** zurückgesetzt. `is_running()` (das nur das Flag las) log daraufhin dauerhaft `True` → der UI-Auto-Restart-Guard `if not rx.is_running(): rx.start()` feuerte nie und `start()` no-oppte → der Eingang blieb **permanent stumm**, obwohl das Status-Label „Aktiv" zeigte (Erholung nur durch manuelles Ab-/Wieder-Anhaken). Jetzt setzen **beide** `break`-Pfade `self._running = False`, und `is_running()` prüft zusätzlich `self._thread.is_alive()` → nach einem Blip meldet der Receiver ehrlich „nicht laufend" und der UI-Guard startet ihn (inkl. Multicast-Re-Join) neu. Betrifft `artnet_input.py` **und** `sacn_input.py`.
+- **Tests:** NEU `tests/test_dmx_input_rx_lifecycle.py` (6) — `is_running()` ist nur mit lebendem Thread True; der `_loop` setzt `_running=False` bei `OSError` und bei unerwartetem Fehler (beide Receiver). Herkunft: AUD-06 (`docs/DMX_INPUT_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — DMX-Eingang: verlorene Quelle friert Kanäle nicht mehr ein (NET-05, aus AUD-06)
 
 #### Geaendert / Fixes

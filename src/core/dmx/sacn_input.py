@@ -92,7 +92,10 @@ class SACNReceiver:
             self._thread = None
 
     def is_running(self) -> bool:
-        return self._running
+        # NET-06: ein ueber `break` gestorbener RX-Thread gilt als NICHT laufend,
+        # damit der UI-Auto-Restart-Guard greift (nicht nur das Flag pruefen).
+        t = self._thread
+        return self._running and t is not None and t.is_alive()
 
     def _join_universe(self, universe: int):
         if self._sock is None or universe in self._joined_universes:
@@ -169,10 +172,12 @@ class SACNReceiver:
             except socket.timeout:
                 continue
             except OSError:
+                self._running = False   # NET-06: Status ehrlich halten -> Auto-Restart
                 break
             except Exception as e:
                 if self._running:
                     print(f"[sACN-In] loop error: {e}")
+                self._running = False   # NET-06
                 break
 
     def _parse(self, packet: bytes) -> tuple[int, bytes] | None:

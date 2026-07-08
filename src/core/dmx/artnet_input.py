@@ -71,7 +71,10 @@ class ArtNetReceiver:
             self._thread = None
 
     def is_running(self) -> bool:
-        return self._running
+        # NET-06: nicht nur das Flag pruefen — ein ueber `break` gestorbener RX-Thread
+        # soll als NICHT laufend gelten, damit der UI-Auto-Restart-Guard greift.
+        t = self._thread
+        return self._running and t is not None and t.is_alive()
 
     # ── Subscribe ────────────────────────────────────────────────────────────
 
@@ -151,11 +154,13 @@ class ArtNetReceiver:
             except socket.timeout:
                 continue
             except OSError:
-                # Socket closed during stop()
+                # Socket closed during stop() ODER transienter Netzfehler.
+                self._running = False   # NET-06: Status ehrlich halten -> Auto-Restart
                 break
             except Exception as e:
                 if self._running:
                     print(f"[ArtNet-In] loop error: {e}")
+                self._running = False   # NET-06
                 break
 
 
