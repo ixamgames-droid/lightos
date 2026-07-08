@@ -722,6 +722,27 @@ def load_show(path: str | os.PathLike):
     except Exception as e:
         return False, f"Öffnen fehlgeschlagen: {e}"
 
+    # STAB-20: show.json MUSS ein Objekt sein. Gueltiges JSON, das eine Liste/Zahl/
+    # String/null ist (korrupte oder fremde Datei), fuehrte sonst beim ersten
+    # data.get(...) zu einem ungefangenen AttributeError (der Aufrufer stuerzt) statt
+    # einer sauberen Fehlermeldung.
+    if not isinstance(data, dict):
+        return False, "Ungültiges Show-Format: show.json ist kein Objekt."
+
+    # STAB-20: Versions-Gate. Ist die Datei NEUER als das unterstuetzte Format,
+    # warnen und best-effort weiterladen (statt sie still als aktuelles Format zu
+    # deuten und ggf. neuere Felder falsch zu interpretieren).
+    def _ver_tuple(v):
+        try:
+            return tuple(int(x) for x in str(v).split("."))
+        except (TypeError, ValueError):
+            return ()
+    _file_ver = _ver_tuple(data.get("version"))
+    if _file_ver and _file_ver > _ver_tuple(SHOW_VERSION):
+        print(f"[show_file] WARNUNG: Show-Version {data.get('version')!r} ist neuer "
+              f"als unterstuetzt ({SHOW_VERSION}) — lade best-effort, neuere Felder "
+              f"werden ignoriert.")
+
     state = get_state()
     pm = get_palette_manager()
 
@@ -898,15 +919,24 @@ def load_show(path: str | os.PathLike):
     try:
         from src.core.engine.efx import EfxInstance
         for ed in (data.get("efx", []) or []):
-            if isinstance(ed, dict):
+            if not isinstance(ed, dict):
+                continue
+            try:  # STAB-20: pro Eintrag isolieren — ein kaputter Legacy-EFX darf
+                  # nicht die Migration abbrechen und alle folgenden verlieren.
                 state.function_manager.add(EfxInstance.from_dict(ed))
+            except Exception as e:
+                _lenient("migrate legacy efx entry error", e)
     except Exception as e:
         _lenient("migrate legacy efx error", e)
     try:
         from src.core.engine.rgb_matrix import RgbMatrixInstance
         for md in (data.get("rgb_matrix", []) or []):
-            if isinstance(md, dict):
+            if not isinstance(md, dict):
+                continue
+            try:  # STAB-20: pro Eintrag isolieren (wie Legacy-EFX).
                 state.function_manager.add(RgbMatrixInstance.from_dict(md))
+            except Exception as e:
+                _lenient("migrate legacy rgb matrix entry error", e)
     except Exception as e:
         _lenient("migrate legacy rgb matrix error", e)
 

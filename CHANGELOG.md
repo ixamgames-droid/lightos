@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Show-Laden: robuster gegen alte/korrupte `.lshow` (STAB-20, aus AUD-04)
+
+#### Geaendert / Fixes
+
+- **Non-Object-JSON liefert eine saubere Fehlermeldung** statt eines Absturzes: ein gültiges JSON, das kein Objekt ist (Liste/Zahl/String/`null` — korrupte oder fremde Datei), führte beim ersten `data.get(...)` zu einem ungefangenen `AttributeError`. `load_show` prüft jetzt `isinstance(data, dict)` und gibt sonst `(False, "…kein Objekt")` zurück.
+- **Versions-Gate:** Ist die Datei-`version` **neuer** als das unterstützte Format (`SHOW_VERSION`), wird jetzt gewarnt und best-effort weitergeladen (statt die Datei still als aktuelles Format zu deuten). Robuste Tupel-Vergleich (`"1.10" > "1.2"`).
+- **Legacy-EFX/RGB-Migration pro Eintrag isoliert:** Die einmalige Migration alter `efx`/`rgb_matrix`-Blöcke in Funktionen brach beim **ersten** kaputten Eintrag ab und verlor **alle folgenden**. Jetzt ist jeder Eintrag in ein eigenes `try/except` gekapselt — nur der kaputte fällt weg.
+- **Tests:** `tests/test_show_file.py` (3 neu) — Non-Object-JSON → saubere Fehlermeldung; zu neue Version → lädt best-effort; kaputter Legacy-EFX-Eintrag → der gute danach wird weiter migriert. Herkunft: AUD-04 (`docs/SHOW_FILE_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — Show-Laden: ein kaputter Wert löscht nicht mehr ganze Blöcke (STAB-18, aus AUD-04)
 
 #### Geaendert / Fixes
