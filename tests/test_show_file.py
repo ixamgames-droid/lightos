@@ -447,6 +447,46 @@ class ShowFileTests(unittest.TestCase):
         self.assertFalse(getattr(self.state, "_suppress_emits", False))
         self.assertEqual(len(self.state.get_patched_fixtures()), 2)
 
+    def test_save_is_atomic_serialization_error_keeps_old_file(self):
+        """STAB-16/17: wirft die Serialisierung (functions.to_dict), bricht save_show
+        ab UND die bereits vorhandene .lshow bleibt BYTE-identisch (kein Truncate),
+        ohne Temp-Leiche. Frueher truncatete der Direkt-Write die gute Datei sofort."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "show.lshow")
+            self.show_file.save_show(path)                 # 1) guter Save
+            before = open(path, "rb").read()
+            self.assertTrue(zipfile.is_zipfile(path))      # gueltige .lshow
+
+            def _boom():                                   # 2) to_dict wirft
+                raise RuntimeError("corrupt function")
+            self.state.function_manager.to_dict = _boom
+            with self.assertRaises(RuntimeError):
+                self.show_file.save_show(path)
+
+            self.assertEqual(open(path, "rb").read(), before)  # unangetastet
+            self.assertTrue(zipfile.is_zipfile(path))          # weiter gueltig
+            self.assertEqual([f for f in os.listdir(td) if f.endswith(".tmp")], [])
+
+    def test_save_leaves_no_temp_files(self):
+        """STAB-16: ein normaler Save hinterlaesst nur die .lshow, keine .tmp-Leichen."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "show.lshow")
+            self.show_file.save_show(path)
+            entries = os.listdir(td)
+            self.assertIn("show.lshow", entries)
+            self.assertEqual([f for f in entries if f.endswith(".tmp")], [])
+
+    def test_functions_block_not_silently_emptied(self):
+        """STAB-17: der functions-Block wird bei to_dict()-Fehler NICHT leer
+        gespeichert (Save bricht ab) — Gegenprobe: ohne Fehler landet er gefuellt."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "show.lshow")
+            self.show_file.save_show(path)
+            with zipfile.ZipFile(path, "r") as zf:
+                data = json.loads(zf.read("show.json").decode("utf-8"))
+            # _FakeFunctionManager.to_dict liefert eine nicht-leere Funktionsliste.
+            self.assertEqual(len(data["functions"]["functions"]), 1)
+
 
 class _FakeStateWithDB(_FakeState):
     """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""
