@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import zipfile
 import os
+import tempfile
 
 from src.core.strict import strict_mode
 from src.core.stage.coords import normalize_rotation
@@ -298,11 +299,14 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     from src.core.engine.efx_path import get_efx_path_library
     efx_paths_data = get_efx_path_library().to_dict()
 
-    functions_data = {"functions": []}
-    try:
-        functions_data = state.function_manager.to_dict()
-    except Exception as e:
-        print(f"[show_file] save function manager error: {e}")
+    # STAB-17: KEIN stiller Leer-Fallback. function_manager.to_dict() hat keine
+    # Per-Funktion-Absicherung — wirft EINE kaputte Funktion, MUSS der Save
+    # abbrechen (Exception propagiert). Sonst wuerde ein leerer functions-Block
+    # gespeichert und ALLE Funktionen inkl. EFX/Matrix (die nur hier leben) gingen
+    # verloren. Dank STAB-16 (serialize-before-open + atomarer Write) bleibt die
+    # vorhandene .lshow bei einem solchen Abbruch unangetastet.
+    fm = getattr(state, "function_manager", None)
+    functions_data = fm.to_dict() if fm is not None else {"functions": []}
 
     # EFX- und RGB-Matrix-Instanzen sind seit dem Programmer-Umbau echte
     # Funktionen und werden im "functions"-Block gespeichert. Die separaten
@@ -382,12 +386,28 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     except Exception:
         tempo_buses_data = []
         tempo_grandmaster_data = {}
+    # STAB-16: programmer/base_levels werden von UI-/MIDI-Threads live mutiert.
+    # Wuerde json.dumps direkt ueber die Live-Dicts iterieren, koennte es mitten
+    # im Schreiben "dict changed size during iteration" werfen. Darum EINEN
+    # konsistenten Snapshot ziehen (unter _prog_lock, wenn vorhanden — derselbe
+    # Lock, den der Renderer/Setter fuer programmer haelt), inkl. der verschachtelten
+    # Attribut-Dicts. base_levels teilt sich denselben Zugriffspfad.
+    def _snapshot_nested(d):
+        return {k: (dict(v) if isinstance(v, dict) else v) for k, v in (d or {}).items()}
+    _prog_lock = getattr(state, "_prog_lock", None)
+    if _prog_lock is not None:
+        with _prog_lock:
+            programmer_snapshot = _snapshot_nested(getattr(state, "programmer", {}))
+            base_levels_snapshot = _snapshot_nested(getattr(state, "base_levels", {}))
+    else:
+        programmer_snapshot = _snapshot_nested(getattr(state, "programmer", {}))
+        base_levels_snapshot = _snapshot_nested(getattr(state, "base_levels", {}))
     show = {
         "version": SHOW_VERSION,
         "name": getattr(state, "show_name", "Neue Show"),
         "patch": patch_data,
-        "programmer": getattr(state, "programmer", {}) or {},
-        "base_levels": getattr(state, "base_levels", {}) or {},
+        "programmer": programmer_snapshot,
+        "base_levels": base_levels_snapshot,
         "implicit_brightness": bool(getattr(state, "implicit_brightness", True)),
         "cue_stacks": stacks_data,
         "executors": executors_data,
@@ -421,8 +441,28 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
-    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("show.json", json.dumps(show, indent=2, ensure_ascii=False))
+    # STAB-16: ERST serialisieren (ein Serialisierungsfehler — inkl. STAB-17
+    # functions.to_dict() — laesst die vorhandene Datei damit unangetastet), DANN
+    # atomar schreiben: in eine Temp-Datei im SELBEN Verzeichnis und per os.replace()
+    # ueber den Zielpfad ziehen. Frueher truncatete zipfile.ZipFile(path,"w") die gute
+    # .lshow sofort und json.dumps lief erst danach im offenen Handle -> ein Crash /
+    # voller Datentraeger / Serialisierungsfehler hinterliess eine korrupte Datei UND
+    # die vorherige Show war weg. os.replace ist auf einem Dateisystem atomar (Windows:
+    # MoveFileEx MOVEFILE_REPLACE_EXISTING).
+    payload = json.dumps(show, indent=2, ensure_ascii=False)
+    fd, tmp_path = tempfile.mkstemp(prefix=".show-", suffix=".lshow.tmp",
+                                    dir=parent or ".")
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("show.json", payload)
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
     try:
         state._emit("show_saved", {"path": path})

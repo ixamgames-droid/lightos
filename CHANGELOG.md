@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Show-Speichern: atomar + kein stiller Funktions-Verlust (STAB-16/17, aus AUD-04)
+
+#### Geaendert / Fixes
+
+- **Speichern zerstört bei einem Fehler nicht mehr die vorhandene Show (STAB-16):** `save_show` öffnete bisher die Ziel-`.lshow` direkt (`zipfile.ZipFile(path,"w")` — truncatet sofort auf 0 Byte) und serialisierte `json.dumps` **erst danach** im offenen Handle. Ein Absturz, ein voller Datenträger oder ein Serialisierungsfehler hinterließ eine **korrupte** Datei und die vorherige Show war weg. Jetzt wird **zuerst serialisiert**, dann in eine **Temp-Datei im selben Verzeichnis** geschrieben und per **`os.replace()` atomar** über den Zielpfad gezogen; bei jedem Fehler bleibt die vorhandene Datei unangetastet und die Temp-Datei wird entfernt. `programmer`/`base_levels` werden zudem vor der Serialisierung unter `_prog_lock` defensiv gesnapshottet (kein „dict changed size" durch nebenläufiges Live-Editing).
+- **Ein kaputter Effekt löscht nicht mehr still alle Funktionen (STAB-17):** Der `functions`-Block (in dem seit dem Programmer-Umbau auch **alle EFX-/RGB-Matrix-Instanzen** leben) wurde bei einem `to_dict()`-Fehler still auf `{"functions": []}` gesetzt und leer gespeichert → Totalverlust beim nächsten Laden. Der Fehler wird jetzt **nicht mehr geschluckt**: die Serialisierung darf abbrechen (dank STAB-16 bleibt die alte Datei dabei erhalten), statt eine leere Show zu schreiben.
+- **Tests:** `tests/test_show_file.py` — Serialisierungsfehler lässt die vorhandene `.lshow` byte-identisch + ohne Temp-Leiche; normaler Save hinterlässt keine `.tmp`; `functions`-Block wird nicht still geleert. Herkunft: AUD-04 (`docs/SHOW_FILE_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — Show-Datei-Persistenz-Audit `.lshow` (AUD-04)
 
 #### Doku / Audit
