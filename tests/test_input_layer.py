@@ -6,6 +6,7 @@ der Per-Frame-Renderer auf gepatchten Kanaelen), sondern in ``state.input_layer`
 tests/test_iso_simple_desk.py (Fake-State ohne DB/Threads)."""
 import os
 import threading
+import time
 import types
 import unittest
 
@@ -117,6 +118,28 @@ class RenderMergeTest(_Base):
         self.st.input_merge_modes = {1: "HTP"}
         self.st._render_frame(0.02)
         self.assertEqual(self.live.get_channel(10), 200)   # Show hoeher -> bleibt
+
+    def test_stale_source_expires_and_channel_falls(self):
+        """NET-05: eine Quelle, die laenger als INPUT_SOURCE_TIMEOUT_S nichts mehr
+        gesendet hat, wird verworfen — ihr eingefrorener Wert haengt nicht mehr."""
+        # frisch empfangen (REPLACE): Adr 10 = 200, wird gemischt.
+        self.st.apply_input_merge(1, bytes([0] * 9 + [200]), "REPLACE")
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 200)
+        # Quelle wird "alt": Empfangs-Stempel ueber den Timeout hinaus zuruueckdatieren.
+        self.st.input_last_seen[1] = time.monotonic() - (A.INPUT_SOURCE_TIMEOUT_S + 1.0)
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 0)     # nicht mehr gemischt
+        self.assertNotIn(1, self.st.input_layer)           # Quelle verworfen
+        self.assertNotIn(1, self.st.input_merge_modes)
+
+    def test_fresh_source_not_expired(self):
+        """Gegenprobe: eine gerade empfangene Quelle wird NICHT verworfen."""
+        self.st.apply_input_merge(1, bytes([0] * 9 + [200]), "REPLACE")
+        self.st._render_frame(0.02)
+        self.st._render_frame(0.02)                        # sofort nochmal -> frisch
+        self.assertEqual(self.live.get_channel(10), 200)
+        self.assertIn(1, self.st.input_layer)
 
     def test_replace_overwrites_show(self):
         self.st.programmer = {1: {"intensity": 200}}
