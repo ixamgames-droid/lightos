@@ -544,6 +544,50 @@ class ShowFileTests(unittest.TestCase):
             self.assertEqual(self.state.base_levels, {2: {"intensity": 255}})
             self.assertFalse(self.state.implicit_brightness)   # NICHT auf True gekippt
 
+    def test_non_object_json_returns_clean_error(self):
+        """STAB-20: gueltiges JSON, das kein Objekt ist (Liste), liefert eine saubere
+        Fehlermeldung statt eines ungefangenen AttributeError."""
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "bad.lshow")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("show.json", json.dumps([1, 2, 3]))
+            ok, msg = self.show_file.load_show(path)
+            self.assertFalse(ok)
+            self.assertIn("kein Objekt", msg)
+
+    def test_newer_version_loads_best_effort(self):
+        """STAB-20: eine zu neue SHOW_VERSION laedt best-effort (kein harter Fail)."""
+        self.state._flush_all_to_dmx = lambda: None
+        with tempfile.TemporaryDirectory() as td:
+            ok, msg = self._load_payload(td, {
+                "version": "9.9", "name": "Future", "patch": [],
+                "functions": {"functions": []}})
+            self.assertTrue(ok, msg)
+
+    def test_legacy_efx_bad_entry_skips_only_that(self):
+        """STAB-20: ein kaputter Legacy-EFX-Eintrag bricht die Migration nicht mehr
+        ab — der gute Eintrag danach wird weiterhin migriert."""
+        self.state._flush_all_to_dmx = lambda: None
+        orig = _FakeEfxInstance.from_dict
+
+        def _fd(cls, d):
+            if d.get("boom"):
+                raise ValueError("bad efx")
+            return cls(d.get("name", "EFX"))
+        _FakeEfxInstance.from_dict = classmethod(_fd)
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                ok, msg = self._load_payload(td, {
+                    "version": "1.2", "name": "L", "patch": [],
+                    "functions": {"functions": []},
+                    "efx": [{"boom": True}, {"name": "good"}]})
+                self.assertTrue(ok, msg)
+                names = [getattr(f, "name", None)
+                         for f in self.state.function_manager.added]
+                self.assertIn("good", names)          # der gute danach migriert
+        finally:
+            _FakeEfxInstance.from_dict = orig
+
 
 class _FakeStateWithDB(_FakeState):
     """_FakeState erweitert um echten SQLite-In-Memory-Store fuer FixtureGroup-Tests."""
