@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import threading
+import time
 from dataclasses import dataclass
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -17,6 +18,12 @@ from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _V
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
 SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
+
+# NET-05: Art-Net/sACN-Eingangs-Timeout. Eine externe Quelle, die laenger als dies
+# nichts mehr gesendet hat, gilt als weg und wird aus input_layer verworfen — sonst
+# frieren ihre letzten Werte die Kanaele dauerhaft ein (Blackout skaliert den Input
+# nicht). E1.31-2018 nennt ~2,5 s Network Data Loss; Art-Net analog.
+INPUT_SOURCE_TIMEOUT_S = 2.5
 
 # Echte Dimmer-/Intensitaets-Kanaele. Dieser Sentinel ist mehrfach load-bearing:
 #   (a) Grand-Master + EE-02 skalieren NUR diese Kanaele (kein Doppel-Dimmen; sonst
@@ -199,6 +206,9 @@ class AppState:
         #   input_merge_modes: {out_universe: "HTP"|"LTP"|"REPLACE"}
         self.input_layer: dict[int, dict[int, int]] = {}
         self.input_merge_modes: dict[int, str] = {}
+        # NET-05: letzter Empfangszeitpunkt je out_univ (time.monotonic) fuer den
+        # Source-Timeout — der Renderer verwirft still gewordene Quellen.
+        self.input_last_seen: dict[int, float] = {}
         self._input_lock = threading.RLock()
         # Simple Desk ist standardmaessig reine ANZEIGE (Monitor). Erst mit aktivem
         # 'Manueller Override' wirkt die Ebene auf die Ausgabe (Schicht 4c, absolute
@@ -1279,17 +1289,27 @@ class AppState:
             self.input_merge_modes[out_univ] = mode
             for i in range(min(len(data), 512)):
                 layer[i + 1] = data[i] & 0xFF
+            # NET-05: Empfang stempeln (defensiv, falls Stub das Feld nicht init).
+            ls = getattr(self, "input_last_seen", None)
+            if ls is None:
+                ls = self.input_last_seen = {}
+            ls[out_univ] = time.monotonic()
 
     def clear_input_merge(self, out_univ: int | None = None):
         """F-20: Eingangs-Schicht leeren (eine Universe oder alle). Damit ein
         weggefallener externer Sender keine eingefrorenen Werte hinterlaesst."""
         with self._input_lock:
+            ls = getattr(self, "input_last_seen", None)
             if out_univ is None:
                 self.input_layer.clear()
                 self.input_merge_modes.clear()
+                if ls is not None:
+                    ls.clear()
             else:
                 self.input_layer.pop(int(out_univ), None)
                 self.input_merge_modes.pop(int(out_univ), None)
+                if ls is not None:
+                    ls.pop(int(out_univ), None)
 
     def _render_frame(self, dt: float):
         """Berechnet jeden Output-Frame komplett neu (ein Thread):
@@ -1631,13 +1651,29 @@ class AppState:
         in_state = getattr(self, "input_layer", None)
         if in_state:
             in_lock = getattr(self, "_input_lock", None)
+
+            def _expire_and_snapshot():
+                # NET-05: Quellen, die laenger als INPUT_SOURCE_TIMEOUT_S nichts mehr
+                # gesendet haben (Konsole abgezogen/abgestuerzt), verwerfen — sonst
+                # mischt der Renderer ihre letzten Werte fuer immer weiter und friert
+                # die Kanaele ein (der Blackout/Submaster skaliert den Input NICHT).
+                ls = getattr(self, "input_last_seen", None)
+                if ls is not None:
+                    now = time.monotonic()
+                    stale = [u for u in list(in_state.keys())
+                             if now - ls.get(u, now) > INPUT_SOURCE_TIMEOUT_S]
+                    for u in stale:
+                        in_state.pop(u, None)
+                        self.input_merge_modes.pop(u, None)
+                        ls.pop(u, None)
+                return ({u: dict(ch) for u, ch in in_state.items()},
+                        dict(self.input_merge_modes))
+
             if in_lock is not None:
                 with in_lock:
-                    in_layer = {u: dict(ch) for u, ch in in_state.items()}
-                    in_modes = dict(self.input_merge_modes)
+                    in_layer, in_modes = _expire_and_snapshot()
             else:
-                in_layer = {u: dict(ch) for u, ch in in_state.items()}
-                in_modes = dict(self.input_merge_modes)
+                in_layer, in_modes = _expire_and_snapshot()
             for univ, chans in in_layer.items():
                 su = scratch.get(univ)
                 if su is None:

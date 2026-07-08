@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — DMX-Eingang: verlorene Quelle friert Kanäle nicht mehr ein (NET-05, aus AUD-06)
+
+#### Geaendert / Fixes
+
+- **Source-Timeout für Art-Net/sACN-Eingang:** Hörte eine externe Konsole auf zu senden (abgezogen/abgestürzt), blieben ihre zuletzt empfangenen Werte in `input_layer` und der 44-Hz-Renderer mischte sie **für immer** weiter → betroffene Kanäle hingen dauerhaft (bei HTP als Boden, bei REPLACE eingefroren) und ließen sich **nicht per Blackout** herunterziehen (der externe Eingang wird nicht vom Submaster/Blackout skaliert). `apply_input_merge` stempelt jetzt pro `out_univ` den Empfangszeitpunkt (`time.monotonic()`), und `_render_frame` (Schritt 4b-Input) verwirft Quellen, die länger als `INPUT_SOURCE_TIMEOUT_S` (2,5 s, E1.31 Network Data Loss) nichts mehr gesendet haben — der Kanal fällt dann auf Default/0 zurück. `clear_input_merge` räumt den Zeitstempel mit auf. `clear_input_merge` war bereits für genau diesen Zweck dokumentiert, wurde aber nie produktiv aufgerufen.
+- **Tests:** `tests/test_input_layer.py` (2 neu) — eine backdatierte Quelle wird verworfen (Kanal fällt auf 0, Universe aus `input_layer` entfernt); eine frische Quelle bleibt. Herkunft: AUD-06 (`docs/DMX_INPUT_AUDIT_2026_07_08.md`).
+
 ### 2026-07-08 — DMX-Eingang- & RX-Thread-Audit (AUD-06)
 
 #### Doku / Audit
