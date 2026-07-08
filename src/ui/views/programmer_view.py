@@ -30,6 +30,13 @@ _PREFS_DIR = os.path.join(
 )
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 
+# UI-20: Leerzustand des Programmers. Der Kopf ist die Status-/Handlungszeile
+# (eine Meldung MIT Anweisung), der Tab-Platzhalter beschreibt nur, was hier
+# erscheinen wird — bewusst anders formuliert, damit nicht 2x derselbe Text
+# uebereinander steht. Beide Konstanten halten Kopf-Text (Init + Rebuild) synchron.
+_EMPTY_SELECTION_MSG = "Kein Gerät ausgewählt — links ein Gerät oder eine Gruppe wählen"
+_EMPTY_TAB_HINT = "Attribute erscheinen hier, sobald ein Gerät gewählt ist."
+
 
 def _load_prefs() -> dict:
     try:
@@ -363,8 +370,9 @@ class ProgrammerView(QWidget):
         al.setContentsMargins(0, 0, 0, 0)
         al.setSpacing(4)
 
-        self._lbl_selection = QLabel("Kein Gerät ausgewählt")
+        self._lbl_selection = QLabel(_EMPTY_SELECTION_MSG)
         self._lbl_selection.setObjectName("label_header")
+        self._lbl_selection.setWordWrap(True)
         al.addWidget(self._lbl_selection)
 
         self._color_preview = ColorPreview([], self._state)
@@ -1077,11 +1085,14 @@ class ProgrammerView(QWidget):
             fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
             selected = [fixtures[fid] for fid in self._selected_fids if fid in fixtures]
             if not selected:
-                self._lbl_selection.setText("Kein Gerät ausgewählt")
+                self._lbl_selection.setText(_EMPTY_SELECTION_MSG)
                 self._color_preview.set_fixtures([])
                 self._template_channels = []
                 for cont in self._attr_group_tabs.values():
-                    _clear(cont).addWidget(QLabel("Kein Gerät ausgewählt"))
+                    hint = QLabel(_EMPTY_TAB_HINT)
+                    hint.setObjectName("label_hint")
+                    hint.setWordWrap(True)
+                    _clear(cont).addWidget(hint)
                 if getattr(self, "_gobo_tab_index", -1) >= 0:
                     self._main_tabs.setTabVisible(self._gobo_tab_index, False)
                 if getattr(self, "_mapping_tab_index", -1) >= 0:
