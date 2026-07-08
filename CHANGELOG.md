@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — Tests: Mixed-Adapter-Send abgesichert (QA-07)
+
+#### Tests / QA
+
+- **Der zentrale Multi-Universe-Send-Pfad ist gegen Regression gesichert:** neuer `tests/test_output_manager.py::TestOutputManagerMixedSend` patcht einen Fake-Enttec auf Universe 1 und einen Fake-Art-Net-Sender auf Universe 2, setzt unterschiedliche Kanalwerte und prüft nach einem `_send_all()`-Durchlauf, dass jeder Adapter **genau seine** Universe-Daten bekommt (keiner die fremden) und der Art-Net-Sender die erwartete externe Universe-Nummer (`univ_num - 1`) sieht. Nagelt das Routing in `output_manager._send_all` (Enttec/Art-Net/sACN je Universum) fest. Kein Produktcode geändert.
+
 ### 2026-07-08 — Tests: Regressions-Wächter für VC-Widget-Drag (VC-WIDGET-DRAG)
 
 #### Tests / QA
