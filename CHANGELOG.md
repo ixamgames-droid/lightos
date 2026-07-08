@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-08 — DMX-Eingang- & RX-Thread-Audit (AUD-06)
+
+#### Doku / Audit
+
+- **Verifizierter Audit des DMX-Eingangs** (Art-Net/sACN-RX-Threads + Merge): NEU [`docs/DMX_INPUT_AUDIT_2026_07_08.md`](docs/DMX_INPUT_AUDIT_2026_07_08.md). 5-Dimensionen-Workflow, jedes Finding adversarial verifiziert — **15 Agenten, 5 CONFIRMED**.
+- **Positiv bestätigt (kein Bug):** beide RX-Parser robust gegen manipulierte/zu kurze/lange Pakete (kein Crash/Thread-Tod); Lock-Disziplin sauber (RX liest GIL-atomar); Multicast-Join korrekt (die UI joint immer das konfigurierte In-Universe).
+- **Echte Defekte** als Backlog-Items abgeleitet: **NET-05** (P1, kein Source-Timeout → verlorene externe Quelle friert Kanäle dauerhaft ein; Blackout greift dort nicht — sicherheitsrelevant), **NET-06** (P2, RX-Thread-Tod ohne `_running`-Reset → Eingang bleibt nach Netz-Blip stumm, `is_running()` lügt), **NET-07/08** (P3, Merge in nicht-konfiguriertes Universe / alte Merge-Config bleibt beim Umkonfigurieren). Reine Doku-Änderung.
+
 ### 2026-07-08 — Output-Typ-Wechsel & „Disabled" schließen den Alt-Adapter (OUT-05, aus AUD-03)
 
 #### Geaendert / Fixes
