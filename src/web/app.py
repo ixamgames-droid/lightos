@@ -66,10 +66,19 @@ def _register_routes(app):
         # UI-/Output-Thread; ein Show-Load darf hier kein „changed size during
         # iteration" auslösen.
         stacks = [{"name": s.name, "cues": len(s.cues)} for s in list(state.cue_stacks)]
+        # Executor-Fader-Zustaende (aktuelle Page) mitliefern, damit das Remote-UI
+        # seine Fader INITIAL auf den ECHTEN Wert setzt statt hart auf 100% (Bug:
+        # index.html initialisierte alle Fader mit value=255/„100%" ohne Sync).
+        try:
+            exec_faders = [round(float(e.fader_value), 3)
+                           for e in list(state.playback_engine.executors)[:10]]
+        except Exception:
+            exec_faders = []
         return jsonify({
             "fixtures": len(fixtures),
             "universes": list(state.universes.keys()),
             "cue_stacks": stacks,
+            "executors": exec_faders,
             "mock_mode": state.mock_mode,
         })
 
@@ -87,6 +96,16 @@ def _register_routes(app):
         stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
         if stacks:
             stacks[0].back()
+        return jsonify({"ok": True})
+
+    @app.route("/api/stop", methods=["POST"])
+    def api_stop():
+        # STOP-Button im Remote-UI stoppt die laufende Cueliste (Pendant zu
+        # go/back). Vorher rief das Frontend die nicht existierende Route
+        # /api/executor/1/back auf -> stiller 404, STOP tat nichts.
+        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        if stacks:
+            stacks[0].stop()
         return jsonify({"ok": True})
 
     @app.route("/api/blackout", methods=["POST"])
@@ -151,6 +170,13 @@ def _register_socketio(sio):
         if stacks:
             stacks[0].back()
         sio.emit("ack", {"action": "back"})
+
+    @sio.on("stop")
+    def on_stop(data=None):
+        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        if stacks:
+            stacks[0].stop()
+        sio.emit("ack", {"action": "stop"})
 
     @sio.on("fader")
     def on_fader(data=None):

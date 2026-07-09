@@ -55,6 +55,9 @@ class _FakeCueStack:
     def back(self):
         self.actions.append("back")
 
+    def stop(self):
+        self.actions.append("stop")
+
 
 class _FakeOM:
     def __init__(self):
@@ -169,6 +172,28 @@ class TestWebRemote(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["fixtures"], 2)
 
+    # ── STOP-Route + Fader-Initial-Sync (Bug-Fixes 2026-07-09) ────────────────
+    def test_stop_routes_to_first_cuestack(self):
+        """Bug: STOP im Web-Remote rief die tote Route /api/executor/1/back auf
+        (stiller 404). Jetzt existiert /api/stop und stoppt die Cueliste."""
+        r = self.client.post("/api/stop")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.state.cue_stacks[0].actions, ["stop"])
+
+    def test_stop_with_empty_cuestacks_is_noop(self):
+        self.state.cue_stacks = []
+        r = self.client.post("/api/stop")
+        self.assertEqual(r.status_code, 200)
+
+    def test_status_includes_executor_fader_values(self):
+        """Bug: das Remote-UI initialisierte alle Fader hart auf 100%. /api/status
+        liefert jetzt die ECHTEN Executor-Fader, damit das UI synchronisieren kann."""
+        self.state.executors[0].fader_value = 0.5
+        self.state.executors[1].fader_value = 0.25
+        data = self.client.get("/api/status").get_json()
+        self.assertIn("executors", data)
+        self.assertEqual(data["executors"][:2], [0.5, 0.25])
+
     # ── SocketIO (WEB-03: ohne Payload kein Crash) ────────────────────────────
     def test_socketio_fader_without_payload_no_crash(self):
         sio_client = self.sio.test_client(self.app)
@@ -186,6 +211,14 @@ class TestWebRemote(unittest.TestCase):
         sio_client.emit("fader", {"slot": "x", "level": "y"})   # nicht-numerisch
         # Kein Crash; Default slot=1/level=1.0 -> executors[0] = 1.0
         self.assertEqual(self.state.executors[0].fader_value, 1.0)
+        sio_client.disconnect()
+
+    def test_socketio_stop_routes_to_cuestack(self):
+        """Das Frontend nutzt socket.emit('stop') -> Handler muss die Cueliste
+        stoppen (und darf ohne Payload nicht crashen)."""
+        sio_client = self.sio.test_client(self.app)
+        sio_client.emit("stop")
+        self.assertEqual(self.state.cue_stacks[0].actions, ["stop"])
         sio_client.disconnect()
 
 
