@@ -131,12 +131,19 @@ class ChannelRangeLockDialog(QDialog):
             rmin, rmax = combo.currentData()
             existing = self._mgr.get(self._fixture.universe, dmx_abs)
             if rmin == 0 and rmax == 255:
-                # Lock entfernen wenn Modifier nur wegen Range existierte
-                if existing and existing.range_min == 0 and existing.range_max == 255:
-                    pass  # schon kein Lock
-                elif existing:
-                    existing.range_min = 0
-                    existing.range_max = 255
+                # Lock entfernen. Existierte der Modifier NUR wegen des Range-Locks
+                # (LINEAR-Kurve, kein Custom-LUT), den Eintrag GANZ entfernen statt nur
+                # die Range zu nullen — sonst bleibt ein Identitaets-Modifier (0-255,
+                # LINEAR) dauerhaft im geteilten ChannelModifierManager registriert
+                # (RL-01: folgenloser, aber unnoetiger Leck-Eintrag, auch persistiert).
+                if existing:
+                    if existing.curve == CurveType.LINEAR and not existing.custom_lut:
+                        self._mgr.remove(self._fixture.universe, dmx_abs)
+                    else:
+                        # Modifier hat eine echte Kurve -> nur die Range aufheben,
+                        # die Kurve des Nutzers NICHT loeschen.
+                        existing.range_min = 0
+                        existing.range_max = 255
             else:
                 if existing:
                     existing.range_min = rmin
