@@ -86,7 +86,7 @@ for (let i = 1; i <= 10; i++) {
     <div class="fader-col">
       <label>Ex ${i}</label>
       <input type="range" min="0" max="255" value="255" orient="vertical"
-             oninput="setFader(${i}, this.value)" />
+             id="fader${i}" oninput="setFader(${i}, this.value)" />
       <span class="fader-val" id="fv${i}">100%</span>
     </div>`;
 }
@@ -110,7 +110,7 @@ socket.on('ack', d => log(`ACK: ${d.action}`));
 
 function doGo()   { socket.emit('go');   log('GO'); }
 function doBack()  { socket.emit('back'); log('BACK'); }
-function doStop()  { fetch('/api/executor/1/back', {method:'POST'}); log('STOP'); }
+function doStop()  { socket.emit('stop'); log('STOP'); }
 
 function toggleBlackout() {
   blackout = !blackout;
@@ -132,6 +132,14 @@ function setFader(slot, raw) {
 fetch('/api/status').then(r => r.json()).then(d => {
   document.getElementById('status').textContent =
     `Verbunden · ${d.fixtures} Geräte · ${d.universes.length} Universes`;
+  // Fader auf den ECHTEN Executor-Zustand setzen (nicht hart auf 100% lassen).
+  (d.executors || []).forEach((level, i) => {
+    const slot = i + 1;
+    const fader = document.getElementById('fader' + slot);
+    if (fader) fader.value = Math.round(level * 255);
+    const el = document.getElementById('fv' + slot);
+    if (el) el.textContent = Math.round(level * 100) + '%';
+  });
 });
 </script>
 </body>
