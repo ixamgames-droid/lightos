@@ -28,16 +28,20 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
 
 ### Jetzt ausführbar
 
-1. **QA-LIVE** — verbliebene reale Klickpfade aus dem Verifikationsplan abschließen.
-2. **QA-09 + QA-10** — alle Views/VC-Widgets deterministisch headless bauen; QA-10
-   umfasst nach #235/#238 noch acht statt zehn ungetesteter Views.
-3. **STAB-10** — `.lshow`-Round-Trip-Identität und die adress-/kanalzahl-Symmetrie.
-4. **ENG-11** — Multi-Head-Attributpfad durchgängig absichern.
-5. **STAB-21** — Threading-/native-AV-Härtungsaudit (umbenannt, damit `STAB-11`
+1. **STAB-10** — `.lshow`-Round-Trip-Identität und die adress-/kanalzahl-Symmetrie.
+2. **ENG-11** — Multi-Head-Attributpfad durchgängig absichern.
+3. **STAB-21** — Threading-/native-AV-Härtungsaudit (umbenannt, damit `STAB-11`
    eindeutig für das Weak-Callback-Thema bleibt).
-6. **QA-11**, danach **QA-17** und **QA-18** — CI-/Dokumentations-/Backlog-Gates.
-7. **VIZ-14** — erst nach den Sicherheits- und Verifikationsgates in kleine,
+4. **QA-11**, danach **QA-17** und **QA-18** — CI-/Dokumentations-/Backlog-Gates.
+5. **VIZ-14** — erst nach den Sicherheits- und Verifikationsgates in kleine,
    einzeln abnehmbare UX-Schritte schneiden.
+
+### Begleitende reale Abnahme
+
+- **QA-LIVE** — der Live-Test-Plan wird bei jedem betroffenen UI-/Remote-Punkt
+  fortgeschrieben und ist kein Blocker fuer unabhängige Engine-/Persistenzarbeit.
+  Web-Remote: Browser-End-to-End (STOP, Blackout AN/AUS, WebSocket-ACK) am
+  2026-07-09 bestanden; die Desktop-Editor-/Hardware-Pfade bleiben terminiert.
 
 ### Wartet auf Produktentscheidung
 
@@ -64,7 +68,7 @@ _Vollautomatischer Verifikations-Durchlauf (Import-/Konstruktions-/Show-Load-Smo
 | ID | Prio | Status | Titel / Notiz |
 |----|------|--------|---------------|
 | RL-01 | P3 | ✅ done ([#234](https://github.com/ixamgames-droid/lightos/pull/234)) | **Range-Lock lässt Identitäts-Modifier zurück.** `channel_range_lock_dialog.py:_on_accept` nullt beim „Lock entfernen" nur `range_min/max` statt den Eintrag zu entfernen → ein Identitäts-`ChannelModifier` (LINEAR, 0–255) bleibt im geteilten `ChannelModifierManager` registriert. **Funktional folgenlos** (Identität → kein DMX-Effekt), reine Hygiene. Fix: Eintrag ganz entfernen, wenn er nur wegen des Locks existiert (`curve==CurveType.LINEAR and not existing.custom_lut`). |
-| QA-LIVE | P2 | teils (2026-07-09) | **Live-Klick-Durchlauf der 85 high-risk Funktionen.** ✅ **Großer Teil live per Computer-Use abgearbeitet** (siehe „Aus Live-Durchlauf" unten): alle 8 Sektionen + Sub-Tabs + Hauptwerkzeuge + 3D-Fenster. Sehr viel funktioniert einwandfrei (Fan-Tool, Farb-Werkzeug+Popout, EFX-Custom-Path, VC-Bedienung, 3D-Bearbeiten-Push, Curve-Editor, Matrix-Vorschau …). 1 Crash gefunden+gefixt ([#235](https://github.com/ixamgames-droid/lightos/pull/235)) + 3 UX-Punkte. **Rest offen:** Effect-Layer-Editor (11/12 Layer), Scene-Editor „Vorschau senden", Show-Manager-Timeline-Drag (nach #235), Fixture-Editor-Rundtrip, Palettes, Web-Remote-Lifecycle. Reihenfolge: `docs/FEATURE_VERIFICATION_2026_07_09.md` §4. |
+| QA-LIVE | P2 | teils (2026-07-09) | **Live-Klick-Durchlauf der 85 high-risk Funktionen.** ✅ **Großer Teil live per Computer-Use abgearbeitet** (siehe „Aus Live-Durchlauf" unten): alle 8 Sektionen + Sub-Tabs + Hauptwerkzeuge + 3D-Fenster. Sehr viel funktioniert einwandfrei (Fan-Tool, Farb-Werkzeug+Popout, EFX-Custom-Path, VC-Bedienung, 3D-Bearbeiten-Push, Curve-Editor, Matrix-Vorschau …). 1 Crash gefunden+gefixt ([#235](https://github.com/ixamgames-droid/lightos/pull/235)) + 3 UX-Punkte. **Neu live im Browser bestätigt (2026-07-09):** Web-Remote verbindet, STOP quittiert, Blackout AN/AUS quittiert. **Rest offen:** Effect-Layer-Editor (11/12 Layer), Scene-Editor „Vorschau senden", Show-Manager-Timeline-Drag (nach #235), Fixture-Editor-Rundtrip, Palettes, Web-Remote-Lifecycle. Reihenfolge: `docs/FEATURE_VERIFICATION_2026_07_09.md` §4. |
 
 ### 🖱️ Aus Live-Durchlauf 2026-07-09 (Computer-Use, Davids „Grosses Rig 2026")
 _Kompletter Klick-Durchlauf aller 8 Sektionen + Sub-Tabs + Hauptwerkzeuge + 3D-Fenster auf der laufenden App (Teil-Erledigung von QA-LIVE). **Sehr viel funktioniert einwandfrei.** ✅ Live bestätigt: Command-Line (`all @ full`/`clear`), Programmer-Intensität, **Fan-Tool** (4 Modi × 5 Kurven rechnen), **Farb-Werkzeug** (Rad+RGB+Popout/Redock), **EFX-Custom-Path-Zeichner** (Punkte, Linear/Spline, Pan/Tilt-Mapping), Matrix-Editor (live Rainbow, 10 Algorithmen), Laser-Tab (Klartext-Bereiche), **VC-Bedienung** (Effekt triggern/toggle), **3D-Visualizer-Fenster** (Kamera, Selektion, Positions-Bearbeiten-Push, Dezimal — VIZ-PULL „Bearbeiten-tot" NICHT vorhanden), Simple Desk, Channel-Groups-Anlegen, Executor-Konfig, **Curve-Editor** (Punkt → Kurve biegt), Output-/DMX-Monitor (+Filter), MIDI, BPM-Manager, Patch-Tabelle._
@@ -491,8 +495,8 @@ _Bestehend: schmales Smoke-Set (`test_views.py` baut nur ~4-6 Views; `test_vc_di
 
 | ID | Prio | Status | Titel | Akzeptanzkriterium (Definition of Done) |
 |----|------|--------|-------|------------------------------------------|
-| QA-09 | P1 | todo | Enumerierender Headless-Smoke: ALLE Views + alle WIDGET_REGISTRY-Widgets bauen ohne Crash (M) | Neuer `tests/test_ui_smoke_enumerated.py`: (1) `@parametrize` über alle no-arg QWidget-Views in `src/ui/views/*.py` (per `importlib/inspect` ausgelesen; arg-pflichtige Editoren via dokumentierter Skip-Liste) — jede headless (`QT_QPA_PLATFORM=offscreen`) ohne Exception; (2) `@parametrize` über `WIDGET_REGISTRY` (`vc_canvas.py`) — jeder Typ instanziiert + `to_dict()`→`apply_dict()`-Roundtrip wirft nicht. Künstliches Umbenennen einer View lässt den Test rot werden. Grün via `tools/verify_loop.ps1`. **Merge der zwei Survey-Vorschläge zu einem.** |
-| QA-10 | P1 | todo | Smoke-Tests für die 8 Views ohne jede Test-Abdeckung (S) | `grep` gegen `tests/` zeigt 8 Views mit 0 Treffern: AudioEditor, CarouselEditor, CollectionEditor, EffectLayerEditor, MidiView, OutputView, SceneEditor, ScriptEditor. Die 2 no-arg + im MainWindow verdrahteten (OutputView, MidiView) headless ohne Crash bauen + je 1 Assertion auf ein zentrales Kind-Widget; die 6 arg-pflichtigen Editoren mit Minimal-Fixture (leere Scene/Script/Carousel/Collection/LayeredEffect/AudioFunction). Alle grün via `verify_loop.ps1`. |
+| QA-09 | P1 | done | Enumerierender Headless-Smoke: ALLE Views + alle WIDGET_REGISTRY-Widgets bauen ohne Crash (M) | `tests/test_ui_smoke_enumerated.py`: inventarisiert alle 24 öffentlichen no-arg `*View`-Klassen per `pkgutil`/`importlib`/`inspect`; neue oder umbenannte Views machen den Inventar-Test rot. Jede wird headless gebaut; alle 19 `WIDGET_REGISTRY`-Widgets durchlaufen `to_dict()`→`apply_dict()`-Roundtrip. |
+| QA-10 | P1 | done | Smoke-Tests für die 8 Views ohne jede Test-Abdeckung (S) | `tests/test_ui_smoke_enumerated.py` baut AudioEditor, CarouselEditor, CollectionEditor, EffectLayerEditor, MidiView, OutputView, SceneEditor und ScriptEditor mit minimalen echten Engine-Objekten und prüft je ein Kern-Widget. **34 neue Tests grün**; gemeinsam mit `test_views.py` und `test_web_app.py`: 63 grün. |
 | QA-11 | P2 | todo | CI-Gate auf Show-Lint + View-Smoke ausweiten (S) | `.github/workflows/ci.yml` ruft nur `pytest tests/test_show_file.py tests/test_core_engine.py` (verifiziert). Zusätzlich `tests/test_show_lint.py` + `tests/test_views.py` ausführen (mit `QT_QPA_PLATFORM=offscreen`, PySide6 im Install-Schritt); ein absichtlich kaputter `param_key` in einer Test-Show lässt CI rot werden. So fällt eine kaputte committete Show/View auch auf GitHub auf, nicht nur lokal (vgl. QA-05, lokal entdeckt). |
 | QA-12 | P2 | todo | `docs/UI_VERIFICATION_CHECKLIST.md`: maschinen-prüfbare Pro-Element-Checkliste (M) | Neue `docs/UI_VERIFICATION_CHECKLIST.md` mit (1) Tabelle aller Views (`src/ui/views/*.py`) + VC-Widgets (WIDGET_REGISTRY), Spalten: headless-instanziierbar / hat Tooltip-od.-Label / Aktion-od.-Signal verdrahtet / Regressionstest (Pfad) / Doc; (2) je Zeile ein ausführbarer Verifikationspfad (Testname od. „manuell: SMOKE_TEST.md §x"). Offene Zellen als Lücke markiert. Löst die rein manuelle `docs/SMOKE_TEST.md` als Backing-Store für QA-13 ab. |
 | QA-13 | P3 | todo | Tooltip-/Label-Coverage-Audit für interaktive Steuerelemente (M) | Headless-Test (oder `tools/`-Skript) baut jede no-arg View, durchläuft `findChildren(QAbstractButton)` und meldet Buttons mit leerem `text()` UND leerem `toolTip()` als Verstoß; Ergebnis in `docs/UI_VERIFICATION_CHECKLIST.md`. Abdeckung heute ungleich: `show_manager_view.py` (7 Buttons, 0 Tooltips), `dmx_monitor_view.py` (0) vs. `efx_view.py` (28). Mindestziel: show_manager + dmx_monitor dokumentiert/behoben. |
