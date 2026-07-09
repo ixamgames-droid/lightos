@@ -474,7 +474,10 @@ class ChaserEditor(QWidget):
     def _move_down(self):
         row = self._table.currentRow()
         steps = self._chaser.steps
-        if row < len(steps) - 1:
+        # row >= 0: ohne Auswahl liefert currentRow() -1 -> `-1 < len-1` waere True
+        # und steps[-1],steps[0] wuerden ersten+letzten Schritt vertauschen (wie
+        # _move_up mit `row > 0` gegen genau das geschuetzt ist).
+        if row >= 0 and row < len(steps) - 1:
             steps[row], steps[row + 1] = steps[row + 1], steps[row]
             self._rebuild_table()
             self._table.selectRow(row + 1)
