@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Mehrkopf-Mapping spiegelt Basiswerte auf alle Köpfe (ENG-11)
+
+#### Behoben / Tests
+
+- **Mapped Channel Change folgt jetzt der gemeinsamen `attr#N`-Konvention:** Ein nicht-pro-Kopf gemapptes Attribut wie `color_r` schrieb bislang nur die erste LED einer Mehrkopf-Bar; `color_r#1` bis `#N` erhielten keinen Basis-Fallback. Der Renderpfad verwendet nun `channel_occurrence_keys()` und spiegelt den Kopf-0-Wert wie Programmer, EFX und Scene auf alle nicht explizit überschriebenen Köpfe.
+- **Neuer realer 4-Kopf-Sweep:** `tests/test_multihead_sweep.py` deckt Programmer, Labels, Paletten, Show-Persistenz sowie gemapptes Basis- und Pro-Kopf-Rendering auf `MOVBAR4` ab (5 grün); bestehende Multi-Head-/Profil-Tests: 20 grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

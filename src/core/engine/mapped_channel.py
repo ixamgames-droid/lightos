@@ -226,7 +226,9 @@ class MappedChannelChange(Function):
         if not self._running or not self.fids or not self.rules:
             return
         try:
-            from src.core.app_state import get_state, get_channels_for_patched
+            from src.core.app_state import (
+                channel_occurrence_keys, get_channels_for_patched, get_state,
+            )
             from src.core.color_utils import (color_attrs_for_fixture,
                                               adapt_color_payload)
         except Exception:
@@ -257,16 +259,16 @@ class MappedChannelChange(Function):
                             attrs[k if h == 0 else f"{k}#{h}"] = v
             if not attrs:
                 continue
-            # Vorkommens-bewusst schreiben (gleiche #N-Logik wie efx.py).
-            seen: dict[str, int] = {}
-            for ch in chans:
+            # Vorkommens-bewusst schreiben. Kopf N erhaelt seinen expliziten
+            # ``attr#N``-Wert; fehlt er, spiegelt er wie Programmer/EFX/Scene
+            # den Basiswert von Kopf 0. Vorher fehlte dieser Fallback hier
+            # exklusiv, sodass ein nicht-per-head gemapptes ``color_r`` nur
+            # die erste LED einer Bar erreichte (ENG-11).
+            for ch, key in channel_occurrence_keys(chans):
                 a = getattr(ch, "attribute", "") or ""
-                head = seen.get(a, 0)
-                seen[a] = head + 1
-                key = a if head == 0 else f"{a}#{head}"
                 if key in attrs:
                     val = attrs[key]
-                elif head == 0 and a in attrs:
+                elif a in attrs:
                     val = attrs[a]
                 else:
                     continue
