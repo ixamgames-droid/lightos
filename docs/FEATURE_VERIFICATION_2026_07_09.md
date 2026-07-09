@@ -100,6 +100,12 @@ Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
 Studio · Playback/Executor-Konfig · Layout-Persistenz/Show-Validierung · Simple Desk/
 Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 
+**Nachtrag 2026-07-10 — Paletten abgeschlossen:** Der noch offene Palettenpfad wurde
+als echter Qt-Workflow abgesichert: „Neu aufzeichnen" aus einer Fixture-Auswahl,
+Klick auf die Kachel zum Anwenden, getrennte `attr#1`-Farbwerte einer SPIDER14 sowie
+Save→Load der `.lshow`. Die offene Palettenansicht aktualisiert sich dabei nach dem
+Show-Laden. Regression: `tests/test_palette_roundtrip.py`.
+
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 - **RL-01** (neu, P3): Range-Lock „entfernen" lässt einen Identitäts-`ChannelModifier`
   (LINEAR, 0–255) im Manager zurück — funktional folgenlos (Identität), nur Hygiene/UI-Rest.

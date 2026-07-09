@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Paletten: UI- und Show-Roundtrip für Mehrkopf-Farben verifiziert (QA-LIVE)
+
+#### Tests
+
+- Neuer End-to-End-Regressionstest `tests/test_palette_roundtrip.py`: zeichnet über die echte Qt-Palettenansicht eine Farbpalette für eine SPIDER14 auf, klickt die Palette zur Wiederherstellung beider Farb-Bänke und prüft anschliessend die `.lshow`-Persistenz. Der Test schliesst zugleich ab, dass `SHOW_LOADED`/`REFRESH_ALL` die offene Palettenansicht aktualisiert.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
