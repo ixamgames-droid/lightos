@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Effect-Layer-Editor schützt Clamp-Grenzen (QA-LIVE)
+
+#### Behoben / Geändert
+
+- **`Min > Max` erzeugt keine invertierte Clamp-Kette mehr:** Änderte man im Effect-Layer-Editor eine Grenze über die andere, wurden beide Werte bislang unabhängig gespeichert; `Clamp.process()` gab dann still den falschen Grenzwert aus. Jetzt zieht der gerade geänderte Wert die Gegen-Grenze signalstill nach, so dass `min_val <= max_val` stets gilt.
+- **Tests:** Neu `tests/test_effect_layer_editor.py` deckt Add/Reorder/Delete, Popout/Redock, die Grenz-Invariante und eine Constant/Multiply/Clamp-Ausgabe auf einen DMX-Kanal ab. Relevanter Satz: 117 Tests grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

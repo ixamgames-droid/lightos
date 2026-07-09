@@ -73,8 +73,9 @@ Linear/Spline, Pfad schließen), Vorschau folgt exakt; Popout-Stresstest.
 **3. Fan-Tool / Position-Tool** — 4 Modi × 5 Kurven durchklicken, Werteverteilung
 plausibel; Position-Pad Pan/Tilt; DMX-/3D-Wirkung.
 
-**4. Effect-Layer-Editor** — LayeredEffect (Sin+Multiply+Clamp) bauen, Play, DMX-Monitor;
-Min>Max-Validierung; Layer verschieben/löschen; Popout.
+**4. Effect-Layer-Editor** — ✅ Headless-UI/DMX-Kette geprüft: Add/Reorder/Delete,
+Popout/Redock und Constant/Multiply/Clamp-Ausgabe. Min/Max bleiben beim Editieren
+geordnet; eine invertierte Clamp-Grenze ist nicht mehr speicherbar.
 
 **5. Popout/Andocken systematisch** — je Editor „Großes Fenster" öffnen/ändern/schließen
 ×3 (RGB-Matrix, Farb-Picker, Chaser, Sequence, Carousel, Audio, Scene) → Absturz/

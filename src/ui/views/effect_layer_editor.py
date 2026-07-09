@@ -292,8 +292,27 @@ class EffectLayerEditor(QWidget):
 
     def _set_layer_prop(self, attr, val):
         layer = self._current_layer()
-        if layer is not None:
-            setattr(layer, attr, val)
+        if layer is None:
+            return
+        setattr(layer, attr, val)
+        # QA-LIVE: ein Clamp mit min_val > max_val liefert still immer min_val
+        # und ist damit kein sinnvoller Bereich mehr. Die beiden Editor-Felder
+        # muessen deshalb gemeinsam eine geordnete Grenze bilden. Der gerade
+        # geaenderte Wert gewinnt; das Gegenfeld zieht signalstill nach.
+        if attr == "min_val" and val > layer.max_val:
+            layer.max_val = val
+            self._set_spin_silently(self._spin_max, val)
+        elif attr == "max_val" and val < layer.min_val:
+            layer.min_val = val
+            self._set_spin_silently(self._spin_min, val)
+
+    @staticmethod
+    def _set_spin_silently(spin, value):
+        spin.blockSignals(True)
+        try:
+            spin.setValue(float(value))
+        finally:
+            spin.blockSignals(False)
 
     def _add_layer(self):
         lt = self._add_combo.currentData()
