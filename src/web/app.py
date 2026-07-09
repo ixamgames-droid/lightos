@@ -7,6 +7,7 @@ from typing import Any
 try:
     from flask import Flask, render_template, request, jsonify
     from flask_socketio import SocketIO, emit
+    from werkzeug.serving import make_server
     HAS_FLASK = True
 except ImportError:
     HAS_FLASK = False
@@ -14,6 +15,7 @@ except ImportError:
 _flask_app: Any = None
 _socketio: Any = None
 _thread: threading.Thread | None = None
+_server: Any = None
 _running = False
 
 
@@ -196,25 +198,33 @@ def _register_socketio(sio):
 
 
 def start_server(port: int = 5000):
-    """Start the web server in a background thread."""
-    global _thread, _running
+    """Startet den Web-Remote in einem kontrolliert stoppbaren Thread."""
+    global _thread, _server, _running
     if _running:
-        return
+        return None
     if not HAS_FLASK:
         raise RuntimeError("Flask / flask-socketio not installed")
 
-    app, sio = create_app()
+    app, _sio = create_app()
+    # ``SocketIO.stop()`` darf nur aus einem HTTP-/SocketIO-Handler aufgerufen
+    # werden. Der GUI-Schalter ruft stop_server() aber aus dem Qt-Thread auf und
+    # bekam daher "Working outside of request context"; der Server lief weiter.
+    # make_server liefert stattdessen ein Handle mit thread-sicherem shutdown().
+    server = make_server("0.0.0.0", port, app, threaded=True)
+    _server = server
     _running = True
+
+    def _serve():
+        global _server, _running
+        try:
+            server.serve_forever()
+        finally:
+            if _server is server:
+                _server = None
+            _running = False
+
     _thread = threading.Thread(
-        # allow_unsafe_werkzeug=True: neuere flask-socketio/werkzeug verweigern
-        # den Dev-Server sonst mit RuntimeError ("not designed to run in
-        # production") -> der WebServer-Thread starb still beim Start und das
-        # Remote-Control war nie erreichbar (crash.log 2026-06). LightOS ist ein
-        # lokaler LAN-Controller, kein Internet-Dienst -> der Dev-Server ist hier
-        # bewusst akzeptabel.
-        target=lambda: sio.run(app, host="0.0.0.0", port=port,
-                               use_reloader=False, log_output=False,
-                               allow_unsafe_werkzeug=True),
+        target=_serve,
         daemon=True,
         name="WebServer"
     )
@@ -223,7 +233,16 @@ def start_server(port: int = 5000):
 
 
 def stop_server():
-    global _running
+    """Stoppt den Web-Remote auch ausserhalb eines Flask-Request-Kontexts."""
+    global _thread, _server, _running
     _running = False
-    if _socketio:
-        _socketio.stop()
+    server = _server
+    if server is not None:
+        server.shutdown()
+    thread = _thread
+    if thread is not None and thread is not threading.current_thread():
+        thread.join(timeout=2.0)
+    if thread is None or not thread.is_alive():
+        _thread = None
+    if _server is server:
+        _server = None

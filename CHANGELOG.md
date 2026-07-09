@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Web-Remote lässt sich aus der GUI wirklich stoppen (QA-LIVE)
+
+#### Behoben / Geändert
+
+- **Der Web-Remote-Checkbox-Stopp funktioniert jetzt außerhalb eines Flask-Requests:** `SocketIO.stop()` ist laut API nur innerhalb eines HTTP-/SocketIO-Handlers erlaubt und warf beim Qt-GUI-Schalter `RuntimeError: Working outside of request context`; der Server blieb dadurch nach „Web: aus" aktiv. `start_server()` nutzt jetzt einen kontrolliert stoppbaren Werkzeug-Server und `stop_server()` fährt ihn über dessen `shutdown()` herunter und wartet kurz auf den Thread.
+- **Tests:** `tests/test_web_app.py` ergänzt eine Lifecycle-Regression mit Fake-Server (Start, idempotenter Start, Stopp außerhalb eines Request-Kontexts). Insgesamt 22 Tests grün.
+
+#### Live-Prüfung
+
+- **Browser:** Lokale Web-Remote auf `127.0.0.1:5051` real verbunden; STOP und Blackout ausgelöst, Blackout-Zustand sichtbar aktiv, keine Browserfehler.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

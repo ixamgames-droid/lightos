@@ -11,6 +11,7 @@ GO/Back/Blackout/Fader) und hatte 0 Tests. Diese Suite nagelt fest:
 `get_state` ist gemockt -> kein echter AppState/OutputManager/DMX.
 """
 import os
+import threading
 import unittest
 from unittest import mock
 
@@ -85,6 +86,21 @@ class _FakeState:
         self.cleared += 1
 
 
+class _FakeServer:
+    def __init__(self):
+        self.started = threading.Event()
+        self.stopped = threading.Event()
+        self.shutdown_calls = 0
+
+    def serve_forever(self):
+        self.started.set()
+        self.stopped.wait(1.0)
+
+    def shutdown(self):
+        self.shutdown_calls += 1
+        self.stopped.set()
+
+
 @unittest.skipUnless(HAS_FLASK, "Flask/flask-socketio nicht installiert")
 class TestWebRemote(unittest.TestCase):
     def setUp(self):
@@ -97,6 +113,7 @@ class TestWebRemote(unittest.TestCase):
 
     def tearDown(self):
         webapp._get_state = self._orig_get_state
+        webapp.stop_server()
 
     # ── Clamping ──────────────────────────────────────────────────────────────
     def test_fader_clamps_high(self):
@@ -220,6 +237,25 @@ class TestWebRemote(unittest.TestCase):
         sio_client.emit("stop")
         self.assertEqual(self.state.cue_stacks[0].actions, ["stop"])
         sio_client.disconnect()
+
+    def test_server_lifecycle_stops_outside_request_context(self):
+        """Der GUI-Schalter ruft stop_server ohne Flask-Request auf.
+
+        Regression: SocketIO.stop() war dort verboten und warf RuntimeError;
+        der Remote blieb nach dem Ausschalten am Port erreichbar.
+        """
+        server = _FakeServer()
+        with mock.patch.object(webapp, "make_server", return_value=server) as factory:
+            self.assertEqual(webapp.start_server(54321), 54321)
+            self.assertTrue(server.started.wait(1.0))
+            self.assertIsNone(webapp.start_server(9999))  # idempotent
+            factory.assert_called_once_with("0.0.0.0", 54321, mock.ANY, threaded=True)
+
+            webapp.stop_server()
+
+        self.assertEqual(server.shutdown_calls, 1)
+        self.assertFalse(webapp._running)
+        self.assertIsNone(webapp._server)
 
 
 if __name__ == "__main__":

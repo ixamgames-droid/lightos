@@ -64,8 +64,10 @@ Pages (nach Fix #230 erneut bestätigen), Grand-Master dimmt nur Intensität/Far
 (nicht Pan/Tilt/Gobo), Laser-Not-Aus (dunkel + unscharf, auch nach Show-Neuladen),
 VC Touch-Lock (Maus tot, MIDI wirkt), Command-Line `blackout`/`go`/`back`/`stop`/`record`.
 
-**1. Web-Remote End-to-End** (nach Fix #231) — STOP stoppt jetzt, Fader initial korrekt,
-GO/BACK/Blackout, bidirektionaler Sync mit Haupt-GUI.
+**1. Web-Remote End-to-End** — ✅ Browser-geprüft am 2026-07-09: Verbindung,
+STOP und Blackout arbeiten ohne Browserfehler; der Server lässt sich nun auch vom
+GUI-Schalter außerhalb eines Request-Kontexts wirklich stoppen (QA-LIVE Web-Remote-Lifecycle).
+Fader-Initial-Sync und Routing bleiben durch `tests/test_web_app.py` abgedeckt.
 
 **2. EFX Custom-Path-Editor** — Pan/Tilt-Zeichenwerkzeug (Punkte setzen/ziehen/löschen,
 Linear/Spline, Pfad schließen), Vorschau folgt exakt; Popout-Stresstest.
@@ -96,7 +98,7 @@ Fade-In), Musik-Player.
 Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
 
 **11.–20.** Farb-Picker-Interaktion · Output-Konfig/DMX-Verbindungen · Command-Line
-`execute()` · Web-Server-Lifecycle · Kurven-Editor/Modifier/Range-Lock · Laser-Zeichen-
+`execute()` · Kurven-Editor/Modifier/Range-Lock · Laser-Zeichen-
 Studio · Playback/Executor-Konfig · Layout-Persistenz/Show-Validierung · Simple Desk/
 Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 
