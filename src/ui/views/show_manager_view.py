@@ -234,13 +234,39 @@ class TimelineCanvas(QWidget):
             dt = dx / PX_PER_SEC
             new_start = max(0.0, self._drag_original_start + dt)
             self._drag_sf.start_time = new_start
+            # Der Block darf beim Ziehen auch die Spur wechseln. _drag_track
+            # war schon vorhanden, wurde aber nie ausgewertet: im Live-Test
+            # blieb ein vertikal gezogener Block still auf der alten Spur.
+            show = self._show()
+            if show is not None and show.tracks:
+                row = int((event.position().y() - RULER_H) // TRACK_H)
+                row = max(0, min(len(show.tracks) - 1, row))
+                target_track = show.tracks[row]
+                if target_track is not self._drag_track:
+                    if self._drag_track is not None:
+                        try:
+                            self._drag_track.show_functions.remove(self._drag_sf)
+                        except ValueError:
+                            pass
+                    target_track.add_function(self._drag_sf)
+                    self._drag_track = target_track
             self.update()
             self.updateGeometry()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            dragged = self._drag_sf
+            track = self._drag_track
             self._drag_sf = None
             self._drag_track = None
+            if dragged is not None:
+                if track is not None:
+                    track.show_functions.sort(key=lambda sf: sf.start_time)
+                show = self._show()
+                if show is not None:
+                    show.recalc_duration()
+                self.update()
+                self.updateGeometry()
 
 
 class TrackLabelPanel(QWidget):
