@@ -1,13 +1,13 @@
 # LightOS — Roadmap
 
-> Stand: 2026-05-27 · Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
+> Stand: 2026-07-09 · Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
 
 ---
 
 ## Kurzfristig
 
 ### UI / Bedienung
-- **Preset-Browser** — Schnellzugriff auf Paletten und Gruppen per Suchfeld
+- ✅ **Preset-Browser** — Schnellzugriff auf Paletten und Gruppen per Suchfeld *(erledigt — `PresetBrowserView`, Suche in Paletten/Gruppen)*
 - **Undo im Patch** — Fixture löschen rückgängig machen
 - **Fixture-Kopieren mit Offset** — Mehrere Geräte gleichzeitig patchen mit Adress-Abstand
 - ✅ **Touch-Keyboard** — On-Screen-Numpad bei Texteingabe auf Touchscreen *(erledigt — `src/ui/touch_keyboard.py`)*
@@ -18,7 +18,7 @@
 - ✅ **Stack-Loop-Modi** — Einzel, Loop, Bounce, Ping-Pong *(erledigt — `CueStack.mode`)*
 
 ### Ausgabe
-- **sACN / E1.31 Ausgabe** — Alternative zu Art-Net für Environments mit sACN-Nodes
+- ✅ **sACN / E1.31 Ausgabe** — Alternative zu Art-Net für Environments mit sACN-Nodes *(erledigt — `SACNSender`, pro-Universum-Konfiguration; Output-Hardwaretest bleibt im Backlog)*
 - **Enttec Open DMX USB** — Stabilisierung des Treibers für lange Sessions (>8h)
 
 ### Stabilität
@@ -33,7 +33,7 @@
 - **Macro-System** — Abfolgen von Kommandozeilen-Befehlen als Makro speichern und abrufen
 - **Multi-Monitor-Layout** — Frei positionierbare Docks auf mehreren Bildschirmen speichern
 - **Touch-Optimierung Phase 2** — Pinch-Zoom im Patch, Swipe zwischen Tabs, größere Hit-Targets
-- **Quick-Recording** — Ein-Klick-Record direkt im Playback-View ohne Umweg
+- ✅ **Quick-Recording** — Ein-Klick-Record direkt im Playback-View ohne Umweg *(erledigt — `PlaybackView._quick_record_cue`)*
 
 ### Engine
 - **Timecode-Import aus Audio** — BPM-Grid automatisch aus WAV/MP3 erkennen

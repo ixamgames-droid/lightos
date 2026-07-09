@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
+
+#### Doku / Prozess
+
+- **Der autonome Loop hat jetzt eine kanonische Arbeitswarteschlange:** `BACKLOG.md` trennt ausführbare Arbeit, notwendige Produktentscheidungen und externe Hardware-Blocker von den detaillierten Befundregistern. Veraltete Status wurden korrigiert (u. a. VIZ-PULL/#201, LAS-03, QA-16), die doppelte STAB-11-ID auf STAB-21 aufgelöst und QA-10 auf die tatsächlich noch acht ungetesteten Views präzisiert.
+- **Die Roadmap spiegelt umgesetzte Funktionen:** Preset-Browser, Quick-Recording und sACN-Ausgabe sind als erledigt markiert; Hardware-Abnahmen bleiben im Backlog.
+
 ### 2026-07-09 — Audio-Input-Startfehler sichtbar (AUDIO-START-WARN)
 
 #### Behoben / Geändert
