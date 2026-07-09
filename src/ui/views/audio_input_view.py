@@ -245,15 +245,27 @@ class AudioInputView(QWidget):
             self._lbl_status.setText("Status: läuft")
             self._lbl_status.setStyleSheet("color:#9DFF52;")
         else:
-            self._lbl_status.setText("Status: Start fehlgeschlagen")
-            self._lbl_status.setStyleSheet("color:#ff4444;")
+            self._show_capture_error("Start fehlgeschlagen")
 
     def _stop_capture(self):
         if not self._capture:
             return
         self._capture.stop()
+        if hasattr(self._capture, "clear_error"):
+            self._capture.clear_error()
         self._lbl_status.setText("Status: gestoppt")
         self._lbl_status.setStyleSheet("color:#888888;")
+
+    def _show_capture_error(self, fallback: str = "Start fehlgeschlagen"):
+        err = None
+        if self._capture and hasattr(self._capture, "last_error"):
+            try:
+                err = self._capture.last_error()
+            except Exception:
+                err = None
+        msg = err or fallback
+        self._lbl_status.setText(f"Status: {msg}")
+        self._lbl_status.setStyleSheet("color:#ff4444;")
 
     # ── Parameter ─────────────────────────────────────────────────────────────
 
@@ -339,6 +351,17 @@ class AudioInputView(QWidget):
             self._lbl_beat.setStyleSheet(
                 "background:#222222; color:#444444; border-radius:6px; "
                 "font-weight:bold;")
+
+        if self._capture and not self._capture.is_running():
+            err = None
+            if hasattr(self._capture, "last_error"):
+                try:
+                    err = self._capture.last_error()
+                except Exception:
+                    err = None
+            if err:
+                self._show_capture_error()
+                return
 
         # Capture-Status checken (z.B. wenn Thread gestorben ist)
         if self._capture and not self._capture.is_running() and (

@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Audio-Input-Startfehler sichtbar (AUDIO-START-WARN)
+
+#### Behoben / Geändert
+
+- **Audio-Input-Tab scheitert nicht mehr still bei fehlendem/ungültigem Loopback-Gerät:** `AudioCapture.start()` setzt jetzt `last_error()` auch bei fehlendem `soundcard`-Backend oder fehlendem Default-Gerät, und `AudioInputView` zeigt diese Meldung direkt im Statuslabel. Stirbt der Capture-Thread erst nach einem zunächst erfolgreichen Start (z. B. Geräte-ID-Mismatch: „no device with id …"), bleibt der Tab nicht mehr stumm auf „Status: gestoppt", sondern zeigt den konkreten Capture-Fehler wie der BPM-Manager. Test: `tests/test_audio_input_view.py`.
+
 ### 2026-07-08 — OSC-Blackout & MTC-Frame robuster (OSC-04 + MTC-02, aus AUD-08)
 
 #### Geaendert / Fixes
