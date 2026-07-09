@@ -197,6 +197,11 @@ class AppState:
         # unsichtbarer Zombie auf freien). Sicht- (ISO-01) und loeschbar (ISO-02).
         self.simple_desk: dict[int, dict[int, int]] = {}
         self._sd_lock = threading.RLock()
+        # QA-LIVE: Szenen-Vorschau ist ein EINMALIGER Render-Layer statt eines
+        # direkten Universe-Write aus dem UI. Dadurch durchlaeuft sie Master,
+        # Blackout und den Laser-NOT-AUS wie jeder andere Output.
+        self._scene_preview: dict[int, dict[int, int]] = {}
+        self._scene_preview_lock = threading.RLock()
         # F-20: Art-Net/sACN-EINGANG als eigene Render-Schicht. Die Empfaenger
         # (artnet_input/sacn_input) schreiben ihre gemergten Werte NICHT mehr direkt
         # ins Live-Universe (das ueberschrieb der Per-Frame-Renderer auf gepatchten
@@ -1190,6 +1195,34 @@ class AppState:
                 self.simple_desk.clear()
         self._emit_dmx_changed(None)
 
+    def queue_scene_preview(self, values) -> None:
+        """Plant Szenenwerte fuer GENAU den naechsten vollstaendigen Render-Frame.
+
+        Der Scene-Editor darf nicht direkt in ``Universe`` schreiben: das umgeht
+        den Render-Vertrag und konnte einen DMX-Laser trotz NOT-AUS kurz ansteuern.
+        Nicht-DMX-Netzwerk-Laser werden wie in allen anderen DMX-Pfaden ignoriert.
+        """
+        preview: dict[int, dict[int, int]] = {}
+        for sv in list(values or ()):
+            try:
+                fid = int(sv.fixture_id)
+                channel = int(sv.channel)
+                value = max(0, min(255, int(sv.value)))
+            except (AttributeError, TypeError, ValueError):
+                continue
+            entry = self._fix_index.get(fid)
+            if not entry:
+                continue
+            fixture = entry[0]
+            if not fixture_uses_dmx(fixture):
+                continue
+            dmx_addr = int(fixture.address) + channel - 1
+            if 1 <= dmx_addr <= 512:
+                preview.setdefault(int(fixture.universe), {})[dmx_addr] = value
+        with self._scene_preview_lock:
+            self._scene_preview = preview
+        self._emit_dmx_changed(None)
+
     # ── Aktive Fremdwerte: Anzeige (ISO-01) + zentrales Clear (ISO-02) ─────────
 
     def programmer_active(self) -> int:
@@ -1555,6 +1588,29 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
+        # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
+        # Mastern, Simple Desk und Laser-NOT-AUS. Sie kann daher keinen direkten
+        # Roh-Write mehr erzeugen und wird im Folgeframe automatisch freigegeben.
+        preview_state = getattr(self, "_scene_preview", None)
+        if preview_state:
+            preview_lock = getattr(self, "_scene_preview_lock", None)
+            if preview_lock is not None:
+                with preview_lock:
+                    scene_preview = {u: dict(chans)
+                                     for u, chans in self._scene_preview.items()}
+                    self._scene_preview = {}
+            else:
+                scene_preview = {u: dict(chans) for u, chans in preview_state.items()}
+                self._scene_preview = {}
+            for univ, chans in scene_preview.items():
+                su = scratch.get(univ)
+                if su is None:
+                    continue
+                for ch, val in chans.items():
+                    if 1 <= ch <= 512:
+                        su.set_channel(ch, max(0, min(255, int(val))))
 
         # 4b. Multiplikativer Dimmer-Master: (globaler Submaster * je-Fixture
         #     zugewiesener Submaster) * Gruppen-/Fixture-Dimmer * Programmer-Dimmer

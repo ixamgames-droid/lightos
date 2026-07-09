@@ -96,6 +96,9 @@ class SceneEditor(QWidget):
         btn_row.addWidget(btn_prog)
 
         btn_preview = QPushButton("Vorschau senden")
+        btn_preview.setToolTip(
+            "Sendet die Szene einmal ueber den zentralen Renderer "
+            "(Master, Blackout und Laser-NOT-AUS bleiben wirksam).")
         btn_preview.clicked.connect(self._send_preview)
         btn_row.addWidget(btn_preview)
 
@@ -285,18 +288,8 @@ class SceneEditor(QWidget):
         self._load_scene()
 
     def _send_preview(self):
-        """Write scene values directly to DMX."""
-        fixtures = self._state.get_patched_fixtures()
-        for sv in self._scene.values:
-            fixture = next((f for f in fixtures if f.fid == sv.fixture_id), None)
-            if fixture is None:
-                continue
-            universe = self._state.universes.get(fixture.universe)
-            if universe is None:
-                continue
-            dmx_addr = fixture.address + sv.channel - 1
-            if 1 <= dmx_addr <= 512:
-                universe.set_channel(dmx_addr, sv.value)
+        """Plant eine sichere Ein-Frame-Vorschau im zentralen Renderer ein."""
+        self._state.queue_scene_preview(self._scene.values)
 
     def _clear_all(self):
         self._scene.clear()

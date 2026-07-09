@@ -21,6 +21,7 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
 | 2 | **Funktionen** | `FunctionManager.tick` (Scene/Chaser/EFX/RGB-Matrix/…) | LTP in **Start-Reihenfolge** (`_start_order`): zuletzt gestartet gewinnt (LAYER-01) |
 | 3 | **Executoren** | `PlaybackEngine.compute_merged` (Cues) | LTP über Funktionen |
 | 4 | **Programmer** | `state.programmer` (inkl. Matrix-Programmer) | LTP, **eingeschränkt** durch WP-6 + EE-02 (s. u.) |
+| 4a³ | **Szenen-Vorschau** | `queue_scene_preview()` aus dem Scene-Editor | einmaliger LTP-Frame nach Programmer/impliziter Helligkeit; wird sofort verbraucht und bleibt unter Master, Simple Desk und Laser-NOT-AUS |
 | 4b | **Dimmer-Master** | `submaster_level` · `fixture_dimmers` · Programmer-Dimmer | multiplikativ auf Intensitäts-/Ersatz-Farbkanäle |
 | 4c | **Simple Desk** | `state.simple_desk` (ISO-03) | **nur wenn `simple_desk_override` aktiv** — sonst reine Anzeige; dann oberste Schicht, nur explizit gesetzte Kanäle |
 | 5 | **Commit** | gepatchte Spans atomar; freie Kanäle über Engine-Extra (+ Freigabe) | ins Live-Universe |
@@ -59,3 +60,5 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
 2. Neue Wertquellen ordnen sich als **Schicht** in diese Tabelle ein — kein Direkt-Write
    ins Live-Universe am Renderer vorbei (sonst Flicker/Zombie wie der alte Simple-Desk-Bug).
 3. Jede manuelle Override-Quelle muss `*_active()`-zählbar und über ein `clear_*` löschbar sein.
+   Einmalige Szenen-Vorschauen sind davon ausgenommen, weil der Renderer sie im
+   selben Frame atomar verbraucht und im Folgeframe automatisch freigibt.

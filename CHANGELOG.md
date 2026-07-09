@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Szenen-Vorschau umgeht Safety nicht mehr (QA-LIVE)
+
+#### Behoben / Geändert
+
+- **„Vorschau senden" schreibt nicht mehr direkt ins Live-Universe:** Der Scene-Editor plant seine Werte nun als einmaligen Render-Layer ein. Damit gelten Dimmer-Master, Simple Desk und insbesondere der DMX-Laser-NOT-AUS weiterhin; nach einem vollständigen Render-Frame wird die Vorschau automatisch freigegeben statt als Rohwert zu verbleiben.
+- **Tests:** Neu `tests/test_scene_preview.py` deckt UI-Button, Ein-Frame-Commit, automatische Freigabe, Master-Dimmung und Laser-NOT-AUS ab. Relevanter Satz: 25 Tests grün.
+
+#### Doku
+
+- **Output-Vertrag ergänzt:** `docs/OUTPUT_MERGE_CONTRACT.md` führt die einmalige Szenen-Vorschau als Schicht 4a³ vor Mastern und Safety-Gates.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

@@ -80,8 +80,9 @@ Min>Max-Validierung; Layer verschieben/löschen; Popout.
 ×3 (RGB-Matrix, Farb-Picker, Chaser, Sequence, Carousel, Audio, Scene) → Absturz/
 Doppel-Widgets/RuntimeError prüfen; während laufender Show auskoppeln.
 
-**6. Scene-Editor** — Szene anlegen, Kanaltabelle editieren, „Vom Programmer übernehmen",
-**„Vorschau senden"** (schreibt direkt auf DMX ohne Safety-Gate — bei Laser prüfen!).
+**6. Scene-Editor** — ✅ „Vorschau senden" läuft jetzt als einmaliger Render-Layer;
+Master, Simple Desk und Laser-NOT-AUS bleiben wirksam. UI-Button, Ein-Frame-Commit,
+automatische Freigabe und Laser-NOT-AUS sind regressionsgetestet.
 
 **7. Show-Manager/Timeline** — Drag&Drop auf Tracks, Blöcke verschieben, speichern/laden,
 Play/Loop/Playhead, Track-Mute, QXW-Import.
