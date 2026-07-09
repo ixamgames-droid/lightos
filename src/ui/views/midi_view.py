@@ -19,6 +19,7 @@ from src.core.midi.midi_mapper import (
     ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE
 )
 from src.core.app_state import get_state
+from src.core.weak_callbacks import weak_callback
 try:
     from src.core.timecode.mtc_reader import get_mtc_reader
 except Exception:
@@ -53,18 +54,64 @@ class MidiView(QWidget):
         self._log_signal.log_received.connect(self._append_log)
         self._log_signal.msg_received.connect(self._on_midi_msg_ui)
         self._log_signal.mtc_received.connect(self._update_mtc_label)
+        self._midi_log_callback = None
+        self._midi_message_callback = None
+        self._mtc_reader = None
+        self._mtc_callback = None
         self._learn_target_row = -1
         self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
         self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
         self._setup_ui()
-        self._midi.subscribe_log(lambda t: self._log_signal.log_received.emit(t))
-        self._midi.subscribe(self._on_midi_msg)
+        self._midi_log_callback = weak_callback(
+            self._on_midi_log, self._midi.unsubscribe_log)
+        self._midi_message_callback = weak_callback(
+            self._on_midi_msg, self._midi.unsubscribe)
+        self._midi.subscribe_log(self._midi_log_callback)
+        self._midi.subscribe(self._midi_message_callback)
 
         # Auto-Refresh Ports alle 2 Sek - erkennt USB-Hotplug
         from PySide6.QtCore import QTimer
         self._port_refresh_timer = QTimer(self)
         self._port_refresh_timer.timeout.connect(self._refresh_ports)
         self._port_refresh_timer.start(2000)
+        # Der Callback-Service ist ein langlebiger Singleton. Die Lambda-Referenz
+        # ist hier bewusst bis zum Qt-destroyed-Signal stark, damit der Teardown
+        # auch bei Parent-Kaskaden noch ausgefuehrt wird.
+        self.destroyed.connect(lambda *_: self._teardown_callbacks())
+
+    def _teardown_callbacks(self):
+        """Meldet alle Worker-Callbacks idempotent ab, bevor Widgets sterben."""
+        self._monitor_active = False
+        timer = getattr(self, "_port_refresh_timer", None)
+        if timer is not None:
+            timer.stop()
+
+        midi = getattr(self, "_midi", None)
+        for attr, unsubscribe_name in (
+            ("_midi_log_callback", "unsubscribe_log"),
+            ("_midi_message_callback", "unsubscribe"),
+        ):
+            callback = getattr(self, attr, None)
+            if midi is not None and callback is not None:
+                try:
+                    getattr(midi, unsubscribe_name)(callback)
+                except Exception:
+                    pass
+            setattr(self, attr, None)
+
+        reader = getattr(self, "_mtc_reader", None)
+        callback = getattr(self, "_mtc_callback", None)
+        if reader is not None and callback is not None:
+            try:
+                reader.unsubscribe(callback)
+            except Exception:
+                pass
+        self._mtc_callback = None
+        self._mtc_reader = None
+
+    def closeEvent(self, event):
+        self._teardown_callbacks()
+        super().closeEvent(event)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -569,7 +616,9 @@ class MidiView(QWidget):
         try:
             if get_mtc_reader:
                 rd = get_mtc_reader()
-                rd.subscribe(self._on_mtc)
+                self._mtc_reader = rd
+                self._mtc_callback = weak_callback(self._on_mtc, rd.unsubscribe)
+                rd.subscribe(self._mtc_callback)
         except Exception as e:
             print(f"[MidiView] MTC subscribe error: {e}")
 
@@ -608,6 +657,10 @@ class MidiView(QWidget):
             self._log_signal.mtc_received.emit(int(h), int(m), int(s), int(f))
         except Exception:
             pass
+
+    def _on_midi_log(self, text: str):
+        """MIDI-Log aus dem Worker-Thread per Signal in die UI uebergeben."""
+        self._log_signal.log_received.emit(text)
 
     def _update_mtc_label(self, h: int, m: int, s: int, f: int):
         self._lbl_mtc_time.setText(f"{h:02d}:{m:02d}:{s:02d}:{f:02d}")

@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Worker-Callback-Teardown und Threading-Audit (STAB-21)
+
+#### Behoben / Geändert
+
+- **Geschlossene MIDI- und Audio-Views werden nicht mehr von Worker-Singletons festgehalten:** `MidiView` meldet MIDI-, MIDI-Log- und MTC-Callbacks, `AudioInputView` Capture- und Beat-Callbacks idempotent in `closeEvent`/`destroyed` ab. Die neuen Callback-Adapter halten Views nur schwach und entfernen sich nach deren Tod selbst; `MidiManager.unsubscribe_log()` ergänzt den bisher fehlenden symmetrischen Pfad.
+- **Tests:** Neu `tests/test_midi_view_callback_teardown.py`; erweitert `tests/test_audio_input_view.py`. Der relevante Qt-/Callback-Satz (`audio_input_view`, `midi_view_callback_teardown`, `sync_safe_subscribe`) ist mit 11 Tests grün.
+
+#### Doku / Audit
+
+- **Neuer Threading-/native-AV-Audit:** [`docs/THREADING_AV_AUDIT_2026_07_09.md`](docs/THREADING_AV_AUDIT_2026_07_09.md) dokumentiert die geprüften UI↔Worker↔Output-Grenzen. Als verbleibender P1-Befund ist **STAB-22** abgeleitet: direkter Programmer-Flush darf den zentralen Render-Commit nicht weiter umgehen.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

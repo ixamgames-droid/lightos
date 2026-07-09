@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QCheckBox, QProgressBar, QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer
+from src.core.weak_callbacks import weak_callback
 
 try:
     from src.core.audio.capture import (
@@ -44,6 +45,8 @@ class AudioInputView(QWidget):
         self._bass: float = 0.0
         self._treble: float = 0.0
         self._beat_flash: int = 0   # countdown frames fuer Beat-Indikator
+        self._capture_callback = None
+        self._beat_callback = None
         self._setup_ui()
 
         if not AUDIO_AVAILABLE or not HAS_NUMPY or (
@@ -55,8 +58,12 @@ class AudioInputView(QWidget):
             return
 
         # Beat- und Level-Callback verkabeln
-        self._capture.subscribe(self._on_audio_chunk)
-        self._detector.subscribe(self._on_beat)
+        self._capture_callback = weak_callback(
+            self._on_audio_chunk, self._capture.unsubscribe)
+        self._beat_callback = weak_callback(
+            self._on_beat, self._detector.unsubscribe)
+        self._capture.subscribe(self._capture_callback)
+        self._detector.subscribe(self._beat_callback)
 
         # Geraete-Liste aufbauen
         self._populate_devices()
@@ -77,6 +84,29 @@ class AudioInputView(QWidget):
         self._ui_timer.setInterval(33)
         self._ui_timer.timeout.connect(self._refresh_ui)
         self._ui_timer.start()
+        self.destroyed.connect(lambda *_: self._teardown_callbacks())
+
+    def _teardown_callbacks(self):
+        """Loest Worker-Callbacks vor dem Zerstoeren der View."""
+        timer = getattr(self, "_ui_timer", None)
+        if timer is not None:
+            timer.stop()
+        for source_name, callback_name in (
+            ("_capture", "_capture_callback"),
+            ("_detector", "_beat_callback"),
+        ):
+            source = getattr(self, source_name, None)
+            callback = getattr(self, callback_name, None)
+            if source is not None and callback is not None:
+                try:
+                    source.unsubscribe(callback)
+                except Exception:
+                    pass
+            setattr(self, callback_name, None)
+
+    def closeEvent(self, event):
+        self._teardown_callbacks()
+        super().closeEvent(event)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 

@@ -10,8 +10,14 @@ def qapp():
 
 
 class _FakeDetector:
-    def subscribe(self, _cb):
-        pass
+    def __init__(self):
+        self.callbacks = []
+
+    def subscribe(self, cb):
+        self.callbacks.append(cb)
+
+    def unsubscribe(self, cb):
+        self.callbacks.remove(cb)
 
     def get_bpm(self):
         return 0.0
@@ -30,9 +36,13 @@ class _FakeCapture:
         self._start_ok = start_ok
         self._error = error
         self._running = False
+        self.callbacks = []
 
-    def subscribe(self, _cb):
-        pass
+    def subscribe(self, cb):
+        self.callbacks.append(cb)
+
+    def unsubscribe(self, cb):
+        self.callbacks.remove(cb)
 
     def set_device(self, name):
         self._device_name = name
@@ -68,7 +78,7 @@ class _FakeAudioCaptureClass:
         return "Bad Loopback"
 
 
-def _make_view(monkeypatch, capture):
+def _make_view(monkeypatch, capture, detector=None):
     from src.ui.views import audio_input_view as aiv
 
     monkeypatch.setattr(aiv, "AUDIO_AVAILABLE", True)
@@ -76,18 +86,19 @@ def _make_view(monkeypatch, capture):
     monkeypatch.setattr(aiv, "HAS_SOUNDCARD", True)
     monkeypatch.setattr(aiv, "AudioCapture", _FakeAudioCaptureClass)
     monkeypatch.setattr(aiv, "get_audio_capture", lambda: capture)
-    monkeypatch.setattr(aiv, "get_beat_detector", lambda: _FakeDetector())
+    detector = detector or _FakeDetector()
+    monkeypatch.setattr(aiv, "get_beat_detector", lambda: detector)
 
     app = QApplication.instance() or QApplication([])
     view = aiv.AudioInputView()
     view.show()
     app.processEvents()
-    return app, view
+    return app, view, detector
 
 
 def test_audio_input_view_shows_async_capture_error(qapp, monkeypatch):
     capture = _FakeCapture(start_ok=True)
-    app, view = _make_view(monkeypatch, capture)
+    app, view, _detector = _make_view(monkeypatch, capture)
 
     view._start_capture()
     capture.fail_after_start("no device with id 13")
@@ -103,13 +114,30 @@ def test_audio_input_view_shows_async_capture_error(qapp, monkeypatch):
 
 def test_audio_input_view_shows_immediate_start_error(qapp, monkeypatch):
     capture = _FakeCapture(start_ok=False, error="Kein Audio-Geraet gefunden")
-    app, view = _make_view(monkeypatch, capture)
+    app, view, _detector = _make_view(monkeypatch, capture)
 
     view._start_capture()
 
     assert "Kein Audio-Geraet gefunden" in view._lbl_status.text()
 
     view._ui_timer.stop()
+    view.deleteLater()
+    app.processEvents()
+
+
+def test_audio_input_view_unregisters_worker_callbacks(qapp, monkeypatch):
+    capture = _FakeCapture()
+    detector = _FakeDetector()
+    app, view, _ = _make_view(monkeypatch, capture, detector)
+
+    assert len(capture.callbacks) == 1
+    assert len(detector.callbacks) == 1
+
+    view._teardown_callbacks()
+    view._teardown_callbacks()  # idempotent beim closeEvent + destroyed-Pfad
+    assert capture.callbacks == []
+    assert detector.callbacks == []
+
     view.deleteLater()
     app.processEvents()
 

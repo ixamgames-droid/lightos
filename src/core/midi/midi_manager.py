@@ -295,7 +295,15 @@ class MidiManager:
             pass
 
     def subscribe_log(self, cb: Callable[[str], None]):
-        self._log_callbacks.append(cb)
+        if cb not in self._log_callbacks:
+            self._log_callbacks.append(cb)
+
+    def unsubscribe_log(self, cb: Callable[[str], None]):
+        """Entfernt einen Log-Callback beim Schliessen einer UI-View."""
+        try:
+            self._log_callbacks.remove(cb)
+        except ValueError:
+            pass
 
     def _on_message(self, raw: list[int], port_name: str):
         try:
