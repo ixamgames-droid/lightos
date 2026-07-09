@@ -77,14 +77,23 @@ def _fixture_to_dict(pf) -> dict:
     if isinstance(pf, dict):
         return {
             "fid": _to_int(pf.get("fid", pf.get("id", 0)), 0),
-            "label": str(pf.get("label", pf.get("name", "")) or ""),
+            # Der Loader ersetzt einen leeren Namen durch ``Fixture <fid>``.
+            # Dieselbe Kanonisierung beim Dump verhindert eine zweite stille
+            # save→load→save-Drift neben den DMX-Grenzen (STAB-10).
+            "label": str(
+                pf.get("label", pf.get("name", ""))
+                or f"Fixture {_to_int(pf.get('fid', pf.get('id', 0)), 0)}"
+            ),
             "fixture_profile_id": _to_int(
                 pf.get("fixture_profile_id", pf.get("profile_id", 0)), 0
             ),
             "mode_name": str(pf.get("mode_name", pf.get("mode", "")) or ""),
             "universe": _to_int(pf.get("universe", 1), 1),
-            "address": _to_int(pf.get("address", 1), 1),
-            "channel_count": max(1, _to_int(pf.get("channel_count", 1), 1)),
+            # Die persistente Patch-Schema-Grenze ist 1..512. Der Loader
+            # klemmt seit jeher auf genau diesen Bereich; der Dump muss es
+            # ebenfalls tun, sonst driftet ein save→load→save still (STAB-10).
+            "address": min(512, max(1, _to_int(pf.get("address", 1), 1))),
+            "channel_count": min(512, max(1, _to_int(pf.get("channel_count", 1), 1))),
             "invert_pan": bool(pf.get("invert_pan", False)),
             "invert_tilt": bool(pf.get("invert_tilt", False)),
             "swap_pan_tilt": bool(pf.get("swap_pan_tilt", False)),
@@ -103,14 +112,17 @@ def _fixture_to_dict(pf) -> dict:
         }
     return {
         "fid": _to_int(getattr(pf, "fid", getattr(pf, "id", 0)), 0),
-        "label": str(getattr(pf, "label", getattr(pf, "name", "")) or ""),
+        "label": str(
+            getattr(pf, "label", getattr(pf, "name", ""))
+            or f"Fixture {_to_int(getattr(pf, 'fid', getattr(pf, 'id', 0)), 0)}"
+        ),
         "fixture_profile_id": _to_int(
             getattr(pf, "fixture_profile_id", getattr(pf, "profile_id", 0)), 0
         ),
         "mode_name": str(getattr(pf, "mode_name", getattr(pf, "mode", "")) or ""),
         "universe": _to_int(getattr(pf, "universe", 1), 1),
-        "address": _to_int(getattr(pf, "address", 1), 1),
-        "channel_count": max(1, _to_int(getattr(pf, "channel_count", 1), 1)),
+        "address": min(512, max(1, _to_int(getattr(pf, "address", 1), 1))),
+        "channel_count": min(512, max(1, _to_int(getattr(pf, "channel_count", 1), 1))),
         "invert_pan": bool(getattr(pf, "invert_pan", False)),
         "invert_tilt": bool(getattr(pf, "invert_tilt", False)),
         "swap_pan_tilt": bool(getattr(pf, "swap_pan_tilt", False)),

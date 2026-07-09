@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — Show-Dateien bleiben nach dem ersten Save stabil (STAB-10)
+
+#### Behoben / Tests
+
+- **Keine stille Patch-Drift mehr bei wiederholtem Speichern:** Der Dump begrenzt `address` und `channel_count` nun wie der Loader auf 1..512 und ersetzt einen leeren Fixture-Namen wie der Loader deterministisch durch `Fixture <fid>`. So produziert ein kanonischer Save→Load→Save keinen veränderten `show.json`-Inhalt.
+- **Neuer Korpus-Gate:** `tests/test_show_roundtrip_identity.py` lädt alle 54 committeten Shows, speichert/liest/speichert erneut und vergleicht die kanonischen JSON-Payloads. Ergebnis: 56 grün; zusätzlich `tests/test_show_file.py`: 23 grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
