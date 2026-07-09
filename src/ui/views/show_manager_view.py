@@ -245,9 +245,16 @@ class TrackLabelPanel(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
     def refresh(self):
-        # Remove old widgets
-        for i in reversed(range(self.layout().count() if self.layout() else 0)):
-            self.layout().itemAt(i).widget().deleteLater()
+        # Remove old widgets. itemAt(i).widget() kann None sein (Layout-Item ist
+        # ein Spacer/Stretch oder ein Sub-Layout, kein Widget) -> ohne Guard warf
+        # das AttributeError: 'NoneType' has no attribute 'deleteLater' und liess
+        # z. B. "+ Neue Show" / "+ Track" abstuerzen (live gefunden 2026-07-09).
+        lay = self.layout()
+        for i in reversed(range(lay.count() if lay else 0)):
+            item = lay.itemAt(i)
+            w = item.widget() if item is not None else None
+            if w is not None:
+                w.deleteLater()
 
         if self.layout() is None:
             layout = QVBoxLayout(self)
