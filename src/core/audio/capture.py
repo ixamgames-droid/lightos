@@ -55,6 +55,14 @@ class AudioCapture:
         with self._lock:
             return self._error
 
+    def _set_error(self, text: str | None):
+        with self._lock:
+            self._error = text
+
+    def clear_error(self):
+        """Vergisst den letzten Capture-Fehler, z. B. nach einem manuellen Stop."""
+        self._set_error(None)
+
     @staticmethod
     def list_input_devices() -> list[str]:
         """Echte Eingaenge (Mikro / Line-In), ohne Loopback-Geraete."""
@@ -121,10 +129,12 @@ class AudioCapture:
 
     def start(self):
         if not HAS_SOUNDCARD:
+            self._set_error("soundcard nicht verfuegbar")
             print("[AudioCapture] soundcard nicht verfügbar")
             return False
         if self._running:
             return True
+        self._set_error(None)
         if self._device_name is None:
             # Default je nach Quelle waehlen
             if self.source_mode == "input":
@@ -132,6 +142,7 @@ class AudioCapture:
             else:
                 self._device_name = self.default_speaker()
         if self._device_name is None:
+            self._set_error("Kein Audio-Geraet gefunden")
             return False
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True, name="AudioCapture")
