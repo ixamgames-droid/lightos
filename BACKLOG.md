@@ -26,6 +26,14 @@ _Aktuell nichts in Arbeit. **F-26/F-26b** (Feature-Dimmer-Master) ist erledigt �
 
 _Aktuell keine frei eingereihten Items — die nächsten Kandidaten stehen unten unter „Aus Demo-Bau" / „Aus Codex-Reviews". Einzelne Zeilen nach hier oben ziehen, um sie für den Loop zu priorisieren (oder eine neue Idee anhängen)._
 
+### 🔬 Aus Feature-Verifikations-Sweep 2026-07-09
+_Vollautomatischer Verifikations-Durchlauf (Import-/Konstruktions-/Show-Load-Smoke + volle Suite 337 grün) + Multi-Agent-Feature×Test-Abdeckungs-Inventar (21 Subsysteme, **519 Funktionen, 85 high-risk**) + adversariale Bug-Verifikation. Voller Bericht + **priorisierter Live-Test-Plan**: [`docs/FEATURE_VERIFICATION_2026_07_09.md`](docs/FEATURE_VERIFICATION_2026_07_09.md). **3 bestätigte Bugs bereits gefixt:** STOP ALL nur aktuelle Page ([#230](https://github.com/ixamgames-droid/lightos/pull/230)), Web-Remote STOP tot + Fader-Initial 100 % ([#231](https://github.com/ixamgames-droid/lightos/pull/231)), Tests verschmutzten echtes crash.log ([#232](https://github.com/ixamgames-droid/lightos/pull/232))._
+
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| RL-01 | P3 | todo | **Range-Lock lässt Identitäts-Modifier zurück.** `channel_range_lock_dialog.py:_on_accept` nullt beim „Lock entfernen" nur `range_min/max` statt den Eintrag zu entfernen → ein Identitäts-`ChannelModifier` (LINEAR, 0–255) bleibt im geteilten `ChannelModifierManager` registriert. **Funktional folgenlos** (Identität → kein DMX-Effekt), reine Hygiene. Fix: Eintrag ganz entfernen, wenn er nur wegen des Locks existiert (`curve==CurveType.LINEAR and not existing.custom_lut`). |
+| QA-LIVE | P2 | todo | **Live-Klick-Durchlauf der 85 high-risk Funktionen** (Interaktions-/Hardware-/Persistenz-Schicht: Popout/Andocken ×9 Editoren, EFX-Custom-Path, Fan/Position-Tool, Effect-Layer, Scene-Editor „Vorschau senden" ohne Safety-Gate, Show-Manager-Timeline, MIDI/OSC/APC, Audio/OS2L, Farb-Picker, Command-Line `execute()`, Web-Lifecycle, Simple Desk, 3D-Bühnenpersistenz). Reihenfolge + Erwartung je Schritt: `docs/FEATURE_VERIFICATION_2026_07_09.md` §4. Am besten per Computer-Use abarbeiten (Sicherheit zuerst). |
+
 ### 🔦 Laser-Support (Epic, Plan 2026-07-02)
 _Davids Auftrag: Laser steuern — der eigene „3D Partylight L2600" (= **Ehaho L2600**, Manual verifiziert: nur 6ch + 34ch existieren) sofort per DMX, perspektivisch Profi-Laser über Netzwerk (Ether Dream → IDN); eigene Programmer-UI mit Muster-Paletten + gut abgesichertem freiem Zeichenmodus. Voller Plan mit Recherche (Manual/Protokolle), Ist-Analyse und Safety-Konzept: [`docs/LASER_PLAN.md`](docs/LASER_PLAN.md). **3D-Viewer bewusst ausgeklammert** (parallele VIZ-Strecke)._
 
