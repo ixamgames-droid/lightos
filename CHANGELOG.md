@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Timeline-Blöcke wechseln beim Drag die Spur (QA-LIVE)
+
+#### Behoben / Geändert
+
+- **Timeline-Drag aktualisiert jetzt das gesamte Modell:** Ein Block verschob sich bisher nur horizontal; `_drag_track` wurde nie ausgewertet, daher hatte vertikales Ziehen keine Wirkung. Beim Loslassen blieb außerdem `Show.total_duration` stale, wodurch Canvas-Breite und Playback-Länge falsch bleiben konnten. Blöcke wechseln nun beim Ziehen die Spur, die Zielliste wird sortiert und die Dauer wird neu berechnet.
+- **Tests:** Neu `tests/test_show_manager_timeline_drag.py` simuliert einen echten Qt-Canvas-Drag über Zeit und Spur und prüft Modell, Sortierung und Dauer. Relevanter Satz: 106 Tests grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

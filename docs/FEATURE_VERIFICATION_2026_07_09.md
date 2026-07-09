@@ -83,8 +83,9 @@ Doppel-Widgets/RuntimeError prüfen; während laufender Show auskoppeln.
 **6. Scene-Editor** — Szene anlegen, Kanaltabelle editieren, „Vom Programmer übernehmen",
 **„Vorschau senden"** (schreibt direkt auf DMX ohne Safety-Gate — bei Laser prüfen!).
 
-**7. Show-Manager/Timeline** — Drag&Drop auf Tracks, Blöcke verschieben, speichern/laden,
-Play/Loop/Playhead, Track-Mute, QXW-Import.
+**7. Show-Manager/Timeline** — ✅ Block-Drag geprüft und repariert: horizontales
+Verschieben, Spurwechsel und Showdauer-Update. Rest: speichern/laden, Play/Loop/
+Playhead, Track-Mute, QXW-Import.
 
 **8. MIDI/OSC/Timecode/APC** — Port öffnen, Monitor, MIDI-Learn, Teach-Dialog (beide
 Wege), APC-mini-mk2-Feedback/Ripple, OSC-Befehle (:7770), MTC.
