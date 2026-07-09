@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from src.core.database.fixture_db import engine
 from src.core.database.models import (
-    Manufacturer, FixtureProfile, FixtureMode, FixtureChannel,
+    Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
 )
 
 
@@ -43,9 +43,12 @@ CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]
 class _ModeTab(QWidget):
     """Eine Mode-Tab: Channel-Tabelle."""
 
-    def __init__(self, name: str = "Default", parent=None):
+    def __init__(self, name: str = "Default", description: str = "", parent=None):
         super().__init__(parent)
         self.mode_name = name
+        # Das einfache Editor-UI bearbeitet keine Beschreibung, muss sie beim
+        # Save eines bestehenden Profils aber unbedingt erhalten.
+        self.description = description
         self.channels: list[dict] = []   # [{name, attribute, default, highlight}]
         layout = QVBoxLayout(self)
 
@@ -155,15 +158,16 @@ class _ModeTab(QWidget):
             except (ValueError, AttributeError):
                 pass
 
-    def load_mode_data(self, name: str, channels: list[dict]):
+    def load_mode_data(self, name: str, channels: list[dict], description: str = ""):
         self.mode_name = name
+        self.description = description
         self._edit_name.setText(name)
         self.channels = [dict(c) for c in channels]
         self._refresh()
 
-    def get_data(self) -> tuple[str, list[dict]]:
+    def get_data(self) -> tuple[str, list[dict], str]:
         self._sync_from_table()
-        return self.mode_name, list(self.channels)
+        return self.mode_name, list(self.channels), self.description
 
 
 class FixtureEditorDialog(QDialog):
@@ -246,16 +250,17 @@ class FixtureEditorDialog(QDialog):
             for m in mfrs:
                 self._cb_manufacturer.addItem(m.name)
 
-    def _add_mode(self, name: str | None = None, channels: list[dict] | None = None):
+    def _add_mode(self, name: str | None = None, channels: list[dict] | None = None,
+                  description: str = ""):
         if name is None:
             existing = [self._tabs.tabText(i) for i in range(self._tabs.count())]
             i = 1
             while f"Mode {i}" in existing:
                 i += 1
             name = f"Mode {i}"
-        tab = _ModeTab(name)
+        tab = _ModeTab(name, description=description)
         if channels:
-            tab.load_mode_data(name, channels)
+            tab.load_mode_data(name, channels, description=description)
         self._tabs.addTab(tab, name)
         self._tabs.setCurrentWidget(tab)
         return tab
@@ -313,8 +318,14 @@ class FixtureEditorDialog(QDialog):
                 ch_data = [{
                     "name": c.name, "attribute": c.attribute,
                     "default": c.default_value, "highlight": c.highlight_value,
+                    "invert": c.invert, "resolution": c.resolution,
+                    "ranges": [{
+                        "range_from": r.range_from, "range_to": r.range_to,
+                        "name": r.name, "kind": r.kind,
+                    } for r in c.ranges],
                 } for c in chans]
-                self._add_mode(name=m.name, channels=ch_data)
+                self._add_mode(name=m.name, channels=ch_data,
+                               description=m.description)
             if self._tabs.count() == 0:
                 self._add_mode()
 
@@ -335,12 +346,12 @@ class FixtureEditorDialog(QDialog):
         modes_data = []
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
-            mname, chans = tab.get_data()
+            mname, chans, description = tab.get_data()
             if not chans:
                 QMessageBox.warning(self, "Speichern",
                                     f"Mode '{mname}' hat keine Channels.")
                 return
-            modes_data.append((mname, chans))
+            modes_data.append((mname, chans, description))
 
         with Session(engine()) as s:
             # Manufacturer get-or-create
@@ -384,10 +395,10 @@ class FixtureEditorDialog(QDialog):
                 s.add(profile)
                 s.flush()
 
-            for mname, chans in modes_data:
+            for mname, chans, description in modes_data:
                 mode = FixtureMode(
                     fixture_id=profile.id, name=mname,
-                    channel_count=len(chans), description="",
+                    channel_count=len(chans), description=description,
                 )
                 s.add(mode)
                 s.flush()
@@ -395,11 +406,23 @@ class FixtureEditorDialog(QDialog):
                     fc = FixtureChannel(
                         mode_id=mode.id, channel_number=i,
                         name=ch.get("name", f"Ch {i}"),
-                        attribute=ch.get("attribute", "raw"),
-                        default_value=int(ch.get("default", 0)),
-                        highlight_value=int(ch.get("highlight", 255)),
-                    )
-                    s.add(fc)
+                    attribute=ch.get("attribute", "raw"),
+                    default_value=int(ch.get("default", 0)),
+                    highlight_value=int(ch.get("highlight", 255)),
+                    invert=bool(ch.get("invert", False)),
+                    resolution=str(ch.get("resolution", "8bit") or "8bit"),
+                )
+                s.add(fc)
+                for r in ch.get("ranges", []) or []:
+                    try:
+                        fc.ranges.append(ChannelRange(
+                            range_from=int(r.get("range_from", 0)),
+                            range_to=int(r.get("range_to", 255)),
+                            name=str(r.get("name", "") or ""),
+                            kind=str(r.get("kind", "") or ""),
+                        ))
+                    except (AttributeError, TypeError, ValueError):
+                        continue
             s.commit()
             self._saved_id = profile.id
 

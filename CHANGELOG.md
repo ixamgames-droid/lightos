@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Fixture-Editor erhält Profilmetadaten (QA-LIVE)
+
+#### Behoben / Geändert
+
+- **Ein Bearbeiten löscht keine unsichtbaren Fixture-Daten mehr:** Beim Speichern baute der Editor Modes und Channels neu auf, hatte beim Laden aber nur die sichtbaren Tabellenfelder übernommen. Dadurch verschwanden Modusbeschreibung, `invert`, `resolution` und alle Channel-Ranges (z. B. Gobo-/Shutter-Slots) still. Diese Metadaten werden nun mitgeladen und unverändert zurückgeschrieben.
+- **Tests:** Neu `tests/test_fixture_editor_roundtrip.py` erstellt ein echtes Nutzerprofil mit 16-Bit-/Invert-/Range-Metadaten, bearbeitet und speichert es über den Dialog und lädt es erneut. Relevanter UI-/Profiltestsatz: 30 Tests grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

@@ -92,8 +92,10 @@ Wege), APC-mini-mk2-Feedback/Ripple, OSC-Befehle (:7770), MTC.
 **9. Audio** — Capture/Pegel/BPM, OS2L (:1234), AudioFunction-Fade (Fade-Out mitten in
 Fade-In), Musik-Player.
 
-**10. Patch/Fixture-Dialoge** — Laser-Protokoll-Umschaltung (DMX↔Ether Dream/IDN),
-Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
+**10. Patch/Fixture-Dialoge** — Fixture-Editor Save/Load-Rundtrip ✅: auch
+Modusbeschreibung, Kanal-Invertierung/-Auflösung und Range-Slots bleiben erhalten.
+Rest: Laser-Protokoll-Umschaltung (DMX↔Ether Dream/IDN), Auto-Patch + Undo,
+QLC+/QXF/.qxi-Import.
 
 **11.–20.** Farb-Picker-Interaktion · Output-Konfig/DMX-Verbindungen · Command-Line
 `execute()` · Web-Server-Lifecycle · Kurven-Editor/Modifier/Range-Lock · Laser-Zeichen-
