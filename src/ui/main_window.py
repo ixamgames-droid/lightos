@@ -970,9 +970,12 @@ class MainWindow(QMainWindow):
     def _stop_all(self):
         pe = self._state.playback_engine
         if pe:
-            for ex in pe.executors:
-                if ex.stack:
-                    ex.stack.stop()
+            # STOP ALL muss Executoren auf ALLEN Playback-Pages stoppen, nicht nur
+            # auf der aktuell sichtbaren. `pe.executors` ist die Backwards-Compat-
+            # Property (liefert NUR self.pages[current_page]) -> Chaser/Cues auf
+            # anderen Pages liefen trotz STOP ALL weiter (sicherheitsrelevant).
+            # Die korrekte Multi-Page-Logik liegt bereits in PlaybackEngine.stop_all().
+            pe.stop_all()
 
     # ── Undo/Redo ─────────────────────────────────────────────────────────────
 
