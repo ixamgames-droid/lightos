@@ -29,6 +29,19 @@ _TEST_PID = os.getpid()
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
     os.path.join(_TEST_TMP, f"lightos_test_show_{_TEST_PID}.db"))
+
+# APPDATA in ein PID-eigenes Temp-Verzeichnis umlenken -> KEIN Test fasst je die
+# echte %APPDATA%/LightOS des Nutzers an. Zahlreiche Module lesen APPDATA in
+# MODUL-Konstanten beim Import (snap_library, snapshots_view, live_view, bpm_cache,
+# vc_button, visualizer_window's crash.log-Handle, stages/, auto_save.lshow, ...) —
+# das MUSS daher VOR dem ersten App-Import stehen. Unbedingt setzen (nicht
+# setdefault): auf Windows ist APPDATA IMMER gesetzt, sonst griffe der echte Pfad.
+# Konkreter Anlass: test_viz10_stability schrieb sonst absichtliche Fake-Crashes
+# ("ValueError: kaputt") in Davids echtes crash.log und verfaelschte die
+# Absturz-Diagnose. PID-scoped -> parallele Laeufe teilen sich nichts.
+_TEST_APPDATA = os.path.join(_TEST_TMP, f"lightos_test_appdata_{_TEST_PID}")
+os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
+os.environ["APPDATA"] = _TEST_APPDATA
 # Hinweis: Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT
 # umgelenkt. Die committeten shows/*.lshow referenzieren feste
 # fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
@@ -172,6 +185,14 @@ def _stop_background_threads_at_end():
     except Exception:
         pass
     _purge_test_dbs()
+    # Das PID-eigene Temp-APPDATA am Suite-Ende best-effort abraeumen (crash.log/
+    # stages/... koennen einen offenen Handle halten -> ignore_errors; ein
+    # PID-scoped Rest ist harmlos).
+    try:
+        import shutil
+        shutil.rmtree(_TEST_APPDATA, ignore_errors=True)
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
