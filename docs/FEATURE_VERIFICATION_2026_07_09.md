@@ -100,7 +100,12 @@ Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
 Studio · Playback/Executor-Konfig · Layout-Persistenz/Show-Validierung · Simple Desk/
 Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 
+**Nachtrag 2026-07-10 — OutputView:** Universe 17–32 waren trotz gültigem Patch nicht
+im Monitor auswählbar. Die Auswahl reicht nun bis U32; ein Qt-Keyboard-Test bestätigt
+die Auswahl und den DMX-Refresh einer 512-Zellen-Ansicht (`tests/test_output_view.py`).
+
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
+
 - **RL-01** (neu, P3): Range-Lock „entfernen" lässt einen Identitäts-`ChannelModifier`
   (LINEAR, 0–255) im Manager zurück — funktional folgenlos (Identität), nur Hygiene/UI-Rest.
   Fix-Skizze: im „Lock entfernen"-Zweig (`channel_range_lock_dialog.py:_on_accept`) den

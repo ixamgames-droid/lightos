@@ -13,6 +13,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 - **Neue `tests/test_ui_smoke_enumerated.py` (34 Tests):** inventarisiert alle öffentlichen no-arg Views in `src/ui/views` per `pkgutil`/`importlib`/`inspect`; neue oder umbenannte Views lassen den Test rot werden. Jede View wird headless gebaut, alle 19 VC-Widgets durchlaufen ihren Serialisierungs-Roundtrip. Die acht bislang komplett ungetesteten Editoren bauen mit minimalen echten Engine-Objekten und beweisen je ein zentrales Kind-Widget.
 - **Reale Browser-Abnahme des Web-Remote:** gegen die laufende lokale Anwendung verbinden, STOP sowie Blackout AN/AUS bedienen; WebSocket-ACK und sichtbares Log wurden bestätigt. Der restliche Desktop-/Hardware-Teil von QA-LIVE bleibt im Verifikationsplan.
+### 2026-07-10 — Output-Monitor erreicht alle gültigen Universen (QA-10)
+
+#### Behoben / Tests
+
+- **Universe 17–32 waren im Output-Monitor nicht auswählbar:** `OutputView` begrenzte seinen Universe-Spinbox auf 16, während Patch, Validierung und Output-Konfiguration bis 32 arbeiten. Der Monitor akzeptiert jetzt U1–32. `tests/test_output_view.py` baut die View headless, steuert die Spinbox mit echten Tastaturereignissen bis U32 und prüft die 512 Zellen inklusive DMX-Refresh.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
