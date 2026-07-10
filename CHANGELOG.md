@@ -48,6 +48,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Tests
 
 - `tests/test_scene_editor.py` baut den SceneEditor mit einer Minimal-Szene und leerem Patch, prüft Name, Timing, Leeren der Kanalwerte sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Script-Editor-Minimalworkflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_script_editor.py` baut den ScriptEditor gegen einen isolierten Function-Manager, prüft Name-/Textbindung und Syntax-Highlighter sowie Run/Stop der Minimal-`ScriptFunction`.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
