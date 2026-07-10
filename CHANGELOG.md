@@ -43,6 +43,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Behoben / Tests
 
 - **Clamp-Layer konnten `min > max` erhalten:** Der Editor akzeptierte beide Werte unabhängig und speicherte dadurch einen widersprüchlichen Bereich. Beim Überschreiten zieht er die jeweilige Gegen-Grenze nach; `tests/test_effect_layer_editor.py` prüft beide Richtungen sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Scene-Editor-Minimalworkflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_scene_editor.py` baut den SceneEditor mit einer Minimal-Szene und leerem Patch, prüft Name, Timing, Leeren der Kanalwerte sowie drei Popout-/Andock-Zyklen.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 

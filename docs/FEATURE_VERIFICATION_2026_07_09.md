@@ -121,6 +121,8 @@ und Transport der Collection sind regressionsgetestet (`tests/test_collection_ed
 eine widersprüchliche Reihenfolge geraten. Min/Max werden nun beim Überschreiten
 miteinander synchronisiert; inklusive Popout-Regression
 `tests/test_effect_layer_editor.py`.
+**Nachtrag 2026-07-10 — SceneEditor:** Minimal-Szene ohne Patch: Name, Timing,
+Leeren und wiederholtes Popout/Andocken sind abgedeckt (`tests/test_scene_editor.py`).
 
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 
