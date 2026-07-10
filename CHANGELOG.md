@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Carousel-Editor kann feste Eigenfarbe bewusst aktivieren (QA-10)
+
+#### Behoben / Tests
+
+- **Die `paint_color`-Option war im Carousel-Editor unsichtbar:** Die Engine unterstützt bewusstes Opt-in für eine feste Carousel-Farbe, damit Pulse/Wave/Chase standardmäßig die Programmer-/Look-Farbe nicht überschreiben. Der Editor bietet nun „Eigene Farbe ausgeben“ mit erklärendem Tooltip. `tests/test_carousel_editor.py` prüft die Option, Pattern, robuste Fixture-ID-Eingabe sowie drei Popout-/Andock-Zyklen.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
