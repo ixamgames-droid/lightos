@@ -114,6 +114,9 @@ ohne verlorenen Körper oder Modellwerte. Regression: `tests/test_audio_editor.p
 bedienbar. Der neue Opt-in-Schalter erhält die sichere Standardsemantik (Look-Farbe
 nicht überschreiben) und erlaubt bei Bedarf eine feste Carousel-Farbe. Regression:
 `tests/test_carousel_editor.py`.
+**Nachtrag 2026-07-10 — CollectionEditor:** Der Editor baut mit einem Minimal-Manager
+ohne Datenbank-/Hardware-Abhängigkeit; Listeninhalt, Umbenennen, Umordnen, Entfernen
+und Transport der Collection sind regressionsgetestet (`tests/test_collection_editor.py`).
 
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 

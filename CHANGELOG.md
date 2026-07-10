@@ -33,6 +33,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Behoben / Tests
 
 - **Die `paint_color`-Option war im Carousel-Editor unsichtbar:** Die Engine unterstützt bewusstes Opt-in für eine feste Carousel-Farbe, damit Pulse/Wave/Chase standardmäßig die Programmer-/Look-Farbe nicht überschreiben. Der Editor bietet nun „Eigene Farbe ausgeben“ mit erklärendem Tooltip. `tests/test_carousel_editor.py` prüft die Option, Pattern, robuste Fixture-ID-Eingabe sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Collection-Editor als UI-Workflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_collection_editor.py` baut den Editor gegen einen isolierten Function-Manager und prüft die zentrale Listenbearbeitung: beschriftete Minimal-Funktionen, Umbenennen, Umordnen, Entfernen und Play/Stop der Collection samt verbleibendem Member.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
