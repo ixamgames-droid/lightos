@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — CI prüft Show-Lint und headless Views (QA-11)
+
+#### Geändert / Tests
+
+- GitHub Actions installiert jetzt PySide6 und führt zusätzlich zu den Kern-Tests `tests/test_show_lint.py` und `tests/test_views.py` offscreen aus. `tests/test_ci_workflow.py` stellt sicher, dass Qt und alle vier Testziele im Workflow verbleiben. Lokal bestanden: 54 Shows ohne Lint-Fehler und 18 Tests.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
