@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Collection-Editor als UI-Workflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_collection_editor.py` baut den Editor gegen einen isolierten Function-Manager und prüft die zentrale Listenbearbeitung: beschriftete Minimal-Funktionen, Umbenennen, Umordnen, Entfernen und Play/Stop der Collection samt verbleibendem Member.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
