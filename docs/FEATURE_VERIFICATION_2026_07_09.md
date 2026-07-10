@@ -110,6 +110,10 @@ alle registrierten MIDI-, Log- und MTC-Subscriber. Regression:
 **Nachtrag 2026-07-10 — AudioEditor:** Eine Minimal-`AudioFunction` lässt sich über
 die Qt-Controls bearbeiten; der gesamte Editor übersteht drei Popout-/Andock-Zyklen
 ohne verlorenen Körper oder Modellwerte. Regression: `tests/test_audio_editor.py`.
+**Nachtrag 2026-07-10 — CarouselEditor:** Die Engine-Option `paint_color` war nicht
+bedienbar. Der neue Opt-in-Schalter erhält die sichere Standardsemantik (Look-Farbe
+nicht überschreiben) und erlaubt bei Bedarf eine feste Carousel-Farbe. Regression:
+`tests/test_carousel_editor.py`.
 
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 

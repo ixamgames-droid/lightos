@@ -28,6 +28,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Tests
 
 - `tests/test_audio_editor.py` baut den `AudioEditor` mit einer Minimal-`AudioFunction`, steuert Lautstärke, Loop und Name über echte Qt-Ereignisse und führt drei Popout-/Andock-Zyklen aus. Der Editor-Körper bleibt dabei vollständig bedienbar und wird zuverlässig zurückgedockt.
+### 2026-07-10 — Carousel-Editor kann feste Eigenfarbe bewusst aktivieren (QA-10)
+
+#### Behoben / Tests
+
+- **Die `paint_color`-Option war im Carousel-Editor unsichtbar:** Die Engine unterstützt bewusstes Opt-in für eine feste Carousel-Farbe, damit Pulse/Wave/Chase standardmäßig die Programmer-/Look-Farbe nicht überschreiben. Der Editor bietet nun „Eigene Farbe ausgeben“ mit erklärendem Tooltip. `tests/test_carousel_editor.py` prüft die Option, Pattern, robuste Fixture-ID-Eingabe sowie drei Popout-/Andock-Zyklen.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
