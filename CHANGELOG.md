@@ -7,6 +7,53 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-09 — UI-View-/VC-Widget-Smoke vollständig (QA-09 + QA-10)
+
+#### Tests
+
+- **Neue `tests/test_ui_smoke_enumerated.py` (34 Tests):** inventarisiert alle öffentlichen no-arg Views in `src/ui/views` per `pkgutil`/`importlib`/`inspect`; neue oder umbenannte Views lassen den Test rot werden. Jede View wird headless gebaut, alle 19 VC-Widgets durchlaufen ihren Serialisierungs-Roundtrip. Die acht bislang komplett ungetesteten Editoren bauen mit minimalen echten Engine-Objekten und beweisen je ein zentrales Kind-Widget.
+- **Reale Browser-Abnahme des Web-Remote:** gegen die laufende lokale Anwendung verbinden, STOP sowie Blackout AN/AUS bedienen; WebSocket-ACK und sichtbares Log wurden bestätigt. Der restliche Desktop-/Hardware-Teil von QA-LIVE bleibt im Verifikationsplan.
+### 2026-07-10 — Output-Monitor erreicht alle gültigen Universen (QA-10)
+
+#### Behoben / Tests
+
+- **Universe 17–32 waren im Output-Monitor nicht auswählbar:** `OutputView` begrenzte seinen Universe-Spinbox auf 16, während Patch, Validierung und Output-Konfiguration bis 32 arbeiten. Der Monitor akzeptiert jetzt U1–32. `tests/test_output_view.py` baut die View headless, steuert die Spinbox mit echten Tastaturereignissen bis U32 und prüft die 512 Zellen inklusive DMX-Refresh.
+### 2026-07-10 — MIDI-Ansicht räumt ihre Hintergrund-Subscriber auf (QA-10)
+
+#### Behoben / Tests
+
+- **`MidiView` hinterließ Callbacks nach dem Schliessen:** Nachrichten-, Log- und MTC-Subscriber blieben beim jeweiligen Manager registriert und konnten in eine geschlossene Qt-View senden. Die View behält ihre Callbacks jetzt explizit, stoppt ihren Port-Refresh-Timer und meldet alle beim `closeEvent` ab. `MidiManager` kann Log-Subscriber gezielt entfernen und iteriert sie mutationssicher. `tests/test_midi_view.py` prüft den echten Qt-Monitor-/Toggle-Pfad mit isolierten MIDI-/MTC-Fakes sowie den vollständigen Teardown.
+### 2026-07-10 — Audio-Editor: Editieren und wiederholtes Popout abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_audio_editor.py` baut den `AudioEditor` mit einer Minimal-`AudioFunction`, steuert Lautstärke, Loop und Name über echte Qt-Ereignisse und führt drei Popout-/Andock-Zyklen aus. Der Editor-Körper bleibt dabei vollständig bedienbar und wird zuverlässig zurückgedockt.
+### 2026-07-10 — Carousel-Editor kann feste Eigenfarbe bewusst aktivieren (QA-10)
+
+#### Behoben / Tests
+
+- **Die `paint_color`-Option war im Carousel-Editor unsichtbar:** Die Engine unterstützt bewusstes Opt-in für eine feste Carousel-Farbe, damit Pulse/Wave/Chase standardmäßig die Programmer-/Look-Farbe nicht überschreiben. Der Editor bietet nun „Eigene Farbe ausgeben“ mit erklärendem Tooltip. `tests/test_carousel_editor.py` prüft die Option, Pattern, robuste Fixture-ID-Eingabe sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Collection-Editor als UI-Workflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_collection_editor.py` baut den Editor gegen einen isolierten Function-Manager und prüft die zentrale Listenbearbeitung: beschriftete Minimal-Funktionen, Umbenennen, Umordnen, Entfernen und Play/Stop der Collection samt verbleibendem Member.
+### 2026-07-10 — Effect-Layer-Editor verhindert widersprüchliche Clamp-Grenzen (QA-10)
+
+#### Behoben / Tests
+
+- **Clamp-Layer konnten `min > max` erhalten:** Der Editor akzeptierte beide Werte unabhängig und speicherte dadurch einen widersprüchlichen Bereich. Beim Überschreiten zieht er die jeweilige Gegen-Grenze nach; `tests/test_effect_layer_editor.py` prüft beide Richtungen sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Scene-Editor-Minimalworkflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_scene_editor.py` baut den SceneEditor mit einer Minimal-Szene und leerem Patch, prüft Name, Timing, Leeren der Kanalwerte sowie drei Popout-/Andock-Zyklen.
+### 2026-07-10 — Script-Editor-Minimalworkflow abgesichert (QA-10)
+
+#### Tests
+
+- `tests/test_script_editor.py` baut den ScriptEditor gegen einen isolierten Function-Manager, prüft Name-/Textbindung und Syntax-Highlighter sowie Run/Stop der Minimal-`ScriptFunction`.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess

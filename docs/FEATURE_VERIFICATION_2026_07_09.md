@@ -100,7 +100,34 @@ Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
 Studio · Playback/Executor-Konfig · Layout-Persistenz/Show-Validierung · Simple Desk/
 Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 
+**Nachtrag 2026-07-10 — OutputView:** Universe 17–32 waren trotz gültigem Patch nicht
+im Monitor auswählbar. Die Auswahl reicht nun bis U32; ein Qt-Keyboard-Test bestätigt
+die Auswahl und den DMX-Refresh einer 512-Zellen-Ansicht (`tests/test_output_view.py`).
+**Nachtrag 2026-07-10 — MidiView:** Die MIDI-/MTC-Ansicht baut ohne Hardware mit
+isolierten Fakes, zeigt eingehende Nachrichten im Qt-Monitor und entfernt beim Schließen
+alle registrierten MIDI-, Log- und MTC-Subscriber. Regression:
+`tests/test_midi_view.py`.
+**Nachtrag 2026-07-10 — AudioEditor:** Eine Minimal-`AudioFunction` lässt sich über
+die Qt-Controls bearbeiten; der gesamte Editor übersteht drei Popout-/Andock-Zyklen
+ohne verlorenen Körper oder Modellwerte. Regression: `tests/test_audio_editor.py`.
+**Nachtrag 2026-07-10 — CarouselEditor:** Die Engine-Option `paint_color` war nicht
+bedienbar. Der neue Opt-in-Schalter erhält die sichere Standardsemantik (Look-Farbe
+nicht überschreiben) und erlaubt bei Bedarf eine feste Carousel-Farbe. Regression:
+`tests/test_carousel_editor.py`.
+**Nachtrag 2026-07-10 — CollectionEditor:** Der Editor baut mit einem Minimal-Manager
+ohne Datenbank-/Hardware-Abhängigkeit; Listeninhalt, Umbenennen, Umordnen, Entfernen
+und Transport der Collection sind regressionsgetestet (`tests/test_collection_editor.py`).
+**Nachtrag 2026-07-10 — EffectLayerEditor:** Clamp-Grenzen konnten im Editor in
+eine widersprüchliche Reihenfolge geraten. Min/Max werden nun beim Überschreiten
+miteinander synchronisiert; inklusive Popout-Regression
+`tests/test_effect_layer_editor.py`.
+**Nachtrag 2026-07-10 — SceneEditor:** Minimal-Szene ohne Patch: Name, Timing,
+Leeren und wiederholtes Popout/Andocken sind abgedeckt (`tests/test_scene_editor.py`).
+**Nachtrag 2026-07-10 — ScriptEditor:** Modellbindung, Syntax-Highlighter und
+Run/Stop eines Minimal-Scripts sind abgedeckt (`tests/test_script_editor.py`).
+
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
+
 - **RL-01** (neu, P3): Range-Lock „entfernen" lässt einen Identitäts-`ChannelModifier`
   (LINEAR, 0–255) im Manager zurück — funktional folgenlos (Identität), nur Hygiene/UI-Rest.
   Fix-Skizze: im „Lock entfernen"-Zweig (`channel_range_lock_dialog.py:_on_accept`) den

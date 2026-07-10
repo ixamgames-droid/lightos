@@ -56,15 +56,38 @@ class MidiView(QWidget):
         self._learn_target_row = -1
         self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
         self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
+        self._log_callback = lambda t: self._log_signal.log_received.emit(t)
+        self._midi_callback = self._on_midi_msg
+        self._mtc_reader = None
+        self._mtc_callback = None
         self._setup_ui()
-        self._midi.subscribe_log(lambda t: self._log_signal.log_received.emit(t))
-        self._midi.subscribe(self._on_midi_msg)
+        self._midi.subscribe_log(self._log_callback)
+        self._midi.subscribe(self._midi_callback)
 
         # Auto-Refresh Ports alle 2 Sek - erkennt USB-Hotplug
         from PySide6.QtCore import QTimer
         self._port_refresh_timer = QTimer(self)
         self._port_refresh_timer.timeout.connect(self._refresh_ports)
         self._port_refresh_timer.start(2000)
+
+    def closeEvent(self, event):
+        """Keine MIDI-/MTC-Callbacks in eine bereits geschlossene Qt-View lassen."""
+        timer = getattr(self, "_port_refresh_timer", None)
+        if timer is not None:
+            timer.stop()
+        try:
+            self._midi.unsubscribe(self._midi_callback)
+            self._midi.unsubscribe_log(self._log_callback)
+        except Exception:
+            pass
+        reader = getattr(self, "_mtc_reader", None)
+        callback = getattr(self, "_mtc_callback", None)
+        if reader is not None and callback is not None:
+            try:
+                reader.unsubscribe(callback)
+            except Exception:
+                pass
+        super().closeEvent(event)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -569,7 +592,9 @@ class MidiView(QWidget):
         try:
             if get_mtc_reader:
                 rd = get_mtc_reader()
-                rd.subscribe(self._on_mtc)
+                self._mtc_reader = rd
+                self._mtc_callback = self._on_mtc
+                rd.subscribe(self._mtc_callback)
         except Exception as e:
             print(f"[MidiView] MTC subscribe error: {e}")
 

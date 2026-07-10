@@ -297,6 +297,13 @@ class MidiManager:
     def subscribe_log(self, cb: Callable[[str], None]):
         self._log_callbacks.append(cb)
 
+    def unsubscribe_log(self, cb: Callable[[str], None]):
+        """Entfernt einen Log-Subscriber, etwa beim Schliessen einer View."""
+        try:
+            self._log_callbacks.remove(cb)
+        except ValueError:
+            pass
+
     def _on_message(self, raw: list[int], port_name: str):
         try:
             self._rx_queue.put_nowait((list(raw), port_name))
@@ -328,7 +335,7 @@ class MidiManager:
                 # Event würde die Anzeige duplizieren und die Qt-Event-Loop fluten.
 
     def _log(self, text: str):
-        for cb in self._log_callbacks:
+        for cb in list(self._log_callbacks):
             try:
                 cb(text)
             except Exception:

@@ -105,6 +105,16 @@ class CarouselEditor(QWidget):
         color_row.addStretch(1)
         form_color.addRow("Farbe:", self._make_row_widget(color_row))
 
+        # Pulse/Wave/Chase lassen die bestehende Farbe bewusst unangetastet.
+        # Eine feste Carousel-Farbe ist deshalb ein explizites Opt-in.
+        self._paint_color_chk = QCheckBox("Eigene Farbe ausgeben")
+        self._paint_color_chk.setToolTip(
+            "Die hier gewählte RGB-Farbe auf die Ziel-Fixtures schreiben; "
+            "aus = Farbe aus Programmer/Look beibehalten")
+        self._paint_color_chk.setChecked(self._c.paint_color)
+        self._paint_color_chk.toggled.connect(self._on_paint_color_toggled)
+        form_color.addRow(self._paint_color_chk)
+
         # RGB spins (direkt editierbar)
         self._spin_r = QSpinBox()
         self._spin_r.setRange(0, 255)
@@ -174,6 +184,9 @@ class CarouselEditor(QWidget):
 
     def _on_intensity_changed(self, v):
         setattr(self._c, "intensity_max", int(v))
+
+    def _on_paint_color_toggled(self, enabled: bool):
+        self._c.paint_color = bool(enabled)
 
     def _toggle_editor_popout(self):
         """Koppelt den GANZEN Carousel-Editor in ein grosses, scrollbares Fenster
