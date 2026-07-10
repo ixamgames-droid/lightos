@@ -20,6 +20,9 @@ _app = QApplication.instance() or QApplication([])
 
 
 class BenchmarkSmokeTest(unittest.TestCase):
+    # 44 Hz entsprechen 22,7 ms/Frame. 20 ms lässt messbaren Headroom und ist
+    # zugleich locker genug für Windows-/CI-Jitter bei einem kleinen 1U-Rig.
+    P95_BUDGET_MS = 20.0
     def test_pct_helper(self):
         data = [1.0, 2.0, 3.0, 4.0, 5.0]
         self.assertEqual(B._pct(data, 0), 1.0)
@@ -39,6 +42,12 @@ class BenchmarkSmokeTest(unittest.TestCase):
         table = B._fmt_table(rows)
         self.assertIn("Universen", table)
         self.assertIn("| 1 |", table)
+
+    def test_single_universe_p95_stays_below_44hz_budget(self):
+        rows = B.run_benchmark(universe_counts=(1,), pars_per_universe=2, frames=30)
+        self.assertLess(
+            rows[0]["p95"], self.P95_BUDGET_MS,
+            f"Render-p95 {rows[0]['p95']:.2f} ms überschreitet das {self.P95_BUDGET_MS} ms-Gate")
 
     def tearDown(self):
         # run_benchmark ruft am Ende _reset(); zur Sicherheit Singleton leeren.

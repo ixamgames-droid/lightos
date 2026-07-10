@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Render-p95 ist als 44-Hz-Regression-Gate geschützt (QA-20)
+
+- Der Benchmark-Test verlangt für ein kleines 1-Universum-Rig p95 unter 20 ms; das liegt unter dem 44-Hz-Framebudget von 22,7 ms und lässt normalen CI-Jitter zu.
+
 ### 2026-07-09 — UI-View-/VC-Widget-Smoke vollständig (QA-09 + QA-10)
 
 #### Tests
