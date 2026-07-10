@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Bühnen-Editor hält die Auswahl beim Parameter-Edit stabil
+
+#### Behoben / Tests
+
+- **Kein Springen bzw. Flackern der Bühnen-Auswahl mehr beim Ändern von Eigenschaften:** Die lokal im Baum gewählte Element-ID wird sofort als maßgeblich gespeichert. Unvollständige asynchrone 3D-Reload-Echos dürfen die Bühnenliste nicht teilweise zurückdrehen. Während ein Bühnenfeld bearbeitet wird, kann ein nachlaufendes WebGL-Auswahlecho die Qt-Auswahl nicht überschreiben; jede Änderung bestätigt die aktuelle Auswahl gezielt im 3D-View. `tests/test_visualizer_bauraum_ui.py` deckt Baum-ID, partielle Echos und den aktiven Eingabefokus ab. Reale Desktop-Prüfung: Publikumsfläche ausgewählt, X geändert — 3D-Markierung, Tabellenzeile und Eigenschaftsfeld blieben synchron.
+- **Neues Fixture ohne Dimmer erzeugt keinen sichtbaren Rest-Lichtkegel mehr:** Der initiale Beam-Opacity-Wert darf bei Intensität 0 exakt 0 sein. Damit summieren sich beim Aufbau großer Rigs keine erzwungenen 2%-Kegel zu einem scheinbar flackernden Schleier. Der echte QtWebEngine-Szenen-Smoke prüft das mit einem ungedimmten Moving Head.
+
 ### 2026-07-10 — Render-p95 ist als 44-Hz-Regression-Gate geschützt (QA-20)
 
 - Der Benchmark-Test verlangt für ein kleines 1-Universum-Rig p95 unter 20 ms; das liegt unter dem 44-Hz-Framebudget von 22,7 ms und lässt normalen CI-Jitter zu.

@@ -249,6 +249,27 @@ class SceneModulesSmokeTest(unittest.TestCase):
             "return typeof j === 'object' && Array.isArray(j.objects) && Array.isArray(j.fixtures); })()")
         self.assertTrue(stage_json_ok, "getStageJson() liefert unerwartete Form")
 
+    def test_unlit_fixture_has_no_initial_beam_artifact(self):
+        """Ein neues, ungedimmtes Fixture darf keinen Rest-Lichtkegel zeigen.
+
+        Das ist besonders bei großen Rigs wichtig: ein erzwungenes Minimum an
+        Kegel-Opacity summiert sich sonst zu einem grauen, scheinbar flackernden
+        Schleier, bis der erste DMX-Update-Zyklus angekommen ist.
+        """
+        self._load_and_wait()
+        payload = (
+            '[{"fid": 987655, "type": "moving_head", "x": 0, "y": 6, '
+            '"z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0}]'
+        )
+        is_dark = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            "(function() { const f = window.__lightos.fixtures['987655']; "
+            "return !!f && !!f.beam && f.beam.material.opacity === 0 "
+            "&& f.beam.visible === false; })()",
+            timeout_s=5.0,
+        )
+        self.assertTrue(is_dark, "Fixture mit Dimmer 0 zeigt beim Build noch einen Lichtkegel")
+
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der
         21 Signale, die tryChannel() im Original UND in bridge.js verbindet,

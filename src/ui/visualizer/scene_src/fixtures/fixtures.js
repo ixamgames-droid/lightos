@@ -44,7 +44,11 @@ export function createBeamCone(color, intensity, angle, length) {
   const mat = new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
-    opacity: Math.max(0.02, intensity * settings.beamOpacity),
+    // Ein Fixture mit Dimmer = 0 darf auch beim allerersten Build keinen
+    // Restkegel hinterlassen. Bei großen Rigs überlagerten sich die zuvor
+    // erzwungenen 2 % zu einem scheinbaren Flackern, bis der erste DMX-Batch
+    // die Materialien nachträglich korrigierte.
+    opacity: Math.max(0.0, intensity * settings.beamOpacity),
     side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,

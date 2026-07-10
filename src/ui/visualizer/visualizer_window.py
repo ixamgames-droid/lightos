@@ -1293,6 +1293,11 @@ class VisualizerWindow(QMainWindow):
         self._current_stage: StageDefinition = get_default_simple()
         self._stage_elements_cache: list[dict] = []   # spiegel der JS-stageObjects
         self._selected_stage_id: str = ""
+        # IDs der zuletzt vollstaendig an JS gesendeten Buehne.  QtWebEngine
+        # kann beim Reload noch ein aelteres/partielles stageListChanged-Echo
+        # liefern; bis die vollstaendige Liste zurueck ist, bleibt Python die
+        # Autoritaet fuer Baum und Selektion.
+        self._pending_stage_ids: Optional[frozenset[str]] = None
         self._suppress_property_signals = False
         self._stage_dirty = False   # VIZ-10: ungespeicherte Buehnen-Aenderungen
         self._suppress_tab_mode_sync = False   # VIZ-10: Reentrancy-Schutz Tab<->Modus
@@ -2373,6 +2378,11 @@ class VisualizerWindow(QMainWindow):
 
     def _apply_stage(self, definition: StageDefinition):
         """Sende komplette Buehnen-Definition an JS."""
+        # Ein Reload ist asynchron.  Ein zwischenzeitliches Echo darf die
+        # gerade uebergebene Definition nicht teilweise zurueckdrehen (z. B.
+        # den vorigen Truss-Eintrag selektieren, waehrend der neue schon im
+        # 3D-View sichtbar ist).
+        self._pending_stage_ids = frozenset(el.id for el in definition.elements)
         # VIZ-12 Schritt 5: zentraler Buehnen-Wechsel-Pfad -> Interaktions-
         # Zustand (Live-Trace, Reload-Guard) ueber ALLE Targets zuruecksetzen,
         # BEVOR die neue Definition raus geht. Sonst wuerde eine laufende
@@ -2501,6 +2511,12 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
+        # Die lokale Baum-Auswahl ist sofort die Autorität. Ohne diese
+        # Zuweisung blieb _selected_stage_id auf dem zuvor angelegten Element;
+        # ein späteres JS-Echo bzw. ein Tree-Refresh stellte dann diese alte
+        # Auswahl wieder her. Das zeigte sich beim Tippen in den Bühnen-
+        # Eigenschaften als springende/flackernde Selektion.
+        self._selected_stage_id = el.id
         self._suppress_property_signals = True
         try:
             self._stage_name_edit.setText(el.name)
@@ -2614,6 +2630,13 @@ class VisualizerWindow(QMainWindow):
             apply_props=lambda _props: self._apply_stage_element_props(el, _props),
         )
         self._apply_stage_element_props(el, new_props)
+        # Ein im WebGL-Thread nachlaufendes Selection-Echo darf den gerade
+        # bearbeiteten Knoten nicht wieder uebermalen.  Die Eigenschafts-
+        # aenderung bestaetigt deshalb auch explizit dieselbe 3D-Auswahl.
+        try:
+            self._bridge.push_select_stage_object(el.id)
+        except Exception as e:
+            print(f"[Visualizer] property selection sync error: {e}")
 
     def _on_resize_mode_toggled(self, checked: bool):
         """Toggle Resize-Handles im JS. AUS = nur Verschieben moeglich (default)."""
@@ -2817,13 +2840,30 @@ class VisualizerWindow(QMainWindow):
         Neuanlage/Update pro Element bleibt harmlos (idempotent) und laeuft
         weiter, damit z.B. Positions-Updates aus demselben Echo nicht verloren
         gehen."""
-        tree_needs_rebuild = False
         js_ids = set()
         for it in items:
             sid = it.get("id")
             if not sid:
                 continue
             js_ids.add(sid)
+
+        # Ein Stage-Reload muss als atomarer Snapshot ankommen.  Teil- oder
+        # Altechos koennen sonst exakt den Effekt erzeugen, den man im
+        # Buehnen-Editor als flackernde Auswahl sieht: 3D zeigt bereits das
+        # neue Element, die Qt-Liste springt aber auf einen alten Eintrag und
+        # Eigenschaftsaenderungen treffen den falschen Knoten.  Erst das Echo
+        # mit *genau* den erwarteten IDs darf das Modell wieder synchronisieren.
+        pending_ids = getattr(self, "_pending_stage_ids", None)
+        if pending_ids is not None:
+            if js_ids != pending_ids:
+                return
+            self._pending_stage_ids = None
+
+        tree_needs_rebuild = False
+        for it in items:
+            sid = it.get("id")
+            if not sid:
+                continue
             el = self._current_stage.get(sid)
             if el is None:
                 # Neues Element aus JS - in Python-Modell anlegen
@@ -2911,6 +2951,21 @@ class VisualizerWindow(QMainWindow):
                 self._suppress_property_signals = False
 
     def _on_stage_selection_from_js(self, sid: str):
+        # Beim Tippen in den Buehnen-Eigenschaften ist die Qt-Auswahl die
+        # Autoritaet.  Ein asynchrones 3D-Echo einer vorigen Auswahl wuerde
+        # sonst die Tabellenzeile sichtbar springen lassen und die Eingabe
+        # dem falschen Element zuordnen.
+        if _any_focused(
+                self._stage_name_edit, self._stage_spin_x, self._stage_spin_y,
+                self._stage_spin_z, self._stage_spin_w, self._stage_spin_h,
+                self._stage_spin_d, self._stage_spin_rot):
+            return
+        # Waehrend eines Reloads kann JS noch die Auswahl eines alten,
+        # partiellen Snapshots melden.  Diese darf die lokale, autoritative
+        # Baum-Auswahl nicht mehr zuruecksetzen.
+        pending_ids = getattr(self, "_pending_stage_ids", None)
+        if pending_ids is not None and sid not in pending_ids:
+            return
         self._selected_stage_id = sid or ""
         if not sid:
             return
