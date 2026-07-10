@@ -100,6 +100,11 @@ Fixture-Editor Save/Load-Rundtrip, Auto-Patch + Undo, QLC+/QXF/.qxi-Import.
 Studio · Playback/Executor-Konfig · Layout-Persistenz/Show-Validierung · Simple Desk/
 Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 
+**Nachtrag 2026-07-10 — EffectLayerEditor:** Clamp-Grenzen konnten im Editor in
+eine widersprüchliche Reihenfolge geraten. Min/Max werden nun beim Überschreiten
+miteinander synchronisiert; inklusive Popout-Regression
+`tests/test_effect_layer_editor.py`.
+
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 - **RL-01** (neu, P3): Range-Lock „entfernen" lässt einen Identitäts-`ChannelModifier`
   (LINEAR, 0–255) im Manager zurück — funktional folgenlos (Identität), nur Hygiene/UI-Rest.
