@@ -294,6 +294,19 @@ class EffectLayerEditor(QWidget):
         layer = self._current_layer()
         if layer is not None:
             setattr(layer, attr, val)
+            # Ein Clamp mit min > max kann keine sinnvolle Grenze darstellen.
+            # Beim Überschreiten die Gegen-Grenze mitziehen statt einen
+            # widersprüchlichen Layer zu persistieren.
+            if attr == "min_val" and layer.min_val > layer.max_val:
+                layer.max_val = layer.min_val
+                self._spin_max.blockSignals(True)
+                self._spin_max.setValue(layer.max_val)
+                self._spin_max.blockSignals(False)
+            elif attr == "max_val" and layer.max_val < layer.min_val:
+                layer.min_val = layer.max_val
+                self._spin_min.blockSignals(True)
+                self._spin_min.setValue(layer.min_val)
+                self._spin_min.blockSignals(False)
 
     def _add_layer(self):
         lt = self._add_combo.currentData()

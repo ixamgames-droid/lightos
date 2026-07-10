@@ -38,6 +38,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Tests
 
 - `tests/test_collection_editor.py` baut den Editor gegen einen isolierten Function-Manager und prüft die zentrale Listenbearbeitung: beschriftete Minimal-Funktionen, Umbenennen, Umordnen, Entfernen und Play/Stop der Collection samt verbleibendem Member.
+### 2026-07-10 — Effect-Layer-Editor verhindert widersprüchliche Clamp-Grenzen (QA-10)
+
+#### Behoben / Tests
+
+- **Clamp-Layer konnten `min > max` erhalten:** Der Editor akzeptierte beide Werte unabhängig und speicherte dadurch einen widersprüchlichen Bereich. Beim Überschreiten zieht er die jeweilige Gegen-Grenze nach; `tests/test_effect_layer_editor.py` prüft beide Richtungen sowie drei Popout-/Andock-Zyklen.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 

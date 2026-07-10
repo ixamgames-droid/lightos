@@ -117,6 +117,10 @@ nicht überschreiben) und erlaubt bei Bedarf eine feste Carousel-Farbe. Regressi
 **Nachtrag 2026-07-10 — CollectionEditor:** Der Editor baut mit einem Minimal-Manager
 ohne Datenbank-/Hardware-Abhängigkeit; Listeninhalt, Umbenennen, Umordnen, Entfernen
 und Transport der Collection sind regressionsgetestet (`tests/test_collection_editor.py`).
+**Nachtrag 2026-07-10 — EffectLayerEditor:** Clamp-Grenzen konnten im Editor in
+eine widersprüchliche Reihenfolge geraten. Min/Max werden nun beim Überschreiten
+miteinander synchronisiert; inklusive Popout-Regression
+`tests/test_effect_layer_editor.py`.
 
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 
