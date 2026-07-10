@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Kanonische Backlog-Warteschlange wird gelintet (QA-18)
+
+- `tools/check_backlog.py` und `tests/test_backlog_lint.py` schützen die aktive Warteschlange gegen leere oder doppelte IDs und unzulässige aktive QA-Status; historische Detailregister bleiben explizit ausgenommen.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
