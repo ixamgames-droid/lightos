@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Aktive Markdown-Querverweise sind geprüft (QA-17)
+
+- Neues Tool `tools/check_doc_links.py` plus Regressionstest. Es prüft aktive relative Markdown-Links; historische `docs/_archiv`-Notizen sind als bewusst ausgenommener Bestand dokumentiert. Aktueller Lauf: 150 Dateien grün.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
