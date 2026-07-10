@@ -7,6 +7,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-10 — Aktive Shows bereinigt, historische Shows archiviert
+
+- Sechs aktuelle `.lshow`-Dateien verbleiben in `shows/` und bestehen das Lint-Gate fehlerfrei. 48 ältere Shows wurden nach `shows/_archiv/` verschoben, damit sie nicht mehr den aktiven CI-/Migrationsbestand verfälschen.
+
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 
 #### Doku / Prozess
