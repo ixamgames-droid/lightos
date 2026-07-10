@@ -608,9 +608,29 @@ let _isLoadingStage = false;
 let _currentStageReloadToken = null;
 
 export function loadStageJson(json) {
+  const incoming = typeof json === 'string' ? JSON.parse(json) : json;
+  const incomingToken = incoming && incoming._reloadToken;
+  // Die QtWebChannel-Signale werden zusätzlich über pollControl zugestellt.
+  // Sobald die direkte Zustellung doch greift, erreicht derselbe Bulk-Push
+  // den View somit zweimal. Ein zweiter clear/create-Durchlauf während/kurz
+  // nach dem ersten machte sich bei komplexen Bühnen als partiell geleerte
+  // Elementliste bemerkbar. Ein Reload-Token ist pro Python-Push eindeutig;
+  // identische, bereits vollständig vorhandene Tokens sind daher strikt
+  // idempotent und brauchen keinen erneuten Szenenaufbau.
+  const incomingIds = (incoming && Array.isArray(incoming.objects))
+    ? incoming.objects.map(o => o && o.id).filter(Boolean).sort()
+    : [];
+  const currentIds = Object.keys(stageObjects).sort();
+  const isAlreadyComplete = incomingIds.length === currentIds.length
+    && incomingIds.every((id, index) => id === currentIds[index]);
+  if (typeof incomingToken === 'number'
+      && incomingToken === _currentStageReloadToken
+      && isAlreadyComplete) {
+    return;
+  }
   _isLoadingStage = true;
   try {
-    const data = typeof json === 'string' ? JSON.parse(json) : json;
+    const data = incoming;
     if (typeof data._reloadToken === 'number') _currentStageReloadToken = data._reloadToken;
     clearStageObjects();
     view.selectedStageId = null;

@@ -12,14 +12,14 @@ gefangen (Design-Dokument, Leitprinzip) - deshalb dieser dedizierte Test:
   1) Laedt die ECHTE Produktiv-Page ``stage_scene.html`` offscreen in einer
      ``QWebEngineView`` mit ``NoCache``-Profil (identische Konfiguration zu
      ``visualizer_view.py``/``visualizer_window.py``).
-  2) Registriert eine Mock-Bridge mit ALLEN 21 Signalen, die
+  2) Registriert eine Mock-Bridge mit ALLEN 22 Signalen, die
      ``scene_src/bridge/bridge.js#tryChannel()`` verbindet (siehe
      ``visualizer_window.py::VisualizerBridge`` fuer die Signal-Liste) +
      dem ``requestFixtures``-Slot.
   3) Prueft ``window.__lightosAppReady === true`` - app.js ist komplett
      durchgelaufen (alle Module importiert, Render-Loop gestartet,
      Bridge-Poll gestartet).
-  4) Prueft, dass ALLE 21 ``bridge.X.connect(...)``-Aufrufe aus
+  4) Prueft, dass ALLE 22 ``bridge.X.connect(...)``-Aufrufe aus
      ``tryChannel()`` tatsaechlich passiert sind - jedes Signal bekommt vor
      dem Laden einen JS-seitigen Connect-Zaehler injiziert
      (``Object.defineProperty`` auf dem Bridge-Mock-Objekt), der bei jedem
@@ -73,6 +73,7 @@ _SIGNAL_SPECS = [
     ("editModeChanged", (str,)),
     ("stageLoaded", (str,)),
     ("addStageObject", (str,)),
+    ("addStageObjectData", (str,)),
     ("removeStageObject", (str,)),
     ("selectStageObject", (str,)),
     ("applyFixtureTransform", (str,)),
@@ -88,7 +89,7 @@ _SIGNAL_SPECS = [
 
 
 def _make_mock_bridge_class():
-    """Baut eine QObject-Subklasse mit allen 21 Signalen dynamisch (Signal()
+    """Baut eine QObject-Subklasse mit allen 22 Signalen dynamisch (Signal()
     muss ein Klassenattribut sein, PySide6 erlaubt kein setattr nach
     Instanziierung) + dem requestFixtures-Slot."""
     attrs = {}
@@ -100,6 +101,11 @@ def _make_mock_bridge_class():
         self._request_fixtures_calls = getattr(self, "_request_fixtures_calls", 0) + 1
 
     attrs["requestFixtures"] = requestFixtures
+    @Slot(result=str)
+    def pollControl(self):
+        return getattr(self, "_poll_payload", "{}")
+
+    attrs["pollControl"] = pollControl
     attrs["requestFullResync"] = Signal()  # von bridge.allFixtures-Handler optional aufgerufen
 
     return type("MockVisualizerBridge", (QObject,), attrs)
@@ -269,6 +275,90 @@ class SceneModulesSmokeTest(unittest.TestCase):
             timeout_s=5.0,
         )
         self.assertTrue(is_dark, "Fixture mit Dimmer 0 zeigt beim Build noch einen Lichtkegel")
+
+    def test_incremental_stage_add_preserves_python_id(self):
+        """Ein einzelnes Stage-Add bleibt bei Direkt-/Poll-Doppelzustellung idempotent."""
+        self._load_and_wait()
+        payload = (
+            '{"id":"py-stage-add-1","type":"platform","name":"Testdeck",'
+            '"position":{"x":1,"y":0.2,"z":2},'
+            '"size":{"x":6,"y":0.4,"z":4},"rotation":0,"color":"#332520"}'
+        )
+        created = self._emit_until_true(
+            lambda: self._bridge_obj.addStageObjectData.emit(payload),
+            "(function(){ const s=window.__lightos.stageObjects; "
+            "return !!s['py-stage-add-1'] && Object.keys(s).length === 1; })()",
+            timeout_s=5.0,
+        )
+        self.assertTrue(created, "Inkrementelles Stage-Add erreichte den 3D-View nicht")
+        # Der gleiche Event darf kein Suffix-Objekt erzeugen.
+        still_one = self._emit_until_true(
+            lambda: self._bridge_obj.addStageObjectData.emit(payload),
+            "Object.keys(window.__lightos.stageObjects).length === 1",
+            timeout_s=5.0,
+        )
+        self.assertTrue(still_one, "Doppelzustellung erzeugte ein zweites Stage-Objekt")
+
+    def test_bulk_stage_load_keeps_every_element(self):
+        """Ein kompletter Bühnen-Push darf nicht beim ersten Element enden.
+
+        Das ist der echte Save/Load-Pfad des Bühneneditors.  Besonders wichtig
+        ist der Test bei einer großen Bühne: ein fehlerhaftes Reload-Echo darf
+        beispielsweise die Truss-, LED- und Publikumsobjekte nicht aus dem
+        laufenden 3D-View entfernen.
+        """
+        self._load_and_wait()
+        objects = [
+            {
+                "id": f"bulk-{i}", "type": typ, "name": f"Element {i}",
+                "position": {"x": i - 4, "y": 0.5 + (i % 3), "z": i % 5},
+                "size": {"x": 2, "y": 1, "z": 1}, "rotation": 0,
+                "color": "#334455",
+            }
+            for i, typ in enumerate((
+                "floor", "platform", "truss_h", "truss_v", "led_wall",
+                "wall", "dj_booth", "speaker", "audience",
+            ))
+        ]
+        import json
+        payload = json.dumps({"objects": objects, "fixtures": [], "_reloadToken": 42})
+        loaded = self._emit_until_true(
+            lambda: self._bridge_obj.stageLoaded.emit(payload),
+            "Object.keys(window.__lightos.stageObjects).length === 9",
+            timeout_s=5.0,
+        )
+        self.assertTrue(loaded, "Bulk-Bühnenladung verlor mindestens ein Element")
+        # Die produktive Bridge liefert denselben State zusätzlich über den
+        # Pull-Kanal. Diese Doppelzustellung darf weder neu aufbauen noch
+        # Elemente verlieren.
+        still_complete = self._emit_until_true(
+            lambda: self._bridge_obj.stageLoaded.emit(payload),
+            "Object.keys(window.__lightos.stageObjects).length === 9",
+            timeout_s=5.0,
+        )
+        self.assertTrue(still_complete, "Doppelzustellung reduzierte die Bühnenliste")
+
+    def test_bulk_stage_load_via_poll_keeps_every_element(self):
+        """Der produktive Pull-Kanal muss komplexe Bühnen vollständig liefern."""
+        objects = [
+            {
+                "id": f"poll-{i}", "type": typ, "name": f"Poll {i}",
+                "position": {"x": i, "y": 1, "z": -i},
+                "size": {"x": 2, "y": 1, "z": 1}, "rotation": 0,
+                "color": "#334455",
+            }
+            for i, typ in enumerate((
+                "floor", "platform", "truss_h", "truss_v", "led_wall",
+                "wall", "dj_booth", "speaker", "audience",
+            ))
+        ]
+        import json
+        stage = json.dumps({"objects": objects, "fixtures": [], "_reloadToken": 43})
+        self._bridge_obj._poll_payload = json.dumps({"stage": stage})
+        self._load_and_wait()
+        loaded = self._poll_until_true(
+            "Object.keys(window.__lightos.stageObjects).length === 9", timeout_s=5.0)
+        self.assertTrue(loaded, "Poll-Bulk-Ladung verlor mindestens ein Element")
 
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der

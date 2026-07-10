@@ -5,7 +5,7 @@
 import * as THREE from '../three/three.js';
 import { renderer, scene } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
-import { fixtures, settings, view } from '../state.js';
+import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines } from '../interaction/tools.js';
@@ -26,6 +26,25 @@ import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 // ============================================================================
 export function jsAddStageObject(type) {
   return createStageObject(type, null, null, null, 0, null, null);
+}
+
+// QWebChannel kann denselben Direkt- und Poll-Event zustellen. Durch die
+// Python-ID bleibt das inkrementelle Hinzufügen deshalb idempotent.
+export function jsAddStageObjectData(json) {
+  try {
+    const d = typeof json === 'string' ? JSON.parse(json) : json;
+    if (!d || !d.type) return null;
+    if (d.id && stageObjects[d.id]) {
+      updateStageObjectProps(d.id, d);
+      return d.id;
+    }
+    return createStageObject(
+      d.type, d.position || null, d.size || null, d.color || null,
+      d.rotation || 0, d.id || null, d.name || null,
+    );
+  } catch (e) {
+    return null;
+  }
 }
 
 export function jsRemoveStageObject(id) {
@@ -197,6 +216,7 @@ export function tryChannel() {
         if (bridge.editModeChanged) bridge.editModeChanged.connect(name => setEditMode(name));
         if (bridge.stageLoaded)    bridge.stageLoaded.connect(j => loadStageJson(j));
         if (bridge.addStageObject) bridge.addStageObject.connect(t => jsAddStageObject(t));
+        if (bridge.addStageObjectData) bridge.addStageObjectData.connect(j => jsAddStageObjectData(j));
         if (bridge.removeStageObject) bridge.removeStageObject.connect(id => jsRemoveStageObject(id));
         if (bridge.selectStageObject) bridge.selectStageObject.connect(id => jsSelectStageObject(id));
         if (bridge.applyFixtureTransform) bridge.applyFixtureTransform.connect(j => {
@@ -272,6 +292,7 @@ export function tryChannel() {
                         else if (ev.t === 'brightnessAuto') resetBrightnessAuto();
                         else if (ev.t === 'transform') { const d = JSON.parse(ev.j); jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ); }
                         else if (ev.t === 'addStage') jsAddStageObject(ev.stype);
+                        else if (ev.t === 'addStageData') jsAddStageObjectData(ev.j);
                         else if (ev.t === 'removeStage') jsRemoveStageObject(ev.id);
                         else if (ev.t === 'selectStage') jsSelectStageObject(ev.id);
                         else if (ev.t === 'updateStage') { const d = JSON.parse(ev.j); updateStageObjectProps(d.id, d); }

@@ -284,6 +284,7 @@ class VisualizerBridge(QObject):
     editModeChanged         = Signal(str)
     stageLoaded             = Signal(str)
     addStageObject          = Signal(str)
+    addStageObjectData      = Signal(str)
     removeStageObject       = Signal(str)
     selectStageObject       = Signal(str)
     applyFixtureTransform   = Signal(str)
@@ -377,6 +378,7 @@ class VisualizerBridge(QObject):
         self.brightnessSignal.connect(lambda v: self._poll_event({"t": "brightness", "v": v}))
         self.applyFixtureTransform.connect(lambda j: self._poll_event({"t": "transform", "j": j}))
         self.addStageObject.connect(lambda t: self._poll_event({"t": "addStage", "stype": t}))
+        self.addStageObjectData.connect(lambda j: self._poll_event({"t": "addStageData", "j": j}))
         self.removeStageObject.connect(lambda i: self._poll_event({"t": "removeStage", "id": i}))
         self.selectStageObject.connect(lambda i: self._poll_event({"t": "selectStage", "id": i}))
         self.updateStageObject.connect(lambda j: self._poll_event({"t": "updateStage", "j": j}))
@@ -1119,6 +1121,13 @@ class VisualizerBridge(QObject):
             self.addStageObject.emit(type_)
         except Exception as e:
             print(f"[Visualizer] push_add_stage_object error: {e}")
+
+    def push_add_stage_object_data(self, element: StageElement):
+        """Inkrementelles Add mit stabiler Python-ID statt Scene-Reload."""
+        try:
+            self.addStageObjectData.emit(json.dumps(element.to_js_dict()))
+        except Exception as e:
+            print(f"[Visualizer] push_add_stage_object_data error: {e}")
 
     def push_remove_stage_object(self, sid: str):
         try:
@@ -2471,9 +2480,14 @@ class VisualizerWindow(QMainWindow):
         def _on_add_change():
             if self._current_stage.get(el.id) is not None:
                 self._sync_stage_node_to_scene(el)
+                self._bridge.push_add_stage_object_data(el)
             else:
                 self._remove_stage_node_from_scene(el.id)
-            self._apply_stage(self._current_stage)
+                self._bridge.push_remove_stage_object(el.id)
+            # Kein Voll-Reload: Der würde bei schnell aufeinander folgenden
+            # Stage-Adds ein teilweises WebGL-Echo zurück in das Modell holen.
+            self._refresh_stage_tree()
+            self._update_status_counts()
 
         # VIZ-11 (Schritt 6): AddNode-Undo — Element ist bereits angelegt
         # (execute=False), Undo entfernt es wieder (inkl. Graph-Knoten).
