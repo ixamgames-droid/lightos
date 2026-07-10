@@ -18,6 +18,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Behoben / Tests
 
 - **Universe 17–32 waren im Output-Monitor nicht auswählbar:** `OutputView` begrenzte seinen Universe-Spinbox auf 16, während Patch, Validierung und Output-Konfiguration bis 32 arbeiten. Der Monitor akzeptiert jetzt U1–32. `tests/test_output_view.py` baut die View headless, steuert die Spinbox mit echten Tastaturereignissen bis U32 und prüft die 512 Zellen inklusive DMX-Refresh.
+### 2026-07-10 — MIDI-Ansicht räumt ihre Hintergrund-Subscriber auf (QA-10)
+
+#### Behoben / Tests
+
+- **`MidiView` hinterließ Callbacks nach dem Schliessen:** Nachrichten-, Log- und MTC-Subscriber blieben beim jeweiligen Manager registriert und konnten in eine geschlossene Qt-View senden. Die View behält ihre Callbacks jetzt explizit, stoppt ihren Port-Refresh-Timer und meldet alle beim `closeEvent` ab. `MidiManager` kann Log-Subscriber gezielt entfernen und iteriert sie mutationssicher. `tests/test_midi_view.py` prüft den echten Qt-Monitor-/Toggle-Pfad mit isolierten MIDI-/MTC-Fakes sowie den vollständigen Teardown.
 
 ### 2026-07-09 — Backlog-Arbeitswarteschlange und Roadmap bereinigt
 

@@ -103,6 +103,10 @@ Channel-Groups · 3D-Visualizer/Bühnenpersistenz.
 **Nachtrag 2026-07-10 — OutputView:** Universe 17–32 waren trotz gültigem Patch nicht
 im Monitor auswählbar. Die Auswahl reicht nun bis U32; ein Qt-Keyboard-Test bestätigt
 die Auswahl und den DMX-Refresh einer 512-Zellen-Ansicht (`tests/test_output_view.py`).
+**Nachtrag 2026-07-10 — MidiView:** Die MIDI-/MTC-Ansicht baut ohne Hardware mit
+isolierten Fakes, zeigt eingehende Nachrichten im Qt-Monitor und entfernt beim Schließen
+alle registrierten MIDI-, Log- und MTC-Subscriber. Regression:
+`tests/test_midi_view.py`.
 
 ## 5. Offene, dokumentierte Niedrig-Prio-Punkte
 
