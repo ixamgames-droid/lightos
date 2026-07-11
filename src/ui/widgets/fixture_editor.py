@@ -82,20 +82,27 @@ class _ModeTab(QWidget):
         self.mode_name = self._edit_name.text().strip() or "Default"
 
     def _add_channel(self):
+        self._sync_from_table()   # Live-Edits sichern (Tabelle<->channels aligned)
         self.channels.append({
             "name": f"Channel {len(self.channels) + 1}",
             "attribute": "raw",
             "default": 0,
             "highlight": 255,
         })
-        self._refresh()
+        self._rebuild_rows()
 
     def _del_channel(self):
+        # WICHTIG: Tabelle ZUERST zuruecksynchronisieren (Alignment Tabelle<->channels
+        # gilt noch), DANN loeschen, DANN NUR neu bauen. Frueher lief _refresh() ->
+        # _sync_from_table() NACH dem del: die um eins verschobene, stale Tabelle wurde
+        # per Index in die bereits verkuerzte channels-Liste geschrieben -> Name/Default/
+        # Highlight des Folge-Channels korrumpiert.
+        self._sync_from_table()
         rows = sorted({i.row() for i in self._tbl.selectedIndexes()}, reverse=True)
         for r in rows:
             if 0 <= r < len(self.channels):
                 del self.channels[r]
-        self._refresh()
+        self._rebuild_rows()
 
     def _move(self, dir: int):
         rows = sorted({i.row() for i in self._tbl.selectedIndexes()})
@@ -104,12 +111,19 @@ class _ModeTab(QWidget):
         r = rows[0]
         nr = r + dir
         if 0 <= nr < len(self.channels):
+            # Edits VOR dem Tausch sichern (sonst wird nur `attribute` getauscht,
+            # Name/Default/Highlight aber aus der stale Tabelle rueckgesynct).
+            self._sync_from_table()
             self.channels[r], self.channels[nr] = self.channels[nr], self.channels[r]
-            self._refresh()
+            self._rebuild_rows()
             self._tbl.selectRow(nr)
 
     def _refresh(self):
-        self._sync_from_table()  # save edits first
+        # Live-Edits zuruecklesen (Alignment vorausgesetzt), dann Tabelle neu bauen.
+        self._sync_from_table()
+        self._rebuild_rows()
+
+    def _rebuild_rows(self):
         self._tbl.blockSignals(True)
         self._tbl.setRowCount(len(self.channels))
         for i, ch in enumerate(self.channels):
@@ -159,7 +173,10 @@ class _ModeTab(QWidget):
         self.mode_name = name
         self._edit_name.setText(name)
         self.channels = [dict(c) for c in channels]
-        self._refresh()
+        # NUR neu bauen, NICHT syncen: channels sind frisch gesetzt, die Tabelle
+        # zeigt noch den ALTEN Mode -> ein Sync wuerde alte Tabellenzeilen per Index
+        # in die neuen channels schreiben (Korruption beim Mode-Wechsel).
+        self._rebuild_rows()
 
     def get_data(self) -> tuple[str, list[dict]]:
         self._sync_from_table()
@@ -361,9 +378,15 @@ class FixtureEditorDialog(QDialog):
                     profile.short_name = self._edit_short.text().strip() or name[:8].upper()
                     profile.fixture_type = self._cb_type.currentText()
                     profile.power_w = self._spin_power.value()
-                    # Wipe old modes (cascade loescht channels)
-                    s.execute(delete(FixtureMode).where(
-                        FixtureMode.fixture_id == profile.id))
+                    # Alte Modes ueber die ORM-Session loeschen -> cascade=
+                    # "all, delete-orphan" (FixtureMode.channels / FixtureChannel.ranges)
+                    # raeumt Channels + Ranges mit ab. Ein Core-Bulk-delete(FixtureMode)
+                    # umgeht die ORM-Cascade (der FK channels.mode_id hat kein
+                    # ON DELETE CASCADE) und liess Channels/Ranges als Waisen zurueck.
+                    old_modes = s.execute(select(FixtureMode).where(
+                        FixtureMode.fixture_id == profile.id)).scalars().all()
+                    for _m in old_modes:
+                        s.delete(_m)
                     s.flush()
                 else:
                     profile = FixtureProfile(

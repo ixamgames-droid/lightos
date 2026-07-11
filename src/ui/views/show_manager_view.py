@@ -199,8 +199,8 @@ class TimelineCanvas(QWidget):
         show = self._show()
         if show is None:
             return None, None
-        row = (y - RULER_H) // TRACK_H
-        if row < 0 or row >= len(show.tracks):
+        row = int((y - RULER_H) // TRACK_H)   # y ist float (event.position()) -> int-Cast,
+        if row < 0 or row >= len(show.tracks):  # sonst crasht show.tracks[float] mit TypeError
             return None, None
         track = show.tracks[row]
         t = x / PX_PER_SEC
@@ -500,18 +500,30 @@ class ShowManagerView(QWidget):
             self._playing = False
             self._play_timer.stop()
             self._btn_play.setText("Play")
+            # Engine anhalten — sonst spielt die Show im Renderer weiter, obwohl die
+            # UI "Play" anzeigt.
+            if self._current_show is not None:
+                self._fm.stop(self._current_show.id)
         else:
             if self._current_show is None:
                 return
             self._playing = True
             self._play_timer.start()
             self._btn_play.setText("Pause")
+            # WICHTIG: die Show wirklich im Engine starten. Frueher lief nur der
+            # lokale Playhead-Timer (_on_play_tick bewegt nur _elapsed) — es wurde
+            # KEINE Funktion getriggert, also kein DMX. Der Renderer tickt laufende
+            # Funktionen (function_manager -> f.write), daher startet _fm.start() die
+            # tatsaechliche Wiedergabe.
+            self._fm.start(self._current_show.id)
 
     def _stop(self):
         self._playing = False
         self._play_timer.stop()
         self._elapsed = 0.0
         self._btn_play.setText("Play")
+        if self._current_show is not None:
+            self._fm.stop(self._current_show.id)
         self._timeline.update()
         self._update_time_label()
 

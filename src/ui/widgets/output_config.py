@@ -78,7 +78,7 @@ class OutputConfigDialog(QDialog):
         ef.addRow("", refresh_btn)
 
         self._spin_enttec_univ = QSpinBox()
-        self._spin_enttec_univ.setRange(1, 16)
+        self._spin_enttec_univ.setRange(1, 32)
         ef.addRow("Universe:", self._spin_enttec_univ)
 
         connect_btn = QPushButton("Verbinden")
@@ -100,7 +100,7 @@ class OutputConfigDialog(QDialog):
         # mehr pauschal ALLE Universen. (Das separate „Startuniversum"-Feld unten ist
         # die EXTERNE Universe-Nummer und gehört zu OUT-03.)
         self._spin_artnet_univ = QSpinBox()
-        self._spin_artnet_univ.setRange(1, 16)
+        self._spin_artnet_univ.setRange(1, 32)
         af.addRow("Universe:", self._spin_artnet_univ)
 
         self._edit_artnet_ip = QLineEdit("255.255.255.255")
@@ -127,7 +127,7 @@ class OutputConfigDialog(QDialog):
 
         # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (nicht mehr alle).
         self._spin_sacn_univ = QSpinBox()
-        self._spin_sacn_univ.setRange(1, 16)
+        self._spin_sacn_univ.setRange(1, 32)
         sf.addRow("Universe:", self._spin_sacn_univ)
 
         self._check_sacn_multicast = QCheckBox("Multicast (239.255.0.x)")
