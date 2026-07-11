@@ -6,7 +6,7 @@
 // dispatcht per registry.js#updateFixtureDmx auf die pro-Typ-Handler in
 // builders.js — belegt durch tests/test_viz13c_updatedmx_registry.py.
 import * as THREE from '../three/three.js';
-import { scene, renderer } from '../scene/renderer.js';
+import { scene, renderer, isLowSpec } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
 // VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
@@ -78,7 +78,9 @@ export function rebuildFixtureMeshList() {
 // ── Beam helpers ─────────────────────────────────────────────────────────────
 export function createBeamCone(color, intensity, angle, length) {
   const radius = Math.tan(angle) * length;
-  const geo = new THREE.ConeGeometry(radius, length, 24, 1, true);
+  // Low-Spec: 48 additive Doppelseiten-Kegel sind Fill-Rate-Fresser — halbe
+  // Segmentzahl ist optisch kaum unterscheidbar, halbiert aber die Kegel-Tris.
+  const geo = new THREE.ConeGeometry(radius, length, isLowSpec ? 12 : 24, 1, true);
   const mat = new THREE.MeshBasicMaterial({
     color: color,
     transparent: true,
@@ -196,8 +198,13 @@ export function addFixture(data) {
     // castShadow vergibt syncSpotShadowBudget() nach der Registrierung —
     // ein hartes `true` je Fixture sprengt auf 16-Unit-GPUs das Shader-Limit.
     spot.castShadow = false;
-    spot.shadow.mapSize.width = 512;
-    spot.shadow.mapSize.height = 512;
+    // Dunkle Lampen kosten sonst trotzdem Shading in JEDEM beleuchteten Pixel
+    // (three.js wertet alle sichtbaren Lichter aus) — applyGenericColor haelt
+    // die Sichtbarkeit synchron zur DMX-Intensitaet.
+    spot.visible = intensity > 0.01;
+    const shadowRes = isLowSpec ? 256 : 512;
+    spot.shadow.mapSize.width = shadowRes;
+    spot.shadow.mapSize.height = shadowRes;
     root.add(spot);
 
     spotTarget = new THREE.Object3D();
@@ -206,6 +213,8 @@ export function addFixture(data) {
     spot.target = spotTarget;
 
     floorSpot = createFloorSpot(color, intensity, 1.2);
+    // Wie beim SpotLight: dunkle Boden-Discs gar nicht erst zeichnen.
+    floorSpot.visible = settings.showFloorSpots && intensity > 0.01;
     scene.add(floorSpot);
   }
 

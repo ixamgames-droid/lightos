@@ -154,15 +154,20 @@ class SceneModulesSmokeTest(unittest.TestCase):
             pass
         _pump(0.2)
 
-    def _load_and_wait(self, cache_bust=True):
+    def _load_and_wait(self, cache_bust=True, gpu_tier=None):
         # WICHTIG: .clear() statt Neuzuweisung - loadFinished ist in setUp()
         # an die urspruengliche Liste per `self._loaded_ok.append` gebunden;
         # eine Neuzuweisung (`self._loaded_ok = []`) wuerde das Signal von
         # der neuen Liste entkoppeln (Callback fuellt weiter die ALTE Liste).
         self._loaded_ok.clear()
         url = QUrl.fromLocalFile(_HTML_PATH)
-        if cache_bust:
-            url.setQuery(f"v={int(time.time() * 1000)}")
+        query = f"v={int(time.time() * 1000)}" if cache_bust else ""
+        if gpu_tier:
+            # Deterministischer Tier-Override (renderer.js#probeGpuTier) —
+            # offscreen laeuft sonst je nach GL-Backend mal low, mal high.
+            query = (query + "&" if query else "") + f"gputier={gpu_tier}"
+        if query:
+            url.setQuery(query)
         self._view.load(url)
         deadline = time.monotonic() + _LOAD_TIMEOUT_S
         while not self._loaded_ok and time.monotonic() < deadline:
@@ -481,6 +486,68 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertEqual(
             c2["shadows"], min(n - 1, budget),
             "Nach dem Entfernen wurde das Shadow-Budget nicht neu verteilt")
+
+    def test_gpu_tier_low_reduces_geometry_and_culls_dark_spots(self):
+        """Low-Spec-Modus (Surface/Adreno): schlankere Kegel + Dunkel-Culling.
+
+        Auf 16-Texture-Unit-GPUs ist neben dem Shadow-Budget die laufende
+        Licht-Auswertung der Kostentreiber: ein SpotLight mit intensity 0
+        wird sonst weiter in JEDEM beleuchteten Pixel mitgerechnet. Das
+        Culling ist tier-unabhaengig; die Geometrie-Reduktion nur im Low-Tier.
+        """
+        self._load_and_wait(gpu_tier="low")
+        import json
+        tier = self._eval("window.__lightos.gpuTier")
+        self.assertEqual(tier, "low")
+
+        dark = json.dumps([{"fid": 700001, "type": "moving_head",
+                            "x": 0, "y": 6, "z": 0,
+                            "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        built = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(dark),
+            "(function(){ const f = window.__lightos.fixtures['700001']; "
+            "return !!f && !!f.spot && f.spot.visible === false; })()",
+            timeout_s=5.0)
+        self.assertTrue(built, "Dunkler SpotLight wurde nicht aus der Licht-Auswertung genommen")
+
+        segments = self._eval(
+            "window.__lightos.fixtures['700001'].beam.geometry.parameters.radialSegments")
+        self.assertEqual(segments, 12, "Low-Tier muss die Beam-Kegel auf 12 Segmente reduzieren")
+
+        # Aufdrehen ueber den echten dmxBatch-Pfad -> Licht wird wieder aktiv.
+        lit_batch = json.dumps([{"fid": 700001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
+        lit = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(lit_batch),
+            "window.__lightos.fixtures['700001'].spot.visible === true",
+            timeout_s=5.0)
+        self.assertTrue(lit, "Aufgedrehter SpotLight wurde nicht wieder sichtbar")
+        # Und wieder dunkel -> wieder raus aus der Auswertung.
+        dark_batch = json.dumps([{"fid": 700001, "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        dark_again = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(dark_batch),
+            "window.__lightos.fixtures['700001'].spot.visible === false",
+            timeout_s=5.0)
+        self.assertTrue(dark_again, "Abgedunkelter SpotLight blieb in der Licht-Auswertung")
+
+    def test_gpu_tier_high_keeps_full_geometry(self):
+        """High-Tier behaelt die volle Kegel-Aufloesung (keine Optik-Regression)."""
+        self._load_and_wait(gpu_tier="high")
+        import json
+        tier = self._eval("window.__lightos.gpuTier")
+        self.assertEqual(tier, "high")
+        payload = json.dumps([{"fid": 700002, "type": "par",
+                               "x": 1, "y": 0, "z": 0,
+                               "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            "!!window.__lightos.fixtures['700002']", timeout_s=5.0)
+        segments = self._eval(
+            "window.__lightos.fixtures['700002'].beam.geometry.parameters.radialSegments")
+        self.assertEqual(segments, 24, "High-Tier darf die Kegel-Geometrie nicht reduzieren")
+        # Dunkel-Culling gilt tier-unabhaengig.
+        culled = self._eval(
+            "window.__lightos.fixtures['700002'].spot.visible === false")
+        self.assertTrue(culled, "Dunkel-Culling muss auch im High-Tier greifen")
 
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der
