@@ -201,6 +201,26 @@ export function buildTopDownIcon(type, nHeads) {
         new THREE.Vector3(Math.sin(a) * len, 0.05, -0.15 - Math.cos(a) * len),
       ], 0x44ff44));
     });
+  } else if (type === 'other') {
+    // FLA-4: bewusst neutrales Geraete-Symbol statt PAR-/Default-Kreis.
+    // Das Fragezeichen bleibt als feste Glyph-Farbe lesbar, waehrend nur das
+    // Gehaeuse wie bei allen Single-Head-Typen dem Live-DMX folgt.
+    body = mkFill(new THREE.PlaneGeometry(0.82, 0.68));
+    group.add(body);
+    group.add(mkOutline(new THREE.PlaneGeometry(0.82, 0.68)));
+    group.add(mkLine([
+      new THREE.Vector3(-0.16, 0.05, -0.12),
+      new THREE.Vector3(-0.08, 0.05, -0.21),
+      new THREE.Vector3(0.09, 0.05, -0.21),
+      new THREE.Vector3(0.17, 0.05, -0.12),
+      new THREE.Vector3(0.17, 0.05, -0.02),
+      new THREE.Vector3(0.00, 0.05, 0.12),
+      new THREE.Vector3(0.00, 0.05, 0.20),
+    ]));
+    group.add(mkLine([
+      new THREE.Vector3(0.00, 0.05, 0.27),
+      new THREE.Vector3(0.00, 0.05, 0.29),
+    ]));
   } else {
     body = mkFill(new THREE.CircleGeometry(0.45, 16));
     group.add(body);
