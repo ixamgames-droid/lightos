@@ -210,12 +210,13 @@ class ChannelGroupsView(QWidget):
         if not (0 <= row < len(self._groups)):
             return
         g = self._groups[row]
-        universe = self._state.universes.get(g.universe)
-        if universe is None:
-            return
+        # Ueber die Simple-Desk-Override-Schicht schreiben (oberste Schicht in
+        # _render_frame) statt roh per universe.set_channel: den Roh-Wert
+        # ueberschrieb der 44-Hz-Renderer sofort wieder -> der Gruppen-Slider war
+        # wirkungslos, sobald irgendetwas anderes renderte.
         for ch in g.channels:
             if 1 <= ch <= 512:
-                universe.set_channel(ch, max(0, min(255, g.value)))
+                self._state.set_simple_desk_channel(g.universe, ch, g.value)
 
     def _add_group(self):
         name, ok = QInputDialog.getText(self, "Neue Gruppe", "Name:")

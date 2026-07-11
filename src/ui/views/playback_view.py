@@ -531,9 +531,14 @@ class PlaybackView(QWidget):
 
         if cue:
             self._lbl_current.setText(f"▶ Cue {cue.number} — {cue.label}")
-            # Nächste Cue
-            next_idx = idx + 1
-            if next_idx < len(self._current_stack.cues):
+            # Naechste Cue modusabhaengig (loop/bounce/pingpong) statt naivem
+            # idx+1 — der zeigte am Listenende/bei bounce die falsche Vorschau.
+            try:
+                next_idx, _d = self._current_stack.peek_next()
+            except Exception:
+                next_idx = idx + 1
+            if (next_idx is not None
+                    and 0 <= next_idx < len(self._current_stack.cues)):
                 nc = self._current_stack.cues[next_idx]
                 self._lbl_next.setText(f"Nächste: {nc.number} — {nc.label}")
             else:
