@@ -228,6 +228,11 @@ class VCEncoder(VCWidget):
     def wheelEvent(self, event):
         if self._edit_mode:
             return
+        # Wie mousePressEvent: der Display-only-/Touch-Lock muss auch das Mausrad
+        # blocken, sonst laesst sich der Encoder trotz Sperre per Scroll verstellen.
+        if self._run_input_blocked():
+            event.accept()
+            return
         self.nudge(event.angleDelta().y() / 120.0)
 
     # ── Paint ─────────────────────────────────────────────────────────────────
