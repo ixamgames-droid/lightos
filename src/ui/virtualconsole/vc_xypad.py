@@ -65,8 +65,12 @@ class VCXYPad(VCWidget):
 
     def _pos_to_value(self, pos: QPoint):
         pr = self._pad_rect()
-        pan = max(0.0, min(1.0, (pos.x() - pr.x()) / pr.width()))
-        tilt = max(0.0, min(1.0, (pos.y() - pr.y()) / pr.height()))
+        # `or 1`: bei sehr kleinem Widget (<=48px) ist die um 24px eingerueckte
+        # Pad-Breite/-Hoehe 0 -> sonst ZeroDivisionError-Crash beim Klick.
+        w = pr.width() or 1
+        h = pr.height() or 1
+        pan = max(0.0, min(1.0, (pos.x() - pr.x()) / w))
+        tilt = max(0.0, min(1.0, (pos.y() - pr.y()) / h))
         self._pan = pan
         self._tilt = tilt
         self._apply()
@@ -75,8 +79,10 @@ class VCXYPad(VCWidget):
     def _norm(self, pos: QPoint) -> tuple[float, float]:
         """Mausposition auf 0..1 im Pad-Feld (geklemmt)."""
         pr = self._pad_rect()
-        return (max(0.0, min(1.0, (pos.x() - pr.x()) / pr.width())),
-                max(0.0, min(1.0, (pos.y() - pr.y()) / pr.height())))
+        w = pr.width() or 1
+        h = pr.height() or 1
+        return (max(0.0, min(1.0, (pos.x() - pr.x()) / w)),
+                max(0.0, min(1.0, (pos.y() - pr.y()) / h)))
 
     # Mindest-Kantenlänge des Feldes (0..1) — ~13/255. Verhindert, dass ein reiner
     # Klick (ohne Ziehen) die EFX-Figur auf einen Punkt kollabieren lässt.

@@ -2013,7 +2013,14 @@ class VCButton(VCWidget):
             # Unbekannte Aktion (z. B. aus einer neueren Version) -> sicherer Default
             # statt Absturz; das Widget bleibt erhalten (Vorwaerts-/Rueckwaerts-Kompat).
             self.action = ButtonAction.TOGGLE
-        self.function_id = d.get("function_id")
+        # int-Cast wie bei snap_id/function_ids: ein Float aus einer (manuell
+        # editierten/aelteren) .lshow -> spaeter `executors[float]` = TypeError-Crash
+        # bei TOGGLE/FLASH (_trigger_primary indiziert die Executor-Liste ungefangen).
+        try:
+            _fid0 = d.get("function_id")
+            self.function_id = int(_fid0) if _fid0 is not None else None
+        except (TypeError, ValueError):
+            self.function_id = None
         _fids = []
         for i in d.get("function_ids", []):
             try:
@@ -2021,7 +2028,11 @@ class VCButton(VCWidget):
             except (TypeError, ValueError):
                 pass
         self.function_ids = _fids
-        self.snapshot_index = d.get("snapshot_index")
+        try:
+            _sidx = d.get("snapshot_index")
+            self.snapshot_index = int(_sidx) if _sidx is not None else None
+        except (TypeError, ValueError):
+            self.snapshot_index = None
         try:
             _sid0 = d.get("snap_id")
             self.snap_id = int(_sid0) if _sid0 is not None else None

@@ -304,6 +304,79 @@ class SceneModulesSmokeTest(unittest.TestCase):
         )
         self.assertTrue(still_one, "Doppelzustellung erzeugte ein zweites Stage-Objekt")
 
+    def test_truss_obj_uses_its_real_z_long_axis(self):
+        """Das 2-m-OBJ darf nicht aus seinem 30-cm-Querschnitt langgezogen werden.
+
+        Asset-Bounds: ca. 0.302 x 0.300 x 2.000 m (Laengsachse Z). Der alte
+        Builder behandelte X als Laengsachse; seine Aussen-Bounds passten zwar,
+        aber Gurte und Diagonalen waren um bis zu Faktor 13 verzerrt.
+        """
+        self._load_and_wait()
+        import json
+        objects = [
+            {
+                "id": "truss-axis-h", "type": "truss_h", "name": "H",
+                "position": {"x": 0, "y": 1, "z": 0},
+                "size": {"x": 4, "y": 0.3, "z": 0.3},
+                "rotation": 0, "color": "#999999",
+            },
+            {
+                "id": "truss-axis-v", "type": "truss_v", "name": "V",
+                "position": {"x": 2, "y": 2, "z": 0},
+                "size": {"x": 0.3, "y": 4, "z": 0.3},
+                "rotation": 0, "color": "#999999",
+            },
+        ]
+        payload = json.dumps({"objects": objects, "fixtures": [], "_reloadToken": 46})
+        self._emit_until_true(
+            lambda: self._bridge_obj.stageLoaded.emit(payload),
+            "(function(){"
+            " const s=window.__lightos.stageObjects;"
+            " const ready=id => s[id] && s[id].mesh.children.some("
+            "   c => c.userData && c.userData.isFittedTrussModel);"
+            " return ready('truss-axis-h') && ready('truss-axis-v');"
+            "})()",
+            timeout_s=8.0,
+        )
+        raw = self._eval("""
+            (function(){
+                function info(id) {
+                    const root = window.__lightos.stageObjects[id].mesh;
+                    const fitted = root.children.find(
+                        c => c.userData && c.userData.isFittedTrussModel);
+                    const source = fitted.children[0];
+                    const size = new THREE.Box3().setFromObject(root)
+                        .getSize(new THREE.Vector3());
+                    const scales = [fitted.scale.x, fitted.scale.y, fitted.scale.z];
+                    return {
+                        size: [size.x, size.y, size.z],
+                        target: fitted.userData.targetLongAxis,
+                        source: fitted.userData.sourceLongAxis,
+                        fitScale: scales,
+                        scaleRatio: Math.max(...scales) / Math.min(...scales),
+                        rotation: [source.rotation.x, source.rotation.y, source.rotation.z],
+                    };
+                }
+                return JSON.stringify({
+                    h: info('truss-axis-h'), v: info('truss-axis-v')
+                });
+            })()
+        """)
+        d = json.loads(raw)
+        for actual, expected in ((d["h"]["size"], [4, 0.3, 0.3]),
+                                 (d["v"]["size"], [0.3, 4, 0.3])):
+            for got, want in zip(actual, expected):
+                self.assertAlmostEqual(got, want, places=3)
+        self.assertEqual((d["h"]["source"], d["h"]["target"]), ("z", "x"))
+        self.assertEqual((d["v"]["source"], d["v"]["target"]), ("z", "y"))
+        # Nur die echte 2-m-Achse wird auf 4 m verdoppelt; kein 13x/.15x-
+        # Extremstretch des Querschnitts mehr.
+        self.assertLess(d["h"]["scaleRatio"], 2.1)
+        self.assertLess(d["v"]["scaleRatio"], 2.1)
+        import math
+        self.assertAlmostEqual(abs(d["h"]["rotation"][1]), math.pi / 2, places=5)
+        self.assertAlmostEqual(abs(d["v"]["rotation"][0]), math.pi / 2, places=5)
+
     def test_bulk_stage_load_keeps_every_element(self):
         """Ein kompletter Bühnen-Push darf nicht beim ersten Element enden.
 

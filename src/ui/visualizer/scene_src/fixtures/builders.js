@@ -213,6 +213,115 @@ export function buildDimmer() {
   return { group, head: group, lamp: lensPanel };
 }
 
+// FLA-4: neutrale Geometrie fuer importierte Geraete der Klasse `other`.
+// QLC+ bildet u.a. Fan/Effect/Other hierhin ab; der bisherige PAR-Fallback
+// suggerierte deshalb eine runde Lampe. Das Modell bleibt absichtlich
+// herstellerneutral, behaelt aber den bisherigen Single-Head-/DMX-Vertrag:
+// `head` traegt den Beam, `lamp` zeigt Farbe und Intensitaet an.
+export function buildOther() {
+  const group = new THREE.Group();
+  group.userData.fixtureModel = 'other';
+
+  const housingMat = new THREE.MeshStandardMaterial({
+    color: 0x20232b, metalness: 0.65, roughness: 0.42,
+  });
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: 0x353a46, metalness: 0.78, roughness: 0.32,
+  });
+  const detailMat = new THREE.MeshStandardMaterial({
+    color: 0x7a8292, metalness: 0.72, roughness: 0.28,
+  });
+
+  // Kompaktes Effektgeraet/Controller-Gehaeuse statt einer Lampen-Silhouette.
+  const housing = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.28, 0.42), housingMat);
+  housing.name = 'other-housing';
+  housing.castShadow = true;
+  group.add(housing);
+
+  // Deckel, Boden und vier geschuetzte Gehaeusekanten erzeugen einen
+  // robusten Flightcase-Look, ohne einen konkreten Geraetetyp vorzugeben.
+  [-0.155, 0.155].forEach((y) => {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.035, 0.46), edgeMat);
+    plate.position.y = y;
+    plate.castShadow = true;
+    group.add(plate);
+  });
+  [-0.285, 0.285].forEach((x) => {
+    [-0.215, 0.215].forEach((z) => {
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.31, 0.035), edgeMat);
+      guard.position.set(x, 0, z);
+      guard.castShadow = true;
+      group.add(guard);
+    });
+  });
+
+  // Universal-Haltebuegel: das Modell bleibt sowohl stehend als auch an einer
+  // Traverse sofort als technisches Geraet erkennbar.
+  [-0.34, 0.34].forEach((x) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.30, 0.07), edgeMat);
+    arm.position.set(x, 0.20, 0);
+    arm.castShadow = true;
+    group.add(arm);
+  });
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.055, 0.07), edgeMat);
+  bridge.position.y = 0.35;
+  bridge.castShadow = true;
+  group.add(bridge);
+
+  // Frontseitiges Ident-Feld mit geometrischem Fragezeichen. Kein Font- oder
+  // Textur-Asset noetig, daher bleibt das Modell offline und cache-freundlich.
+  const idPlate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.28, 0.19),
+    new THREE.MeshStandardMaterial({ color: 0x101218, metalness: 0.35, roughness: 0.58 })
+  );
+  idPlate.position.set(0, 0.025, 0.216);
+  group.add(idPlate);
+  const mark = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.055, 0.100, 0.225),
+      new THREE.Vector3(0.035, 0.100, 0.225),
+      new THREE.Vector3(0.060, 0.072, 0.225),
+      new THREE.Vector3(0.060, 0.035, 0.225),
+      new THREE.Vector3(-0.015, -0.005, 0.225),
+      new THREE.Vector3(-0.015, -0.042, 0.225),
+    ]),
+    new THREE.LineBasicMaterial({ color: 0xaab2c2 })
+  );
+  group.add(mark);
+  const markDot = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.026, 0.012), detailMat);
+  markDot.position.set(-0.015, -0.082, 0.224);
+  group.add(markDot);
+
+  // Rueckseitige Lueftungsschlitze in EINEM LineSegments-Drawcall.
+  const ventPoints = [];
+  for (let i = 0; i < 5; i++) {
+    const x = -0.07 + i * 0.035;
+    ventPoints.push(
+      new THREE.Vector3(x, -0.06, -0.217),
+      new THREE.Vector3(x, 0.06, -0.217)
+    );
+  }
+  group.add(new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(ventPoints),
+    new THREE.LineBasicMaterial({ color: 0x7a8292 })
+  ));
+
+  // Unterseitiges Status-/Output-Feld: dieselbe DMX-Rueckmeldung wie der alte
+  // PAR-Fallback, aber rechteckig und damit optisch eindeutig `other`.
+  const lamp = new THREE.Mesh(
+    new THREE.BoxGeometry(0.24, 0.018, 0.13),
+    new THREE.MeshStandardMaterial({
+      color: 0x30343f, emissive: 0x000000, emissiveIntensity: 0,
+      metalness: 0.2, roughness: 0.32,
+    })
+  );
+  lamp.name = 'other-status-lamp';
+  lamp.position.y = -0.182;
+  group.add(lamp);
+
+  return { group, head: group, lamp };
+}
+
 export function buildScanner() {
   // FM-1: Scanner mit BEWEGLICHER Spiegel-Optik (vorher statisch). Aufbau wie ein
   // Moving Head: festes Gehaeuse -> yoke (pant um Y) -> head/Spiegel (kippt um X).
