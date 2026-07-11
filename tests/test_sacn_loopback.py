@@ -99,5 +99,67 @@ class SacnLoopbackTest(unittest.TestCase):
             rx.close()
 
 
+class _CaptureSock:
+    """Fake-Socket: sammelt sendto-Aufrufe (kein echtes Netz noetig -> deterministisch)."""
+    def __init__(self):
+        self.sent = []
+
+    def sendto(self, pkt, dest):
+        self.sent.append((bytes(pkt), dest))
+
+    def close(self):
+        pass
+
+    def setsockopt(self, *a):
+        pass
+
+
+class SacnStreamTerminationTest(unittest.TestCase):
+    """OUT-06: close() sendet je bespieltem Universum 3 Pakete mit gesetztem
+    Stream_Terminated-Options-Bit, damit Empfaenger die Quelle sofort verwerfen."""
+
+    # Options-Byte-Offset im E1.31-Paket: Root-Layer 38 + Framing bis Options
+    # (Flags&Len2+Vector4+Source64+Prio1+SyncAddr2+Seq1 = 74) = 112.
+    _OPTIONS_OFFSET = 112
+
+    def _sender_with_fake_sock(self):
+        s = SACNSender.__new__(SACNSender)
+        s._target_ip = None
+        s._source_name = "TermTest"
+        s._cid = b"\x00" * 16
+        s._seq = {1: 5, 7: 200}
+        s._sock = _CaptureSock()
+        return s
+
+    def test_close_sends_three_terminations_per_universe(self):
+        s = self._sender_with_fake_sock()
+        sock = s._sock
+        s.close()
+        # 2 Universen x 3 Pakete = 6.
+        self.assertEqual(len(sock.sent), 6)
+        # Jedes Paket hat das Stream_Terminated-Bit (0x40) im Options-Byte gesetzt.
+        for pkt, _dest in sock.sent:
+            self.assertEqual(pkt[self._OPTIONS_OFFSET], 0x40)
+        # Multicast-Ziele beider Universen vertreten.
+        dests = {d[0] for _p, d in sock.sent}
+        self.assertIn("239.255.0.1", dests)
+        self.assertIn("239.255.0.7", dests)
+        # Socket danach geschlossen.
+        self.assertIsNone(s._sock)
+
+    def test_normal_packet_has_no_terminated_bit(self):
+        from src.core.dmx.sacn import _pack_framing
+        pkt = _pack_framing(bytes(512), 1, 0, "X", b"\x00" * 16)
+        self.assertEqual(pkt[self._OPTIONS_OFFSET], 0x00)
+
+    def test_close_without_universes_is_safe(self):
+        s = self._sender_with_fake_sock()
+        s._seq = {}
+        sock = s._sock
+        s.close()                         # nichts gesendet, kein Fehler
+        self.assertEqual(sock.sent, [])
+        self.assertIsNone(s._sock)
+
+
 if __name__ == "__main__":
     unittest.main()
