@@ -278,6 +278,7 @@ class TrackLabelPanel(QWidget):
             rl.addWidget(lbl, 1)
 
             btn_mute = QPushButton("M")
+            btn_mute.setToolTip("Track stummschalten")
             btn_mute.setCheckable(True)
             btn_mute.setChecked(track.muted)
             btn_mute.setFixedSize(22, 22)
