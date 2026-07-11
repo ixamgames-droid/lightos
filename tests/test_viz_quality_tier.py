@@ -70,8 +70,22 @@ class LoadStageHtmlTierQueryTest(unittest.TestCase):
 
 
 class QualityComboHandlerTest(unittest.TestCase):
+    """Qt-GC-Falle: parentlose Widgets MÜSSEN vor dem conftest-Teardown
+    (_cleanup_vc_canvases iteriert app.allWidgets()) deterministisch weg —
+    sonst native AV im Isolate-Gate (halbtote Wrapper in allWidgets)."""
+
+    def setUp(self):
+        self._widgets = []
+
+    def tearDown(self):
+        for w in self._widgets:
+            w.deleteLater()
+        self._widgets.clear()
+        _app.processEvents()
+
     def _fake(self):
         combo = QComboBox()
+        self._widgets.append(combo)
         combo.addItem("Automatisch (empfohlen)", "auto")
         combo.addItem("Hoch (Desktop-GPU)", "high")
         combo.addItem("Niedrig (schwache/mobile GPU)", "low")
@@ -100,6 +114,15 @@ class QualityComboHandlerTest(unittest.TestCase):
 
 
 class GpuTierReportTest(unittest.TestCase):
+    def setUp(self):
+        self._widgets = []
+
+    def tearDown(self):
+        for w in self._widgets:
+            w.deleteLater()
+        self._widgets.clear()
+        _app.processEvents()
+
     def test_bridge_slot_forwards_tier(self):
         fake = SimpleNamespace(pyGpuTierReported=MagicMock())
         VW.VisualizerBridge.reportGpuTier(fake, "low")
@@ -112,6 +135,7 @@ class GpuTierReportTest(unittest.TestCase):
 
     def test_window_label_shows_german_tier_name(self):
         lbl = QLabel("aktiv: –")
+        self._widgets.append(lbl)
         fake = SimpleNamespace(_lbl_gpu_tier=lbl)
         VW.VisualizerWindow._on_gpu_tier_reported(fake, "low")
         self.assertEqual(lbl.text(), "aktiv: Niedrig")
