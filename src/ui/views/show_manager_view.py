@@ -499,18 +499,30 @@ class ShowManagerView(QWidget):
             self._playing = False
             self._play_timer.stop()
             self._btn_play.setText("Play")
+            # Engine anhalten — sonst spielt die Show im Renderer weiter, obwohl die
+            # UI "Play" anzeigt.
+            if self._current_show is not None:
+                self._fm.stop(self._current_show.id)
         else:
             if self._current_show is None:
                 return
             self._playing = True
             self._play_timer.start()
             self._btn_play.setText("Pause")
+            # WICHTIG: die Show wirklich im Engine starten. Frueher lief nur der
+            # lokale Playhead-Timer (_on_play_tick bewegt nur _elapsed) — es wurde
+            # KEINE Funktion getriggert, also kein DMX. Der Renderer tickt laufende
+            # Funktionen (function_manager -> f.write), daher startet _fm.start() die
+            # tatsaechliche Wiedergabe.
+            self._fm.start(self._current_show.id)
 
     def _stop(self):
         self._playing = False
         self._play_timer.stop()
         self._elapsed = 0.0
         self._btn_play.setText("Play")
+        if self._current_show is not None:
+            self._fm.stop(self._current_show.id)
         self._timeline.update()
         self._update_time_label()
 
