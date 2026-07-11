@@ -266,7 +266,9 @@ class VCSpeedDial(VCWidget):
                         fn.speed = factor
                 else:
                     executors = state.playback_engine.executors
-                    if int(fid) < len(executors):
+                    # 0 <= ...: ohne Untergrenze adressiert ein negativer fid per
+                    # Python-Negativindex faelschlich den LETZTEN Executor.
+                    if 0 <= int(fid) < len(executors):
                         ex = executors[int(fid)]
                         if ex.stack:
                             if self.multiplier_mode:
