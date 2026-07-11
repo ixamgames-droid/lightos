@@ -128,7 +128,9 @@ class ChannelGroupsView(QWidget):
             self._table.setCellWidget(row, 0, name_edit)
 
             # Universe
-            spin_u = QSpinBox(); spin_u.setRange(1, 16); spin_u.setValue(g.universe)
+            # 1-32 wie der Universen-Manager (nicht 1-16), sonst sind Gruppen in
+            # Universe 17-32 nicht konfigurierbar.
+            spin_u = QSpinBox(); spin_u.setRange(1, 32); spin_u.setValue(g.universe)
             spin_u.valueChanged.connect(weak_slot_fwd(self._on_universe_changed, row))
             self._table.setCellWidget(row, 1, spin_u)
 
