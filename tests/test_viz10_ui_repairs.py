@@ -139,6 +139,10 @@ class AddStageElementAutoModeTest(unittest.TestCase):
             _apply_stage=MagicMock(),
             _sync_stage_node_to_scene=MagicMock(),
             _remove_stage_node_from_scene=MagicMock(),
+            # Seit b65eb9c/2026-07-11 laufen Add/Delete inkrementell und
+            # pflegen Baum + Statuszeile direkt (kein _apply_stage-Reload).
+            _refresh_stage_tree=MagicMock(),
+            _update_status_counts=MagicMock(),
         )
 
     def test_switches_from_view_to_stage_mode(self):
@@ -219,6 +223,10 @@ class UpdateStatusCountsTest(unittest.TestCase):
             _current_stage=stage,
             _state=SimpleNamespace(visualizer_positions={}),
             _update_status_counts=MagicMock(),
+            # _apply_stage armiert seit 4025631/2026-07-11 zwei Timer auf
+            # diese Methoden — im Fake stummschalten.
+            _reassert_current_stage_after_load=MagicMock(),
+            _clear_stale_pending_stage_ids=MagicMock(),
         )
         VW.VisualizerWindow._apply_stage(fake, stage)
         fake._update_status_counts.assert_called_once()

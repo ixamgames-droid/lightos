@@ -217,6 +217,10 @@ class DirtyFlagTransitionsTest(unittest.TestCase):
             _selected_stage_id="",
             _sync_stage_node_to_scene=MagicMock(),
             _remove_stage_node_from_scene=MagicMock(),
+            # Seit b65eb9c/2026-07-11 laufen Add/Delete inkrementell und
+            # pflegen Baum + Statuszeile direkt (kein _apply_stage-Reload).
+            _refresh_stage_tree=MagicMock(),
+            _update_status_counts=MagicMock(),
         )
         fake._combo_edit.currentData.return_value = "stage"
         return fake

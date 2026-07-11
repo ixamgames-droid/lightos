@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-11 — 3D-Visualizer rendert große Rigs wieder (Shader-Texture-Limit)
+
+#### Behoben / Tests
+
+- **Bühne blieb bei großen Rigs komplett unsichtbar (nur Beam-Kegel zeichneten):** Jede schattenwerfende SpotLight kostet im Fragment-Shader jedes beleuchteten Materials eine Texture-Unit (Shadow-Map). Beim 48-Fixture-Demo-Rig überschritt das auf GPUs mit `MAX_TEXTURE_IMAGE_UNITS=16` (z. B. Adreno im Surface) das Limit — kein beleuchteter Shader kompilierte mehr (`FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)` + Dauer-Spam `useProgram: program not valid` im crash.log). Jetzt vergeben `addFixture`/`removeFixture` ein deterministisches Shadow-Budget (`maxTextures − 6 Reserve`, fid-Reihenfolge): die ersten N Spots werfen Schatten, alle weiteren leuchten ohne; Entfernen verteilt frei gewordenes Budget zurück. QtWebEngine-Smoke `test_shadow_spot_budget_respects_texture_units` prüft Kappung und Rückverteilung mit 30 echten Fixtures.
+- **Bühnen-Sync gegen GPU-Stress gehärtet (adversariale Review der Fixes vom 10./11.07.):** (1) Ein Element-Build-Throw (z. B. bei WebGL-Context-Loss) reißt den restlichen Bulk-Bau nicht mehr ab — vorher blieb von einer 15-Element-Bühne exakt Element #0 übrig und das Qt-Panel fror bei „1 Element" ein. (2) Der lokale Repair-Loop ist token-aware und respektiert Lösch-Tombstones — er kann keine gelöschten oder zur vorherigen Bühne gehörenden Elemente mehr reanimieren. (3) `stageObjectDeleted` (die einzige Tür, durch die das autoritative Python-Modell schrumpfen kann) trägt jetzt dieselben Guards wie der Snapshot-Reconcile: Lösch-Echos aus Reload-Churn, zu Elementen eines laufenden Reloads oder mit bereits eingereihtem Re-Add werden ignoriert. (4) Das Nachsenden fehlender Elemente gibt nach 3 Versuchen auf, statt Selektion und Positions-Sync für den Rest der Session einzufrieren (Python behält die Elemente autoritativ); ein 6-s-Backstop öffnet das Pending-Gate auch bei völliger Echo-Stille. (5) Ein überholtes (stale) Echo darf keine Elemente mehr ins Modell zurücklegen — nur Updates bestehender. (6) Panel-Löschen/Undo laufen inkrementell statt als Full-Reload (Gegenstück zum Add-Pfad vom 10.07.). (7) Die Poll-Event-Queue ist auf 512 gedeckelt und wird beim Page-Reload geleert (kein Stale-Burst in frische Seiten). Regressionstests in `test_visualizer_bauraum_ui.py`, `test_viz11_bridge_fixes.py` und QtWebEngine-Smoke (`test_explicit_delete_survives_repair_chain`).
+- **`state.js` blieb nach dem Test-Gate als CRLF-Geisteränderung dirty:** Der Cache-Buster-Smoke-Test las/schrieb das Modul ohne `newline=""` und konvertierte dabei die Zeilenenden. Roundtrip ist jetzt byte-treu.
+- `.gitignore`: Computer-Use-Debug-Screenshots (`artifacts_*.png`) werden nicht mehr als untracked Dateien angezeigt.
+
 ### 2026-07-10 — Bühnen-Editor hält die Auswahl beim Parameter-Edit stabil
 
 #### Behoben / Tests

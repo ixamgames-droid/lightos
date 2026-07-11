@@ -355,10 +355,51 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self._emit_until_true(
             lambda: self._bridge_obj.stageLoaded.emit(payload),
             "Object.keys(window.__lightos.stageObjects).length === 3", timeout_s=5.0)
-        self._eval("window.__lightos.clearStageObjects(); true")
+        # Verlust wie im echten Fehlerbild simulieren: WebGL-/Renderer-Ausfall
+        # verliert Objekte OHNE durch removeStageObject zu laufen. (Ein
+        # expliziter removeStageObject setzt seit 2026-07-11 bewusst einen
+        # Lösch-Tombstone, den die Reparatur respektiert — User-Löschungen
+        # dürfen nicht reanimiert werden.)
+        self._eval(
+            "(function(){ const s = window.__lightos.stageObjects; "
+            "for (const id of Object.keys(s)) delete s[id]; return true; })()")
         repaired = self._poll_until_true(
             "Object.keys(window.__lightos.stageObjects).length === 3", timeout_s=3.0)
         self.assertTrue(repaired, "Lokale Stage-Reparatur stellte fehlende IDs nicht wieder her")
+
+    def test_explicit_delete_survives_repair_chain(self):
+        """Die Repair-Kette darf eine explizite Löschung NICHT reanimieren.
+
+        Zombie-Guard 2026-07-11: der Repair-Loop eines Bulk-Loads läuft bis
+        ~720 ms nach dem Load mit dessen expectedObjects weiter. Löscht der
+        User in diesem Fenster ein Element, setzte die Kette es vorher wieder
+        in die Szene (Doppel-Lösch-Zombie). Der Lösch-Tombstone hält es raus.
+        """
+        self._load_and_wait()
+        import json
+        objects = [
+            {
+                "id": f"tomb-{i}", "type": typ, "name": f"Tomb {i}",
+                "position": {"x": i, "y": 1, "z": 0},
+                "size": {"x": 2, "y": 1, "z": 1}, "rotation": 0,
+                "color": "#334455",
+            }
+            for i, typ in enumerate(("floor", "platform", "truss_h"))
+        ]
+        payload = json.dumps({"objects": objects, "fixtures": [], "_reloadToken": 45})
+        self._emit_until_true(
+            lambda: self._bridge_obj.stageLoaded.emit(payload),
+            "Object.keys(window.__lightos.stageObjects).length === 3", timeout_s=5.0)
+        # Explizite Löschung im Repair-Fenster (Python-push → jsRemoveStageObject).
+        self._emit_until_true(
+            lambda: self._bridge_obj.removeStageObject.emit("tomb-1"),
+            "Object.keys(window.__lightos.stageObjects).length === 2", timeout_s=5.0)
+        # Repair-Kette komplett ausleben lassen (120 + 2×300 ms) …
+        _pump(1.2)
+        still_deleted = self._eval(
+            "Object.keys(window.__lightos.stageObjects).length === 2 "
+            "&& !window.__lightos.stageObjects['tomb-1']")
+        self.assertTrue(still_deleted, "Repair-Kette hat eine explizite Löschung reanimiert")
 
     def test_bulk_stage_load_via_poll_keeps_every_element(self):
         """Der produktive Pull-Kanal muss komplexe Bühnen vollständig liefern."""
@@ -381,6 +422,65 @@ class SceneModulesSmokeTest(unittest.TestCase):
         loaded = self._poll_until_true(
             "Object.keys(window.__lightos.stageObjects).length === 9", timeout_s=5.0)
         self.assertTrue(loaded, "Poll-Bulk-Ladung verlor mindestens ein Element")
+
+    def test_shadow_spot_budget_respects_texture_units(self):
+        """Grosse Rigs duerfen das Fragment-Shader-Texture-Limit nicht sprengen.
+
+        Live-Befund 2026-07-11 (crash.log 12:45, Adreno-GPU mit
+        MAX_TEXTURE_IMAGE_UNITS=16): 48 Fixtures = 40+ schattenwerfende
+        SpotLights -> jede Shadow-Map kostet eine Texture-Unit in JEDEM
+        beleuchteten Material -> kein Lit-Shader kompilierte mehr, die ganze
+        Buehne blieb unsichtbar (nur MeshBasic-Beams zeichneten noch).
+        Fix: nur die ersten N Spots werfen Schatten (N = maxTextures - Reserve,
+        deterministisch nach fid), Entfernen gibt Budget an den Rest zurueck.
+        """
+        self._load_and_wait()
+        import json
+        n = 30
+        payload = json.dumps([
+            {"fid": 800000 + i, "type": "moving_head", "x": i, "y": 6, "z": 0,
+             "r": 255, "g": 0, "b": 0, "intensity": 255}
+            for i in range(n)
+        ])
+        built = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            f"Object.keys(window.__lightos.fixtures).length === {n}",
+            timeout_s=10.0)
+        self.assertTrue(built, "Nicht alle 30 Fixtures wurden gebaut")
+
+        count_js = """
+            (function(){
+                const fx = window.__lightos.fixtures;
+                let spots = 0, shadows = 0;
+                for (const fid in fx) {
+                    const s = fx[fid].spot;
+                    if (s) { spots += 1; if (s.castShadow) shadows += 1; }
+                }
+                const gl = document.createElement('canvas').getContext('webgl');
+                const maxTex = gl ? gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) : 16;
+                return JSON.stringify({spots: spots, shadows: shadows, maxTex: maxTex});
+            })()
+        """
+        c = json.loads(self._eval(count_js))
+        budget = max(2, int(c["maxTex"]) - 6)
+        self.assertEqual(c["spots"], n, "Jedes generische Fixture braucht seinen SpotLight")
+        self.assertEqual(
+            c["shadows"], min(n, budget),
+            f"Shadow-Spots ({c['shadows']}) muessen exakt das Budget "
+            f"min({n}, {budget}) ausschoepfen — nicht mehr (Shader-Limit), "
+            f"nicht weniger (Optik ohne Not verschenkt)")
+
+        # Entfernen gibt Budget zurueck: nach dem Loeschen eines Fixtures
+        # bleibt die Verteilung exakt am (neuen) Limit.
+        removed = self._emit_until_true(
+            lambda: self._bridge_obj.fixtureRemoved.emit(800000),
+            f"Object.keys(window.__lightos.fixtures).length === {n - 1}",
+            timeout_s=5.0)
+        self.assertTrue(removed, "fixtureRemoved erreichte den 3D-View nicht")
+        c2 = json.loads(self._eval(count_js))
+        self.assertEqual(
+            c2["shadows"], min(n - 1, budget),
+            "Nach dem Entfernen wurde das Shadow-Budget nicht neu verteilt")
 
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der
@@ -448,7 +548,10 @@ class SceneModulesSmokeTest(unittest.TestCase):
         probe_path = os.path.normpath(os.path.join(
             os.path.dirname(__file__), "..", "src", "ui", "visualizer",
             "scene_src", "state.js"))
-        with open(probe_path, "r", encoding="utf-8") as f:
+        # newline="" bewahrt die exakten Zeilenenden — der Roundtrip dieses
+        # Tests hinterliess sonst eine CRLF-konvertierte state.js als
+        # Dauer-Dirty-Datei im Worktree (beobachtet 2026-07-11).
+        with open(probe_path, "r", encoding="utf-8", newline="") as f:
             original = f.read()
         self.assertIn("dockEnabled: false,", original, "Marker-Zeile in state.js nicht gefunden")
 
@@ -463,7 +566,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
             # Modul aendern: dockEnabled-Default auf true drehen.
             patched = original.replace("dockEnabled: false,", "dockEnabled: true,")
             self.assertNotEqual(patched, original)
-            with open(probe_path, "w", encoding="utf-8") as f:
+            with open(probe_path, "w", encoding="utf-8", newline="") as f:
                 f.write(patched)
 
             # Neu laden MIT frischem Cache-Buster (wie load_stage_html()).
@@ -477,7 +580,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
                 "Chromium hat scene_src/state.js aus dem Cache bedient trotz "
                 "NoCache-Profil-Setting + frischer ?v=-Query auf der HTML-URL.")
         finally:
-            with open(probe_path, "w", encoding="utf-8") as f:
+            with open(probe_path, "w", encoding="utf-8", newline="") as f:
                 f.write(original)
 
 

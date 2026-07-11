@@ -86,3 +86,6 @@ recordings/
 *.bak
 *.backup
 *.orig
+
+# ── Computer-Use-/Debug-Screenshots (Agenten-Sessions) ──────────────────────
+artifacts_*.png

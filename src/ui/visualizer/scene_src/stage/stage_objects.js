@@ -180,6 +180,7 @@ export function createStageObject(type, position, size, color, rotation, provide
   mesh.userData.stageId = id;
   mesh.userData.isStageObject = true;
   mesh.userData.stageType = type;
+  _userRemovedIds.delete(id);   // bewusstes Neu-Anlegen hebt den Lösch-Tombstone auf
   scene.add(mesh);
   stageObjects[id] = {
     mesh,
@@ -422,6 +423,7 @@ export function removeStageObject(id) {
   // remove-Aufrufe innerhalb von loadStageJson(). Nur ersterer darf Python
   // aus seinem autoritativen Bühnenmodell entfernen.
   if (!_isLoadingStage) {
+    _userRemovedIds.add(id);
     const bridge = bridgeRef.get();
     if (bridge && bridge.stageObjectDeleted) {
       try { bridge.stageObjectDeleted(id); } catch (e) {}
@@ -608,6 +610,13 @@ export function getStageJson() {
 // melden – das löst sonst N×Tree-Rebuilds aus.
 let _isLoadingStage = false;
 
+// Tombstones expliziter Löschungen seit dem letzten Bulk-Load: der
+// Repair-Loop (loadStageJson-finally) darf ein gerade erst gelöschtes
+// Element NICHT aus seinen veralteten expectedObjects reanimieren.
+// Ein erfolgreiches Neu-Anlegen derselben ID (Undo/Redo, Python-Reassert)
+// hebt den Tombstone wieder auf (createStageObject).
+const _userRemovedIds = new Set();
+
 // Review-Fix (Stage-Echo-Race): Sequenz-Token aus der zuletzt per
 // loadStageJson() empfangenen Buehnen-Definition ("_reloadToken", von
 // push_stage_definition() vergeben). JEDES notifyStageListChanged()-Echo
@@ -641,13 +650,24 @@ export function loadStageJson(json) {
   try {
     const data = incoming;
     if (typeof data._reloadToken === 'number') _currentStageReloadToken = data._reloadToken;
+    // Ein frischer autoritativer Load ueberschreibt alte Loesch-Tombstones:
+    // was Python jetzt pusht, gilt.
+    _userRemovedIds.clear();
     clearStageObjects();
     view.selectedStageId = null;
     clearResizeHandles();
     clearStageLabels();
     if (data.objects && Array.isArray(data.objects)) {
       data.objects.forEach(o => {
-        createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+        // Per-Element-Fangnetz: EIN defektes Element (z.B. Build-Throw bei
+        // GPU-Context-Loss) darf den restlichen Bulk-Bau nicht abreissen —
+        // sonst bleibt von einer 15-Element-Buehne nur Element #0 uebrig
+        // (Live-Befund 2026-07-11).
+        try {
+          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+        } catch (e) {
+          console.log('loadStageJson: Element uebersprungen', o && o.id, e);
+        }
       });
     }
     if (data.fixtures && Array.isArray(data.fixtures)) {
@@ -676,13 +696,28 @@ export function loadStageJson(json) {
     // zurückzunehmen.
     const expectedObjects = Array.isArray(incoming && incoming.objects)
       ? incoming.objects.slice() : [];
+    // Zombie-Guards (Review 2026-07-11): (1) ein NEUERER Load (anderer
+    // Token) macht diese Repair-Kette obsolet — sonst reanimiert sie
+    // Elemente der VORHERIGEN Buehne; (2) explizit geloeschte IDs
+    // (_userRemovedIds-Tombstone) bleiben geloescht; (3) per-Element-
+    // try/catch, damit ein Dauer-Thrower die restliche Reparatur und die
+    // Folgeversuche nicht abwuergt.
+    const armedToken = _currentStageReloadToken;
     let repairAttempt = 0;
     const repairIncompleteStage = () => {
-      const missing = expectedObjects.filter(o => o && o.id && !stageObjects[o.id]);
+      if (_currentStageReloadToken !== armedToken) return;
+      const missing = expectedObjects.filter(o => o && o.id
+        && !stageObjects[o.id] && !_userRemovedIds.has(o.id));
+      let repaired = 0;
       for (const o of missing) {
-        createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+        try {
+          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+          repaired += 1;
+        } catch (e) {
+          console.log('stage repair: Element uebersprungen', o && o.id, e);
+        }
       }
-      if (missing.length) notifyStageListChanged();
+      if (repaired) notifyStageListChanged();
       repairAttempt += 1;
       if (repairAttempt < 3) setTimeout(repairIncompleteStage, 300);
     };

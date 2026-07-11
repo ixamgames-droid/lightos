@@ -142,6 +142,92 @@ class StageSelectionStateTest(unittest.TestCase):
             [truss.id, wall.id],
         )
 
+    def test_reassert_gives_up_after_three_attempts_and_unfreezes_sync(self):
+        """Ein dauerhaft nicht baubares JS-Element darf die Session nicht einfrieren.
+
+        Live-Befund 2026-07-11: wirft ein Element-Build auf der GPU-gestressten
+        Seite dauerhaft, echo't JS immer dieselbe Teilmenge. Der Early-Return
+        blockierte dann Selektion + Positions-Sync für den Rest der Session.
+        Nach 3 Nachsende-Versuchen muss der Sync für die baubaren Elemente
+        weiterlaufen (Python behält die fehlenden autoritativ im Modell).
+        """
+        from src.core.stage.stage_definition import StageDefinition
+
+        stage = StageDefinition(name="Zäh")
+        floor = stage.add("floor", name="Boden")
+        truss = stage.add("truss_h", name="Truss")
+        bridge = MagicMock()
+        bridge._reloading_stage = False
+        fake = SimpleNamespace(
+            _current_stage=stage,
+            _pending_stage_ids=frozenset({floor.id, truss.id}),
+            _last_stage_reassert_ids=None,
+            _bridge=bridge,
+            _selected_stage_id="",
+            _stage_dirty=False,
+            _suppress_property_signals=False,
+            _sync_stage_node_to_scene=MagicMock(),
+            _push_stage_rotation_to_children=MagicMock(),
+            _refresh_stage_tree=MagicMock(),
+            _update_status_counts=MagicMock(),
+            _selected_stage_element=lambda: None,
+            _stage_name_edit=QLineEdit(),
+            _stage_spin_x=QSpinBox(), _stage_spin_y=QSpinBox(),
+            _stage_spin_z=QSpinBox(), _stage_spin_w=QSpinBox(),
+            _stage_spin_h=QSpinBox(), _stage_spin_d=QSpinBox(),
+            _stage_spin_rot=QSpinBox(),
+        )
+
+        echo = [dict(floor.to_js_dict(), position={"x": 9.0, "y": 0.0, "z": 0.0})]
+        # Versuche 1-3: identische Teilmenge -> jeweils Nachsenden + Early-Return.
+        for _ in range(3):
+            VW.VisualizerWindow._on_stage_list_from_js(fake, echo, is_stale=False)
+            self.assertEqual({e.id for e in stage.elements}, {floor.id, truss.id})
+        self.assertEqual(bridge.push_add_stage_object_data.call_count, 3)
+        self.assertEqual(floor.x, 0.0)   # Early-Return: Update noch nicht angewandt
+
+        # Versuch 4: aufgeben -> Gate öffnen, Update der baubaren Elemente läuft.
+        VW.VisualizerWindow._on_stage_list_from_js(fake, echo, is_stale=False)
+        self.assertIsNone(fake._pending_stage_ids)
+        self.assertEqual(floor.x, 9.0)
+        # Truss bleibt autoritativ im Modell (kein Löschen durch Teilmenge).
+        self.assertEqual({e.id for e in stage.elements}, {floor.id, truss.id})
+
+    def test_stale_echo_cannot_resurrect_unknown_elements(self):
+        """Ein überholtes Echo (alter Token) darf keine Elemente wiederbeleben."""
+        from src.core.stage.stage_definition import StageDefinition
+
+        stage = StageDefinition(name="Aktuell")
+        keep = stage.add("floor", name="Boden")
+        ghost = {
+            "id": "el_geloescht", "type": "platform", "name": "Zombie",
+            "position": {"x": 0, "y": 0, "z": 0},
+            "size": {"x": 1, "y": 1, "z": 1}, "rotation": 0, "color": "#123456",
+        }
+        fake = SimpleNamespace(
+            _current_stage=stage,
+            _pending_stage_ids=None,
+            _last_stage_reassert_ids=None,
+            _selected_stage_id="",
+            _stage_dirty=False,
+            _suppress_property_signals=False,
+            _sync_stage_node_to_scene=MagicMock(),
+            _push_stage_rotation_to_children=MagicMock(),
+            _refresh_stage_tree=MagicMock(),
+            _update_status_counts=MagicMock(),
+            _selected_stage_element=lambda: None,
+            _stage_name_edit=QLineEdit(),
+            _stage_spin_x=QSpinBox(), _stage_spin_y=QSpinBox(),
+            _stage_spin_z=QSpinBox(), _stage_spin_w=QSpinBox(),
+            _stage_spin_h=QSpinBox(), _stage_spin_d=QSpinBox(),
+            _stage_spin_rot=QSpinBox(),
+        )
+
+        VW.VisualizerWindow._on_stage_list_from_js(
+            fake, [keep.to_js_dict(), ghost], is_stale=True)
+
+        self.assertEqual({e.id for e in stage.elements}, {keep.id})
+
     def test_js_selection_is_ignored_while_a_stage_property_is_edited(self):
         """Ein nachlaufendes 3D-Echo darf die Texteingabe nicht umhängen."""
         focused = QSpinBox()
@@ -162,6 +248,79 @@ class StageSelectionStateTest(unittest.TestCase):
 
         self.assertEqual(fake._selected_stage_id, "edited-stage")
         focused.close()
+
+
+class StageObjectDeletedGuardTest(unittest.TestCase):
+    """stageObjectDeleted ist die einzige Modell-Schrumpf-Tür — sie braucht
+    dieselben Stale-/Reload-Guards wie der stageListChanged-Reconcile."""
+
+    def _fake(self, stage, bridge, pending=None):
+        return SimpleNamespace(
+            _current_stage=stage,
+            _bridge=bridge,
+            _pending_stage_ids=pending,
+            _selected_stage_id="",
+            _stage_dirty=False,
+            _remove_stage_node_from_scene=MagicMock(),
+            _refresh_stage_tree=MagicMock(),
+            _update_status_counts=MagicMock(),
+        )
+
+    def _stage_with_truss(self):
+        from src.core.stage.stage_definition import StageDefinition
+        stage = StageDefinition(name="Del-Test")
+        el = stage.add("truss_h", name="Truss")
+        return stage, el
+
+    def test_user_delete_applies(self):
+        stage, el = self._stage_with_truss()
+        bridge = MagicMock()
+        bridge._reloading_stage = False
+        bridge._poll_events = []
+        fake = self._fake(stage, bridge)
+
+        VW.VisualizerWindow._on_stage_object_deleted_from_js(fake, el.id)
+
+        self.assertEqual(stage.elements, [])
+        self.assertTrue(fake._stage_dirty)
+
+    def test_delete_echo_ignored_during_reload(self):
+        stage, el = self._stage_with_truss()
+        bridge = MagicMock()
+        bridge._reloading_stage = True
+        bridge._poll_events = []
+        fake = self._fake(stage, bridge)
+
+        VW.VisualizerWindow._on_stage_object_deleted_from_js(fake, el.id)
+
+        self.assertEqual([e.id for e in stage.elements], [el.id])
+
+    def test_delete_echo_ignored_for_pending_reload_ids(self):
+        stage, el = self._stage_with_truss()
+        bridge = MagicMock()
+        bridge._reloading_stage = False
+        bridge._poll_events = []
+        fake = self._fake(stage, bridge, pending=frozenset({el.id}))
+
+        VW.VisualizerWindow._on_stage_object_deleted_from_js(fake, el.id)
+
+        self.assertEqual([e.id for e in stage.elements], [el.id])
+
+    def test_delete_echo_ignored_when_readd_is_queued(self):
+        """Undo/Redo-Interleaving: ein überholtes Lösch-Echo darf ein gerade
+        wieder angefordertes Element nicht aus dem Modell entfernen."""
+        import json as _json
+        stage, el = self._stage_with_truss()
+        bridge = MagicMock()
+        bridge._reloading_stage = False
+        bridge._poll_events = [
+            {"t": "addStageData", "j": _json.dumps({"id": el.id})},
+        ]
+        fake = self._fake(stage, bridge)
+
+        VW.VisualizerWindow._on_stage_object_deleted_from_js(fake, el.id)
+
+        self.assertEqual([e.id for e in stage.elements], [el.id])
 
 
 class DeleteStageTest(unittest.TestCase):
