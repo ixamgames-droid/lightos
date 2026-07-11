@@ -50,7 +50,9 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
 renderer.shadowMap.enabled = true;
 // PCFSoft sampelt deutlich mehr Shadow-Taps pro Pixel als plain PCF.
 renderer.shadowMap.type = isLowSpec ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-console.log('[viz] GPU-Tier: ' + gpuTier
+// console.warn statt .log: Qt spiegelt nur Warning/Error-Konsolenzeilen ins
+// crash.log — so ist die Tier-Entscheidung auch nachtraeglich diagnostizierbar.
+console.warn('[viz] GPU-Tier: ' + gpuTier
   + ' (maxTextures=' + renderer.capabilities.maxTextures
   + ', pixelRatioCap=' + PIXEL_RATIO_CAP
   + ', antialias=' + String(!isLowSpec) + ')');
