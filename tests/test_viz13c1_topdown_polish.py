@@ -99,7 +99,8 @@ def _pump(seconds):
         time.sleep(_POLL_INTERVAL_S)
 
 
-# Test-Rig: 1 PAR, 1 PAR-Bar (4 Zellen), 1 Mover-Bar (4 Zellen), 1 MH, 1 Spider.
+# Test-Rig: 1 PAR, 1 PAR-Bar (4 Zellen), 1 Mover-Bar (4 Zellen), 1 MH,
+# 1 Spider und 1 explizites `other`-Importgeraet (FLA-4).
 _FIXTURES_PAYLOAD = json.dumps([
     {"fid": 11, "type": "par", "x": 0, "y": 2, "z": 0,
      "r": 0, "g": 0, "b": 0, "intensity": 0},
@@ -111,6 +112,8 @@ _FIXTURES_PAYLOAD = json.dumps([
      "x": 6, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
     {"fid": 15, "type": "moving_head", "model": "spider",
      "x": 8, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+    {"fid": 16, "type": "other",
+     "x": 10, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
 ])
 
 
@@ -191,7 +194,7 @@ class TopDownPolishTest(unittest.TestCase):
     def _add_test_fixtures(self):
         self._emit_until_true(
             lambda: self._bridge_obj.allFixtures.emit(_FIXTURES_PAYLOAD),
-            "typeof window.__lightos.fixtures['15'] === 'object'", timeout_s=8.0)
+            "typeof window.__lightos.fixtures['16'] === 'object'", timeout_s=8.0)
 
     # ── 1+2) Kontrast + Typ-Glyphen ────────────────────────────────────────────
     def test_icons_outline_cells_and_unlit_fill(self):
@@ -210,22 +213,36 @@ class TopDownPolishTest(unittest.TestCase):
                     });
                     const cells = f.icon.userData.cells ? f.icon.userData.cells.length : 0;
                     const bodyHex = f.icon.userData.body.material.color.getHex();
+                    const bodyGeometry = f.icon.userData.body.geometry.type;
                     const ring = f.icon.userData.ring;
+                    let fixtureModel = null;
+                    let modelDrawables = 0;
+                    f.group.traverse(o => {
+                        if (o.userData && o.userData.fixtureModel) {
+                            fixtureModel = o.userData.fixtureModel;
+                        }
+                        if (fixtureModel === 'other' && (o.isMesh || o.isLine)) {
+                            modelDrawables++;
+                        }
+                    });
                     const ringNoRaycast = !!ring
                         && String(ring.raycast).replace(/\\s/g, '').endsWith('{}');
                     return { outlines: outlines, cells: cells, bodyHex: bodyHex,
                              hasRing: !!ring, opaqueLines: opaqueLines,
                              ringNoRaycast: ringNoRaycast,
-                             iconYaw: f.icon.rotation.y };
+                             iconYaw: f.icon.rotation.y, bodyGeometry: bodyGeometry,
+                             fixtureModel: fixtureModel,
+                             hasLamp: !!f.lamp, hasLens: !!f.lens,
+                             hasBeam: !!f.beam, modelDrawables: modelDrawables };
                 }
                 return JSON.stringify({
                     par: info('11'), parBar: info('12'), moverBar: info('13'),
-                    mh: info('14'), spider: info('15'),
+                    mh: info('14'), spider: info('15'), other: info('16'),
                 });
             })()
         """)
         d = json.loads(raw)
-        for key in ("par", "parBar", "moverBar", "mh", "spider"):
+        for key in ("par", "parBar", "moverBar", "mh", "spider", "other"):
             self.assertIsNotNone(d[key], f"Icon fuer {key} fehlt")
             self.assertGreaterEqual(d[key]["outlines"], 1, f"{key}: kein permanenter Umriss")
             self.assertTrue(d[key]["hasRing"], f"{key}: Selektionsring fehlt")
@@ -247,6 +264,16 @@ class TopDownPolishTest(unittest.TestCase):
         self.assertEqual(d["parBar"]["cells"], 4)
         self.assertEqual(d["moverBar"]["cells"], 4)
         self.assertEqual(d["spider"]["cells"], 2)
+        # `other` ist ein eigener Registry-/Icon-Pfad, nicht mehr buildPar().
+        self.assertEqual(d["other"]["fixtureModel"], "other")
+        self.assertTrue(d["other"]["hasLamp"])
+        self.assertFalse(d["other"]["hasLens"])
+        # Rein kosmetischer Modellwechsel: der bisherige Single-Head-Beam-
+        # Vertrag bleibt fuer lichtemittierende Effect/Other-Importe erhalten.
+        self.assertTrue(d["other"]["hasBeam"])
+        self.assertEqual(d["other"]["bodyGeometry"], "PlaneGeometry")
+        self.assertEqual(d["par"]["bodyGeometry"], "CircleGeometry")
+        self.assertLessEqual(d["other"]["modelDrawables"], 16)
         # Unbelichtet (intensity 0): heller Unlit-Fill statt 0x3a3a4a.
         self.assertEqual(d["par"]["bodyHex"], ICON_UNLIT_FILL)
         self.assertEqual(d["mh"]["bodyHex"], ICON_UNLIT_FILL)
@@ -300,6 +327,20 @@ class TopDownPolishTest(unittest.TestCase):
             lambda: self._bridge_obj.dmxBatch.emit(par_off),
             f"window.__lightos.fixtures['11'].icon.userData.body"
             f".material.color.getHex() === {ICON_UNLIT_FILL}", timeout_s=8.0)
+
+        # FLA-4: Statusfeld und eigenes quadratisches Top-Down-Icon folgen dem
+        # bestehenden generischen DMX-Vertrag (nur die Geometrie ist neu).
+        other_on = json.dumps([{
+            "fid": 16, "r": 40, "g": 120, "b": 255, "intensity": 200,
+        }])
+        self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(other_on),
+            "window.__lightos.fixtures['16'].lamp.material.emissive.getHex() "
+            "=== 0x2878ff", timeout_s=8.0)
+        self.assertEqual(
+            self._eval("window.__lightos.fixtures['16'].icon.userData.body"
+                       ".material.color.getHex()"),
+            0x2878FF)
 
     # ── 3) Footer-Hint ─────────────────────────────────────────────────────────
     def test_footer_hint_follows_view_mode(self):

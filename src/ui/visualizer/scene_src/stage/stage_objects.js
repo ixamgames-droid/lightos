@@ -3,7 +3,7 @@
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
-import { loadModel, fitModelToSize } from '../scene/model_loader.js';
+import { loadModel } from '../scene/model_loader.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { raycaster, mouse } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
@@ -11,6 +11,38 @@ import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 // stageObjIdCounter bleibt hier (kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" - nur von createStageObject genutzt).
 let stageObjIdCounter = 1;
+
+// Das Blender-Asset `truss_square_2m.obj` liegt mit seiner 2-m-Laengsachse
+// auf lokal Z (Bounds ca. 0.302 x 0.300 x 2.000 m). Erst das Kind ausrichten,
+// dann einen aeusseren Wrapper in den Weltachsen skalieren. Direktes
+// fitModelToSize() auf dem ungedrehten Modell machte bisher aus dem 30-cm-
+// Querschnitt die 4-m-Laengsachse und stauchte die echten Gurte/Diagonalen.
+function prepareTrussModel(model, size, targetAxis) {
+  const fitted = new THREE.Group();
+  fitted.userData.isFittedTrussModel = true;
+  fitted.userData.sourceLongAxis = 'z';
+  fitted.userData.targetLongAxis = targetAxis;
+  fitted.add(model);
+
+  if (targetAxis === 'x') model.rotation.y = Math.PI / 2;       // Z -> X
+  else if (targetAxis === 'y') model.rotation.x = -Math.PI / 2; // Z -> Y
+
+  fitted.updateMatrixWorld(true);
+  let bbox = new THREE.Box3().setFromObject(model);
+  const center = bbox.getCenter(new THREE.Vector3());
+  // `fitted` ist hier noch identisch zu den Weltachsen; der Box-Mittelpunkt
+  // kann daher direkt als lokale Kind-Translation abgezogen werden.
+  model.position.sub(center);
+  fitted.updateMatrixWorld(true);
+  bbox = new THREE.Box3().setFromObject(model);
+  const measured = bbox.getSize(new THREE.Vector3());
+  fitted.scale.set(
+    size.x / Math.max(measured.x, 1e-6),
+    size.y / Math.max(measured.y, 1e-6),
+    size.z / Math.max(measured.z, 1e-6)
+  );
+  return fitted;
+}
 
 export const STAGE_BLUEPRINTS = {
   floor: {
@@ -53,7 +85,6 @@ export const STAGE_BLUEPRINTS = {
       group.userData.size = { x: size.x, y: size.y, z: size.z };
       loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
         if (!model) return;
-        fitModelToSize(model, size);
         model.traverse(c => {
           if (c.isMesh) {
             c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
@@ -64,7 +95,7 @@ export const STAGE_BLUEPRINTS = {
         group.remove(placeholder);
         if (placeholder.geometry) placeholder.geometry.dispose();
         if (placeholder.material) placeholder.material.dispose();
-        group.add(model);
+        group.add(prepareTrussModel(model, size, 'x'));
         // 3c-2: ASYNCHRONER Modell-Tausch (Platzhalter -> OBJ) kommt NACH dem
         // createStageObject-Frame an — ohne eigenen requestRender bliebe der
         // Platzhalter-Quader bis zum naechsten fremden Render sichtbar.
@@ -91,10 +122,6 @@ export const STAGE_BLUEPRINTS = {
       group.userData.size = { x: size.x, y: size.y, z: size.z };
       loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
         if (!model) return;
-        // truss_square_2m.obj has its long axis along X. Rotate 90deg around Z so it becomes Y-vertical.
-        model.rotation.z = Math.PI / 2;
-        // After rotation, X<->Y swap for sizing; pass swapped target.
-        fitModelToSize(model, { x: size.y, y: size.x, z: size.z });
         model.traverse(c => {
           if (c.isMesh) {
             c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
@@ -105,7 +132,7 @@ export const STAGE_BLUEPRINTS = {
         group.remove(placeholder);
         if (placeholder.geometry) placeholder.geometry.dispose();
         if (placeholder.material) placeholder.material.dispose();
-        group.add(model);
+        group.add(prepareTrussModel(model, size, 'y'));
         requestRender();  // 3c-2: asynchroner Modell-Tausch (s. truss_h)
       });
       return group;

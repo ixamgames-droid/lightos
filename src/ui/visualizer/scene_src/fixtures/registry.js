@@ -9,7 +9,7 @@
 // Payload byte-identisch zum dmxBatch des VisualizerService).
 import {
   buildMovingHead, buildSpider, buildPar, buildLedBar, buildStrobe,
-  buildDimmer, buildScanner, buildSmoke, buildHazer, buildLaser, buildParBar, buildMoverBar,
+  buildDimmer, buildOther, buildScanner, buildSmoke, buildHazer, buildLaser, buildParBar, buildMoverBar,
   updateSpiderDmx, updateParBarDmx, updateMoverBarDmx, updateMovingHeadDmx, updateGenericDmx,
 } from './builders.js';
 
@@ -22,6 +22,7 @@ const REGISTRY = {
   led_bar:     { build: ()  => buildLedBar(),                       updateDmx: updateGenericDmx },
   strobe:      { build: ()  => buildStrobe(),                       updateDmx: updateGenericDmx },
   dimmer:      { build: ()  => buildDimmer(),                       updateDmx: updateGenericDmx },
+  other:       { build: ()  => buildOther(),                        updateDmx: updateGenericDmx },
   scanner:     { build: ()  => buildScanner(),                      updateDmx: updateMovingHeadDmx }, // FM-1: Spiegel folgt Pan/Tilt
   // smoke/hazer BEWUSST generisch statt No-Op: ihr Indikator-Lamp (f.lamp)
   // und ihr 2D-Icon folgen im Monolith der DMX-Farbe — das bleibt erhalten.

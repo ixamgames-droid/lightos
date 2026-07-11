@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-12 — Fehlendes Other-Modell ergänzt, Truss-Geometrie entzerrt
+
+#### Neu / Verbessert / Tests
+
+- **Eigene 3D-Darstellung für importierte Geräte der Klasse `other` (FLA-4):** Fan/Effect/Other-Profile fallen nicht länger auf die runde PAR-Geometrie zurück, sondern erhalten ein neutrales technisches Gehäuse mit Haltebügel, Statusfeld, Ident-Glyph und Lüftungsdetails. Der bestehende Single-Head-/DMX-Vertrag bleibt bewusst erhalten; beliebige Legacy-Typstrings wie `color` nutzen weiterhin den kompatiblen PAR-Fallback. Das Modell ist auf höchstens 16 Drawables inklusive Beam begrenzt. Dieselbe Klasse hat jetzt ein eigenes quadratisches Fragezeichen-Symbol im 3D-Top-Down-Plan, in der nativen 2D-Live-View und in Listen/Bäumen. Runtime-Regression in `test_viz13c1_topdown_polish.py`, Symbol-Smoke in `test_viz_model_routing.py`/`test_mini_icons.py`.
+- **Traversen behalten ihre echte Geometrie:** `truss_square_2m.obj` ist mit der 2-m-Längsachse auf lokal Z modelliert (nicht X). Horizontal und vertikal wird das Kind jetzt zuerst Z→X beziehungsweise Z→Y orientiert und anschließend über einen äußeren Wrapper in Weltachsen skaliert. Dadurch stimmen die Zielmaße weiterhin exakt (`4 × 0,3 × 0,3 m` bzw. `0,3 × 4 × 0,3 m`), ohne den 30-cm-Querschnitt um Faktor ~13 zur Länge zu verzerren und die echten Gurte/Diagonalen zusammenzustauchen. Der echte QtWebEngine-/OBJ-Test prüft Bounds, Quell-/Zielachse, Rotation und einen moderaten Skalierungsquotienten (`test_truss_obj_uses_its_real_z_long_axis`).
+
 ### 2026-07-11 — Render-Qualität wählbar: Automatik + manueller Override (VIZ-15 Teil)
 
 #### Neu / Tests

@@ -319,6 +319,26 @@ def _draw_dimmer(p: QPainter, s: int, color):
     p.drawLine(QPointF(s * 0.57, s * 0.7), QPointF(s * 0.57, s * 0.82))
 
 
+def _draw_other(p: QPainter, s: int, color):
+    """Neutrales Import-Geraet: technisches Gehaeuse mit Fragezeichen."""
+    col = _qc(color)
+    p.setPen(QPen(col.lighter(155), max(1.0, s * 0.065)))
+    p.setBrush(QBrush(col.darker(145)))
+    p.drawRoundedRect(QRectF(s * 0.14, s * 0.16, s * 0.72, s * 0.68),
+                      s * 0.08, s * 0.08)
+    # Kleine obere Halteschiene macht das Symbol als technisches Geraet lesbar.
+    p.setBrush(QBrush(col.darker(120)))
+    p.drawRoundedRect(QRectF(s * 0.25, s * 0.08, s * 0.50, s * 0.12),
+                      s * 0.04, s * 0.04)
+    font = QFont("Arial")
+    font.setBold(True)
+    font.setPixelSize(max(7, int(s * 0.50)))
+    p.setFont(font)
+    p.setPen(QPen(col.lighter(190), max(1.0, s * 0.04)))
+    p.drawText(QRectF(s * 0.14, s * 0.20, s * 0.72, s * 0.58),
+               Qt.AlignmentFlag.AlignCenter, "?")
+
+
 def _draw_scanner(p: QPainter, s: int, color):
     """Scanner: Spiegel auf Sockel mit Lichtstrahl."""
     col = _qc(color)
@@ -496,7 +516,7 @@ _PAINTERS = {
     "fx_smoke":       (_draw_smoke,       _FX_SMOKE),
     "fx_hazer":       (_draw_hazer,       _FX_HAZER),
     "fx_spider":      (_draw_spider,      _FX_SPIDER),
-    "fx_other":       (_draw_dot,         _FX_OTHER),
+    "fx_other":       (_draw_other,       _FX_OTHER),
 }
 
 

@@ -112,6 +112,9 @@ class BarSymbolRenderSmokeTest(unittest.TestCase):
     def test_mover_bar_draws(self):
         self._draw("mover_bar")
 
+    def test_other_draws(self):
+        self._draw("other")
+
 
 class BarListIconRoutingTest(unittest.TestCase):
     """mini_icons.fixture_icon_for routet par_bar/mover_bar/spider ueber das
@@ -121,6 +124,11 @@ class BarListIconRoutingTest(unittest.TestCase):
         import src.ui.widgets.mini_icons as MI
         self.assertIn("fx_par_bar", MI._PAINTERS)
         self.assertIn("fx_mover_bar", MI._PAINTERS)
+
+    def test_other_uses_dedicated_painter(self):
+        import src.ui.widgets.mini_icons as MI
+        self.assertIs(MI._PAINTERS["fx_other"][0], MI._draw_other)
+        self.assertIsNot(MI._PAINTERS["fx_other"][0], MI._draw_dot)
 
     def _routed_kind(self, model):
         import src.ui.widgets.mini_icons as MI
