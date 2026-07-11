@@ -24,13 +24,18 @@ _VECTOR_E131_DATA_PACKET = 0x00000002
 _VECTOR_DMP_SET_PROPERTY = 0x02
 _DMP_ADDR_DATA_TYPE = 0xA1   # 1-byte addressing, increment 1
 _E131_DEFAULT_PRIORITY = 100
+# OUT-06: Options-Bit 6 = "Stream_Terminated" (E1.31-2018 6.2.6). Beim close() 3x mit
+# gesetztem Bit senden -> Empfaenger verwerfen die Quelle SOFORT, statt ~2,5 s auf den
+# Network-Data-Loss-Timeout zu warten (haengende Kanaele beim Adapter-Wechsel).
+_OPT_STREAM_TERMINATED = 0x40
 
 # PDU-Flags: oberes Nibble 0x7 (Längen/Vector/Header-Flags gesetzt), die unteren
 # 12 Bit tragen die PDU-Länge (inkl. des Flags+Length-Feldes selbst).
 _PDU_FLAGS = 0x7000
 
 
-def _pack_framing(data: bytes, universe: int, seq: int, source: str, cid: bytes) -> bytes:
+def _pack_framing(data: bytes, universe: int, seq: int, source: str, cid: bytes,
+                  options: int = 0x00) -> bytes:
     """Baut ein spec-konformes sACN-(E1.31-)Datenpaket fuer ein Universum.
 
     Layout (ANSI E1.31-2018) fuer 512 DMX-Kanaele = 638 Byte:
@@ -62,7 +67,7 @@ def _pack_framing(data: bytes, universe: int, seq: int, source: str, cid: bytes)
     framing += struct.pack("!B", _E131_DEFAULT_PRIORITY)    # Priority
     framing += struct.pack("!H", 0x0000)                    # Synchronization Address
     framing += struct.pack("!B", seq & 0xFF)                # Sequence Number
-    framing += struct.pack("!B", 0x00)                      # Options
+    framing += struct.pack("!B", options & 0xFF)            # Options
     framing += struct.pack("!H", universe & 0xFFFF)         # Universe
 
     # DMP-Layer
@@ -113,20 +118,38 @@ class SACNSender:
         except struct.error:
             return
 
-        if self._target_ip:
-            dest = (self._target_ip, SACN_PORT)
-        else:
-            # E1.31 Multicast: 239.255.<Universe-High>.<Universe-Low>
-            hi = (universe >> 8) & 0xFF
-            lo = universe & 0xFF
-            dest = (f"239.255.{hi}.{lo}", SACN_PORT)
-
         try:
-            self._sock.sendto(packet, dest)
+            self._sock.sendto(packet, self._dest(universe))
         except OSError:
             pass
 
+    def _dest(self, universe: int):
+        if self._target_ip:
+            return (self._target_ip, SACN_PORT)
+        # E1.31 Multicast: 239.255.<Universe-High>.<Universe-Low>
+        hi = (universe >> 8) & 0xFF
+        lo = universe & 0xFF
+        return (f"239.255.{hi}.{lo}", SACN_PORT)
+
     def close(self):
-        if self._sock:
-            self._sock.close()
-            self._sock = None
+        if self._sock is None:
+            return
+        # OUT-06: E1.31-Stream-Termination — je zuletzt bespieltem Universum 3 Pakete
+        # mit gesetztem Stream_Terminated-Options-Bit senden, damit Empfaenger die
+        # Quelle sofort verwerfen (statt ~2,5 s Network-Data-Loss-Timeout). Ohne das
+        # blieben beim Adapter-Wechsel kurz zwei Quellen aktiv (bekannte Merge-Luecke).
+        for universe in list(self._seq.keys()):
+            seq = self._seq.get(universe, 0)
+            try:
+                pkt = _pack_framing(bytes(512), universe, seq, self._source_name,
+                                    self._cid, options=_OPT_STREAM_TERMINATED)
+            except struct.error:
+                continue
+            dest = self._dest(universe)
+            for _ in range(3):
+                try:
+                    self._sock.sendto(pkt, dest)
+                except OSError:
+                    break
+        self._sock.close()
+        self._sock = None
