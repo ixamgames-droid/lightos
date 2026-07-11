@@ -654,7 +654,10 @@ class SimpleDeskView(QWidget):
 
         header.addWidget(QLabel("Universe:"))
         self._uni_combo = QComboBox()
-        self._uni_combo.addItems(["Universe 1", "Universe 2", "Universe 3", "Universe 4"])
+        # Alle 32 unterstuetzten Universen (nicht nur 1-4): sonst zeigte ein Klick
+        # auf ein Fixture in Universe 5+ in der Geraeteuebersicht die Fader des
+        # AKTUELL angezeigten Universe (falsches Universe, stiller Fehlgriff).
+        self._uni_combo.addItems([f"Universe {i}" for i in range(1, 33)])
         self._uni_combo.currentIndexChanged.connect(self._universe_changed)
         self._uni_combo.setFixedWidth(120)
         header.addWidget(self._uni_combo)
@@ -879,7 +882,7 @@ class SimpleDeskView(QWidget):
 
     def _on_overview_fixture(self, universe: int, address: int, count: int):
         """Klick in der Geräteübersicht → ggf. Universe wechseln, dann Fader zeigen."""
-        if 1 <= universe <= 4 and universe != self._universe:
+        if 1 <= universe <= self._uni_combo.count() and universe != self._universe:
             self._uni_combo.setCurrentIndex(universe - 1)  # löst _universe_changed aus
             QTimer.singleShot(60, lambda a=address, c=count: self._reveal_fixture(a, c))
         else:
@@ -887,7 +890,7 @@ class SimpleDeskView(QWidget):
 
     def _on_overview_universe(self, universe: int):
         """Overview-Filter auf ein konkretes Universe gestellt → Fader ziehen mit."""
-        if universe and 1 <= universe <= 4 and universe != self._universe:
+        if universe and 1 <= universe <= self._uni_combo.count() and universe != self._universe:
             self._uni_combo.setCurrentIndex(universe - 1)
 
     def _on_band_clicked(self, start_channel: int):
