@@ -195,13 +195,35 @@ def _render_status_name(status) -> str:
         return str(status)
 
 
+def quality_tier_pref() -> str:
+    """Geräte-gebundene Qualitätsstufe aus ui_prefs.json: 'auto'|'high'|'low'.
+
+    Bewusst in den Geräte-Prefs statt in der Show: die Stufe hängt an der
+    GPU dieses Rechners, eine Show wandert dagegen zwischen Maschinen.
+    'auto' = die JS-seitige Probe (renderer.js#probeGpuTier) entscheidet.
+    """
+    try:
+        from src.ui.views.programmer_view import _load_prefs
+        val = str(_load_prefs().get("viz_quality_tier", "auto")).lower()
+        return val if val in ("auto", "high", "low") else "auto"
+    except Exception:
+        return "auto"
+
+
 def load_stage_html(view) -> None:
     """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
     auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
-    aus einem alten Chromium-Cache kommt."""
+    aus einem alten Chromium-Cache kommt. Eine manuell erzwungene Qualitäts-
+    stufe reist als ``gputier``-Query mit — derselbe Override-Mechanismus, den
+    auch die Tests nutzen; er greift damit für ALLE Targets (Vollfenster,
+    eingebettete Live-View-3D, Crash-Guard-Selbstheilung, Szene-neu-laden)."""
     try:
         url = QUrl.fromLocalFile(HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        query = f"v={int(time.time() * 1000)}"
+        tier = quality_tier_pref()
+        if tier != "auto":
+            query += f"&gputier={tier}"
+        url.setQuery(query)
         view.load(url)
     except Exception as e:
         print(f"[Visualizer] HTML load error: {e}")
@@ -314,6 +336,7 @@ class VisualizerBridge(QObject):
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
     pyStageObjectDeleted    = Signal(str)
+    pyGpuTierReported       = Signal(str)     # VIZ-15: aktive Qualitätsstufe der Szene ('low'|'high')
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
@@ -987,6 +1010,14 @@ class VisualizerBridge(QObject):
         """Explizite 3D-Loeschung, getrennt von unvollstaendigen Snapshots."""
         if sid:
             self.pyStageObjectDeleted.emit(str(sid))
+
+    @Slot(str)
+    @_bridge_slot_guard
+    def reportGpuTier(self, tier: str):
+        """JS meldet beim Channel-Connect die aktive Qualitätsstufe der Szene
+        (Probe- oder Override-Ergebnis) — fürs Einstellungen-Tab-Label."""
+        if tier:
+            self.pyGpuTierReported.emit(str(tier))
 
     @Slot()
     @_bridge_slot_guard
@@ -1812,6 +1843,37 @@ class VisualizerWindow(QMainWindow):
         w = QWidget()
         layout = QVBoxLayout(w)
 
+        # ── Qualitätsstufe (VIZ-15: Automatik + manueller Override) ─────────
+        quality_group = QGroupBox("Render-Qualität")
+        q_layout = QVBoxLayout(quality_group)
+        q_row = QHBoxLayout()
+        q_row.addWidget(QLabel("Stufe:"))
+        self._combo_quality = QComboBox()
+        self._combo_quality.addItem("Automatisch (empfohlen)", "auto")
+        self._combo_quality.addItem("Hoch (Desktop-GPU)", "high")
+        self._combo_quality.addItem("Niedrig (schwache/mobile GPU)", "low")
+        self._combo_quality.setToolTip(
+            "Automatisch: beim Start wird die Grafikkarte geprüft und die Stufe\n"
+            "passend gewählt (schwache Chips wie im Surface → Niedrig).\n"
+            "Manuell überschreiben, falls die Erkennung danebenliegt.\n\n"
+            "Niedrig = ohne Kantenglättung, reduzierte Auflösung/Schatten/Kegel\n"
+            "(flüssiger), Hoch = volle Optik. Gilt für dieses Gerät, nicht pro Show."
+        )
+        tier_pref = quality_tier_pref()
+        self._combo_quality.setCurrentIndex(
+            {"auto": 0, "high": 1, "low": 2}.get(tier_pref, 0))
+        self._combo_quality.currentIndexChanged.connect(self._on_quality_tier_changed)
+        q_row.addWidget(self._combo_quality, 1)
+        # Wird über den Bridge-Slot reportGpuTier befüllt — zeigt die AKTIVE
+        # Stufe der laufenden Szene (bei "Automatisch" = das Probe-Ergebnis).
+        self._lbl_gpu_tier = QLabel("aktiv: –")
+        self._lbl_gpu_tier.setToolTip(
+            "Die gerade aktive Stufe der 3D-Szene. Bei 'Automatisch' ist das\n"
+            "das Ergebnis der GPU-Erkennung dieses Rechners.")
+        q_row.addWidget(self._lbl_gpu_tier)
+        q_layout.addLayout(q_row)
+        layout.addWidget(quality_group)
+
         # ── Helligkeit (NEU) ────────────────────────────────────────────────
         brightness_group = QGroupBox("Szenen-Helligkeit")
         bg_layout = QVBoxLayout(brightness_group)
@@ -1927,6 +1989,7 @@ class VisualizerWindow(QMainWindow):
         self._bridge.pyFixtureDeleted.connect(self._on_fixture_deleted_from_js)
         self._bridge.pyStageListChanged.connect(self._on_stage_list_from_js)
         self._bridge.pyStageObjectDeleted.connect(self._on_stage_object_deleted_from_js)
+        self._bridge.pyGpuTierReported.connect(self._on_gpu_tier_reported)
         self._bridge.pyStageSelection.connect(self._on_stage_selection_from_js)
         self._bridge.pyStageSaved.connect(self._on_stage_saved_from_js)
         self._bridge.pyBrightnessChanged.connect(self._on_brightness_from_js)
@@ -3314,6 +3377,30 @@ class VisualizerWindow(QMainWindow):
         """Bridge meldet (ueber cameraSaved-Slot -> pyCameraSaved) eine neu
         gespeicherte/aktualisierte Kamera zurueck -- Toolbar-Menue neu bauen."""
         self._rebuild_camera_menu()
+
+    def _on_quality_tier_changed(self, _idx: int):
+        """Neue Qualitätsstufe: geräte-lokal persistieren + Szene neu bauen
+        (die Stufe ist eine Konstruktor-Entscheidung des Renderers und greift
+        erst beim Seiten-Neuaufbau — load_stage_html hängt sie als Query an)."""
+        tier = self._combo_quality.currentData() or "auto"
+        try:
+            from src.ui.views.programmer_view import _save_prefs
+            _save_prefs({"viz_quality_tier": tier})
+        except Exception as e:
+            print(f"[Visualizer] quality pref save error: {e}")
+        self._on_reload_scene()
+
+    def _on_gpu_tier_reported(self, tier: str):
+        """JS meldet die AKTIVE Stufe der laufenden Szene (Probe- oder
+        Override-Ergebnis) — im Einstellungen-Tab anzeigen."""
+        lbl = getattr(self, "_lbl_gpu_tier", None)
+        if lbl is None:
+            return
+        name = {"low": "Niedrig", "high": "Hoch"}.get(str(tier), str(tier))
+        try:
+            lbl.setText(f"aktiv: {name}")
+        except RuntimeError:
+            pass
 
     def _on_reload_scene(self):
         """VIZ-12 Schritt 5: "Szene neu laden"-Menuepunkt. Ruft

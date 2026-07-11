@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-11 — Render-Qualität wählbar: Automatik + manueller Override (VIZ-15 Teil)
+
+#### Neu / Tests
+
+- **Einstellungen-Tab „Render-Qualität":** Stufe `Automatisch (empfohlen)` / `Hoch` / `Niedrig`. Automatisch = die GPU-Probe beim Szenen-Start entscheidet (schwache Chips wie das Surface-Adreno → Niedrig); die manuelle Wahl übersteuert sie, falls die Erkennung danebenliegt. Ein Label zeigt die **aktive** Stufe der laufenden Szene (JS meldet sie beim Channel-Connect über den neuen Slot `reportGpuTier`). Die Wahl ist **geräte-gebunden** (`ui_prefs.json`, nicht in der Show) und reist als `gputier`-Query mit jedem `load_stage_html` — sie greift damit für alle Targets (Vollfenster, eingebettete 3D-View, Crash-Guard-Selbstheilung, „Szene neu laden"); ein Stufenwechsel lädt die Szene automatisch neu. `tests/test_viz_quality_tier.py` (11 Tests: Pref-Roundtrip/Fallbacks, URL-Query, Combo-Handler, Bridge-Slot, Label).
+
+
 ### 2026-07-11 — Low-Spec-Modus: Visualizer läuft flüssig auf schwachen GPUs (Surface)
 
 #### Verbessert / Tests
