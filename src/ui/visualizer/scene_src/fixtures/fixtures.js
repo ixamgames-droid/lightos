@@ -6,7 +6,7 @@
 // dispatcht per registry.js#updateFixtureDmx auf die pro-Typ-Handler in
 // builders.js — belegt durch tests/test_viz13c_updatedmx_registry.py.
 import * as THREE from '../three/three.js';
-import { scene } from '../scene/renderer.js';
+import { scene, renderer } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
 // VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
@@ -23,6 +23,44 @@ import { requestRender } from '../scene/render_loop.js';
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
 export const fixtureMeshes = []; // for raycasting
+
+// ── Shadow-Budget ────────────────────────────────────────────────────────────
+// Jede schattenwerfende SpotLight belegt im Fragment-Shader JEDES beleuchteten
+// Materials eine Texture-Unit (Shadow-Map). GPUs wie die Adreno in Davids
+// Surface haben nur MAX_TEXTURE_IMAGE_UNITS=16 — bei grossen Rigs (48 Fixtures
+// im Demo-Rig) kompilierte deshalb KEIN Lit-Shader mehr ("FRAGMENT shader
+// texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)") und die
+// gesamte Buehne blieb unsichtbar (nur MeshBasic-Beams zeichneten noch).
+// Daher: nur die ersten N Spots werfen Schatten, der Rest leuchtet ohne.
+// Reserve deckt Material-/Sonstige-Texturen (Boden-Canvas, Label-Sprites) ab.
+const SHADOW_TEXTURE_RESERVE = 6;
+let _shadowSpotBudget = null;
+
+function shadowSpotBudget() {
+  if (_shadowSpotBudget === null) {
+    const maxTex = (renderer && renderer.capabilities
+      && renderer.capabilities.maxTextures) || 16;
+    _shadowSpotBudget = Math.max(2, maxTex - SHADOW_TEXTURE_RESERVE);
+  }
+  return _shadowSpotBudget;
+}
+
+// Idempotent: verteilt das Budget deterministisch (fid-Reihenfolge) auf alle
+// vorhandenen Spots. three.js r128 erkennt den castShadow-Wechsel ueber die
+// lightsStateVersion selbst und kompiliert betroffene Programme neu.
+export function syncSpotShadowBudget() {
+  const budget = shadowSpotBudget();
+  let used = 0;
+  let changed = false;
+  for (const fid in fixtures) {
+    const spot = fixtures[fid] && fixtures[fid].spot;
+    if (!spot) continue;
+    const want = used < budget;
+    if (want) used += 1;
+    if (spot.castShadow !== want) { spot.castShadow = want; changed = true; }
+  }
+  if (changed) requestRender();
+}
 
 export function rebuildFixtureMeshList() {
   fixtureMeshes.length = 0;
@@ -155,7 +193,9 @@ export function addFixture(data) {
     headHost.add(beam);
 
     spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
-    spot.castShadow = true;
+    // castShadow vergibt syncSpotShadowBudget() nach der Registrierung —
+    // ein hartes `true` je Fixture sprengt auf 16-Unit-GPUs das Shader-Limit.
+    spot.castShadow = false;
     spot.shadow.mapSize.width = 512;
     spot.shadow.mapSize.height = 512;
     root.add(spot);
@@ -213,6 +253,7 @@ export function addFixture(data) {
     data: { ...data },
   };
 
+  syncSpotShadowBudget();
   rebuildFixtureMeshList();
   updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128, data.heads||null);
 }
@@ -227,6 +268,8 @@ export function removeFixture(fid) {
   f.group.traverse(disposeObj);
   delete fixtures[fid];
   delete topDownIcons[fid];
+  // Frei gewordenes Shadow-Budget an verbleibende Spots weiterreichen.
+  syncSpotShadowBudget();
   // Clean selection
   const idx = view.selectedFids.indexOf(Number(fid));
   if (idx >= 0) view.selectedFids.splice(idx, 1);

@@ -36,7 +36,7 @@ import { attachGizmoToSelection } from './interaction/gizmo.js';  // VIZ-13 3b-G
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
-import { removeFixture as _removeFixtureForTouch } from './fixtures/fixtures.js';
+import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget } from './fixtures/fixtures.js';
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
 } from './scene/render_loop.js';
@@ -136,6 +136,8 @@ window.__lightos = {
   // deterministischen Test-Hooks (offscreen drosselt rAF + Post-Load-Signale,
   // s. render_loop.js — Tests treiben die Ticks selbst per runJavaScript).
   requestRender, renderStats, __renderTick: renderTick,
+  // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
+  syncSpotShadowBudget,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

@@ -227,6 +227,18 @@ class StaleEchoDoesNotDeleteFreshElementTest(unittest.TestCase):
 
         self.bridge.push_stage_definition(stage)
         self.assertEqual(self.bridge._stage_reload_token, 1)
+        # Reload-Handshake abschließen (volles Echo mit aktuellem Token):
+        # eine echte User-Löschung passiert NACH dem fertigen Szenenaufbau.
+        # Während eines offenen Reloads werden Lösch-Echos bewusst ignoriert
+        # (Guard 2026-07-11 — dieselbe Skepsis wie beim Snapshot-Reconcile).
+        import json as _json
+        self.bridge.stageListChanged(_json.dumps(
+            {"objects": [el.to_js_dict()], "_reloadToken": 1}))
+        self.assertFalse(self.bridge._reloading_stage)
+        # Poll-Queue wie in Produktion abholen: solange für dieses Element
+        # noch ein addStageData-Event aussteht, würde eine Löschung bewusst
+        # ignoriert (Undo/Redo-Interleaving-Guard 2026-07-11).
+        self.bridge.pollControl()
         # Der explizite Slot trennt eine echte Löschung vom unzuverlässigen
         # stageListChanged-Teil-Snapshot.
         deleted = {}

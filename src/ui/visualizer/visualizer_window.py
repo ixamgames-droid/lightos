@@ -409,6 +409,11 @@ class VisualizerBridge(QObject):
         """Einmal-Event fuer den naechsten Poll einreihen (Kamera-Reset/Transform/
         Stage-Add ...). JS wendet es an und quittiert per Leerung."""
         self._poll_events.append(ev)
+        # Backstop: pollt keine Seite (Fenster zu, Renderer nach CrashGuard-
+        # Give-up tot), darf die Queue nicht unbegrenzt wachsen und spaeter
+        # als veralteter Event-Burst in eine frische Seite replayed werden.
+        if len(self._poll_events) > 512:
+            del self._poll_events[: len(self._poll_events) - 512]
 
     def _poll_set_dmx(self, batch_json: str):
         """Letzten DMX-Batch fuer den Poll vormerken (coalesced)."""
@@ -2065,6 +2070,16 @@ class VisualizerWindow(QMainWindow):
         view = getattr(self, "_view", None)
         if view is None:
             return
+        # Events, die fuer die ALTE Seite eingereiht wurden, sind fuer die
+        # frische Seite Gift (alte selectStage/transform/removeStage wuerden
+        # den Neuaufbau ueberschreiben). Der Voll-Zustand kommt ohnehin per
+        # force_full_resync + Sticky-Poll-State.
+        bridge = getattr(self, "_bridge", None)
+        if bridge is not None:
+            try:
+                bridge._poll_events.clear()
+            except Exception:
+                pass
         load_stage_html(view)
 
     # ── Fixture-Tab actions ─────────────────────────────────────────────────
@@ -2435,6 +2450,15 @@ class VisualizerWindow(QMainWindow):
         # Events NACH dem Channel-Handshake landen (der Sofort-Emit oben bleibt
         # für bereits bereite Pages wichtig).
         QTimer.singleShot(1200, self._reassert_current_stage_after_load)
+        # Stumm-Freeze-Backstop: liefert die Seite NIE den vollständigen
+        # Snapshot (z.B. weil ein Element-Build auf einer GPU-gestressten
+        # Seite dauerhaft wirft und danach KEINE Echos mehr kommen), darf das
+        # Pending-Gate Selektion/Positions-Sync nicht für den Rest der
+        # Session sperren. Generation-Zähler: ein Timer eines ÜBERHOLTEN
+        # _apply_stage darf das Gate eines neueren nicht öffnen.
+        self._pending_stage_gen = getattr(self, "_pending_stage_gen", 0) + 1
+        _gen = self._pending_stage_gen
+        QTimer.singleShot(6000, lambda: self._clear_stale_pending_stage_ids(_gen))
         self._refresh_stage_tree()
         # VIZ-10: zentraler Pfad fuer Buehnen-Wechsel/-Neuaufbau -> Statuszeile
         # (Bühnen-Elemente-Zaehler) hier statt an jedem Aufrufer einzeln pflegen.
@@ -2448,6 +2472,20 @@ class VisualizerWindow(QMainWindow):
                 self._bridge.push_add_stage_object_data(el)
         except Exception as e:
             print(f"[Visualizer] delayed stage reassert error: {e}")
+
+    def _clear_stale_pending_stage_ids(self, gen: int):
+        """Öffnet das Pending-Gate, wenn der vollständige Snapshot ausbleibt.
+
+        Nur reine Python-Attribute — darf auch nach einem zerstörten
+        C++-Widget noch gefahrlos feuern (Qt-GC-Falle der singleShot-Lambda).
+        """
+        if gen != getattr(self, "_pending_stage_gen", 0):
+            return
+        pending = getattr(self, "_pending_stage_ids", None)
+        if pending is not None:
+            print("[Visualizer] pending stage snapshot blieb aus - Gate geöffnet, "
+                  f"Python bleibt Autorität: {sorted(pending)}")
+            self._pending_stage_ids = None
 
     def _refresh_stage_tree(self):
         # Aktuelle Selektion merken um sie nach Rebuild wiederherzustellen (T4.3)
@@ -2765,11 +2803,27 @@ class VisualizerWindow(QMainWindow):
             return
 
         def _on_delete_change():
+            # Inkrementell statt Full-Reload (Gegenstück zum Add-Pfad aus
+            # b65eb9c): ein kompletter loadStageJson-Umbau pro Löschung
+            # re-armierte Pending-Gate, Repair-Ketten und 1200ms-Reassert —
+            # bei schnellen Folge-Löschungen die Hauptquelle für
+            # wiederauferstehende Elemente.
             if self._current_stage.get(el.id) is None:
                 self._remove_stage_node_from_scene(el.id)
+                if self._selected_stage_id == el.id:
+                    self._selected_stage_id = ""
+                try:
+                    self._bridge.push_remove_stage_object(el.id)
+                except Exception as e:
+                    print(f"[Visualizer] stage delete push error: {e}")
             else:
                 self._sync_stage_node_to_scene(el)
-            self._apply_stage(self._current_stage)
+                try:
+                    self._bridge.push_add_stage_object_data(el)
+                except Exception as e:
+                    print(f"[Visualizer] stage undelete push error: {e}")
+            self._refresh_stage_tree()
+            self._update_status_counts()
 
         # VIZ-11 (Schritt 6): RemoveNode-Undo — Snapshot VOR dem Loeschen.
         _scmd.push_remove_stage_element(
@@ -2905,19 +2959,34 @@ class VisualizerWindow(QMainWindow):
             # der Renderer echo'te zeitweise nur den Boden und räumte damit
             # Trussen, LED-Wand und Plattform aus dem Qt-Panel. Die stabile
             # Python-ID erlaubt ein gefahrloses, idempotentes Nachsenden.
-            # Pro beobachteter Teilmenge nur einmal senden; bei Fortschritt
-            # (weitere JS-IDs) wird die neue Restmenge erneut ergänzt.
+            # Begrenzte Versuche pro beobachteter Teilmenge: kann JS ein
+            # Element DAUERHAFT nicht bauen (Build-Throw auf GPU-gestresster
+            # Seite, Live-Befund 2026-07-11), darf der Early-Return nicht die
+            # gesamte JS->Python-Synchronisation (Selektion, Drag-Positionen)
+            # fuer den Rest der Session einfrieren.
             signature = frozenset(js_ids)
             if signature != getattr(self, "_last_stage_reassert_ids", None):
                 self._last_stage_reassert_ids = signature
+                self._stage_reassert_attempts = 0
+            self._stage_reassert_attempts = getattr(self, "_stage_reassert_attempts", 0) + 1
+            if self._stage_reassert_attempts <= 3:
                 for el in self._current_stage.elements:
                     if el.id in missing_ids:
                         try:
                             self._bridge.push_add_stage_object_data(el)
                         except Exception as e:
                             print(f"[Visualizer] stage reassert error: {e}")
-            return
-        self._last_stage_reassert_ids = None
+                return
+            # Aufgeben — Python behaelt die fehlenden Elemente autoritativ im
+            # Modell, aber die baubaren Elemente synchronisieren ab hier
+            # normal weiter (kein return).
+            if self._stage_reassert_attempts == 4:
+                print("[Visualizer] stage reassert aufgegeben, JS baut nicht: "
+                      f"{sorted(missing_ids)}")
+            self._pending_stage_ids = None
+        else:
+            self._last_stage_reassert_ids = None
+            self._stage_reassert_attempts = 0
 
         # Ein Stage-Reload muss als atomarer Snapshot ankommen.  Teil- oder
         # Altechos koennen sonst exakt den Effekt erzeugen, den man im
@@ -2938,6 +3007,12 @@ class VisualizerWindow(QMainWindow):
                 continue
             el = self._current_stage.get(sid)
             if el is None:
+                # Resurrection-Guard: ein ueberholtes Echo (aelterer Token)
+                # spiegelt einen Zwischenstand und darf keine inzwischen
+                # geloeschten oder buehnen-fremden Elemente wiederbeleben —
+                # nur Updates BESTEHENDER Elemente sind idempotent-harmlos.
+                if is_stale:
+                    continue
                 # Neues Element aus JS - in Python-Modell anlegen
                 pos = it.get("position") or {}
                 size = it.get("size") or {}
@@ -3013,7 +3088,29 @@ class VisualizerWindow(QMainWindow):
                 self._suppress_property_signals = False
 
     def _on_stage_object_deleted_from_js(self, sid: str):
-        """Wendet eine ausdrücklich vom 3D-Editor gemeldete Löschung an."""
+        """Wendet eine ausdrücklich vom 3D-Editor gemeldete Löschung an.
+
+        Dieser Kanal ist die EINZIGE Tür, durch die das autoritative
+        Python-Modell schrumpfen kann — daher dieselbe Skepsis wie beim
+        stageListChanged-Reconcile: Lösch-Echos aus Lade-/Reload-Churn oder
+        zu Elementen eines gerade laufenden Reloads sind keine User-Geste.
+        """
+        bridge = getattr(self, "_bridge", None)
+        if bridge is not None and getattr(bridge, "_reloading_stage", False):
+            return
+        pending = getattr(self, "_pending_stage_ids", None)
+        if pending is not None and sid in pending:
+            return
+        # Undo/Redo-Interleaving: hängt für dieses Element bereits ein neues
+        # Add in der Poll-Queue, ist das Lösch-Echo überholt (es stammt vom
+        # vorigen, bereits rückgängig gemachten Remove).
+        for ev in list(getattr(bridge, "_poll_events", None) or []):
+            if ev.get("t") == "addStageData":
+                try:
+                    if json.loads(ev.get("j") or "{}").get("id") == sid:
+                        return
+                except Exception:
+                    pass
         el = self._current_stage.get(sid)
         if el is None:
             return
