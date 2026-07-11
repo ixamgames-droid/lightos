@@ -418,6 +418,15 @@ export function removeStageObject(id) {
     clearResizeHandles();
   }
   if (dockHighlightRef.get() === id) dockHighlightRef.set(null);
+  // Ein finaler, expliziter Delete ist etwas anderes als die vielen
+  // remove-Aufrufe innerhalb von loadStageJson(). Nur ersterer darf Python
+  // aus seinem autoritativen Bühnenmodell entfernen.
+  if (!_isLoadingStage) {
+    const bridge = bridgeRef.get();
+    if (bridge && bridge.stageObjectDeleted) {
+      try { bridge.stageObjectDeleted(id); } catch (e) {}
+    }
+  }
   // Angedockte Strahler loesen (bleiben an letzter Position)
   for (const fid in fixtures) {
     const f = fixtures[fid];
@@ -659,6 +668,25 @@ export function loadStageJson(json) {
     _isLoadingStage = false;
     // EINE einzige finale Sync ans Python schicken (statt N×)
     notifyStageListChanged();
+    // QtWebEngine kann direkt nach einem großen QWebChannel-Callback einen
+    // unvollständigen stageObjects-Snapshot rendern. Der vollständige Payload
+    // ist lokal vorhanden, daher lassen sich fehlende IDs ohne einen weiteren
+    // Python-Roundtrip idempotent ergänzen. Die kurzen Wiederholungen decken
+    // späte WebGL-/Modell-Callbacks ab, ohne spätere User-Löschungen dauerhaft
+    // zurückzunehmen.
+    const expectedObjects = Array.isArray(incoming && incoming.objects)
+      ? incoming.objects.slice() : [];
+    let repairAttempt = 0;
+    const repairIncompleteStage = () => {
+      const missing = expectedObjects.filter(o => o && o.id && !stageObjects[o.id]);
+      for (const o of missing) {
+        createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+      }
+      if (missing.length) notifyStageListChanged();
+      repairAttempt += 1;
+      if (repairAttempt < 3) setTimeout(repairIncompleteStage, 300);
+    };
+    if (expectedObjects.length) setTimeout(repairIncompleteStage, 120);
     // 3c-2: Bulk-Load deckt auch den direkten Fixture-Transform-Zweig oben
     // (f.group.position/rotation OHNE verdrahteten Helfer) + den Fehlerfall ab.
     requestRender();

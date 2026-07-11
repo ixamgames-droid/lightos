@@ -110,6 +110,21 @@ class StageEchoTokenTest(unittest.TestCase):
         payload2 = _json.loads(captured["json"])
         self.assertEqual(payload2["_reloadToken"], 2)
 
+    def test_stage_push_reasserts_every_element_over_poll(self):
+        """Ein partieller Bulk-Push wird durch ID-stabile Add-Events geheilt."""
+        stage = StageDefinition(name="Mehrteilig")
+        floor = stage.add("floor", name="Floor")
+        truss = stage.add("truss_h", name="Fronttruss")
+        led = stage.add("led_wall", name="LED")
+
+        self.bridge.push_stage_definition(stage)
+
+        import json as _json
+        events = _json.loads(self.bridge.pollControl()).get("events", [])
+        reasserted = [ev for ev in events if ev.get("t") == "addStageData"]
+        self.assertEqual([_json.loads(ev["j"])["id"] for ev in reasserted],
+                         [floor.id, truss.id, led.id])
+
     def test_current_token_echo_is_not_stale(self):
         self.bridge.push_stage_definition(StageDefinition(name="A"))
         # Reload abgeschlossen (finales Echo bereits verarbeitet) -> ein
@@ -202,11 +217,8 @@ class StaleEchoDoesNotDeleteFreshElementTest(unittest.TestCase):
         self.assertIsNotNone(stage.get(el.id))
         self.assertEqual(len(stage.elements), 1)
 
-    def test_current_echo_still_removes_elements_deleted_in_js(self):
-        """Gegenprobe: ein AKTUELLES, SETTLED Echo (Reload abgeschlossen,
-        _reloading_stage=False) muss den Loesch-Abgleich weiterhin ausfuehren
-        (Regressionsschutz fuer den Normalfall: Element per JS-Hotkey/FAB
-        geloescht -- das passiert IMMER ausserhalb eines laufenden Reloads)."""
+    def test_explicit_js_delete_still_removes_element(self):
+        """Echte 3D-Hotkey/FAB-Löschung bleibt trotz Snapshot-Schutz möglich."""
         stage = StageDefinition(name="T")
         el = stage.add("platform", x=0.0, y=0.2, z=0.0, name="Weg")
         fake = _fake_window(self.state, stage, bridge=self.bridge)
@@ -215,19 +227,14 @@ class StaleEchoDoesNotDeleteFreshElementTest(unittest.TestCase):
 
         self.bridge.push_stage_definition(stage)
         self.assertEqual(self.bridge._stage_reload_token, 1)
-        # Reload abgeschlossen; DANACH loescht der User das Element in JS.
-        self.bridge._reloading_stage = False
-
-        received = {}
-        self.bridge.pyStageListChanged.connect(
-            lambda items, is_stale: received.update(items=items, is_stale=is_stale))
-        import json as _json
-        # SETTLED Echo (Token 1, aktueller Token) mit leerer Liste -> JS hat
-        # das Element nicht (mehr).
-        self.bridge.stageListChanged(_json.dumps({"objects": [], "_reloadToken": 1}))
-        self.assertFalse(received["is_stale"])
-
-        VW.VisualizerWindow._on_stage_list_from_js(fake, received["items"], received["is_stale"])
+        # Der explizite Slot trennt eine echte Löschung vom unzuverlässigen
+        # stageListChanged-Teil-Snapshot.
+        deleted = {}
+        self.bridge.pyStageObjectDeleted.connect(
+            lambda sid: deleted.__setitem__("sid", sid))
+        self.bridge.stageObjectDeleted(el.id)
+        self.assertEqual(deleted["sid"], el.id)
+        VW.VisualizerWindow._on_stage_object_deleted_from_js(fake, el.id)
         self.assertIsNone(stage.get(el.id))
 
     def test_reload_echo_missing_fresh_element_is_not_deleted(self):

@@ -338,6 +338,28 @@ class SceneModulesSmokeTest(unittest.TestCase):
         )
         self.assertTrue(still_complete, "Doppelzustellung reduzierte die Bühnenliste")
 
+    def test_bulk_stage_load_repairs_objects_lost_just_after_load(self):
+        """Der Renderer repariert einen unmittelbaren, partiellen WebGL-Snapshot."""
+        self._load_and_wait()
+        import json
+        objects = [
+            {
+                "id": f"repair-{i}", "type": typ, "name": f"Repair {i}",
+                "position": {"x": i, "y": 1, "z": 0},
+                "size": {"x": 2, "y": 1, "z": 1}, "rotation": 0,
+                "color": "#334455",
+            }
+            for i, typ in enumerate(("floor", "platform", "truss_h"))
+        ]
+        payload = json.dumps({"objects": objects, "fixtures": [], "_reloadToken": 44})
+        self._emit_until_true(
+            lambda: self._bridge_obj.stageLoaded.emit(payload),
+            "Object.keys(window.__lightos.stageObjects).length === 3", timeout_s=5.0)
+        self._eval("window.__lightos.clearStageObjects(); true")
+        repaired = self._poll_until_true(
+            "Object.keys(window.__lightos.stageObjects).length === 3", timeout_s=3.0)
+        self.assertTrue(repaired, "Lokale Stage-Reparatur stellte fehlende IDs nicht wieder her")
+
     def test_bulk_stage_load_via_poll_keeps_every_element(self):
         """Der produktive Pull-Kanal muss komplexe Bühnen vollständig liefern."""
         objects = [

@@ -313,6 +313,7 @@ class VisualizerBridge(QObject):
     pyFixtureSelection      = Signal(list)
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
+    pyStageObjectDeleted    = Signal(str)
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
@@ -975,6 +976,13 @@ class VisualizerBridge(QObject):
         self._last_stage_echo_token = echo_token
         self.pyStageListChanged.emit(data, is_stale)
 
+    @Slot(str)
+    @_bridge_slot_guard
+    def stageObjectDeleted(self, sid: str):
+        """Explizite 3D-Loeschung, getrennt von unvollstaendigen Snapshots."""
+        if sid:
+            self.pyStageObjectDeleted.emit(str(sid))
+
     @Slot()
     @_bridge_slot_guard
     def requestFullResync(self):
@@ -1084,6 +1092,15 @@ class VisualizerBridge(QObject):
             payload = definition.to_js_dict()
             payload["_reloadToken"] = token
             self.stageLoaded.emit(json.dumps(payload))
+            # QtWebChannel-Push und der zuverlaessige Pull-Kanal koennen bei
+            # komplexen Szenen unterschiedlich weit sein. Reassert jedes
+            # Element deshalb zusätzlich als idempotentes Inkremental-Event:
+            # Ist der Bulk-Load vollständig, aktualisiert JS nur das bestehende
+            # Objekt; ist er partiell angekommen, werden die fehlenden Trussen,
+            # Wände und Plattformen nachgezogen. Die Poll-Reihenfolge wendet
+            # zuerst ``stage`` und danach ``events`` an.
+            for element in definition.elements:
+                self.addStageObjectData.emit(json.dumps(element.to_js_dict()))
         except Exception as e:
             print(f"[Visualizer] push_stage_definition error: {e}")
             self._reloading_stage = False
@@ -1307,6 +1324,10 @@ class VisualizerWindow(QMainWindow):
         # liefern; bis die vollstaendige Liste zurueck ist, bleibt Python die
         # Autoritaet fuer Baum und Selektion.
         self._pending_stage_ids: Optional[frozenset[str]] = None
+        # Signatur der zuletzt aus einem partiellen JS-Snapshot nachgesendeten
+        # IDs. Verhindert bei einem hängenden WebGL-Echo eine Event-Flut, ohne
+        # fehlende Elemente dauerhaft aufzugeben.
+        self._last_stage_reassert_ids: Optional[frozenset[str]] = None
         self._suppress_property_signals = False
         self._stage_dirty = False   # VIZ-10: ungespeicherte Buehnen-Aenderungen
         self._suppress_tab_mode_sync = False   # VIZ-10: Reentrancy-Schutz Tab<->Modus
@@ -1900,6 +1921,7 @@ class VisualizerWindow(QMainWindow):
         self._bridge.pyFixtureSelection.connect(self._on_fixture_selection_from_js)
         self._bridge.pyFixtureDeleted.connect(self._on_fixture_deleted_from_js)
         self._bridge.pyStageListChanged.connect(self._on_stage_list_from_js)
+        self._bridge.pyStageObjectDeleted.connect(self._on_stage_object_deleted_from_js)
         self._bridge.pyStageSelection.connect(self._on_stage_selection_from_js)
         self._bridge.pyStageSaved.connect(self._on_stage_saved_from_js)
         self._bridge.pyBrightnessChanged.connect(self._on_brightness_from_js)
@@ -2392,6 +2414,7 @@ class VisualizerWindow(QMainWindow):
         # den vorigen Truss-Eintrag selektieren, waehrend der neue schon im
         # 3D-View sichtbar ist).
         self._pending_stage_ids = frozenset(el.id for el in definition.elements)
+        self._last_stage_reassert_ids = None
         # VIZ-12 Schritt 5: zentraler Buehnen-Wechsel-Pfad -> Interaktions-
         # Zustand (Live-Trace, Reload-Guard) ueber ALLE Targets zuruecksetzen,
         # BEVOR die neue Definition raus geht. Sonst wuerde eine laufende
@@ -2407,11 +2430,24 @@ class VisualizerWindow(QMainWindow):
             self._bridge.push_stage_definition(definition)
         except Exception as e:
             print(f"[Visualizer] _apply_stage push error: {e}")
+        # Der WebChannel wird nach einem Page-Reload erst asynchron bereit.
+        # Ein zweiter, kurzer Reassert stellt sicher, dass die inkrementellen
+        # Events NACH dem Channel-Handshake landen (der Sofort-Emit oben bleibt
+        # für bereits bereite Pages wichtig).
+        QTimer.singleShot(1200, self._reassert_current_stage_after_load)
         self._refresh_stage_tree()
         # VIZ-10: zentraler Pfad fuer Buehnen-Wechsel/-Neuaufbau -> Statuszeile
         # (Bühnen-Elemente-Zaehler) hier statt an jedem Aufrufer einzeln pflegen.
         if hasattr(self, "_lbl_info"):
             self._update_status_counts()
+
+    def _reassert_current_stage_after_load(self):
+        """Sendet die autoritative Bühne nach dem WebChannel-Handshake erneut."""
+        try:
+            for el in self._current_stage.elements:
+                self._bridge.push_add_stage_object_data(el)
+        except Exception as e:
+            print(f"[Visualizer] delayed stage reassert error: {e}")
 
     def _refresh_stage_tree(self):
         # Aktuelle Selektion merken um sie nach Rebuild wiederherzustellen (T4.3)
@@ -2861,6 +2897,28 @@ class VisualizerWindow(QMainWindow):
                 continue
             js_ids.add(sid)
 
+        expected_ids = {el.id for el in self._current_stage.elements}
+        missing_ids = expected_ids - js_ids
+        if missing_ids:
+            # Ein Teil-Snapshot ist KEINE Loeschanweisung. Das trat live bei
+            # großen, gespeicherten Bühnen auf: Python hatte alle 15 Elemente,
+            # der Renderer echo'te zeitweise nur den Boden und räumte damit
+            # Trussen, LED-Wand und Plattform aus dem Qt-Panel. Die stabile
+            # Python-ID erlaubt ein gefahrloses, idempotentes Nachsenden.
+            # Pro beobachteter Teilmenge nur einmal senden; bei Fortschritt
+            # (weitere JS-IDs) wird die neue Restmenge erneut ergänzt.
+            signature = frozenset(js_ids)
+            if signature != getattr(self, "_last_stage_reassert_ids", None):
+                self._last_stage_reassert_ids = signature
+                for el in self._current_stage.elements:
+                    if el.id in missing_ids:
+                        try:
+                            self._bridge.push_add_stage_object_data(el)
+                        except Exception as e:
+                            print(f"[Visualizer] stage reassert error: {e}")
+            return
+        self._last_stage_reassert_ids = None
+
         # Ein Stage-Reload muss als atomarer Snapshot ankommen.  Teil- oder
         # Altechos koennen sonst exakt den Effekt erzeugen, den man im
         # Buehnen-Editor als flackernde Auswahl sieht: 3D zeigt bereits das
@@ -2924,21 +2982,11 @@ class VisualizerWindow(QMainWindow):
                 self._sync_stage_node_to_scene(el)
                 self._push_stage_rotation_to_children(el)
 
-        # Elemente die nur in Python existieren (in JS via Hotkey/FAB geloescht)
-        # entfernen -- NUR bei einem AKTUELLEN Echo (Stage-Echo-Race-Fix): ein
-        # stale Echo (aus einem ueberholten Reload) listet ggf. nicht alle
-        # gerade erst angelegten Elemente, das darf NICHT als "in JS geloescht"
-        # missverstanden werden.
-        if not is_stale:
-            py_ids_to_remove = [e.id for e in self._current_stage.elements if e.id not in js_ids]
-            if py_ids_to_remove:
-                for pid in py_ids_to_remove:
-                    self._current_stage.remove(pid)
-                    self._remove_stage_node_from_scene(pid)
-                    if self._selected_stage_id == pid:
-                        self._selected_stage_id = ""
-                tree_needs_rebuild = True
-                self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
+        # Loeschungen kommen nicht mehr aus einer Mengen-Differenz dieses
+        # Snapshots: QtWebEngine kann bei grossen Bühnen eine Teilmenge echoen.
+        # Echte 3D-Hotkey/FAB-Loeschungen reisen separat ueber
+        # ``stageObjectDeleted`` und koennen daher nicht mit einem Render-Race
+        # verwechselt werden.
 
         if tree_needs_rebuild:
             self._refresh_stage_tree()
@@ -2963,6 +3011,19 @@ class VisualizerWindow(QMainWindow):
                 self._stage_spin_rot.setValue(math.degrees(cur.rotation))
             finally:
                 self._suppress_property_signals = False
+
+    def _on_stage_object_deleted_from_js(self, sid: str):
+        """Wendet eine ausdrücklich vom 3D-Editor gemeldete Löschung an."""
+        el = self._current_stage.get(sid)
+        if el is None:
+            return
+        self._current_stage.remove(sid)
+        self._remove_stage_node_from_scene(sid)
+        if self._selected_stage_id == sid:
+            self._selected_stage_id = ""
+        self._stage_dirty = True
+        self._refresh_stage_tree()
+        self._update_status_counts()
 
     def _on_stage_selection_from_js(self, sid: str):
         # Beim Tippen in den Buehnen-Eigenschaften ist die Qt-Auswahl die

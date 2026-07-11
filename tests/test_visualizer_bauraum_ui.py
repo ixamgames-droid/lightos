@@ -111,6 +111,37 @@ class StageSelectionStateTest(unittest.TestCase):
         self.assertEqual(fake._selected_stage_id, old.id)
         self.assertEqual(fake._pending_stage_ids, frozenset({old.id, new.id}))
 
+    def test_partial_stage_echo_reasserts_missing_saved_objects(self):
+        """Ein Teil-Snapshot repariert die 3D-Szene statt die Bühne zu kürzen."""
+        from src.core.stage.stage_definition import StageDefinition
+
+        stage = StageDefinition(name="Mehrteilig")
+        floor = stage.add("floor", name="Boden")
+        truss = stage.add("truss_h", name="Truss")
+        wall = stage.add("led_wall", name="LED")
+        bridge = MagicMock()
+        fake = SimpleNamespace(
+            _current_stage=stage,
+            _pending_stage_ids=frozenset({floor.id, truss.id, wall.id}),
+            _last_stage_reassert_ids=None,
+            _bridge=bridge,
+            _selected_stage_id="",
+            _stage_name_edit=QLineEdit(),
+            _stage_spin_x=QSpinBox(), _stage_spin_y=QSpinBox(),
+            _stage_spin_z=QSpinBox(), _stage_spin_w=QSpinBox(),
+            _stage_spin_h=QSpinBox(), _stage_spin_d=QSpinBox(),
+            _stage_spin_rot=QSpinBox(),
+        )
+
+        VW.VisualizerWindow._on_stage_list_from_js(
+            fake, [floor.to_js_dict()], is_stale=False)
+
+        self.assertEqual({e.id for e in stage.elements}, {floor.id, truss.id, wall.id})
+        self.assertEqual(
+            [c.args[0].id for c in bridge.push_add_stage_object_data.call_args_list],
+            [truss.id, wall.id],
+        )
+
     def test_js_selection_is_ignored_while_a_stage_property_is_edited(self):
         """Ein nachlaufendes 3D-Echo darf die Texteingabe nicht umhängen."""
         focused = QSpinBox()
