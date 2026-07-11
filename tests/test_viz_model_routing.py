@@ -93,7 +93,7 @@ class BarSymbolRenderSmokeTest(unittest.TestCase):
         from PySide6.QtWidgets import QApplication
         cls._app = QApplication.instance() or QApplication([])
 
-    def _draw(self, render_type):
+    def _draw(self, render_type, color=None, intensity=220):
         from PySide6.QtGui import QPixmap, QPainter, QColor
         from src.ui.views.live_view import FixtureRenderer
         pm = QPixmap(80, 80)
@@ -101,10 +101,12 @@ class BarSymbolRenderSmokeTest(unittest.TestCase):
         painter = QPainter(pm)
         try:
             FixtureRenderer.draw(
-                painter, render_type, 40, 40, 24, QColor(255, 80, 80),
-                220, "1", pan=90, tilt=140)
+                painter, render_type, 40, 40, 24,
+                color or QColor(255, 80, 80), intensity, "1",
+                pan=90, tilt=140)
         finally:
             painter.end()
+        return pm.toImage()
 
     def test_par_bar_draws(self):
         self._draw("par_bar")       # darf nicht werfen
@@ -114,6 +116,16 @@ class BarSymbolRenderSmokeTest(unittest.TestCase):
 
     def test_other_draws(self):
         self._draw("other")
+
+    def test_other_keeps_dmx_color_and_intensity_feedback(self):
+        from PySide6.QtGui import QColor
+        off = self._draw("other", QColor(255, 0, 0), intensity=0)
+        on = self._draw("other", QColor(255, 0, 0), intensity=255)
+        # Linke Haelfte des inneren Statuspanels (weg von der ?-Glyph).
+        off_px = off.pixelColor(34, 40)
+        on_px = on.pixelColor(34, 40)
+        self.assertGreater(on_px.red(), off_px.red() + 100)
+        self.assertGreater(on_px.red(), on_px.green() + 100)
 
 
 class BarListIconRoutingTest(unittest.TestCase):

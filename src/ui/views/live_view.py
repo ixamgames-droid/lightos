@@ -368,11 +368,18 @@ class FixtureRenderer:
             painter.setBrush(QBrush(QColor("#343947")))
             painter.drawRoundedRect(
                 QRectF(-size*0.30, -size*0.50, size*0.60, size*0.12), 2, 2)
+            # DMX-Statuspanel: `color` ist oben bereits mit der Intensitaet
+            # gegen den Unlit-Farbton gemischt. Damit bleiben Farbe, Dimmer und
+            # Blink-Phase wie beim frueheren Default-Quadrat direkt sichtbar.
+            painter.setBrush(QBrush(color))
+            painter.setPen(QPen(color.lighter(145), 1))
+            painter.drawRoundedRect(
+                QRectF(-size*0.34, -size*0.27, size*0.68, size*0.54), 3, 3)
             glyph_font = QFont("Arial")
             glyph_font.setBold(True)
             glyph_font.setPointSizeF(12 * tscale)
             painter.setFont(glyph_font)
-            painter.setPen(QColor("#d0d4e0"))
+            painter.setPen(color.lighter(185))
             painter.drawText(
                 QRectF(-size*0.35, -size*0.32, size*0.70, size*0.64),
                 Qt.AlignmentFlag.AlignCenter, "?")
