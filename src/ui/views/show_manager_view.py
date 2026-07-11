@@ -199,8 +199,8 @@ class TimelineCanvas(QWidget):
         show = self._show()
         if show is None:
             return None, None
-        row = (y - RULER_H) // TRACK_H
-        if row < 0 or row >= len(show.tracks):
+        row = int((y - RULER_H) // TRACK_H)   # y ist float (event.position()) -> int-Cast,
+        if row < 0 or row >= len(show.tracks):  # sonst crasht show.tracks[float] mit TypeError
             return None, None
         track = show.tracks[row]
         t = x / PX_PER_SEC
