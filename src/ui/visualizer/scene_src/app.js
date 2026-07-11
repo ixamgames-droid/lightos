@@ -8,7 +8,7 @@
 // blieb unveraendert - Buttons rufen weiterhin z.B. `setEditTool(...)` als
 // globale Funktion auf) und startet den Render-Loop + Bridge-Poll wie im
 // Original.
-import { scene, renderer } from './scene/renderer.js';
+import { scene, renderer, gpuTier } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
@@ -138,6 +138,9 @@ window.__lightos = {
   requestRender, renderStats, __renderTick: renderTick,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
+  // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
+  // Override per ?gputier=low|high in der Page-URL.
+  gpuTier,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

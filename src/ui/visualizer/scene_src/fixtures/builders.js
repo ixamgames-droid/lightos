@@ -759,6 +759,11 @@ function applyGenericColor(f, dmx) {
   if (f.spot) {
     f.spot.color = color;
     f.spot.intensity = intNorm * 3.0;
+    // Dunkle Lichter komplett aus der Licht-Auswertung nehmen: ein SpotLight
+    // mit intensity 0 kostet sonst weiterhin Shading in JEDEM beleuchteten
+    // Pixel (three.js wertet alle sichtbaren Lichter pro Fragment aus) —
+    // bei 48 Fixtures der groesste laufende Kostenblock auf schwachen GPUs.
+    f.spot.visible = intNorm > 0.01;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;

@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-11 — Low-Spec-Modus: Visualizer läuft flüssig auf schwachen GPUs (Surface)
+
+#### Verbessert / Tests
+
+- **Automatische GPU-Tier-Erkennung (`renderer.js`):** Eine Wegwerf-Canvas probt vor dem Renderer-Bau `MAX_TEXTURE_IMAGE_UNITS` und den Chip-Namen (Adreno/Mali/PowerVR/SwiftShader). Auf Low-Spec-Geräten: **kein MSAA** (Antialias ist eine Konstruktor-Entscheidung), **Pixel-Ratio-Deckel 1,25** statt 2 (Fragment-Last ist quadratisch — auf dem High-DPI-Surface bis zu ~2,5× weniger Pixel), **PCF statt PCFSoft-Schatten**, **256er statt 512er Shadow-Maps** und **12 statt 24 Kegel-Segmente**. Der `pixelRatioSignal`-Handler (Monitor-Wechsel) respektiert denselben Deckel. Override für Tests/Debug: `?gputier=low|high`; Tier als `window.__lightos.gpuTier` exponiert. Desktop-GPUs behalten die volle Optik.
+- **Dunkle Lampen kosten nichts mehr (alle Tiers):** Ein `SpotLight` mit Intensität 0 wurde bisher trotzdem in jedem beleuchteten Pixel mitgerechnet — bei 48 Fixtures der größte laufende Kostenblock. `applyGenericColor` nimmt dunkle Spots jetzt komplett aus der Licht-Auswertung (`visible=false`, analog zu Beam/FloorSpot) und aktiviert sie beim Aufdrehen wieder; auch der Initial-Build startet dunkel-unsichtbar. QtWebEngine-Smoke prüft Tier-Erkennung, Kegel-Geometrie und das Culling über den echten `dmxBatch`-Pfad in beide Richtungen.
+
 ### 2026-07-11 — 3D-Visualizer rendert große Rigs wieder (Shader-Texture-Limit)
 
 #### Behoben / Tests
