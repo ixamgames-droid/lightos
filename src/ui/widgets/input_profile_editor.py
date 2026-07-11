@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QMessageBox, QInputDialog, QLineEdit,
     QDialogButtonBox,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from src.core.input.profile import (
     InputProfile, list_profiles, delete_profile, create_default_apc_mini_profile
 )
@@ -31,11 +31,17 @@ ACTIONS = [
 
 
 class InputProfileEditor(QDialog):
+    # Der MIDI-Learn-Callback kommt aus dem MIDI-Dispatch-Thread. Qt-Widgets duerfen
+    # NUR im GUI-Thread mutiert werden -> dieses Signal marshallt das Ergebnis per
+    # QueuedConnection in den GUI-Thread (statt _refresh_table() cross-thread zu rufen).
+    _learned_signal = Signal(object)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Input-Profile verwalten")
         self.setMinimumSize(900, 580)
         self._profile = None  # type: InputProfile | None
+        self._learned_signal.connect(self._on_learned)
         self._setup_ui()
         self._reload_profiles()
 
@@ -273,25 +279,35 @@ class InputProfileEditor(QDialog):
             QMessageBox.information(self, "MIDI Lernen",
                                     "Drücke jetzt eine Taste/Note auf deinem MIDI-Gerät ...")
 
-            def learned(msg):
-                try:
-                    r = self._table.currentRow()
-                    if r < 0 or r >= len(self._profile.mappings):
-                        m = MidiMapping(name="Gelernt", msg_type=msg.msg_type, channel=msg.channel,
-                                        data1=msg.data1, action=ACTION_NONE, param="", port_filter="")
-                        self._profile.mappings.append(m)
-                    else:
-                        m = self._profile.mappings[r]
-                        m.msg_type = msg.msg_type
-                        m.channel = msg.channel
-                        m.data1 = msg.data1
-                    self._save_meta()
-                    self._refresh_table()
-                except Exception as e:
-                    print(f"[InputProfileEditor] learned cb error: {e}")
-            state.midi_mapper.start_learn(learned)
+            # Callback laeuft im MIDI-Thread -> NUR das Signal emittieren (thread-
+            # sicher). Die eigentliche Model-/UI-Arbeit passiert in _on_learned auf
+            # dem GUI-Thread (QueuedConnection). Frueher mutierte der Callback direkt
+            # _refresh_table()/self._table cross-thread -> Absturzgefahr.
+            state.midi_mapper.start_learn(
+                lambda msg: self._learned_signal.emit(msg))
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
+
+    def _on_learned(self, msg):
+        """GUI-Thread-Slot fuer das MIDI-Learn-Ergebnis (via _learned_signal).
+        Hier — und NUR hier — darf self._table mutiert werden."""
+        if not self._profile:
+            return
+        try:
+            r = self._table.currentRow()
+            if r < 0 or r >= len(self._profile.mappings):
+                m = MidiMapping(name="Gelernt", msg_type=msg.msg_type, channel=msg.channel,
+                                data1=msg.data1, action=ACTION_NONE, param="", port_filter="")
+                self._profile.mappings.append(m)
+            else:
+                m = self._profile.mappings[r]
+                m.msg_type = msg.msg_type
+                m.channel = msg.channel
+                m.data1 = msg.data1
+            self._save_meta()
+            self._refresh_table()
+        except Exception as e:
+            print(f"[InputProfileEditor] learned cb error: {e}")
 
     def _delete_mapping(self):
         if not self._profile:
