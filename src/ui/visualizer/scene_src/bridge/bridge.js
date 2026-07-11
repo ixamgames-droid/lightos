@@ -3,7 +3,7 @@
 // tryChannel). Reines Verschieben - ALLE 14 Signal-Connects + Slot-Aufrufe
 // 1:1 erhalten (Design-Dokument Leitprinzip).
 import * as THREE from '../three/three.js';
-import { renderer, scene, PIXEL_RATIO_CAP } from '../scene/renderer.js';
+import { renderer, scene, PIXEL_RATIO_CAP, gpuTier } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
@@ -253,6 +253,9 @@ export function tryChannel() {
           renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
           requestRender();  // 3c-2 Dirty-Quelle 5 (PixelRatio-Wechsel)
         });
+        // VIZ-15: aktive Qualitaetsstufe (Probe- oder ?gputier-Override-
+        // Ergebnis) an Python melden — Slot-Aufrufe kommen zuverlaessig an.
+        if (bridge.reportGpuTier) { try { bridge.reportGpuTier(gpuTier); } catch (e) {} }
         if (bridge.requestFixtures) bridge.requestFixtures();
         // VIZ-13 3c-2-Fix (2026-07-07, LIVE verifiziert): PULL statt PUSH.
         // QtWebEngine stellt Python->JS-SIGNALE (Push) an die eingebettete
