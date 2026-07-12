@@ -117,8 +117,11 @@ class ColorWheel(QWidget):
         p.drawEllipse(int(cx - radius), int(cy - radius),
                       int(radius * 2), int(radius * 2))
 
-        # Marker
-        angle = math.radians(self._hue)
+        # Marker — gespiegelt zur Gradient-Konstruktion: der Konus malt Hue H bei
+        # Schirm-Winkel (90 - H) (offscreen gemessen), also muss der Marker fuer H
+        # genau dort sitzen, sonst steht er nicht auf seiner eigenen Farbe / nicht
+        # unter dem Cursor. (BH-COLORWHEEL)
+        angle = math.radians(90.0 - self._hue)
         r = self._sat * radius
         mx = cx + math.cos(angle) * r
         my = cy - math.sin(angle) * r
@@ -144,7 +147,12 @@ class ColorWheel(QWidget):
             return
         sat = min(1.0, dist / radius)
         angle = math.degrees(math.atan2(dy, dx)) % 360
-        self._hue = angle
+        # BH-COLORWHEEL: der Konus-Gradient malt bei Schirm-Winkel `angle` die Farbe
+        # (90 - angle) (offscreen gemessen) — die angeklickte Farbe ist also
+        # (90 - angle), NICHT `angle`. Frueher wurde `angle` gesetzt, sodass die
+        # gewaehlte Farbe nicht die unter dem Cursor war. Spiegelbildlich zur
+        # Marker-Platzierung, damit der Marker unter dem Cursor bleibt.
+        self._hue = (90.0 - angle) % 360.0
         self._sat = sat
         self.update()
         self.color_changed.emit(self.color())
