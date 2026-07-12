@@ -41,6 +41,7 @@ class MidiLogSignal(QObject):
     log_received = Signal(str)
     msg_received = Signal(object)
     mtc_received = Signal(int, int, int, int)   # MTC aus dem Reader-Thread -> UI
+    learn_received = Signal(object)             # MIDI-Learn-Ergebnis -> GUI-Thread
 
 
 class MidiView(QWidget):
@@ -53,6 +54,7 @@ class MidiView(QWidget):
         self._log_signal.log_received.connect(self._append_log)
         self._log_signal.msg_received.connect(self._on_midi_msg_ui)
         self._log_signal.mtc_received.connect(self._update_mtc_label)
+        self._log_signal.learn_received.connect(self._on_learn_received)
         self._learn_target_row = -1
         self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
         self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
@@ -462,7 +464,13 @@ class MidiView(QWidget):
             return
         self._learn_target_row = list(rows)[0]
         self._append_log("⏳ MIDI Learn — sende eine MIDI-Nachricht...")
-        self._mapper.start_learn(self._on_learn_received)
+        # Der Learn-Callback kommt aus dem MIDI-Dispatch-Thread. NUR das Signal
+        # emittieren (thread-sicher) — _on_learn_received laeuft dann via
+        # QueuedConnection auf dem GUI-Thread. Frueher lief der Handler direkt im
+        # MIDI-Thread und oeffnete dort einen MODALEN QInputDialog + mutierte die
+        # Mapping-Tabelle (Cross-Thread-Qt, Absturzgefahr).
+        self._mapper.start_learn(
+            lambda msg: self._log_signal.learn_received.emit(msg))
 
     def _on_learn_received(self, msg: MidiMessage):
         row = self._learn_target_row

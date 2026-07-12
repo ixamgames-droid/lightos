@@ -33,9 +33,12 @@ class SelectionExpr:
                         sel.add(f)
                 for s, e in self.ranges:
                     lo, hi = (s, e) if s <= e else (e, s)
-                    for i in range(lo, hi + 1):
-                        if i in all_fids:
-                            sel.add(i)
+                    # Ueber die GEPATCHTEN fids iterieren, nicht ueber range(lo,hi+1):
+                    # ein Tippfehler wie `1 thru 999999999` iterierte sonst
+                    # milliardenfach und fror die GUI ein (DoS per Command-Line).
+                    for f in all_fids:
+                        if lo <= f <= hi:
+                            sel.add(f)
             for ex in self.excludes:
                 sel.discard(ex)
             return sorted(sel)
@@ -125,6 +128,10 @@ class GoCommand(Command):
 
     def execute(self, state) -> CommandResult:
         try:
+            # Executor-Slots sind 1-basiert; get_executor(0) wuerde per
+            # Python-Negativindex den LETZTEN Executor treffen.
+            if self.slot < 1:
+                return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")
             pe = state.playback_engine
             if pe is None:
                 # Fallback: Cue-Stack direkt
@@ -146,6 +153,8 @@ class BackCommand(Command):
 
     def execute(self, state) -> CommandResult:
         try:
+            if self.slot < 1:   # 1-basiert; 0 waere Negativindex (letzter Executor)
+                return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")
             pe = state.playback_engine
             if pe is None:
                 stacks = getattr(state, "cue_stacks", [])
@@ -172,6 +181,8 @@ class StopCommand(Command):
             if self.slot is None:
                 pe.stop_all()
                 return CommandResult(True, "Stop All")
+            if self.slot < 1:   # 1-basiert; 0 waere Negativindex (letzter Executor)
+                return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")
             ex = pe.get_executor(self.slot)
             ex.press_btn("stop")
             return CommandResult(True, f"Stop Exec {self.slot}")
@@ -387,15 +398,17 @@ def parse(text: str) -> Command:
         if kw in ("go", "g"):
             advance()
             n = consume_number()
-            return GoCommand(slot=int(n) if n else 1)
+            # `is not None` statt Falsy-Check: `go 0`/`stop 0` fiel sonst still auf
+            # den Default (Slot 1 bzw. Stop-ALL!) statt als ungueltig zu gelten.
+            return GoCommand(slot=int(n) if n is not None else 1)
         if kw == "back":
             advance()
             n = consume_number()
-            return BackCommand(slot=int(n) if n else 1)
+            return BackCommand(slot=int(n) if n is not None else 1)
         if kw == "stop":
             advance()
             n = consume_number()
-            return StopCommand(slot=int(n) if n else None)
+            return StopCommand(slot=int(n) if n is not None else None)
         if kw == "page":
             advance()
             nxt = peek()

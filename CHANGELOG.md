@@ -15,6 +15,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **LowRes-Anschluss der Modelle:** Neuer `segs()`-Helfer in `builders.js` — auf Low-Tier-GPUs halbieren alle Gehäuse-Rundkörper ihre Radial-Segmente (Boden 6), analog zur bestehenden Beam-Kegel-Reduktion; High-Tier bleibt unverändert. Der Mover-Bar-Beam hängt jetzt an der Linsen-Position statt an einem hart kodierten Offset (überlebt künftige Maß-Änderungen).
 - Tests: `test_fixture_models_have_realistic_dimensions` (Bounding-Box-Abnahme von PAR/MH/Spider/Bars/Nebel in echtem QtWebEngine, Beams ausgenommen); Low-/High-Tier-Tests prüfen zusätzlich die Gehäuse-Segmente (`mh-head-body` 14 vs. `par-body` 16).
 
+### 2026-07-09 — sACN sendet Stream-Termination beim Adapter-Wechsel (OUT-06 Teil, aus AUD-03)
+
+#### Geaendert / Fixes
+
+- **sACN-Ausgabe verwirft sich beim Schließen sofort:** `SACNSender.close()` schloss bisher nur den Socket. Empfänger mussten die Quelle dann über den E1.31-Timeout (~2,5 s Network Data Loss) verwerfen — beim Adapter-Wechsel blieben kurz zwei Quellen aktiv (Merge-Fenster). Jetzt sendet `close()` je zuletzt bespieltem Universum **3 Pakete mit gesetztem `Stream_Terminated`-Options-Bit** (E1.31-2018 6.2.6), sodass Empfänger die Quelle **sofort** freigeben. `_pack_framing` nimmt dafür ein optionales `options`-Byte; normale Datenpakete bleiben unverändert (Options = 0). Der sACN-CID ist weiterhin pro Instanz zufällig (Persistenz braucht einen Config-Speicherort → OUT-06-Rest offen).
+- **Tests:** `tests/test_sacn_loopback.py` (3 neu, Fake-Socket) — `close()` sendet 3× je Universe mit `Stream_Terminated`-Bit auf die korrekten Multicast-Ziele; normale Pakete haben das Bit nicht; `close()` ohne bespielte Universen ist sicher. Herkunft: AUD-03 (`docs/DMX_OUTPUT_AUDIT_2026_07_08.md`).
+
 ### 2026-07-12 — Fehlendes Other-Modell ergänzt, Truss-Geometrie entzerrt
 
 #### Neu / Verbessert / Tests
