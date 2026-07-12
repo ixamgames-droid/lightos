@@ -10,7 +10,7 @@
 Geh in die **Virtual Console** (`Strg+4`) und blättere mit `Strg+Bild↑` auf **Bank 1**
 (oben steht „BANK 1 FARBEFFEKTE"). Mit APC: **SCENE-Taste 1**.
 
-![Bank 1 Farbeffekte](img/mini_gruenes_lauflicht/01_bank1.png)
+![Bank 1 Farbeffekte](../img/mini_gruenes_lauflicht/01_bank1.png)
 
 ### Schritt 2 — Muster „Feste Farbe" antippen
 In der Reihe der Paarlichter-Muster die **erste Kachel „Feste Farbe"** antippen.
@@ -20,20 +20,20 @@ Jetzt leuchten alle Paarlichter (zunächst weiß).
 In der **obersten Reihe** (die bunten Farb-Kacheln) **„Grün"** antippen.
 → Alle Paarlichter leuchten **voll grün**. (Die Farb-Kacheln färben immer den **gerade laufenden** Effekt um.)
 
-![Alle Paarlichter voll grün](img/mini_gruenes_lauflicht/04_solid_gruen.png)
+![Alle Paarlichter voll grün](../img/mini_gruenes_lauflicht/04_solid_gruen.png)
 
 ### Schritt 4 — Bank 2 „Dimmereffekte" öffnen
 Mit `Strg+Bild↓` auf **Bank 2** (oben steht „BANK 2 DIMMEREFFEKTE"). Mit APC: **SCENE-Taste 2**.
 
-![Bank 2 Dimmereffekte](img/mini_gruenes_lauflicht/05_bank2.png)
+![Bank 2 Dimmereffekte](../img/mini_gruenes_lauflicht/05_bank2.png)
 
 ### Schritt 5 — Bewegung „Lauflicht" antippen
 Die **erste Dimmer-Kachel „Lauflicht"** antippen.
 → Das Grün **läuft jetzt durch** — die Lampen gehen nacheinander an. Fertig: **grünes Lauflicht!**
 
-![Grünes Lauflicht läuft](img/mini_gruenes_lauflicht/06_chase_frame.png)
+![Grünes Lauflicht läuft](../img/mini_gruenes_lauflicht/06_chase_frame.png)
 
-![Animation: grünes Lauflicht](img/mini_gruenes_lauflicht/gruenes_lauflicht.gif)
+![Animation: grünes Lauflicht](../img/mini_gruenes_lauflicht/gruenes_lauflicht.gif)
 
 ---
 
