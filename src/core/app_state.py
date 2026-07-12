@@ -697,12 +697,7 @@ class AppState:
         self._release_engine_extra()
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
-        gm_mask: dict[int, set] = {}
-        for fid, (fx, chans) in fix_index.items():
-            if not fixture_uses_dmx(fx):
-                continue
-            for addr in self._fixture_intensity_addrs(fx, chans):
-                gm_mask.setdefault(fx.universe, set()).add(addr)
+        gm_mask = self._build_gm_mask(fix_index)
         try:
             self.output_manager.set_gm_address_mask(
                 {u: frozenset(s) for u, s in gm_mask.items()})
@@ -1896,6 +1891,26 @@ class AppState:
             elif attr in _DIM_COLOR_ATTRS:
                 color.append(addr)
         return inten if inten else color
+
+    def _build_gm_mask(self, fix_index) -> dict[int, set]:
+        """Grand-Master-Adressmaske pro gepatchtem DMX-Universum: die zu dimmenden
+        Intensitaets-/Farbadressen (Pan/Tilt/Gobo bleiben unangetastet, Audit B4).
+
+        WICHTIG: JEDES gepatchte DMX-Universum bekommt einen (ggf. LEEREN) Eintrag.
+        So kann der Sende-Pfad (``output_manager._send_all``) 'gepatcht, aber ohne
+        Intensitaets-/Farbkanal' (leere Maske -> NICHTS skalieren) von 'ungepatchtes
+        Roh-Universum' (KEIN Key -> global dimmen wie bisher) unterscheiden. Ohne die
+        Leer-Saat fiel ein reines Pan/Tilt/Gobo-Universum (z. B. nur Farbrad-Spots
+        ohne Dimmer/RGB) in den mask-is-None-Global-Dim-Zweig -> der GM fuhr Moving
+        Heads bei GM<100 % auf falsche Pan/Tilt-Positionen."""
+        gm_mask: dict[int, set] = {}
+        for _fid, (fx, chans) in fix_index.items():
+            if not fixture_uses_dmx(fx):
+                continue
+            addrs = gm_mask.setdefault(fx.universe, set())   # Universum registrieren
+            for addr in self._fixture_intensity_addrs(fx, chans):
+                addrs.add(addr)
+        return gm_mask
 
     def _resolve_cue_stack(self, idx):
         """F-16: Index → Geschwister-Cueliste (oder None). Liest die Liste LIVE, ist
