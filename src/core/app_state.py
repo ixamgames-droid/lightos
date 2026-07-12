@@ -616,6 +616,11 @@ class AppState:
         laser_fids: set = set()
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
+            # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
+            # der Channel-Cache nach clear_channel_cache wieder befuellt wird) —
+            # sonst zahlt der naechste 20-FPS-Paint-Tick der Live-View pro
+            # distinktem Profil eine synchrone DB-Session auf dem GUI-Thread.
+            viz_model_override_for(fx)
             fix_index[fx.fid] = (fx, chans)
             # LAS-04: Netzwerk-Laser bleiben im fix_index (Programmer/Effekte
             # adressieren sie per fid), bekommen aber KEINE Defaults/Spans —
@@ -2042,7 +2047,10 @@ def viz_model_override_for(fixture) -> str:
             prof = s.get(FixtureProfile, pid)
             val = (getattr(prof, "viz_model", "") or "").strip() if prof else ""
     except Exception:
-        val = ""
+        # Transienter DB-Fehler (z.B. gesperrte fixtures.db mitten in einem
+        # Generator-Save): NICHT cachen — sonst wird der Fehlerfall dauerhaft
+        # als "kein Override" eingefroren. Naechster Aufruf versucht es neu.
+        return ""
     _viz_model_override_cache[pid] = val
     return val
 

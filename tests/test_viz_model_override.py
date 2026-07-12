@@ -163,6 +163,24 @@ class OverrideRoutingTest(unittest.TestCase):
         # Override schlaegt die par_bar-Heuristik.
         self.assertEqual(viz_model_for(f), "moving_head")
 
+    def test_transient_db_error_is_not_cached(self):
+        """Review-Fix (MEDIUM): Ein DB-Fehler darf nicht als '' eingefroren
+        werden — der naechste Aufruf muss es erneut versuchen."""
+        import src.core.app_state as APS
+        pid = save_generated_profile(
+            build_profile_payload(_par_bar_model(viz_model="spider")),
+            engine=self._eng)
+        f = self._fake_fixture(pid)
+
+        def _boom():
+            raise RuntimeError("fixtures.db gesperrt")
+        self._fdb.engine = _boom
+        self.assertEqual(viz_model_override_for(f), "")
+        self.assertNotIn(pid, APS._viz_model_override_cache)
+        # DB wieder da -> echter Wert, kein vergifteter Cache.
+        self._fdb.engine = lambda: self._eng
+        self.assertEqual(viz_model_override_for(f), "spider")
+
     def test_cache_cleared_on_clear_channel_cache(self):
         pid = save_generated_profile(
             build_profile_payload(_par_bar_model(viz_model="spider")),
@@ -178,6 +196,41 @@ class OverrideRoutingTest(unittest.TestCase):
         clear_channel_cache()
         # … nach Invalidierung frisch aus der DB.
         self.assertEqual(viz_model_override_for(f), "par")
+
+
+class PrewarmOnPatchMutationTest(unittest.TestCase):
+    """Review-Fix (MEDIUM): _rebuild_render_plan waermt den Override-Cache vor,
+    damit der 20-FPS-Paint-Pfad der Live-View nach einer Patch-Aenderung keine
+    synchronen DB-Sessions auf dem GUI-Thread zahlt (Muster = Channel-Cache)."""
+
+    def setUp(self):
+        from src.core.show.show_file import reset_show
+        from src.core.database.fixture_db import ensure_builtins
+        ensure_builtins()
+        reset_show()
+
+    def tearDown(self):
+        from src.core.show.show_file import reset_show
+        reset_show()
+
+    def test_add_fixture_prewarms_override_cache(self):
+        import src.core.app_state as APS
+        from src.core.app_state import get_state
+        from src.core.database.fixture_db import engine as fdb_engine
+        from src.core.database.models import PatchedFixture, FixtureProfile
+        from sqlalchemy import select
+        with Session(fdb_engine()) as s:
+            pid = int(s.execute(select(FixtureProfile.id).where(
+                FixtureProfile.short_name == "ZQ01424")).scalar_one())
+        state = get_state()
+        state.add_fixture(PatchedFixture(
+            fid=901, label="PAR", fixture_profile_id=pid,
+            mode_name="8-Kanal RGBW", universe=1, address=400, channel_count=8,
+            manufacturer_name="Generic", fixture_name="Stage Light ZQ01424",
+            fixture_type="par"), undoable=False)
+        # add_fixture -> _reload_patch_cache -> clear + Prewarm: der Cache
+        # muss den Profil-Eintrag OHNE weiteren viz_model_for-Aufruf enthalten.
+        self.assertIn(pid, APS._viz_model_override_cache)
 
 
 class GeneratorDialogVizModelTest(unittest.TestCase):
