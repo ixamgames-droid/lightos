@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-12 — Fixture-Generator: 3D-Modell wählbar mit Automatik-Vorschlag (FM-12)
+
+#### Neu / Verbessert / Tests
+
+- **„3D-Modell"-Auswahl im Fixture-Generator:** Beim Anlegen (oder QLC+-Import) eines Geräteprofils lässt sich jetzt explizit wählen, welches Visualizer-Modell das Gerät bekommt — 13 Modelle von PAR-Dose über Mover-Bar bis Hazer. Der Standardeintrag „Automatisch" zeigt live in Klammern, was die Kanal-Heuristik für den gerade bearbeiteten Modus vorschlagen würde (z. B. „Mover-Bar" bei zwei Pan-Köpfen); die Heuristik ist dafür als DB-freie Funktion `suggest_viz_model()` ausgekoppelt und bleibt die EINE gemeinsame Quelle mit dem Visualizer.
+- **Profil-Override wirkt überall gleichzeitig:** Die Wahl wird als neues Feld `FixtureProfile.viz_model` gespeichert (idempotente ALTER-TABLE-Migration für bestehende `fixtures.db`; leer = Automatik, Bestandsprofile unverändert). `viz_model_for` liefert den Override vor der Heuristik — 3D-Modell, 2D-Live-View-Symbol, Listen-Icon und die Spider-Spiegel-Option im Patch-Dialog schalten gemeinsam um. Der neue Override-Cache wird zusammen mit dem Channel-Cache invalidiert (auch direkt nach dem Speichern im Generator).
+- Tests: `tests/test_viz_model_override.py` (15) — Heuristik-Regeln inkl. Laser-Gate, Migration einer Alt-DB, Payload-/Speicher-Roundtrip, Override-Routing mit Cache-Invalidierung, Dialog-Vorschlag + explizite Wahl.
+
 ### 2026-07-12 — Realismus-Pass: 3D-Fixture-Modelle auf echte Datenblatt-Maße (FM-11)
 
 #### Neu / Verbessert / Tests

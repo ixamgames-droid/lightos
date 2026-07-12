@@ -36,6 +36,9 @@ class FixtureProfile(Base):
     power_w: Mapped[int] = mapped_column(Integer, default=0)
     notes: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(20), default="builtin")
+    # FM-12: expliziter 3D-Modell-Override fuer den Visualizer ("" = Automatik:
+    # Kanal-Heuristik viz_model_for bzw. fixture_type entscheidet).
+    viz_model: Mapped[str] = mapped_column(String(40), default="")
 
     manufacturer: Mapped[Manufacturer] = relationship(back_populates="fixtures")
     modes: Mapped[list[FixtureMode]] = relationship(
@@ -214,6 +217,11 @@ def migrate_fixtures_db(engine) -> None:
             if cols and "kind" not in cols:
                 conn.execute(text(
                     "ALTER TABLE channel_ranges ADD COLUMN kind VARCHAR DEFAULT ''"))
+            # FM-12: expliziter 3D-Modell-Override am Profil ("" = Automatik).
+            fcols = {row[1] for row in conn.execute(text("PRAGMA table_info(fixtures)"))}
+            if fcols and "viz_model" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN viz_model VARCHAR(40) DEFAULT ''"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 

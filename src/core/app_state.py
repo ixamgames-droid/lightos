@@ -2012,8 +2012,62 @@ _channel_cache: dict = {}
 
 
 def clear_channel_cache():
-    """Invalidiert den Channel-Cache (bei jeder Patch-Aenderung aufrufen)."""
+    """Invalidiert den Channel-Cache (bei jeder Patch-Aenderung aufrufen).
+    Leert auch den viz_model-Override-Cache (FM-12) mit — Profil-Aenderungen
+    aus Generator/Editor reisen ueber denselben Invalidierungs-Pfad."""
     _channel_cache.clear()
+    _viz_model_override_cache.clear()
+
+
+# FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der
+# Channel-Cache noetig, weil viz_model_for pro Fixture pro Frame laufen kann.
+_viz_model_override_cache: dict = {}
+
+
+def viz_model_override_for(fixture) -> str:
+    """Expliziter 3D-Modell-Override aus dem FixtureProfile (FM-12).
+
+    Liefert ``FixtureProfile.viz_model`` des gepatchten Geraets oder ``""``
+    (= Automatik). Gecached pro Profil-ID; ``clear_channel_cache`` leert mit."""
+    pid = getattr(fixture, "fixture_profile_id", None)
+    if pid is None:
+        return ""
+    cached = _viz_model_override_cache.get(pid)
+    if cached is not None:
+        return cached
+    try:
+        from .database.fixture_db import engine
+        from .database.models import FixtureProfile
+        with Session(engine()) as s:
+            prof = s.get(FixtureProfile, pid)
+            val = (getattr(prof, "viz_model", "") or "").strip() if prof else ""
+    except Exception:
+        val = ""
+    _viz_model_override_cache[pid] = val
+    return val
+
+
+def suggest_viz_model(fixture_type: str, attributes) -> str | None:
+    """Reine Multi-Emitter-Heuristik OHNE DB-Zugriff (FM-12).
+
+    ``attributes`` = Liste der Kanal-Attribut-Strings eines Modus. Liefert
+    'mover_bar' / 'par_bar' / 'spider' oder ``None`` (= Single-Head, Aufrufer
+    nutzt den ``fixture_type``). Identische Regeln wie ``viz_model_for``
+    (dort mit echten DB-Kanaelen); der Fixture-Generator nutzt sie fuer den
+    Live-Vorschlag auf noch ungespeicherten Kanallisten."""
+    if (fixture_type or "") == "laser":
+        return None            # Laser = Punkt-Scanner, nie Multi-Emitter (FLA-1)
+    attrs = [(a or "") for a in attributes]
+    banks = sum(1 for a in attrs if a == "color_r")
+    if banks < 2:
+        return None
+    pan_count = sum(1 for a in attrs if a == "pan")
+    tilt_count = sum(1 for a in attrs if a == "tilt")
+    if pan_count >= 2:
+        return "mover_bar"
+    if pan_count == 0 and tilt_count == 0:
+        return "par_bar"
+    return "spider"
 
 
 class _AttrOverrideChannel:
@@ -2207,26 +2261,35 @@ def viz_model_for(fixture):
 
     EINZIGE Quelle, damit 2D-Symbol (``live_view``/``mini_icons``), 3D-Modell
     (``VisualizerBridge._viz_model_for``) und die Patch-Spiegel-Option NICHT
-    auseinanderdriften. Rein aus dem Kanal-Layout:
+    auseinanderdriften.
+
+    FM-12: Ein expliziter Profil-Override (``FixtureProfile.viz_model``, im
+    Fixture-Generator waehlbar) gewinnt IMMER — er darf auch Single-Head-
+    Modelle ('par', 'laser', …) liefern; alle Aufrufer nutzen das Muster
+    ``viz_model_for(f) or f.fixture_type`` und tragen ihn damit durch.
+
+    Ohne Override rein aus dem Kanal-Layout:
       * kein ``is_spider_fixture`` (>=2 RGBW-Banks) -> ``None`` (Aufrufer nutzt
         den ``fixture_type``).
       * >=2 ``pan`` (Pro-Kopf-Pan)         -> ``'mover_bar'`` (FM-4: N Mini-MHs).
       * keine Bewegung (kein Pan, kein Tilt) -> ``'par_bar'`` (FM-3: N PARs).
       * sonst (Bewegung, aber kein Pro-Kopf-Pan) -> ``'spider'`` (Doppelbar).
     """
+    override = viz_model_override_for(fixture)
+    if override:
+        return override
     if not is_spider_fixture(fixture):
         return None
     try:
         chans = get_channels_for_patched(fixture)
     except Exception:
         return "spider"
-    pan_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
-    tilt_count = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
-    if pan_count >= 2:
-        return "mover_bar"
-    if pan_count == 0 and tilt_count == 0:
-        return "par_bar"
-    return "spider"
+    # Gemeinsame Heuristik mit dem Generator-Vorschlag (suggest_viz_model);
+    # nach bestandenem is_spider_fixture liefert sie immer ein Multi-Emitter-
+    # Modell — "spider" nur als defensiver Fallback.
+    return suggest_viz_model(
+        getattr(fixture, "fixture_type", ""),
+        [(getattr(c, "attribute", "") or "") for c in chans]) or "spider"
 
 
 def tilt_head_count(fixture) -> int:

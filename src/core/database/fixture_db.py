@@ -321,6 +321,8 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
             power_w=int(payload.get("power_w", 0) or 0),
             notes=payload.get("notes", "") or "",
             source=payload.get("source", "user") or "user",
+            # FM-12: expliziter 3D-Modell-Override ("" = Automatik).
+            viz_model=(payload.get("viz_model") or "").strip()[:40],
         )
         s.add(prof)
         s.flush()

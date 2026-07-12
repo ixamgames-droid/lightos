@@ -46,6 +46,28 @@ FINE_CAPABLE_ATTRS = {
 RANGE_KINDS = ["", "open", "closed", "strobe", "color", "gobo", "rotate",
                "shake", "sound", "reset"]
 
+# FM-12: waehlbare 3D-Visualizer-Modelle. Wert "" = Automatik (Kanal-Heuristik
+# suggest_viz_model bzw. fixture_type); alles andere ist ein harter Override,
+# der als FixtureProfile.viz_model gespeichert wird und 3D, 2D-Live-View und
+# Listen-Icons gemeinsam umschaltet (viz_model_for, FM-7).
+VIZ_MODEL_CHOICES = [
+    ("Automatisch (Vorschlag)", ""),
+    ("PAR-Dose", "par"),
+    ("Moving Head", "moving_head"),
+    ("Scanner (Spiegel)", "scanner"),
+    ("LED-Bar (Pixel)", "led_bar"),
+    ("PAR-Bar (N Köpfe)", "par_bar"),
+    ("Mover-Bar (N bewegliche Köpfe)", "mover_bar"),
+    ("Spider (Doppel-Bar)", "spider"),
+    ("Strobe", "strobe"),
+    ("Dimmer-Pack", "dimmer"),
+    ("Laser", "laser"),
+    ("Nebelmaschine", "smoke"),
+    ("Hazer", "hazer"),
+    ("Neutrales Gerät", "other"),
+]
+VIZ_MODEL_LABELS = {value: label for label, value in VIZ_MODEL_CHOICES if value}
+
 
 # ── Datenmodell (UI-unabhaengig, serialisierbar) ─────────────────────────────
 
@@ -106,6 +128,8 @@ class GeneratorModel:
     fixture_type: str = "par"
     power_w: int = 0
     notes: str = ""
+    # FM-12: expliziter 3D-Modell-Override ("" = Automatik/Vorschlag).
+    viz_model: str = ""
     modes: list[GenMode] = field(default_factory=list)
 
     def to_payload(self) -> dict:
@@ -157,6 +181,7 @@ def build_profile_payload(model: GeneratorModel) -> dict:
         "power_w": int(model.power_w or 0),
         "notes": model.notes or "",
         "source": "user",
+        "viz_model": (model.viz_model or "").strip(),
         "modes": modes_out,
     }
 
@@ -1002,7 +1027,19 @@ class FixtureGeneratorDialog(QDialog):
         self._cb_type = QComboBox()
         self._cb_type.addItems(FIXTURE_TYPES)
         self._cb_type.setCurrentText(self._model.fixture_type)
+        self._cb_type.currentTextChanged.connect(lambda *_: self._revalidate())
         form.addRow("Typ:", self._cb_type)
+        # FM-12: 3D-Modell-Wahl mit Live-Vorschlag der Automatik.
+        self._cb_vizmodel = QComboBox()
+        for label, value in VIZ_MODEL_CHOICES:
+            self._cb_vizmodel.addItem(label, value)
+        self._cb_vizmodel.setToolTip(
+            "Welches 3D-Modell der Visualizer (und die 2D-Symbole) fuer dieses "
+            "Geraet verwenden. 'Automatisch' folgt der Kanal-Heuristik — der "
+            "aktuelle Vorschlag steht in Klammern.")
+        idx = self._cb_vizmodel.findData(self._model.viz_model or "")
+        self._cb_vizmodel.setCurrentIndex(idx if idx >= 0 else 0)
+        form.addRow("3D-Modell:", self._cb_vizmodel)
         self._spin_power = QSpinBox()
         self._spin_power.setRange(0, 5000)
         self._spin_power.setSuffix(" W")
@@ -1116,14 +1153,35 @@ class FixtureGeneratorDialog(QDialog):
         self._model.model = self._edit_model.text().strip() or "Neues Fixture"
         self._model.short_name = self._edit_short.text().strip()
         self._model.fixture_type = self._cb_type.currentText()
+        self._model.viz_model = self._cb_vizmodel.currentData() or ""
         self._model.power_w = self._spin_power.value()
         self._model.notes = self._edit_notes.text()
         for i in range(self._tabs.count()):
             self._tabs.widget(i).sync_from_widgets()
 
     # ── Validierung ──────────────────────────────────────────────────────
+    def _viz_suggestion(self) -> str:
+        """Modell, das die Automatik fuer den aktuell bearbeiteten Modus
+        waehlen wuerde (FM-12) — identische Heuristik wie der Visualizer."""
+        from src.core.app_state import suggest_viz_model
+        idx = self._tabs.currentIndex() if hasattr(self, "_tabs") else -1
+        mode = None
+        if 0 <= idx < len(self._model.modes):
+            mode = self._model.modes[idx]
+        elif self._model.modes:
+            mode = self._model.modes[0]
+        attrs = [ch.attribute for ch in mode.channels] if mode else []
+        return (suggest_viz_model(self._model.fixture_type, attrs)
+                or (self._model.fixture_type or "other"))
+
+    def _update_viz_suggestion(self):
+        sug = self._viz_suggestion()
+        label = VIZ_MODEL_LABELS.get(sug, sug)
+        self._cb_vizmodel.setItemText(0, f"Automatisch (Vorschlag: {label})")
+
     def _revalidate(self):
         self._sync_all()
+        self._update_viz_suggestion()
         issues = validate_model(self._model)
         if not issues:
             self._issues.setHtml(
@@ -1153,6 +1211,8 @@ class FixtureGeneratorDialog(QDialog):
         self._edit_model.setText(model.model)
         self._edit_short.setText(model.short_name)
         self._cb_type.setCurrentText(model.fixture_type)
+        vidx = self._cb_vizmodel.findData(model.viz_model or "")
+        self._cb_vizmodel.setCurrentIndex(vidx if vidx >= 0 else 0)
         self._spin_power.setValue(model.power_w)
         self._edit_notes.setText(model.notes)
         self._reload_modes()
@@ -1198,6 +1258,12 @@ class FixtureGeneratorDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Speichern", f"Fehlgeschlagen:\n{e}")
             return
+        try:
+            # FM-12: gecachte viz_model-Overrides/Channels des Profils verwerfen.
+            from src.core.app_state import clear_channel_cache
+            clear_channel_cache()
+        except Exception:
+            pass
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.REFRESH_ALL, None)
