@@ -159,12 +159,32 @@ class SceneGraph:
         if node_id not in self._nodes:
             return
         if reparent_children_to_root:
+            # keep_world: die Kinder an ihrer aktuellen WELT-Position lassen (wie
+            # der Docstring verspricht). Vorher wurde nur parent_id genullt — die
+            # lokale Transform (Dock-Offset zum Parent) wurde damit zur Welt-
+            # Transform und das Fixture teleportierte um die volle Parent-Transform.
+            # reparent(..., keep_world=True) baeckt die Welt-Pose in die lokale.
             for child in self.children_of(node_id):
-                child.parent_id = None
+                self.reparent(child.id, None, keep_world=True)
         else:
             for child in list(self.children_of(node_id)):
                 self.remove(child.id, reparent_children_to_root=reparent_children_to_root)
         self._nodes.pop(node_id, None)
+
+    def _would_create_cycle(self, node_id: str, new_parent_id: str) -> bool:
+        """True, wenn ``new_parent_id`` gleich ``node_id`` ist ODER ein Nachfahre
+        von ``node_id`` — dann wuerde ein Reparent eine geschlossene parent-Kette
+        bilden. Laeuft die Vorfahren-Kette von ``new_parent_id`` hoch (mit eigenem
+        Besuchs-Set, robust auch gegen bereits vorhandene Zyklen)."""
+        seen: set[str] = set()
+        cur: str | None = new_parent_id
+        while cur is not None and cur not in seen:
+            if cur == node_id:
+                return True
+            seen.add(cur)
+            parent = self._nodes.get(cur)
+            cur = parent.parent_id if parent is not None else None
+        return False
 
     def reparent(self, node_id: str, new_parent_id: str | None, *, keep_world: bool = True) -> None:
         """Haengt ``node_id`` an einen neuen Parent.
@@ -176,6 +196,12 @@ class SceneGraph:
         """
         node = self._nodes.get(node_id)
         if node is None:
+            return
+        # Zyklen verhindern: node darf nicht unter sich selbst ODER einen seiner
+        # Nachfahren gehaengt werden — sonst entsteht eine geschlossene parent-
+        # Kette (falsche Welt-Transform + Endlosschleife in
+        # descendant_world_transforms). Ungueltiger Reparent = No-Op.
+        if new_parent_id is not None and self._would_create_cycle(node_id, new_parent_id):
             return
         if keep_world:
             world = self.world_transform(node_id)
@@ -281,9 +307,16 @@ class SceneGraph:
         ueber alle Ebenen), keyed nach ``fixture_id``. Fuer Bulk-Propagation
         nach einer Parent-Transform-Aenderung (Constraint 2)."""
         result: dict[int, Transform] = {}
+        # Besuchs-Set: schuetzt vor Endlosschleife, falls die parent-Kette doch
+        # einmal einen Zyklus enthaelt (analog zum visiting-Guard in
+        # _world_transform; reparent verhindert Zyklen jetzt zusaetzlich an der Quelle).
+        seen: set[str] = set()
         stack = list(self.children_of(node_id))
         while stack:
             child = stack.pop()
+            if child.id in seen:
+                continue
+            seen.add(child.id)
             if child.kind == NodeKind.FIXTURE and child.fixture_id is not None:
                 result[child.fixture_id] = self.world_transform(child.id)
             stack.extend(self.children_of(child.id))
