@@ -4,7 +4,8 @@
 > Wertebereiche (ChannelRanges) funktionieren und wie der Programmer daraus
 > generische Bedienelemente baut.
 > Verwandt: [MOVING_HEADS.md](MOVING_HEADS.md) ·
-> [FUTURE_FIXTURE_GENERATOR.md](FUTURE_FIXTURE_GENERATOR.md)
+> [FUTURE_FIXTURE_GENERATOR.md](FUTURE_FIXTURE_GENERATOR.md) ·
+> [FIXTURE_3D_GALLERY.md](FIXTURE_3D_GALLERY.md) (gerenderte 3D-Modelle aller Klassen)
 
 ---
 
