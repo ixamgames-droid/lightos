@@ -31,6 +31,10 @@ class ChannelModifierDialog(QDialog):
 
         self._table = QTableWidget(0, 4)
         self._table.setHorizontalHeaderLabels(["Universe", "Adresse", "Curve", "Name"])
+        # Name-Spalte (3) ist editierbar -> Edits sofort zurueck ins Modifier-Objekt
+        # schreiben, sonst gingen sie beim Speichern verloren (nur der Manager wird
+        # persistiert, nicht der Tabellentext).
+        self._table.itemChanged.connect(self._on_name_edited)
         self._table.horizontalHeader().setSectionResizeMode(
             2, QHeaderView.ResizeMode.Stretch
         )
@@ -78,6 +82,9 @@ class ChannelModifierDialog(QDialog):
 
     def _refresh(self):
         mods = sorted(self._mgr.all(), key=lambda m: (m.universe, m.address))
+        # Waehrend des Neuaufbaus die itemChanged-Signale unterdruecken (sonst
+        # feuert das Setzen der Zellen den Name-Handler).
+        self._table.blockSignals(True)
         self._table.setRowCount(len(mods))
         for r, m in enumerate(mods):
             item_u = QTableWidgetItem(str(m.universe))
@@ -94,7 +101,18 @@ class ChannelModifierDialog(QDialog):
                 lambda _, mod=m, cb=combo: self._change_curve(mod, cb)
             )
             self._table.setCellWidget(r, 2, combo)
-            self._table.setItem(r, 3, QTableWidgetItem(m.name))
+            name_item = QTableWidgetItem(m.name)
+            name_item.setData(Qt.ItemDataRole.UserRole, m)   # Modifier-Referenz
+            self._table.setItem(r, 3, name_item)
+        self._table.blockSignals(False)
+
+    def _on_name_edited(self, item):
+        """Editierten Namen (Spalte 3) sofort ins Modifier-Objekt schreiben."""
+        if item.column() != 3:
+            return
+        mod = item.data(Qt.ItemDataRole.UserRole)
+        if mod is not None:
+            mod.name = item.text()
 
     def _add_modifier(self):
         u = self._spin_univ.value()

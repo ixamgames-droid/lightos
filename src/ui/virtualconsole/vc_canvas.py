@@ -324,6 +324,10 @@ class VCCanvas(QWidget):
             VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly
         ):
             child.setVisible(self.on_active_bank(child))
+            # Frames haben eigene (Seiten x Bank)-Sichtbarkeit fuer ihre Kinder —
+            # sonst blieben Bank-Pins verschachtelter Widgets unbeachtet.
+            if hasattr(child, "_apply_bank_visibility"):
+                child._apply_bank_visibility()
 
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
