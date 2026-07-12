@@ -316,8 +316,14 @@ class PlaybackView(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self._state.remove_cue_stack(self._current_stack)
-            self._current_stack = None
+            removed = self._current_stack
+            self._state.remove_cue_stack(removed)
+            # remove_cue_stack emittiert synchron stacks_changed -> der Combo-Refresh
+            # hat _current_stack ggf. schon auf die naechste gueltige Cueliste gesetzt.
+            # Nur auf None setzen, wenn wirklich noch die geloeschte referenziert wird —
+            # sonst zeigte die Combo eine Auswahl, waehrend die Cue-Tabelle leer blieb.
+            if self._current_stack is removed:
+                self._current_stack = None
 
     def _refresh_table(self):
         if not self._current_stack:
