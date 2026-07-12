@@ -3,7 +3,7 @@
 Diese Anleitung zeigt **Schritt für Schritt**, wie im LightOS-3D-Visualizer eine Bühne
 gebaut wird (Trassen, Stützen, Plattform) und wie Fixtures daran gehängt werden —
 seitlich, unten und oben. Sie entstand beim Live-Durchspielen der Demo-Show
-[`shows/demo_komplett_2026.lshow`](../../shows/demo_komplett_2026.lshow).
+`shows/demo_komplett_2026.lshow` (Demo-Show, selbst aufzubauen — nicht mitgeliefert).
 
 > **Wichtiger Kontext — der 3D-Bearbeiten-Fix:** Bis 2026-07-07 war das Bearbeiten im 3D
 > komplett tot (Hinzufügen/Verschieben/Drehen/Kamera-Reset reagierten nicht, Fixtures
