@@ -10,6 +10,9 @@ und Web-Remote.
 
 > **Neu hier?** Bebilderte Schritt-für-Schritt-Anleitungen mit Screenshots:
 > **[docs/ANLEITUNGEN.md](docs/ANLEITUNGEN.md)**
+>
+> **3D-Modelle:** Alle Fixture-3D-Modelle des Visualizers auf einen Blick:
+> **[docs/FIXTURE_3D_GALLERY.md](docs/FIXTURE_3D_GALLERY.md)**
 
 ---
 

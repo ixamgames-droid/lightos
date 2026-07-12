@@ -1,0 +1,106 @@
+<!doctype html>
+<!--
+  DOC-11 Fixture-3D-Galerie-Render-Harness (Dev-/Doku-Werkzeug, KEIN Produktiv-Pfad).
+  Rendert NACHEINANDER ALLE viz_model-Fixture-3D-Modelle mit der ECHTEN Produktions-
+  Szene/Renderer/Lichtern/Buildern (scene_src/…) — maximal originalgetreu — und POSTet
+  jedes Canvas-PNG an den gallery_server (-> docs/img/fixture_gallery/<typ>.png).
+  Braucht eine echte GPU (Browser-Preview-Pane); offscreen faellt WebGL aus.
+  Start via tools/gallery_server.py; dann http://127.0.0.1:PORT/gallery_render.html
+  Fortschritt: window.__done / window.__log.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #12141a; }
+  #err { position: fixed; left: 8px; top: 8px; color: #f66; font: 13px monospace; white-space: pre-wrap; z-index: 9; }
+  #label { position: fixed; left: 12px; bottom: 10px; color: #cdd3dd; font: 15px system-ui, sans-serif; z-index: 9; }
+</style>
+<script src="three_local.js"></script>
+<script src="assets/OBJLoader.js"></script>
+<script src="assets/ColladaLoader.js"></script>
+</head>
+<body>
+<div id="err"></div>
+<div id="label"></div>
+<script type="module">
+  const TYPES = ['moving_head','spider','par_bar','mover_bar','par','led_bar','strobe',
+                 'dimmer','other','scanner','smoke','hazer','laser'];
+  const showErr = (m) => { document.getElementById('err').textContent += m + '\n'; };
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  window.addEventListener('error', e => showErr('ERR: ' + (e.message || e)));
+  window.__log = [];
+  window.__done = false;
+  try {
+    const THREE = (await import('./scene_src/three/three.js')).default || window.THREE;
+    const { scene, renderer } = await import('./scene_src/scene/renderer.js');
+    const { applyBrightness } = await import('./scene_src/scene/lights.js');
+    const { buildFixtureModel } = await import('./scene_src/fixtures/registry.js');
+
+    const W = 1000, H = 760;
+    document.body.appendChild(renderer.domElement);
+    renderer.setSize(W, H);
+    renderer.domElement.style.width = W + 'px';
+    renderer.domElement.style.height = H + 'px';
+    scene.fog = null;
+    applyBrightness(0.62);
+
+    const cam = new THREE.PerspectiveCamera(42, W / H, 0.01, 200);
+
+    // Bounding-Box NUR ueber echte Meshes (Builder haengen 2D-Icons an, an denen
+    // Box3.setFromObject scheitert). Fehlertolerant.
+    function meshBox(model) {
+      const box = new THREE.Box3();
+      try { model.updateMatrixWorld(true); } catch (e) {}
+      model.traverse(o => {
+        try {
+          if (o && o.isMesh && o.geometry) {
+            if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+            if (o.geometry.boundingBox) box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+          }
+        } catch (e) {}
+      });
+      return box;
+    }
+    function frame(model) {
+      let box; try { box = meshBox(model); } catch (e) { box = null; }
+      let center, maxDim;
+      if (box && !box.isEmpty()) {
+        const size = box.getSize(new THREE.Vector3());
+        center = box.getCenter(new THREE.Vector3());
+        maxDim = Math.max(size.x, size.y, size.z, 0.1);
+      } else { center = new THREE.Vector3(0, 0.3, 0); maxDim = 0.6; }
+      cam.position.set(center.x + maxDim * 1.45, center.y + maxDim * 1.05, center.z + maxDim * 2.0);
+      cam.lookAt(center);
+    }
+
+    (async () => {
+      let current = null;
+      for (const type of TYPES) {
+        if (current) scene.remove(current);
+        document.getElementById('label').textContent = type;
+        let model;
+        try {
+          const built = buildFixtureModel(type, { mirror: false, nHeads: 4, pixelBar: false });
+          model = built.group || built;        // Builder -> { group, ... }; group = Object3D
+        } catch (e) { window.__log.push(type + ': build-ERR ' + e.message); continue; }
+        current = model;
+        scene.add(model);
+        await sleep(2600);                      // async .dae-Overlays laden (bis ~62 KB, ColladaLoader-Parse)
+        frame(model);
+        renderer.render(scene, cam);
+        const png = renderer.domElement.toDataURL('image/png');
+        try {
+          const resp = await fetch('/save/' + type, { method: 'POST', body: png });
+          window.__log.push(type + ': ' + (await resp.text()));
+        } catch (e) { window.__log.push(type + ': POST-ERR ' + e.message); }
+      }
+      window.__done = true;
+    })();
+  } catch (e) {
+    showErr('FATAL: ' + (e && e.stack ? e.stack : e));
+    window.__done = true;
+  }
+</script>
+</body>
+</html>
