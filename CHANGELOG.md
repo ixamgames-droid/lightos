@@ -7,12 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-12 — Realismus-Pass: 3D-Fixture-Modelle auf echte Datenblatt-Maße (FM-11)
+
+#### Neu / Verbessert / Tests
+
+- **Alle prozeduralen Fixture-Modelle folgen jetzt echten Geräteabmessungen** (Referenzen als Kommentar am jeweiligen Builder in `builders.js`): PAR-64-Dose Ø 0,23 m statt Ø 0,44 (neu mit Doppelbügel); Moving Head der Intimidator-260-Klasse ~0,48 m hoch statt 0,85; 8×10W-Spider 0,40 × 0,25 × 0,20 m statt 0,88 × 0,54 m Grundfläche; 4er-PAR-Bar in Dotz-TPar-Maßen (~1,05 m statt 1,82 m); 4-Kopf-Mover-Bar ~1,05 m mit Ø-0,10-m-Köpfen statt 2,05 m; LED-Pixel-Bar 1,07 × 0,088 × 0,065 m; Strobe 0,46 × 0,14 × 0,24 m; Dimmerpack als kompakter 4-Kanal-Truss-Kasten mit Ausgangs-Dosen statt Torblenden; Scanner mit **Spiegel am Gehäuse-Ende** (Dynamo-Klasse) statt mittig; Laser in Ehaho-L2600-Maßen (201 × 66 × 160 mm, flaches Alu-Gehäuse mit Bügel, Frontfenster, Lüftungsgitter); Nebelmaschine der N-10-Klasse mit vorstehender Düse und Hängebügel; Hazer der Antari-HZ-100-Klasse (hochkant, Tragegriff, Ausblasgitter vorn oben).
+- **LowRes-Anschluss der Modelle:** Neuer `segs()`-Helfer in `builders.js` — auf Low-Tier-GPUs halbieren alle Gehäuse-Rundkörper ihre Radial-Segmente (Boden 6), analog zur bestehenden Beam-Kegel-Reduktion; High-Tier bleibt unverändert. Der Mover-Bar-Beam hängt jetzt an der Linsen-Position statt an einem hart kodierten Offset (überlebt künftige Maß-Änderungen).
+- Tests: `test_fixture_models_have_realistic_dimensions` (Bounding-Box-Abnahme von PAR/MH/Spider/Bars/Nebel in echtem QtWebEngine, Beams ausgenommen); Low-/High-Tier-Tests prüfen zusätzlich die Gehäuse-Segmente (`mh-head-body` 14 vs. `par-body` 16).
+
 ### 2026-07-09 — sACN sendet Stream-Termination beim Adapter-Wechsel (OUT-06 Teil, aus AUD-03)
 
 #### Geaendert / Fixes
 
 - **sACN-Ausgabe verwirft sich beim Schließen sofort:** `SACNSender.close()` schloss bisher nur den Socket. Empfänger mussten die Quelle dann über den E1.31-Timeout (~2,5 s Network Data Loss) verwerfen — beim Adapter-Wechsel blieben kurz zwei Quellen aktiv (Merge-Fenster). Jetzt sendet `close()` je zuletzt bespieltem Universum **3 Pakete mit gesetztem `Stream_Terminated`-Options-Bit** (E1.31-2018 6.2.6), sodass Empfänger die Quelle **sofort** freigeben. `_pack_framing` nimmt dafür ein optionales `options`-Byte; normale Datenpakete bleiben unverändert (Options = 0). Der sACN-CID ist weiterhin pro Instanz zufällig (Persistenz braucht einen Config-Speicherort → OUT-06-Rest offen).
 - **Tests:** `tests/test_sacn_loopback.py` (3 neu, Fake-Socket) — `close()` sendet 3× je Universe mit `Stream_Terminated`-Bit auf die korrekten Multicast-Ziele; normale Pakete haben das Bit nicht; `close()` ohne bespielte Universen ist sicher. Herkunft: AUD-03 (`docs/DMX_OUTPUT_AUDIT_2026_07_08.md`).
+
 ### 2026-07-12 — Fehlendes Other-Modell ergänzt, Truss-Geometrie entzerrt
 
 #### Neu / Verbessert / Tests

@@ -7,6 +7,14 @@ import * as THREE from '../three/three.js';
 import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
+import { isLowSpec } from '../scene/renderer.js';
+
+// LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
+// Gehaeuse-Rundkoerper ihre Radial-Segmente (Boden 6) — analog zum Beam-Kegel
+// in fixtures.js (12 statt 24 Segmente). High-Tier behaelt die vollen Werte.
+function segs(n) {
+  return isLowSpec ? Math.max(6, Math.round(n / 2)) : n;
+}
 
 // ── Builders ─────────────────────────────────────────────────────────────────
 export function buildMovingHead() {
@@ -17,80 +25,105 @@ export function buildMovingHead() {
   // ist -Y (deckt sich mit dem Beam aus createBeamCone) -> Linse an der Unterseite.
   // Pivots/Return-Vertrag unveraendert (yoke pant um Y, head kippt um X, lens =
   // Farb-Feedback via updateFixture, addFixture haengt den Beam an model.head).
+  // Reale Referenz (FM-Runde 2): Mittelklasse-LED-Spot wie Chauvet Intimidator
+  // Spot 260 — 232 x 351 x 163 mm. Das Modell nutzt eine leicht groessere
+  // Generik (Basis Ø ~0,30 m, Gesamthoehe ~0,47 m), weil die Builtins MH8/16
+  // auch fuer groessere Heads stehen; vorher war die Basis Ø 0,60 m (Fantasie).
   const group = new THREE.Group();
   const darkMetal = new THREE.MeshStandardMaterial({ color: 0x191920, metalness: 0.8, roughness: 0.35 });
   const midMetal  = new THREE.MeshStandardMaterial({ color: 0x26262e, metalness: 0.7, roughness: 0.30 });
   const trim      = new THREE.MeshStandardMaterial({ color: 0x3a3a46, metalness: 0.6, roughness: 0.40 });
 
-  // ── Basis: breite Bodenplatte + kegeliger Hals ──
-  const baseP = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.30, 0.07, 28), darkMetal);
-  baseP.position.y = 0.035; baseP.castShadow = true; group.add(baseP);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.26, 0.11, 28), midMetal);
-  neck.position.y = 0.125; group.add(neck);
+  // ── Basis: Bodenplatte + kegeliger Hals ──
+  const baseP = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.16, 0.045, segs(28)), darkMetal);
+  baseP.position.y = 0.022; baseP.castShadow = true; group.add(baseP);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.145, 0.065, segs(28)), midMetal);
+  neck.position.y = 0.075; group.add(neck);
 
   // ── Yoke (pant um Y) ──
   const yoke = new THREE.Group();
-  yoke.position.y = 0.19;
+  yoke.position.y = 0.11;
   group.add(yoke);
-  const turn = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.055, 28), trim);
-  turn.position.y = 0.01; yoke.add(turn);
-  [-0.21, 0.21].forEach(x => {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.42, 0.13), midMetal);   // U-Arm
-    arm.position.set(x, 0.27, 0); arm.castShadow = true; yoke.add(arm);
-    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.078, 0.09, 22), darkMetal);
-    motor.rotation.z = Math.PI / 2; motor.position.set(x * 0.82, 0.46, 0); yoke.add(motor);
+  const turn = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.032, segs(28)), trim);
+  turn.position.y = 0.006; yoke.add(turn);
+  [-0.12, 0.12].forEach(x => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.245, 0.075), midMetal);   // U-Arm
+    arm.position.set(x, 0.155, 0); arm.castShadow = true; yoke.add(arm);
+    const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.052, segs(22)), darkMetal);
+    motor.rotation.z = Math.PI / 2; motor.position.set(x * 0.82, 0.265, 0); yoke.add(motor);
   });
 
   // ── Kopf (kippt um X), Lichtausgang -Y ──
   const head = new THREE.Group();
-  head.position.y = 0.46;
+  head.position.y = 0.265;
   yoke.add(head);
-  const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.175, 0.34, 28), midMetal);
+  const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.100, 0.20, segs(28)), midMetal);
+  headBody.name = 'mh-head-body';
   headBody.castShadow = true; head.add(headBody);
-  [0.09, -0.03].forEach(y => {                     // zwei Zier-Ringe (Rillen)
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.179, 0.179, 0.018, 28), trim);
+  [0.052, -0.017].forEach(y => {                   // zwei Zier-Ringe (Rillen)
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.103, 0.103, 0.011, segs(28)), trim);
     ring.position.y = y; head.add(ring);
   });
-  const lensRing = new THREE.Mesh(new THREE.CylinderGeometry(0.168, 0.152, 0.05, 28), darkMetal);
-  lensRing.position.y = -0.17; head.add(lensRing);
+  const lensRing = new THREE.Mesh(new THREE.CylinderGeometry(0.096, 0.087, 0.03, segs(28)), darkMetal);
+  lensRing.position.y = -0.10; head.add(lensRing);
   const lens = new THREE.Mesh(                      // emissive Linse (Farb-Feedback)
-    new THREE.CylinderGeometry(0.135, 0.135, 0.02, 28),
+    new THREE.CylinderGeometry(0.077, 0.077, 0.012, segs(28)),
     new THREE.MeshStandardMaterial({ color: 0x606060, emissive: 0x000000, metalness: 0.3, roughness: 0.2 })
   );
-  lens.position.y = -0.195; head.add(lens);
+  lens.position.y = -0.115; head.add(lens);
 
   return { group, yoke, head, lens };
 }
 
 export function buildPar() {
+  // Reale Referenz (FM-Runde 2): PAR-64-Dose, z.B. Eurolite LED PAR-64 short
+  // (280 x 265 x 320 mm inkl. Buegel, Tubus Ø ~0,23 m) — vorher Ø 0,44 m.
   const group = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 });
   const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.22, 0.22, 0.32, 16),
-    new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 })
+    new THREE.CylinderGeometry(0.115, 0.115, 0.30, segs(16)),
+    bodyMat
   );
+  body.name = 'par-body';
   body.castShadow = true;
   group.add(body);
   const front = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.22, 0.22, 0.04, 16),
+    new THREE.CylinderGeometry(0.115, 0.115, 0.03, segs(16)),
     new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95, roughness: 0.05 })
   );
-  front.position.y = -0.18;
+  front.position.y = -0.165;
   group.add(front);
-  // Try to overlay a real PAR model. If loaded, hide procedural body but keep lens for emissive.
+  // Haengebuegel (Doppelbuegel wie am echten PAR): zwei Arme + Querjoch.
+  const bracketParts = [];
+  [-0.13, 0.13].forEach(x => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.16, 0.05), bodyMat);
+    arm.position.set(x, 0.09, 0);
+    group.add(arm);
+    bracketParts.push(arm);
+  });
+  const yokeBar = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.028, 0.05), bodyMat);
+  yokeBar.position.y = 0.175;
+  group.add(yokeBar);
+  bracketParts.push(yokeBar);
+  // Try to overlay a real PAR model. If loaded, hide procedural body (incl.
+  // Buegel — das .dae bringt seine eigene Silhouette mit), keep lens emissive.
   loadModel('assets/models/fixtures/par.dae', (model) => {
     if (!model) return;
-    fitModelToSize(model, { x: 0.5, y: 0.5, z: 0.5 });
+    fitModelToSize(model, { x: 0.26, y: 0.32, z: 0.26 });
     model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
     body.visible = false;
+    bracketParts.forEach(p => { p.visible = false; });
     group.add(model);
   });
   return { group, head: group, lens: front };
 }
 
 export function buildLedBar() {
+  // Reale Referenz (FM-Runde 2): 1-m-LED-Bar, z.B. Stairville LED Bar 240/8
+  // (1070 x 88 x 65 mm) — vorher 1,2 m lang und 0,18 m tief (zu klobig).
   const group = new THREE.Group();
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(1.2, 0.12, 0.18),
+    new THREE.BoxGeometry(1.07, 0.088, 0.065),
     new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 })
   );
   body.castShadow = true;
@@ -103,8 +136,8 @@ export function buildLedBar() {
   });
   let firstPx = null;
   for (let i = 0; i < 8; i++) {
-    const px = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.02), pxMat);
-    px.position.set(-0.5 + i * 0.14, 0, 0.1);
+    const px = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.06, 0.015), pxMat);
+    px.position.set(-0.4375 + i * 0.125, 0, 0.037);
     group.add(px);
     if (!firstPx) firstPx = px;
   }
@@ -112,22 +145,25 @@ export function buildLedBar() {
 }
 
 export function buildStrobe() {
+  // Reale Referenz (FM-Runde 2): Eurolite Superstrobe 2700 — 460 x 240 x 140 mm
+  // (B x T x H). Vorher 0,6 x 0,5 m Grundflaeche (fast doppelt zu tief).
   const group = new THREE.Group();
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.6, 0.15, 0.5),
+    new THREE.BoxGeometry(0.46, 0.14, 0.24),
     new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 })
   );
   body.castShadow = true;
   group.add(body);
+  // Breite Blitzroehren-Wanne an der Unterseite (Lichtausgang -Y wie bisher).
   const lamp = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.04, 0.4),
+    new THREE.BoxGeometry(0.38, 0.03, 0.17),
     new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 })
   );
-  lamp.position.y = -0.08;
+  lamp.position.y = -0.075;
   group.add(lamp);
   loadModel('assets/models/fixtures/strobe.dae', (model) => {
     if (!model) return;
-    fitModelToSize(model, { x: 0.7, y: 0.3, z: 0.6 });
+    fitModelToSize(model, { x: 0.48, y: 0.18, z: 0.26 });
     model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
     body.visible = false;
     group.add(model);
@@ -136,12 +172,15 @@ export function buildStrobe() {
 }
 
 export function buildDimmer() {
+  // Reale Referenz (FM-Runde 2): 4-Kanal-Truss-Dimmerpack (Botex-/Eurolite-
+  // Klasse, ~0,30 x 0,13 x 0,19 m) statt des frueheren 0,44-m-Wuerfels. Ein
+  // Dimmerpack hat keine Torblenden — stattdessen Ausgangs-Dosen an der Front.
   const group = new THREE.Group();
 
   // ── Dark-metal housing ────────────────────────────────────────────────────
   const housingMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.65, roughness: 0.45 });
   const housing = new THREE.Mesh(
-    new THREE.BoxGeometry(0.44, 0.36, 0.38),
+    new THREE.BoxGeometry(0.30, 0.13, 0.19),
     housingMat
   );
   housing.position.y = 0.0;
@@ -150,12 +189,12 @@ export function buildDimmer() {
 
   // ── Mounting-ear flanges (left and right) ─────────────────────────────────
   const earMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.55, roughness: 0.5 });
-  [-0.28, 0.28].forEach((xOff) => {
+  [-0.17, 0.17].forEach((xOff) => {
     const ear = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.10, 0.22),
+      new THREE.BoxGeometry(0.04, 0.06, 0.12),
       earMat
     );
-    ear.position.set(xOff, 0.13, 0);
+    ear.position.set(xOff, 0.055, 0);
     ear.castShadow = true;
     group.add(ear);
   });
@@ -171,44 +210,38 @@ export function buildDimmer() {
     side: THREE.DoubleSide,
   });
   const lensPanel = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.38, 0.28),
+    new THREE.PlaneGeometry(0.24, 0.08),
     lampMat
   );
-  lensPanel.position.set(0, 0, 0.195);
+  lensPanel.position.set(0, 0.015, 0.098);
   group.add(lensPanel);
 
-  // ── 4×2 grid of emissive LED discs (share lampMat so one update covers all) ─
+  // ── 4×1 Reihe emissiver Kanal-LEDs (teilen lampMat: ein Update fuer alle) ──
   const ledCols = 4;
-  const ledRows = 2;
-  const ledXStep = 0.085;
-  const ledYStep = 0.09;
-  for (let row = 0; row < ledRows; row++) {
-    for (let col = 0; col < ledCols; col++) {
-      const disc = new THREE.Mesh(
-        new THREE.CircleGeometry(0.030, 10),
-        lampMat   // shared material — emissiveIntensity update on lampMat drives all
-      );
-      disc.position.set(
-        (col - (ledCols - 1) / 2) * ledXStep,
-        (row - (ledRows - 1) / 2) * ledYStep,
-        0.198   // just in front of the lens panel to avoid z-fight
-      );
-      group.add(disc);
-    }
+  const ledXStep = 0.055;
+  for (let col = 0; col < ledCols; col++) {
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.016, segs(10)),
+      lampMat   // shared material — emissiveIntensity update on lampMat drives all
+    );
+    disc.position.set(
+      (col - (ledCols - 1) / 2) * ledXStep,
+      0.015,
+      0.100   // just in front of the lens panel to avoid z-fight
+    );
+    group.add(disc);
   }
 
-  // ── Barn-door stub panels (top and bottom, non-emissive) ──────────────────
-  const barnMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.7, roughness: 0.4 });
-  [{ yOff: 0.195, rotX:  0.35 }, { yOff: -0.195, rotX: -0.35 }].forEach(({ yOff, rotX }) => {
-    const door = new THREE.Mesh(
-      new THREE.BoxGeometry(0.42, 0.06, 0.14),
-      barnMat
+  // ── 4 Ausgangs-Dosen (Kaltgeraete-/Schuko-Andeutung) an der Front unten ────
+  const socketMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.7, roughness: 0.4 });
+  for (let col = 0; col < 4; col++) {
+    const socket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.038, 0.038, 0.012),
+      socketMat
     );
-    door.position.set(0, yOff, 0.12);
-    door.rotation.x = rotX;
-    door.castShadow = true;
-    group.add(door);
-  });
+    socket.position.set((col - 1.5) * 0.055, -0.032, 0.098);
+    group.add(socket);
+  }
 
   return { group, head: group, lamp: lensPanel };
 }
@@ -327,38 +360,43 @@ export function buildScanner() {
   // Moving Head: festes Gehaeuse -> yoke (pant um Y) -> head/Spiegel (kippt um X).
   // Der Strahl haengt (via model.head in fixtures.js#addFixture) am Kopf und
   // schwenkt so mit Pan/Tilt-DMX. updateFixture animiert Scanner analog zum MH.
+  // Reale Referenz (FM-Runde 2): kompakter Spiegel-Scanner der JB-Systems-
+  // Dynamo-Klasse — 385 x 170 x 120 mm, laengliches Gehaeuse, Spiegel sitzt
+  // am GEHAEUSE-ENDE (nicht mittig): Lampe/Optik stecken im hinteren Teil,
+  // der Strahl tritt vorn aus und trifft den freistehenden Spiegel.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.6, roughness: 0.4 });
-  // Festes Gehaeuse (Lampen-/Elektronik-Kompartment)
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.16, 0.34), baseMat);
-  body.position.y = 0.08;
+  // Festes Gehaeuse (Lampen-/Elektronik-Kompartment), lange Achse X,
+  // nach hinten (+X) versetzt, damit vorn (-X) Platz fuer den Spiegel bleibt.
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.14, 0.15), baseMat);
+  body.position.set(0.06, 0.07, 0);
   body.castShadow = true;
   group.add(body);
-  // Pan-Pivot (rotiert um Y) auf dem Gehaeuse
+  // Pan-Pivot (rotiert um Y) am vorderen Gehaeuse-Ende
   const yoke = new THREE.Group();
-  yoke.position.y = 0.16;
+  yoke.position.set(-0.12, 0.14, 0);
   group.add(yoke);
   const armMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.12), armMat);
-  arm.position.set(-0.18, 0.09, 0);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.13, 0.06), armMat);
+  arm.position.set(-0.09, 0.055, 0);
   yoke.add(arm);
   // Tilt-Pivot (Spiegelkopf, kippt um X)
   const head = new THREE.Group();
-  head.position.set(0, 0.18, 0);
+  head.position.set(0, 0.12, 0);
   yoke.add(head);
   // Spiegel: metallische ~45°-Scheibe (die sichtbare bewegte Kernoptik)
   const mirror = new THREE.Mesh(
-    new THREE.CircleGeometry(0.16, 24),
+    new THREE.CircleGeometry(0.085, segs(24)),
     new THREE.MeshStandardMaterial({ color: 0x99a0aa, metalness: 0.95, roughness: 0.05, side: THREE.DoubleSide })
   );
   mirror.rotation.x = -Math.PI / 4;
   head.add(mirror);
   // Emissive Lens (DMX-Farb-Feedback) am Kopf -> pant/kippt mit
   const lens = new THREE.Mesh(
-    new THREE.CircleGeometry(0.07, 16),
+    new THREE.CircleGeometry(0.045, segs(16)),
     new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.1, side: THREE.DoubleSide })
   );
-  lens.position.set(0, -0.02, 0.14);
+  lens.position.set(0, -0.015, 0.08);
   lens.rotation.x = -Math.PI / 2;
   head.add(lens);
   // BEWUSST KEIN scanner.dae-Overlay: das statische Modell wuerde den beweglichen
@@ -368,27 +406,41 @@ export function buildScanner() {
 }
 
 export function buildSmoke() {
+  // Reale Referenz (FM-Runde 2): kompakte DJ-Nebelmaschine (Eurolite N-10:
+  // 145 x 170 x 265 mm; Antari-Z-Klasse etwas groesser) — flacher laenglicher
+  // Kasten mit vorstehender Duese. Vorher ein 0,55-m-Klotz.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.4, roughness: 0.6 });
-  // Procedural fallback: simple box
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.55, 0.35, 0.38),
+    new THREE.BoxGeometry(0.20, 0.17, 0.33),
     baseMat
   );
   body.castShadow = true;
   group.add(body);
+  // Vorstehende Ausstoss-Duese (Zylinder) an der Front.
+  const spout = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.034, 0.05, segs(12)),
+    new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 })
+  );
+  spout.rotation.x = Math.PI / 2;
+  spout.position.set(0, 0.02, -0.185);
+  group.add(spout);
+  // Haengebuegel oben (die Klasse wird oft an der Traverse montiert).
+  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.05), baseMat);
+  bracket.position.y = 0.10;
+  group.add(bracket);
   // Nozzle / emissive mesh (small circle at front)
   const nozzle = new THREE.Mesh(
-    new THREE.CircleGeometry(0.06, 12),
+    new THREE.CircleGeometry(0.026, segs(12)),
     new THREE.MeshStandardMaterial({ color: 0xcccccc, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2, side: THREE.DoubleSide })
   );
-  nozzle.position.set(0, 0, -0.2);
+  nozzle.position.set(0, 0.02, -0.211);
   nozzle.rotation.x = Math.PI / 2;
   group.add(nozzle);
   // Load real model
   loadModel('assets/models/fixtures/smoke.dae', (model) => {
     if (!model) return;
-    fitModelToSize(model, { x: 0.6, y: 0.4, z: 0.4 });
+    fitModelToSize(model, { x: 0.22, y: 0.18, z: 0.36 });
     model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
     body.visible = false;
     group.add(model);
@@ -397,27 +449,40 @@ export function buildSmoke() {
 }
 
 export function buildHazer() {
+  // Reale Referenz (FM-Runde 2): Kompressor-Hazer der Antari-HZ-100-Klasse —
+  // 250 x 294 x 490 mm: laenglicher, leicht hochkantiger Kasten (hoeher als
+  // breit), Ausblasgitter vorn oben, Tragegriff. Vorher 0,55-m-Wuerfel.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.45, roughness: 0.55 });
-  // Procedural fallback: box slightly taller than smoke
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.55, 0.45, 0.48),
+    new THREE.BoxGeometry(0.25, 0.28, 0.48),
     baseMat
   );
   body.castShadow = true;
   group.add(body);
+  // Tragegriff oben (Buegel).
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.24), baseMat);
+  handle.position.y = 0.165;
+  group.add(handle);
+  // Ausblasgitter-Rahmen vorn oben (die Duese sitzt beim Hazer hoch).
+  const grille = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.09, 0.015),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.6, roughness: 0.4 })
+  );
+  grille.position.set(0, 0.08, -0.243);
+  group.add(grille);
   // Lamp / indicator mesh on front face
   const lamp = new THREE.Mesh(
-    new THREE.CircleGeometry(0.07, 12),
+    new THREE.CircleGeometry(0.045, segs(12)),
     new THREE.MeshStandardMaterial({ color: 0xaaaaaa, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.15, side: THREE.DoubleSide })
   );
-  lamp.position.set(0, 0.05, -0.25);
+  lamp.position.set(0, 0.08, -0.252);
   lamp.rotation.x = Math.PI / 2;
   group.add(lamp);
   // Load real model
   loadModel('assets/models/fixtures/hazer.dae', (model) => {
     if (!model) return;
-    fitModelToSize(model, { x: 0.6, y: 0.4, z: 0.5 });
+    fitModelToSize(model, { x: 0.26, y: 0.30, z: 0.50 });
     model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
     body.visible = false;
     group.add(model);
@@ -426,21 +491,46 @@ export function buildHazer() {
 }
 
 export function buildLaser() {
+  // Reale Referenz (FM-Runde 2): Ehaho L2600 Partylaser — 201 x 155 x 66 mm
+  // flaches Alu-Gehaeuse mit Frontfenster und Haltebuegel. Vorher ein zu
+  // hoher 0,14-m-Wuerfelblock ohne Buegel.
   const group = new THREE.Group();
-  // Small emitter body
   const emitterMat = new THREE.MeshStandardMaterial({ color: 0x0d0d0d, metalness: 0.7, roughness: 0.3 });
   const emitter = new THREE.Mesh(
-    new THREE.BoxGeometry(0.22, 0.14, 0.18),
+    new THREE.BoxGeometry(0.20, 0.07, 0.16),
     emitterMat
   );
   emitter.castShadow = true;
   group.add(emitter);
+  // Frontblende mit Austrittsfenster (dunkles Glas, leicht vorstehend).
+  const windowPane = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.045, 0.008),
+    new THREE.MeshStandardMaterial({ color: 0x101418, metalness: 0.3, roughness: 0.15 })
+  );
+  windowPane.position.set(0, 0, -0.082);
+  group.add(windowPane);
+  // Haltebuegel (die Klasse haengt am Buegel oder steht auf ihm).
+  [-0.115, 0.115].forEach(x => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.10, 0.04), emitterMat);
+    arm.position.set(x, 0.03, 0);
+    group.add(arm);
+  });
+  const yokeBar = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.02, 0.04), emitterMat);
+  yokeBar.position.y = 0.085;
+  group.add(yokeBar);
+  // Seitliches Lueftergitter (charakteristisch fuer die Alu-Klasse).
+  const vent = new THREE.Mesh(
+    new THREE.BoxGeometry(0.008, 0.045, 0.10),
+    new THREE.MeshStandardMaterial({ color: 0x2c2f34, metalness: 0.6, roughness: 0.4 })
+  );
+  vent.position.set(0.10, 0, 0.01);
+  group.add(vent);
   // Aperture lamp (emissive; colour driven by DMX)
   const lamp = new THREE.Mesh(
-    new THREE.CircleGeometry(0.04, 10),
+    new THREE.CircleGeometry(0.025, segs(10)),
     new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.0, roughness: 0.05, side: THREE.DoubleSide })
   );
-  lamp.position.set(0, 0, -0.1);
+  lamp.position.set(0, 0, -0.088);
   lamp.rotation.x = Math.PI / 2;
   group.add(lamp);
   // Fan of ~5 thin emissive beam lines radiating forward (downward in world-Y when hung)
@@ -480,37 +570,40 @@ export function buildLaser() {
 // false sind beide Bars gleichlaeufig/parallel (R,G,B,W) — selber Controller,
 // leicht andere Bauweise (per-Fixture-Option im Patch-Dialog).
 export function buildSpider(mirrored) {
+  // Reale Referenz (FM-Runde 2): 8x10W-RGBW-Spider (U`King-/Lixada-Klasse) —
+  // 400 x 250 x 200 mm, 4,5 kg. Vorher war das Gehaeuse 0,88 m breit und
+  // 0,54 m tief (mehr als doppelt so gross wie das echte Geraet).
   const group = new THREE.Group();
   // ── Nicer central body (replaces plain bracket) ───────────────────────────
   // Main body block — slightly chamfered look via two layered boxes
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, metalness: 0.7, roughness: 0.38 });
-  const bodyMain = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.18, 0.54), bodyMat);
-  bodyMain.position.y = 0.12;
+  const bodyMain = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.11, 0.22), bodyMat);
+  bodyMain.position.y = 0.075;
   bodyMain.castShadow = true;
   group.add(bodyMain);
   // Slim accent strip along the front face of the body
   const accentMat = new THREE.MeshStandardMaterial({ color: 0x2e2e2e, metalness: 0.8, roughness: 0.3 });
-  const accentStrip = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.03), accentMat);
-  accentStrip.position.set(0, 0.12, 0.275);
+  const accentStrip = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.03, 0.02), accentMat);
+  accentStrip.position.set(0, 0.075, 0.115);
   group.add(accentStrip);
   // Side ribs for visual detail
-  [-0.38, 0.38].forEach((xOff) => {
-    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.56), bodyMat);
-    rib.position.set(xOff, 0.12, 0);
+  [-0.185, 0.185].forEach((xOff) => {
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.13, 0.24), bodyMat);
+    rib.position.set(xOff, 0.075, 0);
     rib.castShadow = true;
     group.add(rib);
   });
 
   // ── Top yoke-mount cap (non-emissive, on root group) ──────────────────────
   const yokeMat = new THREE.MeshStandardMaterial({ color: 0x252525, metalness: 0.75, roughness: 0.35 });
-  const yokeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.13, 0.10, 14), yokeMat);
-  yokeCap.position.set(0, 0.27, 0);
+  const yokeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.045, segs(14)), yokeMat);
+  yokeCap.position.set(0, 0.125, 0);
   yokeCap.castShadow = true;
   group.add(yokeCap);
   // Small bolt detail on top of cap
   const boltMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.9, roughness: 0.2 });
-  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.06, 8), boltMat);
-  bolt.position.set(0, 0.35, 0);
+  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8), boltMat);
+  bolt.position.set(0, 0.16, 0);
   group.add(bolt);
 
   // Fixfarben der LEDs. ch = Index in [color_r, color_g, color_b, color_w].
@@ -527,10 +620,10 @@ export function buildSpider(mirrored) {
     ? [LED.r, LED.g, LED.b, LED.w]
     : [LED.w, LED.b, LED.g, LED.r];
   const LAYOUT = [
-    { zoff: -0.17, leds: barL },
-    { zoff:  0.17, leds: barR },
+    { zoff: -0.075, leds: barL },
+    { zoff:  0.075, leds: barR },
   ];
-  const XS = [-0.27, -0.09, 0.09, 0.27];   // LED-Positionen entlang der Bar (X)
+  const XS = [-0.126, -0.042, 0.042, 0.126];   // LED-Positionen entlang der Bar (X)
 
   const bars = [];
   LAYOUT.forEach((def) => {
@@ -540,7 +633,7 @@ export function buildSpider(mirrored) {
     group.add(pivot);
     // Bar-Koerper laeuft entlang X
     const arm = new THREE.Mesh(
-      new THREE.BoxGeometry(0.72, 0.07, 0.10),
+      new THREE.BoxGeometry(0.34, 0.05, 0.07),
       new THREE.MeshStandardMaterial({ color: 0x0d0d0d, metalness: 0.5, roughness: 0.5 })
     );
     arm.castShadow = true;
@@ -549,14 +642,14 @@ export function buildSpider(mirrored) {
     // ── Cosmetic additions on the pivot (tilt with the bar) ────────────────
     // Bottom fascia strip — a thin plate below the arm
     const fasciaMat = new THREE.MeshStandardMaterial({ color: 0x202020, metalness: 0.6, roughness: 0.42 });
-    const fascia = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.018, 0.12), fasciaMat);
-    fascia.position.set(0, -0.07, 0);
+    const fascia = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.014, 0.085), fasciaMat);
+    fascia.position.set(0, -0.05, 0);
     pivot.add(fascia);
 
     // End-cap discs at the arm ends (cosmetic, non-emissive)
     const capMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.65, roughness: 0.4 });
-    [-0.36, 0.36].forEach((xEnd) => {
-      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.10, 10), capMat);
+    [-0.165, 0.165].forEach((xEnd) => {
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 0.075, segs(10)), capMat);
       cap.rotation.z = Math.PI / 2;
       cap.position.set(xEnd, 0, 0);
       pivot.add(cap);
@@ -567,13 +660,13 @@ export function buildSpider(mirrored) {
       // Grund-Tint in der LED-Fixfarbe (dezent), damit man die R/G/B/W-Anordnung
       // auch bei dunkler LED erkennt.
       const lens = new THREE.Mesh(
-        new THREE.CircleGeometry(0.05, 18),
+        new THREE.CircleGeometry(0.030, segs(18)),
         new THREE.MeshStandardMaterial({
           color: led.c.clone().multiplyScalar(0.22),
           emissive: 0x000000, roughness: 0.25, side: THREE.DoubleSide,
         })
       );
-      lens.position.set(XS[k], -0.05, 0);
+      lens.position.set(XS[k], -0.038, 0);
       lens.rotation.x = -Math.PI / 2;        // Flaeche zeigt nach unten
       lens.userData.ledColor = led.c;
       lens.userData.ch = led.ch;             // welcher Kanal diese LED treibt
@@ -583,10 +676,10 @@ export function buildSpider(mirrored) {
       // Thin bezel ring around each lens (RingGeometry, non-emissive, on pivot)
       const bezelMat = new THREE.MeshStandardMaterial({ color: 0x303030, metalness: 0.75, roughness: 0.35, side: THREE.DoubleSide });
       const bezel = new THREE.Mesh(
-        new THREE.RingGeometry(0.051, 0.068, 18),
+        new THREE.RingGeometry(0.031, 0.042, segs(18)),
         bezelMat
       );
-      bezel.position.set(XS[k], -0.048, 0);  // same plane as lens, slightly raised
+      bezel.position.set(XS[k], -0.036, 0);  // same plane as lens, slightly raised
       bezel.rotation.x = -Math.PI / 2;
       pivot.add(bezel);
     });
@@ -610,10 +703,10 @@ export function buildParBar(n, pixelStyle) {
     // Unterseite (Ausgang -Y wie die PAR-Variante -> par_bar-Render-Branch in
     // fixtures.js passt unveraendert: ph.lens + ph.beam pro Kopf). Gleicher
     // parHeads-Vertrag wie unten — nur die Optik ist Bar-mit-Pixeln statt
-    // N PAR-Dosen.
-    const spacing = 0.15;
-    const width = (n - 1) * spacing + 0.22;
-    const housing = new THREE.Mesh(new THREE.BoxGeometry(width, 0.09, 0.12), barMat);
+    // N PAR-Dosen. Querschnitt real ~88 x 65 mm (Stairville-1m-Klasse).
+    const spacing = 0.125;
+    const width = (n - 1) * spacing + 0.19;
+    const housing = new THREE.Mesh(new THREE.BoxGeometry(width, 0.075, 0.09), barMat);
     housing.castShadow = true;
     group.add(housing);
     const parHeads = [];
@@ -621,22 +714,25 @@ export function buildParBar(n, pixelStyle) {
     for (let i = 0; i < n; i++) {
       const x = startX + i * spacing;
       const lens = new THREE.Mesh(
-        new THREE.BoxGeometry(0.125, 0.02, 0.09),
+        new THREE.BoxGeometry(0.105, 0.018, 0.07),
         new THREE.MeshStandardMaterial({
           color: 0x303030, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.3,
         })
       );
-      lens.position.set(x, -0.052, 0);       // Unterseite, Ausgang -Y
+      lens.position.set(x, -0.044, 0);       // Unterseite, Ausgang -Y
       group.add(lens);
       parHeads.push({ lens, x });
     }
     return { group, parHeads, isParBar: true };
   }
 
-  const spacing = 0.44;
-  const width = (n - 1) * spacing + 0.5;
+  // Reale Referenz (FM-Runde 2): ADJ Dotz TPar System — 4 Pods auf ~1,0 m
+  // Bar (1000 x 320 x 82 mm), Pod-Pitch ~0,25 m, Pod Ø ~0,16 m. Vorher
+  // ergaben 4 Koepfe eine 1,8-m-Bar mit Ø-0,4-m-Dosen.
+  const spacing = 0.25;
+  const width = (n - 1) * spacing + 0.30;
   // Horizontaler Traeger-Balken entlang X
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, 0.26), barMat);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.08, 0.10), barMat);
   bar.castShadow = true;
   group.add(bar);
   const parHeads = [];
@@ -644,20 +740,20 @@ export function buildParBar(n, pixelStyle) {
   for (let i = 0; i < n; i++) {
     const x = startX + i * spacing;
     // PAR-Gehaeuse (kurzer Zylinder, nach unten offen)
-    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.18, 16), barMat);
-    can.position.set(x, -0.13, 0);
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.15, segs(16)), barMat);
+    can.position.set(x, -0.10, 0);
     can.castShadow = true;
     group.add(can);
     // Linse (emissive, faerbbar) — zeigt nach unten
     const lens = new THREE.Mesh(
-      new THREE.CircleGeometry(0.15, 20),
+      new THREE.CircleGeometry(0.065, segs(20)),
       new THREE.MeshStandardMaterial({
         color: 0x808080, emissive: 0x000000, emissiveIntensity: 0,
         roughness: 0.2, side: THREE.DoubleSide,
       })
     );
     lens.rotation.x = -Math.PI / 2;          // Normale -Y (nach unten)
-    lens.position.set(x, -0.223, 0);
+    lens.position.set(x, -0.178, 0);
     group.add(lens);
     parHeads.push({ lens, x });
   }
@@ -669,13 +765,16 @@ export function buildParBar(n, pixelStyle) {
 // Kopf = Yoke (pant um Y) -> Head (kippt um X) -> Linse. heads[i].pan/tilt/farbe
 // treiben Kopf i (Datenmodell via FM-2 pro-Kopf-Pan). n = RGBW-Bank-Anzahl.
 export function buildMoverBar(n) {
+  // Reale Referenz (FM-Runde 2): 4-Kopf-Moving-Bar (Soundsation-AXIS-Klasse) —
+  // 1004 x 271 x 115 mm, Kopf-Pitch ~0,25 m, Kopf Ø ~0,10 m. Vorher ergaben
+  // 4 Koepfe eine 2,05-m-Bar mit Ø-0,22-m-Koepfen.
   n = Math.max(1, Math.min(24, Math.floor(n || 4)));
   const group = new THREE.Group();
   const barMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.5, roughness: 0.5 });
   const yokeMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5, roughness: 0.5 });
-  const spacing = 0.5;
-  const width = (n - 1) * spacing + 0.55;
-  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.16, 0.28), barMat);
+  const spacing = 0.25;
+  const width = (n - 1) * spacing + 0.30;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.10, 0.115), barMat);
   bar.castShadow = true;
   group.add(bar);
   const moverHeads = [];
@@ -684,29 +783,29 @@ export function buildMoverBar(n) {
     const x = startX + i * spacing;
     // Pan-Pivot (yoke) unter dem Balken
     const yoke = new THREE.Group();
-    yoke.position.set(x, -0.1, 0);
+    yoke.position.set(x, -0.06, 0);
     group.add(yoke);
-    [-0.09, 0.09].forEach(ax => {
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.05), yokeMat);
-      arm.position.set(ax, -0.11, 0);
+    [-0.062, 0.062].forEach(ax => {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.13, 0.03), yokeMat);
+      arm.position.set(ax, -0.065, 0);
       yoke.add(arm);
     });
     // Tilt-Pivot (head)
     const head = new THREE.Group();
-    head.position.set(0, -0.22, 0);
+    head.position.set(0, -0.13, 0);
     yoke.add(head);
-    const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.2, 14), barMat);
+    const headBody = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.11, segs(14)), barMat);
     head.add(headBody);
     // Linse (faerbbar), zeigt bei Tilt=0 nach unten (-Y)
     const lens = new THREE.Mesh(
-      new THREE.CircleGeometry(0.1, 18),
+      new THREE.CircleGeometry(0.045, segs(18)),
       new THREE.MeshStandardMaterial({
         color: 0x808080, emissive: 0x000000, emissiveIntensity: 0,
         roughness: 0.2, side: THREE.DoubleSide,
       })
     );
     lens.rotation.x = -Math.PI / 2;
-    lens.position.y = -0.11;
+    lens.position.y = -0.062;
     head.add(lens);
     moverHeads.push({ yoke, head, lens });
   }

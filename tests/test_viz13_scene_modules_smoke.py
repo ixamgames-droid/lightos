@@ -587,6 +587,15 @@ class SceneModulesSmokeTest(unittest.TestCase):
             "window.__lightos.fixtures['700001'].beam.geometry.parameters.radialSegments")
         self.assertEqual(segments, 12, "Low-Tier muss die Beam-Kegel auf 12 Segmente reduzieren")
 
+        # FM-Runde 2: auch die Gehaeuse-Rundkoerper folgen dem Tier (segs()-
+        # Helfer in builders.js) — der MH-Kopf faellt von 28 auf 14 Segmente.
+        housing = self._eval(
+            "(function(){ let s = null;"
+            " window.__lightos.fixtures['700001'].group.traverse(o => {"
+            "   if (o.name === 'mh-head-body') s = o.geometry.parameters.radialSegments;"
+            " }); return s; })()")
+        self.assertEqual(housing, 14, "Low-Tier muss Gehaeuse-Segmente halbieren (segs())")
+
         # Aufdrehen ueber den echten dmxBatch-Pfad -> Licht wird wieder aktiv.
         lit_batch = json.dumps([{"fid": 700001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
         lit = self._emit_until_true(
@@ -617,10 +626,98 @@ class SceneModulesSmokeTest(unittest.TestCase):
         segments = self._eval(
             "window.__lightos.fixtures['700002'].beam.geometry.parameters.radialSegments")
         self.assertEqual(segments, 24, "High-Tier darf die Kegel-Geometrie nicht reduzieren")
+        # FM-Runde 2: Gehaeuse-Segmente bleiben im High-Tier voll (segs()-Helfer).
+        housing = self._eval(
+            "(function(){ let s = null;"
+            " window.__lightos.fixtures['700002'].group.traverse(o => {"
+            "   if (o.name === 'par-body') s = o.geometry.parameters.radialSegments;"
+            " }); return s; })()")
+        self.assertEqual(housing, 16, "High-Tier darf Gehaeuse-Segmente nicht reduzieren")
         # Dunkel-Culling gilt tier-unabhaengig.
         culled = self._eval(
             "window.__lightos.fixtures['700002'].spot.visible === false")
         self.assertTrue(culled, "Dunkel-Culling muss auch im High-Tier greifen")
+
+    def test_fixture_models_have_realistic_dimensions(self):
+        """FM-Runde 2: Gehaeuse-Bounding-Boxen folgen echten Datenblatt-Massen.
+
+        Referenzen (siehe builders.js): PAR-64-Dose Ø ~0,23 m; Moving Head
+        (Intimidator-260-Klasse) H ~0,48 m; 8x10W-Spider 0,40 x 0,25 x 0,20 m;
+        Dotz-TPar-4er-Bar ~1,05 m; 4-Kopf-Mover-Bar ~1,05 m; Nebelmaschine
+        (N-10-Klasse) 0,20 x 0,17 x 0,33 m. Vorher waren PAR/Spider/Bars etwa
+        doppelt so gross wie die echten Geraete. Beams (excludeFromFit) und
+        ausgeblendete Fallback-Koerper zaehlen nicht mit.
+        """
+        self._load_and_wait()
+        import json
+        rig = json.dumps([
+            {"fid": 801, "type": "par",
+             "x": 0, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 802, "type": "moving_head",
+             "x": 2, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 803, "type": "moving_head", "model": "spider",
+             "x": 4, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 804, "type": "led_bar", "model": "par_bar", "nHeads": 4,
+             "x": 6, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 805, "type": "moving_head", "model": "mover_bar", "nHeads": 4,
+             "x": 8, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 806, "type": "smoke",
+             "x": 10, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+        ])
+        built = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(rig),
+            "!!window.__lightos.fixtures['806']", timeout_s=8.0)
+        self.assertTrue(built, "Mess-Rig wurde nicht gebaut")
+        raw = self._eval("""
+            (function(){
+                function dims(fid) {
+                    const f = window.__lightos.fixtures[fid];
+                    if (!f) return null;
+                    f.group.updateMatrixWorld(true);
+                    const box = new THREE.Box3();
+                    let found = false;
+                    f.group.traverse(o => {
+                        if (!o.isMesh) return;
+                        if (o.userData && o.userData.excludeFromFit) return;
+                        if (o.visible === false) return;
+                        const b = new THREE.Box3().setFromObject(o);
+                        if (!b.isEmpty()) { box.union(b); found = true; }
+                    });
+                    if (!found) return null;
+                    const s = box.getSize(new THREE.Vector3());
+                    return [s.x, s.y, s.z];
+                }
+                return JSON.stringify({
+                    par: dims('801'), mh: dims('802'), spider: dims('803'),
+                    parBar: dims('804'), moverBar: dims('805'), smoke: dims('806'),
+                });
+            })()
+        """)
+        d = json.loads(raw)
+        for key in ("par", "mh", "spider", "parBar", "moverBar", "smoke"):
+            self.assertIsNotNone(d[key], f"Bounding-Box fuer {key} fehlt")
+        px, py, pz = d["par"]
+        self.assertLessEqual(px, 0.36, "PAR breiter als eine echte PAR-64-Dose")
+        self.assertLessEqual(pz, 0.36, "PAR tiefer als eine echte PAR-64-Dose")
+        self.assertGreaterEqual(px, 0.15, "PAR unrealistisch geschrumpft")
+        mx, my, mz = d["mh"]
+        self.assertLessEqual(my, 0.55, "Moving Head hoeher als die 260er-Klasse")
+        self.assertGreaterEqual(my, 0.35, "Moving Head unrealistisch geschrumpft")
+        self.assertLessEqual(mx, 0.36, "Moving-Head-Basis breiter als real")
+        sx, sy, sz = d["spider"]
+        self.assertLessEqual(sx, 0.46, "Spider breiter als die 8x10W-Klasse (0,40 m)")
+        self.assertLessEqual(sz, 0.30, "Spider tiefer als die 8x10W-Klasse (0,25 m)")
+        self.assertLessEqual(sy, 0.26, "Spider hoeher als die 8x10W-Klasse (0,20 m)")
+        bx = d["parBar"][0]
+        self.assertLessEqual(bx, 1.15, "4er-PAR-Bar laenger als die Dotz-TPar-Klasse (~1,0 m)")
+        self.assertGreaterEqual(bx, 0.90, "4er-PAR-Bar unrealistisch kurz")
+        mbx, mby, _ = d["moverBar"]
+        self.assertLessEqual(mbx, 1.15, "4-Kopf-Mover-Bar laenger als die 1-m-Klasse")
+        self.assertGreaterEqual(mbx, 0.90, "4-Kopf-Mover-Bar unrealistisch kurz")
+        self.assertLessEqual(mby, 0.36, "Mover-Bar hoeher als die AXIS-Klasse (0,27 m)")
+        smx, _, smz = d["smoke"]
+        self.assertLessEqual(smx, 0.30, "Nebelmaschine breiter als die N-10-Klasse")
+        self.assertLessEqual(smz, 0.42, "Nebelmaschine tiefer als die N-10-Klasse")
 
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der
