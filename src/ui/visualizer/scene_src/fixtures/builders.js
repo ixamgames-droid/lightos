@@ -830,7 +830,13 @@ export function updateSpiderDmx(f, dmx) {
   // Fixture im Monolith durch den generischen Single-Head-Pfad.
   if (!f.isSpider || !f.bars) return updateGenericDmx(f, dmx);
   const { r, g, b, intNorm } = dmx;
-  const hs = f.lastHeads || [];
+  // FM-12-Review-Fix (HIGH): Ohne Multihead-Banks (z.B. viz_model-Override
+  // 'spider' auf einem RGB-Geraet, oder Head-Daten transient noch nicht da)
+  // blieben alle LEDs dauerhaft dunkel (chan aus leerem lastHeads = 0). Dann
+  // die Top-Level-Farbe als Kanalwerte beider Bars verwenden, Tilt = Basis-Tilt.
+  const hs = (f.lastHeads && f.lastHeads.length)
+    ? f.lastHeads
+    : [{ cr: r, cg: g, cb: b, cw: 0, tilt: dmx.tilt }];
   for (let i = 0; i < f.bars.length; i++) {
     const bar = f.bars[i];
     const h = hs[i] || hs[0] || {};

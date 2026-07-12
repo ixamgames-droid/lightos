@@ -638,6 +638,31 @@ class SceneModulesSmokeTest(unittest.TestCase):
             "window.__lightos.fixtures['700002'].spot.visible === false")
         self.assertTrue(culled, "Dunkel-Culling muss auch im High-Tier greifen")
 
+    def test_spider_override_without_heads_uses_base_color(self):
+        """FM-12-Review-HIGH: 'spider'-Modell ohne Multihead-Banks (z.B. via
+        viz_model-Override auf einem RGB-PAR) muss auf die Top-Level-Farbe
+        zurueckfallen — vorher blieben alle LEDs dauerhaft dunkel, weil
+        updateSpiderDmx nur aus f.lastHeads las."""
+        self._load_and_wait()
+        import json
+        payload = json.dumps([{"fid": 810, "type": "par", "model": "spider",
+                               "x": 0, "y": 3, "z": 0,
+                               "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            "!!window.__lightos.fixtures['810']", timeout_s=5.0)
+        lit = json.dumps([{"fid": 810, "r": 255, "g": 0, "b": 0, "intensity": 255}])
+        ok = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            "(function(){ const f = window.__lightos.fixtures['810'];"
+            " if (!f || !f.bars) return false;"
+            " return f.bars.some(bar => bar.lenses.some("
+            "   l => l.material.emissiveIntensity > 0.1)); })()",
+            timeout_s=5.0)
+        self.assertTrue(
+            ok, "Spider-Override ohne Head-Daten blieb dunkel "
+                "(Basis-RGB-Fallback in updateSpiderDmx fehlt)")
+
     def test_fixture_models_have_realistic_dimensions(self):
         """FM-Runde 2: Gehaeuse-Bounding-Boxen folgen echten Datenblatt-Massen.
 
