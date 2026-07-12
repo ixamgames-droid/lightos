@@ -51,7 +51,12 @@ class FadeState:
             return self.from_vals
         if raw >= 1.0:                    # fertig -> exakt Zielwerte (kurvenunabhaengig)
             self.done = True
-            return self.to_vals
+            # KOPIE der inneren dicts: to_vals ist die cue.values des Ziel-Cues
+            # (per-Referenz in _fade_to uebergeben). Gaeben wir sie direkt zurueck,
+            # aliast _own_output die gespeicherten Cue-Werte und ein spaeterer
+            # In-Place-Merge (Sub-Cueliste, tick()) mutiert die persistente Cue —
+            # korrumpiert die Show dauerhaft. Siehe tick()-Merge-Kommentar.
+            return {fid: dict(attrs) for fid, attrs in self.to_vals.items()}
         # F-5: Fade-Verlauf der Cue (Default scurve = bisheriges Smoothstep-Verhalten)
         t = eval_named(self.curve, raw)
         return self._blend(t)
@@ -272,14 +277,21 @@ class CueStack:
                                        self.cues[nxt].values, 1.0, 0.0)
                 self._fade.manual = True
             if pos >= 1.0:
-                # Uebernehmen: Zielcue wird aktiv, manueller Fade beendet.
-                self._dir = self._manual_dir
-                self._current_idx = self._manual_target
-                self._own_output = dict(self._fade.to_vals)
-                self._output = dict(self._own_output)
-                self._fade = None
-                committed = True
-                commit_cb = (self._current_idx, self.cues[self._current_idx])
+                # F4: Die Zielcue kann waehrend des Scrubs entfernt worden sein
+                # (_manual_target wird von _reindex_after_mutation auf -1 gesetzt).
+                # Dann den Fade sauber abbrechen statt self.cues[ungueltig] -> Crash.
+                if not (0 <= self._manual_target < len(self.cues)):
+                    self._fade = None
+                    self._manual_target = -1
+                else:
+                    # Uebernehmen: Zielcue wird aktiv, manueller Fade beendet.
+                    self._dir = self._manual_dir
+                    self._current_idx = self._manual_target
+                    self._own_output = dict(self._fade.to_vals)
+                    self._output = dict(self._own_output)
+                    self._fade = None
+                    committed = True
+                    commit_cb = (self._current_idx, self.cues[self._current_idx])
             else:
                 self._fade.manual_pos = pos
                 self._own_output = self._fade.current_values()
@@ -320,18 +332,55 @@ class CueStack:
 
     # ── Cue-Verwaltung ────────────────────────────────────────────────────────
 
+    def _active_cue_obj(self) -> "Cue | None":
+        """Die aktuell aktive Cue als OBJEKT (oder None), fuer identitaets-
+        basiertes Nachfuehren ueber eine Cues-Mutation hinweg."""
+        if 0 <= self._current_idx < len(self.cues):
+            return self.cues[self._current_idx]
+        return None
+
+    def _reindex_after_mutation(self, active_cue: "Cue | None"):
+        """Nach jeder Mutation von ``self.cues`` (add/remove/sort) den laufenden
+        Zustand konsistent halten: ``_current_idx`` der zuvor aktiven Cue per
+        IDENTITAET nachfuehren (Cue ist ein value-eq dataclass -> ``.index()``
+        traefe die falsche gleichwertige Cue), sonst in den gueltigen Bereich
+        clampen. Stale ``_manual_target`` eines laufenden manuellen Crossfades
+        entschaerfen. Behebt IndexError in go/back/manual_crossfade nach Live-
+        Loeschen und die falsche Playback-Position nach Live-Insert."""
+        n = len(self.cues)
+        if active_cue is not None:
+            idx = next((i for i, c in enumerate(self.cues) if c is active_cue), None)
+            self._current_idx = idx if idx is not None else min(self._current_idx, n - 1)
+        else:
+            self._current_idx = min(self._current_idx, n - 1)
+        if self._current_idx < 0:
+            self._current_idx = -1
+        if not (0 <= self._manual_target < n):
+            self._manual_target = -1
+
     def add_cue(self, cue: Cue):
-        self.cues.append(cue)
-        self.cues.sort(key=lambda c: c.number)
+        with self._lock:
+            active = self._active_cue_obj()
+            self.cues.append(cue)
+            self.cues.sort(key=lambda c: c.number)
+            self._reindex_after_mutation(active)
 
     def remove_cue(self, number: float):
-        self.cues = [c for c in self.cues if abs(c.number - number) > 0.001]
+        with self._lock:
+            active = self._active_cue_obj()
+            self.cues = [c for c in self.cues if abs(c.number - number) > 0.001]
+            self._reindex_after_mutation(active)
 
     def update_cue(self, cue: Cue):
-        for i, c in enumerate(self.cues):
-            if abs(c.number - cue.number) < 0.001:
-                self.cues[i] = cue
-                return
+        with self._lock:
+            for i, c in enumerate(self.cues):
+                if abs(c.number - cue.number) < 0.001:
+                    # Gleiche Nummer -> Position in der sortierten Liste unveraendert,
+                    # _current_idx bleibt gueltig (zeigt auf dieselbe Zeile).
+                    self.cues[i] = cue
+                    return
+        # Neue Nummer -> einsortieren. add_cue nimmt selbst den (nicht-reentranten)
+        # Lock, daher AUSSERHALB des with-Blocks aufrufen.
         self.add_cue(cue)
 
     # ── Tick (wird von Engine-Timer aufgerufen) ───────────────────────────────
@@ -382,7 +431,12 @@ class CueStack:
                 merged = dict(self._own_output)
                 if sub_out:               # F-16: Sub mischt sich oben drauf (LTP)
                     for fid, attrs in sub_out.items():
-                        merged.setdefault(fid, {}).update(attrs)
+                        # NEUES inneres dict bauen statt setdefault(...).update():
+                        # _own_output[fid] kann das mit cue.values geteilte dict
+                        # sein (FadeState.current_values liefert to_vals by-ref),
+                        # ein .update() daran wuerde die gespeicherte Cue mutieren.
+                        base = merged.get(fid)
+                        merged[fid] = {**base, **attrs} if base else dict(attrs)
                 self._output = merged
                 active = fade_active or (sub is not None)
                 out = dict(self._output)
