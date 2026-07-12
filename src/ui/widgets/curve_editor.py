@@ -89,6 +89,10 @@ class CurveEditorWidget(QWidget):
             if idx is not None and 0 < idx < len(self._curve.points) - 1:
                 self._curve.points.pop(idx)
                 self._curve.set_points(self._curve.points)
+                # Laufenden Linksklick-Drag invalidieren: die Indizes sind nach
+                # dem pop verschoben — ein stale _drag_idx korrumpierte sonst
+                # beim naechsten mouseMove einen anderen Punkt/Endpunkt.
+                self._drag_idx = None
                 self.update()
                 self.curveChanged.emit()
             event.accept()

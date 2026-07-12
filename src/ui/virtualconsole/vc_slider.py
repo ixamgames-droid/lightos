@@ -1046,21 +1046,26 @@ class VCSlider(VCWidget):
           die alte Gruppe A zuerst zuruecksetzen (VCB-34), dann B anwenden;
           weg vom GROUP_DIMMER -> die (alte) Gruppe zuruecksetzen (VCB-19).
         """
-        if self.mode == SliderMode.SUBMASTER:
-            self._apply()
-        elif _old_mode == SliderMode.SUBMASTER:
+        # ZWEI unabhaengige Phasen statt einer elif-Kette: "alten Modus aufraeumen"
+        # und "neuen Modus sofort anwenden" schliessen sich NICHT aus. Die fruehere
+        # elif-Kette liess z. B. bei GROUP_DIMMER->SUBMASTER die alte Gruppe als
+        # Geister-Dimmer stehen (Zweig 1 beendete die Kette) und wandte bei
+        # SUBMASTER->GROUP_DIMMER den neuen Modus nicht sofort an (Zweig 2 endete).
+        #
+        # Phase 1: Alt-Modus aufraeumen (nur wenn verlassen bzw. Gruppe gewechselt).
+        if _old_mode == SliderMode.SUBMASTER and self.mode != SliderMode.SUBMASTER:
             _clear_submaster_slot(id(self))
-        elif self.mode == SliderMode.GROUP_DIMMER:
-            if (_old_mode == SliderMode.GROUP_DIMMER
-                    and _old_group and _old_group != self.programmer_group):
-                self._reset_group_dimmer(_old_group)   # VCB-34
-            self._apply()
-        elif _old_mode == SliderMode.GROUP_DIMMER:
-            self._reset_group_dimmer(_old_group)         # VCB-19
-        elif self.mode == SliderMode.FEATURE_DIMMER:
-            self._apply()                                # F-26b: Slot sofort setzen
-        elif _old_mode == SliderMode.FEATURE_DIMMER:
+        if _old_mode == SliderMode.GROUP_DIMMER and (
+                self.mode != SliderMode.GROUP_DIMMER
+                or (_old_group and _old_group != self.programmer_group)):
+            self._reset_group_dimmer(_old_group)         # VCB-19 / VCB-34
+        if (_old_mode == SliderMode.FEATURE_DIMMER
+                and self.mode != SliderMode.FEATURE_DIMMER):
             _clear_feature_dimmer_slot(id(self))         # F-26b: weg -> Slot raeumen
+        # Phase 2: Neu-Modus sofort anwenden (nicht erst beim naechsten Ziehen).
+        if self.mode in (SliderMode.SUBMASTER, SliderMode.GROUP_DIMMER,
+                         SliderMode.FEATURE_DIMMER):
+            self._apply()
 
     # ── Serialization ─────────────────────────────────────────────────────────
 

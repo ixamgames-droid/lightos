@@ -1328,6 +1328,17 @@ class ProgrammerView(QWidget):
     def active_fixture_index(self) -> int:
         return getattr(self, "_active_fixture_idx", 0)
 
+    def active_fixture_fid(self):
+        """fid des in der Einzeln-Combo aktiven Fixtures (None wenn unbekannt).
+        Identitaets-basiert statt Index-basiert: Kopf-Slider im Getrennt-Modus
+        arbeiten auf einer GEFILTERTEN Fixture-Teilmenge, dort zeigt der rohe
+        Combo-Index sonst aufs falsche Geraet."""
+        fids = getattr(self, "_combo_selected_fids", None)
+        idx = self.active_fixture_index()
+        if fids and 0 <= idx < len(fids):
+            return fids[idx]
+        return None
+
     def _on_group_mode_toggled(self, key: str, checked: bool):
         """Bound-Slot statt Lambda (STAB-10): nur der AKTIV werdende Radio-Button
         schaltet den Modus (toggled feuert auch für den abgewählten)."""
@@ -1357,6 +1368,8 @@ class ProgrammerView(QWidget):
         combo = self._fixture_combo
         combo.blockSignals(True)
         combo.clear()
+        # fid-Liste parallel zur Combo pflegen (Quelle fuer active_fixture_fid()).
+        self._combo_selected_fids = [f.fid for f in selected]
         for f in selected:
             combo.addItem(f"[{f.fid}] {f.label}")
         if self._active_fixture_idx >= len(selected):
@@ -2025,7 +2038,23 @@ class AttributeSlider(QWidget):
 
     def _active_index(self) -> int:
         owner = self._owner
-        if owner is not None and hasattr(owner, "active_fixture_index"):
+        if owner is None:
+            return 0
+        # Identitaets- statt Index-Mapping: self._fixtures kann eine GEFILTERTE
+        # Teilmenge der Selektion sein (Getrennt-Modus-Kopf-Slider laesst
+        # Fixtures ohne diesen Kopf weg). Der rohe Combo-Index (Index in die
+        # VOLLE Selektion) traf dann das falsche Geraet bzw. lief ins Leere.
+        if hasattr(owner, "active_fixture_fid"):
+            try:
+                fid = owner.active_fixture_fid()
+            except Exception:
+                fid = None
+            if fid is not None:
+                for i, f in enumerate(self._fixtures):
+                    if f.fid == fid:
+                        return i
+                return -1   # aktives Fixture besitzt diesen Kopf nicht -> No-Op
+        if hasattr(owner, "active_fixture_index"):
             try:
                 return int(owner.active_fixture_index())
             except Exception:
