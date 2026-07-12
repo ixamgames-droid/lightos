@@ -54,6 +54,41 @@ class VCFrame(VCWidget):
         w = max(40, self.width() // self._page_count)
         return QRect(page * w, 0, w, self._tab_height)
 
+    def _canvas(self):
+        """Umschliessende VCCanvas finden (erkannt an ``on_active_bank``) — oder
+        None, solange der Frame noch nicht in einer Canvas haengt."""
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, "on_active_bank"):
+                return p
+            p = p.parent()
+        return None
+
+    def _child_visible(self, child) -> bool:
+        """Kind ist sichtbar, wenn es auf der aktuellen Seite liegt UND die
+        Bank-Regel erfuellt. Die Bank-Entscheidung delegieren wir an
+        ``VCCanvas.on_active_bank`` — DIE getestete Autoritaet, die die
+        VCB-04-Vererbung (``bank=-1`` erbt vom naechsten Vorfahr mit fester Bank,
+        heisst NICHT „alle Banks") ueber die ganze Parent-Kette inkl.
+        verschachtelter Frames aufloest. Frueher rechnete der Frame das selbst mit
+        abweichender Semantik nach. Ohne Canvas (z.B. im Aufbau) nur Seiten-Regel.
+        Behebt: Bank-Pins von Widgets IN einem Frame blieben bei der Sichtbarkeit
+        unbeachtet (Canvas._apply_bank_visibility iteriert nur direkte Kinder)."""
+        on_page = (child.property("vc_page") or 0) == self._current_page
+        cv = self._canvas()
+        on_bank = cv.on_active_bank(child) if cv is not None else True
+        return on_page and on_bank
+
+    def _apply_bank_visibility(self):
+        """Kombinierte Seiten+Bank-Sichtbarkeit der Kinder neu anwenden — vom
+        Canvas propagiert und vom VCWidget-Bank-Parent-Walk gerufen. Rekursiv in
+        verschachtelte Frames, damit auch deren Kinder neu bewertet werden."""
+        for child in self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            child.setVisible(self._child_visible(child))
+            if child is not self and hasattr(child, "_apply_bank_visibility"):
+                child._apply_bank_visibility()
+
     def switch_page(self, page: int):
         self._current_page = max(0, min(self._page_count - 1, page))
         # VCB-01: nur DIREKTE Kinder umschalten — sonst versteckt der Seitenwechsel
@@ -62,14 +97,13 @@ class VCFrame(VCWidget):
         # to_dict/on_child_activated/paintEvent.
         for child in self.findChildren(
                 VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
-            p = child.property("vc_page") or 0
-            child.setVisible(p == self._current_page)
+            child.setVisible(self._child_visible(child))
         self.update()
 
     def add_child_to_page(self, widget: VCWidget, page: int = 0):
         widget.setParent(self)
         widget.setProperty("vc_page", page)
-        widget.setVisible(page == self._current_page)
+        widget.setVisible(self._child_visible(widget))
         if self._edit_mode:
             widget.set_edit_mode(True)
         # FRM-01: Delete-Ownership an die Box uebergeben. Die Methode verdrahtete
