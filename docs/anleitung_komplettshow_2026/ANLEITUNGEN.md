@@ -1,7 +1,7 @@
 # Komplettshow 2026 — Bebilderte Einzelanleitungen
 
 Diese Sammlung zeigt **Schritt für Schritt**, wie die komplette Show
-[`shows/Komplettshow_2026.lshow`](../../shows/Komplettshow_2026.lshow) von Grund auf in LightOS
+`shows/Komplettshow_2026.lshow` von Grund auf in LightOS
 gebaut wurde — jeweils mit echten Screenshots (und einem GIF des laufenden Effekts). Jede
 Anleitung steht für sich und hat ein klares Lernziel.
 
