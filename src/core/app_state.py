@@ -1917,6 +1917,19 @@ class AppState:
 
     def remove_cue_stack(self, stack):
         self.cue_stacks.remove(stack)
+        # Executor-Bindungen auf ALLEN Pages loesen: sonst behaelt ein Executor die
+        # tote CueStack-Referenz, tickt/rendert sie weiter (Ghost-Playback) und GO/
+        # BACK/Fader wirken auf eine Cueliste, die nirgends mehr sichtbar ist.
+        pe = self.playback_engine
+        if pe is not None:
+            try:
+                stack.stop()
+            except Exception:
+                pass
+            for page in pe.pages:
+                for ex in page:
+                    if ex.stack is stack:
+                        ex.stack = None
         self._emit("stacks_changed", None)
         self._emit("cue_stack_changed", None)
 
