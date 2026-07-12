@@ -76,7 +76,7 @@ auf ARM64 laeuft, und warnt dann mit konkreter Umstiegs-Empfehlung auf ARM64-Pyt
 - Three.js basiert (in QtWebEngine)
 - 2D Top-Down + 3D Perspektive
 - 4 Buehnen-Presets + Custom Stage Builder
-- Echte 3D-Modelle (Moving Head, PAR, Strobe, Truss, ...)
+- Echte 3D-Modelle für jede Geräteklasse — **[Modell-Galerie ansehen](docs/FIXTURE_3D_GALLERY.md)** (Moving Head, PAR, Spider, Laser, Bars, Strobe, Nebel, ...)
 - Volumetrische Beam-Cones
 - Helligkeits-Slider mit Auto-Mode
 
