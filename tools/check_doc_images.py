@@ -19,6 +19,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MD_IMG = re.compile(r"!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")   # ![alt](pfad "title")
 HTML_IMG = re.compile(r"<img\b[^>]*\bsrc\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)   # auskommentierte Bilder ignorieren
+# Code-Bloecke/-Spans enthalten oft Bild-SYNTAX-Beispiele (z.B. `![alt](pfad)` im
+# Audit-Report), keine echten Referenzen -> vor dem Scan entfernen.
+CODE_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+INLINE_CODE = re.compile(r"`[^`\n]*`")
 
 
 def _iter_md_files():
@@ -50,6 +54,8 @@ def scan():
         except Exception:
             continue
         text = HTML_COMMENT.sub("", text)      # auskommentierte Bilder nicht pruefen
+        text = CODE_FENCE.sub("", text)        # Bild-Syntax in ```-Bloecken ist Beispiel
+        text = INLINE_CODE.sub("", text)       # `![](…)`-Beispiele nicht als Ref werten
         md_dir = os.path.dirname(md)
         ok = 0
         for ref in _refs(text):
