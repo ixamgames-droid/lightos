@@ -1973,7 +1973,13 @@ class AppState:
                    fade_in: float = 2.0, fade_out: float = 0.0):
         """Speichert aktuellen Programmer-Inhalt als neue Cue."""
         from .engine.cue import Cue
-        values = {fid: dict(attrs) for fid, attrs in self.programmer.items()}
+        # STAB-21: Snapshot unter _prog_lock (wie _render_frame:1324) — sonst kann ein
+        # paralleler MIDI-/OSC-/Web-RX-set_programmer_value ein NEUES fid einfuegen,
+        # waehrend diese Comprehension self.programmer iteriert (das innere dict(attrs)
+        # ist ein GIL-Yield-Punkt) -> "dictionary changed size during iteration"
+        # (unabgefangen -> Record-Cue bricht ab, Cue nicht gespeichert).
+        with self._prog_lock:
+            values = {fid: dict(attrs) for fid, attrs in self.programmer.items()}
         cue = Cue(number=number, label=label, fade_in=fade_in,
                   fade_out=fade_out, values=values)
         stack.add_cue(cue)
