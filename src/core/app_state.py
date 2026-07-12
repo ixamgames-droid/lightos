@@ -1419,7 +1419,23 @@ class AppState:
         if self.playback_engine is not None:
             try:
                 merged = self.playback_engine.compute_merged()
+                # Executor-Schreibungen protokollieren, um func_driven zu bereinigen.
+                for _su in scratch.values():
+                    _su.begin_write_log()
                 self._apply_fixture_map(scratch, merged)
+                # WP-6-Fix (Prioritaets-Inversion): func_driven wurde VOR den
+                # Executoren erfasst und schuetzt Nicht-Intensitaets-Kanaele vor dem
+                # Programmer-LTP ("Funktion besitzt sie"). Ueberschreibt aber ein Cue
+                # so einen Kanal, gehoert er nicht mehr der Funktion — er dann trotzdem
+                # im Schutz zu lassen liesse den (hoechstprioren) Programmer aussen vor
+                # und den CUE-Wert gegen den Programmer gewinnen (untere Ebene schlaegt
+                # obere). Darum jede vom Cue geschriebene Adresse aus func_driven
+                # nehmen: rein funktions-getriebene (cue-unberuehrte) Kanaele bleiben
+                # geschuetzt, cue-uebernommene faellt der Programmer korrekt wieder an.
+                for _univ, _su in scratch.items():
+                    _ex = _su.end_write_log()
+                    if _ex and _univ in func_driven:
+                        func_driven[_univ] = func_driven[_univ] - _ex
                 # Fixtures, deren Intensitaet ein Cue setzt (auch 0) → 4a² laesst
                 # sie in Ruhe (der Cue „besitzt" den Dimmer).
                 for fid_m, attrs_m in merged.items():
