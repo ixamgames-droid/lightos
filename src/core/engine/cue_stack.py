@@ -239,6 +239,13 @@ class CueStack:
             return None, self._dir
         return nxt, self._dir
 
+    def peek_next(self) -> tuple[int | None, int]:
+        """Public read-only: (naechster_index, richtung) wie ein GO ihn waehlen
+        wuerde — fuer UI-Vorschauen (loop/bounce/pingpong-korrekt statt naivem
+        idx+1)."""
+        with self._lock:
+            return self._peek_next()
+
     def manual_crossfade(self, pos: float) -> bool:
         """Manueller Crossfade: pos 0..1 scrubbt den Uebergang von der aktiven
         zur naechsten Cue von Hand (Fader). Bei pos>=1.0 wird der Uebergang
