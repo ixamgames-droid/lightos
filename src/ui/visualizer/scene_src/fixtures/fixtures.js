@@ -177,7 +177,7 @@ export function addFixture(data) {
     const beamAngle = Math.PI / 13;
     model.moverHeads.forEach(mh => {
       const host = new THREE.Group();
-      host.position.set(0, -0.11, 0);   // an der Linse im Kopf-Frame
+      host.position.copy(mh.lens.position);   // an der Linse im Kopf-Frame
       mh.head.add(host);
       const bcone = createBeamCone(new THREE.Color(0, 0, 0), 0, beamAngle, 7.5);
       host.add(bcone);
