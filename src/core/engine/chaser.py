@@ -141,10 +141,15 @@ class Chaser(Function):
                 self._render_and_blend(universes, patch_cache, function_registry)
                 return True
             return False
-        mult = getattr(self, "tempo_multiplier", 1.0) or 1.0
+        mult = float(getattr(self, "tempo_multiplier", 1.0) or 1.0)
+        if mult <= 0:                     # F7: negativer/korrupter Multiplier (Load
+            mult = 1.0                    # umgeht set_param-Clamp) fror sonst dauerhaft
         anchor = getattr(self, "_beat_anchor", 0.0)
+        # F8: Tempo-Versatz (Beats) gehoert wie bei EFX/Matrix in die effect_pos —
+        # sonst ist der beworbene phase_offset-Parameter fuer Chaser ein No-Op.
+        off = float(getattr(self, "phase_offset", 0.0) or 0.0)
         per = max(1e-9, float(self.beats_per_step or 1))
-        target = int(round(((pos - anchor) * mult) / per, 9))
+        target = int(round((((pos - anchor) * mult) + off) / per, 9))
         prev = getattr(self, "_synced_target_prev", None)
         if prev is None or target < prev:
             self._synced_target_prev = target  # (Re-)Sync ohne Sprung
@@ -179,6 +184,25 @@ class Chaser(Function):
                 pass
         self._step_idx = (len(self.steps) - 1) if self.direction == Direction.Backward else 0
         self._step_elapsed = 0.0
+
+    def _reanchor_bus_target(self):
+        """F5: Nach einer LIVE-Aenderung von ``tempo_multiplier`` die Bus-Sync neu
+        ankern, sodass der aktuelle Schritt erhalten bleibt und die neue Rate AB
+        JETZT gilt. Ohne Re-Anker skaliert der neue Faktor die ganze seit dem
+        Anker verstrichene Beat-Distanz RUECKWIRKEND -> ein Step-Burst von bis zu
+        len(steps) Schritten in einem Frame bzw. ein vorzeitiger SingleShot-Stop.
+        No-op, wenn nicht bus-gebunden (freier/Audio-Pfad nutzt den Multiplier nicht)."""
+        bus_id = getattr(self, "tempo_bus_id", "") or ""
+        if not bus_id:
+            return
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().get(bus_id)
+            if bus is not None:
+                self._beat_anchor = bus.position()
+                self._synced_target_prev = None
+        except Exception:
+            pass
 
     def _clamp_step_idx(self) -> None:
         """Haelt _step_idx im gueltigen Bereich [0, len(steps)-1].
@@ -572,6 +596,7 @@ class Chaser(Function):
         if key == "tempo_multiplier":
             try:
                 self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
+                self._reanchor_bus_target()   # F5: Rate wechseln ohne Step-Burst
             except (TypeError, ValueError):
                 pass
             return True
