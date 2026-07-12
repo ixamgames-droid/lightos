@@ -70,9 +70,23 @@ class Snapshot:
         vals: dict[int, dict[str, int]] = {}
         for k, v in raw.items():
             try:
-                vals[int(k)] = {ak: int(av) for ak, av in v.items()}
-            except Exception:
-                pass
+                fid = int(k)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(v, dict):
+                continue
+            # STAB-18: int(av) PRO Wert kapseln — ein einzelner kaputter Wert
+            # (None/Liste/nicht-numerisch aus hand-editiertem/importiertem JSON) darf
+            # nur DIESEN Kanal ueberspringen, nicht das GANZE Fixture verwerfen
+            # (Verlust-Amplifikation). Analog show_file.py-Programmer-Loader /
+            # snap_library._clean_values.
+            attrs: dict[str, int] = {}
+            for ak, av in v.items():
+                try:
+                    attrs[str(ak)] = int(av)
+                except (TypeError, ValueError):
+                    continue
+            vals[fid] = attrs
         ign: set[tuple[int, str]] = set()
         for item in d.get("ignored", []):
             try:
