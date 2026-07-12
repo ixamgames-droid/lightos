@@ -82,9 +82,12 @@ def _fixture_to_dict(pf) -> dict:
                 pf.get("fixture_profile_id", pf.get("profile_id", 0)), 0
             ),
             "mode_name": str(pf.get("mode_name", pf.get("mode", "")) or ""),
-            "universe": _to_int(pf.get("universe", 1), 1),
-            "address": _to_int(pf.get("address", 1), 1),
-            "channel_count": max(1, _to_int(pf.get("channel_count", 1), 1)),
+            # STAB-10: symmetrisch zu _patched_fixture_from_data klemmen, sonst
+            # driftet ein Fixture mit address/channel_count>512 beim Save->Load->Save
+            # (Dump klemmte frueher nur nach unten, Load auf [1,512]).
+            "universe": max(1, _to_int(pf.get("universe", 1), 1)),
+            "address": min(512, max(1, _to_int(pf.get("address", 1), 1))),
+            "channel_count": min(512, max(1, _to_int(pf.get("channel_count", 1), 1))),
             "invert_pan": bool(pf.get("invert_pan", False)),
             "invert_tilt": bool(pf.get("invert_tilt", False)),
             "swap_pan_tilt": bool(pf.get("swap_pan_tilt", False)),
@@ -108,9 +111,10 @@ def _fixture_to_dict(pf) -> dict:
             getattr(pf, "fixture_profile_id", getattr(pf, "profile_id", 0)), 0
         ),
         "mode_name": str(getattr(pf, "mode_name", getattr(pf, "mode", "")) or ""),
-        "universe": _to_int(getattr(pf, "universe", 1), 1),
-        "address": _to_int(getattr(pf, "address", 1), 1),
-        "channel_count": max(1, _to_int(getattr(pf, "channel_count", 1), 1)),
+        # STAB-10: symmetrisch zu _patched_fixture_from_data klemmen (s. dict-Zweig).
+        "universe": max(1, _to_int(getattr(pf, "universe", 1), 1)),
+        "address": min(512, max(1, _to_int(getattr(pf, "address", 1), 1))),
+        "channel_count": min(512, max(1, _to_int(getattr(pf, "channel_count", 1), 1))),
         "invert_pan": bool(getattr(pf, "invert_pan", False)),
         "invert_tilt": bool(getattr(pf, "invert_tilt", False)),
         "swap_pan_tilt": bool(getattr(pf, "swap_pan_tilt", False)),
