@@ -596,14 +596,14 @@ export function buildSpider(mirrored) {
 
   // ── Top yoke-mount cap (non-emissive, on root group) ──────────────────────
   const yokeMat = new THREE.MeshStandardMaterial({ color: 0x252525, metalness: 0.75, roughness: 0.35 });
-  const yokeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.055, segs(14)), yokeMat);
-  yokeCap.position.set(0, 0.155, 0);
+  const yokeCap = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 0.045, segs(14)), yokeMat);
+  yokeCap.position.set(0, 0.125, 0);
   yokeCap.castShadow = true;
   group.add(yokeCap);
   // Small bolt detail on top of cap
   const boltMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.9, roughness: 0.2 });
-  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.035, 8), boltMat);
-  bolt.position.set(0, 0.20, 0);
+  const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8), boltMat);
+  bolt.position.set(0, 0.16, 0);
   group.add(bolt);
 
   // Fixfarben der LEDs. ch = Index in [color_r, color_g, color_b, color_w].
