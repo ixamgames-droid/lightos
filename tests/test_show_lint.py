@@ -64,7 +64,7 @@ def test_validator_catches_broken_show():
         ]},
         "virtual_console": {"widgets": [
             {"type": "VCBogus", "caption": "gibt's nicht"},
-            {"type": "VCSlider", "caption": "Tempo", "mode": "Level",
+            {"type": "VCSlider", "caption": "Tempo", "mode": "EffectParam",
              "param_key": "speeed", "function_id": 1},   # Tippfehler von "speed"
         ]},
     }
@@ -143,7 +143,7 @@ def test_paramkey_bound_to_wrong_function_type_caught():
              "algorithm": "Plain", "style": "RGB", "params": {}},
         ]},
         "virtual_console": {"widgets": [
-            {"type": "VCSlider", "caption": "Size?", "mode": "Level",
+            {"type": "VCSlider", "caption": "Size?", "mode": "EffectParam",
              "param_key": "size", "function_id": 7},
         ]},
     }
@@ -170,7 +170,7 @@ def test_paramkey_correct_binding_stays_clean():
              "algorithm": "Plain", "style": "RGB", "params": {}},
         ]},
         "virtual_console": {"widgets": [
-            {"type": "VCSlider", "caption": "Size", "mode": "Level",
+            {"type": "VCSlider", "caption": "Size", "mode": "EffectParam",
              "param_key": "size", "function_id": 1},     # EFX trägt 'size' -> ok
             {"type": "VCSlider", "caption": "Speed", "mode": "EffectSpeed",
              "param_key": "speed", "function_id": 2},     # Matrix-universell -> ok
@@ -200,9 +200,9 @@ def test_paramkey_bound_to_efx_tagged_non_efxinstance_stays_clean():
             {"id": 2, "type": "EFX", "name": "Schichten", "layers": []},      # LayeredEffect
         ]},
         "virtual_console": {"widgets": [
-            {"type": "VCSlider", "caption": "Off1", "mode": "Level",
+            {"type": "VCSlider", "caption": "Off1", "mode": "EffectParam",
              "param_key": "offset", "function_id": 1},
-            {"type": "VCSlider", "caption": "Off2", "mode": "Level",
+            {"type": "VCSlider", "caption": "Off2", "mode": "EffectParam",
              "param_key": "offset", "function_id": 2},
         ]},
     }
@@ -218,7 +218,7 @@ def test_paramkey_bound_to_efx_tagged_non_efxinstance_stays_clean():
             {"id": 3, "type": "EFX", "name": "Kreis", "motion": True, "algorithm": "Circle"},
         ]},
         "virtual_console": {"widgets": [
-            {"type": "VCSlider", "caption": "Off", "mode": "Level",
+            {"type": "VCSlider", "caption": "Off", "mode": "EffectParam",
              "param_key": "offset", "function_id": 3},
         ]},
     }
@@ -226,15 +226,43 @@ def test_paramkey_bound_to_efx_tagged_non_efxinstance_stays_clean():
         format_findings(validate_show_dict(hard))
 
 
+def test_paramkey_inert_slider_mode_not_checked():
+    """CDX-04: Ein VCSlider liest param_key NUR im EffectParam-Modus (vc_slider.py).
+    In anderen Modi (Level/EffectSpeed/…) ist der serialisierte param_key inert — der
+    Linter darf ihn dort NICHT gegen die gebundene Funktion prüfen, sonst blockt ein
+    stale param_key das Speichern einer sonst gültigen Show. Gegenprobe: derselbe
+    Slider im EffectParam-Modus MUSS weiter als VC-PARAMKEY-FN feuern."""
+    def _show(mode):
+        return {
+            "version": "1.1",
+            "functions": {"functions": [
+                {"id": 1, "type": "EFX", "name": "Kreis", "motion": True,
+                 "algorithm": "Circle"},
+            ]},
+            "virtual_console": {"widgets": [
+                {"type": "VCSlider", "caption": "X", "mode": mode,
+                 "param_key": "offset", "function_id": 1},   # 'offset' inert an EFX
+            ]},
+        }
+    caps = get_capabilities()
+    assert "offset" in caps.all_param_keys and "offset" not in caps.efx_param_keys
+    # inerter Modus -> KEIN Fehler (der Regler nutzt param_key gar nicht)
+    assert "VC-PARAMKEY-FN" not in _codes(validate_show_dict(_show("Level")), ERROR)
+    assert "VC-PARAMKEY-FN" not in _codes(validate_show_dict(_show("EffectSpeed")), ERROR)
+    assert_show_dict(_show("Level"))   # die gültige Show darf NICHT am Speichern scheitern
+    # param_key-nutzender Modus -> der scharfe Check lebt weiter
+    assert "VC-PARAMKEY-FN" in _codes(validate_show_dict(_show("EffectParam")), ERROR)
+
+
 def test_paramkey_unbound_still_only_union_checked():
     """Ohne function_id (keine Bindung auflösbar) bleibt es beim Union-Check:
     ein global gültiger Key ist ok, ein Tippfehler weiterhin VC-PARAMKEY."""
     ok = {"virtual_console": {"widgets": [
-        {"type": "VCSlider", "caption": "x", "mode": "Level", "param_key": "size"}]}}
+        {"type": "VCSlider", "caption": "x", "mode": "EffectParam", "param_key": "size"}]}}
     assert not _codes(validate_show_dict(ok), ERROR), \
         format_findings(validate_show_dict(ok))
     bad = {"virtual_console": {"widgets": [
-        {"type": "VCSlider", "caption": "x", "mode": "Level", "param_key": "siize"}]}}
+        {"type": "VCSlider", "caption": "x", "mode": "EffectParam", "param_key": "siize"}]}}
     assert "VC-PARAMKEY" in _codes(validate_show_dict(bad), ERROR)
 
 
