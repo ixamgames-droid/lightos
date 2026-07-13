@@ -22,6 +22,23 @@ def _get_state():
     return get_state()
 
 
+def _is_private_ipv4(ip: str) -> bool:
+    """True fuer private LAN-Adressen (RFC 1918): 10./172.16-31./192.168.,
+    nicht Loopback (127.*) und nicht 0.*. Nur diese sind fuer das isolierte
+    Venue-LAN brauchbar."""
+    if not ip or ip.startswith(("0.", "127.")):
+        return False
+    if ip.startswith(("10.", "192.168.")):
+        return True
+    if ip.startswith("172."):
+        try:
+            second = int(ip.split(".")[1])
+        except (IndexError, ValueError):
+            return False
+        return 16 <= second <= 31
+    return False
+
+
 def get_lan_ip() -> str:
     """Ermittelt die eigene LAN-IPv4-Adresse fuer die Remote-Anzeige.
 
@@ -29,8 +46,14 @@ def get_lan_ip() -> str:
     aber die konkrete Adresse stehen, die der Nutzer am Handy eintippt — nicht
     das irrefuehrende ``localhost`` (NET-02). Trick: ein UDP-Socket "verbinden"
     zu einer externen Adresse; dabei fliesst kein Paket, aber das OS waehlt das
-    ausgehende Interface, dessen lokale Adresse wir dann auslesen. Ohne Netz
-    (kein Interface) faellt das auf ``127.0.0.1`` zurueck — nie ein Crash."""
+    ausgehende Interface, dessen lokale Adresse wir dann auslesen.
+
+    Die connect-Heuristik liefert aber die Adresse der DEFAULT-Route — bei
+    aktivem VPN die VPN-NIC, ohne Internet wirft sie (bzw. 127.*), was fuer die
+    isolierten Venue-LANs falsch ist (CDX-06). Faellt sie auf Loopback/nichts
+    zurueck, enumerieren wir daher die lokalen NICs und nehmen die erste private
+    (10./172.16-31./192.168.) Nicht-Loopback-Adresse. Erst wenn auch das nichts
+    findet, bleibt ``127.0.0.1`` — nie ein Crash."""
     import socket
     sock = None
     try:
@@ -38,7 +61,7 @@ def get_lan_ip() -> str:
         # 8.8.8.8 ist nur ein Routing-Ziel; es wird nichts gesendet.
         sock.connect(("8.8.8.8", 80))
         ip = sock.getsockname()[0]
-        if ip and not ip.startswith("0."):
+        if ip and not ip.startswith(("0.", "127.")):
             return ip
     except OSError:
         pass
@@ -48,6 +71,31 @@ def get_lan_ip() -> str:
                 sock.close()
             except OSError:
                 pass
+
+    # Fallback: die default-Route hat keine brauchbare LAN-IP geliefert
+    # (kein Netz oder VPN/Loopback). Lokale NICs enumerieren — ohne externe
+    # Dependency, nur ueber die stdlib — und die erste private Adresse nehmen.
+    candidates: list[str] = []
+    try:
+        hostname = socket.gethostname()
+        candidates.append(socket.gethostbyname(hostname))
+    except OSError:
+        pass
+    try:
+        _name, _aliases, addrs = socket.gethostbyname_ex(socket.gethostname())
+        candidates.extend(addrs)
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            candidates.append(info[4][0])
+    except OSError:
+        pass
+
+    for ip in candidates:
+        if _is_private_ipv4(ip):
+            return ip
+
     return "127.0.0.1"
 
 

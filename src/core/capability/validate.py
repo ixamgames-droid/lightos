@@ -279,7 +279,16 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
     # NICHT trägt -> QA-05-Bugklasse (global gültig, für DIESE Funktion inert):
     # statisch gegen die Param-Keys des gebundenen Funktionstyps prüfen.
     if wtype in ("VCSlider", "VCEncoder", "VCStepper"):
-        pk = w.get("param_key")
+        # CDX-04: Ein VCSlider liest ``param_key`` NUR im ``EffectParam``-Modus
+        # (vc_slider.py:268-277). In allen anderen Modi (Level/EffectSpeed/
+        # EffectIntensity/GrandMaster/…) ist der serialisierte ``param_key`` inert —
+        # ihn dort gegen die gebundene Funktion zu prüfen ist selbst ein Falsch-
+        # Positiv, das eine gültige Show über ``assert_show_dict`` am Speichern
+        # hindern kann. VCEncoder/VCStepper binden dagegen IMMER einen Effekt-
+        # parameter über ``param_key`` (vc_encoder.py:110 / vc_stepper.py) → dort
+        # bleibt der Check unbedingt.
+        _uses_pk = wtype != "VCSlider" or w.get("mode") == "EffectParam"
+        pk = w.get("param_key") if _uses_pk else None
         if pk and caps.all_param_keys and pk not in caps.all_param_keys:
             sugg = _suggest(pk, caps.all_param_keys)
             out.append(Finding(

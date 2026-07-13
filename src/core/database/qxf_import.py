@@ -518,25 +518,55 @@ def import_qxf_file(path: str, session: Session,
                 channel_count=len(ch_refs),
             )
             session.add(mode_obj)
+            # CDX-03 (Review): ZWEI Durchlaeufe. Ein FEHLENDES ``Number`` (frueher
+            # per Default "0" → num=1) durfte NIE einen explizit nummerierten Kanal 1
+            # (Number="0") verdraengen — je nach Dokument-Reihenfolge haette der
+            # Number-lose Ref den echten Kanal 1 belegt und den expliziten als
+            # "Kollision" verworfen (stille DMX-Fehlbelegung). Deshalb: Pass 1 platziert
+            # ALLE explizit (gueltig) nummerierten Kanaele; Pass 2 legt die Number-losen
+            # auf die jeweils naechste WIRKLICH freie Nummer (nicht fix auf 1). Non-
+            # numerische Number bleibt ein sichtbar gemeldeter Skip; eine echte
+            # Nummern-Kollision zwischen zwei EXPLIZITEN Kanaelen ebenfalls.
+            used_numbers: set[int] = set()
+            explicit: list[tuple[int, str, object]] = []   # (num, ch_name, channel_def)
+            missing: list[tuple[str, object]] = []          # (ch_name, channel_def)
+            _mode_name = mode_el.get("Name", "Standard")
             for ch_ref in ch_refs:
                 ch_name = (ch_ref.text or "").strip()
+                cdef = channel_defs.get(ch_name)
+                raw = ch_ref.get("Number")
+                if raw is None:
+                    missing.append((ch_name, cdef))
+                    continue
                 try:
-                    num = int(ch_ref.get("Number", "0")) + 1   # 0- → 1-basiert
+                    num = int(raw) + 1   # 0- → 1-basiert
                 except (ValueError, TypeError):
-                    # Kaputtes/fehlendes ``Number`` NICHT auf einen fixen Default
-                    # (frueher ``len(ch_refs)``) zwingen — das kollidierte mit dem
-                    # legitim letzten Kanal und verschob die DMX-Belegung still.
-                    # Lieber den defekten Kanal ueberspringen + sichtbar melden;
-                    # der Footprint ist dann um einen Kanal kleiner, aber keine
-                    # zwei Kanaele teilen sich dieselbe channel_number.
                     print(
-                        f"[qxf_import] {model_str}: Mode "
-                        f"'{mode_el.get('Name', 'Standard')}' Channel "
-                        f"'{ch_name or '?'}' hat ungueltiges Number="
-                        f"{ch_ref.get('Number')!r} — Kanal uebersprungen."
+                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
+                        f"'{ch_name or '?'}' hat ungueltiges Number={raw!r} "
+                        f"— Kanal uebersprungen."
                     )
                     continue
-                _make_channel(mode_obj, num, ch_name, channel_defs.get(ch_name))
+                if num in used_numbers:
+                    print(
+                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
+                        f"'{ch_name or '?'}' Number={raw!r} kollidiert mit Kanal "
+                        f"{num} — Kanal uebersprungen."
+                    )
+                    continue
+                used_numbers.add(num)
+                explicit.append((num, ch_name, cdef))
+            # Pass 2: Number-lose Kanaele auf die naechste freie Nummer (verdraengt nie
+            # einen expliziten). Reihenfolge der Number-losen bleibt Dokument-Reihenfolge.
+            for ch_name, cdef in missing:
+                n = 1
+                while n in used_numbers:
+                    n += 1
+                used_numbers.add(n)
+                explicit.append((n, ch_name, cdef))
+            # Deterministisch in Kanal-Nummer-Reihenfolge anlegen.
+            for num, ch_name, cdef in sorted(explicit, key=lambda t: t[0]):
+                _make_channel(mode_obj, num, ch_name, cdef)
     return True
 
 
