@@ -47,6 +47,7 @@ Die Looks sind **getrennte Ebenen** über denselben Geräten und lassen sich fre
 - **Hochzeit-Show: Farbwechsel und Dimmer taktgleich** (drei **Tempo-Controller** auf Bus A/B/C · unterschiedliche Geschwindigkeit · gemeinsamer Taktstart): [anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md)
 - **Tempo & Synchronisierung — Gesamtüberblick** (BPM · Tempo-Buses · Multiplikatoren · „Taktgleich"-Haken · **Auto-Sync/Phasen-Sync** · Panel „Effekte je Bus"): [ANLEITUNG_TEMPO_SYNC.md](ANLEITUNG_TEMPO_SYNC.md)
 - **BPM-Manager — neue Funktionen** (BPM-Quelle, Genre-Presets, Takt-Raster, **Generator**: ganzes Lied → Beatgrid, Analyse-Engines, Beatgrid-Editor, „Taktgenau"): [anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)
+- **Web-Remote — das Handy als Konsole** (Server auf Port 5000 starten · LAN-IP finden · GO/BACK/STOP/Blackout/Fader · Sicherheitshinweis offenes LAN): [anleitung_web_remote/ANLEITUNG.md](anleitung_web_remote/ANLEITUNG.md)
 - **Event-Demo-2026-Anleitungen** (Moving Heads · Spider · Speed/BPM · VC live bearbeiten): [ANLEITUNGEN_EVENT_DEMO.md](ANLEITUNGEN_EVENT_DEMO.md)
 - **Zwei Universen über zwei Adapter** (U1 via Enttec USB Pro · U2 via Art-Net · Patchen auf U1/U2 · Ausgabe-Konfig pro Universum · Verifikation im Output-Monitor): [anleitung_zwei_universen/ANLEITUNG.md](anleitung_zwei_universen/ANLEITUNG.md)
 - Komplette Oberflächen-Anleitung (alle 8 Sektionen): [ANLEITUNG.md](ANLEITUNG.md)
