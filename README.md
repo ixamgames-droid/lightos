@@ -263,6 +263,7 @@ LightOS/
 | RGB‑Matrix live programmieren | [docs/MATRIX_LIVE.md](docs/MATRIX_LIVE.md) |
 | Show‑Dateiformat | [docs/SHOW_FILE_FORMAT.md](docs/SHOW_FILE_FORMAT.md) |
 | Art‑Net / DMX‑Protokoll | [docs/ARTNET.md](docs/ARTNET.md) · [docs/DMX_PROTOCOL.md](docs/DMX_PROTOCOL.md) |
+| **Env‑Flags & Config‑Dateien (`LIGHTOS_*`, `data/`)** | **[docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md)** |
 
 Schneller Einstieg in die mitgelieferte Demo für die echte Hardware:
 ```cmd

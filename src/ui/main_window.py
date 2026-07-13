@@ -1601,12 +1601,15 @@ class MainWindow(QMainWindow):
     def _toggle_web_server(self, checked: bool):
         if checked:
             try:
-                from src.web.app import start_server
-                start_server(5000)
-                self._lbl_web.setText("Web: :5000 OK")
+                from src.web.app import start_server, remote_url
+                port = start_server(5000) or 5000
+                url = remote_url(port)
+                self._lbl_web.setText(f"Web: :{port} OK")
                 self._lbl_web.setStyleSheet("color: #9DFF52;")
                 QMessageBox.information(self, "Web-Interface",
-                    "Web-Interface läuft auf http://localhost:5000")
+                    f"Web-Interface läuft auf {url}\n\n"
+                    "Erreichbar für ALLE Geräte im selben (W)LAN. "
+                    "Nur in vertrauenswürdigen Netzen aktivieren.")
             except Exception as e:
                 self._act_web.setChecked(False)
                 QMessageBox.warning(self, "Web-Interface Fehler", str(e))
