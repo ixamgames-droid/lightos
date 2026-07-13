@@ -22,6 +22,40 @@ def _get_state():
     return get_state()
 
 
+def get_lan_ip() -> str:
+    """Ermittelt die eigene LAN-IPv4-Adresse fuer die Remote-Anzeige.
+
+    Der Server bindet auf 0.0.0.0 (das ganze LAN), im Verbindungs-Dialog soll
+    aber die konkrete Adresse stehen, die der Nutzer am Handy eintippt — nicht
+    das irrefuehrende ``localhost`` (NET-02). Trick: ein UDP-Socket "verbinden"
+    zu einer externen Adresse; dabei fliesst kein Paket, aber das OS waehlt das
+    ausgehende Interface, dessen lokale Adresse wir dann auslesen. Ohne Netz
+    (kein Interface) faellt das auf ``127.0.0.1`` zurueck — nie ein Crash."""
+    import socket
+    sock = None
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # 8.8.8.8 ist nur ein Routing-Ziel; es wird nichts gesendet.
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("0."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+    return "127.0.0.1"
+
+
+def remote_url(port: int = 5000) -> str:
+    """Vollstaendige LAN-URL fuer das Web-Remote, z.B. ``http://192.168.1.5:5000``."""
+    return f"http://{get_lan_ip()}:{port}"
+
+
 def _num(data, key, default, cast):
     """Robuste Zahl-Coercion aus einem (JSON-)Dict: bei fehlendem, nicht-
     numerischem oder nicht-endlichem (int(inf)/int(NaN)) Wert wird der Default
