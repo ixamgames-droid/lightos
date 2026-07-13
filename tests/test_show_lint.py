@@ -180,6 +180,52 @@ def test_paramkey_correct_binding_stays_clean():
     assert "VC-PARAMKEY-FN" not in _codes(findings, ERROR), format_findings(findings)
 
 
+def test_paramkey_bound_to_efx_tagged_non_efxinstance_stays_clean():
+    """QA-19-Regression (adversariale Review): ``FunctionType.EFX`` ist mehrdeutig —
+    ``Carousel`` (Diskriminator ``pattern``) und ``LayeredEffect`` (``layers``) tragen
+    denselben Typ-Tag ``"EFX"`` wie die echte Pan/Tilt-``EfxInstance`` (``motion``/
+    ``speed_hz``), exponieren aber KEINE ``list_params``. Der maßgebliche Live-Check
+    liefert für sie ``[]`` und flaggt nichts; der statische VC-PARAMKEY-FN-Check darf
+    daher NICHT strenger sein und eine sonst gültige Show beim Speichern blocken.
+
+    'offset' ist global gültig (Matrix-Param) aber KEIN EFX-Param — vor dem Fix meldete
+    der statische Pfad ihn an einer Carousel/LayeredEffect fälschlich als Fehler."""
+    caps = get_capabilities()
+    assert "offset" in caps.all_param_keys        # global gültig …
+    assert "offset" not in caps.efx_param_keys    # … aber kein EFX-Param
+    show = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 1, "type": "EFX", "name": "Wirbel", "pattern": "Pulse"},   # Carousel
+            {"id": 2, "type": "EFX", "name": "Schichten", "layers": []},      # LayeredEffect
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCSlider", "caption": "Off1", "mode": "Level",
+             "param_key": "offset", "function_id": 1},
+            {"type": "VCSlider", "caption": "Off2", "mode": "Level",
+             "param_key": "offset", "function_id": 2},
+        ]},
+    }
+    findings = validate_show_dict(show)
+    assert "VC-PARAMKEY-FN" not in _codes(findings, ERROR), format_findings(findings)
+    assert_show_dict(show)  # die sonst gültige Show darf NICHT am Speichern gehindert werden
+
+    # Gegenprobe, dass der scharfe Check lebt: dieselbe 'offset'-Bindung an eine echte
+    # EfxInstance (motion) MUSS weiterhin als VC-PARAMKEY-FN feuern.
+    hard = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 3, "type": "EFX", "name": "Kreis", "motion": True, "algorithm": "Circle"},
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCSlider", "caption": "Off", "mode": "Level",
+             "param_key": "offset", "function_id": 3},
+        ]},
+    }
+    assert "VC-PARAMKEY-FN" in _codes(validate_show_dict(hard), ERROR), \
+        format_findings(validate_show_dict(hard))
+
+
 def test_paramkey_unbound_still_only_union_checked():
     """Ohne function_id (keine Bindung auflösbar) bleibt es beim Union-Check:
     ein global gültiger Key ist ok, ein Tippfehler weiterhin VC-PARAMKEY."""

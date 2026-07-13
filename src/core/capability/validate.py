@@ -142,7 +142,17 @@ def _function_param_keys(fd: dict, caps: Capabilities) -> frozenset | None:
     if ftype == "RGBMatrix":
         return caps.matrix_all_param_keys or None
     if ftype == "EFX":
-        return caps.efx_param_keys or None
+        # FunctionType.EFX ist mehrdeutig (gleicher Typ-Tag): nur die echte Pan/Tilt-
+        # ``EfxInstance`` (Diskriminator ``motion``/``speed_hz``, wie in _check_efx)
+        # trägt reflektierte ``efx_param_keys``. ``LayeredEffect`` (``layers``) und
+        # ``Carousel`` (``pattern``) teilen sich das EFX-Tag, exponieren aber KEINE
+        # ``list_params`` -> der maßgebliche Live-Check (``effect_live.list_params``)
+        # liefert für sie ``[]`` und flaggt nichts. ``None`` hält den statischen Check
+        # konsistent (nur der Union-Check greift) und verhindert die QA-19-Regression,
+        # eine gültige Carousel-/Layer-Bindung fälschlich als Fehler zu blocken.
+        if bool(fd.get("motion")) or ("speed_hz" in fd):
+            return caps.efx_param_keys or None
+        return None
     return None
 
 
