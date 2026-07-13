@@ -25,7 +25,13 @@ def import_qxw(path: str) -> dict:
     """Parse a QLC+ .qxw file. Returns dict with keys:
        'ok': bool, 'message': str,
        'fixtures': list of dicts, 'functions': list of dicts,
-       'virtual_console': dict.
+       'virtual_console': dict,
+       'skipped_fixtures': list of dicts ({'label', 'reason'}).
+
+    FIMP-04: Ein einzelnes defektes Zahlenfeld (z.B. Address='notanumber')
+    verwirft das betroffene Fixture NICHT mehr still. Stattdessen wird es mit
+    Grund in ``skipped_fixtures`` gesammelt; die Erfolgsmeldung listet die
+    übersprungenen Fixtures auf und zählt nur die tatsächlich importierten.
     """
     result = {
         "ok": False,
@@ -33,6 +39,7 @@ def import_qxw(path: str) -> dict:
         "fixtures": [],
         "functions": [],
         "virtual_console": {},
+        "skipped_fixtures": [],
     }
     if not os.path.exists(path):
         result["message"] = f"Datei nicht gefunden: {path}"
@@ -50,14 +57,19 @@ def import_qxw(path: str) -> dict:
     # Walk through engine + virtualconsole sections
     fixtures = []
     functions = []
+    skipped_fixtures = []
     vc = {}
 
     for el in _walk(root):
         tag = _strip_ns(el.tag)
         if tag == "Fixture":
-            fx = _parse_fixture(el)
-            if fx is not None:
-                fixtures.append(fx)
+            try:
+                fixtures.append(_parse_fixture(el))
+            except Exception as e:
+                label = _fixture_label(el)
+                reason = str(e)
+                print(f"[qxw_importer] fixture '{label}' skipped: {reason}")
+                skipped_fixtures.append({"label": label, "reason": reason})
         elif tag == "Function":
             fn = _parse_function(el)
             if fn is not None:
@@ -66,13 +78,21 @@ def import_qxw(path: str) -> dict:
             vc = _parse_virtual_console(el)
 
     result["ok"] = True
-    result["message"] = (
+    message = (
         f"Importiert: {len(fixtures)} Fixtures, {len(functions)} Funktionen, "
         f"{len(vc.get('widgets', []))} VC-Widgets"
     )
+    if skipped_fixtures:
+        message += (
+            f"\n{len(skipped_fixtures)} Fixture(s) übersprungen (defekte Werte):"
+        )
+        for s in skipped_fixtures:
+            message += f"\n  - {s['label']}: {s['reason']}"
+    result["message"] = message
     result["fixtures"] = fixtures
     result["functions"] = functions
     result["virtual_console"] = vc
+    result["skipped_fixtures"] = skipped_fixtures
     return result
 
 
@@ -85,29 +105,49 @@ def _child_text(el: ET.Element, name: str, default: str = "") -> str:
     return default
 
 
-def _parse_fixture(el: ET.Element) -> dict | None:
+def _fixture_label(el: ET.Element) -> str:
+    """Best-effort human label for a Fixture element (for skip reporting).
+    Uses only text lookups that never raise, so it works even when the
+    fixture is being skipped because a numeric field is broken."""
+    name = _child_text(el, "Name", "")
+    model = _child_text(el, "Model", "")
+    fid = _child_text(el, "ID", "")
+    label = name or model or (f"ID {fid}" if fid else "") or "Fixture"
+    return label
+
+
+def _int_field(el: ET.Element, name: str, default: str = "0", offset: int = 0) -> int:
+    """Parse a numeric child field, raising a descriptive ValueError on bad
+    input so the caller can record *which* field of *which* fixture failed
+    (FIMP-04) instead of silently dropping the whole fixture."""
+    raw = _child_text(el, name, default)
     try:
-        fid = int(_child_text(el, "ID", "0"))
-        manufacturer = _child_text(el, "Manufacturer", "")
-        model = _child_text(el, "Model", "")
-        mode = _child_text(el, "Mode", "")
-        name = _child_text(el, "Name", model or "Fixture")
-        univ = int(_child_text(el, "Universe", "0")) + 1  # QLC+ universe is 0-based
-        address = int(_child_text(el, "Address", "0")) + 1  # 0-based -> 1-based
-        channels = int(_child_text(el, "Channels", "1"))
-        return {
-            "fid": fid,
-            "label": name,
-            "manufacturer_name": manufacturer,
-            "fixture_name": model,
-            "mode_name": mode,
-            "universe": univ,
-            "address": address,
-            "channel_count": channels,
-        }
-    except Exception as e:
-        print(f"[qxw_importer] fixture parse error: {e}")
-        return None
+        return int(raw) + offset
+    except (TypeError, ValueError):
+        raise ValueError(f"Feld {name!r} ist keine Zahl: {raw!r}")
+
+
+def _parse_fixture(el: ET.Element) -> dict:
+    """Parse a single <Fixture>. Raises ValueError on a broken numeric field;
+    the caller (:func:`import_qxw`) collects the reason in ``skipped_fixtures``."""
+    manufacturer = _child_text(el, "Manufacturer", "")
+    model = _child_text(el, "Model", "")
+    mode = _child_text(el, "Mode", "")
+    name = _child_text(el, "Name", model or "Fixture")
+    fid = _int_field(el, "ID", "0")
+    univ = _int_field(el, "Universe", "0", 1)  # QLC+ universe is 0-based
+    address = _int_field(el, "Address", "0", 1)  # 0-based -> 1-based
+    channels = _int_field(el, "Channels", "1")
+    return {
+        "fid": fid,
+        "label": name,
+        "manufacturer_name": manufacturer,
+        "fixture_name": model,
+        "mode_name": mode,
+        "universe": univ,
+        "address": address,
+        "channel_count": channels,
+    }
 
 
 def _parse_function(el: ET.Element) -> dict | None:
