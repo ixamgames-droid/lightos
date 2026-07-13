@@ -159,6 +159,30 @@ class TestOutputConfigLifecycle(unittest.TestCase):
         self.assertEqual(self.state.output_manager.active_registries(5), [])
         self.assertEqual(self.dlg._lbl_sacn_status.text(), "Inaktiv")
 
+    def test_deactivate_artnet_removes_applied_univ_not_current_spin(self):
+        # Review-Fix (MU-02b): Art-Net auf U1 aktiv, dann Spin auf U2 (dort laeuft
+        # bewusst sACN), dann Art-Net abwaehlen -> es MUSS U1 geraeumt werden (das
+        # tatsaechlich belegte), NICHT U2 — sonst wird der fremde sACN-Adapter auf U2
+        # faelschlich gekillt.
+        self.dlg._spin_artnet_univ.setValue(1)
+        self.dlg._check_artnet.setChecked(True)
+        self.dlg._apply_artnet()                        # Art-Net auf U1
+        self.dlg._spin_sacn_univ.setValue(2)
+        self.dlg._check_sacn.setChecked(True)
+        self.dlg._apply_sacn()                          # sACN auf U2
+        self.assertEqual(self.state.output_manager.active_registries(2), ["sacn"])
+
+        self.dlg._spin_artnet_univ.setValue(2)          # Spin (irrefuehrend) auf U2
+        self.dlg._check_artnet.setChecked(False)
+        self.state.output_manager.calls.clear()
+        self.dlg._apply_artnet()                        # Art-Net abwaehlen
+
+        self.assertIn(("remove_output", 1), self.state.output_manager.calls)
+        self.assertNotIn(("remove_output", 2), self.state.output_manager.calls)
+        # Der fremde sACN-Adapter auf U2 ueberlebt; U1 ist leer.
+        self.assertEqual(self.state.output_manager.active_registries(2), ["sacn"])
+        self.assertEqual(self.state.output_manager.active_registries(1), [])
+
 
 if __name__ == "__main__":
     unittest.main()

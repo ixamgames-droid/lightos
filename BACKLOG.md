@@ -6,6 +6,13 @@
 > sie sind **keine** alternative Reihenfolge. Vision/Langfrist steht in
 > [ROADMAP.md](ROADMAP.md).
 
+> **🏁 FINALIZE + 🔮 Nächstes Backlog** (David 2026-07-13; Details in `SecondBrain/project_lightos_roadmap_next.md`).
+> **Reihenfolge bindend — NICHT vorziehen:** erst den aktuellen Backlog komplett leerräumen, DANN als **allerletzter Punkt** die Projekt-Finalisierung, DANN ein frisches Backlog.
+>
+> **FINALIZE (letzter Punkt):** Projekt-Stand vs. Backlog vs. Second Brain abgleichen · verwaiste/nie-umgesetzte Alt-Items klären/schließen · Repo **und** den lokalen Ordner (`C:\Users\David\Downloads\lightos-main`) von sinnlosen Altdateien säubern → *clean repo + clean lokaler Ordner* · Second Brain konsolidieren (Index + Graph aktuell).
+>
+> **Nächstes Backlog (nach FINALIZE):** (1) VC-Buttons plastischer/„3D-ig" — Shadows/Bevel/Depth + klares Press-/Aktiv-Feedback, touch-tauglich, *nicht* echt-3D; (2) umfassende **UX-/User-Friendliness-Audits** über ALLES Klickbare/Interaktive — **auch mit Computer Use** (echt, nicht nur headless); (3) Effekte selbst bauen + im **3D-Visualizer** prüfen; (4) Fixture-Erstellung/Generator/Patchen rundlaufen; (5) **Cross-Platform**: ARM-Windows (jetzt) + normales Windows (x86) + Linux (x86).
+
 ## Legende
 - **Status:** `todo` (ausführbar) · `decision` (Produktentscheidung nötig) ·
   `blocked` (Hardware/Zugang/extern) · `wip` (in Arbeit) · `review` (PR offen) ·

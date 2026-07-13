@@ -75,6 +75,12 @@ class MidiManager:
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
         self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=_RX_QUEUE_MAX)
+        # Producer-Lock (Review): serialisiert ALLE Producer-Enqueues untereinander.
+        # Jeder offene MIDI-Input hat einen eigenen Callback-Thread; ohne Serialisierung
+        # konnte ein zweiter Producer die in _make_room_for_release freigeraeumten Slots
+        # fuellen, sodass die beiseitegelegten Note-Off/CC-0 beim Wieder-Einreihen doch
+        # verloren gingen. Der Consumer (_rx_loop) nimmt diesen Lock NIE -> kein Deadlock.
+        self._producer_lock = threading.Lock()
         self._rx_dropped = 0  # Zaehler fuer bei Overflow verworfene Nachrichten (F2)
         self._rx_running = True
         self._rx_thread = threading.Thread(target=self._rx_loop, daemon=True, name="MidiDispatch")
@@ -397,27 +403,31 @@ class MidiManager:
 
     def _on_message(self, raw: list[int], port_name: str):
         item = (list(raw), port_name)
-        try:
-            self._rx_queue.put_nowait(item)
-            return
-        except queue.Full:
-            pass
-        # Queue voll: NICHT still verwerfen. Release-Nachrichten (Note-Off/CC-0)
-        # bevorzugt zustellen, indem eine ältere Nicht-Release-Nachricht weicht.
-        if self._is_release(raw) and self._make_room_for_release():
+        # Der gesamte Enqueue-/Rescue-Pfad laeuft unter dem Producer-Lock, damit
+        # _make_room_for_release nicht von einem parallelen Input-Callback-Thread
+        # unterlaufen wird (Review-Fix). +Nebeneffekt: _rx_dropped ist so RMW-sicher.
+        with self._producer_lock:
             try:
                 self._rx_queue.put_nowait(item)
-                self._rx_dropped += 1
-                print(f"[midi_manager] RX-Queue voll — ältere Nachricht verworfen, "
-                      f"damit Note-Off/CC-0 zugestellt wird (drops={self._rx_dropped})")
                 return
             except queue.Full:
                 pass
-        # Sonst: diese Nachricht verwerfen, aber zählen + (gedrosselt) warnen.
-        self._rx_dropped += 1
-        if self._rx_dropped == 1 or self._rx_dropped % 64 == 0:
-            print(f"[midi_manager] RX-Queue voll (maxsize={_RX_QUEUE_MAX}) — "
-                  f"Nachricht verworfen (drops={self._rx_dropped})")
+            # Queue voll: NICHT still verwerfen. Release-Nachrichten (Note-Off/CC-0)
+            # bevorzugt zustellen, indem eine ältere Nicht-Release-Nachricht weicht.
+            if self._is_release(raw) and self._make_room_for_release():
+                try:
+                    self._rx_queue.put_nowait(item)
+                    self._rx_dropped += 1
+                    print(f"[midi_manager] RX-Queue voll — ältere Nachricht verworfen, "
+                          f"damit Note-Off/CC-0 zugestellt wird (drops={self._rx_dropped})")
+                    return
+                except queue.Full:
+                    pass
+            # Sonst: diese Nachricht verwerfen, aber zählen + (gedrosselt) warnen.
+            self._rx_dropped += 1
+            if self._rx_dropped == 1 or self._rx_dropped % 64 == 0:
+                print(f"[midi_manager] RX-Queue voll (maxsize={_RX_QUEUE_MAX}) — "
+                      f"Nachricht verworfen (drops={self._rx_dropped})")
 
     def _rx_loop(self):
         while self._rx_running:
