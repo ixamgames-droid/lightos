@@ -106,6 +106,25 @@ class _ReconfigureBase:
         self.assertEqual(self.rx._merges[7], (2, "HTP"))
         self.fake_state.clear_input_merge.assert_called_once_with(1)
 
+    def test_reconfigure_same_in_out_change_clears_old_out(self):
+        # NET-08b (Review): gleiches EINGANGS-Universum, nur OUT gewechselt (U1->U2).
+        # Der Merge-Eintrag bleibt (in==5), set_merge remappt ihn — die ALTE out-
+        # Schicht (U1) muss trotzdem SOFORT geleert werden, sonst haengt sie bis zum
+        # NET-05-Timeout (~2,5s) als eingefrorener DMX. Genau diesen Fall (stale==[])
+        # uebersah der erste Fix.
+        self._configure(5, 1)
+        self.fake_state.clear_input_merge.reset_mock()
+        self._configure(5, 2)
+        self.assertEqual(self.rx._merges[5], (2, "HTP"))
+        self.fake_state.clear_input_merge.assert_called_once_with(1)
+
+    def test_first_config_no_spurious_clear(self):
+        # Erst-Konfiguration (kein alter Eintrag) darf nichts raeumen.
+        self.fake_state.clear_input_merge.reset_mock()
+        self._configure(5, 1)
+        self.assertEqual(self.rx._merges[5], (1, "HTP"))
+        self.fake_state.clear_input_merge.assert_not_called()
+
 
 class TestSacnInputReconfigure(_ReconfigureBase, unittest.TestCase):
     spin_univ_attr = "_spin_sacn_in_univ"

@@ -69,7 +69,14 @@ def get(path: str, engine: str, genre: str, takt) -> dict | None:
     k = _key(path, engine, genre, takt)
     if not k:
         return None
-    entry = _load().get(k)
+    # BPM-03b (Review): unter _lock lesen. Sonst kann ein paralleler
+    # put()->_save()->os.replace() auf Windows eine Sharing-Violation
+    # (PermissionError) werfen, während dieser Reader die Datei offen hält — der
+    # Schreibvorgang wird dann still verworfen (Cache-Verlust). Der Writer hält
+    # _lock über den gesamten _save(); durch dasselbe Lock hier liest kein Reader
+    # mehr, während die Zieldatei ersetzt wird.
+    with _lock:
+        entry = _load().get(k)
     return entry if isinstance(entry, dict) and entry.get("timeline") else None
 
 

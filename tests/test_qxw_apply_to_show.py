@@ -121,6 +121,49 @@ class TestQxwApplyToShow(unittest.TestCase):
             except OSError:
                 pass
 
+    def test_import_qxw_reports_address_collision(self):
+        # FIMP-05b (Review): importierte Fixtures duerfen nicht STILL mit dem
+        # bestehenden Patch im DMX ueberlappen. Zweimal dieselbe .qxw importieren:
+        # der 2. Import trifft exakt die vom 1. belegten Adressen (U1/11, U1/21) ->
+        # die Abschlussmeldung muss die Kollision ausweisen (statt still zu
+        # ueberschreiben).
+        app = _app()
+        from src.ui.main_window import MainWindow
+
+        fd, qxw_path = tempfile.mkstemp(suffix=".qxw")
+        os.close(fd)
+        with open(qxw_path, "w", encoding="utf-8") as f:
+            f.write(_QXW)
+
+        msgs = []
+        orig_open = QFileDialog.getOpenFileName
+        orig_info = QMessageBox.information
+        orig_warn = QMessageBox.warning
+        QFileDialog.getOpenFileName = staticmethod(lambda *a, **k: (qxw_path, ""))
+        QMessageBox.information = staticmethod(
+            lambda *a, **k: msgs.append(" ".join(str(x) for x in a)))
+        QMessageBox.warning = staticmethod(lambda *a, **k: None)
+
+        win = MainWindow()
+        try:
+            win._import_qxw()          # 1. Import belegt U1/11 + U1/21
+            msgs.clear()
+            win._import_qxw()          # 2. Import trifft dieselben Adressen
+            self.assertTrue(msgs, "keine Info-Box beim 2. Import")
+            self.assertIn(
+                "überlappen", msgs[-1],
+                "DMX-Kollision beim QXW-Import wurde nicht gemeldet (FIMP-05b)")
+        finally:
+            win.close()
+            app.processEvents()
+            QFileDialog.getOpenFileName = orig_open
+            QMessageBox.information = orig_info
+            QMessageBox.warning = orig_warn
+            try:
+                os.remove(qxw_path)
+            except OSError:
+                pass
+
 
 if __name__ == "__main__":
     unittest.main()

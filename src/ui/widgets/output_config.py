@@ -402,17 +402,29 @@ class OutputConfigDialog(QDialog):
         merges = getattr(rx, "_merges", None)
         if not merges:
             return
-        stale = [in_u for in_u in list(merges.keys()) if int(in_u) != int(new_in_u)]
-        if not stale:
-            return
+        new_in = int(new_in_u)
+        new_out = int(new_out_u)
+        stale = [in_u for in_u in list(merges.keys()) if int(in_u) != new_in]
         # Alte out-Universen merken, um eingefrorene Eingangs-Schichten zu leeren.
         stale_outs = {int(merges[in_u][0]) for in_u in stale}
+        # NET-08b (Review): Bleibt das EINGANGS-Universum gleich, wechselt aber nur das
+        # AUSGANGS-Universum, so bleibt der Merge-Eintrag (in==new_in) erhalten und
+        # set_merge remappt ihn — die ALTE out-Schicht würde sonst nie geleert und hinge
+        # bis zum NET-05-Timeout (~2,5s) als eingefrorener DMX. Sein altes out mitnehmen.
+        for k in list(merges.keys()):
+            if int(k) == new_in:
+                stale_outs.add(int(merges[k][0]))
+                break
+        # Nichts zu räumen: keine anderen in_u UND kein abweichendes altes out
+        # (Erst-Konfiguration oder unveränderte in/out).
+        if not stale and stale_outs <= {new_out}:
+            return
         for in_u in stale:
             rx.remove_merge(in_u)
         try:
             st = get_state()
             for out_u in stale_outs:
-                if out_u != int(new_out_u):
+                if out_u != new_out:
                     st.clear_input_merge(out_u)
         except Exception:
             pass
