@@ -1,6 +1,5 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
-import logging
 import os
 import threading
 import time
@@ -15,8 +14,6 @@ from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, classify_attr
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
-
-_log = logging.getLogger(__name__)
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
@@ -1340,10 +1337,10 @@ class AppState:
                 unconf = self.input_unconfigured = {}
             if out_univ not in getattr(self, "universes", {}):
                 if out_univ not in unconf:
-                    _log.warning(
-                        "Art-Net/sACN-Eingang fuer Universe %d empfangen, aber %d ist "
-                        "nicht als Output gepatcht -> Kanaele bleiben wirkungslos "
-                        "(Status faelschlich 'Aktiv').", out_univ, out_univ)
+                    print(
+                        f"[app_state] Art-Net/sACN-Eingang fuer Universe {out_univ} "
+                        f"empfangen, aber {out_univ} ist nicht als Output gepatcht -> "
+                        f"Kanaele bleiben wirkungslos (Status faelschlich 'Aktiv').")
                 unconf[out_univ] = unconf.get(out_univ, 0) + 1
             else:
                 # Ziel ist (wieder) konfiguriert -> Fehl-Flag zuruecknehmen.
