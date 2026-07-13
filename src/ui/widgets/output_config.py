@@ -282,6 +282,10 @@ class OutputConfigDialog(QDialog):
         # bevor es die neue oeffnet. KEIN direkter Zugriff auf om._enttec_outputs
         # aus dem UI-Thread mehr -> verhindert den Deadlock mit dem Output-Thread.
         try:
+            # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen
+            # (auch ArtNet/sACN), sonst bleibt bei einem Cross-Typ-Wechsel der alte
+            # Adapter aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
+            om.remove_output(univ)
             om.add_enttec(univ, port)
             _persist_output(univ, "Enttec", port)
             self._lbl_enttec_status.setText(f"Verbunden: {port} -> Universe {univ} (gespeichert)")
@@ -289,18 +293,25 @@ class OutputConfigDialog(QDialog):
             self._lbl_enttec_status.setText(f"Fehler: {e}")
 
     def _apply_artnet(self):
-        if not self._check_artnet.isChecked():
-            self._lbl_artnet_status.setText("Deaktiviert")
-            return
-        ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
         univ = self._spin_artnet_univ.value()
         state = get_state()
+        if not self._check_artnet.isChecked():
+            # MU-02: Abwaehlen muss den Adapter WIRKLICH stoppen. Vorher blieb er in
+            # der Registry und _send_all sendete weiter -> remove_output raeumt ihn.
+            state.output_manager.remove_output(univ)
+            self._lbl_artnet_status.setText("Inaktiv")
+            return
+        ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
         # OUT-04: NUR das gewählte Universum belegen. Die frühere Schleife über ALLE
         # Universen überschrieb jede andere Adapter-Zuweisung — live UND in
         # universes.json (`_persist_output` je Universum) → Mixed-Setups zerstört.
         # `_persist_output` aktualisiert jetzt nur diese eine Zeile, andere bleiben.
         if univ not in state.universes:
             state.universes[univ] = state.output_manager.add_universe(univ)
+        # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
+        # bleibt bei einem Cross-Typ-Wechsel (z. B. Enttec->ArtNet) der alte Adapter
+        # aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
+        state.output_manager.remove_output(univ)
         state.output_manager.add_artnet(univ, ip)
         _persist_output(univ, "ArtNet", ip)
         self._lbl_artnet_status.setText(f"Aktiv → {ip} · Universe {univ} (gespeichert)")
@@ -370,18 +381,25 @@ class OutputConfigDialog(QDialog):
         QMessageBox.information(self, "Gespeichert", _UNIV_CONFIG_PATH)
 
     def _apply_sacn(self):
+        univ = self._spin_sacn_univ.value()
+        state = get_state()
         if not self._check_sacn.isChecked():
-            self._lbl_sacn_status.setText("Deaktiviert")
+            # MU-02: Abwaehlen muss den Adapter WIRKLICH stoppen. Vorher blieb er in
+            # der Registry und _send_all sendete weiter -> remove_output raeumt ihn.
+            state.output_manager.remove_output(univ)
+            self._lbl_sacn_status.setText("Inaktiv")
             return
         ip_text = self._edit_sacn_ip.text().strip()
         target_ip = None if (self._check_sacn_multicast.isChecked() or not ip_text) else ip_text
-        univ = self._spin_sacn_univ.value()
-        state = get_state()
         try:
             # OUT-04: NUR das gewählte Universum belegen (nicht mehr alle über eine
             # Schleife überschreiben); andere universes.json-Zeilen bleiben erhalten.
             if univ not in state.universes:
                 state.universes[univ] = state.output_manager.add_universe(univ)
+            # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
+            # bleibt bei einem Cross-Typ-Wechsel der alte Adapter aktiv -> Doppel-Output/
+            # Leak. Analog apply_output_config (OUT-05).
+            state.output_manager.remove_output(univ)
             state.output_manager.add_sacn(univ, target_ip)
             _persist_output(univ, "sACN", target_ip or "")
             mode = "Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
