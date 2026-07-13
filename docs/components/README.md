@@ -97,13 +97,50 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | `vc_frame` | Basis (Container/Solo-Gruppe) |
 | `vc_drop_panel`, `vc_inspector_panel`, `vc_conflict_card`, `vc_effect_editor`, `vc_effect_meta`, `vc_live_editor`, `vc_multi_live_editor`, `vc_widget_gallery` | Basis/Infrastruktur (kein platzierbares Bedien-Widget) |
 
-### Views (`views/`) — DOC-04
+### Views (`views/`) — DOC-04 ✅
+
+**Tabs / Haupt-Views:**
 
 | View | Doc |
 |---|---|
-| `virtual_console_view`, `patch_view`, `fixture_group_view`, `programmer_view`, `live_view`, `playback_view`, `efx_view`, `rgb_matrix_view`, `laser_view`, `music_view`, `audio_input_view`, `midi_view`, `output_view`, `dmx_monitor_view`, `function_manager_view`, `show_manager_view`, `palette_view`, `preset_browser_view`, `snapshots_view`, `channel_groups_view`, `bpm_manager_view`, `bpm_generator_view` | — nein |
-| `scene_editor`, `chaser_editor`, `sequence_editor`, `collection_editor`, `script_editor`, `snap_editor`, `carousel_editor`, `effect_layer_editor`, `audio_editor`, `curve_library_view` | — nein |
-| `simple_desk`, `spectrum_bars`, `snap_file_panel` | — nein (ggf. Helfer, beim Schreiben prüfen) |
+| `virtual_console_view` | [✅ ja](views/virtual_console_view.md) |
+| `patch_view` | [✅ ja](views/patch_view.md) |
+| `fixture_group_view` | [✅ ja](views/fixture_group_view.md) |
+| `programmer_view` | [✅ ja](views/programmer_view.md) |
+| `live_view` | [✅ ja](views/live_view.md) |
+| `playback_view` | [✅ ja](views/playback_view.md) |
+| `efx_view` | [✅ ja](views/efx_view.md) |
+| `rgb_matrix_view` | [✅ ja](views/rgb_matrix_view.md) |
+| `laser_view` | [✅ ja](views/laser_view.md) |
+| `music_view` | [✅ ja](views/music_view.md) |
+| `audio_input_view` | [✅ ja](views/audio_input_view.md) |
+| `midi_view` | [✅ ja](views/midi_view.md) |
+| `output_view` | [✅ ja](views/output_view.md) |
+| `dmx_monitor_view` | [✅ ja](views/dmx_monitor_view.md) |
+| `function_manager_view` | [✅ ja](views/function_manager_view.md) |
+| `show_manager_view` | [✅ ja](views/show_manager_view.md) |
+| `palette_view` | [✅ ja](views/palette_view.md) |
+| `preset_browser_view` | [✅ ja](views/preset_browser_view.md) |
+| `snapshots_view` | [✅ ja](views/snapshots_view.md) |
+| `channel_groups_view` | [✅ ja](views/channel_groups_view.md) |
+| `bpm_manager_view` | [✅ ja](views/bpm_manager_view.md) |
+| `bpm_generator_view` | [✅ ja](views/bpm_generator_view.md) |
+
+**Funktions-Editoren:**
+
+| Editor | Doc |
+|---|---|
+| `scene_editor` | [✅ ja](views/scene_editor.md) |
+| `chaser_editor` | [✅ ja](views/chaser_editor.md) |
+| `sequence_editor` | [✅ ja](views/sequence_editor.md) |
+| `collection_editor` | [✅ ja](views/collection_editor.md) |
+| `script_editor` | [✅ ja](views/script_editor.md) |
+| `snap_editor` | [✅ ja](views/snap_editor.md) |
+| `carousel_editor` | [✅ ja](views/carousel_editor.md) |
+| `effect_layer_editor` | [✅ ja](views/effect_layer_editor.md) |
+| `audio_editor` | [✅ ja](views/audio_editor.md) |
+| `curve_library_view` | [✅ ja](views/curve_library_view.md) |
+| `simple_desk`, `spectrum_bars`, `snap_file_panel` | Helfer (kein eigenständiger Tab: Sub-Widget bzw. Panel) |
 
 ### Engine-Funktionstypen (`engine/`) — DOC-05 ✅
 
