@@ -80,5 +80,71 @@ class MtcCompletenessGateTest(unittest.TestCase):
         self.assertEqual(len(fired), 1)
 
 
+class MtcFrameWrapTest(unittest.TestCase):
+    """MTC-01: die +2-Frame-Korrektur darf die Frame-Nr nicht ueber fps treiben —
+    Ueberlauf muss sauber in Sekunden/Minuten/Stunden getragen werden, sodass immer
+    0 <= frame < fps gilt (inkl. Drop-Frame 29.97)."""
+
+    def _send_full_frame(self, reader, h, m, s, f, fps_code):
+        """Sende einen vollstaendigen 0..7-Quarter-Frame-Satz fuer h:m:s:f."""
+        pieces = [
+            f & 0x0F,                                   # 0: frames LS
+            (f >> 4) & 0x01,                            # 1: frames MS (1 bit)
+            s & 0x0F,                                   # 2: seconds LS
+            (s >> 4) & 0x03,                            # 3: seconds MS
+            m & 0x0F,                                   # 4: minutes LS
+            (m >> 4) & 0x03,                            # 5: minutes MS
+            h & 0x0F,                                   # 6: hours LS
+            ((h >> 4) & 0x01) | ((fps_code & 0x03) << 1),  # 7: hours MS + fps code
+        ]
+        for piece, value in enumerate(pieces):
+            reader._handle_quarter_frame((piece << 4) | (value & 0x0F))
+
+    def _fire_and_get(self, h, m, s, f, fps_code):
+        r = MTCReader()
+        fired = []
+        r.subscribe(lambda *a: fired.append(a))
+        self._send_full_frame(r, h, m, s, f, fps_code)
+        self.assertEqual(len(fired), 1, "voller Satz sollte genau einmal feuern")
+        return r, fired[0]
+
+    def test_frame_wrap_30fps(self):
+        # 30 fps (code 3), frame 29 -> +2 = 31 muss auf f=1, s+1 wrappen.
+        r, (h, m, s, f) = self._fire_and_get(0, 0, 0, 29, 3)
+        self.assertTrue(0 <= f < r.fps(), f"frame {f} nicht in [0,{r.fps()})")
+        self.assertEqual((h, m, s, f), (0, 0, 1, 1))
+
+    def test_frame_wrap_carries_minute_hour_25fps(self):
+        # 25 fps (code 1), 01:59:59:24 -> +2 traegt bis in die Stunde.
+        r, (h, m, s, f) = self._fire_and_get(1, 59, 59, 24, 1)
+        self.assertTrue(0 <= f < r.fps())
+        self.assertEqual((h, m, s, f), (2, 0, 0, 1))
+
+    def test_no_wrap_when_in_range(self):
+        # 30 fps, frame 10 -> +2 = 12, kein Carry.
+        r, (h, m, s, f) = self._fire_and_get(0, 0, 0, 10, 3)
+        self.assertEqual((h, m, s, f), (0, 0, 0, 12))
+        self.assertTrue(0 <= f < r.fps())
+
+    def test_dropframe_skips_frames_0_1_on_minute(self):
+        # 29.97 Drop-Frame (code 2): Carry auf ss=00 einer Nicht-10er-Minute ->
+        # Frame 0/1 existieren nicht, muss auf 2/3 gehoben werden.
+        r, (h, m, s, f) = self._fire_and_get(0, 4, 59, 29, 2)
+        self.assertEqual((h, m, s), (0, 5, 0))
+        self.assertEqual(f, 3)             # 29+2=31 -> f=1 -> Drop -> 3
+        self.assertTrue(0 <= f < 30)
+
+    def test_dropframe_keeps_frames_on_tenth_minute(self):
+        # Auf jeder 10. Minute werden Frame 0/1 NICHT gedroppt.
+        r, (h, m, s, f) = self._fire_and_get(0, 9, 59, 29, 2)
+        self.assertEqual((h, m, s, f), (0, 10, 0, 1))
+
+    def test_all_fps_codes_stay_in_range(self):
+        # Fuer jeden fps-Code bleibt eine grenznahe Frame-Nr nach +2 im Bereich.
+        for code, fps in ((0, 24), (1, 25), (2, 30), (3, 30)):
+            r, (h, m, s, f) = self._fire_and_get(0, 0, 0, fps - 1, code)
+            self.assertTrue(0 <= f < fps, f"code {code}: frame {f} out of range")
+
+
 if __name__ == "__main__":
     unittest.main()
