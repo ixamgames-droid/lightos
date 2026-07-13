@@ -391,6 +391,32 @@ class OutputConfigDialog(QDialog):
 
     # ── DMX Input ────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _clear_stale_input_merges(rx, new_in_u: int, new_out_u: int):
+        """NET-08: Vor dem Einrichten einer neuen Input-Merge-Konfiguration die
+        zuvor gesetzte(n) raeumen. Sonst mischt eine auf ein anderes eingehendes
+        Universe umgestellte Quelle (z. B. U5 -> U7) ueber die alte Merge-Config +
+        den weiterhin aktiven Empfangs-Handler in dasselbe out-Universe weiter.
+        Nutzt die vorhandenen ``remove_merge``/``clear_input_merge``-Lifecycles
+        (NET-05/NET-07)."""
+        merges = getattr(rx, "_merges", None)
+        if not merges:
+            return
+        stale = [in_u for in_u in list(merges.keys()) if int(in_u) != int(new_in_u)]
+        if not stale:
+            return
+        # Alte out-Universen merken, um eingefrorene Eingangs-Schichten zu leeren.
+        stale_outs = {int(merges[in_u][0]) for in_u in stale}
+        for in_u in stale:
+            rx.remove_merge(in_u)
+        try:
+            st = get_state()
+            for out_u in stale_outs:
+                if out_u != int(new_out_u):
+                    st.clear_input_merge(out_u)
+        except Exception:
+            pass
+
     def _apply_artnet_input(self):
         try:
             from src.core.dmx.artnet_input import get_artnet_receiver
@@ -404,6 +430,7 @@ class OutputConfigDialog(QDialog):
             in_u = self._spin_artnet_in_univ.value()
             out_u = self._spin_artnet_in_out.value()
             mode = self._combo_artnet_in_mode.currentText()
+            self._clear_stale_input_merges(rx, in_u, out_u)
             rx.set_merge(in_u, out_u, mode)
             self._lbl_artnet_in_status.setText(
                 f"Aktiv: U{in_u} -> U{out_u} ({mode})"
@@ -426,6 +453,7 @@ class OutputConfigDialog(QDialog):
                 rx.start(universes=[in_u])
             else:
                 rx.join_universe(in_u)
+            self._clear_stale_input_merges(rx, in_u, out_u)
             rx.set_merge(in_u, out_u, mode)
             self._lbl_sacn_in_status.setText(
                 f"Aktiv: U{in_u} -> U{out_u} ({mode})"
