@@ -264,6 +264,7 @@ LightOS/
 | Show‑Dateiformat | [docs/SHOW_FILE_FORMAT.md](docs/SHOW_FILE_FORMAT.md) |
 | Art‑Net / DMX‑Protokoll | [docs/ARTNET.md](docs/ARTNET.md) · [docs/DMX_PROTOCOL.md](docs/DMX_PROTOCOL.md) |
 | **Env‑Flags & Config‑Dateien (`LIGHTOS_*`, `data/`)** | **[docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md)** |
+| Komponenten‑Doku (Widgets/Views/Engine, Entwicklersicht) | [docs/components/README.md](docs/components/README.md) |
 
 Schneller Einstieg in die mitgelieferte Demo für die echte Hardware:
 ```cmd
