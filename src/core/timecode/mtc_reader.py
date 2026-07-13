@@ -10,6 +10,7 @@ Verwendet rtmidi (bevorzugt), faellt auf mido zurueck falls vorhanden.
 Wenn beide nicht vorhanden -> Reader laeuft trotzdem (no-op via subscribe).
 """
 from __future__ import annotations
+import threading
 from typing import Callable
 
 try:
@@ -31,6 +32,11 @@ class MTCReader:
         self._seconds = 0
         self._frames = 0
         self._fps = 25.0
+        # MTC-03: schuetzt den (h, m, s, f, fps)-Satz gegen Torn-Reads. Der
+        # rtmidi-Callback-Thread (Writer) und Poll-Consumer (time()/format()/fps())
+        # laufen in verschiedenen Threads; ohne Lock koennte ein Reader h/m vom
+        # alten und s/f vom neuen Frame mischen.
+        self._lock = threading.Lock()
 
         # Working buffers (8 pieces accumulate one frame)
         self._buf = [0, 0, 0, 0, 0, 0, 0, 0]
@@ -136,14 +142,14 @@ class MTCReader:
             hours_byte = self._buf[6] | ((self._buf[7] & 0x01) << 4)
             hours = hours_byte & 0x1F
             fps_code = (self._buf[7] >> 1) & 0x03
-            self._fps = FPS_MAP.get(fps_code, 25.0)
+            fps = FPS_MAP.get(fps_code, 25.0)
             # Adjust frame: MTC reports current frame of the *previous* frame
             # (8 quarter-frames take 2 frames worth of time). Add 2 frames.
             adj_frames = frames + 2
             # MTC-01: die +2-Korrektur darf die Frame-Nr nicht ueber fps treiben
             # (z. B. "29" -> "31" bei 30 fps). Ueberlauf sauber in Sekunden/Minuten/
             # Stunden tragen, damit 0 <= frame < fps bleibt.
-            fps_int = int(round(self._fps)) or 25
+            fps_int = int(round(fps)) or 25
             carry_sec, adj_frames = divmod(adj_frames, fps_int)
             seconds += carry_sec
             carry_min, seconds = divmod(seconds, 60)
@@ -155,10 +161,14 @@ class MTCReader:
             # einer solchen Minute landet, die (ungueltigen) Frames 0/1 auf 2/3 heben.
             if fps_code == 2 and seconds == 0 and minutes % 10 != 0 and adj_frames < 2:
                 adj_frames += 2
-            self._hours = hours
-            self._minutes = minutes
-            self._seconds = seconds
-            self._frames = adj_frames
+            # MTC-03: alle Komponenten als ein konsistenter Satz unter dem Lock
+            # setzen, damit Poll-Consumer nie ein gemischtes h:m:s:f sehen.
+            with self._lock:
+                self._fps = fps
+                self._hours = hours
+                self._minutes = minutes
+                self._seconds = seconds
+                self._frames = adj_frames
             self._fire()
 
     def _handle_sysex(self, msg: list[int]):
@@ -169,11 +179,13 @@ class MTCReader:
         if msg[1] != 0x7F or msg[3] != 0x01 or msg[4] != 0x01:
             return
         hh_byte = msg[5]
-        self._fps = FPS_MAP.get((hh_byte >> 5) & 0x03, 25.0)
-        self._hours = hh_byte & 0x1F
-        self._minutes = msg[6]
-        self._seconds = msg[7]
-        self._frames = msg[8]
+        # MTC-03: konsistenter Satz unter dem Lock (siehe _handle_quarter_frame).
+        with self._lock:
+            self._fps = FPS_MAP.get((hh_byte >> 5) & 0x03, 25.0)
+            self._hours = hh_byte & 0x1F
+            self._minutes = msg[6]
+            self._seconds = msg[7]
+            self._frames = msg[8]
         self._fire()
 
     def _fire(self):
@@ -194,13 +206,20 @@ class MTCReader:
             self._callbacks.remove(cb)
 
     def time(self) -> tuple[int, int, int, int]:
-        return (self._hours, self._minutes, self._seconds, self._frames)
+        # MTC-03: den Satz unter dem Lock als konsistentes Tupel kopieren, damit
+        # kein h/m des alten und s/f des neuen Frames gemischt werden.
+        with self._lock:
+            return (self._hours, self._minutes, self._seconds, self._frames)
 
     def fps(self) -> float:
-        return self._fps
+        with self._lock:
+            return self._fps
 
     def format(self) -> str:
-        return f"{self._hours:02d}:{self._minutes:02d}:{self._seconds:02d}:{self._frames:02d}"
+        # MTC-03: konsistenten Satz unter dem Lock lesen, dann ausserhalb formatieren.
+        with self._lock:
+            h, m, s, f = self._hours, self._minutes, self._seconds, self._frames
+        return f"{h:02d}:{m:02d}:{s:02d}:{f:02d}"
 
 
 _reader: MTCReader | None = None
