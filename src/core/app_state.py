@@ -1,5 +1,6 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
+import logging
 import os
 import threading
 import time
@@ -14,6 +15,8 @@ from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, classify_attr
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
+
+_log = logging.getLogger(__name__)
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
@@ -218,6 +221,14 @@ class AppState:
         # NET-05: letzter Empfangszeitpunkt je out_univ (time.monotonic) fuer den
         # Source-Timeout — der Renderer verwirft still gewordene Quellen.
         self.input_last_seen: dict[int, float] = {}
+        # NET-07: Merge-Ziele, die NICHT als Output konfiguriert/gepatcht sind (nicht
+        # in self.universes). scratch wird nur aus self.universes gebaut, also verwirft
+        # _render_frame solche empfangenen Kanaele STILL (scratch.get(univ) is None ->
+        # continue) — die UI zeigt trotzdem "Aktiv". Dieser Zaehler je out_univ macht
+        # das erkennbar (dropped-because-unconfigured); die Status-Abfrage kann ihn
+        # lesen. apply_input_merge pflegt ihn und warnt EINMAL pro out_univ (kein
+        # Per-Frame-Spam). Wird das Ziel spaeter gepatcht, faellt der Eintrag weg.
+        self.input_unconfigured: dict[int, int] = {}
         self._input_lock = threading.RLock()
         # Simple Desk ist standardmaessig reine ANZEIGE (Monitor). Erst mit aktivem
         # 'Manueller Override' wirkt die Ebene auf die Ausgabe (Schicht 4c, absolute
@@ -1320,22 +1331,44 @@ class AppState:
             if ls is None:
                 ls = self.input_last_seen = {}
             ls[out_univ] = time.monotonic()
+            # NET-07: Ist out_univ NICHT als Output gepatcht, verwirft _render_frame
+            # die Kanaele still (scratch kennt nur self.universes). Statt still zu
+            # schlucken je out_univ zaehlen und EINMAL warnen — die Status-Abfrage
+            # liest input_unconfigured und kann so "Aktiv, aber wirkungslos" zeigen.
+            unconf = getattr(self, "input_unconfigured", None)
+            if unconf is None:
+                unconf = self.input_unconfigured = {}
+            if out_univ not in getattr(self, "universes", {}):
+                if out_univ not in unconf:
+                    _log.warning(
+                        "Art-Net/sACN-Eingang fuer Universe %d empfangen, aber %d ist "
+                        "nicht als Output gepatcht -> Kanaele bleiben wirkungslos "
+                        "(Status faelschlich 'Aktiv').", out_univ, out_univ)
+                unconf[out_univ] = unconf.get(out_univ, 0) + 1
+            else:
+                # Ziel ist (wieder) konfiguriert -> Fehl-Flag zuruecknehmen.
+                unconf.pop(out_univ, None)
 
     def clear_input_merge(self, out_univ: int | None = None):
         """F-20: Eingangs-Schicht leeren (eine Universe oder alle). Damit ein
         weggefallener externer Sender keine eingefrorenen Werte hinterlaesst."""
         with self._input_lock:
             ls = getattr(self, "input_last_seen", None)
+            unconf = getattr(self, "input_unconfigured", None)
             if out_univ is None:
                 self.input_layer.clear()
                 self.input_merge_modes.clear()
                 if ls is not None:
                     ls.clear()
+                if unconf is not None:
+                    unconf.clear()
             else:
                 self.input_layer.pop(int(out_univ), None)
                 self.input_merge_modes.pop(int(out_univ), None)
                 if ls is not None:
                     ls.pop(int(out_univ), None)
+                if unconf is not None:
+                    unconf.pop(int(out_univ), None)
 
     def _render_frame(self, dt: float):
         """Berechnet jeden Output-Frame komplett neu (ein Thread):
