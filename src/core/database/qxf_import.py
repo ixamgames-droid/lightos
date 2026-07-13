@@ -519,11 +519,23 @@ def import_qxf_file(path: str, session: Session,
             )
             session.add(mode_obj)
             for ch_ref in ch_refs:
+                ch_name = (ch_ref.text or "").strip()
                 try:
                     num = int(ch_ref.get("Number", "0")) + 1   # 0- → 1-basiert
                 except (ValueError, TypeError):
-                    num = len(ch_refs)
-                ch_name = (ch_ref.text or "").strip()
+                    # Kaputtes/fehlendes ``Number`` NICHT auf einen fixen Default
+                    # (frueher ``len(ch_refs)``) zwingen — das kollidierte mit dem
+                    # legitim letzten Kanal und verschob die DMX-Belegung still.
+                    # Lieber den defekten Kanal ueberspringen + sichtbar melden;
+                    # der Footprint ist dann um einen Kanal kleiner, aber keine
+                    # zwei Kanaele teilen sich dieselbe channel_number.
+                    print(
+                        f"[qxf_import] {model_str}: Mode "
+                        f"'{mode_el.get('Name', 'Standard')}' Channel "
+                        f"'{ch_name or '?'}' hat ungueltiges Number="
+                        f"{ch_ref.get('Number')!r} — Kanal uebersprungen."
+                    )
+                    continue
                 _make_channel(mode_obj, num, ch_name, channel_defs.get(ch_name))
     return True
 
