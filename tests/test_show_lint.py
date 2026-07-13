@@ -125,6 +125,73 @@ def test_clean_show_passes():
     assert_show_dict(show)  # darf NICHT werfen
 
 
+def test_paramkey_bound_to_wrong_function_type_caught():
+    """QA-19: ein global gültiger param_key, der an eine Funktion gebunden ist,
+    deren Typ ihn NICHT trägt (QA-05-Bugklasse: global gültig, für DIESE Funktion
+    inert), wird als VC-PARAMKEY-FN-ERROR gemeldet — statt still durch den
+    Union-Check (caps.all_param_keys) zu rutschen.
+
+    'size' ist ein echter EFX-Param (also in der Union), aber KEIN Matrix-Param;
+    an eine RGBMatrix gebunden bleibt der Regler wirkungslos."""
+    caps = get_capabilities()
+    assert "size" in caps.all_param_keys        # global gültig …
+    assert "size" not in caps.matrix_all_param_keys  # … aber nicht an einer Matrix
+    show = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 7, "type": "RGBMatrix", "name": "Matrix",
+             "algorithm": "Plain", "style": "RGB", "params": {}},
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCSlider", "caption": "Size?", "mode": "Level",
+             "param_key": "size", "function_id": 7},
+        ]},
+    }
+    findings = validate_show_dict(show)
+    codes = _codes(findings, ERROR)
+    assert "VC-PARAMKEY-FN" in codes, format_findings(findings)
+    # NICHT als bloßer Union-Miss (Tippfehler) gemeldet — der Key IST global gültig.
+    assert "VC-PARAMKEY" not in codes, format_findings(findings)
+    # das Finding zitiert die echte Schluck-Stelle.
+    fn = [f for f in findings if f.code == "VC-PARAMKEY-FN"][0]
+    assert fn.swallow_site
+
+
+def test_paramkey_correct_binding_stays_clean():
+    """Gegenprobe zu QA-19: derselbe param_key, korrekt an eine EFX gebunden
+    (die 'size' wirklich trägt), erzeugt KEIN VC-PARAMKEY-FN-Finding. Und ein
+    universeller Matrix-Param ('speed') an einer Matrix bleibt ebenfalls sauber."""
+    show = {
+        "version": "1.1",
+        "functions": {"functions": [
+            {"id": 1, "type": "EFX", "name": "Kreis", "motion": True,
+             "algorithm": "Circle"},
+            {"id": 2, "type": "RGBMatrix", "name": "Matrix",
+             "algorithm": "Plain", "style": "RGB", "params": {}},
+        ]},
+        "virtual_console": {"widgets": [
+            {"type": "VCSlider", "caption": "Size", "mode": "Level",
+             "param_key": "size", "function_id": 1},     # EFX trägt 'size' -> ok
+            {"type": "VCSlider", "caption": "Speed", "mode": "EffectSpeed",
+             "param_key": "speed", "function_id": 2},     # Matrix-universell -> ok
+        ]},
+    }
+    findings = validate_show_dict(show)
+    assert "VC-PARAMKEY-FN" not in _codes(findings, ERROR), format_findings(findings)
+
+
+def test_paramkey_unbound_still_only_union_checked():
+    """Ohne function_id (keine Bindung auflösbar) bleibt es beim Union-Check:
+    ein global gültiger Key ist ok, ein Tippfehler weiterhin VC-PARAMKEY."""
+    ok = {"virtual_console": {"widgets": [
+        {"type": "VCSlider", "caption": "x", "mode": "Level", "param_key": "size"}]}}
+    assert not _codes(validate_show_dict(ok), ERROR), \
+        format_findings(validate_show_dict(ok))
+    bad = {"virtual_console": {"widgets": [
+        {"type": "VCSlider", "caption": "x", "mode": "Level", "param_key": "siize"}]}}
+    assert "VC-PARAMKEY" in _codes(validate_show_dict(bad), ERROR)
+
+
 def test_legacy_matrix_algo_accepted():
     """Ein Legacy-Algorithmus-String (über _LEGACY_ALGO_MAP migriert) ist gültig."""
     show = {"functions": {"functions": [
