@@ -237,8 +237,13 @@ class TestLanIpHelper(unittest.TestCase):
             self.assertTrue(0 <= int(p) <= 255, f"Oktett out-of-range in {ip!r}")
 
     def test_get_lan_ip_no_network_falls_back_to_loopback(self):
-        # Kein Interface / kein Netz -> connect wirft OSError -> Fallback 127.0.0.1
-        with mock.patch("socket.socket") as m_sock:
+        # Kein Interface / kein Netz -> connect wirft OSError; auch die
+        # NIC-Enumeration (CDX-06) findet nichts Privates -> Fallback 127.0.0.1.
+        with mock.patch("socket.socket") as m_sock, \
+                mock.patch("socket.gethostname", return_value="host"), \
+                mock.patch("socket.gethostbyname", side_effect=OSError), \
+                mock.patch("socket.gethostbyname_ex", side_effect=OSError), \
+                mock.patch("socket.getaddrinfo", side_effect=OSError):
             m_sock.return_value.connect.side_effect = OSError("network down")
             self.assertEqual(webapp.get_lan_ip(), "127.0.0.1")
 
