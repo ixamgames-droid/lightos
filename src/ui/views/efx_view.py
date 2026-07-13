@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
                                 QSizePolicy, QScrollArea, QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
-from PySide6.QtGui import QPainter, QColor, QPen, QFont
+from PySide6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.flow_layout import FlowLayout
@@ -870,6 +870,16 @@ class EfxView(QWidget):
                 QPushButton:hover { background:#30363d; }
             """)
             path_row.addWidget(b)
+        # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht mehr vom stretchenden
+        # Combo zusammengequetscht werden ("eich"/"beit"). Mindestbreite = echte
+        # Label-Breite (10px-Font aus dem StyleSheet) + Rand fuer Padding/Border,
+        # damit die Beschriftung immer vollstaendig passt.
+        _btn_font = QFont(self._btn_path_new.font())
+        _btn_font.setPixelSize(10)
+        _fm = QFontMetrics(_btn_font)
+        for b in (self._btn_path_new, self._btn_path_edit):
+            b.setMinimumWidth(_fm.horizontalAdvance(b.text()) + 20)
+            b.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._btn_path_new.clicked.connect(self._record_new_path)
         self._btn_path_edit.clicked.connect(self._edit_current_path)
         self._btn_path_del.clicked.connect(self._delete_current_path)
