@@ -77,33 +77,70 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | Widget | Doc |
 |---|---|
 | [`vc_button`](vc/vc_button.md) | ✅ ja |
-| `vc_slider` | — nein |
-| `vc_color` | — nein |
-| `vc_color_list` | — nein |
-| `vc_xypad` | — nein |
-| `vc_encoder` | — nein |
-| `vc_speedial` | — nein |
-| `vc_stepper` | — nein |
-| `vc_cuelist` | — nein |
-| `vc_label` | — nein |
-| `vc_bpm_display` | — nein |
-| `vc_bus_selector` | — nein |
-| `vc_tempo_bus_controller` | — nein |
-| `vc_effect_colors` | — nein |
-| `vc_effect_display` | — nein |
-| `vc_song_info` | — nein |
+| [`vc_slider`](vc/vc_slider.md) | ✅ ja |
+| [`vc_color`](vc/vc_color.md) | ✅ ja |
+| [`vc_color_list`](vc/vc_color_list.md) | ✅ ja |
+| [`vc_xypad`](vc/vc_xypad.md) | ✅ ja |
+| [`vc_encoder`](vc/vc_encoder.md) | ✅ ja |
+| [`vc_speedial`](vc/vc_speedial.md) | ✅ ja |
+| [`vc_stepper`](vc/vc_stepper.md) | ✅ ja |
+| [`vc_cuelist`](vc/vc_cuelist.md) | ✅ ja |
+| [`vc_label`](vc/vc_label.md) | ✅ ja |
+| [`vc_bpm_display`](vc/vc_bpm_display.md) | ✅ ja |
+| [`vc_bus_selector`](vc/vc_bus_selector.md) | ✅ ja |
+| [`vc_tempo_bus_controller`](vc/vc_tempo_bus_controller.md) | ✅ ja |
+| [`vc_effect_colors`](vc/vc_effect_colors.md) | ✅ ja |
+| [`vc_effect_display`](vc/vc_effect_display.md) | ✅ ja |
+| [`vc_song_info`](vc/vc_song_info.md) | ✅ ja |
 | `vc_widget` | Basis (Basisklasse aller VC-Widgets) |
 | `vc_canvas` | Basis (Layout-/Drop-Fläche, kein eigenes Bedienelement) |
 | `vc_frame` | Basis (Container/Solo-Gruppe) |
 | `vc_drop_panel`, `vc_inspector_panel`, `vc_conflict_card`, `vc_effect_editor`, `vc_effect_meta`, `vc_live_editor`, `vc_multi_live_editor`, `vc_widget_gallery` | Basis/Infrastruktur (kein platzierbares Bedien-Widget) |
 
-### Views (`views/`) — DOC-04
+### Views (`views/`) — DOC-04 ✅
+
+**Tabs / Haupt-Views:**
 
 | View | Doc |
 |---|---|
-| `virtual_console_view`, `patch_view`, `fixture_group_view`, `programmer_view`, `live_view`, `playback_view`, `efx_view`, `rgb_matrix_view`, `laser_view`, `music_view`, `audio_input_view`, `midi_view`, `output_view`, `dmx_monitor_view`, `function_manager_view`, `show_manager_view`, `palette_view`, `preset_browser_view`, `snapshots_view`, `channel_groups_view`, `bpm_manager_view`, `bpm_generator_view` | — nein |
-| `scene_editor`, `chaser_editor`, `sequence_editor`, `collection_editor`, `script_editor`, `snap_editor`, `carousel_editor`, `effect_layer_editor`, `audio_editor`, `curve_library_view` | — nein |
-| `simple_desk`, `spectrum_bars`, `snap_file_panel` | — nein (ggf. Helfer, beim Schreiben prüfen) |
+| `virtual_console_view` | [✅ ja](views/virtual_console_view.md) |
+| `patch_view` | [✅ ja](views/patch_view.md) |
+| `fixture_group_view` | [✅ ja](views/fixture_group_view.md) |
+| `programmer_view` | [✅ ja](views/programmer_view.md) |
+| `live_view` | [✅ ja](views/live_view.md) |
+| `playback_view` | [✅ ja](views/playback_view.md) |
+| `efx_view` | [✅ ja](views/efx_view.md) |
+| `rgb_matrix_view` | [✅ ja](views/rgb_matrix_view.md) |
+| `laser_view` | [✅ ja](views/laser_view.md) |
+| `music_view` | [✅ ja](views/music_view.md) |
+| `audio_input_view` | [✅ ja](views/audio_input_view.md) |
+| `midi_view` | [✅ ja](views/midi_view.md) |
+| `output_view` | [✅ ja](views/output_view.md) |
+| `dmx_monitor_view` | [✅ ja](views/dmx_monitor_view.md) |
+| `function_manager_view` | [✅ ja](views/function_manager_view.md) |
+| `show_manager_view` | [✅ ja](views/show_manager_view.md) |
+| `palette_view` | [✅ ja](views/palette_view.md) |
+| `preset_browser_view` | [✅ ja](views/preset_browser_view.md) |
+| `snapshots_view` | [✅ ja](views/snapshots_view.md) |
+| `channel_groups_view` | [✅ ja](views/channel_groups_view.md) |
+| `bpm_manager_view` | [✅ ja](views/bpm_manager_view.md) |
+| `bpm_generator_view` | [✅ ja](views/bpm_generator_view.md) |
+
+**Funktions-Editoren:**
+
+| Editor | Doc |
+|---|---|
+| `scene_editor` | [✅ ja](views/scene_editor.md) |
+| `chaser_editor` | [✅ ja](views/chaser_editor.md) |
+| `sequence_editor` | [✅ ja](views/sequence_editor.md) |
+| `collection_editor` | [✅ ja](views/collection_editor.md) |
+| `script_editor` | [✅ ja](views/script_editor.md) |
+| `snap_editor` | [✅ ja](views/snap_editor.md) |
+| `carousel_editor` | [✅ ja](views/carousel_editor.md) |
+| `effect_layer_editor` | [✅ ja](views/effect_layer_editor.md) |
+| `audio_editor` | [✅ ja](views/audio_editor.md) |
+| `curve_library_view` | [✅ ja](views/curve_library_view.md) |
+| `simple_desk`, `spectrum_bars`, `snap_file_panel` | Helfer (kein eigenständiger Tab: Sub-Widget bzw. Panel) |
 
 ### Engine-Funktionstypen (`engine/`) — DOC-05 ✅
 
