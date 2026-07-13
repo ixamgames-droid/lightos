@@ -37,8 +37,18 @@ ATTR_GROUPS: dict[str, set[str]] = {
     # laser_color/laser_color_change MUESSEN exakt hier stehen, sonst zieht sie
     # der Color-Substring-Fallback in die Color-Gruppe (Range-Select-Kanaele
     # duerfen nicht vom Color-Feature-Dimmer skaliert werden).
-    "Effect":    {"macro", "effect", "effect_speed", "prism_rot", "prism_rotation",
-                  "animation",
+    # "speed" (FIMP-01): ueberladenes Attribut -> gehoert exakt in Effect, sonst
+    # faellt es ueber den Substring-Fallback auf 'Other' (kein Tab/Label, gleiche
+    # Fallenklasse wie ENG-07). NICHT Position: die REAL emittierten "speed"-Kanaele
+    # sind ueberwiegend Funktions-/Programm-Geschwindigkeit (fixture_db "Funk.Speed",
+    # "Cue-Geschwindigkeit", generisch "Speed") auf NICHT-Movern (z. B. ZQ01424-PAR);
+    # eine Position-Einordnung gaebe diesen PARs faelschlich eine Bewegungs-Capability
+    # und wuerde den Bewegungs-Snap-Kompatibilitaetsfilter brechen (snap_editor
+    # is_compatible -> test_movement_snap_excludes_par). Effect passt zu effect_speed/
+    # macro und aendert deren Gruppen-Set nicht (PAR hat via "macro" schon Effect).
+    # Der QXF-SpeedPanTilt*-Mover zeigt seinen Speed-Kanal damit im Effekt-Tab.
+    "Effect":    {"macro", "effect", "effect_speed", "speed", "prism_rot",
+                  "prism_rotation", "animation",
                   "laser_boundary", "laser_bank", "laser_x", "laser_y",
                   "laser_zoom_x", "laser_zoom_y", "laser_color",
                   "laser_color_change", "laser_dots", "laser_draw",
@@ -63,6 +73,7 @@ ATTR_LABELS: dict[str, str] = {
     "color_wheel": "Farbrad", "colour_wheel": "Farbrad", "color": "Farbe",
     "pan": "Pan", "tilt": "Tilt", "pan_fine": "Pan (fein)", "tilt_fine": "Tilt (fein)",
     "pan_speed": "Pan-Speed", "tilt_speed": "Tilt-Speed",
+    "speed": "Speed",
     "zoom": "Zoom", "focus": "Focus", "frost": "Frost", "iris": "Iris", "prism": "Prisma",
     "prism_rot": "Prisma-Rotation", "prism_rotation": "Prisma-Rotation",
     "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_rotation": "Gobo-Rotation",
