@@ -1483,13 +1483,35 @@ class MainWindow(QMainWindow):
         if not result.get("ok"):
             QMessageBox.warning(self, "Import-Fehler", result.get("message", "Unbekannter Fehler"))
             return
-        QMessageBox.information(
-            self, "QLC+ Import",
-            result.get("message", "") +
+        # FIMP-05: geparste Fixtures tatsächlich in die Show/Patch-Struktur
+        # übernehmen — vorher wurde das Ergebnis nur angezeigt und verworfen.
+        # Nutzt den regulären Patch-Pfad (AppState.add_fixture + die kanonische
+        # dict→PatchedFixture-Konvertierung aus show_file). Frische fids, da
+        # QLC+-IDs 0-basiert sind und mit dem bestehenden Patch kollidieren
+        # können — add_fixture würde sonst umnummerieren.
+        from src.core.show.show_file import _patched_fixture_from_data
+        added = 0
+        for fx in result.get("fixtures", []):
+            try:
+                d = dict(fx)
+                d["fid"] = self._state.next_fid()
+                self._state.add_fixture(
+                    _patched_fixture_from_data(d, d["fid"]), undoable=False
+                )
+                added += 1
+            except Exception as e:
+                print(f"[qxw_import] Fixture-Übernahme fehlgeschlagen: {e}")
+        skipped = result.get("skipped_fixtures", [])
+        parts = [result.get("message", "")]
+        parts.append(f"\nIn die Show übernommen: {added} Fixtures.")
+        if skipped:
+            parts.append(f"Übersprungen (fehlerhaft): {len(skipped)}.")
+        parts.append(
             "\n\nHinweis: Funktionen / VC-Widgets werden geparst, "
             "aber das vollständige Mapping in LightOS-Strukturen "
             "ist nicht automatisch (Profil-IDs unterscheiden sich)."
         )
+        QMessageBox.information(self, "QLC+ Import", "\n".join(parts))
 
     def _default_show_dir(self) -> str:
         """UXT-11: sinnvolles Start-Verzeichnis für Show-Dialoge — der Ordner der
