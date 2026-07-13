@@ -118,22 +118,25 @@ class UndoCoverageTest(unittest.TestCase):
         self.assertEqual((self._fix(4).address, self._fix(4).universe), (100, 2))
         self.assertTrue(self.undo.can_undo(), "update_fixture muss ein Undo pushen")
 
-    @unittest.expectedFailure
     def test_update_fixture_undo_rolls_back_ENG(self):
-        """ENG-Item (QA-15): update_fixture SOLLTE undo-bar sein, ist es aber
-        NICHT. Die Undo/Redo-Closures rufen ``update_fixture(fid, **before)``,
-        wobei ``before`` (aus ``_fixture_to_dict``) selbst einen Schluessel
-        ``fid`` enthaelt -> ``TypeError: got multiple values for argument 'fid'``.
-        Der Fehler wird im UndoStack nur geloggt, der Vorzustand bleibt stehen.
-        Dieser Test ist bewusst als expectedFailure markiert (kein Produktivcode-
-        Change im Rahmen QA-15) und schlaegt in einen unerwarteten Erfolg um,
-        sobald der Bug behoben ist -> dann Marker entfernen. Siehe
-        docs/UNDO_COVERAGE.md."""
+        """ENG-12: update_fixture ist undo-bar. Frueher rief die Undo/Redo-Closure
+        ``update_fixture(fid, **before)``, wobei ``before`` (aus
+        ``_fixture_to_dict``) selbst einen Schluessel ``fid`` trug ->
+        ``TypeError: got multiple values for argument 'fid'``; der Fehler wurde im
+        UndoStack nur geloggt und verschluckt, der Vorzustand blieb stehen.
+        Fix: die Closure entfernt ``fid`` aus dem before/after-Dict, bevor es als
+        **kwargs uebergeben wird. Siehe docs/UNDO_COVERAGE.md."""
         self._add(4, addr=10)
         self.state.update_fixture(4, address=100, universe=2)
+        self.assertEqual((self._fix(4).address, self._fix(4).universe), (100, 2))
+
         self.undo.undo()
         self.assertEqual((self._fix(4).address, self._fix(4).universe), (10, 1),
                          "Undo muss die Patch-Aenderung exakt zuruecknehmen")
+
+        self.undo.redo()
+        self.assertEqual((self._fix(4).address, self._fix(4).universe), (100, 2),
+                         "Redo muss die Patch-Aenderung wiederherstellen")
 
     # ── 4) auto_patch_fixtures ────────────────────────────────────────────────
 

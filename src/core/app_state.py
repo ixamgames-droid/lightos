@@ -540,11 +540,16 @@ class AppState:
         if undoable:
             after = dict(before)
             after.update(values)
+            # Drop the 'fid' key: it is passed positionally to update_fixture,
+            # so leaving it in the **kwargs dict would raise
+            # "TypeError: got multiple values for argument 'fid'".
+            before_kw = {k: v for k, v in before.items() if k != "fid"}
+            after_kw = {k: v for k, v in after.items() if k != "fid"}
             self._push_undo(
                 label=f"Fixture ~{before.get('label', '')}",
                 do=lambda: None,
-                undo=lambda b=before: self.update_fixture(fid, undoable=False, **b),
-                redo=lambda a=after: self.update_fixture(fid, undoable=False, **a),
+                undo=lambda b=before_kw: self.update_fixture(fid, undoable=False, **b),
+                redo=lambda a=after_kw: self.update_fixture(fid, undoable=False, **a),
             )
         return True
 
