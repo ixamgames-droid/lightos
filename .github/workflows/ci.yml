@@ -46,6 +46,11 @@ jobs:
       - name: Unit-Tests ausfuehren
         env:
           QT_QPA_PLATFORM: offscreen
+          # test_views.py baut echte Qt-Views (+ MIDI-Threads); der FINALE native
+          # Interpreter-Exit crasht auf Windows/Py3.11/PySide6 6.11 sporadisch mit
+          # STATUS_HEAP_CORRUPTION NACH bestandenen Tests -> falsch-rotes CI. Nach
+          # dem echten Ergebnis mit os._exit(exitstatus) beenden (conftest.py).
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
           python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_views.py -v --tb=short
 
@@ -53,5 +58,6 @@ jobs:
         if: always()
         env:
           QT_QPA_PLATFORM: offscreen
+          LIGHTOS_HARDEN_EXIT_ALL: "1"   # s. o. — flaky nativer Teardown-Crash (Py3.11)
         run: |
           python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_views.py --tb=no -q
