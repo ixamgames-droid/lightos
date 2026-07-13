@@ -137,12 +137,27 @@ class MTCReader:
             hours = hours_byte & 0x1F
             fps_code = (self._buf[7] >> 1) & 0x03
             self._fps = FPS_MAP.get(fps_code, 25.0)
-            self._hours = hours
-            self._minutes = minutes
-            self._seconds = seconds
             # Adjust frame: MTC reports current frame of the *previous* frame
             # (8 quarter-frames take 2 frames worth of time). Add 2 frames.
             adj_frames = frames + 2
+            # MTC-01: die +2-Korrektur darf die Frame-Nr nicht ueber fps treiben
+            # (z. B. "29" -> "31" bei 30 fps). Ueberlauf sauber in Sekunden/Minuten/
+            # Stunden tragen, damit 0 <= frame < fps bleibt.
+            fps_int = int(round(self._fps)) or 25
+            carry_sec, adj_frames = divmod(adj_frames, fps_int)
+            seconds += carry_sec
+            carry_min, seconds = divmod(seconds, 60)
+            minutes += carry_min
+            carry_hr, minutes = divmod(minutes, 60)
+            hours = (hours + carry_hr) % 24
+            # Drop-Frame (29.97, fps_code==2): zu Beginn jeder Minute ausser jeder
+            # 10. fehlen die Frame-Nummern 0 & 1. Wenn der Carry genau auf ss=00
+            # einer solchen Minute landet, die (ungueltigen) Frames 0/1 auf 2/3 heben.
+            if fps_code == 2 and seconds == 0 and minutes % 10 != 0 and adj_frames < 2:
+                adj_frames += 2
+            self._hours = hours
+            self._minutes = minutes
+            self._seconds = seconds
             self._frames = adj_frames
             self._fire()
 
