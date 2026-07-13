@@ -35,7 +35,10 @@ jobs:
           # pytest-timeout: ohne das Plugin sind die timeout-Keys aus pytest.ini
           # wirkungslos -> der Watchdog ist in CI still deaktiviert und ein
           # haengender Test blockiert den Lauf bis zum Job-Timeout (QA-01).
-          pip install pytest pytest-timeout
+          # requirements-dev.txt bringt pytest + pytest-timeout + hypothesis;
+          # OHNE hypothesis skippt test_render_contract_props.py still (QA-14 nie
+          # in CI ausgefuehrt) -> ueber die Dev-Deps mitinstallieren (CDX-05).
+          pip install -r requirements-dev.txt
           pip install SQLAlchemy>=2.0.0 numpy>=1.26.0 mido>=1.3.0 pyserial>=3.5
           # PySide6 (+ Addons, wie requirements.txt) fuer den View-Smoke.
           pip install "PySide6>=6.7.0" "PySide6-Addons>=6.7.0"
@@ -52,7 +55,7 @@ jobs:
           # dem echten Ergebnis mit os._exit(exitstatus) beenden (conftest.py).
           LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
-          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_views.py -v --tb=short
+          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py -v --tb=short
 
       - name: Test-Ergebnis zusammenfassen
         if: always()
@@ -60,4 +63,4 @@ jobs:
           QT_QPA_PLATFORM: offscreen
           LIGHTOS_HARDEN_EXIT_ALL: "1"   # s. o. — flaky nativer Teardown-Crash (Py3.11)
         run: |
-          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_views.py --tb=no -q
+          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py --tb=no -q
