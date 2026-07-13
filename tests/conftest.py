@@ -128,7 +128,26 @@ def pytest_collection_modifyitems(session, config, items):
 
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
-    if _HARDEN_EXIT_ARMED and os.environ.get("LIGHTOS_HARDEN_EXIT"):
+    # Zwei Wege in die Exit-Härtung:
+    #  (1) _HARDEN_EXIT_ARMED + LIGHTOS_HARDEN_EXIT  -> ENG (oben): nur WebEngine-
+    #      Sessions, nur unter dem lokalen Lock-Runner. Bewusst eng, damit die
+    #      Teardown-Crash-Erkennung für alle anderen lokalen Tests erhalten bleibt.
+    #  (2) LIGHTOS_HARDEN_EXIT_ALL -> CI-Variante (GENERELL). Hintergrund: der QA-11-
+    #      View-Smoke (`test_views.py`) baut echte Qt-Views, die u. a. MIDI-Dispatch-/
+    #      Feedback-Threads starten. Beim FINALEN Interpreter-Exit auf Windows/
+    #      Python 3.11 mit PySide6 6.11 crasht der native Abbau sporadisch mit
+    #      STATUS_HEAP_CORRUPTION (0xc0000374), WÄHREND QApplication + gerade
+    #      gestoppte Threads abgebaut werden — die Tests selbst bestehen (der Crash
+    #      liegt NACH dem Ergebnis). Der Prozess-Exitcode wird dann ≠0 und CI wird
+    #      fälschlich rot (nur 3.11, nicht 3.12). Da die session-scoped
+    #      `_stop_background_threads_at_end`-Fixture VOR diesem Hook läuft (Threads
+    #      sind gestoppt) und `exitstatus` das ECHTE Testergebnis trägt (0 nur, wenn
+    #      ALLE Tests bestehen), beenden wir den Prozess hier mit exakt diesem Status
+    #      und überspringen die flaky native Abbauphase. Das maskiert KEINE
+    #      Test-Failures — ein echter Fehler liefert exitstatus≠0 -> os._exit(≠0).
+    harden = bool(os.environ.get("LIGHTOS_HARDEN_EXIT_ALL")) or (
+        _HARDEN_EXIT_ARMED and bool(os.environ.get("LIGHTOS_HARDEN_EXIT")))
+    if harden:
         import sys
         try:
             sys.stdout.flush()
