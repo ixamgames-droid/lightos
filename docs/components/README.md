@@ -77,21 +77,21 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | Widget | Doc |
 |---|---|
 | [`vc_button`](vc/vc_button.md) | ✅ ja |
-| `vc_slider` | — nein |
-| `vc_color` | — nein |
-| `vc_color_list` | — nein |
-| `vc_xypad` | — nein |
-| `vc_encoder` | — nein |
-| `vc_speedial` | — nein |
-| `vc_stepper` | — nein |
-| `vc_cuelist` | — nein |
-| `vc_label` | — nein |
-| `vc_bpm_display` | — nein |
-| `vc_bus_selector` | — nein |
-| `vc_tempo_bus_controller` | — nein |
-| `vc_effect_colors` | — nein |
-| `vc_effect_display` | — nein |
-| `vc_song_info` | — nein |
+| [`vc_slider`](vc/vc_slider.md) | ✅ ja |
+| [`vc_color`](vc/vc_color.md) | ✅ ja |
+| [`vc_color_list`](vc/vc_color_list.md) | ✅ ja |
+| [`vc_xypad`](vc/vc_xypad.md) | ✅ ja |
+| [`vc_encoder`](vc/vc_encoder.md) | ✅ ja |
+| [`vc_speedial`](vc/vc_speedial.md) | ✅ ja |
+| [`vc_stepper`](vc/vc_stepper.md) | ✅ ja |
+| [`vc_cuelist`](vc/vc_cuelist.md) | ✅ ja |
+| [`vc_label`](vc/vc_label.md) | ✅ ja |
+| [`vc_bpm_display`](vc/vc_bpm_display.md) | ✅ ja |
+| [`vc_bus_selector`](vc/vc_bus_selector.md) | ✅ ja |
+| [`vc_tempo_bus_controller`](vc/vc_tempo_bus_controller.md) | ✅ ja |
+| [`vc_effect_colors`](vc/vc_effect_colors.md) | ✅ ja |
+| [`vc_effect_display`](vc/vc_effect_display.md) | ✅ ja |
+| [`vc_song_info`](vc/vc_song_info.md) | ✅ ja |
 | `vc_widget` | Basis (Basisklasse aller VC-Widgets) |
 | `vc_canvas` | Basis (Layout-/Drop-Fläche, kein eigenes Bedienelement) |
 | `vc_frame` | Basis (Container/Solo-Gruppe) |
