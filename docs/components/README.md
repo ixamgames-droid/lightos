@@ -105,20 +105,26 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | `scene_editor`, `chaser_editor`, `sequence_editor`, `collection_editor`, `script_editor`, `snap_editor`, `carousel_editor`, `effect_layer_editor`, `audio_editor`, `curve_library_view` | — nein |
 | `simple_desk`, `spectrum_bars`, `snap_file_panel` | — nein (ggf. Helfer, beim Schreiben prüfen) |
 
-### Engine-Funktionstypen (`engine/`) — DOC-05
+### Engine-Funktionstypen (`engine/`) — DOC-05 ✅
 
-| FunctionType | Doc |
-|---|---|
-| `Scene`, `Chaser`, `Sequence`, `Collection`, `Show`, `EFX`, `RGBMatrix`, `Audio`, `Script`, `MappedChannelChange` | — nein |
+Index: [`engine/README.md`](engine/README.md). Alle 10 `FunctionType`-Werte dokumentiert:
+[`Scene`](engine/scene.md) · [`Chaser`](engine/chaser.md) · [`Sequence`](engine/sequence.md) ·
+[`Collection`](engine/collection.md) · [`Show`](engine/show.md) · [`EFX`](engine/efx.md) ·
+[`RGBMatrix`](engine/rgbmatrix.md) · [`Audio`](engine/audio.md) · [`Script`](engine/script.md) ·
+[`MappedChannelChange`](engine/mappedchannelchange.md).
 
-### DMX-/Output-Module (`output/`) — DOC-06
+### DMX-/Output-Module (`output/`) — DOC-06 ✅
 
-| Modul | Doc |
-|---|---|
-| `output_manager`, `universe`, `artnet`, `sacn`, `enttec_pro`, `serial_process`, `artnet_input`, `sacn_input` | — nein |
+Index: [`output/README.md`](output/README.md). Alle 8 Nicht-`__init__`-Module dokumentiert:
+[`output_manager`](output/output_manager.md) · [`universe`](output/universe.md) ·
+[`artnet`](output/artnet.md) · [`sacn`](output/sacn.md) · [`enttec_pro`](output/enttec_pro.md) ·
+[`serial_process`](output/serial_process.md) · [`artnet_input`](output/artnet_input.md) ·
+[`sacn_input`](output/sacn_input.md).
 
-### Input-Module (`input/`) — DOC-07
+### Input-Module (`input/`) — DOC-07 ✅
 
-| Modul | Doc |
-|---|---|
-| `midi_manager`, `midi_mapper`, `midi_backend_winmm`, `osc_server`, `mtc_reader`, `input/keyboard_hotkeys`, `input/profile` | — nein |
+Index: [`input/README.md`](input/README.md). Alle Input-Module dokumentiert:
+[`midi_manager`](input/midi_manager.md) · [`midi_mapper`](input/midi_mapper.md) ·
+[`midi_backend_winmm`](input/midi_backend_winmm.md) · [`osc_server`](input/osc_server.md) ·
+[`mtc_reader`](input/mtc_reader.md) · [`keyboard_hotkeys`](input/keyboard_hotkeys.md) ·
+[`profile`](input/profile.md).
