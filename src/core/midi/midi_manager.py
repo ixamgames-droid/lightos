@@ -30,6 +30,9 @@ except Exception:
 # Welches Backend ist aktiv?
 _USE_WINMM = (not RTMIDI_OK) and WINMM_OK
 
+# Groesse der bounded RX-Queue (Treiber-Callback -> MidiDispatch-Thread).
+_RX_QUEUE_MAX = 4096
+
 
 @dataclass
 class MidiMessage:
@@ -71,7 +74,14 @@ class MidiManager:
         self._io_lock = threading.RLock()
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
-        self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=4096)
+        self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=_RX_QUEUE_MAX)
+        # Producer-Lock (Review): serialisiert ALLE Producer-Enqueues untereinander.
+        # Jeder offene MIDI-Input hat einen eigenen Callback-Thread; ohne Serialisierung
+        # konnte ein zweiter Producer die in _make_room_for_release freigeraeumten Slots
+        # fuellen, sodass die beiseitegelegten Note-Off/CC-0 beim Wieder-Einreihen doch
+        # verloren gingen. Der Consumer (_rx_loop) nimmt diesen Lock NIE -> kein Deadlock.
+        self._producer_lock = threading.Lock()
+        self._rx_dropped = 0  # Zaehler fuer bei Overflow verworfene Nachrichten (F2)
         self._rx_running = True
         self._rx_thread = threading.Thread(target=self._rx_loop, daemon=True, name="MidiDispatch")
         self._rx_thread.start()
@@ -103,9 +113,44 @@ class MidiManager:
 
     # ── Verbinden ────────────────────────────────────────────────────────────
 
-    def open_input(self, port_name: str):
-        if port_name in self._inputs:
+    def _input_handle_alive(self, handle: object, port_name: str) -> bool:
+        """Prueft, ob ein bereits geoeffneter Input-Handle noch lebt (F3).
+
+        Ein Backend-Handle darf optional eine ``is_alive()``-Methode anbieten
+        (wird bevorzugt). Fehlt sie, gilt der Handle als lebendig, solange sein
+        Port noch in ``list_inputs()`` auftaucht — verschwundene Ports werden von
+        ``open_all_inputs`` separat evakuiert."""
+        checker = getattr(handle, "is_alive", None)
+        if callable(checker):
+            try:
+                return bool(checker())
+            except Exception:
+                return False
+        try:
+            return port_name in self.list_inputs()
+        except Exception:
+            return True
+
+    def _evict_input(self, port_name: str):
+        """Schliesst einen (toten/verschwundenen) Input-Handle und entfernt ihn."""
+        handle = self._inputs.pop(port_name, None)
+        if handle is None:
             return
+        try:
+            handle.close_port()
+        except Exception:
+            pass
+
+    def open_input(self, port_name: str):
+        existing = self._inputs.get(port_name)
+        if existing is not None:
+            if self._input_handle_alive(existing, port_name):
+                return
+            # Toter Handle (z.B. nach USB-Unplug/Replug) -> evakuieren + neu oeffnen,
+            # sonst bleibt der Controller stumm bis App-Neustart trotz Auto-Connect.
+            print(f"[midi_manager] toter Input-Handle fuer '{port_name}' erkannt "
+                  f"-> schliesse + oeffne neu")
+            self._evict_input(port_name)
         if _USE_WINMM:
             ports = _winmm_list_inputs()
             if port_name not in ports:
@@ -134,13 +179,23 @@ class MidiManager:
     def open_all_inputs(self) -> int:
         """Öffnet alle verfügbaren MIDI-Eingänge (Auto-Connect, idempotent).
 
-        open_input() überspringt bereits offene Ports, daher kann dies gefahrlos
-        periodisch (Hot-Plug) aufgerufen werden. Gibt die Anzahl offener Eingänge
-        zurück."""
+        open_input() prüft bei bereits offenen Ports die Handle-Lebendigkeit und
+        ersetzt tote Handles; verschwundene Ports (USB-Unplug) werden hier
+        evakuiert. Damit ist der periodische Aufruf echt Hot-(Re-)Plug-tauglich.
+        Gibt die Anzahl offener Eingänge zurück."""
         try:
             names = self.list_inputs()
         except Exception:
             names = []
+        # Verschwundene Ports evakuieren: ein während des Betriebs abgezogenes
+        # Gerät hinterlässt sonst einen toten Handle im Dict, der beim Replug
+        # (Name taucht wieder auf) die Neuverbindung blockiert.
+        for open_name in list(self._inputs.keys()):
+            if open_name.startswith("Virtual:"):
+                continue
+            if open_name not in names:
+                print(f"[midi_manager] Input-Port verschwunden -> evakuiere '{open_name}'")
+                self._evict_input(open_name)
         for name in names:
             if name and not name.startswith("("):
                 try:
@@ -304,12 +359,75 @@ class MidiManager:
         except ValueError:
             pass
 
+    @staticmethod
+    def _is_release(raw: list[int]) -> bool:
+        """True für 'Loslass'-Nachrichten, die einen Zustand zurücknehmen:
+        Note-Off, Note-On mit Velocity 0 (== Note-Off) und CC-Wert 0
+        (Moment-/Flash-Button-Release). Diese dürfen NIE still verloren gehen,
+        sonst bleibt ein Flash/Moment-Button dauerhaft an (F2)."""
+        if not raw:
+            return False
+        status = raw[0] & 0xF0
+        d2 = raw[2] if len(raw) > 2 else 0
+        if status == 0x80:              # Note-Off
+            return True
+        if status == 0x90 and d2 == 0:  # Note-On Velocity 0 == Note-Off
+            return True
+        if status == 0xB0 and d2 == 0:  # CC-Wert 0 -> Button-Release
+            return True
+        return False
+
+    def _make_room_for_release(self) -> bool:
+        """Verwirft das älteste Nicht-Release-Element der RX-Queue, um Platz für
+        eine ankommende Release-Nachricht zu schaffen. Dabei herausgezogene
+        Release-Nachrichten werden wieder eingereiht, damit KEIN Note-Off/CC-0
+        verloren geht. Gibt True zurück, wenn ein Platz frei wurde."""
+        held: list[tuple[list[int], str]] = []
+        dropped = False
+        while True:
+            try:
+                item = self._rx_queue.get_nowait()
+            except queue.Empty:
+                break
+            if self._is_release(item[0]):
+                held.append(item)   # Release behalten
+                continue
+            dropped = True           # ältestes Nicht-Release gefunden -> verwerfen
+            break
+        for it in held:              # zurückgehaltene Releases wieder einreihen
+            try:
+                self._rx_queue.put_nowait(it)
+            except queue.Full:
+                break
+        return dropped
+
     def _on_message(self, raw: list[int], port_name: str):
-        try:
-            self._rx_queue.put_nowait((list(raw), port_name))
-        except queue.Full:
-            # Bei sehr hoher Last Events droppen statt Callback-Thread zu blockieren.
-            pass
+        item = (list(raw), port_name)
+        # Der gesamte Enqueue-/Rescue-Pfad laeuft unter dem Producer-Lock, damit
+        # _make_room_for_release nicht von einem parallelen Input-Callback-Thread
+        # unterlaufen wird (Review-Fix). +Nebeneffekt: _rx_dropped ist so RMW-sicher.
+        with self._producer_lock:
+            try:
+                self._rx_queue.put_nowait(item)
+                return
+            except queue.Full:
+                pass
+            # Queue voll: NICHT still verwerfen. Release-Nachrichten (Note-Off/CC-0)
+            # bevorzugt zustellen, indem eine ältere Nicht-Release-Nachricht weicht.
+            if self._is_release(raw) and self._make_room_for_release():
+                try:
+                    self._rx_queue.put_nowait(item)
+                    self._rx_dropped += 1
+                    print(f"[midi_manager] RX-Queue voll — ältere Nachricht verworfen, "
+                          f"damit Note-Off/CC-0 zugestellt wird (drops={self._rx_dropped})")
+                    return
+                except queue.Full:
+                    pass
+            # Sonst: diese Nachricht verwerfen, aber zählen + (gedrosselt) warnen.
+            self._rx_dropped += 1
+            if self._rx_dropped == 1 or self._rx_dropped % 64 == 0:
+                print(f"[midi_manager] RX-Queue voll (maxsize={_RX_QUEUE_MAX}) — "
+                      f"Nachricht verworfen (drops={self._rx_dropped})")
 
     def _rx_loop(self):
         while self._rx_running:

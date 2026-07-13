@@ -6,6 +6,13 @@
 > sie sind **keine** alternative Reihenfolge. Vision/Langfrist steht in
 > [ROADMAP.md](ROADMAP.md).
 
+> **🏁 FINALIZE + 🔮 Nächstes Backlog** (David 2026-07-13; Details in `SecondBrain/project_lightos_roadmap_next.md`).
+> **Reihenfolge bindend — NICHT vorziehen:** erst den aktuellen Backlog komplett leerräumen, DANN als **allerletzter Punkt** die Projekt-Finalisierung, DANN ein frisches Backlog.
+>
+> **FINALIZE (letzter Punkt):** Projekt-Stand vs. Backlog vs. Second Brain abgleichen · verwaiste/nie-umgesetzte Alt-Items klären/schließen · Repo **und** den lokalen Ordner (`C:\Users\David\Downloads\lightos-main`) von sinnlosen Altdateien säubern → *clean repo + clean lokaler Ordner* · Second Brain konsolidieren (Index + Graph aktuell).
+>
+> **Nächstes Backlog (nach FINALIZE):** (1) VC-Buttons plastischer/„3D-ig" — Shadows/Bevel/Depth + klares Press-/Aktiv-Feedback, touch-tauglich, *nicht* echt-3D; (2) umfassende **UX-/User-Friendliness-Audits** über ALLES Klickbare/Interaktive — **auch mit Computer Use** (echt, nicht nur headless); (3) Effekte selbst bauen + im **3D-Visualizer** prüfen; (4) Fixture-Erstellung/Generator/Patchen rundlaufen; (5) **Cross-Platform**: ARM-Windows (jetzt) + normales Windows (x86) + Linux (x86).
+
 ## Legende
 - **Status:** `todo` (ausführbar) · `decision` (Produktentscheidung nötig) ·
   `blocked` (Hardware/Zugang/extern) · `wip` (in Arbeit) · `review` (PR offen) ·
@@ -531,11 +538,11 @@ _Verifizierte Befunde aus [`docs/MULTI_UNIVERSE_AUDIT_2026-07-13.md`](docs/MULTI
 
 | ID | Prio | Status | Titel | Stelle / DoD |
 |----|------|--------|-------|--------------|
-| ENG-12 | P2 | todo | **`update_fixture` NICHT undo-bar → Ctrl+Z auf Patch-Änderungen wirkungslos** | Aus QA-15: die Undo/Redo-Closures (`app_state.py:~549`) rufen `update_fixture(fid, undoable=False, **before)`, wobei `before` (aus `_fixture_to_dict`) selbst einen `fid`-Key trägt → `TypeError: got multiple values for argument 'fid'`, im UndoStack still verschluckt. **Fix:** `fid` vor `**kwargs` aus dem Dict entfernen; den `tests/test_undo_coverage.py`-xfail zu einem echten Test machen. |
-| MU-01 | P2 | todo | **Live-Tab: Cross-Typ-Adapterwechsel → Doppel-Output/Leak (OUT-05 im Live-Pfad)** | `output_config.py:284-289/302-306/383-388` — `_connect_enttec`/`_apply_artnet`/`_apply_sacn` rufen kein `remove_output` vor `add_*`; der OUT-05-Fix lebt nur im Rehydrierungs-Pfad (`app_state.py:816`). Nach Enttec+Art-Net auf demselben Universum senden beide (`_send_all`). **Fix:** vor `add_*` das Universum via `remove_output` räumen; Test. |
-| MU-02 | P2 | todo | **„Deaktivieren"-Checkbox ist No-Op → Adapter sendet weiter** | `output_config.py:291-294/372-375` — setzt nur das Label + `return`; der Adapter bleibt registriert. **Fix:** `remove_output`/disable beim Abwählen; Test. |
-| MIDI-RECONN | P2 | todo | **APC-Reconnect ohne Handle-Ersatz → stumm bis Neustart (AUD-07 F3)** | `midi_manager.py:106-108` — `open_input` kehrt sofort zurück, solange der Portname im Dict steht; tote Handles werden nie evakuiert. Nach USB-Replug bleibt der APC stumm trotz 4s-Auto-Connect (`main_window.py:290-298`). **Fix:** bei Reconnect toten Handle erkennen + ersetzen; Feedback-LEDs neu aufbauen. |
-| MIDI-QDROP | P2 | todo | **RX-Queue-Overflow droppt Note-Off → hängender Flash/Button (AUD-07 F2)** | `midi_manager.py:307-312` — `put_nowait`-Overflow (Queue 4096) droppt still; ein gedropptes Note-Off bei durchgekommenem Note-On lässt `_flash_active` True (`executor.py:40/47`). **Fix:** bei Full Note-Off/CC bevorzugen ODER Resync nach Overflow + Drop-Zähler/Log. |
+| ENG-12 | P2 | done (Batch 8) | **`update_fixture` NICHT undo-bar → Ctrl+Z auf Patch-Änderungen wirkungslos** | Aus QA-15: die Undo/Redo-Closures (`app_state.py:~549`) rufen `update_fixture(fid, undoable=False, **before)`, wobei `before` (aus `_fixture_to_dict`) selbst einen `fid`-Key trägt → `TypeError: got multiple values for argument 'fid'`, im UndoStack still verschluckt. **Fix:** `fid` vor `**kwargs` aus dem Dict entfernen; den `tests/test_undo_coverage.py`-xfail zu einem echten Test machen. |
+| MU-01 | P2 | done (Batch 8) | **Live-Tab: Cross-Typ-Adapterwechsel → Doppel-Output/Leak (OUT-05 im Live-Pfad)** | `output_config.py:284-289/302-306/383-388` — `_connect_enttec`/`_apply_artnet`/`_apply_sacn` rufen kein `remove_output` vor `add_*`; der OUT-05-Fix lebt nur im Rehydrierungs-Pfad (`app_state.py:816`). Nach Enttec+Art-Net auf demselben Universum senden beide (`_send_all`). **Fix:** vor `add_*` das Universum via `remove_output` räumen; Test. |
+| MU-02 | P2 | done (Batch 8) | **„Deaktivieren"-Checkbox ist No-Op → Adapter sendet weiter** | `output_config.py:291-294/372-375` — setzt nur das Label + `return`; der Adapter bleibt registriert. **Fix:** `remove_output`/disable beim Abwählen; Test. |
+| MIDI-RECONN | P2 | done (Batch 8) | **APC-Reconnect ohne Handle-Ersatz → stumm bis Neustart (AUD-07 F3)** | `midi_manager.py:106-108` — `open_input` kehrt sofort zurück, solange der Portname im Dict steht; tote Handles werden nie evakuiert. Nach USB-Replug bleibt der APC stumm trotz 4s-Auto-Connect (`main_window.py:290-298`). **Fix:** bei Reconnect toten Handle erkennen + ersetzen; Feedback-LEDs neu aufbauen. |
+| MIDI-QDROP | P2 | done (Batch 8) | **RX-Queue-Overflow droppt Note-Off → hängender Flash/Button (AUD-07 F2)** | `midi_manager.py:307-312` — `put_nowait`-Overflow (Queue 4096) droppt still; ein gedropptes Note-Off bei durchgekommenem Note-On lässt `_flash_active` True (`executor.py:40/47`). **Fix:** bei Full Note-Off/CC bevorzugen ODER Resync nach Overflow + Drop-Zähler/Log. |
 
 _P3-Rest (Details in den Audit-Docs, bei Bedarf als Item ziehen):_ MU-03 (Art-Net-Startuniversum-Feld unread), MU-04 (Universe-Nr ohne Klemme/Dedup), MU-05 (Universe-Manager überschreibt stale Tabelle) · MIDI-F1 (Mapper inline-Dispatch), MIDI-F4 (Feedback-LED-Hang), MIDI-F5 (Learn-Flags ohne Lock).
 
