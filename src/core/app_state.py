@@ -215,6 +215,13 @@ class AppState:
         #   input_merge_modes: {out_universe: "HTP"|"LTP"|"REPLACE"}
         self.input_layer: dict[int, dict[int, int]] = {}
         self.input_merge_modes: dict[int, str] = {}
+        # WEB-01: Kanaele, die vom Web-/OSC-Remote ueber set_input_channel gesetzt
+        # wurden ({out_univ: set(channel)}). Sie liegen mit in input_layer, sind
+        # aber DISKRETE Einzelbefehle (kein Stream) -> der Renderer nimmt sie vom
+        # NET-05-Source-Timeout aus (nie verworfen) und wendet sie als REPLACE an,
+        # unabhaengig vom Per-Universe-Merge-Mode der Art-Net/sACN-Quelle. Freigabe
+        # nur ueber clear_remote_input()/clear_programmer (Release-Pfad).
+        self._remote_input_channels: dict[int, set[int]] = {}
         # NET-05: letzter Empfangszeitpunkt je out_univ (time.monotonic) fuer den
         # Source-Timeout — der Renderer verwirft still gewordene Quellen.
         self.input_last_seen: dict[int, float] = {}
@@ -988,6 +995,14 @@ class AppState:
                 self.programmer.clear()
             else:
                 self.programmer.pop(fid, None)
+        # WEB-01: Der globale Clear ist auch der Release-Pfad fuer die per Web/OSC
+        # ueber set_input_channel gesetzten Roh-Kanaele. Ein Per-Fixture-Clear
+        # (fid gesetzt) laesst die Roh-Overrides stehen (sie sind nicht fid-basiert).
+        if fid is None:
+            try:
+                self.clear_remote_input()
+            except Exception as e:
+                print(f"[app_state] clear_remote_input error: {e}")
         self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
 
@@ -1372,6 +1387,79 @@ class AppState:
                 if unconf is not None:
                     unconf.pop(int(out_univ), None)
 
+    def set_input_channel(self, universe: int, channel: int, value: int,
+                          source: str = "remote"):
+        """WEB-01: Web-/OSC-Remote setzt einen EINZELNEN DMX-Kanal ueber die
+        Input-Override-Schicht — NICHT mehr direkt ins Live-Universe. Frueher rief
+        der Web-/OSC-Handler ``universe.set_channel()`` direkt; der 44-Hz-Renderer
+        ueberschrieb den Wert auf gepatchten Kanaelen aber jeden Frame wieder
+        (Flackern, hielt nur ~1 Frame ~23 ms). Jetzt landet der Wert in
+        ``input_layer`` und wird in ``_render_frame`` (Schritt 4b-Input)
+        deterministisch als REPLACE eingemischt.
+
+        Anders als ein Art-Net/sACN-Stream ist ein Web-POST ein DISKRETER
+        Einzelbefehl: er darf NICHT vom NET-05-Stale-Timeout (~2,5 s) verworfen
+        werden. Darum wird der Kanal zusaetzlich in ``_remote_input_channels``
+        vermerkt — der Renderer nimmt diese Kanaele vom Source-Timeout aus und
+        laesst sie stehen, bis sie per ``clear_remote_input``/``clear_programmer``
+        (Release) ausdruecklich geraeumt werden. ``source`` ('web'/'osc') ist nur
+        Diagnostik.
+
+        Range-Guards wie im alten set_channel-Pfad: unbekannte Universe verwerfen
+        (der Renderer koennte den Kanal ohnehin nur in ``self.universes`` committen),
+        ``1<=channel<=512``, ``0<=value<=255``. Never-crash bei kaputtem Payload."""
+        try:
+            universe = int(universe)
+            channel = int(channel)
+            value = int(value)
+        except (TypeError, ValueError):
+            return
+        if not (1 <= channel <= 512):
+            return
+        value = max(0, min(255, value))
+        lock = getattr(self, "_input_lock", None)
+        if lock is None:
+            return
+        with lock:
+            if universe not in getattr(self, "universes", {}):
+                return
+            layer = self.input_layer.get(universe)
+            if layer is None:
+                layer = {}
+                self.input_layer[universe] = layer
+            layer[channel] = value
+            remote = getattr(self, "_remote_input_channels", None)
+            if remote is None:
+                remote = self._remote_input_channels = {}
+            remote.setdefault(universe, set()).add(channel)
+
+    def clear_remote_input(self):
+        """WEB-01: Die von Web/OSC ueber ``set_input_channel`` gesetzten Einzel-
+        Kanaele wieder freigeben (Release-Pfad). Entfernt sie aus ``input_layer``
+        und der Remote-Merkliste; leert eine Universe komplett, faellt ihr
+        input_layer-/mode-/last_seen-Eintrag mit weg, damit kein Zombie-Wert
+        eingefroren zurueckbleibt. Art-Net/sACN-Kanaele derselben Universe bleiben
+        unberuehrt."""
+        lock = getattr(self, "_input_lock", None)
+        if lock is None:
+            return
+        with lock:
+            remote = getattr(self, "_remote_input_channels", None)
+            if not remote:
+                return
+            ls = getattr(self, "input_last_seen", None)
+            for univ, chans in list(remote.items()):
+                layer = self.input_layer.get(univ)
+                if layer is not None:
+                    for ch in list(chans):
+                        layer.pop(ch, None)
+                    if not layer:
+                        self.input_layer.pop(univ, None)
+                        self.input_merge_modes.pop(univ, None)
+                        if ls is not None:
+                            ls.pop(univ, None)
+            remote.clear()
+
     def _render_frame(self, dt: float):
         """Berechnet jeden Output-Frame komplett neu (ein Thread):
         Default → Funktionen → Executoren → Programmer, dann atomarer Commit
@@ -1745,33 +1833,53 @@ class AppState:
                 # gesendet haben (Konsole abgezogen/abgestuerzt), verwerfen — sonst
                 # mischt der Renderer ihre letzten Werte fuer immer weiter und friert
                 # die Kanaele ein (der Blackout/Submaster skaliert den Input NICHT).
+                remote = getattr(self, "_remote_input_channels", None) or {}
                 ls = getattr(self, "input_last_seen", None)
                 if ls is not None:
                     now = time.monotonic()
                     stale = [u for u in list(in_state.keys())
                              if now - ls.get(u, now) > INPUT_SOURCE_TIMEOUT_S]
                     for u in stale:
-                        in_state.pop(u, None)
-                        self.input_merge_modes.pop(u, None)
-                        ls.pop(u, None)
+                        rc = remote.get(u)
+                        if rc:
+                            # WEB-01: Web/OSC-Kanaele sind diskrete Befehle (kein
+                            # Stream) -> NICHT vom Source-Timeout verwerfen. Nur die
+                            # Stream-Kanaele (Art-Net/sACN) dieser Universe entfernen,
+                            # die Remote-Kanaele stehen lassen.
+                            layer = in_state.get(u)
+                            if layer is not None:
+                                for ch in [c for c in list(layer) if c not in rc]:
+                                    layer.pop(ch, None)
+                                if not layer:
+                                    in_state.pop(u, None)
+                                    self.input_merge_modes.pop(u, None)
+                            ls.pop(u, None)
+                        else:
+                            in_state.pop(u, None)
+                            self.input_merge_modes.pop(u, None)
+                            ls.pop(u, None)
                 return ({u: dict(ch) for u, ch in in_state.items()},
-                        dict(self.input_merge_modes))
+                        dict(self.input_merge_modes),
+                        {u: set(chs) for u, chs in remote.items()})
 
             if in_lock is not None:
                 with in_lock:
-                    in_layer, in_modes = _expire_and_snapshot()
+                    in_layer, in_modes, in_remote = _expire_and_snapshot()
             else:
-                in_layer, in_modes = _expire_and_snapshot()
+                in_layer, in_modes, in_remote = _expire_and_snapshot()
             for univ, chans in in_layer.items():
                 su = scratch.get(univ)
                 if su is None:
                     continue
                 htp = in_modes.get(univ, "HTP") == "HTP"
+                rc = in_remote.get(univ, ())
                 for ch, val in chans.items():
                     if not (1 <= ch <= 512):
                         continue
                     v = max(0, min(255, int(val)))
-                    if htp:
+                    # WEB-01: von Web/OSC gesetzte Kanaele gelten IMMER als REPLACE
+                    # (diskreter Befehl), unabhaengig vom Per-Universe-Merge-Mode.
+                    if htp and ch not in rc:
                         if v > su.get_channel(ch):
                             su.set_channel(ch, v)
                     else:

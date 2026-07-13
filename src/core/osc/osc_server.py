@@ -24,13 +24,23 @@ class OscServer:
       /lightos/blackout {1|0}      → Blackout
     """
 
-    def __init__(self, ip: str = "0.0.0.0", port: int = 7770):
+    def __init__(self, ip: str = "127.0.0.1", port: int = 7770):
+        # NET-01: Default-Bind ist LOOPBACK — OSC ist ungeschuetztes UDP; ein
+        # 0.0.0.0-Bind machte den Steuer-Eingang fuer das ganze LAN offen. Der
+        # Startup-Aufrufer setzt 0.0.0.0 nur, wenn der sichtbare Toggle 'OSC ueber
+        # Netzwerk' aktiv ist (siehe set_bind_ip / main_window).
         self._ip = ip
         self._port = port
         self._server = None
         self._thread: threading.Thread | None = None
         self._running = False
         self._custom_handlers: list[tuple[str, Callable]] = []
+
+    def set_bind_ip(self, ip: str) -> None:
+        """Bind-Adresse setzen, bevor ``start`` laeuft (z. B. '0.0.0.0', wenn der
+        Nutzer 'OSC ueber Netzwerk' aktiviert). Kein Effekt auf einen bereits
+        laufenden Server."""
+        self._ip = ip or "127.0.0.1"
 
     def start(self):
         if not HAS_OSC:
@@ -145,8 +155,10 @@ class OscServer:
             channel = int(parts[3])
             value = int(args[0]) if args else 0
             state = self._get_state()
-            if universe in state.universes:
-                state.universes[universe].set_channel(channel, value)
+            # WEB-01: ueber die Input-Override-Schicht statt direkt ins Live-
+            # Universe (sonst ueberschriebe der 44-Hz-Renderer gepatchte Kanaele
+            # jeden Frame). Range-Guards liegen in set_input_channel.
+            state.set_input_channel(universe, channel, value, source="osc")
         except Exception:
             pass
 
