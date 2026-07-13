@@ -429,6 +429,23 @@ class OutputConfigDialog(QDialog):
         except Exception:
             pass
 
+    def _input_status_text(self, in_u, out_u, mode):
+        """NET-07/CDX-02: Baut das Eingangs-Status-Label. Ist out_u nicht als
+        Output gepatcht, zaehlt app_state die verworfenen Frames in
+        state.input_unconfigured hoch -> statt "Aktiv" wirkungslos melden.
+        Liest input_unconfigured NUR (kein Schreiben)."""
+        base = f"Aktiv: U{in_u} -> U{out_u} ({mode})"
+        try:
+            unconf = getattr(get_state(), "input_unconfigured", None)
+            if unconf and unconf.get(out_u, 0) > 0:
+                return (
+                    f"Aktiv, aber wirkungslos (U{out_u} nicht als Output "
+                    f"gepatcht): U{in_u} -> U{out_u} ({mode})"
+                )
+        except Exception:
+            pass
+        return base
+
     def _apply_artnet_input(self):
         try:
             from src.core.dmx.artnet_input import get_artnet_receiver
@@ -445,7 +462,7 @@ class OutputConfigDialog(QDialog):
             self._clear_stale_input_merges(rx, in_u, out_u)
             rx.set_merge(in_u, out_u, mode)
             self._lbl_artnet_in_status.setText(
-                f"Aktiv: U{in_u} -> U{out_u} ({mode})"
+                self._input_status_text(in_u, out_u, mode)
             )
         except Exception as e:
             self._lbl_artnet_in_status.setText(f"Fehler: {e}")
@@ -468,7 +485,7 @@ class OutputConfigDialog(QDialog):
             self._clear_stale_input_merges(rx, in_u, out_u)
             rx.set_merge(in_u, out_u, mode)
             self._lbl_sacn_in_status.setText(
-                f"Aktiv: U{in_u} -> U{out_u} ({mode})"
+                self._input_status_text(in_u, out_u, mode)
             )
         except Exception as e:
             self._lbl_sacn_in_status.setText(f"Fehler: {e}")
