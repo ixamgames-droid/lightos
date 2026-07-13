@@ -44,10 +44,23 @@ class BenchmarkSmokeTest(unittest.TestCase):
         self.assertIn("| 1 |", table)
 
     def test_single_universe_p95_stays_below_44hz_budget(self):
-        rows = B.run_benchmark(universe_counts=(1,), pars_per_universe=2, frames=30)
+        # Das Gate läuft im lokalen Pflicht-Test-Gate, das laut Projekt-Setup mit
+        # parallelen Claude-/Cowork-Sessions rechnen muss. Ein einzelner 30-Frame-
+        # Lauf ohne Absicherung reißt unter solcher Last fälschlich das Budget
+        # (Scheduler-Jitter, Thermik) und blockiert Merges. Deshalb: Median von 3
+        # Läufen (jeder mit eingebauten Warmup-Frames). Ein einzelner Ausreißer wird
+        # so weggemittelt, eine ECHTE Regression (dauerhaft > Budget) reißt aber
+        # weiterhin bei ≥ 2 von 3 Läufen und damit auch im Median durch.
+        p95s = sorted(
+            B.run_benchmark(universe_counts=(1,), pars_per_universe=2, frames=30)[0]["p95"]
+            for _ in range(3)
+        )
+        p95 = p95s[1]   # Median-von-3
         self.assertLess(
-            rows[0]["p95"], self.P95_BUDGET_MS,
-            f"Render-p95 {rows[0]['p95']:.2f} ms überschreitet das {self.P95_BUDGET_MS} ms-Gate")
+            p95, self.P95_BUDGET_MS,
+            f"Render-p95 (Median von 3) {p95:.2f} ms überschreitet das "
+            f"{self.P95_BUDGET_MS} ms-Gate — Läufe: "
+            f"{', '.join(f'{v:.2f}' for v in p95s)} ms")
 
     def tearDown(self):
         # run_benchmark ruft am Ende _reset(); zur Sicherheit Singleton leeren.
