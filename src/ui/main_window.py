@@ -1483,13 +1483,53 @@ class MainWindow(QMainWindow):
         if not result.get("ok"):
             QMessageBox.warning(self, "Import-Fehler", result.get("message", "Unbekannter Fehler"))
             return
-        QMessageBox.information(
-            self, "QLC+ Import",
-            result.get("message", "") +
+        # FIMP-05: geparste Fixtures tatsächlich in die Show/Patch-Struktur
+        # übernehmen — vorher wurde das Ergebnis nur angezeigt und verworfen.
+        # Nutzt den regulären Patch-Pfad (AppState.add_fixture + die kanonische
+        # dict→PatchedFixture-Konvertierung aus show_file). Frische fids, da
+        # QLC+-IDs 0-basiert sind und mit dem bestehenden Patch kollidieren
+        # können — add_fixture würde sonst umnummerieren.
+        from src.core.show.show_file import _patched_fixture_from_data
+        added = 0
+        collided = []
+        for fx in result.get("fixtures", []):
+            try:
+                d = dict(fx)
+                d["fid"] = self._state.next_fid()
+                pf = _patched_fixture_from_data(d, d["fid"])
+                # FIMP-05b (Review): DMX-Adresskollision mit dem bestehenden Patch
+                # (oder bereits importierten Fixtures) erkennen und MELDEN, statt sie
+                # still zu überlappen — sonst überschreiben sich zwei Fixtures im
+                # 44-Hz-Render auf denselben Kanälen ohne jede Warnung. Import bleibt
+                # vollständig (die QLC+-Adressen sind Nutzer-Absicht); der Nutzer
+                # sieht die Kollision und kann sie im Patch auflösen.
+                try:
+                    if self._state.check_address_conflict(
+                            pf.universe, pf.address, pf.channel_count):
+                        collided.append(
+                            f"{d.get('name', 'Fixture')} (U{pf.universe}@{pf.address})")
+                except Exception:
+                    pass
+                self._state.add_fixture(pf, undoable=False)
+                added += 1
+            except Exception as e:
+                print(f"[qxw_import] Fixture-Übernahme fehlgeschlagen: {e}")
+        skipped = result.get("skipped_fixtures", [])
+        parts = [result.get("message", "")]
+        parts.append(f"\nIn die Show übernommen: {added} Fixtures.")
+        if skipped:
+            parts.append(f"Übersprungen (fehlerhaft): {len(skipped)}.")
+        if collided:
+            _shown = ", ".join(collided[:5]) + ("…" if len(collided) > 5 else "")
+            parts.append(
+                f"⚠ {len(collided)} Fixture(s) überlappen im DMX mit bestehendem "
+                f"Patch — bitte Adressen prüfen: {_shown}")
+        parts.append(
             "\n\nHinweis: Funktionen / VC-Widgets werden geparst, "
             "aber das vollständige Mapping in LightOS-Strukturen "
             "ist nicht automatisch (Profil-IDs unterscheiden sich)."
         )
+        QMessageBox.information(self, "QLC+ Import", "\n".join(parts))
 
     def _default_show_dir(self) -> str:
         """UXT-11: sinnvolles Start-Verzeichnis für Show-Dialoge — der Ordner der

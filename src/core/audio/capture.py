@@ -24,6 +24,10 @@ class AudioCapture:
         self._device_name: str | None = None
         self._thread: threading.Thread | None = None
         self._running = False
+        # Zaehlt bei jedem stop() hoch. Jeder Capture-Thread merkt sich seine
+        # Epoch; eine veraltete Loop beendet sich beim naechsten Chunk selbst,
+        # selbst wenn _running spaeter wieder True wird -> keine Doppel-Capture.
+        self._epoch = 0
         self._subscribers: list = []  # callables(numpy.ndarray)
         self._sample_rate = SAMPLE_RATE
         self._latest_volume: float = 0.0
@@ -134,6 +138,17 @@ class AudioCapture:
             return False
         if self._running:
             return True
+        # Ein vorheriger stop() konnte den alten Thread evtl. nicht sauber
+        # joinen (Geraet haengt in rec.record()). Laeuft er noch, darf hier
+        # KEIN zweiter Capture-Thread aufmachen -> sonst Doppel-Capture. Ihm
+        # eine letzte kurze Chance geben zu sterben, sonst koaleszieren.
+        old = self._thread
+        if old is not None and old.is_alive():
+            old.join(timeout=0.5)
+            if old.is_alive():
+                self._set_error("Vorheriger Audio-Thread haengt noch")
+                return False
+            self._thread = None
         self._set_error(None)
         if self._device_name is None:
             # Default je nach Quelle waehlen
@@ -145,17 +160,26 @@ class AudioCapture:
             self._set_error("Kein Audio-Geraet gefunden")
             return False
         self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True, name="AudioCapture")
+        my_epoch = self._epoch
+        self._thread = threading.Thread(target=self._run, args=(my_epoch,),
+                                        daemon=True, name="AudioCapture")
         self._thread.start()
         return True
 
     def stop(self):
         self._running = False
+        # Epoch hochzaehlen: markiert die aktuelle Loop dauerhaft als veraltet,
+        # falls sie den Join-Timeout ueberlebt und _running spaeter wieder True
+        # wird -> sie sieht den Mismatch und beendet sich beim naechsten Chunk.
+        self._epoch += 1
         if self._thread:
             self._thread.join(timeout=2.0)
-            self._thread = None
+            if not self._thread.is_alive():
+                self._thread = None
+            # Sonst haengt der Thread (Geraet weg): Referenz behalten, damit ein
+            # folgender start() ihn erkennt statt einen zweiten zu starten.
 
-    def _run(self):
+    def _run(self, epoch: int | None = None):
         try:
             # Quelle bestimmen: Loopback (PC-Wiedergabe) vs. echter Eingang
             if self.source_mode == "input":
@@ -168,7 +192,7 @@ class AudioCapture:
                 with self._lock:
                     self._error = None
                 fails = 0
-                while self._running:
+                while self._running and (epoch is None or epoch == self._epoch):
                     try:
                         data = rec.record(numframes=CHUNK_SIZE)
                         if data.ndim > 1:
