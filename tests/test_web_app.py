@@ -222,5 +222,42 @@ class TestWebRemote(unittest.TestCase):
         sio_client.disconnect()
 
 
+class TestLanIpHelper(unittest.TestCase):
+    """NET-02: Der Verbindungs-Dialog soll die echte LAN-IP statt ``localhost``
+    zeigen. Diese Tests decken die IP-Ermittlung ab — inkl. Fallback bei
+    fehlendem Netz (kein Crash)."""
+
+    def test_get_lan_ip_returns_plausible_ipv4(self):
+        ip = webapp.get_lan_ip()
+        self.assertIsInstance(ip, str)
+        parts = ip.split(".")
+        self.assertEqual(len(parts), 4, f"keine IPv4: {ip!r}")
+        for p in parts:
+            self.assertTrue(p.isdigit(), f"nicht-numerisches Oktett in {ip!r}")
+            self.assertTrue(0 <= int(p) <= 255, f"Oktett out-of-range in {ip!r}")
+
+    def test_get_lan_ip_no_network_falls_back_to_loopback(self):
+        # Kein Interface / kein Netz -> connect wirft OSError -> Fallback 127.0.0.1
+        with mock.patch("socket.socket") as m_sock:
+            m_sock.return_value.connect.side_effect = OSError("network down")
+            self.assertEqual(webapp.get_lan_ip(), "127.0.0.1")
+
+    def test_get_lan_ip_uses_getsockname(self):
+        with mock.patch("socket.socket") as m_sock:
+            inst = m_sock.return_value
+            inst.getsockname.return_value = ("192.168.42.7", 12345)
+            self.assertEqual(webapp.get_lan_ip(), "192.168.42.7")
+            inst.close.assert_called_once()
+
+    def test_remote_url_builds_lan_url_with_port(self):
+        with mock.patch.object(webapp, "get_lan_ip", return_value="10.0.0.5"):
+            self.assertEqual(webapp.remote_url(5000), "http://10.0.0.5:5000")
+            self.assertEqual(webapp.remote_url(8080), "http://10.0.0.5:8080")
+
+    def test_remote_url_never_shows_localhost_when_lan_present(self):
+        with mock.patch.object(webapp, "get_lan_ip", return_value="172.16.3.9"):
+            self.assertNotIn("localhost", webapp.remote_url())
+
+
 if __name__ == "__main__":
     unittest.main()
