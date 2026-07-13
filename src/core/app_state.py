@@ -187,6 +187,15 @@ class AppState:
         self.laser_estop_active: bool = False
         self._laser_estop_addrs: dict[int, frozenset] = {}   # univ -> Laser-Adressen
         self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
+        # STAB-15: Der 44-Hz-Renderer (_render_frame) liest den Render-Plan
+        # (_fix_index/_default_frame/_commit_spans/_patched_set/_laser_estop_addrs),
+        # waehrend _rebuild_render_plan ihn beim Umpatchen feldweise austauscht.
+        # Ohne Schutz koennte der Renderer einen HALB getauschten Plan sehen (neue
+        # fix_index + alte spans -> 1-Frame-Glitch/Crash). Dieses Lock haelt beide
+        # nur KURZ: der Rebuild baut den Plan lokal fertig und tauscht die Felder
+        # gebuendelt darunter; _render_frame zieht darunter EINEN konsistenten
+        # Snapshot in Locals und rechnet dann daraus (wie prog/simple_desk/input).
+        self._plan_lock = threading.RLock()
         # Nicht-gepatchte Adressen, die Funktionen (z. B. ScriptFunction setdmx)
         # im letzten Frame geschrieben haben — fuer korrektes Freigeben.
         self._engine_extra_prev: dict[int, set] = {}
@@ -605,6 +614,15 @@ class AppState:
         clear_channel_cache()
         self._rebuild_render_plan()
 
+    def _get_plan_lock(self):
+        """STAB-15: Liefert das Render-Plan-Lock; legt es defensiv an, falls das
+        Objekt ohne __init__ gebaut wurde (Test-Helfer via AppState.__new__ —
+        gleiches Muster wie _fd_lock/_sd_lock: getattr mit Fallback)."""
+        lock = getattr(self, "_plan_lock", None)
+        if lock is None:
+            lock = self._plan_lock = threading.RLock()
+        return lock
+
     def _rebuild_render_plan(self):
         """Berechnet aus dem Patch die Strukturen fuer den Per-Frame-Renderer:
         Default-Frame (gepatchte Kanaele auf Default), fid->Kanal-Index und die
@@ -686,12 +704,20 @@ class AppState:
                             buf[addr - 1] = max(0, min(255, int(attrs[aname])))
                         except (TypeError, ValueError):
                             pass
-        self._fix_index = fix_index
-        self._default_frame = {u: bytes(b) for u, b in defaults.items()}
-        self._commit_spans = spans
-        self._patched_set = {u: frozenset(s) for u, s in addrs.items()}
-        self._laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
-        self._laser_fids = frozenset(laser_fids)
+        # STAB-15: Der Plan wurde oben KOMPLETT lokal aufgebaut; die Felder jetzt
+        # gebuendelt unter _plan_lock tauschen, damit _render_frame nie eine halb
+        # getauschte Kombination (neuer fix_index + alte spans/defaults) sieht.
+        new_default_frame = {u: bytes(b) for u, b in defaults.items()}
+        new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
+        new_laser_fids = frozenset(laser_fids)
+        with self._get_plan_lock():
+            self._fix_index = fix_index
+            self._default_frame = new_default_frame
+            self._commit_spans = spans
+            self._patched_set = new_patched_set
+            self._laser_estop_addrs = new_laser_estop_addrs
+            self._laser_fids = new_laser_fids
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
@@ -1324,11 +1350,22 @@ class AppState:
         with self._prog_lock:
             programmer = {fid: dict(attrs)
                           for fid, attrs in self.programmer.items()}
+        # STAB-15: EINEN konsistenten Snapshot des Render-Plans unter _plan_lock
+        # ziehen (kurz gehalten) und danach NUR aus diesen Locals rechnen — so
+        # kann ein gleichzeitiges _rebuild_render_plan (Umpatchen) nie eine halb
+        # getauschte Feld-Kombination in diesen Frame einschleusen.
+        with self._get_plan_lock():
+            fix_index = self._fix_index
+            default_frame = self._default_frame
+            commit_spans = self._commit_spans
+            patched_set = self._patched_set
+            # _laser_estop_addrs wie zuvor defensiv (Test-Stubs ohne das Feld).
+            laser_estop_addrs = getattr(self, "_laser_estop_addrs", {})
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
             su = Universe(univ)
-            base = self._default_frame.get(univ)
+            base = default_frame.get(univ)
             if base:
                 su.set_range(1, base)
             scratch[univ] = su
@@ -1364,8 +1401,8 @@ class AppState:
         #     gepatchte Adressen werden geprueft (schnell).
         func_driven: dict[int, set[int]] = {}
         for univ, su in scratch.items():
-            base = self._default_frame.get(univ)
-            patched = self._patched_set.get(univ, frozenset())
+            base = default_frame.get(univ)
+            patched = patched_set.get(univ, frozenset())
             if not patched:
                 continue
             cur = su.get_all()
@@ -1385,7 +1422,7 @@ class AppState:
         dim_addrs: dict[int, list[int]] = {}
         color_addrs: dict[int, list[int]] = {}
         effect_present: dict[int, bool] = {}
-        for fidi, entry in self._fix_index.items():
+        for fidi, entry in fix_index.items():
             fx, chans = entry
             addrs = self._fixture_intensity_addrs(fx, chans)
             inten_addrs[fidi] = addrs
@@ -1406,7 +1443,7 @@ class AppState:
             if su is None:
                 effect_present[fidi] = False
                 continue
-            base = self._default_frame.get(fx.universe)
+            base = default_frame.get(fx.universe)
             present = False
             for a in addrs:
                 dv = base[a - 1] if (base and a - 1 < len(base)) else 0
@@ -1422,7 +1459,7 @@ class AppState:
                 # Executor-Schreibungen protokollieren, um func_driven zu bereinigen.
                 for _su in scratch.values():
                     _su.begin_write_log()
-                self._apply_fixture_map(scratch, merged)
+                self._apply_fixture_map(scratch, merged, fix_index=fix_index)
                 # WP-6-Fix (Prioritaets-Inversion): func_driven wurde VOR den
                 # Executoren erfasst und schuetzt Nicht-Intensitaets-Kanaele vor dem
                 # Programmer-LTP ("Funktion besitzt sie"). Ueberschreibt aber ein Cue
@@ -1465,7 +1502,7 @@ class AppState:
         for fidi, dims in dim_addrs.items():
             if not dims:
                 continue
-            entry = self._fix_index.get(fidi)
+            entry = fix_index.get(fidi)
             if not entry:
                 continue
             touched = func_touched.get(entry[0].universe, ())
@@ -1505,7 +1542,7 @@ class AppState:
         if intensity_wins:
             protect = {u: set(a) for u, a in func_driven.items()}
             for fidi in intensity_wins:
-                entry = self._fix_index.get(fidi)
+                entry = fix_index.get(fidi)
                 if not entry:
                     continue
                 univ = entry[0].universe
@@ -1514,7 +1551,7 @@ class AppState:
                         protect[univ].discard(a)
         self._apply_fixture_map(scratch, programmer,
                                 skip_intensity_for=set(prog_factor) | owned_by_func,
-                                protect_addrs=protect)
+                                protect_addrs=protect, fix_index=fix_index)
 
         # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
         #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch
@@ -1544,7 +1581,7 @@ class AppState:
         for fidi, dims in _dim_items:
             if not dims or fidi in exec_dimmer_fids or fidi in prog_dimmer_fids:
                 continue
-            entry = self._fix_index.get(fidi)
+            entry = fix_index.get(fidi)
             if not entry:
                 continue
             univ = entry[0].universe
@@ -1559,7 +1596,7 @@ class AppState:
             # „Farbe aktiv" = ein Farbkanal wird UEBER seinen Ruhewert (Default-
             # Frame) getrieben. Ein blosser Geraete-Default (z. B. color_b=5) zaehlt
             # also nicht — nur eine echt gesetzte/effekt­getriebene Farbe lichtet.
-            base = self._default_frame.get(univ)
+            base = default_frame.get(univ)
             cols = color_addrs.get(fidi) or []
             active = False
             for a in cols:
@@ -1598,7 +1635,7 @@ class AppState:
             factor = global_sub * sub_t * float(fixture_dimmers.get(fidi, 1.0)) * prog_factor.get(fidi, 1.0)
             if factor >= 0.999 or not addrs:
                 continue
-            entry = self._fix_index.get(fidi)
+            entry = fix_index.get(fidi)
             if not entry:
                 continue
             su = scratch.get(entry[0].universe)
@@ -1633,7 +1670,7 @@ class AppState:
             for s in active:
                 target_fids |= set(s.fids)
             for fidi in target_fids:
-                entry = self._fix_index.get(fidi)
+                entry = fix_index.get(fidi)
                 if not entry:
                     continue
                 fx, chans = entry
@@ -1736,7 +1773,7 @@ class AppState:
         #     L2600 gibt über DMX aus und würde sonst nach dem Not-Aus weiterlaufen.
         #     (Annahme: Betriebsart/Shutter 0 = Laser aus; gilt für den L2600.)
         if getattr(self, "laser_estop_active", False):
-            for univ, laser_addrs in getattr(self, "_laser_estop_addrs", {}).items():
+            for univ, laser_addrs in laser_estop_addrs.items():
                 su = scratch.get(univ)
                 if su is None:
                     continue
@@ -1749,12 +1786,12 @@ class AppState:
             if su is None:
                 continue
             data = su.get_all()
-            for start, length in self._commit_spans.get(univ, ()):
+            for start, length in commit_spans.get(univ, ()):
                 live.set_range(start, data[start - 1:start - 1 + length])
             # Roh-Kanaele, die Funktionen (z. B. ScriptFunction setdmx) auf NICHT
             # gepatchte Adressen geschrieben haben, ebenfalls committen — und
             # zuvor geschriebene, jetzt nicht mehr aktive, wieder freigeben (0).
-            patched = self._patched_set.get(univ, frozenset())
+            patched = patched_set.get(univ, frozenset())
             cur = {a for a in range(1, 513) if a not in patched and data[a - 1] != 0}
             prev = self._engine_extra_prev.get(univ)
             if cur or prev:
@@ -1767,7 +1804,8 @@ class AppState:
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
-                           protect_addrs: dict | None = None):
+                           protect_addrs: dict | None = None,
+                           fix_index: dict | None = None):
         """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
         nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht).
 
@@ -1784,12 +1822,17 @@ class AppState:
         nicht separat gesetzte Koepfe verhalten sich damit byte-genau wie bisher."""
         skip = skip_intensity_for or ()
         protect = protect_addrs or {}
+        # STAB-15: den vom Aufrufer (_render_frame) unter _plan_lock gezogenen
+        # Plan-Snapshot verwenden; nur ohne (Alt-Aufruf) auf das Live-Feld fallen.
+        if fix_index is None:
+            with self._get_plan_lock():
+                fix_index = self._fix_index
         for fid, attrs in fixmap.items():
             try:
                 fidi = int(fid)
             except (TypeError, ValueError):
                 continue
-            entry = self._fix_index.get(fidi)
+            entry = fix_index.get(fidi)
             if not entry:
                 continue
             fx, chans = entry

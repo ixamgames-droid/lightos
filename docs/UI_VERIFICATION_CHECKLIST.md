@@ -26,3 +26,11 @@ im Backlog-/Changelog-Durchlauf dokumentiert.
 Ein neues View-Modul oder VC-Widget muss entweder vom enumerierenden Smoke erfasst
 sein oder einen begründeten Skip mit eigenem Testpfad erhalten. QA-13 ergänzt darauf
 die Tooltip-/Label-Prüfung.
+
+## Tooltip-/Label-Coverage (QA-13)
+
+Jeder no-arg `*View` wird headless gebaut und auf `QAbstractButton`s mit leerem
+`text()` **und** leerem `toolTip()` geprüft. Report + Baseline:
+[`UI_TOOLTIP_COVERAGE.md`](UI_TOOLTIP_COVERAGE.md), Gate:
+`tests/test_tooltip_coverage.py` (rot bei NEUEN textlosen Buttons ohne Tooltip).
+Report neu erzeugen: `python tools/audit_tooltip_coverage.py`.

@@ -85,6 +85,7 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
     caps = caps or get_capabilities()
     findings: list[Finding] = []
     known_fids: set[int] = set()
+    fid_to_fn: dict[int, dict] = {}
 
     # ── Funktionen ──────────────────────────────────────────────────────────────
     funcs = _functions_list(show)
@@ -103,6 +104,7 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
                     "function_manager.py:528"))
             seen_ids.add(fid)
             known_fids.add(fid)
+            fid_to_fn[fid] = fd
 
         ftype = fd.get("type")
         if caps.function_types and ftype not in caps.function_types:
@@ -124,9 +126,34 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
     widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
     for j, w in enumerate(widgets):
         if isinstance(w, dict):
-            findings += _check_widget(w, f"virtual_console.widgets[{j}]", caps, known_fids)
+            findings += _check_widget(
+                w, f"virtual_console.widgets[{j}]", caps, known_fids, fid_to_fn)
 
     return findings
+
+
+def _function_param_keys(fd: dict, caps: Capabilities) -> frozenset | None:
+    """Statisch aufgelöste Param-Key-Menge des KONKRETEN gebundenen Funktionstyps
+    (spiegelt ``list_params`` der jeweiligen Function). ``None`` = Typ trägt keine
+    reflektierten Param-Keys (dann greift nur der Union-Check). RGBMatrix nutzt die
+    Union über alle Algorithmen (``params``/Bindungen akkumulieren über
+    Algo-Wechsel — Typ-Präzision reicht, um die QA-05-Bugklasse zu fangen)."""
+    ftype = fd.get("type")
+    if ftype == "RGBMatrix":
+        return caps.matrix_all_param_keys or None
+    if ftype == "EFX":
+        # FunctionType.EFX ist mehrdeutig (gleicher Typ-Tag): nur die echte Pan/Tilt-
+        # ``EfxInstance`` (Diskriminator ``motion``/``speed_hz``, wie in _check_efx)
+        # trägt reflektierte ``efx_param_keys``. ``LayeredEffect`` (``layers``) und
+        # ``Carousel`` (``pattern``) teilen sich das EFX-Tag, exponieren aber KEINE
+        # ``list_params`` -> der maßgebliche Live-Check (``effect_live.list_params``)
+        # liefert für sie ``[]`` und flaggt nichts. ``None`` hält den statischen Check
+        # konsistent (nur der Union-Check greift) und verhindert die QA-19-Regression,
+        # eine gültige Carousel-/Layer-Bindung fälschlich als Fehler zu blocken.
+        if bool(fd.get("motion")) or ("speed_hz" in fd):
+            return caps.efx_param_keys or None
+        return None
+    return None
 
 
 def _check_matrix(fd: dict, where: str, caps: Capabilities) -> list[Finding]:
@@ -212,7 +239,9 @@ _WIDGET_ENUM_FIELDS = {
 
 
 def _check_widget(w: dict, where: str, caps: Capabilities,
-                  known_fids: set[int]) -> list[Finding]:
+                  known_fids: set[int],
+                  fid_to_fn: dict[int, dict] | None = None) -> list[Finding]:
+    fid_to_fn = fid_to_fn or {}
     out: list[Finding] = []
     wtype = w.get("type")
     if caps.widget_types and wtype not in caps.widget_types:
@@ -244,7 +273,11 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
                 + " — fällt beim Laden still auf den Default zurück",
                 site))
 
-    # param_key (Slider/Encoder/Stepper) gegen die Union aller echten Param-Keys
+    # param_key (Slider/Encoder/Stepper): zuerst gegen die Union aller echten
+    # Param-Keys (fängt Tippfehler/Halluzinationen). Ist er global gültig, aber die
+    # Bindung (function_id) zeigt auf eine konkrete Funktion, deren Typ diesen Key
+    # NICHT trägt -> QA-05-Bugklasse (global gültig, für DIESE Funktion inert):
+    # statisch gegen die Param-Keys des gebundenen Funktionstyps prüfen.
     if wtype in ("VCSlider", "VCEncoder", "VCStepper"):
         pk = w.get("param_key")
         if pk and caps.all_param_keys and pk not in caps.all_param_keys:
@@ -254,6 +287,17 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
                 f"param_key '{pk}' ist kein bekannter Effekt-Parameter" + sugg
                 + " — der Regler bleibt wirkungslos",
                 "effect_live.py:100-102"))
+        elif pk:
+            fid = w.get("function_id")
+            fd = fid_to_fn.get(fid) if isinstance(fid, int) else None
+            fn_keys = _function_param_keys(fd, caps) if fd is not None else None
+            if fn_keys is not None and pk not in fn_keys:
+                out.append(Finding(
+                    ERROR, "VC-PARAMKEY-FN", label,
+                    f"param_key '{pk}' existiert nicht an der gebundenen Funktion "
+                    f"{fid} ({fd.get('type')})" + _suggest(pk, fn_keys)
+                    + " — global gültig, für DIESE Funktion aber wirkungslos",
+                    "effect_live.py:100-102"))
 
     # tempo_bus_id (offener Satz) -> nur Warnung
     tb = w.get("tempo_bus_id")
@@ -283,7 +327,8 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
     if isinstance(children, list):
         for k, child in enumerate(children):
             if isinstance(child, dict):
-                out += _check_widget(child, f"{where}.children[{k}]", caps, known_fids)
+                out += _check_widget(
+                    child, f"{where}.children[{k}]", caps, known_fids, fid_to_fn)
     return out
 
 
