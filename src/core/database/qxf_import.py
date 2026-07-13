@@ -518,43 +518,55 @@ def import_qxf_file(path: str, session: Session,
                 channel_count=len(ch_refs),
             )
             session.add(mode_obj)
+            # CDX-03 (Review): ZWEI Durchlaeufe. Ein FEHLENDES ``Number`` (frueher
+            # per Default "0" → num=1) durfte NIE einen explizit nummerierten Kanal 1
+            # (Number="0") verdraengen — je nach Dokument-Reihenfolge haette der
+            # Number-lose Ref den echten Kanal 1 belegt und den expliziten als
+            # "Kollision" verworfen (stille DMX-Fehlbelegung). Deshalb: Pass 1 platziert
+            # ALLE explizit (gueltig) nummerierten Kanaele; Pass 2 legt die Number-losen
+            # auf die jeweils naechste WIRKLICH freie Nummer (nicht fix auf 1). Non-
+            # numerische Number bleibt ein sichtbar gemeldeter Skip; eine echte
+            # Nummern-Kollision zwischen zwei EXPLIZITEN Kanaelen ebenfalls.
             used_numbers: set[int] = set()
+            explicit: list[tuple[int, str, object]] = []   # (num, ch_name, channel_def)
+            missing: list[tuple[str, object]] = []          # (ch_name, channel_def)
+            _mode_name = mode_el.get("Name", "Standard")
             for ch_ref in ch_refs:
                 ch_name = (ch_ref.text or "").strip()
-                # ``Number`` OHNE Default holen: ``int(ch_ref.get("Number","0"))``
-                # liess ein FEHLENDES Attribut still per Default "0" → num=1
-                # durchrutschen; der bestehende except faengt nur NON-numerische
-                # Strings, nicht die fehlende Angabe. Damit kollidierte ein Ref
-                # ohne Number mit dem echten 1. Kanal (Number="0") und verschob die
-                # DMX-Belegung still. Fehlt das Attribut, mappen wir es nur
-                # provisorisch auf den 0-basierten Anfang (0 → 1) — und ANY Kanal,
-                # dessen channel_number bereits vergeben ist, wird ausgelassen +
-                # sichtbar gemeldet, statt zwei Kanaele dieselbe Nummer teilen zu
-                # lassen. Explizit nummerierte Kanaele behalten ihre Nummer.
+                cdef = channel_defs.get(ch_name)
                 raw = ch_ref.get("Number")
                 if raw is None:
-                    num = 1   # 0-basiert 0 → 1 (nur wenn frei)
-                else:
-                    try:
-                        num = int(raw) + 1   # 0- → 1-basiert
-                    except (ValueError, TypeError):
-                        print(
-                            f"[qxf_import] {model_str}: Mode "
-                            f"'{mode_el.get('Name', 'Standard')}' Channel "
-                            f"'{ch_name or '?'}' hat ungueltiges Number="
-                            f"{raw!r} — Kanal uebersprungen."
-                        )
-                        continue
+                    missing.append((ch_name, cdef))
+                    continue
+                try:
+                    num = int(raw) + 1   # 0- → 1-basiert
+                except (ValueError, TypeError):
+                    print(
+                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
+                        f"'{ch_name or '?'}' hat ungueltiges Number={raw!r} "
+                        f"— Kanal uebersprungen."
+                    )
+                    continue
                 if num in used_numbers:
                     print(
-                        f"[qxf_import] {model_str}: Mode "
-                        f"'{mode_el.get('Name', 'Standard')}' Channel "
-                        f"'{ch_name or '?'}' Number={raw!r} kollidiert mit "
-                        f"Kanal {num} — Kanal uebersprungen."
+                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
+                        f"'{ch_name or '?'}' Number={raw!r} kollidiert mit Kanal "
+                        f"{num} — Kanal uebersprungen."
                     )
                     continue
                 used_numbers.add(num)
-                _make_channel(mode_obj, num, ch_name, channel_defs.get(ch_name))
+                explicit.append((num, ch_name, cdef))
+            # Pass 2: Number-lose Kanaele auf die naechste freie Nummer (verdraengt nie
+            # einen expliziten). Reihenfolge der Number-losen bleibt Dokument-Reihenfolge.
+            for ch_name, cdef in missing:
+                n = 1
+                while n in used_numbers:
+                    n += 1
+                used_numbers.add(n)
+                explicit.append((n, ch_name, cdef))
+            # Deterministisch in Kanal-Nummer-Reihenfolge anlegen.
+            for num, ch_name, cdef in sorted(explicit, key=lambda t: t[0]):
+                _make_channel(mode_obj, num, ch_name, cdef)
     return True
 
 

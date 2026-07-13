@@ -430,14 +430,22 @@ class OutputConfigDialog(QDialog):
             pass
 
     def _input_status_text(self, in_u, out_u, mode):
-        """NET-07/CDX-02: Baut das Eingangs-Status-Label. Ist out_u nicht als
-        Output gepatcht, zaehlt app_state die verworfenen Frames in
-        state.input_unconfigured hoch -> statt "Aktiv" wirkungslos melden.
-        Liest input_unconfigured NUR (kein Schreiben)."""
+        """NET-07/CDX-02: Baut das Eingangs-Status-Label. Ist out_u NICHT als Output
+        gepatcht, verwirft ``_render_frame`` die gemergten Kanaele -> statt "Aktiv"
+        "wirkungslos" melden.
+
+        CDX-02b (Review): Maszgeblich ist der AKTUELLE Patch-Stand ``state.universes``
+        (genau was ``_render_frame`` zum Verwerfen prueft, app_state.py) — NICHT der
+        ``input_unconfigured``-Zaehler. Der Zaehler wird erst vom RX-Thread NACH dem
+        ersten empfangenen+gerenderten Frame hochgezaehlt: beim Klick auf "Uebernehmen"
+        stuende er sonst noch auf 0 (Warnung verpasst, obwohl gerade der zu warnende
+        Fall) bzw. bliebe nach nachtraeglichem Patchen stehen (falsche Warnung). Der
+        direkte ``universes``-Check stimmt sofort beim Klick und verschwindet nach dem
+        Patchen ohne Frame-Abhaengigkeit."""
         base = f"Aktiv: U{in_u} -> U{out_u} ({mode})"
         try:
-            unconf = getattr(get_state(), "input_unconfigured", None)
-            if unconf and unconf.get(out_u, 0) > 0:
+            universes = getattr(get_state(), "universes", None)
+            if universes is not None and int(out_u) not in universes:
                 return (
                     f"Aktiv, aber wirkungslos (U{out_u} nicht als Output "
                     f"gepatcht): U{in_u} -> U{out_u} ({mode})"

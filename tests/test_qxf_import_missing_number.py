@@ -8,9 +8,12 @@ NON-numerische Strings faengt) NICHT — der Kanal ohne Number bekam dieselbe
 ``channel_number`` wie der legitime 1. Kanal (``Number="0"``). Beim nach
 ``channel_number`` sortierten Auslesen verschob sich die DMX-Belegung still.
 
-Fix: ``Number`` OHNE Default holen; fehlt/kollidiert die Nummer, wird der Kanal
-sauber ausgelassen (und gemeldet) — nie auf einen kollidierenden Default
-gezwungen. Alle ``channel_number`` bleiben eindeutig.
+Fix (CDX-03 + Review): ``Number`` OHNE Default holen und in ZWEI Durchlaeufen
+aufloesen — zuerst alle explizit nummerierten Kanaele, dann die Number-losen auf die
+jeweils naechste WIRKLICH freie Nummer. So teilen sich nie zwei Kanaele dieselbe
+``channel_number`` UND ein Number-loser Ref verdraengt nie einen explizit
+nummerierten (auch nicht, wenn er im Dokument zuerst steht). Non-numerische Number
+bleibt ein sichtbar gemeldeter Skip.
 """
 import os
 import tempfile
@@ -73,13 +76,38 @@ class MissingNumberDoesNotCollideTest(unittest.TestCase):
         self.assertEqual(len(numbers), len(set(numbers)),
                          f"channel_number-Kollision: {chs}")
 
-    def test_missing_number_channel_is_dropped_valid_survives(self):
+    def test_missing_number_does_not_displace_explicit(self):
+        # CDX-03 (Review): Der Number-lose Kanal wird NICHT gedroppt, sondern auf die
+        # naechste freie Nummer gelegt — verdraengt aber den explizit nummerierten
+        # Kanal 1 nie.
         chs = self._import(_QXF_MISSING)
         by_num = {n: (name, attr) for (n, name, attr) in chs}
-        # Der legitime 1. Kanal (Number="0") bleibt unveraendert auf 1.
-        self.assertEqual(by_num[1], ("Red", "color_r"))
-        # Der Kanal OHNE Number wird sauber ausgelassen — kein zweiter Kanal.
-        self.assertNotIn("Green", [name for (name, _) in by_num.values()])
+        self.assertEqual(by_num[1], ("Red", "color_r"))   # explizit, bleibt auf 1
+        self.assertEqual(by_num[2][0], "Green")           # Number-los -> naechste frei (2)
+
+    def test_missing_number_FIRST_still_does_not_displace(self):
+        # Der eigentliche Review-Fall: der Number-lose Kanal steht ZUERST im Dokument,
+        # der explizit nummerierte (Number="0") danach. Trotzdem darf der explizite
+        # Kanal 1 nicht verdraengt werden (Pass 1 platziert ihn vor den Number-losen).
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>TestCo</Manufacturer>
+ <Model>MissingFirstSpider</Model>
+ <Type>Moving Head</Type>
+ <Channel Name="Foo" Preset="IntensityMasterDimmer"/>
+ <Channel Name="Dimmer" Preset="IntensityDimmer"/>
+ <Mode Name="bank">
+  <Channel>Foo</Channel>
+  <Channel Number="0">Dimmer</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+        chs = self._import(xml)
+        by_num = {n: name for (n, name, _) in chs}
+        numbers = [n for (n, _, _) in chs]
+        self.assertEqual(len(numbers), len(set(numbers)))   # keine Kollision
+        self.assertEqual(by_num[1], "Dimmer")               # explizit gewinnt Kanal 1
+        self.assertEqual(by_num[2], "Foo")                  # Number-los -> 2, nicht verdraengend
 
 
 if __name__ == "__main__":
