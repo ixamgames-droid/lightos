@@ -518,24 +518,42 @@ def import_qxf_file(path: str, session: Session,
                 channel_count=len(ch_refs),
             )
             session.add(mode_obj)
+            used_numbers: set[int] = set()
             for ch_ref in ch_refs:
                 ch_name = (ch_ref.text or "").strip()
-                try:
-                    num = int(ch_ref.get("Number", "0")) + 1   # 0- → 1-basiert
-                except (ValueError, TypeError):
-                    # Kaputtes/fehlendes ``Number`` NICHT auf einen fixen Default
-                    # (frueher ``len(ch_refs)``) zwingen — das kollidierte mit dem
-                    # legitim letzten Kanal und verschob die DMX-Belegung still.
-                    # Lieber den defekten Kanal ueberspringen + sichtbar melden;
-                    # der Footprint ist dann um einen Kanal kleiner, aber keine
-                    # zwei Kanaele teilen sich dieselbe channel_number.
+                # ``Number`` OHNE Default holen: ``int(ch_ref.get("Number","0"))``
+                # liess ein FEHLENDES Attribut still per Default "0" → num=1
+                # durchrutschen; der bestehende except faengt nur NON-numerische
+                # Strings, nicht die fehlende Angabe. Damit kollidierte ein Ref
+                # ohne Number mit dem echten 1. Kanal (Number="0") und verschob die
+                # DMX-Belegung still. Fehlt das Attribut, mappen wir es nur
+                # provisorisch auf den 0-basierten Anfang (0 → 1) — und ANY Kanal,
+                # dessen channel_number bereits vergeben ist, wird ausgelassen +
+                # sichtbar gemeldet, statt zwei Kanaele dieselbe Nummer teilen zu
+                # lassen. Explizit nummerierte Kanaele behalten ihre Nummer.
+                raw = ch_ref.get("Number")
+                if raw is None:
+                    num = 1   # 0-basiert 0 → 1 (nur wenn frei)
+                else:
+                    try:
+                        num = int(raw) + 1   # 0- → 1-basiert
+                    except (ValueError, TypeError):
+                        print(
+                            f"[qxf_import] {model_str}: Mode "
+                            f"'{mode_el.get('Name', 'Standard')}' Channel "
+                            f"'{ch_name or '?'}' hat ungueltiges Number="
+                            f"{raw!r} — Kanal uebersprungen."
+                        )
+                        continue
+                if num in used_numbers:
                     print(
                         f"[qxf_import] {model_str}: Mode "
                         f"'{mode_el.get('Name', 'Standard')}' Channel "
-                        f"'{ch_name or '?'}' hat ungueltiges Number="
-                        f"{ch_ref.get('Number')!r} — Kanal uebersprungen."
+                        f"'{ch_name or '?'}' Number={raw!r} kollidiert mit "
+                        f"Kanal {num} — Kanal uebersprungen."
                     )
                     continue
+                used_numbers.add(num)
                 _make_channel(mode_obj, num, ch_name, channel_defs.get(ch_name))
     return True
 

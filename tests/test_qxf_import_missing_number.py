@@ -1,0 +1,86 @@
+"""QXF-Import: ein FEHLENDES Mode-``Number`` darf nicht mit dem echten 1. Kanal
+kollidieren (CDX-03, FIMP-02-Rest).
+
+``int(ch_ref.get("Number", "0")) + 1`` liess ein komplett fehlendes
+``Number``-Attribut still per Default "0" → num=1 durchrutschen. ``int("0")`` ist
+parsebar, also griff der bestehende ``except (ValueError, TypeError)`` (der nur
+NON-numerische Strings faengt) NICHT — der Kanal ohne Number bekam dieselbe
+``channel_number`` wie der legitime 1. Kanal (``Number="0"``). Beim nach
+``channel_number`` sortierten Auslesen verschob sich die DMX-Belegung still.
+
+Fix: ``Number`` OHNE Default holen; fehlt/kollidiert die Nummer, wird der Kanal
+sauber ausgelassen (und gemeldet) — nie auf einen kollidierenden Default
+gezwungen. Alle ``channel_number`` bleiben eindeutig.
+"""
+import os
+import tempfile
+import unittest
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from src.core.database.models import Base, FixtureMode, FixtureChannel
+from src.core.database.qxf_import import import_qxf_file, QXF_NS
+
+
+# Mode: legitimer 1. Kanal mit Number="0" (→ channel_number 1), daneben ein
+# Kanal OHNE Number-Attribut. Frueher landeten BEIDE auf channel_number 1.
+_QXF_MISSING = f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>TestCo</Manufacturer>
+ <Model>MissingNumberSpider</Model>
+ <Type>Moving Head</Type>
+ <Channel Name="Red" Preset="IntensityRed"/>
+ <Channel Name="Green" Preset="IntensityGreen"/>
+ <Mode Name="bank">
+  <Channel Number="0">Red</Channel>
+  <Channel>Green</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+
+
+class MissingNumberDoesNotCollideTest(unittest.TestCase):
+    def _import(self, xml_text):
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        fd, path = tempfile.mkstemp(suffix=".qxf")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(xml_text)
+            with Session(engine) as s:
+                ok = import_qxf_file(path, s, {})
+                self.assertTrue(ok)
+                s.commit()
+                mode = s.execute(select(FixtureMode)).scalar_one()
+                chs = s.execute(
+                    select(FixtureChannel)
+                    .where(FixtureChannel.mode_id == mode.id)
+                    .order_by(FixtureChannel.channel_number)
+                ).scalars().all()
+                return [(c.channel_number, c.name, c.attribute) for c in chs]
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+    def test_no_two_channels_share_a_number(self):
+        chs = self._import(_QXF_MISSING)
+        numbers = [n for (n, _, _) in chs]
+        # Kernaussage CDX-03: KEINE zwei Kanaele teilen sich dieselbe
+        # channel_number, obwohl ein Ref das Number-Attribut nicht hatte.
+        self.assertEqual(len(numbers), len(set(numbers)),
+                         f"channel_number-Kollision: {chs}")
+
+    def test_missing_number_channel_is_dropped_valid_survives(self):
+        chs = self._import(_QXF_MISSING)
+        by_num = {n: (name, attr) for (n, name, attr) in chs}
+        # Der legitime 1. Kanal (Number="0") bleibt unveraendert auf 1.
+        self.assertEqual(by_num[1], ("Red", "color_r"))
+        # Der Kanal OHNE Number wird sauber ausgelassen — kein zweiter Kanal.
+        self.assertNotIn("Green", [name for (name, _) in by_num.values()])
+
+
+if __name__ == "__main__":
+    unittest.main()
