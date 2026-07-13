@@ -49,6 +49,24 @@ def test_programmer_and_save_dialog_share_one_classifier():
     assert snap_classify is prog_classify is classify_attr
 
 
+def test_speed_classifies_as_effect_not_other():
+    # FIMP-01: "speed" (QXF SpeedPanTilt*/SpeedPan*/SpeedTilt*, fixture_db "Funk.Speed"/
+    # "Cue-Geschwindigkeit"/generisch "Speed") fiel vorher auf 'Other' (kein Tab/Label,
+    # gleiche Fallenklasse wie ENG-07). Jetzt exakt in Effect + Label.
+    # BEWUSST NICHT Position: die real emittierten "speed"-Kanaele sind ueberwiegend
+    # Funktions-/Programm-Speed auf Nicht-Movern (ZQ01424-PAR "Funk.Speed"); Position
+    # gaebe diesen PARs eine falsche Bewegungs-Capability und wuerde
+    # test_movement_snap_excludes_par (snap_editor is_compatible) brechen.
+    assert classify_attr("speed") == "Effect"
+    assert attr_label("speed") == "Speed"
+    # ENG-09: Mehrkopf-Suffix wird vor classify gestrippt -> greift auch mit #N.
+    assert classify_attr("speed#1") == "Effect"
+    assert attr_label("speed#1") == "Speed (Kopf 2)"
+    # pan_speed/tilt_speed bleiben unveraendert Position (pan/tilt-Substring vor Effect).
+    assert classify_attr("pan_speed") == "Position"
+    assert classify_attr("tilt_speed") == "Position"
+
+
 def test_order_other_last_and_complete():
     assert ATTR_GROUP_ORDER[-1] == "Other"
     assert set(ATTR_GROUP_ORDER) - {"Other"} == set(ATTR_GROUPS.keys())
