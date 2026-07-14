@@ -46,21 +46,20 @@ jobs:
       # QA-11: zusaetzlich Show-Lint (kaputte committete Show) + View-Smoke.
       # Ein absichtlich kaputter param_key in einer Test-Show bzw. eine nicht mehr
       # baubare View laesst CI jetzt rot werden.
+      #
+      # EINZIGER Testschritt (bewusst): test_views.py baut echte Qt-Views (+ MIDI-
+      # Threads); der FINALE native Interpreter-Exit crasht auf Windows/Py3.11/
+      # PySide6 6.11 sporadisch mit STATUS_HEAP_CORRUPTION (0xc0000374) NACH
+      # bestandenen Tests. LIGHTOS_HARDEN_EXIT_ALL laesst conftest.py nach dem
+      # echten Ergebnis mit os._exit(exitstatus) beenden und ueberspringt so die
+      # flaky native Abbauphase (maskiert NICHTS: exitstatus=0 nur, wenn alle Tests
+      # bestehen). Frueher gab es dahinter noch einen zweiten, IDENTISCHEN
+      # "Zusammenfassen"-Lauf derselben 5 Dateien — reine Redundanz ohne Mehr-
+      # Abdeckung, die den Teardown-Crash nur ein zweites Mal wuerfelte und CI
+      # zuverlaessig rot faerbte (traf #294/#296). Entfernt -> ein Lauf genuegt.
       - name: Unit-Tests ausfuehren
         env:
           QT_QPA_PLATFORM: offscreen
-          # test_views.py baut echte Qt-Views (+ MIDI-Threads); der FINALE native
-          # Interpreter-Exit crasht auf Windows/Py3.11/PySide6 6.11 sporadisch mit
-          # STATUS_HEAP_CORRUPTION NACH bestandenen Tests -> falsch-rotes CI. Nach
-          # dem echten Ergebnis mit os._exit(exitstatus) beenden (conftest.py).
           LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
           python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py -v --tb=short
-
-      - name: Test-Ergebnis zusammenfassen
-        if: always()
-        env:
-          QT_QPA_PLATFORM: offscreen
-          LIGHTOS_HARDEN_EXIT_ALL: "1"   # s. o. — flaky nativer Teardown-Crash (Py3.11)
-        run: |
-          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py --tb=no -q
