@@ -161,6 +161,12 @@ class BpmManagerView(QWidget):
         self._conf.setRange(0, 100)
         self._conf.setValue(0)
         self._conf.setTextVisible(True)
+        # UI-24c: sichtbare Kontur auch bei 0 % — sonst wirkt der leere Balken
+        # (ohne Chunk) wie ein fehlendes/kaputtes Element.
+        self._conf.setStyleSheet(
+            "QProgressBar { border: 1px solid #3d444d; border-radius: 3px; "
+            "background: #161b22; text-align: center; color: #e6edf3; } "
+            "QProgressBar::chunk { background: #3fb950; border-radius: 2px; }")
         conf.addWidget(self._conf, 1)
         lay.addLayout(conf)
 

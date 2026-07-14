@@ -194,9 +194,11 @@ class DmxMonitorView(QWidget):
         top.addStretch(1)
         self._lbl_legend = QLabel(
             'Blauer Rahmen = gepatcht  |  Gelber Rahmen = hervorgehoben  |  '
-            'Farbe + Kürzel = Kanalfunktion (Gerät · Funktion)'
+            'Farbige Kürzel = Kanalfunktion (z. B. Rot = Rot-Farbkanal, '
+            'Gelb = Dimmer, Blau = Blau/Position)'
         )
-        self._lbl_legend.setStyleSheet("color: #888; font-size: 11px;")
+        # UI-24a: kräftigeres Grau für besseren Kontrast auf dunklem Grund.
+        self._lbl_legend.setStyleSheet("color: #b0b6c0; font-size: 11px;")
         top.addWidget(self._lbl_legend)
         root.addLayout(top)
 

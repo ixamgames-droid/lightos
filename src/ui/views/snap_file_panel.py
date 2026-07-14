@@ -626,6 +626,9 @@ class SnapFilePanel(QWidget):
             item.setData(0, _ROLE_KIND, "snap")
             item.setForeground(0, _SNAP_COLOR)
             item.setIcon(0, _mini.snap_icon())
+            # UI-24f: Farbcode erklären — gelb = gespeicherter Snap.
+            item.setToolTip(0, f"{snap.name} — Snap (gelb): gespeicherter "
+                               "Programmer-Look. Doppelklick wendet ihn an.")
         # Funktionen/Effekte (je Typ farbig)
         fm = self._fm()
         if fm is not None:
@@ -640,6 +643,9 @@ class SnapFilePanel(QWidget):
                 item.setData(0, _ROLE_KIND, "function")
                 item.setForeground(0, _func_color(f))
                 item.setIcon(0, _mini.function_icon(f))
+                # UI-24f: Farbcode erklären — blau/farbig = Effekt/Funktion (nach Typ).
+                item.setToolTip(0, f"{f.name} — Effekt/Funktion (Farbe = Typ, "
+                                   "z. B. blau = Szene). Doppelklick startet/stoppt.")
                 self._func_items.append((item, int(fid)))
         self._update_running()
         self._tree_rebuilding = False

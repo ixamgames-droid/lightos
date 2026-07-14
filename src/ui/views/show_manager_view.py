@@ -115,6 +115,14 @@ class TimelineCanvas(QWidget):
         self._draw_ruler(painter, show)
 
         if show is None:
+            # UI-24b: Leerzustand nicht als „kaputte" leere Fläche zeigen —
+            # kurzer Hinweis mit Handlungsanweisung.
+            painter.setPen(QColor("#888888"))
+            painter.setFont(QFont("sans-serif", 11))
+            painter.drawText(
+                self.rect().adjusted(0, RULER_H, 0, 0),
+                Qt.AlignmentFlag.AlignCenter,
+                'Keine Show geladen — oben „+ Neue Show" anlegen oder eine wählen.')
             return
 
         # Tracks

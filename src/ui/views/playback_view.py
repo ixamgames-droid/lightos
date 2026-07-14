@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QSizePolicy, QFrame, QMessageBox,
     QDialog, QFormLayout, QDialogButtonBox
 )
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QEvent
 from PySide6.QtGui import QColor, QFont
 from src.core.app_state import get_state, AppState
 from src.core.engine.cue_stack import CueStack
@@ -199,6 +199,17 @@ class PlaybackView(QWidget):
         self._table.itemChanged.connect(self._on_cue_edited)
         lv.addWidget(self._table)
 
+        # UI-24b: Leerzustand-Hinweis über der (leeren) Cue-Tabelle statt leerer
+        # Fläche. Als Overlay auf dem Viewport, per eventFilter mitzentriert.
+        self._table_empty = QLabel(
+            'Keine Cues — „+ Cue" hinzufügen oder oben eine Cueliste wählen.',
+            self._table.viewport())
+        self._table_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table_empty.setWordWrap(True)
+        self._table_empty.setStyleSheet("color:#777; font-style:italic;")
+        self._table.viewport().installEventFilter(self)
+        self._table_empty.hide()
+
         splitter.addWidget(left)
 
         # Rechts: Cue-Details + Status
@@ -325,7 +336,20 @@ class PlaybackView(QWidget):
             if self._current_stack is removed:
                 self._current_stack = None
 
+    def eventFilter(self, obj, event):
+        # UI-24b: den Leerzustand-Hinweis auf die Viewport-Größe zentrieren.
+        if (getattr(self, "_table_empty", None) is not None
+                and obj is self._table.viewport()
+                and event.type() == QEvent.Type.Resize):
+            self._table_empty.setGeometry(self._table.viewport().rect())
+        return super().eventFilter(obj, event)
+
     def _refresh_table(self):
+        empty = (not self._current_stack) or (not self._current_stack.cues)
+        if getattr(self, "_table_empty", None) is not None:
+            if empty:
+                self._table_empty.setGeometry(self._table.viewport().rect())
+            self._table_empty.setVisible(empty)
         if not self._current_stack:
             self._table.setRowCount(0)
             return
