@@ -1,3 +1,4 @@
+# HINWEIS: durch tools/app.ps1 'fg' ersetzt/konsolidiert (QA-22).
 # Robustly force the LightOS window to the foreground+topmost (defeats foreground lock).
 # Finds the window by title SUBSTRING "LightOS" (title changes when a show loads).
 Add-Type @"
