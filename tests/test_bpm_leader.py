@@ -223,3 +223,62 @@ def test_bpm_settings_apply_to_backend(monkeypatch):
     assert mgr.mode == BpmMode.MANUAL
     # Aufraeumen fuer andere Tests
     mgr.set_mode(BpmMode.AUTO)
+
+
+# ── reset()-Threadsicherheit (BPM-04) ────────────────────────────────────────
+
+def test_reset_zeroes_bpm_inside_lock(mgr):
+    """BPM-04: reset() nullt _bpm INNERHALB des Locks (kein Ordering-Race mit
+    einem parallelen set_bpm aus dem Audio-Thread)."""
+    mgr.request_bpm(128, "audio")
+    assert mgr.bpm == 128
+
+    real_lock = mgr._lock
+    snapshots: list[float] = []
+
+    class _SpyLock:
+        def __enter__(self):
+            return real_lock.__enter__()
+
+        def __exit__(self, *exc):
+            # Zustand GENAU beim Verlassen der kritischen Sektion festhalten:
+            # ist _bpm hier bereits 0, wurde es unter dem Lock genullt.
+            snapshots.append(mgr._bpm)
+            return real_lock.__exit__(*exc)
+
+    mgr._lock = _SpyLock()  # type: ignore[assignment]
+    mgr.reset()
+
+    assert mgr.bpm == 0.0
+    assert mgr.current_source == "off"
+    # Der Reset hat den Lock genommen und _bpm darin bereits genullt.
+    assert snapshots and all(v == 0.0 for v in snapshots)
+
+
+def test_reset_under_concurrent_set_bpm_stays_consistent():
+    """BPM-04: reset() waehrend ein Thread set_bpm() hammert → am Ende ein
+    konsistenter Aus-Zustand, kein halb-genullter Manager."""
+    import threading
+    m = BPMManager()
+    m._ensure_running = lambda: setattr(m, "_running", True)   # type: ignore[method-assign]
+    m._stop_timer = lambda: setattr(m, "_running", False)      # type: ignore[method-assign]
+
+    stop = threading.Event()
+
+    def hammer():
+        while not stop.is_set():
+            m.set_bpm(140.0)
+
+    t = threading.Thread(target=hammer, daemon=True)
+    t.start()
+    try:
+        for _ in range(200):
+            m.reset()
+    finally:
+        stop.set()
+        t.join(timeout=2.0)
+
+    # Ein finaler Reset ohne Nebenlaeufer → deterministisch konsistent.
+    m.reset()
+    assert m.bpm == 0.0
+    assert m.current_source == "off"
