@@ -430,6 +430,10 @@ class FixtureTreeWithDrag(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setHeaderHidden(True)
+        # QOL-03: laenger Namen mittig kuerzen (statt rechts) — so bleibt der
+        # unterscheidende Namens-Schwanz sichtbar (`[013] PAR …RGBW` statt
+        # `[013] PAR T…`); der Vollname haengt zusaetzlich im Tooltip.
+        self.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.setDragEnabled(True)
         self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self.setStyleSheet("""
@@ -631,7 +635,9 @@ class FixtureGroupView(QWidget):
             for f in by_universe[uni_num]:
                 # Konstruktor mit uni_item als Parent hängt das Kind bereits ein
                 # (kein zusätzliches addChild → sonst qWarning "already owned").
-                child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {f.label}"])
+                _txt = f"[{f.fid:03d}] {f.label}"
+                child = QTreeWidgetItem(uni_item, [_txt])
+                child.setToolTip(0, _txt)  # QOL-03: Vollname auch bei Kuerzung
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
                 child.setIcon(0, _mini.fixture_icon_for(f))
                 labels[f.fid] = f.label
