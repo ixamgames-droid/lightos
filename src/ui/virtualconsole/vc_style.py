@@ -107,12 +107,19 @@ def paint_button_surface(painter: QPainter, rect, base: QColor,
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRoundedRect(face.adjusted(1.0, 1.0, -1.0, 2.0), radius, radius)
     else:
-        # Bevel: dezente Licht-Kante oben (Glanzlicht der Woelbung).
-        hi = QColor(255, 255, 255, 65)
-        painter.setPen(QPen(hi, 1.4))
+        # Bevel (saettigungs-UNABHAENGIG, VC3D-03): ein Gradient-Stift von hellem
+        # Weiss (oben) ueber transparent zu Dunkel (unten) zeichnet Glanz- und
+        # Schattenkante der Woelbung. Noetig, weil QColor.lighter() auf voll
+        # gesaettigten Farben (V bereits 255) den Verlauf-Top NICHT aufhellt ->
+        # ohne feste Kanten wirkte das Pad auf reinem Rot/Blau/Gruen flach.
+        inner = QRectF(face.adjusted(1.2, 1.2, -1.2, -1.2))
+        bevel = QLinearGradient(inner.topLeft(), inner.bottomLeft())
+        bevel.setColorAt(0.0, QColor(255, 255, 255, 130))   # helle Glanzkante oben
+        bevel.setColorAt(0.5, QColor(255, 255, 255, 20))
+        bevel.setColorAt(1.0, QColor(0, 0, 0, 95))           # dunkle Schattenkante unten
+        painter.setPen(QPen(QBrush(bevel), 1.5))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        top = QRectF(face.adjusted(1.2, 1.2, -1.2, -1.2))
-        painter.drawRoundedRect(top, radius - 1, radius - 1)
+        painter.drawRoundedRect(inner, radius - 1, radius - 1)
 
     # 5) Aktiv-Glow: weicher heller Ring um die Face.
     if lit:
