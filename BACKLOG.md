@@ -75,6 +75,19 @@ bzw. wartet auf Davids Linux-Rechner / eine Computer-Use-Session._
 | VC3D-02 | P3 | todo | Optional: 3D-Optik auch auf **VCSlider**-Griff + **SpeedDial** ausweiten (gleicher `vc_style`-Helfer), für einen konsistenten Pad-/Fader-Look. |
 | VC3D-03 | P3 | todo (Live-Audit 2026-07-14) | **VC3D-Politur (live gefunden):** (a) Auf voll gesättigten Farb-Pads (Rot/Grün/Blau/Gelb/Magenta/Weiß) ist der 3D-Verlauf/Bevel kaum sichtbar (bei Max-Sättigung greift `lighter()/darker()` wenig) → wirken flacher als Funktions-Pads; Idee: Bevel-/Kanten-Highlight sättigungs-unabhängig (fester Weiß-Alpha-Rand) verstärken. (b) Der Farb-Vorschau-Badge (Punkt oben rechts) überlappt den Tastentext — „PAR" teils verdeckt, „PAR Farbwechsel" wird zu „…arbwechs" beschnitten; Idee: Badge tiefer stapeln oder Text-Clip-Rechteck um die Badge-Zone verkleinern. `vc_button.py::paintEvent` / `vc_style.py`. |
 
+## 🧹 Quality-of-Life / Bedien-Reibung (Live-Audit 2026-07-14)
+
+_David-Auftrag: Audits sollen nicht nur Bugs finden, sondern auch **umständliche/unlogische/unnötig komplizierte Bedienung**. Live per Computer-Use gefundene UX-Reibung (keine Funktionsfehler). Verwandt (schon gelistet): **UI-25** (Sektions-Tabs kürzen zu „…") · **UI-26** (2D-Fixture-Labels überlappen unlesbar) — beide sind ebenfalls QoL._
+
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| QOL-04 | P2 | todo (Live-Audit 2026-07-14) | **Programmer-Tab „Hilfe" enthält die EFFEKTE/FUNKTIONEN (irreführendes Label)** | Der Attribut-Tab **„Hilfe"** (zwischen `Weitere` und `Matrix`) zeigt keine Hilfe, sondern die Funktions-/Effekt-/Szenen-Verwaltung (Effekt-Assistent, „+ Szene", „+ Chaser", „Programmer → Szene", komplette Funktionsliste, Start/Stop). Wer Effekte sucht, klickt nie auf „Hilfe". `programmer_view.py:442` `addTab(_make_effects_page(), "Hilfe")` (intern „Helper" = Hilfsfunktionen → zu „Hilfe" verkürzt). **Fix:** Tab in **„Effekte"** oder **„Funktionen"** umbenennen; Achtung: Tab-Text wird als Key genutzt (`tabText(idx)`, `:489`) → Persistenz/Lookup mitziehen. Hoher QoL-Wert (zentraler Bereich, aktuell praktisch versteckt). |
+| QOL-01 | P2 | todo (Live-Audit 2026-07-14) | **Start zeigt eine chaotische Bühne (Patch ohne Positionen)** | Beim App-Start ist der Patch geladen (48 Geräte aus `current_show.db`), aber die 2D-Bühne legt die Fixtures in einen dicht überlappenden Bogen mit unlesbaren Labels — die gespeicherten Positionen kommen erst nach `Datei→Zuletzt→<Show>`. Erster Eindruck = Chaos. Idee: beim Start die zuletzt benutzte **benannte** Show (mit Positionen/VC) laden ODER bei „nur Patch" ein sauberes Default-Raster statt Bogen; mind. ein „letzte Show fortsetzen?"-Hinweis. |
+| QOL-02 | P3 | todo (Live-Audit 2026-07-14) | **„Zuletzt verwendet" listet gleichnamige Shows doppelt** | `grosses_rig_2026.lshow` erscheint zweimal (verschiedene Pfade AppData vs. Repo), optisch nicht unterscheidbar → man weiß nicht, welche man öffnet. Idee: bei Namensgleichheit verkürzten Pfad/Ordner mitzeigen oder nach Kanonpfad deduplizieren. |
+| QOL-03 | P3 | todo (Live-Audit 2026-07-14) | **Fixture-Namen in der Geräte-Liste abgeschnitten** | Längere Namen gekürzt (`[013] PAR T…`, `[009] MH Li…`) → Geräte am Namen nicht unterscheidbar, kein Tooltip, obwohl seitlich Platz. Idee: Spalte breiter/Umbruch, Tooltip mit Vollname, oder Nummer+Kurztyp getrennt. |
+
+_Positiv notiert (kein Handlungsbedarf, zur Balance): konsistente Auswahl Bühne↔Programmer · hilfreiche Info-Sprechblase bei Fixture-Selektion (#/Name/Typ/Farbe/Intensität/aktive Effekte) · schnelles Show-Laden über „Zuletzt verwendet"._
+
 ## 📚 Befund- und Detailregister
 
 _Die folgenden Blöcke bleiben als nachvollziehbares Detailregister erhalten. Ein
