@@ -200,13 +200,29 @@ class BpmTimeline:
                              float(row[2]) if len(row) > 2 else 0.0])
             except (TypeError, ValueError, IndexError):
                 continue
+
+        beats = _int_list("beats_ms")
+        downs = _int_list("downbeats_ms")
+        # Invariante downbeats ⊆ beats erzwingen: ein korrupter/veralteter Cache
+        # kann Downbeats enthalten, die in keinem Beat vorkommen (unabhaengig
+        # sortiert). ``beat_phase_at`` zaehlt dann falsche Beats seit dem Downbeat
+        # → falsches ``beat_in_bar``. Darum auf die Schnittmenge mit ``beats``
+        # reduzieren; ueberlebt bei vorhandenen Beats gar kein Downbeat, sauber
+        # verwerfen (Fallback ``i // bpb`` liefert dann konsistente Bars).
+        if downs and beats:
+            beat_set = set(beats)
+            downs = [x for x in downs if x in beat_set]
+        elif downs and not beats:
+            # Downbeats ohne jedes Beatgrid sind sinnlos → verwerfen.
+            downs = []
+
         return cls(
             segments=segs,
             duration_ms=int(d.get("duration_ms", 0) or 0),
             step_ms=int(d.get("step_ms", 0) or 0),
             window_ms=int(d.get("window_ms", 0) or 0),
-            beats_ms=_int_list("beats_ms"),
-            downbeats_ms=_int_list("downbeats_ms"),
+            beats_ms=beats,
+            downbeats_ms=downs,
             engine=str(d.get("engine", "builtin") or "builtin"),
             beats_per_bar=int(d.get("beats_per_bar", 4) or 4),
             sections=secs,
