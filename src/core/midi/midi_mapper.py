@@ -75,6 +75,66 @@ def _msg_type_from_binding(binding_type: str) -> str:
     return "cc" if binding_type == "cc" else "note_on"
 
 
+# --- Konflikt-Erkennung beim MIDI-Learn (STAB-12, Option B) -----------------
+# Nicht-behaviorale Warnung: eine Note/CC kann gleichzeitig ein globales
+# MidiMapper-Mapping UND ein VC-Widget-Binding treffen (beide haengen am selben
+# Bus, kein Konsumierungs-Protokoll). Damit der Mapper beim Learn cross-Ebene
+# warnen kann, OHNE UI-Code zu importieren (Layering: core kennt UI nicht),
+# registriert die VC-Canvas hier einen Provider, der ihre aktuellen Widget-
+# Bindungen liefert. Descriptor je Bindung: (label, msg_type, channel, data1).
+
+_vc_binding_providers: list[Callable[[], list]] = []
+
+
+def register_vc_binding_provider(provider: Callable[[], list]) -> None:
+    """VC-Canvas meldet einen Provider an, der ihre MIDI-Widget-Bindungen liefert."""
+    if provider not in _vc_binding_providers:
+        _vc_binding_providers.append(provider)
+
+
+def unregister_vc_binding_provider(provider: Callable[[], list]) -> None:
+    try:
+        _vc_binding_providers.remove(provider)
+    except ValueError:
+        pass
+
+
+def _iter_vc_bindings() -> list[tuple]:
+    """Alle aktuell registrierten VC-Widget-Bindungen einsammeln (robust)."""
+    out: list[tuple] = []
+    for provider in list(_vc_binding_providers):
+        try:
+            for item in (provider() or []):
+                out.append(tuple(item))
+        except Exception:
+            pass
+    return out
+
+
+def _binding_family(msg_type: str) -> str:
+    """note_on/note_off/note -> 'note', cc -> 'cc' (Match-Familie)."""
+    return "cc" if str(msg_type) == "cc" else "note"
+
+
+def _bindings_overlap(type_a, ch_a, d1_a, type_b, ch_b, d1_b) -> bool:
+    """True, wenn zwei Bindungen auf DIESELBE eingehende Nachricht feuern wuerden.
+
+    Gleiche data1, gleiche Familie (note vs cc), ueberlappender Kanal
+    (0 = alle Kanaele). Deckt sich mit MidiInBinding.matches /
+    midi_binding_matches (note_on bindet auch note_off)."""
+    try:
+        if int(d1_a) != int(d1_b):
+            return False
+    except (TypeError, ValueError):
+        return False
+    if _binding_family(type_a) != _binding_family(type_b):
+        return False
+    ca, cb = int(ch_a or 0), int(ch_b or 0)
+    if ca != 0 and cb != 0 and ca != cb:
+        return False
+    return True
+
+
 @dataclass
 class MidiInBinding:
     """Incoming MIDI trigger definition."""
@@ -269,6 +329,8 @@ class MidiMapper:
         self._learn_mode = False
         self._learn_callback = None
         self._state_callbacks: list[Callable[[str, dict], None]] = []
+        # UI-Hook fuer Learn-Konflikt-Warnungen (Option B, rein additiv).
+        self._conflict_callbacks: list[Callable[[dict], None]] = []
         self._toggle_states: dict[str, bool] = {}
         self._feedback_state_cache: dict[str, float] = {}
         self._feedback_output_cache: dict[str, int] = {}
@@ -324,14 +386,97 @@ class MidiMapper:
         self._learn_mode = False
         self._learn_callback = None
 
+    # Learn-Konflikt-Warnung (STAB-12, Option B) -------------------------
+
+    def subscribe_conflict(self, callback: Callable[[dict], None]) -> None:
+        """UI-Hook: callback(payload) bei erkanntem Learn-Konflikt (optional)."""
+        if callback not in self._conflict_callbacks:
+            self._conflict_callbacks.append(callback)
+
+    def find_binding_conflicts(self, msg_type, channel, data1,
+                               *, exclude_mapping_id=None) -> list[dict]:
+        """Zu einer eingehenden Note/CC-Bindung ALLE bereits belegten Bindungen
+        liefern, die auf DIESELBE Nachricht feuern wuerden: globale Mapper-
+        Mappings UND VC-Widget-Bindungen (ueber registrierte Provider).
+
+        Rein informativ (Option B) — aendert das Dispatch-Verhalten NICHT."""
+        conflicts: list[dict] = []
+        # 1) Globale Mapper-Mappings.
+        for m in self._mappings:
+            if exclude_mapping_id and m.mapping_id == exclude_mapping_id:
+                continue
+            b = m.midi_in
+            if _bindings_overlap(msg_type, channel, data1,
+                                 b.message_type, b.channel, b.trigger_id):
+                conflicts.append({
+                    "source": "global",
+                    "label": m.name or m.target_id or m.action or "Mapping",
+                    "msg_type": b.message_type,
+                    "channel": int(b.channel),
+                    "data1": int(b.trigger_id),
+                })
+        # 2) VC-Widget-Bindungen (ueber Provider von der VC-Canvas).
+        for item in _iter_vc_bindings():
+            try:
+                label, b_type, b_ch, b_d1 = item
+            except (ValueError, TypeError):
+                continue
+            if _bindings_overlap(msg_type, channel, data1, b_type, b_ch, b_d1):
+                conflicts.append({
+                    "source": "vc",
+                    "label": str(label),
+                    "msg_type": str(b_type),
+                    "channel": int(b_ch or 0),
+                    "data1": int(b_d1),
+                })
+        return conflicts
+
+    def check_and_warn_conflicts(self, msg_type, channel, data1,
+                                 *, learned_label="Learn",
+                                 exclude_mapping_id=None) -> list[dict]:
+        """Konflikte suchen und (falls vorhanden) warnen: print + optionaler
+        UI-Callback. Gibt die gefundenen Konflikte zurueck."""
+        conflicts = self.find_binding_conflicts(
+            msg_type, channel, data1, exclude_mapping_id=exclude_mapping_id)
+        if not conflicts:
+            return conflicts
+        fam = _binding_family(msg_type)
+        ident = f"{'CC' if fam == 'cc' else 'Note'} {int(data1)} (CH{int(channel or 0)})"
+        for c in conflicts:
+            print(f"[midi_mapper] Konflikt-Warnung ({learned_label}): {ident} ist "
+                  f"bereits an {c['source']}:{c['label']} gebunden — beide feuern "
+                  f"gleichzeitig.")
+        payload = {
+            "learned": learned_label,
+            "msg_type": msg_type,
+            "channel": int(channel or 0),
+            "data1": int(data1),
+            "conflicts": conflicts,
+        }
+        for cb in list(self._conflict_callbacks):
+            try:
+                cb(payload)
+            except Exception:
+                pass
+        return conflicts
+
     # Inbound engine -----------------------------------------------------
 
     def _on_midi(self, msg: MidiMessage):
         if self._learn_mode and self._learn_callback:
             if msg.msg_type in ("note_on", "note_off", "cc"):
-                self._learn_callback(msg)
+                callback = self._learn_callback
                 self._learn_mode = False
                 self._learn_callback = None
+                # Konflikt-Check VOR dem Anwenden der Bindung: so zaehlt die
+                # gerade gelernte Zeile sich nicht selbst mit (Option B).
+                try:
+                    self.check_and_warn_conflicts(
+                        msg.msg_type, msg.channel, msg.data1,
+                        learned_label="Mapper-Learn")
+                except Exception:
+                    pass
+                callback(msg)
             return
 
         for mapping in self._mappings:

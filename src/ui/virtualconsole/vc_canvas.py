@@ -164,8 +164,20 @@ class VCCanvas(QWidget):
             self.destroyed.connect(lambda *_: self._teardown_midi())
         except Exception as e:
             print(f"[VCCanvas] MIDI-Subscribe-Fehler: {e}")
+        # STAB-12 (Option B): dem Mapper unsere Widget-Bindungen abfragbar machen,
+        # damit er beim globalen Learn cross-Ebene warnen kann (rein additiv).
+        try:
+            from src.core.midi import midi_mapper
+            midi_mapper.register_vc_binding_provider(self.iter_midi_bindings)
+        except Exception as e:
+            print(f"[VCCanvas] MIDI-Konflikt-Provider-Fehler: {e}")
 
     def _teardown_midi(self):
+        try:
+            from src.core.midi import midi_mapper
+            midi_mapper.unregister_vc_binding_provider(self.iter_midi_bindings)
+        except Exception:
+            pass
         mm = getattr(self, "_mm", None)
         if mm is not None:
             try:
@@ -173,6 +185,30 @@ class VCCanvas(QWidget):
             except Exception:
                 pass
             self._mm = None
+
+    def iter_midi_bindings(self) -> list[tuple]:
+        """Aktuelle MIDI-Bindungen aller VC-Widgets als (label, msg_type,
+        channel, data1). Fuer die Learn-Konflikt-Warnung des MidiMapper
+        (STAB-12, Option B)."""
+        out: list[tuple] = []
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return out
+        for w in widgets:
+            getter = getattr(w, "current_midi_binding", None)
+            if not callable(getter):
+                continue
+            try:
+                binding = getter()
+            except Exception:
+                continue
+            if not binding:
+                continue
+            msg_type, channel, data1 = binding
+            label = getattr(w, "caption", "") or type(w).__name__
+            out.append((label, msg_type, channel, data1))
+        return out
 
     def closeEvent(self, event):
         self._teardown_midi()
@@ -339,6 +375,18 @@ class VCCanvas(QWidget):
         if self._midi_learn_btn is not None:
             btn = self._midi_learn_btn
             self._midi_learn_btn = None
+            # STAB-12 (Option B): VOR dem Binden auf bereits belegte Note/CC
+            # pruefen (global ODER anderes VC-Widget) und ggf. warnen. Vor dem
+            # accept_midi, damit sich der Button nicht selbst als Konflikt meldet.
+            try:
+                from src.core.midi.midi_mapper import get_midi_mapper
+                mapper = get_midi_mapper()
+                if mapper is not None:
+                    mapper.check_and_warn_conflicts(
+                        msg.msg_type, msg.channel, msg.data1,
+                        learned_label="VC-Widget-Learn")
+            except Exception:
+                pass
             btn.accept_midi(msg.channel, msg.data1, msg.msg_type)
             self.midi_learn_done.emit()
             return
