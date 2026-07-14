@@ -1,3 +1,4 @@
+# HINWEIS: App-Steuerung (start/stop/wait/shot/fg) ist jetzt in tools/app.ps1 konsolidiert (QA-22).
 # Win32 UI driver for LightOS — clicks/typing in PHYSICAL pixels (DPI-aware).
 # Usage:
 #   _ui.ps1 fg                         -> bring LightOS to foreground (by window title)
