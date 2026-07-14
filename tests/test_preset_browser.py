@@ -38,8 +38,8 @@ class PaletteEntriesTest(unittest.TestCase):
         e = palette_entries(_palettes())
         self.assertEqual([x.kind for x in e], ["palette"] * 3)
         self.assertEqual(e[0].name, "Rot")
-        # Untertitel = Typ-Label, bei Ordner zusätzlich " · Ordner"
-        self.assertIn("Color", e[0].subtitle)
+        # Untertitel = Typ-Label (UI-22: deutsch), bei Ordner zusätzlich " · Ordner"
+        self.assertIn("Farbe", e[0].subtitle)
         self.assertIn("Winter", e[1].subtitle)
         self.assertEqual(e[0].tags, ("warm",))
         # ref zeigt auf die Original-Palette (zum Anwenden)

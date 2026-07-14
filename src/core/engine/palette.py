@@ -14,6 +14,34 @@ class PaletteType(str, Enum):
     ALL      = "All"
 
 
+# UI-22: Deutsche ANZEIGE-Labels fuer Palette-Typen. NUR fuer nutzer-sichtbare
+# Titel/Kategorien — die Enum-.value bleibt UNVERAENDERT der interne,
+# serialisierte Schluessel (siehe to_dict/from_dict). Keine Datenmigration.
+PALETTE_TYPE_LABELS_DE = {
+    PaletteType.COLOR:    "Farbe",
+    PaletteType.POSITION: "Position",
+    PaletteType.BEAM:     "Beam",
+    PaletteType.EFFECT:   "Effekt",
+    PaletteType.LASER:    "Laser",
+    PaletteType.ALL:      "Alle",
+}
+
+
+def palette_type_label(ptype) -> str:
+    """Deutsches Anzeige-Label fuer einen ``PaletteType`` (oder dessen ``.value``).
+
+    Nur fuer die Anzeige gedacht; nie zum Serialisieren/Vergleichen von Keys.
+    """
+    if ptype is None:
+        return ""
+    if not isinstance(ptype, PaletteType):
+        try:
+            ptype = PaletteType(ptype)
+        except Exception:
+            return str(ptype)
+    return PALETTE_TYPE_LABELS_DE.get(ptype, ptype.value)
+
+
 @dataclass
 class Palette:
     """A named set of attribute values applicable to any fixture."""

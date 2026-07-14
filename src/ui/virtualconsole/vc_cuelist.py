@@ -12,7 +12,7 @@ from .vc_widget import VCWidget
 class VCCueList(VCWidget):
     """Shows a CueStack's cue list with GO/BACK/STOP transport."""
 
-    def __init__(self, caption: str = "Cue List", parent=None):
+    def __init__(self, caption: str = "Cueliste", parent=None):
         super().__init__(caption, parent)
         self.stack_slot: int = 0
         self._bg_color = QColor("#0d1117")
@@ -121,7 +121,7 @@ class VCCueList(VCWidget):
 
     def _open_properties(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Cue List Einstellungen")
+        dlg.setWindowTitle("Cueliste-Einstellungen")
         form = QFormLayout(dlg)
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
