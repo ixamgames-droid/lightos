@@ -62,6 +62,18 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
 - **LAS-09** (nur 6ch-CH5 prüfen), **LAS-18c**, **LAS-20**, Ether-Dream-/IDN-
   Hardware-Verifikation sowie ShowNET/Moncha-Profile.
 
+## 🔮 Nächstes Backlog — vorgezogen (David 2026-07-14)
+
+_David-Direktive im Chat: „letzte einfache Items fertig, **dann VC-3D-Buttons**" → Punkt (1)
+des Nächsten-Backlogs wurde vor FINALIZE umgesetzt. Der Rest (UX-Audits mit Computer-Use,
+Effekt-Bau + 3D-Viz-Abnahme, Fixture-Rundlauf, Cross-Platform/Linux) bleibt nach FINALIZE
+bzw. wartet auf Davids Linux-Rechner / eine Computer-Use-Session._
+
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| VC3D-01 | P2 | ✅ done (dieser PR) | **VC-Tasten plastisch/„3D-ig".** Neuer geteilter Paint-Helfer `src/ui/virtualconsole/vc_style.py` (`paint_button_surface`: Verlauf + Bevel + farbiger Tiefenrand + Press-Inset + Aktiv-Glow, rein QPainter). Angewandt in `vc_button.py::paintEvent`: Text + Zustands-Rahmen sitzen auf der erhabenen Taste und wandern beim Druck mit; Aktions-Farbbalken auf die runde Face-Form geclippt (`QPainterPath`) statt flach über die Ecken. Robust bei jeder Größe (Face-Maße ≥ 1 px). 6 Tests `tests/test_vc_style_3d.py` (Contract + sichtbares Press-/Aktiv-Feedback). Nur Buttons — Slider/SpeedDial optional als Folge. Showcase-Artifact im Chat. |
+| VC3D-02 | P3 | todo | Optional: 3D-Optik auch auf **VCSlider**-Griff + **SpeedDial** ausweiten (gleicher `vc_style`-Helfer), für einen konsistenten Pad-/Fader-Look. |
+
 ## 📚 Befund- und Detailregister
 
 _Die folgenden Blöcke bleiben als nachvollziehbares Detailregister erhalten. Ein

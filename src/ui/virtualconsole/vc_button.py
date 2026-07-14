@@ -6,9 +6,10 @@ from enum import Enum
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
                                 QCheckBox)
-from PySide6.QtCore import Qt, QRect
-from PySide6.QtGui import QPainter, QColor, QFont, QPen
+from PySide6.QtCore import Qt, QRect, QRectF
+from PySide6.QtGui import QPainter, QColor, QFont, QPen, QPainterPath
 from .vc_widget import VCWidget
+from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
 
 _SNAPSHOTS_FILE = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
@@ -1284,34 +1285,37 @@ class VCButton(VCWidget):
         # liefe nichts mehr, obwohl die Geraete sich noch bewegten (Anzeige-Desync).
         func_on = self._function_running()
         lit = self._pressed or snap_on or audio_on or func_on or action_on
-        bg = self._bg_color.lighter(160) if lit else self._bg_color
-        p.fillRect(self.rect(), bg)
+        # 3D-/Haptik-Optik: plastische Taste (Verlauf + Bevel + Tiefe), die beim
+        # Druck sichtbar einsinkt und aktiv leuchtet. ``face`` = obere Sichtflaeche;
+        # Text/Zustands-Rahmen sitzen darauf und wandern beim Druck mit (haptisch).
+        face = paint_button_surface(p, self.rect(), self._bg_color, self._pressed, lit)
+        # AA fuer die runden Rahmen/Clips (der Helfer stellt seinen State zurueck).
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        brect = face.adjusted(1, 1, -1, -1)
+        br = VC_RADIUS - 1
 
-        # "Gedrueckt"-Feedback (Maus ODER MIDI): deutlicher heller Rahmen
+        # Zustands-Rahmen — die FARBE traegt die Bedeutung (welcher Zustand aktiv):
+        state_pen = None
         if self._pressed:
-            p.setPen(QPen(QColor("#ffe680"), 3))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            state_pen = QPen(QColor("#ffe680"), 3)   # gerade gedrueckt (Maus/MIDI)
         elif func_on:
-            # Funktion laeuft (Toggle aktiv): gruener Rahmen (an, aber nicht gedrueckt).
-            p.setPen(QPen(QColor("#3fb950"), 2))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            state_pen = QPen(QColor("#3fb950"), 2)   # Funktion laeuft (Toggle aktiv)
         elif snap_on:
-            # Aktiver Snap-Toggle: dezenter gruener Rahmen (an, aber nicht gedrueckt).
-            p.setPen(QPen(QColor("#58d68d"), 2))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            state_pen = QPen(QColor("#58d68d"), 2)   # Snap-Toggle an
         elif audio_on:
-            # Musik-Modus aktiv: cyaner Rahmen (BPM kommt vom Audio-Eingang).
-            p.setPen(QPen(QColor("#00d4ff"), 2))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            state_pen = QPen(QColor("#00d4ff"), 2)   # Musik-Modus (BPM vom Audio)
         elif action_on:
-            # VCI-01: Tempo-Toggle aktiv (Freeze/Auto-Sync/BPM-Modus): amber Rahmen.
-            p.setPen(QPen(QColor("#ffb000"), 2))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            state_pen = QPen(QColor("#ffb000"), 2)   # Tempo-Toggle (Freeze/Sync/Mode)
+        if state_pen is not None:
+            p.setPen(state_pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(brect, br, br)
 
-        # MIDI-Learn-Arm: orange Rahmen pulsieren
+        # MIDI-Learn-Arm: orange Rahmen
         if self._midi_armed:
             p.setPen(QPen(QColor("#ff8800"), 3))
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(brect, br, br)
 
         p.setPen(self._fg_color)
         font = QFont("Segoe UI", 9, QFont.Weight.Bold)
@@ -1322,7 +1326,7 @@ class VCButton(VCWidget):
         if self.action == ButtonAction.SNAPSHOT and self.snapshot_index is not None:
             display += f"\n[Snap {self.snapshot_index + 1}]"
 
-        p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+        p.drawText(face, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
 
         # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.
         _gpm = self._gobo_icon()
@@ -1348,18 +1352,21 @@ class VCButton(VCWidget):
             p.drawEllipse(bx, by, d, d)
             p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
-        # Farbbalken unten je nach Aktion
+        # Farbbalken je nach Aktion — als Streifen am UNTEREN Rand der Taste, auf
+        # die runde Face-Form geclippt (bleibt so Teil des Pads statt ueber den
+        # 3D-Rand/die Ecken zu laufen) und wandert beim Druck mit der Taste mit.
+        bar_color = None
         if self.action == ButtonAction.FLASH:
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff8800"))
+            bar_color = QColor("#ff8800")
         elif self.action in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH):
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#3fb950"))
+            bar_color = QColor("#3fb950")
         elif self.action == ButtonAction.BLACKOUT:
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+            bar_color = QColor("#ff2222")
         elif self.action == ButtonAction.LASER_ESTOP:
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff2222"))
+            bar_color = QColor("#ff2222")
         elif self.action == ButtonAction.LASER_PATTERN:
             # LAS-18: Laser-Muster-Abruf = gedämpftes Lila (Laser-Familie).
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#a371f7"))
+            bar_color = QColor("#a371f7")
         elif self.action == ButtonAction.LASER_ARM:
             # Scharf = leuchtend lila (Laser-Farbe), unscharf = gedämpft.
             armed = False
@@ -1369,19 +1376,26 @@ class VCButton(VCWidget):
                 armed = bool(lo is not None and lo.armed)
             except Exception:
                 armed = False
-            p.fillRect(0, self.height() - 4, self.width(), 4,
-                       QColor("#cc55ff") if armed else QColor("#4a2a5a"))
+            bar_color = QColor("#cc55ff") if armed else QColor("#4a2a5a")
         elif self.action == ButtonAction.SNAPSHOT:
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ffd700"))
+            bar_color = QColor("#ffd700")
         elif self.action == ButtonAction.LIBRARY_SNAP:
             # Farbbalken in der Snap-Farbe (Bibliothek-Look auf einen Blick).
-            sc = self._snap_swatch_color() or QColor("#b388ff")
-            p.fillRect(0, self.height() - 4, self.width(), 4, sc)
+            bar_color = self._snap_swatch_color() or QColor("#b388ff")
         elif self.action == ButtonAction.AUDIO_BPM:
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#00d4ff"))
+            bar_color = QColor("#00d4ff")
         elif self.action in (ButtonAction.MEDIA_PLAY_PAUSE, ButtonAction.MEDIA_NEXT,
                              ButtonAction.MEDIA_PREV):
-            p.fillRect(0, self.height() - 4, self.width(), 4, QColor("#ff5fb0"))
+            bar_color = QColor("#ff5fb0")
+        if bar_color is not None:
+            clip = QPainterPath()
+            clip.addRoundedRect(face, VC_RADIUS, VC_RADIUS)
+            p.save()
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.setClipPath(clip)
+            bh = 4.0
+            p.fillRect(QRectF(face.left(), face.bottom() - bh, face.width(), bh), bar_color)
+            p.restore()
 
         # MIDI-Bindung-Indikator oben rechts
         if self.midi_data1 >= 0:
@@ -1404,7 +1418,9 @@ class VCButton(VCWidget):
             pen = QPen(QColor("#ff5555"), 2)
             pen.setStyle(Qt.PenStyle.DashLine)
             p.setPen(pen)
-            p.drawRect(self.rect().adjusted(1, 1, -2, -2))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.drawRoundedRect(brect, br, br)
             p.setPen(QColor("#ff5555"))
             p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             p.drawText(self.rect().adjusted(0, 2, -4, 0),
