@@ -13,7 +13,10 @@ OSC (ungeschuetztes UDP) bindet per Default nur an 127.0.0.1.
 beruehrt. ``get_state`` ist gemockt.
 """
 import os
+import socket
 import tempfile
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -184,6 +187,75 @@ class TestRemoteSettings(unittest.TestCase):
         remote_settings.set_osc_network_enabled(True)
         self.assertTrue(remote_settings.is_osc_network_enabled())
         remote_settings.set_osc_network_enabled(False)
+
+
+@unittest.skipUnless(HAS_FLASK, "Flask/flask-socketio nicht installiert")
+class TestServerLifecycle(unittest.TestCase):
+    """NET-09: stop_server() gibt den Listen-Port WIRKLICH frei (frueher blieb
+    :5000 offen, weil socketio.stop() den Werkzeug-Dev-Server aus einem
+    Fremd-Thread nicht beendete) — und der Server ist danach neu startbar."""
+
+    def setUp(self):
+        self._orig_get_state = webapp._get_state
+        webapp._get_state = lambda: _FakeState()
+        from src.web import remote_settings
+        remote_settings.set_lan_remote_enabled(False)   # -> Bind 127.0.0.1
+
+    def tearDown(self):
+        try:
+            webapp.stop_server()
+        except Exception:
+            pass
+        webapp._get_state = self._orig_get_state
+
+    @staticmethod
+    def _free_port():
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        return port
+
+    @staticmethod
+    def _port_open(port, host="127.0.0.1", timeout=1.0):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        try:
+            s.connect((host, port))
+            return True
+        except OSError:
+            return False
+        finally:
+            s.close()
+
+    def _wait(self, port, want_open, tries=30):
+        for _ in range(tries):
+            if self._port_open(port) == want_open:
+                return True
+            time.sleep(0.1)
+        return self._port_open(port) == want_open
+
+    def test_stop_frees_port_and_is_restartable(self):
+        port = self._free_port()
+        # start -> Port offen
+        webapp.start_server(port)
+        self.assertTrue(self._wait(port, True), "Server-Port nach start nicht offen")
+        # stop -> Port SOFORT frei (NET-09: frueher blieb er bis App-Ende offen)
+        webapp.stop_server()
+        self.assertTrue(self._wait(port, False),
+                        "Port nach stop_server() NICHT frei — NET-09-Regression")
+        # Neustart auf demselben Port -> darf nicht an 'Port belegt' scheitern
+        webapp.start_server(port)
+        self.assertTrue(self._wait(port, True), "Server nach Neustart nicht erreichbar")
+        webapp.stop_server()
+        self.assertTrue(self._wait(port, False), "Port nach 2. stop NICHT frei")
+        # kein verwaister WebServer-Thread
+        self.assertNotIn("WebServer", [t.name for t in threading.enumerate()])
+
+    def test_stop_is_idempotent(self):
+        # stop_server() ohne laufenden Server darf nicht werfen.
+        webapp.stop_server()
+        webapp.stop_server()
 
 
 if __name__ == "__main__":

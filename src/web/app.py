@@ -14,6 +14,7 @@ except ImportError:
 _flask_app: Any = None
 _socketio: Any = None
 _thread: threading.Thread | None = None
+_server: Any = None   # NET-09: Werkzeug-Server-Handle fuer thread-safen shutdown()
 _running = False
 
 
@@ -381,13 +382,13 @@ def _register_socketio(sio):
 
 def start_server(port: int = 5000):
     """Start the web server in a background thread."""
-    global _thread, _running
+    global _thread, _running, _server
     if _running:
         return
     if not HAS_FLASK:
         raise RuntimeError("Flask / flask-socketio not installed")
 
-    app, sio = create_app(port)
+    app, _sio = create_app(port)   # _sio == _socketio-Global (Middleware sitzt an app)
     # NET-01: Bind-Host am Toggle 'LAN-/Handy-Remote' ausrichten. AN (Default) ->
     # 0.0.0.0 (das Handy im LAN erreicht es, Token schuetzt). AUS -> 127.0.0.1
     # (nur der Host selbst, kein LAN-Zugriff).
@@ -398,17 +399,21 @@ def start_server(port: int = 5000):
             host = "127.0.0.1"
     except Exception as e:
         print(f"[web] lan-remote flag read error: {e}")
+    # NET-09: Frueher lief der Server via ``sio.run(app, ...)`` — das ruft intern
+    # ``werkzeug.serving.run_simple`` (bzw. ``make_server(...).serve_forever()``),
+    # gibt aber KEIN Server-Handle her, und ``socketio.stop()`` beendet den
+    # Dev-Server aus einem Fremd-Thread (Qt-Menue-Toggle) NICHT zuverlaessig ->
+    # der Listen-Socket auf :5000 blieb bis zum App-Ende offen ("Web: aus" log).
+    # Fix: denselben Werkzeug-Server EXPLIZIT halten. Die SocketIO-Middleware
+    # haengt bereits an ``app.wsgi_app`` (``SocketIO(app, async_mode="threading")``)
+    # -> ``make_server(host, port, app, threaded=True)`` bedient HTTP UND SocketIO
+    # identisch zu vorher, und ``srv.shutdown()`` beendet ``serve_forever()``
+    # thread-safe (Socket schliesst beim Toggle 'aus').
+    from werkzeug.serving import make_server
+    _server = make_server(host, port, app, threaded=True)
     _running = True
     _thread = threading.Thread(
-        # allow_unsafe_werkzeug=True: neuere flask-socketio/werkzeug verweigern
-        # den Dev-Server sonst mit RuntimeError ("not designed to run in
-        # production") -> der WebServer-Thread starb still beim Start und das
-        # Remote-Control war nie erreichbar (crash.log 2026-06). LightOS ist ein
-        # lokaler LAN-Controller, kein Internet-Dienst -> der Dev-Server ist hier
-        # bewusst akzeptabel.
-        target=lambda: sio.run(app, host=host, port=port,
-                               use_reloader=False, log_output=False,
-                               allow_unsafe_werkzeug=True),
+        target=_server.serve_forever,
         daemon=True,
         name="WebServer"
     )
@@ -417,7 +422,22 @@ def start_server(port: int = 5000):
 
 
 def stop_server():
-    global _running
+    # NET-09: Den Werkzeug-Server sauber herunterfahren. ``srv.shutdown()`` ist
+    # thread-safe und unterbricht ``serve_forever()``; ``server_close()`` gibt den
+    # Listen-Socket frei -> :5000 ist SOFORT beim Toggle 'aus' frei (frueher blieb
+    # er bis App-Ende offen). Idempotent + fehlertolerant.
+    global _running, _server, _thread
     _running = False
-    if _socketio:
-        _socketio.stop()
+    srv, _server = _server, None
+    if srv is not None:
+        try:
+            srv.shutdown()          # entblockt serve_forever()
+        except Exception as e:
+            print(f"[web] server shutdown error: {e}")
+        try:
+            srv.server_close()      # gibt den Listen-Socket frei
+        except Exception:
+            pass
+    t, _thread = _thread, None
+    if t is not None and t.is_alive():
+        t.join(timeout=3.0)
