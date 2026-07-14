@@ -122,16 +122,36 @@ class EnttecPro:
     def _try_reconnect(self):
         """Gedrosselt (``_reconnect_every_s``) den Port neu oeffnen. Gelingt es, ist
         das USB wieder da -> Ausgabe reaktivieren. Schlaegt es fehl, bleibt der Port
-        tot und der naechste Versuch kommt nach der Drossel-Zeit."""
+        tot und der naechste Versuch kommt nach der Drossel-Zeit.
+
+        SERIAL-02: Nach einem USB-Replug haengt der Enttec oft an einer NEUEN
+        COM-Nummer -> ein Reconnect nur auf die alte ``self.port`` heilte NIE. Darum
+        zuerst per VID/PID neu auffinden (:func:`find_enttec_port`); nur wenn das
+        nichts findet, Fallback auf die urspruengliche Nummer (mit Warnung)."""
         now = self._now()
         if (now - self._last_reconnect) < self._reconnect_every_s:
             return
         self._last_reconnect = now
         try:
-            self._ser = serial.Serial(self.port, ENTTEC_BAUD, timeout=1,
+            found = find_enttec_port()
+        except Exception:
+            found = None
+        if found:
+            if found != self.port:
+                print(f"[EnttecPro] Reconnect: Enttec jetzt auf {found} "
+                      f"(war {self.port}) — wechsle per VID/PID.")
+            target = found
+        else:
+            # Kein Enttec per VID/PID sichtbar -> alte Nummer erneut versuchen.
+            print(f"[EnttecPro] Reconnect: kein Enttec per VID/PID gefunden — "
+                  f"Fallback auf alte Nummer {self.port}.")
+            target = self.port
+        try:
+            self._ser = serial.Serial(target, ENTTEC_BAUD, timeout=1,
                                       write_timeout=0.5)
         except (serial.SerialException, OSError, ValueError):
             return
+        self.port = target
         self._disabled = False
         self._fail_count = 0
 
