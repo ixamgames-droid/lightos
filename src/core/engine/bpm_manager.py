@@ -4,7 +4,13 @@ Funktionsweise:
 - Speichert eine globale BPM (0 = aus).
 - tap() registriert einen Tap-Zeitstempel, berechnet BPM aus den letzten 4 Intervallen.
 - _emit_beat() wird intern alle (60 / BPM) Sekunden aufgerufen und benachrichtigt Subscriber.
-- Subscriber registrieren sich via subscribe_beat(callback). Callback wird im Qt-Mainthread aufgerufen.
+- Subscriber registrieren sich via subscribe_beat(callback).
+
+WICHTIG — Threading-Kontrakt: _emit_beat() (und damit die Beat-Callbacks) laeuft
+IM HINTERGRUND-THREAD — je nach Quelle im Timer-Thread 'BPM-Beat' oder im
+Audio-Capture-Thread, NICHT im Qt-Mainthread. Subscriber, die Qt beruehren,
+MUESSEN selbst in den Qt-Thread marshallen (z.B. QTimer.singleShot(0, ...) oder
+ein Signal.emit über eine QueuedConnection).
 """
 from __future__ import annotations
 import time
@@ -252,13 +258,16 @@ class BPMManager:
 
     def reset(self):
         """Schaltet BPM aus."""
+        # BPM-04: _bpm MUSS unter dem Lock genullt werden — sonst kann ein
+        # paralleler set_bpm() (Audio-Thread) den Reset ueberholen und einen
+        # inkonsistenten Zustand hinterlassen (Ordering-Race).
         with self._lock:
             self._last_taps = []
             self._beat_index = 0
             self._tick_index = 0
             self._source = "off"
             self._grid_active = False
-        self._bpm = 0.0
+            self._bpm = 0.0
         self._stop_timer()
         self._emit_bpm_change()
         self._emit_state_change()
@@ -343,6 +352,11 @@ class BPMManager:
         self._tick_index += 1
 
     def _emit_beat(self):
+        # BPM-01: Laeuft im HINTERGRUND-THREAD (Timer 'BPM-Beat' bzw.
+        # Audio-Capture-Thread), NICHT im Qt-Mainthread. Die Beat-Callbacks werden
+        # direkt hier synchron aufgerufen — jeder Subscriber, der Qt beruehrt, muss
+        # selbst marshallen (QTimer.singleShot / Signal.emit). Kein Marshalling hier,
+        # um das praezise Beat-Timing nicht zu stoeren.
         idx = self._beat_index
         for cb in list(self._beat_callbacks):
             try:
