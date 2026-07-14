@@ -122,6 +122,28 @@ EFFECT_ACTION_LABELS: list[tuple[str, str]] = [
 ]
 
 
+def _badge_text_right_inset(has_gobo: bool, gobo_w: int, has_badge: bool,
+                            face_w: float | None = None,
+                            badge_d: int = 16, margin: int = 8) -> int:
+    """VC3D-03: Breite der oben-rechts belegten Spalte (Gobo-Icon / Farb-Badge),
+    die aus dem Text-Rechteck ausgespart werden muss, damit umbrochener
+    Tastentext nicht unter das Badge laeuft (Live-Audit: „…arbwechs"). Reine
+    Funktion — deterministisch testbar.
+
+    ``face_w`` (falls gegeben) deckelt den Inset auf die halbe Face-Breite: auf
+    sehr schmalen Gobo-/Badge-Buttons (min. 40px) wuerde der volle Inset sonst
+    fast die ganze Breite fressen und die Beschriftung unlesbar machen — lieber
+    etwas Badge-Ueberlappung als eine verschwundene Beschriftung."""
+    inset = 0
+    if has_gobo:
+        inset = max(inset, gobo_w + margin)
+    if has_badge:
+        inset = max(inset, badge_d + margin)
+    if face_w is not None and face_w > 0:
+        inset = min(inset, max(0, int(face_w * 0.5)))
+    return inset
+
+
 class VCButton(VCWidget):
     """Pushbutton — Flash / Toggle / Blackout / StopAll / Snapshot."""
 
@@ -1326,23 +1348,32 @@ class VCButton(VCWidget):
         if self.action == ButtonAction.SNAPSHOT and self.snapshot_index is not None:
             display += f"\n[Snap {self.snapshot_index + 1}]"
 
-        p.drawText(face, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+        # VC3D-03: Gobo-Icon und Farb-Badge liegen oben rechts. Ihre Geometrie
+        # EINMAL bestimmen und die belegte rechte Spalte aus dem Text-Rechteck
+        # aussparen — sonst laeuft umbrochener Text unter das Badge ("…arbwechs").
+        _gpm = self._gobo_icon()
+        _has_gobo = _gpm is not None and not _gpm.isNull()
+        _badge = self._color_badge_colors()
+        _badge_d = 16
+        _right_inset = _badge_text_right_inset(
+            _has_gobo, _gpm.width() if _has_gobo else 0, bool(_badge),
+            face_w=float(face.width()), badge_d=_badge_d)
+        text_rect = face.adjusted(0, 0, -_right_inset, 0) if _right_inset else face
+        p.drawText(text_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
 
         # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.
-        _gpm = self._gobo_icon()
-        if _gpm is not None and not _gpm.isNull():
+        if _has_gobo:
             p.drawPixmap(self.width() - _gpm.width() - 4, 4, _gpm)
 
         # Farb-Vorschau-Badge (oben rechts): kleiner Kreis in der aktuellen
         # Effekt-/Snap-Farbe. Mehrere Farben (Farbwechsel) => der Kreis wechselt
         # zyklisch durch (Timer). Liegt schon ein Gobo oben rechts, wird das Badge
         # darunter gestapelt, damit beide sichtbar bleiben.
-        _badge = self._color_badge_colors()
         if _badge:
-            d = 16
+            d = _badge_d
             bx = self.width() - d - 4
             by = 4
-            if _gpm is not None and not _gpm.isNull():
+            if _has_gobo:
                 by = 4 + _gpm.height() + 2
             idx = self._badge_index if self._badge_index < len(_badge) else 0
             cur = _badge[idx]
