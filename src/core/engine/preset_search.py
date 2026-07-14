@@ -28,9 +28,12 @@ class PresetEntry:
 
 def palette_entries(palettes: Iterable[Any]) -> list[PresetEntry]:
     """Paletten → Einträge (Untertitel = Typ-Label · Ordner)."""
+    from src.core.engine.palette import palette_type_label
     out: list[PresetEntry] = []
     for p in palettes:
-        tlabel = getattr(getattr(p, "type", None), "value", "") or ""
+        # UI-22: deutsches Anzeige-Label (z. B. "Farbe") statt der internen
+        # Enum-.value ("Color") — nur der angezeigte Untertitel, kein Key.
+        tlabel = palette_type_label(getattr(p, "type", None))
         folder = getattr(p, "folder", "") or ""
         subtitle = " · ".join(x for x in (tlabel, folder) if x)
         tags = tuple(str(t) for t in (getattr(p, "tags", None) or []))

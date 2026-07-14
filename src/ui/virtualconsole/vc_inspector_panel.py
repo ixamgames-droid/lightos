@@ -36,7 +36,7 @@ _TYPE_LABELS = {
     "VCBusSelector": "Tempo-Bus", "VCXYPad": "XY-Feld", "VCFrame": "Rahmen",
     "VCEffectEditor": "Effekt-Box", "VCLabel": "Beschriftung",
     "VCEffectDisplay": "Effekt-Vorschau", "VCColorList": "Farbliste",
-    "VCEffectColors": "Effekt-Farben", "VCCuelist": "Cue-Liste",
+    "VCEffectColors": "Effekt-Farben", "VCCueList": "Cueliste",
     "VCBpmDisplay": "BPM-Anzeige", "VCSongInfo": "Song-Info",
     "VCMultiLiveEditor": "Live-Edit",
 }
