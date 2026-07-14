@@ -1644,12 +1644,27 @@ class MainWindow(QMainWindow):
                 from src.web.app import start_server, remote_url
                 port = start_server(5000) or 5000
                 url = remote_url(port)
+                # NET-01/NET-02: Token + vollstaendige Handshake-URL anzeigen.
+                # Das Handy tippt entweder die kurze URL mit ?k=<token> oder das
+                # Token separat. Ohne Token kommen /api-Aufrufe mit 403 zurueck.
+                try:
+                    from src.web import remote_settings
+                    token = remote_settings.get_token()
+                    lan_on = remote_settings.is_lan_remote_enabled()
+                except Exception:
+                    token = ""
+                    lan_on = True
+                full_url = f"{url}/?k={token}" if token else url
                 self._lbl_web.setText(f"Web: :{port} OK")
                 self._lbl_web.setStyleSheet("color: #9DFF52;")
+                scope = ("Erreichbar für Geräte im selben (W)LAN"
+                         if lan_on else
+                         "NUR lokal (LAN-/Handy-Remote ist AUS)")
                 QMessageBox.information(self, "Web-Interface",
                     f"Web-Interface läuft auf {url}\n\n"
-                    "Erreichbar für ALLE Geräte im selben (W)LAN. "
-                    "Nur in vertrauenswürdigen Netzen aktivieren.")
+                    f"{scope}. Zugriff nur mit Token.\n\n"
+                    f"Token: {token}\n"
+                    f"Direkt-Link (am Handy öffnen):\n{full_url}")
             except Exception as e:
                 self._act_web.setChecked(False)
                 QMessageBox.warning(self, "Web-Interface Fehler", str(e))
@@ -1666,8 +1681,21 @@ class MainWindow(QMainWindow):
         if checked:
             try:
                 from src.core.osc.osc_server import get_osc_server
-                get_osc_server().start()
-                self.statusBar().showMessage("OSC-Server: UDP :7770", 4000)
+                srv = get_osc_server()
+                # NET-01: nur bei aktivem Toggle 'OSC ueber Netzwerk' ans ganze LAN
+                # binden; sonst Loopback (Default), damit der ungeschuetzte UDP-
+                # Steuer-Eingang nicht offen im Netz haengt.
+                try:
+                    from src.web import remote_settings
+                    if remote_settings.is_osc_network_enabled():
+                        srv.set_bind_ip("0.0.0.0")
+                    else:
+                        srv.set_bind_ip("127.0.0.1")
+                except Exception as e:
+                    print(f"[main_window] osc bind flag error: {e}")
+                srv.start()
+                bind = "0.0.0.0" if getattr(srv, "_ip", "127.0.0.1") == "0.0.0.0" else "127.0.0.1"
+                self.statusBar().showMessage(f"OSC-Server: UDP {bind}:7770", 4000)
             except Exception as e:
                 self._act_osc.setChecked(False)
                 QMessageBox.warning(self, "OSC-Server Fehler", str(e))

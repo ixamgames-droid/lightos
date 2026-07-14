@@ -81,6 +81,20 @@ class _FakeState:
     def get_patched_fixtures(self):
         return [object(), object()]
 
+    def set_input_channel(self, universe, channel, value, source="remote"):
+        # WEB-01: der Web-Handler ruft jetzt set_input_channel statt
+        # universe.set_channel direkt. Der Fake spiegelt die gleichen Range-
+        # Guards/Clamps in die Fake-Universe, damit die Kanal-Tests weiter greifen.
+        try:
+            universe = int(universe); channel = int(channel); value = int(value)
+        except (TypeError, ValueError):
+            return
+        if not (1 <= channel <= 512):
+            return
+        if universe not in self.universes:
+            return
+        self.universes[universe].set_channel(channel, max(0, min(255, value)))
+
     def clear_programmer(self):
         self.cleared += 1
 
@@ -93,7 +107,12 @@ class TestWebRemote(unittest.TestCase):
         webapp._get_state = lambda: self.state
         self.app, self.sio = webapp.create_app()
         self.app.config["TESTING"] = True
+        # NET-01: bekanntes Token setzen + Session authentisieren, damit die
+        # /api-Routen hinter dem Auth-Gate erreichbar sind. Der test_client haelt
+        # das Session-Cookie ueber Requests hinweg.
+        self.app.config["LIGHTOS_REMOTE_TOKEN"] = "testtoken"
         self.client = self.app.test_client()
+        self.client.get("/?k=testtoken")
 
     def tearDown(self):
         webapp._get_state = self._orig_get_state
@@ -196,7 +215,7 @@ class TestWebRemote(unittest.TestCase):
 
     # ── SocketIO (WEB-03: ohne Payload kein Crash) ────────────────────────────
     def test_socketio_fader_without_payload_no_crash(self):
-        sio_client = self.sio.test_client(self.app)
+        sio_client = self.sio.test_client(self.app, flask_test_client=self.client)
         self.assertTrue(sio_client.is_connected())
         # Emit OHNE Payload -> Handler bekommt data=None -> darf nicht crashen.
         sio_client.emit("fader")
@@ -207,7 +226,7 @@ class TestWebRemote(unittest.TestCase):
         sio_client.disconnect()
 
     def test_socketio_fader_bad_payload_no_crash(self):
-        sio_client = self.sio.test_client(self.app)
+        sio_client = self.sio.test_client(self.app, flask_test_client=self.client)
         sio_client.emit("fader", {"slot": "x", "level": "y"})   # nicht-numerisch
         # Kein Crash; Default slot=1/level=1.0 -> executors[0] = 1.0
         self.assertEqual(self.state.executors[0].fader_value, 1.0)
@@ -216,7 +235,7 @@ class TestWebRemote(unittest.TestCase):
     def test_socketio_stop_routes_to_cuestack(self):
         """Das Frontend nutzt socket.emit('stop') -> Handler muss die Cueliste
         stoppen (und darf ohne Payload nicht crashen)."""
-        sio_client = self.sio.test_client(self.app)
+        sio_client = self.sio.test_client(self.app, flask_test_client=self.client)
         sio_client.emit("stop")
         self.assertEqual(self.state.cue_stacks[0].actions, ["stop"])
         sio_client.disconnect()

@@ -5,7 +5,7 @@ import os
 from typing import Any
 
 try:
-    from flask import Flask, render_template, request, jsonify
+    from flask import Flask, render_template, request, jsonify, session
     from flask_socketio import SocketIO, emit
     HAS_FLASK = True
 except ImportError:
@@ -104,6 +104,22 @@ def remote_url(port: int = 5000) -> str:
     return f"http://{get_lan_ip()}:{port}"
 
 
+def cors_allowlist(port: int = 5000, lan_ip: str | None = None) -> list[str]:
+    """NET-03: konkrete CORS-Origin-Allowlist statt ``"*"``.
+
+    Frueher stand ``cors_allowed_origins="*"`` — JEDE Website im Browser des
+    Nutzers durfte damit per fetch/WebSocket auf das LAN-Remote zugreifen
+    (Drive-by-CSRF/-WebSocket). Da der Server auf 0.0.0.0 an der bekannten
+    LAN-IP:Port haengt, kennen wir die drei legitimen Origins und listen genau
+    sie: die LAN-IP (fuers Handy) plus Loopback (Bedienung am Host). Alles offline
+    ermittelt (``get_lan_ip`` nutzt nur die stdlib, kein DNS/Cloud)."""
+    ip = lan_ip if lan_ip is not None else get_lan_ip()
+    origins = [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
+    if ip and ip not in ("127.0.0.1", "localhost"):
+        origins.insert(0, f"http://{ip}:{port}")
+    return origins
+
+
 def _num(data, key, default, cast):
     """Robuste Zahl-Coercion aus einem (JSON-)Dict: bei fehlendem, nicht-
     numerischem oder nicht-endlichem (int(inf)/int(NaN)) Wert wird der Default
@@ -116,7 +132,7 @@ def _num(data, key, default, cast):
         return default
 
 
-def create_app() -> tuple:
+def create_app(port: int = 5000) -> tuple:
     """Create and configure the Flask app + SocketIO."""
     global _flask_app, _socketio
     if not HAS_FLASK:
@@ -127,17 +143,90 @@ def create_app() -> tuple:
     # SECRET_KEY: aus ENV lesen, sonst zufaellig generieren (nie hardcoden!)
     import secrets
     _flask_app.config["SECRET_KEY"] = os.environ.get("LIGHTOS_FLASK_SECRET") or secrets.token_hex(32)
-    _socketio = SocketIO(_flask_app, cors_allowed_origins="*", async_mode="threading")
+    # NET-01: Session-Cookie haerten — HttpOnly (kein JS-Zugriff) + SameSite=Strict
+    # (kein Cross-Site-Mitsenden, ergaenzt die Origin-Allowlist gegen CSRF).
+    _flask_app.config["SESSION_COOKIE_HTTPONLY"] = True
+    _flask_app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
+    # NET-01: Token bei erstem create_app erzeugen + persistieren (Wiederverwendung
+    # bei Neustart). Fehlt das Settings-Modul (z. B. Test-Stub), bleibt es leer.
+    try:
+        from src.web import remote_settings
+        _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = remote_settings.get_token()
+    except Exception as e:
+        print(f"[web] token init error: {e}")
+        _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = ""
+    # NET-03: konkrete Origin-Allowlist statt "*" (Drive-by-CSRF/-WebSocket). Die
+    # Liste auch in der App-Config ablegen, damit UI/Tests sie einsehen koennen.
+    origins = cors_allowlist(port)
+    _flask_app.config["CORS_ALLOWED_ORIGINS"] = origins
+    _socketio = SocketIO(_flask_app, cors_allowed_origins=origins, async_mode="threading")
 
+    _register_auth(_flask_app)
     _register_routes(_flask_app)
     _register_socketio(_socketio)
     return _flask_app, _socketio
+
+
+def refresh_token(app) -> None:
+    """Laedt das aktuelle Token frisch aus den Prefs in ``app.config`` — nach einer
+    Token-Rotation (``remote_settings.regenerate_token()``) aufrufen, damit der
+    LAUFENDE Server den NEUEN ``?k=``-Link akzeptiert und den ALTEN abweist (kein
+    Neustart). Die Invalidierung bereits authentisierter Sessions erledigt die
+    mit-erhoehte ``auth_epoch`` (Gate). Beides zusammen macht die Rotation
+    vollstaendig wirksam (Security-Review)."""
+    try:
+        from src.web import remote_settings
+        app.config["LIGHTOS_REMOTE_TOKEN"] = remote_settings.get_token()
+    except Exception as e:
+        print(f"[web] refresh_token error: {e}")
+
+
+def _register_auth(app):
+    """NET-01: Token-Gate. Alle Routen ausser der Allowlist ('/', statische
+    Assets) verlangen eine authentisierte Session. Die '/'-Route macht den
+    Token-Handshake (``?k=<token>``)."""
+
+    @app.before_request
+    def _auth_gate():
+        # never-crash: ein Fehler hier darf den Server nicht lahmlegen — aber auch
+        # nicht ungeschuetzt durchlassen (im Zweifel 403).
+        try:
+            path = request.path or "/"
+            # Allowlist: Startseite (macht den Handshake) + statische Assets.
+            if path == "/" or path.startswith("/static/"):
+                return None
+            if session.get("authed") is True:
+                # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
+                # -> ein 'Token neu erzeugen' (epoch++) wirft bestehende Sessions raus.
+                from src.web import remote_settings
+                if session.get("epoch") == remote_settings.get_auth_epoch():
+                    return None
+        except Exception as e:
+            print(f"[web] auth gate error: {e}")
+        return ("Forbidden", 403)
 
 
 def _register_routes(app):
 
     @app.route("/")
     def index():
+        # NET-01: Token-Handshake. ``?k=<token>`` per constant-time-Vergleich gegen
+        # das persistierte Token; bei Treffer die Session als authed markieren.
+        try:
+            k = request.args.get("k")
+            if k:
+                import secrets as _secrets
+                from src.web import remote_settings
+                # Laufzeit-Token = app.config (bei create_app aus den Prefs gecacht;
+                # ``refresh_token(app)`` haelt es nach einer Rotation aktuell). Die
+                # Session bekommt die aktuelle Auth-Epoche gestempelt -> ein 'Token
+                # neu erzeugen' (epoch++) invalidiert bestehende Sessions im Gate.
+                token = app.config.get("LIGHTOS_REMOTE_TOKEN") or ""
+                if token and _secrets.compare_digest(str(k), str(token)):
+                    session["authed"] = True
+                    session["epoch"] = remote_settings.get_auth_epoch()
+        except Exception as e:
+            print(f"[web] handshake error: {e}")
         return render_template("index.html")
 
     @app.route("/api/status")
@@ -222,8 +311,11 @@ def _register_routes(app):
         data = request.get_json(silent=True) or {}
         value = _num(data, "value", 0, int)      # WEB-02: kein 500 bei kaputtem Payload
         state = _get_state()
-        if universe in state.universes and 1 <= channel <= 512:
-            state.universes[universe].set_channel(channel, max(0, min(255, value)))
+        # WEB-01: nicht mehr direkt ins Live-Universe (der 44-Hz-Renderer
+        # ueberschriebe gepatchte Kanaele jeden Frame), sondern ueber die
+        # Input-Override-Schicht — haelt als diskreter Einzelbefehl (REPLACE,
+        # vom Source-Timeout ausgenommen). Range-Guards liegen in set_input_channel.
+        state.set_input_channel(universe, channel, value, source="web")
         return jsonify({"ok": True})
 
     @app.route("/api/programmer/clear", methods=["POST"])
@@ -236,6 +328,16 @@ def _register_socketio(sio):
 
     @sio.on("connect")
     def on_connect():
+        # NET-01/NET-03: unauthentisierte WebSocket-Verbindung ablehnen — das ist
+        # zugleich der Riegel gegen Drive-by-WebSockets (der CORS-Check greift bei
+        # WS nicht zuverlaessig). Nur eine Session mit erfolgtem Token-Handshake
+        # darf verbinden.
+        try:
+            if session.get("authed") is not True:
+                return False
+        except Exception as e:
+            print(f"[web] socket connect gate error: {e}")
+            return False
         state = _get_state()
         emit("status", {"fixtures": len(state.get_patched_fixtures())})
 
@@ -285,7 +387,17 @@ def start_server(port: int = 5000):
     if not HAS_FLASK:
         raise RuntimeError("Flask / flask-socketio not installed")
 
-    app, sio = create_app()
+    app, sio = create_app(port)
+    # NET-01: Bind-Host am Toggle 'LAN-/Handy-Remote' ausrichten. AN (Default) ->
+    # 0.0.0.0 (das Handy im LAN erreicht es, Token schuetzt). AUS -> 127.0.0.1
+    # (nur der Host selbst, kein LAN-Zugriff).
+    host = "0.0.0.0"
+    try:
+        from src.web import remote_settings
+        if not remote_settings.is_lan_remote_enabled():
+            host = "127.0.0.1"
+    except Exception as e:
+        print(f"[web] lan-remote flag read error: {e}")
     _running = True
     _thread = threading.Thread(
         # allow_unsafe_werkzeug=True: neuere flask-socketio/werkzeug verweigern
@@ -294,7 +406,7 @@ def start_server(port: int = 5000):
         # Remote-Control war nie erreichbar (crash.log 2026-06). LightOS ist ein
         # lokaler LAN-Controller, kein Internet-Dienst -> der Dev-Server ist hier
         # bewusst akzeptabel.
-        target=lambda: sio.run(app, host="0.0.0.0", port=port,
+        target=lambda: sio.run(app, host=host, port=port,
                                use_reloader=False, log_output=False,
                                allow_unsafe_werkzeug=True),
         daemon=True,
