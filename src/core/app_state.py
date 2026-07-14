@@ -814,6 +814,16 @@ class AppState:
                 continue
             output = (r.get("output") or "Disabled").strip()
             patch = (r.get("patch") or "").strip()
+            # OUT-03: optionale externe Universe-Nummer (Art-Net/sACN). Fehlt sie
+            # oder ist leer/unparsbar -> None = abwaertskompatibler Default.
+            out_u = r.get("out_universe")
+            if out_u is not None and str(out_u).strip() != "":
+                try:
+                    out_u = int(out_u)
+                except (TypeError, ValueError):
+                    out_u = None
+            else:
+                out_u = None
             if num not in self.universes:
                 self.universes[num] = self.output_manager.add_universe(num)
             try:
@@ -826,9 +836,11 @@ class AppState:
                 if output == "Enttec" and patch:
                     self.output_manager.add_enttec(num, patch)
                 elif output == "ArtNet":
-                    self.output_manager.add_artnet(num, patch or "255.255.255.255")
+                    self.output_manager.add_artnet(num, patch or "255.255.255.255",
+                                                   out_universe=out_u)
                 elif output == "sACN":
-                    self.output_manager.add_sacn(num, patch or None)
+                    self.output_manager.add_sacn(num, patch or None,
+                                                 out_universe=out_u)
             except Exception as e:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
