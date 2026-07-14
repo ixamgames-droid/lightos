@@ -74,7 +74,11 @@ class FixtureRenderer:
              blink_off: bool = False, highlighted: bool = False,
              zoom: float = 1.0, pan_range_deg: float = 540.0,
              tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
-             tilt_zero_dmx: float = 128.0):
+             tilt_zero_dmx: float = 128.0, lod: int = 0):
+        # lod (Level-of-Detail, QOL/UI-26): 0 = volles Label + Intensity% + FX-Badge,
+        # 1 = nur Kurz-Label (ohne Typ-Praefix), 2 = gar kein Text. Wird vom Canvas
+        # aus dem Bildschirm-Nachbarabstand bestimmt -> keine ueberlappenden Labels
+        # bei dichten Fixtures/kleinem Zoom. Default 0 = rueckwaertskompatibel.
         effects = effects or []
         painter.save()
         painter.translate(x, y)
@@ -392,17 +396,24 @@ class FixtureRenderer:
             painter.drawRect(QRectF(-size*0.4, -size*0.4, size*0.8, size*0.8))
             label_prefix = "?"
 
-        # Label darunter (konstante Bildschirmgroesse, nicht abschneiden)
-        _fl = QFont("Arial"); _fl.setPointSizeF(8 * tscale)
-        painter.setPen(QColor("#bbb"))
-        painter.setFont(_fl)
-        text_rect = QRectF(-size, size*0.55, size*2, 16)
-        painter.drawText(text_rect,
-                         Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
-                         (f"{label_prefix} {label}" if label else label_prefix))
+        # Label darunter (konstante Bildschirmgroesse, nicht abschneiden).
+        # LOD 0 = "PREFIX Name", LOD 1 = nur Kurz-Label (spart Breite bei Dichte),
+        # LOD 2 = kein Label (Selektion/Hover bekommt vom Canvas immer LOD 0).
+        if lod <= 1:
+            _fl = QFont("Arial"); _fl.setPointSizeF(8 * tscale)
+            painter.setPen(QColor("#bbb"))
+            painter.setFont(_fl)
+            text_rect = QRectF(-size, size*0.55, size*2, 16)
+            if lod == 0:
+                _txt = (f"{label_prefix} {label}" if label else label_prefix)
+            else:
+                _txt = (label if label else label_prefix)
+            painter.drawText(text_rect,
+                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
+                             _txt)
 
-        # Intensity-Wert oben
-        if intensity > 0:
+        # Intensity-Wert oben — nur bei voller Detailstufe (sonst Text-Salat)
+        if intensity > 0 and lod == 0:
             _fi = QFont("Arial"); _fi.setPointSizeF(7 * tscale)
             painter.setPen(QColor("#FFD700") if intensity > 200 else QColor("#aaa"))
             painter.setFont(_fi)
@@ -411,8 +422,8 @@ class FixtureRenderer:
                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
                             f"{inten_pct}%")
 
-        # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant)
-        if effects:
+        # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant) — nur LOD 0
+        if effects and lod == 0:
             bw, bh = 22 * tscale, 12 * tscale
             badge_rect = QRectF(size*0.25, -size*0.9, bw, bh)
             painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
@@ -426,6 +437,51 @@ class FixtureRenderer:
                              f"FX{len(effects)}" if len(effects) > 1 else "FX")
 
         painter.restore()
+
+
+def _lod_for_screen_gap(screen_gap: float) -> int:
+    """UI-26/QOL: Bildschirm-Abstand zum naechsten Nachbarn -> Label-Detailgrad.
+    0 = volles Label + Intensity% + FX-Badge, 1 = nur Kurz-Label, 2 = kein Text.
+    Reine Schwellenfunktion (kein Qt) -> trivial unit-testbar. Schwellen so, dass
+    das ~72 px breite Label-Rect erst faellt, wenn Nachbarn wirklich zu nah sind."""
+    if screen_gap >= 48.0:
+        return 0
+    if screen_gap >= 22.0:
+        return 1
+    return 2
+
+
+def _grid_positions(n: int, world_w: float, world_h: float,
+                    min_step: float = 90.0,
+                    margin: float = 60.0) -> list[tuple[float, float]]:
+    """QOL-01: n Fixtures ohne gespeicherte Position in ein zeilenweises Raster
+    INNERHALB der Welt legen (frueher ein dicht gedraengter Halbkreis -> beim ersten
+    Start unlesbarer Label-Salat). Normalfall: Schrittweite ``min_step`` (>= Label-
+    Breite ~72 px) -> bei Zoom 1.0 sind alle Labels frei. Passen bei ``min_step``
+    nicht alle Zeilen in ``world_h`` (sehr grosse Rigs), wird die Schrittweite so
+    geschrumpft, dass ALLE Fixtures im sichtbaren, fix-grossen Canvas
+    ``[margin, world-margin]`` bleiben (die dann dichteren Labels uebernimmt das
+    LOD-System) — statt sie wie zuvor unbegrenzt ueber ``world_h`` hinaus
+    off-canvas/unerreichbar wachsen zu lassen. Reine Funktion -> testbar."""
+    if n <= 0:
+        return []
+    usable_w = max(1.0, world_w - 2.0 * margin)
+    usable_h = max(1.0, world_h - 2.0 * margin)
+    cols = max(1, min(n, int(usable_w // min_step) or 1))
+    rows = (n + cols - 1) // cols
+    step_x = step_y = min_step
+    if rows > 1 and (rows - 1) * step_y > usable_h:
+        # Zeilen sprengen die Hoehe -> flaechenfuellendes Raster, das sicher passt.
+        from math import sqrt, ceil
+        cols = max(1, min(n, int(ceil(sqrt(n * usable_w / usable_h)))))
+        rows = (n + cols - 1) // cols
+        step_x = usable_w / (cols - 1) if cols > 1 else 0.0
+        step_y = usable_h / (rows - 1) if rows > 1 else 0.0
+    out: list[tuple[float, float]] = []
+    for i in range(n):
+        r, c = divmod(i, cols)
+        out.append((margin + c * step_x, margin + r * step_y))
+    return out
 
 
 # ── Stage-Canvas ──────────────────────────────────────────────────────────────
@@ -459,7 +515,13 @@ class StageCanvas(QWidget):
         self._state = get_state()
         # Fixture-Positionen (fid -> (x, y) in Welt-Koordinaten)
         self._positions: dict[int, tuple[float, float]] = {}
-        self._fixture_size: float = 36.0
+        # QOL/UI-26: Nachbar-Abstand (Welt-px) je Fixture fuer die LOD-Label-Wahl;
+        # in _load_positions() UND _notify_layout_changed() (nach Drag/place_fixture)
+        # neu berechnet -> bleibt nach jeder Positions-Aenderung konsistent.
+        self._nn_gap: dict[int, float] = {}
+        # Icon-Groesse per Pref justierbar (Davids "kleiner skalieren"-Wunsch als
+        # Self-Service); Default moderat 30 -> MH-Kopf (size*0.4) bleibt erkennbar.
+        self._fixture_size: float = float(lv_prefs.get("fixture_size", 30.0))
         self._selected_fids: list[int] = []
         self._drag_fid: int | None = None
         self._drag_offset: QPointF = QPointF()
@@ -627,7 +689,15 @@ class StageCanvas(QWidget):
         self.update()
 
     def _notify_layout_changed(self) -> None:
-        """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save)."""
+        """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save).
+
+        UI-26: Dieser Hook laeuft nach JEDER Positions-Mutation ausserhalb von
+        ``_load_positions`` (place_fixture, Einzel-/Multi-Drag-Release, Snap) — hier
+        die Nachbar-Abstaende fuer die LOD-Label-Wahl neu berechnen. Sonst blieb der
+        ``_nn_gap``-Cache nach dem Verschieben stale: zusammengeschobene Fixtures
+        zeigten weiter volle, ueberlappende Labels (und auseinandergezogene blieben
+        faelschlich abgekuerzt), bis erst der naechste Show-Reload korrigierte."""
+        self._compute_label_gaps()
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
@@ -726,19 +796,44 @@ class StageCanvas(QWidget):
                     self._positions[f.fid] = world3d_to_live(x3d, z3d)
                 except Exception:
                     pass
-        # 3) Auto-Layout (Halbkreis vor der Buehne) fuer den Rest
+        # 3) Auto-Layout: gleichmaessiges Raster mit label-sicherem Abstand.
+        #    QOL-01: frueher ein dicht gedraengter Halbkreis -> beim ersten Start
+        #    (Patch ohne gespeicherte Positionen) lagen die Fixtures fast
+        #    uebereinander und die Labels wurden zu unlesbarem Salat. Ein Raster mit
+        #    STEP_X >= Label-Breite (~72 px) zeigt bei Zoom 1.0 ALLE Labels. Nur der
+        #    Auto-Layout-Zweig aendert sich -> gespeicherte 2D-/3D-Positionen (1+2)
+        #    bleiben unangetastet und persistieren wie bisher.
         missing = [f for f in fixtures if f.fid not in self._positions]
         if missing:
-            from math import cos, sin, pi
-            n = len(missing)
-            for i, f in enumerate(missing):
-                angle = pi * (0.2 + 0.6 * i / max(1, n - 1))
-                cx = 300 + cos(angle) * 200
-                cz = 100 + sin(angle) * 80
-                self._positions[f.fid] = (cx, cz)
+            for f, (px, py) in zip(missing, _grid_positions(len(missing),
+                                                            self.world_w, self.world_h)):
+                self._positions[f.fid] = (px, py)
         # zurueckschreiben -> persistiert mit der Show
         for fid, (x, y) in self._positions.items():
             lv[fid] = (float(x), float(y))
+        # UI-26: Nachbar-Abstaende fuer die LOD-Label-Wahl neu berechnen. Weitere
+        # Positions-Mutationen (Drag/place_fixture) frischen ueber
+        # _notify_layout_changed() ebenfalls auf -> nn_gap bleibt konsistent.
+        self._compute_label_gaps()
+
+    def _compute_label_gaps(self) -> None:
+        """UI-26: pro Fixture den WELT-Abstand zum naechsten Nachbarn cachen
+        (``self._nn_gap``). Mal Zoom ergibt das den Bildschirm-Abstand, aus dem
+        ``_lod_for_screen_gap`` den Label-Detailgrad waehlt. Naiv O(n^2) — reicht
+        fuer reale Rigs (Dutzende bis wenige hundert Fixtures); Einzel-Fixture ->
+        Default 1e9 (immer volles Label)."""
+        pts = list(self._positions.items())
+        gaps: dict[int, float] = {}
+        for i, (fid, (x, y)) in enumerate(pts):
+            best = 1e9
+            for j, (_ofid, (ox, oy)) in enumerate(pts):
+                if i == j:
+                    continue
+                d = ((x - ox) ** 2 + (y - oy) ** 2) ** 0.5
+                if d < best:
+                    best = d
+            gaps[fid] = best
+        self._nn_gap = gaps
 
     # ── Strobe / Effekte ──────────────────────────────────────────────────────
 
@@ -1088,6 +1183,12 @@ class StageCanvas(QWidget):
             _tz = getattr(fixture, "tilt_zero_dmx", 128)
             _pz = 128 if _pz is None else _pz
             _tz = 128 if _tz is None else _tz
+            # UI-26: Label-Detailgrad aus dem Bildschirm-Nachbarabstand. Selektierte
+            # oder hervorgehobene Fixtures bekommen IMMER das volle Label (der Nutzer
+            # will genau die sehen), unabhaengig von der Dichte.
+            _lod = _lod_for_screen_gap(self._nn_gap.get(fixture.fid, 1e9) * self.zoom)
+            if fixture.fid in self._selected_fids or fixture.fid in self._highlight_fids:
+                _lod = 0
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
@@ -1099,6 +1200,7 @@ class StageCanvas(QWidget):
                 zoom=self.zoom,
                 pan_range_deg=_pr, tilt_range_deg=_tr,
                 pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
+                lod=_lod,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
