@@ -100,7 +100,13 @@ class EnttecProcessProxy:
 
     Hat dieselben Methoden, die der :class:`OutputManager` nutzt: ``send_dmx`` (512
     Bytes), ``close``, ``is_open`` und das ``port``-Attribut; zusaetzlich
-    ``is_disabled`` fuer den UI-Status.
+    ``is_disabled``, ``is_connected`` und ``status`` fuer den UI-Status.
+
+    Wichtig (SERIAL-01): ``is_open`` meldet nur, dass der Worker-PROZESS laeuft
+    (Respawn-Kriterium). Ob der PORT wirklich offen ist und Frames rausgehen, sagt
+    ``is_connected()`` (== ``ST_OK``) bzw. ``status()``/``is_disabled()``. Fuer die
+    UI-Anzeige "Verbunden" IMMER ``is_connected()`` verwenden, sonst bleibt die
+    Anzeige "Verbunden", waehrend das Rig (toter COM-Port) dunkel bleibt.
     """
     RESPAWN_EVERY_S = 3.0
 
@@ -165,8 +171,29 @@ class EnttecProcessProxy:
             pass
 
     def is_open(self) -> bool:
+        """Worker-LEBENSZEICHEN: True, solange der Worker-Prozess laeuft. Das ist
+        NICHT gleichbedeutend mit "Port offen / Licht kommt an" — ein toter/falscher
+        COM-Port laeuft im Worker als ST_DISABLED weiter (er versucht gedrosselt neu
+        zu oeffnen), der Prozess lebt also weiter. Fuer den TATSAECHLICHEN
+        Verbindungsstatus (UI: "Verbunden") ``is_connected()``/``status()`` nutzen —
+        sonst zeigt die App dauerhaft "Verbunden", obwohl das Rig dunkel bleibt
+        (SERIAL-01)."""
         p = self._proc
         return bool(p is not None and p.is_alive())
+
+    def status(self) -> int:
+        """Roher Worker-/Port-Status (``ST_CONNECTING``/``ST_OK``/``ST_DISABLED``),
+        vom Worker-Prozess ueber das shared ``Value`` gemeldet."""
+        return self._status.value
+
+    def is_connected(self) -> bool:
+        """SERIAL-01: True NUR, wenn der Worker lebt UND sein Port tatsaechlich offen
+        ist (``ST_OK``) — d. h. Frames gehen wirklich raus. Ein toter Port
+        (``ST_DISABLED``) oder das erste Verbinden (``ST_CONNECTING``) gilt hier als
+        NICHT verbunden, sodass ein totes Rig als "kein Signal" erkennbar ist."""
+        p = self._proc
+        return bool(p is not None and p.is_alive()
+                    and self._status.value == ST_OK)
 
     def is_disabled(self) -> bool:
         return self._status.value == ST_DISABLED
