@@ -71,6 +71,16 @@ class OutputManager:
         # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
         # global dimmen. {universe:int -> frozenset[addr 1..512]}
         self._gm_address_mask: dict[int, frozenset] = {}
+        # ANZEIGE-Snapshot (WYSIWYG): pro Universum die zuletzt GESENDETEN Bytes
+        # NACH Grand-Master/Blackout/Channel-Modifier. Output-facing Anzeigen
+        # (DMX-Monitor, Output-Monitor, 3D-Visualizer) lesen diesen Snapshot statt
+        # des Roh-Universe-Puffers, damit sie den echten Output zeigen — bei
+        # Blackout also alles 0, bei GM<100% skaliert. NUR-LESEN fuer die Anzeige:
+        # wird NIE zurueck in den Puffer/Render geschrieben (keine Feedback-Schleife).
+        # Zuweisung erfolgt GIL-atomar mit immutable ``bytes`` je Universum.
+        # {universe:int -> bytes(512)}. Leer, solange noch kein Frame gesendet wurde
+        # -> Konsumenten fallen dann sauber auf den Rohpuffer zurueck.
+        self._display_frame: dict[int, bytes] = {}
 
     # ── Grand Master ─────────────────────────────────────────────────────────
 
@@ -92,6 +102,23 @@ class OutputManager:
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
         aus dem Patch gepflegt."""
         self._gm_address_mask = mask or {}
+
+    # ── Anzeige-Snapshot (WYSIWYG) ───────────────────────────────────────────
+
+    def get_display_frame(self, universe: int) -> bytes | None:
+        """Zuletzt GESENDETE Bytes (512) fuer ``universe`` NACH Grand-Master/
+        Blackout/Channel-Modifier — der echte Output fuer output-facing Anzeigen
+        (DMX-Monitor, Output-Monitor, 3D-Visualizer). ``None``, solange noch kein
+        Frame gesendet wurde (Output-Thread aus / kein Tick) -> der Aufrufer faellt
+        dann auf den Rohpuffer (``universe.get_all()``) zurueck. NUR LESEN: der
+        Snapshot wird nie zurueck in den Puffer/Render geschrieben."""
+        return self._display_frame.get(universe)
+
+    def display_snapshot(self) -> dict[int, bytes]:
+        """Flache Kopie des Anzeige-Snapshots {universe -> bytes(512)} (POST-
+        Master). Kopie des dicts, damit der Aufrufer nicht ueber eine mutierende
+        Struktur iteriert; die ``bytes``-Werte selbst sind immutable."""
+        return dict(self._display_frame)
 
     def add_tick_callback(self, cb):
         """Register a callable(dt) that is called each output frame."""
@@ -346,6 +373,11 @@ class OutputManager:
                         if 1 <= addr <= 512:
                             buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
                     data = bytes(buf)
+            # ANZEIGE-Snapshot: exakt die Bytes, die gleich gesendet werden (POST
+            # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit
+            # immutable ``bytes`` — keine Sperre noetig, Anzeige-Leser sehen immer
+            # einen vollstaendigen Frame. NUR fuer die Anzeige, nie zurueckgeschrieben.
+            self._display_frame[univ_num] = data
             # Geraete-Zugriff unter Lock: verhindert, dass der UI-Thread ein
             # Geraet schliesst/austauscht, waehrend wir hier senden (Deadlock).
             with self._io_lock:

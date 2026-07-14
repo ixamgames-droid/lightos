@@ -113,7 +113,14 @@ class OutputView(QWidget):
         if univ_num not in self._state.universes:
             return
         universe = self._state.universes[univ_num]
-        data = universe.get_all()
+        # WYSIWYG: den GESENDETEN Output zeigen (POST Grand-Master/Blackout).
+        # Fallback auf den Rohpuffer, solange noch kein Frame gesendet wurde.
+        data = None
+        om = getattr(self._state, "output_manager", None)
+        if om is not None:
+            data = om.get_display_frame(univ_num)
+        if data is None:
+            data = universe.get_all()
         cells = self._cells.get(univ_num, [])
         for i, cell in enumerate(cells):
             cell.set_value(data[i])

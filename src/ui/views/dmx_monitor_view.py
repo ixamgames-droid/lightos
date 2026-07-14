@@ -266,7 +266,14 @@ class DmxMonitorView(QWidget):
         if univ not in self._state.universes:
             return
         try:
-            data = self._state.universes[univ].get_all()
+            # WYSIWYG: den GESENDETEN Output zeigen (POST Grand-Master/Blackout).
+            # Fallback auf den Rohpuffer, solange noch kein Frame gesendet wurde.
+            data = None
+            om = getattr(self._state, "output_manager", None)
+            if om is not None:
+                data = om.get_display_frame(univ)
+            if data is None:
+                data = self._state.universes[univ].get_all()
             self._grid.set_values(data)
         except Exception:
             pass
