@@ -106,6 +106,27 @@ class TestRemoteAuth(unittest.TestCase):
         srv.set_bind_ip("0.0.0.0")
         self.assertEqual(srv._ip, "0.0.0.0")
 
+    def test_regenerate_and_refresh_fully_revokes_access(self):
+        # Security-Review: 'Token neu erzeugen' + refresh_token(app) muss (a) die
+        # bestehende Session sofort abweisen (auth_epoch++), (b) das ALTE ?k=-Link
+        # entwerten (app.config uebernimmt das neue Token), (c) mit dem NEUEN Token
+        # wieder Zugang geben.
+        from src.web import remote_settings
+        self.client.get("/?k=geheim123")
+        self.assertEqual(self.client.post("/api/go").status_code, 200)   # authed
+
+        new_tok = remote_settings.regenerate_token()                     # epoch++ + neues Token
+        webapp.refresh_token(self.app)                                   # laufender Server uebernimmt
+
+        # (a) alte Session (alte Epoche) -> 403
+        self.assertEqual(self.client.post("/api/go").status_code, 403)
+        # (b) altes Token authet nicht mehr
+        self.client.get("/?k=geheim123")
+        self.assertEqual(self.client.post("/api/go").status_code, 403)
+        # (c) neues Token -> wieder rein
+        self.client.get(f"/?k={new_tok}")
+        self.assertEqual(self.client.post("/api/go").status_code, 200)
+
 
 @unittest.skipUnless(HAS_FLASK, "Flask/flask-socketio nicht installiert")
 class TestCorsAllowlist(unittest.TestCase):

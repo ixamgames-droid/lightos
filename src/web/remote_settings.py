@@ -38,6 +38,11 @@ DEFAULTS: dict = {
     "token": "",
     "lan_remote_enabled": True,
     "osc_network_enabled": False,
+    # Auth-Epoche: wird bei jeder Token-Rotation erhoeht. Die Web-Session speichert
+    # die Epoche zum Auth-Zeitpunkt; der Gate weist Sessions mit veralteter Epoche ab
+    # -> ein 'Token neu erzeugen' wirft bestehende Sessions SOFORT raus (Security-
+    # Review). Im Cookie steht nur die Zahl, nichts Token-Ableitbares.
+    "auth_epoch": 0,
 }
 
 
@@ -96,11 +101,23 @@ def get_token() -> str:
     return tok
 
 
+def get_auth_epoch() -> int:
+    """Aktuelle Auth-Epoche (steigt bei jeder Token-Rotation)."""
+    try:
+        return int(load_settings().get("auth_epoch", 0) or 0)
+    except Exception:
+        return 0
+
+
 def regenerate_token() -> str:
     """Erzeugt ein NEUES Token, persistiert es und gibt es zurueck ('Token neu
-    erzeugen'). Alte am Handy gespeicherte Links werden damit ungueltig."""
+    erzeugen'). Wirkt SOFORT am laufenden Server: der Handshake liest das Token
+    frisch (kein Neustart noetig), und die mit-erhoehte ``auth_epoch`` macht alle
+    bestehenden authentisierten Web-Sessions ungueltig (der Gate vergleicht die
+    Session-Epoche gegen die aktuelle). Alte am Handy gespeicherte ``?k=``-Links
+    (mit dem alten Token) werden damit ebenfalls abgewiesen."""
     tok = _new_token()
-    save_settings({"token": tok})
+    save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
     return tok
 
 

@@ -167,6 +167,20 @@ def create_app(port: int = 5000) -> tuple:
     return _flask_app, _socketio
 
 
+def refresh_token(app) -> None:
+    """Laedt das aktuelle Token frisch aus den Prefs in ``app.config`` — nach einer
+    Token-Rotation (``remote_settings.regenerate_token()``) aufrufen, damit der
+    LAUFENDE Server den NEUEN ``?k=``-Link akzeptiert und den ALTEN abweist (kein
+    Neustart). Die Invalidierung bereits authentisierter Sessions erledigt die
+    mit-erhoehte ``auth_epoch`` (Gate). Beides zusammen macht die Rotation
+    vollstaendig wirksam (Security-Review)."""
+    try:
+        from src.web import remote_settings
+        app.config["LIGHTOS_REMOTE_TOKEN"] = remote_settings.get_token()
+    except Exception as e:
+        print(f"[web] refresh_token error: {e}")
+
+
 def _register_auth(app):
     """NET-01: Token-Gate. Alle Routen ausser der Allowlist ('/', statische
     Assets) verlangen eine authentisierte Session. Die '/'-Route macht den
@@ -182,7 +196,11 @@ def _register_auth(app):
             if path == "/" or path.startswith("/static/"):
                 return None
             if session.get("authed") is True:
-                return None
+                # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
+                # -> ein 'Token neu erzeugen' (epoch++) wirft bestehende Sessions raus.
+                from src.web import remote_settings
+                if session.get("epoch") == remote_settings.get_auth_epoch():
+                    return None
         except Exception as e:
             print(f"[web] auth gate error: {e}")
         return ("Forbidden", 403)
@@ -198,9 +216,15 @@ def _register_routes(app):
             k = request.args.get("k")
             if k:
                 import secrets as _secrets
+                from src.web import remote_settings
+                # Laufzeit-Token = app.config (bei create_app aus den Prefs gecacht;
+                # ``refresh_token(app)`` haelt es nach einer Rotation aktuell). Die
+                # Session bekommt die aktuelle Auth-Epoche gestempelt -> ein 'Token
+                # neu erzeugen' (epoch++) invalidiert bestehende Sessions im Gate.
                 token = app.config.get("LIGHTOS_REMOTE_TOKEN") or ""
                 if token and _secrets.compare_digest(str(k), str(token)):
                     session["authed"] = True
+                    session["epoch"] = remote_settings.get_auth_epoch()
         except Exception as e:
             print(f"[web] handshake error: {e}")
         return render_template("index.html")
