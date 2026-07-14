@@ -932,6 +932,10 @@ class MainWindow(QMainWindow):
     def _setup_statusbar(self):
         sb = self.statusBar()
         self._lbl_enttec   = QLabel("Enttec: --")
+        # UI-24e: Enttec-Status anklickbar → Output-Einstellungen öffnen.
+        self._lbl_enttec.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_enttec.setToolTip("Klick öffnet die Output-Einstellungen")
+        self._lbl_enttec.mousePressEvent = lambda _e: self._open_output_config()
         self._lbl_web      = QLabel("Web: aus")
         self._lbl_fixtures = QLabel("0 Geräte")
         self._lbl_mock     = QLabel("")

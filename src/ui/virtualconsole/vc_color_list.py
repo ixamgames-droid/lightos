@@ -158,13 +158,17 @@ class VCColorList(VCWidget):
 
         entries = list(getattr(seq, "entries", []) or []) if seq is not None else None
         if entries is None:
-            # Effekt ohne Farbliste (z. B. echter Szenen-Chaser) -> Schritt-Hinweis.
-            steps = getattr(fn, "steps", None)
-            txt = (f"{len(steps)} Schritt(e)" if steps is not None
-                   else "(keine Farbliste)")
-            p.setPen(QColor("#666"))
-            p.setFont(QFont("Segoe UI", 9))
-            p.drawText(area, Qt.AlignmentFlag.AlignCenter, txt)
+            # UI-24d: bei fehlendem Ziel genügt der Status „— kein Ziel —" oben;
+            # den zweiten, konkurrierenden Hinweis „(keine Farbliste)" in der Mitte
+            # NICHT doppeln. Der Zentral-Hinweis bleibt nur echten Effekten ohne
+            # Farbliste (z. B. Szenen-Chaser) vorbehalten.
+            if fn is not None:
+                steps = getattr(fn, "steps", None)
+                txt = (f"{len(steps)} Schritt(e)" if steps is not None
+                       else "(keine Farbliste)")
+                p.setPen(QColor("#666"))
+                p.setFont(QFont("Segoe UI", 9))
+                p.drawText(area, Qt.AlignmentFlag.AlignCenter, txt)
             p.end()
             return
         if not entries:
