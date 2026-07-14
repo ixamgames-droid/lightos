@@ -57,6 +57,11 @@ class OutputManager:
         # Slot (Widget-ID), damit sich mehrere Submaster nicht ueberschreiben.
         self._submasters: dict = {}
         self._sacn_outputs: dict[int, SACNSender] = {}  # universe → sender
+        # OUT-03: pro internem Universum eine optionale, explizit konfigurierte
+        # EXTERNE Universe-Nummer fuer Art-Net/sACN. Fehlt ein Eintrag, gilt der
+        # abwaertskompatible Default (Art-Net = num-1, sACN = num). {internal:int
+        # -> external:int}
+        self._out_universe: dict[int, int] = {}
         self._tick_callbacks: list = []   # callables(dt: float)
         self.grand_master: float = 1.0  # 0.0–1.0 — globale Helligkeit
         self._gm_callbacks: list = []   # callables(value: float)
@@ -181,11 +186,29 @@ class OutputManager:
             except Exception:
                 pass
 
-    def add_artnet(self, universe: int, target_ip: str = "255.255.255.255"):
-        self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip))
+    def _set_out_universe(self, universe: int, out_universe):
+        """OUT-03: merkt/loescht die konfigurierte externe Universe-Nummer fuer
+        ein internes Universum. ``None`` (oder unparsbar) -> Default-Verhalten in
+        _send_all (Art-Net num-1, sACN num). Unter Lock, damit _send_all nicht
+        mitten im Umschalten liest."""
+        with self._io_lock:
+            if out_universe is None:
+                self._out_universe.pop(universe, None)
+                return
+            try:
+                self._out_universe[universe] = int(out_universe)
+            except (TypeError, ValueError):
+                self._out_universe.pop(universe, None)
 
-    def add_sacn(self, universe: int, target_ip: str | None = None):
+    def add_artnet(self, universe: int, target_ip: str = "255.255.255.255",
+                   out_universe=None):
+        self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip))
+        self._set_out_universe(universe, out_universe)
+
+    def add_sacn(self, universe: int, target_ip: str | None = None,
+                 out_universe=None):
         self._swap_device(self._sacn_outputs, universe, SACNSender(target_ip))
+        self._set_out_universe(universe, out_universe)
 
     def remove_output(self, universe: int):
         """OUT-05: entfernt ALLE Ausgabe-Adapter (Enttec/ArtNet/sACN) fuer ein
@@ -202,6 +225,10 @@ class OutputManager:
                 dev = registry.pop(universe, None)
                 if dev is not None:
                     victims.append(dev)
+            # OUT-03: eine evtl. konfigurierte externe Universe-Nummer mit
+            # entfernen, damit ein spaeter neu angelegter Adapter nicht die alte
+            # Nummer erbt.
+            self._out_universe.pop(universe, None)
         for dev in victims:
             try:
                 dev.close()
@@ -325,6 +352,9 @@ class OutputManager:
                 enttec = self._enttec_outputs.get(univ_num)
                 artnet = self._artnet_outputs.get(univ_num)
                 sacn = self._sacn_outputs.get(univ_num)
+                # OUT-03: konfigurierte externe Universe-Nummer (falls gesetzt),
+                # sonst abwaertskompatibler Default (Art-Net num-1, sACN num).
+                ext = self._out_universe.get(univ_num)
                 if enttec is not None:
                     try:
                         enttec.send_dmx(data)
@@ -332,11 +362,11 @@ class OutputManager:
                         pass
                 if artnet is not None:
                     try:
-                        artnet.send_dmx(univ_num - 1, data)
+                        artnet.send_dmx(ext if ext is not None else univ_num - 1, data)
                     except Exception:
                         pass
                 if sacn is not None:
                     try:
-                        sacn.send_dmx(univ_num, data)
+                        sacn.send_dmx(ext if ext is not None else univ_num, data)
                     except Exception:
                         pass

@@ -1,3 +1,5 @@
+# HINWEIS: Start/Stop/Wait/Shot sind jetzt in tools/app.ps1 konsolidiert (QA-22). Dieses Skill-Toolset
+# bleibt fuer die Feinsteuerung (move/click/drag/type/key/scroll/crop) erhalten.
 # LightOS walkthrough driver — robust foreground + input + screenshot (DPI-aware, physical px).
 # The target is the VISIBLE window whose title is "LightOS" / "LightOS ..." AND owned by a python process
 # (this excludes the "lightos-main - Datei-Explorer" window and the console).

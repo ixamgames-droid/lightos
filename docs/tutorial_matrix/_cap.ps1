@@ -1,3 +1,4 @@
+# HINWEIS: durch tools/app.ps1 'shot' ersetzt/konsolidiert (QA-22).
 # Single screenshot to a file. Optional crop rect: -X -Y -W -H (physical pixels).
 param(
   [Parameter(Mandatory=$true)][string]$Path,

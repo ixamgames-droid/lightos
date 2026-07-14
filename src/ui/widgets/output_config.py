@@ -221,17 +221,25 @@ class OutputConfigDialog(QDialog):
         uf = QVBoxLayout(univ_tab)
         uf.addWidget(QLabel(
             "Universen verwalten - bis zu 32 Universen.\n"
-            "Pro Universe: Name, Output-Typ (Disabled / Enttec / sACN / ArtNet), Patch-Adresse."
+            "Pro Universe: Name, Output-Typ (Disabled / Enttec / sACN / ArtNet), "
+            "Patch-Adresse, optionale externe Universe-Nummer."
         ))
-        self._univ_table = QTableWidget(0, 4)
+        self._univ_table = QTableWidget(0, 5)
         self._univ_table.setHorizontalHeaderLabels(
-            ["#", "Name", "Output", "Patch (Port/IP)"]
+            ["#", "Name", "Output", "Patch (Port/IP)", "Ext-Universe"]
+        )
+        # OUT-03: "Ext-Universe" = optionale externe Art-Net/sACN-Universe-Nummer.
+        # Leer = Default (Art-Net num-1, sACN num).
+        self._univ_table.horizontalHeaderItem(4).setToolTip(
+            "Optionale externe Art-Net/sACN-Universe-Nummer. "
+            "Leer = Standard (Art-Net #-1, sACN #)."
         )
         self._univ_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._univ_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self._univ_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self._univ_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self._univ_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self._univ_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         uf.addWidget(self._univ_table, 1)
 
         uf_btns = QHBoxLayout()
@@ -344,6 +352,11 @@ class OutputConfigDialog(QDialog):
             combo.setCurrentText(r.get("output", "Disabled"))
             self._univ_table.setCellWidget(i, 2, combo)
             self._univ_table.setItem(i, 3, QTableWidgetItem(r.get("patch", "")))
+            # OUT-03: externe Universe-Nummer (leer = Default). None/fehlt -> "".
+            ext = r.get("out_universe")
+            ext_item = QTableWidgetItem("" if ext is None else str(ext))
+            ext_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._univ_table.setItem(i, 4, ext_item)
 
     def _univ_add(self):
         row = self._univ_table.rowCount()
@@ -358,6 +371,7 @@ class OutputConfigDialog(QDialog):
             combo.addItem(opt)
         self._univ_table.setCellWidget(row, 2, combo)
         self._univ_table.setItem(row, 3, QTableWidgetItem(""))
+        self._univ_table.setItem(row, 4, QTableWidgetItem(""))
 
     def _univ_delete(self):
         rows = sorted({i.row() for i in self._univ_table.selectedIndexes()}, reverse=True)
@@ -370,17 +384,27 @@ class OutputConfigDialog(QDialog):
             num_item = self._univ_table.item(r, 0)
             name_item = self._univ_table.item(r, 1)
             patch_item = self._univ_table.item(r, 3)
+            ext_item = self._univ_table.item(r, 4)
             combo = self._univ_table.cellWidget(r, 2)
             try:
                 num = int(num_item.text()) if num_item else r + 1
             except ValueError:
                 num = r + 1
-            rows.append({
+            entry = {
                 "num": num,
                 "name": name_item.text() if name_item else f"Universe {num}",
                 "output": combo.currentText() if combo else "Disabled",
                 "patch": patch_item.text() if patch_item else "",
-            })
+            }
+            # OUT-03: externe Universe-Nummer nur speichern, wenn gesetzt & gueltig
+            # (leer/ungueltig -> Feld weglassen = abwaertskompatibler Default).
+            ext_text = ext_item.text().strip() if ext_item else ""
+            if ext_text:
+                try:
+                    entry["out_universe"] = int(ext_text)
+                except ValueError:
+                    pass
+            rows.append(entry)
         _save_universe_config(rows)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         try:
