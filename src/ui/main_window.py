@@ -64,14 +64,76 @@ def _save_recent_files(paths: list[str]) -> None:
         print(f"[main_window] save recent error: {e}")
 
 
+def _canon_path(p: str) -> str:
+    """Kanonische Vergleichsform eines Pfades (case-/slash-/'..'-normalisiert).
+
+    QOL-02: nur fuer den Dedup-Vergleich — der anzeigefaehige Originalpfad bleibt
+    unveraendert erhalten (Autosave-Recovery liest weiter den echten Pfad).
+    Bewusst OHNE `os.path.realpath`: das wuerde beim Show-Oeffnen Filesystem-I/O
+    auf dem UI-Thread ausloesen (koennte auf langsamen Netz-Shares kurz blockieren).
+    `abspath` ist rein string-/cwd-basiert und deckt Gross/Klein, Slash und '..' ab;
+    Symlink-Aufloesung ist fuer Show-Dateien praktisch irrelevant.
+    """
+    try:
+        return os.path.normcase(os.path.normpath(os.path.abspath(p)))
+    except Exception:
+        return os.path.normcase(os.path.normpath(p))
+
+
 def _add_recent_file(path: str) -> list[str]:
     recents = _load_recent_files()
-    # Move to front, dedup
-    recents = [p for p in recents if p != path]
+    # Move to front, dedup nach Kanonpfad: dieselbe Datei in anderer Schreibweise
+    # (Gross/Klein, Slash-Richtung, Symlink) zaehlt als Duplikat. Der neu
+    # hinzugefuegte Originalpfad wird zur Anzeige behalten.
+    key = _canon_path(path)
+    recents = [p for p in recents if _canon_path(p) != key]
     recents.insert(0, path)
     recents = recents[:10]
     _save_recent_files(recents)
     return recents
+
+
+def _split_dirs(path: str) -> list[str]:
+    """Ordner-Komponenten eines Pfades ohne Dateiname (Trenner-agnostisch)."""
+    d = os.path.dirname(path)
+    return [c for c in d.replace("\\", "/").split("/") if c]
+
+
+def _recent_menu_labels(paths: list[str]) -> list[str]:
+    """QOL-02: Menue-Beschriftungen fuer 'Zuletzt verwendet'.
+
+    Standard = Dateiname. Teilen sich >=2 Eintraege denselben Dateinamen
+    (z. B. dieselbe Show einmal in AppData und einmal im Projektordner), wird
+    das *kuerzeste unterscheidende* Ordner-Suffix angehaengt, damit gleichnamige
+    Shows aus verschiedenen Ordnern auseinanderzuhalten sind. Reine Funktion.
+    """
+    bases = [os.path.basename(p) or p for p in paths]
+    groups: dict[str, list[int]] = {}
+    for i, b in enumerate(bases):
+        groups.setdefault(os.path.normcase(b), []).append(i)
+    labels = list(bases)
+    for idxs in groups.values():
+        if len(idxs) < 2:
+            continue  # eindeutiger Dateiname -> schlichtes basename
+        dir_parts = [_split_dirs(paths[i]) for i in idxs]
+        maxlen = max((len(p) for p in dir_parts), default=0)
+        if maxlen == 0:
+            continue  # keine Ordner-Info -> nichts zu unterscheiden
+        # kleinstes k, fuer das die letzten k Ordner alle Eintraege eindeutig machen
+        k = maxlen
+        for kk in range(1, maxlen + 1):
+            suffixes = [os.path.normcase("/".join(p[-kk:])) for p in dir_parts]
+            if len(set(suffixes)) == len(suffixes):
+                k = kk
+                break
+        for pos, i in enumerate(idxs):
+            parts = dir_parts[pos]
+            tail = os.sep.join(parts[-k:]) if parts else ""
+            if not tail:
+                continue
+            prefix = "…" + os.sep if len(parts) > k else ""
+            labels[i] = f"{bases[i]}  —  {prefix}{tail}"
+    return labels
 
 
 def _recovery_prompt_suppressed() -> bool:
@@ -1459,10 +1521,10 @@ class MainWindow(QMainWindow):
             empty = self._recent_menu.addAction("(leer)")
             empty.setEnabled(False)
             return
-        for path in recents:
-            short = os.path.basename(path) or path
+        labels = _recent_menu_labels(recents)
+        for path, short in zip(recents, labels):
             act = self._recent_menu.addAction(short)
-            act.setToolTip(path)
+            act.setToolTip(path)  # voller Pfad bleibt im Tooltip
             act.triggered.connect(weak_slot(self._open_show_path, path))
         self._recent_menu.addSeparator()
         clear_act = self._recent_menu.addAction("Liste leeren")
