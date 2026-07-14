@@ -223,6 +223,14 @@ class VisualizerService:
         attrs: dict[str, int] = {}
         seen: dict[str, int] = {}
         universe = self._state.universes[fixture.universe]
+        # WYSIWYG: den GESENDETEN Output speisen (POST Grand-Master/Blackout), damit
+        # der 3D-Visualizer den echten Output zeigt — bei Blackout also dunkel.
+        # Fallback auf den Rohpuffer (get_channel), solange noch kein Frame gesendet
+        # wurde. NUR LESEN: der Snapshot wird nie zurueckgeschrieben.
+        frame = None
+        om = getattr(self._state, "output_manager", None)
+        if om is not None:
+            frame = om.get_display_frame(fixture.universe)
         channels = get_channels_for_patched(fixture)
         for ch in channels:
             dmx_addr = fixture.address + ch.channel_number - 1
@@ -231,7 +239,10 @@ class VisualizerService:
                 h = seen.get(a, 0)
                 seen[a] = h + 1
                 key = a if h == 0 else f"{a}#{h}"
-                attrs[key] = universe.get_channel(dmx_addr)
+                if frame is not None:
+                    attrs[key] = frame[dmx_addr - 1]
+                else:
+                    attrs[key] = universe.get_channel(dmx_addr)
         return attrs
 
     def _build_snapshot(self) -> dict[int, dict[str, object]]:
