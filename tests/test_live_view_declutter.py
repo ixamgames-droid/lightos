@@ -48,23 +48,31 @@ class TestGridLayout(unittest.TestCase):
     """QOL-01: Auto-Layout (`_grid_positions`) ist label-sicher — reine Funktion,
     deterministisch, unabhaengig von Szene/Adapter."""
 
-    def test_no_overlap_and_in_bounds(self):
-        for n in (1, 3, 12, 48, 200):
-            pts = _grid_positions(n, world_w=1200.0)
+    def test_no_overlap_when_fits(self):
+        # n, die bei min_step 90 in 1200x800 passen -> label-sicher (>= 90 px)
+        for n in (1, 3, 12, 48, 96):
+            pts = _grid_positions(n, 1200.0, 800.0)
             self.assertEqual(len(pts), n)
-            # Kein Paar naeher als STEP (90 px) -> Label-Rect (~72 px) kollidiert nie
             for i in range(len(pts)):
                 for j in range(i + 1, len(pts)):
                     d = ((pts[i][0] - pts[j][0]) ** 2 + (pts[i][1] - pts[j][1]) ** 2) ** 0.5
                     self.assertGreaterEqual(round(d, 3), 89.9,
                                             f"n={n}: Fixtures zu nah: {pts[i]} {pts[j]}")
-            for (x, y) in pts:
-                self.assertGreaterEqual(x, 0.0)
-                self.assertGreaterEqual(y, 0.0)
+
+    def test_large_n_stays_in_world_bounds(self):
+        # Review-Regression: bei sehr vielen Fixtures duerfen KEINE off-canvas
+        # (x>world_w / y>world_h) landen — frueher wuchsen die Zeilen unbegrenzt.
+        pts = _grid_positions(200, 1200.0, 800.0)
+        self.assertEqual(len(pts), 200)
+        for (x, y) in pts:
+            self.assertGreaterEqual(x, 0.0)
+            self.assertLessEqual(x, 1200.0)
+            self.assertGreaterEqual(y, 0.0)
+            self.assertLessEqual(y, 800.0)
 
     def test_single_and_zero(self):
-        self.assertEqual(len(_grid_positions(1, 1200.0)), 1)
-        self.assertEqual(_grid_positions(0, 1200.0), [])
+        self.assertEqual(len(_grid_positions(1, 1200.0, 800.0)), 1)
+        self.assertEqual(_grid_positions(0, 1200.0, 800.0), [])
 
     def test_load_positions_integration_smoke(self):
         """_load_positions läuft mit Mock-Fixtures durch (Raster-Zweig + Gap-Cache)
@@ -135,6 +143,26 @@ class TestDrawLodReducesText(unittest.TestCase):
         self.assertGreater(i0, i1, "LOD 0 sollte mehr Text zeichnen als LOD 1")
         self.assertGreater(i1, i2, "LOD 1 sollte mehr Text zeichnen als LOD 2")
         self.assertGreater(i2, 0, "Das Icon soll bei LOD 2 weiter gezeichnet werden")
+
+
+class TestGapsRecomputedOnLayoutChange(unittest.TestCase):
+    """Review-Regression: nach place_fixture/Drag (-> _notify_layout_changed) muss
+    _nn_gap neu berechnet sein — sonst arbeitet die LOD-Label-Wahl mit veralteten
+    Nachbarabstaenden weiter (zusammengezogene Fixtures behielten volle Labels)."""
+
+    def test_notify_layout_changed_refreshes_gaps(self):
+        c = StageCanvas()
+        try:
+            c._positions = {1: (0.0, 0.0), 2: (1000.0, 0.0)}
+            c._compute_label_gaps()
+            self.assertAlmostEqual(c._nn_gap[1], 1000.0, places=3)   # weit -> volles Label
+            # Fixture 2 nah an 1 schieben (wie ein Drag) + Layout-Change melden
+            c._positions[2] = (30.0, 0.0)
+            c._notify_layout_changed()
+            self.assertAlmostEqual(c._nn_gap[1], 30.0, places=3)     # jetzt eng -> Gap aktuell
+            self.assertAlmostEqual(c._nn_gap[2], 30.0, places=3)
+        finally:
+            c.deleteLater()
 
 
 if __name__ == "__main__":

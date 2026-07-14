@@ -451,16 +451,32 @@ def _lod_for_screen_gap(screen_gap: float) -> int:
     return 2
 
 
-def _grid_positions(n: int, world_w: float,
-                    step_x: float = 90.0, step_y: float = 90.0,
+def _grid_positions(n: int, world_w: float, world_h: float,
+                    min_step: float = 90.0,
                     margin: float = 60.0) -> list[tuple[float, float]]:
-    """QOL-01: n Fixtures ohne gespeicherte Position in ein zeilenweises Raster mit
-    label-sicherem Abstand legen (frueher ein dicht gedraengter Halbkreis -> beim
-    ersten Start unlesbarer Label-Salat). ``step_x >= Label-Breite`` (~72 px) haelt
-    bei Zoom 1.0 alle Labels frei. Reine Funktion -> die 'kein-Overlap'-Invariante
-    ist deterministisch testbar (ohne Qt/Szene)."""
-    usable = max(step_x, world_w - 2.0 * margin)
-    cols = max(1, min(max(1, n), int(usable // step_x)))
+    """QOL-01: n Fixtures ohne gespeicherte Position in ein zeilenweises Raster
+    INNERHALB der Welt legen (frueher ein dicht gedraengter Halbkreis -> beim ersten
+    Start unlesbarer Label-Salat). Normalfall: Schrittweite ``min_step`` (>= Label-
+    Breite ~72 px) -> bei Zoom 1.0 sind alle Labels frei. Passen bei ``min_step``
+    nicht alle Zeilen in ``world_h`` (sehr grosse Rigs), wird die Schrittweite so
+    geschrumpft, dass ALLE Fixtures im sichtbaren, fix-grossen Canvas
+    ``[margin, world-margin]`` bleiben (die dann dichteren Labels uebernimmt das
+    LOD-System) — statt sie wie zuvor unbegrenzt ueber ``world_h`` hinaus
+    off-canvas/unerreichbar wachsen zu lassen. Reine Funktion -> testbar."""
+    if n <= 0:
+        return []
+    usable_w = max(1.0, world_w - 2.0 * margin)
+    usable_h = max(1.0, world_h - 2.0 * margin)
+    cols = max(1, min(n, int(usable_w // min_step) or 1))
+    rows = (n + cols - 1) // cols
+    step_x = step_y = min_step
+    if rows > 1 and (rows - 1) * step_y > usable_h:
+        # Zeilen sprengen die Hoehe -> flaechenfuellendes Raster, das sicher passt.
+        from math import sqrt, ceil
+        cols = max(1, min(n, int(ceil(sqrt(n * usable_w / usable_h)))))
+        rows = (n + cols - 1) // cols
+        step_x = usable_w / (cols - 1) if cols > 1 else 0.0
+        step_y = usable_h / (rows - 1) if rows > 1 else 0.0
     out: list[tuple[float, float]] = []
     for i in range(n):
         r, c = divmod(i, cols)
@@ -500,7 +516,8 @@ class StageCanvas(QWidget):
         # Fixture-Positionen (fid -> (x, y) in Welt-Koordinaten)
         self._positions: dict[int, tuple[float, float]] = {}
         # QOL/UI-26: Nachbar-Abstand (Welt-px) je Fixture fuer die LOD-Label-Wahl;
-        # am einzigen Positions-Schreibpfad _load_positions() neu berechnet.
+        # in _load_positions() UND _notify_layout_changed() (nach Drag/place_fixture)
+        # neu berechnet -> bleibt nach jeder Positions-Aenderung konsistent.
         self._nn_gap: dict[int, float] = {}
         # Icon-Groesse per Pref justierbar (Davids "kleiner skalieren"-Wunsch als
         # Self-Service); Default moderat 30 -> MH-Kopf (size*0.4) bleibt erkennbar.
@@ -672,7 +689,15 @@ class StageCanvas(QWidget):
         self.update()
 
     def _notify_layout_changed(self) -> None:
-        """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save)."""
+        """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save).
+
+        UI-26: Dieser Hook laeuft nach JEDER Positions-Mutation ausserhalb von
+        ``_load_positions`` (place_fixture, Einzel-/Multi-Drag-Release, Snap) — hier
+        die Nachbar-Abstaende fuer die LOD-Label-Wahl neu berechnen. Sonst blieb der
+        ``_nn_gap``-Cache nach dem Verschieben stale: zusammengeschobene Fixtures
+        zeigten weiter volle, ueberlappende Labels (und auseinandergezogene blieben
+        faelschlich abgekuerzt), bis erst der naechste Show-Reload korrigierte."""
+        self._compute_label_gaps()
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
@@ -780,13 +805,15 @@ class StageCanvas(QWidget):
         #    bleiben unangetastet und persistieren wie bisher.
         missing = [f for f in fixtures if f.fid not in self._positions]
         if missing:
-            for f, (px, py) in zip(missing, _grid_positions(len(missing), self.world_w)):
+            for f, (px, py) in zip(missing, _grid_positions(len(missing),
+                                                            self.world_w, self.world_h)):
                 self._positions[f.fid] = (px, py)
         # zurueckschreiben -> persistiert mit der Show
         for fid, (x, y) in self._positions.items():
             lv[fid] = (float(x), float(y))
-        # UI-26: Nachbar-Abstaende fuer die LOD-Label-Wahl neu berechnen (dies ist
-        # der EINZIGE Positions-Schreibpfad -> ein Choke-Point, nn_gap wird nie stale).
+        # UI-26: Nachbar-Abstaende fuer die LOD-Label-Wahl neu berechnen. Weitere
+        # Positions-Mutationen (Drag/place_fixture) frischen ueber
+        # _notify_layout_changed() ebenfalls auf -> nn_gap bleibt konsistent.
         self._compute_label_gaps()
 
     def _compute_label_gaps(self) -> None:
