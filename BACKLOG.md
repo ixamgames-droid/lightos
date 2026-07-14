@@ -71,7 +71,7 @@ bzw. wartet auf Davids Linux-Rechner / eine Computer-Use-Session._
 
 | ID | Prio | Status | Titel / Notiz |
 |----|------|--------|---------------|
-| VC3D-01 | P2 | ✅ done (dieser PR) | **VC-Tasten plastisch/„3D-ig".** Neuer geteilter Paint-Helfer `src/ui/virtualconsole/vc_style.py` (`paint_button_surface`: Verlauf + Bevel + farbiger Tiefenrand + Press-Inset + Aktiv-Glow, rein QPainter). Angewandt in `vc_button.py::paintEvent`: Text + Zustands-Rahmen sitzen auf der erhabenen Taste und wandern beim Druck mit; Aktions-Farbbalken auf die runde Face-Form geclippt (`QPainterPath`) statt flach über die Ecken. Robust bei jeder Größe (Face-Maße ≥ 1 px). 6 Tests `tests/test_vc_style_3d.py` (Contract + sichtbares Press-/Aktiv-Feedback). Nur Buttons — Slider/SpeedDial optional als Folge. Showcase-Artifact im Chat. |
+| VC3D-01 | P2 | ✅ done ([#296](https://github.com/ixamgames-droid/lightos/pull/296)) | **VC-Tasten plastisch/„3D-ig".** Neuer geteilter Paint-Helfer `src/ui/virtualconsole/vc_style.py` (`paint_button_surface`: Verlauf + Bevel + farbiger Tiefenrand + Press-Inset + Aktiv-Glow, rein QPainter). Angewandt in `vc_button.py::paintEvent`: Text + Zustands-Rahmen sitzen auf der erhabenen Taste und wandern beim Druck mit; Aktions-Farbbalken auf die runde Face-Form geclippt (`QPainterPath`) statt flach über die Ecken. Robust bei jeder Größe (Face-Maße ≥ 1 px). 6 Tests `tests/test_vc_style_3d.py` (Contract + sichtbares Press-/Aktiv-Feedback). Nur Buttons — Slider/SpeedDial optional als Folge. Showcase-Artifact im Chat. |
 | VC3D-02 | P3 | todo | Optional: 3D-Optik auch auf **VCSlider**-Griff + **SpeedDial** ausweiten (gleicher `vc_style`-Helfer), für einen konsistenten Pad-/Fader-Look. |
 
 ## 📚 Befund- und Detailregister
@@ -348,6 +348,10 @@ _**Stand 2026-06-30:** P1 (VCB-01..10) → [PR #100]; **P2 (VCB-11/12/13/14/15/1
 
 ## ✅ Erledigt (Kurz-Log)
 _(der Loop verschiebt fertige Items mit PR-Link hierher; Details stehen in [CHANGELOG.md](CHANGELOG.md))_
+
+- **CI-FLAKE-3.11** · Redundanten zweiten Testlauf aus `ci.yml` entfernt: der Schritt „Test-Ergebnis zusammenfassen" lief exakt dieselben 5 Testdateien wie „Unit-Tests ausführen" nochmal (nur `-q`) → keine Mehr-Abdeckung, aber ein zweiter Würfelwurf auf den flaky nativen Py3.11-Teardown-Crash (`0xc0000374`, Qt/MIDI-Thread-Abbau NACH bestandenen Tests). Traf #294 und #296 (je Testschritt grün, Zusammenfassen-Schritt rot). Verbleibender Lauf ist mit `LIGHTOS_HARDEN_EXIT_ALL`/`os._exit` gehärtet; PR- und main-CI danach 3.11 UND 3.12 grün. ([#297](https://github.com/ixamgames-droid/lightos/pull/297))
+
+- **VC3D-01** · Plastische 3D-Optik für Virtual-Console-Tasten (neuer Paint-Helfer `vc_style.py`, angewandt in `vc_button.paintEvent`; Verlauf/Bevel/Tiefenrand + Press-Inset + Aktiv-Glow, Aktionsbalken auf runde Form geclippt). +6 Tests (`test_vc_style_3d.py`). Gate 407 ok/0. ([#296](https://github.com/ixamgames-droid/lightos/pull/296))
 
 - **VIZ-FIX-DECIMAL** (+ VIZ-STAGE-PANEL a) · 3D-Panel-Zahlenfelder akzeptieren Punkt UND Komma als Dezimaltrenner: neues wiederverwendbares `LocaleTolerantDoubleSpinBox` (`src/ui/widgets/decimal_spinbox.py`) ersetzt alle 14 `QDoubleSpinBox` in `visualizer_window.py` (Fixture-Position/-Ausrichtung, Stage-Größe, Raster). Vorher verwarf die Standard-Spinbox unter dt. Locale eine Eingabe mit Punkt („5.7" → Datenverlust). +5 Tests (`test_decimal_spinbox.py`). (dieser PR)
 
