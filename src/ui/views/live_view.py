@@ -2243,7 +2243,9 @@ class LiveView(QWidget):
             uni_item.setExpanded(True)
             for f in by_universe[uni_num]:
                 label = getattr(f, "label", None) or getattr(f, "fixture_type", "?") or "?"
-                child = QTreeWidgetItem(uni_item, [f"[{f.fid:03d}] {label}"])
+                _txt = f"[{f.fid:03d}] {label}"
+                child = QTreeWidgetItem(uni_item, [_txt])
+                child.setToolTip(0, _txt)  # QOL-03: Vollname auch bei Kuerzung
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
                 child.setIcon(0, _mini.fixture_icon_for(f))
         self._apply_fixture_filter()
