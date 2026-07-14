@@ -436,10 +436,13 @@ class ProgrammerView(QWidget):
         self._mapping_tab_index = self._main_tabs.indexOf(self._mapping_page)
         self._main_tabs.setTabVisible(self._mapping_tab_index, False)
 
-        # Funktions-Tabs (einmalig gebaut). "Hilfe" ist reine Anzeige — der an
-        # set_programmer_focus gemeldete Tab-Text wird nur gegen "Intensity"
-        # verglichen (app_state), nie gegen "Helper"/"Hilfe".
-        self._main_tabs.addTab(self._make_effects_page(), "Hilfe")
+        # Funktions-Tabs (einmalig gebaut). Der "Assistent"-Tab (intern "Helper":
+        # Effekt-Assistent + Effekt-/Funktions-/Szenen-Liste) ist reine Anzeige —
+        # der an set_programmer_focus gemeldete Tab-Text wird nur gegen "Intensity"
+        # verglichen (app_state), nie gegen "Helper"/"Assistent".
+        # QOL-04: frueher "Hilfe" beschriftet -> irrefuehrend (enthaelt keine Hilfe,
+        # sondern die Effekt-/Funktionsverwaltung); zu "Assistent" umbenannt.
+        self._main_tabs.addTab(self._make_effects_page(), "Assistent")
         # EFX-Tab: Widget merken, damit der Index via indexOf ermittelt werden kann.
         self._efx_page = self._make_efx_page()
         self._main_tabs.addTab(self._efx_page, "EFX")

@@ -61,7 +61,7 @@ def test_programmer_zones_has_five_zones(tmp_path, monkeypatch):
     # (nur bei Laser-Geraeten sichtbar).
     labels = [pv._main_tabs.tabText(i) for i in range(pv._main_tabs.count())]
     assert labels == ["Intensity", "Color", "Position", "Gobo", "Weitere",
-                      "Mapping", "Hilfe", "EFX", "Matrix", "Laser",
+                      "Mapping", "Assistent", "EFX", "Matrix", "Laser",
                       "Paletten"], labels
     # Gobo-, Mapping-, Position-, EFX- und Laser-Tab sind ohne Auswahl
     # ausgeblendet.
