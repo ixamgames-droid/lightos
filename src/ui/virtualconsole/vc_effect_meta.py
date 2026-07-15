@@ -10,6 +10,67 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+# ── UI-19: deutsche Anzeige-Labels fuer select-Options-Tokens ────────────────
+# Geteilte, Qt-freie Label-Quelle (aus VCL-03/PR #132 hierher gehoben), damit
+# NICHT nur der Live-Editor, sondern auch die Programmer-Matrix-Combos und die
+# VCStepper/VCEncoder-Untertitel rohe Tokens ("normal", "H", …) durch deutsche
+# Labels ersetzen. WICHTIG: nur zur ANZEIGE-Zeit anwenden — der gespeicherte
+# Rohwert (ParamSpec.options bleibt skalar) aendert sich nicht.
+DIR_LABELS = {"forward": "vorwärts", "reverse": "rückwärts",
+              "backward": "rückwärts", "bounce": "Ping-Pong",
+              "left": "links", "right": "rechts", "up": "hoch", "down": "runter",
+              "in": "nach innen", "out": "nach außen",
+              "center_out": "Mitte→außen", "out_center": "außen→Mitte",
+              "inside_out": "Mitte→außen", "outside_in": "außen→Mitte",
+              "cw": "im Uhrzeigersinn", "ccw": "gegen Uhrzeigersinn"}
+
+OPTION_LABELS = {
+    "H": "Horizontal", "V": "Vertikal", "Diag": "Diagonal",
+    "all": "Alle", "row": "Reihe", "col": "Spalte",
+    "top": "oben", "bottom": "unten", "center": "Mitte", "radial": "Radial",
+    "diag": "diagonal", "random": "Zufällig",
+    "color": "Farbe", "flash": "Blitz",
+    "dimmer": "Dimmer", "strobe": "Strobe", "pulse": "Puls", "sparkle": "Funkeln",
+    "restart": "Neu starten", "stay": "Stehen bleiben",
+    "fadeout": "Ausfaden",
+    "linear": "Linear",
+    "normal": "Normal", "pingpong": "Ping-Pong",
+    "smooth": "Weich", "steps": "Bänder",
+    "target": "Zielfarbe", "sequence": "Sequenz",
+    "fan": "Fächer", "offset": "Versatz", "sync": "Synchron",
+    "Forward": "Vorwärts", "Backward": "Rückwärts",
+    "Loop": "Schleife", "SingleShot": "Einmalig", "PingPong": "Ping-Pong",
+    "Random": "Zufällig",
+}
+
+# Kontextabhaengige Labels: derselbe Token bedeutet je Param etwas anderes —
+# hoechste Praezedenz (VCL-03: loop_mode="reverse" = "rueckwaerts LEEREN").
+OPTION_LABELS_BY_KEY = {
+    "loop_mode": {"reverse": "Rückwärts leeren"},
+}
+
+
+def prettify_option(val) -> str:
+    """Letzter Fallback: rohen Token lesbar machen — Unterstriche zu Leerzeichen,
+    erster Buchstabe gross (kein Woerterbuch-Eintrag noetig)."""
+    s = str(val).replace("_", " ")
+    return s[:1].upper() + s[1:] if s else s
+
+
+def option_label(val, key: str = "") -> str:
+    """Deutsches Anzeige-Label fuer einen einzelnen Options-Wert. Fallback-Kette:
+    OPTION_LABELS_BY_KEY (kontextabhaengig, hoechste Praezedenz) -> DIR_LABELS
+    (Pfeil-Richtungen) -> OPTION_LABELS -> prettify_option. Reine Funktion."""
+    by_key = OPTION_LABELS_BY_KEY.get(key)
+    if by_key and val in by_key:
+        return by_key[val]
+    if val in DIR_LABELS:
+        return DIR_LABELS[val]
+    if val in OPTION_LABELS:
+        return OPTION_LABELS[val]
+    return prettify_option(val)
+
+
 class DropKind:
     """Art des gedroppten Bibliotheks-Items (aus dem MIME-Typ abgeleitet)."""
     FUNCTION = "function"

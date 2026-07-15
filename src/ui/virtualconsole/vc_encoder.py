@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
+from .vc_effect_meta import option_label
 
 
 class EncoderMidiMode(str):
@@ -243,6 +244,11 @@ class VCEncoder(VCWidget):
     def _radius(self) -> int:
         return min(self.width(), self.height() - 28) // 2 - 6
 
+    def _param_label(self) -> str:
+        """UI-19: sichtbarer Parameter-Name — deutsches ParamSpec.label statt
+        rohem Key (Fallback: param_key, wenn kein Effekt gebunden)."""
+        return getattr(self._spec(), "label", "") or self.param_key
+
     def _fmt_value(self) -> str:
         val = self._current_value()
         if val is None:
@@ -251,6 +257,9 @@ class VCEncoder(VCWidget):
             return "An" if val else "Aus"
         if isinstance(val, float):
             return f"{val:.2f}".rstrip("0").rstrip(".")
+        spec = self._spec()
+        if spec is not None and getattr(spec, "kind", "") == "select":
+            return option_label(val, self.param_key)   # UI-19: Label statt Roh-Token
         return str(val)
 
     def paintEvent(self, event):
@@ -288,8 +297,9 @@ class VCEncoder(VCWidget):
         p.setPen(QColor("#8b949e"))
         p.drawText(QRect(0, 2, self.width(), 14), Qt.AlignmentFlag.AlignCenter, self.caption)
         p.setFont(QFont("Segoe UI", 7))
+        # UI-19: Parameter-Label statt rohem Key ("Geschwindigkeit" statt "speed")
         p.drawText(QRect(0, self.height() - 16, self.width(), 14),
-                   Qt.AlignmentFlag.AlignCenter, self.param_key)
+                   Qt.AlignmentFlag.AlignCenter, self._param_label())
 
         # MIDI-Indikator
         if self.midi_cc >= 0:

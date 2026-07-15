@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QSpinBox, QLabel
 from PySide6.QtCore import Qt, QRect
 from PySide6.QtGui import QPainter, QColor, QFont
 from .vc_widget import VCWidget
+from .vc_effect_meta import option_label
 
 
 class VCStepper(VCWidget):
@@ -185,6 +186,11 @@ class VCStepper(VCWidget):
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 
+    def _param_label(self) -> str:
+        """UI-19: sichtbarer Parameter-Name — deutsches ParamSpec.label statt
+        rohem Key (Fallback: param_key, wenn kein Effekt gebunden)."""
+        return getattr(self._spec(), "label", "") or self.param_key
+
     def _fmt_value(self) -> str:
         val = self._current_value()
         if val is None:
@@ -194,7 +200,7 @@ class VCStepper(VCWidget):
         if kind == "bool":
             return "An" if bool(val) else "Aus"
         if kind == "select":
-            return str(val)
+            return option_label(val, self.param_key)
         try:
             return str(int(round(float(val))))
         except (TypeError, ValueError):
@@ -242,7 +248,9 @@ class VCStepper(VCWidget):
 
         p.setFont(QFont("Segoe UI", 7))
         p.setPen(QColor("#8b949e"))
-        p.drawText(QRect(0, h - 14, w, 12), Qt.AlignmentFlag.AlignCenter, self.param_key)
+        # UI-19: Parameter-Label statt rohem Key ("Läufer-Anzahl" statt "runner_count")
+        p.drawText(QRect(0, h - 14, w, 12), Qt.AlignmentFlag.AlignCenter,
+                   self._param_label())
         if self.midi_cc >= 0:
             p.fillRect(w - 8, 0, 8, 8, QColor("#00aaff"))
         p.end()
