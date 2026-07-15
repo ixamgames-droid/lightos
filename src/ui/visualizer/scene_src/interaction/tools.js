@@ -29,6 +29,7 @@ let _pulseDirty = false;  // true solange Ringe vom Puls verstellt sind (fuer 1x
 
 export function setEditMode(mode) {
   view.editMode = mode || 'view';
+  updateModeFrame();   // VIZ-14: permanenter Ansehen/Bauen-Rahmen (reines DOM, kein Render)
   const banner = document.getElementById('mode-banner');
   if (view.editMode === 'edit') {
     banner.textContent = 'FIXTURE EDIT – Ziehen=Bewegen | Rechtsklick/Lang-Drücken=Platzieren | 📌 Taste unten rechts';
@@ -420,6 +421,25 @@ export function updateFABs() {
   if (btnDelete) btnDelete.style.display = (hasFixtureSel || hasStageSel) ? 'flex' : 'none';
   if (btnRotate) btnRotate.style.display = (hasFixtureSel || hasStageSel) ? 'flex' : 'none';
   if (btnPlace)  btnPlace.style.display  = (view.editMode === 'edit') ? 'flex' : 'none';
+}
+
+// VIZ-14: permanenter Modus-Indikator (Ansehen/Bauen). setEditMode() ist der
+// EINZIGE Drive-Punkt fuer editMode (Direkt-Signal editModeChanged UND PULL-Poll
+// s.editMode laufen beide dort zusammen, s. bridge.js) -> ein Aufruf hier deckt
+// alle Pfade. Reines DOM (data-mode + Chip-Text): view -> "Ansehen", edit|stage ->
+// "Bauen" mit Sub-Kontext. KEIN requestRender/Live-Probe (kein Render-Loop-Bezug).
+function updateModeFrame() {
+  const el = document.getElementById('mode-frame');
+  if (!el) return;
+  const m = view.editMode;
+  const build = (m === 'edit' || m === 'stage');
+  el.dataset.mode = build ? 'build' : 'view';
+  const chip = document.getElementById('mode-frame-chip');
+  if (chip) {
+    chip.textContent = build
+      ? (m === 'stage' ? 'BAUEN · Bühne' : 'BAUEN · Fixtures')
+      : 'ANSEHEN';
+  }
 }
 
 // ── Spaet-Bindung (bridge entsteht erst beim WebChannel-Connect,
