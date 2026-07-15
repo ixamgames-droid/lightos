@@ -1063,6 +1063,29 @@ def _add_eurolite_gross(s, mfr):
                  _eurolite_gross_modes_data())
 
 
+def _fog_hazer_modes_data():
+    """Nebelmaschine/Hazer — Nebelausstoss (und optional Lüfter) per DMX.
+    Beides als Intensitaets-Kanal (``dimmer``): 0 = aus, 255 = voll. Der
+    Grand-Master/Blackout skaliert den Nebel damit wie ein Dimmer mit."""
+    return [
+        ("1-Kanal (Nebel)", [
+            ("Nebel", "dimmer", 0, 200),
+        ]),
+        ("2-Kanal (Nebel + Lüfter)", [
+            ("Nebel",  "dimmer", 0, 200),
+            ("Lüfter", "dimmer", 0, 0),
+        ]),
+    ]
+
+
+def _add_fog_hazer(s, mfr):
+    """Eurolite N-10 Nebelmaschine (Hazer) — schliesst die Library-Luecke, dass
+    es KEIN eingebautes Fog-/Nebel-Profil gab (FIX-FOG, UXTEST-3-Audit). Patchbar
+    ohne Custom-Profil; rendert als Hazer im 3D-Visualizer, Fog-Icon in der 2D-View."""
+    _add_fixture(s, mfr, "N-10 Nebelmaschine", "EURON10", "hazer", 950,
+                 _fog_hazer_modes_data())
+
+
 # ── ADJ Flat Par QWH12X (12x5W RGBW, Art.-Nr. 1226100244, 2026-06-25) ────────
 # Faithful aus dem ADJ-Handbuch der baugleichen QA12X-Serie (gleiche Platine,
 # nur Amber→Weiß): 8 DMX-Modi (1–8 Kanal). Hier modelliert sind die für die
@@ -1411,6 +1434,9 @@ def ensure_builtins():
         if "EUROGROSS" not in have:
             _add_eurolite_gross(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
             changed = True
+        if "EURON10" not in have:                       # FIX-FOG: Nebelmaschine
+            _add_fog_hazer(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
+            changed = True
         if "FPQWH12X" not in have:
             _add_adj_flatpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
             changed = True
@@ -1602,6 +1628,7 @@ def _seed(s: Session):
         ]),
     ])
     _add_eurolite_gross(s, eurolite)
+    _add_fog_hazer(s, eurolite)
 
     # ── ADJ (American DJ) ─────────────────────────────────────────────────────
     adj = Manufacturer(name="ADJ", short_name="ADJ")
