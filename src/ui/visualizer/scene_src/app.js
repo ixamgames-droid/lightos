@@ -30,6 +30,8 @@ import {
   setEditMode, setEditTool, setTraceShape, onTraceRadius, onTraceSpeed,
   saveTraceSeq, setBrightnessManual, resetBrightnessAuto, updateOutlines,
   applyStageEmissive, wireToolsLateBindings,
+  applySelectionPulse, selectionPulseActive,   // VIZ-14 Slice 1c: Identify-Flash
+  expireSelectionPulseForTest,                 // VIZ-14 Slice 1c: Test-Seam (Flash beenden)
 } from './interaction/tools.js';
 import { wirePointerLateBindings } from './interaction/pointer.js';
 import { attachGizmoToSelection } from './interaction/gizmo.js';  // VIZ-13 3b-G
@@ -79,6 +81,11 @@ function perFrameUpdate() {
     }
     if (so._helper) so._helper.update();
   }
+  // VIZ-14 (Slice 1c): Identify-Flash der ausgewaehlten Fixtures (zeitbegrenzt,
+  // s. tools.js). Reine In-Place-Opacity-Mutation der Auswahl-Ringe — kein
+  // requestRender hier (Endlos-Render-Falle, s. render_loop.js): die
+  // selectionPulseActive-Live-Probe unten haelt das Gate waehrend des Fensters offen.
+  applySelectionPulse();
   // VIZ-13 3b-G: Move/Rotate-Gizmo an die aktuelle Auswahl heften (Sichtbarkeit/
   // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
   // Drags, und haelt konstante Bildschirmgroesse).
@@ -91,6 +98,10 @@ function perFrameUpdate() {
 // rendern. Nach dem Deselektieren faellt der Loop automatisch in Idle zurueck.
 // (Wirkung erst mit dem Dirty-Gate in render_loop.js Schritt 2.)
 registerLiveAnimation(() => !!(view.selectedStageId && stageObjects[view.selectedStageId]));
+// VIZ-14 (Slice 1c): Identify-Flash haelt den Loop NUR waehrend seines kurzen
+// Fensters live (nach Auswahl-Aenderung), danach faellt er in Idle zurueck —
+// obwohl die Auswahl (seit 1b persistent) bestehen bleibt. So kein Dauer-rAF.
+registerLiveAnimation(selectionPulseActive);
 
 startRenderLoop({
   render: () => renderer.render(scene, view.activeCam),
@@ -139,6 +150,8 @@ window.__lightos = {
   // deterministischen Test-Hooks (offscreen drosselt rAF + Post-Load-Signale,
   // s. render_loop.js — Tests treiben die Ticks selbst per runJavaScript).
   requestRender, renderStats, __renderTick: renderTick,
+  // VIZ-14 Slice 1c: Test-Seam — Identify-Flash-Fenster deterministisch beenden.
+  __expireSelectionPulse: expireSelectionPulseForTest,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,

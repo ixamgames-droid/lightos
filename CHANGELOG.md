@@ -20,13 +20,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Plastische Virtual-Console-Buttons (VC3D-01/03):** VC-Tasten wirken erhaben mit Licht-/Schattenkante und Druck-Feedback; auf voll gesättigten Farben liest die Wölbung jetzt ebenfalls, und der Farb-Badge überlappt den Tastentext nicht mehr. (PRs #296, #307)
 - **Tests:** `test_live_view_declutter`, `test_recent_menu`, `test_fixture_list_tooltip`, `test_ui19_option_labels`, `test_ui25_tab_allocation`, `test_vc_style_3d` (jeweils reine Funktionen + Widget-/Render-Contracts, headless). Jede Änderung mit vollem Test-Gate + adversarialer Sub-Agent-Review; UI-relevante Punkte zusätzlich per Computer-Use auf dem echten Screen bestätigt.
 
-### 2026-07-15 — 3D-Visualizer: Auswahl folgt dem Programmer — beidseitig (VIZ-14, Teil 1+2)
+### 2026-07-15 — 3D-Visualizer: Auswahl folgt dem Programmer — beidseitig + Identify-Flash (VIZ-14, Teil 1+2+3)
 
 #### Neu / Tests
 
 - **Ein Gerät im 3D-Visualizer (oder seiner Geräteliste) anklicken wählt es jetzt auch im Programmer aus:** Die 3D-Selektion und die Liste im Visualizer-Fenster treiben die gemeinsame Auswahl (die u. a. Programmer, Matrix, Effekte und Paletten steuert). So beantwortet ein Klick „welches Gerät ist das?" und man kann es direkt weiterbearbeiten. (Slice 1a der 3D-Bedien-UX.)
 - **Und umgekehrt (neu, Slice 1b): eine Auswahl im Programmer (oder in jeder anderen Ansicht) markiert die betroffenen Geräte jetzt auch im 3D-Visualizer.** Wählt man z. B. im Programmer „alle Moving Heads", heben sich genau diese im 3D-Bild hervor — die Auswahl ist in beide Richtungen synchron. Echo-sicher gebaut: die aus Python gesetzte Auswahl meldet sich NICHT wieder an Python zurück (kein Rückkopplungs-Loop).
-- Tests: `tests/test_viz14_selection_sync.py` (3D→Auswahl, Liste→Auswahl, leere 3D-Auswahl löscht nicht, Mehrfachauswahl-Guard, Rückrichtung→Bridge-Poll, Signal/Poll-Mirror); `tests/test_viz14_selection_scene.py` (End-to-End in echter QWebEngine: Python-Poll → JS wendet Auswahl an, ohne Echo, idempotent).
+- **Und jetzt blinken ausgewählte Geräte kurz auf (Slice 1c „Identify"):** Wählt man Geräte (im Programmer oder im 3D), blitzen ihre Auswahl-Ringe im 3D-Visualizer ~1,5 s lang auf — so findet man sofort, „wo ist das Gerät?", danach beruhigt sich die Anzeige zum statischen Rahmen. Bewusst als kurzes Aufblitzen (nicht als Dauer-Pulsieren) gebaut, damit der sparsame On-Demand-Renderer danach wieder in den Ruhezustand fällt (keine Dauerlast auf schwacher Grafik).
+- Tests: `tests/test_viz14_selection_sync.py` (3D→Auswahl, Liste→Auswahl, leere 3D-Auswahl löscht nicht, Mehrfachauswahl-Guard, Rückrichtung→Bridge-Poll, Signal/Poll-Mirror); `tests/test_viz14_selection_scene.py` (End-to-End in echter QWebEngine: Python-Poll → JS wendet Auswahl an, ohne Echo, idempotent; **Identify-Flash rendert im Fenster und fällt danach in Idle zurück, obwohl die Auswahl bestehen bleibt**).
 
 ### 2026-07-15 — 2D-Bühne: Auto-Fit-Zoom beim Laden (QOL-05)
 
