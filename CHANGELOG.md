@@ -20,6 +20,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Plastische Virtual-Console-Buttons (VC3D-01/03):** VC-Tasten wirken erhaben mit Licht-/Schattenkante und Druck-Feedback; auf voll gesättigten Farben liest die Wölbung jetzt ebenfalls, und der Farb-Badge überlappt den Tastentext nicht mehr. (PRs #296, #307)
 - **Tests:** `test_live_view_declutter`, `test_recent_menu`, `test_fixture_list_tooltip`, `test_ui19_option_labels`, `test_ui25_tab_allocation`, `test_vc_style_3d` (jeweils reine Funktionen + Widget-/Render-Contracts, headless). Jede Änderung mit vollem Test-Gate + adversarialer Sub-Agent-Review; UI-relevante Punkte zusätzlich per Computer-Use auf dem echten Screen bestätigt.
 
+### 2026-07-15 — Nebelmaschine als eingebautes Fixture (FIX-FOG)
+
+#### Neu / Tests
+
+- **Nebelmaschine/Hazer jetzt in der Fixture-Library:** Neues Builtin-Profil **„N-10 Nebelmaschine"** (`EURON10`, Typ Hazer) mit zwei Modi (1-Kanal „Nebel" · 2-Kanal „Nebel + Lüfter"). Der Nebel-Ausstoß ist ein Intensitäts-Kanal (Grand Master/Blackout skalieren mit). Damit lassen sich Nebel-/Smoke-Maschinen ohne selbst angelegtes Profil patchen — sie rendern als Hazer im 3D-Visualizer und mit Fog-Icon in der 2D-Ansicht. Bestehende Fixture-Datenbanken bekommen das Profil idempotent nachgerüstet.
+- Tests: `tests/test_fog_hazer_profile.py` (Seed als Hazer, beide Modi + Nebel-Kanal, Idempotenz der Migration).
+
 ### 2026-07-12 — Fixture-Generator: 3D-Modell wählbar mit Automatik-Vorschlag (FM-12)
 
 #### Neu / Verbessert / Tests

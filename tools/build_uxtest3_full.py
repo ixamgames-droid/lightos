@@ -5,7 +5,7 @@
    6× Moving Head (ZQ02001)   — Pan/Tilt-Bewegung, Circle-EFX
    4× Spider (SPIDER14)       — nur Tilt (KEIN Pan → keine Circle-EFX!)
    6× Laser (L2600LASER)      — Laser-Steuerung/-Panel, NOT-AUS
-   2× Nebelmaschine (HAZE1)   — Smoke/Hazer (eigenes 1ch-Profil, 3D-Hazer-Modell)
+   2× Nebelmaschine (EURON10) — Smoke/Hazer (Builtin seit FIX-FOG, 3D-Hazer-Modell)
 
 Plus Gruppen, Farb-/Bewegungs-/Dimmer-Effekte, eine Virtuelle Konsole (Buttons/
 Slider/SpeedDials, Solo-Frame statt globalem stop_all), sowie ein Trassen-Rig mit
@@ -20,7 +20,6 @@ import math
 from _builder import (ShowBuilder, RgbAlgorithm, EfxAlgorithm, RunOrder,
                       ButtonAction, build_and_verify)
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from src.core.database.models import FixtureGroup
 from src.core.stage.stage_definition import StageDefinition, save_stage
@@ -33,37 +32,16 @@ OUT = os.path.join(_ROOT, "shows", "UXTEST-3 Full Rig.lshow")
 STAGE_NAME = "UXTest3FullRig"
 
 
-def _ensure_fog_profile():
-    """Legt ein simples 1-Kanal Nebelmaschinen-Profil (fixture_type='hazer') an,
-    falls noch nicht vorhanden — LightOS hat kein eingebautes Fog-Profil. Der
-    'dimmer'-Kanal steuert die Nebelausgabe; 'hazer' liefert das 3D-Hazer-Modell."""
-    from src.core.database import fixture_db as fdb
-    from src.core.database.models import FixtureProfile, Manufacturer
-    eng = fdb.engine()
-    with Session(eng) as s:
-        if s.execute(select(FixtureProfile).where(
-                FixtureProfile.short_name == "HAZE1")).first():
-            return
-        mfr = s.execute(select(Manufacturer).where(
-            Manufacturer.short_name == "GEN")).scalars().first()
-        if mfr is None:
-            mfr = Manufacturer(name="Generic", short_name="GEN")
-            s.add(mfr)
-        fdb._add_fixture(s, mfr, "Nebelmaschine 1ch", "HAZE1", "hazer", 900,
-                         [("1-Kanal", [("Nebel", "dimmer", 0, 255)])])
-        s.commit()
-
-
 def main():
     b = ShowBuilder(reset=True)
-    _ensure_fog_profile()
 
     # ---- 1) PATCH: 30 Fixtures über 2 Universen ----
     par_fids  = b.patch("ZQ01424",   count=12, channel_count=8,  mode_name="8-Kanal RGBW", universe=1)
     mh_fids   = b.patch("ZQ02001",   count=6,  channel_count=11, mode_name="11-Kanal",     universe=1)
     spi_fids  = b.patch("SPIDER14",  count=4,  channel_count=14, mode_name="14-Kanal",     universe=2)
     las_fids  = b.patch("L2600LASER",count=6,  channel_count=6,  mode_name="6-Kanal (Simple DMX)", universe=2)
-    fog_fids  = b.patch("HAZE1",     count=2,  channel_count=1,  mode_name="1-Kanal",      universe=2, label="Nebel")
+    # FIX-FOG: die Nebelmaschine ist jetzt ein Builtin (EURON10) — kein Custom-Profil mehr noetig.
+    fog_fids  = b.patch("EURON10",   count=2,  channel_count=1,  mode_name="1-Kanal (Nebel)", universe=2, label="Nebel")
     all_fids = par_fids + mh_fids + spi_fids + las_fids + fog_fids
     print(f"[patch] {len(all_fids)} Fixtures: PAR={len(par_fids)} MH={len(mh_fids)} "
           f"Spider={len(spi_fids)} Laser={len(las_fids)} Fog={len(fog_fids)}")
