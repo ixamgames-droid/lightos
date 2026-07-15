@@ -125,7 +125,10 @@ def test_chase_round_trip_movement_select():
     view = _make_view_with_matrix()
     view._rebuild_param_fields(RgbAlgorithm.CHASE)
     view._current.algorithm = RgbAlgorithm.CHASE
-    view._param_widgets["movement"].setCurrentText("bounce")
+    # UI-19: das Combo zeigt jetzt das deutsche Label ("Ping-Pong"); der Rohwert
+    # "bounce" liegt als userData. Wie die App (currentData) per findData waehlen.
+    _mw = view._param_widgets["movement"]
+    _mw.setCurrentIndex(_mw.findData("bounce"))
     view._param_change()
     assert view._current.params.get("movement") == "bounce"
 

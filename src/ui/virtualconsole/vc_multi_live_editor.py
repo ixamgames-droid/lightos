@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QHBoxLayout,
                                QLabel, QPushButton, QScrollArea, QSlider,
                                QVBoxLayout, QWidget)
 from .vc_widget import VCWidget
+from .vc_effect_meta import option_label as _option_label, prettify_option
 from src.ui.weak_slots import weak_slot
 
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
@@ -73,13 +74,8 @@ _EXCLUDE_KEYS = frozenset({
 _MULT_CHOICES = (("¼", 0.25), ("½", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0))
 _TAP_BUSES = ("A", "B", "C", "D")
 
-_DIR_LABELS = {"forward": "vorwärts", "reverse": "rückwärts",
-               "backward": "rückwärts", "bounce": "Ping-Pong",
-               "left": "links", "right": "rechts", "up": "hoch", "down": "runter",
-               "in": "nach innen", "out": "nach außen",
-               "center_out": "Mitte→außen", "out_center": "außen→Mitte",
-               "inside_out": "Mitte→außen", "outside_in": "außen→Mitte",
-               "cw": "im Uhrzeigersinn", "ccw": "gegen Uhrzeigersinn"}
+# UI-19: die deutschen Options-Labels (_DIR_LABELS/_OPTION_LABELS/…) liegen jetzt
+# geteilt in vc_effect_meta (option_label); hier nur noch _DIR_ARROWS (rein visuell).
 
 # Visuelle Richtungs-Auswahl: Options-Wert -> Pfeil-Glyph. Ein select-Param, dessen
 # Options ALLE hier auftauchen, wird als Pfeil-Buttongruppe statt Dropdown gezeigt.
@@ -87,52 +83,6 @@ _DIR_ARROWS = {"forward": "→", "reverse": "←", "backward": "←", "bounce": 
                "left": "←", "right": "→", "up": "↑", "down": "↓",
                "in": "→←", "out": "←→", "center_out": "←‧→", "out_center": "→‧←",
                "cw": "↻", "ccw": "↺"}
-
-# VCL-03: deutsche Labels fuer die restlichen select-Options-Tokens (Superset-
-# Ergaenzung zu _DIR_LABELS, das fuer die Pfeil-Beschriftung reserviert bleibt).
-# Inventur per Wegwerf-Skript ueber ALGO_META (rgb_matrix_meta.py) + EFX-/Chaser-
-# list_params: alle kind=="select"-Tokens ohne explizites (wert, label)-Tupel und
-# ohne Eintrag in _DIR_LABELS. tempo_bus_id/algorithm sind hier NICHT gelistet —
-# beide Keys sind in _EXCLUDE_KEYS und erreichen den Picker nie.
-_OPTION_LABELS = {
-    # Achse (axis)
-    "H": "Horizontal", "V": "Vertikal", "Diag": "Diagonal",
-    # Auswahl (scope)
-    "all": "Alle", "row": "Reihe", "col": "Spalte",
-    # Ursprung (origin) — top/bottom/center/radial hier, "left/right/up/down"
-    # deckt bereits _DIR_LABELS ab (gemeinsam genutzte Tokens).
-    "top": "oben", "bottom": "unten", "center": "Mitte", "radial": "Radial",
-    # Reihenfolge (fill_dir) — "diag"/"random" zusaetzlich zu Richtungen oben.
-    "diag": "diagonal", "random": "Zufällig",
-    # Farb-/Helligkeits-/Dimmer-/Loop-/Blend-/Fuell-Modus etc.
-    "color": "Farbe", "flash": "Blitz",
-    "dimmer": "Dimmer", "strobe": "Strobe", "pulse": "Puls", "sparkle": "Funkeln",
-    "restart": "Neu starten", "stay": "Stehen bleiben",
-    "fadeout": "Ausfaden",
-    "linear": "Linear",
-    "normal": "Normal", "pingpong": "Ping-Pong",
-    "smooth": "Weich", "steps": "Bänder",
-    # "up"/"down"/"reverse" stehen hier bewusst NICHT: die Tokens deckt _DIR_LABELS
-    # ab; wo ein Param ihnen eine ANDERE Bedeutung gibt, gehoert das Label in
-    # _OPTION_LABELS_BY_KEY (sonst totes Schatten-Mapping, Review-Befund).
-    "target": "Zielfarbe", "sequence": "Sequenz",
-    # EFX phase_mode (Verhaeltnis der Geraete)
-    "fan": "Fächer", "offset": "Versatz", "sync": "Synchron",
-    # EFX Formen (algorithm ist zwar ausgeschlossen, aber falls andernorts
-    # gebraucht schadet ein Eintrag nicht — bewusst NICHT ergaenzt, siehe oben).
-    # Chaser Direction/RunOrder (Enum-Werte gross geschrieben)
-    "Forward": "Vorwärts", "Backward": "Rückwärts",
-    "Loop": "Schleife", "SingleShot": "Einmalig", "PingPong": "Ping-Pong",
-    "Random": "Zufällig",
-}
-
-# Kontextabhaengige Labels: derselbe Token bedeutet je Param etwas anderes —
-# diese Map hat VORRANG vor _DIR_LABELS/_OPTION_LABELS (Review-Befund VCL-03:
-# loop_mode="reverse" heisst "rueckwaerts LEEREN", nicht die Laufrichtung).
-_OPTION_LABELS_BY_KEY = {
-    "loop_mode": {"reverse": "Rückwärts leeren"},
-}
-
 
 class _EffectPreview(QWidget):
     """Kompakte Live-Vorschau des gewaehlten Effekts — EIGENER Renderer je Typ:
@@ -1191,25 +1141,15 @@ class VCMultiLiveEditor(VCWidget):
     # ── Visuelle Regler je Parameter-Typ ─────────────────────────────────────────
     @staticmethod
     def _prettify_option(val) -> str:
-        """Letzter Fallback (VCL-03): rohen Token lesbar machen — Unterstriche zu
-        Leerzeichen, erster Buchstabe gross (kein Woerterbuch-Eintrag noetig)."""
-        s = str(val).replace("_", " ")
-        return s[:1].upper() + s[1:] if s else s
+        """Letzter Fallback: rohen Token lesbar machen (delegiert an die geteilte
+        Meta-Quelle, UI-19)."""
+        return prettify_option(val)
 
     def _option_labeled(self, val, key: str = "") -> str:
-        """Fallback-Kette fuer einen einzelnen Options-Wert OHNE explizites Tupel-
-        Label: _OPTION_LABELS_BY_KEY (kontextabhaengig, hoechste Praezedenz —
-        derselbe Token kann je Param anderes bedeuten, z. B. loop_mode="reverse")
-        -> _DIR_LABELS (Pfeil-Richtungen) -> _OPTION_LABELS (VCL-03, restliche
-        deutsche Labels) -> Prettify (rohes Token lesbar gemacht)."""
-        by_key = _OPTION_LABELS_BY_KEY.get(key)
-        if by_key and val in by_key:
-            return by_key[val]
-        if val in _DIR_LABELS:
-            return _DIR_LABELS[val]
-        if val in _OPTION_LABELS:
-            return _OPTION_LABELS[val]
-        return self._prettify_option(val)
+        """Deutsches Label fuer einen Options-Wert (Fallback-Kette in
+        vc_effect_meta.option_label: kontextabhaengig -> Richtung -> Option ->
+        Prettify). Delegiert an die geteilte Meta-Quelle (UI-19)."""
+        return _option_label(val, key)
 
     def _option_pairs(self, spec):
         """ParamSpec.options -> [(wert, beschriftung)] (normalisiert Tupel/Skalar).

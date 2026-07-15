@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
 from src.core.engine.rgb_matrix_meta import ALGO_META
+from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
@@ -602,7 +603,7 @@ class RgbMatrixView(QWidget):
         # (_PROMOTED_PARAM_KEYS); nur sichtbar, wenn der Farb-Chase aktiv ist.
         self._color_order_combo = QComboBox()
         for _co_val in ("normal", "random", "pingpong"):
-            self._color_order_combo.addItem(_co_val, _co_val)
+            self._color_order_combo.addItem(option_label(_co_val, "color_order"), _co_val)
         self._color_order_combo.setToolTip(
             "Reihenfolge, in der pro Runde durch die Color-Sequence gewechselt wird")
         self._color_order_combo.currentIndexChanged.connect(self._param_change)
@@ -915,7 +916,7 @@ class RgbMatrixView(QWidget):
                     if isinstance(opt, (tuple, list)) and len(opt) == 2:
                         w.addItem(str(opt[1]), opt[0])
                     else:
-                        w.addItem(str(opt), opt)
+                        w.addItem(option_label(opt, getattr(spec, "key", "")), opt)
                 # Default ueber userData treffen (Fallback: angezeigter Text).
                 _idx = w.findData(spec.default)
                 if _idx >= 0:
