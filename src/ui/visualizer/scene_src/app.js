@@ -123,6 +123,9 @@ setTimeout(tryChannel, 200);
 // ============================================================================
 window.__lightos = {
   fixtures, stageObjects, settings,
+  // VIZ-14 (Slice 1b): view (u.a. selectedFids) als Test/Debug-Hook — der
+  // QWebEngine-Smoke-Test prueft darueber die globale Auswahl -> 3D-Outlines.
+  view,
   setViewMode, setEditMode, getStageJson, loadStageJson,
   addStageObject: jsAddStageObject,
   clearStageObjects, updateResizeHandles, resizeHandles: () => resizeHandles,
