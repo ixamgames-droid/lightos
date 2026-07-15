@@ -20,6 +20,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Plastische Virtual-Console-Buttons (VC3D-01/03):** VC-Tasten wirken erhaben mit Licht-/Schattenkante und Druck-Feedback; auf voll gesättigten Farben liest die Wölbung jetzt ebenfalls, und der Farb-Badge überlappt den Tastentext nicht mehr. (PRs #296, #307)
 - **Tests:** `test_live_view_declutter`, `test_recent_menu`, `test_fixture_list_tooltip`, `test_ui19_option_labels`, `test_ui25_tab_allocation`, `test_vc_style_3d` (jeweils reine Funktionen + Widget-/Render-Contracts, headless). Jede Änderung mit vollem Test-Gate + adversarialer Sub-Agent-Review; UI-relevante Punkte zusätzlich per Computer-Use auf dem echten Screen bestätigt.
 
+### 2026-07-15 — 3D-Visualizer: Auswahl folgt dem Programmer (VIZ-14, Teil 1)
+
+#### Neu / Tests
+
+- **Ein Gerät im 3D-Visualizer (oder seiner Geräteliste) anklicken wählt es jetzt auch im Programmer aus:** Die 3D-Selektion und die Liste im Visualizer-Fenster treiben die gemeinsame Auswahl (die u. a. Programmer, Matrix, Effekte und Paletten steuert). So beantwortet ein Klick „welches Gerät ist das?" und man kann es direkt weiterbearbeiten. (Erster Slice der 3D-Bedien-UX; die Rückrichtung — Auswahl im Programmer lässt das Gerät im 3D pulsieren — folgt.)
+- Tests: `tests/test_viz14_selection_sync.py` (3D→Auswahl, Liste→Auswahl, leere 3D-Auswahl löscht nicht, Mehrfachauswahl-Guard).
+
 ### 2026-07-15 — 2D-Bühne: Auto-Fit-Zoom beim Laden (QOL-05)
 
 #### Neu / Tests

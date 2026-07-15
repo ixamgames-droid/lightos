@@ -57,7 +57,9 @@ class EnableGatingTest(unittest.TestCase):
         btn.setEnabled = lambda v: setattr(btn, "state", v)
         pl = MagicMock()
         pl.count.return_value = 0
-        return SimpleNamespace(_btn_align=btn, _patch_list=pl), btn
+        # VIZ-14: der Handler treibt jetzt auch die globale Auswahl -> _state + Guard.
+        return SimpleNamespace(_btn_align=btn, _patch_list=pl,
+                               _state=MagicMock(), _applying_selection=False), btn
 
     def test_enabled_with_two_or_more(self):
         fake, btn = self._fake()

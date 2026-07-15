@@ -1349,6 +1349,7 @@ class VisualizerWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._state = get_state()
+        self._applying_selection = False   # VIZ-14: Guard gegen Selektions-Echo (3D<->Liste)
         self.setWindowTitle("LightOS - 3D/2D Visualizer")
         self.resize(1400, 850)
 
@@ -2174,6 +2175,10 @@ class VisualizerWindow(QMainWindow):
         if not item:
             return
         fid = item.data(Qt.ItemDataRole.UserRole)
+        # VIZ-14: Auswahl in der Visualizer-Geraeteliste -> globale/Programmer-
+        # Auswahl (nicht, wenn die Markierung gerade aus der 3D-Selektion kommt).
+        if fid is not None and not getattr(self, "_applying_selection", False):
+            self._state.set_selected_fids([int(fid)])
         if fid in self._state.visualizer_positions:
             x, y, z = self._state.visualizer_positions[fid]
             self._suppress_property_signals = True
@@ -2369,13 +2374,23 @@ class VisualizerWindow(QMainWindow):
             self._btn_align.setEnabled(len(fids) >= 2)
         if not fids:
             return
-        # Highlight first one in list
-        target = int(fids[0])
-        for i in range(self._patch_list.count()):
-            it = self._patch_list.item(i)
-            if it.data(Qt.ItemDataRole.UserRole) == target:
-                self._patch_list.setCurrentItem(it)
-                break
+        # VIZ-14: 3D-Selektion treibt die globale/Programmer-Auswahl. Der
+        # _applying_selection-Guard verhindert, dass die Listen-Markierung unten
+        # (_on_patch_list_selected) die Mehrfachauswahl auf das erste Fixture
+        # reduziert. set_selected_fids hat einen no-op-Breaker, und das Fenster
+        # reagiert selbst NICHT auf SELECTION_CHANGED -> kein Loop.
+        self._applying_selection = True
+        try:
+            self._state.set_selected_fids([int(x) for x in fids])
+            # Highlight first one in list
+            target = int(fids[0])
+            for i in range(self._patch_list.count()):
+                it = self._patch_list.item(i)
+                if it.data(Qt.ItemDataRole.UserRole) == target:
+                    self._patch_list.setCurrentItem(it)
+                    break
+        finally:
+            self._applying_selection = False
 
     def _on_fixture_deleted_from_js(self, fid: int):
         # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,
