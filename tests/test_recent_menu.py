@@ -17,13 +17,16 @@ from src.ui import main_window as mw
 
 
 class TestRecentMenuLabels(unittest.TestCase):
+    # Pfade als Forward-Slash (portabel): os.path.basename spaltet Backslashes
+    # NUR unter Windows -> auf Linux (Projekt unterstuetzt beides, CDX-Fund) waeren
+    # r"C:\..."-Fixtures nicht aussagekraeftig. `_split_dirs` normalisiert ohnehin.
     def test_unique_basenames_are_plain(self):
-        paths = [r"C:\a\show1.lshow", r"C:\b\show2.lshow"]
+        paths = ["C:/a/show1.lshow", "C:/b/show2.lshow"]
         self.assertEqual(mw._recent_menu_labels(paths), ["show1.lshow", "show2.lshow"])
 
     def test_same_basename_gets_folder_hint(self):
-        paths = [r"C:\Users\x\AppData\LightOS\grosses_rig_2026.lshow",
-                 r"C:\Users\x\Projekte\lightos-main\grosses_rig_2026.lshow"]
+        paths = ["C:/Users/x/AppData/LightOS/grosses_rig_2026.lshow",
+                 "C:/Users/x/Projekte/lightos-main/grosses_rig_2026.lshow"]
         labels = mw._recent_menu_labels(paths)
         self.assertNotEqual(labels[0], labels[1])
         self.assertTrue(all(l.startswith("grosses_rig_2026.lshow") for l in labels))
@@ -31,20 +34,21 @@ class TestRecentMenuLabels(unittest.TestCase):
         self.assertIn("lightos-main", labels[1])
 
     def test_three_way_collision_all_distinct(self):
-        paths = [r"C:\x\a\s.lshow", r"C:\x\b\s.lshow", r"C:\x\c\s.lshow"]
+        paths = ["C:/x/a/s.lshow", "C:/x/b/s.lshow", "C:/x/c/s.lshow"]
         labels = mw._recent_menu_labels(paths)
         self.assertEqual(len(set(labels)), 3)
 
     def test_shortest_distinguishing_suffix(self):
         # unterscheiden sich schon im letzten Ordner -> nur EIN Ordner im Hinweis,
         # der gemeinsame Elternordner 'path' soll NICHT noetig sein
-        paths = [r"C:\deep\path\alpha\s.lshow", r"C:\deep\path\beta\s.lshow"]
+        paths = ["C:/deep/path/alpha/s.lshow", "C:/deep/path/beta/s.lshow"]
         labels = mw._recent_menu_labels(paths)
         self.assertIn("alpha", labels[0])
         self.assertIn("beta", labels[1])
         self.assertNotIn("path", labels[0])
         self.assertNotIn("deep", labels[1])
 
+    @unittest.skipUnless(os.name == "nt", "gemischte Backslashes sind Windows-spezifisch (basename)")
     def test_forward_and_back_slashes_mixed(self):
         paths = ["C:/x/a/s.lshow", r"C:\x\b\s.lshow"]
         labels = mw._recent_menu_labels(paths)
@@ -52,7 +56,7 @@ class TestRecentMenuLabels(unittest.TestCase):
 
     def test_empty_and_single(self):
         self.assertEqual(mw._recent_menu_labels([]), [])
-        self.assertEqual(mw._recent_menu_labels([r"C:\a\solo.lshow"]), ["solo.lshow"])
+        self.assertEqual(mw._recent_menu_labels(["C:/a/solo.lshow"]), ["solo.lshow"])
 
 
 class TestCanonPath(unittest.TestCase):

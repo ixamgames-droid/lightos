@@ -105,14 +105,29 @@ class TestSectionTabsFairInWindow(unittest.TestCase):
             self.assertNotIn(b.text(), ("…", "...", ""),
                              f"Tab {b._full_text!r} zeigt reines '…' bei 1344px")
 
-    def test_short_label_stays_full_while_long_elides(self):
-        # bei 1600px war frueher E/A='…' und VC lang — jetzt: E/A voll, VC elidiert
-        self._resize(1600)
-        ea = self._tab("E/A")
-        vc = self._tab("Virtual")
-        self.assertEqual(ea.text(), "E/A", "kurzer Tab muss voll lesbar bleiben")
-        self.assertNotEqual(vc.text(), vc._full_text, "langer Tab soll bei Enge eliden")
-        self.assertNotIn(vc.text(), ("…", "...", ""))
+    def test_short_label_never_more_elided_than_long(self):
+        # Fairness FONT-UNABHAENGIG (keine feste Pixelbreite -> kein Widerspruch
+        # zu TestSectionButtonsFullTextAt1440, Codex-Fund CDX): sobald es eng wird
+        # (Container kann nicht alle Volltexte fassen), darf der KURZE Tab (E/A)
+        # nie staerker gekuerzt sein als der LANGE (Virtual Console). Max-Min gibt
+        # kurzen Labels Vorrang -> ihr sichtbarer Anteil ist >= der der langen.
+        def frac(b):
+            return len(b.text().rstrip("…")) / max(1, len(b._full_text))
+        checked = False
+        for W in (1000, 1100, 1200, 1300, 1344):
+            self._resize(820)          # neutralisieren, dann Ziel -> hysteresefrei
+            self._resize(W)
+            tabs = self.win._section_btns
+            full_sum = sum(b._full_text_size_hint().width() for b in tabs)
+            if full_sum <= self.win._tab_container.width():
+                continue               # passt alles -> keine Enge, ueberspringen
+            ea, vc = self._tab("E/A"), self._tab("Virtual")
+            self.assertGreaterEqual(
+                frac(ea) + 1e-9, frac(vc),
+                f"@{W}px: kurzer Tab staerker gekuerzt als langer (unfair)")
+            self.assertNotIn(vc.text(), ("…", "...", ""))   # nie reines '…'
+            checked = True
+        self.assertTrue(checked, "keine enge Breite im Testbereich gefunden")
 
     def test_full_text_when_plenty_of_room(self):
         self._resize(2600)
