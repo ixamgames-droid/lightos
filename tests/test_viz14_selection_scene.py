@@ -17,6 +17,7 @@ verbundenen Signale + pollControl-Slot). Zusaetzlich ein aufzeichnender
 ``fixtureSelectionChanged``-Slot (JS->Python-Echo), damit der Test belegt, dass
 die extern gepushte Auswahl NICHT zurueckechot (Loop-Brecher updateOutlines(false)).
 """
+import json
 import os
 import time
 import unittest
@@ -152,6 +153,26 @@ class ExternalSelectionSceneTest(unittest.TestCase):
             time.sleep(_POLL_INTERVAL_S)
         self.fail(f"Timeout beim Warten auf truthy '{js_expr}' (letzter: {last!r})")
 
+    def _stats(self):
+        return json.loads(self._eval("JSON.stringify(window.__lightos.renderStats())"))
+
+    def _tick(self):
+        # Einen Loop-Tick deterministisch ausfuehren (rAF-unabhaengig; offscreen
+        # drosselt rAF, s. render_loop.js) — identischer Tick-Body wie der rAF-Loop.
+        self._eval("window.__lightos.__renderTick(); true")
+
+    def _settle(self, max_rounds=30):
+        """Tickt bis das Dirty-Gate zu ist und der Zaehler ruht (konsumiert
+        Init-/Auswahl-Dirty). Scheitert, wenn der Loop nicht in Idle faellt."""
+        last = None
+        for _ in range(max_rounds):
+            self._tick()
+            s = self._stats()
+            if (not s["dirty"]) and (not s["live"]) and s["count"] == last:
+                return s
+            last = s["count"]
+        self.fail(f"Render-Loop stabilisiert nicht: {self._stats()}")
+
     def test_external_selection_applies_to_scene_without_echo(self):
         self._load_and_wait()
         self._poll_until_true("!!window.__lightosAppReady")
@@ -185,6 +206,83 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         _pump(0.4)
         after = len(list(getattr(self._bridge_obj, "_fixture_selection_calls", [])))
         self.assertEqual(before, after, "unveraenderte Auswahl loeste weitere Echo-Calls aus (nicht idempotent)")
+
+    def test_identify_pulse_decays_to_idle_despite_persistent_selection(self):
+        """VIZ-14 (Slice 1c): Identify-Decay-Flash. Eine Auswahl-Aenderung laesst die
+        Ringe kurz pulsieren (Live-Probe haelt den On-Demand-Loop am Rendern) und
+        faellt danach in Idle zurueck — OBWOHL die Auswahl (seit 1b persistent)
+        bestehen bleibt (F1: kein Dauer-rAF). Echo-frei (F2)."""
+        self._load_and_wait()
+        self._poll_until_true("!!window.__lightosAppReady")
+        self._settle()   # Idle-Baseline vor der Auswahl
+
+        # Auswahl pushen -> Identify-Flash startet -> Live-Probe aktiv.
+        self._bridge_obj._poll_payload = '{"selection": "[2, 4]"}'
+        self._poll_until_true("window.__lightos.renderStats().live === true", timeout_s=8.0)
+
+        # Waehrend des Flash-Fensters rendert jeder Tick (Live-Probe haelt das Gate offen).
+        c0 = self._stats()["count"]
+        for _ in range(3):
+            self._tick()
+        self.assertGreater(
+            self._stats()["count"], c0,
+            "Identify-Flash rendert nicht — Live-Probe haelt das Dirty-Gate nicht offen")
+
+        # ★ F1: Fenster ablaufen lassen (> SELECTION_PULSE_MS=1500ms) -> Idle.
+        _pump(1.8)
+        self._poll_until_true("window.__lightos.renderStats().live === false", timeout_s=8.0)
+        # Die Auswahl bleibt bestehen — genau das macht den Decay-Beweis aus:
+        self.assertEqual(
+            self._eval("JSON.stringify(window.__lightos.view.selectedFids)"), "[2,4]",
+            "Auswahl muss fuer den Decay-Beweis persistent bleiben")
+        settled = self._settle()
+        c1 = settled["count"]
+        for _ in range(3):
+            self._tick()
+        self.assertEqual(
+            self._stats()["count"], c1,
+            "Loop rendert nach Ablauf des Flash-Fensters weiter (Dauer-rAF trotz statischer Auswahl)")
+
+        # ★ F2: die extern gepushte Auswahl darf NICHT via fixtureSelectionChanged echon.
+        calls = list(getattr(self._bridge_obj, "_fixture_selection_calls", []))
+        self.assertNotIn("[2,4]", calls, f"Identify-Puls echot die Auswahl zurueck (Loop-Gefahr): {calls!r}")
+
+    def test_identify_pulse_renders_settle_frame_on_expiry(self):
+        """VIZ-14 (Slice 1c, Defect-#1-Guard): am Fenster-Ende muss der Reset auf
+        Basis-Deckkraft GENAU EINMAL gerendert werden — sonst friert der Auswahl-
+        Ring bei einer gedimmten Puls-Deckkraft ein (in statischer Szene rendert
+        das Gate sonst nicht mehr). Deterministisch via Test-Seam
+        __expireSelectionPulse (kein 1.5s-Echtzeit-Warten, kein rAF-Race)."""
+        self._load_and_wait()
+        self._poll_until_true("!!window.__lightosAppReady")
+        self._settle()
+
+        # Auswahl pushen -> Flash aktiv.
+        self._bridge_obj._poll_payload = '{"selection": "[2, 4]"}'
+        self._poll_until_true("window.__lightos.renderStats().live === true", timeout_s=8.0)
+        # Einmal ticken, damit der Puls laeuft (_pulseDirty=true, Ringe verstellt).
+        self._tick()
+        self.assertTrue(self._stats()["live"], "Flash sollte noch aktiv sein")
+
+        # Fenster deterministisch beenden.
+        self._eval("window.__lightos.__expireSelectionPulse(); true")
+        self.assertFalse(self._stats()["live"], "Flash-Fenster nicht beendet")
+
+        # ★ Der naechste Tick MUSS rendern (Settle-Frame) — sonst bliebe der Ring
+        # bei der zuletzt gerenderten Puls-Deckkraft haengen (Defect #1).
+        c_before = self._stats()["count"]
+        self._tick()
+        self.assertGreater(
+            self._stats()["count"], c_before,
+            "Settle-Frame wurde nicht gerendert — Auswahl-Ring friert gedimmt ein (Defect #1)")
+
+        # Danach idle: der Settle ist EINMALIG (kein Loop) — weitere Ticks rendern nicht.
+        c_after = self._stats()["count"]
+        for _ in range(3):
+            self._tick()
+        self.assertEqual(
+            self._stats()["count"], c_after,
+            "Settle-Render war nicht einmalig (Dauer-Render nach Reset)")
 
 
 if __name__ == "__main__":

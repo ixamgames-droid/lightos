@@ -12,6 +12,21 @@ import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 let _userBrightnessOverride = null;  // wenn Slider manuell gesetzt
 
+// VIZ-14 (Slice 1c): Identify-Decay-Flash. Eine Auswahl-AENDERUNG stempelt ein
+// kurzes Zeitfenster, in dem die Selektions-Ringe pulsieren ("wo ist das Geraet?").
+// BEWUSST zeitbegrenzt (nicht dauerhaft wie der Stage-Objekt-Puls in app.js):
+// view.selectedFids ist seit Slice 1b PERSISTENT vom Programmer/globalen Bus
+// getrieben — eine Dauer-Live-Animation-Probe hielte den On-Demand-Render-Loop
+// FUER IMMER auf voller rAF (VIZ-13-On-Demand-Regression auf schwachen GPUs).
+// Nach dem Fenster faellt der Loop von selbst in Idle zurueck, die statischen
+// Outlines bleiben. Der Puls mutiert NUR Material-Deckkraft (kein Echo an Python).
+const SELECTION_PULSE_MS = 1500;      // Dauer des Aufblitzens ab Auswahl-Aenderung
+const SELBORDER_BASE_OPACITY = 0.85;  // Basis-Deckkraft des 3D-Auswahl-Rings (_selBorder)
+const ICON_RING_BASE_OPACITY = 1.0;   // Basis-Deckkraft des 2D-Icon-Rings (selektiert)
+let _pulseUntil = 0;      // Date.now()-Deadline; > jetzt = Puls aktiv
+let _lastPulseSel = '';   // zuletzt gepulste Auswahl (Key) — nur bei AENDERUNG neu stempeln
+let _pulseDirty = false;  // true solange Ringe vom Puls verstellt sind (fuer 1x-Reset)
+
 export function setEditMode(mode) {
   view.editMode = mode || 'view';
   const banner = document.getElementById('mode-banner');
@@ -209,6 +224,18 @@ export function updateOutlines(notify = true) {
   // zurueckzumelden (VIZ-14 Slice 1b). Wird von jsApplyExternalSelection genutzt,
   // wenn die Auswahl GERADE VON Python kam — sonst liefe sie via
   // fixtureSelectionChanged sofort wieder nach Python zurueck (Echo/Loop).
+  // VIZ-14 (Slice 1c): bei AENDERUNG der Fixture-Auswahl den Identify-Flash
+  // anstossen (nur bei geaenderter, nicht-leerer Auswahl — laeuft fuer Hin- wie
+  // Rueckrichtung, da beide durch updateOutlines gehen; der requestRender() am
+  // Funktionsende rendert den ersten Puls-Frame, die Live-Probe die folgenden).
+  // Key ueber die SORTIERTE Menge: ein reines Umsortieren (z.B. geaenderte
+  // Fan-Reihenfolge, selbe Fixtures) soll den Identify-Flash NICHT neu ausloesen
+  // (und den Loop nicht 1.5s laenger live halten) — nur eine echte Mengen-Aenderung.
+  const _selKey = view.selectedFids.slice().sort((a, b) => a - b).join(',');
+  if (view.selectedFids.length > 0 && _selKey !== _lastPulseSel) {
+    _pulseUntil = Date.now() + SELECTION_PULSE_MS;
+  }
+  _lastPulseSel = _selKey;
   // Fixture outlines: tint icon ring in 2D, otherwise fall back to a wireframe-like hue
   for (const fid in fixtures) {
     const f = fixtures[fid];
@@ -321,6 +348,60 @@ export function jsApplyExternalSelection(json) {
   if (!Array.isArray(fids)) return;
   view.selectedFids = fids.map(Number).filter(n => !Number.isNaN(n));
   updateOutlines(false);
+}
+
+// VIZ-14 (Slice 1c): Live-Animation-Probe — haelt den On-Demand-Render-Loop NUR
+// waehrend des Identify-Flash-Fensters am Rendern (danach Idle, auch wenn die
+// Auswahl bestehen bleibt). Registriert in app.js via registerLiveAnimation.
+export function selectionPulseActive() { return Date.now() < _pulseUntil; }
+
+// Test/Debug-Seam (wie __renderTick): das Flash-Fenster deterministisch beenden,
+// ohne 1.5s Echtzeit abzuwarten — der Test kann so den Settle-Frame gezielt
+// pruefen. Reiner Deadline-Reset, keine Szenen-Seiteneffekte.
+export function expireSelectionPulseForTest() { _pulseUntil = 0; }
+
+// Pro-Frame-Modulation der Selektions-Ringe (aus app.js#perFrameUpdate, laeuft
+// jeden rAF-Tick). Mutiert NUR Material-Deckkraft IN PLACE — NIE view.selectedFids,
+// NIE updateOutlines(notify=true) (das waere ein Echo an Python -> Loop, s. 1b).
+// Pulsiert BEWUSST NICHT die Lens/Beam-Emissive: die ist DMX-getrieben (ein Puls
+// dort flackerte gegen den DMX-Wert) — nur der dedizierte Auswahl-Ring pulsiert.
+export function applySelectionPulse() {
+  const now = Date.now();
+  if (now >= _pulseUntil) {
+    // Fenster vorbei: EINMALIG die Ringe auf Basis-Deckkraft zuruecksetzen
+    // (sauberes Settle — updateOutlines toggelt nur .visible/Selektion, es wuerde
+    // die vom Puls verstellte .material.opacity sonst nicht heilen).
+    if (_pulseDirty) {
+      for (const fid of view.selectedFids) {
+        const f = fixtures[fid];
+        if (!f) continue;
+        if (f._selBorder && f._selBorder.material) f._selBorder.material.opacity = SELBORDER_BASE_OPACITY;
+        if (f.icon && f.icon.userData && f.icon.userData.ring && f.icon.userData.ring.material) {
+          f.icon.userData.ring.material.opacity = ICON_RING_BASE_OPACITY;
+        }
+      }
+      _pulseDirty = false;
+      // WICHTIG: den Settle-Frame GENAU EINMAL rendern. Ohne das bliebe die
+      // korrigierte Basis-Deckkraft nur im Material stehen (dieser Tick hat
+      // selectionPulseActive()=false und in statischer Szene _dirty=false -> das
+      // Gate rendert sonst nicht mehr), und der Ring friert bei der zuletzt
+      // gerenderten Puls-Deckkraft ein. Der _pulseDirty-Guard macht es zum
+      // Einmal-Render -> KEIN Loop (naechster Tick: _pulseDirty=false -> no-op).
+      requestRender();
+    }
+    return;
+  }
+  _pulseDirty = true;
+  // Envelope 0.25..1.0, ~3 Hz Blinken (Math.sin(now*0.02)).
+  const k = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(now * 0.02));
+  for (const fid of view.selectedFids) {
+    const f = fixtures[fid];
+    if (!f) continue;   // F3: entfernte/unbekannte fid ueberspringen (removeFixture spliced)
+    if (f._selBorder && f._selBorder.material) f._selBorder.material.opacity = SELBORDER_BASE_OPACITY * k;
+    if (f.icon && f.icon.userData && f.icon.userData.ring && f.icon.userData.ring.material) {
+      f.icon.userData.ring.material.opacity = ICON_RING_BASE_OPACITY * k;
+    }
+  }
 }
 
 // ============================================================================
