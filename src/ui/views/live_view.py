@@ -484,6 +484,18 @@ def _grid_positions(n: int, world_w: float, world_h: float,
     return out
 
 
+def _compute_fit_zoom(bbox_w: float, bbox_h: float, view_w: float, view_h: float,
+                      margin: float = 1.3, lo: float = 0.25, hi: float = 4.0) -> float:
+    """QOL-05: Zoom, der ein ``bbox_w × bbox_h`` (Welt-px) grosses Fixture-Rechteck
+    in ein ``view_w × view_h`` Sichtfeld einpasst (mit etwas Rand), geklemmt auf
+    ``[lo, hi]``. Reine Funktion — die 2D-Ansicht zoomt damit beim Laden so, dass
+    ein kompaktes (aus 3D projiziertes) Rig die Flaeche fuellt statt zu klumpen."""
+    bw = max(1.0, float(bbox_w)) * max(1.0, margin)
+    bh = max(1.0, float(bbox_h)) * max(1.0, margin)
+    z = min(max(1.0, view_w) / bw, max(1.0, view_h) / bh)
+    return max(lo, min(hi, z))
+
+
 # ── Stage-Canvas ──────────────────────────────────────────────────────────────
 
 class StageCanvas(QWidget):
@@ -1514,9 +1526,11 @@ class LiveView(QWidget):
                            lambda *a: self._on_global_selection_changed(
                                a[1] if len(a) > 1 else None))
             # P4: Nach Show-Load die Steuerelemente (Zoom/Grid/Snap/Welt) an den
-            # wiederhergestellten Canvas-Zustand angleichen.
+            # wiederhergestellten Canvas-Zustand angleichen; QOL-05: danach die
+            # 2D-Ansicht auf die Fixtures einpassen (kompakte, aus 3D migrierte Rigs
+            # lagen sonst als ueberlappender Klumpen im Weltraum).
             sync.subscribe(SyncEvent.SHOW_LOADED,
-                           lambda *_: self._sync_controls_from_canvas())
+                           lambda *_: self._on_show_loaded_2d())
         except Exception as e:
             print(f"[live_view] sync (fixture list) subscribe error: {e}")
 
@@ -1927,6 +1941,16 @@ class LiveView(QWidget):
         zo.addWidget(self._zoom_slider)
         zo.addWidget(self._btn_zoom_in)
 
+        # QOL-05: „Einpassen" — Ansicht auf die Fixtures zoomen/zentrieren.
+        self._btn_fit = QPushButton("⤢")
+        self._btn_fit.setFixedSize(30, 30)
+        self._btn_fit.setToolTip("Ansicht auf die Geräte einpassen")
+        self._btn_fit.setStyleSheet(
+            "QPushButton{background:#1a1c28;color:#ccc;border:1px solid #333;"
+            "border-radius:4px;font-size:15px;} QPushButton:hover{background:#252838;color:#fff;}")
+        self._btn_fit.clicked.connect(weak_slot(self._fit_view_clicked))
+        zo.addWidget(self._btn_fit)
+
         self._lbl_zoom = QLabel(f"{int(round(zoom_init * 100))} %")
         self._lbl_zoom.setStyleSheet("color:#ccc; font-size:12px; min-width:44px;")
         self._lbl_zoom.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -2112,7 +2136,54 @@ class LiveView(QWidget):
     def _on_zoom_changed(self, value: int):
         self._canvas.set_zoom(value / 100.0)
         self._lbl_zoom.setText(f"{int(round(self._canvas.zoom * 100))} %")
-        self._persist_live_view_prefs()
+        self._persist_live_view_prefs()   # P4: Zoom-Aenderung persistieren (Show + ui_prefs)
+
+    def _fit_2d_to_fixtures(self, *, force: bool = False) -> None:
+        """QOL-05: Auto-Fit-Zoom — die 2D-Ansicht so zoomen/zentrieren, dass die
+        Fixtures die Flaeche mit etwas Rand fuellen. Positionen bleiben unveraendert
+        (nur die Ansicht skaliert — treu zur 3D-Projektion). Ohne ``force`` nur, wenn
+        das Rig das Sichtfeld aktuell schlecht ausfuellt (kompakter Klumpen) — eine
+        bewusst gesetzte Zoom-Stufe bleibt so erhalten."""
+        canvas = getattr(self, "_canvas", None)
+        scroll = getattr(self, "_scroll", None)
+        if canvas is None or scroll is None:
+            return
+        pts = list(getattr(canvas, "_positions", {}).values())
+        if len(pts) < 2:
+            return
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        bw = max(xs) - min(xs)
+        bh = max(ys) - min(ys)
+        vp = scroll.viewport().size()
+        vw, vh = max(1, vp.width()), max(1, vp.height())
+        if not force:
+            # aktuelle Bildschirm-Ausdehnung des Rigs -> nur eingreifen beim Klumpen
+            if bw * canvas.zoom >= 0.35 * vw and bh * canvas.zoom >= 0.35 * vh:
+                return
+        z = _compute_fit_zoom(bw, bh, vw, vh)
+        self._zoom_slider.setValue(int(round(z * 100)))   # -> _on_zoom_changed: Canvas-Zoom + Label
+        # Fixture-Bbox-Mitte ins Sichtfeld zentrieren
+        cx = (min(xs) + max(xs)) / 2 * canvas.zoom
+        cy = (min(ys) + max(ys)) / 2 * canvas.zoom
+        scroll.horizontalScrollBar().setValue(int(cx - vw / 2))
+        scroll.verticalScrollBar().setValue(int(cy - vh / 2))
+
+    def _on_show_loaded_2d(self) -> None:
+        """Show-Load: Steuerelemente angleichen. QOL-05: die 2D-Ansicht NUR
+        auto-einpassen, wenn die Show KEINEN eigenen 2D-Zoom gespeichert hat (z. B.
+        aus 3D projiziert) — ein bewusst gewaehlter Zoom bleibt so unangetastet.
+        Deferred, damit Viewport + Positionen stehen. Nach dem Fit ist der Zoom
+        gespeichert -> ein Reload passt nicht erneut ungefragt an."""
+        self._sync_controls_from_canvas()
+        meta = getattr(self._state, "live_view_meta", None) or {}
+        if "zoom" not in meta:
+            QTimer.singleShot(0, self._fit_2d_to_fixtures)
+
+    def _fit_view_clicked(self, *_) -> None:
+        """„Einpassen"-Button (QOL-05): Ansicht bewusst (force) auf die Geräte fitten.
+        Die Zoom-Aenderung persistiert ueber ``_on_zoom_changed`` mit."""
+        self._fit_2d_to_fixtures(force=True)
 
     def _persist_live_view_prefs(self):
         meta = {

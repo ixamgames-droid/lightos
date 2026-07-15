@@ -20,6 +20,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Plastische Virtual-Console-Buttons (VC3D-01/03):** VC-Tasten wirken erhaben mit Licht-/Schattenkante und Druck-Feedback; auf voll gesättigten Farben liest die Wölbung jetzt ebenfalls, und der Farb-Badge überlappt den Tastentext nicht mehr. (PRs #296, #307)
 - **Tests:** `test_live_view_declutter`, `test_recent_menu`, `test_fixture_list_tooltip`, `test_ui19_option_labels`, `test_ui25_tab_allocation`, `test_vc_style_3d` (jeweils reine Funktionen + Widget-/Render-Contracts, headless). Jede Änderung mit vollem Test-Gate + adversarialer Sub-Agent-Review; UI-relevante Punkte zusätzlich per Computer-Use auf dem echten Screen bestätigt.
 
+### 2026-07-15 — 2D-Bühne: Auto-Fit-Zoom beim Laden (QOL-05)
+
+#### Neu / Tests
+
+- **Die 2D-Bühne passt die Ansicht beim Laden automatisch auf die Geräte an:** Kompakte Rigs (deren Positionen aus dem 3D-Visualizer projiziert wurden) lagen vorher als überlappender Klumpen im Weltraum. Jetzt zoomt und zentriert die 2D-Ansicht beim Öffnen einer Show so, dass die Fixtures die Fläche mit etwas Rand füllen — die Positionen selbst bleiben unverändert (nur die Ansicht skaliert). Ein neuer **„⤢ Einpassen"-Knopf** neben dem Zoom-Regler ruft das jederzeit manuell auf. Eine bewusst gewählte Zoom-Stufe bleibt erhalten (der Auto-Fit greift nur, wenn das Rig das Sichtfeld schlecht ausfüllt).
+- Tests: `tests/test_live_view_fit.py` (Fit-Zoom-Berechnung inkl. Klemmung + Grenzfälle, Klumpen wird hineingezoomt, gut gefüllte Ansicht bleibt).
+
 ### 2026-07-15 — Nebelmaschine als eingebautes Fixture (FIX-FOG)
 
 #### Neu / Tests
