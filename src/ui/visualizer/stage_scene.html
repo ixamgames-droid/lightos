@@ -117,9 +117,39 @@
     0%   { transform: translate(-50%,-50%) scale(0.4); opacity: 1; }
     100% { transform: translate(-50%,-50%) scale(1.4); opacity: 0; }
   }
+  /* VIZ-14: permanenter Modus-Indikator (Ansehen/Bauen). Voll-Viewport-Rahmen als
+     ruhige periphere Rueckmeldung, welcher Modus aktiv ist (Gegenmittel zum
+     "Modus-Wirrwarr"). NIE interaktiv: pointer-events:none, sonst schluckt der
+     Rahmen Canvas-Klicks (Auswahl/Gizmo/Orbit tot). z-index bewusst 4: UEBER dem
+     auto-gestackten renderer.domElement-Canvas (hat keinen z-index), UNTER allen
+     interaktiven/Text-Overlays (z-index >= 5). Rahmen als inset-box-shadow ->
+     kein Layout/Scrollbar. Default data-mode="view" (= _editMode-Default) zeigt
+     die richtige Deckung schon vor dem ersten Poll (kein Init-Race). */
+  #mode-frame {
+    position: fixed; inset: 0; pointer-events: none; z-index: 4;
+    box-shadow: inset 0 0 0 3px rgba(120,140,160,0.30);   /* Ansehen: dezent kuehl */
+    transition: box-shadow 0.15s ease;
+  }
+  #mode-frame[data-mode="build"] {
+    box-shadow: inset 0 0 0 3px #ff8c2a;   /* Bauen: aktiv warm-orange (klar unterscheidbar
+                                              von Auswahl-Blau #66ccff & Buehnen-Gelb #ffd700) */
+  }
+  #mode-frame-chip {
+    position: absolute; top: 8px; right: 8px;   /* freie Ecke (overlay=TL, banner=TC, controls=BR, ruler=BL) */
+    font: bold 11px sans-serif; letter-spacing: 0.5px;
+    color: rgba(150,170,190,0.80); background: rgba(0,0,0,0.45);
+    padding: 3px 9px; border-radius: 4px; pointer-events: none;
+  }
+  #mode-frame[data-mode="build"] #mode-frame-chip {
+    color: #ff8c2a; background: rgba(0,0,0,0.62);
+  }
 </style>
 </head>
 <body>
+<!-- VIZ-14: permanenter Modus-Indikator (Ansehen/Bauen). Erstes body-Kind; data-mode
+     Default "view" passt zum _editMode-Default (state.js) -> korrekte Deckung vor dem
+     ersten Poll. setEditMode()#updateModeFrame (tools.js) pflegt data-mode + Chip-Text. -->
+<div id="mode-frame" data-mode="view"><span id="mode-frame-chip">ANSEHEN</span></div>
 <div id="overlay">LightOS Visualizer | <span id="mode-text">3D View</span></div>
 <div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
 <div id="edit-toolbar">
