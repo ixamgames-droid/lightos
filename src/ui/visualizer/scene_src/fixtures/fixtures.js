@@ -19,6 +19,7 @@ import { deg2rad } from '../scene/renderer.js';
 // Fixtures muss einen Frame anfordern (render_loop.js ist import-frei,
 // kein Zyklus-Risiko).
 import { requestRender } from '../scene/render_loop.js';
+import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
@@ -220,6 +221,14 @@ export function addFixture(data) {
 
   scene.add(root);
 
+  // VIZ-14: persistentes Fixture-Label (Sprite) als Kind von root -> folgt
+  // Position/Rotation und versteckt sich in 2D (root.visible) ohne Extra-Draht.
+  // Text "#<fid> <Kurzname>". Sichtbarkeit unten via initFixtureLabelVisibility.
+  const _labelText = "#" + fid + (data.label ? " " + data.label : "");
+  const label = makeFixtureLabel(_labelText);
+  label.position.set(0, 1.6, 0);   // lokal ueber dem Geraet
+  root.add(label);
+
   // 2D top-down icon (3c-1: nHeads fuer die Einzel-Zellen der Bar-Icons)
   const icon = buildTopDownIcon(rtype, data.nHeads);
   icon.position.set(root.position.x, 0.05, root.position.z);
@@ -252,6 +261,7 @@ export function addFixture(data) {
     isMoverBar: !!model.isMoverBar,
     beam, spot, spotTarget, floorSpot,
     icon,
+    label,   // VIZ-14: persistentes 3D-Label (Sprite, Kind von root)
     type: rtype,
     dockedTo: data.dockedTo || null,
     // Pan/Tilt physischer Bereich (Grad) + Nullpunkt -> Beam-Abbildung = Hardware.
@@ -262,6 +272,8 @@ export function addFixture(data) {
     data: { ...data },
   };
 
+  // (Label-Sichtbarkeit setzt der Per-Frame-Zoom-Gate in app.js#perFrameUpdate im
+  // ersten gerenderten Frame — updateFixture unten dirtyt, perFrame laeuft davor.)
   syncSpotShadowBudget();
   rebuildFixtureMeshList();
   updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128, data.heads||null);
@@ -274,6 +286,13 @@ export function removeFixture(fid) {
   if (f.spotTarget) scene.remove(f.spotTarget);
   if (f.floorSpot) { scene.remove(f.floorSpot); disposeObj(f.floorSpot); }
   if (f.icon) { scene.remove(f.icon); f.icon.traverse(disposeObj); }
+  // VIZ-14: Label-Sprite explizit freigeben (Textur-Map; disposeObj disposed nur
+  // Geometry+Material, NICHT material.map -> sonst Leck pro Entfernung/Resync).
+  // MUSS VOR dem f.group.traverse bleiben: disposeFixtureLabel loest das Sprite
+  // aus root; three r128 teilt EINE Modul-globale Sprite-Geometrie -> liefe der
+  // traverse ueber das noch angehaengte Sprite, disposete disposeObj die GETEILTE
+  // Geometrie und leerte damit die Labels ALLER Fixtures.
+  disposeFixtureLabel(f.label);
   f.group.traverse(disposeObj);
   delete fixtures[fid];
   delete topDownIcons[fid];

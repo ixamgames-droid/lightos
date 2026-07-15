@@ -39,6 +39,7 @@ import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interac
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget } from './fixtures/fixtures.js';
+import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
 } from './scene/render_loop.js';
@@ -86,6 +87,10 @@ function perFrameUpdate() {
   // requestRender hier (Endlos-Render-Falle, s. render_loop.js): die
   // selectionPulseActive-Live-Probe unten haelt das Gate waehrend des Fensters offen.
   applySelectionPulse();
+  // VIZ-14: Fixture-Label Zoom-/Distanz-Gate. O(1)-Early-Out bei unbewegter Kamera
+  // (kostet im Idle ~nichts); KEIN requestRender hier — piggybackt den Kamera-Dirty-
+  // Pfad (cameras.js#updateCamera dirtyt bereits bei jeder Kamerabewegung).
+  updateLabelZoomVisibility(fixtures, view.activeCam, view.mode);
   // VIZ-13 3b-G: Move/Rotate-Gizmo an die aktuelle Auswahl heften (Sichtbarkeit/
   // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
   // Drags, und haelt konstante Bildschirmgroesse).
