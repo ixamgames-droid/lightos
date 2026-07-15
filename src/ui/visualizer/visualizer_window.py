@@ -325,6 +325,13 @@ class VisualizerBridge(QObject):
     # (Live-Befund: gespeicherte Kamera erschien nie im JS). namedCamerasChanged
     # entspricht auch dem urspruenglichen Design.
     namedCamerasChanged     = Signal(str)
+    # VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> 3D-Szene (Outlines). JSON-
+    # Liste der fids. Idempotenter Zustand (via _poll_set("selection", ...)) statt
+    # Einmal-Event: eine frisch geladene Seite pullt die aktuelle Auswahl nach und
+    # zeigt korrekte Outlines. Der JS-Konsum (bridge.js) wendet sie nur bei
+    # Aenderung an (_pSel-Guard) und OHNE Echo an Python zurueck (updateOutlines
+    # mit notify=false) — der einzige, robuste Loop-Brecher der Rueckrichtung.
+    selectFixtures          = Signal(str)
 
     # ── Python-seitige Signals (an die Hauptfenster-Klasse) ─────────────────
     pyFixtureMoved          = Signal(int, float, float, float)
@@ -419,6 +426,10 @@ class VisualizerBridge(QObject):
         # Voll-Rebuild (idempotent, addFixture ersetzt vorhandene), fixtureAdded/
         # fixtureRemoved = inkrementell (Platzieren/Entfernen einzelner Geraete).
         self.allFixtures.connect(lambda j: self._poll_set("fixtures", j))
+        # VIZ-14 (Slice 1b): globale Auswahl -> 3D. Idempotenter Zustand (nicht
+        # Event): JS wendet nur bei geaenderter Liste an (_pSel), Reconnect pullt
+        # die aktuelle Auswahl nach.
+        self.selectFixtures.connect(lambda j: self._poll_set("selection", j))
         self.fixtureAdded.connect(lambda j: self._poll_event({"t": "fixtureAdded", "j": j}))
         self.fixtureRemoved.connect(lambda i: self._poll_event({"t": "fixtureRemoved", "fid": i}))
         self._activate()
@@ -2093,6 +2104,16 @@ class VisualizerWindow(QMainWindow):
         self._bridge.full_resync_cb = getattr(
             self, "_force_full_resync_after_crash", None)
         self._state.subscribe(self._on_state)
+        # VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im 3D. Auf dem
+        # SyncEvent-Bus (NICHT AppState.subscribe, der nur "patch_changed"-artige
+        # String-Events liefert). subscribe_widget bindet an die Fenster-Lebenszeit
+        # (auto-Abmeldung bei destroyed) — kein Leak wie beim Bridge-_on_state.
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().subscribe_widget(
+                SyncEvent.SELECTION_CHANGED, self, self._on_global_selection)
+        except Exception:
+            pass
 
     def _force_full_resync_after_crash(self) -> None:
         """Review-Blocker-Nachbar (VIZ-12): nach der RenderCrashGuard-Selbst-
@@ -2373,12 +2394,27 @@ class VisualizerWindow(QMainWindow):
         if hasattr(self, "_btn_align"):
             self._btn_align.setEnabled(len(fids) >= 2)
         if not fids:
+            # BEWUSST: eine LEERE 3D-Auswahl loescht die globale Auswahl NICHT.
+            # updateOutlines(notify=true) in JS feuert fixtureSelectionChanged("[]")
+            # auch bei NICHT-User-Events (setEditMode leert selectedFids -> tools.js,
+            # Fixture-Entfernen, View-Mode-Wechsel). Wuerde das die globale Auswahl
+            # loeschen, wischte ein blosser 3D-Moduswechsel die Programmer-Auswahl.
+            # BEKANNTE, selbstheilende Asymmetrie mit Slice 1b (Rueckrichtung): ein
+            # explizites 3D-Deselect (leere Marquee) im Edit-Modus raeumt lokal die
+            # 3D-Outlines, laesst die globale Auswahl aber stehen -> beide re-syncen
+            # bei der naechsten (neuen) Auswahl. Sauberes User-Deselect braeuchte ein
+            # eigenes JS-Signal (User-Intent von spurioesem Leer-Emit trennen) —
+            # Folge-Slice, nicht hier.
             return
         # VIZ-14: 3D-Selektion treibt die globale/Programmer-Auswahl. Der
         # _applying_selection-Guard verhindert, dass die Listen-Markierung unten
         # (_on_patch_list_selected) die Mehrfachauswahl auf das erste Fixture
-        # reduziert. set_selected_fids hat einen no-op-Breaker, und das Fenster
-        # reagiert selbst NICHT auf SELECTION_CHANGED -> kein Loop.
+        # reduziert. set_selected_fids hat einen no-op-Breaker.
+        # Loop mit Slice 1b (Rueckrichtung _on_global_selection): set_selected_fids
+        # feuert SELECTION_CHANGED synchron -> _on_global_selection spiegelt die
+        # Auswahl in den Poll -> JS wendet sie mit updateOutlines(notify=false) an
+        # (KEIN Echo per fixtureSelectionChanged) -> genau ein harmloser Roundtrip,
+        # kein Loop. notify=false ist der robuste Loop-Brecher der Rueckrichtung.
         self._applying_selection = True
         try:
             self._state.set_selected_fids([int(x) for x in fids])
@@ -2391,6 +2427,28 @@ class VisualizerWindow(QMainWindow):
                     break
         finally:
             self._applying_selection = False
+
+    def _on_global_selection(self, _event, fids):
+        """VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im 3D.
+
+        Spiegelt die gemeinsame Auswahl (SELECTION_CHANGED) in den Bridge-Poll
+        (`selectFixtures` -> `_poll_set("selection", ...)`), die JS-Seite zeigt
+        die betroffenen Fixtures im 3D markiert (`jsApplyExternalSelection`).
+
+        BEWUSST OHNE `_applying_selection`-Guard: auch bei 3D-Ursprung wird die
+        Auswahl gespiegelt, damit der Poll-Zustand NIE veraltet (eine frisch
+        geladene/reconnectete Seite pullt die korrekte Auswahl nach). Der eine
+        dadurch entstehende Roundtrip ist harmlos — JS wendet mit
+        `updateOutlines(notify=false)` an und meldet NICHTS zurueck (kein Echo,
+        kein Loop). `set_selected_fids` hat zudem einen no-op-Breaker."""
+        bridge = getattr(self, "_bridge", None)
+        if bridge is None:
+            return
+        try:
+            payload = json.dumps([int(f) for f in (fids or [])])
+            bridge.selectFixtures.emit(payload)
+        except Exception:
+            pass
 
     def _on_fixture_deleted_from_js(self, fid: int):
         # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,

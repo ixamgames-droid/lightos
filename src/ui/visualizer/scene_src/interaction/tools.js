@@ -204,7 +204,11 @@ export function applyStageEmissive(target, r, g, b) {
   }
 }
 
-export function updateOutlines() {
+export function updateOutlines(notify = true) {
+  // notify=false: NUR die Visuals aktualisieren, OHNE die Auswahl an Python
+  // zurueckzumelden (VIZ-14 Slice 1b). Wird von jsApplyExternalSelection genutzt,
+  // wenn die Auswahl GERADE VON Python kam — sonst liefe sie via
+  // fixtureSelectionChanged sofort wieder nach Python zurueck (Echo/Loop).
   // Fixture outlines: tint icon ring in 2D, otherwise fall back to a wireframe-like hue
   for (const fid in fixtures) {
     const f = fixtures[fid];
@@ -285,18 +289,38 @@ export function updateOutlines() {
       sb.style.display = 'none';
     }
   }
-  // Notify python of selection
-  const bridge = bridgeRef.get();
-  if (bridge && bridge.fixtureSelectionChanged) {
-    try { bridge.fixtureSelectionChanged(JSON.stringify(view.selectedFids)); } catch (e) {}
-  }
-  if (bridge && bridge.stageSelectionChanged) {
-    try { bridge.stageSelectionChanged(view.selectedStageId || ''); } catch (e) {}
+  // Notify python of selection — uebersprungen bei notify=false (die Auswahl kam
+  // gerade VON Python; ein Rueckruf waere ein Echo/Loop, VIZ-14 Slice 1b).
+  if (notify) {
+    const bridge = bridgeRef.get();
+    if (bridge && bridge.fixtureSelectionChanged) {
+      try { bridge.fixtureSelectionChanged(JSON.stringify(view.selectedFids)); } catch (e) {}
+    }
+    if (bridge && bridge.stageSelectionChanged) {
+      try { bridge.stageSelectionChanged(view.selectedStageId || ''); } catch (e) {}
+    }
   }
   updateFABs();
   // 3c-2 Dirty-Quelle 3 (Selektion/Outlines): Ring-Opacities, Sel-Border,
   // BoxHelper, Emissive-Reset — alle Selektionswechsel laufen hier durch.
   requestRender();
+}
+
+// VIZ-14 (Slice 1b): globale/Programmer-Auswahl (aus Python via Poll) auf die
+// 3D-Szene anwenden. Setzt view.selectedFids und aktualisiert die Outlines OHNE
+// Echo an Python (updateOutlines(false)) — der Loop-Brecher der Rueckrichtung.
+// Defensiv: ungueltiges JSON / Nicht-Array wird ignoriert (leert die Auswahl NUR
+// bei explizit leerem Array, nicht bei Parse-Fehlern).
+export function jsApplyExternalSelection(json) {
+  let fids;
+  try {
+    fids = JSON.parse(json);
+  } catch (e) {
+    return;
+  }
+  if (!Array.isArray(fids)) return;
+  view.selectedFids = fids.map(Number).filter(n => !Number.isNaN(n));
+  updateOutlines(false);
 }
 
 // ============================================================================

@@ -8,7 +8,7 @@ import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
 import { setViewMode } from '../stage/view_mode.js';
-import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines } from '../interaction/tools.js';
+import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
 import { setFpsVisible } from '../camera/presets.js';
 import {
   loadStageJson, createStageObject, removeStageObject, updateStageObjectProps,
@@ -265,7 +265,7 @@ export function tryChannel() {
         // Darum pollt die Seite periodisch pollControl() MIT Callback und wendet
         // den zurueckgegebenen Steuer-Zustand + Einmal-Events an.
         if (bridge.pollControl) {
-          let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null;
+          let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
           setInterval(function(){
             try {
               bridge.pollControl(function(js){
@@ -281,6 +281,13 @@ export function tryChannel() {
                   if (s.fixtures && s.fixtures !== _pFix) {
                     _pFix = s.fixtures;
                     try { JSON.parse(s.fixtures).forEach(f => addFixture(f)); } catch (eF) {}
+                  }
+                  // VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im
+                  // 3D. Idempotent (nur bei geaenderter Liste), OHNE Echo zurueck
+                  // (jsApplyExternalSelection ruft updateOutlines(false)).
+                  if (s.selection !== undefined && s.selection !== _pSel) {
+                    _pSel = s.selection;
+                    jsApplyExternalSelection(s.selection);
                   }
                   if (s.dmx) {
                     const arr = JSON.parse(s.dmx);
