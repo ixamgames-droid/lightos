@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-15 — Quality-of-Life-Phase: Bedienbarkeit & Lesbarkeit (QOL-01..04, UI-19/25/26, VC3D-01/03)
+
+#### Neu / Verbessert / Tests
+
+- **2D-Bühne aufgeräumt (UI-26 / QOL-01):** Fixture-Namen überlappen nicht mehr unlesbar bei dichter Platzierung — die 2D-Live-View zeichnet Labels jetzt nach Bildschirm-Nachbarabstand (voll → nur Nummer → aus), Auswahl/Hover immer voll. Neue Patches ohne gespeicherte Positionen erscheinen als aufgeräumtes Raster statt gedrängtem Bogen; die Icon-Größe ist per Voreinstellung (`fixture_size`) einstellbar. (PR #304)
+- **„Zuletzt verwendet" unterscheidet gleichnamige Shows (QOL-02):** Zwei Shows mit gleichem Dateinamen (z. B. in AppData vs. Projektordner) bekommen das kürzeste unterscheidende Ordner-Suffix (`… — …/LightOS/shows`); dieselbe Datei in anderer Schreibweise zählt als ein Eintrag. Voller Pfad weiter im Tooltip. (PR #305)
+- **Fixture-Namen in der Geräte-Liste lesbar (QOL-03):** Lange Namen werden mittig gekürzt (der unterscheidende Schwanz bleibt sichtbar: `[009] … Links`) und jeder Eintrag hat einen Tooltip mit dem Vollnamen. (PR #306)
+- **Programmer-Tab korrekt benannt (QOL-04):** Der Attribut-Tab „Hilfe" heißt jetzt „Assistent" — er enthält die Effekt-/Funktionsverwaltung, keine Hilfe. (PR #303)
+- **Deutsche Options-Labels app-weit (UI-19):** Programmer-Matrix-Auswahlfelder und VCStepper/VCEncoder-Beschriftungen zeigen deutsche Labels (z. B. „Läufer-Anzahl", „Rückwärts leeren") statt roher Tokens (`runner_count`, `reverse`); der gespeicherte Wert bleibt unverändert. (PR #308)
+- **Faire Sektions-Tab-Breiten (UI-25):** Bei knappem Fensterplatz kollabiert kein Tab mehr zu reinem „…" — kurze Titel (z. B. „E/A") bleiben lesbar, nur lange Titel werden gekürzt. (PR #309)
+- **Plastische Virtual-Console-Buttons (VC3D-01/03):** VC-Tasten wirken erhaben mit Licht-/Schattenkante und Druck-Feedback; auf voll gesättigten Farben liest die Wölbung jetzt ebenfalls, und der Farb-Badge überlappt den Tastentext nicht mehr. (PRs #296, #307)
+- **Tests:** `test_live_view_declutter`, `test_recent_menu`, `test_fixture_list_tooltip`, `test_ui19_option_labels`, `test_ui25_tab_allocation`, `test_vc_style_3d` (jeweils reine Funktionen + Widget-/Render-Contracts, headless). Jede Änderung mit vollem Test-Gate + adversarialer Sub-Agent-Review; UI-relevante Punkte zusätzlich per Computer-Use auf dem echten Screen bestätigt.
+
 ### 2026-07-12 — Fixture-Generator: 3D-Modell wählbar mit Automatik-Vorschlag (FM-12)
 
 #### Neu / Verbessert / Tests
