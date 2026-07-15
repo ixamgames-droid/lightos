@@ -129,10 +129,13 @@ class TestSectionButtonsDoNotOverlap(unittest.TestCase):
         gm_group = self.win._slider_gm.parentWidget()
         widgets.append(gm_group)
 
+        # UI-25: die Tabs liegen jetzt in einem eigenen Container (Koordinaten
+        # container-relativ), die GM-Gruppe im Bar -> alles ins Fenster-Frame
+        # mappen, sonst vergleicht man verschiedene Bezugssysteme (Review-Hinweis).
         spans = []
         for w in widgets:
-            g = w.geometry()
-            spans.append((w, g.x(), g.x() + g.width()))
+            tl = w.mapTo(self.win, w.rect().topLeft())
+            spans.append((w, tl.x(), tl.x() + w.width()))
 
         for i in range(len(spans)):
             for j in range(i + 1, len(spans)):

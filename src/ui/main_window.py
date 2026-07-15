@@ -248,8 +248,117 @@ class SectionButton(QPushButton):
         avail = self.width() - chrome
         shown = self.fontMetrics().elidedText(
             self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
+        # UI-25: nie ein reines "…" (unlesbar) — dann lieber die ersten Zeichen
+        # ohne Ellipse zeigen (ein sinnvolles Kuerzel statt Punkte).
+        if shown in ("…", "...", "") and self._full_text:
+            shown = self._full_text[:2]
         if shown != self.text():
             self.setText(shown)
+
+
+def _allocate_tab_widths(full: list[float], avail: float, floor: float) -> list[float]:
+    """UI-25: faire Max-Min-Verteilung der Sektions-Tab-Breiten.
+
+    Passt alles (``sum(full) <= avail``), bekommt jeder Tab seine volle Breite.
+    Sonst: kurze Labels behalten ihren Volltext, nur die LANGEN Titel schrumpfen
+    (Wasserfuellung auf ein gemeinsames Level) — kein Tab faellt unter ``floor``,
+    solange der Platz reicht, und die Summe ueberschreitet ``avail`` NIE (kein
+    Ueberlauf/Ueberlappung). Ersetzt die unfaire QHBoxLayout-Stauchung, die kurze
+    Labels wie „E/A" zu reinem „…" verhungern liess. Reine Funktion.
+    """
+    n = len(full)
+    if n == 0:
+        return []
+    full = [max(1.0, float(f)) for f in full]
+    if sum(full) <= avail:
+        return list(full)                       # alles passt -> jeder voll
+    floor = max(1.0, float(floor))
+    if avail <= n * floor:
+        # Fenster unter Minimalgroesse: gleichmaessig aufteilen (kann < floor sein;
+        # der Elide-Guard im Button verhindert dort ein reines "…").
+        share = avail / n
+        return [min(f, share) for f in full]
+    # Wasserfuellung: Level L finden, sodass sum(clamp(L, floor, full_i)) == avail.
+    lo, hi = floor, max(full)
+    for _ in range(64):
+        mid = (lo + hi) / 2.0
+        if sum(min(max(mid, floor), f) for f in full) < avail:
+            lo = mid
+        else:
+            hi = mid
+    level = (lo + hi) / 2.0
+    return [min(max(level, floor), f) for f in full]
+
+
+class _SectionBar(QWidget):
+    """Container NUR der Sektions-Tabs (Haupt-Navigation). Nimmt im aeusseren
+    Bar-Layout als EIN Element genau den fuer die Tabs uebrigen Platz ein (schrumpft
+    nach dem Stretch, vor den fixen GM/TAP-Widgets) und verteilt DIESE Breite intern
+    FAIR (``_allocate_tab_widths``): kurze Labels behalten Volltext, nur lange Titel
+    eliden, nie ein reines „…" — statt der unfairen QHBoxLayout-Stauchung, die „E/A"
+    verhungern liess (UI-25). Die gemeldete ``sizeHint`` bleibt STABIL (Summe der
+    Volltextbreiten), unabhaengig von den gesetzten Fixbreiten -> keine Rueckkopplung.
+    """
+    _SP = 0  # Innen-Spacing zwischen Tabs (wie die alte bar_layout-Spacing)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._tabs: list = []
+        self._reflowing = False
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(self._SP)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+
+    def add_tab(self, btn) -> None:
+        self._tabs.append(btn)
+        self.layout().addWidget(btn)
+
+    def _full_widths(self) -> list[int]:
+        return [max(1, b._full_text_size_hint().width()) for b in self._tabs]
+
+    def sizeHint(self):  # noqa: N802
+        fw = self._full_widths()
+        return QSize(sum(fw) + self._SP * max(0, len(fw) - 1), 34)
+
+    def minimumSizeHint(self):  # noqa: N802
+        n = len(self._tabs)
+        return QSize(SectionButton._CLICK_FLOOR_PX * n + self._SP * max(0, n - 1), 34)
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self._reflow()
+
+    def _reflow(self) -> None:
+        if self._reflowing or not self._tabs:
+            return
+        tabs = [b for b in self._tabs if not b.isHidden()]
+        if not tabs:
+            return
+        self._reflowing = True
+        try:
+            avail = int(self.width() - self._SP * max(0, len(tabs) - 1))
+            full = [max(1, b._full_text_size_hint().width()) for b in tabs]
+            if sum(full) <= avail:
+                ints = list(full)                       # alles passt -> jeder voll
+            else:
+                widths = _allocate_tab_widths(full, avail, float(SectionButton._CLICK_FLOOR_PX))
+                # Ganzzahlig OHNE die Summe (== avail) zu ueberschreiten: erst
+                # ABRUNDEN (Summe <= avail), dann den Rest pixelweise an die
+                # groessten Nachkommaanteile verteilen. Ein pro-Tab int(round())
+                # wuerde mehrere aufrunden -> Summe > avail -> Tabs liefen ueber
+                # den Container in die GM-Gruppe (Overlap-Befund dieser Zone).
+                ints = [int(w) for w in widths]
+                residual = avail - sum(ints)            # 0..n harmlose Rest-Pixel
+                if residual > 0:
+                    frac = sorted(range(len(widths)),
+                                  key=lambda i: widths[i] - ints[i], reverse=True)
+                    for i in frac[:residual]:
+                        ints[i] += 1
+            for b, wi in zip(tabs, ints):
+                b.setFixedWidth(max(1, wi))
+        finally:
+            self._reflowing = False
 
 
 class MainWindow(QMainWindow):
@@ -601,14 +710,20 @@ class MainWindow(QMainWindow):
         # Volle Bezeichnung fuer Tooltip der gekuerzten Buttons (UI-15).
         _section_full_names = {"Bühne": "Bühnen-Layout", "E/A": "Eingabe / Ausgabe"}
 
+        # UI-25: die Tabs leben in einem eigenen Container, der bei Platzmangel
+        # ihre Breiten FAIR verteilt (kurze Labels voll, nur lange eliden) statt
+        # der unfairen QHBoxLayout-Stauchung. Der Container nimmt im Bar-Layout
+        # genau den fuer die Tabs uebrigen Platz ein (schrumpft nach dem Stretch).
+        self._tab_container = _SectionBar()
         self._section_btns: list[SectionButton] = []
         for i, (label, color) in enumerate(sections):
             btn = SectionButton(label, color)
             if label in _section_full_names:
                 btn.setToolTip(_section_full_names[label])
             self._btn_group.addButton(btn, i)
-            bar_layout.addWidget(btn)
+            self._tab_container.add_tab(btn)
             self._section_btns.append(btn)
+        bar_layout.addWidget(self._tab_container)
 
         # Spacer rechts
         bar_layout.addStretch(1)
