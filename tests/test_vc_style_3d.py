@@ -13,9 +13,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtCore import QRect, QRectF
+from PySide6.QtCore import QRect, QRectF, QPoint
 
-from src.ui.virtualconsole.vc_style import paint_button_surface, key_rect, DEPTH
+from src.ui.virtualconsole.vc_style import (
+    paint_button_surface, key_rect, DEPTH, paint_slider_handle, paint_dial_knob)
 
 _app = QApplication.instance() or QApplication([])
 
@@ -143,6 +144,58 @@ class TestBevelSaturationIndependent(unittest.TestCase):
     def test_pure_blue_top_edge_lighter(self):
         top, mid = self._top_vs_mid("#0000ff", "red", "green")
         self.assertGreater(top, mid, "obere Bevel-Kante muss auf reinem Blau heller sein")
+
+
+def _img_for(w, h):
+    img = QImage(max(1, w), max(1, h), QImage.Format.Format_ARGB32)
+    img.fill(QColor("#0d1117"))
+    return img
+
+
+def _lum(img, x, y):
+    c = img.pixelColor(int(x), int(y))
+    return c.red() + c.green() + c.blue()
+
+
+class TestSliderHandle3D(unittest.TestCase):
+    """VC3D-02: plastischer Fader-Griff (paint_slider_handle)."""
+
+    def test_tiny_sizes_do_not_crash(self):
+        for w, h in [(1, 1), (4, 3), (20, 8), (60, 8)]:
+            img = _img_for(w + 2, h + 6)
+            p = QPainter(img)
+            paint_slider_handle(p, QRect(0, 0, w, h), QColor("#aaccff"))
+            p.end()   # darf bei keiner Groesse werfen
+
+    def test_handle_top_light_bottom_shadow(self):
+        # Woelbung: obere Kante heller als untere (Licht von oben).
+        img = _img_for(60, 12)
+        p = QPainter(img)
+        paint_slider_handle(p, QRect(0, 2, 60, 8), QColor("#8899aa"))
+        p.end()
+        top = _lum(img, 30, 3)
+        bottom = _lum(img, 30, 9)
+        self.assertGreater(top, bottom, "Fader-Griff hat keine Licht-oben/Schatten-unten-Woelbung")
+
+
+class TestDialKnob3D(unittest.TestCase):
+    """VC3D-02: plastische Dreh-Knopf-Flaeche (paint_dial_knob)."""
+
+    def test_zero_and_tiny_radius_do_not_crash(self):
+        for r in [0, 1, 4, 20]:
+            img = _img_for(60, 60)
+            p = QPainter(img)
+            paint_dial_knob(p, QPoint(30, 30), r, QColor("#2b3244"))
+            p.end()
+
+    def test_knob_is_convex_top_brighter_than_bottom(self):
+        img = _img_for(60, 60)
+        p = QPainter(img)
+        paint_dial_knob(p, QPoint(30, 30), 24, QColor("#3a4560"))
+        p.end()
+        top = _lum(img, 30, 10)     # oben im Knopf (Lichtquelle oben-links + Rand-Glanz)
+        bottom = _lum(img, 30, 50)  # unten im Knopf (Schattenkante)
+        self.assertGreater(top, bottom, "Dreh-Knopf hat keine Woelbung (oben nicht heller als unten)")
 
 
 if __name__ == "__main__":

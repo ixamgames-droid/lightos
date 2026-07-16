@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Virtual Console: plastische Fader & Speed-Dials (VC3D-02)
+
+#### Neu / Tests
+
+- **Fader-Griffe und Speed-Dials wirken jetzt plastisch wie die VC-Tasten:** Der Fader-Griff ist nicht mehr ein flacher Balken, sondern eine leicht gewölbte Taste mit Licht-/Schattenkante und mittiger Griff-Rille; die Speed-Dials (BPM/Tempo) sitzen auf einer erhabenen Dreh-Knopf-Fläche, sodass Wertanzeige und Zeiger auf einem „echten" Knopf liegen. Konsistenter, griffiger Pad-/Fader-Look über die ganze Virtual Console (gleicher `vc_style`-Helfer wie die Buttons, rein QPainter — keine Assets, touch-freundlich). Tests: `tests/test_vc_style_3d.py` (Crash-Sicherheit bei jeder Größe + Wölbungs-Nachweis für `paint_slider_handle`/`paint_dial_knob`).
+
 ### 2026-07-16 — 3D-Visualizer: Gerätenamen direkt im 3D-Bild + Modus-Indikator (VIZ-14)
 
 #### Neu / Tests

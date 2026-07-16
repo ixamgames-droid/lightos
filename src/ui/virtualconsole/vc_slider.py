@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from .vc_widget import VCWidget
+from .vc_style import paint_slider_handle   # VC3D-02: plastischer Fader-Griff
 
 
 def _clear_submaster_slot(slot):
@@ -621,8 +622,9 @@ class VCSlider(VCWidget):
         grad.setColorAt(1.0, QColor("#0088ff"))
         p.fillRect(fill, grad)
 
-        # Handle knob
-        p.fillRect(tr.x() - 8, hy - 4, tr.width() + 16, 8, QColor("#aaccff"))
+        # Handle knob — VC3D-02: plastischer Griff (Woelbung + Bevel + Griff-Rille)
+        # statt flachem fillRect, konsistent mit dem 3D-Look der VC-Buttons.
+        paint_slider_handle(p, QRect(tr.x() - 8, hy - 4, tr.width() + 16, 8), QColor("#aaccff"))
 
         # Soft-Takeover-Hinweis: Fader „armiert" und wartet, bis der physische
         # Fader den VC-Wert (hy) durchfährt. Ziel-Linie + Geist-Position + Pfeil.

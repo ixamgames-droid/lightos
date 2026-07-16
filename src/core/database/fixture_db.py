@@ -1261,7 +1261,13 @@ def _dotz_tpar_modes_data():
 
 
 def _add_adj_dotz_tpar(s, mfr):
-    """ADJ Dotz TPar System (4x 30W RGB COB), complete five-mode profile."""
+    """ADJ Dotz TPar System (4x 30W RGB COB), complete five-mode profile.
+
+    FLA-5(b): der 3D-Visualizer waehlt das Modell MODUSABHAENGIG (``_viz_model_for``)
+    — schmale Modi (3/5/9ch, 1 Bank) rendern als ``led_bar``, die grossen 4-Bank-Modi
+    (12/18ch) als ``par_bar`` (4 einzeln ansteuerbare Koepfe). Das ist gewollt: der
+    Fixture-Typ hier ist ``led_bar`` (Default/Fallback), die par_bar-Optik entsteht
+    erst aus der gepatchten Modus-Kanalzahl. Kein Bug, nur nicht offensichtlich."""
     _add_fixture(s, mfr, "Dotz TPar System", "DOTZTPAR", "led_bar", 144,
                  _dotz_tpar_modes_data())
 
