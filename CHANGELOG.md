@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Behoben: Nebelmaschine mit Lüfter — Lüfter jetzt getrennt regelbar (CDX-07)
+
+#### Behoben
+
+- **Bei der Nebelmaschine im Modus „2-Kanal (Nebel + Lüfter)" lässt sich der Lüfter jetzt unabhängig vom Nebelausstoß regeln.** Vorher trugen beide Kanäle dieselbe Kennung („Dimmer"), sodass der Programmer sie zu **einem** Regler zusammenfasste und der Lüfter still dem Nebelwert folgte. Der Lüfter hat nun eine eigene Kennung („Lüfter") und einen eigenen Regler; der Nebelausstoß bleibt vom Grand Master/Blackout gedimmt (Sicherheit), der Lüfter läuft davon unabhängig. Bestehende Shows werden beim Start automatisch mit-korrigiert. Gefunden im Codex-Review-Harvest (CDX-07). Tests in `tests/test_fog_hazer_profile.py`.
+
 ### 2026-07-16 — Test-Show „Laser Gobo Test 2026" + Anleitung
 
 #### Neu

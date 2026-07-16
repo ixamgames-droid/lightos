@@ -48,7 +48,7 @@ ATTR_GROUPS: dict[str, set[str]] = {
     # macro und aendert deren Gruppen-Set nicht (PAR hat via "macro" schon Effect).
     # Der QXF-SpeedPanTilt*-Mover zeigt seinen Speed-Kanal damit im Effekt-Tab.
     "Effect":    {"macro", "effect", "effect_speed", "speed", "prism_rot",
-                  "prism_rotation", "animation",
+                  "prism_rotation", "animation", "fan",
                   "laser_boundary", "laser_bank", "laser_x", "laser_y",
                   "laser_zoom_x", "laser_zoom_y", "laser_color",
                   "laser_color_change", "laser_dots", "laser_draw",
@@ -79,7 +79,7 @@ ATTR_LABELS: dict[str, str] = {
     "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_rotation": "Gobo-Rotation",
     "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
     "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
-    "animation": "Animation",
+    "animation": "Animation", "fan": "Lüfter",
     "laser_boundary": "Grenzverhalten", "laser_bank": "Musterbank",
     "laser_x": "X-Bewegung", "laser_y": "Y-Bewegung",
     "laser_zoom_x": "X-Zoom", "laser_zoom_y": "Y-Zoom",
