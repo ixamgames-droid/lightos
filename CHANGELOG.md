@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Test-Show „Laser Gobo Test 2026" + Anleitung
+
+#### Neu
+
+- **Neue komplette Test-Show mit Laser, Gobo-Moving-Heads, PARs und Nebel** — 18 Geräte über 2 Universen, damit sich Laser-, Gobo-, Bewegungs-, Farb-, Dimmer- und Nebel-Steuerung an einem Rig prüfen lassen. Reproduzierbar über den Generator `tools/build_laser_gobo_test.py` (Show-Lint `--strict` sauber). Live per Computer-Use durch alle UI-Bereiche verifiziert (2D/3D-Darstellung inkl. Fixture-Labels + Modus-Indikator, Virtuelle Konsole, Laser-Panel, Gobo-Kacheln). Anleitung: [`docs/ANLEITUNG_LASER_GOBO_TEST_2026.md`](docs/ANLEITUNG_LASER_GOBO_TEST_2026.md). (Die `.lshow`-Datei ist git-ignoriert; über den Generator jederzeit neu erzeugbar.)
+
 ### 2026-07-16 — Doku: Audit-Coverage-Tracker (DOC-10)
 
 #### Neu / Tests
