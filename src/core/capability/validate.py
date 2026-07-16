@@ -255,6 +255,19 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
 
     label = f"{where} ({wtype})"
 
+    # VC-IMG: bg_image MUSS ein wohlgeformter Asset-Key sein (<sha1>.<ext>). Ein
+    # roher Galerie-Name oder Pfad, der in eine hand-editierte Show geriet, wuerde
+    # still kein Bild zeigen (der Loader findet dafuer kein eingebettetes Asset).
+    _bgi = w.get("bg_image")
+    if isinstance(_bgi, str) and _bgi:
+        from src.core.show import vc_assets
+        if not vc_assets.is_valid_key(_bgi):
+            out.append(Finding(
+                WARNING, "VC-BGIMAGE", label,
+                f"bg_image '{_bgi}' ist kein gültiger Asset-Key (<sha1>.<ext>) — "
+                "der Button zeigt kein Bild (roher Galerie-Name/Pfad statt Key?)",
+                "vc_assets.py"))
+
     # Enum-Feld des Widget-Typs prüfen
     spec = _WIDGET_ENUM_FIELDS.get(wtype)
     if spec:

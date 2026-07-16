@@ -208,7 +208,7 @@ class ShowBuilder:
         return w
 
     def button(self, caption, action, *, function=None, effect_action_key=None,
-               bank=-1, **attrs):
+               bank=-1, bg_image=None, **attrs):
         from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
         av = self._check(action, self.caps.button_actions, "ButtonAction")
         fid = self._bind_id(function)
@@ -224,9 +224,26 @@ class ShowBuilder:
             w.function_id = fid
         if effect_action_key:
             w.effect_action_key = effect_action_key
+        if bg_image:                       # VC-IMG: Galerie-Grafik/GIF auf den Button
+            w.bg_image = self._resolve_bg_image(bg_image)
         for k, v in attrs.items():
             setattr(w, k, v)
         return self._add(w, bank)
+
+    def _resolve_bg_image(self, bg_image: str) -> str:
+        """VC-IMG: ``bg_image`` = eingebauter Galerie-Name (aus
+        ``assets/vc_gallery/manifest.json``) ODER ein fertiger Asset-Key ->
+        Content-Hash-Key (wird beim Speichern in die .lshow eingebettet).
+        Unbekannter Name -> ``BuildError`` (Halluzinations-Kontrakt wie ueberall)."""
+        from src.core.show import vc_assets, vc_gallery
+        if vc_assets.is_valid_key(bg_image):
+            return bg_image
+        try:
+            return vc_gallery.import_to_cache(bg_image)
+        except KeyError:
+            raise BuildError(
+                f"bg_image '{bg_image}' ist weder ein Asset-Key noch eine Galerie-"
+                f"Grafik{did_you_mean(bg_image, vc_gallery.names())}")
 
     def slider(self, caption, mode, *, param_key=None, function=None, bank=-1, **attrs):
         from src.ui.virtualconsole.vc_slider import VCSlider

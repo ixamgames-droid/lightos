@@ -8,3 +8,6 @@
 pytest>=8.0
 pytest-timeout>=2.4.0   # Watchdog gegen den Voll-Suite-Random-Haenger (pytest.ini)
 hypothesis>=6.0         # Property-basierte Vertrags-Tests (QA-14, tests/test_render_contract_props.py)
+
+# VC-Galerie-Grafik-Regenerierung (tools/gen_vc_gallery.py) — nur Dev
+Pillow>=12
