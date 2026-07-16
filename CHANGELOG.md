@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Virtual Console: eigenes Hintergrundbild/GIF pro Button (VC-IMG)
+
+#### Neu
+
+- **Ein VC-Button kann jetzt ein eigenes Bild oder animiertes GIF als Hintergrund tragen** — Rechtsklick auf den Button → „Hintergrundbild wählen…" (PNG/JPG/GIF/WEBP/BMP) bzw. „Hintergrundbild entfernen". Das Bild füllt die Tastenfläche, skaliert automatisch mit, wenn man den Button größer/kleiner zieht, und liegt unter der (weiterhin möglichen) Beschriftung; ein dezenter Schleier hält den Text lesbar. GIFs animieren live auf der Konsole (und pausieren, wenn die Bank nicht sichtbar ist → keine Extra-Last). So baut man eigene, individuell aussehende Effekt-Buttons. **Portabel:** das gewählte Bild wird in die `.lshow`-Datei eingebettet — die Show funktioniert mit ihren Button-Bildern auch auf einem anderen PC. Der plastische 3D-Look der Taste (Wölbung, Druck-Feedback, Aktiv-Glow) bleibt erhalten. Tests: `tests/test_vc_button_bg_image.py`.
+
 ### 2026-07-16 — Codex-Funde CDX-08..11 (Auto-Fit-Feinschliff + Dev-Härtung)
 
 #### Behoben / Verbessert
