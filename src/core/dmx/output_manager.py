@@ -71,6 +71,14 @@ class OutputManager:
         # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
         # global dimmen. {universe:int -> frozenset[addr 1..512]}
         self._gm_address_mask: dict[int, frozenset] = {}
+        # A3D-01: Adressen je Universum, die bei aktivem Laser-NOT-AUS FINAL (nach
+        # Channel-Modifier + Grand-Master + Blackout) hart auf 0 gezwungen werden.
+        # Leeres Dict = kein NOT-AUS aktiv. Vom AppState gepflegt (set_laser_estop /
+        # _rebuild_render_plan). Noetig, weil ein auf einer Laser-Adresse liegender
+        # Channel-Modifier (INVERSE -> 255, Range-Lock -> range_min) das im Renderer
+        # erzwungene Dunkel sonst nach dem Modifier-Pass wieder aufhebt.
+        # {universe:int -> frozenset[addr 1..512]}
+        self._laser_estop_mask: dict[int, frozenset] = {}
         # ANZEIGE-Snapshot (WYSIWYG): pro Universum die zuletzt GESENDETEN Bytes
         # NACH Grand-Master/Blackout/Channel-Modifier. Output-facing Anzeigen
         # (DMX-Monitor, Output-Monitor, 3D-Visualizer) lesen diesen Snapshot statt
@@ -102,6 +110,13 @@ class OutputManager:
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
         aus dem Patch gepflegt."""
         self._gm_address_mask = mask or {}
+
+    def set_laser_estop_mask(self, mask: dict[int, frozenset]):
+        """A3D-01: Setzt je Universum die Laser-Adressen, die bei aktivem NOT-AUS
+        FINAL (nach Channel-Modifier/Grand-Master/Blackout) auf 0 gezwungen werden.
+        Leeres Dict = NOT-AUS inaktiv. Vom AppState gepflegt (spiegelt
+        ``_laser_estop_addrs`` solange ``laser_estop_active``)."""
+        self._laser_estop_mask = mask or {}
 
     # ── Anzeige-Snapshot (WYSIWYG) ───────────────────────────────────────────
 
@@ -373,6 +388,19 @@ class OutputManager:
                         if 1 <= addr <= 512:
                             buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
                     data = bytes(buf)
+            # A3D-01: Laser-NOT-AUS als ALLERLETZTE Ebene — nach Channel-Modifier,
+            # Grand-Master UND Blackout die verriegelten Laser-Adressen hart auf 0
+            # zwingen. Der Modifier-Pass oben laeuft VOR diesem Schritt und wuerde
+            # aus dem im Renderer erzwungenen 0 sonst wieder 255 (INVERSE) bzw.
+            # range_min (Range-Lock) machen -> der DMX-Laser bliebe trotz NOT-AUS an.
+            # Muss die letzte Transformation vor Anzeige/Senden sein (auch nach GM).
+            estop_mask = self._laser_estop_mask.get(univ_num)
+            if estop_mask:
+                buf = bytearray(data)
+                for addr in estop_mask:
+                    if 1 <= addr <= 512:
+                        buf[addr - 1] = 0
+                data = bytes(buf)
             # ANZEIGE-Snapshot: exakt die Bytes, die gleich gesendet werden (POST
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit
             # immutable ``bytes`` — keine Sperre noetig, Anzeige-Leser sehen immer
