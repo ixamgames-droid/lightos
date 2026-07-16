@@ -126,6 +126,14 @@ class TestSectionTabsFairInWindow(unittest.TestCase):
                 frac(ea) + 1e-9, frac(vc),
                 f"@{W}px: kurzer Tab staerker gekuerzt als langer (unfair)")
             self.assertNotIn(vc.text(), ("…", "...", ""))   # nie reines '…'
+            # CDX-11: AUCH der kurze Tab „E/A" muss im engen Band lesbar bleiben —
+            # nie zu reinem „…"/leer kollabieren (bei viel Platz ist er voll, s.
+            # test_full_text_when_plenty_of_room; hier nur „bleibt lesbar"). Der
+            # reine Fairness-Anteil oben liesse ein pures „…" fuer E/A theoretisch
+            # durch, solange VC noch staerker gekuerzt waere.
+            self.assertNotIn(
+                ea.text(), ("…", "...", ""),
+                f"@{W}px: kurzer Tab '{ea._full_text}' zu reinem '{ea.text()}' kollabiert")
             checked = True
         self.assertTrue(checked, "keine enge Breite im Testbereich gefunden")
 

@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Codex-Funde CDX-08..11 (Auto-Fit-Feinschliff + Dev-Härtung)
+
+#### Behoben / Verbessert
+
+- **2D-Bühne Auto-Fit** greift jetzt nur noch bei einem echten kompakten Klumpen: ein bereits gut gespreiztes Rig, das schon EINE Achse (Breite oder Höhe) ausfüllt, wird beim Laden nicht mehr eingepasst/geschrumpft (CDX-09).
+- Dev/intern: Demoshow-Generatoren treiben die PAR-Intensität mit, sodass die Farb-Pads eigenständig leuchten (CDX-08); AGENTS.md-CHANGELOG-Konvention an den gelebten Stil angeglichen (CDX-10); UI-25-Fairness-Test härtet, dass auch der kurze Tab nie zu „…" kollabiert (CDX-11). Alle aus dem Codex-Review-Harvest.
+
 ### 2026-07-16 — Behoben: Nebelmaschine mit Lüfter — Lüfter jetzt getrennt regelbar (CDX-07)
 
 #### Behoben
