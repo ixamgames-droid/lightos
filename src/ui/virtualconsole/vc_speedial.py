@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
 import math
 from .vc_widget import VCWidget
+from .vc_style import paint_dial_knob   # VC3D-02: plastische Dreh-Knopf-Flaeche
 
 
 class SpeedTarget(str):
@@ -693,6 +694,10 @@ class VCSpeedDial(VCWidget):
 
         cx = self._dial_center()
         r = self._dial_radius()
+
+        # VC3D-02: plastische Knopf-Flaeche HINTER Arcs/Nadel -> Wert-Arc + Nadel
+        # sitzen auf einem physisch wirkenden Dreh-Knopf (konsistent zum Button-Look).
+        paint_dial_knob(p, cx, r, QColor("#2b3244"))
 
         # Track arc (background)
         p.setPen(QPen(QColor("#21262d"), 4))

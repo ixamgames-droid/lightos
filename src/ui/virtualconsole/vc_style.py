@@ -16,8 +16,8 @@ Bewusst *kein* echtes 3D — nur Verlauf + Bevel + Schatten (guenstig, deutlich,
 Touch-freundlich). Alles rein via QPainter, keine externen Assets.
 """
 from __future__ import annotations
-from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QColor, QLinearGradient, QPen, QBrush, QPainter
+from PySide6.QtCore import Qt, QRectF, QPointF
+from PySide6.QtGui import QColor, QLinearGradient, QRadialGradient, QPen, QBrush, QPainter
 
 # Tastendicke: wie weit die Taste beim Druck faellt (px). Gleich der Hoehe des
 # sichtbaren farbigen Randes im Normalzustand.
@@ -131,3 +131,73 @@ def paint_button_surface(painter: QPainter, rect, base: QColor,
 
     painter.restore()
     return face
+
+
+def paint_slider_handle(painter: QPainter, rect, base: QColor) -> None:
+    """Plastischer Fader-Griff (horizontaler Balken) — VC3D-02.
+
+    Gewoelbte Oberflaeche (Licht oben, Schatten unten) + saettigungs-unabhaengige
+    Bevel-Kante (wie VC3D-03) + mittige Griff-Rille (haptisch). Reines QPainter,
+    konsistent mit ``paint_button_surface``. Ersetzt ein flaches ``fillRect``."""
+    painter.save()
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    rf = QRectF(rect)
+    rad = min(3.0, rf.height() / 2.0)
+    # Woelbung: hell oben -> Basis -> dunkel unten (konvex, Licht von oben).
+    grad = QLinearGradient(rf.topLeft(), rf.bottomLeft())
+    grad.setColorAt(0.0, base.lighter(150))
+    grad.setColorAt(0.5, base)
+    grad.setColorAt(1.0, base.darker(140))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QBrush(grad))
+    painter.drawRoundedRect(rf, rad, rad)
+    # Bevel-Kante: heller Glanz oben -> dunkle Schattenkante unten (liest auch auf
+    # voll gesaettigten Farben, da fixe Weiss/Schwarz-Alpha statt lighter()).
+    inner = rf.adjusted(0.8, 0.8, -0.8, -0.8)
+    if inner.width() > 0 and inner.height() > 0:
+        bevel = QLinearGradient(inner.topLeft(), inner.bottomLeft())
+        bevel.setColorAt(0.0, QColor(255, 255, 255, 150))
+        bevel.setColorAt(0.5, QColor(255, 255, 255, 15))
+        bevel.setColorAt(1.0, QColor(0, 0, 0, 110))
+        painter.setPen(QPen(QBrush(bevel), 1.2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(inner, rad, rad)
+    # Mittige Griff-Rille (nur wenn hoch genug) — zwei 1px-Linien (Schatten+Glanz).
+    if rf.height() >= 6 and rf.width() >= 10:
+        cy = rf.center().y()
+        painter.setPen(QPen(QColor(0, 0, 0, 90), 1.0))
+        painter.drawLine(QPointF(rf.left() + 4, cy), QPointF(rf.right() - 4, cy))
+        painter.setPen(QPen(QColor(255, 255, 255, 55), 1.0))
+        painter.drawLine(QPointF(rf.left() + 4, cy - 1.0), QPointF(rf.right() - 4, cy - 1.0))
+    painter.restore()
+
+
+def paint_dial_knob(painter: QPainter, center, radius: float, base: QColor) -> None:
+    """Plastische Dreh-Knopf-Flaeche (Kreis) HINTER Arcs/Nadel — VC3D-02.
+
+    Radialer Verlauf (Lichtquelle oben-links) + Rand-Glanz oben / Schatten unten,
+    damit Wert-Arc + Nadel auf einem physisch wirkenden Knopf sitzen. Vor den Arcs
+    zeichnen. Reines QPainter."""
+    painter.save()
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    cx, cy, r = float(center.x()), float(center.y()), float(radius)
+    if r <= 0:
+        painter.restore()
+        return
+    # Radialer Verlauf, Lichtquelle oben-links -> Woelbung.
+    rg = QRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 1.4)
+    rg.setColorAt(0.0, base.lighter(155))
+    rg.setColorAt(0.6, base)
+    rg.setColorAt(1.0, base.darker(160))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(QBrush(rg))
+    painter.drawEllipse(QPointF(cx, cy), r, r)
+    # Rand: Glanzkante oben, Schattenkante unten (saettigungs-unabhaengig).
+    rim = QLinearGradient(cx, cy - r, cx, cy + r)
+    rim.setColorAt(0.0, QColor(255, 255, 255, 120))
+    rim.setColorAt(0.5, QColor(255, 255, 255, 12))
+    rim.setColorAt(1.0, QColor(0, 0, 0, 110))
+    painter.setPen(QPen(QBrush(rim), 1.4))
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawEllipse(QPointF(cx, cy), max(0.5, r - 0.8), max(0.5, r - 0.8))
+    painter.restore()
