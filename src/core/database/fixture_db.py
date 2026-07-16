@@ -1065,15 +1065,19 @@ def _add_eurolite_gross(s, mfr):
 
 def _fog_hazer_modes_data():
     """Nebelmaschine/Hazer — Nebelausstoss (und optional Lüfter) per DMX.
-    Beides als Intensitaets-Kanal (``dimmer``): 0 = aus, 255 = voll. Der
-    Grand-Master/Blackout skaliert den Nebel damit wie ein Dimmer mit."""
+    ``Nebel`` = ``dimmer`` (0 = aus, 255 = voll) -> Grand-Master/Blackout skalieren
+    den Nebel wie ein Dimmer mit (Safety: Blackout stoppt den Ausstoss). ``Lüfter``
+    hat ein EIGENES Attribut ``fan`` (CDX-07): sonst deduplizierte der Programmer
+    beide ``dimmer``-Kanaele zu EINEM Regler und der Lüfter spiegelte still den
+    Nebelwert (nicht getrennt steuerbar). ``fan`` liegt in der Effect-Gruppe ->
+    eigener Regler, NICHT vom Grand-Master/Blackout skaliert (Lüfter laeuft weiter)."""
     return [
         ("1-Kanal (Nebel)", [
             ("Nebel", "dimmer", 0, 200),
         ]),
         ("2-Kanal (Nebel + Lüfter)", [
             ("Nebel",  "dimmer", 0, 200),
-            ("Lüfter", "dimmer", 0, 0),
+            ("Lüfter", "fan",    0, 0),
         ]),
     ]
 
@@ -1378,6 +1382,11 @@ _ZQ02001_SIGNATURE = {
 
 # Soll-Signatur des Spider (2026-06-16): zwei separate Tilts (Bar L/R) statt
 # Pan/Tilt. Aeltere DBs (CH1=pan) werden in-place migriert.
+_EURON10_SIGNATURE = {
+    mode_name: [ch[1] for ch in channels]
+    for mode_name, channels in _fog_hazer_modes_data()
+}
+
 _SPIDER14_SIGNATURE = {
     mode_name: [ch[1] for ch in channels]
     for mode_name, channels in _spider_modes_data()
@@ -1490,6 +1499,23 @@ def ensure_builtins():
                 prof.modes.clear()
                 s.flush()
                 _add_modes(s, prof, _spider_modes_data())
+                changed = True
+        if "EURON10" in have:
+            # CDX-07: alte DBs (seit FIX-FOG) haben den Lüfter-Kanal des 2-Kanal-
+            # Modus faelschlich als `dimmer` -> der Programmer dedupliziert beide
+            # `dimmer`-Kanaele zu EINEM Regler, der Lüfter ist nicht getrennt
+            # steuerbar. In-place auf `fan` migrieren (Signatur-Abgleich).
+            prof = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == "EURON10",
+                       FixtureProfile.source == "builtin")
+            ).scalars().first()
+            if prof is not None and _mode_attr_signature(prof) != _EURON10_SIGNATURE:
+                prof.modes.clear()
+                s.flush()
+                _add_modes(s, prof, _fog_hazer_modes_data())
                 changed = True
         # X-3: generische MH-Spots mit Farb-/Gobo-Rad-Slots nachruesten
         if _ensure_wheel_ranges(s, "MH8", _mh8_modes_data()):
