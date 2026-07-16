@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Doku: Audit-Coverage-Tracker (DOC-10)
+
+#### Neu / Tests
+
+- **Neuer Überblick, welche Teile der Software wann geprüft wurden:** [`docs/AUDIT_COVERAGE.md`](docs/AUDIT_COVERAGE.md) listet pro Subsystem (DMX, MIDI, Show-Datei, Fixtures, Audio, Virtual Console, UI, …) das letzte Audit-Dokument, das Datum und den Status (geprüft / teilweise / offen). Macht die nächste sinnvolle Prüf-Runde sofort sichtbar und verhindert Doppel-Prüfungen. Ein Test (`tests/test_audit_coverage_docs_exist.py`) stellt sicher, dass jedes verlinkte Dokument wirklich existiert.
+
 ### 2026-07-16 — Virtual Console: plastische Fader & Speed-Dials (VC3D-02)
 
 #### Neu / Tests
