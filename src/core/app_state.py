@@ -749,6 +749,9 @@ class AppState:
                 {u: frozenset(s) for u, s in gm_mask.items()})
         except Exception as e:
             print(f"[AppState] set gm mask error: {e}")
+        # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
+        # koennen sich geaendert haben, waehrend der NOT-AUS-Latch aktiv ist).
+        self._push_laser_estop_mask()
 
     def _release_engine_extra(self):
         """STAB-14: gibt die zuletzt als Engine-Extra committeten Roh-Kanaele
@@ -948,17 +951,60 @@ class AppState:
 
     # ── Programmer ────────────────────────────────────────────────────────────
 
+    def _get_estop_lock(self):
+        """A3D-01: Lock, das den ``laser_estop_active``-Flag-Wechsel mit dem
+        Mask-Push an den OutputManager koppelt. Defensiv angelegt (wie
+        ``_get_plan_lock``), damit Test-Helfer via ``AppState.__new__`` es nicht
+        vorab setzen müssen. Nötig, weil der Latch-Clear (MIDI/OSC-Thread) und ein
+        gleichzeitiges ``set_laser_estop`` (UI-Thread) sonst einen stale Push
+        hinterlassen könnten (Flag ``True``, Maske leer → Safety-Backstop aus)."""
+        lock = getattr(self, "_estop_lock", None)
+        if lock is None:
+            lock = self._estop_lock = threading.RLock()
+        return lock
+
+    def _push_laser_estop_mask(self):
+        """A3D-01: dem OutputManager die aktuell zu verriegelnden Laser-Adressen
+        pushen — bei aktivem NOT-AUS die ``_laser_estop_addrs``, sonst leer.
+
+        Läuft unter ``_get_estop_lock`` (self-lockend + re-entrant), damit der
+        gepushte Mask-Zustand IMMER zum ``laser_estop_active``-Flag passt: die
+        Aufrufer setzen Flag und Push unter demselben Lock, sonst könnte ein stale
+        Push zwischen Flag-Write und Push eines anderen Threads landen.
+
+        Der Renderer nullt die Laser-Adressen bereits im Puffer (Schritt 4d), der
+        OutputManager erzwingt sie zusätzlich NACH dem Channel-Modifier-Pass final
+        auf 0. Ohne das hebt ein auf einer Laser-Adresse konfigurierter Modifier
+        (INVERSE → 255, Range-Lock → range_min) das erzwungene Dunkel wieder auf.
+        Überall aufrufen, wo ``laser_estop_active`` oder die Laser-Adressen sich
+        ändern (set_laser_estop / Latch-Clear / Plan-Rebuild)."""
+        with self._get_estop_lock():
+            try:
+                om = getattr(self, "output_manager", None)
+                if om is None or not hasattr(om, "set_laser_estop_mask"):
+                    return
+                active = getattr(self, "laser_estop_active", False)
+                addrs = getattr(self, "_laser_estop_addrs", {}) or {}
+                om.set_laser_estop_mask(
+                    {u: frozenset(s) for u, s in addrs.items()} if active else {})
+            except Exception as e:
+                print(f"[AppState] set laser estop mask error: {e}")
+
     def set_laser_estop(self, active: bool):
         """UXT-12: DMX-Muster-Laser (L2600 & Co.) bei NOT-AUS hart dunkel halten.
 
         ``estop_all`` verriegelt nur den Netzwerk-Streamer (Ether Dream/IDN);
         Fixtures, die über normale DMX-Kanäle ein Muster ausgeben, erreicht das
         nicht. Ist dieser Latch aktiv, zwingt der Renderer alle Laser-Kanäle als
-        oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus). Der Latch wird
-        bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
+        oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus); zusätzlich erzwingt
+        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01). Der
+        Latch wird bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
         (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
         stehen (dunkel = sicher)."""
-        self.laser_estop_active = bool(active)
+        # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
+        with self._get_estop_lock():
+            self.laser_estop_active = bool(active)
+            self._push_laser_estop_mask()
 
     def set_programmer_value(self, fid: int, attribute: str, value: int,
                              undoable: bool = False, head: int = 0):
@@ -977,7 +1023,10 @@ class AppState:
         # den Laser-NOT-AUS auf („wieder an"). Billiger Guard: nur wenn verriegelt.
         if (getattr(self, "laser_estop_active", False)
                 and int(fid) in getattr(self, "_laser_fids", frozenset())):
-            self.laser_estop_active = False
+            # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
+            with self._get_estop_lock():
+                self.laser_estop_active = False
+                self._push_laser_estop_mask()
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
