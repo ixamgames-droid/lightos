@@ -89,3 +89,6 @@ recordings/
 
 # ── Computer-Use-/Debug-Screenshots (Agenten-Sessions) ──────────────────────
 artifacts_*.png
+
+# Generator-Artefakt (build_*.py aus tools/ schreibt current_show.db)
+tools/data/
