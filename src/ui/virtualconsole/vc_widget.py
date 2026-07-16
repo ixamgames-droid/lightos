@@ -402,7 +402,14 @@ class VCWidget(QFrame):
         menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
         menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
         menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
+        self._extend_context_menu(menu)   # Unterklassen-Hook (VC-IMG: Button-Bild)
         menu.exec(global_pos)
+
+    def _extend_context_menu(self, menu):
+        """Hook für Unterklassen, um dem Rechtsklick-Menü eigene Aktionen
+        anzuhängen (z. B. VCButton: Hintergrundbild wählen/entfernen). Standard =
+        nichts."""
+        pass
 
     def _set_bank(self, b: int):
         """Weist das Widget einer Bank zu (-1 = alle) und aktualisiert die

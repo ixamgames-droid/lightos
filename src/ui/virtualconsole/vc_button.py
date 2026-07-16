@@ -5,11 +5,13 @@ import json
 from enum import Enum
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
-                                QCheckBox)
+                                QCheckBox, QFileDialog)
 from PySide6.QtCore import Qt, QRect, QRectF
-from PySide6.QtGui import QPainter, QColor, QFont, QPen, QPainterPath
+from PySide6.QtGui import (QPainter, QColor, QFont, QPen, QPainterPath,
+                           QPixmap, QMovie, QImageReader, QLinearGradient, QBrush)
 from .vc_widget import VCWidget
 from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
+from src.core.show import vc_assets   # VC-IMG: Button-Hintergrundbild/GIF-Assets
 
 _SNAPSHOTS_FILE = os.path.join(
     os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
@@ -221,6 +223,14 @@ class VCButton(VCWidget):
         self._live_editor = None
         self._bg_color = QColor("#1a3a5c")
         self._fg_color = QColor("#ffffff")
+
+        # VC-IMG: optionales user-gewaehltes Hintergrundbild/GIF (Content-Hash-Key,
+        # s. vc_assets). Text bleibt zusaetzlich moeglich. Medien lazy aufgebaut.
+        self.bg_image: str = ""          # "" = kein Bild
+        self._bg_pm: QPixmap | None = None      # statisches Bild
+        self._bg_movie: QMovie | None = None    # animiertes GIF
+        self._bg_scaled: QPixmap | None = None  # auf die aktuelle Face skaliert (Cache)
+        self._bg_scaled_key = None              # (id(src), w, h) des Cache-Standes
 
         # Farb-Vorschau-Badge (oben rechts): zeigt die Farbe(n) des gebundenen
         # Farb-Effekts/-Snaps. Mehrere Farben (Farbwechsel) => Eck-Icon wechselt
@@ -698,11 +708,125 @@ class VCButton(VCWidget):
         # Beim Sichtbarwerden (Bank-Wechsel) Farben frisch aufloesen + Timer steuern.
         self._color_badge_colors()
         self._sync_badge_timer()
+        if self._bg_movie is not None:      # VC-IMG: GIF nur laufen lassen wenn sichtbar
+            self._bg_movie.start()
 
     def hideEvent(self, event):
         super().hideEvent(event)
         if self._badge_timer.isActive():
             self._badge_timer.stop()
+        if self._bg_movie is not None:      # VC-IMG: off-bank -> GIF stoppen (keine CPU)
+            self._bg_movie.stop()
+
+    # ── VC-IMG: Hintergrundbild / GIF ─────────────────────────────────────────
+    def set_bg_image(self, key: str):
+        """Hintergrundbild/GIF setzen (Content-Hash-Key aus vc_assets) und neu bauen."""
+        self.bg_image = key or ""
+        self._teardown_bg_media()
+        self._ensure_bg_media()
+        self.update()
+
+    def clear_bg_image(self):
+        self.bg_image = ""
+        self._teardown_bg_media()
+        self.update()
+
+    def _teardown_bg_media(self):
+        if self._bg_movie is not None:
+            try:
+                self._bg_movie.stop()
+                self._bg_movie.frameChanged.disconnect(self.update)
+            except Exception:
+                pass
+        self._bg_movie = None
+        self._bg_pm = None
+        self._bg_scaled = None
+        self._bg_scaled_key = None
+
+    def _ensure_bg_media(self):
+        """QPixmap (statisch) ODER QMovie (GIF) aus dem Asset-Cache bauen. Headless-
+        sicher: fehlt das Asset ODER das GIF-Plugin, bleibt es beim statischen
+        ersten Frame bzw. None (Button ohne Bild — nie Crash)."""
+        if self._bg_pm is not None or self._bg_movie is not None:
+            return
+        path = vc_assets.resolve(self.bg_image)
+        if not path:
+            return
+        if path.lower().endswith(".gif"):
+            mv = QMovie(path)
+            if mv.isValid():
+                mv.frameChanged.connect(self.update)
+                self._bg_movie = mv
+                if self.isVisible():
+                    mv.start()
+                return
+            # kein GIF-Plugin (z. B. offscreen) -> statischer erster Frame
+            try:
+                img = QImageReader(path).read()
+                if not img.isNull():
+                    self._bg_pm = QPixmap.fromImage(img)
+            except Exception:
+                self._bg_pm = None
+            return
+        pm = QPixmap(path)
+        self._bg_pm = pm if not pm.isNull() else None
+
+    def _bg_current_pixmap(self):
+        if self._bg_movie is not None:
+            pm = self._bg_movie.currentPixmap()
+            return pm if not pm.isNull() else None
+        return self._bg_pm
+
+    def _paint_bg_image(self, p, face):
+        """Bild/GIF-Frame auf die Face zeichnen — deckend skaliert (Ueberstand
+        mittig, auf die runde Face geclippt) + dezenter Scrim fuer Text-Lesbarkeit.
+        Wird VOR Text/Badges gezeichnet (die bleiben oben, lesbar)."""
+        if not self.bg_image:
+            return
+        self._ensure_bg_media()
+        src = self._bg_current_pixmap()
+        if src is None or src.isNull():
+            return
+        fw, fh = max(1, int(face.width())), max(1, int(face.height()))
+        key = (src.cacheKey(), fw, fh)
+        if key != self._bg_scaled_key or self._bg_scaled is None:
+            self._bg_scaled = src.scaled(
+                fw, fh, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation)
+            self._bg_scaled_key = key
+        scaled = self._bg_scaled
+        p.save()
+        clip = QPainterPath()
+        clip.addRoundedRect(face, VC_RADIUS, VC_RADIUS)
+        p.setClipPath(clip)
+        ox = face.left() + (fw - scaled.width()) / 2.0
+        oy = face.top() + (fh - scaled.height()) / 2.0
+        p.drawPixmap(int(ox), int(oy), scaled)
+        scrim = QLinearGradient(face.topLeft(), face.bottomLeft())
+        scrim.setColorAt(0.0, QColor(0, 0, 0, 60))
+        scrim.setColorAt(1.0, QColor(0, 0, 0, 120))
+        p.fillRect(face, QBrush(scrim))
+        p.restore()
+
+    def _extend_context_menu(self, menu):
+        menu.addSeparator()
+        menu.addAction("Hintergrundbild wählen…").triggered.connect(self._pick_bg_image)
+        rm = menu.addAction("Hintergrundbild entfernen")
+        rm.setEnabled(bool(self.bg_image))
+        rm.triggered.connect(self.clear_bg_image)
+
+    def _pick_bg_image(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Hintergrundbild wählen", "",
+            "Bilder (*.png *.jpg *.jpeg *.gif *.webp *.bmp)")
+        if not path:
+            return
+        try:
+            key = vc_assets.import_file(path)
+        except Exception as e:
+            print(f"[vc_button] Hintergrundbild-Import fehlgeschlagen: {e}")
+            return
+        self.set_bg_image(key)
 
     def _gobo_icon(self):
         """Gobo-Icon (QPixmap) wenn dieser Button einen Gobo setzt, sonst None.
@@ -1313,6 +1437,8 @@ class VCButton(VCWidget):
         face = paint_button_surface(p, self.rect(), self._bg_color, self._pressed, lit)
         # AA fuer die runden Rahmen/Clips (der Helfer stellt seinen State zurueck).
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # VC-IMG: optionales Hintergrundbild/GIF auf die Face (unter Text/Badges).
+        self._paint_bg_image(p, face)
         brect = face.adjusted(1, 1, -1, -1)
         br = VC_RADIUS - 1
 
@@ -2050,6 +2176,7 @@ class VCButton(VCWidget):
         d["midi_type"] = self.midi_type
         d["key_binding"] = self.key_binding
         d["long_press_editor"] = self.long_press_editor
+        d["bg_image"] = self.bg_image      # VC-IMG: Content-Hash-Key (Asset im ZIP)
         return d
 
     def apply_dict(self, d: dict):
@@ -2117,3 +2244,8 @@ class VCButton(VCWidget):
         self._snap_active = False
         self._snap_prev = {}
         self.long_press_editor = bool(d.get("long_press_editor", False))
+        # VC-IMG: Hintergrundbild/GIF-Key (leer/None -> kein Bild). Medien werden
+        # lazy beim ersten paintEvent gebaut; hier nur den alten Stand verwerfen.
+        _bg = d.get("bg_image", "")
+        self.bg_image = str(_bg) if isinstance(_bg, str) else ""
+        self._teardown_bg_media()

@@ -460,6 +460,15 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     try:
         with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("show.json", payload)
+            # VC-IMG: referenzierte VC-Button-Hintergrund-Assets (Bild/GIF) mit
+            # einbetten -> die Show ist auf einem anderen PC weiter vollstaendig.
+            # NUR referenzierte Keys (mark-sweep-GC verwaister Assets); fehlt ein
+            # Asset im Cache, wird es uebersprungen (Button zeigt dann kein Bild).
+            from . import vc_assets
+            for _key in vc_assets.collect_keys(show):
+                _data = vc_assets.bytes_for(_key)
+                if _data is not None:
+                    zf.writestr(vc_assets.zip_name(_key), _data)
         os.replace(tmp_path, path)
     except BaseException:
         try:
@@ -722,6 +731,17 @@ def load_show(path: str | os.PathLike):
     try:
         with zipfile.ZipFile(path, "r") as zf:
             raw = zf.read("show.json").decode("utf-8")
+            # VC-IMG: eingebettete VC-Button-Assets in den lokalen Cache entpacken,
+            # damit die Buttons ihre Bilder/GIFs finden (resolve()). Fehler pro
+            # Eintrag ignorieren (eine kaputte Asset-Datei darf das Laden nicht
+            # abbrechen — der Button zeigt dann eben kein Bild).
+            from . import vc_assets
+            for _name in zf.namelist():
+                if vc_assets.is_asset_entry(_name):
+                    try:
+                        vc_assets.store_extracted(vc_assets.key_from_entry(_name), zf.read(_name))
+                    except Exception:
+                        pass
         data = json.loads(raw)
     except Exception as e:
         return False, f"Öffnen fehlgeschlagen: {e}"
