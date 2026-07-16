@@ -38,6 +38,31 @@ class TestGalleryDialog(unittest.TestCase):
         self.assertIsNone(dlg.selected_key)
         dlg.deleteLater()
 
+    def test_dismiss_stops_all_preview_movies(self):
+        # Regress (PR-B-Review): die Vorschau-GIFs muessen beim Schliessen stoppen,
+        # sonst laufen sie als verstecktes Button-Kind mit ~12 fps endlos weiter.
+        from PySide6.QtWidgets import QWidget
+        from PySide6.QtGui import QMovie
+        parent = QWidget()
+        dlg = VCGalleryDialog(parent)
+        movies = list(dlg._movies)
+        if movies:                                   # nur aussagekraeftig mit GIF-Plugin
+            self.assertTrue(any(m.state() == QMovie.MovieState.Running for m in movies))
+        dlg.reject()                                 # -> done() -> _stop_movies()
+        self.assertFalse(any(m.state() == QMovie.MovieState.Running for m in movies))
+        self.assertEqual(len(dlg._movies), 0)
+
+    def test_pick_helper_leaves_no_lingering_dialog_child(self):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QWidget, QDialog
+        import src.ui.virtualconsole.vc_gallery_dialog as mod
+        parent = QWidget()
+        with patch.object(QDialog, "exec", return_value=QDialog.DialogCode.Rejected):
+            key = mod.pick_bg_image_key(parent)
+        self.assertIsNone(key)
+        lingering = [c for c in parent.children() if isinstance(c, mod.VCGalleryDialog)]
+        self.assertEqual(lingering, [])              # setParent(None) hat den Dialog geloest
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -117,10 +117,34 @@ class VCGalleryDialog(QDialog):
             return
         self.accept()
 
+    # ── Aufraeumen ────────────────────────────────────────────────────────────
+    def _stop_movies(self) -> None:
+        """Alle Vorschau-GIFs anhalten + Signale trennen (sonst laufen sie nach
+        dem Schliessen als verstecktes Button-Kind mit ~12 fps endlos weiter)."""
+        for mv in self._movies:
+            try:
+                mv.stop()
+                mv.frameChanged.disconnect()
+            except Exception:
+                pass
+        self._movies.clear()
+
+    def done(self, result: int) -> None:
+        # Wird von accept()/reject()/Esc/Fenster-Schliessen aufgerufen -> hier ist
+        # der einzige garantierte Punkt, die Animationen zu stoppen.
+        self._stop_movies()
+        super().done(result)
+
 
 def pick_bg_image_key(parent=None) -> str | None:
-    """Dialog modal oeffnen; liefert den gewaehlten Asset-Key oder ``None``."""
+    """Dialog modal oeffnen; liefert den gewaehlten Asset-Key oder ``None``.
+    Der Dialog wird danach zuverlaessig entsorgt (kein verstecktes Button-Kind mit
+    weiterlaufenden GIF-Timers)."""
     dlg = VCGalleryDialog(parent)
-    if dlg.exec() == QDialog.DialogCode.Accepted:
-        return dlg.selected_key
-    return None
+    try:
+        accepted = dlg.exec() == QDialog.DialogCode.Accepted
+        return dlg.selected_key if accepted else None
+    finally:
+        dlg._stop_movies()      # falls exec ohne done() endet (Ausnahmefall)
+        dlg.setParent(None)     # sofort aus der Kind-Liste des Buttons loesen
+        dlg.deleteLater()
