@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Demo-Show „Komplette Show mit animierten Buttons" (Tooling)
+
+#### Neu
+
+- **Neuer Demo-Show-Generator `tools/build_komplette_animierte_show.py`** — baut eine komplette Test-Show (8 PAR, 4 Gobo-Moving-Heads, 4 Laser, 2 Nebelmaschinen, Effekte für Farbe/Bewegung/Gobo/Strobe/Nebel, virtuelle Konsole, 2D+3D-Rig), deren VC-Buttons durchgehend die neue Galerie nutzen: jeder Effekt-Button trägt eine passende animierte Grafik (`bg_image=`). Lint `--strict` sauber, alle 9 Galerie-Grafiken portabel in die `.lshow` eingebettet. Live per Computer-Use verifiziert: Grafiken skalieren auf die Buttons, die GIFs animieren auf der Konsole, die Buttons lösen ihre Effekte real aus (sichtbar in 2D-FX-Badges + 3D-Lichtkegeln). Erste Referenz-Show für das animierte-Buttons-Feature.
+
 ### 2026-07-16 — Virtual Console: grafischer Galerie-Auswähler auf dem Button (VC-IMG Galerie, Teil 2)
 
 #### Neu
