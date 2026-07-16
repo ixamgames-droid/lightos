@@ -7,9 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-07-16 — 3D-Visualizer: permanenter Modus-Indikator „Ansehen"/„Bauen" (VIZ-14)
+### 2026-07-16 — 3D-Visualizer: Gerätenamen direkt im 3D-Bild + Modus-Indikator (VIZ-14)
 
 #### Neu / Tests
+
+- **Jedes Gerät trägt jetzt sein Namensschild im 3D-Visualizer:** Über jedem Gerät schwebt ein kleines Label mit `#<Nummer> <Kurzname>` (z. B. `#12 MH LINKS`) — so sieht man auf einen Blick, welches Gerät welches ist, ohne erst klicken zu müssen. Das Schild folgt dem Gerät beim Verschieben/Drehen und verschwindet im 2D-Modus automatisch. **Gegen Unübersichtlichkeit:** die Schilder schrumpfen beim Rauszoomen (feste Weltgröße) und blenden sich ab einer gewissen Kamera-Entfernung ganz aus — dichte, weit entfernte Rigs bleiben sauber. Bewusst schlank gehalten (kein separater Ein/Aus-Schalter in v1); erzeugt keine zusätzliche Grafiklast (der Zoom-Check hängt sich an die ohnehin vorhandene Kamera-Aktualisierung, kein Dauer-Rendern). Tests: `tests/test_viz14_labels_scene.py` (Aufbau/Anhängen/Text/Aufräumen ohne Dauer-Render + Kamera-Distanz-Gate).
 
 - **Man sieht jetzt immer, in welchem Modus der 3D-Visualizer ist:** Ein ruhiger Rahmen um das 3D-Bild zeigt permanent den Modus an — dezent kühl im **Ansehen**-Modus (nichts kann kaputtgehen), deutlich orange im **Bauen**-Modus (Geräte platzieren/bewegen), mit einer kleinen Ecken-Beschriftung („ANSEHEN" bzw. „BAUEN · Fixtures"/„BAUEN · Bühne"). Das ist das direkte Gegenmittel gegen das bisherige „Modus-Wirrwarr" (man wusste oft nicht, warum ein Klick nichts tat — weil man im falschen Modus war). Erster kleiner Schritt hin zu den zwei klaren Hauptmodi; die volle Modus-Umstellung folgt.
 - Der Rahmen ist reine Anzeige (fängt keine Klicks ab) und erzeugt keine zusätzliche Grafiklast (kein Dauer-Rendern). Tests: `tests/test_viz14_mode_frame_scene.py` (Existenz + Default „Ansehen", Umschalten per `setEditMode` und über den echten Poll-Pfad, kein Dauer-Render, nicht interaktiv).
