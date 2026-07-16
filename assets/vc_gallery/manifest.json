@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "canvas": {
+    "png": [
+      256,
+      256
+    ],
+    "gif": [
+      128,
+      128
+    ],
+    "fps": 12
+  },
+  "items": [
+    {
+      "name": "spectrum",
+      "file": "spectrum.png",
+      "kind": "png",
+      "category": "statisch",
+      "title": "Spektrum"
+    },
+    {
+      "name": "hot_white",
+      "file": "hot_white.png",
+      "kind": "png",
+      "category": "statisch",
+      "title": "Weiß-Flare"
+    },
+    {
+      "name": "pulse",
+      "file": "pulse.gif",
+      "kind": "gif",
+      "category": "dynamik",
+      "title": "Puls / Atmen"
+    },
+    {
+      "name": "strobe",
+      "file": "strobe.gif",
+      "kind": "gif",
+      "category": "dynamik",
+      "title": "Strobe / Blitz"
+    },
+    {
+      "name": "rainbow_scroll",
+      "file": "rainbow_scroll.gif",
+      "kind": "gif",
+      "category": "farbe",
+      "title": "Regenbogen-Lauf"
+    },
+    {
+      "name": "color_chase",
+      "file": "color_chase.gif",
+      "kind": "gif",
+      "category": "dynamik",
+      "title": "Farb-Chase"
+    },
+    {
+      "name": "color_wheel",
+      "file": "color_wheel.gif",
+      "kind": "gif",
+      "category": "farbe",
+      "title": "Farbrad"
+    },
+    {
+      "name": "vu_meter",
+      "file": "vu_meter.gif",
+      "kind": "gif",
+      "category": "dynamik",
+      "title": "Pegel / VU"
+    },
+    {
+      "name": "sparkle",
+      "file": "sparkle.gif",
+      "kind": "gif",
+      "category": "dynamik",
+      "title": "Funkeln"
+    },
+    {
+      "name": "gobo_spin",
+      "file": "gobo_spin.gif",
+      "kind": "gif",
+      "category": "bewegung",
+      "title": "Gobo-Dreh"
+    },
+    {
+      "name": "beam_sweep",
+      "file": "beam_sweep.gif",
+      "kind": "gif",
+      "category": "bewegung",
+      "title": "Beam-Sweep"
+    },
+    {
+      "name": "breathe_rgb",
+      "file": "breathe_rgb.gif",
+      "kind": "gif",
+      "category": "farbe",
+      "title": "RGB-Atmen"
+    }
+  ]
+}

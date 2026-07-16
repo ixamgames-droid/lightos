@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Virtual Console: eingebaute Galerie fertiger Button-Grafiken (VC-IMG Galerie)
+
+#### Neu
+
+- **LightOS bringt jetzt eine Galerie fertiger Button-Grafiken mit** — animierte GIFs und Bilder, die wie Licht-Effekte aussehen (u. a. Puls, Strobe, Regenbogen-Lauf, Farb-Chase, Farbrad, VU-Meter, Funkeln, Gobo-Dreh, Beam-Sweep, Atem-RGB, Spektrum, Heiß-Weiß). Damit kann man einem VC-Button sofort einen passenden Effekt-Look geben, ohne selbst eine Datei zu suchen. Die Grafiken liegen unter `assets/vc_gallery/` und werden — wie eigene Bilder — beim Verwenden portabel in die `.lshow` eingebettet. Zugriff im Show-Builder über `b.button(..., bg_image="<name>")` (ungültiger Name → klarer Fehler mit Vorschlag); das Demoshow-Werkzeug nutzt die Galerie ab jetzt automatisch. Der Show-Lint warnt (`VC-BGIMAGE`), falls in einer hand-editierten Show statt eines eingebetteten Asset-Keys ein roher Galerie-Name steht. Tests: `tests/test_vc_gallery.py`. *(Der grafische Galerie-Auswähler auf der Konsole folgt separat.)*
+
 ### 2026-07-16 — Virtual Console: eigenes Hintergrundbild/GIF pro Button (VC-IMG)
 
 #### Neu
