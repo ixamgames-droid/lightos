@@ -5,7 +5,7 @@ import json
 from enum import Enum
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
-                                QCheckBox, QFileDialog)
+                                QCheckBox)
 from PySide6.QtCore import Qt, QRect, QRectF
 from PySide6.QtGui import (QPainter, QColor, QFont, QPen, QPainterPath,
                            QPixmap, QMovie, QImageReader, QLinearGradient, QBrush)
@@ -816,17 +816,12 @@ class VCButton(VCWidget):
         rm.triggered.connect(self.clear_bg_image)
 
     def _pick_bg_image(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Hintergrundbild wählen", "",
-            "Bilder (*.png *.jpg *.jpeg *.gif *.webp *.bmp)")
-        if not path:
-            return
-        try:
-            key = vc_assets.import_file(path)
-        except Exception as e:
-            print(f"[vc_button] Hintergrundbild-Import fehlgeschlagen: {e}")
-            return
-        self.set_bg_image(key)
+        # VC-IMG: grafische Galerie (fertige Effekt-Grafiken/GIFs) mit "Eigene
+        # Datei…"-Fallback; liefert einen fertigen Asset-Key oder None.
+        from src.ui.virtualconsole.vc_gallery_dialog import pick_bg_image_key
+        key = pick_bg_image_key(self)
+        if key:
+            self.set_bg_image(key)
 
     def _gobo_icon(self):
         """Gobo-Icon (QPixmap) wenn dieser Button einen Gobo setzt, sonst None.

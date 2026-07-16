@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-16 — Virtual Console: grafischer Galerie-Auswähler auf dem Button (VC-IMG Galerie, Teil 2)
+
+#### Neu
+
+- **Der Button-Hintergrund lässt sich jetzt aus einem grafischen Auswähler picken** — Rechtsklick auf einen VC-Button → „Hintergrundbild wählen…" öffnet ein Fenster mit einem Raster aller eingebauten Effekt-Grafiken (die GIFs animieren direkt in der Vorschau). Ein Klick übernimmt die Grafik sofort auf den Button — kein Dateisuchen nötig. Wer doch ein eigenes Bild will, nimmt im selben Fenster „Eigene Datei…" (wie bisher). Ersetzt den bisherigen direkten Datei-Dialog. Tests: `tests/test_vc_gallery_dialog.py`.
+
 ### 2026-07-16 — Virtual Console: eingebaute Galerie fertiger Button-Grafiken (VC-IMG Galerie)
 
 #### Neu
