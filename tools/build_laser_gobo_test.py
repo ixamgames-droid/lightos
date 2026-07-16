@@ -64,11 +64,16 @@ def main():
           for f in b.state.get_patched_fixtures()}
 
     # ---- 3) EFFEKTE ----
-    # Farbe (PARs haben RGB -> Matrix-Effekte)
+    # Farbe (PARs haben RGB -> Matrix-Effekte). drive_intensity=True (CDX-08):
+    # sonst treibt die Matrix den PAR-Dimmer (Default 0) NICHT -> die PARs blieben
+    # dunkel, solange nicht separat ein Dimmer-Effekt laeuft. So leuchtet das Pad
+    # eigenstaendig.
     par_rainbow = b.matrix("PAR Rainbow", RgbAlgorithm.RAINBOW, style="RGB",
-                           fixtures=par_fids, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)])
+                           fixtures=par_fids, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
+                           drive_intensity=True)
     par_chase   = b.matrix("PAR Chase", RgbAlgorithm.CHASE, style="RGB",
-                           fixtures=par_fids, colors=[(255, 255, 255), (0, 0, 0)])
+                           fixtures=par_fids, colors=[(255, 255, 255), (0, 0, 0)],
+                           drive_intensity=True)
     # Bewegung (MH16 hat Pan/Tilt)
     mh_circle   = b.efx("MH Kreis", EfxAlgorithm.CIRCLE, fixtures=mh_fids)
 

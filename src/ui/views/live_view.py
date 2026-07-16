@@ -2158,8 +2158,11 @@ class LiveView(QWidget):
         vp = scroll.viewport().size()
         vw, vh = max(1, vp.width()), max(1, vp.height())
         if not force:
-            # aktuelle Bildschirm-Ausdehnung des Rigs -> nur eingreifen beim Klumpen
-            if bw * canvas.zoom >= 0.35 * vw and bh * canvas.zoom >= 0.35 * vh:
+            # CDX-09: nur beim kompakten KLUMPEN eingreifen. `or` statt `and`: fuellt
+            # das Rig schon EINE Achse gut aus (breite flache Reihe / hohe schmale
+            # Saeule), gilt es als ausreichend gespreizt und wird NICHT geschrumpft;
+            # nur ein Rig, das BEIDE Achsen schlecht ausfuellt, ist ein echter Klumpen.
+            if bw * canvas.zoom >= 0.35 * vw or bh * canvas.zoom >= 0.35 * vh:
                 return
         z = _compute_fit_zoom(bw, bh, vw, vh)
         self._zoom_slider.setValue(int(round(z * 100)))   # -> _on_zoom_changed: Canvas-Zoom + Label

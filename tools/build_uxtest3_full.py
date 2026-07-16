@@ -60,12 +60,20 @@ def main():
         s.commit()
 
     # ---- 3) EFFEKTE: Farbe / Bewegung / Dimmer ----
+    # drive_intensity=True (CDX-08): sonst treiben die Matrizen den ZQ01424-Dimmer
+    # (Default 0) nicht -> die PARs blieben ohne separaten Dimmer-Effekt dunkel.
     par_rainbow  = b.matrix("PAR Rainbow", RgbAlgorithm.RAINBOW, style="RGB",
-                            fixtures=par_fids, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)])
+                            fixtures=par_fids, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)],
+                            drive_intensity=True)
     par_chase_fx = b.matrix("PAR Chase", RgbAlgorithm.CHASE, style="RGB",
-                            fixtures=par_fids, colors=[(255, 255, 255), (0, 0, 0)])
+                            fixtures=par_fids, colors=[(255, 255, 255), (0, 0, 0)],
+                            drive_intensity=True)
+    # HINWEIS (CDX-08): ZQ02001-Farbe ist `color_wheel` — eine RGB-Matrix schreibt
+    # darauf NICHT (totes Pad). Fuer echte MH-Farbe ein color_wheel-Chaser statt
+    # Matrix (so macht es build_laser_gobo_test.py). Hier nur Intensitaet an.
     mh_colorfade = b.matrix("MH ColorFade", RgbAlgorithm.COLORFADE, style="RGB",
-                            fixtures=mh_fids, colors=[(255, 0, 255), (0, 255, 255)])
+                            fixtures=mh_fids, colors=[(255, 0, 255), (0, 255, 255)],
+                            drive_intensity=True)
     spi_color    = b.matrix("Spider Farbe", RgbAlgorithm.COLORFADE, style="RGB",
                             fixtures=spi_fids, colors=[(255, 120, 0), (0, 120, 255)])
     # Bewegung NUR für Moving Heads (Spider haben KEIN Pan → keine Circle-EFX!)

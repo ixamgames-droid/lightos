@@ -30,9 +30,11 @@ Code- und Git-Root.
    Es gibt ~2000+ Tests. **Neue/▶geänderte Logik braucht einen Test.** Wenn etwas
    rot ist: erst fixen, nicht abgeben.
 
-3. **CHANGELOG.md pflegen** — Einträge gehören **unter** den Kopftext in den
-   passenden Abschnitt (`#### Neu / Hinzugefuegt` bzw. `#### Behoben`), **nicht**
-   ganz oben über die Beschreibung. Format: Keep a Changelog.
+3. **CHANGELOG.md pflegen** — Einträge gehören **unter** den Kopftext in einen
+   `####`-Abschnitt (Konvention: `#### Neu / …` z. B. `Neu / Tests`,
+   `Neu / Verbessert / Tests`, `Neu / Hinzugefuegt` — bzw. `#### Behoben`),
+   **nicht** ganz oben über die Beschreibung. Format: Keep a Changelog. (CDX-10:
+   die gelebte Konvention nutzt `Neu / …`-Varianten; hier verankert.)
 
 4. **Verhaltensänderungen sichtbar machen.** Wenn sich ein **Default** oder eine
    **Bedienung** ändert (z. B. „neue Effekte folgen jetzt dem Tempo-Bus"):
