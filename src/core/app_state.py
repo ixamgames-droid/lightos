@@ -47,6 +47,17 @@ _DIM_COLOR_ATTRS = frozenset({
     "cyan", "magenta", "yellow",
 })
 
+# A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
+# DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
+# Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
+# Shutter und die Effekt-/Programm-Auswahl (macro — treibt bei macro-basierten
+# Party-Lasern wie dem PARTYLASER-Builtin ohne laser_bank/gobo_wheel die Emission).
+# Ein harmloses Attribut (Position laser_x/laser_y, Zoom, Punktfarbe, Twist, Raster,
+# …) darf den NOT-AUS NICHT lösen — sonst öffnet ein Positions-/Farb-Nudge den Laser
+# trotz gedrücktem Not-Aus wieder. Annahme wie bei UXT-12: Betriebsart/Shutter/Macro
+# 0 = Laser aus; die genannten Attribute sind die Betriebsart-/Emissions-Gates.
+_LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
+
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
 
@@ -1019,9 +1030,15 @@ class AppState:
             self.programmer[fid][key] = max(0, min(255, value))
             new_val = self.programmer[fid][key]
         self._flush_programmer_to_dmx(fid)
-        # UXT-12: bewusstes Setzen eines Laser-Werts (Muster-Abruf/Regler) hebt
-        # den Laser-NOT-AUS auf („wieder an"). Billiger Guard: nur wenn verriegelt.
+        # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
+        # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
+        # den Laser-NOT-AUS auf. Ein harmloses Attribut (Position/Zoom/Farbe/…) darf
+        # ihn NICHT lösen — sonst öffnet ein Positions-Nudge den Laser trotz Not-Aus.
+        # Auf den Basisnamen prüfen: Snap-/VC-Restore-Pfade reichen den Composite-Key
+        # "attr#N" (Kopf>0) direkt als attribute durch -> vor dem Whitelist-Check das
+        # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
         if (getattr(self, "laser_estop_active", False)
+                and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
                 and int(fid) in getattr(self, "_laser_fids", frozenset())):
             # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
             with self._get_estop_lock():
