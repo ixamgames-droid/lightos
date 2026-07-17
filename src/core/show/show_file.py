@@ -797,11 +797,14 @@ def load_show(path: str | os.PathLike):
             # (None/Liste/nicht-numerisch) darf nur diesen Eintrag ueberspringen,
             # nicht den GESAMTEN Programmer aller Fixtures loeschen (Verlust-
             # Amplifikation). Analog zur schon vorhandenen fid-/attrs-Isolation.
+            # A3D-19: OverflowError mitfangen — json.loads('1e999') ergibt
+            # float('inf'), und int(inf) wirft OverflowError (NICHT ValueError);
+            # ohne den Fang riss der eine Wert bisher den ganzen Programmer mit.
             vals = {}
             for a, v in attrs.items():
                 try:
                     vals[str(a)] = int(v)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     continue
             cleaned[fid] = vals
         state.programmer = cleaned
@@ -823,12 +826,13 @@ def load_show(path: str | os.PathLike):
             except (TypeError, ValueError):
                 continue
             # STAB-18: int(v) pro Wert kapseln (ein kaputter Wert -> nur dieser
-            # faellt, nicht alle Basis-Level).
+            # faellt, nicht alle Basis-Level). A3D-19: OverflowError mitfangen
+            # (int(float('inf')) aus '1e999'), sonst reisst er alle Basis-Level mit.
             clean = {}
             for a, v in vals.items():
                 try:
                     clean[str(a)] = int(v)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     continue
             parsed[fid] = clean
         state.base_levels = parsed
