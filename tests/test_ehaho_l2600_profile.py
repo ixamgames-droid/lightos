@@ -224,6 +224,9 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             "DOTZTPAR": "led_bar",
             "PARTYLASER": "laser", "L2600LASER": "laser", "PANGFB4": "laser",
             "MOVBAR4": "moving_head", "PARBAR4": "led_bar",   # FM-5
+            # Katalog-Erweiterung Runde 2 (2026-07-17)
+            "FLATPRO7": "par", "ADJ5PXHEX": "par",
+            "STAIRB2408": "led_bar", "CBANDPIX": "led_bar",
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(

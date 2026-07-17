@@ -1348,6 +1348,252 @@ def _add_par_bar4(s, mfr):
                  _par_bar_modes_data())
 
 
+# ── Katalog-Erweiterung Runde 2 (2026-07-17): gaengige Wash-/Matrix-Scheinwerfer +
+#    LED-Bars, damit die Bibliothek ueber die Nutzer-Strahler hinaus verbreitete
+#    Markengeraete abdeckt. Alle Kanal-Charts gegen Primaer-/Community-Quellen
+#    verifiziert (Open Fixture Library / QLC+); NIE aus dem Gedaechtnis geraten.
+#    NEUE Builtins -> keine Signatur-Migration noetig (wie MOVBAR4/PARBAR4, FM-5),
+#    nur Backfill in ensure_builtins(). Mehrere RGB-Bloecke = N color_r-Banks ->
+#    viz_model_for() routet automatisch auf 'par_bar' (Reihe aus N Pixeln).
+
+def _rgb_pixel_channels(count, label):
+    """N RGB-Bloecke (color_r/g/b je Segment/Pixel). Ergibt N color_r-Banks ohne
+    Pan/Tilt -> viz_model_for(): 'par_bar' (statische Reihe aus N Pixeln, FM-3)."""
+    channels = []
+    for i in range(1, count + 1):
+        channels.extend([
+            (f"{label} {i} Rot",  "color_r", 0, 255),
+            (f"{label} {i} Grün", "color_g", 0, 255),
+            (f"{label} {i} Blau", "color_b", 0, 255),
+        ])
+    return channels
+
+
+# -- Cameo FLAT PRO 7 (7x10W RGBWA 5in1 Flat-PAR-Wash) -----------------------
+# Chart aus der Open Fixture Library (Cameo Flat Pro Serie, 7/12/18 teilen sich
+# das DMX-Protokoll — nur die LED-Zahl unterscheidet sich). Modi 2/3/5/8ch.
+# 8ch-Reihenfolge laut OFL: Dimmer, Strobe, R, G, B, W, A, Farb-Makro.
+_CAMEO_MACRO = [                         # "Color Macro Advanced" (OFL)
+    (0,   4,   "Aus",                    "open"),
+    (5,   80,  "15 Farb-Presets",        "color"),
+    (81,  150, "Farbsprung (Speed)",     ""),
+    (151, 220, "Farb-Fade (Speed)",      ""),
+    (221, 255, "Sound-Aktiv",            "sound"),
+]
+_CAMEO_MACRO_SIMPLE = [                  # "Color Macro Simple" (2ch-Modus, OFL)
+    (0, 255, "15 Festfarben", "color"),
+]
+
+
+def _add_cameo_flatpro7(s, mfr):
+    """Cameo FLAT PRO 7 (RGBWA Flat-PAR) — Chart: Open Fixture Library."""
+    _add_fixture(s, mfr, "FLAT PRO 7", "FLATPRO7", "par", 70, [
+        ("3-Kanal RGB", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+        ]),
+        ("5-Kanal RGBWA", [
+            ("Rot",   "color_r", 0, 255),
+            ("Grün",  "color_g", 0, 255),
+            ("Blau",  "color_b", 0, 255),
+            ("Weiß",  "color_w", 0, 255),
+            ("Amber", "color_a", 0, 255),
+        ]),
+        ("8-Kanal Voll", [
+            ("Master Dimmer", "intensity",   0, 255),
+            ("Strobe",        "shutter",     0, 0, _SIMPLE_STROBE),
+            ("Rot",           "color_r",     0, 255),
+            ("Grün",          "color_g",     0, 255),
+            ("Blau",          "color_b",     0, 255),
+            ("Weiß",          "color_w",     0, 255),
+            ("Amber",         "color_a",     0, 255),
+            ("Farb-Makro",    "color_wheel", 0, 0, _CAMEO_MACRO),
+        ]),
+        ("2-Kanal Dimmer+Makro", [
+            ("Master Dimmer", "intensity",   0, 255),
+            ("Farb-Makro",    "color_wheel", 0, 0, _CAMEO_MACRO_SIMPLE),
+        ]),
+    ])
+
+
+# -- ADJ 5PX HEX (5x 6-in-1 RGBWA+UV HEX-PAR) --------------------------------
+# Chart aus der QLC+ Fixture-Library (American_DJ/American-DJ-5PX-Hex.qxf).
+# Modi 6/7/8/12ch. WICHTIG (Safety): der Strobe-Kanal ist ein echter Shutter —
+# DMX 0..31 = "LED OFF" (ShutterClose). Default DARF NICHT 0 sein, sonst haengt
+# das Geraet im geschlossenen Shutter (dunkel). Default 40 = "LED ON"-Band.
+_HEX_STROBE = [
+    (0,   31,  "LED aus",                   "closed"),
+    (32,  63,  "LED an",                    "open"),
+    (64,  95,  "Strobe langsam → schnell",  "strobe"),
+    (96,  127, "LED an",                    "open"),
+    (128, 159, "Puls-Strobe",               "strobe"),
+    (160, 191, "LED an",                    "open"),
+    (192, 223, "Zufalls-Strobe",            "strobe"),
+    (224, 255, "LED an",                    "open"),
+]
+_HEX_PROGRAMS = [                        # QLC+ "Programs" — exakte Bänder aus der .qxf
+    (0,   20,  "Aus",                   "open"),
+    (21,  40,  "30-Farben-Wechsel",     ""),
+    (41,  60,  "6-Farben-Wechsel",      ""),
+    (61,  80,  "Farb-Fade",             ""),
+    (81,  100, "Sound-Aktiv 30-Farben", "sound"),
+    (101, 120, "Sound-Aktiv 6-Farben",  "sound"),
+    (121, 140, "Sound-Aktiv 6-Fade",    "sound"),
+    (141, 255, "Aus",                   "open"),
+]
+_HEX_DIMMODE = [                         # QLC+ "Dim Mode" — exakte Bänder aus der .qxf
+    (0,   20,  "Standard",       ""),
+    (21,  40,  "Bühne",          ""),
+    (41,  60,  "TV",             ""),
+    (61,  80,  "Architektur",    ""),
+    (81,  100, "Theater",        ""),
+    (101, 255, "Display-Vorgabe", ""),
+]
+
+
+def _add_adj_5px_hex(s, mfr):
+    """ADJ 5PX HEX (RGBWA+UV HEX-PAR) — Chart: QLC+ Fixture-Library.
+    Strobe-Kanal 0..31 = LED aus -> Default 40 (offen), Safety-Gate."""
+    _add_fixture(s, mfr, "5PX HEX", "ADJ5PXHEX", "par", 60, [
+        ("6-Kanal RGBWA+UV", [
+            ("Rot",   "color_r",  0, 255),
+            ("Grün",  "color_g",  0, 255),
+            ("Blau",  "color_b",  0, 255),
+            ("Weiß",  "color_w",  0, 255),
+            ("Amber", "color_a",  0, 255),
+            ("UV",    "color_uv", 0, 255),
+        ]),
+        ("7-Kanal + Dimmer", [
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Weiß",          "color_w",   0, 255),
+            ("Amber",         "color_a",   0, 255),
+            ("UV",            "color_uv",  0, 255),
+            ("Master Dimmer", "intensity", 0, 255),
+        ]),
+        ("8-Kanal + Strobe", [
+            ("Rot",           "color_r",   0,  255),
+            ("Grün",          "color_g",   0,  255),
+            ("Blau",          "color_b",   0,  255),
+            ("Weiß",          "color_w",   0,  255),
+            ("Amber",         "color_a",   0,  255),
+            ("UV",            "color_uv",  0,  255),
+            ("Master Dimmer", "intensity", 0,  255),
+            ("Strobe",        "shutter",   40, 40, _HEX_STROBE),
+        ]),
+        ("12-Kanal Voll", [
+            ("Rot",             "color_r",     0,  255),
+            ("Grün",            "color_g",     0,  255),
+            ("Blau",            "color_b",     0,  255),
+            ("Weiß",            "color_w",     0,  255),
+            ("Amber",           "color_a",     0,  255),
+            ("UV",              "color_uv",    0,  255),
+            ("Master Dimmer",   "intensity",   0,  255),
+            ("Strobe",          "shutter",     40, 40, _HEX_STROBE),
+            ("Farb-Makro",      "color_wheel", 0,  0),
+            ("Programme",       "macro",       0,  0,  _HEX_PROGRAMS),
+            ("Programm-Speed",  "speed",       0,  0),
+            # Dimmer-Kurven-Wahl bewusst als 'raw' (NICHT 'macro'): ein Single-Head-
+            # Geraet darf ein Attribut nicht wiederholen, sonst deutet die Mehrkopf-
+            # Konvention (attr#N) den 2. „macro"-Kanal als Kopf 1 und er erbt den
+            # Programm-Wert des 1. macro-Kanals (ENG-03/07/09-Falle: Auto-Programm
+            # wuerde still die Dimmerkurve umschalten). 'raw' → Gruppe „Other", keine
+            # Kopf-Kette.
+            ("Dimmer-Modus",    "raw",         0,  0,  _HEX_DIMMODE),
+        ]),
+    ])
+
+
+# -- Stairville LED Bar 240/8 RGB (8-Segment RGB LED-Bar) --------------------
+# Chart aus der Open Fixture Library (stairville/led-bar-240-8). Modi 2/3/5/24ch;
+# 24ch = 8 Segmente x RGB -> 8 color_r-Banks -> viz 'par_bar'.
+_STAIR_PROGRAM = [
+    (0,   7,   "Blackout",        "closed"),
+    (8,   63,  "Festfarben",      "color"),
+    (64,  231, "Programme",       ""),
+    (232, 255, "Sound-Programme", "sound"),
+]
+_STAIR_SPEED = [
+    (0,   231, "Geschwindigkeit langsam → schnell", ""),
+    (232, 255, "Sound-Empfindlichkeit",             "sound"),
+]
+_STAIR_STROBE = [
+    (0, 2,   "Offen (kein Strobe)",       "open"),
+    (3, 255, "Strobe langsam → schnell",  "strobe"),
+]
+
+
+def _add_stairville_bar2408(s, mfr):
+    """Stairville LED Bar 240/8 RGB (8-Segment-Bar) — Chart: Open Fixture Library."""
+    _add_fixture(s, mfr, "LED Bar 240/8 RGB", "STAIRB2408", "led_bar", 45, [
+        ("2-Kanal Automatik", [
+            ("Programm", "macro", 0, 0, _STAIR_PROGRAM),
+            ("Speed",    "speed", 0, 0, _STAIR_SPEED),
+        ]),
+        ("3-Kanal RGB", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+        ]),
+        ("5-Kanal RGB+Dimmer", [
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Master Dimmer", "intensity", 0, 255),
+            ("Strobe",        "shutter",   0, 0, _STAIR_STROBE),
+        ]),
+        ("24-Kanal 8×RGB", _rgb_pixel_channels(8, "Seg.")),
+    ])
+
+
+# -- Chauvet DJ COLORband PiX (12-Pixel RGB LED-Bar) -------------------------
+# Chart aus der Open Fixture Library (chauvet-dj/colorband-pix). 12 RGB-Pixel;
+# Modi 3/4/7/36ch; 36ch = 12 Pixel x RGB -> 12 color_r-Banks -> viz 'par_bar'.
+_COLORBAND_MACRO = [
+    (0,  15,  "Aus",           "open"),
+    (16, 255, "Farb-Presets",  "color"),
+]
+_COLORBAND_PROG = [
+    (0,   31,  "Aus",              "open"),
+    (32,  63,  "Ramp-up",          ""),
+    (64,  95,  "Ramp-down",        ""),
+    (96,  127, "Puls",             ""),
+    (128, 159, "Farb-Fade",        ""),
+    (160, 191, "3-Farben-Sprung",  ""),
+    (192, 223, "7-Farben-Sprung",  ""),
+    (224, 255, "Sound-Aktiv",      "sound"),
+]
+
+
+def _add_chauvet_colorband_pix(s, mfr):
+    """Chauvet DJ COLORband PiX (12-Pixel-Bar) — Chart: Open Fixture Library."""
+    _add_fixture(s, mfr, "COLORband PiX", "CBANDPIX", "led_bar", 86, [
+        ("3-Kanal RGB", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+        ]),
+        ("4-Kanal RGB+Dimmer", [
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Master Dimmer", "intensity", 0, 255),
+        ]),
+        ("7-Kanal Voll", [
+            ("Rot",          "color_r",     0, 255),
+            ("Grün",         "color_g",     0, 255),
+            ("Blau",         "color_b",     0, 255),
+            ("Farb-Makro",   "color_wheel", 0, 0, _COLORBAND_MACRO),
+            ("Strobe/Speed", "shutter",     0, 0, _SIMPLE_STROBE),
+            ("Auto-Programm","macro",       0, 0, _COLORBAND_PROG),
+            ("Master Dimmer","intensity",   0, 255),
+        ]),
+        ("36-Kanal 12×RGB", _rgb_pixel_channels(12, "Pixel")),
+    ])
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -1469,6 +1715,18 @@ def ensure_builtins():
             changed = True
         if "PARBAR4" not in have:                       # FM-5
             _add_par_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
+            changed = True
+        if "ADJ5PXHEX" not in have:                      # Katalog Runde 2
+            _add_adj_5px_hex(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+            changed = True
+        if "CBANDPIX" not in have:                       # Katalog Runde 2
+            _add_chauvet_colorband_pix(s, _get_or_create_mfr(s, "Chauvet DJ", "CHAUVET"))
+            changed = True
+        if "FLATPRO7" not in have:                       # Katalog Runde 2
+            _add_cameo_flatpro7(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
+            changed = True
+        if "STAIRB2408" not in have:                     # Katalog Runde 2
+            _add_stairville_bar2408(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -1737,3 +1995,14 @@ def _seed(s: Session):
     pangolin = Manufacturer(name="Pangolin", short_name="PANG")
     s.add(pangolin)
     _add_pangolin_fb4(s, pangolin)
+
+    # ── Katalog-Erweiterung Runde 2: gaengige Wash-/Matrix-Scheinwerfer + Bars ─
+    # (adj/chauvet-Variablen von oben wiederverwenden; Cameo/Stairville neu.)
+    _add_adj_5px_hex(s, adj)
+    _add_chauvet_colorband_pix(s, chauvet)
+    cameo = Manufacturer(name="Cameo", short_name="CAMEO")
+    s.add(cameo)
+    _add_cameo_flatpro7(s, cameo)
+    stairville = Manufacturer(name="Stairville", short_name="STAIR")
+    s.add(stairville)
+    _add_stairville_bar2408(s, stairville)
