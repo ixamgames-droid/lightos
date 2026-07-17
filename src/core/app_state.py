@@ -210,6 +210,11 @@ class AppState:
         # Nicht-gepatchte Adressen, die Funktionen (z. B. ScriptFunction setdmx)
         # im letzten Frame geschrieben haben — fuer korrektes Freigeben.
         self._engine_extra_prev: dict[int, set] = {}
+        # A3D-18: Adressen, die ein Rebuild als "war gepatcht, jetzt frei" markiert
+        # hat und die der Render-Thread im naechsten Frame-Commit (Schritt 5, NACH
+        # dem Span-Commit) final nullt — race-fest gegen einen nachlaufenden
+        # Alt-Plan-Commit. {universe: set[addr]}.
+        self._pending_release: dict[int, set] = {}
         # Simple Desk = manuelle Roh-Override-Ebene (ISO-03). {universe: {ch: val}},
         # nur explizit gesetzte Kanaele. Wird im _render_frame als OBERSTE Schicht
         # angewandt (deterministisch jeden Frame) — frueher schrieb der Fader direkt
@@ -742,6 +747,10 @@ class AppState:
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
+        # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
+        # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
+        # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
+        old_patched = {u: set(s) for u, s in getattr(self, "_patched_set", {}).items()}
         with self._get_plan_lock():
             self._fix_index = fix_index
             self._default_frame = new_default_frame
@@ -752,6 +761,10 @@ class AppState:
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
+        # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
+        # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
+        # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        self._release_unpatched_addrs(old_patched, new_patched_set)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
         gm_mask = self._build_gm_mask(fix_index)
@@ -794,6 +807,47 @@ class AppState:
                 for a in prev_addrs:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
+
+    def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict):
+        """A3D-18: Adressen, die vor dem Rebuild gepatcht waren, jetzt aber NICHT
+        mehr (Fixture entfernt oder umadressiert), im Live-Universe auf 0 freigeben.
+
+        Ohne das behaelt so eine Adresse fuer immer ihren zuletzt committeten Wert:
+        _render_frame committet in Schritt 5 nur noch die NEUEN _commit_spans, und
+        _release_engine_extra erfasst ausschliesslich ungepatchte Roh-Kanaele
+        (ScriptFunction setdmx) — die alte Fixture-Adresse ist keins von beidem und
+        bleibt als Zombie stehen (bei Dimmer/Shutter/Beam sicht-/sicherheitsrelevant).
+
+        Eine Adresse, die weiterhin von einem ANDEREN Fixture gepatcht ist
+        (Umadressierung auf denselben Kanal), steht in ``new_patched`` und wird NICHT
+        genullt — sie committet der naechste Frame ueber ihren Span neu (max. 1 Frame
+        Dip). Defensiv (getattr/None-Guards) wie _release_engine_extra: darf laufen,
+        bevor ``universes`` existiert (Bau-Reihenfolge/Test-Stubs). ``set_channel`` ist
+        per Universe-Lock thread-safe.
+
+        Race-Absicherung (A3D-18-Review): das SOFORTIGE Nullen hier laeuft im
+        UI-Thread; ein bereits gestarteter Render-Frame mit STALE altem Plan-Snapshot
+        kann seine alte Span aber NACH diesem Nullen erneut committen -> die Adresse
+        wuerde dauerhaft wieder auferstehen. Darum werden die Adressen zusaetzlich in
+        ``_pending_release`` vorgemerkt; der Render-Thread nullt sie im naechsten
+        Frame-Commit (Schritt 5) NACH dem Span-Commit deterministisch nach (Rendering
+        ist single-threaded -> genau der folgende Frame konsumiert das Pending)."""
+        universes = getattr(self, "universes", None)
+        pending = getattr(self, "_pending_release", None)
+        if pending is None:
+            pending = self._pending_release = {}
+        for u, old_addrs in old_patched.items():
+            stale = {a for a in (set(old_addrs) - set(new_patched.get(u, frozenset())))
+                     if 1 <= a <= 512}
+            if not stale:
+                continue
+            # 1) sofort nullen (Anzeige/Monitor + Fall ohne laufenden Render-Thread).
+            uni = universes.get(u) if universes else None
+            if uni is not None:
+                for a in stale:
+                    uni.set_channel(a, 0)
+            # 2) dem Render-Thread vormerken (race-fest gegen Alt-Plan-Commit).
+            pending[u] = set(pending.get(u, set())) | stale
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}
@@ -2022,6 +2076,18 @@ class AppState:
                     for a in prev - cur:
                         live.set_channel(a, 0)
                 self._engine_extra_prev[univ] = cur
+            # A3D-18: vom Rebuild vorgemerkte, jetzt ungepatchte Adressen final auf 0
+            # — als LETZTER Schritt fuer dieses Universe, NACH dem Span-Commit oben.
+            # Ein nachlaufender Alt-Plan-Commit (stale Snapshot) haette die Adresse
+            # sonst wieder gesetzt; hier ueberschreibt der Render-Thread sie determi-
+            # nistisch mit 0. Einmalig konsumiert (pop) — Rendering ist single-threaded.
+            pr = getattr(self, "_pending_release", None)
+            if pr:
+                rel = pr.pop(univ, None)
+                if rel:
+                    for a in rel:
+                        if 1 <= a <= 512:
+                            live.set_channel(a, 0)
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
