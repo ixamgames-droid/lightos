@@ -121,6 +121,43 @@ class LaserDmxEstopTest(unittest.TestCase):
         lo.estop_all()
         self.assertTrue(self.st.laser_estop_active)
 
+    def test_harmless_laser_attribute_keeps_latch(self):
+        # A3D-02: ein harmloses Attribut (Position laser_x) darf den NOT-AUS NICHT
+        # lösen — sonst öffnet ein Positions-Nudge den Laser trotz Not-Aus wieder.
+        self.st.set_laser_estop(True)
+        self.st.set_programmer_value(7, "laser_x", 200)     # laser_x = harmlos
+        self.assertTrue(self.st.laser_estop_active)         # Latch bleibt
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(12), 0)      # laser_x-Adr bleibt dunkel
+
+    def test_output_relevant_attrs_clear_latch(self):
+        # A3D-02: Betriebsart/Musterbank/Gobo/Shutter/Macro = bewusstes „wieder an".
+        # macro deckt macro-getriebene Party-Laser (ohne laser_bank/gobo_wheel) ab;
+        # die "#N"-Varianten simulieren den Snap-/VC-Restore-Pfad (Composite-Key,
+        # der als attribute durchgereicht wird -> Basisname muss matchen).
+        for attr in ("shutter", "gobo_wheel", "laser_bank", "macro",
+                     "gobo_wheel#1", "shutter#1"):
+            with self.subTest(attr=attr):
+                self.st.set_laser_estop(True)
+                self.assertTrue(self.st.laser_estop_active)
+                self.st.set_programmer_value(7, attr, 60)
+                self.assertFalse(self.st.laser_estop_active,
+                                 f"{attr} sollte den NOT-AUS-Latch lösen")
+
+    def test_harmless_composite_key_keeps_latch(self):
+        # Kopf>0-Position (laser_x#1) bleibt harmlos -> Latch hält.
+        self.st.set_laser_estop(True)
+        self.st.set_programmer_value(7, "laser_x#1", 200)
+        self.assertTrue(self.st.laser_estop_active)
+
+    def test_harmless_attr_on_laser_still_writes_value_but_stays_dark(self):
+        # Der Wert wird gesetzt (Programmer akzeptiert ihn), aber solange der Latch
+        # steht, hält der Renderer die Laser-Adressen (inkl. laser_x) auf 0.
+        self.st.set_laser_estop(True)
+        self.st.set_programmer_value(7, "laser_x", 123)
+        self.assertEqual(self.st.programmer[7]["laser_x"], 123)   # Wert gespeichert
+        self.assertTrue(self.st.laser_estop_active)               # aber NOT-AUS bleibt
+
 
 if __name__ == "__main__":
     unittest.main()
