@@ -3578,6 +3578,13 @@ class VisualizerWindow(QMainWindow):
                 self._apply_active_stage_from_state()
                 self._bridge.requestFixtures()
                 self._refresh_patch_list()
+                # A3D-13/A3D-22: benannte Kameras der NEUEN Show an JS pushen +
+                # Toolbar-Menue neu aufbauen. Ohne das behielt ein bereits
+                # offenes Visualizer-Fenster beim Show-Wechsel die Kameras der
+                # alten Show (der Resync lief bisher nur in _push_initial_state).
+                cams = list(getattr(self._state, "visualizer_named_cameras", []) or [])
+                self._bridge.push_named_cameras(cams)
+                self._rebuild_camera_menu()
             except Exception as e:
                 print(f"[Visualizer] show_loaded handling error: {e}")
 

@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-17 — 3D-Visualizer: benannte Kameras nach Show-Wechsel (A3D-13 / A3D-22)
+
+#### Behoben
+
+- **Benannte Kameras + das Kamera-Menü übernehmen jetzt beim Laden einer Show den Stand der NEUEN Show, auch wenn das 3D-Fenster schon offen ist.** Vorher lief dieser Abgleich nur beim ersten Öffnen des Visualizers (`_push_initial_state`) — wer das Fenster offen ließ und eine andere Show lud, sah weiter die gespeicherten Kameras/Menü-Einträge der alten Show. Der `show_loaded`-Handler (`visualizer_window.py`) pusht die Kameras jetzt neu an die 3D-Ansicht und baut das Toolbar-Kamera-Menü neu auf (eine Show ohne gespeicherte Kameras räumt die alten Einträge weg). Regressionstest `tests/test_a3d13_show_loaded_camera_resync.py`. Schließt A3D-13 (P2) und den Duplikat-Befund A3D-22 (P3, selber Codex-157-Fund).
+
 ### 2026-07-16 — Demo-Show „Komplette Show mit animierten Buttons" (Tooling)
 
 #### Neu
