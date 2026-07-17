@@ -135,6 +135,13 @@ class CueStack:
         self._own_output: dict[int, dict[str, int]] = {}
         self._output: dict[int, dict[str, int]] = {}
         self._manual_target: int = -1     # Zielzeile eines laufenden manuellen Crossfades
+        # A3D-16: zusaetzlich die Ziel-Cue als OBJEKT-Referenz (Identitaets-Anker).
+        # Der reine Index verschiebt sich bei Live-Insert/-Remove waehrend des
+        # Scrubs (bleibt in-bounds, zeigt aber auf eine ANDERE Cue) -> ein Commit
+        # gegen den Index wuerde die falsche Cue aktivieren. Ueber die Referenz
+        # wird der Index bei jeder Mutation identitaets-treu nachgefuehrt bzw. der
+        # Fade verworfen, wenn die Ziel-Cue entfernt wurde.
+        self._manual_target_cue: "Cue | None" = None
         self._manual_dir: int = 1
         self._lock = threading.Lock()
         self._follow_timer: threading.Timer | None = None
@@ -272,24 +279,35 @@ class CueStack:
                     return False
                 self._cancel_follow()
                 self._manual_target = nxt
+                self._manual_target_cue = self.cues[nxt]
                 self._manual_dir = d
                 self._fade = FadeState(dict(self._own_output),
                                        self.cues[nxt].values, 1.0, 0.0)
                 self._fade.manual = True
             if pos >= 1.0:
-                # F4: Die Zielcue kann waehrend des Scrubs entfernt worden sein
-                # (_manual_target wird von _reindex_after_mutation auf -1 gesetzt).
-                # Dann den Fade sauber abbrechen statt self.cues[ungueltig] -> Crash.
-                if not (0 <= self._manual_target < len(self.cues)):
+                # F4/A3D-16: Ziel-Cue per IDENTITAET aufloesen statt den evtl.
+                # waehrend des Scrubs verschobenen Index blind zu uebernehmen.
+                # Wurde die Ziel-Cue entfernt (oder ist sonst nicht mehr auffindbar),
+                # den Fade sauber verwerfen statt die falsche/ungueltige Cue zu
+                # aktivieren.
+                target_idx = None
+                if self._manual_target_cue is not None:
+                    target_idx = next(
+                        (i for i, c in enumerate(self.cues)
+                         if c is self._manual_target_cue), None)
+                if target_idx is None:
                     self._fade = None
                     self._manual_target = -1
+                    self._manual_target_cue = None
                 else:
                     # Uebernehmen: Zielcue wird aktiv, manueller Fade beendet.
                     self._dir = self._manual_dir
-                    self._current_idx = self._manual_target
+                    self._current_idx = target_idx
+                    self._manual_target = target_idx
                     self._own_output = dict(self._fade.to_vals)
                     self._output = dict(self._own_output)
                     self._fade = None
+                    self._manual_target_cue = None
                     committed = True
                     commit_cb = (self._current_idx, self.cues[self._current_idx])
             else:
@@ -314,6 +332,8 @@ class CueStack:
             self._output = {}
             self._current_idx = -1
             self._dir = 1
+            self._manual_target = -1
+            self._manual_target_cue = None
             sub = self._active_sub        # F-16: mitlaufende Sub-Cueliste mit stoppen
             self._active_sub = None
         if sub is not None:
@@ -355,7 +375,18 @@ class CueStack:
             self._current_idx = min(self._current_idx, n - 1)
         if self._current_idx < 0:
             self._current_idx = -1
-        if not (0 <= self._manual_target < n):
+        # A3D-16: einen laufenden manuellen Crossfade identitaets-treu nachfuehren
+        # (nicht nur bounds-klemmen) -- sonst zeigt der in-bounds gebliebene Index
+        # nach einem Insert/Remove auf die falsche Cue.
+        if self._manual_target_cue is not None:
+            midx = next((i for i, c in enumerate(self.cues)
+                         if c is self._manual_target_cue), None)
+            if midx is None:
+                self._manual_target = -1
+                self._manual_target_cue = None
+            else:
+                self._manual_target = midx
+        elif not (0 <= self._manual_target < n):
             self._manual_target = -1
 
     def add_cue(self, cue: Cue):
@@ -377,6 +408,11 @@ class CueStack:
                 if abs(c.number - cue.number) < 0.001:
                     # Gleiche Nummer -> Position in der sortierten Liste unveraendert,
                     # _current_idx bleibt gueltig (zeigt auf dieselbe Zeile).
+                    # A3D-16: ersetzt die In-Place-Bearbeitung die Ziel-Cue eines
+                    # laufenden manuellen Crossfades, den Identitaets-Anker mitziehen
+                    # (sonst verwirft die naechste Mutation den Fade faelschlich).
+                    if self._manual_target_cue is c:
+                        self._manual_target_cue = cue
                     self.cues[i] = cue
                     return
         # Neue Nummer -> einsortieren. add_cue nimmt selbst den (nicht-reentranten)
@@ -475,6 +511,10 @@ class CueStack:
             attr_delays,
         )
         self._current_idx = idx
+        # A3D-16: ein programmatischer GO/BACK bricht einen evtl. armierten
+        # manuellen Crossfade ab -> Ziel-Anker verwerfen (Fader-Scrub hinfaellig).
+        self._manual_target = -1
+        self._manual_target_cue = None
         self._beat_count = 0          # Beat-Sync zählt ab dieser Cue neu
         for cb in self._on_cue_change:
             try:

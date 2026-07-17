@@ -117,5 +117,56 @@ class AddCueReindexTest(unittest.TestCase):
         self.assertEqual(s.current_cue.number, 3.0)
 
 
+class ManualCrossfadeTargetIdentityTest(unittest.TestCase):
+    """A3D-16: ein Live-Insert/-Remove waehrend des Scrubs verschiebt den Ziel-Index
+    (er bleibt in-bounds, zeigt aber auf eine ANDERE Cue). Der Commit muss die beim
+    Armieren gewaehlte Ziel-Cue per IDENTITAET treffen, nicht den verschobenen Index
+    blind uebernehmen. (F4 oben deckt nur das ENTFERNEN des Ziels ab; hier bleibt das
+    Ziel erhalten und darf trotz Verschiebung nicht zur falschen Cue committen.)"""
+
+    def test_insert_before_target_commits_original_target(self):
+        s = CueStack("s")
+        s.add_cue(_cue(1, values={1: {"intensity": 10}}))
+        s.add_cue(_cue(2, values={1: {"intensity": 20}}))
+        s.add_cue(_cue(3, values={1: {"intensity": 30}}))
+        s.go()                                   # aktiv: Cue 1.0 (idx 0)
+        s.tick()
+        self.assertFalse(s.manual_crossfade(0.5))            # armiert Ziel = Cue 2.0 (idx 1)
+        s.add_cue(_cue(0.5, values={9: {"intensity": 5}}))   # sortiert davor -> Cue 2.0 rutscht auf idx 2
+        self.assertTrue(s.manual_crossfade(1.0))             # Commit
+        # ORIGINAL-Ziel Cue 2.0, NICHT die auf idx 1 nachgerutschte Cue 1.0.
+        self.assertEqual(s.current_cue.number, 2.0)
+        self.assertEqual(s.get_output()[1]["intensity"], 20)
+
+    def test_remove_before_target_commits_original_target(self):
+        s = CueStack("s")
+        for i in (1, 2, 3, 4):
+            s.add_cue(_cue(i, values={1: {"intensity": i * 10}}))
+        s.go(); s.go()                           # aktiv: Cue 2.0 (idx 1)
+        s.tick()
+        self.assertEqual(s.current_cue.number, 2.0)
+        self.assertFalse(s.manual_crossfade(0.5))            # armiert Ziel = Cue 3.0 (idx 2)
+        s.remove_cue(1.0)                        # Cue 3.0 rutscht auf idx 1 (bleibt in-bounds)
+        self.assertTrue(s.manual_crossfade(1.0))             # Commit
+        # ORIGINAL-Ziel Cue 3.0, NICHT die auf idx 2 verbliebene Cue 4.0.
+        self.assertEqual(s.current_cue.number, 3.0)
+        self.assertEqual(s.get_output()[1]["intensity"], 30)
+
+    def test_go_abandons_armed_manual_target(self):
+        """Ein programmatischer GO waehrend eines armierten Scrubs verwirft den
+        manuellen Ziel-Anker (Fader-Scrub hinfaellig) statt ihn stale zu halten."""
+        s = CueStack("s")
+        for i in (1, 2, 3):
+            s.add_cue(_cue(i, values={1: {"intensity": i * 10}}))
+        s.go()                                   # aktiv Cue 1.0
+        s.tick()
+        self.assertFalse(s.manual_crossfade(0.5))    # armiert Ziel Cue 2.0
+        s.go()                                   # GO -> Cue 2.0, manueller Anker weg
+        # Erneuter (Fader-auf-1)-Aufruf armiert frisch das NAECHSTE Ziel (Cue 3.0),
+        # committet nicht versehentlich gegen ein stale Ziel.
+        self.assertTrue(s.manual_crossfade(1.0))
+        self.assertEqual(s.current_cue.number, 3.0)
+
+
 if __name__ == "__main__":
     unittest.main()
