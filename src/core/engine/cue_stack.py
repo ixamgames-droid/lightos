@@ -410,9 +410,15 @@ class CueStack:
                     # _current_idx bleibt gueltig (zeigt auf dieselbe Zeile).
                     # A3D-16: ersetzt die In-Place-Bearbeitung die Ziel-Cue eines
                     # laufenden manuellen Crossfades, den Identitaets-Anker mitziehen
-                    # (sonst verwirft die naechste Mutation den Fade faelschlich).
+                    # (sonst verwirft die naechste Mutation den Fade faelschlich) UND
+                    # die Fade-Zielwerte auffrischen: _fade.to_vals haelt die alten
+                    # cue.values by-ref (Arm-Snapshot); ohne Auffrischen zeigten
+                    # Live-Scrub UND Commit sonst die VERALTETEN Werte, obwohl der
+                    # Anker bereits die neue Cue trifft (Review-Fund A3D-16).
                     if self._manual_target_cue is c:
                         self._manual_target_cue = cue
+                        if self._fade is not None and self._fade.manual:
+                            self._fade.to_vals = cue.values
                     self.cues[i] = cue
                     return
         # Neue Nummer -> einsortieren. add_cue nimmt selbst den (nicht-reentranten)

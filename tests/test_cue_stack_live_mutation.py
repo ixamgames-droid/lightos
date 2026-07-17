@@ -152,6 +152,25 @@ class ManualCrossfadeTargetIdentityTest(unittest.TestCase):
         self.assertEqual(s.current_cue.number, 3.0)
         self.assertEqual(s.get_output()[1]["intensity"], 30)
 
+    def test_update_target_values_mid_scrub_commits_fresh_values(self):
+        """A3D-16 (Review-Haertung): wird die armierte Ziel-Cue mitten im Scrub via
+        update_cue (gleiche Nummer) editiert, muessen Live-Scrub UND Commit die NEUEN
+        Werte zeigen -- nicht den beim Armieren eingefrorenen to_vals-Snapshot. Sonst
+        trifft der Identitaets-Anker zwar die richtige Cue, der Output bleibt aber bis
+        zum naechsten GO auf den alten Werten (get_output != current_cue.values)."""
+        s = CueStack("s")
+        s.add_cue(_cue(1, values={1: {"intensity": 50}}))
+        s.add_cue(_cue(2, values={1: {"intensity": 200}}))
+        s.go()                                   # aktiv Cue 1.0
+        s.tick()
+        self.assertFalse(s.manual_crossfade(0.5))            # armiert Ziel Cue 2.0 (int 200)
+        s.update_cue(_cue(2, values={1: {"intensity": 99}}))  # Ziel-Cue live editiert (Nr. 2.0)
+        self.assertTrue(s.manual_crossfade(1.0))             # Commit
+        self.assertEqual(s.current_cue.number, 2.0)
+        # Output == NEUE Werte, konsistent mit current_cue.values (nicht der alte 200-Snapshot).
+        self.assertEqual(s.get_output()[1]["intensity"], 99)
+        self.assertEqual(s.current_cue.values, {1: {"intensity": 99}})
+
     def test_go_abandons_armed_manual_target(self):
         """Ein programmatischer GO waehrend eines armierten Scrubs verwirft den
         manuellen Ziel-Anker (Fader-Scrub hinfaellig) statt ihn stale zu halten."""
