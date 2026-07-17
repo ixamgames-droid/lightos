@@ -168,6 +168,14 @@ class VCSlider(VCWidget):
         self.destroyed.connect(lambda *_, s=id(self): _clear_submaster_slot(s))
         # F-26b: ebenso den Feature-Dimmer-Slot raeumen (sonst Geister-Feature-Dimmer).
         self.destroyed.connect(lambda *_, s=id(self): _clear_feature_dimmer_slot(s))
+        # GDS-1: GRANDMASTER-Fader spiegelt den EINEN globalen grand_master (Load-Init
+        # aus dem Live-Wert + Push-Sync). Hier nur der Callback-Slot; die Subscription
+        # setzt _ensure_grandmaster_sync (idempotent) und wird bei destroy geraeumt.
+        self._gm_sync_cb = None
+        # GDS-1: Re-Entrancy-Guard — waehrend der Fader SELBST set_grand_master ruft
+        # (Drag), seinen eigenen Push ignorieren, sonst ueberschriebe das effektive
+        # (invert/range-gemappte) Ergebnis den rohen Griff-Wert (Snap/Blackout).
+        self._gm_self_push = False
 
     # ── Value ─────────────────────────────────────────────────────────────────
 
@@ -180,6 +188,66 @@ class VCSlider(VCWidget):
         self._value = max(0, min(255, v))
         self._apply()
         self.update()
+
+    # ── GDS-1: Grand-Master-Spiegelung ──────────────────────────────────────────
+    def _ensure_grandmaster_sync(self):
+        """Ein GRANDMASTER-Fader ist eine ANSICHT/Steuerung des EINEN globalen
+        grand_master. Beim Laden/Modus-Wechsel den Fader aus dem LIVE-Wert fuellen
+        (nicht dem gespeicherten 0) und Push-Aenderungen abonnieren — sonst zeigt er
+        0 % trotz GM=voll und die erste Beruehrung schreibt die 0 -> Blackout-Sprung."""
+        try:
+            from src.core.app_state import get_state
+            om = get_state().output_manager
+        except Exception:
+            return
+        self._value = max(0, min(255, int(round(float(om.grand_master) * 255))))
+        self.update()
+        if self._gm_sync_cb is None:
+            self._gm_sync_cb = self._on_grand_master_pushed
+            om.subscribe_grand_master(self._gm_sync_cb)
+            # GC-sicher raeumen: die Lambda haelt NUR om + cb (nicht self ueber eine
+            # zusaetzliche Closure) — bei Qt-Loeschung wird die Subscription geloest.
+            self.destroyed.connect(
+                lambda *_, om=om, cb=self._gm_sync_cb: om.unsubscribe_grand_master(cb))
+
+    def _teardown_grandmaster_sync(self):
+        """Beim Verlassen des GRANDMASTER-Modus die Push-Subscription loesen."""
+        if self._gm_sync_cb is not None:
+            try:
+                from src.core.app_state import get_state
+                get_state().output_manager.unsubscribe_grand_master(self._gm_sync_cb)
+            except Exception:
+                pass
+            self._gm_sync_cb = None
+
+    def _value_for_output(self, out: int) -> int:
+        """Umkehrung von _effective_value: der rohe Griff-Wert (_value), dessen
+        Ausgabe ``out`` (0..255) ergibt — damit der Griff bei externer GM-Aenderung
+        an der richtigen Stelle steht (identisch fuer Default-Fader lo=0/hi=255/kein
+        invert; korrekt fuer invertierte/geranged Fader)."""
+        lo, hi = self.range_min, self.range_max
+        if lo > hi:
+            lo, hi = hi, lo
+        if hi == lo:                          # kollabierter Bereich -> Griff belassen
+            return self._value
+        ratio = max(0.0, min(1.0, (out - lo) / (hi - lo)))
+        if self.invert:
+            ratio = 1.0 - ratio
+        return max(0, min(255, int(round(ratio * 255))))
+
+    def _on_grand_master_pushed(self, gm: float):
+        """Externe grand_master-Aenderung (Header-Fader, MIDI, anderer VC-Fader) ->
+        NUR die Anzeige nachfuehren, KEIN _apply (sonst Feedback-Loop
+        set_grand_master -> cb -> set_grand_master). Den EIGENEN Push (Drag) ignorieren,
+        damit der rohe Griff-Wert nicht durch das effektive Ergebnis ersetzt wird."""
+        if self._gm_self_push:
+            return
+        try:
+            out = max(0, min(255, int(round(float(gm) * 255))))
+            self._value = self._value_for_output(out)
+            self.update()
+        except Exception:
+            pass
 
     def _effective_value(self) -> int:
         """Tatsächlicher Ausgabewert: der Hub 0..255 wird auf [range_min, range_max]
@@ -215,9 +283,12 @@ class VCSlider(VCWidget):
             self._autostart_targets()
         if self.mode == SliderMode.GRANDMASTER:
             try:
+                self._gm_self_push = True    # eigenen Push im Callback ignorieren
                 state.output_manager.set_grand_master(v / 255.0)
             except Exception:
                 pass
+            finally:
+                self._gm_self_push = False
         elif self.mode == SliderMode.BPM:
             # Globales Tempo 30..300 BPM -> Beat-Effekte folgen.
             # WP-8: set_manual_bpm() statt set_bpm() — das Ziehen des BPM-Faders
@@ -1064,10 +1135,15 @@ class VCSlider(VCWidget):
         if (_old_mode == SliderMode.FEATURE_DIMMER
                 and self.mode != SliderMode.FEATURE_DIMMER):
             _clear_feature_dimmer_slot(id(self))         # F-26b: weg -> Slot raeumen
+        if (_old_mode == SliderMode.GRANDMASTER
+                and self.mode != SliderMode.GRANDMASTER):
+            self._teardown_grandmaster_sync()            # GDS-1: Push-Sync loesen
         # Phase 2: Neu-Modus sofort anwenden (nicht erst beim naechsten Ziehen).
         if self.mode in (SliderMode.SUBMASTER, SliderMode.GROUP_DIMMER,
                          SliderMode.FEATURE_DIMMER):
             self._apply()
+        if self.mode == SliderMode.GRANDMASTER:          # GDS-1: aus live GM spiegeln
+            self._ensure_grandmaster_sync()
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -1163,3 +1239,8 @@ class VCSlider(VCWidget):
                 self._apply()
             except Exception:
                 pass
+        elif self.mode == SliderMode.GRANDMASTER:
+            # GDS-1: NICHT den gespeicherten (oft 0-)Wert pushen — das wuerde die Show
+            # beim Laden schwarz ziehen. Stattdessen den Fader aus dem live
+            # grand_master spiegeln und Aenderungen abonnieren.
+            self._ensure_grandmaster_sync()
