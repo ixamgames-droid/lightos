@@ -172,6 +172,10 @@ class VCSlider(VCWidget):
         # aus dem Live-Wert + Push-Sync). Hier nur der Callback-Slot; die Subscription
         # setzt _ensure_grandmaster_sync (idempotent) und wird bei destroy geraeumt.
         self._gm_sync_cb = None
+        # GDS-1: Re-Entrancy-Guard — waehrend der Fader SELBST set_grand_master ruft
+        # (Drag), seinen eigenen Push ignorieren, sonst ueberschriebe das effektive
+        # (invert/range-gemappte) Ergebnis den rohen Griff-Wert (Snap/Blackout).
+        self._gm_self_push = False
 
     # ── Value ─────────────────────────────────────────────────────────────────
 
@@ -216,12 +220,31 @@ class VCSlider(VCWidget):
                 pass
             self._gm_sync_cb = None
 
+    def _value_for_output(self, out: int) -> int:
+        """Umkehrung von _effective_value: der rohe Griff-Wert (_value), dessen
+        Ausgabe ``out`` (0..255) ergibt — damit der Griff bei externer GM-Aenderung
+        an der richtigen Stelle steht (identisch fuer Default-Fader lo=0/hi=255/kein
+        invert; korrekt fuer invertierte/geranged Fader)."""
+        lo, hi = self.range_min, self.range_max
+        if lo > hi:
+            lo, hi = hi, lo
+        if hi == lo:                          # kollabierter Bereich -> Griff belassen
+            return self._value
+        ratio = max(0.0, min(1.0, (out - lo) / (hi - lo)))
+        if self.invert:
+            ratio = 1.0 - ratio
+        return max(0, min(255, int(round(ratio * 255))))
+
     def _on_grand_master_pushed(self, gm: float):
         """Externe grand_master-Aenderung (Header-Fader, MIDI, anderer VC-Fader) ->
         NUR die Anzeige nachfuehren, KEIN _apply (sonst Feedback-Loop
-        set_grand_master -> cb -> set_grand_master)."""
+        set_grand_master -> cb -> set_grand_master). Den EIGENEN Push (Drag) ignorieren,
+        damit der rohe Griff-Wert nicht durch das effektive Ergebnis ersetzt wird."""
+        if self._gm_self_push:
+            return
         try:
-            self._value = max(0, min(255, int(round(float(gm) * 255))))
+            out = max(0, min(255, int(round(float(gm) * 255))))
+            self._value = self._value_for_output(out)
             self.update()
         except Exception:
             pass
@@ -260,9 +283,12 @@ class VCSlider(VCWidget):
             self._autostart_targets()
         if self.mode == SliderMode.GRANDMASTER:
             try:
+                self._gm_self_push = True    # eigenen Push im Callback ignorieren
                 state.output_manager.set_grand_master(v / 255.0)
             except Exception:
                 pass
+            finally:
+                self._gm_self_push = False
         elif self.mode == SliderMode.BPM:
             # Globales Tempo 30..300 BPM -> Beat-Effekte folgen.
             # WP-8: set_manual_bpm() statt set_bpm() — das Ziehen des BPM-Faders

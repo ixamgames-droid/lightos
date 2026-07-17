@@ -63,6 +63,29 @@ class GrandmasterSyncTest(unittest.TestCase):
         # Nach dem Abmelden folgt die Anzeige nicht mehr (bleibt beim letzten Wert).
         self.assertEqual(s.value, 255)
 
+    def test_inverted_drag_keeps_raw_handle_no_snap(self):
+        """Review-Fund: ein GRANDMASTER-Fader mit invert=True darf beim Ziehen NICHT
+        durch seinen eigenen Push den rohen Griff-Wert mit dem effektiven ersetzen
+        (sonst schnappt der Griff weg / Blackout beim Hochziehen)."""
+        s = VCSlider("Master")
+        s.apply_dict(_grandmaster_dict(value=0))
+        s.invert = True
+        s.value = 255                          # ganz nach oben ziehen
+        self.assertEqual(s.value, 255)         # Griff bleibt oben (kein Snap)
+        # invert: oben = GM 0 (gewollt) — aber eben KEIN unbeabsichtigter Sprung.
+        self.assertAlmostEqual(self.om.grand_master, 0.0, places=3)
+
+    def test_external_change_positions_inverted_handle(self):
+        """Externe GM-Aenderung positioniert den Griff eines invertierten Faders
+        korrekt (Inverse-Mapping), nicht am rohen gm*255."""
+        s = VCSlider("Master")
+        s.apply_dict(_grandmaster_dict(value=0))
+        s.invert = True
+        self.om.set_grand_master(0.0)          # extern -> invertiert = Griff oben
+        self.assertEqual(s.value, 255)
+        self.om.set_grand_master(1.0)          # extern -> invertiert = Griff unten
+        self.assertEqual(s.value, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
