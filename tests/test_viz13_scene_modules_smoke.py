@@ -744,6 +744,72 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertLessEqual(smx, 0.30, "Nebelmaschine breiter als die N-10-Klasse")
         self.assertLessEqual(smz, 0.42, "Nebelmaschine tiefer als die N-10-Klasse")
 
+    def test_multihead_beams_resync_on_showcones_and_view_switch(self):
+        """A3D-05 + A3D-24: Multi-Head-Pro-Kopf-Kegel folgen showCones-Toggle
+        UND 2D<->3D-Wechsel SOFORT.
+
+        Die Pro-Kopf-Kegel von PAR-Bar/Mover-Bar/Spider
+        (``f.parHeads[*].beam`` / ``f.moverHeads[*].beam`` / ``f.bars[*].beams[*]``)
+        wurden bisher NUR von den Pro-Fixture-DMX-Handlern
+        (updateParBar/MoverBar/SpiderDmx) gesetzt. ``applySettings`` (showCones-
+        Toggle) und ``setViewMode`` (2D<->3D) fassten nur den Einzelkopf-Kegel
+        ``f.beam`` (+ Laser-Faecher) an -> die Bar-/Spider-Kegel blieben bis zum
+        naechsten DMX-Update der Fixture auf ihrem alten Sichtbarkeits-Stand
+        stehen (A3D-05 / A3D-24). Der gemeinsame Helfer
+        ``resyncBeamVisibility(f)`` (builders.js) schliesst diese Luecke an
+        beiden Aufrufstellen. VOR dem Fix laufen die drei ``every(... === false)``
+        bzw. Rueckstell-Polls in den Timeout.
+        """
+        self._load_and_wait()
+        import json
+        # PAR-Bar mit 4 Koepfen bei vollem Master-Dimmer -> jeder Pro-Kopf-Kegel
+        # bekommt opacity>0.01 und ist im 3D sichtbar (bright=intNorm gilt fuer
+        # ALLE Koepfe gemeinsam, s. updateParBarDmx).
+        build = json.dumps([{"fid": 555001, "type": "led_bar", "model": "par_bar",
+                             "nHeads": 4, "x": 0, "y": 3, "z": 0,
+                             "r": 255, "g": 40, "b": 0, "intensity": 255}])
+        self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(build),
+            "(function(){ const f = window.__lightos.fixtures['555001'];"
+            " return !!f && !!f.parHeads && f.parHeads.length === 4; })()",
+            timeout_s=8.0)
+        lit = json.dumps([{"fid": 555001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
+        all_lit = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            "(function(){ const hs = window.__lightos.fixtures['555001'].parHeads;"
+            " return hs.every(ph => ph.beam && ph.beam.visible === true"
+            "                  && ph.beam.material.opacity > 0.01); })()",
+            timeout_s=6.0)
+        self.assertTrue(all_lit, "PAR-Bar-Pro-Kopf-Kegel wurden nicht beleuchtet/sichtbar")
+
+        # A3D-05: showCones AUS -> ALLE Pro-Kopf-Kegel sofort unsichtbar, OHNE
+        # weiteres DMX-Update fuer die (statische) Fixture.
+        cones_off = self._emit_until_true(
+            lambda: self._bridge_obj.settingsChanged.emit('{"showCones": false}'),
+            "window.__lightos.fixtures['555001'].parHeads.every(ph => ph.beam.visible === false)",
+            timeout_s=5.0)
+        self.assertTrue(cones_off, "showCones AUS liess die Multi-Head-Kegel sichtbar (A3D-05)")
+
+        # showCones AN -> die beleuchteten Pro-Kopf-Kegel wieder sichtbar.
+        cones_on = self._emit_until_true(
+            lambda: self._bridge_obj.settingsChanged.emit('{"showCones": true}'),
+            "window.__lightos.fixtures['555001'].parHeads.every(ph => ph.beam.visible === true)",
+            timeout_s=5.0)
+        self.assertTrue(cones_on, "showCones AN stellte die Multi-Head-Kegel nicht wieder her (A3D-05)")
+
+        # A3D-24: 2D versteckt alle Kegel, Rueckwechsel auf 3D stellt sie wieder
+        # her — ebenfalls ohne zwischenzeitliches DMX-Update.
+        view_2d = self._emit_until_true(
+            lambda: self._bridge_obj.viewModeChanged.emit('2D'),
+            "window.__lightos.fixtures['555001'].parHeads.every(ph => ph.beam.visible === false)",
+            timeout_s=5.0)
+        self.assertTrue(view_2d, "2D-Wechsel liess die Multi-Head-Kegel sichtbar (A3D-24)")
+        back_3d = self._emit_until_true(
+            lambda: self._bridge_obj.viewModeChanged.emit('3D'),
+            "window.__lightos.fixtures['555001'].parHeads.every(ph => ph.beam.visible === true)",
+            timeout_s=5.0)
+        self.assertTrue(back_3d, "2D->3D-Wechsel stellte die Multi-Head-Kegel nicht wieder her (A3D-24)")
+
     def test_all_bridge_connects_wired(self):
         """Belegt den Bridge-Vertrag (Design-Dokument Leitprinzip): jedes der
         21 Signale, die tryChannel() im Original UND in bridge.js verbindet,

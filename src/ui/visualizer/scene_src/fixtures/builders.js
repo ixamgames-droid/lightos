@@ -16,6 +16,26 @@ function segs(n) {
   return isLowSpec ? Math.max(6, Math.round(n / 2)) : n;
 }
 
+// A3D-05 / A3D-24: Beam-Kegel-Sichtbarkeit EINER Fixture aus dem aktuellen
+// settings.showCones + view.mode neu setzen — OHNE auf das naechste DMX-Frame zu
+// warten. Deckt den Einzelkopf-Kegel (f.beam), die Laser-Faecher (f.laserBeams)
+// UND die Multi-Head-Pro-Kopf-Kegel ab: PAR-Bar f.parHeads[*].beam,
+// Mover-Bar f.moverHeads[*].beam, Spider f.bars[*].beams[*]. Letztere setzten
+// bisher NUR die Pro-Fixture-DMX-Handler (updateParBar/MoverBar/SpiderDmx), darum
+// blieben sie nach einem Settings-Toggle (applySettings) oder einem 2D<->3D-Wechsel
+// (setViewMode) stale, bis die Fixture das naechste Mal DMX bekam. `opacity > 0.01`
+// ist derselbe „war beleuchtet"-Proxy wie in der Einzelkopf-Zeile (der DMX-Pfad
+// setzt die Kegel-Opacity aus der Pro-Kopf-Helligkeit).
+export function resyncBeamVisibility(f) {
+  const on = settings.showCones && view.mode === '3D';
+  const set = (bm) => { if (bm && bm.material) bm.visible = on && bm.material.opacity > 0.01; };
+  set(f.beam);
+  if (f.laserBeams) for (const bm of f.laserBeams) set(bm);
+  if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
+  if (f.moverHeads) for (const mh of f.moverHeads) set(mh.beam);
+  if (f.bars) for (const bar of f.bars) { if (bar.beams) for (const bm of bar.beams) set(bm); }
+}
+
 // ── Builders ─────────────────────────────────────────────────────────────────
 export function buildMovingHead() {
   // FM-8: detailliertes PROZEDURALES Moving-Head-Modell (statt des groben
