@@ -176,9 +176,15 @@ class BPMManager:
             bpm = 0
         if bpm > 0 and (bpm < self.MIN_BPM or bpm > self.MAX_BPM):
             bpm = max(self.MIN_BPM, min(self.MAX_BPM, bpm))
-        self._bpm = float(bpm)
-        if self._bpm <= 0:
-            self._source = "off"
+        # A3D-17: _bpm (+ abgeleitetes _source) unter dem Lock schreiben — sonst kann
+        # dieser (oft aus dem Audio-Thread aufgerufene) Setter den unter dem Lock
+        # nullenden reset() ueberholen und einen inkonsistenten Zustand hinterlassen
+        # (_bpm>0 bei _source='off'). Der BPM-04-Lock in reset() wirkt nur, wenn auch
+        # der Gegen-Writer den Lock nimmt.
+        with self._lock:
+            self._bpm = float(bpm)
+            if self._bpm <= 0:
+                self._source = "off"
         self._sync_emitter()
         self._emit_bpm_change()
 
@@ -258,9 +264,16 @@ class BPMManager:
 
     def reset(self):
         """Schaltet BPM aus."""
-        # BPM-04: _bpm MUSS unter dem Lock genullt werden — sonst kann ein
+        # BPM-04 / A3D-17: _bpm MUSS unter dem Lock genullt werden — sonst kann ein
         # paralleler set_bpm() (Audio-Thread) den Reset ueberholen und einen
-        # inkonsistenten Zustand hinterlassen (Ordering-Race).
+        # inkonsistenten Zustand hinterlassen (_bpm>0 bei _source='off'). Seit A3D-17
+        # nimmt set_bpm() den Lock ebenfalls, sodass die Serialisierung wirklich
+        # greift (vorher schuetzte der Lock hier nur eine Haelfte der Race).
+        # HINWEIS: reset() laesst _mode==AUTO — laufende AUTO-Quellen (Audio-Detektor,
+        # OS2L, Timeline, File, TempoBus) re-setzen _bpm beim naechsten Event wieder
+        # ('BPM springt zurueck'). Ob ein manuelles '0'/reset ALLE Live-Quellen
+        # ueberstimmen soll (und den Modus auf MANUAL flippen), ist eine offene
+        # Verhaltensentscheidung -> BACKLOG A3D-17b (nicht hier geraten).
         with self._lock:
             self._last_taps = []
             self._beat_index = 0
