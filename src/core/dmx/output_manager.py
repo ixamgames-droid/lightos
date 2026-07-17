@@ -105,6 +105,14 @@ class OutputManager:
         if cb not in self._gm_callbacks:
             self._gm_callbacks.append(cb)
 
+    def unsubscribe_grand_master(self, cb):
+        """Callback wieder abmelden (z. B. wenn ein VC-Grandmaster-Fader geloescht
+        wird) — sonst feuert set_grand_master() weiter auf ein totes Widget."""
+        try:
+            self._gm_callbacks.remove(cb)
+        except ValueError:
+            pass
+
     def set_gm_address_mask(self, mask: dict[int, frozenset]):
         """Setzt je Universum die Adressen, die der Grand-Master skalieren darf
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState

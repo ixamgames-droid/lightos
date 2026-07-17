@@ -761,6 +761,13 @@ class MainWindow(QMainWindow):
         # ("100%") + Puffer, als setMinimumWidth (Layout-Floor, siehe SectionButton).
         gm_val_min_w = self._lbl_gm_val.fontMetrics().horizontalAdvance("100%") + 8
         self._lbl_gm_val.setMinimumWidth(gm_val_min_w)
+        # GDS-1: Header-GM spiegelt externe grand_master-Aenderungen (VC-Grandmaster-
+        # Fader, MIDI) zurueck — feedback-sicher via blockSignals (kein
+        # valueChanged -> set_grand_master -> notify -> ...-Loop).
+        try:
+            self._state.output_manager.subscribe_grand_master(self._sync_header_gm)
+        except Exception:
+            pass
         gm_layout.addWidget(self._lbl_gm_val)
         gm_group.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         # Container selbst braucht ebenfalls einen Layout-Floor (sonst wandert das
@@ -1195,6 +1202,16 @@ class MainWindow(QMainWindow):
             self._state.output_manager.set_grand_master(gm)
         except Exception as e:
             print(f"[main_window] grand_master error: {e}")
+        self._lbl_gm_val.setText(f"{val}%")
+
+    def _sync_header_gm(self, gm: float):
+        """GDS-1: externe grand_master-Aenderung -> Header-Fader/-Label nachfuehren,
+        OHNE valueChanged auszuloesen (blockSignals) — sonst set_grand_master erneut
+        und Feedback-Loop mit dem VC-Grandmaster-Fader."""
+        val = int(round(max(0.0, min(1.0, float(gm))) * 100))
+        self._slider_gm.blockSignals(True)
+        self._slider_gm.setValue(val)
+        self._slider_gm.blockSignals(False)
         self._lbl_gm_val.setText(f"{val}%")
 
     def _on_tap_tempo(self):
