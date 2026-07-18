@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — Playback: Cue-Umnummerieren desynct keine laufende Cueliste mehr (ENG-13)
+
+#### Behoben
+
+- **Das Ändern einer Cue-Nummer im Playback-Editor bringt eine *laufende* Cueliste nicht mehr aus dem Tritt.** `playback_view._on_cue_edited` setzte `cue.number` und rief `stack.cues.sort(...)` **direkt von außen** auf — das umging `CueStack._reindex_after_mutation` (die einzige Stelle, die `_current_idx`/`_manual_target` einer laufenden Liste identitätstreu nachführt) **und lief ohne `_lock`** gegen den Engine-Tick-Thread. Wer während des Abspielens eine Cue-Nummer editierte, dessen `_current_idx` zeigte nach dem Re-Sort auf die falsche Cue (Replay/Skip der nächsten Cue). **Fix:** neue `CueStack.renumber_cue(cue, new_number)`-API mutiert die Nummer, sortiert und reindiziert **unter `_lock`** (identisches Muster wie `add_cue`/`remove_cue`); der View ruft nur noch diese API. Neue Tests in `tests/test_cue_stack_live_mutation.py` (aktive Cue bleibt identitätstreu aktiv; Index folgt beim Umsortieren; armiertes Manual-Crossfade-Ziel wird nachgeführt).
+
 ### 2026-07-18 — DMX-Ausgabe: Art-Net-Startuniversum ist jetzt einstellbar (A3D-15)
 
 #### Behoben
