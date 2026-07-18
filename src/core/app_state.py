@@ -485,10 +485,17 @@ class AppState:
         # Pro-Kopf-Matrix-Gruppe anlegen, damit die Einzelkoepfe sofort als Matrix
         # im Matrix-Programmer (und beim Zusammenlegen) ansprechbar sind. Best-effort:
         # ein Fehler hier darf den Patch NIE brechen; idempotent (kein Duplikat).
-        try:
-            self.create_head_matrix_group(fixture)
-        except Exception as e:
-            debug_swallow("app_state.add_fixture.head_matrix_group", e)
+        # NUR bei INTERAKTIVEM Einzel-Patch: waehrend eines Bulk-Load/Reset ist
+        # _suppress_emits gesetzt -> die Auto-Gruppe waere sinnlos (der Loader macht
+        # gleich delete-all + _restore_fixture_groups) und ihr group_changed-Emit
+        # wuerde re-entrante View-Rebuilds mitten im halb aufgebauten Patch ausloesen
+        # (BUG-01-Klasse). Guard hier + notify_groups_changed() (statt direktem
+        # get_sync-Emit) in create_head_matrix_group respektiert die Suppression.
+        if not getattr(self, "_suppress_emits", False):
+            try:
+                self.create_head_matrix_group(fixture)
+            except Exception as e:
+                debug_swallow("app_state.add_fixture.head_matrix_group", e)
         if undoable:
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -545,9 +552,11 @@ class AppState:
             debug_swallow("app_state.create_head_matrix_group", e)
             return None
         if emit:
+            # notify_groups_changed -> self._emit("group_changed") respektiert
+            # _suppress_emits UND das UI-Thread-Marshalling (kein direkter get_sync-
+            # Bus-Emit, der beide Schutzmechanismen umgeht).
             try:
-                from src.core.sync import get_sync, SyncEvent
-                get_sync().emit(SyncEvent.GROUP_CHANGED, None)
+                self.notify_groups_changed()
             except Exception:
                 pass
         return gid
@@ -559,13 +568,41 @@ class AppState:
             if f.fid == fid:
                 snap = self._fixture_to_dict(f)
                 break
+        removed_group = False
         with self._session() as s:
             from sqlalchemy import select, delete
             s.execute(delete(PatchedFixture).where(PatchedFixture.fid == fid))
+            # FM-16: die beim Patchen auto-erzeugte Kopf-Matrix-Gruppe (Ordner
+            # "Multi-Head") dieses Fixtures mit entfernen -> keine verwaisten
+            # "fid:head"-Gruppen bei Delete/Undo. NUR eine Gruppe anfassen, die
+            # AUSSCHLIESSLICH die Koepfe DIESES fid adressiert (die dedizierte 1×N-
+            # Auto-Gruppe) — vom Nutzer zusammengelegte Matrizen (mehrere fids)
+            # bleiben unberuehrt.
+            try:
+                from src.core.database.models import FixtureGroup as _FG
+                import json as _json
+                for g in s.execute(
+                        select(_FG).where(_FG.folder == "Multi-Head")).scalars().all():
+                    try:
+                        pos = _json.loads(g.positions_json or "{}")
+                    except Exception:
+                        continue
+                    vals = [str(v) for v in pos.values()]
+                    if vals and all(":" in v and v.split(":", 1)[0] == str(fid)
+                                    for v in vals):
+                        s.delete(g)
+                        removed_group = True
+            except Exception as e:
+                debug_swallow("app_state.remove_fixture.head_group_cleanup", e)
             s.commit()
         self.programmer.pop(fid, None)
         self._reload_patch_cache()
         self._emit("patch_changed")
+        if removed_group:
+            try:
+                self.notify_groups_changed()
+            except Exception:
+                pass
         if undoable and snap is not None:
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",

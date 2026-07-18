@@ -239,6 +239,42 @@ class CreateHeadMatrixGroupTest(unittest.TestCase):
         fx = NS(fid=8, label="PAR", fixture_type="par")
         self.assertIsNone(self.state.create_head_matrix_group(fx))
 
+    def test_remove_fixture_cleans_up_auto_group(self):
+        # Review-Fix (MEDIUM): Delete/Undo eines Multi-Head-Fixtures raeumt seine
+        # auto-erzeugte "· Köpfe"-Gruppe mit ab (keine verwaiste "fid:head"-Gruppe).
+        A.get_channels_for_patched = lambda fx: _rgbw_heads(4)
+        gid = self.state.create_head_matrix_group(
+            NS(fid=7, label="HB", fixture_type="moving_head"))
+        self.assertIsNotNone(self._load_group(gid))
+        self.state.remove_fixture(7, undoable=False)
+        self.assertIsNone(self._load_group(gid))
+
+    def test_remove_fixture_spares_combined_group(self):
+        # Eine vom Nutzer ZUSAMMENGELEGTE Matrix (mehrere fids) darf remove_fixture
+        # NICHT loeschen — nur die dedizierte 1×N-Auto-Gruppe genau dieses fids.
+        from sqlalchemy.orm import Session
+        from src.core.database.models import FixtureGroup
+        with Session(self.state._show_engine) as s:
+            g = FixtureGroup(name="Combo", cols=2, rows=1,
+                             positions_json=json.dumps({"0,0": "7:0", "1,0": "8:0"}),
+                             folder="Multi-Head")
+            s.add(g); s.commit(); gid = g.id
+        self.state.remove_fixture(7, undoable=False)
+        self.assertIsNotNone(self._load_group(gid))   # bleibt erhalten
+
+    def test_create_under_suppression_no_crash(self):
+        # Review-Fix (HIGH): unter _suppress_emits (Bulk-Load) erzeugt der Aufruf
+        # die Gruppe, aber der group_changed-Emit wird ueber notify_groups_changed
+        # unterdrueckt (kein re-entranter View-Rebuild). Hier: kein Crash.
+        A.get_channels_for_patched = lambda fx: _rgbw_heads(4)
+        self.state._suppress_emits = True
+        try:
+            gid = self.state.create_head_matrix_group(
+                NS(fid=9, label="HB", fixture_type="moving_head"))
+        finally:
+            self.state._suppress_emits = False
+        self.assertIsNotNone(gid)
+
 
 if __name__ == "__main__":
     unittest.main()
