@@ -141,20 +141,49 @@ def _scale(rgb: Color, b: float) -> Color:
     return (int(rgb[0] * b), int(rgb[1] * b), int(rgb[2] * b))
 
 
-def grid_from_positions(positions: dict, cols: int, rows: int) -> list:
-    """Baut eine dichte fixture_grid-Liste (Laenge cols*rows) mit None-Luecken
-    aus einem {"col,row": fid}-Dict (FixtureGroup.positions_json). Out-of-range-
-    Schluessel werden ignoriert; nicht belegte Zellen bleiben None (Luecke)."""
-    grid: list = [None] * (cols * rows)
-    for key, fid in (positions or {}).items():
+def _parse_cell(value) -> tuple:
+    """Zerlegt einen positions_json-Zellwert in ``(fid, head|None)`` — rueckwaerts-
+    kompatibel (FM-16). Ein reiner Zahlwert (``5`` oder ``"5"``) = GANZES Fixture
+    -> ``(5, None)``; ``"5:2"`` = KOPF 2 des Fixtures 5 -> ``(5, 2)`` (Pro-Kopf-
+    Matrix). Alt-Shows/-Gruppen (nur fids) laden damit unveraendert."""
+    try:
+        s = str(value)
+        if ":" in s:
+            fid_s, head_s = s.split(":", 1)
+            return int(fid_s), int(head_s)
+        return int(s), None
+    except Exception:
+        return None, None
+
+
+def grids_from_positions(positions: dict, cols: int, rows: int) -> tuple:
+    """Baut PARALLEL die dichte ``fixture_grid``-Liste (fids) UND die
+    ``head_grid``-Liste (Kopf-Index je Zelle, ``None`` = ganzes Fixture) aus einem
+    ``{"col,row": fid|"fid:head"}``-Dict (FixtureGroup.positions_json). Beide
+    Laenge cols*rows, None-Luecken bleiben. Out-of-range-Schluessel ignoriert."""
+    fid_grid: list = [None] * (cols * rows)
+    head_grid: list = [None] * (cols * rows)
+    for key, value in (positions or {}).items():
         try:
             c_str, r_str = str(key).split(",")
             c, r = int(c_str), int(r_str)
         except Exception:
             continue
-        if 0 <= c < cols and 0 <= r < rows:
-            grid[r * cols + c] = int(fid)
-    return grid
+        if not (0 <= c < cols and 0 <= r < rows):
+            continue
+        fid, head = _parse_cell(value)
+        if fid is None:
+            continue
+        fid_grid[r * cols + c] = fid
+        head_grid[r * cols + c] = head
+    return fid_grid, head_grid
+
+
+def grid_from_positions(positions: dict, cols: int, rows: int) -> list:
+    """Rueckwaertskompatible Fassade: nur die fixture_grid-Liste (fids). Neue
+    Aufrufer, die Pro-Kopf-Matrizen unterstuetzen, nutzen ``grids_from_positions``
+    (fids + head_grid)."""
+    return grids_from_positions(positions, cols, rows)[0]
 
 
 def is_gap(fixture_grid: list, idx: int) -> bool:
@@ -427,6 +456,7 @@ class RgbMatrixInstance(Function):
     def __init__(self, name: str = "RGB Matrix", fid: int | None = None, *,
                  cols: int = 8, rows: int = 4,
                  fixture_grid: list[int] | None = None,
+                 head_grid: list[int] | None = None,
                  algorithm: RgbAlgorithm = RgbAlgorithm.CHASE,
                  color1: Color = (255, 0, 0),
                  color2: Color = (0, 0, 255),
@@ -439,6 +469,11 @@ class RgbMatrixInstance(Function):
         self.rows = rows
         # None-Eintraege = Luecken (raeumlich vorhanden, kein Fixture)
         self.fixture_grid: list[int | None] = list(fixture_grid or [])
+        # FM-16: paralleler Kopf-Index je Zelle (None = ganzes Fixture, wie bisher;
+        # int = NUR dieser Kopf des Multi-Head-Fixtures wird gefaerbt). Leer/kuerzer
+        # als fixture_grid -> die fehlenden Zellen gelten als „ganzes Fixture"
+        # (Alt-Shows byte-identisch). Siehe write() + channels_for_head.
+        self.head_grid: list[int | None] = list(head_grid or [])
         # Gruppen-Bindung (nur fuer die Programmer-Listen-Filterung): Name der
         # Fixture-Gruppe, fuer die dieser Matrix-Effekt erstellt wurde. Bewusst per
         # NAME (nicht DB-id), weil Gruppen beim Show-Save/Load per Name neu angelegt
@@ -739,7 +774,7 @@ class RgbMatrixInstance(Function):
         self._advance_step(dt)
         grid = self._render(self._step)
         try:
-            from src.core.app_state import get_channels_for_patched
+            from src.core.app_state import get_channels_for_patched, channels_for_head
         except Exception:
             return
         for idx, fid in enumerate(self.fixture_grid):
@@ -756,6 +791,13 @@ class RgbMatrixInstance(Function):
             if universe is None:
                 continue
             chans = get_channels_for_patched(fx)
+            # FM-16 Pro-Kopf-Matrix: Traegt diese Zelle einen Kopf-Index (head_grid),
+            # faerbt sie NUR die Kanaele DIESES Kopfes (das head-te color_r#h/g#h/b#h/
+            # w#h + die geteilten Dimmer/Shutter) statt aller Vorkommen uniform. Ohne
+            # head_grid-Eintrag (None / Alt-Show) bleibt es das ganze Fixture
+            # (byte-identisch). channels_for_head projiziert {attr: channel} des Kopfes.
+            _head = self.head_grid[idx] if (self.head_grid and idx < len(self.head_grid)) else None
+            target_chans = list(channels_for_head(chans, _head).values()) if _head is not None else chans
             # M1: Per-Effekt-Master (intensity) auf die Farbkanaele anwenden — aber
             # NUR wenn der generische FunctionManager-Merge sie nicht ohnehin
             # skaliert. Der Merge skaliert pro Fixture entweder dessen Dimmer-Kanal
@@ -794,7 +836,7 @@ class RgbMatrixInstance(Function):
             else:
                 cw = 0
                 cr, cg, cb = r, g, b
-            for ch in chans:
+            for ch in target_chans:      # FM-16: ganzes Fixture ODER nur ein Kopf
                 attr = (ch.attribute or "").lower()
                 # ── Style-Kanalmaske ────────────────────────────────────────
                 if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
@@ -1807,6 +1849,7 @@ class RgbMatrixInstance(Function):
         d.update({
             "cols": self.cols, "rows": self.rows,
             "fixture_grid": self.fixture_grid,
+            "head_grid": self.head_grid,       # FM-16: Pro-Kopf-Zellen ("" = Alt)
             # Gruppen-Bindung (Programmer-Listen-Scope) — per Name, stabil ueber Save/Load.
             "source_group": self.source_group,
             "algorithm": self.algorithm.value,
@@ -1847,6 +1890,9 @@ class RgbMatrixInstance(Function):
         self.rows = d.get("rows", 4)
         # None-Eintraege = Luecken; alte dichte Listen (ohne None) laden unveraendert (Migration).
         self.fixture_grid = list(d.get("fixture_grid", []))
+        # FM-16: Pro-Kopf-Index je Zelle. Alt-Shows ohne den Key -> [] (= alle Zellen
+        # „ganzes Fixture", byte-identisches Verhalten).
+        self.head_grid = list(d.get("head_grid", []))
         # Gruppen-Bindung (Programmer-Listen-Scope). Fehlender Key (Alt-Shows) ODER
         # leerer String = ungebunden (None) -> erscheint in jeder Gruppe.
         _sg = d.get("source_group", getattr(self, "source_group", None))
