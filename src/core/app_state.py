@@ -491,11 +491,23 @@ class AppState:
         # wuerde re-entrante View-Rebuilds mitten im halb aufgebauten Patch ausloesen
         # (BUG-01-Klasse). Guard hier + notify_groups_changed() (statt direktem
         # get_sync-Emit) in create_head_matrix_group respektiert die Suppression.
+        # WICHTIG: NICHT das uebergebene `fixture` verwenden — nach s.commit()
+        # ist es (expire_on_commit) EXPIRED und nach dem with-Exit DETACHED, d.h.
+        # jeder Zugriff auf eine Spalte (fixture_profile_id/mode_name/channel_count
+        # …) in color_head_count -> get_channels_for_patched wirft
+        # DetachedInstanceError. create_head_matrix_group verschluckt das still
+        # (except -> None) -> es entsteht KEINE Kopf-Gruppe (FM-16 (d) tot). Statt
+        # dessen das frisch aus _reload_patch_cache() GEBUNDENE Cache-Objekt
+        # (Spalten geladen, nicht expired) an create_head_matrix_group geben.
         if not getattr(self, "_suppress_emits", False):
-            try:
-                self.create_head_matrix_group(fixture)
-            except Exception as e:
-                debug_swallow("app_state.add_fixture.head_matrix_group", e)
+            bound = next(
+                (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
+            )
+            if bound is not None:
+                try:
+                    self.create_head_matrix_group(bound)
+                except Exception as e:
+                    debug_swallow("app_state.add_fixture.head_matrix_group", e)
         if undoable:
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -519,7 +531,10 @@ class AppState:
             return None
         try:
             n = color_head_count(fixture)
-        except Exception:
+        except Exception as e:
+            # Frueher voellig stumm -> ein detached/expired Fixture (BUG-Klasse
+            # von FM-16 (d)) blieb unsichtbar. Jetzt wenigstens im Debug-Log.
+            debug_swallow("app_state.create_head_matrix_group.head_count", e)
             return None
         if n < 2:
             return None
