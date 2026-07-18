@@ -249,5 +249,133 @@ class LaserEstopEndToEndTest(unittest.TestCase):
         self.assertEqual(self._sent(20), 200)    # PAR unberührt (NOT-AUS gilt nur dem Laser)
 
 
+class LaserEstopActivationOrderTest(unittest.TestCase):
+    """CDX-12: die AKTIVIERUNG muss die OM-Estop-Maske (Ebene 2) installieren,
+    BEVOR ``laser_estop_active`` True wird. Der lockfreie Sende-/Renderpfad liest
+    das Flag roh; setzte man erst das Flag, sähe ein Frame im Fenster Flag=True
+    (Renderer nullt den Puffer) aber die OM-Maske noch leer → ein INVERSE/Range-
+    Lock-Modifier auf einer Laser-Adresse öffnete den Laser für genau diesen Frame.
+    Die DEAKTIVIERUNG bleibt Flag-dann-leere-Maske (failt safe)."""
+
+    def setUp(self):
+        self._orig = A.get_channels_for_patched
+        A.get_channels_for_patched = lambda fx: _CHANNELS[fx.fid]
+        self.mgr = get_modifier_manager()
+        self.mgr.clear()
+        st = AppState.__new__(AppState)
+        om = OutputManager()
+        om.add_universe(1)
+        st.universes = om.universes            # Renderer und Sender teilen dasselbe Universe
+        st.output_manager = om
+        st.programmer = {}
+        st.playback_engine = None
+        st.function_manager = _FM()
+        st._patch_cache = [_LASER, _PAR]
+        st._prog_lock = threading.RLock()
+        st.laser_estop_active = False
+        st._laser_estop_addrs = {}
+        st._laser_fids = frozenset()
+        st.base_levels = {}
+        st._engine_extra_prev = {}
+        st._suppress_emits = True
+        st._rebuild_render_plan()
+        self.st = st
+        self.om = om
+
+    def tearDown(self):
+        A.get_channels_for_patched = self._orig
+        self.mgr.clear()
+
+    def _sent(self, addr):
+        return self.om._display_frame[1][addr - 1]
+
+    def _spy_pushes(self):
+        """Ersetzt set_laser_estop_mask durch einen Spy, der pro Push
+        (nicht-leer?, Flag-Zustand-in-diesem-Moment) protokolliert."""
+        log = []
+        real = self.om.set_laser_estop_mask
+        def spy(mask):
+            log.append((bool(mask), self.st.laser_estop_active))
+            return real(mask)
+        self.om.set_laser_estop_mask = spy
+        return log
+
+    def test_activation_installs_mask_before_flag(self):
+        log = self._spy_pushes()
+        self.st.set_laser_estop(True)
+        # Die NICHT-leere Maske wurde gepusht, WÄHREND das Flag noch False war.
+        nonempty = [flag for (has_mask, flag) in log if has_mask]
+        self.assertTrue(nonempty, "keine nicht-leere Estop-Maske gepusht")
+        self.assertTrue(
+            all(flag is False for flag in nonempty),
+            "CDX-12-Regression: Estop-Maske wurde erst NACH dem Flag installiert "
+            "(Sub-Frame-Fenster offen)")
+        # Endzustand korrekt: Flag True + volle Maske.
+        self.assertTrue(self.st.laser_estop_active)
+        self.assertEqual(self.om._laser_estop_mask, {1: frozenset({10, 11, 12, 13})})
+
+    def test_deactivation_clears_flag_before_emptying_mask(self):
+        self.st.set_laser_estop(True)
+        log = self._spy_pushes()
+        self.st.set_laser_estop(False)
+        # Die LEERE Maske wurde gepusht, NACHDEM das Flag False war (fail-safe:
+        # im Fenster ist die alte, nicht-leere Maske noch aktiv → Laser extra dunkel).
+        empty = [flag for (has_mask, flag) in log if not has_mask]
+        self.assertTrue(empty, "keine leere Maske beim Deaktivieren gepusht")
+        self.assertTrue(
+            all(flag is False for flag in empty),
+            "Deaktivierung nicht fail-safe: leere Maske vor Flag=False")
+        self.assertFalse(self.st.laser_estop_active)
+        self.assertEqual(self.om._laser_estop_mask, {})
+
+    def test_interleaving_window_would_open_laser(self):
+        """Kontroll-Nachweis WARUM die Reihenfolge zählt: ein von Hand hergestellter
+        Fenster-Zustand (Flag=True, OM-Maske noch leer) öffnet den Laser trotz
+        NOT-AUS via INVERSE-Modifier. Der Fix (Maske VOR Flag) sorgt dafür, dass
+        genau dieser Zustand über ``set_laser_estop(True)`` nie entsteht."""
+        self.mgr.add(ChannelModifier(universe=1, address=10, curve=CurveType.INVERSE))
+        self.st.programmer = {7: {"laser_bank": 100}}
+        # Fenster-Zustand simulieren: Flag True, Ebene-2-Maske NOCH leer.
+        self.st.laser_estop_active = True
+        self.om.set_laser_estop_mask({})
+        self.st._render_frame(0.02)            # Renderer nullt Puffer (Flag True)
+        self.om._send_all()                    # Modifier hebt 0 → 255, keine Maske
+        self.assertEqual(
+            self._sent(10), 255,
+            "Kontrolle: im offenen Fenster öffnet der Modifier den Laser (genau das "
+            "verhindert der Maske-vor-Flag-Fix)")
+
+    def test_readdressing_during_estop_extends_mask_before_swap(self):
+        """CDX-12 (Plan-Rebuild): wird der Laser bei AKTIVEM NOT-AUS re-adressiert,
+        muss die Ebene-2-Maske die NEUE Adresse abdecken, BEVOR Ebene 1
+        (``_laser_estop_addrs``) unter ``_plan_lock`` darauf umschaltet — sonst
+        deckt die Maske im Rebuild-Fenster nur die alte Adresse, während der
+        Renderer schon die neue nullt, und ein Modifier öffnet die neue Adresse.
+        Fix: vor dem Swap die Maske auf die Vereinigung alt+neu erweitern."""
+        self.st.set_laser_estop(True)
+        self.assertEqual(self.om._laser_estop_mask, {1: frozenset({10, 11, 12, 13})})
+        pushes = []
+        real = self.om.set_laser_estop_mask
+        def spy(mask):
+            pushes.append(set().union(*[set(s) for s in mask.values()]) if mask else set())
+            return real(mask)
+        self.om.set_laser_estop_mask = spy
+        orig_addr = _LASER.address
+        try:
+            _LASER.address = 30            # Laser umadressieren -> Kanäle 30..33
+            self.st._rebuild_render_plan()
+        finally:
+            _LASER.address = orig_addr
+        # Irgendein Push deckte BEIDE die alte (10) UND die neue (30) Adresse ab
+        # (Union), bevor die Maske auf nur-neu verengt wurde.
+        covered_both = [p for p in pushes if 10 in p and 30 in p]
+        self.assertTrue(
+            covered_both,
+            "Rebuild pushte keine Union-Maske (alt+neu) → Ebene-2-Lücke für die neu "
+            "adressierte Laser-Adresse während aktivem NOT-AUS")
+        # Endzustand: Maske deckt die neuen Adressen.
+        self.assertEqual(self.om._laser_estop_mask, {1: frozenset({30, 31, 32, 33})})
+
+
 if __name__ == "__main__":
     unittest.main()

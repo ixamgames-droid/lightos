@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — Laser-Sicherheit: NOT-AUS schließt sein letztes Sub-Frame-Fenster (CDX-12)
+
+#### Behoben
+
+- **Der DMX-Laser-NOT-AUS lässt keinen einzelnen Frame mehr durch, in dem ein Kanal-Modifier den Laser wieder öffnen könnte.** Beim Aktivieren des NOT-AUS wurde bisher erst das Flag gesetzt und dann die Output-seitige Sicherheitsmaske installiert — ein Bildframe genau dazwischen sah den NOT-AUS als aktiv (Renderer stellt den Laser dunkel), fand die zweite Sicherheitsebene aber noch nicht installiert, sodass ein auf einer Laser-Adresse konfigurierter INVERSE-/Range-Lock-Modifier den Laser für diesen einen Frame wieder aufmachte. Der NOT-AUS installiert die Ausgangs-Sicherheitsmaske jetzt **vor** dem Setzen des Flags (Deaktivieren bleibt fail-safe: Flag zuerst, dann Maske leeren — der Laser bleibt lieber einen Frame länger dunkel). Damit ist an jedem Zeitpunkt entweder die Maske aktiv oder der NOT-AUS noch gar nicht scharf — nie ein offenes Fenster. Zusätzlich (aus der adversarialen Safety-Review) wird dieselbe Lücke beim **Umadressieren eines Lasers während aktivem NOT-AUS** geschlossen: die Ausgangs-Sicherheitsmaske deckt jetzt schon die neue Adresse ab, bevor der Renderer auf sie umschaltet. Regressionstests in `tests/test_laser_estop_modifier_bypass.py`.
+
 ### 2026-07-18 — 3D-Visualizer: GPU-Shadow-Map-Leak beim Fixture-Löschen (A3D-07)
 
 #### Behoben
