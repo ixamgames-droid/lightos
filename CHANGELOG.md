@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — DMX-Ausgabe: Art-Net-Startuniversum ist jetzt einstellbar (A3D-15)
+
+#### Behoben
+
+- **Das „Art-Net Startuniversum"-Feld im Ausgabe-Dialog wirkt jetzt tatsächlich** — bisher war es komplett tot: man konnte die externe Art-Net-Universe-Nummer nicht einstellen, LightOS sendete immer hart auf „internes Universum − 1". Jetzt reicht „Übernehmen" den eingestellten Wert an den Sender durch und speichert ihn (überlebt einen Neustart). Das Feld folgt standardmäßig dem internen Universum (− 1), sodass bestehende Setups sich **exakt wie bisher** verhalten, solange man nichts ändert — und eine gespeicherte Wahl wird beim Wiederöffnen angezeigt. Regressionstest `tests/test_a3d15_artnet_start_universe.py`.
+
 ### 2026-07-18 — Neuer Strahler: Clay Paky Sharpy (Beam Moving Head)
 
 #### Neu

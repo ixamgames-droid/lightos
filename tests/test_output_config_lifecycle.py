@@ -43,12 +43,17 @@ class _FakeOutputManager:
         self.calls.append(("add_enttec", int(universe)))
         self._enttec_outputs[int(universe)] = object()
 
-    def add_artnet(self, universe, target_ip="255.255.255.255"):
+    def add_artnet(self, universe, target_ip="255.255.255.255", out_universe=None):
+        # A3D-15: out_universe (externe Art-Net-Universe) muss angenommen werden,
+        # seit _apply_artnet die Startuniversum-Spinbox durchreicht. Format des
+        # calls-Spy unveraendert (2-Tupel), damit bestehende Assertions gelten.
         self.calls.append(("add_artnet", int(universe)))
+        self.last_out_universe = out_universe
         self._artnet_outputs[int(universe)] = object()
 
-    def add_sacn(self, universe, target_ip=None):
+    def add_sacn(self, universe, target_ip=None, out_universe=None):
         self.calls.append(("add_sacn", int(universe)))
+        self.last_out_universe = out_universe
         self._sacn_outputs[int(universe)] = object()
 
     def remove_output(self, universe):
