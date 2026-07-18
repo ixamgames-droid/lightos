@@ -35,22 +35,42 @@ def _save_universe_config(rows: list[dict]) -> None:
         print(f"[output_config] save universes error: {e}")
 
 
-def _persist_output(num: int, output: str, patch: str) -> None:
+_UNSET = object()   # A3D-15: "Argument nicht uebergeben" vs. explizit None unterscheiden.
+
+
+def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> None:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
-    nach einem Neustart weg -> 'es kommt kein Output'."""
+    nach einem Neustart weg -> 'es kommt kein Output'.
+
+    A3D-15: ``out_universe`` = externe Art-Net-/sACN-Universe-Nummer.
+    - ``_UNSET`` (Default) = das Feld NICHT anfassen. Wichtig: Enttec-/sACN-
+      „Übernehmen" rufen ohne Wert und duerfen eine per Universe-Tabelle (OUT-03)
+      gesetzte externe Universe NICHT loeschen (Review-Fund: sonst stiller
+      Datenverlust + falscher Output ueber Neustarts).
+    - ``None`` = explizit entfernen (Art-Net-Default univ-1, leer = Default wie die
+      Tabellen-Spalte).
+    - Wert = setzen. So ueberlebt die im Art-Net-Tab gewaehlte externe Universe
+      einen Neustart (apply_output_config liest sie)."""
     rows = _load_universe_config()
     found = False
     for r in rows:
         if int(r.get("num", -1)) == int(num):
             r["output"] = output
             r["patch"] = patch
+            if out_universe is None:
+                r.pop("out_universe", None)
+            elif out_universe is not _UNSET:
+                r["out_universe"] = int(out_universe)
             found = True
             break
     if not found:
-        rows.append({"num": int(num), "name": f"Universe {num}",
-                     "output": output, "patch": patch})
+        entry = {"num": int(num), "name": f"Universe {num}",
+                 "output": output, "patch": patch}
+        if out_universe is not None and out_universe is not _UNSET:
+            entry["out_universe"] = int(out_universe)
+        rows.append(entry)
     _save_universe_config(rows)
 
 
@@ -113,7 +133,16 @@ class OutputConfigDialog(QDialog):
 
         self._spin_artnet_start_univ = QSpinBox()
         self._spin_artnet_start_univ.setRange(0, 32767)
+        self._spin_artnet_start_univ.setToolTip(
+            'Externe Art-Net-Universe-Nummer für "Übernehmen". Default = '
+            'internes Universum − 1 (abwärtskompatibel).')
         af.addRow("Art-Net Startuniversum:", self._spin_artnet_start_univ)
+        # A3D-15: die externe Universe folgt standardmaessig dem internen Universum
+        # (univ-1 = Alt-Verhalten) bzw. einer bereits gespeicherten Wahl — so setzt
+        # ein unbeabsichtigtes „Übernehmen" nicht still auf Universe 0/eine falsche
+        # Nummer und eine gespeicherte externe Universe wird beim Neuwahl gezeigt.
+        self._spin_artnet_univ.valueChanged.connect(self._sync_artnet_start_univ_default)
+        self._sync_artnet_start_univ_default()
 
         apply_artnet_btn = QPushButton("Übernehmen")
         apply_artnet_btn.clicked.connect(self._apply_artnet)
@@ -305,6 +334,29 @@ class OutputConfigDialog(QDialog):
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
 
+    def _sync_artnet_start_univ_default(self):
+        """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
+        aktuell gewaehlte interne Universum stellen — eine bereits gespeicherte
+        externe Art-Net-Universe, sonst den abwaertskompatiblen Default (univ-1).
+        Verhindert, dass ein „Übernehmen" ohne bewusste Eingabe auf Universe 0
+        (Spinbox-Minimum) setzt, und zeigt eine gespeicherte Wahl nach Reload/
+        Universumswechsel wieder an."""
+        univ = self._spin_artnet_univ.value()
+        persisted = None
+        try:
+            for r in _load_universe_config():
+                if int(r.get("num", -1)) == univ and (r.get("output") or "") == "ArtNet":
+                    v = r.get("out_universe")
+                    if v is not None and str(v).strip() != "":
+                        persisted = int(v)
+                    break
+        except (ValueError, TypeError):
+            persisted = None
+        target = persisted if persisted is not None else max(0, univ - 1)
+        self._spin_artnet_start_univ.blockSignals(True)
+        self._spin_artnet_start_univ.setValue(target)
+        self._spin_artnet_start_univ.blockSignals(False)
+
     def _apply_artnet(self):
         univ = self._spin_artnet_univ.value()
         state = get_state()
@@ -328,10 +380,27 @@ class OutputConfigDialog(QDialog):
         # bleibt bei einem Cross-Typ-Wechsel (z. B. Enttec->ArtNet) der alte Adapter
         # aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
         state.output_manager.remove_output(univ)
-        state.output_manager.add_artnet(univ, ip)
+        # A3D-15: externe Art-Net-Universe aus der (bisher toten) Startuniversum-
+        # Spinbox durchreichen. Weicht sie NICHT vom Default (univ-1) ab -> None,
+        # damit der Send-Pfad den abwaertskompatiblen Default (univ_num-1) nutzt und
+        # universes.json sauber bleibt (Konvention "leer = Default", wie die Tabelle).
+        start = self._spin_artnet_start_univ.value()
+        out_u = start if start != univ - 1 else None
+        state.output_manager.add_artnet(univ, ip, out_universe=out_u)
         self._artnet_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
-        _persist_output(univ, "ArtNet", ip)
-        self._lbl_artnet_status.setText(f"Aktiv → {ip} · Universe {univ} (gespeichert)")
+        _persist_output(univ, "ArtNet", ip, out_universe=out_u)
+        # A3D-15 (Review-Fund #2): die Universe-Tabelle wurde nur beim Setup gefuellt
+        # und kennt die eben persistierte externe Universe nicht -> ein spaeteres
+        # „Speichern" im Universen-Tab wuerde sie aus der (stalen, leeren) Ext-Zelle
+        # ueberschreiben. Tabelle neu laden, damit die Ext-Zelle den aktuellen Stand
+        # zeigt und Tab und Datei konsistent bleiben.
+        try:
+            self._univ_load_table()
+        except Exception:
+            pass
+        _ext_txt = f" → Art-Net-Universe {start}" if out_u is not None else ""
+        self._lbl_artnet_status.setText(
+            f"Aktiv → {ip} · Universe {univ}{_ext_txt} (gespeichert)")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
 

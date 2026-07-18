@@ -36,8 +36,9 @@ class TestOutputConfigPerUniverseApply(unittest.TestCase):
         self.fake_state.universes = {1: object(), 2: object(), 3: object()}
         oc.get_state = lambda: self.fake_state
         self.persist_calls = []
-        oc._persist_output = lambda num, output, patch: self.persist_calls.append(
-            (num, output, patch))
+        # A3D-15: _persist_output nimmt jetzt optional out_universe (Startuniversum).
+        oc._persist_output = lambda num, output, patch, out_universe=None: \
+            self.persist_calls.append((num, output, patch))
         self.dlg = oc.OutputConfigDialog()
 
     def tearDown(self):
@@ -51,7 +52,7 @@ class TestOutputConfigPerUniverseApply(unittest.TestCase):
         self.dlg._edit_artnet_ip.setText("10.0.0.5")
         self.dlg._apply_artnet()
         # NUR Universum 2 belegt — genau EIN add_artnet, nicht drei.
-        self.fake_om.add_artnet.assert_called_once_with(2, "10.0.0.5")
+        self.fake_om.add_artnet.assert_called_once_with(2, "10.0.0.5", out_universe=None)
         self.assertEqual(self.persist_calls, [(2, "ArtNet", "10.0.0.5")])
         # Universum 2 existiert bereits -> es wird nicht neu angelegt.
         self.fake_om.add_universe.assert_not_called()
@@ -78,7 +79,7 @@ class TestOutputConfigPerUniverseApply(unittest.TestCase):
         self.dlg._check_artnet.setChecked(True)
         self.dlg._apply_artnet()
         self.fake_om.add_universe.assert_called_once_with(9)
-        self.fake_om.add_artnet.assert_called_once_with(9, "255.255.255.255")
+        self.fake_om.add_artnet.assert_called_once_with(9, "255.255.255.255", out_universe=None)
 
 
 if __name__ == "__main__":
