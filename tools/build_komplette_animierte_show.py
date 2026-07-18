@@ -39,13 +39,14 @@ def main():
     b = ShowBuilder(reset=True)
 
     # ---- 1) PATCH ----
-    par_fids = b.patch("ZQ01424",    count=8, channel_count=8,  mode_name="8-Kanal RGBW",        universe=1)
-    mh_fids  = b.patch("MH16",       count=4, channel_count=16, mode_name="16-Kanal",             universe=1, label="Gobo-MH")
-    las_fids = b.patch("L2600LASER", count=4, channel_count=6,  mode_name="6-Kanal (Simple DMX)", universe=2)
-    fog_fids = b.patch("EURON10",    count=2, channel_count=1,  mode_name="1-Kanal (Nebel)",      universe=2, label="Nebel")
-    all_fids = par_fids + mh_fids + las_fids + fog_fids
+    par_fids  = b.patch("ZQ01424",    count=8, channel_count=8,  mode_name="8-Kanal RGBW",          universe=1)
+    mh_fids   = b.patch("MH16",       count=4, channel_count=16, mode_name="16-Kanal",               universe=1, label="Gobo-MH")
+    beam_fids = b.patch("SHARPY",     count=4, channel_count=16, mode_name="16-Kanal (Standard)",    universe=1, label="Beam")
+    las_fids  = b.patch("L2600LASER", count=4, channel_count=6,  mode_name="6-Kanal (Simple DMX)",   universe=2)
+    fog_fids  = b.patch("EURON10",    count=2, channel_count=1,  mode_name="1-Kanal (Nebel)",        universe=2, label="Nebel")
+    all_fids = par_fids + mh_fids + beam_fids + las_fids + fog_fids
     print(f"[patch] {len(all_fids)} Fixtures: PAR={len(par_fids)} MH={len(mh_fids)} "
-          f"Laser={len(las_fids)} Fog={len(fog_fids)}")
+          f"Beam={len(beam_fids)} Laser={len(las_fids)} Fog={len(fog_fids)}")
 
     # ---- 2) GRUPPEN ----
     def _grp(session, name, fids):
@@ -55,6 +56,7 @@ def main():
     with Session(b.state._show_engine) as s:
         _grp(s, "PARs", par_fids)
         _grp(s, "Moving Heads (Gobo)", mh_fids)
+        _grp(s, "Beams (Sharpy)", beam_fids)
         _grp(s, "Laser", las_fids)
         _grp(s, "Nebel", fog_fids)
         s.commit()
@@ -103,6 +105,36 @@ def main():
                 sc.fn.set_value(fid, di, 255)
         color_fx.fn.steps.append(ChaserStep(function_id=sc.fn.id, fade_in=0.15, hold=0.6, fade_out=0.15))
 
+    # Beams (Sharpy): eigene Bewegungs-Achse — enge Aerial-Beams als Fan/Kreis,
+    # dazu Farbrad-Chase mit eingelegtem 8-Fach-Prisma. Shutter ist per Default
+    # offen (Sharpy-Builtin 106); "Beam an" oeffnet ihn explizit + zieht den Dimmer.
+    beam_circle = b.efx("Beam Fan", EfxAlgorithm.CIRCLE, fixtures=beam_fids)
+
+    beam_on = b.scene("Beam an")
+    for fid in beam_fids:
+        di = ch[fid].get("intensity") or ch[fid].get("dimmer")
+        sh = ch[fid].get("shutter")
+        if di is not None:
+            beam_on.fn.set_value(fid, di, 255)
+        if sh is not None:
+            beam_on.fn.set_value(fid, sh, 106)          # offen (0-3 waere zu)
+
+    beam_color = b.chaser("Beam Farbrad")
+    beam_color.fn.run_order = RunOrder.Loop
+    for cval in (7, 31, 63, 79, 111):                   # Rot, Gruen, Gelb, Cyan, Blau
+        sc = b.scene(f"Beam Farbe {cval}")
+        for fid in beam_fids:
+            cw = ch[fid].get("color_wheel")
+            di = ch[fid].get("intensity") or ch[fid].get("dimmer")
+            pr = ch[fid].get("prism")
+            if cw is not None:
+                sc.fn.set_value(fid, cw, cval)
+            if di is not None:
+                sc.fn.set_value(fid, di, 255)
+            if pr is not None:
+                sc.fn.set_value(fid, pr, 200)           # 8-Fach-Prisma eingelegt (Fan)
+        beam_color.fn.steps.append(ChaserStep(function_id=sc.fn.id, fade_in=0.1, hold=0.7, fade_out=0.1))
+
     par_run = b.chaser("PAR Lauflicht")
     par_run.fn.run_order = RunOrder.Loop
     for fid in par_fids:
@@ -144,6 +176,10 @@ def main():
     _btn("PAR Lauflicht", par_run,    920, "pulse")
     _btn("PAR Strobe",   par_strobe, 1070, "strobe")
     _btn("Nebel an",     fog_scene,  1220, "breathe_rgb")
+    # Zweite Reihe (rechts der Slider): Beam-Sharpy-Buttons.
+    _btn("Beam an",      beam_on,     400, "hot_white",   y=94)
+    _btn("Beam Fan",     beam_circle, 560, "beam_sweep",  y=94)
+    _btn("Beam Farbrad", beam_color,  720, "color_wheel", y=94)
 
     b_black = b.button("BLACKOUT", action=ButtonAction.BLACKOUT, bank=0)   # bewusst ohne Bild (klar erkennbar)
     b_black.setGeometry(1370, 20, 140, 64)
@@ -161,6 +197,7 @@ def main():
     # ---- 5) STAGE ----
     sd = StageDefinition(name=STAGE_NAME)
     front = sd.add("truss_h", x=0, y=5.5, z=2.6,  w=12, h=0.3, d=0.3, name="Front-Traverse")
+    mid   = sd.add("truss_h", x=0, y=5.8, z=0.0,  w=12, h=0.3, d=0.3, name="Mittel-Traverse")
     back  = sd.add("truss_h", x=0, y=5.5, z=-2.6, w=12, h=0.3, d=0.3, name="Back-Traverse")
     for sx in (-6, 6):
         for sz in (2.6, -2.6):
@@ -196,6 +233,8 @@ def main():
         pos[fid] = (x, 5.1, 2.6); dock[fid] = front.id
     for fid, x in zip(mh_fids, _spread(len(mh_fids), -4.5, 4.5)):
         pos[fid] = (x, 5.1, -2.6); dock[fid] = back.id
+    for fid, x in zip(beam_fids, _spread(len(beam_fids), -4.5, 4.5)):
+        pos[fid] = (x, 5.4, 0.0); dock[fid] = mid.id
     for fid, x in zip(las_fids, _spread(len(las_fids), -3.5, 3.5)):
         pos[fid] = (x, 5.9, -2.6); dock[fid] = back.id
     for fid, x in zip(fog_fids, (-6.0, 6.0)):

@@ -80,6 +80,9 @@ ATTR_LABELS: dict[str, str] = {
     "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
     "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
     "animation": "Animation", "fan": "Lüfter",
+    # Control-Kanaele (z. B. Clay Paky Sharpy Reset/Lampe) — landen ueber
+    # classify_attr in "Other" (kein Substring-Treffer). Safety: default 0.
+    "reset": "Reset", "lamp": "Lampe",
     "laser_boundary": "Grenzverhalten", "laser_bank": "Musterbank",
     "laser_x": "X-Bewegung", "laser_y": "Y-Bewegung",
     "laser_zoom_x": "X-Zoom", "laser_zoom_y": "Y-Zoom",

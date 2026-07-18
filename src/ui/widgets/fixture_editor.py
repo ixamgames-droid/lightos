@@ -34,7 +34,7 @@ CHANNEL_ATTRS = [
     "laser_zoom_y", "laser_color", "laser_color_change", "laser_dots",
     "laser_draw", "laser_draw_mode", "laser_twist", "laser_grating",
     "laser_scan_rate",
-    "reset", "raw",
+    "reset", "lamp", "raw",
 ]
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]
