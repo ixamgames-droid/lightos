@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — 3D-Visualizer startet auf Linux (QtWebEngine-Sandbox-Fallback, XPLAT-01)
+
+#### Behoben
+
+- **Der 3D-Visualizer bleibt auf Linux nicht mehr schwarz.** `_setup_webengine_diagnostics()` (`main.py`) setzte nur Anti-Drossel-Flags, aber keine Chromium-Sandbox-Flags. Auf verbreiteten Linux-Setups (pip-PySide6-Wheels ohne setuid `chrome-sandbox`, Container/Docker, root) startet der Chromium-Renderprozess von QtWebEngine dann nicht → die eingebettete `QWebEngineView` bleibt schwarz (`renderProcessTerminated`, der Auto-Reload-Guard loopt nur). **Fix:** auf Linux werden jetzt `--no-sandbox --disable-gpu-sandbox` an die WebEngine-Flags angehängt (neue reine Helfer-Funktion `_webengine_sandbox_flags`). **Abwahl für korrekt aufgesetzte Distros** (setuid `chrome-sandbox` vorhanden): `LIGHTOS_WEBENGINE_NO_SANDBOX` auf einen falsy-Wert (`0`/`false`/`no`/`off`) setzen, oder selbst ein `sandbox`-Flag über `LIGHTOS_WEBENGINE_FLAGS` setzen (eigene Wahl hat Vorrang). **Windows/macOS bleiben komplett unberührt** (hinter `sys.platform`-Weiche — WinARM-Regression: keine). Neue Tests `tests/test_webengine_linux_sandbox.py`.
+
 ### 2026-07-18 — Playback: Cue-Umnummerieren desynct keine laufende Cueliste mehr (ENG-13)
 
 #### Behoben
