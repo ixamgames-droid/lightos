@@ -172,6 +172,15 @@ class AppState:
         # show_file.py). Einfaches plain-list-Attribut wie live_view_meta,
         # kein SceneGraph-Backing (keine Fixture-Topologie).
         self.visualizer_named_cameras: list = []
+        # VIZ-LABELS: globaler Schalter, ob die Fixture-Namens-Labels ("#<fid>
+        # <Name>"-Sprites) im 3D-Visualizer sichtbar sind. EINE Quelle fuer alle
+        # 3D-Ansichten (eingebettete Live-View-3D, Pop-out-Fenster, volles
+        # VisualizerWindow) — jede liest den Wert in ihrem _collect_settings() und
+        # schreibt ihn bei ihrem Toggle, damit die UIs nicht auseinanderlaufen.
+        # Reine View-Praeferenz: bewusst NICHT in der .lshow persistiert (wie
+        # brightness/showCones — transient, Default beim Start). Default AN
+        # (heutiges Verhalten: Labels innerhalb 28 m sichtbar).
+        self.show_fixture_labels: bool = True
         self._patch_cache: list[PatchedFixture] = []
         # Basis-Level pro Fixture: {fid: {attr: 0-255}}. Wird in den Default-Frame
         # gelegt (siehe _rebuild_render_plan) und mit der Show gespeichert. Typisch:

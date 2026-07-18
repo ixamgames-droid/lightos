@@ -67,6 +67,7 @@ export const settings = {
   brightness: 0.20,        // 0.0 = pitch black, 1.0 = bright daylight
   autoBrightness: true,    // auto-bump brightness when in edit modes
   dockEnabled: false,      // opt-in: Strahler rasten an Trassen/Plattformen ein
+  showLabels: true,        // VIZ-LABELS: Fixture-Namens-Sprites ein-/ausblenden (Toolbar-Toggle)
 };
 
 // ----------------------------------------------------------------------------

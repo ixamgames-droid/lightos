@@ -167,6 +167,11 @@ export function applySettings(s) {
   // Kein eigener Bridge-Vertrag noetig (Design-Dokument (c) "FPS-Debug-
   // Toggle") - reist additiv im bestehenden settingsChanged-JSON mit.
   if (typeof s.fpsVisible === 'boolean') setFpsVisible(s.fpsVisible);
+  // VIZ-LABELS: Fixture-Namens-Sprites global ein-/ausblenden. Reine Flag-
+  // Mutation — die tatsaechliche Sichtbarkeit setzt der Per-Frame-Gate
+  // (updateLabelZoomVisibility, app.js) im durch requestRender() unten
+  // ohnehin ausgeloesten Frame. Additiv im settingsChanged-JSON (wie fpsVisible).
+  if (typeof s.showLabels === 'boolean') settings.showLabels = s.showLabels;
   for (const fid in fixtures) {
     const f = fixtures[fid];
     if (f.beam) f.beam.visible = settings.showCones && (view.mode === '3D') && f.beam.material.opacity > 0.01;

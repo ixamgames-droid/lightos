@@ -1556,13 +1556,30 @@ class LiveView(QWidget):
         von Strahlern; das Bauen der Buehne bleibt dem separaten 3D-Editor-
         Fenster vorbehalten. Die 3D-View wird beim ersten Umschalten lazy erzeugt.
         """
+        # VIZ-POPOUT: ist die 3D-Ansicht bereits in ein eigenes Fenster
+        # ausgeklinkt, KEIN zweites eingebettetes GL-Fenster oeffnen (GPU-
+        # Invariante: nur EINE WebGL-Szene gleichzeitig). Stattdessen in 2D
+        # bleiben und das Pop-out nach vorne holen.
+        if on and self._viz_popout is not None:
+            self._view_stack.setCurrentWidget(self._page2d)
+            self._btn_view2d.setChecked(True)
+            self._btn_view3d.setChecked(False)
+            try:
+                self._viz_popout.raise_()
+                self._viz_popout.activateWindow()
+            except Exception:
+                pass
+            return
         self._btn_view2d.setChecked(not on)
         self._btn_view3d.setChecked(on)
         if on:
             if self._viz3d is None:
                 try:
                     from src.ui.visualizer.visualizer_view import Visualizer3DView
-                    self._viz3d = Visualizer3DView(self)
+                    # show_popout_button=True: nur die eingebettete View bietet das
+                    # Ausklinken an (das Pop-out-Fenster selbst braucht es nicht).
+                    self._viz3d = Visualizer3DView(self, show_popout_button=True)
+                    self._viz3d.popOutRequested.connect(self._pop_out_3d)
                     self._view_stack.addWidget(self._viz3d)   # index 1
                 except Exception as e:
                     print(f"[live_view] 3D-Ansicht nicht verfügbar: {e}")
@@ -1583,7 +1600,7 @@ class LiveView(QWidget):
                     self._viz3d.on_hidden()
                 except Exception:
                     pass
-            self._view_stack.setCurrentWidget(self._scroll)
+            self._view_stack.setCurrentWidget(self._page2d)
             try:
                 self._minimap.show()
             except Exception:
@@ -1592,6 +1609,113 @@ class LiveView(QWidget):
             # Verschiebungen (Live View ist die Quelle der Top-Down-Positionen).
             try:
                 self._canvas._reload_positions_safe()
+            except Exception:
+                pass
+
+    # ── VIZ-POPOUT: 3D-Ansicht ausklinken / andocken ────────────────────────
+    def _build_popout_banner(self) -> QFrame:
+        """Schmaler Hinweis-Balken oben in der 2D-Seite, sichtbar nur solange die
+        3D-Ansicht ausgeklinkt ist. Bietet den sichtbaren Rueckhol-Weg (zweiter
+        Weg: Pop-out-Fenster schliessen)."""
+        bar = QFrame()
+        bar.setStyleSheet(
+            "QFrame { background:#14263a; border-bottom:1px solid #2a4a6a; }"
+            "QLabel { color:#9acbff; font-size:12px; }"
+            "QPushButton { background:#1f6feb; color:#fff; border:none;"
+            " border-radius:4px; padding:5px 12px; font-size:12px; }"
+            "QPushButton:hover { background:#3b82f6; }"
+        )
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(10, 6, 10, 6)
+        lay.addWidget(QLabel("🧊 3D läuft im separaten Fenster (Zweitmonitor)."))
+        lay.addStretch()
+        btn = QPushButton("⇲ Zurückholen")
+        btn.setToolTip("3D-Fenster schließen und wieder hier einbetten")
+        btn.clicked.connect(weak_slot(self._redock_popout))
+        lay.addWidget(btn)
+        return bar
+
+    def _pop_out_3d(self):
+        """Eingebettete 3D-Ansicht in ein eigenes Fenster loesen (Zweitmonitor).
+        Bereits offen -> nur nach vorne holen. Sonst: ZUERST das Pop-out-Fenster
+        bauen (das kann bei WebEngine/GL-Init fehlschlagen) und ERST bei Erfolg
+        die eingebettete View auf 2D zuruecknehmen (GPU-Invariante: nur EINE
+        GL-Szene) + Banner zeigen. Scheitert der Bau, bleibt die eingebettete
+        3D-Ansicht stehen und der Nutzer bekommt einen sichtbaren Hinweis statt
+        still in einer nackten 2D-Ansicht zu landen (Review-Fix)."""
+        if self._viz_popout is not None:
+            try:
+                self._viz_popout.raise_()
+                self._viz_popout.activateWindow()
+            except Exception:
+                pass
+            return
+        try:
+            from src.ui.visualizer.visualizer_view import VisualizerPopoutWindow
+            # Als Sekundaerfenster des Hauptfensters: frei auf einen zweiten
+            # Monitor ziehbar, aber an die App-Lebenszeit gebunden (blockiert den
+            # App-Exit nicht, wird beim Beenden mit abgeraeumt). Noch NICHT gezeigt
+            # -> Page-Visibility 'hidden' -> rAF gedrosselt, rendert noch nicht.
+            win = VisualizerPopoutWindow(self.window())
+        except Exception as e:
+            print(f"[live_view] Pop-out-Fenster-Fehler: {e}")
+            try:
+                self._set_status("3D-Fenster konnte nicht geöffnet werden — Ansicht bleibt eingebettet.")
+            except Exception:
+                pass
+            return
+        # Fenster steht -> jetzt die eingebettete 3D-View auf 2D zuruecknehmen
+        # (on_hidden: Target inaktiv + dispose) und das Pop-out zeigen; so rendert
+        # nur die Pop-out-Szene.
+        self._set_view_3d(False)
+        self._viz_popout = win
+        try:
+            win.closed.connect(weak_slot(self._on_popout_closed))
+            win.show()
+            win.raise_()
+            win.activateWindow()
+        except Exception as e:
+            print(f"[live_view] Pop-out-Show-Fehler: {e}")
+        try:
+            self._popout_banner.show()
+        except Exception:
+            pass
+
+    def _on_popout_closed(self):
+        """Dock-back-Einstieg: Pop-out geschlossen (X-Knopf, Banner-Button, App-
+        Ende). Banner weg + Referenz loesen SOFORT; das eigentliche Wieder-
+        Andocken wird per singleShot AUS dem synchronen closeEvent-Pfad des
+        Pop-outs geloest, damit das Fenster sicher versteckt/compositor-
+        suspendiert ist, bevor die eingebettete Szene wieder rendert (Review-Fix
+        Reentrancy)."""
+        self._viz_popout = None
+        try:
+            self._popout_banner.hide()
+        except Exception:
+            pass
+        QTimer.singleShot(0, self._redock_after_popout)
+
+    def _redock_after_popout(self):
+        """Deferred Dock-back: eingebettete 3D-Ansicht wieder einblenden — aber
+        nur AKTIV schalten, wenn der Live-View-Tab ueberhaupt sichtbar ist. Sonst
+        wuerde on_shown das Service-Target trotz verborgenem Tab aktivieren
+        (Umgehung des Sichtbarkeits-Gates, Review-Fix)."""
+        if self._viz_popout is not None:
+            return   # zwischenzeitlich erneut ausgeklinkt
+        self._set_view_3d(True)
+        # Sichtbarkeits-Gate idempotent nachziehen: verborgener Tab -> das gerade
+        # aktivierte 3D-Target wieder deaktivieren.
+        try:
+            self._set_views_active(self.isVisible())
+        except Exception:
+            pass
+
+    def _redock_popout(self):
+        """Banner-Button '⇲ Zurückholen': schliesst das Pop-out — der closeEvent
+        laeuft ueber _on_popout_closed (gemeinsamer Dock-back-Pfad)."""
+        if self._viz_popout is not None:
+            try:
+                self._viz_popout.close()
             except Exception:
                 pass
 
@@ -1826,11 +1950,26 @@ class LiveView(QWidget):
             "QScrollArea { border: none; background: #0d1117; }"
         )
 
-        # QStackedWidget: Seite 0 = 2D-Canvas, Seite 1 = eingebettete 3D-Ansicht
-        # (lazy erzeugt beim ersten Umschalten auf 3D).
+        # VIZ-POPOUT: 2D-Seite = Banner (verborgen) ueber dem Canvas. Der Banner
+        # erscheint nur, waehrend die 3D-Ansicht in ein eigenes Fenster ausgeklinkt
+        # ist, und bietet einen sichtbaren Weg zurueck (der zweite Weg: Pop-out-
+        # Fenster schliessen). So bleibt der 2D-Ueberblick auf Monitor 1, waehrend
+        # die 3D-Schoenheit auf Monitor 2 laeuft.
+        self._page2d = QWidget()
+        _p2 = QVBoxLayout(self._page2d)
+        _p2.setContentsMargins(0, 0, 0, 0)
+        _p2.setSpacing(0)
+        self._popout_banner = self._build_popout_banner()
+        self._popout_banner.hide()
+        _p2.addWidget(self._popout_banner)
+        _p2.addWidget(self._scroll, 1)
+
+        # QStackedWidget: Seite 0 = 2D-Canvas(+Banner), Seite 1 = eingebettete
+        # 3D-Ansicht (lazy erzeugt beim ersten Umschalten auf 3D).
         self._view_stack = QStackedWidget()
-        self._view_stack.addWidget(self._scroll)        # index 0
+        self._view_stack.addWidget(self._page2d)        # index 0
         self._viz3d = None                              # type: ignore[assignment]
+        self._viz_popout = None                         # aktives Pop-out-Fenster (VIZ-POPOUT)
         mid.addWidget(self._view_stack, 1)
 
         # Minimap als schwebende Overlay-Widget im Viewport

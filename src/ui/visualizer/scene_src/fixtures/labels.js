@@ -8,6 +8,7 @@
 // s. render_loop.js). Sprite-`sizeAttenuation` (Default true) = feste Weltgroesse ->
 // Labels schrumpfen beim Rauszoomen = Auto-Declutter (die "ab Zoomstufe"-Vorgabe).
 import * as THREE from '../three/three.js';
+import { settings } from '../state.js';  // VIZ-LABELS: globaler showLabels-Toggle
 
 const _LABEL_COLOR = '#cfe3ff';
 const _CANVAS_W = 256, _CANVAS_H = 64;
@@ -59,7 +60,9 @@ export function disposeFixtureLabel(sprite) {
 }
 
 function _visibleFor(f, camPos, show3d) {
-  return show3d && camPos.distanceTo(f.group.position) < _LABEL_MAX_DIST;
+  // VIZ-LABELS: globaler Toggle hat Vorrang — aus = alle Labels aus (ohne dass
+  // die Sprites disposed werden; ein Re-Toggle blendet sie sofort wieder ein).
+  return show3d && settings.showLabels && camPos.distanceTo(f.group.position) < _LABEL_MAX_DIST;
 }
 
 // Zoom-/Distanz-Gate, aus app.js#perFrameUpdate JEDEN rAF-Tick gerufen. Setzt die

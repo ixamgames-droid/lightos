@@ -50,7 +50,12 @@ class _Toggle3DStub:
         self._btn_view2d = _Btn()
         self._btn_view3d = _Btn()
         self._viz3d = viz
+        # VIZ-POPOUT: die 2D-Seite ist jetzt der Container ``_page2d`` (Banner +
+        # Canvas) statt direkt ``_scroll``; ``_viz_popout`` ist None solange nicht
+        # ausgeklinkt (der Guard in _set_view_3d fragt es ab).
+        self._page2d = object()
         self._scroll = object()
+        self._viz_popout = None
         self._view_stack = _Stack()
         self._minimap = SimpleNamespace(hide=lambda: None, show=lambda: None)
         self._reloaded = False
@@ -80,7 +85,7 @@ def test_toggle_back_to_2d_reloads_canvas_and_pauses_3d():
     s = _Toggle3DStub(viz)
     s._set_view_3d(True)
     s._set_view_3d(False)
-    assert s._view_stack.current is s._scroll
+    assert s._view_stack.current is s._page2d   # 2D-Seite (Container mit Banner+Canvas)
     assert s._reloaded is True            # 2D-Canvas neu geladen (spiegelt 3D-Moves)
     assert calls["hidden"] == 1           # 3D-Timer pausiert
     assert s._btn_view2d.isChecked() and not s._btn_view3d.isChecked()
