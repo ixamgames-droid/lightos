@@ -516,8 +516,11 @@ class PlaybackView(QWidget):
                 new_num = round(float(val.replace(",", ".")), 3)
                 if not any(abs(c.number - new_num) < 0.001 and c is not cue
                            for c in self._current_stack.cues):
-                    cue.number = new_num
-                    self._current_stack.cues.sort(key=lambda c: c.number)
+                    # ENG-13: NICHT cue.number direkt setzen + cues.sort() — das umging
+                    # _reindex_after_mutation und liess _current_idx einer laufenden
+                    # Cueliste auf die falsche Cue zeigen (Replay/Skip) + lief ohne Lock
+                    # gegen den Engine-Tick-Thread. renumber_cue macht beides konsistent.
+                    self._current_stack.renumber_cue(cue, new_num)
                 self._refresh_table()
                 return
             if col == 1:

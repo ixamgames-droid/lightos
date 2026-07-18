@@ -1,5 +1,6 @@
 """CueStack — Führt eine Cueliste aus mit Crossfades."""
 from __future__ import annotations
+import math
 import threading
 import time
 from typing import Callable, Optional
@@ -424,6 +425,28 @@ class CueStack:
         # Neue Nummer -> einsortieren. add_cue nimmt selbst den (nicht-reentranten)
         # Lock, daher AUSSERHALB des with-Blocks aufrufen.
         self.add_cue(cue)
+
+    def renumber_cue(self, cue: Cue, new_number: float):
+        """ENG-13: Die Nummer EINER bereits eingelisteten Cue aendern und die Liste
+        konsistent neu sortieren. MUSS ueber diese API laufen — ``cue.number`` von
+        aussen setzen + ``cues.sort()`` (wie der Playback-Editor es frueher tat) umging
+        die einzige konsistenz-wahrende Stelle: nur ``_reindex_after_mutation`` fuehrt
+        ``_current_idx``/``_manual_target`` einer LAUFENDEN Cueliste identitaets-treu
+        nach (sonst zeigt der Index nach dem Re-Sort auf die falsche Cue -> Replay/Skip),
+        und das ``_lock`` serialisiert die Mutation gegen den Engine-Tick-Thread."""
+        try:
+            num = round(float(new_number), 3)
+        except (TypeError, ValueError):
+            return
+        # NaN/inf wuerde die Sortierung undefiniert machen (und ist ueber go_to eh nie
+        # erreichbar) -> verwerfen statt die Liste zu korrumpieren.
+        if not math.isfinite(num):
+            return
+        with self._lock:
+            active = self._active_cue_obj()
+            cue.number = num
+            self.cues.sort(key=lambda c: c.number)
+            self._reindex_after_mutation(active)
 
     # ── Tick (wird von Engine-Timer aufgerufen) ───────────────────────────────
 
