@@ -187,5 +187,72 @@ class ManualCrossfadeTargetIdentityTest(unittest.TestCase):
         self.assertEqual(s.current_cue.number, 3.0)
 
 
+class RenumberReindexTest(unittest.TestCase):
+    """ENG-13: eine Cue-Nummer live aendern (Playback-Editor) MUSS ueber
+    renumber_cue laufen. Direktes cue.number=+cues.sort() von aussen umging
+    _reindex_after_mutation -> _current_idx einer laufenden Cueliste zeigte nach
+    dem Re-Sort auf die falsche Cue (Replay/Skip)."""
+
+    def _stack(self):
+        s = CueStack("s")
+        for i in (1, 2, 3):
+            s.add_cue(_cue(i, values={i: {"intensity": i * 10}}))
+        return s
+
+    def test_renumber_active_cue_stays_current_by_identity(self):
+        s = self._stack()
+        s.go(); s.go()                          # aktiv: Cue 2.0 (idx 1)
+        active = s.current_cue
+        self.assertEqual(active.number, 2.0)
+        s.renumber_cue(active, 5.0)             # 2.0 -> 5.0 rutscht ans Ende
+        self.assertIs(s.current_cue, active)    # dieselbe Cue bleibt aktiv (Identitaet)
+        self.assertEqual(s.current_cue.number, 5.0)
+        self.assertEqual(s.current_index, 2)    # Index folgt der neuen Position
+
+    def test_renumber_other_before_active_shifts_index(self):
+        s = self._stack()
+        s.go(); s.go()                          # aktiv: Cue 2.0 (idx 1)
+        active = s.current_cue
+        other = next(c for c in s.cues if c.number == 3.0)
+        s.renumber_cue(other, 0.5)              # 3.0 -> 0.5, rutscht VOR die aktive Cue
+        self.assertIs(s.current_cue, active)    # aktiv bleibt DIESELBE Cue …
+        self.assertEqual(s.current_cue.number, 2.0)
+        self.assertEqual(s.current_index, 2)    # … Index von 1 auf 2 nachgefuehrt
+        s.go()                                  # kein Replay von 2.0 -> bleibt am Ende
+        self.assertEqual(s.current_cue.number, 2.0)
+
+    def test_renumber_follows_manual_crossfade_target(self):
+        # Wie die A3D-16-Tests, aber die Verschiebung kommt von renumber_cue:
+        # der armierte Ziel-Anker muss identitaets-treu nachgefuehrt werden.
+        # (Werte auf fid 1 gekeyt, damit der Output pruefbar ist.)
+        s = CueStack("s")
+        s.add_cue(_cue(1, values={1: {"intensity": 10}}))
+        s.add_cue(_cue(2, values={1: {"intensity": 20}}))
+        s.add_cue(_cue(3, values={1: {"intensity": 30}}))
+        s.go()                                  # aktiv Cue 1.0
+        s.tick()
+        self.assertFalse(s.manual_crossfade(0.5))       # armiert Ziel = Cue 2.0
+        other = next(c for c in s.cues if c.number == 3.0)
+        s.renumber_cue(other, 1.5)              # 3.0 -> 1.5 schiebt Cue 2.0 einen Index weiter
+        self.assertTrue(s.manual_crossfade(1.0))        # Commit
+        self.assertEqual(s.current_cue.number, 2.0)     # ORIGINAL-Ziel getroffen
+        self.assertEqual(s.get_output()[1]["intensity"], 20)
+
+    def test_renumber_rejects_non_finite(self):
+        # NaN/inf (z. B. aus "nan" in der Nummern-Zelle) darf die Liste nicht
+        # korrumpieren -> Mutation wird verworfen, Zustand bleibt konsistent.
+        s = self._stack()
+        s.go(); s.go()                          # aktiv Cue 2.0
+        active = s.current_cue
+        before = [c.number for c in s.cues]
+        s.renumber_cue(active, float("nan"))
+        self.assertEqual([c.number for c in s.cues], before)   # unveraendert
+        self.assertIs(s.current_cue, active)
+        self.assertEqual(s.current_cue.number, 2.0)
+        s.renumber_cue(active, float("inf"))
+        self.assertEqual([c.number for c in s.cues], before)
+        self.assertEqual(s.current_cue.number, 2.0)
+
+
 if __name__ == "__main__":
     unittest.main()
