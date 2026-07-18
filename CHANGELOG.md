@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — VC-Asset-Cache wächst nicht mehr unbegrenzt (VC-IMG-GC)
+
+#### Behoben
+
+- **Der lokale Cache für VC-Button-Hintergrundbilder/GIFs (`%APPDATA%/LightOS/vc_assets/`) wird jetzt gedeckelt.** Bisher entpackte `load_show` die eingebetteten Assets jeder geladenen Show dorthin, räumte aber nie etwas lokal weg — über viele Shows (oder eine bösartig große `.lshow`) wuchs der Ordner unbegrenzt (reine Disk-Hygiene, kein Absturz/Traversal). Neu räumt `vc_assets.prune` verwaiste Assets per LRU (ältestes Änderungsdatum zuerst) weg, sobald der Cache den weichen Deckel (Default 256 MB, per `LIGHTOS_VC_ASSET_CACHE_MB` einstellbar) überschreitet — aufgerufen aus `load_show`. **Sicherheits-Invarianten:** die vom aktuell geladenen Show referenzierten Assets werden nie gelöscht (live sichtbare Buttons behalten ihr Bild); frisch geschriebene Dateien (< 5 min) werden nie evictet, damit eine **parallele** LightOS-/Test-Session, die sich denselben Cache teilt, ihre gerade entpackten Assets nicht verliert; ein Windows-Dateilock (laufendes QMovie/QPixmap) oder eine parallel schon gelöschte Datei bricht den Lauf per Pro-Datei-`try/except` nicht ab; verwaiste `.tmp`-Reste abgebrochener Schreibvorgänge werden mitentsorgt. Löschen ist verlustfrei — ein wieder geöffnetes Show entpackt seine Assets ohnehin erneut aus dem ZIP. Neue Tests `tests/test_vc_asset_gc.py`.
+- **Zugleich abgesichert (adversariale Review dieses PRs, Cross-Session-Fokus):** (1) **`save_show` ist jetzt ein verlustfreier Round-Trip** — fehlt ein referenziertes Asset im Cache (z. B. weil eine parallele Session es gerade evictet hat), übernimmt der Save die Bytes aus der bestehenden `.lshow`, statt es still fallenzulassen und die Datei zu überschreiben (schließt einen **permanenten, stillen Bild-Verlust**); ist ein Asset wirklich unrettbar, gibt es eine laute Warnung statt stiller Löschung. (2) Der Dedup-Pfad (`_write_atomic`) frischt die mtime auf, sodass ein erneut referenziertes Asset nicht unter das `min_age`-Fenster altert. (3) `LIGHTOS_VC_ASSET_CACHE_MB=inf`/riesige Werte deaktivieren die GC nicht mehr still (kein `OverflowError` mehr). (4) Parallele `prune`-Läufe über-evicten nicht mehr unter den Deckel hinaus (`FileNotFoundError` zählt korrekt als „schon geräumt"). (5) Ein gültiger `<sha1>.tmp`-Key wird nicht mehr über den Scratch-`.tmp`-Sonderpfad an der keep-Prüfung vorbei gelöscht.
+
 ### 2026-07-18 — Neuer Strahler: Clay Paky Sharpy (Beam Moving Head)
 
 #### Neu
