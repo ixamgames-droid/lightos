@@ -116,6 +116,23 @@ class HeadlessGeneratorFullPatchTest(unittest.TestCase):
     SHOW = ROOT / "shows" / "Test_Show_Komplett.lshow"
     EXPECTED_FIXTURES = 10
 
+    def tearDown(self):
+        # Den generierten Test-Show-Artefakt NICHT in shows/ liegen lassen. Sonst
+        # lintet ihn test_show_lint spaeter mit (Hard-Gate glob-t shows/*.lshow) und
+        # koppelt den Lint-Gate an DIESEN Build — der die Fixture-DEFINITIONEN aus der
+        # geteilten, NICHT umgelenkten fixtures.db zieht (nur die Show-DB ist pro
+        # Prozess isoliert). Baut eine parallele Session zeitgleich an fixtures.db
+        # (Reseed/Migration), faengt der Build inkonsistente Profil-Referenzen ein →
+        # der geleakte Artefakt lintet rot → spurious rotes Gate (beobachtet
+        # 2026-07-18, s. SecondBrain project_test_isolation_show_db_2026_06_21).
+        # Aufraeumen macht den Test in sich geschlossen (wie schon die Build-Show-DB);
+        # die eigentliche DEMO-02-Zusicherung prueft der Test selbst per Load+Count.
+        for p in (ROOT / "shows").glob("Test_Show_Komplett.lshow*"):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
     def test_file_build_yields_full_patch(self):
         py = sys.executable
         # Pro-Prozess-eindeutige Show-DB (wie conftest) -> keine Kollision mit
