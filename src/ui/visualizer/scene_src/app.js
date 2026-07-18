@@ -10,7 +10,7 @@
 // Original.
 import { scene, renderer, gpuTier } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
-import './scene/grid_floor.js';
+import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
 import './camera/cameras.js';
@@ -160,6 +160,8 @@ window.__lightos = {
   // VIZ-LABELS: Test-Seam — das Label-Zoom/Toggle-Gate deterministisch treiben
   // (offscreen drosselt Post-Load-Signale, daher direkter Aufruf statt push).
   updateLabelZoomVisibility,
+  // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
+  disposeObj,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
