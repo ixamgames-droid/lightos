@@ -760,6 +760,25 @@ class AppState:
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
         old_patched = {u: set(s) for u, s in getattr(self, "_patched_set", {}).items()}
+        # CDX-12 (Plan-Rebuild): Ist der Laser-NOT-AUS AKTIV und aendern sich die
+        # Laser-Adressen (Fixture umadressiert/entfernt/dazu), die Ebene-2-OM-Maske
+        # ZUERST auf die VEREINIGUNG aus alten und neuen Adressen erweitern — BEVOR
+        # Ebene 1 (`_laser_estop_addrs`) unter `_plan_lock` auf die neuen umschaltet.
+        # Sonst deckt die Maske im Fenster bis zum finalen Push (unten) nur die alten
+        # Adressen, waehrend der Renderer schon die neuen nullt → ein Modifier auf
+        # einer neu adressierten Laser-Adresse oeffnete den Laser fuer die Rebuild-
+        # Frames (dieselbe Ebene-1-vor-Ebene-2-Fehlerklasse wie in set_laser_estop).
+        # Extra-(alte)-Adressen dunkel zu halten ist safe; der Push unten verengt
+        # danach auf die neuen. Deadlock-frei: KEIN verschachteltes _plan_lock —
+        # dieser Push (nur _estop_lock) laeuft VOR dem _plan_lock-Block.
+        if getattr(self, "laser_estop_active", False):
+            _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
+            if _old_le != new_laser_estop_addrs:
+                _union = {}
+                for _m in (_old_le, new_laser_estop_addrs):
+                    for _u, _s in _m.items():
+                        _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
+                self._push_laser_estop_mask(target_active=True, target_addrs=_union)
         with self._get_plan_lock():
             self._fix_index = fix_index
             self._default_frame = new_default_frame
@@ -1037,7 +1056,7 @@ class AppState:
             lock = self._estop_lock = threading.RLock()
         return lock
 
-    def _push_laser_estop_mask(self):
+    def _push_laser_estop_mask(self, target_active=None, target_addrs=None):
         """A3D-01: dem OutputManager die aktuell zu verriegelnden Laser-Adressen
         pushen — bei aktivem NOT-AUS die ``_laser_estop_addrs``, sonst leer.
 
@@ -1051,14 +1070,32 @@ class AppState:
         auf 0. Ohne das hebt ein auf einer Laser-Adresse konfigurierter Modifier
         (INVERSE → 255, Range-Lock → range_min) das erzwungene Dunkel wieder auf.
         Überall aufrufen, wo ``laser_estop_active`` oder die Laser-Adressen sich
-        ändern (set_laser_estop / Latch-Clear / Plan-Rebuild)."""
+        ändern (set_laser_estop / Latch-Clear / Plan-Rebuild).
+
+        CDX-12: ``target_active`` erlaubt es, die Maske für einen EXPLIZITEN Ziel-
+        Zustand zu pushen, statt ihn aus dem Flag abzuleiten. Nötig, damit
+        ``set_laser_estop`` bei der AKTIVIERUNG die (nicht-leere) Maske installieren
+        kann, BEVOR das Flag gesetzt wird — leitete der Helfer den Zustand hier aus
+        dem noch-``False``-Flag ab, würde er eine LEERE Maske pushen (No-Op) und das
+        Sub-Frame-Fenster bliebe offen. ``None`` = Zustand aus dem Flag lesen
+        (Plan-Rebuild / Latch-Clear-Deaktivierung: passt weiter zum Flag).
+
+        CDX-12 (Plan-Rebuild): ``target_addrs`` erlaubt es, EXPLIZITE Adressen (statt
+        ``_laser_estop_addrs``) zu maskieren — genutzt, um im Plan-Rebuild die Maske
+        VOR dem Adress-Swap auf die VEREINIGUNG aus alten und neuen Laser-Adressen zu
+        erweitern (Ebene 1 schaltet unter ``_plan_lock`` auf die neuen Adressen um,
+        Ebene 2 hier unter ``_estop_lock`` — ohne Union deckt die Maske im Rebuild-
+        Fenster nur die alten, während der Renderer schon die neuen nullt). ``None``
+        = aus ``_laser_estop_addrs`` lesen (alle Alt-Aufrufer)."""
         with self._get_estop_lock():
             try:
                 om = getattr(self, "output_manager", None)
                 if om is None or not hasattr(om, "set_laser_estop_mask"):
                     return
-                active = getattr(self, "laser_estop_active", False)
-                addrs = getattr(self, "_laser_estop_addrs", {}) or {}
+                active = (getattr(self, "laser_estop_active", False)
+                          if target_active is None else bool(target_active))
+                addrs = ((getattr(self, "_laser_estop_addrs", {}) or {})
+                         if target_addrs is None else target_addrs)
                 om.set_laser_estop_mask(
                     {u: frozenset(s) for u, s in addrs.items()} if active else {})
             except Exception as e:
@@ -1076,9 +1113,28 @@ class AppState:
         (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
         stehen (dunkel = sicher)."""
         # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
+        # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
+        # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
+        # und die OutputManager-Maske (Ebene 2) wird separat angewandt.
         with self._get_estop_lock():
-            self.laser_estop_active = bool(active)
-            self._push_laser_estop_mask()
+            if active:
+                # AKTIVIEREN: Ebene 2 (OM-Maske) installieren, BEVOR das Flag sichtbar
+                # wird. Setzte man erst das Flag, sähe ein Frame im Fenster Flag=True
+                # (Renderer nullt den Puffer, Ebene 1), aber die OM-Maske noch leer —
+                # ein INVERSE/Range-Lock-Modifier auf einer Laser-Adresse öffnete den
+                # Laser für genau diesen einen Frame trotz NOT-AUS. Maske-vor-Flag
+                # schließt das Fenster: an jedem Interleaving gilt Maske installiert
+                # ODER Flag noch aus. ``target_active=True``, weil der Helfer sonst aus
+                # dem noch-False-Flag eine leere Maske ableitete (No-Op).
+                self._push_laser_estop_mask(target_active=True)
+                self.laser_estop_active = True
+            else:
+                # DEAKTIVIEREN bleibt Flag-dann-leere-Maske → failt safe: im Fenster
+                # sieht der Sendepfad Flag=False (Renderer nullt nicht mehr), aber die
+                # OM-Maske ist noch die alte (nicht-leere) → der Laser bleibt einen
+                # Frame extra dunkel. Nie ein offenes Fenster.
+                self.laser_estop_active = False
+                self._push_laser_estop_mask(target_active=False)
 
     def set_programmer_value(self, fid: int, attribute: str, value: int,
                              undoable: bool = False, head: int = 0):
