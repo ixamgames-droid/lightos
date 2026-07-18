@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — Neuer Strahler: Clay Paky Sharpy (Beam Moving Head)
+
+#### Neu
+
+- **Clay Paky Sharpy als eingebautes Geräteprofil** — der erste **Beam**-Strahler der Library (bisher waren alle Moving Heads Spot oder Wash): enger, im Nebel sichtbarer Aerial-Beam mit Farbrad, statischem Gobo-Rad, 8-fach-Prisma, Frost und Focus (kein Zoom). 16-Kanal-Standardmodus, Kanal-Chart gegen die Open Fixture Library + Web-Gegencheck verifiziert. Sicherheits-Defaults: Dimmer aus, Shutter offen (der Beam bleibt über den Dimmer dunkel), Reset/Lampe/Funktion auf „keine Funktion" (kein versehentlicher Reset / keine Lampe-aus beim Patchen). Rendert im 3D-Visualizer als Moving Head. Regressionstest `tests/test_claypaky_sharpy_profile.py`.
+- **Die Master-Demo-Show („Komplette Show mit animierten Buttons") enthält jetzt 4 Sharpys** als eigene Beam-Gruppe an einer Mittel-Traverse, mit „Beam an"-Szene, Fan-Bewegungseffekt und Farbrad-Chaser (mit eingelegtem Prisma) sowie passenden Konsolen-Buttons — für den scharfen Strahl-Look neben den weichen Gobo-Spots.
+
 ### 2026-07-18 — Laser-Sicherheit: NOT-AUS schließt sein letztes Sub-Frame-Fenster (CDX-12)
 
 #### Behoben

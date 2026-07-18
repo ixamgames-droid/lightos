@@ -610,6 +610,113 @@ def _conti_mh_modes_data():
     ]
 
 
+# ── Clay Paky Sharpy (Beam Moving Head) ──────────────────────────────────────
+# Verifizierter 16-Kanal-Standard-Chart: Open Fixture Library (clay-paky/sharpy)
+# + Web-Gegencheck (2026-07-18). Beam-Mover -> fuellt die BEAM-Luecke der Library
+# (alle bisherigen MHs sind Spot/Wash). KEIN Zoom (fixer ~0-3.8°-Beam); festes
+# Gobo-Rad, 8-Facetten-Prisma, Frost, Focus. Ungewoehnliche Sharpy-Reihenfolge:
+# Farbe/Strobe/Dimmer VOR Pan/Tilt (10-13), Control 14-16.
+_SHARPY_COLOR = [
+    (0,   6,   "Weiß / Offen", "open"),
+    (7,   14,  "Rot",          "color"),
+    (15,  22,  "Orange",       "color"),
+    (23,  30,  "Aquamarin",    "color"),
+    (31,  38,  "Grün",         "color"),
+    (39,  46,  "Hellgrün",     "color"),
+    (47,  54,  "Lavendel",     "color"),
+    (55,  62,  "Pink",         "color"),
+    (63,  70,  "Gelb",         "color"),
+    (71,  78,  "Magenta",      "color"),
+    (79,  86,  "Cyan",         "color"),
+    (87,  94,  "CTO 2600 K",   "color"),
+    (95,  102, "CTO 1900 K",   "color"),
+    (103, 110, "CTB 8000 K",   "color"),
+    (111, 127, "Blau",         "color"),
+    (128, 255, "Farbrad-Rotation langsam → schnell", "rotate"),
+]
+_SHARPY_GOBO = [
+    (0,   3,   "Offen / kein Gobo",       "open"),
+    (4,   71,  "Statische Gobos 1–17",    "gobo"),
+    (72,  159, "Gobo-Rotation ±5–60 rpm", "rotate"),
+    (160, 255, "Gobo-Shake",              "rotate"),
+]
+# Sharpy-eigene Shutter-Ranges: 0-3 = GESCHLOSSEN (NICHT der generische
+# _MH_SHUTTER_RANGES, wo 0 = offen ist!) -> Default 106 = offen (dunkel via Dimmer 0).
+_SHARPY_SHUTTER = [
+    (0,   3,   "Geschlossen"),
+    (4,   103, "Strobe 1 → 12 Hz"),
+    (104, 107, "Offen"),
+    (108, 207, "Puls-Strobe"),
+    (208, 212, "Offen"),
+    (213, 251, "Zufalls-Strobe"),
+    (252, 255, "Offen"),
+]
+_SHARPY_PRISM = [
+    (0,   127, "Kein Prisma",     "open"),
+    (128, 255, "Prisma (8-fach)", "prism"),
+]
+_SHARPY_PRISM_ROT = [
+    (0,   127, "Feste Position 0° → 540°"),
+    (128, 255, "Rotation ±43 rpm"),
+]
+_SHARPY_FUNCTION = [
+    (0,   11,  "Standard"),
+    (12,  24,  "Pan/Tilt schnell"),
+    (25,  37,  "Pan/Tilt normal"),
+    (38,  50,  "Dimmer konventionell"),
+    (51,  62,  "Dimmer linear"),
+    (63,  255, "Standard"),
+]
+# Safety: Reset/Lampe defaulten auf 0 = keine Funktion (kein versehentlicher Reset,
+# keine Lampe-aus). 26-100 auf Lamp = Lampe AUS -> NIE als Default/Highlight.
+_SHARPY_RESET = [
+    (0,   25,  "Keine Funktion"),
+    (26,  76,  "Effekt-Reset"),
+    (77,  127, "Pan/Tilt-Reset"),
+    (128, 255, "Kompletter Reset"),
+]
+_SHARPY_LAMP = [
+    (0,   25,  "Keine Funktion"),
+    (26,  100, "Lampe AUS"),
+    (101, 255, "Lampe AN"),
+]
+
+
+def _sharpy_modes_data():
+    """Clay Paky Sharpy — 16-Kanal-Standard (verifiziert OFL + Web). Reihenfolge
+    exakt wie im Chart; jedes Attribut kommt GENAU EINMAL vor (Single-Head, keine
+    attr#N-Mehrkopf-Deutung). Shutter-Default 106 = OFFEN (Sharpy 0-3 = zu)."""
+    return [
+        ("16-Kanal (Standard)", [
+            ("Farbe",          "color_wheel",    0,   0,   _SHARPY_COLOR),
+            ("Shutter/Strobe", "shutter",        106, 106, _SHARPY_SHUTTER),
+            ("Dimmer",         "intensity",      0,   255),
+            ("Gobo",           "gobo_wheel",     0,   0,   _SHARPY_GOBO),
+            ("Prisma",         "prism",          0,   0,   _SHARPY_PRISM),
+            ("Prisma Rot.",    "prism_rotation", 0,   0,   _SHARPY_PRISM_ROT),
+            ("P/T-Speed",      "speed",          0,   0),
+            ("Frost",          "frost",          0,   0),
+            ("Fokus",          "focus",          128, 128),
+            ("Pan",            "pan",            128, 128),
+            ("Pan Fine",       "pan_fine",       0,   0),
+            ("Tilt",           "tilt",           128, 128),
+            ("Tilt Fine",      "tilt_fine",      0,   0),
+            ("Funktion",       "macro",          0,   0,   _SHARPY_FUNCTION),
+            ("Reset",          "reset",          0,   0,   _SHARPY_RESET),
+            ("Lampe",          "lamp",           0,   0,   _SHARPY_LAMP),
+        ]),
+    ]
+
+
+def _add_claypaky_sharpy(s, mfr):
+    """Clay Paky Sharpy — Beam Moving Head (16ch Standard). fixture_type=moving_head
+    -> buildMovingHead im 3D. Safety-Defaults: Shutter 106 = OFFEN (dunkel wird ueber
+    Dimmer 0 erreicht, nicht ueber zu-Shutter), Dimmer 0; Funktion/Reset/Lampe 0 =
+    keine Funktion. Fuellt die Beam-Luecke (alle bisherigen MHs Spot/Wash)."""
+    _add_fixture(s, mfr, "Sharpy (Beam 16ch)", "SHARPY", "moving_head", 189,
+                 _sharpy_modes_data())
+
+
 def _add_conti_mh(s, mfr):
     """Conti Moving Head 11ch — Layout siehe _conti_mh_modes_data()."""
     _add_fixture(s, mfr, "Moving Head 11ch", "CONTIMH", "moving_head", 30,
@@ -1686,6 +1793,9 @@ def ensure_builtins():
         if "CONTIMH" not in have:
             _add_conti_mh(s, _get_or_create_mfr(s, "Conti", "CONTI"))
             changed = True
+        if "SHARPY" not in have:                         # Clay Paky Sharpy (Beam)
+            _add_claypaky_sharpy(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
+            changed = True
         if "KLEINCONTI" not in have:
             _add_klein_conti(s, _get_or_create_mfr(s, "Klein", "KLEIN"))
             changed = True
@@ -1979,6 +2089,9 @@ def _seed(s: Session):
     conti = Manufacturer(name="Conti", short_name="CONTI")
     s.add(conti)
     _add_conti_mh(s, conti)
+    claypaky = Manufacturer(name="Clay Paky", short_name="CLAYPAKY")
+    s.add(claypaky)
+    _add_claypaky_sharpy(s, claypaky)
     klein = Manufacturer(name="Klein", short_name="KLEIN")
     s.add(klein)
     _add_klein_conti(s, klein)
