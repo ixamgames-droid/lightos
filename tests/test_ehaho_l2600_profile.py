@@ -227,6 +227,8 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             # Katalog-Erweiterung Runde 2 (2026-07-17)
             "FLATPRO7": "par", "ADJ5PXHEX": "par",
             "STAIRB2408": "led_bar", "CBANDPIX": "led_bar",
+            # Katalog-Erweiterung Runde 3 (2026-07-18)
+            "HYDRA4000": "moving_head", "EVENTPARIP65": "par",
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(
