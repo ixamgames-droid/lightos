@@ -1701,6 +1701,245 @@ def _add_chauvet_colorband_pix(s, mfr):
     ])
 
 
+# ── Katalog-Erweiterung Runde 3 (2026-07-18): reale Nutzer-Geraete ────────────
+#   (A) Cameo HYDRABEAM 4000 RGBW — 4-Kopf-Moving-Beam-Bar (echtes Moving-Head je
+#       Kopf), (B) Varytec Event PAR IP65 4in1 — IP65-Outdoor-RGBW-PAR.
+#   Beide Kanal-Charts gegen PRIMAERQUELLE verifiziert (Adam Hall/Cameo bzw.
+#   Varytec/Thomann Hersteller-Manual-PDF) + Zweitquelle (QLC+ .qxf bzw. Thomann),
+#   NICHT geraten. NEUE Builtins -> keine Signatur-Migration noetig (wie Runde 2),
+#   nur _seed + idempotenter ensure_builtins-Backfill. Attribute alle im
+#   bestehenden Vokabular (CHANNEL_ATTRS/ATTR_GROUPS) — keine neuen Attribute.
+
+# -- (A) Cameo HYDRABEAM 4000 RGBW (4x 32W RGBW Quad-LED, Beam 2,5°) -----------
+# Chart verifiziert gegen offizielles Adam Hall/Cameo CLHB4000RGBW-Manual (DMX-
+# Tabelle) UND QLC+ Cameo-HydraBeam-4000.qxf (kanal-/wertebereichsweise 1:1).
+# 5 Modi: 6/10/19/32/56 Kanaele. Jeder der 4 Koepfe hat EINZELN Pan 540° / Tilt
+# 270° (16-bit, Fine-Kanaele in 10/32/56) + eigene RGBW-LED. Mehrkopf-Konvention:
+# wiederholtes Attribut = Kopf N (attr#N).
+#   Routing (viz_model_for): NUR der 56-Kanal-Modus hat pro Kopf EIGENE RGBW-
+#   Kanaele (>=2 color_r-Banks + >=2 pan) -> 'mover_bar' mit pro-Kopf-Farbe. Die
+#   Modi 19/32 (4x pan, aber nur 1 gemeinsame RGBW-/Makro-Bank) fallen bewusst auf
+#   den Einzel-'moving_head' (alle Koepfe bewegen sich gemeinsam) statt auf eine
+#   Mover-Bar mit dunklen Koepfen (der Payload faerbt Kopf N aus color_r#N, das es
+#   dort nicht gibt). 6/10 sind Auto-Show-/Master-Bewegungs-Modi.
+# Safety: alle Strobe/Shutter-Kanaele DMX 0..10 = offen (kind 'open'), Default 0
+# sicher (Manual verbatim "000-010 no strobe"). Reset-Baender im Default gemieden.
+_HYDRA_STROBE = [
+    (0,  10,  "Offen (kein Strobe)",       "open"),
+    (11, 255, "Strobe langsam → schnell",  "strobe"),
+]
+# Show-/Auto-Programm (16 Shows + Sound-Modus). Default 0 = keine Bewegung.
+_HYDRA_SHOW = [
+    (0,   7,   "Keine Bewegung",   "open"),
+    (8,   247, "Show 1 → 16",      ""),
+    (248, 255, "Sound-Steuerung",  "sound"),
+]
+# Farb-Makro (Light Control): 0..30 Auto-Farbwechsel, 31..255 Fest-/Kombifarben.
+_HYDRA_COLOR = [
+    (0,   30,  "Auto-Farbwechsel", ""),
+    (31,  45,  "Rot",              "color"),
+    (46,  60,  "Grün",             "color"),
+    (61,  75,  "Blau",             "color"),
+    (76,  90,  "Weiß",             "color"),
+    (91,  105, "Rot+Grün",         "color"),
+    (106, 120, "Rot+Blau",         "color"),
+    (121, 135, "Rot+Weiß",         "color"),
+    (136, 150, "Grün+Blau",        "color"),
+    (151, 165, "Grün+Weiß",        "color"),
+    (166, 180, "Blau+Weiß",        "color"),
+    (181, 195, "Rot+Grün+Blau",    "color"),
+    (196, 210, "Rot+Grün+Weiß",    "color"),
+    (211, 225, "Rot+Blau+Weiß",    "color"),
+    (226, 240, "Grün+Blau+Weiß",   "color"),
+    (241, 255, "RGBW",             "color"),
+]
+# Pro-Kopf-Farbwahl (32/56ch): 0..30 = die RGBW-Kanaele des Kopfes steuern die
+# Farbe, 31..255 = Farb-Makro (identisch _HYDRA_COLOR ab 31).
+_HYDRA_HEAD_COLORSEL = [(0, 30, "RGBW-Kanäle steuern Farbe", "")] + _HYDRA_COLOR[1:]
+# Sound/Reset (32ch CH27): Reset-Band 200..209 im Default (0) meiden.
+_HYDRA_SOUND_RESET = [
+    (0,   199, "Keine Funktion",  "open"),
+    (200, 209, "Reset",           "reset"),
+    (210, 240, "Keine Funktion",  "open"),
+    (241, 255, "Sound-Steuerung", "sound"),
+]
+# Auto/Sound/Reset pro Kopf (56ch): 0 = keine Funktion, Reset 200..224 meiden.
+_HYDRA_HEAD_AUTO = [
+    (0,   7,   "Keine Funktion",  "open"),
+    (8,   99,  "Show 1 → 4",      ""),
+    (100, 122, "Sound-Steuerung", "sound"),
+    (123, 199, "Keine Funktion",  "open"),
+    (200, 224, "Reset",           "reset"),
+    (225, 255, "Keine Funktion",  "open"),
+]
+
+
+def _hydra_head_19(head):
+    """19-Kanal-Block eines Kopfes: Pan/Tilt/Dimmer (Farbe global RGBW)."""
+    return [
+        (f"Kopf {head} Pan",    "pan",       128, 128),
+        (f"Kopf {head} Tilt",   "tilt",      128, 128),
+        (f"Kopf {head} Dimmer", "intensity", 0,   255),
+    ]
+
+
+def _hydra_head_32(head):
+    """32-Kanal-Block eines Kopfes: Pan/PanFine/Tilt/TiltFine/Speed/Farb-Makro
+    (16-bit Pan/Tilt; Farbe entweder global RGBW oder pro-Kopf-Makro)."""
+    return [
+        (f"Kopf {head} Pan",       "pan",         128, 128),
+        (f"Kopf {head} Pan fein",  "pan_fine",    0,   0),
+        (f"Kopf {head} Tilt",      "tilt",        128, 128),
+        (f"Kopf {head} Tilt fein", "tilt_fine",   0,   0),
+        (f"Kopf {head} Speed",     "speed",       0,   0),
+        (f"Kopf {head} Farbwahl",  "color_wheel", 0,   0, _HYDRA_HEAD_COLORSEL),
+    ]
+
+
+def _hydra_head_full(head):
+    """56-Kanal-Block eines Kopfes (14 Kanaele): Pan/PanFine/Tilt/TiltFine/Speed/
+    Dimmer/Strobe/Farbwahl/Auto/Sound-Empf./R/G/B/W. Pro-Kopf-RGBW -> dieser Modus
+    routet auf 'mover_bar' mit eigener Kopf-Farbe (color_r#N + color_w#N)."""
+    return [
+        (f"Kopf {head} Pan",        "pan",          128, 128),
+        (f"Kopf {head} Pan fein",   "pan_fine",     0,   0),
+        (f"Kopf {head} Tilt",       "tilt",         128, 128),
+        (f"Kopf {head} Tilt fein",  "tilt_fine",    0,   0),
+        (f"Kopf {head} Speed",      "speed",        0,   0),
+        (f"Kopf {head} Dimmer",     "intensity",    0,   255),
+        (f"Kopf {head} Strobe",     "shutter",      0,   0, _HYDRA_STROBE),
+        (f"Kopf {head} Farbwahl",   "color_wheel",  0,   0, _HYDRA_HEAD_COLORSEL),
+        (f"Kopf {head} Auto/Sound", "macro",        0,   0, _HYDRA_HEAD_AUTO),
+        (f"Kopf {head} Sound-Empf.", "effect_speed", 0,  0),
+        (f"Kopf {head} Rot",        "color_r",      0,   255),
+        (f"Kopf {head} Grün",       "color_g",      0,   255),
+        (f"Kopf {head} Blau",       "color_b",      0,   255),
+        (f"Kopf {head} Weiß",       "color_w",      0,   255),
+    ]
+
+
+def _add_cameo_hydrabeam(s, mfr):
+    """Cameo HYDRABEAM 4000 RGBW (4-Kopf-Moving-Beam) — Chart: Adam Hall/Cameo
+    Manual + QLC+ Cameo-HydraBeam-4000.qxf. Modi 6/10/19/32/56."""
+    _add_fixture(s, mfr, "HYDRABEAM 4000 RGBW", "HYDRA4000", "moving_head", 220, [
+        ("6-Kanal Kompakt", [
+            ("Master Dimmer", "intensity",    0, 255),
+            ("Strobe",        "shutter",      0, 0, _HYDRA_STROBE),
+            ("Show-Programm", "macro",        0, 0, _HYDRA_SHOW),
+            ("Show-Speed",    "speed",        0, 0),
+            ("Farb-Makro",    "color_wheel",  0, 0, _HYDRA_COLOR),
+            ("Farb-Speed",    "effect_speed", 0, 0),
+        ]),
+        ("10-Kanal Move", [
+            ("Pan",           "pan",          128, 128),
+            ("Tilt",          "tilt",         128, 128),
+            ("Master Dimmer", "intensity",    0,   255),
+            ("Strobe",        "shutter",      0,   0, _HYDRA_STROBE),
+            ("Show-Programm", "macro",        0,   0, _HYDRA_SHOW),
+            ("Show-Speed",    "speed",        0,   0),
+            ("Farb-Makro",    "color_wheel",  0,   0, _HYDRA_COLOR),
+            ("Farb-Speed",    "effect_speed", 0,   0),
+            ("Pan fein",      "pan_fine",     0,   0),
+            ("Tilt fein",     "tilt_fine",    0,   0),
+        ]),
+        ("19-Kanal 4×Move + RGBW", [
+            ("Master Dimmer", "intensity", 0, 255),
+            ("Strobe",        "shutter",   0, 0, _HYDRA_STROBE),
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Weiß",          "color_w",   0, 255),
+        ] + _hydra_head_19(1) + _hydra_head_19(2)
+          + _hydra_head_19(3) + _hydra_head_19(4) + [
+            ("Head Speed",    "speed",     0, 0),
+        ]),
+        ("32-Kanal 4×Move + Makro", [
+            ("Master Dimmer", "intensity", 0, 255),
+            ("Strobe",        "shutter",   0, 0, _HYDRA_STROBE),
+        ] + _hydra_head_32(1) + _hydra_head_32(2)
+          + _hydra_head_32(3) + _hydra_head_32(4) + [
+            ("Sound/Reset",   "macro",        0, 0, _HYDRA_SOUND_RESET),
+            ("Sound-Empf.",   "effect_speed", 0, 0),
+            ("Master Rot",    "color_r",   0, 255),
+            ("Master Grün",   "color_g",   0, 255),
+            ("Master Blau",   "color_b",   0, 255),
+            ("Master Weiß",   "color_w",   0, 255),
+        ]),
+        ("56-Kanal Voll (pro Kopf RGBW)",
+            _hydra_head_full(1) + _hydra_head_full(2)
+          + _hydra_head_full(3) + _hydra_head_full(4)),
+    ])
+
+
+# -- (B) Varytec Event PAR IP65 4in1 14x8W 25° (IP65-Outdoor-RGBW-PAR) ---------
+# Chart verifiziert gegen Varytec/Thomann Hersteller-Manual-PDF (EN/DE, Art.-Nr.
+# 435626 / WDMX 452127) + Thomann-Produktseite. 3 Modi: 4/7/9 Kanaele.
+# Safety: der Strobe/Shutter-Kanal (Ch6 in 7/9ch) ist bei DMX 0..10 = OFFEN
+# (Dauerlicht) -> Default 0 sicher (kein Stuck-Dark). Der eigentliche Blackout ist
+# der Master-Dimmer (Ch5). Der 4-Kanal-Modus hat WEDER Dimmer NOCH Shutter (reine
+# RGBW-Direktintensitaet). Statischer PAR -> viz 'par'.
+_VARYTEC_STROBE = [
+    (0,  10,  "Offen (kein Strobe)",       "open"),
+    (11, 255, "Strobe langsam → schnell",  "strobe"),
+]
+# 7-Kanal Farbprogramm (Ch7): 0..10 manuell, 11..200 Programme, 201..255 Sound.
+_VARYTEC_MACRO7 = [
+    (0,   10,  "Ohne Funktion (manuell)",       ""),
+    (11,  100, "Farbwechsel (Speed)",           ""),
+    (101, 200, "Farbwechsel Cross-Fade (Speed)", ""),
+    (201, 255, "Sound-Steuerung",               "sound"),
+]
+# 9-Kanal Farbmakro (Ch7): feiner aufgeschluesselte Programm-Baender.
+_VARYTEC_MACRO9 = [
+    (0,   10,  "Ohne Funktion (manuell)",       ""),
+    (11,  32,  "7-Farben-Wechsel",              ""),
+    (33,  50,  "Farbwechsel Rot/Orange",        ""),
+    (51,  68,  "15-Farben-Wechsel",             ""),
+    (69,  86,  "4 Farben mit Blackout",         ""),
+    (87,  100, "15-Farben-Wechsel",             ""),
+    (101, 200, "Farbwechsel Cross-Fade (Speed)", ""),
+    (201, 255, "Sound-Steuerung",               "sound"),
+]
+# 9-Kanal Sound-Empfindlichkeit (Ch9).
+_VARYTEC_SOUND = [
+    (0,  14,  "Ohne Funktion",                        ""),
+    (15, 255, "Sound-Steuerung (Empfindlichkeit)",    "sound"),
+]
+
+
+def _add_varytec_event_par(s, mfr):
+    """Varytec Event PAR IP65 4in1 14x8W 25° — Chart: Varytec/Thomann Manual.
+    Modi 4/7/9. Strobe 0..10 offen (Safety); Blackout via Master-Dimmer."""
+    _add_fixture(s, mfr, "Event PAR IP65 4in1", "EVENTPARIP65", "par", 150, [
+        ("4-Kanal RGBW", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Weiß", "color_w", 0, 255),
+        ]),
+        ("7-Kanal RGBW+Dimmer", [
+            ("Rot",           "color_r",   0, 255),
+            ("Grün",          "color_g",   0, 255),
+            ("Blau",          "color_b",   0, 255),
+            ("Weiß",          "color_w",   0, 255),
+            ("Master Dimmer", "intensity", 0, 255),
+            ("Strobe",        "shutter",   0, 0, _VARYTEC_STROBE),
+            ("Farbprogramm",  "macro",     0, 0, _VARYTEC_MACRO7),
+        ]),
+        ("9-Kanal Voll", [
+            ("Rot",            "color_r",      0, 255),
+            ("Grün",           "color_g",      0, 255),
+            ("Blau",           "color_b",      0, 255),
+            ("Weiß",           "color_w",      0, 255),
+            ("Master Dimmer",  "intensity",    0, 255),
+            ("Strobe",         "shutter",      0, 0, _VARYTEC_STROBE),
+            ("Farbmakro",      "macro",        0, 0, _VARYTEC_MACRO9),
+            ("Programm-Speed", "speed",        0, 0),
+            ("Sound-Empf.",    "effect_speed", 0, 0, _VARYTEC_SOUND),
+        ]),
+    ])
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -1837,6 +2076,12 @@ def ensure_builtins():
             changed = True
         if "STAIRB2408" not in have:                     # Katalog Runde 2
             _add_stairville_bar2408(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+            changed = True
+        if "HYDRA4000" not in have:                       # Katalog Runde 3
+            _add_cameo_hydrabeam(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
+            changed = True
+        if "EVENTPARIP65" not in have:                    # Katalog Runde 3
+            _add_varytec_event_par(s, _get_or_create_mfr(s, "Varytec", "VARYTEC"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -2119,3 +2364,11 @@ def _seed(s: Session):
     stairville = Manufacturer(name="Stairville", short_name="STAIR")
     s.add(stairville)
     _add_stairville_bar2408(s, stairville)
+
+    # ── Katalog-Erweiterung Runde 3 (2026-07-18): reale Nutzer-Geraete ────────
+    # Cameo HYDRABEAM 4000 RGBW (4-Kopf-Moving-Beam) + Varytec Event PAR IP65
+    # 4in1 (IP65-RGBW-PAR). Charts gegen Hersteller-Manual verifiziert.
+    _add_cameo_hydrabeam(s, cameo)          # 'cameo'-Manufacturer von oben wiederverwenden
+    varytec = Manufacturer(name="Varytec", short_name="VARYTEC")
+    s.add(varytec)
+    _add_varytec_event_par(s, varytec)
