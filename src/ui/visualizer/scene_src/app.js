@@ -157,6 +157,9 @@ window.__lightos = {
   requestRender, renderStats, __renderTick: renderTick,
   // VIZ-14 Slice 1c: Test-Seam — Identify-Flash-Fenster deterministisch beenden.
   __expireSelectionPulse: expireSelectionPulseForTest,
+  // VIZ-LABELS: Test-Seam — das Label-Zoom/Toggle-Gate deterministisch treiben
+  // (offscreen drosselt Post-Load-Signale, daher direkter Aufruf statt push).
+  updateLabelZoomVisibility,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,

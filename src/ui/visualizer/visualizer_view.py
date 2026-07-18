@@ -21,11 +21,13 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider,
+    QMainWindow,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QGuiApplication
 
 from src.core.app_state import get_state
 from src.core.stage.stage_definition import resolve_active_stage
@@ -37,13 +39,29 @@ from src.ui.weak_slots import weak_slot_fwd
 
 
 class Visualizer3DView(QWidget):
-    """Leichtgewichtige 3D-Ansicht zum Einbetten (z.B. in die Live View)."""
+    """Leichtgewichtige 3D-Ansicht zum Einbetten (z.B. in die Live View).
 
-    def __init__(self, parent=None):
+    VIZ-POPOUT: dieselbe Klasse wird ZWEIMAL genutzt — eingebettet in der Live
+    View (``target_name='live_view_mirror'``, ``show_popout_button=True``) und
+    als Inhalt des Pop-out-Fensters (``target_name='live_view_popout'``, kein
+    Pop-out-Button). Der Target-Name MUSS je Instanz eindeutig sein, sonst
+    kollidieren zwei gleichnamige Targets im ``VisualizerService`` (Panel-Fund).
+    """
+
+    #: VIZ-POPOUT: die eingebettete View bittet ihren Owner (Live View), sie in
+    #: ein eigenes Fenster auszuklinken. Reine Absichts-Meldung — das Ausklinken
+    #: (2D-Rueckfall + Fensterbau) orchestriert der Owner, damit die View selbst
+    #: wiederverwendbar/kontextfrei bleibt.
+    popOutRequested = Signal()
+
+    def __init__(self, parent=None, *, target_name: str = "live_view_mirror",
+                 show_popout_button: bool = False):
         super().__init__(parent)
         self._state = get_state()
         self._loaded = False
         self._edit_mode = "view"          # 'view' | 'edit' (kein 'stage')
+        self._target_name = target_name
+        self._show_popout_button = show_popout_button
         self._setup_ui()
         self._setup_channel()
         self._setup_service_target()
@@ -83,6 +101,17 @@ class Visualizer3DView(QWidget):
         btn_cam.clicked.connect(self._reset_camera)
         bar.addWidget(btn_cam)
 
+        # VIZ-LABELS: Fixture-Namens-Labels ein-/ausblenden. Checkable, gespiegelt
+        # gegen den zentralen AppState-Schalter (eine Quelle fuer alle 3D-Views).
+        self._btn_labels = QPushButton("🏷 Labels")
+        self._btn_labels.setCheckable(True)
+        self._btn_labels.setChecked(bool(getattr(self._state, "show_fixture_labels", True)))
+        self._btn_labels.setMinimumHeight(30)
+        self._btn_labels.setStyleSheet(_style)
+        self._btn_labels.setToolTip("Fixture-Namen (#ID + Kurzname) im 3D ein-/ausblenden")
+        self._btn_labels.toggled.connect(self._on_labels_toggled)
+        bar.addWidget(self._btn_labels)
+
         bar.addWidget(QLabel("☀"))
         self._sld_brightness = QSlider(Qt.Orientation.Horizontal)
         self._sld_brightness.setRange(0, 100)
@@ -91,6 +120,20 @@ class Visualizer3DView(QWidget):
         self._sld_brightness.setToolTip("Szenen-Helligkeit")
         self._sld_brightness.valueChanged.connect(self._on_brightness_changed)
         bar.addWidget(self._sld_brightness)
+
+        # VIZ-POPOUT: 3D in ein eigenes, frei verschiebbares Fenster loesen
+        # (Zweitmonitor). Nur in der eingebetteten View — das Ausklinken selbst
+        # macht der Owner (Live View) ueber das popOutRequested-Signal.
+        if self._show_popout_button:
+            self._btn_popout = QPushButton("⧉ Ausklinken")
+            self._btn_popout.setMinimumHeight(30)
+            self._btn_popout.setStyleSheet(_style)
+            self._btn_popout.setToolTip(
+                "3D in ein eigenes Fenster loesen — auf einen zweiten Monitor\n"
+                "ziehbar. Fenster schliessen holt die Ansicht zurueck."
+            )
+            self._btn_popout.clicked.connect(self.popOutRequested.emit)
+            bar.addWidget(self._btn_popout)
 
         bar.addStretch()
         self._lbl_hint = QLabel("3D — im Bühnen-Layout platzierte Strahler erscheinen automatisch")
@@ -150,8 +193,13 @@ class Visualizer3DView(QWidget):
         Backstop (kein State-Unsubscribe mehr noetig, das laeuft zentral im
         Service, s. ``VisualizerService.shutdown``)."""
         self._service = get_visualizer_service(self._state)
+        # getattr-Default: die bestehenden Service-Target-Tests rufen
+        # _setup_service_target mit einem SimpleNamespace-Fake-self OHNE
+        # _target_name (Fake-self-Muster, s. test_viz12_service) — dort gilt der
+        # Alt-Name. Echte Instanzen setzen _target_name im __init__.
+        target_name = getattr(self, "_target_name", "live_view_mirror")
         self._target = VisualizerTarget(
-            "live_view_mirror", self._bridge.dmxBatch.emit,
+            target_name, self._bridge.dmxBatch.emit,
             on_reset_interaction=self._reset_own_interaction_state,
             on_reload=self._reload_own_page,
         )
@@ -260,6 +308,10 @@ class Visualizer3DView(QWidget):
             "brightness":     self._sld_brightness.value() / 100.0,
             "autoBrightness": False,
             "dockEnabled":    False,
+            # VIZ-LABELS: aus der zentralen Quelle lesen (nicht aus dem Button),
+            # damit der gepushte Wert immer dem AppState entspricht — der Button
+            # ist nur ein Controller, der AppState VOR dem Push schreibt.
+            "showLabels":     bool(getattr(self._state, "show_fixture_labels", True)),
         }
 
     # ── oeffentliche API (von der Live View aufgerufen) ─────────────────────
@@ -278,7 +330,27 @@ class Visualizer3DView(QWidget):
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
             svc.set_target_active(target, True)
-        if self._loaded:
+        # VIZ-LABELS (Review-Fix): die View wird beim 2D<->3D-Wechsel / Pop-out-
+        # Redock nur versteckt & wiederverwendet (KEIN Page-Reload). Der einzige
+        # Settings-Push liegt sonst in _push_initial_state (nur bei loadFinished).
+        # Ohne Nachziehen behaelt die Page einen stale showLabels-Wert (z.B. im
+        # Pop-out/Vollfenster umgeschaltet) und der Button-Haken laeuft aus der
+        # zentralen Quelle heraus -> Nutzerwahl geht still verloren. Daher beim
+        # (Wieder-)Einblenden Button + JS-Settings aus AppState resyncen.
+        # (getattr-guarded: die Service-Target-Tests rufen on_shown mit einem
+        # SimpleNamespace-Fake-self OHNE Button/_collect_settings, s. test_viz12.)
+        _btn = getattr(self, "_btn_labels", None)
+        if _btn is not None:
+            _want = bool(getattr(self._state, "show_fixture_labels", True))
+            if _btn.isChecked() != _want:
+                _btn.blockSignals(True)
+                _btn.setChecked(_want)
+                _btn.blockSignals(False)
+        if getattr(self, "_loaded", False):
+            try:
+                self._bridge.push_settings(self._collect_settings())
+            except Exception:
+                pass
             try:
                 self._bridge.requestFixtures()
             except Exception:
@@ -308,6 +380,19 @@ class Visualizer3DView(QWidget):
         except Exception:
             pass
 
+    def _on_labels_toggled(self, checked: bool):
+        # VIZ-LABELS: zentrale Quelle ZUERST schreiben, dann pushen (push liest
+        # AppState) — so bleiben eingebettete View, Pop-out und Vollfenster
+        # konsistent, auch wenn diese Instanz spaeter lazy neu erzeugt wird.
+        try:
+            self._state.show_fixture_labels = bool(checked)
+        except Exception:
+            pass
+        try:
+            self._bridge.push_settings(self._collect_settings())
+        except Exception:
+            pass
+
     def _reset_camera(self):
         try:
             self._bridge.cameraReset.emit()
@@ -319,3 +404,90 @@ class Visualizer3DView(QWidget):
             self._bridge.brightnessSignal.emit(value / 100.0)
         except Exception:
             pass
+
+
+class VisualizerPopoutWindow(QMainWindow):
+    """VIZ-POPOUT: schlankes, eigenstaendiges Top-Level-Fenster, das genau EINE
+    weitere :class:`Visualizer3DView` hostet (Service-Target ``live_view_popout``).
+    Damit laesst sich die 3D-Ansicht auf einen zweiten Monitor ziehen.
+
+    Panel-Entscheidung C: bewusst KEIN Neubau von WebView/Bridge/RenderCrashGuard/
+    Pull-Poll — die wiederverwendete :class:`Visualizer3DView` bringt all das schon
+    fertig mit. Lifecycle-Vertrag (Panel-Muss): ``closeEvent`` ruft ``on_hidden()``
+    der Kind-View (Service-Target inaktiv + ``bridge.dispose()``), ``deleteLater()``
+    loest die View aus -> ihr ``destroyed``->``detach_target``-Backstop meldet das
+    Target beim Service ab. ``closed`` signalisiert dem Owner (Live View), dass
+    wieder in die eingebettete Ansicht angedockt werden soll.
+
+    GPU-Invariante (Panel-Muss): der Owner schaltet die eingebettete 3D-View beim
+    Ausklinken auf 2D-Top-Down zurueck, sodass NIE zwei WebGL-Szenen gleichzeitig
+    rendern (Adreno-Textur-Budget).
+    """
+
+    #: an den Owner: das Fenster wird geschlossen -> bitte wieder andocken.
+    closed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("LightOS — 3D-Visualizer (Zweitmonitor)")
+        # Eigenstaendiges Top-Level-Fenster, damit es frei auf einen anderen
+        # Bildschirm gezogen werden kann. WA_DeleteOnClose: beim Schliessen wird
+        # das Fenster (und via Qt-Parent die Kind-View) zerstoert -> deren
+        # destroyed->detach_target-Backstop meldet das Service-Target sauber ab
+        # (kein lingernder Subscriber). closeEvent macht zusaetzlich den
+        # deterministischen Teil (on_hidden: Target inaktiv + bridge.dispose).
+        self.setWindowFlag(Qt.WindowType.Window, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._closing = False
+        self._view = Visualizer3DView(
+            self, target_name="live_view_popout", show_popout_button=False)
+        self.setCentralWidget(self._view)
+        self._place_on_free_screen()
+
+    @property
+    def view(self) -> "Visualizer3DView":
+        return self._view
+
+    def _place_on_free_screen(self):
+        """Auf einem moeglichst NICHT-primaeren Bildschirm zentrieren (Davids
+        Zweitmonitor-Wunsch); faellt auf den Primaerschirm zurueck, wenn nur ein
+        Screen vorhanden ist. Immer gegen die AKTUELL vorhandenen Screens
+        validiert — so landet das Fenster nie unsichtbar auf einem abgezogenen
+        Monitor (Panel-Risiko 'off-screen')."""
+        try:
+            screens = QGuiApplication.screens()
+            primary = QGuiApplication.primaryScreen()
+            target = next((s for s in screens if s is not primary), None) or primary
+            if target is None:
+                self.resize(960, 640)
+                return
+            geo = target.availableGeometry()
+            w = min(1100, max(480, geo.width() - 80))
+            h = min(720, max(360, geo.height() - 80))
+            self.resize(w, h)
+            self.move(geo.center().x() - w // 2, geo.center().y() - h // 2)
+        except Exception as e:
+            print(f"[VisualizerPopoutWindow] place error: {e}")
+            self.resize(960, 640)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Kind-View aktiv schalten (Target aktiv + voller Resync). Idempotent —
+        # showEvent kann bei Fokuswechseln mehrfach feuern.
+        try:
+            self._view.on_shown()
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        # Deterministischer Teil des Teardowns; idempotent gegen doppelte
+        # Zustellung (Fenster-X UND Owner-seitiges close()). Die eigentliche
+        # Zerstoerung + Target-detach besorgt WA_DeleteOnClose (s. __init__).
+        if not self._closing:
+            self._closing = True
+            try:
+                self._view.on_hidden()   # Target inaktiv + bridge.dispose()
+            except Exception:
+                pass
+            self.closed.emit()
+        super().closeEvent(event)

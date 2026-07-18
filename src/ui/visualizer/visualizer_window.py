@@ -1950,6 +1950,14 @@ class VisualizerWindow(QMainWindow):
         self._chk_cones = QCheckBox("Lichtkegel anzeigen");      self._chk_cones.setChecked(True)
         self._chk_floor = QCheckBox("Bodenpunkte anzeigen");     self._chk_floor.setChecked(True)
         self._chk_fog   = QCheckBox("Nebel/Haze anzeigen");      self._chk_fog.setChecked(True)
+        # VIZ-LABELS: Fixture-Namens-Labels ein-/ausblenden. Zentraler AppState-
+        # Schalter (dieselbe Quelle wie der Toolbar-Button der eingebetteten
+        # Live-View-3D) — eigener Handler, weil er AppState VOR dem Push schreibt.
+        self._chk_labels = QCheckBox("Fixture-Namen (Labels) anzeigen")
+        self._chk_labels.setChecked(bool(getattr(self._state, "show_fixture_labels", True)))
+        self._chk_labels.setToolTip(
+            "Blendet die '#<ID> <Name>'-Beschriftungen an den Fixtures im 3D ein/aus.")
+        self._chk_labels.toggled.connect(self._on_labels_toggled)
         # VIZ-13 Schritt 3b-K-2: FPS-Debug-Overlay (Design-Dokument (c)).
         self._chk_fps   = QCheckBox("FPS anzeigen (Debug)");     self._chk_fps.setChecked(False)
         self._chk_fps.setToolTip("Zeigt ein kleines FPS-Overlay oben rechts in der 3D-Szene (nur Debug).")
@@ -1957,6 +1965,8 @@ class VisualizerWindow(QMainWindow):
         for c in (self._chk_cones, self._chk_floor, self._chk_fog, self._chk_snap, self._chk_fps):
             c.toggled.connect(self._on_settings_changed)
             layout.addWidget(c)
+        # Labels-Checkbox direkt hinter "Nebel/Haze" einreihen (visuelle Toggles).
+        layout.insertWidget(layout.indexOf(self._chk_fog) + 1, self._chk_labels)
 
         grid_row = QHBoxLayout()
         grid_row.addWidget(QLabel("Grid-Schritt (m):"))
@@ -3507,6 +3517,10 @@ class VisualizerWindow(QMainWindow):
             "autoBrightness":  self._chk_auto_brightness.isChecked(),
             "dockEnabled":     self._dock_enabled(),
             "fpsVisible":      self._chk_fps.isChecked(),
+            # VIZ-LABELS: aus der zentralen Quelle (AppState) lesen, damit der
+            # gepushte Wert immer dem Toggle entspricht (die Checkbox schreibt
+            # AppState VOR dem Push, s. _on_labels_toggled).
+            "showLabels":      bool(getattr(self._state, "show_fixture_labels", True)),
         }
 
     def _dock_enabled(self) -> bool:
@@ -3519,6 +3533,15 @@ class VisualizerWindow(QMainWindow):
             self._bridge.push_settings(self._collect_settings())
         except Exception as e:
             print(f"[Visualizer] _on_settings_changed error: {e}")
+
+    def _on_labels_toggled(self, checked: bool):
+        """VIZ-LABELS: zentrale Quelle (AppState) ZUERST schreiben, dann pushen —
+        so bleibt der Schalter mit der eingebetteten Live-View-3D konsistent."""
+        try:
+            self._state.show_fixture_labels = bool(checked)
+        except Exception:
+            pass
+        self._on_settings_changed()
 
     def _on_brightness_changed(self, value: int):
         """User bewegt einen Helligkeits-Slider (Toolbar oder Einstellungen-Tab).
@@ -3630,6 +3653,23 @@ class VisualizerWindow(QMainWindow):
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
             svc.set_target_active(target, True)
+        # VIZ-LABELS: Checkbox mit der zentralen Quelle nachziehen, falls der
+        # Schalter zwischenzeitlich in der eingebetteten Live-View-3D umgelegt
+        # wurde (blockSignals -> kein Spurious-Push beim Angleichen), UND die
+        # Settings neu pushen — sonst behaelt die (nur versteckte, nicht neu
+        # geladene) Page ihren stale showLabels-Wert und die gerenderte Szene
+        # weicht von der eigenen Checkbox ab (Review-Fix).
+        chk = getattr(self, "_chk_labels", None)
+        if chk is not None:
+            want = bool(getattr(self._state, "show_fixture_labels", True))
+            if chk.isChecked() != want:
+                chk.blockSignals(True)
+                chk.setChecked(want)
+                chk.blockSignals(False)
+        try:
+            self._bridge.push_settings(self._collect_settings())
+        except Exception as e:
+            print(f"[Visualizer] showEvent push_settings error: {e}")
         self._connect_screen_changed()
         super().showEvent(event)
 
