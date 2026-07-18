@@ -19,6 +19,15 @@ export function disposeObj(o) {
     if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
     else o.material.dispose();
   }
+  // A3D-07: Licht-Shadow-Map (WebGLRenderTarget) freigeben. disposeObj wird pro
+  // entferntem Fixture ueber f.group.traverse gerufen; der Per-Fixture-SpotLight
+  // (fixtures.js: root.add(spot), shadow.mapSize gesetzt) haengt als Kind an root.
+  // three r128s disposeObj-Aequivalent gibt aber NUR geometry+material frei, NICHT
+  // spot.shadow -> das GPU-RenderTarget der Shadow-Map leckt sonst pro Show-Reload
+  // (waechst bis Context-Loss auf schwachen GPUs). Sicher hier: disposeObj laeuft
+  // ausschliesslich ueber Fixture-/Stage-/Grid-Objekte, NIE ueber die persistenten
+  // Szenen-Lichter (die werden nie getraversed/disposed).
+  if (o.isLight && o.shadow && typeof o.shadow.dispose === 'function') o.shadow.dispose();
 }
 
 export function clearPreset() {

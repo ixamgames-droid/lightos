@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — 3D-Visualizer: GPU-Shadow-Map-Leak beim Fixture-Löschen (A3D-07)
+
+#### Behoben
+
+- **Beim Entfernen eines Fixtures (Show-Reload) wird jetzt auch die GPU-Shadow-Map seines Scheinwerfers freigegeben.** `removeFixture` löste die Fixture über `f.group.traverse(disposeObj)` auf, aber `disposeObj` (scene/grid_floor.js) gab nur Geometrie + Material frei, nicht `light.shadow` — das Shadow-RenderTarget des Per-Fixture-`SpotLight` leckte pro Show-Reload und wuchs auf schwachen GPUs (z. B. der Surface-Adreno) bis zum WebGL-Context-Loss. `disposeObj` gibt jetzt zusätzlich `light.shadow` frei (deckt den Scheinwerfer über den bestehenden Traverse ab, an einer Stelle). Regressionstest `tests/test_viz_shadow_dispose.py`.
+
+### 2026-07-18 — 3D-Visualizer: Namens-Labels ein/aus + Pop-out-Fenster (VIZ-LABELS-POPOUT, #342)
+
+#### Neu
+
+- **Fixture-Namens-Labels im 3D lassen sich per Button aus-/einblenden** — Toolbar-Button „🏷 Labels" in der eingebetteten Live-View-3D und Checkbox „Fixture-Namen (Labels) anzeigen" im Einstellungen-Tab des Visualizer-Fensters; beide steuern denselben app-weiten Schalter (`AppState.show_fixture_labels`, Default an).
+- **Der 3D-Visualizer lässt sich in ein eigenes, frei verschiebbares Fenster ausklinken** („⧉ Ausklinken" in der Live-View-3D) — für einen zweiten Monitor. Das Fenster öffnet auf einem Nebenschirm; die eingebettete Ansicht fällt solange auf 2D zurück (nie zwei 3D-Szenen gleichzeitig, GPU-schonend). Fenster schließen oder „⇲ Zurückholen" dockt wieder an.
+
 ### 2026-07-17 — 3D-Visualizer: benannte Kameras nach Show-Wechsel (A3D-13 / A3D-22)
 
 #### Behoben
