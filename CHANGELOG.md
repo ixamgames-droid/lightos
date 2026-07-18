@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — VC-Asset-Cache gegen Poisoning gehärtet (CDX-15)
+
+#### Behoben
+
+- **Eine manipulierte/korrupte `.lshow` kann den globalen VC-Asset-Cache nicht mehr vergiften.** `vc_assets.store_extracted` legte beim Laden die aus dem ZIP entpackten Bytes unter dem im **ZIP-Eintragsnamen** genannten Content-Hash-Key ab, **ohne zu prüfen, ob die Bytes wirklich diesen Hash haben** — und `_write_atomic` überschreibt eine bestehende Datei nicht. Eine Show mit `assets/vc/<sha1-eines-guten-Bildes>.png` = **anderer Inhalt** konnte so den legitimen Key im geteilten Cache (`%APPDATA%/LightOS/vc_assets/`) **dauerhaft mit Fremdinhalt belegen**; spätere echte Shows mit demselben Key hätten das falsche Bild gerendert und beim Speichern wieder eingebettet. **Fix:** `store_extracted` verwirft Bytes, deren `sha1` nicht zum Key-Präfix passt (neue reine Prüf-Funktion `content_matches_key`) — nur zum Key passender Inhalt wird je abgelegt. Der sichere Import-Pfad `store_bytes` (bildet den Key selbst aus den Bytes) war nie betroffen. Neue Tests `tests/test_vc_asset_poison.py`.
+
 ### 2026-07-18 — VC-Asset-Cache wächst nicht mehr unbegrenzt (VC-IMG-GC)
 
 #### Behoben

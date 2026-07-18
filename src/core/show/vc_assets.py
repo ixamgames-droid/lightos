@@ -109,10 +109,34 @@ def bytes_for(key: str) -> bytes | None:
         return None
 
 
+def content_matches_key(key: str, data: bytes) -> bool:
+    """True, wenn ``data`` wirklich den Content-Hash trägt, den der Key behauptet
+    (SHA1-Präfix vor der Extension). ``store_bytes`` bildet den Key AUS den Bytes und
+    ist damit inhärent konsistent — nur der Entpack-Pfad (``store_extracted``) bekommt
+    den Key aus dem untrusted ZIP-Eintragsnamen und muss das prüfen (CDX-15)."""
+    if not is_valid_key(key):
+        return False
+    return hashlib.sha1(data).hexdigest() == key.split(".", 1)[0]
+
+
 def store_extracted(key: str, data: bytes) -> None:
     """Beim Laden: aus dem ZIP entpackte Bytes unter dem (bereits gehashten) Key
-    ablegen. Ungültige Keys (Pfad-Traversal) werden verworfen."""
-    if not is_valid_key(key):
+    ablegen. Verworfen werden ungültige Keys (Pfad-Traversal) UND Bytes, deren SHA1
+    nicht zum Key passt: der Key stammt aus dem untrusted ZIP-Eintragsnamen, also
+    könnte eine manipulierte/korrupte ``.lshow`` einen legitimen ``<sha1>.png``-Key
+    im GLOBALEN Cache (`%APPDATA%/LightOS/vc_assets/`) sonst dauerhaft mit Fremdinhalt
+    vergiften — spätere echte Shows mit demselben Key würden das falsche Asset rendern
+    und beim Speichern erneut einbetten (CDX-15). ``_write_atomic`` überschreibt eine
+    bestehende Datei ohnehin nicht; die Hash-Prüfung stellt sicher, dass nur der zum
+    Key passende Inhalt jemals abgelegt wird."""
+    if not content_matches_key(key, data):
+        return
+    # CDX-15 (Härtung): nur bekannte Bild-/GIF-Extensions ablegen. store_bytes zwingt
+    # ohnehin auf _ALLOWED_EXT (_key_for); ein hash-konsistenter, aber exotischer
+    # <sha1>.exe/.bat-Key aus einer manipulierten .lshow soll gar nicht erst als Datei
+    # im Cache-Ordner landen (LightOS führt nichts daraus aus — reine Vorsicht,
+    # hält den Entpack-Pfad deckungsgleich mit dem sicheren Import-Pfad).
+    if os.path.splitext(key)[1].lower() not in _ALLOWED_EXT:
         return
     _write_atomic(os.path.join(cache_dir(), key), data)
 
