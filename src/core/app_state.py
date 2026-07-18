@@ -481,6 +481,21 @@ class AppState:
             s.commit()
         self._reload_patch_cache()
         self._emit("patch_changed")
+        # FM-16: Multi-Head-Fixture (Spider/Mover-/Beam-Bar) -> automatisch eine
+        # Pro-Kopf-Matrix-Gruppe anlegen, damit die Einzelkoepfe sofort als Matrix
+        # im Matrix-Programmer (und beim Zusammenlegen) ansprechbar sind. Best-effort:
+        # ein Fehler hier darf den Patch NIE brechen; idempotent (kein Duplikat).
+        # NUR bei INTERAKTIVEM Einzel-Patch: waehrend eines Bulk-Load/Reset ist
+        # _suppress_emits gesetzt -> die Auto-Gruppe waere sinnlos (der Loader macht
+        # gleich delete-all + _restore_fixture_groups) und ihr group_changed-Emit
+        # wuerde re-entrante View-Rebuilds mitten im halb aufgebauten Patch ausloesen
+        # (BUG-01-Klasse). Guard hier + notify_groups_changed() (statt direktem
+        # get_sync-Emit) in create_head_matrix_group respektiert die Suppression.
+        if not getattr(self, "_suppress_emits", False):
+            try:
+                self.create_head_matrix_group(fixture)
+            except Exception as e:
+                debug_swallow("app_state.add_fixture.head_matrix_group", e)
         if undoable:
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -489,6 +504,63 @@ class AppState:
                 redo=lambda s=snapshot: self._restore_fixture_dict(s),
             )
 
+    def create_head_matrix_group(self, fixture, *, emit: bool = True) -> int | None:
+        """FM-16: Legt fuer ein MULTI-HEAD-Fixture (>=2 color_r-Baenke, z. B. Spider/
+        Mover-Bar/Hydrabeam) automatisch eine 1×N-``FixtureGroup`` an, deren N Zellen
+        die EINZELKOEPFE sind (``positions`` = ``{"i,0": "fid:i"}``). Damit sind die
+        Koepfe sofort als Pro-Kopf-Matrix im Matrix-Programmer ansprechbar und
+        koennen mit anderen Kopf-Matrizen zu groesseren Matrizen zusammengelegt
+        werden (FM-16 Vision). Idempotent: existiert bereits eine Gruppe, die diesen
+        ``fid`` pro-Kopf adressiert, wird deren id zurueckgegeben (kein Duplikat bei
+        Re-Patch). Rueckgabe: neue/bestehende Gruppen-id, oder ``None`` wenn kein
+        Multi-Head oder keine Show-DB."""
+        eng = getattr(self, "_show_engine", None)
+        if eng is None:
+            return None
+        try:
+            n = color_head_count(fixture)
+        except Exception:
+            return None
+        if n < 2:
+            return None
+        fid = getattr(fixture, "fid", None)
+        if fid is None:
+            return None
+        import json as _json
+        from sqlalchemy import select as _select
+        from src.core.database.models import FixtureGroup as _FG
+        label = (getattr(fixture, "label", None)
+                 or getattr(fixture, "fixture_name", None) or f"Fixture {fid}")
+        positions = {f"{i},0": f"{fid}:{i}" for i in range(n)}
+        try:
+            with self._session() as s:
+                # Idempotenz: existiert schon eine Kopf-Gruppe fuer genau dieses fid?
+                for g in s.execute(_select(_FG)).scalars().all():
+                    try:
+                        pos = _json.loads(g.positions_json or "{}")
+                    except Exception:
+                        continue
+                    if any(":" in str(v) and str(v).split(":", 1)[0] == str(fid)
+                           for v in pos.values()):
+                        return g.id
+                g = _FG(name=f"{label} · Köpfe", cols=n, rows=1,
+                        positions_json=_json.dumps(positions), folder="Multi-Head")
+                s.add(g)
+                s.commit()
+                gid = g.id
+        except Exception as e:
+            debug_swallow("app_state.create_head_matrix_group", e)
+            return None
+        if emit:
+            # notify_groups_changed -> self._emit("group_changed") respektiert
+            # _suppress_emits UND das UI-Thread-Marshalling (kein direkter get_sync-
+            # Bus-Emit, der beide Schutzmechanismen umgeht).
+            try:
+                self.notify_groups_changed()
+            except Exception:
+                pass
+        return gid
+
     def remove_fixture(self, fid: int, undoable: bool = True):
         # Snapshot before delete
         snap = None
@@ -496,13 +568,41 @@ class AppState:
             if f.fid == fid:
                 snap = self._fixture_to_dict(f)
                 break
+        removed_group = False
         with self._session() as s:
             from sqlalchemy import select, delete
             s.execute(delete(PatchedFixture).where(PatchedFixture.fid == fid))
+            # FM-16: die beim Patchen auto-erzeugte Kopf-Matrix-Gruppe (Ordner
+            # "Multi-Head") dieses Fixtures mit entfernen -> keine verwaisten
+            # "fid:head"-Gruppen bei Delete/Undo. NUR eine Gruppe anfassen, die
+            # AUSSCHLIESSLICH die Koepfe DIESES fid adressiert (die dedizierte 1×N-
+            # Auto-Gruppe) — vom Nutzer zusammengelegte Matrizen (mehrere fids)
+            # bleiben unberuehrt.
+            try:
+                from src.core.database.models import FixtureGroup as _FG
+                import json as _json
+                for g in s.execute(
+                        select(_FG).where(_FG.folder == "Multi-Head")).scalars().all():
+                    try:
+                        pos = _json.loads(g.positions_json or "{}")
+                    except Exception:
+                        continue
+                    vals = [str(v) for v in pos.values()]
+                    if vals and all(":" in v and v.split(":", 1)[0] == str(fid)
+                                    for v in vals):
+                        s.delete(g)
+                        removed_group = True
+            except Exception as e:
+                debug_swallow("app_state.remove_fixture.head_group_cleanup", e)
             s.commit()
         self.programmer.pop(fid, None)
         self._reload_patch_cache()
         self._emit("patch_changed")
+        if removed_group:
+            try:
+                self.notify_groups_changed()
+            except Exception:
+                pass
         if undoable and snap is not None:
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -2628,6 +2728,61 @@ def channel_occurrence_keys(channels):
         head = seen.get(a, 0)
         seen[a] = head + 1
         out.append((ch, a if head == 0 else f"{a}#{head}"))
+    return out
+
+
+# FM-16: Multi-Head-Fixtures als Pro-Kopf-Matrix. Kanonische Kopf-Sicht — EINE
+# Quelle fuer den Matrix-Pro-Kopf-Write UND (spaeter) die EFX-Pro-Kopf-Ziele.
+
+
+def color_head_count(fixture) -> int:
+    """Anzahl unabhaengig faerbbarer Koepfe/Emitter = Zahl der ``color_r``-Kanaele
+    (jeder Kopf hat eine eigene RGB(W)-Bank). 1 = Single-Head/einfarbig, >=2 =
+    Multi-Head (Spider/Mover-Bar/Beam-Bar wie Hydrabeam 56ch). Basis fuer die
+    Pro-Kopf-Matrix (FM-16): jeder Kopf wird eine Grid-Zelle. Laser-Ausnahme wie
+    is_spider_fixture: ein Punkt-Scanner ist kein Multi-Emitter."""
+    if (getattr(fixture, "fixture_type", "") or "") == "laser":
+        return 1
+    try:
+        chans = get_channels_for_patched(fixture)
+        n = sum(1 for c in chans
+                if (getattr(c, "attribute", "") or "").lower() == "color_r")
+        return n if n >= 1 else 1
+    except Exception:
+        return 1
+
+
+def channels_for_head(channels, head: int) -> dict:
+    """Projiziert die Kanaele EINES Kopfes eines Multi-Head-Fixtures: liefert
+    ``{basis_attr: channel}`` fuer den ``head``-ten Kopf.
+
+    Regel (verallgemeinert, deckt Pro-Kopf-Farbe UND Pro-Kopf-Dimmer/Strobe ab):
+    Ein Attribut, das MEHRFACH vorkommt, ist PRO KOPF — genommen wird sein
+    ``head``-tes Vorkommen (dieselbe ``channel_occurrence_keys``-Logik: Kopf 0 =
+    ``attr``, Kopf N = ``attr#N``). Ein Attribut, das nur EINMAL vorkommt (ein
+    gemeinsamer Master-Dimmer, Strobe, Farbrad, Makro …), ist GETEILT und erscheint
+    bei JEDEM Kopf. So bekommt eine Matrix-Zelle „Kopf h" genau dessen Farbe (und —
+    wichtig fuer Geraete wie die Hydrabeam 56ch mit eigenem Dimmer/Strobe je Kopf —
+    dessen eigenen Dimmer/Strobe), waehrend ein einzelner Master-Dimmer allen
+    Koepfen gemeinsam bleibt. ``head=0`` auf einem Single-Head-Fixture liefert
+    schlicht alle Kanaele (byte-identisch zum Nicht-Kopf-Pfad)."""
+    counts: dict[str, int] = {}
+    for ch in channels:
+        a = (getattr(ch, "attribute", "") or "").lower()
+        counts[a] = counts.get(a, 0) + 1
+    out: dict = {}
+    seen: dict[str, int] = {}
+    for ch in channels:
+        a = (getattr(ch, "attribute", "") or "").lower()
+        occ = seen.get(a, 0)
+        seen[a] = occ + 1
+        if counts[a] > 1:
+            # wiederholtes Attribut -> pro Kopf: nur das head-te Vorkommen.
+            if occ == head:
+                out[a] = ch
+        else:
+            # einmaliges Attribut -> geteilt (jeder Kopf).
+            out[a] = ch
     return out
 
 

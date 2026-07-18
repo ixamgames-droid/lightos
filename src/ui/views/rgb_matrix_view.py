@@ -1471,20 +1471,24 @@ class RgbMatrixView(QWidget):
                     import json
                     from sqlalchemy.orm import Session
                     from src.core.database.models import FixtureGroup
-                    from src.core.engine.rgb_matrix import grid_from_positions
+                    from src.core.engine.rgb_matrix import grids_from_positions
                     with Session(eng) as s:
                         g = s.get(FixtureGroup, gid)
                     if g is not None:
                         positions = json.loads(g.positions_json or "{}")
-                        grid = grid_from_positions(positions, g.cols, g.rows)
+                        # FM-16: fixture_grid + head_grid parallel (Pro-Kopf-Zellen
+                        # "fid:head" tragen einen Kopf-Index; reine fids -> None).
+                        grid, head_grid = grids_from_positions(positions, g.cols, g.rows)
                         # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
                         self._current.cols = g.cols
                         self._current.rows = g.rows
                         self._current.fixture_grid = grid
+                        self._current.head_grid = head_grid
                         if self._saved is not None:
                             self._saved.cols = g.cols
                             self._saved.rows = g.rows
                             self._saved.fixture_grid = list(grid)
+                            self._saved.head_grid = list(head_grid)
                         for spin, val in ((self._cols_spin, g.cols), (self._rows_spin, g.rows)):
                             spin.blockSignals(True)
                             spin.setValue(val)
@@ -1514,10 +1518,12 @@ class RgbMatrixView(QWidget):
         self._current.cols = len(fids)
         self._current.rows = 1
         self._current.fixture_grid = list(fids)
+        self._current.head_grid = []          # FM-16: lose Auswahl = ganze Fixtures
         if self._saved is not None:
             self._saved.cols = len(fids)
             self._saved.rows = 1
             self._saved.fixture_grid = list(fids)
+            self._saved.head_grid = []
         for spin, val in ((self._cols_spin, len(fids)), (self._rows_spin, 1)):
             spin.blockSignals(True)
             spin.setValue(val)

@@ -462,13 +462,44 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
             zf.writestr("show.json", payload)
             # VC-IMG: referenzierte VC-Button-Hintergrund-Assets (Bild/GIF) mit
             # einbetten -> die Show ist auf einem anderen PC weiter vollstaendig.
-            # NUR referenzierte Keys (mark-sweep-GC verwaister Assets); fehlt ein
-            # Asset im Cache, wird es uebersprungen (Button zeigt dann kein Bild).
+            # NUR referenzierte Keys (mark-sweep-GC verwaister Assets).
             from . import vc_assets
+            _missing = []
             for _key in vc_assets.collect_keys(show):
                 _data = vc_assets.bytes_for(_key)
                 if _data is not None:
                     zf.writestr(vc_assets.zip_name(_key), _data)
+                else:
+                    _missing.append(_key)
+            # VC-IMG-GC: Fehlt ein referenziertes Asset im lokalen Cache (z. B. weil
+            # eine PARALLELE Session es aus dem geteilten Cache evictet hat), NICHT
+            # still fallenlassen — sonst überschriebe os.replace unten die bestehende
+            # .lshow, die das Asset noch eingebettet hatte, und der Button wäre
+            # dauerhaft leer. Stattdessen die Bytes verlustfrei aus der vorhandenen
+            # Ziel-Datei übernehmen: ein Save ist mindestens ein verlustfreier
+            # Round-Trip dessen, was schon in der Datei stand.
+            _recovered: set[str] = set()
+            if _missing and os.path.isfile(path):
+                try:
+                    with zipfile.ZipFile(path, "r") as _old:
+                        _old_names = set(_old.namelist())
+                        for _key in _missing:
+                            _entry = vc_assets.zip_name(_key)
+                            if _entry in _old_names:
+                                _bytes = _old.read(_entry)
+                                zf.writestr(_entry, _bytes)
+                                # Cache gleich wieder auffüllen -> Button zeigt sofort
+                                # wieder + die nächste Speicherung findet es erneut.
+                                vc_assets.store_extracted(_key, _bytes)
+                                _recovered.add(_key)
+                except Exception as _exc:
+                    print(f"[show_file] WARN: fehlende VC-Assets nicht aus {path} "
+                          f"übernehmbar: {_exc}")
+            _lost = [k for k in _missing if k not in _recovered]
+            if _lost:
+                print(f"[show_file] WARN: {len(_lost)} referenzierte(s) VC-Hintergrund-"
+                      f"Asset(s) fehlen im Cache und in der bestehenden Show-Datei — "
+                      f"betroffene Buttons zeigen kein Bild: {_lost}")
         os.replace(tmp_path, path)
     except BaseException:
         try:
@@ -752,6 +783,16 @@ def load_show(path: str | os.PathLike):
     # einer sauberen Fehlermeldung.
     if not isinstance(data, dict):
         return False, "Ungültiges Show-Format: show.json ist kein Objekt."
+
+    # VC-IMG-GC: den lokalen VC-Asset-Cache deckeln. Oben wurden die eingebetteten
+    # Assets DIESER Show entpackt; über viele Shows sammeln sich verwaiste Assets
+    # früher geladener Shows an. Verwaiste per LRU wegräumen — aber nie die vom
+    # gerade geladenen Show referenzierten Keys. Darf das Laden nie stören.
+    try:
+        from . import vc_assets as _vc_assets
+        _vc_assets.prune(keep=_vc_assets.collect_keys(data))
+    except Exception:
+        pass
 
     # STAB-20: Versions-Gate. Ist die Datei NEUER als das unterstuetzte Format,
     # warnen und best-effort weiterladen (statt sie still als aktuelles Format zu
