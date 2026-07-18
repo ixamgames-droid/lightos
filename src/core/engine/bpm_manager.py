@@ -169,20 +169,30 @@ class BPMManager:
 
     # ── BPM setzen ───────────────────────────────────────────────────────────────
 
-    def set_bpm(self, bpm: float):
-        """Tiefer, geklemmter Setter. 0 = aus. Aendert NICHT Modus/Quelle —
-        dafuer request_bpm() (Auto-Quellen) bzw. tap()/nudge() (manuell)."""
+    def set_bpm(self, bpm: float, source: str | None = None):
+        """Tiefer, geklemmter Setter. 0 = aus. source=None laesst die Quelle
+        unveraendert (Alt-Verhalten: aendert NICHT Modus/Quelle — dafuer sonst
+        request_bpm()/tap()/nudge()). Wird source uebergeben, schreibt der Setter
+        _source UND _bpm unter EINEM Lock-Hold (atomar).
+
+        CDX-14: Die internen Aufrufer (_set_manual/request_bpm) setzten _source
+        frueher in einem SEPARATEN Lock-Fenster und danach _bpm hier — ein
+        reset() dazwischen (setzt _source='off', _bpm=0) hinterliess einen
+        inkonsistenten Zustand _bpm>0 bei _source='off'. Source jetzt atomar mit
+        _bpm zu setzen schliesst dieses Fenster."""
         if bpm < 0:
             bpm = 0
         if bpm > 0 and (bpm < self.MIN_BPM or bpm > self.MAX_BPM):
             bpm = max(self.MIN_BPM, min(self.MAX_BPM, bpm))
-        # A3D-17: _bpm (+ abgeleitetes _source) unter dem Lock schreiben — sonst kann
-        # dieser (oft aus dem Audio-Thread aufgerufene) Setter den unter dem Lock
-        # nullenden reset() ueberholen und einen inkonsistenten Zustand hinterlassen
-        # (_bpm>0 bei _source='off'). Der BPM-04-Lock in reset() wirkt nur, wenn auch
-        # der Gegen-Writer den Lock nimmt.
+        # A3D-17 + CDX-14: _bpm, optionale _source und das abgeleitete 'off' unter
+        # EINEM Lock schreiben — sonst kann dieser (oft aus dem Audio-Thread
+        # aufgerufene) Setter den unter dem Lock nullenden reset() ueberholen und
+        # einen inkonsistenten Zustand hinterlassen (_bpm>0 bei _source='off'). Der
+        # BPM-04-Lock in reset() wirkt nur, wenn auch der Gegen-Writer den Lock nimmt.
         with self._lock:
             self._bpm = float(bpm)
+            if source is not None:
+                self._source = source
             if self._bpm <= 0:
                 self._source = "off"
         self._sync_emitter()
@@ -192,8 +202,9 @@ class BPMManager:
         """Manuelle Uebersteuerung (Tap/Nudge/Fader/Eingabe) → MANUAL-Modus."""
         with self._lock:
             self._mode = BpmMode.MANUAL
-            self._source = source
-        self.set_bpm(bpm)
+        # CDX-14: _source atomar mit _bpm setzen (nicht mehr in separatem
+        # Lock-Fenster vor set_bpm, in das ein reset() schluepfen koennte).
+        self.set_bpm(bpm, source=source)
         self._emit_state_change()
 
     def request_bpm(self, bpm: float, source: str = "audio"):
@@ -205,9 +216,10 @@ class BPMManager:
         # Audio-Detektor ist im AUTO-Modus die fuehrende Quelle.
         if self._audio_active and source != "audio":
             return
-        with self._lock:
-            self._source = source
-        self.set_bpm(bpm)
+        # CDX-14: _source atomar mit _bpm setzen (kein separates _source-Lock-Fenster
+        # mehr, in das ein reset() schluepfen und _bpm>0 bei _source='off' hinterlassen
+        # koennte).
+        self.set_bpm(bpm, source=source)
         self._emit_state_change()
 
     def tap(self) -> float:
@@ -453,9 +465,10 @@ class BPMManager:
         if bpm <= 0:
             return
         bpm = self._clamp_bounds(bpm)
-        with self._lock:
-            self._source = "audio"
-        self.set_bpm(bpm)
+        # CDX-14: _source atomar mit _bpm setzen (nicht in einem separaten Lock-Fenster
+        # vor set_bpm) — der Audio-Pfad ist der haeufigste Gegenspieler von reset(),
+        # sonst bliebe genau hier das Fenster _bpm>0 bei _source='off' offen.
+        self.set_bpm(bpm, source="audio")
 
     # ── Beat-Emitter (genau eine Quelle: Timer XOR Audio XOR Grid) ──────────────
 

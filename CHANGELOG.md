@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-18 — BPM-Manager: Quelle & Wert werden atomar gesetzt (CDX-14)
+
+#### Behoben
+
+- **Ein `Reset`/„BPM aus" kann keinen inkonsistenten Zustand `BPM>0` bei Quelle=„aus" mehr hinterlassen.** Die BPM-Quellen (manueller Tap/Nudge/Fader, OS2L-/Datei-Anfrage und der Audio-Detektor) setzten die Quelle (`_source`) und den Wert (`_bpm`) in ZWEI getrennten Lock-Fenstern: erst die Quelle, dann — über `set_bpm()` — den Wert. Ein `reset()` genau dazwischen (nullt beide unter dem Lock) wurde vom nachfolgenden Wert-Schreiben überholt, sodass ein positiver BPM-Wert mit Quelle „aus" zurückblieb (z. B. ein weiterlaufender Beat-Timer trotz angezeigtem „aus"). `set_bpm()` nimmt jetzt eine optionale Quelle und schreibt Quelle **und** Wert unter EINEM Lock-Hold; die drei internen Aufrufer (`_set_manual`, `request_bpm`, `_apply_detected_bpm` — inkl. des häufigsten Gegenspielers, des Audio-Pfads) reichen die Quelle atomar durch. Externe Low-Level-Aufrufer (ohne Quelle) verhalten sich **exakt wie bisher**. Deterministischer Regressionstest `tests/test_bpm_manager_source_race.py` (injiziert ein `reset()` in das alte Fenster und prüft die Invariante „nie BPM>0 bei Quelle=aus"). Ergänzt A3D-17, das die andere Hälfte (reset() vs. set_bpm) schloss.
+
 ### 2026-07-18 — DMX-Ausgabe: Art-Net-Startuniversum ist jetzt einstellbar (A3D-15)
 
 #### Behoben
