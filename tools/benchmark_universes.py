@@ -27,6 +27,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # Output-/Render-Thread NICHT autostarten — wir rufen _render_frame selbst auf.
 os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
+# STAB-CURSHOW (a): _reset() leert den Patch — das darf NIE die geteilte
+# data/current_show.db treffen. Isolierte Wegwerf-DB (conftest/Testlauf setzt
+# vorher seine eigene; setdefault respektiert das).
+import tempfile
+os.environ.setdefault(
+    "LIGHTOS_SHOW_DB",
+    os.path.join(tempfile.gettempdir(), f"lightos_bench_{os.getpid()}.db"),
+)
 
 from PySide6.QtWidgets import QApplication
 _app = QApplication.instance() or QApplication([])

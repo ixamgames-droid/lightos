@@ -28,9 +28,14 @@ Fix (Single-Point, kein Guard in ~40 Dateien noetig):
         koennte sonst noch im Prozess senden, waehrend die Show geschrieben wird).
       * ``LIGHTOS_NO_AUDIO_AUTOSTART=1`` -> kein WASAPI-Loopback-Capture im
         Build-Lauf (analog conftest; rein vorsorglich).
+      * ``LIGHTOS_SHOW_DB=<tmp>/lightos_gen_<skript>_<pid>.db`` -> isolierte
+        Wegwerf-Show-DB statt der geteilten ``data/current_show.db``
+        (STAB-CURSHOW (a): Generator-Laeufe duerfen Davids echten Show-Zustand
+        nicht anfassen; Muster aus ``build_mega_arena_2026.py`` verallgemeinert).
 
     ``setdefault`` respektiert eine bereits gesetzte Umgebung (z. B. wenn jemand den
-    Generator bewusst mit echtem Output-Prozess laufen lassen will).
+    Generator bewusst mit echtem Output-Prozess oder gegen eine echte DB laufen
+    lassen will).
 
 Verwendung:
     Als ALLERERSTE Zeile eines Generators (vor jedem ``src.core``-Import)::
@@ -43,6 +48,8 @@ Verwendung:
     oben hinzu (Beispiele: ``build_demo_show.py``, ``build_test_show.py``).
 """
 import os
+import sys
+import tempfile
 
 # Robust gegen verschobene Imports: setzt die Schalter sofort beim Import dieses
 # Moduls. setdefault -> eine bereits gesetzte (bewusste) Umgebung gewinnt.
@@ -51,3 +58,15 @@ os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 # Headless: kein echtes Qt-Display fuer einen reinen JSON/DB-Build-Lauf.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+# STAB-CURSHOW (a): Generatoren/Tools duerfen nie auf der geteilten
+# data/current_show.db arbeiten — ShowBuilder(reset=True) macht dort reset_show()
+# und patcht hinein, parallele Laeufe (oder eine offene App) desyncen die DB.
+# Isolierte Wegwerf-DB pro Lauf; Skript-Stem + PID, damit zwei gleichzeitig
+# laufende Generatoren sich keine Temp-DB teilen.
+_stem = os.path.splitext(os.path.basename(sys.argv[0] or ""))[0] or "interactive"
+_stem = "".join(c if (c.isalnum() or c in "-_") else "_" for c in _stem)
+os.environ.setdefault(
+    "LIGHTOS_SHOW_DB",
+    os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
+)

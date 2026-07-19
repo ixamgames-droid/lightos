@@ -33,11 +33,21 @@ from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
 from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_label import VCLabel
 
-OUT = os.path.join("shows", "APC_Demo_Show.lshow")
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(_ROOT, "shows", "APC_Demo_Show.lshow")
 
 state = get_state()
 fm = get_function_manager()
 fixtures = state.get_patched_fixtures()
+if not fixtures:
+    # Seit der LIGHTOS_SHOW_DB-Isolation in _gen_env (STAB-CURSHOW a) startet dieses
+    # Alt-Skript auf einer leeren Wegwerf-DB; es baut aber auf dem Bestands-Patch auf.
+    sys.exit(
+        "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
+        "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
+        "echte DB (App vorher schliessen!):\n"
+        "  $env:LIGHTOS_SHOW_DB='data/current_show.db'; venv/Scripts/python tools/build_demo_show.py"
+    )
 fids = [f.fid for f in fixtures]
 
 # Attribut -> 1-basierter Kanal-Offset (alle PARs gleicher Mode)

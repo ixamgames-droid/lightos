@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Werkzeug-Audit-Runde: DB-Isolation, Archiv, neue Loop-Werkzeuge
+
+#### Hinzugefügt
+
+- **`tools/backlog_compact.py`** — Backlog-Verdichter + Queue-View: `--queue N` listet die nächsten offenen Items kompakt (BACKLOG.md ist mit ~290 KB nicht mehr am Stück ladbar), `--stats` zählt Status/Prio, `--archive [--apply]` verdichtet reine done-Tabellenzeilen nach `BACKLOG_ARCHIVE.md` (Kurzzeile mit ID+PR-Link bleibt, QA-18-lint-konform). Tests: `tests/test_backlog_compact.py`.
+- **`tools/janitor.py`** — Worktree-/Branch-/Artefakt-Hygiene, report-first: erkennt verwaiste `wt-*`-Ordner, vollständig gemergte inaktive Branches und alte `artifacts_*.png`-/Log-Leichen; aufgeräumt wird nur mit `--apply` (Artefakte wandern nach `_trash/`, nie hartes Löschen; pytest-Lock-Halter, dirty Trees, `main` und der eigene Worktree sind tabu). Tests: `tests/test_janitor.py`.
+- **`tools/_showpath.py`** — `find_show(name)` löst Show-Dateien mit Fallback `shows/` → `shows/_archiv/` auf (viele historische Shows sind seit 2026-07-19 archiviert) und bricht sonst mit klarer Meldung ab.
+- **`tools/gen_tools_index.py` + `tools/README.md`** — generierter Werkzeug-Index (erste Docstring-/Synopsis-Zeile je Skript); Frische-Gate `tests/test_tools_index.py`.
+- **Lint-Gate `tests/test_tools_db_isolation.py`** (STAB-CURSHOW a): jedes tools/-Skript, das State-/Show-DB-APIs referenziert, muss `import _gen_env` nutzen oder `LIGHTOS_SHOW_DB` setzen (Whitelist nur mit Begründung).
+
+#### Geändert
+
+- **`tools/_gen_env.py` setzt jetzt zusätzlich eine isolierte Wegwerf-`LIGHTOS_SHOW_DB`** (`<tmp>/lightos_gen_<skript>_<pid>.db`, `setdefault`): alle `_gen_env`-basierten Generatoren/Captures arbeiten nie mehr auf Davids geteilter `data/current_show.db` (STAB-CURSHOW (a); Muster aus `build_mega_arena_2026.py` verallgemeinert). `build_demo_show.py`/`build_full_show.py` (bauen bewusst auf dem Bestands-Patch auf) brechen auf leerer Wegwerf-DB jetzt mit klarer Anleitung ab statt mit IndexError.
+- **11 überholte Einmal-Skripte nach `tools/_archiv/` verschoben** (Begründungen in `tools/_archiv/README.md`): `verify_matrix_group_scope`, `_shot_matrix_group_scope(_live)`, `verify_efx_group_scope`, `verify_komplett_demo`, `patch_stage_show_pages`+`build_stage_show`, `build_hardstyle_vc`, `build_snaps_show`, `diag_hardstyle`, `diag_movers` — Prüflogik lebt in pytest-Tests weiter bzw. Ziel-Shows sind archiviert.
+- Capture-/Render-Skripte (`capture_hochzeit_tempo_guide`, `capture_test123_tempo_guide`, `render_apc_pages`, `render_neue_demo_pages`) nutzen `find_show` (Archiv-Fallback) und `_gen_env`-Isolation; `benchmark_universes.py` und `check_demo_show_full.py` laufen ebenfalls DB-isoliert.
+
+#### Behoben
+
+- **`tools/build_full_show.py` überschreibt nicht mehr die Crash-Recovery-Autosave** `%APPDATA%/LightOS/auto_save.lshow` (löste beim nächsten App-Start einen irreführenden Recovery-Dialog aus und zerstörte die echte Autosave).
+- `tools/vc_click_targets.py`: Usage-Zeile statt nacktem IndexError ohne Argument; `tools/gallery_server.py`-Docstring (kein `?type=`-Filter), `verify_color_dimmer_separation.py`-Zeilenverweise (`live_view.py:1069`), `start.ps1`/`install.py`/`INSTALL.md` ARM64-Hinweis auf Python **3.14** aktualisiert.
+
 ### 2026-07-19 — Test-Gate auch auf Linux/macOS lauffähig (XPLAT-02)
 
 #### Geändert

@@ -8,7 +8,9 @@ laufen. Nur lokal (127.0.0.1).
 
 Start (aus dem Repo-Root):
   python tools/gallery_server.py 8778
-Dann im Preview-Pane: http://127.0.0.1:8778/gallery_render.html?type=<viz_model>
+Dann im Preview-Pane: http://127.0.0.1:8778/gallery_render.html
+(rendert ALLE Typen der in gallery_render.html hart kodierten TYPES-Liste und
+speichert sie per POST /save/<name>; einen ?type=-Filter gibt es nicht)
 """
 import base64
 import os

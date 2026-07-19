@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Native Plattform: das offscreen-Plugin hat keine Schrift-Glyphen (Text wuerde als
 # Kaestchen erscheinen). Auf einem Windows-Desktop rendert "windows" mit echten Fonts.
 os.environ.setdefault("QT_QPA_PLATFORM", "windows")
+# Isolations-Schalter (Wegwerf-Show-DB etc.); "windows" oben gewinnt gegen offscreen.
+import _gen_env  # noqa: F401,E402
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QSize
@@ -24,9 +26,12 @@ from PySide6.QtCore import QSize
 _app = QApplication.instance() or QApplication([])
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
+from _showpath import find_show
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHOW = os.path.join(_ROOT, "shows", "APC_Test_Komplett.lshow")
+# Show liegt seit 2026-07-19 ggf. nur noch in shows/_archiv/ — find_show prueft beide.
+SHOW = str(find_show("APC_Test_Komplett.lshow",
+                     hint="Neu erzeugen: venv/Scripts/python tools/build_apc_test_show.py"))
 OUT_DIR = os.path.join(_ROOT, "docs", "images")
 PAGE_NAMES = ["farben", "dimmer", "matrix", "mix", "rgbw", "color-chase"]
 W, H = 760, 812

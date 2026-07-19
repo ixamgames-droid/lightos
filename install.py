@@ -159,7 +159,7 @@ def check_arm_runtime():
             "Du bist auf Windows ARM64, aber Python laeuft nicht nativ als ARM64. "
             "Bitte ARM64-Python installieren, sonst laufen DMX/MIDI/Qt ggf. nur per Emulation."
         )
-        warn("Empfohlen: winget install Python.Python.3.13 --arch arm64")
+        warn("Empfohlen: winget install Python.Python.3.14 --arch arm64")
 
 
 def create_venv():
