@@ -379,12 +379,22 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                         b = sorted_fxs[i + 1]
                         a_end = getattr(a, "address", 0) + getattr(a, "channel_count", 0) - 1
                         b_addr = getattr(b, "address", 0)
+                        b_end = b_addr + getattr(b, "channel_count", 0) - 1
                         if a_end >= b_addr:
+                            # STAB-CURSHOW: Adress-Ueberlappung zwischen zwei
+                            # DISTINKTEN fids wird nur GEMELDET, nie auto-geloescht
+                            # (fid ist UNIQUE -> beide sind eigenstaendige Fixtures;
+                            # am Startzeitpunkt nicht von einem legitimen Nutzer-
+                            # Stapel unterscheidbar -> Auto-Delete = stiller Verlust).
+                            # Meldung nennt beide fids + volle Adressbereiche +
+                            # Universe, damit sie manuell aufloesbar ist.
                             issues.append(ValidationIssue(
                                 'error', f"Universe {univ}",
-                                f"Konflikt: {getattr(a, 'label', '?')}[{getattr(a, 'fid', '?')}] "
+                                f"Adresskonflikt (U{univ}): "
+                                f"{getattr(a, 'label', '?')}[fid {getattr(a, 'fid', '?')}] "
                                 f"@ {getattr(a, 'address', '?')}-{a_end} überlappt "
-                                f"{getattr(b, 'label', '?')}[{getattr(b, 'fid', '?')}] @ {b_addr}",
+                                f"{getattr(b, 'label', '?')}[fid {getattr(b, 'fid', '?')}] "
+                                f"@ {b_addr}-{b_end} — report-only, manuell aufloesen.",
                             ))
             except Exception as e:
                 issues.append(ValidationIssue(

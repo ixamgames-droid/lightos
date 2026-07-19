@@ -1,10 +1,11 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
 import os
+import sys
 import threading
 import time
 from dataclasses import dataclass
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
@@ -18,6 +19,101 @@ from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _V
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
 SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
+
+
+# STAB-CURSHOW: Bekannte Cloud-Sync-Ordner-Marker. Liegt die Show-DB in einem
+# solchen Ordner, ist WAL unsicher — der Sync-Client fasst die -wal/-shm-mmap-
+# Sidecar-Dateien mitten in einem Schreibvorgang an und kann die geteilte DB
+# korrumpieren. Dann bleibt es beim DELETE-Journal (busy_timeout traegt den Fix
+# ohnehin allein). Marker in Kleinschreibung; gematcht als Teilstring im Pfad.
+_CLOUD_SYNC_MARKERS = (
+    "onedrive", "dropbox", "google drive", "googledrive", "\\google\\drive",
+    "icloud", "\\box\\", "\\box sync", "nextcloud", "creative cloud files",
+    "pcloud", "mega", "sync.com",
+)
+
+
+def _is_local_writable_path(path: str) -> bool:
+    """WAL-Guard (STAB-CURSHOW): ``True`` nur, wenn ``path`` auf einem lokalen
+    Fixed-Laufwerk liegt UND nicht in einem bekannten Cloud-Sync-Ordner.
+
+    WAL nutzt mmap-Shared-Memory (``-wal``/``-shm``) und wird auf SMB-/Netz-
+    laufwerken NICHT zuverlaessig unterstuetzt; Cloud-Sync-Clients korrumpieren
+    die Sidecars. Im Zweifel ``False`` -> ``journal_mode`` bleibt ``DELETE``
+    (kein Nachteil ggue. heute, nur der WAL-Reader-Snapshot-Bonus entfaellt)."""
+    try:
+        ap = os.path.abspath(path)
+        low = ap.replace("/", "\\").lower()
+        # UNC / Netzpfad (\\server\share, \\?\UNC\...).
+        if low.startswith("\\\\") or low.startswith("\\\\?\\unc"):
+            return False
+        # Bekannte Cloud-Sync-Ordner — auch auf Fixed-Disk unsicher.
+        if any(m in low for m in _CLOUD_SYNC_MARKERS):
+            return False
+        # Windows: nur DRIVE_FIXED zulassen (kein Wechsel-/Netz-/RAM-Laufwerk).
+        if sys.platform == "win32":
+            import ctypes
+            drive = os.path.splitdrive(ap)[0]
+            if not drive:
+                return False
+            if not drive.endswith("\\"):
+                drive += "\\"
+            DRIVE_FIXED = 3
+            t = ctypes.windll.kernel32.GetDriveTypeW(ctypes.c_wchar_p(drive))
+            if int(t) != DRIVE_FIXED:
+                return False
+            return True
+        # Nicht-Windows (Linux/macOS): es gibt hier keinen portablen lokaler-vs-
+        # Netz-/Wechselmedium-Check (ein NFS/CIFS-Mount matcht weder UNC noch die
+        # Cloud-Marker) -> konservativ KEIN WAL, statt fail-open auf ein evtl.
+        # unsicheres Netz-Dateisystem. busy_timeout + der atomare Replace tragen
+        # die Korrektheit auch ohne WAL. Lokales WAL auf Linux -> Item STAB-WAL-NET.
+        return False
+    except Exception:
+        # Jede Unsicherheit -> konservativ kein WAL.
+        return False
+
+
+def _set_sqlite_pragmas(dbapi_conn, wal_ok: bool) -> None:
+    """SQLAlchemy ``connect``-Callback (STAB-CURSHOW): setzt pro physischer
+    Show-DB-Connection die Concurrency-PRAGMAs.
+
+    * ``busy_timeout=5000`` IMMER (pro Connection, risikofrei, auch auf
+      Netzlaufwerk): macht aus sofortigem ``SQLITE_BUSY`` ein kurzes Warten, so
+      dass zwei echte App-Prozesse ihre (jetzt atomaren) Patch-Replaces
+      serialisieren statt sich zu korrumpieren.
+    * ``journal_mode=WAL`` + ``synchronous=NORMAL`` NUR wenn ``wal_ok`` (lokaler
+      Fixed-Pfad) — best-effort, Rueckgabewert verifiziert, nie crashend."""
+    try:
+        cur = dbapi_conn.cursor()
+        try:
+            cur.execute("PRAGMA busy_timeout=5000")
+            if wal_ok:
+                cur.execute("PRAGMA journal_mode=WAL")
+                row = cur.fetchone()
+                mode = (row[0] if row else "") or ""
+                if str(mode).lower() == "wal":
+                    # synchronous=NORMAL ist mit WAL crash-sicher und schneller.
+                    cur.execute("PRAGMA synchronous=NORMAL")
+                # Bleibt der Modus nicht 'wal' haengen (z. B. Netz-/Sync-Ordner
+                # trotz Guard) -> nichts weiter tun, DELETE-Journal bleibt.
+            else:
+                # `journal_mode` ist eine PERSISTENTE Datei-Eigenschaft: war die DB
+                # je (an einem sicheren Ort) auf WAL, bliebe sie es ueber Neustarts
+                # hinweg — auch nachdem der Guard den Pfad jetzt als unsicher (Netz-/
+                # Cloud-Sync-Ordner) einstuft. Reines "WAL nicht einschalten" reicht
+                # daher nicht; eine geerbte WAL-Datei aktiv auf DELETE zurueckschalten
+                # (best-effort; checkpointet + entfernt die -wal/-shm-Sidecars).
+                cur.execute("PRAGMA journal_mode")
+                row = cur.fetchone()
+                mode = (row[0] if row else "") or ""
+                if str(mode).lower() == "wal":
+                    cur.execute("PRAGMA journal_mode=DELETE")
+        finally:
+            cur.close()
+    except Exception as e:
+        # PRAGMAs duerfen das Oeffnen der Show nie brechen.
+        debug_swallow("app_state._set_sqlite_pragmas", e)
 
 # NET-05: Art-Net/sACN-Eingangs-Timeout. Eine externe Quelle, die laenger als dies
 # nichts mehr gesendet hat, gilt als weg und wird aus input_layer verworfen — sonst
@@ -441,7 +537,26 @@ class AppState:
     def open_show(self, path: str = SHOW_DB_PATH):
         import os
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        # STAB-CURSHOW: eine evtl. schon offene Show-Engine (samt ihrem
+        # connect-Listener-Closure) vor dem Ueberschreiben freigeben — sonst
+        # leakt bei wiederholtem open_show (Tests / kuenftiges "Show wechseln
+        # ohne Neustart") der alte Connection-Pool + Listener.
+        _old_engine = getattr(self, "_show_engine", None)
+        if _old_engine is not None:
+            try:
+                _old_engine.dispose()
+            except Exception as e:
+                debug_swallow("app_state.open_show.dispose_old", e)
         self._show_engine = create_engine(f"sqlite:///{path}", echo=False)
+        # STAB-CURSHOW: Concurrency-PRAGMAs pro Connection setzen. busy_timeout ist
+        # Pflicht (serialisiert zwei echte App-Prozesse statt sofort SQLITE_BUSY);
+        # WAL nur auf lokalem Fixed-Pfad (Guard gegen Netz-/Cloud-Sync-Ordner).
+        # Der 'connect'-Listener feuert fuer jede neue physische Pool-Connection.
+        _wal_ok = _is_local_writable_path(path)
+        event.listen(
+            self._show_engine, "connect",
+            lambda dbapi_conn, _rec: _set_sqlite_pragmas(dbapi_conn, _wal_ok),
+        )
         create_all_idempotent(self._show_engine)   # QA-06: TOCTOU-toleranter create_all
         # FLD-01b: fehlende Spalten in bestehenden Show-DBs nachziehen.
         try:
@@ -649,6 +764,59 @@ class AppState:
         with self._session() as s:
             s.execute(delete(PatchedFixture))
             s.commit()
+        self._reload_patch_cache()
+        self._emit("patch_changed")
+
+    def replace_patch(self, fixtures: list[PatchedFixture]):
+        """STAB-CURSHOW: Ersetzt den GESAMTEN Patch ATOMAR in EINER Transaktion.
+
+        Ersetzt das frühere ``clear_patch()`` + N×``add_fixture()`` (N+1 Commits)
+        durch GENAU EINEN Commit: ``DELETE FROM patched_fixtures`` + Bulk-Insert
+        aller Fixtures. Dadurch existiert nie ein persistierter Leer-/Halbzustand,
+        den ein paralleler Prozess sieht oder in den er hinein-INSERTet — die
+        Quelle der 22-35-Nichtdeterminismus + der Adress-Ueberlapp-Zeilen. Crash
+        vor dem Commit -> Journal-Rollback -> alter Patch bleibt intakt.
+
+        FALLEN (zwingend, siehe STAB-CURSHOW-Debatte):
+        * ZWINGEND Core-``delete()`` (``s.execute(delete(...))``), NIEMALS ORM-
+          ``session.delete``/objektweise: die Unit-of-Work ordnet objektweises
+          Delete sonst NACH den ``add_all``-INSERTs derselben Tabelle -> UNIQUE-
+          Constraint-Clash auf ``fid``. Core-delete emittiert das SQL sofort und
+          leert die Tabelle im selben TX vor dem Flush (Vorbild: ``clear_patch``).
+        * fid-Dedup REASSIGN (nie droppen): kollidiert eine fid innerhalb der
+          eingehenden Liste (kaputte Show-Datei), weicht sie auf die naechste
+          freie aus — sonst Intra-Load-Datenverlust. Kein DB-Read alter fids
+          noetig, da die Tabelle im selben TX geleert wird.
+        * KEIN ``add_fixture`` -> KEINE Auto-Kopf-Matrix-Gruppe (FM-16). Gruppen
+          werden vom Loader separat via ``_restore_fixture_groups`` gesetzt.
+        * ``expire_on_commit``: die uebergebenen ORM-Objekte sind nach dem Commit
+          DETACHED. Downstream ausschliesslich den frisch via
+          ``_reload_patch_cache`` gebundenen Cache nutzen, nie ``fixtures``.
+        """
+        # fid-Dedup mit REASSIGN gegen das Batch-Set.
+        used: set[int] = set()
+        for pf in fixtures:
+            if pf.fid in used:
+                pf.fid = max(used) + 1
+            used.add(pf.fid)
+        if self._show_engine is None:
+            # Kein Show-Engine (Test-/Headless-Sonderfall): Cache setzen UND die
+            # In-Memory-Ableitungen genauso vorwaermen wie der Engine-Zweig via
+            # _reload_patch_cache (Universes/Channel-/Render-Plan), sonst emittiert
+            # patch_changed auf einen inkonsistenten abgeleiteten Zustand.
+            self._patch_cache = list(fixtures)
+            self._rebuild_universes()
+            clear_channel_cache()
+            self._rebuild_render_plan()
+            self._emit("patch_changed")
+            return
+        from sqlalchemy import delete
+        with self._session() as s:
+            # Core-delete zuerst (leert die Tabelle im selben TX), dann Bulk-Insert.
+            s.execute(delete(PatchedFixture))
+            s.add_all(fixtures)
+            s.commit()   # GENAU EIN Commit -> kein persistierter Zwischenzustand.
+        # `fixtures` ist jetzt detached (expire_on_commit) -> ab hier nur der Cache.
         self._reload_patch_cache()
         self._emit("patch_changed")
 
