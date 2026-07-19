@@ -76,7 +76,13 @@ class Chaser(Function):
                 from .bpm_manager import get_bpm_manager
                 bm = get_bpm_manager()
                 if bm.bpm <= 0:
-                    bm.set_bpm(120.0)
+                    # CDX-14b: Quelle MITGEBEN. Ohne source liesse set_bpm() aus dem
+                    # Off-Zustand _source=='off' stehen (leitet 'off' nur aus bpm<=0
+                    # ab) -> _bpm>0 bei Quelle 'off' (Timer laeuft trotz Anzeige
+                    # "aus"). "manual" = fest gesetzter Default-Takt (kein gemessener
+                    # Beat); set_bpm aendert den Modus NICHT, der Audio-Detektor darf
+                    # also weiter in AUTO uebernehmen.
+                    bm.set_bpm(120.0, source="manual")
             except Exception:
                 pass
         # WP-Tempo: Step-Zaehler zuruecksetzen + ankern. „Taktgleich" (align_on_start,

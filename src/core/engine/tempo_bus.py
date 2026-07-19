@@ -680,7 +680,11 @@ class TempoBusManager:
             gstate = None
             try:
                 mgr = get_bpm_manager()
-                gstate = (mgr.bpm, bool(mgr.is_locked), mgr.mode)
+                # CDX-14b: die QUELLE mit einfrieren, damit das Auftauen sie treu
+                # restauriert. Sonst setzt das Unfreeze unten set_bpm(bpm0) OHNE
+                # Quelle -> aus dem zwischenzeitlichen Off-Zustand (Freeze nullt auf
+                # 0 = 'off') bliebe _bpm>0 bei _source=='off' zurueck.
+                gstate = (mgr.bpm, bool(mgr.is_locked), mgr.mode, mgr.current_source)
                 mgr.set_bpm(0.0)
                 mgr.set_locked(True)
             except Exception:
@@ -697,14 +701,22 @@ class TempoBusManager:
         if g is not None:
             try:
                 mgr = get_bpm_manager()
-                bpm0, locked0, mode0 = g
+                # CDX-14b: defensiv entpacken — neue States tragen die Quelle als 4.
+                # Element, aeltere (falls doch mal ein 3-Tupel auftaucht) fallen auf
+                # "manual" zurueck (fester Wert, nie 'off' bei bpm>0).
+                bpm0, locked0, mode0 = g[0], g[1], g[2]
+                # 4. Element = Quelle (neu); fehlend ODER 'off' -> "manual", damit die
+                # Restauration eines positiven bpm0 nie _bpm>0 bei _source=='off' setzt.
+                source0 = g[3] if (len(g) > 3 and g[3] != "off") else "manual"
                 mgr.set_locked(bool(locked0))
                 try:
                     mgr.set_mode(mode0)
                 except Exception:
                     pass
                 if bpm0 and bpm0 > 0:
-                    mgr.set_bpm(bpm0)
+                    # Quelle + Wert atomar restaurieren (set_bpm haelt seit CDX-14 den
+                    # Lock ueber beide -> kein neues Race-Fenster).
+                    mgr.set_bpm(bpm0, source=source0)
             except Exception:
                 pass
         self._freeze_state = None

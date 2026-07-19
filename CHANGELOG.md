@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — BPM: Beat-Timer läuft nicht mehr bei Anzeige „aus" (CDX-14b)
+
+#### Behoben
+
+- **Ein „aus"-angezeigtes Tempo lässt keinen versteckten Beat-Takt mehr laufen.** Nach CDX-14 setzte `set_bpm()` Quelle und Wert atomar, aber drei Aufrufer gaben aus dem Off-Zustand einen positiven Wert **ohne** Quelle weiter — `set_bpm()` leitet „aus" nur aus `BPM<=0` ab, nie umgekehrt, sodass `BPM>0` bei Quelle „aus" zurückblieb und der Beat-Timer lief, obwohl die UI „aus" zeigte (Chaser/Effekte triggerten gegen einen unsichtbaren Takt). Betroffen: der audio-getriggerte Chaser-Default (120 BPM), der OS2L-Fallback-Pfad und das Auftauen aus dem Tempo-Freeze (F3). **Fix:** alle drei geben die Quelle jetzt explizit mit (`set_bpm(bpm, source=…)`) — Chaser-Default → „manual", OS2L → „os2l"; der Tempo-Freeze **sichert die Quelle beim Einfrieren mit und restauriert sie treu** beim Auftauen. Bewusst **ohne** Umleitung über `request_bpm`/`set_manual_bpm` (deren Präzedenz-Guards MANUAL/Lock/Audio würden das Verhalten der Aufrufer ändern). Deterministische Regressionstests `tests/test_bpm_cdx14b_source_invariant.py` (Invariante je Aufrufer + Freeze/Unfreeze-Roundtrip erhält die Quelle). Schließt die von CDX-14 offen dokumentierte Rest-Lücke.
 ### 2026-07-19 — Linux-Installations-/Laufzeit-Doku (XPLAT-07)
 
 #### Dokumentation
