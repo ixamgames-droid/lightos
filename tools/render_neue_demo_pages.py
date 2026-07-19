@@ -7,14 +7,19 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "windows")
+# Isolations-Schalter (Wegwerf-Show-DB etc.); "windows" oben gewinnt gegen offscreen.
+import _gen_env  # noqa: F401,E402
 
 from PySide6.QtWidgets import QApplication
 _app = QApplication.instance() or QApplication([])
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
+from _showpath import find_show
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHOW = os.path.join(_ROOT, "shows", "Neue_Demo_2026.lshow")
+# Show liegt seit 2026-07-19 ggf. nur noch in shows/_archiv/ — find_show prueft beide.
+SHOW = str(find_show("Neue_Demo_2026.lshow",
+                     hint="Neu erzeugen: venv/Scripts/python tools/build_neue_demo_show.py"))
 OUT_DIR = os.path.join(_ROOT, "docs", "images")
 PAGE_NAMES = ["quadranten", "matrix-looks", "builder", "moving-heads", "playback"]
 W, H = 1180, 812

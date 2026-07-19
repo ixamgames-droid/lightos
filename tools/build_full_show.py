@@ -13,7 +13,7 @@ APC-Pads (Note=Reihe*8+Spalte, Reihe 0 unten; untere 2 Reihen = MIDI-Mapper):
 
 Aufruf: venv/Scripts/python.exe tools/build_full_show.py
 """
-import os, sys, json, shutil
+import os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -32,13 +32,22 @@ from src.ui.virtualconsole.vc_label import VCLabel
 
 APPDIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
 SNAP_FILE = os.path.join(APPDIR, "snapshots.json")
-AUTO_SAVE = os.path.join(APPDIR, "auto_save.lshow")
 MIDIMAP = os.path.join("data", "midi_mappings.json")
 SHOW_OUT = os.path.join("shows", "APC_Demo_Show.lshow")
 
 st = get_state()
 fm = get_function_manager()
 fixtures = st.get_patched_fixtures()
+if not fixtures:
+    # Seit der LIGHTOS_SHOW_DB-Isolation in _gen_env (STAB-CURSHOW a) startet dieses
+    # Alt-Skript auf einer leeren Wegwerf-DB. Es baut aber bewusst auf dem
+    # BESTANDS-Patch auf — wer das will, muss explizit gegen die echte DB laufen.
+    sys.exit(
+        "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
+        "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
+        "echte DB (App vorher schliessen!):\n"
+        "  $env:LIGHTOS_SHOW_DB='data/current_show.db'; venv/Scripts/python tools/build_full_show.py"
+    )
 fids = [f.fid for f in fixtures]
 chan = {c.attribute: c.channel_number for c in get_channels_for_patched(fixtures[0])}
 
@@ -261,9 +270,11 @@ try:
 except Exception as e:
     print(f"midi remap uebersprungen: {e}")
 
+# Bewusst KEINE Kopie nach %APPDATA%/LightOS/auto_save.lshow mehr: das ist die
+# Crash-Recovery-Autosave der echten App — ein Build-Lauf darf sie nicht ersetzen
+# (loeste beim naechsten App-Start einen irrefuehrenden Recovery-Dialog aus).
 from src.core.show.show_file import save_show, load_show
 save_show(SHOW_OUT)
-shutil.copyfile(SHOW_OUT, AUTO_SAVE)
 
 ok, _ = load_show(SHOW_OUT)
 vc = st._vc_layout.get("widgets", [])

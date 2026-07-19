@@ -26,6 +26,9 @@ def _bbox(im, color, region, tol=12):
 
 
 def main():
+    if len(sys.argv) < 2:
+        print("usage: vc_click_targets.py <fullscreen.png> [widget-name]")
+        sys.exit(2)
     shot = sys.argv[1]
     only = sys.argv[2] if len(sys.argv) > 2 else None
     geo = json.load(open(GEO, encoding="utf-8"))

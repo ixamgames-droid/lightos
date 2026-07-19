@@ -15,6 +15,11 @@ os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
 os.environ.setdefault("QT_OPENGL", "software")
 os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
+# STAB-CURSHOW (a): load_show schreibt in die Show-DB — isolierte Wegwerf-DB via
+# _gen_env, damit der Capture-Lauf Davids echte data/current_show.db nicht anfasst.
+# (QT_QPA_PLATFORM='windows' oben gewinnt gegen das offscreen-setdefault.)
+import _gen_env  # noqa: F401
+from _showpath import find_show
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -31,7 +36,7 @@ from src.ui.virtualconsole.vc_live_editor import VCLiveEditor
 from src.ui.virtualconsole.vc_speedial import VCSpeedDial
 
 
-SHOW = ROOT / "shows" / "test123.lshow"
+SHOW = find_show("test123.lshow")
 OUT = ROOT / "docs" / "anleitung_test123_tempo" / "img"
 
 

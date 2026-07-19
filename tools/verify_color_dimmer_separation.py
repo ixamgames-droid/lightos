@@ -5,7 +5,7 @@ abspeichere, ist auf einmal ein Dimmer mit dabei." Dieses Skript baut reine
 Farb-Effekte UND reine Dimmer-Effekte, laesst sie am ECHTEN Render-Pfad
 (state._render_frame) laufen und liest dann pro Fixture exakt das aus, was der
 LIVE-VIEWER anzeigt -- mit derselben Funktion, die der Live-Viewer benutzt
-(LiveView._fixture_color_and_intensity, live_view.py:741):
+(LiveView._fixture_color_and_intensity, live_view.py:1069):
     * eine FARBE (color_r/g/b/w -> RGB, Weiss auf RGB addiert)
     * eine INTENSITAET (Dimmer-Kanal; ohne Dimmer-Kanal = 255)
 Der Live-Viewer zeichnet beide GETRENNT: die Farbe immer als Hue, die Intensitaet
@@ -107,8 +107,12 @@ def raw(fid: int, attr: str) -> int:
     return int(state.universes[1].get_channel(abs_addr(fid, attr)))
 
 
-# ── EXAKTE Live-Viewer-Berechnung (Kopie von LiveView._fixture_color_and_intensity,
-#    src/ui/views/live_view.py:741-763) -- so sehen wir 1:1 was der Viewer anzeigt. ──
+# ── Live-Viewer-Berechnung (Kopie von LiveView._fixture_color_and_intensity,
+#    src/ui/views/live_view.py:1069 ff.) -- so sehen wir 1:1 was der Viewer anzeigt.
+#    Abweichung zum Original: das Original hat inzwischen ein seen-Set ("erster
+#    Kopf gewinnt") fuer Mehrkopf-Geraete; fuer die hier benutzten Einkopf-PARs
+#    ist das Ergebnis identisch. Dauerhafter Regressionsschutz liegt in
+#    tests/test_strict_dimmer_render.py — dieses Skript ist Doku/Aufklaerung. ──
 def live_view_shows(fid: int) -> tuple[tuple[int, int, int], int]:
     """Gibt ((r,g,b), intensity) zurueck -- genau wie der Live-Viewer."""
     fx = fixtures[fid]
