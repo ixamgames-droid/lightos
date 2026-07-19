@@ -26,7 +26,7 @@ Das war's. Das Script:
 ### Python fuer ARM64 holen
 - Offizielle ARM64-Builds: https://www.python.org/downloads/windows/
   Achten auf "**ARM64**" in den Dateinamen
-- Oder: `winget install Python.Python.3.13 --arch arm64`
+- Oder: `winget install Python.Python.3.14 --arch arm64`
 
 ### VS Build Tools fuer ARM64 (nur falls noetig)
 - Download: https://visualstudio.microsoft.com/visual-cpp-build-tools/
@@ -196,7 +196,7 @@ Wenn du das vorbereitest sag Bescheid - dann mache ich ein dediziertes Build-Scr
 | Problem | Loesung |
 |---|---|
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
-| Installer meldet "Python laeuft emuliert auf ARM64" | ARM64-Python installieren (`winget install Python.Python.3.13 --arch arm64`) und `install.py` erneut ausfuehren |
+| Installer meldet "Python laeuft emuliert auf ARM64" | ARM64-Python installieren (`winget install Python.Python.3.14 --arch arm64`) und `install.py` erneut ausfuehren |
 | `python-rtmidi` Build-Fehler auf ARM64 | MSVC Build Tools installieren |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |

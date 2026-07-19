@@ -10,10 +10,10 @@ import sys
 import math
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
-os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_SHOW_DB", os.path.join(os.environ.get("TEMP", "."), "lightos_check.db"))
+# Restliche Isolations-Schalter (offscreen, kein Output-Thread/Audio, SERIAL_INPROC
+# gegen den __mp_main__-Doppellauf) zentral aus _gen_env — DEMO-02/STAB-CURSHOW.
+import _gen_env  # noqa: F401,E402
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QImage, QPainter, QColor, QPen, QFont

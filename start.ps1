@@ -10,7 +10,7 @@ Write-Host "[start] OS-Arch: $osArch | Prozess-Arch: $procArch"
 
 # Hinweis, wenn auf ARM64 ein emuliertes (nicht-ARM64) Python genutzt wird
 if ($osArch -eq "Arm64" -and $procArch -ne "Arm64") {
-    Write-Host "[start] WARN: Python laeuft emuliert ($procArch auf ARM64). Fuer beste Stabilitaet/Performance ARM64-Python nutzen (winget install Python.Python.3.13 --arch arm64)."
+    Write-Host "[start] WARN: Python laeuft emuliert ($procArch auf ARM64). Fuer beste Stabilitaet/Performance ARM64-Python nutzen (winget install Python.Python.3.14 --arch arm64)."
 }
 
 # venv-Python suchen (Windows-Pfad ODER Unix-Pfad)
