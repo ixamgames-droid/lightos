@@ -22,9 +22,19 @@ $outer = Split-Path $repo -Parent   # aeusserer Projektordner (Eltern des Repo-R
 # Python: bevorzugt das venv im Repo-Root; in einem frischen Worktree (kein eigenes venv,
 # da gitignored) auf das venv des Haupt-Checkouts im aeusseren Ordner zurueckfallen -
 # dasselbe venv, das auch run_tests.ps1 nutzt.
-$py = Join-Path $repo "venv\Scripts\python.exe"
-if (-not (Test-Path $py)) { $py = Join-Path $outer "lightos-main\venv\Scripts\python.exe" }
-if (-not (Test-Path $py)) { Write-Host "[verify] FEHLER: venv-Python nicht gefunden (weder im Repo-Root noch im Haupt-Checkout: $py)"; exit 2 }
+# XPLAT-02: Kandidaten-Liste statt fester Windows-Pfad. Windows ZUERST (erster Treffer
+# gewinnt -> auf Windows byte-identisches Verhalten), danach die Linux/macOS-venv-Pfade,
+# damit dieses Gate auch auf einem Linux-Checkout laeuft (dort `venv/bin/python`).
+$pyCandidates = @(
+    (Join-Path $repo  "venv\Scripts\python.exe"),                # Windows, Repo-venv
+    (Join-Path $outer "lightos-main\venv\Scripts\python.exe"),   # Windows, Haupt-Checkout
+    (Join-Path $repo  "venv/bin/python"),                        # Linux/macOS, Repo-venv
+    (Join-Path $repo  "venv/bin/python3"),
+    (Join-Path $outer "lightos-main/venv/bin/python"),           # Linux/macOS, Haupt-Checkout
+    (Join-Path $outer "lightos-main/venv/bin/python3")
+)
+$py = $pyCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $py) { Write-Host "[verify] FEHLER: venv-Python nicht gefunden. Geprueft:`n  $($pyCandidates -join "`n  ")"; exit 2 }
 
 # Lock-Runner im aeusseren Projektordner (Geschwister-Verzeichnis des Repo-Roots).
 $runner = Join-Path $outer "run_tests.ps1"
