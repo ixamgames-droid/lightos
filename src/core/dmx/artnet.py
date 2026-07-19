@@ -26,6 +26,10 @@ class ArtNetSender:
         self.target_ip = target_ip
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        # XPLAT-06: optional an eine gewählte Ausgangs-NIC binden (LIGHTOS_OUTPUT_IFACE)
+        # -> Broadcast geht über dieses Interface (Linux Multi-NIC). No-op im Default.
+        from src.core.dmx.output_iface import bind_to_output_iface
+        bind_to_output_iface(self._sock)
         self._sequence = 0
 
     def send_dmx(self, universe: int, data: bytes):

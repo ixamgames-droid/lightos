@@ -98,11 +98,17 @@ class SACNSender:
     def _open(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # XPLAT-06: optionale Ausgangs-NIC (LIGHTOS_OUTPUT_IFACE). Für Multicast das
+        # korrekte IP_MULTICAST_IF, zusätzlich Quell-Bind. No-op im Default.
+        from src.core.dmx.output_iface import (
+            bind_to_output_iface, set_multicast_iface)
+        bind_to_output_iface(self._sock)
         if self._target_ip is None:
             # Enable multicast
             self._sock.setsockopt(
                 socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 8
             )
+            set_multicast_iface(self._sock)
 
     def send_dmx(self, universe: int, data: bytes):
         """Send 512 bytes of DMX data for the given universe (1-based)."""

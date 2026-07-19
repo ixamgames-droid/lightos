@@ -194,6 +194,10 @@ def discover(timeout: float = 1.0, broadcast: str = "255.255.255.255") -> list[d
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        # XPLAT-06: Discovery optional über die gewählte Ausgangs-NIC schicken
+        # (LIGHTOS_OUTPUT_IFACE) — sonst evtl. am falschen Interface (Linux Multi-NIC).
+        from src.core.dmx.output_iface import bind_to_output_iface
+        bind_to_output_iface(sock)
         sock.settimeout(timeout)
         sock.sendto(struct.pack(">BBH", CMD_SCAN_REQUEST, 0x00, 1),
                     (broadcast, PORT))
