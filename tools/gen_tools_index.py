@@ -45,6 +45,15 @@ def ps1_purpose(path: str) -> str:
     return "(kein Kommentar-Kopf)"
 
 
+def sh_purpose(path: str) -> str:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.strip()
+            if s.startswith("#") and not s.startswith("#!"):
+                return s.lstrip("# ").strip()
+    return "(kein Kommentar-Kopf)"
+
+
 def _entries(folder: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for name in sorted(os.listdir(folder), key=str.lower):
@@ -55,6 +64,8 @@ def _entries(folder: str) -> list[tuple[str, str]]:
             out.append((name, py_purpose(path)))
         elif name.endswith(".ps1"):
             out.append((name, ps1_purpose(path)))
+        elif name.endswith(".sh"):
+            out.append((name, sh_purpose(path)))
     return out
 
 

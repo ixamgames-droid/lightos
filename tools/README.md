@@ -69,6 +69,7 @@
 | `vc_click_targets.py` | Berechnet aus einem Vollbild-Screenshot (mit der Magenta-Kalibrier-Kachel |
 | `verify_color_dimmer_separation.py` | Verifikation: Trennung FARBE <-> DIMMER an Effekten (Color/Matrix/Chase). |
 | `verify_loop.ps1` | tools/verify_loop.ps1 - Test-Gate fuer den LightOS Loop-Modus |
+| `verify_loop.sh` | tools/verify_loop.sh — Test-Gate fuer Linux/macOS (Pendant zu verify_loop.ps1). |
 
 ## _archiv/ — ausgemustert
 

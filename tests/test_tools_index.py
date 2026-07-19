@@ -18,7 +18,7 @@ def _scripts(folder):
     if not os.path.isdir(folder):
         return []
     return [n for n in os.listdir(folder)
-            if n.endswith((".py", ".ps1")) and n != "__init__.py"
+            if n.endswith((".py", ".ps1", ".sh")) and n != "__init__.py"
             and os.path.isfile(os.path.join(folder, n))]
 
 
@@ -42,7 +42,7 @@ class ToolsIndexTest(unittest.TestCase):
     def test_no_ghost_entries(self):
         import re
         text = self._readme()
-        listed = set(re.findall(r"`(?:_archiv/)?([\w.\-]+\.(?:py|ps1))`", text))
+        listed = set(re.findall(r"`(?:_archiv/)?([\w.\-]+\.(?:py|ps1|sh))`", text))
         existing = set(_scripts(TOOLS)) | set(_scripts(os.path.join(TOOLS, "_archiv")))
         # Generator-Selbstnennung u. ae. herausrechnen: nur echte Geister melden.
         ghosts = sorted(n for n in listed if n not in existing)
