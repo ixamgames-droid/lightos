@@ -48,6 +48,31 @@ class PlaybackSlotSerializationTest(unittest.TestCase):
         s.apply_dict({"mode": SliderMode.PLAYBACK, "function_id": 9, "playback_slot": 3})
         self.assertEqual(s.playback_slot, 3)
 
+    def test_explicit_null_slot_not_migrated_from_function_id(self):
+        # A3D-39: eine NEUE Show mit BEWUSST geloestem Slot schreibt playback_slot=None
+        # (to_dict schreibt den Key IMMER mit). Beim Laden darf der geloeste Slot NICHT
+        # aus der (stale) function_id zurueckmigriert werden -> sonst kaeme der geloeschte
+        # Executor als Slot zurueck. Frueher unterschied `d.get() is None` das explizite
+        # null nicht von einem fehlenden Key.
+        s = VCSlider("Cleared")
+        s.mode = SliderMode.PLAYBACK
+        s.playback_slot = None
+        s.function_id = 9             # stale Rest im function_id-Feld
+        d = s.to_dict()
+        self.assertIn("playback_slot", d)      # Key IST da (nur null)
+        self.assertIsNone(d["playback_slot"])
+        s2 = VCSlider("Cleared2")
+        s2.apply_dict(d)
+        self.assertIsNone(
+            s2.playback_slot,
+            "bewusst geloester Slot faelschlich aus function_id migriert (A3D-39)")
+
+    def test_missing_key_still_migrates(self):
+        # Gegenprobe: fehlt der Key GANZ (echte Alt-Show), migriert function_id weiter.
+        s = VCSlider("Legacy")
+        s.apply_dict({"mode": SliderMode.PLAYBACK, "function_id": 7})   # kein playback_slot
+        self.assertEqual(s.playback_slot, 7)
+
 
 class PlaybackApplyTest(unittest.TestCase):
     def setUp(self):

@@ -1187,10 +1187,15 @@ class VCSlider(VCWidget):
         self.function_id = d.get("function_id")
         self.function_ids = [int(i) for i in d.get("function_ids", []) if str(i).strip().lstrip("-").isdigit()]
         # DQ-2: dediziertes playback_slot-Feld. Alt-Shows speicherten den Executor-
-        # Slot im PLAYBACK-Modus in function_id -> migrieren, wenn playback_slot fehlt.
-        _ps = d.get("playback_slot")
-        if _ps is None and self.mode == SliderMode.PLAYBACK:
-            _ps = d.get("function_id")
+        # Slot im PLAYBACK-Modus in function_id -> migrieren, wenn playback_slot FEHLT.
+        # A3D-39: auf Abwesenheit des Keys pruefen, NICHT auf None. to_dict schreibt
+        # playback_slot IMMER mit; ein bewusst geloester Slot einer NEUEN Show ist ein
+        # explizites null. `d.get() is None` konnte beides nicht unterscheiden und
+        # migrierte den geloesten Slot faelschlich aus der (stale) function_id zurueck.
+        if "playback_slot" not in d and self.mode == SliderMode.PLAYBACK:
+            _ps = d.get("function_id")          # Legacy-Migration (Alt-Show ohne Key)
+        else:
+            _ps = d.get("playback_slot")        # explizites null bleibt None (kein Rueckfall)
         try:
             self.playback_slot = int(_ps) if _ps is not None else None
         except (TypeError, ValueError):
