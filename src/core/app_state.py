@@ -2263,10 +2263,20 @@ class AppState:
             # nistisch mit 0. Einmalig konsumiert (pop) — Rendering ist single-threaded.
             pr = getattr(self, "_pending_release", None)
             if pr:
-                rel = pr.pop(univ, None)
+                rel = pr.pop(univ, None)   # unbedingt konsumieren (Race-Guard-pop)
                 if rel:
+                    # CDX-17: nur WIRKLICH-ungepatchte Adressen nullen. Wird eine
+                    # Adresse entfernt und VOR diesem Render-Tick wieder gepatcht
+                    # (Bulk-Show-Load, schnelles Undo/Redo), steht sie noch aus dem
+                    # frueheren Rebuild in _pending_release, ist jetzt aber wieder in
+                    # patched_set. Ohne Filter zwingt die Nullung das NEU-gepatchte
+                    # Fixture fuer diesen einen Frame auf 0 (sichtbares Schwarz-
+                    # Aufblitzen). Der pop bleibt unbedingt (konsumiert gegen nach-
+                    # laufende Alt-Plan-Commits); nur die Schreib-Teilmenge wird auf
+                    # ungepatchte Adressen (a not in patched) verengt — genuin
+                    # entpatchte Adressen werden weiter deterministisch freigegeben.
                     for a in rel:
-                        if 1 <= a <= 512:
+                        if 1 <= a <= 512 and a not in patched:
                             live.set_channel(a, 0)
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,

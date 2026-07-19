@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — DMX: neu-gepatchtes Fixture blitzt nicht mehr 1 Frame schwarz (CDX-17)
+
+#### Behoben
+
+- **Wird ein Fixture entfernt und dieselbe DMX-Adresse sofort wieder gepatcht (Bulk-Show-Load, schnelles Undo/Redo), blitzt das neue Fixture nicht mehr für einen Frame auf 0.** Beim Entfernen merkt LightOS die verlassene Adresse in `_pending_release` vor, damit ein nachlaufender Alt-Plan-Commit sie nicht wiederbelebt; der nächste Render-Frame nullt sie dann final. Wurde die Adresse aber **vor** diesem Frame wieder gepatcht, stand sie noch aus dem früheren Rebuild in `_pending_release` und wurde bedingungslos auf 0 gezwungen — das gerade neu-gepatchte Fixture wurde für genau diesen einen Frame dunkel getastet (bei Dimmer/Beam sichtbares Aufblitzen). **Fix:** die finale Nullung schreibt jetzt nur noch auf Adressen, die aktuell **nicht** gepatcht sind (`a not in patched_set[univ]`); der `pop`-Konsum bleibt unbedingt (weiter race-fest gegen Alt-Plan-Commits), genuin entpatchte Adressen werden weiterhin deterministisch freigegeben. Regressionstest in `tests/test_zombie_channel_release.py` (re-gepatchte Adresse behält ihren Wert, genuin entpatchte wird 0). Ergänzt A3D-18.
+
 ### 2026-07-19 — BPM: Beat-Timer läuft nicht mehr bei Anzeige „aus" (CDX-14b)
 
 #### Behoben

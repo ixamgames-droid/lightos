@@ -126,6 +126,48 @@ class ZombieChannelReleaseTest(unittest.TestCase):
             self.assertEqual(live.get_channel(a), 0, f"addr {a} nicht final genullt")
         self.assertNotIn(1, st._pending_release)            # konsumiert (pop)
 
+    def test_repatch_before_tick_is_not_zeroed(self):
+        # CDX-17: Wird eine Adresse entfernt (landet in _pending_release) und VOR dem
+        # naechsten Render-Tick wieder gepatcht, darf der Tick sie NICHT auf 0 nullen
+        # (sonst blitzt das neu-gepatchte Fixture 1 Frame schwarz). Der pending-pop
+        # bleibt unbedingt, aber nur WIRKLICH-ungepatchte Adressen werden genullt.
+        def _chans(_fx):
+            c = [_Ch("intensity", 1), _Ch("color_r", 2),
+                 _Ch("color_g", 3), _Ch("color_b", 4)]
+            c[1].default_value = 180        # color_r (addr+1) rendert 180, kein Dimmer-Scaling
+            return c
+        A.get_channels_for_patched = _chans
+
+        # Zwei Fixtures: fid5 -> 10..13, fid6 -> 20..23.
+        st = _make_state([_Fx(5, 1, 10), _Fx(6, 1, 20)])
+        live = st.universes[1]
+        st._render_frame(0.02)
+        self.assertEqual(live.get_channel(11), 180)   # fid5 color_r Baseline
+        self.assertEqual(live.get_channel(21), 180)   # fid6 color_r Baseline
+
+        # beide entfernen -> beide Spans in _pending_release
+        st._patch_cache = []
+        st._rebuild_render_plan()
+        self.assertEqual(st._pending_release.get(1),
+                         {10, 11, 12, 13, 20, 21, 22, 23})
+
+        # NUR fid5 (10..13) VOR dem naechsten Tick wieder patchen; 20..23 bleiben frei.
+        st._patch_cache = [_Fx(5, 1, 10)]
+        st._rebuild_render_plan()
+        self.assertEqual(st._patched_set[1], frozenset({10, 11, 12, 13}))
+        # Der Alt-Eintrag aus dem Entfernen lauert weiter komplett in _pending_release.
+        self.assertEqual(st._pending_release.get(1),
+                         {10, 11, 12, 13, 20, 21, 22, 23})
+
+        st._render_frame(0.02)
+        # re-gepatchte Adresse behaelt ihren Render-Wert (NICHT auf 0 gezwungen):
+        self.assertEqual(live.get_channel(11), 180,
+                         "re-gepatchte Adresse 11 faelschlich auf 0 genullt (CDX-17)")
+        # genuin entpatchte Adresse wird weiterhin korrekt freigegeben:
+        self.assertEqual(live.get_channel(21), 0,
+                         "genuin entpatchte Adresse 21 nicht genullt")
+        self.assertNotIn(1, st._pending_release)            # trotzdem konsumiert (pop)
+
 
 if __name__ == "__main__":
     unittest.main()
