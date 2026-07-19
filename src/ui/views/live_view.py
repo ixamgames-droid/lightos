@@ -179,6 +179,27 @@ class FixtureRenderer:
                 painter.drawLine(QPointF(cx, 0), QPointF(bx, by))
             label_prefix = "MOVBAR"
 
+        elif ft == "matrix":
+            # FM-13: Pixel-Panel — quadratisches Gehaeuse mit kleinem Zell-Raster
+            # (schematisch in der Fixture-Farbe; Per-Pixel-Farbe zeigt das 3D).
+            painter.setBrush(QBrush(QColor("#161616")))
+            painter.setPen(QPen(QColor("#555"), 1.5))
+            painter.drawRoundedRect(QRectF(-size*0.55, -size*0.55, size*1.1, size*1.1), 4, 4)
+            n = 4
+            inner = size * 0.9
+            step = inner / n
+            cw = step * 0.7
+            x0 = -inner/2 + step*0.5
+            lit = intensity > 12
+            painter.setPen(Qt.PenStyle.NoPen)
+            for r in range(n):
+                for c in range(n):
+                    painter.setBrush(QBrush(color if lit else QColor("#3a3a44")))
+                    cx = x0 + c*step
+                    cy = x0 + r*step
+                    painter.drawRoundedRect(QRectF(cx - cw/2, cy - cw/2, cw, cw), 1.5, 1.5)
+            label_prefix = "MTX"
+
         elif "moving" in ft or "head" in ft:
             # Moving Head: Diamant + Yoke
             painter.setBrush(QBrush(QColor("#2a2a2a")))
