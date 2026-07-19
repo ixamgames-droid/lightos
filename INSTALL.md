@@ -72,6 +72,69 @@ Kern-Abhaengigkeiten sind ARM64-kompatibel. Ein Paket bleibt optional:
 
 Stand: 2026-05-25 (PyPI Latest Stable)
 
+## Linux (x86_64, sekundaer)
+
+LightOS laeuft auf Linux; Windows bleibt die primaere Plattform. Der Source ist
+plattformneutral (keine `sys.platform`-Verzweigung im Kern) — es fehlen auf Linux
+nur ein paar **Systempakete** und eine **Audio-Monitor-Quelle**, sonst schlaegt
+`pip install` fehl oder einzelne Funktionen bleiben still.
+
+### 1) Systempakete (Debian/Ubuntu — analog fuer andere Distros)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+    python3 python3-venv python3-pip \
+    build-essential libasound2-dev \
+    libpulse0 \
+    fonts-noto fonts-dejavu
+```
+
+Wozu die Pakete:
+- `build-essential` + `libasound2-dev` → `python-rtmidi` (MIDI, C-Extension)
+- `libpulse0` → `soundcard`-Loopback (BPM aus Audio)
+- `fonts-noto` + `fonts-dejavu` → saubere UI-Fonts (s. Font-Hinweis unten)
+
+- **`build-essential` + `libasound2-dev` sind fuer MIDI Pflicht.** `python-rtmidi` ist
+  eine C-Extension; fehlt ein manylinux-Wheel, wird es aus dem Quellcode gebaut und
+  braucht dann Compiler + ALSA-Header. **Ohne `python-rtmidi` gibt es auf Linux GAR
+  KEIN MIDI** — der WinMM-Fallback existiert nur auf Windows. `requirements.txt` fuehrt
+  `python-rtmidi` weiterhin als optionales Paket.
+- **`libpulse0` (PulseAudio/PipeWire) fuer Loopback-BPM.** Die Beat-Erkennung aus dem
+  Loopback (`soundcard`) nutzt WASAPI-Semantik (Windows). Auf Linux braucht sie eine
+  **PulseAudio-Monitor-Quelle** (z. B. `Monitor of <Ausgabegeraet>`); fehlt sie, bleibt
+  die Loopback-BPM stumm (degradiert weich, kein Absturz). Mikrofon-/Line-In-Beat geht
+  unabhaengig davon.
+
+### 2) Installieren
+
+```bash
+python3 -m venv venv
+venv/bin/python -m pip install --upgrade pip
+venv/bin/python -m pip install -r requirements.txt
+venv/bin/python main.py
+```
+
+`install.py` funktioniert grundsaetzlich auch unter Linux (venv + Pakete), erstellt
+aber Windows-spezifische Desktop-Verknuepfungen — auf Linux ist der manuelle venv-Weg
+oben der verlaessliche.
+
+### 3) Plattform-Hinweise (bereits im Code beruecksichtigt)
+
+| Thema | Verhalten auf Linux |
+|---|---|
+| **3D-Visualizer** (QtWebEngine) | Der Chromium-Renderprozess laeuft ohne setuid-`chrome-sandbox` (pip-PySide6, Container, root) sonst nicht → LightOS haengt auf Linux automatisch `--no-sandbox --disable-gpu-sandbox` an (XPLAT-01). Korrekt aufgesetzte Distros koennen die Sandbox behalten: `LIGHTOS_WEBENGINE_NO_SANDBOX=0`. |
+| **Art-Net-Input** (Port 6454) | Setzt `SO_REUSEPORT` (XPLAT-03) → teilt sich den Port mit einer 2. Art-Net-App (z. B. QLC+); ohne das schluegen parallele Listener fehl. |
+| **UI-Fonts** | Die hart gesetzten Windows-Fonts (Segoe UI/Consolas/…) werden auf Noto Sans/DejaVu (Sans + Mono) gemappt (XPLAT-05). `fonts-noto`/`fonts-dejavu` installieren, damit enge Labels/Ziffern nicht clippen. |
+| **App-Datenordner** | Aktuell `~/LightOS/` (kein `APPDATA` → Home-Fallback). XDG-Konformitaet (`~/.local/share/LightOS`) ist als XPLAT-04 offen. |
+| **Headless/QtWebEngine im Test** | `QT_QPA_PLATFORM=offscreen` setzen (die Test-/Capture-Tools tun das bereits). |
+
+### 4) Bekannte Grenzen
+
+- Kein MIDI ohne `python-rtmidi` (s. o.); Enttec/FTDI und Art-Net/sACN/OSC funktionieren.
+- Loopback-BPM braucht eine Pulse/PipeWire-Monitor-Quelle.
+- Der Windows-/ARM64-Installer-Komfort (Desktop-Shortcut, VS Build Tools) ist Windows-spezifisch.
+
 ## Externe Treiber
 
 LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
@@ -139,3 +202,8 @@ Wenn du das vorbereitest sag Bescheid - dann mache ich ein dediziertes Build-Scr
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
+| **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |
+| **Linux:** kein MIDI trotz angeschlossenem Geraet | `python-rtmidi` fehlt (kein WinMM-Fallback auf Linux) → wie oben nachinstallieren |
+| **Linux:** 3D-Visualizer bleibt schwarz | QtWebEngine-Sandbox — LightOS setzt automatisch `--no-sandbox`; falls doch: sicherstellen, dass `LIGHTOS_WEBENGINE_NO_SANDBOX` nicht auf `0` steht; ggf. `QT_QPA_PLATFORM` pruefen |
+| **Linux:** Loopback-BPM reagiert nicht | PulseAudio/PipeWire-**Monitor-Quelle** als Audio-Eingang waehlen (`Monitor of …`); `libpulse0` installiert? |
+| **Linux:** Labels/Ziffern abgeschnitten | `sudo apt-get install fonts-noto fonts-dejavu` (Font-Fallbacks) |
