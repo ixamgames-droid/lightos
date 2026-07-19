@@ -80,17 +80,20 @@ class OscServer:
 
     def _handle_go(self, address, *args):
         try:
-            state = self._get_state()
-            if state.cue_stacks:
-                state.cue_stacks[0].go()
+            # A3D-40: einen Snapshot ziehen (kein Doppel-Fetch/Alias auf die Live-Liste,
+            # die show_file beim Laden per cue_stacks.clear() in-place leert). Ohne das
+            # koennte das GO zwischen 'if' und Index still verschluckt werden.
+            stacks = list(self._get_state().cue_stacks)
+            if stacks:
+                stacks[0].go()
         except Exception:
             pass
 
     def _handle_back(self, address, *args):
         try:
-            state = self._get_state()
-            if state.cue_stacks:
-                state.cue_stacks[0].back()
+            stacks = list(self._get_state().cue_stacks)   # A3D-40: Snapshot, s. _handle_go
+            if stacks:
+                stacks[0].back()
         except Exception:
             pass
 
