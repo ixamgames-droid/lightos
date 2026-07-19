@@ -7,6 +7,7 @@ import { renderer, scene, PIXEL_RATIO_CAP, gpuTier } from '../scene/renderer.js'
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
+import { resyncBeamVisibility } from '../fixtures/builders.js';
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
 import { setFpsVisible } from '../camera/presets.js';
@@ -174,11 +175,11 @@ export function applySettings(s) {
   if (typeof s.showLabels === 'boolean') settings.showLabels = s.showLabels;
   for (const fid in fixtures) {
     const f = fixtures[fid];
-    if (f.beam) f.beam.visible = settings.showCones && (view.mode === '3D') && f.beam.material.opacity > 0.01;
+    // A3D-05: Kegel-Sichtbarkeit (Einzelkopf + Laser-Faecher + Multi-Head-Pro-Kopf)
+    // nach showCones-Toggle sofort neu setzen — vorher blieben die PAR-Bar-/Mover-Bar-/
+    // Spider-Pro-Kopf-Kegel bis zum naechsten DMX-Update der Fixture stale.
+    resyncBeamVisibility(f);
     if (f.floorSpot) f.floorSpot.visible = settings.showFloorSpots && f.floorSpot.material.opacity > 0.01;
-    // VIZ-03: Laser-Faecher analog zu beam/floorSpot neu setzen (z. B. nach
-    // showCones-Toggle), nicht erst beim naechsten DMX-Update.
-    if (f.laserBeams) for (const bm of f.laserBeams) { if (bm.material) bm.visible = settings.showCones && (view.mode === '3D') && bm.material.opacity > 0.01; }
   }
   requestRender();  // 3c-2 Dirty-Quelle 6 (Settings: Fog/Beam-Sichtbarkeiten)
 }
