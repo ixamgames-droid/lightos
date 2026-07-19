@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import json
+from src.core.paths import app_data_dir
 from enum import Enum
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
@@ -13,9 +14,7 @@ from .vc_widget import VCWidget
 from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
 from src.core.show import vc_assets   # VC-IMG: Button-Hintergrundbild/GIF-Assets
 
-_SNAPSHOTS_FILE = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snapshots.json"
-)
+_SNAPSHOTS_FILE = os.path.join(app_data_dir(), "snapshots.json")
 
 # Quadratische Standard-Groesse fuer NEU angelegte Buttons (Pad-Look wie im
 # Demo-Show-Generator, PAD=56 → hier etwas grosszuegiger fuer Hand-Platzierung).

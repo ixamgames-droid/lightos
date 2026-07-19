@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from src.core.paths import app_data_dir
 from dataclasses import dataclass, field, asdict
 from typing import Callable, Optional
 
@@ -232,8 +233,7 @@ class StageDefinition:
 # ---------------------------------------------------------------------------
 
 def stages_dir() -> str:
-    base_root = os.environ.get("APPDATA") or os.path.expanduser("~")
-    base = os.path.join(base_root, "LightOS", "stages")
+    base = os.path.join(app_data_dir(), "stages")
     os.makedirs(base, exist_ok=True)
     return base
 

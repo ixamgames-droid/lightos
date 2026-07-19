@@ -4,6 +4,7 @@ import json
 import math
 import os
 import time
+from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QPushButton, QSlider, QFrame, QSizePolicy,
                                 QScrollArea, QListWidget, QListWidgetItem,
@@ -24,9 +25,7 @@ from src.ui.weak_slots import weak_slot
 
 # ── UI-Praeferenzen (analog zu programmer_view.py) ───────────────────────────
 
-_PREFS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-)
+_PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 
 

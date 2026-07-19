@@ -14,6 +14,7 @@ import json
 import math
 import os
 import time
+from src.core.paths import app_data_dir
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -75,7 +76,7 @@ _viz_log_dedup = _cl.ExceptionDedup(min_interval=5.0)
 
 
 def _viz_crash_log_path() -> str:
-    d = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    d = app_data_dir()
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, "crash.log")
 

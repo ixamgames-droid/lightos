@@ -16,9 +16,8 @@ import os
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
-_PREFS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-)
+from src.core.paths import app_data_dir
+_PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 
 

@@ -21,6 +21,7 @@ import math
 import os
 import re
 import time
+from src.core.paths import app_data_dir
 
 _ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 # Key-Form: 40 Hex (sha1) + kurze Extension. Schuetzt beim Entpacken aus dem ZIP
@@ -40,8 +41,7 @@ def cache_dir() -> str:
     if _override_dir:
         os.makedirs(_override_dir, exist_ok=True)
         return _override_dir
-    base = os.environ.get("APPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "LightOS", "vc_assets")
+    d = os.path.join(app_data_dir(), "vc_assets")
     os.makedirs(d, exist_ok=True)
     return d
 

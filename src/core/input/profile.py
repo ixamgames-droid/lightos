@@ -4,12 +4,10 @@ from dataclasses import dataclass, asdict
 from typing import Optional
 import json
 import os
+from src.core.paths import app_data_dir
 from src.core.midi.midi_mapper import MidiMapping
 
-PROFILES_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")),
-    "LightOS", "input_profiles"
-)
+PROFILES_DIR = os.path.join(app_data_dir(), "input_profiles")
 
 
 @dataclass

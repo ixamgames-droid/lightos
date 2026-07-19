@@ -12,11 +12,10 @@ from __future__ import annotations
 import os
 import json
 from pathlib import Path
+from src.core.paths import app_data_dir
 
 # Alt-Speicherort der globalen Snap-Dateien (nur noch Migrations-Quelle).
-SNAPS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "snaps"
-)
+SNAPS_DIR = os.path.join(app_data_dir(), "snaps")
 
 
 def _clean_values(raw: dict) -> dict[int, dict[str, int]]:

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+from src.core.paths import app_data_dir
 
 _KEY = "remote"
 
@@ -28,7 +29,7 @@ def _prefs_dir() -> str:
     override = os.environ.get("LIGHTOS_PREFS_DIR")
     if override:
         return override
-    return os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    return app_data_dir()
 
 
 def _prefs_path() -> str:

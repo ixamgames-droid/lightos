@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import json
+from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QPushButton, QButtonGroup, QStackedWidget, QStatusBar,
@@ -34,7 +35,7 @@ from src.ui.weak_slots import weak_slot
 
 # Recent files storage
 def _recent_files_path() -> str:
-    base = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    base = app_data_dir()
     try:
         os.makedirs(base, exist_ok=True)
     except Exception:
@@ -1737,8 +1738,7 @@ class MainWindow(QMainWindow):
             d = os.path.dirname(self._current_show_path)
             if d and os.path.isdir(d):
                 return d
-        base = os.path.join(
-            os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS", "shows")
+        base = os.path.join(app_data_dir(), "shows")
         try:
             os.makedirs(base, exist_ok=True)
         except Exception:
@@ -2151,9 +2151,7 @@ class MainWindow(QMainWindow):
     # ── Auto-Save ────────────────────────────────────────────────────────────
 
     def _autosave_path(self) -> str:
-        base = os.path.join(
-            os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-        )
+        base = app_data_dir()
         try:
             os.makedirs(base, exist_ok=True)
         except Exception:
