@@ -68,7 +68,8 @@ class WtVerdict:
 
 def classify_worktrees(disk_dirs: list[str], registered: dict[str, dict],
                        merged_branches: set[str], lock_cwd: str | None,
-                       own_path: str) -> list[WtVerdict]:
+                       own_path: str,
+                       git_marked: set[str] | None = None) -> list[WtVerdict]:
     """Klassifiziert Worktree-Kandidaten.
 
     disk_dirs:  wt-*-Ordner auf der Platte (absolute Pfade, normalisiert)
@@ -76,11 +77,16 @@ def classify_worktrees(disk_dirs: list[str], registered: dict[str, dict],
     merged_branches: Branch-Namen, die vollstaendig in origin/main enthalten sind
     lock_cwd:   cwd aus einer LEBENDEN pytest-Sperre (oder None)
     own_path:   der Worktree, aus dem wir selbst laufen (nie anfassen)
+    git_marked: Pfade, die einen .git-Marker tragen (also je ein Worktree WAREN).
+                None = alle gelten als markiert (rueckwaerts-kompatible Tests).
+                Ein unregistrierter Ordner OHNE Marker war nie ein Worktree
+                (z. B. Davids manueller 'wt-backup') -> NIE als orphan einstufen.
     """
     def norm(p: str) -> str:
         return os.path.normcase(os.path.normpath(p))
 
     reg = {norm(k): v for k, v in registered.items()}
+    marked = None if git_marked is None else {norm(p) for p in git_marked}
     lock_n = norm(lock_cwd) if lock_cwd else None
     own_n = norm(own_path)
     out: list[WtVerdict] = []
@@ -94,7 +100,13 @@ def classify_worktrees(disk_dirs: list[str], registered: dict[str, dict],
             out.append(WtVerdict(d, "keep", "haelt die pytest-Sperre (Tests laufen)"))
             continue
         if info is None:
-            out.append(WtVerdict(d, "orphan", "auf Platte, aber nicht (mehr) als Worktree registriert"))
+            if marked is not None and dn not in marked:
+                out.append(WtVerdict(d, "keep",
+                                     "kein .git-Marker — nie ein Worktree ODER Rest-Husk eines "
+                                     "frueheren remove; nicht automatisch anfassen, manuell pruefen"))
+            else:
+                out.append(WtVerdict(d, "orphan",
+                                     "auf Platte, aber nicht (mehr) als Worktree registriert"))
             continue
         branch = info.get("branch", "")
         if branch in PROTECTED_BRANCHES:
@@ -171,6 +183,39 @@ def _local_branches() -> list[str]:
     return [b.strip() for b in out.splitlines() if b.strip()]
 
 
+def _pid_alive(pid: int) -> bool:
+    """Lebt der Prozess? Windows-tauglich.
+
+    NICHT os.kill(pid, 0) auf Windows: CPython interpretiert Signal 0 dort als
+    CTRL_C_EVENT (GenerateConsoleCtrlEvent) — das schlaegt fuer Prozesse ausser-
+    halb der eigenen Konsolengruppe IMMER mit WinError 87 fehl, obwohl der
+    Prozess lebt (adversariale Review 2026-07-19, empirisch belegt). Stattdessen
+    OpenProcess-Handle-Test + GetExitCodeProcess (STILL_ACTIVE=259).
+    """
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        k32 = ctypes.windll.kernel32
+        handle = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if k32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return code.value == STILL_ACTIVE
+            return True   # Handle offen, Status unklar -> im Zweifel lebendig
+        finally:
+            k32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
 def _alive_lock_cwd() -> str | None:
     """cwd der pytest-Sperre, falls der Halter-Prozess noch lebt."""
     try:
@@ -178,11 +223,7 @@ def _alive_lock_cwd() -> str | None:
         pid = int(info.get("pid", 0))
     except (OSError, ValueError, json.JSONDecodeError):
         return None
-    if pid <= 0:
-        return None
-    try:
-        os.kill(pid, 0)
-    except OSError:
+    if not _pid_alive(pid):
         return None
     return str(info.get("cwd") or "") or None
 
@@ -196,10 +237,27 @@ def _disk_worktree_dirs() -> list[str]:
     return dirs
 
 
+def _git_marked(dirs: list[str]) -> set[str]:
+    """Pfade mit .git-Marker (Datei ODER Ordner) — nur die waren je ein Worktree/Repo."""
+    return {d for d in dirs if (Path(d) / ".git").exists()}
+
+
+def _unique_dest(dest_dir: Path, name: str) -> Path:
+    """Kollisionsfreier Zielpfad in dest_dir — shutil.move ueberschreibt sonst still."""
+    cand = dest_dir / name
+    stem, suffix = os.path.splitext(name)
+    i = 1
+    while cand.exists():
+        cand = dest_dir / f"{stem}.{i}{suffix}"
+        i += 1
+    return cand
+
+
 def cmd_worktrees(apply: bool) -> int:
+    disk = _disk_worktree_dirs()
     verdicts = classify_worktrees(
-        _disk_worktree_dirs(), _registered_worktrees(), _merged_branches(),
-        _alive_lock_cwd(), str(_REPO))
+        disk, _registered_worktrees(), _merged_branches(),
+        _alive_lock_cwd(), str(_REPO), git_marked=_git_marked(disk))
     orphans = [v for v in verdicts if v.verdict == "orphan"]
     removable = [v for v in verdicts if v.verdict == "removable"]
     print(f"Worktrees: {len(verdicts)} Kandidaten — {len(orphans)} verwaist, "
@@ -217,12 +275,19 @@ def cmd_worktrees(apply: bool) -> int:
             print(f"  entfernt: {v.path}")
         except RuntimeError as e:
             print(f"  MANUELL PRUEFEN (Windows-Lock? spaeter erneut): {v.path} — {e}")
-    for v in orphans:
-        try:
-            shutil.rmtree(v.path)
-            print(f"  geloescht (verwaister Ordner): {v.path}")
-        except OSError as e:
-            print(f"  MANUELL PRUEFEN (Datei-Lock, nach App-Neustart erneut): {v.path} — {e}")
+    # Verwaiste Ordner NICHT hart loeschen, sondern nach _trash verschieben
+    # (gleiche Sicherheitsstufe wie artifacts; Review-Fund 2026-07-19). Auf
+    # demselben Volume ist das ein schneller Rename.
+    if orphans:
+        wt_trash = _TRASH / _dt.date.today().isoformat() / "worktrees"
+        wt_trash.mkdir(parents=True, exist_ok=True)
+        for v in orphans:
+            target = _unique_dest(wt_trash, Path(v.path).name)
+            try:
+                shutil.move(v.path, str(target))
+                print(f"  nach _trash verschoben (verwaister Ordner): {v.path} -> {target}")
+            except OSError as e:
+                print(f"  MANUELL PRUEFEN (Datei-Lock, nach App-Neustart erneut): {v.path} — {e}")
     try:
         _git("worktree", "prune")
         print("  git worktree prune: ok")
@@ -279,7 +344,9 @@ def cmd_artifacts(apply: bool, days: int) -> int:
     moved = 0
     for p in stale:
         try:
-            shutil.move(str(p), str(dest / p.name))
+            # _unique_dest: bei Namenskollision (2. Lauf am selben Tag) NICHT
+            # still ueberschreiben — shutil.move faellt sonst auf copy2 zurueck.
+            shutil.move(str(p), str(_unique_dest(dest, p.name)))
             moved += 1
         except OSError as e:
             print(f"  uebersprungen (in Benutzung?): {p.name} — {e}")

@@ -76,6 +76,35 @@ class WorktreeClassifyTest(unittest.TestCase):
         self.assertEqual(vs[0].verdict, "removable",
                          "Pfadvergleich muss normcase-normalisiert sein")
 
+    def test_unregistered_without_git_marker_is_never_orphan(self):
+        # Review 2026-07-19: Davids manuell angelegter 'wt-backup'-Ordner (nie
+        # ein Worktree) darf NICHT als verwaist eingestuft und angefasst werden.
+        vs = janitor.classify_worktrees([WT_C], REGISTERED, MERGED, None, WT_OWN,
+                                        git_marked=set())
+        self.assertEqual(vs[0].verdict, "keep")
+        self.assertIn(".git-Marker", vs[0].reason)
+
+    def test_unregistered_with_git_marker_is_orphan(self):
+        vs = janitor.classify_worktrees([WT_C], REGISTERED, MERGED, None, WT_OWN,
+                                        git_marked={WT_C.upper()})
+        self.assertEqual(vs[0].verdict, "orphan",
+                         "git_marked muss normcase-normalisiert verglichen werden")
+
+    def test_unique_dest_never_overwrites(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "err.txt").write_text("alt")
+            cand = janitor._unique_dest(d, "err.txt")
+            self.assertNotEqual(cand.name, "err.txt")
+            self.assertFalse(cand.exists())
+
+    def test_pid_alive_for_own_and_bogus_pid(self):
+        self.assertTrue(janitor._pid_alive(os.getpid()),
+                        "eigener Prozess muss als lebendig erkannt werden")
+        self.assertFalse(janitor._pid_alive(0))
+        self.assertFalse(janitor._pid_alive(-5))
+
 
 class PorcelainParseTest(unittest.TestCase):
     def test_branch_prefix_with_slash_survives(self):

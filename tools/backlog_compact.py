@@ -35,12 +35,28 @@ ARCHIVE = os.path.join(_ROOT, "BACKLOG_ARCHIVE.md")
 # Identisch zur QA-18-Lint-Konvention (tests/test_backlog_lint.py).
 ROW = re.compile(r"^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|")
 PRIO_ORDER = {"P1": 0, "P2": 1, "P3": 2}
-BOLD_TITLE = re.compile(r"\*\*(.+?)\*\*")
-PR_LINK = re.compile(r"\[#?\d+\]\(https://github\.com/[\w.-]+/[\w.-]+/(?:pull|issues)/\d+\)")
+# Bold-Titel NUR am Zellenanfang: ein spaeterer '**Fix:**'-Span im Fliesstext
+# darf nie zum Titel-Stub werden (Review-Fund 2026-07-19).
+BOLD_TITLE = re.compile(r"^\s*\*\*(.+?)\*\*")
+# Linktext beliebig ([#270], [PR #100], [Codex #334], [Codex-Review], ...) —
+# die enge [#N]-Form verlor real 79 % der PR-Links (Review-Fund 2026-07-19).
+PR_LINK = re.compile(r"\[[^\]]*\]\(https://github\.com/[\w.-]+/[\w.-]+/(?:pull|issues)/\d+[^)]*\)")
 
 # Ein Status gilt als "nur noch Historie", wenn er 'done' enthaelt und KEIN
 # aktives Keyword mehr — dekorierte Staten wie "wip (3/8 done)" bleiben aktiv.
 _ACTIVE_KEYWORDS = ("todo", "wip", "review", "blocked", "decision", "teils", "teil")
+# Markdown-Links VOR der Keyword-Erkennung strippen: ein Linktext wie
+# "[Codex-Review](...)" in der Status-Zelle ist Dekoration, kein Status —
+# sonst zaehlt eine done-Zeile faelschlich als 'review' (Review-Fund 2026-07-19).
+_MD_LINK = re.compile(r"\[[^\]]*\]\([^)]*\)")
+
+
+def _status_text(status: str) -> str:
+    return _MD_LINK.sub(" ", status).lower()
+
+
+def _has_word(text: str, word: str) -> bool:
+    return re.search(rf"\b{re.escape(word)}\b", text) is not None
 
 
 @dataclass
@@ -53,12 +69,13 @@ class Row:
 
     @property
     def status_low(self) -> str:
-        return self.status.lower()
+        """Status-Zelle in Kleinschreibung, Markdown-Links entfernt."""
+        return _status_text(self.status)
 
     @property
     def is_done(self) -> bool:
         low = self.status_low
-        return "done" in low and not any(k in low for k in _ACTIVE_KEYWORDS)
+        return _has_word(low, "done") and not any(_has_word(low, k) for k in _ACTIVE_KEYWORDS)
 
     @property
     def is_condensed(self) -> bool:
@@ -69,7 +86,7 @@ class Row:
         """'todo' | 'wip' | 'review' | 'blocked' | 'decision' | None."""
         low = self.status_low
         for kind in ("todo", "wip", "review", "blocked", "decision"):
-            if kind in low:
+            if _has_word(low, kind):
                 return kind
         return None
 
@@ -124,7 +141,7 @@ def cmd_stats(lines: list[str]) -> str:
     rows = parse_rows(lines)
     by_kind: dict[str, int] = {}
     for r in rows:
-        kind = r.active_kind() or ("done" if "done" in r.status_low else "sonstig")
+        kind = r.active_kind() or ("done" if _has_word(r.status_low, "done") else "sonstig")
         by_kind[kind] = by_kind.get(kind, 0) + 1
     size = os.path.getsize(BACKLOG)
     archivable = sum(1 for r in rows if r.is_done and not r.is_condensed)

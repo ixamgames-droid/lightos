@@ -26,6 +26,8 @@ FIXTURE = """# Test-Backlog
 | DD-04 | P3 | wip (1a done, 1b offen) | **Laufende Arbeit.** Teilweise done, bleibt aktiv. |
 | EE-05 | P2 | review | **PR offen.** |
 | FF-06 | P3 | done → Archiv | Schon frueher verdichtet (Details: BACKLOG_ARCHIVE.md) |
+| GG-07 | P2 | done ([PR #100](https://github.com/ixamgames-droid/lightos/pull/100)) | Unformatierter Titel ohne Bold am Anfang. **Fix:** spaeter Bold-Span darf nicht Titel werden. |
+| HH-08 | P3 | done ([Codex-Review](https://github.com/ixamgames-droid/lightos/pull/280)) | **Codex-Fund.** Details egal. |
 """.replace("\n", "\n")
 
 
@@ -37,7 +39,8 @@ class ParseTest(unittest.TestCase):
     def test_parse_finds_all_rows(self):
         rows = bc.parse_rows(_lines())
         self.assertEqual([r.id for r in rows],
-                         ["AA-01", "BB-02", "CC-03", "DD-04", "EE-05", "FF-06"])
+                         ["AA-01", "BB-02", "CC-03", "DD-04", "EE-05", "FF-06",
+                          "GG-07", "HH-08"])
 
     def test_done_detection_respects_decorated_wip(self):
         rows = {r.id: r for r in bc.parse_rows(_lines())}
@@ -66,14 +69,15 @@ class StatsTest(unittest.TestCase):
         out = bc.cmd_stats(_lines())
         self.assertIn("todo=2", out)
         self.assertIn("wip=1", out)
-        self.assertIn("review=1", out)
-        self.assertIn("done=2", out)
+        self.assertIn("review=1", out,
+                      "[Codex-Review]-Linktext in HH-08 darf NICHT als review zaehlen")
+        self.assertIn("done=4", out)
 
 
 class ArchiveTest(unittest.TestCase):
     def test_archive_split_moves_only_pure_done(self):
         new_lines, done = bc.archive_split(_lines())
-        self.assertEqual({r.id for r in done}, {"BB-02"},
+        self.assertEqual({r.id for r in done}, {"BB-02", "GG-07", "HH-08"},
                          "FF-06 ist schon verdichtet und darf nicht erneut wandern")
         text = "".join(new_lines)
         self.assertIn("AA-01", text)
@@ -99,6 +103,29 @@ class ArchiveTest(unittest.TestCase):
         self.assertEqual(done2, [], "zweiter Lauf darf nichts mehr finden")
         self.assertEqual("".join(again), "".join(new_lines),
                          "kein Aufschaukeln der Kurzform")
+
+
+class ReviewRegressionTest(unittest.TestCase):
+    """Regressionen aus der adversarialen Review 2026-07-19."""
+
+    def _row(self, rid):
+        return {r.id: r for r in bc.parse_rows(_lines())}[rid]
+
+    def test_pr_link_matches_arbitrary_link_text(self):
+        self.assertIn("pull/100", self._row("GG-07").first_pr_link(),
+                      "[PR #100](...)-Format muss gefunden werden")
+        self.assertIn("pull/280", self._row("HH-08").first_pr_link(),
+                      "[Codex-Review](...)-Format muss gefunden werden")
+
+    def test_short_title_ignores_later_bold_span(self):
+        title = self._row("GG-07").short_title()
+        self.assertNotEqual(title, "Fix:", "spaeterer **Fix:**-Span darf nicht Titel werden")
+        self.assertIn("Unformatierter Titel", title)
+
+    def test_condensed_line_keeps_pr_link(self):
+        new_lines, _ = bc.archive_split(_lines())
+        gg = next(l for l in new_lines if l.startswith("| GG-07"))
+        self.assertIn("https://github.com/ixamgames-droid/lightos/pull/100", gg)
 
 
 class RealBacklogSmokeTest(unittest.TestCase):

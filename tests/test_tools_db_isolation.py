@@ -20,7 +20,13 @@ TOOLS = os.path.join(REPO, "tools")
 
 STATE_API = re.compile(
     r"\b(get_state|app_state|load_show|save_show|reset_show|get_function_manager)\b")
-ISOLATION = re.compile(r"import _gen_env|LIGHTOS_SHOW_DB")
+# Echte Isolation, nicht blosse Erwaehnung: Import am Zeilenanfang ODER eine
+# echte os.environ-Zuweisung/-setdefault auf LIGHTOS_SHOW_DB. Ein Kommentar,
+# der die Variable nur nennt, darf den Lint nicht beruhigen (Review 2026-07-19).
+ISOLATION = re.compile(
+    r"^\s*import _gen_env\b"
+    r"|os\.environ(?:\.setdefault)?\s*[\(\[]\s*[\"']LIGHTOS_SHOW_DB",
+    re.M)
 
 # Bewusste Ausnahmen: Datei -> Begruendung (bitte NUR mit gutem Grund erweitern).
 WHITELIST = {
