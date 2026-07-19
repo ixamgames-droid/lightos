@@ -688,10 +688,12 @@ class SceneModulesSmokeTest(unittest.TestCase):
              "x": 8, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
             {"fid": 806, "type": "smoke",
              "x": 10, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 807, "type": "matrix", "nHeads": 64,
+             "x": 12, "y": 2, "z": 0, "r": 0, "g": 0, "b": 0, "intensity": 0},
         ])
         built = self._emit_until_true(
             lambda: self._bridge_obj.allFixtures.emit(rig),
-            "!!window.__lightos.fixtures['806']", timeout_s=8.0)
+            "!!window.__lightos.fixtures['807']", timeout_s=8.0)
         self.assertTrue(built, "Mess-Rig wurde nicht gebaut")
         raw = self._eval("""
             (function(){
@@ -715,11 +717,12 @@ class SceneModulesSmokeTest(unittest.TestCase):
                 return JSON.stringify({
                     par: dims('801'), mh: dims('802'), spider: dims('803'),
                     parBar: dims('804'), moverBar: dims('805'), smoke: dims('806'),
+                    matrix: dims('807'),
                 });
             })()
         """)
         d = json.loads(raw)
-        for key in ("par", "mh", "spider", "parBar", "moverBar", "smoke"):
+        for key in ("par", "mh", "spider", "parBar", "moverBar", "smoke", "matrix"):
             self.assertIsNotNone(d[key], f"Bounding-Box fuer {key} fehlt")
         px, py, pz = d["par"]
         self.assertLessEqual(px, 0.36, "PAR breiter als eine echte PAR-64-Dose")
@@ -743,6 +746,43 @@ class SceneModulesSmokeTest(unittest.TestCase):
         smx, _, smz = d["smoke"]
         self.assertLessEqual(smx, 0.30, "Nebelmaschine breiter als die N-10-Klasse")
         self.assertLessEqual(smz, 0.42, "Nebelmaschine tiefer als die N-10-Klasse")
+        # FM-13: Matrix-Panel = feste 0,5-m-LED-Kachel (0,50 x 0,50 x 0,05 m),
+        # Pixel-Quads knapp vor der +Z-Front (duenn). Aufloesung aendert die
+        # physische Panel-Groesse NICHT.
+        mtx = d["matrix"]
+        self.assertLessEqual(mtx[0], 0.56, "Matrix-Panel breiter als die 0,5-m-Kachel")
+        self.assertGreaterEqual(mtx[0], 0.44, "Matrix-Panel unrealistisch geschrumpft")
+        self.assertLessEqual(mtx[1], 0.56, "Matrix-Panel hoeher als die 0,5-m-Kachel")
+        self.assertLessEqual(mtx[2], 0.12, "Matrix-Panel dicker als eine flache LED-Kachel")
+
+    def test_matrix_panel_per_pixel_color(self):
+        """FM-13: buildMatrixPanel baut rows*cols Pixel-Quads; updateMatrixPanelDmx
+        faerbt jeden Pixel EINZELN aus heads[i]. 8x8 (64 Pixel): Pixel 40 (2. Haelfte!)
+        rot, Pixel 0 aus. Pixel 40 wuerde bei nur 16 gebauten Pixeln fehlen -> deckt
+        die Review-HIGH-Regression (nHeads muss die echte Pixel-Anzahl tragen) ab."""
+        self._load_and_wait()
+        import json
+        payload = json.dumps([{"fid": 820, "type": "matrix", "nHeads": 64,
+                               "x": 0, "y": 3, "z": 0,
+                               "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        built = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            "(function(){const f=window.__lightos.fixtures['820'];"
+            " return !!(f && f.pixels && f.pixels.length===64);})()",
+            timeout_s=6.0)
+        self.assertTrue(built, "Matrix-Panel (64 Pixel) wurde nicht gebaut")
+        heads = [{"r": 255 if i == 40 else 0, "g": 0, "b": 0} for i in range(64)]
+        lit = json.dumps([{"fid": 820, "r": 0, "g": 0, "b": 0,
+                           "intensity": 255, "heads": heads}])
+        ok = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            "(function(){const f=window.__lightos.fixtures['820'];"
+            " if(!f||!f.pixels||f.pixels.length!==64) return false;"
+            " const p40=f.pixels[40].mesh.material, p0=f.pixels[0].mesh.material;"
+            " return p40.emissiveIntensity>0.1 && p40.emissive.r>0.5"
+            "     && p0.emissive.r<0.1; })()",
+            timeout_s=6.0)
+        self.assertTrue(ok, "Matrix-Panel faerbte Pixel 40 nicht (nur 16 gebaut? heads[40] verloren?)")
 
     def test_multihead_beams_resync_on_showcones_and_view_switch(self):
         """A3D-05 + A3D-24: Multi-Head-Pro-Kopf-Kegel folgen showCones-Toggle

@@ -24,6 +24,7 @@ TYPE_COLORS = {
     "dimmer":      "#2a2a2a",
     "scanner":     "#1a3a5c",
     "laser":       "#2a0a3a",
+    "matrix":      "#3a2e0a",   # FM-13: Pixel-Panel (gold-orange, wie das Icon)
     "smoke":       "#2e2e2e",
     "hazer":       "#263030",
     "other":       "#222233",

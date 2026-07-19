@@ -1249,9 +1249,12 @@ class VisualizerBridge(QObject):
         tilt_default = 180 if model == "spider" else 270
         # FM-3: Kopf-/PAR-Anzahl fuer Multi-Emitter-Modelle (par_bar/spider) =
         # Zahl der RGBW-Banks; JS baut damit N PARs bzw. bringt sie zur Deckung
-        # mit dem heads-Array (FM-2).
+        # mit dem heads-Array (FM-2). FM-13: 'matrix' ist ebenfalls Multi-Emitter —
+        # n_heads = Pixel-Anzahl (color_r-Banks, 16/64) MUSS mitreisen, sonst baut
+        # buildMatrixPanel(0->16) IMMER ein 4x4-Panel und das 8x8 (64px) verliert
+        # heads[16..63] (adversariale Review HIGH).
         n_heads = 0
-        if model in ("par_bar", "spider", "mover_bar"):
+        if model in ("par_bar", "spider", "mover_bar", "matrix"):
             try:
                 n_heads = sum(1 for c in get_channels_for_patched(f)
                               if (getattr(c, "attribute", "") or "") == "color_r")

@@ -832,6 +832,46 @@ export function buildMoverBar(n) {
   return { group, moverHeads, isMoverBar: true };
 }
 
+// FM-13: LED-Matrix/Pixel-Panel — flaches Panel mit rows*cols einzeln faerbbaren
+// Pixel-Quads (Direkt-Emitter, KEIN Beam/Kein Pan-Tilt — einfachstes Multi-Head-
+// Modell). n = Pixel-Anzahl (aus head_count); Gitter near-square abgeleitet. Pixel
+// i (Zeilen-Haupt, i=0 = oben links) wird von heads[i].r/g/b gefaerbt. Front = +Z
+// (Panel steht vertikal wie ein Backdrop). Reale Referenz: generische 0,5-m-LED-
+// Kachel (500 x 500 x 50 mm) — Pixel fuellen die feste Panel-Flaeche unabh. der
+// Aufloesung. Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols }.
+export function buildMatrixPanel(n) {
+  n = Math.max(1, Math.min(256, Math.floor(n || 16)));
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n / cols);
+  const group = new THREE.Group();
+  const PW = 0.5, PH = 0.5, PD = 0.05;    // feste Panel-Groesse (0,5-m-Kachel)
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x141414, metalness: 0.4, roughness: 0.6 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, PD), bodyMat);
+  body.castShadow = true;
+  group.add(body);
+  const margin = 0.02;
+  const gw = (PW - 2 * margin) / cols;
+  const gh = (PH - 2 * margin) / rows;
+  const pxW = gw * 0.85, pxH = gh * 0.85;
+  const x0 = -PW / 2 + margin + gw / 2;
+  const y0 = PH / 2 - margin - gh / 2;     // Start oben links (Zeile 0 = oben)
+  const pixels = [];
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / cols), c = i % cols;
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(pxW, pxH),
+      new THREE.MeshStandardMaterial({
+        color: 0x0a0a0a, emissive: 0x000000, emissiveIntensity: 0,
+        roughness: 0.4, side: THREE.DoubleSide,
+      })
+    );
+    mesh.position.set(x0 + c * gw, y0 - r * gh, PD / 2 + 0.002);   // knapp vor +Z-Front
+    group.add(mesh);
+    pixels.push({ mesh, r, c });
+  }
+  return { group, pixels, isMatrix: true, rows, cols };
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // updateDmx-Handler pro Fixture-Typ (VIZ-13 3c Teil 2)
 // Bodies 1:1 aus den ehemaligen updateFixture-Zweigen in fixtures.js
@@ -952,6 +992,33 @@ export function updateMoverBarDmx(f, dmx) {
     }
   }
   // Top-Down-Icon: N Kopf-Zellen einzeln faerben (3c-1 zentrales Tinting)
+  tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
+  syncIconPos(f);
+}
+
+// ── FM-13: Matrix-Panel — rows*cols Pixel je einzeln aus heads[i] gefaerbt ──
+// Direkt-Emitter: KEIN Beam, kein Pan/Tilt. Master-Dimmer (intNorm) skaliert
+// ALLE Pixel gemeinsam. Fallback ohne Head-Daten: Pixel 0 = Basis-Farbe, Rest
+// aus (analog par_bar/mover_bar). Pixel i <-> heads[i] <-> color_r#i (Kanal-
+// reihenfolge = Zeilen-Haupt, deckungsgleich mit buildMatrixPanel).
+export function updateMatrixPanelDmx(f, dmx) {
+  if (!f.isMatrix || !f.pixels) return updateGenericDmx(f, dmx);
+  const { r, g, b, intNorm } = dmx;
+  const hs = f.lastHeads || [];
+  for (let i = 0; i < f.pixels.length; i++) {
+    const px = f.pixels[i];
+    const h = hs[i] || {};
+    const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
+    const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
+    const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
+    const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+    if (px.mesh && px.mesh.material) {
+      px.mesh.material.color = col;
+      px.mesh.material.emissive = col;
+      px.mesh.material.emissiveIntensity = intNorm * 1.6;   // Master-Dimmer skaliert alle Pixel
+    }
+  }
+  // Top-Down-Icon: Panel-Zellen aus den Kopf-Farben (3c-1 zentrales Tinting)
   tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
   syncIconPos(f);
 }

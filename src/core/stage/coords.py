@@ -43,6 +43,7 @@ def world3d_to_live(x: float, z: float) -> tuple[float, float]:
 _DEFAULT_Y: dict[str, float] = {
     "moving_head": 6.0,
     "scanner": 6.0,
+    "matrix": 3.0,      # FM-13: Pixel-Panel — mittlere Truss-/Stativ-Hoehe (Backdrop)
 }
 _DEFAULT_Y_FALLBACK: float = 0.6
 

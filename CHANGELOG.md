@@ -12,6 +12,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 #### Behoben
 
 - **Ein „aus"-angezeigtes Tempo lässt keinen versteckten Beat-Takt mehr laufen.** Nach CDX-14 setzte `set_bpm()` Quelle und Wert atomar, aber drei Aufrufer gaben aus dem Off-Zustand einen positiven Wert **ohne** Quelle weiter — `set_bpm()` leitet „aus" nur aus `BPM<=0` ab, nie umgekehrt, sodass `BPM>0` bei Quelle „aus" zurückblieb und der Beat-Timer lief, obwohl die UI „aus" zeigte (Chaser/Effekte triggerten gegen einen unsichtbaren Takt). Betroffen: der audio-getriggerte Chaser-Default (120 BPM), der OS2L-Fallback-Pfad und das Auftauen aus dem Tempo-Freeze (F3). **Fix:** alle drei geben die Quelle jetzt explizit mit (`set_bpm(bpm, source=…)`) — Chaser-Default → „manual", OS2L → „os2l"; der Tempo-Freeze **sichert die Quelle beim Einfrieren mit und restauriert sie treu** beim Auftauen. Bewusst **ohne** Umleitung über `request_bpm`/`set_manual_bpm` (deren Präzedenz-Guards MANUAL/Lock/Audio würden das Verhalten der Aufrufer ändern). Deterministische Regressionstests `tests/test_bpm_cdx14b_source_invariant.py` (Invariante je Aufrufer + Freeze/Unfreeze-Roundtrip erhält die Quelle). Schließt die von CDX-14 offen dokumentierte Rest-Lücke.
+### 2026-07-19 — Linux-Installations-/Laufzeit-Doku (XPLAT-07)
+
+#### Dokumentation
+
+- **`INSTALL.md` hat jetzt einen Linux-Abschnitt (x86_64, sekundäre Plattform).** Dokumentiert die auf Linux nötigen Systempakete und Laufzeit-Voraussetzungen, die vorher fehlten: `build-essential` + `libasound2-dev` für `python-rtmidi` (C-Extension — **ohne die gibt es auf Linux gar kein MIDI**, der WinMM-Fallback ist Windows-only), `libpulse0` + eine PulseAudio/PipeWire-**Monitor-Quelle** für Loopback-BPM (WASAPI-Semantik → auf Linux sonst stumm), `fonts-noto`/`fonts-dejavu` für saubere UI-Fonts. Dazu der manuelle venv-Installationsweg, eine Plattform-Hinweis-Tabelle mit den bereits im Code umgesetzten Linux-Anpassungen (QtWebEngine-Sandbox XPLAT-01, Art-Net-`SO_REUSEPORT` XPLAT-03, Font-Fallbacks XPLAT-05, `~/LightOS`-Datenordner) und Linux-Zeilen in der Troubleshooting-Tabelle. Reine Doku, kein Code/Verhalten geändert.
+
+### 2026-07-19 — Referenz-Demoshow „animierte Buttons": erreichbare Buttons + sichtbarer Strobe (CDX-19/20)
+
+#### Behoben
+
+- **CDX-19 — „Nebel an"/„BLACKOUT" (und „PAR Strobe") lagen außerhalb der erreichbaren VC-Canvas.** Der Generator `tools/build_komplette_animierte_show.py` platzierte diese Buttons bei x=1070/1220/1370, die `VCCanvas` ist aber nur 1200 px breit (Scroll-Area nicht resizable) → die Buttons waren im normalen VC-View nicht anklickbar. Jetzt in die zweite/dritte Reihe umgebrochen (alle Widgets enden bei x ≤ 1180); Reihe 1 endet sauber bei x=1060.
+- **CDX-20 — „PAR Strobe" blitzte physisch schwarz.** Der Strobe-Chaser alternierte nur den Dimmer 255↔0, die RGBW-Farbkanäle der ZQ01424-PARs starten bei 0 → der PAR blieb dunkel, obwohl der Dimmer blitzte. Der An-Schritt setzt jetzt zusätzlich Weiß (`color_w`=255) → sichtbarer weißer Strobe (der Aus-Schritt bleibt über Dimmer=0 dunkel). Show mit `build_and_verify` neu erzeugt + validiert (16 Widgets, 0 Off-Canvas).
+
+#### Behoben
+
+- **Hart gesetzte Windows-Fontfamilien haben auf Linux jetzt definierte Fallbacks.** Dutzende Widgets setzen `QFont("Segoe UI")` (76×), `"Arial"` (8×), `"Consolas"`/`"Courier New"` (je 3×). Auf Linux existieren diese Familien nicht → Qt substituierte still eine beliebige Default-Familie, wodurch die fein austarierten kleinen Punktgrößen (6–17 px) breiter werden und enge Labels/Ziffern (BPM, Slider) clippen konnten. **Fix:** ein zentraler `QFont.insertSubstitutions`-Eintrag pro Familie beim App-Start (`_install_font_substitutions` in `main.py`, direkt nach der `QApplication`) mappt sie auf verbreitete Linux-Äquivalente (`Segoe UI`/`Arial` → Noto Sans/DejaVu Sans/sans-serif; `Consolas`/`Courier New` → DejaVu Sans Mono/Liberation Mono/monospace) — die 90 `QFont(...)`-Aufrufstellen bleiben unangetastet. **Windows/macOS unberührt:** dort werden die Originale zuerst gefunden, die Substitution ist registriert, greift aber nie. Neue Tests `tests/test_font_substitutions.py`.
 
 ### 2026-07-19 — Art-Net-Input teilt den Port auf Linux (SO_REUSEPORT, XPLAT-03)
 
