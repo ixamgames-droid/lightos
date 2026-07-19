@@ -190,7 +190,9 @@ class OS2LServer:
             if hasattr(mgr, "request_bpm"):
                 mgr.request_bpm(bpm, "os2l")
             elif hasattr(mgr, "set_bpm"):
-                mgr.set_bpm(bpm)
+                # CDX-14b: Fallback-Pfad (alter Manager ohne request_bpm) — Quelle
+                # mitgeben, sonst bliebe aus dem Off-Zustand _bpm>0 bei _source=='off'.
+                mgr.set_bpm(bpm, source="os2l")
         except Exception as e:
             print(f"[OS2L] BPM-Manager error: {e}")
 
