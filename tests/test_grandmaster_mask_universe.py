@@ -72,6 +72,27 @@ class BuildGmMaskTest(unittest.TestCase):
         self.assertIn(1, mask)
         self.assertNotIn(2, mask)
 
+    def test_cmy_only_fixture_not_dimmed_via_color(self):
+        # A3D-37: ein CMY-only-Mover (KEIN echter Dimmer) darf NICHT ueber seine
+        # SUBTRAKTIVEN CMY-Farbkanaele "gedimmt" werden — Skalieren Richtung 0 wuerde
+        # CMY OEFFNEN (aufhellen/weiss) statt dunkeln. Er traegt also NICHTS zur
+        # GM/Blackout-Dimm-Maske bei (Universum bleibt registriert = leere Maske).
+        st = self._st()
+        fx = _Fx(1, 2, 20)
+        chans = [_Ch("cmy_c", 1), _Ch("cmy_m", 2), _Ch("cmy_y", 3), _Ch("pan", 4)]
+        mask = st._build_gm_mask({1: (fx, chans)})
+        self.assertIn(2, mask)                  # Universum registriert ...
+        self.assertEqual(set(mask[2]), set())   # ... aber KEINE CMY-Adresse in der Maske
+
+    def test_additive_rgb_only_still_dimmed_via_color(self):
+        # Gegenprobe: ADDITIVES RGB ohne Dimmer bleibt virtueller Dimmer (Skalieren
+        # Richtung 0 = dunkler, korrekt) -> die Farbadressen stehen weiter in der Maske.
+        st = self._st()
+        fx = _Fx(1, 2, 30)
+        chans = [_Ch("color_r", 1), _Ch("color_g", 2), _Ch("color_b", 3), _Ch("pan", 4)]
+        mask = st._build_gm_mask({1: (fx, chans)})
+        self.assertEqual(set(mask[2]), {30, 31, 32})   # RGB gedimmt, Pan (33) nicht
+
 
 class SendPathGmMaskTest(unittest.TestCase):
     """Der Sende-Pfad: leere Maske skaliert nichts, fehlender Key dimmt global."""
