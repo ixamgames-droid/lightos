@@ -516,6 +516,7 @@ _PAINTERS = {
     "fx_smoke":       (_draw_smoke,       _FX_SMOKE),
     "fx_hazer":       (_draw_hazer,       _FX_HAZER),
     "fx_spider":      (_draw_spider,      _FX_SPIDER),
+    "fx_matrix":      (_draw_matrix,      _MATRIX),   # FM-13: Pixel-Panel = buntes Raster-Glyph
     "fx_other":       (_draw_other,       _FX_OTHER),
 }
 

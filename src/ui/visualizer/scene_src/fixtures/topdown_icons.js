@@ -83,6 +83,29 @@ function addBarCells(group, n, barW) {
   return cells;
 }
 
+// FM-13: rows*cols kleine Quadrate als Raster (near-square aus n) — als
+// userData.cells registriert -> tintTopDownIcon faerbt pro Pixel (heads[i],
+// Zeilen-Haupt, deckungsgleich mit buildMatrixPanel/updateMatrixPanelDmx).
+function addGridCells(group, n, size) {
+  const count = Math.max(1, Math.min(256, Math.floor(n || 16)));
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+  const cells = [];
+  const inner = size - 0.18;
+  const gw = inner / cols, gh = inner / rows;
+  const cw = gw * 0.82, ch = gh * 0.82;
+  const x0 = -inner / 2 + gw / 2;
+  const z0 = -inner / 2 + gh / 2;
+  for (let i = 0; i < count; i++) {
+    const r = Math.floor(i / cols), c = i % cols;
+    const cell = mkFill(new THREE.PlaneGeometry(cw, ch));
+    cell.position.set(x0 + c * gw, 0.055, z0 + r * gh);
+    group.add(cell);
+    cells.push(cell);
+  }
+  return cells;
+}
+
 export function buildTopDownIcon(type, nHeads) {
   const group = new THREE.Group();
   let body, ring, cells = null;
@@ -121,6 +144,15 @@ export function buildTopDownIcon(type, nHeads) {
     cells = addBarCells(group, nHeads, 1.6);
     addArrow(group, -0.25, -0.65, 0.12);
     ringRadii = [0.92, 1.02];
+  } else if (type === 'matrix') {
+    // FM-13: Pixel-Panel — quadratisches Gehaeuse + rows*cols Einzel-Pixel-Zellen
+    // (Raster-Schema; jede Zelle ist ein Kopf -> tintTopDownIcon faerbt per-Pixel).
+    const S = 1.3;
+    body = mkFill(new THREE.PlaneGeometry(S, S), BAR_BODY_FILL);
+    group.add(body);
+    group.add(mkOutline(new THREE.PlaneGeometry(S, S)));
+    cells = addGridCells(group, nHeads, S);
+    ringRadii = [0.98, 1.08];
   } else if (type === 'spider') {
     // zwei kurze parallele Bars (Top-Down); jede Bar ist eine Zelle ->
     // tintTopDownIcon spiegelt die Farbe pro Kopf/Bar.

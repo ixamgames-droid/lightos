@@ -24,7 +24,7 @@
 <div id="err"></div>
 <div id="label"></div>
 <script type="module">
-  const TYPES = ['moving_head','spider','par_bar','mover_bar','par','led_bar','strobe',
+  const TYPES = ['moving_head','spider','par_bar','mover_bar','matrix','par','led_bar','strobe',
                  'dimmer','other','scanner','smoke','hazer','laser'];
   const showErr = (m) => { document.getElementById('err').textContent += m + '\n'; };
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));

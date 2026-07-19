@@ -231,6 +231,8 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             "HYDRA4000": "moving_head", "EVENTPARIP65": "par",
             # Katalog-Erweiterung Runde 4 (2026-07-19)
             "ATOMIC3000": "strobe", "POINTE": "moving_head", "MACAURA": "moving_head",
+            # FM-13: LED-Matrix/Pixel-Panel (neuer fixture_type 'matrix')
+            "MATRIXPANEL": "matrix",
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(

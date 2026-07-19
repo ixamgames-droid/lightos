@@ -184,6 +184,10 @@ export function addFixture(data) {
       host.add(bcone);
       mh.beam = bcone;
     });
+  } else if (model.isMatrix) {
+    // FM-13: Matrix-Panel = Direkt-Emitter (die Pixel-Quads leuchten selbst) —
+    // KEIN Beam/SpotLight/Floor-Spot (wie Nebel/Hazer, aber mit faerbbaren
+    // Pixeln). Per-Pixel-Farbe setzt updateMatrixPanelDmx aus f.lastHeads.
   } else if (rtype === 'smoke' || rtype === 'hazer') {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
     // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
@@ -259,6 +263,8 @@ export function addFixture(data) {
     isParBar: !!model.isParBar,
     moverHeads: model.moverHeads || null,   // FM-4: Mover-Bar-Koepfe (je {yoke, head, lens, beam})
     isMoverBar: !!model.isMoverBar,
+    pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
+    isMatrix: !!model.isMatrix,
     beam, spot, spotTarget, floorSpot,
     icon,
     label,   // VIZ-14: persistentes 3D-Label (Sprite, Kind von root)

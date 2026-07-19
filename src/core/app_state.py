@@ -2610,8 +2610,10 @@ def suggest_viz_model(fixture_type: str, attributes) -> str | None:
     nutzt den ``fixture_type``). Identische Regeln wie ``viz_model_for``
     (dort mit echten DB-Kanaelen); der Fixture-Generator nutzt sie fuer den
     Live-Vorschlag auf noch ungespeicherten Kanallisten."""
-    if (fixture_type or "") == "laser":
-        return None            # Laser = Punkt-Scanner, nie Multi-Emitter (FLA-1)
+    if (fixture_type or "") in ("laser", "matrix"):
+        # Laser = Punkt-Scanner (FLA-1); matrix = Pixel-Panel mit eigenem
+        # Renderer (FM-13) — beide NIE ueber die Multi-Emitter-Heuristik routen.
+        return None
     attrs = [(a or "") for a in attributes]
     banks = sum(1 for a in attrs if a == "color_r")
     if banks < 2:
@@ -2856,7 +2858,11 @@ def is_spider_fixture(fixture) -> bool:
     Option. Gilt genauso fuer importierte Laser mit doppelter Farb-Bank."""
     # Laser = Punkt-Scanner, nie ein Multi-Emitter-Spider (s. Docstring). Vor dem
     # Bank-Zaehlen greifen, damit auch >=2 color_r ein Laser bleibt.
-    if (getattr(fixture, "fixture_type", "") or "") == "laser":
+    # FM-13: dito fuer 'matrix' (Pixel-Panel) — es hat rows*cols color_r-Banks,
+    # ist aber KEIN Spider/par_bar: der Panel-Renderer nutzt den fixture_type
+    # 'matrix' direkt (buildMatrixPanel). Ohne dieses Gate routet viz_model_for
+    # das Panel faelschlich auf par_bar (>=2 Banks, keine Bewegung).
+    if (getattr(fixture, "fixture_type", "") or "") in ("laser", "matrix"):
         return False
     try:
         chans = get_channels_for_patched(fixture)

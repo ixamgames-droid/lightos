@@ -2156,6 +2156,37 @@ def _add_martin_mac_aura(s, mfr):
     ])
 
 
+# ── FM-13: LED-Matrix-/Pixel-Panel als EIGENER Fixture-Typ ('matrix') ─────────
+# Neuer Geraetetyp mit Per-Pixel-Adressierung EINES Fixtures. Kanal-Layout:
+# 1 Master-Dimmer + rows*cols Pixel je [R,G,B] in Zeilen-Haupt-Reihenfolge. Die
+# N-te Wiederholung von color_r/g/b wird per attr#N-Mehrkopf-Konvention Pixel N
+# (Kopf N) -> `visualizer_service._build_fixture_payload` baut daraus das heads[]-
+# Array (per-Pixel-Farbe) -> 3D `buildMatrixPanel` (Grid emissiver Quads) faerbt
+# jeden Pixel einzeln. Routing: `is_spider_fixture`/`suggest_viz_model` gaten
+# 'matrix' (sonst wuerden die vielen color_r-Banks es faelschlich auf par_bar
+# routen) -> `viz_model_for` liefert None -> Renderer nutzt fixture_type 'matrix'.
+def _matrix_panel_mode(rows: int, cols: int):
+    """Kanalliste eines RGB-Pixel-Panels (Master-Dimmer + rows*cols * RGB)."""
+    channels = [("Master-Dimmer", "intensity", 255, 255)]
+    for i in range(rows * cols):
+        r, c = divmod(i, cols)
+        channels.append((f"P{i} (Z{r}/S{c}) Rot",  "color_r", 0, 255))
+        channels.append((f"P{i} (Z{r}/S{c}) Grün", "color_g", 0, 255))
+        channels.append((f"P{i} (Z{r}/S{c}) Blau", "color_b", 0, 255))
+    return channels
+
+
+def _add_generic_matrix_panel(s, mfr):
+    """Generisches RGB-Pixel-Panel (FM-13, fixture_type 'matrix'). Modi 4×4 (16px,
+    49ch) + 8×8 (64px, 193ch). Master-Default 255 = voll (Pixel sind per Default
+    schwarz -> keine Blend-Gefahr; per-Pixel-Farbe sofort sichtbar sobald RGB
+    gesetzt). Per-Pixel-Farbe reist ueber attr#N -> heads[] -> buildMatrixPanel."""
+    _add_fixture(s, mfr, "LED Matrix Panel", "MATRIXPANEL", "matrix", 100, [
+        ("4×4 (16 Pixel RGB)", _matrix_panel_mode(4, 4)),
+        ("8×8 (64 Pixel RGB)", _matrix_panel_mode(8, 8)),
+    ])
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -2307,6 +2338,9 @@ def ensure_builtins():
             changed = True
         if "POINTE" not in have:                          # Katalog Runde 4
             _add_robe_pointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+            changed = True
+        if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
+            _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -2609,3 +2643,6 @@ def _seed(s: Session):
     robe = Manufacturer(name="Robe", short_name="ROBE")
     s.add(robe)
     _add_robe_pointe(s, robe)
+
+    # ── FM-13: LED-Matrix/Pixel-Panel als eigener Fixture-Typ ─────────────────
+    _add_generic_matrix_panel(s, generic)
