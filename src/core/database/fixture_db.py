@@ -8,7 +8,11 @@ from .models import (Manufacturer, FixtureProfile, FixtureMode,
                      FixtureChannel, ChannelRange, migrate_fixtures_db,
                      create_all_idempotent)
 
-DB_PATH = os.path.join(app_data_dir(), "fixtures.db")
+# XPLAT-04: standardmaessig im App-Datenordner (app_data_dir()). Override via
+# LIGHTOS_FIXTURE_DB (analog LIGHTOS_SHOW_DB) — die Test-Suite pinnt darueber die
+# reale, geseedete fixtures.db, obwohl sie APPDATA sonst in ein Temp umlenkt (die
+# committeten shows/*.lshow referenzieren feste fixture_profile_id aus der realen DB).
+DB_PATH = os.environ.get("LIGHTOS_FIXTURE_DB") or os.path.join(app_data_dir(), "fixtures.db")
 
 
 def get_engine(path: str = DB_PATH):

@@ -39,15 +39,23 @@ os.environ.setdefault(
 # Konkreter Anlass: test_viz10_stability schrieb sonst absichtliche Fake-Crashes
 # ("ValueError: kaputt") in Davids echtes crash.log und verfaelschte die
 # Absturz-Diagnose. PID-scoped -> parallele Laeufe teilen sich nichts.
+# Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT ins Test-
+# APPDATA umgelenkt. Die committeten shows/*.lshow referenzieren feste
+# fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
+# geseedete Eigen-DB vergibt andere Auto-IDs -> Kanal-Lookups (Dimmer/Farbe)
+# liefen ins Leere (test_color_fx_show_render/test_strict_dimmer_render/
+# test_capability_live). Sie ist zudem reine LESE-/idempotente Seed-Last.
+# XPLAT-04: fixture_db.DB_PATH folgt jetzt app_data_dir() (also APPDATA). Damit die
+# Umlenkung unten die Fixture-DB NICHT mitzieht, pinnen wir sie hier EXPLIZIT auf
+# die reale DB via LIGHTOS_FIXTURE_DB -- SOLANGE APPDATA noch echt ist (app_data_dir
+# importiert nur os/sys, kein App-State -> sicher vor dem ersten App-Import).
+from src.core.paths import app_data_dir as _app_data_dir  # noqa: E402
+os.environ.setdefault(
+    "LIGHTOS_FIXTURE_DB", os.path.join(_app_data_dir(), "fixtures.db"))
+
 _TEST_APPDATA = os.path.join(_TEST_TMP, f"lightos_test_appdata_{_TEST_PID}")
 os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
 os.environ["APPDATA"] = _TEST_APPDATA
-# Hinweis: Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT
-# umgelenkt. Die committeten shows/*.lshow referenzieren feste
-# fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
-# geseedete Eigen-DB vergibt andere Auto-IDs -> Kanal-Lookups (Dimmer/Farbe)
-# liefen ins Leere (test_color_fx_show_render/test_strict_dimmer_render). Sie ist
-# zudem reine LESE-/idempotente Seed-Last und damit nicht die Flaky-Quelle.
 
 
 def _purge_test_dbs():
