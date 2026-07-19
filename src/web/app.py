@@ -256,16 +256,19 @@ def _register_routes(app):
 
     @app.route("/api/go", methods=["POST"])
     def api_go():
-        # WEB-04: lokale Referenz greifen -> kein TOCTOU-IndexError, falls die
-        # Liste zwischen Prüfung und Index-Zugriff nebenläufig geleert wird.
-        stacks = _get_state().cue_stacks
+        # WEB-04/A3D-40: echten Snapshot ziehen (list(...)). Die 'lokale Referenz'
+        # allein war KEIN Schutz — sie aliast dieselbe Live-Liste, die show_file beim
+        # Laden per cue_stacks.clear() IN-PLACE leert; zwischen 'if stacks:' und
+        # 'stacks[0]' gab das weiterhin einen IndexError (HTTP 500). list(...) kopiert
+        # -> index-sicher (identisches Muster wie /api/status).
+        stacks = list(_get_state().cue_stacks)
         if stacks:
             stacks[0].go()
         return jsonify({"ok": True})
 
     @app.route("/api/back", methods=["POST"])
     def api_back():
-        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
         if stacks:
             stacks[0].back()
         return jsonify({"ok": True})
@@ -275,7 +278,7 @@ def _register_routes(app):
         # STOP-Button im Remote-UI stoppt die laufende Cueliste (Pendant zu
         # go/back). Vorher rief das Frontend die nicht existierende Route
         # /api/executor/1/back auf -> stiller 404, STOP tat nichts.
-        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
         if stacks:
             stacks[0].stop()
         return jsonify({"ok": True})
@@ -344,21 +347,21 @@ def _register_socketio(sio):
 
     @sio.on("go")
     def on_go(data=None):
-        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
         if stacks:
             stacks[0].go()
         sio.emit("ack", {"action": "go"})
 
     @sio.on("back")
     def on_back(data=None):
-        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
         if stacks:
             stacks[0].back()
         sio.emit("ack", {"action": "back"})
 
     @sio.on("stop")
     def on_stop(data=None):
-        stacks = _get_state().cue_stacks      # WEB-04: TOCTOU-sicher (lokale Ref)
+        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
         if stacks:
             stacks[0].stop()
         sio.emit("ack", {"action": "stop"})

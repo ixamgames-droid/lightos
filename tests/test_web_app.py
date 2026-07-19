@@ -99,6 +99,32 @@ class _FakeState:
         self.cleared += 1
 
 
+class _RacyStacks:
+    """A3D-40: simuliert das nebenlaeufige ``cue_stacks.clear()`` (show_file leert
+    die Liste beim Laden IN-PLACE) genau zwischen ``if stacks:`` und ``stacks[0]``.
+    ``__bool__``/``__len__`` sehen die Liste voll; ein Index-Zugriff auf DIESE
+    (Live-)Instanz leert sie vorher und wirft ``IndexError``. Der Fix zieht per
+    ``list(...)`` einen Snapshot (nutzt ``__iter__``), auf dem der Index NICHT diese
+    Instanz trifft -> kein Crash. Ohne Snapshot fliegt der IndexError durch den
+    Handler (HTTP 500 bzw. — mit TESTING — direkt in den Test)."""
+
+    def __init__(self, stacks):
+        self._s = list(stacks)
+
+    def __bool__(self):
+        return bool(self._s)
+
+    def __len__(self):
+        return len(self._s)
+
+    def __iter__(self):
+        return iter(list(self._s))     # Snapshot-Iteration (der Fix nutzt list(...))
+
+    def __getitem__(self, idx):
+        self._s = []                   # Race: Live-Liste ist jetzt leer
+        return self._s[idx]            # IndexError
+
+
 @unittest.skipUnless(HAS_FLASK, "Flask/flask-socketio nicht installiert")
 class TestWebRemote(unittest.TestCase):
     def setUp(self):
@@ -203,6 +229,31 @@ class TestWebRemote(unittest.TestCase):
         self.state.cue_stacks = []
         r = self.client.post("/api/stop")
         self.assertEqual(r.status_code, 200)
+
+    # ── A3D-40: TOCTOU-Race gegen nebenlaeufiges cue_stacks.clear() ────────────
+    def test_go_survives_concurrent_cuestack_clear(self):
+        # cue_stacks wird zwischen 'if stacks:' und 'stacks[0]' geleert (Show-Load
+        # waehrend Remote-Bedienung). Der list(...)-Snapshot macht den Zugriff
+        # index-sicher -> kein IndexError/HTTP 500, das GO landet auf dem Snapshot.
+        stack = self.state.cue_stacks[0]
+        self.state.cue_stacks = _RacyStacks([stack])
+        r = self.client.post("/api/go")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(stack.actions, ["go"])
+
+    def test_back_survives_concurrent_cuestack_clear(self):
+        stack = _FakeCueStack()
+        self.state.cue_stacks = _RacyStacks([stack])
+        r = self.client.post("/api/back")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(stack.actions, ["back"])
+
+    def test_stop_survives_concurrent_cuestack_clear(self):
+        stack = _FakeCueStack()
+        self.state.cue_stacks = _RacyStacks([stack])
+        r = self.client.post("/api/stop")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(stack.actions, ["stop"])
 
     def test_status_includes_executor_fader_values(self):
         """Bug: das Remote-UI initialisierte alle Fader hart auf 100%. /api/status
