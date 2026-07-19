@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Linux-Installations-/Laufzeit-Doku (XPLAT-07)
+
+#### Dokumentation
+
+- **`INSTALL.md` hat jetzt einen Linux-Abschnitt (x86_64, sekundäre Plattform).** Dokumentiert die auf Linux nötigen Systempakete und Laufzeit-Voraussetzungen, die vorher fehlten: `build-essential` + `libasound2-dev` für `python-rtmidi` (C-Extension — **ohne die gibt es auf Linux gar kein MIDI**, der WinMM-Fallback ist Windows-only), `libpulse0` + eine PulseAudio/PipeWire-**Monitor-Quelle** für Loopback-BPM (WASAPI-Semantik → auf Linux sonst stumm), `fonts-noto`/`fonts-dejavu` für saubere UI-Fonts. Dazu der manuelle venv-Installationsweg, eine Plattform-Hinweis-Tabelle mit den bereits im Code umgesetzten Linux-Anpassungen (QtWebEngine-Sandbox XPLAT-01, Art-Net-`SO_REUSEPORT` XPLAT-03, Font-Fallbacks XPLAT-05, `~/LightOS`-Datenordner) und Linux-Zeilen in der Troubleshooting-Tabelle. Reine Doku, kein Code/Verhalten geändert.
+
 ### 2026-07-19 — Referenz-Demoshow „animierte Buttons": erreichbare Buttons + sichtbarer Strobe (CDX-19/20)
 
 #### Behoben
