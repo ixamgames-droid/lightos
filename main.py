@@ -257,6 +257,36 @@ def _setup_webengine_diagnostics():
         pass
 
 
+# XPLAT-05: Dutzende Widgets setzen hart Windows-Fontfamilien (Segoe UI/Consolas/
+# Courier New/Arial). Auf Linux fehlen die -> Qt substituiert still eine beliebige
+# Default-Familie; die fein austarierten kleinen Punktgroessen (6-17px) koennen
+# dann breiter werden und enge Labels/Ziffern (BPM, Slider) clippen. Ein zentraler
+# Substitutions-Eintrag pro Familie mappt sie auf verbreitete Linux-Aequivalente.
+# Auf Windows werden die Originale zuerst gefunden -> die Substitution greift nie
+# (registriert, aber ungenutzt), der Windows-/WinARM-Pfad bleibt unveraendert.
+_FONT_SUBSTITUTIONS = {
+    "Segoe UI": ["Noto Sans", "DejaVu Sans", "sans-serif"],
+    "Arial": ["Noto Sans", "DejaVu Sans", "sans-serif"],
+    "Consolas": ["DejaVu Sans Mono", "Liberation Mono", "monospace"],
+    "Courier New": ["DejaVu Sans Mono", "Liberation Mono", "monospace"],
+}
+
+
+def _install_font_substitutions():
+    """XPLAT-05: Fallback-Familien fuer die hart gesetzten Windows-Fonts registrieren.
+
+    No-op-Wirkung auf Windows (Originale existieren -> nie substituiert). Muss NACH
+    der QApplication und VOR dem Bauen der UI laufen, damit alle Widgets die
+    Fallbacks sehen. QFont.insertSubstitutions ist eine globale, idempotente
+    Registrierung."""
+    try:
+        from PySide6.QtGui import QFont
+        for family, subs in _FONT_SUBSTITUTIONS.items():
+            QFont.insertSubstitutions(family, subs)
+    except Exception as e:
+        print(f"[main] Font-Substitutionen fehlgeschlagen: {e}")
+
+
 def _install_crash_dialog():
     """F-9: Haengt einen nutzersichtbaren Fehler-Dialog an sys.excepthook UND
     threading.excepthook an. Wird NACH der QApplication aufgerufen. Die vorhandenen
@@ -438,6 +468,9 @@ def main():
     app.setApplicationName("LightOS")
     app.setApplicationVersion(APP_VERSION)
     app.setOrganizationName("LightOS")
+
+    # XPLAT-05: Font-Fallbacks registrieren, bevor Dialoge/UI Fonts aufloesen.
+    _install_font_substitutions()
 
     # F-9: nutzersichtbarer Crash-Report-Dialog (nach der QApplication, da er
     # QMessageBox nutzt). Ergaenzt das stille crash.log-Logging.

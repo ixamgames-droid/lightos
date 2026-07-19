@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Font-Fallbacks für Linux (kein Layout-Drift, XPLAT-05)
+
+#### Behoben
+
+- **Hart gesetzte Windows-Fontfamilien haben auf Linux jetzt definierte Fallbacks.** Dutzende Widgets setzen `QFont("Segoe UI")` (76×), `"Arial"` (8×), `"Consolas"`/`"Courier New"` (je 3×). Auf Linux existieren diese Familien nicht → Qt substituierte still eine beliebige Default-Familie, wodurch die fein austarierten kleinen Punktgrößen (6–17 px) breiter werden und enge Labels/Ziffern (BPM, Slider) clippen konnten. **Fix:** ein zentraler `QFont.insertSubstitutions`-Eintrag pro Familie beim App-Start (`_install_font_substitutions` in `main.py`, direkt nach der `QApplication`) mappt sie auf verbreitete Linux-Äquivalente (`Segoe UI`/`Arial` → Noto Sans/DejaVu Sans/sans-serif; `Consolas`/`Courier New` → DejaVu Sans Mono/Liberation Mono/monospace) — die 90 `QFont(...)`-Aufrufstellen bleiben unangetastet. **Windows/macOS unberührt:** dort werden die Originale zuerst gefunden, die Substitution ist registriert, greift aber nie. Neue Tests `tests/test_font_substitutions.py`.
+
 ### 2026-07-19 — Art-Net-Input teilt den Port auf Linux (SO_REUSEPORT, XPLAT-03)
 
 #### Behoben
