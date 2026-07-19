@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-20 — Patch-Loader gegen geteilte `current_show.db` gehärtet (STAB-CURSHOW b)
+
+#### Behoben
+
+- **Eine saubere 32-Fixture-Show lädt nicht mehr nichtdeterministisch 22–35 Fixtures, wenn mehrere Prozesse dieselbe `data/current_show.db` teilen** (Davids zwei laufende App-Instanzen + parallele Build-/Test-Läufe). Ursache war ein **nicht-atomarer** Patch-Replace: `_replace_patch_from_data` committete das `clear_patch()`-DELETE separat und danach jedes `add_fixture()` einzeln (N+1 Commits). Ein Parallelprozess sah den leeren/halben Zwischenzustand oder INSERTete hinein; der FLD-FID-Guard wich auf `next_fid()` aus → Adress-Überlapp-Zeilen (zwei distinkte fids auf derselben `universe:address`). **Fix (aus einer adversarialen 3-Wege-Design-Debatte, einstimmig):**
+  - **Atomarer Voll-Replace:** neue `AppState.replace_patch(fixtures)` ersetzt den gesamten Patch in **einer** Transaktion — **Core**-`delete(PatchedFixture)` + `add_all` + **genau ein** Commit + **genau ein** `_reload_patch_cache`. Kein persistierter Zwischenzustand mehr; Absturz vor dem Commit → Rollback → alter Patch intakt. `_replace_patch_from_data` ruft dies (mit Fallback auf den alten Pfad für ältere APIs/Test-Fakes). fid-Kollisionen in der Show-Datei werden **reassigned** (nie verworfen).
+  - **Concurrency-PRAGMAs:** `busy_timeout=5000` pro Show-DB-Connection (`_set_sqlite_pragmas` als `connect`-Listener in `open_show`) verwandelt sofortiges `SQLITE_BUSY` in kurzes Warten → zwei echte App-Prozesse serialisieren ihre Loads. `journal_mode=WAL` best-effort, aber nur auf lokalem Fixed-Laufwerk (`_is_local_writable_path` sperrt UNC/Netz- und Cloud-Sync-Ordner wie OneDrive/Dropbox, wo WAL-Sidecars korrumpieren); alles `try/except`, bricht `open_show` nie.
+- **Adress-Konflikte werden präziser gemeldet** (`validate_and_repair` Check 5): beide kollidierenden fids + volle Adressbereiche + Universe. **Bewusst weiterhin report-only** — kein Auto-Löschen überlappender Fixtures (`fid` ist UNIQUE, ein Überlapp ist am Startzeitpunkt nicht von einem legitimen Nutzer-Stapel unterscheidbar → Auto-Delete wäre stiller Datenverlust). Der atomare Replace heilt verwaiste Zeilen ohnehin beim nächsten sauberen Load.
+
+#### Tests
+
+- `tests/test_stab_curshow_loader_hardening.py` — T1 Zwei-Writer-Contention (eigene Engine je Thread auf dieselbe FILE-DB, Barrier, K Iterationen → exakt 32, null Überlappung), T2 Atomizität (genau 1 Commit), T3 Überlapp-Überleben/kein stiller Verlust, T4 Einzelprozess-Regression + `replace_patch` legt keine Gruppen an, T5 `busy_timeout`-Serialisierung, + WAL-Guard-Unit-Tests.
+
 ### 2026-07-19 — Blackout/Grand Master hellt CMY-Mover nicht mehr auf (A3D-37)
 
 #### Behoben

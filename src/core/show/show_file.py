@@ -183,36 +183,18 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
     _prev_suppress = getattr(state, "_suppress_emits", False)
     state._suppress_emits = True
     try:
-        # Remove old fixtures first. FLD-FID: hart ueber clear_patch() leeren, damit
-        # auch verwaiste DB-Zeilen (Cache/DB-Desync) verschwinden — sonst kollidieren
-        # neue fids mit Altzeilen (IntegrityError: UNIQUE constraint patched_fixtures.fid).
-        cleared = False
-        try:
-            state.clear_patch()
-            cleared = True
-        except AttributeError:
-            cleared = False  # aeltere AppState-API ohne clear_patch
-        except Exception as e:
-            print(f"[show_file] clear_patch failed: {e}")
-        if not cleared:
-            old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
-            for fid in [f for f in old_fids if f is not None]:
-                try:
-                    state.remove_fixture(fid, undoable=False)
-                except TypeError:
-                    state.remove_fixture(fid)
-                except Exception as e:
-                    print(f"[show_file] remove fixture {fid} failed: {e}")
-
-        # Clear stale programmer values referencing old patch
+        # Clear stale programmer values referencing old patch (in-memory).
         try:
             state.clear_programmer()
         except Exception as e:
             print(f"[show_file] clear programmer failed: {e}")
 
-        # Add imported fixtures, dedupe duplicate FIDs
+        # Volle PatchedFixture-Liste bauen, doppelte FIDs auffangen — REASSIGN auf
+        # die naechste freie fid (nie droppen), sonst Intra-Load-Datenverlust bei
+        # einer Show-Datei mit fid-Kollision.
         next_fid = 1
-        used_fids = set()
+        used_fids: set = set()
+        pfs: list = []
         for entry in patch_data:
             if not isinstance(entry, dict):
                 continue
@@ -221,14 +203,64 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
                 pf.fid = max(used_fids) + 1
             used_fids.add(pf.fid)
             next_fid = max(next_fid, pf.fid + 1)
-            try:
-                state.add_fixture(pf, undoable=False)
-            except TypeError:
-                state.add_fixture(pf)
-            except Exception as e:
-                print(f"[show_file] add fixture {pf.fid} failed: {e}")
+            pfs.append(pf)
+
+        # STAB-CURSHOW: den GESAMTEN Patch ATOMAR in EINER Transaktion ersetzen
+        # (DELETE-all + Bulk-Insert, GENAU EIN Commit). Kein persistierter Leer-/
+        # Halbzustand mehr, in den ein Parallelprozess hinein-INSERTet — die Quelle
+        # der 22-35-Nichtdeterminismus + der Adress-Ueberlapp-Zeilen. Aeltere
+        # AppState-APIs (und die Test-Fakes) ohne replace_patch fallen auf den
+        # früheren, nicht-atomaren clear_patch()+add_fixture()-Pfad zurueck.
+        # Ein Fehler im Patch-Replace (z. B. OperationalError 'database is locked'
+        # nach Ablauf von busy_timeout) darf den Show-Load NICHT bis in den Qt-Slot
+        # durchschlagen — der frühere Pfad kapselte clear_patch/add_fixture einzeln
+        # in try/except. Bei atomarem replace_patch rollt die Transaktion zurück,
+        # der alte Patch bleibt intakt; hier nur loggen, nicht propagieren.
+        replace = getattr(state, "replace_patch", None)
+        try:
+            if callable(replace):
+                replace(pfs)
+            else:
+                _replace_patch_legacy(state, pfs)
+        except Exception as e:
+            print(f"[show_file] patch replace failed: {e}")
     finally:
         state._suppress_emits = _prev_suppress
+
+
+def _replace_patch_legacy(state, pfs: list):
+    """Fallback fuer AppState-APIs OHNE ``replace_patch`` (aeltere States/Fakes):
+    der frühere, NICHT-atomare Pfad — Altpatch hart leeren (clear_patch, sonst
+    remove_fixture-Schleife) + je Fixture add_fixture(). Nur Kompatibilitaets-
+    Schicht; der Default ist das atomare ``state.replace_patch`` (STAB-CURSHOW).
+    Erwartet, dass der Aufrufer ``_suppress_emits`` bereits gesetzt hat."""
+    # Remove old fixtures first. FLD-FID: hart ueber clear_patch() leeren, damit
+    # auch verwaiste DB-Zeilen (Cache/DB-Desync) verschwinden — sonst kollidieren
+    # neue fids mit Altzeilen (IntegrityError: UNIQUE constraint patched_fixtures.fid).
+    cleared = False
+    try:
+        state.clear_patch()
+        cleared = True
+    except AttributeError:
+        cleared = False  # aeltere AppState-API ohne clear_patch
+    except Exception as e:
+        print(f"[show_file] clear_patch failed: {e}")
+    if not cleared:
+        old_fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
+        for fid in [f for f in old_fids if f is not None]:
+            try:
+                state.remove_fixture(fid, undoable=False)
+            except TypeError:
+                state.remove_fixture(fid)
+            except Exception as e:
+                print(f"[show_file] remove fixture {fid} failed: {e}")
+    for pf in pfs:
+        try:
+            state.add_fixture(pf, undoable=False)
+        except TypeError:
+            state.add_fixture(pf)
+        except Exception as e:
+            print(f"[show_file] add fixture {getattr(pf, 'fid', '?')} failed: {e}")
 
 
 def _collect_fixture_groups(state) -> list:
