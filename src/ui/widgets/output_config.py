@@ -15,6 +15,30 @@ from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
 
 _UNIV_CONFIG_PATH = os.path.join("data", "universes.json")
 
+# A3D-33: gueltiger interner Universe-Bereich — identisch zu den 1..32-Spinboxen der
+# Tabs und der 32-Zeilen-Grenze in _univ_add. Die freie '#'-Spalte des Universe-Tables
+# hatte KEINEN Range-Guard -> -1/70000 landeten in universes.json und liessen
+# apply_output_config Art-Net werfen bzw. sACN still auf ein falsches Universum wrappen.
+_UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
+
+
+def _coerce_universe_num(text, fallback: int) -> tuple[int, bool]:
+    """Universe-Nummer aus einem freien Tabellenfeld robust in den gueltigen
+    Bereich [``_UNIVERSE_MIN``..``_UNIVERSE_MAX``] zwingen.
+
+    Rueckgabe ``(nummer, angepasst?)``:
+    - Nicht parsebar (leer/Muell) -> ``(fallback, False)``: unveraendertes Verhalten,
+      der Aufrufer setzt still den Zeilen-Default (Zeilenindex+1).
+    - Parsebar aber ausserhalb -> auf die naechste Grenze geklemmt, ``angepasst=True``.
+    - Innerhalb -> ``(nummer, False)``.
+    """
+    try:
+        n = int(str(text).strip())
+    except (ValueError, TypeError, AttributeError):
+        return fallback, False
+    clamped = max(_UNIVERSE_MIN, min(_UNIVERSE_MAX, n))
+    return clamped, clamped != n
+
 
 def _load_universe_config() -> list[dict]:
     if not os.path.exists(_UNIV_CONFIG_PATH):
@@ -449,16 +473,22 @@ class OutputConfigDialog(QDialog):
 
     def _univ_save(self):
         rows = []
+        adjusted: list[tuple[int, int]] = []   # A3D-33: (Zeilennr, geklemmte Nummer)
         for r in range(self._univ_table.rowCount()):
             num_item = self._univ_table.item(r, 0)
             name_item = self._univ_table.item(r, 1)
             patch_item = self._univ_table.item(r, 3)
             ext_item = self._univ_table.item(r, 4)
             combo = self._univ_table.cellWidget(r, 2)
-            try:
-                num = int(num_item.text()) if num_item else r + 1
-            except ValueError:
-                num = r + 1
+            # A3D-33: die freie '#'-Spalte auf [1..32] klemmen, BEVOR sie persistiert
+            # und via apply_output_config als Universe-Key/Adapter angewandt wird
+            # (sonst Art-Net-Wurf bzw. stiller sACN-Wrap auf ein falsches Universum).
+            num, was_adjusted = _coerce_universe_num(
+                num_item.text() if num_item else "", r + 1)
+            if was_adjusted:
+                adjusted.append((r + 1, num))
+                if num_item is not None:
+                    num_item.setText(str(num))   # UI spiegelt den gespeicherten Wert
             entry = {
                 "num": num,
                 "name": name_item.text() if name_item else f"Universe {num}",
@@ -474,6 +504,12 @@ class OutputConfigDialog(QDialog):
                 except ValueError:
                     pass
             rows.append(entry)
+        if adjusted:
+            _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
+            QMessageBox.warning(
+                self, "Universe-Nummer angepasst",
+                f"Universe-Nummern müssen zwischen {_UNIVERSE_MIN} und "
+                f"{_UNIVERSE_MAX} liegen. Angepasst: {_lst}.")
         _save_universe_config(rows)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         try:

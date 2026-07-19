@@ -100,8 +100,8 @@ place(xy, "Pan/Tilt", COL[3], ROWY[0], 150, 150, "VCXYPad — XY-Feld")
 sd = VCSpeedDial("Tempo-Knoten"); sd.target_mode = SpeedTarget.SPEED_NODE; sd.tempo_bus_id = "A"; sd.role = "master"
 place(sd, "Tempo-Knoten", COL[4], ROWY[0], 150, 140, "VCSpeedDial — Tempo-Rad")
 # Reihe 1
-en = VCEncoder("Groesse"); en.param_key = "size"; en.function_id = mtx.id
-place(en, "Groesse", COL[0], ROWY[1], 96, 110, "VCEncoder — Drehgeber")
+en = VCEncoder("Helligkeit"); en.param_key = "intensity"; en.function_id = mtx.id
+place(en, "Helligkeit", COL[0], ROWY[1], 96, 110, "VCEncoder — Drehgeber")
 cl = VCCueList("Cueliste"); cl.stack_slot = 0
 place(cl, "Cueliste", COL[1], ROWY[1], 200, 150, "VCCueList — Cue-Transport")
 si = VCSongInfo("Musik")

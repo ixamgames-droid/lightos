@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Art-Net-Input teilt den Port auf Linux (SO_REUSEPORT, XPLAT-03)
+
+#### Behoben
+
+- **Der Art-Net-Input bindet auf Linux nicht mehr fehl, wenn schon eine andere Art-Net-App auf Port 6454 lauscht.** `artnet_input.py` setzte nur `SO_REUSEADDR` — das teilt den UDP-Port auf Linux (anders als auf Windows) NICHT. Lief parallel eine zweite Art-Net-Anwendung (QLC+ o. Ä.), warf `bind()` „Address already in use", der `except`-Block schluckte es, und der Art-Net-Input blieb still. **Fix:** wie beim sACN-Input wird jetzt zusätzlich `SO_REUSEPORT` gesetzt (guarded — auf Windows/altem Kernel fällt es per `AttributeError`/`OSError` sauber durch, `bind()` läuft trotzdem). Windows unberührt. Neue Tests `tests/test_artnet_reuseport.py`.
+
+### 2026-07-19 — 3D-Visualizer startet auf Linux (QtWebEngine-Sandbox-Fallback, XPLAT-01)
+
+#### Behoben
+
+- **Der 3D-Visualizer bleibt auf Linux nicht mehr schwarz.** `_setup_webengine_diagnostics()` (`main.py`) setzte nur Anti-Drossel-Flags, aber keine Chromium-Sandbox-Flags. Auf verbreiteten Linux-Setups (pip-PySide6-Wheels ohne setuid `chrome-sandbox`, Container/Docker, root) startet der Chromium-Renderprozess von QtWebEngine dann nicht → die eingebettete `QWebEngineView` bleibt schwarz (`renderProcessTerminated`, der Auto-Reload-Guard loopt nur). **Fix:** auf Linux werden jetzt `--no-sandbox --disable-gpu-sandbox` an die WebEngine-Flags angehängt (neue reine Helfer-Funktion `_webengine_sandbox_flags`). **Abwahl für korrekt aufgesetzte Distros** (setuid `chrome-sandbox` vorhanden): `LIGHTOS_WEBENGINE_NO_SANDBOX` auf einen falsy-Wert (`0`/`false`/`no`/`off`) setzen, oder selbst ein `sandbox`-Flag über `LIGHTOS_WEBENGINE_FLAGS` setzen (eigene Wahl hat Vorrang). **Windows/macOS bleiben komplett unberührt** (hinter `sys.platform`-Weiche — WinARM-Regression: keine). Neue Tests `tests/test_webengine_linux_sandbox.py`.
+
 ### 2026-07-18 — BPM-Manager: Quelle & Wert werden atomar gesetzt (CDX-14)
 
 #### Behoben

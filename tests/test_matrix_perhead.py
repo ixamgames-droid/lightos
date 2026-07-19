@@ -262,6 +262,43 @@ class CreateHeadMatrixGroupTest(unittest.TestCase):
         self.state.remove_fixture(7, undoable=False)
         self.assertIsNotNone(self._load_group(gid))   # bleibt erhalten
 
+    def test_add_fixture_real_multihead_creates_group(self):
+        # Regression FM-16 (d): der ECHTE interaktive Patch-Pfad. add_fixture()
+        # committed das Fixture -> danach ist es expired+detached, jeder Zugriff
+        # auf eine ORM-Spalte (fixture_profile_id/mode_name/channel_count in
+        # get_channels_for_patched) wirft DetachedInstanceError. Frueher gab
+        # create_head_matrix_group(fixture) das still als None zurueck -> es
+        # entstand KEINE "· Köpfe"-Gruppe. WICHTIG: get_channels_for_patched hier
+        # NICHT mocken — sonst wird der detached-Pfad (der eigentliche Bug) nie
+        # ausgeloest. Deshalb ein ECHTES >=2-color_r-Profil (Hydrabeam 56ch).
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from src.core.database.fixture_db import engine as fdb_engine, ensure_builtins
+        from src.core.database.models import (
+            FixtureProfile, FixtureGroup, PatchedFixture,
+        )
+        ensure_builtins()
+        with Session(fdb_engine()) as s:
+            pid = int(s.execute(select(FixtureProfile.id).where(
+                FixtureProfile.short_name == "HYDRA4000")).scalar_one())
+        self.state.add_fixture(PatchedFixture(
+            fid=1, label="HYDRA4000", fixture_profile_id=pid,
+            mode_name="56-Kanal Voll (pro Kopf RGBW)", universe=1, address=1,
+            channel_count=56, manufacturer_name="Cameo",
+            fixture_name="HYDRABEAM 4000 RGBW", fixture_type="moving_head"),
+            undoable=False)
+        with Session(self.state._show_engine) as s:
+            groups = s.execute(select(FixtureGroup)).scalars().all()
+        head_groups = [g for g in groups if g.folder == "Multi-Head"
+                       and (g.name or "").endswith("· Köpfe")]
+        self.assertEqual(
+            len(head_groups), 1,
+            f"genau eine Kopf-Gruppe erwartet, gefunden: "
+            f"{[(g.name, g.folder) for g in groups]}")
+        self.assertEqual((head_groups[0].cols, head_groups[0].rows), (4, 1))
+        self.assertEqual(json.loads(head_groups[0].positions_json),
+                         {"0,0": "1:0", "1,0": "1:1", "2,0": "1:2", "3,0": "1:3"})
+
     def test_create_under_suppression_no_crash(self):
         # Review-Fix (HIGH): unter _suppress_emits (Bulk-Load) erzeugt der Aufruf
         # die Gruppe, aber der group_changed-Emit wird ueber notify_groups_changed

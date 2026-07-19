@@ -185,6 +185,36 @@ _ANTI_THROTTLE_FLAGS = (
     "--disable-background-timer-throttling"
 )
 
+# XPLAT-01: Auf Linux startet der Chromium-Renderprozess von QtWebEngine ohne
+# setuid-``chrome-sandbox`` nicht (pip-PySide6-Wheels ohne setuid-Helfer, Container/
+# Docker, root) -> die eingebettete ``QWebEngineView`` des 3D-Visualizers bleibt
+# schwarz / ``renderProcessTerminated``. Windows/macOS brauchen das nicht.
+_LINUX_SANDBOX_FLAGS = "--no-sandbox --disable-gpu-sandbox"
+_SANDBOX_OPTOUT_VALUES = {"0", "false", "no", "off"}
+
+
+def _webengine_sandbox_flags(platform_name: str, env, existing_flags: str) -> str:
+    """XPLAT-01: die auf Linux anzuhaengenden Chromium-Sandbox-Flags (leer sonst).
+
+    Rueckgabe ``--no-sandbox --disable-gpu-sandbox`` NUR auf Linux und nur, wenn der
+    Nutzer nicht selbst schon eine Sandbox-Wahl getroffen oder ausdruecklich abgewaehlt
+    hat. Abwahl fuer korrekt aufgesetzte Distros (setuid ``chrome-sandbox`` vorhanden):
+      * ``LIGHTOS_WEBENGINE_NO_SANDBOX`` auf einen falsy-Wert (``0``/``false``/``no``/
+        ``off``) setzen, ODER
+      * selbst ein ``sandbox``-Flag ueber ``LIGHTOS_WEBENGINE_FLAGS`` /
+        ``QTWEBENGINE_CHROMIUM_FLAGS`` setzen (eigene Wahl hat Vorrang).
+    Hinter dieser ``platform_name``-Weiche bleibt der Windows-/macOS-Pfad unberuehrt
+    (WinARM-Regression: none).
+    """
+    if not platform_name.startswith("linux"):
+        return ""
+    if "sandbox" in (existing_flags or ""):          # eigene Sandbox-Wahl -> Vorrang
+        return ""
+    optout = env.get("LIGHTOS_WEBENGINE_NO_SANDBOX", "").strip().lower()
+    if optout in _SANDBOX_OPTOUT_VALUES:
+        return ""
+    return _LINUX_SANDBOX_FLAGS
+
 
 def _setup_webengine_diagnostics():
     """VIZ-10 / VIZ-13 3c-2-Fix: Chromium-Flags fuer QWebEngine (3D-Visualizer).
@@ -196,6 +226,9 @@ def _setup_webengine_diagnostics():
       hat SEINE Wahl Vorrang (wir ueberschreiben sie nicht).
     - Optionales ``LIGHTOS_WEBENGINE_FLAGS`` wird zusaetzlich angehaengt (fuer
       gezieltes Debugging, z. B. ``--disable-gpu``).
+    - XPLAT-01: auf Linux werden ``--no-sandbox --disable-gpu-sandbox`` angehaengt,
+      sonst bleibt der 3D-Visualizer auf verbreiteten Setups schwarz (s.
+      ``_webengine_sandbox_flags`` fuer die Abwahl korrekt aufgesetzter Distros).
     - Die effektiven Flags landen einmalig im crash.log, damit man beim
       Nachstellen eines 3D-Renderer-Absturzes sieht, welche Flags aktiv waren.
     """
@@ -209,6 +242,10 @@ def _setup_webengine_diagnostics():
                         if existing else _ANTI_THROTTLE_FLAGS)
         extra = os.environ.get("LIGHTOS_WEBENGINE_FLAGS", "").strip()
         combined = f"{existing} {extra}".strip() if extra else existing
+        # XPLAT-01: Linux-Sandbox-Flags anhaengen (Windows/macOS: no-op).
+        sandbox = _webengine_sandbox_flags(sys.platform, os.environ, combined)
+        if sandbox:
+            combined = f"{combined} {sandbox}".strip() if combined else sandbox
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
         effective = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
         if _crash_log_handle is not None:

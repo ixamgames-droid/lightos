@@ -229,6 +229,8 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             "STAIRB2408": "led_bar", "CBANDPIX": "led_bar",
             # Katalog-Erweiterung Runde 3 (2026-07-18)
             "HYDRA4000": "moving_head", "EVENTPARIP65": "par",
+            # Katalog-Erweiterung Runde 4 (2026-07-19)
+            "ATOMIC3000": "strobe", "POINTE": "moving_head", "MACAURA": "moving_head",
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(
