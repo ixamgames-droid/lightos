@@ -32,7 +32,7 @@ Die **Vorschau** zeigt die Helligkeit als Graustufen-Lauflicht (weiße Balken = 
 ![Dimmer-Matrix im Editor (Style = Dimmer)](img/01_matrix_dimmer.png)
 
 > In **Bewegung & Parameter** steuerst du die **Läufer-Anzahl** (mehr Läufer = voller/dichter),
-> die **Läufer-Breite** und **After Fade** (in %: 0 % → harter Wechsel, höher → langes weiches
+> die **Läufer-Breite** und **Schweif (%)** (0 % → harte Kante ohne Schweif, höher → langes weiches
 > Nachfaden hinter dem Läufer). In der Gruppe **Farben** legst du bei Style *Dimmer* über den
 > **Dimmer-Bereich** (Spinboxen **Min** / **Max**) den Helligkeitsbereich fest.
 

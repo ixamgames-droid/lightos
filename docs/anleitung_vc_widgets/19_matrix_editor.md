@@ -83,7 +83,7 @@ Zeigt – abhängig von Style und Algorithmus – entweder feste Farbknöpfe **C
 | Element | Bedeutung |
 |---|---|
 | **Richtung** | Vorwärts / Rückwärts (nur bei Algorithmen, für die Richtung sinnvoll ist). |
-| **dynamische Felder** | Je Algorithmus passende Regler – z. B. Achse, Bewegung, Läufer-Anzahl, After Fade, Strahlbreite, Spread … Sie bauen sich automatisch neu auf, sobald sich Algorithmus, Style oder ein abhängiger Wert ändert (es erscheinen nur die Parameter, die wirklich wirken). |
+| **dynamische Felder** | Je Algorithmus passende Regler – z. B. Achse, Bewegung, Läufer-Anzahl, Schweif (%), Strahlbreite, Spread … Sie bauen sich automatisch neu auf, sobald sich Algorithmus, Style oder ein abhängiger Wert ändert (es erscheinen nur die Parameter, die wirklich wirken). |
 
 #### Gruppe „Fixture-Grid"
 
@@ -104,7 +104,7 @@ Der Algorithmus bestimmt das Muster. Viele Bewegungsvarianten sind heute **Param
 | Algorithmus | Was er macht | Wichtige Parameter |
 |---|---|---|
 | **Plain** | Volle Fläche in C1 (Standfarbe). | – |
-| **Chase** | Lauflicht. | Achse (H/V/Diag), Bewegung (normal/bounce/center_out/outside_in), Läufer-Anzahl & -Breite, **After Fade** (Nachfaden in %), Farbe pro Runde wechseln, Invertieren |
+| **Chase** | Lauflicht. | Achse (H/V/Diag), Bewegung (normal/bounce/center_out/outside_in), Läufer-Anzahl & -Breite, **Schweif (%)** (räumlicher Nachfaden hinter dem Läufer), Farbe pro Runde wechseln, Invertieren |
 | **Wipe** | Wischt C1 über Hintergrund C2. | Achse, Bewegung, Kanten-Fade |
 | **Wave** | Welle mit wählbarem Ursprung. | Ursprung (links/rechts/oben/unten/Mitte/radial), Dichte, Breite |
 | **Gradient** | Scrollender Farbverlauf über die Color-Sequence. | Achse, Verlauf (smooth/Bänder) |
@@ -185,6 +185,6 @@ Verfügbare **Live-Aktionen** (auf Buttons/MIDI legbar): Farbe +/−, +Farbe, Fa
 - **Keine Farbfelder sichtbar?** Entweder erzeugt der Algorithmus eigene Farben (Rainbow) oder der Style ist Dimmer/Shutter.
 - **Reine Farb-Ebene gewünscht?** Lass die Matrix den Dimmer nicht selbst treiben und steuere die Helligkeit über einen separaten Fader/Dimmer-Effekt – dank Layer-Priorität überlagern sich beide sauber.
 - **Lücken sind gewollt:** Eine leere, gepunktete Zelle in der Vorschau ist kein Fehler, sondern eine unbelegte Grid-Position.
-- **Tote Regler gibt es nicht:** Es erscheinen nur Parameter, die im aktuellen Algorithmus/Style/Modus auch wirken (z. B. Strobe-Rate nur im Strobe-Modus, Läufer-Anzahl/After Fade nur bei Chase-Bewegung „normal").
+- **Tote Regler gibt es nicht:** Es erscheinen nur Parameter, die im aktuellen Algorithmus/Style/Modus auch wirken (z. B. Strobe-Rate nur im Strobe-Modus, Läufer-Anzahl/Schweif (%) nur bei Chase-Bewegung „normal").
 - **Großes Fenster** nutzen, wenn der Editor im schmalen Tab eng wird – derselbe Inhalt, frei vergrößerbar.
 - **Echtes 2D-Raster** bekommst du nur über eine **Gerätegruppe mit Positionen**; lose Auswahl ergibt immer nur einen 1 × N-Streifen.
