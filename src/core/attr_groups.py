@@ -29,8 +29,12 @@ ATTR_GROUPS: dict[str, set[str]] = {
                   "cyan", "magenta", "yellow", "color_wheel", "colour_wheel", "color"},
     "Position":  {"pan", "tilt", "pan_fine", "tilt_fine"},
     "Beam":      {"zoom", "focus", "frost", "iris", "prism"},
-    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo_fx", "gobo1",
-                  "gobo2", "gobo_rot"},
+    # gobo_wheel2 = zweites (rotierendes) Gobo-Rad EINES Fixtures (Robe Pointe
+    # u. a. haben ein statisches UND ein rotierendes Gobo-Rad). Exakt hier, damit
+    # der Programmer beide Raeder als getrennte Regler fuehrt statt sie ueber das
+    # gemeinsame Attribut "gobo_wheel" zu einem zu deduplizieren (EURON10-Falle).
+    "Gobo":      {"gobo", "gobo_rotation", "gobo_wheel", "gobo_wheel2", "gobo_fx",
+                  "gobo1", "gobo2", "gobo_rot"},
     # "prism_rot" = synthetische Kurzform; "prism_rotation" = real emittierter
     # Name (QXF-Import, eingebauter Generic-MH) -> BEIDE exakt in Effect, damit der
     # Beam-Substring "prism" sie nicht faelschlich als Beam klassifiziert (ENG-07).
@@ -47,8 +51,12 @@ ATTR_GROUPS: dict[str, set[str]] = {
     # is_compatible -> test_movement_snap_excludes_par). Effect passt zu effect_speed/
     # macro und aendert deren Gruppen-Set nicht (PAR hat via "macro" schon Effect).
     # Der QXF-SpeedPanTilt*-Mover zeigt seinen Speed-Kanal damit im Effekt-Tab.
-    "Effect":    {"macro", "effect", "effect_speed", "speed", "prism_rot",
-                  "prism_rotation", "animation", "fan",
+    # "duration" (Martin Atomic 3000 Blitzdauer): BEWUSST Effect, NICHT Intensity
+    # — ein Intensity-Eintrag wuerde ueber _DIM_INTENSITY_ATTRS grand-master-
+    # gedimmt (Parameter-Korruption) und den Dim-Sentinel-Test brechen. Effect
+    # ist parameter-artig (wie speed/effect_speed), kein Helligkeitswert.
+    "Effect":    {"macro", "effect", "effect_speed", "speed", "duration",
+                  "prism_rot", "prism_rotation", "animation", "fan",
                   "laser_boundary", "laser_bank", "laser_x", "laser_y",
                   "laser_zoom_x", "laser_zoom_y", "laser_color",
                   "laser_color_change", "laser_dots", "laser_draw",
@@ -76,10 +84,11 @@ ATTR_LABELS: dict[str, str] = {
     "speed": "Speed",
     "zoom": "Zoom", "focus": "Focus", "frost": "Frost", "iris": "Iris", "prism": "Prisma",
     "prism_rot": "Prisma-Rotation", "prism_rotation": "Prisma-Rotation",
-    "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_rotation": "Gobo-Rotation",
+    "gobo": "Gobo", "gobo_wheel": "Gobo-Rad", "gobo_wheel2": "Rotier-Gobo-Rad",
+    "gobo_rotation": "Gobo-Rotation",
     "gobo_rot": "Gobo-Rotation", "gobo_fx": "Gobo-FX", "gobo1": "Gobo 1", "gobo2": "Gobo 2",
     "macro": "Makro", "effect": "Effekt", "effect_speed": "Effekt-Speed",
-    "animation": "Animation", "fan": "Lüfter",
+    "duration": "Blitzdauer", "animation": "Animation", "fan": "Lüfter",
     # Control-Kanaele (z. B. Clay Paky Sharpy Reset/Lampe) — landen ueber
     # classify_attr in "Other" (kein Substring-Treffer). Safety: default 0.
     "reset": "Reset", "lamp": "Lampe",
