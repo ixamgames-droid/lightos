@@ -7,6 +7,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — VC-Slider: bewusst gelöster Playback-Slot bleibt nach dem Laden gelöst (A3D-39)
+
+#### Behoben
+
+- **Ein Playback-Slider, dessen Executor-Slot bewusst geleert wurde, bekommt beim erneuten Laden nicht mehr einen veralteten Slot untergeschoben.** `apply_dict` migrierte Alt-Shows (die den Slot früher in `function_id` ablegten), indem es bei `playback_slot is None` auf `function_id` zurückfiel. `d.get("playback_slot")` liefert aber `None` **sowohl** bei fehlendem Key (echte Alt-Show) **als auch** bei explizitem `null` — und `to_dict` schreibt den Key **immer** mit. Ein in einer **neuen** Show bewusst geleerter Slot (`playback_slot: null`) wurde so fälschlich aus der (oft veralteten) `function_id` zurückmigriert → der gelöschte Executor tauchte wieder auf. **Fix:** die Legacy-Migration greift jetzt nur noch, wenn der Key **ganz fehlt** (`"playback_slot" not in d`); ein explizites `null` bleibt `None`. Regressionstests in `tests/test_vc_slider_playback_slot.py` (explizites null wird nicht migriert; fehlender Key migriert weiter).
 ### 2026-07-19 — Werkzeug-Audit-Runde: DB-Isolation, Archiv, neue Loop-Werkzeuge
 
 #### Hinzugefügt
