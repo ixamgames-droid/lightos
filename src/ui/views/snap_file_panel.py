@@ -544,9 +544,8 @@ class SnapFilePanel(QWidget):
     @staticmethod
     def _prefs_path() -> str:
         import os
-        return os.path.join(
-            os.environ.get("APPDATA", os.path.expanduser("~")),
-            "LightOS", "ui_prefs.json")
+        from src.core.paths import app_data_dir
+        return os.path.join(app_data_dir(), "ui_prefs.json")
 
     def _load_collapsed_folders(self) -> set[str]:
         import json

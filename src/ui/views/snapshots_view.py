@@ -8,6 +8,7 @@ Wie QLC+ Snapshots: 48 Slots in einem 12x4 Grid.
 from __future__ import annotations
 import os
 import json
+from src.core.paths import app_data_dir
 import copy
 import weakref
 from typing import Optional
@@ -25,9 +26,7 @@ except Exception:
     get_state = None  # type: ignore
 
 
-SNAPSHOTS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-)
+SNAPSHOTS_DIR = app_data_dir()
 SNAPSHOTS_FILE = os.path.join(SNAPSHOTS_DIR, "snapshots.json")
 SNAPSHOT_COLS = 12
 SNAPSHOT_ROWS = 4

@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Zentraler, XDG-konformer App-Datenordner (XPLAT-04)
+
+#### Geändert
+
+- **Der App-Datenordner wird jetzt zentral über `src/core/paths.py:app_data_dir()` aufgelöst** statt an ~19 Fundstellen einzeln. Vorher hatte jede Stelle `os.path.join(os.environ.get("APPDATA", expanduser("~")), "LightOS", …)` — auf Linux/macOS ist `APPDATA` nicht gesetzt, also landeten **alle** Nutzerdaten (Show-DB, Snaps, Stages, `vc_assets`, BPM-Cache, Prefs, Crash-Log …) im sichtbaren, nicht-XDG-konformen `~/LightOS/`. Neu: `app_data_dir()` mit `sys.platform`-Weiche — **Windows unverändert `%APPDATA%/LightOS` (byte-identisch, kein Datenumzug)**, Linux `$XDG_DATA_HOME/LightOS` bzw. `~/.local/share/LightOS`, macOS `~/Library/Application Support/LightOS`. Alle Fundstellen (`bpm_cache`, `bpm_settings`, `controller_library`, `fixture_db`, `snap_library`, `input/profile`, `vc_assets`, `stage_definition`, `web/remote_settings`, `main_window`, `live_view`, `programmer_view`, `snap_file_panel`, `snapshots_view`, `vc_button`, `visualizer_window`, `collapsible_section`) darauf umgestellt. Neue Tests `tests/test_app_data_dir.py`. **Keine Migration** bestehender Linux-Daten (Linux-Support ist frisch, keine Alt-Daten); auf Windows/WinARM bleibt alles am selben Ort. Die Fixture-Definitions-DB folgt ebenfalls `app_data_dir()`, akzeptiert aber neu einen `LIGHTOS_FIXTURE_DB`-Override (analog `LIGHTOS_SHOW_DB`) — die Test-Suite pinnt darüber die reale, geseedete `fixtures.db`, obwohl sie `APPDATA` sonst isoliert.
+
 ### 2026-07-19 — DMX: neu-gepatchtes Fixture blitzt nicht mehr 1 Frame schwarz (CDX-17)
 
 #### Behoben

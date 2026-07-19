@@ -23,16 +23,14 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
+from src.core.paths import app_data_dir
 
 _BUILTIN_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))),
     "data", "controller_library",
 )
-_USER_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")),
-    "LightOS", "controller_library",
-)
+_USER_DIR = os.path.join(app_data_dir(), "controller_library")
 
 SCHEMA_VERSION = 1
 

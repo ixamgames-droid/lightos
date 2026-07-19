@@ -7,10 +7,9 @@ gespeichert. Liegt wie die uebrigen UI-Prefs in ``%APPDATA%/LightOS/ui_prefs.jso
 from __future__ import annotations
 import json
 import os
+from src.core.paths import app_data_dir
 
-_PREFS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-)
+_PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 _KEY = "bpm_settings"
 

@@ -10,6 +10,7 @@ import copy
 import json
 import os
 import weakref
+from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
     QListWidget, QListWidgetItem, QLineEdit, QGroupBox, QScrollArea, QFrame,
@@ -25,9 +26,7 @@ from src.core.database.models import PatchedFixture, FixtureChannel
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
-_PREFS_DIR = os.path.join(
-    os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS"
-)
+_PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 
 # UI-20: Leerzustand des Programmers. Der Kopf ist die Status-/Handlungszeile

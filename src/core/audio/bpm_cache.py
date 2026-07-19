@@ -11,8 +11,9 @@ import os
 import json
 import tempfile
 import threading
+from src.core.paths import app_data_dir
 
-_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+_DIR = app_data_dir()
 _PATH = os.path.join(_DIR, "bpm_analysis_cache.json")
 _MAX_ENTRIES = 400
 

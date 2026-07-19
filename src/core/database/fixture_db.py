@@ -1,15 +1,14 @@
 """Fixture-Datenbank — CRUD und initiale Befüllung."""
 from __future__ import annotations
 import os
+from src.core.paths import app_data_dir
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
 from .models import (Manufacturer, FixtureProfile, FixtureMode,
                      FixtureChannel, ChannelRange, migrate_fixtures_db,
                      create_all_idempotent)
 
-DB_PATH = os.path.join(
-    os.path.expanduser("~"), "AppData", "Roaming", "LightOS", "fixtures.db"
-)
+DB_PATH = os.path.join(app_data_dir(), "fixtures.db")
 
 
 def get_engine(path: str = DB_PATH):
