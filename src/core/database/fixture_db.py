@@ -1940,6 +1940,222 @@ def _add_varytec_event_par(s, mfr):
     ])
 
 
+# ── Katalog-Erweiterung Runde 4 (2026-07-19): namhafte reale Profi-Geraete ────
+# (FM-15 / David-Wunsch "reale Fixtures aus dem Netz laden"). Drei Flaggschiffe,
+# jeder Kanal-Chart gegen die QLC+-Primaerquelle (.qxf) UND einen unabhaengigen
+# Zweitquellen-Gegencheck (Hersteller-DMX-Protokoll / OFL / Rental-Sheet)
+# verifiziert — NICHT geraten:
+#   (A) Martin Atomic 3000 DMX — Xenon-Strobe/Blinder (fixture_type 'strobe';
+#       fuellt die letzte grosse Luecke "kein Strobe/Blinder"-Builtin).
+#   (B) Robe Pointe            — Beam/Spot-Hybrid Moving Head (16-Kanal-Modus).
+#   (C) Martin MAC Aura        — RGBW-LED-Wash Moving Head (Standard 14ch).
+# Alle routen ueber viz_model_for auf BESTEHENDE 3D-Modelle (buildStrobe /
+# buildMovingHead) + 2D-Icons — kein neues Modell noetig (Reuse). NEUE Builtins
+# -> nur _seed + idempotenter ensure_builtins-Backfill, KEINE Signatur-Migration.
+# Zwei NEUE Attribute (attr_groups + fixture_editor.CHANNEL_ATTRS, exact-match):
+#   'duration' (Effect-Gruppe, Atomic Blitzdauer) + 'gobo_wheel2' (Gobo-Gruppe,
+#   Robe 2. Gobo-Rad) — sonst dedupliziert der Programmer wiederholte Attribute
+#   zu EINEM Regler (EURON10-Falle). 'effect_speed'/'fan' sind bereits klassifiziert.
+
+# -- (A) Martin Atomic 3000 DMX (Xenon-Strobe / Blinder) ----------------------
+# Chart: QLC+ Martin-Atomic-3000.qxf + Martin "Atomic 3000 DMX Protocol V1" +
+# OFL + Rental-Sheet (3 unabhaengige Quellen, exakt gleich). NATIVE Modi NUR
+# 1/3/4 Kanal — Farbe/Luefter gehoeren zum SEPARATEN "Atomic Colors"-Zubehoer
+# (kein Kanal des Strobes selbst) und sind darum bewusst NICHT enthalten.
+# Safety: Xenon-Flashtube ohne mech. Shutter -> DMX 0 = Blackout in ALLEN Modi
+# (Simple + Intensity Default 0 = kein Blitz beim Patchen). 4ch nur mit Mode-
+# DIP #4 an (sonst = 3ch). Effekt-Edges laut Manual p.24 exakt (verifiziert).
+_ATOMIC_SIMPLE = [
+    (0,   5,   "Blackout",                    "closed"),
+    (6,   249, "Blitzrate langsam → schnell", "strobe"),
+    (250, 255, "Blinder (Dauerlicht)",        "open"),
+]
+_ATOMIC_RATE = [
+    (0,   5,   "Kein Blitz / Einzelblitz",    ""),
+    (6,   255, "0,5 → 25 Hz",                 "strobe"),
+]
+_ATOMIC_EFFECTS = [
+    (0,   5,   "Kein Effekt",   ""),
+    (6,   42,  "Ramp up",       ""),
+    (43,  85,  "Ramp down",     ""),
+    (86,  128, "Ramp up/down",  ""),
+    (129, 171, "Zufall",        ""),
+    (172, 214, "Lightning",     ""),
+    (215, 255, "Spikes",        ""),
+]
+
+
+def _add_martin_atomic3000(s, mfr):
+    """Martin Atomic 3000 DMX — Xenon-Strobe/Blinder. fixture_type='strobe' ->
+    buildStrobe im 3D. Native Modi NUR 1/3/4 Kanal (Farbe/Luefter = separates
+    'Atomic Colors'-Zubehoer). Safety: DMX 0 = Blackout in allen Modi -> Default 0
+    = kein Blitz beim Patchen. 'duration' (Blitzdauer) = neues Attribut."""
+    _add_fixture(s, mfr, "Atomic 3000 DMX", "ATOMIC3000", "strobe", 1000, [
+        ("1-Kanal", [
+            ("Blitz (Rate/Blinder)", "shutter", 0, 0, _ATOMIC_SIMPLE),
+        ]),
+        ("3-Kanal", [
+            ("Intensität", "intensity", 0, 255),
+            ("Blitzdauer", "duration",  0, 0),
+            ("Blitzrate",  "strobe",    0, 0, _ATOMIC_RATE),
+        ]),
+        ("4-Kanal (+ Effekte)", [
+            ("Intensität", "intensity", 0, 255),
+            ("Blitzdauer", "duration",  0, 0),
+            ("Blitzrate",  "strobe",    0, 0, _ATOMIC_RATE),
+            ("Effekte",    "macro",     0, 0, _ATOMIC_EFFECTS),
+        ]),
+    ])
+
+
+# -- (B) Robe Pointe (Beam/Spot-Hybrid Moving Head, 16-Kanal) -----------------
+# Chart: QLC+ Robe/Robe-Pointe.qxf (16ch = Robe-Modus 2 "Reduced") + offizielles
+# Robe-DMX-Protokoll (v1.3/v1.4) — Kanalreihenfolge + Werte verifiziert. Drei
+# SEPARATE Rad-Kanaele (Farbrad + statisches + rotierendes Gobo-Rad) und zwei
+# Speed-Kanaele (P/T-Speed + Effekt-Speed) -> bewusst DISTINKTE Attribute, sonst
+# dedupliziert der Programmer sie zu EINEM Regler. Shutter 0-31 = zu (Lampe 230W)
+# -> Default 40 = offen (32-63, volle Lampe); dunkel via Dimmer 0. Alle 16 distinkt.
+_POINTE_COLOUR = [
+    (0,   0,   "Weiß / Offen",                       "open"),
+    (1,   64,  "Vollfarben (Rot/Blau/Gelb/Grün/…)",  "color"),
+    (65,  127, "Split-Farben + CTO/UV",              "color"),
+    (128, 189, "Vollfarben (indexiert)",             "color"),
+    (190, 215, "Regenbogen vorwärts",                "rotate"),
+    (216, 217, "Keine Rotation",                     "open"),
+    (218, 243, "Regenbogen rückwärts",               "rotate"),
+    (244, 249, "Audio-Steuerung",                    "sound"),
+    (250, 255, "Zufallsfarbe",                       "rotate"),
+]
+_POINTE_STATIC_GOBO = [
+    (0,   3,   "Offen",                     "open"),
+    (4,   63,  "Statische Gobos 1–10",      "gobo"),
+    (64,  87,  "Beam-Reducer 1–4",          "gobo"),
+    (88,  167, "Gobo-Shake 1–10",           "shake"),
+    (168, 199, "Beam-Reducer 1–4",          "gobo"),
+    (200, 201, "Offen",                     "open"),
+    (202, 243, "Rad-Rotation vor/zurück",   "rotate"),
+    (244, 255, "Zufall / Auto (Audio)",     "rotate"),
+]
+_POINTE_ROT_GOBO = [
+    (0,   4,   "Offen",                     "open"),
+    (5,   59,  "Rotier-Gobos 1–9",          "gobo"),
+    (60,  199, "Gobo-Shake (indexiert)",    "shake"),
+    (200, 201, "Offen",                     "open"),
+    (202, 243, "Rad-Rotation vor/zurück",   "rotate"),
+    (244, 255, "Zufall / Auto (Audio)",     "rotate"),
+]
+_POINTE_PRISM = [
+    (0,   19,  "Kein Prisma",               "open"),
+    (20,  75,  "6-fach Prisma (Index/Rot)", "prism"),
+    (76,  127, "8-fach Prisma (Index/Rot)", "prism"),
+    (128, 255, "Prisma-Makros 1–16",        "prism"),
+]
+_POINTE_SPECIAL = [
+    (0,   19,  "Keine Funktion / DMX-Eingang", ""),
+    (20,  24,  "Eco-Modus (230W)",             ""),
+    (25,  29,  "Standard-Modus (280W)",        ""),
+    (50,  129, "Bewegungs-/Blackout-Modi",     ""),
+    (130, 139, "Lampe an",                     ""),
+    (140, 209, "Reset-Funktionen",             "reset"),
+    (230, 239, "Lampe AUS",                    ""),
+]
+_POINTE_SHUTTER = [
+    (0,   31,  "Geschlossen (Lampe 230W)",  "closed"),
+    (32,  63,  "Offen (volle Lampe)",       "open"),
+    (64,  95,  "Strobe langsam → schnell",  "strobe"),
+    (96,  127, "Offen",                     "open"),
+    (128, 159, "Puls-Strobe (auf/zu)",      "strobe"),
+    (160, 191, "Offen",                     "open"),
+    (192, 223, "Zufalls-Strobe",            "strobe"),
+    (224, 255, "Offen, volle Lampe",        "open"),
+]
+
+
+def _add_robe_pointe(s, mfr):
+    """Robe Pointe — Beam/Spot-Hybrid Moving Head (16-Kanal-Modus). fixture_type=
+    'moving_head' -> buildMovingHead. Zwei Gobo-Raeder (gobo_wheel + gobo_wheel2)
+    und zwei Speed-Kanaele (speed + effect_speed) DISTINKT gemappt. Shutter-Default
+    40 = offen (0-31 = Lampe reduziert/zu). Alle 16 Attribute verschieden."""
+    _add_fixture(s, mfr, "Pointe (Beam/Spot 16ch)", "POINTE", "moving_head", 470, [
+        ("16-Kanal", [
+            ("Pan",             "pan",            128, 128),
+            ("Tilt",            "tilt",           128, 128),
+            ("P/T-Speed",       "speed",          0,   0),
+            ("Spezialfunktion", "macro",          0,   0, _POINTE_SPECIAL),
+            ("Farbrad",         "color_wheel",    0,   0, _POINTE_COLOUR),
+            ("Effekt-Speed",    "effect_speed",   0,   0),
+            ("Statisches Gobo", "gobo_wheel",     0,   0, _POINTE_STATIC_GOBO),
+            ("Rotier-Gobo",     "gobo_wheel2",    0,   0, _POINTE_ROT_GOBO),
+            ("Gobo-Rotation",   "gobo_rotation",  0,   0),
+            ("Prisma",          "prism",          0,   0, _POINTE_PRISM),
+            ("Prisma-Rotation", "prism_rotation", 0,   0),
+            ("Frost",           "frost",          0,   0),
+            ("Zoom",            "zoom",           128, 128),
+            ("Fokus",           "focus",          128, 128),
+            ("Shutter/Strobe",  "shutter",        40,  40, _POINTE_SHUTTER),
+            ("Dimmer",          "intensity",      0,   255),
+        ]),
+    ])
+
+
+# -- (C) Martin MAC Aura (RGBW-LED-Wash Moving Head, Standard 14-Kanal) --------
+# Chart: QLC+ Martin-MAC-Aura.qxf (Standard-Modus) + offizielles Martin-Manual
+# (Gegencheck: identisch, Werksdefault Shutter 22 = offen). NUR der Standard-14ch-
+# Modus als Builtin -> genau EINE RGBW-Bank -> Single-'moving_head'. Der Extended-
+# 25ch-Modus hat eine ZWEITE Aura-RGB-Bank -> wuerde ueber is_spider_fixture (>=2
+# color_r-Banks) faelschlich als Spider gerendert; darum bewusst weggelassen.
+# Farbrad + RGBW koexistieren (wie ADJ FlatPar): color_wheel-Default 0 = "offen,
+# RGBW-Mischung aktiv". CTC (Farbtemperatur) -> 'raw' (Konvention wie QXF-CTO/Fine).
+_AURA_SHUTTER = [
+    (0,   19,  "Geschlossen",         "closed"),
+    (20,  24,  "Offen",               "open"),
+    (25,  255, "Strobe/Puls-Effekte", "strobe"),
+]
+_AURA_CONTROL = [
+    (0,   9,   "Keine Funktion",          ""),
+    (10,  14,  "Reset",                   "reset"),
+    (40,  54,  "Pan/Tilt-Speed-Modus",    ""),
+    (60,  74,  "Lüfter-Modus",            ""),
+    (90,  104, "Farbkalibrierung an/aus", ""),
+    (110, 124, "Dimmkurve",               ""),
+    (250, 255, "Display beleuchten",      ""),
+]
+_AURA_COLOUR = [
+    (0,   9,   "Offen (RGBW-Mischung aktiv)", "open"),
+    (10,  174, "Farb-Presets (LEE-Gele)",     "color"),
+    (175, 179, "Offen",                       "open"),
+    (180, 229, "Farbrad-Rotation CW/CCW",     "rotate"),
+    (230, 234, "Offen",                       "open"),
+    (235, 249, "Zufallsfarbe",                "rotate"),
+    (250, 255, "Offen",                       "open"),
+]
+
+
+def _add_martin_mac_aura(s, mfr):
+    """Martin MAC Aura — RGBW-LED-Wash Moving Head (Standard 14ch). fixture_type=
+    'moving_head'. Shutter-Default 22 = offen (0-19 = zu) — Werksdefault; dunkel
+    via Dimmer 0. EINE RGBW-Bank -> Single-MH (Extended-25ch mit 2. Aura-Bank
+    bewusst weggelassen). CTC (Farbtemperatur) als 'raw' (Konvention)."""
+    _add_fixture(s, mfr, "MAC Aura (Wash 14ch)", "MACAURA", "moving_head", 245, [
+        ("14-Kanal (Standard)", [
+            ("Shutter/Strobe",  "shutter",     22,  22, _AURA_SHUTTER),
+            ("Dimmer",          "intensity",   0,   255),
+            ("Zoom",            "zoom",        128, 128),
+            ("Pan",             "pan",         128, 128),
+            ("Pan Fine",        "pan_fine",    0,   0),
+            ("Tilt",            "tilt",        128, 128),
+            ("Tilt Fine",       "tilt_fine",   0,   0),
+            ("Steuerung",       "macro",       0,   0, _AURA_CONTROL),
+            ("Farbrad",         "color_wheel", 0,   0, _AURA_COLOUR),
+            ("Rot",             "color_r",     0,   255),
+            ("Grün",            "color_g",     0,   255),
+            ("Blau",            "color_b",     0,   255),
+            ("Weiß",            "color_w",     0,   255),
+            ("CTC (Farbtemp.)", "raw",         0,   0),
+        ]),
+    ])
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -2082,6 +2298,15 @@ def ensure_builtins():
             changed = True
         if "EVENTPARIP65" not in have:                    # Katalog Runde 3
             _add_varytec_event_par(s, _get_or_create_mfr(s, "Varytec", "VARYTEC"))
+            changed = True
+        if "ATOMIC3000" not in have:                      # Katalog Runde 4
+            _add_martin_atomic3000(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
+            changed = True
+        if "MACAURA" not in have:                         # Katalog Runde 4
+            _add_martin_mac_aura(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
+            changed = True
+        if "POINTE" not in have:                          # Katalog Runde 4
+            _add_robe_pointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -2372,3 +2597,15 @@ def _seed(s: Session):
     varytec = Manufacturer(name="Varytec", short_name="VARYTEC")
     s.add(varytec)
     _add_varytec_event_par(s, varytec)
+
+    # ── Katalog-Erweiterung Runde 4 (2026-07-19): namhafte Profi-Flaggschiffe ──
+    # Martin Atomic 3000 DMX (Strobe/Blinder) + Robe Pointe (Beam/Spot 16ch) +
+    # Martin MAC Aura (RGBW-Wash 14ch). Charts gegen QLC+ .qxf + Hersteller-
+    # Protokoll/OFL verifiziert; alle nutzen bestehende 3D-Modelle (Reuse).
+    martin = Manufacturer(name="Martin", short_name="MARTIN")
+    s.add(martin)
+    _add_martin_atomic3000(s, martin)
+    _add_martin_mac_aura(s, martin)
+    robe = Manufacturer(name="Robe", short_name="ROBE")
+    s.add(robe)
+    _add_robe_pointe(s, robe)
