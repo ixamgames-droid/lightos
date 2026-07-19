@@ -7,7 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-07-19 — Font-Fallbacks für Linux (kein Layout-Drift, XPLAT-05)
+### 2026-07-19 — Referenz-Demoshow „animierte Buttons": erreichbare Buttons + sichtbarer Strobe (CDX-19/20)
+
+#### Behoben
+
+- **CDX-19 — „Nebel an"/„BLACKOUT" (und „PAR Strobe") lagen außerhalb der erreichbaren VC-Canvas.** Der Generator `tools/build_komplette_animierte_show.py` platzierte diese Buttons bei x=1070/1220/1370, die `VCCanvas` ist aber nur 1200 px breit (Scroll-Area nicht resizable) → die Buttons waren im normalen VC-View nicht anklickbar. Jetzt in die zweite/dritte Reihe umgebrochen (alle Widgets enden bei x ≤ 1180); Reihe 1 endet sauber bei x=1060.
+- **CDX-20 — „PAR Strobe" blitzte physisch schwarz.** Der Strobe-Chaser alternierte nur den Dimmer 255↔0, die RGBW-Farbkanäle der ZQ01424-PARs starten bei 0 → der PAR blieb dunkel, obwohl der Dimmer blitzte. Der An-Schritt setzt jetzt zusätzlich Weiß (`color_w`=255) → sichtbarer weißer Strobe (der Aus-Schritt bleibt über Dimmer=0 dunkel). Show mit `build_and_verify` neu erzeugt + validiert (16 Widgets, 0 Off-Canvas).
 
 #### Behoben
 
