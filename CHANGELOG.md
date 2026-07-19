@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Wählbare Ausgangs-NIC für DMX/Laser-Broadcast (XPLAT-06)
+
+#### Neu
+
+- **Die Ausgangs-Netzwerkkarte für Art-Net-Broadcast, sACN-Multicast und IDN-Laser-Discovery ist jetzt wählbar** (`LIGHTOS_OUTPUT_IFACE=<iface-IP>`). Bisher gingen `ArtNetSender` (`255.255.255.255`), `SACNSender`-Multicast und `idn.discover()` über die OS-Default-Route. Windows sendet Limited-Broadcast historisch auf ALLEN Interfaces, **Linux nur über die Route-NIC** → auf einem Rig, dessen Lichtnetz an einer 2./USB-Ethernet-NIC (≠ Default-Route) hängt, erreichte die Ausgabe unter Linux die Nodes evtl. nicht. **Fix:** neuer Helfer `src/core/dmx/output_iface.py` bindet die Sende-Sockets an die gewählte NIC (Art-Net/IDN: Quell-Bind; sACN-Multicast: zusätzlich `IP_MULTICAST_IF`). **Opt-in — ohne `LIGHTOS_OUTPUT_IFACE` bleibt alles beim bisherigen OS-Routing (Windows/WinARM unverändert)**; eine falsche/verschwundene IP wird geschluckt (Fallback aufs Routing). Neue Tests `tests/test_output_iface.py`.
+
 ### 2026-07-19 — Zentraler, XDG-konformer App-Datenordner (XPLAT-04)
 
 #### Geändert
