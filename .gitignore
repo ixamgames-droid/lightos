@@ -24,6 +24,10 @@ shows/*.lshow.layout.json
 shows/*.lshow.bak*
 # Demo-Shows werden versioniert
 !shows/demo_*.lshow
+# Archiv alter Shows (User-Daten, nicht versioniert)
+shows/_archiv/
+# Verirrte Show-Dateien im Repo-Root (Scratch — Shows gehoeren nach shows/)
+/*.lshow
 
 # Eigene Fixture-Profile
 fixtures/custom/*
@@ -41,6 +45,7 @@ fix_show_modes.py
 *.log
 app_stderr.txt
 err.txt
+err_*.txt
 
 # ── Build-Output ────────────────────────────────────────────────────────────
 dist/
