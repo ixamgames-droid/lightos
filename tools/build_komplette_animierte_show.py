@@ -153,6 +153,14 @@ def main():
             dim_ch = ch[fid].get("intensity") or ch[fid].get("dimmer")
             if dim_ch is not None:
                 sc.fn.set_value(fid, dim_ch, on)
+            # CDX-20: der PAR blitzte sonst nur den Dimmer, die RGBW-Farbkanaele
+            # blieben 0 -> physisch schwarz trotz blinkendem Dimmer. Im An-Schritt
+            # zusaetzlich Weiss setzen (sichtbarer weisser Strobe); im Aus-Schritt
+            # macht der Dimmer=0 alles dunkel, Farbe egal.
+            if on:
+                cw = ch[fid].get("color_w") or ch[fid].get("white")
+                if cw is not None:
+                    sc.fn.set_value(fid, cw, 255)
         par_strobe.fn.steps.append(ChaserStep(function_id=sc.fn.id, fade_in=0.0, hold=0.06, fade_out=0.0))
 
     fog_scene = b.scene("Nebel an")
@@ -174,15 +182,18 @@ def main():
     _btn("PAR Rainbow",  par_rainbow, 620, "rainbow_scroll")
     _btn("PAR Chase",    par_chase,   770, "color_chase")
     _btn("PAR Lauflicht", par_run,    920, "pulse")
-    _btn("PAR Strobe",   par_strobe, 1070, "strobe")
-    _btn("Nebel an",     fog_scene,  1220, "breathe_rgb")
-    # Zweite Reihe (rechts der Slider): Beam-Sharpy-Buttons.
+    # CDX-19: PAR Strobe/Nebel an/BLACKOUT lagen bei x=1070/1220/1370 — jenseits der
+    # erreichbaren VC-Canvas-Breite (VCCanvas min 1200, Scroll-Area nicht resizable)
+    # -> nicht anklickbar. In die zweite Reihe (rechts der Slider, x<=1180) umgebrochen.
+    # Reihe 1 (y=20) endet damit sauber bei x=1060 (PAR Lauflicht 920+140).
     _btn("Beam an",      beam_on,     400, "hot_white",   y=94)
     _btn("Beam Fan",     beam_circle, 560, "beam_sweep",  y=94)
     _btn("Beam Farbrad", beam_color,  720, "color_wheel", y=94)
+    _btn("PAR Strobe",   par_strobe,  880, "strobe",      y=94)
+    _btn("Nebel an",     fog_scene,  1040, "breathe_rgb", y=94)
 
     b_black = b.button("BLACKOUT", action=ButtonAction.BLACKOUT, bank=0)   # bewusst ohne Bild (klar erkennbar)
-    b_black.setGeometry(1370, 20, 140, 64)
+    b_black.setGeometry(880, 168, 140, 64)   # dritte Reihe (unter PAR Strobe), gut erreichbar
 
     from src.ui.virtualconsole.vc_slider import SliderMode
     s_master = b.slider("Master", mode=SliderMode.GRANDMASTER, bank=0)
