@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Test-Gate auch auf Linux/macOS lauffähig (XPLAT-02)
+
+#### Geändert
+
+- **Der Loop-Test-Gate lässt sich jetzt auch auf einem Linux-/macOS-Checkout ausführen.** Bisher suchte `tools/verify_loop.ps1` ausschließlich `venv\Scripts\python.exe` (Windows) → auf Linux (`venv/bin/python`) Exit 2, bevor ein Test lief; zudem delegiert es an den PowerShell-only-Lock-Runner `../run_tests.ps1` (liegt ausserhalb des Repos, fehlt einem frischen Checkout). **Fix:** (a) die Interpreter-Suche in `verify_loop.ps1` prüft jetzt eine Kandidatenliste — **Windows-Pfade zuerst (erster Treffer gewinnt → auf Windows byte-identisch)**, danach `venv/bin/python(3)`; (b) neuer eingecheckter, plattformneutraler Runner `tools/verify_loop.sh` (Syntax-Check `compileall src` + direktes `pytest`, `QT_QPA_PLATFORM=offscreen`) für Linux/macOS, wo Davids Multi-Session-Parallelität (und damit der serialisierende Lock-Runner) nicht existiert; (c) Linux-Weg in `WORKFLOW.md` dokumentiert. Windows/WinARM-Verhalten unverändert.
+
 ### 2026-07-19 — Wählbare Ausgangs-NIC für DMX/Laser-Broadcast (XPLAT-06)
 
 #### Neu

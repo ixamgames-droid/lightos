@@ -91,6 +91,14 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   direktes `pytest` zurueck (OHNE Sperre — nur Notnagel, nicht bei parallelen Sessions nutzen).
 - **Gate-Kriterium:** Exit 0 = gruen. Keine neuen Fehler ggue. Baseline; rot → selbst fixen,
   nicht mit kaputtem Stand committen/reporten.
+- **Linux/macOS (XPLAT-02):** `verify_loop.ps1` findet jetzt auch ein `venv/bin/python`
+  (Windows-Pfade zuerst → auf Windows unveraendert). Der PowerShell-Lock-Runner
+  `run_tests.ps1` ist aber Windows-spezifisch; auf Linux/macOS gibt es Davids
+  Multi-Session-Parallelitaet nicht → dort den eingecheckten, plattformneutralen
+  Runner nutzen: `./tools/verify_loop.sh` (Syntax-Check + direktes `pytest`;
+  `./tools/verify_loop.sh tests/test_x.py` fuer gezielte Tests). Voraussetzung:
+  `python3 -m venv venv && venv/bin/pip install -r requirements.txt` (Linux-Systempakete
+  s. `INSTALL.md`).
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
