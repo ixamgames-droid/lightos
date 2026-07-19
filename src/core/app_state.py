@@ -47,6 +47,17 @@ _DIM_COLOR_ATTRS = frozenset({
     "cyan", "magenta", "yellow",
 })
 
+# A3D-37: SUBTRAKTIVE Farbkanaele (CMY). Sie bleiben in _DIM_COLOR_ATTRS (die
+# GM-Farbmaske / Farb-Feature-Dimmung braucht CMY-Mover als Farbe), duerfen aber
+# NICHT als Intensity-/Dimm-Fallback dienen: der Dimmer-Master/GM/Blackout skaliert
+# die Fallback-Adressen MULTIPLIKATIV Richtung 0 — bei ADDITIVEM RGB(W) = dunkler
+# (korrekt), bei SUBTRAKTIVEM CMY aber = Farbe OEFFNEN = heller/weiss (invertiert).
+# Ein CMY-only-Mover ohne echten Dimmer wuerde so beim Blackout AUFHELLEN statt
+# dunkeln. Deshalb in _fixture_intensity_addrs ausgenommen.
+_SUBTRACTIVE_COLOR_ATTRS = frozenset({
+    "cmy_c", "cmy_m", "cmy_y", "cyan", "magenta", "yellow",
+})
+
 # A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
 # DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
 # Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
@@ -2424,7 +2435,9 @@ class AppState:
                 continue
             if attr in _DIM_INTENSITY_ATTRS:
                 inten.append(addr)
-            elif attr in _DIM_COLOR_ATTRS:
+            elif attr in _DIM_COLOR_ATTRS and attr not in _SUBTRACTIVE_COLOR_ATTRS:
+                # A3D-37: additive Farbe (RGB/W/A/UV) darf als virtueller Dimmer
+                # dienen; subtraktives CMY NICHT (Skalieren Richtung 0 hellt auf).
                 color.append(addr)
         return inten if inten else color
 

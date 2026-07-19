@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-19 — Blackout/Grand Master hellt CMY-Mover nicht mehr auf (A3D-37)
+
+#### Behoben
+
+- **Ein Moving Head mit reiner CMY-Farbmischung (ohne eigenen Dimmer) wird beim Blackout / bei sinkendem Grand Master nicht mehr *heller* statt dunkler.** Fixtures ohne echten Dimmer-Kanal nutzen ihre Farbkanäle als virtuellen Dimmer — der Dimmer-Master/GM/Blackout skaliert diese Adressen multiplikativ Richtung 0. Bei **additivem** RGB(W) ist das korrekt (0 = dunkel), bei **subtraktivem CMY** aber invertiert: CMY Richtung 0 = Farbe *öffnen* = heller/weiß. Ein CMY-only-Mover fuhr beim Blackout also auf **Weiß** statt aus. **Fix:** `_fixture_intensity_addrs` nimmt die subtraktiven CMY-Kanäle (`cmy_c/m/y`, `cyan/magenta/yellow`) vom Intensitäts-/Dimm-Fallback aus (neue `_SUBTRACTIVE_COLOR_ATTRS`) — ein CMY-only-Fixture trägt damit nichts zur GM-/Blackout-Dimmmaske bei und wird nicht mehr invertiert. CMY bleibt in `_DIM_COLOR_ATTRS` (die Farb-Feature-Dimmung / GM-Farbmaske braucht CMY weiterhin als Farbe); additives RGB(W) bleibt unverändert virtueller Dimmer. Regressionstests in `tests/test_grandmaster_mask_universe.py` (CMY-only → leere Dimmmaske; RGB-only → weiter gedimmt).
+
 ### 2026-07-19 — VC-Slider: bewusst gelöster Playback-Slot bleibt nach dem Laden gelöst (A3D-39)
 
 #### Behoben
