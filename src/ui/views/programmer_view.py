@@ -1526,7 +1526,16 @@ class ProgrammerView(QWidget):
         Zug unabhaengig; die Ausgabe bleibt im Moment des Verankerns byte-genau
         gleich (gleicher Wert, nur jetzt explizit pro Kopf). ``owners`` sind bereits
         owner-gefiltert (nur Fixtures mit diesem Kopf) -> keine toten "attr#N"-
-        Schluessel auf Einzelkopf-Geraeten. Rueckweg via _normalize_color_heads_to_sync."""
+        Schluessel auf Einzelkopf-Geraeten. Rueckweg via _normalize_color_heads_to_sync.
+
+        UI-06 (David-Entscheidung 2026-07-20, „wontfix bewusst"): das Seeding wird
+        BEHALTEN. Codex' Vorschlag „nur Anzeige-Fallback, nicht persistieren"
+        (PR #35) wurde VERWORFEN — das Tab-Bau-Seeding ist der einzige robuste Weg,
+        dass Bewegen von Kopf 0 die anderen Koepfe NICHT mitzieht (deckt Slider,
+        Color-Picker, Palette, VC ab). Ohne Seeding kehrt Davids urspruenglich
+        gemeldeter Kopf-Unabhaengigkeits-Bug zurueck. Dass ein noch nie separat
+        gesetzter Kopf dadurch einen (byte-gleichen) Default-Wert persistiert, ist
+        der bewusst akzeptierte Trade-off fuer die Getrennt-Kopf-Unabhaengigkeit."""
         attr = ch.attribute
         for f in owners:
             if self._state.get_programmer_value(f.fid, attr, head=head) is not None:

@@ -163,6 +163,14 @@ _SUBTRACTIVE_COLOR_ATTRS = frozenset({
 # …) darf den NOT-AUS NICHT lösen — sonst öffnet ein Positions-/Farb-Nudge den Laser
 # trotz gedrücktem Not-Aus wieder. Annahme wie bei UXT-12: Betriebsart/Shutter/Macro
 # 0 = Laser aus; die genannten Attribute sind die Betriebsart-/Emissions-Gates.
+# CDX-13 (David-Entscheidung 2026-07-20, SAFETY vor Usability): `intensity` bleibt
+# BEWUSST DRAUSSEN. Ein FB4-/Streaming-Laser exponiert seine Helligkeit als
+# `intensity`, könnte also per Helligkeitsregler nicht wieder scharfgeschaltet
+# werden — das ist gewollt: `intensity` ist zu breit, ein Szenen-/Snapshot-/
+# Palette-Apply mit Laser-`intensity>0` (über set_programmer_value) würde den
+# NOT-AUS sonst UNGEWOLLT lösen. Bewusstes Wieder-Scharfschalten läuft über den
+# FB4-„Cue"-Kanal (= `gobo_wheel`, bereits whitelisted). Regressionstest:
+# tests/test_laser_dmx_estop.py::test_intensity_on_laser_keeps_latch.
 _LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
 
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
