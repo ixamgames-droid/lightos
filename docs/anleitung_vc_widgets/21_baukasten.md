@@ -1,8 +1,8 @@
 # Smart-Drop & Baukasten (Elemente schnell anlegen)
 
-> ⚠️ **Veraltet (entfernt 2026-07):** Die hier beschriebenen Editor-Bausteine (Controller-Vorlage, Color-Chase, Chase-Bereich) wurden aus der virtuellen Konsole entfernt. Stattdessen gibt es jetzt das **Live-Edit-Panel** (ein Widget auf der VC-Fläche, siehe `docs/LIVE_EDIT_FENSTER.md`).
+> **Hinweis:** Die früheren grünen Baukasten-Blöcke (Controller-Vorlage, Color-Chase, Chase-Bereich) wurden 2026-07 aus der virtuellen Konsole entfernt — Live-Color-Chase läuft heute über das **Live-Edit-Panel** (`docs/LIVE_EDIT_FENSTER.md`), eine Controller-Vorlage über den **Controller-Browser** (Sektion *MIDI*). Der hier beschriebene **Smart-Drop** („Effekt einrichten") ist weiterhin aktuell.
 
-> Statt Bedien-Elemente einzeln von Hand aufzubauen und zu verdrahten, zieht LightOS einen Effekt aus dem Funktions-Baum auf die Konsole und schlägt dir die passenden, schon fertig verkabelten Regler vor — oder setzt auf Knopfdruck ganze Blöcke (MIDI-Controller, Color-Chase).
+> Statt Bedien-Elemente einzeln von Hand aufzubauen und zu verdrahten, zieht LightOS einen Effekt aus dem Funktions-Baum auf die Konsole und schlägt dir die passenden, schon fertig verkabelten Regler vor.
 
 ## Zwei Wege, ein Element anzulegen (Toolbar-Knopf vs. Effekt auf die Canvas ziehen)
 
@@ -60,33 +60,9 @@ Ziehst du einen Effekt direkt auf einen Regler, der **schon** etwas steuert (z. 
 
 **Abbrechen** lässt alles, wie es war.
 
-## Komplette Blöcke: Controller, Color-Chase, Chase-Bereich
-
-![Controller-Vorlage](img/baukasten_controller.png)
-
-> ⚠️ **Entfernt 2026-07** (siehe Banner oben): Diese drei grünen Baukasten-Knöpfe (⌗ Controller / 🎨 Color-Chase / 🟦 Chase-Bereich) gibt es in der VC **nicht mehr** — weder in der Werkzeugleiste noch im Kontextmenü. Eine Controller-Vorlage ist heute über den **Controller-Browser** (Sektion *MIDI*) nutzbar. Die folgende Beschreibung (inkl. „Color-Chase auf eine Gruppe") ist **historisch**.
-
-Früher konntest du in der Bearbeiten-Leiste mit drei grünen Knöpfen ganze, fertige Blöcke einsetzen:
-
-- **⌗ Controller** — legt das **Abbild eines MIDI-Pad-Controllers** auf die Seite: ein beschriftetes 8×8-Pad-Raster plus Fader-Reihe, jede Taste schon auf die richtige MIDI-Note bzw. jeder Fader auf den richtigen CC gemappt. Du wählst nur das Modell (im Bild „Akai APC mini (Original)", außerdem „APC mini mk2"). So siehst du auf der Konsole genau, **wo welche Hardware-Taste liegt**, und musst den Pads nur noch per Rechtsklick Funktionen/Farben zuweisen.
-
-- **🎨 Color-Chase** — legt einen kompletten **Live-Color-Chase-Baukasten** an: Farb-Pads (im Modus „Farbe hinzufügen"), die Tasten **Start**, **Clear**, **Farbe −/+** sowie zwei Fader für **Speed** und **Übergang**. Dazu erzeugt LightOS automatisch eine passende **COLORFADE-Funktion**, an die alles schon gebunden ist. Ablauf zum Spielen: **Clear → Farben antippen → Start**.
-
-- **🟦 Chase-Bereich** — wie Color-Chase, aber du **ziehst zuerst ein Rechteck** auf der Canvas auf; der Baukasten wird passend in diesen Bereich skaliert hineingelegt. (Dafür muss der Bearbeiten-Modus aktiv sein.)
-
-## Color-Chase auf eine Gruppe
-
-![Gruppen-Auswahl](img/baukasten_chase_gruppe.png)
-
-Bei **🎨 Color-Chase** und **🟦 Chase-Bereich** fragt LightOS zuerst, **auf welche Fixtures** der Chase wirken soll. Wählst du **„Alle Fixtures"**, betrifft der Chase alle gepatchten Geräte; ansonsten erscheinen hier deine angelegten **Fixture-Gruppen**, und der Chase wirkt nur auf die gewählte Gruppe. Die automatisch angelegte COLORFADE-Funktion trägt den Gruppennamen im Titel (z. B. „Color-Chase – Front"), damit du sie später wiederfindest.
-
 ## Tipps & Fallen
 
-- **Bearbeiten zuerst.** Die Bau-Knöpfe und der Smart-Drop sind nur im **Bearbeiten-Modus** sichtbar. „🟦 Chase-Bereich" weist sogar ausdrücklich darauf hin, wenn Bearbeiten noch aus ist.
+- **Bearbeiten zuerst.** Die Widget-Knöpfe und der Smart-Drop sind nur im **Bearbeiten-Modus** sichtbar; im Spielbetrieb sind sie ausgeblendet.
 - **Mehrere Häkchen = mehrere Elemente in einem Schritt.** Kreuze in der Karte „Effekt einrichten" ruhig mehrere Aspekte an — das spart Wege und lässt sich mit **einem** Rückgängig (Strg+Z) komplett zurücknehmen.
 - **„Erstellen" ohne Änderung** liefert genau einen An/Aus-Button — der schnellste Fall mit einem Klick.
 - **Dazu koppeln teilt das Tempo.** Wenn du auf der Konflikt-Karte „Dazu koppeln" wählst, laufen beide Effekte mit **einem** gemeinsamen Tempo. Sollen sie unabhängig bleiben, nimm „Neues Widget daneben".
-- **Controller-Vorlage ist nur ein Abbild.** Die Pads sind richtig auf MIDI-Notes gemappt, aber noch **ohne Funktion**. Per Rechtsklick (Funktion/Farbe) belegen; den Fader-Modus stellst du im Eigenschaften-Dialog ein.
-- **Color-Chase-Pads warten auf MIDI.** Die Pads/Fader des Color-Chase-Baukastens haben noch keine feste MIDI-Taste — weise sie bei Bedarf per **„MIDI Lernen"** den echten APC-Tasten zu.
-- **Color-Chase legt eine echte Funktion an.** Jeder Color-Chase erzeugt im Funktions-Baum eine neue COLORFADE-Matrix. Wenn du den Block wieder löschst, bleibt die Funktion bestehen — sie bei Bedarf separat entfernen.
-- **Reihenfolge beim Color-Chase merken:** erst **Clear**, dann **Farben antippen**, dann **Start** — sonst mischt sich Altes mit Neuem.

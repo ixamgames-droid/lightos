@@ -116,22 +116,6 @@ eigener Effekt-Funktion:
 - **🟦 Chase-Bereich** — wie Color-Chase, aber du **ziehst** zuerst einen Bereich auf der
   Canvas auf; der Block wird hineingelegt.
 
-### Neu: Chase auf eine **Gruppe**
-
-Beim **🎨 Color-Chase** / **🟦 Chase-Bereich** fragt LightOS jetzt zuerst, **auf welche
-Fixture-Gruppe** der Chase wirken soll:
-
-![Color-Chase: Gruppen-Auswahl](img/03_chase_gruppe_dialog.png)
-
-- **„Alle Fixtures"** → Chase über alles (wie bisher).
-- oder eine **Gruppe** (z. B. *Alle PAR* / *Strahler*, *Spider*, *Moving Heads*) → der
-  komplette Chase-Block steuert **nur diese Gruppe**. Genau so bekommst du „einen
-  Chase-Builder auf die Gruppe Strahler".
-
-> Die Liste enthält automatisch alle in der Show angelegten Fixture-Gruppen. (Im
-> Schaukasten oben gibt es keine Gruppen, daher nur „Alle Fixtures"; in der Event-Demo
-> erscheinen *Alle PAR · PAR Links/Rechts · Moving Heads · Spider · Alle Mover · Alles*.)
-
 ---
 
 ## Stand / Nutzbarkeit (Kurz)
