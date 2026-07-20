@@ -64,7 +64,9 @@ Ziehst du einen Effekt direkt auf einen Regler, der **schon** etwas steuert (z. 
 
 ![Controller-Vorlage](img/baukasten_controller.png)
 
-Neben einzelnen Elementen kannst du in der Bearbeiten-Leiste mit drei grünen Knöpfen ganze, fertige Blöcke einsetzen:
+> ⚠️ **Entfernt 2026-07** (siehe Banner oben): Diese drei grünen Baukasten-Knöpfe (⌗ Controller / 🎨 Color-Chase / 🟦 Chase-Bereich) gibt es in der VC **nicht mehr** — weder in der Werkzeugleiste noch im Kontextmenü. Eine Controller-Vorlage ist heute über den **Controller-Browser** (Sektion *MIDI*) nutzbar. Die folgende Beschreibung (inkl. „Color-Chase auf eine Gruppe") ist **historisch**.
+
+Früher konntest du in der Bearbeiten-Leiste mit drei grünen Knöpfen ganze, fertige Blöcke einsetzen:
 
 - **⌗ Controller** — legt das **Abbild eines MIDI-Pad-Controllers** auf die Seite: ein beschriftetes 8×8-Pad-Raster plus Fader-Reihe, jede Taste schon auf die richtige MIDI-Note bzw. jeder Fader auf den richtigen CC gemappt. Du wählst nur das Modell (im Bild „Akai APC mini (Original)", außerdem „APC mini mk2"). So siehst du auf der Konsole genau, **wo welche Hardware-Taste liegt**, und musst den Pads nur noch per Rechtsklick Funktionen/Farben zuweisen.
 
