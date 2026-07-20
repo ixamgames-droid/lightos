@@ -128,7 +128,7 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
 **Intensity · Color · Position · Gobo · Weitere** (Gobo nur bei Gobo-Geräten)
-sowie **Helper · EFX · Matrix · Paletten**. Pro Kanal ein Fader
+sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
 (0–255 / 0–100 %); `↺` setzt einen Kanal auf den Standardwert.
 - **Intensity-Tab:** Dimmer + **Strobe** (Status-Kacheln „Auf" / „Zu" sowie
   „Strobe langsam" / „Strobe mittel" / „Strobe schnell", dazu der Slider
@@ -147,8 +147,8 @@ sowie **Helper · EFX · Matrix · Paletten**. Pro Kanal ein Fader
   Gobo-Wechsel-Slider, Gobo-FX-Fader.
 - **Weitere-Tab:** restliche Kanäle (Beam/Effect/…) + **„⟳ Moving Head
   Reset…"**-Button (mit Sicherheitsabfrage, setzt sich automatisch zurück).
-- **Helper · EFX · Matrix · Paletten:** hier baust du Effekte und Presets direkt
-  im Programmer — **Helper** („Effekt-Assistent…", „+ Szene", „+ Chaser",
+- **Assistent · EFX · Matrix · Paletten:** hier baust du Effekte und Presets direkt
+  im Programmer — **Assistent** („Effekt-Assistent…", „+ Szene", „+ Chaser",
   „Programmer → Szene" sowie eine Funktionsliste mit „Start"/„Stop"; mehr in §5),
   **EFX** (Pan/Tilt-Figuren für Moving Heads), **Matrix** (Pixel-/Farbeffekte)
   und **Paletten** (gespeicherte Attributwerte). EFX und Matrix folgen der
@@ -182,14 +182,14 @@ links nach rechts). Nutzt die Auswahl-Reihenfolge → zuerst eine Gruppe wählen
 
 ---
 
-## 5. Funktionen: Szenen, Chaser & Co. (Programmer → Helper / Bibliothek)
+## 5. Funktionen: Szenen, Chaser & Co. (Programmer → Assistent / Bibliothek)
 
 Abspielbare Bausteine (Szenen, Chaser …) baust und startest du **im Programmer**:
-über den Tab **Helper** und die rechte **Bibliothek** (verwaltet Snaps +
+über den Tab **Assistent** und die rechte **Bibliothek** (verwaltet Snaps +
 Funktionen). Einen eigenen „Funktionen"-Tab in der Sektion „Patchen" gibt es
 nicht mehr.
 
-Der Tab **Programmer → Attribute → Helper** enthält:
+Der Tab **Programmer → Attribute → Assistent** enthält:
 
 - **„Effekt-Assistent…"** – baut geführt (Typ → Lampen → Farben → Tempo) fertige
   Effekte. Bester Startpunkt für Einsteiger.
@@ -202,7 +202,7 @@ Der Tab **Programmer → Attribute → Helper** enthält:
   starten/stoppen. Eine **laufende** Funktion ist mit einem **▶**-Pfeil
   vorangestellt; ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 
-> 📷 *Screenshot folgt: Programmer → Helper-Tab (Effekt-Assistent… · + Szene · + Chaser · Start/Stop-Liste).*
+> 📷 *Screenshot folgt: Programmer → Assistent-Tab (Effekt-Assistent… · + Szene · + Chaser · Start/Stop-Liste).*
 <!-- ![Programmer – Helper-Tab](tutorial_matrix/web/programmer_helper.png) -->
 
 > **MIDI lernen ist nicht hier.** Funktionen/Bedienelemente legst du per MIDI

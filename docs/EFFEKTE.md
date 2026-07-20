@@ -5,22 +5,22 @@ So baust du Effekte und koppelst sie mit Geschwindigkeit/Tempo. Grundlagen
 
 > Beschrieben ist die aktuelle Oberfläche (Stand 2026‑07). Geometrie- und
 > Pixel-Effekte liegen im **Programmer** in den Tabs **EFX** und **Matrix**;
-> Szenen, Chaser und der Effekt-Assistent im Programmer-Tab **Hilfe**, fertige
-> Bausteine in der rechten **Bibliothek**. (Der Effekt-Tab hieß früher „Helper";
-> der sichtbare Reiter heißt jetzt **Hilfe** — die Buttons darauf sind unverändert.)
+> Szenen, Chaser und der Effekt-Assistent im Programmer-Tab **Assistent**, fertige
+> Bausteine in der rechten **Bibliothek**. (Der Effekt-/Assistent-Tab hieß früher „Helper",
+> zwischenzeitlich „Hilfe"; der sichtbare Reiter heißt jetzt **Assistent** — die Buttons darauf sind unverändert.)
 >
 > **Snap vs. Szene — häufige Verwechslung:** Ein **Snap** (rechte Bibliothek,
 > „💾 Muster/Speichern") ist ein gespeicherter Programmer-Stand zum direkten
 > Abrufen. Ein **Chaser** braucht dagegen **Szenen/Funktionen** als Schritte,
 > **keine Snaps**. Willst du aus dem aktuellen Look einen Chaser-Baustein machen,
-> nimm auf dem **Hilfe**-Tab **„Programmer → Szene"** (Abschnitt 5) — dann steht
+> nimm auf dem **Assistent**-Tab **„Programmer → Szene"** (Abschnitt 5) — dann steht
 > die Szene im „+ Hinzufügen"-Dialog des Chasers zur Wahl.
 
 ---
 
 ## 0. Der schnellste Weg: der Effekt-Assistent
 
-Im **Programmer → Tab Hilfe** gibt es den Button
+Im **Programmer → Tab Assistent** gibt es den Button
 **„Effekt-Assistent…"**. Er führt dich Schritt für Schritt durch
 **Typ → Lampen → Farben → Tempo** und legt am Ende fertige Funktionen
 (Szenen + Chaser) an. **Wenn du schnell ein Ergebnis willst, fang hier an.**
@@ -128,13 +128,13 @@ Bebilderte Schritt-für-Schritt-Anleitungen:
 
 ---
 
-## 4. Chaser – Lauflicht aus Funktionen (Programmer → Tab Hilfe → „+ Chaser")
+## 4. Chaser – Lauflicht aus Funktionen (Programmer → Tab Assistent → „+ Chaser")
 
 Ein Chaser spielt mehrere **Funktionen** (meist Szenen) der Reihe nach ab.
 
 ![Chaser-Editor](tutorial_matrix/web/06_chaser_editor.png)
 
-1. Vorher die Bausteine anlegen (z. B. **+ Szene** im Programmer-Tab **Hilfe**
+1. Vorher die Bausteine anlegen (z. B. **+ Szene** im Programmer-Tab **Assistent**
    und im Szenen-Editor speichern).
 2. **+ Chaser** klicken → der Chaser-Editor öffnet sich in einem eigenen Fenster
    (Titel „Bearbeiten: …"). **Name** vergeben.
@@ -147,7 +147,7 @@ Ein Chaser spielt mehrere **Funktionen** (meist Szenen) der Reihe nach ab.
      Gesamttempo (`0.5x` = halb, `2.0x` = doppelt so schnell).
    - **Trigger = Beat:** läuft **synchron zur globalen BPM**; **Beats/Step** =
      wie viele Beats ein Schritt dauert (1 = jeder Beat, 4 = alle 4 Beats).
-7. Starten/Stoppen über **Start** / **Stop** im Hilfe-Tab (Liste mit den
+7. Starten/Stoppen über **Start** / **Stop** im Assistent-Tab (Liste mit den
    Buttons **Start** und **Stop** darunter).
 
 **Kern-Rezept „Tempo-Regler + Effekt":** Chaser auf **Beat** stellen → er folgt
@@ -157,9 +157,9 @@ die BPM-Anzeige** oder automatisch über **Eingabe / Ausgabe → Audio Input**
 
 ---
 
-## 5. Was der Hilfe-Tab kann
+## 5. Was der Assistent-Tab kann
 
-Im **Programmer → Tab Hilfe** gibt es genau diese Buttons:
+Im **Programmer → Tab Assistent** gibt es genau diese Buttons:
 
 - **Effekt-Assistent…** – der geführte Assistent (siehe Abschnitt 0).
 - **+ Szene** – neue Szene anlegen und direkt im Editor bearbeiten.
@@ -183,7 +183,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 
 ## 6. Effekte live auslösen & per Hardware steuern
 
-- **Start / Stop** im Hilfe-Tab startet/stoppt die in der Liste ausgewählte
+- **Start / Stop** im Assistent-Tab startet/stoppt die in der Liste ausgewählte
   Funktion (Doppelklick schaltet sie um).
 - **MIDI lernen über die Virtuelle Konsole:** in der VC zuerst **„MIDI Lernen"**
   aktivieren, dann das gewünschte Pad/Fader im Bearbeiten-Modus anklicken und

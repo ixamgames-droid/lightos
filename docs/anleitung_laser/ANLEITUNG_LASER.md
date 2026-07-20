@@ -121,7 +121,7 @@ So bedienst du den Laser im Live-Betrieb ohne den Programmer:
    MIDI-Pad auslösbar).
 
 > Muster lassen sich außerdem in **Snaps/Szenen** aufnehmen (Programmer →
-> „Speichern" bzw. Hilfe-Tab „Programmer → Szene") und so über Chaser abspielen.
+> „Speichern" bzw. Assistent-Tab „Programmer → Szene") und so über Chaser abspielen.
 
 ---
 
