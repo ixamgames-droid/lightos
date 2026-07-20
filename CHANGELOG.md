@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-20 — `load_show` ist reset-first: kein halb-alter (Frankenstein) Zustand bei Ladefehler (STAB-19b)
+
+#### Behoben
+
+- **Bricht das Laden einer Show an einer der wenigen ungefangenen Zeilen ab, bleibt kein inkonsistenter „Frankenstein"-Zustand (neuer Patch + Rest der alten Show) zurück.** Bisher ersetzte `load_show` den Patch zuerst und setzte die übrigen State-Felder erst *inline* pro Block zurück — ein Absturz mittendrin ließ die noch nicht geladenen Blöcke auf ALTEN Werten stehen. **Fix (Entwurf via 3-Agent-Design-Debatte → Option A+C):** `load_show` ist jetzt **reset-first** — es setzt über die neue, mit `reset_show` geteilte Funktion `_reset_state(state, emit_events=False)` den **gesamten** State auf leer, **bevor** ein Block geladen wird. Stürzt danach etwas ab, sind die noch nicht geladenen Blöcke LEER statt ALT. Ergänzend sind die zwei realen ungefangenen Zeilen (`_replace_patch_from_data`, `clear_feature_dimmers`) in `_lenient` gekapselt.
+  - **`_reset_state` als SSOT:** `reset_show()` ruft es mit `emit_events=True` (verhaltensgleich zu vorher, inkl. der Listener-Benachrichtigung). Beim reset-first (`emit_events=False`) bleibt der komplette Tail-Emit-Block aus — **wichtig für `state.sync.refresh_all()`, das als direkter Bus-Call `_suppress_emits` umgeht** und sonst ein Doppel-Refresh (leer→voll) samt re-entrantem Rebuild (BUG-01) mitten im Laden ausgelöst hätte.
+  - Snapshot+Rollback (Alternative) wurde verworfen: der Patch ist seit STAB-CURSHOW bereits atomar in `current_show.db` committet, ein In-Memory-Rollback könnte ihn nicht zurücknehmen.
+  - **Kein neuer Nebeneffekt beim normalen Laden** (aus der adversarialen Review): das reset-first blankt **nicht** die laufende DMX-Ausgabe (neuer Parameter `blackout_output=False` — nur `reset_show`/„Neue Show" blendet hart, sonst gäbe es bei jedem Laden einen physischen Blackout-Puls) und feuert **keine** Media-Player-Qt-Signale mitten im Laden (`blockSignals`, da diese `_suppress_emits` umgehen); die bare Zeilen in `_reset_state` (`clear_feature_dimmers`, Scene-Replace) sind gekapselt, damit ein Fehler dort den Reset nicht abbricht.
+- Regressionstests in `tests/test_stab19b_load_atomic.py`: „Crash im Block N → kein Feld der vorigen Show überlebt" (STRICT-Modus + injizierter Crash vor dem cue_stacks-Block), Mirror-Guard (`_reset_state` leert die geladenen Felder) und Normal-Load-Regression.
+
 ### 2026-07-20 — EURON10-Fog: Lüfter folgt nach dem fan-Split wieder alten Shows (CDX-18)
 
 #### Behoben
