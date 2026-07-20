@@ -63,7 +63,7 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
 | `Leertaste` | GO (nächste Cue) |
 | `Shift+Leertaste` | BACK (Cue zurück) |
 | `Esc` | Programmer leeren |
-| `H` / `Shift+H` | Highlight / Lowlight |
+| `H` / `Shift+H` | Hervorheben / Abdunkeln |
 | `Strg+C` / `Strg+V` | Selektion kopieren / einfügen |
 | `R` | Cue aufnehmen |
 | `:` oder `F12` | Kommandozeile fokussieren |
@@ -123,7 +123,7 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
     (mehrere Gruppen kombinieren).
   - Hinter dem Namen steht die Geräteanzahl, z. B. `Moving Heads  (6)`.
   - Die Auswahl-Reihenfolge folgt der **Raster-Reihenfolge** der Gruppe –
-    wichtig für das **Fan Tool** und Lauflichter.
+    wichtig für das **Fächer-Werkzeug** und Lauflichter.
 
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
@@ -140,7 +140,7 @@ sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
   mit wählbarem Bereich).
 - **Position-Tab:** ein fester Aufklappbereich **„Position-Tool (XY-Pad)"** mit
   Pan/Tilt-Pad (zugeklappt, ein Klick auf die Kopfzeile öffnet ihn) — er wirkt
-  sofort live. Alternativ öffnet der Toolbar-Button **„Position Tool…"** dasselbe
+  sofort live. Alternativ öffnet der Toolbar-Button **„Positions-Werkzeug…"** dasselbe
   Pad als eigenes Fenster.
 - **Gobo-Tab** (nur bei Gobo-fähigen Geräten sichtbar): Gobo-Kacheln **mit
   grafischer Vorschau**, Shake-Kacheln + Shake-Geschwindigkeit,
@@ -162,14 +162,14 @@ Details für Moving Heads: [MOVING_HEADS.md](MOVING_HEADS.md).
 ### 4.3 Toolbar
 | Button | Funktion |
 |--------|----------|
-| **Highlight** | Auswahl voll/weiß/zentriert (Gerät finden) |
-| **Lowlight** | dimmt alle **nicht** ausgewählten Geräte auf ~30 % |
-| **Clear** | Programmer leeren (Auswahl oder alles) |
-| **Copy / Paste** | Werte kopieren; Paste verteilt im Round-Robin auf die Auswahl |
-| **Undo / Redo** | Schritt zurück/vor |
-| **Color / Position / Fan Tool** | eigene Dialoge |
+| **Hervorheben** | Auswahl voll/weiß/zentriert (Gerät finden) |
+| **Abdunkeln** | dimmt alle **nicht** ausgewählten Geräte auf ~30 % |
+| **Löschen** | Programmer leeren (Auswahl oder alles) |
+| **Kopieren / Einfügen** | Werte kopieren; Einfügen verteilt im Round-Robin auf die Auswahl |
+| **Rückgängig / Wiederholen** | Schritt zurück/vor |
+| **Farb-Werkzeug… / Positions-Werkzeug… / Fächer…** | eigene Dialoge |
 
-**Fan Tool:** fächert einen Attributwert über die Auswahl auf (z. B. Pan von
+**Fächer-Werkzeug:** fächert einen Attributwert über die Auswahl auf (z. B. Pan von
 links nach rechts). Nutzt die Auswahl-Reihenfolge → zuerst eine Gruppe wählen.
 
 ### 4.4 Paletten & Snapshots
