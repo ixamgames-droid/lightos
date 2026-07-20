@@ -641,9 +641,29 @@ def reset_show():
     behaelt nichts aus der vorherigen Show (auch nicht aus current_show.db).
     """
     from src.core.app_state import get_state
-    from src.core.engine.palette import get_palette_manager
+    _reset_state(get_state(), emit_events=True)
 
-    state = get_state()
+
+def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = True):
+    """STAB-19b: geteilte SSOT-Reset-Logik (Rumpf von reset_show). Leert den
+    App-State auf eine leere Show.
+
+    ``reset_show()`` ruft dies mit ``emit_events=True`` (Voll-Reset +
+    Listener-Benachrichtigung fuer „Neue Show"). ``load_show()`` ruft es als
+    ERSTEN Schritt mit ``emit_events=False`` (leere Baseline VOR dem Laden):
+    stuerzt danach eine der wenigen ungefangenen Zeilen ab, sind die noch nicht
+    geladenen Bloecke LEER statt ALT — kein halb-alter Frankenstein-Zustand.
+
+    ``emit_events=False`` unterdrueckt den Tail-Emit-Block KOMPLETT —
+    insbesondere ``state.sync.refresh_all()``, das als direkter Bus-Call
+    ``_suppress_emits`` UMGEHT: sonst gaebe reset-first ein Doppel-Refresh
+    (leer -> voll) und einen re-entranten Rebuild mitten im Laden (BUG-01).
+
+    ⚠️ MIRROR-PFLICHT: dies MUSS jedes Feld leeren, das ``load_show`` setzt —
+    sonst kippt die reset-first-Garantie fuer ein neu hinzugefuegtes Feld still
+    nach Frankenstein zurueck. Regressionstest: ``test_stab19b_load_atomic.py``.
+    """
+    from src.core.engine.palette import get_palette_manager
 
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
@@ -689,8 +709,13 @@ def reset_show():
     # ein Fader der vorigen Show die Fixtures der neuen Show weiter herunter.
     state.fixture_dimmers = {}
     # F-26b: ebenso die Feature-Dimmer-Slots (FEATURE_DIMMER-Fader) verwerfen.
-    if hasattr(state, "clear_feature_dimmers"):
-        state.clear_feature_dimmers()
+    # STAB-19b: kapseln — ein Wurf hier darf im reset-first-Pfad nicht den REST
+    # des Resets verschlucken (sonst blieben spaetere Felder ALT = Frankenstein).
+    try:
+        if hasattr(state, "clear_feature_dimmers"):
+            state.clear_feature_dimmers()
+    except Exception as e:
+        print(f"[show_file] reset feature_dimmers error: {e}")
     # Neue Show: strikte Trennung Farbe/Dimmer (Default seit 2026-06-24). Eine reine
     # Farbe macht den Dimmer NICHT automatisch auf — Helligkeit kommt aus Dimmer-
     # Snaps/-Effekten/Mastern. Per Menue-Schalter umschaltbar.
@@ -699,15 +724,22 @@ def reset_show():
     # "Neue Show" weiter die ALTEN Werte (die Strahler bleiben an): ein leerer
     # Patch hat keinen Default-Frame mehr, und _render_frame fasst die Buffer der
     # nun unpatchten Universes nicht mehr an -> alte Werte bleiben stehen.
-    try:
-        for _u in getattr(state, "universes", {}).values():
-            _u.clear()
-    except Exception as e:
-        print(f"[show_file] reset universes error: {e}")
-    try:
-        state._flush_all_to_dmx()
-    except Exception as e:
-        print(f"[show_file] reset flush error: {e}")
+    # STAB-19b: NUR bei blackout_output (reset_show / „Neue Show" will die harte
+    # Blende). Beim load_show-reset-first (blackout_output=False) uebersprungen —
+    # sonst blitzt bei JEDEM Laden ein physischer Blackout-Puls auf der laufenden
+    # DMX-Ausgabe (44-Hz-Output-Thread liest die genullten Universes), bevor der
+    # neue Patch-Render die Werte gleich wieder setzt. Der Render-Plan wird ueber
+    # replace_patch (leerer + dann neuer Patch) ohnehin frisch aufgebaut.
+    if blackout_output:
+        try:
+            for _u in getattr(state, "universes", {}).values():
+                _u.clear()
+        except Exception as e:
+            print(f"[show_file] reset universes error: {e}")
+        try:
+            state._flush_all_to_dmx()
+        except Exception as e:
+            print(f"[show_file] reset flush error: {e}")
 
     try:
         get_palette_manager().from_dict({})
@@ -789,9 +821,12 @@ def reset_show():
     # expliziten Feld-Resets darunter bleiben zusaetzlich bestehen, damit
     # Fake-States ohne Property-Adapter (z. B. tests/test_show_file.py
     # _FakeState) weiterhin korrekt geleert werden.
-    if hasattr(state, "_scene"):
-        from src.core.stage.scene_graph import SceneGraph
-        _replace_scene(state, SceneGraph())
+    try:  # STAB-19b: kapseln (set_scene haengt lebende Registry-Views um).
+        if hasattr(state, "_scene"):
+            from src.core.stage.scene_graph import SceneGraph
+            _replace_scene(state, SceneGraph())
+    except Exception as e:
+        print(f"[show_file] reset scene error: {e}")
     if hasattr(state, "_live_view_transient"):
         state._live_view_transient = {}
     state.visualizer_positions = {}
@@ -807,7 +842,19 @@ def reset_show():
     state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0}
     try:
         from src.core.audio.media_player import get_media_player
-        get_media_player().set_tracks([])
+        mp = get_media_player()
+        # STAB-19b: `set_tracks` feuert playlistChanged/trackChanged (Qt-Signale,
+        # die _suppress_emits NICHT kennen). Beim reset-first (emit_events=False)
+        # die Tracks weiter LEEREN (Frankenstein-Garantie), aber den synchronen
+        # UI-Rebuild via blockSignals unterdruecken.
+        if emit_events:
+            mp.set_tracks([])
+        else:
+            _blocked = mp.blockSignals(True)
+            try:
+                mp.set_tracks([])
+            finally:
+                mp.blockSignals(_blocked)
     except Exception as e:
         print(f"[show_file] playlist reset error: {e}")
 
@@ -818,14 +865,19 @@ def reset_show():
 
     # Listener benachrichtigen (gleiche Events wie beim Laden), damit alle
     # Views (Patch, VC, Programmer, Snapshots …) die leere Show uebernehmen.
-    try:
-        state._emit("patch_changed", None)
-        state._emit("stacks_changed", None)
-        state._emit("cue_stack_changed", None)
-        state._emit("show_loaded", {"path": None, "issues": []})
-        state.sync.refresh_all()
-    except Exception as e:
-        print(f"[show_file] reset post events error: {e}")
+    # STAB-19b: NUR bei emit_events (reset_show / „Neue Show"). Beim load_show-
+    # reset-first (emit_events=False) uebersprungen — sonst Doppel-Emit
+    # (leer -> voll) UND sync.refresh_all() als direkter Bus-Call, der
+    # _suppress_emits umgeht (BUG-01: re-entranter Rebuild mitten im Laden).
+    if emit_events:
+        try:
+            state._emit("patch_changed", None)
+            state._emit("stacks_changed", None)
+            state._emit("cue_stack_changed", None)
+            state._emit("show_loaded", {"path": None, "issues": []})
+            state.sync.refresh_all()
+        except Exception as e:
+            print(f"[show_file] reset post events error: {e}")
 
 
 def _resolve_stage_definition(stage_name: str):
@@ -928,15 +980,43 @@ def load_show(path: str | os.PathLike):
     state = get_state()
     pm = get_palette_manager()
 
+    # STAB-19b: RESET-FIRST — den GESAMTEN State auf leer setzen, BEVOR ein Block
+    # geladen wird (geteilte SSOT mit reset_show via _reset_state). Stuerzt danach
+    # eine der wenigen ungefangenen Zeilen ab, sind die noch NICHT geladenen
+    # Bloecke LEER statt ALT -> kein halb-alter Frankenstein-Zustand. emit_events=
+    # False + Suppress-Fenster: kein Doppel-Refresh, kein refresh_all-BUG-01.
+    # Best-effort — der Reset selbst darf den Load NIE abbrechen.
+    _prev_suppress = getattr(state, "_suppress_emits", False)
+    state._suppress_emits = True
+    try:
+        # emit_events=False: keine Tail-Emits/refresh_all (BUG-01). blackout_output=
+        # False: kein physischer DMX-Blackout-Puls (der neue Patch-Render setzt die
+        # Werte gleich; alte Werte bleiben bis dahin stehen wie vor STAB-19b).
+        _reset_state(state, emit_events=False, blackout_output=False)
+    except Exception as e:
+        _lenient("reset-first before load error", e)
+    finally:
+        state._suppress_emits = _prev_suppress
+
+    # STAB-19b (C-Haertung): der Patch-Replace ist eine der wenigen UNGEFANGENEN
+    # Zeilen (die pfs-Bauschleife in _replace_patch_from_data ist nicht pro-Eintrag
+    # gekapselt) — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
+    # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert).
     patch_entries = data.get("patch", [])
     if isinstance(patch_entries, list):
-        _replace_patch_from_data(state, patch_entries)
+        try:
+            _replace_patch_from_data(state, patch_entries)
+        except Exception as e:
+            _lenient("load patch error", e)
 
     # VCB-05: Gruppen-/Fixture-Dimmer der vorigen Show verwerfen (sonst Ghost-Dimmer).
     state.fixture_dimmers = {}
-    # F-26b: ebenso die Feature-Dimmer-Slots verwerfen.
-    if hasattr(state, "clear_feature_dimmers"):
-        state.clear_feature_dimmers()
+    # F-26b: ebenso die Feature-Dimmer-Slots verwerfen (STAB-19b: ungefangen -> kapseln).
+    try:
+        if hasattr(state, "clear_feature_dimmers"):
+            state.clear_feature_dimmers()
+    except Exception as e:
+        _lenient("load clear_feature_dimmers error", e)
 
     # Spatial-Gruppen wiederherstellen (sonst fehlt die MH-/PAR-Gruppe nach Load).
     _restore_fixture_groups(state, data.get("fixture_groups", []) or [])
