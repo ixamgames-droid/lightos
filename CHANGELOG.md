@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-21 — „Grosse Demo Show 2026": konkurrierende PAR-Looks lösen sich ab + Farbwähler wirkt (GDS-4, GDS-5)
+
+#### Behoben
+
+- **GDS-4 — Effekt-Buttons stapeln nicht mehr auf denselben Geräten.** Die vier konkurrierenden PAR-Voll-Looks (Rainbow / Chase / ColorFade / Lauflicht) sind jetzt `solo_fixtures` — ein neuer Look löst den alten auf denselben PARs ab, statt gleichzeitig zu laufen. PAR Strobe (Shutter) bleibt bewusst komplementär (mit einem Farb-Look kombinierbar). Nur der Demo-Generator (`tools/build_grosse_demo_show_2026.py`); Show neu erzeugt.
+- **GDS-5 — Der VC-Farbwähler „Farbe" wirkt jetzt zuverlässig.** Er zielte auf `Programmer/Selektion`; die Demo-VC bietet aber kein Auswahl-Pad → der Picker hing am (leeren) Programmer-Zustand (der Empty-Fallback färbte zwar alle, aber nur solange nichts anderes selektiert war). Jetzt `target='Alle Fixtures'` → färbt explizit + robust immer alle Geräte, unabhängig vom Programmer-Zustand.
+
 ### 2026-07-21 — „STOP ALL" ist jetzt ein echter Panik-Knopf (stoppt auch VC-Szenen/Matrizen)
 
 #### Behoben

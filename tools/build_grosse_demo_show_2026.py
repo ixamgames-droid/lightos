@@ -184,16 +184,27 @@ def main():
     from src.ui.virtualconsole.vc_slider import SliderMode
     from src.ui.virtualconsole.vc_speedial import SpeedTarget
 
-    def _btn(cap, fn, x, y, bg, bank, action=ButtonAction.FUNCTION_TOGGLE):
+    def _btn(cap, fn, x, y, bg, bank, action=ButtonAction.FUNCTION_TOGGLE, solo=False):
         w = b.button(cap, action=action, function=fn, bg_image=bg, bank=bank)
         w.setGeometry(x, y, 150, 66)
+        # GDS-4: solo_fixtures -> stoppt beim Start nur ANDERE Effekte auf DENSELBEN
+        # Geraeten (ein neuer Look loest den alten ab, statt zu stapeln). Bewusst nur
+        # an konkurrierenden Voll-Looks setzen, nicht an komplementaeren (Licht+Bewegung).
+        if solo:
+            w.solo_fixtures = True
         return w
 
     # --- Bank 0: PARs & Farbe ---
-    _btn("PAR Rainbow",   par_rainbow, 20,  20, "rainbow_scroll", 0)
-    _btn("PAR Chase",     par_chase,   190, 20, "color_chase",    0)
-    _btn("PAR ColorFade", par_fade,    360, 20, "breathe_rgb",    0)
-    _btn("PAR Lauflicht", par_run,     530, 20, "pulse",          0)
+    # GDS-4: die vier konkurrierenden PAR-Voll-Looks solo -> ein neuer loest den
+    # alten auf denselben PARs ab (statt zu stapeln). PAR Strobe bleibt komplementaer
+    # -> KEIN solo: der PAR hat KEINEN Shutter-Kanal, der Strobe moduliert die
+    # Intensitaet (255/0) und schreibt kein RGB -> LTP ueberschreibt nur die
+    # Helligkeit, ein gleichzeitig laufender Farb-Look liefert weiter die Farbe
+    # (colored strobe). Deshalb Strobe NACH einem Farb-Look startbar-kombinierbar.
+    _btn("PAR Rainbow",   par_rainbow, 20,  20, "rainbow_scroll", 0, solo=True)
+    _btn("PAR Chase",     par_chase,   190, 20, "color_chase",    0, solo=True)
+    _btn("PAR ColorFade", par_fade,    360, 20, "breathe_rgb",    0, solo=True)
+    _btn("PAR Lauflicht", par_run,     530, 20, "pulse",          0, solo=True)
     _btn("PAR Strobe",    par_strobe,  700, 20, "strobe",         0)
     b0_stop = b.button("Effekte stop", action=ButtonAction.STOP_EFFECTS, bank=0)
     b0_stop.setGeometry(870, 20, 150, 66)
@@ -225,7 +236,12 @@ def main():
     _btn("Nebel an", fog_on, 530, 20, "vu_meter", 2)
     b2_stop = b.button("Effekte stop", action=ButtonAction.STOP_EFFECTS, bank=2)
     b2_stop.setGeometry(700, 20, 150, 66)
-    c2 = b.color("Farbe", target="Programmer/Selektion", bank=2)
+    # GDS-5: „Alle Fixtures" statt „Programmer/Selektion" — die Demo-VC bietet kein
+    # SELECT_GROUP-Pad, d.h. der Picker hing an der (leeren) Programmer-Selektion:
+    # der Empty-Fallback faerbte zwar alle, aber nur solange nichts anderes selektiert
+    # war (stale Programmer-Selektion -> nur diese). „Alle Fixtures" macht das Ziel
+    # explizit + robust (immer alle Geraete, unabhaengig vom Programmer-Zustand).
+    c2 = b.color("Farbe", target="Alle Fixtures", bank=2)
     c2.setGeometry(20, 110, 220, 180)
 
     # ---- 5) STAGE ---------------------------------------------------------------
