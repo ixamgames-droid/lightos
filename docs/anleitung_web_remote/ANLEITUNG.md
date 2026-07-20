@@ -59,17 +59,19 @@ ausgibt:
 **Am Handy öffnen:** Handy ins **gleiche WLAN** bringen, den Browser öffnen und
 
 ```
-http://<PC-IP>:5000
+http://<PC-IP>:5000/?k=<token>
 ```
 
-eingeben — z. B. `http://192.168.1.42:5000`. Es erscheint die Seite
-**„⚡ LightOS Remote"**. Tipp: Als Lesezeichen/Startbildschirm-Verknüpfung
-speichern, dann ist die Remote beim nächsten Mal ein Fingertipp entfernt.
+eingeben — z. B. `http://192.168.1.42:5000/?k=ab12cd`. Das **Token** (`?k=…`) ist nötig,
+seit das Remote per Token abgesichert ist (siehe Abschnitt 4). Den genauen Wert **und einen
+fertigen Direkt-Link** zeigt LightOS im **Verbindungs-Dialog** beim Einschalten — am
+einfachsten dort kopieren. Ohne gültiges Token antwortet der Server mit **403**. Nach dem
+ersten Öffnen merkt sich das Handy die Anmeldung (Cookie); es erscheint die Seite
+**„⚡ LightOS Remote"**. Tipp: Als Lesezeichen/Startbildschirm-Verknüpfung speichern.
 
-> **Hinweis:** Die Info-Box in LightOS nennt derzeit nur `localhost:5000`, nicht
-> die echte LAN-IP (siehe Backlog `NET-02`). Nutze für das Handy immer die per
-> `ipconfig` ermittelte Adresse. Firewall-Abfrage beim ersten Start mit
-> **„Zugriff erlauben"** (privates Netz) bestätigen, sonst ist Port 5000 von
+> **Hinweis:** Nutze für das Handy immer die per `ipconfig` ermittelte **LAN-IP** (nicht
+> `localhost` — das zeigt beim Handy auf das Handy selbst). Firewall-Abfrage beim ersten
+> Start mit **„Zugriff erlauben"** (privates Netz) bestätigen, sonst ist Port 5000 von
 > außen dicht.
 
 ---
@@ -106,40 +108,42 @@ Weitere Details:
 
 ---
 
-## 4. Sicherheitshinweis — offenes LAN, keine Authentifizierung
+## 4. Sicherheit — Token-Auth, CORS-Allowlist, LAN-Bind
 
-Wichtig zu wissen, bevor du das Remote in einem fremden Netz (Club-WLAN,
-Gäste-WLAN, offener Hotspot) nutzt:
+Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
+[DESIGN_DECISION_REMOTE_SECURITY_2026-07-14.md](../DESIGN_DECISION_REMOTE_SECURITY_2026-07-14.md)):
 
-- **Keine Anmeldung.** Es gibt **kein** Passwort, keinen PIN und kein Token.
-  Der Server bindet auf `0.0.0.0:5000` — **jedes** Gerät im selben WLAN/LAN kann
-  die Seite `http://<PC-IP>:5000` öffnen und damit **GO/BACK/STOP, Blackout und
-  die Fader** auslösen (Backlog `NET-01`).
-- **Offene SocketIO-Origins.** Der SocketIO-Endpunkt erlaubt derzeit beliebige
-  Ursprünge (`cors_allowed_origins="*"`), es gibt keinen CSRF-/Origin-Schutz
-  (Backlog `NET-03`). Eine beliebige Webseite im selben Netz könnte sich
-  theoretisch verbinden.
+- **Token-Auth (NET-01).** Der Zugriff ist durch ein **pro Setup gespeichertes Token**
+  geschützt (kurz & tippbar, als `?k=<token>` in der URL). Ein `@before_request`-Gate lässt
+  nur authentisierte Sessions durch — jede API-Route ohne gültige Session antwortet mit
+  **403**; auch SocketIO lehnt unauthentisierte Verbindungen ab. Nach dem Handshake merkt ein
+  `HttpOnly`/`SameSite=Strict`-Cookie die Anmeldung. Das Token zeigt der Verbindungs-Dialog;
+  „Token neu erzeugen" macht alte Links ungültig.
+- **CORS-Allowlist (NET-03).** Statt `cors_allowed_origins="*"` erlaubt der SocketIO-Endpunkt
+  nur noch die bekannten Origins (`http://<lan-ip>:5000`, `127.0.0.1`, `localhost`) — eine
+  fremde Webseite im selben Netz kann sich nicht mehr einfach drauf verbinden.
+- **LAN-Bind steuerbar.** Der Toggle **„LAN-/Handy-Remote"** (Default AN, sicher weil Token
+  davor) bindet `0.0.0.0` (das Handy erreicht es); AUS bindet `127.0.0.1` (nur der PC selbst).
 
-**Empfehlung für den Live-Betrieb:**
+**Trotzdem Rest-Risiko im Blick behalten:**
 
-- Nur in einem **vertrauenswürdigen, kontrollierten Netz** verwenden — am besten
-  ein **eigenes WLAN** nur für die Technik, kein Gäste-/Publikums-WLAN.
-- Das Web-Interface **nur einschalten, solange du es brauchst**, und danach im
-  Menü wieder ausschalten.
-- Den PC **nicht** direkt ins Internet hängen bzw. Port 5000 **nicht** im Router
-  weiterleiten.
+- Das Token ist ein **geteiltes** Setup-Geheimnis (keine Einzel-Benutzer/PIN). Wer den
+  Direkt-Link kennt, kann steuern → Link/Token nicht im Publikum herumzeigen; bei Verdacht
+  **„Token neu erzeugen"**.
+- Weiterhin sinnvoll: ein **vertrauenswürdiges** Netz (eigenes Technik-WLAN), das Interface
+  nach Gebrauch ausschalten, und Port 5000 **nicht** ins Internet weiterleiten.
 
-> Auth/PIN und eine LAN-Freigabe als bewusste Option sind als Verbesserung
-> vorgemerkt (`NET-01`/`NET-03`). Bis dahin gilt: LightOS-Web-Remote ist ein
-> **lokaler LAN-Controller ohne Zugangsschutz** — behandle das Netz entsprechend.
+> **Offene Follow-ups:** QR-Bild des Direkt-Links, OSC-Source-Allowlist und Token-Rotation pro
+> Start sind bewusst noch offen (siehe Design-Doc). Der OSC-Eingang ist separat nur über den
+> Loopback-/„OSC über Netzwerk"-Toggle (Default AUS) abgesichert.
 
 ---
 
 ## Kurz-Referenz
 
 1. **Ausgabe → „Web-Interface (Port 5000)"** anhaken → Server läuft auf `0.0.0.0:5000`.
-2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000` (gleiches WLAN) öffnen.
+2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
 3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader 1–5** = Executor-Pegel.
-4. **Kein Passwort, `0.0.0.0`-Bind** → nur im vertrauenswürdigen Netz nutzen, sonst ausschalten (`NET-01`/`NET-03`).
+4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)
