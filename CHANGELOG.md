@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-20 — Fixture-DB-Robustheit: QXF-Import-Kanalnummern + eindeutiger Profil-Lookup (A3D-34, A3D-35)
+
+#### Behoben
+
+- **A3D-34 — QXF-Import: kaputte `Number`-Attribute korrumpieren die Kanalbelegung nicht mehr.** Der Kern (ein *fehlendes* `Number` durfte nie den echten Kanal 1 verdrängen) war bereits durch den CDX-03-Zwei-Pass gelöst; geschlossen sind jetzt die zwei vom Finding genannten Rest-Kanten: ein **leeres** `Number=""` wird wie „keine Angabe" behandelt (Pass 2 legt den Kanal auf die nächste *wirklich freie* Nummer, statt ihn per `int("")`→`ValueError` still zu droppen), und eine **negative** `Number` (`int("-1")+1 == 0`, `"-2"` → `-1`) wird sichtbar verworfen, statt eine ungültige `channel_number ≤ 0` zu patchen. Betrifft hand-editierte/ältere `.qxf`-Dateien. Tests `tests/test_qxf_import_missing_number.py` (+leerer/negativer Fall).
+- **A3D-35 — Show-Builder patcht bei doppeltem `short_name` nicht mehr stumm das falsche Profil.** `FixtureProfile.short_name` hat keine Unique-Constraint (Builtins und Importe — `source` `qlcplus`/`user` — können kollidieren); das frühere `.first()` **ohne `ORDER BY`** lieferte einen rowid-abhängigen Zufallstreffer → mal das falsche Profil (falsche `channel_count`/`fixture_type`/DMX-Abbildung), nicht reproduzierbar. **Fix (Entwurf via 3-Agent-Design-Debatte → „C_hybrid"):** `_lookup_profile` wählt jetzt **total-deterministisch** — `ORDER BY` builtin-vor-Import, dann kleinste `id` (PK ist unique → keine Rest-Ties, reproduzierbar unabhängig von SQLite-Storage/Insert-Reihenfolge). Bei Mehrdeutigkeit **laut** warnen (`[showbuilder] WARN` mit voller Kandidatenliste `id=…/source`, 1× pro `short_name` pro Builder — kein Rauschen über `patch()`+`profile_id()`), statt still zu picken. Für CI/strenge Autoren ein **opt-in-Strict-Modus** (`ShowBuilder(strict_profiles=True)` oder env `LIGHTOS_STRICT_PROFILES=1`), der dieselbe Meldung zu einem harten `BuildError` macht — der Raise sitzt **außerhalb** des DB-`try/except`, wird also nicht als „Fixture-DB nicht lesbar" fehl-umgewickelt. Der Default bleibt grün+reproduzierbar für alle `build_*.py`-Skripte. Tests `tests/test_a3d35_lookup_profile_dedup.py` (10, inkl. diskriminierendem Order-Unabhängigkeits-Test aus der adversarialen Review). Adversariale Review über beide Fixes: 2 von 3 Reviewern ohne Befund; ein LOW (vakuöser Order-Test) gefunden **und behoben**.
+
 ### 2026-07-20 — BPM „0/aus" überstimmt laufende Auto-Tempo-Quellen (A3D-17b)
 
 #### Behoben

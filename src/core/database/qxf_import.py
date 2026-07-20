@@ -535,7 +535,11 @@ def import_qxf_file(path: str, session: Session,
                 ch_name = (ch_ref.text or "").strip()
                 cdef = channel_defs.get(ch_name)
                 raw = ch_ref.get("Number")
-                if raw is None:
+                if raw is None or str(raw).strip() == "":
+                    # A3D-34: FEHLENDES *oder* LEERES ``Number`` gleich behandeln —
+                    # als „ohne Nummer". Pass 2 legt es auf die naechste WIRKLICH
+                    # freie Nummer (statt es via int("") → ValueError still zu
+                    # verwerfen). Ein leeres Attribut ist morally „keine Angabe".
                     missing.append((ch_name, cdef))
                     continue
                 try:
@@ -545,6 +549,17 @@ def import_qxf_file(path: str, session: Session,
                         f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
                         f"'{ch_name or '?'}' hat ungueltiges Number={raw!r} "
                         f"— Kanal uebersprungen."
+                    )
+                    continue
+                if num < 1:
+                    # A3D-34: negative/zu kleine Number (z. B. "-1" → num=0, "-2" →
+                    # num=-1) ergaebe eine ungueltige channel_number ≤ 0 (der fruehere
+                    # `int(raw)+1` liess das still durch). Sichtbar verwerfen statt
+                    # eine kaputte DMX-Nummer zu patchen.
+                    print(
+                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
+                        f"'{ch_name or '?'}' Number={raw!r} ist negativ/ungueltig "
+                        f"(ergaebe Kanal {num}) — Kanal uebersprungen."
                     )
                     continue
                 if num in used_numbers:
