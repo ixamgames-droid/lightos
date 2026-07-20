@@ -50,7 +50,7 @@ class Handle:
 
 
 class ShowBuilder:
-    def __init__(self, reset: bool = True):
+    def __init__(self, reset: bool = True, *, strict_profiles: bool | None = None):
         # VC-Widgets sind QWidgets -> headless QApplication wie in den Build-Skripten.
         try:
             from PySide6.QtWidgets import QApplication
@@ -66,6 +66,15 @@ class ShowBuilder:
         self.fm = get_function_manager()
         self.caps = get_capabilities()
         self._widgets: list = []
+        # A3D-35: mehrdeutiger short_name (kein Unique-Constraint) -> deterministisch
+        # wählen + laut warnen; strict-Modus (opt-in / CI) macht daraus einen harten
+        # BuildError. Default aus der Umgebung, explizites kwarg gewinnt.
+        if strict_profiles is None:
+            strict_profiles = str(
+                os.environ.get("LIGHTOS_STRICT_PROFILES", "")
+            ).lower() in ("1", "true", "yes", "on")
+        self._strict_profiles = bool(strict_profiles)
+        self._ambig_warned: set[str] = set()   # 1× WARN pro short_name pro Builder
 
     # ── interne Prüf-Helfer ─────────────────────────────────────────────────────
     def _check(self, value, valid, label):
@@ -92,24 +101,55 @@ class ShowBuilder:
 
     # ── Fixtures / Patch ────────────────────────────────────────────────────────
     def _lookup_profile(self, short_name: str) -> tuple[int, str]:
-        """(id, fixture_type) des Profils per short_name — wirft BuildError, wenn es
-        das Profil nicht gibt (statt eine inerte Fixture zu patchen). fixture_type ist
-        der Bibliotheks-Typ des Profils (Default 'other', wenn nicht gesetzt)."""
+        """(id, fixture_type) des Profils per short_name. ``fixture_type`` ist der
+        Bibliotheks-Typ (Default 'other'). Fehlt das Profil ganz -> BuildError.
+
+        A3D-35: ``FixtureProfile.short_name`` hat KEINE Unique-Constraint — Builtins
+        und Importe (source 'qlcplus'/'user') können denselben short_name tragen. Das
+        frühere ``.first()`` OHNE ``ORDER BY`` lieferte dann einen rowid-abhängigen,
+        stillen Zufalls-Treffer -> mal das falsche Profil (falsche channel_count/
+        fixture_type/DMX-Abbildung). Jetzt wird TOTAL-deterministisch gewählt —
+        ``builtin`` vor Import, dann kleinste ``id`` (PK ist unique -> keine Rest-
+        Ties, reproduzierbar unabhängig von SQLite-Storage/Insert-Reihenfolge) — und
+        bei Mehrdeutigkeit laut gewarnt (bzw. im strict-Modus hart geworfen)."""
         try:
-            from sqlalchemy import select
+            from sqlalchemy import select, case
             from sqlalchemy.orm import Session
             from src.core.database.fixture_db import engine as fdb_engine
             from src.core.database.models import FixtureProfile
             with Session(fdb_engine()) as s:
-                row = s.execute(select(FixtureProfile.id, FixtureProfile.fixture_type)
-                                .where(FixtureProfile.short_name == short_name)).first()
+                rows = s.execute(
+                    select(FixtureProfile.id, FixtureProfile.fixture_type,
+                           FixtureProfile.source)
+                    .where(FixtureProfile.short_name == short_name)
+                    .order_by(
+                        case((FixtureProfile.source == "builtin", 0), else_=1),
+                        FixtureProfile.id.asc(),
+                    )
+                ).all()
         except Exception as exc:
             raise BuildError(f"Fixture-DB nicht lesbar: {exc}")
-        if row is None:
+        # AUSSERHALB des try/except: ein hier (strict) geworfener BuildError darf NICHT
+        # als „Fixture-DB nicht lesbar" fehl-umgewickelt werden.
+        if not rows:
             raise BuildError(
                 f"Fixture-Profil '{short_name}' existiert nicht in der Bibliothek "
                 "(short_name) — App einmal starten (ensure_builtins) oder Profil importieren.")
-        return int(row[0]), (row[1] or "other")
+        if len(rows) > 1:
+            cand = ", ".join(f"id={r[0]}/{r[2] or '?'}" for r in rows)
+            msg = (
+                f"short_name '{short_name}' ist in der Fixture-Bibliothek MEHRDEUTIG "
+                f"({len(rows)} Profile: {cand}) -> gewaehlt id={rows[0][0]} "
+                f"(source={rows[0][2] or '?'}; Regel: builtin vor Import, dann kleinste id). "
+                f"Zum Aufloesen das gewuenschte Profil eindeutig umbenennen oder Duplikate entfernen."
+            )
+            if self._strict_profiles:
+                raise BuildError(msg)
+            if short_name not in self._ambig_warned:
+                print(f"[showbuilder] WARN: {msg}")
+                self._ambig_warned.add(short_name)
+        chosen = rows[0]
+        return int(chosen[0]), (chosen[1] or "other")
 
     def profile_id(self, short_name: str) -> int:
         """Fixture-Profil-ID per short_name — wirft BuildError, wenn es das Profil

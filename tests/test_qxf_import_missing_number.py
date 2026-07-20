@@ -109,6 +109,57 @@ class MissingNumberDoesNotCollideTest(unittest.TestCase):
         self.assertEqual(by_num[1], "Dimmer")               # explizit gewinnt Kanal 1
         self.assertEqual(by_num[2], "Foo")                  # Number-los -> 2, nicht verdraengend
 
+    def test_empty_number_treated_as_missing(self):
+        # A3D-34: ein LEERES Number-Attribut (Number="") ist morally „keine Angabe".
+        # Frueher lief es in int("") -> ValueError -> der Kanal wurde still GEDROPPT.
+        # Jetzt wird es wie fehlend behandelt -> Pass 2 legt es auf die naechste
+        # freie Nummer (2), der Kanal bleibt also erhalten.
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>TestCo</Manufacturer>
+ <Model>EmptyNumberSpider</Model>
+ <Type>Moving Head</Type>
+ <Channel Name="Red" Preset="IntensityRed"/>
+ <Channel Name="Green" Preset="IntensityGreen"/>
+ <Mode Name="bank">
+  <Channel Number="0">Red</Channel>
+  <Channel Number="">Green</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+        chs = self._import(xml)
+        by_num = {n: name for (n, name, _) in chs}
+        numbers = [n for (n, _, _) in chs]
+        self.assertEqual(len(chs), 2, f"leerer Number-Kanal wurde gedroppt: {chs}")
+        self.assertEqual(len(numbers), len(set(numbers)))   # keine Kollision
+        self.assertEqual(by_num[1], "Red")                  # explizit bleibt Kanal 1
+        self.assertEqual(by_num[2], "Green")                # leer -> naechste frei (2)
+
+    def test_negative_number_rejected(self):
+        # A3D-34: eine negative Number (Number="-1" -> int("-1")+1 == 0, "-2" -> -1)
+        # ergaebe eine ungueltige channel_number <= 0 und rutschte frueher still
+        # durch. Jetzt wird der Kanal sichtbar verworfen; NIE eine Nummer <= 0
+        # gepatcht. Der legitime Kanal 1 bleibt erhalten.
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>TestCo</Manufacturer>
+ <Model>NegativeNumberSpider</Model>
+ <Type>Moving Head</Type>
+ <Channel Name="Red" Preset="IntensityRed"/>
+ <Channel Name="Green" Preset="IntensityGreen"/>
+ <Mode Name="bank">
+  <Channel Number="0">Red</Channel>
+  <Channel Number="-1">Green</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+        chs = self._import(xml)
+        numbers = [n for (n, _, _) in chs]
+        self.assertTrue(all(n >= 1 for n in numbers),
+                        f"channel_number <= 0 gepatcht: {chs}")
+        # der negative Kanal wird verworfen -> nur der legitime Kanal 1 bleibt
+        self.assertEqual(numbers, [1], f"negativer Kanal nicht verworfen: {chs}")
+
 
 if __name__ == "__main__":
     unittest.main()
