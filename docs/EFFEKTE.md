@@ -232,7 +232,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 | **Beat-Color-Chase** | Farb-Szenen → **+ Chaser**, Trigger = Beat, Beats/Step = 1, BPM per TAP |
 | **Langsamer Build-up** | **+ Chaser**, Trigger = Timer, Speed langsam → im Drop Speed hochziehen |
 | **LED-Bar-Lauf** | Programmer → Tab Matrix → Spalten = Geräte, Reihen = 1, „Auto-Zuweisung aus Patch" |
-| **Drop (alles auf einmal)** | **+ Collection** aus EFX + Matrix + Strobe-Szene |
+| **Drop (alles auf einmal)** | EFX + Matrix + Strobe-Szene **gemeinsam starten** — z. B. ein VC-Button mit **Mehrfach-Aktion** (mehrere Funktionen auf einen Druck). *(Der Funktionstyp „Collection" existiert in der Engine, hat aber keinen sichtbaren „+"-Button — siehe Abschnitt 5.)* |
 | **Auto-Sync zur Musik** | Audio Input starten → BPM kommt automatisch → Beat-Chaser laufen mit |
 
 ---
