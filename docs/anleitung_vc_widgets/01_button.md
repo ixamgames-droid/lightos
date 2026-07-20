@@ -86,6 +86,9 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Alles stoppen | Stoppt alle Executors/Playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) | Stoppt alle laufenden Effekt-Funktionen; Tempo/BPM bleiben unverändert (Pause/Effekt-Stop) |
 | Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) |
+| Laser scharf/unscharf | Schaltet den Netzwerk-Laser-Ausgang scharf/unscharf (unscharf = Ausgabe geblankt) — LAS-10 |
+| Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen |
+| Laser-Muster abrufen | Ruft ein gespeichertes Laser-Muster (Muster-Palette) ab — LAS-18 |
 | Alles Weiß (gehalten) | Blitzt die gebundene (hochpriore) Weiß-Szene, solange gedrückt; beim Loslassen zurück |
 | Freeze (BPM einfrieren) | Friert das Tempo ein — alle Buses + globaler Leader auf 0 (Toggle); bus-gekoppelte Effekte halten ihre Position |
 | Auto-Sync an/aus | Schaltet Auto-Sync um: neu startende bus-gekoppelte Effekte starten phasengleich am gemeinsamen Beat-Raster |
