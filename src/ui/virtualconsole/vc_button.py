@@ -943,6 +943,12 @@ class VCButton(VCWidget):
             elif t == "blackout":
                 state.output_manager.set_blackout(mode != "off")
             elif t == "stop_all":
+                # NUR Executor-Cuestacks (Label „Alle Executors stoppen") — BEWUSST
+                # NICHT das Panik-Superset. Als komponierbarer Baustein (z. B. „Master-
+                # Look": Szene per Primäraktion starten + Cuelists leeren) müssen die
+                # per Button gestarteten Funktionen weiterlaufen. Das Superset ist der
+                # PANIK-Knopf (ButtonAction.STOP_ALL) + cmdline `stop`, nicht dieser
+                # Baustein. (Review-Fund: sonst kill der Extra die eigene Primär-Szene.)
                 state.playback_engine.stop_all()
             elif t == "clear":
                 state.clear_programmer()
@@ -992,8 +998,20 @@ class VCButton(VCWidget):
             return
 
         if self.action == ButtonAction.STOP_ALL:
+            # STOP ALL = echter Panik-Knopf: BEIDE Laufwerke stoppen — die Playback-
+            # Cuestacks (Executor) UND die FunctionManager-Funktionen (VC-getriggerte
+            # Szenen/EFX/Programmer-Matrizen, die in FunctionManager._running_ids leben).
+            # Frueher lief nur `playback_engine.stop_all()` (nur Cuestacks) → getoggelte
+            # Szenen/Matrizen liefen weiter (Banner „Aktiver Effekt" + DMX blieben, bis
+            # die Show neu geladen wurde). STOP_EFFECTS macht nur die FM-Hälfte;
+            # STOP_ALL ist jetzt das Superset. (Der Programmer bleibt bewusst unberührt —
+            # das ist CLEARs Aufgabe, kein Panik-Datenverlust.)
             if press:
                 state.playback_engine.stop_all()
+                try:
+                    state.function_manager.stop_all()
+                except Exception:
+                    pass
             return
 
         if self.action == ButtonAction.STOP_EFFECTS:

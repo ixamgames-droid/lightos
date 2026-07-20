@@ -179,7 +179,13 @@ class StopCommand(Command):
             if pe is None:
                 return CommandResult(False, "Kein Playback")
             if self.slot is None:
+                # „Stop All" = Panik-Superset (wie der STOP_ALL-Button): Cuestacks UND
+                # FunctionManager-Funktionen (getoggelte Szenen/EFX/Programmer-Matrizen).
                 pe.stop_all()
+                try:
+                    state.function_manager.stop_all()
+                except Exception:
+                    pass
                 return CommandResult(True, "Stop All")
             if self.slot < 1:   # 1-basiert; 0 waere Negativindex (letzter Executor)
                 return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")

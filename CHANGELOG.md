@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-21 — „STOP ALL" ist jetzt ein echter Panik-Knopf (stoppt auch VC-Szenen/Matrizen)
+
+#### Behoben
+
+- **„STOP ALL" (VC-Button, Toolbar-Knopf und cmdline `stop`) stoppt jetzt AUCH FunctionManager-Funktionen — nicht mehr nur Playback-Cuestacks.** Bisher rief `STOP_ALL` nur `playback_engine.stop_all()` (Executor-Cuestacks/Chaser); **VC-getriggerte Szenen, EFX und im Programmer gestartete RGB-Matrizen** (die in `FunctionManager._running_ids` leben) liefen einfach WEITER — der Banner „Aktiver Effekt" blieb stehen und DMX floss weiter, bis man die Show neu lud. Der Panik-Knopf war also keiner (live beim Hardware-Test aufgefallen: „STOP ALL gedrückt, Licht blieb an"). **Fix:** `STOP ALL` ist jetzt das **Superset** — nach `playback_engine.stop_all()` wird zusätzlich `function_manager.stop_all()` gerufen (genau der Call, den der „Effekte stoppen (Tempo bleibt)"-Button `STOP_EFFECTS` schon nutzt), an **allen vier** Aufrufstellen (VC-Button-Primäraktion, Multi-Action-Liste, Toolbar-`_stop_all`, cmdline-`StopCommand`). Der **Programmer bleibt bewusst unberührt** (manuelle Farben/Snaps/Snapshots — das ist `CLEAR`s Aufgabe, kein überraschender Panik-Datenverlust); Blackout/Laser-NOT-AUS bleiben ebenfalls eigene Knöpfe. Regressionstests `tests/test_stop_all_stops_functions.py` (VC-Button, Multi-Action, cmdline + `STOP_EFFECTS`-Gegenprobe; verifiziert diskriminierend gegen den alten Codepfad).
+
 ### 2026-07-20 — Fixture-DB-Robustheit: QXF-Import-Kanalnummern + eindeutiger Profil-Lookup (A3D-34, A3D-35)
 
 #### Behoben
