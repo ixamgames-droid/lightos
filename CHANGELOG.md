@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-20 — EURON10-Fog: Lüfter folgt nach dem fan-Split wieder alten Shows (CDX-18)
+
+#### Behoben
+
+- **Der Lüfter einer Eurolite N-10 Nebelmaschine (EURON10, 2-Kanal-Modus) bleibt nicht mehr aus, wenn eine vor dem `fan`-Split (CDX-07) gespeicherte Show geladen wird.** Vor dem Split waren beide Kanäle `dimmer`; der Programmer deduplizierte sie zu einem Regler, sodass der Lüfter den Nebelwert still spiegelte. Nach dem Split (Kanal 2 = `fan`) enthielten die davor aufgezeichneten, attr-gekeyten Playback-Daten nur `dimmer` → `fan` blieb auf Default 0 (Lüfter aus). **Fix (Entwurf via 3-Agent-Design-Debatte):** `load_show` zieht `fan=dimmer` **einmalig** nach — pro Playback-Container **inline direkt am jeweiligen Ladepunkt** (kritisch: Programmer VOR `_flush_all_to_dmx`, base_levels VOR `_rebuild_render_plan`, sonst zeigte der Lüfter unmittelbar nach dem Laden weiter 0). Abgedeckt sind alle 7 attr-gekeyten Container: Programmer, base_levels, `Palette.fixture_values` (nie die generischen `values`), Cue-Werte, Sequence-Schritte (str-fid), Snaps und die rohen Snapshot-Dicts. **Streng gegatet** auf das Builtin-EURON10 (`short_name=='EURON10'` + `source=='builtin'` + `channel_count==2` + Kanalform `[dimmer,fan]`) — ein Custom-Fixture mit echtem, unabhängigem Lüfter-Kanal wird nie getroffen. **Nie überschreibend:** ein bereits gesetztes `fan` (auch 0) gilt als bewusst editiert. Self-healing (der nächste Save persistiert die reparierten Werte), kein `SHOW_VERSION`-Bump. Scene/Chaser/EFX/Executor sind kanal-/referenzbasiert bzw. live-berechnet und daher immun. Regressionstests in `tests/test_cdx18_euron10_fan_migration.py` (alle 7 Container + DMX-Timing-Beweis + Kontrollen fan-schon-gesetzt/Nicht-EURON10 + Idempotenz).
+
 ### 2026-07-20 — Patch-Loader gegen geteilte `current_show.db` gehärtet (STAB-CURSHOW b)
 
 #### Behoben
