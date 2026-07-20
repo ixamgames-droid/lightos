@@ -16,6 +16,8 @@ ENV/
 # Show-Datenbank, MIDI-Mappings, Channel-Modifier - alles user-spezifisch
 data/*.db
 data/*.db-journal
+data/*.db-wal
+data/*.db-shm
 data/*.json
 
 # Eigene Shows (user-spezifisch, nicht versioniert)
