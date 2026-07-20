@@ -297,6 +297,31 @@ class BPMManager:
         self._emit_bpm_change()
         self._emit_state_change()
 
+    def turn_off(self):
+        """A3D-17b: manuelles „0/aus" aus dem BPM-Dialog. Ueberstimmt ALLE Live-
+        Quellen und flippt in MANUAL, damit die naechste AUTO-Quelle (Audio-
+        Detektor, OS2L, Timeline, File, TempoBus) ``_bpm`` NICHT wieder setzt
+        ('springt nicht mehr zurueck'). Der Audio-Sync wird mit abgeschaltet
+        (die Views ziehen ueber ``audio_active`` nach).
+
+        Unterschied zu ``reset()``: ``reset()`` ist der Low-Level-Clean-Slate,
+        der den MODUS bewusst LAESST (u. a. fuer Test-Setup, das danach AUTO
+        erwartet). ``turn_off()`` ist die bewusste User-'aus'-Aktion und bleibt
+        aus bis zur naechsten expliziten User-Aktion (symmetrisch zu
+        ``set_manual_bpm(>0)``, das ebenfalls in MANUAL kippt)."""
+        # A3D-17b-Race-Fix (Review): MANUAL ZUERST unter Lock — schliesst das
+        # AUTO-Fenster in request_bpm (214) + _apply_detected_bpm (463) SOFORT.
+        # Sonst koennte eine bereits im Audio-Thread laufende, verspaetete
+        # _on_audio_beat-Invocation (unsubscribe in use_audio_source ist ungelockt,
+        # process_chunk snapshottet die Callback-Liste) im Fenster NACH reset _bpm
+        # wieder setzen und via _sync_emitter (bpm>0, audio_active=False) einen
+        # Phantom-Timer neustarten. DANACH erst clean-slaten + Quelle abklemmen.
+        with self._lock:
+            self._mode = BpmMode.MANUAL
+        self.reset()                   # nullt _bpm/_source/taps + stoppt Timer + emits
+        self.use_audio_source(False)   # Audio-Sync abschalten (bpm=0 -> kein Timer-Restart)
+        self._emit_state_change()
+
     # ── Subscriber ───────────────────────────────────────────────────────────────
 
     def subscribe_beat(self, cb: BeatCallback):
