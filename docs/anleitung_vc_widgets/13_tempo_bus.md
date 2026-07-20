@@ -41,6 +41,7 @@ Im Bearbeiten-Modus verhält sich das Element wie jedes andere VC-Widget: auswä
 | --- | --- | --- |
 | Beschriftung | Text in der Kopfzeile des Widgets (wird in Großbuchstaben gezeigt). | Freitext. Leer eingegeben bleibt die bisherige Beschriftung erhalten. |
 | Buses | Liste der Bus-IDs, die als Chips erscheinen — in dieser Reihenfolge und Anzahl. | Komma-getrennte Liste, z. B. `A, B, C, D`. Semikolon `;` wird ebenfalls als Trenner akzeptiert; Leerzeichen um die Einträge werden entfernt; leere Einträge fallen weg. Wird keine gültige ID eingegeben, bleibt die bisherige Liste bestehen. Jede ID ist ein freier Bus-Name (nicht auf A–D beschränkt). |
+| Effekt-IDs (leer = global) | Koppelt das Widget optional an bestimmte Effekte. **Leer** = das Widget wirkt **global** (schaltet den aktiven Bus für alle Tempo-Widgets/Effekte mit leerem Bus-Ziel scharf). Sind Effekt-IDs eingetragen, bindet das Widget gezielt diese Effekte an den gewählten Bus. | Komma-getrennte Effekt-/Funktions-IDs (Zahlen), z. B. `6, 8`. Leer lassen für den Normalfall (global). |
 
 Die Chip-Anzahl und -Breite ergeben sich direkt aus dieser Liste: zwei IDs ergeben zwei breite Chips, sechs IDs sechs schmale.
 
