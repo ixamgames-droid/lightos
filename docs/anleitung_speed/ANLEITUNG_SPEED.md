@@ -88,9 +88,9 @@ Effekte einfach **auf den Speed-Dial ziehen**:
 
   ![Konflikt-Karte „Regler ist schon belegt"](img/04_konflikt_karte.png)
 
-Im Dialog **„Speed Dial Einstellungen"** lässt sich unter **„Gekoppelte
-Effekte"** je Effekt wählen, **welcher Parameter** gesteuert wird (wie die
-„Funktionen"-Tabelle in QLC+).
+Im Dialog **„Speed Dial Einstellungen"** lässt sich in der **„Steuert"**-Liste je
+gekoppeltem Effekt wählen, **welcher Parameter** gesteuert wird (je Zeile eine
+eigene Parameter-Auswahl — wie die „Funktionen"-Tabelle in QLC+).
 
 ---
 

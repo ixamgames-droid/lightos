@@ -14,17 +14,16 @@ Oben in der Toolbar **Virtual Console** wählen. Anfangs ist der Canvas leer (Ra
 ![Leere VC](img/01_vc_leer.png)
 
 Klick oben links auf **Bearbeiten** (Schalter wird grün, Beschriftung „Bearbeiten ✓"). Jetzt erscheinen
-die Widget-Werkzeugleiste und das Raster zum Platzieren. Die Werkzeugleiste hat **15 Schnell-Anlegen-
+die Widget-Werkzeugleiste und das Raster zum Platzieren. Die Werkzeugleiste hat **16 Schnell-Anlegen-
 Knöpfe** für je einen Widget-Typ:
 
-**Button**, **Fader**, **XY Pad**, **Cue List**, **SpeedDial**, **Encoder**, **Farbe**,
-**Chase-Liste**, **Chase Builder**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**,
-**Tempo-Bus**.
+**Button**, **Fader**, **XY Pad**, **Cueliste**, **SpeedDial**, **Encoder**, **Farbe**,
+**Chase-Liste**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**, **Tempo-Bus**,
+**Tempo-Controller**, **Live-Edit**.
 
-Daneben liegen **drei grüne Baukasten-Knöpfe**, die fertige Element-Gruppen einsetzen:
-**⌗ Controller** (Controller-Vorlage), **🎨 Color-Chase** (Color-Chase-Baukasten — *kein* einzelnes
-Widget, sondern ein kompletter Farb-Chase-Aufbau) und **🟦 Chase-Bereich**. Rechts daneben **↶ / ↷**
-(Rückgängig/Wiederholen, Strg+Z / Strg+Y).
+Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Fertige Vorlagen — etwa eine
+**Controller-Vorlage** für ein komplettes APC-mini-Layout — lassen sich zusätzlich über die Funktion
+**„Controller-Vorlage einfügen"** einsetzen (siehe *APC mini mappen*).
 
 ![Bearbeiten-Modus](img/02_bearbeiten_modus.png)
 

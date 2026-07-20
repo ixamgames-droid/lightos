@@ -32,12 +32,12 @@ bzw. eine **Color Sequence**; manche (z. B. **Rainbow**) nutzen **keine** Farbfe
 ihre Farben selbst — dort blendet der Editor die Farbauswahl aus.
 
 > **Hinweis:** „Komet" und „Ripple" sind **keine eigenen Algorithmen mehr** — ein Komet ist
-> jetzt ein **Chase** mit Schweif (siehe „After Fade"), ein Ripple ist eine **Wave** mit
+> jetzt ein **Chase** mit Schweif (Regler „Schweif (%)"), ein Ripple ist eine **Wave** mit
 > Ursprung *radial*. Alte Shows mit diesen Namen laden weiterhin (Legacy-Migration).
 
 - **„Farbe pro Runde wechseln" (color_cycle):** schaltet von Einzelfarbe auf eine ganze
   **Farbfolge** (Color Sequence) um — dann läuft z. B. ein Chase Blau→Weiß→Grün.
-- **Läufer-Anzahl / After Fade (in %):** mehr/dichtere Läufer bzw. weicher Übergang hinter dem
+- **Läufer-Anzahl / Schweif (%):** mehr/dichtere Läufer bzw. weicher Übergang hinter dem
   Läufer (0 % = harter Wechsel, 100 % = langer weicher Übergang). Beides nur bei Chase mit
   Bewegung *normal*.
 

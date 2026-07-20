@@ -69,12 +69,15 @@ So laufen z. B. die beiden Hardstyle-MH gegenläufige Kreise: **Verhältnis** = 
 
 ## 4. Tempo & Musik-Sync
 
-- **Geschwindigkeit (Hz)** stellt die Bahn-Rate ein. In der Gruppe *Tempo & Richtung* findest du
-  **Geschwindigkeit (Hz)**, **Richtung** und **Loop** — **aber kein Tempo-Bus-Feld**.
-- Für **musiksynchron** koppelst du den EFX an einen **Tempo-Bus** (Bus = globale BPM) — die
-  Bewegung folgt dann dem Takt. **Diese Kopplung machst du NICHT im EFX-Editor** (dort gibt es kein
-  Tempo-Bus-Feld), sondern über die **Virtuelle Konsole** bzw. die **Tempo-/BPM-Werkzeuge** (siehe
-  *Musik-Sync* / *Dimmer-Matrix* für die Bus-Kopplung).
+- **Geschwindigkeit (Hz)** stellt die Bahn-Rate als festen Wert ein. Die Gruppe *Tempo & Richtung*
+  enthält außerdem **Tempo-Bus**, **Tempo ×**, **Tempo-Versatz**, **Taktgleich starten**,
+  **Richtung** und **Loop**.
+- Für **musiksynchron** stellst du **Tempo-Bus** direkt im EFX-Editor auf **Global (taktgleich,
+  Standard)** — dann folgt die Bewegung der Master-/Musik-BPM und startet mit **Taktgleich starten**
+  auf dem gemeinsamen Beat-Raster. **Tempo ×** läuft relativ dazu (z. B. ×2 = doppelt so schnell),
+  **Tempo-Versatz** verschiebt die Phase; für bewusst freien Lauf **Frei (nicht taktgebunden)**.
+- In der **Virtuellen Konsole** lässt sich die Bus-/Faktor-Umschaltung zusätzlich **live** steuern
+  (SpeedDial / Tempo-Bus-Selektor — siehe *Musik-Sync* / *Dimmer-Matrix*).
 
 ## 5. Starten
 
@@ -87,6 +90,6 @@ Den EFX mit **▶ Start** starten (**■ Stop** daneben). So sieht eine Kreis-Be
 **Kurz:** EFX-Tab → **+ Neu** und Gruppe (Moving Heads) wählen (Reihenfolge egal — der EFX folgt der
 Auswahl live) → Algorithmus (Circle …) + Pan/Tilt-Hub (0–255) + Geschwindigkeit →
 **„Dimmer/Shutter mit öffnen" AN** (sonst dunkel) → Verhältnis der Geräte zueinander (Verhältnis:
-Synchron/Fächer/Versatz, dazu Gegenläufig/Spiegeln) → **▶ Start**. Musik-Sync (Tempo-Bus) **nicht im
-EFX-Editor**, sondern über die Virtuelle Konsole / Tempo-Werkzeuge. Farbe der MH separat über eine
-Farb-Matrix oder den Color-Tab.
+Synchron/Fächer/Versatz, dazu Gegenläufig/Spiegeln) → **▶ Start**. Musik-Sync per **Tempo-Bus**
+direkt im EFX-Editor (Global/Bus A–D + Tempo ×), zusätzlich live über die Virtuelle Konsole. Farbe
+der MH separat über eine Farb-Matrix oder den Color-Tab.

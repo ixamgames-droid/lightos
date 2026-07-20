@@ -19,7 +19,7 @@ Die Beispielkonfiguration ist bereits in `shows/test1234.lshow` eingerichtet:
 | **Fade ein/aus (s)** | Blendet den **gesamten Effekt** beim Starten und Stoppen ein oder aus. |
 | **Color Fade** | Überblendet während des laufenden Effekts weich von einer Farbe zur nächsten. |
 | **Halte-Zeit** | Bestimmt, wie lange eine Farbe stehen bleibt, bevor übergeblendet wird. |
-| **After Fade** | Erzeugt bei einem **Chase** nur einen nachlaufenden Schweif hinter dem Läufer. |
+| **Schweif (%)** | Erzeugt bei einem **Chase** nur einen nachlaufenden Schweif hinter dem Läufer. |
 
 Für einen laufenden Weiß-Rot-Farbverlauf wird daher **Color Fade + Haltezeit**
 verwendet. Der Start-/Stop-Fade ist davon unabhängig.
