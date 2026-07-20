@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-20 — BPM „0/aus" überstimmt laufende Auto-Tempo-Quellen (A3D-17b)
+
+#### Behoben
+
+- **Wenn du im „BPM einstellen"-Dialog `0` = „aus" eingibst, springt der Wert nicht mehr sofort zurück.** Bisher nullte `reset()` nur `_bpm`, ließ aber den Modus auf AUTO → die nächste Nachricht einer laufenden Auto-Quelle (Audio-Detektor, OS2L/VirtualDJ, Timeline, File, TempoBus) setzte `_bpm` sofort wieder. **Entscheidung (David):** „0/aus" soll alle Live-Quellen überstimmen und in MANUAL wechseln. **Fix:** neue `BPMManager.turn_off()` (nur der Dialog ruft sie) flippt in MANUAL — das blockt `request_bpm` und `_apply_detected_bpm` — schaltet den Audio-Sync mit ab und bleibt aus bis zur nächsten expliziten Aktion (symmetrisch zu `set_manual_bpm(>0)`, das ebenfalls MANUAL setzt). `reset()` bleibt bewusst der Low-Level-Clean-Slate, der den Modus lässt (Test-Setup). Der „Drive-BPM"-Haken im Audio-Input-View zieht den Zustand jetzt nach (UI-Thread-sicher im 30-Hz-Refresh). `turn_off()` setzt MANUAL **zuerst** (unter Lock, aus der adversarialen Review), damit eine bereits im Audio-Thread laufende, verspätete Beat-Invocation `_bpm` nicht doch noch setzt und keinen Phantom-Timer startet. Regressionstests `tests/test_a3d17b_bpm_turn_off.py` (inkl. injiziertem in-flight-Beat).
+
 ### 2026-07-20 — `load_show` ist reset-first: kein halb-alter (Frankenstein) Zustand bei Ladefehler (STAB-19b)
 
 #### Behoben

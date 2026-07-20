@@ -341,6 +341,20 @@ class AudioInputView(QWidget):
         else:
             self._lbl_bpm.setText("BPM: --")
 
+        # A3D-17b: den „Drive-BPM"-Haken am Live-Zustand halten — ein manuelles
+        # „0/aus" (turn_off) schaltet den Audio-Sync ab, ohne dass die Checkbox
+        # es bisher mitbekam. UI-Thread-sicher (30-Hz-Timer). Nur bei Abweichung +
+        # blockSignals, damit der Refresh keinen toggled-Slot feuert.
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            _want = bool(get_bpm_manager().audio_active)
+            if self._chk_drive_bpm.isChecked() != _want:
+                self._chk_drive_bpm.blockSignals(True)
+                self._chk_drive_bpm.setChecked(_want)
+                self._chk_drive_bpm.blockSignals(False)
+        except Exception:
+            pass
+
         # Beat-Flash
         if self._beat_flash > 0:
             self._lbl_beat.setStyleSheet(

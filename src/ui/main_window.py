@@ -1270,7 +1270,10 @@ class MainWindow(QMainWindow):
             if val > 0:
                 self._bpm_mgr.set_manual_bpm(val)
             else:
-                self._bpm_mgr.reset()
+                # A3D-17b: „0/aus" ueberstimmt laufende AUTO-Quellen und flippt in
+                # MANUAL (turn_off), sonst setzt die naechste Audio-/OS2L-/Timeline-
+                # Nachricht _bpm sofort wieder ('springt zurueck').
+                self._bpm_mgr.turn_off()
             if val > 0:
                 self._lbl_bpm.setText(f"BPM: {val:.1f}")
                 self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
