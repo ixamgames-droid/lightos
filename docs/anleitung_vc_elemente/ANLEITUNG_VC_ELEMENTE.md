@@ -99,7 +99,14 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
 
 ## Baukasten-Knöpfe (komplette Blöcke)
 
-Drei Knöpfe setzen **nicht** nur ein Einzel-Widget, sondern einen **ganzen Block** inkl.
+> ⚠ **Stand 2026‑07:** Diese drei grünen Baukasten‑Knöpfe wurden aus der VC **entfernt** (weder in der
+> Werkzeugleiste noch im Rechtsklick‑Menü „Hinzufügen"). Einzel‑Widgets legst du über die Palette bzw.
+> „Hinzufügen" an; einen kompletten Effekt‑Aufbau baust du, indem du einen Effekt aus der Bibliothek
+> aufs Raster ziehst (Karte „Effekt einrichten") — siehe [ANLEITUNG_VC.md](../anleitung_vc/ANLEITUNG_VC.md).
+> Eine **Controller‑Vorlage** ist über den Controller‑Browser (Sektion *MIDI*) nutzbar. Die folgende
+> Beschreibung ist historisch.
+
+Drei Knöpfe setzten **nicht** nur ein Einzel-Widget, sondern einen **ganzen Block** inkl.
 eigener Effekt-Funktion:
 
 - **⌗ Controller** — legt ein beschriftetes Pad-/Fader-Raster passend zu einem MIDI-Controller

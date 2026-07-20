@@ -304,13 +304,12 @@ Farb‑Pads + Fadern, gebunden an eine Color‑Fade‑Funktion:
 5. **MIDI:** Allen Elementen per Rechtsklick → *MIDI lernen* eine APC‑Taste/‑Fader
    zuweisen. Auf eine eigene **Bank** legen = eine eigene APC‑Seite.
 
-> Genau so ist **Seite 6** der mitgelieferten Show aufgebaut. **Noch schneller geht
-> es jetzt mit den Editor‑Werkzeugen** in der VC‑Toolbar (im *Bearbeiten*‑Modus):
-> **🎨 Color‑Chase** fügt den kompletten Baustein samt Funktion mit einem Klick ein,
-> **⌗ Controller** baut dein APC‑Layout als beschriftetes Raster nach. Details in
-> [APC_SCHRITT_FUER_SCHRITT.md §12](APC_SCHRITT_FUER_SCHRITT.md#12-eigene-seite-bauen-editor-werkzeuge).
-> **Neu:** Mit **🟦 Chase‑Bereich** ziehst du jetzt direkt auf der Canvas ein
-> Rechteck auf — der Color‑Chase wird passend hineingebaut.
+> Genau so ist **Seite 6** der mitgelieferten Show aufgebaut.
+>
+> ⚠ **Stand 2026‑07:** Die früher hier empfohlenen Editor‑Baukasten‑Knöpfe (🎨 Color‑Chase /
+> ⌗ Controller / 🟦 Chase‑Bereich) gibt es in der VC **nicht mehr**. Den Chase baust du wie oben
+> Schritt für Schritt oder über die aktuelle Widget‑/Effekt‑Erstellung — siehe
+> [anleitung_vc/ANLEITUNG_VC.md](anleitung_vc/ANLEITUNG_VC.md).
 
 ---
 
