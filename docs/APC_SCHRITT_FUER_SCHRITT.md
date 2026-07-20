@@ -173,7 +173,14 @@ willst:
 
 ## 12. Eigene Seite bauen (Editor‑Werkzeuge)
 
-In der Virtual Console gibt es im **Bearbeiten**‑Modus drei Baukästen in der Toolbar:
+> ⚠ **Stand 2026‑07:** Die VC‑Werkzeugleiste wurde überarbeitet — die hier beschriebenen drei grünen
+> Baukasten‑Knöpfe (⌗ Controller / 🎨 Color‑Chase / 🟦 Chase‑Bereich) gibt es so **nicht mehr**. Die
+> aktuelle Widget‑/Effekt‑Erstellung (Effekt aus der Bibliothek aufs Raster ziehen → Karte „Effekt
+> einrichten") steht in **[anleitung_vc/ANLEITUNG_VC.md](anleitung_vc/ANLEITUNG_VC.md)**; eine
+> **Controller‑Vorlage** fügst du über die Funktion „Controller‑Vorlage einfügen" ein. Die folgende
+> Beschreibung ist historisch.
+
+In der Virtual Console gab es im **Bearbeiten**‑Modus drei Baukästen in der Toolbar:
 
 **a) „⌗ Controller" — Controller‑Vorlage einfügen**
 1. **Bearbeiten** aktivieren → Knopf **⌗ Controller**.
