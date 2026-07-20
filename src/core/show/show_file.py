@@ -263,6 +263,91 @@ def _replace_patch_legacy(state, pfs: list):
             print(f"[show_file] add fixture {getattr(pf, 'fid', '?')} failed: {e}")
 
 
+def _euron10_2ch_fids(state) -> set[int]:
+    """CDX-18: fids der gepatchten **EURON10**-Nebelmaschinen im 2-Kanal-Modus
+    (Nebel=``dimmer``, Lüfter=``fan``). Streng gegatet, damit die fan-Split-
+    Kompat NUR dieses eine Builtin-Gerät trifft und NIE ein Custom-Fixture mit
+    echtem, unabhängigem ``fan``-Kanal (``fan`` ist ein generisch wählbares
+    Attribut): Builtin-Profil ``short_name=='EURON10'`` UND ``source=='builtin'``
+    UND ``channel_count==2`` UND die tatsächliche Kanalform ist exakt
+    ``[dimmer, fan]`` (``get_channels_for_patched``). Best-effort: schlägt die
+    Erkennung fehl, wird nichts migriert (kein Crash, kein Load-Abbruch).
+
+    Hinweis: der EURON10-Filter liegt in der WHERE-Klausel, d. h. die EINE
+    Library-DB-Query läuft bei JEDEM gepatchten 2-Kanal-Gerät (nicht nur EURON10),
+    einmal pro ``load_show`` — vernachlässigbar (Load ist kein Hot-Path)."""
+    out: set[int] = set()
+    try:
+        fixtures = [f for f in state.get_patched_fixtures()
+                    if getattr(f, "channel_count", 0) == 2]
+    except Exception:
+        return out
+    if not fixtures:
+        return out
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from src.core.database.fixture_db import engine as _fdb_engine
+        from src.core.database.models import FixtureProfile
+        from src.core.app_state import get_channels_for_patched
+        pids = {getattr(f, "fixture_profile_id", None) for f in fixtures}
+        pids.discard(None)
+        if not pids:
+            return out
+        with Session(_fdb_engine()) as s:
+            euron10_pids = set(s.execute(
+                select(FixtureProfile.id).where(
+                    FixtureProfile.id.in_(pids),
+                    FixtureProfile.short_name == "EURON10",
+                    FixtureProfile.source == "builtin",
+                )
+            ).scalars().all())
+        if not euron10_pids:
+            return out
+        for f in fixtures:
+            if getattr(f, "fixture_profile_id", None) not in euron10_pids:
+                continue
+            try:
+                attrs = [getattr(c, "attribute", None)
+                         for c in get_channels_for_patched(f)]
+                fid_i = int(getattr(f, "fid"))
+            except Exception:
+                # Pro-Fixture isoliert: ein defektes Fixture darf die Erkennung
+                # der nachfolgenden nicht abbrechen (fid-Cast mit im try).
+                continue
+            if attrs == ["dimmer", "fan"]:
+                out.add(fid_i)
+    except Exception as e:
+        print(f"[show_file] EURON10 fan detection failed: {e}")
+    return out
+
+
+def _fill_fan_from_dimmer(attrs, fid_key, euron10_fids: set) -> None:
+    """CDX-18: Vor dem fan-Split (CDX-07) spiegelte der Nebelwert (``dimmer``)
+    still auf den 2. Kanal. In einem attr-gekeyten Playback-Record eines EURON10
+    fehlt daher das (neue) ``fan``-Attribut. Fehlt ``fan`` KOMPLETT, aber
+    ``dimmer`` ist da, ziehe ``fan=dimmer`` EINMAL nach — NUR fuer erkannte
+    EURON10-fids und NIE ueberschreibend (ein bereits vorhandenes ``fan``, auch
+    0, gilt als bewusst editiert). Nimmt int- ODER str-fid-Keys an (Programmer/
+    base_levels/Cue/Palette/Snap = int, Sequence/Snapshot = str)."""
+    if not isinstance(attrs, dict):
+        return
+    try:
+        fid_int = int(fid_key)
+    except (TypeError, ValueError):
+        return
+    if fid_int not in euron10_fids:
+        return
+    if "dimmer" in attrs and "fan" not in attrs:
+        try:
+            # OverflowError mitfangen: int(float('inf')) aus einem rohen, nicht
+            # vorsanitisierten Container-Wert (Cue/Palette/Sequence/Snap/Snapshot)
+            # wirft OverflowError (NICHT ValueError) — analog STAB-18/A3D-19.
+            attrs["fan"] = int(attrs["dimmer"])
+        except (TypeError, ValueError, OverflowError):
+            pass
+
+
 def _collect_fixture_groups(state) -> list:
     """Spatial-Gruppen (FixtureGroup) aus der Show-DB fuer die .lshow sammeln.
     Frueher gingen Gruppen beim Save/Load verloren (nur in current_show.db)."""
@@ -856,6 +941,11 @@ def load_show(path: str | os.PathLike):
     # Spatial-Gruppen wiederherstellen (sonst fehlt die MH-/PAR-Gruppe nach Load).
     _restore_fixture_groups(state, data.get("fixture_groups", []) or [])
 
+    # CDX-18: EURON10-2-Kanal-fids EINMAL bestimmen (nach dem Patch, daher fid->
+    # Profil verfuegbar) fuer die fan-Split-Kompat, die unten pro Playback-Container
+    # inline laeuft — jeweils VOR dessen nachgelagertem Flush/Rebuild/Verbraucher.
+    _euron10_fids = _euron10_2ch_fids(state)
+
     try:
         programmer = data.get("programmer", {}) or {}
         cleaned = {}
@@ -879,6 +969,9 @@ def load_show(path: str | os.PathLike):
                     vals[str(a)] = int(v)
                 except (TypeError, ValueError, OverflowError):
                     continue
+            # CDX-18: fan<-dimmer VOR dem gleich folgenden _flush_all_to_dmx(),
+            # sonst zeigte der Luefter unmittelbar nach dem Laden weiter 0.
+            _fill_fan_from_dimmer(vals, fid, _euron10_fids)
             cleaned[fid] = vals
         state.programmer = cleaned
         state._flush_all_to_dmx()
@@ -907,6 +1000,9 @@ def load_show(path: str | os.PathLike):
                     clean[str(a)] = int(v)
                 except (TypeError, ValueError, OverflowError):
                     continue
+            # CDX-18: fan<-dimmer VOR dem gleich folgenden _rebuild_render_plan(),
+            # sonst faehrt der Default-Frame den Luefter dauerhaft auf 0.
+            _fill_fan_from_dimmer(clean, fid, _euron10_fids)
             parsed[fid] = clean
         state.base_levels = parsed
         state.implicit_brightness = bool(data.get("implicit_brightness", True))
@@ -937,6 +1033,17 @@ def load_show(path: str | os.PathLike):
             pm.from_dict({})
         except Exception as e:
             _lenient("reset palettes (kein Key) error", e)
+
+    # CDX-18: fan<-dimmer NUR in den per-Fixture-Overrides (Palette.fixture_values);
+    # die generische Palette.values hat keinen Fixture-Bezug und darf NICHT (sonst
+    # bekaeme jedes Gerät, das die Palette nutzt, faelschlich einen fan-Kanal).
+    if _euron10_fids:
+        try:
+            for _p in pm.get_all():
+                for _fid, _attrs in (getattr(_p, "fixture_values", {}) or {}).items():
+                    _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+        except Exception as e:
+            print(f"[show_file] EURON10 fan palette migration failed: {e}")
 
     try:
         from src.core.engine.curve_library import get_curve_library
@@ -988,6 +1095,16 @@ def load_show(path: str | os.PathLike):
     except Exception as e:
         _lenient("load cue stacks error", e)
 
+    # CDX-18: fan<-dimmer in allen Cue-Werten der gerade geladenen Cuelisten.
+    if _euron10_fids:
+        try:
+            for _stk in state.cue_stacks:
+                for _cue in (getattr(_stk, "cues", []) or []):
+                    for _fid, _attrs in (getattr(_cue, "values", {}) or {}).items():
+                        _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+        except Exception as e:
+            print(f"[show_file] EURON10 fan cue migration failed: {e}")
+
     # Executor-/Page-Bindung wiederherstellen (nach den cue_stacks, da die
     # Stack-Referenzen als Index in cue_stacks abgelegt sind). Wird auch bei
     # fehlendem "executors"-Key aufgerufen → setzt stale Bindungen zurueck.
@@ -1008,6 +1125,20 @@ def load_show(path: str | os.PathLike):
     except Exception as e:
         _lenient("load function manager error", e)
 
+    # CDX-18: fan<-dimmer in allen Sequence-Schritt-Werten (SequenceStep.values
+    # nutzt STRING-fid-Keys — _fill_fan_from_dimmer normalisiert via int()).
+    if _euron10_fids:
+        try:
+            from src.core.engine.function import FunctionType as _FT
+            _fm = getattr(state, "function_manager", None)
+            if _fm is not None:
+                for _seq in _fm.by_type(_FT.Sequence):
+                    for _step in (getattr(_seq, "steps", []) or []):
+                        for _fid, _attrs in (getattr(_step, "values", {}) or {}).items():
+                            _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+        except Exception as e:
+            print(f"[show_file] EURON10 fan sequence migration failed: {e}")
+
     # Snap-Bibliothek pro Show. Hat die Show einen "library"-Block, ist er
     # maßgeblich. Alt-Shows ohne Block erben einmalig die globalen Snap-Dateien.
     try:
@@ -1019,6 +1150,16 @@ def load_show(path: str | os.PathLike):
             lib.migrate_from_disk(replace=True)
     except Exception as e:
         _lenient("load snap library error", e)
+
+    # CDX-18: fan<-dimmer in allen Snap-Werten der Show-Snap-Bibliothek.
+    if _euron10_fids:
+        try:
+            from src.core.engine.snap_library import get_snap_library as _gsl
+            for _snap in _gsl().snaps():
+                for _fid, _attrs in (getattr(_snap, "values", {}) or {}).items():
+                    _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+        except Exception as e:
+            print(f"[show_file] EURON10 fan snap migration failed: {e}")
 
     # Abwaertskompatibilitaet: Alt-Shows speicherten EFX/RGB-Matrix in separaten
     # Bloecken (nicht als Funktionen). Diese werden hier einmalig in echte
@@ -1054,7 +1195,20 @@ def load_show(path: str | os.PathLike):
 
     # Snapshots pro Show: Rohdaten ablegen, die SnapshotsView spielt sie im
     # show_loaded-Handler des Hauptfensters zurück (UI-Thread).
-    state._snapshots_data = data.get("snapshots", []) or []
+    _snaps_raw = data.get("snapshots", []) or []
+    # CDX-18: fan<-dimmer direkt auf den ROHEN Snapshot-Dicts — zum load_show-
+    # Zeitpunkt existieren noch KEINE Snapshot-Objekte (sie entstehen erst im
+    # UI-Thread), daher hier auf entry["values"][fid_str][attr] (str-fid).
+    if _euron10_fids:
+        try:
+            for _entry in _snaps_raw:
+                _vals = _entry.get("values") if isinstance(_entry, dict) else None
+                if isinstance(_vals, dict):
+                    for _fid, _attrs in _vals.items():
+                        _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+        except Exception as e:
+            print(f"[show_file] EURON10 fan snapshot migration failed: {e}")
+    state._snapshots_data = _snaps_raw
     # SDK-02: Kanal-Gruppen pro Show (ChannelGroupsView spielt sie zurück).
     state._channel_groups_data = data.get("channel_groups", []) or []
 
