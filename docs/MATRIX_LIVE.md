@@ -38,7 +38,7 @@ was ausgegeben wird.
 
 ---
 
-## 2. Algorithmen-Katalog (17)
+## 2. Algorithmen-Katalog (18)
 
 Bewusst konservativ konsolidiert: reine Richtungs-/Bewegungs-Varianten sind
 **Parameter** eines Grundalgorithmus; eigenständige Texturen bleiben getrennt.
@@ -57,6 +57,7 @@ Bewusst konservativ konsolidiert: reine Richtungs-/Bewegungs-Varianten sind
 | **Random** | Zufalls-Effekt (nur echte Fixtures) | `mode` (color/dimmer/strobe/flash/sparkle/pulse), `count`, `rate`, `scope` (all/row/col), `no_repeat`, `strobe_rate` | 3 |
 | **ColorFade** | Crossfade durch die Sequence (deaktivierte Farben übersprungen) | `hold`, `pingpong` | 3 |
 | **Strobe** | ganzes Feld blitzt | – | 1 |
+| **Schachbrett** | benachbarte Zellen abwechselnd Farbe A/B (rot-blau / rot-aus) | `tile`, `blink` (pro Beat umschalten) | 2 |
 
 ### Texturen (eigenständig)
 
