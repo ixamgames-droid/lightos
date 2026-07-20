@@ -1165,6 +1165,12 @@ class MainWindow(QMainWindow):
             # anderen Pages liefen trotz STOP ALL weiter (sicherheitsrelevant).
             # Die korrekte Multi-Page-Logik liegt bereits in PlaybackEngine.stop_all().
             pe.stop_all()
+        # Panik-Superset: auch die FunctionManager-Funktionen (VC-getriggerte Szenen/
+        # EFX/Programmer-Matrizen) stoppen — nur `pe.stop_all()` liess die weiterlaufen.
+        try:
+            self._state.function_manager.stop_all()
+        except Exception:
+            pass
 
     # ── Undo/Redo ─────────────────────────────────────────────────────────────
 
