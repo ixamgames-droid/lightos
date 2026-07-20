@@ -55,11 +55,17 @@ Gradient, Color-Fade, Chase, Fill, Strobe, Zufall. FX-Speed/FX-Master/PAR-Dim.
 
 ![Bank 3 — Builder](images/neue_demo_3_builder.png)
 
-- **Links:** Chase-Builder-Fenster — Farb-Palette antippen = an die Chase-Liste
-  anhängen, mit Start/Clear/C−/C+/Richtung/Freeze/Commit + Speed/Hold.
-- **Rechts:** Matrix-Builder — Start + **Form ±** blättert durch *alle*
-  Algorithmen, C1-Farben (Rot/Grün/Blau) und Sequenz-Farben live setzen, Commit
-  übernimmt. Rechts die Farb-Sequenz-Liste (VCColorList).
+- **Matrix-Builder-Pads:** **Matrix-Builder** (Start) + **Form −/+** blättert
+  durch *alle* RGB-Algorithmen; **Richtung**, **Freeze** und **Commit**
+  (übernimmt den Look). Darunter **C1-Farben** (Rot/Grün/Blau) und
+  **Sequenz-Farben** (Seq Rot/Grün/Blau) live setzen.
+- **Rechts:** die Farb-Sequenz-Liste **„Matrix-Farben"** (VCColorList) zeigt das
+  aktuelle Sequenz-Ziel. Unten die Track-Fader (MB-Speed/MB-Master, Dimmer/
+  Speed/Master) + Clear/Stop All/Blackout/Tap.
+
+> Hinweis: Das frühere **Chase-Builder-Fenster** links gibt es nicht mehr
+> (Widget entfernt 2026-07); Live-Color-Chase läuft heute über das
+> Live-Edit-Panel bzw. die Matrix-Builder-Pads oben.
 
 ### Bank 4 — MOVING HEADS
 
