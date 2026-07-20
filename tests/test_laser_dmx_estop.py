@@ -159,5 +159,23 @@ class LaserDmxEstopTest(unittest.TestCase):
         self.assertTrue(self.st.laser_estop_active)               # aber NOT-AUS bleibt
 
 
+    def test_intensity_on_laser_keeps_latch(self):
+        # CDX-13 (Safety, David-Entscheidung): `intensity` ist BEWUSST NICHT in der
+        # Rearm-Whitelist. Ein FB4-Laser (Helligkeit = intensity) wird per
+        # Helligkeitsregler NICHT wieder scharf — sonst löste ein Szenen-/Snapshot-/
+        # Palette-Apply mit Laser-intensity>0 (über set_programmer_value) den NOT-AUS
+        # ungewollt. Wieder-Scharfschalten läuft bewusst über gobo_wheel (FB4-„Cue").
+        self.st.set_laser_estop(True)
+        self.st.set_programmer_value(7, "intensity", 255)      # Laser-fid, intensity
+        self.assertTrue(self.st.laser_estop_active,
+                        "intensity löste den Laser-NOT-AUS (Safety-Regression)")
+        self.st.set_programmer_value(7, "intensity#1", 255)    # Kopf>0-Variante ebenso
+        self.assertTrue(self.st.laser_estop_active)
+        # Gegenprobe: der bewusste Rearm-Pfad (gobo_wheel = FB4-Cue) löst weiterhin.
+        self.st.set_programmer_value(7, "gobo_wheel", 60)
+        self.assertFalse(self.st.laser_estop_active,
+                         "gobo_wheel-Rearm (FB4-Cue) funktioniert nicht mehr")
+
+
 if __name__ == "__main__":
     unittest.main()
