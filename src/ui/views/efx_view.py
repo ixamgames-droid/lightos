@@ -446,7 +446,7 @@ class SpiderEfxPreview(QWidget):
         try:
             hs = max(0.0, float(getattr(e, "head_spread", 1.0)))
             if e.algorithm == EfxAlgorithm.RANDOM:
-                # RANDOM-Walk wie EfxInstance._values/_spider_head_tilts: Tilt aus der
+                # RANDOM-Walk wie EfxInstance._values/_head_pan_tilts: Tilt aus der
                 # y-Komponente; Kopf 1 (k=1) um 1*1.7*head_spread versetzt, Gegenlauf
                 # kehrt ihn um (Befund [18]). cy = Figur-Zentrum (y_offset).
                 counter = bool(getattr(e, "counter_rotate", False))
@@ -459,7 +459,7 @@ class SpiderEfxPreview(QWidget):
             else:
                 _p0, t0 = e._calc(self._phase)
                 # 2-Bar-Vorschau: Kopf 1 liegt bei k/N = 1/2, also 0.5*head_spread
-                # versetzt — exakt wie EfxInstance._spider_head_tilts es fuer
+                # versetzt — exakt wie EfxInstance._head_pan_tilts es fuer
                 # head_count=2 berechnet (Vorschau spiegelt den Render).
                 _p1, t1 = e._calc((self._phase + 0.5 * hs) % 1.0)
         except Exception:
