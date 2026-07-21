@@ -58,8 +58,8 @@ passiert automatisch:
 
 ## 4. Tempo / BPM folgt der Musik
 
-- In der **BPM**-Sektion (Strg+8) unter **Einstellungen** den Modus **AUTO (Audio)** + Quelle
-  **PC-Audio (Player/Spotify)** wählen — dann erkennt LightOS das Tempo aus der laufenden Musik
+- In der **BPM**-Sektion (Strg+8) unter **Einstellungen** bei **BPM-Quelle** „Live-Audio" und als **Audio-Eingang**
+  **PC-Audio (Player/Spotify)** wählen — dann erkennt LightOS das Tempo aus der laufenden Musik (den Modus setzt LightOS dabei automatisch auf AUTO)
   (im **Monitor** oben springt die große **BPM-Zahl** mit, z. B. ~150 BPM bei Hardstyle).
 - Am **taktgenausten** läuft es über **OS2L (VirtualDJ)**: als Quelle **OS2L (VirtualDJ)** wählen
   und in VirtualDJ den OS2L-Versand aktivieren (in LightOS Menü *Ausgabe → OS2L-Server (Port 1234)*
@@ -83,6 +83,6 @@ So steuerst du Wiedergabe und Tempo komplett aus der VC (und per APC mini, s. *A
 
 **Kurz:** Playlist laden → globalen Schalter „Lichtshow automatisch zur Musik starten" setzen
 (und/oder pro Lied über „Auto-Show für Lied…" Funktionen zuweisen) → **Play** startet Musik **und**
-Show automatisch → BPM-Sektion auf **AUTO / PC-Audio (Player/Spotify)** (oder **OS2L (VirtualDJ)** für
+Show automatisch → BPM-Sektion auf **BPM-Quelle „Live-Audio" / Audio-Eingang PC-Audio (Player/Spotify)** (oder **OS2L (VirtualDJ)** für
 exakten Takt) → die Effekte folgen taktgenau der Musik. Bedienung über die (show-spezifischen)
 VC-Bänke *Strobe/Musik* + *Tempo/BPM* (optional APC mini).

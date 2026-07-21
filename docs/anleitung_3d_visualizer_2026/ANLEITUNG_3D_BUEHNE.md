@@ -58,8 +58,8 @@ Status: `[ ]` = nicht in Szene, `[X]` = platziert.
    - **Oben auf die Trasse (top-mount):** `Y` knapp über die Trasse (z. B. `Y=6.5`).
    - **Seitlich:** an eine vertikale Stütze setzen (Stützen-`X`/`Z`, mittlere `Y`) und
      mit **Drehen (Hochachse Y)** zur Seite ausrichten.
-   > **Falle (BACKLOG VIZ-FIX-DECIMAL):** Das Positionsfeld erwartet deutsches Dezimal —
-   > „5.7" wird als 5 gelesen. Ganzzahlen oder Komma verwenden.
+   > **Hinweis (Fix VIZ-FIX-DECIMAL erledigt):** Die Positions-/Ausrichtungsfelder akzeptieren
+   > Punkt UND Komma — „5.7" und „5,7" werden beide korrekt als 5,7 übernommen.
 3. **Ausrichten:** **Drehen (Hochachse Y)** / **Kippen (auf/ab X)** / **Roll (seitlich Z)**
    je Fixture; Moving Heads folgen zusätzlich ihren Pan/Tilt-DMX-Werten live.
 

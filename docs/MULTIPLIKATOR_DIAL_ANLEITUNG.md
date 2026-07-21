@@ -18,7 +18,8 @@ und **X** = zurück auf 1×). Die Anzeige zeigt live **Master-BPM × Faktor**.
 3. **Rechtsklick** auf den Dial → **„Einstellungen…"** (zuverlässiger als Doppelklick).
    ![Kontextmenü](_walkthrough/multiplier/09_widget_menu.png)
 
-4. **Ziel-Effekt zuerst wählen:** im Dropdown **„Funktion/Chase (Name)"** den Effekt aussuchen
+4. **Ziel-Effekt zuerst wählen:** in der aufklappbaren Liste **„Steuert"** auf
+   **„+ Funktion/Effekt hinzufügen"** klicken und den Effekt nach Namen aussuchen
    (hier *Matrix 1*). Das füllt automatisch die Function-ID.
    ![Effekt wählen](_walkthrough/multiplier/15_func_dropdown.png)
 

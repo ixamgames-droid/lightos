@@ -1,6 +1,6 @@
 # Stepper (Schrittzähler) (`VCStepper`)
 
-> Ein Plus/Minus-Zähler, der einen **ganzzahligen** Effekt-Parameter (z. B. Läufer-Anzahl) per Tastendruck präzise um feste Schritte hoch- und runterzählt.
+> Ein Plus/Minus-Zähler, der einen **diskreten** Effekt-Parameter (z. B. Läufer-Anzahl, Richtung, Ein/Aus) per Tastendruck präzise um feste Schritte durchschaltet.
 
 ![Stepper (Schrittzähler)](img/VCStepper.png)
 
@@ -74,7 +74,7 @@ Der Stepper unterstützt **MIDI-Teach** (kein Tasten-Teach). Du weist eine Steue
 
 ## Tipps & Fallen
 
-- **Nur für Ganzzahlen.** Der Stepper ist für ganzzahlige Parameter ausgelegt. Für `runner_width` oder andere diskrete Werte funktioniert er genauso wie für `runner_count` — bei kontinuierlichen Werten nimmst du besser einen Fader oder Encoder.
+- **Für diskrete Parameter.** Der Stepper eignet sich für ganzzahlige (z. B. `runner_count`, `runner_width`), Auswahl- (`select`, z. B. `direction` — schaltet die Optionen durch) und boolesche Parameter (schaltet zwischen `Aus`/`An` um, z. B. `loop`, `invert`) — bei kontinuierlichen Werten nimmst du besser einen Fader oder Encoder.
 - **`—` als Wert** bedeutet: kein gültiges Ziel. Prüfe Effekt-ID/aktiven Effekt und den Parameter-Key.
 - **Ausgegrautes `−`/`+`** ist kein Fehler, sondern der Anschlag: Du bist am Minimum bzw. Maximum des Parameters. Höher/tiefer geht serverseitig nicht — der Wert wird geklemmt.
 - **Parameter-Key muss exakt passen.** Tippfehler im Key führen dazu, dass der Stepper kein Ziel findet (`—`). Verwende exakt den Namen, den der Effekt anbietet (z. B. `runner_count`, `runner_width`).

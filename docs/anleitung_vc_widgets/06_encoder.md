@@ -17,12 +17,12 @@ Das Element ist ein runder Drehknopf-Bogen. Von oben nach unten:
 - **Beschriftung** (oben, grau) — der frei wählbare Name, im Beispiel „Groesse".
 - **Bogen (270°)** — ein dunkler Hintergrundbogen, darüber ein blauer Füllbogen, der den aktuellen Wert auf dem Wertebereich des Parameters (0–100 %) anzeigt. Ein weißer **Zeiger** in der Mitte zeigt zur aktuellen Position.
 - **Zahl in der Mitte** — der aktuelle Wert in Klartext. Kommazahlen werden gekürzt, `An`/`Aus` bei Schaltern, `—` wenn gerade kein Zielparameter vorhanden ist.
-- **Parameter-Key** (unten, klein) — der gesteuerte Parameter, im Beispiel `speed`.
+- **Parameter-Name** (unten, klein) — das deutsche Label des gesteuerten Parameters (z. B. „Geschwindigkeit"); nur ohne gebundenen Effekt steht dort der rohe Key wie `speed`.
 - **MIDI-Indikator** — ein kleines blaues Quadrat oben rechts, sobald eine MIDI-CC-Bindung gesetzt ist.
 
 Bedienung (nur außerhalb des Bearbeiten-Modus; siehe Übersicht in der [README.md](README.md)):
 
-- **Ziehen nach oben** (linke Maustaste halten und hoch) → Wert **erhöhen**. **Ziehen nach unten** → Wert **senken**. Die Bewegung ist feinfühlig: erst ab ca. 3 px Bewegung greift sie, ungefähr 60 px Zugweg entsprechen einer vollen Schrittweite. So lässt sich der Wert kontinuierlich „drehen".
+- **Ziehen nach oben** (linke Maustaste halten und hoch) → Wert **erhöhen**. **Ziehen nach unten** → Wert **senken**. Die Bewegung ist feinfühlig: erst ab ca. 3 px Bewegung greift sie, ungefähr 60 px Zugweg entsprechen dem vollen Wertebereich (0–100 %) — bei der Standard-Schrittweite (0,05) also rund eine Schrittweite je 3 px. So lässt sich der Wert kontinuierlich „drehen".
 - **Mausrad** — ein Rasterschritt nach oben/unten erhöht bzw. senkt um genau **eine Schrittweite** (`step`).
 - **Linksklick allein** (ohne Ziehen) setzt nur den Drehbeginn; loslassen beendet das Drehen. Es gibt **keine** Doppelklick-Aktion im Betrieb.
 - Ist **Touch-Lock** aktiv, ignoriert der Encoder Maus/Touch (reine Anzeige); MIDI steuert weiter.

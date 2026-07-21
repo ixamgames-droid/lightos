@@ -84,7 +84,7 @@ Du setzt das an drei Stellen:
 2. **Tempo-Controller-Widget** in der VC — der bequeme Weg: **ein Bus + Quelle
    (Sound/Tap/Fix) + Faktor + gekoppelte Effekte** in einem Panel. Effekt einfach
    drauf­ziehen. → **[Tempo-Controller-Anleitung](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)**.
-3. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Tempo-Bus-Multiplikator"** —
+3. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Effekt ×½/×2 (Multiplier)"** —
    das „Multiplikator-Fenster", mit dem du den Faktor eines Effekts (oder mehrerer,
    per Komma-Liste) im Betrieb auf **Half/Double** ziehst.
 

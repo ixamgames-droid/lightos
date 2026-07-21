@@ -47,7 +47,7 @@ Brauchst du später einen Regler mehr, gehst du kurz zurück in den Bearbeiten-M
 Die Regler sind **visuell** und passen zum Parameter-Typ:
 
 - **Helligkeit, Ein-/Ausblenden, Schweif** → **Slider**
-- **Läuferzahl, Läuferbreite** → **−/+ ‑Stepper**
+- **Läufer-Anzahl, Läufer-Breite** → **−/+ ‑Stepper**
 - **Richtung** → **Pfeil-Buttons** (`→ vorwärts`, `← rückwärts`, `↔ Ping-Pong`, `Mitte↔außen`)
 - **Bewegung / andere Auswahl** → **Segment-Buttons** (bei vielen Optionen ein Dropdown)
 - **An/Aus-Parameter** → **Schalter**

@@ -26,7 +26,7 @@ Du bist nach dem Gruppen-Klick bereits im Tab **Matrix**. Wähle eine Matrix (od
 **+ Neu** eine an) und stelle in **Grundeinstellungen** ein:
 
 - **Algorithmus: Chase**
-- **Style: RGB** (bei Spider/RGBW-PAR auch RGBW)
+- **Stil: RGB** (bei Spider/RGBW-PAR auch RGBW)
 
 Die eingebettete Matrix **folgt automatisch der Programmer-Auswahl** (Überschrift „Geräte
 (folgen der Programmer-Auswahl)") und setzt **Spalten** und **Reihen** aus der Gruppen-Definition
@@ -38,7 +38,7 @@ von **Spalten/Reihen** ist daher meist unnötig und wird beim nächsten Auswahl-
 
 ## 3. „Farbe pro Runde wechseln" aktivieren
 
-Scrolle zur Gruppe **Bewegung & Parameter** und setze den Haken bei
+Scrolle zur Gruppe **Farben** und setze den Haken bei
 **„Farbe pro Runde wechseln"**. Erst dadurch nutzt der Chase eine **ganze Farbfolge**
 (statt nur einer Einzelfarbe) — und der Farbfolgen-Editor wird sichtbar.
 

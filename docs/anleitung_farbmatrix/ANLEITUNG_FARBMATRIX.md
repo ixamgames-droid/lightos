@@ -11,7 +11,7 @@
 
 Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
 
-- **Style: RGB** (reine Farbe) oder **RGBW** (mit Weiß-Kanal — z. B. Spider/RGBW-PAR).
+- **Stil: RGB** (reine Farbe) oder **RGBW** (mit Weiß-Kanal — z. B. Spider/RGBW-PAR).
 - **Spalten:** so viele wie Geräte, **Reihen: 1** (oder ein echtes 2D-Raster für Flächen).
 - **Algorithmus** wählen (siehe unten).
 

@@ -16,9 +16,10 @@ ob du zuerst die **Gruppe wählst** und dann **+ Neu** drückst oder umgekehrt: 
 aktuelle Auswahl in jedem Fall sofort.
 
 Dass der EFX der Auswahl folgt, siehst du an der Geräte-Box im Editor: Sie heißt dynamisch
-**„Geräte (folgen der Auswahl)"** und zeigt bei aktiver Auswahl z. B. **„Geräte: 2 Moving Head(s)
-(folgen der Auswahl)"** (bzw. **„Geräte: keine Moving Heads in der Auswahl"**, falls nichts
-Passendes markiert ist — der EFX bindet nur Geräte mit Pan **und** Tilt).
+**„Geräte (folgen der Auswahl)"** und zeigt bei aktiver Auswahl z. B. **„Geräte: 2 Gerät(e)
+(folgen der Auswahl)"** (bei reinen Spidern **„Geräte: 2 Spider (folgen der Auswahl)"**; bzw.
+**„Geräte: keine beweglichen Geräte in der Auswahl"**, falls nichts Passendes markiert ist — der
+EFX bindet nur Geräte mit Pan **und** Tilt bzw. Doppel-Tilt-Fixtures).
 
 In der Gruppe **Form & Geometrie** stellst du ein:
 - **Algorithmus:** Die Namen erscheinen englisch — *Circle* (Kreis), *Eight* (Acht), *Line* (Linie),

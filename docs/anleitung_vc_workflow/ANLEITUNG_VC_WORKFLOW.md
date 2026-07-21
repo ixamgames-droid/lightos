@@ -58,8 +58,8 @@ Der **einfachste** Weg, einen Effekt auf die VC zu bringen: den Effekt aus der
 **Bibliothek** direkt auf die Canvas **ziehen** (Drag & Drop). Statt eines fest
 verdrahteten Knopfes führt LightOS dann durch den Aufbau:
 
-- **Drop ins Leere** → es öffnet sich die Karte **„Effekt einrichten"** mit der Frage
-  *„… — was soll dieser Effekt können?"*. Pro gewünschtem Aspekt ein **Häkchen** setzen
+- **Drop ins Leere** → es öffnet sich die Karte **„Effekt einrichten"** mit dem Hinweis
+  *„… direkt verknüpfen — es wird kein neuer Effekt erzeugt. Welche Bedienelemente brauchst du?"*. Pro gewünschtem Aspekt ein **Häkchen** setzen
   (z. B. an/aus, Geschwindigkeit, Helligkeit …); je Häkchen kann über **„Widget: … ▸
   ändern"** das Bedien-Element gewählt werden. Über die Kachel-Galerie **„Widget
   wählen"** (*„Bedien-Element wählen — tippe eine Kachel an"*) lässt sich der Widget-Typ
@@ -93,7 +93,7 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
 
 ![Aktion: Funktion an/aus](img/06_aktion_funktion_anaus.png)
 
-4. Feld **„Funktion/Chase (Name):"** aufklappen und den Effekt wählen (hier
+4. Feld **„Funktion / Chase (Name):"** aufklappen und den Effekt wählen (hier
    *Effekt Feuer*). Die Funktions-ID (12) wird automatisch eingetragen.
 
 ![Effekt gebunden](img/07_button_gebunden_feuer.png)
