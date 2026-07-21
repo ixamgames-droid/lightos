@@ -48,7 +48,7 @@ am Boden vorne links/rechts.
 - **Virtuelle Konsole:** plastische Buttons/Fader/SpeedDial; Effekt-Buttons triggern
   (aktive Buttons leuchten auf, oben „Aktiver Effekt: …").
 - **Laser-Steuerung** (Gerät wählen → Programmer → Tab **Laser**): Klartext-Bereiche
-  Betriebsart (Aus/An), Musterbank (0-223, Bänke 1-14), Farbrad (0-31, z. B. „Cyan"),
+  Betriebsart (Aus/An), Musterbank (0-223, Bänke 1-14), Farbrad (0-31 = „Vollfarbe"; „Cyan" liegt bei 128-159),
   Bewegung/Speed. Werte reagieren live.
 - **Gobo-Steuerung** (Gobo-MH wählen → Programmer → Tab **Gobo**): visuelle Gobo-Kacheln
   „Kein Gobo / Gobo 1…7", Gobo-Wechsel-Slider (langsam→schnell), Gobo-Rotation. Ein Klick

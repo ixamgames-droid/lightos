@@ -11,8 +11,12 @@ speichern und auf der Virtuellen Konsole auf einen Knopf legen. Grundlagen
 
 ## 0. Zwei Arten von Lasern — was deiner kann
 
-LightOS unterscheidet ehrlich, was ein Laser wirklich ausgeben kann. Ein
-**Fähigkeits-Banner** oben im Laser-Tab sagt es dir:
+LightOS unterscheidet ehrlich, was ein Laser wirklich ausgeben kann. Woran du den
+Typ erkennst: Nur beim **Netzwerk-Laser** erscheinen im Laser-Tab der Bereich
+**„Laser-Ausgabe (Netzwerk)"** (Scharf/Unscharf + NOT-AUS) und der Knopf
+**„✏️ Zeichnen…"**. Öffnest du damit das **Zeichen-Studio**, zeigt dir dort ein
+ehrliches **Fähigkeits-Banner**, ob deine Zeichnung 1:1 ausgegeben wird (grün) oder
+auf diesem Gerät nur als Vorlage/Näherung dient (bernstein):
 
 - **DMX-Muster-Laser** (z. B. **Ehaho L2600 „3D Partylight"**): gibt nur seine
   **eingebauten Werksmuster** aus. Du wählst Muster über DMX-Werte an — eine
