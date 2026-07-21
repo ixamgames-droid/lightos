@@ -1,6 +1,6 @@
-# EFX-Bewegung für Moving Heads – und warum die Spider anders sind
+# EFX-Bewegung: Moving Heads (Kreis) und Spider (Tilt-Muster)
 
-In dieser Anleitung lernst du, wie du eine EFX-Bewegungsfigur (Kreis) für die Moving Heads anlegst und prüfst – und warum die Spider von EFX-Figuren ausgenommen sind. Bezug: `shows/Komplettshow_2026.lshow`.
+In dieser Anleitung lernst du, wie du eine EFX-Bewegungsfigur (Kreis) für die Moving Heads anlegst und prüfst – und wie du für die Spider (zwei Tilt-Bars, kein Pan) im **Spider-Modus** des EFX-Editors ein Tilt-Bewegungsmuster wählst. Bezug: `shows/Komplettshow_2026.lshow`.
 
 ## Moving Heads: EFX "Circle" anlegen
 
@@ -18,14 +18,16 @@ In dieser Anleitung lernst du, wie du eine EFX-Bewegungsfigur (Kreis) für die M
 
 ![DMX-Monitor: MH-Kanäle 65 und 76 stehen auf 151 bzw. 104 statt Mitte 128 – Pan bewegt sich gegenläufig](img/02_dmx_mh_pan_bewegung.png)
 
-## Spider: warum hier keine EFX-Figur greift
+## Spider: EFX im Spider-Modus (Tilt-Bewegungsmuster)
 
-7. Die **Spider** sind Flower-Lichter mit **zwei separaten Tilt-Bars** und **ohne Pan**. EFX-Figuren wie der Kreis brauchen **Pan UND Tilt** und gelten deshalb **nicht** für die Spider (Meldung: "keine Moving Heads in der Auswahl").
-8. Spider-"Bewegung" bedeutet, die **Tilt-Bars auf/zu** zu fahren – steuerbar über den **Position-Tab (Tilt)** bzw. auf der **Virtuellen Konsole**. Die Spider-Farbe ist **RGBW**.
+7. Die **Spider** sind Flower-Lichter mit **zwei separaten Tilt-Bars** und **ohne Pan**. Wählst du im Programmer die Gruppe **"Spider"** und legst über **"+ Neu"** eine EFX an, erkennt der Editor die Doppel-Tilt-Geräte und schaltet **automatisch in den Spider-Modus**: Statt der Pan/Tilt-Geometrie erscheint der Abschnitt **"Bewegungsmuster (Spider)"**, und die Geräte-Box zeigt **"Geräte: 2 Spider (folgen der Auswahl)"**. (Ist gar kein bewegliches Gerät gewählt, meldet der Editor **"keine beweglichen Geräte in der Auswahl"**.)
+8. Wähle ein **Bewegungsmuster** – **Wippe**, **Welle**, **Zacken**, **Flackern** oder **Puls**. Jedes setzt eine reine **Tilt-Figur**; die EFX-Engine fährt die beiden Bars gegenläufig auf/zu (**Schere**). Feineinstellung über **"Schwung (Tilt-Hub)"**, **"Mitte (Tilt)"** und **"Welle (Versatz)"** – die **Scheren-Vorschau** zeigt die Bewegung live. Mit **Start** läuft das Muster. Aktiviere auch hier **"Dimmer/Shutter mit öffnen"**, sonst bleiben die Bars dunkel (der Spider-Master-Dimmer steht per Default auf 0).
+
+Die Tilt-Stellung lässt sich alternativ **statisch** über den **Position-Tab (Tilt)** bzw. die **Virtuelle Konsole** setzen. Die Spider-Farbe ist **RGBW**.
 
 ## Tipps / Fallen
 
 - **MH bleiben dunkel?** "Dimmer/Shutter mit öffnen" (`open_beam`) im Abschnitt "Sichtbarkeit & Sonstiges" muss aktiviert sein.
 - **Keine Bewegung sichtbar?** Die 2D-Live-View zeigt die Pan-Drehung (Beam-Linie), aber keinen Tilt – zur genauen Kontrolle nutze den DMX Monitor (Kanäle 65/76 verlassen die Mitte 128) oder den 3D-Visualizer.
-- **Spider lassen sich nicht auswählen?** Das ist korrekt: Spider haben keinen Pan und sind daher von EFX-Figuren ausgenommen.
+- **Spider bewegen sich nicht?** Prüfe, dass der **Spider-Modus** aktiv ist (Abschnitt "Bewegungsmuster (Spider)" sichtbar, Geräte-Box zeigt "… Spider"), ein **Muster** gewählt und **Start** gedrückt ist. Bleiben die Bars dunkel: **"Dimmer/Shutter mit öffnen"** aktivieren.
 - Die **EFX-Geschwindigkeit** stellst du im Editor unter **"Tempo & Richtung"** (in Hz) ein.

@@ -18,7 +18,7 @@ Anleitung steht für sich und hat ein klares Lernziel.
 4. [Fixture-Gruppen anlegen (PAR/MH/Spider)](03_gruppen/ANLEITUNG.md)
 5. [Coloreffekte über den Color-Tab — **nur die Farbe speichern**](04_coloreffekt/ANLEITUNG.md) ⭐
 6. [Matrix-/Dimmereffekte — **Farbe + Dimmer mischen**](05_matrix_dimmer/ANLEITUNG.md) ⭐ (mit GIF)
-7. [EFX-Bewegung für Moving Heads (und warum Spider anders sind)](06_efx_bewegung/ANLEITUNG.md)
+7. [EFX-Bewegung: Moving Heads (Kreis) & Spider (Tilt-Muster)](06_efx_bewegung/ANLEITUNG.md)
 8. [Virtuelle Konsole bauen & Effekte/MH steuern (+ APC Mini)](07_virtuelle_konsole/ANLEITUNG.md)
 
 ## Zwei zentrale Lehren (deine Fragen)
@@ -32,6 +32,7 @@ Anleitung steht für sich und hat ein klares Lernziel.
 ## Stand / noch offen
 - ✅ Patch, Positionen, Gruppen, Color-Looks, PAR-Mix (Farbe×Dimmer), MH-Bewegung+Steuerung,
   Virtuelle Konsole (live getestet) — alle gebaut & gespeichert.
-- ⏳ **Spider Auto-Tilt-Chase** (die Spider sind Tilt-Flower ohne Pan → keine EFX-Figuren;
-  Bewegung = Tilt-Bars per Chaser/Position) und **APC-Mini-Pad-Belegung** (das Drücken der Pads
+- ⏳ **Spider-Tilt-Bewegung** (in dieser Show noch nicht als Effekt gebaut) — geht jetzt über eine
+  **EFX im Spider-Modus** (Tilt-Bewegungsmuster wie „Wippe"/„Welle", siehe Anleitung 6),
+  alternativ per Chaser/Position. Sowie **APC-Mini-Pad-Belegung** (das Drücken der Pads
   beim „MIDI Lernen" erfolgt an der Hardware) — als nächster Schritt vorgesehen.
