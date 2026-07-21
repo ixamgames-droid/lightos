@@ -715,6 +715,86 @@ class AppState:
                 pass
         return gid
 
+    @staticmethod
+    def _stack_group_grids(grids: list[tuple[int, int, dict]]) -> tuple[int, int, dict]:
+        """FM-16e: Stapelt mehrere ``(cols, rows, positions)``-Raster VERTIKAL zu
+        EINEM groesseren. ``positions`` = ``{(col,row): value}`` (value = ganzer fid
+        ODER Kopf-Zelle ``"fid:head"``). Raster k beginnt bei ``row = Summe der Hoehen
+        davor``; Spalten auf die max. Breite. Zellwerte bleiben UNVERAENDERT (das
+        ``fid:head``-Encoding ueberlebt) -> die Matrix-Engine (grids_from_positions)
+        spricht die Koepfe weiter einzeln an. Rueckgabe ``(cols, rows, merged)``."""
+        max_cols = 1
+        total_rows = 0
+        merged: dict = {}
+        for cols, rows, positions in grids:
+            max_cols = max(max_cols, int(cols or 1))
+            for (c, r), val in positions.items():
+                merged[(c, total_rows + r)] = val
+            total_rows += max(1, int(rows or 1))
+        return max_cols, max(1, total_rows), merged
+
+    def merge_head_matrix_groups(self, gids, name=None, *, emit: bool = True):
+        """FM-16e (Kopf-Matrizen ZUSAMMENLEGEN, David-Wunsch 2026-07-18): fasst
+        mehrere (Kopf-)Matrix-Gruppen zu EINER groesseren Matrix zusammen — die N
+        Raster werden in ``gids``-Reihenfolge untereinander gestapelt (Zeilen),
+        Spalten auf die max. Breite; jede Zelle behaelt ihr ``fid``/``"fid:head"``-
+        Encoding, sodass die zusammengelegte Matrix im Matrix-Programmer pro Kopf
+        ansprechbar bleibt (z. B. 2× Hydrabeam 1×4 -> eine 4×2-Matrix). Die
+        QUELL-Gruppen bleiben unangetastet (nicht-destruktiv). Neue Gruppe im Ordner
+        "Matrizen" (nicht "Multi-Head" -> remove_fixture raeumt sie nicht mit weg).
+        Rueckgabe: neue gid, oder None (<2 gueltige Gruppen / keine Show-DB)."""
+        eng = getattr(self, "_show_engine", None)
+        if eng is None:
+            return None
+        import json as _json
+        from sqlalchemy import select as _select
+        from src.core.database.models import FixtureGroup as _FG
+        gids = [int(g) for g in (gids or [])]
+        if len(gids) < 2:
+            return None
+        try:
+            with self._session() as s:
+                by_id = {g.id: g for g in s.execute(
+                    _select(_FG).where(_FG.id.in_(gids))).scalars().all()}
+                grids: list[tuple[int, int, dict]] = []
+                names: list[str] = []
+                for gid in gids:                      # Reihenfolge = Stapel-Reihenfolge
+                    g = by_id.get(gid)
+                    if g is None:
+                        continue
+                    try:
+                        pos_raw = _json.loads(g.positions_json or "{}")
+                    except Exception:
+                        pos_raw = {}
+                    positions: dict = {}
+                    for k, v in pos_raw.items():
+                        try:
+                            c, r = k.split(",")
+                            positions[(int(c), int(r))] = v
+                        except Exception:
+                            continue
+                    grids.append((int(g.cols or 1), int(g.rows or 1), positions))
+                    names.append(g.name or "")
+                if len(grids) < 2:
+                    return None
+                cols, rows, merged = self._stack_group_grids(grids)
+                merged_json = _json.dumps({f"{c},{r}": v for (c, r), v in merged.items()})
+                label = name or (" + ".join(n for n in names if n)[:60] or "Matrix")
+                ng = _FG(name=label, cols=cols, rows=rows,
+                         positions_json=merged_json, folder="Matrizen")
+                s.add(ng)
+                s.commit()
+                gid = ng.id
+        except Exception as e:
+            debug_swallow("app_state.merge_head_matrix_groups", e)
+            return None
+        if emit:
+            try:
+                self.notify_groups_changed()
+            except Exception:
+                pass
+        return gid
+
     def remove_fixture(self, fid: int, undoable: bool = True):
         # Snapshot before delete
         snap = None

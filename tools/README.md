@@ -21,6 +21,7 @@
 | `build_demo_show.py` | Erzeugt eine komplett vorprogrammierte Demo-Show (.lshow) fuer die 3 RGBW-PARs |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
 | `build_demo_zq_show.py` | Demo-/Bühnen-Show fuer Davids reale Hardware (DMO-01, Masterplan 2026-06-08): |
+| `build_dimmer_farbe_combo.py` | Dimmer + Farbe frei kombinieren — EINE VC-Bank fuer Davids 8 PAR (ZQ01424 RGBW). |
 | `build_event_demo_2026.py` | EVENT-DEMO 2026 — grosse, vollstaendige Demo-Show fuer ein Event. |
 | `build_farb_fx_vc_show.py` | FARB-/EFFEKT-VC-SHOW — 4-Seiten Virtual Console fuer Davids Rig. |
 | `build_feature_showcase.py` | FEATURE-SHOWCASE — die "alles drin"-Test-/Demo-Show. |
