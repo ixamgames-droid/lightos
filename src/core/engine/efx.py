@@ -395,18 +395,76 @@ class EfxInstance(Function):
             result[fx.fid] = self._pan_tilt_attrs(fx, pan, tilt)
         return result
 
+    def head_phase_points(self, i: int, n: int, phase: float,
+                          rand_progress: float,
+                          head_count: int) -> list[tuple[float, float]]:
+        """(pan, tilt) ALLER Koepfe ``0..head_count-1`` des ``i``-ten Geraets bei
+        der GEGEBENEN Phase/Progress — bewusst STATE-FREI (liest nicht
+        ``self._phase``/``self._rand_progress``), damit die EFX-Vorschau (mit
+        EIGENER Vorschau-Phase) UND Tests exakt dieselbe Kopf-Welle wie der Render
+        berechnen (FM-16b Preview-Nachtrag). Spiegelt genau die Render-Zerlegung
+        aus ``_values`` (Kopf 0) + ``_head_pan_tilts`` (Koepfe >=1):
+
+        - **Kopf 0** traegt die GERAETE-Dekorrelation (Fan/Offset ``_fan_for``
+          bzw. RANDOM-``offs = i*1.7*spread``) — wie in ``_values``.
+        - **Koepfe >=1** tragen den KOPF-Versatz ``(k/head_count)*head_spread``
+          (bzw. RANDOM ``k*1.7*head_spread``) auf der Geraete-Basisphase.
+
+        Geraete-Spiegelung (``mirror`` — nur Pan, jedes 2. Geraet) ist angewandt;
+        ``invert_pan``/``invert_tilt``/``swap`` NICHT (die legt der DMX-Schreiber
+        pro Kopf drauf). Werte auf 0..255 geklemmt."""
+        head_count = max(1, int(head_count))
+        fx = self.fixtures[i]
+        cx, cy = self._fixture_center(fx)
+        counter = bool(getattr(self, "counter_rotate", False))
+        mirror_dev = bool(getattr(self, "mirror", False)) and (i % 2 == 1)
+        hs = max(0.0, float(getattr(self, "head_spread", 1.0)))
+        is_random = (self.algorithm == EfxAlgorithm.RANDOM)
+        out: list[tuple[float, float]] = []
+        if is_random:
+            # Gegenlauf ist GERAETE-weit (i%2, wie Kopf 0 in _values) — NICHT pro
+            # Kopf, sonst brechen bei hs=0 die Koepfe auseinander (Review-Fund).
+            prog = -rand_progress if (counter and i % 2 == 1) else rand_progress
+            mode = getattr(self, "phase_mode", "fan")
+            offs = 0.0 if mode == "sync" else (i * 1.7 * self.spread if n > 1 else 0.0)
+            for k in range(head_count):
+                # Kopf 0 = Geraete-Dekorrelation (offs, wie _values); Koepfe >=1 =
+                # Kopf-Dekorrelation (k*1.7*hs, wie _head_pan_tilts).
+                d = offs if k == 0 else k * 1.7 * hs
+                x, y = self._random_xy(prog + d)
+                pan, tilt = cx + x, cy + y
+                if mirror_dev:        # mirror kippt NUR Pan
+                    pan = 255.0 - pan
+                out.append((max(0.0, min(255.0, pan)),
+                            max(0.0, min(255.0, tilt))))
+        else:
+            # Geraete-Basisphase = _fixture_phase(i, n, fx) mit der UEBERGEBENEN
+            # Phase (statt self._phase): base + start_offset + Fan/Offset.
+            base = -phase if (counter and i % 2 == 1) else phase
+            base_phase = (base + fx.start_offset + self._fan_for(i, n)) % 1.0
+            for k in range(head_count):
+                ph = (base_phase + (k / head_count) * hs) % 1.0
+                pan, tilt = self._calc(ph, cx, cy)
+                if mirror_dev:        # wie _values: mirror kippt NUR Pan
+                    pan = 255.0 - pan
+                out.append((max(0.0, min(255.0, pan)),
+                            max(0.0, min(255.0, tilt))))
+        return out
+
     def _head_pan_tilts(self, fid: int,
                         head_count: int) -> list[tuple[int, str, float, str, float]]:
         """Pan+Tilt-Werte der ZUSAETZLICHEN Koepfe (k=1..head_count-1) eines
-        Mehrkopf-Fixtures bei der aktuellen Phase. Jeder Kopf faehrt die Figur um
-        (k/head_count)*head_spread phasenversetzt -> eine Pan+Tilt-Welle/Chase
-        rollt ueber die Koepfe (FM-16b; verallgemeinert die fruehere tilt-only
-        Spider-Kopf-Welle, ersetzt die starre Kopf-0-Spiegelung via
+        Mehrkopf-Fixtures bei der aktuellen (Render-)Phase. Jeder Kopf faehrt die
+        Figur um (k/head_count)*head_spread phasenversetzt -> eine Pan+Tilt-Welle/
+        Chase rollt ueber die Koepfe (FM-16b; verallgemeinert die fruehere
+        tilt-only Spider-Kopf-Welle, ersetzt die starre Kopf-0-Spiegelung via
         resolve_attr_channels). Liefert (k, pan_attr, pan_float, tilt_attr,
-        tilt_float) je Zusatzkopf; Geraete-Spiegelung (mirror — nur Pan, wie in
-        _values) ist bereits angewandt, invert_pan/invert_tilt NICHT (der Aufrufer
-        wendet sie pro Achse an, exakt wie apply_pan_tilt_orientation es fuer
-        Kopf 0 macht). Kopf 0 steckt schon in den Basis-Attrs aus _values()."""
+        tilt_float) je Zusatzkopf; Geraete-Spiegelung (mirror — nur Pan) ist
+        bereits angewandt, invert_pan/invert_tilt NICHT (der Aufrufer wendet sie
+        pro Achse an). Kopf 0 steckt schon in den Basis-Attrs aus _values().
+
+        Reine Delegation an ``head_phase_points`` (state-frei, mit der aktuellen
+        Render-Phase) — EINE Positions-Quelle fuer Render UND Vorschau."""
         out: list[tuple[int, str, float, str, float]] = []
         if head_count < 2:
             return out
@@ -416,28 +474,11 @@ class EfxInstance(Function):
             return out
         fx = self.fixtures[i]
         pa, ta = fx.pan_attr, fx.tilt_attr
-        cx, cy = self._fixture_center(fx)
-        hs = max(0.0, float(getattr(self, "head_spread", 1.0)))
-        counter = bool(getattr(self, "counter_rotate", False))
-        mirror_dev = bool(getattr(self, "mirror", False)) and (i % 2 == 1)
-        is_random = (self.algorithm == EfxAlgorithm.RANDOM)
-        base_phase = self._fixture_phase(i, n, fx)  # bei RANDOM ungenutzt
+        pts = self.head_phase_points(i, n, self._phase, self._rand_progress,
+                                     head_count)
         for k in range(1, head_count):
-            if is_random:
-                # Jeder Kopf wandert eine eigene Zufallsbahn (Dekorrelation via
-                # k*1.7*hs, wie in _values). Gegenlauf ist GERAETE-weit (i%2, wie
-                # Kopf 0 in _values) — NICHT pro Kopf, sonst brechen bei hs=0 die
-                # Koepfe auseinander statt synchron zu laufen (Review-Fund).
-                prog = -self._rand_progress if (counter and i % 2 == 1) else self._rand_progress
-                x, y = self._random_xy(prog + k * 1.7 * hs)
-                pval, tval = cx + x, cy + y
-            else:
-                phase = (base_phase + (k / head_count) * hs) % 1.0
-                pval, tval = self._calc(phase, cx, cy)
-            if mirror_dev:            # wie _values: mirror kippt NUR Pan
-                pval = 255.0 - pval
-            out.append((k, pa, max(0.0, min(255.0, pval)),
-                        ta, max(0.0, min(255.0, tval))))
+            pval, tval = pts[k]
+            out.append((k, pa, pval, ta, tval))
         return out
 
     @staticmethod
@@ -542,6 +583,7 @@ class EfxInstance(Function):
             from src.core.app_state import (get_channels_for_patched,
                                             apply_pan_tilt_orientation,
                                             open_value_for,
+                                            pan_tilt_head_count,
                                             resolve_attr_channels)
         except Exception:
             return
@@ -572,9 +614,10 @@ class EfxInstance(Function):
             # Spiegelung via resolve_attr_channels. invert_pan/invert_tilt/swap
             # je Zusatzkopf identisch wie Kopf 0 (dieselbe apply_pan_tilt_orientation
             # pro Kopf, unten im Loop).
-            tilt_heads = sum(1 for c in chans if (c.attribute or "") == "tilt")
-            pan_heads = sum(1 for c in chans if (c.attribute or "") == "pan")
-            head_count = max(pan_heads, tilt_heads)
+            # Kopfzahl zentral (eine Quelle mit der EFX-Vorschau, FM-16b):
+            # max(#pan, #tilt). Nutzt denselben gecachten Kanal-Pfad (`chans`),
+            # daher kein zusaetzlicher DB-Roundtrip im Per-Frame-Renderer.
+            head_count = pan_tilt_head_count(fx)
             if head_count >= 2 and (("tilt" in attrs) or ("pan" in attrs)):
                 attrs = dict(attrs)
                 for k, pa, pval, ta, tval in self._head_pan_tilts(fid, head_count):
