@@ -52,10 +52,14 @@ def group_member_fids(positions_json: str) -> list[int]:
     except Exception:
         return []
     items = []
-    for key, fid in pos.items():
+    for key, v in pos.items():
+        # FM-16e: Kopf-Zellen "fid:head" sind KEINE ganzen Mitglieder -> ueberspringen
+        # (sie bleiben beim Speichern verbatim erhalten, s. GroupEditDialog._head_cells).
+        if isinstance(v, str) and ":" in v:
+            continue
         try:
             c, r = key.split(",")
-            items.append((int(r), int(c), int(fid)))
+            items.append((int(r), int(c), int(v)))
         except Exception:
             continue
     items.sort()
@@ -80,13 +84,25 @@ class GroupEditDialog(QDialog):
         self._cols = max(1, int(cols))
         self._rows = max(1, int(rows))
         self._order_changed = False
-        # Originale Zellen je fid merken (Erhalt des 2D-Layouts ohne Umsortierung)
-        self._orig_cells: dict[int, str] = {}
+        # Originale Zellen je fid merken (Erhalt des 2D-Layouts ohne Umsortierung).
+        # FM-16e: ganze-Fixture-Zellen (fid) von Kopf-Zellen ("fid:head") trennen.
+        # Kopf-Zellen editiert dieser Mitglieder-Dialog NICHT — sie bleiben beim
+        # Speichern VERBATIM erhalten (frueher warf int("5:0") und loeschte das ganze
+        # Raster einer Kopf-Matrix, inkl. der neuen "Matrizen"-Merge-Gruppen).
+        self._orig_cells: dict[int, str] = {}    # fid -> cellkey (nur ganze Fixtures)
+        self._head_cells: dict[str, str] = {}     # cellkey -> "fid:head" (unveraendert)
         try:
-            for key, fid in (json.loads(positions_json or "{}") or {}).items():
-                self._orig_cells[int(fid)] = str(key)
+            for key, v in (json.loads(positions_json or "{}") or {}).items():
+                if isinstance(v, str) and ":" in v:
+                    self._head_cells[str(key)] = v
+                else:
+                    try:
+                        self._orig_cells[int(v)] = str(key)
+                    except (TypeError, ValueError):
+                        continue
         except Exception:
             self._orig_cells = {}
+            self._head_cells = {}
 
         members = [fid for fid in group_member_fids(positions_json)
                    if fid in self._labels]
@@ -239,15 +255,20 @@ class GroupEditDialog(QDialog):
         werden Zeilen ergänzt."""
         fids = self.member_fids()
         cols, rows = self._cols, self._rows
-        while cols * rows < len(fids):
+        # FM-16e: Kopf-Zellen ("fid:head") IMMER verbatim erhalten — sie belegen ihre
+        # Zellen; ganze Mitglieder landen NUR in den restlichen freien Zellen.
+        positions: dict[str, object] = dict(self._head_cells)
+        head_used: set[str] = set(self._head_cells.keys())
+        while cols * rows < len(fids) + len(head_used):
             rows += 1
 
-        positions: dict[str, int] = {}
         if self._order_changed:
-            for i, fid in enumerate(fids):
-                positions[f"{i % cols},{i // cols}"] = fid
+            free = (f"{c},{r}" for r in range(rows) for c in range(cols)
+                    if f"{c},{r}" not in head_used)
+            for fid, cell in zip(fids, free):
+                positions[cell] = fid
         else:
-            used: set[str] = set()
+            used: set[str] = set(head_used)
             pending: list[int] = []
             for fid in fids:
                 cell = self._orig_cells.get(fid)

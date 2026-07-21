@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-21 — FM-16 (e): Kopf-Matrizen zusammenlegen + Gruppen-Editor versteht Kopf-Zellen
+
+#### Hinzugefügt
+
+- **Mehrere (Kopf-)Matrix-Gruppen lassen sich zu EINER größeren Matrix zusammenlegen** (David-Wunsch, schließt FM-16 funktional ab). Neuer Button „⧉ Matrizen zusammenlegen…" im Gruppen-Editor (Mehrfach-Auswahl-Dialog) → `AppState.merge_head_matrix_groups` stapelt die N Raster vertikal zu einem größeren (`_stack_group_grids`, rein/getestet; Spalten auf Max-Breite, Zeilen summiert) — z. B. **2× Hydrabeam (je 1×4 Köpfe) → eine 4×2-Matrix**. Jede Zelle behält ihr `fid:head`-Encoding, sodass die zusammengelegte Matrix im Matrix-Programmer **pro Kopf** ansprechbar bleibt (`grids_from_positions`/`head_grid`). Nicht-destruktiv (Quell-Gruppen bleiben); neue Gruppe im Ordner „Matrizen" (wird von `remove_fixture` nicht mit weggeräumt).
+- **Gruppen-Editor versteht jetzt Kopf-Zellen `"fid:head"`** (`_split_cell`). Zuvor warf `_load_group` bei `int("5:0")` und die Zellen fielen **still weg** → eine auto-erzeugte Kopf-Matrix-Gruppe erschien im Editor komplett **leer**. Jetzt bleiben Kopf-Zellen erhalten, werden als „fid·K{n}" (1-basiert, leicht abgesetzt) gezeichnet, `_group_fids` liefert die Basis-fids fürs Member-Highlight. Ganze-Fixture-Zellen (int) unverändert.
+
+Tests `tests/test_fm16e_head_matrix_merge.py` (15). _Computer-Use-Folgeschritt offen: interaktives Pro-Kopf-Platzieren (Drag einzelner Köpfe) + Live-UX-Abnahme._
+
 ### 2026-07-21 — FM-16 (b): EFX fährt bei Mehrkopf-Movern eine echte pro-Kopf-Pan+Tilt-Welle
 
 #### Hinzugefügt / Geändert

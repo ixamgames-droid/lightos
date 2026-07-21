@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget, QTreeWidgetItem,
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
     QFormLayout, QFrame, QSizePolicy, QGridLayout,
+    QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, Signal
 from PySide6.QtGui import (
@@ -15,6 +16,23 @@ from src.core.database.models import FixtureGroup
 from src.ui.widgets import mini_icons as _mini
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
+
+
+def _split_cell(v):
+    """FM-16e: Rasterzellwert -> (fid, head). ``v`` ist ENTWEDER ein ganzer fid
+    (int/str) ODER eine Kopf-Zelle ``"fid:head"`` (Str, aus create_head_matrix_group
+    / Merge). head=None fuer ganze Fixtures; (None, None) wenn unparsbar. EINE Quelle
+    fuer Paint, Member-Highlight und Persistenz."""
+    if isinstance(v, str) and ":" in v:
+        a, b = v.split(":", 1)
+        try:
+            return int(a), int(b)
+        except (TypeError, ValueError):
+            return None, None
+    try:
+        return int(v), None
+    except (TypeError, ValueError):
+        return None, None
 
 
 # ── Floating Panel (Rastergröße) ──────────────────────────────────────────────
@@ -143,7 +161,7 @@ class FixtureGridWidget(QWidget):
         super().__init__(parent)
         self.cols = 8
         self.rows = 8
-        self.positions: dict[tuple[int, int], int] = {}  # (col, row) -> fid
+        self.positions: dict[tuple[int, int], "int | str"] = {}  # (col,row) -> fid ODER "fid:head" (FM-16e)
         self.setMinimumSize(320, 320)
         self.setAcceptDrops(True)
         self._labels: dict[int, str] = {}
@@ -225,8 +243,11 @@ class FixtureGridWidget(QWidget):
             return None
         if self.positions.get(target) == fid:
             return target  # steht schon dort
-        # alte Platzierung dieses fid entfernen (Move statt Duplikat)
-        self.positions = {k: v for k, v in self.positions.items() if v != fid}
+        # alte Platzierung dieses fid entfernen (Move statt Duplikat). FM-16e:
+        # per Basis-fid vergleichen -> ein extern gedroptetes ganzes Fixture räumt
+        # auch etwaige Kopf-Zellen ("fid:head") desselben fid weg (kein Doppel).
+        self.positions = {k: v for k, v in self.positions.items()
+                          if _split_cell(v)[0] != fid}
         self.positions[target] = fid
         return target
 
@@ -263,7 +284,8 @@ class FixtureGridWidget(QWidget):
         font.setBold(True)
         p.setFont(font)
 
-        for (c, r), fid in self.positions.items():
+        for (c, r), v in self.positions.items():
+            fid, head = _split_cell(v)
             x = c * cw
             y = r * ch
             rect = (int(x) + 2, int(y) + 2, int(cw) - 4, int(ch) - 4)
@@ -271,13 +293,17 @@ class FixtureGridWidget(QWidget):
             if self._drag_from and (c, r) == self._drag_from:
                 fill_color = QColor("#ff8c00")
             else:
-                fill_color = QColor("#0978FF")
+                # FM-16e: Kopf-Zellen einer Kopf-Matrix leicht dunkler absetzen.
+                fill_color = QColor("#0d63c8") if head is not None else QColor("#0978FF")
             p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
             p.setFont(font)
+            # FM-16e: Kopf-Zelle als "fid·K{head+1}" (1-basiert), ganzes Fixture als fid.
+            big = f"{fid}·K{head + 1}" if (fid is not None and head is not None) \
+                else (f"{fid}" if fid is not None else str(v))
             p.drawText(rect[0], rect[1], rect[2], rect[3],
-                       Qt.AlignmentFlag.AlignCenter, f"{fid}")
-            label = self._labels.get(fid, str(fid))
+                       Qt.AlignmentFlag.AlignCenter, big)
+            label = self._labels.get(fid, str(fid if fid is not None else v))
             small = QFont("Segoe UI", 7)
             p.setFont(small)
             p.drawText(rect[0], rect[1] + 14, rect[2], rect[3] - 14,
@@ -536,6 +562,13 @@ class FixtureGroupView(QWidget):
         b_folder.setToolTip("Gruppe einem (verschachtelten) Ordner zuordnen — z. B. Front/Wash")
         b_folder.clicked.connect(self._set_group_folder)
         btns.addWidget(b_folder, 2, 1)
+        b_merge = QPushButton("⧉ Matrizen zusammenlegen…")
+        b_merge.setToolTip("Mehrere (Kopf-)Matrix-Gruppen zu EINER größeren Matrix "
+                           "stapeln — z. B. 2× Hydrabeam (je 1×4 Köpfe) → eine 4×2-"
+                           "Matrix. Kopf-Zellen bleiben pro Kopf ansprechbar; die "
+                           "Quell-Gruppen bleiben erhalten (FM-16).")
+        b_merge.clicked.connect(self._merge_groups)
+        btns.addWidget(b_merge, 3, 0, 1, 2)
         left.addLayout(btns)
 
         # Fixture tree (Universe-Ordner)
@@ -647,7 +680,9 @@ class FixtureGroupView(QWidget):
 
     def _highlight_group_members(self):
         """Hebt Fixture-Items hervor, die im aktuellen Raster platziert sind."""
-        active_fids = set(self._grid_widget.positions.values())
+        # FM-16e: Basis-fids (Kopf-Zellen "fid:head" -> fid), sonst wird ein nur per
+        # Kopf-Zelle platziertes Fixture nie hervorgehoben (str != int).
+        active_fids = set(self._group_fids())
 
         accent_bg = QColor("#1f6feb")
         accent_fg = QColor("#ffffff")
@@ -750,9 +785,20 @@ class FixtureGroupView(QWidget):
         for k, v in pos_dict.items():
             try:
                 c, r = k.split(",")
-                positions[(int(c), int(r))] = int(v)
+                cell = (int(c), int(r))
             except Exception:
                 continue
+            # FM-16e: Zellwert ist ENTWEDER ein ganzer fid (int) ODER eine
+            # Kopf-Zelle "fid:head" (Str, aus create_head_matrix_group / Merge).
+            # Frueher int(v) -> "5:0" warf und die Kopf-Zelle fiel STILL weg
+            # (Kopf-Matrix-Gruppe erschien im Editor leer). Beide Formen erhalten.
+            if isinstance(v, str) and ":" in v:
+                positions[cell] = v
+            else:
+                try:
+                    positions[cell] = int(v)
+                except (TypeError, ValueError):
+                    continue
         self._grid_widget.set_grid(g.cols, g.rows)
         self._grid_widget.positions = positions
         self._grid_widget.update()
@@ -957,8 +1003,63 @@ class FixtureGroupView(QWidget):
             QMessageBox.warning(self, "Fehler", str(e))
 
     def _group_fids(self) -> list[int]:
-        """Fids der aktuell im Raster platzierten Fixtures der Gruppe."""
-        return list(self._grid_widget.positions.values())
+        """Fids der aktuell im Raster platzierten Fixtures der Gruppe. FM-16e:
+        Kopf-Zellen ``"fid:head"`` -> Basis-fid (dedupliziert) fuer Member-Highlight."""
+        out: list[int] = []
+        for v in self._grid_widget.positions.values():
+            fid, _head = _split_cell(v)
+            if fid is not None and fid not in out:
+                out.append(fid)
+        return out
+
+    def _merge_groups(self):
+        """FM-16e: >=2 Gruppen wählen -> zu EINER größeren Matrix stapeln (Raster
+        untereinander, Reihenfolge = Listen-/Namensreihenfolge). Ruft
+        AppState.merge_head_matrix_groups; die Quell-Gruppen bleiben erhalten."""
+        s = self._session()
+        if s is None:
+            QMessageBox.warning(self, "Fehler", "Keine Show geöffnet.")
+            return
+        # FM-16e: Session SOFORT schließen (with) — sonst hält ein offener Read-Tx
+        # während des modalen Dialogs auf einer non-WAL/Netz-Show den Writer auf
+        # (busy_timeout). Nur (id, name) mitnehmen, keine ORM-Objekte/Session halten.
+        with s:
+            groups = [(int(g.id), g.name or f"Gruppe {g.id}") for g in s.execute(
+                select(FixtureGroup).order_by(FixtureGroup.name)).scalars().all()]
+        if len(groups) < 2:
+            QMessageBox.information(self, "Zusammenlegen", "Mindestens zwei Gruppen nötig.")
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Matrizen zusammenlegen")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("Gruppen wählen (von oben nach unten gestapelt):"))
+        lst = QListWidget()
+        lst.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+        for gid, gname in groups:
+            it = QListWidgetItem(gname)
+            it.setData(Qt.ItemDataRole.UserRole, gid)
+            lst.addItem(it)
+        lay.addWidget(lst)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                              | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        # FM-16e: in VISUELLER Reihenfolge (Listen-Zeile) stapeln, nicht in Klick-/
+        # Selektions-Reihenfolge — sonst passt „von oben nach unten" nicht zum Ergebnis.
+        gids = [it.data(Qt.ItemDataRole.UserRole)
+                for it in sorted(lst.selectedItems(), key=lst.row)]
+        if len(gids) < 2:
+            QMessageBox.information(self, "Zusammenlegen",
+                                    "Mindestens zwei Gruppen wählen.")
+            return
+        new_gid = get_state().merge_head_matrix_groups(gids)
+        if new_gid is None:
+            QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
+            return
+        self._reload_group_list(select_gid=new_gid)
 
     def _notify_groups_changed(self):
         """Zentrale GROUP_CHANGED-Benachrichtigung: Programmer, Live View, Matrix
@@ -982,7 +1083,9 @@ class FixtureGroupView(QWidget):
         Drag speichert das noch nicht — erst „Speichern" schreibt es in die Gruppe."""
         gw = self._grid_widget
         fixtures = self._state.get_patched_fixtures()
-        placed = set(gw.positions.values())
+        # FM-16e: Basis-fids (Kopf-Zellen -> fid), sonst wird ein nur per Kopf-Zelle
+        # platziertes Fixture erneut als ganze Zelle hinzugefügt (Duplikat).
+        placed = set(self._group_fids())
         todo = [f.fid for f in sorted(fixtures, key=lambda x: (x.universe, x.address))
                 if f.fid not in placed]
         if not todo:
