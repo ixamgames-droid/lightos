@@ -39,11 +39,15 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | Einstellung | Bedeutung | Werte/Optionen |
 |---|---|---|
 | **Beschriftung** | Text unten am Fader. | Freitext |
-| **Modus** | Was der Fader regelt (Details unten). | `Effekt-Helligkeit`, `Effekt-Tempo`, `Effekt-Parameter`, `Programmer-Attribut`, `Gruppen-Dimmer`, `Submaster`, `Grand Master`, `Speed (alle Effekte)`, `Tempo (BPM)`, `Tempo-Bus (BPM)`, `Playback (Executor)`, `DMX-Kanal (Level)` |
+| **Modus** | Was der Fader regelt (Details unten). | `Effekt-Helligkeit`, `Effekt-Tempo`, `Effekt-Parameter`, `Programmer-Attribut`, `Gruppen-Dimmer`, `Feature-Dimmer (Gruppe)`, `Submaster`, `Grand Master`, `Speed (alle Effekte)`, `Tempo (BPM)`, `Tempo-Bus (BPM)`, `Playback (Executor)`, `DMX-Kanal (Level)` |
 | **Parameter (Effekt-Parameter)** | Nur Modus *Effekt-Parameter*: welcher Parameter des gebundenen Effekts geregelt wird. Die Liste zeigt die echten Parameter des Effekts (Label + Key); eigener Key tippbar. | Auswahl/Freitext (z. B. `speed`) |
 | **Steuert** | Aufklappbare Liste der Effekte/Funktionen, die der Fader steuert (nach Namen). Je Zeile ein eigener Parameter wählbar, mit ✕ entfernbar, „+ Funktion/Effekt hinzufügen". Maßgeblich bei den Effekt-Modi (überschreibt das Slot-Feld) – ermöglicht einen Gruppen-Submaster über mehrere Effekte. | Effekt-/Funktionsliste + je Zeile Parameter |
-| **Reichweite (Programmer)** | Nur Modus *Programmer-Attribut*: auf welche Fixtures der Fader wirkt. | `Alle Geräte` (alle gepatchten), `Nur Auswahl` (aktuelle Programmer-Auswahl; nichts gewählt → alle), `Feste Gruppe` (eine fest gewählte Gruppe, unabhängig von der Live-Auswahl) |
-| **Feste Gruppe** | Fixture-Gruppe für Reichweite = *Feste Gruppe* (Programmer) bzw. für den Modus *Gruppen-Dimmer*. | Auswahl vorhandener Gruppen / Freitext |
+| **Reichweite (Programmer/Submaster)** | Modi *Programmer-Attribut* und *Submaster*: auf welche Fixtures der Fader wirkt. Beim Submaster = *Alle Geräte* ist es der bisherige globale Submaster. | `Alle Geräte` (alle gepatchten), `Nur Auswahl` (aktuelle Programmer-Auswahl; im Programmer-Modus → alle bei leerer Auswahl, beim Submaster → keine Wirkung), `Feste Gruppe` (eine fest gewählte Gruppe, unabhängig von der Live-Auswahl) |
+| **Feste Gruppe** | Fixture-Gruppe für Reichweite = *Feste Gruppe* (Programmer/Submaster) bzw. für die Modi *Gruppen-Dimmer* und *Feature-Dimmer (Gruppe)*. | Auswahl vorhandener Gruppen / Freitext |
+| **Feature (Feature-Dimmer)** | Nur Modus *Feature-Dimmer (Gruppe)*: welche Feature-Gruppe der Dimmer skaliert. | `Intensity`, `Color`, `Gobo`, `Beam`, `Position`, `Effect` |
+| **Attribut (Programmer)** | Nur Modus *Programmer-Attribut*: welches Attribut der Fader auf den Fixtures setzt (Standard `intensity`). Liste = bekannte Attribute (Label + Key), eigener Key tippbar – so wird z. B. ein LAS-Speed-Fader auf `gobo_rotation` baubar. | Auswahl/Freitext (z. B. `intensity`, `gobo_rotation`) |
+| **Wert bei 0 % (Programmer)** | Nur Modus *Programmer-Attribut*: Kanalwert, den der Fader bei 0 % ausgibt. Bildet den Fader auf ein Kanal-Teilband ab (z. B. Laser-Speed-Anfang `192`). | 0–255 |
+| **Wert bei 100 % (Programmer)** | Nur Modus *Programmer-Attribut*: Kanalwert, den der Fader bei 100 % ausgibt (Ende des Teilbands, z. B. `223`). Zusammen mit *Wert bei 0 %* der eigentliche Dynamik-Bereich – unabhängig von den Leitplanken *Wert min/max*. | 0–255 |
 | **Live-Edit-Slot (EFFECT)** | Nur Effekt-Modi: ohne feste Funktions-ID wird der Effekt aus diesem benannten Slot bearbeitet (von einem Effekt-Pad gesetzt) statt des global aktiven. | Freitext (z. B. `MH`, `MX`) |
 | **Tempo-Bus** | Nur Modus *Tempo-Bus (BPM)*: welcher Tempo-Bus gesetzt wird. | `(aktiver/Default-Bus)`, `Bus A`, `Bus B`, `Bus C`, `Bus D` |
 | **Effekt An/Aus (EFFECT-Modi)** | Nur Effekt-Modi: Verhalten am unteren Anschlag. An = Fader steuert An/Aus (Wert > 0 startet den Ziel-Effekt, Wert 0 stoppt ihn wirklich). Aus = Fader regelt nur; den Effekt separat per Taste starten. | Checkbox „bei 0 wirklich stoppen (sonst nur runterregeln)" |
@@ -52,7 +56,8 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Wert max** | Oberer Ausgabewert (Leitplanke). Der Fader regelt nie darüber (z. B. Speed-Fader, der bei 70 % deckelt). Gilt für alle Modi. | 0–255 |
 | **DMX-Universe (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Universe. Wird bei Bedarf angelegt. | Ganzzahl (1-basiert) |
 | **DMX-Kanal (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Kanal im Universe. | Ganzzahl |
-| **Slot/Funktions-ID (Playback/Effekt)** | Playback-Slot (Executor-Index) bzw. Effekt-Funktions-ID(s). Mehrere IDs mit Komma = Gruppe. Effekt-Modi: leer = aktiver Effekt. Bei Effekt-Modi überschreibt die „Steuert"-Liste dieses Feld. | Ganzzahl(en), kommagetrennt |
+| **Playback Executor-Slot** | Nur Modus *Playback (Executor)*: der Executor-Slot-Index (0-basiert), dessen Fader dieser Regler steuert. Eigenes Feld – „nicht gesetzt" = kein Slot (der Fader wirkt dann nicht). | Ganzzahl ≥ 0 oder „nicht gesetzt" |
+| **Slot/Funktions-ID (Playback/Effekt)** | Nur in den **Effekt-Modi** sichtbar (unter „Erweitert"): Effekt-Funktions-ID(s). Mehrere IDs mit Komma = Gruppe. Leer = aktiver Effekt. Die „Steuert"-Liste überschreibt dieses Feld. Setzt **nicht** den Playback-Slot – dafür dient das eigene Feld *Playback Executor-Slot*; in Playback-Mode wird dieses Feld gar nicht angezeigt. | Ganzzahl(en), kommagetrennt |
 | **CC-Nummer (-1=keine)** | MIDI-Controller-Nummer für die CC-Bindung. | -1 (keine) bis 127 |
 | **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. | 0 (Alle) bis 16 |
 
@@ -71,6 +76,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Effekt-Tempo** | Tempo-Master eines Effekts oder einer Gruppe (0,1× bis 4,0×). Leer = aktiver Effekt. |
 | **Effekt-Parameter** | Bildet den Fader (0–255) auf den Wertebereich eines beliebigen Effekt-Parameters ab (Key im Feld *Parameter*). Bei mehreren Zielen kann je Effekt ein eigener Parameter gelten (Spalte in der „Steuert"-Liste). |
 | **Gruppen-Dimmer** | Multiplikativer Dimmer für eine feste Fixture-Gruppe (*Feste Gruppe*) – skaliert deren Helligkeit (0–100 %). |
+| **Feature-Dimmer (Gruppe)** | Multiplikativer Dimmer für eine WÄHLBARE Feature-Gruppe (Intensity/Color/Gobo/Beam/Position/Effect) einer festen Fixture-Gruppe – skaliert nur dieses Feature (0–100 %). |
 | **Tempo-Bus (BPM)** | Steuert die BPM eines benannten Tempo-Bus (A/B/C/D) von 30 bis 300, unabhängig vom globalen Leader. Leer = aktiver/Default-Bus. |
 
 ## Bindung an einen Effekt

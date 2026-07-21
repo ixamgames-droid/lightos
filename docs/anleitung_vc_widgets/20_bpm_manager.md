@@ -39,27 +39,32 @@ Der oberste Kasten **Monitor** zeigt live, was die Erkennung gerade macht:
 | **Erkennungs-Qualität** (Balken) | Confidence der Beat-Erkennung in Prozent. Hoch = stabile, sichere Erkennung; niedrig = unsicher (leiser/komplexer Track, falsche Grenzen). |
 | **Spektrum** (Bargraph) | Live-Frequenzanzeige des Eingangssignals — nützlich, um zu sehen, ob überhaupt Audio ankommt und wo die Energie liegt. |
 
-## Modus & Quelle (AUTO/MANUAL/Lock; PC-Audio/Externer Eingang/OS2L)
+## BPM-Quelle, Lock & Audio-Eingang
 
 Im Kasten **Einstellungen** legst du oben fest, **wie** und **woraus** das Tempo bestimmt wird.
 
+### BPM-Quelle & Lock
+
+Ganz oben der Umschalter **BPM-Quelle:** — er legt fest, **woraus** das Tempo kommt. Genau eine Option ist aktiv:
+
+| Option | Wirkung |
+|---|---|
+| **Live-Audio** | Die BPM wird live aus dem Audio-Eingang erkannt (Standard, „läuft von selbst mit"). Welcher Eingang das speist, stellst du unten unter *Audio-Eingang* ein (PC-Audio / Externer Eingang / OS2L). |
+| **Lied-Analyse** | Die BPM folgt der Offline-Analyse eines geladenen Songs (aus dem Generator-Tab). Das Feld **Analyse-Song** daneben wählt, welcher analysierte Song das Tempo treibt. |
+| **Manuell / Tap** | Die Automatik treibt nicht mehr; das Tempo kommt nur noch aus **Tap/Nudge/Eingabe**. |
+| **🔒 BPM einfrieren** (Lock, Umschalt-Knopf) | **Friert die aktuelle BPM ein.** Die Quellen ändern sie nicht mehr, bis du Lock wieder löst. Praktisch, wenn die Erkennung gut sitzt und du sie für einen Übergang festhalten willst. |
+
+> Intern fasst LightOS „Live-Audio/Lied-Analyse" als **AUTO** und „Manuell / Tap" als **MANUAL** zusammen. Dieses Kürzel siehst du nur noch als **Badge in der globalen Kopfzeile** (Klick dort schaltet AUTO/MANUAL um) — einen eigenen AUTO/MANUAL-Schalter gibt es im Einstellungen-Kasten nicht mehr.
+
+**Präzedenz (wer gewinnt):** **Manuell / Tap / Lock** überstimmen alles → darunter **Live-Audio** → darunter **Lied-Analyse/OS2L** als Fallback. Es gibt immer **genau eine** Beat-Quelle gleichzeitig.
+
 ### Genre-Preset
 
-Ganz oben eine Auswahlliste **Genre-Preset** + Knopf **Anwenden**. Wählst du ein Genre (z. B. House, Drum&Bass) und klickst *Anwenden*, stellt LightOS in einem Rutsch die passenden **Tempo-Grenzen, Empfindlichkeit, Glättung und das Takt-Raster** ein. Bequemer Startpunkt, den du danach noch von Hand nachjustieren kannst.
+Unter **BPM-Quelle** und **Analyse-Song** eine Auswahlliste **Genre-Preset** + Knopf **Anwenden**. Wählst du ein Genre (z. B. House, Drum&Bass) und klickst *Anwenden*, stellt LightOS in einem Rutsch die passenden **Tempo-Grenzen, Empfindlichkeit, Glättung und das Takt-Raster** ein. Bequemer Startpunkt, den du danach noch von Hand nachjustieren kannst.
 
-### Modus
+### Audio-Eingang
 
-| Bedienelement | Wirkung |
-|---|---|
-| **AUTO (Audio)** | Die BPM kommt automatisch aus der Audio-Analyse (bzw. OS2L/Datei). Normalfall für „läuft von selbst mit". |
-| **MANUAL** | Die Automatik treibt nicht mehr; das Tempo kommt nur noch aus **Tap/Nudge/Eingabe**. |
-| **🔒 Lock** (Umschalt-Knopf) | **Friert die aktuelle BPM ein.** Auto-Quellen ändern sie nicht mehr, bis du Lock wieder löst. Praktisch, wenn die Erkennung gut sitzt und du sie für einen Übergang festhalten willst. |
-
-**Präzedenz (wer gewinnt):** **MANUAL / Lock** überstimmen alles → darunter **AUTO · Audio** → darunter **Datei/OS2L** als Fallback. Es gibt immer **genau eine** Beat-Quelle gleichzeitig.
-
-### Quelle
-
-Drei Optionen, welcher Eingang die Automatik speist:
+Nur bei *BPM-Quelle = Live-Audio*: welcher Eingang die Erkennung speist:
 
 | Quelle | Bedeutung |
 |---|---|

@@ -1,6 +1,6 @@
 # Referenz: Alle VC-Elemente (Virtual Console)
 
-> **Überblick aller 15 Bau-Elemente** der Virtual Console — was sie sind, wie man sie
+> **Überblick aller 16 Bau-Elemente** der Virtual Console — was sie sind, wie man sie
 > bedient und was man einstellen kann. Plus die **Baukasten-Knöpfe** (komplette Blöcke)
 > und die neue **Gruppenwahl** beim Color-Chase.
 >
@@ -23,8 +23,8 @@ Es gibt **zwei Wege**:
 3. **Doppelklick** auf das Element → **Einstellungen**-Dialog.
 4. **Rechtsklick** → Kontextmenü (siehe unten).
 
-> **Neu:** Die Toolbar bietet jetzt **alle 15 Typen** als Knopf an — auch die früher nur
-> intern verfügbaren **Effekt-Farben, Musik, BPM, Tempo-Bus**. Passt nicht alles in eine
+> **Neu:** Die Toolbar bietet jetzt **alle 16 Typen** als Knopf an — auch die früher nur
+> intern verfügbaren **Effekt-Farben, Musik, BPM, Tempo-Bus** sowie **Tempo-Controller** und **Live-Edit**. Passt nicht alles in eine
 > Zeile, bricht die Toolbar automatisch in eine zweite Zeile um.
 
 ![Toolbar mit allen Hinzufügen-Knöpfen](img/02_toolbar_alle_knoepfe.png)
@@ -35,7 +35,7 @@ Du kannst auch einen **Effekt aus der Bibliothek direkt auf die Canvas ziehen** 
 baut dir dann das passende Bedien-Element praktisch von selbst.
 
 - **Drop auf eine freie Stelle** → es öffnet sich die Karte **„Effekt einrichten"**
-  (Fenster). Sie fragt *„… — was soll dieser Effekt können?"* und zeigt **je Aspekt eine
+  (Fenster). Sie zeigt den Hinweis *„… direkt verknüpfen — es wird kein neuer Effekt erzeugt. Welche Bedienelemente brauchst du?"* und **je Aspekt eine
   ankreuzbare Zeile** („An/Aus (Toggle)", „Tempo (Geschwindigkeit)", „Helligkeit",
   „Farben ändern…", „Bewegung (XY-Feld)…", „Tempo-Bus zuweisen…",
   „Tempo-Multiplikator (×½ ×2)…" …). „An/Aus (Toggle)" ist vorangekreuzt. Pro Zeile gibt es — wo mehrere Bedien-Typen
@@ -120,7 +120,7 @@ eigener Effekt-Funktion:
 
 ## Stand / Nutzbarkeit (Kurz)
 
-- **Alle 14 Typen** sind über die Toolbar anlegbar (der frühere „Chase Builder"/VCChaseBuilder
+- **Alle 16 Typen** sind über die Toolbar anlegbar (der frühere „Chase Builder"/VCChaseBuilder
   wurde 2026-07 komplett entfernt, PR #116).
 - **Sofort nutzbar ohne Bindung:** Button, Fader, Farbe, XY Pad, SpeedDial, Encoder, Musik,
   BPM, Tempo-Bus, Text, Container, Cue List (mit Executor-Slot).

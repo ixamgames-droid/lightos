@@ -68,7 +68,7 @@ Ist kein Effekt auflösbar, zeigt die Titelzeile `— kein Ziel —` und der Kac
 
 ## Tipps & Fallen
 
-- **Anlegen über Smart-Drop:** Dieses Anzeige-Widget hat keinen eigenen Toolbar-Knopf. Es entsteht, indem du einen Effekt aus der Bibliothek auf die Canvas ziehst bzw. über die Widget-Galerie — siehe Übersicht (README.md).
+- **Anlegen:** Im Bearbeiten-Modus gibt es in der VC-Toolbar einen Knopf „Chase-Liste", der das Widget direkt auf der Canvas anlegt. Alternativ entsteht es per Smart-Drop, indem du einen Effekt aus der Bibliothek auf die Canvas ziehst bzw. über die Widget-Galerie — siehe Übersicht (README.md).
 - **Goldener Rahmen nur bei laufendem Effekt:** Die aktive Farbe wird nur markiert, wenn der Effekt wirklich läuft. Bei `○ gestoppt` siehst du die Liste, aber keine Lauf-Markierung.
 - **Schmale Kacheln zeigen keine Nummern:** Bei vielen Farben oder kleinem Widget werden die Positionsnummern ausgeblendet (Kachel zu schmal). Mach das Element breiter, wenn du die Nummern brauchst.
 - **Rechtsklick entfernt sofort und dauerhaft** — die Farbe ist aus der Sequenz weg, nicht nur deaktiviert. Zum vorübergehenden Überspringen lieber den Linksklick (Toggle) nutzen.

@@ -10,27 +10,27 @@ Die Beispielkonfiguration ist bereits in `shows/test1234.lshow` eingerichtet:
 - Farben: **Weiß → Rot**
 - Tempo-Bus: **Global**
 - Tempo-Multiplikator: **1×**
-- Haltezeit: **0 %** für einen durchgehend weichen Übergang
+- Übergangs-Pause: **0 %** für einen durchgehend weichen Übergang
 
 ## Welcher Fade ist welcher?
 
 | Einstellung | Wirkung |
 |---|---|
-| **Fade ein/aus (s)** | Blendet den **gesamten Effekt** beim Starten und Stoppen ein oder aus. |
+| **Fade ein+aus (s)** | Blendet den **gesamten Effekt** beim Starten und Stoppen ein oder aus. |
 | **Color Fade** | Überblendet während des laufenden Effekts weich von einer Farbe zur nächsten. |
-| **Halte-Zeit** | Bestimmt, wie lange eine Farbe stehen bleibt, bevor übergeblendet wird. |
+| **Übergangs-Pause** | Bestimmt, wie lange eine Farbe stehen bleibt, bevor übergeblendet wird. |
 | **Schweif (%)** | Erzeugt bei einem **Chase** nur einen nachlaufenden Schweif hinter dem Läufer. |
 
-Für einen laufenden Weiß-Rot-Farbverlauf wird daher **Color Fade + Haltezeit**
+Für einen laufenden Weiß-Rot-Farbverlauf wird daher **Color Fade + Übergangs-Pause**
 verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 
 ## 1. Matrix auf „Color Fade“ stellen
 
-1. Öffne **Programme → Matrix**.
+1. Öffne **Programmer → Matrix**.
 2. Wähle den vorhandenen Effekt, beispielsweise **Farb wechsel**.
 3. Stelle **Algorithmus** auf **Color Fade**.
 4. Lasse den Stil auf **RGB** oder **RGBW**.
-5. Stelle unter **Bewegung & Parameter** die **Halte-Zeit auf 0,00**.
+5. Stelle unter **Bewegung & Parameter** die **Übergangs-Pause auf 0,00**.
 6. Speichere den Matrix-Effekt.
 
 ![Algorithmus Color Fade](img/01_algorithmus_color_fade.png)
@@ -43,9 +43,9 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 1. Öffne die gewünschte VC-Bank und aktiviere **Bearbeiten**.
 2. Rechtsklicke den bisherigen Fade-Regler und öffne **Einstellungen**.
 3. Verwende diese Werte:
-   - **Beschriftung:** `Haltezeit (0 = weich)`
+   - **Beschriftung:** `Übergangs-Pause (0 = weich)`
    - **Modus:** `Effekt-Parameter`
-   - **Parameter:** `Halte-Zeit (hold)`
+   - **Parameter:** `Übergangs-Pause (crossfade_hold)`
    - **Steuert:** der gewünschte Matrix-Effekt, hier `Farb wechsel [RGBMatrix #6]`
    - **Invertieren:** aus
    - **Wert min/max:** `0` / `255`
@@ -59,12 +59,12 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 
 ![Fertige Bank 4](img/03_bank4_fertig.png)
 
-- **0 % Haltezeit:** durchgehender, weicher Crossfade.
+- **0 % Übergangs-Pause:** durchgehender, weicher Crossfade.
 - **25–50 %:** Farben bleiben kurz stehen, der Übergang wird kompakter.
 - **nahe 100 %:** lange Haltephase und kurzer, beinahe harter Farbwechsel.
 - Das **Speed-Rad** bestimmt weiterhin die Geschwindigkeit relativ zum
   Global-Tempo.
-- **SYNC** setzt nur die Phase neu; die Haltezeit und Farbreihenfolge bleiben erhalten.
+- **SYNC** setzt nur die Phase neu; die Übergangs-Pause und Farbreihenfolge bleiben erhalten.
 - Der An/Aus-Schalter auf einer anderen Bank darf denselben Effekt steuern.
 
 ## Start-/Stop-Fade zusätzlich verwenden
@@ -85,7 +85,7 @@ Beim Ziehen einer Farbmatrix auf die virtuelle Konsole:
 
 1. **Color Fade** als Matrix-Algorithmus wählen.
 2. **Farben ändern** und **Tempo** als Bedienelemente hinzufügen.
-3. Unter **Mehr Parameter** den Parameter **Halte-Zeit** hinzufügen.
+3. Unter **Mehr Parameter** den Parameter **Übergangs-Pause** hinzufügen.
 4. **Fade ein+aus (s)** nur zusätzlich wählen, wenn auch das Starten und Stoppen
    des gesamten Effekts weich erfolgen soll.
 
