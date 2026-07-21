@@ -7,6 +7,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-21 — FM-16 (b): EFX fährt bei Mehrkopf-Movern eine echte pro-Kopf-Pan+Tilt-Welle
+
+#### Hinzugefügt / Geändert
+
+- **Voll-Mehrkopf-Mover (MOVBAR4, Hydrabeam 4000, …) bekommen im EFX jetzt einen echten Pan+Tilt-Chase über ihre Köpfe.** Bisher fuhr nur ein Dual-Tilt-Spider eine pro-Kopf-**Tilt**-Welle; ein Voll-Mover mit `pan#k`/`tilt#k` erhielt nur Kopf-0-Pan/Tilt, alle weiteren Köpfe spiegelten Kopf 0 (`resolve_attr_channels`-Fallback) → alle 4 Köpfe bewegten sich identisch. Die tilt-only Spider-Kopf-Welle `_spider_head_tilts` wurde zu `_head_pan_tilts` verallgemeinert (Pan **und** Tilt, `(k/head_count)*head_spread` phasenversetzt); der `write()`-Gate feuert auf `pan_heads≥2` **oder** `tilt_heads≥2` und bespielt pro Kopf nur die Achse(n) mit ≥2 Kanälen. **Reine Dual-Tilt-Spider (0 Pan) bleiben exakt tilt-only** (unverändert, `test_efx_swings_bars_counter` grün). `invert_pan`/`invert_tilt`/`swap_pan_tilt` je Kopf über **dieselbe** `apply_pan_tilt_orientation` wie Kopf 0 (koppelt das 16-bit-Paar bitidentisch — Float-Invert vor `_split16` wäre um bis zu 256 daneben, per Test abgesichert); Geräte-Mirror/Counter/Fan/RANDOM/16-bit mitgetragen. **Keine neue Persistenz** (nutzt bestehendes `head_spread`), **keine Änderung der Ziel-Zuweisung** (1 `EfxFixture`/fid, Kopf-Expansion im `write()` — bewusst kein invasives N-`EfxFixture`-Split). Tests `tests/test_efx_perhead_pan.py` (12). _Nachtrag offen: `EfxPreviewWidget` zeigt weiter 1 Punkt/Gerät (die pro-Kopf-Streuung wurde nie visualisiert — analog `head_spread` bei Spidern nur in `SpiderEfxPreview`)._
+
 ### 2026-07-21 — Salvage-Runde: 3 bestätigte Fixes + Palette-Coverage aus Pre-Konsolidierungs-QA-Branches geborgen
 
 _Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück auf `main`) enthielten 6 „stale" Branches echt-ungelandeten Inhalt. Gegen den aktuellen `main` verifiziert (parallele Analyse): 3 Fixes + 1 Test-Coverage sind real noch nötig und hier geborgen; die überholten Branches verworfen (Worker-Callback-Teardown ist in `main` anders + getestet gelandet, der CI-Meta-Test war brüchig)._

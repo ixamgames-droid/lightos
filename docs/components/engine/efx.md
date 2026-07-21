@@ -63,7 +63,8 @@ Timing `speed_hz`/`direction`/`loop`, Verteilung
 (`_advance` → bei Bus-Sync `_sync_from_bus`, sonst `speed_hz × Function.speed ×
 dt`), berechnet je Gerät Pan/Tilt (`_values`/`_calc`), wendet
 Pan/Tilt-Invert/Swap (`apply_pan_tilt_orientation`) und ggf. Beam-Öffnen an,
-verteilt Spider-Kopf-Tilts (`_spider_head_tilts`), löst Kanäle
+verteilt pro-Kopf-Pan+Tilt bei Mehrkopf-Fixtures (`_head_pan_tilts`, FM-16b —
+Voll-Mover pro Kopf, Dual-Tilt-Spider tilt-only), löst Kanäle
 mehrkopf-bewusst (`resolve_attr_channels`) auf und schreibt coarse (+ fine bei
 `bit16`) ins Universum.
 

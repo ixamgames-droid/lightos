@@ -365,7 +365,7 @@ class EfxInstance(Function):
     def _fixture_phase(self, i: int, n: int, fx: "EfxFixture") -> float:
         """Figur-Phase 0..1 des i-ten Geraets: globale Phase (+ Gegenlauf bei
         jedem 2. Geraet) + Einzelgeraete-Offset + Geraete-Faecher (phase_mode).
-        Einzige Quelle fuer _values UND die Spider-Kopf-Welle (_spider_head_tilts)
+        Einzige Quelle fuer _values UND die Kopf-Pan+Tilt-Welle (_head_pan_tilts)
         — bei Aenderung wirkt beides konsistent."""
         counter = bool(getattr(self, "counter_rotate", False))
         base = -self._phase if (counter and i % 2 == 1) else self._phase
@@ -395,15 +395,19 @@ class EfxInstance(Function):
             result[fx.fid] = self._pan_tilt_attrs(fx, pan, tilt)
         return result
 
-    def _spider_head_tilts(self, fid: int,
-                           head_count: int) -> list[tuple[str, str, float]]:
-        """Tilt-Werte der ZUSAETZLICHEN Tilt-Koepfe (k=1..head_count-1) eines
-        Dual-Tilt-Spiders bei der aktuellen Phase. Jeder Kopf bekommt die
-        Tilt-Komponente der Figur um (k/head_count)*head_spread phasenversetzt
-        -> eine Welle/Chase rollt ueber die Bars (ersetzt die alte starre
-        255-tilt-Spiegelung). Liefert (coarse_key, fine_key, tilt_float) je
-        Zusatzkopf; Kopf 0 steckt schon in den Basis-Attrs aus _values()."""
-        out: list[tuple[str, str, float]] = []
+    def _head_pan_tilts(self, fid: int,
+                        head_count: int) -> list[tuple[int, str, float, str, float]]:
+        """Pan+Tilt-Werte der ZUSAETZLICHEN Koepfe (k=1..head_count-1) eines
+        Mehrkopf-Fixtures bei der aktuellen Phase. Jeder Kopf faehrt die Figur um
+        (k/head_count)*head_spread phasenversetzt -> eine Pan+Tilt-Welle/Chase
+        rollt ueber die Koepfe (FM-16b; verallgemeinert die fruehere tilt-only
+        Spider-Kopf-Welle, ersetzt die starre Kopf-0-Spiegelung via
+        resolve_attr_channels). Liefert (k, pan_attr, pan_float, tilt_attr,
+        tilt_float) je Zusatzkopf; Geraete-Spiegelung (mirror — nur Pan, wie in
+        _values) ist bereits angewandt, invert_pan/invert_tilt NICHT (der Aufrufer
+        wendet sie pro Achse an, exakt wie apply_pan_tilt_orientation es fuer
+        Kopf 0 macht). Kopf 0 steckt schon in den Basis-Attrs aus _values()."""
+        out: list[tuple[int, str, float, str, float]] = []
         if head_count < 2:
             return out
         n = len(self.fixtures)
@@ -411,24 +415,29 @@ class EfxInstance(Function):
         if i is None:
             return out
         fx = self.fixtures[i]
-        ta = fx.tilt_attr
+        pa, ta = fx.pan_attr, fx.tilt_attr
         cx, cy = self._fixture_center(fx)
         hs = max(0.0, float(getattr(self, "head_spread", 1.0)))
         counter = bool(getattr(self, "counter_rotate", False))
+        mirror_dev = bool(getattr(self, "mirror", False)) and (i % 2 == 1)
         is_random = (self.algorithm == EfxAlgorithm.RANDOM)
         base_phase = self._fixture_phase(i, n, fx)  # bei RANDOM ungenutzt
         for k in range(1, head_count):
             if is_random:
-                # Jeder Kopf wandert eine eigene Zufallsbahn (wie die Geraete-
-                # Dekorrelation in _values); Gegenlauf kehrt jeden 2. Kopf um.
-                prog = -self._rand_progress if (counter and k % 2 == 1) else self._rand_progress
-                _x, y = self._random_xy(prog + k * 1.7 * hs)
-                tval = cy + y
+                # Jeder Kopf wandert eine eigene Zufallsbahn (Dekorrelation via
+                # k*1.7*hs, wie in _values). Gegenlauf ist GERAETE-weit (i%2, wie
+                # Kopf 0 in _values) — NICHT pro Kopf, sonst brechen bei hs=0 die
+                # Koepfe auseinander statt synchron zu laufen (Review-Fund).
+                prog = -self._rand_progress if (counter and i % 2 == 1) else self._rand_progress
+                x, y = self._random_xy(prog + k * 1.7 * hs)
+                pval, tval = cx + x, cy + y
             else:
                 phase = (base_phase + (k / head_count) * hs) % 1.0
-                _pan, tval = self._calc(phase, cx, cy)
-            out.append((f"{ta}#{k}", f"{ta}_fine#{k}",
-                        max(0.0, min(255.0, tval))))
+                pval, tval = self._calc(phase, cx, cy)
+            if mirror_dev:            # wie _values: mirror kippt NUR Pan
+                pval = 255.0 - pval
+            out.append((k, pa, max(0.0, min(255.0, pval)),
+                        ta, max(0.0, min(255.0, tval))))
         return out
 
     @staticmethod
@@ -554,25 +563,42 @@ class EfxInstance(Function):
                     attrs["shutter"] = open_value_for(fx, "shutter")
             # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden.
             attrs = apply_pan_tilt_orientation(fx, attrs)
-            # Mehrkopf-Spider (>=2 Tilt-Kanaele, kein Pan): jeder weitere Tilt-Kopf
-            # faehrt die Figur-Tilt-Komponente um head_spread phasenversetzt -> eine
-            # Welle/Chase rollt ueber die Bars (ersetzt die fruehere starre
-            # 255-tilt-Spiegelung). invert_tilt wird je Zusatzkopf gleich angewandt
-            # wie an Kopf 0 (apply_pan_tilt_orientation oben); Pan/Swap sind bei
-            # Spidern (kein Pan-Kanal) ohne Wirkung.
+            # FM-16b: Mehrkopf-Fixtures (>=2 Pan- ODER >=2 Tilt-Kanaele) — jeder
+            # weitere Kopf faehrt die Figur um head_spread phasenversetzt: eine
+            # Pan+Tilt-Welle/Chase rollt ueber die Koepfe. Nur Achsen mit >=2
+            # Kanaelen werden pro Kopf bespielt: reine Dual-Tilt-Spider (0 Pan)
+            # bleiben tilt-only (unveraendert), Voll-Mehrkopf-Mover (Hydrabeam/
+            # MOVBAR4/…) bekommen jetzt AUCH pro-Kopf-Pan statt der Kopf-0-
+            # Spiegelung via resolve_attr_channels. invert_pan/invert_tilt/swap
+            # je Zusatzkopf identisch wie Kopf 0 (dieselbe apply_pan_tilt_orientation
+            # pro Kopf, unten im Loop).
             tilt_heads = sum(1 for c in chans if (c.attribute or "") == "tilt")
-            if "tilt" in attrs and tilt_heads >= 2:
+            pan_heads = sum(1 for c in chans if (c.attribute or "") == "pan")
+            head_count = max(pan_heads, tilt_heads)
+            if head_count >= 2 and (("tilt" in attrs) or ("pan" in attrs)):
                 attrs = dict(attrs)
-                inv_tilt = bool(getattr(fx, "invert_tilt", False))
-                for ckey, fkey, tval in self._spider_head_tilts(fid, tilt_heads):
-                    if inv_tilt:
-                        tval = 255.0 - tval
+                for k, pa, pval, ta, tval in self._head_pan_tilts(fid, head_count):
+                    # Kopf k EXAKT wie Kopf 0 behandeln: BEIDE Achsen packen und
+                    # durch dieselbe apply_pan_tilt_orientation schicken. Nur mit
+                    # beiden Achsen koppelt invert das 16-bit-Paar bitidentisch
+                    # (Float-Invert 255-pval vor _split16 waere um bis zu 256
+                    # daneben) UND swap tauscht symmetrisch — eine Teil-Achse
+                    # wuerde swap sonst in die falsche Achse schieben und die
+                    # vorhandene loeschen (Review-Fund: Swap auf Dual-Tilt-Spider
+                    # riss die Kopf-Welle ab). resolve_attr_channels schreibt danach
+                    # NUR die attr#k-Keys, fuer die das Fixture wirklich einen
+                    # Kopf-k-Kanal hat — fehlende Achsen (Pan beim Spider,
+                    # ueberzaehlige Koepfe der kuerzeren Achse) bleiben folgenlos.
                     if self.bit16:
-                        tc, tf = self._split16(max(0.0, min(255.0, tval)))
-                        attrs[ckey] = tc
-                        attrs[fkey] = tf
+                        pc, pf = self._split16(pval)
+                        tc, tf = self._split16(tval)
+                        head = {pa: pc, f"{pa}_fine": pf, ta: tc, f"{ta}_fine": tf}
                     else:
-                        attrs[ckey] = int(max(0, min(255, tval)))
+                        head = {pa: int(max(0, min(255, pval))),
+                                ta: int(max(0, min(255, tval)))}
+                    head = apply_pan_tilt_orientation(fx, head)
+                    for bkey, val in head.items():
+                        attrs[f"{bkey}#{k}"] = val
             # Mehrkopf-Vorkommens-Aufloesung zentral (eine Quelle, identisch zur
             # frueheren Inline-seen-Schleife): resolve_attr_channels mappt jedes
             # attr/attr#N auf sein Kanal-Vorkommen, Kopf>0 spiegelt Kopf 0 als
