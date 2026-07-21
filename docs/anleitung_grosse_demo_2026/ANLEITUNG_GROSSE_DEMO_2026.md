@@ -61,7 +61,7 @@ Kontextmenü):
 
 1. Oben links **Bearbeiten** einschalten (Bearbeiten-Modus).
 2. **Rechtsklick** auf den gewünschten VC-Button.
-3. Im Kontextmenü unten **„Hintergrundbild wählen…"** wählen (darüber „Hintergrundbild entfernen" zum Löschen).
+3. Im Kontextmenü unten **„Hintergrundbild wählen…"** wählen (darunter „Hintergrundbild entfernen" zum Löschen).
 
 ![Rechtsklick-Kontextmenü eines Buttons mit „Hintergrundbild wählen…"](img/05_button_bild_kontextmenu.png)
 

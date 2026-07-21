@@ -15,7 +15,7 @@ Erst das Muster antippen, dann oben eine **Farb-Kachel** → das Muster nimmt di
 |---|---|
 | **Feste Farbe** | Alle Paarlichter in **einer** Farbe (die du oben tippst). |
 | **Farbwechsel** | Alle wechseln gemeinsam die Farbe (auf den Beat). |
-| **Regenbogen** | Regenbogen läuft über die Reihe (jede Lampe ein anderer Farbton). |
+| **Regenbogen** | Regenbogen läuft über die Reihe (jede Lampe ein anderer Farbton). *Erzeugt eigene Farbtöne — nicht per Farb-Kachel umfärbbar.* |
 | **Verlauf** | Sanfter Farbverlauf über die Reihe. |
 
 ### Die bunten Looks (eigene Optik)

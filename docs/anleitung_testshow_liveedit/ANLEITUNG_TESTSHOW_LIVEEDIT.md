@@ -64,7 +64,7 @@ So sieht Seite 1 im laufenden Betrieb aus — links die Start-Buttons, rechts da
 
 Der Live-Edit hängt am **Bearbeiten-Modus der Konsole**:
 
-**Bearbeiten an** → du bekommst die **Häkchen-Auswahl**: pro Effekt hakst du an, *was* du live steuern willst (Helligkeit, Richtung, Läuferzahl …). Die Auswahl wird **mit der Show gespeichert**.
+**Bearbeiten an** → du bekommst die **Häkchen-Auswahl**: pro Effekt hakst du an, *was* du live steuern willst (Helligkeit, Richtung, Läufer-Anzahl …). Die Auswahl wird **mit der Show gespeichert**.
 
 ![Bearbeiten-Modus: Häkchen-Auswahl](bilder/N4_editmode_checkbox_picker.png)
 
@@ -76,11 +76,11 @@ Der Live-Edit hängt am **Bearbeiten-Modus der Konsole**:
 ![Betrieb: Slider + Pfeil-Richtung](bilder/N2_runmode_rainbow_slider_arrows.png)
 
 - **Bewegung** → Segment-Buttons (normal · Ping-Pong · Mitte→außen · außen→Mitte)
-- **Läuferzahl / Läuferbreite** → **−/+ ‑Stepper**
+- **Läufer-Anzahl / Läufer-Breite** → **−/+ ‑Stepper**
 
 ![Betrieb: Segment-Buttons + Stepper](bilder/N1_runmode_chase_segment_stepper.png)
 
-Brauchst du später einen Regler mehr (z. B. „Läuferbreite"), gehst du kurz auf **Bearbeiten**, hakst ihn an, und gehst wieder raus — der Regler ist dann für diesen Effekt da.
+Brauchst du später einen Regler mehr (z. B. „Läufer-Breite"), gehst du kurz auf **Bearbeiten**, hakst ihn an, und gehst wieder raus — der Regler ist dann für diesen Effekt da.
 
 **Tempo pro Effekt** (unten im Panel): **Aus** = eigener Geschwindigkeits-Slider (direkt), **BPM** = folgt der Master-BPM mit einem Tempo-×-Faktor, **Tap** = eigener getappter Takt auf einem festen Bus (A–D).
 

@@ -77,13 +77,20 @@ Dieser Schritt muss bei **jedem der neun Effekte** einmal durchgeführt werden.
 
 1. Auf Bank 1, 2 oder 3 den jeweiligen Effekt-Button suchen.
 2. **Bearbeiten** einschalten.
-3. Rechtsklick auf den Effekt-Button → **⚡ Live-Parameter…**.
-4. Folgende Werte setzen:
+3. Rechtsklick auf den Effekt-Button → **Einstellungen…** und die Option
+   **Lang drücken → Live-Einstellungen (erst Anwenden sendet)** aktivieren; den Dialog schließen.
+4. **Bearbeiten** wieder ausschalten (Bedienen-Modus) und den Effekt-Button
+   **lang gedrückt halten** — es öffnet sich der Dialog **Live-Einstellungen: <Effekt>**.
+5. Folgende Werte setzen:
    - **Geschwindigkeit:** `1,00`
    - **Tempo-Bus:** `Global`
    - **Tempo ×:** `1,00`
    - **Tempo-Versatz (Beats):** `0,00`
-5. **Anwenden** klicken.
+6. **Anwenden** klicken.
+
+> Hinweis: Der Rechtsklick-Eintrag **⚡ Live-Parameter…** öffnet dagegen den
+> Bedienelement-Erzeuger „Live-Editor (Effekt → VC-Bedienelemente)" (Kästchen-Liste
+> + Knopf **Erzeugen**) — dort lassen sich diese Tempo-Werte **nicht** setzen.
 
 ![Effekt auf den globalen Master-Bus legen](img/05_effekt_tempo_bus_global.png)
 
@@ -95,7 +102,7 @@ Das wird wiederholt für:
 
 > Wichtig: Das Feld **Tempo-Bus** im Eigenschaften-Dialog des Multiplikator-Fensters
 > weist den Ziel-Effekten nicht automatisch einen Bus zu. Entscheidend ist
-> **Tempo-Bus = Global im Live-Parameter-Dialog jedes Effekts**.
+> **Tempo-Bus = Global im Live-Einstellungen-Dialog (Long-Press) jedes Effekts**.
 
 ## 6. Master-BPM und gemeinsame Phase aktivieren
 
