@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-21 — Salvage-Runde: 3 bestätigte Fixes + Palette-Coverage aus Pre-Konsolidierungs-QA-Branches geborgen
+
+_Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück auf `main`) enthielten 6 „stale" Branches echt-ungelandeten Inhalt. Gegen den aktuellen `main` verifiziert (parallele Analyse): 3 Fixes + 1 Test-Coverage sind real noch nötig und hier geborgen; die überholten Branches verworfen (Worker-Callback-Teardown ist in `main` anders + getestet gelandet, der CI-Meta-Test war brüchig)._
+
+#### Behoben
+
+- **Scene-Editor „Vorschau senden" läuft jetzt über den Render-Pfad statt roh ins Universe (Safety).** Der direkte `universe.set_channel()`-Write umging Grand-Master/Blackout **und** die Laser-NOT-AUS-Maske → eine Scene-Vorschau konnte einen DMX-Laser trotz NOT-AUS kurz ansteuern. Jetzt `AppState.queue_scene_preview()` = Ein-Frame-Renderschicht (nach Funktionen/Programmer, **vor** allen Mastern, one-shot + selbst-freigebend, Nicht-DMX-Fixtures via `fixture_uses_dmx` übersprungen). `scene_editor._send_preview` ruft nur noch das. Test `tests/test_scene_preview.py`.
+- **Fixture-Editor verliert beim Öffnen→Bearbeiten→Speichern keine Metadaten mehr.** Modus-`description`, Kanal-`invert`, `resolution` und alle `ranges` (Gobo/Shutter-Slots) wurden still verworfen (nur die sichtbaren Tabellenfelder überlebten). Jetzt vollständig durchgereicht (inkl. `ChannelRange`-Rebuild). Test `tests/test_fixture_editor_roundtrip.py`.
+- **Show-Manager-Timeline: Blöcke lassen sich über Track-Grenzen ziehen** (QA-LIVE-Offenpunkt). Vertikales Ziehen weist den Block dem Ziel-Track zu; beim Loslassen wird der Ziel-Track nach `start_time` sortiert + `recalc_duration()` gegen eine stale Gesamtlänge gerufen. Test `tests/test_show_manager_timeline_drag.py`.
+
+#### Tests
+
+- **Palette-UI-Roundtrip-Coverage** (`tests/test_palette_roundtrip.py`, QA-LIVE-Offenpunkt „Palettes"): Color-Palette aus Auswahl aufnehmen → Button im echten Qt-Workflow klicken → Werte einer 2. Spider-Farb-Bank überleben Save/Load.
+
 ### 2026-07-21 — „Grosse Demo Show 2026": konkurrierende PAR-Looks lösen sich ab + Farbwähler wirkt (GDS-4, GDS-5)
 
 #### Behoben
