@@ -53,6 +53,16 @@ class EfxPreviewWidget(QWidget):
         self._phase = 0.0
         self._bounce_dir = 1.0
         self._rand_progress = 0.0   # RANDOM: kontinuierlicher Walk-Progress (Befund [18])
+        # FM-16b Preview-Nachtrag: Mehrkopf-Mover (MOVBAR4/Hydrabeam) zeigen N
+        # phasenversetzte Kopf-Punkte statt 1 — genau die Pro-Kopf-Welle, die
+        # efx.write() ans DMX gibt. Die Kopfzahl je fid wird PRO PAINT frisch aus
+        # dem Patch aufgeloest (ein `get_patched_fixtures()`-Snapshot/Frame,
+        # `get_channels_for_patched` ist ohnehin gecacht) — KEIN persistenter
+        # Cache: so kann kein transienter Fehlwert/Re-Patch eine falsche Kopfzahl
+        # einfrieren (Fallenklasse #6b). `_head_counts_override` ist eine reine
+        # Test-/Aufrufer-Injektion (gewinnt vor der Patch-Aufloesung, entkoppelt
+        # vom app_state).
+        self._head_counts_override: dict[int, int] = {}
         # Editier-Modus: Zentrum per Drag verschieben, Eck-Griffe = Groesse.
         # Ein Callback meldet Geometrie-Aenderungen ({attr: wert}) an die EfxView,
         # die Spinboxen/Modell/zweite Vorschau synchron haelt.
@@ -81,7 +91,54 @@ class EfxPreviewWidget(QWidget):
         self._phase = 0.0
         self._bounce_dir = 1.0
         self._rand_progress = 0.0
+        self._head_counts_override = {}   # neuer EFX -> Overrides verwerfen
         self.update()
+
+    def set_head_counts(self, mapping: dict) -> None:
+        """Kopfzahl je Fixture ({fid: N}) explizit setzen (Tests/Aufrufer, die die
+        Kopfzahl schon kennen). Gewinnt vor der Patch-Aufloesung fuer die genannten
+        fids — entkoppelt die Vorschau vom app_state."""
+        try:
+            self._head_counts_override.update(
+                {int(k): max(1, int(v)) for k, v in dict(mapping).items()})
+        except (TypeError, ValueError):
+            return
+        self.update()
+
+    def _patched_by_fid(self, fids) -> dict:
+        """Ein `{fid: PatchedFixture}`-Snapshot fuer die uebergebenen fids —
+        GENAU EINMAL pro Paint (nicht pro Fixture). Leer, wenn jede benoetigte
+        Kopfzahl schon per Override bekannt ist ODER kein App-State greifbar ist
+        (Teardown/Tests). `get_patched_fixtures()` ist in-memory (kein DB-Hit)."""
+        need = [f for f in fids
+                if f is not None and f not in self._head_counts_override]
+        if not need:
+            return {}
+        try:
+            from src.core.app_state import get_state
+            return {getattr(f, "fid", None): f
+                    for f in get_state().get_patched_fixtures()}
+        except Exception:
+            return {}
+
+    def _head_count_for(self, fid, patched_by_fid: dict) -> int:
+        """Kopfzahl (Pan/Tilt-Motoren) eines fid — PRO PAINT frisch (kein Stale bei
+        Re-Patch, kein eingefrorener Fehlwert). Reihenfolge: expliziter Override →
+        Patch-Aufloesung ueber `pan_tilt_head_count` (dieselbe Quelle wie
+        efx.write()) → sicher 1 (Single-Head, altes 1-Punkt-Verhalten)."""
+        if fid is None:
+            return 1
+        ov = self._head_counts_override.get(fid)
+        if ov is not None:
+            return ov
+        fx = patched_by_fid.get(fid)
+        if fx is None:
+            return 1
+        try:
+            from src.core.app_state import pan_tilt_head_count
+            return max(1, int(pan_tilt_head_count(fx)))
+        except Exception:
+            return 1
 
     def _tick(self):
         e = self._efx
@@ -181,13 +238,58 @@ class EfxPreviewWidget(QWidget):
                 except Exception:
                     pass
 
-        # 3) Fixture-Punkte: bei RANDOM der echte _random_xy-Walk (wie
-        #    EfxInstance._values, dekorreliert ueber i*1.7*spread + Counter-Sign,
-        #    Befund [18]); sonst Verhaeltnis (sync/fan/offset) + Gegenlauf + Mirror.
+        # 3) Fixture-Punkte: Single-Head = EIN Punkt/Gerät; Mehrkopf-Mover
+        #    (MOVBAR4/Hydrabeam) = N phasenversetzte KOPF-Punkte + Wellenlinie —
+        #    genau die Pro-Kopf-Pan/Tilt-Welle, die efx.write() ans DMX gibt
+        #    (FM-16b, gemeinsame Positions-Quelle e.head_phase_points). bei RANDOM
+        #    der echte _random_xy-Walk (wie EfxInstance._values, dekorreliert ueber
+        #    i*1.7*spread + Counter-Sign, Befund [18]); sonst Verhaeltnis
+        #    (sync/fan/offset) + Gegenlauf + Mirror.
         fixtures = list(getattr(e, "fixtures", None) or [])
         n = max(1, len(fixtures))
         counter = bool(getattr(e, "counter_rotate", False))
+        multihead = False       # fuer die Status-Zeile ("Kopf-Welle X%")
+        # Kopfzahl-Snapshot GENAU EINMAL pro Paint (nicht pro Fixture) — frisch,
+        # damit ein Re-Patch sofort greift und kein Fehlwert einfriert (#6b).
+        patched_by_fid = self._patched_by_fid(
+            [getattr(fx, "fid", None) for fx in fixtures])
         for i in range(n):
+            fid = getattr(fixtures[i], "fid", None) if i < len(fixtures) else None
+            hc = self._head_count_for(fid, patched_by_fid) if fid is not None else 1
+            color = QColor(self._DOT_COLORS[i % len(self._DOT_COLORS)])
+            # ── Mehrkopf-Mover: N Kopf-Punkte (state-freie Kopf-Welle wie write) ──
+            if hc >= 2 and i < len(fixtures):
+                multihead = True
+                try:
+                    pts = e.head_phase_points(i, n, self._phase,
+                                              self._rand_progress, hc)
+                except Exception:
+                    pts = []
+                if not pts:
+                    continue
+                px = [self._to_px(pan, tilt, m, w, h) for pan, tilt in pts]
+                # Verbindungslinie (Fixture-Farbe, transluzent) macht die
+                # Kopf-Reihenfolge/Welle sichtbar: Kopf 0 -> Kopf N-1.
+                if len(px) > 1:
+                    p.setPen(QPen(QColor(color.red(), color.green(),
+                                         color.blue(), 110), 1))
+                    for j in range(1, len(px)):
+                        p.drawLine(px[j - 1][0], px[j - 1][1], px[j][0], px[j][1])
+                for hidx, (hx, hy) in enumerate(px):
+                    r = 6 if hidx == 0 else 5
+                    p.setBrush(color)
+                    p.setPen(QPen(QColor("#0d1117"), 1))
+                    p.drawEllipse(QPoint(hx, hy), r, r)
+                    # Kopf-Nummer (1..hc) im Punkt macht den Chase lesbar; die
+                    # Fixture-Identitaet traegt die Farbe.
+                    p.setPen(QColor("#0d1117"))
+                    f = QFont()
+                    f.setPixelSize(8)
+                    p.setFont(f)
+                    p.drawText(QRect(hx - r, hy - r, r * 2, r * 2),
+                               Qt.AlignmentFlag.AlignCenter, str(hidx + 1))
+                continue
+            # ── Single-Head: EIN Punkt/Gerät (Verhalten wie vor FM-16b) ──
             if is_random:
                 mode = getattr(e, "phase_mode", "fan")
                 offs = 0.0 if mode == "sync" else (i * 1.7 * e.spread if n > 1 else 0.0)
@@ -223,7 +325,6 @@ class EfxPreviewWidget(QWidget):
                 if e.mirror and (i % 2 == 1):
                     pan = 255 - pan
             x, y = self._to_px(pan, tilt, m, w, h)
-            color = QColor(self._DOT_COLORS[i % len(self._DOT_COLORS)])
             p.setBrush(color)
             p.setPen(QPen(QColor("#0d1117"), 1))
             p.drawEllipse(QPoint(x, y), 6, 6)
@@ -278,6 +379,11 @@ class EfxPreviewWidget(QWidget):
                 info += f" · Fächer {int(e.spread * 100)}%"
             if getattr(e, "counter_rotate", False):
                 info += " · gegenläufig"
+        # FM-16b: Mehrkopf-Mover fahren eine Pro-Kopf-Welle (head_spread) — auch
+        # bei EINEM zugewiesenen Fixture sichtbar (n==1), daher ausserhalb des
+        # len>1-Blocks.
+        if multihead:
+            info += f" · Kopf-Welle {int(round(e.head_spread * 100))}%"
         if self._editable:
             info += "   ✋ Zentrum ziehen · Ecken = Größe"
         p.drawText(QRect(m, self.height() - m + 2, w, m - 2),

@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-22 — FM-16 (b) Preview-Nachtrag: EFX-Vorschau zeigt Pro-Kopf-Punkte (FM-16 abgeschlossen)
+
+#### Hinzugefügt / Geändert
+
+- **Die EFX-Vorschau (`EfxPreviewWidget`) zeichnet für Mehrkopf-Mover jetzt N phasenversetzte Kopf-Punkte** (+ transluzente Wellenlinie in Fixture-Farbe + Kopf-Nummern) statt eines einzigen Punkts pro Gerät — genau die Pro-Kopf-Pan+Tilt-Welle, die `efx.write()` seit FM-16 (b) ans DMX gibt (schließt den offenen Preview-Nachtrag; **FM-16 damit komplett**). Single-Head-Geräte, Spider (`SpiderEfxPreview`) und der Platzhalter ohne Gerät bleiben unverändert.
+- **Neue state-freie Positions-Quelle `EfxInstance.head_phase_points(i, n, phase, rand_progress, head_count)`** — berechnet die (pan, tilt) ALLER Köpfe eines Geräts bei einer ÜBERGEBENEN Phase (die Vorschau hat ihre eigene Phase, getrennt vom Render). `_head_pan_tilts` delegiert jetzt reine an diese Funktion → **eine einzige Positions-Quelle** für Render UND Vorschau (keine Drift). Der `write()`-DMX-Output ist bit-identisch (bestehende `test_efx_perhead_pan.py` + 329 EFX/Spider-Tests grün); adversarial verifiziert, dass Kopf 0 aus `head_phase_points` == Render-Kopf-0 aus `_values` für **alle** Kombinationen (random/mirror/counter/offset/sync).
+- **Neuer kanonischer Kopfzähler `app_state.pan_tilt_head_count(fixture)`** = `max(#pan, #tilt)` — EINE Quelle für den `write()`-Gate (`head_count ≥ 2`) UND die Vorschau. `efx.write()` nutzt ihn statt der Inline-Zählung.
+- Die Kopfzahl je Fixture wird in der Vorschau **pro Paint frisch** aus dem Patch aufgelöst (ein `get_patched_fixtures()`-Snapshot/Frame; `get_channels_for_patched` ist ohnehin gecacht) — **kein persistenter Cache**, damit ein Re-Patch sofort greift und kein transienter Fehlwert einfriert (adversariale Review, Fallenklasse #6b). Status-Zeile zeigt „· Kopf-Welle X%".
+
+Tests `tests/test_efx_preview_perhead.py` (18: Kopfzähler, `head_phase_points`↔Render-Äquivalenz, Multi-Head- vs Single-Head-Paint-Pfad). Adversariale Review (5 Linsen × Skeptiker, Opus): Bit-Identität + Kopf-Mathematik bestätigt sauber; 1 MEDIUM (Fallback-Cache) vor Merge gefixt; Rest-LOWs kosmetisch/vorbestehend. _Computer-Use-Folgeschritt (interaktives Pro-Kopf-Platzieren im Editor, Live-UX-Abnahme) läuft als eigenständiges **FM-HEADLAYOUT** (P1)._
+
 ### 2026-07-21 — FM-16 (e): Kopf-Matrizen zusammenlegen + Gruppen-Editor versteht Kopf-Zellen
 
 #### Hinzugefügt

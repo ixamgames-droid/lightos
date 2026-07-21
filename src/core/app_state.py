@@ -3254,6 +3254,25 @@ def tilt_head_count(fixture) -> int:
         return 0
 
 
+def pan_tilt_head_count(fixture) -> int:
+    """EFX-Kopfzahl eines beweglichen Geraets = Zahl der ANSTEUERBAREN Pan/Tilt-
+    Koepfe = ``max(#pan, #tilt)`` Motoren (Fine-Kanaele ``pan_fine``/``tilt_fine``
+    zaehlen NICHT mit). 1 = Single-Head-Mover, >=2 = Mehrkopf-Mover (MOVBAR4/
+    Hydrabeam) bzw. Doppelbar-Spider (>=2 Tilt, 0 Pan).
+
+    EINE Quelle fuer die pro-Kopf-Pan/Tilt-Welle im Render (``efx.write()`` gatet
+    genau hierauf: ``head_count >= 2``) UND fuer die Pro-Kopf-Punkte der
+    EFX-Vorschau (FM-16b). Immer >= 1 (nutzt denselben gecachten
+    ``get_channels_for_patched``-Pfad wie ``tilt_head_count``)."""
+    try:
+        chans = get_channels_for_patched(fixture)
+    except Exception:
+        return 1
+    pans = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "pan")
+    tilts = sum(1 for c in chans if (getattr(c, "attribute", "") or "") == "tilt")
+    return max(1, pans, tilts)
+
+
 def is_dual_tilt_fixture(fixture) -> bool:
     """True fuer ALLE spider-/doppeltilter-artigen Geraete: >=2 separate Tilt-
     Kanaele UND KEIN Pan. Solche Geraete bewegen sich ausschliesslich ueber Tilt
