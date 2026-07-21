@@ -16,7 +16,7 @@ In dieser Anleitung lernst du, wie du im Programmer über den Color-Tab Farben f
 
 ![Dialog „Kanäle auswählen", nur „Color (32 Werte)" angehakt](img/03_speichern_nur_color_dialog.png)
 
-4. Nutze **„Fan Color…"**, um **ein einzelnes Farb-Attribut** über die Geräte zu fächern. Ein „Apply Fan" fächert immer nur **ein** Attribut – wähle also z. B. den Blau-Kanal und lasse ihn über die PARs ansteigen. (Ein echter Magenta→Blau-Übergang bräuchte mehrere gefächerte Kanäle und ist mit einem einzigen „Apply Fan" nicht herstellbar.) Klicke auf **„Apply Fan"** und speichere das Ergebnis als **„PAR Verlauf"**.
+4. Nutze das **Fächer-Tool** (Programmer-Toolbar-Button **„Fächer…"** bzw. **„Fächern: PAR…"**), um **ein einzelnes Attribut** über die Geräte zu fächern. Wähle im Dialog unter **„Attribut:"** den Farbkanal (z. B. **„Blau"**) und lass ihn über die PARs ansteigen – ein **„Fächer anwenden"** wirkt immer nur auf **ein** Attribut. (Ein echter Magenta→Blau-Übergang bräuchte mehrere gefächerte Kanäle und ist mit einem einzigen Fächer nicht herstellbar.) Klicke auf **„Fächer anwenden"** und speichere das Ergebnis als **„PAR Verlauf"**.
 
 ![Fan Tool Color, Blau-Kanal über die PARs gefächert](img/04_fan_color_verlauf.png)
 
