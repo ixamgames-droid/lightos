@@ -145,15 +145,12 @@ def _parse_cell(value) -> tuple:
     """Zerlegt einen positions_json-Zellwert in ``(fid, head|None)`` — rueckwaerts-
     kompatibel (FM-16). Ein reiner Zahlwert (``5`` oder ``"5"``) = GANZES Fixture
     -> ``(5, None)``; ``"5:2"`` = KOPF 2 des Fixtures 5 -> ``(5, 2)`` (Pro-Kopf-
-    Matrix). Alt-Shows/-Gruppen (nur fids) laden damit unveraendert."""
-    try:
-        s = str(value)
-        if ":" in s:
-            fid_s, head_s = s.split(":", 1)
-            return int(fid_s), int(head_s)
-        return int(s), None
-    except Exception:
-        return None, None
+    Matrix). Alt-Shows/-Gruppen (nur fids) laden damit unveraendert.
+
+    Delegiert an die kanonische ``group_cells.parse_group_cell`` (EINE Parse-Quelle
+    fuer Matrix-Engine UND alle Gruppen-fid-Resolver, FM16E-HEADCOUNT)."""
+    from src.core.group_cells import parse_group_cell
+    return parse_group_cell(value)
 
 
 def grids_from_positions(positions: dict, cols: int, rows: int) -> tuple:

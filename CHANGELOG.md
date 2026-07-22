@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-22 — FM16E-HEADCOUNT: Kopf-Matrix-Gruppen zeigen ihre Geräte statt „(0)" (eine Zell-Parse-Quelle)
+
+#### Behoben
+
+- **Eine per `create_head_matrix_group` entstandene Kopf-Matrix-Gruppe („… · Köpfe") zeigte „(0) Geräte" und selektierte nichts im Attribut-Editor.** Mehrere fid-Resolver parsten den `positions_json`-Zellwert je für sich per `int(v)` — das warf bei einer Kopf-Zelle `"5:2"` (`ValueError`) und liess die Zelle **still fallen**. Ein Teilfix in nur einer View hätte eine Cross-View-Inkonsistenz erzeugt, daher **alle** Sites über **eine** Quelle vereinheitlicht.
+- **Neues Leaf-Modul `src/core/group_cells.py`** (`parse_group_cell(v)→(fid,head)` + `base_fids_in_grid_order(positions)→[fid]`, dedupliziert, Rasterreihenfolge; dependency-frei → kein Import-Zyklus). Darauf umgestellt: die Kern-Resolver `AppState._group_lookup` (speist `group_fids_by_name`/`select_group_by_name` → VC-Slider/Buttons/Effect-Wizard/Preset-Browser) + `list_fixture_groups`, dazu `ProgrammerView._group_fids` und `EfxView._active_group_fids`. Die beiden schon korrekten Parser (`rgb_matrix._parse_cell`, `fixture_group_view._split_cell`) **delegieren** jetzt an `parse_group_cell` → **keine Parser-Drift** mehr. Kopf-Matrix-Gruppen liefern damit ihre deduplizierten Basis-fids (Count > 0, korrekt selektierbar); reine-fid-Alt-Gruppen unverändert; Matrix-Render (`grids_from_positions`) unverändert.
+- **live_view-Gruppen-Panel (adversariale Review, MEDIUM):** dieselbe Klasse, anderes Fehlermodell — die Anzeige reichte den Roh-Zellwert durch, sodass Auswahl einer Kopf-Matrix-Gruppe im Live-Canvas **nichts** hervorhob (Strings in ein `set[int]`), der Zähler „(4)" statt Geräte zeigte und die Detail-Box auf `f"{fid:03d}"` warf. Count + Highlight + Detail laufen jetzt ebenfalls über `base_fids_in_grid_order`. _(Die Add-/Remove-Editierpfade des Simple-Panels reshapen eine Kopf-Matrix wie gehabt auf 1×N — Encoding bleibt erhalten; interaktives 2D-Editieren gehört zu FM-HEADLAYOUT.)_
+
+Tests `tests/test_fm16e_headcount.py` (20: Parser · Delegation-Identität · alle 5 Resolver E2E gegen echte Show-DB · live_view-Panel). Adversariale Review (3 Linsen × Skeptiker, Opus): int()-Skip-Muster vollständig gefixt bestätigt; 1 MEDIUM (live_view) vor Merge gefixt; 2 Kandidaten widerlegt (Exception-Granularität unverändert; Float-Zellwerte kommen real nie vor).
+
 ### 2026-07-22 — FM-16 (b) Preview-Nachtrag: EFX-Vorschau zeigt Pro-Kopf-Punkte (FM-16 abgeschlossen)
 
 #### Hinzugefügt / Geändert

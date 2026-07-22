@@ -897,15 +897,10 @@ class ProgrammerView(QWidget):
             pos = json.loads(group.positions_json or "{}")
         except Exception:
             return []
-        items = []
-        for key, fid in pos.items():
-            try:
-                c, r = key.split(",")
-                items.append((int(r), int(c), int(fid)))
-            except Exception:
-                continue
-        items.sort()
-        return [fid for _, _, fid in items]
+        # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" -> Basis-fid (eine Parse-Quelle
+        # group_cells) — sonst ueberspringt int("5:2") die Kopf-Matrix-Gruppe still.
+        from src.core.group_cells import base_fids_in_grid_order
+        return base_fids_in_grid_order(pos)
 
     def _refresh_group_list(self):
         self._group_list.clear()

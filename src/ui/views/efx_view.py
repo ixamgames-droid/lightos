@@ -662,7 +662,11 @@ class EfxView(QWidget):
             with Session(eng) as s:
                 g = s.get(FixtureGroup, gid)
                 pos = json.loads(g.positions_json or "{}") if g is not None else {}
-            return {int(v) for v in pos.values()}
+            # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" -> Basis-fid (eine Parse-
+            # Quelle) — sonst wirft int("5:2") und die Kopf-Matrix-Gruppe faellt
+            # aus dem EFX-Geraete-Zugehoerigkeitsfilter.
+            from src.core.group_cells import base_fids_in_grid_order
+            return set(base_fids_in_grid_order(pos))
         except Exception:
             return set()
 
