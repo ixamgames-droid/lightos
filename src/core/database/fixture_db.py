@@ -2101,6 +2101,137 @@ def _add_robe_pointe(s, mfr):
     ])
 
 
+# -- (B2) Robe MegaPointe (FM-15) — Beam/Spot/Wash-Hybrid, Standard 16-bit 39ch -
+# Chart DOPPELT verifiziert: offizielles Robe-DMX-Protokoll v1.5 + Blizzard-Lighting-
+# Fixture-Library (.fix, Brand Robe, 2017) — kanal-fuer-kanal deckungsgleich
+# (Mode1 39ch / Mode2 34ch). QLC+ UND OFL enthalten die MegaPointe NICHT (nur die
+# aeltere, andere Pointe) -> Robe-Protokoll + unabhaengige Blizzard-Lib als Doppel-
+# quelle. fixture_type 'moving_head' -> buildMovingHead. Single-Head: 0 color_r ->
+# kein is_spider_fixture, 1 pan / 1 tilt -> kein Mehrkopf; Farbe ueber echtes CMY
+# (cmy_c/m/y, Ch7-9) + Farbrad (Ch10). NUR der volle 39ch-Standard-16bit-Modus als
+# Builtin; der reduzierte 34ch-8bit-Modus (ohne die 5 Fine-Kanaele) ist eine
+# triviale spaetere Ergaenzung. **KEINE Iris** (die MegaPointe hat keinen Iris-Kanal
+# — Beam-Verkleinerung via Zoom + Beam-Reducer im statischen Gobo-Rad). Viele
+# Spezial-/Fine-Kanaele OHNE kanonisches Attribut -> 'raw' (etablierte Konvention,
+# vgl. L2600-Fines): Virtuelles Farbrad, Effektrad, Pattern, Beam-Shaper, Hotspot,
+# 2. Prisma, alle Fine-Kanaele. Safety-Defaults: Shutter 32 = offen (0-31 zu; dunkel
+# via Dimmer 0), Dimmer 0, Power/Special 0 = keine Funktion (kein versehentl. Reset/
+# Lampe-aus), Rotationen 0 = keine Rotation.
+_MEGAPNT_POWER = [
+    (0,   9,   "Keine Funktion",           ""),
+    (80,  89,  "Autofokus an/aus",         ""),
+    (130, 139, "Lampe an",                 ""),
+    (140, 199, "Reset-Funktionen",         "reset"),
+    (200, 209, "Total-Reset",              "reset"),
+    (230, 239, "Lampe AUS",                ""),
+    (240, 255, "RoboSpot-Modus",           ""),
+]
+_MEGAPNT_COLOUR = [
+    (0,   0,   "Offen / Weiß",             "open"),
+    (1,   81,  "Vollfarben (indexiert)",   "color"),
+    (82,  110, "CTO 2700K → 3200K",        "color"),
+    (111, 129, "Weiß / UV",                "color"),
+    (190, 215, "Regenbogen vorwärts",      "rotate"),
+    (216, 217, "Keine Rotation",           "open"),
+    (218, 243, "Regenbogen rückwärts",     "rotate"),
+    (250, 255, "Auto-Zufallsfarbe",        "rotate"),
+]
+_MEGAPNT_STATIC_GOBO = [
+    (0,   3,   "Offen",                    "open"),
+    (4,   63,  "Statische Gobos 1–10",     "gobo"),
+    (64,  87,  "Beam-Reducer 1–4",         "gobo"),
+    (88,  199, "Gobo-Shake",               "shake"),
+    (200, 201, "Offen",                    "open"),
+    (202, 243, "Rad-Rotation vor/zurück",  "rotate"),
+    (250, 255, "Auto (Audio)",             "rotate"),
+]
+_MEGAPNT_ROT_GOBO = [
+    (0,   0,   "Offen",                    "open"),
+    (5,   31,  "Rotier-Gobos 1–9 (Index)", "gobo"),
+    (32,  59,  "Rotier-Gobos 1–9 (rot.)",  "gobo"),
+    (200, 201, "Offen",                    "open"),
+    (202, 243, "Rad-Rotation vor/zurück",  "rotate"),
+]
+_MEGAPNT_PRISM = [
+    (0,   3,   "Kein Prisma",              "open"),
+    (4,   15,  "Prisma 1–3 (Index)",       "prism"),
+    (16,  27,  "Prisma 1–3 (rotierend)",   "prism"),
+]
+_MEGAPNT_ANIM = [
+    (0,   19,  "Keine Funktion",           ""),
+    (20,  127, "Effektrad indexiert",      ""),
+    (128, 255, "Effektrad Ramping",        ""),
+]
+_MEGAPNT_FROST = [
+    (0,   0,   "Offen (kein Frost)",       "open"),
+    (1,   86,  "Light Frost",              "frost"),
+    (87,  172, "Medium Frost",             "frost"),
+    (173, 255, "Combined Frost",           "frost"),
+]
+_MEGAPNT_SHUTTER = [
+    (0,   31,  "Geschlossen",              "closed"),
+    (32,  63,  "Offen",                    "open"),
+    (64,  95,  "Strobe langsam → schnell", "strobe"),
+    (96,  127, "Offen",                    "open"),
+    (128, 159, "Puls-Strobe",              "strobe"),
+    (160, 191, "Offen",                    "open"),
+    (192, 223, "Zufalls-Strobe",           "strobe"),
+    (224, 255, "Offen, volle Lampe",       "open"),
+]
+
+
+def _add_robe_megapointe(s, mfr):
+    """Robe MegaPointe — Beam/Spot/Wash-Hybrid Moving Head (Standard 16-bit, 39ch).
+    fixture_type 'moving_head' -> buildMovingHead. Single-Head (0 color_r, 1 pan/
+    1 tilt). Farbe: echtes CMY (cmy_c/m/y) + Farbrad + (virtuelles Farbrad -> raw).
+    KEINE Iris. Spezial-/Fine-Kanaele ohne kanonisches Attribut -> 'raw'. Safety:
+    Shutter 32 = offen, Dimmer 0, Power 0 = keine Funktion. Chart doppelt verifiziert
+    (Robe-Protokoll v1.5 + Blizzard-Lib)."""
+    _add_fixture(s, mfr, "MegaPointe (Beam/Spot 39ch)", "MEGAPNT", "moving_head", 470, [
+        ("39-Kanal (Standard 16-bit)", [
+            ("Pan",                  "pan",            128, 128),
+            ("Pan Fein",             "pan_fine",       0,   0),
+            ("Tilt",                 "tilt",           128, 128),
+            ("Tilt Fein",            "tilt_fine",      0,   0),
+            ("P/T-Speed",            "speed",          0,   0),
+            ("Power/Spezialfunkt.",  "macro",          0,   0, _MEGAPNT_POWER),
+            ("Cyan",                 "cmy_c",          0,   0),
+            ("Magenta",              "cmy_m",          0,   0),
+            ("Gelb",                 "cmy_y",          0,   0),
+            ("Farbrad",              "color_wheel",    0,   0, _MEGAPNT_COLOUR),
+            ("Farbrad Fein",         "raw",            0,   0),
+            ("Virtuelles Farbrad",   "raw",            0,   0),
+            ("Effekt-Speed (CMY)",   "effect_speed",   0,   0),
+            ("CMY/Farbrad-Zeit",     "raw",            0,   0),
+            ("Effekt-Zeit",          "raw",            0,   0),
+            ("Effektrad-Position",   "animation",      0,   0, _MEGAPNT_ANIM),
+            ("Effektrad-Rotation",   "raw",            0,   0),
+            ("Effektrad-Animation",  "raw",            0,   0),
+            ("Statisches Gobo",      "gobo_wheel",     0,   0, _MEGAPNT_STATIC_GOBO),
+            ("Rotier-Gobo",          "gobo_wheel2",    0,   0, _MEGAPNT_ROT_GOBO),
+            ("Gobo-Rotation",        "gobo_rotation",  0,   0),
+            ("Gobo-Rotation Fein",   "raw",            0,   0),
+            ("Prisma 1",             "prism",          0,   0, _MEGAPNT_PRISM),
+            ("Prisma-1-Rotation",    "prism_rotation", 0,   0),
+            ("Prisma 2",             "raw",            0,   0),
+            ("Prisma-2-Rotation",    "raw",            0,   0),
+            ("Pattern-Wahl",         "raw",            0,   0),
+            ("Pattern-Rotation",     "raw",            0,   0),
+            ("Beam-Shaper-Wahl",     "raw",            0,   0),
+            ("Beam-Shaper-Rotation", "raw",            0,   0),
+            ("Frost",                "frost",          0,   0, _MEGAPNT_FROST),
+            ("Zoom",                 "zoom",           128, 128),
+            ("Zoom Fein",            "raw",            0,   0),
+            ("Fokus",                "focus",          128, 128),
+            ("Fokus Fein",           "raw",            0,   0),
+            ("Hotspot",              "raw",            0,   0),
+            ("Shutter/Strobe",       "shutter",        32,  32, _MEGAPNT_SHUTTER),
+            ("Dimmer",               "intensity",      0,   255),
+            ("Dimmer Fein",          "raw",            0,   0),
+        ]),
+    ])
+
+
 # -- (C) Martin MAC Aura (RGBW-LED-Wash Moving Head, Standard 14-Kanal) --------
 # Chart: QLC+ Martin-MAC-Aura.qxf (Standard-Modus) + offizielles Martin-Manual
 # (Gegencheck: identisch, Werksdefault Shutter 22 = offen). NUR der Standard-14ch-
@@ -2341,6 +2472,9 @@ def ensure_builtins():
             changed = True
         if "POINTE" not in have:                          # Katalog Runde 4
             _add_robe_pointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+            changed = True
+        if "MEGAPNT" not in have:                         # FM-15: Robe MegaPointe
+            _add_robe_megapointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
             changed = True
         if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
             _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
@@ -2646,6 +2780,7 @@ def _seed(s: Session):
     robe = Manufacturer(name="Robe", short_name="ROBE")
     s.add(robe)
     _add_robe_pointe(s, robe)
+    _add_robe_megapointe(s, robe)                        # FM-15
 
     # ── FM-13: LED-Matrix/Pixel-Panel als eigener Fixture-Typ ─────────────────
     _add_generic_matrix_panel(s, generic)

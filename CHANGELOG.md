@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-22 — FM-15: Robe MegaPointe als Builtin (namhafter Beam/Spot/Wash-Hybrid, 39ch)
+
+#### Hinzugefügt
+
+- **Neues Builtin „Robe MegaPointe" (`MEGAPNT`, 39-Kanal Standard-16-bit-Modus, `moving_head`).** Namhafter Profi-Beam/Spot/Wash-Hybrid mit dem vollen Feature-Set (CMY-Farbmischung + Farbrad, 2 Gobo-Räder + Rotation, 2 Prismen, Effektrad, Frost, Zoom, Fokus, Shutter/Strobe, Dimmer). **Chart doppelt verifiziert:** offizielles Robe-DMX-Protokoll v1.5 + unabhängige Blizzard-Lighting-Fixture-Library (`.fix`, Brand Robe) — kanal-für-kanal deckungsgleich. _(QLC+ und OFL enthalten die MegaPointe **nicht** — nur die ältere, andere Pointe; daher Robe-Protokoll + Blizzard-Lib als Doppelquelle.)_
+- **Korrektheits-Details:** Farbe über echtes **CMY** (`cmy_c/m/y`, FLA-2-Kanonik) + Farbrad — **kein** RGB. **Keine Iris** (die MegaPointe hat keinen Iris-Kanal; fehlerhafte Community-Charts erfinden eine — Beam-Verkleinerung läuft über Zoom + Beam-Reducer im statischen Gobo-Rad). Kern-Beam-Features über kanonische Attribute (exact-match, keine Vokabular-Änderung nötig); Spezial-/Fine-Kanäle ohne kanonisches Attribut (virtuelles Farbrad, Effektrad, Pattern, Beam-Shaper, Hotspot, 2. Prisma, alle Fine-Kanäle) → `raw` (etablierte Konvention, vgl. L2600-Fines). **Single-Head** trotz der wiederholten `raw`-Kanäle (0 `color_r`, 1 Pan / 1 Tilt → `is_spider_fixture` False, `moving_head`/`buildMovingHead` wiederverwendet). **Safety-Defaults:** Shutter 32 = offen (0-31 zu; dunkel via Dimmer 0), Dimmer 0, Power/Special 0 = keine Funktion (kein versehentlicher Reset / keine Lampe-aus).
+
+Tests `tests/test_robe_megapointe_profile.py` (8: verifizierte 39ch-Sequenz, Single-Head-trotz-`raw`, keine Iris, CMY→Color, Safety-Defaults, Shutter-/Power-Range-Sicherheit). _(Der reduzierte 34ch-8-bit-Modus ist eine triviale spätere Ergänzung.)_
+
 ### 2026-07-22 — FM16E-HEADCOUNT: Kopf-Matrix-Gruppen zeigen ihre Geräte statt „(0)" (eine Zell-Parse-Quelle)
 
 #### Behoben
