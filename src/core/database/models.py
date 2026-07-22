@@ -128,6 +128,18 @@ class PatchedFixture(Base):
     # tilt/tilt gemappt wurden. Auto-Erkennung ist unmoeglich (echte Pan+Tilt-Mover
     # sehen strukturell identisch aus), daher setzt der Nutzer es bewusst im Patch.
     spider_dual_tilt: Mapped[bool] = mapped_column(Boolean, default=False)
+    # FM-HEADLAYOUT: WIE ein Mehrkopf-Geraet (Spider/Mover-Bar/Hydrabeam) programmiert
+    # werden soll. Steuert, ob beim Patchen automatisch die Pro-Kopf-Matrix-Gruppe
+    # ("… · Köpfe", create_head_matrix_group) angelegt wird:
+    #   "auto"   = Bestandsverhalten (Gruppe wird automatisch angelegt) — DEFAULT,
+    #              damit Alt-Shows sich exakt wie bisher verhalten.
+    #   "heads"  = Koepfe einzeln: die Kopf-Matrix-Gruppe SOLL existieren (wird beim
+    #              Speichern idempotent angelegt/wiederhergestellt).
+    #   "single" = als EINE Lampe: keine automatische Kopf-Matrix-Gruppe.
+    # WICHTIG: der Modus loescht NIE eine bestehende Gruppe (zusammengelegte/
+    # bearbeitete Matrizen bleiben unangetastet) — "single" verhindert nur das
+    # automatische Neuanlegen.
+    head_mode: Mapped[str] = mapped_column(String(16), default="auto")
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
@@ -165,6 +177,12 @@ class FixtureGroup(Base):
     folder: Mapped[str] = mapped_column(String(200), default="")
 
 
+# FM-HEADLAYOUT: gueltige Werte + Normalisierer von PatchedFixture.head_mode
+# liegen im Leaf-Modul `src/core/head_mode.py` (HEAD_MODES /
+# normalize_head_mode) — dort zyklenfrei UND auch dann importierbar, wenn Tests
+# dieses models-Modul ausstubben.
+
+
 def migrate_show_db(engine) -> None:
     """Idempotente Light-Migrationen fuer bestehende Show-DBs (current_show.db).
     create_all() legt fehlende TABELLEN an, aber keine fehlenden SPALTEN — daher
@@ -186,6 +204,12 @@ def migrate_show_db(engine) -> None:
             if pcols and "spider_dual_tilt" not in pcols:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN spider_dual_tilt BOOLEAN DEFAULT 0"))
+            # FM-HEADLAYOUT: Mehrkopf-Programmiermodus (auto|heads|single). Default
+            # 'auto' = Bestandsverhalten -> Alt-Shows verhalten sich unveraendert.
+            if pcols and "head_mode" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN head_mode "
+                    "VARCHAR(16) DEFAULT 'auto'"))
             # Pan/Tilt physische Bereiche + Nullpunkt (Moving-Head-Aim/Visualizer).
             for _col, _def in (("pan_range_deg", 540), ("tilt_range_deg", 270),
                                ("pan_zero_dmx", 128), ("tilt_zero_dmx", 128)):
