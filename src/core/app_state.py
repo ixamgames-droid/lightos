@@ -642,7 +642,11 @@ class AppState:
             bound = next(
                 (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
             )
-            if bound is not None:
+            # FM-HEADLAYOUT: head_mode == "single" ("als EINE Lampe") unterdrueckt
+            # die automatische Kopf-Matrix-Gruppe. "auto" (Default, Alt-Shows) und
+            # "heads" legen sie wie bisher an.
+            _hmode = str(getattr(bound, "head_mode", "auto") or "auto")
+            if bound is not None and _hmode != "single":
                 try:
                     self.create_head_matrix_group(bound)
                 except Exception as e:
@@ -654,6 +658,61 @@ class AppState:
                 undo=lambda s=snapshot: self.remove_fixture(s["fid"], undoable=False),
                 redo=lambda s=snapshot: self._restore_fixture_dict(s),
             )
+
+    def _scan_head_matrix_group(self, fid_i: int, dedicated: bool) -> int | None:
+        """Interner Scan — WIRFT bei DB-Fehlern (damit ``create_head_matrix_group``
+        einen fehlgeschlagenen Scan NICHT als „nicht vorhanden" missdeutet und ein
+        Duplikat anlegt, Review-Fund LOW)."""
+        import json as _json
+        from sqlalchemy import select as _select
+        from src.core.database.models import FixtureGroup as _FG
+        from .group_cells import parse_group_cell
+        with self._session() as s:
+            stmt = _select(_FG)
+            if dedicated:
+                stmt = stmt.where(_FG.folder == "Multi-Head")
+            for g in s.execute(stmt).scalars().all():
+                try:
+                    pos = _json.loads(g.positions_json or "{}")
+                except Exception:
+                    continue
+                cells = [parse_group_cell(v) for v in (pos or {}).values()]
+                if dedicated:
+                    # Die DEDIZIERTE Auto-Gruppe: AUSSCHLIESSLICH Koepfe DIESES
+                    # fid (identisch zum Cleanup in remove_fixture). Eine vom
+                    # Nutzer zusammengelegte Matrix (mehrere fids) zaehlt NICHT.
+                    if cells and all(h is not None and cf == fid_i
+                                     for cf, h in cells):
+                        return g.id
+                else:
+                    if any(h is not None and cf == fid_i for cf, h in cells):
+                        return g.id
+        return None
+
+    def find_head_matrix_group(self, fid, *, dedicated: bool = False) -> int | None:
+        """FM-HEADLAYOUT: id der Pro-Kopf-Matrix-Gruppe zu ``fid`` — sonst ``None``.
+        Read-only, fehlertolerant.
+
+        ``dedicated=False`` (breit): IRGENDEINE Gruppe adressiert ``fid`` kopfweise
+        (Zellen ``"fid:head"``) — das ist der Idempotenz-Begriff von
+        ``create_head_matrix_group`` (kein zweites Kopf-Adressierungs-Raster).
+        ``dedicated=True`` (eng): die beim Patchen erzeugte AUTO-Gruppe (Ordner
+        „Multi-Head", ausschliesslich Koepfe dieses fid) — dafuer, dass die Status-
+        Anzeige im Patch-Dialog nicht „vorhanden" meldet, obwohl nur eine
+        zusammengelegte Fremd-Matrix die Koepfe abdeckt (Review-Fund MEDIUM).
+        Nutzt den kanonischen Zell-Parser (``group_cells``)."""
+        eng = getattr(self, "_show_engine", None)
+        if eng is None or fid is None:
+            return None
+        try:
+            fid_i = int(fid)
+        except (TypeError, ValueError):
+            return None
+        try:
+            return self._scan_head_matrix_group(fid_i, dedicated)
+        except Exception as e:
+            debug_swallow("app_state.find_head_matrix_group", e)
+            return None
 
     def create_head_matrix_group(self, fixture, *, emit: bool = True) -> int | None:
         """FM-16: Legt fuer ein MULTI-HEAD-Fixture (>=2 color_r-Baenke, z. B. Spider/
@@ -687,16 +746,15 @@ class AppState:
                  or getattr(fixture, "fixture_name", None) or f"Fixture {fid}")
         positions = {f"{i},0": f"{fid}:{i}" for i in range(n)}
         try:
+            # Idempotenz: adressiert schon IRGENDEINE Gruppe dieses fid kopfweise?
+            # Der Scan liegt BEWUSST im try und wirft bei DB-Fehlern — sonst
+            # wuerde ein fehlgeschlagener Scan als „nicht vorhanden" gelten und
+            # ein Duplikat anlegen (Review-Fund). Gleiche Quelle wie die Status-
+            # Anzeige im Patch-Dialog (dort eng, hier breit).
+            existing = self._scan_head_matrix_group(int(fid), False)
+            if existing is not None:
+                return existing
             with self._session() as s:
-                # Idempotenz: existiert schon eine Kopf-Gruppe fuer genau dieses fid?
-                for g in s.execute(_select(_FG)).scalars().all():
-                    try:
-                        pos = _json.loads(g.positions_json or "{}")
-                    except Exception:
-                        continue
-                    if any(":" in str(v) and str(v).split(":", 1)[0] == str(fid)
-                           for v in pos.values()):
-                        return g.id
                 g = _FG(name=f"{label} · Köpfe", cols=n, rows=1,
                         positions_json=_json.dumps(positions), folder="Multi-Head")
                 s.add(g)
@@ -920,10 +978,18 @@ class AppState:
             "fixture_name", "fixture_type", "invert_pan",
             "invert_tilt", "swap_pan_tilt", "dimmer_curve",
             "spider_mirrored", "spider_dual_tilt",
+            # FM-HEADLAYOUT: OHNE diesen Eintrag wird die Mehrkopf-Modus-Wahl aus
+            # dem Patch-Dialog STILL verworfen (Review-Fund HIGH) -> Feature tot.
+            "head_mode",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
             "protocol", "net_host",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
+        if "head_mode" in values:
+            # Garbage aus Skript-/Remote-Pfaden klemmen (kanonische Quelle:
+            # Leaf-Modul core.head_mode — dieselbe wie die Show-Persistenz).
+            from .head_mode import normalize_head_mode
+            values["head_mode"] = normalize_head_mode(values["head_mode"])
         if not values:
             return False
 
@@ -987,6 +1053,9 @@ class AppState:
             "dimmer_curve": f.dimmer_curve,
             "spider_mirrored": getattr(f, "spider_mirrored", True),
             "spider_dual_tilt": getattr(f, "spider_dual_tilt", False),
+            # FM-HEADLAYOUT: OHNE dies verliert Loeschen+Undo den Modus UND legt
+            # die per "single" unterdrueckte Kopf-Gruppe wieder an (Review-Fund).
+            "head_mode": getattr(f, "head_mode", "auto") or "auto",
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -1012,6 +1081,7 @@ class AppState:
             dimmer_curve=d.get("dimmer_curve", "linear"),
             spider_mirrored=d.get("spider_mirrored", True),
             spider_dual_tilt=d.get("spider_dual_tilt", False),
+            head_mode=d.get("head_mode", "auto") or "auto",   # FM-HEADLAYOUT
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),

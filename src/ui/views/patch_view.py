@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
-from src.core.app_state import (get_state, AppState,
+from src.core.app_state import (get_state, AppState, color_head_count,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
@@ -79,6 +79,9 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         swap_pan_tilt=src.swap_pan_tilt,
         spider_mirrored=src.spider_mirrored,
         spider_dual_tilt=src.spider_dual_tilt,
+        # FM-HEADLAYOUT: Mehrkopf-Programmiermodus mitkopieren (sonst faellt die
+        # Kopie still auf den ORM-Default 'auto' zurueck).
+        head_mode=getattr(src, "head_mode", "auto") or "auto",
         pan_range_deg=src.pan_range_deg,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
@@ -126,6 +129,10 @@ class PatchFixtureEditDialog(QDialog):
         self._state = state
         self._fixture = fixture
         self.result_updates: dict | None = None
+        # FM-HEADLAYOUT: Wunsch „Kopf-Matrix soll existieren" (Modus „Köpfe
+        # einzeln"). Der Aufrufer stellt sie NACH dem Persistieren her — im
+        # _on_accept waere der Zustand (Modus/Label/Modus-Kanalzahl) noch stale.
+        self.wants_head_group: bool = False
         self._modes = fdb.get_modes(fixture.fixture_profile_id) if fixture.fixture_profile_id else []
         self.setWindowTitle("Gerät bearbeiten")
         self.setMinimumWidth(440)
@@ -282,6 +289,60 @@ class PatchFixtureEditDialog(QDialog):
                 "importierte Motor wird dabei als zweiter Tilt-Bar angesteuert.")
             form.addRow("Spider-Steuerung:", self._chk_spider_dual)
 
+        # FM-HEADLAYOUT: WIE soll dieses MEHRKOPF-Geraet programmiert werden?
+        # Bewusst an derselben Stelle wie Invert/Swap (Davids Wunsch 2026-07-22) —
+        # nur bei echten Mehrkopf-Geraeten (>=2 pro-Kopf faerbbare Baenke), denn nur
+        # dort legt create_head_matrix_group ueberhaupt eine Kopf-Matrix an.
+        self._combo_head_mode = None
+        self._lbl_head_group = None
+        try:
+            _heads = color_head_count(self._fixture)
+        except Exception:
+            _heads = 1
+        if _heads >= 2:
+            self._combo_head_mode = QComboBox()
+            for _key, _label in (
+                ("auto",   "Automatisch (beim Patchen anlegen)"),
+                ("heads",  f"Köpfe einzeln — Kopf-Matrix ({_heads} Köpfe)"),
+                ("single", "Als EINE Lampe (keine Kopf-Matrix)"),
+            ):
+                self._combo_head_mode.addItem(_label, _key)
+            _cur = str(getattr(self._fixture, "head_mode", "auto") or "auto")
+            _i = self._combo_head_mode.findData(_cur)
+            self._combo_head_mode.setCurrentIndex(_i if _i >= 0 else 0)
+            self._combo_head_mode.setToolTip(
+                "Wie dieses Mehrkopf-Gerät (Spider/Mover-Bar/Hydrabeam) programmiert\n"
+                "werden soll:\n"
+                "• Automatisch – wie bisher: beim Patchen wird die Pro-Kopf-Matrix-\n"
+                "  Gruppe („… · Köpfe\") angelegt.\n"
+                "• Köpfe einzeln – die Kopf-Matrix soll existieren; beim Speichern\n"
+                "  wird sie angelegt bzw. wiederhergestellt (idempotent).\n"
+                "• Als EINE Lampe – keine automatische Kopf-Matrix; das Gerät wird\n"
+                "  als ein einzelnes Fixture programmiert.\n\n"
+                "Der Modus LÖSCHT NIE eine bestehende Gruppe — zusammengelegte oder\n"
+                "bearbeitete Matrizen bleiben unangetastet.")
+            form.addRow("Mehrkopf-Programmierung:", self._combo_head_mode)
+
+            # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
+            # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.
+            _row = QHBoxLayout()
+            _row.setContentsMargins(0, 0, 0, 0)
+            self._lbl_head_group = QLabel("")
+            _btn_restore = QPushButton("Wiederherstellen")
+            _btn_restore.setToolTip(
+                "Legt die Pro-Kopf-Matrix-Gruppe für dieses Gerät (wieder) an.\n"
+                "Wirkt SOFORT (unabhängig von „Speichern\"/„Abbrechen\" unten).\n"
+                "Idempotent und nicht-destruktiv: existiert bereits eine Gruppe,\n"
+                "die diese Köpfe adressiert, bleibt sie unverändert — es entsteht\n"
+                "kein Duplikat.")
+            _btn_restore.clicked.connect(self._restore_head_group)
+            _row.addWidget(self._lbl_head_group, 1)
+            _row.addWidget(_btn_restore)
+            _wrap = QWidget()
+            _wrap.setLayout(_row)
+            form.addRow("Kopf-Matrix-Gruppe:", _wrap)
+            self._update_head_group_status()
+
         layout.addLayout(form)
 
         self._lbl_warn = QLabel("")
@@ -392,7 +453,65 @@ class PatchFixtureEditDialog(QDialog):
             self.result_updates["spider_mirrored"] = bool(self._combo_spider.currentData())
         if self._chk_spider_dual is not None:
             self.result_updates["spider_dual_tilt"] = self._chk_spider_dual.isChecked()
+        if self._combo_head_mode is not None:
+            _hm = str(self._combo_head_mode.currentData() or "auto")
+            self.result_updates["head_mode"] = _hm
+            # „Köpfe einzeln" heisst: die Kopf-Matrix SOLL existieren. NUR den
+            # Wunsch markieren — der Aufrufer legt sie NACH dem Persistieren aus
+            # dem frischen Patch-Objekt an (sonst stale Label/Kanalzahl, und ein
+            # spaeter abgebrochener Speichervorgang haette schon geschrieben).
+            # Nicht-destruktiv: „Als EINE Lampe" loescht NICHTS.
+            self.wants_head_group = (_hm == "heads")
         self.accept()
+
+    def _update_head_group_status(self):
+        """Status-Label mit DREI ehrlichen Zustaenden — die dedizierte Auto-Gruppe
+        („Multi-Head", nur Koepfe dieses fid) wird eng geprueft, damit nicht
+        „vorhanden" gemeldet wird, obwohl nur eine vom Nutzer ZUSAMMENGELEGTE
+        Fremd-Matrix die Koepfe abdeckt (dann waere „Wiederherstellen" ein stiller
+        No-Op, weil die Idempotenz breit prueft)."""
+        lbl = getattr(self, "_lbl_head_group", None)
+        if lbl is None:
+            return
+        fid = getattr(self._fixture, "fid", None)
+        try:
+            state = get_state()
+            dedicated = state.find_head_matrix_group(fid, dedicated=True)
+            covered = state.find_head_matrix_group(fid)
+        except Exception:
+            dedicated = covered = None
+        if dedicated is not None:
+            lbl.setText("vorhanden")
+            lbl.setStyleSheet("color:#3fb950;")
+            lbl.setToolTip("Die automatisch erzeugte Kopf-Matrix-Gruppe existiert.")
+        elif covered is not None:
+            lbl.setText("über andere Gruppe abgedeckt")
+            lbl.setStyleSheet("color:#79c0ff;")
+            lbl.setToolTip(
+                "Die Köpfe dieses Geräts sind bereits in einer anderen (z. B.\n"
+                "zusammengelegten) Matrix-Gruppe enthalten. „Wiederherstellen\"\n"
+                "legt deshalb keine zweite Gruppe an.")
+        else:
+            lbl.setText("fehlt")
+            lbl.setStyleSheet("color:#ffa657;")
+            lbl.setToolTip(
+                "Es gibt keine Gruppe, die die Köpfe dieses Geräts einzeln\n"
+                "adressiert — „Wiederherstellen\" legt sie neu an.")
+
+    def _restore_head_group(self):
+        """Legt die Pro-Kopf-Matrix-Gruppe fuer dieses Geraet (wieder) an —
+        idempotent und NIE destruktiv (eine bestehende Gruppe bleibt unveraendert).
+        Arbeitet auf dem LIVE-Patch-Objekt (der Dialog haelt ggf. eine Kopie, deren
+        Spalten fuer color_head_count nicht gebunden waeren)."""
+        state = get_state()
+        fid = getattr(self._fixture, "fid", None)
+        bound = next((f for f in state.get_patched_fixtures()
+                      if getattr(f, "fid", None) == fid), None)
+        try:
+            state.create_head_matrix_group(bound if bound is not None else self._fixture)
+        except Exception as e:
+            print(f"[patch] Kopf-Matrix-Gruppe wiederherstellen: {e}")
+        self._update_head_group_status()
 
 
 class PatchView(QWidget):
@@ -651,6 +770,17 @@ class PatchView(QWidget):
         dlg = PatchFixtureEditDialog(self._state, fixture, self)
         if dlg.exec() and dlg.result_updates:
             self._state.update_fixture(fixture.fid, **dlg.result_updates)
+            # FM-HEADLAYOUT: Modus „Köpfe einzeln" -> Kopf-Matrix-Gruppe NACH dem
+            # Persistieren aus dem FRISCHEN Patch-Objekt anlegen (Label/Modus/
+            # Kanalzahl sind dann aktuell; idempotent, nicht-destruktiv).
+            if getattr(dlg, "wants_head_group", False):
+                fresh = next((f for f in self._state.get_patched_fixtures()
+                              if f.fid == fid), None)
+                if fresh is not None:
+                    try:
+                        self._state.create_head_matrix_group(fresh)
+                    except Exception as e:
+                        print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
 
     def _on_univ_select(self, _idx):
         sel = self._univ_select.currentData()

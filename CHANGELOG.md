@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-23 — FM-HEADLAYOUT (Slice 1): Mehrkopf-Programmierung pro Fixture + Kopf-Matrix wiederherstellen
+
+#### Hinzugefügt
+
+- **Die beim Patchen automatisch erzeugte Pro-Kopf-Matrix-Gruppe („… · Köpfe") lässt sich jetzt wiederherstellen** — ohne das Gerät neu patchen zu müssen (David-Wunsch 2026-07-22: bei einer Hydrabeam 4000 in einer Produktiv-Show gelöscht, danach kein Weg zurück). Im Patch-Dialog (Gerät doppelklicken) zeigt eine neue Zeile **„Kopf-Matrix-Gruppe"** den ehrlichen Status **„vorhanden" / „fehlt" / „über andere Gruppe abgedeckt"** plus einen **„Wiederherstellen"**-Button (wirkt sofort, idempotent, nicht-destruktiv).
+- **Neue per-Fixture-Option „Mehrkopf-Programmierung"** (`PatchedFixture.head_mode`: `auto` | `heads` | `single`) — bewusst **an derselben Stelle wie Invert Pan/Tilt & Swap**, sichtbar nur bei echten Mehrkopf-Geräten (≥2 pro-Kopf färbbare Bänke). `auto` (Default) = Bestandsverhalten (Auto-Anlage beim Patchen), `heads` = die Kopf-Matrix soll existieren (wird beim Speichern angelegt), `single` = als EINE Lampe (keine automatische Kopf-Matrix). **Der Modus löscht NIE eine bestehende Gruppe** — zusammengelegte/bearbeitete Matrizen bleiben unangetastet; `single` unterdrückt nur das automatische Neuanlegen.
+- **Rückwärtskompatibel (Fallenklasse #3):** additive `ALTER TABLE`-Migration mit `PRAGMA`-Guard (wie seinerzeit `spider_dual_tilt`), Persistenz über `d.get(…, "auto")` → **Alt-Shows ohne den Schlüssel laden unverändert** und verhalten sich exakt wie bisher. Kanonischer Normalisierer `models.normalize_head_mode` als EINE Quelle für Show-Persistenz, Live-Schreibpfad und Undo (klemmt Garbage aus Skript-/Remote-Pfaden auf `auto`).
+- Neue read-only `AppState.find_head_matrix_group(fid, *, dedicated=False)` — **breit** (irgendeine Gruppe adressiert das fid kopfweise) für die Idempotenz von `create_head_matrix_group`, **eng** (die dedizierte „Multi-Head"-Auto-Gruppe) für die Statusanzeige.
+
+#### Behoben (adversariale Review, 13 bestätigte Funde — vor Merge gefixt)
+
+- **HIGH:** `head_mode` fehlte in der `allowed`-Whitelist von `AppState.update_fixture` → die Modus-Wahl aus dem Dialog wurde **still verworfen** (Feature-Hälfte tot). Jetzt in der Whitelist + normalisiert.
+- **MEDIUM:** Der Undo-Snapshot (`AppState._fixture_to_dict`/`_restore_fixture_dict`) kannte das Feld nicht → Löschen + Rückgängig setzte den Modus auf `auto` **und legte die per `single` unterdrückte Gruppe wieder an**.
+- **MEDIUM:** Die Statusanzeige meldete „vorhanden", sobald **irgendeine** Gruppe eine `fid:head`-Zelle hatte (z. B. eine zusammengelegte Matrix) → „Wiederherstellen" wäre ein stiller No-Op gewesen. Jetzt enges Prädikat + dritter Status „über andere Gruppe abgedeckt".
+- **MEDIUM:** Die Gruppe wurde in `_on_accept` **vor** dem Persistieren gebaut (stale Label/Kanalzahl). Jetzt setzt der Dialog nur ein Flag; der Aufrufer legt sie **nach** `update_fixture` aus dem frischen Patch-Objekt an.
+- **LOW:** Ein fehlgeschlagener Idempotenz-Scan galt als „nicht vorhanden" → hätte ein **Duplikat** angelegt; der Scan wirft jetzt und `create` bricht sauber ab. Button-Tooltip weist darauf hin, dass „Wiederherstellen" sofort wirkt.
+
+Tests `tests/test_head_mode_option.py` (21) — u. a. echter Alt-DB-`ALTER TABLE`-Zweig mit Bestandszeile, `update_fixture`-Round-Trip, Undo-Erhalt inkl. Unterdrückung, Gate für alle drei Modi, eng-vs-breit-Prädikat. _(Nächste Slices: Programmer-UI passt sich am Modus an, freies Pro-Kopf-Platzieren im Grid-Editor — brauchen Davids visuelle Abnahme.)_
+
 ### 2026-07-22 — FM-15: Robe MegaPointe als Builtin (namhafter Beam/Spot/Wash-Hybrid, 39ch)
 
 #### Hinzugefügt
