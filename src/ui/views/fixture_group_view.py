@@ -21,18 +21,13 @@ from sqlalchemy import select, delete
 def _split_cell(v):
     """FM-16e: Rasterzellwert -> (fid, head). ``v`` ist ENTWEDER ein ganzer fid
     (int/str) ODER eine Kopf-Zelle ``"fid:head"`` (Str, aus create_head_matrix_group
-    / Merge). head=None fuer ganze Fixtures; (None, None) wenn unparsbar. EINE Quelle
-    fuer Paint, Member-Highlight und Persistenz."""
-    if isinstance(v, str) and ":" in v:
-        a, b = v.split(":", 1)
-        try:
-            return int(a), int(b)
-        except (TypeError, ValueError):
-            return None, None
-    try:
-        return int(v), None
-    except (TypeError, ValueError):
-        return None, None
+    / Merge). head=None fuer ganze Fixtures; (None, None) wenn unparsbar.
+
+    Delegiert an die kanonische ``group_cells.parse_group_cell`` (EINE Parse-Quelle
+    fuer Paint, Member-Highlight, Persistenz UND alle Gruppen-fid-Resolver,
+    FM16E-HEADCOUNT)."""
+    from src.core.group_cells import parse_group_cell
+    return parse_group_cell(v)
 
 
 # ── Floating Panel (Rastergröße) ──────────────────────────────────────────────

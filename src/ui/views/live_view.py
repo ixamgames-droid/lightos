@@ -2516,11 +2516,13 @@ class LiveView(QWidget):
                     s.execute(_select(_FG).order_by(_FG.name)).scalars()
                 )
                 self._group_list.clear()
+                from src.core.group_cells import base_fids_in_grid_order
                 for g in groups:
-                    # Anzahl Fixtures aus positions_json ermitteln
+                    # Anzahl GERAETE (Basis-fids) — Kopf-Matrix-Zellen "fid:head"
+                    # zaehlen als EIN Geraet, nicht als N Zellen (FM16E-HEADCOUNT).
                     try:
                         pos = _json.loads(g.positions_json or "{}")
-                        n = len(pos)
+                        n = len(base_fids_in_grid_order(pos))
                     except Exception:
                         n = 0
                     item = QListWidgetItem(f"{g.name} ({n})")
@@ -2741,14 +2743,12 @@ class LiveView(QWidget):
                     pos = _json.loads(g.positions_json or "{}")
                 except Exception:
                     pos = {}
-                # fids in row-major-Reihenfolge (sortiert nach row, dann col)
-                fids = [
-                    fid for _, fid in sorted(
-                        pos.items(),
-                        key=lambda kv: (int(kv[0].split(",")[1]),
-                                        int(kv[0].split(",")[0]))
-                    )
-                ]
+                # FM16E-HEADCOUNT: Basis-fids in Rasterreihenfolge (eine Quelle
+                # group_cells). Kopf-Zellen "fid:head" -> int-Basis-fid -> Canvas-
+                # Highlight matcht, Count zeigt GERAETE, und f"{fid:03d}" unten wirft
+                # nicht mehr auf einem Roh-String.
+                from src.core.group_cells import base_fids_in_grid_order
+                fids = base_fids_in_grid_order(pos)
                 self._detail_group_id = gid
                 # Canvas Highlight setzen
                 self._canvas.set_highlight(set(fids))

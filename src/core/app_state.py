@@ -1672,15 +1672,12 @@ class AppState:
                         g = s.execute(stmt).scalars().first()
             if g is None:
                 return None, []
-            items = []
-            for key, fid in (json.loads(g.positions_json or "{}") or {}).items():
-                try:
-                    c, r = str(key).split(",")
-                    items.append((int(r), int(c), int(fid)))
-                except Exception:
-                    continue
-            items.sort()
-            return g.id, [fid for _, _, fid in items]
+            # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" tragen ihren Basis-fid bei
+            # (EINE Parse-Quelle group_cells) — sonst faellt eine Kopf-Matrix-Gruppe
+            # hier still auf [] (int("5:2") wirft), zeigte "(0)" + selektierte nichts.
+            from .group_cells import base_fids_in_grid_order
+            return g.id, base_fids_in_grid_order(
+                json.loads(g.positions_json or "{}") or {})
         except Exception:
             return None, []
 
@@ -1713,19 +1710,15 @@ class AppState:
             from .database.models import FixtureGroup
             with self._session() as s:
                 groups = list(s.execute(select(FixtureGroup)).scalars())
+                from .group_cells import base_fids_in_grid_order
                 for g in groups:
-                    items = []
+                    # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" mitzaehlen (eine
+                    # Parse-Quelle) — sonst leerer Preset-Browser-Eintrag.
                     try:
-                        for key, fid in (json.loads(g.positions_json or "{}") or {}).items():
-                            c, r = str(key).split(",")
-                            items.append((int(r), int(c), int(fid)))
+                        fids = base_fids_in_grid_order(
+                            json.loads(g.positions_json or "{}") or {})
                     except Exception:
-                        items = []
-                    items.sort()
-                    fids: list[int] = []
-                    for _r, _c, fid in items:
-                        if fid not in fids:
-                            fids.append(fid)
+                        fids = []
                     out.append({"id": g.id,
                                 "name": g.name or "",
                                 "folder": getattr(g, "folder", "") or "",
