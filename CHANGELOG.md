@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-23 — Linux-Stabilitätsaudit
+
+#### Behoben
+
+- Mehrfachstarts werden vor der Initialisierung von Qt, ALSA und WebEngine über
+  eine betriebssystemweite Einzelinstanz-Sperre abgefangen.
+- Audio und MIDI starten auch bei nicht erreichbarem PulseAudio/ALSA-Sequencer
+  weiter; MIDI-Portscans sind serialisiert und besitzen einen
+  10-Sekunden-Circuit-Breaker gegen native Client-Stürme.
+- Show-Dateien validieren Fixture-Profil-IDs gegen Hersteller/Modell und mappen
+  abweichende lokale Datenbank-IDs automatisch nach Namen.
+- Frische Installationen starten keine Test-/Netzwerkausgänge mehr:
+  `COM_FAKE`, Art-Net-Broadcast und sACN sind standardmäßig deaktiviert.
+- 2D-Bühnenvorschau auf 10 FPS begrenzt, ohne DMX- oder Playback-Timing zu
+  verändern; Tab-Titel bleiben bei 1440 px vollständig lesbar.
+- Headless-Schließen, MIDI-Ansicht und plattformübergreifende Janitor-Pfade
+  gegen reproduzierte Fehler gehärtet.
+- Der App-Exit stoppt und joint Audio-Capture und deaktiviert MIDI-Autoconnect
+  vor dem nativen Backend-Abbau; damit tritt der reproduzierte PulseAudio-
+  `SIGSEGV` nach bereits gemeldetem sauberem Exit nicht mehr auf.
+- Qt-WebEngine erhält `AA_ShareOpenGLContexts` vor `QApplication`; der
+  Produktionsabschluss führt alle Finalizer aus und überspringt anschließend
+  den bekannten fehlerhaften QtWebEngine-Interpreterabbau.
+
+Details und Prüfergebnisse:
+`docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.
+
 ### 2026-07-23 — FM-HEADLAYOUT (Slice 1): Mehrkopf-Programmierung pro Fixture + Kopf-Matrix wiederherstellen
 
 #### Hinzugefügt

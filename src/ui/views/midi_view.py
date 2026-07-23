@@ -252,8 +252,19 @@ class MidiView(QWidget):
         prev_in = self._combo_in.currentText() if self._combo_in.count() else ""
         prev_out = self._combo_out.currentText() if self._combo_out.count() else ""
 
-        inputs = self._midi.list_inputs()
-        outputs = self._midi.list_outputs()
+        # Ein nicht verfuegbarer nativer MIDI-Treiber ist optional. Der Manager
+        # faengt Backendfehler selbst ab; der zusaetzliche UI-Guard schuetzt auch
+        # alternative/testweise Backends und verhindert einen Startabbruch.
+        try:
+            inputs = self._midi.list_inputs()
+        except Exception as e:
+            print(f"[MidiView] MIDI-Inputs konnten nicht gelesen werden: {e}")
+            inputs = []
+        try:
+            outputs = self._midi.list_outputs()
+        except Exception as e:
+            print(f"[MidiView] MIDI-Outputs konnten nicht gelesen werden: {e}")
+            outputs = []
 
         # Nur neu aufbauen wenn sich was geaendert hat (verhindert Combo-Flicker)
         cur_in_items = [self._combo_in.itemText(i) for i in range(self._combo_in.count())
@@ -261,7 +272,7 @@ class MidiView(QWidget):
         cur_out_items = [self._combo_out.itemText(i) for i in range(self._combo_out.count())
                          if not self._combo_out.itemText(i).startswith("(")]
 
-        if cur_in_items != inputs:
+        if cur_in_items != inputs or self._combo_in.count() == 0:
             self._combo_in.clear()
             for p in inputs:
                 self._combo_in.addItem(p)
@@ -275,7 +286,7 @@ class MidiView(QWidget):
                 elif apc_idx >= 0:
                     self._combo_in.setCurrentIndex(apc_idx)
 
-        if cur_out_items != outputs:
+        if cur_out_items != outputs or self._combo_out.count() == 0:
             self._combo_out.clear()
             for p in outputs:
                 self._combo_out.addItem(p)

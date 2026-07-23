@@ -368,6 +368,30 @@ def _install_qt_message_handler():
 _watchdog_timer = None  # Referenz halten, sonst raeumt Qt den Timer weg
 
 
+def _finalize_and_exit(exit_code: int) -> None:
+    """Finalizer ausfuehren, dann QtWebEngine-Interpreterabbau ueberspringen.
+
+    PySide6 6.11/QtWebEngine kann unter Linux nach vollstaendig beendetem
+    QApplication-Eventloop beim globalen Python-GC im Chromium-Profilabbau
+    segfaulten. MainWindow.closeEvent hat zu diesem Zeitpunkt alle LightOS-
+    Threads/Backends bereits synchron gestoppt. Wir fuehren die registrierten
+    atexit-Hooks (insbesondere Clean-Marker + Running-Flag) deshalb explizit
+    aus, flushen die Streams und beenden erst dann ohne den fehlerhaften
+    nativen Interpreter-Teardown.
+    """
+    try:
+        import atexit
+        atexit._run_exitfuncs()
+    except Exception:
+        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:
+            pass
+    os._exit(int(exit_code))
+
+
 def _start_freeze_watchdog():
     """Erkennt UI-Freezes und dumpt dann die Stacks ALLER Threads in crash.log —
     und unterscheidet dabei einen echten Freeze von System-Standby/Resume.
@@ -442,6 +466,18 @@ def _start_freeze_watchdog():
 
 
 def main():
+    # Vor Crash-Logging, Qt, ALSA/MIDI und WebEngine nur eine GUI-Instanz
+    # zulassen. Mehrfachstarts konkurrieren sonst um native Ressourcen und
+    # waren auf Linux als SIGABRT/SIGSEGV reproduzierbar.
+    from src.core.paths import app_data_dir
+    from src.core.single_instance import acquire_instance_lock
+    instance_lock = acquire_instance_lock(
+        os.path.join(app_data_dir(), "lightos.instance.lock")
+    )
+    if instance_lock is None:
+        print("[main] LightOS läuft bereits — zweiter Start wird beendet.")
+        return
+
     _setup_crash_logging()
 
     parser = argparse.ArgumentParser(description="LightOS DMX Lichtsteuerung")
@@ -464,6 +500,15 @@ def main():
 
     _setup_webengine_diagnostics()
 
+    # QtWebEngine/3D wird absichtlich lazy importiert. Unter Linux muss das
+    # OpenGL-Context-Sharing trotzdem VOR QApplication gesetzt sein; fordert
+    # QWebEngineView es erst beim spaeteren Oeffnen des Visualizers an, warnt
+    # Qt ("AA_ShareOpenGLContexts must be set before...") und PySide kann kurz
+    # danach nativ segfaulten.
+    from PySide6.QtCore import QCoreApplication, Qt
+    QCoreApplication.setAttribute(
+        Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("LightOS")
     app.setApplicationVersion(APP_VERSION)
@@ -495,7 +540,7 @@ def main():
     else:
         window.show()
 
-    sys.exit(app.exec())
+    _finalize_and_exit(app.exec())
 
 
 if __name__ == "__main__":

@@ -107,6 +107,29 @@ def test_open_all_inputs_evicts_vanished_port(winmm_stub):
         mgr.close_all()
 
 
+def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch):
+    """Ein kaputter ALSA-Sequencer darf weder Start noch Refresh-Schleife
+    beenden und soll nicht alle zwei Sekunden neue native Clients erzeugen."""
+    calls = {"n": 0}
+
+    class BrokenMidiIn:
+        def __init__(self):
+            calls["n"] += 1
+            raise SystemError("ALSA sequencer unavailable")
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiIn", BrokenMidiIn)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.list_inputs() == []
+        assert mgr.list_inputs() == []
+        assert calls["n"] == 1, "Circuit-Breaker muss wiederholte native Scans drosseln"
+        assert mgr._rtmidi_retry_after > 0
+    finally:
+        mgr.close_all()
+
+
 # ── F2: RX-Queue-Overflow ────────────────────────────────────────────────────
 
 def test_is_release_classification():

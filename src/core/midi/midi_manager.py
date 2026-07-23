@@ -7,6 +7,7 @@ Backend-Priorität:
 from __future__ import annotations
 import threading
 import queue
+import time
 from dataclasses import dataclass
 from typing import Callable
 
@@ -32,6 +33,12 @@ _USE_WINMM = (not RTMIDI_OK) and WINMM_OK
 
 # Groesse der bounded RX-Queue (Treiber-Callback -> MidiDispatch-Thread).
 _RX_QUEUE_MAX = 4096
+
+# RtMidi/ALSA erzeugt fuer jeden Scan einen nativen Sequencer-Client. Wenn ALSA
+# gerade keine Clients mehr anlegen kann, kann paralleles/repetitives Scannen
+# nicht nur Exceptions, sondern auch native Abstuerze in librtmidi ausloesen.
+# Darum werden alle Scans eines Managers serialisiert und Fehler kurz gecacht.
+_RTMIDI_RETRY_SECONDS = 10.0
 
 
 @dataclass
@@ -72,6 +79,9 @@ class MidiManager:
         self._output_name: str = ""
         self._virtual_out: object | None = None
         self._io_lock = threading.RLock()
+        self._scan_lock = threading.Lock()
+        self._rtmidi_retry_after = 0.0
+        self._rtmidi_error = ""
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
         self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=_RX_QUEUE_MAX)
@@ -96,20 +106,54 @@ class MidiManager:
             return _winmm_list_inputs()
         if not RTMIDI_OK:
             return []
-        m = rtmidi.MidiIn()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        del m
-        return ports
+        return self._list_rtmidi_ports(output=False)
 
     def list_outputs(self) -> list[str]:
         if _USE_WINMM:
             return _winmm_list_outputs()
         if not RTMIDI_OK:
             return []
-        m = rtmidi.MidiOut()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        del m
-        return ports
+        return self._list_rtmidi_ports(output=True)
+
+    def _list_rtmidi_ports(self, *, output: bool) -> list[str]:
+        """RtMidi-Portscan mit Circuit-Breaker fuer fehlerhaftes ALSA.
+
+        Ein fehlender/ausgelasteter ALSA-Sequencer ist ein optionaler
+        Hardwarefehler und darf die GUI nicht beenden. Nach einem Fehler wird
+        fuer kurze Zeit kein weiterer nativer Client erzeugt; danach kann sich
+        das Backend automatisch erholen (z. B. nach USB-/Dienst-Neustart).
+        """
+        now = time.monotonic()
+        if now < self._rtmidi_retry_after:
+            return []
+        with self._scan_lock:
+            now = time.monotonic()
+            if now < self._rtmidi_retry_after:
+                return []
+            handle = None
+            try:
+                handle = rtmidi.MidiOut() if output else rtmidi.MidiIn()
+                ports = [
+                    handle.get_port_name(i)
+                    for i in range(handle.get_port_count())
+                ]
+                self._rtmidi_retry_after = 0.0
+                self._rtmidi_error = ""
+                return ports
+            except Exception as exc:
+                self._rtmidi_retry_after = now + _RTMIDI_RETRY_SECONDS
+                text = str(exc)
+                if text != self._rtmidi_error:
+                    self._rtmidi_error = text
+                    self._log(f"MIDI Backend voruebergehend nicht verfuegbar: {text}")
+                    print(f"[midi_manager] MIDI-Scan fehlgeschlagen: {text}")
+                return []
+            finally:
+                if handle is not None:
+                    try:
+                        del handle
+                    except Exception:
+                        pass
 
     # ── Verbinden ────────────────────────────────────────────────────────────
 

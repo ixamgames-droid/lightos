@@ -41,5 +41,5 @@ Rendering und pausiert, wenn die View nicht sichtbar ist.
 
 - `src/ui/views/live_view.py:433` — `StageCanvas`
 - `src/ui/views/live_view.py:66` — `FixtureRenderer` (typ-abhängiges Zeichnen)
-- `src/ui/views/live_view.py:528` — Render-Timer (20 FPS, sichtbarkeitsgekoppelt)
+- `src/ui/views/live_view.py` — Render-Timer (10 FPS, sichtbarkeitsgekoppelt)
 - `src/ui/views/live_view.py:56` — DMX→Grad-Umrechnung
