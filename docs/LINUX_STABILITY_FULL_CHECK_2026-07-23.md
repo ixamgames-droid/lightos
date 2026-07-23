@@ -109,6 +109,12 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     Flaeche. Hauptansicht und Popout wachsen jetzt bis zur Viewportgroesse;
     unterhalb von 1200x800 bleiben sie weiterhin scrollbar. Show-Inhalt,
     Widgetpositionen und das 8-px-Snapraster bleiben unveraendert.
+27. Die VC-Bibliothek nutzte als periodischen Sicherheitsabgleich nur die
+    Anzahl der Funktionen. Beim Ablauf `anlegen -> umbenennen -> in Ordner
+    verschieben` blieb diese Zahl gleich; ein ausgebliebenes spaeteres
+    Sync-Event liess z. B. `Hintergrund/Dimmer/Strobe` dauerhaft fehlen. Die VC
+    vergleicht nun ID, Name, Ordner, Typ und Commit-Zustand und aktualisiert
+    zusaetzlich bei jedem Sichtbarwerden der Ansicht.
 
 ## Testprotokoll
 
@@ -132,6 +138,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | Bierpong-Outputkonfiguration | BESTANDEN | Universe 1 oeffnet realen ENTTEC; 0 Art-Net- und 0 sACN-Ausgaenge; Port beim Shutdown geschlossen |
 | Internes WLAN/Bluetooth | NEUSTART AUSSTEHEND | ThinkCentre M720q: beide Funkoptionen im BIOS von `Disabled` auf `Enabled` gesetzt; Treiber/Firmware vorhanden, Hardware muss nach Neustart neu enumeriert und real verbunden werden |
 | VC-Raster auf breitem Touchscreen | BESTANDEN | Screenshot-Befund behoben; Canvas fuellt breite Viewports, Popout identisch; 28 VC-/Touch-/Frame-Tests bestanden |
+| VC-Bibliothek Live-Aktualisierung | BESTANDEN | Neuer/umbenannter/verschobener Effekt erscheint beim Tabwechsel bzw. binnen 400 ms; Pfad `Hintergrund/Dimmer/Strobe`; 30 relevante Tests bestanden |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 

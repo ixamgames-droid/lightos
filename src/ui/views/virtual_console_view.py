@@ -435,19 +435,58 @@ class VirtualConsoleView(QWidget):
         # verbleibenden vertikalen Platz (Toolbar + Statuszeile sind fix).
         layout.addWidget(splitter, 1)
 
+    def showEvent(self, event):
+        """Beim Oeffnen der VC immer einen aktuellen Bibliotheksbaum zeigen.
+
+        Das ist neben dem Event-/Signaturpfad ein billiger, deterministischer
+        Abgleich fuer den typischen Ablauf: Effekt in einer anderen Ansicht
+        erstellen, danach erst zur Virtual Console wechseln.
+        """
+        super().showEvent(event)
+        sidebar = getattr(self, "_sidebar", None)
+        if sidebar is not None:
+            sidebar.refresh()
+
     # ── Status: aktiver Effekt ───────────────────────────────────────────────
+
+    @staticmethod
+    def _function_catalog_signature(functions) -> tuple:
+        """Leichte Signatur der in der VC-Bibliothek sichtbaren Metadaten.
+
+        Die reine Anzahl reicht nicht: Editor-Ablauf ist oft
+        ``Funktion anlegen -> benennen -> in Ordner verschieben``. Nach dem
+        ersten Schritt bleibt die Anzahl gleich; geht das spaetere Sync-Event
+        verloren, zeigte die VC dauerhaft den alten Namen/Ordner. Die Signatur
+        erkennt auch solche In-Place-Aenderungen, ohne den Baum alle 400 ms
+        unnoetig neu aufzubauen.
+        """
+        rows = []
+        for f in functions:
+            ftype = getattr(f, "function_type", "")
+            ftype = getattr(ftype, "value", ftype)
+            rows.append((
+                int(getattr(f, "id", 0) or 0),
+                str(getattr(f, "name", "") or ""),
+                str(getattr(f, "folder", "") or ""),
+                str(ftype or ""),
+                bool(getattr(f, "committed", True)),
+            ))
+        return tuple(sorted(rows))
 
     def _update_active_fx(self):
         """Zeigt den zuletzt gestarteten, noch laufenden Effekt + Anzahl laufender."""
         try:
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
-            # Funktionsliste der Sidebar nachziehen, wenn sich die Anzahl geaendert
-            # hat (z. B. Show geladen) — ohne bei jedem Tick die Auswahl zu stoeren.
+            # Funktionskatalog der Sidebar nachziehen, wenn sich Anzahl ODER
+            # sichtbare Metadaten (Name/Ordner/Typ) geaendert haben. So erscheint
+            # z. B. ein nachtraeglich nach Hintergrund/Dimmer verschobener
+            # "Strobe" auch dann sofort, wenn sein einzelnes Sync-Event ausblieb.
             try:
-                cnt = len(fm.all())
-                if cnt != getattr(self, "_last_fn_count", -1):
-                    self._last_fn_count = cnt
+                funcs = fm.all()
+                sig = self._function_catalog_signature(funcs)
+                if sig != getattr(self, "_last_function_catalog_signature", None):
+                    self._last_function_catalog_signature = sig
                     if getattr(self, "_sidebar", None) is not None:
                         self._sidebar.refresh_functions()
             except Exception:

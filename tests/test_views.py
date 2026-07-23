@@ -165,6 +165,48 @@ def test_virtualconsole_canvas_fills_wide_viewport():
     v.close()
 
 
+def test_virtualconsole_sidebar_detects_in_place_function_move():
+    """Regression: Eine Funktion wird erst angelegt und danach benannt/in einen
+    Ordner verschoben. Auch ohne zweites FUNCTION_CHANGED muss die VC den
+    geaenderten Katalog beim naechsten 400-ms-Abgleich neu einlesen."""
+    _app()
+    from src.core.engine.function_manager import get_function_manager
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    fm = get_function_manager()
+    effect = fm.new_chaser("Strobe")
+    view = VirtualConsoleView()
+    try:
+        view._update_active_fx()  # Ausgangssignatur merken
+        refreshes = []
+        view._sidebar.refresh_functions = lambda: refreshes.append(True)
+
+        # Absichtlich KEIN Sync-Event: exakt der bisher haengende Editor-Pfad.
+        effect.folder = "Hintergrund/Dimmer"
+        view._update_active_fx()
+
+        assert refreshes == [True]
+        assert any(row[2] == "Hintergrund/Dimmer"
+                   for row in view._last_function_catalog_signature)
+    finally:
+        fm.remove(effect.id)
+        view.close()
+
+
+def test_virtualconsole_refreshes_library_when_tab_becomes_visible():
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    view = VirtualConsoleView()
+    refreshes = []
+    view._sidebar.refresh = lambda: refreshes.append(True)
+    view.show()
+    app.processEvents()
+
+    assert refreshes
+    view.close()
+
+
 def test_toolbar_add_cascades_and_selects():
     """UXT-06: Zwei Toolbar-Klicks legen VERSETZTE Widgets an (nicht deckungs-
     gleich in der Mitte) und wählen das jeweils neue aus."""

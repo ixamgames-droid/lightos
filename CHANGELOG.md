@@ -38,6 +38,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   vollständigen Viewportgröße, statt starr bei 1200 px zu enden und rechts eine
   große unbenutzbare Fläche zu lassen. Kleine Fenster bleiben scrollbar; das
   gespeicherte Layout und das Snapraster ändern sich nicht.
+- Die Bibliothek der Virtual Console aktualisiert sich beim Öffnen der Ansicht
+  sowie bei Änderungen an ID, Name, Ordner oder Typ einer Funktion. Effekte,
+  die nach dem Erstellen umbenannt oder etwa nach `Hintergrund/Dimmer`
+  verschoben werden, erscheinen damit ohne manuelles Neuladen in der VC.
 
 Details und Prüfergebnisse:
 `docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.
