@@ -71,6 +71,32 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 18. `AA_ShareOpenGLContexts` wird vor `QApplication` gesetzt. Nach dem
     Eventloop werden alle `atexit`-Finalizer explizit ausgefuehrt und erst dann
     der unter QtWebEngine fehlerhafte globale Interpreter-Abbau uebersprungen.
+19. Die eigentliche 3D-Crashursache wurde bis auf den globalen Python-
+    `QApplication`-Eventfilter der VC-Tastatur-Hotkeys isoliert. Dieser Filter
+    wurde durch einen fokusgebundenen Widget-Filter ersetzt; Chromium-interne
+    `QWebEngineView`-/`RenderWidgetHost`-Widgets werden bewusst ausgeschlossen.
+    Tastatur-Patching, Press/Release und Flash-Semantik bleiben erhalten.
+20. Die Windows-Roaming-Daten wurden vom USB-Stick unveraendert nach
+    `~/lightos-windows-data-backup-2026-07-23` kopiert und per Dateivergleich
+    verifiziert. `bierpong.lshow` sowie VC-Assets, Stages und Snaps wurden in
+    den lokalen LightOS-Datenordner installiert; die Linux-Fixture-Datenbank
+    wurde dabei nicht ueberschrieben.
+21. Der Onboard-Adapter Intel I219-V (`e1000e`, `eno1`) wurde als dauerhaftes
+    NetworkManager-Profil `Internes Ethernet` eingerichtet. Wegen eines
+    fehlerhaften Router-DHCP-Leases (angebotene Adresse bereits im LAN belegt)
+    verwendet er konfliktgeprueft `192.168.178.250/24`, Gateway
+    `192.168.178.1`, DNS `192.168.178.1` und `1.1.1.1`, EEE aus.
+22. Fuer den ENTTEC DMX USB Pro wurde `maxi` dauerhaft der Gruppe `dialout`
+    hinzugefuegt. Fuer die laufende Sitzung wurde zusaetzlich eine ACL auf
+    `/dev/ttyUSB0` gesetzt.
+23. Die lokale Fixture-Datenbank enthielt fuer mehrere in `bierpong.lshow`
+    benoetigte Profile keine Modes und erzeugte dadurch falsche Fallback-Modi.
+    Sie wurde als `fixtures.db.before-windows-import-2026-07-23` gesichert und
+    durch die Datenbank der funktionierenden Windows-Installation ersetzt.
+24. Alle 30 Fixtures von `bierpong.lshow` liegen auf Universe 1. Deshalb wurde
+    Universe 1 auf den persistenten ENTTEC-Pfad
+    `/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN492875-if00-port0` gestellt.
+    Alte Test-/Broadcast-Ausgaenge (`COM_FAKE`, Art-Net, sACN) sind deaktiviert.
 
 ## Testprotokoll
 
@@ -86,9 +112,14 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | MIDI ohne ALSA-Sequencer | BESTANDEN (Fallback) | GUI bleibt aktiv; Scan liefert leer und wird 10 s gedrosselt |
 | Audio/BPM ohne Pulse/Device | BESTANDEN (Fallback) | Optionaler Import/Start degradiert ohne Collection-/App-Abbruch |
 | Show-/Fixture-Portabilitaet | BESTANDEN | Demo-Profil Stage Light ZQ01424 von stale ID 17 auf lokale ID 23 remappt |
-| 3D-WebEngine-Funktionen | BLOCKIERT | Echter X11-Nutzerpfad segfaultet auf diesem System ca. 9 s nach dem Oeffnen auch mit PySide 6.8/6.10/6.11 sowie Hardware-/Software-Rendering |
+| 3D-WebEngine-Funktionen | BESTANDEN | Crash auf globalen VC-Hotkey-Eventfilter eingegrenzt und behoben; isolierte Reproduktion 12 s sowie komplette `bierpong.lshow` im Hauptfenster mit 3D 30 s stabil |
+| `bierpong.lshow` statische Validierung | BESTANDEN | 0 Findings, 0 Fehler; lokale Kopie SHA-256-identisch zum USB-Original |
+| `bierpong.lshow` Live-Validierung | BESTANDEN | 30 Fixtures geladen, 0 bindungsbewusste Findings/Fehler; alle auf Universe 1 |
+| Onboard-Ethernet | BESTANDEN | `eno1`, 1 Gbit/s Full Duplex; Gateway und `1.1.1.1` je 3/3 Pings; HTTPS zu GitHub explizit ueber `eno1` erfolgreich |
+| ENTTEC DMX USB Pro | BESTANDEN (Host/Protokoll) | Seriennummer EN492875, `ftdi_sio`; stabiler by-id-Pfad; Port geoeffnet, drei 512-Kanal-Blackout-Frames gesendet, sauber geschlossen |
+| Bierpong-Outputkonfiguration | BESTANDEN | Universe 1 oeffnet realen ENTTEC; 0 Art-Net- und 0 sACN-Ausgaenge; Port beim Shutdown geschlossen |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
-| Physische Hardwareausgabe | NICHT MESSBAR | Kein reales DMX-, Laser-, Audio- oder MIDI-Testgeraet fuer Signal-End-to-End vorhanden |
+| Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 
 ### Testmethodik und bekannte Testgrenze
 
@@ -97,6 +128,11 @@ Qt-Objekte aus hunderten Tests akkumulieren pro Prozess und QtWebEngine kann
 beim wiederholten Erzeugen/Zerstoeren nativer Views im Chromium-Thread
 segfaulten. Daher wurde jede der 471 Dateien in einem frischen Prozess
 ausgefuehrt. So waren Anwendungsfehler von Testprozess-Kontamination trennbar.
+Ein zusaetzlicher monolithischer Lauf am Ende erreichte ca. 63 %, bevor er
+waehrend `gc.collect()` in `test_snapshot_teardown_gc.py` mit noch laufenden,
+aus frueheren Tests stammenden MIDI-Threads nativ segfaultete. Dieselbe Datei
+bestand direkt danach allein mit 2/2; die direkt betroffenen Hotkey-, 3D-,
+ENTTEC-, Serial- und Show-Portabilitaetsdateien bestanden frisch mit 72/72.
 Versuche mit PySide6 6.8.3 und 6.10.3 zeigten denselben WebEngine-Nativfehler;
 die Umgebung wurde danach auf die deklarierte Version 6.11.1 zurueckgesetzt.
 
@@ -116,16 +152,18 @@ die Umgebung wurde danach auf die deklarierte Version 6.11.1 zurueckgesetzt.
   blieb dabei responsiv und speicherstabil (ca. 309 MiB RSS); weitere
   Renderoptimierung ist Performance-Arbeit, kein in diesem Lauf beobachteter
   Absturz.
-- Der separate 3D-Visualizer ist auf diesem konkreten Grafik-/Qt-System noch
-  nicht betriebssicher. Der Coredump endet im GUI-Hauptthread in
-  `libpyside6.abi3.so`; Qt 6.8/6.10/6.11, Software-Rendering, deaktivierte GPU
-  und korrekt gesetztes OpenGL-Context-Sharing aendern den Befund nicht. Dieser
-  Punkt verhindert bewusst die Aussage „alle Features funktionieren“.
+- Der 3D-Absturz war kein Renderer- oder GPU-Fehler. Eine einzelne
+  `QWebEngineView` und das komplette Visualizer-Fenster waren jeweils stabil;
+  erst die Kombination mit der Virtual Console stuerzte ab. Komponentenweise
+  Tests schlossen GIFs, MIDI, Engine-Anbindung und alle anderen MainWindow-
+  Views aus. Ausschliesslich der app-weite Python-Eventfilter fuer VC-Hotkeys
+  reproduzierte Exit 139. Der fokusgebundene Ersatz besteht sowohl den
+  isolierten Reproduktionstest als auch den realen Bierpong-Show-Lauf.
 
 ## Hardwaregrenzen
 
-- Ohne angeschlossene DMX-/Laser-Hardware kann nur die komplette
-  Software-Pipeline, nicht das elektrische/optische Ausgangssignal bestaetigt
+- Der ENTTEC-Hostpfad ist bestaetigt. Ohne angeschlossene DMX-Leuchte bzw.
+  Messgeraet kann das elektrische Signal hinter dem Adapter nicht bestaetigt
   werden.
 - Ohne funktionierenden ALSA-Sequencer und MIDI-Geraet kann der robuste
   Fehlerpfad, nicht ein reales MIDI-Signal bestaetigt werden.

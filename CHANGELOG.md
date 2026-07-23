@@ -30,6 +30,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - Qt-WebEngine erhält `AA_ShareOpenGLContexts` vor `QApplication`; der
   Produktionsabschluss führt alle Finalizer aus und überspringt anschließend
   den bekannten fehlerhaften QtWebEngine-Interpreterabbau.
+- Der app-weite Python-Eventfilter für VC-Tastatur-Hotkeys wird nicht mehr in
+  den Chromium-Renderbaum des 3D-Visualizers eingehängt. Ein fokusgebundener
+  Filter erhält Press/Release- und Flash-Hotkeys, verhindert aber den unter
+  Linux reproduzierbaren nativen Segmentation Fault von Virtual Console + 3D.
 
 Details und Prüfergebnisse:
 `docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.

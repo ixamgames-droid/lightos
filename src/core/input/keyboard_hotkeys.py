@@ -79,6 +79,7 @@ class KeyboardHotkeyFilter(QObject):
         super().__init__()
         self._subs: list = []
         self._installed = False
+        self._focus_target = None
         # pro Basis-Taste die beim Press gesendete Sequenz (für das Release)
         self._active: dict[int, str] = {}
 
@@ -90,8 +91,47 @@ class KeyboardHotkeyFilter(QObject):
         app = QApplication.instance()
         if app is None:
             return
-        app.installEventFilter(self)
+        # Kein QApplication-weites Python-EventFilter verwenden. Unter Linux
+        # kollidiert dessen Aufruf fuer Chromium-interne QtWebEngine-Objekte
+        # nativ mit dem 3D-Visualizer (Segmentation Fault, kein Python-Trace).
+        # Stattdessen folgt der Filter nur dem jeweils fokussierten normalen
+        # Qt-Widget. So bleiben VC-Hotkeys app-weit erhalten, ohne jemals in den
+        # Chromium-Renderbaum eingehängt zu werden.
+        app.focusChanged.connect(self._on_focus_changed)
+        self._on_focus_changed(None, app.focusWidget())
         self._installed = True
+
+    @staticmethod
+    def _is_webengine_widget(widget) -> bool:
+        """Auch interne Chromium-Kinder eines QWebEngineView erkennen."""
+        current = widget
+        while current is not None:
+            try:
+                name = type(current).__name__.lower()
+                if ("webengine" in name or "renderwidgethost" in name
+                        or current.inherits("QWebEngineView")):
+                    return True
+                current = current.parentWidget()
+            except (AttributeError, RuntimeError):
+                return True
+        return False
+
+    def _on_focus_changed(self, old, new):
+        target = self._focus_target
+        if target is not None:
+            try:
+                target.removeEventFilter(self)
+            except RuntimeError:
+                pass
+        self._focus_target = None
+        self._active.clear()
+        if new is None or self._is_webengine_widget(new):
+            return
+        try:
+            new.installEventFilter(self)
+            self._focus_target = new
+        except RuntimeError:
+            pass
 
     def subscribe(self, cb):
         if cb not in self._subs:

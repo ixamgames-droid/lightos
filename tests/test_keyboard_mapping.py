@@ -9,7 +9,7 @@ Abdeckung:
 import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QApplication, QLineEdit
+from PySide6.QtWidgets import QApplication, QLineEdit, QWidget
 
 from src.core.input.keyboard_hotkeys import (KeyboardHotkeyFilter,
                                              _is_text_input,
@@ -60,6 +60,24 @@ class TestTextInputDetection:
 
 
 class TestHotkeyFilter:
+    def test_focus_filter_attaches_to_regular_widget(self):
+        f = KeyboardHotkeyFilter()
+        widget = QWidget()
+        f._on_focus_changed(None, widget)
+        assert f._focus_target is widget
+        f._on_focus_changed(widget, None)
+        assert f._focus_target is None
+
+    def test_webengine_like_focus_is_excluded(self):
+        class RenderWidgetHostViewQtDelegateWidget(QWidget):
+            pass
+
+        f = KeyboardHotkeyFilter()
+        chromium_child = RenderWidgetHostViewQtDelegateWidget()
+        assert f._is_webengine_widget(chromium_child) is True
+        f._on_focus_changed(None, chromium_child)
+        assert f._focus_target is None
+
     def test_dispatch_press_and_release(self):
         f = KeyboardHotkeyFilter()
         got = []
