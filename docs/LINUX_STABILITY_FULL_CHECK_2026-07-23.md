@@ -199,3 +199,17 @@ die Umgebung wurde danach auf die deklarierte Version 6.11.1 zurueckgesetzt.
   Fehlerpfad, nicht ein reales MIDI-Signal bestaetigt werden.
 - Touch-Zuordnung ist systemseitig getauscht: USB 1-5 -> HDMI-2 und USB 1-6 ->
   HDMI-1. Diese Zuordnung ist ausserhalb des LightOS-Codes.
+
+## Plattformwirkung der Aenderungen
+
+| Bereich | Einordnung | Windows-Auswirkung |
+|---|---|---|
+| Einzelinstanz, sauberer Audio-/MIDI-/WebEngine-Shutdown | Allgemeine Stabilitaet | Auch auf Windows sinnvoll; verhindert konkurrierende Prozesse und tote native Handles. Plattformtests bleiben unveraendert. |
+| Fixture-Profil-Remapping beim Show-Laden | Allgemeiner Datenfehler | Betrifft auch Windows, wenn zwei Installationen unterschiedliche lokale Profil-IDs besitzen. Remapping nach Hersteller/Modell ist plattformneutral. |
+| VC-Bibliothek nach Effekt-Aenderung | Allgemeiner UI-Fehler | Derselbe fehlende Name-/Ordner-Abgleich konnte auch unter Windows auftreten; Fix ist Qt-/plattformneutral. |
+| VC-Canvas fuellt breiten Viewport | Allgemeiner UI-Fehler | Gilt ebenso fuer breite Windows-Touchscreens; gespeicherte Layoutkoordinaten bleiben identisch. |
+| VC-Hotkeyfilter und 3D-WebEngine | Allgemeiner Qt-Sicherheitspfad, auf Linux reproduziert | Chromium-interne Widgets werden auf allen Plattformen ausgeschlossen. Normale Windows-Hotkeys behalten Press-/Release-Semantik; der konkrete SIGSEGV wurde nur unter Linux beobachtet. |
+| RtMidi-Discovery-Handles | Linux-/ALSA-Backend | Windows mit WinMM-Fallback bleibt unveraendert. Falls Windows python-rtmidi nutzt, ist die Wiederverwendung ebenfalls sicher und vermeidet Client-Churn. |
+| XDG-Datenpfade, `libxcb`, `e1000e`, NetworkManager, `dialout`, ThinkLMI-WLAN, Touch-Mapping | Linux-/Rechnerkonfiguration | Kein Windows-Codepfad und keine Windows-Systemeinstellung wird geaendert. |
+| ENTTEC-Pfad `/dev/serial/by-id/...` und Universe-Konfiguration | Lokale Laufzeitdaten (nicht in Git) | Windows verwendet weiterhin seinen COM-Port; der Linux-by-id-Pfad wird nicht als Repository-Standard ausgeliefert. |
+| Windows-Roaming-/Fixture-Datenimport | Lokale Nutzerdaten (nicht in Git) | Originaldaten auf dem USB-Stick und das lokale Backup bleiben unveraendert; keine Migration wird in Windows erzwungen. |
