@@ -42,6 +42,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   sowie bei Änderungen an ID, Name, Ordner oder Typ einer Funktion. Effekte,
   die nach dem Erstellen umbenannt oder etwa nach `Hintergrund/Dimmer`
   verschoben werden, erscheinen damit ohne manuelles Neuladen in der VC.
+- RtMidi-Hotplug-Scans verwenden unter ALSA je einen langlebigen Discovery-
+  Client für Ein- und Ausgänge. Dadurch sammeln sich bei wiederholten Scans
+  keine leeren Sequencer-Clients mehr an, die nach längerer Laufzeit MIDI mit
+  `Cannot allocate memory` blockieren.
 
 Details und Prüfergebnisse:
 `docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.

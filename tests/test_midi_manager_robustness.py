@@ -130,6 +130,42 @@ def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch):
         mgr.close_all()
 
 
+def test_successful_rtmidi_scans_reuse_discovery_client(monkeypatch):
+    """Hotplug-Polling darf nicht pro Aufruf einen neuen ALSA-Sequencer-Client
+    erzeugen; sonst ist dessen Client-Limit nach kurzer Laufzeit erschoepft."""
+    made = []
+
+    class ScanMidiIn:
+        def __init__(self):
+            self.closed = False
+            made.append(self)
+
+        def get_port_count(self):
+            return 1
+
+        def get_port_name(self, index):
+            assert index == 0
+            return "APC mini mk2 Notes"
+
+        def close_port(self):
+            self.closed = True
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiIn", ScanMidiIn)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert len(made) == 1
+        assert mgr._scan_input is made[0]
+    finally:
+        mgr.close_all()
+    assert made[0].closed is True
+    assert mgr._scan_input is None
+
+
 # ── F2: RX-Queue-Overflow ────────────────────────────────────────────────────
 
 def test_is_release_classification():

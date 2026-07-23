@@ -115,6 +115,13 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     Sync-Event liess z. B. `Hintergrund/Dimmer/Strobe` dauerhaft fehlen. Die VC
     vergleicht nun ID, Name, Ordner, Typ und Commit-Zustand und aktualisiert
     zusaetzlich bei jedem Sichtbarwerden der Ansicht.
+28. Ein angeschlossener Akai APC mini mk2 (`09e8:004f`) wurde vom Kernel direkt
+    ueber `snd-usb-audio` erkannt; Control- und Notes-MIDI-Port sind vorhanden,
+    ein Fremdtreiber ist nicht notwendig. Der laufende LightOS-Prozess hatte
+    jedoch durch wiederholte RtMidi-Discovery-Konstruktoren 60+ leere ALSA-
+    Sequencer-Clients angesammelt und das Clientlimit erreicht. Input-/Output-
+    Discovery-Handles werden nun pro Manager wiederverwendet und beim Shutdown
+    geschlossen.
 
 ## Testprotokoll
 
@@ -139,6 +146,8 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | Internes WLAN/Bluetooth | NEUSTART AUSSTEHEND | ThinkCentre M720q: beide Funkoptionen im BIOS von `Disabled` auf `Enabled` gesetzt; Treiber/Firmware vorhanden, Hardware muss nach Neustart neu enumeriert und real verbunden werden |
 | VC-Raster auf breitem Touchscreen | BESTANDEN | Screenshot-Befund behoben; Canvas fuellt breite Viewports, Popout identisch; 28 VC-/Touch-/Frame-Tests bestanden |
 | VC-Bibliothek Live-Aktualisierung | BESTANDEN | Neuer/umbenannter/verschobener Effekt erscheint beim Tabwechsel bzw. binnen 400 ms; Pfad `Hintergrund/Dimmer/Strobe`; 30 relevante Tests bestanden |
+| APC mini mk2 Host/Treiber | BESTANDEN | USB-ID `09e8:004f`, `snd-usb-audio`, zwei Raw-MIDI-Ports; LightOS besitzt mk2-VC-Vorlage, MIDI-Learn und RGB-LED-Feedback |
+| ALSA-MIDI Discovery-Leak | BESTANDEN (Softwarefix) | Discovery-Clients werden wiederverwendet; 47 MIDI-/Controller-/Mapping-Tests bestanden; reale APC-Ein-/Ausgabe nach Prozess-/Systemneustart noch zu pruefen |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 

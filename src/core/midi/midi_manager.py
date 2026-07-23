@@ -80,6 +80,12 @@ class MidiManager:
         self._virtual_out: object | None = None
         self._io_lock = threading.RLock()
         self._scan_lock = threading.Lock()
+        # Ein langlebiger Discovery-Handle je Richtung. python-rtmidi/ALSA legt
+        # bereits beim Konstruktor einen Sequencer-Client an; ein neuer Handle
+        # bei jedem 2-s-Hotplug-Scan sammelte auf diesem Rechner dutzende leere
+        # RtMidi-Clients an, bis ALSA mit "Cannot allocate memory" ausstieg.
+        self._scan_input: object | None = None
+        self._scan_output: object | None = None
         self._rtmidi_retry_after = 0.0
         self._rtmidi_error = ""
         self._callbacks: list[Callable[[MidiMessage], None]] = []
@@ -130,9 +136,12 @@ class MidiManager:
             now = time.monotonic()
             if now < self._rtmidi_retry_after:
                 return []
-            handle = None
             try:
-                handle = rtmidi.MidiOut() if output else rtmidi.MidiIn()
+                attr = "_scan_output" if output else "_scan_input"
+                handle = getattr(self, attr)
+                if handle is None:
+                    handle = rtmidi.MidiOut() if output else rtmidi.MidiIn()
+                    setattr(self, attr, handle)
                 ports = [
                     handle.get_port_name(i)
                     for i in range(handle.get_port_count())
@@ -148,12 +157,6 @@ class MidiManager:
                     self._log(f"MIDI Backend voruebergehend nicht verfuegbar: {text}")
                     print(f"[midi_manager] MIDI-Scan fehlgeschlagen: {text}")
                 return []
-            finally:
-                if handle is not None:
-                    try:
-                        del handle
-                    except Exception:
-                        pass
 
     # ── Verbinden ────────────────────────────────────────────────────────────
 
@@ -355,6 +358,16 @@ class MidiManager:
             self._output = None
             self._output_name = ""
             self._virtual_out = None
+        # Auch die beiden langlebigen reinen Discovery-Clients freigeben.
+        with self._scan_lock:
+            for attr in ("_scan_input", "_scan_output"):
+                handle = getattr(self, attr, None)
+                if handle is not None:
+                    try:
+                        handle.close_port()
+                    except Exception:
+                        pass
+                setattr(self, attr, None)
 
     # ── Senden ───────────────────────────────────────────────────────────────
 
