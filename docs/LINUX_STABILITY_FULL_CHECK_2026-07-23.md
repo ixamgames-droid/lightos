@@ -97,6 +97,12 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     Universe 1 auf den persistenten ENTTEC-Pfad
     `/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN492875-if00-port0` gestellt.
     Alte Test-/Broadcast-Ausgaenge (`COM_FAKE`, Art-Net, sACN) sind deaktiviert.
+25. Das interne Funkmodul wurde von Linux zunaechst ueberhaupt nicht enumeriert
+    (`nmcli`: `WIFI-HW missing`; kein PCI-/USB-WLAN- oder Bluetooth-Geraet).
+    Treiber (`iwlwifi`) und `linux-firmware` waren vorhanden. Die aus Linux
+    auslesbaren Lenovo-UEFI-Werte zeigten `Wireless LAN: Disabled` und
+    `Bluetooth: Disabled`; beide wurden ueber ThinkLMI/fwupd auf `Enabled`
+    gestellt. Ein Neustart ist fuer die erneute Hardware-Enumeration notwendig.
 
 ## Testprotokoll
 
@@ -118,6 +124,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | Onboard-Ethernet | BESTANDEN | `eno1`, 1 Gbit/s Full Duplex; Gateway und `1.1.1.1` je 3/3 Pings; HTTPS zu GitHub explizit ueber `eno1` erfolgreich |
 | ENTTEC DMX USB Pro | BESTANDEN (Host/Protokoll) | Seriennummer EN492875, `ftdi_sio`; stabiler by-id-Pfad; Port geoeffnet, drei 512-Kanal-Blackout-Frames gesendet, sauber geschlossen |
 | Bierpong-Outputkonfiguration | BESTANDEN | Universe 1 oeffnet realen ENTTEC; 0 Art-Net- und 0 sACN-Ausgaenge; Port beim Shutdown geschlossen |
+| Internes WLAN/Bluetooth | NEUSTART AUSSTEHEND | ThinkCentre M720q: beide Funkoptionen im BIOS von `Disabled` auf `Enabled` gesetzt; Treiber/Firmware vorhanden, Hardware muss nach Neustart neu enumeriert und real verbunden werden |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 
