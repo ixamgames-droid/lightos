@@ -122,6 +122,13 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     Sequencer-Clients angesammelt und das Clientlimit erreicht. Input-/Output-
     Discovery-Handles werden nun pro Manager wiederverwendet und beim Shutdown
     geschlossen.
+29. Beim letzten realen App-Ende blieb der prozessisolierte ENTTEC-Worker als
+    Waise zurueck und hielt `/dev/ttyUSB0` offen. Ursache war der absichtliche
+    AV-Schutz des OutputManagers: Bei einem Join-Timeout wurden bisher alle
+    Ausgabegeraete offengelassen. Prozessisolierte ENTTEC-Proxies sind davon
+    ausgenommen worden, weil ihr Parent nur Shared Memory beschreibt und sie
+    daher auch bei einem noch lebenden Output-Thread gefahrlos beendet werden
+    koennen. Direkte serielle Handles bleiben im Timeout-Fall weiterhin offen.
 
 ## Testprotokoll
 
@@ -148,6 +155,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | VC-Bibliothek Live-Aktualisierung | BESTANDEN | Neuer/umbenannter/verschobener Effekt erscheint beim Tabwechsel bzw. binnen 400 ms; Pfad `Hintergrund/Dimmer/Strobe`; 30 relevante Tests bestanden |
 | APC mini mk2 Host/Treiber | BESTANDEN | USB-ID `09e8:004f`, `snd-usb-audio`, zwei Raw-MIDI-Ports; LightOS besitzt mk2-VC-Vorlage, MIDI-Learn und RGB-LED-Feedback |
 | ALSA-MIDI Discovery-Leak | BESTANDEN (Softwarefix) | Discovery-Clients werden wiederverwendet; 47 MIDI-/Controller-/Mapping-Tests bestanden; reale APC-Ein-/Ausgabe nach Prozess-/Systemneustart noch zu pruefen |
+| ENTTEC-Worker beim App-Ende | BESTANDEN (Regressionstest) | Prozessisolierter Worker wird auch bei haengendem Output-Thread beendet; direkte Windows-Serial-Handles behalten ihren AV-Schutz |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 
@@ -210,6 +218,7 @@ die Umgebung wurde danach auf die deklarierte Version 6.11.1 zurueckgesetzt.
 | VC-Canvas fuellt breiten Viewport | Allgemeiner UI-Fehler | Gilt ebenso fuer breite Windows-Touchscreens; gespeicherte Layoutkoordinaten bleiben identisch. |
 | VC-Hotkeyfilter und 3D-WebEngine | Allgemeiner Qt-Sicherheitspfad, auf Linux reproduziert | Chromium-interne Widgets werden auf allen Plattformen ausgeschlossen. Normale Windows-Hotkeys behalten Press-/Release-Semantik; der konkrete SIGSEGV wurde nur unter Linux beobachtet. |
 | RtMidi-Discovery-Handles | Linux-/ALSA-Backend | Windows mit WinMM-Fallback bleibt unveraendert. Falls Windows python-rtmidi nutzt, ist die Wiederverwendung ebenfalls sicher und vermeidet Client-Churn. |
+| ENTTEC-Worker-Shutdown bei Thread-Timeout | Allgemeiner Lebenszyklusfehler | Der Fix gilt auch auf Windows. Nur der gefahrlos isolierte Kindprozess wird beendet; direkte `WriteFile`-/`CloseHandle`-Pfade bleiben zum Schutz vor Access Violations unveraendert. |
 | XDG-Datenpfade, `libxcb`, `e1000e`, NetworkManager, `dialout`, ThinkLMI-WLAN, Touch-Mapping | Linux-/Rechnerkonfiguration | Kein Windows-Codepfad und keine Windows-Systemeinstellung wird geaendert. |
 | ENTTEC-Pfad `/dev/serial/by-id/...` und Universe-Konfiguration | Lokale Laufzeitdaten (nicht in Git) | Windows verwendet weiterhin seinen COM-Port; der Linux-by-id-Pfad wird nicht als Repository-Standard ausgeliefert. |
 | Windows-Roaming-/Fixture-Datenimport | Lokale Nutzerdaten (nicht in Git) | Originaldaten auf dem USB-Stick und das lokale Backup bleiben unveraendert; keine Migration wird in Windows erzwungen. |

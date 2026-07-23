@@ -1358,6 +1358,13 @@ Dieses Update überarbeitet das Tempo/BPM-Subsystem von Grund auf (zentraler Lea
 - `.github/workflows/ci.yml` — automatisierte Test-Pipeline (Python 3.11 + 3.12)
 - `CHANGELOG.md` — diese Datei (Keep-a-Changelog-Format)
 
+### Behoben
+- Prozessisolierte ENTTEC-Worker werden beim Beenden auch dann explizit
+  geschlossen, wenn der DMX-Output-Thread sein Join-Timeout ueberschreitet.
+  Dadurch bleibt nach dem App-Ende kein verwaister Prozess zurueck, der den
+  USB-Port belegt. Direkte serielle Geraete behalten den Windows-Schutz gegen
+  paralleles `CloseHandle`/`WriteFile`.
+
 ### Entfernt
 - **Redundanter „Snap"-Button (UIC-01)** aus der oberen Leiste. Die Schnell-Snapshot-Funktion
   bleibt vollstaendig erreichbar ueber Menue *Programmer → Snapshot aufnehmen* (`Strg+Shift+S`),
