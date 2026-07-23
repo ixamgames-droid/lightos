@@ -142,6 +142,29 @@ def test_virtualconsole_popout_then_edit_no_crash():
     assert v._canvas_alive()
 
 
+def test_virtualconsole_canvas_fills_wide_viewport():
+    """Regression: Der 1200px-Minimum-Canvas darf auf einem breiten Touchscreen
+    nicht starr 1200px bleiben und rechts eine unbenutzbare schwarze Flaeche
+    erzeugen."""
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    v.resize(1800, 900)
+    v.show()
+    app.processEvents()
+
+    assert v._main_scroll.widgetResizable() is True
+    assert v._canvas.width() >= v._main_scroll.viewport().width()
+
+    v._popout_canvas()
+    app.processEvents()
+    assert v._pop_scroll is not None
+    assert v._pop_scroll.widgetResizable() is True
+    v._popout_window.close()
+    v.close()
+
+
 def test_toolbar_add_cascades_and_selects():
     """UXT-06: Zwei Toolbar-Klicks legen VERSETZTE Widgets an (nicht deckungs-
     gleich in der Mitte) und wählen das jeweils neue aus."""

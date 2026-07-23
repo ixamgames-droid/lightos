@@ -394,7 +394,11 @@ class VirtualConsoleView(QWidget):
         splitter.setStyleSheet("QSplitter::handle { background:#30363d; width:2px; }")
 
         self._main_scroll = QScrollArea()
-        self._main_scroll.setWidgetResizable(False)
+        # Die VC-Arbeitsflaeche soll mindestens 1200x800 gross bleiben, auf
+        # breiten Touchscreens aber den GANZEN verfuegbaren Viewport nutzen.
+        # Mit False blieb der Canvas starr bei 1200 px und rechts entstand trotz
+        # ~1680 px Platz eine grosse schwarze, nicht nutzbare Flaeche.
+        self._main_scroll.setWidgetResizable(True)
         self._main_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
 
         self._canvas = VCCanvas()
@@ -651,7 +655,9 @@ class VirtualConsoleView(QWidget):
         pop_l.setContentsMargins(0, 0, 0, 0)
 
         pop_scroll = QScrollArea()
-        pop_scroll.setWidgetResizable(False)
+        # Gleiches Verhalten wie im Hauptfenster: auf grosse Fenster mitwachsen,
+        # bei kleineren Fenstern dank Canvas-Minimum weiterhin scrollbar.
+        pop_scroll.setWidgetResizable(True)
         pop_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
         # Canvas zuerst aus dem Haupt-Scroll lösen (ohne Löschen), dann übergeben.
         self._main_scroll.takeWidget()

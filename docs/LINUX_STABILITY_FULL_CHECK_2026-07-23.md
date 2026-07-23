@@ -103,6 +103,12 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     auslesbaren Lenovo-UEFI-Werte zeigten `Wireless LAN: Disabled` und
     `Bluetooth: Disabled`; beide wurden ueber ThinkLMI/fwupd auf `Enabled`
     gestellt. Ein Neustart ist fuer die erneute Hardware-Enumeration notwendig.
+26. Die VC-Arbeitsflaeche blieb wegen `QScrollArea.setWidgetResizable(False)`
+    auf ihrer Mindestbreite von 1200 px stehen. Auf dem 1920-px-Touchscreen
+    entstand dadurch rechts neben dem Raster eine grosse unbenutzbare schwarze
+    Flaeche. Hauptansicht und Popout wachsen jetzt bis zur Viewportgroesse;
+    unterhalb von 1200x800 bleiben sie weiterhin scrollbar. Show-Inhalt,
+    Widgetpositionen und das 8-px-Snapraster bleiben unveraendert.
 
 ## Testprotokoll
 
@@ -125,6 +131,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | ENTTEC DMX USB Pro | BESTANDEN (Host/Protokoll) | Seriennummer EN492875, `ftdi_sio`; stabiler by-id-Pfad; Port geoeffnet, drei 512-Kanal-Blackout-Frames gesendet, sauber geschlossen |
 | Bierpong-Outputkonfiguration | BESTANDEN | Universe 1 oeffnet realen ENTTEC; 0 Art-Net- und 0 sACN-Ausgaenge; Port beim Shutdown geschlossen |
 | Internes WLAN/Bluetooth | NEUSTART AUSSTEHEND | ThinkCentre M720q: beide Funkoptionen im BIOS von `Disabled` auf `Enabled` gesetzt; Treiber/Firmware vorhanden, Hardware muss nach Neustart neu enumeriert und real verbunden werden |
+| VC-Raster auf breitem Touchscreen | BESTANDEN | Screenshot-Befund behoben; Canvas fuellt breite Viewports, Popout identisch; 28 VC-/Touch-/Frame-Tests bestanden |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 

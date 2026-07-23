@@ -34,6 +34,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   den Chromium-Renderbaum des 3D-Visualizers eingehängt. Ein fokusgebundener
   Filter erhält Press/Release- und Flash-Hotkeys, verhindert aber den unter
   Linux reproduzierbaren nativen Segmentation Fault von Virtual Console + 3D.
+- Die Virtual-Console-Arbeitsfläche wächst auf breiten Touchscreens nun bis zur
+  vollständigen Viewportgröße, statt starr bei 1200 px zu enden und rechts eine
+  große unbenutzbare Fläche zu lassen. Kleine Fenster bleiben scrollbar; das
+  gespeicherte Layout und das Snapraster ändern sich nicht.
 
 Details und Prüfergebnisse:
 `docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.
