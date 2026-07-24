@@ -7,8 +7,15 @@ import time
 try:
     import soundcard as sc
     HAS_SOUNDCARD = True
-except ImportError:
+except Exception as exc:
+    # soundcard initialisiert PulseAudio bereits beim Import. Ist der Pulse-
+    # Server beim Start noch nicht bereit (oder in einer Headless-Sitzung nicht
+    # erreichbar), wirft das Paket unter Linux u. a. AssertionError statt
+    # ImportError. Audio-Capture ist optional und darf deshalb weder LightOS
+    # noch die Testsuite schon beim Modulimport beenden.
+    sc = None
     HAS_SOUNDCARD = False
+    print(f"[AudioCapture] soundcard nicht verfügbar: {exc}")
 
 SAMPLE_RATE = 44100
 CHUNK_SIZE = 1024

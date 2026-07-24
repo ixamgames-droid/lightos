@@ -247,8 +247,14 @@ class SectionButton(QPushButton):
         full_text_w = self.fontMetrics().horizontalAdvance(self._full_text)
         chrome = max(self._full_text_size_hint().width() - full_text_w, 0)
         avail = self.width() - chrome
-        shown = self.fontMetrics().elidedText(
-            self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
+        # QFontMetrics.elidedText() kann selbst bei exakt horizontalAdvance()
+        # wegen Glyph-Bearings noch kuerzen. Wenn unser konsistenter
+        # sizeHint-Chrome exakt Platz meldet, ist der Volltext autoritativ.
+        if avail >= full_text_w:
+            shown = self._full_text
+        else:
+            shown = self.fontMetrics().elidedText(
+                self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
         # UI-25: nie ein reines "…" (unlesbar) — dann lieber die ersten Zeichen
         # ohne Ellipse zeigen (ein sinnvolles Kuerzel statt Punkte).
         if shown in ("…", "...", "") and self._full_text:
@@ -329,6 +335,15 @@ class _SectionBar(QWidget):
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self._reflow()
+        # Das aeussere Layout kann die finale Containerbreite erst nach diesem
+        # Resize-Durchlauf festlegen. Ein zweiter Reflow im naechsten
+        # Event-Loop-Takt verhindert, dass die pro Tab gesetzten Fixbreiten von
+        # einer kurzzeitig kleineren Zwischengeometrie uebrig bleiben.
+        QTimer.singleShot(0, self._reflow)
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        QTimer.singleShot(0, self._reflow)
 
     def _reflow(self) -> None:
         if self._reflowing or not self._tabs:
@@ -2282,7 +2297,11 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         # Warnung wenn Show ungespeicherte Aenderungen hat
-        if self._has_unsaved_changes():
+        # Headless-/CI-Sitzungen duerfen niemals in einem modalen Dialog haengen.
+        # Derselbe Guard schuetzt bereits die Autosave-Recovery; beim Schliessen
+        # entspricht der sichere Testpfad "verwerfen" (Testdaten liegen ohnehin
+        # im isolierten APPDATA).
+        if self._has_unsaved_changes() and not _recovery_prompt_suppressed():
             reply = QMessageBox.question(
                 self, "Show speichern?",
                 "Es gibt möglicherweise ungespeicherte Änderungen "
@@ -2298,6 +2317,23 @@ class MainWindow(QMainWindow):
                 return
             if reply == QMessageBox.StandardButton.Save:
                 self._save_show()
+
+        # Keine neuen MIDI-Handles mehr waehrend des Teardowns oeffnen. Der
+        # 4-s-Autoconnect-Timer konnte sonst zwischen close_all() und dem
+        # nativen RtMidi-Abbau erneut feuern.
+        try:
+            self._midi_autoconnect_timer.stop()
+        except Exception:
+            pass
+        # PulseAudio/soundcard MUSS vor dem Python-/Qt-Abbau beendet und
+        # gejoint werden. Ein daemon AudioCapture-Thread im nativen
+        # pa_threaded_mainloop verursachte auf Linux nach bereits gemeldetem
+        # "sauberer Exit" reproduzierbar einen SIGSEGV.
+        try:
+            from src.core.audio.capture import get_audio_capture
+            get_audio_capture().stop()
+        except Exception as e:
+            print(f"[MainWindow] audio capture shutdown error: {e}")
 
         self._state.output_manager.stop()
         # LAS-05: Laser-Streaming-Thread mit herunterfahren (Netzwerk-Laser).

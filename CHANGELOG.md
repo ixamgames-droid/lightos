@@ -7,6 +7,49 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-23 — Linux-Stabilitätsaudit
+
+#### Behoben
+
+- Mehrfachstarts werden vor der Initialisierung von Qt, ALSA und WebEngine über
+  eine betriebssystemweite Einzelinstanz-Sperre abgefangen.
+- Audio und MIDI starten auch bei nicht erreichbarem PulseAudio/ALSA-Sequencer
+  weiter; MIDI-Portscans sind serialisiert und besitzen einen
+  10-Sekunden-Circuit-Breaker gegen native Client-Stürme.
+- Show-Dateien validieren Fixture-Profil-IDs gegen Hersteller/Modell und mappen
+  abweichende lokale Datenbank-IDs automatisch nach Namen.
+- Frische Installationen starten keine Test-/Netzwerkausgänge mehr:
+  `COM_FAKE`, Art-Net-Broadcast und sACN sind standardmäßig deaktiviert.
+- 2D-Bühnenvorschau auf 10 FPS begrenzt, ohne DMX- oder Playback-Timing zu
+  verändern; Tab-Titel bleiben bei 1440 px vollständig lesbar.
+- Headless-Schließen, MIDI-Ansicht und plattformübergreifende Janitor-Pfade
+  gegen reproduzierte Fehler gehärtet.
+- Der App-Exit stoppt und joint Audio-Capture und deaktiviert MIDI-Autoconnect
+  vor dem nativen Backend-Abbau; damit tritt der reproduzierte PulseAudio-
+  `SIGSEGV` nach bereits gemeldetem sauberem Exit nicht mehr auf.
+- Qt-WebEngine erhält `AA_ShareOpenGLContexts` vor `QApplication`; der
+  Produktionsabschluss führt alle Finalizer aus und überspringt anschließend
+  den bekannten fehlerhaften QtWebEngine-Interpreterabbau.
+- Der app-weite Python-Eventfilter für VC-Tastatur-Hotkeys wird nicht mehr in
+  den Chromium-Renderbaum des 3D-Visualizers eingehängt. Ein fokusgebundener
+  Filter erhält Press/Release- und Flash-Hotkeys, verhindert aber den unter
+  Linux reproduzierbaren nativen Segmentation Fault von Virtual Console + 3D.
+- Die Virtual-Console-Arbeitsfläche wächst auf breiten Touchscreens nun bis zur
+  vollständigen Viewportgröße, statt starr bei 1200 px zu enden und rechts eine
+  große unbenutzbare Fläche zu lassen. Kleine Fenster bleiben scrollbar; das
+  gespeicherte Layout und das Snapraster ändern sich nicht.
+- Die Bibliothek der Virtual Console aktualisiert sich beim Öffnen der Ansicht
+  sowie bei Änderungen an ID, Name, Ordner oder Typ einer Funktion. Effekte,
+  die nach dem Erstellen umbenannt oder etwa nach `Hintergrund/Dimmer`
+  verschoben werden, erscheinen damit ohne manuelles Neuladen in der VC.
+- RtMidi-Hotplug-Scans verwenden unter ALSA je einen langlebigen Discovery-
+  Client für Ein- und Ausgänge. Dadurch sammeln sich bei wiederholten Scans
+  keine leeren Sequencer-Clients mehr an, die nach längerer Laufzeit MIDI mit
+  `Cannot allocate memory` blockieren.
+
+Details und Prüfergebnisse:
+`docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.
+
 ### 2026-07-23 — FM-HEADLAYOUT (Slice 1): Mehrkopf-Programmierung pro Fixture + Kopf-Matrix wiederherstellen
 
 #### Hinzugefügt
@@ -1314,6 +1357,20 @@ Dieses Update überarbeitet das Tempo/BPM-Subsystem von Grund auf (zentraler Lea
 - `README.md` um "Quick Start"-Abschnitt erweitert (5-Minuten-Guide fuer neue Nutzer)
 - `.github/workflows/ci.yml` — automatisierte Test-Pipeline (Python 3.11 + 3.12)
 - `CHANGELOG.md` — diese Datei (Keep-a-Changelog-Format)
+
+### Behoben
+- Linux/ALSA: APC-Ausgaenge verwenden einen einzigen zentralen RtMidi-Client.
+  Portable Profil-Hinweise wie `APC` werden auf den realen mk2-Control-Port
+  aufgeloest; wiederholte Scans, LED-Feedback und Mapping erzeugen keine
+  Sequencer-Client-Flut mehr. Fehler beim Oeffnen bleiben in der MIDI-Ansicht
+  sichtbar, statt als unbehandelte Qt-Slot-Exception im Crashlog zu landen.
+- Die Audio-Input-Ansicht bietet neben PC-Loopback nun auch echte Mikrofon-/
+  Line-In-Geraete an und schaltet Quelle plus Geraet gemeinsam um.
+- Prozessisolierte ENTTEC-Worker werden beim Beenden auch dann explizit
+  geschlossen, wenn der DMX-Output-Thread sein Join-Timeout ueberschreitet.
+  Dadurch bleibt nach dem App-Ende kein verwaister Prozess zurueck, der den
+  USB-Port belegt. Direkte serielle Geraete behalten den Windows-Schutz gegen
+  paralleles `CloseHandle`/`WriteFile`.
 
 ### Entfernt
 - **Redundanter „Snap"-Button (UIC-01)** aus der oberen Leiste. Die Schnell-Snapshot-Funktion

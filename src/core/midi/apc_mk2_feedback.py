@@ -116,13 +116,14 @@ class ApcMk2Feedback:
     def _open(self) -> bool:
         if _RTMIDI:
             try:
-                m = _rtmidi.MidiOut()
-                ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+                from .midi_manager import get_midi_manager
+                m = get_midi_manager()
+                ports = m.list_outputs()
                 idx = self._pick_port(ports)
                 if idx is None:
-                    del m
                     return False
-                m.open_port(idx)
+                if not m.open_output(ports[idx]):
+                    return False
                 self._out = m
                 print(f"[ApcMk2] Output geoeffnet: {ports[idx]}")
                 return True
@@ -210,10 +211,9 @@ class ApcMk2Feedback:
                 self.clear_all()
             except Exception:
                 pass
-            try:
-                self._out.close_port()
-            except Exception:
-                pass
+            # Der zentrale MidiManager besitzt den gemeinsam genutzten Port.
+            # Hier nur unsere Referenz loesen; Mapper/andere VC-Widgets duerfen
+            # denselben Ausgang weiterverwenden.
             self._out = None
         print("[ApcMk2] Geschlossen.")
 

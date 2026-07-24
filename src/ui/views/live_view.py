@@ -581,7 +581,11 @@ class StageCanvas(QWidget):
         # Live-Update
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self.update)
-        self._update_timer.start(50)  # 20 FPS
+        # Die 2D-Buehne zeichnet Raster, Fixtures und Overlays komplett in
+        # Python/QPainter. 20 FPS belegten auf dem Zielrechner schon im
+        # Leerlauf einen grossen Teil eines CPU-Kerns. 10 FPS sind fuer die
+        # Vorschau fluessig genug; DMX-Ausgabe/Playback laufen unabhaengig.
+        self._update_timer.start(100)
 
         # Bei Show-Load / Refresh die Positionen neu laden
         try:
@@ -624,7 +628,7 @@ class StageCanvas(QWidget):
         try:
             if on:
                 if not self._update_timer.isActive():
-                    self._update_timer.start(50)
+                    self._update_timer.start(100)
             else:
                 self._update_timer.stop()
         except (RuntimeError, AttributeError):

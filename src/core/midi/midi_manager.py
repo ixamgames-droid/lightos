@@ -7,6 +7,7 @@ Backend-Priorität:
 from __future__ import annotations
 import threading
 import queue
+import time
 from dataclasses import dataclass
 from typing import Callable
 
@@ -32,6 +33,13 @@ _USE_WINMM = (not RTMIDI_OK) and WINMM_OK
 
 # Groesse der bounded RX-Queue (Treiber-Callback -> MidiDispatch-Thread).
 _RX_QUEUE_MAX = 4096
+
+# RtMidi/ALSA erzeugt fuer jeden Scan einen nativen Sequencer-Client. Wenn ALSA
+# gerade keine Clients mehr anlegen kann, kann paralleles/repetitives Scannen
+# nicht nur Exceptions, sondern auch native Abstuerze in librtmidi ausloesen.
+# Darum werden alle Scans eines Managers serialisiert und Fehler kurz gecacht.
+_RTMIDI_RETRY_SECONDS = 10.0
+_manager_lock = threading.Lock()
 
 
 @dataclass
@@ -72,6 +80,15 @@ class MidiManager:
         self._output_name: str = ""
         self._virtual_out: object | None = None
         self._io_lock = threading.RLock()
+        self._scan_lock = threading.Lock()
+        # Ein langlebiger Discovery-Handle je Richtung. python-rtmidi/ALSA legt
+        # bereits beim Konstruktor einen Sequencer-Client an; ein neuer Handle
+        # bei jedem 2-s-Hotplug-Scan sammelte auf diesem Rechner dutzende leere
+        # RtMidi-Clients an, bis ALSA mit "Cannot allocate memory" ausstieg.
+        self._scan_input: object | None = None
+        self._scan_output: object | None = None
+        self._rtmidi_retry_after = 0.0
+        self._rtmidi_error = ""
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
         self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=_RX_QUEUE_MAX)
@@ -96,20 +113,53 @@ class MidiManager:
             return _winmm_list_inputs()
         if not RTMIDI_OK:
             return []
-        m = rtmidi.MidiIn()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        del m
-        return ports
+        return self._list_rtmidi_ports(output=False)
 
     def list_outputs(self) -> list[str]:
         if _USE_WINMM:
             return _winmm_list_outputs()
         if not RTMIDI_OK:
             return []
-        m = rtmidi.MidiOut()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        del m
-        return ports
+        return self._list_rtmidi_ports(output=True)
+
+    def _list_rtmidi_ports(self, *, output: bool) -> list[str]:
+        """RtMidi-Portscan mit Circuit-Breaker fuer fehlerhaftes ALSA.
+
+        Ein fehlender/ausgelasteter ALSA-Sequencer ist ein optionaler
+        Hardwarefehler und darf die GUI nicht beenden. Nach einem Fehler wird
+        fuer kurze Zeit kein weiterer nativer Client erzeugt; danach kann sich
+        das Backend automatisch erholen (z. B. nach USB-/Dienst-Neustart).
+        """
+        now = time.monotonic()
+        if now < self._rtmidi_retry_after:
+            return []
+        with self._scan_lock:
+            now = time.monotonic()
+            if now < self._rtmidi_retry_after:
+                return []
+            try:
+                attr = "_scan_output" if output else "_scan_input"
+                # Ein bereits geoeffneter Ausgang kann seine Portliste selbst
+                # liefern. Dafuer keinen weiteren ALSA-Client konstruieren.
+                handle = self._output if output and self._output is not None else getattr(self, attr)
+                if handle is None:
+                    handle = rtmidi.MidiOut() if output else rtmidi.MidiIn()
+                    setattr(self, attr, handle)
+                ports = [
+                    handle.get_port_name(i)
+                    for i in range(handle.get_port_count())
+                ]
+                self._rtmidi_retry_after = 0.0
+                self._rtmidi_error = ""
+                return ports
+            except Exception as exc:
+                self._rtmidi_retry_after = now + _RTMIDI_RETRY_SECONDS
+                text = str(exc)
+                if text != self._rtmidi_error:
+                    self._rtmidi_error = text
+                    self._log(f"MIDI Backend voruebergehend nicht verfuegbar: {text}")
+                    print(f"[midi_manager] MIDI-Scan fehlgeschlagen: {text}")
+                return []
 
     # ── Verbinden ────────────────────────────────────────────────────────────
 
@@ -204,15 +254,18 @@ class MidiManager:
                     self._log(f"Auto-Connect Fehler ({name}): {e}")
         return len(self._inputs)
 
-    def open_output(self, port_name: str):
+    def open_output(self, port_name: str) -> bool:
         with self._io_lock:
-            if self._output is not None and self._output_name == port_name:
-                return
+            if self._output is not None:
+                requested = str(port_name or "").strip().lower()
+                current = self._output_name.lower()
+                if self._output_name == port_name or (requested and requested in current):
+                    return True
 
             if _USE_WINMM:
                 ports = _winmm_list_outputs()
                 if port_name not in ports:
-                    return
+                    return False
                 idx = ports.index(port_name)
                 try:
                     if self._output is not None:
@@ -224,27 +277,73 @@ class MidiManager:
                     self._output = WinMMOutput(idx)
                     self._output_name = port_name
                     self._log(f"MIDI Output geöffnet (WinMM): {port_name}")
+                    return True
                 except Exception as e:
                     self._log(f"MIDI Output Fehler: {e}")
-                return
+                    return False
 
             if not RTMIDI_OK:
-                return
-            m = rtmidi.MidiOut()
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            if port_name not in ports:
-                del m
-                return
-            idx = ports.index(port_name)
-            m.open_port(idx)
-            if self._output is not None:
-                try:
-                    self._output.close_port()
-                except Exception:
-                    pass
-            self._output = m
-            self._output_name = port_name
-            self._log(f"MIDI Output geöffnet: {port_name}")
+                return False
+            # Der langlebige Discovery-Handle wird zum echten Ausgang befoerdert.
+            # Ein frischer MidiOut()-Konstruktor pro Klick erzeugte auf ALSA bei
+            # einem Initialisierungsfehler trotzdem einen leeren Kernel-Client;
+            # wiederholtes Klicken erschoepfte so den Sequencer und crashte die UI.
+            m = self._output
+            was_open_output = m is not None
+            if m is None:
+                with self._scan_lock:
+                    m = self._scan_output
+                    if m is None:
+                        try:
+                            m = rtmidi.MidiOut()
+                        except Exception as exc:
+                            self._rtmidi_retry_after = float("inf")
+                            self._rtmidi_error = str(exc)
+                            self._log(
+                                "MIDI Output nicht verfügbar; LightOS neu starten, "
+                                f"nachdem ALSA wieder frei ist: {exc}")
+                            return False
+                    self._scan_output = None
+            try:
+                ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+                resolved = port_name if port_name in ports else None
+                if resolved is None:
+                    hint = str(port_name or "").strip().lower()
+                    matches = [p for p in ports if hint and hint in p.lower()]
+                    # Profile speichern absichtlich portable Hinweise wie "APC"
+                    # statt Linux-spezifischer ALSA-Namen. Beim mk2 den Control-
+                    # Port fuer LEDs bevorzugen, nicht den Notes-Port.
+                    if matches:
+                        resolved = next(
+                            (p for p in matches if "control" in p.lower()),
+                            matches[0])
+                if resolved is None:
+                    try:
+                        m.close_port()
+                    except Exception:
+                        pass
+                    return False
+                idx = ports.index(resolved)
+                # close_port() auf einem noch NIE geoeffneten RtMidi/ALSA-
+                # Discovery-Client zerstoert bei einigen python-rtmidi-Versionen
+                # dessen Sequencer-Client. Das anschliessende open_port() scheitert
+                # dann und jeder Wiederholungsversuch hinterlaesst einen neuen
+                # leeren Client. Nur einen bereits echten Ausgang umschalten.
+                if was_open_output:
+                    try:
+                        m.close_port()
+                    except Exception:
+                        pass
+                m.open_port(idx)
+                self._output = m
+                self._output_name = resolved
+                self._rtmidi_retry_after = 0.0
+                self._rtmidi_error = ""
+                self._log(f"MIDI Output geöffnet: {resolved}")
+                return True
+            except Exception as exc:
+                self._log(f"MIDI Output Fehler ({port_name}): {exc}")
+                return False
 
     def open_virtual_input(self, name: str = "LightOS Virtual IN"):
         """Erstellt einen virtuellen MIDI-Eingang (andere Apps können darauf senden)."""
@@ -311,6 +410,16 @@ class MidiManager:
             self._output = None
             self._output_name = ""
             self._virtual_out = None
+        # Auch die beiden langlebigen reinen Discovery-Clients freigeben.
+        with self._scan_lock:
+            for attr in ("_scan_input", "_scan_output"):
+                handle = getattr(self, attr, None)
+                if handle is not None:
+                    try:
+                        handle.close_port()
+                    except Exception:
+                        pass
+                setattr(self, attr, None)
 
     # ── Senden ───────────────────────────────────────────────────────────────
 
@@ -321,6 +430,22 @@ class MidiManager:
             out = self._virtual_out if virtual else self._output
             if out:
                 out.send_message(msg)
+
+    def send_message(self, message) -> bool:
+        """Rohe MIDI-Nachricht ueber den gemeinsam verwalteten Ausgang senden.
+
+        APC-LED-Treiber nutzen bewusst diese API statt eigene MidiOut-Clients
+        anzulegen. So teilen UI, Mapper und LED-Feedback genau einen ALSA-Port.
+        """
+        with self._io_lock:
+            if self._output is None:
+                return False
+            try:
+                self._output.send_message(list(message))
+                return True
+            except Exception as exc:
+                self._log(f"MIDI Output Sendefehler: {exc}")
+                return False
 
     def send_note(self, channel: int, note: int, velocity: int = 127):
         status = 0x90 | ((channel - 1) & 0x0F)
@@ -467,5 +592,10 @@ _manager: MidiManager | None = None
 def get_midi_manager() -> MidiManager:
     global _manager
     if _manager is None:
-        _manager = MidiManager()
+        # GUI, MIDI-Feedback und Hotplug-Timer koennen beim Start gleichzeitig
+        # hier landen. Ohne Lock entstanden zwei Manager samt ALSA-Clients und
+        # Dispatch-Threads.
+        with _manager_lock:
+            if _manager is None:
+                _manager = MidiManager()
     return _manager

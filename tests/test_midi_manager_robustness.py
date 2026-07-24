@@ -107,6 +107,142 @@ def test_open_all_inputs_evicts_vanished_port(winmm_stub):
         mgr.close_all()
 
 
+def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch):
+    """Ein kaputter ALSA-Sequencer darf weder Start noch Refresh-Schleife
+    beenden und soll nicht alle zwei Sekunden neue native Clients erzeugen."""
+    calls = {"n": 0}
+
+    class BrokenMidiIn:
+        def __init__(self):
+            calls["n"] += 1
+            raise SystemError("ALSA sequencer unavailable")
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiIn", BrokenMidiIn)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.list_inputs() == []
+        assert mgr.list_inputs() == []
+        assert calls["n"] == 1, "Circuit-Breaker muss wiederholte native Scans drosseln"
+        assert mgr._rtmidi_retry_after > 0
+    finally:
+        mgr.close_all()
+
+
+def test_successful_rtmidi_scans_reuse_discovery_client(monkeypatch):
+    """Hotplug-Polling darf nicht pro Aufruf einen neuen ALSA-Sequencer-Client
+    erzeugen; sonst ist dessen Client-Limit nach kurzer Laufzeit erschoepft."""
+    made = []
+
+    class ScanMidiIn:
+        def __init__(self):
+            self.closed = False
+            made.append(self)
+
+        def get_port_count(self):
+            return 1
+
+        def get_port_name(self, index):
+            assert index == 0
+            return "APC mini mk2 Notes"
+
+        def close_port(self):
+            self.closed = True
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiIn", ScanMidiIn)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
+        assert len(made) == 1
+        assert mgr._scan_input is made[0]
+    finally:
+        mgr.close_all()
+    assert made[0].closed is True
+    assert mgr._scan_input is None
+
+
+def test_open_output_promotes_discovery_handle_without_new_client(monkeypatch):
+    """Portscan + Oeffnen teilen einen MidiOut-Client statt pro Klick neue
+    ALSA-Clients zu erzeugen."""
+    made = []
+
+    class FakeMidiOut:
+        def __init__(self):
+            made.append(self)
+            self.opened = None
+            self.closed = False
+
+        def get_port_count(self):
+            return 1
+
+        def get_port_name(self, index):
+            return "APC mini mk2 Control"
+
+        def open_port(self, index):
+            assert self.closed is False, (
+                "frischer Discovery-Handle darf vor dem ersten open_port nicht "
+                "geschlossen werden")
+            self.opened = index
+
+        def close_port(self):
+            self.closed = True
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiOut", FakeMidiOut)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.list_outputs() == ["APC mini mk2 Control"]
+        assert mgr.open_output("APC mini mk2 Control") is True
+        assert mgr.open_output("APC mini mk2 Control") is True
+        assert len(made) == 1
+        assert mgr._output is made[0]
+        assert mgr._scan_output is None
+    finally:
+        mgr.close_all()
+
+
+def test_open_output_resolves_portable_apc_hint_to_control_port(monkeypatch):
+    made = []
+
+    class FakeMidiOut:
+        def __init__(self):
+            made.append(self)
+            self.opened = None
+
+        def get_port_count(self):
+            return 2
+
+        def get_port_name(self, index):
+            return [
+                "APC mini mk2:APC mini mk2 Notes 20:1",
+                "APC mini mk2:APC mini mk2 Control 20:0",
+            ][index]
+
+        def open_port(self, index):
+            self.opened = index
+
+        def close_port(self):
+            pass
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiOut", FakeMidiOut)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.open_output("APC") is True
+        assert mgr._output.opened == 1
+        assert "Control" in mgr.current_output_name()
+        assert len(made) == 1
+    finally:
+        mgr.close_all()
+
+
 # ── F2: RX-Queue-Overflow ────────────────────────────────────────────────────
 
 def test_is_release_classification():
