@@ -129,6 +129,21 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     ausgenommen worden, weil ihr Parent nur Shared Memory beschreibt und sie
     daher auch bei einem noch lebenden Output-Thread gefahrlos beendet werden
     koennen. Direkte serielle Handles bleiben im Timeout-Fall weiterhin offen.
+30. Beim APC-Ausgang erzeugten drei Pfade unabhaengige RtMidi-Ausgaenge:
+    Port-Discovery, Mapper-Feedback und beide APC-LED-Klassen. Portable
+    Profilnamen wie `APC` entsprachen zudem nicht exakt dem langen ALSA-
+    Portnamen; jeder fehlgeschlagene Wiederholungsversuch liess einen leeren
+    Sequencer-Client zurueck. Alle Ausgabepfade teilen jetzt den zentralen
+    MidiManager-Handle, `APC` wird bevorzugt auf den mk2-Control-Port
+    aufgeloest, und die UI behandelt Backendfehler ohne Crash-Exception.
+31. Die Audio-Input-Ansicht zeigte trotz vorhandener Capture-Unterstuetzung nur
+    Lautsprecher-Loopbacks. Sie listet jetzt auch echte Mikrofon-/Line-In-
+    Quellen und schaltet den Capture-Modus passend um. Auf diesem Rechner war
+    zusaetzlich ALSA auf `Mic` gestellt, obwohl das Kabel laut Jack-Sense in
+    `Mic 1` steckt. Die persistierte Hardwarekonfiguration nutzt nun `Mic 1`,
+    Capture +12 dB und 10 dB Mic-Boost. Der reale Pegel stieg von ca. -85 dB
+    auf ca. -19 dB; der BeatDetector erkannte im 12-s-Test 29 Beats und etwa
+    160 BPM. Im anschliessenden Live-Lauf zeigte LightOS stabil eine AUTO-BPM.
 
 ## Testprotokoll
 
@@ -156,6 +171,8 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | APC mini mk2 Host/Treiber | BESTANDEN | USB-ID `09e8:004f`, `snd-usb-audio`, zwei Raw-MIDI-Ports; LightOS besitzt mk2-VC-Vorlage, MIDI-Learn und RGB-LED-Feedback |
 | ALSA-MIDI Discovery-Leak | BESTANDEN (Softwarefix) | Discovery-Clients werden wiederverwendet; 47 MIDI-/Controller-/Mapping-Tests bestanden; reale APC-Ein-/Ausgabe nach Prozess-/Systemneustart noch zu pruefen |
 | ENTTEC-Worker beim App-Ende | BESTANDEN (Regressionstest) | Prozessisolierter Worker wird auch bei haengendem Output-Thread beendet; direkte Windows-Serial-Handles behalten ihren AV-Schutz |
+| APC mk2 Ausgang/LEDs | BESTANDEN (real + Regression) | Genau ein RtMidiOut ist mit `APC mini mk2 Control` verbunden; keine leeren Client-Ketten; portable `APC`-Hinweise werden aufgeloest |
+| Analoger Audioeingang/BPM | BESTANDEN (real) | `Mic 1` aktiv, ca. -19 dB Durchschnittspegel; 29 Beats/12 s erkannt; LightOS zeigt AUTO-BPM und fortlaufende Beats |
 | Netzwerk-/Output-Subsysteme | BESTANDEN (Software) | Art-Net, sACN, OSC, Web-Remote, Laser und Output-Tests liefen isoliert mit normalem Socket-Zugriff gruen |
 | Physische DMX-Ausgabe | TEILWEISE BESTANDEN | Reales ENTTEC erkannt und Protokollframes geschrieben; elektrisches DMX-Signal bzw. Reaktion einer angeschlossenen Lampe noch nicht gemessen |
 
@@ -219,6 +236,8 @@ die Umgebung wurde danach auf die deklarierte Version 6.11.1 zurueckgesetzt.
 | VC-Hotkeyfilter und 3D-WebEngine | Allgemeiner Qt-Sicherheitspfad, auf Linux reproduziert | Chromium-interne Widgets werden auf allen Plattformen ausgeschlossen. Normale Windows-Hotkeys behalten Press-/Release-Semantik; der konkrete SIGSEGV wurde nur unter Linux beobachtet. |
 | RtMidi-Discovery-Handles | Linux-/ALSA-Backend | Windows mit WinMM-Fallback bleibt unveraendert. Falls Windows python-rtmidi nutzt, ist die Wiederverwendung ebenfalls sicher und vermeidet Client-Churn. |
 | ENTTEC-Worker-Shutdown bei Thread-Timeout | Allgemeiner Lebenszyklusfehler | Der Fix gilt auch auf Windows. Nur der gefahrlos isolierte Kindprozess wird beendet; direkte `WriteFile`-/`CloseHandle`-Pfade bleiben zum Schutz vor Access Violations unveraendert. |
+| Zentraler MIDI-Ausgang + portable Port-Hinweise | Allgemeiner MIDI-Lebenszyklusfehler, auf ALSA kritisch | Windows profitiert ebenfalls von einem einzigen Output-Handle; WinMM-Fallback bleibt erhalten. Lange Linux-Portnamen werden nicht in Windows-Profile geschrieben. |
+| Audio-Input-Auswahl in der Audio-Ansicht | Allgemeiner UI-Fehler | Mikrofon-/Line-In-Auswahl funktioniert auch unter Windows; die konkrete `Mic 1`-Mixerwahl ist reine Linux-Rechnerkonfiguration. |
 | XDG-Datenpfade, `libxcb`, `e1000e`, NetworkManager, `dialout`, ThinkLMI-WLAN, Touch-Mapping | Linux-/Rechnerkonfiguration | Kein Windows-Codepfad und keine Windows-Systemeinstellung wird geaendert. |
 | ENTTEC-Pfad `/dev/serial/by-id/...` und Universe-Konfiguration | Lokale Laufzeitdaten (nicht in Git) | Windows verwendet weiterhin seinen COM-Port; der Linux-by-id-Pfad wird nicht als Repository-Standard ausgeliefert. |
 | Windows-Roaming-/Fixture-Datenimport | Lokale Nutzerdaten (nicht in Git) | Originaldaten auf dem USB-Stick und das lokale Backup bleiben unveraendert; keine Migration wird in Windows erzwungen. |

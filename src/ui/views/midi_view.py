@@ -318,8 +318,20 @@ class MidiView(QWidget):
         port = self._combo_out.currentText()
         if not port or port.startswith("("):
             return
-        self._midi.open_output(port)
-        self._lbl_midi_status.setText(f"OUT: {port}")
+        try:
+            ok = self._midi.open_output(port)
+        except Exception as exc:
+            # Ein optionales MIDI-Backend darf niemals als unbehandelte Qt-Slot-
+            # Exception im crash.log landen oder die Anwendung destabilisieren.
+            ok = False
+            self._append_log(f"✗ MIDI-Ausgang konnte nicht geöffnet werden: {exc}")
+        if ok:
+            self._lbl_midi_status.setText(f"OUT: {port}")
+            self._lbl_midi_status.setStyleSheet("color: #00cc66;")
+        else:
+            self._lbl_midi_status.setText(
+                "MIDI-Ausgang nicht verfügbar – ALSA belegt; LightOS neu starten")
+            self._lbl_midi_status.setStyleSheet("color: #ff5555;")
 
     def _toggle_virtual_in(self, checked: bool):
         if checked:

@@ -64,15 +64,16 @@ class APCMiniFeedback:
     def _open(self) -> bool:
         if _RTMIDI:
             try:
-                m = _rtmidi.MidiOut()
-                ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+                from .midi_manager import get_midi_manager
+                m = get_midi_manager()
+                ports = m.list_outputs()
                 idx = next((i for i, p in enumerate(ports)
                             if self._hint.lower() in p.lower()), None)
                 if idx is None:
-                    del m
                     print(f"[APCMiniFeedback] Kein Output-Port mit '{self._hint}' gefunden.")
                     return False
-                m.open_port(idx)
+                if not m.open_output(ports[idx]):
+                    return False
                 self._out = m
                 print(f"[APCMiniFeedback] Output geoeffnet: {ports[idx]}")
                 return True
@@ -131,10 +132,8 @@ class APCMiniFeedback:
                 self.clear_all()
             except Exception:
                 pass
-            try:
-                self._out.close_port()
-            except Exception:
-                pass
+            # Gemeinsamer MidiManager-Port: nicht aus einem einzelnen
+            # LED-Feedback-Widget heraus schliessen.
             self._out = None
         if _instance is self:
             _instance = None

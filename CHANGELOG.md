@@ -1359,6 +1359,13 @@ Dieses Update überarbeitet das Tempo/BPM-Subsystem von Grund auf (zentraler Lea
 - `CHANGELOG.md` — diese Datei (Keep-a-Changelog-Format)
 
 ### Behoben
+- Linux/ALSA: APC-Ausgaenge verwenden einen einzigen zentralen RtMidi-Client.
+  Portable Profil-Hinweise wie `APC` werden auf den realen mk2-Control-Port
+  aufgeloest; wiederholte Scans, LED-Feedback und Mapping erzeugen keine
+  Sequencer-Client-Flut mehr. Fehler beim Oeffnen bleiben in der MIDI-Ansicht
+  sichtbar, statt als unbehandelte Qt-Slot-Exception im Crashlog zu landen.
+- Die Audio-Input-Ansicht bietet neben PC-Loopback nun auch echte Mikrofon-/
+  Line-In-Geraete an und schaltet Quelle plus Geraet gemeinsam um.
 - Prozessisolierte ENTTEC-Worker werden beim Beenden auch dann explizit
   geschlossen, wenn der DMX-Output-Thread sein Join-Timeout ueberschreitet.
   Dadurch bleibt nach dem App-Ende kein verwaister Prozess zurueck, der den

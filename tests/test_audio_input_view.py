@@ -25,6 +25,7 @@ class _FakeDetector:
 
 class _FakeCapture:
     _device_name = "Bad Loopback"
+    source_mode = "loopback"
 
     def __init__(self, start_ok: bool = True, error: str | None = None):
         self._start_ok = start_ok
@@ -35,6 +36,10 @@ class _FakeCapture:
         pass
 
     def set_device(self, name):
+        self._device_name = name
+
+    def set_source_mode(self, mode, name=None):
+        self.source_mode = mode
         self._device_name = name
 
     def start(self):
@@ -66,6 +71,14 @@ class _FakeAudioCaptureClass:
     @staticmethod
     def default_speaker():
         return "Bad Loopback"
+
+    @staticmethod
+    def list_input_devices():
+        return ["Built-in Analog Input"]
+
+    @staticmethod
+    def default_input():
+        return "Built-in Analog Input"
 
 
 def _make_view(monkeypatch, capture):
@@ -109,6 +122,27 @@ def test_audio_input_view_shows_immediate_start_error(qapp, monkeypatch):
 
     assert "Kein Audio-Geraet gefunden" in view._lbl_status.text()
 
+    view._ui_timer.stop()
+    view.deleteLater()
+    app.processEvents()
+
+
+def test_audio_input_view_lists_and_selects_real_input(qapp, monkeypatch):
+    capture = _FakeCapture(start_ok=True)
+    app, view = _make_view(monkeypatch, capture)
+
+    labels = [view._combo_device.itemText(i)
+              for i in range(view._combo_device.count())]
+    assert any("[Mikro/Line-In]" in text for text in labels)
+    idx = next(i for i in range(view._combo_device.count())
+               if view._combo_device.itemData(i)
+               == ("input", "Built-in Analog Input"))
+
+    view._combo_device.setCurrentIndex(idx)
+    view._start_capture()
+
+    assert capture.source_mode == "input"
+    assert capture._device_name == "Built-in Analog Input"
     view._ui_timer.stop()
     view.deleteLater()
     app.processEvents()
