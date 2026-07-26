@@ -12,6 +12,7 @@ import glob
 import os
 
 from src.core.capability.reflect import get_capabilities
+from src.core.show import show_file
 from src.core.capability.validate import (
     ERROR, WARNING, validate_show_dict, validate_lshow, assert_show_dict,
     ShowValidationError, format_findings)
@@ -36,7 +37,7 @@ def test_reflect_smoke():
     assert "Circle" in caps.efx_algorithms
     assert "RGBMatrix" in caps.function_types
     assert "speed" in caps.all_param_keys
-    assert caps.show_version  # "1.1"
+    assert caps.show_version == show_file.SHOW_VERSION  # eine Quelle, kein Zahlen-Kommentar
 
 
 def test_linter_widget_types_match_registry():

@@ -11,6 +11,22 @@ from src.core.stage.coords import normalize_rotation
 
 SHOW_VERSION = "1.2"
 
+# Fremdformat-Gate (s. load_show): Top-Level-Bloecke, an denen eine show.json als
+# LightOS-Show erkennbar ist. Bewusst ein KLEINER, stabiler Kern aus dem
+# save_show-Schema (nicht die vollstaendige Liste) — jede von save_show
+# geschriebene Datei enthaelt mehrere davon, waehrend ein Fremdformat keinen
+# einzigen hat. Erweitern ist harmlos, Weglassen ebenfalls (nur die Erkennung
+# wird grober) -> kein Wartungszwang bei jedem neuen additiven Block.
+_KNOWN_SHOW_BLOCKS = frozenset({
+    "patch", "programmer", "base_levels", "functions", "virtual_console",
+    "cue_stacks", "executors", "palettes", "curves", "visualizer", "live_view",
+    "scene_graph", "library", "snapshots", "fixture_groups", "channel_groups",
+    "efx", "rgb_matrix", "efx_paths", "tempo_buses", "laser_figures",
+})
+# Nur fuer die Fehlermeldung: Marker, die auf einen bekannten Fremd-Entwurf
+# zeigen (der nie implementierte 1.0-Entwurf mit patch.json/sequences/-Eintraegen).
+_FOREIGN_MARKERS = frozenset({"format_version", "universes", "software_version"})
+
 
 def _replace_scene(state, scene) -> None:
     """Review-Fix (state._scene-Ersetzung desynct lebende Views): einzige
@@ -88,7 +104,11 @@ def _fixture_to_dict(pf) -> dict:
     if isinstance(pf, dict):
         return {
             "fid": _to_int(pf.get("fid", pf.get("id", 0)), 0),
-            "label": str(pf.get("label", pf.get("name", "")) or ""),
+            # Symmetrie zum Loader (s. u.): der leere Label wird schon beim
+            # Dump auf denselben Platzhalter kanonisiert, den der Loader
+            # ohnehin einsetzt. Sonst aendert der ERSTE save->load->save eine
+            # Show-Datei still ('' -> 'Fixture 7') = Diff-Rauschen in Git.
+            "label": str(pf.get("label", pf.get("name", "")) or f"Fixture {_to_int(pf.get('fid', pf.get('id', 0)), 0)}"),
             "fixture_profile_id": _to_int(
                 pf.get("fixture_profile_id", pf.get("profile_id", 0)), 0
             ),
@@ -118,7 +138,10 @@ def _fixture_to_dict(pf) -> dict:
         }
     return {
         "fid": _to_int(getattr(pf, "fid", getattr(pf, "id", 0)), 0),
-        "label": str(getattr(pf, "label", getattr(pf, "name", "")) or ""),
+        # Gleiche Kanonisierung wie im dict-Zweig oben — sonst ist der
+        # Save-Pfad asymmetrisch zum Loader.
+        "label": str(getattr(pf, "label", getattr(pf, "name", ""))
+                     or f"Fixture {_to_int(getattr(pf, 'fid', getattr(pf, 'id', 0)), 0)}"),
         "fixture_profile_id": _to_int(
             getattr(pf, "fixture_profile_id", getattr(pf, "profile_id", 0)), 0
         ),
@@ -1051,6 +1074,26 @@ def load_show(path: str | os.PathLike):
     # einer sauberen Fehlermeldung.
     if not isinstance(data, dict):
         return False, "Ungültiges Show-Format: show.json ist kein Objekt."
+
+    # Fremdformat-Gate (2026-07-26): eine show.json OHNE "version" UND ohne
+    # jeden bekannten Show-Block ist keine LightOS-Show. Vorher lief so eine
+    # Datei durch den ganzen Loader — jedes data.get("patch"/"functions"/…)
+    # traf ins Leere -> der Nutzer bekam ok=True samt "Show '<Name>' geladen."
+    # und stand vor einer LEEREN Bühne (Patch, VC, Funktionen alle weg), ohne
+    # eine einzige Warnung. Konkret aufgefallen an shows/demo_rgb_par.lshow:
+    # ein nie implementierter Entwurf ("format_version"/"universes" + eigene
+    # ZIP-Einträge patch.json/sequences/…), der zwei Monate lang als "geladen"
+    # gemeldet wurde. Ein von save_show geschriebenes Show hat IMMER "version"
+    # und alle Blöcke -> kann hier nicht hängenbleiben (Test:
+    # tests/test_show_format_upgrade.py).
+    if "version" not in data and not (_KNOWN_SHOW_BLOCKS & set(data)):
+        _foreign = ", ".join(sorted(set(data) & _FOREIGN_MARKERS)) or "keine"
+        return False, (
+            "Unbekanntes Show-Format: show.json enthält keinen einzigen "
+            "LightOS-Block (patch/functions/virtual_console/…) und keine "
+            f"'version'. Fremd-Marker: {_foreign}. Datei nicht geladen — der "
+            "bisherige Show-Zustand bleibt erhalten."
+        )
 
     # VC-IMG-GC: den lokalen VC-Asset-Cache deckeln. Oben wurden die eingebetteten
     # Assets DIESER Show entpackt; über viele Shows sammeln sich verwaiste Assets

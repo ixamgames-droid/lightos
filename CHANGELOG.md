@@ -55,6 +55,95 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   (und ebenso der Lock) auch eine bereits angelaufene Quelle sicher überstimmt.
   Manuelles Setzen, Tap/Nudge und das Auftauen nach Freeze sind unverändert.
 
+### 2026-07-26 — Bergung aus den Alt-Branches
+
+Beim Aufräumen der 24 nie gemergten Branches wurden 18 als überholt verifiziert und
+gelöscht; aus vier steckte noch echte Arbeit drin, die hier landet.
+
+#### Behoben
+
+- **Mapped-Channel-Regeln erreichten bei Mehrkopf-Geräten nur den ersten Kopf.**
+  `MappedChannelChange.write` gattete den Basiswert-Fallback auf `head == 0`. Eine
+  Regel mit `per_head=False` — dem **Default** jeder neuen Regel — schrieb damit auf
+  einem 4-Kopf-Gerät (Hydrabeam 4000, MOVBAR4, Spider, LED-Bar) nur die erste
+  RGB-Bank: gemessen `[73, 0, 0, 0]` statt `[73, 73, 73, 73]`. Jetzt spiegelt Kopf>0
+  den Basiswert, wie es `efx.py`/`resolve_attr_channels` längst tun. Der Pfad hatte
+  bis dahin **null** Testabdeckung — ENG-11 hatte ihn beim attr#N-Sweep übersehen.
+  Test: `tests/test_mapped_channel_multihead.py`.
+- **Show-Dateien waren nach dem ersten Speichern nicht stabil.** Der Dump schrieb ein
+  leeres Label als `""`, der Loader machte daraus `"Fixture 7"` — der erste
+  save→load→save änderte die Datei also still (Diff-Rauschen in Git). Beide
+  Dump-Zweige kanonisieren jetzt wie der Loader.
+  Tests: `tests/test_show_roundtrip_fixpoint.py` (Fixpunkt über alle committeten
+  Shows + gezielte Label-Regression).
+- **Audio-Ansicht meldete ihre Worker-Callbacks nie ab.** `AudioCapture`/
+  `BeatDetector` halten die gebundene Methode stark; ohne `closeEvent`-Teardown pinnt
+  jede gebaute View sich an den Singleton und `process_chunk` läuft mehrfach. Gleiches
+  Muster wie `MidiView.closeEvent`, idempotent.
+
+#### Tests
+
+- `tests/test_effect_layer_chain.py` — der Ausgabepfad `LayeredEffect.write` (Layer-Kette
+  → Clamp → DMX-Adresse) lief bisher in **keinem** Test gegen ein echtes Universe;
+  dazu die Listenoperationen des Editors (`_add_layer`/`_move_up`/`_delete`).
+
+### 2026-07-26 — Alt-Shows auf das aktuelle Format gehoben (Davids Entscheidung)
+
+Die committeten Demo-Shows lagen noch auf `version "1.1"` (aktuell: `1.2`). Sie luden
+zwar weiter — der Loader ergänzt fehlende Felder mit Defaults — aber die **Dateien**
+blieben alt, bis sie einmal gespeichert wurden. David: „die kannst du upgraden auf die
+neueste Version."
+
+#### Neu
+
+- **`tools/upgrade_shows.py`** — hebt `.lshow`-Dateien per `load_show` → `save_show` auf
+  `SHOW_VERSION`. Mit `--check` nur prüfen (Exit 1, wenn etwas veraltet ist). Vier
+  Sicherheitsnetze pro Datei, sonst wird aus dem Backup zurückgerollt: kein verlorener
+  Top-Level-Block (`layout` wird durchgereicht — `save_show` schreibt es nur, wenn es
+  übergeben wird), unveränderte Anzahl Fixtures/Funktionen/VC-Widgets/Cuelisten/Paletten,
+  Version danach wirklich aktuell, und **Fixpunkt** (ein weiterer load→save ändert nichts
+  mehr). Fremdformate werden erkannt und nicht angefasst.
+- **`tools/build_demo_rgb_par.py`** — baut `shows/demo_rgb_par.lshow` als echte Show.
+
+#### Behoben
+
+- **Eine Fremdformat-Datei „lud" still als LEERE Show.** `shows/demo_rgb_par.lshow` war
+  keine Alt-Show, sondern ein nie implementierter Format-Entwurf (Commit 4a90339,
+  2026-05-27): eigene `show.json` mit `format_version`/`universes` plus separate
+  ZIP-Einträge `patch.json`, `sequences/seq_001.json`, `groups.json`, … `load_show` kennt
+  nur `show.json` im heutigen Schema, fand darin **keinen einzigen** Block und meldete
+  trotzdem `ok=True` samt „Show 'Demo RGB PAR Show' geladen." — der Nutzer stand vor einer
+  leeren Bühne, ohne eine Warnung. Zwei Monate unbemerkt. **Fix:** `load_show` lehnt eine
+  `show.json` ohne `version` UND ohne jeden bekannten Block jetzt ab; das Gate greift VOR
+  dem reset-first, die offene Show bleibt also erhalten. Ein von `save_show` geschriebenes
+  Show kann dort nie hängenbleiben (Gegenprobe im Test).
+- **Die Datei selbst neu gebaut** — mit demselben Inhalt wie der Entwurf: 4× `PAR3`
+  („LED PAR RGB 3ch", R/G/B) auf Universe 1 Adressen 1/4/7/10 als „PAR 1".."PAR 4",
+  Gruppe „Alle PAR" (4×1), Cueliste „Demo-Show" mit den vier Original-Cues inkl.
+  Fade-Zeiten (Blackout · Warm White · Rot · Blau), Executor 1 gebunden, Palette
+  „Warm White". Statt 639 Byte Leershow lädt sie jetzt echte 4 Geräte.
+
+#### Geändert
+
+- Alle fünf committeten Shows liegen auf `v1.2` — inhaltlich unverändert (nachgewiesen:
+  gleiche Anzahl Fixtures/Funktionen/VC-Widgets, kein verlorener Block). Der Upgrade
+  schreibt nur die additiven Defaults neuer Features (`tempo_bus_id`, `env_curve`,
+  `priority`, `head_grid`, `scene_graph`, `laser_figures`, …) in die Datei. Ausnahme mit
+  Absicht: `Demo_Show_Full` hatte veraltete 2D-Positionen im `live_view`-Block — der
+  Loader leitet 2D seit VIZ-11 aus den 3D-Weltpositionen ab (3D ist führend), die Datei
+  hält jetzt also das, was die App ohnehin anzeigt.
+- `tests/test_viz11_migration_gate.py` überspringt Dateien, die der Loader als
+  Fremdformat ablehnt (kein Migrations-Regress) — jeder andere Ladefehler bleibt hart.
+
+#### Tests
+
+- `tests/test_show_format_upgrade.py` — Fremdformat wird abgelehnt (mit Marker in der
+  Meldung) · die offene Show überlebt eine abgelehnte Datei · Gegenprobe: eine von
+  `save_show` geschriebene und eine Alt-Show ohne `version` laden weiter · jede committete
+  Show trägt `SHOW_VERSION` (fällt nach dem nächsten Bump um → `tools/upgrade_shows.py`) ·
+  `--check` des Werkzeugs ist grün · `demo_rgb_par.lshow` lädt mit 4 PARs auf 1/4/7/10 und
+  der 4-Cue-Cueliste.
+
 ### 2026-07-26 — Cross-Platform-Härtung des Linux-Audits
 
 Nachzug vor dem Merge: der Linux-Stabilitätsbranch wurde gegen Windows
