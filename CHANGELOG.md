@@ -30,10 +30,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
      `clear_programmer(flush=False)` unterdrückt jetzt genau diesen DMX-Flush im
      Ladepfad; der Loader flusht unmittelbar danach ohnehin erneut — dann gegen
      den neuen Patch. In-Memory-Clear und WEB-01-Release laufen unverändert.
-  Regressionstest `tests/test_cdx22_load_no_blackout_pulse.py` (8 Fälle, u. a.
+  **Safety-Ausnahme:** Adressen bisheriger DMX-Laser werden auch im Ladefenster
+  sofort freigegeben. Solange der Render-Plan sie nicht kennt, greift an ihnen
+  weder die Renderer-Nullung noch die OutputManager-Maske eines *dann*
+  ausgelösten NOT-AUS — ein Laser darf im Ladefenster nicht unerreichbar
+  weiterstrahlen, ein kurzer Dunkel-Dip ist dort das sichere Verhalten.
+  Regressionstest `tests/test_cdx22_load_no_blackout_pulse.py` (11 Fälle, u. a.
   Ende-zu-Ende über `load_show`: kein einziger 0-Schreibvorgang auf einer weiter
-  gepatchten Adresse; Gegenprobe, dass eine entpatchte Adresse trotzdem
-  freigegeben wird). [Codex #386]
+  gepatchten Adresse; Gegenproben, dass eine entpatchte Adresse trotzdem
+  freigegeben wird und dass Laser-Adressen nie aufgeschoben werden).
+  [Codex #386]
 
 ### 2026-07-26 — Cross-Platform-Härtung des Linux-Audits
 

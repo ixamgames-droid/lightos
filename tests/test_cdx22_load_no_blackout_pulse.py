@@ -51,11 +51,11 @@ class _Fx:
     channel_count = 4
     protocol = ""
 
-    def __init__(self, fid, universe, address):
+    def __init__(self, fid, universe, address, fixture_type=""):
         self.fid = fid
         self.universe = universe
         self.address = address
-        self.fixture_type = ""
+        self.fixture_type = fixture_type
 
 
 class _FM:
@@ -187,6 +187,34 @@ class DeferredReleaseUnitTest(unittest.TestCase):
             self.assertEqual(live.get_channel(10), 200,
                              "innerer Scope gab bereits frei (Tiefen-Zaehler defekt)")
         self.assertEqual(live.get_channel(10), 0, "aeusserer Scope gab nicht frei")
+
+    def test_laser_addrs_are_never_deferred(self):
+        # SAFETY: Das Fenster haelt alte Adressen absichtlich auf ihrem Wert. Fuer
+        # DMX-LASER waere das falsch: solange der Plan sie nicht kennt, greift
+        # weder die Renderer-Nullung noch die OutputManager-Maske eines JETZT
+        # ausgeloesten NOT-AUS an sie -> Laser-Adressen sofort freigeben.
+        st = _make_state([_Fx(5, 1, 10), _Fx(7, 1, 30, fixture_type="laser")])
+        live = st.universes[1]
+        self.assertEqual(st._laser_estop_addrs.get(1), frozenset({30, 31, 32, 33}),
+                         "Laser-Adressen nicht als Laser erkannt")
+        for a in (10, 11, 12, 13, 30, 31, 32, 33):
+            live.set_channel(a, 200)
+
+        with st.deferred_unpatched_release():
+            st._patch_cache = []
+            st._rebuild_render_plan()
+            for a in (30, 31, 32, 33):
+                self.assertEqual(live.get_channel(a), 0,
+                                 f"Laser-addr {a} im Fenster nicht freigegeben")
+            for a in (10, 11, 12, 13):
+                self.assertEqual(live.get_channel(a), 200,
+                                 f"Nicht-Laser-addr {a} faelschlich genullt")
+            st._patch_cache = [_Fx(5, 1, 10), _Fx(7, 1, 30, fixture_type="laser")]
+            st._rebuild_render_plan()
+
+        for a in (10, 11, 12, 13):
+            self.assertEqual(live.get_channel(a), 200,
+                             f"addr {a} nach dem Tausch genullt -> Blackout-Puls")
 
     def test_direct_rebuild_without_scope_unchanged(self):
         # Ohne Fenster bleibt das A3D-18-Verhalten byte-identisch (Sofort-Freigabe).

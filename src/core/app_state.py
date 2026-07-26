@@ -1225,6 +1225,12 @@ class AppState:
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
         old_patched = {u: set(s) for u, s in getattr(self, "_patched_set", {}).items()}
+        # CDX-22 (Safety): Snapshot der bisherigen DMX-Laser-Adressen — sie sind von
+        # der Deferral-Aufschiebung ausgenommen (Begruendung in
+        # _release_unpatched_addrs). Eigener Snapshot, damit der CDX-12-Vergleich
+        # unten (_old_le vs. frozenset-Werte) unangetastet bleibt.
+        old_laser_addrs = {u: set(s) for u, s
+                           in (getattr(self, "_laser_estop_addrs", {}) or {}).items()}
         # CDX-12 (Plan-Rebuild): Ist der Laser-NOT-AUS AKTIV und aendern sich die
         # Laser-Adressen (Fixture umadressiert/entfernt/dazu), die Ebene-2-OM-Maske
         # ZUERST auf die VEREINIGUNG aus alten und neuen Adressen erweitern — BEVOR
@@ -1257,7 +1263,8 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
-        self._release_unpatched_addrs(old_patched, new_patched_set)
+        self._release_unpatched_addrs(old_patched, new_patched_set,
+                                     never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
         gm_mask = self._build_gm_mask(fix_index)
@@ -1301,7 +1308,8 @@ class AppState:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
 
-    def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict):
+    def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
+                                 *, never_defer: dict | None = None):
         """A3D-18: Adressen, die vor dem Rebuild gepatcht waren, jetzt aber NICHT
         mehr (Fixture entfernt oder umadressiert), im Live-Universe auf 0 freigeben.
 
@@ -1329,18 +1337,44 @@ class AppState:
         CDX-22: Laeuft ein ``deferred_unpatched_release``-Fenster (mehrstufiger
         Patch-Tausch), wird hier NICHT genullt, sondern nur gemerkt — die Freigabe
         holt ``_flush_deferred_release`` am Ende des Fensters gegen den dann
-        gueltigen Patch nach."""
+        gueltigen Patch nach. ``never_defer`` ({universe: addrs}) nimmt Adressen
+        davon AUS und gibt sie auch im Fenster sofort frei — der Rebuild uebergibt
+        dort die Adressen der bisherigen DMX-Laser (Safety, s. u.)."""
         if getattr(self, "_defer_release_depth", 0) > 0:
             store = getattr(self, "_deferred_release", None)
             if store is None:
                 store = self._deferred_release = {}
+            # SAFETY: Laser-Adressen NIE aufschieben. Das Fenster laesst alte
+            # Adressen absichtlich auf ihrem letzten Wert stehen (kein Blackout-
+            # Puls) — waehrenddessen kennt der Plan die alten Laser-Adressen aber
+            # nicht mehr, also greift weder die Renderer-Nullung (Ebene 1) noch die
+            # OutputManager-Maske (Ebene 2) eines JETZT ausgeloesten NOT-AUS an sie.
+            # Ein Laser darf im Ladefenster nicht unerreichbar weiterstrahlen; ein
+            # kurzer Dunkel-Dip ist bei Lasern das sichere Verhalten (und war es
+            # vor CDX-22 fuer alle Fixtures).
+            urgent: dict[int, set] = {}
             for u, old_addrs in old_patched.items():
-                stale = {a for a in (set(old_addrs)
-                                     - set(new_patched.get(u, frozenset())))
+                addrs = set(old_addrs)
+                laser = {int(a) for a in ((never_defer or {}).get(u) or ())}
+                if laser:
+                    hit = addrs & laser
+                    if hit:
+                        urgent[u] = hit
+                    addrs -= laser
+                stale = {a for a in (addrs - set(new_patched.get(u, frozenset())))
                          if 1 <= a <= 512}
                 if stale:
                     store[u] = set(store.get(u, set())) | stale
+            if urgent:
+                self._release_now(urgent, new_patched)
             return
+        self._release_now(old_patched, new_patched)
+
+    def _release_now(self, old_patched: dict, new_patched: dict):
+        """Sofort-Freigabe (Rumpf von ``_release_unpatched_addrs`` ohne Deferral):
+        entpatchte Adressen im Live-Universe nullen UND dem Render-Thread
+        vormerken. Getrennt, weil das CDX-22-Fenster denselben Pfad fuer die
+        Laser-Ausnahme und fuer den Flush am Ende braucht."""
         universes = getattr(self, "universes", None)
         pending = getattr(self, "_pending_release", None)
         if pending is None:
