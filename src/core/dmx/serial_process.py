@@ -109,6 +109,11 @@ class EnttecProcessProxy:
     Anzeige "Verbunden", waehrend das Rig (toter COM-Port) dunkel bleibt.
     """
     RESPAWN_EVERY_S = 3.0
+    # OutputManager darf diesen Proxy selbst dann sicher schliessen, wenn sein
+    # Output-Thread nicht rechtzeitig endet: send_dmx() beruehrt nur Shared
+    # Memory, der potenziell blockierende serielle Write lebt im Kindprozess.
+    # Direkte EnttecPro-Instanzen besitzen diesen Marker bewusst nicht.
+    process_isolated = True
 
     def __init__(self, port: str, frame_interval: float = FRAME_INTERVAL,
                  _process_factory=None, _clock=time.monotonic):

@@ -368,6 +368,30 @@ def _install_qt_message_handler():
 _watchdog_timer = None  # Referenz halten, sonst raeumt Qt den Timer weg
 
 
+def _finalize_and_exit(exit_code: int) -> None:
+    """Finalizer ausfuehren, dann QtWebEngine-Interpreterabbau ueberspringen.
+
+    PySide6 6.11/QtWebEngine kann unter Linux nach vollstaendig beendetem
+    QApplication-Eventloop beim globalen Python-GC im Chromium-Profilabbau
+    segfaulten. MainWindow.closeEvent hat zu diesem Zeitpunkt alle LightOS-
+    Threads/Backends bereits synchron gestoppt. Wir fuehren die registrierten
+    atexit-Hooks (insbesondere Clean-Marker + Running-Flag) deshalb explizit
+    aus, flushen die Streams und beenden erst dann ohne den fehlerhaften
+    nativen Interpreter-Teardown.
+    """
+    try:
+        import atexit
+        atexit._run_exitfuncs()
+    except Exception:
+        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:
+            pass
+    os._exit(int(exit_code))
+
+
 def _start_freeze_watchdog():
     """Erkennt UI-Freezes und dumpt dann die Stacks ALLER Threads in crash.log —
     und unterscheidet dabei einen echten Freeze von System-Standby/Resume.
@@ -441,15 +465,54 @@ def _start_freeze_watchdog():
     threading.Thread(target=_watch, name="FreezeWatchdog", daemon=True).start()
 
 
-def main():
-    _setup_crash_logging()
+def _report_already_running() -> None:
+    """Abgewiesenen Zweitstart SICHTBAR melden.
 
+    Ein reiner ``print`` verpufft: per Desktop-Verknuepfung/``start.bat``
+    blitzt die Konsole nur kurz auf, unter ``pythonw`` sieht man gar nichts.
+    Fuer den Benutzer wirkt LightOS dann schlicht kaputt — vor allem, wenn die
+    laufende Instanz minimiert oder auf dem zweiten Monitor liegt.
+    """
+    msg = ("LightOS läuft bereits.\n\n"
+           "Es kann immer nur eine Instanz laufen (sonst streiten sich zwei "
+           "Prozesse um MIDI, Audio und die DMX-Schnittstelle).\n"
+           "Das vorhandene Fenster ist eventuell minimiert oder auf einem "
+           "anderen Bildschirm.")
+    print(f"[main] {msg}")
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND
+            ctypes.windll.user32.MessageBoxW(0, msg, "LightOS", 0x40 | 0x10000)
+        except Exception:
+            pass
+
+
+def main():
+    # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
+    # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
+    # laufendes LightOS auch `--help` und Tippfehler in Flags mit
+    # "LightOS laeuft bereits" statt mit der Hilfe bzw. einem Argumentfehler.
     parser = argparse.ArgumentParser(description="LightOS DMX Lichtsteuerung")
     parser.add_argument("--kiosk", action="store_true",
                         help="Kiosk-Modus: Vollbild, nur Virtual Console, keine Bearbeitung")
     parser.add_argument("--touch", action="store_true",
                         help="Touch-Modus: groessere Buttons fuer Tablet-Bedienung")
     args = parser.parse_args()
+
+    # Vor Crash-Logging, Qt, ALSA/MIDI und WebEngine nur eine GUI-Instanz
+    # zulassen. Mehrfachstarts konkurrieren sonst um native Ressourcen und
+    # waren auf Linux als SIGABRT/SIGSEGV reproduzierbar.
+    from src.core.paths import app_data_dir
+    from src.core.single_instance import acquire_instance_lock
+    instance_lock = acquire_instance_lock(
+        os.path.join(app_data_dir(), "lightos.instance.lock")
+    )
+    if instance_lock is None:
+        _report_already_running()
+        return
+
+    _setup_crash_logging()
 
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
@@ -464,6 +527,15 @@ def main():
 
     _setup_webengine_diagnostics()
 
+    # QtWebEngine/3D wird absichtlich lazy importiert. Unter Linux muss das
+    # OpenGL-Context-Sharing trotzdem VOR QApplication gesetzt sein; fordert
+    # QWebEngineView es erst beim spaeteren Oeffnen des Visualizers an, warnt
+    # Qt ("AA_ShareOpenGLContexts must be set before...") und PySide kann kurz
+    # danach nativ segfaulten.
+    from PySide6.QtCore import QCoreApplication, Qt
+    QCoreApplication.setAttribute(
+        Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("LightOS")
     app.setApplicationVersion(APP_VERSION)
@@ -495,7 +567,7 @@ def main():
     else:
         window.show()
 
-    sys.exit(app.exec())
+    _finalize_and_exit(app.exec())
 
 
 if __name__ == "__main__":

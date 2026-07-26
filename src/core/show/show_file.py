@@ -154,6 +154,11 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
     fixture_profile_id = _to_int(
         d.get("fixture_profile_id", d.get("profile_id", 0)), 0
     )
+    fixture_profile_id = _resolve_fixture_profile_id(
+        fixture_profile_id,
+        str(d.get("manufacturer_name", "") or ""),
+        str(d.get("fixture_name", "") or ""),
+    )
     mode_name = str(d.get("mode_name", d.get("mode", "")) or "")
     universe = max(1, _to_int(d.get("universe", 1), 1))
     address = min(512, max(1, _to_int(d.get("address", 1), 1)))
@@ -184,6 +189,56 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         protocol=str(d.get("protocol", "dmx") or "dmx"),
         net_host=str(d.get("net_host", "") or ""),
     )
+
+
+def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
+                                fixture_name: str) -> int:
+    """Stabile Show-Referenz ueber Rechner/Fixture-DBs hinweg.
+
+    SQLite-Auto-IDs sind keine portablen Fixture-IDs: eine frisch aufgebaute DB
+    kann dieselben eingebauten Profile in anderer Reihenfolge enthalten. Moderne
+    Shows speichern deshalb Hersteller und Modell mit. Passt die numerische ID
+    dort auf ein anderes Profil, wird sie anhand dieser Namen aufgeloest.
+    Legacy-Shows ohne Namen behalten unveraendert ihre alte ID.
+    """
+    if not fixture_name:
+        return profile_id
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session, joinedload
+        from src.core.database.fixture_db import engine
+        from src.core.database.models import FixtureProfile, Manufacturer
+
+        with Session(engine()) as session:
+            current = session.execute(
+                select(FixtureProfile)
+                .options(joinedload(FixtureProfile.manufacturer))
+                .where(FixtureProfile.id == profile_id)
+            ).scalar_one_or_none()
+            if current is not None:
+                current_mfr = getattr(current.manufacturer, "name", "") or ""
+                if (current.name == fixture_name and
+                        (not manufacturer_name or current_mfr == manufacturer_name)):
+                    return profile_id
+
+            query = (
+                select(FixtureProfile.id)
+                .join(Manufacturer)
+                .where(FixtureProfile.name == fixture_name)
+            )
+            if manufacturer_name:
+                query = query.where(Manufacturer.name == manufacturer_name)
+            resolved = session.execute(query.order_by(FixtureProfile.id)).scalars().first()
+            if resolved is not None:
+                print(
+                    f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
+                    f"({manufacturer_name} / {fixture_name})"
+                )
+                return int(resolved)
+    except Exception as exc:
+        # Ein optionaler Library-DB-Fehler darf den Show-Load nicht verhindern.
+        print(f"[show_file] Fixture-Profil-Aufloesung fehlgeschlagen: {exc}")
+    return profile_id
 
 
 def _replace_patch_from_data(state, patch_data: list[dict]):

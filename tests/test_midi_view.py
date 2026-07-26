@@ -33,6 +33,16 @@ class _FakeMidi:
         self.log_callbacks.remove(callback)
 
 
+class _BrokenMidi(_FakeMidi):
+    available = True
+
+    def list_inputs(self):
+        raise SystemError("ALSA unavailable")
+
+    def list_outputs(self):
+        raise RuntimeError("ALSA unavailable")
+
+
 class _FakeMtcReader:
     def __init__(self):
         self.callbacks = []
@@ -86,7 +96,30 @@ def test_midi_view_monitors_message_and_unsubscribes_on_close(monkeypatch):
         assert not view._monitor_active
     finally:
         view.close()
+        view.deleteLater()
+        _app().processEvents()
 
     assert not midi.message_callbacks
     assert not midi.log_callbacks
     assert not mtc.callbacks
+
+
+def test_midi_view_survives_backend_scan_errors(monkeypatch):
+    """Ein optionaler nativer MIDI-Backendfehler darf den UI-Start nicht
+    abbrechen; die View zeigt stattdessen leere Portlisten."""
+    _app()
+    midi = _BrokenMidi()
+    monkeypatch.setattr(midi_ui, "get_midi_manager", lambda: midi)
+    monkeypatch.setattr(midi_ui, "get_state", lambda: _FakeState())
+    monkeypatch.setattr(midi_ui, "get_mtc_reader", lambda: _FakeMtcReader())
+
+    view = midi_ui.MidiView()
+    try:
+        assert view._combo_in.count() == 1
+        assert "Keine MIDI" in view._combo_in.currentText()
+        assert view._combo_out.count() == 1
+        assert "Keine MIDI" in view._combo_out.currentText()
+    finally:
+        view.close()
+        view.deleteLater()
+        _app().processEvents()

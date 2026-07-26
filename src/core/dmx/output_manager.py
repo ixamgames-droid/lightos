@@ -326,9 +326,32 @@ class OutputManager:
                 # Violation aus (crash.log 21.+22.06.). Der Prozess endet ohnehin
                 # gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen.
                 import sys
-                print("[OutputManager] DMX-Output-Thread reagiert nicht — Geraete "
-                      "bleiben offen (Schutz vor Access Violation beim Beenden).",
+                print("[OutputManager] DMX-Output-Thread reagiert nicht — direkte "
+                      "Geraete bleiben offen (Schutz vor Access Violation beim "
+                      "Beenden); prozessisolierte Serial-Worker werden beendet.",
                       file=sys.stderr)
+                # STAB-09: Ein EnttecProcessProxy darf hier trotzdem geschlossen
+                # werden. Sein send_dmx() blockiert nie im Treiber, sondern
+                # schreibt nur in Shared Memory. Ohne diesen expliziten Close
+                # ueberlebt der per ``spawn`` gestartete Worker den anschliessenden
+                # os._exit()-Pfad als Waise und haelt den USB-Port weiter offen.
+                #
+                # Bewusst OHNE _io_lock: genau dieser kann vom haengenden Thread
+                # gehalten werden. Snapshot/Identity-Pop sind unter dem GIL
+                # konsistent; ein bereits gelesener Proxy ignoriert nach close()
+                # weitere send_dmx()-Aufrufe. Direkte Serial-/Socket-Geraete
+                # bleiben fuer den bisherigen Windows-AV-Schutz unangetastet.
+                isolated = []
+                for universe, dev in list(self._enttec_outputs.items()):
+                    if getattr(dev, "process_isolated", False):
+                        if self._enttec_outputs.get(universe) is dev:
+                            self._enttec_outputs.pop(universe, None)
+                            isolated.append(dev)
+                for dev in isolated:
+                    try:
+                        dev.close()
+                    except Exception:
+                        pass
                 # STAB-04: Referenz auf den noch lebenden Thread BEHALTEN (nicht
                 # auf None setzen). Sonst startet ein folgender start() einen
                 # zweiten DMX-Thread daneben, der gleichzeitig seriell schreibt

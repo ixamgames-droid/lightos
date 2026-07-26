@@ -526,6 +526,14 @@ class StageCanvas(QWidget):
     zoom_requested = Signal(int)    # Strg+Mausrad -> gewuenschter Zoom in %
     context_menu_requested = Signal(int, object)  # (fid|-1, global QPoint)
 
+    # Takt der 2D-Vorschau. Sie zeichnet Raster, Fixtures und Overlays komplett
+    # in Python/QPainter; 50 ms (20 FPS) belegten auf dem Linux-Zielrechner
+    # schon im Leerlauf einen grossen Teil eines CPU-Kerns. 100 ms sind fuer die
+    # Vorschau fluessig genug — DMX-Ausgabe und Playback haben ihren EIGENEN
+    # Takt und sind davon nicht betroffen. Eine Zahl, beide Startstellen:
+    # wer die Vorschau wieder fluessiger will, aendert nur diese Konstante.
+    RENDER_INTERVAL_MS = 100
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -581,7 +589,7 @@ class StageCanvas(QWidget):
         # Live-Update
         self._update_timer = QTimer(self)
         self._update_timer.timeout.connect(self.update)
-        self._update_timer.start(50)  # 20 FPS
+        self._update_timer.start(self.RENDER_INTERVAL_MS)
 
         # Bei Show-Load / Refresh die Positionen neu laden
         try:
@@ -624,7 +632,7 @@ class StageCanvas(QWidget):
         try:
             if on:
                 if not self._update_timer.isActive():
-                    self._update_timer.start(50)
+                    self._update_timer.start(self.RENDER_INTERVAL_MS)
             else:
                 self._update_timer.stop()
         except (RuntimeError, AttributeError):

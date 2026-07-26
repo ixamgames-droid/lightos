@@ -12,6 +12,51 @@ from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.weak_slots import weak_slot
 
 
+class GrowingScrollArea(QScrollArea):
+    """Scroll-Bereich, dessen Inhalt auf breiten Viewports MITWAECHST.
+
+    Zweck (Linux-Audit 2026-07-23): auf einem 1920-px-Touchscreen blieb die
+    VC-Arbeitsflaeche starr auf ihrer Mindestbreite (1200 px) stehen; rechts
+    daneben entstand eine grosse, unbenutzbare schwarze Flaeche.
+
+    Bewusst NICHT ueber ``setWidgetResizable(True)`` geloest: die VC reicht
+    denselben ``VCCanvas`` per ``takeWidget()``/``setWidget()`` zwischen Haupt-
+    und Popout-Fenster hin und her. Mit ``widgetResizable=True`` destabilisiert
+    dieser Wechsel den nativen Qt-Widget-Abbau — auf Windows/Python 3.11/
+    PySide6 6.11 in ~88 % der Testlaeufe als ``STATUS_HEAP_CORRUPTION``
+    (0xc0000374) reproduzierbar (Messung 2026-07-26: main 1/8 rot,
+    ``setWidgetResizable(True)`` 7/8 rot; Bisect auf Commit e28c261).
+
+    Diese Klasse behaelt deshalb die alte, stabile Eigentumssemantik
+    (``widgetResizable=False``) und setzt die Groesse des Inhalts stattdessen
+    selbst auf ``max(Mindestgroesse, Viewport)``. Sichtbares Ergebnis auf
+    breiten Bildschirmen ist identisch; unterhalb von 1200x800 bleibt der
+    Bereich wie bisher scrollbar.
+    """
+
+    def setWidget(self, widget):  # noqa: N802 (Qt-API)
+        super().setWidget(widget)
+        self._grow_widget()
+
+    def resizeEvent(self, event):  # noqa: N802 (Qt-API)
+        super().resizeEvent(event)
+        self._grow_widget()
+
+    def _grow_widget(self) -> None:
+        w = self.widget()
+        if w is None:
+            return
+        try:
+            vp = self.viewport().size()
+            target = QSize(max(w.minimumWidth(), vp.width()),
+                           max(w.minimumHeight(), vp.height()))
+            if w.size() != target:
+                w.resize(target)
+        except RuntimeError:
+            # Canvas wird gerade zerstoert (Popout-Wechsel) — nichts zu tun.
+            pass
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Bibliothek-Sidebar (Show-Bibliothek → VC-Tasten)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -393,8 +438,12 @@ class VirtualConsoleView(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet("QSplitter::handle { background:#30363d; width:2px; }")
 
-        self._main_scroll = QScrollArea()
-        self._main_scroll.setWidgetResizable(False)
+        # Die VC-Arbeitsflaeche soll mindestens 1200x800 gross bleiben, auf
+        # breiten Touchscreens aber den GANZEN verfuegbaren Viewport nutzen.
+        # Vorher blieb der Canvas starr bei 1200 px und rechts entstand trotz
+        # ~1680 px Platz eine grosse schwarze, nicht nutzbare Flaeche.
+        # GrowingScrollArea erledigt das ohne Qt-``widgetResizable`` (siehe dort).
+        self._main_scroll = GrowingScrollArea()
         self._main_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
 
         self._canvas = VCCanvas()
@@ -431,19 +480,100 @@ class VirtualConsoleView(QWidget):
         # verbleibenden vertikalen Platz (Toolbar + Statuszeile sind fix).
         layout.addWidget(splitter, 1)
 
+    def showEvent(self, event):
+        """Beim Oeffnen der VC einen aktuellen Bibliotheksbaum zeigen.
+
+        Deckt den typischen Ablauf ab: Effekt in einer anderen Ansicht
+        erstellen, danach erst zur Virtual Console wechseln.
+
+        WICHTIG: nur bei tatsaechlicher Aenderung neu aufbauen.
+        ``SnapshotSidebar.refresh()`` ist ein Clear-and-Rebuild des ganzen
+        Baums und wirft dabei Auswahl und Scrollposition weg. Ein
+        bedingungsloser Refresh bei JEDEM Tabwechsel liess also die gerade
+        markierte Funktion verschwinden, sobald man kurz woanders nachsah.
+        """
+        super().showEvent(event)
+        # Statusticker laeuft, solange die Ansicht benutzt wird. closeEvent
+        # stoppt ihn; ein erneutes Anzeigen weckt ihn wieder auf.
+        try:
+            self._active_fx_timer.start()
+        except (RuntimeError, AttributeError):
+            pass
+        sidebar = getattr(self, "_sidebar", None)
+        if sidebar is None:
+            return
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            sig = self._function_catalog_signature(get_function_manager().all())
+        except Exception:
+            sig = None
+        if sig is None or sig != getattr(self, "_last_function_catalog_signature", None):
+            if sig is not None:
+                self._last_function_catalog_signature = sig
+            sidebar.refresh()
+
+    def closeEvent(self, event):
+        """Beim Schliessen den 400-ms-Statusticker stoppen.
+
+        Der Timer haengt am View und lief bisher weiter, solange das Objekt
+        lebte — also auch nach dem Schliessen. Er ruft ``_update_active_fx``,
+        das den Funktionskatalog abfragt und die Sidebar neu baut; auf einer
+        bereits geschlossenen Ansicht ist das reine Last und arbeitet im
+        Qt-Abbau auf halb zerlegten Widgets weiter.
+        """
+        try:
+            self._active_fx_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
+        fb = getattr(self, "_apc_feedback", None)
+        if fb is not None:
+            try:
+                fb.close()
+            except Exception:
+                pass
+            self._apc_feedback = None
+        super().closeEvent(event)
+
     # ── Status: aktiver Effekt ───────────────────────────────────────────────
+
+    @staticmethod
+    def _function_catalog_signature(functions) -> tuple:
+        """Leichte Signatur der in der VC-Bibliothek sichtbaren Metadaten.
+
+        Die reine Anzahl reicht nicht: Editor-Ablauf ist oft
+        ``Funktion anlegen -> benennen -> in Ordner verschieben``. Nach dem
+        ersten Schritt bleibt die Anzahl gleich; geht das spaetere Sync-Event
+        verloren, zeigte die VC dauerhaft den alten Namen/Ordner. Die Signatur
+        erkennt auch solche In-Place-Aenderungen, ohne den Baum alle 400 ms
+        unnoetig neu aufzubauen.
+        """
+        rows = []
+        for f in functions:
+            ftype = getattr(f, "function_type", "")
+            ftype = getattr(ftype, "value", ftype)
+            rows.append((
+                int(getattr(f, "id", 0) or 0),
+                str(getattr(f, "name", "") or ""),
+                str(getattr(f, "folder", "") or ""),
+                str(ftype or ""),
+                bool(getattr(f, "committed", True)),
+            ))
+        return tuple(sorted(rows))
 
     def _update_active_fx(self):
         """Zeigt den zuletzt gestarteten, noch laufenden Effekt + Anzahl laufender."""
         try:
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
-            # Funktionsliste der Sidebar nachziehen, wenn sich die Anzahl geaendert
-            # hat (z. B. Show geladen) — ohne bei jedem Tick die Auswahl zu stoeren.
+            # Funktionskatalog der Sidebar nachziehen, wenn sich Anzahl ODER
+            # sichtbare Metadaten (Name/Ordner/Typ) geaendert haben. So erscheint
+            # z. B. ein nachtraeglich nach Hintergrund/Dimmer verschobener
+            # "Strobe" auch dann sofort, wenn sein einzelnes Sync-Event ausblieb.
             try:
-                cnt = len(fm.all())
-                if cnt != getattr(self, "_last_fn_count", -1):
-                    self._last_fn_count = cnt
+                funcs = fm.all()
+                sig = self._function_catalog_signature(funcs)
+                if sig != getattr(self, "_last_function_catalog_signature", None):
+                    self._last_function_catalog_signature = sig
                     if getattr(self, "_sidebar", None) is not None:
                         self._sidebar.refresh_functions()
             except Exception:
@@ -650,8 +780,9 @@ class VirtualConsoleView(QWidget):
         pop_l = QVBoxLayout(win)
         pop_l.setContentsMargins(0, 0, 0, 0)
 
-        pop_scroll = QScrollArea()
-        pop_scroll.setWidgetResizable(False)
+        # Gleiches Verhalten wie im Hauptfenster: auf grosse Fenster mitwachsen,
+        # bei kleineren Fenstern dank Canvas-Minimum weiterhin scrollbar.
+        pop_scroll = GrowingScrollArea()
         pop_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
         # Canvas zuerst aus dem Haupt-Scroll lösen (ohne Löschen), dann übergeben.
         self._main_scroll.takeWidget()

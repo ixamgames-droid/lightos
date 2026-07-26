@@ -54,6 +54,9 @@ class APCMiniFeedback:
         _instance = self
         self._hint = port_hint
         self._out: object | None = None
+        # Beim geteilten MidiManager-Ausgang: Port, auf den gebunden wurde.
+        # Vor jedem Senden pruefen, sonst gehen LED-Noten an ein fremdes Geraet.
+        self._out_name: str | None = None
         self._state = None
         self._timer = None
         self._cache: dict[int, int] = {}
@@ -64,17 +67,30 @@ class APCMiniFeedback:
     def _open(self) -> bool:
         if _RTMIDI:
             try:
-                m = _rtmidi.MidiOut()
-                ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+                from .midi_manager import get_midi_manager
+                m = get_midi_manager()
+                ports = m.list_outputs()
                 idx = next((i for i, p in enumerate(ports)
                             if self._hint.lower() in p.lower()), None)
                 if idx is None:
-                    del m
                     print(f"[APCMiniFeedback] Kein Output-Port mit '{self._hint}' gefunden.")
                     return False
-                m.open_port(idx)
+                want = ports[idx]
+                # Geteilten Ausgang nur uebernehmen, wenn frei oder schon APC.
+                current = ""
+                try:
+                    current = str(m.current_output_name() or "")
+                except Exception:
+                    current = ""
+                if current and current != want and self._hint.lower() not in current.lower():
+                    print(f"[APCMiniFeedback] MIDI-Ausgang '{current}' ist belegt — "
+                          f"LED-Feedback bleibt aus (gewuenscht: {want}).")
+                    return False
+                if not m.open_output(want):
+                    return False
                 self._out = m
-                print(f"[APCMiniFeedback] Output geoeffnet: {ports[idx]}")
+                self._out_name = m.current_output_name()
+                print(f"[APCMiniFeedback] Output geoeffnet: {self._out_name}")
                 return True
             except Exception as e:
                 print(f"[APCMiniFeedback] Fehler beim Öffnen: {e}")
@@ -131,11 +147,18 @@ class APCMiniFeedback:
                 self.clear_all()
             except Exception:
                 pass
-            try:
-                self._out.close_port()
-            except Exception:
-                pass
+            # Den GETEILTEN MidiManager-Port nicht aus einem einzelnen
+            # LED-Feedback-Widget heraus schliessen — der gehoert dem Manager.
+            # Einen EIGENEN Handle (WinMM-Fallback ohne python-rtmidi, u. a. auf
+            # ARM-Windows) aber sehr wohl: sonst bleibt der midiOut-Handle bis
+            # zum Prozessende offen und das Geraet belegt.
+            if self._out_name is None:
+                try:
+                    self._out.close_port()
+                except Exception:
+                    pass
             self._out = None
+        self._out_name = None
         if _instance is self:
             _instance = None
         print("[APCMiniFeedback] Geschlossen.")
@@ -147,11 +170,20 @@ class APCMiniFeedback:
         if self._cache.get(note) == velocity:
             return
         self._cache[note] = velocity
-        if self._out:
+        if self._out and self._targets_apc():
             try:
                 self._out.send_message([0x90, note & 0x7F, velocity & 0x7F])
             except Exception:
                 pass
+
+    def _targets_apc(self) -> bool:
+        """Zeigt der geteilte Manager-Ausgang noch auf unseren APC-Port?"""
+        if self._out_name is None:
+            return True
+        try:
+            return str(self._out.current_output_name() or "") == self._out_name
+        except Exception:
+            return True
 
     def clear_all(self):
         """Alle relevanten APC-Mini-LEDs ausschalten."""

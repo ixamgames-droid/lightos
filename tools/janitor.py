@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import ntpath
 import os
 import shutil
 import subprocess
@@ -82,7 +83,16 @@ def classify_worktrees(disk_dirs: list[str], registered: dict[str, dict],
                 Ein unregistrierter Ordner OHNE Marker war nie ein Worktree
                 (z. B. Davids manueller 'wt-backup') -> NIE als orphan einstufen.
     """
+    def is_windows_path(p: str) -> bool:
+        return "\\" in p or (len(p) >= 2 and p[1] == ":")
+
     def norm(p: str) -> str:
+        # Windows-Pfade bleiben auch dann Windows-Pfade, wenn dieses reine
+        # Analysewerkzeug/Test unter Linux laeuft (z. B. Audit eines kopierten
+        # Reports). os.path.normcase waere dort case-sensitiv und behandelte
+        # C:\WT und c:\wt faelschlich als verschieden.
+        if is_windows_path(p):
+            return ntpath.normcase(ntpath.normpath(p))
         return os.path.normcase(os.path.normpath(p))
 
     reg = {norm(k): v for k, v in registered.items()}
@@ -96,7 +106,8 @@ def classify_worktrees(disk_dirs: list[str], registered: dict[str, dict],
         if dn == own_n:
             out.append(WtVerdict(d, "keep", "eigener Worktree dieser Session"))
             continue
-        if lock_n and (dn == lock_n or lock_n.startswith(dn + os.sep)):
+        path_sep = "\\" if is_windows_path(d) else os.sep
+        if lock_n and (dn == lock_n or lock_n.startswith(dn + path_sep)):
             out.append(WtVerdict(d, "keep", "haelt die pytest-Sperre (Tests laufen)"))
             continue
         if info is None:

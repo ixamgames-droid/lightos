@@ -119,7 +119,13 @@ class VCCanvas(QWidget):
         self._redo_stack: list[dict] = []
         self._restoring = False
         self._UNDO_MAX = 50
-        self.setMinimumSize(QSize(1200, 800))
+        # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
+        # Inhalt mit (siehe _update_content_extent) — sonst haette die
+        # umgebende QScrollArea keinen Scrollweg zu Widgets, die auf einem
+        # breiten Bildschirm jenseits von 1200 px abgelegt wurden.
+        self.BASE_W = 1200
+        self.BASE_H = 800
+        self.setMinimumSize(QSize(self.BASE_W, self.BASE_H))
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -1694,8 +1700,18 @@ class VCCanvas(QWidget):
             # Neu angelegte Widgets landen auf der aktuell sichtbaren Bank.
             w.bank = self._active_bank
         w.delete_requested.connect(self._on_widget_delete_requested)
+        # Verschieben kann das Widget ueber die bisherige Flaeche hinausziehen —
+        # dann muss der Scrollweg mitwachsen, sonst ist es spaeter unerreichbar.
+        try:
+            w.moved.connect(self._on_widget_moved)
+        except (AttributeError, RuntimeError):
+            pass
         w.setVisible(self.on_active_bank(w))
+        self._update_content_extent()
         return w
+
+    def _on_widget_moved(self, _x=0, _y=0):
+        self._update_content_extent()
 
     def _on_widget_delete_requested(self):
         # STAB-09: sender()-Adapter statt Lambda — die C++-Connection wuerde ein
@@ -1883,12 +1899,14 @@ class VCCanvas(QWidget):
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
+        self._update_content_extent()
 
     def _clear(self):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
             child.setParent(None)
             child.deleteLater()
+        self.setMinimumSize(QSize(self.BASE_W, self.BASE_H))
 
     # ── Undo/Redo ───────────────────────────────────────────────────────────────
     def _push_undo(self):
@@ -1937,6 +1955,36 @@ class VCCanvas(QWidget):
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
+    def _update_content_extent(self) -> None:
+        """Mindestgroesse an den tatsaechlichen Inhalt anpassen.
+
+        Auf einem breiten Touchscreen darf die VC die ganze Flaeche nutzen.
+        Ohne diese Kopplung waere ein dort abgelegtes Widget auf einem
+        kleineren Bildschirm (oder im 1280-px-Popout) weder sichtbar NOCH
+        erscrollbar: die QScrollArea kennt als Scrollweg nur die
+        Mindestgroesse des Inhalts, und die lag fest bei 1200x800.
+        Jetzt reicht der Scrollweg immer bis zum aeussersten Widget — das
+        Layout bleibt damit zwischen Linux-Touchscreen und Windows-Laptop
+        portabel. Gespeicherte Koordinaten aendern sich nicht.
+        """
+        pad = self.GRID * 2
+        right = self.BASE_W
+        bottom = self.BASE_H
+        try:
+            children = self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+        except RuntimeError:
+            return
+        for child in children:
+            try:
+                geo = child.geometry()
+            except RuntimeError:
+                continue
+            right = max(right, geo.right() + pad)
+            bottom = max(bottom, geo.bottom() + pad)
+        if (self.minimumWidth(), self.minimumHeight()) != (right, bottom):
+            self.setMinimumSize(QSize(right, bottom))
+
     def to_dict(self) -> dict:
         widgets = []
         # VCI-11: NUR direkte Kinder serialisieren. Kinder, die in einem VCFrame
@@ -1968,6 +2016,7 @@ class VCCanvas(QWidget):
         if getattr(self, "_pe", None) is not None:
             self._active_bank = self._pe.current_page
         self._apply_bank_visibility()
+        self._update_content_extent()
         self.bank_changed.emit(self._active_bank)
 
     def _save(self):

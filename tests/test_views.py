@@ -18,6 +18,24 @@ def _app() -> QApplication:
     return QApplication.instance() or QApplication([])
 
 
+def _drop_view(view, app: QApplication) -> None:
+    """View schliessen UND wirklich abbauen.
+
+    Ein nur ``close()``-ter VirtualConsoleView bleibt am Leben: sein
+    400-ms-Statusticker, die MIDI-Abos und der Canvas haengen weiter in
+    ``QApplication.allWidgets()``. Ueber eine Testdatei summiert sich das und
+    macht den nativen Qt-Abbau am Suite-Ende messbar instabiler
+    (Windows/Py3.11: STATUS_HEAP_CORRUPTION). Deshalb hier deterministisch
+    abraeumen — wie es ``test_midi_view.py`` schon vormacht.
+    """
+    try:
+        view.close()
+        view.deleteLater()
+        app.processEvents()
+    except RuntimeError:
+        pass
+
+
 def test_virtualconsole_widgets_and_canvas():
     _app()
     from src.ui.virtualconsole import (
@@ -140,6 +158,149 @@ def test_virtualconsole_popout_then_edit_no_crash():
     v._popout_canvas(); v._popout_window.close()
     v._popout_canvas(); v._popout_window.close()
     assert v._canvas_alive()
+
+
+def test_virtualconsole_canvas_fills_wide_viewport():
+    """Regression: Der 1200px-Minimum-Canvas darf auf einem breiten Touchscreen
+    nicht starr 1200px bleiben und rechts eine unbenutzbare schwarze Flaeche
+    erzeugen.
+
+    Geprueft wird die WIRKUNG (Canvas fuellt den Viewport), nicht das Mittel:
+    ``setWidgetResizable(True)`` ist hier bewusst NICHT erlaubt, weil es den
+    Popout-Wechsel desselben Canvas zwischen zwei QScrollAreas destabilisiert
+    (Windows/Py3.11: STATUS_HEAP_CORRUPTION im Teardown). Stattdessen waechst
+    ``GrowingScrollArea`` den Inhalt selbst mit.
+    """
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    v.resize(1800, 900)
+    v.show()
+    app.processEvents()
+
+    assert v._main_scroll.widgetResizable() is False, (
+        "widgetResizable=True bricht den Popout-Wechsel (Heap-Corruption)")
+    assert v._canvas.width() >= v._main_scroll.viewport().width()
+    # Mindestgroesse bleibt erhalten -> kleine Fenster bleiben scrollbar.
+    assert v._canvas.width() >= 1200
+
+    v._popout_canvas()
+    app.processEvents()
+    assert v._pop_scroll is not None
+    assert v._pop_scroll.widgetResizable() is False
+    assert v._canvas.width() >= v._pop_scroll.viewport().width()
+    v._popout_window.close()
+    _drop_view(v, app)
+
+
+def test_virtualconsole_canvas_stays_scrollable_on_small_window():
+    """Gegenprobe: unter 1200x800 darf der Canvas NICHT schrumpfen — sonst
+    waeren Widgets am rechten/unteren Rand unerreichbar statt scrollbar."""
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    v.resize(900, 600)
+    v.show()
+    app.processEvents()
+
+    assert v._canvas.width() >= 1200
+    assert v._canvas.height() >= 800
+    _drop_view(v, app)
+
+
+def test_vc_widget_beyond_base_area_stays_scrollable():
+    """Portabilitaet: ein auf dem breiten Touchscreen jenseits von 1200 px
+    abgelegtes Widget muss auf einem KLEINEN Fenster erscrollbar bleiben.
+
+    Sonst ist es dort weder sichtbar noch erreichbar (die QScrollArea kennt als
+    Scrollweg nur die Mindestgroesse des Inhalts) — die auf Linux gebaute VC
+    waere auf dem Windows-Laptop halb unbedienbar.
+    """
+    app = _app()
+    from PySide6.QtCore import QPoint
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    v = VirtualConsoleView()
+    v.resize(1800, 900)
+    v.show()
+    app.processEvents()
+
+    w = v._canvas._add_widget("VCButton", QPoint(1560, 120))
+    assert w is not None
+    app.processEvents()
+
+    # Fenster schrumpfen (Laptop/Beamer) -> Canvas darf NICHT unter die
+    # rechte Kante des Widgets fallen.
+    v.resize(1000, 700)
+    app.processEvents()
+    assert v._canvas.width() >= w.geometry().right(), (
+        "Widget jenseits 1200 px ist nicht mehr erscrollbar")
+    _drop_view(v, app)
+
+
+def test_virtualconsole_sidebar_detects_in_place_function_move():
+    """Regression: Eine Funktion wird erst angelegt und danach benannt/in einen
+    Ordner verschoben. Auch ohne zweites FUNCTION_CHANGED muss die VC den
+    geaenderten Katalog beim naechsten 400-ms-Abgleich neu einlesen."""
+    _app()
+    from src.core.engine.function_manager import get_function_manager
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    fm = get_function_manager()
+    effect = fm.new_chaser("Strobe")
+    view = VirtualConsoleView()
+    try:
+        view._update_active_fx()  # Ausgangssignatur merken
+        refreshes = []
+        view._sidebar.refresh_functions = lambda: refreshes.append(True)
+
+        # Absichtlich KEIN Sync-Event: exakt der bisher haengende Editor-Pfad.
+        effect.folder = "Hintergrund/Dimmer"
+        view._update_active_fx()
+
+        assert refreshes == [True]
+        assert any(row[2] == "Hintergrund/Dimmer"
+                   for row in view._last_function_catalog_signature)
+    finally:
+        fm.remove(effect.id)
+        _drop_view(view, _app())
+
+
+def test_virtualconsole_refreshes_library_when_tab_becomes_visible():
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    view = VirtualConsoleView()
+    refreshes = []
+    view._sidebar.refresh = lambda: refreshes.append(True)
+    view.show()
+    app.processEvents()
+
+    assert refreshes
+    _drop_view(view, app)
+
+
+def test_virtualconsole_tab_switch_without_changes_keeps_library():
+    """Gegenprobe zum Vorherigen: ohne Katalog-Aenderung darf der Tabwechsel den
+    Bibliotheksbaum NICHT neu bauen — sonst geht bei jedem kurzen Blick in eine
+    andere Ansicht die Auswahl und die Scrollposition verloren."""
+    app = _app()
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+
+    view = VirtualConsoleView()
+    view.show()
+    app.processEvents()
+
+    refreshes = []
+    view._sidebar.refresh = lambda: refreshes.append(True)
+    view.hide()
+    view.show()                       # Tabwechsel hin und zurueck
+    app.processEvents()
+
+    assert refreshes == [], "Bibliothek wurde ohne Aenderung neu aufgebaut"
+    _drop_view(view, app)
 
 
 def test_toolbar_add_cascades_and_selects():

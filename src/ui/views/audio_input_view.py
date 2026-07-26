@@ -214,13 +214,22 @@ class AudioInputView(QWidget):
             for name in speakers:
                 marker = "  (Standard)" if name == default else ""
                 self._combo_device.addItem(
-                    f"[Loopback] {name}{marker}", name)
+                    f"[PC-Audio/Loopback] {name}{marker}", ("loopback", name))
+            inputs = AudioCapture.list_input_devices()
+            default_input = AudioCapture.default_input()
+            for name in inputs:
+                marker = "  (Standard)" if name == default_input else ""
+                self._combo_device.addItem(
+                    f"[Mikro/Line-In] {name}{marker}", ("input", name))
         except Exception as e:
-            print(f"[audio_input_view] list_speakers error: {e}")
+            print(f"[audio_input_view] list devices error: {e}")
         # Default auswaehlen
         if self._capture and self._capture._device_name:
             for i in range(self._combo_device.count()):
-                if self._combo_device.itemData(i) == self._capture._device_name:
+                mode_name = self._combo_device.itemData(i)
+                if (isinstance(mode_name, tuple)
+                        and mode_name == (self._capture.source_mode,
+                                          self._capture._device_name)):
                     self._combo_device.setCurrentIndex(i)
                     break
         self._combo_device.blockSignals(False)
@@ -228,18 +237,20 @@ class AudioInputView(QWidget):
     def _on_device_changed(self, _idx: int):
         if not self._capture:
             return
-        name = self._combo_device.currentData()
-        if name:
-            self._capture.set_device(name)
+        selected = self._combo_device.currentData()
+        if isinstance(selected, tuple) and len(selected) == 2:
+            mode, name = selected
+            self._capture.set_source_mode(mode, name)
 
     # ── Start/Stop ────────────────────────────────────────────────────────────
 
     def _start_capture(self):
         if not self._capture:
             return
-        name = self._combo_device.currentData()
-        if name:
-            self._capture.set_device(name)
+        selected = self._combo_device.currentData()
+        if isinstance(selected, tuple) and len(selected) == 2:
+            mode, name = selected
+            self._capture.set_source_mode(mode, name)
         ok = self._capture.start()
         if ok:
             self._lbl_status.setText("Status: läuft")

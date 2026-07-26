@@ -56,10 +56,11 @@ class MTCReader:
         if not RTMIDI_OK:
             return []
         try:
-            m = rtmidi.MidiIn(rtapi=rtmidi.API_UNSPECIFIED, name="LightOS-MTC-Scan")
-            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            del m
-            return ports
+            # Den geschuetzten, rate-limitierten Scan des zentralen Managers
+            # wiederverwenden. Ein eigener nativer MidiIn pro UI-Refresh
+            # umging sonst dessen ALSA-Circuit-Breaker.
+            from src.core.midi.midi_manager import get_midi_manager
+            return get_midi_manager().list_inputs()
         except Exception as e:
             print(f"[MTCReader] list_ports error: {e}")
             return []

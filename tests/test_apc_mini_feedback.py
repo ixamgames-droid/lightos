@@ -47,6 +47,104 @@ def _make_fb():
     return fb, out
 
 
+class _FakeManager:
+    """Minimaler MidiManager-Ersatz mit umschaltbarem Ausgang."""
+
+    def __init__(self, ports, current=""):
+        self._ports = list(ports)
+        self._current = current
+        self.sent: list[tuple[int, ...]] = []
+        self.open_calls: list[str] = []
+
+    def list_outputs(self):
+        return list(self._ports)
+
+    def current_output_name(self):
+        return self._current
+
+    def open_output(self, name, **_kw):
+        self.open_calls.append(name)
+        self._current = name
+        return True
+
+    def send_message(self, msg):
+        self.sent.append(tuple(msg))
+        return True
+
+
+def test_led_feedback_does_not_hijack_a_foreign_output(monkeypatch):
+    """Das Einschalten der LEDs darf einen fremden, bereits offenen Ausgang
+    nicht wegreissen (der gehoert der MIDI-Ansicht bzw. dem Mapping-Feedback)."""
+    from src.core.midi import apc_mini_feedback as mod
+
+    mgr = _FakeManager(["APC mini mk2", "Anderes Pult"], current="Anderes Pult")
+    monkeypatch.setattr(mod, "_RTMIDI", True)
+    monkeypatch.setattr("src.core.midi.midi_manager.get_midi_manager", lambda: mgr)
+
+    fb = APCMiniFeedback(port_hint="APC")
+    assert fb.is_connected is False
+    assert mgr.open_calls == [], "fremder Ausgang wurde uebernommen"
+    assert mgr.current_output_name() == "Anderes Pult"
+
+
+def test_led_feedback_stops_sending_when_output_switches_away(monkeypatch):
+    """Schaltet jemand den geteilten Ausgang um, duerfen keine Pad-Noten mehr
+    rausgehen — sonst klimpern sie auf dem fremden Geraet (Windows: GS Synth)."""
+    from src.core.midi import apc_mini_feedback as mod
+
+    mgr = _FakeManager(["APC mini mk2"], current="")
+    monkeypatch.setattr(mod, "_RTMIDI", True)
+    monkeypatch.setattr("src.core.midi.midi_manager.get_midi_manager", lambda: mgr)
+
+    fb = APCMiniFeedback(port_hint="APC")
+    assert fb.is_connected is True
+    fb.set_led(3, LED_GREEN)
+    assert len(mgr.sent) == 1
+
+    mgr._current = "Anderes Pult"          # jemand schaltet um
+    fb.set_led(4, LED_RED)
+    assert len(mgr.sent) == 1, "LED-Note ging an ein fremdes Geraet"
+
+
+def test_close_does_not_close_the_shared_manager_port(monkeypatch):
+    """Der geteilte Manager-Port gehoert nicht uns — nicht schliessen."""
+    from src.core.midi import apc_mini_feedback as mod
+
+    mgr = _FakeManager(["APC mini mk2"], current="")
+    mgr.closed = False
+    mgr.close_port = lambda: setattr(mgr, "closed", True)
+    monkeypatch.setattr(mod, "_RTMIDI", True)
+    monkeypatch.setattr("src.core.midi.midi_manager.get_midi_manager", lambda: mgr)
+
+    fb = APCMiniFeedback(port_hint="APC")
+    assert fb.is_connected is True
+    fb.close()
+    assert mgr.closed is False, "geteilter Manager-Port wurde geschlossen"
+
+
+def test_close_releases_an_own_winmm_handle():
+    """WinMM-Fallback (ARM-Windows, kein python-rtmidi): der EIGENE midiOut-
+    Handle muss beim Schliessen freigegeben werden, sonst bleibt das Geraet
+    bis zum Prozessende belegt."""
+    class _OwnOut:
+        def __init__(self):
+            self.closed = False
+            self.sent = []
+
+        def send_message(self, msg):
+            self.sent.append(tuple(msg))
+
+        def close_port(self):
+            self.closed = True
+
+    fb = APCMiniFeedback(port_hint="__no_such_port__")
+    own = _OwnOut()
+    fb._out = own
+    fb._out_name = None            # eigener Handle, nicht der Manager
+    fb.close()
+    assert own.closed is True, "eigener WinMM-Handle wurde nicht geschlossen"
+
+
 def test_exclude_mechanism_removed():
     """exclude_note/include_note/_excluded duerfen nicht mehr existieren."""
     assert not hasattr(APCMiniFeedback, "exclude_note")

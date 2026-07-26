@@ -179,6 +179,32 @@ class TestOutputManagerStopSafety(unittest.TestCase):
         release.set()
         stuck.join(timeout=3.0)
 
+    def test_stop_closes_process_isolated_enttec_when_thread_hangs(self):
+        """STAB-09: Der Proxy-Worker darf os._exit nicht als Waise ueberleben.
+
+        Direkte Treiber bleiben im Timeout-Fall offen (voriger Test); der
+        prozessisolierte Proxy ist sicher schliessbar, weil send_dmx nur Shared
+        Memory beschreibt.
+        """
+        om = OutputManager()
+        om._stop_join_s = 0.05
+        dev = _FakeDev()
+        dev.process_isolated = True
+        om._enttec_outputs[1] = dev
+        release = threading.Event()
+        stuck = threading.Thread(target=lambda: release.wait(3.0), daemon=True)
+        stuck.start()
+        om._thread = stuck
+
+        om.stop()
+
+        self.assertTrue(dev.closed)
+        self.assertNotIn(1, om._enttec_outputs)
+        self.assertIs(om._thread, stuck,
+                      "STAB-04: haengenden Output-Thread weiterhin verfolgen")
+        release.set()
+        stuck.join(timeout=3.0)
+
     def test_second_stop_does_not_double_close(self):
         om = OutputManager()
         dev = _FakeDev()
