@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-26 — BPM „0/aus" hält auch gegen in-flight Auto-Quellen (CDX-23)
+
+#### Behoben
+
+- **„BPM = 0/aus" sprang unter Last doch zurück.** Die automatischen
+  Tempo-Quellen (Audio-Detektor, OS2L/VirtualDJ, Timeline, Datei, TempoBus)
+  prüften „läuft der Leader noch auf AUTO?" und schrieben die BPM danach in
+  einem zweiten Schritt. Drückte man im BPM-Dialog genau dazwischen die `0`,
+  war die Prüfung schon durch und der Wert landete trotzdem — der Zähler sprang
+  von 0 wieder auf die erkannte BPM. Prüfung und Schreiben laufen jetzt in
+  einem Zug (`set_bpm(..., only_if_auto=True)`), sodass ein manuelles „aus"
+  (und ebenso der Lock) auch eine bereits angelaufene Quelle sicher überstimmt.
+  Manuelles Setzen, Tap/Nudge und das Auftauen nach Freeze sind unverändert.
+
 ### 2026-07-26 — Cross-Platform-Härtung des Linux-Audits
 
 Nachzug vor dem Merge: der Linux-Stabilitätsbranch wurde gegen Windows
