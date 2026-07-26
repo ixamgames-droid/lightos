@@ -48,6 +48,9 @@ import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import _gen_env  # noqa: F401,E402  # DEMO-02/STAB-CURSHOW: Wegwerf-Show-DB + spawn-sicher
+# (`_builder` importiert dasselbe Modul, aber die Isolation soll HIER sichtbar
+# stehen — Lint-Gate tests/test_tools_db_isolation.py prueft die Datei selbst.)
 from _builder import ShowBuilder, build_and_verify            # noqa: E402
 from src.core.app_state import get_channels_for_patched        # noqa: E402
 from src.core.engine.cue import Cue                            # noqa: E402
