@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-26 — Kein Blackout-Puls mehr beim Live-Show-Load (CDX-22)
+
+#### Behoben
+
+- **Jeder Show-Load im laufenden Betrieb blitzte das Rig kurz schwarz.** Der
+  `reset-first`-Pfad von `load_show` (STAB-19b) ruft `_reset_state` bewusst mit
+  `blackout_output=False`, um genau das zu vermeiden — der Guard überspringt aber
+  nur den expliziten `universe.clear()`/`_flush_all_to_dmx()`. Zwei andere
+  Schritte nullten die alten Adressen trotzdem, und der 44-Hz-Output-Thread
+  sendete diese Nullen physisch, bis der neue Patch geladen **und** gerendert war:
+  1. Der leere Zwischen-Patch (`replace_patch([])`) ließ die A3D-18-Freigabe
+     **jede** bisher gepatchte Adresse als „jetzt frei" sofort auf 0 setzen. Neu
+     bündelt `AppState.deferred_unpatched_release()` die Freigabe über den
+     gesamten, mehrstufigen Patch-Tausch: im Fenster wird nur gemerkt, am Ende
+     einmal gegen den dann gültigen Patch freigegeben. Adressen, die die neue
+     Show weiter belegt, bleiben unberührt; genuin entpatchte Adressen werden
+     weiter deterministisch freigegeben (A3D-18/CDX-17 unverändert, auch wenn der
+     Patch-Tausch mitten drin wirft).
+  2. Der Programmer-Clear im Patch-Replace flushte, **während der alte Patch noch
+     geladen war**, jedes alte Fixture auf seine Kanal-Defaults (Dimmer 0).
+     `clear_programmer(flush=False)` unterdrückt jetzt genau diesen DMX-Flush im
+     Ladepfad; der Loader flusht unmittelbar danach ohnehin erneut — dann gegen
+     den neuen Patch. In-Memory-Clear und WEB-01-Release laufen unverändert.
+  Regressionstest `tests/test_cdx22_load_no_blackout_pulse.py` (8 Fälle, u. a.
+  Ende-zu-Ende über `load_show`: kein einziger 0-Schreibvorgang auf einer weiter
+  gepatchten Adresse; Gegenprobe, dass eine entpatchte Adresse trotzdem
+  freigegeben wird). [Codex #386]
+
 ### 2026-07-26 — Cross-Platform-Härtung des Linux-Audits
 
 Nachzug vor dem Merge: der Linux-Stabilitätsbranch wurde gegen Windows
