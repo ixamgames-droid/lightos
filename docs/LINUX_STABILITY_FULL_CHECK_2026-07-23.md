@@ -144,6 +144,14 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     Capture +12 dB und 10 dB Mic-Boost. Der reale Pegel stieg von ca. -85 dB
     auf ca. -19 dB; der BeatDetector erkannte im 12-s-Test 29 Beats und etwa
     160 BPM. Im anschliessenden Live-Lauf zeigte LightOS stabil eine AUTO-BPM.
+32. Am 26.07. setzte PipeWire/ACP den aktiven Capture-MUX (`numid=8`) trotz
+    gespeicherten ALSA-Zustands erneut von `Mic 1` auf die leere Buchse `Mic`
+    zurueck; Jack-Sense meldete weiterhin korrekt nur `Mic Jack 1` als belegt.
+    `tools/linux_audio_input_guard.sh` prueft beide Bedingungen und korrigiert
+    ausschliesslich auf kompatibler Hardware den MUX. Lokal laeuft es ueber
+    einen systemd-User-Timer alle 10 s. Ausserdem wurde die versehentlich auf
+    2,64 gestellte Detektor-Sensitivity wieder auf 1,3 gesetzt. Nach Korrektur
+    lag das reale Eingangssignal bei ca. -6,7 dB statt Grundrauschen.
 
 ## Testprotokoll
 

@@ -64,6 +64,10 @@ Review). Die Linux-Verbesserungen bleiben vollständig erhalten.
   Baum wird nur bei tatsächlicher Änderung neu aufgebaut.
 - **MIDI-Robustheitstests laufen ohne `python-rtmidi`** (CI und frische venvs);
   sie scheiterten dort mit `AttributeError`.
+- **Linux-Audioeingang bleibt auf der belegten Buchse.**
+  `tools/linux_audio_input_guard.sh` korrigiert bei kompatiblen Realtek-Codecs
+  den Capture-MUX automatisch auf die per Jack-Sense erkannte zweite
+  Mikrofonbuchse, falls PipeWire ihn auf den leeren Eingang zurücksetzt.
 
 ### 2026-07-23 — Linux-Stabilitätsaudit
 
