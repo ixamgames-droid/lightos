@@ -8,8 +8,10 @@
 Visuelles Live-Feedback. `StageCanvas` malt die Bühne von oben; `FixtureRenderer`
 zeichnet jedes Fixture typ-abhängig unterscheidbar und rechnet DMX-Werte in
 Auslenkung/Farbe/Helligkeit um. Antippen/Auswählen von Fixtures synchronisiert
-mit der linken Geräteliste und dem Programmer. Ein 20-FPS-Timer treibt das
-Rendering und pausiert, wenn die View nicht sichtbar ist.
+mit der linken Geräteliste und dem Programmer. Ein 10-FPS-Timer
+(`StageCanvas.RENDER_INTERVAL_MS`, seit 2026-07-23 von 20 auf 10 FPS gesenkt)
+treibt das Rendering und pausiert, wenn die View nicht sichtbar ist. Das betrifft
+nur die Vorschau — DMX-Ausgabe und Playback haben ihren eigenen Takt.
 
 ## Bedienung / Optionen
 
@@ -39,7 +41,7 @@ Rendering und pausiert, wenn die View nicht sichtbar ist.
 
 ## Quelle (file:line)
 
-- `src/ui/views/live_view.py:433` — `StageCanvas`
-- `src/ui/views/live_view.py:66` — `FixtureRenderer` (typ-abhängiges Zeichnen)
-- `src/ui/views/live_view.py` — Render-Timer (10 FPS, sichtbarkeitsgekoppelt)
-- `src/ui/views/live_view.py:56` — DMX→Grad-Umrechnung
+- `src/ui/views/live_view.py:521` — `StageCanvas`
+- `src/ui/views/live_view.py:65` — `FixtureRenderer` (typ-abhängiges Zeichnen)
+- `src/ui/views/live_view.py:535` — `RENDER_INTERVAL_MS` (10 FPS, sichtbarkeitsgekoppelt)
+- `src/ui/views/live_view.py:55` — DMX→Grad-Umrechnung

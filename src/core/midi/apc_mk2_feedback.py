@@ -83,6 +83,11 @@ class ApcMk2Feedback:
         self._canvas = canvas
         self._hint = port_hint
         self._out = None
+        # Port, auf den beim Oeffnen gebunden wurde. Beim geteilten
+        # MidiManager-Ausgang muss vor jedem Senden geprueft werden, ob er
+        # noch derselbe ist — sonst landen die Pad-Note-Ons auf einem fremden
+        # Geraet (unter Windows z. B. hoerbar auf dem GS Wavetable Synth).
+        self._out_name: str | None = None
         self._timer = None
         self._cache: dict[int, tuple[int, int]] = {}   # note -> (mode, color)
         # Standard-Farbschema (spaeter pro Button konfigurierbar)
@@ -122,10 +127,25 @@ class ApcMk2Feedback:
                 idx = self._pick_port(ports)
                 if idx is None:
                     return False
-                if not m.open_output(ports[idx]):
+                want = ports[idx]
+                # Den GETEILTEN Manager-Ausgang nur uebernehmen, wenn keiner
+                # offen ist oder bereits der APC dranhaengt. Sonst wuerde das
+                # blosse Einschalten der VC-LEDs den vom Benutzer (oder von
+                # einem Mapping-Feedback) gewaehlten Ausgang wegreissen.
+                current = ""
+                try:
+                    current = str(m.current_output_name() or "")
+                except Exception:
+                    current = ""
+                if current and current != want and self._hint.lower() not in current.lower():
+                    print(f"[ApcMk2] MIDI-Ausgang '{current}' ist belegt — "
+                          f"LED-Feedback bleibt aus (gewuenscht: {want}).")
+                    return False
+                if not m.open_output(want):
                     return False
                 self._out = m
-                print(f"[ApcMk2] Output geoeffnet: {ports[idx]}")
+                self._out_name = m.current_output_name()
+                print(f"[ApcMk2] Output geoeffnet: {self._out_name}")
                 return True
             except Exception as e:
                 print(f"[ApcMk2] rtmidi Fehler: {e}")
@@ -160,11 +180,26 @@ class ApcMk2Feedback:
         if self._cache.get(key) == val:
             return
         self._cache[key] = val
-        if self._out:
+        if self._out and self._targets_apc():
             try:
                 self._out.send_message([mode, note & 0x7F, color & 0x7F])
             except Exception:
                 pass
+
+    def _targets_apc(self) -> bool:
+        """Zeigt der geteilte Manager-Ausgang noch auf unseren APC-Port?
+
+        Beim eigenen WinMM-Handle (kein Manager) gilt das immer. Beim geteilten
+        rtmidi-Ausgang kann ihn ein anderer Besitzer (MIDI-Ansicht,
+        Mapping-Feedback) inzwischen umgeschaltet haben — dann NICHT senden,
+        sonst gehen die Pad-Noten an ein fremdes Geraet.
+        """
+        if self._out_name is None:
+            return True
+        try:
+            return str(self._out.current_output_name() or "") == self._out_name
+        except Exception:
+            return True
 
     def clear_all(self):
         for n in range(64):
@@ -212,9 +247,18 @@ class ApcMk2Feedback:
             except Exception:
                 pass
             # Der zentrale MidiManager besitzt den gemeinsam genutzten Port.
-            # Hier nur unsere Referenz loesen; Mapper/andere VC-Widgets duerfen
+            # Dort nur unsere Referenz loesen; Mapper/andere VC-Widgets duerfen
             # denselben Ausgang weiterverwenden.
+            # Ein EIGENER Handle (WinMM-Fallback ohne python-rtmidi, u. a. auf
+            # ARM-Windows) muss dagegen geschlossen werden, sonst bleibt der
+            # midiOut-Handle bis zum Prozessende offen.
+            if self._out_name is None:
+                try:
+                    self._out.close_port()
+                except Exception:
+                    pass
             self._out = None
+        self._out_name = None
         print("[ApcMk2] Geschlossen.")
 
     # ── Update-Loop (UI-Thread via QTimer) ─────────────────────────────────────

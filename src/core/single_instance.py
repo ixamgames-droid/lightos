@@ -10,18 +10,36 @@ import os
 from typing import BinaryIO
 
 
-def acquire_instance_lock(path: str) -> BinaryIO | None:
+class _NoLock:
+    """Platzhalter-Lease: eine Sperre war technisch nicht moeglich.
+
+    Bewusst NICHT ``None``: ``None`` heisst ausschliesslich „eine andere
+    Instanz laeuft bereits". Ein nicht anlegbares Sperrfile (fehlende Rechte,
+    read-only/Netz-/Cloud-Ordner) darf LightOS niemals am Start hindern —
+    der Einzelinstanz-Schutz ist eine Komfortfunktion, kein Startkriterium.
+    """
+
+    def close(self) -> None:
+        return None
+
+
+def acquire_instance_lock(path: str) -> BinaryIO | _NoLock | None:
     """Sperrt ``path`` nicht-blockierend und haelt den Dateihandle als Lease.
 
-    Rueckgabe ``None`` bedeutet: eine andere LightOS-Instanz haelt die Sperre.
+    Rueckgabe ``None`` bedeutet: eine andere LightOS-Instanz haelt die Sperre
+    (und NUR das). Laesst sich die Sperrdatei ueberhaupt nicht oeffnen, wird
+    ein ``_NoLock``-Platzhalter geliefert — der Aufrufer startet dann normal
+    weiter, nur ohne Mehrfachstart-Schutz.
     Der Aufrufer muss den erfolgreichen Handle fuer die gesamte Prozesslaufzeit
     referenziert halten.
     """
     try:
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         handle = open(path, "a+b")
-    except OSError:
-        return None
+    except OSError as exc:
+        print(f"[single_instance] Sperrdatei nicht nutzbar ({exc}) — "
+              "Mehrfachstart-Schutz deaktiviert, LightOS startet trotzdem.")
+        return _NoLock()
 
     try:
         if os.name == "nt":

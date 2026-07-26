@@ -159,6 +159,19 @@ def _recovery_prompt_suppressed() -> bool:
     return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
 
 
+def _exit_prompt_suppressed() -> bool:
+    """"Show speichern?"-Abfrage beim Schliessen unterdruecken — NUR headless.
+
+    Bewusst NICHT ``_recovery_prompt_suppressed()`` mitbenutzen: dessen
+    ``LIGHTOS_NO_RECOVERY_PROMPT`` ist ein dokumentierter Schalter mit der
+    Bedeutung „kein Autosave-Wiederherstellungsdialog beim Start". Wer ihn
+    setzt, will NICHT, dass beim Beenden ungespeicherte Arbeit kommentarlos
+    verworfen wird. Hier zaehlt deshalb allein die headless-Plattform, auf der
+    ein modaler Dialog schlicht niemanden erreicht.
+    """
+    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+
+
 def _colored_icon(color: str, size: int = 16) -> QIcon:
     """Kleines farbiges Quadrat als Fallback-Icon."""
     px = QPixmap(size, size)
@@ -2297,11 +2310,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         # Warnung wenn Show ungespeicherte Aenderungen hat
-        # Headless-/CI-Sitzungen duerfen niemals in einem modalen Dialog haengen.
-        # Derselbe Guard schuetzt bereits die Autosave-Recovery; beim Schliessen
-        # entspricht der sichere Testpfad "verwerfen" (Testdaten liegen ohnehin
-        # im isolierten APPDATA).
-        if self._has_unsaved_changes() and not _recovery_prompt_suppressed():
+        # Headless-/CI-Sitzungen duerfen niemals in einem modalen Dialog haengen;
+        # dort entspricht der sichere Testpfad "verwerfen" (Testdaten liegen
+        # ohnehin im isolierten APPDATA). Auf einem echten Desktop kommt die
+        # Abfrage IMMER — auch wenn der Benutzer den Recovery-Dialog beim Start
+        # abgeschaltet hat (eigener Guard, siehe _exit_prompt_suppressed).
+        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
             reply = QMessageBox.question(
                 self, "Show speichern?",
                 "Es gibt möglicherweise ungespeicherte Änderungen "

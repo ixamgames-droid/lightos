@@ -7,6 +7,64 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-26 — Cross-Platform-Härtung des Linux-Audits
+
+Nachzug vor dem Merge: der Linux-Stabilitätsbranch wurde gegen Windows
+gegengeprüft (CI-identische Umgebung Python 3.11 + PySide6 6.11.1, adversariale
+Review). Die Linux-Verbesserungen bleiben vollständig erhalten.
+
+#### Behoben
+
+- **Windows-Heap-Corruption im Qt-Abbau.** Die VC-Arbeitsfläche wuchs über
+  `QScrollArea.setWidgetResizable(True)` mit. Da die VC denselben `VCCanvas` per
+  `takeWidget()`/`setWidget()` zwischen Haupt- und Popout-Fenster reicht,
+  destabilisierte das den nativen Widget-Abbau: gemessen 7 von 8 Läufen rot
+  (`STATUS_HEAP_CORRUPTION`, 0xc0000374) gegenüber 1 von 8 auf `main`. Ersetzt
+  durch `GrowingScrollArea`, die den Inhalt selbst auf
+  `max(Mindestgröße, Viewport)` zieht — gleiches Bild auf breiten Touchscreens,
+  wieder 0 von 8 rot.
+- **VC-Layout bleibt portabel.** Die Canvas-Mindestgröße wächst jetzt mit dem
+  Inhalt (`_update_content_extent`). Ein auf dem 1920-px-Touchscreen jenseits
+  von 1200 px abgelegtes Widget ist auf einem kleineren Bildschirm bzw. im
+  Popout wieder erscrollbar statt unsichtbar und unerreichbar.
+- **MIDI-Ausgang stirbt nicht mehr still.** Ein nicht auflösbarer Portname
+  schloss den LAUFENDEN Ausgang, ließ `_output`/`_output_name` aber gesetzt —
+  der Manager meldete weiter „offen", es ging nie wieder ein Byte raus, und der
+  Frühausstieg verhinderte jedes Wiederöffnen bis zum Neustart. Ausgelöst vom
+  Mapping-Feedback bei einem plattformfremden Portnamen aus der Show.
+- **Explizite Portauswahl ist wieder exakt** (`open_output(..., allow_hint=False)`
+  aus der MIDI-Ansicht). Der Teilstring-Vergleich schluckte sonst die Auswahl
+  „APC mini mk2", solange „MIDIOUT2 (APC mini mk2)" offen war, und meldete
+  trotzdem grün Erfolg. Portable Profil-Hinweise wie `APC` lösen weiterhin
+  unscharf auf.
+- **APC-LED-Feedback kapert keinen fremden Ausgang mehr** und sendet nur, solange
+  der geteilte Ausgang noch auf den APC zeigt. Sonst gingen die Pad-Noten an das
+  zuletzt gewählte Gerät (unter Windows hörbar auf dem GS Wavetable Synth).
+- **Ein gescheiterter MIDI-Ausgang legt die Eingänge nicht mehr lahm.** Der
+  Circuit-Breaker galt für beide Richtungen; nach einem Ausgangsfehler fand der
+  Autoconnect keine Eingänge mehr und der APC war bis zum Neustart taub.
+- **Gehaltene Flash-Taste bleibt nicht mehr hängen.** Der fokusgebundene
+  Hotkey-Filter verwarf beim Fokuswechsel die aktiven Tasten, ohne das Release
+  zuzustellen — das Licht blieb an. Zusätzlich weicht der Filter jetzt auf das
+  Fenster aus, wenn der Fokus im Chromium-Baum des 3D-Visualizers liegt oder gar
+  kein Widget ihn hält; VC-Hotkeys bleiben damit auch dort erreichbar, ohne je am
+  Chromium-Renderbaum zu hängen (das war die Linux-Absturzursache).
+- **Nicht anlegbare Einzelinstanz-Sperre verhindert den Start nicht mehr.**
+  Rechteproblem oder Netz-/Cloud-Ordner galten als „läuft schon"; LightOS ließ
+  sich dann gar nicht mehr starten. Jetzt läuft es ohne Mehrfachstart-Schutz
+  weiter. Ein echter Zweitstart meldet sich unter Windows sichtbar per Dialog
+  statt nur mit einer Konsolenzeile, die niemand sieht.
+- **`--help` und Argumentfehler funktionieren wieder**, während LightOS läuft
+  (argparse läuft jetzt vor der Sperre).
+- **Kein stiller Datenverlust beim Beenden.** Die „Show speichern?"-Abfrage hing
+  am Schalter `LIGHTOS_NO_RECOVERY_PROMPT`, der laut Doku nur den
+  Autosave-Dialog beim Start abschaltet. Sie nutzt jetzt einen eigenen Guard und
+  greift auf einem echten Desktop immer.
+- **VC-Bibliothek verliert die Auswahl nicht mehr bei jedem Tabwechsel** — der
+  Baum wird nur bei tatsächlicher Änderung neu aufgebaut.
+- **MIDI-Robustheitstests laufen ohne `python-rtmidi`** (CI und frische venvs);
+  sie scheiterten dort mit `AttributeError`.
+
 ### 2026-07-23 — Linux-Stabilitätsaudit
 
 #### Behoben
@@ -18,8 +76,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   10-Sekunden-Circuit-Breaker gegen native Client-Stürme.
 - Show-Dateien validieren Fixture-Profil-IDs gegen Hersteller/Modell und mappen
   abweichende lokale Datenbank-IDs automatisch nach Namen.
-- Frische Installationen starten keine Test-/Netzwerkausgänge mehr:
-  `COM_FAKE`, Art-Net-Broadcast und sACN sind standardmäßig deaktiviert.
 - 2D-Bühnenvorschau auf 10 FPS begrenzt, ohne DMX- oder Playback-Timing zu
   verändern; Tab-Titel bleiben bei 1440 px vollständig lesbar.
 - Headless-Schließen, MIDI-Ansicht und plattformübergreifende Janitor-Pfade
@@ -46,6 +102,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Client für Ein- und Ausgänge. Dadurch sammeln sich bei wiederholten Scans
   keine leeren Sequencer-Clients mehr an, die nach längerer Laufzeit MIDI mit
   `Cannot allocate memory` blockieren.
+- Linux/ALSA: APC-Ausgänge verwenden einen einzigen zentralen RtMidi-Client.
+  Portable Profil-Hinweise wie `APC` werden auf den realen mk2-Control-Port
+  aufgelöst; wiederholte Scans, LED-Feedback und Mapping erzeugen keine
+  Sequencer-Client-Flut mehr. Fehler beim Öffnen bleiben in der MIDI-Ansicht
+  sichtbar, statt als unbehandelte Qt-Slot-Exception im Crashlog zu landen.
+- Die Audio-Input-Ansicht bietet neben PC-Loopback nun auch echte Mikrofon-/
+  Line-In-Geräte an und schaltet Quelle plus Gerät gemeinsam um.
+- Prozessisolierte ENTTEC-Worker werden beim Beenden auch dann explizit
+  geschlossen, wenn der DMX-Output-Thread sein Join-Timeout überschreitet.
+  Dadurch bleibt nach dem App-Ende kein verwaister Prozess zurück, der den
+  USB-Port belegt. Direkte serielle Geräte behalten den Windows-Schutz gegen
+  paralleles `CloseHandle`/`WriteFile`.
 
 Details und Prüfergebnisse:
 `docs/LINUX_STABILITY_FULL_CHECK_2026-07-23.md`.
@@ -1357,20 +1425,6 @@ Dieses Update überarbeitet das Tempo/BPM-Subsystem von Grund auf (zentraler Lea
 - `README.md` um "Quick Start"-Abschnitt erweitert (5-Minuten-Guide fuer neue Nutzer)
 - `.github/workflows/ci.yml` — automatisierte Test-Pipeline (Python 3.11 + 3.12)
 - `CHANGELOG.md` — diese Datei (Keep-a-Changelog-Format)
-
-### Behoben
-- Linux/ALSA: APC-Ausgaenge verwenden einen einzigen zentralen RtMidi-Client.
-  Portable Profil-Hinweise wie `APC` werden auf den realen mk2-Control-Port
-  aufgeloest; wiederholte Scans, LED-Feedback und Mapping erzeugen keine
-  Sequencer-Client-Flut mehr. Fehler beim Oeffnen bleiben in der MIDI-Ansicht
-  sichtbar, statt als unbehandelte Qt-Slot-Exception im Crashlog zu landen.
-- Die Audio-Input-Ansicht bietet neben PC-Loopback nun auch echte Mikrofon-/
-  Line-In-Geraete an und schaltet Quelle plus Geraet gemeinsam um.
-- Prozessisolierte ENTTEC-Worker werden beim Beenden auch dann explizit
-  geschlossen, wenn der DMX-Output-Thread sein Join-Timeout ueberschreitet.
-  Dadurch bleibt nach dem App-Ende kein verwaister Prozess zurueck, der den
-  USB-Port belegt. Direkte serielle Geraete behalten den Windows-Schutz gegen
-  paralleles `CloseHandle`/`WriteFile`.
 
 ### Entfernt
 - **Redundanter „Snap"-Button (UIC-01)** aus der oberen Leiste. Die Schnell-Snapshot-Funktion

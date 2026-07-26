@@ -1,10 +1,22 @@
 """App-weite Tastatur-Hotkeys für die Virtual Console (Feature: Keyboard-Patch).
 
-Ein einziger QApplication-Event-Filter fängt KeyPress/KeyRelease ab, baut
-daraus einen portablen Sequenz-String (QKeySequence, z. B. "F5", "Ctrl+B",
-"Shift+Space") und verteilt ihn an Subscriber (die VC-Canvases). Die Canvases
-leiten an ihre Widgets weiter — gleiche Architektur wie der MIDI-Pfad
-(MidiManager → VCCanvas → widget.handle_midi).
+Ein Event-Filter fängt KeyPress/KeyRelease ab, baut daraus einen portablen
+Sequenz-String (QKeySequence, z. B. "F5", "Ctrl+B", "Shift+Space") und verteilt
+ihn an Subscriber (die VC-Canvases). Die Canvases leiten an ihre Widgets weiter
+— gleiche Architektur wie der MIDI-Pfad (MidiManager → VCCanvas →
+widget.handle_midi).
+
+Wo der Filter hängt (wichtig, seit 2026-07-23):
+- NICHT mehr an der ``QApplication``. Ein app-weiter Python-Filter wird auch für
+  Chromium-interne QtWebEngine-Objekte des 3D-Visualizers aufgerufen; unter
+  Linux war das als nativer Segmentation Fault reproduzierbar (Virtual Console
+  + 3D gleichzeitig).
+- Stattdessen folgt er dem jeweils fokussierten normalen Qt-Widget.
+- Liegt der Fokus im Chromium-Renderbaum oder hält gar kein Widget ihn, weicht
+  er auf das Top-Level-Fenster aus. Damit bleiben die Hotkeys überall
+  erreichbar, ohne je an einem Chromium-Objekt zu hängen.
+- Beim Fokuswechsel werden gehaltene Tasten sauber released (sonst bliebe ein
+  Flash-Licht an).
 
 Schutzregeln (wichtig für den Live-Betrieb):
 - KEIN Auslösen, wenn der Fokus in einem Texteingabefeld liegt
@@ -116,6 +128,32 @@ class KeyboardHotkeyFilter(QObject):
                 return True
         return False
 
+    @staticmethod
+    def _fallback_target(widget):
+        """Fenster, auf das der Filter ausweicht, wenn das Fokus-Widget nichts taugt.
+
+        Faellt der Fokus auf ``None`` oder in den Chromium-Renderbaum des
+        3D-Visualizers, darf der Filter dort NICHT haengen (genau das war der
+        Linux-Segfault). Ohne Ersatz waeren die VC-Hotkeys dann aber tot —
+        z. B. sobald man im 3D die Kamera dreht oder gar kein Widget den Fokus
+        haelt. Das Top-Level-Fenster ist ein normales Qt-Widget und bekommt
+        Key-Events, die das Fokus-Widget nicht annimmt.
+        """
+        app = QApplication.instance()
+        if app is None:
+            return None
+        win = None
+        if widget is not None:
+            try:
+                win = widget.window()
+            except (AttributeError, RuntimeError):
+                win = None
+        if win is None:
+            win = app.activeWindow()
+        if win is None or KeyboardHotkeyFilter._is_webengine_widget(win):
+            return None
+        return win
+
     def _on_focus_changed(self, old, new):
         target = self._focus_target
         if target is not None:
@@ -124,12 +162,27 @@ class KeyboardHotkeyFilter(QObject):
             except RuntimeError:
                 pass
         self._focus_target = None
-        self._active.clear()
-        if new is None or self._is_webengine_widget(new):
+        # Gehaltene Tasten sauber abschliessen, BEVOR der Filter umzieht.
+        # Frueher wurde `_active` nur geleert — das Release kam nie an und ein
+        # Flash-Licht blieb dauerhaft an, wenn sich waehrend des Haltens der
+        # Fokus verschob (Bank-Button klicken, Dialog schliesst, Widget wird
+        # versteckt). Auf main lag der Filter app-weit, dort kam das Release an.
+        if self._active:
+            for _key, seq in list(self._active.items()):
+                try:
+                    self._dispatch(seq, False)
+                except Exception:
+                    pass
+            self._active.clear()
+        if new is not None and not self._is_webengine_widget(new):
+            candidate = new
+        else:
+            candidate = self._fallback_target(new)
+        if candidate is None:
             return
         try:
-            new.installEventFilter(self)
-            self._focus_target = new
+            candidate.installEventFilter(self)
+            self._focus_target = candidate
         except RuntimeError:
             pass
 

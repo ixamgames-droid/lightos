@@ -88,6 +88,9 @@ class MidiManager:
         self._scan_input: object | None = None
         self._scan_output: object | None = None
         self._rtmidi_retry_after = 0.0
+        # Nur die AUSGANGS-Seite: ein gescheiterter MidiOut()-Konstruktor darf
+        # die Eingangs-Erkennung (Autoconnect fuer APC & Co.) nicht mitreissen.
+        self._rtmidi_out_blocked = False
         self._rtmidi_error = ""
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
@@ -254,12 +257,26 @@ class MidiManager:
                     self._log(f"Auto-Connect Fehler ({name}): {e}")
         return len(self._inputs)
 
-    def open_output(self, port_name: str) -> bool:
+    def open_output(self, port_name: str, *, allow_hint: bool = True) -> bool:
+        """Ausgang oeffnen.
+
+        ``allow_hint=True`` (Default) erlaubt die unscharfe Aufloesung portabler
+        Profilnamen wie ``"APC"`` auf den echten, plattformspezifischen Port —
+        das brauchen Auto-Connect, Mapping-Feedback und die APC-LED-Treiber.
+
+        ``allow_hint=False`` ist fuer die EXPLIZITE Auswahl aus der Portliste
+        (MIDI-Ansicht): dort muss exakt der gewaehlte Port geoeffnet werden.
+        Sonst schluckte der Teilstring-Vergleich z. B. die Auswahl
+        ``"APC mini mk2"``, waehrend ``"MIDIOUT2 (APC mini mk2)"`` offen ist —
+        und meldete dem Benutzer trotzdem gruen Erfolg.
+        """
         with self._io_lock:
             if self._output is not None:
+                if self._output_name == port_name:
+                    return True
                 requested = str(port_name or "").strip().lower()
                 current = self._output_name.lower()
-                if self._output_name == port_name or (requested and requested in current):
+                if allow_hint and requested and requested in current:
                     return True
 
             if _USE_WINMM:
@@ -290,24 +307,33 @@ class MidiManager:
             # wiederholtes Klicken erschoepfte so den Sequencer und crashte die UI.
             m = self._output
             was_open_output = m is not None
+            took_scan_handle = False
             if m is None:
+                if self._rtmidi_out_blocked:
+                    return False
                 with self._scan_lock:
                     m = self._scan_output
                     if m is None:
                         try:
                             m = rtmidi.MidiOut()
                         except Exception as exc:
-                            self._rtmidi_retry_after = float("inf")
+                            # NUR die Ausgangsseite sperren. Frueher setzte das
+                            # hier den GEMEINSAMEN Breaker auf float("inf") und
+                            # legte damit auch list_inputs() dauerhaft still —
+                            # der APC war danach als Eingabegeraet tot, obwohl
+                            # nur der Ausgang scheiterte.
+                            self._rtmidi_out_blocked = True
                             self._rtmidi_error = str(exc)
                             self._log(
                                 "MIDI Output nicht verfügbar; LightOS neu starten, "
                                 f"nachdem ALSA wieder frei ist: {exc}")
                             return False
                     self._scan_output = None
+                    took_scan_handle = True
             try:
                 ports = [m.get_port_name(i) for i in range(m.get_port_count())]
                 resolved = port_name if port_name in ports else None
-                if resolved is None:
+                if resolved is None and allow_hint:
                     hint = str(port_name or "").strip().lower()
                     matches = [p for p in ports if hint and hint in p.lower()]
                     # Profile speichern absichtlich portable Hinweise wie "APC"
@@ -318,10 +344,17 @@ class MidiManager:
                             (p for p in matches if "control" in p.lower()),
                             matches[0])
                 if resolved is None:
-                    try:
-                        m.close_port()
-                    except Exception:
-                        pass
+                    # NICHT schliessen. Frueher lief hier close_port() auf genau
+                    # dem Handle, der gerade als self._output in Benutzung ist —
+                    # der native Port war danach zu, self._output/_output_name
+                    # blieben aber gesetzt. Der Manager meldete weiter „offen",
+                    # es ging nie wieder ein Byte raus, und der Early-Return oben
+                    # verhinderte jedes Wiederoeffnen bis zum Neustart.
+                    # Ein frisch geholter Discovery-Handle wandert einfach zurueck.
+                    if took_scan_handle and not was_open_output:
+                        with self._scan_lock:
+                            if self._scan_output is None:
+                                self._scan_output = m
                     return False
                 idx = ports.index(resolved)
                 # close_port() auf einem noch NIE geoeffneten RtMidi/ALSA-
@@ -338,6 +371,7 @@ class MidiManager:
                 self._output = m
                 self._output_name = resolved
                 self._rtmidi_retry_after = 0.0
+                self._rtmidi_out_blocked = False
                 self._rtmidi_error = ""
                 self._log(f"MIDI Output geöffnet: {resolved}")
                 return True

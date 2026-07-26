@@ -465,7 +465,41 @@ def _start_freeze_watchdog():
     threading.Thread(target=_watch, name="FreezeWatchdog", daemon=True).start()
 
 
+def _report_already_running() -> None:
+    """Abgewiesenen Zweitstart SICHTBAR melden.
+
+    Ein reiner ``print`` verpufft: per Desktop-Verknuepfung/``start.bat``
+    blitzt die Konsole nur kurz auf, unter ``pythonw`` sieht man gar nichts.
+    Fuer den Benutzer wirkt LightOS dann schlicht kaputt — vor allem, wenn die
+    laufende Instanz minimiert oder auf dem zweiten Monitor liegt.
+    """
+    msg = ("LightOS läuft bereits.\n\n"
+           "Es kann immer nur eine Instanz laufen (sonst streiten sich zwei "
+           "Prozesse um MIDI, Audio und die DMX-Schnittstelle).\n"
+           "Das vorhandene Fenster ist eventuell minimiert oder auf einem "
+           "anderen Bildschirm.")
+    print(f"[main] {msg}")
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            # MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND
+            ctypes.windll.user32.MessageBoxW(0, msg, "LightOS", 0x40 | 0x10000)
+        except Exception:
+            pass
+
+
 def main():
+    # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
+    # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
+    # laufendes LightOS auch `--help` und Tippfehler in Flags mit
+    # "LightOS laeuft bereits" statt mit der Hilfe bzw. einem Argumentfehler.
+    parser = argparse.ArgumentParser(description="LightOS DMX Lichtsteuerung")
+    parser.add_argument("--kiosk", action="store_true",
+                        help="Kiosk-Modus: Vollbild, nur Virtual Console, keine Bearbeitung")
+    parser.add_argument("--touch", action="store_true",
+                        help="Touch-Modus: groessere Buttons fuer Tablet-Bedienung")
+    args = parser.parse_args()
+
     # Vor Crash-Logging, Qt, ALSA/MIDI und WebEngine nur eine GUI-Instanz
     # zulassen. Mehrfachstarts konkurrieren sonst um native Ressourcen und
     # waren auf Linux als SIGABRT/SIGSEGV reproduzierbar.
@@ -475,17 +509,10 @@ def main():
         os.path.join(app_data_dir(), "lightos.instance.lock")
     )
     if instance_lock is None:
-        print("[main] LightOS läuft bereits — zweiter Start wird beendet.")
+        _report_already_running()
         return
 
     _setup_crash_logging()
-
-    parser = argparse.ArgumentParser(description="LightOS DMX Lichtsteuerung")
-    parser.add_argument("--kiosk", action="store_true",
-                        help="Kiosk-Modus: Vollbild, nur Virtual Console, keine Bearbeitung")
-    parser.add_argument("--touch", action="store_true",
-                        help="Touch-Modus: groessere Buttons fuer Tablet-Bedienung")
-    args = parser.parse_args()
 
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 

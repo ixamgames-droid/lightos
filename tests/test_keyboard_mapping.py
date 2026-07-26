@@ -78,6 +78,43 @@ class TestHotkeyFilter:
         f._on_focus_changed(None, chromium_child)
         assert f._focus_target is None
 
+    def test_focus_change_releases_held_keys(self):
+        """Regression: gehaltene Flash-Taste darf beim Fokuswechsel nicht haengen.
+
+        Der fokusgebundene Filter leerte frueher einfach ``_active`` — das
+        Release wurde nie zugestellt und ein Flash-Licht blieb dauerhaft an
+        (z. B. Taste halten und dabei den Bank-Button klicken).
+        """
+        f = KeyboardHotkeyFilter()
+        got = []
+        f.subscribe(lambda seq, pressed: got.append((seq, pressed)) or True)
+        first = QWidget()
+        second = QWidget()
+        f._on_focus_changed(None, first)
+
+        assert f.eventFilter(first, key_event(Qt.Key.Key_F5)) is True
+        assert got == [("F5", True)]
+
+        f._on_focus_changed(first, second)
+
+        assert got == [("F5", True), ("F5", False)], "Release fehlt nach Fokuswechsel"
+        assert f._active == {}
+
+    def test_webengine_focus_falls_back_to_window(self):
+        """Fokus im Chromium-Renderbaum: Filter darf nicht dort haengen, die
+        Hotkeys duerfen aber auch nicht tot sein — er zieht aufs Fenster um."""
+        class RenderWidgetHostViewQtDelegateWidget(QWidget):
+            pass
+
+        window = QWidget()
+        chromium_child = RenderWidgetHostViewQtDelegateWidget(window)
+
+        f = KeyboardHotkeyFilter()
+        f._on_focus_changed(None, chromium_child)
+
+        assert f._focus_target is window
+        assert f._is_webengine_widget(f._focus_target) is False
+
     def test_dispatch_press_and_release(self):
         f = KeyboardHotkeyFilter()
         got = []

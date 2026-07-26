@@ -319,6 +319,13 @@ class MidiView(QWidget):
         if not port or port.startswith("("):
             return
         try:
+            # Explizite Auswahl aus der Portliste: EXAKT diesen Port oeffnen.
+            # Ohne allow_hint=False schluckte der Teilstring-Vergleich z. B.
+            # die Auswahl "APC mini mk2", solange "MIDIOUT2 (APC mini mk2)"
+            # offen war — und meldete trotzdem gruen Erfolg.
+            ok = self._midi.open_output(port, allow_hint=False)
+        except TypeError:
+            # Alternative/Test-Backends ohne den Parameter.
             ok = self._midi.open_output(port)
         except Exception as exc:
             # Ein optionales MIDI-Backend darf niemals als unbehandelte Qt-Slot-

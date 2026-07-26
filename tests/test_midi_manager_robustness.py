@@ -20,9 +20,29 @@ import queue
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import types
+
 import pytest
 
 from src.core.midi import midi_manager as mm
+
+
+@pytest.fixture
+def rtmidi_stub(monkeypatch):
+    """Sorgt dafuer, dass ``mm.rtmidi`` monkeypatchbar ist.
+
+    ``midi_manager`` bindet den Namen ``rtmidi`` NUR, wenn der optionale
+    C-Extension-Import geklappt hat. Auf jedem Rechner ohne ``python-rtmidi``
+    — also auch in der GitHub-CI und in einem frischen venv — existiert das
+    Attribut gar nicht, und ``monkeypatch.setattr(mm.rtmidi, ...)`` scheiterte
+    mit ``AttributeError``. Die Tests pruefen aber reine Python-Logik
+    (Circuit-Breaker, Handle-Wiederverwendung, Port-Aufloesung) und brauchen
+    kein echtes rtmidi. Deshalb hier notfalls ein leeres Modul einhaengen.
+    """
+    if getattr(mm, "rtmidi", None) is None:
+        stub = types.SimpleNamespace(MidiIn=object, MidiOut=object)
+        monkeypatch.setattr(mm, "rtmidi", stub, raising=False)
+    return mm.rtmidi
 
 
 class FakeInput:
@@ -107,7 +127,7 @@ def test_open_all_inputs_evicts_vanished_port(winmm_stub):
         mgr.close_all()
 
 
-def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch):
+def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch, rtmidi_stub):
     """Ein kaputter ALSA-Sequencer darf weder Start noch Refresh-Schleife
     beenden und soll nicht alle zwei Sekunden neue native Clients erzeugen."""
     calls = {"n": 0}
@@ -130,7 +150,7 @@ def test_rtmidi_scan_error_is_soft_and_rate_limited(monkeypatch):
         mgr.close_all()
 
 
-def test_successful_rtmidi_scans_reuse_discovery_client(monkeypatch):
+def test_successful_rtmidi_scans_reuse_discovery_client(monkeypatch, rtmidi_stub):
     """Hotplug-Polling darf nicht pro Aufruf einen neuen ALSA-Sequencer-Client
     erzeugen; sonst ist dessen Client-Limit nach kurzer Laufzeit erschoepft."""
     made = []
@@ -166,7 +186,7 @@ def test_successful_rtmidi_scans_reuse_discovery_client(monkeypatch):
     assert mgr._scan_input is None
 
 
-def test_open_output_promotes_discovery_handle_without_new_client(monkeypatch):
+def test_open_output_promotes_discovery_handle_without_new_client(monkeypatch, rtmidi_stub):
     """Portscan + Oeffnen teilen einen MidiOut-Client statt pro Klick neue
     ALSA-Clients zu erzeugen."""
     made = []
@@ -207,7 +227,7 @@ def test_open_output_promotes_discovery_handle_without_new_client(monkeypatch):
         mgr.close_all()
 
 
-def test_open_output_resolves_portable_apc_hint_to_control_port(monkeypatch):
+def test_open_output_resolves_portable_apc_hint_to_control_port(monkeypatch, rtmidi_stub):
     made = []
 
     class FakeMidiOut:
@@ -239,6 +259,141 @@ def test_open_output_resolves_portable_apc_hint_to_control_port(monkeypatch):
         assert mgr._output.opened == 1
         assert "Control" in mgr.current_output_name()
         assert len(made) == 1
+    finally:
+        mgr.close_all()
+
+
+class _PortsFakeMidiOut:
+    """Fake-MidiOut mit fester Portliste und beobachtbarem Offen-Zustand."""
+
+    ports: list[str] = []
+    made: list = []
+
+    def __init__(self):
+        type(self).made.append(self)
+        self.opened = None
+        self.is_open = False
+
+    def get_port_count(self):
+        return len(type(self).ports)
+
+    def get_port_name(self, index):
+        return type(self).ports[index]
+
+    def open_port(self, index):
+        self.opened = index
+        self.is_open = True
+
+    def close_port(self):
+        self.is_open = False
+
+    def send_message(self, msg):
+        if not self.is_open:
+            raise RuntimeError("Port ist zu")
+
+
+def _rtmidi_out_manager(monkeypatch, ports):
+    cls = type("FakeOut", (_PortsFakeMidiOut,), {"ports": list(ports), "made": []})
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiOut", cls)
+    return mm.MidiManager(), cls
+
+
+def test_unresolvable_port_does_not_kill_the_open_output(monkeypatch, rtmidi_stub):
+    """Regression: ein nicht auffindbarer Portname darf den LAUFENDEN Ausgang
+    nicht schliessen.
+
+    Vorher rief open_output() in diesem Fall close_port() auf genau dem Handle,
+    der als ``self._output`` in Benutzung ist — ``_output``/``_output_name``
+    blieben aber gesetzt. Der Manager meldete weiter „offen", es ging nie wieder
+    ein Byte raus, und der Early-Return verhinderte jedes Wiederoeffnen. Real
+    ausgeloest von ``midi_mapper._feedback_loop``, das den in der Show
+    gespeicherten (plattformfremden) Portnamen dauernd erneut anfordert.
+    """
+    mgr, cls = _rtmidi_out_manager(monkeypatch, ["APC mini mk2"])
+    try:
+        assert mgr.open_output("APC mini mk2") is True
+        handle = mgr._output
+        assert handle.is_open is True
+
+        # Portname aus einer auf Linux gespeicherten Show — hier unbekannt.
+        assert mgr.open_output("APC mini mk2:APC mini mk2 Control 20:0") is False
+
+        assert handle.is_open is True, "laufender Ausgang wurde geschlossen"
+        assert mgr.current_output_name() == "APC mini mk2"
+        assert mgr.send_message([0x90, 5, 21]) is True
+    finally:
+        mgr.close_all()
+
+
+def test_unresolvable_port_keeps_discovery_handle_reusable(monkeypatch, rtmidi_stub):
+    """Ohne offenen Ausgang darf ein Fehlversuch den Discovery-Handle nicht
+    verbrennen — sonst legt der naechste Scan einen neuen ALSA-Client an."""
+    mgr, cls = _rtmidi_out_manager(monkeypatch, ["Irgendein Synth"])
+    try:
+        assert mgr.list_outputs() == ["Irgendein Synth"]
+        assert mgr.open_output("APC") is False
+        assert mgr._scan_output is not None, "Discovery-Handle ging verloren"
+        assert mgr.list_outputs() == ["Irgendein Synth"]
+        assert len(cls.made) == 1, "es wurde ein zusaetzlicher Client erzeugt"
+    finally:
+        mgr.close_all()
+
+
+def test_explicit_selection_is_exact_not_substring(monkeypatch, rtmidi_stub):
+    """Die explizite Auswahl aus der Portliste muss exakt oeffnen.
+
+    'APC mini mk2' ist Teilstring von 'MIDIOUT2 (APC mini mk2)'. Mit dem
+    unscharfen Vergleich meldete open_output() Erfolg, ohne umzuschalten — die
+    MIDI-Ansicht faerbte gruen und der Benutzer kam nie mehr auf den anderen
+    Port.
+    """
+    mgr, _cls = _rtmidi_out_manager(
+        monkeypatch, ["APC mini mk2", "MIDIOUT2 (APC mini mk2)"])
+    try:
+        assert mgr.open_output("MIDIOUT2 (APC mini mk2)") is True
+        assert mgr.current_output_name() == "MIDIOUT2 (APC mini mk2)"
+
+        # Unscharf (Profil-Hinweis) -> darf kurzschliessen.
+        assert mgr.open_output("APC mini mk2", allow_hint=True) is True
+        assert mgr.current_output_name() == "MIDIOUT2 (APC mini mk2)"
+
+        # Explizit (Benutzerauswahl) -> muss wirklich umschalten.
+        assert mgr.open_output("APC mini mk2", allow_hint=False) is True
+        assert mgr.current_output_name() == "APC mini mk2"
+    finally:
+        mgr.close_all()
+
+
+def test_failed_output_constructor_does_not_disable_input_scan(monkeypatch, rtmidi_stub):
+    """Ein gescheiterter MidiOut()-Konstruktor darf die EINGANGS-Erkennung nicht
+    mitreissen — sonst ist der APC als Eingabegeraet tot, obwohl nur der Ausgang
+    scheiterte (Autoconnect findet dann nichts mehr)."""
+    class BrokenMidiOut:
+        def __init__(self):
+            raise SystemError("ALSA: Cannot allocate memory")
+
+    class WorkingMidiIn:
+        def get_port_count(self):
+            return 1
+
+        def get_port_name(self, index):
+            return "APC mini mk2 Notes"
+
+        def close_port(self):
+            pass
+
+    monkeypatch.setattr(mm, "_USE_WINMM", False)
+    monkeypatch.setattr(mm, "RTMIDI_OK", True)
+    monkeypatch.setattr(mm.rtmidi, "MidiOut", BrokenMidiOut)
+    monkeypatch.setattr(mm.rtmidi, "MidiIn", WorkingMidiIn)
+    mgr = mm.MidiManager()
+    try:
+        assert mgr.open_output("APC") is False
+        assert mgr._rtmidi_out_blocked is True
+        # Entscheidend: Eingaenge bleiben scanbar.
+        assert mgr.list_inputs() == ["APC mini mk2 Notes"]
     finally:
         mgr.close_all()
 
