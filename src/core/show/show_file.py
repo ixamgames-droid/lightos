@@ -1,5 +1,6 @@
 """Show file manager - saves/loads .lshow ZIP archives."""
 from __future__ import annotations
+import contextlib
 import json
 import zipfile
 import os
@@ -241,6 +242,26 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     return profile_id
 
 
+@contextlib.contextmanager
+def _deferred_addr_release(state):
+    """CDX-22: Klammert den MEHRSTUFIGEN Patch-Tausch des Show-Loads (reset-first
+    leerer Patch -> neuer Patch) in ``AppState.deferred_unpatched_release``, damit
+    der Zwischenschritt mit dem LEEREN Patch nicht jede bisher gepatchte Adresse
+    sofort im Live-Universe nullt (physischer Blackout-Puls bei JEDEM Live-Load,
+    den ``blackout_output=False`` allein nicht verhindert — Begruendung + Semantik
+    im Docstring von ``AppState.deferred_unpatched_release``).
+
+    Aeltere AppState-APIs und Test-Fakes ohne die Methode laufen unveraendert
+    weiter (dann kein Deferral) — gleiche Toleranz wie beim ``replace_patch``-
+    Fallback in ``_replace_patch_from_data``."""
+    defer = getattr(state, "deferred_unpatched_release", None)
+    if not callable(defer):
+        yield
+        return
+    with defer():
+        yield
+
+
 def _replace_patch_from_data(state, patch_data: list[dict]):
     # BUG-01: Patch verlustfrei ersetzen und dabei ALLE State-Emits unterdrücken.
     # Jedes clear_patch()/clear_programmer()/add_fixture() würde sonst synchron
@@ -252,8 +273,18 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
     state._suppress_emits = True
     try:
         # Clear stale programmer values referencing old patch (in-memory).
+        # CDX-22: OHNE DMX-Flush. Der Clear laeuft, waehrend der ALTE Patch noch
+        # geladen ist — ein Flush schriebe hier jedes alte Fixture auf seine
+        # Kanal-Defaults (Dimmer 0) und der Output-Thread sendet diesen
+        # Blackout-Frame physisch, bis der neue Patch steht (genau der Puls, den
+        # blackout_output=False verhindern soll). load_show flusht unmittelbar nach
+        # dem Programmer-Block erneut — dann gegen den NEUEN Patch. Aeltere
+        # AppState-APIs/Test-Fakes ohne das Keyword: Fallback auf den Alt-Pfad.
         try:
-            state.clear_programmer()
+            try:
+                state.clear_programmer(flush=False)
+            except TypeError:
+                state.clear_programmer()
         except Exception as e:
             print(f"[show_file] clear programmer failed: {e}")
 
@@ -1054,28 +1085,35 @@ def load_show(path: str | os.PathLike):
     # Bloecke LEER statt ALT -> kein halb-alter Frankenstein-Zustand. emit_events=
     # False + Suppress-Fenster: kein Doppel-Refresh, kein refresh_all-BUG-01.
     # Best-effort — der Reset selbst darf den Load NIE abbrechen.
-    _prev_suppress = getattr(state, "_suppress_emits", False)
-    state._suppress_emits = True
-    try:
-        # emit_events=False: keine Tail-Emits/refresh_all (BUG-01). blackout_output=
-        # False: kein physischer DMX-Blackout-Puls (der neue Patch-Render setzt die
-        # Werte gleich; alte Werte bleiben bis dahin stehen wie vor STAB-19b).
-        _reset_state(state, emit_events=False, blackout_output=False)
-    except Exception as e:
-        _lenient("reset-first before load error", e)
-    finally:
-        state._suppress_emits = _prev_suppress
-
-    # STAB-19b (C-Haertung): der Patch-Replace ist eine der wenigen UNGEFANGENEN
-    # Zeilen (die pfs-Bauschleife in _replace_patch_from_data ist nicht pro-Eintrag
-    # gekapselt) — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
-    # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert).
-    patch_entries = data.get("patch", [])
-    if isinstance(patch_entries, list):
+    #
+    # CDX-22: reset-first (leerer Patch) UND der neue Patch bilden EINEN
+    # Patch-Tausch — die Freigabe entpatchter Adressen darf erst am ENDE laufen,
+    # sonst nullt der Zwischenschritt mit dem leeren Patch alle alten Adressen im
+    # Live-Universe und der Output-Thread sendet den Blackout-Puls, bis der neue
+    # Patch gerendert ist.
+    with _deferred_addr_release(state):
+        _prev_suppress = getattr(state, "_suppress_emits", False)
+        state._suppress_emits = True
         try:
-            _replace_patch_from_data(state, patch_entries)
+            # emit_events=False: keine Tail-Emits/refresh_all (BUG-01). blackout_output=
+            # False: kein physischer DMX-Blackout-Puls (der neue Patch-Render setzt die
+            # Werte gleich; alte Werte bleiben bis dahin stehen wie vor STAB-19b).
+            _reset_state(state, emit_events=False, blackout_output=False)
         except Exception as e:
-            _lenient("load patch error", e)
+            _lenient("reset-first before load error", e)
+        finally:
+            state._suppress_emits = _prev_suppress
+
+        # STAB-19b (C-Haertung): der Patch-Replace ist eine der wenigen UNGEFANGENEN
+        # Zeilen (die pfs-Bauschleife in _replace_patch_from_data ist nicht pro-Eintrag
+        # gekapselt) — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
+        # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert).
+        patch_entries = data.get("patch", [])
+        if isinstance(patch_entries, list):
+            try:
+                _replace_patch_from_data(state, patch_entries)
+            except Exception as e:
+                _lenient("load patch error", e)
 
     # VCB-05: Gruppen-/Fixture-Dimmer der vorigen Show verwerfen (sonst Ghost-Dimmer).
     state.fixture_dimmers = {}

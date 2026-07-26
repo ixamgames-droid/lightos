@@ -1,5 +1,6 @@
 """Globaler App-State — hält Show-Daten und Engine-Referenzen zusammen."""
 from __future__ import annotations
+import contextlib
 import os
 import sys
 import threading
@@ -339,6 +340,13 @@ class AppState:
         # dem Span-Commit) final nullt — race-fest gegen einen nachlaufenden
         # Alt-Plan-Commit. {universe: set[addr]}.
         self._pending_release: dict[int, set] = {}
+        # CDX-22: Deferral-Fenster fuer die A3D-18-Freigabe (s.
+        # deferred_unpatched_release). > 0 = laufender MEHRSTUFIGER Patch-Tausch
+        # (Show-Load: leerer Patch -> neuer Patch); entpatchte Adressen werden
+        # dann nur in _deferred_release gemerkt und erst beim Verlassen EINMAL
+        # gegen den dann gueltigen _patched_set freigegeben.
+        self._defer_release_depth: int = 0
+        self._deferred_release: dict[int, set] = {}
         # Simple Desk = manuelle Roh-Override-Ebene (ISO-03). {universe: {ch: val}},
         # nur explizit gesetzte Kanaele. Wird im _render_frame als OBERSTE Schicht
         # angewandt (deterministisch jeden Frame) — frueher schrieb der Fader direkt
@@ -1217,6 +1225,12 @@ class AppState:
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
         old_patched = {u: set(s) for u, s in getattr(self, "_patched_set", {}).items()}
+        # CDX-22 (Safety): Snapshot der bisherigen DMX-Laser-Adressen — sie sind von
+        # der Deferral-Aufschiebung ausgenommen (Begruendung in
+        # _release_unpatched_addrs). Eigener Snapshot, damit der CDX-12-Vergleich
+        # unten (_old_le vs. frozenset-Werte) unangetastet bleibt.
+        old_laser_addrs = {u: set(s) for u, s
+                           in (getattr(self, "_laser_estop_addrs", {}) or {}).items()}
         # CDX-12 (Plan-Rebuild): Ist der Laser-NOT-AUS AKTIV und aendern sich die
         # Laser-Adressen (Fixture umadressiert/entfernt/dazu), die Ebene-2-OM-Maske
         # ZUERST auf die VEREINIGUNG aus alten und neuen Adressen erweitern — BEVOR
@@ -1249,7 +1263,8 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
-        self._release_unpatched_addrs(old_patched, new_patched_set)
+        self._release_unpatched_addrs(old_patched, new_patched_set,
+                                     never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
         # damit der GM nur dimmt und nicht Pan/Tilt/Gobo verstellt (Audit B4).
         gm_mask = self._build_gm_mask(fix_index)
@@ -1293,7 +1308,8 @@ class AppState:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
 
-    def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict):
+    def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
+                                 *, never_defer: dict | None = None):
         """A3D-18: Adressen, die vor dem Rebuild gepatcht waren, jetzt aber NICHT
         mehr (Fixture entfernt oder umadressiert), im Live-Universe auf 0 freigeben.
 
@@ -1316,7 +1332,49 @@ class AppState:
         wuerde dauerhaft wieder auferstehen. Darum werden die Adressen zusaetzlich in
         ``_pending_release`` vorgemerkt; der Render-Thread nullt sie im naechsten
         Frame-Commit (Schritt 5) NACH dem Span-Commit deterministisch nach (Rendering
-        ist single-threaded -> genau der folgende Frame konsumiert das Pending)."""
+        ist single-threaded -> genau der folgende Frame konsumiert das Pending).
+
+        CDX-22: Laeuft ein ``deferred_unpatched_release``-Fenster (mehrstufiger
+        Patch-Tausch), wird hier NICHT genullt, sondern nur gemerkt — die Freigabe
+        holt ``_flush_deferred_release`` am Ende des Fensters gegen den dann
+        gueltigen Patch nach. ``never_defer`` ({universe: addrs}) nimmt Adressen
+        davon AUS und gibt sie auch im Fenster sofort frei — der Rebuild uebergibt
+        dort die Adressen der bisherigen DMX-Laser (Safety, s. u.)."""
+        if getattr(self, "_defer_release_depth", 0) > 0:
+            store = getattr(self, "_deferred_release", None)
+            if store is None:
+                store = self._deferred_release = {}
+            # SAFETY: Laser-Adressen NIE aufschieben. Das Fenster laesst alte
+            # Adressen absichtlich auf ihrem letzten Wert stehen (kein Blackout-
+            # Puls) — waehrenddessen kennt der Plan die alten Laser-Adressen aber
+            # nicht mehr, also greift weder die Renderer-Nullung (Ebene 1) noch die
+            # OutputManager-Maske (Ebene 2) eines JETZT ausgeloesten NOT-AUS an sie.
+            # Ein Laser darf im Ladefenster nicht unerreichbar weiterstrahlen; ein
+            # kurzer Dunkel-Dip ist bei Lasern das sichere Verhalten (und war es
+            # vor CDX-22 fuer alle Fixtures).
+            urgent: dict[int, set] = {}
+            for u, old_addrs in old_patched.items():
+                addrs = set(old_addrs)
+                laser = {int(a) for a in ((never_defer or {}).get(u) or ())}
+                if laser:
+                    hit = addrs & laser
+                    if hit:
+                        urgent[u] = hit
+                    addrs -= laser
+                stale = {a for a in (addrs - set(new_patched.get(u, frozenset())))
+                         if 1 <= a <= 512}
+                if stale:
+                    store[u] = set(store.get(u, set())) | stale
+            if urgent:
+                self._release_now(urgent, new_patched)
+            return
+        self._release_now(old_patched, new_patched)
+
+    def _release_now(self, old_patched: dict, new_patched: dict):
+        """Sofort-Freigabe (Rumpf von ``_release_unpatched_addrs`` ohne Deferral):
+        entpatchte Adressen im Live-Universe nullen UND dem Render-Thread
+        vormerken. Getrennt, weil das CDX-22-Fenster denselben Pfad fuer die
+        Laser-Ausnahme und fuer den Flush am Ende braucht."""
         universes = getattr(self, "universes", None)
         pending = getattr(self, "_pending_release", None)
         if pending is None:
@@ -1333,6 +1391,53 @@ class AppState:
                     uni.set_channel(a, 0)
             # 2) dem Render-Thread vormerken (race-fest gegen Alt-Plan-Commit).
             pending[u] = set(pending.get(u, set())) | stale
+
+    @contextlib.contextmanager
+    def deferred_unpatched_release(self):
+        """CDX-22: Schiebt die A3D-18-Freigabe entpatchter Adressen bis zum ENDE
+        eines MEHRSTUFIGEN Patch-Tauschs auf (Show-Load: leerer Patch -> neuer Patch).
+
+        Warum: ``load_show`` setzt reset-first einen LEEREN Patch (``replace_patch([])``
+        via ``_reset_state``). Dessen ``_rebuild_render_plan`` sah JEDE bisher
+        gepatchte Adresse als "jetzt frei" und nullte sie SOFORT im Live-Universe —
+        der 44-Hz-Output-Thread sendet diese Nullen, bis der neue Patch geladen und
+        gerendert ist. Ergebnis: bei JEDEM Live-Show-Load blitzten die alten Adressen
+        physisch schwarz. Genau das sollte ``blackout_output=False`` verhindern, doch
+        dieser Guard ueberspringt nur den EXPLIZITEN ``universe.clear()``/
+        ``_flush_all_to_dmx()``, nicht die Freigabe aus dem Plan-Rebuild.
+
+        Im Fenster werden entpatchte Adressen nur in ``_deferred_release`` GEMERKT.
+        Beim Verlassen laeuft die Freigabe EINMAL gegen den dann gueltigen
+        ``_patched_set``:
+        * Adressen, die der neue Patch weiter belegt, bleiben unberuehrt — ihr
+          zuletzt committeter Wert steht, bis der naechste Render-Commit ihn
+          ersetzt (kein Puls).
+        * Genuin entpatchte Adressen (Fixture in der neuen Show weg/umadressiert)
+          werden weiter deterministisch freigegeben — A3D-18/CDX-17 bleiben intakt,
+          auch wenn der Patch-Tausch mitten drin wirft (``finally``).
+
+        Re-entrant (Tiefen-Zaehler); nur die AEUSSERSTE Ebene gibt frei.
+        """
+        self._defer_release_depth = getattr(self, "_defer_release_depth", 0) + 1
+        try:
+            yield
+        finally:
+            depth = getattr(self, "_defer_release_depth", 1) - 1
+            self._defer_release_depth = depth if depth > 0 else 0
+            if self._defer_release_depth == 0:
+                self._flush_deferred_release()
+
+    def _flush_deferred_release(self):
+        """CDX-22: gibt die im Deferral-Fenster gemerkten Adressen frei — aber NUR
+        die, die auch nach dem Patch-Tausch nicht mehr gepatcht sind. Delegiert an
+        ``_release_unpatched_addrs`` (Tiefe ist hier 0 -> echter Freigabe-Pfad mit
+        Sofort-Nullung + ``_pending_release``-Vormerkung fuer den Render-Thread)."""
+        deferred = getattr(self, "_deferred_release", None)
+        self._deferred_release = {}
+        if not deferred:
+            return
+        self._release_unpatched_addrs(
+            deferred, getattr(self, "_patched_set", {}) or {})
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}
@@ -1643,7 +1748,19 @@ class AppState:
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
-    def clear_programmer(self, fid: int | None = None):
+    def clear_programmer(self, fid: int | None = None, *, flush: bool = True):
+        """Leert den Programmer (global oder ein Fixture) und schreibt die
+        betroffenen Kanaele per Default sofort neu ins Live-Universe.
+
+        ``flush=False`` unterdrueckt NUR diesen DMX-Flush (CDX-22): Beim Show-Load
+        leert ``_replace_patch_from_data`` den Programmer, WAEHREND der ALTE Patch
+        noch geladen ist — der Flush schreibt dann jedes alte Fixture auf seine
+        Kanal-Defaults (Dimmer 0), und der 44-Hz-Output-Thread sendet diesen
+        Blackout-Frame physisch, bis der neue Patch geladen UND geflusht ist. Der
+        Loader flusht ohnehin direkt nach dem Programmer-Block erneut — dann gegen
+        den NEUEN Patch (jede weiter gepatchte Adresse bekommt ihren Wert bzw. ihren
+        Default, entpatchte Adressen die A3D-18-Freigabe). Der In-Memory-Clear und
+        der WEB-01-Release laufen unveraendert."""
         with self._prog_lock:
             if fid is None:
                 self.programmer.clear()
@@ -1657,7 +1774,8 @@ class AppState:
                 self.clear_remote_input()
             except Exception as e:
                 print(f"[app_state] clear_remote_input error: {e}")
-        self._flush_all_to_dmx()
+        if flush:
+            self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
 
     def get_programmer_value(self, fid: int, attribute: str, head: int = 0) -> int | None:
