@@ -89,9 +89,12 @@ AUS) gesetzt ist.
   nur ueber den Loopback-/LAN-Toggle abgesichert.
 - **Token-Rotation pro Start** (aktuell pro Setup persistiert + manuelles
   'neu erzeugen').
-- Voller **UI-Toggle-Dialog** (NET-02) fuer die beiden Settings-Flags — die Flags
-  sind persistiert und werden respektiert, die dedizierte UI-Einbindung liefert
-  die Integrationsrunde.
+- ~~Voller **UI-Toggle-Dialog** (NET-02) fuer die beiden Settings-Flags~~ ✅ **erledigt
+  2026-07-27 (CDX-24):** „Ausgabe → Web-Remote: Verbindung & Token…" mit Token,
+  Direkt-Link + Kopieren, „Token neu erzeugen" (zieht das Token auch am LAUFENDEN
+  Server nach) und der Checkbox „LAN-/Handy-Remote" (startet den laufenden Server
+  neu, damit der Bind-Wechsel sofort greift). Bis dahin hatten `regenerate_token()`
+  und `set_lan_remote_enabled()` repo-weit NUR Test-Aufrufer.
 
 ## Tests
 

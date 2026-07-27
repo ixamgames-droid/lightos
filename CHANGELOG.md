@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Web-Remote: Token und LAN-Zugriff endlich bedienbar (CDX-24)
+
+#### Hinzugefügt
+
+- **Neuer Dialog „Web-Remote: Verbindung & Token…" im Menü *Ausgabe*.** Er zeigt
+  Adresse, Token und den Direkt-Link fürs Handy (mit „Link kopieren") und
+  enthält die beiden Sicherheits-Bedienelemente, die die Anleitung schon lange
+  beschreibt, die es aber nie zu klicken gab:
+  - **„Token neu erzeugen"** macht alle bisherigen Links und angemeldeten Geräte
+    sofort ungültig — auch am **laufenden** Server, ohne Neustart. Bereits
+    verbundene Geräte werden dabei aktiv getrennt: ein schon offener Draht zum
+    Handy lief bisher nicht mehr durch die Zugangsprüfung und hätte sonst
+    weitergesteuert, obwohl gerade „alle Geräte ungültig" gedrückt wurde.
+  - **„LAN-/Handy-Remote"** schaltet zwischen „im WLAN erreichbar" und „nur
+    dieser PC" um. Läuft das Web-Interface gerade, startet LightOS es dabei
+    automatisch neu, damit „aus" auch wirklich sofort „aus" heisst.
+- Der Dialog ersetzt die bisherige Info-Box beim Einschalten und ist zusätzlich
+  jederzeit über das Menü erreichbar — ein kompromittiertes Token liess sich
+  während einer laufenden Show sonst praktisch nicht wechseln.
+
+
 ### 2026-07-27 — Ein EFX kann auf einem einzelnen Kopf laufen (FM-HEADLAYOUT A3)
 
 #### Hinzugefügt

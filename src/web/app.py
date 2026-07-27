@@ -182,6 +182,66 @@ def refresh_token(app) -> None:
         print(f"[web] refresh_token error: {e}")
 
 
+def is_running() -> bool:
+    """Laeuft der Web-Server gerade? CDX-24: die UI darf das NICHT am QAction-
+    Haken ablesen — der kann vom echten Zustand abweichen (z. B. wenn ein Fehler
+    nach erfolgreichem Start den Haken zuruecksetzt), und daran haengt die
+    Entscheidung, ob ein Bind-Wechsel einen Neustart braucht (NET-09)."""
+    return bool(_running)
+
+
+def refresh_running_token() -> bool:
+    """CDX-24: ``refresh_token`` fuer den LAUFENDEN Server, ohne dass ein Aufrufer
+    an das modulprivate ``_flask_app`` muss.
+
+    Noetig, weil die UI nach ``remote_settings.regenerate_token()`` sonst nichts
+    ausrichtet: der Gate liest das Token aus ``app.config`` (dort landet es nur in
+    ``create_app``), der laufende Server wuerde also weiter den ALTEN ``?k=``-Link
+    akzeptieren. Gibt True zurueck, wenn ein Server lief und nachgezogen wurde.
+    """
+    app = _flask_app
+    if app is None:
+        return False
+    refresh_token(app)
+    disconnect_all_clients()
+    return True
+
+
+def disconnect_all_clients() -> int:
+    """CDX-24: alle offenen Socket.IO-Verbindungen trennen. Gibt die Anzahl zurueck.
+
+    Ohne das bleibt die Token-Rotation ein halbes Versprechen: das
+    ``before_request``-Gate sperrt zwar jede HTTP-Anfrage der alten Epoche, aber
+    ein SCHON VERBUNDENER WebSocket laeuft nicht mehr durch dieses Gate — und die
+    Event-Handler (``go``/``back``/…) pruefen einzeln gar nichts. Ein Handy, das
+    vor der Rotation verbunden war, koennte also weitersteuern, obwohl der Nutzer
+    gerade „alle bisherigen Geraete ungueltig machen" gedrueckt hat.
+
+    Defensiv: ein Fehler hier darf die Rotation selbst nie kippen.
+    """
+    sio = _socketio
+    if sio is None:
+        return 0
+    n = 0
+    try:
+        server = getattr(sio, "server", None)
+        manager = getattr(server, "manager", None) if server is not None else None
+        if manager is None:
+            return 0
+        # Teilnehmer-Snapshot ZUERST materialisieren — wir trennen waehrend der
+        # Iteration, das veraendert die zugrundeliegende Struktur.
+        sids = [sid for sid, _eio in list(manager.get_participants("/", None))]
+        for sid in sids:
+            try:
+                server.disconnect(sid, namespace="/")
+                n += 1
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"[web] disconnect_all_clients error: {e}")
+    return n
+
+
 def _register_auth(app):
     """NET-01: Token-Gate. Alle Routen ausser der Allowlist ('/', statische
     Assets) verlangen eine authentisierte Session. Die '/'-Route macht den
@@ -339,6 +399,13 @@ def _register_socketio(sio):
         try:
             if session.get("authed") is not True:
                 return False
+            # CDX-24: auch die EPOCHE pruefen, genau wie das HTTP-Gate. Sonst
+            # duerfte eine Session, die vor einer Token-Rotation authentisiert
+            # wurde, danach noch neu verbinden — die Rotation soll aber ALLE
+            # bisherigen Anmeldungen entwerten.
+            from src.web import remote_settings
+            if session.get("epoch") != remote_settings.get_auth_epoch():
+                return False
         except Exception as e:
             print(f"[web] socket connect gate error: {e}")
             return False
@@ -429,8 +496,19 @@ def stop_server():
     # thread-safe und unterbricht ``serve_forever()``; ``server_close()`` gibt den
     # Listen-Socket frei -> :5000 ist SOFORT beim Toggle 'aus' frei (frueher blieb
     # er bis App-Ende offen). Idempotent + fehlertolerant.
-    global _running, _server, _thread
+    global _running, _server, _thread, _flask_app, _socketio
     _running = False
+    # CDX-24 (Safety): BESTEHENDE Verbindungen ZUERST kappen — `server_close()`
+    # gibt nur den LISTEN-Socket frei. Werkzeugs `ThreadedWSGIServer` laeuft mit
+    # `daemon_threads = True`, deshalb sammelt `ThreadingMixIn` seine Handler-
+    # Threads gar nicht ein und joint beim Schliessen nichts: ein bereits auf
+    # WebSocket hochgestufter Client lief bisher UNBEGRENZT weiter und konnte GO,
+    # STOP, Fader und Blackout schicken, obwohl der Nutzer das Web-Interface
+    # ausgeschaltet bzw. auf „nur dieser PC" gestellt hatte. Genau der Notfall-
+    # Pfad („Handy weg", „Token kompromittiert") hielt also nicht.
+    # Reihenfolge ist zwingend: nach einem `start_server()` zeigt `_socketio` auf
+    # die NEUE Instanz, die alten Clients waeren dann gar nicht mehr adressierbar.
+    disconnect_all_clients()
     srv, _server = _server, None
     if srv is not None:
         try:
@@ -444,3 +522,8 @@ def stop_server():
     t, _thread = _thread, None
     if t is not None and t.is_alive():
         t.join(timeout=3.0)
+    # CDX-24: Globals mit abraeumen — sonst meldet `refresh_running_token()` auch
+    # nach dem Ausschalten noch Erfolg (`_flask_app` blieb gesetzt), und der Dialog
+    # behauptet „Neues Token aktiv" fuer einen Server, der gar nicht laeuft.
+    _flask_app = None
+    _socketio = None

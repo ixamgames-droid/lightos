@@ -80,8 +80,20 @@ def save_settings(settings: dict) -> None:
             if k in settings:
                 cur[k] = settings[k]
         all_prefs[_KEY] = cur
-        with open(_prefs_path(), "w", encoding="utf-8") as f:
+        # CDX-24: ATOMAR schreiben (tmp + os.replace). Vorher truncate+dump: der
+        # Auth-Gate liest diese Datei bei JEDER HTTP-Anfrage aus dem Web-Thread,
+        # waehrend der Qt-Thread beim Rotieren schreibt. Im Schreibfenster sah der
+        # Gate eine leere/halbe Datei, fiel auf die DEFAULTS zurueck und damit auf
+        # `auth_epoch: 0` — ausgerechnet waehrend der Rotation waere er also
+        # fail-OPEN fuer jede Session der Epoche 0 gewesen. `os.replace` ist auf
+        # Windows wie POSIX atomar, es gibt kein Fenster mit Teil-Inhalt mehr.
+        path = _prefs_path()
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(all_prefs, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
     except Exception as e:
         print(f"[remote_settings] save error: {e}")
 
@@ -112,13 +124,30 @@ def get_auth_epoch() -> int:
 
 def regenerate_token() -> str:
     """Erzeugt ein NEUES Token, persistiert es und gibt es zurueck ('Token neu
-    erzeugen'). Wirkt SOFORT am laufenden Server: der Handshake liest das Token
-    frisch (kein Neustart noetig), und die mit-erhoehte ``auth_epoch`` macht alle
-    bestehenden authentisierten Web-Sessions ungueltig (der Gate vergleicht die
-    Session-Epoche gegen die aktuelle). Alte am Handy gespeicherte ``?k=``-Links
-    (mit dem alten Token) werden damit ebenfalls abgewiesen."""
+    erzeugen').
+
+    Die mit-erhoehte ``auth_epoch`` macht alle bestehenden authentisierten
+    Web-Sessions sofort ungueltig (das Gate vergleicht die Session-Epoche gegen
+    die aktuelle) — das wirkt allein durch das Persistieren.
+
+    ⚠️ Fuer das TOKEN selbst gilt das NICHT automatisch: der Handshake liest es aus
+    ``app.config['LIGHTOS_REMOTE_TOKEN']``, und dort landet es nur beim
+    ``create_app``. Ein laufender Server akzeptiert also weiter den ALTEN
+    ``?k=``-Link, bis jemand ``src.web.app.refresh_running_token()`` ruft. Die UI
+    (Ausgabe → „Web-Remote: Verbindung & Token…") tut beides zusammen; wer die
+    Rotation programmatisch ausloest, muss es ebenfalls tun.
+    (Der frueher hier stehende Satz „wirkt SOFORT am laufenden Server" war falsch —
+    CDX-24.)"""
     tok = _new_token()
     save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
+    # CDX-24: GEGENPROBE. `save_settings` schluckt jeden Schreibfehler (Datei
+    # gesperrt, Profil read-only, Platte voll) und loggt nur — ohne diese Pruefung
+    # gaebe die Funktion das neue Token zurueck, obwohl gar nichts rotiert wurde,
+    # und die UI meldete „alte Links sind ungueltig", waehrend sie es nicht sind.
+    if get_token() != tok:
+        raise RuntimeError(
+            "Token-Rotation fehlgeschlagen: die Einstellungen liessen sich nicht "
+            "speichern. Die bisherigen Links bleiben gueltig.")
     return tok
 
 
