@@ -7,6 +7,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Köpfe im Gruppen-Raster selbst anordnen (FM-HEADLAYOUT Slice 3)
+
+#### Hinzugefügt
+
+- **Die Köpfe eines Mehrkopf-Strahlers lassen sich jetzt von Hand ins Raster
+  legen — waagerecht oder hochkant.** Neuer Button **„Köpfe einzeln → Raster ▾"**
+  im Fixture-Gruppen-Editor mit „als Zeile (waagerecht)", „als Spalte
+  (hochkant)" und „Köpfe zusammenfassen (eine Zelle)". Bisher konnte man ein
+  Mehrkopf-Gerät nur als **eine** ganze Zelle aufs Raster ziehen; Kopf-Zellen
+  entstanden ausschließlich automatisch beim Patchen als 1×N-Reihe. Damit folgt
+  das Raster jetzt dem realen Rig-Aufbau (Hydrabeam hochkant an der Traverse vs.
+  Spider-Bar waagerecht), und die Köpfe bleiben einzeln verschiebbar (Drag),
+  tauschbar und entfernbar (Rechtsklick).
+- Der Streifen bleibt **zusammenhängend**: passt er ab der Startzelle nicht mehr
+  ins Raster, rutscht der Start zurück statt hinten abzuschneiden. Ist das Raster
+  für die gewünschte Richtung zu klein (die Auto-Kopf-Matrix hat nur **eine**
+  Reihe), **wachsen Reihen bzw. Spalten mit** — sonst wäre ein „hochkant"-Wunsch
+  über die Ausweichregel wieder als Reihe gelandet, also das Gegenteil der
+  Anweisung.
+- Die Raster-Invarianten bleiben: kein stilles Überschreiben fremder Zellen (ein
+  Kopf weicht auf die nächste freie aus), kein Duplikat desselben Geräts, und bei
+  vollem Raster wird nichts zerstört (mit Angabe, wie viele Köpfe gesetzt wurden).
+  Kopfzahl kommt aus derselben Quelle wie die automatische Kopf-Matrix
+  (`color_head_count`), damit Hand- und Auto-Anlage nicht auseinanderdriften.
+
+#### Behoben
+
+- **Ein Mehrkopf-Gerät konnte sich beim Ablegen selbst blockieren.** Füllten
+  seine eigenen Kopf-Zellen das Raster komplett (genau die Form der 1×N-Auto-
+  Kopf-Matrix), scheiterte der Drop des ganzen Geräts still — die Zielsuche
+  zählte die eigenen Zellen als belegt, obwohl der Drop sie ohnehin freigibt.
+  Eigene Zellen gelten jetzt als frei; fremde blockieren weiterhin. Drop-Vorschau
+  und tatsächliche Platzierung bleiben dabei deckungsgleich.
+- Tests `tests/test_fm_headlayout_slice3_head_cells.py` (24 Fälle: Streifen-
+  Geometrie in beiden Richtungen, Start-Rückschub, Raster-Wachstum,
+  Kollisionsschutz, Duplikat-Freiheit, Teilplatzierung, Zusammenfassen in
+  Raster-Reihenfolge, Selbstblockade-Regression, View-Verdrahtung mit echtem
+  Spider vs. Einzelkopf-PAR).
+
 ### 2026-07-27 — „Mehrkopf-Programmierung" steuert die Programmer-Farbregler (FM-HEADLAYOUT Slice 2)
 
 #### Geändert
