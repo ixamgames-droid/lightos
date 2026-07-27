@@ -1906,6 +1906,19 @@ class AppState:
         Scope -> alles speichern (Alt-Verhalten, z. B. wenn nichts gewaehlt ist)."""
         return list(self.selected_fids)
 
+    def active_scope_heads(self) -> dict:
+        """FM-HEADLAYOUT A2: Kopf-Einschraenkung des aktiven Speicher-Scopes,
+        ``{fid: {head, ...}}`` — NUR fuer Geraete, bei denen wirklich einzelne
+        Koepfe gewaehlt sind. Ein ganz gewaehltes Geraet taucht NICHT auf (dort
+        gelten alle Koepfe), leeres Dict = keine Einschraenkung.
+
+        Gegenstueck zu ``active_scope_fids``: wer den Programmer beim Speichern auf
+        die Auswahl reduziert, soll dieselbe Feinheit anwenden — sonst landen bei
+        gewaehltem Kopf 2 auch die Werte der anderen Koepfe still im Snap."""
+        return {fid: set(hs)
+                for fid, hs in (getattr(self, "_selected_heads", None) or {}).items()
+                if hs and fid in self.selected_fids}
+
     # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
     def _group_lookup(self, name_or_ref):
         """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe.

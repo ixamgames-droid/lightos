@@ -784,9 +784,11 @@ class ProgrammerView(QWidget):
                                    "Programmer ist leer — nichts zu speichern.")
             return
         try:
-            from src.ui.views.snap_file_panel import ChannelSelectDialog
+            from src.ui.views.snap_file_panel import (
+                ChannelSelectDialog, _scope_heads)
             scope = state.active_scope_fids() if hasattr(state, "active_scope_fids") else None
-            dlg = ChannelSelectDialog(prog, self, scope_fids=scope)
+            dlg = ChannelSelectDialog(prog, self, scope_fids=scope,
+                                      scope_heads=_scope_heads(state))
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)
@@ -2070,12 +2072,25 @@ class ProgrammerView(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Position Tool", str(e))
 
+    def _feed_fan_targets(self, ft):
+        """FM-HEADLAYOUT A2: Ziele ins Fächer-Werkzeug geben.
+
+        Mit KOPF-Auswahl fächert es über die Köpfe (die 4 Köpfe einer PAR-Bar
+        bekommen einen Verlauf, statt alle denselben Wert) — sonst wie bisher über
+        ganze Geräte. Eine Zell-Liste, die nur ganze Geräte enthält, ist dabei
+        gleichwertig zur fid-Liste; der Umweg schadet also nie."""
+        cells = getattr(self, "_selected_cells", None)
+        if cells and hasattr(ft, "set_cells"):
+            ft.set_cells(cells)
+        else:
+            ft.set_selection(self._selected_fids)
+
     def _open_fan_tool(self):
         try:
             from src.ui.widgets.fan_tool import FanTool
             dlg = _ToolDialog("Fan Tool", self)
             ft = FanTool()
-            ft.set_selection(self._selected_fids)
+            self._feed_fan_targets(ft)
             dlg.set_content(ft)
             dlg.exec()
         except Exception as e:
@@ -2086,7 +2101,7 @@ class ProgrammerView(QWidget):
             from src.ui.widgets.fan_tool import FanTool, FAN_ATTRIBUTES
             dlg = _ToolDialog(f"Fan Tool - {group_name}", self)
             ft = FanTool()
-            ft.set_selection(self._selected_fids)
+            self._feed_fan_targets(ft)
             # Default attribute fuer die Gruppe
             default_attr = {
                 "Intensity": "intensity",

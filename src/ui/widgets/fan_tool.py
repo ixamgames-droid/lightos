@@ -122,13 +122,44 @@ class FanTool(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._selected_fids: list[int] = []
+        # FM-HEADLAYOUT A2: Ziele koennen KOEPFE sein. Parallel-Liste zu
+        # _selected_fids: je Eintrag der Kopf-Index oder None (= ganzes Geraet).
+        # So faechert der Fan ueber die 4 Koepfe EINER Bar statt nur ueber Geraete.
+        self._selected_heads: list = []
         self._setup_ui()
         self._refresh_table()
 
     def set_selection(self, fids: list[int]):
-        """Setze welche Fixture-IDs benutzt werden sollen."""
+        """Setze welche Fixture-IDs benutzt werden sollen (ganze Geraete)."""
         self._selected_fids = list(fids)
+        self._selected_heads = [None] * len(self._selected_fids)
         self._refresh_table()
+
+    def set_cells(self, cells):
+        """FM-HEADLAYOUT A2: Ziele als ZELLEN setzen — ``"7"`` (ganzes Geraet)
+        oder ``"7:2"`` (Kopf 3), dieselbe Syntax wie Gruppen-/Auswahl-Zellen.
+
+        Damit faechert das Werkzeug ueber Koepfe: die 4 Koepfe einer PAR-Bar
+        bekommen einen Verlauf, statt dass alle denselben Wert erhalten. Reine
+        fid-Aufrufer bleiben ueber ``set_selection`` unveraendert gueltig."""
+        from src.core.group_cells import parse_group_cell
+        fids: list[int] = []
+        heads: list = []
+        for c in cells or []:
+            fid, head = parse_group_cell(c)
+            if fid is None:
+                continue
+            fids.append(fid)
+            heads.append(head)
+        self._selected_fids = fids
+        self._selected_heads = heads
+        self._refresh_table()
+
+    def _head_of(self, i: int):
+        """Kopf-Index des i-ten Ziels (None = ganzes Geraet). Defensiv, falls die
+        Parallel-Liste aus einem Alt-Pfad kuerzer ist als die fid-Liste."""
+        heads = getattr(self, "_selected_heads", None) or []
+        return heads[i] if i < len(heads) else None
 
     # ── UI ───────────────────────────────────────────────────────────────────
 
@@ -241,7 +272,17 @@ class FanTool(QWidget):
             state = get_state()
             # bevorzugt die aktuelle Programmer-Auswahl (wie Position-/Spider-Tool),
             # erst dann Fallback auf bereits angefasste Programmer-Geraete.
+            # A2: die ZELL-Auswahl gewinnt, damit „Neu laden" eine Kopf-Auswahl
+            # nicht auf ganze Geraete zurueckfallen laesst.
+            cells = None
+            getter = getattr(state, "get_selected_cells", None)
+            if callable(getter):
+                cells = list(getter() or [])
+            if cells:
+                self.set_cells(cells)
+                return
             self._selected_fids = list(state.get_selected_fids()) or list(state.programmer.keys())
+            self._selected_heads = [None] * len(self._selected_fids)
             self._refresh_table()
         except Exception as e:
             print(f"[fan_tool] reload error: {e}")
@@ -270,7 +311,14 @@ class FanTool(QWidget):
         self._table.setRowCount(len(fids))
         for i, fid in enumerate(fids):
             self._table.setItem(i, 0, QTableWidgetItem(str(fid)))
-            self._table.setItem(i, 1, QTableWidgetItem(labels.get(fid, "?")))
+            # A2: Kopf-Ziele als "Label · K2" ausweisen — sonst stuenden vier
+            # gleich benannte Zeilen untereinander und man wuesste nicht, welcher
+            # Wert auf welchen Kopf geht.
+            _h = self._head_of(i)
+            _name = labels.get(fid, "?")
+            if _h is not None:
+                _name = f"{_name} · K{int(_h) + 1}"
+            self._table.setItem(i, 1, QTableWidgetItem(_name))
             v = values[i] if i < len(values) else 0
             it = QTableWidgetItem(str(v))
             it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -303,7 +351,11 @@ class FanTool(QWidget):
             return
         try:
             state = get_state()
-            for fid, val in zip(self._selected_fids, values):
-                state.set_programmer_value(fid, attr, val)
+            for i, (fid, val) in enumerate(zip(self._selected_fids, values)):
+                head = self._head_of(i)
+                # A2: Kopf-Ziel -> genau dieser Kopf ("attr#N"); ganzes Geraet
+                # unveraendert wie bisher (head=0 = einfacher Schluessel).
+                state.set_programmer_value(fid, attr, val,
+                                           head=int(head) if head is not None else 0)
         except Exception as e:
             print(f"[fan_tool] apply error: {e}")

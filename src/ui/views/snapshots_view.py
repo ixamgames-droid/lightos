@@ -359,13 +359,15 @@ class SnapshotsView(QWidget):
 
             # Kanal-Auswahl: welche Attribut-Gruppen sollen gespeichert werden?
             try:
-                from src.ui.views.snap_file_panel import ChannelSelectDialog
+                from src.ui.views.snap_file_panel import (
+                    ChannelSelectDialog, _scope_heads)
                 # Scope wie an den anderen Call-Sites (snap_file_panel/programmer_view/
                 # main_window) uebergeben: nur die aktuell ausgewaehlten Geraete kommen
                 # in den Snapshot. Sonst landen liegengebliebene Programmer-Werte zuvor
                 # gewaehlter Gruppen mit im Snapshot ("Color speichert Dimmer mit").
                 scope = state.active_scope_fids() if hasattr(state, "active_scope_fids") else None
-                chan_dlg = ChannelSelectDialog(vals, self, scope_fids=scope)
+                chan_dlg = ChannelSelectDialog(vals, self, scope_fids=scope,
+                                           scope_heads=_scope_heads(state))
                 if chan_dlg.exec() != QDialog.DialogCode.Accepted:
                     return
                 vals = chan_dlg.filter_programmer(vals)
