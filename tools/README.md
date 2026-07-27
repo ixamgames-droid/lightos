@@ -15,9 +15,7 @@
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
-| `build_apc_probier_show.py` | APC-PROBIER-SHOW — Testfeld fuer Davids reales Setup (4 PAR + 2 MH + APC mini). |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
-| `build_custom_path_demo.py` | DEMO: Custom Paths + EFX-Live-Steuerung + Keyboard-Mapping (2026-06-11). |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
 | `build_demo_show.py` | Erzeugt eine komplett vorprogrammierte Demo-Show (.lshow) fuer die 3 RGBW-PARs |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
@@ -36,21 +34,17 @@
 | `build_laser_gobo_test.py` | „Laser Gobo Test 2026" — Test-Show mit Laser + Gobo-Moving-Heads + PARs + Nebel |
 | `build_live_demo_show.py` | Demo-Show fuer das LIVE-PROGRAMMING der RGB-Matrix (Phase 7 der Matrix-Initiative). |
 | `build_live_edit_show.py` | LIVE-EDIT-SHOW — vordefinierte Effekte live einmappen & bearbeiten (Quadranten). |
-| `build_master_demo_show.py` | MASTER-DEMO-SHOW — „alles, was die Show jetzt kann", auf mehrere Banks verteilt. |
 | `build_mega_arena_2026.py` | MEGA ARENA SHOW 2026 — die grosse Hardstyle-Arena-Demo auf einem 4-Trassen-Rig. |
 | `build_movinghead_show.py` | LEIT-DEMO-SHOW: Moving Heads + PARs + APC mini (Moving-Head-Initiative). |
 | `build_musik_show_2026.py` | MUSIK SHOW 2026 — Auto-Lichtshow, die zur Musik im BPM-Takt mitläuft. |
 | `build_neue_demo_show.py` | NEUE DEMO 2026 — Quadranten-Layout + echtes PLAYBACK, alles auf einer Show. |
 | `build_party_demo_show.py` | PARTY DEMO 2026 — BPM-getaktete Party-Show + Musik-Playlist. |
-| `build_practice_show.py` | PRAXIS-DEMO-SHOW (P13): Praxisvalidierung aller neuen Funktionen der |
-| `build_profi_show.py` | PROFI-MODUS-SHOW — sektioniertes Quadranten-Layout (APC-Probier To-Do #11). |
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |
 | `build_tutorial_matrix_show.py` | TUTORIAL_MATRIX — Begleit-Show zur bebilderten Schritt-fuer-Schritt-Anleitung. |
 | `build_uxtest3_full.py` | UXTEST-3 „Full Rig" — 30-Fixture-Test-Show für den UI-Audit (Davids Auftrag 2026-07-15). |
 | `build_validated_demo.py` | Beispiel-/Proof-Show über die ShowBuilder-DSL — baut eine kleine, ECHTE Show, |
 | `build_vc_elements_showcase.py` | VC-Elemente-Schaukasten: legt JEDEN der 15 VC-Widget-Typen einmal beschriftet |
-| `build_vc_test_2026.py` | VC-TEST-SHOW 2026 — Rig-Positionen + Gruppen + sofort leuchtende Test-Effekte |
 | `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt JEDEN der 18 VC-Widget-Typen einmal |
 | `capture_hochzeit_tempo_guide.py` | Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung. |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |
@@ -79,11 +73,18 @@
 
 Begruendungen: [tools/_archiv/README.md](_archiv/README.md).
 
+- `_archiv/_bootstrap.py`
 - `_archiv/_shot_matrix_group_scope.py`
 - `_archiv/_shot_matrix_group_scope_live.py`
+- `_archiv/build_apc_probier_show.py`
+- `_archiv/build_custom_path_demo.py`
 - `_archiv/build_hardstyle_vc.py`
+- `_archiv/build_master_demo_show.py`
+- `_archiv/build_practice_show.py`
+- `_archiv/build_profi_show.py`
 - `_archiv/build_snaps_show.py`
 - `_archiv/build_stage_show.py`
+- `_archiv/build_vc_test_2026.py`
 - `_archiv/diag_hardstyle.py`
 - `_archiv/diag_movers.py`
 - `_archiv/patch_stage_show_pages.py`

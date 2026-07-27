@@ -4,13 +4,12 @@ Laedt VC_Test_2026.lshow, startet 'MH Kreis' + 'Spider Kreis', rendert Frames un
 zeigt, welche DMX-Kanaele sich aendern. So trennt sich Engine-Bug (Kanaele aendern
 sich NICHT) von Hardware/Adresse/Modus (Kanaele aendern sich, Geraet folgt nicht).
 
-Aufruf: venv\Scripts\python.exe tools\diag_movers.py
+Aufruf: venv\Scripts\python.exe tools\_archiv\diag_movers.py
 """
 from __future__ import annotations
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["LIGHTOS_SHOW_DB"] = os.path.join(os.environ.get("TEMP", "."), "lightos_vctest.db")
 os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
@@ -23,7 +22,7 @@ from src.core.app_state import get_state, get_channels_for_patched
 from src.core.engine.function_manager import get_function_manager
 from src.core.show.show_file import load_show
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+OUT = os.path.join(_bootstrap.REPO_ROOT,
                    "shows", "VC_Test_2026.lshow")
 ok, msg = load_show(OUT)
 print("Load:", ok, msg)

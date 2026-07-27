@@ -60,6 +60,51 @@ class DbIsolationLintTest(unittest.TestCase):
             "LIGHTOS_SHOW_DB setzen; echte Ausnahmen in die WHITELIST dieses Tests "
             f"mit Begruendung): {offenders}"))
 
+    def test_archived_state_touching_tools_are_isolated(self):
+        """tools/_archiv/ ist NICHT mehr generell ausgenommen (TOOLS-ALTGEN, 2026-07-27).
+
+        Bis der Pfad-Bootstrap kam, waren die archivierten Skripte gar nicht
+        startbar (Repo-Root fehlte auf ``sys.path``) — die Ausnahme war deshalb
+        folgenlos. Seit ``tools/_archiv/_bootstrap.py`` laufen sie wieder, also
+        lebt auch der Show-DB-Footgun wieder: fuenf von ihnen fassen den
+        App-State ohne eigenes ``import _gen_env`` an. Der Bootstrap zieht
+        ``_gen_env`` inzwischen selbst mit, ``import _bootstrap`` zaehlt hier
+        also als Isolation — dieses Gate haelt genau das fest.
+        """
+        archiv = os.path.join(TOOLS, "_archiv")
+        if not os.path.isdir(archiv):
+            self.skipTest("tools/_archiv/ existiert nicht")
+        offenders = []
+        for name in sorted(os.listdir(archiv)):
+            if not name.endswith(".py") or name == "_bootstrap.py":
+                continue
+            path = os.path.join(archiv, name)
+            if not os.path.isfile(path):
+                continue
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+            if not STATE_API.search(text):
+                continue
+            if ISOLATION.search(text) or re.search(r"^\s*import _bootstrap\b", text, re.M):
+                continue
+            offenders.append(name)
+        self.assertEqual(offenders, [], (
+            "Diese tools/_archiv/-Skripte fassen den App-State ohne Isolation an. "
+            "Fix: `import _bootstrap` (zieht _gen_env mit) oder direkt "
+            f"`import _gen_env`: {offenders}"))
+
+    def test_bootstrap_pulls_in_gen_env(self):
+        """Der Archiv-Bootstrap MUSS _gen_env mitziehen, sonst traegt das Gate oben nicht."""
+        boot = os.path.join(TOOLS, "_archiv", "_bootstrap.py")
+        if not os.path.isfile(boot):
+            self.skipTest("tools/_archiv/_bootstrap.py existiert nicht")
+        with open(boot, "r", encoding="utf-8") as f:
+            text = f.read()
+        self.assertTrue(
+            re.search(r"^\s*import _gen_env\b", text, re.M),
+            "_bootstrap.py muss `import _gen_env` enthalten — sonst laufen die "
+            "wieder startbaren Archiv-Skripte auf der echten data/current_show.db")
+
     def test_whitelist_entries_still_exist(self):
         ghosts = [n for n in WHITELIST if not os.path.isfile(os.path.join(TOOLS, n))]
         self.assertEqual(ghosts, [], f"Whitelist-Eintraege ohne Datei (aufraeumen): {ghosts}")

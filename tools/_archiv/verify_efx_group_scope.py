@@ -5,12 +5,12 @@ Gruppe und eine UNGEBUNDENE (= so liegen bestehende/alte EFX in echten Shows vor
 weil es keinen 'Speichern'-Button gibt). Treibt die ECHTE EfxView(follow_selection)
 + echten AppState + echte Gruppen-DB (kein Mock) und liest die wirkliche Liste.
 
-Aufruf:  venv/Scripts/python.exe tools/verify_efx_group_scope.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/verify_efx_group_scope.py
 """
 from __future__ import annotations
 import os, sys, json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")

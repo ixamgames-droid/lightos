@@ -18,15 +18,14 @@ und alle neuen Virtual-Console-Fenster-Widgets (Chase-Liste, Chase-Builder, XY-P
 Universell: Track-Tasten Clear/Stop All/Blackout/Tap; Fader F6 Dimmer, F7 Speed,
 F9 Grand Master.
 
-Aufruf:  venv/Scripts/python.exe tools/build_master_demo_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_master_demo_show.py
 Erzeugt: shows/Master_Demo.lshow
 """
 from __future__ import annotations
 import os
-import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -52,7 +51,7 @@ from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_color_list import VCColorList
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Master_Demo.lshow")
 TRACK0 = 100
 

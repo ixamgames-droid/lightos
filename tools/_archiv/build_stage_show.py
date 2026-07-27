@@ -27,19 +27,18 @@ NEUES, intuitives Layer-Prinzip (überarbeitet 2026-06-02):
       F8    = Matrix-Master (Helligkeit der Matrix-Effekte)
       F9    = GRAND MASTER
 
-Aufruf:  venv/Scripts/python.exe tools/build_stage_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_stage_show.py
 
 WICHTIG (2026-06-02): Die ausgelieferte shows/Buehnen_Show.lshow wurde NACH der
-Generierung mit tools/patch_stage_show_pages.py auf ein ZWEI-SEITEN-Layout
+Generierung mit tools/_archiv/patch_stage_show_pages.py auf ein ZWEI-SEITEN-Layout
 (VC-Banks) umgebaut und enthaelt inzwischen eine vom User gepflegte Library
 (Farb-Snaps). Dieser Generator erzeugt nur das EINSEITIGE Grund-Layout OHNE
 Library. Nicht blind neu generieren -> sonst gehen die Farb-Seite (Bank 2,
 Fader 1-4 = RGBW) und die Library verloren. Nach einem Neu-Bau jeweils
-tools/patch_stage_show_pages.py erneut ausfuehren.
+tools/_archiv/patch_stage_show_pages.py erneut ausfuehren.
 """
 import os
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -59,7 +58,7 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Buehnen_Show.lshow")
 
 state = get_state()

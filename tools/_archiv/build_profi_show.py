@@ -20,15 +20,14 @@ beliebig komplex für Profis":
   Parameter wirken auf den zuletzt gestarteten Effekt, function_id=None).
 
 Setup: APC mini mk2 + 4 PAR (ZQ01424) + 2 MH (ZQ02001).
-Aufruf:  venv/Scripts/python.exe tools/build_profi_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_profi_show.py
 Erzeugt: shows/Profi_Modus.lshow
 """
 from __future__ import annotations
 import os
-import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -52,7 +51,7 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Profi_Modus.lshow")
 TRACK0 = 100
 

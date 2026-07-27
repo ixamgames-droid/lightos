@@ -1,6 +1,7 @@
 # APC Probier-Show — Testfeld & Offene Punkte
 
-> **Show:** `shows/APC_Probier.lshow` · **Generator:** `tools/build_apc_probier_show.py`
+> **Show:** `shows/_archiv/APC_Probier.lshow` · **Generator:** `tools/_archiv/build_apc_probier_show.py`
+> _(beide archiviert — TOOLS-ALTGEN 2026-07-27; dieses Dokument ist ein abgeschlossenes Test-Log.)_
 > **Stand:** 2026-06-11 · **Hardware:** Akai APC mini (mk2) + 4× PAR (ZQ01424, 8ch RGBW) + 2× Moving Head (ZQ02001, 11ch)
 >
 > Zweck: ausprobieren, ob sich die Befehle so auf dem APC bauen lassen, wie wir
@@ -161,7 +162,7 @@ Universell auf **jeder** Seite:
    das **Feedback-Fenster** (#6) wären die UI-Krönung.
 
 11. ~~**Nächste Demo: sektioniertes APC-Layout („Profi-Modus").**~~ ✅ **erledigt
-   2026-06-12.** `shows/Profi_Modus.lshow` (Generator `tools/build_profi_show.py`,
+   2026-06-12.** `shows/_archiv/Profi_Modus.lshow` (Generator `tools/_archiv/build_profi_show.py`,
    Doku [PROFI_MODUS.md](PROFI_MODUS.md)): 4×4 Farben (Programmer) · 4×4 Effekte
    (**exklusiv**, nur einer) · 4×4 Attribute des **aktiven** Effekts · 4×4 Sonstiges.
    Die Fader F1–F3 (FX-Speed/Master/Param) sind **nicht** fest gebunden → wirken

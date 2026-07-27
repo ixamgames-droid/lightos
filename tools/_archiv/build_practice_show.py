@@ -24,15 +24,14 @@ Dogfooding der neuen Features:
   7 SPECIALS   Blackout/Stop/Clear/Tap/Musik-BPM + Beat-Chaser + MH-Reset
   8 TEST       White-Kanal-Vergleich, Slider-Sync-, Live-View-, Ordner-Tests
 
-Aufruf:  venv/Scripts/python.exe tools/build_practice_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_practice_show.py
 Erzeugt: shows/Praxis_Demo.lshow + Selbstverifikation (Exit != 0 bei Fehler).
 """
 from __future__ import annotations
 import os
-import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -55,7 +54,7 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Praxis_Demo.lshow")
 
 DEVICE = "mk2"
