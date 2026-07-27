@@ -61,6 +61,31 @@ def dmx_to_angle_deg(dmx: float, zero_dmx: float = 128.0,
     return (dmx - zero_dmx) / 128.0 * half
 
 
+# Render-Typen, deren 2D-Glyph einen RICHTUNGS-gedrehten Strahl zeichnet.
+# Muss zu den beam-zeichnenden Zweigen des FixtureRenderer passen.
+_BEAM_DIRECTED_TYPES = frozenset({"moving_head", "scanner", "mover_bar"})
+
+
+def _has_pan_tilt(fixture, render_type: str | None = None) -> bool:
+    """Soll die Info-Box eine Pan/Tilt-Zeile zeigen?
+
+    Frueher entschied ein Substring auf ``fixture_type`` (``"moving"``/``"head"``).
+    Der Renderer zeichnet einen gedrehten Strahl aber auch fuer ``scanner`` und
+    ``mover_bar`` — dort zeigte das Glyph also eine sichtbare, DMX-abhaengige
+    Strahlrichtung, waehrend die Info-Box dazu schwieg (A3D-21). Massgeblich ist
+    jetzt derselbe Render-Typ wie fuer das Glyph, plus als Rueckfall die real
+    vorhandenen Pan/Tilt-Kanaele des Geraets.
+    """
+    rt = (render_type or getattr(fixture, "fixture_type", "") or "").lower()
+    if rt in _BEAM_DIRECTED_TYPES or "moving" in rt or "head" in rt or "scanner" in rt:
+        return True
+    try:
+        attrs = {ch.attribute for ch in get_channels_for_patched(fixture)}
+    except Exception:
+        return False
+    return "pan" in attrs or "tilt" in attrs
+
+
 # ── Fixture-Renderer ──────────────────────────────────────────────────────────
 
 class FixtureRenderer:
@@ -986,15 +1011,15 @@ class StageCanvas(QWidget):
 
     def _draw_info_box(self, painter: QPainter, fixture, color: QColor,
                        intensity: int, pan: int, tilt: int,
-                       effects: list[str], fx: float, fy: float):
+                       effects: list[str], fx: float, fy: float,
+                       render_type: str | None = None):
         """Zeichnet ein Info-Overlay neben dem selektierten Fixture.
 
         Geometrie und Schrift werden mit 1/Zoom skaliert, damit die Box auf dem
         Bildschirm immer gleich gross und lesbar bleibt (der Painter ist global
         mit dem Zoom skaliert)."""
         s = 1.0 / self.zoom if self.zoom > 0 else 1.0
-        ft_lower = (fixture.fixture_type or "").lower()
-        has_pantilt = "moving" in ft_lower or "head" in ft_lower
+        has_pantilt = _has_pan_tilt(fixture, render_type)
 
         line_h = 15 * s
         # +1 Zeile fuer "Keine Effekte aktiv", wenn keine Effekte aktiv sind
@@ -1241,7 +1266,11 @@ class StageCanvas(QWidget):
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
-                info_box_data = (fixture, color, intensity, pan, tilt, effects, x, y)
+                # Render-Typ mitgeben: die Info-Box muss dieselbe Quelle nutzen
+                # wie das Glyph, sonst zeigt der Strahl eine Richtung an, ueber
+                # die die Box schweigt (A3D-21).
+                info_box_data = (fixture, color, intensity, pan, tilt, effects,
+                                 x, y, _render_type)
 
         # Info-Box über allem zeichnen
         if info_box_data:

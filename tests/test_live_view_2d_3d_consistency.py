@@ -128,6 +128,44 @@ def test_strobe_without_dimmer_follows_shutter(monkeypatch):
     assert (color.red(), color.green(), color.blue()) == (255, 255, 255)
 
 
+class TestInfoBoxPanTilt:
+    """A3D-21: Glyph und Info-Box muessen dieselbe Quelle nutzen.
+
+    Der FixtureRenderer zeichnet einen richtungs-gedrehten Strahl auch fuer
+    `scanner` und `mover_bar`; die Info-Box entschied dagegen per Substring auf
+    `fixture_type` (`moving`/`head`) und schwieg fuer genau diese Geraete —
+    sichtbare Strahlrichtung, aber keine Pan/Tilt-Zeile.
+    """
+
+    def test_beam_drawing_render_types_show_pan_tilt(self):
+        fx = SimpleNamespace(fid=1, fixture_type="Scanner")
+        for rt in ("moving_head", "scanner", "mover_bar"):
+            assert live_view._has_pan_tilt(fx, rt) is True, rt
+
+    def test_static_type_without_pan_tilt_channels_stays_silent(self, monkeypatch):
+        fx = SimpleNamespace(fid=2, fixture_type="PAR")
+        monkeypatch.setattr(live_view, "get_channels_for_patched",
+                            lambda _f: [_ch(1, "color_r"), _ch(2, "intensity")])
+        assert live_view._has_pan_tilt(fx, "par") is False
+
+    def test_static_type_with_pan_tilt_channels_shows_them(self, monkeypatch):
+        """Rueckfall: ein Geraet, dessen Glyph keinen Strahl dreht, das aber real
+        Pan/Tilt-Kanaele hat, bekommt die Zeile trotzdem."""
+        fx = SimpleNamespace(fid=3, fixture_type="Effekt")
+        monkeypatch.setattr(live_view, "get_channels_for_patched",
+                            lambda _f: [_ch(1, "pan"), _ch(2, "tilt")])
+        assert live_view._has_pan_tilt(fx, "other") is True
+
+    def test_channel_lookup_failure_is_not_fatal(self, monkeypatch):
+        fx = SimpleNamespace(fid=4, fixture_type="PAR")
+
+        def _boom(_f):
+            raise RuntimeError("keine DB")
+
+        monkeypatch.setattr(live_view, "get_channels_for_patched", _boom)
+        assert live_view._has_pan_tilt(fx, "par") is False
+
+
 # ── Winkel-Helper: eine Quelle fuer 2D & 3D ──────────────────────────────────
 
 def test_dmx_to_angle_deg_center_is_zero():

@@ -10,11 +10,57 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QApplication
 
-from src.ui.main_window import _allocate_tab_widths
+from src.ui.main_window import SectionButton, _SectionBar, _allocate_tab_widths
 
 _app = QApplication.instance() or QApplication([])
+
+
+class TestClickFloorInReflow(unittest.TestCase):
+    """UI-TABFLOOR: `_reflow` setzt die Breite per ``setFixedWidth`` — das haengt
+    das ``setMinimumWidth(56)`` des Buttons aus. Solange alles passt, bekam jeder
+    Tab exakt seine Textbreite; bei schmalen Titeln (andere Schrift/DPI — der
+    Linux-Audit senkte dafuer das QSS-Padding auf 7 px) landet er dann UNTER der
+    56-px-Klickflaeche, die dasselbe QSS ausdruecklich zusichert.
+
+    Bewusst gegen gestellte Breiten-Hints statt gegen echte Titel: die reale
+    Textbreite haengt an Schrift und DPI (auf Windows/Segoe liegen selbst „E/A"
+    und „BPM" ueber dem Floor), der Mechanismus aber nicht.
+    """
+
+    def _widths_after_reflow(self, hints, bar_width):
+        bar = _SectionBar()
+        for i, h in enumerate(hints):
+            btn = SectionButton(f"T{i}")
+            btn._full_text_size_hint = lambda h=h: QSize(h, 34)
+            bar.add_tab(btn)
+        bar.resize(bar_width, 34)
+        bar._reflow()
+        return [b.width() for b in bar._tabs], bar
+
+    def test_floor_is_enforced_when_there_is_room(self):
+        floor = SectionButton._CLICK_FLOOR_PX
+        widths, _bar = self._widths_after_reflow([40, 40, 40], 600)
+        for w in widths:
+            self.assertGreaterEqual(w, floor,
+                                    f"Tab unter der zugesagten Klickflaeche: {widths}")
+
+    def test_wide_tabs_keep_their_full_width(self):
+        """Regression: der Floor darf breite Titel nicht stauchen."""
+        widths, _bar = self._widths_after_reflow([200, 40, 180], 600)
+        self.assertEqual(widths[0], 200)
+        self.assertEqual(widths[2], 180)
+
+    def test_no_overflow_when_the_floor_would_not_fit(self):
+        """Bei echtem Platzmangel geht Nicht-Ueberlaufen vor: die Summe darf den
+        Container nie sprengen (sonst laufen Tabs in die Grand-Master-Gruppe)."""
+        floor = SectionButton._CLICK_FLOOR_PX
+        for avail in (60, 100, 150, 8 * floor - 1):
+            widths, bar = self._widths_after_reflow([40] * 8, avail)
+            self.assertLessEqual(sum(widths), bar.width(),
+                                 f"Tab-Breiten sprengen den Container bei {avail}px")
 
 
 class TestAllocatePure(unittest.TestCase):
