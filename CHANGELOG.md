@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Ein EFX kann auf einem einzelnen Kopf laufen (FM-HEADLAYOUT A3)
+
+#### Hinzugefügt
+
+- **Ein Bewegungseffekt kann jetzt einen einzelnen Kopf als Ziel haben.** Ist im
+  Programmer „Kopf 2" gewählt, bewegt der Effekt ausschließlich dessen Pan/Tilt —
+  die übrigen Köpfe bleiben stehen. Ohne Kopf-Auswahl arbeitet er unverändert auf
+  ganzen Geräten inklusive der Kopfwelle über alle Köpfe.
+- Mehrere Kopf-Ziele desselben Geräts sind erlaubt und tragen je ihren eigenen
+  Phasen-Offset — damit lässt sich ein Fächer über die Köpfe eines Movers fahren.
+- Die Zielliste im EFX-Editor benennt Kopf-Ziele als „Fixture #1 · K3"; alle drei
+  Zuweisungswege (Auto-Zuweisung, Neuanlage, „Auswahl hinzufügen") laufen über
+  denselben Ziel-Bauer, und „Auswahl hinzufügen" unterscheidet Ziele jetzt nach
+  Gerät **und** Kopf.
+- Ein gemeinsamer Master-Dimmer bleibt bei einem Kopf-Ziel geteilt (sonst wäre der
+  Kopf bei „Beam öffnen" dunkel geblieben), pro Kopf vorhandene Dimmer gehören dem
+  Kopf — dieselbe Regel wie bei der Pro-Kopf-Matrix.
+
+#### Show-Format
+
+- Das Kopf-Feld wird **nur bei echten Kopf-Zielen** in die Show geschrieben. Alte
+  Shows laden unverändert, und ihr erster Speichervorgang ändert die Datei nicht
+  (Save→Load→Save bleibt ein Fixpunkt). Ein kaputtes oder negatives Kopf-Feld
+  verliert nicht das Ziel, sondern fällt auf „ganzes Gerät" bzw. Kopf 1 zurück.
+- Tests `tests/test_fm_head_selection_a3_efx.py` (15).
 ### 2026-07-27 — Ein Strg+Z macht die ganze 3D-Geste rückgängig (A3D-06/09/10/27)
 
 #### Behoben

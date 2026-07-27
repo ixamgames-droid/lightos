@@ -644,6 +644,52 @@ class EfxView(QWidget):
         except Exception:
             return None, set()
 
+    def _targets_for(self, fids) -> list:
+        """FM-HEADLAYOUT A3: fid-Liste -> EFX-Ziele, KOPF-genau.
+
+        Ist im Programmer nur ein Kopf eines Mehrkopf-Geraets gewaehlt
+        (``AppState.selected_heads_for``), entsteht ein Ziel je gewaehltem Kopf —
+        der Effekt bewegt dann ausschliesslich diese Koepfe. Ohne Kopf-Auswahl
+        (oder ohne die API, z. B. Test-Fake) genau ein Ziel je Geraet = das
+        bisherige Verhalten inkl. FM-16b-Kopfwelle.
+
+        EINE Quelle fuer alle drei Zuweisungs-Stellen (Auto-Zuweisung, Neuanlage,
+        „Auswahl hinzufuegen") — sonst driften sie auseinander."""
+        from src.core.engine.efx import EfxFixture
+        # ⚠ EfxView haelt KEIN self._state (anders als die ProgrammerView) — der
+        # State kommt hier pro Zugriff aus get_state(). Ein self._state-Zugriff
+        # sprengt jeden Aufruf mit AttributeError (vom Bestandstest
+        # test_efx_follow_no_clobber gefangen).
+        heads_for = None
+        try:
+            from src.core.app_state import get_state
+            heads_for = getattr(get_state(), "selected_heads_for", None)
+        except Exception:
+            heads_for = None
+        out = []
+        for fid in fids:
+            hs = None
+            if callable(heads_for):
+                try:
+                    hs = heads_for(fid)
+                except Exception:
+                    hs = None
+            if hs:
+                for h in sorted(hs):
+                    out.append(EfxFixture(fid=int(fid), head=int(h)))
+            else:
+                out.append(EfxFixture(fid=int(fid)))
+        return out
+
+    @staticmethod
+    def _target_label(target) -> str:
+        """Listen-Beschriftung eines EFX-Ziels — Kopf-Ziele ausdruecklich benennen,
+        sonst stehen bei einem 4-Kopf-Geraet vier gleiche Zeilen untereinander."""
+        head = getattr(target, "head", None)
+        if head is None:
+            return f"Fixture #{target.fid}"
+        return f"Fixture #{target.fid} · K{int(head) + 1}"
+
     def _active_group_fids(self) -> set[int]:
         """Fid-Set der aktuell gewaehlten Gruppe — fuer den Geraete-Zugehoerigkeits-
         Filter UNGEBUNDENER/verwaister EFX (so werden bestehende EFX, die es ohne
@@ -1593,10 +1639,10 @@ class EfxView(QWidget):
                 elif is_dual_tilt_fixture(fx):
                     movers.append(fid)
                     spiders += 1
-            self._current.fixtures = [EfxFixture(fid=fid) for fid in movers]
+            self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
-            for fid in movers:
-                self._fx_list.addItem(f"Fixture #{fid}")
+            for _t in self._current.fixtures:
+                self._fx_list.addItem(self._target_label(_t))
             if not movers:
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
@@ -2102,10 +2148,10 @@ class EfxView(QWidget):
         if not movers and allow_all:
             movers = self._patched_movers()
         if movers:
-            self._current.fixtures = [EfxFixture(fid=fid) for fid in movers]
+            self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
-            for fid in movers:
-                self._fx_list.addItem(f"Fixture #{fid}")
+            for _t in self._current.fixtures:
+                self._fx_list.addItem(self._target_label(_t))
             if not self._follow:
                 self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
             self._notify_timer.start()  # Bibliothek/2. Ansicht aktualisieren
@@ -2154,13 +2200,18 @@ class EfxView(QWidget):
             if not fids:
                 patched = state.get_patched_fixtures()
                 fids = [patched[0].fid] if patched else []
-            existing = {f.fid for f in self._current.fixtures}
-            for fid in fids:
-                if fid in existing:
+            # A3: Ziel-Identitaet ist (fid, head) — sonst blockiert ein bereits
+            # vorhandenes Geraete-Ziel das Hinzufuegen eines Kopf-Ziels (und
+            # umgekehrt), obwohl es verschiedene Ziele sind.
+            existing = {(f.fid, getattr(f, "head", None))
+                        for f in self._current.fixtures}
+            for _t in self._targets_for(fids):
+                key = (_t.fid, getattr(_t, "head", None))
+                if key in existing:
                     continue
-                self._current.fixtures.append(EfxFixture(fid=fid))
-                self._fx_list.addItem(f"Fixture #{fid}")
-                existing.add(fid)
+                self._current.fixtures.append(_t)
+                self._fx_list.addItem(self._target_label(_t))
+                existing.add(key)
             self._update_spider_mode()
         except Exception:
             pass
