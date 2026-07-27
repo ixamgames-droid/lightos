@@ -236,23 +236,33 @@ class RealBuiltinsTest(unittest.TestCase):
                     for c in mode.channels]
 
     def test_atomic3000_blinder_is_visible_white(self):
-        """Martin Atomic 3000 (Xenon-Strobe/Blinder): KEINE Farb- und KEINE
-        Dimmer-Kanaele. Vorher: Farbe schwarz + Helligkeit hart 255 (unsichtbar
-        UND dauerhaft an). Jetzt: weiss, und der Shutter steuert die Helligkeit."""
-        chans = self._channels_of("ATOMIC3000")
+        """Martin Atomic 3000 (Xenon-Strobe/Blinder) hat in KEINEM Modus Farb-
+        kanaele — vorher war er im 3D schwarz, also unsichtbar. Im 1-Kanal-Modus
+        hat er zusaetzlich keinen Dimmer: dort steuert der Shutter die Helligkeit
+        (vorher galt er als dauerhaft voll aufgedreht)."""
+        # 1-Kanal-Modus: nur der Shutter.
+        chans = self._channels_of("ATOMIC3000", "1-Kanal")
         attrs = {c.attribute: 0 for c in chans}
-        self.assertNotIn("color_r", attrs, "Profil-Annahme: Atomic hat kein RGB")
-        self.assertIn("shutter", attrs, "Profil-Annahme: Atomic hat einen Shutter")
+        self.assertEqual(set(attrs), {"shutter"}, "Profil-Annahme: 1-Kanal = Shutter")
 
-        # Shutter zu -> dunkel (vorher: dauerhaft hell)
         p = _build_fixture_payload(_fx(), dict(attrs), chans)
-        self.assertEqual(p["intensity"], 0)
+        self.assertEqual(p["intensity"], 0, "Shutter 0-5 = Blackout laut Profil")
+        self.assertEqual((p["r"], p["g"], p["b"]), (255, 255, 255),
+                         "ohne Farbkanaele leuchtet die Lampe weiss, nicht schwarz")
 
-        # Blinder-Dauerlicht -> hell UND weiss (vorher: schwarz)
-        attrs["shutter"] = 255
+        attrs["shutter"] = 255           # Blinder-Dauerlicht
         p = _build_fixture_payload(_fx(), dict(attrs), chans)
         self.assertEqual(p["intensity"], 255)
-        self.assertEqual((p["r"], p["g"], p["b"]), (255, 255, 255))
+
+        # 3-Kanal-Modus: echter Dimmer, weiterhin keine Farbe.
+        chans3 = self._channels_of("ATOMIC3000", "3-Kanal")
+        attrs3 = {c.attribute: 0 for c in chans3}
+        self.assertNotIn("color_r", attrs3)
+        self.assertIn("intensity", attrs3)
+        attrs3["intensity"] = 200
+        p3 = _build_fixture_payload(_fx(), attrs3, chans3)
+        self.assertEqual(p3["intensity"], 200)
+        self.assertEqual((p3["r"], p3["g"], p3["b"]), (255, 255, 255))
 
     def test_robe_pointe_dimmer_and_wheel_are_visible(self):
         """Robe Pointe: Dimmer + Farbrad, KEIN color_r. Vorher schwarz bei jedem
@@ -449,26 +459,28 @@ class LuminanceCullingJsTest(unittest.TestCase):
             lambda: self._push_dmx(255, 255, 255, 255, fid=22, pan=180, tilt=60),
             "window.__lightos.fixtures['22'].floorSpot.visible === true")
 
-        raw = self._eval("""
+        # Objekte gehen nicht direkt ueber die Bridge — wie die uebrigen
+        # Szenen-Tests ueber JSON.stringify zurueckgeben.
+        raw = json.loads(self._eval("""
             (function() {
                 const THREE = window.THREE;   // three_local.js setzt das global
                 const f = window.__lightos.fixtures['22'];
-                if (!f || !f.head || !f.floorSpot) return null;
+                if (!f || !f.head || !f.floorSpot) return JSON.stringify(null);
                 f.head.updateMatrixWorld(true);
                 const H = new THREE.Vector3(); f.head.getWorldPosition(H);
                 const G = new THREE.Vector3(); f.group.getWorldPosition(G);
                 const q = new THREE.Quaternion(); f.head.getWorldQuaternion(q);
                 const d = new THREE.Vector3(0, -1, 0).applyQuaternion(q);
                 const t = -H.y / d.y;
-                return {
+                return JSON.stringify({
                     hx: f.floorSpot.position.x, hz: f.floorSpot.position.z,
                     ex: H.x + d.x * t,          ez: H.z + d.z * t,
                     baseX: G.x + d.x * (-G.y / d.y),
                     baseZ: G.z + d.z * (-G.y / d.y),
                     headY: H.y, groupY: G.y,
-                };
+                });
             })()
-        """)
+        """))
         self.assertIsNotNone(raw, "Moving Head ohne head/floorSpot aufgebaut")
 
         # Praemisse des Tests: Kopf und Sockel liegen wirklich auseinander —
