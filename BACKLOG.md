@@ -60,10 +60,32 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
   Output nach Grand Master/Blackout (WYSIWYG); Rohwerte später optional.
 - **VIZ-05**, **VCB-04**, **DQ-1/3/4** — dokumentierte Designentscheidungen.
 
-### Wartet auf Hardware/externen Input
+### 🔌 Wartet auf Hardware/externen Input — **David muss ans Gerät**
 
-- **LAS-09** (nur 6ch-CH5 prüfen), **LAS-18c**, **LAS-20**, Ether-Dream-/IDN-
-  Hardware-Verifikation sowie ShowNET/Moncha-Profile.
+_Alles hier ist **code-fertig und headless verifiziert**; es fehlt ausschliesslich
+die Prüfung am echten Rig. Jede Zeile nennt: **anschliessen → machen → worauf achten
+→ was zurückmelden.** Sobald eine Rückmeldung da ist, wird daraus ein normales Item
+(oder der Punkt fällt weg). Volle Details je Punkt im Register unten; Übersicht im
+Second Brain: `project_lightos_hardware_tasks`._
+
+| ID | Setup | Was du machst | Was du zurückmeldest |
+|----|-------|---------------|----------------------|
+| **HW-1** | Hydrabeam 4000 (Enttec COM3) **oder** LED Moving Bar 4× / Spider | Programmer → Gerät aufklappen → `Kopf 2` wählen → im Color-Tab Rot auf 255. Dann dasselbe mit Kopf 3 und 4. | **Welche physische Lampe leuchtet bei Kopf N?** Reihenfolge aus Publikumssicht (z. B. „1=links … 4=rechts" oder abweichend). |
+| **HW-2** | Rig an, Licht steht (EventPar über Art-Net-Node .99 **und** Hydra über Enttec COM3) | Bei laufendem Licht eine **andere Show laden** (Datei → Show öffnen). | Blitzt das Rig noch **schwarz**? Wenn ja: bei welchem Gerät/Universe. |
+| **HW-3** | Hydrabeam 4000 oder Moving Bar | `Kopf 2` wählen → EFX-Tab → `+ Neu`, **`Speichern`**, dann `▶ Start`. | Bewegt sich **nur** dieser Kopf, stehen die anderen? Ist der Beam sichtbar (Dimmer)? |
+| **HW-4** | Echte Show: 4 PAR + 2 Moving Heads + APC Mini (ZQ02001 auf Adresse 33/44) | Show hochziehen und die dokumentierten Profil-Annahmen durchgehen (9ch + 11ch), auf MH-Stillstand achten. | Stimmen die Kanalzuordnungen? Bleibt ein MH stehen, der fahren soll? _(war `X-1` in `docs/OPEN_POINTS_OVERVIEW.md`)_ |
+| **HW-5** | Enttec Open DMX USB, Session **>8 h** | Lange Session fahren (Party/Probe) und am Ende prüfen, ob der Ausgang noch lebt. | Bricht der Ausgang irgendwann weg? Wenn ja: nach wie vielen Stunden, und kam er von selbst zurück? _(war `F-8`)_ |
+| **LAS-09** | Ehaho L2600 | Im **6-Kanal-Modus CH5** durchfahren und beobachten. | Was macht CH5 wirklich? (Rest des Profils ist aus dem Handbuch geklärt.) |
+| **LAS-18c · LAS-20 · Ether Dream/IDN · ShowNET/Moncha** | Laser-Hardware, die **nicht da** ist | — | Nur bauen, wenn du solche Geräte hast, sonst wird es toter Code. |
+
+**Warum HW-1 der wichtigste Punkt ist:** die gesamte Kopf-Kette (Programmer-Kopfwahl,
+Fächer, Snaps, EFX-Kopf-Ziele, Kopf-Matrix, Raster-Anordnung) nimmt an, dass das
+**N-te Kanal-Vorkommen** eines Attributs auch der **N-te Kopf in physischer
+Reihenfolge** ist. Bei Pixel-Panels hat sich genau diese Annahme schon als falsch
+erwiesen (FM-13: Werks-Nummerierung in Schlangenlinien). Weicht die Reihenfolge bei
+einem Mehrkopf-Mover ab, brauchen wir eine **Kopf-Reihenfolge pro Profil** — analog
+zum Pixel-Flip. Headless ist das nicht prüfbar: die Software kann nur zählen, nicht
+sehen, wo die Lampe hängt.
 
 ## 🔮 Nächstes Backlog — vorgezogen (David 2026-07-14)
 
@@ -148,6 +170,21 @@ _Vollautomatischer Verifikations-Durchlauf (Import-/Konstruktions-/Show-Load-Smo
 |----|------|--------|---------------|
 | RL-01 | P3 | ✅ done ([#234](https://github.com/ixamgames-droid/lightos/pull/234)) | **Range-Lock lässt Identitäts-Modifier zurück.** `channel_range_lock_dialog.py:_on_accept` nullt beim „Lock entfernen" nur `range_min/max` statt den Eintrag zu entfernen → ein Identitäts-`ChannelModifier` (LINEAR, 0–255) bleibt im geteilten `ChannelModifierManager` registriert. **Funktional folgenlos** (Identität → kein DMX-Effekt), reine Hygiene. Fix: Eintrag ganz entfernen, wenn er nur wegen des Locks existiert (`curve==CurveType.LINEAR and not existing.custom_lut`). |
 | QA-LIVE | P2 | teils (2026-07-09) | **Live-Klick-Durchlauf der 85 high-risk Funktionen.** ✅ **Großer Teil live per Computer-Use abgearbeitet** (siehe „Aus Live-Durchlauf" unten): alle 8 Sektionen + Sub-Tabs + Hauptwerkzeuge + 3D-Fenster. Sehr viel funktioniert einwandfrei (Fan-Tool, Farb-Werkzeug+Popout, EFX-Custom-Path, VC-Bedienung, 3D-Bearbeiten-Push, Curve-Editor, Matrix-Vorschau …). 1 Crash gefunden+gefixt ([#235](https://github.com/ixamgames-droid/lightos/pull/235)) + 3 UX-Punkte. **Neu live im Browser bestätigt (2026-07-09):** Web-Remote verbindet, STOP quittiert, Blackout AN/AUS quittiert. **Rest offen:** Effect-Layer-Editor (11/12 Layer), Scene-Editor „Vorschau senden", Show-Manager-Timeline-Drag (nach #235), Fixture-Editor-Rundtrip, Palettes, Web-Remote-Lifecycle. Reihenfolge: `docs/FEATURE_VERIFICATION_2026_07_09.md` §4. **Salvage 2026-07-21:** Scene-„Vorschau senden" (jetzt render-/NOT-AUS-sicher), Show-Manager-Timeline-Drag, Fixture-Editor-Rundtrip + Palettes haben nun Fixes **und** automatisierte Tests (aus alten QA-Branches geborgen); für Live-Computer-Use offen bleiben v. a. Effect-Layer-Editor + Web-Remote-Lifecycle. |
+
+### 🔌 Braucht Davids Hardware (Verifikation offen, Code fertig)
+
+_Diese fünf Punkte kann **nur David am echten Rig** abschliessen — die Software kann
+zählen, aber nicht sehen, welche Lampe wo hängt bzw. ob physisch etwas blitzt.
+Kurzfassung + Handgriffe stehen oben in der Arbeitswarteschlange; Second Brain:
+`project_lightos_hardware_tasks`._
+
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| HW-1 | P1 | blocked (David/Hardware) | **Kopf-Reihenfolge physisch prüfen (Software-„Kopf N" ↔ welche Lampe?).** Die ganze Kopf-Kette — Programmer-Kopfwahl (FM-9/A1), Fächer + Snap-Scope (A2), EFX-Kopf-Ziele (A3), Pro-Kopf-Matrix (FM-16), freie Kopf-Anordnung im Raster (FM-HEADLAYOUT Slice 3) — nimmt an: **N-tes Kanal-Vorkommen = N-ter Kopf in physischer Reihenfolge**. Genau diese Annahme war bei Pixel-Panels schon falsch (FM-13: Werks-Nummerierung in Schlangenlinien → ein Lauflicht liefe im Zickzack). **Handgriff:** Programmer → Mehrkopf-Gerät aufklappen → `Kopf 2` wählen → Rot 255; dann Kopf 3, Kopf 4. **Melden:** welche physische Lampe je Kopf leuchtet (Reihenfolge aus Publikumssicht). **Wenn abweichend:** wir brauchen eine Kopf-Reihenfolge pro Profil (analog Pixel-Flip), dann sind Fächer/EFX/Matrix-Verläufe erst wirklich richtig. Geräte: Cameo Hydrabeam 4000 (Enttec COM3), LED Moving Bar 4×, U-King Spider. |
+| HW-2 | P2 | blocked (David/Hardware) | **CDX-22 physisch bestätigen: kein Blackout-Blitzen beim Live-Show-Wechsel.** Der Fix ist gelandet ([PR #433](https://github.com/ixamgames-droid/lightos/pull/433)) und headless bewiesen (jeder `set_channel(addr, 0)` während des Loads mitgeschnitten: vorher 4 Null-Schreibvorgänge, nachher keiner). Was fehlt, ist der **physische** Gegenbeweis auf deinem Rig — es war ursprünglich deine Beobachtung. **Handgriff:** Rig an, Licht steht (EventPar über Art-Net-Node .99 + Hydra über Enttec COM3), dann bei laufendem Licht eine andere Show laden. **Melden:** blitzt noch etwas, und wenn ja bei welchem Gerät/Universe. _(Rest-Vektor CDX-22b betrifft nur per Skript getriebene Roh-Kanäle.)_ |
+| HW-3 | P2 | blocked (David/Hardware) | **EFX auf einem einzelnen Kopf am echten Mover.** Gelandet ([PR #454](https://github.com/ixamgames-droid/lightos/pull/454)), verifiziert im Simple-Desk-Kanalstreifen (nur CH6/CH7 bewegten sich, Köpfe 1/3/4 blieben auf 128/128) — aber ohne DMX-Ausgang, also nie an einem echten Motor. **Handgriff:** `Kopf 2` wählen → EFX-Tab → `+ Neu`, **`Speichern`** (ein nicht gespeicherter Entwurf verschwindet beim Tab-Wechsel), dann `▶ Start`. **Melden:** bewegt sich nur dieser Kopf, stehen die anderen, ist der Beam sichtbar. Hängt an HW-1 (welcher Kopf ist es physisch?) und lässt sich in derselben Session miterledigen. |
+| HW-4 | P2 | blocked (David/Hardware) | **Hardware-Verifikation der realen Show** (4 PAR + 2 Moving Heads + APC Mini, ZQ02001 auf Adresse 33/44, 9ch + 11ch) inkl. „MH-Stillstand". Code-seitig ist nichts offen; es fehlt der Durchgang am Gerät gegen die dokumentierten Profil-Annahmen. **Stand bisher nur in `docs/OPEN_POINTS_OVERVIEW.md` als `X-1 / B-1-HW / MH-Stillstand` (dort „Hoch")** — beim Zusammenziehen der Hardware-Punkte 2026-07-27 ins BACKLOG geholt, weil das die Single Source ist. **Melden:** stimmen die Kanalzuordnungen, bleibt ein MH stehen, der fahren soll. |
+| HW-5 | P3 | blocked (David/Hardware) | **Enttec Open DMX USB im Langzeitbetrieb (>8 h).** Auto-Reconnect/Health-Check ist im `OutputManager`-Loop noch nicht ergänzt, weil unklar ist, ob und wann der Ausgang real wegbricht. **Handgriff:** eine lange Session fahren (Party/Probe) und am Ende prüfen, ob DMX noch rausgeht. **Melden:** bricht es weg — nach wie vielen Stunden, und kommt es von selbst zurück? Danach entscheiden wir, ob der Reconnect gebaut wird. **War `F-8` in `docs/OPEN_POINTS_OVERVIEW.md`.** |
 
 ### 🎛️ Aus Hardware-Live-Test (2026-07-20/21, Computer-Use, Davids echtes Rig)
 _Live-Test des Dual-Outputs (Varytec EventPar IP65 über Art-Net-Node .99 + Cameo Hydrabeam 4000 über Enttec COM3) + Per-Kopf-Matrix-Verifikation. ✅ Bestätigt: beide Ausgänge gleichzeitig; Per-Kopf-Matrix-Split (Hydra 56ch → automatisch 1×4-Grid, 4 Zellen; `tests/test_matrix_perhead.py` 20/20 inkl. echtem HYDRA4000). Netzwerk-Wurzel: der Art-Net-USB-Adapter hatte keine IP im Node-Subnetz (nur APIPA, kein DHCP) → statische IP gesetzt. Details: SecondBrain `reference_lightos_hardware_dmx_rig`._
