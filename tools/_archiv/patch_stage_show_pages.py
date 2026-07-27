@@ -17,12 +17,15 @@ Aufruf:  python tools/_archiv/patch_stage_show_pages.py
 from __future__ import annotations
 import io
 import json
-import os
 import zipfile
 
 import _bootstrap  # noqa: F401  # Repo-Root aufloesen (siehe _bootstrap.py)
+from _showpath import find_show
 
-SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Buehnen_Show.lshow")
+# ACHTUNG: In-Place-Patcher — schreibt in GENAU die Datei, die hier gefunden
+# wird. Liegt die Show nur noch in shows/_archiv/, wird die archivierte Kopie
+# umgebaut (und dabei weiterhin assets/vc/* verworfen, s. README).
+SHOW = str(find_show("Buehnen_Show.lshow"))
 
 BANK_ALL = -1
 BANK_FX = 0      # Seite 1 = Effekte

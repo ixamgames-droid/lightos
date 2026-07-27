@@ -12,7 +12,11 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
-SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Komplett_Demo.lshow")
+from _showpath import find_show
+
+# Ziel-Show liegt (wie bei den meisten Archiv-Werkzeugen) in shows/_archiv/ —
+# find_show prueft shows/ zuerst und faellt darauf zurueck.
+SHOW = str(find_show("Komplett_Demo.lshow"))
 FPS = 44.0
 DT = 1.0 / FPS
 

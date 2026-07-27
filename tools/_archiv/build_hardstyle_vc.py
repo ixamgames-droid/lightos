@@ -22,11 +22,14 @@ Baenke (0-basiert):
 import json
 import zipfile
 import shutil
-import os
 
 import _bootstrap  # noqa: F401  # Repo-Root aufloesen (siehe _bootstrap.py)
+from _showpath import find_show
 
-SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Hardstyle_Show.lshow")
+# ACHTUNG: In-Place-Patcher — schreibt in GENAU die Datei, die hier gefunden
+# wird (inkl. .bak daneben). Liegt die Show nur noch in shows/_archiv/, wird
+# also die archivierte Kopie umgebaut.
+SHOW = str(find_show("Hardstyle_Show.lshow"))
 
 # ── Fixture-IDs aus dem Patch ────────────────────────────────────────────────
 PARS = [1, 2, 3, 4, 5, 6, 7, 8]

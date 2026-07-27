@@ -58,23 +58,42 @@ unbemerkt, weil danach keines mehr lief:
 
 **Regel seither:** archivierte Skripte holen sich den Repo-Root ueber
 [`_bootstrap.py`](_bootstrap.py) (Marker-Suche nach dem Ordner mit `src/` +
-`tools/`, statt Tiefen-Raten):
+`tools/`, statt Tiefen-Raten). Der Bootstrap zieht ausserdem `_gen_env` mit —
+also isolierte `LIGHTOS_SHOW_DB`, kein Output-Thread, kein Audio-Autostart:
 
 ```python
 import _bootstrap                  # Repo-Root + tools/ auf sys.path
-import _gen_env  # noqa: F401      # spawn-sichere Env-Schalter + isolierte Show-DB
+                                   # + isolierte Show-DB (zieht _gen_env mit)
+from _showpath import find_show    # Show-Pfade: prueft shows/ UND shows/_archiv/
 from src.core.app_state import get_state
 ...
 _ROOT = _bootstrap.REPO_ROOT       # statt dirname(dirname(__file__))
+SHOW  = str(find_show("Meine_Show.lshow"))
 ```
 
-`tests/test_tools_archiv_paths.py` haelt die Regel gruen. Damit ist
-Archivieren wieder ein **reines `git mv`** — der Bootstrap funktioniert in
-`tools/` wie in `tools/_archiv/`.
+Warum der Bootstrap `_gen_env` mitzieht: der Pfad-Fix macht die Archiv-Skripte
+wieder **startbar** — damit lebte auch ihr alter Show-DB-Footgun wieder auf
+(fuenf von ihnen fassen den App-State ohne eigenes `import _gen_env` an,
+`verify_matrix_group_scope.py` sogar mit `reset_show()` + `delete(FixtureGroup)`).
+`tests/test_tools_db_isolation.py` deckt das jetzt auch fuer `tools/_archiv/` ab.
 
-**Reaktivieren:** zurueck nach `tools/` schieben; `import _bootstrap` gegen die
-uebliche `sys.path`-Zeile tauschen (oder stehen lassen — der Marker-Bootstrap
-funktioniert auch aus `tools/`) und pruefen, dass `import _gen_env` vorhanden
-ist (setzt seit STAB-CURSHOW (a) eine isolierte `LIGHTOS_SHOW_DB`). Show-Pfade
-zum Lesen ueber `from _showpath import find_show` aufloesen (prueft `shows/`
-**und** `shows/_archiv/`).
+**Zum Archivieren** eines Skripts aus `tools/` reichen zwei Handgriffe:
+`git mv` und die `sys.path`-Zeile/`_ROOT`-Zeile gegen `import _bootstrap` +
+`_bootstrap.REPO_ROOT` tauschen. `tests/test_tools_archiv_paths.py` faellt rot,
+solange noch irgendeine Form von Tiefen-Raten drinsteht (auch
+`Path(__file__).resolve().parents[1]` und mehrzeilige Schreibweisen — der Check
+laeuft auf AST-Ebene).
+
+> ⚠ **`_bootstrap.py` liegt NUR in `tools/_archiv/`.** Beim **Reaktivieren**
+> (zurueck nach `tools/`) muss `import _bootstrap` deshalb wieder **raus** —
+> sonst `ModuleNotFoundError`. Ersetzen durch die uebliche Kopfzeile
+> `sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))`
+> **plus** `import _gen_env` (das der Bootstrap vorher mitgebracht hat) und
+> `_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))`.
+> `from _showpath import find_show` kann bleiben — `_showpath.py` liegt in
+> `tools/` und ist aus beiden Ordnern erreichbar.
+
+**In-Place-Patcher beachten:** `build_hardstyle_vc.py` und
+`patch_stage_show_pages.py` schreiben in **genau die Datei, die `find_show`
+liefert**. Liegt die Show nur noch in `shows/_archiv/`, bauen sie also die
+archivierte Kopie um.
