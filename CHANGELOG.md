@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Button-Anleitung nennt den Pflicht-Selektor für „Laser-Muster abrufen" (CDX-16/26/27)
+
+#### Geändert
+
+- **Die Button-Anleitung erklärt jetzt, warum „Laser-Muster abrufen" scheinbar
+  nichts tut.** Die Einstellungs-Tabelle in `docs/anleitung_vc_widgets/01_button.md`
+  hatte keine Zeile für den Selektor **Laser-Muster (Palette)** — man konnte die
+  Aktion also anlegen, ohne das dafür zwingend nötige Feld zu finden, und der
+  Button blieb beim Drücken still wirkungslos. Die Zeile steht jetzt an der
+  echten Dialog-Position und ist als Pflichtfeld markiert, mit Verweis darauf,
+  wo Muster angelegt werden.
+
+_Ausserdem Backlog-/Report-Pflege ohne Verhaltensänderung: die A3D-Zeilen im
+BACKLOG waren bei fester Breite mitten im Satz abgeschnitten und dadurch nicht
+als Arbeitsauftrag nutzbar (aus der Audit-Quelle regeneriert), und ein
+nachträglich als falsch erkanntes Verdikt im Anleitungen-Audit vom 2026-07-20
+wurde als „revidiert" markiert statt still überschrieben._
+
+
 ### 2026-07-27 — Rasterzellen zeigen, zu welchem Gerät und Kopf sie gehören (FM-HEADLAYOUT Slice 4)
 
 #### Geändert

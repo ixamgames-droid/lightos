@@ -59,6 +59,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Tasten-Modus (Snap) | Verhalten des Bibliothek-Snaps | `Umschalten (an/aus)` · `Setzen (bleibt)` · `Halten (nur gedrückt)` |
 | Effekt-Aktion (EffectAction) | Welche Live-Aktion der gebundene Effekt ausführt | siehe Effekt-Aktionen unten; bei gebundenem Effekt zusätzlich dessen eigene Aktionen |
 | Gruppe (SelectGroup) | Fixture-Gruppe, die in den Programmer gewählt wird | Dropdown vorhandener Gruppen, editierbar |
+| Laser-Muster (Palette) | **Pflichtfeld für die Aktion `Laser-Muster abrufen`** — welches gespeicherte Muster der Button abruft. Ohne Auswahl tut der Button beim Drücken **nichts** (stilles No-Op). Muster legst du im Programmer-Tab „Laser" per *Muster speichern* an, siehe [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md) | Dropdown der gespeicherten Laser-Muster, editierbar (Name tippbar) |
 | Tempo-Bus | Auf welchen benannten Tempo-Bus Tap/Sync/Scharfschalten wirkt | `(aktiver/Default-Bus)` · `Bus A` · `Bus B` · `Bus C` · `Bus D` |
 | Live-Edit-Slot | Freitext-Name; der gestartete Effekt wird zum Bearbeitungsziel dieses Slots. Fader/Farb-Kacheln mit gleichem Slot bearbeiten ihn (quadrantenweise exklusiv) | Freitext (z. B. `MH`, `MX`) |
 | Exklusiv | Beim Start alle anderen laufenden Funktionen stoppen (Solo) | Checkbox (nur Funktions-Aktionen) |
