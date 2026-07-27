@@ -104,8 +104,12 @@ class WindowSpinHandlerTest(unittest.TestCase):
         # Tupel im State gespeichert
         self.assertEqual(fake._state.visualizer_rotations[3], (10.0, 90.0, -5.0))
         # Bridge mit allen drei Achsen aufgerufen (fid, x, y, z, rx, ry, rz)
+        # A3D-10: seither reist zusaetzlich `dock` mit — sonst hinterliesse der
+        # Commit einen anderen JS-Zustand als sein eigenes Redo (das ueber
+        # `apply_push` laeuft und den Dock mitschickt). Hier `None`, weil das
+        # Fake-Fixture nicht angedockt ist; ein Undock waere ebenfalls None.
         fake._bridge.push_apply_fixture_transform.assert_called_once_with(
-            3, 1.0, 6.5, -2.0, 10.0, 90.0, -5.0)
+            3, 1.0, 6.5, -2.0, 10.0, 90.0, -5.0, dock=None)
 
 
 if __name__ == "__main__":

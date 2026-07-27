@@ -11,8 +11,11 @@ Command-Katalog (siehe docs/VIZ11_SCENEGRAPH_DESIGN.md (e)):
   * ``push_rotate_fixtures``       — TransformNode Rotation (analog)
   * ``push_dock_fixture``          — SetParent (Fixture, Dock UND Undock ueber
                                       old_dock/new_dock=None)
-  * ``push_transform_and_dock_fixture`` — kombiniertes TransformNode+SetParent
-                                      (EIN Command fuer einen Spinbox-Commit)
+  * ``push_transform_and_dock_fixtures`` — kombiniertes TransformNode+SetParent
+                                      fuer BELIEBIG VIELE Fixtures: EIN Command
+                                      pro Gestik, auch bei Multi-Select (A3D-09/27)
+  * ``push_transform_and_dock_fixture`` — Ein-Fixture-Fall, duenner Delegate auf
+                                      die Plural-Variante (Spinbox-Commit)
   * ``push_remove_fixture``        — RemoveNode (Fixture, inkl. pos/rot/dock)
   * ``push_add_stage_element``     — AddNode (Buehnen-Element)
   * ``push_remove_stage_element``  — RemoveNode (Buehnen-Element)
@@ -39,7 +42,9 @@ def push_transform_fixtures(
     entries: Iterable[tuple[int, tuple, tuple]],
     *,
     label: str = "Fixture bewegen",
-    apply_push: Callable[[int, tuple], None] | None = None,
+    # Der Typ war auf 2 Argumente gesetzt, die Funktion ruft ihn aber seit jeher
+    # mit (fid, pos, rot) — s. unten. Hinweis stammt aus der Design-Review.
+    apply_push: Callable[[int, tuple, tuple], None] | None = None,
 ) -> None:
     """EIN Command fuer eine ganze Drag-Gestik, auch bei Multi-Select.
 
@@ -151,6 +156,87 @@ def push_dock_fixture(
     )
 
 
+def push_transform_and_dock_fixtures(
+    state,
+    entries: list,
+    *,
+    label: str = "Fixture bearbeiten",
+    apply_push: Callable[[int, tuple, tuple], None] | None = None,
+    on_dock_change: Callable[[int, str | None], None] | None = None,
+    on_applied: Callable[[], None] | None = None,
+) -> None:
+    """EIN Command fuer eine Gestik, die BELIEBIG VIELE Fixtures aendert
+    (A3D-09/A3D-27).
+
+    ``entries`` = Liste von Dicts mit ``fid``, ``old_pos``/``new_pos``,
+    ``old_rot``/``new_rot``, ``old_dock``/``new_dock``.
+
+    Warum Plural: Die ueberzaehligen Undo-Schritte entstehen in JS-SCHLEIFEN
+    (ein Bridge-Aufruf je ausgewaehltem Fixture), nicht in einem Python-Frame —
+    ein ``begin_group()``/``end_group()`` am UndoStack haette dort gar keinen
+    Ort zum Klammern gehabt und haette stattdessen zwei zusaetzliche
+    Bridge-Slots gebraucht, also eine GROESSERE Vertragsaenderung als dieser
+    eine Batch-Weg. Ausserdem ist der UndoStack global geteilt (Patch-Ops,
+    Programmer, VC): eine ueber die Bridge-Grenze offen gehaltene Gruppe haette
+    zwischen zwei Slot-Zustellungen fremde Commands eingefangen, und ein
+    verlorenes ``end_group`` (Renderer-Crash) haette Strg+Z fuer die restliche
+    Sitzung getoetet. ``docs/VIZ11_SCENEGRAPH_DESIGN.md`` lehnt
+    „Koaleszenz-Logik im Stack" ausdruecklich ab und sagt „Multi-Select = EIN
+    Command ueber Liste von (id, old, new)".
+
+    ``on_applied`` wird EINMAL am Ende jeder Anwendung gerufen (do/undo/redo) —
+    dort gehoert genau ein ``LIVE_VIEW_CHANGED``-Emit hin, nicht eines pro
+    Fixture. ``scene_commands`` bleibt dabei UI-frei (Invariante des
+    Design-Dokuments): der Aufrufer reicht den Callback herein.
+    """
+    # No-op-Eintraege fallen raus (jeweils fuer sich geprueft, damit ein
+    # unveraendertes Fixture in einer 20er-Auswahl seinen Dock nicht verliert).
+    kept = []
+    for e in entries or []:
+        if (tuple(e["old_pos"]) == tuple(e["new_pos"])
+                and tuple(e["old_rot"]) == tuple(e["new_rot"])
+                and (e.get("old_dock") or None) == (e.get("new_dock") or None)):
+            continue
+        kept.append(e)
+    if not kept:
+        return
+
+    def _apply(which: str) -> None:
+        for e in kept:
+            fid = e["fid"]
+            pos = e["new_pos"] if which == "new" else e["old_pos"]
+            rot = e["new_rot"] if which == "new" else e["old_rot"]
+            dock = e.get("new_dock") if which == "new" else e.get("old_dock")
+            state.visualizer_positions[fid] = pos
+            state.visualizer_rotations[fid] = rot
+            # ``has_dock`` (Default True = Alt-Verhalten): traegt der Eintrag
+            # keinen echten Dock-Wechsel, wird die Andockung GAR NICHT angefasst.
+            # Sonst erzwaenge ein Undo sie — und ein Pfad, der Docks nie meldet
+            # (Traversen-Drag, A3D-27), koennte eine zwischenzeitlich anders
+            # gesetzte Andockung still zurueckdrehen.
+            if e.get("has_dock", True):
+                if dock:
+                    state.visualizer_docks[fid] = dock
+                else:
+                    state.visualizer_docks.pop(fid, None)
+                if on_dock_change is not None:
+                    on_dock_change(fid, dock)
+            if apply_push is not None:
+                apply_push(fid, pos, rot)
+        if on_applied is not None:
+            on_applied()
+
+    get_undo_stack().push(
+        Command(
+            label=label,
+            do=lambda: _apply("new"),
+            undo=lambda: _apply("old"),
+            redo=lambda: _apply("new"),
+        ),
+        execute=False,  # Werte sind bereits angewendet (JS-Echo/Spinbox)
+    )
+
+
 def push_transform_and_dock_fixture(
     state,
     fid: int,
@@ -161,37 +247,19 @@ def push_transform_and_dock_fixture(
     label: str = "Fixture bearbeiten",
     apply_push: Callable[[int, tuple, tuple], None] | None = None,
     on_dock_change: Callable[[int, str | None], None] | None = None,
+    on_applied: Callable[[], None] | None = None,
 ) -> None:
-    """EIN Command fuer einen Spinbox-Commit, der Position, Rotation UND
-    Dock-Aufloesung in derselben Nutzerinteraktion aendert (Design-
-    Entscheidung 5: EIN Command pro Gestik — hier: pro Eingabe-Commit).
-    No-op-Felder (alt==neu) werden trotzdem als Teil des gemeinsamen Commands
-    mitgefuehrt, damit ein einziges Undo den kompletten Commit rueckgaengig
-    macht."""
-    if (tuple(old_pos) == tuple(new_pos) and tuple(old_rot) == tuple(new_rot)
-            and (old_dock or None) == (new_dock or None)):
-        return
-
-    def _apply(pos: tuple, rot: tuple, dock: str | None) -> None:
-        state.visualizer_positions[fid] = pos
-        state.visualizer_rotations[fid] = rot
-        if dock:
-            state.visualizer_docks[fid] = dock
-        else:
-            state.visualizer_docks.pop(fid, None)
-        if on_dock_change is not None:
-            on_dock_change(fid, dock)
-        if apply_push is not None:
-            apply_push(fid, pos, rot)
-
-    get_undo_stack().push(
-        Command(
-            label=label,
-            do=lambda: _apply(new_pos, new_rot, new_dock),
-            undo=lambda: _apply(old_pos, old_rot, old_dock),
-            redo=lambda: _apply(new_pos, new_rot, new_dock),
-        ),
-        execute=False,  # Werte sind bereits ueber die Spinboxen angewendet
+    """Ein-Fixture-Fall — duenner Delegate auf
+    :func:`push_transform_and_dock_fixtures`, damit es GENAU EINEN Codepfad gibt
+    (und die bestehenden Tests unveraendert gruen bleiben)."""
+    push_transform_and_dock_fixtures(
+        state,
+        [{"fid": fid,
+          "old_pos": old_pos, "new_pos": new_pos,
+          "old_rot": old_rot, "new_rot": new_rot,
+          "old_dock": old_dock, "new_dock": new_dock}],
+        label=label, apply_push=apply_push,
+        on_dock_change=on_dock_change, on_applied=on_applied,
     )
 
 

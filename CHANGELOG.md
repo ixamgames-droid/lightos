@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Ein Strg+Z macht die ganze 3D-Geste rückgängig (A3D-06/09/10/27)
+
+#### Behoben
+
+- **Ein Strg+Z nimmt jetzt die komplette Geste zurück, nicht ein Gerät davon.**
+  Wer zehn Lampen gemeinsam verschob oder drehte, musste bisher zehnmal
+  rückgängig machen — jedes Gerät war ein eigener Schritt. Dasselbe beim Bewegen
+  einer Traverse mit angedockten Lampen. Beides ist jetzt ein einziger Schritt.
+- **Grosse Auswahlen zerstören die Rückgängig-Liste nicht mehr.** Da der Verlauf
+  auf 100 Schritte begrenzt ist, löschte das Verschieben von mehr als hundert
+  Geräten in einem Zug die gesamte bisherige Rückgängig-Historie der Sitzung.
+- **Rückgängig aktualisiert die 3D-Ansicht wieder.** Bisher änderte es nur den
+  internen Zustand: die Geräte blieben im Bild an der neuen Stelle stehen,
+  obwohl der Zustand schon der alte war — Ansicht und Wahrheit liefen
+  auseinander, bis irgendetwas anderes ein Neuzeichnen auslöste. Auch die
+  Andock-Beziehung wird jetzt mit zurückgerollt.
+- **Positionen aus den Zahlenfeldern markieren die Show wieder als geändert.**
+  Der Eingabe-Pfad meldete überhaupt keine Änderung, weshalb die automatische
+  Speicherung solche Positionen still überging.
+
+
 ### 2026-07-27 — Fächer und Snap-Aufnahme verstehen Köpfe (FM-HEADLAYOUT A2)
 
 #### Hinzugefügt
