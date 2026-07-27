@@ -46,18 +46,49 @@ PR_LINK = re.compile(r"\[[^\]]*\]\(https://github\.com/[\w.-]+/[\w.-]+/(?:pull|i
 # Ein Status gilt als "nur noch Historie", wenn er 'done' enthaelt und KEIN
 # aktives Keyword mehr — dekorierte Staten wie "wip (3/8 done)" bleiben aktiv.
 _ACTIVE_KEYWORDS = ("todo", "wip", "review", "blocked", "decision", "teils", "teil")
+# Woerter, die offene Restarbeit MELDEN. Ein Status wie
+# "✅ Bild-Links done · Screenshots offen" ist damit NICHT erledigt, sondern
+# teil-erledigt (Review-Fund 2026-07-28: genau so verschwand DOC-10s Teil b
+# still ins Archiv, weil nur nach 'done' gesucht wurde).
+_OPEN_MARKERS = ("offen", "ausstehend")
+# Verneinungen unmittelbar vor einem Offen-Marker heben ihn auf ("nichts mehr
+# offen" meldet keine Restarbeit).
+_NEGATIONS = ("nichts", "nicht", "kein", "keine", "keinerlei")
 # Markdown-Links VOR der Keyword-Erkennung strippen: ein Linktext wie
 # "[Codex-Review](...)" in der Status-Zelle ist Dekoration, kein Status —
 # sonst zaehlt eine done-Zeile faelschlich als 'review' (Review-Fund 2026-07-19).
 _MD_LINK = re.compile(r"\[[^\]]*\]\([^)]*\)")
+# [Text](url) -> Text. Fuer Kurztitel: die URL faellt weg, statt beim Kuerzen
+# mitten in der Adresse abgeschnitten zu werden (Review-Fund 2026-07-28).
+_MD_LINK_TEXT = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 
 
 def _status_text(status: str) -> str:
     return _MD_LINK.sub(" ", status).lower()
 
 
+def _status_head(status_low: str) -> str:
+    """Der eigentliche Status = alles VOR der ersten Klammer.
+
+    Der Rest ist Kommentar und darf die Einordnung nicht steuern: sonst gilt ein
+    ``✅ done (… stand frueher auf „teils" …)`` als teil-erledigt, nur weil das
+    Wort irgendwo im Fliesstext zitiert wird (Review-Fund 2026-07-28).
+    """
+    return status_low.split("(")[0]
+
+
 def _has_word(text: str, word: str) -> bool:
     return re.search(rf"\b{re.escape(word)}\b", text) is not None
+
+
+def _reports_open_work(text: str) -> bool:
+    """Meldet der Text offene Restarbeit? Verneinte Marker zaehlen nicht."""
+    for marker in _OPEN_MARKERS:
+        for m in re.finditer(rf"\b{re.escape(marker)}\b", text):
+            before = text[max(0, m.start() - 24):m.start()]
+            if not any(_has_word(before, n) for n in _NEGATIONS):
+                return True
+    return False
 
 
 @dataclass
@@ -169,6 +200,21 @@ def cmd_stats(lines: list[str]) -> str:
     return "\n".join(out)
 
 
+# Ein Status kann 'done' sagen UND im selben Atemzug offene Arbeit nennen
+# ("✅ Bild-Links done · Screenshots offen" — real DOC-10, 2026-07-28). Solche
+# Zeilen wandern sonst still ins Archiv und der Rest ist aus jeder Ansicht weg.
+# Bewusst nur eine WARNUNG, keine stille Umklassifizierung: 'offen' steht auch in
+# legitimen done-Zeilen als Prosa ("Labels bewusst offen"), das kann nur ein
+# Mensch/Agent entscheiden. Richtiger Status fuer echte Mischfaelle: 'teils'.
+_OPEN_MARKER = re.compile(r"\b(offen|ausstehend|folgt noch|fehlt noch)\b", re.I)
+
+
+def mixed_status_rows(rows: list[Row]) -> list[Row]:
+    """done-Zeilen, deren Status zugleich offene Arbeit nennt (Pruef-Kandidaten)."""
+    return [r for r in rows
+            if r.is_done and not r.is_condensed and _OPEN_MARKER.search(r.status)]
+
+
 def archive_split(lines: list[str]) -> tuple[list[str], list[Row]]:
     """Liefert (neue BACKLOG-Zeilen, archivierte Rows). Reine Funktion, schreibt nichts."""
     rows = parse_rows(lines)
@@ -199,6 +245,12 @@ def cmd_archive(lines: list[str], apply: bool) -> str:
               f"{len(done)} done-Zeilen -> BACKLOG_ARCHIVE.md"]
     for r in done:
         report.append(f"  {r.id}  [{r.prio}]  {r.short_title(80)}")
+    mixed = mixed_status_rows(done)
+    if mixed:
+        report.append(f"!! PRUEFEN ({len(mixed)}): Status sagt done UND nennt offene Arbeit — "
+                      f"wandert sonst mitsamt Rest ins Archiv. Echter Mischfall -> 'teils':")
+        for r in mixed:
+            report.append(f"   {r.id}  [{r.prio}]  {re.sub(r'  +', ' ', r.status)[:100]}")
     if apply:
         stamp = _dt.date.today().isoformat()
         header_needed = not os.path.exists(ARCHIVE)

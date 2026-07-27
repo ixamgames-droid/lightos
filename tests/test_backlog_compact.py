@@ -29,6 +29,8 @@ FIXTURE = """# Test-Backlog
 | GG-07 | P2 | done ([PR #100](https://github.com/ixamgames-droid/lightos/pull/100)) | Unformatierter Titel ohne Bold am Anfang. **Fix:** spaeter Bold-Span darf nicht Titel werden. |
 | HH-08 | P3 | done ([Codex-Review](https://github.com/ixamgames-droid/lightos/pull/280)) | **Codex-Fund.** Details egal. |
 | II-09 | P2 | teils (Socket-Haelfte erledigt) | **Teil-erledigtes Item.** Rest offen, niemand dran. |
+| JJ-10 | P2 | ✅ Bild-Links done · Screenshots offen | **Halb erledigt, sagt aber done.** |
+| KK-11 | P3 | done (Labels bewusst offen gelassen) | **Echt done**, 'offen' nur als Prosa. |
 """.replace("\n", "\n")
 
 
@@ -41,7 +43,8 @@ class ParseTest(unittest.TestCase):
         rows = bc.parse_rows(_lines())
         self.assertEqual([r.id for r in rows],
                          ["AA-01", "BB-02", "CC-03", "DD-04", "EE-05", "FF-06",
-                          "GG-07", "HH-08", "II-09"])
+                          "GG-07", "HH-08", "II-09", "JJ-10",
+                          "KK-11"])
 
     def test_done_detection_respects_decorated_wip(self):
         rows = {r.id: r for r in bc.parse_rows(_lines())}
@@ -81,13 +84,13 @@ class StatsTest(unittest.TestCase):
         self.assertIn("wip=1", out)
         self.assertIn("review=1", out,
                       "[Codex-Review]-Linktext in HH-08 darf NICHT als review zaehlen")
-        self.assertIn("done=4", out)
+        self.assertIn("done=6", out)
 
 
 class ArchiveTest(unittest.TestCase):
     def test_archive_split_moves_only_pure_done(self):
         new_lines, done = bc.archive_split(_lines())
-        self.assertEqual({r.id for r in done}, {"BB-02", "GG-07", "HH-08"},
+        self.assertEqual({r.id for r in done}, {"BB-02", "GG-07", "HH-08", "JJ-10", "KK-11"},
                          "FF-06 ist schon verdichtet und darf nicht erneut wandern")
         text = "".join(new_lines)
         self.assertIn("AA-01", text)
@@ -106,6 +109,22 @@ class ArchiveTest(unittest.TestCase):
             status = m.group(3).strip().lower()
             self.assertTrue(any(kw in status for kw in STATUS_KEYWORDS),
                             f"Kurzzeile faellt durch QA-18-Lint: {line!r}")
+
+    def test_mixed_done_and_open_rows_are_flagged(self):
+        """DOC-10-Klasse: 'done' UND offene Arbeit in einer Status-Zelle.
+
+        Real passiert 2026-07-28: `✅ Bild-Links done · Screenshots offen` wanderte
+        samt offenem Rest ins Archiv und war aus jeder Ansicht weg. Die Zeile wird
+        weiter archiviert (Verhalten bleibt vorhersagbar), aber sie MUSS im Report
+        auffallen — 'offen' kommt auch als blosse Prosa in echten done-Zeilen vor,
+        das kann nur ein Mensch entscheiden.
+        """
+        rows = bc.parse_rows(_lines())
+        flagged = {r.id for r in bc.mixed_status_rows(rows)}
+        self.assertIn("JJ-10", flagged)
+        report = bc.cmd_archive(_lines(), apply=False)
+        self.assertIn("PRUEFEN", report)
+        self.assertIn("JJ-10", report)
 
     def test_archive_is_idempotent(self):
         new_lines, _ = bc.archive_split(_lines())
