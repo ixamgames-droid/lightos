@@ -102,16 +102,35 @@ export function moveDockedFixtures(sid, dxw, dzw) {
 }
 
 export function _reportDockedFixturePositions(sid) {
+  const bridge = bridgeRef.get();
+  // A3D-27: EIN Batch-Aufruf fuer alle mitgezogenen Fixtures -> EIN
+  // Undo-Command. Vorher ging pro angedocktem Fixture ein eigener
+  // fixturePositionChanged-Aufruf raus, jeder mit eigenem Command: das Bewegen
+  // einer Traverse mit 8 Lampen kostete 8 (bzw. N+1) mal Strg+Z, und ein
+  // einzelnes Undo rollte die Gestik nur teilweise zurueck.
+  const batch = (bridge && bridge.fixturesTransformBatch) ? [] : null;
   for (const fid in fixtures) {
     const f = fixtures[fid];
     if (!f || f.dockedTo !== sid) continue;
-    const bridge = bridgeRef.get();
-    if (bridge && bridge.fixturePositionChanged) {
+    if (batch) {
+      batch.push({
+        fid: Number(fid),
+        x: f.group.position.x, y: f.group.position.y, z: f.group.position.z,
+        hasRotation: false,
+        hasDockChange: false,
+      });
+    } else if (bridge && bridge.fixturePositionChanged) {
       try {
         bridge.fixturePositionChanged(String(fid),
           f.group.position.x, f.group.position.y, f.group.position.z);
       } catch (e) {}
     }
+  }
+  if (batch && batch.length) {
+    try {
+      bridge.fixturesTransformBatch(JSON.stringify(
+        { label: 'Bühnen-Element bewegen', items: batch }));
+    } catch (e) {}
   }
 }
 

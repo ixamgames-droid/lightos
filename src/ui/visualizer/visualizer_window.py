@@ -273,6 +273,13 @@ def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> Render
 # Bridge
 # ============================================================================
 
+# A3D-10: Sentinel fuer `push_apply_fixture_transform(dock=...)`. Noetig, weil
+# `None` ein GUELTIGER Wert ist ("kein Dock") und daher nicht "Feld weglassen"
+# bedeuten kann. Ohne Sentinel wuerde jeder Alt-Aufrufer (der `dock` nicht kennt)
+# still ein `dock: ""` mitschicken und in JS bestehende Andockungen loeschen.
+_KEEP_DOCK = object()
+
+
 class VisualizerBridge(QObject):
     """Kommunikationsbruecke Python <-> JavaScript (Three.js).
 
@@ -671,53 +678,105 @@ class VisualizerBridge(QObject):
         fixtureRotationChanged) bleiben UNVERAENDERT bestehen (Kompatibilitaet
         zu bestehenden Tests/Aufrufern, z.B. Spinbox-Commits) -- nur der
         JS-Drag-Ende-Pfad wechselt auf dieses Buendel-Event."""
+        self._commit_gesture_entries([json.loads(json_str) or {}],
+                                     label="Fixture bearbeiten")
+
+    @Slot(str)
+    @_bridge_slot_guard
+    def fixturesTransformBatch(self, json_str: str):
+        """A3D-09/A3D-27: EIN Event fuer eine Gestik, die MEHRERE Fixtures
+        aendert -> genau EIN Undo-Command.
+
+        Erwartetes JSON: ``{"label": str, "items": [<exakt die
+        fixtureGestureEnd-Payload>, ...]}``. Vorher schleifte JS ueber
+        ``view.selectedFids`` und rief ``fixtureGestureEnd`` EINMAL PRO FIXTURE
+        — jeder Aufruf pushte ein eigenes Command, ein 10-Fixture-Multi-Drag
+        brauchte also 10x Strg+Z (und bei >100 Fixtures sprengte er den
+        ``MAX_SIZE``-Deckel des UndoStacks, d.h. er loeschte die komplette
+        Undo-Historie der Sitzung).
+        """
         d = json.loads(json_str) or {}
-        fid = int(d["fid"])
-        has_rotation = bool(d.get("hasRotation"))
-        has_dock_change = bool(d.get("hasDockChange"))
+        items = d.get("items") or []
+        self._commit_gesture_entries(
+            items, label=str(d.get("label") or "Fixture bearbeiten"))
 
-        old_pos = self._state.visualizer_positions.get(
-            fid, (float(d["x"]), float(d["y"]), float(d["z"])))
-        new_pos = (float(d["x"]), float(d["y"]), float(d["z"]))
+    def _commit_gesture_entries(self, items: list, *, label: str):
+        """Gemeinsamer Rumpf von ``fixtureGestureEnd`` (1 Eintrag) und
+        ``fixturesTransformBatch`` (n Eintraege).
 
-        old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
-        if has_rotation:
-            new_rot = (float(d.get("rx", 0.0)), float(d.get("ry", 0.0)), float(d.get("rz", 0.0)))
-        else:
-            new_rot = old_rot
+        JS sendet NUR am Gestik-ENDE — die hier gelesenen Alt-Werte SIND damit
+        der Gestik-Start-Snapshot (Design-Entscheidung 5).
+        """
+        entries = []
+        for d in items:
+            if not isinstance(d, dict) or "fid" not in d:
+                continue
+            fid = int(d["fid"])
+            has_rotation = bool(d.get("hasRotation"))
+            has_dock_change = bool(d.get("hasDockChange"))
 
-        old_dock = self._state.visualizer_docks.get(fid)
-        if has_dock_change:
-            raw_dock = d.get("dock") or ""
-            new_dock = str(raw_dock) if raw_dock else None
-        else:
-            new_dock = old_dock
+            new_pos = (float(d["x"]), float(d["y"]), float(d["z"]))
+            old_pos = self._state.visualizer_positions.get(fid, new_pos)
 
-        # State bereits VOR dem Undo-Push anwenden (gleiche Reihenfolge wie
-        # die bisherigen Einzel-Slots: JS-Echo ist schon "wahr", der Command
-        # protokolliert nur, execute=False).
-        self._state.visualizer_positions[fid] = new_pos
-        if has_rotation:
-            self._state.visualizer_rotations[fid] = new_rot
-        if has_dock_change:
-            if new_dock:
-                self._state.visualizer_docks[fid] = new_dock
+            old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
+            new_rot = ((float(d.get("rx", 0.0)), float(d.get("ry", 0.0)),
+                        float(d.get("rz", 0.0))) if has_rotation else old_rot)
+
+            old_dock = self._state.visualizer_docks.get(fid)
+            if has_dock_change:
+                raw_dock = d.get("dock") or ""
+                new_dock = str(raw_dock) if raw_dock else None
             else:
-                self._state.visualizer_docks.pop(fid, None)
+                new_dock = old_dock
 
-        self._write_back_to_live_view(fid, new_pos[0], new_pos[2])
-        self.pyFixtureMoved.emit(fid, new_pos[0], new_pos[1], new_pos[2])
-        if has_rotation:
-            self.pyFixtureRotated.emit(fid, new_rot[0], new_rot[1], new_rot[2])
+            # State bereits VOR dem Undo-Push anwenden (JS-Echo ist schon
+            # "wahr", der Command protokolliert nur, execute=False).
+            self._state.visualizer_positions[fid] = new_pos
+            if has_rotation:
+                self._state.visualizer_rotations[fid] = new_rot
+            if has_dock_change:
+                if new_dock:
+                    self._state.visualizer_docks[fid] = new_dock
+                else:
+                    self._state.visualizer_docks.pop(fid, None)
 
-        _scmd.push_transform_and_dock_fixture(
-            self._state, fid,
-            old_pos=old_pos, new_pos=new_pos,
-            old_rot=old_rot, new_rot=new_rot,
-            old_dock=old_dock, new_dock=new_dock,
-            label="Fixture bearbeiten",
+            self.pyFixtureMoved.emit(fid, new_pos[0], new_pos[1], new_pos[2])
+            if has_rotation:
+                self.pyFixtureRotated.emit(fid, new_rot[0], new_rot[1], new_rot[2])
+
+            entries.append({
+                "fid": fid,
+                "old_pos": old_pos, "new_pos": new_pos,
+                "old_rot": old_rot, "new_rot": new_rot,
+                "old_dock": old_dock, "new_dock": new_dock,
+            })
+
+        if not entries:
+            return
+
+        # A3D-10: apply_push + dock, damit do()/undo()/redo() die 3D-Ansicht UND
+        # den Dock-Zustand mitfuehren. Vorher aenderte ein Undo nur den AppState
+        # und pushte nichts an JS -> State und Bild desynchronisierten.
+        _scmd.push_transform_and_dock_fixtures(
+            self._state, entries, label=label,
+            apply_push=lambda fid_, pos_, rot_: self.push_apply_fixture_transform(
+                fid_, pos_[0], pos_[1], pos_[2], *rot_,
+                dock=self._state.visualizer_docks.get(fid_)),
+            on_applied=self._emit_live_view_changed,
         )
+        self._emit_live_view_changed()
 
+    def _emit_live_view_changed(self):
+        """EIN LIVE_VIEW_CHANGED je Gestik/Anwendung — nicht eines pro Fixture.
+
+        A3D-06: Das Emit (nicht ein Positions-Write-Back) ist der eigentliche
+        Punkt. ``visualizer_positions`` und ``live_view_positions`` sind seit
+        VIZ-11 zwei Projektionen DESSELBEN SceneGraph — ein Write-Back waere ein
+        No-op und wuerde die Weltposition ueber den
+        ``world3d_to_live``/``live_to_world3d``-Roundtrip sogar um 1 ULP
+        verfaelschen (nachgemessen). Was fehlte, war das Dirty-Signal: einziger
+        Abnehmer ist der Autosave.
+        """
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
@@ -1255,11 +1314,23 @@ class VisualizerBridge(QObject):
 
     def push_apply_fixture_transform(self, fid: int, x: float, y: float, z: float,
                                      rot_x: float = 0.0, rot_y: float = 0.0,
-                                     rot_z: float = 0.0):
-        """Transform an JS schicken. Rotationen in GRAD (JS wandelt in Radiant)."""
+                                     rot_z: float = 0.0, dock=_KEEP_DOCK):
+        """Transform an JS schicken. Rotationen in GRAD (JS wandelt in Radiant).
+
+        A3D-10: ``dock`` reist optional in DERSELBEN Payload mit (``None``/``""``
+        = kein Dock). Bewusst KEIN neues Signal: Python->JS-Signale erreichen die
+        eingebettete Post-Load-Seite nicht zuverlaessig, ein neues Signal muesste
+        zusaetzlich in die Poll-Spiegel-Liste und wuerde den „22 Signale"-Vertrag
+        des Smoke-Tests brechen. Ausserdem existiert ueberhaupt kein Python->JS-
+        Dock-Kanal: ``f.dockedTo`` wird JS-seitig sonst nur aus der
+        ``addFixture``-Payload gesetzt. Default ``_KEEP_DOCK`` = Feld weglassen
+        (Alt-Verhalten, JS laesst ``dockedTo`` dann unangetastet).
+        """
         try:
             payload = {"fid": fid, "x": x, "y": y, "z": z,
                        "rotX": rot_x, "rotY": rot_y, "rotZ": rot_z}
+            if dock is not _KEEP_DOCK:
+                payload["dock"] = dock or ""
             self.applyFixtureTransform.emit(json.dumps(payload))
         except Exception as e:
             print(f"[Visualizer] push_apply_fixture_transform error: {e}")
@@ -2354,9 +2425,19 @@ class VisualizerWindow(QMainWindow):
             old_rot=old_rot, new_rot=rot,
             old_dock=old_dock, new_dock=new_dock,
             label="Fixture bearbeiten",
+            # A3D-10: `dock` reist mit, damit ein Undo das geloeste Andocken auch
+            # in JS wiederherstellt (nicht nur im AppState).
             apply_push=lambda fid_, pos_, rot_: self._bridge.push_apply_fixture_transform(
-                fid_, pos_[0], pos_[1], pos_[2], *rot_),
+                fid_, pos_[0], pos_[1], pos_[2], *rot_,
+                dock=self._state.visualizer_docks.get(fid_)),
+            on_applied=self._bridge._emit_live_view_changed,
         )
+        # A3D-06: Der Spinbox-Commit emittierte BISHER GAR NICHTS — per Spinbox
+        # gesetzte Positionen machten die Show also nie „dirty", der Autosave
+        # uebersprang sie still. (Der Wert selbst war nie das Problem:
+        # `visualizer_positions` und `live_view_positions` sind seit VIZ-11 zwei
+        # Projektionen desselben SceneGraph.)
+        self._bridge._emit_live_view_changed()
 
     def _clear_positions(self):
         # T-VIZ-04 (B-6): Sicherheitsabfrage — Loeschen aller Positionen ist nicht
