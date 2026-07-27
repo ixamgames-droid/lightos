@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Backlog-Hygiene: Status-Drift beseitigt, Datei halbiert, Queue ehrlich
+
+Reine Buchhaltung, kein Verhalten der App betroffen.
+
+#### Behoben
+
+- **Vier Zeilen in `BACKLOG.md` behaupteten einen falschen Stand.** `FM-9` stand
+  auf `todo`, obwohl der Kern (Kopf als selektierbares Ziel, #448), Fächer/Snaps
+  (#451) und EFX-auf-einem-Kopf (#454) längst gemergt sind — es war damit das
+  oberste P1 der Loop-Queue. `FM-HEADLAYOUT` meldete „Slices 4+ offen", obwohl
+  Slice 4/5 und A2/A3 landeten (offen ist nur noch A4). `FM-13` versprach seit
+  dem Merge von #438 weiter „PR folgt". `CDX-24` trug seinen gesamten
+  Umsetzungsbericht in der Status-Zelle; das Wort „Review" darin liess das Item
+  als laufende Arbeit gelten.
+- **Neuer Lint (QA-18b, `tests/test_backlog_lint.py`):** Status `todo` und
+  „GELANDET" in derselben Zeile sind ab jetzt ein Testfehler. Genau dieser
+  Widerspruch ist dem Loop bis 2026-07-27 fünfmal passiert und schickt die
+  nächste Runde auf ein Item, das grösstenteils erledigt ist.
+
+#### Verbessert
+
+- **`BACKLOG.md` 375 KB → 207 KB.** 273 reine `done`-Zeilen sind per
+  `tools/backlog_compact.py --archive --apply` als Volltext nach
+  `BACKLOG_ARCHIVE.md` gewandert; in der Arbeitsdatei bleibt je eine Kurzzeile
+  mit ID, Titel und PR-Link. Damit ist die Datei wieder in einer Loop-Runde
+  ladbar.
+- **`--queue` zeigt `teils`-Items in einem eigenen Block.** Sie sind weder
+  `done` noch in Arbeit und fielen bisher aus jeder Ansicht heraus — real waren
+  sechs Items (`QA-LIVE`, `LAS-07`, `LAS-08`, `VIZ-15`, `A3D-17`, `NET-04`)
+  unsichtbar liegengeblieben.
+
 ### 2026-07-27 — Web-Remote: Token und LAN-Zugriff endlich bedienbar (CDX-24)
 
 #### Hinzugefügt

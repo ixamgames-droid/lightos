@@ -28,6 +28,7 @@ FIXTURE = """# Test-Backlog
 | FF-06 | P3 | done → Archiv | Schon frueher verdichtet (Details: BACKLOG_ARCHIVE.md) |
 | GG-07 | P2 | done ([PR #100](https://github.com/ixamgames-droid/lightos/pull/100)) | Unformatierter Titel ohne Bold am Anfang. **Fix:** spaeter Bold-Span darf nicht Titel werden. |
 | HH-08 | P3 | done ([Codex-Review](https://github.com/ixamgames-droid/lightos/pull/280)) | **Codex-Fund.** Details egal. |
+| II-09 | P2 | teils (Socket-Haelfte erledigt) | **Teil-erledigtes Item.** Rest offen, niemand dran. |
 """.replace("\n", "\n")
 
 
@@ -40,7 +41,7 @@ class ParseTest(unittest.TestCase):
         rows = bc.parse_rows(_lines())
         self.assertEqual([r.id for r in rows],
                          ["AA-01", "BB-02", "CC-03", "DD-04", "EE-05", "FF-06",
-                          "GG-07", "HH-08"])
+                          "GG-07", "HH-08", "II-09"])
 
     def test_done_detection_respects_decorated_wip(self):
         rows = {r.id: r for r in bc.parse_rows(_lines())}
@@ -62,6 +63,15 @@ class QueueTest(unittest.TestCase):
         out = bc.cmd_queue(_lines(), 1)
         self.assertIn("CC-03", out)
         self.assertNotIn("AA-01  [P2]", out)
+
+    def test_partial_items_get_their_own_block(self):
+        """'teils' ist weder done noch in Arbeit — ohne eigenen Block unsichtbar."""
+        out = bc.cmd_queue(_lines(), 10)
+        self.assertIn("II-09", out, "teils-Item darf nicht aus der Queue fallen")
+        head, _, tail = out.partition("# Teil-erledigt")
+        self.assertTrue(tail, "eigener Block fuer teils-Items fehlt")
+        self.assertIn("II-09", tail)
+        self.assertNotIn("II-09", head, "teils gehoert nicht in die todo-/wip-Liste")
 
 
 class StatsTest(unittest.TestCase):

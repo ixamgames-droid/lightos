@@ -23,6 +23,9 @@ STATUS_KEYWORDS = ("todo", "done", "wip", "review", "blocked", "decision",
 PRIOS = ("P1", "P2", "P3")
 GH_LINK = re.compile(r"\]\((https?://github\.com/[^)]+)\)")
 GH_PR_ISSUE_OK = re.compile(r"^https://github\.com/[\w.-]+/[\w.-]+/(pull|issues)/\d+")
+# QA-18b: "GELANDET" ist die projektweite Vokabel fuer "ist gemergt" (Loop-Runden
+# schreiben sie in die Zeile, wenn eine Teil-Lieferung in main ist).
+LANDED = re.compile(r"gelandet", re.IGNORECASE)
 
 
 def _rows():
@@ -36,6 +39,14 @@ def _rows():
             if set(m.group(2).strip()) <= set("-: "):
                 continue
             yield lineno, m.group(1), prio, m.group(3).strip()
+
+
+def _rows_with_line():
+    """Wie _rows(), aber mit der kompletten Zeile (fuer Status-vs-Inhalt-Checks)."""
+    with open(BACKLOG, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    for lineno, id_, prio, status in _rows():
+        yield lineno, id_, prio, status, lines[lineno - 1]
 
 
 class BacklogLintTest(unittest.TestCase):
@@ -63,6 +74,26 @@ class BacklogLintTest(unittest.TestCase):
                     bad.append((ln, id_, url))
         self.assertEqual(bad, [], f"Status-GitHub-Links, die kein wohlgeformter "
                                   f"pull/issues-Link sind: {bad}")
+
+    def test_todo_rows_do_not_claim_landed_work(self):
+        """QA-18b: 'todo' und 'GELANDET' in derselben Zeile widersprechen sich.
+
+        Wiederkehrender Loop-Fehler (bis 2026-07-27 fuenfmal): eine Teil-Lieferung
+        wird in die Zeile geschrieben, der Status bleibt 'todo' — `--queue` bietet
+        das Item dann als naechste Aufgabe an, obwohl der Kern laengst in `main`
+        ist (real passiert mit FM-9, dem obersten P1). Richtig ist 'wip', solange
+        noch etwas offen ist, sonst 'done'. Bewusst eng: nur der harte Widerspruch
+        todo↔GELANDET, damit dekorierte wip-Staten weiter frei formulierbar sind.
+        """
+        bad = []
+        for ln, id_, _p, status, line in _rows_with_line():
+            low = status.lower()
+            if "todo" not in low or "done" in low or "wip" in low:
+                continue
+            if LANDED.search(line):
+                bad.append((ln, id_, status[:60]))
+        self.assertEqual(bad, [], f"Status 'todo', aber die Zeile meldet gelandete "
+                                  f"Arbeit — auf 'wip'/'done' ziehen: {bad}")
 
 
 if __name__ == "__main__":

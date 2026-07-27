@@ -6,7 +6,8 @@ Stueck zu laden. Dieses Werkzeug macht die Datei wieder loop-tauglich:
   --queue [N]    Die naechsten N offenen Items (todo zuerst, P1 < P2 < P3) als
                  kompakte Liste auf stdout — Ersatz fuer das Voll-Read in
                  /lightos-loop Schritt 1. wip/review-Items werden separat
-                 gelistet (laufende Arbeit sichtbar, aber nicht doppelt nehmen).
+                 gelistet (laufende Arbeit sichtbar, aber nicht doppelt nehmen),
+                 teils-Items in einem dritten Block (Rest offen, niemand dran).
   --stats        Zaehler je Status/Prio + Dateigroesse + Archivierungs-Potenzial.
   --archive      Verdichtet erledigte Tabellenzeilen gemaess der Konvention in
                  BACKLOG.md ("Ein done-Eintrag wird beim naechsten Beruehren in
@@ -83,9 +84,14 @@ class Row:
         return "archiv" in self.status_low
 
     def active_kind(self) -> str | None:
-        """'todo' | 'wip' | 'review' | 'blocked' | 'decision' | None."""
+        """'todo' | 'wip' | 'review' | 'blocked' | 'decision' | 'teils' | None.
+
+        'teils' zaehlt bewusst mit: solche Items sind WEDER done NOCH in Arbeit —
+        ohne eigenen Topf fielen sie aus jeder Ansicht heraus und blieben liegen
+        (2026-07-27 waren real 6 Stueck unsichtbar).
+        """
         low = self.status_low
-        for kind in ("todo", "wip", "review", "blocked", "decision"):
+        for kind in ("todo", "wip", "review", "blocked", "decision", "teils"):
             if _has_word(low, kind):
                 return kind
         return None
@@ -127,6 +133,8 @@ def cmd_queue(lines: list[str], n: int) -> str:
     todo = [r for r in rows if r.active_kind() == "todo"]
     todo.sort(key=lambda r: (PRIO_ORDER.get(r.prio, 9), r.lineno))
     running = [r for r in rows if r.active_kind() in ("wip", "review")]
+    partial = [r for r in rows if r.active_kind() == "teils"]
+    partial.sort(key=lambda r: (PRIO_ORDER.get(r.prio, 9), r.lineno))
     out = [f"# Naechste ausfuehrbare Items (todo, P1<P2<P3) — {min(n, len(todo))}/{len(todo)}:"]
     for r in todo[:n]:
         out.append(f"  {r.id}  [{r.prio}]  {r.short_title()}")
@@ -134,6 +142,11 @@ def cmd_queue(lines: list[str], n: int) -> str:
         out.append(f"# In Arbeit / Review ({len(running)}) — nicht doppelt nehmen:")
         for r in running:
             out.append(f"  {r.id}  [{r.prio}]  ({r.active_kind()})  {r.short_title(80)}")
+    if partial:
+        out.append(f"# Teil-erledigt, Rest offen ({len(partial)}) — niemand dran, "
+                   f"vor dem Aufgreifen pruefen was schon steht:")
+        for r in partial:
+            out.append(f"  {r.id}  [{r.prio}]  {r.short_title(80)}")
     return "\n".join(out)
 
 
