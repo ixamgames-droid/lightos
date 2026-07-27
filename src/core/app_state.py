@@ -233,6 +233,12 @@ class AppState:
         # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
         # (REVISION, Phase R1).
         self.selected_fids: list[int] = []
+        # FM-HEADLAYOUT Slice 5: feine Auswahl auf Zell-Ebene ("fid" ODER
+        # "fid:head"). selected_fids bleibt die dedup-Basisliste und damit der
+        # unveraenderte Vertrag fuer alle SELECTION_CHANGED-Konsumenten; beide
+        # werden AUSSCHLIESSLICH in set_selected_cells fortgeschrieben.
+        self.selected_cells: list[str] = []
+        self._selected_heads: dict[int, set] = {}
         # Aktive Gruppen-ID im Programmer (None = lose Einzel-/Mehrfachauswahl).
         # Wird VOR set_selected_fids gesetzt, damit die Matrix beim SELECTION_CHANGED
         # bereits die korrekte Gruppen-ID vorfindet.
@@ -1792,16 +1798,85 @@ class AppState:
     def set_selected_fids(self, fids: list[int]):
         """Setzt die gemeinsame Programmer-Auswahl und benachrichtigt alle
         Kategorien (RGB Matrix, Effekte, Paletten …) via SELECTION_CHANGED.
-        Reihenfolge bleibt erhalten (wichtig fuer Fan/Chase)."""
-        new = [int(f) for f in fids]
-        if new == self.selected_fids:
+        Reihenfolge bleibt erhalten (wichtig fuer Fan/Chase).
+
+        FM-HEADLAYOUT Slice 5: delegiert an ``set_selected_cells`` — jedes fid wird
+        als GANZES Geraet gewaehlt. Dadurch kann die feine Auswahl
+        (``selected_cells``) nie veralten, egal welcher der vielen Bestandsaufrufer
+        hier hereinkommt (die Fehlerklasse „zweites Feld, das ein Schreiber
+        vergisst" ist genau die, die FM16E schon einmal geliefert hat)."""
+        self.set_selected_cells([str(int(f)) for f in fids])
+
+    def set_selected_cells(self, cells):
+        """FM-HEADLAYOUT Slice 5: Auswahl auf **Zell-Ebene** setzen — ein Eintrag
+        ist ENTWEDER ein ganzes Geraet (``"7"``/``7``) ODER ein einzelner Kopf
+        (``"7:2"``), also dieselbe Syntax wie die Gruppen-Zellen
+        (``core.group_cells.parse_group_cell`` ist die EINE Parse-Quelle).
+
+        ``selected_fids`` bleibt die dedup-Basisliste in Auswahl-Reihenfolge und
+        damit der unveraenderte Vertrag fuer ALLE bisherigen Konsumenten
+        (SELECTION_CHANGED traegt weiterhin die fid-Liste). Wer Koepfe
+        unterscheiden will, liest zusaetzlich ``get_selected_cells()`` bzw.
+        ``selected_heads_for(fid)``.
+
+        Ist ein Geraet sowohl als Ganzes als auch per Kopf gewaehlt, gewinnt das
+        GANZE Geraet (die groebere Aussage ist die sichere: alle Koepfe)."""
+        from .group_cells import parse_group_cell
+        norm: list[str] = []
+        whole: set[int] = set()
+        heads: dict[int, list[int]] = {}
+        for c in cells or []:
+            fid, head = parse_group_cell(c)
+            if fid is None:
+                continue
+            key = f"{fid}" if head is None else f"{fid}:{head}"
+            if key in norm:
+                continue
+            norm.append(key)
+            if head is None:
+                whole.add(fid)
+            else:
+                heads.setdefault(fid, []).append(head)
+        # Ganzes Geraet schlaegt seine Kopf-Eintraege (sonst waere unklar, ob
+        # „alle Koepfe" oder „nur diese" gemeint ist).
+        if whole:
+            norm = [k for k in norm
+                    if ":" not in k or int(k.split(":", 1)[0]) not in whole]
+            for fid in list(heads):
+                if fid in whole:
+                    heads.pop(fid, None)
+        base: list[int] = []
+        for k in norm:
+            fid = int(k.split(":", 1)[0])
+            if fid not in base:
+                base.append(fid)
+        if norm == list(getattr(self, "selected_cells", [])) and base == self.selected_fids:
             return
-        self.selected_fids = new
+        self.selected_cells = norm
+        self._selected_heads = {f: set(hs) for f, hs in heads.items()}
+        self.selected_fids = base
         try:
             from .sync import SyncEvent
-            self.sync.emit(SyncEvent.SELECTION_CHANGED, list(new))
+            self.sync.emit(SyncEvent.SELECTION_CHANGED, list(base))
         except Exception as e:
             print(f"[app_state] selection emit error: {e}")
+
+    def get_selected_cells(self) -> list[str]:
+        """Feine Auswahl in Auswahl-Reihenfolge (``"fid"`` oder ``"fid:head"``)."""
+        return list(getattr(self, "selected_cells", []))
+
+    def selected_heads_for(self, fid) -> set | None:
+        """Welche Koepfe von ``fid`` sind gewaehlt? ``None`` = das GANZE Geraet
+        (alle Koepfe) — der Normalfall und das Bestandsverhalten. Ein Set heisst:
+        NUR diese Koepfe. Leeres Ergebnis (Geraet gar nicht gewaehlt) -> ``set()``."""
+        try:
+            fid = int(fid)
+        except (TypeError, ValueError):
+            return None
+        if fid not in self.selected_fids:
+            return set()
+        hs = (getattr(self, "_selected_heads", None) or {}).get(fid)
+        return set(hs) if hs else None
 
     def get_selected_fids(self) -> list[int]:
         return list(self.selected_fids)
