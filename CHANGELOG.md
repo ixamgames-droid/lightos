@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Laser-NOT-AUS verriegelt DMX-Laser sofort, nicht erst nach dem Netzwerk (CDX-25)
+
+#### Behoben
+
+- **Der NOT-AUS legt DMX-Laser jetzt augenblicklich still — auch wenn ein
+  Netzwerk-Laser nicht erreichbar ist.** Bisher setzte `estop_all()` die
+  DMX-Verriegelung erst NACH dem Durchlauf aller Netzwerk-Verbindungen. Da jeder
+  dieser Aufrufe ein Socket-Roundtrip mit 0,5 s Zeitlimit ist, blieb ein
+  DMX-Muster-Laser (z. B. L2600) bei einem hängenden oder abgezogenen DAC pro
+  Gerät bis zu eine halbe Sekunde weiter hell, obwohl der NOT-AUS schon gedrückt
+  war. Die Verriegelung läuft jetzt zuerst, die Netzwerk-Zustellung danach —
+  dieselbe fail-safe Reihenfolge wie bei CDX-12.
+- **Ein fehlgeschlagener NOT-AUS ist nicht mehr unsichtbar.** Ein stilles
+  `except: pass` um genau diese Verriegelung liess einen misslungenen NOT-AUS wie
+  einen erfolgreichen aussehen; der Fehler wird jetzt protokolliert (die
+  Netzwerk-Ebene verriegelt unabhängig davon weiter).
+
+_Der ursprünglich gemeldete Befund („der VC-Button latcht DMX-Laser gar nicht")
+war ein Fehlalarm — `estop_all()` ruft `set_laser_estop(True)` selbst, und
+`clear_estop_all()` hebt den Latch nicht auf. Neue Tests nageln beides fest._
+
 ### 2026-07-27 — Köpfe im Gruppen-Raster selbst anordnen (FM-HEADLAYOUT Slice 3)
 
 #### Hinzugefügt

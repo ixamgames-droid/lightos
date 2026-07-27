@@ -195,6 +195,26 @@ class LaserOutputManager:
         # Netzwerk-Befehle AUSSERHALB des Locks — I/O unterm Lock würde den
         # Tick-Thread (und damit weitere Geräte) bis zum Timeout blockieren.
         self._estopped = True
+        # UXT-12: auch DMX-Muster-Laser (L2600 & Co.) hart dunkel schalten — der
+        # folgende Netzwerk-Estop erreicht sie nicht. Latch im State setzen; der
+        # Renderer zwingt deren Kanäle dann auf 0, bis bewusst ein neuer Laser-
+        # Wert gesetzt wird.
+        #
+        # CDX-25: Der Latch steht BEWUSST VOR der Netzwerk-I/O-Schleife. `conn.estop()`
+        # ist ein TCP-/UDP-Roundtrip mit `timeout=0.5` je Verbindung (etherdream.py:146,
+        # idn.py:236) — hinter der Schleife gesetzt, blieben DMX-Laser bei nur EINEM
+        # unerreichbaren DAC bis zu 0,5 s pro Gerät weiter hell, obwohl der Nutzer
+        # NOT-AUS gedrückt hat. Fail-safe Reihenfolge wie bei CDX-12 (`set_laser_estop`
+        # aktiviert die OM-Maske ebenfalls VOR dem Flag): die billige, lokale
+        # Verriegelung zuerst, die teure Netzwerk-Zustellung danach.
+        try:
+            self._state.set_laser_estop(True)
+        except Exception as e:
+            # CDX-25: NICHT still schlucken — das ist die primäre Verriegelung für
+            # DMX-Laser. Ein stilles `pass` liess einen fehlgeschlagenen NOT-AUS wie
+            # einen erfolgreichen aussehen. Die Netzwerk-Ebene läuft trotzdem weiter
+            # (sie verriegelt unabhängig), aber der Fehler muss sichtbar sein.
+            print(f"[laser_output] NOT-AUS: DMX-Latch konnte nicht gesetzt werden: {e}")
         with self._lock:
             conns = list(self._connections.values())
         for conn in conns:
@@ -202,14 +222,6 @@ class LaserOutputManager:
                 conn.estop()
             except Exception:
                 conn.close()
-        # UXT-12: auch DMX-Muster-Laser (L2600 & Co.) hart dunkel schalten — der
-        # obige Netzwerk-Estop erreicht sie nicht. Latch im State setzen; der
-        # Renderer zwingt deren Kanäle dann auf 0, bis bewusst ein neuer Laser-
-        # Wert gesetzt wird.
-        try:
-            self._state.set_laser_estop(True)
-        except Exception:
-            pass
         # UXT-09: zentrale, unmissverständliche NOT-AUS-Bestätigung — egal ob von
         # der Laser-Steuerseite oder einem VC-Button ausgelöst (beide gehen hier
         # durch). Das Hauptfenster zeigt darauf einen prominenten Hinweis.
