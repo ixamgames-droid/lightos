@@ -14,6 +14,7 @@ from PySide6.QtGui import (
 )
 from src.core.app_state import get_state
 from src.core.database.models import FixtureGroup
+from src.core.group_cells import base_fids_in_grid_order
 from src.ui.widgets import mini_icons as _mini
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
@@ -32,6 +33,57 @@ def _split_cell(v):
 
 
 # ── Floating Panel (Rastergröße) ──────────────────────────────────────────────
+
+# FM-HEADLAYOUT Slice 4: Pro-Fixture-Farben fuer die Rasterzellen. Vorher waren
+# ALLE Zellen gleich blau — in einer zusammengelegten Kopf-Matrix (z. B. 2x
+# Hydrabeam = 8 Kopf-Zellen) war nicht zu sehen, welche Zelle zu welchem Geraet
+# gehoert. Davids Anforderung: "eine schoene UI, die klar anzeigt, welche Zellen
+# zu welchem Fixture/Kopf gehoeren".
+#
+# Bewusst dunkle, kraeftige Basistoene (dunkles UI, weisse Schrift muss lesbar
+# bleiben) mit deutlich unterschiedlichem Farbton — nicht nur Helligkeit, damit
+# sie auch bei Rot-Gruen-Schwaeche unterscheidbar bleiben.
+_FIXTURE_CELL_COLORS = (
+    "#0978FF",   # Blau (bisheriger Standardton -> Ein-Geraet-Gruppen sehen aus wie vorher)
+    "#22a06b",   # Gruen
+    "#c2410c",   # Orange-Rot
+    "#7c3aed",   # Violett
+    "#0e7490",   # Petrol
+    "#a16207",   # Ocker
+    "#be185d",   # Magenta
+    "#4d7c0f",   # Oliv
+)
+
+
+def fixture_cell_color(fid, head, fid_order) -> QColor:
+    """Zellfarbe fuer ``fid``/``head``: **Farbton je Geraet, Helligkeit je Kopf.**
+
+    * ``fid_order`` = Basis-fids in Raster-Reihenfolge (``base_fids_in_grid_order``).
+      Der Farb-Index ist die POSITION darin, nicht der fid selbst — so bekommen
+      die Geraete EINER Gruppe garantiert unterschiedliche Toene (genau der Zweck),
+      statt dass z. B. fid 1 und fid 9 bei ``fid % 8`` denselben Ton erwischen.
+    * Koepfe desselben Geraets teilen den Farbton und werden nur **aufgehellt**
+      (K1 dunkel -> Kn heller) — dadurch ist die Kopf-REIHENFOLGE ablesbar und die
+      Zugehoerigkeit bleibt trotzdem sofort sichtbar.
+    * Ein Geraet ohne Kopf-Zelle (ganzes Fixture) behaelt den Basiston; eine
+      Ein-Geraet-Gruppe sieht damit aus wie vor Slice 4 (kein Bruch mit Gewohnheit).
+
+    Reine Funktion (nur Qt-Farbe, kein Widget-Zustand) -> headless testbar."""
+    try:
+        idx = list(fid_order).index(fid)
+    except (ValueError, TypeError):
+        idx = 0
+    base = QColor(_FIXTURE_CELL_COLORS[idx % len(_FIXTURE_CELL_COLORS)])
+    if head is None:
+        return base
+    # Helligkeits-Rampe je Kopf: HSL-Lightness in kleinen Schritten anheben,
+    # geklemmt, damit weisse Schrift lesbar bleibt (max. ~62 % Lightness).
+    h, s, light, a = base.getHsl()
+    light = min(int(light + 26 * max(0, int(head))), 158)
+    out = QColor()
+    out.setHsl(h, s, light, a)
+    return out
+
 
 class _FloatingGridPanel(QFrame):
     """Schwebendes, ein-/ausklappbares, verschiebbares Panel für Rastergröße.
@@ -387,6 +439,12 @@ class FixtureGridWidget(QWidget):
         font.setBold(True)
         p.setFont(font)
 
+        # FM-HEADLAYOUT Slice 4: Farbton je Geraet, Helligkeit je Kopf. Reihenfolge
+        # EINMAL pro Paint bestimmen (nicht je Zelle) — dieselbe Quelle wie alle
+        # anderen Gruppen-fid-Resolver (group_cells), damit die Farbzuordnung nicht
+        # von der dict-Reihenfolge abhaengt.
+        fid_order = base_fids_in_grid_order(
+            {f"{c},{r}": v for (c, r), v in self.positions.items()})
         for (c, r), v in self.positions.items():
             fid, head = _split_cell(v)
             x = c * cw
@@ -396,8 +454,7 @@ class FixtureGridWidget(QWidget):
             if self._drag_from and (c, r) == self._drag_from:
                 fill_color = QColor("#ff8c00")
             else:
-                # FM-16e: Kopf-Zellen einer Kopf-Matrix leicht dunkler absetzen.
-                fill_color = QColor("#0d63c8") if head is not None else QColor("#0978FF")
+                fill_color = fixture_cell_color(fid, head, fid_order)
             p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
             p.setFont(font)
@@ -732,6 +789,18 @@ class FixtureGroupView(QWidget):
         self._grid_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         right_inner.addWidget(self._grid_widget, 1)
 
+        # FM-HEADLAYOUT Slice 4: Legende „Farbe -> Gerät" unter dem Raster. Die
+        # Zellfarbe allein ist ein Hinweis, keine Zuordnung — erst die Legende macht
+        # sie eindeutig (Davids „klar anzeigen, welche Zellen zu welchem Fixture/Kopf
+        # gehören"). Leer = versteckt, damit sie in Ein-Geräte-Gruppen nicht stört.
+        self._legend = QLabel("")
+        self._legend.setWordWrap(True)
+        self._legend.setTextFormat(Qt.TextFormat.RichText)
+        self._legend.setToolTip(
+            "Farbton = Gerät, Helligkeit = Kopf (K1 dunkel → höhere Köpfe heller).")
+        self._legend.hide()
+        right_inner.addWidget(self._legend)
+
         # Schwebende Rastergröße-Panel (Kind von right_w, schwebt über dem Grid)
         self._float_panel = _FloatingGridPanel(right_w)
         # Spinbox-Referenzen auf Attributnamen, die _apply_grid_size/_save_group/_load_group nutzen
@@ -804,6 +873,43 @@ class FixtureGroupView(QWidget):
         self._grid_widget.update_fixture_labels(labels)
         self._highlight_group_members()
 
+    def _refresh_legend(self):
+        """FM-HEADLAYOUT Slice 4: „Farbe → Gerät"-Legende unter dem Raster.
+
+        Zeigt je Gerät im Raster ein Farbfeld in genau der Zellfarbe (dieselbe
+        Funktion wie der Renderer, also keine zweite Farbquelle) + Label + Kopfzahl.
+        Bleibt versteckt, solange nur EIN Gerät im Raster liegt — dort ist nichts
+        zu unterscheiden und die Zeile wäre nur Rauschen."""
+        lg = getattr(self, "_legend", None)
+        if lg is None:
+            return
+        order = self._group_fids()
+        if len(order) < 2:
+            lg.hide()
+            lg.setText("")
+            return
+        heads: dict[int, int] = {}
+        for v in self._grid_widget.positions.values():
+            fid, head = _split_cell(v)
+            if fid is not None and head is not None:
+                heads[fid] = max(heads.get(fid, 0), int(head) + 1)
+        parts = []
+        for fid in order:
+            col = fixture_cell_color(fid, None, order).name()
+            name = self._labels_by_fid().get(fid, f"Fixture {fid}")
+            n = heads.get(fid)
+            suffix = f" ({n} Köpfe)" if n and n > 1 else ""
+            parts.append(
+                f"<span style='background:{col}; color:#fff;'>&nbsp;&nbsp;&nbsp;</span>"
+                f" {name}{suffix}")
+        lg.setText("Farbe → Gerät: " + " &nbsp;·&nbsp; ".join(parts))
+        lg.show()
+
+    def _labels_by_fid(self) -> dict:
+        """fid -> Label der gepatchten Fixtures (dieselbe Quelle wie die
+        Rasterzellen-Beschriftung)."""
+        return dict(getattr(self._grid_widget, "_labels", {}) or {})
+
     def _highlight_group_members(self):
         """Hebt Fixture-Items hervor, die im aktuellen Raster platziert sind."""
         # FM-16e: Basis-fids (Kopf-Zellen "fid:head" -> fid), sonst wird ein nur per
@@ -833,6 +939,9 @@ class FixtureGroupView(QWidget):
                     child.setBackground(0, QBrush(normal_bg))
                     child.setForeground(0, QBrush(normal_fg))
                     child.setFont(0, normal_font)
+        # Slice 4: Legende mitziehen — sie haengt an genau denselben Rasterdaten
+        # und laeuft ueber dieselben Trigger (positions_changed + Gruppenwechsel).
+        self._refresh_legend()
 
     def _reload_group_list(self, select_gid: int | None = None):
         """Gruppen-Combo neu aufbauen und die GEWAEHLTE Gruppe (per ID) erhalten.

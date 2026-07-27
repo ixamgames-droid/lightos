@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Rasterzellen zeigen, zu welchem Gerät und Kopf sie gehören (FM-HEADLAYOUT Slice 4)
+
+#### Geändert
+
+- **Im Fixture-Gruppen-Raster hat jetzt jedes Gerät seinen eigenen Farbton, jeder
+  Kopf seine eigene Helligkeit.** Vorher waren alle Zellen gleich blau — in einer
+  zusammengelegten Kopf-Matrix (z. B. 2× Hydrabeam = 8 Kopf-Zellen) ließ sich
+  nicht ablesen, welche Zelle zu welchem Gerät gehört. Köpfe eines Geräts teilen
+  den Farbton und werden von K1 aufwärts aufgehellt, sodass auch die
+  Kopf-Reihenfolge sichtbar ist.
+- Der Farb-Index ist die **Position des Geräts in der Raster-Reihenfolge**, nicht
+  die Geräte-Nummer: damit sind die Geräte *einer* Gruppe garantiert
+  unterschiedlich gefärbt (bei „Nummer modulo Palette" hätten z. B. Gerät 1 und
+  Gerät 9 denselben Ton bekommen). Der erste Ton ist das bisherige Blau, also
+  sehen Gruppen mit einem Gerät genauso aus wie vorher.
+- Die Aufhellung ist gedeckelt, damit die weiße Zellbeschriftung auch bei
+  vielköpfigen Panels lesbar bleibt.
+- **Neue Legende „Farbe → Gerät"** unter dem Raster (Farbfeld, Label, Kopfzahl) —
+  sie zieht ihre Farben aus derselben Funktion wie die Zellen, kann also nicht
+  auseinanderdriften. Bei nur einem Gerät im Raster bleibt sie ausgeblendet.
+- Tests `tests/test_fm_headlayout_slice4_cell_colors.py` (16 Fälle: eigene Töne je
+  Gerät, gleicher Ton mit monotoner Kopf-Rampe, Helligkeits-Deckel,
+  Abgrenzung aufgehellter Kopf gegen Nachbargerät, Palette-Umlauf, Paint-Durchlauf
+  mit gemischten Zellen, Legende sichtbar/versteckt/aktualisiert).
+
 ### 2026-07-27 — Köpfe im Gruppen-Raster selbst anordnen (FM-HEADLAYOUT Slice 3)
 
 #### Hinzugefügt
