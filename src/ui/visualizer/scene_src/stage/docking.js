@@ -128,8 +128,10 @@ export function _reportDockedFixturePositions(sid) {
   }
   if (batch && batch.length) {
     try {
+      // Neutrales Label: dieser Pfad laeuft auch aus stageResize und fabRotate,
+      // "bewegen" waere dort im Rueckgaengig-Menue schlicht falsch.
       bridge.fixturesTransformBatch(JSON.stringify(
-        { label: 'Bühnen-Element bewegen', items: batch }));
+        { label: 'Bühnen-Element bearbeiten', items: batch }));
     } catch (e) {}
   }
 }

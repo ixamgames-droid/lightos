@@ -208,6 +208,42 @@ class GestureBatchTest(unittest.TestCase):
         self.undo.undo()
         self.assertEqual(self.state.visualizer_docks.get(2), "truss-b")
 
+    def test_entry_without_dock_change_never_touches_the_dock(self):
+        """Review-Fund: der Traversen-Pfad (A3D-27) meldet immer
+        ``hasDockChange: false``. Wuerde der Command die Andockung trotzdem
+        erzwingen, koennte ein Undo eine zwischenzeitlich anders gesetzte
+        Andockung still zurueckdrehen — vorher fasste dieser Pfad ueber
+        ``push_transform_fixtures`` ausschliesslich Positionen an."""
+        self.state.visualizer_positions[1] = (0.0, 6.0, 0.0)
+        self.undo.clear()
+        self.bridge.fixturesTransformBatch(json.dumps({
+            "items": [_item(1, x=5.0)]}))          # hasDockChange = False
+
+        # Zwischendurch wird das Dock auf anderem Weg gesetzt (z.B. place_fixture_at).
+        self.state.visualizer_docks[1] = "truss-neu"
+
+        self.undo.undo()
+        self.assertEqual(self.state.visualizer_docks.get(1), "truss-neu",
+                         "ein Eintrag ohne Dock-Wechsel darf die Andockung nicht anfassen")
+
+    def test_broken_entry_leaves_no_half_applied_state(self):
+        """Review-Fund: erst die ganze Payload parsen, dann schreiben. Sonst
+        haette ein defekter Eintrag die vorherigen Fixtures im State stehen
+        lassen — ohne Undo-Command, ohne Meldung (der Slot-Guard schluckt)."""
+        self.state.visualizer_positions[1] = (0.0, 6.0, 0.0)
+        self.state.visualizer_positions[2] = (0.0, 6.0, 0.0)
+        self.undo.clear()
+
+        # zweiter Eintrag defekt: x = None (JSON.stringify macht das aus NaN)
+        bad = _item(2, x=9.0)
+        bad["x"] = None
+        self.bridge.fixturesTransformBatch(json.dumps({
+            "items": [_item(1, x=5.0), bad]}))
+
+        self.assertEqual(self.state.visualizer_positions[1], (0.0, 6.0, 0.0),
+                         "kein Fixture darf halb angewendet zurueckbleiben")
+        self.assertFalse(self.undo.can_undo())
+
     def test_empty_batch_pushes_nothing(self):
         self.undo.clear()
         self.bridge.fixturesTransformBatch(json.dumps({"items": []}))

@@ -11,8 +11,11 @@ Command-Katalog (siehe docs/VIZ11_SCENEGRAPH_DESIGN.md (e)):
   * ``push_rotate_fixtures``       — TransformNode Rotation (analog)
   * ``push_dock_fixture``          — SetParent (Fixture, Dock UND Undock ueber
                                       old_dock/new_dock=None)
-  * ``push_transform_and_dock_fixture`` — kombiniertes TransformNode+SetParent
-                                      (EIN Command fuer einen Spinbox-Commit)
+  * ``push_transform_and_dock_fixtures`` — kombiniertes TransformNode+SetParent
+                                      fuer BELIEBIG VIELE Fixtures: EIN Command
+                                      pro Gestik, auch bei Multi-Select (A3D-09/27)
+  * ``push_transform_and_dock_fixture`` — Ein-Fixture-Fall, duenner Delegate auf
+                                      die Plural-Variante (Spinbox-Commit)
   * ``push_remove_fixture``        — RemoveNode (Fixture, inkl. pos/rot/dock)
   * ``push_add_stage_element``     — AddNode (Buehnen-Element)
   * ``push_remove_stage_element``  — RemoveNode (Buehnen-Element)
@@ -206,12 +209,18 @@ def push_transform_and_dock_fixtures(
             dock = e.get("new_dock") if which == "new" else e.get("old_dock")
             state.visualizer_positions[fid] = pos
             state.visualizer_rotations[fid] = rot
-            if dock:
-                state.visualizer_docks[fid] = dock
-            else:
-                state.visualizer_docks.pop(fid, None)
-            if on_dock_change is not None:
-                on_dock_change(fid, dock)
+            # ``has_dock`` (Default True = Alt-Verhalten): traegt der Eintrag
+            # keinen echten Dock-Wechsel, wird die Andockung GAR NICHT angefasst.
+            # Sonst erzwaenge ein Undo sie — und ein Pfad, der Docks nie meldet
+            # (Traversen-Drag, A3D-27), koennte eine zwischenzeitlich anders
+            # gesetzte Andockung still zurueckdrehen.
+            if e.get("has_dock", True):
+                if dock:
+                    state.visualizer_docks[fid] = dock
+                else:
+                    state.visualizer_docks.pop(fid, None)
+                if on_dock_change is not None:
+                    on_dock_change(fid, dock)
             if apply_push is not None:
                 apply_push(fid, pos, rot)
         if on_applied is not None:

@@ -707,6 +707,12 @@ class VisualizerBridge(QObject):
         JS sendet NUR am Gestik-ENDE — die hier gelesenen Alt-Werte SIND damit
         der Gestik-Start-Snapshot (Design-Entscheidung 5).
         """
+        # ZUERST die ganze Payload parsen, ERST DANN State schreiben. Sonst
+        # hinterlaesst ein einziger defekter Eintrag (z. B. `x: null`, weil
+        # JSON.stringify ein NaN zu null macht -> float(None) wirft) die bereits
+        # geschriebenen Fixtures im State — OHNE Undo-Command und ohne Meldung,
+        # weil `_bridge_slot_guard` die Exception schluckt. Vorher war jedes
+        # Fixture ein eigener Slot-Aufruf, der Schaden also auf eines begrenzt.
         entries = []
         for d in items:
             if not isinstance(d, dict) or "fid" not in d:
@@ -729,30 +735,40 @@ class VisualizerBridge(QObject):
             else:
                 new_dock = old_dock
 
-            # State bereits VOR dem Undo-Push anwenden (JS-Echo ist schon
-            # "wahr", der Command protokolliert nur, execute=False).
-            self._state.visualizer_positions[fid] = new_pos
-            if has_rotation:
-                self._state.visualizer_rotations[fid] = new_rot
-            if has_dock_change:
-                if new_dock:
-                    self._state.visualizer_docks[fid] = new_dock
-                else:
-                    self._state.visualizer_docks.pop(fid, None)
-
-            self.pyFixtureMoved.emit(fid, new_pos[0], new_pos[1], new_pos[2])
-            if has_rotation:
-                self.pyFixtureRotated.emit(fid, new_rot[0], new_rot[1], new_rot[2])
-
             entries.append({
                 "fid": fid,
                 "old_pos": old_pos, "new_pos": new_pos,
                 "old_rot": old_rot, "new_rot": new_rot,
                 "old_dock": old_dock, "new_dock": new_dock,
+                # Ohne echten Dock-Wechsel fasst der Command die Andockung GAR
+                # NICHT an. Sonst wuerde ein Undo sie erzwingen — und der
+                # Traversen-Pfad (A3D-27, meldet immer hasDockChange=false)
+                # koennte ein zwischenzeitlich per `place_fixture_at` geaendertes
+                # Dock still zurueckdrehen. Vorher fasste dieser Pfad ueber
+                # `push_transform_fixtures` ausschliesslich Positionen an.
+                "has_dock": has_dock_change,
+                "has_rotation": has_rotation,
             })
 
         if not entries:
             return
+
+        # Erst jetzt anwenden — die Payload ist vollstaendig geparst.
+        # (JS-Echo ist bereits "wahr", der Command protokolliert nur,
+        # execute=False.)
+        for e in entries:
+            fid = e["fid"]
+            self._state.visualizer_positions[fid] = e["new_pos"]
+            if e["has_rotation"]:
+                self._state.visualizer_rotations[fid] = e["new_rot"]
+            if e["has_dock"]:
+                if e["new_dock"]:
+                    self._state.visualizer_docks[fid] = e["new_dock"]
+                else:
+                    self._state.visualizer_docks.pop(fid, None)
+            self.pyFixtureMoved.emit(fid, *e["new_pos"])
+            if e["has_rotation"]:
+                self.pyFixtureRotated.emit(fid, *e["new_rot"])
 
         # A3D-10: apply_push + dock, damit do()/undo()/redo() die 3D-Ansicht UND
         # den Dock-Zustand mitfuehren. Vorher aenderte ein Undo nur den AppState
@@ -2416,7 +2432,13 @@ class VisualizerWindow(QMainWindow):
         if old_dock is not None:
             self._state.visualizer_docks.pop(fid, None)
             new_dock = None
-        self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot)
+        # `dock` MUSS hier mit — sonst hinterlaesst der Commit einen anderen
+        # JS-Zustand als sein eigenes Redo (das ueber `apply_push` laeuft und den
+        # Dock mitschickt): JS behielte das alte `f.dockedTo`, `moveDockedFixtures`
+        # zoege das vermeintlich noch angedockte Fixture beim naechsten Bewegen der
+        # Traverse mit, und `_reportDockedFixturePositions` schriebe diese Position
+        # sogar in den AppState zurueck.
+        self._bridge.push_apply_fixture_transform(fid, x, y, z, *rot, dock=new_dock)
         # VIZ-11 (Schritt 6): EIN TransformNode/SetParent-Command fuer den
         # gesamten Spinbox-Commit (Position + Rotation + evtl. Undock).
         _scmd.push_transform_and_dock_fixture(
