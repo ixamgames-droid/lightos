@@ -205,8 +205,9 @@ export function addFixture(data) {
     spot.castShadow = false;
     // Dunkle Lampen kosten sonst trotzdem Shading in JEDEM beleuchteten Pixel
     // (three.js wertet alle sichtbaren Lichter aus) — applyGenericColor haelt
-    // die Sichtbarkeit synchron zur DMX-Intensitaet.
-    spot.visible = intensity > 0.01;
+    // die Sichtbarkeit synchron zur effektiven Leuchtdichte. Gleiches Mass schon
+    // beim Anlegen (A3D-25/A3D-28): Dimmer offen + Farbe schwarz ist dunkel.
+    spot.visible = intensity * Math.max(color.r, color.g, color.b) > 0.01;
     const shadowRes = isLowSpec ? 256 : 512;
     spot.shadow.mapSize.width = shadowRes;
     spot.shadow.mapSize.height = shadowRes;

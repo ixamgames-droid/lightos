@@ -1052,10 +1052,17 @@ export function updateGenericDmx(f, dmx) {
 // Helfer alle Single-Head-Typen identisch zum alten Durchlauf.
 function applyGenericColor(f, dmx) {
   const { color, intNorm } = dmx;
+  // A3D-25/A3D-28: Sichtbarkeit an der EFFEKTIVEN Leuchtdichte messen, nicht am
+  // Dimmer allein. Ein Fixture mit offenem Dimmer, aber Farbe 0/0/0 (RGB-
+  // Blackout ohne Dimmer-Blackout) lieferte intNorm=1 -> SpotLight blieb
+  // sichtbar und wurde in JEDEM beleuchteten Fragment ausgewertet + belegte
+  // einen Shadow-Slot, obwohl es nichts emittiert. Genau der Kostenblock, den
+  // das Dunkel-Culling einsparen soll.
+  const lum = intNorm * Math.max(color.r, color.g, color.b);
   if (f.beam) {
     f.beam.material.color = color;
     f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
-    f.beam.visible = settings.showCones && intNorm > 0.01 && view.mode === '3D';
+    f.beam.visible = settings.showCones && lum > 0.01 && view.mode === '3D';
   }
   if (f.spot) {
     f.spot.color = color;
@@ -1064,12 +1071,12 @@ function applyGenericColor(f, dmx) {
     // mit intensity 0 kostet sonst weiterhin Shading in JEDEM beleuchteten
     // Pixel (three.js wertet alle sichtbaren Lichter pro Fragment aus) —
     // bei 48 Fixtures der groesste laufende Kostenblock auf schwachen GPUs.
-    f.spot.visible = intNorm > 0.01;
+    f.spot.visible = lum > 0.01;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
     f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55);
-    f.floorSpot.visible = settings.showFloorSpots && intNorm > 0.01;
+    f.floorSpot.visible = settings.showFloorSpots && lum > 0.01;
   }
   if (f.lens && f.lens.material) {
     f.lens.material.emissive = color;
@@ -1081,7 +1088,7 @@ function applyGenericColor(f, dmx) {
   }
   // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
   if (f.laserBeams) {
-    const laserVis = settings.showCones && intNorm > 0.01 && view.mode === '3D';
+    const laserVis = settings.showCones && lum > 0.01 && view.mode === '3D';
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       bm.material.color = color;
