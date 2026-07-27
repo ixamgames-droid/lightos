@@ -567,6 +567,12 @@ export function handlePointerUp(shiftKey) {
     // -> ein fixtureGestureEnd je Fixture, Python buendelt zu EINEM Undo-Command.
     const gizmoRotate = (dragMode === 'gizmoDrag' && dragGizmo && dragGizmo.mode === 'rotate');
     const bridge = bridgeRef.get();
+    // A3D-09: alle Payloads der Gestik sammeln und EINMAL als Batch schicken ->
+    // Python baut GENAU EIN Undo-Command. Vorher ging pro Fixture ein eigener
+    // Bridge-Aufruf raus, ein 10-Fixture-Multi-Drag brauchte also 10x Strg+Z
+    // (und >100 Fixtures sprengten den MAX_SIZE-Deckel des UndoStacks, d.h. sie
+    // loeschten die komplette Undo-Historie der Sitzung).
+    const batch = (bridge && bridge.fixturesTransformBatch) ? [] : null;
     for (const fid of view.selectedFids) {
       const f = fixtures[fid];
       if (!f) continue;
@@ -592,7 +598,7 @@ export function handlePointerUp(shiftKey) {
       // -- Python buendelt sie zu GENAU EINEM Undo-Command (Design (e): "EIN
       // Command pro Gestik"). Faellt auf die alten Einzel-Slots zurueck, falls
       // eine aeltere Bridge (ohne fixtureGestureEnd) im WebChannel haengt.
-      if (bridge && bridge.fixtureGestureEnd) {
+      if (batch || (bridge && bridge.fixtureGestureEnd)) {
         const payload = {
           fid: Number(fid),
           x: f.group.position.x, y: f.group.position.y, z: f.group.position.z,
@@ -605,7 +611,10 @@ export function handlePointerUp(shiftKey) {
           payload.ry = rad2deg(f.group.rotation.y);
           payload.rz = rad2deg(f.group.rotation.z);
         }
-        try { bridge.fixtureGestureEnd(JSON.stringify(payload)); } catch (e) {}
+        // Dreistufig: Batch (neu) -> Einzel-Buendel-Event -> Legacy-Einzelslots.
+        // Nichts entfernen: eine aeltere Bridge kann im WebChannel haengen.
+        if (batch) batch.push(payload);
+        else { try { bridge.fixtureGestureEnd(JSON.stringify(payload)); } catch (e) {} }
       } else {
         if (hasDockChange && bridge && bridge.fixtureDockChanged) {
           try { bridge.fixtureDockChanged(String(fid), f.dockedTo || ''); } catch (e) {}
@@ -632,6 +641,13 @@ export function handlePointerUp(shiftKey) {
           } catch (err) {}
         }
       }
+    }
+    // A3D-09: EIN Bridge-Aufruf fuer die ganze Gestik -> EIN Undo-Command.
+    if (batch && batch.length) {
+      try {
+        bridge.fixturesTransformBatch(JSON.stringify(
+          { label: 'Fixture bearbeiten', items: batch }));
+      } catch (e) {}
     }
     clearDockHighlight();
     hideDockBadge();

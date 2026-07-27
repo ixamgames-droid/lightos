@@ -57,9 +57,13 @@ export function jsSelectStageObject(id) {
   updateOutlines();
 }
 
-export function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ) {
+export function jsApplyFixtureTransform(fid, x, y, z, rotX, rotY, rotZ, dock) {
   const f = fixtures[fid];
   if (!f) return;
+  // A3D-10: `dock` reist optional in DERSELBEN Payload mit, damit Undo/Redo einer
+  // Gestik den Andock-Zustand mitfuehrt. Fehlt das Feld (Alt-Payload), bleibt
+  // `dockedTo` unangetastet — sonst wuerde jeder Alt-Aufrufer still entdocken.
+  if (dock !== undefined && dock !== null) f.dockedTo = dock || null;
   hideTooltip();   // VIZ-10: Panel-Eingabe darf keinen veralteten Tooltip stehen lassen
   if (x != null) f.group.position.x = x;
   if (y != null) f.group.position.y = y;
@@ -227,7 +231,7 @@ export function tryChannel() {
         if (bridge.selectStageObject) bridge.selectStageObject.connect(id => jsSelectStageObject(id));
         if (bridge.applyFixtureTransform) bridge.applyFixtureTransform.connect(j => {
           const d = JSON.parse(j);
-          jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ);
+          jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ, d.dock);
         });
         if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
         if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));
@@ -315,7 +319,7 @@ export function tryChannel() {
                         if (ev.t === 'cameraReset') resetCameraView();
                         else if (ev.t === 'brightness') setBrightnessManual(ev.v);
                         else if (ev.t === 'brightnessAuto') resetBrightnessAuto();
-                        else if (ev.t === 'transform') { const d = JSON.parse(ev.j); jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ); }
+                        else if (ev.t === 'transform') { const d = JSON.parse(ev.j); jsApplyFixtureTransform(d.fid, d.x, d.y, d.z, d.rotX, d.rotY, d.rotZ, d.dock); }
                         else if (ev.t === 'addStage') jsAddStageObject(ev.stype);
                         else if (ev.t === 'addStageData') jsAddStageObjectData(ev.j);
                         else if (ev.t === 'removeStage') jsRemoveStageObject(ev.id);
