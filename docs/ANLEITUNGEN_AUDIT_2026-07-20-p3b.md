@@ -8,7 +8,7 @@ Fortsetzung von [Batch 1](ANLEITUNGEN_AUDIT_2026-07-20-p3.md) (#382). Batch 2 pr
 | Doc | Ergebnis |
 |---|---|
 | vc_widgets/01_button.md | ⚠️→✅ **Aktionstabelle vervollständigt** — 3 fehlende Laser-Aktionen ergänzt. |
-| vc_widgets/02_fader.md | ✅ 12-Modi-Liste = SLIDER_MODE_LABELS (vc_slider.py) exakt. |
+| vc_widgets/02_fader.md | ⚠️ **revidiert (siehe Nachtrag unten)** — damals als „12-Modi-Liste = SLIDER_MODE_LABELS exakt" abgehakt; tatsächlich waren es 13. |
 | vc_widgets/03_farbe.md | ✅ 7-Ziel-Liste = ColorTarget (vc_color.py) exakt. |
 | vc_widgets/04_xy_pad.md | ✅ 3 Modi + Feld-Params (vc_xypad.py) bestätigt. |
 | vc_widgets/13_tempo_bus.md | ✅ Dialog „Bus-Auswahl" + buses/armed_bus_id (vc_bus_selector.py). |
@@ -23,6 +23,23 @@ Fortsetzung von [Batch 1](ANLEITUNGEN_AUDIT_2026-07-20-p3.md) (#382). Batch 2 pr
 
 Die übrigen geprüften Widget-Docs waren durchweg exakt (Enum-Listen 1:1 mit dem Code) — die
 `anleitung_vc_widgets/`-Serie ist sehr gut gepflegt.
+
+## Nachtrag 2026-07-27 — ein Verdikt dieses Reports war falsch (CDX-27)
+
+- **vc_widgets/02_fader:** Oben stand „12-Modi-Liste = `SLIDER_MODE_LABELS` exakt". Das war
+  **falsch** — `SLIDER_MODE_LABELS` (`vc_slider.py`) enthält **13** Einträge; dem Guide fehlte
+  `Feature-Dimmer (Gruppe)` (`SliderMode.FEATURE_DIMMER`). Der Guide selbst wurde inzwischen im
+  Folge-Audit **p4** korrigiert ([PR #415](https://github.com/ixamgames-droid/lightos/pull/415),
+  Commit `866279f`) und listet heute alle 13 Modi — sowohl in der Einstellungs-Tabelle als auch
+  im Abschnitt „Die Modi im Klartext". Offen war nur noch dieses Report-Verdikt, das eine
+  spätere Audit-Runde erneut in die Irre führen konnte. Aufgedeckt von Codex auf
+  [PR #383](https://github.com/ixamgames-droid/lightos/pull/383#discussion_r3614888369).
+
+> **Konvention (hiermit etabliert, erster Präzedenzfall):** Ein datierter Audit-Report wird
+> **nicht rückwirkend umgeschrieben** — er bleibt ein ehrliches Zeitdokument. Stellt sich ein
+> Verdikt später als falsch heraus, wird die betroffene Zeile auf `⚠️ revidiert` gesetzt und
+> unten ein Nachtrag mit Datum, Begründung und Beleg ergänzt. So bleibt sichtbar, *dass* der
+> Audit sich geirrt hat — genau die Information, die eine stille Korrektur vernichten würde.
 
 ## Offen (weitere Batches)
 
