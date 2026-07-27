@@ -11,14 +11,13 @@ Effekte leuchten standalone (drive_intensity=True) -> kein Dimmer-Gefummel noeti
 
 Aufruf (headless, eigene Test-DB, ruehrt current_show.db NICHT an):
   set LIGHTOS_SHOW_DB=%TEMP%\lightos_vctest.db
-  venv\Scripts\python.exe tools\build_vc_test_2026.py
+  venv\Scripts\python.exe tools\_archiv\build_vc_test_2026.py
 Erzeugt: shows/VC_Test_2026.lshow
 """
 from __future__ import annotations
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # Eigene Test-DB, damit der Build die laufende App / current_show.db nicht stoert.
 os.environ.setdefault("LIGHTOS_SHOW_DB",
@@ -46,7 +45,7 @@ from src.ui.virtualconsole.vc_effect_colors import VCEffectColors
 from src.ui.virtualconsole.vc_bus_selector import VCBusSelector
 from src.ui.virtualconsole.vc_bpm_display import VCBpmDisplay
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "VC_Test_2026.lshow")
 
 

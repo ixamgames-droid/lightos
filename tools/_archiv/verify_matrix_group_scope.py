@@ -9,14 +9,14 @@ fuehrt direkt einen END-TO-END-Test mit der ECHTEN RgbMatrixView (follow_selecti
 
 Erzeugt zusaetzlich shows/Matrix_Gruppen_Test.lshow zum Live-Anschauen in der App.
 
-Aufruf:  PYTHONPATH=<code-root> venv/Scripts/python.exe tools/verify_matrix_group_scope.py
+Aufruf:  PYTHONPATH=<code-root> venv/Scripts/python.exe tools/_archiv/verify_matrix_group_scope.py
 """
 from __future__ import annotations
 import os
 import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
@@ -31,7 +31,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.core.engine.rgb_matrix import RgbAlgorithm, grid_from_positions
 from src.core.show.show_file import reset_show, save_show
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Matrix_Gruppen_Test.lshow")
 
 

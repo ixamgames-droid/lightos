@@ -18,16 +18,15 @@ Selbst-verifizierender Show-Generator für die neuen Features:
 Hardware wie Komplett_Demo: 4x ZQ01424-PAR (DMX 1/9/17/25) + 2x ZQ02001-MH
 (33/44) + Akai APC mini mk2.
 
-Aufruf:  venv/Scripts/python.exe tools/build_custom_path_demo.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_custom_path_demo.py
 Erzeugt: shows/CustomPath_Demo.lshow   (Doku: docs/UPDATE_2026-06-11.md)
 """
 from __future__ import annotations
 
 import json
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -50,7 +49,7 @@ from src.ui.virtualconsole.vc_button import ButtonAction, VCButton
 from src.ui.virtualconsole.vc_slider import SliderMode, VCSlider
 from src.ui.virtualconsole.vc_label import VCLabel
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "CustomPath_Demo.lshow")
 
 

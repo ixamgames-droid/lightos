@@ -9,12 +9,10 @@ und dass der Timeline-Loop sauber neu startet.
 Aufruf:  venv\\Scripts\\python.exe tools\\verify_komplett_demo.py
 """
 import os
-import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-SHOW = os.path.join("shows", "Komplett_Demo.lshow")
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
+SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Komplett_Demo.lshow")
 FPS = 44.0
 DT = 1.0 / FPS
 

@@ -21,15 +21,14 @@ Universell auf JEDER Seite:
   * Track-Tasten unten: Clear / Stop All / Blackout / Tap / Musik-BPM
   * Fader F6 Dimmer (Submaster) | F7 Speed global | F9 Grand Master
 
-Aufruf:  venv/Scripts/python.exe tools/build_apc_probier_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_apc_probier_show.py
 Erzeugt: shows/APC_Probier.lshow
 """
 from __future__ import annotations
 import os
-import sys
 import json
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)
@@ -55,7 +54,7 @@ from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_color_list import VCColorList
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "APC_Probier.lshow")
 
 DEVICE = "mk2"                       # Davids APC mini meldet sich als mk2

@@ -1,6 +1,7 @@
 # Praxis-Demo-Show — Notizen (P13)
 
-> **Show:** `shows/Praxis_Demo.lshow` · **Generator:** `tools/build_practice_show.py`
+> **Show:** `shows/_archiv/Praxis_Demo.lshow` · **Generator:** `tools/_archiv/build_practice_show.py`
+> _(beide archiviert — TOOLS-ALTGEN 2026-07-27.)_
 > (selbstverifizierend: baut, speichert, lädt neu und prüft alles per assert).
 > Stand: 2026-06-11. Schwester-Show: `Komplett_Demo.lshow` (Feature-Vollabdeckung);
 > die Praxis-Demo fokussiert auf die **neuen Funktionen der Runde P1–P12**.

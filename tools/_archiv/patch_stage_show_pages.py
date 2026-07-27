@@ -12,7 +12,7 @@ Seite 1 (Bank 1 / index 0) = EFFEKTE: Effekt-Pads + Fader F1-F4 = Effekt-Speed.
 Seite 2 (Bank 2 / index 1) = FARBE/RGBW: Fader 1-4 = Rot/Gruen/Blau/Weiss (Programmer).
 Immer sichtbar (Bank "Alle"): Farb-Presets oben, Clear/Stop/Blackout, Dimmer, Master.
 
-Aufruf:  python tools/patch_stage_show_pages.py
+Aufruf:  python tools/_archiv/patch_stage_show_pages.py
 """
 from __future__ import annotations
 import io
@@ -20,8 +20,9 @@ import json
 import os
 import zipfile
 
-SHOW = os.path.join(os.path.dirname(__file__), "..", "shows", "Buehnen_Show.lshow")
-SHOW = os.path.abspath(SHOW)
+import _bootstrap  # noqa: F401  # Repo-Root aufloesen (siehe _bootstrap.py)
+
+SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Buehnen_Show.lshow")
 
 BANK_ALL = -1
 BANK_FX = 0      # Seite 1 = Effekte

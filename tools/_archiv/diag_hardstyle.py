@@ -1,8 +1,8 @@
 r"""Headless-Verifikation der Hardstyle-Show: laedt sie, treibt den Tempo-Bus,
 prueft Beat-Blink (R,R,R,W pro Beat), Spider-Bar-Farben und Gobo-Szene."""
 from __future__ import annotations
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
 os.environ["LIGHTOS_NO_AUDIO_AUTOSTART"] = "1"
@@ -16,7 +16,7 @@ from src.core.engine.bpm_manager import get_bpm_manager
 from src.core.engine.tempo_bus import get_tempo_bus_manager
 from src.core.show.show_file import load_show
 
-SHOW = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+SHOW = os.path.join(_bootstrap.REPO_ROOT,
                     "shows", "Hardstyle_Show.lshow")
 ok, msg = load_show(SHOW)
 print("Load:", ok, msg)

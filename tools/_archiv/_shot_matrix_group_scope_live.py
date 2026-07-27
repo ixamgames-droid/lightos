@@ -6,13 +6,12 @@ waehlt je Gruppe + den Matrix-Tab und greift das Fenster per QWidget.grab().
 Kein Live-Klick-Raten, kein GDI noetig — und keine Hardware-Seiteneffekte
 (Output/Audio per Env-Gate aus, Show-DB auf temp).
 
-Aufruf:  PYTHONPATH=<root> venv/Scripts/python.exe tools/_shot_matrix_group_scope_live.py
+Aufruf:  PYTHONPATH=<root> venv/Scripts/python.exe tools/_archiv/_shot_matrix_group_scope_live.py
 """
 from __future__ import annotations
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 # WICHTIG: NICHT offscreen -> echte Fonts. Hardware-Seiteneffekte abschalten.
 os.environ["NO_OUTPUT_THREAD"] = "1"
 os.environ["NO_AUDIO_AUTOSTART"] = "1"
@@ -28,7 +27,7 @@ from src.core.app_state import get_state
 from src.core.show.show_file import load_show
 from src.ui.main_window import MainWindow
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 SHOW = os.path.join(_ROOT, "shows", "Matrix_Gruppen_Test.lshow")
 OUT_DIR = os.path.join(_ROOT, "docs", "_verify")
 os.makedirs(OUT_DIR, exist_ok=True)

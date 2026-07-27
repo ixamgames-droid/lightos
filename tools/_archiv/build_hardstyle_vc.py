@@ -24,8 +24,9 @@ import zipfile
 import shutil
 import os
 
-SHOW = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shows",
-                                    "Hardstyle_Show.lshow"))
+import _bootstrap  # noqa: F401  # Repo-Root aufloesen (siehe _bootstrap.py)
+
+SHOW = os.path.join(_bootstrap.REPO_ROOT, "shows", "Hardstyle_Show.lshow")
 
 # ── Fixture-IDs aus dem Patch ────────────────────────────────────────────────
 PARS = [1, 2, 3, 4, 5, 6, 7, 8]

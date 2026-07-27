@@ -5,13 +5,12 @@ Laedt zuerst shows/Matrix_Gruppen_Test.lshow FRISCH (beweist: die Gruppen-Bindun
 source_group uebersteht Show-Save/Load, weil per Name gebunden), waehlt dann je
 Gruppe und greift das Widget per QWidget.grab().
 
-Aufruf:  PYTHONPATH=<root> LIGHTOS_SHOW_DB=<temp> venv/Scripts/python.exe tools/_shot_matrix_group_scope.py
+Aufruf:  PYTHONPATH=<root> LIGHTOS_SHOW_DB=<temp> venv/Scripts/python.exe tools/_archiv/_shot_matrix_group_scope.py
 """
 from __future__ import annotations
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
@@ -24,7 +23,7 @@ from src.core.database.models import FixtureGroup
 from src.core.show.show_file import load_show
 from src.ui.views.rgb_matrix_view import RgbMatrixView
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 SHOW = os.path.join(_ROOT, "shows", "Matrix_Gruppen_Test.lshow")
 OUT_DIR = os.path.join(_ROOT, "docs", "_verify")
 os.makedirs(OUT_DIR, exist_ok=True)

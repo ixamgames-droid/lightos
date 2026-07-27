@@ -1,6 +1,7 @@
 # Profi-Modus-Show — sektioniertes Quadranten-Layout (To-Do #11)
 
-> **Show:** `shows/Profi_Modus.lshow` · **Generator:** `tools/build_profi_show.py`
+> **Show:** `shows/_archiv/Profi_Modus.lshow` · **Generator:** `tools/_archiv/build_profi_show.py`
+> _(beide archiviert — TOOLS-ALTGEN 2026-07-27.)_
 > **Hardware:** Akai APC mini (mk2) + 4× PAR (ZQ01424) + 2× Moving Head (ZQ02001)
 
 Die 8×8-Pads sind in vier **4×4-Quadranten** aufgeteilt — „einfach für Laien,

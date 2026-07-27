@@ -2,10 +2,10 @@
 die Snaps auf die APC-Pads legt. Snapshots wenden direkt Programmer-Werte an —
 genau der Pfad, der beim manuellen Steuern nachweislich Licht macht.
 
-Aufruf: venv/Scripts/python.exe tools/build_snaps_show.py
+Aufruf: venv/Scripts/python.exe tools/_archiv/build_snaps_show.py
 """
-import os, sys, json
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os, json
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core (tools/_gen_env.py)

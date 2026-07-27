@@ -1,6 +1,7 @@
 # Master-Demo-Show — „alles, was die Show kann"
 
-> **Show:** `shows/Master_Demo.lshow` · **Generator:** `tools/build_master_demo_show.py`
+> **Show:** `shows/_archiv/Master_Demo.lshow` · **Generator:** `tools/_archiv/build_master_demo_show.py`
+> _(beide archiviert — TOOLS-ALTGEN 2026-07-27.)_
 > **Hardware:** Akai APC mini (mk2) + 4× PAR (ZQ01424) + 2× Moving Head (ZQ02001)
 
 Die große Gesamt-Demo: nutzt das **Multi-Konsolen-/Bank-System** (APC-SCENE-Tasten
