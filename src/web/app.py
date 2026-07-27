@@ -182,6 +182,22 @@ def refresh_token(app) -> None:
         print(f"[web] refresh_token error: {e}")
 
 
+def refresh_running_token() -> bool:
+    """CDX-24: ``refresh_token`` fuer den LAUFENDEN Server, ohne dass ein Aufrufer
+    an das modulprivate ``_flask_app`` muss.
+
+    Noetig, weil die UI nach ``remote_settings.regenerate_token()`` sonst nichts
+    ausrichtet: der Gate liest das Token aus ``app.config`` (dort landet es nur in
+    ``create_app``), der laufende Server wuerde also weiter den ALTEN ``?k=``-Link
+    akzeptieren. Gibt True zurueck, wenn ein Server lief und nachgezogen wurde.
+    """
+    app = _flask_app
+    if app is None:
+        return False
+    refresh_token(app)
+    return True
+
+
 def _register_auth(app):
     """NET-01: Token-Gate. Alle Routen ausser der Allowlist ('/', statische
     Assets) verlangen eine authentisierte Session. Die '/'-Route macht den

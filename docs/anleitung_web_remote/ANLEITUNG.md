@@ -17,9 +17,11 @@ Info-Box; in der Statusleiste erscheint **„Web: :5000 OK"** (grün).
 Ein paar Fakten zum Server (aus `src/web/app.py`):
 
 - **Port:** `5000` (fest; `start_server(5000)` wird beim Einschalten aufgerufen).
-- **Bind-Adresse:** `0.0.0.0` — der Server lauscht bewusst auf **allen**
-  Netzwerk-Schnittstellen, damit ihn andere Geräte im LAN erreichen. Genau
-  deshalb gilt der Sicherheitshinweis in Abschnitt 4.
+- **Bind-Adresse:** hängt am Schalter **„LAN-/Handy-Remote"** (siehe unten).
+  Eingeschaltet (Standard) lauscht der Server auf `0.0.0.0`, also auf **allen**
+  Netzwerk-Schnittstellen, damit ihn andere Geräte im LAN erreichen — genau
+  deshalb gilt der Sicherheitshinweis in Abschnitt 4. Ausgeschaltet bindet er
+  `127.0.0.1`, dann kommt nur dieser PC dran.
 - **Secret-Key:** Der Flask-`SECRET_KEY` wird **nicht** hart im Code hinterlegt.
   Ist die Umgebungsvariable `LIGHTOS_FLASK_SECRET` gesetzt, wird sie verwendet;
   sonst erzeugt LightOS bei jedem Start einen zufälligen Key. Für den normalen
@@ -117,13 +119,18 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
   geschützt (kurz & tippbar, als `?k=<token>` in der URL). Ein `@before_request`-Gate lässt
   nur authentisierte Sessions durch — jede API-Route ohne gültige Session antwortet mit
   **403**; auch SocketIO lehnt unauthentisierte Verbindungen ab. Nach dem Handshake merkt ein
-  `HttpOnly`/`SameSite=Strict`-Cookie die Anmeldung. Das Token zeigt der Verbindungs-Dialog;
-  „Token neu erzeugen" macht alte Links ungültig.
+  `HttpOnly`/`SameSite=Strict`-Cookie die Anmeldung. Token und Direkt-Link zeigt der Dialog
+  **„Ausgabe → Web-Remote: Verbindung & Token…"** (er öffnet sich auch beim Einschalten);
+  dort macht **„Token neu erzeugen"** alle bisherigen Links und angemeldeten Geräte sofort
+  ungültig — auch am **laufenden** Server, ohne Neustart.
 - **CORS-Allowlist (NET-03).** Statt `cors_allowed_origins="*"` erlaubt der SocketIO-Endpunkt
   nur noch die bekannten Origins (`http://<lan-ip>:5000`, `127.0.0.1`, `localhost`) — eine
   fremde Webseite im selben Netz kann sich nicht mehr einfach drauf verbinden.
-- **LAN-Bind steuerbar.** Der Toggle **„LAN-/Handy-Remote"** (Default AN, sicher weil Token
-  davor) bindet `0.0.0.0` (das Handy erreicht es); AUS bindet `127.0.0.1` (nur der PC selbst).
+- **LAN-Bind steuerbar.** Die Checkbox **„LAN-/Handy-Remote"** im selben Dialog (Default AN,
+  sicher weil Token davor) bindet `0.0.0.0` (das Handy erreicht es); AUS bindet `127.0.0.1`
+  (nur der PC selbst). Die Bind-Adresse wird beim Serverstart gesetzt — läuft das
+  Web-Interface gerade, startet LightOS es beim Umschalten deshalb **automatisch neu**, damit
+  „aus" auch wirklich sofort „aus" heißt (die Statusleiste bestätigt das).
 
 **Trotzdem Rest-Risiko im Blick behalten:**
 

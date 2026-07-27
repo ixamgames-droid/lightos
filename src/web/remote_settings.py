@@ -112,11 +112,20 @@ def get_auth_epoch() -> int:
 
 def regenerate_token() -> str:
     """Erzeugt ein NEUES Token, persistiert es und gibt es zurueck ('Token neu
-    erzeugen'). Wirkt SOFORT am laufenden Server: der Handshake liest das Token
-    frisch (kein Neustart noetig), und die mit-erhoehte ``auth_epoch`` macht alle
-    bestehenden authentisierten Web-Sessions ungueltig (der Gate vergleicht die
-    Session-Epoche gegen die aktuelle). Alte am Handy gespeicherte ``?k=``-Links
-    (mit dem alten Token) werden damit ebenfalls abgewiesen."""
+    erzeugen').
+
+    Die mit-erhoehte ``auth_epoch`` macht alle bestehenden authentisierten
+    Web-Sessions sofort ungueltig (das Gate vergleicht die Session-Epoche gegen
+    die aktuelle) — das wirkt allein durch das Persistieren.
+
+    ⚠️ Fuer das TOKEN selbst gilt das NICHT automatisch: der Handshake liest es aus
+    ``app.config['LIGHTOS_REMOTE_TOKEN']``, und dort landet es nur beim
+    ``create_app``. Ein laufender Server akzeptiert also weiter den ALTEN
+    ``?k=``-Link, bis jemand ``src.web.app.refresh_running_token()`` ruft. Die UI
+    (Ausgabe → „Web-Remote: Verbindung & Token…") tut beides zusammen; wer die
+    Rotation programmatisch ausloest, muss es ebenfalls tun.
+    (Der frueher hier stehende Satz „wirkt SOFORT am laufenden Server" war falsch —
+    CDX-24.)"""
     tok = _new_token()
     save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
     return tok
