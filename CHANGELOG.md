@@ -39,6 +39,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Vorrang-Tabelle, beide Richtungen gegen die globale Wahl, `auto`-Regressions-
   schutz, Wiedervereinigung getrennter Köpfe, gemischte Auswahl inkl. Prüfung
   beider DMX-Bänke, Schalter-Gate).
+- Bei der Live-Abnahme nachgezogen: ist der globale Umschalter wirkungslos
+  (alle ausgewählten Mehrkopf-Geräte haben eine feste Wahl), wird er jetzt
+  sichtbar abgeblendet und mit „pro Gerät gesetzt (Patch-Dialog)" erklärt —
+  vorher sah er bedienbar aus und ein Klick tat einfach nichts.
+
+### 2026-07-27 — Zwei echte Pixel-Panels in der Geräte-Bibliothek (FM-13)
+
+#### Hinzugefügt
+
+- **ADJ Dotz Matrix** und **Stairville Pixel Panel 144 RGB** sind jetzt fertige
+  Geräte in der Bibliothek — bisher gab es für Pixel-Panels nur das generische
+  „LED Matrix Panel". Beide lassen sich patchen wie jedes andere Gerät und
+  erscheinen im 3D-Visualizer mit ihrem echten Raster: die Dotz Matrix als 4×4
+  (16 Pixel), das Stairville-Panel als 12×12 (144 Pixel), jeder Pixel einzeln
+  färbbar. Die schmalen Modi der Geräte (bei denen das ganze Panel eine Farbe
+  bekommt) zeigen entsprechend eine Fläche.
+- Alle Kanal-Zuordnungen stammen aus den Hersteller-Anleitungen und wurden
+  zusätzlich gegen eine unabhängige Fixture-Datenbank geprüft. Strobe steht
+  beim Patchen auf „aus", die Farb-Makros auf „manuelle Steuerung" — ein frisch
+  gepatchtes Panel blitzt also nicht und läuft kein Automatikprogramm.
+
+#### Gut zu wissen
+
+- **Dotz Matrix: „Pixel Flip" am Gerät auf `Flip 4` stellen.** Ab Werk zählt das
+  Gerät seine Pixel in Schlangenlinien (erste Reihe von links, zweite von
+  rechts), LightOS zeigt sie dagegen zeilenweise an. Ein Lauflicht liefe sonst
+  auf dem echten Panel im Zickzack. `Flip 4` stellt die zeilenweise Reihenfolge
+  her, danach stimmt 3D-Ansicht und Realität überein.
 
 ### 2026-07-26 — Kein Blackout-Puls mehr beim Live-Show-Load (CDX-22)
 

@@ -233,6 +233,8 @@ class BuiltinTypeAuditTest(unittest.TestCase):
             "ATOMIC3000": "strobe", "POINTE": "moving_head", "MACAURA": "moving_head",
             # FM-13: LED-Matrix/Pixel-Panel (neuer fixture_type 'matrix')
             "MATRIXPANEL": "matrix",
+            # FM-13 Slice 2: benannte reale Panels
+            "DOTZMATRIX": "matrix", "STAIRPP144": "matrix",
         }
         with Session(self._eng) as s:
             rows = dict(s.execute(
