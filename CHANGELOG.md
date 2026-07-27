@@ -22,21 +22,55 @@ Reine Buchhaltung, kein Verhalten der App betroffen.
   Umsetzungsbericht in der Status-Zelle; das Wort „Review" darin liess das Item
   als laufende Arbeit gelten.
 - **Neuer Lint (QA-18b, `tests/test_backlog_lint.py`):** Status `todo` und
-  „GELANDET" in derselben Zeile sind ab jetzt ein Testfehler. Genau dieser
-  Widerspruch ist dem Loop bis 2026-07-27 fünfmal passiert und schickt die
-  nächste Runde auf ein Item, das grösstenteils erledigt ist.
+  „GELANDET" in derselben Zeile sind ab jetzt ein Testfehler — der Widerspruch
+  schickt die nächste Loop-Runde auf ein Item, das grösstenteils erledigt ist
+  (zuletzt `FM-9`, das oberste P1). Bewertet wird nur der **Status-Kopf** vor der
+  ersten Klammer: `todo (Slice 1 done)` entwertet die Regel nicht mehr, und ein
+  zitiertes Wort im Fliesstext löst sie nicht mehr fälschlich aus.
+- **Neuer Lint (QA-18c): doppelte IDs sind ein Testfehler.** Vorgefunden: zwei
+  völlig verschiedene Items trugen beide `DOC-10` (Anleitungs-/Bild-Audit und der
+  AUDIT_COVERAGE-Tracker). Jede Auswertung, die per ID zusammenführt — Verdichten,
+  Zurückholen aus dem Archiv, Queue — greift dann die falsche Zeile. Der Tracker
+  heisst jetzt `DOC-10b`.
+- **Halb erledigte Zeilen wandern nicht mehr ins Archiv.** `DOC-10` stand auf
+  „✅ Bild-Links done · Screenshots offen" — die Zelle meldet Erledigtes UND
+  offene Arbeit im selben Atemzug. Die Verdichtung sah nur das Wort `done` und
+  schob die Zeile samt offenem Rest ins Archiv, wo keine Queue und kein Report
+  sie je wieder zeigt. Solche gemischten Staten gelten jetzt als `teils`.
+- **Kurztitel schneiden keine Links mehr an.** Die Kürzung auf 90 Zeichen lief
+  stumpf über die Zeichenzahl und zerhackte dabei Markdown-Links — 21 Kurzzeilen
+  trugen eine abgeschnittene, tote URL. Links werden jetzt auf ihren Text
+  reduziert (die kanonische PR-Adresse hängt ohnehin separat an) und es wird nur
+  an Wortgrenzen gekürzt. Alle betroffenen Zeilen sind neu erzeugt.
+- **Neun Zeilen waren für sämtliche Backlog-Werkzeuge unsichtbar.** Unterpunkte
+  mit Kleinbuchstaben-Suffix (`LAS-18b`, `LAS-18c`, `UXT-11a/b`, `CDX-14b`,
+  `CDX-22b`, `STAB-19a/b`, `A3D-17b`) fielen durch das ID-Muster — sie tauchten
+  in Queue, Statistik, Verdichtung und Lint schlicht nicht auf, darunter ein
+  offenes `todo` und ein `blocked`. Das Muster erfasst die Konvention jetzt, und
+  ein neuer Lint (QA-18d) meldet jede Zeile, die wie ein Item aussieht, aber
+  nicht erfasst wird.
+- **Das Doku-Link-Gate (QA-17) prüft jetzt auch `BACKLOG_ARCHIVE.md`.** Die
+  Verdichtung schiebt laufend Doku-Verweise dorthin; ohne Eintrag im Gate wären
+  ausgerechnet die Links ungeprüft geblieben, für die es das Gate gibt.
 
 #### Verbessert
 
-- **`BACKLOG.md` 375 KB → 207 KB.** 273 reine `done`-Zeilen sind per
+- **`BACKLOG.md` 375 KB → 197 KB.** 283 reine `done`-Zeilen sind per
   `tools/backlog_compact.py --archive --apply` als Volltext nach
   `BACKLOG_ARCHIVE.md` gewandert; in der Arbeitsdatei bleibt je eine Kurzzeile
   mit ID, Titel und PR-Link. Damit ist die Datei wieder in einer Loop-Runde
-  ladbar.
-- **`--queue` zeigt `teils`-Items in einem eigenen Block.** Sie sind weder
-  `done` noch in Arbeit und fielen bisher aus jeder Ansicht heraus — real waren
-  sechs Items (`QA-LIVE`, `LAS-07`, `LAS-08`, `VIZ-15`, `A3D-17`, `NET-04`)
-  unsichtbar liegengeblieben.
+  ladbar. Nachgerechnet: 339 IDs vorher, 340 nachher (der aufgelöste Doppel-Name),
+  keine einzige verloren, jede Kurzzeile hat ihren Volltext im Archiv.
+- **`--queue` zeigt liegengebliebene Items in eigenen Blöcken.** `teils`-Items
+  sind weder `done` noch in Arbeit und fielen bisher aus jeder Ansicht heraus;
+  real sind es sieben (`QA-LIVE`, `LAS-07`, `VIZ-15`, `DOC-10`, `LAS-08`,
+  `NET-04`, `OUT-06`). Dazu ein Block für Zeilen mit **freiem Status-Text**, den
+  keine Vokabel der Legende trifft (`VIZ-05` „✅ verifiziert → 🎨 Design",
+  `UXT-02` „⏳ nicht reproduzierbar") — die waren bislang genauso unsichtbar.
+- **`--archive` warnt vor dem Schreiben**, wenn eine als erledigt eingestufte
+  Zeile im Kommentar noch nach offener Arbeit klingt. Bewusst nur eine Warnung:
+  „offen" steht auch als blosse Prosa in echten `done`-Zeilen, das entscheidet
+  ein Mensch.
 
 ### 2026-07-27 — Web-Remote: Token und LAN-Zugriff endlich bedienbar (CDX-24)
 

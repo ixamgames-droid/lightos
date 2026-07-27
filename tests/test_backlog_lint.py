@@ -16,7 +16,9 @@ BACKLOG = os.path.join(REPO, "BACKLOG.md")
 
 # Tabellenzeile: | <ID> | <Prio> | <Status> | … |  (ID darf mehrere Segmente haben,
 # z.B. QA-P95-FLAKE, VIZ-MASTER-FEEDBACK).
-ROW = re.compile(r"^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|")
+# Muss mit tools/backlog_compact.py::ROW deckungsgleich bleiben — inkl. des
+# optionalen Kleinbuchstaben-Suffix fuer Unterpunkte (LAS-18b, CDX-22b, …).
+ROW = re.compile(r"^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+[a-z]?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|")
 # Anerkannte Status-Keywords (irgendwo in der Status-Zelle, case-insensitiv).
 STATUS_KEYWORDS = ("todo", "done", "wip", "review", "blocked", "decision",
                    "teils", "teil", "defer", "verifiziert", "reproduzierbar", "n/a")
@@ -87,13 +89,55 @@ class BacklogLintTest(unittest.TestCase):
         """
         bad = []
         for ln, id_, _p, status, line in _rows_with_line():
-            low = status.lower()
-            if "todo" not in low or "done" in low or "wip" in low:
+            # Nur der Status-KOPF (vor der ersten Klammer) ist der Status; was in
+            # Klammern steht, ist Kommentar. Sonst entwertet ein blosses
+            # "todo (Slice 1 done)" die Regel, und ein zitiertes Wort im
+            # Fliesstext loest sie faelschlich aus (Review-Fund 2026-07-28).
+            head = status.split("(")[0].lower()
+            if "todo" not in head:
+                continue
+            if any(k in head for k in ("done", "wip", "teils", "teil")):
                 continue
             if LANDED.search(line):
                 bad.append((ln, id_, status[:60]))
         self.assertEqual(bad, [], f"Status 'todo', aber die Zeile meldet gelandete "
-                                  f"Arbeit — auf 'wip'/'done' ziehen: {bad}")
+                                  f"Arbeit — auf 'wip'/'teils'/'done' ziehen: {bad}")
+
+    def test_item_rows_are_all_recognized(self):
+        """QA-18d: eine Zeile, die wie ein Item aussieht (ID-Zelle + P1/P2/P3),
+        MUSS vom ID-Muster erfasst werden.
+
+        Beim Entzerren der doppelten `DOC-10` war die Umbenennung zuerst
+        `DOC-10b` — mit Kleinbuchstaben faellt die Zeile durch `ROW` und ist damit
+        fuer Verdichtung, Queue, Stats und diesen Lint **gar nicht vorhanden**.
+        Dieselbe stille Unsichtbarkeit, gegen die dieser Branch antritt.
+        """
+        looks_like_item = re.compile(r"^\|\s*[A-Za-z][\w.-]*\s*\|\s*\**\s*(P[123])\b")
+        bad = []
+        with open(BACKLOG, "r", encoding="utf-8") as f:
+            for lineno, line in enumerate(f, 1):
+                if looks_like_item.match(line) and not ROW.match(line):
+                    bad.append((lineno, line.split("|")[1].strip()))
+        self.assertEqual(bad, [], f"Item-Zeile passt nicht aufs ID-Muster "
+                                  f"(GROSSBUCHSTABEN/Ziffern, mit Bindestrich): {bad}")
+
+    def test_ids_are_unique(self):
+        """QA-18c: eine ID darf nur EIN Item bezeichnen.
+
+        Real vorgefunden 2026-07-28: zwei voellig verschiedene Items trugen beide
+        `DOC-10` (Anleitungs-/Bild-Audit und der AUDIT_COVERAGE-Tracker). Jede
+        Auswertung, die per ID zusammenfuehrt — Verdichtung, Archiv-Rueckholung,
+        Queue — greift dann die falsche Zeile; beim Archivieren war genau das der
+        Weg, auf dem offene Arbeit still verschwand.
+        """
+        seen: dict[str, int] = {}
+        dupes = []
+        for ln, id_, _p, _status in _rows():
+            if id_ in seen:
+                dupes.append((id_, seen[id_], ln))
+            else:
+                seen[id_] = ln
+        self.assertEqual(dupes, [], f"doppelte IDs (ID, erste Zeile, zweite Zeile): {dupes}")
 
 
 if __name__ == "__main__":

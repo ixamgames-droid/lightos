@@ -24,7 +24,11 @@ HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 CODE_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 
-TOP_LEVEL = ("README.md", "BACKLOG.md", "ROADMAP.md", "CHANGELOG.md")
+# BACKLOG_ARCHIVE.md gehoert dazu: --archive schiebt laufend Doku-Links aus der
+# gegateten BACKLOG.md dorthin — ohne Eintrag hier waeren genau die Verweise
+# ungeprueft, die das Gate schuetzen soll (Review-Fund 2026-07-28).
+TOP_LEVEL = ("README.md", "BACKLOG.md", "BACKLOG_ARCHIVE.md", "ROADMAP.md",
+             "CHANGELOG.md")
 
 
 def _iter_md_files():
