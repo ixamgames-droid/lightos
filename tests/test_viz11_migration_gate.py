@@ -195,6 +195,14 @@ class MigrationGateTest(unittest.TestCase):
         already_migrated = "scene_graph" in raw
 
         ok, msg = load_show(path)
+        # Fremdformat (2026-07-26): eine Datei, die der Loader als "keine
+        # LightOS-Show" ABLEHNT, ist kein Migrations-Regress — hier ist nichts zu
+        # migrieren. Bewusst NUR diese eine Meldung wird uebersprungen; jeder
+        # andere Ladefehler bleibt ein harter Fehlschlag. Anlass: dieser Gate
+        # scannt auch ../lightos-main/shows/ (Davids lokale Shows), wo eine solche
+        # Datei liegen kann. Siehe show_file.load_show / tests/test_show_format_upgrade.py.
+        if not ok and "Unbekanntes Show-Format" in msg:
+            self.skipTest(f"{path.name}: kein LightOS-Show-Format — {msg}")
         self.assertTrue(ok, f"{path.name}: load_show fehlgeschlagen: {msg}")
 
         state = get_state()

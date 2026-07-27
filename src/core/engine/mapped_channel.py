@@ -266,7 +266,14 @@ class MappedChannelChange(Function):
                 key = a if head == 0 else f"{a}#{head}"
                 if key in attrs:
                     val = attrs[key]
-                elif head == 0 and a in attrs:
+                elif a in attrs:
+                    # Kopf>0 SPIEGELT den Basiswert (kein `head == 0`-Gate mehr).
+                    # Vorher erreichte eine Regel mit per_head=False — dem
+                    # DEFAULT jeder neuen Regel — bei Mehrkopf-Fixtures
+                    # (Hydrabeam/MOVBAR4, Spider, LED-Bar) nur die ERSTE
+                    # RGB-Bank: gemessen [73, 0, 0, 0] statt [73, 73, 73, 73].
+                    # Gleiche Semantik wie efx.py/`resolve_attr_channels`, wo
+                    # der Fallback `elif ch.attribute in values` schon so ist.
                     val = attrs[a]
                 else:
                     continue

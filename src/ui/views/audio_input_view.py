@@ -78,6 +78,35 @@ class AudioInputView(QWidget):
         self._ui_timer.timeout.connect(self._refresh_ui)
         self._ui_timer.start()
 
+    def closeEvent(self, event):  # noqa: N802 (Qt-API)
+        """Worker-Callbacks abmelden und den 30-Hz-Ticker stoppen.
+
+        ``AudioCapture``/``BeatDetector`` halten die gebundene Methode STARK
+        (`self._subscribers.append(cb)`), also pinnt jede nicht abgemeldete
+        View sich selbst an den Prozess-Singleton. Im Live-Betrieb faellt das
+        kaum auf (die View wird genau einmal gebaut), in Tests und
+        Wiederaufbau-Pfaden stapeln sich die Callbacks aber auf den echten
+        Singletons — `process_chunk` laeuft dann mehrfach.
+        Gleiches Muster wie `MidiView.closeEvent`. Idempotent.
+
+        Geborgen 2026-07-26 aus dem Branch `audit/threading-native-av`
+        (dessen weakref-Loesung wurde bewusst NICHT uebernommen — main faehrt
+        explizites Abmelden, siehe `src/ui/weak_slots.py` fuer Qt-Signale).
+        """
+        try:
+            self._ui_timer.stop()
+        except (RuntimeError, AttributeError):
+            pass
+        for owner, cb in ((getattr(self, "_capture", None), getattr(self, "_on_audio_chunk", None)),
+                          (getattr(self, "_detector", None), getattr(self, "_on_beat", None))):
+            if owner is None or cb is None:
+                continue
+            try:
+                owner.unsubscribe(cb)
+            except Exception:
+                pass
+        super().closeEvent(event)
+
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _setup_ui(self):

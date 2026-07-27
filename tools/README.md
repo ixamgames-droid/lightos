@@ -18,6 +18,7 @@
 | `build_apc_probier_show.py` | APC-PROBIER-SHOW — Testfeld fuer Davids reales Setup (4 PAR + 2 MH + APC mini). |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
 | `build_custom_path_demo.py` | DEMO: Custom Paths + EFX-Live-Steuerung + Keyboard-Mapping (2026-06-11). |
+| `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
 | `build_demo_show.py` | Erzeugt eine komplett vorprogrammierte Demo-Show (.lshow) fuer die 3 RGBW-PARs |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
 | `build_demo_zq_show.py` | Demo-/Bühnen-Show fuer Davids reale Hardware (DMO-01, Masterplan 2026-06-08): |
@@ -68,6 +69,7 @@
 | `render_apc_pages.py` | Rendert jede Seite (VC-Bank) der APC-Test-Show als PNG — fuer die Anleitung. |
 | `render_neue_demo_pages.py` | Rendert die 5 Banks der Neue_Demo_2026-Show als PNG (für die Doku/Vorschau). |
 | `ui_verification_checklist.py` | QA-12 UI-Verifikations-Checklisten-Generator/-Checker. |
+| `upgrade_shows.py` | Alt-Shows auf das aktuelle Show-Format (``show_file.SHOW_VERSION``) heben. |
 | `vc_click_targets.py` | Berechnet aus einem Vollbild-Screenshot (mit der Magenta-Kalibrier-Kachel |
 | `verify_color_dimmer_separation.py` | Verifikation: Trennung FARBE <-> DIMMER an Effekten (Color/Matrix/Chase). |
 | `verify_loop.ps1` | tools/verify_loop.ps1 - Test-Gate fuer den LightOS Loop-Modus |
