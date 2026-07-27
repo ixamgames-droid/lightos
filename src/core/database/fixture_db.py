@@ -2321,6 +2321,213 @@ def _add_generic_matrix_panel(s, mfr):
     ])
 
 
+# ── FM-13 Slice 2: BENANNTE REALE Pixel-Panels ('matrix') ────────────────────
+# Bis hier gab es nur das generische MATRIXPANEL. Diese zwei Geraete sind echte,
+# am Markt verbreitete Panels — Charts DOPPELT verifiziert: Hersteller-Manual
+# (primaer) + QLC+ `.qxf` (unabhaengig), kanalweise deckungsgleich.
+#
+# ★ Der Punkt, an dem ein geratenes Chart teuer geworden waere: BEIDE Geraete
+#   adressieren im Pixel-Modus je Pixel R,G,B NACHEINANDER (Rot 1, Gruen 1,
+#   Blau 1, Rot 2, …) — NICHT blockweise (alle Rot, dann alle Gruen). Genau das
+#   erwartet die attr#N-Konvention, auf der `buildMatrixPanel` steht. Belegt aus
+#   dem ADJ-Manual (S. 16-17, „RED 1 / GREEN 1 / BLUE 1 / RED 2 …") bzw. dem
+#   Thomann-Manual (Abschn. 6.3) UND den <Head>-Bloecken der QLC+-Dateien.
+#
+# ★ Nicht wiederverwendet: die Makro-Baender des Schwestergeraets Dotz TPar
+#   enden anders (dort 240-255 „Sound Active", hier 240-247 „Color Flow 10" +
+#   248-255 ohne Funktion) — eigene Konstante statt „sieht gleich aus".
+#   Die Dimmerkurven-Baender sind dagegen nachweislich identisch → geteilt.
+
+def _pixel_rgb_channels(count: int):
+    """``count`` Pixel als je [Rot, Gruen, Blau], in der Kanalreihenfolge des
+    Geraets (Pixel 1 R/G/B, Pixel 2 R/G/B, …).
+
+    1-basiert benannt, weil beide Hersteller-Charts ihre Pixel 1-basiert zaehlen
+    („RED 1" / „Intensity red LED 1") — das generische MATRIXPANEL zaehlt
+    0-basiert. Reine Anzeigenamen; getragen wird die Zuordnung von der
+    attr#N-Wiederholung (N-tes ``color_r`` = Pixel N).
+
+    ★ BEWUSST OHNE Zeile/Spalte im Namen: welche PHYSISCHE Position Pixel N hat,
+    steht nicht fest. Die ADJ Dotz Matrix nummeriert im Werkszustand
+    („Pixel Flip: Standard") in SCHLANGENLINIEN — Manual S. 12:
+
+        Standard          Flip 4
+         1  2  3  4       1  2  3  4
+         8  7  6  5       5  6  7  8
+         9 10 11 12       9 10 11 12
+        16 15 14 13      13 14 15 16
+
+    Erst „Flip 4" ist zeilenweise und deckt sich damit mit dem Raster, das
+    `buildMatrixPanel` im 3D aufbaut. Fuer das Stairville-Panel dokumentiert das
+    Manual ueberhaupt keine Anordnung. Ein „Z2/S1" im Kanalnamen waere also eine
+    Behauptung, die im Werkszustand schlicht falsch ist — die Kanalzuordnung
+    (Kanal 13-15 = Pixel 5) bleibt davon unberuehrt und ist korrekt."""
+    channels = []
+    for i in range(count):
+        channels.append((f"P{i + 1} Rot",  "color_r", 0, 255))
+        channels.append((f"P{i + 1} Grün", "color_g", 0, 255))
+        channels.append((f"P{i + 1} Blau", "color_b", 0, 255))
+    return channels
+
+
+# ADJ Dotz Matrix, Kanal 4 (7ch) bzw. 49 (52ch) — Manual S. 15/18.
+_DOTZM_MACROS = [
+    (0, 15, "Manuelle RGB-Steuerung", "open"),
+    (16, 23, "Rot", "color"),
+    (24, 31, "Gruen", "color"),
+    (32, 39, "Blau", "color"),
+    (40, 47, "Rot + Gruen", "color"),
+    (48, 55, "Gruen + Blau", "color"),
+    (56, 63, "Rot + Blau", "color"),
+    (64, 71, "Rot + Gruen + Blau", "color"),
+    (72, 79, "Farbe 1", "color"),
+    (80, 87, "Farbe 2", "color"),
+    (88, 95, "Farbe 3", "color"),
+    (96, 103, "Farbe 4", "color"),
+    (104, 111, "Farbe 5", "color"),
+    (112, 119, "Farbe 6", "color"),
+    (120, 127, "Farbe 7", "color"),
+    (128, 135, "Farbe 8", "color"),
+    (136, 143, "Color Fade 1", ""),
+    (144, 151, "Color Snake", ""),
+    (152, 159, "Color Fade 2", ""),
+    (160, 167, "Color Change", ""),
+    (168, 175, "Color Flow 1", ""),
+    (176, 183, "Color Flow 2", ""),
+    (184, 191, "Color Flow 3", ""),
+    (192, 199, "Color Flow 4", ""),
+    (200, 207, "Color Flow 5", ""),
+    (208, 215, "Color Flow 6", ""),
+    (216, 223, "Color Flow 7", ""),
+    (224, 231, "Color Flow 8", ""),
+    (232, 239, "Color Flow 9", ""),
+    (240, 247, "Color Flow 10", ""),
+    (248, 255, "Ohne Funktion", ""),
+]
+
+
+def _dotz_matrix_modes_data():
+    """ADJ Dotz Matrix — 5 Modi laut Manual (S. 13-19), 16 COB-Pixel im 4×4-Raster.
+
+    Steuerkanaele sind in 6/7/52ch dieselben wie beim Schwestergeraet Dotz TPar:
+    Farb-Makros → ``color_wheel``, Master Dimmer/Programm-Speed → ``intensity``,
+    Strobing → ``shutter``, Dimmerkurve → ``raw``.
+
+    ``raw`` fuer die Dimmerkurve ist KEIN Schoenheitsfehler, sondern Pflicht: ein
+    zweiter ``macro``-Kanal auf einem Geraet ohne echte Koepfe wuerde von der
+    attr#N-Konvention als Kopf 1 gelesen und erbte den Programm-Wert des ersten
+    (ENG-03/07/09-Falle, wie bei ADJ 5PX HEX).
+
+    Strobe-Default 0: das Manual schreibt fuer „STROBING" durchgehend
+    „0-255 SLOW - FAST" und dokumentiert KEIN Aus-Band. `_SIMPLE_STROBE` liest
+    0 als „kein Strobe" — dieselbe Hausauslegung wie beim Dotz TPar, dessen
+    Manual identisch formuliert ist. 0 ist zugleich der kleinstmoegliche Wert,
+    also die sicherste dokumentierte Wahl.
+
+    Master-Dimmer-Default 255 (statt 0 wie beim TPar): fuer den Typ ``matrix``
+    gilt die MATRIXPANEL-Konvention — die Pixel sind per Default schwarz, also
+    droht kein Blenden, und eine gesetzte Pixel-Farbe wird sofort sichtbar,
+    ohne dass man erst einen Master suchen muss. So verhalten sich der 48ch-
+    Modus (hat gar keinen Master) und der 52ch-Modus gleich."""
+    pixels = _pixel_rgb_channels(16)
+    controls = [
+        ("Farb-Makros/Programme", "color_wheel", 0, 0, _DOTZM_MACROS),
+        ("Master Dimmer/Programm-Speed", "intensity", 255, 255),
+        ("Strobing langsam→schnell", "shutter", 0, 0, _SIMPLE_STROBE),
+        # Baender nachweislich identisch zum Dotz TPar -> geteilte Konstante.
+        ("Dimmerkurve", "raw", 0, 0, _DOTZ_TPAR_DIM_CURVES),
+    ]
+    rgb = [
+        ("Rot",  "color_r", 0, 255),
+        ("Grün", "color_g", 0, 255),
+        ("Blau", "color_b", 0, 255),
+    ]
+    return [
+        ("3-Kanal RGB", rgb),
+        ("6-Kanal RGB + Dimmer", rgb + [
+            ("Master Dimmer", "intensity", 255, 255),
+            ("Strobing langsam→schnell", "shutter", 0, 0, _SIMPLE_STROBE),
+            ("Dimmerkurve", "raw", 0, 0, _DOTZ_TPAR_DIM_CURVES),
+        ]),
+        ("7-Kanal RGB Voll", rgb + controls),
+        ("48-Kanal 16 Pixel RGB", pixels),
+        ("52-Kanal 16 Pixel RGB Voll", pixels + controls),
+    ]
+
+
+def _add_adj_dotz_matrix(s, mfr):
+    """ADJ Dotz Matrix (4×4 = 16× 30 W TRI-COB, 480 W Wash/Blinder).
+
+    Quellen: ADJ „DOTZ MATRIX User Instructions 9/13" (DMX-Charts S. 13-19) +
+    QLC+ `American-DJ-Dotz-Matrix.qxf` — kanalweise deckungsgleich.
+
+    ``fixture_type='matrix'``: in 48/52ch traegt jeder der 16 Pixel eigene RGB-
+    Kanaele → 16 ``color_r``-Baenke → `_fixture_to_dict` meldet nHeads=16 →
+    3D `buildMatrixPanel(16)` rendert das 4×4-Raster pixelgenau. Die schmalen
+    Modi (3/6/7ch) haben EINE Bank → nHeads=1 → das Panel rendert als ein
+    einzelnes Feld, was den realen Modi entspricht (dort faerbt man das ganze
+    Geraet auf einmal).
+
+    ⚠️ Geraete-Einstellung fuer deckungsgleiches Mapping: das Geraetemenue hat
+    „Pixel Flip" (Standard / Flip 1-4). Im WERKSZUSTAND („Standard") laeuft die
+    Pixelnummerierung in Schlangenlinien (1-2-3-4 / 8-7-6-5 / …), waehrend
+    `buildMatrixPanel` zeilenweise aufbaut — eine horizontale Lauflicht-Figur
+    liefe auf dem realen Geraet also im Zickzack. **„Flip 4" am Geraet stellt die
+    zeilenweise Reihenfolge her** und deckt sich dann mit der 3D-Ansicht.
+    Bewusst NICHT im Profil umsortiert: die Kanalzuordnung des Manuals bleibt
+    autoritativ (Kanal 13-15 = Pixel 5), und ein Umsortieren waere fuer die vier
+    anderen Flip-Einstellungen wieder falsch."""
+    _add_fixture(s, mfr, "Dotz Matrix", "DOTZMATRIX", "matrix", 480,
+                 _dotz_matrix_modes_data())
+
+
+# Stairville Pixel Panel 144 RGB, Kanal 6/7 (8ch-Modus) — Manual Abschn. 6.2.
+# 15 Programme je Kanal in 16er-Schritten; Kanal 7 endet auf „Programm-Mix".
+def _stair_pp144_programs(first: int, last_label: str):
+    ranges = [(0, 15, "Ohne Funktion", "open")]
+    for i in range(15):
+        lo = 16 + i * 16
+        hi = lo + 15
+        label = last_label if i == 14 else f"Show-Programm {first + i:02d}"
+        ranges.append((lo, hi, label, ""))
+    return ranges
+
+
+def _add_stairville_pp144(s, mfr):
+    """Stairville Pixel Panel 144 RGB (12×12 = 144 SMD-RGB-Pixel, 65 W).
+
+    Quellen: Thomann/Stairville „Pixel Panel 144 RGB" Manual (Abschn. 6.2/6.3,
+    Technische Daten S. 34) + QLC+ `Stairville-Pixel-Panel-144-RGB.qxf` —
+    kanalweise deckungsgleich (144 <Head>-Bloecke je [R,G,B]).
+
+    Der 432-Kanal-Modus hat BEWUSST keinen Master-Dimmer — das Geraet bietet in
+    diesem Modus keinen; Helligkeit kommt rein aus den Pixelwerten. Der 8-Kanal-
+    Modus faerbt das ganze Panel auf einmal (1 Bank → nHeads=1).
+
+    „Show-Programm"-Kanal 7 als ``raw`` statt eines zweiten ``macro``: sonst
+    liest die attr#N-Konvention ihn als Kopf 1 des ersten Makro-Kanals
+    (ENG-03/07/09-Falle) und der Programmer dedupliziert beide zu EINEM Regler.
+
+    Strobe-Default 0 wie beim Dotz Matrix: das Manual schreibt „0 … 255 Strobe
+    effect (slow … fast)" ohne dokumentiertes Aus-Band; 0 ist der kleinste und
+    damit sicherste Wert (`_SIMPLE_STROBE` liest ihn als „kein Strobe")."""
+    _add_fixture(s, mfr, "Pixel Panel 144 RGB", "STAIRPP144", "matrix", 65, [
+        ("8-Kanal Panel gesamt", [
+            ("Dimmer", "intensity", 255, 255),
+            ("Strobe langsam→schnell", "shutter", 0, 0, _SIMPLE_STROBE),
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Show-Programme 01-15", "macro", 0, 0,
+             _stair_pp144_programs(1, "Show-Programm 15")),
+            ("Show-Programme 16-29 + Mix", "raw", 0, 0,
+             _stair_pp144_programs(16, "Show-Programm-Mix")),
+            ("Programm-Speed", "speed", 0, 0),
+        ]),
+        ("432-Kanal 144 Pixel RGB", _pixel_rgb_channels(144)),
+    ])
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -2478,6 +2685,12 @@ def ensure_builtins():
             changed = True
         if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
             _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
+            changed = True
+        if "DOTZMATRIX" not in have:                      # FM-13 Slice 2: reale Panels
+            _add_adj_dotz_matrix(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+            changed = True
+        if "STAIRPP144" not in have:                      # FM-13 Slice 2: reale Panels
+            _add_stairville_pp144(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
@@ -2784,3 +2997,6 @@ def _seed(s: Session):
 
     # ── FM-13: LED-Matrix/Pixel-Panel als eigener Fixture-Typ ─────────────────
     _add_generic_matrix_panel(s, generic)
+    # FM-13 Slice 2: benannte reale Panels (Hersteller sind oben schon angelegt).
+    _add_adj_dotz_matrix(s, adj)
+    _add_stairville_pp144(s, stairville)
