@@ -1936,23 +1936,41 @@ class MainWindow(QMainWindow):
                 "Nur dieser PC. Andere Geräte im Netz erreichen die Fernbedienung nicht.")
 
         def _copy():
-            QGuiApplication.clipboard().setText(edit_link.text())
-            self.statusBar().showMessage("Direkt-Link kopiert.", 3000)
+            # Einziger Handler ohne eigenes Netz waere sonst dieser — eine
+            # Exception in einem Qt-Slot ist unter PySide6 kein stiller Fehler.
+            try:
+                QGuiApplication.clipboard().setText(edit_link.text())
+                self.statusBar().showMessage("Direkt-Link kopiert.", 3000)
+            except Exception as e:
+                QMessageBox.warning(dlg, "Kopieren fehlgeschlagen", str(e))
 
         def _regen():
+            # Default bewusst „Nein": ein Enter/Leertaste im Showbetrieb wuerde
+            # sonst alle Geraete rauswerfen.
             if QMessageBox.question(
                     dlg, "Token neu erzeugen",
                     "Ein neues Token macht ALLE bisherigen Links und angemeldeten "
-                    "Geräte sofort ungültig.\n\nFortfahren?") != QMessageBox.StandardButton.Yes:
+                    "Geräte sofort ungültig.\n\nFortfahren?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
-            remote_settings.regenerate_token()
+            try:
+                # `regenerate_token` prueft selbst nach, ob wirklich persistiert
+                # wurde, und wirft sonst — sonst meldeten wir Erfolg, waehrend die
+                # alten Links weiter gelten (save_settings schluckt Schreibfehler).
+                remote_settings.regenerate_token()
+            except Exception as e:
+                QMessageBox.warning(dlg, "Token neu erzeugen", str(e))
+                _refresh_labels()
+                return
             # Ohne das hier laeuft die Rotation ins Leere: der Gate liest das Token
             # aus app.config, das nur beim create_app gefuellt wird — der laufende
-            # Server akzeptierte sonst weiter den ALTEN ?k=-Link.
+            # Server akzeptierte sonst weiter den ALTEN ?k=-Link. Der Aufruf kappt
+            # zusaetzlich alle offenen Verbindungen.
             refreshed = refresh_running_token()
             _refresh_labels()
             self.statusBar().showMessage(
-                "Neues Token aktiv — alte Links sind ungültig."
+                "Neues Token aktiv — alte Links und verbundene Geräte sind ungültig."
                 if refreshed else
                 "Neues Token gespeichert (wirkt beim nächsten Einschalten).", 5000)
 
@@ -1961,15 +1979,26 @@ class MainWindow(QMainWindow):
             # NET-09-Falle: die Bind-Adresse wird NUR in start_server gelesen. Ein
             # Umschalten am laufenden Server waere sonst wirkungslos — der Nutzer
             # glaubt "aus", der Port bleibt aber im LAN offen. Deshalb hier hart
-            # neu starten (stop_server gibt den Socket sofort frei, NET-09).
-            if self._act_web.isChecked():
+            # neu starten; stop_server kappt dabei auch bestehende Verbindungen
+            # (ein aufgestufter WebSocket ueberlebt das blosse Schliessen des
+            # Listen-Sockets, s. dort) und gibt den Port frei.
+            #
+            # Den Serverzustand aus dem Modul lesen, NICHT am Menue-Haken: die
+            # beiden koennen auseinanderlaufen, und daran haengt hier, ob der
+            # Bind-Wechsel ueberhaupt wirksam wird.
+            from src.web import app as _web
+            if _web.is_running():
                 try:
-                    from src.web.app import start_server, stop_server
-                    stop_server()
-                    start_server(5000)
+                    _web.stop_server()
+                    _web.start_server(5000)
                     self.statusBar().showMessage(
                         "Web-Interface neu gestartet — Bind-Adresse übernommen.", 4000)
                 except Exception as e:
+                    # Server ist jetzt unten — Menue/Statusleiste ehrlich nachziehen,
+                    # sonst behauptet die UI weiter "laeuft".
+                    self._act_web.setChecked(False)
+                    self._lbl_web.setText("Web: aus")
+                    self._lbl_web.setStyleSheet("")
                     QMessageBox.warning(dlg, "Web-Interface Fehler", str(e))
             _refresh_labels()
 
@@ -1982,33 +2011,25 @@ class MainWindow(QMainWindow):
     def _toggle_web_server(self, checked: bool):
         if checked:
             try:
-                from src.web.app import start_server, remote_url
+                from src.web.app import start_server
                 port = start_server(5000) or 5000
-                url = remote_url(port)
-                # NET-01/NET-02: Token + vollstaendige Handshake-URL anzeigen.
-                # Das Handy tippt entweder die kurze URL mit ?k=<token> oder das
-                # Token separat. Ohne Token kommen /api-Aufrufe mit 403 zurueck.
-                try:
-                    from src.web import remote_settings
-                    token = remote_settings.get_token()
-                    lan_on = remote_settings.is_lan_remote_enabled()
-                except Exception:
-                    token = ""
-                    lan_on = True
-                full_url = f"{url}/?k={token}" if token else url
                 self._lbl_web.setText(f"Web: :{port} OK")
                 self._lbl_web.setStyleSheet("color: #9DFF52;")
-                scope = ("Erreichbar für Geräte im selben (W)LAN"
-                         if lan_on else
-                         "NUR lokal (LAN-/Handy-Remote ist AUS)")
-                # CDX-24: derselbe Dialog wie unter „Ausgabe → Web-Remote", statt
-                # einer reinen Info-Box — hier braucht man den Direkt-Link zum
-                # Kopieren, und die Sicherheits-Bedienelemente sollen genau dort
-                # sein, wo die Anleitung sie verspricht.
-                self._open_web_remote_dialog()
             except Exception as e:
                 self._act_web.setChecked(False)
                 QMessageBox.warning(self, "Web-Interface Fehler", str(e))
+                return
+            # CDX-24: derselbe Dialog wie unter „Ausgabe → Web-Remote", statt einer
+            # reinen Info-Box — hier braucht man den Direkt-Link zum Kopieren, und
+            # die Sicherheits-Bedienelemente sollen genau dort sein, wo die
+            # Anleitung sie verspricht.
+            #
+            # BEWUSST AUSSERHALB des try oben: ein Fehler IM DIALOG darf nicht den
+            # Menue-Haken zuruecksetzen, waehrend der Server laeuft — sonst zeigt
+            # das Menue „aus", Port 5000 ist aber offen, und ein spaeteres
+            # Umschalten von „LAN-/Handy-Remote" wuerde das Flag nur persistieren
+            # statt neu zu starten. Genau die NET-09-Falle durch die Hintertuer.
+            self._open_web_remote_dialog()
         else:
             try:
                 from src.web.app import stop_server

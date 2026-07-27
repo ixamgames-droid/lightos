@@ -80,8 +80,20 @@ def save_settings(settings: dict) -> None:
             if k in settings:
                 cur[k] = settings[k]
         all_prefs[_KEY] = cur
-        with open(_prefs_path(), "w", encoding="utf-8") as f:
+        # CDX-24: ATOMAR schreiben (tmp + os.replace). Vorher truncate+dump: der
+        # Auth-Gate liest diese Datei bei JEDER HTTP-Anfrage aus dem Web-Thread,
+        # waehrend der Qt-Thread beim Rotieren schreibt. Im Schreibfenster sah der
+        # Gate eine leere/halbe Datei, fiel auf die DEFAULTS zurueck und damit auf
+        # `auth_epoch: 0` — ausgerechnet waehrend der Rotation waere er also
+        # fail-OPEN fuer jede Session der Epoche 0 gewesen. `os.replace` ist auf
+        # Windows wie POSIX atomar, es gibt kein Fenster mit Teil-Inhalt mehr.
+        path = _prefs_path()
+        tmp = f"{path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(all_prefs, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
     except Exception as e:
         print(f"[remote_settings] save error: {e}")
 
@@ -128,6 +140,14 @@ def regenerate_token() -> str:
     CDX-24.)"""
     tok = _new_token()
     save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
+    # CDX-24: GEGENPROBE. `save_settings` schluckt jeden Schreibfehler (Datei
+    # gesperrt, Profil read-only, Platte voll) und loggt nur — ohne diese Pruefung
+    # gaebe die Funktion das neue Token zurueck, obwohl gar nichts rotiert wurde,
+    # und die UI meldete „alte Links sind ungueltig", waehrend sie es nicht sind.
+    if get_token() != tok:
+        raise RuntimeError(
+            "Token-Rotation fehlgeschlagen: die Einstellungen liessen sich nicht "
+            "speichern. Die bisherigen Links bleiben gueltig.")
     return tok
 
 

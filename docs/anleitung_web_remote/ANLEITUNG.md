@@ -122,7 +122,9 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
   `HttpOnly`/`SameSite=Strict`-Cookie die Anmeldung. Token und Direkt-Link zeigt der Dialog
   **„Ausgabe → Web-Remote: Verbindung & Token…"** (er öffnet sich auch beim Einschalten);
   dort macht **„Token neu erzeugen"** alle bisherigen Links und angemeldeten Geräte sofort
-  ungültig — auch am **laufenden** Server, ohne Neustart.
+  ungültig — auch am **laufenden** Server, ohne Neustart. Schon verbundene Geräte werden dabei
+  aktiv getrennt (ein offener WebSocket läuft nicht mehr durch das HTTP-Gate und könnte sonst
+  weitersteuern), und ein Wiederverbinden mit der alten Anmeldung wird abgewiesen.
 - **CORS-Allowlist (NET-03).** Statt `cors_allowed_origins="*"` erlaubt der SocketIO-Endpunkt
   nur noch die bekannten Origins (`http://<lan-ip>:5000`, `127.0.0.1`, `localhost`) — eine
   fremde Webseite im selben Netz kann sich nicht mehr einfach drauf verbinden.

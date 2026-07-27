@@ -115,5 +115,174 @@ class MainWindowWiringTest(unittest.TestCase):
         self.assertIn("start_server", src)
 
 
+
+class SocketIoRotationTest(unittest.TestCase):
+    """CDX-24: die Rotation darf kein halbes Versprechen bleiben.
+
+    Das ``before_request``-Gate sperrt jede HTTP-Anfrage der alten Epoche — ein
+    SCHON VERBUNDENER WebSocket laeuft aber nicht mehr durch dieses Gate, und die
+    Event-Handler (``go``/``back``/…) pruefen einzeln gar nichts. Ein Handy, das
+    vor der Rotation verbunden war, koennte also weitersteuern, obwohl der Nutzer
+    gerade „alle bisherigen Geraete ungueltig machen" gedrueckt hat.
+    """
+
+    def setUp(self):
+        self._orig_sio = web_app._socketio
+        self._orig_app = web_app._flask_app
+
+    def tearDown(self):
+        web_app._socketio = self._orig_sio
+        web_app._flask_app = self._orig_app
+
+    def test_disconnect_all_clients_drops_every_open_socket(self):
+        dropped = []
+
+        class _Mgr:
+            def get_participants(self, ns, room):
+                return [("sid-a", object()), ("sid-b", object())]
+
+        class _Srv:
+            manager = _Mgr()
+
+            def disconnect(self, sid, namespace=None):
+                dropped.append(sid)
+
+        web_app._socketio = type("_Sio", (), {"server": _Srv()})()
+        self.assertEqual(web_app.disconnect_all_clients(), 2)
+        self.assertEqual(dropped, ["sid-a", "sid-b"])
+
+    def test_rotation_helper_also_disconnects(self):
+        dropped = []
+
+        class _Mgr:
+            def get_participants(self, ns, room):
+                return [("sid-a", object())]
+
+        class _Srv:
+            manager = _Mgr()
+
+            def disconnect(self, sid, namespace=None):
+                dropped.append(sid)
+
+        fake = type("_App", (), {})()
+        fake.config = {"LIGHTOS_REMOTE_TOKEN": "alt"}
+        web_app._flask_app = fake
+        web_app._socketio = type("_Sio", (), {"server": _Srv()})()
+
+        self.assertTrue(web_app.refresh_running_token())
+        self.assertEqual(dropped, ["sid-a"],
+                         "Token neu erzeugen muss offene Verbindungen kappen")
+
+    def test_no_socketio_is_harmless(self):
+        web_app._socketio = None
+        self.assertEqual(web_app.disconnect_all_clients(), 0)
+
+    def test_broken_manager_never_breaks_the_rotation(self):
+        class _Srv:
+            @property
+            def manager(self):
+                raise RuntimeError("kaputt")
+
+        web_app._socketio = type("_Sio", (), {"server": _Srv()})()
+        self.assertEqual(web_app.disconnect_all_clients(), 0)
+
+
+class StopServerSafetyTest(unittest.TestCase):
+    """CDX-24 (Review-Fund S1): `stop_server()` muss BESTEHENDE Verbindungen kappen.
+
+    `server_close()` gibt nur den LISTEN-Socket frei. Werkzeugs
+    `ThreadedWSGIServer` laeuft mit `daemon_threads = True`, deshalb sammelt
+    `ThreadingMixIn` seine Handler-Threads gar nicht ein und joint beim Schliessen
+    nichts — ein bereits auf WebSocket hochgestufter Client lief UNBEGRENZT weiter
+    und konnte GO/STOP/Fader/Blackout schicken, obwohl der Nutzer das Interface
+    ausgeschaltet bzw. auf „nur dieser PC" gestellt hatte.
+
+    Reihenfolge ist dabei zwingend: nach einem `start_server()` zeigt `_socketio`
+    auf die NEUE Instanz, die Alt-Clients waeren dann nicht mehr adressierbar.
+    """
+
+    def setUp(self):
+        self._orig = (web_app._socketio, web_app._flask_app,
+                      web_app._server, web_app._thread, web_app._running)
+
+    def tearDown(self):
+        (web_app._socketio, web_app._flask_app,
+         web_app._server, web_app._thread, web_app._running) = self._orig
+
+    def test_stop_server_disconnects_open_clients(self):
+        dropped = []
+
+        class _Mgr:
+            def get_participants(self, ns, room):
+                return [("sid-alt", object())]
+
+        class _Srv:
+            manager = _Mgr()
+
+            def disconnect(self, sid, namespace=None):
+                dropped.append(sid)
+
+        web_app._socketio = type("_Sio", (), {"server": _Srv()})()
+        web_app._server = None
+        web_app._thread = None
+        web_app._running = True
+
+        web_app.stop_server()
+
+        self.assertEqual(dropped, ["sid-alt"],
+                         "ein offener WebSocket ueberlebt sonst das Ausschalten")
+
+    def test_stop_server_clears_the_globals(self):
+        web_app._flask_app = object()
+        web_app._socketio = None
+        web_app._server = None
+        web_app._thread = None
+        web_app._running = True
+
+        web_app.stop_server()
+
+        self.assertIsNone(web_app._flask_app)
+        self.assertFalse(web_app.is_running())
+        self.assertFalse(web_app.refresh_running_token(),
+                         "nach dem Ausschalten darf der Dialog nicht 'Neues Token "
+                         "aktiv' fuer einen toten Server melden")
+
+
+class RotationFailureTest(unittest.TestCase):
+    """CDX-24 (Review-Fund S3): `save_settings` schluckt Schreibfehler. Ohne
+    Gegenprobe meldete die UI Erfolg, waehrend die alten Links weiter galten."""
+
+    def test_regenerate_raises_when_nothing_was_persisted(self):
+        orig = remote_settings.save_settings
+        remote_settings.save_settings = lambda *_a, **_k: None   # schlaegt still fehl
+        try:
+            with self.assertRaises(RuntimeError):
+                remote_settings.regenerate_token()
+        finally:
+            remote_settings.save_settings = orig
+
+    def test_regenerate_succeeds_normally(self):
+        before = remote_settings.get_token()
+        after = remote_settings.regenerate_token()
+        self.assertNotEqual(before, after)
+        self.assertEqual(remote_settings.get_token(), after)
+
+
+class AtomicSaveTest(unittest.TestCase):
+    """CDX-24 (Review-Fund S8): nicht-atomares Schreiben liess den Auth-Gate im
+    Schreibfenster eine leere Datei lesen -> Rueckfall auf `auth_epoch: 0`, also
+    fail-OPEN ausgerechnet waehrend der Rotation."""
+
+    def test_settings_file_is_never_half_written(self):
+        import json as _json
+        remote_settings.regenerate_token()
+        path = remote_settings._prefs_path()
+        with open(path, encoding="utf-8") as f:
+            data = _json.load(f)          # wirft, waere die Datei abgeschnitten
+        self.assertIn("remote", data)
+        self.assertFalse(os.path.exists(f"{path}.tmp"),
+                         "die Temp-Datei muss per os.replace verschwunden sein")
+
+
 if __name__ == "__main__":
     unittest.main()
