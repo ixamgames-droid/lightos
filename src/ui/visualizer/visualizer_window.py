@@ -396,7 +396,16 @@ class VisualizerBridge(QObject):
         self._poll_state = {"editMode": "view", "viewMode": "3D",
                             "settings": None, "brightness": None}
         self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
-        self._poll_dmx = None       # letzter dmxBatch-JSON (coalesced); None=nichts Neues
+        # A3D-04: pro fid GEMERGTER dmx-Puffer {fid: payload}, NICHT nur der letzte
+        # Batch. Der VisualizerService pusht DIFFERENTIELL (nur geaenderte Fixtures)
+        # und setzt sein `_last_payload` unbedingt weiter — ein verworfener Batch
+        # wird also NIE nachgeliefert. Bei ~33 ms Tick gegen ~130 ms Poll fielen
+        # damit ~3 von 4 Batches ersatzlos aus. Leeres dict = nichts Neues.
+        self._poll_dmx: dict = {}
+        # Backstop analog zum 512er-Deckel von `_poll_events`: pollt keine Seite
+        # (Fenster zu, Renderer nach CrashGuard-Give-up tot), darf der Puffer nicht
+        # unbegrenzt wachsen. Ueber Repatch-Zyklen entstehen immer neue fids.
+        self._poll_dmx_max = 2048
         # JEDES Python->JS-Signal automatisch in den Poll spiegeln — so muss KEIN
         # Emit-Aufrufer (Fenster/Live-View/Service) geaendert werden. Der Emit
         # selbst bleibt (feuert, kommt an der Post-Load-Seite nur nicht an); der
@@ -451,8 +460,40 @@ class VisualizerBridge(QObject):
             del self._poll_events[: len(self._poll_events) - 512]
 
     def _poll_set_dmx(self, batch_json: str):
-        """Letzten DMX-Batch fuer den Poll vormerken (coalesced)."""
-        self._poll_dmx = batch_json
+        """A3D-04: DMX-Batch pro fid in den Poll-Puffer MERGEN (frueher: den letzten
+        Batch behalten und alle vorherigen verwerfen).
+
+        Der Merge ersetzt den Eintrag einer fid IMMER GANZ und aktualisiert ihn
+        NIE per ``dict.update``: ``_build_fixture_payload`` haengt ``heads`` nur bei
+        ``head_count >= 2`` an. Faellt die Kopfzahl (Mode-/Profilwechsel), fehlt
+        ``heads`` im neuen Payload — ein Key-Merge liesse das alte Array stehen, und
+        JS cacht es dauerhaft (``if (heads) f.lastHeads = heads``) → permanent
+        falsche Pro-Kopf-Farben bei Spider/PAR-Bar/Mover-Bar.
+
+        Defensiv: diese Methode haengt am ``dmxBatch``-Emit des VisualizerService,
+        der seine Targets in einer Schleife OHNE try/except bedient und KEINEN
+        ``_bridge_slot_guard`` traegt. Eine Exception hier wuerde die Schleife
+        abbrechen und das naechste Target (den Live-View-Spiegel) um seinen Batch
+        bringen — also genau die Verlust-Klasse, die A3D-04 beseitigt.
+        """
+        try:
+            arr = json.loads(batch_json)
+            if not isinstance(arr, list):
+                return
+            for d in arr:
+                fid = d.get("fid") if isinstance(d, dict) else None
+                if fid is None:
+                    continue
+                self._poll_dmx[fid] = d
+            over = len(self._poll_dmx) - self._poll_dmx_max
+            if over > 0:
+                # dicts halten Einfuegereihenfolge -> die aeltesten fids fallen.
+                for k in list(self._poll_dmx)[:over]:
+                    del self._poll_dmx[k]
+        except Exception as e:
+            # Ein defekter Batch darf weder werfen noch den bereits gesammelten
+            # Puffer verwerfen.
+            print(f"[Visualizer] _poll_set_dmx: Batch verworfen ({e})")
 
     @Slot(result=str)
     @_bridge_slot_guard
@@ -464,9 +505,15 @@ class VisualizerBridge(QObject):
         if self._poll_events:
             out["events"] = self._poll_events
             self._poll_events = []
-        if self._poll_dmx is not None:
-            out["dmx"] = self._poll_dmx
-            self._poll_dmx = None
+        if self._poll_dmx:
+            # A3D-04: ``out["dmx"]`` MUSS ein JSON-STRING bleiben — JS macht
+            # `JSON.parse(s.dmx)`. Legte man hier die Liste selbst hinein, wuerfe
+            # JSON.parse auf "[object Object]"; der Wurf landete im aeusseren catch
+            # des Poll-Handlers und uebersprunge damit den DANACH folgenden
+            # events-Block, waehrend Python die Event-Queue unten bereits geleert
+            # hat -> stiller Totalverlust aller Einmal-Events in jedem Poll mit DMX.
+            out["dmx"] = json.dumps(list(self._poll_dmx.values()))
+            self._poll_dmx = {}
         try:
             return json.dumps(out)
         except Exception:

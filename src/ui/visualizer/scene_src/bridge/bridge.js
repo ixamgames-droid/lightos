@@ -296,10 +296,17 @@ export function tryChannel() {
                     jsApplyExternalSelection(s.selection);
                   }
                   if (s.dmx) {
-                    const arr = JSON.parse(s.dmx);
-                    for (const d of arr) {
-                      updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-                    }
+                    // A3D-04: eigenes try/catch. Ein Wurf hier (defektes JSON, ein
+                    // Fixture-Handler, der stolpert) landete sonst im aeusseren catch
+                    // und uebersprunge den DANACH folgenden events-Block - waehrend
+                    // Python die Event-Queue beim Ausliefern schon geleert hat. Ein
+                    // DMX-Problem darf keine Kamera-/Transform-/Stage-Events fressen.
+                    try {
+                      const arr = JSON.parse(s.dmx);
+                      for (const d of arr) {
+                        updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
+                      }
+                    } catch (e) { console.log('poll dmx: Batch uebersprungen', e); }
                   }
                   // Einmal-Events: genau einmal ausfuehren (Python leert die Queue).
                   if (s.events) {

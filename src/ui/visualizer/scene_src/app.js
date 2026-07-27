@@ -33,7 +33,7 @@ import {
   applySelectionPulse, selectionPulseActive,   // VIZ-14 Slice 1c: Identify-Flash
   expireSelectionPulseForTest,                 // VIZ-14 Slice 1c: Test-Seam (Flash beenden)
 } from './interaction/tools.js';
-import { wirePointerLateBindings } from './interaction/pointer.js';
+import { wirePointerLateBindings, resolveDockOnGestureEnd } from './interaction/pointer.js';
 import { attachGizmoToSelection } from './interaction/gizmo.js';  // VIZ-13 3b-G
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
@@ -162,6 +162,11 @@ window.__lightos = {
   updateLabelZoomVisibility,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
+  // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
+  // Gestik-Ende. Der Commit lag vorher inline in handlePointerUp und war nur ueber
+  // echte Pointer-Events erreichbar — pointer.js hatte deshalb null
+  // Verhaltensabdeckung, obwohl hier Nutzerdaten (Andockungen) geloescht werden.
+  __resolveDockOnGestureEnd: resolveDockOnGestureEnd,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,

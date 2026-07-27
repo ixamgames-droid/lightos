@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — 3D-Visualizer: keine verlorenen Fixture-Updates, keine verlorenen Andockungen (A3D-04/08)
+
+#### Behoben
+
+- **Ein Auswahl-Klick im 3D löscht keine Andockungen mehr.** Bisher schrieb jede
+  Geste die Andock-Beziehung fest — auch eine, die das Gerät gar nicht bewegt
+  hatte. Da „Andocken" standardmässig aus ist, hiess „festschreiben" dort
+  **lösen**: ein einfacher Klick zum Auswählen entfernte die gespeicherte
+  Andockung, und weil die Schleife über die ganze Auswahl läuft, gleich für alle
+  markierten Geräte. Der Commit läuft jetzt nur noch, wenn sich die Position
+  tatsächlich geändert hat.
+- **Ein weggedrehtes Gerät hängt nicht mehr an der alten Traverse (A3D-08).**
+  Beim Drehen mehrerer Geräte um den gemeinsamen Mittelpunkt wanderten sie aus
+  der Traverse heraus, behielten aber ihre Bindung — und wurden beim nächsten
+  Bewegen des Bühnenelements dorthin zurückgerissen. Die Bindung wird jetzt
+  gelöst, sobald die Drehung das Gerät wirklich versetzt hat. (Bewusst lösen
+  statt neu andocken: der Boden ist ein Andock-Ziel, ein weggedrehtes Gerät wäre
+  sonst „auf dem Boden stehend" in sieben Metern Höhe gelandet.)
+- **Der 3D-Visualizer verliert keine Fixture-Updates mehr (A3D-04).** Die
+  DMX-Zustellung sammelte zwischen zwei Abrufen nur das jeweils letzte Paket ein
+  und verwarf alle vorherigen. Da jedes Paket nur die *geänderten* Geräte enthält
+  und nie erneut geschickt wird, blieb ein Gerät, dessen einzige Änderung in
+  einem verworfenen Paket lag, dauerhaft auf altem Stand — bei rund vier Paketen
+  pro Abruf-Intervall traf das regelmässig. Die Pakete werden jetzt pro Gerät
+  zusammengeführt.
+
+
 ### 2026-07-27 — Ein einzelner Kopf lässt sich im Programmer auswählen (FM-HEADLAYOUT Slice 5 / FM-9)
 
 #### Hinzugefügt

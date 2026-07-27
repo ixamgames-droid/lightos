@@ -281,6 +281,67 @@ class SceneModulesSmokeTest(unittest.TestCase):
         )
         self.assertTrue(is_dark, "Fixture mit Dimmer 0 zeigt beim Build noch einen Lichtkegel")
 
+    def test_gesture_end_dock_decision(self):
+        """A3D-08 + Klick-Entdock-Guard: die Andock-Entscheidung am Gestik-Ende.
+
+        Der Commit lag vorher inline in ``handlePointerUp`` und war damit nur ueber
+        echte Pointer-Events erreichbar — ``pointer.js`` hatte deshalb null
+        Verhaltensabdeckung, obwohl hier Nutzerdaten (gespeicherte Andockungen)
+        geloescht werden koennen. Jetzt als reine Funktion
+        ``resolveDockOnGestureEnd`` herausgezogen und ueber ``window.__lightos``
+        als Test-Seam exportiert.
+
+        Der wichtigste Fall ist der ERSTE: ``handlePointerDown`` setzt ``dragMode``
+        bei JEDEM Treffer eines Fixture-Koerpers, ohne Bewegungsbedingung, und der
+        Commit-Zweig hatte keinen Guard. Bei ausgeschaltetem Andocken (Default!)
+        loeschte damit ein blosser Auswahl-Klick die Andockung — und wegen der
+        Schleife ueber ``view.selectedFids`` gleich fuer die ganze Auswahl.
+        """
+        self._load_and_wait()
+        self._poll_until_true("!!window.__lightosAppReady")
+        self.assertTrue(
+            self._eval("typeof window.__lightos.__resolveDockOnGestureEnd === 'function'"),
+            "Test-Seam __resolveDockOnGestureEnd fehlt")
+
+        def _decide(dock, start, pos, dock_enabled, pending="__none__"):
+            # QtWebEngine marshallt JS-null als leeren String nach Python -> im JS
+            # auf ein eindeutiges Sentinel abbilden, damit "kein Dock" nicht mit
+            # einer leeren Stage-ID verwechselbar ist.
+            pend = "" if pending == "__none__" else f"f._pendingDock = {pending};"
+            return self._eval(
+                "(function(){"
+                f"  const f = {{ dockedTo: {dock}, group: {{ position: {pos} }} }};"
+                f"  {pend}"
+                f"  const r = window.__lightos.__resolveDockOnGestureEnd(f, {start}, {dock_enabled});"
+                "  return (r === null || r === undefined) ? '<kein-dock>' : r;"
+                "})()")
+
+        at = "{x: 1, y: 6, z: 2}"
+        same = "{x: 1, y: 6, z: 2}"
+        moved = "{x: 4, y: 6, z: 2}"
+
+        with self.subTest("Auswahl-Klick ohne Bewegung behaelt die Andockung"):
+            # Der eigentliche Datenverlust-Fall: Andocken AUS ist der Default.
+            self.assertEqual(_decide("'truss-1'", same, at, "false"), "truss-1")
+
+        with self.subTest("Klick ohne Bewegung auch bei aktivem Andocken neutral"):
+            self.assertEqual(_decide("'truss-1'", same, at, "true"), "truss-1")
+
+        with self.subTest("echte Bewegung ohne Andocken loest die Bindung"):
+            self.assertEqual(_decide("'truss-1'", at, moved, "false"), "<kein-dock>")
+
+        with self.subTest("A3D-08: weggedrehtes Fixture bleibt NICHT an der alten Trasse"):
+            # Der Rotate-Zweig setzt _pendingDock=null, sobald er die Position
+            # wirklich versetzt hat -> die Bindung faellt.
+            self.assertEqual(_decide("'truss-1'", at, moved, "true", pending="null"), "<kein-dock>")
+
+        with self.subTest("Bewegung mit Andocken schreibt die Vorschau fest"):
+            self.assertEqual(
+                _decide("null", at, moved, "true", pending="'truss-2'"), "truss-2")
+
+        with self.subTest("bewegt, Andocken an, keine Vorschau -> Bindung bleibt"):
+            self.assertEqual(_decide("'truss-1'", at, moved, "true"), "truss-1")
+
     def test_incremental_stage_add_preserves_python_id(self):
         """Ein einzelnes Stage-Add bleibt bei Direkt-/Poll-Doppelzustellung idempotent."""
         self._load_and_wait()
