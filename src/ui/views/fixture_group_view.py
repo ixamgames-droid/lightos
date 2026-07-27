@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
     QFormLayout, QFrame, QSizePolicy, QGridLayout,
     QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
+    QMenu,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, Signal
 from PySide6.QtGui import (
@@ -163,7 +164,10 @@ class FixtureGridWidget(QWidget):
 
         # Internal drag state
         self._drag_from: tuple[int, int] | None = None
-        self._drag_fid: int | None = None
+        # Zell-WERT der laufenden internen Verschiebung: ganzes Fixture (int) ODER
+        # Kopf-Zelle ("fid:head", str) — Kopf-Zellen sind seit FM-16e einzeln
+        # verschieb-/tauschbar, die Annotation hinkte hinterher.
+        self._drag_fid: "int | str | None" = None
         self._drag_current: tuple[int, int] | None = None  # for visual feedback
         # External drag state (from fixture tree): live "so rastet es ein"-Ziel.
         self._drop_target: tuple[int, int] | None = None
@@ -201,17 +205,31 @@ class FixtureGridWidget(QWidget):
         row = max(0, min(row, self.rows - 1))
         return col, row
 
-    def _nearest_free_cell(self, col: int, row: int) -> tuple[int, int] | None:
+    def _is_free(self, cell: tuple[int, int], ignore_fid: int | None) -> bool:
+        """Zelle frei? ``ignore_fid`` zaehlt die EIGENEN Zellen dieses Geraets als
+        frei — ein Drop ist immer ein MOVE, das Geraet darf sich nicht selbst
+        blockieren (FM-HEADLAYOUT Slice 3: sonst scheitert das Zurueckziehen eines
+        Multi-Head-Geraets auf ein kleines Raster, das seine eigenen Kopf-Zellen
+        komplett fuellen — z. B. die 1×N-Auto-Kopf-Matrix)."""
+        v = self.positions.get(cell)
+        if v is None:
+            return True
+        return ignore_fid is not None and _split_cell(v)[0] == ignore_fid
+
+    def _nearest_free_cell(self, col: int, row: int,
+                           ignore_fid: int | None = None) -> tuple[int, int] | None:
         """Naechste freie Zelle zu (col,row). (col,row) selbst, wenn frei; sonst
         die per Manhattan-Distanz naechste (Tie-Break row-major). None, wenn das
-        Raster komplett voll ist. So wird beim Drop nie still ueberschrieben."""
-        if 0 <= col < self.cols and 0 <= row < self.rows and (col, row) not in self.positions:
+        Raster komplett voll ist. So wird beim Drop nie still ueberschrieben.
+        ``ignore_fid`` s. ``_is_free``."""
+        if (0 <= col < self.cols and 0 <= row < self.rows
+                and self._is_free((col, row), ignore_fid)):
             return (col, row)
         best_key = None
         best_cell = None
         for r in range(self.rows):
             for c in range(self.cols):
-                if (c, r) in self.positions:
+                if not self._is_free((c, r), ignore_fid):
                     continue
                 key = (abs(c - col) + abs(r - row), r, c)
                 if best_key is None or key < best_key:
@@ -221,12 +239,14 @@ class FixtureGridWidget(QWidget):
     def resolve_drop_cell(self, fid: int | None, col: int, row: int) -> tuple[int, int] | None:
         """Zielzelle fuer einen externen Drop bestimmen (identisch fuer Highlight
         und echten Drop). Liegt fid schon an (col,row) -> genau dort (No-Op);
-        ist die Zelle von einem ANDEREN fid belegt -> naechste freie Zelle."""
+        ist die Zelle von einem ANDEREN fid belegt -> naechste freie Zelle. Eigene
+        Zellen (auch Kopf-Zellen) gelten als frei, weil der Drop sie ohnehin
+        freigibt — Highlight und echte Platzierung bleiben so deckungsgleich."""
         col = max(0, min(col, self.cols - 1))
         row = max(0, min(row, self.rows - 1))
         if self.positions.get((col, row)) == fid and fid is not None:
             return (col, row)
-        return self._nearest_free_cell(col, row)
+        return self._nearest_free_cell(col, row, ignore_fid=fid)
 
     def place_fixture(self, fid: int, col: int, row: int) -> tuple[int, int] | None:
         """Platziert fid an/nahe (col,row) und gibt die tatsaechliche Zelle zurueck.
@@ -245,6 +265,94 @@ class FixtureGridWidget(QWidget):
                           if _split_cell(v)[0] != fid}
         self.positions[target] = fid
         return target
+
+    def _drop_fid_cells(self, fid: int):
+        """Alle Zellen dieses Basis-fid entfernen (ganzes Fixture UND Kopf-Zellen).
+        Gemeinsame Move-Semantik von ``place_fixture``/``place_fixture_heads``:
+        ein Gerät steht nie doppelt im Raster."""
+        self.positions = {k: v for k, v in self.positions.items()
+                          if _split_cell(v)[0] != fid}
+
+    def place_fixture_heads(self, fid: int, count: int,
+                            col: int | None = None, row: int | None = None,
+                            *, vertical: bool = False) -> list[tuple[int, int]]:
+        """FM-HEADLAYOUT Slice 3: setzt die ``count`` Köpfe eines Multi-Head-
+        Fixtures als EINZELNE Zellen (``"fid:head"``) ab — **waagerecht** (Zeile)
+        oder **hochkant** (Spalte, ``vertical=True``). Davids Kernwunsch: die Köpfe
+        einer Hydrabeam/Spider-Bar so anordnen, wie sie am Rig wirklich hängen.
+
+        Regeln (bewusst dieselben wie beim externen Drop):
+        * **Zusammenhängend, wenn möglich:** passt der Streifen ab (col,row) nicht
+          mehr ins Raster, wird der START so weit zurückgeschoben, dass er
+          hineinpasst (statt hinten abzuschneiden).
+        * **Kein stilles Überschreiben:** eine von einem ANDEREN Gerät belegte
+          Zelle wird nicht überschrieben — dieser Kopf weicht auf die nächste
+          freie Zelle aus (``_nearest_free_cell``). Ist das Raster voll, bleiben
+          die restlichen Köpfe ungesetzt (nichts wird zerstört).
+        * **Move statt Duplikat:** vorherige Platzierungen desselben fid (ganzes
+          Fixture ODER alte Kopf-Zellen) werden vorher freigegeben.
+
+        ``col``/``row`` weggelassen = „such dir die erste freie Zelle" — und zwar
+        NACH dem Freigeben der eigenen Zellen, sonst weicht ein Gerät, das schon
+        kopfweise im Raster steht, unnötig hinter sich selbst aus. Das Raster wächst
+        hier NICHT (Spalten/Reihen gehören der Gruppe, nicht dem Widget) — der
+        Aufrufer vergrößert vorher, wenn der Streifen sonst nicht hineinpasst.
+
+        Rückgabe: die tatsächlich belegten Zellen in Kopf-Reihenfolge (leer, wenn
+        nichts platziert werden konnte)."""
+        try:
+            count = int(count)
+        except (TypeError, ValueError):
+            return []
+        if count < 1:
+            return []
+        self._drop_fid_cells(fid)
+        if col is None or row is None:
+            _free = self.first_free_cells(1)
+            want_c, want_r = _free[0] if _free else (0, 0)
+        else:
+            want_c, want_r = int(col), int(row)
+        limit = self.rows if vertical else self.cols
+        start_c = max(0, min(want_c, self.cols - 1))
+        start_r = max(0, min(want_r, self.rows - 1))
+        # Streifen zusammenhängend halten: Start zurückschieben, wenn er sonst
+        # über den Rand läuft (nur soweit das Raster überhaupt lang genug ist).
+        if count <= limit:
+            if vertical:
+                start_r = min(start_r, self.rows - count)
+            else:
+                start_c = min(start_c, self.cols - count)
+        placed: list[tuple[int, int]] = []
+        for h in range(count):
+            c = start_c + (0 if vertical else h)
+            r = start_r + (h if vertical else 0)
+            if not (0 <= c < self.cols and 0 <= r < self.rows) or (c, r) in self.positions:
+                cell = self._nearest_free_cell(c, r)
+            else:
+                cell = (c, r)
+            if cell is None:
+                break               # Raster voll -> Rest bleibt ungesetzt
+            self.positions[cell] = f"{fid}:{h}"
+            placed.append(cell)
+        return placed
+
+    def collapse_fixture_heads(self, fid: int) -> tuple[int, int] | None:
+        """Gegenstück zu ``place_fixture_heads``: die Kopf-Zellen dieses fid durch
+        EINE Ganz-Fixture-Zelle ersetzen (an der ersten bisherigen Kopf-Zelle in
+        Raster-Reihenfolge). Rückgabe: die belegte Zelle, oder ``None``, wenn das
+        fid gar nicht kopfweise im Raster steht (dann bleibt alles unverändert)."""
+        head_cells = []
+        for (c, r), v in self.positions.items():
+            base, head = _split_cell(v)
+            if base == fid and head is not None:
+                head_cells.append((r, c))       # Raster-Reihenfolge: Zeile, Spalte
+        head_cells.sort()
+        if not head_cells:
+            return None
+        first = (head_cells[0][1], head_cells[0][0])   # (col,row)
+        self._drop_fid_cells(fid)
+        self.positions[first] = fid
+        return first
 
     def first_free_cells(self, count: int) -> list[tuple[int, int]]:
         """Liefert `count` freie Zellen in row-major Reihenfolge; erweitert die
@@ -570,6 +678,29 @@ class FixtureGroupView(QWidget):
         left.addWidget(QLabel("Fixtures (drag auf Raster):"))
         self._fixture_list = FixtureTreeWithDrag()
         left.addWidget(self._fixture_list, 1)
+
+        # FM-HEADLAYOUT Slice 3: Köpfe eines Multi-Head-Geräts als EINZELNE Zellen
+        # ins Raster — mit Orientierung, damit das Raster dem realen Rig-Aufbau
+        # folgen kann (Hydrabeam hochkant vs. Spider-Bar waagerecht).
+        self._btn_heads = QPushButton("Köpfe einzeln → Raster ▾")
+        self._btn_heads.setToolTip(
+            "Setzt die Köpfe des im Baum gewählten Mehrkopf-Geräts als einzelne "
+            "Zellen ins Raster (waagerecht oder hochkant) — so ansprechbar wie "
+            "eine Pro-Kopf-Matrix.\n"
+            "Die Köpfe lassen sich danach frei einzeln verschieben/tauschen "
+            "(Drag) und einzeln entfernen (Rechtsklick).\n"
+            "Unabhängig von der Auto-Anlage beim Patchen: hier bestimmst du die "
+            "Anordnung von Hand.")
+        _heads_menu = QMenu(self._btn_heads)
+        _act_row = _heads_menu.addAction("als Zeile (waagerecht)")
+        _act_row.triggered.connect(self._place_heads_horizontal)
+        _act_col = _heads_menu.addAction("als Spalte (hochkant)")
+        _act_col.triggered.connect(self._place_heads_vertical)
+        _heads_menu.addSeparator()
+        _act_one = _heads_menu.addAction("Köpfe zusammenfassen (eine Zelle)")
+        _act_one.triggered.connect(self._collapse_heads)
+        self._btn_heads.setMenu(_heads_menu)
+        left.addWidget(self._btn_heads)
 
         btn_all = QPushButton("Alle → Raster")
         btn_all.setToolTip("Alle gepatchten Fixtures ins Raster übernehmen "
@@ -1070,6 +1201,150 @@ class FixtureGroupView(QWidget):
         r = self._spin_rows.value()
         self._grid_widget.set_grid(c, r)
         self._highlight_group_members()
+
+    # ── FM-HEADLAYOUT Slice 3: Kopf-Zellen von Hand anordnen ──────────────────
+
+    def _tree_fids(self) -> list[int]:
+        """fids aller Fixture-Items im Baum (Universe-Ordner tragen kein fid)."""
+        out: list[int] = []
+        root = self._fixture_list.invisibleRootItem()
+        for i in range(root.childCount()):
+            uni = root.child(i)
+            for j in range(uni.childCount()):
+                fid = uni.child(j).data(0, Qt.ItemDataRole.UserRole)
+                if fid is not None:
+                    out.append(int(fid))
+        return out
+
+    def _target_fid(self) -> int | None:
+        """Gerät, dessen Köpfe angeordnet werden sollen — in dieser Reihenfolge:
+
+        1. das **angeklickte** Baum-Item (``currentItem``),
+        2. genau EIN echt selektiertes Baum-Item,
+        3. enthält die gerade bearbeitete Gruppe genau EIN Gerät, dann dieses
+           (eindeutig, also kein Raten).
+
+        Sonst ``None``. Punkt 3 ist wichtig, weil das blaue Hervorheben im Baum
+        die **Gruppen-Mitglieder** markiert (Hintergrundfarbe, s.
+        ``_highlight_group_members``) und NICHT die Auswahl: bei einer frisch
+        gepatchten Kopf-Matrix-Gruppe sieht das Gerät „gewählt" aus, ohne
+        ``currentItem`` zu sein — ohne diesen Fall verlangte die Aktion ein
+        Anklicken von etwas, das schon markiert wirkt."""
+        item = self._fixture_list.currentItem()
+        fid = item.data(0, Qt.ItemDataRole.UserRole) if item is not None else None
+        if fid is not None:
+            return int(fid)
+        sel = [it.data(0, Qt.ItemDataRole.UserRole)
+               for it in self._fixture_list.selectedItems()]
+        sel = [int(f) for f in sel if f is not None]
+        if len(sel) == 1:
+            return sel[0]
+        in_group = self._group_fids()
+        if len(in_group) == 1:
+            return int(in_group[0])
+        return None
+
+    def _selected_tree_fixture(self, title: str):
+        """Das Zielgerät (oder ``None`` + Hinweis-Dialog, der die blaue Markierung
+        erklärt — sonst liest man sie als Auswahl und der Hinweis wirkt falsch)."""
+        fid = self._target_fid()
+        if fid is None:
+            QMessageBox.information(
+                self, title,
+                "Klick links im Baum das Gerät an, dessen Köpfe du anordnen "
+                "willst (ein Gerät, nicht den Universe-Ordner).\n\n"
+                "Hinweis: Die blaue Markierung im Baum zeigt nur, welche Geräte "
+                "schon in dieser Gruppe liegen — sie ist keine Auswahl.")
+            return None
+        fx = next((f for f in self._state.get_patched_fixtures()
+                   if f.fid == int(fid)), None)
+        if fx is None:
+            QMessageBox.information(self, title,
+                                    "Das gewählte Gerät ist nicht mehr gepatcht.")
+        return fx
+
+    def _grow_grid_for_strip(self, count: int, *, vertical: bool):
+        """Raster so vergrößern, dass ein Kopf-Streifen der Länge ``count`` in der
+        gewünschten Richtung überhaupt Platz hat (hochkant → Reihen, waagerecht →
+        Spalten). Verkleinert NIE. Spinbox mit ``blockSignals`` mitziehen (wie
+        ``_add_all_fixtures``), damit kein re-entranter ``_apply_grid_size`` läuft."""
+        gw = self._grid_widget
+        cols, rows = gw.cols, gw.rows
+        if vertical and rows < count:
+            rows = count
+            self._spin_rows.blockSignals(True)
+            self._spin_rows.setValue(rows)
+            self._spin_rows.blockSignals(False)
+        elif not vertical and cols < count:
+            cols = count
+            self._spin_cols.blockSignals(True)
+            self._spin_cols.setValue(cols)
+            self._spin_cols.blockSignals(False)
+        if (cols, rows) != (gw.cols, gw.rows):
+            gw.set_grid(cols, rows)
+
+    def _place_heads(self, *, vertical: bool):
+        """Setzt die Köpfe des gewählten Geräts als Einzel-Zellen ins Raster.
+        Kopfzahl kommt aus derselben Quelle wie die Auto-Kopf-Matrix beim Patchen
+        (``app_state.color_head_count``) — sonst driften Hand- und Auto-Anlage."""
+        title = "Köpfe einzeln → Raster"
+        fx = self._selected_tree_fixture(title)
+        if fx is None:
+            return
+        from src.core.app_state import color_head_count
+        try:
+            n = int(color_head_count(fx))
+        except Exception:
+            n = 0
+        if n < 2:
+            _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
+            QMessageBox.information(
+                self, title,
+                f"{_name} hat keine pro-Kopf färbbaren Bänke — es gibt also "
+                "keine Einzelköpfe, die man im Raster verteilen könnte.")
+            return
+        gw = self._grid_widget
+        # Raster erst gross genug machen, sonst KIPPT die gewuenschte Orientierung:
+        # eine Auto-Kopf-Matrix ist 1×N, ein „hochkant"-Streifen passt dort nicht,
+        # und die Ausweich-Regel (naechste freie Zelle) haette die Koepfe wieder
+        # waagerecht verteilt — genau das Gegenteil der Anweisung.
+        self._grow_grid_for_strip(n, vertical=vertical)
+        placed = gw.place_fixture_heads(fx.fid, n, vertical=vertical)
+        if not placed:
+            QMessageBox.information(self, title,
+                                    "Im Raster ist keine Zelle frei — erst "
+                                    "Spalten/Reihen erhöhen oder Platz machen.")
+            return
+        if len(placed) < n:
+            QMessageBox.information(
+                self, title,
+                f"Nur {len(placed)} von {n} Köpfen platziert — das Raster war "
+                "voll. Rest nach dem Vergrößern erneut einfügen.")
+        gw.update()
+        gw.positions_changed.emit()
+
+    def _place_heads_horizontal(self, _checked: bool = False):
+        self._place_heads(vertical=False)
+
+    def _place_heads_vertical(self, _checked: bool = False):
+        self._place_heads(vertical=True)
+
+    def _collapse_heads(self, _checked: bool = False):
+        """Kopf-Zellen des gewählten Geräts wieder zu EINER Zelle zusammenfassen."""
+        title = "Köpfe zusammenfassen"
+        fx = self._selected_tree_fixture(title)
+        if fx is None:
+            return
+        gw = self._grid_widget
+        cell = gw.collapse_fixture_heads(fx.fid)
+        if cell is None:
+            QMessageBox.information(
+                self, title,
+                "Dieses Gerät steht nicht kopfweise im Raster — es gibt nichts "
+                "zusammenzufassen.")
+            return
+        gw.update()
+        gw.positions_changed.emit()
 
     def _add_all_fixtures(self):
         """Shortcut „alle auswählen → in Gruppe übernehmen": alle gepatchten
