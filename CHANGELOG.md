@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Ein einzelner Kopf lässt sich im Programmer auswählen (FM-HEADLAYOUT Slice 5 / FM-9)
+
+#### Hinzugefügt
+
+- **In der Geräteliste des Programmers steht unter jedem Mehrkopf-Gerät jetzt eine
+  Zeile je Kopf.** Wählst du „Kopf 2", zeigt der Color-Tab nur dessen Regler, und
+  Schreiben trifft ausschließlich diesen Kopf — „jeden Kopf einzeln programmieren"
+  ohne Umweg über Matrix- oder EFX-Pfade. Einzelkopf-Geräte bekommen keine
+  Kopf-Zeilen, und Geräte, die im Patch-Dialog auf „Als eine Lampe" stehen, auch
+  nicht (sonst widerspräche die Liste dieser Einstellung).
+- Die gemeinsame Auswahl kennt dafür eine **feinere Ebene**: neben der bisherigen
+  Geräte-Auswahl gibt es jetzt eine Zell-Auswahl (`"7"` = ganzes Gerät, `"7:2"` =
+  Kopf 3, dieselbe Schreibweise wie Gruppen-Zellen). Für alle bestehenden
+  Ansichten ändert sich nichts: die Auswahl-Benachrichtigung trägt weiterhin genau
+  die Geräteliste. Ist ein Gerät sowohl als Ganzes als auch per Kopf gewählt, gilt
+  „alle Köpfe".
+- Eine aktive Kopf-Auswahl **schlägt** den Synchron/Getrennt-Umschalter — sie ist
+  eine ausdrückliche Ansage. Damit das nicht in Widerspruch zur Anzeige gerät,
+  wird der Umschalter dann abgeblendet und mit „↳ Kopf gewählt — Regler folgen der
+  Auswahl" begründet, und die Kopfzeile nennt den Kopf (`[1] PARBAR4 · K2`).
+- Tests `tests/test_fm_head_selection_a1.py` (21).
+
+#### Behoben
+
+- Die Gruppen- und Preset-Auswahl markiert weiterhin die Geräte-Zeilen. Ohne
+  Nachziehen hätten die neuen Kopf-Zeilen sie ins Leere laufen lassen — dieselbe
+  Falle wie damals bei den Kopf-Zellen in Fixture-Gruppen.
 ### 2026-07-27 — Button-Anleitung nennt den Pflicht-Selektor für „Laser-Muster abrufen" (CDX-16/26/27)
 
 #### Geändert

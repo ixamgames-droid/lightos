@@ -21,8 +21,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
-    get_state, AppState, get_channels_for_patched, resolve_attr_channels)
+    get_state, AppState, get_channels_for_patched, resolve_attr_channels,
+    color_head_count)
 from src.core.database.models import PatchedFixture, FixtureChannel
+from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
@@ -844,8 +846,20 @@ class ProgrammerView(QWidget):
             lst.clear()
             for f in self._state.get_patched_fixtures():
                 it = QListWidgetItem(f"[{f.fid:03d}] {f.label}")
-                it.setData(Qt.ItemDataRole.UserRole, f.fid)
+                # FM-HEADLAYOUT Slice 5: UserRole traegt jetzt den ZELL-Schluessel
+                # ("fid" fuer das ganze Geraet, "fid:head" fuer einen Kopf) —
+                # dieselbe Syntax wie Gruppen-Zellen. Bestandsleser MUESSEN ihn
+                # ueber parse_group_cell lesen (int(v) wirft bei "5:2").
+                it.setData(Qt.ItemDataRole.UserRole, str(f.fid))
                 lst.addItem(it)
+                for h in range(self._head_row_count(f)):
+                    hit = QListWidgetItem(f"      └ Kopf {h + 1}")
+                    hit.setData(Qt.ItemDataRole.UserRole, f"{f.fid}:{h}")
+                    hit.setToolTip(
+                        f"Nur Kopf {h + 1} von „{f.label}“ programmieren "
+                        f"(Regler/Schnellwahl schreiben dann ausschließlich auf "
+                        f"diesen Kopf). Das Geräte-Zeile darüber wählt alle Köpfe.")
+                    lst.addItem(hit)
         finally:
             lst.blockSignals(blocked)
         # clear() hat die Auswahl geleert. Die Auswahl-Folgelogik (Auswahl
@@ -854,13 +868,43 @@ class ProgrammerView(QWidget):
         # clear()/addItem. Reproduziert den bisherigen Endzustand ohne den Crash.
         self._on_fixture_selected()
 
+    def _head_row_count(self, fixture) -> int:
+        """Wie viele Kopf-Zeilen bekommt dieses Geraet in der Liste? 0 = keine.
+
+        Nur echte Mehrkopf-Farbgeraete (>=2 pro-Kopf faerbbare Baenke) und nur,
+        wenn der Patch-Dialog sie nicht ausdruecklich als EINE Lampe fuehrt
+        (``head_mode == 'single'``) — sonst widerspraeche die Liste der
+        Geraete-Einstellung aus Slice 1/2. ``auto``/``heads`` bekommen Kopf-Zeilen."""
+        try:
+            if normalize_head_mode(getattr(fixture, "head_mode", "auto")) == "single":
+                return 0
+            n = int(color_head_count(fixture))
+        except Exception:
+            return 0
+        return n if n >= 2 else 0
+
     def _select_all(self):
         self._fixture_list.selectAll()
 
+    @staticmethod
+    def _cell_of_item(item) -> tuple:
+        """UserRole eines Listen-Items -> ``(fid, head)`` ueber die kanonische
+        Parse-Quelle. Deckt auch Alt-Items ab, die noch ein int tragen."""
+        return parse_group_cell(item.data(Qt.ItemDataRole.UserRole))
+
     def _on_fixture_selected(self):
+        # FM-HEADLAYOUT Slice 5: Auswahl auf Zell-Ebene publizieren (Geraet ODER
+        # Kopf). _selected_fids bleibt die Basisliste fuer alles Bestehende.
+        cells: list[str] = []
         self._selected_fids = []
         for it in self._fixture_list.selectedItems():
-            self._selected_fids.append(it.data(Qt.ItemDataRole.UserRole))
+            fid, head = self._cell_of_item(it)
+            if fid is None:
+                continue
+            cells.append(f"{fid}" if head is None else f"{fid}:{head}")
+            if fid not in self._selected_fids:
+                self._selected_fids.append(fid)
+        self._selected_cells = cells
         # Einzelauswahl = keine Gruppe aktiv; VOR dem Publish setzen
         try:
             self._state.set_selected_group_id(None)
@@ -871,9 +915,19 @@ class ProgrammerView(QWidget):
 
     def _publish_selection(self):
         """Gemeinsame Auswahl in den App-Zustand schreiben (R1), damit alle
-        Kategorien (RGB Matrix, Effekte, Paletten …) darauf reagieren."""
+        Kategorien (RGB Matrix, Effekte, Paletten …) darauf reagieren.
+
+        FM-HEADLAYOUT Slice 5: bevorzugt die ZELL-Auswahl (Geraet ODER Kopf) —
+        ``set_selected_cells`` pflegt ``selected_fids`` mit, der Vertrag fuer alle
+        Bestandskonsumenten bleibt also gleich. Der Fallback deckt Test-Fakes und
+        aeltere AppState-APIs ohne die neue Methode ab."""
         try:
-            self._state.set_selected_fids(self._selected_fids)
+            cells = getattr(self, "_selected_cells", None)
+            setter = getattr(self._state, "set_selected_cells", None)
+            if cells is not None and callable(setter):
+                setter(cells)
+            else:
+                self._state.set_selected_fids(self._selected_fids)
         except Exception as e:
             print(f"[programmer_view] publish selection error: {e}")
 
@@ -1010,10 +1064,16 @@ class ProgrammerView(QWidget):
         Die interne Auswahl-Reihenfolge folgt der Gruppen-Reihenfolge (nicht
         der Listen-Reihenfolge), damit Fan/Chase korrekt durchlaufen.
         """
-        present = {
-            self._fixture_list.item(i).data(Qt.ItemDataRole.UserRole)
-            for i in range(self._fixture_list.count())
-        }
+        # FM-HEADLAYOUT Slice 5: die Liste enthaelt jetzt AUCH Kopf-Zeilen. Eine
+        # fid-Auswahl (Gruppe/Preset) meint IMMER das ganze Geraet -> nur die
+        # Geraete-Zeilen (head is None) markieren. Ohne die Unterscheidung liefe
+        # der Vergleich gegen den Zell-String ins Leere und die Gruppenwahl
+        # markierte gar nichts mehr (FM16E-Fehlerklasse).
+        present = set()
+        for i in range(self._fixture_list.count()):
+            fid, head = self._cell_of_item(self._fixture_list.item(i))
+            if fid is not None and head is None:
+                present.add(fid)
         # Visuelle Selektion aktualisieren (ohne _on_fixture_selected zu triggern)
         self._fixture_list.blockSignals(True)
         if not add:
@@ -1021,13 +1081,15 @@ class ProgrammerView(QWidget):
         want = set(fids)
         for i in range(self._fixture_list.count()):
             it = self._fixture_list.item(i)
-            if it.data(Qt.ItemDataRole.UserRole) in want:
+            fid, head = self._cell_of_item(it)
+            if head is None and fid in want:
                 it.setSelected(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in Gruppen-Reihenfolge setzen
         existing = list(self._selected_fids) if add else []
         ordered = existing + [f for f in fids if f not in existing]
         self._selected_fids = [f for f in ordered if f in present]
+        self._selected_cells = [str(f) for f in self._selected_fids]
         self._publish_selection()
         self._rebuild_attr_editor()
 
@@ -1045,21 +1107,38 @@ class ProgrammerView(QWidget):
             return
         if new_fids == self._selected_fids:
             return  # eigenes Echo oder keine Aenderung
-        present = {
-            self._fixture_list.item(i).data(Qt.ItemDataRole.UserRole)
-            for i in range(self._fixture_list.count())
-        }
+        # FM-HEADLAYOUT Slice 5: Kopf-Zeilen mitdenken. Traegt der State eine
+        # ZELL-Auswahl (z. B. weil eine andere View Koepfe gewaehlt hat), spiegeln
+        # wir genau die; sonst meint eine reine fid-Liste das ganze Geraet.
+        cells = None
+        getter = getattr(self._state, "get_selected_cells", None)
+        if callable(getter):
+            try:
+                cells = list(getter() or [])
+            except Exception:
+                cells = None
+        want_cells = set(cells) if cells else {str(f) for f in new_fids}
+        present = set()
+        for i in range(self._fixture_list.count()):
+            fid, head = self._cell_of_item(self._fixture_list.item(i))
+            if fid is not None and head is None:
+                present.add(fid)
         # Visuelle Selektion ohne _on_fixture_selected-Trigger (kein Re-Publish).
         self._fixture_list.blockSignals(True)
         self._fixture_list.clearSelection()
-        want = set(new_fids)
         for i in range(self._fixture_list.count()):
             it = self._fixture_list.item(i)
-            if it.data(Qt.ItemDataRole.UserRole) in want:
+            fid, head = self._cell_of_item(it)
+            if fid is None:
+                continue
+            key = f"{fid}" if head is None else f"{fid}:{head}"
+            if key in want_cells:
                 it.setSelected(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in der vom Publisher vorgegebenen Reihenfolge uebernehmen.
         self._selected_fids = [f for f in new_fids if f in present]
+        self._selected_cells = (list(cells) if cells
+                                else [str(f) for f in self._selected_fids])
         self._rebuild_attr_editor()
 
     # ── Attr Tabs Build ──────────────────────────────────────────────────────
@@ -1101,9 +1180,18 @@ class ProgrammerView(QWidget):
                     self._main_tabs.setTabVisible(self._efx_tab_index, False)
                 return
 
+            # FM-HEADLAYOUT Slice 5: Ist die Auswahl auf Köpfe eingeschränkt, muss
+            # die Kopfzeile das sagen — sonst steht dort „1 Gerät", während die
+            # Regler nur einen Kopf treiben.
+            def _sel_name(f):
+                hs = self._heads_filter_for(f)
+                if not hs:
+                    return f"[{f.fid}] {f.label}"
+                ks = ", ".join(f"K{h + 1}" for h in sorted(hs))
+                return f"[{f.fid}] {f.label} · {ks}"
             self._lbl_selection.setText(
                 f"{len(selected)} Gerät(e): " +
-                ", ".join(f"[{f.fid}] {f.label}" for f in selected[:3]) +
+                ", ".join(_sel_name(f) for f in selected[:3]) +
                 ("..." if len(selected) > 3 else "")
             )
             self._color_preview.set_fixtures(selected)
@@ -1249,7 +1337,14 @@ class ProgrammerView(QWidget):
                         "feste Wahl.")
                 sub_tb.addWidget(head_combo)
                 if _pinned:
-                    _pin_hint = QLabel("↳ pro Gerät gesetzt (Patch-Dialog)")
+                    # Slice 5: Grund benennen — „Kopf gewählt" ist etwas anderes
+                    # als „im Patch-Dialog festgelegt", auch wenn beide den
+                    # Umschalter überstimmen.
+                    _by_head = any(self._heads_filter_for(f) is not None
+                                   for f in self._selected_fixtures())
+                    _pin_hint = QLabel("↳ Kopf gewählt — Regler folgen der Auswahl"
+                                       if _by_head
+                                       else "↳ pro Gerät gesetzt (Patch-Dialog)")
                     _pin_hint.setStyleSheet("color: #8a8a8a;")
                     _pin_hint.setToolTip(head_combo.toolTip())
                     sub_tb.addWidget(_pin_hint)
@@ -1461,8 +1556,16 @@ class ProgrammerView(QWidget):
     def _has_auto_mode_color_head_fixture(self) -> bool:
         """FM-HEADLAYOUT Slice 2: Gibt es in der Auswahl ein Mehrkopf-Farbgeraet,
         das noch der GLOBALEN Voreinstellung folgt (``head_mode == "auto"``)?
-        Nur dann hat der Umschalter im Color-Tab ueberhaupt eine Wirkung."""
+        Nur dann hat der Umschalter im Color-Tab ueberhaupt eine Wirkung.
+
+        Slice 5: Ein Geraet mit aktiver KOPF-Auswahl zaehlt hier NICHT mehr — die
+        Kopf-Wahl schlaegt den Modus, der Umschalter waere fuer dieses Geraet also
+        wirkungslos. Sonst zeigte er „Synchron", waehrend sichtbar Pro-Kopf-Regler
+        stehen (die Klasse „sichtbarer Zustand != Logikzustand", die schon zweimal
+        live aufgefallen ist)."""
         for f in self._selected_fixtures():
+            if self._heads_filter_for(f) is not None:
+                continue
             counts = self._color_head_counts(f)
             if counts and max(counts.values()) > 1 \
                     and normalize_head_mode(getattr(f, "head_mode", "auto")) == "auto":
@@ -1533,10 +1636,15 @@ class ProgrammerView(QWidget):
         ``auto``), ist der Aufbau byte-identisch zu vorher."""
         if not fixtures:
             return
+        # Slice 5: Eine aktive KOPF-Auswahl ist eine ausdrückliche Nutzer-Ansage
+        # („nur dieser Kopf") und schlägt daher den Modus — das Gerät landet im
+        # Pro-Kopf-Block, auch wenn es sonst synchron liefe.
         sync_fx = [f for f in fixtures
-                   if self._fixture_color_head_mode(f) == "sync"]
+                   if self._heads_filter_for(f) is None
+                   and self._fixture_color_head_mode(f) == "sync"]
         sep_fx = [f for f in fixtures
-                  if self._fixture_color_head_mode(f) == "separate"]
+                  if self._heads_filter_for(f) is not None
+                  or self._fixture_color_head_mode(f) == "separate"]
         mixed = bool(sync_fx) and bool(sep_fx)
         if sync_fx:
             if mixed:
@@ -1578,14 +1686,37 @@ class ProgrammerView(QWidget):
                 color_chs.append((ch, h))
         return color_chs, occ
 
+    def _heads_filter_for(self, fixture) -> set | None:
+        """FM-HEADLAYOUT Slice 5: Auf welche Koepfe ist dieses Geraet gerade
+        eingeschraenkt? ``None`` = ganzes Geraet (alle Koepfe) = Bestandsverhalten.
+
+        Quelle ist die ZELL-Auswahl im AppState (``selected_heads_for``); fehlt die
+        API (Test-Fake/alter State), gilt „alle Koepfe"."""
+        fn = getattr(self._state, "selected_heads_for", None)
+        if not callable(fn):
+            return None
+        try:
+            sel = fn(getattr(fixture, "fid", None))
+        except Exception:
+            return None
+        # Leeres Set (Geraet gar nicht in der Auswahl) NICHT als „keine Koepfe"
+        # deuten — sonst verschwaenden die Regler eines Geraets, das der Aufrufer
+        # bewusst uebergeben hat. Nur ein echtes Kopf-Set schraenkt ein.
+        return sel or None
+
     def _add_per_head_color_sliders(self, ilay, fixtures):
         """Ein Regler je Kopf. Jeder Pro-Kopf-Regler bekommt NUR die Fixtures,
         die diesen Kopf wirklich besitzen (kein "attr#N" auf Einzelkopf-
-        Geraeten)."""
+        Geraeten).
+
+        Slice 5: Ist in der Geraeteliste NUR ein Kopf gewaehlt, erscheinen auch nur
+        dessen Regler — „Kopf 2 anklicken und programmieren" ohne die anderen
+        versehentlich mitzuziehen."""
         color_chs, _occ = self._color_template_channels(fixtures)
         for ch, h in color_chs:
             owners = [f for f in fixtures
-                      if self._color_head_counts(f).get(ch.attribute, 0) > h]
+                      if self._color_head_counts(f).get(ch.attribute, 0) > h
+                      and ((sel := self._heads_filter_for(f)) is None or h in sel)]
             if not owners:
                 continue
             if h > 0:
