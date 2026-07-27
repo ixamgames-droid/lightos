@@ -307,9 +307,13 @@ class BPMManager:
         # greift (vorher schuetzte der Lock hier nur eine Haelfte der Race).
         # HINWEIS: reset() laesst _mode==AUTO — laufende AUTO-Quellen (Audio-Detektor,
         # OS2L, Timeline, File, TempoBus) re-setzen _bpm beim naechsten Event wieder
-        # ('BPM springt zurueck'). Ob ein manuelles '0'/reset ALLE Live-Quellen
-        # ueberstimmen soll (und den Modus auf MANUAL flippen), ist eine offene
-        # Verhaltensentscheidung -> BACKLOG A3D-17b (nicht hier geraten).
+        # ('BPM springt zurueck'). Das ist hier ABSICHT: reset() ist die Test-/Neustart-
+        # Clean-Slate, nicht der Nutzer-Wunsch 'BPM aus'.
+        # A3D-17b ist ENTSCHIEDEN und umgesetzt (nicht mehr offen): der Nutzer-Weg
+        # 'BPM = 0/aus' ist `turn_off()` — es flippt _mode=MANUAL und blockt damit
+        # request_bpm/_apply_detected_bpm dauerhaft; der in-flight-Race dabei ist per
+        # set_bpm(..., only_if_auto=True) (Compare-and-Set, CDX-23) geschlossen.
+        # Wer 'springt zurueck' beobachtet, ruft also reset() statt turn_off().
         with self._lock:
             self._last_taps = []
             self._beat_index = 0
