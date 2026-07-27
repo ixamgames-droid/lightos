@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — Fächer und Snap-Aufnahme verstehen Köpfe (FM-HEADLAYOUT A2)
+
+#### Hinzugefügt
+
+- **Das Fächer-Werkzeug fächert jetzt über die gewählten Köpfe.** Sind die vier
+  Köpfe einer PAR-Bar ausgewählt, bekommen sie einen echten Verlauf statt vier
+  gleicher Werte; die Vorschau weist jede Zeile als „PARBAR4 · K2" aus, damit
+  sichtbar ist, welcher Wert auf welchen Kopf geht. Ohne Kopf-Auswahl arbeitet es
+  unverändert über ganze Geräte.
+- **Die Snap-Aufnahme respektiert die Kopf-Auswahl.** Ist im Programmer nur Kopf 2
+  gewählt, landet auch nur dessen Wert im Snap — vorher nahm der Geräte-Scope die
+  übrigen Köpfe still mit. Der Speicher-Scope kennt dafür eine Kopf-Ebene
+  (`active_scope_heads`), die alle drei Aufrufer des Kanal-Auswahl-Dialogs über
+  denselben Helfer nutzen.
+- Tests `tests/test_fm_head_selection_a2.py` (15).
+
+#### Noch nicht kopf-fähig
+
+- **EFX** speichert seine Ziel-Geräte in der Show-Datei; eine Umstellung auf
+  Kopf-Ziele ist eine Formatänderung mit Migration für Altshows und bekommt
+  deshalb eine eigene Runde.
+- **VC-Submaster** wirkt über eine Geräte-Maske im DMX-Ausgang, nicht über den
+  Programmer; pro Kopf hieße Adress-Maske im Ausgabepfad — ebenfalls eigene Runde.
 ### 2026-07-27 — 3D-Visualizer: keine verlorenen Fixture-Updates, keine verlorenen Andockungen (A3D-04/08)
 
 #### Behoben

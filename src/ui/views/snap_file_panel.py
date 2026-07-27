@@ -45,6 +45,21 @@ from src.core.attr_groups import (
 # Kanal-Auswahl-Dialog
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+def _scope_heads(state) -> dict:
+    """FM-HEADLAYOUT A2: Kopf-Einschraenkung des aktiven Speicher-Scopes
+    (``{fid: {head}}``) — tolerant gegen aeltere States/Test-Fakes ohne die API
+    (dann ``{}`` = keine Einschraenkung, Bestandsverhalten). Von allen drei
+    Aufrufern des ChannelSelectDialog genutzt, damit „nur Kopf 2 gewaehlt" ueberall
+    dasselbe bedeutet."""
+    fn = getattr(state, "active_scope_heads", None)
+    if not callable(fn):
+        return {}
+    try:
+        return dict(fn() or {})
+    except Exception:
+        return {}
+
+
 class ChannelSelectDialog(QDialog):
     """Auswahl, WAS beim Speichern (Snap/Szene) uebernommen wird.
 
@@ -60,7 +75,8 @@ class ChannelSelectDialog(QDialog):
     direkt darauf zu.
     """
 
-    def __init__(self, programmer: dict, parent=None, *, scope_fids=None):
+    def __init__(self, programmer: dict, parent=None, *, scope_fids=None,
+                 scope_heads=None):
         super().__init__(parent)
         self.setWindowTitle("Kanäle auswählen")
         self.setMinimumWidth(320)
@@ -70,14 +86,40 @@ class ChannelSelectDialog(QDialog):
         # damit liegengebliebene Werte zuvor gewaehlter Gruppen NICHT mitgespeichert
         # werden. None/leer -> kein Scope (alle Programmer-Werte, Alt-Verhalten).
         self._scope = {int(f) for f in scope_fids} if scope_fids else None
+        # FM-HEADLAYOUT A2: zusaetzlich pro Geraet auf KOEPFE einschraenken
+        # ({fid: {head, ...}}). Ist im Programmer nur Kopf 2 gewaehlt, soll auch
+        # nur dessen Wert in den Snap — sonst nimmt man die anderen Koepfe still
+        # mit auf. Ohne Angabe: alle Koepfe (Bestandsverhalten).
+        self._scope_heads = {int(f): {int(h) for h in hs}
+                             for f, hs in (scope_heads or {}).items() if hs}
         self._setup_ui(programmer)
 
+    @staticmethod
+    def _head_of_key(attr: str) -> int:
+        """Kopf-Index eines Programmer-Schluessels: ``"color_r"`` -> 0,
+        ``"color_r#2"`` -> 2 (die ``attr#N``-Konvention des Programmers)."""
+        if "#" in attr:
+            try:
+                return int(attr.rsplit("#", 1)[1])
+            except ValueError:
+                return 0
+        return 0
+
     def _in_scope(self, programmer: dict) -> dict:
-        """Programmer auf die Geraete im aktiven Scope reduzieren."""
-        if not self._scope:
-            return dict(programmer)
-        return {fid: attrs for fid, attrs in programmer.items()
-                if int(fid) in self._scope}
+        """Programmer auf die Geraete im aktiven Scope reduzieren — und, falls
+        gesetzt, je Geraet auf die gewaehlten KOEPFE."""
+        out: dict = {}
+        for fid, attrs in programmer.items():
+            if self._scope and int(fid) not in self._scope:
+                continue
+            heads = self._scope_heads.get(int(fid))
+            if heads:
+                attrs = {a: v for a, v in attrs.items()
+                         if self._head_of_key(a) in heads}
+                if not attrs:
+                    continue
+            out[fid] = attrs
+        return out
 
     def _setup_ui(self, programmer: dict):
         layout = QVBoxLayout(self)
@@ -801,7 +843,8 @@ class SnapFilePanel(QWidget):
                     "Programmer ist leer - nichts zu speichern.")
                 return
 
-            dlg = ChannelSelectDialog(prog, self, scope_fids=state.active_scope_fids())
+            dlg = ChannelSelectDialog(prog, self, scope_fids=state.active_scope_fids(),
+                                      scope_heads=_scope_heads(state))
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)
