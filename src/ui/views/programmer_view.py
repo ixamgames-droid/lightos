@@ -23,6 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels)
 from src.core.database.models import PatchedFixture, FixtureChannel
+from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
@@ -1223,9 +1224,23 @@ class ProgrammerView(QWidget):
                 head_combo.setToolTip(
                     "Synchron: ein Regler je Farbe steuert alle Köpfe gemeinsam.\n"
                     "Getrennt: jeder Kopf (z. B. linke/rechte Spider-Bar) hat "
-                    "eigene Farbregler.")
+                    "eigene Farbregler.\n\n"
+                    "Gilt nur für Geräte, die im Patch-Dialog auf "
+                    "„Mehrkopf-Programmierung: Automatisch“ stehen — eine dort "
+                    "fest gesetzte Wahl („Köpfe einzeln“ / „Als eine Lampe“) "
+                    "schlägt diese Voreinstellung.")
                 head_combo.currentIndexChanged.connect(
                     self._on_color_head_combo_changed)
+                # FM-HEADLAYOUT Slice 2: Hat KEIN ausgewaehltes Mehrkopf-Geraet
+                # mehr „auto", entscheidet die Pro-Fixture-Wahl allein — dann
+                # waere ein bedienbarer Umschalter eine Luege. Deaktiviert statt
+                # versteckt: die globale Voreinstellung bleibt sichtbar.
+                if not self._has_auto_mode_color_head_fixture():
+                    head_combo.setEnabled(False)
+                    head_combo.setToolTip(
+                        head_combo.toolTip() + "\n\nHier ohne Wirkung: alle "
+                        "ausgewählten Mehrkopf-Geräte haben im Patch-Dialog eine "
+                        "feste Wahl.")
                 sub_tb.addWidget(head_combo)
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
@@ -1432,6 +1447,17 @@ class ProgrammerView(QWidget):
                 best = max(best, max(c.values()))
         return best
 
+    def _has_auto_mode_color_head_fixture(self) -> bool:
+        """FM-HEADLAYOUT Slice 2: Gibt es in der Auswahl ein Mehrkopf-Farbgeraet,
+        das noch der GLOBALEN Voreinstellung folgt (``head_mode == "auto"``)?
+        Nur dann hat der Umschalter im Color-Tab ueberhaupt eine Wirkung."""
+        for f in self._selected_fixtures():
+            counts = self._color_head_counts(f)
+            if counts and max(counts.values()) > 1 \
+                    and normalize_head_mode(getattr(f, "head_mode", "auto")) == "auto":
+                return True
+        return False
+
     def _on_color_head_combo_changed(self, index: int):
         """Bound-Slot statt Lambda (STAB-10): Combo über den Sender auflösen."""
         combo = self.sender()
@@ -1460,27 +1486,78 @@ class ProgrammerView(QWidget):
         """Entfernt die "attr#N"-Pro-Kopf-Farbwerte der Auswahl (pro Fixture nur
         bis zu dessen echter Kopf-Zahl), sodass alle Koepfe wieder dem einfachen
         Schluessel folgen (Flush-Fallback) — so wirken auch Schnellwahl/Picker
-        wieder auf beide Koepfe."""
+        wieder auf beide Koepfe.
+
+        FM-HEADLAYOUT Slice 2: Fixtures, die PRO FIXTURE auf „Koepfe einzeln"
+        stehen, bleiben verschont — ihre Pro-Kopf-Werte sind gewollt, und der
+        globale Umschalter darf sie nicht plattmachen."""
         for f in self._selected_fixtures():
+            if self._fixture_color_head_mode(f) == "separate":
+                continue
             prog = self._state.programmer.get(f.fid, {})
             for attr, cnt in self._color_head_counts(f).items():
                 for h in range(1, cnt):
                     if f"{attr}#{h}" in prog:
                         self._state.clear_programmer_value(f.fid, f"{attr}#{h}")
 
+    def _fixture_color_head_mode(self, fixture) -> str:
+        """FM-HEADLAYOUT Slice 2: „sync"/„separate" fuer DIESES Fixture.
+
+        Der Pro-Fixture-``head_mode`` (Patch-Dialog „Mehrkopf-Programmierung")
+        schlaegt den globalen Umschalter; ``auto`` erbt ihn. Vorrang-Regel liegt
+        als reine Funktion im Leaf-Modul ``core.head_mode`` (EINE Quelle)."""
+        return effective_color_head_mode(
+            getattr(fixture, "head_mode", "auto"), self.color_head_mode())
+
     def _add_color_head_sliders(self, ilay, fixtures):
-        """Baut die Farbregler eines Mehrkopf-Geraets je nach color_head_mode:
-        - "sync": ein Regler je Farbe, treibt alle Koepfe gemeinsam.
+        """Baut die Farbregler der Mehrkopf-Geraete der Auswahl.
+
+        Der Modus wird PRO FIXTURE bestimmt (``_fixture_color_head_mode``):
+        - "sync": ein Regler je Farbe, treibt alle Koepfe des Geraets gemeinsam.
         - "separate": ein Regler je Kopf (N-tes Vorkommen).
-        Kanal-Vorlage ist das farb-reichste Geraet der Auswahl (nicht zwingend
-        selected[0]); jeder Pro-Kopf-Regler bekommt NUR die Fixtures, die diesen
-        Kopf wirklich besitzen (kein "attr#N" auf Einzelkopf-Geraeten)."""
+        Enthaelt die Auswahl beide Sorten (z. B. ein als „eine Lampe" gesetzter
+        Hydrabeam + ein Spider auf „Koepfe einzeln"), entstehen BEIDE Bloecke —
+        mit Zwischen-Ueberschrift, damit sichtbar ist, warum es zwei Saetze
+        Farbregler gibt. Ist nur eine Sorte dabei (der Normalfall: alles
+        ``auto``), ist der Aufbau byte-identisch zu vorher."""
         if not fixtures:
             return
+        sync_fx = [f for f in fixtures
+                   if self._fixture_color_head_mode(f) == "sync"]
+        sep_fx = [f for f in fixtures
+                  if self._fixture_color_head_mode(f) == "separate"]
+        mixed = bool(sync_fx) and bool(sep_fx)
+        if sync_fx:
+            if mixed:
+                ilay.addWidget(self._head_block_label(
+                    "Als eine Lampe (Köpfe synchron)", sync_fx))
+            self._add_sync_color_sliders(ilay, sync_fx)
+        if sep_fx:
+            if mixed:
+                ilay.addWidget(self._head_block_label(
+                    "Köpfe einzeln", sep_fx))
+            self._add_per_head_color_sliders(ilay, sep_fx)
+
+    @staticmethod
+    def _head_block_label(title: str, fixtures) -> QLabel:
+        """Zwischen-Ueberschrift fuer einen Farbregler-Block (nur bei gemischter
+        Auswahl) — nennt die betroffenen Geraete, damit die zwei Saetze Regler
+        zuordenbar sind."""
+        names = ", ".join(str(getattr(f, "label", "") or f"Fixture {f.fid}")
+                          for f in fixtures)
+        lbl = QLabel(f"<b>{title}</b> — {names}")
+        lbl.setWordWrap(True)
+        return lbl
+
+    def _color_template_channels(self, fixtures):
+        """(Farb-Kanaele mit Kopf-Index, Vorkommen je Attribut) der Vorlage.
+
+        Kanal-Vorlage ist das farb-reichste Geraet der uebergebenen Menge (nicht
+        zwingend selected[0]) — bei der Bucket-Aufteilung also jeweils das
+        reichste Geraet DES BLOCKS."""
         template = max(
             fixtures,
             key=lambda f: max(self._color_head_counts(f).values(), default=0))
-        # Farb-Kanaele der Vorlage in Reihenfolge, mit Kopf-Index (Vorkommen).
         occ: dict[str, int] = {}
         color_chs = []   # (channel, head_index)
         for ch in get_channels_for_patched(template):
@@ -1488,26 +1565,38 @@ class ProgrammerView(QWidget):
                 h = occ.get(ch.attribute, 0)
                 occ[ch.attribute] = h + 1
                 color_chs.append((ch, h))
-        if not color_chs:
-            return
-        if self.color_head_mode() == "separate":
-            for ch, h in color_chs:
-                owners = [f for f in fixtures
-                          if self._color_head_counts(f).get(ch.attribute, 0) > h]
-                if not owners:
-                    continue
-                if h > 0:
-                    self._seed_separate_head(owners, ch, h)
-                ilay.addWidget(AttributeSlider(
-                    ch, owners, self._state, owner=self, head=h))
-        else:   # sync — ein Regler je Farbe (erstes Vorkommen), treibt alle Koepfe
-            for ch, h in color_chs:
-                if h != 0:
-                    continue
-                ilay.addWidget(AttributeSlider(
-                    ch, fixtures, self._state, owner=self,
-                    sync_heads=occ.get(ch.attribute, 1),
-                    display_name=self._color_label(ch)))
+        return color_chs, occ
+
+    def _add_per_head_color_sliders(self, ilay, fixtures):
+        """Ein Regler je Kopf. Jeder Pro-Kopf-Regler bekommt NUR die Fixtures,
+        die diesen Kopf wirklich besitzen (kein "attr#N" auf Einzelkopf-
+        Geraeten)."""
+        color_chs, _occ = self._color_template_channels(fixtures)
+        for ch, h in color_chs:
+            owners = [f for f in fixtures
+                      if self._color_head_counts(f).get(ch.attribute, 0) > h]
+            if not owners:
+                continue
+            if h > 0:
+                self._seed_separate_head(owners, ch, h)
+            ilay.addWidget(AttributeSlider(
+                ch, owners, self._state, owner=self, head=h))
+
+    def _add_sync_color_sliders(self, ilay, fixtures):
+        """Ein Regler je Farbe (erstes Vorkommen), treibt alle Koepfe gemeinsam.
+
+        ``sync_heads`` ist die Kopfzahl der Block-Vorlage; der Regler raeumt beim
+        Schreiben etwaige "attr#N"-Abweichungen weg (AttributeSlider._apply_value)
+        — so wird ein auf „als eine Lampe" gestelltes Geraet auch dann wieder
+        einheitlich, wenn frueher pro Kopf programmiert wurde."""
+        color_chs, occ = self._color_template_channels(fixtures)
+        for ch, h in color_chs:
+            if h != 0:
+                continue
+            ilay.addWidget(AttributeSlider(
+                ch, fixtures, self._state, owner=self,
+                sync_heads=occ.get(ch.attribute, 1),
+                display_name=self._color_label(ch)))
 
     def _seed_separate_head(self, owners, ch, head: int):
         """Getrennt-Modus: verankert den aktuell EFFEKTIVEN Wert eines Kopf>0

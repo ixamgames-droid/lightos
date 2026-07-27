@@ -7,6 +7,39 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-27 — „Mehrkopf-Programmierung" steuert die Programmer-Farbregler (FM-HEADLAYOUT Slice 2)
+
+#### Geändert
+
+- **Die Wahl am Gerät entscheidet jetzt, ob Köpfe einzeln oder als eine Lampe
+  programmiert werden.** Die per-Fixture-Option „Mehrkopf-Programmierung" aus
+  Slice 1 wirkte bisher nur auf die automatische Kopf-Matrix-Gruppe beim
+  Patchen — die Farbregler im Programmer hingen allein am globalen Umschalter
+  „Köpfe: Synchron / Getrennt". Neu gilt: **`Köpfe einzeln` → Regler pro Kopf,
+  `Als eine Lampe` → ein Regler je Farbe für alle Köpfe, `Automatisch` → wie
+  bisher die globale Voreinstellung.** Die Vorrang-Regel liegt als reine
+  Funktion `effective_color_head_mode` im Leaf-Modul `core/head_mode.py` (eine
+  Quelle für UI, Tests und spätere Kopf-Auswahl in Matrix/EFX/VC).
+- **Gemischte Auswahl zeigt beide Blöcke.** Sind ein „Köpfe einzeln"- und ein
+  „Als eine Lampe"-Gerät gleichzeitig ausgewählt, entstehen beide Regler-Sätze
+  mit Zwischen-Überschrift (welches Gerät zu welchem Block gehört) — vorher
+  überstimmte eine globale Einstellung beide Geräte. Ein Pro-Kopf-Regler kann
+  dabei nie mehr einen `attr#N`-Wert auf einem „eine Lampe"-Gerät anlegen (die
+  Zuordnung läuft pro Block statt über die ganze Auswahl).
+- **Der globale Umschalter plättet keine gewollten Pro-Kopf-Farben mehr:** beim
+  Wechsel auf „Synchron" bleiben Geräte auf „Köpfe einzeln" unangetastet (für
+  „Automatisch" räumt er weiter auf wie bisher). Stehen alle ausgewählten
+  Mehrkopf-Geräte auf einer festen Wahl, ist der Umschalter deaktiviert statt
+  wirkungslos bedienbar — mit Hinweis auf den Patch-Dialog.
+- Ein Gerät, das nach früherem Pro-Kopf-Programmieren auf „Als eine Lampe"
+  gestellt wird, wird beim ersten Regler-Zug wieder einheitlich (der
+  Synchron-Regler räumt die `attr#N`-Abweichungen weg) — sonst hätte der Regler
+  auf der zweiten Bank tot gewirkt.
+- Tests `tests/test_fm_headlayout_slice2_programmer_head_mode.py` (15 Fälle:
+  Vorrang-Tabelle, beide Richtungen gegen die globale Wahl, `auto`-Regressions-
+  schutz, Wiedervereinigung getrennter Köpfe, gemischte Auswahl inkl. Prüfung
+  beider DMX-Bänke, Schalter-Gate).
+
 ### 2026-07-26 — Kein Blackout-Puls mehr beim Live-Show-Load (CDX-22)
 
 #### Behoben
