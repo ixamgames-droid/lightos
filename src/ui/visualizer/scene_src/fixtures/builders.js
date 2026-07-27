@@ -1136,8 +1136,13 @@ function applyFloorAim(f, dmx) {
       aimObj.getWorldQuaternion(wq);
       dir.applyQuaternion(wq);
     }
+    // A3D-26: Ursprung aus DEMSELBEN Objekt wie die Richtung. Vorher kam die
+    // Richtung aus dem Kopf (Pan/Tilt), der Auftreffpunkt wurde aber ab dem
+    // Fixture-SOCKEL gerechnet — bei Moving Head/Scanner sitzt die Linse bzw.
+    // der Spiegel deutlich davon entfernt, der Bodenpool lag also versetzt zum
+    // sichtbaren Kegel (der am Kopf haengt).
     const origin = new THREE.Vector3();
-    f.group.getWorldPosition(origin);
+    (aimObj || f.group).getWorldPosition(origin);
     if (Math.abs(dir.y) > 0.001) {
       const t = -origin.y / dir.y;
       if (t > 0 && t < 100) {

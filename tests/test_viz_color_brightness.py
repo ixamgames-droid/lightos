@@ -317,6 +317,8 @@ _MockVisualizerBridge = _make_mock_bridge_class()
 _FIXTURES_PAYLOAD = json.dumps([
     {"fid": 21, "type": "par", "x": 0, "y": 2, "z": 0,
      "r": 0, "g": 0, "b": 0, "intensity": 0},
+    {"fid": 22, "type": "moving_head", "x": 4, "y": 6, "z": 0,
+     "r": 0, "g": 0, "b": 0, "intensity": 0},
 ])
 
 
@@ -401,9 +403,9 @@ class LuminanceCullingJsTest(unittest.TestCase):
         self.assertTrue(self._loaded_ok[-1], "loadFinished(ok=False)")
         self.assertTrue(self._poll_until_true("!!window.__lightosAppReady"))
 
-    def _push_dmx(self, r, g, b, intensity):
-        payload = json.dumps([{"fid": 21, "r": r, "g": g, "b": b,
-                               "intensity": intensity, "pan": 128, "tilt": 128}])
+    def _push_dmx(self, r, g, b, intensity, fid=21, pan=128, tilt=128):
+        payload = json.dumps([{"fid": fid, "r": r, "g": g, "b": b,
+                               "intensity": intensity, "pan": pan, "tilt": tilt}])
         self._bridge_obj.dmxBatch.emit(payload)
 
     def test_black_at_full_dimmer_is_culled_bright_color_is_visible(self):
@@ -428,6 +430,58 @@ class LuminanceCullingJsTest(unittest.TestCase):
         self._emit_until_true(
             lambda: self._push_dmx(255, 255, 255, 0),
             "window.__lightos.fixtures['21'].spot.visible === false")
+
+    def test_floor_spot_origin_follows_the_head_not_the_base(self):
+        """A3D-26: Der Bodenpool wird ab dem KOPF gerechnet, nicht ab dem Sockel.
+
+        Vorher kam die Strahl-RICHTUNG aus dem Kopf-Weltquaternion, der
+        Auftreffpunkt aber ab ``f.group`` (Fixture-Sockel) — bei getiltetem Kopf
+        lag der Bodenpool damit neben dem sichtbaren Kegel, der am Kopf haengt.
+        """
+        self._load_and_wait()
+        self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(_FIXTURES_PAYLOAD),
+            "typeof window.__lightos.fixtures['22'] === 'object'", timeout_s=8.0)
+
+        # Deutlich getiltet + gepannt, damit Kopf- und Sockel-Ursprung
+        # unterschiedliche Auftreffpunkte ergeben.
+        self._emit_until_true(
+            lambda: self._push_dmx(255, 255, 255, 255, fid=22, pan=180, tilt=60),
+            "window.__lightos.fixtures['22'].floorSpot.visible === true")
+
+        raw = self._eval("""
+            (function() {
+                const THREE = window.THREE;   // three_local.js setzt das global
+                const f = window.__lightos.fixtures['22'];
+                if (!f || !f.head || !f.floorSpot) return null;
+                f.head.updateMatrixWorld(true);
+                const H = new THREE.Vector3(); f.head.getWorldPosition(H);
+                const G = new THREE.Vector3(); f.group.getWorldPosition(G);
+                const q = new THREE.Quaternion(); f.head.getWorldQuaternion(q);
+                const d = new THREE.Vector3(0, -1, 0).applyQuaternion(q);
+                const t = -H.y / d.y;
+                return {
+                    hx: f.floorSpot.position.x, hz: f.floorSpot.position.z,
+                    ex: H.x + d.x * t,          ez: H.z + d.z * t,
+                    baseX: G.x + d.x * (-G.y / d.y),
+                    baseZ: G.z + d.z * (-G.y / d.y),
+                    headY: H.y, groupY: G.y,
+                };
+            })()
+        """)
+        self.assertIsNotNone(raw, "Moving Head ohne head/floorSpot aufgebaut")
+
+        # Praemisse des Tests: Kopf und Sockel liegen wirklich auseinander —
+        # sonst waere die Zusicherung leer.
+        self.assertNotAlmostEqual(raw["headY"], raw["groupY"], places=3,
+                                  msg="Kopf sitzt auf dem Sockel — Test waere leer")
+
+        self.assertAlmostEqual(raw["hx"], raw["ex"], places=4,
+                               msg="Bodenpool liegt nicht auf der Kopf-Achse")
+        self.assertAlmostEqual(raw["hz"], raw["ez"], places=4)
+        # Und er stimmt NICHT mit der alten Sockel-Rechnung ueberein.
+        self.assertGreater(abs(raw["hx"] - raw["baseX"]) + abs(raw["hz"] - raw["baseZ"]),
+                           1e-3, "Fix wirkungslos: Ergebnis gleicht der Sockel-Rechnung")
 
 
 if __name__ == "__main__":

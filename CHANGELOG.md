@@ -40,6 +40,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   „sichtbares" Licht: three.js wertet es in jedem beleuchteten Pixel aus und es
   belegt einen Schatten-Slot, obwohl es nichts abstrahlt — genau der Kostenblock,
   den das Culling einsparen soll. Auf schwachen GPUs (Davids Surface) zählt das.
+- **Der Bodenlichtpunkt wird ab dem Kopf gerechnet, nicht ab dem Fuß des Geräts**
+  (A3D-26). Die Strahlrichtung kam schon aus dem Kopf, der Auftreffpunkt aber vom
+  Sockel — bei einem gekippten Moving Head oder Scanner lag der Bodenpool damit
+  sichtbar neben dem Lichtkegel, der am Kopf hängt.
 
 
 ### 2026-07-27 — Web-Remote: Token und LAN-Zugriff endlich bedienbar (CDX-24)
