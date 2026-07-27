@@ -57,6 +57,12 @@ class EfxFixture:
     start_offset: float = 0.0   # Phase-Offset 0.0–1.0 (für Fan-Effekte)
     pan_attr:  str = "pan"
     tilt_attr: str = "tilt"
+    # FM-HEADLAYOUT A3: Ziel ist EIN KOPF dieses Geraets (0-basiert) statt des
+    # ganzen Geraets. ``None`` = ganzes Geraet = Bestandsverhalten (inkl. der
+    # FM-16b-Kopfwelle ueber alle Koepfe). Ein Kopf-Ziel bewegt AUSSCHLIESSLICH
+    # die Kanaele dieses Kopfes; mehrere Kopf-Ziele desselben Geraets sind
+    # erlaubt und tragen je ihren eigenen ``start_offset`` (Fan pro Kopf).
+    head: "int | None" = None
 
 
 def _find_fixture(patch_cache, fid):
@@ -372,8 +378,24 @@ class EfxInstance(Function):
         return (base + fx.start_offset + self._fan_for(i, n)) % 1.0
 
     def _values(self) -> dict[int, dict[str, int]]:
-        """{fid: {pan_attr: val, tilt_attr: val}} fuer die aktuelle Phase."""
-        result = {}
+        """{fid: {pan_attr: val, tilt_attr: val}} fuer die aktuelle Phase.
+
+        Abgeleitete Sicht auf ``_target_values()`` (EINE Rechen-Quelle). Der
+        fid-gekeyte Vertrag bleibt fuer Vorschau + Bestandstests unveraendert; bei
+        mehreren Zielen desselben fid (FM-HEADLAYOUT A3: Kopf-Ziele) gewinnt wie
+        bisher das LETZTE — der Renderpfad nutzt darum ``_target_values``, das
+        jedes Ziel einzeln behaelt."""
+        return {fx.fid: vals
+                for fx, vals in zip(self.fixtures, self._target_values())}
+
+    def _target_values(self) -> list[dict[str, int]]:
+        """Werte JE ZIEL, index-gleich zu ``self.fixtures``.
+
+        Herausgezogen aus ``_values`` (FM-HEADLAYOUT A3), damit zwei Kopf-Ziele
+        DESSELBEN Geraets ihre eigene Phase/ihren eigenen ``start_offset``
+        behalten, statt sich im fid-gekeyten Dict zu ueberschreiben. Rechenweg
+        unveraendert — ``_values`` ist jetzt nur noch die Projektion darauf."""
+        result: list[dict[str, int]] = []
         n = len(self.fixtures)
         is_random = (self.algorithm == EfxAlgorithm.RANDOM)
         counter = bool(getattr(self, "counter_rotate", False))
@@ -392,7 +414,7 @@ class EfxInstance(Function):
                 pan, tilt = self._calc(self._fixture_phase(i, n, fx), cx, cy)
             if self.mirror and (i % 2 == 1):
                 pan = 255 - pan
-            result[fx.fid] = self._pan_tilt_attrs(fx, pan, tilt)
+            result.append(self._pan_tilt_attrs(fx, pan, tilt))
         return result
 
     def head_phase_points(self, i: int, n: int, phase: float,
@@ -587,8 +609,13 @@ class EfxInstance(Function):
                                             resolve_attr_channels)
         except Exception:
             return
-        values = self._values()
-        for fid, attrs in values.items():
+        # FM-HEADLAYOUT A3: JE ZIEL rendern (nicht je fid) — nur so behalten zwei
+        # Kopf-Ziele desselben Geraets ihre eigene Phase. Fuer reine Geraete-Ziele
+        # ist die Schleife inhaltsgleich zum fruheren values.items() (jedes fid
+        # kommt einmal vor).
+        for _target, attrs in zip(self.fixtures, self._target_values()):
+            fid = _target.fid
+            target_head = getattr(_target, "head", None)
             fx = _find_fixture(patch_cache, fid)
             if fx is None:
                 continue
@@ -618,7 +645,11 @@ class EfxInstance(Function):
             # max(#pan, #tilt). Nutzt denselben gecachten Kanal-Pfad (`chans`),
             # daher kein zusaetzlicher DB-Roundtrip im Per-Frame-Renderer.
             head_count = pan_tilt_head_count(fx)
-            if head_count >= 2 and (("tilt" in attrs) or ("pan" in attrs)):
+            # A3: Bei einem KOPF-Ziel entfaellt die Kopfwelle — das Ziel IST ein
+            # einzelner Kopf; die Welle ueber alle Koepfe waere das Gegenteil der
+            # Ansage (und ihre attr#k-Keys wuerden unten ohnehin verworfen).
+            if (target_head is None and head_count >= 2
+                    and (("tilt" in attrs) or ("pan" in attrs))):
                 attrs = dict(attrs)
                 for k, pa, pval, ta, tval in self._head_pan_tilts(fid, head_count):
                     # Kopf k EXAKT wie Kopf 0 behandeln: BEIDE Achsen packen und
@@ -642,6 +673,23 @@ class EfxInstance(Function):
                     head = apply_pan_tilt_orientation(fx, head)
                     for bkey, val in head.items():
                         attrs[f"{bkey}#{k}"] = val
+            if target_head is not None:
+                # FM-HEADLAYOUT A3: KOPF-ZIEL — ausschliesslich die Kanaele dieses
+                # Kopfes bespielen. ``channels_for_head`` ist dieselbe Quelle, die
+                # die Pro-Kopf-Matrix nutzt (FM-16): mehrfach vorkommende Attribute
+                # gehoeren dem Kopf (dessen Pan/Tilt/Dimmer), EINMALIGE Attribute
+                # (gemeinsamer Master-Dimmer/Shutter) erscheinen bei JEDEM Kopf und
+                # bleiben damit geteilt. Die Basis-Attrs aus _target_values passen
+                # unveraendert: sie sind bereits die Figur-Werte DIESES Ziels.
+                from src.core.app_state import channels_for_head
+                for base_attr, ch in channels_for_head(chans, int(target_head)).items():
+                    if base_attr not in attrs:
+                        continue
+                    addr = fx.address + ch.channel_number - 1
+                    if 1 <= addr <= 512:
+                        universe.set_channel(
+                            addr, max(0, min(255, int(attrs[base_attr]))))
+                continue
             # Mehrkopf-Vorkommens-Aufloesung zentral (eine Quelle, identisch zur
             # frueheren Inline-seen-Schleife): resolve_attr_channels mappt jedes
             # attr/attr#N auf sein Kanal-Vorkommen, Kopf>0 spiegelt Kopf 0 als
@@ -1050,7 +1098,16 @@ class EfxInstance(Function):
             "algorithm": self.algorithm.value,
             # Gruppen-Bindung (Programmer-Listen-Scope) — per Name, stabil ueber Save/Load.
             "source_group": self.source_group,
-            "fixtures": [{"fid": f.fid, "offset": f.start_offset} for f in self.fixtures],
+            # FM-HEADLAYOUT A3: ``head`` wird NUR bei echten Kopf-Zielen
+            # geschrieben. Damit bleibt der Dump einer Alt-Show byte-identisch
+            # (Save->Load->Save-Fixpunkt, tests/test_show_roundtrip_fixpoint.py)
+            # und Alt-Shows lesen den fehlenden Schluessel als „ganzes Geraet".
+            "fixtures": [
+                ({"fid": f.fid, "offset": f.start_offset}
+                 if getattr(f, "head", None) is None else
+                 {"fid": f.fid, "offset": f.start_offset, "head": int(f.head)})
+                for f in self.fixtures
+            ],
             "width": self.width, "height": self.height,
             "x_offset": self.x_offset, "y_offset": self.y_offset,
             "rotation": self.rotation,
@@ -1080,9 +1137,26 @@ class EfxInstance(Function):
         # leerer String = ungebunden (None) -> erscheint in jeder Gruppe.
         _sg = d.get("source_group")
         e.source_group = str(_sg) if _sg else None
+        def _mk_target(f):
+            """Ein Ziel aus dem Show-Dict. FM-HEADLAYOUT A3: optionales ``head``
+            (fehlt in Alt-Shows -> None -> ganzes Geraet). Garbage im head-Feld
+            klemmt auf None statt den ganzen Effekt zu verlieren."""
+            if isinstance(f, dict):
+                fid, off, raw_head = f.get("fid"), f.get("offset", 0), f.get("head")
+            else:
+                fid = getattr(f, "fid", None)
+                off = getattr(f, "start_offset", 0)
+                raw_head = getattr(f, "head", None)
+            head = None
+            if raw_head is not None:
+                try:
+                    head = max(0, int(raw_head))
+                except (TypeError, ValueError):
+                    head = None
+            return EfxFixture(fid=int(fid), start_offset=off, head=head)
+
         e.fixtures = [
-            EfxFixture(fid=f.get("fid") if isinstance(f, dict) else getattr(f, "fid", None),
-                       start_offset=(f.get("offset", 0) if isinstance(f, dict) else getattr(f, "start_offset", 0)))
+            _mk_target(f)
             for f in d.get("fixtures", [])
             if (isinstance(f, dict) and f.get("fid") is not None)
             or (not isinstance(f, dict) and getattr(f, "fid", None) is not None)
