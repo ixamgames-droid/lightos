@@ -36,6 +36,41 @@ let downMouseX = 0, downMouseY = 0;
 let mouseMovedDuringClick = false;
 
 let dragStartPositions = {}; // fid -> {x, z}
+
+// A3D-08 / Klick-Entdock-Guard: hat sich die Position eines Fixtures gegenueber dem
+// Gestik-Start wirklich geaendert? Der Dock-Commit am Drag-Ende darf NUR dann laufen —
+// sonst loescht schon ein blosser Auswahl-Klick (dragMode wird bei jedem Treffer
+// gesetzt, ohne Bewegungsbedingung) die gespeicherten Andockungen, und zwar fuer ALLE
+// Fixtures in view.selectedFids. Die Epsilon-Schwelle liegt weit unter jeder
+// sichtbaren Bewegung und faengt Float-Rauschen aus der Quaternion-Rechnung ab.
+const _POS_EPS = 1e-6;
+function _positionChanged(f, start) {
+  if (!f || !start) return false;
+  const p = f.group.position;
+  return Math.abs(p.x - start.x) > _POS_EPS
+      || Math.abs(p.y - start.y) > _POS_EPS
+      || Math.abs(p.z - start.z) > _POS_EPS;
+}
+
+/**
+ * Entscheidet, welche Andock-Bindung ein Fixture am Ende einer Gestik bekommt.
+ *
+ * Bewusst als REINE Funktion herausgezogen (und ueber `window.__lightos` als
+ * Test-Seam exportiert): der Dock-Commit lag vorher inline in handlePointerUp und
+ * war damit nur ueber echte Pointer-Events erreichbar — pointer.js hatte deshalb
+ * null Verhaltensabdeckung, obwohl hier Nutzerdaten (gespeicherte Andockungen)
+ * geloescht werden koennen.
+ *
+ *  - Gestik ohne Positionsaenderung  -> Bindung UNVERAENDERT lassen (Auswahl-Klick!)
+ *  - bewegt + Andocken AN            -> die Vorschau `_pendingDock` festschreiben
+ *  - bewegt + Andocken AUS           -> Bindung loesen (bisheriges Verhalten)
+ */
+export function resolveDockOnGestureEnd(f, start, dockEnabled) {
+  const current = (f && f.dockedTo) || null;
+  if (!_positionChanged(f, start)) return current;
+  if (!dockEnabled) return null;
+  return (f._pendingDock !== undefined) ? f._pendingDock : current;
+}
 let dragStartStagePos = null; // for stage drag
 let dragGroundOffset = { x: 0, y: 0, z: 0, userData: undefined };
 let dragResizeCorner = null;     // 'nw' | 'ne' | 'sw' | 'se'
@@ -374,6 +409,23 @@ export function handlePointerMove(clientX, clientY, ctrlKey) {
             f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
             f.icon.rotation.y = f.group.rotation.y + (f._lastPanRad || 0);
           }
+          // A3D-08: Wurde das Fixture beim Orbit um den gemeinsamen Pivot WIRKLICH
+          // versetzt, ist eine bestehende Andock-Bindung ungueltig geworden -> loesen.
+          // Vorher blieb sie stehen: das weggedrehte Geraet hing weiter an der alten
+          // Trasse und wurde beim naechsten Bewegen des Buehnenelements dorthin
+          // zurueckgerissen (moveDockedFixtures).
+          //
+          // BEWUSST LOESEN statt neu andocken: (a) 'floor' ist ein Andock-Ziel und
+          // findDockTarget nimmt den obersten Treffer eines Strahls von oben - ein von
+          // der Traverse weggedrehtes Geraet bekaeme also den BODEN als Ziel und waere
+          // danach "steht auf dem Boden" auf 7 m Hoehe; (b) alle bisherigen
+          // _pendingDock-Schreiber setzen im selben Zug f.group.position.y = dt.y -
+          // dieser Y-Snap mitten in einer Drehung wuerde die Gruppe zerreissen.
+          // Gleiche Entscheidung und gleiche Begruendung wie im Ausrichten/Verteilen-
+          // Pfad (bridge.js): Positionsaenderung ohne gueltige Dock-Geometrie = loesen.
+          // Einzel-Fixture-Rotation (start == pivot) faellt hier bewusst NICHT rein -
+          // sie verschiebt nichts und darf eine bewusste Andockung nicht antasten.
+          if (_positionChanged(f, start)) f._pendingDock = null;
         }
         showEditReadout('Drehen ' + dragGizmo.axis.toUpperCase() + ': ' +
                         (delta >= 0 ? '+' : '') + Math.round(rad2deg(delta)) + '°');
@@ -520,12 +572,17 @@ export function handlePointerUp(shiftKey) {
       if (!f) continue;
       // Andock-Beziehung festschreiben: bei aktivem Andocken aus der Vorschau,
       // bei freiem Ziehen (Andocken AUS) loest ein Drag eine bestehende Bindung.
-      let newDock;
-      if (settings.dockEnabled) {
-        newDock = (f._pendingDock !== undefined) ? f._pendingDock : (f.dockedTo || null);
-      } else {
-        newDock = null;
-      }
+      //
+      // NEU (Klick-Entdock-Guard): das gilt nur fuer eine Geste, die das Fixture
+      // TATSAECHLICH bewegt hat. handlePointerDown setzt dragMode bei JEDEM Treffer
+      // eines Fixture-Koerpers bzw. Gizmo-Handles - ohne Bewegungsbedingung -, und
+      // dieser Zweig hatte keinen Guard. Bei ausgeschaltetem Andocken (settings.js:
+      // dockEnabled ist opt-in, also der Default) fiel der else-Zweig auf
+      // newDock = null: ein blosser Auswahl-Klick loeschte damit die gespeicherten
+      // Andockungen - und wegen der Schleife ueber view.selectedFids gleich fuer die
+      // GANZE Auswahl, nicht nur fuer das angeklickte Geraet.
+      const newDock = resolveDockOnGestureEnd(
+        f, dragStartPositions[fid], settings.dockEnabled);
       const hasDockChange = (newDock || null) !== (f.dockedTo || null);
       if (hasDockChange) f.dockedTo = newDock || null;
       delete f._pendingDock;
