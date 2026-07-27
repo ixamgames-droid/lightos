@@ -1235,13 +1235,24 @@ class ProgrammerView(QWidget):
                 # mehr „auto", entscheidet die Pro-Fixture-Wahl allein — dann
                 # waere ein bedienbarer Umschalter eine Luege. Deaktiviert statt
                 # versteckt: die globale Voreinstellung bleibt sichtbar.
-                if not self._has_auto_mode_color_head_fixture():
+                _pinned = not self._has_auto_mode_color_head_fixture()
+                if _pinned:
                     head_combo.setEnabled(False)
+                    # Das App-Stylesheet greyt eine disabled QComboBox NICHT ab
+                    # (live geprueft): ohne eigenen Hinweis klickt man ins Leere,
+                    # ohne den Grund zu sehen. Darum abgeblendet + Klartext daneben.
+                    head_combo.setStyleSheet(
+                        "QComboBox:disabled { color: #8a8a8a; }")
                     head_combo.setToolTip(
                         head_combo.toolTip() + "\n\nHier ohne Wirkung: alle "
                         "ausgewählten Mehrkopf-Geräte haben im Patch-Dialog eine "
                         "feste Wahl.")
                 sub_tb.addWidget(head_combo)
+                if _pinned:
+                    _pin_hint = QLabel("↳ pro Gerät gesetzt (Patch-Dialog)")
+                    _pin_hint.setStyleSheet("color: #8a8a8a;")
+                    _pin_hint.setToolTip(head_combo.toolTip())
+                    sub_tb.addWidget(_pin_hint)
         sub_tb.addStretch(1)
         layout.addLayout(sub_tb)
 
