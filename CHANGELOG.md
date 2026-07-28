@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-29 — Crash-Signaturen sind wieder plattformunabhängig
+
+#### Behoben
+
+- **Crash-Intake verstümmelte Signaturen, sobald das Log auf Linux ausgewertet
+  wurde.** `tools/collect_crash_report.py` kürzt den Dateipfad eines Frames auf
+  den reinen Dateinamen, benutzte dafür an einer Stelle aber `os.path.basename()`
+  auf dem **rohen** Pfad. Das ist plattformabhängig: auf Windows trennt es an
+  `\` und `/`, auf Linux nur an `/`. Ein Windows-Pfad im crash.log — und davon
+  gibt es viele, das Log wandert zwischen den Rechnern mit — ergab dort statt
+  `AttributeError@live_view.py:42` die Signatur
+  `AttributeError@C:\repo\lightos-main\src\ui\views\live_view.py:42`.
+
+  Folge: **derselbe Absturz bekam je nach auswertender Plattform einen anderen
+  Schlüssel.** Dedup zählte ihn doppelt, und der `seen`-Zustand aus
+  `.crash_seen.json` griff nicht mehr — jeder alte Absturz meldete sich auf dem
+  jeweils anderen Rechner erneut als „🆕".
+
+  Der Fix führt `_basename()` ein, das an beiden Separatoren trennt, und benutzt
+  es überall. Die vier Tests, die das schon immer geprüft haben
+  (`tests/test_crash_intake.py`), waren auf Windows grün und schlugen beim
+  ersten Linux-Lauf fehl — sie sind der Regressionsschutz, es braucht keine neuen.
+
 ### 2026-07-28 — Matrix-Vorschau zeigt auf Wunsch, welche Zelle zu welchem Gerät/Kopf gehört
 
 #### Neu

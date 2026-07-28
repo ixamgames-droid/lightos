@@ -89,13 +89,26 @@ def _is_src_frame(path: str) -> bool:
     return "/src/" in p or p.endswith("/main.py")
 
 
+def _basename(path: str) -> str:
+    """Dateiname ohne Verzeichnis — trennt an BEIDEN Separatoren.
+
+    ``os.path.basename`` ist plattformabhaengig: auf POSIX splittet es NUR an
+    ``/``. Das crash.log enthaelt aber regelmaessig Windows-Pfade — vom
+    Windows-Rig geschriebene Logs, mitgenommene Alt-Logs, geteilte Ablagen. Wird
+    so ein Pfad auf Linux ausgewertet, landet der komplette ``C:\\...``-Pfad in
+    der Signatur: derselbe Absturz bekaeme je nach auswertender Plattform einen
+    ANDEREN Schluessel, Dedup und ``seen``-Zustand liefen auseinander.
+    """
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
 def _is_test_frame(path: str) -> bool:
     """Stammt der Frame aus der Testsuite? Die pytest-Laeufe schreiben in
     DASSELBE crash.log wie die App — mehrere Tests werfen absichtlich (z. B.
     ``ValueError("kaputt")``). Ohne Filter besteht der Intake zum grossen Teil
     aus diesen gewollten Fehlern und begraebt die echten."""
     p = path.replace("\\", "/").lower()
-    return "/tests/" in p or os.path.basename(p).startswith("test_")
+    return "/tests/" in p or _basename(p).startswith("test_")
 
 
 def _short(path: str) -> str:
@@ -103,7 +116,7 @@ def _short(path: str) -> str:
     i = p.lower().rfind("/src/")
     if i >= 0:
         return p[i + 1:]
-    return os.path.basename(p)
+    return _basename(p)
 
 
 def parse_log(text: str, include_tests: bool = False) -> list[Finding]:
@@ -195,7 +208,7 @@ def _add_exception(findings: dict, block: list[str], ts: str, session_idx: int,
     # QtWebEngine-Renderabsturz, der nur eine Meldung liefert) waere "@:0" fuer
     # jeden solchen Fall gleich; dann traegt die Meldung die Unterscheidung.
     if frames:
-        sig = f"{exc_type or 'Unbekannt'}@{os.path.basename(deepest[0])}:{deepest[1]}"
+        sig = f"{exc_type or 'Unbekannt'}@{_basename(deepest[0])}:{deepest[1]}"
     else:
         sig = f"{exc_type or 'Unbekannt'}@ohne-Traceback: {message[:60]}".rstrip(": ")
     _record(findings, sig,
