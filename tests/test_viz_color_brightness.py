@@ -498,3 +498,68 @@ class LuminanceCullingJsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── (6) Amber und UV sind eigene Emitter, kein Filter ────────────────────────
+class AmberAndUvTest(unittest.TestCase):
+    """Folgearbeit aus VIZ-COLORLESS: `color_a`/`color_uv` fielen aus der
+    Anzeigefarbe komplett heraus. Ein RGBA-PAR, der NUR Amber aufdreht, blieb im
+    3D und im 2D-Plan schwarz, obwohl er real leuchtet."""
+
+    AMBER = (255, 191, 0)      # aus der Farbwort-Liste: "amber" = #ffbf00
+    UV = (160, 64, 255)        # "violett" = #a040ff (UV wirkt als tiefes Violett)
+
+    def test_amber_only_fixture_shows_amber_not_white(self):
+        self.assertEqual(visual_rgb({"color_a": 255}), self.AMBER)
+
+    def test_amber_adds_to_rgb(self):
+        self.assertEqual(
+            visual_rgb({"color_r": 0, "color_g": 0, "color_b": 0, "color_a": 255}),
+            self.AMBER)
+
+    def test_uv_shows_as_deep_violet(self):
+        self.assertEqual(
+            visual_rgb({"color_r": 0, "color_g": 0, "color_b": 0, "color_uv": 255}),
+            self.UV)
+
+    def test_half_amber_is_half_the_way(self):
+        r, g, b = visual_rgb({"color_r": 0, "color_g": 0, "color_b": 0,
+                              "color_a": 128})
+        self.assertEqual((r, b), (128, 0))
+        self.assertAlmostEqual(g, 95, delta=1)
+
+    def test_rgb_without_amber_is_unchanged(self):
+        """Regression: der bisherige RGB(W)-Pfad darf sich nicht verschieben."""
+        self.assertEqual(visual_rgb({"color_r": 200, "color_g": 0, "color_b": 0,
+                                     "color_w": 100}), (255, 100, 100))
+
+    def test_everything_open_stays_clamped(self):
+        self.assertEqual(
+            visual_rgb({"color_r": 255, "color_g": 255, "color_b": 255,
+                        "color_w": 255, "color_a": 255, "color_uv": 255}),
+            (255, 255, 255))
+
+    def test_zero_amber_changes_nothing(self):
+        self.assertEqual(visual_rgb({"color_r": 10, "color_g": 20, "color_b": 30,
+                                     "color_a": 0, "color_uv": 0}), (10, 20, 30))
+
+    def test_per_head_amber_reaches_the_payload(self):
+        attrs = {"intensity": 255,
+                 "color_r": 0, "color_g": 0, "color_b": 0, "color_a": 255,
+                 "color_r#1": 0, "color_g#1": 0, "color_b#1": 0, "color_a#1": 0}
+        heads = _build_fixture_payload(_fx(), attrs)["heads"]
+        self.assertEqual((heads[0]["r"], heads[0]["g"], heads[0]["b"]), self.AMBER)
+        self.assertEqual((heads[1]["r"], heads[1]["g"], heads[1]["b"]), (0, 0, 0))
+
+
+class ColorWordListDriftTest(unittest.TestCase):
+    """Die Farbwort-Liste steht ZWEIMAL im Repo (core darf nicht aus der UI
+    importieren) und wird laut Kommentar „von Hand synchron gehalten" — genau die
+    Sorte Absprache, die still auseinanderläuft. Jetzt gegatet."""
+
+    def test_core_and_ui_word_lists_are_identical(self):
+        from src.core.color_utils import _NAME_COLOR_WORDS as core_words
+        from src.ui.widgets.preset_tile import _NAME_COLOR_WORDS as ui_words
+        self.assertEqual(list(core_words), list(ui_words),
+                         "color_utils und preset_tile sind auseinandergelaufen — "
+                         "beide Listen muessen Wort fuer Wort gleich sein")

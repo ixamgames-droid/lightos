@@ -145,6 +145,13 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
 # Blinder (Martin Atomic 3000: nur shutter/rate/duration) und CMY-/Farbrad-Mover
 # (Robe Pointe/MegaPointe: intensity + color_wheel, KEIN color_r).
 
+# Zusatz-Emitter neben RGB(W): Amber und UV sind eigene LEDs, kein Filter — sie
+# werden additiv eingerechnet. Die Farbtoene kommen aus derselben Wortliste, die
+# auch Farbrad-Slots faerbt (EINE Quelle statt neuer Konstanten). UV erscheint
+# dem Auge als tiefes Violett.
+_EMITTER_RGB = {word: hex_to_rgb(color_word_hex(word) or "#000000")
+                for word in ("amber", "violett")}
+
 _CMY_TRIPLES = (("cmy_c", "cmy_m", "cmy_y"), ("cyan", "magenta", "yellow"))
 _WHEEL_ATTRS = ("color_wheel", "colour_wheel", "color")
 # Reihenfolge = Vorrang. "shutter"/"strobe" bewusst NICHT hier: sie sind kein
@@ -207,13 +214,33 @@ def visual_rgb(attrs: dict, channels=None, suffix: str = "") -> tuple[int, int, 
     def a(name: str):
         return attrs.get(f"{name}{suffix}")
 
-    # 1) RGB(W) ---------------------------------------------------------------
-    if a("color_r") is not None or a("color_g") is not None or a("color_b") is not None:
+    # 1) RGB(W/A/UV) ----------------------------------------------------------
+    # Auch ein Geraet OHNE R/G/B, aber MIT Amber/UV gehoert hierher — sonst faellt
+    # ein reiner Amber-Strahler auf den Weiss-Fallback und zeigt die falsche Farbe.
+    if any(a(k) is not None for k in
+           ("color_r", "color_g", "color_b", "color_w", "color_a", "color_uv")):
         w = int(a("color_w") or 0)
         r = int(a("color_r") or 0)
         g = int(a("color_g") or 0)
         b = int(a("color_b") or 0)
-        return (min(255, r + w), min(255, g + w), min(255, b + w))
+        # Amber und UV wie Weiss ADDITIV einrechnen: sie sind eigene Emitter, kein
+        # Filter. Vorher fielen sie ganz heraus — ein RGBA-PAR, der NUR Amber
+        # aufdreht, blieb im 3D und im 2D-Plan schwarz, obwohl er real leuchtet.
+        # Farbtoene aus derselben Wortliste wie die Farbrad-Slots (amber/violett),
+        # damit es nur EINE Farbwort-Quelle gibt.
+        r += w
+        g += w
+        b += w
+        for attr, word in (("color_a", "amber"), ("color_uv", "violett")):
+            val = a(attr)
+            if not val:
+                continue
+            er, eg, eb = _EMITTER_RGB[word]
+            f = max(0, min(255, int(val))) / 255.0
+            r += int(er * f)
+            g += int(eg * f)
+            b += int(eb * f)
+        return (min(255, r), min(255, g), min(255, b))
 
     # 2) CMY (subtraktiv) ------------------------------------------------------
     for ck, mk, yk in _CMY_TRIPLES:
