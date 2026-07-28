@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Ein Gerät patchen fror die Oberfläche sekundenlang ein
+
+#### Behoben
+
+- **Beim Patchen stand die Bedienung 11–12 Sekunden still.** Jede Änderung am
+  Patch liess den Simple Desk seine Kanalübersicht komplett neu einfärben: erst
+  wurden alle 512 Kanalzüge auf neutral zurückgesetzt, danach die belegten wieder
+  eingefärbt. Für jeden belegten Kanal hiess das zweimal ein Stil-Neuaufbau —
+  pro Gerät, das du hinzufügst. Der Absturzbericht hat es als „Oberfläche
+  reagiert nicht" mitgeschrieben (3. und 10. Juli), ohne dass die Ursache
+  sichtbar war: der oberste Eintrag im Bericht zeigte auf die Tastatur-Kürzel,
+  die nur zufällig gerade mitliefen.
+
+  Jetzt wird zuerst der Zielzustand berechnet und **nur die Differenz** gesetzt;
+  Färbung, Kürzel und Tooltip eines Kanalzugs, an dem sich nichts ändert, kosten
+  gar nichts mehr. Gemessen an zwölf nacheinander gepatchten Geräten:
+  **3510 ms → 55 ms**, also 294 ms → 4 ms pro Gerät (headless gemessen; auf dem
+  Desktop mit echtem Stil-Aufbau war es entsprechend mehr).
+
 ### 2026-07-28 — Drei echte Abstürze aus dem Crash-Log behoben, einer davon am Laser-Scharfschalter
 
 #### Behoben
