@@ -91,6 +91,10 @@ class _FloatingGridPanel(QFrame):
     Lebt als Kind-Widget des rechten Container-Widgets über dem Raster.
     """
 
+    # Höhe geändert (auf-/zugeklappt) — der Besitzer muss den oben reservierten
+    # Platz nachziehen, sonst deckt das Panel wieder eine Rasterzelle zu.
+    size_changed = Signal()
+
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
         self.setObjectName("floatingGridPanel")
@@ -165,6 +169,7 @@ class _FloatingGridPanel(QFrame):
         self._body.setVisible(not self._collapsed)
         self._btn_toggle.setText("▸" if self._collapsed else "▾")
         self.adjustSize()
+        self.size_changed.emit()
 
     # ── Drag to move ─────────────────────────────────────────────────────────
 
@@ -782,6 +787,15 @@ class FixtureGroupView(QWidget):
 
         right_inner = QVBoxLayout(right_w)
         right_inner.setContentsMargins(0, 0, 0, 0)
+        # FGRP-PANEL-OVERLAP: Das schwebende „Rastergröße"-Panel sitzt oben
+        # rechts ÜBER diesem Container und verdeckte damit die oberste rechte
+        # Rasterzelle samt Label. Statt das Panel zu verschieben (es soll dort
+        # bleiben, wo man es sucht) reservieren wir seine Höhe hier oben — dann
+        # beginnt das Raster darunter und keine Zelle liegt mehr dahinter.
+        # Die Höhe zieht `_reposition_float_panel` nach, auch beim Zuklappen.
+        self._panel_reserve = QWidget()
+        self._panel_reserve.setFixedHeight(0)
+        right_inner.addWidget(self._panel_reserve)
         right_inner.addWidget(
             QLabel("Raster (Drag&Drop für Platzierung, Rechtsklick zum Entfernen):"))
 
@@ -808,6 +822,8 @@ class FixtureGroupView(QWidget):
         self._spin_rows = self._float_panel.spin_rows
         self._spin_cols.valueChanged.connect(self._apply_grid_size)
         self._spin_rows.valueChanged.connect(self._apply_grid_size)
+        # Zuklappen gibt den reservierten Platz sofort wieder frei.
+        self._float_panel.size_changed.connect(self._reposition_float_panel)
 
         # Signal: Raster-Änderungen → Hervorhebung aktualisieren
         self._grid_widget.positions_changed.connect(self._highlight_group_members)
@@ -822,8 +838,12 @@ class FixtureGroupView(QWidget):
         super().showEvent(event)
         self._reposition_float_panel()
 
+    _PANEL_TOP = 8       # Abstand des Panels zur Oberkante
+    _PANEL_GAP = 6       # Luft zwischen Panel-Unterkante und Raster
+
     def _reposition_float_panel(self):
-        """Floating Panel oben rechts im right_w positionieren."""
+        """Floating Panel oben rechts im right_w positionieren — und oben genau
+        so viel Platz reservieren, dass es keine Rasterzelle verdeckt."""
         panel = self._float_panel
         parent = panel.parent()
         if parent is None:
@@ -831,8 +851,13 @@ class FixtureGroupView(QWidget):
         panel.adjustSize()
         pw = parent.width()
         x = max(0, pw - panel.width() - 8)
-        panel.move(x, 8)
+        panel.move(x, self._PANEL_TOP)
         panel.raise_()
+        reserve = getattr(self, "_panel_reserve", None)
+        if reserve is not None:
+            need = self._PANEL_TOP + panel.height() + self._PANEL_GAP
+            if reserve.height() != need:
+                reserve.setFixedHeight(need)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

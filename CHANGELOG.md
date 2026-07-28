@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Fixture-Gruppen: das Rastergrößen-Panel verdeckt keine Zelle mehr
+
+#### Behoben
+
+- **Das schwebende „Rastergröße"-Panel im Fixture-Gruppen-Editor lag über der
+  obersten rechten Rasterzelle** und verdeckte deren Beschriftung — aufgefallen,
+  als eine Zelle beim Prüfen eines Kopf-Layouts schlicht nicht lesbar war.
+  Zuklappen half, war aber nicht offensichtlich. Das Panel bleibt jetzt, wo man
+  es sucht; stattdessen wird oben genau seine Höhe freigehalten, sodass das
+  Raster darunter beginnt. Klappt man es zu, gibt es den Platz sofort wieder her.
 ### 2026-07-28 — Bedienflächen und 2D-Anzeige: Touch-Floor hält, Info-Box schweigt nicht mehr
 
 #### Behoben

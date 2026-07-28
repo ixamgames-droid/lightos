@@ -228,3 +228,66 @@ class AddAllFixturesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FloatingPanelOverlapTest(unittest.TestCase):
+    """FGRP-PANEL-OVERLAP: das schwebende „Rastergröße"-Panel lag über der
+    obersten rechten Rasterzelle und verdeckte deren Label (bei der
+    FM-HEADLAYOUT-Slice-3-Abnahme aufgefallen, vorbestehend).
+
+    Das Panel bleibt, wo man es sucht — stattdessen wird oben genau seine Höhe
+    reserviert, sodass das Raster darunter beginnt.
+    """
+
+    def setUp(self):
+        _app()
+        reset_show()
+        self.view = FixtureGroupView()
+        self.view.resize(1200, 800)
+        self.view.show()
+        for _ in range(6):
+            _app().processEvents()
+
+    def tearDown(self):
+        try:
+            self.view.close()
+            self.view.deleteLater()
+        except Exception:
+            pass
+        for _ in range(2):
+            _app().processEvents()
+
+    def _bottom_of_panel_and_top_of_grid(self):
+        panel = self.view._float_panel
+        grid = self.view._grid_widget
+        parent = panel.parent()
+        panel_bottom = panel.y() + panel.height()
+        grid_top = grid.mapTo(parent, grid.rect().topLeft()).y()
+        return panel_bottom, grid_top
+
+    def test_grid_starts_below_the_floating_panel(self):
+        panel_bottom, grid_top = self._bottom_of_panel_and_top_of_grid()
+        self.assertGreaterEqual(
+            grid_top, panel_bottom,
+            f"Raster beginnt bei y={grid_top}, Panel reicht bis y={panel_bottom} "
+            f"— die oberste rechte Zelle liegt wieder hinter dem Panel")
+
+    def test_collapsing_the_panel_gives_the_space_back(self):
+        before = self.view._panel_reserve.height()
+        self.view._float_panel._toggle_body()          # zuklappen
+        for _ in range(4):
+            _app().processEvents()
+        after = self.view._panel_reserve.height()
+        self.assertLess(after, before,
+                        "zugeklapptes Panel muss den reservierten Platz freigeben")
+        panel_bottom, grid_top = self._bottom_of_panel_and_top_of_grid()
+        self.assertGreaterEqual(grid_top, panel_bottom,
+                                "auch zugeklappt darf nichts überlappen")
+
+    def test_resize_keeps_the_invariant(self):
+        for w in (900, 1400, 1000):
+            self.view.resize(w, 800)
+            for _ in range(5):
+                _app().processEvents()
+            panel_bottom, grid_top = self._bottom_of_panel_and_top_of_grid()
+            self.assertGreaterEqual(grid_top, panel_bottom, f"Überlappung bei {w}px")
