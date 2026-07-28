@@ -42,7 +42,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Modus** | Was der Fader regelt (Details unten). | `Effekt-Helligkeit`, `Effekt-Tempo`, `Effekt-Parameter`, `Programmer-Attribut`, `Gruppen-Dimmer`, `Feature-Dimmer (Gruppe)`, `Submaster`, `Grand Master`, `Speed (alle Effekte)`, `Tempo (BPM)`, `Tempo-Bus (BPM)`, `Playback (Executor)`, `DMX-Kanal (Level)` |
 | **Parameter (Effekt-Parameter)** | Nur Modus *Effekt-Parameter*: welcher Parameter des gebundenen Effekts geregelt wird. Die Liste zeigt die echten Parameter des Effekts (Label + Key); eigener Key tippbar. | Auswahl/Freitext (z. B. `speed`) |
 | **Steuert** | Aufklappbare Liste der Effekte/Funktionen, die der Fader steuert (nach Namen). Je Zeile ein eigener Parameter wählbar, mit ✕ entfernbar, „+ Funktion/Effekt hinzufügen". Maßgeblich bei den Effekt-Modi (überschreibt das Slot-Feld) – ermöglicht einen Gruppen-Submaster über mehrere Effekte. | Effekt-/Funktionsliste + je Zeile Parameter |
-| **Reichweite (Programmer/Submaster)** | Modi *Programmer-Attribut* und *Submaster*: auf welche Fixtures der Fader wirkt. Beim Submaster = *Alle Geräte* ist es der bisherige globale Submaster. | `Alle Geräte` (alle gepatchten), `Nur Auswahl` (aktuelle Programmer-Auswahl; im Programmer-Modus → alle bei leerer Auswahl, beim Submaster → keine Wirkung), `Feste Gruppe` (eine fest gewählte Gruppe, unabhängig von der Live-Auswahl) |
+| **Reichweite (Programmer/Submaster)** | Modi *Programmer-Attribut* und *Submaster*: auf welche Fixtures der Fader wirkt. Beim Submaster = *Alle Geräte* ist es der bisherige globale Submaster. **Mehrkopf-Geräte:** meint die Reichweite einzelne **Köpfe** statt ganzer Geräte, dimmt der Submaster genau diese Köpfe – siehe [Submaster pro Kopf](#submaster-pro-kopf). | `Alle Geräte` (alle gepatchten), `Nur Auswahl` (aktuelle Programmer-Auswahl; im Programmer-Modus → alle bei leerer Auswahl, beim Submaster → keine Wirkung), `Feste Gruppe` (eine fest gewählte Gruppe, unabhängig von der Live-Auswahl) |
 | **Feste Gruppe** | Fixture-Gruppe für Reichweite = *Feste Gruppe* (Programmer/Submaster) bzw. für die Modi *Gruppen-Dimmer* und *Feature-Dimmer (Gruppe)*. | Auswahl vorhandener Gruppen / Freitext |
 | **Feature (Feature-Dimmer)** | Nur Modus *Feature-Dimmer (Gruppe)*: welche Feature-Gruppe der Dimmer skaliert. | `Intensity`, `Color`, `Gobo`, `Beam`, `Position`, `Effect` |
 | **Attribut (Programmer)** | Nur Modus *Programmer-Attribut*: welches Attribut der Fader auf den Fixtures setzt (Standard `intensity`). Liste = bekannte Attribute (Label + Key), eigener Key tippbar – so wird z. B. ein LAS-Speed-Fader auf `gobo_rotation` baubar. | Auswahl/Freitext (z. B. `intensity`, `gobo_rotation`) |
@@ -67,7 +67,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 |---|---|
 | **DMX-Kanal (Level)** | Schreibt den Wert direkt auf einen festen DMX-Kanal im gewählten Universe (0–255). Das Universe wird bei Bedarf automatisch angelegt. |
 | **Playback (Executor)** | Setzt den Fader-Wert (0–100 %) eines Playback-Executors. Die Slot-Nummer ist der Executor-Index. |
-| **Submaster** | Setzt einen Output-Submaster (0–100 %). Die Slot-Nummer ist die Submaster-Nummer (leer = 0). |
+| **Submaster** | Setzt einen Output-Submaster (0–100 %) – multiplikativ, kombiniert sich sauber mit Grand Master und Gruppen-Dimmer. Jeder Fader hat seinen **eigenen** Submaster-Slot; zwei Submaster-Fader auf denselben Geräten multiplizieren sich also, statt sich zu überschreiben. Auf welche Geräte (oder Köpfe) er wirkt, legt die *Reichweite* fest. |
 | **Grand Master** | Steuert die globale Gesamthelligkeit der gesamten Ausgabe (0–100 %). |
 | **Programmer-Attribut** | Setzt ein Programmer-Attribut (Standard `intensity`) auf den betroffenen Fixtures. Welche Fixtures: siehe *Reichweite*. |
 | **Tempo (BPM)** | Steuert das globale Tempo von 30 bis 300 BPM. Beat-Effekte folgen. Das Ziehen erzwingt den manuellen Tempo-Modus (der Fader wird zur Tempo-Quelle). |
@@ -78,6 +78,34 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Gruppen-Dimmer** | Multiplikativer Dimmer für eine feste Fixture-Gruppe (*Feste Gruppe*) – skaliert deren Helligkeit (0–100 %). |
 | **Feature-Dimmer (Gruppe)** | Multiplikativer Dimmer für eine WÄHLBARE Feature-Gruppe (Intensity/Color/Gobo/Beam/Position/Effect) einer festen Fixture-Gruppe – skaliert nur dieses Feature (0–100 %). |
 | **Tempo-Bus (BPM)** | Steuert die BPM eines benannten Tempo-Bus (A/B/C/D) von 30 bis 300, unabhängig vom globalen Leader. Leer = aktiver/Default-Bus. |
+
+## Submaster pro Kopf
+
+Ein Mehrkopf-Gerät (Hydrabeam 4000, LED Moving Bar 4×, Spider …) lässt sich mit einem Submaster-Fader **kopfweise** dimmen – nicht nur als ganzes Gerät. Nötig ist dafür kein neues Feld am Fader: es zählt schlicht, ob die eingestellte **Reichweite** Köpfe meint oder ganze Geräte.
+
+**Zwei Wege:**
+
+| Weg | Reichweite | Woher die Köpfe kommen |
+|---|---|---|
+| **Fest (empfohlen)** | `Feste Gruppe` | Die Gruppe enthält Kopf-Zellen – angelegt im Fixture-Gruppen-Editor über **„Köpfe einzeln → Raster"** (als Zeile / als Spalte). Diese Zuordnung liegt in der Show, der Fader wirkt also nach dem Neuladen unverändert. |
+| **Live** | `Nur Auswahl` | Die aktuelle Programmer-Auswahl – sind dort einzelne Köpfe gewählt, folgt der Fader ihnen. |
+
+Bei Reichweite `Alle Geräte` gibt es keine Kopf-Einschränkung (globaler Submaster).
+
+**Wichtig – „alle Köpfe" ist das ganze Gerät.** Deckt die Reichweite *sämtliche* Köpfe eines Geräts ab, verhält sich der Fader wie ein ganz normaler Geräte-Submaster (er dimmt also auch den gemeinsamen Master-Dimmer). Das betrifft besonders die beim Patchen **automatisch angelegte Gruppe „… · Köpfe"**, die alle Köpfe enthält: ein Fader darauf tut genau das, was er immer getan hat. Kopfweise wird es erst, wenn du **einen Teil** der Köpfe meinst.
+
+**Was der Kopf-Fader anfasst – und was nicht:**
+
+- Er skaliert nur Kanäle, die es **je Kopf wirklich gibt**: den eigenen Dimmer des Kopfes, falls das Profil einen hat – sonst dessen eigene Farbkanäle (der häufige Fall: ein Gerät mit einem Master-Dimmer und vier RGB-Bänken wird kopfweise über die Farbe gedimmt).
+- Als „je Kopf" zählt ein Kanaltyp nur, wenn er **genau so oft** im Profil vorkommt, wie das Gerät Köpfe hat. Manche Profile haben nämlich **Zonen-Dimmer** – z. B. `Frost FX Bar W` mit 14 Pixeln, aber nur zwei Dimmern (einer für alle weißen, einer für alle farbigen Pixel). Solche Zonen-Kanäle sind keine Kopf-Kanäle und bleiben unangetastet.
+- Ein von allen Köpfen **geteilter Master-Dimmer bleibt unangetastet**. Das ist Absicht: würde „Kopf 2" ihn herunterziehen, ginge das ganze Gerät dunkel.
+- Hat ein Gerät **gar keine** kopf-eigenen Helligkeits- oder Farbkanäle, hat der Fader dort ehrlich keine Wirkung – er dimmt dann *nicht* ersatzweise das ganze Gerät.
+- Pan/Tilt/Gobo werden nie gedimmt (wie beim Grand Master).
+- Stellst du ein Gerät später auf einen anderen **Kanal-Modus** um, werden Kopf-Angaben, die es dort nicht mehr gibt, verworfen – der Fader fällt dann auf „ganzes Gerät" zurück, statt stillschweigend den falschen Kopf zu dimmen.
+
+Kopf-, Geräte- und globale Submaster **multiplizieren sich**: ein Gerät auf 50 % und dessen Kopf 2 zusätzlich auf 50 % ergibt für diesen Kopf 25 %, für die anderen Köpfe 50 %.
+
+> Gemeint ist die Kopf-Reihenfolge des Profils (N-tes Kanal-Vorkommen = N-ter Kopf). Welche physische Lampe das am realen Rig ist, ist Gegenstand der Hardware-Prüfung HW-1.
 
 ## Bindung an einen Effekt
 

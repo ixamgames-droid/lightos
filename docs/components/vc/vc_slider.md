@@ -22,7 +22,7 @@ Der Modus wird im Editor über deutsche Labels (`SLIDER_MODE_LABELS`) gewählt.
 |---|---|---|---|
 | `LEVEL` | DMX-Kanal (Level) | Setzt einen rohen DMX-Kanal | `dmx_channel`, `dmx_universe` |
 | `PLAYBACK` | Playback (Executor) | Fadet den Executor in `playback_slot` | `playback_slot` |
-| `SUBMASTER` | Submaster | Eigener Submaster-Slot (`id(self)`) im OutputManager | — |
+| `SUBMASTER` | Submaster | Eigener Submaster-Slot (`id(self)`) im OutputManager. Reichweite über `programmer_scope`/`programmer_group`; meinen die Zellen dieser Reichweite einzelne **Köpfe** (`fid:head`), dimmt der Fader genau diese — `_submaster_target_heads` → `set_submaster(heads=…)` (FM-HEADLAYOUT A4) | `programmer_scope`, `programmer_group` |
 | `GRANDMASTER` | Grand Master | Globale Gesamthelligkeit | — |
 | `PROGRAMMER` | Programmer-Attribut | Setzt `programmer_attr` mit Scope all/selected/group | `programmer_attr`, `programmer_scope`, `programmer_group`, `programmer_min/max` |
 | `BPM` | Tempo (BPM) | Globales Tempo (Beat-Effekte folgen) | — |
