@@ -252,7 +252,9 @@ class LaserView(QWidget):
         self._btn_arm = QPushButton("🔒 UNSCHARF — Ausgabe geblockt")
         self._btn_arm.setCheckable(True)
         self._btn_arm.setMinimumHeight(40)
-        self._btn_arm.toggled.connect(weak_slot(self._on_arm_toggled))
+        # toggled(bool) traegt den Zustand — weak_slot WUERDE ihn verwerfen und
+        # der Slot stuerbe mit TypeError, ohne je set_armed() zu erreichen.
+        self._btn_arm.toggled.connect(weak_slot_fwd(self._on_arm_toggled))
         arm_row.addWidget(self._btn_arm, stretch=1)
         self._btn_estop = QPushButton("⏹ NOT-AUS")
         self._btn_estop.setMinimumHeight(40)
@@ -266,6 +268,7 @@ class LaserView(QWidget):
         src_row = QHBoxLayout()
         src_row.addWidget(QLabel("Ausgabe:"))
         self._combo_figure = QComboBox()
+        # weak_slot verwirft den Index — den braucht der Slot auch nicht.
         self._combo_figure.currentIndexChanged.connect(
             weak_slot(self._on_figure_changed))
         src_row.addWidget(self._combo_figure, stretch=1)
@@ -520,7 +523,11 @@ class LaserView(QWidget):
         if lo is not None:
             lo.clear_estop_all()
 
-    def _on_figure_changed(self, _idx: int):
+    def _on_figure_changed(self):
+        # BEWUSST ohne Index-Parameter: verbunden ueber weak_slot, das die
+        # Signal-Argumente verwirft. Mit Parameter warf der Slot bei JEDEM
+        # Umschalten TypeError (crash.log 2026-07-06) und die Figur wurde nie
+        # gesetzt. Wer Signal-Argumente braucht, nimmt weak_slot_fwd.
         self._apply_figure_to_selection()
 
     def _apply_figure_to_selection(self, figure=...):

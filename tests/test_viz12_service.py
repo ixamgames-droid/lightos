@@ -212,6 +212,48 @@ class TimerGatingTest(_ServiceTestCase):
         svc.detach_target(target)
         self.assertFalse(svc.timer_running)
 
+    def test_dead_cpp_timer_does_not_break_teardown(self):
+        """crash.log 2026-07-21: beim Beenden zerstoert Qt die C++-Seite des
+        QTimer, der Python-Wrapper bleibt. `self._timer is not None` war dann
+        WAHR und `isActive()` warf `RuntimeError: Internal C++ object already
+        deleted` — ausgerechnet auf dem Aufraeumpfad
+        (`destroyed` -> `detach_target` -> `_update_timer_gate`), wo niemand mit
+        einer Exception rechnet."""
+        class _DeadTimer:
+            def isActive(self):
+                raise RuntimeError(
+                    "libshiboken: Internal C++ object (PySide6.QtCore.QTimer) "
+                    "already deleted.")
+            def stop(self):
+                raise AssertionError("toter Timer darf nicht angefasst werden")
+
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        target = VisualizerTarget("t", lambda s: None)
+        svc.attach_target(target)
+        svc.set_target_active(target, True)
+        self.assertTrue(svc.timer_running)
+
+        svc._timer = _DeadTimer()               # C++-Seite ist weg
+        self.assertFalse(svc.timer_running, "toter Timer laeuft nicht")
+
+        svc.detach_target(target)               # der reale Absturzpfad
+        self.assertIsNone(svc._timer, "toter Timer wird vergessen")
+
+    def test_service_recovers_with_a_fresh_timer_after_a_dead_one(self):
+        """Ein toter Timer darf den Dienst nicht dauerhaft lahmlegen."""
+        class _DeadTimer:
+            def isActive(self):
+                raise RuntimeError("already deleted")
+
+        state = _make_state([], {})
+        svc = VisualizerService(state)
+        target = VisualizerTarget("t", lambda s: None)
+        svc.attach_target(target)
+        svc._timer = _DeadTimer()
+        svc.set_target_active(target, True)      # baut einen neuen Timer
+        self.assertTrue(svc.timer_running)
+
     def test_two_targets_one_active_keeps_timer_running(self):
         state = _make_state([], {})
         svc = VisualizerService(state)

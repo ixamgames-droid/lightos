@@ -197,3 +197,39 @@ class MarkerCouplingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RecencyTest(unittest.TestCase):
+    """Triage fragt „was passiert NOCH?", nicht „was passierte am haeufigsten?".
+
+    Real erlebt 2026-07-28: nach Anzahl sortiert stand ein 159x aufgetretener,
+    seit Wochen toter Testlauf-Absturz ganz oben, waehrend der einzige noch
+    lebende Fehler weiter unten unterging — und die daraus abgeleitete
+    Prioritaet im Backlog war falsch.
+    """
+
+    def _log(self):
+        return (_exception_block("2026-01-01T10:00:00", "OldError", "alt",
+                                 [(SRC, 1, "a")]) * 5
+                + _exception_block("2026-07-20T10:00:00", "NewError", "neu",
+                                   [(SRC, 2, "b")]))
+
+    def test_newest_signature_comes_first(self):
+        found = cci.parse_log(self._log())
+        self.assertEqual(found[0].signature, "NewError@live_view.py:2",
+                         "die juengste Signatur gehoert nach oben, nicht die haeufigste")
+        self.assertEqual(found[1].count, 5, "die alte ist trotzdem noch da")
+
+    def test_report_marks_cold_signatures(self):
+        found = cci.parse_log(self._log())
+        report = cci.format_report(found, seen=set())
+        old_line = next(l for l in report.splitlines()
+                        if "2026-01-01" in l)
+        new_line = next(l for l in report.splitlines()
+                        if "2026-07-20" in l)
+        self.assertIn("❄", old_line, "alte Signatur muss als kalt erkennbar sein")
+        self.assertNotIn("❄", new_line)
+
+    def test_cold_threshold_is_a_date_in_the_past(self):
+        import datetime as d
+        self.assertLess(cci._cold_before(), d.date.today().isoformat())

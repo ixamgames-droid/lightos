@@ -189,8 +189,29 @@ class VisualizerService:
 
     # ── Timer-Lazy-Init (Qt-Objekt erst bei Bedarf, damit Tests ohne
     #    QApplication den Service instanzieren koennen) ─────────────────────
+    def _timer_alive(self) -> bool:
+        """Lebt die C++-Seite des Timers noch?
+
+        Beim Beenden zerstoert Qt das C++-Objekt, waehrend der Python-Wrapper
+        bestehen bleibt: ``self._timer is not None`` ist dann WAHR, aber jeder
+        Zugriff wirft ``RuntimeError: Internal C++ object … already deleted``.
+        Real passiert (crash.log 2026-07-21): ``QWidget.destroyed`` -> Lambda ->
+        ``detach_target`` -> ``_update_timer_gate`` -> ``isActive()`` — also
+        ausgerechnet auf dem Aufraeumpfad, auf dem niemand mit einer Exception
+        rechnet. Ein toter Timer wird hier vergessen, damit die naechste
+        Anforderung sauber einen neuen baut."""
+        t = self._timer
+        if t is None:
+            return False
+        try:
+            t.isActive()
+        except RuntimeError:
+            self._timer = None
+            return False
+        return True
+
     def _ensure_timer(self):
-        if self._timer is not None:
+        if self._timer_alive():
             return
         from PySide6.QtCore import QTimer
         self._timer = QTimer()
@@ -237,12 +258,12 @@ class VisualizerService:
             if not self._timer.isActive():
                 self._timer.start(self.TICK_MS)
         else:
-            if self._timer is not None and self._timer.isActive():
+            if self._timer_alive() and self._timer.isActive():
                 self._timer.stop()
 
     @property
     def timer_running(self) -> bool:
-        return self._timer is not None and self._timer.isActive()
+        return self._timer_alive() and self._timer.isActive()
 
     # ── Dirty-Diff + Batch-Payload-Bau ───────────────────────────────────────
     def _collect_attrs(self, fixture) -> dict[str, int]:
@@ -405,7 +426,7 @@ class VisualizerService:
         if self._subscribed:
             self._state.unsubscribe(self._on_state)
             self._subscribed = False
-        if self._timer is not None:
+        if self._timer_alive():
             self._timer.stop()
         self._targets.clear()
         self._last_payload = {}
