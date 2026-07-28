@@ -135,6 +135,139 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
     return {}
 
 
+# ── Sichtbare Ausgabe EINES Fixtures (Visualizer/Vorschau) ───────────────────
+# Gegenstueck zu color_attrs_for_fixture: dort "Wunschfarbe -> Kanalwerte", hier
+# "Kanalwerte -> was man sieht". Der 3D-Visualizer las frueher NUR color_r/g/b
+# (Default 0) und NUR "intensity" (Default 255). Folge: jedes Geraet ohne
+# RGB-Kanaele wurde mit Farbe SCHWARZ gerendert (additiver Kegel = unsichtbar,
+# SpotLight ohne Emission) und jedes Geraet ohne "intensity"-Kanal galt als
+# dauerhaft voll aufgedreht. Betroffen waren u. a. reine Dimmer-PARs, Strobes/
+# Blinder (Martin Atomic 3000: nur shutter/rate/duration) und CMY-/Farbrad-Mover
+# (Robe Pointe/MegaPointe: intensity + color_wheel, KEIN color_r).
+
+_CMY_TRIPLES = (("cmy_c", "cmy_m", "cmy_y"), ("cyan", "magenta", "yellow"))
+_WHEEL_ATTRS = ("color_wheel", "colour_wheel", "color")
+# Reihenfolge = Vorrang. "shutter"/"strobe" bewusst NICHT hier: sie sind kein
+# Dimmer (s. attr_groups) und werden nur als Notnagel ausgewertet, wenn ein
+# Geraet gar keinen Dimmer hat.
+_DIMMER_ATTRS = ("intensity", "dimmer", "master")
+
+
+def _chan_by_attr(channels, attribute: str):
+    for c in channels or ():
+        if getattr(c, "attribute", None) == attribute:
+            return c
+    return None
+
+
+def _range_kind_for_value(channel, value: int) -> str | None:
+    """``kind`` des Ranges, in den ``value`` faellt ("open"/"closed"/"strobe"/…).
+    ``None``, wenn der Kanal keine Ranges hat oder kein Range passt."""
+    for rg in (getattr(channel, "ranges", None) or ()):
+        try:
+            if int(rg.range_from) <= value <= int(rg.range_to):
+                return (getattr(rg, "kind", "") or "") or None
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _wheel_slot_rgb(channel, value: int) -> tuple[int, int, int] | None:
+    """Farbrad-Slot unter ``value`` als RGB, ueber den Slot-NAMEN (dieselbe
+    Wortliste wie die Farbrad-Kacheln). Slot ohne erkennbares Farbwort -> None."""
+    for rg in (getattr(channel, "ranges", None) or ()):
+        try:
+            if not (int(rg.range_from) <= value <= int(rg.range_to)):
+                continue
+        except (TypeError, ValueError):
+            continue
+        hexc = color_word_hex(getattr(rg, "name", "") or "")
+        return hex_to_rgb(hexc) if hexc else None
+    return None
+
+
+def visual_rgb(attrs: dict, channels=None, suffix: str = "") -> tuple[int, int, int]:
+    """Sichtbare Ausgabefarbe EINES Kopfes aus rohen Attribut-Werten.
+
+    Fallback-Kette (erster Treffer gewinnt):
+      1. **RGB(W)** — ``color_r/g/b`` (Weiss additiv daraufgelegt, geklemmt).
+         Byte-identisch zum bisherigen Visualizer-Verhalten.
+      2. **CMY** (subtraktiv) — ``cmy_c/m/y`` bzw. ``cyan/magenta/yellow``:
+         ``r = 255 - c`` usw. Alle drei auf 0 = offen = weiss.
+      3. **Farbrad** — ``color_wheel``/``colour_wheel``/``color``: Slot unter dem
+         aktuellen DMX-Wert, Farbe aus dem Slot-Namen. Unbekannter Slot -> weiss
+         (offen), denn ein Farbrad steht im Zweifel auf "offen".
+      4. **Keine Farbkanaele** -> **weiss**: das Geraet leuchtet in seiner
+         Lampenfarbe (Dimmer-PAR, Strobe, Blinder).
+
+    ``suffix`` adressiert Multi-Head-Kanaele ("#1", "#2", …). Fuer Koepfe greifen
+    nur Stufe 1 und 4 — Farbrad/CMY gibt es real nur einmal pro Geraet; ein Kopf
+    ohne eigene Farbkanaele erbt darum die Geraetefarbe des Aufrufers.
+    """
+    def a(name: str):
+        return attrs.get(f"{name}{suffix}")
+
+    # 1) RGB(W) ---------------------------------------------------------------
+    if a("color_r") is not None or a("color_g") is not None or a("color_b") is not None:
+        w = int(a("color_w") or 0)
+        r = int(a("color_r") or 0)
+        g = int(a("color_g") or 0)
+        b = int(a("color_b") or 0)
+        return (min(255, r + w), min(255, g + w), min(255, b + w))
+
+    # 2) CMY (subtraktiv) ------------------------------------------------------
+    for ck, mk, yk in _CMY_TRIPLES:
+        if a(ck) is not None or a(mk) is not None or a(yk) is not None:
+            c = max(0, min(255, int(a(ck) or 0)))
+            m = max(0, min(255, int(a(mk) or 0)))
+            y = max(0, min(255, int(a(yk) or 0)))
+            return (255 - c, 255 - m, 255 - y)
+
+    # 3) Farbrad ---------------------------------------------------------------
+    for wheel in _WHEEL_ATTRS:
+        val = a(wheel)
+        if val is None:
+            continue
+        ch = _chan_by_attr(channels, wheel)
+        if ch is not None:
+            rgb = _wheel_slot_rgb(ch, int(val))
+            if rgb is not None:
+                return rgb
+        return (255, 255, 255)   # Rad vorhanden, Slot unbekannt -> offen/weiss
+
+    # 4) Gar keine Farbkanaele -> Lampenfarbe --------------------------------
+    return (255, 255, 255)
+
+
+def visual_intensity(attrs: dict, channels=None) -> int:
+    """Sichtbare Helligkeit (0-255) aus rohen Attribut-Werten.
+
+    Reihenfolge: echter Dimmer (``intensity``/``dimmer``/``master``) →
+    ersatzweise der Shutter (Geraete OHNE Dimmer, z. B. Xenon-Strobes: der
+    Shutter IST dort die Helligkeit) → sonst 255 (kein steuerbarer Dimmer, das
+    Geraet leuchtet konstant).
+
+    Der Shutter wird ueber die maschinenlesbare ``ChannelRange.kind`` ausgewertet
+    (``closed`` = dunkel, alles andere = an). **Ohne Range-Daten wird NICHT
+    geraten**, sondern 255 zurueckgegeben (Alt-Verhalten): die Konvention ist
+    geraeteabhaengig — der Martin Atomic 3000 meint mit Shutter 0 "Blackout",
+    viele LED-PARs dagegen "offen, kein Strobe". Ein falsches "0 = zu" wuerde ein
+    laufendes Geraet unsichtbar machen; im Zweifel bleibt es sichtbar.
+    """
+    for key in _DIMMER_ATTRS:
+        if key in attrs:
+            return max(0, min(255, int(attrs[key] or 0)))
+    for key in ("shutter", "strobe"):
+        if key in attrs:
+            val = max(0, min(255, int(attrs[key] or 0)))
+            ch = _chan_by_attr(channels, key)
+            kind = _range_kind_for_value(ch, val) if ch is not None else None
+            if kind == "closed":
+                return 0
+            return 255
+    return 255
+
+
 def fixture_attr_set(fx) -> set[str]:
     """Menge der Attribut-Namen eines gepatchten Fixtures (gecached ueber
     get_channels_for_patched)."""
