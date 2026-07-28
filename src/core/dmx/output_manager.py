@@ -154,14 +154,33 @@ class OutputManager:
     def set_blackout(self, enabled: bool):
         self._blackout = enabled
 
-    def set_submaster(self, slot, level: float, fids=None):
+    def set_submaster(self, slot, level: float, fids=None, heads=None):
         """Setzt einen Submaster-Slot (multiplikativer Dimmer-Faktor 0.0–1.0).
         ``fids=None`` -> GLOBALER Submaster (wirkt auf alle Fixtures, bisheriges
         Verhalten). Ein iterierbares von Fixture-fids beschraenkt den Submaster auf
-        genau diese Geraete (zuweisbarer Submaster)."""
+        genau diese Geraete (zuweisbarer Submaster).
+
+        FM-HEADLAYOUT A4: ``heads={fid: {head, ...}}`` schraenkt den Slot fuer
+        DIESE Geraete zusaetzlich auf einzelne Koepfe ein (VC-Submaster pro Kopf).
+        Ein Geraet mit Kopf-Einschraenkung zaehlt bewusst NICHT mehr in
+        ``submaster_factor_for`` (sonst dimmte ein Kopf-Fader das ganze Geraet) —
+        seinen Faktor liefert ``submaster_head_factors_for``. ``heads=None``/leer
+        ist exakt das Bestandsverhalten."""
         lvl = max(0.0, min(1.0, float(level)))
         tgt = None if fids is None else frozenset(int(f) for f in fids)
-        self._submasters[slot] = (lvl, tgt)
+        hd = None
+        if heads:
+            hd = {}
+            for f, hs in dict(heads).items():
+                try:
+                    fi = int(f)
+                except (TypeError, ValueError):
+                    continue
+                s = frozenset(int(h) for h in (hs or ()))
+                if s:
+                    hd[fi] = s
+            hd = hd or None
+        self._submasters[slot] = (lvl, tgt, hd)
 
     def clear_submaster(self, slot):
         """Entfernt einen Submaster-Slot — z. B. wenn der zugehoerige VC-Fader
@@ -176,8 +195,10 @@ class OutputManager:
         (EE-02). Zugewiesene (gezielte) Submaster zaehlen hier NICHT mit — die
         liefert ``submaster_factor_for(fid)`` pro Fixture."""
         f = 1.0
-        for lvl, tgt in list(self._submasters.values()):
-            if tgt is None:
+        for lvl, tgt, hd in list(self._submasters.values()):
+            # Ein kopf-beschraenkter Slot ist NIE global — sonst wuerde ein
+            # Kopf-Fader ohne fids-Ziel das gesamte Rig dimmen.
+            if tgt is None and not hd:
                 f *= max(0.0, min(1.0, lvl))
         return f
 
@@ -191,10 +212,47 @@ class OutputManager:
         except (TypeError, ValueError):
             return 1.0
         f = 1.0
-        for lvl, tgt in list(self._submasters.values()):
-            if tgt is not None and fid in tgt:
+        for lvl, tgt, hd in list(self._submasters.values()):
+            if tgt is not None and fid in tgt and not (hd and fid in hd):
                 f *= max(0.0, min(1.0, lvl))
         return f
+
+    def has_head_submasters(self) -> bool:
+        """Gibt es ueberhaupt einen KOPF-beschraenkten Submaster-Slot? Der Renderer
+        fragt das EINMAL pro Frame — sonst muesste er ``submaster_head_factors_for``
+        fuer jedes Fixture jedes Frames rufen, obwohl der Normalfall „gar keine
+        Kopf-Faktoren" ist."""
+        for _lvl, _tgt, hd in list(self._submasters.values()):
+            if hd:
+                return True
+        return False
+
+    def submaster_head_factors_for(self, fid) -> dict:
+        """FM-HEADLAYOUT A4: ``{head: faktor}`` der KOPF-beschraenkten Submaster-
+        Slots fuer dieses Geraet (leeres Dict = keiner, Bestandsfall). Multipliziert
+        sich im Renderer auf die kopf-exklusiven Intensitaets-/Farbadressen dieses
+        Kopfes — zusaetzlich zu Grand-Master, globalem und geraeteweitem Submaster.
+
+        Geraete OHNE Kopf-Eintrag in einem Slot bleiben unberuehrt; ein Slot mit
+        ``fids``-Ziel wirkt nur auf seine Ziel-Geraete (Kopf-Eintraege fremder
+        Geraete werden ignoriert)."""
+        try:
+            fid = int(fid)
+        except (TypeError, ValueError):
+            return {}
+        out: dict = {}
+        for lvl, tgt, hd in list(self._submasters.values()):
+            if not hd:
+                continue
+            hs = hd.get(fid)
+            if not hs:
+                continue
+            if tgt is not None and fid not in tgt:
+                continue
+            v = max(0.0, min(1.0, lvl))
+            for h in hs:
+                out[h] = out.get(h, 1.0) * v
+        return out
 
     def add_universe(self, number: int) -> Universe:
         u = Universe(number)

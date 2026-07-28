@@ -387,8 +387,9 @@ class VCSlider(VCWidget):
             # bestimmte Geraete/Gruppen beschraenkt (Reichweite). fids=None ->
             # globaler Submaster (wirkt auf alles, bisheriges Verhalten).
             try:
-                fids = self._submaster_target_fids(state)
-                state.output_manager.set_submaster(id(self), v / 255.0, fids)
+                fids, heads = self._submaster_targets(state)
+                state.output_manager.set_submaster(id(self), v / 255.0, fids,
+                                                   heads=heads or None)
             except Exception:
                 pass
         elif self.mode == SliderMode.GROUP_DIMMER:
@@ -417,6 +418,19 @@ class VCSlider(VCWidget):
         Delegiert an die zentrale Auflösung in app_state (dedupliziert)."""
         try:
             return state.group_fids_by_name(group_name)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _group_cells(state, group_name: str) -> list[str]:
+        """FEINE Zellen einer FESTEN Fixture-Gruppe (``"fid"`` / ``"fid:head"``) in
+        Raster-Reihenfolge — die kopf-aufloesende Schwester von ``_group_fids``
+        (FM-HEADLAYOUT A4). Der Submaster nutzt DIESE, weil er beides braucht
+        (Geraete UND Koepfe) und die Gruppe pro Fader-Bewegung nur EINMAL abfragen
+        darf; ``base_fids_in_cells`` liefert daraus dieselben fids wie
+        ``_group_fids``."""
+        try:
+            return state.group_cells_by_name(group_name)
         except Exception:
             return []
 
@@ -452,16 +466,54 @@ class VCSlider(VCWidget):
         """Reichweite eines Submaster-Faders -> Ziel-fids oder None (= global/alle).
         'all' -> None (wirkt auf alles, bisheriges Verhalten); 'group' -> fids der
         festen Gruppe; 'selected' -> aktuelle Programmer-Auswahl (Snapshot). Leere
-        Aufloesung -> [] (Fader ohne Wirkung, statt versehentlich alles zu dimmen)."""
+        Aufloesung -> [] (Fader ohne Wirkung, statt versehentlich alles zu dimmen).
+        Nur die fid-Sicht auf ``_submaster_targets`` — EINE Aufloesungs-Quelle."""
+        return self._submaster_targets(state)[0]
+
+    def _submaster_targets(self, state):
+        """FM-HEADLAYOUT A4: ``(fids, heads)`` eines Submaster-Faders in EINEM
+        Durchgang — ``fids`` wie bisher (``None`` = global/alle), ``heads`` als
+        ``{fid: {head}}`` bzw. leeres Dict.
+
+        Leeres ``heads`` = keine Kopf-Einschraenkung (ganze Geraete) und damit exakt
+        das Bestandsverhalten — der Normalfall. Die Koepfe stammen aus den FEINEN
+        Zellen DERSELBEN Reichweite, die auch die fids bestimmt:
+
+        * ``'selected'`` -> die Programmer-Kopf-Auswahl (Slice 5, ``fid:head``),
+        * ``'group'``    -> die Kopf-Zellen des Gruppen-Rasters (Slice 3
+          „Koepfe einzeln → Raster") — das ist der PERSISTENTE Weg: die Gruppe
+          liegt in der Show, der Fader braucht kein eigenes neues Feld,
+        * ``'all'``      -> nie (ein globaler Submaster kennt keine Koepfe).
+
+        Die Vorrang-Regel („ganze Zelle schlaegt Kopf-Zellen") liegt in
+        ``group_cells.head_restrictions``, die Pruefung gegen den echten Patch in
+        ``AppState.validate_head_restrictions`` — dort faellt „alle Koepfe" wieder
+        auf das ganze Geraet zurueck. Beides EINE Quelle fuer beide Reichweiten.
+
+        Die Gruppe wird bewusst nur EINMAL abgefragt (``group_cells_by_name`` statt
+        zusaetzlich ``group_fids_by_name``): ``_apply`` laeuft bei jeder Maus-/MIDI-
+        Bewegung des Faders, zwei DB-Sessions pro Tick waeren spuerbar."""
         scope = self.programmer_scope or "all"
-        if scope == "group" and self.programmer_group:
-            return self._group_fids(state, self.programmer_group)
-        if scope == "selected":
-            try:
-                return list(state.get_selected_fids())
-            except Exception:
-                return []
-        return None
+        if scope not in ("group", "selected"):
+            return None, {}
+        try:
+            from src.core.group_cells import head_restrictions, base_fids_in_cells
+            if scope == "group":
+                if not self.programmer_group:
+                    return None, {}
+                cells = self._group_cells(state, self.programmer_group)
+                fids = base_fids_in_cells(cells)
+            else:
+                cells = state.get_selected_cells()
+                fids = list(state.get_selected_fids())
+            heads = state.validate_head_restrictions(head_restrictions(cells))
+            return fids, (heads or {})
+        except Exception:
+            return [], {}
+
+    def _submaster_target_heads(self, state) -> dict:
+        """Nur die Kopf-Einschraenkung (Sicht auf ``_submaster_targets``)."""
+        return self._submaster_targets(state)[1]
 
     def _resolved_effect_fid(self):
         """Einzel-Ziel-fid für Effekt-Modi: feste function_id, sonst der Live-Edit-Slot
@@ -811,7 +863,13 @@ class VCSlider(VCWidget):
         scope_cb.setToolTip("Modus Programmer/Submaster: auf welche Fixtures der Fader "
                             "wirkt (alle gepatchten, die aktuelle Auswahl, oder eine fest "
                             "gewählte Gruppe — unabhängig von der Live-Auswahl). Beim "
-                            "Submaster = 'Alle Geräte' ist der bisherige globale Submaster.")
+                            "Submaster = 'Alle Geräte' ist der bisherige globale Submaster.\n\n"
+                            "Mehrkopf-Geräte: sind KÖPFE gemeint statt ganzer Geräte — "
+                            "einzelne Köpfe ausgewählt bzw. eine Gruppe mit Kopf-Zellen "
+                            "(Gruppen-Editor → „Köpfe einzeln → Raster“) — dimmt der "
+                            "Submaster genau diese Köpfe. Nur Kanäle, die es je Kopf gibt "
+                            "(eigener Dimmer bzw. eigene Farbe); ein von allen Köpfen "
+                            "GETEILTER Master-Dimmer bleibt unangetastet.")
         form.addRow("Reichweite (Programmer/Submaster):", scope_cb)
 
         # Feste Gruppe (nur scope == "group"): Auswahl aus den vorhandenen Gruppen.

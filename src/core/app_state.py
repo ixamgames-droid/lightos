@@ -1920,15 +1920,18 @@ class AppState:
                 if hs and fid in self.selected_fids}
 
     # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
-    def _group_lookup(self, name_or_ref):
-        """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe.
+    def _group_positions(self, name_or_ref):
+        """``(gid, positions_json-dict)`` einer Fixture-Gruppe; ``(None, {})`` wenn
+        nicht da. EINE Abfrage-Quelle — ``_group_lookup`` (Basis-fids) und
+        ``group_cells_by_name`` (feine Zellen inkl. Koepfe) teilen sie sich, damit
+        beide Sichten garantiert dieselbe Gruppe meinen.
 
         ENG-05: Akzeptiert einen Namen (str) ODER einen ``(gid, name)``-Ref aus
         dem Preset-Browser. Bei vorhandener gid wird EINDEUTIG per ID aufgeloest
         (gleichnamige Gruppen → kein faelschliches „Gruppe ohne Geraete"). Sonst
         per Name: ``scalar_one_or_none`` bleibt der Normalpfad; nur wenn es
         WIRKLICH mehrere gleichnamige Gruppen gibt (``MultipleResultsFound``), wird
-        die erste genommen statt zu crashen. (None, []) wenn nicht da.
+        die erste genommen statt zu crashen.
         """
         import json
         from sqlalchemy.exc import MultipleResultsFound
@@ -1946,20 +1949,104 @@ class AppState:
                         g = s.execute(stmt).scalar_one_or_none()
                     except MultipleResultsFound:
                         g = s.execute(stmt).scalars().first()
-            if g is None:
-                return None, []
-            # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" tragen ihren Basis-fid bei
-            # (EINE Parse-Quelle group_cells) — sonst faellt eine Kopf-Matrix-Gruppe
-            # hier still auf [] (int("5:2") wirft), zeigte "(0)" + selektierte nichts.
-            from .group_cells import base_fids_in_grid_order
-            return g.id, base_fids_in_grid_order(
-                json.loads(g.positions_json or "{}") or {})
+                if g is None:
+                    return None, {}
+                # Attribute NOCH IN der Session lesen (nach dem Schliessen kann eine
+                # expire_on_commit-Session sie nicht mehr nachladen).
+                return g.id, (json.loads(g.positions_json or "{}") or {})
         except Exception:
+            return None, {}
+
+    def _group_lookup(self, name_or_ref):
+        """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe; (None, []) wenn
+        nicht da."""
+        gid, positions = self._group_positions(name_or_ref)
+        if gid is None:
             return None, []
+        # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" tragen ihren Basis-fid bei
+        # (EINE Parse-Quelle group_cells) — sonst faellt eine Kopf-Matrix-Gruppe
+        # hier still auf [] (int("5:2") wirft), zeigte "(0)" + selektierte nichts.
+        from .group_cells import base_fids_in_grid_order
+        return gid, base_fids_in_grid_order(positions)
 
     def group_fids_by_name(self, name: str) -> list[int]:
         """Fids einer Gruppe (Name) in Raster-Reihenfolge; [] wenn unbekannt."""
         return self._group_lookup(name)[1]
+
+    def group_cells_by_name(self, name_or_ref) -> list[str]:
+        """FEINE Zellen einer Gruppe in Raster-Reihenfolge: ``"fid"`` (ganzes
+        Geraet) bzw. ``"fid:head"`` (Kopf-Zelle aus Slice 3 „Koepfe einzeln →
+        Raster"), dedupliziert; [] wenn die Gruppe unbekannt ist.
+
+        Gegenstueck zu ``group_fids_by_name``, das die Kopf-Aufloesung bewusst
+        wegwirft — fuer Konsumenten, die sie brauchen (VC-Submaster pro Kopf, A4)."""
+        from .group_cells import cells_in_grid_order
+        return cells_in_grid_order(self._group_positions(name_or_ref)[1])
+
+    def validate_head_restrictions(self, heads) -> dict:
+        """FM-HEADLAYOUT A4: eine Kopf-Einschraenkung ``{fid: {head}}`` gegen den
+        LIVE-Patch pruefen. Liefert nur die Eintraege, die WIRKLICH „einzelne
+        Koepfe dieses Geraets" bedeuten; alles andere faellt raus und das Geraet
+        landet damit wieder im geraeteweiten Bestandspfad
+        (``submaster_factor_for``) statt in einer Kopf-Maske.
+
+        Verworfen wird ein Geraet, wenn …
+
+        * es **nicht (mehr) gepatcht** ist,
+        * es **kein Mehrkopf-Geraet** ist (``color_head_count < 2``; auch Laser),
+        * nach dem Klemmen **kein gueltiger Kopf** uebrig bleibt,
+        * die Koepfe **ALLE** Koepfe des Geraets abdecken — „alle Koepfe" ist
+          semantisch das ganze Geraet.
+
+        ★ Die letzten beiden Regeln sind kein Feinschliff, sondern verhindern zwei
+        bestaetigte Regressionen: (1) Die beim Patchen automatisch angelegte Gruppe
+        „… · Koepfe" besteht aus lauter Kopf-Zellen. Ein BESTEHENDER Submaster-Fader
+        mit Reichweite „Feste Gruppe" = dieser Gruppe haette ohne die Voll-Abdeckungs-
+        Regel den geraeteweiten Faktor verloren — der von allen Koepfen geteilte
+        Master-Dimmer waere nicht mehr gedimmt worden (**317 Modi der eingebauten
+        Library** haben genau diese Form: ein Master-Dimmer + >=2 Farbbaenke), bei
+        aktivem Farb-Makro sogar bis zur voelligen Wirkungslosigkeit des Faders.
+        (2) Kopf-Zellen ueberleben einen Kanal-Modus-Wechsel (``update_fixture``
+        raeumt die Auto-Gruppe nicht auf) — ohne Klemmen zeigte „Kopf 2" danach auf
+        den Kopf 1 des neuen Modus."""
+        if not heads:
+            return {}
+        try:
+            by_fid = {}
+            for fx in self.get_patched_fixtures():
+                try:
+                    by_fid[int(fx.fid)] = fx
+                except (TypeError, ValueError):
+                    continue
+        except Exception:
+            return {}
+        out: dict = {}
+        for fid, hs in dict(heads).items():
+            try:
+                fid = int(fid)
+            except (TypeError, ValueError):
+                continue
+            fx = by_fid.get(fid)
+            if fx is None:
+                continue
+            try:
+                n = color_head_count_for_channels(fx, get_channels_for_patched(fx))
+            except Exception:
+                continue
+            if n < 2:
+                continue
+            valid: set = set()
+            for h in (hs or ()):
+                try:
+                    h = int(h)
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= h < n:
+                    valid.add(h)
+            if not valid or len(valid) >= n:
+                continue
+            out[fid] = valid
+        return out
 
     def select_group_by_name(self, name_or_ref) -> bool:
         """Wählt die Fixtures einer Gruppe in den Programmer (F-24). True bei Erfolg.
@@ -2650,6 +2737,16 @@ class AppState:
         # Zugewiesene (gezielte) Submaster wirken nur auf ihre Fixture-fids — pro
         # Fixture abgefragt. hasattr einmal aufloesen (Hot Path).
         sub_for = getattr(om, "submaster_factor_for", None) if om is not None else None
+        # FM-HEADLAYOUT A4: kopf-genaue Submaster-Faktoren. EINMAL pro Frame fragen,
+        # ob es ueberhaupt einen kopf-beschraenkten Slot gibt — sonst kostet der
+        # Bestandsfall (der Normalfall) nicht einen einzigen Aufruf pro Fixture.
+        head_fac_for = None
+        if om is not None:
+            try:
+                if om.has_head_submasters():
+                    head_fac_for = getattr(om, "submaster_head_factors_for", None)
+            except Exception:
+                head_fac_for = None
         fixture_dimmers = getattr(self, "fixture_dimmers", {}) or {}
         global_sub = max(0.0, min(1.0, float(getattr(self, "submaster_level", 1.0)))) * submaster
         for fidi, addrs in inten_addrs.items():
@@ -2660,7 +2757,13 @@ class AppState:
                 except Exception:
                     sub_t = 1.0
             factor = global_sub * sub_t * float(fixture_dimmers.get(fidi, 1.0)) * prog_factor.get(fidi, 1.0)
-            if factor >= 0.999 or not addrs:
+            head_fac = {}
+            if head_fac_for is not None:
+                try:
+                    head_fac = head_fac_for(fidi) or {}
+                except Exception:
+                    head_fac = {}
+            if not head_fac and (factor >= 0.999 or not addrs):
                 continue
             entry = fix_index.get(fidi)
             if not entry:
@@ -2668,8 +2771,29 @@ class AppState:
             su = scratch.get(entry[0].universe)
             if su is None:
                 continue
-            for a in addrs:
-                su.set_channel(a, int(su.get_channel(a) * factor))
+            if not head_fac:
+                for a in addrs:
+                    su.set_channel(a, int(su.get_channel(a) * factor))
+                continue
+            # Kopf-Fall: pro Adresse GENAU EINEN Faktor bilden und EINMAL anwenden.
+            # Zwei getrennte int()-Durchgaenge (erst geraeteweit, dann pro Kopf)
+            # wuerden zweimal abrunden und den Fader-Weg verfaelschen.
+            # ``get(a, 1.0)``: eine kopf-exklusive Farbadresse steht NICHT in
+            # ``inten_addrs``, wenn das Geraet einen geteilten Master-Dimmer hat
+            # (dann ist der die Intensitaets-Quelle) — sie bekommt daher nur den
+            # Kopf-Faktor, nicht zusaetzlich den geraeteweiten.
+            addr_fac = {a: factor for a in addrs}
+            head_map = None
+            for head, hf in head_fac.items():
+                if hf >= 0.999:
+                    continue
+                if head_map is None:      # EIN Kanal-Durchlauf fuer alle Koepfe
+                    head_map = self._fixture_head_intensity_addr_map(entry[0], entry[1])
+                for a in head_map.get(head, ()):
+                    addr_fac[a] = addr_fac.get(a, 1.0) * hf
+            for a, f in addr_fac.items():
+                if f < 0.999:
+                    su.set_channel(a, int(su.get_channel(a) * f))
 
         # 4b². Feature-Dimmer-Master (F-26): per-Slot multiplikativer Master ueber
         #      eine Fixture-Menge, effekt-UNABHAENGIG (greift am fertigen Output,
@@ -3022,6 +3146,68 @@ class AppState:
                 color.append(addr)
         return inten if inten else color
 
+    def _fixture_head_intensity_addr_map(self, fx, chans) -> dict:
+        """FM-HEADLAYOUT A4: ``{head: [addr]}`` — welche Adressen ein KOPF-genauer
+        Dimm-Faktor (VC-Submaster pro Kopf) je Kopf skalieren darf.
+
+        Pro Kopf gilt dieselbe Regel wie in ``_fixture_intensity_addrs`` (echter
+        Dimmer falls vorhanden, sonst ADDITIVE Farbe als virtueller Dimmer; CMY nie),
+        aber ausschliesslich auf **kopf-exklusiven** Kanaelen.
+
+        ★ Kopf-exklusiv heisst: das Attribut kommt **GENAU SO OFT vor wie das Geraet
+        Koepfe hat** (``color_head_count`` = Zahl der ``color_r``-Kanaele — dieselbe
+        Quelle, aus der auch die Kopf-Zellen der Gruppe stammen). Die naheliegendere
+        Regel „kommt mehr als einmal vor ⇒ pro Kopf" ist FALSCH und war ein
+        bestaetigter Review-Fund: **107 Modi der eingebauten Library** haben
+        ZONEN-Master, also ein wiederholtes ``intensity``, dessen Anzahl NICHT der
+        Kopfzahl entspricht (z. B. `Frost FX Bar W` 14 Koepfe / 2 Zonen-Dimmer,
+        `Spiider (4) Full RGBW` 21 / 2). Dort haette „Kopf 0" den Weiss-Master ueber
+        ALLE Pixel erwischt und „Kopf 1" den Hintergrund-Master, waehrend Pixel 1
+        und 2 ueber gar keinen Fader erreichbar gewesen waeren.
+
+        Ein Attribut, das seltener/oefter vorkommt, gilt als GETEILT und bleibt
+        unangetastet — sonst dimmte „Kopf 2" ueber den gemeinsamen Master-Dimmer das
+        ganze Geraet. Genau deshalb reicht ``channels_for_head`` hier nicht: das
+        reicht geteilte Attribute bewusst JEDEM Kopf durch (richtig fuer den
+        Programmer-/Matrix-SCHREIBpfad, falsch fuer eine Dimm-Maske).
+
+        Ein Kopf ohne eigenen Intensitaets-/Farbkanal bekommt ``[]`` — der Fader hat
+        dort ehrlich keine Wirkung, statt ersatzweise das ganze Geraet zu dimmen.
+        Single-Head-Geraete (und Laser) liefern ``{}``.
+
+        EIN Durchlauf ueber die Kanaele fuer ALLE Koepfe: der Renderer ruft das pro
+        Fixture und Frame: die frueher kopfweise Fassung war bei Pixel-Panels
+        O(Koepfe x Kanaele) und sprengte bei 144 Pixeln das 22,7-ms-Frame-Budget."""
+        n_heads = color_head_count_for_channels(fx, chans)
+        if n_heads < 2:
+            return {}
+        counts: dict[str, int] = {}
+        for ch in chans:
+            a = (getattr(ch, "attribute", "") or "").lower()
+            counts[a] = counts.get(a, 0) + 1
+        inten: dict[int, list[int]] = {}
+        color: dict[int, list[int]] = {}
+        seen: dict[str, int] = {}
+        for ch in chans:
+            attr = (getattr(ch, "attribute", "") or "").lower()
+            occ = seen.get(attr, 0)
+            seen[attr] = occ + 1
+            if counts.get(attr, 0) != n_heads:
+                continue          # geteilter Master bzw. Zonen-Kanal -> kein Kopf-Kanal
+            addr = fx.address + ch.channel_number - 1
+            if not (1 <= addr <= 512):
+                continue
+            if attr in _DIM_INTENSITY_ATTRS:
+                inten.setdefault(occ, []).append(addr)
+            elif attr in _DIM_COLOR_ATTRS and attr not in _SUBTRACTIVE_COLOR_ATTRS:
+                color.setdefault(occ, []).append(addr)
+        return {h: (inten.get(h) or color.get(h) or []) for h in range(n_heads)}
+
+    def _fixture_head_intensity_addrs(self, fx, chans, head) -> list[int]:
+        """Kopf-Maske eines EINZELNEN Kopfes (Bequemlichkeits-Sicht auf
+        ``_fixture_head_intensity_addr_map``; der Renderer nutzt die Map)."""
+        return self._fixture_head_intensity_addr_map(fx, chans).get(int(head), [])
+
     def _build_gm_mask(self, fix_index) -> dict[int, set]:
         """Grand-Master-Adressmaske pro gepatchtem DMX-Universum: die zu dimmenden
         Intensitaets-/Farbadressen (Pan/Tilt/Gobo bleiben unangetastet, Audit B4).
@@ -3356,6 +3542,20 @@ def channel_occurrence_keys(channels):
 # Quelle fuer den Matrix-Pro-Kopf-Write UND (spaeter) die EFX-Pro-Kopf-Ziele.
 
 
+def color_head_count_for_channels(fixture, channels) -> int:
+    """Wie ``color_head_count``, aber gegen eine BEREITS geladene Kanalliste —
+    fuer Aufrufer, die die Kanaele ohnehin in der Hand haben (Renderer-Hot-Path:
+    spart den Cache-Lookup pro Frame). EINE Zaehl-Regel fuer beide."""
+    if (getattr(fixture, "fixture_type", "") or "") == "laser":
+        return 1
+    try:
+        n = sum(1 for c in channels
+                if (getattr(c, "attribute", "") or "").lower() == "color_r")
+        return n if n >= 1 else 1
+    except Exception:
+        return 1
+
+
 def color_head_count(fixture) -> int:
     """Anzahl unabhaengig faerbbarer Koepfe/Emitter = Zahl der ``color_r``-Kanaele
     (jeder Kopf hat eine eigene RGB(W)-Bank). 1 = Single-Head/einfarbig, >=2 =
@@ -3365,10 +3565,8 @@ def color_head_count(fixture) -> int:
     if (getattr(fixture, "fixture_type", "") or "") == "laser":
         return 1
     try:
-        chans = get_channels_for_patched(fixture)
-        n = sum(1 for c in chans
-                if (getattr(c, "attribute", "") or "").lower() == "color_r")
-        return n if n >= 1 else 1
+        return color_head_count_for_channels(
+            fixture, get_channels_for_patched(fixture))
     except Exception:
         return 1
 

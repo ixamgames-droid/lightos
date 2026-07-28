@@ -30,6 +30,34 @@ def parse_group_cell(value) -> tuple:
         return None, None
 
 
+def head_restrictions(cells) -> dict:
+    """Zell-Liste -> ``{fid: {head, ...}}``: auf WELCHE Koepfe eine Auswahl bzw.
+    ein Gruppen-Raster ein Geraet einschraenkt (FM-HEADLAYOUT A4).
+
+    ``["1", "2:0", "2:3"]`` -> ``{2: {0, 3}}``. Enthalten sind NUR Geraete, deren
+    Zellen ausschliesslich Kopf-Zellen sind: taucht dasselbe Geraet auch als
+    GANZE Zelle (``"2"``) auf, gewinnt das ganze Geraet und faellt hier raus —
+    dieselbe Vorrang-Regel wie ``AppState.set_selected_cells`` ("die groebere
+    Aussage ist die sichere: alle Koepfe"). Ein leeres Ergebnis heisst also
+    ausdruecklich „keine Kopf-Einschraenkung" (= Bestandsverhalten), NICHT
+    „nichts gewaehlt".
+
+    EINE Quelle fuer Auswahl-Zellen (``get_selected_cells``) UND Gruppen-
+    Rasterzellen (``positions_json``), damit „Nur Auswahl" und „Feste Gruppe"
+    beim VC-Submaster nicht auseinanderdriften."""
+    heads: dict[int, set] = {}
+    whole: set = set()
+    for c in cells or []:
+        fid, head = parse_group_cell(c)
+        if fid is None:
+            continue
+        if head is None:
+            whole.add(fid)
+        else:
+            heads.setdefault(fid, set()).add(int(head))
+    return {f: hs for f, hs in heads.items() if hs and f not in whole}
+
+
 def base_fids_in_grid_order(positions: dict) -> list[int]:
     """Basis-fids einer ``positions_json``-Map (``{"col,row": fid|"fid:head"}``) in
     **Raster-Reihenfolge** (Zeile, dann Spalte), **dedupliziert**.
@@ -54,4 +82,44 @@ def base_fids_in_grid_order(positions: dict) -> list[int]:
     for _r, _c, fid in items:
         if fid not in out:
             out.append(fid)
+    return out
+
+
+def base_fids_in_cells(cells) -> list[int]:
+    """Basis-fids einer BEREITS geordneten Zell-Liste, dedupliziert und in
+    Reihenfolge. Gegenstueck zu ``base_fids_in_grid_order`` fuer Aufrufer, die die
+    Zellen schon in der Hand haben — so braucht „Geraete UND Koepfe einer Gruppe"
+    nur EINE Gruppen-Abfrage statt zweier (der VC-Submaster loest das bei jeder
+    Fader-Bewegung auf)."""
+    out: list[int] = []
+    for c in cells or []:
+        fid, _head = parse_group_cell(c)
+        if fid is not None and fid not in out:
+            out.append(fid)
+    return out
+
+
+def cells_in_grid_order(positions: dict) -> list[str]:
+    """Wie ``base_fids_in_grid_order``, aber mit der FEINEN Aufloesung: die
+    normalisierten Zellwerte (``"fid"`` bzw. ``"fid:head"``) in Raster-Reihenfolge
+    (Zeile, dann Spalte), dedupliziert.
+
+    Fuer Konsumenten, die die Kopf-Information brauchen (VC-Submaster pro Kopf,
+    FM-HEADLAYOUT A4) — ``base_fids_in_grid_order`` wirft sie bewusst weg, weil
+    ein Multi-Head-Geraet dort EIN Geraet ist."""
+    items: list[tuple] = []
+    for key, value in (positions or {}).items():
+        try:
+            c_str, r_str = str(key).split(",")
+            c, r = int(c_str), int(r_str)
+        except (TypeError, ValueError):
+            continue
+        fid, head = parse_group_cell(value)
+        if fid is not None:
+            items.append((r, c, f"{fid}" if head is None else f"{fid}:{head}"))
+    items.sort()
+    out: list[str] = []
+    for _r, _c, cell in items:
+        if cell not in out:
+            out.append(cell)
     return out

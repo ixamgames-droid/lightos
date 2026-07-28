@@ -16,7 +16,7 @@ globale und zugewiesene Submaster) sowie Tick-Callbacks für die Engine.
 | `LIGHTOS_SERIAL_INPROC` (Env) | Gesetzt → direkter In-Prozess-`EnttecPro` statt prozess-isoliertem Proxy (Tests/Debug/Fallback). Siehe `_make_enttec_device`. |
 | `_stop_join_s = 2.0` | Wartezeit beim `stop()` auf das saubere Thread-Ende, bevor Geräte geschlossen werden (testbar überschreibbar). |
 | Grand-Master-Adressmaske | `set_gm_address_mask({universe: frozenset(addr)})` — nur Intensitäts-/Farbadressen werden vom Grand Master skaliert; Pan/Tilt/Gobo bleiben unberührt (Audit B4). Universen ohne Eintrag dimmen global. |
-| Submaster | `set_submaster(slot, level, fids=None)` — `fids=None` = globaler Submaster, ein iterierbares von Fixture-fids = zugewiesener Submaster. |
+| Submaster | `set_submaster(slot, level, fids=None, heads=None)` — `fids=None` = globaler Submaster, ein iterierbares von Fixture-fids = zugewiesener Submaster. `heads={fid: {kopf}}` (FM-HEADLAYOUT A4) schränkt den Slot für diese Geräte auf einzelne **Köpfe** ein: ein so eingeschränktes Gerät zählt dann **nicht** mehr in `submaster_factor_for` (sonst dimmte ein Kopf-Fader das ganze Gerät), sondern in `submaster_head_factors_for(fid) → {kopf: faktor}`. Der Renderer legt diesen Faktor auf die **kopf-exklusiven** Intensitäts-/Farbadressen (`AppState._fixture_head_intensity_addr_map`, eine Map pro Fixture und Frame) — ein geteilter Master-Dimmer und Zonen-Dimmer bleiben unangetastet (kopf-exklusiv = Kanalzahl == `color_head_count`). `has_head_submasters()` ist der Frame-Early-Out: ohne Kopf-Slot kostet der Bestandsfall keinen Aufruf pro Fixture. Wer `heads` setzt, sollte es vorher durch `AppState.validate_head_restrictions` schicken — das verwirft nicht-gepatchte/einköpfige Geräte, klemmt veraltete Kopf-Indizes und lässt „alle Köpfe" wieder auf den geräteweiten Pfad fallen. |
 
 Universe-Mapping: Enttec sendet roh, Art-Net erhält `univ_num - 1` (0-basiert),
 sACN erhält `univ_num` (1-basiert). Siehe `_send_all`.
@@ -61,6 +61,7 @@ sACN erhält `univ_num` (1-basiert). Siehe `_send_all`.
 - `tests/test_output_config.py`
 - `tests/test_grandmaster_mask_universe.py`
 - `tests/test_submaster_assignable.py`
+- `tests/test_fm_headlayout_a4_head_submaster.py`
 - `tests/test_dimmer_master.py`
 
 ## Quelle

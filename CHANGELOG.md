@@ -7,6 +7,47 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Submaster pro Kopf: einzelne Köpfe eines Mehrkopf-Geräts dimmen
+
+#### Neu
+
+- **Ein Submaster-Fader kann jetzt einen einzelnen Kopf dimmen**, nicht mehr nur
+  ganze Geräte. Damit ist der letzte Baustein von „jeder Kopf ist eine eigene
+  Lampe" da: Auswahl, Fächer, Snaps und EFX konnten schon kopfweise arbeiten, die
+  Helligkeit am Fader nicht.
+
+  Ein neues Feld gibt es dafür nicht — es zählt die **Reichweite**, die der Fader
+  ohnehin hat. Enthält sie Köpfe statt ganzer Geräte, wirkt er auf genau diese
+  Köpfe. Fest und in der Show gespeichert geht das über eine Gruppe mit
+  Kopf-Zellen (Gruppen-Editor → „Köpfe einzeln → Raster"); spontan über
+  Reichweite „Nur Auswahl" mit ausgewählten Köpfen. Kopf-, Geräte- und globale
+  Submaster multiplizieren sich wie gewohnt: Gerät auf 50 % und dessen Kopf 2
+  zusätzlich auf 50 % ergibt für diesen Kopf 25 %, für die anderen 50 %.
+
+  Angefasst werden nur Kanäle, die es **je Kopf wirklich gibt**: der eigene
+  Dimmer des Kopfes, sonst dessen eigene Farbkanäle — der häufige Fall eines
+  Geräts mit einem Master-Dimmer und vier RGB-Bänken wird also kopfweise über die
+  Farbe gedimmt. Ein von allen Köpfen **geteilter** Master-Dimmer bleibt bewusst
+  unangetastet: würde „Kopf 2" ihn herunterziehen, ginge das ganze Gerät dunkel.
+  Ebenso wenig angefasst werden **Zonen-Dimmer** — Profile wie `Frost FX Bar W`
+  (14 Pixel, aber nur zwei Dimmer für „alle weißen" und „alle farbigen") haben
+  Kanäle, die zwar mehrfach vorkommen, aber trotzdem keine Kopf-Kanäle sind; als
+  „je Kopf" zählt ein Kanaltyp nur, wenn er genau so oft vorkommt wie es Köpfe
+  gibt. Hat ein Gerät gar keine kopf-eigenen Helligkeits- oder Farbkanäle, tut
+  der Fader dort ehrlich nichts, statt ersatzweise das ganze Gerät zu dimmen.
+  Pan, Tilt und Gobo werden nie gedimmt.
+
+  **„Alle Köpfe" bleibt das ganze Gerät.** Deckt die Reichweite sämtliche Köpfe
+  ab — wie es die beim Patchen automatisch angelegte Gruppe „… · Köpfe" tut —,
+  arbeitet der Fader unverändert als Geräte-Submaster und dimmt weiterhin den
+  gemeinsamen Master-Dimmer. Ein bestehender Fader auf dieser Gruppe verhält sich
+  also exakt wie vorher. Kopf-Angaben, die es nach einem Kanal-Modus-Wechsel
+  nicht mehr gibt, werden verworfen (Rückfall auf „ganzes Gerät") statt den
+  falschen Kopf zu dimmen.
+
+  Ohne Kopf-Zellen verhält sich jeder bestehende Submaster **unverändert**; an
+  gespeicherten Shows ändert sich nichts.
+
 ### 2026-07-28 — Ein Gerät patchen fror die Oberfläche sekundenlang ein
 
 #### Behoben

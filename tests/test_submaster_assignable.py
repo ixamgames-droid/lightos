@@ -198,7 +198,10 @@ class TestVCSliderSubmasterApply(unittest.TestCase):
         s.mode = SliderMode.SUBMASTER
         s.programmer_scope = "group"
         s.programmer_group = "PARs"
-        with patch.object(VCSlider, "_group_fids", return_value=[1]):
+        # FM-HEADLAYOUT A4: der Submaster loest die Gruppe ueber die FEINEN Zellen
+        # auf (_group_cells), weil er Geraete UND Koepfe in EINER Abfrage braucht;
+        # base_fids_in_cells liefert daraus dieselben fids wie _group_fids.
+        with patch.object(VCSlider, "_group_cells", return_value=["1"]):
             s.value = 128
         om = self.state.output_manager
         self.assertEqual(om.effective_submaster(), 1.0)            # nicht global
