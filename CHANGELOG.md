@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Abstürze und Freezes aus deinen Sitzungen landen endlich im Backlog
+
+#### Hinzugefügt
+
+- **Neues Werkzeug `tools/collect_crash_report.py`.** LightOS schreibt seit jeher
+  jeden ungefangenen Fehler und jeden erkannten UI-Freeze nach
+  `%APPDATA%/LightOS/crash.log` — nur hat diese Datei nie jemand gelesen. Sie war
+  auf 1,3 MB gewachsen. Das Werkzeug liest sie entlang der Sitzungs-Marker,
+  fasst gleiche Fehler zu einer Signatur zusammen (mit Anzahl, Zeitraum und
+  betroffenen Sitzungen) und gibt einen fertigen Bug-Report aus.
+- **Die Sitzungs-Statuszeile meldet neue Signaturen**, sobald welche dazukommen —
+  eine Zahl, kein Textblock; den Report holt man sich bei Bedarf.
+
+#### Bemerkenswert am ersten Lauf gegen das echte Log
+
+Drei Dinge wären ohne Gegenprobe still falsch geblieben:
+
+- **Freeze-Stacks haben ein anderes Frame-Format als Tracebacks** (`line 12 in f`
+  statt `line 12, in f`). Wer nur eines kennt, verliert die halbe Auswertung,
+  ohne dass etwas fehlschlägt.
+- **Der eingefrorene Thread ist der namenlose.** Nimmt man einfach den ersten
+  passenden Eintrag, zeigt der Bericht auf den Wächter, der den Freeze *meldet* —
+  statt auf die Stelle, die ihn verursacht. Richtig zugeordnet zeigen deine
+  echten Freezes u. a. auf `live_view.paintEvent`, `enttec_pro.close` und
+  `output_manager.stop`.
+- **Die Testsuite schreibt in dasselbe Log** und wirft dort absichtlich Fehler.
+  Ungefiltert bestand der Bericht überwiegend aus diesen gewollten Fehlern;
+  sie bleiben jetzt draussen (`--include-tests` holt sie zurück).
+
 ### 2026-07-28 — Fixture-Gruppen: das Rastergrößen-Panel verdeckt keine Zelle mehr
 
 #### Behoben

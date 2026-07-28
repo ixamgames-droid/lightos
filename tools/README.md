@@ -51,6 +51,7 @@
 | `check_demo_show_full.py` | Prueft shows/Demo_Show_Full.lshow headless und rendert echte Bilder: |
 | `check_doc_images.py` | DOC-10 Anleitungs-/Bild-Audit: findet TOTE Bild-Links in der Doku. |
 | `check_doc_links.py` | QA-17 Doc-Link-Checker: findet TOTE relative Markdown-Querverweise. |
+| `collect_crash_report.py` | Crash-/Session-Log ernten und als Loop-Bug-Intake ausgeben (TOOLS-CRASHINTAKE). |
 | `crop_vc_widgets.py` | Cropper fuer die VC-Widget-Doku: schneidet aus EINEM Vollbild-Screenshot |
 | `gallery_server.py` | DOC-11 Galerie-Render-Server (Dev-/Doku-Werkzeug). |
 | `gen_capabilities.py` | Erzeugt den Agenten-Vertrag aus dem Code: docs/CAPABILITIES.md + |
