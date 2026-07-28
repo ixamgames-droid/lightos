@@ -23,6 +23,13 @@
 | 11 | [Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md) | Tempo aus der VC (QLC+-Stil): Master/Sub × Faktor, Grand-Master, mehrere Effekte je Regler. |
 | 12 | [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen (Bank/Wert), als Muster speichern, Werksmuster-Kacheln mit Foto, VC-Knopf + Tempo-Fader; Netzwerk-Laser: Zeichen-Studio + Sicherheit. |
 
+## Nachschlagen (nicht Teil des roten Fadens)
+
+| Anleitung | Worum geht's |
+|---|---|
+| [3D-Bühne bauen & Fixtures hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Trassen, Stützen, Plattform bauen und Geräte daran hängen. |
+| [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und welche Helligkeit der Visualizer daraus ableitet. |
+
 ## Schichten-Modell (so kombiniert die Show)
 
 Die Looks sind **getrennte Ebenen** über denselben Geräten und lassen sich frei kombinieren:

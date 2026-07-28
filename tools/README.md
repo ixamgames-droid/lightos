@@ -23,6 +23,7 @@
 | `build_dimmer_farbe_combo.py` | Dimmer + Farbe frei kombinieren — EINE VC-Bank fuer Davids 8 PAR (ZQ01424 RGBW). |
 | `build_event_demo_2026.py` | EVENT-DEMO 2026 — grosse, vollstaendige Demo-Show fuer ein Event. |
 | `build_farb_fx_vc_show.py` | FARB-/EFFEKT-VC-SHOW — 4-Seiten Virtual Console fuer Davids Rig. |
+| `build_farbprobe_3d.py` | Probe-Show „Farbprobe 3D" — Geraete OHNE RGB-Kanaele im 3D-Visualizer. |
 | `build_feature_showcase.py` | FEATURE-SHOWCASE — die "alles drin"-Test-/Demo-Show. |
 | `build_feature_test_show.py` | FEATURE-TEST-SHOW — spielt ALLE neuen Funktionen vom 2026-06-12 durch. |
 | `build_full_show.py` | Komplette Demo-Lightshow fuer 3 RGBW-PARs + APC mini mk2 (v4). |
