@@ -64,23 +64,42 @@ class VisualizerTarget:
         self.needs_full: bool = True
 
 
-def _build_fixture_payload(fixture, attrs: dict[str, int]) -> dict[str, object]:
+def _has_own_color(attrs: dict[str, int], suffix: str = "") -> bool:
+    """Traegt dieser Kopf/dieses Geraet eigene Farbkanaele? Entscheidet, ob die
+    Farbe aus den eigenen Werten kommt oder vom Geraet geerbt wird."""
+    return any(f"{k}{suffix}" in attrs
+               for k in ("color_r", "color_g", "color_b", "color_w"))
+
+
+def _build_fixture_payload(fixture, attrs: dict[str, int],
+                           channels=None) -> dict[str, object]:
     """Baut den Pro-Fixture-Payload (inkl. Spider-/Bar-``heads``-Array). Seit
     VIZ-13 3c-4 die EINZIGE Quelle dieser Logik — die frueher parallel gepflegte
     ``VisualizerBridge.push_dmx_update`` wurde entfernt. Der Service verpackt das
-    Ergebnis pro Tick als ein Batch-Array (``dmxBatch``) statt pro Fixture."""
-    r = attrs.get("color_r", 0)
-    g = attrs.get("color_g", 0)
-    b = attrs.get("color_b", 0)
-    w = attrs.get("color_w", 0)
-    intensity = attrs.get("intensity", 255)
+    Ergebnis pro Tick als ein Batch-Array (``dmxBatch``) statt pro Fixture.
+
+    ``channels`` (optional) sind die Kanal-Objekte des Geraets
+    (``get_channels_for_patched``). Sie werden NUR fuer Farbrad-Slots und die
+    Shutter-Semantik gebraucht (``ChannelRange.kind``); ohne sie bleibt die
+    Ableitung auf den reinen Attribut-Werten und faellt konservativ zurueck —
+    darum ist der Parameter optional (Alt-Aufrufer/Tests bleiben gueltig).
+
+    Farbe/Helligkeit kommen aus ``color_utils.visual_rgb``/``visual_intensity``
+    statt wie frueher aus ``attrs.get("color_r", 0)`` + ``attrs.get("intensity",
+    255)``: Geraete ohne RGB-Kanaele (Dimmer-PAR, Strobe/Blinder, CMY- und
+    Farbrad-Mover) wurden sonst SCHWARZ gerendert, Geraete ohne Dimmer-Kanal
+    dauerhaft voll hell."""
+    from src.core.color_utils import visual_intensity, visual_rgb
+
+    r, g, b = visual_rgb(attrs, channels)
+    intensity = visual_intensity(attrs, channels)
     pan = attrs.get("pan", 128)
     tilt = attrs.get("tilt", 128)
     payload: dict[str, object] = {
         "fid": fixture.fid,
-        "r": min(255, r + w),
-        "g": min(255, g + w),
-        "b": min(255, b + w),
+        "r": r,
+        "g": g,
+        "b": b,
         "intensity": intensity,
         "pan": pan,
         "tilt": tilt,
@@ -108,10 +127,18 @@ def _build_fixture_payload(fixture, attrs: dict[str, int]) -> dict[str, object]:
             hg = attrs.get(f"color_g{sfx}", 0)
             hb = attrs.get(f"color_b{sfx}", 0)
             hw = attrs.get(f"color_w{sfx}", 0)
+            if _has_own_color(attrs, sfx):
+                hrgb = (min(255, hr + hw), min(255, hg + hw), min(255, hb + hw))
+            else:
+                # Kopf ohne eigene Farbkanaele (Mover-Bar ohne Farbe, Kopf eines
+                # CMY-/Farbrad-Geraets) erbt die Geraetefarbe — sonst blieben
+                # seine Einzel-LEDs/Beams schwarz, waehrend das Geraet leuchtet.
+                hrgb = (r, g, b)
+                hr, hg, hb = hrgb
             heads.append({
-                "r": min(255, hr + hw),
-                "g": min(255, hg + hw),
-                "b": min(255, hb + hw),
+                "r": hrgb[0],
+                "g": hrgb[1],
+                "b": hrgb[2],
                 "cr": hr, "cg": hg, "cb": hb, "cw": hw,
                 "pan": attrs.get(f"pan{sfx}", pan),   # FM-2: pro-Kopf-Pan (Mover-Bar)
                 "tilt": tilt_sources[h],
@@ -256,7 +283,14 @@ class VisualizerService:
             if fixture.universe not in self._state.universes:
                 continue
             attrs = self._collect_attrs(fixture)
-            snapshot[fixture.fid] = _build_fixture_payload(fixture, attrs)
+            # Kanal-Objekte (gecached) mitgeben: nur so kennt die Payload-
+            # Ableitung Farbrad-Slots und Shutter-Semantik (ChannelRange.kind).
+            try:
+                from src.core.app_state import get_channels_for_patched
+                channels = get_channels_for_patched(fixture)
+            except Exception:
+                channels = None
+            snapshot[fixture.fid] = _build_fixture_payload(fixture, attrs, channels)
         return snapshot
 
     def _tick(self) -> None:

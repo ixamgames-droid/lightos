@@ -89,6 +89,45 @@ def test_single_head_color_unchanged(monkeypatch):
     assert intensity == 200
 
 
+def test_fixture_without_color_channels_is_white(monkeypatch):
+    """Reiner Dimmer-PAR (keine Farbkanaele): die 2D-Ansicht zeigte ihn schwarz,
+    weil ``color_r`` fehlt und mit 0 angenommen wurde. Er leuchtet weiss —
+    dieselbe Ableitung wie im 3D (``color_utils.visual_rgb``)."""
+    _app()
+    c = StageCanvas()
+    fx = SimpleNamespace(fid=3, universe=1, address=1,
+                         label="DIM-1", fixture_type="PAR")
+    channels = [_ch(1, "intensity")]
+    monkeypatch.setattr(live_view, "get_channels_for_patched", lambda _f: channels)
+    monkeypatch.setattr(c._state, "universes", {1: _FakeUniverse({1: 180})})
+
+    color, intensity = c._fixture_color_and_intensity(fx)
+    assert (color.red(), color.green(), color.blue()) == (255, 255, 255)
+    assert intensity == 180
+
+
+def test_strobe_without_dimmer_follows_shutter(monkeypatch):
+    """Xenon-Strobe ohne Dimmer-Kanal: frueher galt er als konstant voll hell.
+    Jetzt entscheidet der Shutter ueber die hinterlegte Range-Semantik."""
+    _app()
+    c = StageCanvas()
+    fx = SimpleNamespace(fid=4, universe=1, address=1,
+                         label="STR-1", fixture_type="Strobe")
+    shutter = SimpleNamespace(channel_number=1, attribute="shutter", ranges=[
+        SimpleNamespace(range_from=0, range_to=5, name="Blackout", kind="closed"),
+        SimpleNamespace(range_from=6, range_to=255, name="Blitzrate", kind="strobe"),
+    ])
+    monkeypatch.setattr(live_view, "get_channels_for_patched", lambda _f: [shutter])
+
+    monkeypatch.setattr(c._state, "universes", {1: _FakeUniverse({1: 0})})
+    assert c._fixture_color_and_intensity(fx)[1] == 0
+
+    monkeypatch.setattr(c._state, "universes", {1: _FakeUniverse({1: 200})})
+    color, intensity = c._fixture_color_and_intensity(fx)
+    assert intensity == 255
+    assert (color.red(), color.green(), color.blue()) == (255, 255, 255)
+
+
 # ── Winkel-Helper: eine Quelle fuer 2D & 3D ──────────────────────────────────
 
 def test_dmx_to_angle_deg_center_is_zero():

@@ -18,6 +18,7 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QDrag)
 from src.core.app_state import (
     get_state, get_channels_for_patched, viz_model_for)
+from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
@@ -1095,37 +1096,33 @@ class StageCanvas(QWidget):
     # ── Farbe / Intensität ────────────────────────────────────────────────────
 
     def _fixture_color_and_intensity(self, fixture) -> tuple[QColor, int]:
-        """Liest aktuelle DMX-Werte und gibt Farbe + Intensity zurueck."""
+        """Liest aktuelle DMX-Werte und gibt Farbe + Intensity zurueck.
+
+        Farbe/Helligkeit kommen aus derselben Quelle wie im 3D-Visualizer
+        (``color_utils.visual_rgb``/``visual_intensity``) — sonst driften 2D und
+        3D auseinander. Insbesondere: Geraete OHNE RGB-Kanaele (Strobe/Blinder,
+        Farbrad-Mover, reiner Dimmer-PAR) sind weiss statt schwarz, und Geraete
+        OHNE Dimmer-Kanal folgen dem Shutter statt konstant 255 zu sein.
+        """
         try:
             universe = self._state.universes.get(fixture.universe)
             if universe is None:
                 return QColor(60, 60, 60), 0
             channels = get_channels_for_patched(fixture)
-            r = g = b = w = 0
-            intensity = 255
             # Mehrkopf-Geraete (Spider) liefern mehrere color_r/g/b-Kanaele —
             # wie der 3D-Top-Down-Icon den ERSTEN Satz (Kopf 0) verwenden, sonst
             # weicht die 2D-Farbe von der 3D-Farbe ab (letzter-gewinnt = Bank 2).
-            seen: set[str] = set()
+            attrs: dict[str, int] = {}
             for ch in channels:
                 addr = fixture.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
                     continue
                 attr = ch.attribute
-                if attr in ("color_r", "color_g", "color_b", "color_w", "intensity") \
-                        and attr in seen:
-                    continue
-                val = universe.get_channel(addr)
-                if attr == "color_r": r = val; seen.add(attr)
-                elif attr == "color_g": g = val; seen.add(attr)
-                elif attr == "color_b": b = val; seen.add(attr)
-                elif attr == "color_w": w = val; seen.add(attr)
-                elif attr == "intensity": intensity = val; seen.add(attr)
-            # Weiss zu RGB
-            r = min(255, r + w)
-            g = min(255, g + w)
-            b = min(255, b + w)
-            return QColor(r, g, b), intensity
+                if attr in attrs:
+                    continue        # nur das ERSTE Vorkommen = Kopf 0
+                attrs[attr] = universe.get_channel(addr)
+            r, g, b = visual_rgb(attrs, channels)
+            return QColor(r, g, b), visual_intensity(attrs, channels)
         except Exception:
             return QColor(60, 60, 60), 0
 

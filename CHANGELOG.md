@@ -7,6 +7,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — 3D-Visualizer: Strobes, Blinder und Farbrad-Mover sind nicht mehr unsichtbar
+
+#### Behoben
+
+- **Geräte ohne RGB-Kanäle wurden im 3D-Visualizer schwarz gerendert — also gar
+  nicht.** Der Visualizer las die Farbe ausschliesslich aus `color_r/g/b` und
+  nahm 0 an, wenn es diese Kanäle nicht gibt. Betroffen waren unter anderem der
+  **Martin Atomic 3000** (Xenon-Strobe/Blinder, hat nur Shutter/Rate/Dauer), die
+  **Robe Pointe** und **MegaPointe** (Dimmer + Farbrad, kein RGB) und jeder reine
+  **Dimmer-PAR**: auf dem echten Rig blitzten sie, im 3D passierte nichts.
+  Die Farbe wird jetzt in dieser Reihenfolge bestimmt: RGB(W) → CMY (subtraktiv)
+  → Farbrad-Slot unter dem aktuellen DMX-Wert → Lampenfarbe Weiss. Geräte **mit**
+  RGB-Kanälen verhalten sich unverändert; eine bewusst auf 0 gesetzte RGB-Farbe
+  bleibt schwarz.
+- **Geräte ohne Dimmer-Kanal galten als dauerhaft voll aufgedreht.** Ein Xenon-
+  Strobe mit geschlossenem Shutter leuchtete im 3D weiter. Die Helligkeit kommt
+  jetzt vom echten Dimmer (`intensity`, `dimmer` oder `master`) und — nur bei
+  Geräten ganz ohne Dimmer — ersatzweise vom Shutter, ausgewertet über die
+  hinterlegte Kanal-Semantik (`zu` = dunkel).
+- **Köpfe ohne eigene Farbkanäle** (z. B. eine Mover-Bar ohne Farbe) erben jetzt
+  die Gerätefarbe, statt als schwarze Einzelstrahlen zu verschwinden.
+- **Die 2D-Bühnenansicht hatte denselben Fehler** und zieht ihre Farbe und
+  Helligkeit jetzt aus derselben Quelle wie der 3D-Visualizer — beide Ansichten
+  können damit nicht mehr auseinanderlaufen.
+
+#### Geändert
+
+- **Dunkel-Culling misst jetzt die tatsächliche Leuchtdichte** (A3D-25/A3D-28).
+  Bisher entschied allein der Dimmer, ob Lichtkegel, SpotLight und Bodenspot
+  sichtbar sind. Ein Gerät mit offenem Dimmer und Farbe 0/0/0 blieb dadurch ein
+  „sichtbares" Licht: three.js wertet es in jedem beleuchteten Pixel aus und es
+  belegt einen Schatten-Slot, obwohl es nichts abstrahlt — genau der Kostenblock,
+  den das Culling einsparen soll. Auf schwachen GPUs (Davids Surface) zählt das.
+- **Der Bodenlichtpunkt wird ab dem Kopf gerechnet, nicht ab dem Fuß des Geräts**
+  (A3D-26). Die Strahlrichtung kam schon aus dem Kopf, der Auftreffpunkt aber vom
+  Sockel — bei einem gekippten Moving Head oder Scanner lag der Bodenpool damit
+  sichtbar neben dem Lichtkegel, der am Kopf hängt.
+
 ### 2026-07-27 — Backlog-Hygiene: Status-Drift beseitigt, Datei halbiert, Queue ehrlich
 
 Reine Buchhaltung, kein Verhalten der App betroffen.
