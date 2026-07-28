@@ -153,7 +153,19 @@ class ChannelFader(QWidget):
 
     def set_tint(self, color: QColor | None):
         """SDK-01: faerbt den Fader nach Fixture (visuelle Gruppierung). None = neutral.
-        Scoped auf ChannelFader, damit Slider/Labels ihre eigenen Styles behalten."""
+        Scoped auf ChannelFader, damit Slider/Labels ihre eigenen Styles behalten.
+
+        **Frueh raus, wenn sich nichts aendert.** ``setStyleSheet`` ist in Qt teuer
+        (voller Style-Repolish des Widgets samt Kindern), und ``_apply_fixture_tints``
+        ruft das fuer ALLE 512 Fader auf — bei jeder Patch-Aenderung. Real gemessen
+        im Crash-Log: 11-12 s ohne Event-Loop beim Hinzufuegen EINES Geraets
+        (`add_fixture` -> Signal -> `_rebuild_overview` -> hier). Ohne diesen Guard
+        zahlt man den Repolish auch fuer die ~500 Fader, die schon neutral sind."""
+        if color is None:
+            if self._tint_color is None:
+                return
+        elif self._tint_color is not None and color == self._tint_color:
+            return
         self._tint_color = color
         if color is None:
             self.setStyleSheet("")
@@ -172,8 +184,12 @@ class ChannelFader(QWidget):
         QTimer.singleShot(450, lambda: self.set_tint(self._tint_color))
 
     def set_function_label(self, text: str):
-        """SD-01: setzt das Funktions-Kürzel unter dem Slider (leer = aus)."""
-        self._attr_text = text or ""
+        """SD-01: setzt das Funktions-Kürzel unter dem Slider (leer = aus).
+        Gleiche Begruendung wie ``set_tint``: laeuft in derselben 512er-Schleife."""
+        text = text or ""
+        if text == self._attr_text:
+            return
+        self._attr_text = text
         self._attr_lbl.setText(self._attr_text)
 
 
@@ -818,11 +834,20 @@ class SimpleDeskView(QWidget):
               "#db61a2", "#bc8cff"]
 
     def _apply_fixture_tints(self):
-        for f in self._faders:
-            f.set_tint(None)
-            f.set_function_label("")
-            f.setToolTip(f"CH {f.channel}")
+        """Faerbt die Fader nach Fixture (bzw. Funktion) ein.
+
+        **Erst den Zielzustand rechnen, dann NUR die Differenz setzen.** Frueher
+        lief das in zwei Schritten: alle 512 Fader auf neutral zuruecksetzen und
+        die gepatchten danach neu einfaerben. Fuer jeden gepatchten Kanal hiess
+        das zweimal ``setStyleSheet`` PRO AUFRUF — und der Aufruf haengt am
+        Patch-Signal. Real gemessen (crash.log 03.07. + 10.07.): 11-12 s ohne
+        Event-Loop beim Hinzufuegen EINES Geraets, weil `add_fixture` ueber
+        `_on_patch_changed` -> `_rebuild_overview` genau hier landet. Mit
+        Ziel-Diff plus den Idempotenz-Guards in ``set_tint``/
+        ``set_function_label`` kostet ein Aufruf ohne echte Aenderung nichts."""
         spans: list[tuple[int, int, QColor, str]] = []
+        # Zielzustand je Fader-Index: (Tint, Funktions-Kuerzel, Tooltip).
+        desired: dict[int, tuple[QColor | None, str, str]] = {}
         try:
             from src.core.app_state import get_state, get_channels_for_patched
             state = get_state()
@@ -847,22 +872,28 @@ class SimpleDeskView(QWidget):
                 for off in range(count):
                     ch = fx.address + off
                     if 1 <= ch <= 512:
-                        fader = self._faders[ch - 1]
                         attr = amap.get(off + 1, "")
                         cname = cmap.get(off + 1, "")
                         # SD-02: nach Funktion einfaerben, sonst nach Fixture gruppieren.
-                        fader.set_tint(QColor(channel_function_color(attr))
-                                       if by_function else color)
-                        # SD-01: pro-Kanal-Kürzel (voller Name bleibt im Tooltip).
-                        fader.set_function_label(channel_function_abbrev(attr, cname))
-                        fader.setToolTip(
-                            f"CH {ch} · {label}" + (f" · {cname}" if cname else ""))
+                        desired[ch - 1] = (
+                            QColor(channel_function_color(attr)) if by_function else color,
+                            # SD-01: pro-Kanal-Kuerzel (voller Name bleibt im Tooltip).
+                            channel_function_abbrev(attr, cname),
+                            f"CH {ch} · {label}" + (f" · {cname}" if cname else ""),
+                        )
                 # Header-Band-Eintrag (sichtbaren Bereich auf 1..512 begrenzen)
                 if 1 <= fx.address <= 512:
                     vis = min(count, 512 - fx.address + 1)
                     spans.append((fx.address, vis, color, label))
         except Exception as e:
             print(f"[simple_desk] tint error: {e}")
+
+        for i, f in enumerate(self._faders):
+            tint, fn_label, tip = desired.get(i, (None, "", f"CH {f.channel}"))
+            f.set_tint(tint)
+            f.set_function_label(fn_label)
+            if f.toolTip() != tip:
+                f.setToolTip(tip)
         self._band_spans = spans
         if hasattr(self, "_header_band"):
             self._header_band.set_spans(spans)
