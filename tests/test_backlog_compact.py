@@ -28,6 +28,11 @@ FIXTURE = """# Test-Backlog
 | FF-06 | P3 | done → Archiv | Schon frueher verdichtet (Details: BACKLOG_ARCHIVE.md) |
 | GG-07 | P2 | done ([PR #100](https://github.com/ixamgames-droid/lightos/pull/100)) | Unformatierter Titel ohne Bold am Anfang. **Fix:** spaeter Bold-Span darf nicht Titel werden. |
 | HH-08 | P3 | done ([Codex-Review](https://github.com/ixamgames-droid/lightos/pull/280)) | **Codex-Fund.** Details egal. |
+| II-09 | P2 | teils (Socket-Haelfte erledigt) | **Teil-erledigtes Item.** Rest offen, niemand dran. |
+| JJ-10 | P2 | ✅ Bild-Links done · Screenshots offen | **Halb erledigt, sagt aber done.** |
+| KK-11 | P3 | done (Labels bewusst offen gelassen) | **Echt done**, 'offen' nur als Prosa. |
+| LL-12 | P2 | ⏳ nicht reproduzierbar (Waechter gesetzt) | **Freitext-Status.** Faellt durch jeden Topf. |
+| MM-13b | P1 | todo | **Unterpunkt eines Items** (Kleinbuchstaben-Suffix wie LAS-18b). |
 """.replace("\n", "\n")
 
 
@@ -40,7 +45,29 @@ class ParseTest(unittest.TestCase):
         rows = bc.parse_rows(_lines())
         self.assertEqual([r.id for r in rows],
                          ["AA-01", "BB-02", "CC-03", "DD-04", "EE-05", "FF-06",
-                          "GG-07", "HH-08"])
+                          "GG-07", "HH-08", "II-09", "JJ-10",
+                          "KK-11", "LL-12", "MM-13b"])
+
+    def test_sub_item_ids_with_lowercase_suffix_are_parsed(self):
+        """Unterpunkte (`LAS-18b`, `CDX-22b`, `STAB-19a`, …) fielen durch das
+        ID-Muster und existierten fuer Verdichtung, Queue, Stats und Lint gar
+        nicht — real waren 2026-07-28 neun Zeilen so unsichtbar, darunter ein
+        offenes `todo`."""
+        rows = {r.id: r for r in bc.parse_rows(_lines())}
+        self.assertIn("MM-13b", rows)
+        self.assertEqual(rows["MM-13b"].active_kind(), "todo")
+        self.assertIn("MM-13b", bc.cmd_queue(_lines(), 10))
+
+    def test_unclassified_status_is_listed_instead_of_vanishing(self):
+        """Freitext-Status ohne Legenden-Vokabel: weder done noch in einem Topf.
+        Ohne eigenen Block ist so eine Zeile in JEDER Ansicht unsichtbar (real:
+        VIZ-05 '✅ verifiziert → 🎨 Design', UXT-02 '⏳ nicht reproduzierbar')."""
+        rows = {r.id: r for r in bc.parse_rows(_lines())}
+        self.assertIsNone(rows["LL-12"].active_kind())
+        self.assertFalse(rows["LL-12"].is_done)
+        queue = bc.cmd_queue(_lines(), 10)
+        self.assertIn("Ohne erkannten Status", queue)
+        self.assertIn("LL-12", queue)
 
     def test_done_detection_respects_decorated_wip(self):
         rows = {r.id: r for r in bc.parse_rows(_lines())}
@@ -63,22 +90,34 @@ class QueueTest(unittest.TestCase):
         self.assertIn("CC-03", out)
         self.assertNotIn("AA-01  [P2]", out)
 
+    def test_partial_items_get_their_own_block(self):
+        """'teils' ist weder done noch in Arbeit — ohne eigenen Block unsichtbar."""
+        out = bc.cmd_queue(_lines(), 10)
+        self.assertIn("II-09", out, "teils-Item darf nicht aus der Queue fallen")
+        head, _, tail = out.partition("# Teil-erledigt")
+        self.assertTrue(tail, "eigener Block fuer teils-Items fehlt")
+        self.assertIn("II-09", tail)
+        self.assertNotIn("II-09", head, "teils gehoert nicht in die todo-/wip-Liste")
+
 
 class StatsTest(unittest.TestCase):
     def test_stats_counts(self):
         out = bc.cmd_stats(_lines())
-        self.assertIn("todo=2", out)
+        self.assertIn("todo=3", out, "AA-01, CC-03 und der Unterpunkt MM-13b")
         self.assertIn("wip=1", out)
         self.assertIn("review=1", out,
                       "[Codex-Review]-Linktext in HH-08 darf NICHT als review zaehlen")
-        self.assertIn("done=4", out)
+        self.assertIn("done=5", out,
+                      "JJ-10 sagt done UND offen -> zaehlt als teils, nicht als done")
+        self.assertIn("teils=2", out, "II-09 (teils) + JJ-10 (gemischter Status)")
 
 
 class ArchiveTest(unittest.TestCase):
     def test_archive_split_moves_only_pure_done(self):
         new_lines, done = bc.archive_split(_lines())
-        self.assertEqual({r.id for r in done}, {"BB-02", "GG-07", "HH-08"},
-                         "FF-06 ist schon verdichtet und darf nicht erneut wandern")
+        self.assertEqual({r.id for r in done}, {"BB-02", "GG-07", "HH-08", "KK-11"},
+                         "FF-06 ist schon verdichtet und darf nicht erneut wandern; "
+                         "JJ-10 meldet im Status-Kopf offene Arbeit und bleibt")
         text = "".join(new_lines)
         self.assertIn("AA-01", text)
         self.assertIn("Sehr langer Detailtext", "".join(_lines()))
@@ -96,6 +135,60 @@ class ArchiveTest(unittest.TestCase):
             status = m.group(3).strip().lower()
             self.assertTrue(any(kw in status for kw in STATUS_KEYWORDS),
                             f"Kurzzeile faellt durch QA-18-Lint: {line!r}")
+
+    def test_mixed_status_row_is_not_archived_but_bucketed_as_teils(self):
+        """DOC-10-Klasse: 'done' UND offene Arbeit im selben Status-Kopf.
+
+        Real passiert 2026-07-28: `✅ Bild-Links done · Screenshots offen` wanderte
+        samt offenem Rest ins Archiv und war aus jeder Ansicht weg. Solche Zeilen
+        werden jetzt gar nicht mehr archiviert, sondern landen im 'teils'-Topf —
+        sichtbar in --queue, statt still zu verschwinden.
+        """
+        rows = {r.id: r for r in bc.parse_rows(_lines())}
+        self.assertFalse(rows["JJ-10"].is_done)
+        self.assertEqual(rows["JJ-10"].active_kind(), "teils")
+        queue = bc.cmd_queue(_lines(), 10)
+        self.assertIn("JJ-10", queue, "gemischter Status muss in der Queue auftauchen")
+
+    def test_open_word_in_comment_only_warns(self):
+        """Zweite Linie: 'offen' NUR im Kommentar hinter der Klammer ist meist
+        Prosa (`done (Labels bewusst offen gelassen)`) — die Zeile wird normal
+        archiviert, aber im Report zum Nachsehen markiert."""
+        rows = bc.parse_rows(_lines())
+        flagged = {r.id for r in bc.mixed_status_rows(rows)}
+        self.assertIn("KK-11", flagged)
+        self.assertNotIn("JJ-10", flagged, "JJ-10 wird gar nicht erst archiviert")
+        report = bc.cmd_archive(_lines(), apply=False)
+        self.assertIn("PRUEFEN", report)
+        self.assertIn("KK-11", report)
+
+    def test_short_title_never_cuts_inside_a_link(self):
+        """Kurztitel duerfen keine angeschnittene URL enthalten — genau das
+        produzierte der erste Verdichtungslauf 21-mal in BACKLOG.md."""
+        long_title = ("**" + "Sehr langer Titel " * 6
+                      + "[PR #999](https://github.com/ixamgames-droid/lightos/pull/999)**")
+        row = bc.Row(lineno=0, id="ZZ-99", prio="P3", status="done",
+                     line=f"| ZZ-99 | P3 | done | {long_title} |\n")
+        short = row.short_title(90)
+        self.assertLessEqual(len(short), 90)
+        self.assertNotIn("http", short, "keine (halbe) URL im Kurztitel")
+        self.assertNotIn("](", short)
+
+    def test_singular_teil_lands_in_the_same_bucket(self):
+        """`teil` (Singular) war in active_kind nicht gelistet — die Zeile war in
+        JEDER Ansicht unsichtbar (real: OUT-06)."""
+        row = bc.Row(lineno=0, id="YY-98", prio="P2", status="🔶 teil (Rest folgt)",
+                     line="| YY-98 | P2 | 🔶 teil (Rest folgt) | **Halbes Ding.** |\n")
+        self.assertEqual(row.active_kind(), "teils")
+
+    def test_quoted_status_word_in_comment_does_not_reclassify(self):
+        """Ein zitiertes Status-Wort im Kommentar darf eine fertige Zeile nicht
+        als offen ausweisen (real: A3D-17 stand als 'teils' in der Queue)."""
+        status = 'done (stand frueher auf „teils“, nichts mehr offen)'
+        row = bc.Row(lineno=0, id="XX-97", prio="P3", status=status,
+                     line=f"| XX-97 | P3 | {status} | **Fertig.** |\n")
+        self.assertIsNone(row.active_kind())
+        self.assertTrue(row.is_done)
 
     def test_archive_is_idempotent(self):
         new_lines, _ = bc.archive_split(_lines())

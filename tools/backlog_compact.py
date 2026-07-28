@@ -6,7 +6,8 @@ Stueck zu laden. Dieses Werkzeug macht die Datei wieder loop-tauglich:
   --queue [N]    Die naechsten N offenen Items (todo zuerst, P1 < P2 < P3) als
                  kompakte Liste auf stdout — Ersatz fuer das Voll-Read in
                  /lightos-loop Schritt 1. wip/review-Items werden separat
-                 gelistet (laufende Arbeit sichtbar, aber nicht doppelt nehmen).
+                 gelistet (laufende Arbeit sichtbar, aber nicht doppelt nehmen),
+                 teils-Items in einem dritten Block (Rest offen, niemand dran).
   --stats        Zaehler je Status/Prio + Dateigroesse + Archivierungs-Potenzial.
   --archive      Verdichtet erledigte Tabellenzeilen gemaess der Konvention in
                  BACKLOG.md ("Ein done-Eintrag wird beim naechsten Beruehren in
@@ -33,7 +34,11 @@ BACKLOG = os.path.join(_ROOT, "BACKLOG.md")
 ARCHIVE = os.path.join(_ROOT, "BACKLOG_ARCHIVE.md")
 
 # Identisch zur QA-18-Lint-Konvention (tests/test_backlog_lint.py).
-ROW = re.compile(r"^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|")
+# Optionaler Kleinbuchstabe am Ende: die Konvention "Unterpunkt eines Items"
+# (LAS-18b, CDX-22b, STAB-19a, A3D-17b …) ist etabliert, war aber vom Muster
+# nicht erfasst — solche Zeilen existierten fuer Verdichtung, Queue, Stats und
+# Lint schlicht NICHT (2026-07-28 waren real 9 Stueck unsichtbar).
+ROW = re.compile(r"^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+[a-z]?)\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|")
 PRIO_ORDER = {"P1": 0, "P2": 1, "P3": 2}
 # Bold-Titel NUR am Zellenanfang: ein spaeterer '**Fix:**'-Span im Fliesstext
 # darf nie zum Titel-Stub werden (Review-Fund 2026-07-19).
@@ -45,18 +50,49 @@ PR_LINK = re.compile(r"\[[^\]]*\]\(https://github\.com/[\w.-]+/[\w.-]+/(?:pull|i
 # Ein Status gilt als "nur noch Historie", wenn er 'done' enthaelt und KEIN
 # aktives Keyword mehr — dekorierte Staten wie "wip (3/8 done)" bleiben aktiv.
 _ACTIVE_KEYWORDS = ("todo", "wip", "review", "blocked", "decision", "teils", "teil")
+# Woerter, die offene Restarbeit MELDEN. Ein Status wie
+# "✅ Bild-Links done · Screenshots offen" ist damit NICHT erledigt, sondern
+# teil-erledigt (Review-Fund 2026-07-28: genau so verschwand DOC-10s Teil b
+# still ins Archiv, weil nur nach 'done' gesucht wurde).
+_OPEN_MARKERS = ("offen", "ausstehend")
+# Verneinungen unmittelbar vor einem Offen-Marker heben ihn auf ("nichts mehr
+# offen" meldet keine Restarbeit).
+_NEGATIONS = ("nichts", "nicht", "kein", "keine", "keinerlei")
 # Markdown-Links VOR der Keyword-Erkennung strippen: ein Linktext wie
 # "[Codex-Review](...)" in der Status-Zelle ist Dekoration, kein Status —
 # sonst zaehlt eine done-Zeile faelschlich als 'review' (Review-Fund 2026-07-19).
 _MD_LINK = re.compile(r"\[[^\]]*\]\([^)]*\)")
+# [Text](url) -> Text. Fuer Kurztitel: die URL faellt weg, statt beim Kuerzen
+# mitten in der Adresse abgeschnitten zu werden (Review-Fund 2026-07-28).
+_MD_LINK_TEXT = re.compile(r"\[([^\]]*)\]\([^)]*\)")
 
 
 def _status_text(status: str) -> str:
     return _MD_LINK.sub(" ", status).lower()
 
 
+def _status_head(status_low: str) -> str:
+    """Der eigentliche Status = alles VOR der ersten Klammer.
+
+    Der Rest ist Kommentar und darf die Einordnung nicht steuern: sonst gilt ein
+    ``✅ done (… stand frueher auf „teils" …)`` als teil-erledigt, nur weil das
+    Wort irgendwo im Fliesstext zitiert wird (Review-Fund 2026-07-28).
+    """
+    return status_low.split("(")[0]
+
+
 def _has_word(text: str, word: str) -> bool:
     return re.search(rf"\b{re.escape(word)}\b", text) is not None
+
+
+def _reports_open_work(text: str) -> bool:
+    """Meldet der Text offene Restarbeit? Verneinte Marker zaehlen nicht."""
+    for marker in _OPEN_MARKERS:
+        for m in re.finditer(rf"\b{re.escape(marker)}\b", text):
+            before = text[max(0, m.start() - 24):m.start()]
+            if not any(_has_word(before, n) for n in _NEGATIONS):
+                return True
+    return False
 
 
 @dataclass
@@ -73,9 +109,28 @@ class Row:
         return _status_text(self.status)
 
     @property
+    def status_head(self) -> str:
+        """Der eigentliche Status (alles vor der ersten Klammer)."""
+        return _status_head(self.status_low)
+
+    @property
     def is_done(self) -> bool:
-        low = self.status_low
-        return _has_word(low, "done") and not any(_has_word(low, k) for k in _ACTIVE_KEYWORDS)
+        """Nur reine Historie.
+
+        Entschieden wird — wie bei ``active_kind`` — auf dem Status-KOPF: er
+        traegt 'done', kein aktives Keyword und keine gemeldete Restarbeit. Der
+        Kommentar hinter der Klammer zaehlt bewusst NICHT mit, sonst waere eine
+        Zeile wie ``done (stand frueher auf „teils", nichts mehr offen)`` weder
+        erledigt noch in einem Topf — also unsichtbar (genau die Fehlerklasse,
+        die dieses Werkzeug beseitigen soll). Als Gegengewicht meldet
+        ``mixed_status_rows`` alles, was im Kommentar nach offener Arbeit klingt.
+        """
+        head = self.status_head
+        if not _has_word(head, "done"):
+            return False
+        if any(_has_word(head, k) for k in _ACTIVE_KEYWORDS):
+            return False
+        return not _reports_open_work(head)
 
     @property
     def is_condensed(self) -> bool:
@@ -83,21 +138,46 @@ class Row:
         return "archiv" in self.status_low
 
     def active_kind(self) -> str | None:
-        """'todo' | 'wip' | 'review' | 'blocked' | 'decision' | None."""
-        low = self.status_low
-        for kind in ("todo", "wip", "review", "blocked", "decision"):
-            if _has_word(low, kind):
-                return kind
+        """'todo' | 'wip' | 'review' | 'blocked' | 'decision' | 'teils' | None.
+
+        'teils' zaehlt bewusst mit: solche Items sind WEDER done NOCH in Arbeit —
+        ohne eigenen Topf fielen sie aus jeder Ansicht heraus und blieben liegen
+        (2026-07-27 waren real 6 Stueck unsichtbar).
+
+        Entschieden wird auf dem Status-KOPF (vor der ersten Klammer), sonst
+        stuft ein zitiertes Wort im Kommentar eine fertige Zeile falsch ein.
+        Die Singularform 'teil' faellt in denselben Topf wie 'teils' — sonst ist
+        genau die Zeile unsichtbar, die der Topf sichtbar machen soll.
+        """
+        head = self.status_head
+        for kind in ("todo", "wip", "review", "blocked", "decision", "teils", "teil"):
+            if _has_word(head, kind):
+                return "teils" if kind == "teil" else kind
+        # Gemischter Status ("… done · … offen") = teil-erledigt.
+        if _has_word(head, "done") and _reports_open_work(head):
+            return "teils"
         return None
 
     def short_title(self, maxlen: int = 110) -> str:
         # Titel-Zelle = 4. Spalte; Bold-Anfang bevorzugen, sonst Zellen-Anfang.
         cells = self.line.split("|")
         title_cell = cells[4].strip() if len(cells) > 4 else ""
+        # Markdown-Links auf ihren Text reduzieren: der Kurztitel soll keine URL
+        # tragen (die kanonische PR-Adresse haengt archive_split separat an), und
+        # eine mitgeschnittene URL waere ein toter Link in BACKLOG.md.
+        title_cell = _MD_LINK_TEXT.sub(r"\1", title_cell)
         m = BOLD_TITLE.search(title_cell)
         text = m.group(1) if m else title_cell
         text = re.sub(r"\s+", " ", text).strip()
-        return text[: maxlen - 1] + "…" if len(text) > maxlen else text
+        if len(text) <= maxlen:
+            return text
+        # An der letzten Wortgrenze kuerzen, damit nie mitten in einem Token
+        # (z. B. einer nackten URL) abgeschnitten wird.
+        cut = text[: maxlen - 1]
+        space = cut.rfind(" ")
+        if space >= maxlen // 2:
+            cut = cut[:space]
+        return cut.rstrip(" ,;:-") + "…"
 
     def first_pr_link(self) -> str:
         m = PR_LINK.search(self.line)
@@ -127,6 +207,8 @@ def cmd_queue(lines: list[str], n: int) -> str:
     todo = [r for r in rows if r.active_kind() == "todo"]
     todo.sort(key=lambda r: (PRIO_ORDER.get(r.prio, 9), r.lineno))
     running = [r for r in rows if r.active_kind() in ("wip", "review")]
+    partial = [r for r in rows if r.active_kind() == "teils"]
+    partial.sort(key=lambda r: (PRIO_ORDER.get(r.prio, 9), r.lineno))
     out = [f"# Naechste ausfuehrbare Items (todo, P1<P2<P3) — {min(n, len(todo))}/{len(todo)}:"]
     for r in todo[:n]:
         out.append(f"  {r.id}  [{r.prio}]  {r.short_title()}")
@@ -134,6 +216,21 @@ def cmd_queue(lines: list[str], n: int) -> str:
         out.append(f"# In Arbeit / Review ({len(running)}) — nicht doppelt nehmen:")
         for r in running:
             out.append(f"  {r.id}  [{r.prio}]  ({r.active_kind()})  {r.short_title(80)}")
+    if partial:
+        out.append(f"# Teil-erledigt, Rest offen ({len(partial)}) — niemand dran, "
+                   f"vor dem Aufgreifen pruefen was schon steht:")
+        for r in partial:
+            out.append(f"  {r.id}  [{r.prio}]  {r.short_title(80)}")
+    # Freitext-Staten ("✅ verifiziert → 🎨 Design", "⏳ nicht reproduzierbar"):
+    # weder done noch in einem Topf. Ohne eigenen Block sind sie in JEDER Ansicht
+    # unsichtbar — dieselbe Fehlerklasse wie die frueher fehlenden teils-Items.
+    unclassified = [r for r in rows
+                    if r.active_kind() is None and not _has_word(r.status_low, "done")]
+    if unclassified:
+        out.append(f"# Ohne erkannten Status ({len(unclassified)}) — Status auf eine "
+                   f"der Legenden-Vokabeln ziehen, sonst faellt das Item durch:")
+        for r in unclassified:
+            out.append(f"  {r.id}  [{r.prio}]  ({r.status.strip()})  {r.short_title(70)}")
     return "\n".join(out)
 
 
@@ -154,6 +251,29 @@ def cmd_stats(lines: list[str]) -> str:
         f"Archivierbar (reine done-Zeilen): {archivable}  -> tools/backlog_compact.py --archive [--apply]",
     ]
     return "\n".join(out)
+
+
+def mixed_status_rows(rows: list[Row]) -> list[Row]:
+    """done-Zeilen, deren KOMMENTAR noch offene Arbeit nennt (Pruef-Kandidaten).
+
+    Zweite Verteidigungslinie: ``is_done`` haelt Zeilen zurueck, deren
+    Status-KOPF offene Arbeit meldet (``✅ … done · … offen``) — die wandern gar
+    nicht mehr ins Archiv. Was hier uebrig bleibt, sind Zeilen, die im Kommentar
+    hinter der Klammer ein 'offen' tragen (``done (Labels bewusst offen
+    gelassen)``). Das ist meistens blosse Prosa, kann aber echte Restarbeit sein
+    — deshalb eine WARNUNG statt stiller Umklassifizierung: das entscheidet ein
+    Mensch.
+    """
+    out: list[Row] = []
+    for r in rows:
+        if not r.is_done or r.is_condensed:
+            continue
+        head_len = len(r.status_head)
+        comment = r.status_low[head_len:]
+        if _reports_open_work(comment) or any(_has_word(comment, k)
+                                              for k in _ACTIVE_KEYWORDS):
+            out.append(r)
+    return out
 
 
 def archive_split(lines: list[str]) -> tuple[list[str], list[Row]]:
@@ -186,6 +306,12 @@ def cmd_archive(lines: list[str], apply: bool) -> str:
               f"{len(done)} done-Zeilen -> BACKLOG_ARCHIVE.md"]
     for r in done:
         report.append(f"  {r.id}  [{r.prio}]  {r.short_title(80)}")
+    mixed = mixed_status_rows(done)
+    if mixed:
+        report.append(f"!! PRUEFEN ({len(mixed)}): Status sagt done UND nennt offene Arbeit — "
+                      f"wandert sonst mitsamt Rest ins Archiv. Echter Mischfall -> 'teils':")
+        for r in mixed:
+            report.append(f"   {r.id}  [{r.prio}]  {re.sub(r'  +', ' ', r.status)[:100]}")
     if apply:
         stamp = _dt.date.today().isoformat()
         header_needed = not os.path.exists(ARCHIVE)
