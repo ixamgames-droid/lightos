@@ -40,49 +40,14 @@ def _split_cell(v):
 # gehoert. Davids Anforderung: "eine schoene UI, die klar anzeigt, welche Zellen
 # zu welchem Fixture/Kopf gehoeren".
 #
-# Bewusst dunkle, kraeftige Basistoene (dunkles UI, weisse Schrift muss lesbar
-# bleiben) mit deutlich unterschiedlichem Farbton — nicht nur Helligkeit, damit
-# sie auch bei Rot-Gruen-Schwaeche unterscheidbar bleiben.
-_FIXTURE_CELL_COLORS = (
-    "#0978FF",   # Blau (bisheriger Standardton -> Ein-Geraet-Gruppen sehen aus wie vorher)
-    "#22a06b",   # Gruen
-    "#c2410c",   # Orange-Rot
-    "#7c3aed",   # Violett
-    "#0e7490",   # Petrol
-    "#a16207",   # Ocker
-    "#be185d",   # Magenta
-    "#4d7c0f",   # Oliv
+# Palette + Farbfunktion liegen seit dem Matrix-Nachzug in src/ui/head_cell_colors
+# (EINE Quelle fuer Gruppen-Editor UND Matrix-Vorschau — zwei Paletten waeren die
+# klassische Drift-Stelle). Hier nur re-exportiert, damit der eingefuehrte Name
+# (und die Slice-4-Tests) unveraendert bleiben.
+from src.ui.head_cell_colors import (           # noqa: E402  (bewusst nach den Qt-Importen)
+    FIXTURE_CELL_COLORS as _FIXTURE_CELL_COLORS,
+    fixture_cell_color,
 )
-
-
-def fixture_cell_color(fid, head, fid_order) -> QColor:
-    """Zellfarbe fuer ``fid``/``head``: **Farbton je Geraet, Helligkeit je Kopf.**
-
-    * ``fid_order`` = Basis-fids in Raster-Reihenfolge (``base_fids_in_grid_order``).
-      Der Farb-Index ist die POSITION darin, nicht der fid selbst — so bekommen
-      die Geraete EINER Gruppe garantiert unterschiedliche Toene (genau der Zweck),
-      statt dass z. B. fid 1 und fid 9 bei ``fid % 8`` denselben Ton erwischen.
-    * Koepfe desselben Geraets teilen den Farbton und werden nur **aufgehellt**
-      (K1 dunkel -> Kn heller) — dadurch ist die Kopf-REIHENFOLGE ablesbar und die
-      Zugehoerigkeit bleibt trotzdem sofort sichtbar.
-    * Ein Geraet ohne Kopf-Zelle (ganzes Fixture) behaelt den Basiston; eine
-      Ein-Geraet-Gruppe sieht damit aus wie vor Slice 4 (kein Bruch mit Gewohnheit).
-
-    Reine Funktion (nur Qt-Farbe, kein Widget-Zustand) -> headless testbar."""
-    try:
-        idx = list(fid_order).index(fid)
-    except (ValueError, TypeError):
-        idx = 0
-    base = QColor(_FIXTURE_CELL_COLORS[idx % len(_FIXTURE_CELL_COLORS)])
-    if head is None:
-        return base
-    # Helligkeits-Rampe je Kopf: HSL-Lightness in kleinen Schritten anheben,
-    # geklemmt, damit weisse Schrift lesbar bleibt (max. ~62 % Lightness).
-    h, s, light, a = base.getHsl()
-    light = min(int(light + 26 * max(0, int(head))), 158)
-    out = QColor()
-    out.setHsl(h, s, light, a)
-    return out
 
 
 class _FloatingGridPanel(QFrame):

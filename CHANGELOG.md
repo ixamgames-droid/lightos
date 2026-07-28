@@ -7,6 +7,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Matrix-Vorschau zeigt auf Wunsch, welche Zelle zu welchem Gerät/Kopf gehört
+
+#### Neu
+
+- **Neuer Schalter „Zuordnung zeigen" unter der Matrix-Vorschau.** Bei einer
+  Matrix über mehrere Geräte — erst recht über einzelne Köpfe — war nicht zu
+  erkennen, welcher Vorschau-Pixel zu welchem Gerät gehört. Der Schalter legt
+  einen dünnen Rahmen je Zelle darüber: **Farbton = Gerät, Helligkeit = Kopf**,
+  exakt dieselben Farben wie im Fixture-Gruppen-Editor, dazu die Legende
+  „Farbe → Gerät" und bei Kopf-Zellen die Kopfnummer (nur wenn die Zelle groß
+  genug ist, damit aus einer 32×32-Matrix kein Textmatsch wird).
+
+  Die **Effektfarben bleiben sichtbar** — der Rahmen liegt nur obendrauf. Das
+  ist Absicht: die Vorschau zeigt, was der Effekt macht, und das darf ihr nichts
+  nehmen. Der Schalter ist standardmäßig **aus**, die Vorschau sieht also
+  unverändert aus, bis du ihn einschaltest.
+
+- **Beim Überfahren einer Zelle** steht jetzt in der Sprechblase, welches Gerät
+  und welcher Kopf dort sitzt (bzw. „Lücke") — unabhängig vom Schalter.
+
+- **Hinweis bei widersprüchlicher Einstellung:** Steht ein Gerät im Patch-Dialog
+  auf „als eine Lampe", wird aber im Raster in einzelne Kopf-Zellen zerlegt,
+  sagt das die Matrix-Ansicht jetzt als sichtbaren Text — statt es stillschweigend
+  zu übergehen. Aufgelöst wird der Widerspruch bewusst **nicht** automatisch: das
+  Raster hast du von Hand gebaut, das Zusammenlegen würde dein Layout zerstören.
+
+#### Intern
+
+- Palette und Zellfarb-Funktion liegen jetzt in `src/ui/head_cell_colors.py` —
+  eine Quelle für Gruppen-Editor **und** Matrix-Vorschau statt zweier Kopien,
+  die auseinanderlaufen können.
+
 ### 2026-07-28 — Submaster pro Kopf: einzelne Köpfe eines Mehrkopf-Geräts dimmen
 
 #### Neu
