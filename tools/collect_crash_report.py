@@ -145,7 +145,12 @@ def parse_log(text: str, include_tests: bool = False) -> list[Finding]:
             continue
         i += 1
     out = list(findings.values())
-    out.sort(key=lambda f: (-f.count, f.signature))
+    # NEUESTE zuerst. Die Haeufigkeit ist der falsche Kompass: ein Fehler, der
+    # vor einem Monat 159x auftrat und seither nie wieder, ist erledigt — ein
+    # einzelner von gestern ist es nicht (real erlebt 2026-07-28: nach Anzahl
+    # sortiert stand ganz oben ein toter Testlauf-Absturz, waehrend der einzige
+    # noch lebende Fehler untergegangen waere).
+    out.sort(key=lambda f: (f.last_ts, f.count), reverse=True)
     return out
 
 
@@ -269,6 +274,13 @@ def save_seen(signatures, path: str | None = None) -> None:
     os.replace(tmp, p)
 
 
+def _cold_before(days: int = 30) -> str:
+    """Ab wann gilt eine Signatur als kalt? Rein textueller ISO-Vergleich —
+    kein Zeitzonen-Zauber noetig, die Marker sind lokale ISO-Zeitstempel."""
+    import datetime as _d
+    return (_d.date.today() - _d.timedelta(days=days)).isoformat()
+
+
 def format_report(findings: list[Finding], seen: set) -> str:
     if not findings:
         return "Keine Abstürze oder UI-Freezes im Log."
@@ -290,7 +302,8 @@ def format_report(findings: list[Finding], seen: set) -> str:
         out.append(f"- **Stelle im Code:** `{f.top_src_frame}`")
         if f.deepest_frame and f.deepest_frame != f.top_src_frame:
             out.append(f"- **Unterster Frame:** `{f.deepest_frame}`")
-        out.append(f"- **Zeitraum:** {f.first_ts or '?'} … {f.last_ts or '?'}")
+        out.append(f"- **Zeitraum:** {f.first_ts or '?'} … **zuletzt {f.last_ts or '?'}**"
+                   + ("" if f.last_ts >= _cold_before() else "  ❄ seither nicht mehr"))
         out.append("")
         out.append("<details><summary>Auszug</summary>")
         out.append("")
@@ -318,6 +331,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="maschinenlesbare Ausgabe")
     ap.add_argument("--include-tests", action="store_true",
                     help="auch Fehler aus der Testsuite melden (Default: aus)")
+    ap.add_argument("--since", metavar="JJJJ-MM-TT", default=None,
+                    help="nur Signaturen, die seit diesem Datum zuletzt auftraten "
+                         "— die eigentliche Triage-Frage lautet 'was passiert NOCH?'")
     args = ap.parse_args(argv)
 
     path = args.log or default_log_path()
@@ -332,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
             text = P_STARTED + P_STARTED.join(parts[-args.sessions:])
 
     findings = parse_log(text, include_tests=args.include_tests)
+    if args.since:
+        findings = [f for f in findings if f.last_ts >= args.since]
     seen = load_seen()
     neu = [f for f in findings if f.signature not in seen]
 

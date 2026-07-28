@@ -407,3 +407,55 @@ def test_save_palette_records_selection(monkeypatch):
     finally:
         if saved is not None:
             manager.remove(saved)
+
+
+# ---------------------------------------------------------------------------
+# Scharfschalten: der Button muss den Zustand WIRKLICH weiterreichen
+# ---------------------------------------------------------------------------
+
+def test_arm_button_forwards_its_state_to_the_output_manager(monkeypatch):
+    """Der Scharfschalt-Button war über ``weak_slot`` verbunden — das VERWIRFT
+    die Signal-Argumente per Vertrag, während ``_on_arm_toggled(checked)`` genau
+    dieses Argument verlangt. Jeder Druck warf damit TypeError, bevor
+    ``set_armed()`` erreicht wurde: der Slot lief nie.
+
+    Gefunden hat das nicht das Crash-Log (David hat keine Laser-Hardware, der
+    Knopf wird kaum gedrückt), sondern der Aritäts-Scan über alle
+    ``weak_slot``-Verwendungen — dieselbe Fehlerklasse wie der real abgestürzte
+    ``_on_figure_changed``.
+    """
+    _app()
+    view, _state = _make_view(monkeypatch, [])
+
+    class _FakeOutput:
+        def __init__(self):
+            self.armed = []
+
+        def set_armed(self, v):
+            self.armed.append(bool(v))
+
+    lo = _FakeOutput()
+    monkeypatch.setattr(view, "_laser_output", lambda: lo)
+
+    view._btn_arm.setChecked(True)
+    assert lo.armed == [True], "Scharfschalten erreicht set_armed(True) nicht"
+
+    view._btn_arm.setChecked(False)
+    assert lo.armed == [True, False], "Entschärfen erreicht set_armed(False) nicht"
+
+
+def test_figure_combo_change_reaches_the_selection(monkeypatch):
+    """Gegenstück: ``_on_figure_changed`` braucht den Index NICHT und bleibt
+    darum an ``weak_slot`` — es darf aber nicht mehr werfen (crash.log
+    2026-07-06)."""
+    _app()
+    view, _state = _make_view(monkeypatch, [])
+    calls = []
+    monkeypatch.setattr(view, "_apply_figure_to_selection",
+                        lambda *a, **k: calls.append(1))
+
+    view._combo_figure.addItem("Testmuster", None)
+    view._combo_figure.addItem("Figur A", object())
+    view._combo_figure.setCurrentIndex(view._combo_figure.count() - 1)
+
+    assert calls, "Combo-Wechsel loest die Figur-Uebernahme nicht aus"

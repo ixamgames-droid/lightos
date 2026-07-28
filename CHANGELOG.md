@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Drei echte Abstürze aus dem Crash-Log behoben, einer davon am Laser-Scharfschalter
+
+#### Behoben
+
+- **Der Scharfschalt-Knopf des Lasers erreichte die Ausgabe nie.** Er war so
+  verdrahtet, dass der An/Aus-Zustand des Knopfes unterwegs verworfen wurde —
+  der Aufruf kam ohne ihn an und brach mit einem Fehler ab, *bevor* das
+  Scharfschalten überhaupt ausgelöst wurde. Der Knopf sah aus, als täte er
+  etwas. **Das stand in keinem Absturzbericht** (Laser-Hardware fehlt, der Knopf
+  wird kaum gedrückt) — gefunden hat es eine neue Prüfung, die alle rund 70
+  Stellen dieser Bauart auf denselben Fehler abklopft.
+- **Der Wechsel der Laser-Figur stürzte bei jedem Umschalten ab** — dieselbe
+  Ursache, hier aber im Absturzbericht vom 6. Juli belegt. Die Figur wurde
+  dadurch nie übernommen.
+- **Beim Schliessen des Visualizer-Fensters konnte ein Fehler auf dem
+  Aufräumpfad hochkommen** (`Internal C++ object already deleted`, zuletzt am
+  21. Juli). Qt zerstört beim Beenden die interne Seite des Taktgebers, während
+  die Python-Seite noch existiert — jeder Zugriff wirft dann. Ein toter Taktgeber
+  wird jetzt als „nicht vorhanden" behandelt und beim nächsten Bedarf neu gebaut.
+
+#### Geändert
+
+- **Der Absturz-Bericht sortiert nach „zuletzt gesehen" statt nach Häufigkeit**
+  und markiert Signaturen, die seit über 30 Tagen nicht mehr auftraten, als kalt.
+  Neu: `--since JJJJ-MM-TT`. Grund: nach Häufigkeit sortiert stand ein 159×
+  aufgetretener, seit Wochen toter Testlauf-Absturz ganz oben, während der
+  einzige noch lebende Fehler unterging — und die daraus abgeleitete Priorität
+  war falsch.
+
 ### 2026-07-28 — Amber und UV leuchten jetzt auch in der Anzeige
 
 #### Behoben
