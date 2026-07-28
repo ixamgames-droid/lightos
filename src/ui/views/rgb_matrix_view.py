@@ -14,6 +14,7 @@ from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.head_cell_colors import fixture_cell_color
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -28,14 +29,25 @@ _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
 
 
 class MatrixPreview(QWidget):
-    """Live LED grid preview."""
+    """Live LED grid preview.
+
+    Zeigt die GERENDERTEN Effektfarben — das ist ihr Zweck, deshalb wird die
+    Zellfarbe nie durch etwas anderes ersetzt. Fuer „welche Zelle gehoert zu
+    welchem Geraet/Kopf" (das Problem, das FM-HEADLAYOUT Slice 4 im Gruppen-
+    Editor mit Farbe geloest hat) gibt es das **Zuordnungs-Overlay**: ein duenner
+    Rahmen je Zelle in derselben Farbsprache — Farbton je Geraet, Helligkeit je
+    Kopf, aus ``src.ui.head_cell_colors`` und damit garantiert identisch zum
+    Gruppen-Editor. Der Rahmen liegt UEBER der Effektfarbe, nimmt ihr also nichts."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._matrix: RgbMatrixInstance | None = None
         self._grid: list[Color] = []
+        self._show_assignment = False
+        self._labels: dict = {}
         self.setFixedSize(240, 160)
         self.setStyleSheet("background:#0d1117; border:1px solid #21262d; border-radius:4px;")
+        self.setMouseTracking(True)          # Tooltip ohne Klick
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -44,6 +56,92 @@ class MatrixPreview(QWidget):
     def set_matrix(self, m: RgbMatrixInstance | None):
         self._matrix = m
         self._grid = []
+
+    # ── Zuordnung (FM-HEADLAYOUT: Geraet/Kopf je Zelle) ───────────────────────
+
+    def set_assignment_visible(self, on: bool):
+        self._show_assignment = bool(on)
+        self.update()
+
+    def set_labels(self, labels: dict):
+        """fid -> Anzeigename (fuer Tooltip/Legende)."""
+        self._labels = dict(labels or {})
+
+    def fid_order(self) -> list:
+        """Basis-fids in Raster-Reihenfolge, dedupliziert — die Reihenfolge, aus
+        der ``fixture_cell_color`` seinen Farb-Index zieht.
+
+        Der Matrix-Index ist ``row * cols + col``, also zeilenweise — dieselbe
+        Ordnung wie ``group_cells.base_fids_in_grid_order`` (sortiert nach
+        Zeile, dann Spalte). Nur so stimmen die Toene zwischen Gruppen-Editor und
+        Matrix-Vorschau ueberein. Luecken zaehlen nicht mit (via ``is_gap``, EINE
+        Luecken-Quelle)."""
+        m = self._matrix
+        if m is None:
+            return []
+        grid = list(getattr(m, "fixture_grid", []) or [])
+        out: list = []
+        for idx, fid in enumerate(grid):
+            if is_gap(grid, idx):
+                continue
+            try:
+                f = int(fid)
+            except (TypeError, ValueError):
+                continue
+            if f not in out:
+                out.append(f)
+        return out
+
+    def _head_at(self, idx: int):
+        hg = list(getattr(self._matrix, "head_grid", []) or [])
+        if 0 <= idx < len(hg) and hg[idx] is not None:
+            try:
+                return int(hg[idx])
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def cell_index_at(self, pos) -> int | None:
+        """Bildschirmpunkt -> Zellindex (oder ``None`` ausserhalb). Spiegelt exakt
+        die Geometrie aus ``paintEvent`` — Hit-Test und Malen duerfen nie
+        auseinanderlaufen (VCB-26-Klasse)."""
+        m = self._matrix
+        if m is None or not m.cols or not m.rows:
+            return None
+        cell_w = (self.width() - 10) / m.cols
+        cell_h = (self.height() - 10) / m.rows
+        if cell_w <= 0 or cell_h <= 0:
+            return None
+        col = int((pos.x() - 5) // cell_w)
+        row = int((pos.y() - 5) // cell_h)
+        if not (0 <= col < m.cols and 0 <= row < m.rows):
+            return None
+        return row * m.cols + col
+
+    def assignment_text(self, idx) -> str:
+        """Tooltip-Text einer Zelle: „Gerät … · Kopf N" bzw. „Lücke". Leer, wenn
+        die Zelle nicht existiert oder noch keine Geraete zugewiesen sind."""
+        m = self._matrix
+        if m is None or idx is None:
+            return ""
+        grid = list(getattr(m, "fixture_grid", []) or [])
+        if not grid:
+            return ""
+        if idx < 0 or idx >= (m.cols * m.rows):
+            return ""
+        if is_gap(grid, idx):
+            return "Lücke (kein Gerät)"
+        try:
+            fid = int(grid[idx])
+        except (TypeError, ValueError, IndexError):
+            return ""
+        name = self._labels.get(fid) or f"Fixture {fid}"
+        head = self._head_at(idx)
+        return f"{name} · Kopf {head + 1}" if head is not None else str(name)
+
+    def mouseMoveEvent(self, event):
+        self.setToolTip(self.assignment_text(self.cell_index_at(event.position().toPoint())))
+        super().mouseMoveEvent(event)
 
     def _tick(self):
         if self._matrix is None:
@@ -88,7 +186,46 @@ class MatrixPreview(QWidget):
                     continue
                 r, g, b = self._grid[idx]
                 p.fillRect(x, y, w, h, QColor(r, g, b))
+        # Zuordnungs-Overlay ZULETZT und nur als Rahmen: die Effektfarbe darunter
+        # bleibt vollstaendig sichtbar (sie ist der Zweck der Vorschau).
+        if self._show_assignment:
+            self._paint_assignment(p, cols, rows, cell_w, cell_h, grid_assign)
         p.end()
+
+    def _paint_assignment(self, p, cols, rows, cell_w, cell_h, grid_assign):
+        """Identitaets-Rahmen je Zelle in der Slice-4-Farbsprache (Farbton je
+        Geraet, Helligkeit je Kopf) — EINE Farbquelle mit dem Gruppen-Editor.
+
+        Zusaetzlich die Kopfnummer, aber nur wenn die Zelle gross genug ist:
+        bei einer 32x32-Matrix sind Zellen wenige Pixel breit, dort waere Text
+        unleserlicher Matsch."""
+        if not grid_assign:
+            return
+        order = self.fid_order()
+        if not order:
+            return
+        font = QFont()
+        font.setPixelSize(9)
+        p.setFont(font)
+        for row in range(rows):
+            for col in range(cols):
+                idx = row * cols + col
+                if is_gap(grid_assign, idx):
+                    continue
+                try:
+                    fid = int(grid_assign[idx])
+                except (TypeError, ValueError, IndexError):
+                    continue
+                head = self._head_at(idx)
+                x = int(5 + col * cell_w)
+                y = int(5 + row * cell_h)
+                w = max(1, int(cell_w) - 1)
+                h = max(1, int(cell_h) - 1)
+                p.setPen(QPen(fixture_cell_color(fid, head, order), 2))
+                p.drawRect(x + 1, y + 1, max(1, w - 3), max(1, h - 3))
+                if head is not None and w >= 16 and h >= 14:
+                    p.setPen(QColor("#ffffff"))
+                    p.drawText(x + 3, y + 11, str(head + 1))
 
 
 class ColorButton(QPushButton):
@@ -206,6 +343,122 @@ class RgbMatrixView(QWidget):
                 out.append(m)
         return out
 
+    # ── FM-HEADLAYOUT: Zuordnung Gerät/Kopf in der Vorschau ───────────────────
+
+    def _sync_preview(self, m):
+        """EINZIGE Naht, die die Vorschau umschaltet — sie zieht Legende und
+        head_mode-Hinweis gleich mit. Sechs Stellen riefen vorher direkt
+        ``_preview.set_matrix``; jede neue Stelle würde die Zusatz-Anzeigen sonst
+        stillschweigend stale lassen."""
+        self._preview.set_matrix(m)
+        self._update_assignment_ui()
+
+    def _on_assignment_toggled(self, on):
+        self._preview.set_assignment_visible(bool(on))
+        self._update_assignment_ui()
+
+    def _patched_by_fid(self) -> dict:
+        """fid -> gepatchtes Fixture (eine Abfrage, von Legende UND Hinweis genutzt)."""
+        try:
+            from src.core.app_state import get_state
+            out = {}
+            for fx in get_state().get_patched_fixtures():
+                try:
+                    out[int(fx.fid)] = fx
+                except (TypeError, ValueError):
+                    continue
+            return out
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _fixture_label(fx, fid) -> str:
+        for attr in ("name", "label", "fixture_name"):
+            v = getattr(fx, attr, None)
+            if v:
+                return str(v)
+        return f"Fixture {fid}"
+
+    def legend_html(self, order, by_fid, heads) -> str:
+        """Legende „Farbe → Gerät" als HTML. Zieht die Farben aus DERSELBEN
+        Funktion wie die Zellrahmen (Slice-4-Regel: Legende und gerendertes
+        Element nie aus zwei Farbquellen). Leer bei < 2 Geräten — dort gibt es
+        nichts zu unterscheiden und die Zeile wäre nur Rauschen.
+
+        Reine Funktion der übergebenen Daten -> headless testbar."""
+        if len(order) < 2:
+            return ""
+        parts = []
+        for fid in order:
+            col = fixture_cell_color(fid, None, order).name()
+            name = self._fixture_label(by_fid.get(fid), fid)
+            n = heads.get(fid)
+            suffix = f" ({n} Köpfe)" if n and n > 1 else ""
+            parts.append(
+                f"<span style='background:{col}; color:#fff;'>&nbsp;&nbsp;&nbsp;</span>"
+                f" {name}{suffix}")
+        return "Farbe → Gerät: " + " &nbsp;·&nbsp; ".join(parts)
+
+    def head_mode_conflict_text(self, order, by_fid, heads) -> str:
+        """Hinweis, wenn das Raster ein Gerät in KOPF-Zellen zerlegt, das im
+        Patch-Dialog auf „als eine Lampe" (``head_mode == 'single'``) steht.
+
+        Der Widerspruch wird bewusst nur GEMELDET, nicht stillschweigend
+        aufgelöst: das Raster hat der Nutzer von Hand gebaut, ein automatisches
+        Zusammenlegen würde sein Layout zerstören. Sichtbarer Text statt Tooltip
+        — die Slice-2-Lehre („disabled sieht aus wie bedienbar, der Grund stand
+        nur im Tooltip")."""
+        try:
+            from src.core.head_mode import normalize_head_mode
+        except Exception:
+            return ""
+        names = []
+        for fid in order:
+            if not heads.get(fid):
+                continue                       # ohne Kopf-Zellen kein Widerspruch
+            fx = by_fid.get(fid)
+            if fx is None:
+                continue
+            if normalize_head_mode(getattr(fx, "head_mode", "auto")) == "single":
+                names.append(self._fixture_label(fx, fid))
+        if not names:
+            return ""
+        return ("⚠ " + ", ".join(names)
+                + (" ist" if len(names) == 1 else " sind")
+                + " im Patch-Dialog auf „als eine Lampe“ gestellt, wird hier aber "
+                  "in Kopf-Zellen angesteuert. Das Raster gilt — ändere es im "
+                  "Fixture-Gruppen-Editor oder stelle die Mehrkopf-Programmierung um.")
+
+    def _update_assignment_ui(self):
+        """Legende + head_mode-Hinweis an den aktuellen Matrix-Zustand anpassen."""
+        legend = getattr(self, "_legend", None)
+        hint = getattr(self, "_head_mode_hint", None)
+        if legend is None or hint is None:
+            return
+        order = self._preview.fid_order()
+        by_fid = self._patched_by_fid() if order else {}
+        self._preview.set_labels({f: self._fixture_label(by_fid.get(f), f) for f in order})
+        heads: dict = {}
+        m = getattr(self, "_current", None)
+        for idx, h in enumerate(list(getattr(m, "head_grid", []) or []) if m else []):
+            if h is None:
+                continue
+            try:
+                fid = int((getattr(m, "fixture_grid", []) or [])[idx])
+            except (TypeError, ValueError, IndexError):
+                continue
+            heads[fid] = max(heads.get(fid, 0), int(h) + 1)
+        # Legende nur zusammen mit dem Overlay — sonst erklärt sie Farben, die
+        # gerade niemand sieht.
+        txt = self.legend_html(order, by_fid, heads) if self._chk_assignment.isChecked() else ""
+        legend.setText(txt)
+        legend.setVisible(bool(txt))
+        # Der head_mode-Widerspruch gilt unabhängig vom Overlay — er ist ein
+        # echter Konfigurations-Konflikt, kein Anzeige-Detail.
+        htxt = self.head_mode_conflict_text(order, by_fid, heads)
+        hint.setText(htxt)
+        hint.setVisible(bool(htxt))
+
     def _update_group_header(self):
         """Aktualisiert die Kopfzeile ueber der Liste: zeigt im Programmer, fuer
         welche Gruppe die aufgelisteten Matrizen gelten (Nutzer-Wunsch: sehen,
@@ -273,7 +526,7 @@ class RgbMatrixView(QWidget):
             if not vis:
                 self._saved = None
                 self._current = None
-                self._preview.set_matrix(None)
+                self._sync_preview(None)
                 self._update_group_header()
                 return
             target = next((i for i, m in enumerate(vis) if m.id == prev_id), -1)
@@ -444,6 +697,38 @@ class RgbMatrixView(QWidget):
         pv_l = QVBoxLayout(pv_box)
         self._preview = MatrixPreview()
         pv_l.addWidget(self._preview, alignment=Qt.AlignmentFlag.AlignTop)
+
+        # FM-HEADLAYOUT: Zuordnung Gerät/Kopf sichtbar machen, ohne die Effekt-
+        # farben zu ersetzen. Aus (Default) = Vorschau exakt wie bisher.
+        self._chk_assignment = QCheckBox("Zuordnung zeigen")
+        self._chk_assignment.setToolTip(
+            "Legt einen dünnen Rahmen je Zelle über die Vorschau: Farbton = Gerät, "
+            "Helligkeit = Kopf — dieselben Farben wie im Fixture-Gruppen-Editor. "
+            "Die Effektfarben darunter bleiben sichtbar. Zeigt beim Überfahren "
+            "ausserdem Gerät und Kopf der Zelle an.")
+        # weak_slot_fwd (NICHT weak_slot): toggled(bool) traegt den Zustand, und
+        # weak_slot verwirft Signal-Argumente per Vertrag — genau daran starb der
+        # Laser-Scharfschalter (test_weak_slot_arity.py).
+        self._chk_assignment.toggled.connect(
+            weak_slot_fwd(self._on_assignment_toggled))
+        pv_l.addWidget(self._chk_assignment)
+
+        # Legende „Farbe → Gerät" — zieht ihre Farben aus DERSELBEN Funktion wie
+        # die Zellrahmen (Slice-4-Regel: nie zwei Farbquellen).
+        self._legend = QLabel("")
+        self._legend.setWordWrap(True)
+        self._legend.setStyleSheet("color:#8b949e; font-size:10px;")
+        self._legend.setVisible(False)
+        pv_l.addWidget(self._legend)
+
+        # Sichtbarer Hinweis, wenn das Raster ein Gerät in Kopf-Zellen zerlegt,
+        # das im Patch-Dialog auf „als eine Lampe" steht (Slice-2-Lehre: den
+        # Grund als TEXT zeigen, nicht nur im Tooltip).
+        self._head_mode_hint = QLabel("")
+        self._head_mode_hint.setWordWrap(True)
+        self._head_mode_hint.setStyleSheet("color:#d29922; font-size:10px;")
+        self._head_mode_hint.setVisible(False)
+        pv_l.addWidget(self._head_mode_hint)
 
         top = QHBoxLayout()
         top.addWidget(grp_general, 1)
@@ -801,11 +1086,11 @@ class RgbMatrixView(QWidget):
         if row < 0 or row >= len(vis):
             self._saved = None
             self._current = None
-            self._preview.set_matrix(None)
+            self._sync_preview(None)
             return
         self._saved = vis[row]
         self._make_draft()
-        self._preview.set_matrix(self._current)
+        self._sync_preview(self._current)
         self._load_ui(self._current)
         self._update_dirty()
 
@@ -1370,7 +1655,7 @@ class RgbMatrixView(QWidget):
         if self._saved is None:
             return
         self._make_draft()
-        self._preview.set_matrix(self._current)
+        self._sync_preview(self._current)
         self._load_ui(self._current)
         # Live-Vorschau des Namens in der Liste auf den gespeicherten Wert zurueck.
         row = self._list.currentRow()
@@ -1498,7 +1783,7 @@ class RgbMatrixView(QWidget):
                         self._grid_label.setText(
                             f"{g.rows}×{g.cols} = {n} Fixtures, {luecken} Lücken (Gruppe »{g.name}«)"
                         )
-                        self._preview.set_matrix(self._current)
+                        self._sync_preview(self._current)
                         self._update_dirty()
                         return
                 except Exception as e:
@@ -1531,7 +1816,7 @@ class RgbMatrixView(QWidget):
         self._grid_label.setText(
             f"1×{len(fids)} = {len(fids)} Fixtures (aus Auswahl)"
         )
-        self._preview.set_matrix(self._current)
+        self._sync_preview(self._current)
         self._update_dirty()
 
     def _auto_assign(self):
