@@ -8,6 +8,7 @@ einem harten Crash fuehren. Diese Autouse-Fixture meldet nach JEDEM Test alle no
 lebenden Canvases ab.
 """
 import os
+import sys
 import tempfile
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -123,6 +124,28 @@ import pytest
 _HARDEN_EXIT_ARMED = False
 
 
+def _webengine_in_process() -> bool:
+    """Ist QtWebEngine in diesem Prozess geladen?
+
+    Ergaenzt die Namespace-Heuristik oben, die NUR den direkten Top-Level-Import
+    unter genau dem Namen ``QWebEngineView`` trifft. Tests, die den View indirekt
+    ueber ein ``src``-Modul erzeugen, fielen durchs Raster: ``test_viz_labels_popout``
+    importiert nur ``src.ui.visualizer.visualizer_service`` und hat ``QWebEngineView``
+    nie im eigenen Namespace. Die Haertung blieb aus, der Prozess starb auf Linux
+    beim finalen Exit nativ (SIGSEGV) — obwohl alle 15 Assertions bestanden.
+
+    Wichtig ist der ZEITPUNKT: zur Kollektionszeit ist QtWebEngine oft noch gar
+    nicht geladen (``visualizer_service`` importiert es erst beim Erzeugen des
+    Views, also waehrend des Testlaufs). Gemessen: bei Kollektion 0 Module, bei
+    ``sessionfinish`` 2. Deshalb wird hier — und nur hier — nachgesehen.
+
+    Die Erkennung wird dadurch etwas breiter: sobald QtWebEngine im Prozess
+    gelandet ist, gilt die Session als WebEngine-Session. Das ist gewollt, denn
+    genau daran haengt das Exit-Risiko, nicht am Importstil.
+    """
+    return any(m.startswith("PySide6.QtWebEngine") for m in list(sys.modules))
+
+
 def pytest_collection_modifyitems(session, config, items):
     global _HARDEN_EXIT_ARMED
     for it in items:
@@ -153,8 +176,9 @@ def pytest_sessionfinish(session, exitstatus):
     #      ALLE Tests bestehen), beenden wir den Prozess hier mit exakt diesem Status
     #      und überspringen die flaky native Abbauphase. Das maskiert KEINE
     #      Test-Failures — ein echter Fehler liefert exitstatus≠0 -> os._exit(≠0).
+    armed = _HARDEN_EXIT_ARMED or _webengine_in_process()
     harden = bool(os.environ.get("LIGHTOS_HARDEN_EXIT_ALL")) or (
-        _HARDEN_EXIT_ARMED and bool(os.environ.get("LIGHTOS_HARDEN_EXIT")))
+        armed and bool(os.environ.get("LIGHTOS_HARDEN_EXIT")))
     if harden:
         import sys
         try:

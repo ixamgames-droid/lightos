@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-29 — Linux-Test-Gate: QtWebEngine-Tests laufen wieder grün zu Ende
+
+#### Behoben
+
+- **Das Linux-Gate `tools/verify_loop.sh` setzte `LIGHTOS_HARDEN_EXIT` nicht.**
+  Die Exit-Härtung in `tests/conftest.py` ist bewusst an diese Variable gekoppelt
+  („nur vom Lock-Runner im Gate"), auf Windows setzt sie `run_tests.ps1 -Isolate`.
+  Das Linux-Pendant tat das nie — dort starb jede QtWebEngine-Testdatei beim
+  finalen Interpreter-Exit mit SIGSEGV, **nachdem** alle Assertions bestanden
+  hatten. Im Segment-Gate zählte das als Crash: 12 Dateien liefen nie grün
+  zu Ende.
+
+- **Die Auto-Erkennung der WebEngine-Sessions griff zu kurz.** Sie prüfte nur
+  `hasattr(mod, "QWebEngineView")`, also den direkten Top-Level-Import unter
+  genau diesem Namen. `test_viz_labels_popout` importiert aber nur
+  `src.ui.visualizer.visualizer_service` und erzeugt den View indirekt — der
+  Name taucht im Modul-Namespace nie auf, die Härtung blieb aus.
+
+  Entscheidend ist zusätzlich der **Zeitpunkt**: zur Kollektionszeit ist
+  QtWebEngine oft noch gar nicht geladen (gemessen: 0 Module bei der Kollektion,
+  2 bei `sessionfinish`), weil `visualizer_service` es erst beim Erzeugen des
+  Views importiert. Die Prüfung sitzt deshalb jetzt in `pytest_sessionfinish`
+  und sieht in `sys.modules` nach — das trifft jeden Importweg.
+
+  Ergebnis auf Linux: **10 von 12 viz-Dateien laufen jetzt grün zu Ende** (vorher
+  keine einzige). `test_viz13_scene_modules_smoke` und `test_viz_shadow_dispose`
+  crashen weiterhin reproduzierbar (SIGSEGV/SIGABRT) — dort schlägt der Chromium-
+  Abbau schon **vor** `sessionfinish` zu, die Härtung kann nicht mehr greifen.
+  Beides ist als eigener Punkt im Backlog vermerkt; die QA-24-Regel
+  (nativer Crash ≠ Failure) deckt sie im Gate weiterhin ab.
+
 ### 2026-07-29 — Crash-Signaturen sind wieder plattformunabhängig
 
 #### Behoben

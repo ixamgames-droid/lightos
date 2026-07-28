@@ -29,6 +29,14 @@ fi
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 
+# Exit-Haertung wie beim Windows-Lock-Runner: QtWebEngine-Sessions sterben auf
+# Linux beim FINALEN Interpreter-Exit sporadisch mit SIGSEGV — NACH dem
+# gemeldeten Ergebnis, die Assertions bestehen. conftest.py beendet den Prozess
+# dann mit dem echten exitstatus (maskiert also keine Failures) und ueberspringt
+# die crashende Abbauphase. Bewusst nur hier im Gate gesetzt, nicht fuer
+# interaktives pytest — dort soll ein Teardown-Crash sichtbar bleiben.
+export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
+
 echo "[verify] 1/2 Syntax-Check (compileall src) ..."
 if ! "$PY" -m compileall -q src; then
     echo "[verify] SYNTAX-FEHLER"
