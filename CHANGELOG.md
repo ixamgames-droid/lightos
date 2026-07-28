@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Amber und UV leuchten jetzt auch in der Anzeige
+
+#### Behoben
+
+- **Amber- und UV-LEDs fielen aus der Anzeigefarbe komplett heraus.** Der
+  Visualizer rechnete nur Rot/Grün/Blau plus Weiss zusammen; ein RGBA-PAR, an dem
+  nur Amber aufgedreht ist, blieb im 3D **und** im 2D-Bühnenplan schwarz, obwohl
+  er real leuchtet. Beide werden jetzt — wie Weiss — additiv eingerechnet: Amber
+  in seinem Bernsteinton, UV als tiefes Violett (so nimmt das Auge es wahr).
+  Ein Gerät, das *nur* Amber hat, zeigt entsprechend Amber statt der
+  Ersatzfarbe Weiss.
+- Auch **einzelne Köpfe** einer Mehrkopf-Leiste rechnen Amber/UV jetzt mit; ihre
+  Farbe kommt aus derselben Ableitung wie die des ganzen Geräts, statt die
+  Rot/Grün/Blau-Rechnung ein zweites Mal zu führen.
+
+#### Intern
+
+- Die Farbwort-Liste steht zweimal im Code (der Kern darf nicht aus der
+  Oberfläche importieren) und wurde laut Kommentar „von Hand synchron gehalten".
+  Ein Test hält beide Listen jetzt Wort für Wort gleich.
 ### 2026-07-28 — Abstürze und Freezes aus deinen Sitzungen landen endlich im Backlog
 
 #### Hinzugefügt

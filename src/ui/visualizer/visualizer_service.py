@@ -68,7 +68,8 @@ def _has_own_color(attrs: dict[str, int], suffix: str = "") -> bool:
     """Traegt dieser Kopf/dieses Geraet eigene Farbkanaele? Entscheidet, ob die
     Farbe aus den eigenen Werten kommt oder vom Geraet geerbt wird."""
     return any(f"{k}{suffix}" in attrs
-               for k in ("color_r", "color_g", "color_b", "color_w"))
+               for k in ("color_r", "color_g", "color_b", "color_w",
+                         "color_a", "color_uv"))
 
 
 def _build_fixture_payload(fixture, attrs: dict[str, int],
@@ -128,7 +129,9 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
             hb = attrs.get(f"color_b{sfx}", 0)
             hw = attrs.get(f"color_w{sfx}", 0)
             if _has_own_color(attrs, sfx):
-                hrgb = (min(255, hr + hw), min(255, hg + hw), min(255, hb + hw))
+                # Dieselbe Ableitung wie fuer das ganze Geraet (inkl. Amber/UV),
+                # statt die RGB(W)-Rechnung hier ein zweites Mal zu fuehren.
+                hrgb = visual_rgb(attrs, channels, sfx)
             else:
                 # Kopf ohne eigene Farbkanaele (Mover-Bar ohne Farbe, Kopf eines
                 # CMY-/Farbrad-Geraets) erbt die Geraetefarbe — sonst blieben
