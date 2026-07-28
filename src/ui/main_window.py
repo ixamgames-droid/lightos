@@ -369,7 +369,13 @@ class _SectionBar(QWidget):
             avail = int(self.width() - self._SP * max(0, len(tabs) - 1))
             full = [max(1, b._full_text_size_hint().width()) for b in tabs]
             if sum(full) <= avail:
-                ints = list(full)                       # alles passt -> jeder voll
+                # UI-TABFLOOR: `setFixedWidth` haengt `setMinimumWidth(56)` aus —
+                # kurze Titel ("E/A", "BPM") landeten dadurch bei 49/54 px und
+                # unterschritten die im QSS zugesagte Touch-Klickflaeche. Den
+                # Floor durchsetzen, solange die gefloorte Summe noch passt;
+                # sonst bleibt der Alt-Pfad (kein Ueberlauf in die GM-Gruppe).
+                floored = [max(SectionButton._CLICK_FLOOR_PX, w) for w in full]
+                ints = floored if sum(floored) <= avail else list(full)
             else:
                 widths = _allocate_tab_widths(full, avail, float(SectionButton._CLICK_FLOOR_PX))
                 # Ganzzahlig OHNE die Summe (== avail) zu ueberschreiten: erst

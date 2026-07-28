@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-28 — Bedienflächen und 2D-Anzeige: Touch-Floor hält, Info-Box schweigt nicht mehr
+
+#### Behoben
+
+- **Die Sektions-Tabs konnten unter ihre eigene Touch-Klickfläche schrumpfen.**
+  Das Stylesheet sichert 56 px zu, die Breitenverteilung setzte aber eine feste
+  Breite und hebelte damit die Mindestbreite aus — bei schmalen Titeln (andere
+  Schrift oder Bildschirmauflösung; für Linux wurde das Innenabstand-Maß auf 7 px
+  gesenkt) landeten „E/A" und „BPM" darunter. Der Floor wird jetzt durchgesetzt,
+  solange der Platz reicht; bei echtem Platzmangel hat weiterhin Vorrang, dass
+  nichts in die Grand-Master-Gruppe überläuft.
+- **Die Info-Box im 2D-Bühnenplan zeigte Scannern und Mover-Bars kein Pan/Tilt.**
+  Das Symbol zeichnet für diese Geräte einen sichtbar gedrehten Strahl, die Box
+  entschied aber anhand des Gerätetyp-Namens und schwieg — Symbol und Text
+  liefen auseinander. Beide nutzen jetzt dieselbe Quelle; zusätzlich zeigt die
+  Box Pan/Tilt auch dann, wenn ein Gerät die Kanäle real hat, sein Symbol aber
+  keinen Strahl dreht.
+
 ### 2026-07-28 — 3D-Visualizer: Strobes, Blinder und Farbrad-Mover sind nicht mehr unsichtbar
 
 #### Behoben
