@@ -55,11 +55,19 @@ def _bg(p, s, color):
 
 # ── Grafik-Zeichenfunktionen: draw(p, s, frac) — frac in [0,1) (0 fuer statisch) ─
 def d_pulse(p, s, frac):
-    _bg(p, s, (8, 10, 18, 255))
-    k = 0.5 + 0.5 * math.sin(frac * 2 * math.pi)          # 0..1 atmen
-    r = s * (0.20 + 0.28 * k)
+    # GDS-3: zwei Aenderungen gegenueber der ersten Fassung.
+    #  (1) cos statt sin -> frac=0 ist das MAXIMUM. Der Poster-Frame (Frame 0, auch
+    #      das statische PNG) zeigte vorher mit k=0.5 die Mitte des Atmens; auf der
+    #      Button-Face wirkte der Puls dadurch tot, obwohl er animiert lief.
+    #  (2) Grundhelligkeit angehoben: der Kern bleibt auch im Tal sichtbar
+    #      (Alpha-Untergrenze) und der Radius startet groesser. Vorher lag das GIF
+    #      bei ~26/255 Mittel gegen ~137 bei den gesunden Galerie-Bildern.
+    _bg(p, s, (12, 16, 28, 255))
+    k = 0.5 + 0.5 * math.cos(frac * 2 * math.pi)          # 1 -> 0 -> 1 atmen
+    r = s * (0.30 + 0.22 * k)
     g = QRadialGradient(s / 2, s / 2, r)
-    g.setColorAt(0.0, QColor(90, 180, 255, int(80 + 175 * k)))
+    g.setColorAt(0.0, QColor(140, 205, 255, int(180 + 75 * k)))
+    g.setColorAt(0.55, QColor(70, 150, 240, int(120 + 90 * k)))
     g.setColorAt(1.0, QColor(20, 60, 140, 0))
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(g))
@@ -81,18 +89,38 @@ def d_rainbow_scroll(p, s, frac):
 
 
 def d_color_chase(p, s, frac):
-    _bg(p, s, (10, 12, 18, 255))
+    # GDS-3: vorher leuchtete GENAU EIN Punkt von fuenf, der Rest lag bei (40,46,60)
+    # auf fast schwarzem Grund -> alle Frames unter 15/255 (~6 %), auf der
+    # Button-Face hinter dem Scrim praktisch unsichtbar.
+    #
+    # Jetzt laeuft ein Schweif: der aktive Punkt voll, die beiden dahinter
+    # abklingend, und die unbeleuchteten Punkte sind deutlich heller. Das ist auch
+    # die ehrlichere Darstellung eines Chase — ein Lauflicht hat einen Nachlauf.
+    # Punkte zusaetzlich groesser (0.30 -> 0.38 der Luecke), damit mehr Flaeche
+    # traegt.
+    _bg(p, s, (18, 22, 34, 255))
     n = 5
     lit = int(frac * n) % n
     gap = s / (n + 1)
-    r = gap * 0.30
+    r = gap * 0.42
+    hue = int(frac * 360) % 360
     for i in range(n):
         cx = gap * (i + 1)
         cy = s / 2
-        if i == lit:
-            col = QColor.fromHsv(int(frac * 360) % 360, 220, 255)
+        # Abstand ZURUECK vom aktiven Punkt (zyklisch) -> 0 = aktiv, 1/2 = Schweif
+        back = (lit - i) % n
+        if back == 0:
+            col = QColor.fromHsv(hue, 200, 255)
+        elif back <= 2:
+            # Schweif: gleicher Farbton, aber ENTSAETTIGT statt abgedunkelt.
+            # Abdunkeln (Value senken) war der erste Versuch und blieb messbar
+            # unter der Sichtbarkeitsschwelle — bei hoher Saettigung ist die
+            # Luminanz eines Farbtons ohnehin niedrig. Entsaettigen haelt den
+            # Schweif hell und liest sich trotzdem als „schon vorbei".
+            fade = 1.0 - back / 3.0
+            col = QColor.fromHsv(hue, int(80 + 90 * fade), 255)
         else:
-            col = QColor(40, 46, 60)
+            col = QColor(95, 105, 130)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QBrush(col))
         p.drawEllipse(QPointF(cx, cy), r, r)
@@ -182,7 +210,12 @@ def d_spectrum(p, s, frac):
     g = QLinearGradient(0, 0, s, 0)
     for i in range(13):
         t = i / 12.0
-        g.setColorAt(t, QColor.fromHsv(int(t * 360), 235, 255))
+        # `% 360`: beim letzten Stop ist t == 1.0 -> int(360), und 360 liegt
+        # ausserhalb des gueltigen Hue-Bereichs (0..359). Qt lieferte dort eine
+        # ungueltige Farbe und gab bei JEDEM Lauf "QColor::fromHsv: HSV parameters
+        # out of range" aus. Vorbestehend, beim Ausmessen der Galerie aufgefallen.
+        # 360 ist ohnehin dasselbe wie 0 (Rot) — das Spektrum schliesst sich.
+        g.setColorAt(t, QColor.fromHsv(int(t * 360) % 360, 235, 255))
     p.fillRect(QRectF(0, 0, s, s), QBrush(g))
 
 
