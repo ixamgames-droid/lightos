@@ -28,7 +28,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
 MANIFEST_PATH = ROOT / "install_manifest.json"
-APPDATA_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "LightOS"
+# XPLAT-10: dieselbe Aufloesung wie App und Installer — sonst raeumt uninstall.py
+# auf Linux ~/LightOS weg (vom alten Installer angelegt, meist leer) und LAESST die
+# echten Nutzerdaten in ~/.local/share/LightOS stehen.
+sys.path.insert(0, str(ROOT))
+from src.core.paths import app_data_dir            # noqa: E402
+
+APPDATA_DIR = Path(app_data_dir())
 VENV_DIR = ROOT / "venv"
 
 
@@ -147,7 +153,7 @@ def main():
 
     # 4. AppData
     if not args.keep_appdata:
-        if args.yes or confirm(f"%APPDATA%/LightOS/ loeschen? (Snapshots, Stages, Profile, Auto-Save)"):
+        if args.yes or confirm(f"{APPDATA_DIR}/ loeschen? (Snapshots, Stages, Profile, Auto-Save)"):
             targets.append(("appdata", APPDATA_DIR))
 
     # 5. Shortcut

@@ -67,10 +67,13 @@ HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 # ============================================================================
 # VIZ-10: Fehler-Logging fuer die Bridge (statt nacktem print(str(e)))
 # ============================================================================
-# Eigener, lazy geoeffneter Append-Handle auf dasselbe %APPDATA%/LightOS/
-# crash.log wie main.py — bewusst UNABHAENGIG vom dortigen Handle (main._hook
-# ist privat/nicht importierbar, und ein Modul-Import von main.py wuerde dessen
-# Top-Level-Code erneut anstossen). Gleiche Datei, gleiche Dedup-Logik.
+# Eigener, lazy geoeffneter Append-Handle auf dasselbe ``app_data_dir()/crash.log``
+# wie main.py — bewusst UNABHAENGIG vom dortigen Handle (main._hook ist privat/nicht
+# importierbar, und ein Modul-Import von main.py wuerde dessen Top-Level-Code erneut
+# anstossen). Gleiche Datei, gleiche Dedup-Logik.
+# XPLAT-10: „gleiche Datei" stimmte auf Linux bis 2026-07-29 NICHT — main.py loeste
+# den Ordner noch selbst ueber APPDATA auf und schrieb nach ~/LightOS, waehrend hier
+# schon app_data_dir() (~/.local/share/LightOS) stand. Jetzt wieder eine Datei.
 _viz_log_handle = None
 _viz_log_dedup = _cl.ExceptionDedup(min_interval=5.0)
 

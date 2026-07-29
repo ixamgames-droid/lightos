@@ -30,7 +30,9 @@ from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_label import VCLabel
 
-APPDIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+from src.core.paths import app_data_dir           # XPLAT-10: nicht selbst aufloesen
+
+APPDIR = app_data_dir()
 SNAP_FILE = os.path.join(APPDIR, "snapshots.json")
 MIDIMAP = os.path.join("data", "midi_mappings.json")
 SHOW_OUT = os.path.join("shows", "APC_Demo_Show.lshow")
