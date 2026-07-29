@@ -38,10 +38,10 @@ Alle Pfade sind relativ zum Repo-Root (dem Arbeitsverzeichnis der App).
 | `data/midi_mappings.json` | JSON-Array von Mapping-Objekten `{"id", "name", "target", "midi_in", "button_mode", "midi_out", "continuous_min", "continuous_max"}`. | MIDI-Mapping-Engine: geladen beim Start (`src/core/app_state.py:273`), gespeichert u. a. aus `src/ui/views/midi_view.py:557`. |
 | `data/channel_groups.json` | JSON-Array von Gruppen `{"name", "universe", "channels": [int], "value": 0-255}`. | Channel-Groups-View (`src/ui/views/channel_groups_view.py:16`). |
 | `data/channel_modifiers.json` | JSON der Kanal-Modifikatoren (Kurven/Invert je Kanal). | Channel-Modifier-Dialog (`src/ui/widgets/channel_modifier_dialog.py:143`). |
-| `data/controller_library/*.json` | Ein Controller-Profil je Datei, `{"schema", "id", "manufacturer", "model", "device_type", "controls": [...]}`; siehe `data/controller_library/README.md`. Nutzer-Importe (QLC+ `.qxi`) landen unter `%APPDATA%/LightOS/controller_library/`. | Controller-Library (`src/core/controllers/controller_library.py:30`), UI: `src/ui/widgets/controller_browser.py`. |
+| `data/controller_library/*.json` | Ein Controller-Profil je Datei, `{"schema", "id", "manufacturer", "model", "device_type", "controls": [...]}`; siehe `data/controller_library/README.md`. Nutzer-Importe (QLC+ `.qxi`) landen unter `app_data_dir()/controller_library/` (Windows `%APPDATA%/LightOS`, Linux `~/.local/share/LightOS`, macOS `~/Library/Application Support/LightOS` — s. `src/core/paths.py`). | Controller-Library (`src/core/controllers/controller_library.py:30`), UI: `src/ui/widgets/controller_browser.py`. |
 
 Weitere JSON-Ablagen liegen NICHT unter `data/`, sondern im Nutzer-Profil
-(`%APPDATA%/LightOS/`, z. B. `ui_prefs.json`, `recent.json`, `snapshots.json`,
+(`app_data_dir()`, plattformabhaengig — s. `src/core/paths.py`; z. B. `ui_prefs.json`, `recent.json`, `snapshots.json`,
 Stage-/Input-Profile) und sind hier bewusst nicht als globale Config gelistet.
 
 ---

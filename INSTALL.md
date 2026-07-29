@@ -126,7 +126,7 @@ oben der verlaessliche.
 | **3D-Visualizer** (QtWebEngine) | Der Chromium-Renderprozess laeuft ohne setuid-`chrome-sandbox` (pip-PySide6, Container, root) sonst nicht → LightOS haengt auf Linux automatisch `--no-sandbox --disable-gpu-sandbox` an (XPLAT-01). Korrekt aufgesetzte Distros koennen die Sandbox behalten: `LIGHTOS_WEBENGINE_NO_SANDBOX=0`. |
 | **Art-Net-Input** (Port 6454) | Setzt `SO_REUSEPORT` (XPLAT-03) → teilt sich den Port mit einer 2. Art-Net-App (z. B. QLC+); ohne das schluegen parallele Listener fehl. |
 | **UI-Fonts** | Die hart gesetzten Windows-Fonts (Segoe UI/Consolas/…) werden auf Noto Sans/DejaVu (Sans + Mono) gemappt (XPLAT-05). `fonts-noto`/`fonts-dejavu` installieren, damit enge Labels/Ziffern nicht clippen. |
-| **App-Datenordner** | Aktuell `~/LightOS/` (kein `APPDATA` → Home-Fallback). XDG-Konformitaet (`~/.local/share/LightOS`) ist als XPLAT-04 offen. |
+| **App-Datenordner** | XDG-konform unter `$XDG_DATA_HOME/LightOS` bzw. `~/.local/share/LightOS` (XPLAT-04). Aufgeloest wird das an EINER Stelle: `src/core/paths.py:app_data_dir()` — kein Modul baut den Pfad selbst (XPLAT-10, per Test abgesichert). Wer von einer aelteren Version kommt, findet ein Rest-`~/LightOS/` mit alter `crash.log`; es wird nicht automatisch migriert. |
 | **Headless/QtWebEngine im Test** | `QT_QPA_PLATFORM=offscreen` setzen (die Test-/Capture-Tools tun das bereits). |
 
 ### 4) Bekannte Grenzen
@@ -165,7 +165,8 @@ LightOS/
 ├── install_manifest.json
 └── src/, assets/, docs/   (Source, mitgeliefert)
 
-%APPDATA%/LightOS/
+App-Datenordner  (Windows %APPDATA%/LightOS · Linux ~/.local/share/LightOS ·
+                  macOS ~/Library/Application Support/LightOS)
 ├── auto_save.lshow        (alle 5 min)
 ├── recent.json
 ├── snapshots.json
