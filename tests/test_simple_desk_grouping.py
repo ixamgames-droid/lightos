@@ -13,7 +13,10 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
 from PySide6.QtWidgets import QApplication
+
+from _qt_lifecycle import destroy_all_top_level_widgets  # XPLAT-14
 
 import src.core.app_state as A
 from src.core.app_state import get_state
@@ -23,6 +26,18 @@ from src.ui.views.simple_desk import (
 )
 
 _app = QApplication.instance() or QApplication([])
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_views():
+    """XPLAT-14: die sieben ``SimpleDeskView()`` dieser Datei wurden nie abgebaut.
+
+    Jede haelt 512 Fader, Timer und Abos; ueber die Datei summiert liess das den
+    Prozess beim finalen Interpreter-Abbau mit Exitcode 139 sterben, nachdem alle
+    Tests bestanden hatten. Herleitung in ``tests/_qt_lifecycle.py``.
+    """
+    yield
+    destroy_all_top_level_widgets(_app)
 
 
 class _F:

@@ -127,10 +127,16 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   > das volle segmentierte Gate braucht mit `-j 3` rund 6,5 Minuten** — es ist also
   > nicht nur robuster, sondern deutlich schneller als der Sammellauf.
   >
-  > **Nicht deterministisch, Stand 2026-07-29:** `tests/test_views.py` crasht in etwa
-  > jedem dritten Lauf beim Prozessende (Tests bestehen, `SIGSEGV` in der GC danach)
-  > — erfasst als **XPLAT-14**. Ein einzelnes rotes Segment mit dieser Datei und ohne
-  > `FAILED`-Zeile ist deshalb kein Signal ueber die eigene Aenderung.
+  > **Zwei Fallen beim Deuten eines roten Segments:**
+  >
+  > 1. **Laeuft eine LightOS-Instanz?** (`pgrep -fa "python main.py"`) Sie haelt
+  >    ALSA-MIDI-Clients; Testdateien, die echte Views bauen, wurden dadurch messbar
+  >    instabiler (XPLAT-14: 2/6 ohne laufende App, 8/8 mit). Sonst misst man die
+  >    Nachbarschaft statt die eigene Aenderung.
+  > 2. **Ein GC-Segfault liefert verfaelschte Stack-Frames** — im Beleg zu XPLAT-14
+  >    ein Modul mit einem Pfad aus einem alten Checkout, der in `sys.path` gar nicht
+  >    vorkommt. Dem nicht nachjagen; stattdessen die Crash-RATE messen
+  >    (dieselbe Datei mehrfach laufen lassen).
 
   > **Beide Runner muessen dieselbe Umgebung setzen** — `tests/test_gate_runner_parity.py`
   > nagelt das fest. Der Segment-Runner lag bis 2026-07-29 ausserhalb des Repos und

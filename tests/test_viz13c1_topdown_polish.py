@@ -32,7 +32,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
-from _qt_webengine import destroy_webengine_view  # XPLAT-09
+from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
 
 _app = QApplication.instance() or QApplication([])
 
@@ -146,7 +146,7 @@ class TopDownPolishTest(unittest.TestCase):
         # stellt DeferredDelete nicht zu. Der View ueberlebt dann mitsamt Page,
         # Channel und Renderer, waehrend die parentlose Bridge mit der
         # TestCase-Instanz stirbt: dangling registriertes QObject -> SIGSEGV.
-        # Ausfuehrliche Herleitung in tests/_qt_webengine.py.
+        # Ausfuehrliche Herleitung in tests/_qt_lifecycle.py.
         destroy_webengine_view(self._view, _pump)
         self._view = None
 
