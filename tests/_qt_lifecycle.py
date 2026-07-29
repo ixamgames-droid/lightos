@@ -1,4 +1,8 @@
-"""XPLAT-09 — deterministischer Abbau von ``QWebEngineView`` im Test.
+"""XPLAT-09 / XPLAT-14 — deterministischer Abbau von Qt-Objekten im Test.
+
+Zwei Funktionen, eine Ursache: ``destroy_widget`` fuer beliebige Widgets/Views,
+``destroy_webengine_view`` fuer die zusaetzlichen Eigenheiten von QtWebEngine.
+Beide leben davon, dass ``DeferredDelete`` wirklich zugestellt wird — siehe unten.
 
 **Warum es diesen Helfer gibt**
 
@@ -59,7 +63,22 @@ geschrieben: die Datei deckelte sich **bewusst auf zwei Testmethoden**, weil „
 sequentielle QWebEngine-Vollladungen in EINEM Prozess den offscreen-Chromium-
 Renderer kippen". Der Bug hat also Testabdeckung gekostet, nicht nur Exitcodes.
 
-**Was der Helfer macht**
+**Dieselbe Falle ausserhalb von QtWebEngine (XPLAT-14)**
+
+Das Muster ``close()`` + ``deleteLater()`` + ``processEvents()`` steckte auch in
+``test_views.py`` (``_drop_view``) und faktisch ueberall dort, wo Tests echte
+Qt-Views bauen. Der Docstring dort wollte ausdruecklich „deterministisch
+abraeumen" und erreichte es nicht — aus genau dem Grund oben. Folge: Views samt
+400-ms-Statusticker, MIDI-Abos und Canvas ueberlebten den Test, und der Prozess
+starb beim finalen Interpreter-Abbau mit Exitcode 139, **nachdem** alle Tests
+bestanden hatten.
+
+Gemessen an ``test_views.py`` (mit laufender LightOS-Instanz, also unter der
+ungeguenstigsten Bedingung): **8 von 8 Laeufen** crashten. Nur mit erzwungener
+``DeferredDelete``-Zustellung im Aufraeumer: **1 von 6**. Der Rest ging auf Views,
+die gar nicht erst durch den Aufraeumer liefen.
+
+**Was die Helfer machen**
 
 ``deleteLater()`` posten und die Zustellung dann auch wirklich erzwingen —
 einmal sofort, einmal nach dem Pumpen (der Abbau postet selbst weitere
@@ -99,6 +118,73 @@ def flush_deferred_deletes() -> None:
     Genau die Zustellung, die ``processEvents()`` auslaesst.
     """
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+def destroy_widget(widget, app=None) -> None:
+    """Ein Qt-Widget/View im Test wirklich abbauen (XPLAT-14).
+
+    Ersetzt das verbreitete ``close(); deleteLater(); processEvents()`` — das
+    laesst das Widget am Leben, weil ``processEvents()`` ``DeferredDelete`` nicht
+    zustellt (Begruendung im Modul-Docstring).
+
+    Im Test typischerweise so::
+
+        view = SimpleDeskView()
+        try:
+            ...  # Assertions
+        finally:
+            destroy_widget(view, app)
+
+    :param widget: das abzubauende Widget (``None`` ist erlaubt und tut nichts).
+    :param app: optionale ``QApplication`` zum Pumpen; ohne Angabe wird
+        ``QCoreApplication.processEvents()`` benutzt.
+    """
+    if widget is None:
+        return
+    try:
+        widget.close()
+        widget.deleteLater()
+    except RuntimeError:
+        # Bereits zerstoert (z. B. per WA_DeleteOnClose) — nichts zu tun.
+        return
+
+    # Zweimal zustellen, mit einer Pump-Runde dazwischen: der Abbau eines Views
+    # postet selbst weitere Delete-Events (Kind-Widgets, Timer, Abo-Objekte).
+    flush_deferred_deletes()
+    try:
+        (app or QCoreApplication).processEvents()
+    except Exception:
+        pass
+    flush_deferred_deletes()
+
+
+def destroy_all_top_level_widgets(app=None) -> None:
+    """Alle uebrig gebliebenen Top-Level-Widgets abbauen (XPLAT-14).
+
+    Gedacht fuer eine autouse-Fixture am Ende jedes Tests einer Qt-lastigen
+    Testdatei::
+
+        @pytest.fixture(autouse=True)
+        def _no_leaked_views():
+            yield
+            destroy_all_top_level_widgets(QApplication.instance())
+
+    Warum als Fixture und nicht als expliziter Aufruf je Test: in
+    ``test_views.py`` deckte der explizite Aufruf nur 5 von 13 View-Erzeugungen
+    ab — ein einzelner Test liess vier Views stehen. Eine Fixture stellt die
+    Invariante an EINER Stelle her, statt sie der Disziplin des naechsten Autors
+    zu ueberlassen.
+
+    Bewusst NICHT in ``conftest.py`` global: es gibt Testdateien, die ein Widget
+    in ``setUpClass`` bauen und ueber mehrere Testmethoden benutzen — die wuerde
+    ein globaler Abbau nach jedem Test zerstoeren. Pro Datei einschalten.
+    """
+    from PySide6.QtWidgets import QApplication
+    app = app or QApplication.instance()
+    if app is None:
+        return
+    for widget in list(app.topLevelWidgets()):
+        destroy_widget(widget, app)
 
 
 def destroy_webengine_view(view, pump=None, pump_seconds: float = 0.2) -> None:

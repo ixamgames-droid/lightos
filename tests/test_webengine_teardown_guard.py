@@ -3,7 +3,7 @@
 Der Defekt war nicht auffaellig, sondern still: elf Testdateien bauten pro
 Testmethode einen echten ``QWebEngineView`` und raeumten mit
 ``deleteLater()`` + ``processEvents()``-Pumpe ab. Das stellt ``DeferredDelete``
-nie zu (Begruendung ausfuehrlich in ``tests/_qt_webengine.py``), der View blieb
+nie zu (Begruendung ausfuehrlich in ``tests/_qt_lifecycle.py``), der View blieb
 am Leben, und der Prozess starb an ``SIGSEGV`` — bei neun Dateien erst beim
 Prozessende, also **nach** dem gemeldeten ``N passed``. Genau deshalb fiel es
 lange nicht auf: die Testergebnisse waren gruen, nur der Exitcode war es nicht.
@@ -51,7 +51,7 @@ def test_every_webengine_test_uses_the_shared_teardown():
                if _HELPER_IMPORT not in src]
     assert not missing, (
         "Diese Testdateien bauen einen QWebEngineView, benutzen aber nicht "
-        "`destroy_webengine_view` aus tests/_qt_webengine.py (XPLAT-09). Ohne den "
+        "`destroy_webengine_view` aus tests/_qt_lifecycle.py (XPLAT-09). Ohne den "
         "Helfer bleibt der View nach deleteLater() am Leben — die Datei laeuft "
         "solange 'gruen', bis sie genug Ladezyklen hat, dann SIGSEGV:\n  "
         + "\n  ".join(missing))
@@ -75,6 +75,6 @@ def test_no_webengine_test_calls_deletelater_directly():
 
 
 def test_helper_module_is_not_collected_as_a_test():
-    """``_qt_webengine.py`` darf nicht wie eine Testdatei heissen."""
-    assert os.path.isfile(os.path.join(_TESTS_DIR, "_qt_webengine.py"))
-    assert not os.path.basename("_qt_webengine.py").startswith("test_")
+    """``_qt_lifecycle.py`` darf nicht wie eine Testdatei heissen."""
+    assert os.path.isfile(os.path.join(_TESTS_DIR, "_qt_lifecycle.py"))
+    assert not os.path.basename("_qt_lifecycle.py").startswith("test_")

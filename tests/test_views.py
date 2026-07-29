@@ -10,8 +10,11 @@ if str(ROOT) not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
 from PySide6.QtCore import QPoint
 from PySide6.QtWidgets import QApplication
+
+from _qt_lifecycle import destroy_widget, destroy_all_top_level_widgets  # XPLAT-14
 
 
 def _app() -> QApplication:
@@ -25,15 +28,30 @@ def _drop_view(view, app: QApplication) -> None:
     400-ms-Statusticker, die MIDI-Abos und der Canvas haengen weiter in
     ``QApplication.allWidgets()``. Ueber eine Testdatei summiert sich das und
     macht den nativen Qt-Abbau am Suite-Ende messbar instabiler
-    (Windows/Py3.11: STATUS_HEAP_CORRUPTION). Deshalb hier deterministisch
-    abraeumen — wie es ``test_midi_view.py`` schon vormacht.
+    (Windows/Py3.11: STATUS_HEAP_CORRUPTION).
+
+    XPLAT-14: hier stand ``close(); deleteLater(); processEvents()`` — das wollte
+    deterministisch abraeumen und tat es nicht, weil ``processEvents()``
+    ``DeferredDelete`` nicht zustellt. Die Views ueberlebten also samt Ticker und
+    Abos, und auf Linux starb der Prozess beim finalen Abbau mit Exitcode 139,
+    nachdem alle Tests bestanden hatten. Der geteilte Helfer erzwingt die
+    Zustellung; Herleitung in ``tests/_qt_lifecycle.py``.
     """
-    try:
-        view.close()
-        view.deleteLater()
-        app.processEvents()
-    except RuntimeError:
-        pass
+    destroy_widget(view, app)
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_views():
+    """XPLAT-14: nach JEDEM Test alle uebrig gebliebenen Top-Level-Widgets abbauen.
+
+    Der explizite ``_drop_view``-Aufruf deckte nur 5 der 13 View-Erzeugungen in
+    dieser Datei ab — ``test_core_views_smoke`` allein liess vier Views stehen.
+    Eine Fixture statt acht Einzelaufrufe, damit auch kuenftige Tests hier nicht
+    zurueckfallen koennen: die Invariante steht an einer Stelle, nicht in der
+    Disziplin des naechsten Autors.
+    """
+    yield
+    destroy_all_top_level_widgets(QApplication.instance())
 
 
 def test_virtualconsole_widgets_and_canvas():
