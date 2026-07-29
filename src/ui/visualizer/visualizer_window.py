@@ -14,7 +14,7 @@ import json
 import math
 import os
 import time
-from src.core.paths import app_data_dir
+from src.core.paths import app_data_dir, crash_log_path
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -79,9 +79,10 @@ _viz_log_dedup = _cl.ExceptionDedup(min_interval=5.0)
 
 
 def _viz_crash_log_path() -> str:
-    d = app_data_dir()
-    os.makedirs(d, exist_ok=True)
-    return os.path.join(d, "crash.log")
+    # QA-CRASHLOG-TESTS: die Aufloesung liegt in core.paths.crash_log_path() —
+    # dieselbe Funktion nutzt main.py. Sie kennt den LIGHTOS_CRASH_LOG-Override,
+    # mit dem die Testsuite von der echten Absturz-Historie getrennt ist.
+    return crash_log_path()
 
 
 def _viz_log_write(text: str) -> None:

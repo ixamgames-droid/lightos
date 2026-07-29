@@ -13,6 +13,9 @@ from src.core import crash_logging as _cl
 # XPLAT-10: den App-Datenordner NICHT selbst aufloesen (importiert nur os+sys,
 # also auch hier vor dem PySide6-Import unbedenklich). Siehe unten.
 from src.core.paths import app_data_dir as _app_data_dir
+# QA-CRASHLOG-TESTS: bewusst NICHT `_crash_log_path` benannt — so heisst
+# unten die Modul-Globale mit dem aufgeloesten Pfad.
+from src.core.paths import crash_log_path as _resolve_crash_log_path
 
 APP_VERSION = "1.0.0"
 
@@ -103,7 +106,11 @@ def _setup_crash_logging():
     global _crash_log_handle, _crash_log_path, _last_alive_path, _running_flag_path
     try:
         log_dir = _appdata_dir()
-        _crash_log_path = os.path.join(log_dir, "crash.log")
+        # QA-CRASHLOG-TESTS: crash.log ueber die gemeinsame Aufloesung, damit sie
+        # den LIGHTOS_CRASH_LOG-Override kennt (Testsuite schrieb sonst in die
+        # echte Absturz-Historie). last_alive/Running-Flag bleiben im Datenordner —
+        # die schreibt nur die laufende App, kein Test.
+        _crash_log_path = _resolve_crash_log_path()
         _last_alive_path = os.path.join(log_dir, "last_alive.txt")
         # STAB-06: per-PID-Flag statt einer globalen Datei -> eine zweite Instanz
         # ueberschreibt/loescht die Flag der ersten nicht mehr (deren Crash bliebe
