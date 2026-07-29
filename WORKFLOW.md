@@ -123,7 +123,14 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   > Menge des angesammelten Zustands, nicht an einer reparierbaren Datei.** Kosten
   > sind ausserdem kein Argument dagegen — der abgestuerzte Sammellauf brauchte
   > 26 min bis 83 %, das vollstaendige segmentierte Gate liegt in derselben
-  > Groessenordnung und laeuft dafuer durch.
+  > Groessenordnung und laeuft dafuer durch. **Nachgemessen ohne konkurrierende Last:
+  > das volle segmentierte Gate braucht mit `-j 3` rund 6,5 Minuten** — es ist also
+  > nicht nur robuster, sondern deutlich schneller als der Sammellauf.
+  >
+  > **Nicht deterministisch, Stand 2026-07-29:** `tests/test_views.py` crasht in etwa
+  > jedem dritten Lauf beim Prozessende (Tests bestehen, `SIGSEGV` in der GC danach)
+  > — erfasst als **XPLAT-14**. Ein einzelnes rotes Segment mit dieser Datei und ohne
+  > `FAILED`-Zeile ist deshalb kein Signal ueber die eigene Aenderung.
 
   > **Beide Runner muessen dieselbe Umgebung setzen** — `tests/test_gate_runner_parity.py`
   > nagelt das fest. Der Segment-Runner lag bis 2026-07-29 ausserhalb des Repos und
