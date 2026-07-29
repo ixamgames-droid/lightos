@@ -39,3 +39,32 @@ def app_data_dir() -> str:
         base = os.environ.get("XDG_DATA_HOME") or os.path.join(
             os.path.expanduser("~"), ".local", "share")
     return os.path.join(base, _APP)
+
+
+def crash_log_path() -> str:
+    """Pfad des gemeinsamen ``crash.log`` — EINE Quelle fuer ``main.py`` und
+    ``visualizer_window``. Legt das Verzeichnis an.
+
+    **QA-CRASHLOG-TESTS:** ``LIGHTOS_CRASH_LOG`` biegt die Datei um; ``conftest.py``
+    setzt das auf ein tmp-Verzeichnis. Vorher schrieb die Testsuite in die ECHTE
+    Absturz-Historie des Nutzers — gemessen 24 Zeilen aus einem einzigen Lauf von
+    ``test_a3d_gesture_batch.py -k broken_entry``, weil mehrere Tests absichtlich
+    Fehler durch ``_bridge_slot_guard`` schicken. Der Test-Filter des Intakes
+    (``collect_crash_report._is_test_frame``) kann das **nicht** auffangen: ein
+    Fehler aus einem Bridge-Slot hat ausschliesslich ``src/``-Frames, weil
+    ``exc.__traceback__`` erst am ``try`` IM Wrapper beginnt und der aufrufende
+    Test-Frame darueber liegt. Deshalb muss die Isolation auf der SCHREIBSEITE
+    passieren, nicht beim Auswerten.
+
+    Bewusst NICHT ueber ein umgebogenes ``app_data_dir()`` geloest: das muss im
+    Test echt bleiben (``conftest.py`` haengt ``LIGHTOS_FIXTURE_DB`` daran).
+    """
+    override = os.environ.get("LIGHTOS_CRASH_LOG")
+    if override:
+        parent = os.path.dirname(override)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        return override
+    d = app_data_dir()
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, "crash.log")

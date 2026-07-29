@@ -40,6 +40,13 @@ os.environ.setdefault(
 # Konkreter Anlass: test_viz10_stability schrieb sonst absichtliche Fake-Crashes
 # ("ValueError: kaputt") in Davids echtes crash.log und verfaelschte die
 # Absturz-Diagnose. PID-scoped -> parallele Laeufe teilen sich nichts.
+# ⚠️ QA-CRASHLOG-TESTS: Fuer crash.log hat DIESE Umlenkung nur auf WINDOWS
+# gereicht. Auf Linux/macOS loest app_data_dir() ueber XDG bzw.
+# ~/Library auf und sieht APPDATA gar nicht — die Fake-Crashes landeten dort
+# weiter im echten Log (2026-07-29 gemessen). Deshalb gibt es zusaetzlich
+# LIGHTOS_CRASH_LOG (unten). Wer hier etwas aendert: der Waechter
+# test_app_data_dir.py::test_suite_never_writes_into_the_real_crash_log
+# prueft den TATSAECHLICH benutzten Pfad, nicht die Absicht.
 # Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT ins Test-
 # APPDATA umgelenkt. Die committeten shows/*.lshow referenzieren feste
 # fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
@@ -58,6 +65,23 @@ _TEST_APPDATA = os.path.join(_TEST_TMP, f"lightos_test_appdata_{_TEST_PID}")
 os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
 os.environ["APPDATA"] = _TEST_APPDATA
 
+# QA-CRASHLOG-TESTS: crash.log aus der ECHTEN Absturz-Historie heraushalten.
+# Die APPDATA-Umlenkung darueber reicht dafuer NUR auf Windows — auf Linux/macOS
+# loest `app_data_dir()` ueber XDG bzw. ~/Library auf und ignoriert APPDATA, also
+# schrieben Testlaeufe dort in `~/.local/share/LightOS/crash.log`. Mehrere Tests
+# schicken absichtlich Fehler durch `_bridge_slot_guard` (test_viz10_stability,
+# jeder Test mit kaputter Bridge-Payload); gemessen kamen aus EINEM Lauf von
+# `test_a3d_gesture_batch.py -k broken_entry` 24 Zeilen zusammen, die das
+# Crash-Intake anschliessend als neue App-Signatur meldete.
+#
+# Der Test-Filter des Intakes (`collect_crash_report._is_test_frame`) kann das
+# nicht auffangen: ein Fehler aus einem Bridge-Slot hat ausschliesslich
+# `src/`-Frames, weil `exc.__traceback__` erst am `try` IM Wrapper beginnt und der
+# aufrufende Test-Frame darueber liegt. Deshalb trennt es hier die Schreibseite.
+os.environ.setdefault(
+    "LIGHTOS_CRASH_LOG",
+    os.path.join(_TEST_TMP, f"lightos_test_crash_{_TEST_PID}.log"))
+
 
 def _purge_test_dbs():
     """Die prozess-eigene Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
@@ -73,9 +97,35 @@ def _purge_test_dbs():
             pass
 
 
+def _purge_old_test_crash_logs():
+    """Test-crash.logs frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
+
+    Die Datei traegt die PID, damit parallele Segmente (``verify_segmented.sh -j 3``)
+    sich nicht in die Quere kommen — sie entsteht lazy, also nur fuer Segmente, die
+    wirklich etwas loggen. Ohne dieses Aufraeumen sammeln sich die Reste in /tmp.
+    Die EIGENE Datei bleibt unangetastet.
+    """
+    own = os.environ.get("LIGHTOS_CRASH_LOG")
+    try:
+        import glob
+        import time as _time
+        cutoff = _time.time() - 24 * 3600
+        for path in glob.glob(os.path.join(_TEST_TMP, "lightos_test_crash_*.log")):
+            if path == own:
+                continue
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except OSError:
+                pass    # fremder Lauf haelt sie noch offen -> naechstes Mal
+    except Exception:
+        pass            # Aufraeumen darf NIE einen Testlauf verhindern
+
+
 # Beim conftest-Import (Sammelphase, VOR dem ersten get_state()/engine())
 # etwaige Altdateien derselben PID wegraeumen -> jeder Lauf startet garantiert leer.
 _purge_test_dbs()
+_purge_old_test_crash_logs()
 # Den 44-Hz-DMX-Output-Thread in Tests gar nicht erst autostarten (siehe
 # app_state.get_state): er rendert in _render_frame und emittiert Sync-Events,
 # die cross-thread in Qt marshallt werden -> race mit dem pytest-Teardown

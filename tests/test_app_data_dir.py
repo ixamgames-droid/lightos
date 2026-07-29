@@ -143,3 +143,70 @@ def test_main_appdata_dir_matches_central_resolution():
         f"(XPLAT-10). Rumpf war:\n{fn}")
     assert not _APPDATA_SELFRESOLVE.search(fn), (
         "main._appdata_dir() loest APPDATA wieder selbst auf (XPLAT-10)")
+
+
+# ── QA-CRASHLOG-TESTS: die Testsuite schreibt nicht in die echte Crash-Historie ──
+# Vorher tat sie genau das: mehrere Tests schicken absichtlich Fehler durch
+# `_bridge_slot_guard`, und `_viz_crash_log_path()` zeigte auf
+# `app_data_dir()/crash.log`. Auf Windows fiel das nie auf, weil `conftest.py`
+# `APPDATA` ins tmp umlenkt — auf Linux/macOS loest `app_data_dir()` ueber
+# XDG bzw. ~/Library auf und ignoriert APPDATA. Gemessen: 24 Zeilen aus EINEM Lauf
+# von `test_a3d_gesture_batch.py -k broken_entry`, die das Crash-Intake danach als
+# neue App-Signatur meldete (und die mich zu einer Fehldiagnose verleitet haben).
+
+def test_crash_log_path_honors_the_test_override():
+    """`LIGHTOS_CRASH_LOG` gewinnt — das ist der Schalter, den conftest setzt."""
+    from src.core.paths import crash_log_path
+    target = os.path.join(_TMP_FOR_OVERRIDE(), "sub", "eigenes_crash.log")
+    old = os.environ.get("LIGHTOS_CRASH_LOG")
+    os.environ["LIGHTOS_CRASH_LOG"] = target
+    try:
+        assert crash_log_path() == target
+        # Das Elternverzeichnis muss angelegt sein, sonst wirft der erste
+        # open(..., "a") des Log-Handles.
+        assert os.path.isdir(os.path.dirname(target))
+    finally:
+        if old is None:
+            os.environ.pop("LIGHTOS_CRASH_LOG", None)
+        else:
+            os.environ["LIGHTOS_CRASH_LOG"] = old
+
+
+def test_crash_log_path_falls_back_to_the_data_dir():
+    """Ohne Override die normale Produktions-Aufloesung — der Schalter darf das
+    Verhalten der ausgelieferten App nicht veraendern."""
+    from src.core.paths import app_data_dir, crash_log_path
+    old = os.environ.pop("LIGHTOS_CRASH_LOG", None)
+    try:
+        assert crash_log_path() == os.path.join(app_data_dir(), "crash.log")
+    finally:
+        if old is not None:
+            os.environ["LIGHTOS_CRASH_LOG"] = old
+
+
+def test_suite_never_writes_into_the_real_crash_log():
+    """DER Waechter. Laeuft unter dem echten conftest-Zustand und schlaegt fehl,
+    sobald die Isolation aushebelt wird — egal wodurch.
+
+    Geprueft wird der Pfad, den der Visualizer-Logger TATSAECHLICH benutzt, nicht
+    die Absicht: `_viz_crash_log_path()` ist die Funktion, die die 24 Zeilen
+    geschrieben hat.
+    """
+    import src.ui.visualizer.visualizer_window as VW
+    from src.core.paths import app_data_dir
+
+    used = os.path.abspath(VW._viz_crash_log_path())
+    real_dir = os.path.abspath(app_data_dir())
+
+    assert os.environ.get("LIGHTOS_CRASH_LOG"), (
+        "conftest.py setzt LIGHTOS_CRASH_LOG nicht mehr — Testlaeufe landen wieder "
+        "in der echten Absturz-Historie des Nutzers")
+    assert os.path.dirname(used) != real_dir, (
+        f"die Testsuite schreibt ihr crash.log in den ECHTEN Datenordner: {used}")
+
+
+def _TMP_FOR_OVERRIDE():
+    """Schreibbares tmp fuer den Override-Test — nutzt denselben Ort wie conftest,
+    damit nichts neben dem Testbaum liegen bleibt."""
+    base = os.environ.get("LIGHTOS_CRASH_LOG")
+    return os.path.dirname(base) if base else os.path.join(_REPO_ROOT, ".pytest_cache")
