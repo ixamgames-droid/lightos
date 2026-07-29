@@ -4,7 +4,7 @@
 import * as THREE from '../three/three.js';
 import { renderer } from '../scene/renderer.js';
 import { rad2deg, deg2rad } from '../scene/renderer.js';
-import { orthoCam, orthoState, updateCamera } from '../camera/cameras.js';
+import { orthoCam, orthoState, updateCamera, viewportAspect } from '../camera/cameras.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import {
   raycaster, mouse, setMouseFromCoords, setMouseFromEvent, intersectGround,
@@ -105,9 +105,14 @@ export const pointerState = {
 export function _placeFixtureAtMouse() {
   raycaster.setFromCamera(mouse, view.activeCam);
   const target = new THREE.Vector3();
-  raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0), -0.4), target);
+  // A3D-41: den RUECKGABEWERT pruefen, nicht `target`. Der ist ein frischer
+  // Vector3 und damit immer truthy — bei einem Fehlschlag (Strahl parallel zur
+  // Ebene, also Klick auf den Horizont) blieb er auf (0,0,0) stehen und das
+  // Geraet landete am Buehnen-Ursprung, statt dass die Aktion ausfaellt.
+  const hit = raycaster.ray.intersectPlane(
+    new THREE.Plane(new THREE.Vector3(0,1,0), -0.4), target);
   const bridge = bridgeRef.get();
-  if (bridge && target && bridge.placeFixture) {
+  if (bridge && hit && bridge.placeFixture) {
     const px = snap(target.x), pz = snap(target.z);
     _fabLastPlaceCoords = { x: target.x, z: target.z };
     let y = 6.5, dock = '';
@@ -295,11 +300,18 @@ export function handlePointerMove(clientX, clientY, ctrlKey) {
     view.phi = Math.max(0.2, Math.min(Math.PI * 0.49, view.phi + dy * 0.008));
     updateCamera();
   } else if (dragMode === 'pan') {
-    const a = window.innerWidth / window.innerHeight;
-    const wPerPxX = (2 * orthoState.size * a) / window.innerWidth;
-    const wPerPxZ = (2 * orthoState.size) / window.innerHeight;
-    orthoCam.position.x -= dx * wPerPxX;
-    orthoCam.position.z -= dy * wPerPxZ;
+    // A3D-41: Bei einem 0-grossen Viewport ist `(2*size*a)/0` je nach Zaehler
+    // Infinity oder NaN, und `dx * Infinity` mit dx===0 ergibt NaN — das landet
+    // per `-=` DAUERHAFT in orthoCam.position und macht ab dann jeden Raycast
+    // im 2D-Modus NaN. Ohne Layout-Groesse gibt es kein sinnvolles Welt-Delta,
+    // also gar nicht schwenken.
+    if (window.innerWidth > 0 && window.innerHeight > 0) {
+      const a = viewportAspect();
+      const wPerPxX = (2 * orthoState.size * a) / window.innerWidth;
+      const wPerPxZ = (2 * orthoState.size) / window.innerHeight;
+      orthoCam.position.x -= dx * wPerPxX;
+      orthoCam.position.z -= dy * wPerPxZ;
+    }
   } else if (dragMode === 'fixtureDrag') {
     // Fixture-Koerper ziehen = XZ-Verschieben am Boden (via Raycast -> schon
     // zoom-korrekt). Y/Rotation laufen ueber das Gizmo (3b-G), nicht mehr ueber
@@ -347,37 +359,45 @@ export function handlePointerMove(clientX, clientY, ctrlKey) {
     const snapActive = settings.snapToGrid && !ctrlKey;
     if (dragGizmo.mode === 'translate') {
       const cur = axisParamUnderPointer(dragGizmo.pivot, dragGizmo.axisVec);
-      let delta = cur - dragGizmo.startParam;
-      if (snapActive) delta = Math.round(delta / settings.gridStep) * settings.gridStep;
-      const ax = dragGizmo.axis;
-      const isVertical = (ax === 'y');
-      let refDock = null;
-      for (const fid of view.selectedFids) {
-        const start = dragStartPositions[fid];
-        const f = fixtures[fid];
-        if (!start || !f) continue;
-        f.group.position.x = start.x + (ax === 'x' ? delta : 0);
-        f.group.position.y = start.y + (ax === 'y' ? delta : 0);
-        f.group.position.z = start.z + (ax === 'z' ? delta : 0);
-        if (isVertical) {
-          // Explizite Hoehe -> Andocken loesen (wie das alte move_y).
-          f._pendingDock = null;
-          f.group.position.y = Math.max(0, Math.min(30, f.group.position.y));
-        } else if (settings.dockEnabled) {
-          const dt = findDockTarget(f.group.position.x, f.group.position.z);
-          f._pendingDock = dt ? dt.stageId : null;
-          if (dt) f.group.position.y = dt.y;
-          if (!refDock && dt) refDock = dt;
+      // A3D-41: Kanten-Guard, wortgleich zum Rotations-Zweig unten. Ohne ihn
+      // wurde ein nicht-endlicher Parameter zu `start + NaN` in
+      // f.group.position — eine unsichtbare Lampe, deren Gestik-Payload Python
+      // mit float(None) abschoss. `startParam` kann aus demselben Grund schon
+      // beim Pointer-Down leer geblieben sein; dann ist JETZT der Start.
+      if (cur != null) {
+        if (dragGizmo.startParam == null) dragGizmo.startParam = cur;
+        let delta = cur - dragGizmo.startParam;
+        if (snapActive) delta = Math.round(delta / settings.gridStep) * settings.gridStep;
+        const ax = dragGizmo.axis;
+        const isVertical = (ax === 'y');
+        let refDock = null;
+        for (const fid of view.selectedFids) {
+          const start = dragStartPositions[fid];
+          const f = fixtures[fid];
+          if (!start || !f) continue;
+          f.group.position.x = start.x + (ax === 'x' ? delta : 0);
+          f.group.position.y = start.y + (ax === 'y' ? delta : 0);
+          f.group.position.z = start.z + (ax === 'z' ? delta : 0);
+          if (isVertical) {
+            // Explizite Hoehe -> Andocken loesen (wie das alte move_y).
+            f._pendingDock = null;
+            f.group.position.y = Math.max(0, Math.min(30, f.group.position.y));
+          } else if (settings.dockEnabled) {
+            const dt = findDockTarget(f.group.position.x, f.group.position.z);
+            f._pendingDock = dt ? dt.stageId : null;
+            if (dt) f.group.position.y = dt.y;
+            if (!refDock && dt) refDock = dt;
+          }
+          if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
         }
-        if (f.icon) f.icon.position.set(f.group.position.x, 0.05, f.group.position.z);
+        if (!isVertical && settings.dockEnabled) {
+          if (refDock) {
+            applyDockHighlight(refDock.stageId);
+            showDockBadge((refDock.kind === 'hang' ? 'haengt an ' : 'steht auf ') + _dockNameFor(refDock.stageId));
+          } else { clearDockHighlight(); hideDockBadge(); }
+        }
+        showEditReadout(ax.toUpperCase() + ': ' + (delta >= 0 ? '+' : '') + delta.toFixed(2) + ' m');
       }
-      if (!isVertical && settings.dockEnabled) {
-        if (refDock) {
-          applyDockHighlight(refDock.stageId);
-          showDockBadge((refDock.kind === 'hang' ? 'haengt an ' : 'steht auf ') + _dockNameFor(refDock.stageId));
-        } else { clearDockHighlight(); hideDockBadge(); }
-      }
-      showEditReadout(ax.toUpperCase() + ': ' + (delta >= 0 ? '+' : '') + delta.toFixed(2) + ' m');
     } else {
       // Rotation UM die Welt-Achse a: delta-Quaternion mit dem Start-Quaternion
       // je Fixture komponieren (f.group.rotation folgt automatisch -> die

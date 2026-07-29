@@ -33,8 +33,15 @@ import {
   applySelectionPulse, selectionPulseActive,   // VIZ-14 Slice 1c: Identify-Flash
   expireSelectionPulseForTest,                 // VIZ-14 Slice 1c: Test-Seam (Flash beenden)
 } from './interaction/tools.js';
-import { wirePointerLateBindings, resolveDockOnGestureEnd } from './interaction/pointer.js';
-import { attachGizmoToSelection } from './interaction/gizmo.js';  // VIZ-13 3b-G
+import {
+  wirePointerLateBindings, resolveDockOnGestureEnd,
+  pointerState, handlePointerMove,   // A3D-41: Test-Seams fuer den Pan-Pfad
+} from './interaction/pointer.js';
+import { attachGizmoToSelection, axisParamUnderPointer } from './interaction/gizmo.js';  // VIZ-13 3b-G
+// A3D-41: Test-Seams fuer die NaN-Guards. Ueber echte Pointer-Events sind sie
+// nicht erreichbar — der Fehlerfall braucht ein Canvas MIT Pointer-Event und
+// OHNE Layout-Groesse, was sich in einem Test nicht per Maus herstellen laesst.
+import { setMouseFromCoords, intersectGround, mouse } from './interaction/picking.js';
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
@@ -172,6 +179,19 @@ window.__lightos = {
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
+  // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
+  // absichtlich das GETEILTE Vector2 selbst (nicht eine Kopie) — der Test muss
+  // pruefen koennen, dass ein verworfener Aufruf es unangetastet laesst, und
+  // den vergifteten Zustand von damals nachstellen koennen.
+  __setMouseFromCoords: setMouseFromCoords,
+  __intersectGround: intersectGround,
+  __axisParamUnderPointer: axisParamUnderPointer,
+  __mouse: mouse,
+  // A3D-41: der 2D-Pan mutiert orthoCam.position direkt (kein Kamera-Helfer,
+  // s. Kommentar in cameras.js) — nur ueber diese beiden Seams laesst sich der
+  // echte Pfad treiben statt nur die Formel nachzurechnen.
+  __pointerState: pointerState,
+  __handlePointerMove: handlePointerMove,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

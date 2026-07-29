@@ -163,6 +163,15 @@ const _w0 = new THREE.Vector3();
 // Parametrischer Wert t (Welt-Einheiten) auf der Achse a durch A, der dem
 // aktuellen Pointer-Strahl am naechsten liegt (closest point between two lines).
 // mouse muss vorher via setMouseFromCoords gesetzt sein (Aufrufer tut das).
+// Rueckgabe null, wenn kein endlicher Parameter herauskommt — dieselbe
+// Fehler-Semantik wie rotationAngleUnderPointer unten.
+//
+// A3D-41: Der Null-Rueckgabepfad fehlte hier, waehrend die Schwester-Funktion
+// ihn hatte. Ein NaN-`mouse` (nicht gelayoutetes Canvas, s. picking.js) macht
+// den ganzen Ray NaN; `Math.abs(NaN) < 1e-6` ist false, also fiel hier NaN
+// heraus statt eines Abbruchs, und der Translate-Zweig schrieb `start + NaN`
+// in f.group.position. Der Rotations-Zweig blieb genau wegen seines
+// Null-Guards verschont — der Bug trat NUR beim Verschieben auf.
 export function axisParamUnderPointer(A, a) {
   raycaster.setFromCamera(mouse, view.activeCam);
   const P = raycaster.ray.origin, d = raycaster.ray.direction; // d normalisiert
@@ -170,7 +179,8 @@ export function axisParamUnderPointer(A, a) {
   // A-P wuerde den Parameter negieren -> Handle liefe der Maus entgegen)
   const b = d.dot(a), dd = d.dot(_w0), ae = a.dot(_w0);
   const denom = 1 - b * b;                       // 0 nur wenn Strahl ∥ Achse
-  return Math.abs(denom) < 1e-6 ? ae : (ae - b * dd) / denom;
+  const t = Math.abs(denom) < 1e-6 ? ae : (ae - b * dd) / denom;
+  return Number.isFinite(t) ? t : null;
 }
 
 // Winkel (rad) des Pointer-Treffers in der Ebene mit Normale = Achse a durch C.
