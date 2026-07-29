@@ -24,6 +24,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Slot
+from _qt_webengine import destroy_webengine_view  # XPLAT-09
 
 _app = QApplication.instance() or QApplication([])
 
@@ -65,11 +66,13 @@ class ShadowDisposeJsTest(unittest.TestCase):
         self._poll_until_true("window.__lightosAppReady === true")
 
     def tearDown(self):
-        try:
-            self._view.deleteLater()
-        except Exception:
-            pass
-        self._pump(0.2)
+        # XPLAT-09: deleteLater() allein raeumt hier nichts ab — processEvents()
+        # stellt DeferredDelete nicht zu. Der View ueberlebt dann mitsamt Page,
+        # Channel und Renderer, waehrend die parentlose Bridge mit der
+        # TestCase-Instanz stirbt: dangling registriertes QObject -> SIGSEGV.
+        # Ausfuehrliche Herleitung in tests/_qt_webengine.py.
+        destroy_webengine_view(self._view, self._pump)
+        self._view = None
 
     def _pump(self, seconds):
         deadline = time.monotonic() + seconds

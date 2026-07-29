@@ -284,6 +284,7 @@ from PySide6.QtWebEngineCore import (QWebEngineProfile,          # noqa: E402
                                      QWebEngineSettings)
 from PySide6.QtWebEngineWidgets import QWebEngineView            # noqa: E402
 from PySide6.QtWidgets import QApplication                       # noqa: E402
+from _qt_webengine import destroy_webengine_view  # XPLAT-09
 
 _app = QApplication.instance() or QApplication([])
 
@@ -356,11 +357,13 @@ class LuminanceCullingJsTest(unittest.TestCase):
         self._view.loadFinished.connect(self._loaded_ok.append)
 
     def tearDown(self):
-        try:
-            self._view.deleteLater()
-        except Exception:
-            pass
-        self._pump(0.2)
+        # XPLAT-09: deleteLater() allein raeumt hier nichts ab — processEvents()
+        # stellt DeferredDelete nicht zu. Der View ueberlebt dann mitsamt Page,
+        # Channel und Renderer, waehrend die parentlose Bridge mit der
+        # TestCase-Instanz stirbt: dangling registriertes QObject -> SIGSEGV.
+        # Ausfuehrliche Herleitung in tests/_qt_webengine.py.
+        destroy_webengine_view(self._view, self._pump)
+        self._view = None
 
     @staticmethod
     def _pump(seconds):
