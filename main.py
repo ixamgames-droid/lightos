@@ -10,12 +10,27 @@ import threading
 # fuer die pythonw-Umleitung unten zur Verfuegung steht.
 sys.path.insert(0, os.path.dirname(__file__))
 from src.core import crash_logging as _cl
+# XPLAT-10: den App-Datenordner NICHT selbst aufloesen (importiert nur os+sys,
+# also auch hier vor dem PySide6-Import unbedenklich). Siehe unten.
+from src.core.paths import app_data_dir as _app_data_dir
 
 APP_VERSION = "1.0.0"
 
 
 def _appdata_dir() -> str:
-    d = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")
+    """App-Datenordner (angelegt) — eine einzige Quelle: ``src.core.paths``.
+
+    XPLAT-10: hier stand noch das alte Selbst-Aufloesen ueber die APPDATA-Variable,
+    das XPLAT-04 ueberall sonst schon abgeloest hatte (Literal bewusst nicht zitiert —
+    ``test_no_module_resolves_appdata_itself`` bewacht genau dieses Muster).
+    Folge auf Linux: crash.log/last_alive/Running-Flags landeten in ``~/LightOS``,
+    waehrend Visualizer-Fehler (``visualizer_window._viz_crash_log_path``) und das
+    Crash-Intake (``tools/collect_crash_report.py``) ueber ``app_data_dir()`` nach
+    ``~/.local/share/LightOS`` schrieben bzw. lasen — das Intake sah die Abstuerze
+    der App also gar nicht. Auf Windows/WinARM ist der Wert byte-identisch
+    (``%APPDATA%/LightOS``), dort aendert sich nichts.
+    """
+    d = _app_data_dir()
     os.makedirs(d, exist_ok=True)
     return d
 

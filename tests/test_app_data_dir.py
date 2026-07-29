@@ -76,3 +76,70 @@ def test_always_ends_with_lightos(monkeypatch, plat):
     got = _call(monkeypatch, plat, env)
     assert os.path.basename(got) == "LightOS"
     assert got  # nie leer
+
+
+# ── XPLAT-10: niemand loest den Ordner mehr selbst auf ───────────────────────
+# Hintergrund: XPLAT-04 hatte `app_data_dir()` eingefuehrt, aber vier aktive
+# Fundstellen bauten den Pfad weiter selbst (`main.py`, `install.py`,
+# `uninstall.py`, `tools/build_full_show.py`). Auf Linux fiel das auseinander:
+# `main.py` schrieb crash.log/last_alive/Running-Flags nach ~/LightOS, waehrend
+# `visualizer_window._viz_crash_log_path` und `tools/collect_crash_report.py`
+# ueber `app_data_dir()` mit ~/.local/share/LightOS arbeiteten — das Crash-Intake
+# sah die Abstuerze der App also gar nicht. Dieser Waechter haelt das geschlossen.
+
+import re                                                          # noqa: E402
+import subprocess                                                  # noqa: E402
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Nur hier darf APPDATA vorkommen: das ist die zentrale Aufloesung selbst.
+_ALLOWED = {os.path.join("src", "core", "paths.py")}
+
+# Nicht gescannt: venv (fremder Code), tools/_archiv (stillgelegt), tests
+# (duerfen das alte Muster zu Vergleichszwecken nennen — siehe oben).
+_SKIP_PREFIXES = ("venv", ".git", os.path.join("tools", "_archiv"), "tests")
+
+_APPDATA_SELFRESOLVE = re.compile(r"""environ(?:\.get\(|\[)\s*["']APPDATA["']""")
+
+
+def _tracked_python_files():
+    out = subprocess.run(["git", "ls-files", "*.py"], cwd=_REPO_ROOT,
+                         capture_output=True, text=True, check=True).stdout
+    for rel in out.splitlines():
+        rel = rel.strip()
+        if not rel or rel.startswith(_SKIP_PREFIXES):
+            continue
+        yield rel
+
+
+def test_no_module_resolves_appdata_itself():
+    offenders = []
+    for rel in _tracked_python_files():
+        if rel.replace("/", os.sep) in _ALLOWED:
+            continue
+        with open(os.path.join(_REPO_ROOT, rel), encoding="utf-8", errors="replace") as f:
+            for lineno, line in enumerate(f, 1):
+                if _APPDATA_SELFRESOLVE.search(line):
+                    offenders.append(f"{rel}:{lineno}: {line.strip()}")
+    assert not offenders, (
+        "Diese Stellen loesen den App-Datenordner selbst ueber APPDATA auf statt ueber "
+        "src.core.paths.app_data_dir() (XPLAT-04/-10) — auf Linux/macOS zeigen sie damit "
+        "woandershin als der Rest der App:\n  " + "\n  ".join(offenders))
+
+
+def test_main_appdata_dir_matches_central_resolution():
+    """`main._appdata_dir()` (crash.log, last_alive, Running-Flags) muss denselben
+    Ordner liefern wie `app_data_dir()` — sonst schreibt die App ihre Crash-Spur
+    dorthin, wo das Crash-Intake nicht nachsieht."""
+    # main.py hat schweren Top-Level-Code (PySide6/MainWindow-Import) -> Quelltext
+    # statt Import pruefen: die Funktion muss an app_data_dir() delegieren.
+    src = open(os.path.join(_REPO_ROOT, "main.py"), encoding="utf-8").read()
+    body = src.split("def _appdata_dir(", 1)
+    assert len(body) == 2, "main.py hat kein _appdata_dir() mehr — Test anpassen"
+    # bis zur naechsten Top-Level-Definition
+    fn = re.split(r"\n(?:def |class |if |from |import )", body[1], maxsplit=1)[0]
+    assert "_app_data_dir()" in fn or "app_data_dir()" in fn, (
+        "main._appdata_dir() delegiert nicht an src.core.paths.app_data_dir() "
+        f"(XPLAT-10). Rumpf war:\n{fn}")
+    assert not _APPDATA_SELFRESOLVE.search(fn), (
+        "main._appdata_dir() loest APPDATA wieder selbst auf (XPLAT-10)")

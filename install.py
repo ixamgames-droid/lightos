@@ -11,7 +11,10 @@ Usage:
 Was wird installiert/erstellt:
 - venv/                        (Python Virtual Environment, ~250 MB)
 - data/                        (lokale Show-DB, MIDI-Mappings, Modifier)
-- %APPDATA%/LightOS/           (Recent-Files, Stages, Input-Profile, Snapshots, Auto-Save)
+- App-Datenordner              (Recent-Files, Stages, Input-Profile, Snapshots, Auto-Save)
+                               Windows %APPDATA%/LightOS, Linux ~/.local/share/LightOS,
+                               macOS ~/Library/Application Support/LightOS — aufgeloest
+                               von src/core/paths.app_data_dir() (XPLAT-04/-10)
 - Desktop\LightOS.lnk          (optional, --no-shortcut zum Ueberspringen)
 - Start-Menu\LightOS\LightOS.lnk (optional)
 - install_manifest.json        (Liste aller installierten Dateien fuer uninstall.py)
@@ -31,7 +34,14 @@ from pathlib import Path
 ROOT = Path(__file__).parent.resolve()
 VENV_DIR = ROOT / "venv"
 MANIFEST_PATH = ROOT / "install_manifest.json"
-APPDATA_DIR = Path(os.environ.get("APPDATA", str(Path.home()))) / "LightOS"
+# XPLAT-10: Datenordner ueber die zentrale Aufloesung, nicht selbst gebaut — sonst
+# legt der Installer auf Linux ~/LightOS/{stages,input_profiles,snaps} an, waehrend
+# die App ihre Daten nach ~/.local/share/LightOS schreibt. src/core/paths importiert
+# nur os+sys, laeuft also auch hier vor dem venv mit dem System-Python.
+sys.path.insert(0, str(ROOT))
+from src.core.paths import app_data_dir            # noqa: E402
+
+APPDATA_DIR = Path(app_data_dir())
 
 PYTHON_MIN = (3, 11)
 OPTIONAL_REQUIREMENTS = {

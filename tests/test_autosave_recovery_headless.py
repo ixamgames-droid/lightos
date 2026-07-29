@@ -77,9 +77,12 @@ class TestAutosaveRecoveryHeadless(unittest.TestCase):
         with open(cls.tmp_autosave, "wb") as f:
             f.write(b"qa23 dummy autosave")
 
-        # AUFLAGE: nie den echten %APPDATA%-Pfad anfassen — hart zusichern.
-        real_appdata_dir = os.path.normcase(os.path.abspath(os.path.join(
-            os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")))
+        # AUFLAGE: nie den echten App-Datenordner anfassen — hart zusichern.
+        # XPLAT-10: frueher wurde hier das alte APPDATA-Muster nachgebaut; auf Linux
+        # bewachte das ~/LightOS statt des echten ~/.local/share/LightOS, die Auflage
+        # lief also am Ziel vorbei. Jetzt dieselbe Quelle wie die App.
+        from src.core.paths import app_data_dir
+        real_appdata_dir = os.path.normcase(os.path.abspath(app_data_dir()))
         tmp_norm = os.path.normcase(os.path.abspath(cls.tmp_autosave))
         assert not tmp_norm.startswith(real_appdata_dir + os.sep), \
             "Regressionstest darf NIE auf %APPDATA%/LightOS zeigen (QA-23-Auflage)"
