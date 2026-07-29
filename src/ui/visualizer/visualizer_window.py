@@ -116,6 +116,29 @@ def log_bridge_exception(context: str, exc: BaseException) -> None:
         pass
 
 
+def _finite_xyz(x, y, z):
+    """``(x, y, z)`` als Float-Tripel — oder ``None``, wenn ein Wert fehlt,
+    nicht in eine Zahl konvertierbar oder nicht endlich ist (NaN/Inf).
+
+    A3D-41: JS kann ``null`` schicken, wo eine Koordinate erwartet wird —
+    ``JSON.stringify`` macht aus einem NaN in ``f.group.position`` ein ``null``.
+    Ein nacktes ``float(...)`` wirft dort (``TypeError``) bzw. laesst NaN
+    ungehindert in den SceneGraph und in die Show-Datei laufen, wo es jede
+    spaetere Rechnung vergiftet und beim Speichern nicht-standardkonformes
+    ``NaN`` in das JSON schreibt. Beides ist hier abgefangen.
+    """
+    out = []
+    for v in (x, y, z):
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(f):
+            return None
+        out.append(f)
+    return (out[0], out[1], out[2])
+
+
 def _bridge_slot_guard(fn):
     """Ersetzt die individuellen ``try/except Exception as e: print(...)``-
     Bloecke der @Slot-Methoden: Fehler werden weiterhin verschluckt (die Bridge
@@ -717,6 +740,8 @@ class VisualizerBridge(QObject):
         # weil `_bridge_slot_guard` die Exception schluckt. Vorher war jedes
         # Fixture ein eigener Slot-Aufruf, der Schaden also auf eines begrenzt.
         entries = []
+        dropped_fids = []   # Position unbrauchbar -> Eintrag ganz verworfen
+        dropped_rots = 0    # nur die Drehung unbrauchbar -> Position bleibt
         for d in items:
             if not isinstance(d, dict) or "fid" not in d:
                 continue
@@ -724,12 +749,34 @@ class VisualizerBridge(QObject):
             has_rotation = bool(d.get("hasRotation"))
             has_dock_change = bool(d.get("hasDockChange"))
 
-            new_pos = (float(d["x"]), float(d["y"]), float(d["z"]))
+            # A3D-41: EIN defekter Eintrag darf nicht die ganze Gestik kosten.
+            # Vorher warf `float(d["x"])` hier bei `x: null` einen TypeError,
+            # den `_bridge_slot_guard` in einen crash.log-Eintrag verwandelte —
+            # der Nutzer sah keine Meldung, aber KEINE der mitgezogenen Lampen
+            # wurde uebernommen und es entstand kein Undo-Command. `null`
+            # entsteht, wenn JS ein NaN sendet (JSON.stringify macht daraus
+            # null); die Quelle davon ist mit dem `mouse`-Guard in picking.js
+            # geschlossen, dieser Filter ist die Grenze dahinter.
+            new_pos = _finite_xyz(d.get("x"), d.get("y"), d.get("z"))
+            if new_pos is None:
+                dropped_fids.append(fid)
+                continue
             old_pos = self._state.visualizer_positions.get(fid, new_pos)
 
             old_rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
-            new_rot = ((float(d.get("rx", 0.0)), float(d.get("ry", 0.0)),
-                        float(d.get("rz", 0.0))) if has_rotation else old_rot)
+            if has_rotation:
+                new_rot = _finite_xyz(d.get("rx", 0.0), d.get("ry", 0.0),
+                                      d.get("rz", 0.0))
+                if new_rot is None:
+                    # Position ist brauchbar, nur die Drehung nicht — Andocken
+                    # und Verschieben trotzdem uebernehmen, Drehung behalten.
+                    # Der Command pusht `new_rot` an JS und heilt damit auch
+                    # eine dort schon gesetzte NaN-Drehung mit.
+                    new_rot = old_rot
+                    has_rotation = False
+                    dropped_rots += 1
+            else:
+                new_rot = old_rot
 
             old_dock = self._state.visualizer_docks.get(fid)
             if has_dock_change:
@@ -752,6 +799,31 @@ class VisualizerBridge(QObject):
                 "has_dock": has_dock_change,
                 "has_rotation": has_rotation,
             })
+
+        if dropped_fids or dropped_rots:
+            # Sichtbar, aber ohne crash.log-Eintrag: eine verworfene Payload ist
+            # kein Programmfehler mehr. Bleibt die Meldung dauerhaft stehen,
+            # sitzt die NaN-Quelle woanders als in picking.js.
+            print(f"[Visualizer] {label}: {len(dropped_fids)} Eintrag/Eintraege "
+                  f"mit ungueltigen Koordinaten verworfen, "
+                  f"{dropped_rots} ungueltige Drehung(en) ignoriert "
+                  f"({len(entries)} uebernommen)")
+
+        # A3D-41: Die verworfenen Fixtures stehen in JS auf dem NaN-Wert, den es
+        # gerade gemeldet hat — dort sind sie UNSICHTBAR (three.js kann eine
+        # NaN-Position nicht rastern), waehrend Python ihre letzte gueltige
+        # Position kennt. Nur zu ignorieren wuerde diese Divergenz stehen
+        # lassen; deshalb den autoritativen Stand zurueckschicken. Das laeuft
+        # bewusst OHNE Undo-Command: es wird nichts geaendert, sondern eine
+        # bereits kaputte Ansicht auf den unveraenderten State zurueckgeholt.
+        for fid in dropped_fids:
+            pos = self._state.visualizer_positions.get(fid)
+            if pos is None:
+                continue    # Python kennt das Fixture nicht — nichts zu heilen
+            rot = self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
+            self.push_apply_fixture_transform(
+                fid, pos[0], pos[1], pos[2], *rot,
+                dock=self._state.visualizer_docks.get(fid))
 
         if not entries:
             return

@@ -10,22 +10,45 @@ import { fixtures, stageObjects, topDownIcons, settings, view } from '../state.j
 export const raycaster = new THREE.Raycaster();
 export const mouse = new THREE.Vector2();
 
+// A3D-41: Ein nicht gelayoutetes Canvas (Visualizer im unsichtbaren Tab,
+// zugezogener Splitter, Layout-Umbau) liefert `rect.width/height === 0`. Dann
+// ist `(clientX - rect.left) / rect.width` je nach Zaehler NaN (0/0) oder
+// ±Infinity — und `mouse` ist ein modulweit GETEILTES Vector2: EIN solcher
+// Aufruf vergiftet JEDEN folgenden Raycast, bis der naechste gueltige Aufruf
+// ihn ueberschreibt. Ueber `axisParamUnderPointer` (kein Null-Guard, anders als
+// der Rotations-Zweig) landete das als NaN in `f.group.position` und von dort
+// als `"x": null` in der Gestik-Payload — `JSON.stringify` macht aus NaN null,
+// Python starb an `float(None)` und verlor die GANZE Gestik (16 Vorkommen in
+// zwei Sitzungen im Crash-Log).
+//
+// Rueckgabe `false` = Koordinaten verworfen, `mouse` bleibt auf dem letzten
+// GUELTIGEN Wert. Das ist bewusst kein Abbruch der Aufrufer: ein Raycast an
+// der letzten bekannten Position ist endlich und damit harmlos, waehrend NaN
+// den SceneGraph beschaedigt. `!(x > 0)` fasst 0, negativ und NaN in einem.
 export function setMouseFromCoords(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
+  if (!(rect.width > 0) || !(rect.height > 0)) return false;
   mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  return true;
 }
 
 export function setMouseFromEvent(e) {
-  setMouseFromCoords(e.clientX, e.clientY);
+  return setMouseFromCoords(e.clientX, e.clientY);
 }
 
+// A3D-41: `null`, wenn der Strahl die Bodenebene NICHT trifft. Vorher gab diese
+// Funktion IMMER einen Vector3 zurueck: `ray.intersectPlane` liefert bei
+// parallelem Strahl (und bei NaN-Ray, weil `NaN >= 0` false ist) `null` und
+// laesst `target` unangetastet — herausgefallen ist dann der frische Nullvektor,
+// also (0,0,0). Alle sechs Aufrufer pruefen `if (gh)` und waren damit
+// wirkungslos: statt die Gestik zu verwerfen, rechneten sie mit dem
+// Buehnen-URSPRUNG weiter und rissen das Geraet dorthin.
 export function intersectGround() {
   raycaster.setFromCamera(mouse, view.activeCam);
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const out = new THREE.Vector3();
-  raycaster.ray.intersectPlane(plane, out);
-  return out;
+  return raycaster.ray.intersectPlane(plane, out) ? out : null;
 }
 
 export function pickFixture() {

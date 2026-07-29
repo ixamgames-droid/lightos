@@ -229,7 +229,16 @@ class GestureBatchTest(unittest.TestCase):
     def test_broken_entry_leaves_no_half_applied_state(self):
         """Review-Fund: erst die ganze Payload parsen, dann schreiben. Sonst
         haette ein defekter Eintrag die vorherigen Fixtures im State stehen
-        lassen — ohne Undo-Command, ohne Meldung (der Slot-Guard schluckt)."""
+        lassen — ohne Undo-Command, ohne Meldung (der Slot-Guard schluckt).
+
+        **A3D-41 hat die Erwartung praezisiert.** Die Garantie war und bleibt:
+        kein nicht-ruecknehmbarer Teilzustand — was ankommt, kommt in EINEM
+        Undo-Command an. Was NICHT mehr gilt, ist „ein defekter Eintrag
+        verwirft die ganze Gestik": das kostete den Nutzer beim Multi-Drag alle
+        mitgezogenen Lampen und hinterliess trotzdem eine Divergenz (JS hatte
+        ja schon bewegt). Jetzt wird der defekte Eintrag einzeln verworfen und
+        die uebrigen bilden weiterhin genau einen Undo-Schritt.
+        """
         self.state.visualizer_positions[1] = (0.0, 6.0, 0.0)
         self.state.visualizer_positions[2] = (0.0, 6.0, 0.0)
         self.undo.clear()
@@ -240,9 +249,77 @@ class GestureBatchTest(unittest.TestCase):
         self.bridge.fixturesTransformBatch(json.dumps({
             "items": [_item(1, x=5.0), bad]}))
 
-        self.assertEqual(self.state.visualizer_positions[1], (0.0, 6.0, 0.0),
-                         "kein Fixture darf halb angewendet zurueckbleiben")
-        self.assertFalse(self.undo.can_undo())
+        self.assertAlmostEqual(self.state.visualizer_positions[1][0], 5.0,
+                               msg="der gueltige Eintrag darf nicht mit "
+                                   "verworfen werden")
+        self.assertEqual(self.state.visualizer_positions[2], (0.0, 6.0, 0.0),
+                         "der defekte Eintrag bleibt unangetastet")
+        self.assertEqual(len(self.undo._undo), 1,
+                         "die uebernommenen Eintraege sind EIN Undo-Schritt")
+        self.assertTrue(self.undo.undo())
+        self.assertEqual(self.state.visualizer_positions[1], (0.0, 6.0, 0.0))
+
+    def test_no_broken_entry_ever_reaches_the_state(self):
+        """A3D-41: keine der Spielarten eines kaputten Wertes darf durch.
+
+        ``None`` ist der Fall aus dem Crash-Log (``JSON.stringify`` macht aus
+        NaN ein ``null``), ``float('nan')``/``inf`` der Fall, wenn ein
+        Nicht-JSON-Transport die Werte roh durchreicht, und der String der
+        Fall eines fehlgeleiteten Payload-Feldes. Alle vier muessen den State
+        unberuehrt lassen, statt ihn mit einem unbrauchbaren Wert zu
+        vergiften — ein NaN in ``visualizer_positions`` ueberlebt sonst bis in
+        die Show-Datei und macht das Geraet dauerhaft unsichtbar.
+        """
+        for bad_value in (None, float("nan"), float("inf"), "abc"):
+            with self.subTest(bad=repr(bad_value)):
+                self.state.visualizer_positions[7] = (1.0, 6.0, 2.0)
+                self.undo.clear()
+                bad = _item(7, x=9.0)
+                bad["x"] = bad_value
+                # allow_nan=True ist der Default und genau der Transportweg,
+                # ueber den ein rohes NaN hier ankommen wuerde.
+                self.bridge.fixturesTransformBatch(json.dumps({"items": [bad]}))
+
+                self.assertEqual(self.state.visualizer_positions[7],
+                                 (1.0, 6.0, 2.0))
+                self.assertFalse(self.undo.can_undo(),
+                                 "nichts uebernommen = kein Undo-Schritt")
+
+    def test_dropped_entry_is_pushed_back_to_js(self):
+        """A3D-41: Der verworfene Eintrag steht in JS auf NaN und ist DORT
+        unsichtbar (three.js rastert eine NaN-Position nicht), waehrend Python
+        die letzte gueltige Position kennt. Ihn nur zu ignorieren liesse ein
+        unsichtbares Geraet in der Szene zurueck — Python schickt deshalb den
+        autoritativen Stand zurueck."""
+        self.state.visualizer_positions[3] = (2.0, 6.0, -1.0)
+        self.bridge._poll_events.clear()
+
+        bad = _item(3, x=9.0)
+        bad["x"] = None
+        self.bridge.fixturesTransformBatch(json.dumps({"items": [bad]}))
+
+        evs = [json.loads(ev["j"]) for ev in self._transform_events()]
+        healed = [p for p in evs if int(p.get("fid", -1)) == 3]
+        self.assertTrue(healed, "Heil-Push fuer genau dieses Fixture fehlt")
+        self.assertAlmostEqual(healed[-1]["x"], 2.0,
+                               msg="und zwar mit der letzten GUELTIGEN Position")
+        self.assertAlmostEqual(healed[-1]["z"], -1.0)
+
+    def test_invalid_rotation_keeps_the_valid_position(self):
+        """A3D-41: Nur die Drehung ist unbrauchbar — Verschieben und Andocken
+        sind trotzdem echte Nutzerarbeit und werden uebernommen."""
+        self.state.visualizer_positions[4] = (0.0, 6.0, 0.0)
+        self.state.visualizer_rotations[4] = (0.0, 45.0, 0.0)
+        self.undo.clear()
+
+        bad = _item(4, x=7.0, rot=(0.0, 90.0, 0.0))
+        bad["ry"] = None
+        self.bridge.fixturesTransformBatch(json.dumps({"items": [bad]}))
+
+        self.assertAlmostEqual(self.state.visualizer_positions[4][0], 7.0,
+                               msg="die gueltige Position muss ankommen")
+        self.assertEqual(self.state.visualizer_rotations[4], (0.0, 45.0, 0.0),
+                         "die unbrauchbare Drehung darf nichts ueberschreiben")
 
     def test_empty_batch_pushes_nothing(self):
         self.undo.clear()

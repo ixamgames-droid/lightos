@@ -15,12 +15,31 @@ import { view } from '../state.js';
 // verdrahtet.)
 import { requestRender } from '../scene/render_loop.js';
 
-export const perspectiveCam = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+// A3D-41: Seitenverhaeltnis des Viewports, NIE nicht-endlich.
+//
+// `window.innerWidth / window.innerHeight` ist bei einem noch nicht
+// gelayouteten View `0/0 === NaN` — und eine Kamera, die einmal mit
+// `aspect = NaN` gebaut wurde, hat eine vollstaendig nicht-endliche
+// Projektionsmatrix. Ab da liefert JEDER Raycast NaN, voellig unabhaengig von
+// der Zeigerposition, und die erste Gestik danach schreibt NaN-Positionen in
+// den SceneGraph (von dort als `"x": null` in die Bridge-Payload — genau der
+// A3D-41-Crash). Nachgemessen in der offscreen-Page: `aspect` NaN,
+// `projectionMatrix.elements` komplett nicht-endlich.
+//
+// Der Fallback 1 (quadratisch) haelt die Kamera in einem gueltigen Zustand,
+// bis ein echter Resize kommt — `onWindowResize` unten laeuft durch dieselbe
+// Funktion und korrigiert das Bild dann von selbst.
+export function viewportAspect() {
+  const w = window.innerWidth, h = window.innerHeight;
+  return (w > 0 && h > 0) ? w / h : 1;
+}
+
+export const perspectiveCam = new THREE.PerspectiveCamera(60, viewportAspect(), 0.1, 500);
 perspectiveCam.position.set(0, 12, 18);
 perspectiveCam.lookAt(0, 0, 0);
 
 let _orthoSize = 18; // half-height in world units
-const aspect = window.innerWidth / window.innerHeight;
+const aspect = viewportAspect();
 export const orthoCam = new THREE.OrthographicCamera(
   -_orthoSize * aspect, _orthoSize * aspect, _orthoSize, -_orthoSize, 0.1, 500
 );
@@ -39,7 +58,7 @@ export const orthoState = {
 view.activeCam = perspectiveCam;
 
 export function resizeOrtho() {
-  const a = window.innerWidth / window.innerHeight;
+  const a = viewportAspect();
   orthoCam.left = -_orthoSize * a;
   orthoCam.right = _orthoSize * a;
   orthoCam.top = _orthoSize;
@@ -95,7 +114,10 @@ export function resetCameraView() {
 // von app.js VOR cameras.js importiert) - identisch zum Ist-Verhalten, da
 // die beiden Anweisungsbloecke im Original nicht voneinander abhingen.
 window.addEventListener('resize', function() {
-  perspectiveCam.aspect = window.innerWidth / window.innerHeight;
+  // A3D-41: ueber viewportAspect() — ein Resize auf 0 (Tab weggeschaltet,
+  // Splitter zugezogen) darf die Projektionsmatrix nicht mit NaN fuellen.
+  // Genau dieser Listener heilt sie umgekehrt beim naechsten echten Resize.
+  perspectiveCam.aspect = viewportAspect();
   perspectiveCam.updateProjectionMatrix();
   resizeOrtho();
 });

@@ -3,7 +3,7 @@
 // (ehem. stage_scene.html:3062-3268). Reines Verschieben.
 import { renderer } from '../scene/renderer.js';
 import { rad2deg } from '../scene/renderer.js';
-import { orthoCam, orthoState, resizeOrtho, panCamera3D, resetCameraView } from '../camera/cameras.js';
+import { orthoCam, orthoState, resizeOrtho, panCamera3D, resetCameraView, viewportAspect } from '../camera/cameras.js';
 import { fitSelected } from '../camera/presets.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import { setMouseFromCoords, pickFixture, pickStageObject, snap } from './picking.js';
@@ -99,9 +99,14 @@ renderer.domElement.addEventListener('touchmove', function(e) {
       panCamera3D(dcx, dcy);   // ruft updateCamera()
     } else {
       orthoState.size = Math.max(4, Math.min(80, orthoState.size + delta * 0.03));
-      const a = window.innerWidth / window.innerHeight;
-      orthoCam.position.x -= dcx * (2 * orthoState.size * a) / window.innerWidth;
-      orthoCam.position.z -= dcy * (2 * orthoState.size) / window.innerHeight;
+      // A3D-41: gleicher Guard wie im Maus-Pan (pointer.js) — ohne
+      // Layout-Groesse gibt es kein Welt-Delta, und ein NaN bleibt hier per
+      // `-=` dauerhaft in der Kameraposition stehen.
+      if (window.innerWidth > 0 && window.innerHeight > 0) {
+        const a = viewportAspect();
+        orthoCam.position.x -= dcx * (2 * orthoState.size * a) / window.innerWidth;
+        orthoCam.position.z -= dcy * (2 * orthoState.size) / window.innerHeight;
+      }
       resizeOrtho();
     }
     lastTouchDist = dist;
