@@ -29,12 +29,32 @@ def _app() -> QApplication:
 
 
 def _make_view_with_matrix():
+    """View mit einer EIGENEN, frischen Matrix — nie mit einer fremden.
+
+    QA-ORDERDEP: hier stand ``if len(view._instances) == 0: view._add()`` plus
+    ``setCurrentRow(0)``. Der FunctionManager ist ein prozessweites Singleton, also
+    war ``_instances`` leer nur dann, wenn diese Datei allein lief. Im gemeinsamen
+    Prozess lagen dort die Matrizen anderer Testdateien, ``_add()`` entfiel, und
+    Zeile 0 traf eine FREMDE Matrix.
+
+    Konkret reproduziert mit ``test_matrix_dimmer_levels_param.py``: die legt
+    Matrizen mit ``style = MatrixStyle.DIMMER`` an. Fuer Dimmer-Matrizen blendet die
+    View die Farbknoepfe voellig korrekt aus — die sieben Farb-/Sequence-Tests
+    hier sahen deshalb 0 statt 1 bzw. 2 sichtbare Knoepfe und schlugen fehl.
+    **Kein Produktionsfehler, sondern fehlende Test-Isolation.**
+
+    ``_add()`` legt die Matrix an UND selektiert sie (``rgb_matrix_view.py``), der
+    Zustand ist danach also eindeutig — unabhaengig davon, was vorher im Prozess lief.
+    """
     from src.ui.views.rgb_matrix_view import RgbMatrixView
     view = RgbMatrixView()
-    if len(view._instances) == 0:
-        view._add()
-    view._list.setCurrentRow(0)
+    vorher = len(view._instances)
+    view._add()
     assert view._current is not None, "Keine aktive Matrix nach Setup"
+    assert len(view._instances) == vorher + 1, (
+        "Setup muss eine EIGENE Matrix anlegen, sonst haengt das Ergebnis daran, "
+        "was andere Testdateien im FunctionManager-Singleton hinterlassen haben "
+        "(QA-ORDERDEP)")
     return view
 
 
