@@ -27,6 +27,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
+from _qt_webengine import destroy_webengine_view  # XPLAT-09
 
 _app = QApplication.instance() or QApplication([])
 
@@ -101,11 +102,13 @@ class ModeFrameSceneTest(unittest.TestCase):
         self._view.loadFinished.connect(self._loaded_ok.append)
 
     def tearDown(self):
-        try:
-            self._view.deleteLater()
-        except Exception:
-            pass
-        _pump(0.2)
+        # XPLAT-09: deleteLater() allein raeumt hier nichts ab — processEvents()
+        # stellt DeferredDelete nicht zu. Der View ueberlebt dann mitsamt Page,
+        # Channel und Renderer, waehrend die parentlose Bridge mit der
+        # TestCase-Instanz stirbt: dangling registriertes QObject -> SIGSEGV.
+        # Ausfuehrliche Herleitung in tests/_qt_webengine.py.
+        destroy_webengine_view(self._view, _pump)
+        self._view = None
 
     def _load_and_wait(self):
         self._loaded_ok.clear()
@@ -155,11 +158,20 @@ class ModeFrameSceneTest(unittest.TestCase):
             last = s["count"]
         self.fail(f"Render-Loop stabilisiert nicht: {self._stats()}")
 
-    # BEWUSST NUR 2 Testmethoden = 2 Seiten-Ladungen: jede _load_and_wait laedt
-    # stage_scene.html komplett neu; >~3 sequentielle QWebEngine-Vollladungen in
-    # EINEM Prozess kippen den offscreen-Chromium-Renderer (nichtdeterministischer
-    # Teardown-/Load-Crash, dieselbe Klasse wie bei test_viz13_scene_modules_smoke).
-    # Darum moeglichst viele Checks pro Ladung buendeln (statt 1 Assertion/Ladung).
+    # HISTORIE (XPLAT-09, aufgehoben 2026-07-29): hier stand die Auflage „BEWUSST
+    # NUR 2 Testmethoden", weil >~3 sequentielle QWebEngine-Vollladungen in EINEM
+    # Prozess den offscreen-Chromium-Renderer kippten. Das war kein Chromium-Limit,
+    # sondern der kaputte Teardown: ``deleteLater()`` + ``processEvents()`` stellt
+    # DeferredDelete nie zu, der alte View ueberlebte mitsamt Channel und Renderer,
+    # waehrend die parentlose Bridge starb — dangling registriertes QObject
+    # (Details in tests/_qt_webengine.py). Seit ``destroy_webengine_view``
+    # im tearDown sind 8 aufeinanderfolgende Vollladungen in einem Prozess gemessen
+    # gruen — die Deckelung ist damit NICHT mehr noetig.
+    #
+    # Das Buendeln vieler Checks pro Ladung bleibt hier trotzdem stehen: es ist
+    # inzwischen eine reine Laufzeit-Entscheidung (jede Vollladung kostet ~4 s),
+    # kein Stabilitaets-Workaround mehr. Neue Testmethoden duerfen ergaenzt werden.
+    # Das Entzerren der gebuendelten Assertions ist als eigenes Item erfasst.
 
     def test_mode_frame_dom_switching_and_no_render(self):
         """DOM + Umschalten + Fallen-Guards — alles auf EINER Seiten-Ladung."""
