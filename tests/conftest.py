@@ -157,25 +157,62 @@ def pytest_collection_modifyitems(session, config, items):
             break
 
 
+_HARDEN_EXIT_STATUS: int | None = None
+
+
 @pytest.hookimpl(trylast=True)
 def pytest_sessionfinish(session, exitstatus):
-    # Zwei Wege in die Exit-Härtung:
-    #  (1) _HARDEN_EXIT_ARMED + LIGHTOS_HARDEN_EXIT  -> ENG (oben): nur WebEngine-
-    #      Sessions, nur unter dem lokalen Lock-Runner. Bewusst eng, damit die
-    #      Teardown-Crash-Erkennung für alle anderen lokalen Tests erhalten bleibt.
-    #  (2) LIGHTOS_HARDEN_EXIT_ALL -> CI-Variante (GENERELL). Hintergrund: der QA-11-
-    #      View-Smoke (`test_views.py`) baut echte Qt-Views, die u. a. MIDI-Dispatch-/
-    #      Feedback-Threads starten. Beim FINALEN Interpreter-Exit auf Windows/
-    #      Python 3.11 mit PySide6 6.11 crasht der native Abbau sporadisch mit
-    #      STATUS_HEAP_CORRUPTION (0xc0000374), WÄHREND QApplication + gerade
-    #      gestoppte Threads abgebaut werden — die Tests selbst bestehen (der Crash
-    #      liegt NACH dem Ergebnis). Der Prozess-Exitcode wird dann ≠0 und CI wird
-    #      fälschlich rot (nur 3.11, nicht 3.12). Da die session-scoped
-    #      `_stop_background_threads_at_end`-Fixture VOR diesem Hook läuft (Threads
-    #      sind gestoppt) und `exitstatus` das ECHTE Testergebnis trägt (0 nur, wenn
-    #      ALLE Tests bestehen), beenden wir den Prozess hier mit exakt diesem Status
-    #      und überspringen die flaky native Abbauphase. Das maskiert KEINE
-    #      Test-Failures — ein echter Fehler liefert exitstatus≠0 -> os._exit(≠0).
+    """Merkt sich nur den Exitstatus — beendet wird in ``pytest_unconfigure``.
+
+    QA-REPORTLOSS (2026-07-29): hier stand das ``os._exit()`` direkt, und es kam
+    dem Bericht des TerminalReporter zuvor (``= FAILURES =``, ``FAILED …``-Zeilen,
+    ``short test summary``). Gemessen an einem Lauf mit 7 echten Fehlschlägen:
+    **mit** Härtung 10 Zeilen Log und **keine** einzige ``FAILED``-Zeile, ohne
+    Härtung 54 Zeilen mit allen sieben.
+
+    Das war gefährlicher als es klingt. ``tools/verify_segmented.sh`` stuft ein
+    rotes Segment danach ein, ob im Log ``FAILED`` steht: kein ``FAILED`` heißt
+    „nativer Abbau-Crash nach dem Ergebnis" (QA-24). Eine gehärtete Datei mit
+    ECHTEN Fehlschlägen sah damit exakt aus wie ein harmloser Teardown-Crash —
+    die Fehldiagnose war ins Werkzeug eingebaut.
+
+    ``hookwrapper`` allein löst das NICHT (probiert): pytests TerminalReporter
+    schreibt seine Zusammenfassung selbst in einem ``pytest_sessionfinish``-
+    Wrapper. Deshalb wird der Status hier nur gemerkt und der Prozess erst in
+    ``pytest_unconfigure`` beendet — das läuft nach der kompletten
+    Session-Auswertung, aber noch weit vor der crashenden nativen Abbauphase beim
+    Interpreter-Exit.
+    """
+    global _HARDEN_EXIT_STATUS
+    _HARDEN_EXIT_STATUS = int(exitstatus)
+
+
+def pytest_unconfigure(config):
+    """Exit-Härtung: den Prozess NACH der kompletten Session-Auswertung beenden.
+
+    Zwei Wege hinein:
+
+    1. ``_HARDEN_EXIT_ARMED`` + ``LIGHTOS_HARDEN_EXIT`` — ENG: nur WebEngine-
+       Sessions, nur unter dem lokalen Gate. Bewusst eng, damit die
+       Teardown-Crash-Erkennung für alle anderen lokalen Tests erhalten bleibt.
+    2. ``LIGHTOS_HARDEN_EXIT_ALL`` — GENERELL (CI-Variante). Hintergrund: der
+       QA-11-View-Smoke (``test_views.py``) baut echte Qt-Views, die u. a.
+       MIDI-Dispatch-/Feedback-Threads starten. Beim finalen Interpreter-Exit
+       crasht der native Abbau sporadisch (Windows/Py 3.11: STATUS_HEAP_CORRUPTION
+       0xc0000374; Linux: SIGSEGV), WÄHREND QApplication und gerade gestoppte
+       Threads abgebaut werden — die Tests selbst bestehen, der Crash liegt NACH
+       dem Ergebnis. Der Prozess-Exitcode wird dann ≠0 und CI fälschlich rot.
+
+    Maskiert KEINE Failures: ``exitstatus`` trägt das echte Testergebnis (0 nur,
+    wenn ALLE Tests bestehen), und genau damit wird beendet.
+
+    **Warum hier und nicht in ``pytest_sessionfinish`` (QA-REPORTLOSS):** dort kam
+    das ``os._exit`` dem Bericht des TerminalReporter zuvor und verschluckte ihn
+    komplett. ``pytest_unconfigure`` läuft nach der Session-Auswertung, aber immer
+    noch weit vor der crashenden nativen Abbauphase.
+    """
+    if _HARDEN_EXIT_STATUS is None:
+        return          # Session gar nicht gelaufen (z. B. Kollektionsfehler)
     armed = _HARDEN_EXIT_ARMED or _webengine_in_process()
     harden = bool(os.environ.get("LIGHTOS_HARDEN_EXIT_ALL")) or (
         armed and bool(os.environ.get("LIGHTOS_HARDEN_EXIT")))
@@ -186,7 +223,7 @@ def pytest_sessionfinish(session, exitstatus):
             sys.stderr.flush()
         except Exception:
             pass
-        os._exit(int(exitstatus))
+        os._exit(_HARDEN_EXIT_STATUS)
 
 
 @pytest.fixture(scope="session", autouse=True)

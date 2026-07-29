@@ -148,6 +148,12 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   Das ist eine **Dringlichkeits-Einstufung, keine Entwarnung** — hinter genau dieser
   Lesart versteckte sich XPLAT-09 neun Testdateien lang.
 
+  > Diese Regel war bis 2026-07-29 sogar **unzuverlässig**: die Exit-Härtung beendete
+  > den Prozess, bevor pytest seinen Bericht schrieb, sodass auch echte Fehlschläge
+  > ohne `FAILED`-Zeile ankamen (QA-REPORTLOSS, behoben — der Exit sitzt jetzt in
+  > `pytest_unconfigure`). Wer eine ältere Log-Sammlung auswertet: dort kann hinter
+  > „keine `FAILED`-Zeile" ein echter Fehlschlag stecken.
+
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
 ## Token-schonende Regeln fuer Agents
