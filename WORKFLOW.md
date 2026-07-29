@@ -95,10 +95,35 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   (Windows-Pfade zuerst → auf Windows unveraendert). Der PowerShell-Lock-Runner
   `run_tests.ps1` ist aber Windows-spezifisch; auf Linux/macOS gibt es Davids
   Multi-Session-Parallelitaet nicht → dort den eingecheckten, plattformneutralen
-  Runner nutzen: `./tools/verify_loop.sh` (Syntax-Check + direktes `pytest`;
-  `./tools/verify_loop.sh tests/test_x.py` fuer gezielte Tests). Voraussetzung:
+  Runner nutzen: `./tools/verify_loop.sh`. Voraussetzung:
   `python3 -m venv venv && venv/bin/pip install -r requirements.txt` (Linux-Systempakete
   s. `INSTALL.md`).
+
+  ```bash
+  ./tools/verify_loop.sh                     # compileall src + VOLLE Suite (segmentiert)
+  ./tools/verify_loop.sh tests/test_x.py     # compileall src + nur diese Dateien (ein Prozess)
+  ./tools/verify_segmented.sh -j 4           # Segment-Runner direkt, 4 parallel
+  ```
+
+- **Volle Suite auf Linux laeuft SEGMENTIERT (XPLAT-11), ein Prozess pro Testdatei.**
+  Das ist die exakte Entsprechung zu `run_tests.ps1 -Isolate` auf Windows und passiert
+  automatisch — `verify_loop.sh` delegiert ohne Argumente an
+  `tools/verify_segmented.sh`. **Grund:** die volle Suite in EINEM Prozess starb auf
+  Linux reproduzierbar bei ~69 % mit `Fatal Python error: Segmentation fault ...
+  Garbage-collecting`, an wechselnden Dateien, die isoliert gruen laufen —
+  akkumulierender nativer Qt-Zustand, kein einzelner Test. Der Ein-Prozess-Lauf ist
+  weiterhin erzwingbar (`LIGHTOS_VERIFY_SINGLE=1`), Parallelitaet ueber
+  `LIGHTOS_VERIFY_JOBS` (Default 3). Segment-Logs landen in `.pytest_segments/`.
+
+  > **Beide Runner muessen dieselbe Umgebung setzen** — `tests/test_gate_runner_parity.py`
+  > nagelt das fest. Der Segment-Runner lag bis 2026-07-29 ausserhalb des Repos und
+  > bekam die Exit-Haertung aus PR #470 nie; dadurch meldete ausgerechnet das real
+  > benutzte Gate 12 rote Segmente, die `verify_loop.sh` gruen sah.
+
+- **Ein rotes Segment heisst nicht automatisch „Test kaputt":** steht im Segment-Log
+  keine `FAILED`-Zeile, war es ein nativer Abbau-Crash nach dem Ergebnis (QA-24).
+  Das ist eine **Dringlichkeits-Einstufung, keine Entwarnung** — hinter genau dieser
+  Lesart versteckte sich XPLAT-09 neun Testdateien lang.
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 

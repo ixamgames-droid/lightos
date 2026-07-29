@@ -44,16 +44,38 @@ if ! "$PY" -m compileall -q src; then
 fi
 
 if [ "$#" -gt 0 ]; then
+    # Gezielte Dateien: direkt, in EINEM Prozess. Hier gibt es keinen ueber
+    # Dateigrenzen akkumulierenden Zustand zu vermeiden, und der Weg ist schnell.
     echo "[verify] 2/2 pytest $* ..."
-    TARGET=("$@")
+    if ! "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider; then
+        echo "[verify] TESTS ROT"
+        exit 1
+    fi
 else
-    echo "[verify] 2/2 pytest tests/ (volle Suite) ..."
-    TARGET=(tests/)
-fi
-
-if ! "$PY" -m pytest "${TARGET[@]}" -q --tb=short -p no:cacheprovider; then
-    echo "[verify] TESTS ROT"
-    exit 1
+    # VOLLE SUITE: segmentiert, ein Prozess pro Testdatei (XPLAT-11).
+    # Pendant zu Windows, wo verify_loop.ps1 an run_tests.ps1 -Isolate delegiert.
+    # Grund: die volle Suite in EINEM Prozess starb auf Linux reproduzierbar bei
+    # ~69 % an akkumulierendem nativem Qt-Zustand — an wechselnden Dateien, die
+    # isoliert gruen laufen. Wer den Ein-Prozess-Lauf trotzdem will (z. B. um zu
+    # pruefen, ob das noch gilt): LIGHTOS_VERIFY_SINGLE=1 setzen.
+    if [ -n "${LIGHTOS_VERIFY_SINGLE:-}" ]; then
+        echo "[verify] 2/2 pytest tests/ (volle Suite, EIN Prozess - LIGHTOS_VERIFY_SINGLE) ..."
+        if ! "$PY" -m pytest tests/ -q --tb=short -p no:cacheprovider; then
+            echo "[verify] TESTS ROT"
+            exit 1
+        fi
+    else
+        SEG="$(dirname "$0")/verify_segmented.sh"
+        if [ ! -x "$SEG" ]; then
+            echo "[verify] FEHLER: $SEG fehlt oder ist nicht ausfuehrbar"
+            exit 2
+        fi
+        echo "[verify] 2/2 volle Suite segmentiert (${LIGHTOS_VERIFY_JOBS:-3} parallel) ..."
+        if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}"; then
+            echo "[verify] TESTS ROT"
+            exit 1
+        fi
+    fi
 fi
 
 echo "[verify] GRUEN - alles bestanden."
