@@ -7,6 +7,56 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Der Enttec-Ausgang war tot und der Statusbalken sagte „OK" (HW-5b)
+
+#### Behoben
+
+- **Nach dem Linux-Umzug ging gar kein DMX über den Enttec — und nichts sagte es.**
+  `data/universes.json` trug für das Enttec-Universe noch `"patch": "COM_FAKE"`,
+  einen Windows-Rest; auf Linux heißt dasselbe Gerät `/dev/ttyUSB0`.
+  `EnttecPro("COM_FAKE")` konnte nur werfen, und die Exception verschwand im
+  `except` von `apply_output_config`.
+
+  **Die eigentliche Bosheit war der Statusbalken.** `_check_hardware` fragte nur
+  `find_enttec_port()` — also ob per VID/PID *irgendein* Enttec am Rechner hängt.
+  Ob ein Universe ihn auch benutzt, interessierte ihn nicht. Also stand dort
+  grün „Enttec: /dev/ttyUSB0 OK", während nichts rausging. Ein Fehler, der sich
+  als Erfolg meldet, ist schlimmer als ein lauter Fehler.
+
+  Neu `enttec_pro.diagnose_port()` (plus `port_is_foreign()`) unterscheidet drei
+  Fälle mit je eigenem Klartext und nennt den konkreten Vorschlag aus der
+  VID/PID-Suche:
+
+  | Fall | Meldung |
+  |---|---|
+  | Portname von einer **anderen Plattform** (`COM*` auf Linux) | „…die Konfiguration stammt vermutlich von einem anderen Rechner. Vorschlag: auf `/dev/ttyUSB0` umstellen." |
+  | Port **existiert nicht mehr** | „…existiert auf diesem System nicht." |
+  | **gar keiner konfiguriert** | „Für dieses Universe ist kein Enttec-Port konfiguriert." |
+
+  `apply_output_config` hält den Befund je Universe in `enttec_port_notes` fest.
+  Der Statusbalken kennt jetzt vier Zustände: aktiv (grün, mit den wirklich
+  benutzten Ports), falsch konfiguriert (amber, Grund im Tooltip), Adapter da
+  aber keinem Universe zugewiesen (amber), nicht gefunden (rot).
+
+  **Bewusst NICHT automatisch umgebogen.** An einem Rechner können mehrere
+  FTDI-Geräte hängen; DMX auf ein nie konfiguriertes Gerät zu schicken wäre
+  schlimmer als der ehrliche Hinweis — und der Aufbau hinge sonst davon ab, was
+  gerade eingesteckt ist, bis in die Tests hinein. Der Öffnungsversuch bleibt
+  exakt wie vorher. (Das automatische Nachfinden per VID/PID gibt es weiterhin
+  in `EnttecPro._try_reconnect`, dort aber für einen Port, der vorher schon
+  funktioniert hat und mitten im Betrieb wegbricht — anderer Fall, SERIAL-02.)
+
+  **Fallenklasse mitgenommen:** `apply_output_config` wird in Bestandstests auf
+  einem `SimpleNamespace`-Stub aufgerufen, der laut eigener Doku nur
+  `output_manager` und `universes` mitbringt. Sowohl ein neues Pflichtfeld als
+  auch eine Hilfsmethode auf `self` schlugen dort mit `AttributeError` zu — und
+  wären im `except` des Aufrufers verschwunden, also genau in der Fehlerklasse
+  gelandet, die dieses Item behebt. Beides von den eigenen Tests gefangen,
+  jetzt `getattr`/Lazy-Init.
+
+  `tests/test_hw5b_enttec_port_resolve.py` (19) — darunter der erste Test für
+  `_check_hardware` überhaupt.
+
 ### 2026-07-30 — Die GitHub-Seite sagt wieder, was LightOS wirklich ist
 
 #### Geändert

@@ -1171,13 +1171,48 @@ class MainWindow(QMainWindow):
         sb.addPermanentWidget(self._lbl_universe)
 
     def _check_hardware(self):
+        """HW-5b: den Statusbalken sagen lassen, ob wirklich DMX rausgeht.
+
+        Vorher fragte er nur ``find_enttec_port()`` — also ob per VID/PID
+        IRGENDEIN Enttec am Rechner haengt. Ob ein Universe ihn auch benutzt,
+        interessierte ihn nicht. Nach dem Linux-Umzug stand deshalb gruen
+        „Enttec: /dev/ttyUSB0 OK", waehrend das Enttec-Universe noch auf den
+        Windows-Rest ``COM_FAKE`` zeigte und gar nichts sendete. Ein Fehler,
+        der sich als Erfolg meldete.
+        """
         port = find_enttec_port()
-        if port:
-            self._lbl_enttec.setText(f"Enttec: {port} OK")
+        offene = {}
+        try:
+            offene = dict(getattr(self._state.output_manager,
+                                  "_enttec_outputs", {}) or {})
+        except Exception:
+            offene = {}
+        notes = getattr(self._state, "enttec_port_notes", {}) or {}
+        problem = next((n for n in notes.values() if n), None)
+
+        if offene:
+            benutzt = sorted({getattr(d, "port", "?") for d in offene.values()})
+            self._lbl_enttec.setText(
+                f"Enttec: {', '.join(benutzt)} aktiv "
+                f"({len(offene)} Universe{'n' if len(offene) != 1 else ''})")
             self._lbl_enttec.setStyleSheet("color: #9DFF52;")
+            self._lbl_enttec.setToolTip(problem or "")
+        elif problem:
+            # Geraet evtl. da, aber die Konfiguration passt nicht -> KEIN Gruen.
+            self._lbl_enttec.setText("Enttec: falsch konfiguriert")
+            self._lbl_enttec.setStyleSheet("color: #ffb454;")
+            self._lbl_enttec.setToolTip(problem)
+        elif port:
+            # Adapter steckt, aber kein Universe ist ihm zugewiesen.
+            self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
+            self._lbl_enttec.setStyleSheet("color: #ffb454;")
+            self._lbl_enttec.setToolTip(
+                "Der Adapter ist da, aber kein Universe gibt darueber aus. "
+                "Im Universe-Manager einem Universe den Ausgang 'Enttec' geben.")
         else:
             self._lbl_enttec.setText("Enttec: nicht gefunden")
             self._lbl_enttec.setStyleSheet("color: #ff4444;")
+            self._lbl_enttec.setToolTip("")
 
     # ── Transport / Playback ──────────────────────────────────────────────────
 
