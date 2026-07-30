@@ -7,6 +7,53 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Die Kommandozeile hielt sich nicht an den Auswahl-Vertrag (FM-9/A7)
+
+#### Behoben
+
+- **Nach `1 thru 3` in der Kommandozeile erfuhr kein einziger Konsument davon —
+  und eine vorherige Kopf-Auswahl überlebte still.** Die Kommandozeile war der
+  letzte Schreiber, der `state.selected_fids` **roh als Attribut** setzte, also
+  an `set_selected_fids` vorbei. Genau die Fehlerklasse, die FM-9 beseitigen
+  sollte („zweites Feld, das ein Schreiber vergisst"): `set_selected_fids`
+  **delegiert** an `set_selected_cells` und pflegt damit die feine Kopf-Auswahl
+  mit — eine rohe Zuweisung tut das nicht.
+
+  An einem echten `AppState` mit drei Hydrabeams gemessen, nach `1 thru 3`:
+
+  | | |
+  |---|---|
+  | `selected_fids` | `[1, 2, 3]` — richtig |
+  | `selected_cells` | `['2:1']` — die **alte** Kopf-Auswahl, unverändert |
+  | `SELECTION_CHANGED` | **0 Events** |
+
+  Zwei Folgen, beide still: Programmer, EFX, Matrix, Live-View, Laser und
+  Visualizer bekamen von der neuen Auswahl nichts mit, und eine spätere Aktion
+  (Fächer, Snap, EFX, XY-Pad) blieb auf „Kopf 2 von Gerät 2" eingeschränkt,
+  obwohl der Nutzer gerade drei ganze Geräte gewählt hatte.
+
+  Alle sechs Zugriffsstellen (`SetValueCommand`, `SelectionCommand`,
+  `ClearCommand`, `HighlightCommand`, `LowlightCommand`) laufen jetzt über zwei
+  Helfer `_set_selection` / `_get_selection`. Der Fallback auf die rohe Zuweisung
+  bleibt bewusst bestehen: die Kommandozeile wird auch gegen Minimal-States
+  gefahren, die kein `set_selected_fids` mitbringen — ohne Fallback verschwände
+  dort eine `AttributeError` im `except` des Aufrufers, also in genau der
+  Fehlerklasse, die hier behoben wird.
+
+- **Und damit die letzte Programmer-Fläche aus FM-9:** ein `@ 50` ohne genannte
+  Selektion respektiert jetzt die Kopf-Auswahl. Die Kopfzahl folgt dabei dem
+  **Attribut** (`head_counter_for_attr`, A6) — bei einer `HYDRABEAM [19-Kanal]`
+  landet `pan 128` auf `pan#1`, `red 200` dagegen geräteweit, weil es dort nur
+  eine Farbbank gibt und `color_r#1` ein Schlüssel ohne Kanal wäre.
+
+  **Bewusste Abgrenzung:** wer eine Selektion *tippt* (`2 @ 50`), meint das
+  ganze Gerät — nicht den zuletzt gewählten Kopf. Nur der Fallback auf die
+  gespeicherte Auswahl kann kopf-fein sein.
+
+  `tests/test_fm9_cmdline_selection_contract.py` (9) fährt die Messung oben
+  gegen den **echten** `AppState`; ein Fake hätte den Bug nicht zeigen können,
+  weil er die Delegation gar nicht hat.
+
 ### 2026-07-30 — MIDI-„Programmer Attribut" fasste alle 30 Geräte an (FM-9/A6)
 
 #### Behoben

@@ -47,6 +47,72 @@ class SelectionExpr:
             return []
 
 
+# ── Auswahl: EIN Zugang statt roher Attributzugriffe ─────────────────────────
+#
+# ★ Warum es diese zwei Helfer gibt (FM-9-Rest, 2026-07-30): die Kommandozeile war
+# der letzte Schreiber, der ``state.selected_fids`` ROH als Attribut setzte, also
+# an ``set_selected_fids`` vorbei. Das ist genau die Fehlerklasse, die FM-9
+# beseitigen sollte („zweites Feld, das ein Schreiber vergisst"):
+# ``set_selected_fids`` DELEGIERT an ``set_selected_cells`` und pflegt damit die
+# feine Kopf-Auswahl mit — eine rohe Zuweisung tut das nicht.
+#
+# Gemessen an einem echten AppState mit drei Hydrabeams: nach ``1 thru 3`` stand
+#   selected_fids  = [1, 2, 3]      (richtig)
+#   selected_cells = ['2:1']        (die ALTE Kopf-Auswahl, unveraendert)
+#   SELECTION_CHANGED-Events = 0
+# Zwei Folgen, beide still: kein Konsument (Programmer, EFX, Matrix, Live-View,
+# Laser, Visualizer) erfaehrt von der neuen Auswahl, und eine spaetere Aktion
+# (Faecher, Snap, EFX, XY-Pad) blieb auf „Kopf 2 von Geraet 2" eingeschraenkt,
+# obwohl der Nutzer gerade drei ganze Geraete gewaehlt hatte.
+
+
+def _set_selection(state, fids):
+    """Auswahl setzen — ueber den Vertrag, wenn es ihn gibt.
+
+    Der Fallback auf die rohe Zuweisung ist bewusst und nicht Bequemlichkeit:
+    die Kommandozeile wird in Tests und Werkzeugen gegen Minimal-States
+    gefahren, die kein ``set_selected_fids`` mitbringen. Ohne Fallback wuerde
+    dort eine ``AttributeError`` im ``except`` des Aufrufers verschwinden — und
+    damit in genau der Fehlerklasse landen, die hier behoben wird.
+    """
+    setter = getattr(state, "set_selected_fids", None)
+    if callable(setter):
+        setter(list(fids))
+        return
+    state.selected_fids = list(fids)
+
+
+def _get_selection(state) -> list:
+    """Aktuelle Auswahl lesen — ueber ``get_selected_fids``, wenn vorhanden."""
+    getter = getattr(state, "get_selected_fids", None)
+    if callable(getter):
+        try:
+            return list(getter() or [])
+        except Exception:
+            return []
+    return list(getattr(state, "selected_fids", []) or [])
+
+
+def _selection_heads(state, attribute: str) -> dict:
+    """Kopf-Einschraenkung der aktuellen Auswahl fuer EIN Attribut —
+    ``{fid: {head}}``, leer = keine Einschraenkung.
+
+    Validiert gegen die Kopfzahl DIESES Attributs (FM-9/A6): eine
+    ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, 5 Intensity und 1
+    Farbbank — mit der falschen Zaehlung entstuende entweder ein ``attr#N`` ohne
+    Kanal (der Kopf faellt auf seinen Default) oder die Einschraenkung fiele weg.
+    """
+    try:
+        from src.core.app_state import head_counter_for_attr
+        from src.core.group_cells import head_restrictions
+        cells = state.get_selected_cells()
+        return state.validate_head_restrictions(
+            head_restrictions(cells),
+            count_heads=head_counter_for_attr(attribute)) or {}
+    except Exception:
+        return {}
+
+
 # ── CommandResult ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -72,11 +138,15 @@ class SetValueCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
             all_fids = [f.fid for f in state.get_patched_fixtures()]
+            # Eine im Kommando GENANNTE Selektion meint ganze Geraete und hebt
+            # eine bestehende Kopf-Einschraenkung damit auf; nur der Fallback auf
+            # die gespeicherte Auswahl kann kopf-fein sein.
             if self.selection.is_empty():
-                # Fallback: aktuell gespeicherte Selektion verwenden
-                fids = list(getattr(state, "selected_fids", []) or [])
+                fids = _get_selection(state)
+                heads = _selection_heads(state, self.attribute)
             else:
                 fids = self.selection.resolve(all_fids)
+                heads = {}
             if not fids:
                 return CommandResult(False, "Keine Fixtures selektiert")
             if self.value_pct is not None:
@@ -84,9 +154,15 @@ class SetValueCommand(Command):
                 val = int(round(pct * 255 / 100))
             else:
                 val = max(0, min(255, int(self.value_raw or 0)))
+            geschrieben = 0
             for fid in fids:
-                state.set_programmer_value(fid, self.attribute, val)
-            return CommandResult(True, f"{len(fids)}x {self.attribute}={val}")
+                # Kein Eintrag = geraeteweit (Kopf 0), byte-identisch zum Bestand.
+                for head in sorted(heads.get(fid) or (0,)):
+                    state.set_programmer_value(fid, self.attribute, val, head=head)
+                    geschrieben += 1
+            koepfe = f" ({geschrieben} Koepfe)" if geschrieben != len(fids) else ""
+            return CommandResult(True,
+                                 f"{len(fids)}x {self.attribute}={val}{koepfe}")
         except Exception as e:
             return CommandResult(False, f"SetValue Fehler: {e}")
 
@@ -100,9 +176,7 @@ class SelectionCommand(Command):
         try:
             all_fids = [f.fid for f in state.get_patched_fixtures()]
             fids = self.selection.resolve(all_fids)
-            if not hasattr(state, "selected_fids"):
-                state.selected_fids = []
-            state.selected_fids = fids
+            _set_selection(state, fids)
             if not fids:
                 return CommandResult(True, "Selektion leer")
             return CommandResult(True, f"Selektiert: {len(fids)} ({_short_list(fids)})")
@@ -115,8 +189,7 @@ class ClearCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
             state.clear_programmer()
-            if hasattr(state, "selected_fids"):
-                state.selected_fids = []
+            _set_selection(state, [])
             return CommandResult(True, "Programmer geleert")
         except Exception as e:
             return CommandResult(False, f"Clear Fehler: {e}")
@@ -291,7 +364,7 @@ class PageCommand(Command):
 class HighlightCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
-            sel = list(getattr(state, "selected_fids", []) or [])
+            sel = _get_selection(state)
             if not sel:
                 sel = [f.fid for f in state.get_patched_fixtures()]
             for fid in sel:
@@ -308,7 +381,7 @@ class HighlightCommand(Command):
 class LowlightCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
-            sel = set(getattr(state, "selected_fids", []) or [])
+            sel = set(_get_selection(state))
             count = 0
             for f in state.get_patched_fixtures():
                 if f.fid not in sel:
