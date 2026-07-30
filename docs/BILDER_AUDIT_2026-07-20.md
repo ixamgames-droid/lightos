@@ -57,9 +57,27 @@ niedrigere Drift-Wahrscheinlichkeit) — separate Runde.
    Begleitende **Text-Drift** mit korrigieren: `NEUE_DEMO.md` (Z. 54-62 Chase-Builder-Text),
    `dialog_VCBusSelector`-Doc-Tabelle (fehlendes „Effekt-IDs"-Feld), `baukasten_drop_karte`-Text.
 2. **Sektionsleisten-Bilder** (29) — Sammel-Capture in einer fokussierten Live-Runde
-   (App mit `Event_Demo_2026.lshow`/Tutorial-Show, je Bild an die richtige Sektion/Bank,
+   (App mit `Event_Demo_2026.lshow` — vorher `tools/build_event_demo_2026.py` laufen
+   lassen, die Datei ist nicht committet — oder Tutorial-Show; je Bild an die richtige Sektion/Bank,
    Vollfenster grabben). Reiner Chrome-Refresh, niedrige Einzel-Priorität, aber viele.
 3. **Sonstige + Style→Stil + Cueliste-Dialog** (11) — gezielt je Dialog/Editor.
+
+---
+
+## Voraussetzung für alle Regenerier-Anweisungen: die Show erst BAUEN
+
+Viele Punkte unten sagen „LightOS mit `shows/Event_Demo_2026.lshow` starten".
+**Diese Datei liegt nicht im Repo** — `shows/*.lshow` ist gitignored, getrackt
+ist nur ihr Generator. Im frischen Checkout scheitert die Anweisung also vor dem
+App-Start (CDX-28). Vorher einmal:
+
+```bash
+QT_QPA_PLATFORM=offscreen venv/bin/python tools/build_event_demo_2026.py
+# -> shows/Event_Demo_2026.lshow (8 Bänke, ~17 KB)
+```
+
+Dasselbe gilt sinngemäß für jede andere im Rezept genannte `.lshow`: erst den
+passenden `tools/build_*.py` laufen lassen, dann die App starten.
 
 ---
 
