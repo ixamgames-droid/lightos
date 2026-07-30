@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Die Statustabellen hinkten dem eigenen Tag hinterher
+
+#### Behoben
+
+- **Die README-Statustabelle beschrieb einen Stand, den derselbe Tag dreimal
+  überholt hatte.** Sie sagte „GitHub-CI faehrt bisher nur Windows" (seit
+  [#486](https://github.com/ixamgames-droid/lightos/pull/486) fährt sie auf
+  `ubuntu-latest` die **volle** segmentierte Suite, 6 min 55 s) und bei den
+  Mehrkopf-Geräten „**Offen:** Kommandozeile und MIDI-Mapping schreiben noch
+  geraeteweit" — beides ist mit FM-9/A6 und A7 erledigt, offen ist dort nur noch
+  eine *getippte* Kopf-Syntax (`1:2 @ 50`).
+
+  Die Plattform-Tabelle weiter oben war mit
+  [#484](https://github.com/ixamgames-droid/lightos/pull/484) korrekt gezogen
+  worden — die Statustabelle am Dateiende nicht. Zwei Tabellen über dasselbe
+  Thema in einer Datei, von denen nur eine gepflegt wird, sind schlimmer als
+  eine ungenaue: der Leser findet zuerst die falsche.
+
+- **`docs/OPEN_POINTS_OVERVIEW.md` verlangte für `F-8` (Enttec-Langzeit) einen
+  Auto-Reconnect/Health-Check, den es längst gibt** — Fehler-Watchdog
+  (`FAIL_LIMIT=20` → Auto-Disable, OUT-02) und gedrosselter Reconnect samt
+  VID/PID-Neusuche (SERIAL-02) sind seit Langem im `EnttecPro`. Der Eintrag
+  nennt jetzt die verbliebene, rein empirische Frage und das Messergebnis des
+  ersten Laufs (3,8 h, 540.225 Frames, 0 Schreibfehler) samt seiner Grenze: der
+  *stille* Tod ist ohne Gerät an der Leitung nicht messbar.
+
 ### 2026-07-30 — Der Statusbalken log weiter, und das Verifikations-Werkzeug auch
 
 #### Behoben
