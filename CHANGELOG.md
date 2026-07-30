@@ -7,6 +7,49 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — HW-5 messbar gemacht: Enttec-Langzeitlauf (`tools/hw5_longrun.py`)
+
+#### Neu
+
+- **`tools/hw5_longrun.py` — der Enttec-Langzeittest läuft jetzt als Messung statt
+  als Bauchgefühl.** HW-5 fragt: *bricht der Ausgang irgendwann weg, nach wie vielen
+  Stunden, und kommt er von selbst zurück?* Das Werkzeug fährt dafür denselben
+  Codepfad wie die App (`EnttecPro.send_dmx` → `serial.write`, 40 Hz) über Stunden
+  und protokolliert minütlich: Schreibfehler, das OUT-02-Auto-Disable, die
+  Selbstheilung danach, den SERIAL-02-Portwechsel nach USB-Replug, das Hochwasser
+  des Sendepuffers und den größten Frame-Abstand. Zwischenstand jederzeit per
+  `--status` (atomar geschriebenes JSON), Abschlussbericht am Ende.
+
+  **Blackout ist Default, sichtbares Licht ist Opt-in.** Im aktuellen Show-Patch
+  liegen alle 30 Fixtures auf Universe 1 (Art-Net), das Enttec-Universe ist leer —
+  was physisch an der Enttec-Leitung hängt, weiß das Werkzeug nicht. Acht Stunden
+  unbeaufsichtigt blind Kanäle zu bespielen kann bei Movern, Spidern oder Lasern
+  reale Folgen haben, also sendet der Lauf 512 Nullen: gleiche Paketgröße, gleiche
+  Rate, gleiche Dauer, kein Licht. Ein sichtbarer Ramp kommt nur auf ausdrückliche
+  Ansage (`--heartbeat-channel`), der Sichttest per `--probe`.
+
+  **Der Bericht nennt seine eigene Grenze.** Was hier nicht messbar ist: der *stille*
+  Tod, bei dem der FTDI weiter Bytes annimmt, aber keine gültigen DMX-Frames mehr
+  auf die Leitung legt. Der Abschlusstext sagt das ausdrücklich, statt Grün zu
+  melden, was er nicht geprüft hat.
+
+  Der Heartbeat ist bewusst ein *Dreieck*, kein fester Pegel: DMX hält den letzten
+  Wert, ein toter Ausgang sähe bei statischem Pegel exakt aus wie ein lebender.
+
+  `tests/test_hw5_longrun.py` (14) prüft Frame-Bau und Zustandserkennung gegen ein
+  Fake-Gerät — denn das Ergebnis eines Zwölf-Stunden-Laufs ist nicht der Lauf,
+  sondern sein Bericht: übersieht `observe` einen Aussetzer, ist die Nacht verloren
+  und niemand merkt es.
+
+#### Nebenbefund
+
+- **Die Enttec-Universe-Konfiguration ist seit dem Linux-Umzug tot** (neu als
+  `HW-5b` im Backlog): `data/universes.json` trägt für Universe 3 noch
+  `"patch": "COM_FAKE"`, einen Windows-Rest. Auf Linux heißt das reale Gerät
+  `/dev/ttyUSB0` und wäre per `find_enttec_port()` auffindbar — `EnttecPro("COM_FAKE")`
+  kann dagegen nur scheitern. Die App sendet damit aktuell nichts an den Enttec,
+  ohne dass es irgendwo auffällt.
+
 ### 2026-07-30 — Crash-Intake: die vergiftete Alt-Historie abgeschnitten (QA-CRASHLOG-CUT)
 
 #### Behoben
