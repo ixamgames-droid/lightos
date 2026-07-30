@@ -253,10 +253,29 @@ def load_stage_html(view) -> None:
         if tier != "auto":
             query += f"&gputier={tier}"
         url.setQuery(query)
+        # A3D-23: die Stufe ist eine KONSTRUKTOR-Entscheidung des Renderers und
+        # reist nur in dieser URL — sie laesst sich spaeter nicht nachpushen.
+        # Also merken, mit welcher Stufe DIESE Seite geladen wurde; nur so kann
+        # ein Target spaeter feststellen, dass es veraltet rendert.
+        try:
+            view._lightos_loaded_tier = tier
+        except Exception:
+            pass
         view.load(url)
     except Exception as e:
         print(f"[Visualizer] HTML load error: {e}")
         view.load(QUrl.fromLocalFile(HTML_PATH))
+
+
+def page_tier_is_stale(view) -> bool:
+    """Wurde diese Seite mit einer ANDEREN Qualitaetsstufe geladen als jetzt gilt?
+
+    ``False``, wenn die Seite nie ueber :func:`load_stage_html` kam — dann gibt
+    es nichts zu vergleichen und ein Reload waere geraten."""
+    geladen = getattr(view, "_lightos_loaded_tier", None)
+    if geladen is None:
+        return False
+    return str(geladen) != quality_tier_pref()
 
 
 def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> RenderCrashGuard:

@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Die eingebettete 3D-Ansicht rechnete nach einem Qualitätswechsel weiter in alter Stufe
+
+#### Behoben
+
+- **Wer die Render-Qualität umstellt, während die eingebettete
+  Live-View-3D-Ansicht gerade nicht sichtbar ist, bekam sie danach in der ALTEN
+  Stufe zurueck (A3D-23).** „Szene neu laden" faehrt nur die **aktiven** Targets
+  neu, und der angedockte Spiegel ist im 2D-Modus bzw. auf einem anderen Tab
+  inaktiv. Beim Wiedereinblenden wurde er zwar reaktiviert und resynct, die
+  Seite aber nicht neu geladen — und die Stufe reist als `gputier`-Query in der
+  Seiten-URL, ist also eine Konstruktor-Entscheidung des Renderers und nicht
+  nachpushbar. Die alte Stufe blieb bis zum naechsten Reload aus anderem Grund
+  (Crash, aktiver Reload, App-Neustart).
+
+  `load_stage_html` merkt sich jetzt, mit welcher Stufe es eine Seite geladen
+  hat; beim Einblenden wird verglichen und bei Abweichung neu geladen.
+
 ### 2026-07-31 — Die F-Taste im Visualizer tat nie, was das Menü versprach
 
 #### Behoben
