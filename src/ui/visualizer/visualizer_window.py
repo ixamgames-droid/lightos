@@ -3867,8 +3867,45 @@ class VisualizerWindow(QMainWindow):
         cam = next((c for c in cams if (c or {}).get("name") == name), None)
         if cam is not None:
             self._bridge.push_camera_preset("applycam:" + json.dumps(cam))
+            # A3D-32: die gespeicherte Kamera bringt ihren ANSICHTS-MODUS mit;
+            # `applyNamedCamera` stellt ihn drueben per `setViewMode` wieder her,
+            # sonst mutierte es nur die inaktive Kamera. Ohne das Nachziehen hier
+            # liefe die Toolbar-Combo aus dem tatsaechlichen Szenen-Modus — und
+            # der naechste Python-seitige `push_view_mode` (z. B.
+            # `_push_initial_state` nach einem Seiten-Reload, das den
+            # Combo-Stand pusht) haette die Szene unerwartet zurueckgeschaltet.
+            self._sync_view_combo_to(cam.get("mode"))
         else:
+            # Kein Eintrag im AppState: JS schlaegt den Namen in seiner lokalen
+            # Liste nach und kann dabei ebenfalls den Modus wechseln — aus dem
+            # Nichts nachziehen koennen wir hier aber nichts. Dieser Zweig ist
+            # der Notnagel fuer einen Namen, den der State nicht (mehr) kennt.
             self._bridge.push_camera_preset(f"apply:{name}")
+
+    def _sync_view_combo_to(self, mode) -> None:
+        """Toolbar-Ansicht-Combo dem Szenen-Modus angleichen — ohne Rueckschlag.
+
+        ``blockSignals`` ist hier Absicht: ``_on_view_mode_changed`` wuerde den
+        Modus umgehend per ``push_view_mode`` an JS zurueckschicken, das ihn
+        gerade selbst gesetzt hat. Die davon abhaengige Sichtbarkeit der
+        Hoehen-Zeile wird deshalb direkt mitgezogen (sonst bliebe der
+        Y-Spinner im 2D-Modus stehen, obwohl er dort wirkungslos ist)."""
+        combo = getattr(self, "_combo_view", None)
+        if combo is None:
+            return
+        ziel = "2D" if str(mode) == "2D" else "3D"
+        try:
+            idx = combo.findData(ziel)
+            if idx < 0 or idx == combo.currentIndex():
+                return
+            combo.blockSignals(True)
+            try:
+                combo.setCurrentIndex(idx)
+            finally:
+                combo.blockSignals(False)
+        except RuntimeError:
+            return
+        self._set_height_row_visible(ziel != "2D")
 
     def _on_camera_saved_from_js(self, name: str):
         """Bridge meldet (ueber cameraSaved-Slot -> pyCameraSaved) eine neu

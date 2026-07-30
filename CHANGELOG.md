@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Gespeicherte Kamera schaltete die Ansicht um, die Toolbar merkte es nicht
+
+#### Behoben
+
+- **Eine gespeicherte 2D-Kamera brachte die Szene in den Top-Down-Modus, die
+  Ansicht-Combo der Toolbar blieb aber auf „3D Perspective" stehen (A3D-32).**
+  `applyNamedCamera` stellt drueben zuerst den gespeicherten View-Modus wieder
+  her — sonst mutierte das Anwenden nur die *inaktive* Kamera und sichtbar
+  passierte nichts. Einen JS→Python-Rueckkanal fuer den Modus gibt es aber
+  nicht, also lief die Combo aus dem tatsaechlichen Szenen-Modus. Der naechste
+  Python-seitige `push_view_mode` — z. B. nach einem Seiten-Reload, der den
+  **Combo-Stand** pusht — schaltete die Szene dann unerwartet zurueck.
+
+  Gefixt ohne neues Signal: jeder Weg in `applyNamedCamera` kommt ohnehin ueber
+  die Bridge aus Python, der Modus ist dort also bereits bekannt. Die Combo
+  wird beim Anwenden mitgezogen (ohne Rueckschlag an JS), die Hoehen-Zeile
+  folgt mit — im 2D-Modus ist der Y-Spinner wirkungslos.
+
 ### 2026-07-30 — Die Geräteliste im Visualizer zeigte etwas anderes als die Szene daneben
 
 #### Behoben
