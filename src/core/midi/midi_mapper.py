@@ -591,6 +591,53 @@ class MidiMapper:
                     pass
             return
 
+    def _programmer_targets(self, attribute: str):
+        """FM-9-Rest: Ziele fuer ``ACTION_PROGRAMMER_VAL`` — ``(fids, {fid: {head}})``.
+
+        **Zwei Dinge waren hier kaputt, das zweite ist das groebere:**
+
+        1. Der Regler kannte die **Kopf**-Auswahl nicht — „Kopf 2" gewaehlt, und
+           trotzdem bewegten sich alle vier Koepfe (wie beim XY-Pad, FM-9/A5).
+        2. Er kannte die Auswahl **ueberhaupt nicht**: geschrieben wurde stur auf
+           ``get_patched_fixtures()``, also auf JEDES gepatchte Geraet. Ein mit
+           „Programmer Attribut" beschrifteter Fader, der 30 Geraete anfasst
+           obwohl zwei gewaehlt sind, ist auf keinem Lichtpult das erwartete
+           Verhalten.
+
+        Die Reichweite folgt jetzt dem im Projekt etablierten Muster von
+        ``VCXYPad._resolve_fids``: **Auswahl, sonst alle gepatchten.** Der
+        Alt-Fall „nichts gewaehlt" bleibt damit byte-identisch — wer den Fader
+        bisher als globalen Attribut-Regler benutzt hat, merkt keinen Unterschied,
+        solange er nichts selektiert.
+
+        ★ Validiert wird gegen die Kopfzahl **dieses Attributs**
+        (``head_counter_for_attr``), nicht gegen Farb- oder Bewegungskoepfe: eine
+        ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, 5 Intensity und 1
+        Farbbank. Mit der falschen Zaehlung entstuende entweder ein ``attr#N``
+        ohne Kanal (Kopf faellt auf seinen Default) oder die Einschraenkung fiele
+        weg — beides stumm.
+        """
+        st = self._state
+        try:
+            fids = list(st.get_selected_fids())
+        except Exception:
+            fids = []
+        if fids:
+            try:
+                from src.core.app_state import head_counter_for_attr
+                from src.core.group_cells import head_restrictions
+                heads = st.validate_head_restrictions(
+                    head_restrictions(st.get_selected_cells()),
+                    count_heads=head_counter_for_attr(attribute)) or {}
+            except Exception:
+                heads = {}
+            return fids, heads
+        try:
+            patched = st.get_patched_fixtures()
+        except Exception:
+            patched = []
+        return [f.fid for f in patched if getattr(f, "fid", None) is not None], {}
+
     def _execute_continuous(self, mapping: MidiMapping, normalized_value: float):
         value = max(0.0, min(1.0, float(normalized_value)))
         scaled = mapping.continuous_min + (mapping.continuous_max - mapping.continuous_min) * value
@@ -606,8 +653,11 @@ class MidiMapper:
         if action == ACTION_PROGRAMMER_VAL:
             attr = mapping.param
             raw = int(max(0.0, min(1.0, scaled)) * 255)
-            for fixture in self._state.get_patched_fixtures():
-                self._state.set_programmer_value(fixture.fid, attr, raw)
+            fids, heads = self._programmer_targets(attr)
+            for fid in fids:
+                # Kein Eintrag = geraeteweit (Kopf 0), byte-identisch zum Bestand.
+                for head in sorted(heads.get(fid) or (0,)):
+                    self._state.set_programmer_value(fid, attr, raw, head=head)
             return
 
         if action == ACTION_GRAND_MASTER:
