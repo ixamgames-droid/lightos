@@ -1424,6 +1424,23 @@ class ProgrammerView(QWidget):
             # SpiderPositionTool oben uebernimmt beide Tilts.
             spider_pos = (group_name == "Position"
                           and self._selection_is_spider(fixtures))
+            # A3D-36: … das galt aber nur, solange die Auswahl NUR aus Spidern
+            # besteht (`_selection_is_spider` ist ein hartes all(...)). Bei
+            # GEMISCHTER Auswahl (Spider + Moving Head) fiel der Tab in den
+            # generischen Loop mit dem pro Attribut deduplizierten Template —
+            # gemessen: EIN "tilt"-Regler fuer BEIDE Geraete, also war die zweite
+            # Bar des Spiders ueberhaupt nicht mehr erreichbar, und der
+            # "pan"-Regler zielte zusaetzlich auf ein Geraet ohne Pan-Kanal.
+            # Zwei Eimer statt alles-oder-nichts, genau wie es
+            # _add_color_head_sliders seit FM-HEADLAYOUT Slice 2 vormacht.
+            spider_fx, rest_fx = self._position_head_buckets(group_name, fixtures)
+            gemischt = bool(spider_fx) and bool(rest_fx)
+            if gemischt:
+                ilay.addWidget(self._head_block_label(
+                    "Tilt je Bar (Spider)", spider_fx))
+                self._add_per_head_tilt_sliders(ilay, spider_fx)
+                ilay.addWidget(self._head_block_label(
+                    "Position geräteweit", rest_fx))
             for ch in channels:
                 # Reset/Rekalibrierung bekommt bewusst KEINEN Dauer-Slider —
                 # nur den sicheren Button (ResetActionButton, _add_quick_select).
@@ -1432,7 +1449,21 @@ class ProgrammerView(QWidget):
                 if spider_pos and ch.attribute in ("pan", "tilt",
                                                    "pan_fine", "tilt_fine"):
                     continue
-                ilay.addWidget(AttributeSlider(ch, fixtures, self._state, owner=self))
+                ziele = fixtures
+                if gemischt and ch.attribute in ("pan", "tilt", "pan_fine"):
+                    # Die Spider haben ihren eigenen Block; ein geraeteweiter
+                    # "tilt"-Regler wuerde sie nur wieder auf Kopf 0 ziehen, und
+                    # "pan"/"pan_fine" gibt es bei ihnen ueberhaupt nicht
+                    # (>=2 Tilt, 0 Pan — genau das macht sie zu Dual-Tiltern).
+                    # ``tilt_fine`` bleibt BEWUSST beim geraeteweiten Regler:
+                    # das ist das untere Byte derselben Achse, ein Regler je Kopf
+                    # dafuer waere eine neue Semantik statt eines Bugfixes. Von
+                    # 22 Dual-Tilt-Modi der Library haben 2 ueberhaupt ein
+                    # tilt_fine; deren Verhalten bleibt damit unveraendert.
+                    ziele = rest_fx
+                if not ziele:
+                    continue
+                ilay.addWidget(AttributeSlider(ch, ziele, self._state, owner=self))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1511,6 +1542,61 @@ class ProgrammerView(QWidget):
             if ch.attribute in attrs:
                 return ch
         return None
+
+    def _position_head_buckets(self, group_name: str, fixtures) -> tuple:
+        """A3D-36: Position-Auswahl in ``(mehrkopf_tilt, rest)`` teilen.
+
+        Nur fuer den Position-Tab und nur, wenn ueberhaupt ein Mehrkopf-Tilter
+        dabei ist — sonst ist der erste Eimer leer und der Aufbau bleibt
+        byte-identisch zum Bestand (auch die reine Spider-Auswahl, die weiterhin
+        ueber ``spider_pos`` + SpiderPositionTool laeuft)."""
+        if group_name != "Position":
+            return [], list(fixtures or [])
+        try:
+            from src.core.app_state import is_dual_tilt_fixture
+        except Exception:
+            return [], list(fixtures or [])
+        spider, rest = [], []
+        for f in fixtures or []:
+            try:
+                (spider if is_dual_tilt_fixture(f) else rest).append(f)
+            except Exception:
+                rest.append(f)
+        return spider, rest
+
+    def _add_per_head_tilt_sliders(self, ilay, fixtures):
+        """Ein Tilt-Regler JE BAR fuer die Mehrkopf-Tilter der Auswahl.
+
+        Vorlage ist das tilt-reichste Geraet des Blocks (nicht ``fixtures[0]``);
+        jeder Regler bekommt nur die Geraete, die diesen Kopf wirklich haben —
+        sonst entstuende ein ``tilt#N`` ohne Kanal, und der Kopf fiele im
+        DMX-Pfad still auf seinen Default zurueck (Fehlerklasse FM-9/A5).
+        Beschriftung ``K1``/``K2`` wie ueberall sonst (1-basiert)."""
+        if not fixtures:
+            return
+        template = max(fixtures, key=self._tilt_count)
+        occ = 0
+        for ch in get_channels_for_patched(template):
+            if ch.attribute != "tilt":
+                continue
+            owners = [f for f in fixtures if self._tilt_count(f) > occ]
+            if owners:
+                if occ > 0:
+                    self._seed_separate_head(owners, ch, occ)
+                ilay.addWidget(AttributeSlider(
+                    ch, owners, self._state, owner=self, head=occ,
+                    display_name=f"{ch.name or 'Tilt'} · K{occ + 1}"))
+            occ += 1
+
+    @staticmethod
+    def _tilt_count(fixture) -> int:
+        """Kopfzahl der TILT-Achse — dieselbe Quelle, die auch das
+        SpiderPositionTool nach der Zahl seiner Regler fragt."""
+        try:
+            from src.core.app_state import tilt_head_count
+            return int(tilt_head_count(fixture))
+        except Exception:
+            return 1
 
     def _selection_is_spider(self, fixtures) -> bool:
         """True, wenn die uebergebene Auswahl ausschliesslich aus spider-/doppel-

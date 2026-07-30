@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Der zweite Spider-Arm war weg, sobald ein Mover danebenstand
+
+#### Behoben
+
+- **Position-Tab, gemischte Auswahl: die zweite Tilt-Bar eines Spiders war
+  ueberhaupt nicht mehr erreichbar (A3D-36).** Der Tab schaltet auf die
+  Spider-Bedienung (SpiderPositionTool statt Pan/Tilt-Regler) nur um, wenn
+  **alle** gewaehlten Geraete Dual-Tilter sind. Stand daneben ein gewoehnlicher
+  Moving Head, fiel der Tab in den generischen Regler-Loop — und der baut aus
+  dem **pro Attribut deduplizierten** Template genau EINEN `tilt`-Regler fuer
+  beide Geraete. Am echten Bau gemessen (ZQ-B20 Mini Spider [15 Channel] +
+  HYDRABEAM 4000 RGBW [19-Kanal]):
+
+  ```
+  vorher   tilt head=0 -> [1, 2]     pan head=0 -> [1, 2]
+  nachher  tilt head=0 -> [1]        tilt head=1 -> [1]      (Spider: je Bar)
+           tilt head=0 -> [2]        pan  head=0 -> [2]      (Mover)
+  ```
+
+  Nebenbefund derselben Zeile: der `pan`-Regler zielte auch auf den Spider —
+  ein Geraet **ohne Pan-Kanal**.
+
+  Gebaut ist die Zwei-Eimer-Aufteilung, die `_add_color_head_sliders` seit
+  FM-HEADLAYOUT Slice 2 vormacht. **Bewusst nicht** der naheliegende
+  `(attribute, head)`-Schluessel fuer das ganze Template: ueber die Library
+  gezaehlt kommt `raw` in 831 Modi mehrfach vor, `macro` in 822, Spitzenwerte
+  bis 24 Vorkommen — das erzeugte dort Hunderte Regler. Die beiden reinen
+  Faelle (nur Spider / nur Mover) bleiben unveraendert.
+
 ### 2026-07-30 — Den Kopf endlich auch tippen können (FM-9 vollständig)
 
 #### Neu
