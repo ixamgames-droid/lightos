@@ -23,12 +23,13 @@ from PySide6.QtWidgets import (
     QSplitter, QGroupBox, QFormLayout, QSlider, QCheckBox,
     QTabWidget, QTreeWidget, QTreeWidgetItem,
     QColorDialog, QInputDialog, QMessageBox, QLineEdit, QSizePolicy,
-    QAbstractSpinBox, QToolButton, QMenu,
+    QAbstractSpinBox, QToolButton, QMenu, QAbstractItemView,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtCore import QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent
+from PySide6.QtCore import (QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent,
+                            QItemSelectionModel)
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
@@ -1965,6 +1966,13 @@ class VisualizerWindow(QMainWindow):
 
         layout.addWidget(QLabel("Gepatchte Fixtures:"))
         self._patch_list = QListWidget()
+        # VIZ-14-Folge: die Liste zeigt die GEMEINSAME Auswahl — die kann mehrere
+        # Geraete umfassen (3D-Marquee, Programmer-Gruppe). Mit dem
+        # Single-Selection-Default liesse sich davon immer nur eines markieren.
+        # Die Eigenschaftsfelder (x/y/z, Rotation) und die Knoepfe darunter
+        # bleiben am `currentItem` — das ist auch im Mehrfachmodus eindeutig.
+        self._patch_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
         self._patch_list.itemSelectionChanged.connect(self._on_patch_list_selected)
         layout.addWidget(self._patch_list, 1)
 
@@ -2475,6 +2483,14 @@ class VisualizerWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
         self._patch_list.blockSignals(False)
+        # Der Neuaufbau wirft die Markierung weg — die gemeinsame Auswahl gilt
+        # aber weiter (Patchen/Platzieren aendert sie nicht). Ohne dieses
+        # Nachziehen stuende die Liste nach jedem Refresh wieder leer da,
+        # obwohl im 3D die Outlines leuchten.
+        try:
+            self._mark_patch_list(self._state.get_selected_fids())
+        except Exception:
+            pass
         self._update_status_counts()
 
     def _update_status_counts(self):
@@ -2495,8 +2511,19 @@ class VisualizerWindow(QMainWindow):
         fid = item.data(Qt.ItemDataRole.UserRole)
         # VIZ-14: Auswahl in der Visualizer-Geraeteliste -> globale/Programmer-
         # Auswahl (nicht, wenn die Markierung gerade aus der 3D-Selektion kommt).
-        if fid is not None and not getattr(self, "_applying_selection", False):
-            self._state.set_selected_fids([int(fid)])
+        # Gemeldet werden ALLE markierten Geraete, nicht nur das aktuelle: sonst
+        # meinte dieselbe Liste in der einen Richtung „diese drei" und in der
+        # anderen „das eine" — und ein Strg-Klick haette die Auswahl der anderen
+        # Ansichten still auf ein Geraet zusammengestrichen.
+        if not getattr(self, "_applying_selection", False):
+            fids = [int(f) for f in
+                    (it.data(Qt.ItemDataRole.UserRole)
+                     for it in self._patch_list.selectedItems())
+                    if f is not None]
+            if not fids and fid is not None:
+                fids = [int(fid)]          # Stub-/Alt-Pfad ohne echte Markierung
+            if fids:
+                self._state.set_selected_fids(fids)
         if fid in self._state.visualizer_positions:
             x, y, z = self._state.visualizer_positions[fid]
             self._suppress_property_signals = True
@@ -2754,6 +2781,13 @@ class VisualizerWindow(QMainWindow):
         dadurch entstehende Roundtrip ist harmlos — JS wendet mit
         `updateOutlines(notify=false)` an und meldet NICHTS zurueck (kein Echo,
         kein Loop). `set_selected_fids` hat zudem einen no-op-Breaker."""
+        # Ueber getattr, nicht direkt: dieser Handler wird in Bestandstests mit
+        # einem SimpleNamespace-`self` gefahren (nur `_bridge`). Ein direkter
+        # Aufruf stirbt dort mit AttributeError — dieselbe Falle wie bei HW-5b,
+        # wo eine Hilfsmethode auf `self` in einem Stub-State zuschlug.
+        marker = getattr(self, "_mark_patch_list", None)
+        if callable(marker):
+            marker(fids)
         bridge = getattr(self, "_bridge", None)
         if bridge is None:
             return
@@ -2762,6 +2796,55 @@ class VisualizerWindow(QMainWindow):
             bridge.selectFixtures.emit(payload)
         except Exception:
             pass
+
+    def _mark_patch_list(self, fids) -> None:
+        """Die gemeinsame Auswahl in der Visualizer-Geraeteliste markieren.
+
+        Der offen gebliebene Review-Fund aus Slice 1b: die Rueckrichtung
+        (Programmer/3D -> Visualizer) hat bisher NUR die 3D-Outlines gesetzt —
+        die Liste daneben blieb auf dem alten Eintrag stehen und zeigte damit
+        etwas anderes an als die Szene, auf die sie sich bezieht.
+
+        ★ `blockSignals` ist hier keine Kosmetik, sondern der Loop-/Clobber-
+        Riegel: `itemSelectionChanged` haengt an `_on_patch_list_selected`, das
+        `set_selected_fids` ruft. Ohne die Sperre wuerde das Markieren einer
+        Mehrfachauswahl Eintrag fuer Eintrag zurueckschreiben — und die
+        Zwischenstaende waeren echte Auswahl-Aenderungen fuer alle anderen
+        Konsumenten (Programmer, EFX, Matrix).
+
+        Das `currentItem` wandert bewusst nur, wenn es NICHT mehr zur Auswahl
+        gehoert: an ihm haengen die Eigenschaftsfelder (x/y/z, Rotation) und die
+        Knoepfe darunter, die sollen nicht unter der Hand das Geraet wechseln."""
+        lst = getattr(self, "_patch_list", None)
+        if lst is None:
+            return
+        try:
+            want = {int(f) for f in (fids or [])}
+        except (TypeError, ValueError):
+            return
+        lst.blockSignals(True)
+        try:
+            lst.clearSelection()
+            treffer = []
+            for i in range(lst.count()):
+                it = lst.item(i)
+                fid = it.data(Qt.ItemDataRole.UserRole)
+                if fid is not None and int(fid) in want:
+                    it.setSelected(True)
+                    treffer.append(it)
+            if treffer:
+                aktuell = lst.currentItem()
+                if aktuell not in treffer:
+                    # ★ `setCurrentItem(item)` allein raeumt im Mehrfachmodus die
+                    # gerade gesetzte Markierung wieder ab (Default-Kommando ist
+                    # ClearAndSelect) — aus drei markierten Geraeten wuerde eines.
+                    # NoUpdate verschiebt nur den Fokus. Vom Test gefangen.
+                    lst.setCurrentItem(
+                        treffer[0], QItemSelectionModel.SelectionFlag.NoUpdate)
+        except Exception as e:
+            print(f"[Visualizer] Listen-Markierung fehlgeschlagen: {e}")
+        finally:
+            lst.blockSignals(False)
 
     def _on_fixture_deleted_from_js(self, fid: int):
         # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,

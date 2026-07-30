@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Die Geräteliste im Visualizer zeigte etwas anderes als die Szene daneben
+
+#### Behoben
+
+- **Wählt man Geräte im Programmer (oder per Marquee im 3D), leuchteten zwar die
+  Outlines in der Szene — die Geräteliste im Visualizer blieb aber auf dem alten
+  Eintrag stehen.** Zwei Anzeigen derselben Auswahl, nebeneinander, mit
+  verschiedenem Inhalt. Der offen gebliebene Review-Fund aus VIZ-14 Slice 1b ist
+  damit erledigt: `_mark_patch_list` zieht die gemeinsame Auswahl in die Liste
+  nach — beim Auswahl-Ereignis **und** nach jedem Neuaufbau der Liste.
+
+  Die Liste steht dafuer auf Mehrfachauswahl (vorher der Single-Default, mit dem
+  sich von drei gewaehlten Geraeten nur eines zeigen liess), und die
+  Gegenrichtung meldet seither **alle** markierten Geraete statt nur des
+  aktuellen — sonst hiesse dieselbe Liste in der einen Richtung „diese drei" und
+  in der anderen „das eine".
+
+  Zwei Fallen dabei, beide vom Test gefangen: `blockSignals` ist hier der
+  Clobber-Riegel (ohne ihn schriebe jeder markierte Eintrag einzeln zurueck, und
+  die Zwischenstaende waeren fuer Programmer/EFX/Matrix echte
+  Auswahl-Aenderungen), und `setCurrentItem` raeumt im Mehrfachmodus die eben
+  gesetzte Markierung wieder ab (Default-Kommando `ClearAndSelect`) — es braucht
+  `NoUpdate`. Das aktuelle Element wandert nur, wenn es aus der Auswahl faellt:
+  an ihm haengen die Positions-/Rotationsfelder.
+
 ### 2026-07-30 — Der zweite Spider-Arm war weg, sobald ein Mover danebenstand
 
 #### Behoben
