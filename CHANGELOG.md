@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Die GitHub-Seite sagt wieder, was LightOS wirklich ist
+
+#### Geändert
+
+- **README, INSTALL, ROADMAP, AGENTS und die Issue-Vorlage nannten LightOS
+  „Software fuer Windows x64 und ARM64" — Linux kam als „sekundaer" vor oder gar
+  nicht.** Seit dem Linux-Umzug (alle XPLAT-Items, PR #431) ist Linux die
+  tägliche Entwicklungs- und Testplattform; die komplette Suite läuft dort grün.
+  Beide Plattformen stehen jetzt gleichberechtigt da, mit Linux-Installationsweg,
+  Systempaketen und Startbefehlen an jeder Stelle, wo bisher nur `cmd`-Zeilen
+  standen.
+
+  **Bewusst mit Ehrlichkeits-Tabelle statt Häkchen:** die README schlüsselt auf,
+  was auf welcher Plattform wirklich geprüft ist — die GitHub-CI fährt nämlich
+  weiterhin nur `windows-latest`. Dieses Loch ist als `XPLAT-CI-LINUX` erfasst,
+  statt es hinter einem „unterstützt" verschwinden zu lassen.
+
+- **Der Feature-Überblick war Jahre hinter dem Code.** Ergänzt: die
+  **Fixture-Bibliothek** (1.786 Geräte in 5.116 Modi von 162 Herstellern), die
+  komplette **Laser-Sektion** (DMX-Laser, Not-Aus, Figuren, Bild-Trace,
+  Ether Dream/IDN) — die vorher überhaupt nicht vorkam —, die **Kopf-Auswahl bei
+  Mehrkopf-Geräten**, die 19 VC-Widget-Typen statt der alten acht, das
+  Sicherheitsmodell des Web-Remote (127.0.0.1 per Default, LAN als Opt-in mit
+  Token-Gate) und der aktuelle Stand des 3D-Visualizers. Kennzahlen-Tabelle
+  oben, damit man den Umfang sieht, ohne die Feature-Liste zu lesen.
+
+- **Der `Status`-Abschnitt sagt jetzt auch, was NICHT fertig ist:** Ether Dream
+  und IDN sind nur gegen Fakes getestet, Kommandozeile und MIDI-Mapping kennen
+  die Kopf-Auswahl noch nicht, macOS ist ungetestet, ARM-Linux ebenso.
+
+- **Die GitHub-Repo-Seite selbst hatte weder Beschreibung noch Topics.** Beides
+  gesetzt (12 Topics: `dmx`, `dmx512`, `art-net`, `sacn`, `enttec`,
+  `lighting-control`, `lighting-console`, `stage-lighting`, `laser`, `pyside6`,
+  `qt`, `python`).
+
 ### 2026-07-30 — Das VC-XY-Pad respektiert die Kopf-Auswahl (FM-9/A5)
 
 #### Behoben

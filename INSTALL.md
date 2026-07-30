@@ -1,6 +1,9 @@
 # LightOS - Installation
 
-## Schnellstart
+LightOS laeuft auf **Linux und Windows**. Beide Wege stehen hier:
+Windows direkt unten, **[Linux weiter unten](#linux-x86_64)**.
+
+## Schnellstart (Windows)
 
 ```cmd
 python install.py
@@ -20,6 +23,7 @@ Das war's. Das Script:
 | | x64 (AMD64) | ARM64 (Snapdragon) |
 |---|---|---|
 | **Windows** | 10/11 | 11 (ARM-Version) |
+| **Linux** | X11 (getestet: Mint 22.3) | nicht getestet |
 | **Python** | 3.11+ (3.12/3.13/3.14 OK) | 3.11+ ARM64-Build |
 | **VS Build Tools** | nicht noetig | optional (nur fuer `python-rtmidi`) |
 
@@ -72,12 +76,18 @@ Kern-Abhaengigkeiten sind ARM64-kompatibel. Ein Paket bleibt optional:
 
 Stand: 2026-05-25 (PyPI Latest Stable)
 
-## Linux (x86_64, sekundaer)
+## Linux (x86_64)
 
-LightOS laeuft auf Linux; Windows bleibt die primaere Plattform. Der Source ist
+**Linux ist eine vollwertig unterstuetzte Plattform** — LightOS wird darauf
+taeglich entwickelt und die komplette Testsuite laeuft dort gruen. Der Source ist
 plattformneutral (keine `sys.platform`-Verzweigung im Kern) — es fehlen auf Linux
 nur ein paar **Systempakete** und eine **Audio-Monitor-Quelle**, sonst schlaegt
 `pip install` fehl oder einzelne Funktionen bleiben still.
+
+> Was Windows (noch) voraus hat: die GitHub-CI faehrt bisher nur `windows-latest`,
+> und das ARM64-Geraet ist das schaerfere Pruefgeraet fuer Qt-Teardown-Races.
+> Umgekehrt ist auf Linux `python-rtmidi` echt installiert — dort laeuft also ein
+> **anderer MIDI-Codepfad** als der WinMM-Fallback auf ARM-Windows.
 
 ### 1) Systempakete (Debian/Ubuntu — analog fuer andere Distros)
 

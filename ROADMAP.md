@@ -1,6 +1,6 @@
 # LightOS — Roadmap
 
-> Stand: 2026-07-09 · Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
+> Stand: 2026-07-30 · Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
 
 ---
 
@@ -64,8 +64,12 @@
 - **Netzwerk-Sync** — Zwei LightOS-Instanzen als Master/Backup synchronisieren
 
 ### Platform
-- **Linux-Port** — Offizielle Unterstützung (Debian/Ubuntu, Raspberry Pi)
-- **macOS-Port** — Offizielle Unterstützung (Apple Silicon)
+- ✅ **Linux-Port** — *(erledigt 2026-07-26: alle XPLAT-Items umgesetzt, Linux ist
+  Entwicklungs- und Alltagsplattform, komplette Testsuite läuft dort grün. Details
+  in [INSTALL.md](INSTALL.md#linux-x86_64). Offen: Raspberry Pi/ARM-Linux ist
+  ungetestet, und die GitHub-CI fährt bisher nur Windows.)*
+- **macOS-Port** — Offizielle Unterstützung (Apple Silicon). Die Pfad-Auflösung
+  (`app_data_dir()`) kennt macOS bereits, getestet wurde es aber nie.
 - **Plugin-System** — Drittanbieter-Plugins für proprietäre Controller und Protokolle
 
 ---
