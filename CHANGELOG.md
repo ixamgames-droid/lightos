@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Die F-Taste im Visualizer tat nie, was das Menü versprach
+
+#### Behoben
+
+- **„⛶ Fit Auswahl  (F)" stand im Kamera-Menü, die Taste sprang aber immer nur
+  auf den Fixtures-Tab (A3D-29).** Der Qt-Shortcut haengt mit
+  WindowShortcut-Kontext am Fenster und gewann jedes Mal; die WebEngine-Canvas
+  bekam die Taste gar nicht erst zu sehen, ihr in-page-Handler lief also nie.
+
+  Aufgeloest wird der Konflikt **nach dem Fokus** statt durch Wegnehmen — beide
+  Bedeutungen waren dokumentiert: liegt der Tastaturfokus auf der 3D-Ansicht,
+  heisst F jetzt „Fit Auswahl", sonst weiterhin Fixtures-Tab.
+
+  Die Fokus-Pruefung geht dabei ueber die Elternkette des `focusWidget()`:
+  `QWebEngineView.hasFocus()` allein meldet `False`, weil der Fokus in einem
+  internen Kind-Widget liegt — die Weiche haette also genau in dem Fall falsch
+  abgebogen, fuer den sie da ist.
+
 ### 2026-07-30 — Gespeicherte Kamera schaltete die Ansicht um, die Toolbar merkte es nicht
 
 #### Behoben

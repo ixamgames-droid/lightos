@@ -1868,7 +1868,17 @@ class VisualizerWindow(QMainWindow):
     def _setup_shortcuts(self):
         """T-VIZ-10: Tastatur-Shortcuts fuer schnellen Modus-Wechsel.
         V = 3D/2D umschalten · E = Bearbeitungsmodus durchschalten ·
-        F/S = Fixtures-/Buehne-Tab fokussieren."""
+        F/S = Fixtures-/Buehne-Tab fokussieren.
+
+        A3D-29: **F haengt am Fokus.** Liegt er auf der 3D-Szene, heisst F
+        „Fit Auswahl" — so, wie das Kamera-Menue es beschriftet
+        („⛶ Fit Auswahl  (F)"); sonst bleibt es der Sprung auf den
+        Fixtures-Tab. Vorher gewann IMMER der Qt-Shortcut: er haengt mit
+        WindowShortcut-Kontext am Top-Level-Fenster und der
+        ShortcutOverride-Zweig reicht Tasten nur an echte Text-Widgets weiter,
+        nicht an die WebEngine-Canvas. Der in-page-Handler in
+        ``interaction/touch.js`` sah die Taste damit nie — die im Menue
+        versprochene Bedienung war schlicht unerreichbar."""
         def _toggle_view():
             self._combo_view.setCurrentIndex(1 - self._combo_view.currentIndex())
 
@@ -1879,7 +1889,7 @@ class VisualizerWindow(QMainWindow):
         for key, fn in (
             ("V", _toggle_view),
             ("E", _cycle_edit),
-            ("F", lambda: self._tabs.setCurrentIndex(0)),
+            ("F", self._on_key_f),
             ("S", lambda: self._tabs.setCurrentIndex(1)),
             ("D", lambda: self._act_dock.toggle()),
         ):
@@ -1894,6 +1904,37 @@ class VisualizerWindow(QMainWindow):
         sc_undo.activated.connect(self._do_undo)
         sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
         sc_redo.activated.connect(self._do_redo)
+
+    def _on_key_f(self):
+        """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
+        if self._focus_is_in_3d():
+            self._on_fit_selected()
+        else:
+            self._tabs.setCurrentIndex(0)
+
+    def _focus_is_in_3d(self) -> bool:
+        """Liegt der Tastaturfokus in der 3D-Ansicht?
+
+        ``self._view.hasFocus()`` allein reicht NICHT: QWebEngineView haelt den
+        Fokus in einem internen Kind-Widget (dem Render-Delegate), die View
+        selbst meldet dann ``False``. Darum die Elternkette vom
+        ``focusWidget()`` aufwaerts pruefen."""
+        view = getattr(self, "_view", None)
+        if view is None:
+            return False
+        try:
+            from PySide6.QtWidgets import QApplication
+            w = QApplication.focusWidget()
+        except Exception:
+            return False
+        while w is not None:
+            if w is view:
+                return True
+            try:
+                w = w.parentWidget()
+            except RuntimeError:      # Widget waehrend des Laufs abgebaut
+                return False
+        return False
 
     def _do_undo(self):
         ok = get_undo_stack().undo()
