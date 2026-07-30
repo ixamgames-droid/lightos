@@ -49,6 +49,7 @@ jobs:
             libdbus-1-3 libfontconfig1 \
             libnss3 libnspr4 libxdamage1 libxrandr2 libxcomposite1 \
             libxcursor1 libxi6 libxtst6 libgbm1 libdrm2 libxshmfence1 \
+            libgl1-mesa-dri libglx-mesa0 xvfb \
             fonts-noto fonts-dejavu
 
       # Bewusst ein echtes venv/ statt System-Python: tools/verify_loop.sh sucht
@@ -69,10 +70,33 @@ jobs:
       # LIGHTOS_VERIFY_JOBS an die Runner-Kerne: ubuntu-latest hat 4, wie der
       # Entwicklungsrechner. verify_loop.sh setzt QT_QPA_PLATFORM und die
       # Exit-Haertung selbst.
+      #
+      # ★ QTWEBENGINE_CHROMIUM_FLAGS ist hier PFLICHT, nicht Kosmetik. Der erste
+      # Anlauf dieser Leg war rot: ~40 Visualizer-Tests scheiterten mit
+      # "Timeout beim Warten auf window.__lightosAppReady". Ursache war nicht der
+      # Code, sondern die Umgebung — ein GitHub-Runner hat keine GPU, und die
+      # Three.js-Szene braucht einen WebGL-Kontext. Ohne SwiftShader kommt der
+      # Renderer nie hoch, und der Fehler sieht aus wie ein Timing-Problem der App.
+      #
+      # Die Tests bauen ihren QWebEngineView DIREKT und laufen NICHT ueber
+      # main.py — die dortige Flag-Logik (_webengine_sandbox_flags, XPLAT-01)
+      # greift hier also nicht. Darum die Flags als Job-Env, inklusive der
+      # Linux-Sandbox-Flags, die main.py sonst beisteuert.
       - name: Volle Suite (segmentiert)
+        env:
+          QTWEBENGINE_CHROMIUM_FLAGS: >-
+            --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage
+            --disable-gpu --enable-unsafe-swiftshader
+            --use-gl=angle --use-angle=swiftshader --in-process-gpu
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
         run: |
           nproc
-          LIGHTOS_VERIFY_JOBS=3 ./tools/verify_loop.sh
+          # xvfb: QT_QPA_PLATFORM=offscreen setzt verify_loop.sh selbst, aber der
+          # Chromium-Unterprozess von QtWebEngine will auf Linux trotzdem ein
+          # DISPLAY sehen. Kostet nichts, wenn es nicht gebraucht wird.
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            env LIGHTOS_VERIFY_JOBS=3 ./tools/verify_loop.sh
 
       - name: Segment-Logs bei Fehlschlag hochladen
         if: failure()
