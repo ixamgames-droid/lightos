@@ -7,6 +7,56 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Das VC-XY-Pad respektiert die Kopf-Auswahl (FM-9/A5)
+
+#### Behoben
+
+- **„Kopf 2" gewählt, XY-Pad gezogen — und trotzdem fuhren alle vier Köpfe.**
+  Programmer-Regler (A1), Fächer und Snaps (A2), EFX (A3) und der VC-Submaster
+  (A4) waren längst kopf-fähig; das XY-Pad war die letzte VC-Fläche, die Pan/Tilt
+  weiterhin geräteweit schrieb. Es holte seine Ziele über `get_selected_fids()`
+  statt über die Zell-Auswahl und rief `set_programmer_value` ohne `head=`.
+
+  Jetzt liest `VCXYPad._resolve_heads` die Zellen (`get_selected_cells` →
+  `group_cells.head_restrictions` → `validate_head_restrictions`) und `_apply`
+  schreibt je gewähltem Kopf — dieselbe Kette wie beim VC-Submaster. Ein fest
+  zugewiesenes Pad (`_fixture_ids`) ignoriert die Auswahl weiterhin: eine
+  ausdrückliche Zuweisung darf die Selektion nicht überstimmen (Vorrang-Regel
+  aus A4). 16-bit-Betrieb zieht den Fine-Kanal mit demselben Kopf-Index mit
+  (`pan#2` / `pan_fine#2`).
+
+#### Der eigentliche Fund — er reicht weit über das XY-Pad hinaus
+
+- **Farbköpfe und Bewegungsköpfe eines Geräts sind nicht dieselbe Zahl** — und
+  `validate_head_restrictions` zählte bisher hart die Farbköpfe (`color_r`).
+  **Über die eingebaute Library ausgezählt (5116 Modi) gehen beide Zählungen bei
+  831 Modi auseinander, und zwar in beide Richtungen:**
+
+  - **108 Modi** haben ≥2 Bewegungs-, aber <2 Farbköpfe — darunter die gängigen
+    Moving-Bars: `Event Bar LED`, `Event Bar Pro`, `Event Bar Q4`,
+    `HYDRABEAM 4000 RGBW` in `19-Kanal`/`32-Kanal`, `Hydrabeam 400 Series`
+    `15-CH`/`28-CH`. Mit der Farb-Zählung wird die Kopf-Einschränkung
+    **verworfen** → „Kopf 2" gewählt, und trotzdem fahren alle vier Köpfe.
+  - **723 Modi** haben ≥2 Farb-, aber <2 Bewegungsköpfe — Pixel-Bars sowie die
+    vier Spider aus Davids Patch (`Speider 14ch`, `Mini Spider ZQ-B20 15ch`).
+    Dort wird die Einschränkung fälschlich **behalten** und erzeugt `pan#1`.
+
+  Was `pan#1` auf einem Ein-Pan-Gerät wirklich anrichtet, ist gemessen statt
+  vermutet: `_flush_programmer_to_dmx` läuft über die **Kanäle**, der einzige
+  Pan-Kanal fragt also nach `"pan"` — `pan#1` liest niemand. Der Kanal fällt auf
+  seinen `default_value` zurück, der Kopf **springt auf Default-Position und
+  folgt dem Pad nicht mehr** (gemessen: Default 128, geschrieben 200, Kanal blieb
+  128). Kein Fehler, keine Meldung.
+
+  Deshalb nimmt `validate_head_restrictions` die Zähl-Quelle jetzt als Parameter
+  (`count_heads`); Default bleibt die Farb-Zählung, der Submaster-Pfad ist
+  byte-identisch. Neu daneben: `move_head_count_for_channels` als Gegenstück zu
+  `color_head_count_for_channels`.
+
+  `tests/test_fm_head_selection_a5_xypad.py` (14) fährt **beide** Richtungen als
+  Wächter — jeweils mit Gegenprobe, dass die alte Farb-Zählung den Fehler
+  wirklich produziert hätte.
+
 ### 2026-07-30 — HW-5 messbar gemacht: Enttec-Langzeitlauf (`tools/hw5_longrun.py`)
 
 #### Neu
