@@ -83,6 +83,11 @@ def main():
     w = build(target)
     w.resize(w_px, h_px)
     w.show()
+    # ⚠️ XPLAT-12: reines Pumpen ohne `DeferredDelete`-Zustellung. Fuer die
+    # hier gebauten Widgets unkritisch (der Prozess endet gleich danach), aber
+    # sobald der Editor je einen QtWebEngine-View rendert, gilt die
+    # XPLAT-09-Regel: Abbau ueber `tests/_qt_lifecycle.destroy_webengine_view`
+    # statt Hoffen auf den Prozess-Exit.
     app.processEvents()
     app.processEvents()
     pm = w.grab()

@@ -176,6 +176,15 @@ def _build_view_row(module_name: str, class_name: str) -> dict:
         if widget is not None:
             widget.close()
             widget.deleteLater()
+        # ⚠️ XPLAT-12: EIN processEvents() stellt `DeferredDelete` NICHT zu —
+        # das reicht fuer gewoehnliche Widgets (sie sterben spaeter am
+        # Prozessende), waere aber die Falle aus XPLAT-09, sobald hier je ein
+        # QtWebEngine-View gebaut wird: dessen nativer Zustand sammelt sich
+        # dann ueber die enumerierten Views hinweg an, bis der Prozess
+        # abstuerzt. Kommt so ein View dazu, den Abbau ueber
+        # `tests/_qt_lifecycle.destroy_webengine_view` fahren (oder den View
+        # an ein Eltern-Widget haengen, das ihn mitnimmt). Heute baut dieses
+        # Werkzeug keinen — reine Vorsorge, kein aktueller Fehler.
         app.processEvents()
     return {
         "kind": "view",
