@@ -7,8 +7,9 @@ Moving Head in der Auswahl, faellt der Tab also in den generischen Regler-Loop,
 und der baut seine Regler aus dem **pro Attribut deduplizierten** Template
 (``union[ch.attribute]``).
 
-Am echten Bau gemessen (Spider ``ZQ-B20 Mini Spider [15 Channel]``: 0 Pan,
-2 Tilt · ``HYDRABEAM 4000 RGBW [19-Kanal]``: 4 Pan, 4 Tilt)::
+Am echten Bau gemessen (Spider ``Spider 14ch [14-Kanal]``: 0 Pan, 2 Tilt ·
+``HYDRABEAM 4000 RGBW [19-Kanal]``: 4 Pan, 4 Tilt — beide **Builtins**, damit
+der Test nicht an einer lokal importierten Library haengt)::
 
     nur Spider [1]   tilt-Regler: keine (SpiderPositionTool uebernimmt)
     nur Mover  [2]   tilt head=0 -> [2]        pan head=0 -> [2]
@@ -45,10 +46,18 @@ def _app() -> QApplication:
     return QApplication.instance() or QApplication([])
 
 
-def _pid(name: str) -> int:
+def _pid(short: str) -> int:
+    """Profil-ID ueber den **Kurznamen** eines BUILTIN-Profils.
+
+    ★ Bewusst nicht ueber den Anzeigenamen: der erste Wurf dieses Tests suchte
+    `ZQ-B20 Mini Spider` — den gibt es nur in Davids lokal importierter Library,
+    nicht in der frisch geseedeten CI-DB. Ergebnis war ein `None` aus der Query,
+    das erst als `TypeError: int() argument ...` auffiel, und zwar erst in der
+    CI (Fallenklasse QA-23: kein Test darf von Maschinenzustand ausserhalb des
+    Repos abhaengen). Beide hier benutzten Profile sind `ensure_builtins`."""
     with Session(fdb_engine()) as s:
         return int(s.execute(select(FixtureProfile.id).where(
-            FixtureProfile.name == name)).scalars().first())
+            FixtureProfile.short_name == short)).scalars().first())
 
 
 class _Basis(unittest.TestCase):
@@ -59,11 +68,11 @@ class _Basis(unittest.TestCase):
         self.state = get_state()
         self._hosts: list = []          # Qt-GC: Wegwerf-Hosts am Leben halten
         self.state.add_fixture(PatchedFixture(
-            fid=1, label="Spider1", fixture_profile_id=_pid("ZQ-B20 Mini Spider"),
-            mode_name="15 Channel", universe=1, address=1, channel_count=15,
+            fid=1, label="Spider1", fixture_profile_id=_pid("SPIDER14"),
+            mode_name="14-Kanal", universe=1, address=1, channel_count=14,
             fixture_type="moving_head"), undoable=False)
         self.state.add_fixture(PatchedFixture(
-            fid=2, label="Mover1", fixture_profile_id=_pid("HYDRABEAM 4000 RGBW"),
+            fid=2, label="Mover1", fixture_profile_id=_pid("HYDRA4000"),
             mode_name="19-Kanal", universe=1, address=100, channel_count=19,
             fixture_type="moving_head"), undoable=False)
 
