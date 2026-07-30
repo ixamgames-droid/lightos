@@ -161,11 +161,26 @@ MA-/Avolites-Style Syntax:
 ```
 1 thru 5 @ 80      # Fixtures 1-5 auf 80%
 all @ full         # alle Lampen voll
+1:2 pan 128        # NUR Kopf 2 von Geraet 1 (Mehrkopf-Bars/Spider)
+1:2 @ 50           # derselbe Kopf, Intensity (s. Hinweis unten)
+2 + 1:3            # ganzes Geraet 2 und Kopf 3 von Geraet 1 waehlen
 go 1               # Executor 1 GO
 record cue 2.5     # Programmer als Cue 2.5 aufnehmen
 page 3             # Wechsel zu Page 3
 blackout           # Blackout toggle
 ```
+
+**Koepfe werden gezaehlt wie sie beschriftet sind:** `1:1` ist der **erste** Kopf,
+genau wie das `K1` im Programmer, im EFX-Editor und im Faecher-Werkzeug.
+
+Wie viele Koepfe ein Geraet hat, haengt am **Attribut**: eine HYDRABEAM 4000 RGBW
+[19-Kanal] hat 4 Pan, 4 Tilt, aber nur **eine** Farbbank — `1:2 red 200` ist dort
+ein Fehlgriff und wird als solcher gemeldet, statt still alle Koepfe rot zu
+faerben. Und wo die Kanalzahl der Kopfzahl **widerspricht** — dieselbe Hydrabeam
+hat 5 Dimmer fuer 4 Koepfe, weil einer davon der gemeinsame Master ist —
+verweigert die Kommandozeile das Kopf-Ziel mit Begruendung, statt zu raten:
+`1:2 @ 50` waere dort um einen Kopf versetzt. Pan/Tilt/Farbe pro Kopf gehen
+unveraendert.
 
 ---
 
@@ -405,7 +420,7 @@ Privates Projekt — keine Garantie, keine Lizenz, kein Support.
 | ENTTEC, Art-Net, sACN | im Betrieb; ENTTEC-Langzeittest: erster Lauf 3,8 h / 540.225 Frames **ohne einen Schreibfehler**, der >8-h-Lauf laeuft |
 | Laser ueber DMX | fertig und im Einsatz |
 | Laser ueber Ether Dream / IDN | implementiert, aber **nur gegen Fakes getestet** — kein echtes Geraet vorhanden |
-| Mehrkopf-Geraete | Kopf-Auswahl wirkt in **allen** Programmer-Flaechen: Programmer, Faecher, Snaps, EFX, Submaster, XY-Pad, MIDI-Regler, Kommandozeile. **Offen:** eine getippte Kopf-Syntax (`1:2 @ 50`) — die Kommandozeile folgt der geklickten Auswahl, kennt den Kopf aber noch nicht als Wort |
+| Mehrkopf-Geraete | Kopf-Auswahl wirkt in **allen** Programmer-Flaechen: Programmer, Faecher, Snaps, EFX, Submaster, XY-Pad, MIDI-Regler, Kommandozeile — inklusive getippter Kopf-Syntax (`1:2 @ 50`) |
 | macOS | nicht unterstuetzt (Pfade sind vorbereitet, aber nie getestet) |
 
 Offene Punkte werden in **[BACKLOG.md](BACKLOG.md)** gefuehrt, die Aenderungs-Historie
