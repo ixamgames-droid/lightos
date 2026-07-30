@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Ein überholtes Bühnen-Echo rollte Positionen zurück (A3D-31)
+
+#### Behoben
+
+- **Ein Echo mit älterem Sequenz-Token konnte Position, Größe, Rotation und
+  Farbe eines Bühnenelements zurückrollen.** `_on_stage_list_from_js` prüfte
+  `is_stale` nur im **Create**-Zweig; der Update-Zweig für bereits vorhandene
+  Elemente wandte die Werte aus dem Echo **unbedingt** an. Der Docstring nannte
+  das „idempotent-harmlos".
+
+  Das stimmt aber nur, wenn der überholte Snapshot zufällig dieselben Werte
+  trägt. Trug er ALTE Werte für eine id, die inzwischen verschoben, gedreht oder
+  umgefärbt wurde, dann landeten sie im autoritativen Modell, `_stage_dirty`
+  wurde gesetzt, und `_sync_stage_node_to_scene` + `_push_stage_rotation_to_children`
+  schoben sie an JS **und an gedockte Fixtures** weiter — ein **Rollback** statt
+  eines No-op, bis in die gespeicherte Bühne hinein.
+
+  Der Guard steht jetzt vor **beiden** Zweigen: ein überholtes Echo schreibt gar
+  nichts. Die Reparatur-Teile derselben Funktion (Nachsenden fehlender Elemente,
+  Pending-Gate) laufen unberührt weiter — die kümmern sich darum, was JS fehlt,
+  nicht darum, was Python glauben soll.
+
+  `tests/test_a3d31_stale_echo_no_rollback.py` (8), **gegengeprüft**: mit der
+  alten Guard-Position fallen genau die vier Rollback-Tests, während die Tests
+  für frische Echos grün bleiben — der Fix macht das Drag-Ende also nicht kaputt.
+
 ### 2026-07-30 — Gelöschte Bühnenobjekte kamen zurück (A3D-30 + A3D-12)
 
 #### Behoben

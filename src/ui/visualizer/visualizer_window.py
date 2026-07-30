@@ -3391,9 +3391,22 @@ class VisualizerWindow(QMainWindow):
         Soll-Zustand -- der destruktive Loesch-Abgleich (py_ids_to_remove)
         wird dafuer uebersprungen, sonst wuerden frisch angelegte Elemente
         (die im stale Snapshot noch fehlen) faelschlich wieder entfernt.
-        Neuanlage/Update pro Element bleibt harmlos (idempotent) und laeuft
-        weiter, damit z.B. Positions-Updates aus demselben Echo nicht verloren
-        gehen."""
+
+        ★ A3D-31: hier stand frueher „Neuanlage/Update pro Element bleibt
+        harmlos (idempotent) und laeuft weiter". Fuer die NEUANLAGE stimmte das
+        nie (daher der Resurrection-Guard), und fuer das UPDATE stimmt es nur,
+        wenn der ueberholte Snapshot zufaellig dieselben Werte traegt. Traegt er
+        ALTE Werte fuer eine id, die inzwischen verschoben/gedreht/umgefaerbt
+        wurde, schrieb der Update-Zweig sie ungeprueft ins autoritative Modell,
+        setzte ``_stage_dirty`` und pushte sie ueber ``_sync_stage_node_to_scene``
+        + ``_push_stage_rotation_to_children`` an JS und an gedockte Fixtures
+        weiter -- ein **Rollback** statt eines No-op, und zwar bis in die
+        gespeicherte Buehne hinein.
+
+        Ein ueberholtes Echo darf den autoritativen Zustand also GAR NICHT
+        schreiben. Die Reparatur-Teile oben (Nachsenden fehlender Elemente,
+        Pending-Gate) laufen davon unberuehrt weiter -- die kuemmern sich um
+        das, was JS fehlt, nicht um das, was Python glauben soll."""
         js_ids = set()
         for it in items:
             sid = it.get("id")
@@ -3458,14 +3471,15 @@ class VisualizerWindow(QMainWindow):
             sid = it.get("id")
             if not sid:
                 continue
+            # A3D-31: ein ueberholtes Echo schreibt GAR NICHTS ins autoritative
+            # Modell — weder Neuanlage (Resurrection-Guard) noch Update. Der
+            # Update-Zweig unten ist NICHT idempotent, wenn der stale Snapshot
+            # alte Transform-/Farbwerte traegt: er rollt sie zurueck und pusht
+            # den Rollback an JS und an gedockte Fixtures weiter.
+            if is_stale:
+                continue
             el = self._current_stage.get(sid)
             if el is None:
-                # Resurrection-Guard: ein ueberholtes Echo (aelterer Token)
-                # spiegelt einen Zwischenstand und darf keine inzwischen
-                # geloeschten oder buehnen-fremden Elemente wiederbeleben —
-                # nur Updates BESTEHENDER Elemente sind idempotent-harmlos.
-                if is_stale:
-                    continue
                 # Neues Element aus JS - in Python-Modell anlegen
                 pos = it.get("position") or {}
                 size = it.get("size") or {}
