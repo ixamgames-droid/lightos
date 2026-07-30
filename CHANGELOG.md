@@ -7,6 +7,56 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Den Kopf endlich auch tippen können (FM-9 vollständig)
+
+#### Neu
+
+- **Kopf-Syntax in der Kommandozeile: `1:2 @ 50` spricht genau einen Kopf an.**
+  Bisher folgte die Kommandozeile zwar der *geklickten* Kopf-Auswahl (A7),
+  aber `1:2` selbst war ein einziges Wort-Token — der Lexer brach Worte nur an
+  `+ - @` und Leerzeichen — und endete in „Unbekannter Befehl". Jetzt:
+
+  ```
+  1:2 @ 50       # nur Kopf 2 von Geraet 1
+  1:2 pan 128    # derselbe Kopf ueber den Attribut-Pfad
+  2 + 1:3        # ganzes Geraet 2 und Kopf 3 von Geraet 1
+  ```
+
+  **Gezaehlt wird, wie beschriftet wird:** `1:1` ist der erste Kopf — so wie
+  das `K1` im Programmer, EFX-Editor, Faecher-Werkzeug und Gruppen-Raster
+  (alle `f"K{head + 1}"`). Intern bleibt das Zellformat `"fid:head"`
+  0-basiert; die Umrechnung passiert an genau einer Stelle. `1:0` wird
+  ausdruecklich abgewiesen, statt still auf Kopf 1 zu zeigen.
+
+#### Behoben
+
+- **Ein getippter Kopf, den es fuer dieses Attribut nicht gibt, faellt nicht
+  mehr still auf „alle Koepfe" zurueck.** Die Kopfzahl haengt am Attribut,
+  nicht am Geraet: eine HYDRABEAM 4000 RGBW [19-Kanal] hat 4 Pan, 5 Intensity
+  und **eine** Farbbank. `1:2 red 200` meldet dort jetzt „Gerät 1 hat für
+  'color_r' nur einen Kopf" und schreibt **nichts** — vorher waere daraus
+  entweder ein `color_r#1` ohne Kanal geworden (der Kopf faellt auf seinen
+  Default) oder, bei stillem Rueckfall, volle Farbe auf allen Koepfen. Eine
+  *geklickte* Auswahl darf still zurueckfallen, weil sie implizit ist; eine
+  getippte ist eine Ansage.
+
+- **Ein Kopf-Ziel, dessen Kanalzahl der Kopfzahl widerspricht, wird abgelehnt
+  statt geraten.** Die Hydrabeam legt ihre fuenf Intensity-Kanaele als
+  `CH1 Master Dimmer` + `CH9/12/15/18 Kopf 1..4 Dimmer` an — das
+  `attr#N`-Vokabular zaehlt aber Vorkommen, `1:2 @ 50` waere dort also CH9 =
+  „Kopf 1 Dimmer", ein Kopf daneben. Ueber die Library ausgezaehlt betrifft das
+  **123 von 5116 Modi**. Die Kommandozeile sagt jetzt, dass sie es nicht
+  aufloesen kann; die dahinterliegende Sache (auch die *geklickten* Wege sind
+  betroffen) ist als **FM-17** erfasst — sie beruehrt gespeicherte Shows und
+  ist keine Nebenbei-Aenderung.
+
+- **Drei Grammatik-Stellen haetten eine Kopf-Zelle kommentarlos geschluckt** —
+  eine davon kehrte sich sogar um: bei `1 thru 4 - 2:1` lieferte
+  `consume_number()` fuer die Zelle `None`, die Zelle blieb im Strom stehen und
+  der naechste Schleifendurchlauf haette sie **addiert** statt abgezogen.
+  Ebenso `all 1:2 @ 50` (haette alle Geraete voll aufgezogen) und `1:2 thru 4`
+  (Zelle verloren). Alle drei sind jetzt klare Fehlermeldungen.
+
 ### 2026-07-30 — Die Statustabellen hinkten dem eigenen Tag hinterher
 
 #### Behoben

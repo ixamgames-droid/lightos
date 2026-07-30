@@ -4,6 +4,7 @@ Zerlegt einen Eingabe-String in eine Liste von Tokens, die der Parser
 in eine ausfuehrbare Aktion umwandelt.
 """
 from __future__ import annotations
+import re
 from enum import Enum
 from dataclasses import dataclass
 
@@ -13,6 +14,7 @@ class TokenType(Enum):
     KEYWORD = "KEYWORD"     # thru, at, plus, minus, all, full, off, ...
     STRING = "STRING"       # "in Anfuehrungszeichen"
     OPERATOR = "OPERATOR"   # + - @
+    CELL = "CELL"           # "1:2" — Kopf 2 von Geraet 1 (FM-9/A8)
     EOF = "EOF"
 
 
@@ -25,6 +27,13 @@ class Token:
 
 # Bekannte Keywords. Alles andere wird trotzdem als KEYWORD ausgegeben
 # (z.B. ein Cue-Name), aber der Parser unterscheidet ueber den .value.
+#: Kopf-Zelle ``<fid>:<kopf>`` — FM-9/A8. Bewusst KEIN ``:``-Operator im Lexer:
+#: ``:`` bliebe sonst auch in Scene-/Cue-Namen ein Trenner (``record scene
+#: Teil:2`` zerfiele in drei Tokens), und die Kommandozeile reicht unbekannte
+#: Worte absichtlich als KEYWORD durch. Erkannt wird deshalb nur die **ganze**
+#: Form aus zwei Zahlen; alles andere mit Doppelpunkt bleibt ein Wort.
+CELL_RE = re.compile(r"^\d+:\d+$")
+
 KEYWORDS = {
     "thru", "at", "all", "full", "off", "ff",
     "clear", "cl",
@@ -68,6 +77,8 @@ def tokenize(text: str) -> list[Token]:
             tok = text[i:j].lower()
             if tok.replace(".", "", 1).isdigit() and tok.count(".") <= 1 and tok != ".":
                 tokens.append(Token(TokenType.NUMBER, tok, i))
+            elif CELL_RE.match(tok):
+                tokens.append(Token(TokenType.CELL, tok, i))
             elif tok in KEYWORDS:
                 tokens.append(Token(TokenType.KEYWORD, tok, i))
             else:

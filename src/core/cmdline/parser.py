@@ -13,16 +13,30 @@ from .lexer import Token, TokenType, tokenize
 
 @dataclass
 class SelectionExpr:
-    """Beschreibt eine Fixture-Selektion."""
+    """Beschreibt eine Fixture-Selektion.
+
+    ``cells`` (FM-9/A8) haelt zusaetzlich **getippte Kopf-Ziele** als
+    ``(fid, kopf_index)`` — ``1:2`` im Befehl wird hier als ``(1, 1)`` abgelegt.
+    Die Umrechnung passiert an genau EINER Stelle (im Parser, beim Verbrauchen
+    des Tokens): getippt wird **1-basiert**, weil jede Oberflaeche den Kopf als
+    ``K1``/``K2`` beschriftet (``programmer_view``, ``efx_view``, ``fan_tool``,
+    ``fixture_group_view`` — alle ``f"K{head + 1}"``); gespeichert wird
+    **0-basiert**, weil das Zellformat ``"fid:head"`` von
+    ``core.group_cells.parse_group_cell`` es so definiert. Wer beides mischt,
+    verschiebt die Auswahl still um einen Kopf."""
     add: list[int] = field(default_factory=list)
     ranges: list[tuple[int, int]] = field(default_factory=list)
     excludes: list[int] = field(default_factory=list)
     all_fixtures: bool = False
+    cells: list[tuple[int, int]] = field(default_factory=list)
 
     def is_empty(self) -> bool:
-        return (not self.add and not self.ranges and not self.all_fixtures)
+        return (not self.add and not self.ranges and not self.all_fixtures
+                and not self.cells)
 
-    def resolve(self, all_fids: list[int]) -> list[int]:
+    def whole_fids(self, all_fids: list[int]) -> list[int]:
+        """Die als GANZE Geraete genannten fids (ohne Kopf-Ziele) —
+        byte-identisch zum Verhalten vor FM-9/A8."""
         try:
             if self.all_fixtures:
                 sel = set(all_fids)
@@ -43,8 +57,50 @@ class SelectionExpr:
                 sel.discard(ex)
             return sorted(sel)
         except Exception as e:
+            print(f"[cmdline.parser] SelectionExpr.whole_fids error: {e}")
+            return []
+
+    def resolve(self, all_fids: list[int]) -> list[int]:
+        """Alle betroffenen Geraete — ganze UND kopf-weise genannte."""
+        try:
+            sel = set(self.whole_fids(all_fids))
+            for fid, _head in self.cells:
+                if fid in all_fids and fid not in self.excludes:
+                    sel.add(fid)
+            return sorted(sel)
+        except Exception as e:
             print(f"[cmdline.parser] SelectionExpr.resolve error: {e}")
             return []
+
+    def cell_strings(self, all_fids: list[int]) -> list[str]:
+        """Die Selektion im **Zellformat** (``"7"`` / ``"7:2"``) — die Sprache,
+        die ``AppState.set_selected_cells`` spricht."""
+        whole = set(self.whole_fids(all_fids))
+        heads: dict[int, set] = {}
+        for fid, head in self.cells:
+            if fid in all_fids and fid not in self.excludes:
+                heads.setdefault(fid, set()).add(head)
+        out: list[str] = []
+        for fid in self.resolve(all_fids):
+            if fid in whole or fid not in heads:
+                out.append(str(fid))
+            else:
+                out.extend(f"{fid}:{h}" for h in sorted(heads[fid]))
+        return out
+
+    def head_map(self, all_fids: list[int]) -> dict:
+        """Kopf-Einschraenkung ``{fid: {head}}`` der getippten Zellen.
+
+        Geht bewusst durch ``group_cells.head_restrictions`` — dieselbe EINE
+        Quelle, die Auswahl-Zellen und Gruppen-Raster auswerten. Damit gilt hier
+        automatisch dieselbe Vorrang-Regel: wer ``1 + 1:2`` tippt, hat das ganze
+        Geraet genannt, und das schlaegt das Kopf-Ziel."""
+        try:
+            from src.core.group_cells import head_restrictions
+            return head_restrictions(self.cell_strings(all_fids)) or {}
+        except Exception as e:
+            print(f"[cmdline.parser] SelectionExpr.head_map error: {e}")
+            return {}
 
 
 # ── Auswahl: EIN Zugang statt roher Attributzugriffe ─────────────────────────
@@ -113,6 +169,115 @@ def _selection_heads(state, attribute: str) -> dict:
         return {}
 
 
+def _geraet_kopfzahl(fx, chans, zaehle_farbe, zaehle_bewegung) -> int:
+    """Wie viele Koepfe hat das GERAET (nicht: das Attribut)? Pan/Tilt und
+    Farbbaenke sind die beiden belastbaren Belege; ohne beide gibt es keinen.
+
+    ★ Gebraucht wird das nur als **Gegenprobe** (FM-9/A8): widerspricht die
+    Kanalzahl eines Attributs der Kopfzahl, ist ein getipptes Kopf-Ziel dort
+    nicht aufloesbar — s. ``_typed_heads``."""
+    try:
+        return max(int(zaehle_farbe(fx, chans)), int(zaehle_bewegung(fx, chans)))
+    except Exception:
+        return 0
+
+
+def _typed_heads(state, selection: "SelectionExpr", attribute: str,
+                 all_fids: list) -> tuple:
+    """GETIPPTE Kopf-Ziele (``1:2 @ 50``) pruefen — ``({fid: {head}}, fehler)``.
+
+    ★ Warum das nicht dasselbe ist wie :func:`_selection_heads` (FM-9/A8): eine
+    **geklickte** Kopf-Auswahl ist implizit, deshalb darf sie still auf
+    geraeteweit zurueckfallen, wenn das Attribut dort gar keine Koepfe hat
+    (``validate_head_restrictions`` verwirft sie einfach). Eine **getippte**
+    ist eine ausdrueckliche Ansage — faellt die still zurueck, schreibt
+    ``1:3 @ 100`` bei einem Tippfehler die volle Intensitaet auf ALLE Koepfe,
+    also sichtbar auf die Buehne. Darum meldet der getippte Weg den Fehlgriff,
+    statt ihn zu schlucken.
+
+    Die Kopfzahl haengt am **Attribut**, nicht am Geraet (FM-9/A6): eine
+    ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, 5 Intensity und 1
+    Farbbank — ``1:2 red 200`` ist dort also ein echter Fehlgriff, ``1:2 pan
+    128`` nicht. Ohne diese Pruefung entstuende ``color_r#1``: ein Schluessel,
+    den ``_flush_programmer_to_dmx`` nie liest, der Kopf faellt auf seinen
+    ``default_value`` (A5, an echten Kanaelen gemessen).
+
+    ★★ Und eine dritte Lage, die erst diese Runde ans Licht brachte
+    (Zonen-Master-Falle der Review-Checkliste): **die Vorkommen eines Attributs
+    sind nicht immer die Koepfe.** Dieselbe Hydrabeam legt ihre 5
+    Intensity-Kanaele als *Master Dimmer* (CH1) + *Kopf 1..4 Dimmer*
+    (CH9/12/15/18) an. Das ``attr#N``-Vokabular zaehlt aber stur die Vorkommen,
+    also waere ``1:2 @ 50`` = ``intensity#1`` = **CH9 = „Kopf 1 Dimmer"** — ein
+    Kopf daneben, und ``1:1`` traefe sogar den gemeinsamen Master. Nachgezaehlt
+    ueber die eingebaute Library: bei **123 von 5116 Modi** widerspricht die
+    Intensity-Kanalzahl der Kopfzahl (37 davon exakt „Master + je Kopf einer",
+    darunter Davids Hydrabeam), bei 338 gibt es gar keinen Pan-/Farb-Beleg fuer
+    eine Kopfzahl und bei 77 stimmen beide ueberein.
+
+    Der getippte Weg **raet dort nicht**, sondern verweigert mit Begruendung.
+    Abgewiesen wird nur bei echtem **Widerspruch** (Geraet hat >=2 belegte
+    Koepfe UND das Attribut hat eine andere Anzahl) — fehlender Beleg ist kein
+    Widerspruch, ein reiner Dimmer-Balken ohne Pan/Farbe bleibt also bedienbar.
+    Der geklickte Weg (A6/A7) schreibt in diesen Faellen weiterhin um einen Kopf
+    versetzt; das ist eine aeltere, tiefer sitzende Sache am ``attr#N``-Vertrag
+    (Show-Persistenz!) und als eigenes Backlog-Item erfasst, nicht hier
+    nebenbei umgebogen.
+    """
+    typed = selection.head_map(all_fids)
+    if not typed:
+        return {}, None
+    try:
+        from src.core.app_state import (head_counter_for_attr,
+                                        get_channels_for_patched,
+                                        color_head_count_for_channels,
+                                        move_head_count_for_channels)
+        counter = head_counter_for_attr(attribute)
+    except Exception:
+        counter = None
+    if counter is not None:
+        try:
+            by_fid = {int(fx.fid): fx for fx in state.get_patched_fixtures()}
+        except Exception:
+            by_fid = {}
+        for fid in sorted(typed):
+            fx = by_fid.get(fid)
+            if fx is None:
+                continue        # nicht gepatcht — resolve() hat es schon aussortiert
+            try:
+                n = int(counter(fx, get_channels_for_patched(fx)))
+            except Exception:
+                continue        # Zaehlung unmoeglich -> nicht raten, Bestandspfad
+            hs = sorted(typed[fid])
+            if n < 2:
+                return {}, (f"Gerät {fid} hat für '{attribute}' nur einen Kopf — "
+                            f"'{fid}:{hs[0] + 1}' gibt es dort nicht")
+            koepfe = _geraet_kopfzahl(fx, get_channels_for_patched(fx),
+                                      color_head_count_for_channels,
+                                      move_head_count_for_channels)
+            if koepfe >= 2 and n != koepfe:
+                return {}, (f"Gerät {fid} hat {koepfe} Köpfe, aber {n} "
+                            f"'{attribute}'-Kanäle — welcher davon zu K"
+                            f"{hs[0] + 1} gehört, ist nicht eindeutig "
+                            f"(typischer Fall: ein gemeinsamer Master plus je "
+                            f"Kopf einer). Kopf-Ziele gehen hier über Pan/Tilt/"
+                            f"Farbe")
+            zu_gross = [h for h in hs if h >= n]
+            if zu_gross:
+                return {}, (f"Gerät {fid} hat für '{attribute}' {n} Köpfe "
+                            f"(K1–K{n}) — K{zu_gross[0] + 1} gibt es dort nicht")
+    validator = getattr(state, "validate_head_restrictions", None)
+    if callable(validator) and counter is not None:
+        try:
+            # Die EINE Quelle fuer die Verwerfungsregeln (u.a. „alle Koepfe
+            # genannt = ganzes Geraet"). Ein leeres Ergebnis heisst hier also
+            # geraeteweit schreiben — und ist nach der Pruefung oben kein
+            # verschluckter Fehlgriff mehr, sondern genau das Gemeinte.
+            return validator(typed, count_heads=counter) or {}, None
+        except Exception:
+            pass
+    return typed, None
+
+
 # ── CommandResult ────────────────────────────────────────────────────────────
 
 @dataclass
@@ -139,14 +304,18 @@ class SetValueCommand(Command):
         try:
             all_fids = [f.fid for f in state.get_patched_fixtures()]
             # Eine im Kommando GENANNTE Selektion meint ganze Geraete und hebt
-            # eine bestehende Kopf-Einschraenkung damit auf; nur der Fallback auf
-            # die gespeicherte Auswahl kann kopf-fein sein.
+            # eine bestehende Kopf-Einschraenkung damit auf — der Fallback auf
+            # die gespeicherte (geklickte) Auswahl darf kopf-fein sein…
             if self.selection.is_empty():
                 fids = _get_selection(state)
                 heads = _selection_heads(state, self.attribute)
             else:
                 fids = self.selection.resolve(all_fids)
-                heads = {}
+                # …ausser der Kopf wurde ausdruecklich MITGETIPPT (`1:2 @ 50`).
+                heads, fehler = _typed_heads(state, self.selection,
+                                             self.attribute, all_fids)
+                if fehler:
+                    return CommandResult(False, fehler)
             if not fids:
                 return CommandResult(False, "Keine Fixtures selektiert")
             if self.value_pct is not None:
@@ -176,10 +345,29 @@ class SelectionCommand(Command):
         try:
             all_fids = [f.fid for f in state.get_patched_fixtures()]
             fids = self.selection.resolve(all_fids)
-            _set_selection(state, fids)
+            zellen = self.selection.cell_strings(all_fids)
+            setter = getattr(state, "set_selected_cells", None)
+            if self.selection.cells:
+                # Kopf-Ziele getippt -> die FEINE Auswahl setzen. Ueber
+                # _set_selection ginge die Kopf-Information verloren:
+                # set_selected_fids waehlt jedes fid als GANZES Geraet.
+                if not callable(setter):
+                    # Kein stiller Rueckfall auf „ganze Geraete": der Nutzer hat
+                    # den Kopf ausdruecklich genannt. Erreichbar nur mit
+                    # Minimal-States (Werkzeuge/Stubs) — die echte App bringt
+                    # den Vertrag mit.
+                    return CommandResult(
+                        False, "Dieser Zustand kennt keine Kopf-Auswahl "
+                               "(set_selected_cells fehlt)")
+                setter(zellen)
+            else:
+                _set_selection(state, fids)
             if not fids:
                 return CommandResult(True, "Selektion leer")
-            return CommandResult(True, f"Selektiert: {len(fids)} ({_short_list(fids)})")
+            # Ohne Kopf-Ziele bleibt die Meldung wortgleich zum Bestand.
+            liste = (_short_cells(zellen) if self.selection.cells
+                     else _short_list(fids))
+            return CommandResult(True, f"Selektiert: {len(fids)} ({liste})")
         except Exception as e:
             return CommandResult(False, f"Selektion Fehler: {e}")
 
@@ -416,6 +604,20 @@ ATTR_MAP = {
 
 # ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
+def _short_cells(cells: list[str], limit: int = 8) -> str:
+    """Zellen fuer die Statuszeile — ``"2:1"`` wird zu ``"2·K2"``, weil jede
+    Oberflaeche den Kopf 1-basiert beschriftet (``K{head + 1}``). Wer hier den
+    rohen Zellwert zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als
+    er getippt hat."""
+    def _label(z: str) -> str:
+        fid, _sep, head = z.partition(":")
+        return f"{fid}·K{int(head) + 1}" if head else fid
+    if len(cells) <= limit:
+        return ",".join(_label(z) for z in cells)
+    head = ",".join(_label(z) for z in cells[:limit])
+    return f"{head},...(+{len(cells) - limit})"
+
+
 def _short_list(fids: list[int], limit: int = 8) -> str:
     if not fids:
         return ""
@@ -516,9 +718,13 @@ def parse(text: str) -> Command:
                 advance()
                 nm_t = peek()
                 name = ""
+                # CELL steht hier mit in der Liste, damit ein Szenen-Name der
+                # Form `1:2` weiter als Name durchgeht (vor FM-9/A8 war das ein
+                # gewoehnliches Wort-Token) — sonst hiesse die Szene still
+                # "Neue Szene".
                 if nm_t.type == TokenType.STRING:
                     name = advance().value
-                elif nm_t.type == TokenType.KEYWORD:
+                elif nm_t.type in (TokenType.KEYWORD, TokenType.CELL):
                     name = advance().value
                 return RecordSceneCommand(name=name)
             return RecordCueCommand()
@@ -528,10 +734,29 @@ def parse(text: str) -> Command:
     if peek().type == TokenType.KEYWORD and peek().value == "all":
         advance()
         sel.all_fixtures = True
+        if peek().type == TokenType.CELL:
+            # Sonst faende die Zelle keinen Verbraucher mehr und fiele STILL
+            # weg: `all 1:2 @ 50` haette alle Geraete voll aufgezogen.
+            return ErrorCommand(
+                f"'all' und ein Kopf-Ziel ('{peek().value}') widersprechen sich "
+                f"— entweder alle Geräte oder einzelne Köpfe")
     else:
         while True:
             tt = peek()
-            if tt.type == TokenType.NUMBER:
+            if tt.type == TokenType.CELL:
+                advance()
+                fid_s, _sep, head_s = tt.value.partition(":")
+                fid, kopf = int(fid_s), int(head_s)
+                if kopf < 1:
+                    return ErrorCommand(
+                        f"Kopf-Nummern sind 1-basiert — '{tt.value}' gibt es "
+                        f"nicht (der erste Kopf ist '{fid}:1')")
+                if peek().type == TokenType.KEYWORD and peek().value == "thru":
+                    return ErrorCommand(
+                        f"'thru' geht nicht über Köpfe — einzeln nennen: "
+                        f"'{fid}:{kopf} + {fid}:{kopf + 1}'")
+                sel.cells.append((fid, kopf - 1))   # Anzeige 1-basiert -> Zelle 0-basiert
+            elif tt.type == TokenType.NUMBER:
                 start = int(advance().value)
                 if peek().type == TokenType.KEYWORD and peek().value == "thru":
                     advance()
@@ -547,6 +772,16 @@ def parse(text: str) -> Command:
                 continue
             elif tt.type == TokenType.OPERATOR and tt.value == "-":
                 advance()
+                if peek().type == TokenType.CELL:
+                    # Ohne diesen Riegel kehrte sich das Minus STILL um:
+                    # consume_number() liefert bei einer Zelle None, die Zelle
+                    # bliebe stehen und der naechste Schleifendurchlauf haette
+                    # sie ADDIERT — `1 thru 4 - 2:1` haette Kopf 2 also
+                    # hinzugefuegt statt abgezogen.
+                    return ErrorCommand(
+                        f"Ein einzelner Kopf lässt sich nicht abziehen "
+                        f"('-{peek().value}') — nenne die gewünschten Köpfe "
+                        f"direkt: '1:1 + 1:3'")
                 nn = consume_number()
                 if nn is not None:
                     sel.excludes.append(int(nn))
@@ -555,6 +790,11 @@ def parse(text: str) -> Command:
                 continue
             elif tt.type == TokenType.KEYWORD and tt.value == "minus":
                 advance()
+                if peek().type == TokenType.CELL:
+                    return ErrorCommand(          # wie beim '-'-Operator
+                        f"Ein einzelner Kopf lässt sich nicht abziehen "
+                        f"('minus {peek().value}') — nenne die gewünschten "
+                        f"Köpfe direkt: '1:1 + 1:3'")
                 nn = consume_number()
                 if nn is not None:
                     sel.excludes.append(int(nn))
@@ -595,7 +835,8 @@ def parse(text: str) -> Command:
         return ErrorCommand("Leerer Befehl")
     return ErrorCommand(
         f"Unbekannter Befehl: '{raw}'. "
-        "Tipp: '1 thru 5 @ 80'  'all @ full'  'go 1'  'page 2'  'clear'"
+        "Tipp: '1 thru 5 @ 80'  'all @ full'  '1:2 @ 50' (Kopf 2)  "
+        "'go 1'  'page 2'  'clear'"
     )
 
 

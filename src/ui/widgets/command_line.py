@@ -113,8 +113,8 @@ class CommandLine(QWidget):
 
         self._edit = _CmdEdit()
         self._edit.setPlaceholderText(
-            "Befehl: '1 thru 5 @ 80'  'all @ full'  'go 1'  "
-            "'record cue 2'  'page +'  'clear'   (Tab = vervollst., Pfeile = History)"
+            "Befehl: '1 thru 5 @ 80'  'all @ full'  '1:2 pan 128' (nur Kopf 2)  "
+            "'go 1'  'page +'  'clear'   (Tab = vervollst., Pfeile = History)"
         )
         font = QFont("Consolas", 10)
         self._edit.setFont(font)
