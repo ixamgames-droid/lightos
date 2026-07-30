@@ -330,6 +330,25 @@ class Visualizer3DView(QWidget):
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
             svc.set_target_active(target, True)
+        # A3D-23: Ein Wechsel der Render-Qualitaet laedt nur die AKTIVEN Targets
+        # neu (`reload_all_targets` filtert auf `t.active`) — dieser Spiegel ist
+        # im 2D-Modus/auf einem anderen Tab aber inaktiv und wird uebersprungen.
+        # Die Stufe reist als Query in der Page-URL (Konstruktor-Entscheidung des
+        # Renderers, nicht nachpushbar), also rendert er nach dem Wiedereinblenden
+        # weiter mit der ALTEN Stufe — bis die Seite aus einem anderen Grund neu
+        # laedt (Crash, aktiver Reload, App-Neustart). Beim Einblenden also
+        # vergleichen und bei Abweichung die Seite neu laden; `loadFinished`
+        # erledigt danach Erstpush + Voll-Resync wie beim normalen Start.
+        _view = getattr(self, "_view", None)
+        if _view is not None:
+            try:
+                from src.ui.visualizer.visualizer_window import page_tier_is_stale
+                if page_tier_is_stale(_view):
+                    self._loaded = False        # nichts mehr an die alte Seite pushen
+                    self._reload_own_page()
+                    return
+            except Exception as e:
+                print(f"[Visualizer3DView] Tier-Pruefung fehlgeschlagen: {e}")
         # VIZ-LABELS (Review-Fix): die View wird beim 2D<->3D-Wechsel / Pop-out-
         # Redock nur versteckt & wiederverwendet (KEIN Page-Reload). Der einzige
         # Settings-Push liegt sonst in _push_initial_state (nur bei loadFinished).
