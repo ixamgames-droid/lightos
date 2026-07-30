@@ -13,7 +13,7 @@ import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, 
 import { setFpsVisible } from '../camera/presets.js';
 import {
   loadStageJson, createStageObject, removeStageObject, updateStageObjectProps,
-  setResizeModeEnabled,
+  setResizeModeEnabled, isUserRemoved,
 } from '../stage/stage_objects.js';
 import { hideTooltip } from '../interaction/pointer.js';
 import { resetCameraView } from '../camera/cameras.js';
@@ -35,6 +35,15 @@ export function jsAddStageObjectData(json) {
   try {
     const d = typeof json === 'string' ? JSON.parse(json) : json;
     if (!d || !d.type) return null;
+    // A3D-12/A3D-30: eine automatische Wiederherstellung (`reassert`) darf ein
+    // vom Nutzer geloeschtes Element NICHT reanimieren. Der Repair-Loop in
+    // loadStageJson respektierte den Tombstone schon immer, dieser
+    // Inkremental-Kanal nicht — ein verspaetet zugestelltes addStageData baute
+    // das Objekt neu auf UND hob per createStageObject seinen Tombstone auf.
+    //
+    // Nur `reassert` wird so behandelt: ein echtes Undo/Redo-Re-Add ist eine
+    // bewusste Nutzergeste und MUSS den Tombstone aufheben duerfen.
+    if (d.reassert && d.id && isUserRemoved(d.id)) return null;
     if (d.id && stageObjects[d.id]) {
       updateStageObjectProps(d.id, d);
       return d.id;

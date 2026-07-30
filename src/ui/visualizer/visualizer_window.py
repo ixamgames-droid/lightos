@@ -307,6 +307,52 @@ def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> Render
 _KEEP_DOCK = object()
 
 
+def _stage_add_events(bridge, sid: str):
+    """Alle eingereihten ``addStageData``-Events fuer ``sid`` — als
+    ``(event, payload)``-Paare. EINE Parse-Stelle fuer die beiden Nutzer unten.
+
+    ★ Bewusst MODUL-Funktionen, nicht Methoden auf ``VisualizerWindow``:
+    ``_on_stage_object_deleted_from_js`` wird in Bestandstests ungebunden auf
+    einem ``SimpleNamespace``-Stub aufgerufen, der nur die Felder mitbringt, die
+    der Guard damals brauchte. Eine neue Hilfs-METHODE haette dort mit
+    ``AttributeError`` zugeschlagen — dieselbe Falle wie bei HW-5b und FM-9/A6,
+    dreimal an einem Tag. Als freie Funktion existiert das Problem nicht.
+    """
+    out = []
+    for ev in list(getattr(bridge, "_poll_events", None) or []):
+        if ev.get("t") != "addStageData":
+            continue
+        try:
+            payload = json.loads(ev.get("j") or "{}")
+        except Exception:
+            continue
+        if payload.get("id") == sid:
+            out.append((ev, payload))
+    return out
+
+
+def _queued_user_readd(bridge, sid: str) -> bool:
+    """A3D-30: haengt fuer ``sid`` ein Add aus einer ECHTEN Nutzergeste in der
+    Queue (Undo/Redo)? Automatische Wiederherstellungen (``reassert``) zaehlen
+    ausdruecklich nicht — sie duerfen eine Loeschung nicht ueberstimmen."""
+    return any(not p.get("reassert") for _ev, p in _stage_add_events(bridge, sid))
+
+
+def _drop_queued_stage_adds(bridge, sid: str) -> int:
+    """Eingereihte Adds fuer ein gerade geloeschtes Element verwerfen.
+    Gibt die Zahl der entfernten Events zurueck (fuer Tests/Diagnose)."""
+    events = getattr(bridge, "_poll_events", None)
+    if events is None:
+        return 0
+    weg = {id(ev) for ev, _p in _stage_add_events(bridge, sid)}
+    if not weg:
+        return 0
+    behalten = [ev for ev in events if id(ev) not in weg]
+    entfernt = len(events) - len(behalten)
+    events[:] = behalten
+    return entfernt
+
+
 class VisualizerBridge(QObject):
     """Kommunikationsbruecke Python <-> JavaScript (Three.js).
 
@@ -1385,10 +1431,37 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_add_stage_object error: {e}")
 
-    def push_add_stage_object_data(self, element: StageElement):
-        """Inkrementelles Add mit stabiler Python-ID statt Scene-Reload."""
+    def push_add_stage_object_data(self, element: StageElement, *,
+                                   reassert: bool = False):
+        """Inkrementelles Add mit stabiler Python-ID statt Scene-Reload.
+
+        ``reassert=True`` markiert ein Add, das NICHT auf eine Nutzergeste
+        zurueckgeht, sondern auf eine automatische Wiederherstellung: den
+        1200-ms-Reassert nach dem Load und den ``<=3x``-Nachsende-Mechanismus
+        bei einem Teil-Snapshot (A3D-30).
+
+        ★ Warum diese Unterscheidung noetig ist: es gibt VIER Sender von
+        ``addStageData``, und der Loesch-Guard in
+        ``_on_stage_object_deleted_from_js`` konnte sie nicht auseinanderhalten.
+        Er verwarf eine echte 3D-Loeschung, sobald IRGENDEIN Add fuer dieselbe
+        id in der Poll-Queue hing — gerechtfertigt war das nur mit
+        Undo/Redo-Interleaving, aber genau dieselbe Event-Form entsteht bei der
+        automatischen Wiederherstellung. Folge: die Loeschung erreichte das
+        autoritative Python-Modell nie, und das eingereihte Add baute das Objekt
+        in JS neu auf — das geloeschte Buehnenobjekt kam zurueck.
+
+        Das Flag reist bewusst IN DER PAYLOAD und nicht als eigenes Signal oder
+        Event-Feld: JS braucht es auch (dort entscheidet es, ob der
+        Loesch-Tombstone ``_userRemovedIds`` respektiert wird, A3D-12), und ein
+        neues Signal muesste zusaetzlich in die Poll-Spiegel-Liste und wuerde den
+        „22 Signale"-Vertrag des Smoke-Tests brechen. Ohne ``reassert`` bleibt die
+        Payload byte-identisch zum Bestand.
+        """
         try:
-            self.addStageObjectData.emit(json.dumps(element.to_js_dict()))
+            payload = element.to_js_dict()
+            if reassert:
+                payload["reassert"] = True
+            self.addStageObjectData.emit(json.dumps(payload))
         except Exception as e:
             print(f"[Visualizer] push_add_stage_object_data error: {e}")
 
@@ -2845,7 +2918,8 @@ class VisualizerWindow(QMainWindow):
         """Sendet die autoritative Bühne nach dem WebChannel-Handshake erneut."""
         try:
             for el in self._current_stage.elements:
-                self._bridge.push_add_stage_object_data(el)
+                # A3D-30: automatische Wiederherstellung, KEINE Nutzergeste.
+                self._bridge.push_add_stage_object_data(el, reassert=True)
         except Exception as e:
             print(f"[Visualizer] delayed stage reassert error: {e}")
 
@@ -3349,7 +3423,10 @@ class VisualizerWindow(QMainWindow):
                 for el in self._current_stage.elements:
                     if el.id in missing_ids:
                         try:
-                            self._bridge.push_add_stage_object_data(el)
+                            # A3D-30: Nachsenden bei Teil-Snapshot = automatische
+                            # Wiederherstellung, keine Nutzergeste.
+                            self._bridge.push_add_stage_object_data(
+                                el, reassert=True)
                         except Exception as e:
                             print(f"[Visualizer] stage reassert error: {e}")
                 return
@@ -3480,16 +3557,26 @@ class VisualizerWindow(QMainWindow):
         # Undo/Redo-Interleaving: hängt für dieses Element bereits ein neues
         # Add in der Poll-Queue, ist das Lösch-Echo überholt (es stammt vom
         # vorigen, bereits rückgängig gemachten Remove).
-        for ev in list(getattr(bridge, "_poll_events", None) or []):
-            if ev.get("t") == "addStageData":
-                try:
-                    if json.loads(ev.get("j") or "{}").get("id") == sid:
-                        return
-                except Exception:
-                    pass
+        #
+        # ★ A3D-30: das gilt NUR für echte Nutzer-Re-Adds. Vorher zählte hier
+        # jedes Add derselben id — und dieselbe Event-Form entsteht auch bei der
+        # automatischen Wiederherstellung (1200-ms-Reassert nach Load, ≤3×-
+        # Nachsenden bei Teil-Snapshot). Eine echte Löschung wurde dadurch
+        # verworfen, das Element blieb im autoritativen `_current_stage`, und das
+        # eingereihte Add baute es in JS wieder auf: das gelöschte Bühnenobjekt
+        # kam zurück. Reassert-Adds tragen seither `reassert: true` und dürfen
+        # eine Löschung nicht mehr überstimmen.
+        if _queued_user_readd(bridge, sid):
+            return
         el = self._current_stage.get(sid)
         if el is None:
             return
+        # Die Löschung ist echt und wird angewendet -> noch eingereihte
+        # Reassert-Adds für dieses Element aus der Queue nehmen. Sonst stellt der
+        # nächste Poll genau das Objekt wieder her, das gerade gelöscht wurde —
+        # der Guard oben würde es beim nächsten Mal nicht einmal bemerken, weil
+        # das Element dann gar nicht mehr in `_current_stage` steht.
+        _drop_queued_stage_adds(bridge, sid)
         self._current_stage.remove(sid)
         self._remove_stage_node_from_scene(sid)
         if self._selected_stage_id == sid:

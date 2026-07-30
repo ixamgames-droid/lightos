@@ -368,6 +368,51 @@ class SceneModulesSmokeTest(unittest.TestCase):
         )
         self.assertTrue(still_one, "Doppelzustellung erzeugte ein zweites Stage-Objekt")
 
+    def test_reassert_add_reanimiert_kein_geloeschtes_stage_objekt(self):
+        """A3D-12: der inkrementelle Add-Kanal respektiert jetzt den Loesch-Tombstone.
+
+        ``loadStageJson``s Repair-Loop respektierte ``_userRemovedIds`` schon
+        immer, ``jsAddStageObjectData`` nicht. Ein verspaetet zugestelltes
+        ``addStageData`` (1200-ms-Reassert, Nachsende-Mechanismus) baute damit ein
+        gerade geloeschtes Objekt neu auf UND hob per ``createStageObject``
+        seinen Tombstone auf.
+
+        Nur ``reassert``-Adds werden abgewiesen: ein echtes Undo/Redo-Re-Add ist
+        eine bewusste Nutzergeste und MUSS den Tombstone aufheben duerfen — der
+        zweite Teil des Tests haelt genau das fest.
+        """
+        self._load_and_wait()
+        basis = ('"type":"platform","name":"Deck",'
+                 '"position":{"x":0,"y":0.2,"z":0},'
+                 '"size":{"x":4,"y":0.4,"z":3},"rotation":0,"color":"#332520"}')
+        da = "!!window.__lightos.stageObjects['a3d12-1']"
+
+        self._emit_until_true(
+            lambda: self._bridge_obj.addStageObjectData.emit(
+                '{"id":"a3d12-1",' + basis), da, timeout_s=5.0)
+
+        # Nutzer loescht es im 3D (echter Kanal) -> Tombstone.
+        self._emit_until_true(
+            lambda: self._bridge_obj.removeStageObject.emit("a3d12-1"),
+            "!window.__lightos.stageObjects['a3d12-1']", timeout_s=5.0)
+
+        # Ein Reassert-Add darf es NICHT zurueckbringen. Mehrfach senden und
+        # dazwischen pollen — ein einzelner Emit koennte schlicht noch nicht
+        # angekommen sein und der Test waere gruen, ohne etwas zu zeigen.
+        for _ in range(6):
+            self._bridge_obj.addStageObjectData.emit(
+                '{"id":"a3d12-1","reassert":true,' + basis)
+            self.assertFalse(
+                self._eval(da),
+                "ein Reassert-Add hat ein geloeschtes Buehnenobjekt reanimiert")
+            time.sleep(_POLL_INTERVAL_S)
+
+        # Ein echtes Undo-Re-Add (ohne Flag) muss es zurueckbringen — sonst haette
+        # der Fix das Undo mit kaputtgemacht.
+        self._emit_until_true(
+            lambda: self._bridge_obj.addStageObjectData.emit(
+                '{"id":"a3d12-1",' + basis), da, timeout_s=5.0)
+
     def test_truss_obj_uses_its_real_z_long_axis(self):
         """Das 2-m-OBJ darf nicht aus seinem 30-cm-Querschnitt langgezogen werden.
 

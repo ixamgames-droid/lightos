@@ -644,6 +644,24 @@ let _isLoadingStage = false;
 // hebt den Tombstone wieder auf (createStageObject).
 const _userRemovedIds = new Set();
 
+/**
+ * A3D-12: Traegt dieses Element einen Loesch-Tombstone?
+ *
+ * Exportiert, damit der INKREMENTELLE Add-Kanal (`jsAddStageObjectData` in
+ * bridge.js) ihn respektieren kann. Der Repair-Loop in `loadStageJson` tat das
+ * schon immer, der Inkremental-Kanal nicht — ein verspaetet zugestelltes
+ * `addStageData` reanimierte damit ein gerade geloeschtes Objekt UND hob per
+ * `createStageObject` seinen Tombstone auf.
+ *
+ * Bewusst als Praedikat statt als Export des Sets: ein exportiertes Set liesse
+ * sich von aussen mutieren, und die Tombstone-Lebensdauer ist hier drin geregelt
+ * (gesetzt in `removeStageObject`, geleert in `loadStageJson`, aufgehoben von
+ * `createStageObject`).
+ */
+export function isUserRemoved(id) {
+  return _userRemovedIds.has(id);
+}
+
 // Review-Fix (Stage-Echo-Race): Sequenz-Token aus der zuletzt per
 // loadStageJson() empfangenen Buehnen-Definition ("_reloadToken", von
 // push_stage_definition() vergeben). JEDES notifyStageListChanged()-Echo
