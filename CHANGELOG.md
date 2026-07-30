@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Build-Skripte verschoben ihre eigenen 3D-Positionen, ohne es zu merken
+
+#### Neu
+
+- **Wer in einem Show-Generator erst Truss-Koordinaten setzt und danach ein
+  2D-Raster, bekommt jetzt eine Warnung** (VIZ-LIVEVIEW-FOOTGUN). 2D und 3D sind
+  zwei Projektionen desselben SceneGraph-Knotens: ein Pixelpaar leitet die
+  3D-x/z ab, die Hoehe bleibt. Beim Ziehen im Grundriss ist das genau richtig —
+  im Build-Skript ueberschreibt es still die eben gesetzten Koordinaten. Am
+  echten AppState gemessen:
+
+  ```
+  visualizer_positions = {1: (3.0, 6.0, -4.0)}   # Truss
+  live_view_positions  = {1: (100.0, 500.0)}     # 2D-Raster danach
+  -> visualizer_positions == {1: (-10.0, 6.0, 15.0)}
+  ```
+
+  In der Mega-Arena-Show landeten die Mover so bei z = 20 m — und weil nur
+  Fixtures MIT 2D-Eintrag betroffen sind, sah es aus wie „manche Geraete stehen
+  falsch". Die Meldung nennt Geraet, alte und neue Position und die zwei
+  Auswege (Raster weglassen oder per `world3d_to_live` ableiten).
+
+  **Das Verhalten bleibt unveraendert** — wer das Raster bewusst setzt, bekommt
+  es. Gewarnt wird nur bei der Ganz-Dict-Zuweisung, dem Weg der Build-Skripte;
+  interaktives Ziehen schreibt einzelne Eintraege und laeuft nicht durch.
+
 ### 2026-07-31 — Der Galerie-Generator schrieb Bilder um, die sich nicht geändert hatten
 
 #### Behoben
