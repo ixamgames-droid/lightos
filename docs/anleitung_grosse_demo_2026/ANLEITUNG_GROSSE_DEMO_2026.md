@@ -25,7 +25,7 @@ Die Show wird reproduzierbar per Generator gebaut:
 
 Nach dem Laden zeigt die **Bühne**-Sektion alle 30 Geräte („30 Geräte im Patch"):
 
-![2D-Bühne mit 30 gepatchten Fixtures](img/01_buehne_30fixtures.png)
+![2D-Bühne mit 30 gepatchten Fixtures — Laser (25–28) in eigener Reihe hinter den Movern](img/01_buehne_30fixtures.png)
 
 > **Hinweis Ausgang:** Der Live-Test lief mit **leerer Output-Config** (Statuszeile
 > „Enttec: nicht gefunden") — reiner Visualizer-/UI-Test, es ging **kein DMX** ans
@@ -88,7 +88,7 @@ Effekt steht in der Statuszeile („Aktiver Effekt: …"). Über **Visualizer �
 zeigt der 3D-Raum das ganze Rig live: weiße MH-Beams, regenbogenfarbene PAR-Bodenpools
 (PAR Rainbow), Spider, Laser & Nebel:
 
-![3D-Visualizer mit dem 30-Fixture-Rig und laufenden Effekten](img/07_3d_visualizer_effekte.png)
+![3D-Visualizer: 30 Fixtures an Front-, Back- und Laser-Traverse](img/07_3d_visualizer_effekte.png)
 
 ---
 

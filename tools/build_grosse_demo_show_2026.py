@@ -248,9 +248,19 @@ def main():
     sd = StageDefinition(name=STAGE_NAME)
     front = sd.add("truss_h", x=0, y=5.5, z=2.6,  w=14, h=0.3, d=0.3, name="Front-Traverse")
     back  = sd.add("truss_h", x=0, y=5.5, z=-2.6, w=14, h=0.3, d=0.3, name="Back-Traverse")
+    # GDS-2: eigene Traverse fuer die Laser. Vorher hingen sie an der
+    # Back-Traverse auf demselben z wie die Moving Heads: im 2D-Top-Down
+    # (x/z-Projektion) faellt "0,8 m hoeher" weg, also lagen Icons und Labels
+    # exakt uebereinander. Eine eigene Reihe trennt beide Ansichten — und
+    # entspricht dem realen Aufbau, in dem Laser hinter den Movern haengen.
+    laser_tr = sd.add("truss_h", x=0, y=5.5, z=-4.6, w=12, h=0.3, d=0.3,
+                      name="Laser-Traverse")
     for sx in (-7, 7):
         for sz in (2.6, -2.6):
             sd.add("truss_v", x=sx, y=2.75, z=sz, w=0.3, h=5.5, d=0.3, name=f"Stuetze {sx},{sz}")
+    for sx in (-6, 6):
+        sd.add("truss_v", x=sx, y=2.75, z=-4.6, w=0.3, h=5.5, d=0.3,
+               name=f"Stuetze {sx},-4.6")
     sd.add("platform", x=0, y=0.3, z=0.4, w=16, h=0.6, d=8, name="Buehne")
     save_stage(sd)
     b.state.active_stage_name = STAGE_NAME
@@ -285,7 +295,9 @@ def main():
     for fid, x in zip(spider_fids, _spread(len(spider_fids), -5.0, 5.0)):
         pos[fid] = (x, 5.1, 2.6); dock[fid] = front.id  # Spider an Front-Traverse
     for fid, x in zip(las_fids, _spread(len(las_fids), -4.0, 4.0)):
-        pos[fid] = (x, 5.9, -2.6); dock[fid] = back.id
+        # GDS-2: eigene Reihe (z=-4.6) statt derselben Tiefe wie die MHs — sonst
+        # decken sich Laser und Mover im 2D-Plan vollstaendig.
+        pos[fid] = (x, 5.9, -4.6); dock[fid] = laser_tr.id
     for fid, x in zip(fog_fids, (-7.0, 7.0)):
         pos[fid] = (x, 0.4, 3.8)
 
