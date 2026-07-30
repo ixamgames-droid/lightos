@@ -37,12 +37,14 @@ Plattform-Verzweigung im Kern. Plattform-Spezifisches liegt hinter
 | Python | 3.11+ | 3.11+ |
 
 Wie belastbar ist das? Ehrlich aufgeschluesselt, damit die Tabelle nicht mehr
-verspricht als geprueft ist:
+verspricht als geprueft ist — die CI-Zeile ist bewusst genau: der Windows-Job ist
+ein **Smoke aus fuenf Dateien**, der Linux-Job faehrt die **komplette** Suite
+(segmentiert, ein Prozess je Testdatei — das geht nur dort).
 
 | | Linux | Windows |
 |---|---|---|
 | Volle Testsuite (501 Dateien) | laeuft taeglich, gruen | laeuft, gruen |
-| GitHub-CI | **noch nicht** (Backlog `XPLAT-CI-LINUX`) | ja (`windows-latest`, Py 3.11 + 3.12) |
+| GitHub-CI | **volle Suite**, segmentiert (`ubuntu-latest`, Py 3.12) | Smoke aus 5 Dateien (`windows-latest`, Py 3.11 + 3.12) |
 | Entwicklungs-/Alltagsrechner | ja | ja (ARM64) |
 | DMX-Ausgang am echten Rig | ENTTEC ueber `/dev/ttyUSB*` | ENTTEC ueber COM-Port |
 | MIDI-Backend | `python-rtmidi` / ALSA | WinMM (ctypes) |
