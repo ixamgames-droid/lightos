@@ -3634,6 +3634,40 @@ def move_head_count_for_channels(fixture, channels) -> int:
         return 1
 
 
+def attr_head_count_for_channels(fixture, channels, attribute: str) -> int:
+    """Wie viele Koepfe hat dieses Geraet **fuer genau dieses Attribut**?
+
+    ★ Die allgemeinste der drei Zaehlungen — und die einzige, die immer stimmt.
+    ``color_head_count`` zaehlt ``color_r``, ``move_head_count`` zaehlt Pan/Tilt;
+    beide sind Spezialfaelle davon. Dass sie noetig sind, zeigt der Blick in die
+    Library: eine ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, **5**
+    Intensity und **1** Farbbank. „Wie viele Koepfe hat das Geraet" hat dort also
+    drei verschiedene richtige Antworten, je nachdem was man schreibt.
+
+    Genau das spiegelt ``channel_occurrence_keys``: jedes Attribut wird fuer sich
+    gezaehlt, das N-te Vorkommen von ``A`` heisst ``A#N``. Wer eine
+    Kopf-Einschraenkung fuer einen Schreibvorgang auf ``A`` validiert, muss also
+    die Vorkommen von ``A`` zaehlen — sonst entsteht ein ``A#N`` ohne Kanal
+    (Kopf faellt auf seinen Default) oder die Einschraenkung faellt weg (alle
+    Koepfe reagieren). Beide Fehlrichtungen sind stumm, s. FM-9/A5.
+    """
+    a = (attribute or "").split("#", 1)[0].lower()
+    if not a:
+        return 1
+    try:
+        n = sum(1 for c in channels
+                if (getattr(c, "attribute", "") or "").lower() == a)
+        return n if n >= 1 else 1
+    except Exception:
+        return 1
+
+
+def head_counter_for_attr(attribute: str):
+    """``(fixture, channels) -> int`` fuer ``validate_head_restrictions``, passend
+    zu dem Attribut, das gleich geschrieben wird."""
+    return lambda fx, chans: attr_head_count_for_channels(fx, chans, attribute)
+
+
 def color_head_count(fixture) -> int:
     """Anzahl unabhaengig faerbbarer Koepfe/Emitter = Zahl der ``color_r``-Kanaele
     (jeder Kopf hat eine eigene RGB(W)-Bank). 1 = Single-Head/einfarbig, >=2 =

@@ -7,6 +7,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — MIDI-„Programmer Attribut" fasste alle 30 Geräte an (FM-9/A6)
+
+#### Behoben
+
+- **Ein MIDI-Fader mit der Aktion „Programmer Attribut" schrieb auf *jedes*
+  gepatchte Gerät — unabhängig davon, was gewählt war.** `_execute_continuous`
+  lief stur über `get_patched_fixtures()`. Auf keinem Lichtpult ist das das
+  erwartete Verhalten eines so beschrifteten Reglers.
+
+  Die Reichweite folgt jetzt dem im Projekt etablierten Muster von
+  `VCXYPad._resolve_fids`: **Auswahl, sonst alle gepatchten.** Der Alt-Fall
+  „nichts gewählt" bleibt damit byte-identisch — wer den Fader als globalen
+  Attribut-Regler benutzt hat, merkt keinen Unterschied, solange er nichts
+  selektiert.
+
+- **Und damit auch die Kopf-Auswahl** (letzte Programmer-Fläche außer der
+  Kommandozeile): „Kopf 2" gewählt → der Regler schreibt nur auf diesen Kopf.
+
+#### Der interessante Teil: die Kopfzahl hängt am Attribut
+
+Bei FM-9/A5 war die Erkenntnis, dass Farb- und Bewegungsköpfe verschiedene
+Zahlen sind. Hier zeigt sich, dass das noch zu grob war: eine
+`HYDRABEAM 4000 RGBW [19-Kanal]` hat **4 Pan, 4 Tilt, 5 Intensity und 1
+Farbbank**. „Wie viele Köpfe hat dieses Gerät" hat dort drei verschiedene
+richtige Antworten — je nachdem, was man schreibt.
+
+Neu `app_state.attr_head_count_for_channels()` plus `head_counter_for_attr()`:
+die allgemeinste der drei Zählungen, von der Farb- und Bewegungs-Zählung
+Spezialfälle sind. Sie spiegelt schlicht `channel_occurrence_keys`, das jedes
+Attribut für sich zählt (`A#N` = N-tes Vorkommen von `A`).
+
+`tests/test_fm9_midi_programmer_scope.py` (13) fährt **dasselbe Gerät mit
+derselben Auswahl** und prüft, dass Pan die Kopf-Einschränkung behält, Farbe sie
+fallen lässt (sonst `color_r#2` — ein Schlüssel ohne Kanal, der Kopf fiele auf
+seinen Default) und Intensity wieder anders zählt.
+
 ### 2026-07-30 — Der Enttec-Ausgang war tot und der Statusbalken sagte „OK" (HW-5b)
 
 #### Behoben
