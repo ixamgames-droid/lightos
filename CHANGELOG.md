@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Der Galerie-Generator schrieb Bilder um, die sich nicht geändert hatten
+
+#### Behoben
+
+- **`tools/gen_vc_gallery.py` churnte bei jedem Lauf sechs GIFs im Diff
+  (GDS-6).** Der Docstring versprach eine deterministische Ausgabe — und auf
+  einem Rechner stimmt das: zwei Laeufe in getrennten Prozessen liefern
+  byte-identische Dateien. Verschieden werden sie **zwischen Umgebungen**: die
+  committeten GIFs stammen vom alten Windows-ARM-Rechner und sind gegenueber
+  der frischen Linux-Ausgabe **Frame fuer Frame pixelgleich, aber anders
+  kodiert** (die adaptive Palette des GIF-Writers haengt an der Pillow-Version).
+
+  Der Riegel sitzt jetzt beim Schreiben, nicht beim Kodieren: verglichen werden
+  **Pixel statt Bytes**, und die Datei wird nur bei echter Bildaenderung
+  angefasst. Eine feste Palette haette das nicht geloest — auch der Rest des
+  Writers kann sich zwischen Versionen aendern. PNG- und GIF-Pfad laufen ueber
+  denselben Vergleich.
+
+  Wirkung: ein Lauf ohne inhaltliche Aenderung laesst `git status` leer, statt
+  sechs Binaerdateien anzufassen.
+
 ### 2026-07-31 — Die F-Taste im Visualizer tat nie, was das Menü versprach
 
 #### Behoben

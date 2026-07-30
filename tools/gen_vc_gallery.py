@@ -19,7 +19,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt, QBuffer, QByteArray, QIODevice, QPointF, QRectF
 from PySide6.QtGui import (QImage, QPainter, QColor, QRadialGradient, QLinearGradient,
                            QConicalGradient, QBrush, QPen)
-from PIL import Image
+from PIL import Image, ImageSequence
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(_ROOT, "assets", "vc_gallery")
@@ -249,14 +249,64 @@ _PNGS = [
 ]
 
 
-def _render_png(draw, path):
+def _render_png(draw, path) -> bool:
     img, p = _new_frame(PNG_SIZE)
     draw(p, PNG_SIZE, 0.0)
     p.end()
-    img.save(path, "PNG")
+    # Auch die PNGs laufen ueber den Pixel-Vergleich: Qts PNG-Schreiber ist
+    # zwar unauffaellig, aber dieselbe Umgebungs-Abhaengigkeit gilt im Prinzip
+    # auch hier — und ein einheitlicher Weg ist einer weniger, den man beim
+    # naechsten Werkzeug-Umbau uebersieht.
+    ba = QByteArray()
+    buf = QBuffer(ba)
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    img.save(buf, "PNG")
+    buf.close()
+    return _write_if_changed(bytes(ba), path)
 
 
-def _render_gif(draw, path):
+def _pixels_equal(neue_bytes: bytes, pfad: str) -> bool:
+    """Haben die frisch erzeugten Bilddaten denselben INHALT wie die Datei?
+
+    Verglichen wird Frame fuer Frame in RGBA — nicht byteweise. Genau darin
+    liegt der Sinn (GDS-6): dieselben Pixel koennen voellig verschieden kodiert
+    sein, und ob sie es sind, entscheidet die Pillow-Version des Rechners, der
+    den Generator zuletzt laufen liess."""
+    if not os.path.exists(pfad):
+        return False
+    try:
+        with Image.open(io.BytesIO(neue_bytes)) as neu, Image.open(pfad) as alt:
+            a = [f.convert("RGBA").tobytes() for f in ImageSequence.Iterator(neu)]
+            b = [f.convert("RGBA").tobytes() for f in ImageSequence.Iterator(alt)]
+        return len(a) == len(b) and all(x == y for x, y in zip(a, b))
+    except Exception as e:
+        print(f"[gen_vc_gallery] Vergleich mit {os.path.basename(pfad)} "
+              f"nicht moeglich ({e}) — wird neu geschrieben")
+        return False
+
+
+def _write_if_changed(neue_bytes: bytes, pfad: str) -> bool:
+    """Datei nur anfassen, wenn sich die Pixel geaendert haben. True = geschrieben.
+
+    ★ Warum der Umweg (GDS-6, 2026-07-29 gemessen, 2026-07-31 praezisiert): der
+    Generator ist auf EINEM Rechner sehr wohl deterministisch — zwei Laeufe in
+    getrennten Prozessen liefern hier byte-identische GIFs. Verschieden werden
+    sie ZWISCHEN Umgebungen: sechs der zehn committeten GIFs (auf dem alten
+    Windows-ARM-Rechner erzeugt) sind gegenueber der frischen Ausgabe
+    **pixelgleich, aber anders kodiert** — die adaptive Palette der
+    GIF-Kodierung haengt an der Pillow-Version. Ohne diesen Riegel churnt also
+    jeder Generator-Lauf saemtliche Binaerdateien im Diff, und man sieht nicht
+    mehr, was sich wirklich geaendert hat (bei GDS-3 mussten sechs Dateien von
+    Hand zurueckgesetzt werden). Eine feste Palette wuerde das NICHT loesen:
+    auch der Rest des GIF-Writers kann sich zwischen Versionen aendern."""
+    if _pixels_equal(neue_bytes, pfad):
+        return False
+    with open(pfad, "wb") as fh:
+        fh.write(neue_bytes)
+    return True
+
+
+def _render_gif(draw, path) -> bool:
     frames = []
     for i in range(GIF_FRAMES):
         img, p = _new_frame(GIF_SIZE)
@@ -264,9 +314,11 @@ def _render_gif(draw, path):
         p.end()
         frames.append(_to_pil(img))
     dur = int(round(1000 / GIF_FPS))
+    buf = io.BytesIO()
     # RGBA -> P (adaptive Palette, Transparenz binaer) haelt GIFs klein
-    frames[0].save(path, save_all=True, append_images=frames[1:], loop=0,
-                   duration=dur, disposal=2, optimize=True)
+    frames[0].save(buf, format="GIF", save_all=True, append_images=frames[1:],
+                   loop=0, duration=dur, disposal=2, optimize=True)
+    return _write_if_changed(buf.getvalue(), path)
 
 
 def main():
