@@ -1838,6 +1838,32 @@ _Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück au
 - **Fixture-Namens-Labels im 3D lassen sich per Button aus-/einblenden** — Toolbar-Button „🏷 Labels" in der eingebetteten Live-View-3D und Checkbox „Fixture-Namen (Labels) anzeigen" im Einstellungen-Tab des Visualizer-Fensters; beide steuern denselben app-weiten Schalter (`AppState.show_fixture_labels`, Default an).
 - **Der 3D-Visualizer lässt sich in ein eigenes, frei verschiebbares Fenster ausklinken** („⧉ Ausklinken" in der Live-View-3D) — für einen zweiten Monitor. Das Fenster öffnet auf einem Nebenschirm; die eingebettete Ansicht fällt solange auf 2D zurück (nie zwei 3D-Szenen gleichzeitig, GPU-schonend). Fenster schließen oder „⇲ Zurückholen" dockt wieder an.
 
+### 2026-07-17 — Demo-/Testshow „Grosse Demo Show 2026" + bebilderte Anleitung
+
+> Nachgetragen am 2026-07-31 (CDX-21): der Generator und das Anleitungs-Kit kamen
+> mit [#336](https://github.com/ixamgames-droid/lightos/pull/336), der
+> CHANGELOG-Eintrag dazu fehlte.
+
+#### Neu
+
+- **Ein Generator baut eine vollstaendige Demo-/Testshow mit ~30 Geraeten**
+  (`tools/build_grosse_demo_show_2026.py` → `shows/Grosse Demo Show 2026.lshow`).
+  Sie zeigt die Geraeteklassen zusammen statt einzeln: 12 PAR, 6 Moving Heads
+  (Pan/Tilt-Kreis, Gobo-/Farbrad-Chaser), 2 reale ZQ02001, 4 Spider (nur Tilt,
+  **kein** Pan → gespiegelte Tilt-Wave, Farbe pro Kopf ueber beide RGBW-Saetze),
+  4 Laser inklusive Arm-/Not-Aus-Taste, 2 Nebelmaschinen, dazu PAR-Matrix
+  (Rainbow/Chase/ColorFade), Lauflicht und Strobe. Die Virtual Console verteilt
+  sich ueber drei Bank-Seiten; jeder Effekt-Button traegt eine passende
+  eingebaute Galerie-Grafik bzw. ein GIF, portabel in die `.lshow` eingebettet.
+  Reproduzierbar: der Lauf validiert die Show und faehrt `tools/lint_show.py
+  --strict` (0 Fehler, 0 Warnungen).
+
+- **Bebilderte Anleitung dazu** (`docs/anleitung_grosse_demo_2026/`, 7 Bilder):
+  Rundgang durch die Show und Schritt-fuer-Schritt, wie Bilder/GIFs auf
+  VC-Buttons kommen — die Funktion steckt im **Rechtsklick-Kontextmenue** und
+  ist deshalb leicht zu uebersehen.
+
+
 ### 2026-07-17 — 3D-Visualizer: benannte Kameras nach Show-Wechsel (A3D-13 / A3D-22)
 
 #### Behoben
