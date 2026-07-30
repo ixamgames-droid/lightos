@@ -14,7 +14,8 @@ from unittest.mock import MagicMock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QListWidget, QListWidgetItem, QPushButton
+from PySide6.QtWidgets import (QApplication, QListWidget, QListWidgetItem,
+                               QPushButton, QAbstractItemView)
 from PySide6.QtCore import Qt
 
 import src.ui.visualizer.visualizer_window as VW
@@ -128,3 +129,88 @@ class TestViz14BridgePollMirror(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestViz14ListFollowsSelection(unittest.TestCase):
+    """VIZ-14-Folge: die Visualizer-Geräteliste folgt der GEMEINSAMEN Auswahl.
+
+    Der offen gebliebene Review-Fund aus Slice 1b: die Rückrichtung setzte nur
+    die 3D-Outlines — die Liste daneben blieb auf dem alten Eintrag stehen und
+    zeigte damit etwas anderes an als die Szene, auf die sie sich bezieht.
+    """
+
+    def setUp(self):
+        self.state = get_state()
+        self.state.set_selected_fids([])
+
+    def _fenster_stub(self, fids=(3, 5, 7)):
+        """Stub mit der ECHTEN Markier-Methode — die Sperre, die hier geprüft
+        wird (`blockSignals`), lebt genau darin."""
+        s = _stub(self.state, fids)
+        s._patch_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
+        s._patch_list.itemSelectionChanged.connect(
+            lambda: VisualizerWindow._on_patch_list_selected(s))
+        s._mark_patch_list = lambda f: VisualizerWindow._mark_patch_list(s, f)
+        s._bridge = MagicMock()
+        return s
+
+    def _markiert(self, s):
+        return sorted(it.data(Qt.ItemDataRole.UserRole)
+                      for it in s._patch_list.selectedItems())
+
+    def test_globale_auswahl_markiert_die_liste(self):
+        s = self._fenster_stub()
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [3, 7])
+        self.assertEqual(self._markiert(s), [3, 7])
+
+    def test_markieren_schreibt_die_auswahl_nicht_zurueck(self):
+        """★ Ohne blockSignals würde jeder markierte Eintrag einzeln
+        `set_selected_fids` rufen — die Zwischenstände wären für Programmer,
+        EFX und Matrix echte Auswahl-Änderungen."""
+        self.state.set_selected_fids([3, 7])
+        s = self._fenster_stub()
+        rufe = []
+        s._state = SimpleNamespace(
+            set_selected_fids=lambda f: rufe.append(list(f)),
+            get_selected_fids=lambda: [3, 7],
+            visualizer_positions={}, visualizer_rotations={})
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [3, 7])
+        self.assertEqual(rufe, [], "die Markierung darf nichts zurückschreiben")
+
+    def test_leere_auswahl_raeumt_die_markierung(self):
+        s = self._fenster_stub()
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [5])
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [])
+        self.assertEqual(self._markiert(s), [])
+
+    def test_current_item_bleibt_wenn_es_zur_auswahl_gehoert(self):
+        """An `currentItem` hängen die Eigenschaftsfelder — es darf nicht unter
+        der Hand das Gerät wechseln, solange es noch gewählt ist."""
+        s = self._fenster_stub()
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [3, 5, 7])
+        s._patch_list.setCurrentRow(2)                      # fid 7
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [5, 7])
+        self.assertEqual(s._patch_list.currentItem().data(Qt.ItemDataRole.UserRole), 7)
+
+    def test_current_item_wandert_wenn_es_rausfaellt(self):
+        s = self._fenster_stub()
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [3])
+        VisualizerWindow._on_global_selection(s, "SELECTION_CHANGED", [5, 7])
+        self.assertEqual(s._patch_list.currentItem().data(Qt.ItemDataRole.UserRole), 5)
+
+    def test_mehrfachmarkierung_in_der_liste_meldet_alle(self):
+        """Gegenrichtung: Strg-Klick auf drei Geräte darf die Auswahl der
+        anderen Ansichten nicht auf eines zusammenstreichen."""
+        s = self._fenster_stub()
+        for row in (0, 2):
+            s._patch_list.item(row).setSelected(True)
+        s._patch_list.setCurrentRow(2)
+        VisualizerWindow._on_patch_list_selected(s)
+        self.assertEqual(self.state.selected_fids, [3, 7])
+
+    def test_handler_ohne_liste_bleibt_ein_noop(self):
+        """Der Handler laeuft in Bestandstests mit einem Stub ohne Liste."""
+        stub = SimpleNamespace(_bridge=MagicMock())
+        VisualizerWindow._on_global_selection(stub, "SELECTION_CHANGED", [3])
+        stub._bridge.selectFixtures.emit.assert_called_once()
