@@ -7,6 +7,65 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Gelöschte Bühnenobjekte kamen zurück (A3D-30 + A3D-12)
+
+#### Behoben
+
+- **Ein im 3D gelöschtes Bühnenobjekt konnte wieder auferstehen.**
+  `_on_stage_object_deleted_from_js` verwarf eine Löschung, sobald **irgendein**
+  `addStageData` für dieselbe id in der Poll-Queue hing. Gerechtfertigt war das
+  nur mit Undo/Redo-Interleaving — aber genau dieselbe Event-Form entsteht bei
+  der **automatischen** Wiederherstellung: der 1200-ms-Reassert nach jedem
+  Stage-Load und der ≤3×-Nachsende-Mechanismus bei einem Teil-Snapshot füllen
+  die Queue mit `addStageData` für *jedes* Element.
+
+  Der Guard konnte beides nicht unterscheiden — es gab kein Token. Folgen, beide
+  still: die Löschung erreichte das autoritative `_current_stage` nie, und das
+  noch eingereihte Add baute das Objekt in JS wieder auf.
+
+  Es gibt vier Sender von `addStageData`, und sie teilen sich sauber:
+
+  | Sender | Art |
+  |---|---|
+  | `_reassert_current_stage_after_load` (+1200 ms) | automatisch |
+  | `_on_stage_list_from_js` (≤3× Nachsenden) | automatisch |
+  | `_on_add_change` (Nutzer legt an / Redo) | Nutzergeste |
+  | `_on_delete_change` else-Zweig (Undo) | Nutzergeste |
+
+  Genau diese Unterscheidung trägt jetzt das Flag `reassert` — **in der
+  Payload**, weil die JS-Seite es auch braucht (s. u.); ohne Flag bleibt die
+  Payload byte-identisch zum Bestand. Der Guard prüft nur noch auf echte
+  Nutzer-Re-Adds, und beim Anwenden einer Löschung werden eingereihte
+  Reassert-Adds für dieses Element aus der Queue geworfen — sonst stellt der
+  nächste Poll genau das wieder her, was gerade gelöscht wurde.
+
+- **A3D-12, gemeinsam gelöst wie 2026-07-27 vorgezeichnet:** der inkrementelle
+  Add-Kanal in JS respektiert jetzt den Lösch-Tombstone. `loadStageJson`s
+  Repair-Loop tat das schon immer, `jsAddStageObjectData` nicht — ein verspätet
+  zugestelltes `addStageData` baute das Objekt neu auf **und** hob per
+  `createStageObject` seinen Tombstone auf. Neu exportiert
+  `stage_objects.isUserRemoved(id)`, bewusst ein Prädikat statt des Sets.
+
+  **Nur `reassert`-Adds werden abgewiesen:** ein echtes Undo/Redo-Re-Add ist eine
+  bewusste Nutzergeste und muss den Tombstone aufheben dürfen. Der Szenentest
+  hält beide Richtungen fest.
+
+#### Geprüft und ausgeschlossen
+
+Das Flag hätte an zwei Stellen lecken können — beides nachgesehen statt
+angenommen: `StageElement.to_js_dict()` liefert ein **frisches Literal** (das
+Element selbst kann nicht korrumpiert werden), und `getStageJson()` baut eine
+**explizite Whitelist**, `updateStageObjectProps` übernimmt keine fremden Keys —
+`reassert` kann also nicht in eine gespeicherte Bühne gelangen.
+
+#### Tests
+
+`tests/test_a3d30_stage_delete_vs_reassert.py` (10) für die Python-Guards, plus
+ein Szenentest in `test_viz13_scene_modules_smoke.py` mit echtem QtWebEngine.
+Beide **gegengeprüft**: ohne den jeweiligen Fix schlagen sie fehl — der
+Python-Test hält den alten Guard wörtlich daneben, der JS-Test wurde mit
+entferntem Guard rot gesehen.
+
 ### 2026-07-30 — Die Kommandozeile hielt sich nicht an den Auswahl-Vertrag (FM-9/A7)
 
 #### Behoben
