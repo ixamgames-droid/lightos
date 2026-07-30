@@ -1983,12 +1983,22 @@ class AppState:
         from .group_cells import cells_in_grid_order
         return cells_in_grid_order(self._group_positions(name_or_ref)[1])
 
-    def validate_head_restrictions(self, heads) -> dict:
+    def validate_head_restrictions(self, heads, *, count_heads=None) -> dict:
         """FM-HEADLAYOUT A4: eine Kopf-Einschraenkung ``{fid: {head}}`` gegen den
         LIVE-Patch pruefen. Liefert nur die Eintraege, die WIRKLICH „einzelne
         Koepfe dieses Geraets" bedeuten; alles andere faellt raus und das Geraet
         landet damit wieder im geraeteweiten Bestandspfad
         (``submaster_factor_for``) statt in einer Kopf-Maske.
+
+        ``count_heads`` waehlt die Zaehl-Quelle: ``(fixture, channels) -> int``.
+        Default ist :func:`color_head_count_for_channels` — der Farb-/Submaster-
+        Fall, byte-identisch zum Bestand. Wer die BEWEGUNGSachse einschraenkt
+        (XY-Pad, FM-9/A5), muss :func:`move_head_count_for_channels` uebergeben:
+        die beiden Zaehlungen gehen in **831 von 5116** Library-Modi auseinander,
+        und zwar in beide Richtungen (Begruendung und Zahlen dort). Die vier
+        Verwerfungsregeln unten gelten fuer beide Reichweiten unveraendert; nur
+        die Frage „wie viele Koepfe hat dieses Geraet ueberhaupt" hat je nach
+        Achse eine andere Antwort.
 
         Verworfen wird ein Geraet, wenn …
 
@@ -2029,8 +2039,9 @@ class AppState:
             fx = by_fid.get(fid)
             if fx is None:
                 continue
+            counter = count_heads or color_head_count_for_channels
             try:
-                n = color_head_count_for_channels(fx, get_channels_for_patched(fx))
+                n = counter(fx, get_channels_for_patched(fx))
             except Exception:
                 continue
             if n < 2:
@@ -3552,6 +3563,41 @@ def color_head_count_for_channels(fixture, channels) -> int:
         n = sum(1 for c in channels
                 if (getattr(c, "attribute", "") or "").lower() == "color_r")
         return n if n >= 1 else 1
+    except Exception:
+        return 1
+
+
+def move_head_count_for_channels(fixture, channels) -> int:
+    """Wie :func:`pan_tilt_head_count`, aber gegen eine BEREITS geladene Kanalliste
+    — das Gegenstueck zu :func:`color_head_count_for_channels` fuer die BEWEGUNGS-
+    achse.
+
+    ★ Warum es beide Zaehlungen braucht (FM-9/A5): Farb- und Bewegungskoepfe eines
+    Geraets sind NICHT dieselbe Zahl. **Ueber die eingebaute Library ausgezaehlt
+    (5116 Modi) gehen sie bei 831 Modi auseinander — in BEIDE Richtungen:**
+
+    * **108 Modi** haben >=2 Bewegungs-, aber <2 Farbkoepfe: ``Event Bar LED/Pro/
+      Q4``, ``HYDRABEAM 4000 RGBW`` in ``19-Kanal``/``32-Kanal``, ``Hydrabeam 400
+      Series`` ``15-CH``/``28-CH``. Mit der Farb-Zahl validiert wird die
+      Kopf-Einschraenkung **verworfen** -> „Kopf 2" gewaehlt, und trotzdem fahren
+      alle vier Koepfe.
+    * **723 Modi** haben >=2 Farb-, aber <2 Bewegungskoepfe: Pixel-Bars und die
+      Spider (``Speider 14ch``, ``Mini Spider ZQ-B20 15ch``). Dort wird die
+      Einschraenkung faelschlich **behalten** und erzeugt ``pan#1``.
+
+    Was ``pan#1`` auf einem Ein-Pan-Geraet wirklich tut, ist gemessen:
+    ``_flush_programmer_to_dmx`` laeuft ueber die KANAELE, der einzige Pan-Kanal
+    fragt also nach ``"pan"`` — ``pan#1`` liest niemand. Der Kanal faellt auf
+    seinen ``default_value`` zurueck, der Kopf springt also auf Default-Position
+    und folgt dem Pad nicht mehr (gemessen: Default 128, geschrieben 200, Kanal
+    blieb 128). Kein Fehler, keine Meldung.
+    """
+    try:
+        pans = sum(1 for c in channels
+                   if (getattr(c, "attribute", "") or "").lower() == "pan")
+        tilts = sum(1 for c in channels
+                    if (getattr(c, "attribute", "") or "").lower() == "tilt")
+        return max(1, pans, tilts)
     except Exception:
         return 1
 

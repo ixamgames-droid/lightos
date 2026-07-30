@@ -150,18 +150,24 @@ class VCXYPad(VCWidget):
         except Exception as e:
             print(f"[VCXYPad] path apply error: {e}")
 
-    def _write_axis(self, state, fid, attr, frac):
+    def _write_axis(self, state, fid, attr, frac, head: int = 0):
         """Schreibt eine Achse (Pan/Tilt). Bei 16-bit zusätzlich den Fine-Kanal
-        (``<attr>_fine``); die Engine wertet Coarse+Fine in app_state aus."""
+        (``<attr>_fine``); die Engine wertet Coarse+Fine in app_state aus.
+
+        ``head`` = 0 heisst geräteweit (Schlüssel ``attr``, byte-identisch zum
+        Bestand); ``head`` = N adressiert das N-te Vorkommen (``attr#N``). Der
+        Fine-Kanal bekommt denselben Kopf-Index — ``channel_occurrence_keys``
+        zählt jedes Attribut für sich, ``pan_fine#2`` ist also der Fine-Kanal
+        desselben Kopfes, dessen Coarse-Kanal ``pan#2`` ist."""
         if self.bits16:
             v = max(0, min(65535, int(round(frac * 65535))))
-            state.set_programmer_value(fid, attr, v >> 8)
-            state.set_programmer_value(fid, f"{attr}_fine", v & 0xFF)
+            state.set_programmer_value(fid, attr, v >> 8, head=head)
+            state.set_programmer_value(fid, f"{attr}_fine", v & 0xFF, head=head)
         else:
             # VCB-11: runden statt abschneiden — int(frac*255) erzeugte einen
             # systematischen -0.5-LSB-Bias ueber den ganzen Pad-Bereich (analog zum
             # 16-bit-Pfad oben, der schon round() nutzt).
-            state.set_programmer_value(fid, attr, int(round(frac * 255)))
+            state.set_programmer_value(fid, attr, int(round(frac * 255)), head=head)
 
     def _resolve_fids(self, state) -> list[int]:
         """Ziel-Fixtures: feste Zuweisung, sonst aktuelle Auswahl, sonst alle
@@ -182,12 +188,43 @@ class VCXYPad(VCWidget):
             return list(patched.keys())
         return [f for f in (getattr(p, "fid", None) for p in patched) if f is not None]
 
+    def _resolve_heads(self, state) -> dict:
+        """FM-9/A5: auf welche Köpfe die aktuelle Auswahl das Pad einschränkt —
+        ``{fid: {head, ...}}``. Leer = keine Einschränkung (Bestandsverhalten).
+
+        Gilt NUR im Auswahl-Modus. Ist das Pad fest zugewiesen (``_fixture_ids``),
+        ist das eine ausdrückliche Ansage des Benutzers, die die Auswahl nicht
+        überstimmen darf — dieselbe Vorrang-Regel wie beim VC-Submaster
+        (``vc_slider._submaster_targets``, A4).
+
+        ★ Validiert wird gegen die **Bewegungs**-Kopfzahl, nicht die Farb-Kopfzahl.
+        Die beiden gehen in 831 von 5116 Library-Modi auseinander: Moving-Bars wie
+        die ``Event Bar LED`` haben vier Pan/Tilt, aber nur eine Farbbank (mit der
+        Farb-Zahl fiele die Einschränkung weg und alle vier Köpfe führen), Spider
+        und Pixel-Bars umgekehrt (dann entstünde ``pan#1``, das kein Kanal liest,
+        und der Kopf fiele auf seinen Default-Wert). Details in
+        ``app_state.move_head_count_for_channels``."""
+        if self._fixture_ids:
+            return {}
+        try:
+            from src.core.group_cells import head_restrictions
+            from src.core.app_state import move_head_count_for_channels
+            cells = state.get_selected_cells()
+            return state.validate_head_restrictions(
+                head_restrictions(cells),
+                count_heads=move_head_count_for_channels) or {}
+        except Exception:
+            return {}
+
     def _apply(self):
         from src.core.app_state import get_state
         state = get_state()
+        heads = self._resolve_heads(state)
         for fid in self._resolve_fids(state):
-            self._write_axis(state, fid, self.pan_attr,  self._pan)
-            self._write_axis(state, fid, self.tilt_attr, self._tilt)
+            # Kein Eintrag = geräteweit (Kopf 0) -> byte-identisch zum Bestand.
+            for head in sorted(heads.get(fid) or (0,)):
+                self._write_axis(state, fid, self.pan_attr,  self._pan, head)
+                self._write_axis(state, fid, self.tilt_attr, self._tilt, head)
 
     # ── MIDI ────────────────────────────────────────────────────────────────────
 
