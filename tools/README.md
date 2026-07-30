@@ -12,6 +12,7 @@
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
+| `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
