@@ -12,6 +12,7 @@ from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
+from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, classify_attr
 from .stage.scene_graph import SceneGraph
@@ -211,6 +212,11 @@ class AppState:
         self._show_engine = None
         self.output_manager = OutputManager()
         self.universes: dict[int, Universe] = {}
+        # HW-5b: je Enttec-Universe der Befund aus resolve_port() — None = alles
+        # unauffaellig, sonst ein zeigbarer Satz ("Port COM_FAKE existiert hier
+        # nicht — benutze /dev/ttyUSB0"). Der Statusbalken liest das, damit ein
+        # falsch konfigurierter Adapter nicht laenger als gruen durchgeht.
+        self.enttec_port_notes: dict[int, str | None] = {}
         self.programmer: dict[int, dict[str, int]] = {}
         # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
         # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
@@ -1498,6 +1504,32 @@ class AppState:
                 # Licht aus.
                 self.output_manager.remove_output(num)
                 if output == "Enttec" and patch:
+                    # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
+                    # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
+                    # auf einem Linux-Rechner) liess add_enttec nur werfen, die
+                    # Exception verschwand im except unten — und der Statusbalken
+                    # meldete trotzdem gruen, weil er nur die VID/PID-Anwesenheit
+                    # prueft. Gar kein DMX, ohne dass es irgendwo auffiel.
+                    #
+                    # Der Oeffnungsversuch bleibt ABSICHTLICH unveraendert: nur
+                    # diagnostizieren, nicht umbiegen. Sonst haenge der Aufbau
+                    # davon ab, was gerade eingesteckt ist (bis in die Tests).
+                    #
+                    # Der Befund wird per getattr/Lazy-Init abgelegt, NICHT ueber
+                    # ein Pflichtfeld oder eine Hilfsmethode auf self: diese
+                    # Funktion wird in Bestandstests auf einem SimpleNamespace-Stub
+                    # aufgerufen, der laut eigener Doku nur `output_manager` und
+                    # `universes` mitbringt. Beides haette dort mit AttributeError
+                    # zugeschlagen — und waere im except unten verschwunden, also
+                    # genau in der Fehlerklasse gelandet, die HW-5b behebt.
+                    hinweis = diagnose_enttec_port(patch)
+                    if hinweis:
+                        print(f"[app_state] Universe {num} (Enttec): {hinweis}")
+                    notes = getattr(self, "enttec_port_notes", None)
+                    if notes is None:
+                        notes = {}
+                        self.enttec_port_notes = notes
+                    notes[num] = hinweis
                     self.output_manager.add_enttec(num, patch)
                 elif output == "ArtNet":
                     self.output_manager.add_artnet(num, patch or "255.255.255.255",

@@ -1,4 +1,5 @@
 """Enttec DMX USB Pro — Ausgabe via pyserial."""
+import os
 import serial
 import serial.tools.list_ports
 import time
@@ -22,6 +23,77 @@ def find_enttec_port() -> str | None:
 def list_serial_ports() -> list[str]:
     """Gibt alle verfügbaren COM-Ports zurück."""
     return [p.device for p in serial.tools.list_ports.comports()]
+
+
+def port_is_foreign(port: str) -> bool:
+    """True, wenn der Portname von einer ANDEREN Plattform stammt.
+
+    Ein `COM3` auf Linux (oder ein `/dev/ttyUSB0` auf Windows) kann nicht bloss
+    "gerade nicht da" sein — er kann auf diesem System gar nicht existieren.
+    Der Unterschied ist wichtig fuer die Meldung: "Geraet abgezogen?" waere hier
+    die falsche Fahrte, richtig ist "die Konfiguration stammt von einem anderen
+    Rechner".
+    """
+    p = (port or "").strip()
+    if not p:
+        return False
+    if os.name == "nt":
+        return p.startswith("/dev/")
+    return p.upper().startswith("COM")
+
+
+def diagnose_port(configured: str) -> str | None:
+    """Einen konfigurierten Enttec-Port begutachten. ``None`` = unauffaellig,
+    sonst ein fertiger, dem Nutzer zeigbarer Satz mit konkretem Vorschlag.
+
+    ★ Warum es das braucht (HW-5b): nach dem Umzug von Windows auf Linux stand in
+    ``data/universes.json`` fuer das Enttec-Universe weiter ``"COM_FAKE"``. Auf
+    Linux heisst dasselbe Geraet ``/dev/ttyUSB0``. ``EnttecPro("COM_FAKE")`` konnte
+    also nur werfen, die Exception verschwand im ``except`` von
+    ``apply_output_config`` — und der Statusbalken meldete trotzdem gruen
+    „Enttec: /dev/ttyUSB0 OK", weil er nur die VID/PID-Anwesenheit prueft.
+    Ergebnis: gar kein DMX, und nichts sagte es.
+
+    **Bewusst nur Diagnose, kein automatisches Umbiegen.** Ein gefundener Adapter
+    wird als *Vorschlag* genannt, nicht stillschweigend eingesetzt: an einem
+    Rechner koennen mehrere FTDI-Geraete haengen, und DMX auf ein Geraet zu
+    schicken, das der Nutzer nie konfiguriert hat, waere schlimmer als der
+    ehrliche Hinweis. Ausserdem bliebe der Aufbau sonst davon abhaengig, was
+    gerade eingesteckt ist — bis in die Tests hinein.
+
+    (Das automatische Nachfinden per VID/PID gibt es weiterhin in
+    ``EnttecPro._try_reconnect`` — dort aber fuer einen Port, der vorher schon
+    funktioniert hat und mitten im Betrieb wegbricht. Anderer Fall, SERIAL-02.)
+    """
+    want = (configured or "").strip()
+    try:
+        vorhanden = list_serial_ports()
+    except Exception:
+        vorhanden = []
+    if want and want in vorhanden:
+        return None
+
+    try:
+        gefunden = find_enttec_port()
+    except Exception:
+        gefunden = None
+
+    if not want:
+        return ("Fuer dieses Universe ist kein Enttec-Port konfiguriert."
+                + (f" Vorschlag: {gefunden} (per VID/PID gefunden)."
+                   if gefunden else " Es ist auch keiner per VID/PID sichtbar."))
+
+    grund = (f"Der konfigurierte Port {want!r} ist ein Portname von einer anderen "
+             f"Plattform — die Konfiguration stammt vermutlich von einem anderen "
+             f"Rechner."
+             if port_is_foreign(want) else
+             f"Der konfigurierte Port {want!r} existiert auf diesem System nicht.")
+    if gefunden:
+        return (f"{grund} Es geht kein DMX ueber diesen Adapter raus. "
+                f"Vorschlag: im Universe-Manager auf {gefunden} umstellen "
+                f"(dort per VID/PID als Enttec erkannt).")
+    return (f"{grund} Es geht kein DMX ueber diesen Adapter raus, und es ist "
+            f"auch kein Enttec per VID/PID sichtbar.")
 
 
 def _build_packet(dmx_data: bytes) -> bytes:
