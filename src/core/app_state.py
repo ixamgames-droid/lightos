@@ -550,11 +550,62 @@ class AppState:
 
     @live_view_positions.setter
     def live_view_positions(self, value: dict) -> None:
+        self._warn_live_view_overwrites_3d(value)
         view = _LiveViewDict(self._scene, self._view_registry, self._live_view_transient)
         with self._view_registry.suspend():
             view.clear()
             for fid, pos in dict(value or {}).items():
                 view[fid] = pos
+
+    def _warn_live_view_overwrites_3d(self, value: dict) -> None:
+        """VIZ-LIVEVIEW-FOOTGUN: warnen, wenn eine 2D-Zuweisung ausdrueckliche
+        3D-Positionen verschiebt.
+
+        2D und 3D sind zwei Projektionen DESSELBEN SceneGraph-Knotens: ein
+        2D-Pixelpaar leitet ueber ``live_to_world3d`` die 3D-x/z ab (die Hoehe
+        bleibt). Das ist im interaktiven Betrieb genau richtig — man zieht ein
+        Symbol im Grundriss und das Geraet wandert. In einem **Build-Skript**
+        ist es eine Falle: wer erst die Truss-Koordinaten setzt und danach ein
+        2D-Raster, ueberschreibt die eben gesetzten x/z still (Mover landeten in
+        der Mega-Arena-Show bei z=20 m). Nur Fixtures OHNE 2D-Eintrag blieben
+        korrekt — der Fehler sah also aus wie "manche Geraete stehen falsch".
+
+        Gewarnt wird NUR bei der Ganz-Dict-Zuweisung: das ist der Weg der
+        Build-Skripte. Interaktives Ziehen schreibt einzelne Eintraege in das
+        Dict und laeuft hier nicht durch. Verhalten bleibt unveraendert — wer
+        das 2D-Raster bewusst setzt, bekommt es; er erfaehrt nur, was es kostet.
+        """
+        try:
+            from .stage.coords import live_to_world3d
+            neu = dict(value or {})
+            if not neu:
+                return
+            betroffen = []
+            for node in self._scene.fixtures():
+                fid = node.fixture_id
+                if fid not in neu:
+                    continue
+                # ``pos_set`` ist die vorhandene Quelle fuer "hat wirklich eine
+                # Position bekommen" — ein Knoten, der nur wegen einer Rotation
+                # existiert, steht auf (0,0,0) und zaehlt hier bewusst nicht.
+                if not getattr(node, "pos_set", False):
+                    continue
+                alt = tuple(node.transform.pos_m)
+                px, py = neu[fid][0], neu[fid][1]
+                x3, z3 = live_to_world3d(px, py)
+                if abs(x3 - alt[0]) > 1e-6 or abs(z3 - alt[2]) > 1e-6:
+                    betroffen.append((fid, (round(alt[0], 2), round(alt[2], 2)),
+                                      (round(x3, 2), round(z3, 2))))
+            if betroffen:
+                print(f"[app_state] WARNUNG: live_view_positions verschiebt "
+                      f"{len(betroffen)} ausdrueckliche 3D-Position(en) "
+                      f"(x/z werden aus dem 2D-Raster abgeleitet): "
+                      + ", ".join(f"fid {f}: {a} -> {b}" for f, a, b in betroffen[:5])
+                      + (" …" if len(betroffen) > 5 else "")
+                      + ". Entweder das 2D-Raster weglassen oder es aus den "
+                        "3D-Positionen ableiten (stage.coords.world3d_to_live).")
+        except Exception as e:
+            print(f"[app_state] live_view-Guard uebersprungen: {e}")
 
     @property
     def active_stage_name(self) -> str:
