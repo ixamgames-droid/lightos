@@ -7,6 +7,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Crash-Intake: die vergiftete Alt-Historie abgeschnitten (QA-CRASHLOG-CUT)
+
+#### Behoben
+
+- **Das Crash-Intake meldete bei jedem Sessionstart „5 neue Abstürze" — alle fünf
+  stammten aus der Testsuite.** Der Vortag hatte die *Schreibseite* dichtgemacht
+  (`LIGHTOS_CRASH_LOG` + conftest-Umlenkung nach `/tmp`, QA-CRASHLOG-TESTS), aber die
+  bereits geschriebenen 25 KB blieben in `crash.log` liegen. `collect_crash_report.py`
+  las sie weiter und stufte sie als echte App-Signaturen ein.
+
+  Herkunft jeder Signatur einzeln nachgewiesen statt vermutet:
+  `TypeError`/`ValueError @ visualizer_window.py:727` und `:731` kommen aus
+  `tests/test_a3d_gesture_batch.py`, das absichtlich `None`/`nan`/`inf`/`"abc"` durch
+  die Bridge schickt — der echte Bug dahinter ist A3D-41 und war bereits gefixt.
+  `RuntimeError: status=CrashedTerminationStatus` (17×, **ohne jeden Traceback-Frame**
+  und damit für den Test-Filter strukturell unerreichbar) kommt aus
+  `tests/test_viz10_stability.py`: ein Einzellauf erzeugt gemessen **exakt einen**
+  Eintrag, und die neun Einträge vom Vorabend liegen minutengenau auf den
+  Gate-Läufen in `logs/gate_*.txt` (17:32 / 17:39 / 17:50 / 18:12 / 18:36 / 18:55 /
+  19:04 / 19:18). Ein „Absturz", der nur auftritt, während die Suite läuft, ist keiner.
+
+  **Behoben als Schnitt, nicht als Löschung:** die Historie liegt byte-identisch in
+  `crash.log.archiv-2026-07-30-testrueckstaende` und bleibt per
+  `collect_crash_report.py --log <datei>` auswertbar; die neue `crash.log` trägt einen
+  `#`-Kopf mit Grund und Archivpfad (die Blockerkennung des Parsers reagiert nur auf
+  `=== `-Zeilen). `crash_report_seen.json` gehört zum Schnitt dazu und wurde
+  mitarchiviert und geleert — sonst wäre ein *echtes* Wiederauftreten einer der vier
+  bereits quittierten Signaturen als „schon gesehen" durchgerutscht.
+
+  Kein Code-Fix nötig: der Wächter
+  `test_app_data_dir.py::test_suite_never_writes_into_the_real_crash_log` verhindert
+  die Neuverschmutzung bereits. Nachweis: `--count-only` gegen die neue Datei → `0`,
+  gegen das Archiv → weiterhin `5`.
+
 ### 2026-07-29 — Linux-Test-Gate: QtWebEngine-Tests laufen wieder grün zu Ende
 
 #### Behoben
