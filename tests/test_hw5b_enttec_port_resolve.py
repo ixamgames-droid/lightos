@@ -245,6 +245,27 @@ class StatusbalkenTests(unittest.TestCase):
         self.assertIn("falsch konfiguriert", lbl.text)
         self.assertIn("COM_FAKE", lbl.tip)
 
+    def test_registriertes_geraet_auf_unmoeglichem_port_ist_NICHT_gruen(self):
+        """★ Genau der Fall, den die Testsuite zuerst verfehlt hat.
+
+        `add_enttec` legt auch fuer einen unsinnigen Port ein Geraet an — der
+        Subprozess-Proxy scheitert nicht sofort. `_enttec_outputs` ist also
+        GEFUELLT, obwohl nichts rausgeht. Der erste Wurf fragte `if offene:`
+        zuerst und meldete im echten Betrieb gruen „Enttec: COM_FAKE aktiv
+        (1 Universe)" — die Luege, die HW-5b beseitigen soll, nur mit neuem
+        Text. Headless nicht aufgefallen, weil die Tests fuer den Problemfall
+        `offene={}` annahmen; gefunden erst am Screenshot der laufenden App.
+        """
+        lbl = self._run(gefunden="/dev/ttyUSB0",
+                        offene={3: _Dev("COM_FAKE")},
+                        notes={3: "Der konfigurierte Port 'COM_FAKE' ist ein "
+                                  "Portname von einer anderen Plattform."})
+        self.assertNotIn("9DFF52", lbl.style,
+                         "ein registrierter Adapter auf einem unmoeglichen Port "
+                         "darf NICHT gruen sein")
+        self.assertIn("falsch konfiguriert", lbl.text)
+        self.assertIn("COM_FAKE", lbl.tip)
+
     def test_adapter_da_aber_keinem_universe_zugewiesen(self):
         lbl = self._run(gefunden="/dev/ttyUSB0", offene={}, notes={})
         self.assertNotIn("9DFF52", lbl.style)

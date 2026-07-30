@@ -7,6 +7,55 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-30 — Der Statusbalken log weiter, und das Verifikations-Werkzeug auch
+
+#### Behoben
+
+- **HW-5b war unvollständig: der Statusbalken meldete im echten Betrieb weiter
+  grün „Enttec: COM_FAKE aktiv (1 Universe)".** `add_enttec` legt nämlich auch
+  für einen unmöglichen Port ein Gerät an — der Subprozess-Proxy scheitert nicht
+  sofort —, also war `_enttec_outputs` gefüllt und der `if offene:`-Zweig gewann
+  über den Problem-Hinweis. Genau die Lüge, die HW-5b beseitigen sollte, nur mit
+  neuem Text.
+
+  Der Befund schlägt jetzt die Registrierung: ein registrierter Adapter auf
+  einem unmöglichen Port **ist** der stille Fehlerfall. Verifiziert am laufenden
+  Programm — Statusbalken steht bernsteinfarben auf „Enttec: falsch
+  konfiguriert", Grund im Tooltip.
+
+  **Headless nicht aufgefallen**, weil die Tests für den Problemfall
+  `offene={}` annahmen. Der neue Test fährt den realen Fall (Hinweis **und**
+  registriertes Gerät).
+
+- **Das App-Steuerskript für UI-Verifikationen fotografierte still das falsche
+  Fenster — und `restart` war ein No-op.** Drei Fehler auf einmal:
+
+  1. `_win_id` suchte per `grep -F "LightOS"` über die Fenstertitel und traf
+     damit **Firefox** („Second Brain — LightOS Backlog — Mozilla Firefox").
+     `shot -w` lieferte einen perfekt aussehenden Screenshot des
+     Backlog-Dashboards statt der App.
+  2. Das PID-File hält die PID von `start.sh`, die sich sofort beendet →
+     `stop` meldete „läuft nicht", **während die App lief**, und `restart` wurde
+     still zum No-op. Man screenshottet dann den alten Build.
+  3. Der Fallback in `cmd_stop` suchte den **absoluten** Pfad, die echte
+     Kommandozeile ist aber relativ — er konnte nie greifen.
+
+  Fenstersuche läuft jetzt über den **Prozessbaum** der App (der Fensterprozess
+  ist ein Kind von `start.sh`), Titel-Fallback nur noch **exakt**; die
+  Prozesssuche gleicht über das **Arbeitsverzeichnis** ab statt über die
+  Pfad-Schreibweise.
+
+- **`bin/app.sh` → `tools/app.sh` (im Repo).** Es lag draußen mit der Begründung
+  „wie `run_tests.ps1` auf Windows" — derselbe falsche Vergleich wie bei
+  XPLAT-11: `run_tests.ps1` serialisiert parallele Windows-Sessions und ist
+  maschinenspezifisch, an der App-Steuerung ist nichts rechnerspezifisch, und ihr
+  Gegenstück `tools/app.ps1` liegt ohnehin im Repo. Die Folge war dieselbe wie
+  damals: ein frischer Checkout hatte kein Werkzeug, und drei Fehler blieben
+  ungetestet und unreviewed liegen. `bin/app.sh` bleibt als Weiterleitung.
+
+  **Lehre:** ein Verifikations-Werkzeug, das still das Falsche misst, ist
+  schlimmer als keines — es erzeugt Belege, die keine sind.
+
 ### 2026-07-30 — Ein überholtes Bühnen-Echo rollte Positionen zurück (A3D-31)
 
 #### Behoben

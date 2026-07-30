@@ -1190,18 +1190,26 @@ class MainWindow(QMainWindow):
         notes = getattr(self._state, "enttec_port_notes", {}) or {}
         problem = next((n for n in notes.values() if n), None)
 
-        if offene:
+        if problem:
+            # ★ Der Befund schlaegt die Registrierung — und zwar bewusst in
+            # DIESER Reihenfolge. Erster Wurf fragte `if offene:` zuerst und
+            # meldete im echten Betrieb gruen „Enttec: COM_FAKE aktiv
+            # (1 Universe)": `add_enttec` legt naemlich auch fuer einen
+            # unsinnigen Port ein Geraet an (der Subprozess-Proxy scheitert
+            # nicht sofort), also war `_enttec_outputs` gefuellt. Ein
+            # registrierter Adapter auf einem unmoeglichen Port ist aber genau
+            # der stille Fehlerfall, den HW-5b sichtbar machen soll.
+            # Headless nicht aufgefallen — erst der Blick auf die laufende App.
+            self._lbl_enttec.setText("Enttec: falsch konfiguriert")
+            self._lbl_enttec.setStyleSheet("color: #ffb454;")
+            self._lbl_enttec.setToolTip(problem)
+        elif offene:
             benutzt = sorted({getattr(d, "port", "?") for d in offene.values()})
             self._lbl_enttec.setText(
                 f"Enttec: {', '.join(benutzt)} aktiv "
                 f"({len(offene)} Universe{'n' if len(offene) != 1 else ''})")
             self._lbl_enttec.setStyleSheet("color: #9DFF52;")
-            self._lbl_enttec.setToolTip(problem or "")
-        elif problem:
-            # Geraet evtl. da, aber die Konfiguration passt nicht -> KEIN Gruen.
-            self._lbl_enttec.setText("Enttec: falsch konfiguriert")
-            self._lbl_enttec.setStyleSheet("color: #ffb454;")
-            self._lbl_enttec.setToolTip(problem)
+            self._lbl_enttec.setToolTip("")
         elif port:
             # Adapter steckt, aber kein Universe ist ihm zugewiesen.
             self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
