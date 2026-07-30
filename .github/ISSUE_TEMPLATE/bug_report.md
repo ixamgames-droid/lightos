@@ -34,10 +34,10 @@ assignees: ''
 | Feld | Wert |
 |------|------|
 | LightOS Version | z.B. 1.0.0 |
-| Betriebssystem | z.B. Windows 11 ARM64 |
+| Betriebssystem | z.B. Linux Mint 22.3 (X11) oder Windows 11 ARM64 |
 | Python-Version | z.B. 3.12.3 |
-| Hardware | z.B. Surface Pro X, Snapdragon 8cx |
-| Angeschlossene Geräte | z.B. Enttec Pro COM4, APC Mini |
+| Hardware | z.B. Surface Pro X (Snapdragon 8cx) oder PC x86_64 |
+| Angeschlossene Geräte | z.B. Enttec Pro auf `/dev/ttyUSB0` bzw. COM4, APC Mini |
 
 ---
 

@@ -23,12 +23,22 @@ Code- und Git-Root.
 
 2. **Vor „fertig": das Test-Gate fahren** (headless, sonst öffnet Qt Fenster):
    ```bash
-   cd <repo-root>
-   QT_QPA_PLATFORM=offscreen ./venv/Scripts/python.exe -m pytest tests/ -q
+   # Linux
+   cd <repo-root> && ./tools/verify_loop.sh
    ```
-   (Windows-PowerShell: `$env:QT_QPA_PLATFORM='offscreen'; .\venv\Scripts\python.exe -m pytest tests\ -q`)
-   Es gibt ~2000+ Tests. **Neue/▶geänderte Logik braucht einen Test.** Wenn etwas
-   rot ist: erst fixen, nicht abgeben.
+   ```powershell
+   # Windows-PowerShell
+   $env:QT_QPA_PLATFORM='offscreen'; .\venv\Scripts\python.exe -m pytest tests\ -q
+   ```
+   **Auf Linux nicht direkt `pytest tests/` aufrufen:** die Suite läuft dort
+   segmentiert (ein Prozess je Testdatei), weil ein einzelner Sammelprozess
+   reproduzierbar an akkumuliertem nativem Qt-Zustand stirbt. `verify_loop.sh`
+   delegiert dafür automatisch an `tools/verify_segmented.sh` und braucht rund
+   6,5 Minuten (`LIGHTOS_VERIFY_JOBS=3`). Einzelne Datei:
+   `./tools/verify_loop.sh tests/test_x.py`.
+
+   501 Testdateien mit 4.430 Testfunktionen. **Neue/geänderte Logik braucht einen
+   Test.** Wenn etwas rot ist: erst fixen, nicht abgeben.
 
 3. **CHANGELOG.md pflegen** — Einträge gehören **unter** den Kopftext in einen
    `####`-Abschnitt (Konvention: `#### Neu / …` z. B. `Neu / Tests`,
@@ -66,8 +76,11 @@ Code- und Git-Root.
 
 - **Logging:** `print(f"[modul_name] info …")`, Fehler `print(f"[modul_name] ERROR: …")`.
   Kein `logging`-Modul. Pro Subscriber try/except — ein Fehler darf andere nicht blocken.
-- **Plattform:** muss auf Windows x64 **und** ARM64 ohne Source-Verzweigung laufen;
-  Plattform-Spezifisches via `sys.platform`/`os.name` mit Fallback.
+- **Plattform:** muss auf **Linux** und auf **Windows x64 + ARM64** ohne
+  Source-Verzweigung laufen; Plattform-Spezifisches via `sys.platform`/`os.name`
+  mit Fallback. Harte Regel: kein Linux-Fix darf Windows-ARM regredieren — und
+  umgekehrt. `python-rtmidi` gibt es nur auf Linux/x64, auf ARM-Windows laeuft
+  der WinMM-Pfad; MIDI-Aenderungen immer fuer BEIDE Zweige durchdenken.
 - **Neue Dependency?** `requirements.txt` aktualisieren + Hinweis.
 - **Was NIE passiert:** Force-Push auf `main`; Löschen von `data/`/`shows/`/
   `fixtures/custom/` ohne Anweisung; Commit von `__pycache__/`, `venv/`, `.claude/`,
@@ -77,9 +90,10 @@ Code- und Git-Root.
 
 ## 🧠 Wissens-Sync (wichtig für dieses Projekt)
 
-Es gibt einen gepflegten Memory-Store **außerhalb des Repos** unter
-`C:\Users\David\SecondBrain` (pro Subsystem ein `entry_*`-Hub: Tempo, Matrix, EFX,
-Virtuelle Konsole, Chaser/Sequence, Fixtures, …). Codex hat darauf i. d. R.
+Es gibt einen gepflegten Memory-Store **außerhalb des Repos** (pro Subsystem ein
+`entry_*`-Hub: Tempo, Matrix, EFX, Virtuelle Konsole, Chaser/Sequence, Fixtures, …).
+Der Ablageort ist plattform- und rechnerabhängig — auf dem aktuellen Linux-Rechner
+`~/SecondBrain`, früher ein Windows-Benutzerordner. Codex hat darauf i. d. R.
 **keinen Schreibzugriff** (liegt außerhalb des Arbeitsverzeichnisses).
 
 **Deshalb:** Beende jede Aufgabe mit einem maschinenlesbaren Block, damit der
