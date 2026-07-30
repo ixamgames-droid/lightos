@@ -7,8 +7,84 @@ on:
     branches: ["main", "master"]
 
 jobs:
+  # XPLAT-CI-LINUX: Linux ist seit dem Umzug Entwicklungs- und Alltagsplattform
+  # und README/INSTALL nennen es ausdruecklich unterstuetzt — geprueft hat das
+  # bisher aber keine Automatik, nur lokale Laeufe auf genau einem Rechner.
+  #
+  # Diese Leg faehrt bewusst die VOLLE Suite, nicht die 5 Smoke-Dateien des
+  # Windows-Jobs: auf Linux gibt es dafuer den segmentierten Runner (ein Prozess
+  # je Testdatei, XPLAT-11), und genau der ist auf Windows nicht verfuegbar. Der
+  # Linux-Job ist damit der breitere von beiden.
+  #
+  # NICHT `pytest tests/` aufrufen: die Suite in EINEM Prozess stirbt auf Linux
+  # reproduzierbar an akkumulierendem nativem Qt-Zustand (XPLAT-11). verify_loop.sh
+  # delegiert automatisch an tools/verify_segmented.sh.
+  linux:
+    name: Linux — volle Suite (segmentiert)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Systempakete wie in INSTALL.md. build-essential + libasound2-dev sind fuer
+      # python-rtmidi Pflicht (C-Extension) — ohne die gibt es auf Linux GAR KEIN
+      # MIDI, und der rtmidi-Zweig in midi_manager.py bliebe in CI ungetestet.
+      # Der Rest ist Qt-/QtWebEngine-Laufzeit fuer den offscreen-View-Smoke.
+      - name: Systempakete installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libasound2-dev libpulse0 \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            libdbus-1-3 libfontconfig1 \
+            libnss3 libnspr4 libxdamage1 libxrandr2 libxcomposite1 \
+            libxcursor1 libxi6 libxtst6 libgbm1 libdrm2 libxshmfence1 \
+            fonts-noto fonts-dejavu
+
+      # Bewusst ein echtes venv/ statt System-Python: tools/verify_loop.sh sucht
+      # genau danach (venv/bin/python). So laeuft in CI derselbe Runner wie lokal,
+      # statt eines CI-Sonderwegs, der auseinanderdriften kann — das war die Lehre
+      # aus XPLAT-11.
+      - name: venv + Abhaengigkeiten
+        run: |
+          python3 -m venv venv
+          venv/bin/python -m pip install --upgrade pip
+          venv/bin/python -m pip install -r requirements.txt
+          venv/bin/python -m pip install -r requirements-dev.txt
+
+      - name: MIDI-Backend gegenpruefen
+        run: |
+          venv/bin/python -c "import rtmidi; print('python-rtmidi OK', rtmidi.__file__)"
+
+      # LIGHTOS_VERIFY_JOBS an die Runner-Kerne: ubuntu-latest hat 4, wie der
+      # Entwicklungsrechner. verify_loop.sh setzt QT_QPA_PLATFORM und die
+      # Exit-Haertung selbst.
+      - name: Volle Suite (segmentiert)
+        run: |
+          nproc
+          LIGHTOS_VERIFY_JOBS=3 ./tools/verify_loop.sh
+
+      - name: Segment-Logs bei Fehlschlag hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-segment-logs
+          path: .pytest_segments/
+          retention-days: 7
+          if-no-files-found: ignore
+
   test:
-    name: Tests (Python ${{ matrix.python-version }})
+    name: Windows-Smoke (Python ${{ matrix.python-version }})
     runs-on: windows-latest
 
     strategy:
