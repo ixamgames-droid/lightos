@@ -401,11 +401,11 @@ Privates Projekt — keine Garantie, keine Lizenz, kein Support.
 | | Stand |
 |---|---|
 | Engine, Programmer, Playback, VC, Visualizer | im Alltagsbetrieb, volle Testsuite gruen |
-| Linux **und** Windows | beide unterstuetzt; GitHub-CI faehrt bisher nur Windows |
-| ENTTEC, Art-Net, sACN | im Betrieb; ein ENTTEC-Langzeittest (>8 h) laeuft gerade |
+| Linux **und** Windows | beide unterstuetzt; GitHub-CI faehrt seit 2026-07-30 beide — Linux die **volle** Suite (segmentiert, ~7 min), Windows einen Smoke aus 5 Dateien |
+| ENTTEC, Art-Net, sACN | im Betrieb; ENTTEC-Langzeittest: erster Lauf 3,8 h / 540.225 Frames **ohne einen Schreibfehler**, der >8-h-Lauf laeuft |
 | Laser ueber DMX | fertig und im Einsatz |
 | Laser ueber Ether Dream / IDN | implementiert, aber **nur gegen Fakes getestet** — kein echtes Geraet vorhanden |
-| Mehrkopf-Geraete | Kopf-Auswahl wirkt in Programmer, Faecher, Snaps, EFX, Submaster, XY-Pad. **Offen:** Kommandozeile und MIDI-Mapping schreiben noch geraeteweit |
+| Mehrkopf-Geraete | Kopf-Auswahl wirkt in **allen** Programmer-Flaechen: Programmer, Faecher, Snaps, EFX, Submaster, XY-Pad, MIDI-Regler, Kommandozeile. **Offen:** eine getippte Kopf-Syntax (`1:2 @ 50`) — die Kommandozeile folgt der geklickten Auswahl, kennt den Kopf aber noch nicht als Wort |
 | macOS | nicht unterstuetzt (Pfade sind vorbereitet, aber nie getestet) |
 
 Offene Punkte werden in **[BACKLOG.md](BACKLOG.md)** gefuehrt, die Aenderungs-Historie
