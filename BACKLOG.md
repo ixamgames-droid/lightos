@@ -111,6 +111,12 @@ Linux-Gerät nach dem Merge._
 | VC3D-02 | P3 | done → Archiv | 3D-Optik auf VCSlider-Griff + SpeedDial ausgeweitet. (Details: BACKLOG_ARCHIVE.md) |
 | VC3D-03 | P3 | done → Archiv | VC3D-Politur (live gefunden): (Details: BACKLOG_ARCHIVE.md) |
 
+## 🐛 Aus Davids Live-Betrieb (2026-08-01)
+
+| ID | Prio | Status | Titel / Notiz |
+|----|------|--------|---------------|
+| BUG-SCHWEIF | P2 | done (2026-08-01, [PR #526](https://github.com/ixamgames-droid/lightos/pull/526)) | **Lauflicht-Schweif drehte sich beim Richtungswechsel nicht mit** | David: „wenn ich im Live-Edit-Fenster in der VC die Richtung ändere, dann stimmt der Schweif nicht - der ändert die Richtung nicht richtig mit." **Reproduziert und gemessen** (12x1, ein Läufer, 40 % Schweif): vorwärts wandert der Kopf 2→3→4 mit Schweif links (richtig, zieht nach); rückwärts wandert er 8→7→6, der Schweif blieb aber **links** - lag also VOR dem Läufer. **Ursache:** die Richtung wird durch Negieren der Phase umgesetzt (der Kopf läuft rückwärts), der Schweif-Abstand wurde aber weiter vorwärts gemessen (`(head - pos) % length` in `_render_chase`). **Fix:** Abstand in Laufrichtung messen. **★ Warum es lange unbemerkt blieb:** jede Einzelaussage stimmte weiter - der Läufer lief korrekt rückwärts, der Schweif war korrekt lang und korrekt abgestuft. Falsch war nur ihr Verhältnis zueinander, und genau das prüft kein Test, der Kopfposition und Schweiflänge getrennt betrachtet. `tests/test_chase_schweif_richtung.py` misst deshalb die RELATION (auf welcher Seite des Kopfes liegt der Schweif?) - ohne den Fix fallen 4 von 6 Fällen um. |
+
 ## 🎨 VC-Button-Grafiken (David-Wunsch 2026-08-01)
 
 | ID | Prio | Status | Titel / Notiz |
