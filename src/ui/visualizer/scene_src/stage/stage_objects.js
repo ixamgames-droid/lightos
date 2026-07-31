@@ -7,6 +7,7 @@ import { loadModel } from '../scene/model_loader.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { raycaster, mouse } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
+import { updateEmptyState } from '../empty_state.js';
 
 // stageObjIdCounter bleibt hier (kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" - nur von createStageObject genutzt).
@@ -223,6 +224,7 @@ export function createStageObject(type, position, size, color, rotation, provide
   // Falls aktuell 2D-Ansicht: frisch erzeugtes Objekt sofort 2D-stylen.
   applyStageObject2DStyle(id, view.mode === '2D');
   notifyStageListChanged();
+  updateEmptyState();   // VIZ-14: erstes Buehnenobjekt da -> Hinweis weg
   requestRender();  // 3c-2 Dirty-Quelle 4 (Stage-CRUD: Objekt hinzugefuegt)
   return id;
 }
@@ -441,6 +443,7 @@ export function removeStageObject(id) {
   scene.remove(so.mesh);
   disposeObj(so.mesh);
   delete stageObjects[id];
+  updateEmptyState();   // VIZ-14
   if (view.selectedStageId === id) {
     view.selectedStageId = null;
     clearResizeHandles();
@@ -478,6 +481,7 @@ export function clearStageObjects() {
   for (const id of ids) removeStageObject(id);
   // Defensiv: Falls etwas haengt
   for (const id in stageObjects) delete stageObjects[id];
+  updateEmptyState();   // VIZ-14
   clearResizeHandles();
   clearStageLabels();
 }

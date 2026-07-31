@@ -143,6 +143,25 @@
   #mode-frame[data-mode="build"] #mode-frame-chip {
     color: #ff8c2a; background: rgba(0,0,0,0.62);
   }
+  /* VIZ-14: Empty-State. Eine leere Szene sah bisher aus wie eine kaputte —
+     Grid und Boden sind da, aber nichts sagt, dass das der NORMALZUSTAND einer
+     neuen Show ist und was der naechste Schritt waere. Reines DOM ueber dem
+     Canvas (wie der Modus-Rahmen), pointer-events:none -> faengt keinen Klick
+     ab, mit dem der Nutzer gerade anfangen will. */
+  #empty-state {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 3; pointer-events: none; text-align: center;
+    font: 13px/1.55 sans-serif; color: rgba(190,200,215,0.72);
+    background: rgba(0,0,0,0.42); border: 1px solid rgba(120,140,160,0.22);
+    border-radius: 8px; padding: 14px 22px; max-width: 60%;
+    transition: opacity 0.2s ease;
+  }
+  #empty-state[hidden] { display: none; }
+  #empty-state .es-title {
+    display: block; font-size: 15px; font-weight: bold;
+    color: rgba(215,225,240,0.92); margin-bottom: 6px;
+  }
+  #empty-state .es-hint { display: block; opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -150,6 +169,13 @@
      Default "view" passt zum _editMode-Default (state.js) -> korrekte Deckung vor dem
      ersten Poll. setEditMode()#updateModeFrame (tools.js) pflegt data-mode + Chip-Text. -->
 <div id="mode-frame" data-mode="view"><span id="mode-frame-chip">ANSEHEN</span></div>
+<!-- VIZ-14: Empty-State-Hinweis. Sichtbar NUR, solange weder Geraete noch
+     Buehnenobjekte da sind (updateEmptyState in tools.js). -->
+<div id="empty-state">
+  <span class="es-title">Noch nichts auf der Bühne</span>
+  <span class="es-hint">Geräte patchst du im Tab <b>Patch</b> — sie erscheinen hier sofort.<br>
+  Traversen und Podeste baust du im Modus <b>Bauen</b> über <b>Bühne</b>.</span>
+</div>
 <div id="overlay">LightOS Visualizer | <span id="mode-text">3D View</span></div>
 <div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
 <div id="edit-toolbar">
