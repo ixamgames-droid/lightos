@@ -82,6 +82,21 @@ def _delete_profile(pid: int):
     clear_channel_cache()
 
 
+# XPLAT-15: nach JEDEM Test die uebrig gebliebenen Top-Level-Widgets WIRKLICH
+# abbauen. `deleteLater()` allein stellt `DeferredDelete` nie zu — die Objekte
+# ueberleben mitsamt Kindern, Signalen und (bei Views) Renderern.
+# Muster + Begruendung: tests/_qt_lifecycle.py, Vorbild test_views.py.
+import pytest as _pytest_xplat15                      # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402  XPLAT-15
+
+
+@_pytest_xplat15.fixture(autouse=True)
+def _xplat15_no_leaked_widgets():
+    yield
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
+
+
 class AsDualTiltTransformTest(unittest.TestCase):
     """Reiner Transform — ohne DB/Qt."""
 

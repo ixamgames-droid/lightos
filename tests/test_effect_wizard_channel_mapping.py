@@ -20,6 +20,21 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+# XPLAT-15: nach JEDEM Test die uebrig gebliebenen Top-Level-Widgets WIRKLICH
+# abbauen. `deleteLater()` allein stellt `DeferredDelete` nie zu — die Objekte
+# ueberleben mitsamt Kindern, Signalen und (bei Views) Renderern.
+# Muster + Begruendung: tests/_qt_lifecycle.py, Vorbild test_views.py.
+import pytest as _pytest_xplat15                      # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402  XPLAT-15
+
+
+@_pytest_xplat15.fixture(autouse=True)
+def _xplat15_no_leaked_widgets():
+    yield
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
+
+
 class _Ch:
     def __init__(self, attr, channel_number):
         self.attribute = attr
