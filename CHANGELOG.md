@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — HW-5 abgeschlossen: der Enttec-Ausgang hält, und es kommt wirklich Licht an
+
+#### Doku
+
+- **Die Enttec-Langzeitfrage ist beantwortet — beide Hälften.** Der Schreibpfad
+  lief über **10,21 h fehlerfrei** (1.456.939 Frames, kein einziger
+  Schreibfehler, Auto-Disable nie ausgelöst). Offen war die zweite Hälfte: ob
+  auch wirklich gültiges DMX auf der Leitung ankommt — ein toter Ausgang hält
+  den letzten Wert und sieht bei konstantem Licht genauso aus wie ein lebender.
+
+  Dafür lief ein dritter Lauf mit einem Gerät an der Leitung und einem
+  **sichtbaren Herzschlag**: **5,87 h, 837.989 Frames, 0 Fehler**, und das
+  Fade-Muster war über die gesamte Zeit zu sehen. Ein fadendes Licht kann nur
+  entstehen, wenn laufend neue, gültige Frames ankommen.
+
+  Ein zusätzlicher Health-Check im Output-Loop ist damit nicht nötig — es gab
+  nichts zu heilen.
+
 ### 2026-08-01 — Der Lauflicht-Schweif dreht sich jetzt mit der Richtung
 
 #### Behoben
