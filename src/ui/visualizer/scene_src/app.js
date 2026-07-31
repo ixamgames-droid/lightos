@@ -52,6 +52,7 @@ import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
 } from './scene/render_loop.js';
 import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
+import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js';  // VIZ-14
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -199,6 +200,7 @@ window.__lightos = {
   // entsteht genau dort, nicht in einer nachgerechneten Formel).
   // VIZ-14: Raum-Huelle fuer Test/Diagnose sichtbar machen.
   roomShellInfo,
+  placeGhostInfo, setPlaceableCount,
   __handlePointerDown: handlePointerDown,
   __handlePointerUp: handlePointerUp,
 };

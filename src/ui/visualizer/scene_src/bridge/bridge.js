@@ -22,6 +22,7 @@ import { deg2rad, rad2deg } from '../scene/renderer.js';
 import { clearDockHighlight } from '../stage/docking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 import { syncRoomShell } from '../scene/room_shell.js';
+import { setPlaceableCount } from '../interaction/place_ghost.js';  // VIZ-14
 
 // ============================================================================
 // Python bridge actions used externally
@@ -357,6 +358,7 @@ export function tryChannel() {
         // den zurueckgegebenen Steuer-Zustand + Einmal-Events an.
         if (bridge.pollControl) {
           let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
+          let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
           setInterval(function(){
             try {
               bridge.pollControl(function(js){
@@ -364,6 +366,11 @@ export function tryChannel() {
                   const s = JSON.parse(js);
                   // Idempotente Zustaende: nur bei Aenderung anwenden.
                   if (s.editMode !== undefined && s.editMode !== _pEM) { _pEM = s.editMode; setEditMode(s.editMode); }
+                  // VIZ-14: wie viele Geraete warten auf einen Platz? Steuert
+                  // den Platzier-Geist (0 = kein Geist).
+                  if (s.placeable !== undefined && s.placeable !== _pPlace) {
+                    _pPlace = s.placeable; setPlaceableCount(s.placeable);
+                  }
                   if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
                   if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
                   if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
