@@ -25,6 +25,26 @@ def _event(point: QPoint, *, button=None, buttons=None):
     )
 
 
+# XPLAT-15: nach JEDEM Test die uebrig gebliebenen Top-Level-Widgets WIRKLICH
+# abbauen. `deleteLater()` allein stellt `DeferredDelete` nie zu — die Objekte
+# ueberleben mitsamt Kindern, Signalen und (bei Views) Renderern. Segmentiert
+# faellt das nicht auf, weil jede Datei allein laeuft; in einem Prozess mit
+# genug angesammeltem Zustand ist es dieselbe Klasse Zeitzuender, die vor
+# XPLAT-09 neun scheinbar gruene viz-Dateien zum Segfault brachte.
+# Muster + Begruendung: tests/_qt_lifecycle.py, Vorbild test_views.py.
+import pytest as _pytest_xplat15                      # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402  XPLAT-15
+
+
+@_pytest_xplat15.fixture(autouse=True)
+def _xplat15_no_leaked_widgets():
+    yield
+    # QApplication lokal importieren: manche Dateien holen es nur INNERHALB
+    # ihrer Tests, dann gibt es den Modulnamen hier nicht.
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
+
+
 class TimelineDragTest(unittest.TestCase):
     def test_drag_moves_block_to_track_and_recalculates_show_duration(self):
         show = Show("Timeline")
