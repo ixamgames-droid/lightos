@@ -73,6 +73,7 @@
 | `verify_loop.ps1` | tools/verify_loop.ps1 - Test-Gate fuer den LightOS Loop-Modus |
 | `verify_loop.sh` | tools/verify_loop.sh — Test-Gate fuer Linux/macOS (Pendant zu verify_loop.ps1). |
 | `verify_segmented.sh` | tools/verify_segmented.sh — Test-Gate in Segmenten (Linux-Pendant zu run_tests.ps1 -Isolate). |
+| `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 
 ## _archiv/ — ausgemustert
 
