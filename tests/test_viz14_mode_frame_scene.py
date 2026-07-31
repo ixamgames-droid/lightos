@@ -173,33 +173,54 @@ class ModeFrameSceneTest(unittest.TestCase):
     # kein Stabilitaets-Workaround mehr. Neue Testmethoden duerfen ergaenzt werden.
     # Das Entzerren der gebuendelten Assertions ist als eigenes Item erfasst.
 
-    def test_mode_frame_dom_switching_and_no_render(self):
-        """DOM + Umschalten + Fallen-Guards — alles auf EINER Seiten-Ladung."""
+    # XPLAT-13: die Assertions lagen frueher in EINER Methode auf EINER Ladung
+    # (Erbe der XPLAT-09-Deckelung). Jede Vollladung kostet ~4 s -- dafuer sagt
+    # ein roter Lauf jetzt, WAS kaputt ist, statt nur "irgendwas am Rahmen".
+    F = "document.getElementById('mode-frame')"
+    CHIP = "document.getElementById('mode-frame-chip')"
+
+    def _frische_seite(self):
         self._load_and_wait()
         self._poll_until_true("!!window.__lightosAppReady")
-        F = "document.getElementById('mode-frame')"
-        CHIP = "document.getElementById('mode-frame-chip')"
-        # (1) Rahmen existiert.
-        self.assertEqual(self._eval(f"!!{F}"), True, "#mode-frame fehlt im DOM")
-        # (2) Default = Ansehen (schon vor dem ersten Poll, via HTML data-mode).
-        self.assertEqual(self._eval(f"{F}.dataset.mode"), "view")
-        self.assertEqual(self._eval(f"{CHIP}.textContent"), "ANSEHEN")
-        # (6) pointer-events:none — sonst schluckt der Vollflaechen-Rahmen Canvas-Klicks.
+
+    def test_rahmen_existiert(self):
+        self._frische_seite()
+        self.assertEqual(self._eval(f"!!{self.F}"), True, "#mode-frame fehlt im DOM")
+
+    def test_startet_auf_ansehen(self):
+        """Default kommt aus dem HTML (data-mode), also schon VOR dem ersten Poll."""
+        self._frische_seite()
+        self.assertEqual(self._eval(f"{self.F}.dataset.mode"), "view")
+        self.assertEqual(self._eval(f"{self.CHIP}.textContent"), "ANSEHEN")
+
+    def test_rahmen_schluckt_keine_canvas_klicks(self):
+        """★ `pointer-events:none` ist hier kein Feinschliff: der Rahmen liegt
+        vollflaechig ueber dem Canvas — ohne das waeren Auswahl, Gizmo und Orbit
+        tot, und zwar lautlos."""
+        self._frische_seite()
         self.assertEqual(
-            self._eval(f"getComputedStyle({F}).pointerEvents"), "none",
+            self._eval(f"getComputedStyle({self.F}).pointerEvents"), "none",
             "#mode-frame ist interaktiv (schluckt Canvas-Klicks -> Auswahl/Gizmo/Orbit tot)")
-        # (3) Direkt-Drive ueber die exponierte setEditMode.
+
+    def test_umschalten_treibt_rahmen_und_chip(self):
+        """Direkt-Drive ueber die exponierte setEditMode — beide Bauen-Varianten
+        und zurueck."""
+        self._frische_seite()
         self._eval("window.__lightos.setEditMode('edit'); true")
-        self.assertEqual(self._eval(f"{F}.dataset.mode"), "build")
-        self.assertEqual(self._eval(f"{CHIP}.textContent.indexOf('Fixtures') >= 0"), True)
+        self.assertEqual(self._eval(f"{self.F}.dataset.mode"), "build")
+        self.assertEqual(self._eval(f"{self.CHIP}.textContent.indexOf('Fixtures') >= 0"), True)
         self._eval("window.__lightos.setEditMode('stage'); true")
-        self.assertEqual(self._eval(f"{F}.dataset.mode"), "build")
+        self.assertEqual(self._eval(f"{self.F}.dataset.mode"), "build")
         # 'Buehne' — ohne Umlaut-Vergleich: Teil-String 'hne'.
-        self.assertEqual(self._eval(f"{CHIP}.textContent.indexOf('hne') >= 0"), True)
+        self.assertEqual(self._eval(f"{self.CHIP}.textContent.indexOf('hne') >= 0"), True)
         self._eval("window.__lightos.setEditMode('view'); true")
-        self.assertEqual(self._eval(f"{F}.dataset.mode"), "view")
-        self.assertEqual(self._eval(f"{CHIP}.textContent"), "ANSEHEN")
-        # (5) Regressions-Guard: der Rahmen ist reines DOM — KEIN Dauer-Render/Live-Probe.
+        self.assertEqual(self._eval(f"{self.F}.dataset.mode"), "view")
+        self.assertEqual(self._eval(f"{self.CHIP}.textContent"), "ANSEHEN")
+
+    def test_rahmen_rendert_nicht_dauerhaft(self):
+        """Regressions-Guard: der Rahmen ist reines DOM. Fuehrte er eine
+        Dauer-Animation ein, liefe der On-Demand-Loop fuer immer auf voller rAF."""
+        self._frische_seite()
         self._eval("window.__lightos.setEditMode('edit'); true")
         s = self._settle()   # muss Idle erreichen (dirty=false, live=false, count ruht)
         self.assertFalse(s["live"], "Modus-Rahmen fuehrte eine Dauer-Animation ein")
@@ -209,10 +230,8 @@ class ModeFrameSceneTest(unittest.TestCase):
         self.assertEqual(self._stats()["count"], c, "Modus-Rahmen rendert dauerhaft (Gate offen)")
 
     def test_real_poll_path_drives_frame(self):
-        """(4) Der ECHTE PULL-Poll-Pfad (bridge.js s.editMode -> setEditMode) —
-        eigene Ladung mit sauberem Ausgangszustand."""
-        self._load_and_wait()
-        self._poll_until_true("!!window.__lightosAppReady")
+        """Der ECHTE PULL-Poll-Pfad (bridge.js s.editMode -> setEditMode)."""
+        self._frische_seite()
         self._bridge_obj._poll_payload = '{"editMode": "stage"}'
         self._poll_until_true(
             "document.getElementById('mode-frame').dataset.mode === 'build'",
