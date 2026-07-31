@@ -272,6 +272,10 @@ export function addFixture(data) {
     // relativ dazu — ohne Referenz waere jede Zoom-Aenderung kumulativ und der
     // Kegel liefe nach ein paar Zuegen weg.
     baseSpotAngle: spot ? spot.angle : null,
+    // VIZ-BEAM-OCCLUSION: Grundlaenge des Kegels merken. Die Laenge wird
+    // relativ dazu skaliert — ohne Referenz waere jede Anpassung kumulativ.
+    baseBeamLength: (beam && beam.geometry && beam.geometry.parameters)
+      ? beam.geometry.parameters.height : null,
     icon,
     label,   // VIZ-14: persistentes 3D-Label (Sprite, Kind von root)
     type: rtype,

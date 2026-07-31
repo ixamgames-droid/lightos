@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Lichtkegel enden am Boden statt hindurchzuschießen
+
+#### Behoben
+
+- **Der sichtbare Lichtkegel hatte eine feste Länge und lief durch den Boden.**
+  Bei tief stehenden oder steil nach unten gerichteten Scheinwerfern ragte
+  damit ein Stück Licht unter die Bühne. Jetzt endet der Kegel dort, wo er
+  auftrifft.
+
+  Das kostet nichts: der Auftreffpunkt wird ohnehin schon für den Lichtfleck am
+  Boden gerechnet. Noch offen bleibt die aufwendige Hälfte — Schatten *im*
+  Strahl und Enden an beliebigen Körpern; das gehört an die Qualitätsstufen.
+
 ### 2026-08-01 — HW-5 abgeschlossen: der Enttec-Ausgang hält, und es kommt wirklich Licht an
 
 #### Doku
