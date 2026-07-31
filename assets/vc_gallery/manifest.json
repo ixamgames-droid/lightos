@@ -27,6 +27,62 @@
       "title": "Weiß-Flare"
     },
     {
+      "name": "pfeil_hoch",
+      "file": "pfeil_hoch.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Hoch"
+    },
+    {
+      "name": "pfeil_runter",
+      "file": "pfeil_runter.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Runter"
+    },
+    {
+      "name": "pfeil_links",
+      "file": "pfeil_links.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Links"
+    },
+    {
+      "name": "pfeil_rechts",
+      "file": "pfeil_rechts.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Rechts"
+    },
+    {
+      "name": "pfeil_hoch_links",
+      "file": "pfeil_hoch_links.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Hoch-Links"
+    },
+    {
+      "name": "pfeil_hoch_rechts",
+      "file": "pfeil_hoch_rechts.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Hoch-Rechts"
+    },
+    {
+      "name": "pfeil_runter_links",
+      "file": "pfeil_runter_links.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Runter-Links"
+    },
+    {
+      "name": "pfeil_runter_rechts",
+      "file": "pfeil_runter_rechts.png",
+      "kind": "png",
+      "category": "pfeile",
+      "title": "Runter-Rechts"
+    },
+    {
       "name": "pulse",
       "file": "pulse.gif",
       "kind": "gif",
@@ -95,6 +151,20 @@
       "kind": "gif",
       "category": "farbe",
       "title": "RGB-Atmen"
+    },
+    {
+      "name": "pfeil_lauf_hoch",
+      "file": "pfeil_lauf_hoch.gif",
+      "kind": "gif",
+      "category": "pfeile",
+      "title": "Pfeile hoch (Lauf)"
+    },
+    {
+      "name": "pfeil_lauf_rechts",
+      "file": "pfeil_lauf_rechts.gif",
+      "kind": "gif",
+      "category": "pfeile",
+      "title": "Pfeile rechts (Lauf)"
     }
   ]
 }

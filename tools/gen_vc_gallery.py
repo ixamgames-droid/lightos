@@ -231,6 +231,80 @@ def d_hot_white(p, s, frac):
 
 
 # ── Katalog ──────────────────────────────────────────────────────────────────
+
+# ── VCG-01 (David-Wunsch 2026-08-01): Pfeile ────────────────────────────────
+# Warum programmatisch statt als Bilddatei: derselbe Grund wie beim Rest der
+# Galerie — nichts nachzuladen, nichts an Lizenzen zu klaeren, und eine
+# Aenderung ist ein Diff statt eines Binaerblobs. Die Pfeile sind bewusst
+# schlicht (Silhouette, keine Verlaeufe): auf einem 64er-Taster zaehlt, dass
+# man die RICHTUNG auf einen Blick sieht.
+
+def _pfeil_pfad(s, winkel_grad):
+    """Pfeil-Silhouette, um die Frame-Mitte gedreht (0 = nach oben)."""
+    from PySide6.QtGui import QPainterPath, QTransform
+    m, w = s * 0.5, s * 0.30
+    pfad = QPainterPath()
+    pfad.moveTo(m, s * 0.14)                 # Spitze
+    pfad.lineTo(m + w, s * 0.52)
+    pfad.lineTo(m + w * 0.42, s * 0.52)
+    pfad.lineTo(m + w * 0.42, s * 0.86)      # Schaft
+    pfad.lineTo(m - w * 0.42, s * 0.86)
+    pfad.lineTo(m - w * 0.42, s * 0.52)
+    pfad.lineTo(m - w, s * 0.52)
+    pfad.closeSubpath()
+    t = QTransform()
+    t.translate(m, m)
+    t.rotate(winkel_grad)
+    t.translate(-m, -m)
+    return t.map(pfad)
+
+
+def _pfeil(p, s, winkel_grad, helligkeit=1.0):
+    _bg(p, s, (10, 12, 18, 255))
+    p.setPen(Qt.PenStyle.NoPen)
+    c = QColor(120, 200, 255)
+    c.setAlphaF(max(0.0, min(1.0, helligkeit)))
+    p.setBrush(QBrush(c))
+    p.drawPath(_pfeil_pfad(s, winkel_grad))
+
+
+def d_pfeil_hoch(p, s, frac):     _pfeil(p, s, 0)
+def d_pfeil_runter(p, s, frac):   _pfeil(p, s, 180)
+def d_pfeil_links(p, s, frac):    _pfeil(p, s, 270)
+def d_pfeil_rechts(p, s, frac):   _pfeil(p, s, 90)
+def d_pfeil_hoch_links(p, s, frac):   _pfeil(p, s, 315)
+def d_pfeil_hoch_rechts(p, s, frac):  _pfeil(p, s, 45)
+def d_pfeil_runter_links(p, s, frac): _pfeil(p, s, 225)
+def d_pfeil_runter_rechts(p, s, frac):_pfeil(p, s, 135)
+
+
+def _pfeil_lauf(p, s, winkel_grad, frac):
+    """Drei Pfeile hintereinander, deren Helligkeit durchlaeuft — liest sich
+    als Bewegung IN die Richtung, ohne dass etwas den Frame verlaesst."""
+    _bg(p, s, (10, 12, 18, 255))
+    from PySide6.QtGui import QTransform
+    p.setPen(Qt.PenStyle.NoPen)
+    for i in range(3):
+        # Phase je Pfeil versetzt; sanfte Kurve statt hartem An/Aus.
+        ph = (frac + i / 3.0) % 1.0
+        a = 0.25 + 0.75 * (0.5 + 0.5 * math.cos(2 * math.pi * ph))
+        c = QColor(120, 200, 255)
+        c.setAlphaF(a)
+        p.setBrush(QBrush(c))
+        t = QTransform()
+        t.translate(s * 0.5, s * 0.5)
+        t.rotate(winkel_grad)
+        t.translate(-s * 0.5, -s * 0.5)
+        # entlang der Pfeilachse gestaffelt + kleiner gezeichnet
+        pfad = _pfeil_pfad(s * 0.52, 0)
+        t2 = QTransform(t)
+        t2.translate(s * 0.24, s * (0.06 + i * 0.30))
+        p.drawPath(t2.map(pfad))
+
+
+def d_pfeil_lauf_hoch(p, s, frac):   _pfeil_lauf(p, s, 0, frac)
+def d_pfeil_lauf_rechts(p, s, frac): _pfeil_lauf(p, s, 90, frac)
+
 _GIFS = [
     ("pulse",          "Puls / Atmen",        "dynamik", d_pulse),
     ("strobe",         "Strobe / Blitz",      "dynamik", d_strobe),
@@ -242,10 +316,20 @@ _GIFS = [
     ("gobo_spin",      "Gobo-Dreh",           "bewegung", d_gobo_spin),
     ("beam_sweep",     "Beam-Sweep",          "bewegung", d_beam_sweep),
     ("breathe_rgb",    "RGB-Atmen",           "farbe",   d_breathe_rgb),
+    ("pfeil_lauf_hoch",   "Pfeile hoch (Lauf)",   "pfeile", d_pfeil_lauf_hoch),
+    ("pfeil_lauf_rechts", "Pfeile rechts (Lauf)", "pfeile", d_pfeil_lauf_rechts),
 ]
 _PNGS = [
     ("spectrum",  "Spektrum",     "statisch", d_spectrum),
     ("hot_white", "Weiß-Flare",   "statisch", d_hot_white),
+    ("pfeil_hoch",          "Hoch",         "pfeile", d_pfeil_hoch),
+    ("pfeil_runter",        "Runter",       "pfeile", d_pfeil_runter),
+    ("pfeil_links",         "Links",        "pfeile", d_pfeil_links),
+    ("pfeil_rechts",        "Rechts",       "pfeile", d_pfeil_rechts),
+    ("pfeil_hoch_links",    "Hoch-Links",   "pfeile", d_pfeil_hoch_links),
+    ("pfeil_hoch_rechts",   "Hoch-Rechts",  "pfeile", d_pfeil_hoch_rechts),
+    ("pfeil_runter_links",  "Runter-Links", "pfeile", d_pfeil_runter_links),
+    ("pfeil_runter_rechts", "Runter-Rechts", "pfeile", d_pfeil_runter_rechts),
 ]
 
 

@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Button-Grafiken: Reiter statt langer Liste, dazu Pfeile
+
+#### Neu
+
+- **Die Grafik-Auswahl für VC-Taster ist nach Kategorien gegliedert.** Statt
+  einer langen Liste gibt es Reiter (Pfeile · Bewegung · Dynamik · Farbe ·
+  Statisch). Die Einordnung stand schon immer in den Daten — sie wurde nur nie
+  angezeigt. Eine neue Kategorie taucht künftig von selbst als Reiter auf.
+
+- **10 neue Pfeil-Grafiken**: acht Richtungen statisch plus zwei animierte
+  Lauf-Pfeile (hoch, rechts). Damit wächst die eingebaute Galerie von 12 auf
+  22 Grafiken. Wie der Rest werden sie gezeichnet statt als Bilddatei
+  mitgeliefert — eine Änderung ist ein lesbarer Diff, kein Binärblob.
+
 ### 2026-08-01 — Gobos sind jetzt im 3D zu sehen
 
 #### Neu
