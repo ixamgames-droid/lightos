@@ -268,6 +268,10 @@ export function addFixture(data) {
     pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
     isMatrix: !!model.isMatrix,
     beam, spot, spotTarget, floorSpot,
+    // VIZ-MH-OPTICS: Grundwinkel des SpotLights merken. applyOptics skaliert
+    // relativ dazu — ohne Referenz waere jede Zoom-Aenderung kumulativ und der
+    // Kegel liefe nach ein paar Zuegen weg.
+    baseSpotAngle: spot ? spot.angle : null,
     icon,
     label,   // VIZ-14: persistentes 3D-Label (Sprite, Kind von root)
     type: rtype,
