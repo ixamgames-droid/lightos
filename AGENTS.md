@@ -46,6 +46,24 @@ Code- und Git-Root.
    **nicht** ganz oben über die Beschreibung. Format: Keep a Changelog. (CDX-10:
    die gelebte Konvention nutzt `Neu / …`-Varianten; hier verankert.)
 
+   **Wann ein Eintrag nötig ist — entschieden 2026-07-31 (CDX-29):** der
+   CHANGELOG ist das Protokoll dessen, was sich **für den Nutzer** ändert, nicht
+   der Diff-Index. Daraus drei Fälle:
+
+   - **Verhalten/Feature/Fix → Eintrag.** Auch wenn die Änderung klein ist.
+     Begleitende Doku gehört in denselben Eintrag, nicht in einen eigenen.
+   - **Neues nutzer-sichtbares Doku-Artefakt → Eintrag** (`#### Neu`): eine neue
+     Anleitung, ein neuer Demo-Generator, ein neues Tutorial. Der Nutzer bekommt
+     etwas, das es vorher nicht gab.
+   - **Reine Doku-GENAUIGKEIT → kein Eintrag.** Korrigierte Beschreibungen,
+     nachgezogene Screenshots, tote Links/Rezepte, Kommentare im Code. Die
+     Software verhält sich unverändert; die Git-Historie trägt es.
+
+   Faustregel bei Zweifel: *Würde David beim Lesen des Eintrags etwas erfahren,
+   das er beim Bedienen merkt?* Wenn nein, gehört es nicht hinein — ein
+   CHANGELOG voller Doku-Nachträge verdeckt genau die Zeilen, für die er ihn
+   liest.
+
 4. **Verhaltensänderungen sichtbar machen.** Wenn sich ein **Default** oder eine
    **Bedienung** ändert (z. B. „neue Effekte folgen jetzt dem Tempo-Bus"):
    - die passende Anleitung unter `docs/` aktualisieren, **und**
