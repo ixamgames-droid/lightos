@@ -8,6 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
+import { pixelCell } from './pixel_order.js';
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
 // Gehaeuse-Rundkoerper ihre Radial-Segmente (Boden 6) — analog zum Beam-Kegel
@@ -839,7 +840,10 @@ export function buildMoverBar(n) {
 // (Panel steht vertikal wie ein Backdrop). Reale Referenz: generische 0,5-m-LED-
 // Kachel (500 x 500 x 50 mm) — Pixel fuellen die feste Panel-Flaeche unabh. der
 // Aufloesung. Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols }.
-export function buildMatrixPanel(n) {
+export function buildMatrixPanel(n, pixelOrder) {
+  // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
+  // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
+  // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
   n = Math.max(1, Math.min(256, Math.floor(n || 16)));
   const cols = Math.ceil(Math.sqrt(n));
   const rows = Math.ceil(n / cols);
@@ -857,7 +861,7 @@ export function buildMatrixPanel(n) {
   const y0 = PH / 2 - margin - gh / 2;     // Start oben links (Zeile 0 = oben)
   const pixels = [];
   for (let i = 0; i < n; i++) {
-    const r = Math.floor(i / cols), c = i % cols;
+    const { r, c } = pixelCell(i, cols, pixelOrder);
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(pxW, pxH),
       new THREE.MeshStandardMaterial({

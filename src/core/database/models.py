@@ -140,6 +140,12 @@ class PatchedFixture(Base):
     # bearbeitete Matrizen bleiben unangetastet) — "single" verhindert nur das
     # automatische Neuanlegen.
     head_mode: Mapped[str] = mapped_column(String(16), default="auto")
+    # FM-13: In WELCHER raeumlichen Reihenfolge legt DIESES Panel seine Pixel auf
+    # DMX? Das Profil sagt es nicht — die ADJ Dotz Matrix nummeriert im
+    # Werkszustand in Schlangenlinien, am Geraet umstellbar ("Pixel Flip").
+    # Darum eine Eigenschaft des gepatchten Geraets, nicht des Profils.
+    # Werte/Umrechnung im Leaf-Modul core.pixel_order; "rowwise" = Bestand.
+    pixel_order: Mapped[str] = mapped_column(String(16), default="rowwise")
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.

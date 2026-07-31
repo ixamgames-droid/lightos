@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Pixel-Panels: die Reihenfolge der Pixel ist jetzt einstellbar
+
+#### Neu
+
+- **Ein Matrix-Panel kann sagen, WIE seine Pixel im Raum liegen.** Die
+  DMX-Kanäle geben nur die *Reihenfolge* vor, nicht die Position — und die ADJ
+  Dotz Matrix nummeriert im Werkszustand („Pixel Flip: Standard") in
+  **Schlangenlinien**: `1-2-3-4 / 8-7-6-5 / 9-10-11-12 / 16-15-14-13`. Der
+  Visualizer legte die Pixel dagegen immer zeilenweise an. Folge: ein
+  horizontales Lauflicht lief im 3D geradeaus und **am echten Gerät im
+  Zickzack** — ein Fehler, den kein Test sehen konnte, weil beide Seiten für
+  sich stimmig waren.
+
+  Im Patch-Dialog gibt es dafür jetzt **„Pixel-Reihenfolge"** (nur bei
+  Matrix-Panels): *Zeilenweise* (Default, unverändertes Verhalten),
+  *Schlangenlinien* und *Gespiegelt*. Die Einstellung gehört bewusst ans
+  **gepatchte Gerät**, nicht ans Profil — dasselbe Modell ist am Gerät
+  umstellbar, und ein Umsortieren im Profil wäre für die anderen
+  Flip-Stellungen wieder falsch. Sie ändert nur die Zuordnung, nie die
+  DMX-Adressen, und Bestands-Shows bleiben zeilenweise.
+
+  3D-Panel und 2D-Draufsicht rechnen die Zelle nicht mehr getrennt aus,
+  sondern gehen durch **eine** Quelle; ein Test hält die Python- und die
+  JS-Fassung der Regel gegeneinander. Läuft sie auseinander, sieht man das
+  sonst erst am echten Gerät.
+
 ### 2026-07-31 — Köpfe eines Movers sind im Programmer jetzt wählbar
 
 #### Behoben
