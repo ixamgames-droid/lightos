@@ -30,6 +30,7 @@ import { resizeOrtho } from '../camera/cameras.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 export let isLeftDragging = false;
+let marqueeHadSelection = false;   // VIZ-14: s. handlePointerDown
 export let dragMode = 'none';  // 'rotate' | 'pan' | 'fixtureDrag' | 'stageDrag' | 'marquee' | 'none'
 let lastMouseX = 0, lastMouseY = 0;
 let downMouseX = 0, downMouseY = 0;
@@ -212,6 +213,11 @@ export function handlePointerDown(clientX, clientY, shiftKey) {
     } else {
       // Marquee-Selektion (nur mit Maus; Touch springt direkt zu Kamera-Pan)
       dragMode = 'marquee';
+      // VIZ-14: OB vorher etwas ausgewaehlt war, entscheidet sich HIER — die
+      // Zeile unten leert die Auswahl bereits beim Druecken. Beim Loslassen
+      // waere sie immer leer, und ein Deselect-Intent nicht mehr von "war eh
+      // nichts da" zu unterscheiden.
+      marqueeHadSelection = view.selectedFids.length > 0;
       const m = document.getElementById('marquee');
       m.style.display = 'block';
       m.style.left = clientX + 'px';
@@ -715,6 +721,18 @@ export function handlePointerUp(shiftKey) {
       view.selectedFids = newlySelected;
     }
     updateOutlines();
+    // VIZ-14: ein LEER gezogenes Marquee ohne Shift ist eine ausdrueckliche
+    // Nutzer-Ansage („nichts mehr ausgewaehlt"). Python ignoriert leere
+    // fixtureSelectionChanged-Emits BEWUSST — die entstehen naemlich auch ohne
+    // Zutun (Moduswechsel, Fixture-Entfernen, View-Wechsel), und ein naives
+    // Durchreichen wischte damit die Programmer-Auswahl weg. Der User-Intent
+    // braucht deshalb einen EIGENEN Kanal statt derselben leeren Liste.
+    if (!shiftKey && newlySelected.length === 0 && marqueeHadSelection) {
+      const b = bridgeRef.get();
+      if (b && b.fixtureSelectionCleared) {
+        try { b.fixtureSelectionCleared(); } catch (e) {}
+      }
+    }
   }
   dragMode = 'none';
   dragGizmo = null;         // VIZ-13 3b-G: Gizmo-Gestik beendet
