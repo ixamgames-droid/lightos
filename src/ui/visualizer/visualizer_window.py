@@ -443,6 +443,7 @@ class VisualizerBridge(QObject):
     pyTraceChanged          = Signal(bool, int, int)  # running, n_fixtures, n_points
     pyTraceSaved            = Signal(str, int)         # sequence name, n_steps
     pyFixtureSelection      = Signal(list)
+    pyFixtureSelectionCleared = Signal()   # VIZ-14: ausdrueckliches Deselect
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
     pyStageObjectDeleted    = Signal(str)
@@ -1236,6 +1237,20 @@ class VisualizerBridge(QObject):
     def fixtureSelectionChanged(self, fids_json: str):
         fids = json.loads(fids_json) or []
         self.pyFixtureSelection.emit([int(x) for x in fids])
+
+    @Slot()
+    @_bridge_slot_guard
+    def fixtureSelectionCleared(self):
+        """VIZ-14: der Nutzer hat im 3D ausdruecklich ABGEWAEHLT (leer gezogenes
+        Marquee ohne Shift).
+
+        ★ Warum das nicht ueber ``fixtureSelectionChanged("[]")`` laeuft: leere
+        Emits entstehen dort auch OHNE Zutun (Moduswechsel, Fixture-Entfernen,
+        View-Wechsel). Wer sie durchreicht, wischt mit einem blossen
+        3D-Moduswechsel die Programmer-Auswahl weg — genau deshalb ignoriert
+        ``_on_fixture_selection_from_js`` leere Listen. Der User-Intent braucht
+        also einen eigenen Kanal, nicht dieselbe leere Liste."""
+        self.pyFixtureSelectionCleared.emit()
 
     @Slot(str)
     @_bridge_slot_guard
@@ -2399,6 +2414,7 @@ class VisualizerWindow(QMainWindow):
         self._bridge.pyTraceChanged.connect(self._on_trace_changed)
         self._bridge.pyTraceSaved.connect(self._on_trace_saved)
         self._bridge.pyFixtureSelection.connect(self._on_fixture_selection_from_js)
+        self._bridge.pyFixtureSelectionCleared.connect(self._on_selection_cleared_from_js)
         self._bridge.pyFixtureDeleted.connect(self._on_fixture_deleted_from_js)
         self._bridge.pyStageListChanged.connect(self._on_stage_list_from_js)
         self._bridge.pyStageObjectDeleted.connect(self._on_stage_object_deleted_from_js)
@@ -2861,6 +2877,30 @@ class VisualizerWindow(QMainWindow):
                 if it.data(Qt.ItemDataRole.UserRole) == target:
                     self._patch_list.setCurrentItem(it)
                     break
+        finally:
+            self._applying_selection = False
+
+    def _on_selection_cleared_from_js(self):
+        """Ausdrueckliches 3D-Deselect -> globale Auswahl wirklich leeren.
+
+        Damit ist die in Slice 1a bewusst hingenommene Asymmetrie weg: bisher
+        raeumte ein leer gezogenes Marquee nur die 3D-Outlines, waehrend
+        Programmer/Liste ihre Auswahl behielten. Beide Seiten liefen erst bei
+        der naechsten NEUEN Auswahl wieder zusammen."""
+        if hasattr(self, "_btn_align"):
+            self._btn_align.setEnabled(False)
+        # Gleicher Guard wie beim Setzen: die Listen-Markierung darf nicht
+        # zurueckschreiben, waehrend wir gerade anwenden.
+        self._applying_selection = True
+        try:
+            self._state.set_selected_fids([])
+            lst = getattr(self, "_patch_list", None)
+            if lst is not None:
+                blocked = lst.blockSignals(True)
+                try:
+                    lst.clearSelection()
+                finally:
+                    lst.blockSignals(blocked)
         finally:
             self._applying_selection = False
 

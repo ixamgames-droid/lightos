@@ -36,6 +36,7 @@ import {
 import {
   wirePointerLateBindings, resolveDockOnGestureEnd,
   pointerState, handlePointerMove,   // A3D-41: Test-Seams fuer den Pan-Pfad
+  handlePointerDown, handlePointerUp,  // VIZ-14: Seams fuer den Marquee-Pfad
 } from './interaction/pointer.js';
 import { attachGizmoToSelection, axisParamUnderPointer } from './interaction/gizmo.js';  // VIZ-13 3b-G
 // A3D-41: Test-Seams fuer die NaN-Guards. Ueber echte Pointer-Events sind sie
@@ -192,6 +193,11 @@ window.__lightos = {
   // echte Pfad treiben statt nur die Formel nachzurechnen.
   __pointerState: pointerState,
   __handlePointerMove: handlePointerMove,
+  // VIZ-14: dieselbe Sorte Seam fuer Down/Up — nur ueber den ECHTEN Zeigerpfad
+  // laesst sich ein leer gezogenes Marquee pruefen (der Deselect-Intent
+  // entsteht genau dort, nicht in einer nachgerechneten Formel).
+  __handlePointerDown: handlePointerDown,
+  __handlePointerUp: handlePointerUp,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett
