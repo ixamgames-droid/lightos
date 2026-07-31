@@ -34,7 +34,7 @@ Gruen zu melden, was er nicht gemessen hat.
 Aufruf::
 
     venv/bin/python tools/hw5_longrun.py --hours 12
-    venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel 1
+    venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel 115-118
     venv/bin/python tools/hw5_longrun.py --status            # laufenden Lauf ansehen
 """
 from __future__ import annotations
@@ -193,7 +193,7 @@ class Run:
             "  durch, kein Auto-Disable). Ein STILLER Tod — FTDI nimmt Bytes an, legt",
             "  aber keine gueltigen DMX-Frames mehr auf die Leitung — ist von hier aus",
             "  nicht sichtbar. Dafuer braucht es den Blick aufs Rig:",
-            "      venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N>",
+            "      venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N-M>",
             "=" * 72,
             "",
         ]
@@ -204,17 +204,60 @@ def _frame_blackout() -> bytes:
     return bytes(512)
 
 
-def _frame_heartbeat(channel: int, level: int, phase: float) -> bytes:
-    """Sanfter Dreieck-Ramp auf EINEM Kanal — Bewegung, nicht Standbild.
+def parse_channel_spec(spec) -> list[int]:
+    """``"115"`` · ``"115-118"`` · ``"115,117"`` -> Liste von DMX-Kanaelen.
+
+    ★ Warum ein BEREICH und nicht ein Kanal: am Rig haengt ein Geraet, dessen
+    Profil man im Zweifel nicht kennt („so ein kleiner U-King, weiss aber nicht
+    genau welcher"). Ein Ramp auf EINEM Kanal ist dann eine Wette: liegt auf
+    Kanal 1 der Master-Dimmer und stehen die Farben auf 0, bleibt das Geraet
+    **dunkel** — und ein dunkles Geraet beweist nichts, weder ueber den Ausgang
+    noch ueber das Kabel. Rampen dagegen Dimmer UND Farben gemeinsam, ist das
+    Ergebnis bei jedem gaengigen Layout sichtbar (Dimmer+RGB genauso wie reines
+    RGBW). Kanaele ausserhalb des Bereichs bleiben auf 0 — das Geraet wird
+    also weiterhin nur dort bespielt, wo es der Aufrufer ausdruecklich sagt.
+
+    Ungueltige/leere Angaben ergeben ``[]`` = Blackout (der sichere Default).
+    """
+    out: list[int] = []
+    for teil in str(spec or "").replace(" ", "").split(","):
+        if not teil:
+            continue
+        try:
+            if "-" in teil[1:]:
+                a, b = teil.split("-", 1)
+                lo, hi = int(a), int(b)
+                if lo > hi:
+                    lo, hi = hi, lo
+                out.extend(range(lo, hi + 1))
+            else:
+                out.append(int(teil))
+        except ValueError:
+            continue
+    return [c for c in dict.fromkeys(out) if 1 <= c <= 512]
+
+
+def _frame_heartbeat(channels, level: int, phase: float) -> bytes:
+    """Sanfter Dreieck-Ramp auf den angegebenen Kanaelen — Bewegung, nicht
+    Standbild.
 
     Ein statischer Wert taugt als Lebenszeichen nicht: DMX haelt den letzten Wert,
     ein toter Ausgang sieht dann exakt aus wie ein lebender. Nur eine sichtbare
     Aenderung unterscheidet beides.
+
+    Alle genannten Kanaele rampen GEMEINSAM (gleiche Phase): bei einem
+    Dimmer+RGB-Geraet oeffnet der Dimmer waehrend die Farbe hochkommt, bei einem
+    reinen RGBW-Geraet wird es gemeinsam heller. Beides ist sichtbar, ohne das
+    Profil zu kennen.
     """
     data = bytearray(512)
     tri = 2.0 * phase if phase < 0.5 else 2.0 * (1.0 - phase)
-    idx = max(1, min(512, channel)) - 1
-    data[idx] = max(0, min(255, int(round(tri * level))))
+    val = max(0, min(255, int(round(tri * level))))
+    if isinstance(channels, int):
+        channels = [channels]
+    for ch in channels or ():
+        if 1 <= int(ch) <= 512:
+            data[int(ch) - 1] = val
     return bytes(data)
 
 
@@ -238,8 +281,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--status-file", default=None, help="Status-JSON fuer --status")
     ap.add_argument("--status", action="store_true",
                     help="nur den Stand eines laufenden Tests ausgeben")
-    ap.add_argument("--heartbeat-channel", type=int, default=0,
-                    help="OPT-IN: sichtbarer Ramp auf diesem Kanal (0 = aus/Blackout)")
+    ap.add_argument("--heartbeat-channel", default="",
+                    help="OPT-IN: sichtbarer Ramp auf diesen Kanaelen — EIN Kanal "
+                         "(\"115\"), ein BEREICH (\"115-118\") oder eine Liste "
+                         "(\"115,117\"). Leer/0 = aus (Blackout). Bereich nehmen, "
+                         "wenn das Profil unbekannt ist: liegt auf dem ersten Kanal "
+                         "der Master-Dimmer, bleibt ein Ein-Kanal-Ramp bei Farben "
+                         "auf 0 unsichtbar.")
     ap.add_argument("--heartbeat-level", type=int, default=64,
                     help="Spitzenwert des Ramps (Default 64 = gedaempft)")
     ap.add_argument("--probe", action="store_true",
@@ -262,10 +310,11 @@ def main(argv: list[str] | None = None) -> int:
     log_path = args.log or os.path.join(
         logdir, f"hw5_longrun_{time.strftime('%Y%m%d_%H%M%S')}.log")
 
-    if args.probe and not args.heartbeat_channel:
-        print("--probe braucht --heartbeat-channel <N> — sonst waere der Sichttest "
-              "unsichtbar. Kanal bewusst waehlen: das Skript kennt den Patch der "
-              "Enttec-Leitung nicht.")
+    hb_channels = parse_channel_spec(args.heartbeat_channel)
+    if args.probe and not hb_channels:
+        print("--probe braucht --heartbeat-channel <N|N-M> — sonst waere der "
+              "Sichttest unsichtbar. Kanaele bewusst waehlen: das Skript kennt "
+              "den Patch der Enttec-Leitung nicht.")
         return 2
 
     try:
@@ -276,10 +325,13 @@ def main(argv: list[str] | None = None) -> int:
 
     run = Run(dev, log_path, status_path)
     duration_h = (20.0 / 3600.0) if args.probe else args.hours
-    mode = (f"Sichttest 20 s, Ramp auf Kanal {args.heartbeat_channel} "
+    _hb_txt = (f"Kanal {hb_channels[0]}" if len(hb_channels) == 1
+               else f"Kanaele {hb_channels[0]}-{hb_channels[-1]}"
+               if hb_channels else "")
+    mode = (f"Sichttest 20 s, Ramp auf {_hb_txt} "
             f"(Spitze {args.heartbeat_level})" if args.probe else
-            (f"Heartbeat-Ramp auf Kanal {args.heartbeat_channel} "
-             f"(Spitze {args.heartbeat_level})" if args.heartbeat_channel
+            (f"Heartbeat-Ramp auf {_hb_txt} "
+             f"(Spitze {args.heartbeat_level})" if hb_channels
              else "Blackout (512 Nullen) — kein Licht, voller Schreibpfad"))
     run.log(f"HW-5 Langzeitlauf startet — Port {port}, {args.hz:g} Hz, "
             f"{duration_h:.2f} h geplant, Modus: {mode}")
@@ -312,9 +364,9 @@ def main(argv: list[str] | None = None) -> int:
             last_frame_at = now
             next_frame = now + period
 
-            if args.heartbeat_channel:
+            if hb_channels:
                 phase = ((now - run.t0) % hb_period) / hb_period
-                frame = _frame_heartbeat(args.heartbeat_channel,
+                frame = _frame_heartbeat(hb_channels,
                                          args.heartbeat_level, phase)
             else:
                 frame = _frame_blackout()

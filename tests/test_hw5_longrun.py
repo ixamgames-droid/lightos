@@ -52,13 +52,33 @@ class FrameBuildTests(unittest.TestCase):
         self.assertEqual(set(f), {0})
 
     def test_heartbeat_beruehrt_genau_einen_kanal(self):
-        f = hw5._frame_heartbeat(channel=1, level=64, phase=0.5)
+        f = hw5._frame_heartbeat(1, level=64, phase=0.5)
         self.assertEqual(len(f), 512)
         self.assertEqual([i for i, v in enumerate(f) if v], [0])
 
     def test_heartbeat_kanalindex_ist_1_basiert(self):
-        f = hw5._frame_heartbeat(channel=7, level=200, phase=0.5)
+        f = hw5._frame_heartbeat(7, level=200, phase=0.5)
         self.assertEqual([i for i, v in enumerate(f) if v], [6])
+
+    def test_heartbeat_rampt_einen_bereich_gemeinsam(self):
+        """Mehrere Kanaele rampen mit DERSELBEN Phase.
+
+        Am Rig haengt oft ein Geraet, dessen Profil man nicht sicher kennt. Liegt
+        auf dem ersten Kanal der Master-Dimmer und stehen die Farben auf 0, bleibt
+        ein Ein-Kanal-Ramp **dunkel** — und dunkel beweist nichts. Rampen Dimmer
+        und Farben gemeinsam, ist das Ergebnis bei jedem gaengigen Layout
+        sichtbar."""
+        f = hw5._frame_heartbeat([115, 116, 117, 118], level=64, phase=0.5)
+        self.assertEqual([i + 1 for i, v in enumerate(f) if v],
+                         [115, 116, 117, 118])
+        self.assertEqual({f[114], f[115], f[116], f[117]}, {64},
+                         "alle Kanaele des Bereichs muessen denselben Wert haben")
+
+    def test_heartbeat_laesst_alles_ausserhalb_des_bereichs_auf_null(self):
+        """Der Rest der Leitung bleibt unangetastet — auch mit Bereich wird nur
+        dort bespielt, wo der Aufrufer es ausdruecklich sagt."""
+        f = hw5._frame_heartbeat([115, 116], level=255, phase=0.5)
+        self.assertEqual(sum(1 for v in f if v), 2)
 
     def test_heartbeat_ist_dreieck_und_haelt_den_deckel(self):
         """Spitze bei Phase 0.5, Null an den Raendern — sonst waere es ein Standbild
@@ -72,11 +92,39 @@ class FrameBuildTests(unittest.TestCase):
         for phase in (0.0, 0.2, 0.5, 0.75, 0.99):
             self.assertLessEqual(max(hw5._frame_heartbeat(ch, 255, phase)), 255)
 
-    def test_heartbeat_klemmt_kanal_in_den_gueltigen_bereich(self):
-        self.assertEqual([i for i, v in enumerate(
-            hw5._frame_heartbeat(0, 64, 0.5)) if v], [0])
-        self.assertEqual([i for i, v in enumerate(
-            hw5._frame_heartbeat(9999, 64, 0.5)) if v], [511])
+    def test_heartbeat_ignoriert_kanaele_ausserhalb_des_gueltigen_bereichs(self):
+        """Frueher wurde geklemmt (0 -> 1, 9999 -> 512). Mit einer Kanal-LISTE
+        waere das gefaehrlich: ein Vertipper ("1150-1180") wuerde Kanal 512
+        bespielen, den niemand genannt hat. Ungueltig heisst jetzt: faellt raus."""
+        self.assertEqual(set(hw5._frame_heartbeat(0, 64, 0.5)), {0})
+        self.assertEqual(set(hw5._frame_heartbeat(9999, 64, 0.5)), {0})
+        self.assertEqual([i + 1 for i, v in enumerate(
+            hw5._frame_heartbeat([0, 7, 9999], 64, 0.5)) if v], [7])
+
+
+class KanalSpecTests(unittest.TestCase):
+    """``--heartbeat-channel`` nimmt Kanal, Bereich oder Liste."""
+
+    def test_einzelkanal(self):
+        self.assertEqual(hw5.parse_channel_spec("115"), [115])
+
+    def test_bereich(self):
+        self.assertEqual(hw5.parse_channel_spec("115-118"),
+                         [115, 116, 117, 118])
+
+    def test_liste_und_leerzeichen(self):
+        self.assertEqual(hw5.parse_channel_spec(" 115, 117 "), [115, 117])
+
+    def test_bereich_verkehrt_herum_wird_gedreht(self):
+        self.assertEqual(hw5.parse_channel_spec("118-115"),
+                         [115, 116, 117, 118])
+
+    def test_doppelte_fallen_raus_reihenfolge_bleibt(self):
+        self.assertEqual(hw5.parse_channel_spec("7,7,5"), [7, 5])
+
+    def test_ungueltiges_ergibt_blackout(self):
+        for spec in ("", None, "0", "abc", "513", "-"):
+            self.assertEqual(hw5.parse_channel_spec(spec), [], spec)
 
 
 class ZustandserkennungTests(unittest.TestCase):
