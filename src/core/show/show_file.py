@@ -94,6 +94,9 @@ def _to_int(value, default: int) -> int:
 # Kanonische Quelle ist das abhaengigkeitsfreie Leaf-Modul core.head_mode, damit
 # Show-Persistenz, Live-Schreibpfad (update_fixture) und Undo nicht driften —
 # und der Import auch dann traegt, wenn Tests `database.models` ausstubben.
+from src.core.pixel_order import (              # noqa: E402  (Leaf-Import)
+    normalize_pixel_order as _to_pixel_order,
+)
 from src.core.head_mode import (                # noqa: E402  (Leaf-Import)
     HEAD_MODES, normalize_head_mode as _to_head_mode,
 )
@@ -126,6 +129,7 @@ def _fixture_to_dict(pf) -> dict:
             "spider_mirrored": bool(pf.get("spider_mirrored", True)),
             "spider_dual_tilt": bool(pf.get("spider_dual_tilt", False)),
             "head_mode": _to_head_mode(pf.get("head_mode", "auto")),
+            "pixel_order": _to_pixel_order(pf.get("pixel_order", "rowwise")),
             "pan_range_deg": _to_int(pf.get("pan_range_deg", 540), 540),
             "tilt_range_deg": _to_int(pf.get("tilt_range_deg", 270), 270),
             "pan_zero_dmx": _to_int(pf.get("pan_zero_dmx", 128), 128),
@@ -157,6 +161,7 @@ def _fixture_to_dict(pf) -> dict:
         "spider_mirrored": bool(getattr(pf, "spider_mirrored", True)),
         "spider_dual_tilt": bool(getattr(pf, "spider_dual_tilt", False)),
         "head_mode": _to_head_mode(getattr(pf, "head_mode", "auto")),
+        "pixel_order": _to_pixel_order(getattr(pf, "pixel_order", "rowwise")),
         "pan_range_deg": _to_int(getattr(pf, "pan_range_deg", 540), 540),
         "tilt_range_deg": _to_int(getattr(pf, "tilt_range_deg", 270), 270),
         "pan_zero_dmx": _to_int(getattr(pf, "pan_zero_dmx", 128), 128),
@@ -202,6 +207,7 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         spider_mirrored=bool(d.get("spider_mirrored", True)),
         spider_dual_tilt=bool(d.get("spider_dual_tilt", False)),
         head_mode=_to_head_mode(d.get("head_mode", "auto")),
+        pixel_order=_to_pixel_order(d.get("pixel_order", "rowwise")),
         pan_range_deg=_to_int(d.get("pan_range_deg", 540), 540),
         tilt_range_deg=_to_int(d.get("tilt_range_deg", 270), 270),
         pan_zero_dmx=_to_int(d.get("pan_zero_dmx", 128), 128),

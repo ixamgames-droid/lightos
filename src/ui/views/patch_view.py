@@ -10,6 +10,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
+from src.core.pixel_order import (PIXEL_ORDERS, PIXEL_ORDER_LABELS,
+                                  normalize_pixel_order)
 from src.core.app_state import (get_state, AppState, color_head_count,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
@@ -323,6 +325,32 @@ class PatchFixtureEditDialog(QDialog):
                 "bearbeitete Matrizen bleiben unangetastet.")
             form.addRow("Mehrkopf-Programmierung:", self._combo_head_mode)
 
+        # FM-13: In WELCHER raeumlichen Reihenfolge legt dieses Panel seine Pixel
+        # auf DMX? Das Profil sagt es nicht — die ADJ Dotz Matrix nummeriert im
+        # Werkszustand in Schlangenlinien und ist am Geraet umstellbar
+        # ("Pixel Flip"). Nur fuer Matrix-Panels: bei allem anderen gibt es keine
+        # Pixel-Reihenfolge, ein Feld dort waere eine Behauptung.
+        self._combo_pixel_order = None
+        if (getattr(self._fixture, "fixture_type", "") or "") == "matrix":
+            self._combo_pixel_order = QComboBox()
+            for _key in PIXEL_ORDERS:
+                self._combo_pixel_order.addItem(PIXEL_ORDER_LABELS[_key], _key)
+            _cur_po = normalize_pixel_order(
+                getattr(self._fixture, "pixel_order", "rowwise"))
+            _ipo = self._combo_pixel_order.findData(_cur_po)
+            self._combo_pixel_order.setCurrentIndex(_ipo if _ipo >= 0 else 0)
+            self._combo_pixel_order.setToolTip(
+                "Wie das Panel seine Pixel raeumlich anordnet — die DMX-Kanaele\n"
+                "sagen nur die REIHENFOLGE, nicht die Position:\n"
+                "• Zeilenweise – Pixel 1 oben links, dann nach rechts (Default).\n"
+                "• Schlangenlinien – jede zweite Zeile laeuft rueckwaerts. Das ist\n"
+                "  der Werkszustand der ADJ Dotz Matrix („Pixel Flip: Standard“);\n"
+                "  ohne diese Einstellung laeuft ein horizontales Lauflicht am\n"
+                "  echten Geraet im Zickzack, waehrend es im 3D geradeaus laeuft.\n"
+                "• Gespiegelt – jede Zeile rechts→links (Panel gedreht verbaut).\n\n"
+                "Aendert NUR die Darstellung/Zuordnung, nie die DMX-Adressen.")
+            form.addRow("Pixel-Reihenfolge:", self._combo_pixel_order)
+
             # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
             # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.
             _row = QHBoxLayout()
@@ -456,6 +484,9 @@ class PatchFixtureEditDialog(QDialog):
         if self._combo_head_mode is not None:
             _hm = str(self._combo_head_mode.currentData() or "auto")
             self.result_updates["head_mode"] = _hm
+        if getattr(self, "_combo_pixel_order", None) is not None:
+            self.result_updates["pixel_order"] = normalize_pixel_order(
+                self._combo_pixel_order.currentData())
             # „Köpfe einzeln" heisst: die Kopf-Matrix SOLL existieren. NUR den
             # Wunsch markieren — der Aufrufer legt sie NACH dem Persistieren aus
             # dem frischen Patch-Objekt an (sonst stale Label/Kanalzahl, und ein

@@ -235,7 +235,7 @@ export function addFixture(data) {
   root.add(label);
 
   // 2D top-down icon (3c-1: nHeads fuer die Einzel-Zellen der Bar-Icons)
-  const icon = buildTopDownIcon(rtype, data.nHeads);
+  const icon = buildTopDownIcon(rtype, data.nHeads, data.pixelOrder);
   icon.position.set(root.position.x, 0.05, root.position.z);
   // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
   // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-

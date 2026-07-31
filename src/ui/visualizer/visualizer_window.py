@@ -15,6 +15,7 @@ import math
 import os
 import time
 from src.core.paths import app_data_dir, crash_log_path
+from src.core.pixel_order import normalize_pixel_order
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -1570,6 +1571,11 @@ class VisualizerBridge(QObject):
             "type": f.fixture_type,
             "model": model,
             "nHeads": n_heads,
+            # FM-13: in welcher raeumlichen Reihenfolge liegen die Pixel dieses
+            # Panels auf DMX? Ohne das rendert ein Panel im Werkszustand
+            # (Schlangenlinien) eine horizontale Figur als Zickzack.
+            "pixelOrder": normalize_pixel_order(
+                getattr(f, "pixel_order", "rowwise")),
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],

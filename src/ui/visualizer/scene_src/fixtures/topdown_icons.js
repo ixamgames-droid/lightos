@@ -7,6 +7,7 @@
 // View) und EIN zentrales Tinting (tintTopDownIcon) statt vier Duplikat-
 // Bloecken in fixtures.js.
 import * as THREE from '../three/three.js';
+import { pixelCell } from './pixel_order.js';
 
 // Fuell-Farbe unbelichteter Icons (vorher 0x3a3a4a auf 0x282828-Boden).
 export const ICON_UNLIT_FILL = 0x4a4e5e;
@@ -86,7 +87,7 @@ function addBarCells(group, n, barW) {
 // FM-13: rows*cols kleine Quadrate als Raster (near-square aus n) — als
 // userData.cells registriert -> tintTopDownIcon faerbt pro Pixel (heads[i],
 // Zeilen-Haupt, deckungsgleich mit buildMatrixPanel/updateMatrixPanelDmx).
-function addGridCells(group, n, size) {
+function addGridCells(group, n, size, pixelOrder) {
   const count = Math.max(1, Math.min(256, Math.floor(n || 16)));
   const cols = Math.ceil(Math.sqrt(count));
   const rows = Math.ceil(count / cols);
@@ -97,7 +98,9 @@ function addGridCells(group, n, size) {
   const x0 = -inner / 2 + gw / 2;
   const z0 = -inner / 2 + gh / 2;
   for (let i = 0; i < count; i++) {
-    const r = Math.floor(i / cols), c = i % cols;
+    // FM-13: dieselbe Quelle wie das 3D-Panel — sonst zeigen 2D und 3D
+    // verschiedene Pixel-Positionen fuer denselben DMX-Kanal.
+    const { r, c } = pixelCell(i, cols, pixelOrder);
     const cell = mkFill(new THREE.PlaneGeometry(cw, ch));
     cell.position.set(x0 + c * gw, 0.055, z0 + r * gh);
     group.add(cell);
@@ -106,7 +109,7 @@ function addGridCells(group, n, size) {
   return cells;
 }
 
-export function buildTopDownIcon(type, nHeads) {
+export function buildTopDownIcon(type, nHeads, pixelOrder) {
   const group = new THREE.Group();
   let body, ring, cells = null;
   // Bar-artige Typen brauchen einen groesseren Selektionsring (die 1.6 m
@@ -151,7 +154,7 @@ export function buildTopDownIcon(type, nHeads) {
     body = mkFill(new THREE.PlaneGeometry(S, S), BAR_BODY_FILL);
     group.add(body);
     group.add(mkOutline(new THREE.PlaneGeometry(S, S)));
-    cells = addGridCells(group, nHeads, S);
+    cells = addGridCells(group, nHeads, S, pixelOrder);
     ringRadii = [0.98, 1.08];
   } else if (type === 'spider') {
     // zwei kurze parallele Bars (Top-Down); jede Bar ist eine Zelle ->
