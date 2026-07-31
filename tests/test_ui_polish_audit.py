@@ -40,6 +40,9 @@ def _app():
     return app
 
 
+from _qt_lifecycle import destroy_widget  # noqa: E402  XPLAT-15
+
+
 class TestSectionButtonsNotClipped(unittest.TestCase):
     """UI-15: Section-Buttons duerfen nie unter ihre Textbreite schrumpfen."""
 
@@ -56,8 +59,13 @@ class TestSectionButtonsNotClipped(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         try:
-            cls.win.close()
-            cls.win.deleteLater()
+            # XPLAT-15: close()+deleteLater() allein stellt DeferredDelete NIE zu
+            # — das Fenster ueberlebt mitsamt Kindern und Signalen bis zum
+            # Prozessende. destroy_widget pumpt die Ereignisschleife, bis der
+            # Abbau wirklich zugestellt ist (tests/_qt_lifecycle.py).
+            # Hier bewusst GEZIELT statt der Pauschal-Fixture: das Fenster
+            # gehoert der KLASSE und wird ueber mehrere Testmethoden benutzt.
+            destroy_widget(cls.win)
         except Exception:
             pass
         cls.app.processEvents()

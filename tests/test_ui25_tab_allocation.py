@@ -18,6 +18,9 @@ from src.ui.main_window import SectionButton, _SectionBar, _allocate_tab_widths
 _app = QApplication.instance() or QApplication([])
 
 
+from _qt_lifecycle import destroy_widget  # noqa: E402  XPLAT-15
+
+
 class TestClickFloorInReflow(unittest.TestCase):
     """UI-TABFLOOR: `_reflow` setzt die Breite per ``setFixedWidth`` — das haengt
     das ``setMinimumWidth(56)`` des Buttons aus. Solange alles passt, bekam jeder
@@ -123,8 +126,13 @@ class TestSectionTabsFairInWindow(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         try:
-            cls.win.close()
-            cls.win.deleteLater()
+            # XPLAT-15: close()+deleteLater() allein stellt DeferredDelete NIE zu
+            # — das Fenster ueberlebt mitsamt Kindern und Signalen bis zum
+            # Prozessende. destroy_widget pumpt die Ereignisschleife, bis der
+            # Abbau wirklich zugestellt ist (tests/_qt_lifecycle.py).
+            # Hier bewusst GEZIELT statt der Pauschal-Fixture: das Fenster
+            # gehoert der KLASSE und wird ueber mehrere Testmethoden benutzt.
+            destroy_widget(cls.win)
         except Exception:
             pass
         for _ in range(2):
