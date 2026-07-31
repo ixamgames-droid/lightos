@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Die leere Bühne sagt jetzt, dass sie leer ist
+
+#### Neu
+
+- **Ein Hinweis im 3D-Visualizer, solange nichts auf der Bühne steht.** Bisher
+  zeigte eine neue Show dort nur Raster und Boden — das ist der Normalzustand,
+  sieht aber aus wie „da fehlt was", und nirgends stand, was der nächste
+  Schritt wäre. Jetzt steht mittig „Noch nichts auf der Bühne" mit den zwei
+  Wegen dorthin (Geräte im Patch-Tab, Traversen im Modus *Bauen* über *Bühne*).
+
+  Er verschwindet, sobald das **erste Gerät oder das erste Bühnenobjekt** da
+  ist, und kommt zurück, wenn wieder alles weg ist. Er fängt keine Klicks ab
+  (`pointer-events: none`) — sonst schluckte ausgerechnet der Hinweis den
+  Klick, mit dem man anfangen will — und weckt den Render-Loop nicht.
+
 ### 2026-07-31 — Pixel-Panels: die Reihenfolge der Pixel ist jetzt einstellbar
 
 #### Neu

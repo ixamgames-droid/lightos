@@ -20,6 +20,7 @@ import { deg2rad } from '../scene/renderer.js';
 // kein Zyklus-Risiko).
 import { requestRender } from '../scene/render_loop.js';
 import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
+import { updateEmptyState } from '../empty_state.js';
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
@@ -283,6 +284,7 @@ export function addFixture(data) {
   // ersten gerenderten Frame — updateFixture unten dirtyt, perFrame laeuft davor.)
   syncSpotShadowBudget();
   rebuildFixtureMeshList();
+  updateEmptyState();   // VIZ-14: erstes Geraet da -> Hinweis weg
   updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128, data.heads||null);
 }
 
@@ -310,6 +312,7 @@ export function removeFixture(fid) {
   if (idx >= 0) view.selectedFids.splice(idx, 1);
   rebuildFixtureMeshList();
   updateOutlinesRef.get()();
+  updateEmptyState();   // VIZ-14: letztes Geraet weg -> Hinweis wieder zeigen
   requestRender();  // 3c-2: Objekt aus der Szene entfernt
 }
 
