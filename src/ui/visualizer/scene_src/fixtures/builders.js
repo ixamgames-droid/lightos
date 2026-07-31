@@ -1133,6 +1133,34 @@ function applyPanTilt(f, dmx) {
 }
 
 // Floor spot follow direction
+
+// VIZ-BEAM-OCCLUSION (Teil 1): Kegel-Laenge an den Auftreffpunkt anpassen.
+//
+// Der sichtbare Strahl ist ein additiver Fake-Kegel mit FESTER Laenge. Er endete
+// deshalb nicht an der Flaeche, die er trifft, sondern lief einfach durch —
+// durch den Boden, durch die Buehne, durch alles. Das ist der billige und
+// zugleich auffaelligste Teil der Verdeckung: eine Skalierung, kein Ray-March.
+//
+// BEWUSST NUR DER BODEN, nicht beliebige Geometrie: ein Raycast gegen alle
+// Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad genau die Sorte Kosten,
+// vor der die Review-Checkliste warnt. Der Bodenauftreffpunkt wird ohnehin
+// schon gerechnet (Floor-Spot) — diese Laenge ist damit gratis. Schatten IM
+// Strahl (volumetrisch) bleibt offen und gehoert an die Qualitaetsstufen.
+function setBeamLength(f, dist) {
+  const beam = f.beam;
+  if (!beam || !f.baseBeamLength) return;
+  // Nie laenger als der Grundkegel (sonst wuerde ein hoch haengender Scheinwerfer
+  // ploetzlich 30 m weit leuchten) und nie ganz auf 0 (ein Kegel ohne Laenge
+  // waere ein unsichtbarer Punkt statt eines kurzen Strahls).
+  const soll = Math.max(0.15, Math.min(f.baseBeamLength, dist));
+  const k = soll / f.baseBeamLength;
+  if (Math.abs((beam.scale.y || 1) - k) < 0.01) return;   // kein Zappeln
+  beam.scale.y = k;
+  // Der Kegel haengt mit seiner Mitte bei -laenge/2 unter der Linse; wird er
+  // kuerzer, muss er entsprechend nach oben ruecken, sonst schwebt er.
+  beam.position.y = -(f.baseBeamLength * k) / 2;
+}
+
 function applyFloorAim(f, dmx) {
   if (!dmx.skipBeam && f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
@@ -1160,6 +1188,13 @@ function applyFloorAim(f, dmx) {
         const hitZ = origin.z + dir.z * t;
         f.floorSpot.position.set(hitX, 0.01, hitZ);
         f.spotTarget.position.set(hitX, 0.0, hitZ);
+        // VIZ-BEAM-OCCLUSION (Teil 1): den sichtbaren Kegel AM BODEN ENDEN
+        // lassen. Er hatte eine feste Laenge und schoss deshalb durch den
+        // Boden hindurch — bei einem tief stehenden Scheinwerfer ragte ein
+        // Meter Licht unter die Buehne. `t` ist der Abstand bis zum
+        // Auftreffpunkt und wird hier ohnehin schon gerechnet; die
+        // Kegel-Laenge daraus abzuleiten kostet also nichts.
+        setBeamLength(f, t);
       }
     }
   }
