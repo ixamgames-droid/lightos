@@ -105,6 +105,15 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
         "pan": pan,
         "tilt": tilt,
     }
+    # VIZ-MH-OPTICS (David-Wunsch 2026-07-16): Optik-Attribute mitschicken.
+    # Sie waren im Programmer schon steuerbar, kamen aber NIE im 3D an — der
+    # Kegel hatte einen festen Winkel, ein Zoom-Zug hatte null Wirkung.
+    # Nur senden, was das Geraet WIRKLICH hat: ein fehlender Schluessel heisst
+    # JS-seitig "unveraendert", ein erfundener 128er-Default wuerde jeden
+    # Scheinwerfer ohne Zoom auf halbe Weite stellen.
+    for _opt in ("zoom", "iris"):
+        if _opt in attrs:
+            payload[_opt] = attrs[_opt]
     # ── Mehrkopf (Spider UND Mover-/PAR-Bars): pro Kopf eigene Farbe/Pan/Tilt ──
     # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N". FM-2: Kopfzahl aus
     # dem hoechsten vorkommenden #N-Index von color_r/pan/tilt ABGELEITET (nicht mehr

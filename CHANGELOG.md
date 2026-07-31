@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Der Lichtkegel im 3D folgt jetzt Zoom und Iris
+
+#### Behoben
+
+- **Ein Zoom-Zug hatte im Visualizer keinerlei Wirkung.** Die Optik-Attribute
+  waren im Programmer längst steuerbar, kamen aber nie im 3D an — der
+  Lichtkegel hatte einen festen Winkel. Man sah im Visualizer also etwas
+  anderes als am echten Gerät.
+
+  Jetzt folgt der Kegel dem **Zoom** (eng ↔ weit) und die **Iris** verengt ihn
+  zusätzlich; der Bodenfleck geht mit, nicht nur der sichtbare Strahl.
+
+  **Ein Gerät ohne Zoom-Kanal bleibt unverändert.** Es bekommt bewusst keinen
+  Vorgabewert — ein erfundener Mittelwert hätte jeden Scheinwerfer ohne Zoom
+  auf halbe Weite gestellt.
+
+  **Eine Annahme steckt drin, und die soll man kennen:** DMX legt nicht fest,
+  in welche Richtung ein Zoom-Kanal läuft. Angenommen ist der verbreitete Fall
+  (0 = eng, 255 = weit). Ein Gerät mit umgekehrter Laufrichtung sieht im 3D
+  falsch herum aus — an der DMX-Ausgabe ändert das nichts. Eine Angabe pro
+  Profil ist als eigener Punkt notiert.
+
+  Noch offen aus derselben Ecke: Fokus/Frost (Kantenschärfe) und Prisma
+  (Mehrfach-Strahl).
+
 ### 2026-07-31 — Platzieren zeigt jetzt vorher, wo das Gerät landet
 
 #### Neu

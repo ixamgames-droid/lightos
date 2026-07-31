@@ -9,6 +9,7 @@ import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
 import { pixelCell } from './pixel_order.js';
+import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
 // Gehaeuse-Rundkoerper ihre Radial-Segmente (Boden 6) — analog zum Beam-Kegel
@@ -1032,6 +1033,7 @@ export function updateMatrixPanelDmx(f, dmx) {
 // Kopf-Rotation (getWorldQuaternion) — PanTilt MUSS vor FloorAim laufen.
 export function updateMovingHeadDmx(f, dmx) {
   applyGenericColor(f, dmx);
+  applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
   syncIconPos(f);
@@ -1044,6 +1046,7 @@ export function updateMovingHeadDmx(f, dmx) {
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
   applyGenericColor(f, dmx);
+  applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyFloorAim(f, dmx);
   syncIconPos(f);
 }
