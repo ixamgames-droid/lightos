@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Gobos sind jetzt im 3D zu sehen
+
+#### Neu
+
+- **Das Gobo-Muster erscheint im Bodenfleck des Scheinwerfers.** Bisher hatte
+  ein Gobo-Wechsel im Visualizer **keine** sichtbare Wirkung — der 3D-Viewer
+  kannte Gobos überhaupt nicht, obwohl das Rad im Programmer längst läuft (der
+  Gobo-Chaser der Demoshows lief also blind).
+
+  Gezeigt wird es dort, wo ein Gobo im echten Raum sichtbar wird: im Lichtfleck
+  am Boden. Die Muster (Ring mit Spalten, Ovale, Kreise, Tetris, Punkte,
+  Spirale, Zebra) werden gezeichnet, nicht aus Bilddateien geladen — und sie
+  folgen denselben Namen wie die Gobo-Kacheln im Programmer. Steht das Rad auf
+  „offen", bleibt der Fleck wie bisher; ein Gerät ohne Gobo-Rad ändert sich
+  nicht.
+
+  Noch offen aus derselben Ecke: Gobo-Rotation und die Projektion im Strahl
+  selbst.
+
 ### 2026-07-31 — Der Lichtkegel im 3D folgt jetzt Zoom und Iris
 
 #### Behoben

@@ -72,6 +72,38 @@ def _has_own_color(attrs: dict[str, int], suffix: str = "") -> bool:
                          "color_a", "color_uv"))
 
 
+
+def _gobo_style(attrs: dict, channels) -> str | None:
+    """Muster-Stil des gerade gewaehlten Gobos ("" = offen/kein Muster).
+
+    ``None`` heisst „dieses Geraet hat gar kein Gobo-Rad" — dann steht auch
+    nichts im Payload, und JS laesst den Bodenfleck in Ruhe (dieselbe Regel wie
+    bei Zoom/Iris: kein erfundener Default).
+    """
+    if not channels:
+        return None
+    wert = None
+    kanal = None
+    for ch in channels:
+        a = (getattr(ch, "attribute", "") or "").lower()
+        if a in ("gobo_wheel", "gobo"):
+            kanal = ch
+            wert = attrs.get(a)
+            break
+    if kanal is None or wert is None:
+        return None
+    try:
+        from src.ui.widgets.gobo_icons import gobo_style_for
+    except Exception:
+        return None
+    for rg in (getattr(kanal, "ranges", None) or ()):
+        try:
+            if int(rg.range_from) <= int(wert) <= int(rg.range_to):
+                return gobo_style_for(getattr(rg, "name", "") or "")
+        except (TypeError, ValueError):
+            continue
+    return ""
+
 def _build_fixture_payload(fixture, attrs: dict[str, int],
                            channels=None) -> dict[str, object]:
     """Baut den Pro-Fixture-Payload (inkl. Spider-/Bar-``heads``-Array). Seit
@@ -114,6 +146,14 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     for _opt in ("zoom", "iris"):
         if _opt in attrs:
             payload[_opt] = attrs[_opt]
+    # VIZ-GOBO-3D (David-Wunsch 2026-07-16): welches Gobo steckt gerade drin?
+    # Nicht der DMX-Wert wandert nach JS, sondern der ERKANNTE MUSTER-STIL —
+    # die Zuordnung Wert -> Range-Name -> Muster ist datengetrieben und lebt
+    # schon in gobo_icons (dieselbe Quelle wie die 2D-Kacheln im Programmer).
+    # Waere der Rohwert gewandert, muesste JS die Ranges des Profils kennen.
+    _gobo = _gobo_style(attrs, channels)
+    if _gobo is not None:
+        payload["gobo"] = _gobo
     # ── Mehrkopf (Spider UND Mover-/PAR-Bars): pro Kopf eigene Farbe/Pan/Tilt ──
     # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N". FM-2: Kopfzahl aus
     # dem hoechsten vorkommenden #N-Index von color_r/pan/tilt ABGELEITET (nicht mehr
