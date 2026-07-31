@@ -6,6 +6,7 @@ import { resizeOrtho, perspectiveCam, orthoCam } from '../camera/cameras.js';
 import { applyStageObject2DStyle, updateResizeHandles } from './stage_objects.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 import { resyncBeamVisibility } from '../fixtures/builders.js';
+import { syncRoomShell } from '../scene/room_shell.js';
 
 // 3c-1: Gesten-Hint unten rechts pro Modus — vorher stand DAUERHAFT der
 // 3D-Text da, auch im 2D-Plan (stale Footer-Hint, Reframe-Befund 3).
@@ -18,6 +19,8 @@ export const HINT_2D = '2D-Plan: Mausrad/Pinch = Zoom · Doppel-Tipp = Ansicht z
 
 export function setViewMode(mode) {
   view.mode = (mode === '2D') ? '2D' : '3D';
+  // VIZ-14: in der Draufsicht laege die Decke genau zwischen Kamera und Buehne.
+  syncRoomShell();
   view.activeCam = (view.mode === '2D') ? orthoCam : perspectiveCam;
   document.getElementById('mode-text').textContent = (view.mode === '2D') ? '2D Top View' : '3D View';
   document.getElementById('ruler-info').style.display = (view.mode === '2D') ? 'block' : 'none';

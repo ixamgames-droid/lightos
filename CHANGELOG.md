@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Optionale Raum-Hülle: die Bühne schwebt nicht mehr im Nichts
+
+#### Neu
+
+- **„Raum-Hülle anzeigen" in den Visualizer-Einstellungen** (Default **aus**).
+  Legt eine neutrale Wand- und Deckenfläche um die Bühne — als
+  Größen-Orientierung, damit das Rig nicht im Leeren steht.
+
+  Bewusst **kein Bühnenbild**: eine Fläche, eine Farbe, kein Muster. Die
+  vorgerenderten Kulissen (Theater/Rock/Box) waren seinerzeit mit gutem Grund
+  entfernt worden, und das bleibt so — die Hülle bringt nichts davon zurück.
+
+  Sie **fängt keine Klicks ab**: Zielen, Marquee und Platzieren treffen
+  weiterhin den Boden, nicht die Wand. Sie **wächst mit dem Rig** statt eine
+  Raumgröße zu behaupten (feste Maße würden bei großen Rigs mitten
+  durchschneiden). In der 2D-Draufsicht ist sie immer aus — die Decke läge dort
+  zwischen Kamera und Bühne.
+
 ### 2026-07-31 — Geräte als Reihe, Raster oder Kreis anordnen
 
 #### Neu

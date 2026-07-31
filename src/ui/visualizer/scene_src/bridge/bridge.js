@@ -21,6 +21,7 @@ import { setCameraPreset, setNamedCameras } from '../camera/presets.js';
 import { deg2rad, rad2deg } from '../scene/renderer.js';
 import { clearDockHighlight } from '../stage/docking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
+import { syncRoomShell } from '../scene/room_shell.js';
 
 // ============================================================================
 // Python bridge actions used externally
@@ -253,6 +254,9 @@ export function applySettings(s) {
   // (updateLabelZoomVisibility, app.js) im durch requestRender() unten
   // ohnehin ausgeloesten Frame. Additiv im settingsChanged-JSON (wie fpsVisible).
   if (typeof s.showLabels === 'boolean') settings.showLabels = s.showLabels;
+  // VIZ-14: Raum-Huelle. syncRoomShell baut sie AUS DEM AKTUELLEN INHALT neu
+  // auf — eine feste Groesse wuerde bei grossen Rigs mitten durchschneiden.
+  if (typeof s.showRoom === 'boolean') { settings.showRoom = s.showRoom; syncRoomShell(); }
   for (const fid in fixtures) {
     const f = fixtures[fid];
     // A3D-05: Kegel-Sichtbarkeit (Einzelkopf + Laser-Faecher + Multi-Head-Pro-Kopf)
