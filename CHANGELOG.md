@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Adresskonflikte lassen sich jetzt auflösen, nicht nur ansehen
+
+#### Neu
+
+- **„⚠ N Adresskonflikt(e)" in der Patch-Werkzeugleiste ist anklickbar
+  geworden** und öffnet einen Dialog, der die Sache zu Ende bringt. Bisher war
+  die Meldung eine Sackgasse: rote Zeilen und eine Zahl, aber weder *welche*
+  Geräte sich überlappen noch wohin damit — auch die Prüfung beim Laden
+  (`validate_and_repair`) meldet bewusst nur, weil automatisches Umadressieren
+  eine Show still anders klingen ließe.
+
+  Der Dialog zeigt je beteiligtem Gerät Universe, belegten Bereich
+  (`1–8 (8 Kan.)`), die Gegenspieler und die **nächste freie Startadresse** —
+  gerechnet von derselben Quelle wie im Patch-Dialog, kein zweiter Algorithmus.
+  „Auf Vorschlag verschieben" und „Alle verschieben" setzen es um; beides ist
+  mit Strg+Z zurücknehmbar.
+
+  **„Alle verschieben" rechnet nach jedem Umzug neu** statt einen Stapel
+  Vorschläge vorab zu berechnen — sonst nähmen sich die Vorschläge gegenseitig
+  die Kanäle weg (mit drei Überlappern schlugen zwei Geräte zunächst dieselbe
+  Adresse vor). Passt ein Gerät nirgends mehr hin, steht „— kein Platz" und die
+  Aktion tut nichts; ein halb ausgeführter Umzug wäre schlimmer als keiner.
+
+  **Löschen bleibt bewusst draußen:** das gibt es in der Patch-Ansicht mit
+  Auswahl, Rückfrage und Undo. In einem Aufräum-Dialog klickt man schnell — und
+  ein Gerät ist kein Adressbereich, es hängt an Gruppen, Szenen und Cues.
+
 ### 2026-07-31 — Build-Skripte verschoben ihre eigenen 3D-Positionen, ohne es zu merken
 
 #### Neu
