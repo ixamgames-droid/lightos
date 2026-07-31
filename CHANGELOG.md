@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — MIDI: mehrere Ausgänge gleichzeitig ansprechbar
+
+#### Neu
+
+- **`send_message_to(port, nachricht)` — MIDI gezielt an einen bestimmten
+  Ausgang schicken.** Bisher teilten sich MIDI-Ansicht, Mapping-Feedback und
+  die APC-LED-Treiber genau einen Ausgang. Das war eine Notbremse: jeder eigene
+  MIDI-Ausgang legt auf Linux einen Sequencer-Client an, und zu viele davon
+  legten die MIDI-Anbindung lahm.
+
+  Der Preis war eine stille Einschränkung — wählte man in der MIDI-Ansicht ein
+  anderes Gerät, hörte das LED-Feedback des APC einfach auf. Die neue API hält
+  **ein Handle pro Port** (nicht pro Nachricht) und macht damit den Weg frei für
+  LED-Feedback und ein separates Feedback-Pult gleichzeitig.
+
+  Die LED-Treiber selbst laufen vorerst weiter wie bisher — ihr Umbau will am
+  echten Gerät geprüft werden.
+
 ### 2026-08-01 — Zielen auf eine Mover-Bar bewegt jetzt die echten Köpfe
 
 #### Behoben
