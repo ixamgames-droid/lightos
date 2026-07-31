@@ -27,7 +27,8 @@ import {
 } from '../stage/stage_objects.js';
 import { floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho } from '../camera/cameras.js';
-import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
+import { requestRender } from '../scene/render_loop.js';
+import { updatePlaceGhost, hidePlaceGhost, placeGhostArmed } from './place_ghost.js';   // VIZ-14
 
 export let isLeftDragging = false;
 let marqueeHadSelection = false;   // VIZ-14: s. handlePointerDown
@@ -762,9 +763,29 @@ window.addEventListener('mouseup', function(e) {
 
 window.addEventListener('mousemove', function(e) {
   handlePointerMove(e.clientX, e.clientY, e.ctrlKey);
-  // Tooltip (Maus-only, bei Touch irrelevant)
+  // VIZ-14: Platzier-Geist mitfuehren. Laeuft im selben Hover-Zweig wie der
+  // Tooltip — der ist der einzige Pfad, der ohne gedrueckte Maus feuert.
   if (!isLeftDragging) {
     setMouseFromCoords(e.clientX, e.clientY);
+    if (placeGhostArmed() && view.editMode === 'edit' && view.mode === '3D') {
+      const gh = intersectGround();
+      if (gh) {
+        const px = snap(gh.x), pz = snap(gh.z);
+        let gy = 6.5, angedockt = false;
+        if (settings.dockEnabled) {
+          const dt = findDockTarget(px, pz);
+          if (dt) { gy = dt.y; angedockt = true; }
+        }
+        updatePlaceGhost(px, gy, pz, angedockt);
+      } else {
+        hidePlaceGhost();
+      }
+    } else {
+      hidePlaceGhost();
+    }
+  }
+  // Tooltip (Maus-only, bei Touch irrelevant)
+  if (!isLeftDragging) {
     const fid = pickFixture();
     const tt = document.getElementById('tooltip');
     if (fid != null && fixtures[fid]) {

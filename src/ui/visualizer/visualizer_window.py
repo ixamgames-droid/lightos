@@ -497,7 +497,10 @@ class VisualizerBridge(QObject):
         # unveraendert (Tests/Fokus-Fall) — pollControl ist eine additive
         # Zustell-Schicht. Ohne diesen Pull war 3D-Bearbeiten/Kamera/DMX tot.
         self._poll_state = {"editMode": "view", "viewMode": "3D",
-                            "settings": None, "brightness": None}
+                            "settings": None, "brightness": None,
+                            # VIZ-14: wie viele gepatchte Geraete haben noch
+                            # keine 3D-Position? Steuert den Platzier-Geist.
+                            "placeable": 0}
         self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
         # A3D-04: pro fid GEMERGTER dmx-Puffer {fid: payload}, NICHT nur der letzte
         # Batch. Der VisualizerService pusht DIFFERENTIELL (nur geaenderte Fixtures)
@@ -549,6 +552,26 @@ class VisualizerBridge(QObject):
         self._activate()
 
     # ── Pull-Zustellung: JS pollt pollControl() (s. __init__-Kommentar) ──────
+    def _unplaced_count(self) -> int:
+        """Wie viele gepatchte Geraete warten noch auf eine 3D-Position?
+
+        Dieselbe Bedingung wie ``placeFixture`` (kein Eintrag in
+        ``visualizer_positions``) — sonst zeigte der Geist etwas anderes an, als
+        der Rechtsklick dann tut."""
+        try:
+            pos = self._state.visualizer_positions
+            return sum(1 for f in self._state.get_patched_fixtures()
+                       if f.fid not in pos)
+        except Exception:
+            return 0
+
+    def _sync_placeable(self) -> None:
+        """Zahl offener Platzierungen in den Poll stellen (idempotent)."""
+        try:
+            self._poll_set("placeable", self._unplaced_count())
+        except Exception:
+            pass
+
     def _poll_set(self, key, value):
         """Steuer-Zustand fuer den naechsten Poll vormerken."""
         self._poll_state[key] = value
@@ -710,6 +733,7 @@ class VisualizerBridge(QObject):
                 self._write_back_to_live_view(f.fid, float(pos["x"]), float(pos["z"]))
                 data = self._fixture_to_dict(f)
                 self.fixtureAdded.emit(json.dumps(data))
+                self._sync_placeable()   # VIZ-14: eines weniger offen
                 return
 
     @Slot(str, float, float, float)
@@ -2609,6 +2633,10 @@ class VisualizerWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
         self._patch_list.blockSignals(False)
+        # VIZ-14: dieselbe Liste zeigt mit "[ ]" schon, was noch keinen Platz
+        # hat — hier ist also der natuerliche Ort, die Zahl fuer den
+        # Platzier-Geist nachzuziehen (Patchen, Loeschen, Show-Laden).
+        self._sync_placeable()
         # Der Neuaufbau wirft die Markierung weg — die gemeinsame Auswahl gilt
         # aber weiter (Patchen/Platzieren aendert sie nicht). Ohne dieses
         # Nachziehen stuende die Liste nach jedem Refresh wieder leer da,

@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Platzieren zeigt jetzt vorher, wo das Gerät landet
+
+#### Neu
+
+- **Platzier-Vorschau im 3D-Visualizer.** Gibt es noch Geräte ohne Position,
+  folgt im Modus *Bauen* eine halbtransparente Vorschau dem Mauszeiger — mit
+  Lotlinie und Bodenmarke, damit im 3D erkennbar ist, *wo unten* ist. Beim
+  Rechtsklick landet das Gerät genau dort.
+
+  Bisher war das blind: der Rechtsklick setzt das nächste unplatzierte Gerät an
+  die Stelle, aber man sah weder **wohin** es kommt, noch **ob** es an einer
+  Traverse hängen wird, noch überhaupt, dass gerade etwas zu platzieren ist. Ist
+  Andocken eingeschaltet und liegt eine Traverse darunter, wird die Vorschau
+  **grün** und zeigt die Hänge-Höhe — der Auto-Hang ist damit vor dem Klick
+  sichtbar.
+
+  Die Vorschau fängt keine Klicks ab und verschwindet, sobald nichts mehr zu
+  platzieren ist oder du in den Modus *Ansehen* wechselst.
+
 ### 2026-07-31 — Optionale Raum-Hülle: die Bühne schwebt nicht mehr im Nichts
 
 #### Neu
