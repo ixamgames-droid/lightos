@@ -17,6 +17,27 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+# XPLAT-15: nach JEDEM Test die uebrig gebliebenen Top-Level-Widgets WIRKLICH
+# abbauen. `deleteLater()` allein stellt `DeferredDelete` nie zu — die Objekte
+# ueberleben mitsamt Kindern, Signalen und (bei Views) Renderern. Segmentiert
+# faellt das nicht auf, weil jede Datei allein laeuft; in einem Prozess mit
+# genug angesammeltem Zustand ist es dieselbe Klasse Zeitzuender, die vor
+# XPLAT-09 neun scheinbar gruene viz-Dateien zum Segfault brachte.
+# Muster + Begruendung: tests/_qt_lifecycle.py, Vorbild test_views.py.
+import pytest as _pytest_xplat15                      # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402  XPLAT-15
+
+
+@_pytest_xplat15.fixture(autouse=True)
+def _xplat15_no_leaked_widgets():
+    yield
+    # QApplication lokal importieren: manche Dateien holen es nur INNERHALB
+    # ihrer Tests, dann gibt es den Modulnamen hier nicht (3 Dateien liefen
+    # genau darauf in einen NameError).
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
+
+
 class MidiLearnCallbackOnlyEmitsTest(unittest.TestCase):
     def test_start_learn_callback_only_emits_signal(self):
         """Der an start_learn uebergebene Callback (laeuft im MIDI-Thread) darf
