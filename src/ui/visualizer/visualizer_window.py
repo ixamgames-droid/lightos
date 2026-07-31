@@ -2365,10 +2365,24 @@ class VisualizerWindow(QMainWindow):
             "Blendet die '#<ID> <Name>'-Beschriftungen an den Fixtures im 3D ein/aus.")
         self._chk_labels.toggled.connect(self._on_labels_toggled)
         # VIZ-13 Schritt 3b-K-2: FPS-Debug-Overlay (Design-Dokument (c)).
+        # VIZ-14 (David-Entscheidung 2026-07-31): NEUTRALE Raum-Huelle, abschaltbar.
+        # Der Plan wollte "Raum-Box statt Void", der Code hatte die vorgerenderten
+        # Kulissen bewusst entfernt — beides zusammen geht nur so: eine Flaeche
+        # ohne Information, Default AUS, faengt keine Eingabe.
+        self._chk_room = QCheckBox("Raum-Hülle anzeigen")
+        self._chk_room.setChecked(False)
+        self._chk_room.setToolTip(
+            "Legt eine neutrale Wand-/Deckenfläche um die Bühne — als Größen-\n"
+            "Orientierung, damit das Rig nicht im Nichts schwebt.\n\n"
+            "Kein Bühnenbild und keine Deko: eine Fläche, eine Farbe. Sie wächst\n"
+            "mit dem Rig (feste Maße würden bei großen Rigs mitten durchschneiden),\n"
+            "fängt keine Klicks ab und ist in der 2D-Draufsicht immer aus\n"
+            "(die Decke läge dort zwischen Kamera und Bühne).")
         self._chk_fps   = QCheckBox("FPS anzeigen (Debug)");     self._chk_fps.setChecked(False)
         self._chk_fps.setToolTip("Zeigt ein kleines FPS-Overlay oben rechts in der 3D-Szene (nur Debug).")
         self._chk_snap  = QCheckBox("Snap to Grid (1m)");        self._chk_snap.setChecked(True)
-        for c in (self._chk_cones, self._chk_floor, self._chk_fog, self._chk_snap, self._chk_fps):
+        for c in (self._chk_cones, self._chk_floor, self._chk_fog, self._chk_snap,
+                  self._chk_fps, self._chk_room):
             c.toggled.connect(self._on_settings_changed)
             layout.addWidget(c)
         # Labels-Checkbox direkt hinter "Nebel/Haze" einreihen (visuelle Toggles).
@@ -4108,6 +4122,9 @@ class VisualizerWindow(QMainWindow):
             # gepushte Wert immer dem Toggle entspricht (die Checkbox schreibt
             # AppState VOR dem Push, s. _on_labels_toggled).
             "showLabels":      bool(getattr(self._state, "show_fixture_labels", True)),
+            # VIZ-14: Raum-Huelle (Default AUS).
+            "showRoom":        bool(getattr(self, "_chk_room", None) is not None
+                                    and self._chk_room.isChecked()),
         }
 
     def _dock_enabled(self) -> bool:

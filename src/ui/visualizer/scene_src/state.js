@@ -68,6 +68,8 @@ export const settings = {
   autoBrightness: true,    // auto-bump brightness when in edit modes
   dockEnabled: false,      // opt-in: Strahler rasten an Trassen/Plattformen ein
   showLabels: true,        // VIZ-LABELS: Fixture-Namens-Sprites ein-/ausblenden (Toolbar-Toggle)
+  showRoom: false,         // VIZ-14: neutrale Raum-Huelle (Default AUS — der Visualizer
+                           // startet bewusst leer, s. scene/room_shell.js)
 };
 
 // ----------------------------------------------------------------------------

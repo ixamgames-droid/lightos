@@ -51,6 +51,7 @@ import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fi
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
 } from './scene/render_loop.js';
+import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -196,6 +197,8 @@ window.__lightos = {
   // VIZ-14: dieselbe Sorte Seam fuer Down/Up — nur ueber den ECHTEN Zeigerpfad
   // laesst sich ein leer gezogenes Marquee pruefen (der Deselect-Intent
   // entsteht genau dort, nicht in einer nachgerechneten Formel).
+  // VIZ-14: Raum-Huelle fuer Test/Diagnose sichtbar machen.
+  roomShellInfo,
   __handlePointerDown: handlePointerDown,
   __handlePointerUp: handlePointerUp,
 };
