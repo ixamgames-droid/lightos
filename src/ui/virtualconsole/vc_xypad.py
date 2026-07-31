@@ -150,12 +150,14 @@ class VCXYPad(VCWidget):
         except Exception as e:
             print(f"[VCXYPad] path apply error: {e}")
 
-    def _write_axis(self, state, fid, attr, frac, head: int = 0):
+    def _write_axis(self, state, fid, attr, frac, head=None):
         """Schreibt eine Achse (Pan/Tilt). Bei 16-bit zusätzlich den Fine-Kanal
         (``<attr>_fine``); die Engine wertet Coarse+Fine in app_state aus.
 
-        ``head`` = 0 heisst geräteweit (Schlüssel ``attr``, byte-identisch zum
-        Bestand); ``head`` = N adressiert das N-te Vorkommen (``attr#N``). Der
+        ``head`` = ``None`` heisst geräteweit (Schlüssel ``attr``, byte-identisch
+        zum Bestand); ``head`` = N adressiert Kopf N (FM-17: welcher Schlüssel das
+        ist, entscheidet die Kopf-Karte — bei Pan/Tilt ist es unverändert das
+        N-te Vorkommen, denn die Bewegungskanäle SIND die Kopf-Anker). Der
         Fine-Kanal bekommt denselben Kopf-Index — ``channel_occurrence_keys``
         zählt jedes Attribut für sich, ``pan_fine#2`` ist also der Fine-Kanal
         desselben Kopfes, dessen Coarse-Kanal ``pan#2`` ist."""
@@ -221,8 +223,9 @@ class VCXYPad(VCWidget):
         state = get_state()
         heads = self._resolve_heads(state)
         for fid in self._resolve_fids(state):
-            # Kein Eintrag = geräteweit (Kopf 0) -> byte-identisch zum Bestand.
-            for head in sorted(heads.get(fid) or (0,)):
+            # Kein Eintrag = geräteweit (FM-17: head=None) -> byte-identisch zum
+            # Bestand. „Kopf 1" wäre seit der Kopf-Karte etwas anderes.
+            for head in (sorted(heads[fid]) if heads.get(fid) else (None,)):
                 self._write_axis(state, fid, self.pan_attr,  self._pan, head)
                 self._write_axis(state, fid, self.tilt_attr, self._tilt, head)
 

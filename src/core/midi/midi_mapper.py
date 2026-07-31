@@ -655,8 +655,9 @@ class MidiMapper:
             raw = int(max(0.0, min(1.0, scaled)) * 255)
             fids, heads = self._programmer_targets(attr)
             for fid in fids:
-                # Kein Eintrag = geraeteweit (Kopf 0), byte-identisch zum Bestand.
-                for head in sorted(heads.get(fid) or (0,)):
+                # Kein Eintrag = geraeteweit (FM-17: head=None), byte-identisch
+                # zum Bestand. „Kopf 1" ist seit der Kopf-Karte etwas anderes.
+                for head in (sorted(heads[fid]) if heads.get(fid) else (None,)):
                     self._state.set_programmer_value(fid, attr, raw, head=head)
             return
 

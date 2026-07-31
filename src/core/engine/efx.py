@@ -681,14 +681,25 @@ class EfxInstance(Function):
                 # (gemeinsamer Master-Dimmer/Shutter) erscheinen bei JEDEM Kopf und
                 # bleiben damit geteilt. Die Basis-Attrs aus _target_values passen
                 # unveraendert: sie sind bereits die Figur-Werte DIESES Ziels.
-                from src.core.app_state import channels_for_head
+                from src.core.app_state import (channels_for_head,
+                                                shared_master_channels,
+                                                _DIM_INTENSITY_ATTRS)
                 for base_attr, ch in channels_for_head(chans, int(target_head)).items():
                     if base_attr not in attrs:
                         continue
+                    val = max(0, min(255, int(attrs[base_attr])))
                     addr = fx.address + ch.channel_number - 1
                     if 1 <= addr <= 512:
-                        universe.set_channel(
-                            addr, max(0, min(255, int(attrs[base_attr]))))
+                        universe.set_channel(addr, val)
+                    # FM-17: den geteilten Master mitziehen, sonst bleibt der
+                    # korrekt adressierte Kopf hinter einem Dimmer auf 0 stehen
+                    # (Hydrabeam CH1). Nur Dimmer — Shutter/Farbe teilen zwar
+                    # auch, sperren aber nichts zu.
+                    if base_attr in _DIM_INTENSITY_ATTRS:
+                        for shared in shared_master_channels(chans, base_attr):
+                            saddr = fx.address + shared.channel_number - 1
+                            if 1 <= saddr <= 512:
+                                universe.set_channel(saddr, val)
                 continue
             # Mehrkopf-Vorkommens-Aufloesung zentral (eine Quelle, identisch zur
             # frueheren Inline-seen-Schleife): resolve_attr_channels mappt jedes

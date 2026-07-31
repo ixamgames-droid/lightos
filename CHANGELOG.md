@@ -7,6 +7,63 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — „Kopf 2" dimmt jetzt Kopf 2 (und macht dabei Licht)
+
+#### Behoben
+
+- **Ein Kopf-Ziel auf dem Dimmer traf bei Mehrkopf-Geräten mit gemeinsamem
+  Master den falschen Kanal — und blieb dabei unsichtbar.** Betroffen ist
+  Davids eigenes Rig: die `HYDRABEAM 4000 RGBW [19-Kanal]` legt ihre
+  Intensity-Kanäle als `CH1 Master Dimmer` + `CH9/12/15/18 Kopf 1..4 Dimmer`
+  an. Die Zuordnung „Kopf N = N-tes Vorkommen des Attributs" zählte damit
+  Vorkommen statt Köpfe: **„Kopf 2" landete auf CH9 = Kopf 1**, und „Kopf 1"
+  auf dem gemeinsamen Master, dimmte also das ganze Gerät.
+
+  Gemessen kam noch eine zweite Hälfte dazu, die niemand vermutet hatte: der
+  Master steht per Default auf 0. Ein Kopf-Dimmer allein **macht deshalb gar
+  kein Licht** — die Fehlzuordnung fiel nicht auf, weil überhaupt nichts
+  leuchtete. Beides ist jetzt behoben: „Kopf 2 auf 50 %" schreibt auf CH12,
+  zieht den geteilten Master mit auf und lässt die anderen drei Köpfe dunkel.
+
+  Die Zuordnung läuft nicht mehr über Vorkommens-Zählen, sondern über
+  **Kopf-Segmente**: Anker sind Pan/Tilt/Farbe (was sich eigen bewegt bzw.
+  eigen färbt), ein Kopf besitzt die Kanäle bis zum nächsten Anker, alles
+  davor oder zusätzlich ist geteilt. Nötig war das, weil der geteilte Master
+  je nach Gerät **vorn** (Hydrabeam CH1), **hinten** (Event Bar Pro CH21) oder
+  **mittendrin** (Impression X4 Bar 10 CH12) steht — an einer festen
+  Verschiebung wäre es gescheitert.
+
+  Die neue Regel gilt **bewusst nur für Dimmer-Kanäle**: über die Library
+  betrifft sie 60 Modi, korrigiert davon 27 und lässt 33 unverändert. Auf alle
+  Attribute angewandt würde sie 128 Zuordnungen verschieben — ohne gemessenen
+  Fehler und mit zwei realen Risiken (bei einigen Profilen wandern `color_g/b`,
+  nicht aber der Anker `color_r`: Rot und Blau eines Kopfes kämen dann von
+  verschiedenen Köpfen; und 7 Laser-Modi bekämen eine Karte auf Muster-/
+  Betriebsart-Kanälen). Nach der Einschränkung ist **kein einziger Laser-Modus**
+  betroffen.
+
+- **Ein Kopf-Ziel auf einem geteilten Kanal verschwand bisher spurlos.** Hat
+  ein Gerät mehrere Köpfe, aber nur EINEN Dimmer (oder eine RGBW-Bank für
+  alle), schrieb „Kopf 2" den Schlüssel `intensity#1`, den kein Kanal trägt:
+  der Wert landete im Programmer und **nie** auf DMX. Über die Library sind
+  das **358 Modi**. Jetzt trifft er den gemeinsamen Kanal.
+
+  Gleichzeitig sind „ganzes Gerät" und „Kopf 1" zwei verschiedene Ziele
+  geworden (vorher beides `head=0`). Geräteweite Regler, Paletten und
+  Kommandozeile ohne Kopf-Angabe schreiben unverändert geräteweit.
+
+- **Gespeicherte Shows brauchen keine Migration** und behalten ihre Wirkung:
+  welcher Kanal zu welchem gespeicherten Schlüssel gehört
+  (`channel_occurrence_keys`), ist unverändert. Verschoben wurde nur, welchen
+  Schlüssel ein KOPF adressiert. Pan/Tilt sind die Kopf-Anker und können sich
+  per Konstruktion nie verschieben — EFX und XY-Pad bleiben damit beweisbar
+  unberührt.
+
+- **Nebenbei 56× schneller:** die Pro-Kopf-Projektion lief pro Matrix-Zelle
+  pro Frame einmal über alle Kanäle. Sie geht jetzt über einen gecachten
+  Kanal-Index — auf einem 64-Pixel-Panel **10,83 ms → 0,19 ms pro Frame**
+  (Budget bei 44 Hz: 22,73 ms).
+
 ### 2026-07-31 — Adresskonflikte lassen sich jetzt auflösen, nicht nur ansehen
 
 #### Neu
