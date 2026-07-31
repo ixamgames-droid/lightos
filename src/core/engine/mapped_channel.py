@@ -156,15 +156,27 @@ def _find_fixture(patch_cache, fid):
     return None
 
 
-def _nth_addr(fx, chans, attr: str, head: int):
-    """DMX-Adresse (1..512) des ``head``-ten Vorkommens von ``attr`` (0-basiert)."""
-    cnt = 0
+def _nth_addr(fx, chans, attr: str, head):
+    """DMX-Adresse (1..512) des Kanals, den ``head`` fuer ``attr`` besitzt.
+
+    FM-17: ``head=None`` = ganzes Geraet -> erstes Vorkommen (Basis-Kanal, wie
+    bisher). Ein echter Kopf geht ueber ``channels_for_head`` — dieselbe Quelle
+    wie der Schreibweg, sonst liest die Regel einen anderen Kanal, als sie
+    schreibt (bei einem geteilten Master-Dimmer waeren das zwei verschiedene)."""
+    if head is not None:
+        try:
+            from src.core.app_state import channels_for_head
+            ch = channels_for_head(chans, int(head)).get((attr or "").lower())
+        except Exception:
+            ch = None
+        if ch is not None:
+            a = fx.address + ch.channel_number - 1
+            return a if 1 <= a <= 512 else None
+        return None
     for ch in chans:
         if (getattr(ch, "attribute", "") or "") == attr:
-            if cnt == head:
-                a = fx.address + ch.channel_number - 1
-                return a if 1 <= a <= 512 else None
-            cnt += 1
+            a = fx.address + ch.channel_number - 1
+            return a if 1 <= a <= 512 else None
     return None
 
 
@@ -184,7 +196,7 @@ class MappedChannelChange(Function):
 
     # ── Quellwert lesen ───────────────────────────────────────────────────────
 
-    def _read_attr(self, state, fx, chans, attr: str, head: int):
+    def _read_attr(self, state, fx, chans, attr: str, head):
         """Aktueller Wert des Quell-Kanals: bevorzugt das committete Live-Universe
         (enthält Hand-Eingabe via _flush, EFX-Output via Commit und VC), Fallback
         auf den Programmer-Wert (z. B. headless ohne Output-Thread)."""
@@ -201,7 +213,7 @@ class MappedChannelChange(Function):
         except Exception:
             return None
 
-    def _read_source(self, state, fx, chans, source: str, head: int) -> float:
+    def _read_source(self, state, fx, chans, source: str, head) -> float:
         if source == SOURCE_XY:
             pv = self._read_attr(state, fx, chans, "pan", head)
             tv = self._read_attr(state, fx, chans, "tilt", head)
@@ -226,7 +238,8 @@ class MappedChannelChange(Function):
         if not self._running or not self.fids or not self.rules:
             return
         try:
-            from src.core.app_state import get_state, get_channels_for_patched
+            from src.core.app_state import (get_state, get_channels_for_patched,
+                                            programmer_key_for_head)
             from src.core.color_utils import (color_attrs_for_fixture,
                                               adapt_color_payload)
         except Exception:
@@ -243,18 +256,23 @@ class MappedChannelChange(Function):
             attr_set = {str(a) for ch in chans if (a := getattr(ch, "attribute", None))}
             attrs: dict[str, int] = {}
             for rule in self.rules:
-                heads = self._target_heads(rule, chans) if rule.per_head else [0]
+                heads = self._target_heads(rule, chans) if rule.per_head else [None]
                 for h in heads:
+                    # FM-17: ``h=None`` = geraeteweit (Basis-Schluessel, den der
+                    # Schreib-Fallback unten auf alle Koepfe spiegelt);
+                    # ``h=0..n-1`` = ein echter Kopf, dessen Schluessel die
+                    # Kopf-Karte bestimmt. Ohne das schriebe eine per_head-Regel
+                    # auf einem Geraet mit geteiltem Master einen Kopf daneben.
                     src = self._read_source(state, fx, chans, rule.source, h)
                     res = rule.evaluate(src)
                     if "value" in res:
-                        key = rule.target if h == 0 else f"{rule.target}#{h}"
-                        attrs[key] = res["value"]
+                        attrs[programmer_key_for_head(chans, rule.target, h)] = \
+                            res["value"]
                     else:
                         payload = color_attrs_for_fixture(chans, res["rgb"])
                         payload = adapt_color_payload(attr_set, payload)
                         for k, v in payload.items():
-                            attrs[k if h == 0 else f"{k}#{h}"] = v
+                            attrs[programmer_key_for_head(chans, k, h)] = v
             if not attrs:
                 continue
             # Vorkommens-bewusst schreiben (gleiche #N-Logik wie efx.py).

@@ -132,7 +132,10 @@ class GemischteAuswahlTest(_Basis):
     def test_geraeteweiter_tilt_bleibt_fuer_den_mover(self):
         tilts = [(kopf, fids) for attr, kopf, fids in self._position_slider([1, 2])
                  if attr == "tilt"]
-        self.assertIn((0, (2,)), tilts,
+        # FM-17: „geraeteweit" ist am Regler jetzt ``head=None`` statt ``0``.
+        # Vorher waren beide dasselbe; seit der Kopf-Karte ist „Kopf 1" bei
+        # einem geteilten Master ein ANDERER Kanal als „das ganze Geraet".
+        self.assertIn((None, (2,)), tilts,
                       "der Moving Head verliert seinen geraeteweiten Tilt-Regler")
 
 
@@ -146,9 +149,10 @@ class BestandsverhaltenTest(_Basis):
 
     def test_reine_mover_auswahl_unveraendert(self):
         regler = self._position_slider([2])
-        self.assertIn(("tilt", 0, (2,)), regler)
-        self.assertIn(("pan", 0, (2,)), regler)
-        self.assertEqual([k for a, k, _f in regler if a == "tilt"], [0],
+        # FM-17: geraeteweit = ``head=None`` (vorher ``0``, s. o.).
+        self.assertIn(("tilt", None, (2,)), regler)
+        self.assertIn(("pan", None, (2,)), regler)
+        self.assertEqual([k for a, k, _f in regler if a == "tilt"], [None],
                          "ohne Spider in der Auswahl entstehen KEINE Kopf-Regler")
 
 

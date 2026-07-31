@@ -771,7 +771,10 @@ class RgbMatrixInstance(Function):
         self._advance_step(dt)
         grid = self._render(self._step)
         try:
-            from src.core.app_state import get_channels_for_patched, channels_for_head
+            from src.core.app_state import (get_channels_for_patched,
+                                            channels_for_head,
+                                            shared_master_channels,
+                                            _DIM_INTENSITY_ATTRS)
         except Exception:
             return
         for idx, fid in enumerate(self.fixture_grid):
@@ -794,7 +797,19 @@ class RgbMatrixInstance(Function):
             # head_grid-Eintrag (None / Alt-Show) bleibt es das ganze Fixture
             # (byte-identisch). channels_for_head projiziert {attr: channel} des Kopfes.
             _head = self.head_grid[idx] if (self.head_grid and idx < len(self.head_grid)) else None
-            target_chans = list(channels_for_head(chans, _head).values()) if _head is not None else chans
+            if _head is None:
+                target_chans = chans
+            else:
+                _proj = channels_for_head(chans, _head)
+                target_chans = list(_proj.values())
+                # FM-17: Hat das Attribut eine Kopf-Karte, gehoert der geteilte
+                # Master KEINEM Kopf mehr — die Zelle wuerde ihren eigenen Dimmer
+                # hochziehen und bliebe hinter dem gemeinsamen Dimmer (Hydrabeam
+                # CH1, default 0) trotzdem dunkel. Darum bei Dimmer-Attributen
+                # ausdruecklich mitnehmen.
+                for _a in list(_proj):
+                    if _a in _DIM_INTENSITY_ATTRS:
+                        target_chans.extend(shared_master_channels(chans, _a))
             # M1: Per-Effekt-Master (intensity) auf die Farbkanaele anwenden — aber
             # NUR wenn der generische FunctionManager-Merge sie nicht ohnehin
             # skaliert. Der Merge skaliert pro Fixture entweder dessen Dimmer-Kanal

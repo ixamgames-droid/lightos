@@ -325,8 +325,9 @@ class SetValueCommand(Command):
                 val = max(0, min(255, int(self.value_raw or 0)))
             geschrieben = 0
             for fid in fids:
-                # Kein Eintrag = geraeteweit (Kopf 0), byte-identisch zum Bestand.
-                for head in sorted(heads.get(fid) or (0,)):
+                # Kein Eintrag = geraeteweit (FM-17: head=None), byte-identisch
+                # zum Bestand. „Kopf 1" ist seit der Kopf-Karte etwas anderes.
+                for head in (sorted(heads[fid]) if heads.get(fid) else (None,)):
                     state.set_programmer_value(fid, self.attribute, val, head=head)
                     geschrieben += 1
             koepfe = f" ({geschrieben} Koepfe)" if geschrieben != len(fids) else ""

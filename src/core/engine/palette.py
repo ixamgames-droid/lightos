@@ -124,7 +124,13 @@ class Palette:
                 # Vorkommen dieses Attributs wirklich hat (sonst Bogus-``attr#N``).
                 if head > 0 and head_counts.get(base, 0) <= head:
                     continue
-                state.set_programmer_value(fid, base, val, head=head)
+                # FM-17: den GESPEICHERTEN Schluessel unveraendert zurueckspielen
+                # (wie die Snap-/VC-Restore-Pfade), NICHT ueber das head-Argument.
+                # ``attr#N`` ist eine Kanal-Zusage, keine Kopf-Nummer: seit der
+                # Kopf-Karte sind das bei einem geteilten Master zwei
+                # verschiedene Kanaele, und ein Umweg ueber den Kopf wuerde die
+                # Palette beim Abruf um einen Kanal verschieben.
+                state.set_programmer_value(fid, attr, val)
 
     def record_from_programmer(self, fixture_ids: list[int] | None = None):
         """Capture current programmer state into this palette."""

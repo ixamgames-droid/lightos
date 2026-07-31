@@ -1854,7 +1854,8 @@ class ProgrammerView(QWidget):
         for f in owners:
             if self._state.get_programmer_value(f.fid, attr, head=head) is not None:
                 continue
-            base = self._state.get_programmer_value(f.fid, attr, head=0)
+            # FM-17: Saat ist der GERAETEWEITE Wert (head=None), nicht „Kopf 1".
+            base = self._state.get_programmer_value(f.fid, attr, head=None)
             if base is None:
                 base = ch.default_value
             self._state.set_programmer_value(f.fid, attr, base, head=head)
@@ -2257,7 +2258,7 @@ class AttributeSlider(QWidget):
 
     def __init__(self, channel: FixtureChannel, fixtures: list[PatchedFixture],
                  state: AppState, owner=None, parent=None,
-                 head: int = 0, sync_heads: int = 0,
+                 head=None, sync_heads: int = 0,
                  display_name: str | None = None):
         super().__init__(parent)
         self._channel = channel
@@ -2269,12 +2270,17 @@ class AttributeSlider(QWidget):
         # ZYKLISCHEN GC -> native AV beim GC-Teardown (PySide6 6.11/Py 3.14,
         # Crash-Klasse STAB-09). Ohne Zyklus stirbt die View per Refcount.
         self._owner_ref = weakref.ref(owner) if owner is not None else None
-        # Mehrkopf (X-6): head = welches Attribut-Vorkommen (Kopf) dieser Slider
-        # steuert. sync_heads>0 => Synchron-Regler, der die Koepfe 0..N-1 GEMEINSAM
-        # ueber den einfachen Schluessel treibt (und etwaige "attr#N"-Abweichungen
+        # Mehrkopf (X-6): head = WELCHER KOPF dieser Slider steuert.
+        # FM-17: ``None`` (Default) = geraeteweiter Regler — der Basis-Schluessel,
+        # byte-genau wie bisher. Ein echter Kopf-Index kommt nur von den
+        # Pro-Kopf-Bloecken (Farbe/Tilt). Der Unterschied wurde mit der Kopf-Karte
+        # sichtbar: bei einem geteilten Master ist „Kopf 1" NICHT der
+        # geraeteweite Kanal, und ein geraeteweiter Regler darf nicht ploetzlich
+        # auf dem ersten Kopf landen.
+        # sync_heads>0 => Synchron-Regler, der die Koepfe 0..N-1 GEMEINSAM ueber
+        # den geraeteweiten Schluessel treibt (und etwaige "attr#N"-Abweichungen
         # der anderen Koepfe aufraeumt, damit der Flush-Fallback spiegelt).
-        # Default (0/0) = byte-genau wie bisher (Einzelkopf).
-        self._head = int(head)
+        self._head = None if head is None else int(head)
         self._sync_heads = int(sync_heads)
         self._display_name = display_name
         self._last_value = channel.default_value
@@ -2343,11 +2349,12 @@ class AttributeSlider(QWidget):
         for f in self._fixtures:
             v = self._state.get_programmer_value(
                 f.fid, self._channel.attribute, head=h)
-            # Getrennt: ein noch nicht separat gesetzter Kopf>0 spiegelt Kopf 0
-            # (wie der DMX-Flush) -> der Regler zeigt den echten Ausgabewert.
-            if v is None and h > 0:
+            # Getrennt: ein noch nicht separat gesetzter Kopf spiegelt den
+            # geraeteweiten Wert (wie der DMX-Flush) -> der Regler zeigt den
+            # echten Ausgabewert.
+            if v is None and h is not None:
                 v = self._state.get_programmer_value(
-                    f.fid, self._channel.attribute, head=0)
+                    f.fid, self._channel.attribute, head=None)
             out.append(self._channel.default_value if v is None else v)
         return out
 
@@ -2417,21 +2424,25 @@ class AttributeSlider(QWidget):
             self._update_labels(value)
         self._last_value = value
 
-    def _base_head(self) -> int:
-        """Kopf, dessen Wert dieser Slider anzeigt/liest (Synchron liest Kopf 0)."""
-        return 0 if self._sync_heads > 0 else self._head
+    def _base_head(self):
+        """Kopf, dessen Wert dieser Slider anzeigt/liest.
+
+        FM-17: Synchron liest das GANZE GERAET (``None``), nicht „Kopf 1" —
+        seit der Kopf-Karte sind das bei einem geteilten Master zwei
+        verschiedene Kanaele."""
+        return None if self._sync_heads > 0 else self._head
 
     def _apply_value(self, fid: int, value: int):
         """Schreibt den Wert in den/die Ziel-Kopf-Schluessel.
 
-        Synchron (sync_heads>0): einfacher Schluessel (Kopf 0) + entfernt etwaige
-        "attr#N"-Abweichungen der anderen Koepfe, sodass der DMX-Flush-Fallback und
-        auch Schnellwahl/Color-Picker (die nur Kopf 0 schreiben) beide Koepfe
-        gleich treiben. Getrennt: genau das N-te Vorkommen ("attr#N"; Kopf 0 =
-        einfacher Schluessel)."""
+        Synchron (sync_heads>0): geraeteweiter Schluessel (``head=None``) +
+        entfernt etwaige "attr#N"-Abweichungen der anderen Koepfe, sodass der
+        DMX-Flush-Fallback und auch Schnellwahl/Color-Picker (die geraeteweit
+        schreiben) beide Koepfe gleich treiben. Getrennt: genau der Kanal dieses
+        Kopfes — welcher Schluessel das ist, entscheidet die Kopf-Karte (FM-17)."""
         attr = self._channel.attribute
         if self._sync_heads > 0:
-            self._state.set_programmer_value(fid, attr, value, head=0)
+            self._state.set_programmer_value(fid, attr, value, head=None)
             prog = self._state.programmer.get(fid, {})
             for h in range(1, self._sync_heads):
                 if f"{attr}#{h}" in prog:

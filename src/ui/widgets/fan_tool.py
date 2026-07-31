@@ -353,9 +353,12 @@ class FanTool(QWidget):
             state = get_state()
             for i, (fid, val) in enumerate(zip(self._selected_fids, values)):
                 head = self._head_of(i)
-                # A2: Kopf-Ziel -> genau dieser Kopf ("attr#N"); ganzes Geraet
-                # unveraendert wie bisher (head=0 = einfacher Schluessel).
+                # A2: Kopf-Ziel -> genau dieser Kopf; ganzes Geraet unveraendert
+                # wie bisher. FM-17: „ganzes Geraet" ist head=None, NICHT head=0
+                # — bei einem geteilten Master-Dimmer sind das zwei verschiedene
+                # Kanaele, und der Faecher haelt die Unterscheidung selbst schon
+                # in _selected_heads (None = ganze Geraetezeile) vor.
                 state.set_programmer_value(fid, attr, val,
-                                           head=int(head) if head is not None else 0)
+                                           head=int(head) if head is not None else None)
         except Exception as e:
             print(f"[fan_tool] apply error: {e}")

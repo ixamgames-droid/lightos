@@ -126,11 +126,30 @@ class EchterAppStateTests(unittest.TestCase):
         self.assertTrue(seen)
 
     def test_wert_ohne_selektion_respektiert_die_kopf_auswahl(self):
-        """`2:1` gewaehlt, dann nur `@ 50` — das muss auf Kopf 2 landen."""
+        """`2:1` gewaehlt, dann nur `@ 50` — das muss auf Kopf 2 landen.
+
+        ★ Bis 2026-07-31 stand hier ``["intensity#1"]`` — der Test sicherte also
+        das GEGENTEIL seines eigenen Docstrings zu. Bei dieser Hydrabeam liegt
+        vor den vier Kopf-Dimmern der gemeinsame ``CH1 Master dimmer``;
+        ``intensity#1`` ist damit CH9 = der Dimmer von Kopf **1**. Kopf 2 ist
+        ``intensity#2`` = CH12 (FM-17). Dass die Zusicherung falsch war und die
+        Absicht daneben stand, ist der Grund, warum der Versatz so lange lebte.
+        """
         self.st.set_selected_cells(["2:1"])
         self.st.programmer[2] = {}
         parse("@ 50").execute(self.st)
-        self.assertEqual(sorted(self.st.programmer.get(2, {})), ["intensity#1"])
+        prog = self.st.programmer.get(2, {})
+        wert = int(round(50 * 255 / 100))
+        self.assertEqual(prog.get("intensity#2"), wert,
+                         "Kopf 2 ist das dritte intensity-Vorkommen (CH12)")
+        self.assertEqual(prog.get("intensity"), wert,
+                         "der geteilte Master muss mitkommen, sonst bleibt der "
+                         "richtig adressierte Kopf dunkel")
+        self.assertEqual(
+            [prog.get("intensity#1"), prog.get("intensity#3"),
+             prog.get("intensity#4")], [0, 0, 0],
+            "die anderen Koepfe werden auf ihrem Ausgabewert verankert, damit "
+            "der mitgezogene Master sie nicht ueber den Flush-Fallback mithochzieht")
 
     def test_genannte_selektion_hebt_die_kopf_einschraenkung_auf(self):
         """Wer `2 @ 50` tippt, meint das ganze Geraet — nicht den zuletzt

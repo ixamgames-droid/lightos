@@ -1787,18 +1787,109 @@ class AppState:
                 self.laser_estop_active = False
                 self._push_laser_estop_mask(target_active=False)
 
+    def _channels_for_fid(self, fid: int):
+        """Kanalliste des gepatchten Fixtures — oder ``None``, wenn es (noch)
+        nicht im Patch steht. Nur fuer die Kopf-Aufloesung (FM-17)."""
+        try:
+            fixture = next((f for f in self._patch_cache
+                            if int(getattr(f, "fid", -1)) == int(fid)), None)
+            if fixture is None:
+                return None
+            return get_channels_for_patched(fixture)
+        except Exception:
+            return None
+
+    def _head_key(self, fid: int, attribute: str, head) -> str:
+        """Aus „Kopf N" wird hier der Programmer-Schluessel (FM-17).
+
+        ``head=None`` = ganzes Geraet -> Basis-Schluessel, unveraendert. Sonst
+        entscheidet :func:`programmer_key_for_head` gegen den LIVE-Patch. Ist das
+        Fixture nicht (mehr) gepatcht, bleibt es beim alten Vorkommens-Schluessel
+        — ein nicht aufloesbarer Kopf darf nichts anderes tun als frueher."""
+        if head is None:
+            return attribute
+        channels = self._channels_for_fid(fid)
+        if channels is None:
+            base = (attribute or "").split("#", 1)[0]
+            return base if not head else f"{base}#{int(head)}"
+        return programmer_key_for_head(channels, attribute, head)
+
+    def _shared_dimmer_key(self, fid: int, attribute: str, head_key: str):
+        """Der GETEILTE Master-Dimmer, den ein Kopf-Schreiben sonst zusperrt.
+
+        ★ FM-17, zweite Haelfte. „Kopf 2 auf 50 %" richtig auf CH12 zu schreiben
+        macht am echten Geraet noch kein Licht: die Hydrabeam hat davor einen
+        gemeinsamen ``CH1 Master dimmer`` mit ``default_value=0``. Gemessen (
+        ``tests/test_fm17_head_dimmer_map.py``): CH12=128, CH1=0 — der Kopf ist
+        korrekt adressiert und bleibt trotzdem dunkel.
+
+        Deshalb zieht ein Kopf-Dimmer den geteilten Master mit. Liefert den
+        Basis-Schluessel, wenn ALLE vier Bedingungen gelten: es ist ein
+        Dimmer-Attribut, geschrieben wurde ein Pro-Kopf-Kanal, das erste
+        Vorkommen gehoert KEINEM Kopf (= geteilt) und es gibt ueberhaupt eine
+        Kopf-Karte. Sonst ``None``.
+
+        Bewusst nur Dimmer: Strobe/Farbe/Makro teilen zwar auch, aber ihre
+        Defaults sperren nichts zu (Shutter steht offen). Ein Riegel, der nichts
+        verbietet, schlaegt einen, der Bestands-Shows umschreibt.
+
+        Rueckgabe ``(basis_schluessel, [(kopf_schluessel, kanal), …])`` oder
+        ``None``."""
+        base = (attribute or "").split("#", 1)[0]
+        a = base.lower()
+        if a not in _DIM_INTENSITY_ATTRS or head_key == base:
+            return None
+        channels = self._channels_for_fid(fid)
+        if channels is None:
+            return None
+        positions, hmap = _channel_index(channels)
+        per_head = hmap.get(a)
+        occurrences = list(positions.get(a, ()))
+        if not per_head or not occurrences:
+            return None
+        if occurrences[0] in per_head:
+            return None      # erstes Vorkommen IST ein Kopf -> kein geteilter Master
+        heads = []
+        for idx in per_head:
+            occ = occurrences.index(idx)
+            heads.append((base if occ == 0 else f"{base}#{occ}", channels[idx]))
+        return base, heads
+
     def set_programmer_value(self, fid: int, attribute: str, value: int,
-                             undoable: bool = False, head: int = 0):
-        # Mehrkopf (X-6): head>0 adressiert das N-te Vorkommen eines Attributs
-        # (z. B. die 2. Farb-/Tilt-Bank eines Spiders) ueber den Schluessel
-        # "attr#N". head=0 = "attr" -> byte-genau wie bisher.
-        key = attribute if not head else f"{attribute}#{int(head)}"
+                             undoable: bool = False, head=None):
+        # Mehrkopf (X-6/FM-17): head=None = ganzes Geraet -> "attr" (byte-genau
+        # wie bisher). head=0..n-1 = ein echter Kopf; welchen Schluessel der
+        # adressiert, entscheidet _head_key gegen die Kanalliste — bei einem
+        # geteilten Master-Dimmer ist "Kopf 1" NICHT der Basis-Schluessel.
+        key = self._head_key(fid, attribute, head)
+        master = self._shared_dimmer_key(fid, attribute, key) if head is not None else None
         with self._prog_lock:
             old = self.programmer.get(fid, {}).get(key, None)
             if fid not in self.programmer:
                 self.programmer[fid] = {}
             self.programmer[fid][key] = max(0, min(255, value))
             new_val = self.programmer[fid][key]
+            master_key = master_old = None
+            if master is not None:
+                master_key, heads = master
+                master_old = self.programmer[fid].get(master_key)
+                # Die ANDEREN Koepfe verankern, BEVOR der Master steigt: der
+                # DMX-Flush spiegelt einen gesetzten Basis-Wert auf jeden noch
+                # nicht eigenstaendigen Kopf-Kanal. Ohne das Verankern zoege
+                # „Kopf 2 auf 50 %" ueber den mitgezogenen Master alle vier
+                # Koepfe auf 50 % — dieselbe Mechanik und dieselbe Antwort wie
+                # beim Getrennt-Modus-Seeding (ProgrammerView._seed_separate_head).
+                # Verankert wird der Wert, den der Kopf JETZT ausgibt; die Ausgabe
+                # bleibt im Moment des Verankerns also byte-genau gleich.
+                for k, ch in heads:
+                    if k == key or k in self.programmer[fid]:
+                        continue
+                    self.programmer[fid][k] = (
+                        master_old if master_old is not None
+                        else int(getattr(ch, "default_value", 0) or 0))
+                brightest = max((self.programmer[fid][k] for k, _ in heads
+                                 if k in self.programmer[fid]), default=new_val)
+                self.programmer[fid][master_key] = brightest
         self._flush_programmer_to_dmx(fid)
         # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
         # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
@@ -1819,13 +1910,35 @@ class AppState:
             self._push_undo(
                 label=f"Programmer FID{fid}.{key}={new_val}",
                 do=lambda: None,
-                undo=lambda f=fid, a=attribute, v=old, h=head: (
+                undo=lambda f=fid, a=attribute, v=old, h=head, mk=master_key,
+                mv=master_old: (
                     self.set_programmer_value(f, a, v, undoable=False, head=h)
                     if v is not None
-                    else self._clear_programmer_attr(f, key)),
+                    else self._clear_programmer_attr(f, key),
+                    # FM-17: der mitgezogene geteilte Master gehoert zum selben
+                    # Schritt zurueck — sonst bliebe er nach dem Undo oben.
+                    self._restore_shared_dimmer(f, mk, mv)),
                 redo=lambda f=fid, a=attribute, v=new_val, h=head:
                     self.set_programmer_value(f, a, v, undoable=False, head=h),
             )
+
+    def _restore_shared_dimmer(self, fid: int, master_key, master_old):
+        """Setzt den von FM-17 mitgezogenen geteilten Master auf seinen Vorwert
+        zurueck (bzw. entfernt ihn, wenn er vorher gar nicht gesetzt war)."""
+        if not master_key:
+            return
+        with self._prog_lock:
+            prog = self.programmer.get(int(fid))
+            if prog is None:
+                return
+            if master_old is None:
+                prog.pop(master_key, None)
+            else:
+                prog[master_key] = master_old
+            if not prog:
+                self.programmer.pop(int(fid), None)
+        self._flush_programmer_to_dmx(int(fid))
+        self._emit("programmer_changed", int(fid))
 
     def _clear_programmer_attr(self, fid: int, attribute: str):
         with self._prog_lock:
@@ -1867,9 +1980,11 @@ class AppState:
             self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
 
-    def get_programmer_value(self, fid: int, attribute: str, head: int = 0) -> int | None:
-        key = attribute if not head else f"{attribute}#{int(head)}"
-        return self.programmer.get(fid, {}).get(key)
+    def get_programmer_value(self, fid: int, attribute: str, head=None) -> int | None:
+        # FM-17: dieselbe Kopf-Aufloesung wie set_programmer_value — ein Regler
+        # muss den Wert LESEN, den er schreibt. head=None = ganzes Geraet.
+        return self.programmer.get(fid, {}).get(
+            self._head_key(fid, attribute, head))
 
     def clear_programmer_value(self, fid: int, attribute: str):
         """Entfernt einen einzelnen Programmer-Wert (z. B. fuer Toggle-/Flash-
@@ -3453,6 +3568,11 @@ def clear_channel_cache():
     aus Generator/Editor reisen ueber denselben Invalidierungs-Pfad."""
     _channel_cache.clear()
     _viz_model_override_cache.clear()
+    # FM-17: die Kopf-Karte haengt an genau diesen Kanal-Listen — zusammen
+    # invalidieren, sonst zeigt sie auf Kanaele eines alten Modus (der Schluessel
+    # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
+    _head_map_cache.clear()
+    _cached_channel_list_ids.clear()
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der
@@ -3611,6 +3731,11 @@ def get_channels_for_patched(fixture: PatchedFixture):
         if spider_dual or auto_dual:
             result = _as_dual_tilt_channels(result)
         _channel_cache[key] = result
+        # FM-17: nur DIESE Listen darf die Kopf-Karte per Objekt-Identitaet
+        # cachen — der Channel-Cache haelt sie am Leben, ihre id kann also nicht
+        # von einer anderen Liste wiederverwendet werden. Eine frei gebaute
+        # Kanal-Liste (Tests, Ad-hoc-Aufrufer) wird jedes Mal frisch gerechnet.
+        _cached_channel_list_ids.add(id(result))
         return result
 
 
@@ -3734,38 +3859,222 @@ def color_head_count(fixture) -> int:
         return 1
 
 
+# FM-17: Kopf-Anker. Ein Kopf ist das, was sich EIGEN BEWEGT bzw. EIGEN FAERBT —
+# an diesen Attributen haengt die Kopf-Zahl, nicht am Dimmer. Reihenfolge = Vorrang
+# bei Gleichstand; genommen wird das am haeufigsten wiederholte.
+_HEAD_ANCHOR_ATTRS = ("pan", "tilt", "color_r")
+
+# FM-17: Kopf-Karte pro Kanal-Liste, gecached wie der Channel-Cache selbst.
+# ★ Ohne das ist es die O(Koepfe x Kanaele)-Falle aus der Review-Checkliste:
+# rgb_matrix.write ruft die Projektion PRO ZELLE PRO FRAME auf — bei einem
+# 144-Pixel-Panel waeren das 144 volle Kanal-Durchlaeufe je 44-Hz-Frame (dieselbe
+# Form, die 2026-07-28 mit 118,88 ms/Frame gemessen wurde; Budget sind 22,73 ms).
+# Schluessel ist die Objekt-IDENTITAET der gecachten Liste: get_channels_for_patched
+# gibt pro (Profil, Modus) DIESELBE Liste zurueck, und clear_channel_cache leert
+# beide Caches gemeinsam — die ids koennen also nicht auf eine andere Liste
+# weiterzeigen, solange der Eintrag lebt.
+_head_map_cache: dict = {}
+# ids der Listen, die WIRKLICH im Channel-Cache haengen (nur die duerfen per
+# Identitaet gecached werden — sonst koennte eine kurzlebige Ad-hoc-Liste ihre
+# Adresse an eine spaetere Liste vererben und deren Karte verfaelschen).
+_cached_channel_list_ids: set = set()
+
+
+def head_channel_map(channels) -> dict:
+    """Welcher Kanal gehoert zu WELCHEM Kopf — ``{attr: [Index je Kopf]}``.
+
+    ★ FM-17. Die alte Regel „Kopf N = N-tes Vorkommen des Attributs" zaehlt
+    Vorkommen und nicht Koepfe. Das geht schief, sobald ein Attribut neben den
+    Pro-Kopf-Kanaelen noch einen GETEILTEN Kanal hat — der klassische Fall ist der
+    Master-Dimmer. Gemessen an der ``HYDRABEAM 4000 RGBW [19-Kanal]`` aus Davids
+    Rig: ``CH1 Master dimmer`` + ``CH9/12/15/18 Kopf 1..4 Dimmer``. „Kopf 2"
+    landete damit auf ``intensity#1`` = CH9 = **Kopf 1**, und „Kopf 1" auf dem
+    gemeinsamen Master, dimmte also alles.
+
+    Diese Funktion bestimmt die Zuordnung stattdessen ueber **Kopf-Segmente**:
+    Anker sind die Vorkommen des am haeufigsten wiederholten Kopf-Attributs
+    (``pan``/``tilt``/``color_r`` — was sich eigen bewegt bzw. eigen faerbt).
+    Kopf N besitzt die Kanaele von seinem Anker bis zum naechsten Anker; pro
+    Segment zaehlt das ERSTE Vorkommen eines Attributs. Alles vor dem ersten
+    Anker und jedes zusaetzliche Vorkommen im Segment ist GETEILT.
+
+    Das trifft den geteilten Master an jeder Position, und genau daran scheitert
+    jede Offset-Regel: er steht vorn (Hydrabeam ``CH1``), hinten (Event Bar Pro
+    ``CH21``) ODER mittendrin (Impression X4 Bar 10 ``CH12``, zwischen Set 1 und
+    Set 2).
+
+    **Rueckwaerts-sicher by design:** Ein Attribut kommt nur in die Karte, wenn
+    sich fuer JEDEN Kopf genau ein Kanal findet. Sonst fehlt es — und der Aufrufer
+    bleibt beim Vorkommens-Zaehlen. Ueber die eingebaute + importierte Library
+    (5116 Modi) aendert das 128 Zuordnungen; die 27 Intensity-Faelle sind
+    durchgaengig ``Master + Kopf 1..3`` -> ``Kopf 1..4``. Die Anker-Attribute
+    selbst koennen sich nie aendern (ihre Vorkommen SIND die Segmentgrenzen) —
+    Pan/Tilt pro Kopf, also EFX und XY-Pad, bleiben damit beweisbar unberuehrt.
+
+    NICHT beruehrt wird ``channel_occurrence_keys``: welcher Kanal welchen
+    Programmer-Schluessel traegt, bleibt exakt wie bisher. Verschoben wird nur,
+    welchen Schluessel ein KOPF adressiert. Deshalb braucht FM-17 keine
+    Show-Migration — gespeicherte ``attr#N`` treffen weiter denselben Kanal.
+    """
+    return _channel_index(channels)[1]
+
+
+def _channel_index(channels):
+    """``(positions, head_map)`` einer Kanal-Liste — EIN Durchlauf, gecached.
+
+    ``positions`` = ``{attr: [Index jedes Vorkommens]}``, ``head_map`` = die
+    Kopf-Karte aus :func:`head_channel_map`. Beides zusammen, weil jeder
+    Kopf-Konsument beides braucht und der 44-Hz-Pfad sonst pro Zelle erneut
+    ueber alle Kanaele laeuft (Review-Checkliste, O(Koepfe x Kanaele))."""
+    ck = (id(channels), len(channels)) if id(channels) in _cached_channel_list_ids else None
+    if ck is not None:
+        hit = _head_map_cache.get(ck)
+        if hit is not None:
+            return hit
+    try:
+        attrs = [(getattr(c, "attribute", "") or "").lower() for c in channels]
+    except Exception:
+        return {}, {}
+    positions: dict[str, list[int]] = {}
+    for i, a in enumerate(attrs):
+        positions.setdefault(a, []).append(i)
+    anchors: list[int] = []
+    for a in _HEAD_ANCHOR_ATTRS:
+        if len(positions.get(a, ())) > len(anchors):
+            anchors = positions[a]
+    heads = len(anchors)
+    out: dict = {}
+    if heads >= 2:
+        bounds = list(anchors) + [len(attrs)]
+        for a, occurrences in positions.items():
+            # BEWUSST nur Dimmer-Attribute. Die Segment-Regel wuerde ueber die
+            # ganze Library 128 Zuordnungen verschieben, aber ein GEMESSENER
+            # Fehler liegt nur bei den 27 Intensity-Faellen vor. Der Rest waere
+            # Umbau auf Verdacht — mit zwei konkreten Risiken, die die
+            # Gegenprobe gezeigt hat: (a) bei einigen Profilen wandern color_g/b,
+            # nicht aber color_r (das ist der Anker) — Rot und Blau eines Kopfes
+            # kaemen dann von verschiedenen Koepfen, also falsche Farben;
+            # (b) 7 Laser-Modi bekommen eine Karte (macro/color_wheel/speed),
+            # und ein verschobener Muster-/Betriebsart-Kanal ist genau die
+            # Sorte Ueberraschung, die man an einem Laser nicht will.
+            # Weiten (mit eigener Messung je Attributklasse) waere ein eigenes
+            # Item, kein Nebeneffekt dieses Fixes.
+            if a not in _DIM_INTENSITY_ATTRS:
+                continue
+            per_head: list[int] = []
+            for k in range(heads):
+                lo, hi = bounds[k], bounds[k + 1]
+                inside = next((p for p in occurrences if lo <= p < hi), None)
+                if inside is None:
+                    per_head = []
+                    break
+                per_head.append(inside)
+            if len(per_head) == heads:
+                out[a] = per_head
+    if ck is not None:
+        # Auch das LEERE Ergebnis cachen: „dieses Geraet hat keine Kopf-Karte"
+        # ist die haeufigste Antwort (Einzelkopf) und darf nicht pro Frame neu
+        # ausgerechnet werden. Der Cache-Write steht bewusst im Erfolgspfad —
+        # ein Ergebnis aus dem except-Zweig oben wird NIE gecached (Lehre FM-12).
+        _head_map_cache[ck] = (positions, out)
+    return positions, out
+
+
+def programmer_key_for_head(channels, attribute: str, head) -> str:
+    """Welchen Programmer-Schluessel adressiert „Kopf ``head``" fuer ``attribute``?
+
+    ★ FM-17, und die EINE Stelle, an der aus einem Kopf ein Schluessel wird.
+    ``head=None`` heisst **ganzes Geraet** (Basis-Schluessel, Bestandsverhalten);
+    ``head=0..n-1`` meint einen echten Kopf. Diese Unterscheidung ist neu und
+    noetig: vorher war „Kopf 1" und „ganzes Geraet" beides ``head=0``, was
+    dieselbe Antwort gab — bei einem geteilten Master sind es aber zwei
+    verschiedene Kanaele.
+
+    Drei Faelle, in dieser Reihenfolge:
+
+    1. Attribut steht in der :func:`head_channel_map` -> dessen Kanal fuer diesen
+       Kopf (Hydrabeam 19ch: Kopf 0 -> ``intensity#1`` = CH9 „Kopf 1 Dimmer").
+    2. Attribut kommt nur EINMAL vor -> geteilt, also der Basis-Schluessel. Das
+       heilt einen zweiten stummen Fehler: bei **358 Modi** der Library (ein
+       Master-Dimmer + mehrere Farb-/Bewegungskoepfe, z. B. ``MOVBAR4 22ch``)
+       schrieb ein Kopf-Ziel bisher ``intensity#1`` — einen Schluessel, den kein
+       Kanal traegt. Der Wert landete im Programmer-Dict und **nirgends** auf DMX.
+       Dasselbe galt fuer die geteilte Farbe der Hydrabeam 19ch.
+    3. Sonst -> unveraendert das ``head``-te Vorkommen (Bestandsverhalten).
+    """
+    if head is None:
+        return attribute
+    base = (attribute or "").split("#", 1)[0]
+    a = base.lower()
+    try:
+        head = int(head)
+    except (TypeError, ValueError):
+        return attribute
+    positions, hmap = _channel_index(channels)
+    occurrences = positions.get(a, ())
+    per_head = hmap.get(a)
+    if per_head is not None and 0 <= head < len(per_head):
+        occ = list(occurrences).index(per_head[head])
+        return base if occ == 0 else f"{base}#{occ}"
+    if len(occurrences) <= 1:
+        return base
+    return base if head == 0 else f"{base}#{head}"
+
+
+def shared_master_channels(channels, attribute: str) -> list:
+    """Kanaele dieses Attributs, die KEINEM Kopf gehoeren — die geteilten Master.
+
+    ★ FM-17, Gegenstueck zu :func:`channels_for_head`. Wer nur den Kanal eines
+    Kopfes bespielt, laesst den davorliegenden gemeinsamen Dimmer unberuehrt —
+    und der steht per ``default_value`` auf 0 (Hydrabeam ``CH1``). Der Kopf ist
+    dann richtig adressiert und trotzdem dunkel. Leer, wenn es fuer das Attribut
+    gar keine Kopf-Karte gibt (dann ist der einzige Kanal ohnehin geteilt und
+    wird auf dem normalen Weg geschrieben)."""
+    a = (attribute or "").split("#", 1)[0].lower()
+    positions, hmap = _channel_index(channels)
+    per_head = hmap.get(a)
+    if not per_head:
+        return []
+    owned = set(per_head)
+    return [channels[i] for i in positions.get(a, ()) if i not in owned]
+
+
 def channels_for_head(channels, head: int) -> dict:
     """Projiziert die Kanaele EINES Kopfes eines Multi-Head-Fixtures: liefert
     ``{basis_attr: channel}`` fuer den ``head``-ten Kopf.
 
-    Regel (verallgemeinert, deckt Pro-Kopf-Farbe UND Pro-Kopf-Dimmer/Strobe ab):
-    Ein Attribut, das MEHRFACH vorkommt, ist PRO KOPF — genommen wird sein
-    ``head``-tes Vorkommen (dieselbe ``channel_occurrence_keys``-Logik: Kopf 0 =
-    ``attr``, Kopf N = ``attr#N``). Ein Attribut, das nur EINMAL vorkommt (ein
-    gemeinsamer Master-Dimmer, Strobe, Farbrad, Makro …), ist GETEILT und erscheint
-    bei JEDEM Kopf. So bekommt eine Matrix-Zelle „Kopf h" genau dessen Farbe (und —
-    wichtig fuer Geraete wie die Hydrabeam 56ch mit eigenem Dimmer/Strobe je Kopf —
-    dessen eigenen Dimmer/Strobe), waehrend ein einzelner Master-Dimmer allen
-    Koepfen gemeinsam bleibt. ``head=0`` auf einem Single-Head-Fixture liefert
-    schlicht alle Kanaele (byte-identisch zum Nicht-Kopf-Pfad)."""
-    counts: dict[str, int] = {}
-    for ch in channels:
-        a = (getattr(ch, "attribute", "") or "").lower()
-        counts[a] = counts.get(a, 0) + 1
-    out: dict = {}
-    seen: dict[str, int] = {}
-    for ch in channels:
-        a = (getattr(ch, "attribute", "") or "").lower()
-        occ = seen.get(a, 0)
-        seen[a] = occ + 1
-        if counts[a] > 1:
-            # wiederholtes Attribut -> pro Kopf: nur das head-te Vorkommen.
-            if occ == head:
-                out[a] = ch
+    Regel: Zuerst die :func:`head_channel_map` (FM-17) — sie weiss, welcher Kanal
+    welchem Kopf gehoert, auch wenn ein GETEILTER Kanal (Master-Dimmer) dasselbe
+    Attribut traegt. Fehlt ein Attribut dort, gilt unveraendert: mehrfaches
+    Vorkommen = pro Kopf (das ``head``-te), einmaliges Vorkommen = GETEILT und
+    damit bei JEDEM Kopf dabei (gemeinsamer Master-Dimmer, Strobe, Farbrad,
+    Makro …). So bekommt eine Matrix-Zelle „Kopf h" genau dessen Farbe und —
+    bei Geraeten wie der Hydrabeam 56ch — dessen eigenen Dimmer/Strobe.
+    ``head=0`` auf einem Single-Head-Fixture liefert schlicht alle Kanaele
+    (byte-identisch zum Nicht-Kopf-Pfad).
+
+    Laeuft ueber den gecachten Kanal-Index (:func:`_channel_index`), kostet also
+    O(Attribute) statt O(Kanaele) — der Matrix-Pfad ruft diese Funktion PRO ZELLE
+    PRO FRAME auf."""
+    positions, hmap = _channel_index(channels)
+    picked: list[tuple[int, str]] = []
+    for a, occurrences in positions.items():
+        per_head = hmap.get(a)
+        if per_head is not None:
+            # FM-17: die Karte entscheidet — geteilte Kanaele desselben
+            # Attributs (Master-Dimmer) gehoeren KEINEM Kopf.
+            if 0 <= head < len(per_head):
+                picked.append((per_head[head], a))
+        elif len(occurrences) > 1:
+            # wiederholtes Attribut ohne Kopf-Karte -> das head-te Vorkommen.
+            if 0 <= head < len(occurrences):
+                picked.append((occurrences[head], a))
         else:
             # einmaliges Attribut -> geteilt (jeder Kopf).
-            out[a] = ch
-    return out
+            picked.append((occurrences[0], a))
+    # In KANAL-Reihenfolge zurueckgeben (wie die fruehere Schleife ueber
+    # ``channels``) — Aufrufer schreiben daraus DMX-Kanaele der Reihe nach.
+    return {a: channels[i] for i, a in sorted(picked)}
 
 
 def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:
