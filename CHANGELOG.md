@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Der Lauflicht-Schweif dreht sich jetzt mit der Richtung
+
+#### Behoben
+
+- **Schaltete man ein Lauflicht auf Rückwärts, zog der Schweif dem Läufer
+  voraus statt hinterher.** Der Läufer lief richtig rückwärts, der Schweif war
+  richtig lang und richtig abgestuft — nur lag er auf der falschen Seite.
+
+  Gemessen an einer 12er-Reihe: vorwärts wandert der Kopf nach rechts und der
+  Schweif liegt links (korrekt). Rückwärts wanderte der Kopf nach links, der
+  Schweif blieb aber links. Ursache: die Richtung kehrt die Phase um, der
+  Abstand zum Schweif wurde aber weiter in Vorwärtsrichtung gerechnet.
+
 ### 2026-08-01 — Button-Grafiken: Reiter statt langer Liste, dazu Pfeile
 
 #### Neu

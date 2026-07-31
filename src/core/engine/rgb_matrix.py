@@ -1154,9 +1154,17 @@ class RgbMatrixInstance(Function):
                     spacing = length / count
                     fadelen = fade * length
                     bright = 0.0
+                    # Der Schweif haengt HINTER dem Laeufer — und "hinten" haengt
+                    # an der Laufrichtung. Die Richtung wird oben durch Negieren
+                    # der Phase umgesetzt (der Kopf laeuft dann rueckwaerts),
+                    # dieser Abstand wurde aber weiter vorwaerts gemessen: der
+                    # Schweif blieb auf derselben Seite und zog dem Laeufer damit
+                    # VORAUS statt nach (Davids Befund 2026-08-01 im Live-Edit).
+                    rueckwaerts = (self.direction == "reverse")
                     for k in range(count):
                         head = (p + k * spacing) % length
-                        dist = (head - pos) % length      # wie weit pos HINTER dem Kopf liegt
+                        dist = ((pos - head) if rueckwaerts
+                                else (head - pos)) % length
                         if dist < width:                  # solider Kopf
                             bright = 1.0
                             break
