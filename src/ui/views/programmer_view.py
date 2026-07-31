@@ -22,7 +22,8 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
-    color_head_count)
+    color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
+    programmer_key_for_head)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -873,14 +874,33 @@ class ProgrammerView(QWidget):
     def _head_row_count(self, fixture) -> int:
         """Wie viele Kopf-Zeilen bekommt dieses Geraet in der Liste? 0 = keine.
 
-        Nur echte Mehrkopf-Farbgeraete (>=2 pro-Kopf faerbbare Baenke) und nur,
-        wenn der Patch-Dialog sie nicht ausdruecklich als EINE Lampe fuehrt
-        (``head_mode == 'single'``) — sonst widerspraeche die Liste der
-        Geraete-Einstellung aus Slice 1/2. ``auto``/``heads`` bekommen Kopf-Zeilen."""
+        Ein Kopf ist, was sich EIGEN BEWEGT **oder** EIGEN FAERBT — also
+        ``max(Farbbaenke, Pan/Tilt-Koepfe)``. Nur wenn der Patch-Dialog das Geraet
+        ausdruecklich als EINE Lampe fuehrt (``head_mode == 'single'``), bleibt es
+        bei 0 — sonst widerspraeche die Liste der Geraete-Einstellung aus
+        Slice 1/2. ``auto``/``heads`` bekommen Kopf-Zeilen.
+
+        ★ FM-18: die Bewegungsachse kam hier frueher nicht vor, gezaehlt wurden nur
+        Farbbaenke. Ausgerechnet die ``HYDRABEAM 4000 RGBW [19-Kanal]`` aus Davids
+        Rig faellt damit durch — vier Bewegungskoepfe, aber EINE gemeinsame
+        RGBW-Bank. In der Liste erschien also keine einzige Kopf-Zeile, und der
+        FM-17-Fix („Kopf 2 dimmt Kopf 2") war ueber diese Flaeche gar nicht
+        erreichbar. Ueber die Library betrifft das **108 Modi** (Bewegung >= 2,
+        Farbe < 2): Hydrabeam, Event Bar LED/Pro/Q4, Nucleus, Inno Pocket Spot
+        Twins …
+
+        BEWUSST NICHT mitgeaendert: die Auto-Kopf-Matrix beim Patchen
+        (``create_head_matrix_group``) und die Hand-Anlage im Gruppen-Editor
+        (``_place_heads``) zaehlen weiter Farbbaenke. Beide legen FARB-Zellen an —
+        ein Bewegungskopf ohne eigene Farbbank haette dort nichts zu faerben, und
+        an dieser Zahl haengen die A4-Regeln (Auto-Gruppe „… · Koepfe" +
+        Submaster-Voll-Abdeckung). Eine Kopf-ZEILE zum Programmieren ist etwas
+        anderes als eine Farb-ZELLE im Raster."""
         try:
             if normalize_head_mode(getattr(fixture, "head_mode", "auto")) == "single":
                 return 0
-            n = int(color_head_count(fixture))
+            n = max(int(color_head_count(fixture)),
+                    int(pan_tilt_head_count(fixture)))
         except Exception:
             return 0
         return n if n >= 2 else 0
@@ -1463,7 +1483,11 @@ class ProgrammerView(QWidget):
                     ziele = rest_fx
                 if not ziele:
                     continue
-                ilay.addWidget(AttributeSlider(ch, ziele, self._state, owner=self))
+                for _head, _owners in self._slider_head_buckets(ziele, ch):
+                    ilay.addWidget(AttributeSlider(
+                        ch, _owners, self._state, owner=self, head=_head,
+                        display_name=(None if _head is None else
+                                      f"{ch.name or ch.attribute} · K{_head + 1}")))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1773,6 +1797,88 @@ class ProgrammerView(QWidget):
                 occ[ch.attribute] = h + 1
                 color_chs.append((ch, h))
         return color_chs, occ
+
+    def _slider_head_buckets(self, fixtures, ch) -> list:
+        """Auf welche Koepfe verteilt sich EIN Attribut-Regler? ``[(head, owners)]``.
+
+        ★ FM-18. Die Werkzeugleiste verspricht bei aktiver Kopf-Auswahl „↳ Kopf
+        gewaehlt — Regler folgen der Auswahl". Das galt bisher nur fuer die
+        Farb- und Tilt-Bloecke, die ohnehin pro Kopf gebaut werden; der
+        allgemeine Attribut-Regler (Dimmer, Strobe, Makro …) wurde geraeteweit
+        gebaut und schrieb weiter auf den Basis-Schluessel. Seit FM-17 ist das
+        ein sichtbarer Unterschied statt eines Gleichstands: bei einem geteilten
+        Master-Dimmer IST der Basis-Schluessel der Master, nicht Kopf 1.
+
+        ``[(None, alle)]`` = kein Geraet ist auf Koepfe eingeschraenkt, also
+        genau der Bestandsfall (ein geraeteweiter Regler, byte-identisch).
+        Sonst ein Eintrag je gewaehltem Kopf-Index mit den Geraeten, die diesen
+        Kopf **fuer dieses Attribut wirklich haben** — ein ``attr#N`` ohne Kanal
+        faellt im DMX-Pfad still auf den ``default_value`` zurueck (FM-9/A5).
+        Geraete ohne Kopf-Einschraenkung behalten ihren geraeteweiten Regler,
+        auch wenn danebenstehende Geraete einen Kopf gewaehlt haben."""
+        attr = getattr(ch, "attribute", "") or ""
+        frei, per_head = [], {}
+        for f in fixtures:
+            sel = self._heads_filter_for(f)
+            if sel is None:
+                frei.append(f)
+                continue
+            try:
+                have = int(attr_head_count_for_channels(
+                    f, get_channels_for_patched(f), attr))
+            except Exception:
+                have = 1
+            for h in sorted(sel):
+                if 0 <= h < have:
+                    per_head.setdefault(h, []).append(f)
+        out = []
+        if frei:
+            out.append((None, frei))
+        for h in sorted(per_head):
+            self._anchor_other_heads(per_head[h], ch, h)
+            out.append((h, per_head[h]))
+        # Hat KEIN Geraet den gewaehlten Kopf fuer dieses Attribut (z. B. Farbe
+        # auf einer Hydrabeam mit EINER gemeinsamen RGBW-Bank), bleibt der
+        # geraeteweite Regler stehen — sonst verschwaende der Regler ganz und
+        # das Attribut waere gar nicht mehr bedienbar.
+        return out or [(None, list(fixtures))]
+
+    def _anchor_other_heads(self, owners, ch, head: int) -> None:
+        """Verankert die ANDEREN Koepfe, wenn dieser Kopf ueber den BASIS-Schluessel
+        schreibt — sonst hielte die Kopf-Einschraenkung nicht.
+
+        ★ FM-18, gemessen an der ``HYDRA4000 [56-Kanal]`` (Strobe je Kopf, kein
+        gemeinsamer Master): „Kopf 1" adressiert dort ``shutter`` — den
+        Basis-Schluessel — und der DMX-Flush spiegelt einen gesetzten Basis-Wert
+        auf JEDEN Kopf-Kanal, der nichts Eigenes hat. Gemessen: Kopf 1 + Strobe
+        traf **alle vier** Koepfe, Kopf 2 nur seinen eigenen. Ein Regler, der
+        „· K1" heisst und vier Koepfe treibt, waere schlimmer als gar keiner.
+
+        Die Spiegelung selbst ist ein bewusster Vertrag („ein nie separat
+        gesetzter Kopf spiegelt Kopf 0", `test_multihead_sweep`) — sie wird
+        deshalb nicht angefasst, sondern wie ueberall im Getrennt-Modus mit
+        Verankerung beantwortet (`_seed_separate_head`, UI-06). Verankert wird
+        der Wert, den der Kopf JETZT ausgibt: die Ausgabe bleibt im Moment des
+        Verankerns byte-genau gleich.
+
+        Nur noetig, wenn dieser Kopf wirklich auf dem Basis-Schluessel landet —
+        bei einem geteilten Master (Hydrabeam 19ch) tut Kopf 1 das nicht, dort
+        hat FM-17 die Verankerung schon im Schreibweg."""
+        attr = getattr(ch, "attribute", "") or ""
+        for f in owners:
+            try:
+                chans = get_channels_for_patched(f)
+                if programmer_key_for_head(chans, attr, head) != attr:
+                    continue          # eigener Kopf-Schluessel -> kein Leck
+                n = int(attr_head_count_for_channels(f, chans, attr))
+            except Exception:
+                continue
+            if n < 2:
+                continue              # geteilter Kanal -> Spiegelung ist gewollt
+            for other in range(n):
+                if other == head:
+                    continue
+                self._seed_separate_head([f], ch, other)
 
     def _heads_filter_for(self, fixture) -> set | None:
         """FM-HEADLAYOUT Slice 5: Auf welche Koepfe ist dieses Geraet gerade

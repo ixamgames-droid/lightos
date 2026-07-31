@@ -7,6 +7,48 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Köpfe eines Movers sind im Programmer jetzt wählbar
+
+#### Behoben
+
+- **An einem Mehrkopf-Mover mit gemeinsamer Farbe gab es gar keine
+  Kopf-Auswahl.** Die Kopf-Zeilen unter einem Gerät („└ Kopf 2") erschienen nur,
+  wenn das Gerät **≥2 eigene Farbbänke** hat. Die `HYDRABEAM 4000 RGBW
+  [19-Kanal]` hat vier Bewegungsköpfe, die sich EINE RGBW-Bank teilen — in der
+  Geräteliste stand also keine einzige Kopf-Zeile, und der eben erst reparierte
+  Kopf-Dimmer war über diese Fläche nicht erreichbar. Ein Kopf ist jetzt, was
+  sich eigen bewegt **oder** eigen färbt; über die Library betrifft das
+  **108 Modi** (Hydrabeam, Event Bar LED/Pro/Q4, Nucleus, Inno Pocket Spot
+  Twins …).
+
+  Ein gewöhnlicher Moving Head (1 Pan, 1 Tilt) und ein PAR bekommen weiterhin
+  keine Kopf-Zeile, und die Patch-Dialog-Ansage „Als eine Lampe" schlägt die
+  Zählung nach wie vor.
+
+- **„↳ Kopf gewählt — Regler folgen der Auswahl" stimmte nur für Farbe und
+  Tilt.** Der allgemeine Attribut-Regler (Dimmer, Strobe, Makro …) wurde
+  geräteweit gebaut und schrieb weiter auf den Basis-Schlüssel — bei einem
+  geteilten Master also auf den Master statt auf den Kopf. Jetzt entsteht bei
+  aktiver Kopf-Auswahl ein Regler je gewähltem Kopf (Beschriftung „· K2"), und
+  zwar nur an den Geräten, die diesen Kopf für dieses Attribut wirklich haben.
+
+  **Ohne Kopf-Auswahl ändert sich nichts** — ein geräteweiter Regler wie bisher.
+  Und ein Attribut, das der gewählte Kopf gar nicht hat (die geteilte RGBW-Bank
+  der Hydrabeam), behält seinen geräteweiten Regler, statt zu verschwinden.
+
+  **„Kopf 1" hätte dabei fast gelogen:** hat ein Attribut je Kopf einen Kanal,
+  aber keinen gemeinsamen Master (Hydrabeam 56ch: Strobe je Kopf), dann schreibt
+  Kopf 1 auf den Basis-Schlüssel — und ein gesetzter Basis-Wert wird auf jeden
+  Kopf gespiegelt, der nichts Eigenes hat. Gemessen: **Kopf 1 + Strobe traf alle
+  vier Köpfe**, Kopf 2 nur seinen eigenen. Die Spiegelung selbst bleibt (sie ist
+  gewollt: ein nie separat gesetzter Kopf folgt Kopf 1); stattdessen werden die
+  übrigen Köpfe beim Bau des Reglers auf ihrem aktuellen Ausgabewert verankert —
+  dieselbe Antwort, die der Getrennt-Modus bei Farbe und Tilt längst gibt.
+
+  Bewusst **nicht** mitgeändert: die Auto-Kopf-Matrix beim Patchen und die
+  Hand-Anlage im Gruppen-Editor zählen weiter Farbbänke — beide legen Farb-Zellen
+  an, und ein Bewegungskopf ohne eigene Farbbank hätte dort nichts zu färben.
+
 ### 2026-07-31 — „Kopf 2" dimmt jetzt Kopf 2 (und macht dabei Licht)
 
 #### Behoben
