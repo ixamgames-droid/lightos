@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-07-31 — Geräte als Reihe, Raster oder Kreis anordnen
+
+#### Neu
+
+- **„▦ Anordnen" im Ausrichten-Menü des Visualizers.** Reihe (entlang X oder
+  Z), Raster und Kreis — jeweils mit festem Abstand. Das schließt die Lücke
+  zwischen den beiden bisherigen Werkzeugen: *Ausrichten* legt alles auf eine
+  Linie, *Verteilen* streckt die Geräte zwischen den vorhandenen Außenpunkten —
+  beide ändern nur eine Achse und setzen eine schon halbwegs passende
+  Ausgangslage voraus. Aus vier wild verstreuten Strahlern wurde damit nie ein
+  Raster.
+
+  Die Formation entsteht **um den Schwerpunkt der Auswahl herum**, bleibt also
+  dort, wo du sie hingestellt hast, statt in den Nullpunkt zu springen. Die
+  Reihenfolge folgt der **sichtbaren** Anordnung, nicht der Geräte-Nummer —
+  links bleibt links.
+
 ### 2026-07-31 — Die leere Bühne sagt jetzt, dass sie leer ist
 
 #### Neu

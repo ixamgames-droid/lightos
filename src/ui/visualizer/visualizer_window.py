@@ -385,7 +385,7 @@ class VisualizerBridge(QObject):
         viewModeChanged(name), editModeChanged(name), stageLoaded(json),
         addStageObject(type), removeStageObject(id), selectStageObject(id),
         applyFixtureTransform(json), alignSelected(mode),
-        distributeSelected(axis), cameraReset(),
+        distributeSelected(axis), arrangeSelected(json), cameraReset(),
         cameraPreset(name) (VIZ-13 3b-K: Top/Front/Seite/Perspektive/Frei),
         namedCamerasChanged(json) (VIZ-13 3b-K: gespeicherte Kamera-Liste push)
 
@@ -414,6 +414,7 @@ class VisualizerBridge(QObject):
     applyFixtureTransform   = Signal(str)
     alignSelected           = Signal(str)
     distributeSelected      = Signal(str)
+    arrangeSelected         = Signal(str)   # VIZ-14: JSON-Spec (Form/Abstand)
     cameraReset             = Signal()
     brightnessSignal        = Signal(float)   # 0.0 - 1.0
     brightnessAutoSignal    = Signal()        # Reset auto-mode
@@ -526,6 +527,7 @@ class VisualizerBridge(QObject):
         self.updateStageObject.connect(lambda j: self._poll_event({"t": "updateStage", "j": j}))
         self.alignSelected.connect(lambda m: self._poll_event({"t": "align", "mode": m}))
         self.distributeSelected.connect(lambda a: self._poll_event({"t": "distribute", "axis": a}))
+        self.arrangeSelected.connect(lambda j: self._poll_event({"t": "arrange", "j": j}))
         self.resizeModeSignal.connect(lambda b: self._poll_event({"t": "resizeMode", "on": bool(b)}))
         self.cameraPreset.connect(lambda n: self._poll_event({"t": "cameraPreset", "name": n}))
         self.namedCamerasChanged.connect(lambda j: self._poll_event({"t": "namedCameras", "j": j}))
@@ -1820,6 +1822,22 @@ class VisualizerWindow(QMainWindow):
         for _label, _axis in (("⇿ Gleichmäßig X", "x"), ("⇕ Gleichmäßig Z", "z")):
             _a = _menu_align.addAction(_label)
             _a.triggered.connect(weak_slot(self._emit_distribute, _axis))
+        # VIZ-14 (Plan §3 "Arrangement-Tool"): Formation NEU aufbauen statt nur
+        # eine Achse anzugleichen. Ausrichten legt alle auf eine Linie,
+        # Verteilen streckt sie zwischen den vorhandenen Aussenpunkten — beides
+        # setzt eine schon halbwegs passende Ausgangslage voraus. Anordnen baut
+        # Reihe/Raster/Kreis um den Schwerpunkt der Auswahl herum auf.
+        _menu_align.addSeparator()
+        _menu_arr = _menu_align.addMenu("▦ Anordnen")
+        for _label, _spec in (
+            ("▬ Reihe (X, 1 m)", {"shape": "row", "axis": "x", "spacing": 1.0}),
+            ("▮ Reihe (Z, 1 m)", {"shape": "row", "axis": "z", "spacing": 1.0}),
+            ("▦ Raster (1 m)", {"shape": "grid", "spacing": 1.0}),
+            ("◯ Kreis (Abstand 1 m)", {"shape": "circle", "spacing": 1.0}),
+        ):
+            _a = _menu_arr.addAction(_label)
+            _a.triggered.connect(weak_slot(self._emit_arrange, _spec))
+        _menu_arr.setToolTipsVisible(True)
         self._btn_align.setMenu(_menu_align)
         self._btn_align.setEnabled(False)   # erst ab >=2 selektierten Fixtures
         tb.addWidget(self._btn_align)
@@ -1995,6 +2013,18 @@ class VisualizerWindow(QMainWindow):
             self._bridge.distributeSelected.emit(axis)
         except Exception as e:
             print(f"[Visualizer] distributeSelected emit error: {e}")
+
+    def _emit_arrange(self, spec: dict):
+        """Stoesst das Anordnen der ausgewaehlten Fixtures an (Reihe/Raster/Kreis).
+
+        Der Abstand kommt aus dem Raster-Schritt der Szene (``settings.gridStep``
+        gibt es JS-seitig; hier reicht der voreingestellte Meter-Wert), damit die
+        Formation zum sichtbaren Boden-Raster passt statt zu einer erfundenen
+        Zahl."""
+        try:
+            self._bridge.arrangeSelected.emit(json.dumps(spec))
+        except Exception as e:
+            print(f"[Visualizer] arrangeSelected emit error: {e}")
 
     def _on_dock_mode_toggled(self, checked: bool):
         """Andock-Modus an/aus -> an JS pushen + Status anzeigen."""
