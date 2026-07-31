@@ -10,6 +10,7 @@ import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
 import { pixelCell } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
+import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
 // Gehaeuse-Rundkoerper ihre Radial-Segmente (Boden 6) — analog zum Beam-Kegel
@@ -1034,6 +1035,7 @@ export function updateMatrixPanelDmx(f, dmx) {
 export function updateMovingHeadDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
+  applyGobo(f, dmx);        // VIZ-GOBO-3D: Gobo-Muster in den Bodenfleck
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
   syncIconPos(f);
@@ -1047,6 +1049,7 @@ export function updateMovingHeadDmx(f, dmx) {
 export function updateGenericDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
+  applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
   applyFloorAim(f, dmx);
   syncIconPos(f);
 }
