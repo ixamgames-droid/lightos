@@ -131,6 +131,73 @@ export function jsDistributeSelected(axis) {
   requestRender();  // 3c-2: Verteilen veraendert Fixture-Positionen
 }
 
+// VIZ-14 (Plan §3 "Arrangement-Tool"): die Auswahl in eine REIHE, ein RASTER
+// oder einen KREIS legen — mit festem Abstand statt per Hand geschoben.
+//
+// Abgrenzung zu den beiden Nachbarn: `jsAlignSelected` legt alle auf EINE Linie
+// (gleicher x bzw. z), `jsDistributeSelected` verteilt sie gleichmaessig
+// ZWISCHEN den vorhandenen Aussenpunkten — beide aendern nur eine Achse und
+// brauchen eine schon halbwegs passende Ausgangslage. Das Anordnen baut die
+// Formation dagegen NEU auf, um den Schwerpunkt der Auswahl herum.
+//
+// ★ Sortiert wird nach der aktuellen Position, nicht nach fid: der Nutzer sieht
+// links-nach-rechts, was er links-nach-rechts hingestellt hat. Nach fid zu
+// ordnen wuerde die Reihenfolge beim Anordnen still umwerfen (und fids haengen
+// an der Patch-Reihenfolge, nicht am Rig).
+export function jsArrangeSelected(spec) {
+  let cfg = spec;
+  if (typeof cfg === 'string') {
+    try { cfg = JSON.parse(cfg); } catch (e) { return; }
+  }
+  if (!cfg) return;
+  const fs = view.selectedFids.map(fid => fixtures[fid]).filter(Boolean);
+  if (fs.length < 2) return;              // eine Formation aus einem Geraet gibt es nicht
+
+  const shape = String(cfg.shape || 'row');
+  const gap = Math.max(0.05, Number(cfg.spacing) || 1.0);
+  const achse = (cfg.axis === 'z') ? 'z' : 'x';
+  // Schwerpunkt der aktuellen Auswahl = Anker. So bleibt die Formation dort,
+  // wo der Nutzer sie hingestellt hat, statt in den Weltnullpunkt zu springen.
+  const cx = fs.reduce((s, f) => s + f.group.position.x, 0) / fs.length;
+  const cz = fs.reduce((s, f) => s + f.group.position.z, 0) / fs.length;
+  const quer = (achse === 'x') ? 'z' : 'x';
+  fs.sort((a, b) => (a.group.position[achse] - b.group.position[achse])
+                 || (a.group.position[quer] - b.group.position[quer]));
+
+  if (shape === 'row') {
+    const start = -((fs.length - 1) * gap) / 2;
+    fs.forEach((f, i) => {
+      if (achse === 'x') { f.group.position.x = cx + start + i * gap; f.group.position.z = cz; }
+      else               { f.group.position.z = cz + start + i * gap; f.group.position.x = cx; }
+    });
+  } else if (shape === 'grid') {
+    const cols = Math.max(1, Math.floor(Number(cfg.cols) || Math.ceil(Math.sqrt(fs.length))));
+    const rows = Math.ceil(fs.length / cols);
+    const x0 = -((cols - 1) * gap) / 2;
+    const z0 = -((rows - 1) * gap) / 2;
+    fs.forEach((f, i) => {
+      const r = Math.floor(i / cols), c = i % cols;
+      f.group.position.x = cx + x0 + c * gap;
+      f.group.position.z = cz + z0 + r * gap;
+    });
+  } else if (shape === 'circle') {
+    // Radius: ausdruecklich gesetzt, sonst aus dem Abstand abgeleitet, damit
+    // benachbarte Geraete wirklich `spacing` auseinander stehen (Umfang/Anzahl).
+    const r = (Number(cfg.radius) > 0)
+      ? Number(cfg.radius)
+      : Math.max(gap, (gap * fs.length) / (2 * Math.PI));
+    fs.forEach((f, i) => {
+      const a = (2 * Math.PI * i) / fs.length;
+      f.group.position.x = cx + Math.cos(a) * r;
+      f.group.position.z = cz + Math.sin(a) * r;
+    });
+  } else {
+    return;                                // unbekannte Form -> nichts anfassen
+  }
+  pushTransformsToPython();
+  requestRender();  // 3c-2: Anordnen veraendert Fixture-Positionen
+}
+
 export function pushTransformsToPython() {
   for (const fid of view.selectedFids) {
     const f = fixtures[fid];
@@ -244,6 +311,7 @@ export function tryChannel() {
         });
         if (bridge.alignSelected)   bridge.alignSelected.connect(m => jsAlignSelected(m));
         if (bridge.distributeSelected) bridge.distributeSelected.connect(a => jsDistributeSelected(a));
+        if (bridge.arrangeSelected) bridge.arrangeSelected.connect(j => jsArrangeSelected(j));
         if (bridge.cameraReset)    bridge.cameraReset.connect(() => resetCameraView());
         // VIZ-13 Schritt 3b-K-2: Kamera-Preset-Auswahl aus der Toolbar +
         // gespeicherte-Kameras-Liste (additiv zu cameraReset).
@@ -336,6 +404,7 @@ export function tryChannel() {
                         else if (ev.t === 'updateStage') { const d = JSON.parse(ev.j); updateStageObjectProps(d.id, d); }
                         else if (ev.t === 'align') jsAlignSelected(ev.mode);
                         else if (ev.t === 'distribute') jsDistributeSelected(ev.axis);
+                        else if (ev.t === 'arrange') jsArrangeSelected(ev.j);
                         else if (ev.t === 'resizeMode') setResizeModeEnabled(ev.on);
                         else if (ev.t === 'cameraPreset') setCameraPreset(ev.name);
                         else if (ev.t === 'namedCameras') setNamedCameras(JSON.parse(ev.j));
