@@ -554,8 +554,18 @@ class PatchView(QWidget):
             "(Modi, Kanäle, Bereiche, Live-Test) und in die Bibliothek speichern.")
         btn_generator.clicked.connect(self._open_generator)
 
-        self._lbl_conflict = QLabel("")
-        self._lbl_conflict.setStyleSheet("color: #ff4444; font-weight: bold;")
+        # UI-ADDRCONFLICT: aus dem Hinweis wird ein Weg. Vorher war die Meldung
+        # eine Sackgasse — sie sagte DASS es klemmt, aber nicht welche Geraete
+        # und wohin damit.
+        self._lbl_conflict = QPushButton("")
+        self._lbl_conflict.setFlat(True)
+        self._lbl_conflict.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lbl_conflict.setStyleSheet(
+            "QPushButton { color: #ff4444; font-weight: bold; border: none; "
+            "text-align: right; } QPushButton:hover { text-decoration: underline; }")
+        self._lbl_conflict.setToolTip("Adresskonflikte anzeigen und aufloesen")
+        self._lbl_conflict.clicked.connect(self._open_conflict_dialog)
+        self._lbl_conflict.setVisible(False)
 
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
@@ -641,9 +651,23 @@ class PatchView(QWidget):
         self._refresh_univ_bar(fixtures)
         conflict_count = len(conflicts)
         if conflict_count:
-            self._lbl_conflict.setText(f"⚠ {conflict_count} Adresskonflikt(e)!")
+            self._lbl_conflict.setText(
+                f"⚠ {conflict_count} Adresskonflikt(e) — auflösen…")
+            self._lbl_conflict.setVisible(True)
         else:
             self._lbl_conflict.setText("")
+            self._lbl_conflict.setVisible(False)
+
+    def _open_conflict_dialog(self):
+        """UI-ADDRCONFLICT: Konflikte auflisten + auf die naechste freie
+        Adresse verschieben lassen. Nach dem Schliessen die Tabelle neu
+        aufbauen — die Adressen koennen sich geaendert haben."""
+        try:
+            from src.ui.widgets.address_conflict_dialog import AddressConflictDialog
+            AddressConflictDialog(self._state, self).exec()
+        except Exception as e:
+            print(f"[patch_view] Konflikt-Dialog fehlgeschlagen: {e}")
+        self._refresh_table()
 
     def _find_conflicts(self, fixtures: list[PatchedFixture]) -> set[int]:
         conflicts = set()
