@@ -980,6 +980,27 @@ class VisualizerBridge(QObject):
         except Exception:
             return False
 
+    def _mover_bar_heads(self, f) -> int:
+        """Wie viele ECHTE Bewegungskoepfe hat dieses Geraet? 0 = keine Bar.
+
+        ★ FM-10. Eine Mover-Bar (>=2 Pan UND >=2 Tilt) faellt unter
+        ``is_spider_fixture`` — sie hat ja auch >=2 Farbbaenke — und landete
+        deshalb im Aim-Werkzeug im STATISCHEN Zweig: dort wird nur
+        ``visualizer_rotations`` gesetzt, also eine rein VISUELLE Drehung des
+        Gehaeuses. Am echten Geraet passierte damit **gar nichts**; im 3D drehte
+        sich die Bar, das Rig blieb stehen. Genau das trennt diese Pruefung vom
+        Spider: der hat 0 oder 1 Pan (er kippt nur), eine Mover-Bar hat pro Kopf
+        einen echten Pan- UND Tilt-Motor.
+        """
+        try:
+            attrs = [(getattr(c, "attribute", "") or "") for c
+                     in get_channels_for_patched(f)]
+        except Exception:
+            return 0
+        pans = attrs.count("pan")
+        tilts = attrs.count("tilt")
+        return min(pans, tilts) if (pans >= 2 and tilts >= 2) else 0
+
     @Slot(str)
     @_bridge_slot_guard
     def aimFixturesAt(self, json_str: str):
@@ -1003,7 +1024,39 @@ class VisualizerBridge(QObject):
             pos = self._state.visualizer_positions.get(fid)
             if not pos:
                 continue
-            if self._is_moving_head(f):
+            # Ueber getattr, weil Bestandstests diesen Handler mit einem
+            # SimpleNamespace-self fahren (dieselbe Falle wie bei HW-5b):
+            # ein hart gebundener Methodenaufruf laesst sie mit
+            # AttributeError im except landen — und der schluckt dann
+            # STILL das gesamte Zielen, nicht nur die neue Bar-Logik.
+            _bar_fn = getattr(self, "_mover_bar_heads", None)
+            n_bar = _bar_fn(f) if callable(_bar_fn) else 0
+            if n_bar:
+                # FM-10: Mover-Bar -> jeden Kopf ueber seine EIGENEN Pan/Tilt-
+                # Kanaele ausrichten statt das Gehaeuse zu drehen. Die Koepfe
+                # bekommen dieselbe Ausrichtung (parallel): die Bar-Geometrie —
+                # also WO auf der Schiene ein Kopf sitzt — kennt nur das
+                # 3D-Modell, nicht der Python-Zustand. Sie hier nachzubauen
+                # hiesse, eine zweite Quelle fuer die Geometrie zu pflegen.
+                # Parallel ist bei realistischen Zielentfernungen nah dran und
+                # vor allem: es schreibt ECHTE Kanaele, waehrend die
+                # Gehaeuse-Drehung am Rig gar nichts tat.
+                rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
+                pan, tilt = aim_pan_tilt(
+                    pos, target, rot,
+                    pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
+                    tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
+                    pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
+                    tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
+                    invert_pan=bool(getattr(f, "invert_pan", False)),
+                    invert_tilt=bool(getattr(f, "invert_tilt", False)),
+                    swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
+                )
+                for _h in range(n_bar):
+                    self._state.set_programmer_value(fid, "pan", pan, head=_h)
+                    self._state.set_programmer_value(fid, "tilt", tilt, head=_h)
+                n_mh += 1
+            elif self._is_moving_head(f):
                 rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
                 pan, tilt = aim_pan_tilt(
                     pos, target, rot,
