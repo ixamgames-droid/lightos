@@ -78,6 +78,10 @@ class MidiManager:
         self._inputs: dict[str, object] = {}
         self._output: object | None = None
         self._output_name: str = ""
+        # MIDI-OUT-MULTI: GEHALTENE Zweit-Ausgaenge {port_name: MidiOut}.
+        # Bewusst gehalten statt pro Nachricht geoeffnet — jeder MidiOut()
+        # legt auf ALSA einen Sequencer-Client an (s. send_message_to).
+        self._aux_outputs: dict = {}
         self._virtual_out: object | None = None
         self._io_lock = threading.RLock()
         self._scan_lock = threading.Lock()
@@ -441,6 +445,8 @@ class MidiManager:
                     self._virtual_out.close_port()
                 except Exception:
                     pass
+            for _name in list(self._aux_outputs):
+                self._close_aux_output(_name)
             self._output = None
             self._output_name = ""
             self._virtual_out = None
@@ -480,6 +486,101 @@ class MidiManager:
             except Exception as exc:
                 self._log(f"MIDI Output Sendefehler: {exc}")
                 return False
+
+    def send_message_to(self, port_name: str, message) -> bool:
+        """Rohe MIDI-Nachricht an EINEN BESTIMMTEN Ausgang senden.
+
+        ★ MIDI-OUT-MULTI. Bisher gab es genau einen gemeinsamen Ausgang: MIDI-
+        Ansicht, Mapping-Feedback und die APC-LED-Treiber teilten ihn. Das war
+        kein Schoenheitsfehler, sondern eine Notbremse — jeder eigene
+        ``MidiOut()`` legt auf ALSA einen Sequencer-Client an, und wiederholtes
+        Oeffnen erschoepfte ihn. Der Notnagel war, dass die LED-Treiber nur
+        senden, solange der geteilte Ausgang noch auf den APC zeigt
+        (``_targets_apc``): waehlte der Benutzer in der MIDI-Ansicht ein anderes
+        Geraet, hoerte das LED-Feedback still auf.
+
+        Diese API loest das, ohne die Notbremse aufzugeben: der Ziel-Port wird
+        EINMAL geoeffnet und als Zweit-Handle GEHALTEN, nicht pro Nachricht.
+        Damit haengt die Zahl der ALSA-Clients an der Zahl der wirklich
+        benutzten Ports statt an der Zahl der Sendevorgaenge.
+
+        Zeigt der Haupt-Ausgang ohnehin schon dorthin, wird er benutzt — ein
+        zweiter Client fuer denselben Port waere Verschwendung (und auf manchen
+        Backends gar nicht erlaubt).
+
+        ``False`` heisst: Port nicht zu oeffnen. Der Aufrufer soll dann NICHT in
+        einer Schleife weiterprobieren.
+        """
+        ziel = str(port_name or "").strip()
+        if not ziel:
+            return False
+        with self._io_lock:
+            if self._output is not None and self._output_name == ziel:
+                try:
+                    self._output.send_message(list(message))
+                    return True
+                except Exception as exc:
+                    self._log(f"MIDI Output Sendefehler ({ziel}): {exc}")
+                    return False
+            aux = self._aux_outputs.get(ziel)
+            if aux is None:
+                aux = self._open_aux_output(ziel)
+                if aux is None:
+                    return False
+            try:
+                aux.send_message(list(message))
+                return True
+            except Exception as exc:
+                self._log(f"MIDI Zweit-Ausgang Sendefehler ({ziel}): {exc}")
+                # Ein toter Handle bliebe sonst fuer immer im Cache stehen.
+                self._close_aux_output(ziel)
+                return False
+
+    def _open_aux_output(self, port_name: str):
+        """Zweit-Ausgang oeffnen und halten. Aufrufer haelt ``_io_lock``."""
+        if _USE_WINMM or not RTMIDI_OK:
+            # WinMM ist der Windows-ARM-Notweg ohne python-rtmidi. Ihn hier
+            # mitzubauen hiesse, ihn ungetestet zu erweitern — es gibt kein
+            # Windows-Geraet zum Nachmessen. Lieber ehrlich False.
+            return None
+        if self._rtmidi_out_blocked:
+            return None
+        try:
+            m = rtmidi.MidiOut()
+            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+            if port_name not in ports:
+                try:
+                    m.delete()
+                except Exception:
+                    pass
+                return None
+            m.open_port(ports.index(port_name))
+        except Exception as exc:
+            self._log(f"MIDI Zweit-Ausgang nicht verfügbar ({port_name}): {exc}")
+            return None
+        self._aux_outputs[port_name] = m
+        self._log(f"MIDI Zweit-Ausgang geöffnet: {port_name}")
+        return m
+
+    def _close_aux_output(self, port_name: str) -> None:
+        """Aufrufer haelt ``_io_lock``."""
+        m = self._aux_outputs.pop(port_name, None)
+        if m is None:
+            return
+        try:
+            m.close_port()
+        except Exception:
+            pass
+
+    def close_aux_output(self, port_name: str) -> None:
+        """Zweit-Ausgang freigeben (z. B. wenn ein Pult abgemeldet wird)."""
+        with self._io_lock:
+            self._close_aux_output(str(port_name or "").strip())
+
+    def aux_output_names(self) -> list:
+        """Aktuell gehaltene Zweit-Ausgaenge (Diagnose/Test)."""
+        with self._io_lock:
+            return sorted(self._aux_outputs)
 
     def send_note(self, channel: int, note: int, velocity: int = 127):
         status = 0x90 | ((channel - 1) & 0x0F)
