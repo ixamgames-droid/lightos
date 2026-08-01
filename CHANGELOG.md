@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Show-Wechsel blitzt auch auf Skript-Kanälen nicht mehr
+
+#### Behoben
+
+- **Skript-gesteuerte Roh-Adressen fielen beim Live-Show-Wechsel auf 0** — und
+  blieben dort, selbst wenn die neue Show dieselbe Adresse weiter ansteuert.
+  Betroffen waren nur Kanäle, die ein Skript direkt schreibt, ohne dass dort ein
+  Gerät gepatcht ist. Für gepatchte Geräte war dieser Blitzer schon behoben;
+  jetzt gilt das auch eine Ebene tiefer.
+
+  Adressen, die nach dem Wechsel wirklich niemand mehr ansteuert, gehen
+  weiterhin aus.
+
 ### 2026-08-01 — Lichtkegel-Piktogramme für VC-Taster
 
 #### Neu
