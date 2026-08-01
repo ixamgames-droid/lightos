@@ -359,6 +359,11 @@ class AppState:
         # gegen den dann gueltigen _patched_set freigegeben.
         self._defer_release_depth: int = 0
         self._deferred_release: dict[int, set] = {}
+        # CDX-22b: dasselbe Fenster fuer die STAB-14-Freigabe script-getriebener
+        # ROH-Adressen. Ohne das nullte _release_engine_extra sie mitten im
+        # Ladefenster sofort — dieselbe Puls-Klasse wie CDX-22, nur eine Ebene
+        # tiefer. {universe: set[addr]}.
+        self._deferred_engine_extra: dict[int, set] = {}
         # Simple Desk = manuelle Roh-Override-Ebene (ISO-03). {universe: {ch: val}},
         # nur explizit gesetzte Kanaele. Wird im _render_frame als OBERSTE Schicht
         # angewandt (deterministisch jeden Frame) — frueher schrieb der Fader direkt
@@ -1359,7 +1364,23 @@ class AppState:
         Defensiv (``getattr``): ``_rebuild_render_plan`` darf — wie die alte reine
         ``= {}``-Zuweisung — auch laufen, bevor ``_engine_extra_prev``/``universes``
         existieren (Bau-Reihenfolge/Test-Stubs); dann nur zuruecksetzen, nichts freigeben.
+
+        CDX-22b: Laeuft ein ``deferred_unpatched_release``-Fenster, wird hier NICHT
+        genullt, sondern nur gemerkt — sonst blitzen script-getriebene Roh-Adressen
+        beim Live-Show-Load schwarz, genau wie die gepatchten vor CDX-22. Die
+        Freigabe holt ``_flush_deferred_engine_extra`` am Fensterende nach.
         """
+        if getattr(self, "_defer_release_depth", 0) > 0:
+            store = getattr(self, "_deferred_engine_extra", None)
+            if store is None:
+                store = self._deferred_engine_extra = {}
+            for u, addrs in list((getattr(self, "_engine_extra_prev", None) or {}).items()):
+                store[u] = set(store.get(u, set())) | set(addrs)
+            # Tracking trotzdem leeren: der Renderer soll im Fenster nicht gegen
+            # einen Vor-Load-Stand diffen. Kein Zombie-Risiko — der Flush unten
+            # laeuft in JEDEM Fall (``finally`` im Kontextmanager).
+            self._engine_extra_prev = {}
+            return
         prev = getattr(self, "_engine_extra_prev", None)
         universes = getattr(self, "universes", None)
         if prev and universes:
@@ -1497,10 +1518,41 @@ class AppState:
         Sofort-Nullung + ``_pending_release``-Vormerkung fuer den Render-Thread)."""
         deferred = getattr(self, "_deferred_release", None)
         self._deferred_release = {}
+        if deferred:
+            self._release_unpatched_addrs(
+                deferred, getattr(self, "_patched_set", {}) or {})
+        self._flush_deferred_engine_extra()
+
+    def _flush_deferred_engine_extra(self):
+        """CDX-22b: gibt die im Fenster gemerkten Roh-Adressen frei — aber nur die,
+        die nach dem Tausch wirklich niemand mehr treibt.
+
+        Zwei Ausnahmen, und beide sind der Grund, warum die Sofort-Freigabe im
+        Fenster falsch war:
+
+        * Die Adresse steht wieder in ``_engine_extra_prev`` — die NEUE Show treibt
+          sie ebenfalls per Skript. Nullen hiesse: kurz aus und im naechsten Frame
+          wieder an, also genau der Puls.
+        * Die Adresse ist inzwischen GEPATCHT. Dann committet sie ihr Span; die
+          Roh-Ebene hat dort nichts mehr zu suchen.
+
+        Kein Zombie (STAB-14): treibt die Adresse weiterhin ein Skript, uebernimmt
+        die normale ``prev``-``cur``-Freigabe im Frame-Commit, sobald es stoppt.
+        """
+        deferred = getattr(self, "_deferred_engine_extra", None)
+        self._deferred_engine_extra = {}
         if not deferred:
             return
-        self._release_unpatched_addrs(
-            deferred, getattr(self, "_patched_set", {}) or {})
+        universes = getattr(self, "universes", None) or {}
+        cur = getattr(self, "_engine_extra_prev", None) or {}
+        patched = getattr(self, "_patched_set", {}) or {}
+        for u, addrs in deferred.items():
+            uni = universes.get(u)
+            if uni is None:
+                continue
+            behalten = set(cur.get(u, ()) or ()) | set(patched.get(u, ()) or ())
+            for a in set(addrs) - behalten:
+                uni.set_channel(a, 0)
 
     def _rebuild_universes(self):
         needed = {f.universe for f in self._patch_cache} or {1}
