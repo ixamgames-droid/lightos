@@ -54,6 +54,7 @@ import {
 import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
 import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js';  // VIZ-14
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
+import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -177,6 +178,11 @@ window.__lightos = {
   // zurueckrechnen — statt den JS-Quelltext nach Konstanten zu greppen, wie es
   // die erste Fassung der Optik-Tests noch tat.
   opticsSoftness, applyOptics,
+  // VIZ-PRISMA-3D: derselbe Seam-Gedanke. prismFacetCount ist rein (Zahl rein,
+  // Zahl raus, inkl. Low-Spec-Deckel), applyPrism laesst sich mit einem
+  // gestellten Fixture-Objekt fahren und legt die Kegel wirklich an — der Test
+  // zaehlt danach Kinder und prueft die geteilte Geometrie.
+  prismFacetCount, applyPrism,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am

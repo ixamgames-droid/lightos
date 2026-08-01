@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Das Prisma ist im 3D-Visualizer zu sehen
+
+#### Neu
+
+- **Ein eingeschaltetes Prisma teilt den Lichtstrahl jetzt auch im 3D auf.** Bisher
+  hatte der Prisma-Kanal dort keine Wirkung: am echten Gerät wurden aus einem Strahl
+  mehrere, im Visualizer blieb es bei einem. Die Anzahl der Strahlen kommt aus dem
+  Gerätprofil selbst — sagt es „6-fach Prisma", sind es sechs. Sagt es nur „Prisma"
+  (der häufigste Fall in der Library), sind es drei. Die Prisma-Drehung dreht den
+  Fächer mit.
+
+  Geräte ohne Prisma-Kanal bleiben unverändert — es wird nichts hinzuerfunden.
+  Auf schwachen Grafikkarten ist die Zahl der zusätzlichen Strahlen gedeckelt.
+
 ### 2026-08-01 — Die 3D-Ansicht holt sich nach einem Grafik-Aussetzer selbst zurück
 
 #### Behoben

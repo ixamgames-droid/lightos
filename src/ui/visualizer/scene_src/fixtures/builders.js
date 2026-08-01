@@ -10,6 +10,7 @@ import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
 import { pixelCell } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
+import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
@@ -33,6 +34,12 @@ export function resyncBeamVisibility(f) {
   const on = settings.showCones && view.mode === '3D';
   const set = (bm) => { if (bm && bm.material) bm.visible = on && bm.material.opacity > 0.01; };
   set(f.beam);
+  // VIZ-PRISMA-3D: die Nebenstrahlen teilen sich das Material mit f.beam, also
+  // auch dessen "war beleuchtet"-Mass — sie folgen schlicht seiner Sichtbarkeit.
+  // Ohne diese Zeile blieben sie nach einem Settings-Toggle oder 2D<->3D-Wechsel
+  // stehen, waehrend der Hauptstrahl schon weg ist (genau die Klasse Stale, die
+  // diese Funktion ueberhaupt erst noetig gemacht hat).
+  syncPrismToBeam(f);
   if (f.laserBeams) for (const bm of f.laserBeams) set(bm);
   if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
   if (f.moverHeads) for (const mh of f.moverHeads) set(mh.beam);
@@ -1035,6 +1042,11 @@ export function updateMatrixPanelDmx(f, dmx) {
 export function updateMovingHeadDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
+  applyPrism(f, dmx);       // VIZ-PRISMA-3D: aus einem Strahl werden mehrere
+  // Ein Batch mit `zoom`, aber OHNE `prism` laeuft nicht durch applyPrism —
+  // ohne diesen Nachzug bliebe der Faecher auf der alten Weite stehen, waehrend
+  // die Mitte schon gezoomt hat. Kostet nichts, wenn kein Prisma steckt.
+  syncPrismToBeam(f);
   applyGobo(f, dmx);        // VIZ-GOBO-3D: Gobo-Muster in den Bodenfleck
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
@@ -1049,6 +1061,8 @@ export function updateMovingHeadDmx(f, dmx) {
 export function updateGenericDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
+  applyPrism(f, dmx);       // ... und manche ein Prisma
+  syncPrismToBeam(f);       // Faecher der Kegelweite nachziehen (s. oben)
   applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
   applyFloorAim(f, dmx);
   syncIconPos(f);
