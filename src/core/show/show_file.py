@@ -595,6 +595,14 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         # State (nicht Szenegraph). Liste roher dicts (JS liefert das Format
         # bereits fertig ueber bridge.cameraSaved), hier nur defensiv kopiert.
         "named_cameras": list(getattr(state, "visualizer_named_cameras", []) or []),
+        # VIZ-15: fids mit ausgeblendetem Lichtkegel. Additiv wie named_cameras
+        # (kein SHOW_VERSION-Bump) — eine alte Show ohne den Block laedt mit
+        # leerer Menge und sieht damit exakt aus wie bisher. Sortiert gespeichert,
+        # damit zwei Speicherungen desselben Standes byte-gleich sind (sonst
+        # erzeugte die Set-Reihenfolge grundlose Diffs in der Show-Datei).
+        "beams_off": sorted(
+            int(f) for f in (getattr(state, "visualizer_beams_off", set()) or set())
+        ),
     }
 
     # VIZ-11 (Schritt 5): SceneGraph-Block additiv dazuschreiben — EINE Quelle
@@ -964,6 +972,7 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     state.live_view_positions = {}
     state.live_view_meta = {}
     state.visualizer_named_cameras = []
+    state.visualizer_beams_off = set()
     state._last_loaded_layout = {}
     state.show_name = "Neue Show"
     state.playlist = []
@@ -1517,6 +1526,16 @@ def load_show(path: str | os.PathLike):
         _lenient("load named_cameras error", e)
         named_cameras = []
 
+    # VIZ-15: ausgeblendete Lichtkegel. Eigener Isolierungsblock aus demselben
+    # Grund wie oben — ein kaputter Eintrag hier darf die Positionen nicht mit
+    # zu Fall bringen. Alte Shows ohne den Key -> leere Menge, also unveraendert.
+    try:
+        viz = data.get("visualizer", {}) or {}
+        beams_off = {int(f) for f in (viz.get("beams_off", []) or [])}
+    except Exception as e:
+        _lenient("load beams_off error", e)
+        beams_off = set()
+
     # Live View: 2D-Fixture-Positionen (eigene Persistenz, entkoppelt vom 3D-Viz)
     live_view_load_error: Exception | None = None
     try:
@@ -1640,6 +1659,7 @@ def load_show(path: str | os.PathLike):
     # unabhaengig von has_adapter immer direkt gesetzt (gleiches Muster wie
     # live_view_meta).
     state.visualizer_named_cameras = named_cameras
+    state.visualizer_beams_off = beams_off
 
     try:
         state._last_loaded_layout = data.get("layout", {}) or {}

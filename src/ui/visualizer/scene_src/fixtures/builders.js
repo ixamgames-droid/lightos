@@ -12,6 +12,7 @@ import { pixelCell } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
+import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
@@ -31,9 +32,22 @@ function segs(n) {
 // (setViewMode) stale, bis die Fixture das naechste Mal DMX bekam. `opacity > 0.01`
 // ist derselbe „war beleuchtet"-Proxy wie in der Einzelkopf-Zeile (der DMX-Pfad
 // setzt die Kegel-Opacity aus der Pro-Kopf-Helligkeit).
+// VIZ-15: EINE Stelle beantwortet "darf dieser Strahl leuchten?".
+//
+// Vorher stand dieselbe Bedingung an sechs Stellen ausgeschrieben
+// (settings.showCones && <hell> && view.mode === '3D') — sechs Stellen, an
+// denen ein neues Kriterium vergessen werden kann. Genau das ist hier passiert:
+// das Pro-Geraet-Veto haette sonst an jeder einzelnen nachgetragen werden
+// muessen, und die Multi-Head-Zweige (Spider/PAR-Bar/Mover-Bar) waeren die
+// ersten gewesen, die man uebersieht.
+export function beamsSichtbar(f, hell) {
+  if (!(settings.showCones && view.mode === '3D')) return false;
+  if (!(hell > 0.01)) return false;
+  return !beamsOff.has(Number(f && f.fid));
+}
+
 export function resyncBeamVisibility(f) {
-  const on = settings.showCones && view.mode === '3D';
-  const set = (bm) => { if (bm && bm.material) bm.visible = on && bm.material.opacity > 0.01; };
+  const set = (bm) => { if (bm && bm.material) bm.visible = beamsSichtbar(f, bm.material.opacity); };
   set(f.beam);
   // VIZ-PRISMA-3D: die Nebenstrahlen teilen sich das Material mit f.beam, also
   // auch dessen "war beleuchtet"-Mass — sie folgen schlicht seiner Sichtbarkeit.
@@ -933,7 +947,7 @@ export function updateSpiderDmx(f, dmx) {
       if (bm) {
         bm.material.color = lens.userData.ledColor;
         bm.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-        bm.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
+        bm.visible = beamsSichtbar(f, bright);
       }
     }
   }
@@ -965,7 +979,7 @@ export function updateParBarDmx(f, dmx) {
     if (ph.beam && ph.beam.material) {
       ph.beam.material.color = col;
       ph.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-      ph.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
+      ph.beam.visible = beamsSichtbar(f, bright);
     }
   }
   // Top-Down-Icon: N PAR-Zellen einzeln faerben (3c-1 zentrales Tinting)
@@ -1002,7 +1016,7 @@ export function updateMoverBarDmx(f, dmx) {
     if (mh.beam && mh.beam.material) {
       mh.beam.material.color = col;
       mh.beam.material.opacity = Math.max(0.0, bright * settings.beamOpacity);
-      mh.beam.visible = settings.showCones && bright > 0.01 && view.mode === '3D';
+      mh.beam.visible = beamsSichtbar(f, bright);
     }
   }
   // Top-Down-Icon: N Kopf-Zellen einzeln faerben (3c-1 zentrales Tinting)
@@ -1089,7 +1103,7 @@ function applyGenericColor(f, dmx) {
   if (f.beam) {
     f.beam.material.color = color;
     f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
-    f.beam.visible = settings.showCones && lum > 0.01 && view.mode === '3D';
+    f.beam.visible = beamsSichtbar(f, lum);
   }
   if (f.spot) {
     f.spot.color = color;
@@ -1115,7 +1129,7 @@ function applyGenericColor(f, dmx) {
   }
   // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
   if (f.laserBeams) {
-    const laserVis = settings.showCones && lum > 0.01 && view.mode === '3D';
+    const laserVis = beamsSichtbar(f, lum);
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       bm.material.color = color;

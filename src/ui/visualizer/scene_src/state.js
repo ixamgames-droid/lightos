@@ -92,6 +92,19 @@ let _editTool = 'move_xz';   // 'move_xz'|'aim'|'trace' (VIZ-13 3b-G: move_y/rot
 // in 3b durch OrbitControls-Objekt-State ab; in 3a bleibt es primitive State.
 let _theta = 0.3, _phi = 1.1, _radius = 22;
 
+// VIZ-15: fids, deren Lichtkegel ausgeblendet ist. Der globale
+// settings.showCones ist alles-oder-nichts; hier steht das Pro-Geraet-Veto.
+// Bewusst ein Set (die Frage ist immer "ist DIESE fid drin") und bewusst
+// NICHT in `settings`: settings reist als Ganzes vom Python-Settings-Panel
+// herueber und wuerde die Menge bei jedem Regler-Zug ueberschreiben.
+export const beamsOff = new Set();
+
+/** Menge ersetzen (kommt aus dem Poll, s. bridge.js). */
+export function setBeamsOff(liste) {
+  beamsOff.clear();
+  (liste || []).forEach(f => { const n = Number(f); if (isFinite(n)) beamsOff.add(n); });
+}
+
 export const view = {
   get mode() { return _viewMode; },
   set mode(v) { _viewMode = v; requestRender(); },

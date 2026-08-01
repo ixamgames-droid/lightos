@@ -374,6 +374,17 @@ class AppState:
         # show_file.py). Einfaches plain-list-Attribut wie live_view_meta,
         # kein SceneGraph-Backing (keine Fixture-Topologie).
         self.visualizer_named_cameras: list = []
+        # VIZ-15: fids, deren Lichtkegel im 3D AUSGEBLENDET ist. Der globale
+        # "Lichtkegel anzeigen"-Schalter ist alles-oder-nichts; wer ein einzelnes
+        # Geraet aus der Sicht nehmen will (Blinder, Zuschauerblender, ein Mover,
+        # der die Kamera zustellt), musste bisher alle Kegel opfern.
+        #
+        # Wie named_cameras ein einfaches plain-Attribut: KEIN SceneGraph-Backing
+        # (das traegt Topologie/Transformationen, nicht Darstellungswuensche) und
+        # ein ADDITIVER Show-Block (visualizer.beams_off) ohne SHOW_VERSION-Bump —
+        # alte Shows ohne den Block laden mit leerer Menge, also unveraendert.
+        # Set statt Liste: die Frage ist immer "ist DIESE fid drin".
+        self.visualizer_beams_off: set = set()
         # VIZ-LABELS: globaler Schalter, ob die Fixture-Namens-Labels ("#<fid>
         # <Name>"-Sprites) im 3D-Visualizer sichtbar sind. EINE Quelle fuer alle
         # 3D-Ansichten (eingebettete Live-View-3D, Pop-out-Fenster, volles
