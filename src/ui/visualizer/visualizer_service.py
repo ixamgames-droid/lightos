@@ -28,6 +28,7 @@ Folgeschritt.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Callable, Optional
 
 
@@ -104,6 +105,81 @@ def _gobo_style(attrs: dict, channels) -> str | None:
             continue
     return ""
 
+# VIZ-PRISMA-3D: wie viele Strahlen macht das Prisma gerade?
+#
+# Gleiche Bauart wie ``_gobo_style`` darueber und aus demselben Grund: die
+# Zuordnung DMX-Wert -> Range -> Bedeutung lebt im Profil, also wird sie HIER
+# aufgeloest und nur die fertige ZAHL wandert nach JS. Ginge der Rohwert
+# hinueber, braeuchte JS die Profil-Ranges — eine zweite Quelle fuer dieselbe
+# Zuordnung.
+#
+# ★ Die Range-Namen sind ZWEISPRACHIG, und das ist keine Kleinigkeit:
+# ausgezaehlt ueber die gesamte Library schreiben die eingebauten Profile
+# deutsch ("6-fach Prisma"), die importierten QXF-Profile englisch
+# ("3 Facet Prism", "8-facet prism"). Ein Muster fuer nur eine Sprache haette
+# 93 % der Library stillschweigend als "kein Prisma" behandelt.
+_PRISM_FACETTEN = re.compile(r"(\d+)\s*[-\s]?\s*(?:fach|facet)", re.IGNORECASE)
+# "Aus"-Ranges heissen quer durch die Library so:
+_PRISM_AUS = re.compile(r"\b(?:aus|off|open|offen|kein|no|none|blank)\b",
+                        re.IGNORECASE)
+# Fallback, wenn die Range zwar ein Prisma meint, aber keine Zahl nennt.
+# AUSGEZAEHLT (2026-08-01), nicht geraten: von 810 Prisma-Ranges der Library
+# nennen nur 49 eine Facettenzahl — und unter denen ist 3 mit 25 von 49 die
+# mit Abstand haeufigste (dann 4x8, 8x4, 6x6, 5x3). Die uebrigen 761 sagen
+# schlicht "Prism". Drei Facetten sind damit die beste verfuegbare Aussage
+# der Daten selbst, nach demselben Verfahren wie der Fokus-Default 128.
+PRISM_FACETTEN_FALLBACK = 3
+
+
+def _prism_facets(attrs: dict, channels) -> int | None:
+    """Facettenzahl des aktiven Prismas — ``0`` = aus, ``None`` = kein Prisma.
+
+    ``None`` heisst "dieses Geraet hat gar keinen Prisma-Kanal": dann steht
+    nichts im Payload und JS laesst den Strahl in Ruhe. Genau wie bei
+    Zoom/Iris/Gobo bekommt ein Geraet ohne den Kanal KEINEN erfundenen Default.
+    """
+    if not channels:
+        return None
+    kanal = None
+    wert = None
+    for ch in channels:
+        # Bewusst NUR "prism", nicht "prism_rotation": die Drehung sagt nichts
+        # ueber die Facettenzahl und wuerde als eigener Kanal danebenliegen.
+        if (getattr(ch, "attribute", "") or "").lower() == "prism":
+            kanal = ch
+            wert = attrs.get("prism")
+            break
+    if kanal is None or wert is None:
+        return None
+    try:
+        wert = int(wert)
+    except (TypeError, ValueError):
+        return None
+    for rg in (getattr(kanal, "ranges", None) or ()):
+        try:
+            if not (int(rg.range_from) <= wert <= int(rg.range_to)):
+                continue
+        except (TypeError, ValueError):
+            continue
+        name = getattr(rg, "name", "") or ""
+        if _PRISM_AUS.search(name):
+            return 0
+        m = _PRISM_FACETTEN.search(name)
+        if m:
+            try:
+                n = int(m.group(1))
+            except ValueError:
+                return PRISM_FACETTEN_FALLBACK
+            # Unplausible Zahlen aus Namen wie "Prisma-Makros 1-16" nicht als
+            # Facetten durchreichen — 16 Kegel je Geraet waeren ein echter
+            # Renderschaden, und gemeint ist dort ohnehin eine Makro-Nummer.
+            return n if 2 <= n <= 12 else PRISM_FACETTEN_FALLBACK
+        return PRISM_FACETTEN_FALLBACK
+    # Keine passende Range (oder gar keine Ranges): dann entscheidet der Wert.
+    # Default 0 = aus ist in der Library einhellig (4/4 Profile mit Prisma).
+    return 0 if wert <= 0 else PRISM_FACETTEN_FALLBACK
+
+
 def _build_fixture_payload(fixture, attrs: dict[str, int],
                            channels=None) -> dict[str, object]:
     """Baut den Pro-Fixture-Payload (inkl. Spider-/Bar-``heads``-Array). Seit
@@ -154,6 +230,15 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     _gobo = _gobo_style(attrs, channels)
     if _gobo is not None:
         payload["gobo"] = _gobo
+    # VIZ-PRISMA-3D: aus EINEM Strahl werden mehrere. Auch hier wandert die
+    # fertige Facetten-ZAHL nach JS, nicht der Rohwert (Begruendung an
+    # _prism_facets). Die Drehung dagegen ist ein reiner Winkel und geht roh
+    # mit — dort gibt es keine Profil-Zuordnung aufzuloesen.
+    _prism = _prism_facets(attrs, channels)
+    if _prism is not None:
+        payload["prism"] = _prism
+        if "prism_rotation" in attrs:
+            payload["prism_rotation"] = attrs["prism_rotation"]
     # ── Mehrkopf (Spider UND Mover-/PAR-Bars): pro Kopf eigene Farbe/Pan/Tilt ──
     # Multi-Head-Konvention: Kopf 0 = "attr", Kopf N = "attr#N". FM-2: Kopfzahl aus
     # dem hoechsten vorkommenden #N-Index von color_r/pan/tilt ABGELEITET (nicht mehr

@@ -114,4 +114,9 @@ export function applyOptics(f, dmx) {
       f.spot.penumbra = PENUMBRA_SCHARF + (PENUMBRA_WEICH - PENUMBRA_SCHARF) * weich;
     }
   }
+  // VIZ-PRISMA-3D: die Prisma-Nebenstrahlen muessen diese Weite mitmachen.
+  // Der Nachzug steht bewusst NICHT hier, sondern in builders.js direkt hinter
+  // dem applyOptics-Aufruf — dieses Modul ist absichtlich importfrei und damit
+  // als reiner Test-Seam aufrufbar (test_viz_optics_focus_frost_scene.py ruft
+  // opticsSoftness/applyOptics mit einem gestellten Objekt auf).
 }
