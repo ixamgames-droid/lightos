@@ -272,6 +272,9 @@ export function addFixture(data) {
     isMoverBar: !!model.isMoverBar,
     pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
     isMatrix: !!model.isMatrix,
+    // VIZ-15: die eigene fid am Objekt — beamsSichtbar() braucht sie, und die
+    // DMX-Handler bekommen sonst nur `f` ohne Bezug zum Schluessel.
+    fid: Number(fid),
     beam, spot, spotTarget, floorSpot,
     // VIZ-MH-OPTICS: Grundwinkel des SpotLights merken. applyOptics skaliert
     // relativ dazu — ohne Referenz waere jede Zoom-Aenderung kumulativ und der

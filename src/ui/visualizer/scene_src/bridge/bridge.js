@@ -8,6 +8,7 @@ import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
 import { resyncBeamVisibility } from '../fixtures/builders.js';
+import { setBeamsOff } from '../state.js';   // VIZ-15
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
 import { setFpsVisible } from '../camera/presets.js';
@@ -359,6 +360,7 @@ export function tryChannel() {
         if (bridge.pollControl) {
           let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
           let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
+          let _pBeamsOff = null;   // VIZ-15 (JSON-Signatur, s. Poll unten)
           setInterval(function(){
             try {
               bridge.pollControl(function(js){
@@ -370,6 +372,19 @@ export function tryChannel() {
                   // den Platzier-Geist (0 = kein Geist).
                   if (s.placeable !== undefined && s.placeable !== _pPlace) {
                     _pPlace = s.placeable; setPlaceableCount(s.placeable);
+                  }
+                  // VIZ-15: welche Geraete haben ihren Lichtkegel ausgeblendet?
+                  // Als JSON-String vergleichen, nicht als Array — ein Array ist
+                  // bei jedem Poll ein NEUES Objekt und waere damit immer
+                  // "geaendert" (der Rebuild liefe dann 8x pro Sekunde).
+                  if (s.beamsOff !== undefined) {
+                    const sig = JSON.stringify(s.beamsOff);
+                    if (sig !== _pBeamsOff) {
+                      _pBeamsOff = sig;
+                      setBeamsOff(s.beamsOff);
+                      for (const k in fixtures) resyncBeamVisibility(fixtures[k]);
+                      requestRender();
+                    }
                   }
                   if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
                   if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }

@@ -698,7 +698,9 @@ class VisualizerBridge(QObject):
                             "settings": None, "brightness": None,
                             # VIZ-14: wie viele gepatchte Geraete haben noch
                             # keine 3D-Position? Steuert den Platzier-Geist.
-                            "placeable": 0}
+                            "placeable": 0,
+                            # VIZ-15: fids mit ausgeblendetem Lichtkegel.
+                            "beamsOff": []}
         self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
         # A3D-04: pro fid GEMERGTER dmx-Puffer {fid: payload}, NICHT nur der letzte
         # Batch. Der VisualizerService pusht DIFFERENTIELL (nur geaenderte Fixtures)
@@ -762,6 +764,25 @@ class VisualizerBridge(QObject):
                        if f.fid not in pos)
         except Exception:
             return 0
+
+    def _sync_beams_off(self) -> None:
+        """Die Menge der ausgeblendeten Lichtkegel an die Szene reichen.
+
+        Ueber denselben Poll wie ``editMode``/``placeable`` — kein eigenes
+        Signal: der Poll ist die Zustell-Schicht, die auch nach einem
+        Seiten-Reload zuverlaessig ankommt (Direkt-Emits vor dem Init-Ende
+        nicht, s. Kommentar an ``_poll_state``).
+
+        Sortiert, weil die JS-Seite die Liste als JSON-Signatur vergleicht — bei
+        wechselnder Set-Reihenfolge saehe jeder Poll nach Aenderung aus und
+        loeste 8x pro Sekunde einen Sichtbarkeits-Rebuild aus.
+        """
+        try:
+            fids = sorted(int(f) for f in
+                          (getattr(self._state, "visualizer_beams_off", set()) or set()))
+        except Exception:
+            fids = []
+        self._poll_set("beamsOff", fids)
 
     def _sync_placeable(self) -> None:
         """Zahl offener Platzierungen in den Poll stellen (idempotent)."""
@@ -2360,6 +2381,14 @@ class VisualizerWindow(QMainWindow):
         self._patch_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection)
         self._patch_list.itemSelectionChanged.connect(self._on_patch_list_selected)
+        # VIZ-15: Lichtkegel pro Geraet aus-/einblenden. Der globale Schalter
+        # "Lichtkegel anzeigen" ist alles-oder-nichts; wer EIN Geraet aus der
+        # Sicht nehmen will (Blinder, Zuschauerblender, ein Mover vor der
+        # Kamera), musste bisher alle Kegel opfern.
+        self._patch_list.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._patch_list.customContextMenuRequested.connect(
+            self._on_patch_list_menu)
         layout.addWidget(self._patch_list, 1)
 
         row = QHBoxLayout()
@@ -2903,18 +2932,37 @@ class VisualizerWindow(QMainWindow):
     # ── Fixture-Tab actions ─────────────────────────────────────────────────
 
     def _refresh_patch_list(self):
+        beams_off = getattr(self._state, "visualizer_beams_off", set()) or set()
         self._patch_list.blockSignals(True)
         self._patch_list.clear()
         for f in self._state.get_patched_fixtures():
             mark = "[X] " if f.fid in self._state.visualizer_positions else "[ ] "
-            item = QListWidgetItem(f"{mark}[{f.fid:03d}] {f.label} ({f.fixture_type})")
+            # VIZ-15: ausgeblendeter Lichtkegel ist an der Zeile ablesbar —
+            # sonst sucht man spaeter, warum genau dieses Geraet nicht strahlt.
+            aus = " · Kegel aus" if f.fid in beams_off else ""
+            item = QListWidgetItem(
+                f"{mark}[{f.fid:03d}] {f.label} ({f.fixture_type}){aus}")
             item.setData(Qt.ItemDataRole.UserRole, f.fid)
             self._patch_list.addItem(item)
         self._patch_list.blockSignals(False)
         # VIZ-14: dieselbe Liste zeigt mit "[ ]" schon, was noch keinen Platz
         # hat — hier ist also der natuerliche Ort, die Zahl fuer den
         # Platzier-Geist nachzuziehen (Patchen, Loeschen, Show-Laden).
-        self._sync_placeable()
+        # ★ BEFUND 2026-08-01: hier stand `self._sync_placeable()` — die Methode
+        # liegt aber auf der BRIDGE, nicht am Fenster (dort wohnt der Poll-
+        # Zustand). Der Aufruf war damit ein AttributeError MITTEN in dieser
+        # Funktion: alles darunter — das Nachziehen der Listen-Markierung und
+        # die Statuszeile — lief seither nie. Aufgefallen ist es nicht, weil
+        # `_mark_patch_list` einen zweiten Aufrufer hat (`_on_global_selection`),
+        # der weiter funktionierte; sichtbar war nur, dass die Markierung nach
+        # einem Listen-Neuaufbau fehlte und die Zahl im Platzier-Geist stehen
+        # blieb. Genau die Klasse „Fehler, der sich als Erfolg meldet".
+        bridge = getattr(self, "_bridge", None)
+        if bridge is not None:
+            bridge._sync_placeable()
+            # VIZ-15: derselbe Ort, aus demselben Grund — die Menge kommt aus
+            # der Show und muss nach jedem Laden/Patchen neu in die Szene.
+            bridge._sync_beams_off()
         # Der Neuaufbau wirft die Markierung weg — die gemeinsame Auswahl gilt
         # aber weiter (Patchen/Platzieren aendert sie nicht). Ohne dieses
         # Nachziehen stuende die Liste nach jedem Refresh wieder leer da,
@@ -2935,6 +2983,66 @@ class VisualizerWindow(QMainWindow):
             f"{count} Fixture(s) in Szene  |  "
             f"{len(self._current_stage.elements)} Bühnen-Elemente"
         )
+
+    def _patch_list_fids(self) -> list:
+        """fids der markierten Listenzeilen (leer, wenn nichts markiert ist).
+
+        Modul-nah als eigene kleine Methode statt inline an drei Stellen — und
+        defensiv ueber ``getattr``, weil Bestandstests diese Handler auf
+        ``SimpleNamespace``-Stubs fahren."""
+        lst = getattr(self, "_patch_list", None)
+        if lst is None:
+            return []
+        out = []
+        for it in lst.selectedItems():
+            try:
+                out.append(int(it.data(Qt.ItemDataRole.UserRole)))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    def _on_patch_list_menu(self, pos):
+        fids = self._patch_list_fids()
+        if not fids:
+            return
+        aus = getattr(self._state, "visualizer_beams_off", set()) or set()
+        # Gemischte Auswahl: EIN Befehl, und der schaltet ein. Ein Menue, das
+        # bei drei Geraeten "teils an, teils aus" anbietet, muss erklaeren, was
+        # es tut — "alle sichtbar machen" braucht keine Erklaerung.
+        alle_aus = all(f in aus for f in fids)
+        menu = QMenu(self._patch_list)
+        titel = ("Lichtkegel anzeigen" if alle_aus else "Lichtkegel ausblenden")
+        act = menu.addAction(f"{titel} ({len(fids)})")
+        gewaehlt = menu.exec(self._patch_list.mapToGlobal(pos))
+        if gewaehlt is act:
+            self._set_beams_off(fids, not alle_aus)
+
+    def _set_beams_off(self, fids, aus: bool) -> None:
+        """Lichtkegel dieser fids aus- bzw. einblenden (und die Show markieren).
+
+        Der Zustand haengt an der SHOW, nicht am Geraet: derselbe Mover kann in
+        der einen Show stoeren und in der naechsten der Hauptdarsteller sein.
+        """
+        menge = set(getattr(self._state, "visualizer_beams_off", set()) or set())
+        for f in fids:
+            menge.add(int(f)) if aus else menge.discard(int(f))
+        self._state.visualizer_beams_off = menge
+        bridge = getattr(self, "_bridge", None)
+        if bridge is not None:
+            bridge._sync_beams_off()
+        self._refresh_patch_list()
+        # Ohne das bliebe die Aenderung beim Schliessen unbemerkt liegen —
+        # exakt dieselbe Dirty-Meldung wie bei einer Fixture-Rotation (dort mit
+        # derselben Begruendung: aendert live_view_positions nicht, ist aber
+        # eine Show-Aenderung). Lokaler Import wie an der Vorlage: SyncEvent ist
+        # modulweit NICHT importiert, ein `SyncEvent.X` hier waere ein
+        # NameError -- und der waere im except verschwunden, also genau die
+        # Klasse "Fehler, der sich als Erfolg meldet".
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+        except Exception:
+            pass
 
     def _on_patch_list_selected(self):
         item = self._patch_list.currentItem()

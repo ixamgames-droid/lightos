@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Lichtkegel einzelner Geräte ausblenden
+
+#### Neu
+
+- **Rechtsklick auf ein Gerät in der Visualizer-Liste blendet dessen Lichtkegel
+  aus** (und wieder ein), auch für mehrere Geräte auf einmal. Bisher gab es nur
+  „alle Kegel an" oder „alle aus" — wer einen einzelnen Blinder oder einen Mover
+  vor der Kamera loswerden wollte, musste auf alle verzichten. Ausgeblendete
+  Geräte sind in der Liste an „· Kegel aus" zu erkennen.
+
+  Die Einstellung gehört zur Show und wird mitgespeichert. Ältere Shows öffnen
+  unverändert.
+
+#### Behoben
+
+- **Die Geräteliste im Visualizer verlor nach jedem Neuaufbau ihre Markierung**
+  (nach Patchen, Löschen oder Show-Laden), und die Anzahl der noch nicht
+  platzierten Geräte blieb stehen. Ursache war ein Programmfehler mitten in der
+  Aktualisierung, der den Rest davon übersprang.
+
 ### 2026-08-01 — Lichtflecken auf dem Boden sehen aus wie Licht
 
 #### Verbessert
