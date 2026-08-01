@@ -305,6 +305,152 @@ def _pfeil_lauf(p, s, winkel_grad, frac):
 def d_pfeil_lauf_hoch(p, s, frac):   _pfeil_lauf(p, s, 0, frac)
 def d_pfeil_lauf_rechts(p, s, frac): _pfeil_lauf(p, s, 90, frac)
 
+
+# ── Lichtkegel-Formationen (VCG-01, Davids „Positionen"-Wunsch) ──────────────
+# Zweck: ein Taster „Mover auf Mitte" soll auch wie „Mover auf Mitte" aussehen.
+# Die Grafik zeigt also WOHIN eine Moving-Head-Gruppe zeigt, nicht WAS sie tut.
+#
+# ★ ENTSCHEIDUNG generisch statt rig-gebunden (2026-08-01, ohne Rueckfrage):
+# eine EINGEBAUTE Grafik kann gar nicht rig-gebunden sein — sie liegt als Datei
+# im Manifest, lange bevor irgendein Patch existiert. Eine Grafik aus dem
+# aktuellen Patch zu erzeugen ist ein anderes Feature (Generator, Cache,
+# Invalidierung beim Umpatchen) und steht als VCG-02 im Backlog.
+#
+# Frontansicht, nicht Draufsicht: von vorn sieht ein Kegel wie ein Kegel aus.
+# Von oben waere er ein Strich — die Neigung, also genau die Information, um
+# die es geht, ginge verloren.
+#
+# Drei Koepfe, nicht sechs: auf einem 64er-Taster zaehlt die FORM der
+# Formation. Mehr Kegel fuellen nur die Flaeche und machen sie unleserlicher.
+_TRUSS_Y = 0.16
+_BODEN_Y = 0.86
+_KOEPFE = (0.22, 0.50, 0.78)
+_STRAHL = (150, 205, 255)
+
+
+def _buehne(p, s):
+    """Traverse oben, Boden unten — der Rahmen, der die Kegel lesbar macht."""
+    _bg(p, s, (10, 12, 18, 255))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(74, 82, 96)))
+    p.drawRoundedRect(QRectF(s * 0.07, s * (_TRUSS_Y - 0.055), s * 0.86, s * 0.052),
+                      s * 0.02, s * 0.02)
+    p.setBrush(QBrush(QColor(40, 45, 56)))
+    p.drawRoundedRect(QRectF(s * 0.05, s * _BODEN_Y, s * 0.90, s * 0.05),
+                      s * 0.016, s * 0.016)
+
+
+def _kegel(p, s, x_kopf, x_ziel, breite=0.19, y_ziel=_BODEN_Y, fleck=True):
+    """Ein Strahl vom Kopf zum Auftreffpunkt, plus Lichtfleck am Boden.
+
+    Der Verlauf laeuft von hell am Kopf nach fast durchsichtig am Ziel — so
+    liest sich die Richtung auch dann, wenn zwei Kegel sich ueberlagern.
+    """
+    from PySide6.QtGui import QPainterPath
+    ax, ay = x_kopf * s, s * (_TRUSS_Y + 0.035)
+    zx, zy = x_ziel * s, s * y_ziel
+    hw = breite * s * 0.5
+    r, g_, b = _STRAHL
+
+    pfad = QPainterPath()
+    pfad.moveTo(ax, ay)
+    pfad.lineTo(zx - hw, zy)
+    pfad.lineTo(zx + hw, zy)
+    pfad.closeSubpath()
+    lg = QLinearGradient(ax, ay, zx, zy)
+    lg.setColorAt(0.0, QColor(r, g_, b, 250))
+    lg.setColorAt(1.0, QColor(r, g_, b, 80))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(lg))
+    p.drawPath(pfad)
+
+    if fleck:
+        rg = QRadialGradient(QPointF(zx, zy), hw * 1.7)
+        rg.setColorAt(0.0, QColor(r, g_, b, 235))
+        rg.setColorAt(1.0, QColor(r, g_, b, 0))
+        p.setBrush(QBrush(rg))
+        p.drawEllipse(QPointF(zx, zy), hw * 1.7, hw * 0.5)
+
+
+def _kopfkoerper(p, s, x_kopf, x_ziel, y_ziel=_BODEN_Y):
+    """Gehaeuse, in Strahlrichtung gekippt — das macht aus dem Dreieck einen
+    Scheinwerfer statt eines abstrakten Keils."""
+    ax, ay = x_kopf * s, s * _TRUSS_Y
+    winkel = math.degrees(math.atan2(x_ziel * s - ax, s * y_ziel - ay))
+    p.save()
+    p.translate(ax, ay)
+    p.rotate(-winkel)          # QPainter.rotate dreht im Uhrzeigersinn
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(126, 136, 156)))
+    p.drawRoundedRect(QRectF(-s * 0.048, -s * 0.012, s * 0.096, s * 0.082),
+                      s * 0.02, s * 0.02)
+    p.restore()
+
+
+def _formation(p, s, ziele, breite=0.19):
+    """Erst ALLE Kegel, dann alle Gehaeuse — sonst deckt ein Kegel das Gehaeuse
+    seines Nachbarn zu und die Traverse wirkt luecklig."""
+    _buehne(p, s)
+    for xk, xz in zip(_KOEPFE, ziele):
+        _kegel(p, s, xk, xz, breite)
+    for xk, xz in zip(_KOEPFE, ziele):
+        _kopfkoerper(p, s, xk, xz)
+
+
+def d_pos_mitte(p, s, frac):    _formation(p, s, (0.50, 0.50, 0.50))
+def d_pos_parallel(p, s, frac): _formation(p, s, _KOEPFE)
+def d_pos_kreuz(p, s, frac):    _formation(p, s, (0.78, 0.50, 0.22))
+def d_pos_links(p, s, frac):    _formation(p, s, (0.10, 0.22, 0.34))
+def d_pos_rechts(p, s, frac):   _formation(p, s, (0.66, 0.78, 0.90))
+
+
+# Faecher und Schmal sind bewusst UEBERZEICHNET. Bei den ersten Werten
+# (0.10/0.90 bzw. 0.42..0.58) waren sie auf 64 px nicht mehr von „Parallel"
+# bzw. „Alle auf Mitte" zu unterscheiden — auf dem Kontaktbogen in echter
+# Tastergroesse nachgesehen. Ein Piktogramm, das man nur bei 256 px erkennt,
+# hat seinen Zweck verfehlt: die Formation muss der EXTREMFALL sein, nicht der
+# realistische Winkel.
+def d_pos_faecher(p, s, frac):  _formation(p, s, (0.02, 0.50, 0.98), breite=0.24)
+def d_pos_schmal(p, s, frac):   _formation(p, s, (0.46, 0.50, 0.54), breite=0.11)
+
+
+def d_pos_publikum(p, s, frac):
+    """Ins Publikum: alle drei zeigen auf den Betrachter.
+
+    In der Frontansicht gibt es dafuer keinen Strahl, den man zeichnen koennte
+    — er kaeme aus dem Bild heraus. Also drei kurze, sehr breite Kegel mit
+    Blend-Flare und KEIN Bodenfleck: nichts trifft den Boden, das ist ja der
+    Punkt. Der erste Entwurf liess zwei Strahlen seitlich aus dem Rahmen
+    laufen; das las sich auf dem Taster wie ein Anschnittfehler.
+    """
+    _buehne(p, s)
+    for x in _KOEPFE:
+        _kegel(p, s, x, x, breite=0.30, y_ziel=0.58, fleck=False)
+    p.setPen(Qt.PenStyle.NoPen)
+    for x in _KOEPFE:
+        rg = QRadialGradient(QPointF(x * s, s * 0.58), s * 0.20)
+        rg.setColorAt(0.0, QColor(225, 242, 255, 240))
+        rg.setColorAt(0.45, QColor(150, 205, 255, 130))
+        rg.setColorAt(1.0, QColor(150, 205, 255, 0))
+        p.setBrush(QBrush(rg))
+        p.drawEllipse(QPointF(x * s, s * 0.58), s * 0.20, s * 0.20)
+    for x in _KOEPFE:
+        _kopfkoerper(p, s, x, x, 0.58)
+
+
+def d_pos_sweep(p, s, frac):
+    """Gleichlauf: alle drei wandern gemeinsam nach links und zurueck."""
+    v = math.sin(2 * math.pi * frac) * 0.30
+    _formation(p, s, tuple(x + v for x in _KOEPFE))
+
+
+def d_pos_faecher_atmen(p, s, frac):
+    """Faecher oeffnet und schliesst — frac=0 ist ZU, damit der Poster-Frame
+    (und das statische Vorschaubild) die kompakte Form zeigt."""
+    k = 0.5 - 0.5 * math.cos(2 * math.pi * frac)      # 0 -> 1 -> 0
+    spanne = 0.06 + k * 0.34
+    _formation(p, s, (0.5 - spanne, 0.50, 0.5 + spanne))
+
 _GIFS = [
     ("pulse",          "Puls / Atmen",        "dynamik", d_pulse),
     ("strobe",         "Strobe / Blitz",      "dynamik", d_strobe),
@@ -318,6 +464,8 @@ _GIFS = [
     ("breathe_rgb",    "RGB-Atmen",           "farbe",   d_breathe_rgb),
     ("pfeil_lauf_hoch",   "Pfeile hoch (Lauf)",   "pfeile", d_pfeil_lauf_hoch),
     ("pfeil_lauf_rechts", "Pfeile rechts (Lauf)", "pfeile", d_pfeil_lauf_rechts),
+    ("pos_sweep",         "Sweep (Gleichlauf)",   "positionen", d_pos_sweep),
+    ("pos_faecher_atmen", "Faecher auf/zu",       "positionen", d_pos_faecher_atmen),
 ]
 _PNGS = [
     ("spectrum",  "Spektrum",     "statisch", d_spectrum),
@@ -330,6 +478,14 @@ _PNGS = [
     ("pfeil_hoch_rechts",   "Hoch-Rechts",  "pfeile", d_pfeil_hoch_rechts),
     ("pfeil_runter_links",  "Runter-Links", "pfeile", d_pfeil_runter_links),
     ("pfeil_runter_rechts", "Runter-Rechts", "pfeile", d_pfeil_runter_rechts),
+    ("pos_mitte",     "Alle auf Mitte",  "positionen", d_pos_mitte),
+    ("pos_faecher",   "Faecher",         "positionen", d_pos_faecher),
+    ("pos_parallel",  "Parallel runter", "positionen", d_pos_parallel),
+    ("pos_kreuz",     "Kreuz",           "positionen", d_pos_kreuz),
+    ("pos_links",     "Alle nach links", "positionen", d_pos_links),
+    ("pos_rechts",    "Alle nach rechts","positionen", d_pos_rechts),
+    ("pos_schmal",    "Eng gebuendelt",  "positionen", d_pos_schmal),
+    ("pos_publikum",  "Ins Publikum",    "positionen", d_pos_publikum),
 ]
 
 

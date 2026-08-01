@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Lichtkegel-Piktogramme für VC-Taster
+
+#### Neu
+
+- **Zehn neue Button-Grafiken in der Kategorie „Positionen".** Sie zeigen, wohin
+  eine Moving-Head-Gruppe zeigt: alle auf Mitte, Fächer, parallel, Kreuz, alles
+  nach links bzw. rechts, eng gebündelt, ins Publikum — dazu zwei animierte
+  (gemeinsamer Sweep, Fächer auf/zu). Ein Taster „Mover auf Mitte" sieht damit
+  auch danach aus. Die Galerie hat jetzt 32 Grafiken.
+
 ### 2026-08-01 — MIDI: mehrere Ausgänge gleichzeitig ansprechbar
 
 #### Neu
