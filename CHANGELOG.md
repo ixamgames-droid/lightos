@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Zielen auf eine Mover-Bar bewegt jetzt die echten Köpfe
+
+#### Behoben
+
+- **Das Aim-Werkzeug drehte eine Mover-Bar nur im 3D — am Rig passierte
+  nichts.** Weil eine Bar mehrere Farbbänke hat, galt sie als Spider und landete
+  im statischen Zweig: dort wird lediglich die Gehäuse-Ausrichtung im
+  Visualizer gesetzt, kein einziger DMX-Kanal. Im 3D sah es richtig aus, die
+  Lampen blieben stehen.
+
+  Jetzt bekommt **jeder Kopf** seine eigenen Pan/Tilt-Werte. Die Köpfe zeigen
+  dabei in dieselbe Richtung (parallel) — wo auf der Schiene ein Kopf sitzt,
+  weiß nur das 3D-Modell.
+
 ### 2026-08-01 - Test-Gate wird nicht mehr grundlos rot
 
 #### Behoben
