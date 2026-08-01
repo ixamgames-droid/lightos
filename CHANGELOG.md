@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 - Test-Gate wird nicht mehr grundlos rot
+
+#### Behoben
+
+- **Segmente mit 3D-Szene konkurrierten um WebGL-Kontexte.** Liefen zwei davon
+  gleichzeitig, scheiterte eines am fehlenden Kontext - an wechselnden Dateien,
+  isoliert immer gruen. Solche Segmente laufen jetzt einzeln, in einer eigenen
+  Spur neben der parallelen. Das Gate bleibt dabei gleich schnell.
+
 ### 2026-08-01 — Lichtkegel enden am Boden statt hindurchzuschießen
 
 #### Behoben

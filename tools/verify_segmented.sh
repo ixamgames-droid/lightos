@@ -76,8 +76,44 @@ run_one() {
 }
 export -f run_one; export PY OUTDIR
 
+# ── Zwei Spuren: WebEngine seriell, Rest parallel ───────────────────────────
+# WARUM (2026-08-01): Segmente, die eine echte three.js-Szene hochfahren,
+# brauchen jeweils einen WebGL-Kontext. Laufen mehrere davon gleichzeitig,
+# scheitert einer reproduzierbar mit
+#   "THREE.WebGLRenderer: Error creating WebGL context"
+# und faerbt das Gate rot — bei EINEM Fehlschlag pro Lauf, an wechselnden
+# Dateien. Isoliert sind dieselben Dateien gruen (3/3 nachgemessen). Das ist
+# also Kontext-Konkurrenz, kein Testfehler.
+#
+# Das ist gefaehrlicher als es klingt: Wer diese Rotfaerbung einmal als
+# "das flackert halt" abtut, hat das Gate als Merge-Kriterium aufgegeben —
+# ab dann sieht ein ECHTER roter Viz-Test genauso aus wie das Rauschen.
+#
+# Deshalb keine Wiederholungslogik (die wuerde echte Fehler mitheilen),
+# sondern die Ursache weg: WebEngine-Dateien laufen in einer eigenen Spur
+# mit genau EINEM Prozess. Die Spur laeuft NEBEN der normalen, nicht davor
+# oder danach — gemessen 208 s seriell gegen ~390 s Gesamt-Gate, die
+# serielle Spur ist also nicht der kritische Pfad und kostet keine Zeit.
+#
+# Marker ist der Import von QWebEngineView: den hat jede Datei, die eine
+# Seite laden kann, und keine andere (test_viz12_service.py etwa arbeitet
+# nur am Service und bleibt korrekt in der schnellen Spur).
+WEB=(); REST=()
+for f in "${FILES[@]}"; do
+    if grep -q 'QWebEngineView' "$f" 2>/dev/null; then WEB+=("$f"); else REST+=("$f"); fi
+done
+
 if [ "$JOBS" -gt 1 ] && command -v xargs >/dev/null 2>&1; then
-    printf '%s\n' "${FILES[@]}" | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {}
+    echo "[seg] Spuren: ${#REST[@]} parallel ($JOBS), ${#WEB[@]} WebEngine seriell"
+    web_pid=""
+    if [ "${#WEB[@]}" -gt 0 ]; then
+        ( for f in "${WEB[@]}"; do run_one "$f"; done ) &
+        web_pid=$!
+    fi
+    if [ "${#REST[@]}" -gt 0 ]; then
+        printf '%s\n' "${REST[@]}" | xargs -P "$JOBS" -I{} bash -c 'run_one "$@"' _ {}
+    fi
+    [ -n "$web_pid" ] && wait "$web_pid"
 else
     for f in "${FILES[@]}"; do run_one "$f"; done
 fi
