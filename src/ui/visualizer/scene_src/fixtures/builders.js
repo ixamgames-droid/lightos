@@ -11,6 +11,7 @@ import { isLowSpec } from '../scene/renderer.js';
 import { pixelCell } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
+import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
@@ -1249,6 +1250,10 @@ function applyFloorAim(f, dmx) {
   // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
   // eine Laenge gesetzt.
   setBeamLength(f, bodenAbstand);
+  // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher einen
+  // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
+  // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
+  syncPoolSize(f, bodenAbstand);
 }
 
 // Keep top-down icon position synced
