@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Lichtkegel im 3D lassen sich in der Länge begrenzen
+
+#### Neu
+
+- **Neuer Regler „Max. Strahllänge" in den Visualizer-Einstellungen.** Lichtkegel
+  enden zwar seit Kurzem am Boden — ein waagerecht oder nach oben gerichteter
+  Kopf trifft den aber nie und leuchtete quer durch die ganze Szene. Der Regler
+  deckelt das (0 = aus, also wie bisher).
+
+  Die Einstellung gehört zum Rechner, nicht zur Show, und bleibt deshalb über
+  Sitzungen hinweg erhalten. Das große Visualizer-Fenster und die kleine 3D-Ansicht
+  zeigen denselben Wert.
+
+  **Nur die Darstellung ist betroffen — an der DMX-Ausgabe ändert sich nichts.**
+
+#### Behoben
+
+- Lichtkegel, die am Boden endeten, sprangen bei einer Zoom-Änderung kurzzeitig
+  auf ihre volle Länge zurück.
+
 ### 2026-08-01 — Das Prisma ist im 3D-Visualizer zu sehen
 
 #### Neu

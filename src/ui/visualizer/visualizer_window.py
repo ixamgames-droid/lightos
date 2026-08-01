@@ -241,6 +241,54 @@ def quality_tier_pref() -> str:
         return "auto"
 
 
+# VIZ-15: globale Obergrenze der sichtbaren Kegellaenge (Meter, 0 = aus).
+MAX_BEAM_RANGE_MAX = 20
+
+
+def beam_range_value(besitzer) -> float:
+    """Aktueller Reglerwert des Fensters in Metern (0 = aus).
+
+    ★ Bewusst eine MODUL-Funktion und kein Methoden-Helfer auf
+    ``VisualizerWindow``: Bestandstests fahren Handler wie
+    ``_collect_settings``/``_update_beam_range_label`` ungebunden auf einem
+    ``SimpleNamespace``-Stub, der nur die Felder von damals mitbringt. Eine neue
+    Methode auf ``self`` schlaegt dort mit ``AttributeError`` zu — und der
+    verschwindet im ``except`` des Aufrufers, das Feature scheitert lautlos.
+    Dieselbe Falle wie HW-5b und FM-9/A6; sie hat hier beim ersten Anlauf
+    prompt wieder zugeschlagen und wurde vom Test gefangen, nicht vom Auge.
+    Als freie Funktion existiert das Problem nicht.
+    Siehe Second Brain ``reference_lightos_trap_stub_state_attributes``.
+    """
+    sld = getattr(besitzer, "_sld_beam_range", None)
+    try:
+        return float(sld.value()) if sld is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def max_beam_range_pref() -> float:
+    """Obergrenze der sichtbaren Kegellaenge in Metern; ``0.0`` = aus.
+
+    Geraete-gebunden in ui_prefs.json (Key ``viz_max_beam_range``) — dieselbe
+    Ablage wie die Qualitaetsstufe, und aus verwandtem Grund: der sinnvolle Wert
+    haengt am RAUM, in dem gearbeitet wird (Club oder Halle), nicht an der Show,
+    die zwischen Raeumen wandert. Anders als Deckkraft oder Nebel ist das nichts,
+    was man waehrend der Arbeit hin- und herschaltet — einmal gesetzt, soll es
+    die naechste Sitzung ueberleben.
+
+    Deckelt AUSSCHLIESSLICH die Darstellung; an der DMX-Ausgabe aendert sich
+    nichts.
+    """
+    try:
+        from src.ui.views.programmer_view import _load_prefs
+        val = float(_load_prefs().get("viz_max_beam_range", 0) or 0)
+    except Exception:
+        return 0.0
+    if not math.isfinite(val) or val <= 0:
+        return 0.0
+    return float(min(val, MAX_BEAM_RANGE_MAX))
+
+
 def load_stage_html(view) -> None:
     """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
     auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
@@ -2580,6 +2628,27 @@ class VisualizerWindow(QMainWindow):
         opacity_row.addWidget(self._lbl_opacity)
         layout.addLayout(opacity_row)
 
+        # VIZ-15: globale Max-Strahllaenge. Der Kegel endet seit
+        # VIZ-BEAM-OCCLUSION am Boden — ein waagerecht oder nach oben
+        # gerichteter Kopf trifft den aber nie und leuchtet mit voller
+        # Grundlaenge quer durch die Szene. Dieser Regler deckelt das.
+        range_row = QHBoxLayout()
+        range_row.addWidget(QLabel("Max. Strahllänge:"))
+        self._sld_beam_range = QSlider(Qt.Orientation.Horizontal)
+        self._sld_beam_range.setRange(0, MAX_BEAM_RANGE_MAX)
+        self._sld_beam_range.setValue(int(round(max_beam_range_pref())))
+        self._sld_beam_range.setToolTip(
+            "Begrenzt die sichtbare Länge der Lichtkegel im 3D (0 = aus, also "
+            "die Grundlänge des Gerätetyps).\nÄndert NICHTS an der "
+            "DMX-Ausgabe — nur an der Darstellung.")
+        self._sld_beam_range.valueChanged.connect(self._on_beam_range_changed)
+        range_row.addWidget(self._sld_beam_range, 1)
+        self._lbl_beam_range = QLabel("aus")
+        self._lbl_beam_range.setFixedWidth(38)
+        range_row.addWidget(self._lbl_beam_range)
+        layout.addLayout(range_row)
+        self._update_beam_range_label()
+
         self._chk_cones = QCheckBox("Lichtkegel anzeigen");      self._chk_cones.setChecked(True)
         self._chk_floor = QCheckBox("Bodenpunkte anzeigen");     self._chk_floor.setChecked(True)
         self._chk_fog   = QCheckBox("Nebel/Haze anzeigen");      self._chk_fog.setChecked(True)
@@ -4362,7 +4431,31 @@ class VisualizerWindow(QMainWindow):
             # VIZ-14: Raum-Huelle (Default AUS).
             "showRoom":        bool(getattr(self, "_chk_room", None) is not None
                                     and self._chk_room.isChecked()),
+            # VIZ-15: globale Max-Strahllaenge in Metern (0 = aus).
+            "maxBeamRange":    beam_range_value(self),
         }
+
+    def _update_beam_range_label(self) -> None:
+        lbl = getattr(self, "_lbl_beam_range", None)
+        if lbl is None:
+            return
+        v = beam_range_value(self)
+        lbl.setText("aus" if v <= 0 else f"{int(v)} m")
+
+    def _on_beam_range_changed(self, _value=None) -> None:
+        """Regler bewegt: Beschriftung nachziehen, Wert merken, Szene pushen.
+
+        Gemerkt wird in ui_prefs (Key ``viz_max_beam_range``) — Begruendung an
+        :func:`max_beam_range_pref`. Bewusst KEIN Szenen-Neuladen wie beim
+        Qualitaets-Override: die Laenge ist keine Konstruktor-Entscheidung des
+        Renderers, sondern eine Zahl, die der naechste Frame ohnehin liest."""
+        self._update_beam_range_label()
+        try:
+            from src.ui.views.programmer_view import _save_prefs
+            _save_prefs({"viz_max_beam_range": beam_range_value(self)})
+        except Exception as e:
+            print(f"[Visualizer] max beam range prefs error: {e}")
+        self._on_settings_changed()
 
     def _dock_enabled(self) -> bool:
         act = getattr(self, "_act_dock", None)

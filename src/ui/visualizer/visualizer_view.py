@@ -33,7 +33,7 @@ from src.core.app_state import get_state
 from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
-    install_scene_start_guard,
+    install_scene_start_guard, max_beam_range_pref,
 )
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot_fwd
@@ -315,6 +315,11 @@ class Visualizer3DView(QWidget):
             "brightness":     self._sld_brightness.value() / 100.0,
             "autoBrightness": False,
             "dockEnabled":    False,
+            # VIZ-15: dieselbe geraete-gebundene Obergrenze wie im Vollfenster.
+            # Aus den Prefs statt fest verdrahtet — sonst zeigte dieselbe Szene
+            # in den beiden Ansichten unterschiedlich lange Kegel, und der
+            # Regler im Vollfenster waere hier wirkungslos.
+            "maxBeamRange":   max_beam_range_pref(),
             # VIZ-LABELS: aus der zentralen Quelle lesen (nicht aus dem Button),
             # damit der gepushte Wert immer dem AppState entspricht — der Button
             # ist nur ein Controller, der AppState VOR dem Push schreibt.

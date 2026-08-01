@@ -102,7 +102,16 @@ export function applyOptics(f, dmx) {
   const frostAnteil = (typeof f.lastFrost === 'number' && isFinite(f.lastFrost))
     ? Math.max(0, Math.min(255, f.lastFrost)) / 255 : 0;
   const k = opticsScale(f.lastZoom, f.lastIris) * (1 + FROST_AUFWEITUNG * frostAnteil);
-  if (f.beam) f.beam.scale.set(k, 1, k);
+  // ★ Y bleibt STEHEN, statt auf 1 zurueckgesetzt zu werden. Die Y-Achse ist
+  // die KEGELLAENGE und gehoert einem anderen Besitzer: setBeamLength in
+  // builders.js (Bodenauftreffpunkt aus VIZ-BEAM-OCCLUSION, globale Obergrenze
+  // aus VIZ-15). Ein hartes `1` funktionierte bisher nur, WEIL applyFloorAim
+  // zufaellig danach lief und die Laenge neu setzte — eine unsichtbare
+  // Reihenfolge-Abhaengigkeit, die beim naechsten Umsortieren der
+  // updateDmx-Kette gerissen waere (und dazwischen haette der Kegel eine
+  // Laenge und eine Position aus zwei verschiedenen Rechnungen gehabt).
+  // Zoom/Iris/Frost aendern die WEITE, nie die Laenge — hier also nur X/Z.
+  if (f.beam) f.beam.scale.set(k, f.beam.scale.y, k);
   if (f.spot && f.baseSpotAngle) {
     // Der SpotLight traegt die Ausleuchtung — ohne ihn wuerde nur der sichtbare
     // Kegel schmaler, der Bodenfleck aber gleich gross bleiben.

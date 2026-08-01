@@ -1043,13 +1043,15 @@ export function updateMovingHeadDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
   applyPrism(f, dmx);       // VIZ-PRISMA-3D: aus einem Strahl werden mehrere
-  // Ein Batch mit `zoom`, aber OHNE `prism` laeuft nicht durch applyPrism —
-  // ohne diesen Nachzug bliebe der Faecher auf der alten Weite stehen, waehrend
-  // die Mitte schon gezoomt hat. Kostet nichts, wenn kein Prisma steckt.
-  syncPrismToBeam(f);
   applyGobo(f, dmx);        // VIZ-GOBO-3D: Gobo-Muster in den Bodenfleck
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
+  // GANZ zum Schluss: der Faecher kopiert Weite UND Laenge vom Hauptstrahl,
+  // und die Laenge setzt erst applyFloorAim eine Zeile darueber. Stuende der
+  // Nachzug frueher (wie bis VIZ-15), haetten die Nebenstrahlen die Laenge des
+  // VORIGEN Frames — sichtbar, sobald ein Kopf schwenkt und der
+  // Bodenauftreffpunkt schnell wandert. Kostet nichts ohne Prisma.
+  syncPrismToBeam(f);
   syncIconPos(f);
 }
 
@@ -1062,9 +1064,9 @@ export function updateGenericDmx(f, dmx) {
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyPrism(f, dmx);       // ... und manche ein Prisma
-  syncPrismToBeam(f);       // Faecher der Kegelweite nachziehen (s. oben)
   applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
   applyFloorAim(f, dmx);
+  syncPrismToBeam(f);       // nach applyFloorAim — s. updateMovingHeadDmx
   syncIconPos(f);
 }
 
@@ -1160,14 +1162,38 @@ function applyPanTilt(f, dmx) {
 // vor der die Review-Checkliste warnt. Der Bodenauftreffpunkt wird ohnehin
 // schon gerechnet (Floor-Spot) — diese Laenge ist damit gratis. Schatten IM
 // Strahl (volumetrisch) bleibt offen und gehoert an die Qualitaetsstufen.
-function setBeamLength(f, dist) {
-  const beam = f.beam;
-  if (!beam || !f.baseBeamLength) return;
+// VIZ-15: `dist` darf ``Infinity`` sein — "kein Auftreffpunkt bekannt". Dann
+// entscheidet allein die Grundlaenge bzw. die globale Obergrenze.
+// Die reine Laengen-Rechnung, herausgezogen als Test-Seam (VIZ-15): DREI
+// Grenzen treffen hier aufeinander, und welche gewinnt, IST die Aussage —
+// ein Test, der nur "der Kegel wurde kuerzer" prueft, haette jede der drei
+// falsch verdrahtet durchgewinkt.
+//
+//   baseLength  Grundlaenge des Geraetetyps (6-8 m)
+//   dist        Abstand zum Bodenauftreffpunkt, ``Infinity`` = trifft nie
+//   maxRange    globale Obergrenze in Metern, 0/ungueltig = aus
+export function beamLengthScale(baseLength, dist, maxRange) {
+  if (!(baseLength > 0)) return 1;
+  const deckel = (typeof maxRange === 'number' && isFinite(maxRange) && maxRange > 0)
+    ? maxRange : Infinity;
+  // Ein unbrauchbarer Abstand heisst "kein Auftreffpunkt", nicht "Laenge 0" —
+  // sonst liesse ein einzelnes NaN den Kegel verschwinden.
+  const d = (typeof dist === 'number' && isFinite(dist)) ? dist : Infinity;
   // Nie laenger als der Grundkegel (sonst wuerde ein hoch haengender Scheinwerfer
   // ploetzlich 30 m weit leuchten) und nie ganz auf 0 (ein Kegel ohne Laenge
   // waere ein unsichtbarer Punkt statt eines kurzen Strahls).
-  const soll = Math.max(0.15, Math.min(f.baseBeamLength, dist));
-  const k = soll / f.baseBeamLength;
+  const soll = Math.max(0.15, Math.min(baseLength, d, deckel));
+  return soll / baseLength;
+}
+
+function setBeamLength(f, dist) {
+  const beam = f.beam;
+  if (!beam || !f.baseBeamLength) return;
+  // VIZ-15: die globale Obergrenze gehoert GENAU hierher und an keine zweite
+  // Stelle — hier laeuft die einzige Kegellaengen-Rechnung, und zwei Stellen
+  // waeren zwei Wahrheiten, von denen eine bei der naechsten Aenderung
+  // stehenbleibt.
+  const k = beamLengthScale(f.baseBeamLength, dist, settings.maxBeamRange);
   if (Math.abs((beam.scale.y || 1) - k) < 0.01) return;   // kein Zappeln
   beam.scale.y = k;
   // Der Kegel haengt mit seiner Mitte bei -laenge/2 unter der Linse; wird er
@@ -1176,7 +1202,13 @@ function setBeamLength(f, dist) {
 }
 
 function applyFloorAim(f, dmx) {
-  if (!dmx.skipBeam && f.floorSpot && f.spotTarget) {
+  if (dmx.skipBeam) return;
+  // VIZ-15: "kein Auftreffpunkt bekannt". Bleibt der Wert stehen, entscheidet
+  // allein die Grundlaenge bzw. die globale Obergrenze — genau der Fall eines
+  // waagerecht oder nach oben gerichteten Kopfes, der den Boden NIE trifft und
+  // deshalb bis hierher immer seine volle Grundlaenge behielt.
+  let bodenAbstand = Infinity;
+  if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
     // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
@@ -1208,10 +1240,15 @@ function applyFloorAim(f, dmx) {
         // Meter Licht unter die Buehne. `t` ist der Abstand bis zum
         // Auftreffpunkt und wird hier ohnehin schon gerechnet; die
         // Kegel-Laenge daraus abzuleiten kostet also nichts.
-        setBeamLength(f, t);
+        bodenAbstand = t;
       }
     }
   }
+  // EINE Aufrufstelle fuer die Kegellaenge, und sie laeuft IMMER — auch ohne
+  // Bodenfleck und ohne Auftreffpunkt. Vorher hing sie im innersten Zweig und
+  // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
+  // eine Laenge gesetzt.
+  setBeamLength(f, bodenAbstand);
 }
 
 // Keep top-down icon position synced

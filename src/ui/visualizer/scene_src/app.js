@@ -55,6 +55,7 @@ import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
 import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js';  // VIZ-14
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
+import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -183,6 +184,9 @@ window.__lightos = {
   // gestellten Fixture-Objekt fahren und legt die Kegel wirklich an — der Test
   // zaehlt danach Kinder und prueft die geteilte Geometrie.
   prismFacetCount, applyPrism,
+  // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
+  // Obergrenze) treffen aufeinander, und welche gewinnt IST die Aussage.
+  beamLengthScale,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
