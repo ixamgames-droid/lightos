@@ -18,9 +18,37 @@
 // Eine Umkehr-Angabe pro Profil waere die saubere Loesung und ist als eigener
 // Punkt notiert, statt sie hier zu raten.
 
+// ── Kantenschaerfe: Fokus + Frost ───────────────────────────────────────────
+//
+// Fokus wird NICHT als 0->255-Rampe abgebildet, und das ist der wichtigste
+// Punkt an dieser Ergaenzung. Physikalisch ist Fokus eine BEIDSEITIGE
+// mechanische Verstellung: die Linse laeuft von nah nach fern, scharf ist sie
+// irgendwo dazwischen. Eine monotone Rampe waere schlicht falsch.
+//
+// Wo "dazwischen" liegt, sagt die Fixture-Library selbst: JEDES eingebaute
+// Profil mit Fokus-Kanal setzt den Default auf 128 (4 von 4 nachgezaehlt),
+// waehrend Frost und Prisma bei 0 stehen (4 von 4). Ein Default von 128 heisst
+// "Mitte des Wegs" — und die Mitte ist die beste verfuegbare Aussage darueber,
+// welche Stellung der Profil-Autor fuer normal hielt. Also: scharf bei 128,
+// zu beiden Enden hin weicher.
+//
+// Frost dagegen IST monoton und hat eine eindeutige Konvention: 0 = kein
+// Diffusor im Strahl, 255 = voll. Die Range-Tabellen der Library ("Light
+// Frost" -> "Medium Frost") bestaetigen die Richtung.
+//
+// Angefasst wird nur `spot.penumbra` — der echte Kantenschaerfe-Regler, den
+// sonst niemand pro Frame schreibt. Beam- und Bodenfleck-Deckkraft setzt
+// `applyGenericColor` in jedem Frame neu; dort etwas hineinzuschreiben waere
+// ein Kampf um dieselbe Eigenschaft, den der letzte Schreiber gewinnt.
+// Zusaetzlich streut Frost den Kegel real etwas auf — das faellt in den
+// vorhandenen Skalierungsfaktor und kostet damit ebenfalls nichts.
 const ZOOM_ENG = 0.45;    // Faktor auf den Grundwinkel bei DMX 0
 const ZOOM_WEIT = 1.90;   // ... bei DMX 255
 const IRIS_ZU = 0.30;     // Iris ganz geschlossen laesst 30 % des Kegels
+const FOKUS_MITTE = 128;  // Library-Default aller Profile mit Fokus-Kanal
+const PENUMBRA_SCHARF = 0.12;
+const PENUMBRA_WEICH = 0.95;
+const FROST_AUFWEITUNG = 0.25;   // voller Frost weitet den Kegel um 25 %
 
 /** DMX 0..255 -> Skalierungsfaktor des Kegel-Radius. */
 export function opticsScale(zoom, iris) {
@@ -37,19 +65,53 @@ export function opticsScale(zoom, iris) {
   return k;
 }
 
-/** Kegel + SpotLight eines Fixtures an Zoom/Iris angleichen. */
+/**
+ * DMX 0..255 -> Weichheit der Kegelkante, 0 = knackscharf, 1 = ganz diffus.
+ *
+ * Fokus ist um `FOKUS_MITTE` herum scharf und wird zu BEIDEN Enden weicher
+ * (s. Modulkopf); Frost ist monoton. Beide diffundieren unabhaengig
+ * voneinander, deshalb multipliziert sich die verbleibende SCHAERFE.
+ */
+export function opticsSoftness(focus, frost) {
+  let schaerfe = 1.0;
+  if (typeof focus === 'number' && isFinite(focus)) {
+    const d = Math.abs(Math.max(0, Math.min(255, focus)) - FOKUS_MITTE);
+    schaerfe *= 1.0 - d / Math.max(FOKUS_MITTE, 255 - FOKUS_MITTE);
+  }
+  if (typeof frost === 'number' && isFinite(frost)) {
+    schaerfe *= 1.0 - Math.max(0, Math.min(255, frost)) / 255;
+  }
+  return 1.0 - schaerfe;
+}
+
+/** Kegel + SpotLight eines Fixtures an Zoom/Iris/Fokus/Frost angleichen. */
 export function applyOptics(f, dmx) {
   if (!f || !dmx) return;
-  if (dmx.zoom === undefined && dmx.iris === undefined) return;   // Geraet ohne Optik
+  if (dmx.zoom === undefined && dmx.iris === undefined
+      && dmx.focus === undefined && dmx.frost === undefined) return;  // ohne Optik
   // Letzten Stand merken: der Service schickt DIFFERENTIELL, ein Batch ohne
   // zoom heisst "unveraendert" und darf den Kegel nicht zurueckspringen lassen.
   if (dmx.zoom !== undefined) f.lastZoom = dmx.zoom;
   if (dmx.iris !== undefined) f.lastIris = dmx.iris;
-  const k = opticsScale(f.lastZoom, f.lastIris);
+  if (dmx.focus !== undefined) f.lastFocus = dmx.focus;
+  if (dmx.frost !== undefined) f.lastFrost = dmx.frost;
+  const weich = opticsSoftness(f.lastFocus, f.lastFrost);
+  // Frost streut den Strahl real etwas auf; Fokus tut das NICHT — eine
+  // unscharfe Kante ist keine breitere. Deshalb haengt die Aufweitung allein
+  // am Frost-Wert, nicht an der gemeinsamen Weichheit.
+  const frostAnteil = (typeof f.lastFrost === 'number' && isFinite(f.lastFrost))
+    ? Math.max(0, Math.min(255, f.lastFrost)) / 255 : 0;
+  const k = opticsScale(f.lastZoom, f.lastIris) * (1 + FROST_AUFWEITUNG * frostAnteil);
   if (f.beam) f.beam.scale.set(k, 1, k);
   if (f.spot && f.baseSpotAngle) {
     // Der SpotLight traegt die Ausleuchtung — ohne ihn wuerde nur der sichtbare
     // Kegel schmaler, der Bodenfleck aber gleich gross bleiben.
     f.spot.angle = Math.min(Math.PI / 2 - 0.01, f.baseSpotAngle * k);
+    // Nur anfassen, wenn das Geraet die Kanaele WIRKLICH hat — sonst bekaeme
+    // jeder Scheinwerfer ohne Fokus/Frost eine erfundene Kantenschaerfe
+    // (dieselbe Falle wie der erfundene 128er-Zoom-Default).
+    if (f.lastFocus !== undefined || f.lastFrost !== undefined) {
+      f.spot.penumbra = PENUMBRA_SCHARF + (PENUMBRA_WEICH - PENUMBRA_SCHARF) * weich;
+    }
   }
 }

@@ -44,13 +44,20 @@ class DatenpfadTest(unittest.TestCase):
         self.assertEqual(p["zoom"], 200)
         self.assertEqual(p["iris"], 40)
 
+    def test_fokus_und_frost_kommen_ebenfalls_an(self):
+        """Kantenschaerfe (PR #534): ohne den Datenpfad bleibt die schoenste
+        Kennlinie wirkungslos — genau daran scheiterte Zoom vor PR #523."""
+        p = _build_fixture_payload(_Fx(), {"intensity": 255, "focus": 200, "frost": 90})
+        self.assertEqual(p["focus"], 200)
+        self.assertEqual(p["frost"], 90)
+
     def test_geraet_ohne_optik_bekommt_keine_erfundenen_werte(self):
         """★ Ein 128er-Default waere schlimmer als gar nichts: er stellte JEDEN
         Scheinwerfer ohne Zoom-Kanal auf halbe Weite. Fehlender Schluessel
         heisst JS-seitig „unveraendert"."""
         p = _build_fixture_payload(_Fx(), {"intensity": 255})
-        self.assertNotIn("zoom", p)
-        self.assertNotIn("iris", p)
+        for k in ("zoom", "iris", "focus", "frost"):
+            self.assertNotIn(k, p)
 
     def test_bestandsfelder_unveraendert(self):
         p = _build_fixture_payload(_Fx(), {"intensity": 255, "pan": 10, "tilt": 20})

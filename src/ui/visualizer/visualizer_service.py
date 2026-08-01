@@ -143,7 +143,7 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     # Nur senden, was das Geraet WIRKLICH hat: ein fehlender Schluessel heisst
     # JS-seitig "unveraendert", ein erfundener 128er-Default wuerde jeden
     # Scheinwerfer ohne Zoom auf halbe Weite stellen.
-    for _opt in ("zoom", "iris"):
+    for _opt in ("zoom", "iris", "focus", "frost"):
         if _opt in attrs:
             payload[_opt] = attrs[_opt]
     # VIZ-GOBO-3D (David-Wunsch 2026-07-16): welches Gobo steckt gerade drin?

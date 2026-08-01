@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Fokus und Frost wirken jetzt im 3D
+
+#### Neu
+
+- **Der Lichtkegel im Visualizer bekommt eine weiche Kante, wenn Fokus oder
+  Frost es sagen.** Frost streut zusätzlich etwas auf, wie am echten Gerät.
+
+  Fokus ist dabei bewusst *nicht* als Rampe von 0 nach 255 umgesetzt: er ist
+  eine beidseitige Verstellung und in der Mittelstellung am schärfsten — genau
+  so, wie es die eingebauten Geräteprofile vorgeben. Scheinwerfer ohne diese
+  Kanäle bleiben unverändert.
+
 ### 2026-08-01 — Show-Wechsel blitzt auch auf Skript-Kanälen nicht mehr
 
 #### Behoben

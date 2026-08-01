@@ -53,6 +53,7 @@ import {
 } from './scene/render_loop.js';
 import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
 import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js';  // VIZ-14
+import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -170,6 +171,12 @@ window.__lightos = {
   // VIZ-LABELS: Test-Seam — das Label-Zoom/Toggle-Gate deterministisch treiben
   // (offscreen drosselt Post-Load-Signale, daher direkter Aufruf statt push).
   updateLabelZoomVisibility,
+  // VIZ-MH-OPTICS: Test-Seam fuer die Optik-Kennlinie. Beide Funktionen sind
+  // rein (kein Szenen-Zustand, keine three.js-Abhaengigkeit), deshalb kann der
+  // Test sie mit einem GESTELLTEN Fixture-Objekt aufrufen und ZAHLEN
+  // zurueckrechnen — statt den JS-Quelltext nach Konstanten zu greppen, wie es
+  // die erste Fassung der Optik-Tests noch tat.
+  opticsSoftness, applyOptics,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
