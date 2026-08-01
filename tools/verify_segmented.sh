@@ -60,10 +60,47 @@ export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 
 echo "[seg] ${#FILES[@]} Testdateien, $JOBS parallel, Ausgabe: $OUTDIR"
 
+# XPLAT-17: warten, bis die Chromium-Kindprozesse des VORIGEN WebEngine-Segments
+# wirklich weg sind.
+#
+# Die serielle Spur aus XPLAT-16 serialisiert die pytest-Prozesse — nicht deren
+# Kinder. QtWebEngine startet einen eigenen GPU-Prozess, und der stirbt nach dem
+# Elternprozess, nicht mit ihm. Zwei GPU-Prozesse koennen sich damit trotz Spur
+# ueberlappen und um den GL-Kontext des Treibers konkurrieren.
+#
+# EHRLICH ZUM STATUS: das ist eine begruendete Vermutung, keine Messung. Belegt
+# ist nur, dass der Flake mit aktiver Spur WEITER auftritt (2 Ausfaelle in 5
+# vollen Laeufen, davor rund einer pro Lauf) und dass Software-GL lokal
+# schlechter ist. Ob dieses Warten die Rate wirklich auf null bringt, muss ueber
+# mehrere volle Laeufe gemessen werden — s. XPLAT-17.
+#
+# Gedeckelt, damit es nie haengt: laeuft nebenher Davids LightOS-Instanz, halten
+# deren Kindprozesse die Bedingung dauerhaft offen, und wir laufen sehenden Auges
+# in den Deckel statt in eine Endlosschleife.
+_warte_auf_freie_gpu() {
+    local deckel=30            # 30 * 0.1 s = 3 s
+    while [ "$deckel" -gt 0 ]; do
+        # -x auf den PROZESSNAMEN, nicht -f auf die Kommandozeile: mit -f
+        # trifft das Muster die eigene Shell (deren Kommandozeile den Text
+        # ja enthaelt), die Bedingung ist dann NIE erfuellt und jedes
+        # Segment laeuft stumpf in den Deckel. Genau das passierte in der
+        # ersten Fassung: 27 von 27 Segmenten meldeten den Deckel, das
+        # Warten war wirkungslos und kostete 81 s. Der Name ist "QtWeb-
+        # EngineProc" — Linux kuerzt comm auf 15 Zeichen ab.
+        pgrep -u "$(id -u)" -x QtWebEngineProc >/dev/null 2>&1 || return 0
+        sleep 0.1
+        deckel=$((deckel - 1))
+    done
+    return 1
+}
+
 run_one() {
     local f="$1"
     local safe="${f//\//_}"
     local log="$OUTDIR/${safe}.log"
+    if [ "${SEG_WEBENGINE:-0}" = "1" ]; then
+        _warte_auf_freie_gpu || echo "$f" >> "$OUTDIR/gpu_wartete_vergeblich.txt"
+    fi
     timeout 300 "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider > "$log" 2>&1
     local rc=$?
     printf '%s\t%s\n' "$rc" "$f" >> "$OUTDIR/results.tsv"
@@ -74,7 +111,7 @@ run_one() {
         *)   printf '  \033[31mROT \033[0m %s (exit %s)\n' "$f" "$rc" ;;
     esac
 }
-export -f run_one; export PY OUTDIR
+export -f run_one _warte_auf_freie_gpu; export PY OUTDIR
 
 # ── Zwei Spuren: WebEngine seriell, Rest parallel ───────────────────────────
 # WARUM (2026-08-01): Segmente, die eine echte three.js-Szene hochfahren,
@@ -90,10 +127,17 @@ export -f run_one; export PY OUTDIR
 # ab dann sieht ein ECHTER roter Viz-Test genauso aus wie das Rauschen.
 #
 # Deshalb keine Wiederholungslogik (die wuerde echte Fehler mitheilen),
-# sondern die Ursache weg: WebEngine-Dateien laufen in einer eigenen Spur
+# sondern an die Ursache: WebEngine-Dateien laufen in einer eigenen Spur
 # mit genau EINEM Prozess. Die Spur laeuft NEBEN der normalen, nicht davor
 # oder danach — gemessen 208 s seriell gegen ~390 s Gesamt-Gate, die
 # serielle Spur ist also nicht der kritische Pfad und kostet keine Zeit.
+#
+# ★ NACHTRAG 2026-08-01, XPLAT-17: das reicht NICHT. Der urspruengliche
+# Eintrag hier sagte "Ursache weg" — zu frueh geschlossen. Mit aktiver Spur
+# fiel der Flake in 2 von 5 vollen Laeufen weiter auf (davor rund einer pro
+# Lauf). Die Spur serialisiert die pytest-Prozesse, nicht deren Chromium-
+# Kinder; dagegen wartet jetzt zusaetzlich _warte_auf_freie_gpu (s. oben).
+# Ob DAS die Rate auf null bringt, ist noch nicht gemessen.
 #
 # Marker ist der Import von QWebEngineView: den hat jede Datei, die eine
 # Seite laden kann, und keine andere (test_viz12_service.py etwa arbeitet
@@ -107,7 +151,7 @@ if [ "$JOBS" -gt 1 ] && command -v xargs >/dev/null 2>&1; then
     echo "[seg] Spuren: ${#REST[@]} parallel ($JOBS), ${#WEB[@]} WebEngine seriell"
     web_pid=""
     if [ "${#WEB[@]}" -gt 0 ]; then
-        ( for f in "${WEB[@]}"; do run_one "$f"; done ) &
+        ( export SEG_WEBENGINE=1; for f in "${WEB[@]}"; do run_one "$f"; done ) &
         web_pid=$!
     fi
     if [ "${#REST[@]}" -gt 0 ]; then
@@ -121,6 +165,11 @@ fi
 echo
 BAD=$(awk -F'\t' '$1!=0' "$OUTDIR/results.tsv" 2>/dev/null | wc -l)
 TOT=$(wc -l < "$OUTDIR/results.tsv" 2>/dev/null || echo 0)
+if [ -f "$OUTDIR/gpu_wartete_vergeblich.txt" ]; then
+    echo "[seg] HINWEIS (XPLAT-17): $(wc -l < "$OUTDIR/gpu_wartete_vergeblich.txt") WebEngine-Segmente"
+    echo "[seg]   starteten, obwohl noch Chromium-Kindprozesse liefen (3-s-Deckel erreicht)."
+    echo "[seg]   Laeuft nebenher eine LightOS-Instanz? Dann ist das erwartet."
+fi
 echo "[seg] $((TOT-BAD))/$TOT Segmente gruen"
 if [ "$BAD" -gt 0 ]; then
     echo "[seg] Rote Segmente:"
