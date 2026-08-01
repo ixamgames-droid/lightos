@@ -13,6 +13,7 @@ import { disposeObj } from '../scene/grid_floor.js';
 // auch tintTopDownIcon konsumiert wird — nicht mehr hier.
 import { buildFixtureModel, updateFixtureDmx } from './registry.js';
 import { buildTopDownIcon } from './topdown_icons.js';
+import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 // VIZ-13 3c-2: On-Demand-Rendering — jede DMX-/Bestands-Aenderung an
@@ -119,6 +120,10 @@ export function createFloorSpot(color, intensity, radius) {
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = 0.01;
   disc.visible = settings.showFloorSpots;
+  // VIZ-15: weicher Rand statt harter Scheibenkante. Eine gemeinsame Textur
+  // fuer alle Fixtures — kostet einmal, nicht pro Geraet (s. floor_pool.js,
+  // dort auch die alphaMap-Gruenkanal-Falle).
+  applyPoolFalloff(disc);
   return disc;
 }
 

@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Lichtflecken auf dem Boden sehen aus wie Licht
+
+#### Verbessert
+
+- **Der Lichtfleck am Boden hat keine harte Kante mehr** und läuft nach außen
+  weich aus — vorher war es eine gleichmäßig gefüllte Scheibe, die eher wie ein
+  Aufkleber als wie Licht aussah.
+
+- **Er wächst jetzt mit dem Abstand und folgt dem Zoom.** Bisher war er immer
+  gleich groß: ein Scheinwerfer zehn Meter über der Bühne warf denselben Fleck
+  wie einer zwei Meter darüber, und ein Zoom-Zug änderte gar nichts.
+
 ### 2026-08-01 — Lichtkegel im 3D lassen sich in der Länge begrenzen
 
 #### Neu

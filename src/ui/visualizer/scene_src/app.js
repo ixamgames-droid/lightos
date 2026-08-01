@@ -56,6 +56,7 @@ import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js'
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
+import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -187,6 +188,11 @@ window.__lightos = {
   // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
   // Obergrenze) treffen aufeinander, und welche gewinnt IST die Aussage.
   beamLengthScale,
+  // VIZ-15 Boden-Pools: die Groessen-Rechnung ist rein (Abstand + Zoom-Winkel
+  // rein, Skalierung raus), die Textur-Funktion belegt den Grauverlauf —
+  // ein 'weiss mit fallendem Alpha' waere im Gruenkanal konstant und der
+  // Rand bliebe hart, ohne dass man es dem Code ansieht.
+  floorPoolScale, poolFalloffTexture,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
