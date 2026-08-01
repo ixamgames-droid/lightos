@@ -7,6 +7,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Die 3D-Ansicht holt sich nach einem Grafik-Aussetzer selbst zurück
+
+#### Behoben
+
+- **Blieb die 3D-Ansicht beim Öffnen schwarz, blieb sie es für immer** — ohne
+  Meldung und ohne Eintrag im Log. Auslöser ist ein Aussetzer des Grafiktreibers
+  (Standby, Treiber-Update, GPU-Reset): die Seite lädt normal, das Fenster lebt,
+  nur die Szene selbst kommt nicht hoch. Für die Software sah das bis jetzt aus
+  wie ein gelungener Start.
+
+  Jetzt sieht sie nach: kommt die Szene nicht hoch, wird **einmal** neu geladen —
+  ein solcher Aussetzer geht in aller Regel vorüber. Hilft auch das nicht, steht
+  es als Meldung im Fenster („3D-Szene startet nicht (Grafiktreiber?)") statt
+  stillschweigend weiter zu versuchen. Der genaue Grund landet im Log.
+
+#### Werkzeuge
+
+- Das Test-Gate **benennt** einen solchen Grafik-Aussetzer jetzt im Fehlerbericht,
+  statt ihn als namenloses rotes Segment stehen zu lassen. Rot bleibt er trotzdem:
+  ein benannter Ausfall ist erklärt, nicht entschuldigt. Gemessen wurde er über
+  sechs volle Testläufe — einmal in sechs.
+
 ### 2026-08-01 — Show-Datenbank nutzt auf Linux wieder das schnellere Journal
 
 #### Behoben

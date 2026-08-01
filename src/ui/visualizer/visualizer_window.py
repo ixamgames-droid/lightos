@@ -14,6 +14,7 @@ import json
 import math
 import os
 import time
+import weakref
 from src.core.paths import app_data_dir, crash_log_path
 from src.core.pixel_order import normalize_pixel_order
 from typing import Optional
@@ -314,6 +315,155 @@ def install_render_crash_guard(view, status_cb=None, on_reloaded=None) -> Render
                     pass
 
     view.page().renderProcessTerminated.connect(_on_terminated)
+    return guard
+
+
+# ============================================================================
+# VIZ-SCENE-SELFHEAL: Szenen-Start-Waechter
+# ============================================================================
+# Die LUECKE, die der RenderCrashGuard oben NICHT abdeckt: der Render-Prozess
+# kann tadellos leben und die Seite fertig laden, waehrend die SZENE trotzdem
+# nie hochkommt. Genau das passiert bei einem verlorenen GL-Kontext —
+# gemessen 2026-08-01 im Test-Gate (XPLAT-17), Signatur:
+#
+#   RasterDecoderImpl: Context lost during MakeCurrent
+#   -> THREE.WebGLRenderer: Error creating WebGL context.
+#
+# ``scene/renderer.js`` baut den ``WebGLRenderer`` beim MODUL-Import; wirft der,
+# stirbt die ganze ESM-Kette und ``app.js`` setzt ``__lightosAppReady`` nie.
+# ``loadFinished`` meldet dennoch Erfolg (die SEITE kam ja an), ``renderProcess-
+# Terminated`` schweigt (der Prozess lebt ja). Ergebnis bisher: die 3D-Ansicht
+# blieb dauerhaft schwarz — ohne Meldung, ohne Log, ohne Selbstheilung. Das
+# Flag ``__lightosAppReady`` gab es zwar schon, aber es las bis hierher
+# ausschliesslich die Testsuite; die App selbst hat nie nachgesehen.
+#
+# Ein Kontextverlust ist typischerweise voruebergehend (Treiber-Reset, Suspend,
+# GPU-Wechsel) — ein Neuladen holt die Ansicht zurueck. Deshalb GENAU EIN
+# gedeckelter Reload und danach eine sichtbare Meldung, nicht stilles
+# Wiederholen: eine Szene, die zweimal nicht startet, hat ein echtes Problem
+# und muss es sagen duerfen.
+#
+# Der Schwellwert ist NICHT geraten: gemessen am 2026-08-01 auf diesem Rechner
+# vergehen zwischen ``loadFinished`` und ``__lightosAppReady`` **0,02 s** (3 von
+# 3 Ladungen der echten Seite). 8 s lassen dafuer rund das 400-fache an Luft —
+# auch eine deutlich langsamere GPU (Davids Surface) kommt nicht in die Naehe.
+# Ein faelschlich ausgeloester Reload waere zwar selbstheilend, aber er wuerde
+# ausgerechnet die schwaechsten Geraete treffen, und das waere die falsche
+# Richtung.
+SCENE_START_TIMEOUT_S = 8.0
+SCENE_START_MAX_RELOADS = 1
+SCENE_START_WINDOW_S = 120.0
+
+
+def scene_start_verdict(ready: bool, guard, now: float) -> str:
+    """``'ok'`` | ``'neu_laden'`` | ``'aufgeben'`` — die ganze Entscheidung des
+    Waechters, ohne Qt und ohne Seiteneffekt (ausser dem Zaehler im ``guard``).
+
+    Bewusst als freie Funktion und nicht als Methode: derselbe Grund wie bei
+    ``_stage_add_events`` weiter unten — Bestandstests fahren solche Helfer auf
+    ``SimpleNamespace``-Stubs, und eine neue Methode auf ``self`` schlaegt dort
+    mit ``AttributeError`` zu, der im ``except`` des Aufrufers verschwindet."""
+    if ready:
+        guard.reset()
+        return "ok"
+    return "neu_laden" if guard.should_restart(now) else "aufgeben"
+
+
+def install_scene_start_guard(view, status_cb=None, on_reloaded=None,
+                              timeout_s: float = SCENE_START_TIMEOUT_S,
+                              schedule=None):
+    """Prueft ``timeout_s`` nach jedem ``loadFinished``, ob die Szene wirklich
+    hochkam (``window.__lightosAppReady``) — und laedt sonst genau einmal neu.
+
+    ``status_cb(text)`` zeigt die Meldung, wenn auch der zweite Versuch nicht
+    startet. ``on_reloaded()`` laeuft nach dem Auto-Reload (gleicher Grund wie
+    beim ``RenderCrashGuard``: der Dirty-Cache des Service haelt unveraenderte
+    Fixtures sonst fuer aktuell und sie blieben schwarz).
+
+    ``schedule(ms, fn)`` ist der Zeitgeber — Default ``QTimer.singleShot``.
+    Tests reichen hier ein sofortiges ``lambda ms, fn: fn()`` herein und pruefen
+    den kompletten Ablauf ohne Ereignisschleife und ohne Wartezeit.
+
+    ★ Alle Closures halten die View nur als ``weakref``. Ein starker Bezug
+    waere View -> Timer -> Closure -> View, also genau der GC-Zyklus um den
+    Owner, den STAB-10 als native AV-Klasse beim Teardown identifiziert hat —
+    dieselbe Ueberlegung wie ``weak_slot_fwd`` an den Aufrufstellen."""
+    guard = RenderCrashGuard(max_restarts=SCENE_START_MAX_RELOADS,
+                             window_s=SCENE_START_WINDOW_S)
+    if schedule is None:
+        schedule = QTimer.singleShot
+    view_ref = weakref.ref(view)
+    # Generationsmarke: die Szene wird auch im Normalbetrieb neu geladen
+    # (Qualitaetsstufen-Wechsel, Stage-Reload, Selbstheilung des
+    # RenderCrashGuard). Ohne Marke koennte eine noch schwebende Pruefung der
+    # ALTEN Ladung gegen die NEUE Seite feuern, waehrend die gerade laedt —
+    # und ein Neuladen ausloesen, das nichts zu heilen hatte.
+    stand = {"gen": 0}
+
+    def _entscheiden(bereit, grund):
+        v = view_ref()
+        if v is None:
+            return
+        urteil = scene_start_verdict(bool(bereit), guard, time.monotonic())
+        if urteil == "ok":
+            return
+        # Der Grund kommt aus dem fruehen error-Listener in stage_scene.html.
+        # Ohne ihn stuende im Log nur "kam nicht hoch" — mit ihm die echte
+        # Zeile ("Error creating WebGL context"), und das ist der Unterschied
+        # zwischen Triage und Diagnose.
+        try:
+            log_bridge_exception(
+                "sceneStartTimeout",
+                RuntimeError(f"__lightosAppReady blieb aus nach {timeout_s}s"
+                             f" — {grund or 'kein JS-Fehler gemeldet'}"))
+        except Exception:
+            pass
+        if urteil == "neu_laden":
+            print(f"[Visualizer] 3D-Szene kam nicht hoch ({grund}) — lade neu")
+            try:
+                load_stage_html(v)
+                if on_reloaded is not None:
+                    on_reloaded()
+            except Exception as e:
+                print(f"[Visualizer] Szenen-Neustart fehlgeschlagen: {e}")
+            return
+        msg = "3D-Szene startet nicht (Grafiktreiber?) — Fenster neu öffnen"
+        print(f"[Visualizer] {msg}")
+        if status_cb is not None:
+            try:
+                status_cb(msg)
+            except Exception:
+                pass
+
+    def _nachsehen(gen):
+        if gen != stand["gen"]:
+            return          # inzwischen neu geladen — diese Pruefung ist alt
+        v = view_ref()
+        if v is None:
+            return
+        # Beide Werte in EINEM Aufruf: zwei verschachtelte runJavaScript-
+        # Rueckrufe waeren eine zweite Stelle, an der die View wegsterben kann.
+        js = ("[!!window.__lightosAppReady,"
+              " String(window.__lightosSceneError || '')]")
+        try:
+            v.page().runJavaScript(
+                js, lambda r: _entscheiden(
+                    (r or [False, ""])[0], (r or [False, ""])[1]))
+        except Exception:
+            # Kein Page-Objekt mehr (Teardown mitten im Timer) — nichts zu tun.
+            pass
+
+    def _on_load_finished(ok):
+        if not ok:
+            # Fehlgeschlagene Ladevorgaenge sind Sache des Aufrufers/Chromium;
+            # dieser Waechter fragt nur nach der SZENE hinter einer Seite, die
+            # nach eigener Auskunft angekommen ist.
+            return
+        stand["gen"] += 1
+        meine = stand["gen"]
+        schedule(int(timeout_s * 1000), lambda: _nachsehen(meine))
+
+    view.loadFinished.connect(_on_load_finished)
     return guard
 
 
@@ -2492,6 +2642,12 @@ class VisualizerWindow(QMainWindow):
             self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup),
             # on_reloaded ebenfalls weak (STAB-10-Muster): der Guard-Closure
             # darf keinen GC-Zyklus um das Fenster aufspannen.
+            on_reloaded=weak_slot_fwd(self._force_full_resync_after_crash))
+        # VIZ-SCENE-SELFHEAL: die andere Haelfte — Prozess lebt, Seite geladen,
+        # Szene trotzdem tot (verlorener GL-Kontext). MUSS vor load_stage_html
+        # stehen, sonst entgeht dem Waechter genau das erste loadFinished.
+        self._scene_start_guard = install_scene_start_guard(
+            self._view, status_cb=weak_slot_fwd(self._on_render_crash_giveup),
             on_reloaded=weak_slot_fwd(self._force_full_resync_after_crash))
         # ── CACHE FIX: Cache-Buster an URL anhaengen, damit QWebEngineView die
         # HTML bei jedem Visualizer-Open frisch laedt ────────────────────────
