@@ -148,7 +148,6 @@ KONTEXTVERLUST = '''"""Segment mit GPU-Kontextverlust: QWebEngineView."""
 def test_stirbt_am_kontextverlust():
     print("[ERROR:raster_decoder.cc:1141] RasterDecoderImpl: "
           "Context lost during MakeCurrent.")
-    print("js: THREE.WebGLRenderer: Error creating WebGL context.")
     assert False, "Szene kam nicht hoch"
 '''
 

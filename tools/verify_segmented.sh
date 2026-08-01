@@ -215,8 +215,20 @@ if [ "$BAD" -gt 0 ]; then
     while IFS=$'\t' read -r rc f; do
         [ "${rc:-0}" = "0" ] && continue
         lg="$OUTDIR/${f//\//_}.log"
-        if grep -q 'Context lost during MakeCurrent' "$lg" 2>/dev/null \
-           && grep -q 'Error creating WebGL context' "$lg" 2>/dev/null; then
+        # ★ KORREKTUR 2026-08-01 (noch am selben Tag): hier stand ein UND auf
+        # beide Zeilen -- Kontextverlust UND "Error creating WebGL context".
+        # Das war falsch, und zwar aus einem Grund, der im Item selbst schon
+        # stand: die WebGL-Zeile ist die FOLGE, nicht die Ursache, und sie
+        # erscheint NICHT immer. Gemessen an einem dritten Ausfall desselben
+        # Tages (test_viz14_place_ghost_scene.py): Kontextverlust im Log,
+        # three.js schwieg, die Szene kam nur nicht hoch (Timeout auf
+        # __lightosAppReady) -- die Signatur griff nicht.
+        #
+        # Das ist die GEFAEHRLICHERE Richtung: eine zu enge Erkennung sagt
+        # "keine Signatur, also ein echter Fehler" und gibt damit falsche
+        # Sicherheit -- genau die Verwechslung, gegen die sie gebaut wurde.
+        # Erkannt wird deshalb die URSACHE, unabhaengig von ihrer Folge.
+        if grep -qE 'Context lost during MakeCurrent|context already lost' "$lg" 2>/dev/null; then
             SIG="$SIG  $f"$'\n'
         fi
     done < "$OUTDIR/results.tsv"
