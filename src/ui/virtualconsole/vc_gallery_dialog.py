@@ -28,7 +28,8 @@ _COLS = 4
 # VCG-01: Anzeige-Namen + REIHENFOLGE der Reiter. Der Schluessel ist die
 # Kategorie aus dem Manifest; was hier fehlt, landet alphabetisch dahinter.
 _KAT_TITEL = {
-    "pfeile":   "Pfeile",
+    "pfeile":     "Pfeile",
+    "positionen": "Positionen",
     "bewegung": "Bewegung",
     "dynamik":  "Dynamik",
     "farbe":    "Farbe",

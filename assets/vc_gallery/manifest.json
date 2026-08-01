@@ -83,6 +83,62 @@
       "title": "Runter-Rechts"
     },
     {
+      "name": "pos_mitte",
+      "file": "pos_mitte.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Alle auf Mitte"
+    },
+    {
+      "name": "pos_faecher",
+      "file": "pos_faecher.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Faecher"
+    },
+    {
+      "name": "pos_parallel",
+      "file": "pos_parallel.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Parallel runter"
+    },
+    {
+      "name": "pos_kreuz",
+      "file": "pos_kreuz.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Kreuz"
+    },
+    {
+      "name": "pos_links",
+      "file": "pos_links.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Alle nach links"
+    },
+    {
+      "name": "pos_rechts",
+      "file": "pos_rechts.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Alle nach rechts"
+    },
+    {
+      "name": "pos_schmal",
+      "file": "pos_schmal.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Eng gebuendelt"
+    },
+    {
+      "name": "pos_publikum",
+      "file": "pos_publikum.png",
+      "kind": "png",
+      "category": "positionen",
+      "title": "Ins Publikum"
+    },
+    {
       "name": "pulse",
       "file": "pulse.gif",
       "kind": "gif",
@@ -165,6 +221,20 @@
       "kind": "gif",
       "category": "pfeile",
       "title": "Pfeile rechts (Lauf)"
+    },
+    {
+      "name": "pos_sweep",
+      "file": "pos_sweep.gif",
+      "kind": "gif",
+      "category": "positionen",
+      "title": "Sweep (Gleichlauf)"
+    },
+    {
+      "name": "pos_faecher_atmen",
+      "file": "pos_faecher_atmen.gif",
+      "kind": "gif",
+      "category": "positionen",
+      "title": "Faecher auf/zu"
     }
   ]
 }
