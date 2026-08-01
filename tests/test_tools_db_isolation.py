@@ -32,6 +32,14 @@ ISOLATION = re.compile(
 WHITELIST = {
     "_run_showcase_app.py": "Echt-App-Launcher fuer Doku-Captures: soll sich wie die "
                             "reale App verhalten (Fenster + echte Show-DB).",
+    "patch_quarantaene.py": "STAB-DEDUP-OPT: raeumt Davids ECHTEN Patch auf — eine "
+                            "Wegwerf-DB waere leer und das Werkzeug damit sinnlos. "
+                            "Abgesichert stattdessen durch die Vorgaben des Werkzeugs "
+                            "selbst: ohne --anwenden wird nichts veraendert, der "
+                            "Unbeladen-Riegel bricht ab, wenn die Show nicht geladen "
+                            "ist, und verschoben wird in eine Quarantaene statt "
+                            "geloescht. LIGHTOS_SHOW_DB wird respektiert — wer an "
+                            "einer Kopie ueben will, setzt sie.",
 }
 
 

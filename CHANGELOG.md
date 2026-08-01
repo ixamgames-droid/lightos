@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Aufräum-Befehl für verwaiste Patch-Zeilen
+
+#### Neu
+
+- **Ein Befehl findet Geräte im Patch, die nirgends mehr benutzt werden**, und
+  legt sie auf Wunsch in eine Quarantäne — verschoben, nicht gelöscht, jederzeit
+  zurückholbar. Er läuft nie von selbst und verändert ohne ausdrückliches
+  `--anwenden` nichts.
+
+  Ein Gerät gilt nur dann als verwaist, wenn es in wirklich keiner Funktion,
+  Cueliste, Gruppe, keinem Snap, Taster oder im 3D vorkommt. Zwei Geräte auf
+  derselben Adresse sind ausdrücklich **kein** Grund — das kann gewollt sein.
+
+      venv/bin/python tools/patch_quarantaene.py --show meine.lshow
+
 ### 2026-08-01 — Fokus und Frost wirken jetzt im 3D
 
 #### Neu

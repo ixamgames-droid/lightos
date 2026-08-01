@@ -183,6 +183,29 @@ class FixtureGroup(Base):
     folder: Mapped[str] = mapped_column(String(200), default="")
 
 
+class QuarantinedFixture(Base):
+    """STAB-DEDUP-OPT: Ablage fuer verwaiste Patch-Zeilen — verschoben, NICHT
+    geloescht.
+
+    ``daten_json`` haelt die VOLLSTAENDIGE Ursprungszeile. Bewusst ein
+    JSON-Feld statt gespiegelter Spalten: eine gespiegelte Tabelle driftet,
+    sobald ``patched_fixtures`` eine Spalte dazubekommt — und gemerkt wird das
+    erst beim Zurueckholen, also genau dann, wenn der Nutzer seine Daten
+    zurueck WILL. Die vier ausgeschriebenen Felder sind nur fuer die Anzeige
+    da (Liste ohne JSON-Parsen).
+    """
+    __tablename__ = "quarantined_fixtures"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fid: Mapped[int] = mapped_column(Integer)
+    label: Mapped[str] = mapped_column(String(80), default="")
+    universe: Mapped[int] = mapped_column(Integer, default=1)
+    address: Mapped[int] = mapped_column(Integer, default=1)
+    grund: Mapped[str] = mapped_column(String(200), default="")
+    verschoben_am: Mapped[str] = mapped_column(String(40), default="")
+    daten_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 # FM-HEADLAYOUT: gueltige Werte + Normalisierer von PatchedFixture.head_mode
 # liegen im Leaf-Modul `src/core/head_mode.py` (HEAD_MODES /
 # normalize_head_mode) — dort zyklenfrei UND auch dann importierbar, wenn Tests
