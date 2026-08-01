@@ -68,11 +68,37 @@ echo "[seg] ${#FILES[@]} Testdateien, $JOBS parallel, Ausgabe: $OUTDIR"
 # Elternprozess, nicht mit ihm. Zwei GPU-Prozesse koennen sich damit trotz Spur
 # ueberlappen und um den GL-Kontext des Treibers konkurrieren.
 #
-# EHRLICH ZUM STATUS: das ist eine begruendete Vermutung, keine Messung. Belegt
-# ist nur, dass der Flake mit aktiver Spur WEITER auftritt (2 Ausfaelle in 5
-# vollen Laeufen, davor rund einer pro Lauf) und dass Software-GL lokal
-# schlechter ist. Ob dieses Warten die Rate wirklich auf null bringt, muss ueber
-# mehrere volle Laeufe gemessen werden — s. XPLAT-17.
+# ★ GEMESSEN 2026-08-01 (6 volle Laeufe, 3210 Segment-Logs) — und die Vermutung
+# oben stimmt so NICHT. Zwei harte Befunde:
+#
+#  1. Es gibt gar keinen "--type=gpu"-Hilfsprozess. QtWebEngine faehrt den
+#     GPU-Dienst hier IM EIGENEN Prozess (nachgemessen waehrend eines Segments:
+#     3x --type=zygote, 1x --type=renderer, 0x gpu; und die GPU-Fehlerzeilen im
+#     Log tragen die pid:tid des pytest-Prozesses selbst). Die serielle Spur
+#     serialisiert den GPU-Dienst damit bereits vollstaendig — zwei
+#     konkurrierende GPU-Prozesse, die dieses Warten verhindern soll, kann es
+#     zwischen den Segmenten nicht geben.
+#  2. Der verbliebene Ausfall ist ein Kontextverlust INNERHALB des Prozesses:
+#       RasterDecoderImpl: Context lost during MakeCurrent
+#       -> SharedImageStub: context already lost
+#       -> THREE.WebGLRenderer: Error creating WebGL context.   (die FOLGE)
+#     Diese Signatur steht in genau 1 von 3210 Logs — sie ist der Fehler
+#     selbst, kein Hintergrundrauschen.
+#
+# Rate mit Spur + diesem Warten: 1 Ausfall in 6 vollen Laeufen (davor: rund
+# einer pro Lauf ohne Spur, 2 von 5 mit Spur ohne Warten).
+#
+# WARUM DAS WARTEN TROTZDEM BLEIBT: es wartet nachweislich auf etwas anderes
+# als gedacht (Zygote-/Renderer-Kinder, nicht auf einen GPU-Prozess), aber ob
+# es die Rate beeinflusst, ist NICHT gemessen — 1/6 gegen 2/5 ist bei diesen
+# Zahlen kein Unterschied, den man behaupten kann. Es zu entfernen, weil die
+# BEGRUENDUNG falsch war, hiesse eine unbelegte Behauptung durch die naechste
+# zu ersetzen. Der Kommentar sagt jetzt, was es wirklich tut.
+#
+# Und die Konsequenz aus 2.: gegen einen Kontextverlust im eigenen Prozess
+# hilft dem Gate kein Warten mehr. Der Ausweg liegt im Produkt — der
+# Szenen-Start-Waechter (VIZ-SCENE-SELFHEAL, visualizer_window.py) laedt die
+# Szene nach genau einem verlorenen Kontext neu, statt schwarz zu bleiben.
 #
 # Gedeckelt, damit es nie haengt: laeuft nebenher Davids LightOS-Instanz, halten
 # deren Kindprozesse die Bedingung dauerhaft offen, und wir laufen sehenden Auges
@@ -132,12 +158,14 @@ export -f run_one _warte_auf_freie_gpu; export PY OUTDIR
 # oder danach — gemessen 208 s seriell gegen ~390 s Gesamt-Gate, die
 # serielle Spur ist also nicht der kritische Pfad und kostet keine Zeit.
 #
-# ★ NACHTRAG 2026-08-01, XPLAT-17: das reicht NICHT. Der urspruengliche
-# Eintrag hier sagte "Ursache weg" — zu frueh geschlossen. Mit aktiver Spur
-# fiel der Flake in 2 von 5 vollen Laeufen weiter auf (davor rund einer pro
-# Lauf). Die Spur serialisiert die pytest-Prozesse, nicht deren Chromium-
-# Kinder; dagegen wartet jetzt zusaetzlich _warte_auf_freie_gpu (s. oben).
-# Ob DAS die Rate auf null bringt, ist noch nicht gemessen.
+# ★ NACHTRAG 2026-08-01, XPLAT-17: das reicht NICHT — aber anders als zuerst
+# gedacht. Der urspruengliche Eintrag sagte "Ursache weg", das war zu frueh
+# geschlossen. Gemessen (6 volle Laeufe): 1 Ausfall, und zwar ein
+# Kontextverlust IM EIGENEN Prozess, nicht zwischen zweien (Herleitung im
+# Block bei _warte_auf_freie_gpu). Die Spur bleibt richtig und billig, sie
+# kann diesen Rest aber prinzipiell nicht abfangen. Getroffen werden
+# ausschliesslich Dateien, die view.show() aufrufen (5 der 29) — nur die
+# realisieren eine echte Fensterflaeche.
 #
 # Marker ist der Import von QWebEngineView: den hat jede Datei, die eine
 # Seite laden kann, und keine andere (test_viz12_service.py etwa arbeitet
@@ -175,6 +203,32 @@ if [ "$BAD" -gt 0 ]; then
     echo "[seg] Rote Segmente:"
     awk -F'\t' '$1!=0 {printf "  exit %-4s %s\n", $1, $2}' "$OUTDIR/results.tsv"
     echo
+    # XPLAT-17: die EINE bekannte Fremd-Ursache beim Namen nennen.
+    #
+    # Das Segment bleibt rot und der Exit-Code ungleich 0 — hier wird nichts
+    # gruen gerechnet und nichts wiederholt. Der Name ist der ganze Zweck:
+    # ohne ihn steht der Mensch vor einem namenlosen roten Viz-Segment und muss
+    # raten, ob es der bekannte Kontextverlust ist oder ein echter Fehler. Und
+    # "im Zweifel Rauschen" ist genau die Gewoehnung, hinter der sich XPLAT-09
+    # neun Testdateien lang versteckt hat.
+    SIG=""
+    while IFS=$'\t' read -r rc f; do
+        [ "${rc:-0}" = "0" ] && continue
+        lg="$OUTDIR/${f//\//_}.log"
+        if grep -q 'Context lost during MakeCurrent' "$lg" 2>/dev/null \
+           && grep -q 'Error creating WebGL context' "$lg" 2>/dev/null; then
+            SIG="$SIG  $f"$'\n'
+        fi
+    done < "$OUTDIR/results.tsv"
+    if [ -n "$SIG" ]; then
+        echo "[seg] XPLAT-17-Signatur — GPU-Kontextverlust im eigenen Prozess:"
+        printf '%s' "$SIG"
+        echo "[seg]   'Context lost during MakeCurrent' + 'Error creating WebGL context'"
+        echo "[seg]   Gemessen: 1 Ausfall in 6 vollen Laeufen (2026-08-01)."
+        echo "[seg]   Gegenprobe: ./tools/verify_loop.sh <datei> — bleibt sie isoliert"
+        echo "[seg]   gruen, war es dieser Fall. ROT bleibt trotzdem ROT."
+        echo
+    fi
     # Wichtig fuer die Triage: steht hier nichts, ist KEIN Test fehlgeschlagen —
     # dann sind die roten Segmente native Abbau-Crashes (QA-24). Das ist aber nur
     # eine Dringlichkeits-Einstufung, keine Entwarnung: XPLAT-09 versteckte sich

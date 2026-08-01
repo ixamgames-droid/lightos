@@ -221,6 +221,21 @@
 </div>
 <div id="longpress-ring"></div>
 
+<!-- VIZ-SCENE-SELFHEAL: den ERSTEN Fehler des Szenen-Starts festhalten.
+     Muss VOR allen anderen Scripts stehen - ein Listener, der spaeter
+     registriert wird, sieht einen frueheren Fehler nicht mehr.
+     Warum ueberhaupt: wirft der Modul-Import (z.B. "Error creating WebGL
+     context", wenn der GL-Kontext des GPU-Dienstes verloren ging), bricht
+     die ESM-Kette ab und __lightosAppReady bleibt aus. Ohne diese Notiz
+     wuesste die Python-Seite nur DASS die Szene nicht kam, nicht WARUM.
+     Nur der erste Fehler zaehlt: die spaeteren sind seine Folgen. -->
+<script>
+window.addEventListener('error', function (e) {
+  if (window.__lightosSceneError) return;
+  var m = (e && (e.message || (e.error && e.error.message))) || 'unbekannter Fehler';
+  window.__lightosSceneError = String(m).slice(0, 300);
+}, true);
+</script>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="three_local.js"></script>
 <script src="assets/OBJLoader.js"></script>

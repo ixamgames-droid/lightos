@@ -138,5 +138,75 @@ class WebEngineSpurTest(unittest.TestCase):
                             f"ist serialisiert worden: {zeiten}")
 
 
+# Ein Segment, das den GPU-Kontextverlust nachstellt: es schreibt die beiden
+# echten Zeilen aus dem Fehl-Log vom 2026-08-01 und faellt dann um. Bewusst als
+# gestellte Ausgabe — den echten Kontextverlust kann kein Test herbeifuehren,
+# und darum geht es hier auch nicht: geprueft wird, ob der Runner die Signatur
+# ERKENNT und benennt.
+KONTEXTVERLUST = '''"""Segment mit GPU-Kontextverlust: QWebEngineView."""
+
+def test_stirbt_am_kontextverlust():
+    print("[ERROR:raster_decoder.cc:1141] RasterDecoderImpl: "
+          "Context lost during MakeCurrent.")
+    print("js: THREE.WebGLRenderer: Error creating WebGL context.")
+    assert False, "Szene kam nicht hoch"
+'''
+
+ECHTER_FEHLER = '''"""Segment mit einem gewoehnlichen Fehler: QWebEngineView."""
+
+def test_faellt_ehrlich_um():
+    assert 1 == 2, "echter Testfehler"
+'''
+
+
+class Xplat17SignaturTest(unittest.TestCase):
+    """XPLAT-17: ein roter Viz-Test darf nicht wie Rauschen aussehen.
+
+    Gemessen wurde 1 Ausfall in 6 vollen Laeufen — selten genug, dass niemand
+    die Signatur im Kopf hat, haeufig genug, dass sie wiederkommt. Der Runner
+    benennt sie deshalb; ROT bleibt sie trotzdem.
+    """
+
+    def _runner(self, tmp, dateien):
+        umgebung = dict(os.environ)
+        umgebung["LIGHTOS_SEG_OUT"] = str(tmp / "out")
+        return subprocess.run(
+            ["bash", str(RUNNER), "-j", "2", *dateien],
+            cwd=str(REPO), env=umgebung, capture_output=True,
+            text=True, timeout=180)
+
+    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    def test_kontextverlust_wird_benannt_bleibt_aber_rot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            p = tmp / "test_kontextverlust.py"
+            p.write_text(KONTEXTVERLUST, encoding="utf-8")
+            erg = self._runner(tmp, [str(p)])
+
+            self.assertNotEqual(
+                erg.returncode, 0,
+                "Die Signatur darf das Segment NICHT gruen rechnen — sonst "
+                "waere sie genau die Wiederholungslogik, die hier nie "
+                f"gebaut werden sollte.\n{erg.stdout}")
+            self.assertIn("XPLAT-17-Signatur", erg.stdout,
+                          f"Ursache nicht benannt:\n{erg.stdout}")
+            self.assertIn("test_kontextverlust.py", erg.stdout)
+
+    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    def test_gewoehnlicher_fehler_bekommt_die_signatur_NICHT(self):
+        """Die Gegenprobe, an der sich alles entscheidet: waere das Etikett zu
+        grosszuegig, haette es genau den Schaden angerichtet, den es verhindern
+        soll — ein echter Fehler als bekannter Flake abgestempelt."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            p = tmp / "test_echter_fehler.py"
+            p.write_text(ECHTER_FEHLER, encoding="utf-8")
+            erg = self._runner(tmp, [str(p)])
+
+            self.assertNotEqual(erg.returncode, 0)
+            self.assertNotIn("XPLAT-17-Signatur", erg.stdout,
+                             f"echter Fehler falsch etikettiert:\n{erg.stdout}")
+
+
 if __name__ == "__main__":
     sys.exit(0 if unittest.main(exit=False).result.wasSuccessful() else 1)
