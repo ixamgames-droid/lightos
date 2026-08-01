@@ -15,6 +15,15 @@ Geprüft wird die Rechen-Regel gegen die Quelle: dass der Kegel nie länger als
 sein Grundmaß wird (sonst leuchtete ein hoch hängender Scheinwerfer plötzlich
 30 m weit), nie auf 0 kollabiert (ein Kegel ohne Länge wäre ein unsichtbarer
 Punkt statt eines kurzen Strahls) und beim Kürzen mitwandert (sonst schwebt er).
+
+> **Einordnung seit VIZ-15 (2026-08-01):** diese Datei prüft *Quelltext*, und das
+> ist die schwächere Testsorte — eine falsche Formel mit richtigen Zeichenketten
+> käme hier durch. Die eigentliche **Rechnung** ist inzwischen als reine Funktion
+> `beamLengthScale(base, dist, maxRange)` herausgezogen und wird in
+> `tests/test_viz15_beam_range_scene.py` mit Zahlen gefahren (dort entscheidet
+> sich, welche der drei Grenzen gewinnt). Was hier bleibt, sind die
+> **Struktur**-Zusagen, die eine Zahlenrechnung nicht abdecken kann: dass es
+> keinen zweiten Raycast gibt und dass die Position mit der Länge mitwandert.
 """
 from __future__ import annotations
 
@@ -77,10 +86,27 @@ class QuelleTest(unittest.TestCase):
         self.assertIn("BEWUSST NUR DER BODEN", self.js)
 
     def test_haengt_am_vorhandenen_auftreffpunkt(self):
-        """setBeamLength wird dort gerufen, wo der Bodenpunkt ohnehin gerechnet
-        wird — nicht in einem zweiten, eigenen Raycast."""
+        """Die Kegellaenge kommt aus dem Bodenpunkt, der in ``applyFloorAim``
+        ohnehin gerechnet wird — NICHT aus einem zweiten, eigenen Raycast. Ein
+        Strahl gegen alle Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad
+        genau die Kostenklasse, vor der die Review-Checkliste warnt.
+
+        VIZ-15 hat den Aufruf aus dem innersten Zweig herausgezogen (er lief
+        sonst NUR bei Bodentreffer, ein waagerechter Kopf bekam nie eine Laenge).
+        Geprueft wird deshalb die Invariante statt der frueheren Zeile: der
+        Abstand stammt aus dem vorhandenen ``t``, wird EINMAL angewandt, und es
+        entsteht kein zusaetzlicher Strahl.
+        """
         i = self.js.index("function applyFloorAim")
-        self.assertIn("setBeamLength(f, t)", self.js[i:i + 2000])
+        block = self.js[i:i + 2800]
+        self.assertIn("bodenAbstand = t", block,
+                      "der Abstand muss aus dem schon gerechneten t kommen")
+        self.assertIn("setBeamLength(f, bodenAbstand)", block)
+        self.assertEqual(block.count("setBeamLength(f,"), 1,
+                         "genau EINE Anwendung — zwei waeren zwei Wahrheiten")
+        for teuer in ("Raycaster", "intersectObjects", "intersectObject("):
+            self.assertNotIn(teuer, block,
+                             f"{teuer} im 44-Hz-Pfad waere ein zweiter Strahl")
 
 
 if __name__ == "__main__":

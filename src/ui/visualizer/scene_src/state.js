@@ -68,6 +68,10 @@ export const settings = {
   autoBrightness: true,    // auto-bump brightness when in edit modes
   dockEnabled: false,      // opt-in: Strahler rasten an Trassen/Plattformen ein
   showLabels: true,        // VIZ-LABELS: Fixture-Namens-Sprites ein-/ausblenden (Toolbar-Toggle)
+  // VIZ-15: globale Obergrenze der sichtbaren Kegellaenge in METERN.
+  // 0 = aus, also die Grundlaenge des jeweiligen Geraetetyps (6-8 m).
+  // Deckelt NUR die Darstellung — an der DMX-Ausgabe aendert sich nichts.
+  maxBeamRange: 0,
   showRoom: false,         // VIZ-14: neutrale Raum-Huelle (Default AUS — der Visualizer
                            // startet bewusst leer, s. scene/room_shell.js)
 };
