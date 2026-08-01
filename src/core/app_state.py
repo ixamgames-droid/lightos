@@ -35,6 +35,59 @@ _CLOUD_SYNC_MARKERS = (
 )
 
 
+# STAB-WAL-NET: Dateisystem-Typen, auf denen WAL sicher ist. ERLAUBNISLISTE —
+# was hier nicht steht, bekommt kein WAL. Aufgenommen sind lokale
+# Platten-Dateisysteme; NICHT drin sind alle Netz-/Verteil-Dateisysteme (nfs,
+# cifs, smb3, 9p, ceph, glusterfs, afs, fuse.sshfs, fuse.rclone, davfs), auf
+# denen SQLite den mmap-Shared-Memory der -shm-Datei nicht zuverlaessig
+# bekommt, sowie alles Unbekannte.
+#
+# overlay steht bewusst NICHT drin: in einem Container ueberlagert es haeufig
+# ein Netz-Volume, und von aussen ist der darunterliegende Speicher nicht zu
+# sehen. tmpfs dagegen ist lokal und fuer WAL unproblematisch — dass es
+# fluechtig ist, ist eine andere Frage als die nach Korruption.
+_WAL_SICHERE_FSTYPES = frozenset({
+    "ext2", "ext3", "ext4", "btrfs", "xfs", "f2fs", "jfs", "reiserfs",
+    "zfs", "bcachefs", "tmpfs", "vfat", "exfat", "ntfs3", "fuseblk",
+})
+
+
+def _linux_fstype(pfad: str, quelle: str = "/proc/self/mountinfo") -> str:
+    """Dateisystem-Typ des Mounts, der ``pfad`` traegt ("" = unbekannt).
+
+    Gelesen aus ``/proc/self/mountinfo``, weil das ohne Zusatzpakete und ohne
+    Aufruf eines externen Programms geht. Gewinnt der LAENGSTE passende
+    Mount-Punkt: bei verschachtelten Mounts (``/`` und ``/home``) traegt den
+    Pfad der speziellere.
+
+    Zeilenformat: Feld 5 ist der Mount-Punkt, nach dem Trenner ``-`` folgt der
+    Dateisystem-Typ. Die Zahl optionaler Felder VOR dem Trenner ist variabel —
+    deshalb wird am ``-`` gesplittet statt ein festes Feld gezaehlt.
+
+    ``quelle`` ist nur fuer Tests da: so laesst sich eine gestellte
+    mountinfo-Tabelle einspeisen (NFS, verschachtelte Mounts, kaputte Zeilen),
+    ohne den Rechner umzubauen.
+    """
+    try:
+        with open(quelle, "r", encoding="utf-8") as fh:
+            zeilen = fh.readlines()
+    except OSError:
+        return ""
+    treffer, beste_laenge = "", -1
+    for zeile in zeilen:
+        links, _, rechts = zeile.partition(" - ")
+        felder = links.split()
+        rest = rechts.split()
+        if len(felder) < 5 or not rest:
+            continue
+        punkt = felder[4].replace("\\040", " ")
+        typ = rest[0]
+        if pfad == punkt or pfad.startswith(punkt.rstrip("/") + "/"):
+            if len(punkt) > beste_laenge:
+                treffer, beste_laenge = typ, len(punkt)
+    return treffer
+
+
 def _is_local_writable_path(path: str) -> bool:
     """WAL-Guard (STAB-CURSHOW): ``True`` nur, wenn ``path`` auf einem lokalen
     Fixed-Laufwerk liegt UND nicht in einem bekannten Cloud-Sync-Ordner.
@@ -47,10 +100,20 @@ def _is_local_writable_path(path: str) -> bool:
         ap = os.path.abspath(path)
         low = ap.replace("/", "\\").lower()
         # UNC / Netzpfad (\\server\share, \\?\UNC\...).
-        if low.startswith("\\\\") or low.startswith("\\\\?\\unc"):
+        #
+        # ★ Gegen den ROHEN Pfad geprueft, nicht nur gegen abspath(): auf Linux
+        # ist ein UNC-Pfad NICHT absolut, also stellt abspath() das
+        # Arbeitsverzeichnis davor und der \\-Praefix verschwindet. Solange der
+        # Linux-Zweig pauschal False lieferte, fiel das nicht auf — mit dem
+        # fstype-Check (STAB-WAL-NET) waere daraus WAL auf einem Netzpfad
+        # geworden, also genau die gefaehrliche Richtung. Der Bestandstest
+        # test_wal_guard_rejects_unc_and_sync_folders hat es sofort gemeldet.
+        roh = (path or "").replace("/", "\\").lower()
+        if (low.startswith("\\\\") or low.startswith("\\\\?\\unc")
+                or roh.startswith("\\\\") or roh.startswith("\\\\?\\unc")):
             return False
         # Bekannte Cloud-Sync-Ordner — auch auf Fixed-Disk unsicher.
-        if any(m in low for m in _CLOUD_SYNC_MARKERS):
+        if any(m in low or m in roh for m in _CLOUD_SYNC_MARKERS):
             return False
         # Windows: nur DRIVE_FIXED zulassen (kein Wechsel-/Netz-/RAM-Laufwerk).
         if sys.platform == "win32":
@@ -65,11 +128,22 @@ def _is_local_writable_path(path: str) -> bool:
             if int(t) != DRIVE_FIXED:
                 return False
             return True
-        # Nicht-Windows (Linux/macOS): es gibt hier keinen portablen lokaler-vs-
-        # Netz-/Wechselmedium-Check (ein NFS/CIFS-Mount matcht weder UNC noch die
-        # Cloud-Marker) -> konservativ KEIN WAL, statt fail-open auf ein evtl.
-        # unsicheres Netz-Dateisystem. busy_timeout + der atomare Replace tragen
-        # die Korrektheit auch ohne WAL. Lokales WAL auf Linux -> Item STAB-WAL-NET.
+        # Linux (STAB-WAL-NET): Bis 2026-08-01 stand hier ein hartes ``False``,
+        # weil es "keinen portablen lokaler-vs-Netz-Check" gebe. Das stimmt fuer
+        # POSIX allgemein — auf LINUX aber nicht: /proc/self/mountinfo nennt den
+        # Dateisystem-TYP des tragenden Mounts, und genau daran haengt die Frage.
+        #
+        # Der Preis des harten False war real: Davids Show-DB liegt auf lokalem
+        # ext4 und lief trotzdem im DELETE-Journal — der WAL-Reader-Snapshot
+        # entfiel auf der Maschine, fuer die er gedacht war.
+        #
+        # Weiterhin eine ERLAUBNISLISTE, keine Verbotsliste: ein unbekannter
+        # Dateisystem-Typ bleibt ohne WAL. Eine Verbotsliste muesste jedes
+        # kuenftige Netz-Dateisystem kennen und waere beim ersten unbekannten
+        # fail-open — also genau in der gefaehrlichen Richtung.
+        if sys.platform.startswith("linux"):
+            return _linux_fstype(ap) in _WAL_SICHERE_FSTYPES
+        # Andere POSIX-Systeme (macOS/BSD): unveraendert konservativ.
         return False
     except Exception:
         # Jede Unsicherheit -> konservativ kein WAL.

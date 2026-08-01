@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-01 — Show-Datenbank nutzt auf Linux wieder das schnellere Journal
+
+#### Behoben
+
+- **Auf Linux lief die Show-Datenbank immer im langsameren Journal-Modus**, auch
+  wenn sie — wie hier — auf einer ganz normalen lokalen Platte liegt. Grund war
+  eine Vorsichtsregel, die keinen Unterschied zwischen lokaler Platte und
+  Netzlaufwerk machen konnte und deshalb pauschal abschaltete.
+
+  Jetzt entscheidet der tatsächliche Dateisystem-Typ. Netzlaufwerke und
+  Cloud-Sync-Ordner bleiben unverändert ausgenommen — dort ist der Modus
+  wirklich unsicher.
+
 ### 2026-08-01 — Aufräum-Befehl für verwaiste Patch-Zeilen
 
 #### Neu
