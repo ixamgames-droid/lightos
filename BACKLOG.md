@@ -65,6 +65,68 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    Blackout ist post-render maskiert) + [[entry_virtual_console]]. **Erst
    headless reproduzieren** (`QT_QPA_PLATFORM=offscreen`, Kanal-Mitschnitt wie
    bei CDX-22b), dann fixen — eine Vermutung reicht bei Panik-Funktionen nicht.
+   **★ SYMPTOME VON DAVID (2026-08-01, Show „bierpong v2", Aufbau ca. 25.07.,
+   also noch auf dem Windows-Rig):** (a) „Alles Weiß" macht nicht alles weiß ·
+   (b) Blackout hat nicht alle Dimmer getroffen, **die betroffenen Geräte hingen
+   am Enttec** · (c) „Stop All" hat nicht immer alles gestoppt · (d) Freeze hat
+   nicht immer alles eingefroren.
+   **ERSTE ANALYSE AUS DEM CODE (gelesen, NICHT reproduziert):** drei der vier
+   sind vermutlich **kein Defekt, sondern ein zu grosses Versprechen** —
+   • **(a) `ALL_WHITE` macht per Bauart nicht „alles" weiss**, sondern startet
+   die an DIESEN Taster **gebundene** Funktion (`_all_function_ids()`); ohne
+   Bindung passiert **gar nichts**, ohne jede Rückmeldung, und eine Weiss-Szene
+   aus einer Zeit mit weniger Geräten deckt heute nur die damaligen ab. Der
+   Code sagt es selbst: „die Szene weiss das, nicht der Button".
+   • **(d) `FREEZE` friert ausdrücklich nur Tempo/BPM ein** (`tempo_bus
+   .toggle_freeze()`, alle Buses + Leader auf 0). Was nicht am Tempo-Bus hängt,
+   läuft weiter.
+   • **(c) `STOP_ALL` stoppt beide Laufwerke** (Playback-Cuestacks **und**
+   FunctionManager), lässt den **Programmer aber bewusst unberührt** („kein
+   Panik-Datenverlust"). Standen dort Werte, leuchtet es weiter — absichtlich.
+   • **(b) Blackout ist als einziger wirklich total** — die Ausgabestufe
+   schreibt `bytes(512)` über **alle** registrierten Universen. Dass am Enttec
+   trotzdem Dimmer standen, passt daher nicht zu einem Blackout-Fehler, sondern
+   zu **HW-5b/HW-5c**: `data/universes.json` trägt für das Enttec-Universe
+   `COM_FAKE`, die App sendet dorthin **nichts** — die Geräte halten ihren
+   letzten Wert und reagieren auch auf einen Blackout nicht. **Damit ist (b)
+   höchstwahrscheinlich kein eigener Bug, sondern die Rig-Hälfte von HW-5c.**
+   **WAS DARAUS FOLGT — und warum das eine Produktentscheidung ist:** ein Fix
+   heisst hier nicht „Zeile reparieren", sondern entscheiden, ob die Knöpfe
+   halten sollen, was ihr Name verspricht. Soll „Alles Weiß" **wirklich alle
+   gepatchten Geräte** weiss setzen (statt eine Szene zu starten)? Soll Freeze
+   **alles** anhalten statt nur den Tempo-Bus? Beides ändert Verhalten, auf das
+   bestehende Shows gebaut sein können. **Mindestens aber muss ein Panik-Knopf
+   sagen, wenn er nichts tut** — `ALL_WHITE` ohne Bindung ist heute ein
+   stummer Klick, und das ist die schlimmste Variante: er meldet Erfolg.
+
+7. **BUG-CLEAR (P1, David 2026-08-01)** — **„Programmer leeren" hat manchmal
+   nicht alles geleert.** Aus demselben Betrieb wie BUG-FBW. Der Programmer ist
+   ein Akkumulator (jeder angefasste Kanal ist scharf, s.
+   [[reference_programmer_save_scope]]) — die Frage ist also, ob „leeren" alle
+   Quellen erwischt: manuell gesetzte Werte, per Palette/Snap geladene, per
+   VC/MIDI getriggerte Flash-/Strobe-Werte, Werte pro Kopf (`attr#N`), und ob
+   ein gleichzeitig laufender Effekt sie sofort wieder hineinschreibt.
+   Zusammenhang mit BUG-MIDI-STROBE unten: dort ist **Clear Programmer die
+   einzige Rettung**, was nahelegt, dass die hängenden Werte IM Programmer
+   liegen — und dass „leeren" sie nur manchmal erwischt, ist dann derselbe
+   Befund von der anderen Seite. Erst headless reproduzieren, dann fixen.
+8. **BUG-MIDI-STROBE (P1, David 2026-08-01)** — **zwei Strobe-Taster auf dem
+   MIDI-Controller mehrfach schnell hintereinander/gleichzeitig gedrückt →
+   sie „hängen sich auf"; nur ein Clear Programmer löst es.** Das ist der
+   konkreteste der gemeldeten Fehler und riecht nach einer **Race-Bedingung
+   zwischen MIDI-Thread und UI-Thread**: MIDI läuft in einem Fremd-Thread und
+   MUSS per Qt-Signal in den UI-Thread (s. [[entry_midi_osc_timecode_input]]) —
+   zwei Tasten, die sich überlappen, sind genau der Fall, in dem ein
+   verlorenes/vertauschtes Note-Off einen Toggle-Zustand invertiert stehen
+   lässt. **Verdächtig ist die Paarigkeit:** press/release-Zählung pro Taste,
+   gemeinsamer Strobe-Zustand für beide Taster, und ob ein zweites Note-On ohne
+   dazwischenliegendes Note-Off als „schon an" verworfen wird. **Dass nur Clear
+   Programmer hilft, ist der wichtigste Hinweis:** der hängende Zustand liegt
+   im Programmer, nicht im Taster — der Taster meldet „aus", die Werte bleiben.
+   **Reproduktion ohne Hardware ist möglich:** die Note-On/Note-Off-Folge lässt
+   sich direkt in den MidiMapper einspeisen (überlappend, doppelte Note-On,
+   fehlendes Note-Off) und der Programmer-Inhalt danach auslesen — dafür braucht
+   es Davids APC nicht.
 
 ### Begleitende reale Abnahme
 
