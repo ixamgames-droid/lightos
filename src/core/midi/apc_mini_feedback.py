@@ -76,21 +76,27 @@ class APCMiniFeedback:
                     print(f"[APCMiniFeedback] Kein Output-Port mit '{self._hint}' gefunden.")
                     return False
                 want = ports[idx]
-                # Geteilten Ausgang nur uebernehmen, wenn frei oder schon APC.
+                # Den GETEILTEN Ausgang nur uebernehmen, wenn er frei ist oder
+                # ohnehin schon auf den APC zeigt — er gehoert der MIDI-Ansicht
+                # bzw. dem Mapping-Feedback. Ist er belegt, bleibt er
+                # unangetastet; gesendet wird trotzdem, portadressiert.
                 current = ""
                 try:
                     current = str(m.current_output_name() or "")
                 except Exception:
                     current = ""
-                if current and current != want and self._hint.lower() not in current.lower():
-                    print(f"[APCMiniFeedback] MIDI-Ausgang '{current}' ist belegt — "
-                          f"LED-Feedback bleibt aus (gewuenscht: {want}).")
-                    return False
-                if not m.open_output(want):
-                    return False
+                frei = (not current or current == want
+                        or self._hint.lower() in current.lower())
                 self._out = m
-                self._out_name = m.current_output_name()
-                print(f"[APCMiniFeedback] Output geoeffnet: {self._out_name}")
+                if frei and m.open_output(want):
+                    self._out_name = str(m.current_output_name() or want)
+                    print(f"[APCMiniFeedback] Output geoeffnet: {self._out_name}")
+                else:
+                    # Kein Grund aufzugeben: send_message_to adressiert den APC
+                    # direkt. Frueher blieben die LEDs hier einfach dunkel.
+                    self._out_name = want
+                    print(f"[APCMiniFeedback] MIDI-Ausgang '{current}' ist belegt — "
+                          f"LED-Feedback laeuft portadressiert an '{want}'.")
                 return True
             except Exception as e:
                 print(f"[APCMiniFeedback] Fehler beim Öffnen: {e}")
@@ -157,6 +163,14 @@ class APCMiniFeedback:
                     self._out.close_port()
                 except Exception:
                     pass
+            else:
+                # Einen fuer uns geoeffneten Zweit-Ausgang freigeben. Zeigt der
+                # Haupt-Ausgang selbst auf den APC, gibt es keinen — dann ist
+                # das ein No-Op und ruehrt den geteilten Port nicht an.
+                try:
+                    self._out.close_aux_output(self._out_name)
+                except Exception:
+                    pass
             self._out = None
         self._out_name = None
         if _instance is self:
@@ -169,21 +183,37 @@ class APCMiniFeedback:
         """Setzt eine LED direkt (Diff-Update: sendet nur bei Aenderung)."""
         if self._cache.get(note) == velocity:
             return
-        self._cache[note] = velocity
-        if self._out and self._targets_apc():
-            try:
-                self._out.send_message([0x90, note & 0x7F, velocity & 0x7F])
-            except Exception:
-                pass
+        # ★ Erst senden, DANN merken. Andersherum vergiftet ein misslungener
+        # Sendeversuch den Diff-Cache: er behauptet, die LED stehe schon auf
+        # dem Wunschwert, und genau derselbe Wunsch wird nie wiederholt — die
+        # LED bleibt dauerhaft falsch statt nur voruebergehend.
+        if self._send([0x90, note & 0x7F, velocity & 0x7F]):
+            self._cache[note] = velocity
 
-    def _targets_apc(self) -> bool:
-        """Zeigt der geteilte Manager-Ausgang noch auf unseren APC-Port?"""
-        if self._out_name is None:
-            return True
+    def _send(self, msg) -> bool:
+        """Portadressiert an UNSEREN APC senden.
+
+        ★ MIDI-LED-AUX. Frueher ging die Note ueber den GETEILTEN Ausgang, und
+        damit sie nicht auf einem fremden Geraet klimperte, sendete der Treiber
+        nur, solange dieser Ausgang noch auf den APC zeigte. Wer in der
+        MIDI-Ansicht etwas anderes waehlte, verlor das LED-Feedback still.
+
+        ``send_message_to`` nennt den Ziel-Port beim Namen: die Note kann das
+        fremde Geraet gar nicht erreichen, unabhaengig davon, was die Ansicht
+        gerade anzeigt. Der Manager benutzt dabei den Haupt-Ausgang, wenn der
+        ohnehin dorthin zeigt, und sonst einen gehaltenen Zweit-Handle.
+        """
+        if self._out is None:
+            return False
         try:
-            return str(self._out.current_output_name() or "") == self._out_name
-        except Exception:
+            if self._out_name is not None:
+                return bool(self._out.send_message_to(self._out_name, msg))
+            # Eigener WinMM-Handle (ARM-Windows ohne python-rtmidi): der zeigt
+            # per Konstruktion auf den APC, da gibt es nichts zu adressieren.
+            self._out.send_message(msg)
             return True
+        except Exception:
+            return False
 
     def clear_all(self):
         """Alle relevanten APC-Mini-LEDs ausschalten."""

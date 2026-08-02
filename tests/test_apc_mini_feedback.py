@@ -54,6 +54,8 @@ class _FakeManager:
         self._ports = list(ports)
         self._current = current
         self.sent: list[tuple[int, ...]] = []
+        self.an_port: list[tuple[str, tuple]] = []
+        self.aux_freigegeben: list[str] = []
         self.open_calls: list[str] = []
 
     def list_outputs(self):
@@ -71,10 +73,23 @@ class _FakeManager:
         self.sent.append(tuple(msg))
         return True
 
+    # ── portadressiert (MIDI-LED-AUX) ────────────────────────────────────────
+    def send_message_to(self, port, msg):
+        self.an_port.append((port, tuple(msg)))
+        return True
+
+    def close_aux_output(self, port):
+        self.aux_freigegeben.append(port)
+
 
 def test_led_feedback_does_not_hijack_a_foreign_output(monkeypatch):
     """Das Einschalten der LEDs darf einen fremden, bereits offenen Ausgang
-    nicht wegreissen (der gehoert der MIDI-Ansicht bzw. dem Mapping-Feedback)."""
+    nicht wegreissen (der gehoert der MIDI-Ansicht bzw. dem Mapping-Feedback).
+
+    Seit MIDI-LED-AUX ist das kein Verzicht mehr: der Ausgang bleibt fremd UND
+    die LEDs leuchten, weil portadressiert gesendet wird. Vorher hiess "belegt"
+    schlicht "keine LEDs" — ohne Meldung in der Oberflaeche.
+    """
     from src.core.midi import apc_mini_feedback as mod
 
     mgr = _FakeManager(["APC mini mk2", "Anderes Pult"], current="Anderes Pult")
@@ -82,14 +97,23 @@ def test_led_feedback_does_not_hijack_a_foreign_output(monkeypatch):
     monkeypatch.setattr("src.core.midi.midi_manager.get_midi_manager", lambda: mgr)
 
     fb = APCMiniFeedback(port_hint="APC")
-    assert fb.is_connected is False
     assert mgr.open_calls == [], "fremder Ausgang wurde uebernommen"
     assert mgr.current_output_name() == "Anderes Pult"
 
+    assert fb.is_connected is True
+    fb.set_led(3, LED_GREEN)
+    assert mgr.sent == [], "Note lief ueber den geteilten (fremden) Ausgang"
+    assert mgr.an_port == [("APC mini mk2", (0x90, 3, LED_GREEN))]
 
-def test_led_feedback_stops_sending_when_output_switches_away(monkeypatch):
-    """Schaltet jemand den geteilten Ausgang um, duerfen keine Pad-Noten mehr
-    rausgehen — sonst klimpern sie auf dem fremden Geraet (Windows: GS Synth)."""
+
+def test_led_feedback_survives_an_output_switch(monkeypatch):
+    """Schaltet jemand den geteilten Ausgang um, muessen die LEDs weiterlaufen —
+    und die Noten trotzdem beim APC landen, nicht beim fremden Geraet.
+
+    Frueher war die Antwort darauf "gar nicht mehr senden". Das schuetzte zwar
+    vor Geklimper auf dem GS Synth, kostete aber jedes LED-Feedback, still.
+    Portadressiert faellt die Wahl weg: die Note nennt ihr Ziel.
+    """
     from src.core.midi import apc_mini_feedback as mod
 
     mgr = _FakeManager(["APC mini mk2"], current="")
@@ -99,11 +123,14 @@ def test_led_feedback_stops_sending_when_output_switches_away(monkeypatch):
     fb = APCMiniFeedback(port_hint="APC")
     assert fb.is_connected is True
     fb.set_led(3, LED_GREEN)
-    assert len(mgr.sent) == 1
+    assert len(mgr.an_port) == 1
 
     mgr._current = "Anderes Pult"          # jemand schaltet um
     fb.set_led(4, LED_RED)
-    assert len(mgr.sent) == 1, "LED-Note ging an ein fremdes Geraet"
+    assert len(mgr.an_port) == 2, "LED-Feedback verstummte nach dem Umschalten"
+    assert all(p == "APC mini mk2" for p, _m in mgr.an_port), \
+        "LED-Note ging an ein fremdes Geraet"
+    assert mgr.sent == [], "Note lief ueber den geteilten Ausgang statt adressiert"
 
 
 def test_close_does_not_close_the_shared_manager_port(monkeypatch):

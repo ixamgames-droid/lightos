@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — APC-LEDs gehen nicht mehr still aus
+
+#### Behoben
+
+- **Die APC-LEDs hörten auf mitzuschalten, sobald in der MIDI-Ansicht ein
+  anderes Ausgabegerät gewählt wurde** — ohne Fehler, ohne Meldung. Die
+  Knöpfe blieben einfach stehen.
+
+  Schlimmer war, was danach passierte: **auch nach dem Zurückschalten blieben
+  sie falsch.** Der Treiber sendet nur bei Änderung und hatte sich den nie
+  gesendeten Wert bereits als „steht so" gemerkt. Nur ein *anderer* Wert hätte
+  je wieder gesendet — aus einem vorübergehenden Aussetzer wurde ein dauerhaft
+  falsches Pult.
+
+  Beide APC-Treiber (mini und mini mk2) nennen jetzt ihren Zielport beim Namen.
+  Die Note kann ein fremdes Gerät gar nicht mehr erreichen — die alte Sperre
+  wird damit überflüssig, statt durch eine schwächere ersetzt zu werden. Und
+  gemerkt wird ein Wert erst, **nachdem** er wirklich rausging.
+
+- **LED-Feedback startet auch, wenn der MIDI-Ausgang schon belegt ist.** Vorher
+  gab der Treiber in diesem Fall ganz auf; die Begründung stand nur auf der
+  Konsole. Der belegte Ausgang bleibt dabei unangetastet — er gehört weiterhin
+  der MIDI-Ansicht.
+
+  Ist gar kein Ausgang offen, übernimmt der APC ihn weiterhin; das spart den
+  Zweit-Anschluss, den die portadressierte Ausgabe sonst offen hält.
+
+- Der `apc_mk2_feedback`-Treiber — der für Davids tatsächliches Gerät — hatte
+  **bislang keinen einzigen Test**. Er ist jetzt mit demselben Satz abgedeckt
+  wie die mini-Variante.
+
 ### 2026-08-02 — Anleitungen zeigten auf ein Bedienfeld, das es nicht mehr gibt
 
 #### Behoben
