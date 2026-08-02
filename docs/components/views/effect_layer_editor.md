@@ -15,7 +15,7 @@ ausgekoppelt werden.
 | Bedienung | Wirkung |
 |---|---|
 | Layer-Liste | Layer hinzufügen/entfernen/umordnen |
-| Layer-Parameter | Einzel-Layer konfigurieren |
+| Layer-Parameter | Einzel-Layer konfigurieren — **es werden nur die Felder gezeigt, die der gewählte Layer-Typ wirklich auswertet** (seit 2026-08-02: ein Begrenzer bot vorher Amplitude und Frequenz an, die er nie liest). Die Zuordnung liegt in `core.engine.effect_layers.used_fields`, direkt neben `process`. |
 | Auskoppeln | Editor in großes Fenster verschieben / zurückholen |
 
 ## Verknüpfungen

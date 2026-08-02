@@ -21,8 +21,15 @@ seitlich, unten und oben. Sie entstand beim Live-Durchspielen der Demo-Show
    direkt im Raum gerendert (Statuszeile unten: „N Fixture(s) in Szene").
 
 ## Teil A — Bühne/Trassen bauen (Tab „Bühne")
-Der Tab **Bühne** schaltet den **Modus** automatisch auf „Bühne bearbeiten" (gelbes
-Banner „BÜHNE BEARBEITEN — Tippen=Auswählen | Ziehen=Verschieben"). Unter
+
+> **Seit 2026-08-02 (VIZ-14):** Der Visualizer hat **zwei Modi** — „Ansehen" und
+> „Bauen". Erst **Modus → Bauen** stellen; *dann* entscheidet der Tab, **woran** du
+> arbeitest. Ein Tab-Klick allein schaltet den Modus **nicht** mehr um (vorher tat er
+> das, und wer nur die Liste ansehen wollte, machte damit ungewollt alles anfassbar).
+> Der Rahmen um die Ansicht zeigt beides an: „BAUEN · Bühne" bzw. „BAUEN · Fixtures".
+
+Im Modus **Bauen** mit dem Tab **Bühne** erscheint das gelbe Banner „BÜHNE BEARBEITEN
+– Tippen=Auswählen | Ziehen=Verschieben". Unter
 **„Element hinzufügen"** stehen: Boden/Floor · Plattform · Truss (horizontal) ·
 Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche · DJ-Booth.
 
@@ -46,12 +53,19 @@ Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche
    `Z=-2`) → ergibt ein „Goalpost"-Gerüst.
 
 ## Teil B — Fixtures an die Trassen hängen (Tab „Fixtures")
-Der Tab **Fixtures** schaltet den Modus auf „Fixtures bearbeiten". Jede Zeile hat einen
-Status: `[ ]` = nicht in Szene, `[X]` = platziert.
 
-1. **Platzieren:** Fixture in der Liste wählen → **„Im Raum platzieren"** → der Mesh
-   erscheint **sofort** in der Szene (dank Fix). Mit **„Entfernen"** verschwindet er
-   sofort wieder.
+Im Modus **Bauen** mit dem Tab **Fixtures** arbeitest du an den Geräten. Jede Zeile hat
+einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
+
+1. **Platzieren — am schnellsten per Ziehen (seit 2026-08-02):** Gerät aus der Liste in
+   die 3D-Ansicht **ziehen**. Während des Ziehens zeigt ein halbtransparenter Geist,
+   wo es landet; färbt er sich **grün**, dockt es beim Loslassen an die Trasse darunter
+   an. Losgelassen landet **genau dieses** Gerät dort. Ein bereits platziertes Gerät
+   lässt sich auf demselben Weg verschieben.
+   > Ziehen wirkt nur im **Bauen**-Modus. Im Ansehen-Modus zeigt der Mauszeiger, dass
+   > hier nichts abgelegt werden kann — der Drop verpufft nicht still.
+2. **Platzieren per Knopf:** Fixture in der Liste wählen → **„Im Raum platzieren"** →
+   der Mesh erscheint sofort in der Szene. Mit **„Entfernen"** verschwindet er wieder.
 2. **Hängen (unten/oben/seitlich)** über „Position & Ausrichtung":
    - **Unten an die Trasse (bottom-hung):** `Y` knapp unter die Trassen-Höhe (Trasse
      Y=6 → Fixture `Y=5`), `Z` = Trassen-Z, `X` entlang der Trasse verteilen.

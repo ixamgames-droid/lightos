@@ -7,6 +7,10 @@ rem
 rem  Bedienung:  Esc = beenden, Leertaste = Pause,
 rem              Mausrad = Zoom, Ziehen = Kamera, Tab = Dateien
 rem  Gource 0.53 (GPLv3, https://gource.io) liegt in tools\gource\
+rem  Auf Linux: Code-Film.sh benutzen (dort kommt Gource aus dem
+rem  Paketmanager - die mitgelieferte Fassung hier ist Windows-only).
+rem  Beide Skripte tragen dieselben Parameter: wer einen aendert,
+rem  aendert bitte beide.
 rem ============================================================
 cd /d "%~dp0"
 tools\gource\gource.exe ^
