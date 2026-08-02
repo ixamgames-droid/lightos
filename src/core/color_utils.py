@@ -61,6 +61,16 @@ def hex_to_rgb(hexc: str) -> tuple[int, int, int]:
         return (0, 0, 0)
 
 
+# Farbrad-Attributnamen, Reihenfolge = Vorrang. EINE Liste fuer BEIDE Richtungen:
+# ``visual_rgb`` liest den Slot (Kanal -> was man sieht), ``color_attrs_for_fixture``
+# schreibt ihn (Wunschfarbe -> Kanal). Bis 2026-08-02 kannte nur die Lese-Seite
+# ``color_wheel``; die Schreib-Seite suchte allein ``color`` und lieferte fuer JEDEN
+# Mover mit Farbrad ein leeres Ergebnis — „Alles Weiß" haette dessen Rad also nicht
+# angefasst (rot stehendes Rad bleibt rot). Zwei parallele Listen sind genau die
+# Drift-Quelle, die FM16E gelehrt hat.
+_WHEEL_ATTRS = ("color_wheel", "colour_wheel", "color")
+
+
 def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
     """Mappt eine Ziel-RGB-Farbe (r, g, b ints 0-255) auf die zu setzenden
     Attribut→Wert-Paare EINES Fixtures, anhand seiner echten Kanaele.
@@ -104,12 +114,33 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
             out["color_w"] = min(r, g, b)
         return out
 
-    # 2) Farbrad (attribute == "color") ---------------------------------------
-    color_ch = next((c for c in chans if getattr(c, "attribute", None) == "color"), None)
+    # 2) Farbrad (color_wheel / colour_wheel / color) -------------------------
+    color_ch = None
+    for _wheel in _WHEEL_ATTRS:
+        color_ch = next((c for c in chans
+                         if getattr(c, "attribute", None) == _wheel), None)
+        if color_ch is not None:
+            break
     if color_ch is not None:
         ranges = list(getattr(color_ch, "ranges", None) or [])
+        # Der OFFENE Slot ist auf fast jedem Farbrad der weisse („Weiß / Offen",
+        # kind='open'). Bis 2026-08-02 waren nur kind=='color'-Slots Kandidaten —
+        # die Anfrage „weiss" landete deshalb auf dem naechstgelegenen BUNTEN
+        # Slot, am generischen Moving Head Spot 16ch konkret auf **Magenta** (119).
+        # Die Lese-Richtung faerbt den offenen Slot laengst weiss (visual_rgb ueber
+        # den Slot-Namen); das hier zieht die Schreib-Richtung nach.
+        #
+        # Bewusst NUR fuer eine (nahezu) weisse Anfrage. Liesse man den offenen
+        # Slot immer mitspielen, zoege er auch bunte Anfragen an sich, sobald das
+        # Rad keinen passenden Farb-Slot hat — „mach rot" mit der Antwort „kein
+        # Filter" waere schlechter als das ehrliche „kann ich nicht" von heute
+        # (genau das haelt ``test_wheel_skips_unnamed_ranges`` fest).
+        # kind=='rotate' bleibt immer draussen: ein Farbwechsel-Band ist keine
+        # Farbe, sondern eine Betriebsart.
+        _hell_neutral = min(r, g, b) >= 200 and (max(r, g, b) - min(r, g, b)) <= 32
+        _kinds = ("color", "open") if _hell_neutral else ("color",)
         candidates = [rg for rg in ranges
-                      if (getattr(rg, "kind", "") or "") == "color"] or ranges
+                      if (getattr(rg, "kind", "") or "") in _kinds] or ranges
         best_val: int | None = None
         best_dist = None
         for rg in candidates:
@@ -123,7 +154,7 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
                 lo, hi = int(rg.range_from), int(rg.range_to)
                 best_val = max(0, min(255, (lo + hi) // 2))
         if best_val is not None:
-            return {"color": best_val}
+            return {getattr(color_ch, "attribute", "color"): best_val}
 
     # 3) Reiner Weiss-Kanal ----------------------------------------------------
     if "color_w" in attrs:
@@ -153,7 +184,6 @@ _EMITTER_RGB = {word: hex_to_rgb(color_word_hex(word) or "#000000")
                 for word in ("amber", "violett")}
 
 _CMY_TRIPLES = (("cmy_c", "cmy_m", "cmy_y"), ("cyan", "magenta", "yellow"))
-_WHEEL_ATTRS = ("color_wheel", "colour_wheel", "color")
 # Reihenfolge = Vorrang. "shutter"/"strobe" bewusst NICHT hier: sie sind kein
 # Dimmer (s. attr_groups) und werden nur als Notnagel ausgewertet, wenn ein
 # Geraet gar keinen Dimmer hat.

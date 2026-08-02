@@ -7,6 +7,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — „Alles Weiß" macht jetzt wirklich alles weiß
+
+#### Geändert
+
+- **Die Taste „Alles Weiß" setzt alle gepatchten Geräte selbst auf Weiß**, statt
+  nur eine hinterlegte Szene zu starten. Damit ist egal, wann die Szene gebaut
+  wurde: neu dazugekommene Geräte sind ab dem nächsten Druck dabei, und ohne
+  hinterlegte Szene funktioniert die Taste überhaupt zum ersten Mal.
+
+  Eine hinterlegte Szene läuft weiterhin mit und behält ihre Geräte — wer einen
+  bewussten Weiß-Look eingestellt hat (etwa warmweiße PARs), behält ihn; der
+  Rest wird aufgefüllt.
+
+  **Blackout und der Master-Regler liegen weiterhin darüber**: „Alles Weiß"
+  hebelt den Notaus nicht aus.
+
+#### Behoben
+
+- **Movern mit Farbrad wurde die Farbe gar nicht gesetzt.** Beim Setzen einer
+  Farbe wurde nur ein Kanal namens „color" gesucht, die meisten Geräte nennen
+  ihn aber „color_wheel" — an denen passierte schlicht nichts. Ein auf Rot
+  stehendes Rad wäre bei „Alles Weiß" rot geblieben, nur heller.
+
+- **„Weiß" landete am Farbrad auf Magenta.** Der weiße Slot ist auf fast jedem
+  Rad als „offen" hinterlegt und zählte deshalb nicht als Farbe — gewählt wurde
+  der nächstgelegene *bunte* Slot. Für eine weiße Anfrage zählt der offene Slot
+  jetzt mit; für bunte Anfragen ausdrücklich nicht.
+
+- **Der Shutter wird nur angefasst, wenn das Geräteprofil sagt, was „offen"
+  heißt.** Sonst bleibt er unberührt — lieber ein dunkles Gerät als eines, das
+  mitten in einer Panik-Situation zu blitzen anfängt.
+
 ### 2026-08-02 — „Alles Weiß" sagt, wie viel es erreicht
 
 #### Behoben
