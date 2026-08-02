@@ -43,12 +43,20 @@ def test_toolbar_buttons_have_whatsthis(tmp_path, monkeypatch):
     from src.ui.views.programmer_view import ProgrammerView, _PROGRAMMER_HELP
     pv = ProgrammerView()
     buttons = pv.findChildren(QPushButton)
-    for label in ("Hervorheben", "Löschen", "Farb-Werkzeug...", "Fächer..."):
+    # BUG-CLEAR (2026-08-02): Der Loesch-Knopf heisst nicht mehr fix „Löschen",
+    # sondern nennt seine REICHWEITE — ohne Auswahl (wie hier, frisch gebaut)
+    # „Alles löschen", mit Auswahl „Auswahl löschen (N)". Sein Hilfetext wechselt
+    # mit; die _PROGRAMMER_HELP-Fassung gilt fuer die volle Reichweite.
+    # Wer beides prueft: tests/test_clear_programmer_scope.py.
+    for label, hilfe_key in (("Hervorheben", "Hervorheben"),
+                             ("Alles löschen", "Löschen"),
+                             ("Farb-Werkzeug...", "Farb-Werkzeug..."),
+                             ("Fächer...", "Fächer...")):
         matches = [b for b in buttons if b.text() == label]
         assert matches, f"Button '{label}' fehlt"
         # Mehrere Buttons koennen denselben Text tragen (z.B. "Löschen" in der
         # Toolbar UND in eingebetteten Panels) -> mind. einer hat den Hilfetext.
-        assert any(b.whatsThis() == _PROGRAMMER_HELP[label] for b in matches), \
+        assert any(b.whatsThis() == _PROGRAMMER_HELP[hilfe_key] for b in matches), \
             f"WhatsThis fehlt fuer '{label}'"
 
 

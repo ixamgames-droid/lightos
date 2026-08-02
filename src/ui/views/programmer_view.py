@@ -102,6 +102,9 @@ _PROGRAMMER_HELP = {
                  "Helligkeit, um sie auf der Bühne zu lokalisieren.",
     "Abdunkeln": "Dimmt alle NICHT ausgewählten Fixtures ab, damit die aktuelle "
                 "Auswahl hervorsticht.",
+    # BUG-CLEAR: Der Knopf hat ZWEI Reichweiten (Auswahl / alles) — welche gilt,
+    # sagen Beschriftung und Hilfetext seit 2026-08-02 selbst. Die Eintraege hier
+    # sind die beiden Fassungen; ``_clear_button_labels`` waehlt aus.
     "Löschen": "Leert den Programmer (alle hier manuell gesetzten Werte). "
              "Gespeicherte Funktionen, Cues und Snapshots bleiben unberührt.",
     "Kopieren": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
@@ -226,7 +229,15 @@ class ProgrammerView(QWidget):
             )
             b.clicked.connect(slot)
             b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3: Hilfe-Modus
+            if label == "Löschen":
+                # BUG-CLEAR: Beschriftung folgt der Reichweite (s. _sync_clear_button).
+                # Breite auf die LAENGERE der beiden Fassungen festnageln, sonst
+                # huepft die halbe Toolbar bei jedem Auswahlwechsel.
+                self._btn_clear = b
+                b.setMinimumWidth(b.fontMetrics().horizontalAdvance(
+                    self._clear_button_labels(99)[0]) + 24)
             tb.addWidget(b)
+        self._sync_clear_button()
         tb.addSpacing(20)
 
         # Tool-Buttons (Color, Position, Fan)
@@ -1166,6 +1177,10 @@ class ProgrammerView(QWidget):
     # ── Attr Tabs Build ──────────────────────────────────────────────────────
 
     def _rebuild_attr_editor(self):
+        # BUG-CLEAR: gemeinsamer Punkt beider Auswahlwege — hier VOR dem
+        # Early-Return unten, sonst bliebe die Beschriftung in Layouts ohne
+        # Attribut-Tabs auf der zuletzt gesetzten Reichweite stehen.
+        self._sync_clear_button()
         # UNTEN-Vorschau (Zonen-Layout) an aktuelle Auswahl koppeln.
         self._push_selection_to_preview()
         # Neue einheitliche Tab-Struktur (WP-5): die 4 Attribut-Container befuellen.
@@ -2202,7 +2217,52 @@ class ProgrammerView(QWidget):
                 continue
             self._state.set_programmer_value(fid, "intensity", 76)
 
+    @staticmethod
+    def _clear_button_labels(anzahl: int) -> tuple[str, str]:
+        """Beschriftung + Hilfetext des „Löschen"-Knopfs zu einer Auswahlgroesse.
+
+        BUG-CLEAR (David 2026-08-01: „Programmer leeren hat manchmal nicht alles
+        geleert"): der Knopf hatte immer schon ZWEI Reichweiten — mit Auswahl
+        leert er nur diese, ohne Auswahl alles. Sein Hilfetext versprach aber
+        „alle hier manuell gesetzten Werte", und im Programmer ist fast immer
+        etwas ausgewaehlt, weil man die Auswahl zum Einstellen braucht. Das
+        „manchmal" WAR die Auswahl. Reine Funktion, damit die Zuordnung ohne
+        gebaute View pruefbar ist.
+        """
+        if anzahl:
+            return (f"Auswahl löschen ({anzahl})",
+                    f"Leert die Programmer-Werte der {anzahl} ausgewählten "
+                    f"Geräte — die übrigen bleiben scharf. Ohne Auswahl leert "
+                    f"derselbe Knopf den GANZEN Programmer. Gespeicherte "
+                    f"Funktionen, Cues und Snapshots bleiben unberührt.")
+        return ("Alles löschen", _PROGRAMMER_HELP["Löschen"])
+
+    def _sync_clear_button(self):
+        """Haelt Beschriftung/Hilfetext des „Löschen"-Knopfs an der Auswahl.
+
+        Wird aus ``_rebuild_attr_editor`` gerufen — dem gemeinsamen Punkt beider
+        Auswahlwege (eigene Liste UND externes SELECTION_CHANGED).
+        """
+        btn = getattr(self, "_btn_clear", None)
+        if btn is None:
+            return
+        text, hilfe = self._clear_button_labels(len(self._selected_fids))
+        try:
+            btn.setText(text)
+            btn.setToolTip(hilfe)
+            btn.setWhatsThis(hilfe)
+        except RuntimeError:
+            self._btn_clear = None      # Widget schon abgebaut (Teardown)
+
     def _clear_programmer(self):
+        """Leert die Auswahl — oder alles, wenn nichts gewaehlt ist.
+
+        Die Reichweite steht seit BUG-CLEAR auf dem Knopf (``_sync_clear_button``).
+        Ist ein KOPF gewaehlt, wird trotzdem das ganze Geraet geleert: die
+        Kopf-Zeile ist eine Verfeinerung der Geraeteauswahl, und beim Aufraeumen
+        ist „mehr" die sichere Richtung — ein halb geleertes Geraet waere genau
+        die Sorte Rest, um die es in diesem Item geht.
+        """
         if not self._selected_fids:
             # Komplett leeren
             self._state.clear_programmer()

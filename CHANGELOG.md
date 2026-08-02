@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Der Löschen-Knopf sagt, wie weit er reicht
+
+#### Behoben
+
+- **„Löschen" im Programmer räumte manchmal nur die Hälfte weg — jetzt steht
+  vorher drauf, was passiert.** Der Knopf hatte immer schon zwei Reichweiten:
+  ist etwas ausgewählt, leert er nur die ausgewählten Geräte; ist nichts
+  ausgewählt, den ganzen Programmer. Da im Programmer fast immer etwas
+  ausgewählt ist, sah das aus wie „hat nicht alles erwischt".
+
+  Der Knopf heißt jetzt **„Alles löschen"** bzw. **„Auswahl löschen (3)"**, je
+  nachdem — und der Hilfetext sagt ausdrücklich, dass die übrigen Geräte scharf
+  bleiben. Am Verhalten selbst ändert sich nichts: beide Reichweiten sind
+  nützlich, falsch war nur die Beschriftung.
+
+  Der Weg über das Menü und die VC-Taste „Programmer leeren" räumt weiterhin
+  wirklich alles weg — auch Werte einzelner Köpfe und die über die Fernbedienung
+  gesetzten Kanäle.
+
 ### 2026-08-02 — Bestehende Shows öffnen wieder
 
 #### Behoben
