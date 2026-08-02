@@ -377,6 +377,82 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    fehlendes Note-Off) und der Programmer-Inhalt danach auslesen — dafür braucht
    es Davids APC nicht.
 
+### 🏁 FINALIZE — Schritt 1: Quellenlage bereinigt (2026-08-02)
+
+**Zwei Dateien beanspruchten dieselbe Rolle.** `BACKLOG.md` nennt sich „Single
+Source of Truth für den autonomen Loop", `docs/OPEN_POINTS_OVERVIEW.md` nannte
+sich „einzige Quelle der Wahrheit für offene Aufgaben" — Stand 2026-06-15. Zwei
+Dokumente mit demselben Anspruch driften zwangsläufig, und die Drift war messbar:
+
+| | |
+|---|---|
+| Einträge in den OFFEN-Abschnitten der Übersicht | **46** |
+| davon im Backlog vertreten | **4** |
+| **nie im Backlog angekommen** | **42** |
+| davon bereits als „✅ umgesetzt" markiert, aber im falschen Abschnitt | **3** |
+
+Die 42 aufgeteilt: **3** in Wahrheit erledigt (gegen den Code belegt, nach
+Abschnitt 5 verschoben) · **9** ausdrücklich „bewusst zurückgestellt" (Entscheidung
+liegt vor) · **4** hardware-abhängig · **26** Ideen/Langfrist ohne Entscheidung.
+
+**Entschieden:** die Übersicht ist ab sofort das **Reservoir** — Ideen, Langfrist,
+bewusst Zurückgestelltes —, aus dem geschöpft wird, wenn der Backlog leer ist.
+Sie ist ausdrücklich **nicht** die Arbeitsliste, und ihr Kopf sagt das jetzt.
+Bewusst **nicht** gemacht: die 26 Kandidaten ins Backlog importieren — das hätte
+die verbindliche Warteschlange mit Langfrist-Ideen geflutet, gegen die
+Backlog-eigene Regel „die Arbeitswarteschlange ist verbindlich".
+
+**Gate:** `tests/test_open_points_source.py` hält die drei Fehlerarten fest, die
+tatsächlich aufgetreten sind — Vorrang-Hinweis fehlt · ein „offener" Punkt
+bezeichnet sich selbst als umgesetzt · der Zähler in einer Themen-Überschrift
+passt nicht zu den Einträgen (die billigste Art, einen Eintrag zu übersehen).
+Alle drei per Mutation gegengeprüft.
+
+**Nächster Griff in den Fundus:** die 26 Kandidaten stehen mit Aufwand-Schätzung
+in der Übersicht; die drei mit Priorität *Mittel* sind `F-17` (Effekt-Layering),
+`NS-B-LivePreview` (Live-Vorschau Programmer) und `F-20` (Art-Net-Merge).
+
+**FINALIZE offen:** Repo- und Ordner-Hygiene (Altdateien), Second-Brain-Konsolidierung.
+
+### 🏁 FINALIZE — Schritt 2: Repo-Hygiene GEMESSEN (2026-08-02, nichts gelöscht)
+
+Der FINALIZE-Auftrag sagt „Repo und lokalen Ordner von sinnlosen Altdateien
+säubern". Gemessen wurde alles, **gelöscht nichts** — beide Kandidaten sind
+Entscheidungen, die David gehören (Lehre aus dem Werkzeug-Audit: destruktive
+Aktionen report-first, ein Namensmuster ist kein Löschkriterium).
+
+**Versionierte Dateien: 165,5 MB.** Verteilung:
+
+| Anteil | | |
+|---|---|---|
+| **132,6 MB** | Bilder/GIF (610 Dateien) | **80,1 %** |
+| 17,3 MB | Code + Doku (1313 Dateien) | 10,4 % |
+| **15,7 MB** | Windows-Binärdateien (29 Dateien) | 9,5 % |
+
+**Kandidat A — `tools/gource/` (17 MB, Windows-only).** Ein mitgeliefertes
+Drittwerkzeug (Gource 0.53, GPLv3): `gource.exe` + 28 DLLs, alles PE32+. Genutzt
+von `Code-Film.bat` — der Projekt-Animation aus den YouTube-Videos. **Auf dem
+Linux-Rig wertlos** (dort wäre es `apt install gource`), auf Windows funktioniert
+es. Entscheidung nötig: rauswerfen (Repo −9,5 %, `Code-Film.bat` bräuchte einen
+Linux-Zweig) oder als Windows-Beigabe behalten. *Nicht angefasst, weil es eine
+Funktion ist, die David benutzt.*
+
+**Kandidat B — Anleitungs-Bilder (132,6 MB, 80 % des Repos).** Allein
+`docs/tutorial_matrix/` wiegt 89 MB, darin drei PNGs mit **4–5,5 MB pro Bild** —
+das sind unkomprimierte Vollbild-Screenshots. Verlustfreie Optimierung dürfte
+hier den Löwenanteil holen, ohne dass eine Anleitung schlechter wird. Das ist
+aber ein Eingriff in committete Doku und gehört eigenständig gemessen
+(vorher/nachher je Bild), nicht nebenbei.
+
+**Was NICHT im Repo liegt und trotzdem Platz frisst:** `archiv/` im
+Projektordner mit **3,5 GB** allein in `alter-dump-2026-07-23/` (Umzugs-Dump vom
+Windows-Rig) und 129 MB `LightOS_Transfer-2026-07-28/`. Das sind Davids
+Sicherungen — hier wird nichts angefasst; der Hinweis steht nur da, weil der
+FINALIZE-Auftrag ausdrücklich auch den lokalen Ordner nennt.
+
+**Nichts zu tun war bei:** `venv/` (815 MB) und `.pytest_segments` (2,1 MB) —
+beide gitignored, also reine Arbeitsdateien.
+
 ### Begleitende reale Abnahme
 
 - **QA-LIVE** — der Live-Test-Plan wird bei jedem betroffenen UI-/Remote-Punkt
