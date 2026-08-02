@@ -255,6 +255,15 @@ def migrate_show_db(engine) -> None:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN net_host "
                     "VARCHAR(120) DEFAULT ''"))
+            # FM-13: Pixel-Reihenfolge eines Matrix-Panels. Kam mit PR #514 ins
+            # Modell, aber NICHT hierher — jede vorher angelegte Show-DB war damit
+            # gar nicht mehr ladbar (`_reload_patch_cache` fragt alle Modell-
+            # Spalten ab und stirbt an "no such column"). Default 'rowwise' =
+            # Bestandsverhalten.
+            if pcols and "pixel_order" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN pixel_order "
+                    "VARCHAR(16) DEFAULT 'rowwise'"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 
