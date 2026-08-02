@@ -174,7 +174,7 @@ Weil `_render` bei **jedem Frame** frisch aus den Feldern liest, wirken Änderun
 | **Stepper** | Durch Algorithmen oder Werte schalten („Form +/−"). |
 | **Effekt-Farben-Widget** | Farb-Sequence live umschalten: nächste/vorige Farbe, Farbe hinzufügen, an/aus. |
 | **Effekt-Editor-Box** | Den ganzen Effekt direkt in der VC bearbeiten. |
-| **Chase-Builder** | Matrix als Schritt in eine größere Abfolge einbauen. |
+| **Chase-Liste** | Zeigt die live gebaute Farbfolge (der frühere *Chase-Builder* ist seit 2026-06-30 entfernt; die Matrix selbst wird über Chaser/Cuelisten in größere Abfolgen eingebaut). |
 
 Verfügbare **Live-Aktionen** (auf Buttons/MIDI legbar): Farbe +/−, +Farbe, Farbe an/aus, Form +/−, Richtung, Bounce, **Freeze** (Animation einfrieren), **Reset Live** (Live-Änderungen verwerfen), **Commit** (Live-Werte als Preset übernehmen), **Tap** (Tempo tappen).
 

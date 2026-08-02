@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Anleitungen zeigten auf ein Bedienfeld, das es nicht mehr gibt
+
+#### Behoben
+
+- **Drei Anleitungen schickten weiterhin zum Chase-Builder** — einem Widget, das
+  am **30.06.2026** entfernt wurde. Über einen Monat lang suchte, wer danach
+  arbeitete, ein Bedienfeld, das es nicht mehr gab: eine Überschrift, ein
+  nummerierter Arbeitsschritt und eine Tabellenzeile. Alle drei nennen jetzt die
+  **Chase-Liste (`VCColorList`)** und wie man dort baut.
+
+- **Damit das nicht wieder unbemerkt passiert**, prüft `test_doc_removed_ui.py`
+  eine kleine, handgepflegte Liste entfernter Bedienelemente gegen alle
+  Anleitungen. Als *Geschichte* darf ein alter Name genannt werden („… wurde
+  entfernt"), als Handlungsanweisung nicht.
+
+  Bewusst **keine** allgemeine Prüfung aller zitierten UI-Beschriftungen: ein
+  Versuch damit ergab 177 Treffer auf 960 Zitate, fast alles Falschmeldungen.
+  Ein Gate mit dieser Quote wird ignoriert und ist damit schlechter als keines.
+
+  Rückblick-Dokumente (Audits, Pläne, Logs archivierter Shows) sind
+  ausgenommen — sie *sollen* den alten Stand nennen. Die Beweislast ist dabei
+  umgedreht: ein Dokument muss sich aktiv als Rückblick ausweisen, sonst wird
+  es geprüft.
+
 ### 2026-08-02 — Geräte ins 3D ziehen
 
 #### Neu

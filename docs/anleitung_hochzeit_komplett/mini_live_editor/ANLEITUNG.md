@@ -15,7 +15,9 @@
    - **Stepper „Lauflichter"** — wie viele Läufer gleichzeitig (1 → mehrere).
    - **Encoder „Dichte"** — z. B. wie dicht die Welle ist.
    - **Fader „Effekt-Tempo" / „Effekt-Helligkeit"** — Gesamttempo/-helligkeit.
-4. **Chase-Builder** (rechts): beim **Live-Chase** Farben hinzufügen/entfernen — **Farbe +/- / Leeren** (Reihe 2).
+4. **Chase-Liste** (rechts): zeigt beim **Live-Chase** die aktuelle Farbfolge. Hinzufügen
+   und Entfernen läuft über die Live-Aktionen **Farbe +/− / Leeren** (Reihe 2) — der
+   frühere Chase-Builder ist seit dem 2026-06-30 nicht mehr Teil der Oberfläche.
 
 ### Warum das praktisch ist
 Du musst einen Effekt nicht löschen und neu anlegen — du **drehst live** an seinen Parametern, während er
