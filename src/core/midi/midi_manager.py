@@ -34,6 +34,12 @@ _USE_WINMM = (not RTMIDI_OK) and WINMM_OK
 # Groesse der bounded RX-Queue (Treiber-Callback -> MidiDispatch-Thread).
 _RX_QUEUE_MAX = 4096
 
+# Wie lange ein Zweit-Ausgang, der sich nicht oeffnen liess, in Ruhe gelassen
+# wird. Kurz genug, dass ein wieder eingestecktes Geraet von selbst zurueckkommt;
+# lang genug, dass ein Tippfehler im Mapping nicht bei jeder Feedback-Nachricht
+# einen neuen ALSA-Client anlegt (s. send_message_to).
+_AUX_RETRY_S = 5.0
+
 # RtMidi/ALSA erzeugt fuer jeden Scan einen nativen Sequencer-Client. Wenn ALSA
 # gerade keine Clients mehr anlegen kann, kann paralleles/repetitives Scannen
 # nicht nur Exceptions, sondern auch native Abstuerze in librtmidi ausloesen.
@@ -82,6 +88,9 @@ class MidiManager:
         # Bewusst gehalten statt pro Nachricht geoeffnet — jeder MidiOut()
         # legt auf ALSA einen Sequencer-Client an (s. send_message_to).
         self._aux_outputs: dict = {}
+        # {port_name: monotonic-Zeit des letzten gescheiterten Oeffnens} —
+        # bremst das Wiederholen, s. send_message_to.
+        self._aux_failed: dict = {}
         self._virtual_out: object | None = None
         self._io_lock = threading.RLock()
         self._scan_lock = threading.Lock()
@@ -524,9 +533,22 @@ class MidiManager:
                     return False
             aux = self._aux_outputs.get(ziel)
             if aux is None:
+                # ★ Negativ-Merker: ein Portname, der sich nicht oeffnen laesst
+                # (Tippfehler im Mapping, Geraet abgezogen), wuerde sonst BEI
+                # JEDER Nachricht einen neuen MidiOut() bauen und wieder
+                # wegwerfen — gemessen 20 Stueck fuer 20 Nachrichten. Genau die
+                # ALSA-Client-Erschoepfung, gegen die diese API gebaut wurde.
+                # Deshalb: nach einem Fehlschlag eine Weile gar nicht erst
+                # versuchen — aber nicht fuer immer, sonst kaeme ein wieder
+                # eingestecktes Geraet nie zurueck.
+                letzter = self._aux_failed.get(ziel)
+                if letzter is not None and (time.monotonic() - letzter) < _AUX_RETRY_S:
+                    return False
                 aux = self._open_aux_output(ziel)
                 if aux is None:
+                    self._aux_failed[ziel] = time.monotonic()
                     return False
+                self._aux_failed.pop(ziel, None)
             try:
                 aux.send_message(list(message))
                 return True
@@ -535,6 +557,20 @@ class MidiManager:
                 # Ein toter Handle bliebe sonst fuer immer im Cache stehen.
                 self._close_aux_output(ziel)
                 return False
+
+    def send_cc_to(self, port_name: str, channel: int, cc: int,
+                   value: int) -> bool:
+        """CC an EINEN BESTIMMTEN Ausgang (s. ``send_message_to``)."""
+        status = 0xB0 | ((channel - 1) & 0x0F)
+        return self.send_message_to(port_name,
+                                    [status, cc & 0x7F, value & 0x7F])
+
+    def send_note_to(self, port_name: str, channel: int, note: int,
+                     velocity: int = 127) -> bool:
+        """Note-On an EINEN BESTIMMTEN Ausgang (s. ``send_message_to``)."""
+        status = 0x90 | ((channel - 1) & 0x0F)
+        return self.send_message_to(port_name,
+                                    [status, note & 0x7F, velocity & 0x7F])
 
     def _open_aux_output(self, port_name: str):
         """Zweit-Ausgang oeffnen und halten. Aufrufer haelt ``_io_lock``."""

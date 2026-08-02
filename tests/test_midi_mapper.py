@@ -13,6 +13,7 @@ class _FakeMidiManager:
     def __init__(self):
         self.callbacks = []
         self.sent: list[tuple[str, int, int, int]] = []
+        self.an_port: list[tuple] = []
         self.opened_output = ""
         self.open_output_calls = 0
 
@@ -24,6 +25,16 @@ class _FakeMidiManager:
 
     def send_cc(self, channel: int, cc: int, value: int, virtual: bool = False):
         self.sent.append(("cc", channel, cc, value))
+
+    # ── portadressiert (MIDI-FB-PORT) ────────────────────────────────────────
+    def send_note_to(self, port: str, channel: int, note: int,
+                     velocity: int = 127):
+        self.an_port.append((port, "note", channel, note, velocity))
+        return True
+
+    def send_cc_to(self, port: str, channel: int, cc: int, value: int):
+        self.an_port.append((port, "cc", channel, cc, value))
+        return True
 
     def open_output(self, port_name: str):
         self.opened_output = port_name
@@ -271,7 +282,16 @@ class MidiMapperTests(unittest.TestCase):
         # Learn-Modus danach beendet.
         self.assertFalse(self.mapper._learn_mode)
 
-    def test_feedback_stress_reuses_output_port(self):
+    def test_feedback_adressiert_den_port_statt_umzuschalten(self):
+        """Nennt ein Mapping ein eigenes Feedback-Geraet, wird die Nachricht
+        dorthin ADRESSIERT — der gemeinsame Ausgang bleibt unangetastet.
+
+        Frueher schaltete der Feedback-Thread ihn per ``open_output`` um. Das
+        nahm dem Benutzer seine Auswahl in der MIDI-Ansicht weg, ohne dass die
+        Anzeige es mitbekam, und liess bei Mappings auf zwei Geraete den
+        Ausgang bei jeder Nachricht springen. Der alte Test sicherte nur, dass
+        das Umschalten HOECHSTENS EINMAL passiert — jetzt passiert es gar nicht.
+        """
         mapping = mm.MidiMapping(
             name="Stress Fader",
             msg_type="cc",
@@ -289,8 +309,15 @@ class MidiMapperTests(unittest.TestCase):
             self.mapper._on_midi(_msg("cc", 1, val))
         time.sleep(0.2)
 
-        self.assertEqual(self.fake_midi.opened_output, "APC mini mk2")
-        self.assertLessEqual(self.fake_midi.open_output_calls, 1)
+        self.assertEqual(self.fake_midi.open_output_calls, 0,
+                         "gemeinsamer Ausgang wurde umgeschaltet")
+        self.assertEqual(self.fake_midi.opened_output, "")
+        self.assertTrue(self.fake_midi.an_port, "gar kein Feedback gesendet")
+        self.assertTrue(
+            all(p == "APC mini mk2" for p, *_r in self.fake_midi.an_port),
+            f"Feedback ging an ein fremdes Geraet: {self.fake_midi.an_port}")
+        self.assertEqual(self.fake_midi.sent, [],
+                         "Feedback lief ueber den gemeinsamen Ausgang")
 
 
 if __name__ == "__main__":

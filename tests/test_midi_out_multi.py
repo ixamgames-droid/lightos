@@ -76,6 +76,7 @@ class SendMessageToTest(unittest.TestCase):
         self.m._output = None
         self.m._output_name = ""
         self.m._aux_outputs = {}
+        self.m._aux_failed = {}
         self.m._rtmidi_out_blocked = False
         self.m._log = lambda *_a, **_k: None
 

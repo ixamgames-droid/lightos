@@ -723,15 +723,14 @@ class MidiMapper:
             trigger = int(fb.trigger_id if fb.trigger_id >= 0 else mapping.data1)
             msg_type = fb.message_type or "note"
 
-            if fb.device:
-                try:
-                    cur_name = ""
-                    if hasattr(midi, "current_output_name"):
-                        cur_name = str(midi.current_output_name() or "")
-                    if cur_name != fb.device:
-                        midi.open_output(fb.device)
-                except Exception:
-                    pass
+            # ★ MIDI-FB-PORT. Frueher wurde hier der GETEILTE Ausgang auf
+            # ``fb.device`` umgeschaltet (``open_output``) — pro Nachricht,
+            # sobald er nicht schon passte. Das nahm dem Benutzer die Auswahl
+            # in der MIDI-Ansicht unter den Fingern weg, ohne dass die Anzeige
+            # das mitbekam, und liess bei Mappings auf ZWEI Geraete den Ausgang
+            # bei jeder Nachricht hin- und herspringen. Jetzt nennt die Nachricht
+            # ihr Ziel; umgeschaltet wird gar nichts mehr.
+            geraet = str(fb.device or "").strip()
 
             if (mapping.button_mode or "") == BUTTON_CONTINUOUS:
                 out_val = _clamp_7bit(round(value * 127.0))
@@ -750,18 +749,37 @@ class MidiMapper:
             self._feedback_last_send_ts[dedupe_key] = time.monotonic()
 
             try:
-                if msg_type == "cc":
-                    midi.send_cc(ch, trigger, out_val)
-                else:
-                    midi.send_note(ch, trigger, out_val)
+                self._sende(midi, geraet, msg_type, ch, trigger, out_val)
             except Exception:
                 pass
 
             if fb.aux_channel is not None:
+                # Zweiter MIDI-Kanal auf DEMSELBEN Geraet — also derselbe Port.
                 try:
-                    midi.send_cc(int(fb.aux_channel), trigger, out_val)
+                    self._sende(midi, geraet, "cc", int(fb.aux_channel),
+                                trigger, out_val)
                 except Exception:
                     pass
+
+    @staticmethod
+    def _sende(midi, geraet: str, msg_type: str, ch: int, trigger: int,
+               wert: int) -> None:
+        """Feedback rausschicken — portadressiert, wenn das Mapping ein Geraet
+        nennt, sonst ueber den gemeinsamen Ausgang.
+
+        Ohne ``fb.device`` gibt es kein Ziel zu adressieren; dann ist der
+        geteilte Ausgang genau die richtige Wahl und bleibt es auch.
+        """
+        if msg_type == "cc":
+            if geraet:
+                midi.send_cc_to(geraet, ch, trigger, wert)
+            else:
+                midi.send_cc(ch, trigger, wert)
+        else:
+            if geraet:
+                midi.send_note_to(geraet, ch, trigger, wert)
+            else:
+                midi.send_note(ch, trigger, wert)
 
     def _hook_state_sources(self):
         # Grand Master changes (UI slider, command line, MIDI, etc.)
