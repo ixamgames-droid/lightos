@@ -502,6 +502,9 @@ class AppState:
         # zu ersetzen (siehe _render_frame).
         self.submaster_level: float = 1.0
         self.fixture_dimmers: dict[int, float] = {}
+        # BUG-FBW Slice 2: Moment-Override „Alles Weiß" (Render-Schritt 4a³).
+        # None = aus. Gebaut von set_all_white(), nicht pro Frame gerechnet.
+        self._all_white_map: dict[int, dict[str, int]] | None = None
         # F-26: Feature-Dimmer-Master pro Slot (stabile Slider-ID -> FeatureDimmer).
         # Effekt-unabhaengiger Helligkeits-/Feature-Master, s. Render-Schritt 4b².
         # STAB-13: _fd_lock schuetzt feature_dimmers gegen den lock-freien Renderer
@@ -2747,6 +2750,40 @@ class AppState:
                 remote = self._remote_input_channels = {}
             remote.setdefault(universe, set()).add(channel)
 
+    def set_all_white(self, active: bool, exclude_fids=()) -> int:
+        """„Alles Weiß" ein-/ausschalten. Gibt die Zahl der gedeckten Geraete zurueck.
+
+        BUG-FBW Slice 2: Der Knopf setzte bisher nichts selbst, sondern startete
+        die an ihn gebundene Weiss-Szene — „die Szene weiss das, nicht der
+        Button". Eine Szene aus einer Zeit mit weniger Geraeten liess die spaeter
+        dazugepatchten dunkel, und ohne Bindung passierte gar nichts. Davids
+        Entscheidung (2026-08-02): der Knopf soll **alle gepatchten Geraete**
+        weiss setzen.
+
+        ``exclude_fids`` — Geraete, die eine gebundene Funktion ohnehin schon
+        bedient. Deren bewusst eingestellter Look (warmweisse PARs o. Ae.) bleibt
+        damit erhalten; die Ueberdeckung fuellt nur die Luecke.
+
+        Die Schicht wird EINMAL beim Druck gebaut (nicht pro Frame): sie haengt
+        am Patch, und der aendert sich waehrend eines gehaltenen Tasters nicht.
+        Geraete ohne DMX-Adressraum (Netzwerk-Laser) bleiben aussen vor —
+        ``fixture_uses_dmx`` ist an JEDER Adress-Rechenstelle Pflicht (LAS-04).
+        """
+        if not active:
+            self._all_white_map = None
+            return 0
+        try:
+            from src.core.all_white import white_map
+            fixtures = [f for f in self.get_patched_fixtures() if fixture_uses_dmx(f)]
+            self._all_white_map = white_map(
+                fixtures, get_channels_for_patched, open_value_of_channel,
+                exclude_fids=exclude_fids)
+        except Exception as e:
+            print(f"[AppState] set_all_white error: {e}")
+            self._all_white_map = None
+            return 0
+        return len(self._all_white_map)
+
     def clear_remote_input(self):
         """WEB-01: Die von Web/OSC ueber ``set_input_channel`` gesetzten Einzel-
         Kanaele wieder freigeben (Release-Pfad). Entfernt sie aus ``input_layer``
@@ -3068,6 +3105,19 @@ class AppState:
                 for ch, val in chans.items():
                     if 1 <= ch <= 512:
                         su.set_channel(ch, max(0, min(255, int(val))))
+
+        # 4a³. „Alles Weiß" — Moment-Override (BUG-FBW Slice 2, Davids
+        #      Entscheidung 2026-08-02: der Knopf soll wirklich ALLE gepatchten
+        #      Geraete weiss setzen, nicht nur die einer gebundenen Szene).
+        #      Absolut geschrieben, ohne ``protect_addrs``: ein Panik-Knopf muss
+        #      auch gegen einen laufenden Farb-Effekt durchkommen — genau daran
+        #      scheiterte die Szenen-Loesung, sobald eine Matrix die Farbkanaele
+        #      besass. Bewusst HIER, also VOR 4b: Grand-Master und Blackout
+        #      wirken weiterhin darueber, damit „alles weiss" den Notaus nicht
+        #      aushebelt.
+        weiss = getattr(self, "_all_white_map", None)
+        if weiss:
+            self._apply_fixture_map(scratch, weiss, fix_index=fix_index)
 
         # 4b. Multiplikativer Dimmer-Master: (globaler Submaster * je-Fixture
         #     zugewiesener Submaster) * Gruppen-/Fixture-Dimmer * Programmer-Dimmer
@@ -4414,11 +4464,15 @@ def channel_addr(fixture, attribute: str):
     return addr if 1 <= addr <= 512 else None
 
 
-def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
-    """Sinnvoller "offener"/Highlight-Wert eines Kanals: bevorzugt eine
-    ChannelRange mit ``kind == "open"`` (Mittelwert), sonst ``highlight_value``,
-    sonst ``fallback``. Nutzt nur vorhandene Capability-Daten (kein Raten)."""
-    ch = find_channel(fixture, attribute)
+def open_value_of_channel(ch, fallback: int = 255) -> int:
+    """Wie ``open_value_for``, aber auf einem bereits aufgeloesten Kanal.
+
+    EINE Quelle fuer beide Wege (BUG-FBW Slice 2): „Alles Weiß" hat die Kanaele
+    ohnehin schon in der Hand, ein zweiter Lookup ueber das Fixture waere nur
+    eine weitere Gelegenheit zur Drift. Ein ``fallback``, den der Aufrufer
+    erkennen kann (z. B. -1), heisst „das Profil sagt nichts" — genau darauf
+    stuetzt sich die Shutter-Regel in ``core.all_white``.
+    """
     if ch is None:
         return fallback
     for rng in (getattr(ch, "ranges", None) or ()):
@@ -4426,6 +4480,13 @@ def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
             return max(0, min(255, (int(rng.range_from) + int(rng.range_to)) // 2))
     hv = getattr(ch, "highlight_value", None)
     return int(hv) if hv is not None else fallback
+
+
+def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
+    """Sinnvoller "offener"/Highlight-Wert eines Kanals: bevorzugt eine
+    ChannelRange mit ``kind == "open"`` (Mittelwert), sonst ``highlight_value``,
+    sonst ``fallback``. Nutzt nur vorhandene Capability-Daten (kein Raten)."""
+    return open_value_of_channel(find_channel(fixture, attribute), fallback)
 
 
 def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:

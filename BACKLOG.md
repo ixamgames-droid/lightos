@@ -82,8 +82,65 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    `reference_lightos_review_checklist`, Klasse 3: „ein neues
    `PatchedFixture`-Feld braucht VIER Nachzieh-Stellen") — deshalb jetzt ein
    maschineller Wächter statt einer weiteren Merkregel.
-6. **BUG-FBW (P1, David 2026-08-01) — Teil 1 erledigt, Rest ist eine
-   Produktentscheidung.**
+6. **BUG-FBW (P1, David 2026-08-01) — „Alles Weiß" erledigt, Freeze offen.**
+   **✅ SLICE 2 (2026-08-02): „Alles Weiß" setzt jetzt WIRKLICH alle gepatchten
+   Geräte weiß.** Davids Entscheidung auf die offene Frage unten: **ja**. Der
+   Knopf startet nicht mehr nur die gebundene Szene, sondern legt einen
+   **Moment-Override** in den Render-Pfad (`AppState.set_all_white` →
+   Schritt 4a³). Damit sind beide Ursachen von Symptom (a) weg: ohne Bindung
+   passiert nicht mehr *nichts*, und eine Weiß-Szene aus einer Zeit mit weniger
+   Geräten lässt die neuen nicht mehr dunkel — die Schicht wird **beim Druck**
+   gebaut und kann deshalb gar nicht veralten.
+   **Absolut geschrieben, ohne `protect_addrs`:** ein Panik-Knopf muss auch gegen
+   einen laufenden Farb-Effekt durchkommen — genau daran scheiterte die
+   Szenen-Lösung, sobald eine Matrix die Farbkanäle besaß. Bewusst VOR
+   Schritt 4b, damit **Grand-Master und Blackout weiterhin darüber liegen**: der
+   Notaus darf nicht aushebelbar sein (mit Test).
+   **Eine gebundene Funktion läuft weiter mit** und behält ihre Geräte
+   (`function_coverage` sagt welche) — ein bewusst eingestellter Weiß-Look bleibt
+   also erhalten, der Override füllt nur die Lücke. Ist die Abdeckung nicht
+   bestimmbar, deckt er sicherheitshalber alles ab.
+   **★★ Zwei Fehler in der Farb-Abbildung gefunden, beide vorbestehend und beide
+   genau an Davids Movern:** (1) Die **Schreib**-Richtung kannte nur `color`,
+   während die **Lese**-Richtung `color_wheel`/`colour_wheel`/`color` mitnimmt —
+   an jedem Mover mit Farbrad lieferte `color_attrs_for_fixture` also **nichts**,
+   ein rot stehendes Rad wäre rot geblieben, nur heller. Beide Richtungen teilen
+   sich jetzt EINE Liste. (2) Der Weiß-Slot heißt am Rad `kind='open'`, Kandidat
+   waren aber nur `kind='color'`-Slots → die Anfrage „weiß" landete auf dem
+   nächstgelegenen **bunten** Slot, am generischen Moving Head Spot 16ch konkret
+   auf **Magenta**. Der offene Slot zählt jetzt mit — aber **nur bei einer nahezu
+   weißen Anfrage**, sonst zöge er auch bunte Anfragen an sich („mach rot" mit
+   der Antwort „kein Filter" wäre schlechter als das ehrliche „kann ich nicht",
+   festgehalten von `test_wheel_skips_unnamed_ranges`).
+   **Shutter nur mit Beleg:** „Shutter" heißt je nach Gerät Blende, Strobe oder
+   Betriebsart. Gesetzt wird er nur, wenn das Profil einen `kind='open'`-Bereich
+   oder `highlight_value` trägt — sonst gar nicht. Lieber ein dunkles Gerät als
+   eines, das in einer Panik-Situation zu blitzen anfängt.
+   `tests/test_allwhite_covers_all.py` (13, am DMX gemessen statt am Zustand) +
+   `tests/test_function_coverage.py` (8). Mutation in vier Richtungen (Override
+   aus → 6 rot, Funktions-Schutz respektiert → 1 rot, offener Slot kein Kandidat
+   → 1 rot, Schreib-Richtung wieder nur `color` → 1 rot). **★ Prozess-Fund:** der
+   erste „schlägt laufenden Effekt"-Test war **vakuum-grün** — die Szene setzte
+   Grün auf 0, was dem Default entspricht, der Kanal galt damit gar nicht als
+   funktions-getrieben. Aufgefallen ist es nur, weil die Mutation nicht rot
+   wurde. *Eine Mutations-Gegenprobe, die grün bleibt, ist ein Testfehler, kein
+   Erfolg.*
+   **Die Slice-1-Warnung am Knopf („⚠ nicht belegt" / „⚠ 4/12 Geräte") ist damit
+   entfallen** — sie zeigte eine Lücke an, die es nicht mehr gibt. Die
+   Abdeckungs-Rechnung dahinter bleibt: sie entscheidet jetzt, welche Geräte der
+   Override in Ruhe lässt.
+   **NOCH OFFEN — Freeze (Davids Entscheidung: ja, soll alles anhalten):** eine
+   eigene Runde, weil die Messung eine Annahme widerlegt hat. `dt` durchzureichen
+   reicht **nicht**: `rgb_matrix`, `efx`, `cue_stack`, `executor` und `audio_func`
+   tracken ihre Zeit über `time.monotonic()`, nicht über das übergebene `dt` —
+   ein „dt=0"-Freeze hielte sie gar nicht an. Der tragfähige Weg ist die
+   **Ausgabestufe** (Frame nicht neu berechnen, letzten Stand weitersenden),
+   mit zwei Punkten, die vorher zu klären sind: Blackout und Laser-NOT-AUS müssen
+   auch im eingefrorenen Zustand durchgreifen (sie sind post-render maskiert —
+   nachmessen, nicht annehmen), und beim Auftauen springen die
+   monotonic-basierten Effekte um die eingefrorene Dauer nach vorn.
+
+   _Teil 1 (Slice 1) siehe unten._
    **✅ ERLEDIGT 2026-08-02 (Slice 1: „ein Panik-Knopf muss sagen, wenn er nichts
    tut"):** Das war der eine Punkt der Analyse unten, der KEINE Entscheidung
    brauchte — und er deckt beide Ursachen von Symptom (a) auf einmal ab. Ein
