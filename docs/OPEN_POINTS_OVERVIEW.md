@@ -1,29 +1,26 @@
-# Offene Punkte — zentrale Übersicht
+# Offene Punkte — Ideen- und Langfrist-Reservoir
 
-> **Einzige Quelle der Wahrheit für offene Aufgaben.** Diese Datei ersetzt die
-> früher verstreuten Listen `TODO.md`, `docs/NEXT_STEPS.md`, `VISUALIZER_TODO.md`
-> und `docs/SPIDER_MULTIHEAD_TODO.md` (am 2026-06-15 nach `docs/_archiv/` verschoben).
-> Roadmap-/Design-Dokumente (`ROADMAP.md`, `docs/MOVING_HEAD_ROADMAP.md`,
-> `docs/MASTERPLAN_2026-06-08.md`, `docs/UMBAU_*`, `docs/FEATURE_MAP.md`,
-> `docs/PROJECT_AUDIT.md`) bleiben als Referenz erhalten — neue/offene *Aufgaben*
-> aber werden ab jetzt nur noch hier gepflegt.
+> **⚠️ NICHT die Quelle der Wahrheit für die laufende Arbeit.** Das ist
+> **[`BACKLOG.md`](../BACKLOG.md)** — dort steht die verbindliche
+> Arbeitswarteschlange, und nur von dort nimmt der Loop Aufgaben.
 >
-> **Stand: 2026-06-15.** Erstellt aus einem Multi-Agent-Audit: alle Tracking-
-> Quellen + Code-Marker (`TODO`/`FIXME`) + Memory wurden gesammelt
-> (173 Kandidaten → 79 eindeutige Punkte) und **jeder Punkt einzeln gegen den
-> echten Code verifiziert**. Ergebnis: **67 wirklich offen**, **12 standen nur noch
-> fälschlich als offen in der Doku** (Abschnitt 6).
+> Diese Datei ist das **Reservoir**: der Fundus an Ideen, Langfrist-Themen und
+> bewusst zurückgestellten Punkten, aus dem geschöpft wird, wenn der Backlog
+> leergeräumt ist. Sie wird **nicht laufend gepflegt** — ihr Stand ist der
+> 2026-06-15 plus punktuelle Korrekturen.
 >
-> **Update 2026-06-15 (Folge-Batches):** 15 Punkte umgesetzt + getestet und nach
-> Abschnitt 5 verschoben — Batch A: **F-1**, **SD-01**, **SD-02**, **F-14**,
-> **AUDIT-exclude_note**, **B-9**; Batch B: **C-7**, **MP-SAV-01**, **NS-TEARDOWN**,
-> **B-5**, **T-VIZ-15**; Batch C: **CODE-fn-editor-placeholder**, **T-8**,
-> **AUDIT-VCXYPad-MIDI**, **EA-01**; Batch D (B1+B2): **T-4**, **EA-02**, **ARC-04**,
-> **FW-4**; Batch E (B3): **F-6**, **F-16**, **F-15**, **AUTODJ**. Damit noch **44 offen**.
+> **Warum dieser Hinweis (FINALIZE, 2026-08-02):** bis dahin behauptete diese
+> Datei von sich, die „einzige Quelle der Wahrheit für offene Aufgaben" zu sein
+> — dieselbe Rolle, die `BACKLOG.md` in seinem eigenen Kopf beansprucht. Zwei
+> Dokumente mit demselben Anspruch driften zwangsläufig, und das war messbar:
+> beim Abgleich standen **46 Einträge** in den OFFEN-Abschnitten, von denen nur
+> **4** im Backlog auftauchten — und **3** hatten sich hier selbst schon als
+> „✅ umgesetzt" markiert, ohne den Abschnitt zu wechseln (inzwischen korrigiert,
+> Abschnitt 5). Ein Gate hält das jetzt fest: `tests/test_open_points_source.py`.
 >
-> **Update 2026-06-21:** **`U-4 / SD-03`** (DMX-Monitor mit Patch-Kontext) umgesetzt + getestet → Abschnitt 5. Ferner per Code-Verifikation als **stale** erkannt (Doku-Status nachzuziehen, kein Code mehr offen): **`F-20`** Art-Net-Merge ist auf eine echte Render-Schicht (HTP/LTP/REPLACE) umgebaut inkl. Tests = *erledigt*; **`F-17`** Layering-Priorität fertig, additives Blending bewusster *Won't-fix*; **`X-6`** Spider per-Kopf-Farbe kann Engine/Profil/VC bereits = *teilweise* (nur Programmer-UI-Schalter offen). Damit real noch **~43 offen**.
+> **Wenn du hier etwas anfassen willst:** einen Punkt ins `BACKLOG.md` holen
+> (dann gehört er dort hin und hier gestrichen) — nicht beides pflegen.
 
-**Legende** — Status: `offen` (im Code nicht vorhanden) · `teilweise` (Kern da, Rest fehlt) · `extern/HW` (Code fertig, nur Hardware-/Fremdtest offen). Prio: Hoch/Mittel/Niedrig. Aufwand: klein/mittel/groß. 🔧 = braucht echte Hardware.
 
 ## 1. Priorisiert — Hoch & Mittel
 
@@ -62,7 +59,7 @@ Die einzigen Punkte mit echter Dringlichkeit. Alles Übrige (Abschnitt 2) ist Ni
   Niedrig · gross · *offen*  
   → Offen und bewusst zurückgestellt (hohes Risiko, langfristige Konsolidierung). Umzusetzen: (1) neue Datenstruktur 'Program' (Name/ID/Typ, Channel-States/Effekt-Referenzen, Fade-In/Out/Hold, Attribut-Maske) in src/core/engine/ definieren; (2) in .lshow speichern/laden; (3) Programm-Browser in rechter Seitenleiste statt SnapFilePanel (programmer_view._make_snap_panel) anbieten; (4) MIDI/VC-Zuweisung; (5) Layer-/Misch-Logik nach Maske+Priorität. Da Snaps/Scenes/Cues bereits ein de-facto-Repertoire bilden, vor Umsetzung Architektur-Entscheid: ARC-05 als eigenes Modell vs. Erweiterung des bestehenden Function/Snap-Stacks (ARC-06-Konsolidierung).
 
-### Programmer & UI/UX  (17)
+### Programmer & UI/UX  (15)
 
 - **`NS-B-LivePreview / P-06 / P-07` — Live-Vorschau Programmer: Wizard-Preview + animierte Matrix-Grid-Vorschau + aktive-Gruppen-Übersicht**  
   Mittel · mittel · *teilweise (Kern vorhanden)*  
@@ -76,12 +73,6 @@ Die einzigen Punkte mit echter Dringlichkeit. Alles Übrige (Abschnitt 2) ist Ni
 - **`VC-DROP-rest` — VC-Restpunkte: Encoder/Color-Target Label==Wert (Show-Migration) + MIDI-Dispatch an versteckte Frame-Page-Kinder**  
   Niedrig · klein · *offen*  
   → Beide Teilpunkte sind bewusst offen geblieben. (1) Encoder/Color: analog zu BUTTON_ACTION_LABELS/SLIDER_MODE_LABELS stabile Code-Keys einfuehren (z.B. midi_mode="relative"/"absolute", target="programmer"/"effect"/...) plus Label-Mapping fuers Combo und Migrations-Mapping in apply_dict (alte deutsche Strings -> neue Keys), damit Alt-Shows nicht brechen. (2) MIDI/Tasten-Dispatch in VCCanvas._handle_midi/_on_hotkey um einen Sichtbarkeits-Check ergaenzen (widget.isVisible() bzw. fuer Frame-Kinder die aktuelle vc_page mit dem Frame._current_page abgleichen), damit Widgets auf verdeckten Frame-Pages nicht mehr feuern. Beides klein, geringe Prioritaet (Edge-Case).
-- **`VC-SPEEDDIAL-BPM` — SpeedDial fest an BPM/Effekt-Tempo binden + Multiplikator-Taste (½ / ×2)**  
-  Niedrig · mittel · *✅ umgesetzt 2026-06-16* (David-Wunsch) → [[project_vc_interactive_2026_06_16]]  
-  → Ein **VCSpeedDial** soll dauerhaft an **BPM** bzw. **Effekt-Tempo** gebunden werden können (Drehen = Wert setzen), plus eine/mehrere zugehörige **Tasten, die den Wert relativ multiplizieren** — z. B. „Geschwindigkeit halbieren" (×0.5) / „verdoppeln" (×2). Idee: SpeedTarget um BPM erweitern bzw. den Dial an `SliderMode.BPM`/`EFFECT_SPEED` koppeln; Multiplikator als neue `ButtonAction` (z. B. `SPEED_MULT` mit Faktor-Param) oder als Dial-eigene Halbieren/Verdoppeln-Buttons. Vorhandene Bausteine: `vc_speedial.py` (VCSpeedDial), SliderMode.BPM/SPEED/EFFECT_SPEED, tempo_bus/bpm_manager. Komfort-Feature, kein Muss.
-- **`VC-SMART-DROP` — Intelligenter Effekt-Drop in die VC (Auswahl-Dialog statt fixem Toggle-Button)**  
-  Niedrig · gross · *✅ umgesetzt 2026-06-16* (David-Wunsch) → [[project_vc_interactive_2026_06_16]]  
-  → Beim **Ziehen eines Effekts aus der Bibliothek** auf den Canvas soll statt der festen Button-Erzeugung ein kleiner **Auswahl-Dialog** erscheinen: „Was willst du steuern?" → **An/Aus** (FUNCTION_TOGGLE), **Flash** (FUNCTION_FLASH), **Effekt-Tempo**, **Effekt-Helligkeit**, ein **Live-Parameter** (`effect_live.list_params`) … → danach wird **automatisch das passende Widget** vorgeschlagen (Button vs. Fader vs. Encoder); bei mehreren sinnvollen Varianten hat man die Auswahl. Ziel: Drop wird intuitiver/intelligenter statt „immer Toggle-Button". Vorhandene Bausteine: `vc_canvas.handle_drag_drop`/`_make_*`-Pfade, `effect_live.list_params`/`list_actions`, BUTTON_ACTION_LABELS/SLIDER_MODE_LABELS, `MatrixLiveDialog` (MLV-Editor). Verwandt mit `VC-DROP-rest`.
 - **`NS-F-Defaults` — Bessere Default-Farben/Beschriftungen im Panel (laufend)**  
   Niedrig · klein · *teilweise (Kern vorhanden)*  
   → Kernfunktion (sinnvolle Default-Farben + deutsche Beschriftungen + Tooltips + kontrastsichere Schrift) ist im Code umgesetzt und ausgereift. Da der Punkt bewusst als offene Dauer-Politur ("laufend") ohne Abnahmekriterium geführt wird, lässt er sich nicht formal abschließen. Empfehlung: in docs/NEXT_STEPS.md als 'weitgehend umgesetzt — nur noch fallweise Feinschliff' markieren oder ganz schließen; sonst nichts Konkretes offen.
@@ -168,8 +159,6 @@ Die einzigen Punkte mit echter Dringlichkeit. Alles Übrige (Abschnitt 2) ist Ni
 - **`B-1 / X-5 / C5` — sACN (E1.31) Ausgabe gegen echte Hardware/Wireshark verifizieren**  
   Niedrig · klein · *extern/Hardware* · 🔧 Hardware  
   → Im Code nichts mehr zu tun — Sender ist implementiert, spec-konform und round-trip-getestet. Verbleibt nur der reine HW-Schritt: mit echtem sACN-Empfaenger (z.B. QLC+/sACNView) + Wireshark-Mitschnitt verifizieren, dass Multicast/Unicast-Pakete auf Port 5568 ankommen und korrekt geparst werden; danach B-1/X-5/C5 in docs/OPEN_POINTS_OVERVIEW.md als erledigt markieren. Verdict 'unknown', weil rein im Code nicht entscheidbar.
-- **`U-4 / SD-03` — DMX-Monitor mit Patch-Kontext (Geräte-Labels + Farbkodierung pro Zelle)**  
-  Niedrig · mittel · *✅ umgesetzt 2026-06-21* → siehe Abschnitt 5
 - **`T-11 / MIGR-5` — Hängende Montage (mounted_inverted) + StageElement.fixture_id mit Tilt-Invertierung**  
   Niedrig · mittel · *teilweise (Kern vorhanden)*  
   → Effekt ist via manuellem 'Tilt invertieren'-Toggle bereits erreichbar, daher nicht dringend. Falls das explizite Feature gewuenscht ist: (1) optionales 'mounted_inverted'-Bool in PatchedFixture/Show-Datei ergaenzen (mit Migration/Default False = alt-kompatibel), das beim Rendern automatisch _apply_orientation/invert_tilt aktiviert; (2) StageElement.fixture_id (oder fids-Liste) einfuehren, damit der 3D-Visualizer Buehnen-Elemente↔Fixtures verknuepft und haengende Montage visuell ableitet. Alternativ Punkt als 'durch invert_tilt abgedeckt' schliessen und Doku entsprechend aktualisieren.
@@ -186,7 +175,7 @@ Die einzigen Punkte mit echter Dringlichkeit. Alles Übrige (Abschnitt 2) ist Ni
 - **`FEAT-LTC / LTC-TIMECODE` — LTC (Linear Timecode) Empfang via Audio-Eingang**  
   Niedrig · gross · *offen* · 🔧 Hardware  
   → LTC-Decoder neu bauen: Audio-Frames aus dem vorhandenen AudioCapture-Stream (44100 Hz, mono) abgreifen und SMPTE-Biphase-Mark-Code dekodieren (Sync-Word 0x3FFD, 80-Bit-Frame -> hh:mm:ss:ff + fps). Als neues Modul src/core/timecode/ltc_reader.py mit gleicher Schnittstelle wie MTCReader (subscribe/time/fps/format), damit der Playback-Timecode-Pfad beide Quellen nutzen kann. Audio-Geraet-/Line-In-Auswahl in der UI ergaenzen. Hardware-Test mit echtem LTC-Generator noetig.
-### MIDI  (5)
+### MIDI  (13)
 
 - **`F-19 / RM-OSC-Feedback` — OSC-Feedback vollständig bidirektional (TouchOSC-kompatibel)**  
   Niedrig · mittel · *teilweise (Kern vorhanden)*  
@@ -227,6 +216,20 @@ Code ist fertig — diese Punkte lassen sich nur am echten Gerät / mit externen
 ## 5. Erledigt laut Code — in alten Listen noch als „offen" geführt
 
 Diese Punkte wurden gegen den Code verifiziert und sind **bereits umgesetzt**. Sie tauchen nicht mehr als offene Aufgaben auf und dienen nur der Nachvollziehbarkeit:
+
+
+### Nachgetragen 2026-08-02 (FINALIZE-Abgleich, gegen den Code geprüft)
+
+Diese drei standen in den OFFEN-Abschnitten, obwohl sie sich dort selbst als
+„✅ umgesetzt" markierten — der Widerspruch fiel erst beim Abgleich mit
+`BACKLOG.md` auf. Jeder Punkt ist gegen den echten Code belegt:
+
+- **`VC-SPEEDDIAL-BPM`** — SpeedDial fest an BPM/Effekt-Tempo binden + Multiplikator-Taste (½ / ×2)  
+  Beleg: `vc_speedial.py`: `SpeedTarget.TEMPO_BUS` („Tempo-Bus (BPM setzen)") plus Multiplikator-Modus
+- **`VC-SMART-DROP`** — Intelligenter Effekt-Drop in die VC (Auswahl-Dialog statt fixem Toggle-Button)  
+  Beleg: `src/ui/virtualconsole/smart_drop_dialog.py` existiert und wird aus dem Drop-Pfad gerufen
+- **`U-4 / SD-03`** — DMX-Monitor mit Patch-Kontext (Geräte-Labels + Farbkodierung pro Zelle)  
+  Beleg: `dmx_monitor_view.py` liest `get_patched_fixtures()` und zeichnet Geräte-Labels
 
 ### Folge-Punkt 2026-06-21 (umgesetzt + getestet)
 
