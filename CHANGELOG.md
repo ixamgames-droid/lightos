@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Mapping-Feedback nimmt den MIDI-Ausgang nicht mehr weg
+
+#### Behoben
+
+- **Ein Mapping mit eigenem Feedback-Gerät stellte den MIDI-Ausgang um** — den,
+  den man selbst in der MIDI-Ansicht gewählt hatte. Die Anzeige bekam davon
+  nichts mit. Bei Mappings auf zwei Geräte sprang der Ausgang außerdem bei
+  jeder Rückmeldung hin und her.
+
+  Die Rückmeldung nennt jetzt ihr Zielgerät, statt den gemeinsamen Ausgang
+  dorthin zu schalten. Nennt ein Mapping kein Gerät, bleibt alles wie bisher —
+  dann gibt es nichts zu adressieren.
+
+  Das war zugleich die Ursache, aus der die APC-LEDs verstummten; die sind seit
+  dem letzten Schritt immun, der Mapper war es noch nicht.
+
+#### Intern
+
+- Ein Ausgang, der sich **nicht öffnen lässt** (Tippfehler im Mapping, Gerät
+  abgezogen), wird kurz in Ruhe gelassen, statt bei jeder Nachricht neu
+  versucht zu werden. Gemessen: vorher **20 Anschluss-Versuche für 20
+  Nachrichten** — genau die Erschöpfung, gegen die die portadressierte Ausgabe
+  gebaut wurde. Nach fünf Sekunden wird wieder versucht, damit ein erneut
+  eingestecktes Gerät von selbst zurückkommt.
+
 ### 2026-08-02 — APC-LEDs gehen nicht mehr still aus
 
 #### Behoben
