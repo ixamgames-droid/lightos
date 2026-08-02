@@ -82,7 +82,40 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    `reference_lightos_review_checklist`, Klasse 3: „ein neues
    `PatchedFixture`-Feld braucht VIER Nachzieh-Stellen") — deshalb jetzt ein
    maschineller Wächter statt einer weiteren Merkregel.
-6. **BUG-FBW (P1, David 2026-08-01)** — **Freeze, Blackout und „Alles Weiß"
+6. **BUG-FBW (P1, David 2026-08-01) — Teil 1 erledigt, Rest ist eine
+   Produktentscheidung.**
+   **✅ ERLEDIGT 2026-08-02 (Slice 1: „ein Panik-Knopf muss sagen, wenn er nichts
+   tut"):** Das war der eine Punkt der Analyse unten, der KEINE Entscheidung
+   brauchte — und er deckt beide Ursachen von Symptom (a) auf einmal ab. Ein
+   `ALL_WHITE`-Taster **ohne Bindung** war ein stummer Klick: er sank ein und
+   leuchtete auf wie jeder andere, meldete also Erfolg. Und eine **gebundene
+   Weiß-Szene aus einer Zeit mit weniger Geräten** sieht am Rig genauso aus wie
+   ein kaputter Knopf. Beides ist dieselbe Frage — *wie viele der gepatchten
+   Geräte erreicht das, was am Knopf hängt?* — und der Knopf beantwortet sie
+   jetzt selbst: **„⚠ nicht belegt"** bzw. **„⚠ 4/12 Geräte"**, dazu ein
+   gestrichelter Warnrahmen (Farbe allein trägt keine Bedeutung). Deckt die Szene
+   alles ab, steht nichts da — kein Daueralarm.
+   **Die Rechnung ist bewusst feige:** neues Leaf-Modul
+   `core/engine/function_coverage.py` beantwortet „welche Geräte schreibt diese
+   Funktion" nur für Szenen und Sammlungen/Chaser daraus; ein Matrix-Effekt/EFX/
+   Skript rechnet seine Ziele erst zur Laufzeit aus → **`None` = nicht
+   bestimmbar**, und dann steht **kein** Hinweis da. Eine geratene Zahl wäre
+   schlimmer als keine, weil sie als geprüft erschiene. Ein einziges unbekanntes
+   Mitglied macht die ganze Sammlung unbestimmbar; Zyklen sind tiefenbegrenzt.
+   **Ohne Cache**, mit Test: ein neu gepatchtes Gerät taucht sofort im Hinweis
+   auf — genau daran wäre ein privater Paint-Cache still veraltet (Lehre
+   FM-16b-Preview). `tests/test_allwhite_coverage_hint.py` (15), Mutation in drei
+   Richtungen (Text nicht gemalt → 1 rot, `None`→leer → 3 rot, Patch-Stand
+   eingefroren → 2 rot). Einer der Tests malt die Taste wirklich und liest den
+   gezeichneten Text — sonst wäre die Warnung korrekt berechnet und trotzdem
+   unsichtbar.
+   **OFFEN und bewusst nicht geraten (Produktentscheidung, David):** ob „Alles
+   Weiß" **wirklich alle gepatchten Geräte** weiß setzen soll (statt eine Szene
+   zu starten) und ob **Freeze alles** anhalten soll statt nur den Tempo-Bus.
+   Beides ändert Verhalten, auf das bestehende Shows gebaut sein können. Ebenfalls
+   offen: Symptom (b) ist nach der Analyse **HW-5c** (Enttec-Universe auf
+   `COM_FAKE`), und (c) `STOP_ALL` lässt den Programmer absichtlich stehen.
+   — _Ursprüngliche Analyse:_ **Freeze, Blackout und „Alles Weiß"
    überprüfen: dort kam es zu Fehlern.** Davids Meldung aus dem Betrieb, ohne
    nähere Eingrenzung — also ist der erste Schritt NICHT ein Fix, sondern eine
    Reproduktion. Alle drei sind Not-/Panik-Funktionen: sie werden gedrückt,
