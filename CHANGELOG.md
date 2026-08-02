@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Martin MAC 700 Profile in der Library
+
+#### Neu
+
+- **Martin MAC 700 Profile** (CMY-Spot, 23 Kanäle) ist als eingebautes Gerät
+  verfügbar — mit **motorisierter Iris**.
+
+  Der Iris-Regler gab es im Programmer schon lange, aber **kein einziges
+  eingebautes Gerät benutzte ihn**: wer ihn bewegte, bewirkte nichts. Der
+  MAC 700 schließt diese Lücke; damit ist jedes Feature der Moving-Head-Liste
+  an mindestens einem eingebauten Gerät erreichbar.
+
+  Kanaltabelle doppelt geprüft — Martin-Handbuch und QLC+-Definition nennen
+  dieselben 23 Kanäle in derselben Reihenfolge.
+
+#### Intern
+
+- Der Profil-Test baut die Library **frisch im Arbeitsspeicher** statt die
+  abgelegte `fixtures.db` zu lesen. Die erste Fassung las die Datei — und blieb
+  bei *jeder* Mutation grün, weil ein einmal geschriebenes Gerät nie wieder
+  gegen den Quelltext geprüft wird. Die bestehenden Profil-Tests haben dieselbe
+  Schwäche; nachgewiesen und als eigener Punkt notiert.
+
 ### 2026-08-02 — Mapping-Feedback nimmt den MIDI-Ausgang nicht mehr weg
 
 #### Behoben

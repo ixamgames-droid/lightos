@@ -2438,6 +2438,160 @@ _AURA_COLOUR = [
 ]
 
 
+# -- (B4) Martin MAC 700 Profile (FM-15) — CMY-Spot mit MOTORISIERTER IRIS ----
+# Chart DOPPELT verifiziert und maschinell gegenuebergestellt: Martin-Handbuch
+# "MAC 700 Profile" (DMX-Protokoll-Anhang, 16-bit Basic) + QLC+
+# Martin/Martin-MAC-700-Profile.qxf (Mode "16-bit Basic") — beide nennen
+# dieselben 23 Kanaele in derselben Reihenfolge, 23/23.
+#
+# ★ Warum GERADE dieses Geraet: `iris` war das letzte Attribut aus der
+#   FM-15-Liste, das KEIN Builtin benutzte (ueber alle Builtins ausgezaehlt,
+#   0 Nennungen) — der Regler existierte im Programmer, konnte aber an keinem
+#   eingebauten Geraet etwas bewirken. Der MAC 700 Profile hat laut Datenblatt
+#   eine "Motorized iris" und traegt sie auf Kanal 15 (Basic).
+# ★ Bewusst OHNE Framing-Shutter-Geraet: das braeuchte neues Vokabular
+#   (4 Blenden x Position/Winkel) und gehoert damit in eine eigene Runde.
+#
+# Gewaehlt ist der 16-bit-BASIC-Modus (23ch). Der Extended-Modus (31ch) fuegt
+# ausschliesslich Fine-Kanaele hinzu — als Builtin waeren das acht weitere
+# 'raw'-Regler ohne eigene Wirkung.
+_MAC700_SHUTTER = [
+    (0,   19,  "Geschlossen (Lampe 400 W)",      "closed"),
+    (20,  49,  "Offen",                          "open"),
+    (50,  72,  "Strobe schnell → langsam",       "strobe"),
+    (73,  79,  "Offen",                          "open"),
+    (80,  99,  "Oeffnungs-Puls schnell → langsam", "strobe"),
+    (100, 119, "Schliess-Puls schnell → langsam", "strobe"),
+    (120, 127, "Offen",                          "open"),
+    (128, 147, "Zufalls-Strobe schnell",         "strobe"),
+    (148, 167, "Zufalls-Strobe mittel",          "strobe"),
+    (168, 187, "Zufalls-Strobe langsam",         "strobe"),
+    (188, 190, "Offen",                          "open"),
+    (191, 202, "Zufalls-Puls",                   "strobe"),
+    (203, 207, "Offen",                          "open"),
+    (208, 217, "Reset",                          "reset"),
+    (218, 227, "Offen",                          "open"),
+    (228, 237, "Lampe an",                       ""),
+    (238, 242, "400-W-Modus",                    ""),
+    (243, 247, "700-W-Modus",                    ""),
+    (248, 255, "Lampe AUS",                      ""),
+]
+# 8 dichroitische Filter + offen. Namen aus der Handbuch-Tabelle (Rosco-/Lee-
+# Bezeichnungen), Rasterpunkte des CONTINUOUS-SCROLL-Bereichs.
+_MAC700_COLOUR = [
+    (0,   16,  "Offen",                          "open"),
+    (17,  33,  "Blau 110",                       "color"),
+    (34,  50,  "Gruen 206 IAD",                  "color"),
+    (51,  67,  "Pink 312",                       "color"),
+    (68,  84,  "Orange 306M",                    "color"),
+    (85,  101, "Half Minus Green",               "color"),
+    (102, 118, "CTC 3200–4100 K",                "color"),
+    (119, 135, "CTC 5500–2800 K",                "color"),
+    (136, 152, "Rot 308",                        "color"),
+    (153, 198, "Offen / Stufen-Scroll",          "open"),
+    (199, 240, "Rad-Dauerrotation",              ""),
+    (241, 255, "Zufallsfarbe",                   ""),
+]
+# Rad 1 = die SECHS rotierenden Gobos (indizierbar).
+_MAC700_ROT_GOBO = [
+    (0,   11,  "Offen",                          "open"),
+    (12,  15,  "Spiral",                         "gobo"),
+    (16,  19,  "Radial Circles",                 "gobo"),
+    (20,  23,  "Fused Dichro Rot/Gelb",          "gobo"),
+    (24,  27,  "Milky Way",                      "gobo"),
+    (28,  31,  "Water",                          "gobo"),
+    (32,  35,  "Flames",                         "gobo"),
+    (36,  59,  "Gobo + Dauerrotation",           "gobo"),
+    (60,  131, "Gobo indiziert + Shake",         "gobo"),
+    (132, 203, "Gobo rotierend + Shake",         "gobo"),
+    (204, 255, "Rad-Scroll",                     ""),
+]
+# Rad 2 = die NEUN statischen Gobos.
+_MAC700_STATIC_GOBO = [
+    (0,   10,  "Offen",                          "open"),
+    (11,  21,  "Crackle",                        "gobo"),
+    (22,  32,  "Triangles Small",                "gobo"),
+    (33,  43,  "Tye Dye",                        "gobo"),
+    (44,  54,  "Globo",                          "gobo"),
+    (55,  65,  "Worms",                          "gobo"),
+    (66,  76,  "Bio",                            "gobo"),
+    (77,  87,  "Leaf Breakup",                   "gobo"),
+    (88,  98,  "Les-Mis-Whirl-Pool",             "gobo"),
+    (99,  109, "Two Tone",                       "gobo"),
+    (110, 202, "Offen / Stufen-Scroll",          "open"),
+    (203, 240, "Rad-Dauerrotation",              ""),
+    (241, 255, "Zufalls-Gobo",                   ""),
+]
+_MAC700_PRISM = [
+    (0,   19,  "Kein Prisma",                    "open"),
+    (20,  79,  "Prisma, CCW-Rotation",           "prism"),
+    (80,  89,  "Prisma ohne Rotation",           "prism"),
+    (90,  149, "Prisma, CW-Rotation",            "prism"),
+    (150, 255, "Kein Prisma",                    "open"),
+]
+# ★ Die Iris — der Grund fuer dieses Geraet.
+_MAC700_IRIS = [
+    (0,   199, "Offen → geschlossen",            "open"),
+    (200, 215, "Geschlossen",                    "closed"),
+    (216, 229, "Oeffnungs-Puls schnell → langsam", "strobe"),
+    (230, 243, "Schliess-Puls schnell → langsam", "strobe"),
+    (244, 249, "Zufalls-Oeffnungs-Puls",         "strobe"),
+    (250, 255, "Zufalls-Schliess-Puls",          "strobe"),
+]
+_MAC700_MACRO = [
+    (0,   15,  "Kein Makro",                     ""),
+    (16,  55,  "Statisches Gobo-Rad Shake",      ""),
+    (56,  95,  "Farbrad Shake",                  ""),
+    (96,  135, "Gobo- + Farbrad Shake",          ""),
+    (136, 255, "Zufalls-CMY",                    ""),
+]
+
+
+def _add_martin_mac700_profile(s, mfr):
+    """Martin MAC 700 Profile — CMY-Spot Moving Head (16-bit Basic, 23ch).
+
+    fixture_type 'moving_head' -> buildMovingHead. Single-Head (kein color_r,
+    1 Pan / 1 Tilt). Farbe ueber echtes CMY + EIN Farbrad (kanonisch
+    `color_wheel`).
+
+    ★ Traegt als ERSTES Builtin ueberhaupt eine `iris` (Kanal 15).
+
+    Safety-Defaults: Dimmer 0 (dunkel), Shutter 30 = mitten im offenen Band
+    20-49 — bewusst NICHT 0, denn 0-19 faehrt die Lampe nach 10 s in den
+    400-W-Modus. Iris-Default 0 = ganz offen. Zoom/Fokus 128 = Mitte.
+    Fine-Kanaele (Pan/Tilt haben eigene Attribute, Gobo-Fine nicht) und die
+    zweite Animationsrad-Achse -> 'raw'.
+    """
+    _add_fixture(s, mfr, "MAC 700 Profile (Spot 23ch)", "MAC700P", "moving_head",
+                 470, [
+        ("23-Kanal (16-bit Basic)", [
+            ("Shutter/Strobe",     "shutter",        30,  30, _MAC700_SHUTTER),
+            ("Dimmer",             "intensity",      0,   255),
+            ("Cyan",               "cmy_c",          0,   0),
+            ("Magenta",            "cmy_m",          0,   0),
+            ("Gelb",               "cmy_y",          0,   0),
+            ("Farbrad",            "color_wheel",    0,   0, _MAC700_COLOUR),
+            ("Rotier-Gobo",        "gobo_wheel",     0,   0, _MAC700_ROT_GOBO),
+            ("Gobo-Rotation",      "gobo_rotation",  0,   0),
+            ("Gobo-Rot. Fein",     "raw",            0,   0),
+            ("Statisches Gobo",    "gobo_wheel2",    0,   0, _MAC700_STATIC_GOBO),
+            ("Gobo-/Farb-Makros",  "macro",          0,   0, _MAC700_MACRO),
+            ("Animationsrad",      "animation",      0,   0),
+            ("Animationsrad-Rot.", "raw",            0,   0),
+            ("Prisma",             "prism",          0,   0, _MAC700_PRISM),
+            ("Iris",               "iris",           0,   0, _MAC700_IRIS),
+            ("Fokus",              "focus",          128, 128),
+            ("Zoom",               "zoom",           128, 128),
+            ("Pan",                "pan",            128, 128),
+            ("Pan Fein",           "pan_fine",       0,   0),
+            ("Tilt",               "tilt",           128, 128),
+            ("Tilt Fein",          "tilt_fine",      0,   0),
+            ("P/T-Speed",          "speed",          0,   0),
+            ("Effekt-Speed",       "effect_speed",   0,   0),
+        ]),
+    ])
+
+
 def _add_martin_mac_aura(s, mfr):
     """Martin MAC Aura — RGBW-LED-Wash Moving Head (Standard 14ch). fixture_type=
     'moving_head'. Shutter-Default 22 = offen (0-19 = zu) — Werksdefault; dunkel
@@ -2858,6 +3012,8 @@ def ensure_builtins():
             changed = True
         if "MYTHOS" not in have:                          # FM-15: Clay Paky Mythos
             _add_claypaky_mythos(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
+        if "MAC700P" not in have:                         # FM-15: Martin MAC 700 Profile
+            _add_martin_mac700_profile(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
             changed = True
         if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
             _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
@@ -3166,6 +3322,7 @@ def _seed(s: Session):
     s.add(martin)
     _add_martin_atomic3000(s, martin)
     _add_martin_mac_aura(s, martin)
+    _add_martin_mac700_profile(s, martin)                # FM-15 (erste Iris)
     robe = Manufacturer(name="Robe", short_name="ROBE")
     s.add(robe)
     _add_robe_pointe(s, robe)
