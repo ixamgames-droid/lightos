@@ -83,10 +83,11 @@ class ApcMk2Feedback:
         self._canvas = canvas
         self._hint = port_hint
         self._out = None
-        # Port, auf den beim Oeffnen gebunden wurde. Beim geteilten
-        # MidiManager-Ausgang muss vor jedem Senden geprueft werden, ob er
-        # noch derselbe ist — sonst landen die Pad-Note-Ons auf einem fremden
-        # Geraet (unter Windows z. B. hoerbar auf dem GS Wavetable Synth).
+        # Name unseres APC-Ausgangs — beim Manager-Weg das ADRESSAT-Feld jeder
+        # Note (s. _send). Deshalb koennen die Pad-Note-Ons nicht mehr auf einem
+        # fremden Geraet landen (unter Windows sonst hoerbar auf dem GS
+        # Wavetable Synth), egal was die MIDI-Ansicht gerade zeigt.
+        # ``None`` heisst: eigener WinMM-Handle statt Manager.
         self._out_name: str | None = None
         self._timer = None
         self._cache: dict[int, tuple[int, int]] = {}   # note -> (mode, color)
@@ -137,15 +138,18 @@ class ApcMk2Feedback:
                     current = str(m.current_output_name() or "")
                 except Exception:
                     current = ""
-                if current and current != want and self._hint.lower() not in current.lower():
-                    print(f"[ApcMk2] MIDI-Ausgang '{current}' ist belegt — "
-                          f"LED-Feedback bleibt aus (gewuenscht: {want}).")
-                    return False
-                if not m.open_output(want):
-                    return False
+                frei = (not current or current == want
+                        or self._hint.lower() in current.lower())
                 self._out = m
-                self._out_name = m.current_output_name()
-                print(f"[ApcMk2] Output geoeffnet: {self._out_name}")
+                if frei and m.open_output(want):
+                    self._out_name = str(m.current_output_name() or want)
+                    print(f"[ApcMk2] Output geoeffnet: {self._out_name}")
+                else:
+                    # Belegt heisst nicht mehr "keine LEDs": send_message_to
+                    # adressiert den APC direkt (s. _send).
+                    self._out_name = want
+                    print(f"[ApcMk2] MIDI-Ausgang '{current}' ist belegt — "
+                          f"LED-Feedback laeuft portadressiert an '{want}'.")
                 return True
             except Exception as e:
                 print(f"[ApcMk2] rtmidi Fehler: {e}")
@@ -179,27 +183,35 @@ class ApcMk2Feedback:
         val = (mode, color)
         if self._cache.get(key) == val:
             return
-        self._cache[key] = val
-        if self._out and self._targets_apc():
-            try:
-                self._out.send_message([mode, note & 0x7F, color & 0x7F])
-            except Exception:
-                pass
+        # ★ Erst senden, DANN merken — sonst behauptet der Diff-Cache nach einem
+        # misslungenen Versuch, das Pad stehe schon richtig, und derselbe Wunsch
+        # wird nie wiederholt. Das Pad bliebe dauerhaft falsch.
+        if self._send([mode, note & 0x7F, color & 0x7F]):
+            self._cache[key] = val
 
-    def _targets_apc(self) -> bool:
-        """Zeigt der geteilte Manager-Ausgang noch auf unseren APC-Port?
+    def _send(self, msg) -> bool:
+        """Portadressiert an UNSEREN APC senden.
 
-        Beim eigenen WinMM-Handle (kein Manager) gilt das immer. Beim geteilten
-        rtmidi-Ausgang kann ihn ein anderer Besitzer (MIDI-Ansicht,
-        Mapping-Feedback) inzwischen umgeschaltet haben — dann NICHT senden,
-        sonst gehen die Pad-Noten an ein fremdes Geraet.
+        ★ MIDI-LED-AUX. Frueher lief das ueber den GETEILTEN Ausgang; damit die
+        Pad-Noten nicht auf einem fremden Geraet klimperten, sendete der Treiber
+        nur, solange dieser Ausgang noch auf den APC zeigte. Wer in der
+        MIDI-Ansicht etwas anderes waehlte, verlor das Feedback still.
+
+        ``send_message_to`` nennt den Ziel-Port beim Namen — die Note kann das
+        fremde Geraet gar nicht erreichen. Der Manager nutzt dabei den
+        Haupt-Ausgang, wenn er ohnehin dorthin zeigt, sonst einen gehaltenen
+        Zweit-Handle.
         """
-        if self._out_name is None:
-            return True
+        if self._out is None:
+            return False
         try:
-            return str(self._out.current_output_name() or "") == self._out_name
-        except Exception:
+            if self._out_name is not None:
+                return bool(self._out.send_message_to(self._out_name, msg))
+            # Eigener WinMM-Handle: zeigt per Konstruktion auf den APC.
+            self._out.send_message(msg)
             return True
+        except Exception:
+            return False
 
     def clear_all(self):
         for n in range(64):
@@ -255,6 +267,13 @@ class ApcMk2Feedback:
             if self._out_name is None:
                 try:
                     self._out.close_port()
+                except Exception:
+                    pass
+            else:
+                # Zweit-Ausgang freigeben, falls wir einen halten. Zeigt der
+                # Haupt-Ausgang selbst auf den APC, ist das ein No-Op.
+                try:
+                    self._out.close_aux_output(self._out_name)
                 except Exception:
                     pass
             self._out = None

@@ -38,6 +38,11 @@
 - [ ] Executor stoppen → LED schaltet auf grün blinkend
 - [ ] Flash-Modus → LED leuchtet rot
 - [ ] Page-Wechsel → aktuelle Page-LED gelb
+- [ ] **MIDI-Ansicht → Ausgang auf ein ANDERES Gerät stellen → LEDs leuchten
+      weiter** und schalten weiter mit (MIDI-LED-AUX). Bis 2026-08-02 hörte das
+      Feedback hier still auf und blieb auch nach dem Zurückschalten falsch.
+- [ ] Umgekehrt: LightOS starten, während der MIDI-Ausgang schon auf einem
+      anderen Gerät steht → APC-LEDs gehen trotzdem an.
 
 ### 2c. MIDI-Ausgabe
 - [ ] MIDI-Mapping auf VC-Button mit „Send Note"-Aktion konfigurieren
