@@ -48,6 +48,40 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
 4. ✅ **QA-11** (CI: +Show-Lint +View-Smoke) · ✅ **QA-17** (Doc-Link-Gate) · ✅ **QA-18** (Backlog-Linter) — CI-/Doku-/Backlog-Gates erledigt.
 5. **VIZ-14** — erst nach den Sicherheits- und Verifikationsgates in kleine,
    einzeln abnehmbare UX-Schritte schneiden.
+
+5b. ✅ **SHOWDB-MIGRATE (P1, gefunden UND behoben 2026-08-02)** — **jede vor dem
+   31.07. angelegte Show-DB war nicht mehr ladbar; die App starb beim
+   Öffnen der Show.** Stand in keinem Item; gefunden beim Aufsetzen der
+   BUG-CLEAR-Messung, weil eine Abfrage gegen `data/current_show.db` mit
+   `OperationalError: no such column: patched_fixtures.pixel_order` starb.
+   **Ursache:** `PatchedFixture.pixel_order` kam mit FM-13
+   ([PR #514](https://github.com/ixamgames-droid/lightos/pull/514)) ins ORM-Modell,
+   aber **nicht** in `migrate_show_db`. `create_all` legt fehlende TABELLEN an,
+   niemals fehlende SPALTEN — die Alt-Datei blieb also ohne die Spalte, und
+   `AppState._reload_patch_cache` fragt beim Öffnen **alle** Modell-Spalten ab.
+   Der Fehler wird nirgends gefangen: er fliegt aus `open_show` heraus. Der Patch
+   war damit nicht leer, sondern **unerreichbar** — bei einer Datei, die man nicht
+   einfach neu anlegen kann, ohne die Show zu verlieren.
+   **An Davids echter Datei gemessen** (30 Geräte, 8 Gruppen; gearbeitet wurde
+   ausschließlich auf **Kopien**, das Original blieb unangetastet): vor dem Fix
+   wirft `open_show()`, nach dem Fix lädt es die 30 Geräte wieder, `pixel_order`
+   fällt auf `rowwise` = Bestandsverhalten. **Für David heißt das:** ab diesem
+   Merge zieht die App die Spalte beim nächsten Start selbst nach, es ist nichts
+   von Hand zu tun.
+   **Gate statt Notiz:** `tests/test_show_db_migration_coverage.py` (5) baut eine
+   Alt-DB im eingefrorenen Urschema (`create_all` + `DROP COLUMN`, also echte
+   Spaltentypen), migriert sie und prüft **strukturell** (jede Modell-Spalte da)
+   **und funktional** (eine Alt-Zeile ist danach per ORM ladbar), dazu
+   Bestandsverhalten der Defaults und Idempotenz. Ohne den Fix sind 4 der 5 rot,
+   einer davon mit exakt der Original-Fehlermeldung. Abgedeckt sind genau die drei
+   Modelle, die auf der Show-Engine abgefragt werden (`PatchedFixture`,
+   `FixtureGroup`, `QuarantinedFixture`) — `Fixture`/`ChannelRange` legt
+   `create_all` dort zwar mit an, abgefragt werden sie aber nur auf der
+   Fixture-DB, ihre Lücken sind folgenlos (nachgemessen).
+   **Die Falle war dokumentiert und wurde trotzdem gestellt** (Second Brain
+   `reference_lightos_review_checklist`, Klasse 3: „ein neues
+   `PatchedFixture`-Feld braucht VIER Nachzieh-Stellen") — deshalb jetzt ein
+   maschineller Wächter statt einer weiteren Merkregel.
 6. **BUG-FBW (P1, David 2026-08-01)** — **Freeze, Blackout und „Alles Weiß"
    überprüfen: dort kam es zu Fehlern.** Davids Meldung aus dem Betrieb, ohne
    nähere Eingrenzung — also ist der erste Schritt NICHT ein Fix, sondern eine
@@ -120,6 +154,27 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    `test_clear_programmer_waehrend_gehalten_kommt_nicht_zurueck`. **Damit ist das
    Item NICHT erledigt** — die anderen Quellen (Paletten, `attr#N`-Werte pro
    Kopf, gleichzeitig laufende Effekte, VC-Farbtasten) sind noch nicht gemessen.
+   **★★ Zweite Quelle, am 2026-08-02 GEMESSEN (nicht vermutet): der Knopf
+   „Löschen" im Programmer-Tab leert nur die AUSWAHL.** `ProgrammerView
+   ._clear_programmer` verzweigt auf `self._selected_fids`: leer → `clear_
+   programmer()` (alles), sonst `clear_programmer(fid)` je gewähltem Gerät.
+   Gemessen an drei gepatchten Movern mit je `intensity=200`: mit „nur Gerät 1"
+   gewählt bleiben nach dem Druck **Gerät 2 und 3 auf 200**; ohne Auswahl ist der
+   Programmer leer. Sein Hilfetext sagt dagegen wörtlich „Leert den Programmer
+   (**alle** hier manuell gesetzten Werte)". Damit ist „hat **manchmal** nicht
+   alles geleert" wörtlich erklärt: das *Manchmal* ist die Auswahl, die David
+   gar nicht als Reichweite liest — und die Auswahl ist im Programmer fast immer
+   gesetzt, weil man sie zum Einstellen braucht. Der globale Weg (Menü, VC-Taste
+   `CLEAR`) leert dagegen wirklich alles. **Zu entscheiden ist die Form, nicht
+   das Ob** (Fallenklasse 12, „sichtbarer Zustand ≠ Logikzustand"): entweder der
+   Knopf sagt seine Reichweite (Beschriftung folgt der Auswahl, z. B. „Auswahl
+   löschen (3)" ↔ „Alles löschen"), oder er leert immer alles und die
+   auswahlweise Variante bekommt einen eigenen Weg. Ersteres behält beide
+   Fähigkeiten und ist die kleinere Verhaltensänderung. **Dritte Quelle, noch
+   offen:** ein `clear_programmer(fid)` ruft **kein** `clear_remote_input()` —
+   über Web/OSC gesetzte Roh-Kanäle bleiben also bei jedem auswahlweisen Leeren
+   stehen (im Code als Absicht vermerkt, weil sie nicht fid-basiert sind; ob das
+   für David so stimmt, ist ungeprüft).
 8. ✅ **BUG-MIDI-STROBE — GEFIXT (2026-08-02).** **Es war keine Thread-Race,
    sondern ein Buchhaltungsfehler pro Taste.** Jeder Flash-/Toggle-Taster merkte
    sich den Programmer-Wert, den er beim Druck vorfand, ganz für sich

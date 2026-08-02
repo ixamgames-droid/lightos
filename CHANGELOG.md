@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Bestehende Shows öffnen wieder
+
+#### Behoben
+
+- **Eine vor dem 31. Juli angelegte Show ließ sich nicht mehr öffnen.** Beim
+  Laden brach das Programm mit einer Datenbank-Fehlermeldung ab — der gesamte
+  Patch war dadurch nicht erreichbar. Grund war eine neue Geräte-Eigenschaft
+  (die Pixel-Reihenfolge von Matrix-Panels), die zwar erwartet, aber in
+  bestehenden Show-Dateien nie angelegt wurde.
+
+  Die fehlende Eigenschaft wird jetzt beim Öffnen automatisch ergänzt, mit dem
+  bisherigen Verhalten als Vorgabe. **Es ist nichts von Hand zu tun** — die
+  betroffene Show öffnet beim nächsten Start wieder normal, mit allen Geräten
+  und Gruppen.
+
 ### 2026-08-02 — Zwei Strobe-Taster hängen sich nicht mehr auf
 
 #### Behoben
