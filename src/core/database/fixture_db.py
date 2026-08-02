@@ -2232,6 +2232,179 @@ def _add_robe_megapointe(s, mfr):
     ])
 
 
+# -- Clay Paky Mythos (Beam/Spot-Hybrid, Standard 30-Kanal) -------------------
+# Chart DOPPELT verifiziert: Clay-Paky-Handbuch „MYTHOS C61391" (Kanaltabelle
+# Standard/Vector + Wertebereiche je Kanal) UND die QLC+-Definition
+# `Clay_Paky/Clay-Paky-Mythos.qxf` — beide Quellen stimmen Kanal fuer Kanal
+# ueberein (30/30, maschinell gegenuebergestellt).
+#
+# ★ Was das Geraet von den bestehenden Hybriden unterscheidet: DREI getrennte
+#   Farbraeder (COLOUR 1/2/3) zusaetzlich zu CMY. Die Library kannte bisher nur
+#   je EIN Farbrad pro Geraet. Kanonisch bekommt das erste `color_wheel` (dort
+#   liegen die Weiss-/CTO-Filter, also die „Farb"-Entscheidung, die Programmer
+#   und Visualizer lesen); Rad 2 und 3 sind zusaetzliche Filterebenen und laufen
+#   als `raw` — sie als zweites `color_wheel` zu fuehren waere eine stille
+#   Zweitquelle fuer „welche Farbe hat das Geraet".
+#
+# ★ KEINE Iris — das Geraet hat physisch keine (Handbuch-Kanaltabelle
+#   vollstaendig geprueft). Damit bleibt `iris` weiterhin das einzige
+#   Feature-Attribut des Vokabulars ohne Builtin; das gehoert in ein eigenes
+#   Item statt in einen erfundenen Kanal.
+#
+# Nur der 30ch-Standard-Modus. Der Vector-Modus (34ch) ergaenzt vier reine
+# ZEIT-Kanaele (Pan-Tilt/Colour/Beam/Gobo Time) — die steuern kein Licht,
+# sondern die Ueberblendzeit im Geraet; als Builtin waeren sie vier Regler ohne
+# sichtbare Wirkung.
+_MYTHOS_COLOUR1 = [
+    (0,   0,   "Offen",                     "open"),
+    (28,  49,  "Offen + Soft Filter",       "color"),
+    (50,  79,  "Soft Filter",               "color"),
+    (80,  99,  "Soft + Lavendel",           "color"),
+    (100, 128, "Lavendel",                  "color"),
+    (129, 149, "Lavendel + CTO 3200K",      "color"),
+    (150, 180, "CTO 3200K",                 "color"),
+    (181, 203, "CTO 3200K + CTO 2500K",     "color"),
+    (204, 234, "CTO 2500K",                 "color"),
+    (235, 254, "CTO 2500K + Blue Wood",     "color"),
+    (255, 255, "Blue Wood (UV-Filter)",     "color"),
+]
+_MYTHOS_COLOUR2 = [
+    (0,   0,   "Offen",                     "open"),
+    (28,  49,  "Offen + Dunkelgrün",        "color"),
+    (50,  74,  "Dunkelgrün",                "color"),
+    (75,  99,  "Dunkelgrün + CTB",          "color"),
+    (100, 128, "CTB",                       "color"),
+    (129, 149, "CTB + Dunkelblau",          "color"),
+    (150, 177, "Dunkelblau",                "color"),
+    (178, 199, "Dunkelblau + H.M.Grün",     "color"),
+    (200, 234, "H.M.Grün",                  "color"),
+    (235, 254, "H.M.Grün + Dunkelrot",      "color"),
+    (255, 255, "Dunkelrot",                 "color"),
+]
+_MYTHOS_COLOUR3 = [
+    (0,   0,   "Offen",                     "open"),
+    (28,  49,  "Offen + Hellgrün",          "color"),
+    (50,  76,  "Hellgrün",                  "color"),
+    (77,  99,  "Hellgrün + Pink",           "color"),
+    (100, 128, "Pink",                      "color"),
+    (129, 149, "Pink + Aquamarin",          "color"),
+    (150, 180, "Aquamarin",                 "color"),
+    (181, 199, "Aquamarin + Dunkelorange",  "color"),
+    (200, 230, "Dunkelorange",              "color"),
+    (231, 254, "Dunkelorange + Hellorange", "color"),
+    (255, 255, "Hellorange",                "color"),
+]
+# „STOPPER / STROBE": Licht AUS liegt bei 0-3, offen bei 104-107 / 208-212 /
+# 252-255. Der Default 104 ist bewusst das ERSTE offene Band (Hausregel: offener
+# Shutter, Helligkeit macht der Dimmer).
+_MYTHOS_SHUTTER = [
+    (0,   3,   "Licht AUS",                     "closed"),
+    (4,   103, "Strobe langsam → schnell",      "strobe"),
+    (104, 107, "Licht AN",                      "open"),
+    (108, 207, "Puls langsam → schnell",        "strobe"),
+    (208, 212, "Licht AN",                      "open"),
+    (213, 225, "Zufalls-Strobe langsam",        "strobe"),
+    (226, 238, "Zufalls-Strobe mittel",         "strobe"),
+    (239, 251, "Zufalls-Strobe schnell",        "strobe"),
+    (252, 255, "Licht AN",                      "open"),
+]
+_MYTHOS_STATIC_GOBO = [
+    (0,   3,   "Offen",                     "open"),
+    (4,   65,  "Statische Gobos 1–17",      "gobo"),
+    (66,  255, "Weitere Gobos / Shake",     "gobo"),
+]
+_MYTHOS_PRISM = [
+    (0,   10,  "Kein Prisma",               "open"),
+    (11,  132, "Prisma 1 im Strahl",        "prism"),
+    (133, 255, "Prisma 2 im Strahl",        "prism"),
+]
+_MYTHOS_BEAM_MODE = [
+    (0,   127, "Zoom / Autofokus",          ""),
+    (128, 255, "Beam-Modus (Zoom aus)",     ""),
+]
+_MYTHOS_FUNCTION = [
+    (0,   11,  "Keine Funktion",            ""),
+    (12,  24,  "Pan/Tilt schnell",          ""),
+    (25,  37,  "Pan/Tilt normal",           ""),
+    (38,  50,  "Dimmerkurve konventionell", ""),
+    (51,  62,  "Dimmerkurve linear",        ""),
+    (63,  75,  "CMY voller Bereich",        ""),
+    (76,  87,  "CMY begrenzt",              ""),
+    (88,  101, "CMY-Shortcut AN",           ""),
+    (102, 114, "CMY-Shortcut AUS",          ""),
+    (115, 255, "Keine Funktion",            ""),
+]
+_MYTHOS_RESET = [
+    (0,   25,  "Keine Funktion",            ""),
+    (26,  76,  "Zoom-Reset",                "reset"),
+    (77,  127, "Pan/Tilt-Reset",            "reset"),
+    (128, 255, "Kompletter Reset",          "reset"),
+]
+_MYTHOS_LAMP = [
+    (0,   25,  "Keine Funktion",            ""),
+    (26,  100, "Lampe AUS",                 ""),
+    (101, 255, "Lampe AN",                  ""),
+]
+_MYTHOS_MACRO = [
+    (0,   7,   "Makro AUS",                 ""),
+    (8,   11,  "Standby",                   ""),
+    (12,  15,  "Standby schwarz",           ""),
+    (16,  45,  "Zoom IN weich",             ""),
+    (46,  75,  "Zoom OUT weich",            ""),
+    (76,  105, "Zoom IN/OUT",               ""),
+    (106, 135, "Standby schwarz 1",         ""),
+    (136, 165, "Zoom IN weich zufällig",    ""),
+    (166, 195, "Zoom OUT weich zufällig",   ""),
+    (196, 225, "Zoom IN/OUT zufällig",      ""),
+    (226, 255, "Standby schwarz 2",         ""),
+]
+
+
+def _add_claypaky_mythos(s, mfr):
+    """Clay Paky Mythos — Beam/Spot-Hybrid Moving Head (Standard, 30ch).
+
+    fixture_type 'moving_head' -> buildMovingHead. Single-Head (kein color_r,
+    1 Pan / 1 Tilt). Safety-Defaults: Dimmer 0, Shutter 104 = offenes Band,
+    Funktion/Reset/Lampe je 0 = keine Funktion (0 schaltet die Lampe NICHT aus —
+    „Lampe AUS" beginnt erst bei 26). Fine-Kanaele und die beiden zusaetzlichen
+    Farbraeder -> 'raw'.
+    """
+    _add_fixture(s, mfr, "Mythos (Beam/Spot 30ch)", "MYTHOS", "moving_head", 470, [
+        ("30-Kanal (Standard)", [
+            ("Cyan",                 "cmy_c",          0,   0),
+            ("Magenta",              "cmy_m",          0,   0),
+            ("Gelb",                 "cmy_y",          0,   0),
+            ("Farbrad 1",            "color_wheel",    0,   0, _MYTHOS_COLOUR1),
+            ("Farbrad 2",            "raw",            0,   0, _MYTHOS_COLOUR2),
+            ("Farbrad 3",            "raw",            0,   0, _MYTHOS_COLOUR3),
+            ("Shutter/Strobe",       "shutter",        104, 104, _MYTHOS_SHUTTER),
+            ("Dimmer",               "intensity",      0,   255),
+            ("Dimmer Fein",          "raw",            0,   0),
+            ("Statisches Gobo",      "gobo_wheel",     0,   0, _MYTHOS_STATIC_GOBO),
+            ("Effektrad-Einschub",   "animation",      0,   0),
+            ("Effektrad-Rotation",   "raw",            0,   0),
+            ("Rotier-Gobo",          "gobo_wheel2",    0,   0),
+            ("Gobo-Rotation",        "gobo_rotation",  0,   0),
+            ("Gobo-Rotation Fein",   "raw",            0,   0),
+            ("Prisma",               "prism",          0,   0, _MYTHOS_PRISM),
+            ("Prisma-Rotation",      "prism_rotation", 0,   0),
+            ("Frost",                "frost",          0,   0),
+            ("Zoom",                 "zoom",           128, 128),
+            ("Fokus",                "focus",          128, 128),
+            ("Fokus Fein",           "raw",            0,   0),
+            ("Beam-Modus",           "macro",          0,   0, _MYTHOS_BEAM_MODE),
+            ("Pan",                  "pan",            128, 128),
+            ("Pan Fein",             "pan_fine",       0,   0),
+            ("Tilt",                 "tilt",           128, 128),
+            ("Tilt Fein",            "tilt_fine",      0,   0),
+            ("Funktion",             "raw",            0,   0, _MYTHOS_FUNCTION),
+            ("Reset",                "reset",          0,   0, _MYTHOS_RESET),
+            ("Lampensteuerung",      "lamp",           0,   0, _MYTHOS_LAMP),
+            ("Makro-Effekte",        "raw",            0,   0, _MYTHOS_MACRO),
+        ]),
+    ])
+
+
 # -- (C) Martin MAC Aura (RGBW-LED-Wash Moving Head, Standard 14-Kanal) --------
 # Chart: QLC+ Martin-MAC-Aura.qxf (Standard-Modus) + offizielles Martin-Manual
 # (Gegencheck: identisch, Werksdefault Shutter 22 = offen). NUR der Standard-14ch-
@@ -2683,6 +2856,9 @@ def ensure_builtins():
         if "MEGAPNT" not in have:                         # FM-15: Robe MegaPointe
             _add_robe_megapointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
             changed = True
+        if "MYTHOS" not in have:                          # FM-15: Clay Paky Mythos
+            _add_claypaky_mythos(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
+            changed = True
         if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
             _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
             changed = True
@@ -2994,6 +3170,7 @@ def _seed(s: Session):
     s.add(robe)
     _add_robe_pointe(s, robe)
     _add_robe_megapointe(s, robe)                        # FM-15
+    _add_claypaky_mythos(s, claypaky)                    # FM-15
 
     # ── FM-13: LED-Matrix/Pixel-Panel als eigener Fixture-Typ ─────────────────
     _add_generic_matrix_panel(s, generic)

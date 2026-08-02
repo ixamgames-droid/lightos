@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Neues Gerät in der Bibliothek: Clay Paky Mythos
+
+#### Neu
+
+- **Clay Paky Mythos** (Beam/Spot-Hybrid) ist als Gerät auswählbar, im
+  Standard-Modus mit 30 Kanälen. Damit lässt sich der Mythos patchen,
+  programmieren und im 3D-Visualizer anzeigen wie jeder andere Moving Head.
+
+  Das Gerät hat **drei getrennte Farbräder** zusätzlich zur CMY-Mischung — als
+  erstes Gerät der Bibliothek. Farbe, Gobos, Prisma, Frost, Zoom und Fokus sind
+  alle einzeln steuerbar.
+
+  Der Kanalplan wurde gegen zwei unabhängige Quellen geprüft (Hersteller-Handbuch
+  und eine fremde Geräte-Bibliothek) und stimmt Kanal für Kanal überein. Beim
+  Anlegen startet das Gerät dunkel, mit offener Blende — Lampe und Reset bleiben
+  unangetastet.
+
 ### 2026-08-02 — Der Layer-Editor zeigt nur noch, was wirklich wirkt
 
 #### Behoben
