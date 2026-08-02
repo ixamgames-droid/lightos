@@ -60,12 +60,15 @@ zeigen die Cuelisten-Fenster den aktuellen Schritt:
 
 Die Fader **Dim 1/2/3** regeln die Helligkeit der jeweiligen Cueliste.
 
-## 4. Live-Chase selbst bauen (Reihen 3–4 + Chase-Builder)
+## 4. Live-Chase selbst bauen (Reihen 3–4)
 
 - **Farb-Kacheln (Reihe 4):** Rot/Orange/Gelb/Grün/Cyan/Blau/Magenta/Weiß antippen =
   diese Farbe **zur Live-Sequenz hinzufügen**.
 - **Reihe 3:** **Live-Chase** (Start/Stop) · **Leeren** · **Farbe −/+** (in der Sequenz blättern).
-- Rechts der **Chase-Builder** — alles-in-einem zum Zusammenklicken und Tempo/Übergang einstellen.
+- Rechts die **Chase-Liste** (`VCColorList`) — sie **zeigt** die gebaute Farbfolge an.
+  > Der frühere **Chase-Builder** ist am 2026-06-30 entfernt worden. Gebaut wird die
+  > Folge seither über die Farb-Kacheln und die Live-Aktionen (Reihe 3/4); Tempo und
+  > Übergang stellt man am Effekt selbst ein (Effekt-Editor-Box oder Tempo-Regler).
 
 So baust du **während** der Show eine eigene Farbfolge: Farben antippen → „Live-Chase" starten.
 
