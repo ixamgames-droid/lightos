@@ -262,7 +262,7 @@ BUTTON_ACTION_LABELS: list[tuple[str, str]] = [
     (ButtonAction.LASER_ESTOP,     "Laser NOT-AUS"),
     (ButtonAction.LASER_PATTERN,   "Laser-Muster abrufen"),
     (ButtonAction.ALL_WHITE,       "Alles Weiß (gehalten)"),
-    (ButtonAction.FREEZE,          "Freeze (BPM einfrieren)"),
+    (ButtonAction.FREEZE,          "Freeze (alles anhalten)"),
     (ButtonAction.AUTO_SYNC,       "Auto-Sync an/aus"),
     (ButtonAction.TAP,             "Tap-Tempo"),
     (ButtonAction.AUDIO_BPM,       "Musik-BPM"),
@@ -1254,12 +1254,14 @@ class VCButton(VCWidget):
             return
 
         if self.action == ButtonAction.FREEZE:
-            # F3: Tempo einfrieren — alle Buses + globaler Leader auf 0 (Toggle).
-            # Bus-gekoppelte Effekte halten dann ihre Position (F5).
+            # BUG-FBW Slice 3 (Davids Entscheidung 2026-08-02): Freeze haelt jetzt
+            # ALLES an, nicht mehr nur den Tempo-Bus. Der Renderer rechnet im
+            # Freeze gar nicht mehr, der Output haelt seinen Stand
+            # (AppState.set_freeze). Der Tempo-Bus wird dort mitgefroren, das
+            # Bestandsverhalten bleibt also enthalten.
             if press:
                 try:
-                    from src.core.engine.tempo_bus import get_tempo_bus_manager
-                    get_tempo_bus_manager().toggle_freeze()
+                    state.set_freeze(not state.is_frozen())
                 except Exception as e:
                     print(f"[VCButton] freeze error: {e}")
                 self.update()
@@ -1637,8 +1639,10 @@ class VCButton(VCWidget):
         action_on = False
         try:
             if self.action == ButtonAction.FREEZE:
-                from src.core.engine.tempo_bus import get_tempo_bus_manager
-                action_on = get_tempo_bus_manager().is_frozen()
+                # EINE Quelle: der globale Freeze-Zustand (er friert den Tempo-Bus
+                # mit, die Anzeige darf also nicht mehr am Bus haengen).
+                from src.core.app_state import get_state as _gs
+                action_on = _gs().is_frozen()
             elif self.action == ButtonAction.AUTO_SYNC:
                 from src.core.engine.tempo_bus import get_tempo_bus_manager
                 action_on = bool(get_tempo_bus_manager().auto_sync)
