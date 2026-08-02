@@ -82,7 +82,7 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    `reference_lightos_review_checklist`, Klasse 3: „ein neues
    `PatchedFixture`-Feld braucht VIER Nachzieh-Stellen") — deshalb jetzt ein
    maschineller Wächter statt einer weiteren Merkregel.
-6. **BUG-FBW (P1, David 2026-08-01) — „Alles Weiß" erledigt, Freeze offen.**
+6. ✅ **BUG-FBW (P1, David 2026-08-01) — ERLEDIGT (Slices 1–3, 2026-08-02).**
    **✅ SLICE 2 (2026-08-02): „Alles Weiß" setzt jetzt WIRKLICH alle gepatchten
    Geräte weiß.** Davids Entscheidung auf die offene Frage unten: **ja**. Der
    Knopf startet nicht mehr nur die gebundene Szene, sondern legt einen
@@ -129,16 +129,40 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    entfallen** — sie zeigte eine Lücke an, die es nicht mehr gibt. Die
    Abdeckungs-Rechnung dahinter bleibt: sie entscheidet jetzt, welche Geräte der
    Override in Ruhe lässt.
-   **NOCH OFFEN — Freeze (Davids Entscheidung: ja, soll alles anhalten):** eine
-   eigene Runde, weil die Messung eine Annahme widerlegt hat. `dt` durchzureichen
-   reicht **nicht**: `rgb_matrix`, `efx`, `cue_stack`, `executor` und `audio_func`
-   tracken ihre Zeit über `time.monotonic()`, nicht über das übergebene `dt` —
-   ein „dt=0"-Freeze hielte sie gar nicht an. Der tragfähige Weg ist die
-   **Ausgabestufe** (Frame nicht neu berechnen, letzten Stand weitersenden),
-   mit zwei Punkten, die vorher zu klären sind: Blackout und Laser-NOT-AUS müssen
-   auch im eingefrorenen Zustand durchgreifen (sie sind post-render maskiert —
-   nachmessen, nicht annehmen), und beim Auftauen springen die
-   monotonic-basierten Effekte um die eingefrorene Dauer nach vorn.
+   **✅ SLICE 3 (2026-08-02): Freeze hält jetzt WIRKLICH alles an.** Davids
+   zweites Ja. **Die naheliegende Reparatur war nachweislich falsch:** `dt`
+   durchzureichen reicht nicht — `rgb_matrix`, `efx` und die Cue-Fades ziehen
+   ihren Fortschritt aus `time.monotonic()`, nicht aus dem übergebenen `dt`; ein
+   „dt=0"-Freeze hätte sie gar nicht angehalten. Gemessen, nicht angenommen.
+   **Zwei Stufen, und beide sind nötig:** (1) `_render_frame` rechnet im Freeze
+   gar nicht mehr — die Funktionen werden also nicht getickt und halten; (2) die
+   **Ausgabestufe** sendet einen Schnappschuss (`OutputManager.set_freeze`).
+   Ohne (2) leckte der Freeze: `set_programmer_value` flusht bei **jedem** Wert
+   direkt ins Universe, am Renderer vorbei — ein gehaltener Fader wäre
+   durchgekommen. Dasselbe gilt für Input-Merge, Web/OSC-Rohkanäle und Simple
+   Desk. *Aufgefallen ist das nur, weil der Test am gesendeten Frame maß und
+   nicht am Zustand.*
+   **Sicherheit nachgemessen statt geschlossen:** Blackout, Grand-Master,
+   Channel-Modifier und Laser-NOT-AUS liegen in `OutputManager._send_all`, also
+   **nach** dem Schnappschuss — sie greifen im eingefrorenen Zustand unverändert
+   durch. Ein Freeze kann den Notaus nicht aushebeln (zwei eigene Tests).
+   **Kein Sprung beim Auftauen:** neues `Function.shift_clock(seconds)`
+   (Basis: no-op) zieht die monotonic-Anker um die eingefrorene Dauer nach —
+   `RgbMatrixInstance`, `EfxInstance` und `CueStack` überschreiben es, ein von
+   Hand gescrubbter Fade (`manual`) bleibt unangetastet, weil er an der
+   Faderposition hängt und nicht an der Zeit. **Der Ton wird bewusst NICHT
+   eingefroren** — eine laufende Musik-Blende ist kein Licht; ein Test hält
+   fest, dass `AudioFunction` `shift_clock` nicht überschreibt, damit das
+   niemand versehentlich „nachrüstet".
+   Der Tempo-Bus wird mitgefroren (Bestandsverhalten F3 bleibt enthalten), die
+   Knopf-Anzeige liest jetzt den globalen Zustand statt des Busses — **eine**
+   Quelle. Beschriftung „Freeze (alles anhalten)".
+   `tests/test_freeze_holds_output.py` (10), Mutation in drei Richtungen
+   (Renderer rechnet weiter → 1 rot, Ausgabestufe friert nicht → 1 rot,
+   Zeitanker nicht nachgezogen → 2 rot).
+   **Damit ist BUG-FBW abgeschlossen**, bis auf Symptom (b) = **HW-5c**
+   (Enttec-Universe auf `COM_FAKE` — Rig-Arbeit, kein Code) und die bewusste
+   Entscheidung, dass `STOP_ALL` den Programmer stehen lässt.
 
    _Teil 1 (Slice 1) siehe unten._
    **✅ ERLEDIGT 2026-08-02 (Slice 1: „ein Panik-Knopf muss sagen, wenn er nichts

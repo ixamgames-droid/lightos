@@ -1864,6 +1864,10 @@ class RgbMatrixInstance(Function):
         from . import effect_live
         effect_live.commit_live_override(self.id)
 
+    def shift_clock(self, seconds: float) -> None:
+        """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""
+        self._last_tick += float(seconds)
+
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
         d.update({

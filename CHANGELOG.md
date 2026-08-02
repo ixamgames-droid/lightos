@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Freeze hält jetzt wirklich alles an
+
+#### Geändert
+
+- **„Freeze" friert das gesamte Ausgabebild ein, nicht mehr nur das Tempo.**
+  Bisher wurden nur BPM und Tempo-Busse angehalten — alles, was nicht daran
+  hing (Matrix-Effekte, Bewegungen, laufende Überblendungen, von Hand gesetzte
+  Werte), lief weiter. Jetzt steht das Bild, bis Freeze wieder aus ist.
+
+  **Blackout, der Master-Regler und der Laser-NOT-AUS wirken weiterhin** — auch
+  im eingefrorenen Zustand. Freeze hält das Bild, nie den Notaus.
+
+  **Beim Auftauen springt nichts:** zeitgesteuerte Effekte und Überblendungen
+  machen dort weiter, wo sie standen, statt die eingefrorene Dauer auf einmal
+  nachzuholen.
+
+  **Die Musik läuft weiter** — eine laufende Ein-/Ausblendung des Tons ist kein
+  Licht und wird bewusst nicht mit eingefroren.
+
 ### 2026-08-02 — „Alles Weiß" macht jetzt wirklich alles weiß
 
 #### Geändert

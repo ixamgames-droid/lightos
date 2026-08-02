@@ -191,6 +191,24 @@ class FunctionManager:
             self._start_order.pop()
         return None
 
+    def shift_clocks(self, seconds: float):
+        """Alle LAUFENDEN Funktionen um ``seconds`` weiterschieben.
+
+        BUG-FBW Slice 3 (Freeze-Auftauen): waehrend des Freeze wird gar nicht
+        getickt. Funktionen, die ihren Fortschritt aus ``time.monotonic()``
+        ziehen, rechneten die eingefrorene Dauer sonst beim ersten Tick danach in
+        EINEM Schritt ab (s. ``Function.shift_clock``). Nur laufende: eine
+        gestoppte Funktion setzt ihren Anker beim Start ohnehin neu.
+        """
+        for fid in list(self._running_ids):
+            f = self._functions.get(fid)
+            if f is None:
+                continue
+            try:
+                f.shift_clock(seconds)
+            except Exception as e:
+                print(f"[FunctionManager] shift_clock({fid}) error: {e}")
+
     def stop_all(self):
         # Sofort-Stopp ohne Fade-Out (fuer Show-Reset/Blackout/Clear).
         for fid in list(self._running_ids):

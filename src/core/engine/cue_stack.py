@@ -324,6 +324,23 @@ class CueStack:
                     debug_swallow("cue_stack.cue_cb", e)
         return committed
 
+    def shift_clock(self, seconds: float) -> None:
+        """Laufenden Cue-Fade um ``seconds`` weiterschieben (Freeze-Auftauen).
+
+        ``FadeState`` misst seinen Fortschritt gegen ``time.monotonic()``; ohne
+        das Verschieben waere ein 3-Sekunden-Fade nach einem 10-Sekunden-Freeze
+        beim Auftauen sofort fertig, statt dort weiterzumachen, wo er stand.
+        Ein von Hand gescrubbter Fade (``manual``) haengt an der Faderposition,
+        nicht an der Zeit — der bleibt unangetastet. Verschachtelte Stacks
+        (``_active_sub``) werden mitgenommen.
+        """
+        fade = getattr(self, "_fade", None)
+        if fade is not None and not getattr(fade, "manual", False):
+            fade.start_time += float(seconds)
+        sub = getattr(self, "_active_sub", None)
+        if sub is not None:
+            sub.shift_clock(seconds)
+
     def stop(self):
         sub = None
         with self._lock:

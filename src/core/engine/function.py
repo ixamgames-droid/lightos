@@ -192,6 +192,22 @@ class Function:
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
+    def shift_clock(self, seconds: float) -> None:
+        """Interne Zeitanker um ``seconds`` nach vorn schieben (Freeze-Auftauen).
+
+        BUG-FBW Slice 3: Der globale Freeze haelt den Output an, indem der
+        Renderer den Frame nicht mehr neu berechnet — die Funktionen werden also
+        gar nicht getickt. Wer seinen Fortschritt aus ``dt`` zieht, haelt damit
+        von selbst. Wer ihn aus ``time.monotonic()`` zieht (Matrix, EFX,
+        Cue-Fades), rechnet beim ersten Tick nach dem Auftauen die GANZE
+        eingefrorene Dauer auf einmal ab und springt nach vorn.
+
+        Diese Methode verschiebt den Anker um genau diese Dauer, damit der erste
+        Tick nach dem Auftauen wieder ein normaler Frame ist. Basis-Fassung: nichts
+        zu tun (die allermeisten Funktionen haengen an ``dt``).
+        """
+        return
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,

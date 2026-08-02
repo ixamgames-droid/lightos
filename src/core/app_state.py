@@ -505,6 +505,10 @@ class AppState:
         # BUG-FBW Slice 2: Moment-Override „Alles Weiß" (Render-Schritt 4a³).
         # None = aus. Gebaut von set_all_white(), nicht pro Frame gerechnet.
         self._all_white_map: dict[int, dict[str, int]] | None = None
+        # BUG-FBW Slice 3: Zeitpunkt des globalen Freeze (None = laeuft normal).
+        # Der Renderer steigt dann sofort aus; die Dauer wird beim Auftauen
+        # gebraucht, um die monotonic-Anker nachzuziehen.
+        self._freeze_since: float | None = None
         # F-26: Feature-Dimmer-Master pro Slot (stabile Slider-ID -> FeatureDimmer).
         # Effekt-unabhaengiger Helligkeits-/Feature-Master, s. Render-Schritt 4b².
         # STAB-13: _fd_lock schuetzt feature_dimmers gegen den lock-freien Renderer
@@ -2750,6 +2754,82 @@ class AppState:
                 remote = self._remote_input_channels = {}
             remote.setdefault(universe, set()).add(channel)
 
+    def is_frozen(self) -> bool:
+        """True, solange der globale Freeze den Output haelt."""
+        return bool(getattr(self, "_freeze_since", None) is not None)
+
+    def set_freeze(self, active: bool) -> bool:
+        """Globaler Freeze: der Output haelt seinen Stand. Gibt den neuen Zustand.
+
+        BUG-FBW Slice 3 (Davids Entscheidung 2026-08-02: Freeze soll ALLES
+        anhalten, nicht nur den Tempo-Bus).
+
+        **Warum auf der Render-Stufe und nicht ueber ``dt``:** gemessen, nicht
+        angenommen — ``rgb_matrix``, ``efx`` und die Cue-Fades ziehen ihren
+        Fortschritt aus ``time.monotonic()``, nicht aus dem uebergebenen ``dt``.
+        Ein „dt=0"-Freeze haette sie gar nicht angehalten. ``_render_frame``
+        rechnet deshalb im Freeze GAR NICHT — die Universen behalten ihren
+        letzten Stand, und der 44-Hz-Sende-Thread schickt genau den weiter.
+
+        **Sicherheit bleibt oben:** Blackout, Grand-Master, Channel-Modifier und
+        der Laser-NOT-AUS liegen in ``OutputManager._send_all``, also NACH dem
+        Renderer. Sie greifen im eingefrorenen Zustand unveraendert durch — ein
+        Freeze kann den Notaus nicht aushebeln (mit Test).
+
+        **Nicht eingefroren wird der Ton:** eine laufende Musik-Blende ist kein
+        Licht; ``audio_func`` bleibt bewusst unberuehrt.
+
+        Der Tempo-Bus wird mitgefroren (Bestandsverhalten, F3), damit
+        bus-gekoppelte Effekte nach dem Auftauen nicht auf einer weitergelaufenen
+        Position aufsetzen.
+        """
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        aktiv = bool(active)
+        if aktiv == self.is_frozen():
+            return aktiv
+        if aktiv:
+            self._freeze_since = time.monotonic()
+            # Der Renderer steigt jetzt aus — den zuletzt GESENDETEN Stand
+            # festhalten, damit die direkten Schreibwege (Programmer-Flush,
+            # Input-Merge, Web/OSC-Roh) nicht am Freeze vorbei durchschlagen.
+            try:
+                self.output_manager.set_freeze(True)
+            except Exception as e:
+                print(f"[AppState] freeze output error: {e}")
+        else:
+            seit = getattr(self, "_freeze_since", None)
+            self._freeze_since = None
+            try:
+                self.output_manager.set_freeze(False)
+            except Exception as e:
+                print(f"[AppState] unfreeze output error: {e}")
+            if seit is not None:
+                # Zeitanker der monotonic-basierten Verbraucher um die
+                # eingefrorene Dauer nachziehen — sonst rechnen sie sie beim
+                # ersten Tick danach in EINEM Schritt ab und springen.
+                dauer = max(0.0, time.monotonic() - seit)
+                try:
+                    self.function_manager.shift_clocks(dauer)
+                except Exception as e:
+                    print(f"[AppState] freeze shift_clocks error: {e}")
+                pe = getattr(self, "playback_engine", None)
+                if pe is not None:
+                    for ex in getattr(pe, "executors", ()) or ():
+                        stack = getattr(ex, "stack", None)
+                        if stack is None:
+                            continue
+                        try:
+                            stack.shift_clock(dauer)
+                        except Exception as e:
+                            print(f"[AppState] freeze shift cue error: {e}")
+        try:
+            tb = get_tempo_bus_manager()
+            if tb.is_frozen() != aktiv:
+                tb.toggle_freeze()
+        except Exception as e:
+            print(f"[AppState] freeze tempo bus error: {e}")
+        return aktiv
+
     def set_all_white(self, active: bool, exclude_fids=()) -> int:
         """„Alles Weiß" ein-/ausschalten. Gibt die Zahl der gedeckten Geraete zurueck.
 
@@ -2820,6 +2900,12 @@ class AppState:
         # RX-Threads programmer/universes mutieren (set_programmer_value,
         # Input-Merge legt Universen an). Iteration ueber Live-Dicts wuerde sonst
         # "dict changed size during iteration" werfen.
+        # BUG-FBW Slice 3: Globaler Freeze — gar nicht erst rechnen. Die Universen
+        # behalten ihren letzten Stand, der Sende-Thread schickt genau den weiter
+        # (inkl. Blackout/Grand-Master/Laser-NOT-AUS, die NACH dem Renderer in
+        # OutputManager._send_all liegen und deshalb weiter durchgreifen).
+        if getattr(self, "_freeze_since", None) is not None:
+            return
         live_universes = list(self.universes.items())
         with self._prog_lock:
             programmer = {fid: dict(attrs)

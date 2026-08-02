@@ -50,6 +50,8 @@ class OutputManager:
         # geschlossen werden (testbar ueberschreibbar).
         self._stop_join_s = 2.0
         self._blackout = False
+        # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
+        self._freeze_frames: dict[int, bytes] | None = None
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -150,6 +152,26 @@ class OutputManager:
 
     def remove_tick_callback(self, cb):
         self._tick_callbacks = [c for c in self._tick_callbacks if c is not cb]
+
+    def set_freeze(self, enabled: bool):
+        """BUG-FBW Slice 3: den gesendeten Frame einfrieren.
+
+        Der Renderer steigt im Freeze schon aus (``AppState._render_frame``) —
+        das allein reicht aber NICHT: mehrere Wege schreiben **direkt** in die
+        Universen, am Renderer vorbei (``_flush_programmer_to_dmx`` bei jedem
+        Programmer-Wert, der Input-Merge, Web/OSC-Rohkanaele, Simple Desk). Ohne
+        diesen Schnappschuss leckte ein gehaltener Fader durch den Freeze.
+
+        Hier liegt der Schnappschuss VOR Channel-Modifier, Grand-Master,
+        Blackout und Laser-NOT-AUS — die vier bleiben also auch eingefroren
+        wirksam. Das ist die Eigenschaft, die den Freeze ueberhaupt vertretbar
+        macht: er haelt das Bild, aber nie den Notaus.
+        """
+        if not enabled:
+            self._freeze_frames = None
+            return
+        self._freeze_frames = {u: universe.get_all()
+                               for u, universe in list(self.universes.items())}
 
     def set_blackout(self, enabled: bool):
         self._blackout = enabled
@@ -451,8 +473,14 @@ class OutputManager:
             except Exception:
                 pass
 
+        gefroren = self._freeze_frames
         for univ_num, universe in list(self.universes.items()):
-            data = universe.get_all()
+            # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
+            # beschriebenen) Live-Universums. Ein Universum, das es beim
+            # Einfrieren noch gar nicht gab, laeuft normal weiter — sonst waere
+            # ein frisch hinzugekommener Ausgang dauerhaft stumm.
+            data = universe.get_all() if gefroren is None else gefroren.get(
+                univ_num, universe.get_all())
             # Channel-Modifier zuerst (vor Grand-Master und Blackout)
             try:
                 from src.core.engine.channel_modifier import get_modifier_manager
