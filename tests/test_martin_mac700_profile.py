@@ -43,11 +43,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import select                                       # noqa: E402
 from sqlalchemy.orm import Session                                  # noqa: E402
 
-from sqlalchemy import create_engine                                # noqa: E402
-
+from _fixture_quelle import frische_library                        # noqa: E402
 from src.core.attr_groups import ATTR_GROUPS                        # noqa: E402
-from src.core.database import fixture_db as fdb                     # noqa: E402
-from src.core.database.models import (Base, ChannelRange,           # noqa: E402
+from src.core.database.models import (ChannelRange,                 # noqa: E402
                                       FixtureChannel, FixtureMode,
                                       FixtureProfile)
 
@@ -96,14 +94,13 @@ class Mac700ProfileTest(unittest.TestCase):
     braucht: beim Aendern.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        cls._eng = frische_library(cls)
+
     def setUp(self):
-        motor = create_engine("sqlite://")       # eigene, leere In-Memory-DB
-        Base.metadata.create_all(motor)
-        self.s = Session(motor)
+        self.s = Session(self._eng)
         self.addCleanup(self.s.close)
-        fdb._add_martin_mac700_profile(
-            self.s, fdb._get_or_create_mfr(self.s, "Martin", "MARTIN"))
-        self.s.flush()
         self.profil = self.s.execute(select(FixtureProfile).where(
             FixtureProfile.short_name == "MAC700P")).scalars().first()
         self.assertIsNotNone(self.profil, "Builtin MAC700P fehlt")
@@ -176,17 +173,12 @@ class Mac700ProfileTest(unittest.TestCase):
         FM-15-Liste mehr ohne Builtin dastehen.
 
         Gemessen an der GANZEN frisch geseedeten Library, nicht an diesem einen
-        Profil — sonst belegt der Test nur, dass ich eine Iris eingebaut habe,
+        Profil — sonst belegt der Test nur, dass eine Iris eingebaut wurde,
         nicht dass sie die fehlende war. (Der MAC 700 hat selbst weder Frost
         noch Prisma-Rotation; die kommen von anderen Builtins.)
         """
-        motor = create_engine("sqlite://")
-        Base.metadata.create_all(motor)
-        with Session(motor) as voll:
-            fdb._seed(voll)
-            voll.flush()
-            vorhanden = set(voll.execute(
-                select(FixtureChannel.attribute).distinct()).scalars().all())
+        vorhanden = set(self.s.execute(
+            select(FixtureChannel.attribute).distinct()).scalars().all())
         gesucht = {"zoom", "focus", "frost", "iris", "prism", "prism_rotation",
                    "gobo_rotation", "gobo_wheel", "animation"}
         fehlen = sorted(gesucht - vorhanden)

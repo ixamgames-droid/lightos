@@ -3,25 +3,13 @@ mit ``kind``, damit die Schnellwahl (PresetTile) Kacheln ableiten kann. Eine
 aeltere DB ohne diese Ranges wird von ensure_builtins() in-place nachgeruestet.
 """
 import os
-import tempfile
 import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
-
-
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 
 def _load(eng, short):
@@ -46,11 +34,7 @@ def _load(eng, short):
 class GenericMHWheelSlotsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def test_mh8_color_wheel_slots(self):
         _, slots = _load(self._eng, "MH8")
@@ -77,10 +61,7 @@ class EnsureWheelRangesUpgradeTest(unittest.TestCase):
     """ensure_builtins() ruestet Wheel-Slots in einer alten DB nach (Profil-ID stabil)."""
 
     def setUp(self):
-        self._FDB, self._eng, self._saved = _temp_seeded_engine()
-
-    def tearDown(self):
-        self._FDB._engine = self._saved
+        self._eng = frische_library(self)
 
     def test_old_db_without_ranges_gets_upgraded(self):
         from src.core.database.fixture_db import ensure_builtins

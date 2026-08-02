@@ -28,8 +28,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import select                                       # noqa: E402
 from sqlalchemy.orm import Session                                  # noqa: E402
 
-from src.core.database.fixture_db import (engine as fdb_engine,     # noqa: E402
-                                          ensure_builtins)
+from _fixture_quelle import frische_library                        # noqa: E402
 from src.core.database.models import (ChannelRange, FixtureChannel,  # noqa: E402
                                       FixtureMode, FixtureProfile)
 
@@ -72,10 +71,14 @@ class MythosProfileTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        ensure_builtins()
+        # ★ Frisch aus dem QUELLTEXT geseedet. Vorher las dieser Test die
+        # abgelegte fixtures.db und war damit blind: die Mutation
+        # „Zoomkanal zoom -> raw" liess ihn 12/12 gruen. Begruendung und
+        # Messung in tests/_fixture_quelle.py.
+        cls._eng = frische_library(cls)
 
     def setUp(self):
-        self.s = Session(fdb_engine())
+        self.s = Session(self._eng)
         self.addCleanup(self.s.close)
         self.profil = self.s.execute(select(FixtureProfile).where(
             FixtureProfile.short_name == "MYTHOS")).scalars().first()

@@ -12,6 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from _fixture_quelle import frische_library
 from src.core.database import fixture_db as fdb
 from src.core.database.models import FixtureProfile, FixtureMode
 
@@ -27,6 +28,17 @@ def _profile():
 
 
 class TestFogHazerBuiltin(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # ★ Frische Library aus dem Quelltext. Vorher lief alles ueber den
+        # GETEILTEN Ausgang auf `fixtures.db` — und
+        # test_migration_repairs_old_dimmer_luefter schrieb dort absichtlich
+        # den Bug-Stand hinein, um die Reparatur zu pruefen. Bricht der Lauf
+        # dazwischen ab, bleibt die echte Library kaputt zurueck.
+        # Dass der Test die Quelle ueberhaupt sah, lag allein an dieser
+        # Reparatur-Migration — nicht an seiner Konstruktion.
+        cls._eng = frische_library(cls)
+
     def test_seeded_as_hazer(self):
         prof = _profile()
         self.assertIsNotNone(prof, "EURON10-Builtin fehlt nach ensure_builtins")

@@ -28,20 +28,9 @@ from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
 
 
 def _load(session, short):
@@ -75,11 +64,7 @@ def _attrs(mode):
 class _SeededCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
 
 # ── ADJ Dotz Matrix ─────────────────────────────────────────────────────────

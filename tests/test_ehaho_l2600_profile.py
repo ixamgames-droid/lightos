@@ -1,22 +1,10 @@
 """Tests fuer das Ehaho-L2600-Builtin (3D-Animations-Laser, 6ch/34ch) und den
 Fixture-Klassen-Audit der Builtins (jedes Builtin traegt einen echten Typ)."""
-import tempfile
 import unittest
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
-
-
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 
 def _load(session, short_name="L2600LASER"):
@@ -55,11 +43,7 @@ _BLOCK_ATTRS = [
 class EhahoL2600ProfileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def test_profile_and_modes_exist(self):
         with Session(self._eng) as s:
@@ -161,10 +145,7 @@ class EhahoL2600ProfileTest(unittest.TestCase):
 
 class EnsureBuiltinsL2600Test(unittest.TestCase):
     def setUp(self):
-        self._FDB, self._eng, self._saved = _temp_seeded_engine()
-
-    def tearDown(self):
-        self._FDB._engine = self._saved
+        self._eng = frische_library(self)
 
     def test_backfill_is_idempotent(self):
         from src.core.database.fixture_db import ensure_builtins
@@ -195,11 +176,7 @@ class BuiltinTypeAuditTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def test_all_builtins_have_real_class(self):
         from src.core.database.models import FixtureProfile

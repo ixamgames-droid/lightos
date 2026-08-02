@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Geräteprofil-Tests prüfen wieder, was im Quelltext steht
+
+#### Intern
+
+- **Ein Profil-Test prüfte den Stand vom ersten Lauf.** Eingebaute Geräte
+  werden einmal in die Geräte-Datei geschrieben und danach nie wieder mit dem
+  Quelltext verglichen — ein Test, der die Datei liest, merkt eine Änderung am
+  Profil also nicht. Betroffen war genau **einer** von 19 (nachgemessen); die
+  übrigen bauten sich die Lösung jeweils selbst nach: **17 Kopien derselben
+  Funktion, schon in zwei Fassungen auseinandergelaufen.** Ausgerechnet der
+  Test ohne Kopie war der blinde.
+
+  Die Konstruktion liegt jetzt an einer Stelle, alle 19 Dateien benutzen sie,
+  und ein Gate hält beide Regeln fest.
+
+- **Testläufe ließen Datenbanken liegen.** Die kopierte Fassung legte
+  Temp-Dateien an und löschte sie nie: gemessen vier pro Lauf allein aus einer
+  Testdatei, auf diesem Rechner **1935 Dateien / 218 MB an einem Tag**. Jetzt
+  wird aufgeräumt.
+
+- **Ein Test schrieb einen kaputten Zustand in die echte Geräte-Datei**, um die
+  Reparatur dafür zu prüfen — bricht der Lauf dazwischen ab, bleibt die Library
+  beschädigt. Er arbeitet jetzt auf einer eigenen Kopie.
+
+- **Nebenbefund zum bekannten WebGL-Aussetzer im Testlauf (XPLAT-17):** er ist
+  erstmals **reproduzierbar** statt zufällig. Ein rechenintensives Segment in
+  der parallelen Spur riss die Grafik-Spur in **3 von 3 Läufen**; dieselben
+  Tests blieben einzeln 3/3 grün. Sechs Vergleichsläufe schließen Segmentzahl
+  und Position aus — es ist die Rechenlast eines Nachbarn. Damit lässt sich der
+  Fehler jetzt auf Zuruf erzeugen, statt auf ihn zu warten.
+
 ### 2026-08-02 — Martin MAC 700 Profile in der Library
 
 #### Neu
