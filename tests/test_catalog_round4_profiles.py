@@ -17,26 +17,14 @@ Master-Dim von 'duration') und die ECHTE viz_model_for-Routing-Entscheidung
 (alle Single-Head -> fixture_type, kein Spider/mover_bar). Analog Runde 2/3.
 """
 import os
-import tempfile
 import unittest
 from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
 
 
 def _load(session, short):
@@ -75,11 +63,7 @@ def _range_at(channel, value):
 class _SeededCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def _first(self, short, mode_name, attr):
         with Session(self._eng) as s:
@@ -315,9 +299,12 @@ class CatalogRound4IdempotencyTest(_SeededCase):
     -> nur Backfill, keine Signatur-Migration; Profil-ID bleibt stabil)."""
 
     def test_ensure_builtins_idempotent(self):
+        from src.core.database import fixture_db as FDB
         from src.core.database.models import FixtureProfile
-        self._FDB.ensure_builtins()
-        self._FDB.ensure_builtins()
+        # `frische_library` setzt FDB._engine um -> ensure_builtins() arbeitet
+        # auf der frischen Library, nicht auf der abgelegten Datei.
+        FDB.ensure_builtins()
+        FDB.ensure_builtins()
         with Session(self._eng) as s:
             for short in ("ATOMIC3000", "POINTE", "MACAURA"):
                 rows = s.execute(

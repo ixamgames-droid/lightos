@@ -7,26 +7,14 @@ als zwei getrennte `color_r`-Kanaele. Ohne Gate liefert die Bank-Zaehlung in
 Gate in `is_spider_fixture` schliesst `fixture_type=='laser'` zentral aus.
 """
 import os
-import tempfile
 import unittest
 from types import SimpleNamespace
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
-
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
 
 
 def _partylaser_chans(eng):
@@ -51,12 +39,8 @@ def _partylaser_chans(eng):
 class LaserNotSpiderTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
+        cls._eng = frische_library(cls)
         cls._chans = _partylaser_chans(cls._eng)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
 
     def test_partylaser_really_has_two_color_r_banks(self):
         # Voraussetzung des Findings: genau die Konstellation, die die

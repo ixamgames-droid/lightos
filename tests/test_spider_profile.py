@@ -10,26 +10,13 @@ Abgedeckt:
 - ensure_builtins() ruestet das Profil in einer bestehenden DB nach (idempotent).
 """
 import os
-import tempfile
 import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
-
-
-def _temp_seeded_engine():
-    """Frische Temp-DB mit komplettem Seed; gibt (modul, engine, alt) zurueck."""
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 
 def _load_spider(s):
@@ -62,11 +49,7 @@ class SpiderProfileTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def test_existiert_und_typ(self):
         with Session(self._eng) as s:
@@ -135,10 +118,7 @@ class EnsureBuiltinsSpiderTest(unittest.TestCase):
     noch nicht hat (Nutzer-DB existiert bereits) — und bleibt idempotent."""
 
     def setUp(self):
-        self._FDB, self._eng, self._saved = _temp_seeded_engine()
-
-    def tearDown(self):
-        self._FDB._engine = self._saved
+        self._eng = frische_library(self)
 
     def _delete_spider(self):
         from src.core.database.models import FixtureProfile
@@ -198,11 +178,7 @@ class WeitereDaniStrahlerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def test_conti_mh_layout(self):
         with Session(self._eng) as s:

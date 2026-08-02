@@ -20,7 +20,6 @@ irgendetwas zu emittieren.
 """
 import json
 import os
-import tempfile
 import time
 import unittest
 from types import SimpleNamespace
@@ -32,6 +31,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from src.core.color_utils import visual_intensity, visual_rgb
 from src.ui.visualizer.visualizer_service import _build_fixture_payload
+from _fixture_quelle import frische_library     # FIXTEST-FRESH
 
 
 def _rng(lo, hi, name, kind=""):
@@ -183,18 +183,6 @@ class PayloadWiringTest(unittest.TestCase):
 
 
 # ── (4) Echte Builtins aus der Fixture-DB ────────────────────────────────────
-def _temp_seeded_engine():
-    from src.core.database import fixture_db as FDB
-    from src.core.database.fixture_db import get_engine, _seed
-    saved = FDB._engine
-    eng = get_engine(tempfile.mktemp(suffix=".db"))
-    with Session(eng) as s:
-        _seed(s)
-        s.commit()
-    FDB._engine = eng
-    return FDB, eng, saved
-
-
 def _load(session, short):
     from src.core.database.models import (
         FixtureChannel, FixtureMode, FixtureProfile,
@@ -216,11 +204,7 @@ class RealBuiltinsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._FDB, cls._eng, cls._saved = _temp_seeded_engine()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._FDB._engine = cls._saved
+        cls._eng = frische_library(cls)
 
     def _channels_of(self, short, mode_name=None):
         with Session(self._eng) as s:
