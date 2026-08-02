@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Lichtkegel enden am Podest, nicht dahinter
+
+#### Behoben
+
+- **Der sichtbare Lichtkegel schoss durch Bühnenelemente hindurch.** Er endete
+  bislang an der Bodenebene — stand ein Podest, ein DJ-Pult oder ein
+  Boxenstapel darunter, lief der Strahl mitten hindurch und hörte erst am Boden
+  dahinter auf. Am Rig ist das der häufige Fall, weil Scheinwerfer über
+  Bühnenelementen hängen, nicht über leerem Boden.
+
+- **Der Lichtfleck liegt jetzt auf der Fläche, die das Licht abbekommt** — auf
+  der Podest-Oberkante statt auf dem Boden darunter. Vorher zeigte die Ansicht
+  Licht an einer Stelle, die in Wahrheit im Schatten des Podests lag.
+
+Noch offen und bewusst eine eigene Runde: der **Schatten im Strahl** — ein
+Körper im Lichtkegel wirft weiterhin keinen Schatten in den sichtbaren Nebel.
+Das ist Ray-Marching und gehört an die Qualitätsstufe „Hoch".
+
+
 ### 2026-08-02 — Geräteprofil-Tests prüfen wieder, was im Quelltext steht
 
 #### Intern

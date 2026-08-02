@@ -14,6 +14,79 @@ import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
+import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
+import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
+
+// EIN gehaltener Raycaster statt einer Neuanlage pro Fixture und Frame —
+// derselbe Haushalt wie beim Andocken (stage/docking.js).
+const _strahl = new THREE.Raycaster();
+
+/**
+ * Naechster Buehnenkoerper auf dem Strahl, oder `null`.
+ *
+ * Bewusst NUR `stageObjects` (Podest, Traverse, Boxen, DJ-Pult, Waende) — nicht
+ * die Fixtures selbst. Ein Scheinwerfer, dessen Kegel knapp am Gehaeuse eines
+ * anderen vorbeigeht, wuerde sonst reihenweise abgeschnitten, und der Boden ist
+ * ohnehin ueber die Ebene gerechnet (billiger als ein Mesh-Treffer).
+ */
+function koerperTreffer(f, origin, dir) {
+  // ★ Kostenbremse. `test_viz_beam_laenge.py` hielt bisher ausdruecklich fest:
+  // „ein Raycast gegen alle Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad
+  // genau die Sorte Kosten, vor der die Review-Checkliste warnt." Das bleibt
+  // richtig — deshalb wird hier NUR gerechnet, wenn sich seit dem letzten Mal
+  // etwas geaendert hat, das das Ergebnis aendern koennte: der Strahl (Position
+  // oder Richtung) oder die Buehne (Anzahl, Lage, Hoehe der Koerper).
+  //
+  // Im Ruhezustand — und das ist der Normalfall, DMX-Batches kommen mit 44 Hz
+  // auch wenn sich nichts bewegt — kostet das eine Handvoll Additionen statt
+  // einer Strahlenverfolgung. Ein Moving Head zahlt sie nur, WAEHREND er faehrt,
+  // also genau dann, wenn sich der Auftreffpunkt wirklich verschiebt.
+  let signatur = 0;
+  let anzahl = 0;
+  for (const id in stageObjects) {
+    const m = stageObjects[id] && stageObjects[id].mesh;
+    if (!m) continue;
+    anzahl += 1;
+    signatur += m.position.x + m.position.y * 3 + m.position.z * 7
+      + m.scale.x * 11 + m.scale.y * 13 + m.scale.z * 17;
+  }
+  if (anzahl === 0) {                        // haeufigster Fall: leere Buehne
+    f._koerperTreffer = null;
+    f._koerperSchluessel = 0;
+    return null;
+  }
+  const schluessel = origin.x + origin.y * 2 + origin.z * 3
+    + dir.x * 5 + dir.y * 7 + dir.z * 11 + signatur * 19 + anzahl * 23;
+  if (f._koerperSchluessel === schluessel) return f._koerperTreffer;
+
+  const treffer = _koerperTrefferRechnen(origin, dir);
+  f._koerperSchluessel = schluessel;
+  f._koerperTreffer = treffer;
+  return treffer;
+}
+
+function _koerperTrefferRechnen(origin, dir) {
+  const meshes = [];
+  for (const id in stageObjects) {
+    const m = stageObjects[id] && stageObjects[id].mesh;
+    if (!m) continue;
+    // ★ Ohne das hier trifft der Strahl NICHTS. Der Raycaster rechnet gegen
+    // `matrixWorld`, und die aktualisiert sonst erst der Renderer. Bei
+    // On-Demand-Rendering (VIZ-198) kann zwischen „Objekt angelegt" und
+    // „erstes Bild" beliebig viel Zeit liegen — bis dahin steht das Podest
+    // fuer den Strahl im Ursprung statt an seinem Platz. Gemessen: 0 Treffer
+    // bei einem Podest, das genau unter der Linse stand.
+    m.updateMatrixWorld();
+    meshes.push(m);
+  }
+  if (meshes.length === 0) return null;
+  _strahl.set(origin, dir);
+  _strahl.near = 0.05;                       // nicht das eigene Gehaeuse treffen
+  _strahl.far = 100;
+  const hits = _strahl.intersectObjects(meshes, true);
+  if (!hits.length) return null;
+  return { abstand: hits[0].distance, y: hits[0].point.y };
+}
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
 // Gehaeuse-Rundkoerper ihre Radial-Segmente (Boden 6) — analog zum Beam-Kegel
@@ -1172,11 +1245,17 @@ function applyPanTilt(f, dmx) {
 // durch den Boden, durch die Buehne, durch alles. Das ist der billige und
 // zugleich auffaelligste Teil der Verdeckung: eine Skalierung, kein Ray-March.
 //
-// BEWUSST NUR DER BODEN, nicht beliebige Geometrie: ein Raycast gegen alle
-// Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad genau die Sorte Kosten,
+// Teil 1 beschraenkte sich bewusst auf den Boden — aus Kostengruenden: ein
+// Raycast gegen alle Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad genau die Sorte Kosten,
 // vor der die Review-Checkliste warnt. Der Bodenauftreffpunkt wird ohnehin
-// schon gerechnet (Floor-Spot) — diese Laenge ist damit gratis. Schatten IM
-// Strahl (volumetrisch) bleibt offen und gehoert an die Qualitaetsstufen.
+// gerechnet (Floor-Spot), diese Laenge war damit gratis.
+//
+// Teil 2 (2026-08-02) nimmt die Buehnenkoerper dazu — ohne die Kosten-Zusage
+// aufzugeben: `koerperTreffer` rechnet NUR, wenn sich Strahl oder Buehne
+// geaendert haben (Aenderungs-Schluessel). Im Ruhezustand kostet das eine
+// Handvoll Additionen, ein Moving Head zahlt den Strahl nur waehrend er faehrt.
+// Schatten IM Strahl (volumetrisch) bleibt offen und gehoert an die
+// Qualitaetsstufen.
 // VIZ-15: `dist` darf ``Infinity`` sein — "kein Auftreffpunkt bekannt". Dann
 // entscheidet allein die Grundlaenge bzw. die globale Obergrenze.
 // Die reine Laengen-Rechnung, herausgezogen als Test-Seam (VIZ-15): DREI
@@ -1220,9 +1299,9 @@ function applyFloorAim(f, dmx) {
   if (dmx.skipBeam) return;
   // VIZ-15: "kein Auftreffpunkt bekannt". Bleibt der Wert stehen, entscheidet
   // allein die Grundlaenge bzw. die globale Obergrenze — genau der Fall eines
-  // waagerecht oder nach oben gerichteten Kopfes, der den Boden NIE trifft und
-  // deshalb bis hierher immer seine volle Grundlaenge behielt.
-  let bodenAbstand = Infinity;
+  // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
+  // trifft und deshalb seine volle Grundlaenge behalten muss.
+  let auftreffAbstand = Infinity;
   if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
@@ -1242,20 +1321,31 @@ function applyFloorAim(f, dmx) {
     // sichtbaren Kegel (der am Kopf haengt).
     const origin = new THREE.Vector3();
     (aimObj || f.group).getWorldPosition(origin);
+    // VIZ-BEAM-OCCLUSION Teil 2: steht ein Buehnenkoerper im Weg, endet der
+    // Strahl DORT. Teil 1 rechnete nur gegen die Bodenebene und liess den Kegel
+    // durch Podest, DJ-Pult und Boxen hindurchschiessen — am Rig der haeufige
+    // Fall, weil Scheinwerfer ueber Buehnenelementen stehen, nicht ueber
+    // leerem Boden.
+    const koerper = koerperTreffer(f, origin, dir);
     if (Math.abs(dir.y) > 0.001) {
-      const t = -origin.y / dir.y;
-      if (t > 0 && t < 100) {
+      const tBoden = -origin.y / dir.y;
+      const flaeche = auftreffFlaeche(
+        (tBoden > 0 && tBoden < 100) ? tBoden : Infinity, koerper);
+      const t = flaeche.abstand;
+      if (isFinite(t)) {
         const hitX = origin.x + dir.x * t;
         const hitZ = origin.z + dir.z * t;
-        f.floorSpot.position.set(hitX, 0.01, hitZ);
-        f.spotTarget.position.set(hitX, 0.0, hitZ);
-        // VIZ-BEAM-OCCLUSION (Teil 1): den sichtbaren Kegel AM BODEN ENDEN
-        // lassen. Er hatte eine feste Laenge und schoss deshalb durch den
-        // Boden hindurch — bei einem tief stehenden Scheinwerfer ragte ein
-        // Meter Licht unter die Buehne. `t` ist der Abstand bis zum
-        // Auftreffpunkt und wird hier ohnehin schon gerechnet; die
-        // Kegel-Laenge daraus abzuleiten kostet also nichts.
-        bodenAbstand = t;
+        // Der Lichtfleck gehoert auf die getroffene FLAECHE — auf das Podest,
+        // nicht auf den Boden darunter. Sonst leuchtet die Ansicht eine Stelle
+        // aus, die in Wahrheit im Schatten des Podests liegt.
+        f.floorSpot.position.set(hitX, flaeche.y + 0.01, hitZ);
+        f.spotTarget.position.set(hitX, flaeche.y, hitZ);
+        // VIZ-BEAM-OCCLUSION: den sichtbaren Kegel an der getroffenen FLAECHE
+        // enden lassen. Er hatte eine feste Laenge und schoss deshalb hindurch
+        // — Teil 1 stoppte ihn am Boden, Teil 2 zusaetzlich am ersten
+        // Buehnenkoerper. `t` wird hier ohnehin gerechnet; die Kegel-Laenge
+        // daraus abzuleiten kostet nichts.
+        auftreffAbstand = t;
       }
     }
   }
@@ -1263,11 +1353,11 @@ function applyFloorAim(f, dmx) {
   // Bodenfleck und ohne Auftreffpunkt. Vorher hing sie im innersten Zweig und
   // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
   // eine Laenge gesetzt.
-  setBeamLength(f, bodenAbstand);
+  setBeamLength(f, auftreffAbstand);
   // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher einen
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
-  syncPoolSize(f, bodenAbstand);
+  syncPoolSize(f, auftreffAbstand);
 }
 
 // Keep top-down icon position synced
