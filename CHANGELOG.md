@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Zwei Strobe-Taster hängen sich nicht mehr auf
+
+#### Behoben
+
+- **Zwei Tasten, die dasselbe schalten, kommen sich nicht mehr in die Quere.**
+  Wurden zwei Strobe-Taster auf dem MIDI-Controller schnell hintereinander oder
+  gleichzeitig gedrückt, blieb der Strobe hängen — und nur „Programmer leeren"
+  half. Grund: jede Taste merkte sich für sich, was sie beim Drücken vorfand.
+  Die zweite Taste sah deshalb nicht den Ruhezustand, sondern den bereits
+  laufenden Strobe der ersten — und stellte ihn beim Loslassen wieder her,
+  statt aufzuräumen.
+
+  Jetzt merken sich alle Tasten den Ruhezustand gemeinsam: Loslassen gibt an die
+  noch gedrückte Nachbartaste zurück, und erst die letzte stellt den
+  ursprünglichen Zustand wieder her. Dasselbe gilt für schnelles Doppeldrücken
+  einer einzelnen Taste.
+
+- **„Programmer leeren" bleibt geleert, auch wenn noch eine Taste gedrückt ist.**
+  Bisher schrieb das Loslassen einer noch gehaltenen Flash-Taste den alten Wert
+  zurück — die Rettung wurde also gleich wieder halb rückgängig gemacht. Das
+  gilt genauso für Werte, die währenddessen von Hand oder über eine Palette
+  gesetzt wurden: der neuere Wert bleibt jetzt stehen.
+
 ### 2026-08-01 — Lichtkegel einzelner Geräte ausblenden
 
 #### Neu

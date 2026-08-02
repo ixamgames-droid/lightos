@@ -110,9 +110,53 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    einzige Rettung**, was nahelegt, dass die hängenden Werte IM Programmer
    liegen — und dass „leeren" sie nur manchmal erwischt, ist dann derselbe
    Befund von der anderen Seite. Erst headless reproduzieren, dann fixen.
-8. **BUG-MIDI-STROBE (P1, David 2026-08-01)** — **zwei Strobe-Taster auf dem
-   MIDI-Controller mehrfach schnell hintereinander/gleichzeitig gedrückt →
-   sie „hängen sich auf"; nur ein Clear Programmer löst es.** Das ist der
+   **★ Erste harte Spur aus BUG-MIDI-STROBE (2026-08-02):** eine der Quellen ist
+   gefunden und geschlossen — hielt David eine Flash-/Strobe-Taste noch, während
+   er „Programmer leeren" drückte, **schrieb ihr Loslassen den Wert von vor dem
+   Druck wieder in den Programmer**. Das Leeren war also nicht unvollständig,
+   sondern wurde danach teilweise rückgängig gemacht; „hat manchmal nicht alles
+   geleert" ist genau die Beschreibung, die dabei herauskommt. Behoben über die
+   Übernahme-Erkennung des Ruhewert-Registers (`vc_button.py`), Test
+   `test_clear_programmer_waehrend_gehalten_kommt_nicht_zurueck`. **Damit ist das
+   Item NICHT erledigt** — die anderen Quellen (Paletten, `attr#N`-Werte pro
+   Kopf, gleichzeitig laufende Effekte, VC-Farbtasten) sind noch nicht gemessen.
+8. ✅ **BUG-MIDI-STROBE — GEFIXT (2026-08-02).** **Es war keine Thread-Race,
+   sondern ein Buchhaltungsfehler pro Taste.** Jeder Flash-/Toggle-Taster merkte
+   sich den Programmer-Wert, den er beim Druck vorfand, ganz für sich
+   (`VCButton._snap_prev`). Drückt eine ZWEITE Taste denselben Kanal, während die
+   erste noch hält, sieht sie als „vorher" nicht den Ruhezustand, sondern den
+   bereits gesetzten Strobe-Wert der ersten — und ihr Loslassen **schreibt ihn
+   zurück, statt zu räumen.** Genau das ist Davids „sie hängen sich auf", und
+   genau deshalb half nur Clear Programmer: der Wert lag im Programmer, nicht im
+   Taster. Dieselbe Mechanik traf ein zweites `note_on` ohne dazwischenliegendes
+   `note_off` (schnelles Doppeldrücken, verschlucktes Release) — dort merkte sich
+   die Taste ihren EIGENEN gerade gesetzten Wert als Ruhewert.
+   **Fix:** ein gemeinsames **Ruhewert-Register** in `vc_button.py` (Ruhewert je
+   Kanal + Halter-Stapel in Druckreihenfolge): der Ruhewert wird EINMAL vom
+   ersten Halter erfasst, ein mittleres Loslassen gibt an den obersten
+   verbliebenen Halter zurück (löscht also den noch gehaltenen Strobe des
+   Nachbarn nicht), und erst der letzte stellt den Ruhezustand wieder her.
+   Dazu zwei Härtungen, die beim Bauen aufliefen: (a) **Übernahme-Erkennung** —
+   zeigt der Kanal nicht mehr, was das Register zuletzt geschrieben hat (Clear
+   Programmer, Palette, Handwert, Show-Load), ist der gemerkte Ruhewert überholt
+   und wird verworfen statt geschrieben; ohne das hätte ausgerechnet Davids
+   Rettung „Programmer leeren" den alten Wert beim Loslassen wieder
+   hereingeholt. (b) **Waisen-Übergabe** — verschwindet ein Halter, ohne
+   zurückzunehmen (Snap neu zugewiesen, Widget zerstört), erbt der nächste
+   Taster nicht den hängenden Wert, sondern den echten Ruhewert und kann ihn
+   auflösen. Threading geprüft, nicht angenommen: MIDI kommt im Fremd-Thread an,
+   wird aber über `VCCanvas._midi_received` (QueuedConnection) in den UI-Thread
+   gereicht — das Register braucht deshalb keinen Lock (im Code vermerkt).
+   `tests/test_vc_snap_flash_overlap.py` (12) misst das VERHÄLTNIS mehrerer
+   Tasten über eine Druckfolge, nicht einzelne Tasten; per Mutation in drei
+   Richtungen gegengeprüft (gemeinsames Register aus → 5 rot, Waisen-Übergabe
+   aus → 2 rot, Nachbar-Rückgabe aus → 2 rot). Nebenbefund: der bestehende
+   `test_vc_library_snap.py::test_toggle_mode_on_off` wurde durch das
+   Modul-Register kurzzeitig reihenfolge-abhängig — die Übernahme-Erkennung löst
+   auch das, ein Test-eigener Register-Reset war dafür **nicht** nötig (und wurde
+   deshalb wieder entfernt, statt totes API stehenzulassen).
+   **Offen bleibt die Rig-Abnahme:** headless bewiesen, am echten APC mini noch
+   nicht nachgespielt. — _Ursprüngliche Analyse:_ Das ist der
    konkreteste der gemeldeten Fehler und riecht nach einer **Race-Bedingung
    zwischen MIDI-Thread und UI-Thread**: MIDI läuft in einem Fremd-Thread und
    MUSS per Qt-Signal in den UI-Thread (s. [[entry_midi_osc_timecode_input]]) —

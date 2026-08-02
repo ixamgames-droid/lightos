@@ -1642,6 +1642,11 @@ class VCCanvas(QWidget):
             btn.snap_id = sid
             btn.snap_ids = []
         btn._snap_active = False
+        # BUG-MIDI-STROBE: beim Neu-Zuweisen eines Snaps auch den Anspruch im
+        # gemeinsamen Ruhewert-Register abmelden — sonst haelt diese Taste den
+        # Ruhewert der alten Kanaele fest, obwohl sie sie nicht mehr schreibt.
+        from .vc_button import forget_snap_claims
+        forget_snap_claims(btn)
         btn._snap_prev = {}
         try:
             from src.core.engine.snap_library import get_snap_library

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import json
+import weakref
 from src.core.paths import app_data_dir
 from enum import Enum
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
@@ -15,6 +16,181 @@ from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
 from src.core.show import vc_assets   # VC-IMG: Button-Hintergrundbild/GIF-Assets
 
 _SNAPSHOTS_FILE = os.path.join(app_data_dir(), "snapshots.json")
+
+
+# ── Flash-/Toggle-Ruhewert-Register (BUG-MIDI-STROBE) ────────────────────────
+# Mehrere VC-Tasten koennen DIESELBEN (fid, attribut) in den Programmer schreiben
+# und beim Loslassen wieder zuruecknehmen wollen. Ohne gemeinsames Register
+# erfasst jede Taste den Ruhewert fuer sich — und wer als ZWEITER drueckt, sieht
+# als "vorher" nicht mehr den Ruhezustand, sondern den bereits gesetzten Wert des
+# ersten Tasters. Sein Loslassen SCHREIBT diesen Wert dann zurueck, statt zu
+# raeumen: der Strobe haengt, und nur „Programmer leeren" loest ihn.
+# (Davids Meldung 2026-08-01: zwei Strobe-Taster schnell/gleichzeitig gedrueckt.)
+#
+# Das Register haelt pro Schluessel EINEN Ruhewert — den des ERSTEN Halters — und
+# einen Stapel der aktuellen Halter in Druckreihenfolge. Erst wenn der letzte
+# loslaesst, wird der Ruhewert wiederhergestellt; laesst ein mittlerer los, gilt
+# wieder der Wert des obersten verbliebenen Halters.
+#
+# Bewusst MODUL-Funktionen und kein neues Pflichtfeld auf ``self``: Bestandstests
+# fahren VCButton-Methoden auf ``SimpleNamespace``-Stubs, wo ein neues Attribut
+# still im ``except`` des Aufrufers verschwaende
+# (Second Brain: reference_lightos_trap_stub_state_attributes).
+#
+# OHNE Lock, und das ist geprueft, nicht angenommen: MIDI kommt im Fremd-Thread an,
+# wird aber ueber ein Cross-Thread-Signal (`VCCanvas._midi_received` ->
+# QueuedConnection, `vc_canvas.py`) in den UI-Thread gereicht. Alle Zugriffe hier
+# laufen damit im UI-Thread. Sollte je ein Pfad direkt aus dem MIDI-Thread hierher
+# zeigen, braucht dieses Register einen Lock — die Lese-Aendere-Schreib-Folgen
+# unten sind nicht atomar.
+_snap_baseline: dict[tuple[int, str], int | None] = {}
+_snap_stack: dict[tuple[int, str], list[tuple[weakref.ref, int]]] = {}
+# Verwaiste Ruhewerte: ein Halter verschwindet, OHNE seinen Wert zurueckzunehmen
+# (Snap neu zugewiesen, Show neu geladen, Widget zerstoert). Sein Flash-Wert steht
+# dann im Programmer und niemand raeumt ihn je weg — genau die Klasse, die David
+# nur mit „Programmer leeren" losbekommt. Der Ruhewert darf hier NICHT mit
+# verfallen, sonst erbt der naechste Taster den verwaisten Wert als „vorher" und
+# schreibt ihn beim Loslassen fest. Gemerkt wird deshalb Ruhewert UND der zuletzt
+# geschriebene Wert; geerbt wird nur, solange genau dieser Wert unveraendert im
+# Programmer steht (s. ``_snap_adopt``).
+_snap_orphan: dict[tuple[int, str], tuple[int | None, int]] = {}
+
+
+def _snap_forsake(key, stack) -> None:
+    """Gibt ``key`` auf, ohne zu schreiben — der oberste Wert bleibt verwaist stehen."""
+    if stack:
+        _snap_orphan[key] = (_snap_baseline.get(key), stack[-1][1])
+    _snap_stack.pop(key, None)
+    _snap_baseline.pop(key, None)
+
+
+def _snap_adopt(key, current: int | None) -> int | None:
+    """Ruhewert fuer einen Kanal, den gerade niemand haelt.
+
+    Steht dort noch unveraendert der verwaiste Wert eines verschwundenen Halters,
+    ist der Ruhezustand der von VOR jenem Druck — nur so kann der naechste Taster
+    den haengenden Wert ueberhaupt noch aufloesen. Hat inzwischen jemand anderes
+    den Kanal angefasst (manuell, Palette, Show-Load mit „Programmer leeren"),
+    ist dessen Wert der Ruhezustand und die Waise gegenstandslos.
+    """
+    base, written = _snap_orphan.pop(key, (None, None))
+    if written is not None and current == written:
+        return base
+    return current
+
+
+def _snap_prune(key) -> list | None:
+    """Haltestapel von ``key`` um gestorbene Widgets bereinigen.
+
+    Gibt den lebenden Stapel zurueck oder ``None``, wenn niemand (mehr) haelt —
+    ein zerstoertes Widget kann nicht mehr zuruecknehmen, sein Wert wird also zur
+    Waise (statt den Ruhewert einfach zu verlieren).
+    """
+    stack = _snap_stack.get(key)
+    if stack is None:
+        return None
+    alive = [(ref, val) for (ref, val) in stack if ref() is not None]
+    if alive:
+        _snap_stack[key] = alive
+        return alive
+    _snap_forsake(key, stack)
+    return None
+
+
+def _snap_discard(key) -> None:
+    """Loescht alles, was das Register ueber ``key`` weiss (ohne zu schreiben)."""
+    _snap_stack.pop(key, None)
+    _snap_baseline.pop(key, None)
+    _snap_orphan.pop(key, None)
+
+
+def _snap_stale(stack, current: int | None) -> bool:
+    """Zeigt der Kanal noch, was das Register zuletzt geschrieben hat?
+
+    Wenn nicht, hat ihn jemand ANDERES uebernommen — „Programmer leeren", eine
+    Palette, ein Handwert, ein Show-Load. Dann ist der gemerkte Ruhewert
+    ueberholt: ihn beim Loslassen zurueckzuschreiben brachte genau den Wert
+    zurueck, den David gerade weggeraeumt hat. Der Ruhewert wird deshalb
+    verworfen statt geschrieben.
+    """
+    return bool(stack) and current != stack[-1][1]
+
+
+def _snap_claim(owner, key, current: int | None, value: int) -> int | None:
+    """Meldet ``owner`` als Halter von ``key`` an; liefert den Ruhewert.
+
+    ``current`` = was gerade im Programmer steht. Es wird als Ruhewert genommen,
+    wenn niemand haelt; haelt schon jemand, ist der sichtbare Wert dessen Wert und
+    taugt nicht als Ruhewert. Ein erneuter Anspruch desselben Tasters (zweites
+    note_on ohne dazwischenliegendes note_off) ruckt ihn nur an die Spitze, ohne
+    den Ruhewert anzufassen.
+    """
+    stack = _snap_prune(key)
+    if _snap_stale(stack, current):
+        _snap_discard(key)
+        stack = None
+    if stack is None:
+        _snap_baseline[key] = _snap_adopt(key, current)
+        stack = _snap_stack[key] = []
+    stack[:] = [(ref, val) for (ref, val) in stack if ref() is not owner]
+    stack.append((weakref.ref(owner), int(value)))
+    return _snap_baseline[key]
+
+
+def _snap_release(owner, key, current: int | None) -> tuple[str, int | None]:
+    """Meldet ``owner`` ab und sagt, was mit dem Kanal zu geschehen hat.
+
+    ``("restore", ruhewert)`` — Ruhezustand wiederherstellen (``None`` = der Wert
+                                war vorher ueberhaupt nicht gesetzt → loeschen).
+    ``("reapply", wert)``     — ein anderer Taster haelt noch, sein Wert gilt wieder.
+    ``("drop", None)``        — NICHTS schreiben: der Kanal gehoert inzwischen
+                                jemand anderem (oder gar niemandem mehr).
+    """
+    stack = _snap_prune(key)
+    if stack is not None and any(ref() is owner for (ref, _v) in stack):
+        if _snap_stale(stack, current):
+            kept = [(r, v) for (r, v) in stack if r() is not owner]
+            if kept:
+                _snap_stack[key] = kept
+            else:
+                _snap_discard(key)
+            return ("drop", None)
+        stack[:] = [(ref, val) for (ref, val) in stack if ref() is not owner]
+        if stack:
+            return ("reapply", stack[-1][1])
+        base = _snap_baseline.pop(key, None)
+        _snap_stack.pop(key, None)
+        _snap_orphan.pop(key, None)   # Kanal ist wieder im Ruhezustand
+        return ("restore", base)
+    # ``owner`` haelt nicht (mehr) — Anspruch unterwegs verloren (Show-Neuladen,
+    # Snap-Wechsel). Steht sein Wert unveraendert als Waise im Programmer, raeumt
+    # er ihn trotzdem weg; sonst nicht anfassen.
+    base, written = _snap_orphan.get(key, (None, None))
+    if written is not None and current == written:
+        _snap_orphan.pop(key, None)
+        return ("restore", base)
+    return ("drop", None)
+
+
+def forget_snap_claims(owner) -> None:
+    """Verwirft alle Anspruechen von ``owner``, OHNE Werte zu schreiben.
+
+    Fuer Show-Neuladen und Neu-Zuweisung eines Snaps: dort schreibt die Taste die
+    Kanaele nicht mehr, ein Restore aus altem Zustand waere hier gerade falsch
+    (der Show-Load leert den Programmer ohnehin selbst, `show_file.py`).
+    War ``owner`` der letzte Halter, bleibt sein Wert als Waise vermerkt — damit
+    der naechste Taster ihn aufloesen kann statt ihn zu erben.
+    """
+    for key in list(_snap_stack):
+        stack = _snap_stack.get(key)
+        if stack is None:
+            continue
+        kept = [(ref, val) for (ref, val) in stack
+                if ref() is not owner and ref() is not None]
+        if kept:
+            _snap_stack[key] = kept
+        else:
+            _snap_forsake(key, stack)
 
 # Quadratische Standard-Groesse fuer NEU angelegte Buttons (Pad-Look wie im
 # Demo-Show-Generator, PAD=56 → hier etwas grosszuegiger fuer Hand-Platzierung).
@@ -516,30 +692,52 @@ class VCButton(VCWidget):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            self._snap_prev = {}
+            # BUG-MIDI-STROBE: den Ruhewert bestimmt NICHT mehr die einzelne
+            # Taste, sondern das gemeinsame Register. Sonst sieht die ZWEITE
+            # Taste als "vorher" den bereits gesetzten Wert der ersten und
+            # schreibt ihn beim Loslassen fest — der Strobe haengt, und nur
+            # „Programmer leeren" loest ihn. Dasselbe gilt fuer ein zweites
+            # note_on ohne dazwischenliegendes note_off (schnelles
+            # Doppeldruecken, verschlucktes Release).
+            prev = dict(getattr(self, "_snap_prev", None) or {})
             for snap in snaps:
                 for fid, attrs in snap.values.items():
                     for attr, val in attrs.items():
                         fid_i = int(fid)
                         key = (fid_i, attr)
-                        if key not in self._snap_prev:
-                            self._snap_prev[key] = state.get_programmer_value(fid_i, attr)
-                        state.set_programmer_value(fid_i, attr, int(val))
+                        val_i = max(0, min(255, int(val)))
+                        current = state.get_programmer_value(fid_i, attr)
+                        prev[key] = _snap_claim(self, key, current, val_i)
+                        state.set_programmer_value(fid_i, attr, val_i)
+            self._snap_prev = prev
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
 
     def _restore_library_snap(self):
-        """Stellt die vor dem Snap aktiven Programmer-Werte wieder her."""
-        if not self._snap_prev:
+        """Stellt die vor dem Snap aktiven Programmer-Werte wieder her.
+
+        Haelt ein ANDERER Taster denselben Kanal noch gedrueckt, wird nicht der
+        Ruhewert geschrieben, sondern dessen Wert wieder gueltig gemacht — sonst
+        loescht das Loslassen der einen Taste den noch gehaltenen Strobe der
+        anderen (BUG-MIDI-STROBE).
+        """
+        prev = getattr(self, "_snap_prev", None) or {}
+        if not prev:
             return
         try:
             from src.core.app_state import get_state
             state = get_state()
-            for (fid, attr), old in self._snap_prev.items():
-                if old is None:
+            for (fid, attr) in list(prev):
+                current = state.get_programmer_value(fid, attr)
+                what, value = _snap_release(self, (fid, attr), current)
+                if what == "drop":
+                    continue          # Kanal gehoert inzwischen jemand anderem
+                if what == "reapply":
+                    state.set_programmer_value(fid, attr, int(value))
+                elif value is None:
                     state.clear_programmer_value(fid, attr)
                 else:
-                    state.set_programmer_value(fid, attr, int(old))
+                    state.set_programmer_value(fid, attr, int(value))
         except Exception as e:
             print(f"[VCButton] Snap-Restore-Fehler: {e}")
         finally:
@@ -2253,7 +2451,10 @@ class VCButton(VCWidget):
         # VCB-18: Laufzeit-Snap-Toggle-Zustand zuruecksetzen. Wird eine Show neu
         # geladen, waehrend ein LIBRARY_SNAP-Toggle aktiv war, schriebe der naechste
         # Druck sonst ueber stale _snap_prev alte DMX-Werte in den Programmer.
+        # BUG-MIDI-STROBE: den Anspruch auch im gemeinsamen Register abmelden,
+        # sonst blockiert diese Taste den Ruhewert fuer alle anderen weiter.
         self._snap_active = False
+        forget_snap_claims(self)
         self._snap_prev = {}
         self.long_press_editor = bool(d.get("long_press_editor", False))
         # VC-IMG: Hintergrundbild/GIF-Key (leer/None -> kein Bild). Medien werden
