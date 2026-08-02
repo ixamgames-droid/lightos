@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (
     QFormLayout, QGroupBox, QLineEdit, QPlainTextEdit,
     QScrollArea, QDialog
 )
-from src.core.engine.effect_layers import EffectLayer, LayerType
+from src.core.engine.effect_layers import (EffectLayer, LayerType,
+                                           offered_types, used_fields)
 from src.core.engine.effect_func import LayeredEffect
 from src.ui.weak_slots import weak_slot_fwd
 
@@ -80,7 +81,10 @@ class EffectLayerEditor(QWidget):
         # Layer-Liste + Add
         add_row = QHBoxLayout()
         self._add_combo = QComboBox()
-        for lt in LayerType:
+        # BH-PHASEOFF: PHASE_OFFSET wird nicht mehr angeboten — er war immer ein
+        # No-Op, und was er verspricht kann „Phase je Gerät" auf jedem
+        # schwingenden Layer bereits (s. effect_layers.offered_types).
+        for lt in offered_types():
             self._add_combo.addItem(lt.value, lt)
         btn_add = QPushButton("+ Layer hinzufügen")
         btn_add.clicked.connect(self._add_layer)
@@ -148,14 +152,23 @@ class EffectLayerEditor(QWidget):
                          (self._spin_fphase, "fixture_phase_step")]:
             sp.valueChanged.connect(weak_slot_fwd(self._set_layer_prop, attr))
 
-        self._props_form.addRow("Amplitude:", self._spin_amp)
-        self._props_form.addRow("Frequency (Hz):", self._spin_freq)
-        self._props_form.addRow("Phase (0-1):", self._spin_phase)
-        self._props_form.addRow("Offset:", self._spin_offset)
-        self._props_form.addRow("Value:", self._spin_value)
-        self._props_form.addRow("Min:", self._spin_min)
-        self._props_form.addRow("Max:", self._spin_max)
-        self._props_form.addRow("Phase/Fixture (rad):", self._spin_fphase)
+        # BH-PHASEOFF: Zeile je Feld merken, damit nur die SICHTBAR sind, die
+        # der gewaehlte Layer-Typ wirklich auswertet (s. _sync_prop_rows).
+        self._prop_rows: dict = {}
+        for beschriftung, spin, attr in [
+                ("Amplitude:", self._spin_amp, "amplitude"),
+                ("Frequenz (Hz):", self._spin_freq, "frequency"),
+                ("Phase (0-1):", self._spin_phase, "phase"),
+                ("Offset:", self._spin_offset, "offset"),
+                ("Wert:", self._spin_value, "value"),
+                ("Min:", self._spin_min, "min_val"),
+                ("Max:", self._spin_max, "max_val"),
+                ("Phase je Gerät (rad):", self._spin_fphase, "fixture_phase_step")]:
+            self._props_form.addRow(beschriftung, spin)
+            self._prop_rows[attr] = spin
+        self._spin_fphase.setToolTip(
+            "Verschiebt die Welle pro Gerät — daraus entsteht der Lauf bzw. "
+            "Fächer über die Geräteliste. 0 = alle Geräte schwingen gleich.")
         layout.addWidget(self._props)
 
         # Transport
@@ -271,8 +284,24 @@ class EffectLayerEditor(QWidget):
             return self._effect.layers[idx]
         return None
 
+    def _sync_prop_rows(self, layer):
+        """Nur die Felder zeigen, die dieser Layer-Typ wirklich auswertet.
+
+        BH-PHASEOFF: vorher standen bei JEDEM Layer alle acht da — ein Clamp bot
+        Amplitude und Frequenz an, die es nie liest. Ein Feld, das nichts tut,
+        behauptet Wirkung. Ausgeblendet statt nur deaktiviert: eine deaktivierte
+        Zeile sieht im App-Stylesheet aus wie eine bedienbare (Fallenklasse 12).
+        """
+        benutzt = used_fields(getattr(layer, "type", None)) if layer else set()
+        for attr, spin in getattr(self, "_prop_rows", {}).items():
+            try:
+                self._props_form.setRowVisible(spin, attr in benutzt)
+            except (AttributeError, RuntimeError):
+                spin.setVisible(attr in benutzt)   # sehr alte Qt-Fassung
+
     def _on_select(self, _idx: int):
         layer = self._current_layer()
+        self._sync_prop_rows(layer)
         if not layer:
             return
         for sp, attr in [(self._spin_amp, "amplitude"),

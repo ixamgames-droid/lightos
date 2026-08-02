@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Der Layer-Editor zeigt nur noch, was wirklich wirkt
+
+#### Behoben
+
+- **Ein Layer zeigte alle acht Einstellfelder — egal, ob er sie benutzt.** Ein
+  Begrenzer-Layer bot Amplitude und Frequenz an, obwohl er beides nie liest.
+  Jetzt stehen pro Layer nur die Felder da, die tatsächlich etwas bewirken.
+
+- **Der Layer-Typ „PhaseOffset" tat nichts** und wird nicht mehr zur Auswahl
+  angeboten. Was er versprach — die Welle pro Gerät versetzen, also ein Lauf
+  oder Fächer über die Geräte — kann das Feld **„Phase je Gerät"** auf jedem
+  schwingenden Layer schon immer; es heißt jetzt so und erklärt sich per
+  Mauszeiger.
+
+  Bestehende Shows mit so einem Layer öffnen unverändert; an ihrem Verhalten
+  ändert sich nichts (er tat vorher nichts und tut weiterhin nichts).
+
 ### 2026-08-02 — Freeze hält jetzt wirklich alles an
 
 #### Geändert

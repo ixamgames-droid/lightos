@@ -26,6 +26,63 @@ class LayerType(Enum):
     MAP       = "Map"         # f(in) = map(in, in_min, in_max, out_min, out_max)
 
 
+# Schwingende Layer — nur sie werten Amplitude/Frequenz/Phase aus.
+_OSZILLATOREN = (LayerType.SIN, LayerType.COS, LayerType.TRIANGLE,
+                 LayerType.SAW, LayerType.SQUARE)
+
+# WELCHE Felder benutzt `EffectLayer.process` je Typ wirklich? Direkt aus dem
+# Code darunter abgelesen, nicht aus der UI geraten.
+#
+# BH-PHASEOFF: Der Editor zeigte bisher ALLE acht Felder fuer JEDEN Layer — ein
+# Clamp bot Amplitude und Frequenz an, die es nie liest. Ein Bedienfeld, das
+# nichts tut, ist dieselbe Klasse wie ein Knopf, der nichts tut: es meldet
+# Wirkung, wo keine ist. Diese Karte ist die eine Quelle dafuer, was der Editor
+# zeigt — sie steht bewusst HIER neben ``process`` und nicht in der View, damit
+# beim naechsten Layer-Typ auffaellt, dass sie mitgepflegt werden muss.
+_FELDER: dict = {
+    LayerType.CONSTANT: {"value"},
+    LayerType.RANDOM:   {"amplitude", "offset"},
+    LayerType.RAMP:     {"frequency", "min_val", "max_val"},
+    LayerType.MULTIPLY: {"amplitude"},
+    LayerType.ADD:      {"offset"},
+    LayerType.CLAMP:    {"min_val", "max_val"},
+    # MAP zweckentfremdet offset/value als Ausgangsbereich (s. process).
+    LayerType.MAP:      {"min_val", "max_val", "offset", "value"},
+    # PHASE_OFFSET ist ein No-Op (s. u.) — es gibt nichts einzustellen.
+    LayerType.PHASE_OFFSET: set(),
+}
+for _lt in _OSZILLATOREN:
+    _FELDER[_lt] = {"amplitude", "frequency", "phase", "offset",
+                    "fixture_phase_step"}
+
+
+def used_fields(layer_type: LayerType) -> set:
+    """Felder, die ``process`` fuer diesen Layer-Typ tatsaechlich auswertet.
+
+    Reine Funktion, damit die Zuordnung ohne gebaute View pruefbar ist — und
+    damit ein Test sie gegen die echten Typen halten kann.
+    """
+    return set(_FELDER.get(layer_type, set()))
+
+
+def offered_types() -> list:
+    """Layer-Typen, die dem Nutzer zur Auswahl gestellt werden.
+
+    **Ohne ``PHASE_OFFSET``** (BH-PHASEOFF): der Layer gibt seinen Eingang
+    unveraendert zurueck und war damit immer schon wirkungslos. Was er
+    verspricht — die Welle pro Geraet verschieben, also Lauf/Faecher — kann das
+    Feld ``fixture_phase_step`` auf JEDEM schwingenden Layer bereits, und zwar
+    seit jeher (``phase_rad`` in ``process``). Ihn „richtig" zu implementieren
+    haette einen ZWEITEN Weg zum selben Ziel gebaut und die Signatur der ganzen
+    Pipeline geaendert.
+
+    Der Typ bleibt im Enum und in ``from_dict``: Bestands-Shows, die ihn
+    gespeichert haben, laden unveraendert weiter (er tut dort weiterhin nichts —
+    aber er tat auch vorher nichts, das Verhalten aendert sich also nicht).
+    """
+    return [lt for lt in LayerType if lt is not LayerType.PHASE_OFFSET]
+
+
 @dataclass
 class EffectLayer:
     """Ein Layer in der Effect-Pipeline."""
