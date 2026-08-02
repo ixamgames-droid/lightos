@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — „Alles Weiß" sagt, wie viel es erreicht
+
+#### Behoben
+
+- **Ein „Alles Weiß"-Taster ohne hinterlegte Szene war ein stummer Klick.** Er
+  sank ein und leuchtete auf wie jeder andere Knopf — es passierte nur nichts.
+  Jetzt steht **„⚠ nicht belegt"** auf der Taste, mit gestricheltem Warnrahmen.
+
+- **Eine ältere Weiß-Szene deckt oft nicht mehr das ganze Rig ab.** Kommen
+  Geräte dazu, bleiben sie beim Druck dunkel — am Rig sieht das aus wie ein
+  kaputter Knopf. Die Taste zeigt deshalb jetzt **„⚠ 4/12 Geräte"**, sobald ihre
+  Szene nicht mehr alle gepatchten Geräte erreicht. Deckt sie alles ab, steht
+  nichts da.
+
+  Lässt sich nicht sicher bestimmen, was eine hinterlegte Funktion anfasst (etwa
+  bei Matrix-Effekten, die ihre Ziele erst beim Laufen ausrechnen), wird
+  **keine** Zahl angezeigt — lieber kein Hinweis als ein geratener.
+
+  Am Verhalten der Taste ändert sich nichts; sie sagt nur, was sie tut.
+
 ### 2026-08-02 — Der Löschen-Knopf sagt, wie weit er reicht
 
 #### Behoben

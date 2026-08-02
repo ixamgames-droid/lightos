@@ -460,6 +460,49 @@ class VCButton(VCWidget):
                 ids.append(iv)
         return ids
 
+    def _coverage_hint(self) -> str | None:
+        """Warnzeile fuer „Alles Weiß" — oder ``None``, wenn es nichts zu sagen gibt.
+
+        BUG-FBW (David 2026-08-01: „Alles Weiß macht nicht alles weiß"). Der Knopf
+        setzt nichts selbst, er startet die an ihn GEBUNDENE Weiss-Szene. Er kann
+        deshalb auf zwei Arten still zu wenig tun: ohne Bindung passiert gar
+        nichts, und eine Szene aus einer Zeit mit weniger Geraeten deckt nur die
+        damaligen ab. Beides sieht am Rig gleich aus — „der Knopf geht nicht".
+
+        Der Knopf sagt es jetzt selbst, statt Erfolg zu melden:
+        ``"⚠ nicht belegt"`` bzw. ``"⚠ 4/12 Geräte"``.
+
+        **Nichts anzeigen ist besser als etwas raten:** laesst sich die Abdeckung
+        einer Bindung nicht bestimmen (Matrix-Effekt, EFX, Skript — die rechnen
+        ihre Ziele erst zur Laufzeit aus), gibt es keine Zahl. Siehe
+        ``core.engine.function_coverage``.
+
+        Bewusst OHNE Cache: ein privater Cache auf einem Paint-Pfad geht bei
+        Live-Re-Patch still veraltet (Lehre FM-16b-Preview), und die Rechnung ist
+        billig — ein Dict-Lookup je Bindung plus ein Durchlauf ueber die
+        Szenen-Werte, und das nur fuer diese eine Aktion.
+        """
+        if self.action != ButtonAction.ALL_WHITE:
+            return None
+        fids = self._all_function_ids()
+        if not fids:
+            return "⚠ nicht belegt"
+        try:
+            from src.core.app_state import get_state
+            from src.core.engine.function_coverage import coverage_of_bindings
+            state = get_state()
+            gedeckt = coverage_of_bindings(fids, state.function_manager.get)
+            if gedeckt is None:
+                return None                      # nicht bestimmbar -> nichts behaupten
+            gepatcht = {f.fid for f in state.get_patched_fixtures()}
+            fehlend = gepatcht - gedeckt
+            if not fehlend:
+                return None                      # deckt alles ab -> kein Hinweis
+            return f"⚠ {len(gepatcht) - len(fehlend)}/{len(gepatcht)} Geräte"
+        except Exception as e:
+            print(f"[VCButton] coverage hint error: {e}")
+            return None
+
     def _all_snap_ids(self) -> list[int]:
         """Alle gekoppelten Bibliothek-Snap-IDs (snap_id + snap_ids),
         snap_id zuerst, dedupliziert. Leer = keine Snap-Bindung."""
@@ -1640,6 +1683,10 @@ class VCButton(VCWidget):
         # sein Effekt laeuft — nicht nur waehrend des Drucks. Sonst sah es aus, als
         # liefe nichts mehr, obwohl die Geraete sich noch bewegten (Anzeige-Desync).
         func_on = self._function_running()
+        # BUG-FBW: Ein Panik-Knopf, der nichts (oder zu wenig) tut, muss das
+        # SAGEN — stiller Erfolg ist die schlimmste Variante. EINMAL bestimmen,
+        # unten zweimal genutzt (gestrichelter Rahmen + Zeile im Text).
+        warnung = self._coverage_hint()
         lit = self._pressed or snap_on or audio_on or func_on or action_on
         # 3D-/Haptik-Optik: plastische Taste (Verlauf + Bevel + Tiefe), die beim
         # Druck sichtbar einsinkt und aktiv leuchtet. ``face`` = obere Sichtflaeche;
@@ -1669,6 +1716,15 @@ class VCButton(VCWidget):
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRoundedRect(brect, br, br)
 
+        # BUG-FBW: gestrichelter Warnrahmen — auf Buehnendistanz erkennbar, ohne
+        # den Zustands-Rahmen zu verdraengen (der sagt „laeuft gerade", dieser
+        # sagt „wird nicht tun, was draufsteht"). Bewusst zusaetzlich zur
+        # Textzeile: Farbe allein traegt keine Bedeutung.
+        if warnung:
+            p.setPen(QPen(QColor("#ffb000"), 2, Qt.PenStyle.DashLine))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(brect, br, br)
+
         # MIDI-Learn-Arm: orange Rahmen
         if self._midi_armed:
             p.setPen(QPen(QColor("#ff8800"), 3))
@@ -1683,6 +1739,10 @@ class VCButton(VCWidget):
         display = self.caption
         if self.action == ButtonAction.SNAPSHOT and self.snapshot_index is not None:
             display += f"\n[Snap {self.snapshot_index + 1}]"
+        # Der Hinweis haengt am Text, damit er dieselbe Umbruch-/Zentrier-Logik
+        # erbt wie die Beschriftung.
+        if warnung:
+            display += f"\n{warnung}"
 
         # VC3D-03: Gobo-Icon und Farb-Badge liegen oben rechts. Ihre Geometrie
         # EINMAL bestimmen und die belegte rechte Spalte aus dem Text-Rechteck
