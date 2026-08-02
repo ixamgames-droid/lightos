@@ -133,8 +133,44 @@ geraten, sondern zum nächsten ausführbaren Eintrag gewechselt._
    sagen, wenn er nichts tut** — `ALL_WHITE` ohne Bindung ist heute ein
    stummer Klick, und das ist die schlimmste Variante: er meldet Erfolg.
 
-7. **BUG-CLEAR (P1, David 2026-08-01)** — **„Programmer leeren" hat manchmal
-   nicht alles geleert.** Aus demselben Betrieb wie BUG-FBW. Der Programmer ist
+7. ✅ **BUG-CLEAR — HAUPTURSACHE GEFUNDEN UND BEHOBEN (2026-08-02).** **Das
+   „manchmal" war die Auswahl.** Der Knopf im Programmer-Tab hatte immer schon
+   ZWEI Reichweiten: `ProgrammerView._clear_programmer` verzweigt auf
+   `_selected_fids` — ohne Auswahl leert er alles, **mit** Auswahl nur diese
+   Geräte. Sein Hilfetext versprach dagegen „alle hier manuell gesetzten Werte",
+   und im Programmer ist fast immer etwas gewählt, weil man die Auswahl zum
+   Einstellen braucht. Gemessen an drei Movern mit je `intensity=200`: mit „nur
+   Gerät 1" gewählt bleiben Gerät 2 und 3 auf 200. Genau das beschreibt Davids
+   Satz wörtlich — und es ist **kein Race**, sondern ein zu großes Versprechen
+   (Fallenklasse 12: sichtbarer Zustand ≠ Logikzustand).
+   **Fix:** die Reichweite steht jetzt auf dem Knopf. Ohne Auswahl **„Alles
+   löschen"**, mit Auswahl **„Auswahl löschen (N)"**, Hilfetext wechselt mit und
+   sagt ausdrücklich, dass die übrigen scharf bleiben. Gehalten wird das an
+   `_rebuild_attr_editor` — dem gemeinsamen Punkt **beider** Auswahlwege (eigene
+   Liste UND fremdes `SELECTION_CHANGED` aus Gruppe/VC/Kommandozeile); die
+   Knopfbreite ist auf die längere Fassung genagelt, sonst hüpft die Toolbar.
+   Verhalten selbst **unverändert** — beide Reichweiten sind nützlich, falsch war
+   nur die Beschriftung.
+   **Gegenprobe mitgemessen:** der globale Weg (Menü, VC-Taste `CLEAR`) erwischt
+   wirklich alles, auch Werte **pro Kopf** (`attr#N`) und die über Web/OSC
+   gesetzten Roh-Kanäle (`clear_remote_input`, WEB-01).
+   **Zwei Entscheidungen auf Protokoll, beide mit Test:** (a) ist ein **Kopf**
+   gewählt, wird trotzdem das **ganze Gerät** geleert — die Kopf-Zeile ist eine
+   Verfeinerung der Geräteauswahl, und beim Aufräumen ist „mehr" die sichere
+   Richtung; (b) ein auswahlweiser Clear lässt **Roh-Kanäle stehen** (sie sind
+   nicht fid-basiert, ein Geräte-Clear kann sie gar nicht zuordnen) — seit der
+   Knopf „Auswahl löschen" heißt, verspricht er sie auch nicht mehr.
+   `tests/test_clear_programmer_scope.py` (10), Mutation in zwei Richtungen
+   gegengeprüft (Sync-Aufruf entfernt → 3 rot, Beschriftung wieder statisch → 4
+   rot). **Erste Quelle war BUG-MIDI-STROBE** (gehaltene Flash-Taste schrieb den
+   alten Wert nach dem Leeren zurück, [PR #543](https://github.com/ixamgames-droid/lightos/pull/543)).
+   **Was offen bleibt:** ob im Betrieb noch eine weitere Quelle auftaucht —
+   Paletten und VC-Farbtasten schreiben in denselben Programmer und sind damit
+   abgedeckt, ein **gleichzeitig laufender Effekt** dagegen füllt nach dem Leeren
+   sofort wieder (er ist kein Programmer-Wert, sieht am Rig aber genauso aus).
+   Das ist Verhalten, kein Fehler — falls David es als „nicht geleert" meldet,
+   gehört es zu BUG-FBW („Stop All" stoppt Effekte, „Löschen" nicht).
+   — _Ursprüngliche Analyse:_ Aus demselben Betrieb wie BUG-FBW. Der Programmer ist
    ein Akkumulator (jeder angefasste Kanal ist scharf, s.
    [[reference_programmer_save_scope]]) — die Frage ist also, ob „leeren" alle
    Quellen erwischt: manuell gesetzte Werte, per Palette/Snap geladene, per
