@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Geräte ins 3D ziehen
+
+#### Neu
+
+- **Geräte lassen sich aus der Liste in die 3D-Ansicht ziehen.** Beim Ziehen
+  zeigt der Geist, wo das Gerät landet und ob es an einer Traverse andockt —
+  losgelassen landet **genau das gezogene** Gerät dort.
+
+  Vorher ging Platzieren nur per Rechtsklick, und der setzte „das nächste noch
+  unplatzierte Gerät" — welches das war, stand nirgends. Der Rechtsklick-Weg
+  bleibt unverändert erhalten.
+
+  Ein bereits platziertes Gerät lässt sich auf dieselbe Art **verschieben**.
+
+  Ziehen funktioniert nur im **Bauen**-Modus. Im Ansehen-Modus zeigt der Zeiger,
+  dass hier nichts abgelegt werden kann — statt den Drop stillschweigend
+  verpuffen zu lassen.
+
 ### 2026-08-02 — Visualizer: zwei Modi statt drei
 
 #### Geändert

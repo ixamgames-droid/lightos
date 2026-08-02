@@ -53,6 +53,7 @@ import {
 } from './scene/render_loop.js';
 import { roomShellInfo } from './scene/room_shell.js';   // VIZ-14
 import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js';  // VIZ-14
+import { dropAllowed, pendingDragFid } from './interaction/drag_drop.js';  // VIZ-14 Drag
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
@@ -224,6 +225,10 @@ window.__lightos = {
   // VIZ-14: Raum-Huelle fuer Test/Diagnose sichtbar machen.
   roomShellInfo,
   placeGhostInfo, setPlaceableCount,
+  // VIZ-14 Drag-Haelfte: Test-Seam fuer den Zustand eines laufenden Drags.
+  // Der Drag selbst kommt von aussen (Qt) — pruefbar ist er nur ueber die
+  // echten dragover/drop-Ereignisse, nicht ueber eine Selbstauskunft.
+  dragDropAllowed: dropAllowed, pendingDragFid,
   __handlePointerDown: handlePointerDown,
   __handlePointerUp: handlePointerUp,
 };

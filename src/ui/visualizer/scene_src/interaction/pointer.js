@@ -29,6 +29,7 @@ import { floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho } from '../camera/cameras.js';
 import { requestRender } from '../scene/render_loop.js';
 import { updatePlaceGhost, hidePlaceGhost, placeGhostArmed } from './place_ghost.js';   // VIZ-14
+import { installDragDrop, setDragHelpers } from './drag_drop.js';   // VIZ-14 Drag-Haelfte
 
 export let isLeftDragging = false;
 let marqueeHadSelection = false;   // VIZ-14: s. handlePointerDown
@@ -125,6 +126,14 @@ export function _placeFixtureAtMouse() {
     bridge.placeFixture(JSON.stringify({ x: px, y: y, z: pz, dock: dock }));
   }
 }
+
+// VIZ-14 Drag-Haelfte: die Rechen-Helfer hier hineinreichen statt sie im
+// Drag-Modul zu wiederholen — EINE Quelle fuer Bodenpunkt, Raster und Andocken.
+setDragHelpers({
+  setMouseFromCoords, intersectGround, snap, findDockTarget, settings,
+  bridge: () => bridgeRef.get(),
+});
+installDragDrop(window);
 
 renderer.domElement.addEventListener('contextmenu', function(e) {
   e.preventDefault();
