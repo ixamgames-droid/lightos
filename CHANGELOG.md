@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-02 — Visualizer: zwei Modi statt drei
+
+#### Geändert
+
+- **Der Visualizer hat jetzt zwei Modi — „Ansehen" und „Bauen".** Vorher gab es
+  drei („Ansehen", „Fixtures bearbeiten", „Bühne bearbeiten"), die sich mit den
+  Tabs rechts gegenseitig umgestellt haben.
+
+  Jetzt sagt der **Modus**, ob überhaupt etwas anfassbar ist, und der **Tab**,
+  woran du gerade arbeitest — Fixtures oder Bühne. Der Rahmen um die Ansicht
+  zeigt weiterhin beides an: „BAUEN · Fixtures" bzw. „BAUEN · Bühne".
+
+  **Ein Tab-Klick wechselt nicht mehr den Modus.** Wer im Ansehen-Modus die
+  Bühnen-Liste aufmacht, bleibt im Ansehen-Modus — vorher wurde dabei
+  stillschweigend alles anfassbar. Der Einstellungen-Tab behält das zuletzt
+  benutzte Werkzeug, ein Blick dorthin beendet die Bühnen-Arbeit also nicht.
+
+  Ein neues Bühnenelement schaltet weiterhin selbst in den Bauen-Modus und auf
+  den Bühne-Tab, damit es sich sofort anfassen lässt.
+
 ### 2026-08-02 — Neues Gerät in der Bibliothek: Clay Paky Mythos
 
 #### Neu

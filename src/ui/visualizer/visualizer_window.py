@@ -1969,6 +1969,49 @@ def _should_pass_key_to_text(focus_widget, key, modifiers) -> bool:
     )
 
 
+# ── VIZ-14: EINE Zustandsmaschine statt drei loser Dimensionen ───────────────
+# Bis 2026-08-02 gab es DREI Top-Level-Modi im Combo (Ansehen / Fixtures
+# bearbeiten / Bühne bearbeiten) UND daneben die Tabs (Fixtures / Bühne /
+# Einstellungen) — und beide schrieben sich gegenseitig um, abgesichert durch
+# einen Reentrancy-Guard gegen die Ping-Pong-Schleife.
+#
+# Davids Produktentscheidung (2026-07-16): „Fixtures bearbeiten" und „Bühne
+# bearbeiten" sind **Werkzeuge INNERHALB eines gemeinsamen Bauen-Modus**, keine
+# eigenen Modi. Damit bleiben zwei unabhaengige Achsen:
+#
+#   Modus (Combo):   Ansehen | Bauen        -> „darf ich ueberhaupt etwas anfassen"
+#   Werkzeug (Tab):  Fixtures | Bühne | …   -> „woran arbeite ich gerade"
+#
+# Die JS-Seite kannte dieses Modell schon: ``updateModeFrame`` behandelt
+# 'edit'/'stage' laengst als EIN „Bauen" und zeigt „BAUEN · Fixtures" bzw.
+# „BAUEN · Bühne". Der Bruecken-Vertrag ('view'|'edit'|'stage') bleibt deshalb
+# unveraendert — aufgeloest wird er hier, aus den zwei Achsen.
+#
+# Der Guard entfaellt ersatzlos: es gibt nur noch EINE Richtung
+# (Zustand -> abgeleiteter Modus -> Push), also nichts, was zurueckschreiben
+# koennte.
+_TAB_FIXTURES, _TAB_STAGE, _TAB_SETTINGS = 0, 1, 2
+_TOOL_BY_TAB = {_TAB_FIXTURES: "edit", _TAB_STAGE: "stage"}
+
+
+def resolve_edit_mode(build: bool, tab_index: int, last_tool: str = "edit") -> str:
+    """Loest (Modus, Tab) in den Bruecken-Modus 'view' | 'edit' | 'stage' auf.
+
+    ``last_tool`` gilt fuer Tabs ohne eigenes Werkzeug (Einstellungen): dort
+    bleibt das zuletzt benutzte Bau-Werkzeug aktiv, statt stillschweigend auf
+    Fixtures zurueckzufallen — ein Blick in die Einstellungen soll nicht die
+    Bühnen-Bearbeitung beenden.
+
+    Reine Funktion, damit die Maschine ohne gebautes Fenster pruefbar ist.
+    """
+    if not build:
+        return "view"
+    werkzeug = _TOOL_BY_TAB.get(tab_index)
+    if werkzeug is not None:
+        return werkzeug
+    return last_tool if last_tool in ("edit", "stage") else "edit"
+
+
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
@@ -2004,7 +2047,9 @@ class VisualizerWindow(QMainWindow):
         self._last_stage_reassert_ids: Optional[frozenset[str]] = None
         self._suppress_property_signals = False
         self._stage_dirty = False   # VIZ-10: ungespeicherte Buehnen-Aenderungen
-        self._suppress_tab_mode_sync = False   # VIZ-10: Reentrancy-Schutz Tab<->Modus
+        # VIZ-14: zuletzt benutztes Bau-Werkzeug ('edit'|'stage'). Gilt weiter,
+        # solange ein Tab ohne eigenes Werkzeug offen ist (Einstellungen).
+        self._build_tool = "edit"
 
         self._setup_ui()
         self._setup_channel()
@@ -2040,9 +2085,13 @@ class VisualizerWindow(QMainWindow):
 
         tb.addWidget(QLabel("Modus:"))
         self._combo_edit = QComboBox()
-        self._combo_edit.addItem("Ansehen",            "view")
-        self._combo_edit.addItem("Fixtures bearbeiten", "edit")
-        self._combo_edit.addItem("Bühne bearbeiten",   "stage")
+        # VIZ-14: zwei Modi. WORAN gebaut wird, sagt der Tab (s. resolve_edit_mode).
+        self._combo_edit.addItem("Ansehen", "view")
+        self._combo_edit.addItem("Bauen",   "build")
+        self._combo_edit.setToolTip(
+            "Ansehen: nichts ist anfassbar.\n"
+            "Bauen: der Tab rechts entscheidet, woran du arbeitest — "
+            "Fixtures oder Bühne.")
         self._combo_edit.currentIndexChanged.connect(self._on_edit_mode_changed)
         tb.addWidget(self._combo_edit)
 
@@ -2237,6 +2286,8 @@ class VisualizerWindow(QMainWindow):
             self._combo_view.setCurrentIndex(1 - self._combo_view.currentIndex())
 
         def _cycle_edit():
+            # VIZ-14: seit der Zusammenlegung sind es zwei Modi -> ein echter
+            # Umschalter Ansehen <-> Bauen statt eines Durchlaufs durch drei.
             n = self._combo_edit.count()
             self._combo_edit.setCurrentIndex((self._combo_edit.currentIndex() + 1) % n)
 
@@ -2358,10 +2409,9 @@ class VisualizerWindow(QMainWindow):
         self._tabs.addTab(self._build_fixture_tab(), "Fixtures")
         self._tabs.addTab(self._build_stage_tab(),   "Bühne")
         self._tabs.addTab(self._build_settings_tab(), "Einstellungen")
-        # VIZ-10: bidirektional halten — Tab-Klick auf Fixtures/Bühne setzt den
-        # passenden Bearbeitungsmodus; Einstellungen laesst den Modus unveraendert
-        # (kein 3. Modus im Combo). _suppress_tab_mode_sync verhindert die
-        # Rueckkopplungsschleife mit _on_edit_mode_changed (Modus -> Tab).
+        # VIZ-14: der Tab waehlt das BAU-WERKZEUG (Fixtures/Bühne), nicht den
+        # Modus. Einstellungen hat kein eigenes Werkzeug -> das zuletzt benutzte
+        # bleibt aktiv (s. resolve_edit_mode).
         self._tabs.currentChanged.connect(self._on_tab_changed)
         layout.addWidget(self._tabs)
         return panel
@@ -2618,11 +2668,11 @@ class VisualizerWindow(QMainWindow):
         bg_layout.addLayout(b_row)
 
         ab_row = QHBoxLayout()
-        self._chk_auto_brightness = QCheckBox("Auto-Helligkeit im Edit-Modus")
+        self._chk_auto_brightness = QCheckBox("Auto-Helligkeit im Bauen-Modus")
         self._chk_auto_brightness.setChecked(True)
         self._chk_auto_brightness.setToolTip(
             "Wenn aktiv: Helligkeit springt automatisch auf 65% wenn du in den\n"
-            "Fixtures-/Bühne-Edit-Modus wechselst, und zurück auf 20% im Ansichts-Modus."
+            "Bauen-Modus wechselst, und zurück auf 20% im Ansehen-Modus."
         )
         self._chk_auto_brightness.toggled.connect(self._on_auto_brightness_toggled)
         ab_row.addWidget(self._chk_auto_brightness)
@@ -2818,7 +2868,7 @@ class VisualizerWindow(QMainWindow):
         try:
             self._bridge.push_settings(self._collect_settings())
             self._bridge.push_view_mode(self._combo_view.currentData() or "3D")
-            self._bridge.push_edit_mode(self._combo_edit.currentData() or "view")
+            self._apply_edit_state()   # VIZ-14: abgeleitet aus Combo + Tab
             self._apply_active_stage_from_state()
             self._bridge.requestFixtures()
             self._refresh_patch_list()
@@ -3635,16 +3685,13 @@ class VisualizerWindow(QMainWindow):
         kwargs.setdefault("name", type_label)
         el = self._current_stage.add(type_, **kwargs)
         self._stage_dirty = True   # VIZ-10: neues Element -> ungespeichert
-        # Sicherstellen, dass wir in "Stage"-EditMode sind (sonst kann User
-        # das neue Element nicht direkt anfassen)
+        # Sicherstellen, dass der Nutzer das neue Element direkt anfassen kann.
+        # VIZ-14: das sind jetzt ZWEI Achsen — Bauen-Modus UND Bühnen-Tab. Wer
+        # ein Bühnenelement anlegt, will bauen; beides zu setzen ist die
+        # ehrliche Entsprechung des frueheren "stage"-Modus.
         try:
-            cur_mode = self._combo_edit.currentData() or "view"
-            if cur_mode != "stage":
-                # In stage-Modus wechseln (loest editModeChanged aus)
-                for i in range(self._combo_edit.count()):
-                    if self._combo_edit.itemData(i) == "stage":
-                        self._combo_edit.setCurrentIndex(i)
-                        break
+            self._tabs.setCurrentIndex(_TAB_STAGE)
+            self._set_build_mode(True)
         except Exception as e:
             print(f"[Visualizer] _add_stage_element mode-switch error: {e}")
 
@@ -4303,41 +4350,51 @@ class VisualizerWindow(QMainWindow):
             if lbl is not None:
                 lbl.setVisible(visible)
 
-    def _on_edit_mode_changed(self, idx: int):
-        mode = self._combo_edit.itemData(idx) or "view"
-        self._bridge.push_edit_mode(mode)
-        # Switch right-panel tab to match (Einstellungen-Tab bleibt unberuehrt -
-        # es gibt keinen passenden Modus dafuer). Guard verhindert, dass
-        # _on_tab_changed den Modus gleich wieder zurueckschreibt.
-        if self._suppress_tab_mode_sync:
-            return
-        self._suppress_tab_mode_sync = True
-        try:
-            if mode == "stage":
-                self._tabs.setCurrentIndex(1)
-            elif mode == "edit":
-                self._tabs.setCurrentIndex(0)
-        finally:
-            self._suppress_tab_mode_sync = False
+    def _apply_edit_state(self):
+        """Leitet den Bruecken-Modus aus (Combo, Tab) ab und schiebt ihn ins JS.
 
-    def _on_tab_changed(self, idx: int):
-        """VIZ-10: Klick auf Fixtures-/Bühne-Tab setzt den passenden
-        Bearbeitungsmodus (bidirektional zu _on_edit_mode_changed). Der
-        Einstellungen-Tab (idx 2) hat keinen entsprechenden Modus -> Combo
-        bleibt unveraendert, der Tab selbst ist immer normal anklickbar."""
-        if self._suppress_tab_mode_sync:
-            return
-        target_mode = {0: "edit", 1: "stage"}.get(idx)
-        if target_mode is None:
-            return
-        self._suppress_tab_mode_sync = True
-        try:
-            for i in range(self._combo_edit.count()):
-                if self._combo_edit.itemData(i) == target_mode:
-                    self._combo_edit.setCurrentIndex(i)
-                    break
-        finally:
-            self._suppress_tab_mode_sync = False
+        VIZ-14: der EINE Punkt, an dem der Modus entsteht. Vorher schrieben
+        Combo und Tabs sich gegenseitig um und brauchten dafuer einen
+        Reentrancy-Guard; jetzt fliesst es nur in eine Richtung.
+        """
+        build = (self._combo_edit.currentData() == "build")
+        idx = self._tabs.currentIndex() if hasattr(self, "_tabs") else _TAB_FIXTURES
+        werkzeug = _TOOL_BY_TAB.get(idx)
+        if werkzeug is not None:
+            self._build_tool = werkzeug          # Tab MIT Werkzeug -> merken
+        mode = resolve_edit_mode(build, idx, self._build_tool)
+        self._bridge.push_edit_mode(mode)
+        return mode
+
+    def _set_build_mode(self, build: bool = True):
+        """Schaltet den Modus-Combo auf Bauen bzw. Ansehen (loest den Push aus)."""
+        ziel = "build" if build else "view"
+        for i in range(self._combo_edit.count()):
+            if self._combo_edit.itemData(i) == ziel:
+                self._combo_edit.setCurrentIndex(i)
+                break
+        # Push IMMER selbst ausloesen, statt ihn dem currentIndexChanged-Signal
+        # zu ueberlassen: das feuert nur, wenn sich der Index WIRKLICH aendert.
+        # Stand der Modus schon richtig, blieb die JS-Seite sonst auf ihrem alten
+        # Stand — und wer diese Methode ruft, will den Modus zugesichert haben,
+        # nicht "vielleicht". Der dadurch moegliche Doppel-Push ist folgenlos:
+        # die Bruecke setzt idempotent (``_poll_set``).
+        self._apply_edit_state()
+
+    def _on_edit_mode_changed(self, _idx: int):
+        self._apply_edit_state()
+
+    def _on_tab_changed(self, _idx: int):
+        """Der Tab waehlt das BAU-WERKZEUG, nicht den Modus.
+
+        VIZ-14 (Verhaltensaenderung): frueher schaltete ein Klick auf den
+        Fixtures-/Bühne-Tab automatisch in den jeweiligen Bearbeitungsmodus —
+        wer nur die Liste ansehen wollte, machte damit ungewollt alles
+        anfassbar, und der Modus-Rahmen wechselte die Farbe, ohne dass jemand
+        den Modus angefasst hatte. Jetzt bleibt „Ansehen" Ansehen; im
+        Bauen-Modus entscheidet der Tab, woran gebaut wird.
+        """
+        self._apply_edit_state()
 
     def _reset_camera(self):
         self._bridge.cameraReset.emit()

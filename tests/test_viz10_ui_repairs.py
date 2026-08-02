@@ -33,82 +33,99 @@ _app = QApplication.instance() or QApplication([])
 # ============================================================================
 
 class TabModeSyncTest(unittest.TestCase):
-    def _fake(self):
+    """VIZ-14: aus drei Top-Level-Modi wurden zwei Achsen.
+
+    Die Tests dieser Klasse nagelten bis 2026-08-02 die BIDIREKTIONALE Kopplung
+    fest (Tab setzt Modus, Modus setzt Tab, abgesichert durch einen
+    Reentrancy-Guard). Nach Davids Entscheidung sind „Fixtures bearbeiten" und
+    „Bühne bearbeiten" **Werkzeuge innerhalb eines Bauen-Modus** — der Tab waehlt
+    das Werkzeug, der Combo den Modus, und es fliesst nur noch in eine Richtung.
+
+    Die Absichten der alten Tests bleiben erhalten, nur ihre Erwartung wechselt
+    von „schreibt zurueck" auf „leitet ab".
+    """
+
+    def _fake(self, modus="view", tab=0, werkzeug="edit"):
         combo = QComboBox()
         combo.addItem("Ansehen", "view")
-        combo.addItem("Fixtures bearbeiten", "edit")
-        combo.addItem("Bühne bearbeiten", "stage")
+        combo.addItem("Bauen", "build")
+        combo.setCurrentIndex({"view": 0, "build": 1}[modus])
         tabs = QTabWidget()
-        tabs.addTab(QWidget(), "Fixtures")
-        tabs.addTab(QWidget(), "Bühne")
-        tabs.addTab(QWidget(), "Einstellungen")
+        for name in ("Fixtures", "Bühne", "Einstellungen"):
+            tabs.addTab(QWidget(), name)
+        tabs.setCurrentIndex(tab)
         fake = SimpleNamespace(
             _combo_edit=combo,
             _tabs=tabs,
             _bridge=MagicMock(),
-            _suppress_tab_mode_sync=False,
+            _build_tool=werkzeug,
         )
+        # Stub-Falle (Second Brain: reference_lightos_trap_stub_state_attributes):
+        # ein SimpleNamespace traegt keine Methoden der Klasse. Die zwei, die die
+        # Handler intern aufrufen, muessen ausdruecklich angebunden werden.
+        fake._apply_edit_state = lambda: VW.VisualizerWindow._apply_edit_state(fake)
+        fake._set_build_mode = lambda build=True: VW.VisualizerWindow._set_build_mode(fake, build)
         return fake
 
-    def test_mode_stage_switches_to_stage_tab(self):
-        fake = self._fake()
-        VW.VisualizerWindow._on_edit_mode_changed(fake, 2)   # "stage"
-        self.assertEqual(fake._tabs.currentIndex(), 1)
+    def _modus(self, fake):
+        return VW.VisualizerWindow._apply_edit_state(fake)
 
-    def test_mode_edit_switches_to_fixture_tab(self):
-        fake = self._fake()
-        VW.VisualizerWindow._on_edit_mode_changed(fake, 1)   # "edit"
-        self.assertEqual(fake._tabs.currentIndex(), 0)
+    def test_modus_fasst_den_tab_nicht_mehr_an(self):
+        """Frueher sprang der Tab mit dem Modus mit. Das ist entfallen: der Tab
+        gehoert dem Nutzer, der Modus sagt nur, ob etwas anfassbar ist."""
+        fake = self._fake(modus="view", tab=2)
+        VW.VisualizerWindow._on_edit_mode_changed(fake, 1)   # -> Bauen
+        self.assertEqual(fake._tabs.currentIndex(), 2,
+                         "der Einstellungen-Tab bleibt offen")
 
-    def test_mode_view_does_not_force_settings_tab_away(self):
-        # Im "Ansehen"-Modus bleibt der Tab unangetastet - insbesondere darf
-        # ein Wechsel in den Einstellungen-Tab (Index 2) NICHT zurueckspringen.
-        fake = self._fake()
+    def test_tabklick_im_ansehen_modus_macht_nichts_anfassbar(self):
+        """Die eigentliche Verhaltensaenderung. Vorher setzte ein Klick auf den
+        Bühne-Tab den Bearbeitungsmodus — wer nur die Liste sehen wollte, machte
+        damit ungewollt alles anfassbar."""
+        fake = self._fake(modus="view", tab=1)
+        self.assertEqual(self._modus(fake), "view")
+        self.assertEqual(fake._combo_edit.currentData(), "view")
+
+    def test_tabklick_im_bauen_modus_waehlt_das_werkzeug(self):
+        """Die erhaltene Absicht des alten `click_*_tab_sets_*_mode`."""
+        fake = self._fake(modus="build", tab=0)
+        self.assertEqual(self._modus(fake), "edit")
+        fake._tabs.setCurrentIndex(1)
+        self.assertEqual(self._modus(fake), "stage")
+
+    def test_einstellungen_lassen_das_werkzeug_unveraendert(self):
+        """Wortgleiche Absicht wie frueher `click_settings_tab_leaves_mode_unchanged`."""
+        fake = self._fake(modus="build", tab=1)
+        self.assertEqual(self._modus(fake), "stage")
         fake._tabs.setCurrentIndex(2)
-        VW.VisualizerWindow._on_edit_mode_changed(fake, 0)   # "view"
-        self.assertEqual(fake._tabs.currentIndex(), 2)
-
-    def test_click_fixtures_tab_sets_edit_mode(self):
-        fake = self._fake()
-        VW.VisualizerWindow._on_tab_changed(fake, 0)
-        self.assertEqual(fake._combo_edit.currentData(), "edit")
-
-    def test_click_stage_tab_sets_stage_mode(self):
-        fake = self._fake()
-        VW.VisualizerWindow._on_tab_changed(fake, 1)
-        self.assertEqual(fake._combo_edit.currentData(), "stage")
-
-    def test_click_settings_tab_leaves_mode_unchanged(self):
-        fake = self._fake()
-        fake._combo_edit.setCurrentIndex(2)   # "stage" aktiv
-        VW.VisualizerWindow._on_tab_changed(fake, 2)   # Einstellungen
-        self.assertEqual(fake._combo_edit.currentData(), "stage")
+        self.assertEqual(self._modus(fake), "stage")
 
     def test_settings_tab_is_never_disabled(self):
         # Regression fuer den Audit-Befund "Einstellungen-Tab unerreichbar":
-        # der Tab selbst darf durch die Sync-Logik nie disabled werden.
-        fake = self._fake()
+        # der Tab selbst darf durch die Modus-Logik nie disabled werden.
+        fake = self._fake(modus="build")
         for idx in (0, 1, 2):
+            fake._tabs.setCurrentIndex(idx)
             VW.VisualizerWindow._on_tab_changed(fake, idx)
             self.assertTrue(fake._tabs.isTabEnabled(2))
 
-    def test_no_feedback_loop_reentrancy(self):
-        # _on_tab_changed setzt den Combo -> loest _on_edit_mode_changed aus
-        # (echtes Signal ueber currentIndexChanged) -> darf NICHT zurueck auf
-        # den Tab wirken und eine Endlosschleife/falschen Sprung ausloesen.
-        fake = self._fake()
+    def test_keine_rueckkopplung_mehr_moeglich(self):
+        """Frueher brauchte es einen Reentrancy-Guard, weil Tab und Modus sich
+        gegenseitig setzten. Jetzt schreibt keiner der beiden den anderen —
+        die Schleife ist strukturell weg, nicht nur abgesichert."""
+        fake = self._fake(modus="build", tab=0)
         fake._combo_edit.currentIndexChanged.connect(
             lambda idx: VW.VisualizerWindow._on_edit_mode_changed(fake, idx))
-        fake._tabs.setCurrentIndex(1)   # Buehne-Tab per Klick
-        VW.VisualizerWindow._on_tab_changed(fake, 1)
-        self.assertEqual(fake._tabs.currentIndex(), 1)
-        self.assertEqual(fake._combo_edit.currentData(), "stage")
-        self.assertFalse(fake._suppress_tab_mode_sync)   # Guard sauber zurueckgesetzt
+        fake._tabs.currentChanged.connect(
+            lambda idx: VW.VisualizerWindow._on_tab_changed(fake, idx))
 
+        fake._tabs.setCurrentIndex(1)          # Nutzer klickt Bühne
 
-# ============================================================================
-# 2) Element-Palette: Auto-Moduswechsel + Statusmeldung
-# ============================================================================
+        self.assertEqual(fake._tabs.currentIndex(), 1, "der Tab bleibt, wo er ist")
+        self.assertEqual(fake._combo_edit.currentData(), "build",
+                         "der Modus wurde NICHT umgeschrieben")
+        self.assertEqual(fake._bridge.push_edit_mode.call_args[0][0], "stage")
+
 
 class AddStageElementAutoModeTest(unittest.TestCase):
     def tearDown(self):
@@ -118,18 +135,24 @@ class AddStageElementAutoModeTest(unittest.TestCase):
         get_undo_stack().clear()
 
     def _fake(self, cur_mode="view"):
+        # VIZ-14: zwei Modi; welches Werkzeug gilt, sagt der Tab.
         combo = QComboBox()
         combo.addItem("Ansehen", "view")
-        combo.addItem("Fixtures bearbeiten", "edit")
-        combo.addItem("Bühne bearbeiten", "stage")
-        combo.setCurrentIndex({"view": 0, "edit": 1, "stage": 2}[cur_mode])
+        combo.addItem("Bauen", "build")
+        combo.setCurrentIndex(0 if cur_mode == "view" else 1)
+        tabs = QTabWidget()
+        for name in ("Fixtures", "Bühne", "Einstellungen"):
+            tabs.addTab(QWidget(), name)
+        tabs.setCurrentIndex(0 if cur_mode in ("view", "edit") else 1)
         tree = MagicMock()
         tree.topLevelItemCount.return_value = 0
         lbl = MagicMock()
-        return SimpleNamespace(
+        fake = SimpleNamespace(
             _state=SimpleNamespace(),
             _current_stage=StageDefinition(),
             _combo_edit=combo,
+            _tabs=tabs,
+            _build_tool="edit",
             _stage_tree=tree,
             _lbl_info=lbl,
             _bridge=MagicMock(),
@@ -144,16 +167,26 @@ class AddStageElementAutoModeTest(unittest.TestCase):
             _refresh_stage_tree=MagicMock(),
             _update_status_counts=MagicMock(),
         )
+        fake._apply_edit_state = lambda: VW.VisualizerWindow._apply_edit_state(fake)
+        fake._set_build_mode = lambda build=True: VW.VisualizerWindow._set_build_mode(fake, build)
+        return fake
 
-    def test_switches_from_view_to_stage_mode(self):
+    def test_aus_ansehen_wird_bauen_am_buehnen_tab(self):
+        """Erhaltene Absicht des alten `switches_from_view_to_stage_mode`: wer
+        ein Bühnenelement anlegt, muss es anfassen koennen. Seit VIZ-14 sind das
+        ZWEI Achsen — Bauen-Modus UND Bühnen-Tab."""
         fake = self._fake(cur_mode="view")
         VW.VisualizerWindow._add_stage_element(fake, "truss_h")
-        self.assertEqual(fake._combo_edit.currentData(), "stage")
+        self.assertEqual(fake._combo_edit.currentData(), "build")
+        self.assertEqual(fake._tabs.currentIndex(), 1)
+        self.assertEqual(fake._bridge.push_edit_mode.call_args[0][0], "stage")
 
-    def test_switches_from_edit_to_stage_mode(self):
+    def test_aus_fixtures_bauen_wird_buehne_bauen(self):
         fake = self._fake(cur_mode="edit")
         VW.VisualizerWindow._add_stage_element(fake, "platform")
-        self.assertEqual(fake._combo_edit.currentData(), "stage")
+        self.assertEqual(fake._combo_edit.currentData(), "build")
+        self.assertEqual(fake._tabs.currentIndex(), 1)
+        self.assertEqual(fake._bridge.push_edit_mode.call_args[0][0], "stage")
 
     def test_element_actually_added(self):
         fake = self._fake(cur_mode="view")
