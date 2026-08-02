@@ -103,6 +103,31 @@ class BacklogLintTest(unittest.TestCase):
         self.assertEqual(bad, [], f"Status 'todo', aber die Zeile meldet gelandete "
                                   f"Arbeit — auf 'wip'/'teils'/'done' ziehen: {bad}")
 
+    def test_status_has_no_dangling_this_pr(self):
+        """FINALIZE 2026-08-02: „dieser PR" ist im Backlog kein Verweis.
+
+        Beim Schreiben ist er eindeutig — der Autor sitzt im Branch. Nach dem
+        Merge steht er dauerhaft in einer Datei, in der niemand mehr auflösen
+        kann, welcher PR gemeint war. Gemessen: vier Status-Angaben trugen ihn
+        (LAS-07, LAS-08, VIZ-15, OUT-06), teils seit dem 2026-07-03; aufgelöst
+        wurden sie erst über `git log -S` — Arbeit, die der Schreibende in einer
+        Sekunde erspart hätte.
+
+        **Bewusst nur die Status-Spalte:** sie ist das Feld, aus dem der Loop
+        seine nächste Aufgabe wählt. Im Fliesstext der Beschreibung stehen
+        weitere Fundstellen; die sind Erzählung und werden hier nicht angefasst,
+        damit die Regel scharf bleibt statt breit.
+        """
+        bad = []
+        for ln, id_, _p, status, _line in _rows_with_line():
+            if re.search(r"dies(er|em)\s+PR|diesem?\s+Branch", status, re.I):
+                bad.append((ln, id_, status[:70]))
+        self.assertEqual(
+            bad, [],
+            'Status verweist auf "diesen PR" - nach dem Merge nicht mehr '
+            'aufloesbar. Stattdessen die PR-Nummer oder Commit+Datum nennen: '
+            f'{bad}')
+
     def test_item_rows_are_all_recognized(self):
         """QA-18d: eine Zeile, die wie ein Item aussieht (ID-Zelle + P1/P2/P3),
         MUSS vom ID-Muster erfasst werden.
