@@ -17,6 +17,10 @@ import { requestRender } from '../scene/render_loop.js';
 
 let geist = null;
 let offen = 0;          // wie viele Geraete warten auf einen Platz?
+// VIZ-14 Drag-Haelfte: waehrend eines laufenden Drags soll der Geist AUCH dann
+// erscheinen, wenn nichts mehr „offen" ist — wer ein bereits platziertes Geraet
+// zieht, verschiebt es, und auch dafuer will man vorher sehen, wo es landet.
+let ziehen = false;
 let zuletzt = null;     // letzte Pose — spart Render-Anstoesse bei Stillstand
 
 function _noop() { /* faengt keine Eingabe: der Geist darf den Klick nicht schlucken */ }
@@ -61,9 +65,17 @@ export function setPlaceableCount(n) {
 
 export function placeGhostArmed() { return offen > 0; }
 
+/** Drag laeuft (an) / ist vorbei (aus). Scharf ist der Geist bei OFFEN oder ZIEHEN. */
+export function setDragArmed(an) {
+  const neu = !!an;
+  if (neu === ziehen) return;
+  ziehen = neu;
+  if (!ziehen && !offen) hidePlaceGhost();
+}
+
 /** Geist an Position setzen. ``angedockt`` faerbt ihn um (Auto-Hang sichtbar). */
 export function updatePlaceGhost(x, y, z, angedockt) {
-  if (!offen) { hidePlaceGhost(); return; }
+  if (!offen && !ziehen) { hidePlaceGhost(); return; }
   bauen();
   const schluessel = `${x.toFixed(2)}|${y.toFixed(2)}|${z.toFixed(2)}|${!!angedockt}`;
   const sichtbarVorher = geist.visible;
@@ -95,7 +107,8 @@ export function hidePlaceGhost() {
  * ("raycast ist ein No-Op") waere kein Beleg — der Strahl ist einer.
  */
 export function placeGhostInfo() {
-  if (!geist) return { vorhanden: false, sichtbar: false, offen, raycastTreffer: -1 };
+  if (!geist) return { vorhanden: false, sichtbar: false, offen, ziehen,
+                       raycastTreffer: -1 };
   const m = geist.children[0] && geist.children[0].material;
   let treffer = -2;
   try {
@@ -105,7 +118,7 @@ export function placeGhostInfo() {
     treffer = rc.intersectObject(geist, true).length;
   } catch (e) { treffer = -2; }
   return {
-    vorhanden: true, sichtbar: !!geist.visible, offen,
+    vorhanden: true, sichtbar: !!geist.visible, offen, ziehen,
     x: geist.position.x, y: geist.position.y, z: geist.position.z,
     farbe: m && m.color ? m.color.getHex() : null,
     raycastTreffer: treffer,

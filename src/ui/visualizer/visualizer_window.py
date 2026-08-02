@@ -31,7 +31,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import (QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent,
-                            QItemSelectionModel)
+                            QItemSelectionModel, QMimeData)
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
@@ -938,8 +938,20 @@ class VisualizerBridge(QObject):
         (stage_element_id) haelt die Andock-Beziehung fest."""
         pos = json.loads(pos_json)
         dock_id = pos.get("dock") or ""
+        # VIZ-14 Drag-Haelfte: traegt der Aufruf eine fid, ist GENAU dieses Geraet
+        # gemeint (es wurde gezogen und fallengelassen) — auch wenn es schon einen
+        # Platz hat; dann ist der Drop ein Verschieben. Ohne fid bleibt das
+        # Bestandsverhalten „das naechste noch unplatzierte", das der Rechtsklick
+        # nutzt.
+        gewuenscht = pos.get("fid")
+        if gewuenscht is not None:
+            try:
+                gewuenscht = int(gewuenscht)
+            except (TypeError, ValueError):
+                gewuenscht = None
         for f in self._state.get_patched_fixtures():
-            if f.fid not in self._state.visualizer_positions:
+            if (f.fid == gewuenscht if gewuenscht is not None
+                    else f.fid not in self._state.visualizer_positions):
                 self._state.visualizer_positions[f.fid] = (
                     float(pos["x"]),
                     float(pos.get("y", 6.5)),
@@ -2012,6 +2024,33 @@ def resolve_edit_mode(build: bool, tab_index: int, last_tool: str = "edit") -> s
     return last_tool if last_tool in ("edit", "stage") else "edit"
 
 
+# ── VIZ-14 Drag-Haelfte: Geraete aus der Liste ins 3D ziehen ────────────────
+# Die Nutzlast ist bewusst ``text/plain`` mit Praefix: gemessen, bevor gebaut
+# wurde — ein Qt-Drag auf die QWebEngineView kommt in der Seite als echtes
+# dragenter/dragover/drop an, und ``text/plain`` ist der Typ, den diese Bruecke
+# verlaesslich durchreicht. Qts eigenes
+# ``application/x-qabstractitemmodeldatalist`` kaeme in der Seite NICHT an.
+FIXTURE_DRAG_PREFIX = "lightos-fixture:"
+
+
+class FixtureDragList(QListWidget):
+    """Geraeteliste, aus der man ins 3D ziehen kann."""
+
+    def mimeData(self, items):
+        md = QMimeData()
+        fids = []
+        for it in items:
+            fid = it.data(Qt.ItemDataRole.UserRole)
+            if fid is not None:
+                fids.append(int(fid))
+        # Genau EIN Geraet je Drag: der Geist zeigt eine Pose, und ein Drop
+        # setzt eine Position — mehrere gleichzeitig haetten keine sichtbare
+        # Entsprechung. Bei Mehrfachauswahl zieht das zuerst angeklickte.
+        if fids:
+            md.setText(f"{FIXTURE_DRAG_PREFIX}{fids[0]}")
+        return md
+
+
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
@@ -2422,7 +2461,13 @@ class VisualizerWindow(QMainWindow):
         layout = QVBoxLayout(w)
 
         layout.addWidget(QLabel("Gepatchte Fixtures:"))
-        self._patch_list = QListWidget()
+        self._patch_list = FixtureDragList()
+        # VIZ-14: ziehen ja, fallenlassen nein — die Liste ist Quelle, nicht Ziel.
+        self._patch_list.setDragEnabled(True)
+        self._patch_list.setDragDropMode(QListWidget.DragDropMode.DragOnly)
+        self._patch_list.setToolTip(
+            "Gerät in die 3D-Ansicht ziehen, um es zu platzieren "
+            "(nur im Bauen-Modus).")
         # VIZ-14-Folge: die Liste zeigt die GEMEINSAME Auswahl — die kann mehrere
         # Geraete umfassen (3D-Marquee, Programmer-Gruppe). Mit dem
         # Single-Selection-Default liesse sich davon immer nur eines markieren.
