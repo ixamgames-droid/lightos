@@ -80,34 +80,42 @@ class QuelleTest(unittest.TestCase):
         ohne Totzone schriebe der 44-Hz-Pfad jeden Frame eine neue Skalierung."""
         self.assertIn("< 0.01) return", self.js)
 
-    def test_nur_der_boden_nicht_beliebige_geometrie(self):
-        """Die Beschraenkung ist eine Entscheidung, keine Luecke — sie steht im
-        Kommentar, damit sie beim naechsten Anfassen nicht als Versehen gilt."""
-        self.assertIn("BEWUSST NUR DER BODEN", self.js)
+    def test_die_beschraenkung_auf_den_boden_ist_aufgehoben(self):
+        """Bis 2026-08-02 galt hier ausdruecklich „BEWUSST NUR DER BODEN".
+
+        Das war eine KOSTEN-Entscheidung, keine gestalterische: ein Raycast je
+        Fixture und Frame waere im 44-Hz-Pfad zu teuer. Aufgehoben wurde sie
+        deshalb auch nicht durch Wegsehen, sondern durch eine Bremse — gerechnet
+        wird nur bei Aenderung an Strahl oder Buehne (VIZ-BEAM-OCCLUSION Teil 2,
+        Zusagen in `test_viz_beam_stop.py`). Der alte Kommentar darf nicht mehr
+        dastehen, sonst liest ihn der naechste als geltende Regel.
+        """
+        self.assertNotIn("BEWUSST NUR DER BODEN", self.js,
+                         "veralteter Kommentar: der Strahl endet jetzt auch an "
+                         "Buehnenkoerpern")
 
     def test_haengt_am_vorhandenen_auftreffpunkt(self):
-        """Die Kegellaenge kommt aus dem Bodenpunkt, der in ``applyFloorAim``
-        ohnehin gerechnet wird — NICHT aus einem zweiten, eigenen Raycast. Ein
-        Strahl gegen alle Buehnenobjekte je Fixture je Frame ist im 44-Hz-Pfad
-        genau die Kostenklasse, vor der die Review-Checkliste warnt.
+        """Die Kegellaenge kommt aus dem Auftreffpunkt, der in ``applyFloorAim``
+        ohnehin gerechnet wird, und wird GENAU EINMAL angewandt.
 
         VIZ-15 hat den Aufruf aus dem innersten Zweig herausgezogen (er lief
         sonst NUR bei Bodentreffer, ein waagerechter Kopf bekam nie eine Laenge).
-        Geprueft wird deshalb die Invariante statt der frueheren Zeile: der
-        Abstand stammt aus dem vorhandenen ``t``, wird EINMAL angewandt, und es
-        entsteht kein zusaetzlicher Strahl.
+
+        **Geaendert am 2026-08-02:** frueher stand hier zusaetzlich „kein
+        Raycaster in diesem Block". Seit Teil 2 gibt es einen — fuer die
+        Buehnenkoerper, ohne die der Kegel durch jedes Podest schiesst. Die
+        Kosten-Zusage ist damit nicht gefallen, sondern umgezogen: sie lautet
+        jetzt „kein Strahl, solange sich nichts bewegt" und wird in
+        `test_viz_beam_stop.py::test_kein_strahl_solange_sich_nichts_bewegt`
+        geprueft. Was hier bleibt, ist die Struktur: EIN Auftreffpunkt, EINE
+        Anwendung.
         """
         i = self.js.index("function applyFloorAim")
-        block = self.js[i:i + 2800]
-        self.assertIn("bodenAbstand = t", block,
+        block = self.js[i:i + 3400]
+        self.assertIn("auftreffAbstand = t", block,
                       "der Abstand muss aus dem schon gerechneten t kommen")
-        self.assertIn("setBeamLength(f, bodenAbstand)", block)
+        self.assertIn("setBeamLength(f, auftreffAbstand)", block)
         self.assertEqual(block.count("setBeamLength(f,"), 1,
                          "genau EINE Anwendung — zwei waeren zwei Wahrheiten")
-        for teuer in ("Raycaster", "intersectObjects", "intersectObject("):
-            self.assertNotIn(teuer, block,
-                             f"{teuer} im 44-Hz-Pfad waere ein zweiter Strahl")
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(block.count("koerperTreffer(f,"), 1,
+                         "genau EINE Koerper-Abfrage je Durchlauf")
