@@ -173,6 +173,18 @@ class RoomShellSceneTest(unittest.TestCase):
         klein = self._huelle()
         self.assertIsNotNone(klein, "eingeschaltet muss eine Huelle da sein")
 
+        # (1b) sie ist von INNEN sichtbar — man steht in ihr drin, das geht nur
+        # mit BackSide. Nachgetragen 2026-08-03 (VIZ-SHIM): `BackSide` fehlte im
+        # three-Wrapper-Modul, `side` war deshalb `undefined`, three fiel auf
+        # FrontSide zurueck und die Huelle wurde von innen gar nicht gezeichnet.
+        # Alle anderen Zusicherungen dieses Tests blieben dabei gruen — Existenz,
+        # Groesse und Eingabe-Neutralitaet stimmten ja. Eine Huelle, die es gibt,
+        # die aber niemand sieht, erfuellt jede davon.
+        self.assertEqual(klein["materialSide"], klein["backSideKonstante"],
+                         "die Huelle steht nicht auf BackSide und ist damit von "
+                         "innen unsichtbar — genau der Zustand, in dem das "
+                         "Feature seit dem Bau war")
+
         # (2) faengt KEINE Eingabe. Gemessen mit einem ECHTEN Strahl aus der
         # Raummitte auf die Wand zu — eine Selbstauskunft waere kein Beleg.
         self.assertEqual(klein["raycastTreffer"], 0,

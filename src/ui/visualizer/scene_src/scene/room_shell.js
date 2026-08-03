@@ -120,5 +120,13 @@ export function roomShellInfo() {
     breite: p.width, hoehe: p.height, tiefe: p.depth,
     x: huelle.position.x, y: huelle.position.y, z: huelle.position.z,
     raycastTreffer: treffer,
+    // VIZ-SHIM (2026-08-03): `side` gehoert hierher, weil die Huelle NUR mit
+    // BackSide von innen ueberhaupt gezeichnet wird — man steht in ihr drin.
+    // Sie fehlte im three-Wrapper-Modul, `side` war deshalb `undefined` und
+    // three fiel auf FrontSide zurueck: die Huelle war unsichtbar, seit sie
+    // gebaut wurde. Die uebrigen Felder hier haetten das nie gezeigt — Existenz,
+    // Groesse und Eingabe-Neutralitaet stimmten ja alle.
+    materialSide: huelle.material && huelle.material.side,
+    backSideKonstante: THREE.BackSide,
   };
 }
