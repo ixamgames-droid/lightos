@@ -5,6 +5,27 @@ Software-UI. Jedes Bild wurde visuell gelesen und die sichtbaren UI-Labels gegen
 die aktuellen String-Literale im Quellcode (`src/`) verifiziert. Ziel: **nur die
 Bilder ersetzen, die sich tatsächlich vom aktuellen Stand unterscheiden.**
 
+> ## ⚠️ Dieses Dokument ist eine Momentaufnahme — den Stand nicht hier ablesen
+>
+> Seit dem 20.07. wurde nachgearbeitet, ohne dass die Datei es weiß. Wer sie von
+> oben abarbeitet, sucht Bilder, die längst neu sind oder gar nicht mehr
+> existieren — genau das ist am 2026-08-03 passiert.
+>
+> **Den aktuellen Stand liefert das Werkzeug, nicht der Text:**
+>
+> ```
+> ./venv/bin/python tools/audit_bilder_stand.py docs/BILDER_AUDIT_2026-07-20.md
+> ```
+>
+> **Stand 2026-08-03:** von 50 Punkten sind **3 hinfällig** (Bild existiert nicht
+> mehr), **31 wurden seit dem Audit angefasst** (30 davon am 21.07. in einer
+> Sammelaktion, eines heute), **16 sind offen** — Schwerpunkte:
+> `anleitung_vc_widgets` (5, überwiegend Dialog-Bilder), `tutorial_matrix` (4),
+> dazu drei Bank-Übersichten und zwei Toolbar-Bilder.
+>
+> Das Werkzeug vergleicht **Dateidaten, keine Inhalte**: „angefasst" heißt
+> *vermutlich* behoben, nicht *nachweislich*. Es sortiert vor, es urteilt nicht.
+
 ## Ergebnis
 
 | | Anzahl |
