@@ -159,11 +159,41 @@ class SacnSource:
             self._next_token += 1
             return self._next_token
 
+    def _erster_seq(self) -> int:
+        """Startwert eines noch unbenutzten Universums — **zufaellig, nicht 0.**
+
+        Der Grund ist der Neustart nach einem Absturz (Codex-Befund zu PR #563):
+        stirbt LightOS ohne ``close()``, bleibt die persistente CID, aber der
+        Zaehler faengt wieder an. Ein Empfaenger, der die Quelle noch kennt —
+        er vergisst sie erst nach 2,5 s (E1.31 §6.7.1) — verwirft dann jeden
+        Frame, dessen Abstand zum letzten in ``(-20, 0]`` liegt.
+
+        **Das Fenster ist erreichbar:** gemessen geht der erste sACN-Frame
+        bereits **1,38 s** nach dem Prozessstart raus (``apply_output_config``
+        laeuft im AppState-Aufbau, lange vor dem fertigen Fenster).
+
+        Mit festem Start 0 trifft es **immer**, wenn die vorige Sitzung im
+        Bereich 1..19 stand — also gerade beim Absturz kurz nach dem Start, dem
+        haeufigsten Fall. Ein zufaelliger Startwert macht daraus die
+        Grundwahrscheinlichkeit **20/256 ≈ 7,8 %**, kostet nichts und braucht
+        weder Persistenz noch I/O im 44-Hz-Sendepfad.
+
+        **Der Rest bleibt bewusst stehen.** Ihn zu beseitigen hiesse, den
+        Sequenzstand laufend auf die Platte zu schreiben — Datei-I/O in genau
+        dem Pfad, der 44-mal je Sekunde laeuft, gegen einen Fall, der einen
+        Absturz UND einen Neustart binnen 2,5 s UND einen Treffer in einem
+        20-von-256-Fenster verlangt. Wer das anders bewertet, findet die
+        Rechnung dafuer in `tests/test_sacn_source.py`.
+        """
+        return uuid.uuid4().bytes[0]              # 0..255, gleichverteilt
+
     def next_seq(self, universe: int, token: int) -> int:
         """Naechste Sequenznummer fuer dieses Universum — und der Sender uebernimmt
         damit den Besitz. Beides zusammen, weil beides genau beim Senden gilt."""
         with self._lock:
             self._owner[universe] = token
+            if universe not in self._seq:
+                self._seq[universe] = self._erster_seq()
             seq = self._seq.get(universe, 0)
             self._seq[universe] = (seq + 1) & 0xFF
             return seq

@@ -308,21 +308,91 @@ def test_sequenz_laeuft_nach_der_termination_weiter(cid_datei, fake_sockets):
     zweiter.send_dmx(3, bytes(512))
     zweiter.close()
 
+    # RELATIV geprueft, nicht gegen eine feste Zahl: seit 2026-08-03 startet der
+    # Zaehler eines frischen Universums zufaellig (Absturz-Neustart, s.
+    # test_sequenz_startet_nicht_bei_null). Die Aussage des Tests ist ohnehin
+    # eine ueber den ABSTAND — „laeuft weiter" —, nicht ueber den Absolutwert.
+    start = fake_sockets[0].sent[0][111]
     letztes_daten_paket = [p for p in fake_sockets[1].sent if p[112] == 0x00][0]
-    assert letztes_daten_paket[111] == 11            # 10 Daten + 1 Termination
+    assert letztes_daten_paket[111] == (start + 11) % 256, (
+        "10 Datenframes + 1 Terminationsframe muessen den Zaehler um genau 11 "
+        "weitergedreht haben")
+
+
+def test_sequenz_startet_nicht_bei_null(cid_datei, fake_sockets):
+    """Nach einem Absturz OHNE `close()` bleibt die CID, der Zaehler nicht.
+
+    Ein Empfaenger, der die Quelle noch kennt (er vergisst sie erst nach 2,5 s,
+    E1.31 §6.7.1), verwirft dann jeden Frame mit Abstand in `(-20, 0]`. Mit
+    festem Start 0 traefe das **immer**, wenn die vorige Sitzung im Bereich
+    1..19 stand — also gerade beim Absturz kurz nach dem Start.
+
+    **Das Fenster ist erreichbar:** gemessen 1,38 s vom Prozessstart bis zum
+    ersten sACN-Frame.
+    """
+    startwerte = set()
+    for _ in range(12):
+        src_mod.reset_for_tests()
+        sender = SACNSender(target_ip="10.0.0.5")
+        try:
+            sender.send_dmx(1, bytes(512))
+        finally:
+            sender.close()
+        startwerte.add(fake_sockets[-1].sent[0][111])
+
+    self_null = startwerte == {0}
+    assert not self_null, "die Sequenz startet fest bei 0"
+    assert len(startwerte) > 1, (
+        f"die Startwerte streuen nicht ({startwerte}) — bei 12 Laeufen ist ein "
+        f"einziger Wert praktisch ausgeschlossen, wenn wirklich gewuerfelt wird")
+
+
+def test_restrisiko_ist_ausgerechnet_und_klein(cid_datei):
+    """Nagelt die Rechnung fest, mit der das Restrisiko akzeptiert wurde.
+
+    Ein zufaelliger Start beseitigt den Fall nicht ganz — er macht aus einem
+    sicheren Treffer eine Wahrscheinlichkeit. Diese Zahl ist die Begruendung
+    dafuer, KEINE Sequenz-Persistenz zu bauen (das waere Datei-I/O im
+    44-Hz-Sendepfad); sie gehoert deshalb nachrechenbar in den Test und nicht
+    nur in einen Kommentar.
+    """
+    zone = 20            # (-20, 0] — E1.31 §6.7.2, Rueckwaerts-Sprung-Fenster
+    werte = 256          # 8-Bit-Sequenznummer
+    risiko = zone / werte
+    assert risiko < 0.08, f"Restrisiko {risiko:.1%} groesser als angenommen"
+
+    # Und die Gegenprobe zur Alternative: mit festem Start 0 ist es KEIN
+    # Zufall mehr, sondern sicher, sobald die vorige Sitzung in [1, 19] stand.
+    vorige_staende_die_treffen = [s for s in range(1, 20)
+                                  if -zone < (0 - s) <= 0]
+    assert len(vorige_staende_die_treffen) == 19
 
 
 def test_universen_haben_getrennte_zaehler(cid_datei, fake_sockets):
-    """Der Zaehler ist je (Quelle, Universum) — nicht einer fuer alles."""
+    """Der Zaehler ist je (Quelle, Universum) — nicht einer fuer alles.
+
+    Geprueft wird der ABSTAND, nicht der Absolutwert: seit 2026-08-03 startet
+    jedes Universum bei einer eigenen Zufallszahl. Genau das ist die Aussage —
+    Universum 2 darf NICHT dort weiterzaehlen, wo Universum 1 steht.
+    """
     sender = SACNSender(target_ip="10.0.0.5")
     for _ in range(5):
         sender.send_dmx(1, bytes(512))
     sender.send_dmx(2, bytes(512))
     sender.close()
 
-    u2 = [p for p in fake_sockets[0].sent
-          if int.from_bytes(p[113:115], "big") == 2 and p[112] == 0x00]
-    assert u2[0][111] == 0
+    def daten(universum):
+        return [p for p in fake_sockets[0].sent
+                if int.from_bytes(p[113:115], "big") == universum
+                and p[112] == 0x00]
+
+    u1, u2 = daten(1), daten(2)
+    assert len(u1) == 5 and len(u2) == 1
+    # Universum 1 ist um 5 vorgerueckt ...
+    assert u1[4][111] == (u1[0][111] + 4) % 256
+    # ... und Universum 2 haengt nicht daran: es hat seinen EIGENEN Startwert,
+    # der genau ein Mal benutzt wurde.
+    assert len(daten(2)) == 1, "Universum 2 wurde mehr als einmal bespielt"
 
 
 def test_kein_tmp_muell_neben_der_cid(cid_datei):

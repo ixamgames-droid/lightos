@@ -255,9 +255,21 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
                   f"{aktiv.get('spots', 0)} Lichter · "
                   f"{aktiv.get('schatten', 0)} Schatten")
         if not aktiv.get("kegel"):
-            print(f"WARNUNG: {anzahl} Fixtures, aber KEIN sichtbarer Kegel — die "
-                  f"Szene ist dunkel, die Zahlen unten messen nur Geometrie.",
-                  file=sys.stderr)
+            # ⚠️ ABBRUCH, nicht Warnung. Eine Warnung geht auf stderr, waehrend
+            # die ungueltige Stufe mit --json als ganz normales Ergebnis in der
+            # strukturierten Ausgabe landet — genau die Sorte falscher Baseline,
+            # gegen die dieses Werkzeug gebaut wurde, nur diesmal maschinell
+            # weiterverarbeitbar. Lieber gar keine Zahl als eine, der man
+            # ansehen muss, dass sie nichts wert ist.
+            ergebnis["stufen"][str(anzahl)] = {
+                "fixtures": anzahl, "ungueltig": True,
+                "grund": "kein sichtbarer Kegel — Szene dunkel",
+                "aktiv": aktiv,
+            }
+            print(f"ABBRUCH: {anzahl} Fixtures, aber KEIN sichtbarer Kegel — die "
+                  f"Szene ist dunkel. Es wird NICHT gemessen; eine Zahl von hier "
+                  f"waere reine Geometrie.", file=sys.stderr)
+            break
 
         def einmal_messen(n=None):
             """Sammelt n Einzelframes — je einer pro Event-Loop-Durchlauf."""
@@ -335,15 +347,30 @@ _SPOTS_AUS = """
 """
 
 
+# Stellt den VOLLEN Zustand wieder her — Lichter UND Schatten.
+#
+# ⚠️ Die erste Fassung setzte nur `spot.visible` zurueck. Die Schatten blieben
+# aus, weil `applySettings()` kein `syncSpotShadowBudget()` ruft (das laeuft nur
+# beim Hinzufuegen/Entfernen von Fixtures). Folge: nach der Stufe "ohne
+# Schatten" waren ALLE weiteren Messungen schattenlos — die SpotLight-Ersparnis
+# haette die Schatten-Ersparnis mitgezaehlt, und die Kontrollmessung am Ende
+# haette gegen einen unvollstaendigen "Vollzustand" verglichen und ihn fuer
+# unauffaellig erklaert. Ein Ruecksetzer, der nur die Haelfte zuruecksetzt, ist
+# schlimmer als keiner: er macht die Zerlegung falsch UND meldet sie als gueltig.
 _ALLES_AN = """
-(function () {
-  for (const fid in window.__lightos.fixtures) {
-    const s = window.__lightos.fixtures[fid].spot;
-    if (s) { s.visible = true; }
+(function (budget) {
+  const L = window.__lightos;
+  let vergeben = 0;
+  for (const fid in L.fixtures) {
+    const s = L.fixtures[fid].spot;
+    if (!s) continue;
+    s.visible = true;
+    s.castShadow = vergeben < budget;      // dieselbe fid-Reihenfolge wie
+    if (s.castShadow) vergeben += 1;       // syncSpotShadowBudget()
   }
-  window.__lightos.requestRender();
-  return true;
-})()
+  L.requestRender();
+  return vergeben;
+})(%d)
 """
 
 # Wirkungs-Kontrolle: zaehlt, was gerade WIRKLICH aktiv ist. Ohne sie sieht ein
@@ -400,7 +427,7 @@ def _zerlegen(anzahl, voll, ev, pumpe, bridge, messen_fn, still,
     def voll_herstellen():
         bridge.settingsChanged.emit(json.dumps({"showCones": True,
                                                 "showFloorSpots": True}))
-        ev(_ALLES_AN)
+        ev(_ALLES_AN % schatten_budget)
         pumpe(0.6)
 
     # (Name, Schaltfunktion, Schluessel in der Wirkungs-Kontrolle)
@@ -412,8 +439,12 @@ def _zerlegen(anzahl, voll, ev, pumpe, bridge, messen_fn, still,
         ("ohne Schatten", lambda: ev(_SCHATTEN_AUS), "schatten"),
         ("ohne SpotLights", lambda: ev(_SPOTS_AUS), "spots"),
     ]
+    # Wieviele Schatten waren im Vollzustand aktiv? Das ist die Zahl, auf die
+    # `voll_herstellen()` zurueckstellen muss — sie steht in der Wirkungs-
+    # Kontrolle, die vor der ersten Stufe gelesen wird.
+    schatten_budget = int(json.loads(ev(_ZAEHLEN) or "{}").get("schatten", 0))
     basis = voll.get("median_ms", 0)
-    raus = {"basis_median_ms": basis}
+    raus = {"basis_median_ms": basis, "schatten_im_vollzustand": schatten_budget}
     if not still:
         print(f"    Zerlegung bei {anzahl} Fixtures (Median voll: {basis:.2f} ms) — "
               f"jeder Bestandteil EINZELN abgeschaltet:")

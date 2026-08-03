@@ -7,6 +7,52 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-03 — Grosse Rigs im 3D-Visualizer, und eine saubere sACN-Identitaet
+
+#### Behoben
+
+- **Ein Rig ab 26 Geraeten liess den 3D-Visualizer abstuerzen.** Auf Rechnern
+  mit einer staerkeren Grafikkarte vergab die Ansicht bis zu 26 Schlagschatten —
+  und genau dort scheiterte der Grafiktreiber beim Uebersetzen des
+  Beleuchtungs-Programms. Der Absturz kam ohne Fehlermeldung; kurz davor
+  (25 Geraete) blieb das Bild ausserdem rund 17 Sekunden lang stehen. Die Zahl
+  der Schlagschatten ist jetzt bei **16** gedeckelt. Wer mehr als 16 Geraete
+  im Raum hat, sieht ab dem 17. keinen Schlagschatten mehr — dafuer laeuft die
+  Ansicht. Auf schwaecheren Geraeten (Surface) aendert sich nichts.
+
+- **Mit vielen Geraeten blieb die 3D-Buehne mitunter ganz dunkel.** Dieselbe
+  Ursache: was der Treiber nicht uebersetzen kann, zeichnet er auch nicht. Mit
+  48 Geraeten ist die Buehne wieder sichtbar.
+
+- **Die 3D-Raum-Huelle war von innen unsichtbar.** Der abschaltbare
+  Orientierungs-Rahmen (Waende/Decke) wurde seit seinem Einbau nie gezeichnet —
+  man steht in ihm drin, und die Innenseiten fehlten. Er erscheint jetzt.
+
+- **Auf schwacher Grafik waren die Schatten haerter als vorgesehen.** Die
+  weiche Kantenglaettung der Schatten war dort versehentlich abgeschaltet.
+
+- **sACN meldet sich jetzt als EINE Konsole, nicht als eine pro Universum.**
+  Bisher bekam jedes sACN-Universum eine eigene Quellkennung, und bei jedem
+  Programmstart — sowie bei jedem Speichern im Universen-Tab — eine neue.
+  Empfaenger, die Quellen verfolgen (Nodes, Pulte, Merge-Listen), sahen dadurch
+  laufend neue, unbekannte Absender und sammelten Karteileichen. LightOS
+  benutzt nun eine feste Kennung je Installation. Sie liegt als Datei
+  `sacn_cid` im Nutzerprofil; wer sie loescht, erscheint dem Netz als neues
+  Geraet.
+
+- **Beim Umschalten der Ausgabe konnten kurz Lichtwerte verloren gehen.** Wurde
+  ein sACN-Universum neu eingerichtet (Speichern/Uebernehmen), begann die
+  Paketzaehlung von vorn; strenge Empfaenger verwarfen daraufhin bis zu einer
+  halben Sekunde lang Daten. Die Zaehlung laeuft jetzt durch.
+
+#### Neu
+
+- **`tools/viz_render_benchmark.py`** — misst, wie lange die 3D-Ansicht fuer ein
+  Bild braucht, wahlweise aufgeschluesselt nach Lichtkegeln, Bodenflecken,
+  Schatten und Scheinwerfern. Damit laesst sich vor jeder Optik-Aenderung
+  beantworten, was sie kostet. Erste Messung: bei 12 Geraeten bleibt reichlich
+  Luft, ab 32 kommt die Ansicht der Lichtausgabe nicht mehr hinterher.
+
 ### 2026-08-02 — Lichtkegel enden am Podest, nicht dahinter
 
 #### Behoben
