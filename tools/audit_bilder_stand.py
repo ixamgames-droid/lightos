@@ -82,13 +82,16 @@ def ist_neuer(bild: str, stichzeit: str) -> bool:
     nur seltener sichtbar — deshalb hier gleich mit erledigt.
 
     Leere Angaben heissen „unbekannt" und damit NICHT neuer: im Zweifel bleibt
-    ein Punkt offen, statt stillschweigend als erledigt zu verschwinden.
+    ein Punkt offen, statt stillschweigend als erledigt zu verschwinden. Das
+    gilt auch fuer den TypeError, den ein Stempel OHNE Zeitzone ausloest
+    (`--date=iso-strict` liefert immer einen Offset — aber die Regel darf nicht
+    daran haengen, dass der Aufrufer das Format richtig waehlt).
     """
     if not bild or not stichzeit:
         return False
     try:
         return datetime.fromisoformat(bild) > datetime.fromisoformat(stichzeit)
-    except ValueError:
+    except (ValueError, TypeError):
         print(f"WARNUNG: unlesbarer Zeitstempel ({bild!r} / {stichzeit!r}) — "
               f"Punkt bleibt offen.", file=sys.stderr)
         return False

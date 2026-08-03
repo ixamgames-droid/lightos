@@ -70,6 +70,11 @@ def test_sommerzeit_wechsel_wird_nicht_alphabetisch_verglichen():
     ("", ""),
     ("kein Datum", _AUDIT),  # Format geaendert
     (_NACHARBEIT, "17.07.2026"),
+    # Ohne Zeitzone — wirft TypeError, nicht ValueError. Waere die Ausnahme
+    # nicht mitgefangen, riss das Werkzeug hier ab, statt den Punkt offen
+    # zu lassen.
+    ("2026-07-20T22:39:34", _AUDIT),
+    (_NACHARBEIT, "2026-07-20T19:18:49"),
 ])
 def test_unbekannte_zeit_laesst_den_punkt_offen(bild, stich):
     """Im Zweifel offen — ein Punkt darf nicht stillschweigend verschwinden."""
