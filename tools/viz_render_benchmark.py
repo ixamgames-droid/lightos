@@ -8,10 +8,39 @@ war damit eine Behauptung. Deshalb liegt es im Repo und nicht im Scratchpad.
     ./venv/bin/python tools/viz_render_benchmark.py            # 12/32/48 Fixtures
     ./venv/bin/python tools/viz_render_benchmark.py 8 24 64
     ./venv/bin/python tools/viz_render_benchmark.py --json     # nur die Zahlen
+    ./venv/bin/python tools/viz_render_benchmark.py 32 --zerlegen   # Anteile trennen
 
 Gemessen wird die Zeit fuer einen kompletten Renderdurchlauf der ECHTEN Szene
 (`stage_scene.html`, echter Modulcode) bei voll aufgedrehten Moving Heads —
 dem teuersten Fixture-Typ (Beam-Kegel, SpotLight, Bodenfleck).
+
+## ⚠️ Stand 2026-08-03: die Zahlen dieses Werkzeugs sind noch NICHT belastbar
+
+Der erste Satz Messwerte (15,3 / 18,6 / 22,5 ms bei 12/32/48 Fixtures) ist
+**falsch** und wurde zurueckgezogen: das `dmxBatch`-Signal bekam ein Objekt statt
+eines Arrays, der Handler lief ins Leere und die Fixtures blieben **dunkel** —
+gemessen wurde reine Gehaeuse-Geometrie ohne Beams, Bodenflecken und Lichter.
+Die Messung sah dabei tadellos aus: Werte stiegen mit der Fixture-Zahl, waren
+reproduzierbar und deckten sich zwischen zwei unabhaengigen Skripten. Gefunden
+hat es erst die Wirkungs-Kontrolle der Zerlegung ("0 sichtbare Kegel" bei
+angeblich voll aufgedrehten Movern).
+
+**Mit korrektem Format ist der Stand:**
+
+* **12 Fixtures: Median 3,0 ms, p95 8,6 ms (116 fps)** — sauber gemessen, alle 12
+  Kegel/Bodenflecken/Lichter aktiv. Deutlich schneller als die falsche Messung.
+* **32 Fixtures: keine Zahl.** Die Szene leuchtet korrekt (32 Kegel, 26 Schatten
+  = das Budget `maxTextures − 6`), aber der Intel-Treiber stuerzt waehrend der
+  Messschleife **reproduzierbar ab** (3 von 3 Laeufen, SIGSEGV mit
+  Shader-Assembly im Log). Ob das an der engen `gl.finish()`-Schleife liegt oder
+  die Szene dort wirklich an eine Grenze stoesst, ist offen.
+* **48 Fixtures: keine Zahl.** Dort leuchtet die Szene aus ungeklaertem Grund
+  gar nicht erst (die Gegenprobe meldet 0 Kegel und der Lauf wird als wertlos
+  markiert, statt eine huebsche Zahl auszugeben).
+
+**Wer hier weiterarbeitet, faengt bei diesen drei Punkten an** — nicht bei einer
+Optimierung. Solange 32 und 48 keine Zahl haben, ist jede Aussage ueber die
+Kosten einer Optik-Aenderung bei realer Rig-Groesse weiter unbelegt.
 
 ## Drei Messfallen, alle beim ersten Anlauf hineingetappt
 
@@ -123,7 +152,7 @@ def _bridge_cls():
     return type("BenchBridge", (QObject,), attrs)
 
 
-def messen(stufen, runden=150, still=False):
+def messen(stufen, runden=150, still=False, zerlegen=False, kumulativ=False):
     app = QApplication.instance() or QApplication([])
     view = QWebEngineView()
     view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
@@ -205,22 +234,56 @@ def messen(stufen, runden=150, still=False):
             print(f"ABBRUCH: nur {da} von {anzahl} Fixtures in der Szene", file=sys.stderr)
             break
 
-        bridge.dmxBatch.emit(json.dumps({
-            str(1000 + i): {"intensity": 255, "red": 255, "green": 180, "blue": 90,
-                            "pan": 128, "tilt": 200, "zoom": 128}
-            for i in range(anzahl)}))
-        pumpe(0.6)
+        # ⚠️ Das Signal erwartet ein ARRAY von {fid, r, g, b, intensity, pan, tilt}
+        # (bridge.js: `for (const d of arr)`), NICHT ein Objekt {fid: {...}}.
+        # Die erste Fassung schickte ein Objekt — der Handler lief ins Leere, die
+        # Fixtures blieben DUNKEL, und die Messung erfasste nur Gehaeuse-Geometrie
+        # ohne Beams, Bodenflecken und Lichter. Gemeldet hat das nicht die Messung
+        # (die lieferte plausible Zahlen), sondern die Wirkungs-Kontrolle der
+        # Zerlegung: "0 sichtbare Kegel" bei angeblich voll aufgedrehten Movern.
+        bridge.dmxBatch.emit(json.dumps([
+            {"fid": 1000 + i, "r": 255, "g": 180, "b": 90,
+             "intensity": 255, "pan": 128, "tilt": 200}
+            for i in range(anzahl)]))
+        pumpe(0.8)
 
-        roh = ev(_MESSUNG_JS % runden, 90.0)
-        werte = json.loads(roh or "{}")
+        # Und die Gegenprobe dazu: leuchten sie wirklich? Eine Messung an einer
+        # dunklen Szene ist keine Messung der Szene.
+        aktiv = json.loads(ev(_ZAEHLEN) or "{}")
+        if not still:
+            print(f"    aktiv: {aktiv.get('kegel', 0)} Kegel · "
+                  f"{aktiv.get('boden', 0)} Bodenflecken · "
+                  f"{aktiv.get('spots', 0)} Lichter · "
+                  f"{aktiv.get('schatten', 0)} Schatten")
+        if not aktiv.get("kegel"):
+            print(f"WARNUNG: {anzahl} Fixtures, aber KEIN sichtbarer Kegel — die "
+                  f"Szene ist dunkel, die Zahlen unten messen nur Geometrie.",
+                  file=sys.stderr)
+
+        def einmal_messen(n=None):
+            roh = ev(_MESSUNG_JS % (n or runden), 120.0)
+            w = json.loads(roh or "{}")
+            w["fps_p95"] = round(1000.0 / max(w.get("p95_ms", 1), 0.001), 1)
+            w["folgt_dmx"] = w.get("p95_ms", 999) <= DMX_BUDGET_MS
+            return w
+
+        werte = einmal_messen()
         werte["fixtures"] = anzahl
-        werte["fps_p95"] = round(1000.0 / max(werte.get("p95_ms", 1), 0.001), 1)
-        werte["folgt_dmx"] = werte.get("p95_ms", 999) <= DMX_BUDGET_MS
         ergebnis["stufen"][str(anzahl)] = werte
         if not still:
             marke = "ok " if werte["folgt_dmx"] else "ZU LANGSAM"
             print(f"{anzahl:>3} Fixtures: median {werte['median_ms']:>6.2f} ms · "
                   f"p95 {werte['p95_ms']:>6.2f} ms · {werte['fps_p95']:>5.1f} fps  {marke}")
+
+        if zerlegen:
+            # mehr Runden: die Anteile sind klein, das Rauschen darf es nicht sein
+            # Mehr Runden fuer die Zerlegung: die Anteile sind klein (1-3 ms),
+            # das Rauschen darf es nicht auch sein.
+            basis = einmal_messen(200)
+            werte["zerlegung"] = _zerlegen(
+                anzahl, basis, ev, pumpe, bridge,
+                lambda: einmal_messen(200), still,
+                zurueckschalten=not kumulativ)
 
     view.setParent(None)
     view.deleteLater()
@@ -228,11 +291,155 @@ def messen(stufen, runden=150, still=False):
     return ergebnis
 
 
+# ── Zerlegung: welcher Bestandteil kostet wieviel? ───────────────────────────
+#
+# Ohne diese Aufteilung optimiert man auf Verdacht. Jede Stufe schaltet GENAU
+# EINEN Bestandteil ab und misst neu; die Differenz zur Vollmessung ist sein
+# Anteil. Bewusst kumulativ am Ende ("nur Gehaeuse"), damit sichtbar wird, ob
+# sich die Einzelanteile ueberhaupt zur Gesamtlast addieren — tun sie es nicht,
+# ist die Last woanders (Geometrie, Uniform-Updates, Szenen-Traversierung).
+
+_SCHATTEN_AUS = """
+(function () {
+  let n = 0;
+  for (const fid in window.__lightos.fixtures) {
+    const s = window.__lightos.fixtures[fid].spot;
+    if (s && s.castShadow) { s.castShadow = false; n += 1; }
+  }
+  window.__lightos.requestRender();
+  return n;
+})()
+"""
+
+_SPOTS_AUS = """
+(function () {
+  let n = 0;
+  for (const fid in window.__lightos.fixtures) {
+    const s = window.__lightos.fixtures[fid].spot;
+    if (s && s.visible) { s.visible = false; n += 1; }
+  }
+  window.__lightos.requestRender();
+  return n;
+})()
+"""
+
+
+_ALLES_AN = """
+(function () {
+  for (const fid in window.__lightos.fixtures) {
+    const s = window.__lightos.fixtures[fid].spot;
+    if (s) { s.visible = true; }
+  }
+  window.__lightos.requestRender();
+  return true;
+})()
+"""
+
+# Wirkungs-Kontrolle: zaehlt, was gerade WIRKLICH aktiv ist. Ohne sie sieht ein
+# Schalter, der nichts bewirkt, in der Messung aus wie ein Bestandteil, der
+# nichts kostet — genau die Verwechslung, die diese Zerlegung aufloesen soll.
+_ZAEHLEN = """
+(function () {
+  const L = window.__lightos;
+  let kegel = 0, boden = 0, schatten = 0, spots = 0;
+  for (const fid in L.fixtures) {
+    const f = L.fixtures[fid];
+    if (f.beam && f.beam.visible) kegel += 1;
+    if (f.floorSpot && f.floorSpot.visible) boden += 1;
+    if (f.spot && f.spot.castShadow) schatten += 1;
+    if (f.spot && f.spot.visible) spots += 1;
+  }
+  return JSON.stringify({kegel, boden, schatten, spots});
+})()
+"""
+
+
+def _zerlegen(anzahl, voll, ev, pumpe, bridge, messen_fn, still,
+              zurueckschalten=True):
+    """Anteil je Bestandteil — EINZELN, nicht kumulativ, mit Kontrollmessung.
+
+    **Der erste Anlauf war nicht auswertbar, und das ist die Lehre.** Er schaltete
+    kumulativ ab (Kegel, dann zusaetzlich Bodenflecken, dann Schatten …) und las
+    p95 ab. Ergebnis: 14,6 → 15,2 → 16,1 → 14,2 ms. Die Werte STIEGEN zwischendurch,
+    obwohl jeder Schritt nur zusaetzlich Arbeit wegnimmt — die Einzelanteile
+    (1–3 ms) liegen unter dem Rauschen von p95 (zwischen zwei Vollmessungen allein
+    1,3 ms Unterschied gemessen).
+
+    Deshalb hier drei Aenderungen:
+      * **Median statt p95.** p95 ist ein Ausreisser-Mass und darum das
+        rauschigste; fuer einen Anteilsvergleich ist der Median die stabilere Zahl.
+      * **Einzeln statt kumulativ**, jeweils mit vollem Rueckbau dazwischen. Sonst
+        summieren sich die Messfehler ueber die Kette.
+      * **Kontrollmessung am Ende:** derselbe Vollzustand wie am Anfang wird
+        erneut gemessen. Weicht er deutlich ab, war der Lauf gestoert und die
+        Anteile sind nichts wert — das sagt das Werkzeug dann selbst.
+    """
+    def voll_herstellen():
+        bridge.settingsChanged.emit(json.dumps({"showCones": True,
+                                                "showFloorSpots": True}))
+        ev(_ALLES_AN)
+        pumpe(0.6)
+
+    # (Name, Schaltfunktion, Schluessel in der Wirkungs-Kontrolle)
+    stufen = [
+        ("ohne Kegel", lambda: bridge.settingsChanged.emit(
+            json.dumps({"showCones": False})), "kegel"),
+        ("ohne Bodenflecken", lambda: bridge.settingsChanged.emit(
+            json.dumps({"showFloorSpots": False})), "boden"),
+        ("ohne Schatten", lambda: ev(_SCHATTEN_AUS), "schatten"),
+        ("ohne SpotLights", lambda: ev(_SPOTS_AUS), "spots"),
+    ]
+    basis = voll.get("median_ms", 0)
+    raus = {"basis_median_ms": basis}
+    if not still:
+        print(f"    Zerlegung bei {anzahl} Fixtures (Median voll: {basis:.2f} ms) — "
+              f"jeder Bestandteil EINZELN abgeschaltet:")
+    for name, schalten, schluessel in stufen:
+        vorher = json.loads(ev(_ZAEHLEN) or "{}")
+        schalten()
+        pumpe(0.7)
+        nachher = json.loads(ev(_ZAEHLEN) or "{}")
+        wirkte = nachher.get(schluessel, -1) < vorher.get(schluessel, 0)
+
+        w = messen_fn()
+        gespart = basis - w["median_ms"]
+        raus[name] = {"median_ms": w["median_ms"], "anteil_ms": round(gespart, 2),
+                      "aktiv_vorher": vorher.get(schluessel),
+                      "aktiv_nachher": nachher.get(schluessel),
+                      "schalter_wirkte": wirkte}
+        if not still:
+            anteil = (gespart / basis * 100) if basis else 0
+            beleg = (f"{vorher.get(schluessel)}→{nachher.get(schluessel)}" if wirkte
+                     else f"SCHALTER OHNE WIRKUNG ({vorher.get(schluessel)}"
+                          f"→{nachher.get(schluessel)}) — Zeile bedeutungslos")
+            print(f"      {name:<20} Median {w['median_ms']:>6.2f} ms  "
+                  f"(−{gespart:>5.2f} ms = {anteil:>4.1f} %)  [{beleg}]")
+        if zurueckschalten:
+            voll_herstellen()
+
+    kontrolle = messen_fn()
+    abweichung = abs(kontrolle["median_ms"] - basis)
+    raus["kontrolle_median_ms"] = kontrolle["median_ms"]
+    raus["kontrolle_abweichung_ms"] = round(abweichung, 2)
+    grenze = max(0.5, basis * 0.10)
+    raus["belastbar"] = abweichung <= grenze
+    if not still:
+        urteil = ("ok — Anteile belastbar" if raus["belastbar"] else
+                  "ACHTUNG: Lauf gestoert, Anteile NICHT verwertbar")
+        print(f"      {'Kontrolle (voll)':<20} Median "
+              f"{kontrolle['median_ms']:>6.2f} ms  "
+              f"(Abweichung {abweichung:.2f} ms) — {urteil}")
+    return raus
+
+
 def main():
-    args = [a for a in sys.argv[1:] if a != "--json"]
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
     still = "--json" in sys.argv
+    zerlegen = "--zerlegen" in sys.argv
+    kumulativ = "--kumulativ" in sys.argv
     stufen = [int(a) for a in args] if args else [12, 32, 48]
-    ergebnis = messen(sorted(stufen), still=still)
+    ergebnis = messen(sorted(stufen), still=still, zerlegen=zerlegen,
+                      kumulativ=kumulativ)
     if still:
         print(json.dumps(ergebnis, indent=2))
     return 0
