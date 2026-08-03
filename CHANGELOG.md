@@ -61,6 +61,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Zeilen. **Geaendert wird nichts** — welche der beiden Zeilen gemeint war, weiss
   nur der Bediener.
 
+- **Die Bilder der VC-Widget-Anleitung zeigten eine alte Oberflaeche.** Sie
+  stammten groesstenteils vom 21.06. — seither sind die VC-Tasten plastisch
+  geworden, Sektionen wurden umbenannt („Live View" heisst „Buehne",
+  „Eingabe / Ausgabe" heisst „E/A"), und die Uebersicht zeigte sogar noch den
+  **Chase-Builder**, der Ende Juni entfernt wurde. Alle 17 Widget-Bilder, die
+  Uebersicht und das Referenz-Vollbild sind neu aufgenommen; die zwei Bilder des
+  entfernten Widgets sind raus.
+
 #### Neu
 
 - **`tools/viz_render_benchmark.py`** — misst, wie lange die 3D-Ansicht fuer ein

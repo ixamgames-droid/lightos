@@ -141,9 +141,18 @@ def place(w, key, title, x, y, ww, hh):
 
 
 # ── Kalibrier-Kacheln (reine Farben, an festen Canvas-Koordinaten) ───────────
+#
+# ⚠️ Die logische Groesse muss mindestens so gross sein, wie das Widget WIRKLICH
+# gerendert wird. Mit den urspruenglichen 14x14 belegte die Kachel real 40x30 px
+# (VCColor hat eine Mindestgroesse) — sie ragte damit in die erste Widget-Reihe
+# und stand als magenta Streifen in jedem VCButton-Bild. Ausserdem war die
+# Eigengroesse dadurch als Massstab unbrauchbar; `crop_vc_widgets.py` kalibriert
+# seither ueber den ABSTAND der beiden Kacheln, was von Mindestgroessen
+# unabhaengig ist. Die Groesse hier ist trotzdem angehoben, damit die Geometrie
+# den Platz einplant, den die Kachel tatsaechlich braucht.
 CAL1 = (255, 0, 255)   # Magenta  @ (4,4)
 CAL2 = (0, 255, 255)   # Cyan     @ (1304,4)
-CAL_SIZE = 14
+CAL_SIZE = 40
 c1 = VCColor(""); c1.color_r, c1.color_g, c1.color_b = CAL1; c1.with_intensity = False
 c1.target = ColorTarget.PROGRAMMER; c1.bank = 0; c1.setGeometry(4, 4, CAL_SIZE, CAL_SIZE)
 widgets.append(c1.to_dict())
@@ -151,19 +160,19 @@ c2 = VCColor(""); c2.color_r, c2.color_g, c2.color_b = CAL2; c2.with_intensity =
 c2.target = ColorTarget.PROGRAMMER; c2.bank = 0; c2.setGeometry(1304, 4, CAL_SIZE, CAL_SIZE)
 widgets.append(c2.to_dict())
 
-# ── Reihe 0 (y=24) ──────────────────────────────────────────────────────────
+# ── Reihe 0 (y=54 — unter den Kalibrier-Kacheln, s. CAL_SIZE) ───────────────
 b = VCButton("Effekt an/aus"); b.action = ButtonAction.FUNCTION_TOGGLE; b.function_id = mtx.id
-place(b, "VCButton", "Button (VCButton)", 30, 24, 160, 64)
+place(b, "VCButton", "Button (VCButton)", 30, 54, 160, 64)
 sl = VCSlider("Tempo"); sl.mode = SliderMode.EFFECT_SPEED; sl.function_id = mtx.id
-place(sl, "VCSlider", "Fader (VCSlider)", 230, 24, 60, 160)
+place(sl, "VCSlider", "Fader (VCSlider)", 230, 54, 60, 160)
 co = VCColor("Rot"); co.color_r, co.color_g, co.color_b = 220, 30, 30; co.target = ColorTarget.ALL
-place(co, "VCColor", "Farbe (VCColor)", 330, 24, 90, 90)
+place(co, "VCColor", "Farbe (VCColor)", 330, 54, 90, 90)
 en = VCEncoder("Groesse"); en.param_key = ENC_KEY; en.function_id = ENC_FID
-place(en, "VCEncoder", "Encoder (VCEncoder)", 460, 24, 100, 120)
+place(en, "VCEncoder", "Encoder (VCEncoder)", 460, 54, 100, 120)
 st = VCStepper("Anzahl"); st.param_key = STEP_KEY; st.function_id = STEP_FID
-place(st, "VCStepper", "Stepper (VCStepper)", 600, 24, 120, 80)
+place(st, "VCStepper", "Stepper (VCStepper)", 600, 54, 120, 80)
 sd = VCSpeedDial("Tempo-Knoten"); sd.target_mode = SpeedTarget.SPEED_NODE; sd.tempo_bus_id = "A"; sd.role = "master"
-place(sd, "VCSpeedDial", "Speed-Dial (VCSpeedDial)", 760, 24, 160, 150)
+place(sd, "VCSpeedDial", "Speed-Dial (VCSpeedDial)", 760, 54, 160, 190)
 
 # ── Reihe 1 (y=210) ─────────────────────────────────────────────────────────
 xy = VCXYPad("Pan/Tilt"); xy.mode = "position"; xy._fixture_ids = list(par_fids)
