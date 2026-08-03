@@ -177,6 +177,51 @@ class TestRemoteSettings(unittest.TestCase):
         self.assertNotEqual(t1, t2)
         self.assertEqual(remote_settings.get_token(), t2)
 
+    def test_token_bleibt_stabil_wenn_das_speichern_scheitert(self):
+        """NET-10: bei nicht schreibbarem Profil lieferte JEDER Aufruf ein
+        anderes Token.
+
+        `save_settings` schluckt jeden Schreibfehler und loggt nur. Ohne
+        Prozess-Cache erzeugte `get_token()` daraufhin jedes Mal ein neues,
+        nirgends gespeichertes Token — das Web-Remote waere unbenutzbar
+        gewesen: der Link zeigt Token A, der Handshake erwartet inzwischen B,
+        und der einzige Hinweis ist eine geschluckte Log-Zeile.
+        """
+        import tempfile
+        from src.web import remote_settings
+
+        with tempfile.TemporaryDirectory() as wegwerf:
+            # Ein Ort, an dem nicht geschrieben werden KANN: das Elternteil ist
+            # eine Datei. Haengt nicht an Rechten und gilt damit auch fuer root.
+            sperre = os.path.join(wegwerf, "eine_datei")
+            with open(sperre, "w", encoding="utf-8") as fh:
+                fh.write("x")
+            alt = os.environ.get("LIGHTOS_PREFS_DIR")
+            os.environ["LIGHTOS_PREFS_DIR"] = os.path.join(sperre, "unmoeglich")
+            remote_settings._token_cache_leeren()
+            try:
+                t1 = remote_settings.get_token()
+                t2 = remote_settings.get_token()
+                t3 = remote_settings.get_token()
+                self.assertTrue(t1, "gar kein Token erzeugt")
+                self.assertEqual(t1, t2)
+                self.assertEqual(t2, t3)
+            finally:
+                if alt is None:
+                    os.environ.pop("LIGHTOS_PREFS_DIR", None)
+                else:
+                    os.environ["LIGHTOS_PREFS_DIR"] = alt
+                remote_settings._token_cache_leeren()
+
+    def test_rotation_wirkt_trotz_cache(self):
+        """Der Cache darf die Rotation nicht aushebeln — und auch nicht ihre
+        eigene Gegenprobe (CDX-24) faelschlich ausloesen."""
+        from src.web import remote_settings
+        t1 = remote_settings.get_token()
+        t2 = remote_settings.regenerate_token()      # wuerfe RuntimeError, wenn
+        self.assertNotEqual(t1, t2)                  # der Cache dazwischenfunkt
+        self.assertEqual(remote_settings.get_token(), t2)
+
     def test_toggles_default_and_roundtrip(self):
         from src.web import remote_settings
         self.assertTrue(remote_settings.is_lan_remote_enabled())    # Default AN

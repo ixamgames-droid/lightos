@@ -22,6 +22,44 @@ _UNIV_CONFIG_PATH = os.path.join("data", "universes.json")
 _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 
 
+def _doppelte_ziele(rows: list[dict]) -> list[tuple[str, str]]:
+    """OUT-07: findet Universen, die auf dasselbe Ziel senden.
+
+    Zwei Zeilen kollidieren, wenn sie **denselben Adaptertyp**, **dasselbe Ziel**
+    (Port bzw. IP) und **dieselbe externe Universe-Nummer** haben. Die externe
+    Nummer ist dabei optional (`out_universe`); fehlt sie, gilt der Default
+    `num - 1` — genau so rechnet auch `OutputManager._send_all`.
+
+    **Warum nur melden und nicht korrigieren:** welches der beiden Universen
+    gemeint war, weiss nur der Bediener. Automatisch umzunummerieren hiesse zu
+    raten — und im schlechtesten Fall schaltet man damit das falsche Rig dunkel.
+    Reine Diagnose also, dieselbe Haltung wie bei `enttec_pro.diagnose_port()`.
+
+    Rueckgabe: je Kollision ein Paar (Zeilenliste, Beschreibung) — leer, wenn
+    alles eindeutig ist.
+    """
+    gesehen: dict[tuple, list[int]] = {}
+    for i, e in enumerate(rows, start=1):
+        typ = (e.get("output") or "Disabled").strip()
+        if typ in ("", "Disabled"):
+            continue                       # abgeschaltet kollidiert mit nichts
+        ziel = (e.get("patch") or "").strip()
+        extern = e.get("out_universe")
+        if extern is None:
+            extern = int(e.get("num", 1)) - 1
+        gesehen.setdefault((typ, ziel, int(extern)), []).append(i)
+
+    treffer = []
+    for (typ, ziel, extern), zeilen in gesehen.items():
+        if len(zeilen) < 2:
+            continue
+        wohin = ziel or "Standard-Ziel"
+        treffer.append((
+            ", ".join(f"Zeile {z}" for z in zeilen),
+            f"{typ} → {wohin}, externes Universum {extern}"))
+    return treffer
+
+
 def _coerce_universe_num(text, fallback: int) -> tuple[int, bool]:
     """Universe-Nummer aus einem freien Tabellenfeld robust in den gueltigen
     Bereich [``_UNIVERSE_MIN``..``_UNIVERSE_MAX``] zwingen.
@@ -510,6 +548,22 @@ class OutputConfigDialog(QDialog):
                 self, "Universe-Nummer angepasst",
                 f"Universe-Nummern müssen zwischen {_UNIVERSE_MIN} und "
                 f"{_UNIVERSE_MAX} liegen. Angepasst: {_lst}.")
+
+        # OUT-07: zwei Universen auf DASSELBE Ziel sind ein Bedienfehler, den die
+        # Software bisher still mitgemacht hat. Beide senden dann auf dieselbe
+        # externe Nummer, der Empfänger bekommt abwechselnd zwei verschiedene
+        # Inhalte und zeigt Flackern — ohne dass irgendwo etwas gemeldet wird.
+        # Nur WARNEN, nicht korrigieren: welches der beiden Universen gemeint
+        # war, weiß nur der Bediener. Eine automatische Umnummerierung würde
+        # raten und dabei möglicherweise das falsche Rig dunkel schalten.
+        for zeilen, was in _doppelte_ziele(rows):
+            QMessageBox.warning(
+                self, "Zwei Universen auf demselben Ziel",
+                f"{was}\n\nBetroffen: {zeilen}.\n\nBeide senden dorthin — der "
+                f"Empfänger bekommt abwechselnd zwei verschiedene Inhalte. "
+                f"Gespeichert wird trotzdem; wenn das Absicht ist, ignorieren "
+                f"Sie diesen Hinweis.")
+
         _save_universe_config(rows)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         try:
