@@ -5,26 +5,31 @@ Software-UI. Jedes Bild wurde visuell gelesen und die sichtbaren UI-Labels gegen
 die aktuellen String-Literale im Quellcode (`src/`) verifiziert. Ziel: **nur die
 Bilder ersetzen, die sich tatsächlich vom aktuellen Stand unterscheiden.**
 
-> ## ⚠️ Dieses Dokument ist eine Momentaufnahme — den Stand nicht hier ablesen
+> ## ✅ Abgearbeitet — Stand 2026-08-03
 >
-> Seit dem 20.07. wurde nachgearbeitet, ohne dass die Datei es weiß. Wer sie von
-> oben abarbeitet, sucht Bilder, die längst neu sind oder gar nicht mehr
-> existieren — genau das ist am 2026-08-03 passiert.
+> Alle Punkte dieses Audits sind erledigt: **3 hinfällig** (Bild existiert nicht
+> mehr), **47 nach dem Audit erneuert**. Die Nacharbeit lief noch am selben Abend
+> (Widget-Dialoge um 22:39, drei Stunden nach dem Audit) und am 21.07.
 >
-> **Den aktuellen Stand liefert das Werkzeug, nicht der Text:**
+> **Den Stand nicht hier ablesen, sondern messen:**
 >
 > ```
 > ./venv/bin/python tools/audit_bilder_stand.py docs/BILDER_AUDIT_2026-07-20.md
 > ```
 >
-> **Stand 2026-08-03:** von 50 Punkten sind **3 hinfällig** (Bild existiert nicht
-> mehr), **31 wurden seit dem Audit angefasst** (30 davon am 21.07. in einer
-> Sammelaktion, eines heute), **16 sind offen** — Schwerpunkte:
-> `anleitung_vc_widgets` (5, überwiegend Dialog-Bilder), `tutorial_matrix` (4),
-> dazu drei Bank-Übersichten und zwei Toolbar-Bilder.
+> ⚠️ **Zwei Vorbehalte, die zum Ergebnis gehören:**
 >
-> Das Werkzeug vergleicht **Dateidaten, keine Inhalte**: „angefasst" heißt
-> *vermutlich* behoben, nicht *nachweislich*. Es sortiert vor, es urteilt nicht.
+> 1. Das Werkzeug vergleicht **Zeitstempel, keine Inhalte**. „Erneuert" heißt
+>    *vermutlich* behoben, nicht *nachweislich*. Stichprobe: für
+>    `dialog_VCButton.png` wurde der Befund am Bild verifiziert — die im Audit
+>    bemängelten Labels („Steuert:", „Weitere Ziel-IDs:", „— MIDI-Bindung —")
+>    sind dort tatsächlich durch die neuen ersetzt.
+> 2. Ein erster Anlauf am 2026-08-03 verglich **tagesgenau** und meldete prompt
+>    16 offene Punkte — darunter vier Dialog-Bilder, die am Stichtag selbst,
+>    drei Stunden nach dem Audit, erneuert worden waren. Beim „Nachaufnehmen"
+>    wäre ein besseres Bild durch ein schlechteres ersetzt worden (ohne
+>    Titelleiste, mit eingeklapptem Abschnitt). *Tagesgenauigkeit reicht nicht,
+>    wenn die Nacharbeit am selben Tag passiert.*
 
 ## Ergebnis
 
