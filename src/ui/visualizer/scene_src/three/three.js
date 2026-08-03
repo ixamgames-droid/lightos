@@ -12,7 +12,31 @@
 //
 // Named-Export-Menge = exakt die in stage_scene.html genutzte Menge
 // (per `grep -oE 'THREE\.[A-Za-z0-9_]+' stage_scene.html | sort -u`
-// ermittelt, Stand 3a-2). OBJLoader/ColladaLoader haengen sich (wie die
+// ermittelt, Stand 3a-2).
+//
+// ⚠️ GENAU DAS WAR DIE LUECKE (2026-08-03, VIZ-SHIM): die Liste wurde einmal
+// aus `stage_scene.html` erhoben und danach nur noch von Hand nachgezogen —
+// die Module unter `scene_src/` greift sie nie ab. Ein hier FEHLENDER Name
+// wirft nicht, er ist beim Zugriff ueber den Modul-Namespace schlicht
+// `undefined`, und `undefined` ist in three ein gueltig aussehender Wert:
+//
+//   * `PCFShadowMap` fehlte -> `renderer.shadowMap.type = undefined` auf
+//     Low-Spec -> Rueckfall auf SHADOWMAP_TYPE_BASIC, also harte Schatten
+//     statt der im Code beschriebenen PCF-Filterung.
+//   * `BackSide` fehlte -> die Raum-Huelle (VIZ-14) bekam `side: undefined`,
+//     three faellt auf `FrontSide` zurueck. Gemessen mit einem Strahl aus der
+//     Raumitte: 2 Treffer mit BackSide, **0** ohne. Die Huelle war also von
+//     innen unsichtbar — das gesamte Feature war wirkungslos, seit es gebaut
+//     wurde. three warnt dabei sogar („'side' parameter is undefined"), nur
+//     liest die Warnung im Qt-Log niemand.
+//
+// Der Fall ist jetzt gegatet: `tests/test_viz_three_shim_complete.py` sammelt
+// JEDEN `THREE.<Name>`-Zugriff aus allen Modulen, die dieses Wrapper-Modul
+// importieren, und verlangt ihn in der Liste unten. Wer hier etwas ergaenzt,
+// braucht nichts weiter zu tun; wer unten etwas BENUTZT ohne es hier
+// einzutragen, wird rot.
+//
+// OBJLoader/ColladaLoader haengen sich (wie die
 // Kernklassen) an `window.THREE` - sie werden als eigene klassische
 // Scripts VOR three_local.js... nein, NACH three_local.js aber weiterhin
 // klassisch (nicht als Modul) geladen (assets/OBJLoader.js,
@@ -24,6 +48,7 @@ export const {
   ACESFilmicToneMapping,
   AdditiveBlending,
   AmbientLight,
+  BackSide,
   Box3,
   BoxGeometry,
   BoxHelper,
@@ -52,6 +77,7 @@ export const {
   OBJLoader,
   Object3D,
   OrthographicCamera,
+  PCFShadowMap,
   PCFSoftShadowMap,
   PerspectiveCamera,
   Plane,
