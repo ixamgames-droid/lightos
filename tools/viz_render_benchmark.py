@@ -14,33 +14,28 @@ Gemessen wird die Zeit fuer einen kompletten Renderdurchlauf der ECHTEN Szene
 (`stage_scene.html`, echter Modulcode) bei voll aufgedrehten Moving Heads —
 dem teuersten Fixture-Typ (Beam-Kegel, SpotLight, Bodenfleck).
 
-## ⚠️ Stand 2026-08-03: die Zahlen dieses Werkzeugs sind noch NICHT belastbar
+## Stand 2026-08-03: die Zahlen stimmen jetzt — nach zwei Korrekturen
 
-Der erste Satz Messwerte (15,3 / 18,6 / 22,5 ms bei 12/32/48 Fixtures) ist
-**falsch** und wurde zurueckgezogen: das `dmxBatch`-Signal bekam ein Objekt statt
-eines Arrays, der Handler lief ins Leere und die Fixtures blieben **dunkel** —
-gemessen wurde reine Gehaeuse-Geometrie ohne Beams, Bodenflecken und Lichter.
-Die Messung sah dabei tadellos aus: Werte stiegen mit der Fixture-Zahl, waren
-reproduzierbar und deckten sich zwischen zwei unabhaengigen Skripten. Gefunden
-hat es erst die Wirkungs-Kontrolle der Zerlegung ("0 sichtbare Kegel" bei
-angeblich voll aufgedrehten Movern).
+Dieses Werkzeug hat zweimal das Falsche gemessen, beide Male ueberzeugend:
 
-**Mit korrektem Format ist der Stand:**
+1. **Die Szene war dunkel.** Das `dmxBatch`-Signal will ein ARRAY
+   `[{fid, r, g, b, intensity}]`, bekam aber ein Objekt `{fid: {...}}`; der
+   Handler lief ins Leere. Gemessen wurde reine Gehaeuse-Geometrie. Die Werte
+   stiegen trotzdem mit der Fixture-Zahl, waren reproduzierbar und deckten sich
+   zwischen zwei unabhaengigen Skripten — gefunden hat es erst eine
+   Wirkungs-Kontrolle ("0 sichtbare Kegel" bei voll aufgedrehten Movern).
+2. **Mehrere Frames in EINEM JS-Task.** Das ist nicht der Betriebsmodus (dort
+   gibt rAF einen Frame je Durchlauf) und ausserdem instabil. Jetzt treibt
+   Python die Schleife, ein Frame je `runJavaScript`.
 
-* **12 Fixtures: Median 3,0 ms, p95 8,6 ms (116 fps)** — sauber gemessen, alle 12
-  Kegel/Bodenflecken/Lichter aktiv. Deutlich schneller als die falsche Messung.
-* **32 Fixtures: keine Zahl.** Die Szene leuchtet korrekt (32 Kegel, 26 Schatten
-  = das Budget `maxTextures − 6`), aber der Intel-Treiber stuerzt waehrend der
-  Messschleife **reproduzierbar ab** (3 von 3 Laeufen, SIGSEGV mit
-  Shader-Assembly im Log). Ob das an der engen `gl.finish()`-Schleife liegt oder
-  die Szene dort wirklich an eine Grenze stoesst, ist offen.
-* **48 Fixtures: keine Zahl.** Dort leuchtet die Szene aus ungeklaertem Grund
-  gar nicht erst (die Gegenprobe meldet 0 Kegel und der Lauf wird als wertlos
-  markiert, statt eine huebsche Zahl auszugeben).
+Beides ist behoben und gegen einen Rueckfall gesichert: vor jeder Messung wird
+geprueft, ob die Szene ueberhaupt leuchtet, und ohne Kegel gibt es eine Warnung
+statt einer huebschen Zahl.
 
-**Wer hier weiterarbeitet, faengt bei diesen drei Punkten an** — nicht bei einer
-Optimierung. Solange 32 und 48 keine Zahl haben, ist jede Aussage ueber die
-Kosten einer Optik-Aenderung bei realer Rig-Groesse weiter unbelegt.
+**Nebenbei fand dieses Werkzeug den Absturz, der VIZ-PERF war:** ein Rig ab 26
+Geraeten liess den Intel-Shader-Compiler scheitern
+(`SIMD8 FS compile failed: no register to spill`), weil das Shadow-Budget zu
+hoch angesetzt war. Seit dem Dach in `fixtures.js` laufen 32 und 48 Fixtures.
 
 ## Drei Messfallen, alle beim ersten Anlauf hineingetappt
 
@@ -105,29 +100,27 @@ _SIGNAL_SPECS = [
     ("pixelRatioSignal", (float,)),
 ]
 
+# EIN Frame je Aufruf. Die Schleife treibt Python, damit zwischen zwei Frames der
+# Event-Loop laeuft — genau wie im Betrieb, wo rAF je Durchlauf einen Frame gibt.
+#
+# ⚠️ Die frueher Fassung liess JS mehrere Frames in EINEM Task rendern. Das ist
+# nicht nur unrealistisch, es bringt den Intel-Treiber zum Absturz: gemessen
+# laeuft 1 Frame bei 32 leuchtenden Fixtures sauber durch (13,9 ms), 3 Frames im
+# selben Task erzeugen reproduzierbar SIGSEGV mit Shader-Assembly im Log. Der
+# Absturz war also ein Fehler des WERKZEUGS, nicht der Szene — und er haette
+# beinahe als Eigenschaft des Visualizers protokolliert.
 _MESSUNG_JS = """
-(function (runden) {
+(function () {
   const L = window.__lightos;
   const c = document.querySelector('canvas');
   const gl = c && (c.getContext('webgl2') || c.getContext('webgl'));
   if (!gl) return JSON.stringify({fehler: 'kein GL-Kontext'});
-  const z = [];
-  for (let i = 0; i < runden; i++) {
-    L.requestRender();
-    const t0 = performance.now();
-    L.__renderTick();
-    gl.finish();                      // ohne das misst man nur die Submission
-    z.push(performance.now() - t0);
-  }
-  z.sort((a, b) => a - b);
-  const q = (p) => z[Math.min(z.length - 1, Math.floor(z.length * p))];
-  return JSON.stringify({
-    runden: z.length,
-    median_ms: +q(0.50).toFixed(2),
-    p95_ms:    +q(0.95).toFixed(2),
-    max_ms:    +z[z.length - 1].toFixed(2),
-  });
-})(%d)
+  L.requestRender();
+  const t0 = performance.now();
+  L.__renderTick();
+  gl.finish();                        // ohne das misst man nur die Submission
+  return JSON.stringify({ms: +(performance.now() - t0).toFixed(2)});
+})()
 """
 
 
@@ -152,7 +145,7 @@ def _bridge_cls():
     return type("BenchBridge", (QObject,), attrs)
 
 
-def messen(stufen, runden=150, still=False, zerlegen=False, kumulativ=False):
+def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
     app = QApplication.instance() or QApplication([])
     view = QWebEngineView()
     view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
@@ -250,6 +243,12 @@ def messen(stufen, runden=150, still=False, zerlegen=False, kumulativ=False):
         # Und die Gegenprobe dazu: leuchten sie wirklich? Eine Messung an einer
         # dunklen Szene ist keine Messung der Szene.
         aktiv = json.loads(ev(_ZAEHLEN) or "{}")
+        if not aktiv.get("antwort"):
+            print(f"ABBRUCH: die Seite antwortet nicht mehr (bei {anzahl} "
+                  f"Fixtures). Das ist KEINE Messung von 0 — vermutlich ist der "
+                  f"Renderer gestorben; im Log nach 'compile failed' suchen.",
+                  file=sys.stderr)
+            break
         if not still:
             print(f"    aktiv: {aktiv.get('kegel', 0)} Kegel · "
                   f"{aktiv.get('boden', 0)} Bodenflecken · "
@@ -261,10 +260,22 @@ def messen(stufen, runden=150, still=False, zerlegen=False, kumulativ=False):
                   file=sys.stderr)
 
         def einmal_messen(n=None):
-            roh = ev(_MESSUNG_JS % (n or runden), 120.0)
-            w = json.loads(roh or "{}")
-            w["fps_p95"] = round(1000.0 / max(w.get("p95_ms", 1), 0.001), 1)
-            w["folgt_dmx"] = w.get("p95_ms", 999) <= DMX_BUDGET_MS
+            """Sammelt n Einzelframes — je einer pro Event-Loop-Durchlauf."""
+            zeiten = []
+            for _ in range(n or runden):
+                roh = ev(_MESSUNG_JS, 30.0)
+                d = json.loads(roh or "{}")
+                if "ms" not in d:
+                    return {"fehler": d.get("fehler", "keine Antwort")}
+                zeiten.append(d["ms"])
+                app.processEvents()          # dem Compositor Luft lassen
+            zeiten.sort()
+            def q(p):
+                return zeiten[min(len(zeiten) - 1, int(len(zeiten) * p))]
+            w = {"runden": len(zeiten), "median_ms": round(q(0.50), 2),
+                 "p95_ms": round(q(0.95), 2), "max_ms": round(zeiten[-1], 2)}
+            w["fps_p95"] = round(1000.0 / max(w["p95_ms"], 0.001), 1)
+            w["folgt_dmx"] = w["p95_ms"] <= DMX_BUDGET_MS
             return w
 
         werte = einmal_messen()
@@ -279,10 +290,10 @@ def messen(stufen, runden=150, still=False, zerlegen=False, kumulativ=False):
             # mehr Runden: die Anteile sind klein, das Rauschen darf es nicht sein
             # Mehr Runden fuer die Zerlegung: die Anteile sind klein (1-3 ms),
             # das Rauschen darf es nicht auch sein.
-            basis = einmal_messen(200)
+            basis = einmal_messen(40)
             werte["zerlegung"] = _zerlegen(
                 anzahl, basis, ev, pumpe, bridge,
-                lambda: einmal_messen(200), still,
+                lambda: einmal_messen(40), still,
                 zurueckschalten=not kumulativ)
 
     view.setParent(None)
@@ -338,9 +349,20 @@ _ALLES_AN = """
 # Wirkungs-Kontrolle: zaehlt, was gerade WIRKLICH aktiv ist. Ohne sie sieht ein
 # Schalter, der nichts bewirkt, in der Messung aus wie ein Bestandteil, der
 # nichts kostet — genau die Verwechslung, die diese Zerlegung aufloesen soll.
+# ⚠️ Das `antwort`-Feld ist kein Zierrat, sondern der Unterschied zwischen
+# "nichts ist aktiv" und "niemand hat geantwortet".
+#
+# `ev()` liefert `None`, wenn `runJavaScript` nicht antwortet — etwa weil der
+# Renderer-Prozess gestorben ist. Ohne Sentinel wird daraus `json.loads("{}")`
+# und damit `{kegel: 0, boden: 0, ...}`, also exakt dasselbe Bild wie eine
+# dunkle Szene. Genau so ist am 2026-08-03 die Meldung "bei 48 Fixtures leuchtet
+# nichts" entstanden: der Renderer war zu dem Zeitpunkt bereits am
+# Shader-Compiler gescheitert, und das Schweigen wurde als Messwert gelesen.
+# Es hat einen halben Tag gekostet, das als eigenes Raetsel zu verfolgen.
 _ZAEHLEN = """
 (function () {
   const L = window.__lightos;
+  if (!L || !L.fixtures) return JSON.stringify({antwort: 1, fehler: 'kein __lightos'});
   let kegel = 0, boden = 0, schatten = 0, spots = 0;
   for (const fid in L.fixtures) {
     const f = L.fixtures[fid];
@@ -349,7 +371,8 @@ _ZAEHLEN = """
     if (f.spot && f.spot.castShadow) schatten += 1;
     if (f.spot && f.spot.visible) spots += 1;
   }
-  return JSON.stringify({kegel, boden, schatten, spots});
+  return JSON.stringify({antwort: 1, geraete: Object.keys(L.fixtures).length,
+                         kegel, boden, schatten, spots});
 })()
 """
 

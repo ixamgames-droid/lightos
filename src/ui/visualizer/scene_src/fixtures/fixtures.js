@@ -37,15 +37,71 @@ export const fixtureMeshes = []; // for raycasting
 // Daher: nur die ersten N Spots werfen Schatten, der Rest leuchtet ohne.
 // Reserve deckt Material-/Sonstige-Texturen (Boden-Canvas, Label-Sprites) ab.
 const SHADOW_TEXTURE_RESERVE = 6;
+
+// ⚠️ VIZ-PERF (2026-08-03): Texture-Units sind NICHT die einzige Grenze.
+//
+// Auf einer GPU mit vielen Units (Intel UHD 630, maxTextures=32) ergibt die
+// Rechnung oben ein Budget von 26 — und genau dort **stuerzt der Grafiktreiber
+// ab**, sobald die Szene mehr als einen Frame zeichnet. Nicht Kontextverlust,
+// sondern ein UEBERSETZUNGS-Fehler des Shaders:
+//
+//     Failed to compile fragment shader:
+//     SIMD8 FS compile failed: no register to spill
+//
+// Jede Shadow-Map kostet den Fragment-Shader nicht nur eine Texture-Unit,
+// sondern auch Register (Matrizen, Bias, Radius je Licht). Ab einer gewissen
+// Zahl findet der Intel-Compiler nichts mehr zum Auslagern und bricht ab; der
+// Prozess endet mit SIGSEGV.
+//
+// Gemessen mit `tools/viz_render_benchmark.py` bzw. der Diagnose-Sonde, jeweils
+// leuchtende Moving Heads im rAF-Betrieb (20 s):
+//
+//     20 Fixtures / 20 Schatten   laeuft (438 Frames)
+//     22 Fixtures / 22 Schatten   laeuft (305 Frames)
+//     24 Fixtures / 24 Schatten   laeuft (148 Frames)
+//     26 Fixtures / 26 Schatten   ABSTURZ      <- Budget ausgeschoepft
+//     32 Fixtures / 26 Schatten   ABSTURZ
+//     32 Fixtures / 22 Schatten   laeuft       (Reserve testweise auf 10)
+//     32 Fixtures / 18 Schatten   laeuft (386 Frames, Reserve auf 14)
+//
+// Ausgeschlossen wurde dabei einzeln: die Kegel (abgeschaltet -> stuerzt
+// weiter ab), die SpotLight-Sichtbarkeit (dito), `gl.finish()` und die
+// Rundenzahl der Messschleife. Es bleibt die Zahl der SHADOW-MAPS.
+//
+// Deshalb zusaetzlich ein ABSOLUTES Dach. Es ist bewusst 16 — der Wert, den
+// Davids Surface ohnehin als `maxTextures` meldet: damit verhaelt sich die
+// Szene auf beiden Geraeten gleich, statt auf der staerkeren GPU in einen
+// Fehler zu laufen, den die schwaechere nie sieht. Der Abstand zur gemessenen
+// Kippgrenze (24 gut / 26 kaputt) ist Absicht — sie wurde auf EINER GPU
+// ermittelt, und ein Dach, das erst kurz vor dem Abgrund greift, ist keins.
+//
+// Grosse Rigs verlieren dadurch Schlagschatten jenseits des 16. Geraets. Das
+// ist der Preis; die Alternative war ein Absturz. Wer das Dach anhebt, misst
+// vorher mit dem Benchmark nach — und zwar auf beiden Geraeten.
+const SHADOW_SPOT_HARD_CAP = 16;
 let _shadowSpotBudget = null;
 
 function shadowSpotBudget() {
   if (_shadowSpotBudget === null) {
     const maxTex = (renderer && renderer.capabilities
       && renderer.capabilities.maxTextures) || 16;
-    _shadowSpotBudget = Math.max(2, maxTex - SHADOW_TEXTURE_RESERVE);
+    _shadowSpotBudget = Math.min(
+      SHADOW_SPOT_HARD_CAP,
+      Math.max(2, maxTex - SHADOW_TEXTURE_RESERVE));
   }
   return _shadowSpotBudget;
+}
+
+/** Nur fuer Tests: die beiden Grenzen und das Ergebnis sichtbar machen. */
+export function shadowBudgetInfo() {
+  const maxTex = (renderer && renderer.capabilities
+    && renderer.capabilities.maxTextures) || 16;
+  return {
+    maxTextures: maxTex,
+    reserve: SHADOW_TEXTURE_RESERVE,
+    hardCap: SHADOW_SPOT_HARD_CAP,
+    budget: shadowSpotBudget(),
+  };
 }
 
 // Idempotent: verteilt das Budget deterministisch (fid-Reihenfolge) auf alle
