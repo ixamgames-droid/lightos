@@ -51,7 +51,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Bild braucht, wahlweise aufgeschluesselt nach Lichtkegeln, Bodenflecken,
   Schatten und Scheinwerfern. Damit laesst sich vor jeder Optik-Aenderung
   beantworten, was sie kostet. Erste Messung: bei 12 Geraeten bleibt reichlich
-  Luft, ab 32 kommt die Ansicht der Lichtausgabe nicht mehr hinterher.
+  Luft, bei 32 sind rund 90 % der verfuegbaren Zeit je Bild verbraucht, bei 48
+  ist sie ausgeschoepft — dann zeigt die Ansicht weniger Zwischenschritte je
+  Sekunde. Sie haengt dabei NICHT hinterher: sie ueberspringt Zwischenstaende
+  und zeigt immer den aktuellen. Aufgeschluesselt kosten bei 32 Geraeten die
+  **Schlagschatten am meisten** (36 %), dann die Lichtkegel (22 %) und die
+  Bodenflecken (15 %) — wer die Ansicht schneller haben will, faengt bei den
+  Schatten an.
 
 ### 2026-08-02 — Lichtkegel enden am Podest, nicht dahinter
 
