@@ -82,6 +82,15 @@ os.environ.setdefault(
     "LIGHTOS_CRASH_LOG",
     os.path.join(_TEST_TMP, f"lightos_test_crash_{_TEST_PID}.log"))
 
+# OUT-06: dieselbe Trennung fuer die persistente sACN-CID. Ohne sie legte JEDER
+# Testlauf, der irgendwo einen SACNSender baut (test_sacn_loopback,
+# test_output_iface), die Identitaet der ECHTEN Installation an bzw. benutzte sie —
+# und ein Test, der eine kaputte Datei prueft, wuerde sie ueberschreiben. Genau wie
+# beim crash.log reicht die APPDATA-Umlenkung dafuer nur auf Windows.
+os.environ.setdefault(
+    "LIGHTOS_SACN_CID",
+    os.path.join(_TEST_TMP, f"lightos_test_sacn_cid_{_TEST_PID}"))
+
 
 def _purge_test_dbs():
     """Die prozess-eigene Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
