@@ -115,22 +115,72 @@ class BenchmarkGueltigkeitTest(unittest.TestCase):
                       "der Rueckbau stellt die Schatten nicht wieder her")
 
 
+class BenchmarkZerlegungTest(unittest.TestCase):
+    """Der `--aus`-Modus misst EINE Variante in einem eigenen Prozess."""
+
+    def test_aus_modus_existiert_mit_allen_vier_teilen(self):
+        quelle = _quelle()
+        self.assertIn('"--aus"', quelle)
+        stelle = quelle.index("_ABSCHALTER = {")
+        block = quelle[stelle:stelle + 700]
+        for teil in ("kegel", "boden", "schatten", "spots"):
+            self.assertIn(f'"{teil}"', block, f"--aus {teil} fehlt")
+
+    def test_aus_modus_bricht_ab_wenn_der_schalter_nichts_bewirkt(self):
+        """Ein Schalter ohne Wirkung sieht in der Messung aus wie ein
+        Bestandteil ohne Kosten — der Fehler, den die Wirkungs-Kontrolle
+        ueberhaupt erst sichtbar gemacht hat."""
+        quelle = _quelle()
+        stelle = quelle.index("_ABSCHALTER[aus]()")
+        block = quelle[stelle:stelle + 800]
+        self.assertIn("hat NICHTS bewirkt", block)
+        self.assertIn("SystemExit", block,
+                      "ohne Wirkung wird trotzdem gemessen")
+
+    def test_das_gescheiterte_verfahren_bleibt_dokumentiert(self):
+        """Die Zerlegung im selben Prozess ist zweimal an ihrer eigenen
+        Kontrollmessung gescheitert. Wer das nicht weiss, baut sie nach."""
+        quelle = _quelle()
+        self.assertIn("Lauf gestoert", quelle,
+                      "die gescheiterte Methode ist nicht mehr dokumentiert")
+
+
 class BenchmarkFormTest(unittest.TestCase):
     """Das Werkzeug muss importierbar und syntaktisch heil sein."""
 
     def test_ist_gueltiges_python(self):
         ast.parse(_quelle())
 
-    def test_dmx_budget_haengt_an_der_echten_ausgaberate(self):
-        """44 Hz ist keine Zierzahl — sie ist der Massstab jeder Aussage."""
+    def test_budget_haengt_an_der_push_rate_des_visualizers(self):
+        """33 ms ist keine Zierzahl — sie ist der Massstab jeder Aussage.
+
+        **Und es ist bewusst NICHT die DMX-Rate.** Die erste Fassung rechnete
+        gegen 44 Hz (`OutputManager.TARGET_HZ`) und meldete daraufhin "ab 32
+        Geraeten ueberschreitet die Szene das Budget" — die falsche Zahl, denn
+        die Szene wird vom `VisualizerService` gefuettert, und der tickt mit
+        `TICK_MS = 33`. Dieser Test bindet beide Seiten aneinander, damit die
+        Verwechslung nicht zurueckkommt.
+        """
         quelle = _quelle()
-        self.assertIn("DMX_HZ = 44.0", quelle)
-        om = open(os.path.join(_REPO, "src", "core", "dmx", "output_manager.py"),
-                  encoding="utf-8").read()
-        self.assertIn("TARGET_HZ = 44", om.replace(" ", "").replace("TARGET_HZ=44",
-                                                                    "TARGET_HZ = 44"),
-                      "OutputManager sendet nicht mehr mit 44 Hz — das Budget im "
-                      "Benchmark stimmt dann nicht mehr")
+        self.assertIn("VIZ_BUDGET_MS = 33.0", quelle)
+
+        dienst = open(os.path.join(_REPO, "src", "ui", "visualizer",
+                                   "visualizer_service.py"), encoding="utf-8").read()
+        treffer = re.search(r"TICK_MS\s*=\s*(\d+)", dienst)
+        self.assertTrue(treffer, "VisualizerService hat kein TICK_MS mehr")
+        self.assertEqual(int(treffer.group(1)), 33,
+                         "der Service tickt anders als das Budget im Benchmark")
+
+    def test_ueberschreiten_staut_nichts_auf(self):
+        """Das Dirty-Flag ist binaer — ueber dem Budget heisst "weniger Bilder",
+        nicht "haengt hinterher". Steht so im Werkzeug und muss dort bleiben,
+        sonst liest jemand die Zahlen wieder dramatischer als sie sind."""
+        quelle = _quelle()
+        self.assertIn("binaer", quelle)
+        loop = open(os.path.join(_REPO, "src", "ui", "visualizer", "scene_src",
+                                 "scene", "render_loop.js"), encoding="utf-8").read()
+        self.assertIn("_dirty = false", loop,
+                      "der Render-Loop puffert jetzt doch — Aussage pruefen")
 
 
 if __name__ == "__main__":

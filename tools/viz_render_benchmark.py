@@ -37,6 +37,41 @@ Geraeten liess den Intel-Shader-Compiler scheitern
 (`SIMD8 FS compile failed: no register to spill`), weil das Shadow-Budget zu
 hoch angesetzt war. Seit dem Dach in `fixtures.js` laufen 32 und 48 Fixtures.
 
+## Zerlegung: EIN PROZESS JE VARIANTE, nicht ein Lauf mit Umschalten
+
+    for v in "" kegel boden schatten spots; do
+      ./venv/bin/python tools/viz_render_benchmark.py 32 ${v:+--aus $v}
+    done
+
+**Warum umstaendlich?** Weil der bequeme Weg zweimal gescheitert ist. Der Modus
+`--zerlegen` schaltet die Bestandteile im selben Prozess nacheinander ab — und
+seine eigene Kontrollmessung meldete beide Male "Lauf gestoert": zwischen der
+ersten und der letzten Messung DESSELBEN Vollzustands lagen 2,5 bzw. 3,8 ms, bei
+gesuchten Anteilen von 1-7 ms. Eine Aufwaermphase machte es schlechter statt
+besser. Der Zustand der Seite driftet ueber einen Lauf einfach staerker, als die
+Anteile gross sind; ein Ergebnis daraus waere geraten gewesen.
+
+Mit einem frischen Prozess je Variante hat jede Messung dieselbe Vorgeschichte.
+Ergebnis bei 32 leuchtenden Movern (Median je Frame, Intel UHD 630):
+
+    voll                 19,50 ms
+    ohne Kegel           15,30 ms   -4,20 ms   22 %
+    ohne Bodenflecken    16,50 ms   -3,00 ms   15 %
+    ohne Schatten        12,40 ms   -7,10 ms   36 %
+    ohne SpotLights       9,00 ms  -10,50 ms   54 %
+
+Die Summe der Einzelanteile (17,7 ms) passt zum Gesamtwert (19,5 ms) — der Rest
+ist Grundgeometrie. **"Ohne SpotLights" enthaelt die Schatten** (ein unsichtbares
+Licht wirft keinen), die reine Beleuchtungsrechnung liegt also bei rund 3,4 ms.
+
+**Rangfolge fuer jede Optimierung: Schatten (36 %) vor Kegeln (22 %) vor
+Bodenflecken (15 %).** Das Schatten-Dach von 16 ist bereits gesetzt (VIZ-PERF);
+es weiter zu senken ist der naechste wirksame Hebel — und eine Entscheidung mit
+optischem Preis, keine reine Technikfrage.
+
+`--zerlegen` bleibt trotzdem im Werkzeug: es ist schnell, und seine
+Kontrollmessung sagt ehrlich, wann man ihm nicht glauben darf.
+
 ## Drei Messfallen, alle beim ersten Anlauf hineingetappt
 
 1. **`performance.now()` um `render()` misst die falsche Sache.** WebGL ist
@@ -59,10 +94,16 @@ ueber SwiftShader auf der CPU, die Zahlen waeren bedeutungslos.
 
 ## Was die Zahl bedeutet
 
-Der DMX-Ausgang laeuft mit **44 Hz** (`OutputManager.TARGET_HZ`). Bei laufenden
-Effekten kommt also alle ~22,7 ms ein `dmxBatch`, und jedes davon macht die Szene
-dirty. Bleibt p95 unter 22,7 ms, kann die Ansicht dem Licht folgen; darueber
-faengt sie an, Aenderungen zu ueberspringen.
+Die Szene wird vom **`VisualizerService`** gefuettert, nicht direkt vom
+DMX-Ausgang: `TICK_MS = 33`, also rund **30 Hz**, und dabei nur die GEAENDERTEN
+Fixtures. Das Budget je Frame ist damit **33 ms**, nicht 22,7 ms.
+
+**Und ein Ueberschreiten staut nichts auf.** Das Dirty-Flag im Render-Loop ist
+binaer (`_dirty = true/false`, keine Warteschlange): kommen zwei Batches zwischen
+zwei Bildern, zeigt das naechste Bild schlicht den neueren Stand. Die Ansicht
+wird also nicht langsamer ODER aelter — sie zeigt weniger Zwischenschritte und
+bleibt aktuell. Ueber dem Budget heisst deshalb "weniger Bilder je Sekunde",
+nicht "haengt hinterher".
 """
 from __future__ import annotations
 
@@ -76,8 +117,21 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.environ.pop("QT_QPA_PLATFORM", None)          # echtes Fenster = echte GPU
 sys.path.insert(0, _REPO)
 
-DMX_HZ = 44.0
-DMX_BUDGET_MS = 1000.0 / DMX_HZ
+# ⚠️ Der Massstab ist die Push-Rate des VISUALIZERS, nicht die des DMX-Ausgangs.
+#
+# Erste Fassung rechnete gegen 44 Hz (`OutputManager.TARGET_HZ`) und meldete
+# daraufhin "ab 32 Geraeten ueberschreitet die Szene das Budget". Das war die
+# falsche Zahl: die Szene wird nicht vom Output-Thread gefuettert, sondern vom
+# `VisualizerService`, und der tickt mit `TICK_MS = 33`, also rund **30 Hz** —
+# und schickt dabei nur die GEAENDERTEN Fixtures (Diff gegen einen Cache).
+#
+# Mit dem richtigen Budget (33 ms) sieht die Lage deutlich anders aus:
+# 32 Fixtures liegen bei 90 % statt bei 130 %, eng wird es erst gegen 48.
+VIZ_HZ = 1000.0 / 33.0                  # VisualizerService.TICK_MS
+VIZ_BUDGET_MS = 33.0
+# Rueckwaertskompatible Namen (die Tests und die Ausgabe unten nutzen sie).
+DMX_HZ = VIZ_HZ
+DMX_BUDGET_MS = VIZ_BUDGET_MS
 
 from PySide6.QtWidgets import QApplication                      # noqa: E402
 from PySide6.QtWebEngineWidgets import QWebEngineView           # noqa: E402
@@ -145,7 +199,8 @@ def _bridge_cls():
     return type("BenchBridge", (QObject,), attrs)
 
 
-def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
+def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
+           aus=None):
     app = QApplication.instance() or QApplication([])
     view = QWebEngineView()
     view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
@@ -199,8 +254,8 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
     tier = ev("(window.__lightos || {}).gpuTier || 'unbekannt'")
     ergebnis = {"gpuTier": tier, "dmx_budget_ms": round(DMX_BUDGET_MS, 1), "stufen": {}}
     if not still:
-        print(f"GPU-Stufe: {tier} · DMX-Budget bei {DMX_HZ:.0f} Hz: "
-              f"{DMX_BUDGET_MS:.1f} ms je Frame")
+        print(f"GPU-Stufe: {tier} · Visualizer-Budget bei {VIZ_HZ:.0f} Hz "
+              f"(VisualizerService.TICK_MS): {VIZ_BUDGET_MS:.1f} ms je Frame")
 
     bereits = 0
     for anzahl in stufen:
@@ -271,8 +326,19 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
                   f"waere reine Geometrie.", file=sys.stderr)
             break
 
-        def einmal_messen(n=None):
-            """Sammelt n Einzelframes — je einer pro Event-Loop-Durchlauf."""
+        def einmal_messen(n=None, aufwaermen=0):
+            """Sammelt n Einzelframes — je einer pro Event-Loop-Durchlauf.
+
+            `aufwaermen` verwirft die ersten Frames. Nach jedem Zustandswechsel
+            (Kegel aus, Schatten aus …) uebersetzt three betroffene Programme
+            NEU; die ersten Frames danach tragen diese Kosten und verzerren den
+            Median. Ohne das meldete die Zerlegung "ohne Kegel spart -38 %" —
+            also eine NEGATIVE Ersparnis, obwohl der Schalter nachweislich 32
+            Kegel abgeschaltet hatte.
+            """
+            for _ in range(aufwaermen):
+                ev(_MESSUNG_JS, 30.0)
+                app.processEvents()
             zeiten = []
             for _ in range(n or runden):
                 roh = ev(_MESSUNG_JS, 30.0)
@@ -293,6 +359,40 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
         werte = einmal_messen()
         werte["fixtures"] = anzahl
         ergebnis["stufen"][str(anzahl)] = werte
+        if aus:
+            _ABSCHALTER = {
+                "kegel": lambda: bridge.settingsChanged.emit(
+                    json.dumps({"showCones": False})),
+                "boden": lambda: bridge.settingsChanged.emit(
+                    json.dumps({"showFloorSpots": False})),
+                "schatten": lambda: ev(_SCHATTEN_AUS),
+                "spots": lambda: ev(_SPOTS_AUS),
+            }
+            if aus not in _ABSCHALTER:
+                raise SystemExit(f"--aus {aus}: unbekannt "
+                                 f"({', '.join(_ABSCHALTER)})")
+            vorher = json.loads(ev(_ZAEHLEN) or "{}")
+            _ABSCHALTER[aus]()
+            pumpe(1.0)
+            nachher = json.loads(ev(_ZAEHLEN) or "{}")
+            schluessel = {"kegel": "kegel", "boden": "boden",
+                          "schatten": "schatten", "spots": "spots"}[aus]
+            if nachher.get(schluessel, -1) >= vorher.get(schluessel, 0):
+                raise SystemExit(
+                    f"--aus {aus} hat NICHTS bewirkt "
+                    f"({vorher.get(schluessel)} -> {nachher.get(schluessel)}) — "
+                    f"eine Messung waere bedeutungslos")
+            werte = einmal_messen()
+            werte["fixtures"] = anzahl
+            werte["aus"] = aus
+            werte["wirkung"] = f"{vorher.get(schluessel)}->{nachher.get(schluessel)}"
+            ergebnis["stufen"][str(anzahl)] = werte
+            if not still:
+                print(f"{anzahl:>3} Fixtures OHNE {aus:<9} median "
+                      f"{werte['median_ms']:>6.2f} ms · p95 {werte['p95_ms']:>6.2f} ms "
+                      f"[{werte['wirkung']}]")
+            continue
+
         if not still:
             marke = "ok " if werte["folgt_dmx"] else "ZU LANGSAM"
             print(f"{anzahl:>3} Fixtures: median {werte['median_ms']:>6.2f} ms · "
@@ -302,10 +402,10 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False):
             # mehr Runden: die Anteile sind klein, das Rauschen darf es nicht sein
             # Mehr Runden fuer die Zerlegung: die Anteile sind klein (1-3 ms),
             # das Rauschen darf es nicht auch sein.
-            basis = einmal_messen(40)
+            basis = einmal_messen(80, aufwaermen=20)
             werte["zerlegung"] = _zerlegen(
                 anzahl, basis, ev, pumpe, bridge,
-                lambda: einmal_messen(40), still,
+                lambda: einmal_messen(80, aufwaermen=20), still,
                 zurueckschalten=not kumulativ)
 
     view.setParent(None)
@@ -486,14 +586,36 @@ def _zerlegen(anzahl, voll, ev, pumpe, bridge, messen_fn, still,
     return raus
 
 
+def _aus_option() -> str | None:
+    """`--aus <teil>`: schaltet EINEN Bestandteil ab und misst nur diesen Fall.
+
+    Gedacht fuer den Aufruf in einem EIGENEN Prozess je Variante. Grund: die
+    Zerlegung im selben Prozess ist zweimal an der eigenen Kontrollmessung
+    gescheitert (Abweichung 2,5 bzw. 3,8 ms zwischen erster und letzter Messung
+    desselben Vollzustands, bei Anteilen von 1-7 ms). Der Zustand der Seite
+    driftet ueber einen Lauf staerker, als die gesuchten Anteile gross sind —
+    eine Aufwaermphase hat es nicht besser, sondern schlechter gemacht.
+
+    Mit einem frischen Prozess je Variante hat jede Messung dieselbe
+    Vorgeschichte. Das ist langsamer und dafuer vergleichbar.
+    """
+    for i, a in enumerate(sys.argv):
+        if a == "--aus" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return None
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    aus = _aus_option()
+    if aus:
+        args = [a for a in args if a != aus]
     still = "--json" in sys.argv
     zerlegen = "--zerlegen" in sys.argv
     kumulativ = "--kumulativ" in sys.argv
     stufen = [int(a) for a in args] if args else [12, 32, 48]
     ergebnis = messen(sorted(stufen), still=still, zerlegen=zerlegen,
-                      kumulativ=kumulativ)
+                      kumulativ=kumulativ, aus=aus)
     if still:
         print(json.dumps(ergebnis, indent=2))
     return 0
