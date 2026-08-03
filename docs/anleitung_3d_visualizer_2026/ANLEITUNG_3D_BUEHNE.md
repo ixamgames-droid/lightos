@@ -90,6 +90,30 @@ einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
 - **Live geprüft:** Stage-Elemente hinzufügen/verschieben/bearbeiten, Modus-Wechsel,
   Kamera-Reset und Fixture-Platzieren/-Entfernen sind sofort in der Szene sichtbar.
 
+## Was bei grossen Rigs anders aussieht
+
+Ab dem **17. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
+Schlagschatten. Die Ansicht vergibt höchstens **16 Schlagschatten**, und zwar an
+die Geräte mit den niedrigsten Fixture-Nummern; alle übrigen leuchten normal
+weiter, werfen aber keinen Schatten auf Boden und Bühnenelemente. Wird ein Gerät
+entfernt, rückt das nächste nach.
+
+**Warum das so ist:** jeder Schlagschatten kostet die Grafikkarte nicht nur eine
+Textur, sondern auch Platz im Beleuchtungs-Programm. Ohne diese Grenze scheiterte
+auf Rechnern mit stärkerer Grafik ab 26 Schatten das Übersetzen dieses Programms —
+die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
+still. Die Grenze ist bewusst dieselbe Zahl, die schwächere Geräte ohnehin
+erreichen, damit die Bühne überall gleich aussieht.
+
+**Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
+Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine
+niedrige Nummer haben — oder man nimmt für die Aufnahme die übrigen kurz aus dem
+Patch.
+
+Wie lange die Ansicht je Bild braucht, lässt sich messen:
+`./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
+nötig, misst auf der echten Grafikkarte).
+
 ## Bekannte offene Punkte (im BACKLOG erfasst)
 - **VIZ-TRUSS-ADD:** „+ Truss" legt bei bereits geladenen Fixtures manchmal kein Element
   an (Plattform/Boden gehen; Truss lädt async ein OBJ-Modell). Workaround: erneut
