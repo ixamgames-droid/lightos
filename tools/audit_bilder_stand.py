@@ -38,6 +38,9 @@ from datetime import datetime
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _UEBERSCHRIFT = re.compile(r"^### `([^`]+)`\s*\((high|medium|low)\)", re.M)
+# Nicht mehr die Quelle der Stichzeit (das war der Fehler), sondern die
+# Gegenprobe gegen eine unvollstaendige Historie — s. _audit_zeitpunkt.
+_DATUM_IM_NAMEN = re.compile(r"(\d{4})-(\d{2})-(\d{2})")
 
 
 def _audit_zeitpunkt(pfad: str) -> str:
@@ -52,7 +55,27 @@ def _audit_zeitpunkt(pfad: str) -> str:
     waere ein besseres Bild durch ein schlechteres ersetzt worden.
 
     Deshalb: Zeitstempel des Commits, der das Audit HINZUGEFUEGT hat.
+
+    ⚠️ **Das setzt vollstaendige Historie voraus** — und die ist nicht
+    selbstverstaendlich. In der CI checkt `actions/checkout` mit Tiefe 1 aus;
+    `git log --diff-filter=A` findet dann nicht den Anlage-Commit, sondern den
+    Checkout von HEUTE. Mit dieser Stichzeit haette das Werkzeug alle Bilder
+    als „offen" gemeldet — eine praezise formatierte, vollstaendig falsche
+    Liste. Gefunden hat es die CI, nicht das lokale Gate: hier liegt die
+    Historie komplett, dort nie.
+
+    Deshalb der Plausibilitaetsabgleich gegen das Datum im DATEINAMEN. Als
+    *Quelle* war es der urspruengliche Fehler (zu grob), als *Gegenprobe* ist
+    es genau richtig: weichen beide um mehr als einen Tag ab, stimmt etwas
+    mit der Historie nicht, und dann gibt es lieber keine Antwort als eine
+    falsche.
     """
+    if _ist_flach():
+        print("FEHLER: flacher Klon (shallow) — der Anlage-Commit des Audits "
+              "liegt nicht in der Historie. Mit `git fetch --unshallow` holen; "
+              "ohne echte Stichzeit ist jede Aussage hier geraten.",
+              file=sys.stderr)
+        return ""
     r = subprocess.run(
         ["git", "log", "--diff-filter=A", "--format=%ad", "--date=iso-strict",
          "--", pfad], cwd=_REPO, capture_output=True, text=True)
@@ -62,7 +85,36 @@ def _audit_zeitpunkt(pfad: str) -> str:
               f"gefunden — ohne Stichzeit ist 'erneuert' nicht bestimmbar.",
               file=sys.stderr)
         return ""
-    return zeilen[-1].strip()
+    zeit = zeilen[-1].strip()
+
+    erwartet = _DATUM_IM_NAMEN.search(os.path.basename(pfad))
+    if erwartet and not _passt_zum_dateinamen(zeit, "-".join(erwartet.groups())):
+        print(f"FEHLER: der gefundene Anlage-Commit ({zeit}) passt nicht zum "
+              f"Datum im Dateinamen ({'-'.join(erwartet.groups())}). Historie "
+              f"unvollstaendig (flacher Klon?) oder umgeschrieben — Aussage "
+              f"waere geraten.", file=sys.stderr)
+        return ""
+    return zeit
+
+
+def _ist_flach() -> bool:
+    r = subprocess.run(["git", "rev-parse", "--is-shallow-repository"],
+                       cwd=_REPO, capture_output=True, text=True)
+    return r.stdout.strip() == "true"
+
+
+def _passt_zum_dateinamen(zeit: str, tag: str) -> bool:
+    """Liegt der Commit-Zeitpunkt nah genug am Datum im Dateinamen?
+
+    Ein Tag Spielraum: das Audit kann kurz vor oder nach Mitternacht
+    committet worden sein, und der Dateiname traegt keine Zeitzone.
+    """
+    try:
+        commit = datetime.fromisoformat(zeit).date()
+        gemeint = datetime.fromisoformat(tag).date()
+    except ValueError:
+        return False
+    return abs((commit - gemeint).days) <= 1
 
 
 def _letztes_git_datum(pfad: str) -> str:
@@ -109,6 +161,12 @@ def main() -> int:
         return 1
 
     stichtag = _audit_zeitpunkt(audit)
+    if not stichtag:
+        # Lieber keine Antwort als eine falsche: ohne Stichzeit waere jeder
+        # Punkt „offen" — eine sauber formatierte Liste, die nichts misst.
+        print("ABBRUCH: ohne belastbare Stichzeit wird nichts eingestuft.",
+              file=sys.stderr)
+        return 2
     punkte = _UEBERSCHRIFT.findall(open(audit, encoding="utf-8").read())
     if not punkte:
         print("FEHLER: keine `### `pfad` (schwere)`-Ueberschriften gefunden — "

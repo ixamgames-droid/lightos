@@ -81,13 +81,56 @@ def test_unbekannte_zeit_laesst_den_punkt_offen(bild, stich):
     assert abs_tool.ist_neuer(bild, stich) is False
 
 
+# --- Unvollstaendige Historie: lieber keine Antwort als eine falsche ------
+# In der CI checkt `actions/checkout` mit Tiefe 1 aus. Dort gibt es den
+# Anlage-Commit des Audits nicht — die Frage ist dann UNBEANTWORTBAR, nicht
+# „alles offen". Genau daran ist die erste Fassung in der CI aufgelaufen.
+_AUDIT_DATEI = os.path.join(_REPO, "docs", "BILDER_AUDIT_2026-07-20.md")
+
+
+def _historie_vollstaendig() -> bool:
+    if not os.path.exists(_AUDIT_DATEI):
+        return False
+    return bool(abs_tool._audit_zeitpunkt(_AUDIT_DATEI))
+
+
+def test_datum_im_dateinamen_ist_die_gegenprobe():
+    """Passt der Commit-Zeitpunkt nicht zum Dateinamen, ist etwas faul."""
+    assert abs_tool._passt_zum_dateinamen(_AUDIT, "2026-07-20") is True
+    assert abs_tool._passt_zum_dateinamen(_NACHARBEIT, "2026-07-20") is True
+    # Ein Tag Spielraum (Mitternacht/Zeitzone) — mehr nicht.
+    assert abs_tool._passt_zum_dateinamen(_AUDIT, "2026-07-21") is True
+    assert abs_tool._passt_zum_dateinamen(_AUDIT, "2026-07-22") is False
+    # Der CI-Fall: flacher Klon liefert den Checkout von heute.
+    assert abs_tool._passt_zum_dateinamen(
+        "2026-08-03T22:47:43+02:00", "2026-07-20") is False
+    assert abs_tool._passt_zum_dateinamen("unlesbar", "2026-07-20") is False
+
+
+def test_flacher_klon_liefert_keine_stichzeit(monkeypatch):
+    """Shallow erkannt → leere Stichzeit, statt den Checkout zu nehmen."""
+    monkeypatch.setattr(abs_tool, "_ist_flach", lambda: True)
+    assert abs_tool._audit_zeitpunkt(_AUDIT_DATEI) == ""
+
+
+def test_ohne_stichzeit_bricht_das_werkzeug_ab(monkeypatch, capsys):
+    """Kein „alles offen" auf duenner Datenlage — Abbruch mit Exitcode 2."""
+    monkeypatch.setattr(abs_tool, "_ist_flach", lambda: True)
+    monkeypatch.setattr(sys, "argv", ["x", _AUDIT_DATEI])
+    if not os.path.exists(_AUDIT_DATEI):
+        pytest.skip("Audit-Datei nicht vorhanden")
+    assert abs_tool.main() == 2
+    ausgabe = capsys.readouterr()
+    assert "OFFEN" not in ausgabe.out, "Es darf gar keine Einstufung geben"
+    assert "ABBRUCH" in ausgabe.err
+
+
 # --- Der Stichzeitpunkt kommt aus git, nicht aus dem Dateinamen -----------
 def test_stichzeit_stammt_aus_dem_anlage_commit():
     """Nicht aus dem Datum im Dateinamen — sonst fehlt die Uhrzeit."""
-    audit = os.path.join(_REPO, "docs", "BILDER_AUDIT_2026-07-20.md")
-    if not os.path.exists(audit):
-        pytest.skip("Audit-Datei nicht vorhanden")
-    zeit = abs_tool._audit_zeitpunkt(audit)
+    if not _historie_vollstaendig():
+        pytest.skip("flacher Klon oder Audit-Datei fehlt — s. Kommentar oben")
+    zeit = abs_tool._audit_zeitpunkt(_AUDIT_DATEI)
     assert zeit.startswith("2026-07-20T"), zeit
     # Eine Uhrzeit, die nicht Mitternacht ist — genau das fehlte vorher.
     assert zeit[11:19] != "00:00:00", "Stichzeit ohne Uhrzeit ist der alte Bug"
@@ -100,11 +143,10 @@ def test_werkzeug_laeuft_durch_und_meldet_null_offen():
     Beleg, dass die Nacharbeit vollstaendig war. Wird spaeter ein Bild
     zurueckgedreht, faellt es hier auf.
     """
-    audit = os.path.join(_REPO, "docs", "BILDER_AUDIT_2026-07-20.md")
-    if not os.path.exists(audit):
-        pytest.skip("Audit-Datei nicht vorhanden")
+    if not _historie_vollstaendig():
+        pytest.skip("flacher Klon oder Audit-Datei fehlt — s. Kommentar oben")
     r = subprocess.run(
         [sys.executable, os.path.join(_REPO, "tools", "audit_bilder_stand.py"),
-         audit], cwd=_REPO, capture_output=True, text=True)
+         _AUDIT_DATEI], cwd=_REPO, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "OFFEN: 0" in r.stdout, r.stdout
