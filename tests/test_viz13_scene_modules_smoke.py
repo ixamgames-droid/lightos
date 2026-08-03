@@ -143,6 +143,22 @@ def _xplat15_no_leaked_widgets():
     destroy_all_top_level_widgets(_QApp.instance())
 
 
+def _shadow_hard_cap() -> int:
+    """Liest `SHADOW_SPOT_HARD_CAP` aus fixtures.js (VIZ-PERF).
+
+    Bewusst gelesen statt hier wiederholt: eine zweite Zahl im Test waere eine
+    zweite Wahrheit, und die faellt beim naechsten Anheben des Dachs auseinander.
+    """
+    import re as _re
+    pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "src", "ui", "visualizer", "scene_src", "fixtures",
+                        "fixtures.js")
+    treffer = _re.search(r"^const SHADOW_SPOT_HARD_CAP = (\d+);",
+                         open(pfad, encoding="utf-8").read(), _re.M)
+    assert treffer, "SHADOW_SPOT_HARD_CAP steht nicht mehr in fixtures.js"
+    return int(treffer.group(1))
+
+
 class SceneModulesSmokeTest(unittest.TestCase):
     def setUp(self):
         self.assertTrue(os.path.isfile(_HTML_PATH), f"stage_scene.html fehlt: {_HTML_PATH}")
@@ -639,8 +655,18 @@ class SceneModulesSmokeTest(unittest.TestCase):
         SpotLights -> jede Shadow-Map kostet eine Texture-Unit in JEDEM
         beleuchteten Material -> kein Lit-Shader kompilierte mehr, die ganze
         Buehne blieb unsichtbar (nur MeshBasic-Beams zeichneten noch).
-        Fix: nur die ersten N Spots werfen Schatten (N = maxTextures - Reserve,
-        deterministisch nach fid), Entfernen gibt Budget an den Rest zurueck.
+        Fix: nur die ersten N Spots werfen Schatten (deterministisch nach fid),
+        Entfernen gibt Budget an den Rest zurueck.
+
+        **Vertrag erweitert 2026-08-03 (VIZ-PERF):** N ist nicht mehr allein
+        `maxTextures - Reserve`, sondern zusaetzlich durch ein ABSOLUTES Dach
+        gedeckelt. Grund: Texture-Units sind nicht die einzige Grenze. Auf einer
+        32-Unit-GPU ergab die alte Rechnung 26 Schatten — und dort bricht der
+        Intel-Shader-Compiler ab (`SIMD8 FS compile failed: no register to
+        spill`), weil jede Shadow-Map auch REGISTER kostet. Gemessen: 24 laufen,
+        26 stuerzen ab. Dieser Test rechnet das Dach deshalb mit; die Zahlen und
+        die Begruendung stehen in `fixtures.js`, gegatet von
+        `tests/test_viz_shadow_budget_cap.py`.
         """
         self._load_and_wait()
         import json
@@ -670,7 +696,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
             })()
         """
         c = json.loads(self._eval(count_js))
-        budget = max(2, int(c["maxTex"]) - 6)
+        budget = min(_shadow_hard_cap(), max(2, int(c["maxTex"]) - 6))
         self.assertEqual(c["spots"], n, "Jedes generische Fixture braucht seinen SpotLight")
         self.assertEqual(
             c["shadows"], min(n, budget),
