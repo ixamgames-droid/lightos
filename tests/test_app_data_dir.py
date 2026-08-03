@@ -205,6 +205,27 @@ def test_suite_never_writes_into_the_real_crash_log():
         f"die Testsuite schreibt ihr crash.log in den ECHTEN Datenordner: {used}")
 
 
+def test_suite_never_writes_the_real_sacn_cid():
+    """Derselbe Waechter fuer die persistente sACN-CID (OUT-06).
+
+    Sie ist die IDENTITAET der Installation gegenueber jedem sACN-Empfaenger im
+    Netz: legte ein Testlauf sie an oder ersetzte sie (der Kaputte-Datei-Test
+    ueberschreibt sie absichtlich), saehe Davids Rig nach dem naechsten Start eine
+    fremde Quelle. Geprueft wird der Pfad, den das Modul TATSAECHLICH benutzt.
+    """
+    from src.core.dmx.sacn_source import cid_file_path
+    from src.core.paths import app_data_dir
+
+    used = os.path.abspath(cid_file_path())
+    real_dir = os.path.abspath(app_data_dir())
+
+    assert os.environ.get("LIGHTOS_SACN_CID"), (
+        "conftest.py setzt LIGHTOS_SACN_CID nicht mehr — Testlaeufe fassen die "
+        "echte sACN-Identitaet der Installation an")
+    assert os.path.dirname(used) != real_dir, (
+        f"die Testsuite schreibt die sACN-CID in den ECHTEN Datenordner: {used}")
+
+
 def _TMP_FOR_OVERRIDE():
     """Schreibbares tmp fuer den Override-Test — nutzt denselben Ort wie conftest,
     damit nichts neben dem Testbaum liegen bleibt."""

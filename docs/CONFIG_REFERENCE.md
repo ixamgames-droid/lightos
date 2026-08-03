@@ -23,6 +23,15 @@ dem tatsächlichen Code recherchiert (Fundstellen als `datei:zeile`).
 | `LIGHTOS_WEBENGINE_FLAGS` | Zusätzliche Chromium-Flags für den QWebEngine-3D-Visualizer (z. B. `--disable-gpu`), an die Anti-Drossel-Basis-Flags angehängt. | leer | `main.py:210` | Debugging von 3D-Renderer-Abstürzen. |
 | `LIGHTOS_HARDEN_EXIT` | Nur im Lock-Runner/Test-Gate: beendet den Prozess nach QtWebEngine-Tests per `os._exit`, um den crashenden Teardown zu überspringen (QA-24). | nicht gesetzt | `tests/conftest.py:131` | Reines Test-Gate-Flag; bei interaktivem pytest NICHT setzen. |
 | `LIGHTOS_TEST_HEAVY` | Schaltet rechenintensive Zusatz-Assertions in einzelnen Tests frei. | nicht gesetzt | `tests/test_bpm_beatgrid.py:156` | Reines Test-Flag (opt-in). |
+| `LIGHTOS_HARDEN_EXIT_ALL` | Wie `LIGHTOS_HARDEN_EXIT`, aber generell statt nur nach WebEngine-Tests (CI-Variante). | nicht gesetzt | `tests/conftest.py:267` | Reines Test-Gate-Flag. |
+| `LIGHTOS_CRASH_LOG` | Pfad des gemeinsamen `crash.log`. Hält Testläufe aus der echten Absturz-Historie des Nutzers heraus (die `APPDATA`-Umlenkung greift dafür nur auf Windows). | `app_data_dir()/crash.log` | `src/core/paths.py:62` | `tests/conftest.py` setzt eine PID-eigene tmp-Datei; Wächter `tests/test_app_data_dir.py::test_suite_never_writes_into_the_real_crash_log`. |
+| `LIGHTOS_SACN_CID` | Pfad der Datei mit der persistenten sACN-CID (E1.31-Component-Identifier, OUT-06). Hält Testläufe von der echten sACN-Identität der Installation fern. | `app_data_dir()/sacn_cid` | `src/core/paths.py` (`sacn_cid_path`) | `tests/conftest.py` setzt eine PID-eigene tmp-Datei; Wächter `tests/test_app_data_dir.py::test_suite_never_writes_the_real_sacn_cid`. |
+| `LIGHTOS_FIXTURE_DB` | Pfad der Fixture-Library-Datenbank (SQLite). | `app_data_dir()/fixtures.db` | `src/core/database/fixture_db.py:15` | `tests/conftest.py:62` bindet die reale DB ein, solange `APPDATA` echt ist. |
+| `LIGHTOS_PREFS_DIR` | Verzeichnis der `ui_prefs.json` für die Web-Remote-Einstellungen (Token/Auth-Epoche). | `app_data_dir()` | `src/web/remote_settings.py:29` | Test-Override; die übrigen Prefs-Nutzer frieren den Pfad beim Import ein. |
+| `LIGHTOS_OUTPUT_IFACE` | IP der Ausgangs-NIC für DMX-über-Netzwerk (XPLAT-06): sACN setzt darauf `IP_MULTICAST_IF`, Art-Net bindet daran. Auf Multi-NIC-Rechnern (WLAN + LAN) sonst evtl. das falsche Interface. | leer (Betriebssystem entscheidet) | `src/core/dmx/output_iface.py:22` | `tests/test_output_iface.py`. |
+| `LIGHTOS_STRICT_PROFILES` | Show-Builder bricht bei unbekanntem Fixture-Profil ab, statt still auf einen Ersatz auszuweichen. | aus (tolerant) | `src/core/show/showbuilder/builder.py:74` | Von Show-Bau-Skripten in `tools/` gesetzt. |
+| `LIGHTOS_VC_ASSET_CACHE_MB` | Obergrenze des VC-Asset-Caches (Bilder/GIFs auf VC-Tasten) in MB. | eingebauter Default | `src/core/show/vc_assets.py:194` | `tests/test_vc_asset_cache.py`. |
+| `LIGHTOS_WEBENGINE_NO_SANDBOX` | Opt-out der QtWebEngine-Sandbox-Abschaltung auf Linux (XPLAT-01). | nicht gesetzt | `main.py:235` | — |
 
 `main.py:197` liest `LIGHTOS_WEBENGINE_FLAGS` referenziell im Docstring; die
 tatsächliche Verwendung steht auf Zeile 210.
@@ -43,6 +52,17 @@ Alle Pfade sind relativ zum Repo-Root (dem Arbeitsverzeichnis der App).
 Weitere JSON-Ablagen liegen NICHT unter `data/`, sondern im Nutzer-Profil
 (`app_data_dir()`, plattformabhaengig — s. `src/core/paths.py`; z. B. `ui_prefs.json`, `recent.json`, `snapshots.json`,
 Stage-/Input-Profile) und sind hier bewusst nicht als globale Config gelistet.
+
+## (c) Identitäts-Dateien im Nutzer-Profil
+
+Zwei Werte im Datenordner sind weder Einstellung noch Cache, sondern **Identität**:
+Sie werden beim ersten Bedarf einmal erzeugt und danach nie wieder geändert. Wer sie
+löscht, erscheint dem Netz als ein anderes Gerät.
+
+| Datei / Key | Inhalt | Erzeugt in | Folge beim Löschen |
+|---|---|---|---|
+| `app_data_dir()/sacn_cid` | sACN-CID (E1.31 Component Identifier) als UUID-Text — dieselbe für **alle** sACN-Universen dieser Installation. | `src/core/dmx/sacn_source.py` (lazy beim ersten `SACNSender`) | Empfänger, die Quellen über die CID verfolgen, sehen eine neue, unbekannte Konsole; die alte bleibt als Karteileiche in ihren Listen. |
+| `ui_prefs.json` → `remote.token` | Web-Remote-Auth-Token. | `src/web/remote_settings.py:106` | Gekoppelte Handys/Browser müssen den Link neu scannen. |
 
 ---
 

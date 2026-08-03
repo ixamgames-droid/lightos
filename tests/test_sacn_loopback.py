@@ -122,12 +122,27 @@ class SacnStreamTerminationTest(unittest.TestCase):
     # (Flags&Len2+Vector4+Source64+Prio1+SyncAddr2+Seq1 = 74) = 112.
     _OPTIONS_OFFSET = 112
 
-    def _sender_with_fake_sock(self):
+    def _sender_with_fake_sock(self, universes=(1, 7)):
+        """Sender an ``__init__`` vorbei, mit Fake-Socket.
+
+        **Seit OUT-06 (CID-Persistenz) liegen Sequenz und Universums-Besitz in der
+        prozessweiten Quelle**, nicht mehr in einem ``_seq``-Dict am Sender. Der
+        Aufbau holt sich deshalb eine echte Quelle und meldet die Universen dort
+        an — sonst gaebe ``release()`` beim ``close()`` ``None`` zurueck („gehoert
+        dir nicht") und es wuerde gar nichts terminiert. Bewusst umgeschrieben
+        statt geloescht: die Aussagen der Tests gelten unveraendert.
+        """
+        from src.core.dmx.sacn_source import sacn_source
+
         s = SACNSender.__new__(SACNSender)
         s._target_ip = None
         s._source_name = "TermTest"
+        s._source = sacn_source()
         s._cid = b"\x00" * 16
-        s._seq = {1: 5, 7: 200}
+        s._token = s._source.new_token()
+        s._universes = set(universes)
+        for universe in universes:
+            s._source.next_seq(universe, s._token)   # Besitz anmelden
         s._sock = _CaptureSock()
         return s
 
@@ -153,8 +168,7 @@ class SacnStreamTerminationTest(unittest.TestCase):
         self.assertEqual(pkt[self._OPTIONS_OFFSET], 0x00)
 
     def test_close_without_universes_is_safe(self):
-        s = self._sender_with_fake_sock()
-        s._seq = {}
+        s = self._sender_with_fake_sock(universes=())
         sock = s._sock
         s.close()                         # nichts gesendet, kein Fehler
         self.assertEqual(sock.sent, [])

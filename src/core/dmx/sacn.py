@@ -3,7 +3,8 @@ from __future__ import annotations
 import socket
 import struct
 import time
-import uuid
+
+from src.core.dmx.sacn_source import sacn_source
 
 SACN_PORT = 5568
 SACN_MULTICAST_BASE = "239.255.0."
@@ -90,9 +91,14 @@ class SACNSender:
     def __init__(self, target_ip: str | None = None, source_name: str = "LightOS"):
         self._target_ip = target_ip   # None = multicast
         self._source_name = source_name
-        self._cid = uuid.uuid4().bytes
+        # OUT-06: CID, Sequenzzaehler und Universums-Besitz liegen in der EINEN Quelle
+        # dieses Prozesses, nicht im Sender-Objekt. Warum alle drei zusammen (und
+        # warum die CID allein hochzuziehen schlimmer waere): sacn_source.py.
+        self._source = sacn_source()
+        self._cid = self._source.cid
+        self._token = self._source.new_token()
+        self._universes: set[int] = set()   # was DIESER Sender bespielt hat
         self._sock: socket.socket | None = None
-        self._seq: dict[int, int] = {}   # universe → seq counter
         self._open()
 
     def _open(self):
@@ -116,8 +122,12 @@ class SACNSender:
             return
         # Pad or trim to exactly 512 bytes
         dmx = (data + bytes(512))[:512]
-        seq = self._seq.get(universe, 0)
-        self._seq[universe] = (seq + 1) & 0xFF
+        # Die Sequenz gehoert zur QUELLE, nicht zum Sender: ein Sender-Tausch
+        # (jedes "Speichern"/"Uebernehmen") setzt die Reihe damit fort, statt beim
+        # Empfaenger als Rueckwaerts-Sprung zu landen. Zugleich uebernimmt dieser
+        # Sender den Besitz des Universums — s. close().
+        seq = self._source.next_seq(universe, self._token)
+        self._universes.add(universe)
 
         try:
             packet = _pack_framing(dmx, universe, seq, self._source_name, self._cid)
@@ -144,8 +154,16 @@ class SACNSender:
         # mit gesetztem Stream_Terminated-Options-Bit senden, damit Empfaenger die
         # Quelle sofort verwerfen (statt ~2,5 s Network-Data-Loss-Timeout). Ohne das
         # blieben beim Adapter-Wechsel kurz zwei Quellen aktiv (bekannte Merge-Luecke).
-        for universe in list(self._seq.keys()):
-            seq = self._seq.get(universe, 0)
+        #
+        # ABER nur fuer Universen, die dieser Sender noch BESITZT: seit CID und
+        # Sequenz prozessweit sind, traefe eine Termination sonst die Quelle, die ein
+        # inzwischen eingetragener Nachfolger gerade bedient — `_swap_device` haengt
+        # den Neuen ein, BEVOR es den Alten schliesst. `release` liefert deshalb
+        # `None`, wenn das Universum weitergereicht wurde.
+        for universe in sorted(self._universes):
+            seq = self._source.release(universe, self._token)
+            if seq is None:
+                continue          # Nachfolger sendet hier bereits — nicht stoeren
             try:
                 pkt = _pack_framing(bytes(512), universe, seq, self._source_name,
                                     self._cid, options=_OPT_STREAM_TERMINATED)

@@ -68,3 +68,21 @@ def crash_log_path() -> str:
     d = app_data_dir()
     os.makedirs(d, exist_ok=True)
     return os.path.join(d, "crash.log")
+
+
+def sacn_cid_path() -> str:
+    """Pfad der persistenten sACN-CID (OUT-06) — dieselbe Bauart wie
+    ``crash_log_path()``: ``LIGHTOS_SACN_CID`` hat Vorrang, sonst der Datenordner.
+
+    Legt hier bewusst **kein** Verzeichnis an: die CID entsteht lazy und darf einen
+    Start nicht mit einem Ordner-Nebeneffekt belasten. Wer schreibt, legt an
+    (``src/core/dmx/sacn_cid.py``).
+
+    ``tests/conftest.py`` setzt den Override auf eine PID-eigene tmp-Datei —
+    andernfalls fasste jeder Testlauf die echte sACN-Identitaet der Installation an
+    (Waechter ``tests/test_app_data_dir.py::test_suite_never_writes_the_real_sacn_cid``).
+    """
+    override = os.environ.get("LIGHTOS_SACN_CID")
+    if override:
+        return override
+    return os.path.join(app_data_dir(), "sacn_cid")
