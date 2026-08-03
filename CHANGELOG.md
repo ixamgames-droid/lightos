@@ -45,6 +45,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Paketzaehlung von vorn; strenge Empfaenger verwarfen daraufhin bis zu einer
   halben Sekunde lang Daten. Die Zaehlung laeuft jetzt durch.
 
+- **Das Web-Remote-Token wechselte staendig, wenn die Einstellungen nicht
+  gespeichert werden konnten.** Liegt das Nutzerprofil schreibgeschuetzt (oder ist
+  die Datei gesperrt), erzeugte LightOS bei jeder Abfrage ein neues Token: der
+  angezeigte Link zeigte eines, die Anmeldung erwartete schon das naechste, und
+  das Handy kam nicht mehr rein. Das Token bleibt jetzt wenigstens fuer die
+  laufende Sitzung gleich. (Damit es auch Neustarts uebersteht, muss das Profil
+  weiterhin beschreibbar sein.)
+
+- **Zwei Universen auf demselben Ausgang blieben unbemerkt.** Trugen zwei Zeilen
+  im Universen-Tab denselben Adapter, dasselbe Ziel und dieselbe externe
+  Universe-Nummer, sendeten beide dorthin — der Empfaenger bekam abwechselnd
+  zwei verschiedene Inhalte und zeigte Flackern, ohne dass irgendwo etwas
+  gemeldet wurde. Beim Speichern erscheint jetzt ein Hinweis mit den betroffenen
+  Zeilen. **Geaendert wird nichts** — welche der beiden Zeilen gemeint war, weiss
+  nur der Bediener.
+
 #### Neu
 
 - **`tools/viz_render_benchmark.py`** — misst, wie lange die 3D-Ansicht fuer ein

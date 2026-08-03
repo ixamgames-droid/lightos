@@ -103,15 +103,49 @@ def _new_token() -> str:
     return secrets.token_urlsafe(6)
 
 
+_token_cache: str = ""
+
+
 def get_token() -> str:
-    """Liefert das persistierte Token; erzeugt+speichert eins beim ersten Aufruf."""
+    """Liefert das persistierte Token; erzeugt+speichert eins beim ersten Aufruf.
+
+    **NET-10 (2026-08-03): mit Prozess-Cache.** ``save_settings`` schluckt jeden
+    Schreibfehler und loggt nur (read-only Profil, gesperrte Datei, volle
+    Platte). Ohne Cache gab diese Funktion dann bei JEDEM Aufruf ein neues,
+    nirgends gespeichertes Token zurueck — dreimal gerufen, dreimal ein anderes.
+
+    Praktisch heisst das: das Web-Remote waere in dieser Lage unbenutzbar. Der
+    QR-Code/Link zeigt Token A, der Handshake erwartet inzwischen Token B, und
+    niemand sieht warum — der einzige Hinweis steht als geschluckte
+    Log-Zeile im Terminal.
+
+    Mit Cache ist das Token wenigstens **fuer die Sitzung** stabil; ueber
+    Neustarts hinweg braucht es weiterhin eine schreibbare Datei. Dieselbe
+    Haltung wie bei der sACN-CID (``src/core/dmx/sacn_source.py``): ein
+    fehlgeschlagenes Speichern darf die laufende Sitzung nicht unbrauchbar
+    machen.
+    """
+    global _token_cache
+    if _token_cache:
+        return _token_cache
     s = load_settings()
     tok = s.get("token") or ""
     if not tok:
         tok = _new_token()
         s["token"] = tok
-        save_settings(s)
+        save_settings(s)          # scheitert leise -> der Cache traegt die Sitzung
+    _token_cache = tok
     return tok
+
+
+def _token_cache_leeren() -> None:
+    """Verwirft den Prozess-Cache — nach Rotation und in Tests.
+
+    Ohne das lieferte ``get_token()`` nach ``regenerate_token()`` weiter das
+    ALTE Token, und die Rotation waere aus Sicht der Anwendung wirkungslos.
+    """
+    global _token_cache
+    _token_cache = ""
 
 
 def get_auth_epoch() -> int:
@@ -140,6 +174,11 @@ def regenerate_token() -> str:
     CDX-24.)"""
     tok = _new_token()
     save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
+    # NET-10: den Prozess-Cache VOR der Gegenprobe leeren. Sonst liefert
+    # `get_token()` das ALTE Token, die Pruefung unten schlaegt fehl und meldet
+    # eine gescheiterte Rotation, obwohl das Speichern geklappt hat — der Cache
+    # haette die Sicherung, die er nicht ausloesen soll, selbst ausgeloest.
+    _token_cache_leeren()
     # CDX-24: GEGENPROBE. `save_settings` schluckt jeden Schreibfehler (Datei
     # gesperrt, Profil read-only, Platte voll) und loggt nur — ohne diese Pruefung
     # gaebe die Funktion das neue Token zurueck, obwohl gar nichts rotiert wurde,
