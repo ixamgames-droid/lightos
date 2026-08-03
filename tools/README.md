@@ -75,6 +75,7 @@
 | `verify_loop.sh` | tools/verify_loop.sh — Test-Gate fuer Linux/macOS (Pendant zu verify_loop.ps1). |
 | `verify_segmented.sh` | tools/verify_segmented.sh — Test-Gate in Segmenten (Linux-Pendant zu run_tests.ps1 -Isolate). |
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
+| `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |
 
 ## _archiv/ — ausgemustert
 
