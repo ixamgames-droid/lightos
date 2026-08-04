@@ -10,6 +10,10 @@ war damit eine Behauptung. Deshalb liegt es im Repo und nicht im Scratchpad.
     ./venv/bin/python tools/viz_render_benchmark.py --json     # nur die Zahlen
     ./venv/bin/python tools/viz_render_benchmark.py 32 --zerlegen   # Anteile trennen
 
+    # Fuer belastbare Anteile (s. "Die Rampe" weiter unten):
+    ./venv/bin/python tools/viz_render_benchmark.py 32 \
+        --runden 200 --aufwaermen 100 --rohdaten --json
+
 Gemessen wird die Zeit fuer einen kompletten Renderdurchlauf der ECHTEN Szene
 (`stage_scene.html`, echter Modulcode) bei voll aufgedrehten Moving Heads —
 dem teuersten Fixture-Typ (Beam-Kegel, SpotLight, Bodenfleck).
@@ -52,25 +56,58 @@ besser. Der Zustand der Seite driftet ueber einen Lauf einfach staerker, als die
 Anteile gross sind; ein Ergebnis daraus waere geraten gewesen.
 
 Mit einem frischen Prozess je Variante hat jede Messung dieselbe Vorgeschichte.
-Ergebnis bei 32 leuchtenden Movern (Median je Frame, Intel UHD 630):
 
-    voll                 19,50 ms
-    ohne Kegel           15,30 ms   -4,20 ms   22 %
-    ohne Bodenflecken    16,50 ms   -3,00 ms   15 %
-    ohne Schatten        12,40 ms   -7,10 ms   36 %
-    ohne SpotLights       9,00 ms  -10,50 ms   54 %
+## Die Rampe: 40 Frames ohne Aufwaermen messen die Einschwingphase
 
-Die Summe der Einzelanteile (17,7 ms) passt zum Gesamtwert (19,5 ms) — der Rest
-ist Grundgeometrie. **"Ohne SpotLights" enthaelt die Schatten** (ein unsichtbares
-Licht wirft keinen), die reine Beleuchtungsrechnung liegt also bei rund 3,4 ms.
+**Auch "ein Prozess je Variante" reicht nicht.** Am 2026-08-04 lieferten ACHT
+identische Voll-Laeufe (je 40 Frames, Default) Mediane von **11,9 bis 26,9 ms** —
+bei gesuchten Anteilen von 3-7 ms. Der Grund steht in den Rohframes, sobald man
+sie sich ansieht (`--rohdaten`): ueber 300 Frames gemessen steigt der Median von
+13,5 ms (Frames 0-24) auf ein Plateau von 21-23 ms **ab etwa Frame 75**. Die
+Intel-iGPU faellt vom Boost- auf den Dauertakt. Die 40 Frames der Voreinstellung
+liegen mitten in dieser Rampe, und wo ein Lauf sie trifft, entscheidet der Zufall.
 
-**Rangfolge fuer jede Optimierung: Schatten (36 %) vor Kegeln (22 %) vor
-Bodenflecken (15 %).** Das Schatten-Dach von 16 ist bereits gesetzt (VIZ-PERF);
-es weiter zu senken ist der naechste wirksame Hebel — und eine Entscheidung mit
-optischem Preis, keine reine Technikfrage.
+Belastbar wird es mit **`--aufwaermen 100 --runden 200`** und mehreren
+Wiederholungen je Variante, **im Round-Robin** gefahren (voll, kegel, boden, …,
+voll, kegel, …). Blockweise gemessen landet jede langsame Drift der Maschine in
+genau einer Variante und sieht dort wie eine Ersparnis aus — zwischen zwei
+Messfenstern desselben Abends lag der Voll-Wert 23,8 ggue. 20,5 ms, ohne dass
+sich am Code etwas geaendert haette.
+
+## Ergebnis 2026-08-04 (Intel UHD 630, Linux Mint, 32 leuchtende Mover)
+
+n=12 Prozesse je Variante, 200 Frames nach 100 Aufwaermframes, zwei
+Zeitfenster, jeweils gegen die Basis DES EIGENEN Fensters verglichen:
+
+    voll                 22,17 ms          = 67 % des 33-ms-Budgets
+    ohne Kegel           21,92 ms   -0,25 ms    1 %   NICHT auflösbar
+    ohne Bodenflecken    20,59 ms   -1,57 ms    7 %   NICHT auflösbar
+    ohne Schatten        15,41 ms   -6,76 ms   30 %   auflösbar
+    ohne SpotLights      11,36 ms  -10,81 ms   49 %   auflösbar
+
+Die Voll-Laeufe streuen mit ±2,43 ms (1 sd) um ihr Fenstermittel; die
+Nachweisschwelle liegt damit bei rund 2 ms. Alles darunter ist eine Zahl ohne
+Aussage — **nicht** "kostet wenig", sondern "mit diesem Aufbau nicht messbar".
+
+**"Ohne SpotLights" enthaelt die Schatten** (ein unsichtbares Licht wirft keinen),
+die reine Beleuchtungsrechnung liegt also bei rund 4,1 ms.
+
+**Rangfolge fuer jede Optimierung: Schatten (30 %), danach lange nichts.** Das
+Schatten-Dach von 16 ist bereits gesetzt (VIZ-PERF); es weiter zu senken ist der
+einzige gemessene Hebel — und eine Entscheidung mit optischem Preis, keine reine
+Technikfrage.
+
+> ⚠️ **Was sich damit gegenueber dem 2026-08-03 geaendert hat.** Die erste
+> Fassung dieser Tabelle nannte die **Lichtkegel als zweitgroessten Posten
+> (22 %)**. Nachgemessen sind es 1 % — und damit nichts. Wer der alten Rangfolge
+> gefolgt waere, haette die Kegel vereinfacht, dafuer Optik bezahlt und **nichts
+> gewonnen**. Die alten Zahlen entstanden aus je einem 40-Frame-Fenster, also aus
+> der Rampe. Bestaetigt haben sich Schatten und Beleuchtung als die teuren
+> Posten; gekippt ist alles darunter.
 
 `--zerlegen` bleibt trotzdem im Werkzeug: es ist schnell, und seine
-Kontrollmessung sagt ehrlich, wann man ihm nicht glauben darf.
+Kontrollmessung sagt ehrlich, wann man ihm nicht glauben darf. Fuer Zahlen, die
+in eine Entscheidung eingehen, ist es der falsche Modus.
 
 ## Drei Messfallen, alle beim ersten Anlauf hineingetappt
 
@@ -126,7 +163,20 @@ sys.path.insert(0, _REPO)
 # und schickt dabei nur die GEAENDERTEN Fixtures (Diff gegen einen Cache).
 #
 # Mit dem richtigen Budget (33 ms) sieht die Lage deutlich anders aus:
-# 32 Fixtures liegen bei 90 % statt bei 130 %, eng wird es erst gegen 48.
+# 32 Fixtures liegen bei 99 % statt bei 130 %.
+#
+# ⚠️ Diese 99 % sind die NACHGEMESSENE Zahl vom 2026-08-04 (p95, eingeschwungen,
+# n=4). Zuerst standen hier 90 % — gemessen an der Rampe, s. "Die Rampe" oben.
+# Eingeschwungen sieht die Treppe so aus (p95 je Frame, Anteil am 33-ms-Budget):
+#
+#     12 Fixtures   11,1 ms    34 %      (vorher gemeldet: 14,0 ms = 42 %)
+#     32 Fixtures   32,6 ms    99 %      (vorher gemeldet: 29,6 ms = 90 %)
+#     48 Fixtures   42,5 ms   129 %      (vorher gemeldet: 33,5 ms = 102 %)
+#
+# Die Aussage "eng wird es erst gegen 48" war damit zu optimistisch: bei 32
+# ist das Budget bereits ausgeschoepft. Was das NICHT heisst, steht unten unter
+# "Was die Zahl bedeutet" — die Ansicht haengt nicht hinterher, sie zeigt
+# weniger Zwischenschritte.
 VIZ_HZ = 1000.0 / 33.0                  # VisualizerService.TICK_MS
 VIZ_BUDGET_MS = 33.0
 # Rueckwaertskompatible Namen (die Tests und die Ausgabe unten nutzen sie).
@@ -200,7 +250,7 @@ def _bridge_cls():
 
 
 def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
-           aus=None):
+           aus=None, rohdaten=False, aufwaermen=0):
     app = QApplication.instance() or QApplication([])
     view = QWebEngineView()
     view.page().profile().setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
@@ -347,13 +397,26 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
                     return {"fehler": d.get("fehler", "keine Antwort")}
                 zeiten.append(d["ms"])
                 app.processEvents()          # dem Compositor Luft lassen
+            # ⚠️ Die REIHENFOLGE zuerst sichern, dann sortieren. `zeiten.sort()`
+            # loescht sie, und genau sie beantwortet die Frage, an der die
+            # Zerlegung am 2026-08-04 gescheitert ist: streut der Median
+            # ZWISCHEN Prozessen, weil die Maschine zwei Zustaende hat (dann
+            # zeigt eine Messreihe eine Stufe), oder weil 40 Frames auf einer
+            # breiten Verteilung zu wenig sind (dann streut es durchgehend)?
+            # Aus einem Median laesst sich das nicht rekonstruieren.
+            reihenfolge = list(zeiten)
             zeiten.sort()
             def q(p):
                 return zeiten[min(len(zeiten) - 1, int(len(zeiten) * p))]
             w = {"runden": len(zeiten), "median_ms": round(q(0.50), 2),
                  "p95_ms": round(q(0.95), 2), "max_ms": round(zeiten[-1], 2)}
+            w["min_ms"] = round(zeiten[0], 2)
+            w["p25_ms"] = round(q(0.25), 2)
+            w["p75_ms"] = round(q(0.75), 2)
             w["fps_p95"] = round(1000.0 / max(w["p95_ms"], 0.001), 1)
             w["folgt_dmx"] = w["p95_ms"] <= DMX_BUDGET_MS
+            if rohdaten:
+                w["roh_ms"] = [round(x, 2) for x in reihenfolge]
             return w
 
         if aus:
@@ -390,9 +453,10 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
                     f"--aus {aus} hat NICHTS bewirkt "
                     f"({vorher.get(schluessel)} -> {nachher.get(schluessel)}) — "
                     f"eine Messung waere bedeutungslos")
-            werte = einmal_messen()
+            werte = einmal_messen(aufwaermen=aufwaermen)
             werte["fixtures"] = anzahl
             werte["aus"] = aus
+            werte["aufwaermen"] = aufwaermen
             werte["wirkung"] = f"{vorher.get(schluessel)}->{nachher.get(schluessel)}"
             ergebnis["stufen"][str(anzahl)] = werte
             if not still:
@@ -401,8 +465,9 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
                       f"[{werte['wirkung']}]")
             continue
 
-        werte = einmal_messen()
+        werte = einmal_messen(aufwaermen=aufwaermen)
         werte["fixtures"] = anzahl
+        werte["aufwaermen"] = aufwaermen
         ergebnis["stufen"][str(anzahl)] = werte
 
         if not still:
@@ -598,33 +663,73 @@ def _zerlegen(anzahl, voll, ev, pumpe, bridge, messen_fn, still,
     return raus
 
 
-def _aus_option() -> str | None:
-    """`--aus <teil>`: schaltet EINEN Bestandteil ab und misst nur diesen Fall.
-
-    Gedacht fuer den Aufruf in einem EIGENEN Prozess je Variante. Grund: die
-    Zerlegung im selben Prozess ist zweimal an der eigenen Kontrollmessung
-    gescheitert (Abweichung 2,5 bzw. 3,8 ms zwischen erster und letzter Messung
-    desselben Vollzustands, bei Anteilen von 1-7 ms). Der Zustand der Seite
-    driftet ueber einen Lauf staerker, als die gesuchten Anteile gross sind —
-    eine Aufwaermphase hat es nicht besser, sondern schlechter gemacht.
-
-    Mit einem frischen Prozess je Variante hat jede Messung dieselbe
-    Vorgeschichte. Das ist langsamer und dafuer vergleichbar.
-    """
-    for i, a in enumerate(sys.argv):
-        if a == "--aus" and i + 1 < len(sys.argv):
-            return sys.argv[i + 1]
-    return None
-
-
+# `--aus <teil>`: schaltet EINEN Bestandteil ab und misst nur diesen Fall.
+#
+# Gedacht fuer den Aufruf in einem EIGENEN Prozess je Variante. Grund: die
+# Zerlegung im selben Prozess ist zweimal an der eigenen Kontrollmessung
+# gescheitert (Abweichung 2,5 bzw. 3,8 ms zwischen erster und letzter Messung
+# desselben Vollzustands, bei Anteilen von 1-7 ms). Der Zustand der Seite
+# driftet ueber einen Lauf staerker, als die gesuchten Anteile gross sind —
+# eine Aufwaermphase hat es nicht besser, sondern schlechter gemacht.
+#
+# Mit einem frischen Prozess je Variante hat jede Messung dieselbe
+# Vorgeschichte. Das ist langsamer und dafuer vergleichbar.
+#
+# ⚠️ Und es reicht NICHT (2026-08-04): auch mit frischem Prozess je Variante
+# streuten acht identische Voll-Laeufe zwischen 11,9 und 26,9 ms. "Gleiche
+# Vorgeschichte" beseitigt die Drift INNERHALB eines Laufs, nicht die Streuung
+# ZWISCHEN Laeufen. Wer Anteile von 3-7 ms trennen will, braucht zusaetzlich
+# lange Messreihen (`--runden`) und mehrere Wiederholungen je Variante.
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    aus = _aus_option()
-    if aus:
-        args = [a for a in args if a != aus]
+    # ⚠️ Optionswerte gehoeren NICHT in die Stufenliste — und das muss ueber die
+    # POSITION entschieden werden, nicht ueber den Wert. Ein wertbasierter
+    # Filter ("alles rauswerfen, was gleich dem Optionswert ist") frisst bei
+    # `32 --runden 32` auch die Stufe und misst stillschweigend den Default
+    # 12/32/48. Deshalb hier ein Durchlauf mit Index, der den Wert nach einer
+    # Wert-Option ueberspringt.
     still = "--json" in sys.argv
     zerlegen = "--zerlegen" in sys.argv
     kumulativ = "--kumulativ" in sys.argv
+    rohdaten = "--rohdaten" in sys.argv
+    # `--runden N`: mehr Frames je Prozess. Der Default 40 reicht fuer die
+    # Frage "folgt die Szene dem Licht?" (da geht es um Groessenordnungen),
+    # aber NICHT fuer die Zerlegung: dort sind die gesuchten Anteile 3-7 ms
+    # gross, und 40 Frames pinnen den Median dieser Verteilung nicht fest
+    # genug (2026-08-04 gemessen: acht identische Prozesse lieferten 11,9 bis
+    # 26,9 ms). Wer Anteile vergleichen will, misst laenger.
+    runden = 40
+    # `--aufwaermen N`: die ersten N Frames verwerfen.
+    #
+    # ⚠️ Der Default 0 ist BEWUSST kein Aufwaermen — er haelt die Bedeutung der
+    # Standardausgabe stabil ("was sieht der Nutzer, der die Ansicht oeffnet?").
+    # Fuer die ZERLEGUNG ist er falsch: am 2026-08-04 ueber 300 Frames gemessen
+    # steigt der Median von 13,5 ms (Frames 0-24) auf ein Plateau von 21-23 ms
+    # ab etwa Frame 75 — die Intel-iGPU faellt vom Boost- auf den Dauertakt.
+    # 40 Frames ohne Aufwaermen messen also die RAMPE, und wo ein Lauf sie
+    # trifft, entscheidet der Zufall: acht identische Prozesse lieferten 11,9
+    # bis 26,9 ms. Anteile von 3-7 ms sind darin nicht auffindbar.
+    aufwaermen = 0
+    aus = None
+    args = []
+    _WERTOPTIONEN = ("--aus", "--runden", "--aufwaermen")
+    i = 1
+    while i < len(sys.argv):
+        a = sys.argv[i]
+        if a in _WERTOPTIONEN:
+            wert = sys.argv[i + 1] if i + 1 < len(sys.argv) else None
+            if wert is None:
+                raise SystemExit(f"{a} braucht einen Wert")
+            if a == "--aus":
+                aus = wert
+            elif a == "--runden":
+                runden = int(wert)
+            else:
+                aufwaermen = int(wert)
+            i += 2
+            continue
+        if not a.startswith("--"):
+            args.append(a)
+        i += 1
     stufen = [int(a) for a in args] if args else [12, 32, 48]
     if aus and len(stufen) != 1:
         # ⚠️ `--aus` schaltet einen Bestandteil ab und raeumt ihn NICHT wieder
@@ -637,7 +742,7 @@ def main():
         #
         # Zurueckschalten waere die andere Loesung, aber nicht die richtige:
         # `--aus` existiert genau deshalb, weil im selben Prozess gemessene
-        # Varianten nicht vergleichbar sind (s. `_aus_option`). Eine zweite
+        # Varianten nicht vergleichbar sind (s. Kommentarblock ueber `main`). Eine zweite
         # Stufe im selben Prozess ist derselbe Fehler eine Ebene hoeher.
         # Ohne Zahl greift der Default [12, 32, 48] — auch das faengt das hier.
         raise SystemExit(
@@ -646,8 +751,9 @@ def main():
             f"gehoert in einen eigenen Prozess — sonst traegt der abgeschaltete "
             f"Zustand in die naechste Stufe hinueber. Beispiel: "
             f"tools/viz_render_benchmark.py 32 --aus {aus}")
-    ergebnis = messen(sorted(stufen), still=still, zerlegen=zerlegen,
-                      kumulativ=kumulativ, aus=aus)
+    ergebnis = messen(sorted(stufen), runden=runden, still=still,
+                      zerlegen=zerlegen, kumulativ=kumulativ, aus=aus,
+                      rohdaten=rohdaten, aufwaermen=aufwaermen)
     if still:
         print(json.dumps(ergebnis, indent=2))
     return 0

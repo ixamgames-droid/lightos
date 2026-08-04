@@ -259,6 +259,84 @@ class AusModusEineStufeTest(unittest.TestCase):
                             "der Default-Dreisatz lief mit --aus durch")
         self.assertIn("EINE Fixture-Zahl", r.stderr + r.stdout)
 
+    def test_optionswert_wird_nicht_als_stufe_gelesen(self):
+        """`--runden 32` darf die Stufe 32 nicht verdoppeln ODER verschlucken.
+
+        Die erste Fassung filterte Optionswerte nach WERT aus der Stufenliste
+        ("alles rauswerfen, was gleich dem Optionswert ist"). Bei
+        ``32 --runden 32`` frisst das auch die Stufe — uebrig bleibt eine leere
+        Liste, und die faellt still auf den Default [12, 32, 48] zurueck. Mit
+        ``--aus`` haette das Werkzeug dann abgebrochen; ohne ``--aus`` haette es
+        klaglos DREI Stufen gemessen, wo eine angefragt war, und der Aufrufer
+        haette die Zahl fuer 32 aus einem Lauf gelesen, in dem vorher schon 12
+        Fixtures gestanden haben. Ein Messfehler, den niemand sieht.
+        """
+        r = self._lauf("32", "--runden", "32", "--aus", "kegel")
+        self.assertNotIn(
+            "EINE Fixture-Zahl", r.stderr + r.stdout,
+            "der Optionswert wurde wertbasiert gefiltert und hat die Stufe "
+            "mitgenommen — der Lauf fiel auf den Default-Dreisatz zurueck")
+
+    def test_option_ohne_wert_bricht_ab(self):
+        """Ein fehlender Wert darf nicht als 'Default' durchgehen."""
+        r = self._lauf("32", "--runden")
+        self.assertNotEqual(r.returncode, 0, "--runden ohne Wert lief durch")
+        self.assertIn("braucht einen Wert", r.stderr + r.stdout)
+
+
+class AufwaermenTest(unittest.TestCase):
+    """Die Zerlegung braucht ein Aufwaermen — sonst misst sie die Rampe.
+
+    Am 2026-08-04 ueber 300 Frames gemessen: der Median steigt von 13,5 ms
+    (Frames 0-24) auf ein Plateau von 21-23 ms ab etwa Frame 75 — die
+    Intel-iGPU faellt vom Boost- auf den Dauertakt. Die 40 Frames der
+    Voreinstellung liegen damit MITTEN in der Einschwingphase, und wo ein Lauf
+    sie trifft, entscheidet der Zufall: acht identische Prozesse lieferten
+    11,9 bis 26,9 ms. Anteile von 3-7 ms sind darin nicht auffindbar.
+    """
+
+    def test_aufwaermen_ist_abschaltbar_und_default_null(self):
+        """Der Default bleibt 0 — die Standardausgabe soll weiter die Frage
+        beantworten "was sieht jemand, der die Ansicht oeffnet?"."""
+        quelle = _quelle()
+        self.assertIn("aufwaermen = 0", quelle)
+        self.assertIn("--aufwaermen", quelle)
+
+    def test_beide_messpfade_reichen_das_aufwaermen_durch(self):
+        """Wenn nur EIN Pfad aufwaermt, vergleicht die Zerlegung wieder
+        zwei verschiedene Abschnitte der Prozess-Lebenszeit — genau der
+        Fehler, den CDX-53 eine Ebene tiefer schon hatte."""
+        baum = ast.parse(_quelle())
+        aufrufe = [k for k in ast.walk(baum)
+                   if isinstance(k, ast.Call)
+                   and isinstance(k.func, ast.Name)
+                   and k.func.id == "einmal_messen"
+                   and not any(isinstance(a, ast.Constant) for a in k.args)]
+        self.assertGreaterEqual(len(aufrufe), 2, "Messpfade nicht gefunden")
+        for k in aufrufe:
+            namen = {s.arg for s in k.keywords}
+            self.assertIn("aufwaermen", namen,
+                          f"Messpfad in Zeile {k.lineno} waermt nicht auf")
+
+    def test_rohdaten_behalten_die_reihenfolge(self):
+        """`zeiten.sort()` loescht die Reihenfolge — und nur sie unterscheidet
+        'breite Verteilung' von 'die Maschine hat zwei Zustaende'."""
+        # Zeilenweise und nur auf ANWEISUNGEN: der Erklaerkommentar darueber
+        # nennt `zeiten.sort()` ebenfalls, ein Textstellen-Vergleich wuerde ihn
+        # treffen und die Reihenfolge falsch herum melden.
+        zeilen = [z.strip() for z in _quelle().splitlines()]
+        def nr(text):
+            for i, z in enumerate(zeilen):
+                if z == text:
+                    return i
+            return None
+        kopie, sortieren = nr("reihenfolge = list(zeiten)"), nr("zeiten.sort()")
+        self.assertIsNotNone(kopie, "die Reihenfolge wird nicht mehr gesichert")
+        self.assertIsNotNone(sortieren, "kein `zeiten.sort()` mehr gefunden")
+        self.assertLess(kopie, sortieren,
+                        "die Kopie entsteht erst NACH dem Sortieren — dann "
+                        "traegt sie die Reihenfolge nicht mehr")
+
 
 class BenchmarkFormTest(unittest.TestCase):
     """Das Werkzeug muss importierbar und syntaktisch heil sein."""
