@@ -7,6 +7,49 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-04 — Die veroeffentlichten 3D-Leistungszahlen waren an der falschen Stelle gemessen
+
+#### Behoben
+
+- **Die Aufschluesselung "was kostet die 3D-Ansicht?" nannte den falschen
+  zweitgroessten Posten.** Im Eintrag vom 2026-08-03 standen die **Lichtkegel
+  mit 22 %** direkt hinter den Schlagschatten. Nachgemessen sind es **1 %** —
+  also nichts. Wer dieser Rangfolge gefolgt waere, haette die Kegel vereinfacht,
+  dafuer Optik bezahlt und keine Geschwindigkeit gewonnen. Bestaetigt haben sich
+  nur die beiden grossen Posten: **Schlagschatten rund 30 %**, die Beleuchtung
+  insgesamt (Scheinwerfer samt ihrer Schatten) rund **49 %**. Alles darunter —
+  Kegel, Bodenflecken — liegt unter der Nachweisschwelle der Messung und ist
+  damit keine Zahl, auf die man eine Entscheidung stellen kann. **Fuer die
+  Bedienung aendert sich nichts; fuer jede kuenftige Optimierung die
+  Reihenfolge:** wer die Ansicht schneller haben will, geht an die Schatten —
+  und danach ist kein zweiter Hebel nachweisbar.
+
+- **Und die Ansicht ist frueher am Limit als gemeldet.** Bei **32 Geraeten** sind
+  nicht 90 %, sondern **99 %** der verfuegbaren Zeit je Bild verbraucht, bei 48
+  Geraeten 129 % statt 102 %; bei 12 Geraeten ist dagegen mehr Luft als gedacht
+  (34 % statt 42 %). Was das *nicht* heisst, bleibt unveraendert: die Ansicht
+  haengt nicht hinterher, sie zeigt weniger Zwischenschritte und immer den
+  aktuellen Stand. Spuerbar wird es bei 48 Geraeten, wo die langsamsten Bilder
+  deutlich aus der Reihe fallen — die Ansicht wird dort nicht gleichmaessig
+  langsamer, sondern unruhig.
+
+- **Ursache beider Korrekturen: das Messwerkzeug mass die Einschwingphase.** Die
+  Grafikeinheit laeuft die ersten rund 75 Bilder im Boost-Takt und faellt dann
+  auf den Dauertakt; die Voreinstellung von 40 Bildern liegt mitten in diesem
+  Uebergang. Acht voellig identische Messlaeufe lieferten deshalb Werte zwischen
+  11,9 und 26,9 ms — bei gesuchten Anteilen von 3-7 ms war der Messfehler
+  doppelt so gross wie das Ergebnis.
+
+#### Neu
+
+- **`tools/viz_render_benchmark.py` kann jetzt lang und aufgewaermt messen** —
+  `--runden N` (mehr Bilder je Lauf), `--aufwaermen N` (die ersten N Bilder
+  verwerfen) und `--rohdaten` (die Einzelzeiten **in ihrer Reihenfolge**
+  herausgeben). Die Voreinstellung bleibt unveraendert, damit die
+  Standardausgabe weiterhin die Frage beantwortet "was sieht jemand, der die
+  Ansicht oeffnet?". Erst die Reihenfolge der Einzelbilder hat die Rampe oben
+  sichtbar gemacht — aus einem Mittelwert ist sie nicht zu erkennen.
+
 ### 2026-08-03 — Grosse Rigs im 3D-Visualizer, und eine saubere sACN-Identitaet
 
 #### Behoben
@@ -102,6 +145,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   **Schlagschatten am meisten** (36 %), dann die Lichtkegel (22 %) und die
   Bodenflecken (15 %) — wer die Ansicht schneller haben will, faengt bei den
   Schatten an.
+
+  > ⚠️ **Diese Zahlen sind am 2026-08-04 nachgemessen und korrigiert worden**
+  > (siehe Eintrag ganz oben): die Lichtkegel kosten 1 %, nicht 22 %, und bei 32
+  > Geraeten sind 99 % der Zeit verbraucht, nicht 90 %. Die Aussage "wer die
+  > Ansicht schneller haben will, faengt bei den Schatten an" hat sich
+  > bestaetigt — die Rangfolge dahinter nicht.
 
 ### 2026-08-02 — Lichtkegel enden am Podest, nicht dahinter
 
