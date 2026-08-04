@@ -1652,7 +1652,7 @@ class AppState:
             if u not in self.universes:
                 self.universes[u] = self.output_manager.add_universe(u)
 
-    def apply_output_config(self, path: str = "data/universes.json"):
+    def apply_output_config(self, path: str | None = None):
         """Liest die im Universe-Manager gespeicherte Output-Konfiguration und
         richtet beim Start die passenden Backends (Enttec/ArtNet/sACN) ein.
 
@@ -1661,9 +1661,19 @@ class AppState:
         - ArtNet: ``patch`` = Ziel-IP/Broadcast (leer = Default-Broadcast)
         - sACN:   ``patch`` = Unicast-IP (leer = Multicast)
         Fehler pro Universe werden geloggt, brechen den Start aber nicht ab.
+
+        ``path=None`` nimmt ``LIGHTOS_UNIVERSES_JSON``, sonst
+        ``data/universes.json``. **Lese- und Schreibseite muessen dieselbe
+        Datei sehen** — der Dialog schreibt ueber ``output_config._UNIV_CONFIG_PATH``,
+        und stuenden die beiden auseinander, richtete die App beim naechsten
+        Start eine andere Konfiguration ein als die gerade gespeicherte.
+        Der frueher hier fest verdrahtete Default war genau diese zweite Stelle.
         """
         import json
         import os
+        if path is None:
+            path = (os.environ.get("LIGHTOS_UNIVERSES_JSON")
+                    or os.path.join("data", "universes.json"))
         if not os.path.exists(path):
             return
         try:

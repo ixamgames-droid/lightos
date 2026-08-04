@@ -91,6 +91,27 @@ os.environ.setdefault(
     "LIGHTOS_SACN_CID",
     os.path.join(_TEST_TMP, f"lightos_test_sacn_cid_{_TEST_PID}"))
 
+# QA-UNIVERSES-WRITE: dieselbe Trennung fuer die Ausgangs-Konfiguration.
+#
+# ⚠️ Diese Datei ist keine Einstellung unter vielen — **ohne sie geht kein DMX
+# raus.** `output_config._persist_output` schreibt sie bei jedem
+# „Uebernehmen"/„Verbinden" neu, und der Pfad war relativ zum
+# Arbeitsverzeichnis. Wer die Suite im Repo-Ordner faehrt (der Normalfall),
+# liess damit `tests/test_output_config_lifecycle.py` eine vollstaendige,
+# **erfundene** 5-Zeilen-Konfiguration ueber die echte legen: Enttec auf
+# `COM_FAKE`, zwei Art-Net-Broadcasts, zwei sACN-Universen.
+#
+# Gemessen wurde das an der Datei selbst — von acht Testdateien, die diese APIs
+# beruehren, schreibt genau diese eine. Aufgefallen ist es nur, weil ein
+# frischer Worktree die Datei noch gar nicht hatte und sie nach dem Lauf
+# ploetzlich da war; im Repo-Ordner haette sie unbemerkt die vorhandene
+# ersetzt, und `git status` schweigt dazu, weil `data/*.json` gitignored ist.
+#
+# Waechter: `tests/test_universes_json_isolation.py`.
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(_TEST_TMP, f"lightos_test_universes_{_TEST_PID}.json"))
+
 
 def _purge_test_dbs():
     """Die prozess-eigene Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)

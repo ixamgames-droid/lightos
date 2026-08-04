@@ -31,6 +31,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Auf schwacher Grafik waren die Schatten haerter als vorgesehen.** Die
   weiche Kantenglaettung der Schatten war dort versehentlich abgeschaltet.
 
+- **Ein Testlauf im Programmordner konnte die Ausgangs-Konfiguration
+  ueberschreiben.** Betroffen war `data/universes.json` — die Datei, die sagt,
+  welches Universum auf welchen Adapter geht; ohne sie geht kein DMX raus. Beim
+  Ausfuehren der Testsuite legte einer der Tests dort eine erfundene
+  Konfiguration ab. Besonders unangenehm daran: bestehende Zeilen behielten
+  ihren **Namen** und bekamen ein anderes **Ziel** — die Liste sah danach aus
+  wie die eigene und sendete woandershin. Tests schreiben jetzt in einen
+  Wegwerf-Ordner; ein Waechter haelt das fest. (Betrifft nur, wer die
+  Testsuite selbst ausfuehrt — die normale Benutzung war nie betroffen.)
+
 - **sACN meldet sich jetzt als EINE Konsole, nicht als eine pro Universum.**
   Bisher bekam jedes sACN-Universum eine eigene Quellkennung, und bei jedem
   Programmstart — sowie bei jedem Speichern im Universen-Tab — eine neue.

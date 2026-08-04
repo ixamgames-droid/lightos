@@ -13,7 +13,24 @@ import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
 
-_UNIV_CONFIG_PATH = os.path.join("data", "universes.json")
+# ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
+#
+# Der Pfad ist RELATIV zum Arbeitsverzeichnis, und `_persist_output` schreibt
+# ihn bei jedem „Übernehmen"/„Verbinden" neu. Wer die Suite im Repo-Ordner
+# fährt — also der Normalfall —, schrieb damit in **genau die Datei, ohne die
+# kein DMX rausgeht**: gemessen legte `tests/test_output_config_lifecycle.py`
+# eine vollständige 5-Zeilen-Konfiguration an (Enttec `COM_FAKE`, zwei
+# Art-Net-Broadcasts, zwei sACN). Auf einem Rechner, wo der Arbeitsbaum
+# zugleich der Betriebsordner ist, ersetzt ein Testlauf so die echte
+# Ausgangs-Konfiguration durch eine erfundene — ohne Meldung, und `git status`
+# schweigt, weil `data/*.json` gitignored ist.
+#
+# Die Umlenkung folgt demselben Muster wie `LIGHTOS_SHOW_DB` /
+# `LIGHTOS_FIXTURE_DB` / `LIGHTOS_CRASH_LOG` (s. `tests/conftest.py`): Default
+# unverändert, im Test ein Wegwerf-Pfad. Der Wächter dazu ist
+# `tests/test_universes_json_isolation.py`.
+_UNIV_CONFIG_PATH = os.environ.get(
+    "LIGHTOS_UNIVERSES_JSON") or os.path.join("data", "universes.json")
 
 # A3D-33: gueltiger interner Universe-Bereich — identisch zu den 1..32-Spinboxen der
 # Tabs und der 32-Zeilen-Grenze in _univ_add. Die freie '#'-Spalte des Universe-Tables
