@@ -92,12 +92,18 @@ import subprocess                                                  # noqa: E402
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# ⚠️ Pfade hier IMMER mit "/" schreiben, nie ueber os.path.join: verglichen wird
+# gegen die Ausgabe von `git ls-files`, und die benutzt auf JEDER Plattform
+# Forward-Slashes. Mit os.path.join stand hier auf Windows "tools\_archiv",
+# traf das getrennte `tools/_archiv/...` nicht mehr und liess das stillgelegte
+# Archiv in den Scan laufen -> der Waechter war auf Windows rot, auf Linux gruen
+# (XPLAT-WIN). Auf POSIX sind beide Schreibweisen identisch.
 # Nur hier darf APPDATA vorkommen: das ist die zentrale Aufloesung selbst.
-_ALLOWED = {os.path.join("src", "core", "paths.py")}
+_ALLOWED = {"src/core/paths.py"}
 
 # Nicht gescannt: venv (fremder Code), tools/_archiv (stillgelegt), tests
 # (duerfen das alte Muster zu Vergleichszwecken nennen — siehe oben).
-_SKIP_PREFIXES = ("venv", ".git", os.path.join("tools", "_archiv"), "tests")
+_SKIP_PREFIXES = ("venv", ".git", "tools/_archiv", "tests")
 
 _APPDATA_SELFRESOLVE = re.compile(r"""environ(?:\.get\(|\[)\s*["']APPDATA["']""")
 
@@ -115,7 +121,7 @@ def _tracked_python_files():
 def test_no_module_resolves_appdata_itself():
     offenders = []
     for rel in _tracked_python_files():
-        if rel.replace("/", os.sep) in _ALLOWED:
+        if rel in _ALLOWED:      # beides in git-Schreibweise ("/"), s. oben
             continue
         with open(os.path.join(_REPO_ROOT, rel), encoding="utf-8", errors="replace") as f:
             for lineno, line in enumerate(f, 1):

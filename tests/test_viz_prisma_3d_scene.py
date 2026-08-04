@@ -148,7 +148,17 @@ class Prisma3DSceneTest(unittest.TestCase):
     def _load_and_wait(self):
         self._loaded_ok.clear()
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        # ⚠️ gputier=high ist hier PFLICHT, nicht Kosmetik. Ohne die Query
+        # entscheidet die JS-Probe (renderer.js#probeGpuTier) nach der echten GPU
+        # des Testrechners. Auf Davids Windows-ARM-Geraet (Adreno,
+        # MAX_TEXTURE_IMAGE_UNITS=16) ist das voellig korrekt 'low' — und dann
+        # deckelt prismFacetCount auf PRISMA_MAX_LOWSPEC=3, also 2 statt 5
+        # Nebenstrahlen. Der Test unten prueft aber die High-Spec-Zahlen, war
+        # damit auf ARM rot und auf der Desktop-GPU der Linux-Session gruen
+        # (XPLAT-WIN). Die Low-Spec-Deckelung selbst bleibt geprueft: die reine
+        # Funktion bekommt lowSpec unten explizit uebergeben.
+        # Gleiche Schreibweise wie load_stage_html (s. test_viz_quality_tier).
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         deadline = time.monotonic() + _LOAD_TIMEOUT_S
         while not self._loaded_ok and time.monotonic() < deadline:

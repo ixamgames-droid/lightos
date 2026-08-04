@@ -15,6 +15,7 @@ grept, wuerde jede kaputte Umbau-Variante durchwinken.
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,20 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RUNNER = REPO / "tools" / "verify_segmented.sh"
+
+# ⚠️ Der bisherige Guard war nur ``RUNNER.exists()`` — und das griff auf Windows
+# NIE, denn die .sh-Datei ist mit eingecheckt und liegt dort selbstverstaendlich
+# auch. Ausgefuehrt wurde sie dann per ``subprocess.run(["bash", ...])``, was im
+# pytest-Prozess mit ``FileNotFoundError [WinError 2]`` starb (XPLAT-WIN).
+#
+# Der Segment-Runner IST das Linux-Gate: er startet je Segment ein
+# ``venv/bin/python``, das es auf einem Windows-Checkout gar nicht gibt. Auf
+# Windows laeuft das Gate stattdessen ueber ``run_tests.ps1 -Isolate``. Diese
+# Datei prueft also bewusst nur dort, wo der Runner das reale Gate ist.
+_RUNNER_LAEUFT = (RUNNER.exists() and os.name != "nt"
+                  and shutil.which("bash") is not None)
+_RUNNER_GRUND = ("verify_segmented.sh ist das Linux-Gate — auf Windows faehrt "
+                 "run_tests.ps1 -Isolate, und bash fehlt im PATH")
 
 # Jede Mini-Testdatei schreibt "<name> <start> <ende>" in eine gemeinsame Datei.
 # Das Anhaengen einer kurzen Zeile mit O_APPEND ist prozessuebergreifend atomar,
@@ -50,7 +65,7 @@ def _ueberlappt(a, b):
 
 
 class WebEngineSpurTest(unittest.TestCase):
-    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
     def test_webengine_segmente_laufen_nie_gleichzeitig(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -94,7 +109,7 @@ class WebEngineSpurTest(unittest.TestCase):
                         f"{a} und {b} liefen gleichzeitig — WebGL-Kontexte "
                         f"konkurrieren wieder: {zeiten[a]} / {zeiten[b]}")
 
-    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
     def test_gewoehnliche_segmente_bleiben_parallel(self):
         """Die Serialisierung darf nicht auf den Rest der Suite durchschlagen.
 
@@ -174,7 +189,7 @@ class Xplat17SignaturTest(unittest.TestCase):
             cwd=str(REPO), env=umgebung, capture_output=True,
             text=True, timeout=180)
 
-    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
     def test_kontextverlust_wird_benannt_bleibt_aber_rot(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
@@ -191,7 +206,7 @@ class Xplat17SignaturTest(unittest.TestCase):
                           f"Ursache nicht benannt:\n{erg.stdout}")
             self.assertIn("test_kontextverlust.py", erg.stdout)
 
-    @unittest.skipUnless(RUNNER.exists(), "verify_segmented.sh fehlt")
+    @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
     def test_gewoehnlicher_fehler_bekommt_die_signatur_NICHT(self):
         """Die Gegenprobe, an der sich alles entscheidet: waere das Etikett zu
         grosszuegig, haette es genau den Schaden angerichtet, den es verhindern

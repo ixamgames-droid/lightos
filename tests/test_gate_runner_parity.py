@@ -20,6 +20,7 @@ from __future__ import annotations
 import os
 import re
 import stat
+import subprocess
 
 import pytest
 
@@ -42,6 +43,23 @@ def _exports(rel_path: str) -> dict[str, str]:
         return {m.group("name"): m.group("value") for m in _EXPORT.finditer(f.read())}
 
 
+def _git_index_mode(rel_path: str) -> str | None:
+    """Der in Git hinterlegte Datei-Modus ("100755"/"100644") oder None.
+
+    Das ist die Eigenschaft, auf die es ankommt: SIE reist in den Linux-Checkout,
+    nicht das lokale Dateisystem-Bit.
+    """
+    try:
+        erg = subprocess.run(["git", "ls-files", "-s", "--", rel_path],
+                             cwd=_REPO_ROOT, capture_output=True, text=True,
+                             timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if erg.returncode != 0 or not erg.stdout.strip():
+        return None
+    return erg.stdout.split()[0]
+
+
 @pytest.mark.parametrize("rel", _RUNNERS)
 def test_runner_exists_and_is_executable(rel):
     path = os.path.join(_REPO_ROOT, rel)
@@ -49,8 +67,27 @@ def test_runner_exists_and_is_executable(rel):
         f"{rel} fehlt. Der Segment-Runner lag frueher ausserhalb des Repos — "
         "ein frischer Linux-Checkout hatte dadurch kein Gate fuer die volle Suite "
         "(XPLAT-11).")
-    mode = os.stat(path).st_mode
-    assert mode & stat.S_IXUSR, f"{rel} ist nicht ausfuehrbar (chmod +x)"
+    # ueber eine Variable statt direkt ``os.name``, sonst wertet Pyright den
+    # jeweils anderen Zweig host-spezifisch als "unreachable" (dieselbe
+    # Schreibweise wie in src/core/paths.py).
+    plat = os.name
+    if plat == "nt":
+        # ⚠️ NICHT auf os.stat().st_mode zurueckbauen. NTFS kennt kein
+        # Ausfuehrbar-Bit, Git setzt auf Windows core.filemode=false, und CPython
+        # meldet fuer .sh-Dateien schlicht 0o666 -> S_IXUSR ist dort IMMER False.
+        # Der Test war damit auf Windows unrettbar rot, obwohl die Dateien
+        # korrekt als 100755 eingecheckt sind (XPLAT-WIN). Geprueft wird deshalb
+        # der Git-Modus: genau der landet im Linux-Checkout, um den es geht.
+        mode = _git_index_mode(rel)
+        if mode is None:
+            pytest.skip("kein Git-Checkout — Ausfuehrbar-Bit auf Windows nicht pruefbar")
+        assert mode == "100755", (
+            f"{rel} ist in Git als {mode} hinterlegt, nicht als 100755 — ein "
+            "frischer Linux-Checkout bekommt die Datei damit nicht ausfuehrbar. "
+            "Beheben mit: git update-index --chmod=+x " + rel)
+    else:
+        mode = os.stat(path).st_mode
+        assert mode & stat.S_IXUSR, f"{rel} ist nicht ausfuehrbar (chmod +x)"
 
 
 @pytest.mark.parametrize("var", _GATE_VARS)
