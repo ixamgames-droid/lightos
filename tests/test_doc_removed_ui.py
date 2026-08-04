@@ -35,6 +35,19 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DOCS = os.path.join(_REPO, "docs")
 _SRC = os.path.join(_REPO, "src")
 
+
+def _rel(pfad: str) -> str:
+    """Repo-relativer Pfad, IMMER mit "/" — auch auf Windows.
+
+    ⚠️ Nicht durch ein blankes ``os.path.relpath`` ersetzen: das liefert auf
+    Windows ``docs\\anleitung_ablaeufe\\ANLEITUNG.md``, verglichen wird hier aber
+    (und in den Fehlertexten der Anleitungen) gegen ``docs/anleitung_...``.
+    Genau daran war ``test_abgrenzung_ist_wirksam`` auf Windows rot, waehrend
+    Linux gruen blieb (XPLAT-WIN). Auf POSIX ist ``os.sep == "/"``, der
+    ``replace`` also wirkungslos — das Verhalten dort bleibt unveraendert.
+    """
+    return os.path.relpath(pfad, _REPO).replace(os.sep, "/")
+
 # Name -> (entfernt am, wodurch ersetzt). Beides landet im Fehlertext, damit der
 # nächste Leser nicht erst Archäologie betreiben muss.
 _ENTFERNT = {
@@ -154,7 +167,7 @@ class EntfernteUiTest(unittest.TestCase):
     def test_abgrenzung_ist_wirksam(self):
         """Die Auswahl darf weder leer sein (Gate liefe ins Nichts) noch alles
         umfassen (Audits/Pläne würden zu Unrecht angemeckert)."""
-        gewaehlt = {os.path.relpath(p, _REPO) for p in _anleitungen()}
+        gewaehlt = {_rel(p) for p in _anleitungen()}
         alle = sum(1 for _w, _v, d in os.walk(_DOCS) for f in d
                    if f.endswith(".md"))
         self.assertGreater(len(gewaehlt), alle // 3,
@@ -184,7 +197,7 @@ class EntfernteUiTest(unittest.TestCase):
         befunde = []
         for pfad in _anleitungen():
             with open(pfad, encoding="utf-8", errors="replace") as fh:
-                befunde += _befunde_in(fh, os.path.relpath(pfad, _REPO))
+                befunde += _befunde_in(fh, _rel(pfad))
         hinweis = "; ".join(f"{n}: entfernt {_ENTFERNT[n][0]} -> {_ENTFERNT[n][1]}"
                             for n in _ENTFERNT)
         self.assertEqual(
