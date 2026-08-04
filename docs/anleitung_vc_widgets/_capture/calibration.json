@@ -1,0 +1,19 @@
+{
+  "quelle": "capture_vc_widgets.py (offscreen grab)",
+  "bild": "full.png",
+  "bild_laufend": "full_running.png",
+  "aus_laufendem_bild": [
+    "VCColorList",
+    "VCEffectDisplay",
+    "VCEffectEditor"
+  ],
+  "groesse": [
+    1527,
+    800
+  ],
+  "scale": 1.0,
+  "origin": [
+    0,
+    0
+  ]
+}

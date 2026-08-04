@@ -140,6 +140,62 @@ def place(w, key, title, x, y, ww, hh):
                      "h": (y + 24 + hh) - y, "wx": x, "wy": y + 24, "ww": ww, "wh": hh}
 
 
+# ── Automatischer Umbruch statt handgesetzter Reihen (CDX, Codex zu PR #571) ──
+#
+# ⚠️ **Die Reihen waren von Hand gesetzt, und fuenf Bereiche ueberlappten sich.**
+# Aufgefallen ist einer davon: der Speed-Dial (190 px hoch, y=78..268) lag unter
+# der ab y=210 beginnenden Chase-Liste, und im fertigen `VCSpeedDial.png`
+# fehlten dadurch SYNC und die BPM-Zeile — beide zeichnet das Widget an seiner
+# UNTERKANTE. Die anderen vier fand erst die maschinelle Pruefung
+# (`tests/test_vc_widgets_showcase_layout.py`), und sie haben alle dieselbe
+# Ursache:
+#
+#     lbl.setGeometry(x, y, max(ww, 150), 20)
+#                            ^^^^^^^^^^^
+# Das TYP-LABEL ist mindestens 150 px breit, auch wenn das Widget schmaler ist.
+# Der Fader ist 60 px breit, sein Label 150 — wer die Reihe nach den WIDGETS
+# ausrichtet, laesst die Labels ineinanderlaufen. Betroffen waren Fader, Farbe,
+# Encoder, Stepper und die Cue-Liste. Kein Bild war offensichtlich kaputt; sie
+# trugen nur alle ein Stueck vom Nachbarn am Rand.
+#
+# **Platz war nie das Problem.** Am Kalibrier-Quadrat im Vollbild nachgemessen:
+# der Zuschnitt laeuft 1:1 und der aufgenommene Bereich reicht logisch bis
+# 1600x900 — belegt waren 990x808. Die Ueberlappungen waren also reine
+# Handarbeit, nicht Platznot.
+#
+# Deshalb rechnet das Layout die Reihen jetzt selbst: Umbruch bei `_MAX_X`,
+# Zeilenhoehe = hoechstes Widget der Reihe. Ein neues Widget kann damit keine
+# Ueberlappung mehr erzeugen, egal wo es eingefuegt wird.
+_MAX_X = 1560          # letzter belegbarer x (gemessen: sichtbar bis 1600)
+_START_X, _START_Y = 30, 54    # y=54: unter den Kalibrier-Kacheln (CAL_SIZE=40)
+# ⚠️ Die Luecke muss GROESSER sein als der doppelte Zuschnitt-Rand.
+# `crop_vc_widgets.py` gibt jedem Bild `pad` Pixel Luft (Default 8) — auf BEIDEN
+# Seiten. Bei 10 px Abstand griffen zwei Ausschnitte deshalb 6 px ineinander,
+# und jedes Bild trug einen schmalen Streifen seines Nachbarn am Rand. Das fiel
+# nicht auf, weil dieser Streifen meist leerer Hintergrund ist — bis er es
+# einmal nicht ist. 24 > 2*8 laesst auch bei erhoehtem `pad` noch Luft.
+_LUECKE, _REIHEN_ABSTAND = 24, 20
+
+_cursor = {"x": _START_X, "y": _START_Y, "hoehe": 0}
+
+
+def reihe(w, key, title, ww, hh):
+    """Wie `place`, aber die Position rechnet sich aus dem bisherigen Lauf.
+
+    Reihenfolge = Aufrufreihenfolge; sie bleibt damit thematisch lesbar
+    (Bedienelemente, dann Anzeigen, dann Container) und nicht nach Groesse
+    sortiert.
+    """
+    breite = max(ww, 150)                 # das Label ist der breitere Teil
+    if _cursor["x"] + breite > _MAX_X:
+        _cursor["y"] += 24 + _cursor["hoehe"] + _REIHEN_ABSTAND
+        _cursor["x"] = _START_X
+        _cursor["hoehe"] = 0
+    place(w, key, title, _cursor["x"], _cursor["y"], ww, hh)
+    _cursor["x"] += breite + _LUECKE
+    _cursor["hoehe"] = max(_cursor["hoehe"], hh)
+
+
 # ── Kalibrier-Kacheln (reine Farben, an festen Canvas-Koordinaten) ───────────
 #
 # ⚠️ Die logische Groesse muss mindestens so gross sein, wie das Widget WIRKLICH
@@ -160,47 +216,46 @@ c2 = VCColor(""); c2.color_r, c2.color_g, c2.color_b = CAL2; c2.with_intensity =
 c2.target = ColorTarget.PROGRAMMER; c2.bank = 0; c2.setGeometry(1304, 4, CAL_SIZE, CAL_SIZE)
 widgets.append(c2.to_dict())
 
-# ── Reihe 0 (y=54 — unter den Kalibrier-Kacheln, s. CAL_SIZE) ───────────────
+# ── Bedienelemente ───────────────────────────────────────────────────────────
+# Reihenfolge = Anordnung; den Umbruch rechnet `reihe()` (s. oben).
 b = VCButton("Effekt an/aus"); b.action = ButtonAction.FUNCTION_TOGGLE; b.function_id = mtx.id
-place(b, "VCButton", "Button (VCButton)", 30, 54, 160, 64)
+reihe(b, "VCButton", "Button (VCButton)", 160, 64)
 sl = VCSlider("Tempo"); sl.mode = SliderMode.EFFECT_SPEED; sl.function_id = mtx.id
-place(sl, "VCSlider", "Fader (VCSlider)", 230, 54, 60, 160)
+reihe(sl, "VCSlider", "Fader (VCSlider)", 60, 160)
 co = VCColor("Rot"); co.color_r, co.color_g, co.color_b = 220, 30, 30; co.target = ColorTarget.ALL
-place(co, "VCColor", "Farbe (VCColor)", 330, 54, 90, 90)
+reihe(co, "VCColor", "Farbe (VCColor)", 90, 90)
 en = VCEncoder("Groesse"); en.param_key = ENC_KEY; en.function_id = ENC_FID
-place(en, "VCEncoder", "Encoder (VCEncoder)", 460, 54, 100, 120)
+reihe(en, "VCEncoder", "Encoder (VCEncoder)", 100, 120)
 st = VCStepper("Anzahl"); st.param_key = STEP_KEY; st.function_id = STEP_FID
-place(st, "VCStepper", "Stepper (VCStepper)", 600, 54, 120, 80)
+reihe(st, "VCStepper", "Stepper (VCStepper)", 120, 80)
 sd = VCSpeedDial("Tempo-Knoten"); sd.target_mode = SpeedTarget.SPEED_NODE; sd.tempo_bus_id = "A"; sd.role = "master"
-place(sd, "VCSpeedDial", "Speed-Dial (VCSpeedDial)", 760, 54, 160, 190)
-
-# ── Reihe 1 (y=210) ─────────────────────────────────────────────────────────
+reihe(sd, "VCSpeedDial", "Speed-Dial (VCSpeedDial)", 160, 190)
 xy = VCXYPad("Pan/Tilt"); xy.mode = "position"; xy._fixture_ids = list(par_fids)
-place(xy, "VCXYPad", "XY-Pad (VCXYPad)", 30, 210, 160, 160)
+reihe(xy, "VCXYPad", "XY-Pad (VCXYPad)", 160, 160)
 cl = VCCueList("Cueliste"); cl.stack_slot = 0
-place(cl, "VCCueList", "Cue-Liste (VCCueList)", 230, 210, 210, 160)
+reihe(cl, "VCCueList", "Cue-Liste (VCCueList)", 210, 160)
+
+# ── Listen & Anzeigen ────────────────────────────────────────────────────────
 ccl = VCColorList("Farb-Sequenz"); ccl.function_id = mtx.id
-place(ccl, "VCColorList", "Chase-Liste (VCColorList)", 750, 210, 230, 80)
+reihe(ccl, "VCColorList", "Chase-Liste (VCColorList)", 230, 80)
 ec = VCEffectColors("Effekt-Farben"); ec.function_id = mtx.id
-place(ec, "VCEffectColors", "Effekt-Farben (VCEffectColors)", 750, 316, 230, 86)
-
-# ── Reihe 2 (y=426) ─────────────────────────────────────────────────────────
+reihe(ec, "VCEffectColors", "Effekt-Farben (VCEffectColors)", 230, 86)
 bpm = VCBpmDisplay("BPM"); bpm.tempo_bus_id = ""
-place(bpm, "VCBpmDisplay", "BPM-Anzeige (VCBpmDisplay)", 30, 426, 190, 96)
+reihe(bpm, "VCBpmDisplay", "BPM-Anzeige (VCBpmDisplay)", 190, 96)
 bs = VCBusSelector("Tempo-Bus"); bs.buses = ["A", "B", "C", "D"]
-place(bs, "VCBusSelector", "Tempo-Bus (VCBusSelector)", 260, 426, 210, 86)
+reihe(bs, "VCBusSelector", "Tempo-Bus (VCBusSelector)", 210, 86)
 si = VCSongInfo("Musik")
-place(si, "VCSongInfo", "Musik-Info (VCSongInfo)", 510, 426, 220, 96)
+reihe(si, "VCSongInfo", "Musik-Info (VCSongInfo)", 220, 96)
 exl = VCLabel("Beschriftung / Titel")
-place(exl, "VCLabel", "Text-Label (VCLabel)", 770, 426, 220, 44)
-ed = VCEffectDisplay("Effekt-Anzeige"); ed.function_id = mtx.id
-place(ed, "VCEffectDisplay", "Effekt-Anzeige (VCEffectDisplay)", 770, 516, 210, 124)
+reihe(exl, "VCLabel", "Text-Label (VCLabel)", 220, 44)
 
-# ── Reihe 3 (y=560) ─────────────────────────────────────────────────────────
+# ── Container & Editor ───────────────────────────────────────────────────────
+ed = VCEffectDisplay("Effekt-Anzeige"); ed.function_id = mtx.id
+reihe(ed, "VCEffectDisplay", "Effekt-Anzeige (VCEffectDisplay)", 210, 124)
 fr = VCFrame("Rahmen / Gruppe")
-place(fr, "VCFrame", "Container (VCFrame)", 30, 560, 240, 150)
+reihe(fr, "VCFrame", "Container (VCFrame)", 240, 150)
 ee = VCEffectEditor("Effekt-Editor"); ee.set_effect(mtx.id)
-place(ee, "VCEffectEditor", "Effekt-Editor-Box (VCEffectEditor)", 320, 560, 380, 224)
+reihe(ee, "VCEffectEditor", "Effekt-Editor-Box (VCEffectEditor)", 380, 224)
 
 # ── Speichern ────────────────────────────────────────────────────────────────
 state._vc_layout = {"widgets": widgets}

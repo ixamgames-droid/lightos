@@ -113,6 +113,32 @@ def test_flacher_klon_liefert_keine_stichzeit(monkeypatch):
     assert abs_tool._audit_zeitpunkt(_AUDIT_DATEI) == ""
 
 
+def test_gescheitertes_git_log_wird_als_fehler_gemeldet(monkeypatch, capsys):
+    """CDX (Codex zu PR #572): ein gescheitertes `git log` ist nicht dasselbe
+    wie eines, das nichts findet — auch wenn beide leeres stdout liefern.
+
+    Kein Repo, beschaedigte Objektdatenbank, fehlende Rechte: dann ist die Frage
+    unbeantwortbar. Vorher fiel das in den „kein Anlage-Commit gefunden"-Zweig
+    und schickte den Leser dort suchen, wo nichts zu finden war. Die Einstufung
+    war schon richtig (leere Stichzeit → `main()` bricht mit Exitcode 2 ab, s.
+    Test unten); falsch war die BEGRUENDUNG, und die ist das Einzige, womit
+    jemand den Fehler abstellen kann.
+    """
+    class _Kaputt:
+        returncode, stdout, stderr = 128, "", "fatal: bad object HEAD\n"
+
+    monkeypatch.setattr(abs_tool, "_ist_flach", lambda: False)
+    monkeypatch.setattr(abs_tool.subprocess, "run", lambda *a, **k: _Kaputt())
+    assert abs_tool._audit_zeitpunkt(_AUDIT_DATEI) == ""
+    fehler = capsys.readouterr().err
+    assert "FEHLER" in fehler
+    assert "128" in fehler, "der Exitcode fehlt — er ist der Ansatzpunkt"
+    assert "bad object HEAD" in fehler, "git sagt, was los ist; das gehoert weitergegeben"
+    assert "kein Anlage-Commit" not in fehler, (
+        "ein git-Fehler wird als 'nichts gefunden' ausgegeben — das schickt "
+        "den Leser an die falsche Stelle")
+
+
 def test_ohne_stichzeit_bricht_das_werkzeug_ab(monkeypatch, capsys):
     """Kein „alles offen" auf duenner Datenlage — Abbruch mit Exitcode 2."""
     monkeypatch.setattr(abs_tool, "_ist_flach", lambda: True)

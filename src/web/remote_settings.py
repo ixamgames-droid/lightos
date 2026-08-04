@@ -172,7 +172,12 @@ def regenerate_token() -> str:
     Rotation programmatisch ausloest, muss es ebenfalls tun.
     (Der frueher hier stehende Satz „wirkt SOFORT am laufenden Server" war falsch —
     CDX-24.)"""
+    global _token_cache
     tok = _new_token()
+    # Das Token, das die laufende Sitzung TRAEGT — der Flask-Server hat genau
+    # dieses beim `create_app` in `app.config` gelegt. Es zu verlieren heisst,
+    # den laufenden Server unerreichbar zu machen; s. den Restore unten.
+    bisher = _token_cache
     save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
     # NET-10: den Prozess-Cache VOR der Gegenprobe leeren. Sonst liefert
     # `get_token()` das ALTE Token, die Pruefung unten schlaegt fehl und meldet
@@ -184,6 +189,20 @@ def regenerate_token() -> str:
     # gaebe die Funktion das neue Token zurueck, obwohl gar nichts rotiert wurde,
     # und die UI meldete „alte Links sind ungueltig", waehrend sie es nicht sind.
     if get_token() != tok:
+        # ⚠️ **NET-10 hob sich hier selbst auf.** Bei unschreibbarem Profil lebt
+        # das gueltige Token NUR im Cache. Der `_token_cache_leeren()`-Aufruf
+        # oben warf es weg, und das `get_token()` in dieser Zeile hat daraufhin
+        # ein DRITTES Zufallstoken erzeugt und gecacht — der laufende Server
+        # erwartete weiter das erste, jeder neu erzeugte Link/QR-Code zeigte das
+        # dritte. Genau der unbrauchbare Zustand, gegen den NET-10 gebaut wurde,
+        # ausgeloest vom Reparaturversuch selbst.
+        #
+        # Also den Sitzungs-Stand zurueckdrehen: die Rotation ist gescheitert,
+        # und eine gescheiterte Rotation darf nichts veraendert haben. Nur wenn
+        # es vorher gar keinen Cache gab, bleibt der eben erzeugte stehen — dann
+        # gibt es kein besseres Token, und die Sitzung braucht eines.
+        if bisher:
+            _token_cache = bisher
         raise RuntimeError(
             "Token-Rotation fehlgeschlagen: die Einstellungen liessen sich nicht "
             "speichern. Die bisherigen Links bleiben gueltig.")

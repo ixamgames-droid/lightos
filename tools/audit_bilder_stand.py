@@ -79,6 +79,19 @@ def _audit_zeitpunkt(pfad: str) -> str:
     r = subprocess.run(
         ["git", "log", "--diff-filter=A", "--format=%ad", "--date=iso-strict",
          "--", pfad], cwd=_REPO, capture_output=True, text=True)
+    if r.returncode != 0:
+        # Ein GESCHEITERTES `git log` ist etwas anderes als eines, das nichts
+        # findet — auch wenn beide leeres stdout liefern. Kein Repo, beschaedigte
+        # oder unvollstaendige Objektdatenbank, fehlende Rechte: dann ist die
+        # Frage unbeantwortbar, und die Meldung muss das auch sagen. Vorher lief
+        # das in den "kein Anlage-Commit"-Zweig und schickte den Leser suchen,
+        # wo nichts zu finden war.
+        grund = (r.stderr or "").strip().splitlines()
+        print(f"FEHLER: `git log` fehlgeschlagen (Exitcode {r.returncode}) — "
+              f"ohne Historie ist keine Stichzeit bestimmbar."
+              + (f" git sagt: {grund[0]}" if grund else ""),
+              file=sys.stderr)
+        return ""
     zeilen = [z for z in r.stdout.splitlines() if z.strip()]
     if not zeilen:
         print(f"WARNUNG: kein Anlage-Commit fuer {os.path.basename(pfad)} "
