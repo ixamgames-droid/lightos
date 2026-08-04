@@ -79,6 +79,35 @@ ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
 - **ArtNet** → Ziel-IP oder Broadcast (leer = `255.255.255.255`).
 - **sACN** → Unicast-IP (leer = Multicast).
 
+#### Hinweis „Zwei Universen auf demselben Ziel"
+
+Beim **Speichern** prüft LightOS, ob zwei Zeilen am Ende an dieselbe Stelle
+senden. Ist das so, erscheint ein Hinweis mit den betroffenen Zeilennummern —
+zum Beispiel *„sACN → 10.0.0.5, externes Universum 1 · Betroffen: Zeile 1,
+Zeile 2."*
+
+**Warum das ein Problem ist:** beide Zeilen schicken dann abwechselnd
+verschiedene Inhalte an denselben Empfänger. Der zeigt Flackern, und weil beide
+Ausgänge für sich völlig normal aussehen, ist die Ursache schwer zu finden.
+
+**Verglichen wird das tatsächliche Ziel, nicht der Feldinhalt.** Zwei Zeilen
+kollidieren also auch dann, wenn sie unterschiedlich aussehen:
+
+- **Art-Net:** ein leeres Patch-Feld und ein ausgeschriebenes
+  `255.255.255.255` sind dieselbe Adresse.
+- **Externe Universe-Nummer:** fehlt sie, gilt der Standard des jeweiligen
+  Protokolls — bei **Art-Net** die Zeilennummer **minus 1**, bei **sACN** die
+  **Zeilennummer selbst**. sACN-Zeile 1 ohne Angabe und sACN-Zeile 2 mit
+  ausdrücklicher `1` landen deshalb beide auf Universum 1.
+- **Enttec:** hier zählt allein der Port. Zwei Zeilen auf demselben COM-Port
+  kollidieren immer, gleich welche Nummern sie tragen.
+
+**Gespeichert wird trotzdem, und geändert wird nichts.** Welche der beiden
+Zeilen gemeint war, weiß nur du — automatisch umzunummerieren hieße raten und
+könnte im schlechtesten Fall das falsche Rig dunkel schalten. Ist die
+Doppelbelegung Absicht (z. B. bewusst zwei Empfänger am selben Universum),
+klick den Hinweis einfach weg.
+
 Weil die Konfiguration in `data/universes.json` persistiert wird, richtet LightOS
 beide Adapter beim **nächsten Start automatisch** wieder ein.
 

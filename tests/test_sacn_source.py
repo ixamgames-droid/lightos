@@ -368,13 +368,26 @@ def test_restrisiko_ist_ausgerechnet_und_klein(cid_datei):
     assert len(vorige_staende_die_treffen) == 19
 
 
-def test_universen_haben_getrennte_zaehler(cid_datei, fake_sockets):
+def test_universen_haben_getrennte_zaehler(cid_datei, fake_sockets, monkeypatch):
     """Der Zaehler ist je (Quelle, Universum) — nicht einer fuer alles.
 
-    Geprueft wird der ABSTAND, nicht der Absolutwert: seit 2026-08-03 startet
-    jedes Universum bei einer eigenen Zufallszahl. Genau das ist die Aussage —
-    Universum 2 darf NICHT dort weiterzaehlen, wo Universum 1 steht.
+    ⚠️ **Der Startwert wird GESTELLT, und das ist der Kern des Tests.** Seit
+    2026-08-03 faengt jedes Universum bei einer eigenen Zufallszahl an — gegen
+    einen Zufallswert laesst sich aber nichts Genaues behaupten. Die erste
+    Fassung wich deshalb auf Abstands-Aussagen aus und pruefte am Ende die
+    Invariante NICHT mehr: „u1 ist um 4 vorgerueckt" und „u2 hat genau ein
+    Paket" erfuellt ein globaler Zaehler ebenso muehelos (er gaebe u1 = s..s+4
+    und u2 = s+5), und die letzte Zeile wiederholte nur die Laengenpruefung von
+    zwei Zeilen darueber. Der Test war gruen, waehrend die Regression, gegen die
+    er steht, durchgegangen waere.
+
+    Mit gestellten Startwerten ist die Aussage wieder exakt pruefbar: Universum
+    2 muss bei SEINEM Wert beginnen, nicht dort, wo Universum 1 steht.
     """
+    startwerte = iter([100, 200])
+    monkeypatch.setattr(src_mod.SacnSource, "_erster_seq",
+                        lambda self: next(startwerte))
+
     sender = SACNSender(target_ip="10.0.0.5")
     for _ in range(5):
         sender.send_dmx(1, bytes(512))
@@ -388,11 +401,15 @@ def test_universen_haben_getrennte_zaehler(cid_datei, fake_sockets):
 
     u1, u2 = daten(1), daten(2)
     assert len(u1) == 5 and len(u2) == 1
-    # Universum 1 ist um 5 vorgerueckt ...
-    assert u1[4][111] == (u1[0][111] + 4) % 256
-    # ... und Universum 2 haengt nicht daran: es hat seinen EIGENEN Startwert,
-    # der genau ein Mal benutzt wurde.
-    assert len(daten(2)) == 1, "Universum 2 wurde mehr als einmal bespielt"
+    # Universum 1 laeuft von seinem eigenen Startwert aus durch ...
+    assert [p[111] for p in u1] == [100, 101, 102, 103, 104]
+    # ... und Universum 2 beginnt bei SEINEM Startwert. Ein gemeinsamer Zaehler
+    # stuende hier bei 105 — das ist die Regression, und nur diese Zeile faengt
+    # sie. Ein Startwert-Stub ist dafuer noetig: gegen uuid4 laesst sich
+    # „eigener Wert" nicht von „zufaellig passender Wert" unterscheiden.
+    assert u2[0][111] == 200, (
+        f"Universum 2 startete bei {u2[0][111]} statt bei seinem eigenen 200 — "
+        f"bei 105 zaehlt es Universum 1 fort, also EIN Zaehler fuer alles")
 
 
 def test_kein_tmp_muell_neben_der_cid(cid_datei):

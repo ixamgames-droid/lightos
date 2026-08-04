@@ -22,13 +22,58 @@ _UNIV_CONFIG_PATH = os.path.join("data", "universes.json")
 _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 
 
+def _effektives_ziel(typ: str, patch: str) -> str:
+    """Wohin geht diese Zeile WIRKLICH? — so, wie ``apply_output_config`` es aufloest.
+
+    Der rohe ``patch``-Text taugt nicht als Schluessel: ``apply_output_config``
+    (``app_state.py``) setzt fuer Art-Net ``patch or "255.255.255.255"`` und fuer
+    sACN ``patch or None`` (= Multicast). Ein leeres Feld und die ausgeschriebene
+    Broadcast-Adresse sind also DASSELBE Ziel — verglichen man die Rohtexte,
+    blieben genau diese beiden unentdeckt.
+    """
+    if typ == "ArtNet":
+        return patch or "255.255.255.255"
+    if typ == "sACN":
+        return patch or "<Multicast>"
+    return patch                      # Enttec: der Port selbst ist das Ziel
+
+
+def _effektives_universum(typ: str, num: int, extern) -> int | None:
+    """Welche externe Universe-Nummer geht raus? — Defaults je Protokoll.
+
+    ⚠️ **Die Defaults sind NICHT gleich**, und genau daran ist die erste Fassung
+    gescheitert: sie rechnete fuer alle Typen ``num - 1``. ``_send_all``
+    (``output_manager.py``) macht aber
+
+        artnet.send_dmx(ext if ext is not None else univ_num - 1, data)
+        sacn.send_dmx(  ext if ext is not None else univ_num,     data)
+
+    — Art-Net zaehlt ab 0, sACN ab 1. Folge der falschen Annahme: sACN-Zeile 1
+    ohne Angabe (geht real auf 1) und sACN-Zeile 2 mit ausdruecklicher 1 (geht
+    real auf 1) bekamen die Schluessel 0 und 1 — **eine echte Kollision ohne
+    Warnung**. Und umgekehrt lieferte sACN-Zeile 2 ohne Angabe (real 2) mit
+    Zeile 3 auf ausdruecklich 1 (real 1) beide Male den Schluessel 1 — ein
+    **Fehlalarm**. Der Dialog meldete also mal nichts, mal das Falsche.
+
+    ``None`` fuer Enttec: dort gibt es gar keine externe Nummer
+    (``enttec.send_dmx(data)`` ohne Universum). Zwei Zeilen auf demselben Port
+    kollidieren deshalb IMMER — ihre internen Nummern sind dafuer bedeutungslos.
+    """
+    if typ == "Enttec":
+        return None
+    if extern is not None:
+        return int(extern)
+    return num if typ == "sACN" else num - 1
+
+
 def _doppelte_ziele(rows: list[dict]) -> list[tuple[str, str]]:
     """OUT-07: findet Universen, die auf dasselbe Ziel senden.
 
-    Zwei Zeilen kollidieren, wenn sie **denselben Adaptertyp**, **dasselbe Ziel**
-    (Port bzw. IP) und **dieselbe externe Universe-Nummer** haben. Die externe
-    Nummer ist dabei optional (`out_universe`); fehlt sie, gilt der Default
-    `num - 1` — genau so rechnet auch `OutputManager._send_all`.
+    Zwei Zeilen kollidieren, wenn sie denselben **Adaptertyp**, dasselbe
+    **effektive Ziel** (Port bzw. IP nach Default-Aufloesung) und dieselbe
+    **effektive externe Universe-Nummer** haben — beides so gerechnet, wie der
+    Sende-Pfad es tut, nicht wie das Eingabefeld es zeigt (s.
+    ``_effektives_ziel`` / ``_effektives_universum``).
 
     **Warum nur melden und nicht korrigieren:** welches der beiden Universen
     gemeint war, weiss nur der Bediener. Automatisch umzunummerieren hiesse zu
@@ -43,20 +88,21 @@ def _doppelte_ziele(rows: list[dict]) -> list[tuple[str, str]]:
         typ = (e.get("output") or "Disabled").strip()
         if typ in ("", "Disabled"):
             continue                       # abgeschaltet kollidiert mit nichts
-        ziel = (e.get("patch") or "").strip()
-        extern = e.get("out_universe")
-        if extern is None:
-            extern = int(e.get("num", 1)) - 1
-        gesehen.setdefault((typ, ziel, int(extern)), []).append(i)
+        ziel = _effektives_ziel(typ, (e.get("patch") or "").strip())
+        extern = _effektives_universum(
+            typ, int(e.get("num", 1)), e.get("out_universe"))
+        gesehen.setdefault((typ, ziel, extern), []).append(i)
 
     treffer = []
     for (typ, ziel, extern), zeilen in gesehen.items():
         if len(zeilen) < 2:
             continue
         wohin = ziel or "Standard-Ziel"
-        treffer.append((
-            ", ".join(f"Zeile {z}" for z in zeilen),
-            f"{typ} → {wohin}, externes Universum {extern}"))
+        # Enttec hat keine externe Nummer — sie in der Meldung zu erfinden waere
+        # irrefuehrend ("externes Universum None" erst recht).
+        was = (f"{typ} → {wohin}" if extern is None
+               else f"{typ} → {wohin}, externes Universum {extern}")
+        treffer.append((", ".join(f"Zeile {z}" for z in zeilen), was))
     return treffer
 
 

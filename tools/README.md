@@ -51,6 +51,7 @@
 | `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt JEDEN der 18 VC-Widget-Typen einmal |
 | `capture_hochzeit_tempo_guide.py` | Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung. |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |
+| `capture_vc_widgets.py` | Vollbild der VC-Widget-Showcase aufnehmen — OHNE Desktop, ohne Fotoapparat. |
 | `check_demo_show_full.py` | Prueft shows/Demo_Show_Full.lshow headless und rendert echte Bilder: |
 | `check_doc_images.py` | DOC-10 Anleitungs-/Bild-Audit: findet TOTE Bild-Links in der Doku. |
 | `check_doc_links.py` | QA-17 Doc-Link-Checker: findet TOTE relative Markdown-Querverweise. |

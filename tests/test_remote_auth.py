@@ -213,6 +213,58 @@ class TestRemoteSettings(unittest.TestCase):
                     os.environ["LIGHTOS_PREFS_DIR"] = alt
                 remote_settings._token_cache_leeren()
 
+    def test_gescheiterte_rotation_behaelt_das_sitzungs_token(self):
+        """CDX (Codex zu PR #570): **NET-10 hob sich im Fehlerfall selbst auf.**
+
+        Bei unschreibbarem Profil lebt das gueltige Token NUR im Prozess-Cache —
+        genau das ist NET-10s Sicherung, und der laufende Flask-Server traegt
+        dieses Token in ``app.config``. Klickt der Bediener dann „Token neu
+        erzeugen", lief bisher:
+
+        1. ``save_settings`` scheitert still,
+        2. ``_token_cache_leeren()`` wirft das **gueltige** Token weg,
+        3. die Gegenprobe ruft ``get_token()`` — der Cache ist leer, die Datei
+           auch, also entsteht ein **drittes** Zufallstoken und wird gecacht,
+        4. die Gegenprobe schlaegt korrekt an und meldet „Rotation
+           fehlgeschlagen: die bisherigen Links bleiben gueltig".
+
+        Der letzte Satz stimmte nach Schritt 3 nicht mehr: der Server erwartete
+        weiter Token A, jeder neu angezeigte Link/QR-Code zeigte Token C. Das
+        ist genau der unbenutzbare Zustand aus NET-10 — ausgeloest vom
+        Reparaturversuch, und gemeldet als „alles beim Alten".
+
+        Eine gescheiterte Rotation muss den Sitzungsstand unveraendert lassen.
+        """
+        import tempfile
+        from src.web import remote_settings
+
+        with tempfile.TemporaryDirectory() as wegwerf:
+            sperre = os.path.join(wegwerf, "eine_datei")
+            with open(sperre, "w", encoding="utf-8") as fh:
+                fh.write("x")
+            alt = os.environ.get("LIGHTOS_PREFS_DIR")
+            os.environ["LIGHTOS_PREFS_DIR"] = os.path.join(sperre, "unmoeglich")
+            remote_settings._token_cache_leeren()
+            try:
+                vorher = remote_settings.get_token()   # Token A — traegt die Sitzung
+                self.assertTrue(vorher)
+                with self.assertRaises(RuntimeError):
+                    remote_settings.regenerate_token()
+                # Der Kern: KEIN drittes Token. Was der Server kennt, muss auch
+                # das sein, was die UI danach anzeigt.
+                self.assertEqual(
+                    remote_settings.get_token(), vorher,
+                    "die gescheiterte Rotation hat das Sitzungs-Token ersetzt — "
+                    "der laufende Server ist damit unerreichbar")
+                # Und stabil bleibt es auch: ein Folgeaufruf wuerfelt nicht neu.
+                self.assertEqual(remote_settings.get_token(), vorher)
+            finally:
+                if alt is None:
+                    os.environ.pop("LIGHTOS_PREFS_DIR", None)
+                else:
+                    os.environ["LIGHTOS_PREFS_DIR"] = alt
+                remote_settings._token_cache_leeren()
+
     def test_rotation_wirkt_trotz_cache(self):
         """Der Cache darf die Rotation nicht aushebeln — und auch nicht ihre
         eigene Gegenprobe (CDX-24) faelschlich ausloesen."""

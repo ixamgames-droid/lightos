@@ -18,6 +18,8 @@ import ast
 import json
 import os
 import re
+import subprocess
+import sys
 import unittest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -143,6 +145,119 @@ class BenchmarkZerlegungTest(unittest.TestCase):
         quelle = _quelle()
         self.assertIn("Lauf gestoert", quelle,
                       "die gescheiterte Methode ist nicht mehr dokumentiert")
+
+
+# ── Die Messung darf keine Vorgeschichte haben (CDX, Codex zu PR #569) ───────
+
+class AusModusReihenfolgeTest(unittest.TestCase):
+    """**Wann** gemessen wird, ist hier genauso wichtig wie **was**.
+
+    Die erste Fassung rief am Anfang jeder Fixture-Stufe ein unbedingtes
+    ``einmal_messen()`` und verwarf dessen Ergebnis im ``--aus``-Zweig wieder.
+    Folge: der Voll-Lauf meldete sein ERSTES 40-Frame-Fenster, jeder
+    ``--aus``-Lauf ein SPAETERES — verglichen wurden zwei verschiedene
+    Abschnitte der Prozess-Lebenszeit. Das Werkzeug beziffert die Drift ueber
+    einen Lauf selbst mit **2,5 bzw. 3,8 ms**, bei gesuchten Anteilen von
+    **1–7 ms**: der Messfehler hatte die Groesse des Messergebnisses.
+
+    Das ist bitter, weil ``--aus`` genau gegen diese Drift gebaut wurde — ein
+    eigener Prozess je Variante. Der Gedanke war richtig und die Umsetzung gab
+    dem einen Prozess trotzdem eine laengere Vorgeschichte als dem anderen.
+
+    Geprueft wird deshalb die **Anweisungsfolge im AST**, nicht der Wortlaut:
+    die Frage ist eine der Reihenfolge, und ein Textfund an anderer Stelle
+    beantwortet sie nicht.
+    """
+
+    def _mess_schleife(self):
+        """Der `for`-Koerper ueber die Fixture-Stufen in `messen()`."""
+        baum = ast.parse(_quelle())
+        fn = next(k for k in ast.walk(baum)
+                  if isinstance(k, ast.FunctionDef) and k.name == "messen")
+        for knoten in ast.walk(fn):
+            if isinstance(knoten, ast.For):
+                körper = "".join(ast.dump(s) for s in knoten.body)
+                if "einmal_messen" in körper and "_ABSCHALTER" in körper:
+                    return knoten
+        self.fail("die Mess-Schleife ueber die Fixture-Stufen ist nicht auffindbar")
+
+    def test_abschalten_kommt_vor_der_ersten_messung(self):
+        """Im `--aus`-Zweig: erst der Zustand, dann die erste getaktete Messung."""
+        schleife = self._mess_schleife()
+        zweig = next((s for s in schleife.body
+                      if isinstance(s, ast.If) and "_ABSCHALTER" in
+                      "".join(ast.dump(k) for k in s.body)), None)
+        self.assertIsNotNone(zweig, "der `if aus:`-Zweig ist nicht auffindbar")
+
+        reihenfolge = []
+        for knoten in ast.walk(zweig):
+            if isinstance(knoten, ast.Call):
+                if (isinstance(knoten.func, ast.Name)
+                        and knoten.func.id == "einmal_messen"):
+                    reihenfolge.append((knoten.lineno, "messen"))
+                elif isinstance(knoten.func, ast.Subscript) and \
+                        getattr(knoten.func.value, "id", "") == "_ABSCHALTER":
+                    reihenfolge.append((knoten.lineno, "abschalten"))
+        reihenfolge.sort()
+        namen = [n for _, n in reihenfolge]
+        self.assertIn("abschalten", namen, "der Abschalter wird gar nicht gerufen")
+        self.assertIn("messen", namen, "es wird gar nicht gemessen")
+        self.assertLess(
+            namen.index("abschalten"), namen.index("messen"),
+            "gemessen wird VOR dem Abschalten — die 40 Frames davor sind "
+            "Vorgeschichte, die der Voll-Lauf nicht hat")
+
+    def test_keine_unbedingte_messung_vor_dem_aus_zweig(self):
+        """Und davor darf ueberhaupt nicht gemessen werden.
+
+        Die Gegenprobe zum Test oben: haette man das alte
+        `werte = einmal_messen()` stehen lassen und im Zweig nur ein zweites
+        ergaenzt, waere die Reihenfolge INNERHALB des Zweigs richtig — und die
+        verworfenen 40 Frames trotzdem wieder da.
+        """
+        schleife = self._mess_schleife()
+        for stmt in schleife.body:
+            if isinstance(stmt, ast.If) and "_ABSCHALTER" in \
+                    "".join(ast.dump(k) for k in stmt.body):
+                break
+            gefunden = [k for k in ast.walk(stmt) if isinstance(k, ast.Call)
+                        and isinstance(k.func, ast.Name)
+                        and k.func.id == "einmal_messen"]
+            self.assertEqual(
+                gefunden, [],
+                f"unbedingte Messung in Zeile {gefunden[0].lineno if gefunden else '?'} "
+                f"— sie laeuft auch im `--aus`-Lauf und verschiebt dessen Fenster")
+
+
+class AusModusEineStufeTest(unittest.TestCase):
+    """`--aus` misst genau EINE Fixture-Zahl — als echter Prozessaufruf geprueft.
+
+    Der abgeschaltete Zustand wird nicht wieder eingeraeumt; er traegt sonst in
+    die naechste Stufe hinueber. Ohne Zahl greift der Default ``[12, 32, 48]``,
+    der Fall entsteht also schon beim bequemsten Aufruf.
+
+    Bewusst als Subprozess statt als Quelltext-Scan: die Frage ist, was das
+    Werkzeug TUT, wenn man es so aufruft. Der Abbruch liegt vor dem Aufbau der
+    Szene, der Test kostet deshalb keinen Renderlauf.
+    """
+
+    def _lauf(self, *argv):
+        umgebung = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+        return subprocess.run([sys.executable, _WERKZEUG, *argv],
+                              cwd=_REPO, capture_output=True, text=True,
+                              env=umgebung, timeout=180)
+
+    def test_mehrere_stufen_mit_aus_werden_abgelehnt(self):
+        r = self._lauf("12", "32", "--aus", "kegel")
+        self.assertNotEqual(r.returncode, 0, "mehrere Stufen wurden gemessen")
+        self.assertIn("EINE Fixture-Zahl", r.stderr + r.stdout)
+
+    def test_aus_ohne_zahl_faellt_nicht_in_den_default(self):
+        """Der Default [12, 32, 48] ist der wahrscheinlichste Weg in die Falle."""
+        r = self._lauf("--aus", "schatten")
+        self.assertNotEqual(r.returncode, 0,
+                            "der Default-Dreisatz lief mit --aus durch")
+        self.assertIn("EINE Fixture-Zahl", r.stderr + r.stdout)
 
 
 class BenchmarkFormTest(unittest.TestCase):

@@ -356,10 +356,18 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
             w["folgt_dmx"] = w["p95_ms"] <= DMX_BUDGET_MS
             return w
 
-        werte = einmal_messen()
-        werte["fixtures"] = anzahl
-        ergebnis["stufen"][str(anzahl)] = werte
         if aus:
+            # ⚠️ **Der Zustand MUSS vor der ersten getakteten Messung stehen.**
+            # Vorher lief hier ein unbedingtes `einmal_messen()` und der
+            # `--aus`-Lauf verwarf dessen 40 Frames wieder. Damit meldete der
+            # Voll-Lauf sein ERSTES 40-Frame-Fenster, jeder `--aus`-Lauf aber ein
+            # SPAETERES — und verglichen wurden am Ende zwei verschiedene
+            # Abschnitte der Prozess-Lebenszeit. Genau diese Drift hat die
+            # Kontrollmessung im selben Werkzeug mit 2,5 bzw. 3,8 ms beziffert,
+            # bei gesuchten Anteilen von 1–7 ms: der Messfehler war so gross wie
+            # das Messergebnis. Das Verfahren "ein eigener Prozess je Variante"
+            # traegt nur, wenn jeder Prozess auch DIESELBE Vorgeschichte hat —
+            # und die kuerzest moegliche ist: gar keine.
             _ABSCHALTER = {
                 "kegel": lambda: bridge.settingsChanged.emit(
                     json.dumps({"showCones": False})),
@@ -392,6 +400,10 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
                       f"{werte['median_ms']:>6.2f} ms · p95 {werte['p95_ms']:>6.2f} ms "
                       f"[{werte['wirkung']}]")
             continue
+
+        werte = einmal_messen()
+        werte["fixtures"] = anzahl
+        ergebnis["stufen"][str(anzahl)] = werte
 
         if not still:
             marke = "ok " if werte["folgt_dmx"] else "ZU LANGSAM"
@@ -614,6 +626,26 @@ def main():
     zerlegen = "--zerlegen" in sys.argv
     kumulativ = "--kumulativ" in sys.argv
     stufen = [int(a) for a in args] if args else [12, 32, 48]
+    if aus and len(stufen) != 1:
+        # ⚠️ `--aus` schaltet einen Bestandteil ab und raeumt ihn NICHT wieder
+        # ein — der Zustand traegt in die naechste Stufe hinueber. Was dann
+        # passiert, haengt vom Bestandteil ab: bei `kegel` bricht die naechste
+        # Stufe als "Szene dunkel" ab, bei `boden`/`schatten`/`spots` schlaegt
+        # die Wirkungskontrolle zu ("hat NICHTS bewirkt") oder — schlimmer —
+        # der Vergleich mischt abgeschaltete Altbestaende mit frisch
+        # hinzugefuegten aktiven Fixtures.
+        #
+        # Zurueckschalten waere die andere Loesung, aber nicht die richtige:
+        # `--aus` existiert genau deshalb, weil im selben Prozess gemessene
+        # Varianten nicht vergleichbar sind (s. `_aus_option`). Eine zweite
+        # Stufe im selben Prozess ist derselbe Fehler eine Ebene hoeher.
+        # Ohne Zahl greift der Default [12, 32, 48] — auch das faengt das hier.
+        raise SystemExit(
+            f"--aus {aus} misst genau EINE Fixture-Zahl (angefragt: "
+            f"{', '.join(str(s) for s in sorted(stufen))}). Jede Variante "
+            f"gehoert in einen eigenen Prozess — sonst traegt der abgeschaltete "
+            f"Zustand in die naechste Stufe hinueber. Beispiel: "
+            f"tools/viz_render_benchmark.py 32 --aus {aus}")
     ergebnis = messen(sorted(stufen), still=still, zerlegen=zerlegen,
                       kumulativ=kumulativ, aus=aus)
     if still:

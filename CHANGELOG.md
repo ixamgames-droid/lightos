@@ -61,13 +61,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Zeilen. **Geaendert wird nichts** — welche der beiden Zeilen gemeint war, weiss
   nur der Bediener.
 
-- **Die Bilder der VC-Widget-Anleitung zeigten eine alte Oberflaeche.** Sie
-  stammten groesstenteils vom 21.06. — seither sind die VC-Tasten plastisch
-  geworden, Sektionen wurden umbenannt („Live View" heisst „Buehne",
-  „Eingabe / Ausgabe" heisst „E/A"), und die Uebersicht zeigte sogar noch den
-  **Chase-Builder**, der Ende Juni entfernt wurde. Alle 17 Widget-Bilder, die
-  Uebersicht und das Referenz-Vollbild sind neu aufgenommen; die zwei Bilder des
-  entfernten Widgets sind raus.
+- **Dieser Hinweis meldete bei sACN das Falsche — mal nichts, mal einen
+  Fehlalarm.** Er verglich alle Ausgaenge nach der Art-Net-Regel. Bei sACN zaehlt
+  die Universe-Nummer aber anders (Zeile 1 ohne eigene Angabe geht auf Universum
+  1, nicht 0). Dadurch blieb eine echte Doppelbelegung stumm, waehrend eine
+  saubere Konfiguration gewarnt wurde. Ausserdem gelten jetzt ein leeres
+  Art-Net-Zielfeld und ein ausgeschriebenes `255.255.255.255` als dieselbe
+  Adresse, und **zwei Zeilen auf demselben Enttec-Port** werden ueberhaupt zum
+  ersten Mal gemeldet — der offensichtlichste Fall war bisher der einzige, der
+  nie auffiel.
+
+- **„Token neu erzeugen" konnte das Web-Remote unerreichbar machen, wenn die
+  Einstellungen nicht speicherbar sind.** In dieser Lage traegt das Token nur die
+  laufende Sitzung. Der Knopf verwarf es trotzdem und erzeugte ein weiteres,
+  waehrend der laufende Server noch das urspruengliche erwartete: Handy raus,
+  neuer Link ungueltig — und die Meldung sagte „die bisherigen Links bleiben
+  gueltig". Eine gescheiterte Rotation laesst den Stand jetzt unveraendert; die
+  Meldung stimmt damit wieder.
 
 #### Neu
 
