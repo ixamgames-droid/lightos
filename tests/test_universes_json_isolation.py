@@ -55,6 +55,42 @@ class UniversesJsonIsolationTest(unittest.TestCase):
             os.path.abspath(umgelenkt), os.path.abspath(_ECHT),
             "die Umlenkung zeigt auf die ECHTE Konfiguration")
 
+    def test_ein_von_aussen_gesetzter_pfad_haelt_den_schutz_nicht_auf(self):
+        """CDX-49: `setdefault` waere hier die falsche Sanftmut.
+
+        Wer sich `LIGHTOS_UNIVERSES_JSON` auf seine echte Konfiguration legt —
+        etwa um die App mit einem anderen Aufbau zu starten — haette mit
+        `setdefault` den Schutz genau dann abgeschaltet, wenn er am meisten
+        kostet. *Eine Schutzmassnahme, die sich vom Zielobjekt abschalten
+        laesst, ist keine.*
+
+        Geprueft am Verhalten eines frischen Subprozesses: er bekommt die
+        echte Datei vorgesetzt und muss sie trotzdem in Ruhe lassen.
+        """
+        opfer = os.path.join(_REPO, "tests", "test_output_config_lifecycle.py")
+        if not os.path.exists(opfer):
+            self.skipTest("test_output_config_lifecycle.py nicht vorhanden")
+
+        vorher = (open(_ECHT, "rb").read()
+                  if os.path.exists(_ECHT) else None)
+        subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", opfer],
+            cwd=_REPO, capture_output=True, text=True, timeout=600,
+            # Der Angriff: die Variable zeigt auf die ECHTE Datei.
+            env=dict(os.environ, QT_QPA_PLATFORM="offscreen",
+                     LIGHTOS_UNIVERSES_JSON=_ECHT))
+
+        if vorher is None:
+            self.assertFalse(
+                os.path.exists(_ECHT),
+                "trotz Schutz wurde data/universes.json angelegt — ein von "
+                "aussen gesetzter Pfad hat ihn ausgehebelt")
+        else:
+            self.assertEqual(
+                vorher, open(_ECHT, "rb").read(),
+                "trotz Schutz wurde data/universes.json veraendert — ein von "
+                "aussen gesetzter Pfad hat ihn ausgehebelt")
+
     def test_beide_seiten_sehen_dieselbe_datei(self):
         """Lesen und Schreiben duerfen nicht auseinanderlaufen.
 

@@ -39,7 +39,7 @@ _UNIV_CONFIG_PATH = os.environ.get(
 _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 
 
-def _effektives_ziel(typ: str, patch: str) -> str:
+def _effektives_ziel(typ: str, patch: str, extern: int | None = None) -> str:
     """Wohin geht diese Zeile WIRKLICH? — so, wie ``apply_output_config`` es aufloest.
 
     Der rohe ``patch``-Text taugt nicht als Schluessel: ``apply_output_config``
@@ -47,11 +47,33 @@ def _effektives_ziel(typ: str, patch: str) -> str:
     sACN ``patch or None`` (= Multicast). Ein leeres Feld und die ausgeschriebene
     Broadcast-Adresse sind also DASSELBE Ziel — verglichen man die Rohtexte,
     blieben genau diese beiden unentdeckt.
+
+    ⚠️ **Bei sACN reicht ein Platzhalter fuer „Multicast" NICHT** (CDX-47, Codex
+    zu PR #574). Die erste Fassung setzte hier ``"<Multicast>"`` — ein fester
+    Text fuer eine Adresse, die in Wahrheit **vom Universum abhaengt**:
+    ``SACNSender._dest()`` rechnet ``239.255.<hi>.<lo>``. Eine leere Zeile auf
+    Universum 3 geht damit auf ``239.255.0.3``, und eine Zeile, die genau das
+    ausschreibt, auf dieselbe Adresse — der Platzhalter verglich aber
+    ``"<Multicast>"`` gegen ``"239.255.0.3"`` und meldete nichts.
+
+    *Das ist exakt die Fehlerklasse, gegen die diese Funktion gebaut wurde,
+    eine Ebene tiefer:* der Default wurde nicht ausgerechnet, sondern benannt.
+    Ein Name kann nicht kollidieren, eine Adresse schon. Schlimmer noch, ein
+    Test hielt die falsche Aussage ausdruecklich fest
+    (``test_sacn_leer_ist_multicast_und_nicht_gleich_einer_unicast_ip``) — die
+    Behauptung stand damit im Code UND im Gate.
     """
     if typ == "ArtNet":
         return patch or "255.255.255.255"
     if typ == "sACN":
-        return patch or "<Multicast>"
+        if patch:
+            return patch
+        # Multicast-Ziel ausrechnen statt benennen — dieselbe Formel wie
+        # SACNSender._dest(). Ohne bekanntes Universum bleibt nur ein
+        # Platzhalter; er kollidiert dann nur mit seinesgleichen.
+        if extern is None:
+            return "<Multicast ohne Universum>"
+        return f"239.255.{(extern >> 8) & 0xFF}.{extern & 0xFF}"
     return patch                      # Enttec: der Port selbst ist das Ziel
 
 
@@ -105,9 +127,11 @@ def _doppelte_ziele(rows: list[dict]) -> list[tuple[str, str]]:
         typ = (e.get("output") or "Disabled").strip()
         if typ in ("", "Disabled"):
             continue                       # abgeschaltet kollidiert mit nichts
-        ziel = _effektives_ziel(typ, (e.get("patch") or "").strip())
+        # Reihenfolge: erst das Universum, dann das Ziel — bei sACN haengt die
+        # Multicast-Adresse vom Universum ab (s. `_effektives_ziel`).
         extern = _effektives_universum(
             typ, int(e.get("num", 1)), e.get("out_universe"))
+        ziel = _effektives_ziel(typ, (e.get("patch") or "").strip(), extern)
         gesehen.setdefault((typ, ziel, extern), []).append(i)
 
     treffer = []

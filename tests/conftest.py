@@ -108,9 +108,18 @@ os.environ.setdefault(
 # ersetzt, und `git status` schweigt dazu, weil `data/*.json` gitignored ist.
 #
 # Waechter: `tests/test_universes_json_isolation.py`.
-os.environ.setdefault(
-    "LIGHTOS_UNIVERSES_JSON",
-    os.path.join(_TEST_TMP, f"lightos_test_universes_{_TEST_PID}.json"))
+# ⚠️ **UNBEDINGT setzen, nicht `setdefault`** (CDX-49, Codex zu PR #575).
+# Bei `setdefault` bliebe ein von aussen gesetzter Wert stehen — und wer sich
+# `LIGHTOS_UNIVERSES_JSON` auf seine ECHTE Konfiguration legt (etwa um die App
+# mit einem anderen Aufbau zu starten), haette den Schutz damit genau dann
+# ausgeschaltet, wenn er am meisten kostet. Eine Schutzmassnahme, die sich
+# vom Zielobjekt abschalten laesst, ist keine. Deshalb dieselbe Behandlung wie
+# `APPDATA` weiter oben: hart ueberschreiben.
+#
+# Der Subprozess in `test_universes_json_isolation.py` erbt damit ebenfalls
+# einen Wegwerf-Pfad statt des geerbten Elternwerts.
+os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
+    _TEST_TMP, f"lightos_test_universes_{_TEST_PID}.json")
 
 
 def _purge_test_dbs():

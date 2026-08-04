@@ -62,7 +62,15 @@ def main():
     # (und das muessen sie, sonst sind Cue-Liste und Effekt-Vorschau leer),
     # faerbt der Demo-Chase die Kalibrier-Kacheln um, weil sie `VCColor` mit
     # Ziel PROGRAMMER sind.
-    seite = os.path.join(os.path.dirname(GEO), "calibration.json")
+    # ⚠️ Die Beilagen gehoeren zum ueBERGEBENEN Bild, nicht zu `_capture/`
+    # (CDX-48, Codex zu PR #574). `capture_vc_widgets.py` legt sie neben SEIN
+    # Ausgabebild — wird dem eine eigene Pfadangabe mitgegeben, landen sie dort.
+    # Der Cropper las aber immer `_capture/calibration.json`; weil alle
+    # Aufnahmen dieselben Masse haben, ging die Groessenpruefung durch und er
+    # mischte das uebergebene Standbild mit dem ALTEN `_capture/full_running.png`
+    # — drei Widgets bekamen damit stillschweigend veraltete Ausschnitte.
+    seite = os.path.join(os.path.dirname(os.path.abspath(shot_path)),
+                         "calibration.json")
     vorgabe = None
     if os.path.exists(seite):
         try:
@@ -92,7 +100,8 @@ def main():
         laufend_im = None
         namen = set(vorgabe.get("aus_laufendem_bild") or [])
         if namen:
-            p = os.path.join(os.path.dirname(GEO),
+            # Auch das Laufend-Bild relativ zur Beilage aufloesen, nicht zu GEO.
+            p = os.path.join(os.path.dirname(seite),
                              vorgabe.get("bild_laufend", "full_running.png"))
             if os.path.exists(p):
                 kandidat = Image.open(p).convert("RGB")
