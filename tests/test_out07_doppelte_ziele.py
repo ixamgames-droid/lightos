@@ -117,12 +117,55 @@ class ZielAufloesungTest(unittest.TestCase):
                 _z(2, output="ArtNet", patch="255.255.255.255", out_universe=3)]
         self.assertEqual(len(_doppelte_ziele(rows)), 1)
 
-    def test_sacn_leer_ist_multicast_und_nicht_gleich_einer_unicast_ip(self):
-        """Gegenprobe: leer heisst bei sACN Multicast — das ist NICHT dieselbe
-        Stelle wie eine ausgeschriebene Unicast-Adresse."""
+    def test_sacn_leer_ist_die_MULTICAST_ADRESSE_dieses_universums(self):
+        """★ Dieser Test stand hier vorher mit der GEGENTEILIGEN Aussage.
+
+        Er hiess `…_und_nicht_gleich_einer_unicast_ip` und behauptete, ein
+        leeres sACN-Ziel sei etwas anderes als ein ausgeschriebenes
+        `239.255.0.3`. **Das ist falsch:** `SACNSender._dest()` rechnet fuer ein
+        leeres Ziel `239.255.<hi>.<lo>` — bei Universum 3 also genau diese
+        Adresse. Beide Zeilen senden an denselben Ort und Port.
+
+        Aufgefallen ist es Codex (CDX-47, zu PR #574). Die erste Fassung setzte
+        als Ziel den festen Text `"<Multicast>"` — sie hat den Default
+        **benannt statt ausgerechnet**, und ein Name kann nicht kollidieren.
+        *Damit stand die falsche Behauptung im Code UND im Gate: der Test hat
+        den Fehler nicht uebersehen, er hat ihn festgeschrieben.*
+        """
         rows = [_z(1, output="sACN", patch="", out_universe=3),
                 _z(2, output="sACN", patch="239.255.0.3", out_universe=3)]
+        treffer = _doppelte_ziele(rows)
+        self.assertEqual(len(treffer), 1,
+                         "leeres sACN-Ziel und die ausgeschriebene "
+                         "Multicast-Adresse desselben Universums kollidieren")
+        self.assertIn("239.255.0.3", treffer[0][1])
+
+    def test_sacn_leer_kollidiert_nicht_mit_einer_echten_unicast_ip(self):
+        """Die Gegenprobe, die der alte Test eigentlich sein wollte.
+
+        Ein leeres Feld heisst Multicast; eine ausgeschriebene Unicast-Adresse
+        ist ein anderer Ort. Nur muss man dafuer eine Adresse nehmen, die NICHT
+        zufaellig der Multicast-Adresse dieses Universums entspricht.
+        """
+        rows = [_z(1, output="sACN", patch="", out_universe=3),
+                _z(2, output="sACN", patch="10.0.0.7", out_universe=3)]
         self.assertEqual(_doppelte_ziele(rows), [])
+
+    def test_zwei_leere_sacn_zeilen_auf_verschiedenen_universen(self):
+        """Multicast ist NICHT ein Ziel, sondern eines je Universum.
+
+        Beide Zeilen sind leer — mit einem festen Platzhalter als Ziel haetten
+        sie denselben Schluessel bekommen und waeren nur deshalb nicht gemeldet
+        worden, weil ihre Universe-Nummern verschieden sind. Hier zaehlt, dass
+        auch das ZIEL verschieden ist.
+        """
+        rows = [_z(1, output="sACN", patch="", out_universe=3),
+                _z(2, output="sACN", patch="", out_universe=4)]
+        self.assertEqual(_doppelte_ziele(rows), [])
+        # ... und mit gleicher Nummer kollidieren sie sehr wohl.
+        rows = [_z(1, output="sACN", patch="", out_universe=3),
+                _z(2, output="sACN", patch="", out_universe=3)]
+        self.assertEqual(len(_doppelte_ziele(rows)), 1)
 
 
 class EnttecPortTest(unittest.TestCase):
