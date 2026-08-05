@@ -135,14 +135,29 @@ class EmptyStateSceneTest(unittest.TestCase):
         self.fail("JS hat den WebChannel nicht verdrahtet (requestFixtures nie gerufen)")
 
     def _eval(self, js_expr):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js_expr) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
         self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
-        return box[0]
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js_expr}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js_expr}': {wert}")
+        return wert
 
     def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -185,6 +200,19 @@ class EmptyStateSceneTest(unittest.TestCase):
             "none",
             "(5) der Hinweis darf den Klick nicht schlucken, mit dem der Nutzer "
             "gerade anfangen will")
+        # ★ QA-VIZ-TESTS (2026-08-05): dieselbe Zusicherung fuer JEDES KIND.
+        # `pointer-events` wird vererbt, ein Kind darf es aber auf `auto`
+        # zuruecksetzen — und schluckt dann in seinem Rechteck die Klicks,
+        # waehrend die Pruefung am Elternteil gruen bleibt. Der Hinweis sitzt
+        # mitten auf dem Canvas (Titel, Text, ein <b>), also genau dort, wo der
+        # Nutzer auf der leeren Buehne anfaengt.
+        self.assertEqual(self._eval(
+            "Array.prototype.every.call("
+            " document.getElementById('empty-state').querySelectorAll('*'),"
+            " function(e){ return getComputedStyle(e).pointerEvents === 'none'; })"),
+            True,
+            "(5) ein Kind des Hinweises ist interaktiv und schluckt genau in der "
+            "Buehnenmitte die Klicks")
 
         # (6) reines DOM: der Loop muss danach in Idle fallen duerfen
         s_ruhe = self._settle()

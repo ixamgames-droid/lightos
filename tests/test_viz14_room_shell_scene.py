@@ -124,14 +124,29 @@ class RoomShellSceneTest(unittest.TestCase):
         self.fail("JS hat den WebChannel nicht verdrahtet")
 
     def _eval(self, js):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js, lambda r: box.append(r))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(box, f"runJavaScript ohne Callback: {js}")
-        return box[0]
+        self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js}")
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js}': {wert}")
+        return wert
 
     def _poll_until_true(self, js, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -202,6 +217,14 @@ class RoomShellSceneTest(unittest.TestCase):
                            f"Huelle waechst nicht mit: {klein} -> {gross}")
         self.assertGreater(gross["hoehe"], klein["hoehe"],
                            "hoehere Geraete brauchen mehr Kopffreiheit")
+        # ★ QA-VIZ-TESTS (2026-08-05): auch die TIEFE. Geprueft wurden bisher
+        # nur Breite und Hoehe — eine Huelle, die in z gar nicht mitwaechst,
+        # bestand den Test, obwohl die beiden neuen Geraete auf z=-18 und z=+18
+        # dann ausserhalb der Waende staenden. `tiefe` liefert `roomShellInfo()`
+        # seit jeher mit, gelesen hat es nur niemand.
+        self.assertGreater(gross["tiefe"], klein["tiefe"] + 10,
+                           f"die Huelle waechst in der Tiefe nicht mit: "
+                           f"{klein['tiefe']} -> {gross['tiefe']}")
 
         # (4) 2D-Draufsicht: immer aus
         self._eval("window.__lightos.setViewMode('2D'); true")

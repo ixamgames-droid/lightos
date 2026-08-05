@@ -86,6 +86,34 @@ def _make_mock_bridge_class():
 
 _MockVisualizerBridge = _make_mock_bridge_class()
 
+# ★ QA-VIZ-TESTS (2026-08-05): DREI Geraete auf der Buehne, zwei davon in der
+# Auswahl. Bis hierhin lief diese Datei auf einer LEEREN Buehne — die Datei
+# enthielt keine einzige Referenz auf `__lightos.fixtures`, die Outline-Schleife
+# (tools.js#updateOutlines) lief also null Mal, und man konnte den kompletten
+# Code, der den Auswahl-Ring baut, loeschen, ohne einen dieser Tests rot zu
+# bekommen. `view.selectedFids` zu setzen ist der halbe Weg; der Beleg ist erst
+# der RING am Geraet. fid 7 ist die Gegenprobe: unselektiert muss er dunkel
+# bleiben, sonst wuerde ein "alle Ringe an" ebenfalls bestehen.
+# Poll-"fixtures" ist ein JSON-STRING (bridge.js JSON.parse't ihn).
+_FIXTURES = [
+    {"fid": 2, "type": "par", "x": -3, "y": 3, "z": 0, "label": "L"},
+    {"fid": 4, "type": "par", "x": 0, "y": 3, "z": 0, "label": "M"},
+    {"fid": 7, "type": "par", "x": 3, "y": 3, "z": 0, "label": "R"},
+]
+_FIXTURES_JSON = json.dumps(_FIXTURES)
+# Beide Poll-Zustaende tragen DIESELBE fixtures-Zeichenkette: bridge.js wendet
+# sie nur bei Aenderung an (_pFix-Guard), der zweite Zustand baut die Geraete
+# also nicht neu, er legt nur die Auswahl dazu.
+_POLL_FIXTURES = json.dumps({"fixtures": _FIXTURES_JSON})
+_POLL_FIXTURES_UND_AUSWAHL = json.dumps(
+    {"fixtures": _FIXTURES_JSON, "selection": "[2, 4]"})
+
+# tools.js: Basis-Deckkraft der beiden Auswahl-Ringe (der Identify-Puls
+# moduliert sie mit k in [0.25, 1.0] — deshalb wird auf > 0 geprueft, nicht auf
+# Gleichheit, ausser nach dem Settle).
+_SELBORDER_BASIS = 0.85
+_ICON_RING_BASIS = 1.0
+
 
 def _pump(seconds):
     deadline = time.monotonic() + seconds
@@ -158,14 +186,29 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         self.assertTrue(self._loaded_ok[-1], "loadFinished(ok=False)")
 
     def _eval(self, js_expr):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js_expr) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
         self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
-        return box[0]
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js_expr}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js_expr}': {wert}")
+        return wert
 
     def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -179,6 +222,27 @@ class ExternalSelectionSceneTest(unittest.TestCase):
 
     def _stats(self):
         return json.loads(self._eval("JSON.stringify(window.__lightos.renderStats())"))
+
+    def _geraete_aufbauen(self):
+        """Drei Geraete ueber den Poll-Resync-Pfad auf die Buehne stellen.
+        Ohne sie misst diese Datei die Auswahl-Optik an einer leeren Szene."""
+        self._bridge_obj._poll_payload = _POLL_FIXTURES
+        self._poll_until_true(
+            "Object.keys(window.__lightos.fixtures).length === 3", timeout_s=8.0)
+
+    def _ringe(self):
+        """Der SICHTBARE Auswahl-Zustand je Geraet, direkt am Material gelesen:
+        {fid: (Deckkraft des 2D-Icon-Rings, Deckkraft des 3D-Rings oder None)}.
+        `_selBorder` entsteht ueberhaupt nur in der Outline-Schleife — fehlt er,
+        hat der Auswahl-Code nicht gearbeitet."""
+        roh = self._eval(
+            "JSON.stringify(Object.keys(window.__lightos.fixtures).map(function(k){"
+            " var f = window.__lightos.fixtures[k];"
+            " var r = f.icon && f.icon.userData && f.icon.userData.ring;"
+            " var b = f._selBorder;"
+            " return [Number(k), r ? r.material.opacity : null,"
+            "         (b && b.visible) ? b.material.opacity : null]; }))")
+        return {fid: (ring, rand) for fid, ring, rand in json.loads(roh)}
 
     def _tick(self):
         # Einen Loop-Tick deterministisch ausfuehren (rAF-unabhaengig; offscreen
@@ -205,16 +269,49 @@ class ExternalSelectionSceneTest(unittest.TestCase):
             self._eval("Array.isArray(window.__lightos.view.selectedFids)"), True,
             "window.__lightos.view.selectedFids nicht als Array exponiert")
 
+        # ★ Geraete AUF die Buehne, bevor die Auswahl gemessen wird.
+        self._geraete_aufbauen()
+        vorher = self._ringe()
+        for fid in (2, 4, 7):
+            self.assertEqual(vorher[fid][0], 0.0,
+                             f"Geraet {fid} traegt vor der Auswahl schon einen Ring")
+            self.assertIsNone(vorher[fid][1],
+                              f"Geraet {fid} hat vor der Auswahl schon einen 3D-Rand")
+
         # Basislinie der Echo-Aufrufe (Initial-Load kann updateOutlines(true) mit
         # leerer Auswahl ausloesen -> "[]"; KEIN Echo unserer Auswahl).
         baseline = list(getattr(self._bridge_obj, "_fixture_selection_calls", []))
 
         # Python pusht die Auswahl in den Poll-Zustand; der JS-Poll (130ms) zieht
         # sie und wendet sie an.
-        self._bridge_obj._poll_payload = '{"selection": "[2, 4]"}'
+        self._bridge_obj._poll_payload = _POLL_FIXTURES_UND_AUSWAHL
         applied = self._poll_until_true(
             "JSON.stringify(window.__lightos.view.selectedFids) === '[2,4]'")
         self.assertTrue(applied, "gepushte Auswahl [2,4] nicht in der 3D-Szene angekommen")
+
+        # ★ Und jetzt der eigentliche Beleg: die Geraete SEHEN auch ausgewaehlt
+        # aus. Ohne diesen Block bestand der Test auch dann, wenn die komplette
+        # Outline-Schleife fehlte.
+        nachher = self._ringe()
+        for fid in (2, 4):
+            self.assertIsNotNone(
+                nachher[fid][1],
+                f"Geraet {fid} ist ausgewaehlt, hat aber keinen sichtbaren "
+                f"3D-Auswahl-Ring — die Outline-Schleife hat nicht gearbeitet")
+            self.assertGreater(
+                nachher[fid][1], 0.0,
+                f"der 3D-Auswahl-Ring an Geraet {fid} ist voellig durchsichtig")
+            self.assertLessEqual(nachher[fid][1], _SELBORDER_BASIS + 1e-6)
+            self.assertGreater(
+                nachher[fid][0], 0.0,
+                f"der 2D-Icon-Ring an Geraet {fid} blieb dunkel")
+            self.assertLessEqual(nachher[fid][0], _ICON_RING_BASIS + 1e-6)
+        # Gegenprobe: das NICHT gewaehlte Geraet bleibt unmarkiert — sonst
+        # bestuende der Test auch bei "alle Ringe an".
+        self.assertEqual(nachher[7][0], 0.0,
+                         "das nicht gewaehlte Geraet 7 traegt einen Icon-Ring")
+        self.assertIsNone(nachher[7][1],
+                          "das nicht gewaehlte Geraet 7 traegt einen 3D-Auswahl-Ring")
 
         # Echo-Guard: die extern angewandte Auswahl darf NICHT zurueckgemeldet
         # worden sein (sonst Loop). Neue Calls seit der Basislinie ohne [2,4].
@@ -238,10 +335,11 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         bestehen bleibt (F1: kein Dauer-rAF). Echo-frei (F2)."""
         self._load_and_wait()
         self._poll_until_true("!!window.__lightosAppReady")
+        self._geraete_aufbauen()   # ★ ohne Geraete pulsiert nichts
         self._settle()   # Idle-Baseline vor der Auswahl
 
         # Auswahl pushen -> Identify-Flash startet -> Live-Probe aktiv.
-        self._bridge_obj._poll_payload = '{"selection": "[2, 4]"}'
+        self._bridge_obj._poll_payload = _POLL_FIXTURES_UND_AUSWAHL
         self._poll_until_true("window.__lightos.renderStats().live === true", timeout_s=8.0)
 
         # Waehrend des Flash-Fensters rendert jeder Tick (Live-Probe haelt das Gate offen).
@@ -279,14 +377,28 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         __expireSelectionPulse (kein 1.5s-Echtzeit-Warten, kein rAF-Race)."""
         self._load_and_wait()
         self._poll_until_true("!!window.__lightosAppReady")
+        self._geraete_aufbauen()   # ★ ohne Geraete gibt es keinen Ring zum Einfrieren
         self._settle()
 
         # Auswahl pushen -> Flash aktiv.
-        self._bridge_obj._poll_payload = '{"selection": "[2, 4]"}'
+        self._bridge_obj._poll_payload = _POLL_FIXTURES_UND_AUSWAHL
         self._poll_until_true("window.__lightos.renderStats().live === true", timeout_s=8.0)
         # Einmal ticken, damit der Puls laeuft (_pulseDirty=true, Ringe verstellt).
         self._tick()
         self.assertTrue(self._stats()["live"], "Flash sollte noch aktiv sein")
+
+        # ★ Der Puls moduliert die Ring-Deckkraft WIRKLICH. Ohne diese Messung
+        # belegte der Test nur, dass gerendert wird — nicht, dass sich am Ring
+        # etwas tut. Die Abtastungen liegen (Runde ueber den Qt-Loop) jeweils
+        # >= 50 ms auseinander, bei ~3 Hz also weit ueber eine Sinus-Flanke.
+        proben = []
+        for _ in range(5):
+            proben.append(self._ringe()[2][1])
+            self._tick()
+        self.assertNotIn(None, proben, "der 3D-Auswahl-Ring fehlt waehrend des Pulses")
+        self.assertGreater(
+            max(proben) - min(proben), 0.05,
+            f"die Ring-Deckkraft steht waehrend des Identify-Pulses still: {proben}")
 
         # Fenster deterministisch beenden.
         self._eval("window.__lightos.__expireSelectionPulse(); true")
@@ -299,6 +411,19 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         self.assertGreater(
             self._stats()["count"], c_before,
             "Settle-Frame wurde nicht gerendert — Auswahl-Ring friert gedimmt ein (Defect #1)")
+
+        # ★ Und der Ring steht danach auf BASIS-Deckkraft, nicht auf irgendeinem
+        # Puls-Zwischenwert. Genau das ist Defect #1 — der Render-Zaehler allein
+        # konnte es nie zeigen.
+        endstand = self._ringe()
+        for fid in (2, 4):
+            self.assertAlmostEqual(
+                endstand[fid][1], _SELBORDER_BASIS, places=6,
+                msg=f"der 3D-Auswahl-Ring an Geraet {fid} blieb nach dem Puls "
+                    f"gedimmt stehen ({endstand[fid][1]})")
+            self.assertAlmostEqual(
+                endstand[fid][0], _ICON_RING_BASIS, places=6,
+                msg=f"der 2D-Icon-Ring an Geraet {fid} blieb nach dem Puls gedimmt")
 
         # Danach idle: der Settle ist EINMALIG (kein Loop) — weitere Ticks rendern nicht.
         c_after = self._stats()["count"]
