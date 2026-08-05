@@ -119,18 +119,76 @@ cmd_start() {
     fi
 }
 
+# ★ TOOL-APPSTOP (2026-08-05): stop meldete „beendet", waehrend die App weiterlief
+#
+# Zweimal belegt (2026-08-03 und 2026-08-05). Die Fassung davor hatte drei
+# Loecher, und alle drei zusammen ergaben genau diese Luege:
+#
+#   1. Sie toetete GENAU EINE PID. `_running_pid` liefert bevorzugt die aus dem
+#      PID-File — und dort steht laut Kommentar oben `start.sh`, nicht der
+#      Fenster-Prozess. Der Python-Prozess ist deren KIND und ueberlebte.
+#      `_pid_tree` gibt es fuer genau diesen Fall seit dem 30.07., benutzt hat
+#      es nur `_win_id`.
+#   2. Sie sah nach dem SIGKILL NICHT NACH, sondern druckte „[app] beendet"
+#      unbedingt — auch wenn nichts gestorben war.
+#   3. Selbst wenn die eine PID starb, blieben Geschwister uebrig (das Scannen
+#      nach `venv/bin/python.*main.py` lief gar nicht mehr, sobald das PID-File
+#      getroffen hatte).
+#
+# WARUM DAS TEUER IST: eine laufende Instanz haelt ALSA-MIDI-Clients und macht
+# View-bauende Testdateien messbar instabiler (XPLAT-14: 2/6 ohne, 8/8 mit). Am
+# 03.08. wurde das Gate deswegen rot, und es kostete Zeit, die Ursache ueberhaupt
+# als Ursache zu erkennen — weil `stop` ja Erfolg gemeldet hatte.
+#
+# Ein Werkzeug, das Erfolg meldet, ohne nachzusehen, ist schlimmer als keins.
 cmd_stop() {
-    # Der frühere Fallback suchte hier nach dem ABSOLUTEN Pfad
-    # ($REPO/venv/bin/python...) und konnte deshalb nie greifen — die echte
-    # Kommandozeile ist relativ. Die Suche steckt jetzt in _running_pid und
-    # gleicht über das Arbeitsverzeichnis ab.
-    if ! pid=$(_running_pid); then echo "[app] laeuft nicht"; return 0; fi
-    kill -TERM "$pid" 2>/dev/null
-    for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
-    if kill -0 "$pid" 2>/dev/null; then
-        echo "[app] reagiert nicht auf SIGTERM -> SIGKILL"; kill -KILL "$pid" 2>/dev/null
+    # Alle Kandidaten einsammeln — PID-File-Baum UND Scan-Treffer. Nicht
+    # entweder/oder: nach einem halb geglueckten frueheren stop kann beides
+    # gleichzeitig existieren.
+    local kandidaten="" p
+    if [ -f "$PIDFILE" ]; then
+        p=$(cat "$PIDFILE" 2>/dev/null)
+        [ -n "$p" ] && kill -0 "$p" 2>/dev/null && kandidaten="$(_pid_tree "$p")"
+    fi
+    kandidaten="$kandidaten $(_app_pid_by_scan 2>/dev/null || true)"
+    # Kinder der Scan-Treffer mitnehmen (QtWebEngine-Hilfsprozesse).
+    for p in $(echo "$kandidaten" | tr ' ' '\n' | sort -un); do
+        kandidaten="$kandidaten $(_pid_tree "$p" 2>/dev/null | tr '\n' ' ')"
+    done
+    kandidaten=$(echo "$kandidaten" | tr ' ' '\n' | grep -E '^[0-9]+$' | sort -un | tr '\n' ' ')
+
+    if [ -z "$(echo "$kandidaten" | xargs 2>/dev/null)" ]; then
+        rm -f "$PIDFILE"; echo "[app] laeuft nicht"; return 0
+    fi
+
+    for p in $kandidaten; do kill -TERM "$p" 2>/dev/null; done
+    for _ in $(seq 1 20); do
+        _noch_am_leben "$kandidaten" >/dev/null || break
+        sleep 0.5
+    done
+    if _noch_am_leben "$kandidaten" >/dev/null; then
+        echo "[app] reagiert nicht auf SIGTERM -> SIGKILL"
+        for p in $(_noch_am_leben "$kandidaten"); do kill -KILL "$p" 2>/dev/null; done
+        sleep 0.5
+    fi
+
+    # ★ NACHSEHEN statt behaupten.
+    local rest
+    rest=$(_noch_am_leben "$kandidaten" | tr '\n' ' ' | xargs 2>/dev/null || true)
+    if [ -n "$rest" ]; then
+        echo "[app] FEHLER: laeuft NOCH (PIDs: $rest) — nicht beendet" >&2
+        return 1
     fi
     rm -f "$PIDFILE"; echo "[app] beendet"
+}
+
+# Welche der uebergebenen PIDs leben noch? (Eine Zeile je PID, leer = keine.)
+_noch_am_leben() {
+    local p gefunden=""
+    for p in $1; do
+        kill -0 "$p" 2>/dev/null && { echo "$p"; gefunden=1; }
+    done
+    [ -n "$gefunden" ]
 }
 
 cmd_wait() {
