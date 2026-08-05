@@ -14,7 +14,7 @@
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UI-Layer (PySide6)                        │
-│ MainWindow (7 Sektionen): Live View · Patchen · Programmer ·     │
+│ MainWindow (8 Sektionen): Bühne · Patchen · Programmer ·        │
 │ Virtual Console · Simple Desk · Playback · Eingabe/Ausgabe       │
 └──────────────┬───────────────────────────────▲───────────────────┘
                │ Setter (set_programmer_value, │ Events

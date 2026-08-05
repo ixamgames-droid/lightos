@@ -2,7 +2,7 @@
 
 In dieser Anleitung lernst du, wie du deine Geräte in der 2D-Live-View auf der Bühnenfläche platzierst und die Positionen anschließend im 3D-Visualizer ansiehst. Grundlage ist die Show `shows/Komplettshow_2026.lshow`.
 
-1. Öffne die Sektion **„Live View"**.
+1. Öffne die Sektion **„Bühne"**.
 
 2. Beim Öffnen der Live-View sind bereits **alle 12 Geräte** an ihren fertigen 2D-Positionen platziert — die Show `Komplettshow_2026.lshow` enthält das gespeicherte Layout, du musst also nichts erst aufbauen. Möchtest du etwas anders stellen, ziehst du das jeweilige Gerät per Drag & Drop an die neue Zielposition.
 

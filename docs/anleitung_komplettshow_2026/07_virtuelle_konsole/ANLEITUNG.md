@@ -20,7 +20,7 @@ In dieser Anleitung baust du eine Virtuelle Konsole (VC) mit Tasten und einem XY
 
 5. Schalte **„Bearbeiten"** wieder aus und drücke die Tasten: Die Effekte laufen jetzt live (verifiziert: PAR als rotes Lauflicht, Moving Heads leuchten und bewegen sich).
 
-![Live View nach Tastendruck: PAR rot im Dimmer-Chase, Moving Heads leuchten und laufen](img/02_vc_ausgeloest_live_mix.png)
+![Bühne nach Tastendruck: PAR rot im Dimmer-Chase, Moving Heads leuchten und laufen](img/02_vc_ausgeloest_live_mix.png)
 
 6. **APC Mini anbinden (MIDI Lernen):**
    1. Schalte in der Toolbar **„MIDI Lernen"** ein.

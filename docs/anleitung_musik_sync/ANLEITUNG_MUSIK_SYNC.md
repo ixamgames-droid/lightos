@@ -7,12 +7,12 @@
 
 ---
 
-> Navigation: Sektion **Eingabe / Ausgabe** (Strg+7) → Tab **„Musik"**. Den BPM-Takt stellst du in
+> Navigation: Sektion **E/A** (Eingabe / Ausgabe, Strg+7) → Tab **„Musik"**. Den BPM-Takt stellst du in
 > der eigenen Sektion **BPM** (Strg+8) ein.
 
 ## 1. Playlist laden
 
-Im **Musik-Tab** (Sektion *Eingabe / Ausgabe* → Tab „Musik", bzw. das eigene Fenster *Musik-Fenster
+Im **Musik-Tab** (Sektion *E/A* → Tab „Musik", bzw. das eigene Fenster *Musik-Fenster
 (Now Playing)*) deine Titel hinzufügen — die Pfade werden **mit
 der Show** gespeichert. Für die Hardstyle-Show liegen z. B. Hardstyle-/Frenchcore-/Bounce-Remixe
 in der Playlist (Adele *Rolling In The Deep (Hardstyle)*, Bonnie Tyler *I Need a Hero*, Toto

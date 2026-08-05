@@ -31,7 +31,7 @@ PAR-/Spider-Grundwerten, sodass die Effekte sofort sichtbar sind. Wirken auf **P
 **Exklusiv:** Es läuft immer nur ein Effekt — eine neue Taste löst die vorige ab.
 „Effekt Feuer" z. B. färbt die PAR-Reihe live in rot-orangem Flackern:
 
-![Effekt Feuer live in der Live View](img/02_feuer_live.png)
+![Effekt Feuer live in der Bühne](img/02_feuer_live.png)
 
 ## 2. Gruppen wählen (Reihe 1)
 

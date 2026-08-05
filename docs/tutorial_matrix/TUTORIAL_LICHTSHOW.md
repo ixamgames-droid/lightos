@@ -62,7 +62,7 @@ Ergebnis – die Patch‑Tabelle: 8 PARs (Adressen 1, 5, 9 … 29) + 2 MH (33, 4
 
 ## 2. In der Live-View platzieren
 
-In der Sektion **„Live View"** ordnest du die Strahler so an, wie sie real auf
+In der Sektion **„Bühne"** ordnest du die Strahler so an, wie sie real auf
 der Bühne stehen. Hier: die 8 PARs als **4×2‑Block**, die 2 Moving Heads darüber.
 Die Live‑View zeigt **live** Farbe und Helligkeit jedes Geräts – das ist unser
 „Monitor" für alle folgenden Effekte.
@@ -340,7 +340,7 @@ Chaser, dem MH‑EFX und der kompletten Virtuellen Konsole gesichert.
 | Aufgabe | Weg in LightOS |
 |---------|----------------|
 | Gerät patchen | Patchen → `+ Gerät hinzufügen` → suchen, Anzahl, Adresse → `Hinzufügen` |
-| Gruppe bauen | Live View → `☑ Mehrfachauswahl` → Rechteck ziehen → `＋ Gruppe aus Auswahl` → benennen |
+| Gruppe bauen | Bühne → `☑ Mehrfachauswahl` → Rechteck ziehen → `＋ Gruppe aus Auswahl` → benennen |
 | Reine Farbe | Programmer → Reiter **Matrix** → Style **RGB** |
 | Reiner Dimmer | Programmer → Reiter **Matrix** → Style **Dimmer** |
 | Farbe + Dimmer | beide Matrizen **gleichzeitig** starten → Badge **FX2** |

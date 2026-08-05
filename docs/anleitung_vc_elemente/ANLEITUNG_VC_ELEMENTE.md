@@ -1,13 +1,16 @@
 # Referenz: Alle VC-Elemente (Virtual Console)
 
-> **Überblick aller 16 Bau-Elemente** der Virtual Console — was sie sind, wie man sie
-> bedient und was man einstellen kann. Plus die **Baukasten-Knöpfe** (komplette Blöcke)
-> und die neue **Gruppenwahl** beim Color-Chase.
+> **Überblick aller 19 Bau-Elemente** der Virtual Console — was sie sind, wie man sie
+> bedient und was man einstellen kann. Plus die **Baukasten-Knöpfe** (komplette Blöcke).
+>
+> *Die früheren Baukasten-Blöcke Controller-Vorlage, Color-Chase und Chase-Bereich
+> gibt es nicht mehr — an ihre Stelle ist das **Live-Edit-Panel** getreten
+> (siehe [LIVE_EDIT_FENSTER.md](../LIVE_EDIT_FENSTER.md)).*
 >
 > Vorlage zum Anschauen: `shows/VC_Elemente_Showcase.lshow` (Generator
 > `tools/build_vc_elements_showcase.py`) — legt jeden Typ einmal beschriftet ab.
 
-![Alle 14 VC-Elemente](img/01_alle_elemente.png)
+![Alle VC-Elemente in der Übersicht](img/01_alle_elemente.png)
 
 ---
 
@@ -111,19 +114,20 @@ eigener Effekt-Funktion:
 
 - **⌗ Controller** — legt ein beschriftetes Pad-/Fader-Raster passend zu einem MIDI-Controller
   (APC mini/mk2 …) an. Pads danach per Rechtsklick belegen.
-- **🎨 Color-Chase** — legt eine **COLORFADE-Funktion + kompletten Chase-Baukasten**
-  (Palette, Farb-Liste, Speed/Hold-Fader, Aktions-Tasten) an, alles aneinander gebunden.
-- **🟦 Chase-Bereich** — wie Color-Chase, aber du **ziehst** zuerst einen Bereich auf der
-  Canvas auf; der Block wird hineingelegt.
+- **🎨 Color-Chase** *(entfernt 2026-07)* — legte eine **COLORFADE-Funktion + kompletten
+  Chase-Baukasten** (Palette, Farb-Liste, Speed/Hold-Fader, Aktions-Tasten) an, alles
+  aneinander gebunden. Heute: **Live-Edit-Panel**.
+- **🟦 Chase-Bereich** *(entfernt 2026-07)* — wie der Color-Chase, aber man **zog** zuerst
+  einen Bereich auf der Canvas auf; der Block wurde hineingelegt. Heute: **Live-Edit-Panel**.
 
 ---
 
 ## Stand / Nutzbarkeit (Kurz)
 
-- **Alle 16 Typen** sind über die Toolbar anlegbar (der frühere „Chase Builder"/VCChaseBuilder
+- **Alle 19 Typen** sind über die Toolbar anlegbar (der frühere „Chase Builder"/VCChaseBuilder
   wurde 2026-07 komplett entfernt, PR #116).
 - **Sofort nutzbar ohne Bindung:** Button, Fader, Farbe, XY Pad, SpeedDial, Encoder, Musik,
   BPM, Tempo-Bus, Text, Container, Cue List (mit Executor-Slot).
 - **Erst mit Effekt-Bindung sinnvoll:** Chase-Liste, Effekt-Farben — am
-  bequemsten über den **🎨 Color-Chase**-Baukasten (legt Effekt + Bindung in einem Rutsch an,
-  jetzt wahlweise auf eine Gruppe).
+  bequemsten über das **Live-Edit-Panel** (Effekt hineinziehen, Ziele ankreuzen);
+  der frühere **🎨 Color-Chase**-Baukasten wurde 2026-07 entfernt.

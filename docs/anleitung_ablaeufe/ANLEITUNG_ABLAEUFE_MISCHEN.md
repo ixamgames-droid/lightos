@@ -29,11 +29,11 @@ Ein Druck auf **Mix: Party (Farbe+Bewegung)** — die Taste bekommt einen grüne
 
 ![Mix: Party aktiv](img/02_mix_party_aktiv.png)
 
-In der Live View sieht man sofort das Ergebnis: die **PAR-Reihe in voller Regenbogen-Farbe**,
+In der Bühne sieht man sofort das Ergebnis: die **PAR-Reihe in voller Regenbogen-Farbe**,
 die **Moving Heads als aktive Strahlen** (MH-Fächer) und die Spider mitgefärbt — Farbe **und**
 Bewegung aus einer Taste:
 
-![Mix: Party live in der Live View](img/03_mix_live_regenbogen.png)
+![Mix: Party live in der Bühne](img/03_mix_live_regenbogen.png)
 
 ## 2. Chaser (Reihe 1)
 

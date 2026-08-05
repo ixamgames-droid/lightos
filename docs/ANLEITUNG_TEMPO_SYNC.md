@@ -172,7 +172,10 @@ Eine ausführlich bebilderte Variante steht in
 
 ## 6. Live-Tipps
 
-- **Freeze** (VC-Aktion „Freeze (BPM einfrieren)", Standard-Taste **F3**): friert alle Buses
+- **Freeze** (VC-Aktion „Freeze (alles anhalten)", Standard-Taste **F3**): hält seit
+  BUG-FBW (2026-08-02) **alles** an — der Renderer rechnet nicht mehr und die Ausgabe
+  hält ihren Stand. Der Tempo-Bus friert dabei mit, das frühere Verhalten ist also
+  enthalten: friert alle Buses
   + globalen Leader auf 0 ein — bus-gekoppelte Effekte **halten** die Pose. Toggle.
 - **Tap** mitklatschen, wenn die Audio-Erkennung mal danebenliegt; danach ggf. **🔒 Lock**.
 - **APC mini / MIDI**: Tap, Sync, Auto-Sync, Freeze und Speed-Dials lassen sich auf Pads/Fader
