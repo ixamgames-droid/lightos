@@ -1149,10 +1149,23 @@ class AppState:
             # FM-HEADLAYOUT: OHNE diesen Eintrag wird die Mehrkopf-Modus-Wahl aus
             # dem Patch-Dialog STILL verworfen (Review-Fund HIGH) -> Feature tot.
             "head_mode",
+            # FM-13/PIXELORDER: dieselbe Falle, ein zweites Mal. Der Kommentar
+            # ueber `head_mode` beschreibt sie woertlich — und `pixel_order`
+            # (PR #514) fehlte hier trotzdem, war also seit dem Bau WIRKUNGSLOS:
+            # der Patch-Dialog schickte den Wert, `update_fixture` verwarf ihn
+            # still und meldete trotzdem True, weil Label/Universum/Adresse
+            # mitreisen. Ein Matrix-Panel im Werkszustand (Schlangen-Zaehlung)
+            # liess sich damit gar nicht auf zeilenweise umstellen.
+            "pixel_order",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
             "protocol", "net_host",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
+        if "pixel_order" in values:
+            # Garbage aus Skript-/Remote-Pfaden klemmen — kanonische Quelle ist
+            # das Leaf-Modul core.pixel_order, dieselbe wie die Show-Persistenz.
+            from .pixel_order import normalize_pixel_order
+            values["pixel_order"] = normalize_pixel_order(values["pixel_order"])
         if "head_mode" in values:
             # Garbage aus Skript-/Remote-Pfaden klemmen (kanonische Quelle:
             # Leaf-Modul core.head_mode — dieselbe wie die Show-Persistenz).
@@ -1224,6 +1237,10 @@ class AppState:
             # FM-HEADLAYOUT: OHNE dies verliert Loeschen+Undo den Modus UND legt
             # die per "single" unterdrueckte Kopf-Gruppe wieder an (Review-Fund).
             "head_mode": getattr(f, "head_mode", "auto") or "auto",
+            # Ohne dies faellt die Pixel-Reihenfolge bei Loeschen+Undo auf
+            # `rowwise` zurueck — und ein Lauflicht laeuft danach wieder im
+            # Zickzack, ohne dass jemand etwas umgestellt haette.
+            "pixel_order": getattr(f, "pixel_order", "rowwise") or "rowwise",
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -1250,6 +1267,9 @@ class AppState:
             spider_mirrored=d.get("spider_mirrored", True),
             spider_dual_tilt=d.get("spider_dual_tilt", False),
             head_mode=d.get("head_mode", "auto") or "auto",   # FM-HEADLAYOUT
+            # Gegenstueck zum Schnappschuss oben — ohne dies traegt der
+            # Schnappschuss den Wert und das Zurueckholen wirft ihn wieder weg.
+            pixel_order=d.get("pixel_order", "rowwise") or "rowwise",
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),

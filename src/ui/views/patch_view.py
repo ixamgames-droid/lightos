@@ -84,6 +84,10 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         # FM-HEADLAYOUT: Mehrkopf-Programmiermodus mitkopieren (sonst faellt die
         # Kopie still auf den ORM-Default 'auto' zurueck).
         head_mode=getattr(src, "head_mode", "auto") or "auto",
+        # Ohne dies faellt eine mit Offset kopierte Matrix auf `rowwise`
+        # zurueck — man kopiert vier Panels und drei davon zaehlen anders als
+        # das Original, ohne dass man etwas umgestellt haette.
+        pixel_order=getattr(src, "pixel_order", "rowwise") or "rowwise",
         pan_range_deg=src.pan_range_deg,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
