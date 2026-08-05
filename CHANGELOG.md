@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Matrix-Panels liessen sich nicht bearbeiten, und die Pixel-Reihenfolge wirkte nie
+
+#### Behoben
+
+- **Ein Matrix-Panel liess sich im Patch-Fenster nicht speichern.** Bei Panels,
+  die die ganze Flaeche auf einmal faerben (also nur EINEN Farbsatz haben),
+  brach das Speichern mit einem Programmfehler ab — das Geraet war damit
+  ueberhaupt nicht editierbar. Betroffen waren vier Modi der mitgelieferten
+  Geraete (ADJ Dotz Matrix 3/6/7-Kanal, Stairville Pixel Panel 144 „8-Kanal").
+
+- **„Koepfe einzeln" legte bei Mehrkopf-Geraeten die Kopf-Gruppe nicht mehr an.**
+  Bei Spider- und Mehrkopf-Strahlern blieb die Wahl folgenlos: die Gruppe, ueber
+  die man die Koepfe einzeln anspricht, entstand nicht. (Beides hatte dieselbe
+  Ursache — eine verrutschte Codezeile.)
+
+- **Die Pixel-Reihenfolge eines Matrix-Panels wurde nie gespeichert.** Die
+  Auswahl im Patch-Fenster (zeilenweise / Schlangenlinie / gespiegelt) verschwand
+  beim Uebernehmen stillschweigend; das Fenster meldete trotzdem Erfolg. Ein
+  Panel, das ab Werk in Schlangenlinien zaehlt, liess sich damit gar nicht auf
+  zeilenweise umstellen — ein Lauflicht lief darauf im Zickzack, und man suchte
+  den Fehler am Geraet.
+
+  Ebenfalls behoben: Loeschen + Rueckgaengig setzte die Reihenfolge zurueck, und
+  „Mit Offset kopieren" vergass sie — man kopierte vier Panels und drei zaehlten
+  anders als das Original.
+
+
 ### 2026-08-05 — Gezeichnete Laser-Figuren gehen jetzt in voller Aufloesung raus
 
 #### Verbessert
