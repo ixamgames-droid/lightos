@@ -55,6 +55,23 @@ SERVICE_MODE_GRAPHIC_DISCRETE = 0x02
 
 # Chunk Type im Channel-Message-Header.
 CHUNK_FRAME_SAMPLES = 0x02      # kompletter Frame (nicht fragmentiert)
+# LAS-07: App-Fragmentierung. Codes woertlich aus der ILDA-Spezifikation
+# „IDN-Stream", Revision 001 (Juli 2015), Abschnitt „Chunk Type":
+#   0x02  Laser Projector Frame Samples (entire chunk)
+#   0x03  Laser Projector Frame Samples (first fragment)
+#   0xC0  Laser Projector Frame Samples (sequel fragment)
+# Dieselbe Quelle regelt die zwei Feinheiten, die man sonst raet:
+#   - „Types with the two most significant bits set, 0xC0 to 0xFF, are used for
+#     the remaining fragments … their timestamp field is shared with the
+#     fragment number." Der Zeitstempel eines Fragments ist also NICHT die Zeit,
+#     sondern **Zeitstempel des ersten Fragments + (0-basierte) Fragmentnummer**.
+#   - Das CCLF-Bit im CNL-Octet hat bei Folge-Fragmenten eine ANDERE Bedeutung:
+#     „Since messages carrying fragments other than the first one can't have
+#     channel configuration headers, this bit, if set to '1' indicates the
+#     message with the last fragment of the data chunk." Es markiert also das
+#     ENDE der Kette — nicht das Vorhandensein einer Config.
+CHUNK_FRAME_SAMPLES_FIRST = 0x03
+CHUNK_FRAME_SAMPLES_SEQUEL = 0xC0
 
 # CNL-Octet (Byte 2 des Channel-Message-Headers): Bit7=1 markiert
 # Channel-Message, Bit6=CCLF (Config folgt), Bit5-0 = Channel-ID.
@@ -89,6 +106,10 @@ _BYTES_PER_SAMPLE = 7   # X(2) + Y(2) + R(1) + G(1) + B(1)
 # 4 (Chunk) = 36 B. So bleibt ein Paket unter der MTU (keine IP-Fragmentierung).
 _MTU_PAYLOAD = 1400
 MAX_SAMPLES_PER_PACKET = (_MTU_PAYLOAD - 36) // _BYTES_PER_SAMPLE   # = 194
+# Ein FOLGE-Fragment traegt weder Config noch Chunk-Header (beide gehoeren zum
+# Anfang des Datenchunks) — nur Hello (4) + Channel-Message-Header (8).
+_FRAGMENT_OVERHEAD = 12
+MAX_SAMPLES_PER_SEQUEL = (_MTU_PAYLOAD - _FRAGMENT_OVERHEAD) // _BYTES_PER_SAMPLE
 
 
 class IDNError(RuntimeError):
@@ -169,7 +190,9 @@ def encode_samples(frame: LaserFrame) -> bytes:
 
 
 def build_stream_packet(frame: LaserFrame, sequence: int, timestamp_us: int,
-                        channel_id: int = 0) -> bytes:
+                        channel_id: int = 0, *,
+                        chunk_type: int = CHUNK_FRAME_SAMPLES,
+                        duration_punkte: "int | None" = None) -> bytes:
     """Baut ein komplettes IDN-RT-Stream-Datagramm für einen Frame.
 
     Config wird bewusst IN JEDEM Frame mitgesendet (CCLF=1): robust gegen
@@ -181,7 +204,11 @@ def build_stream_packet(frame: LaserFrame, sequence: int, timestamp_us: int,
     pps = max(1, int(frame.pps))
     # Untere Schranke 1 µs: ein Chunk mit duration==0 wird von spec-konformen
     # Empfängern als „minimum chunk length error" verworfen (IDNLaproGraDis).
-    duration_us = min(0xFFFFFF, max(1, round(n / pps * 1_000_000)))
+    # LAS-07: Beim ERSTEN Fragment gilt die Dauer fuer den GANZEN Frame,
+    # nicht fuer dessen Teilstueck — sonst spielte der Empfaenger ihn um
+    # den Faktor der Fragmentzahl zu schnell ab.
+    dauer_n = n if duration_punkte is None else max(1, int(duration_punkte))
+    duration_us = min(0xFFFFFF, max(1, round(dauer_n / pps * 1_000_000)))
 
     # Sample-Chunk-Header: oberstes Byte = Flags (0), untere 24 Bit = Dauer.
     chunk_header = struct.pack(">I", duration_us & 0xFFFFFF)
@@ -192,12 +219,76 @@ def build_stream_packet(frame: LaserFrame, sequence: int, timestamp_us: int,
     total_size = 8 + len(config) + len(chunk_header) + len(samples)
     if total_size > 0xFFFF:
         raise IDNError(f"Channel-Message zu groß: {total_size} Bytes")
-    msg_header = struct.pack(">HBBI", total_size, cnl, CHUNK_FRAME_SAMPLES,
+    msg_header = struct.pack(">HBBI", total_size, cnl, chunk_type,
                              timestamp_us & 0xFFFFFFFF)
 
     hello = struct.pack(">BBH", CMD_RT_CHANNEL_MESSAGE, 0x00, sequence & 0xFFFF)
     return hello + msg_header + config + chunk_header + samples
 
+
+
+def build_stream_fragments(frame: LaserFrame, sequence: int, timestamp_us: int,
+                           channel_id: int = 0) -> list:
+    """Einen Frame beliebiger Punktzahl in MTU-sichere IDN-Datagramme zerlegen.
+
+    Passt der Frame in ein Paket, ist das Ergebnis genau ``[entire chunk]`` —
+    byte-identisch zu :func:`build_stream_packet`. Erst darueber wird
+    fragmentiert (Chunk-Typen ``0x03`` / ``0xC0``, s. Konstanten oben).
+
+    **Kein Punkt geht mehr verloren.** Das bisherige Downsampling war die
+    v1-Notloesung; es kostete bei 666 berechneten Punkten rund 71 % der
+    Aufloesung — und bis LAS-BLANK zusaetzlich Blank-Spruenge, also Strahl, wo
+    Dunkelheit gemeint war.
+
+    Drei Dinge, die die Spezifikation vorschreibt und die man sonst falsch macht:
+
+    1. **Config und Chunk-Header nur im ERSTEN Fragment.** Beide gehoeren zum
+       Anfang des Datenchunks; ein Folge-Fragment traegt reine Samples.
+    2. **Der Zeitstempel eines Fragments ist die Fragmentnummer.** ``T`` fuer das
+       erste, ``T+1``, ``T+2`` … fuer die Folge-Fragmente. Wer hier die echte
+       Uhrzeit einsetzt, sendet fuer den Empfaenger unsortierbare Teile.
+    3. **Das CCLF-Bit markiert bei Folge-Fragmenten das ENDE der Kette**, nicht
+       eine Config. Ohne das wartet der Empfaenger auf ein Fragment, das nie
+       kommt, und gibt den Frame nie aus.
+
+    Die Sequenznummer laeuft ueber alle Datagramme weiter — sie zaehlt Pakete,
+    nicht Frames.
+    """
+    punkte = list(frame.points)
+    if len(punkte) <= MAX_SAMPLES_PER_PACKET:
+        return [build_stream_packet(frame, sequence, timestamp_us, channel_id)]
+
+    kopf_punkte = punkte[:MAX_SAMPLES_PER_PACKET]
+    rest = punkte[MAX_SAMPLES_PER_PACKET:]
+    bloecke = [rest[i:i + MAX_SAMPLES_PER_SEQUEL]
+               for i in range(0, len(rest), MAX_SAMPLES_PER_SEQUEL)]
+
+    # Die Dauer gilt fuer den GESAMTEN Frame und steht im Chunk-Header des
+    # ersten Fragments — sie darf sich nicht auf dessen Teilstueck beziehen,
+    # sonst spielte der Empfaenger den Frame um den Faktor der Fragmentzahl zu
+    # schnell ab.
+    erstes = build_stream_packet(
+        LaserFrame(points=kopf_punkte, pps=frame.pps), sequence,
+        timestamp_us, channel_id,
+        chunk_type=CHUNK_FRAME_SAMPLES_FIRST,
+        duration_punkte=len(punkte))
+    pakete = [erstes]
+
+    for nr, block in enumerate(bloecke, start=1):
+        letztes = (nr == len(bloecke))
+        cnl = _CNL_CHANNELMSG | (channel_id & 0x3F)
+        if letztes:
+            cnl |= _CNL_CONFIG          # bei Folge-Fragmenten = „letztes Fragment"
+        samples = encode_samples(LaserFrame(points=block, pps=frame.pps))
+        total_size = 8 + len(samples)
+        if total_size > 0xFFFF:
+            raise IDNError(f"Fragment zu gross: {total_size} Bytes")
+        msg = struct.pack(">HBBI", total_size, cnl, CHUNK_FRAME_SAMPLES_SEQUEL,
+                          (timestamp_us + nr) & 0xFFFFFFFF)
+        hello = struct.pack(">BBH", CMD_RT_CHANNEL_MESSAGE, 0x00,
+                            (sequence + nr) & 0xFFFF)
+        pakete.append(hello + msg + samples)
+    return pakete
 
 _SCAN_UNIT_ID_LEN = 16
 _SCAN_HOSTNAME_LEN = 20
@@ -327,13 +418,18 @@ class IDNConnection:
         """Einen Frame als IDN-RT-Datagramm senden. UDP fire-and-forget →
         immer True (Fehler werfen IDNError). Zu punktreiche Frames werden
         geometrie-erhaltend auf MTU-Größe reduziert."""
-        pts = _downsample(frame.points, MAX_SAMPLES_PER_PACKET)
-        if pts is not frame.points:
-            frame = LaserFrame(points=pts, pps=frame.pps)
-        self._seq = (self._seq + 1) & 0xFFFF
-        packet = build_stream_packet(frame, self._seq, self._timestamp_us(),
-                                     self.channel_id)
-        self._send(packet)
+        # LAS-07: fragmentieren statt ausduennen. Das Downsampling war die
+        # v1-Notloesung und kostete rund 71 % der Aufloesung; es greift jetzt
+        # nur noch als Notnagel, wenn ein Frame selbst fragmentiert nicht in
+        # 0xFFFF Bytes je Fragment oder in die Punktgrenze der Safety passt.
+        pakete = build_stream_fragments(frame, self._seq, self._timestamp_us(),
+                                        self.channel_id)
+        # Die Sequenznummer zaehlt PAKETE, nicht Frames — build_stream_fragments
+        # hat ab self._seq durchnummeriert, hier also um die Zahl der Pakete
+        # weiterdrehen.
+        self._seq = (self._seq + len(pakete)) & 0xFFFF
+        for paket in pakete:
+            self._send(paket)
         return True
 
     # ── Not-Aus / Ende (Interface-Parität zu Ether Dream) ─────────────────
