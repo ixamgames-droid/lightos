@@ -7,6 +7,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Ein fehlerhaftes 3D-Modell konnte im Visualizer unsichtbar werden
+
+#### Behoben
+
+- **Ein 3D-Geraetemodell mit fehlerhafter Datei verschwand aus der Ansicht,
+  statt einfach etwas schief auszusehen.** Beim Einpassen eines geladenen
+  Modells in seine Zielgroesse wurde auch dann umgerechnet, wenn das Modell in
+  einer Richtung gar keine Ausdehnung hat (eine flache Datei, wie sie beim
+  Export schon mal entsteht). Ergebnis: das Modell landete Millionen Meter
+  neben der Buehne — ohne Fehlermeldung, es war einfach weg. Eine voellig leere
+  Modelldatei konnte ausserdem ungueltige Koordinaten erzeugen, die sich in der
+  Szene weiterfressen.
+
+  Jetzt gilt: laesst sich eine Richtung nicht sinnvoll umrechnen, wird sie
+  gelassen wie sie ist, und unbrauchbare Werte fuehren zu gar keiner
+  Verschiebung. Ein Modell an der falschen Stelle kann man sehen und melden —
+  ein verschwundenes sucht man im Rig.
+
+  Betrifft die mitgelieferten Modelle nicht; sie sind in Ordnung. Wichtig wird
+  es, sobald eigene Modelldateien dazukommen.
+
+
 ### 2026-08-05 — Am Profi-Laser fehlte der Dimmer, und gezeichnete Figuren sprangen in der Groesse
 
 #### Behoben
