@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Die Lichtkegel laufen aus, statt an einer Kante zu enden
+
+#### Verbessert
+
+- **Der sichtbare Lichtkegel im 3D-Visualizer wird zum Ende hin duenner.** Bisher
+  war er ueber seine ganze Laenge gleich dicht und hoerte deshalb mit einer
+  sichtbaren Kante auf — als waere der Strahl abgeschnitten. Jetzt ist er am
+  Geraet voll und duennt zum Ende hin aus, so wie Licht in Dunst.
+
+  Am Auftreffpunkt bleibt er bewusst noch sichtbar: trifft der Strahl den Boden,
+  soll man den Kontakt sehen. An Helligkeit, Farbe und Laenge der Kegel aendert
+  sich nichts, an der DMX-Ausgabe ohnehin nicht — es geht ausschliesslich um die
+  Darstellung. Auch die Leistung bleibt gleich: es ist EIN gemeinsames Bild fuer
+  alle Geraete, keine Rechnung je Kegel und keine je Bild.
+
+
 ### 2026-08-05 — Der Master-Fader am APC mini griff der Oberflaeche in die Speichen
 
 #### Behoben
