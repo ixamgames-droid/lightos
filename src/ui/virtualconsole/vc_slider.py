@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
                                 QCheckBox, QWidget, QVBoxLayout, QHBoxLayout)
-from PySide6.QtCore import Qt, QRect, QPoint
+from PySide6.QtCore import Qt, QRect, QPoint, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from .vc_widget import VCWidget
 from .vc_style import paint_slider_handle   # VC3D-02: plastischer Fader-Griff
@@ -78,6 +78,16 @@ _VALID_SLIDER_MODES = frozenset(m for m, _ in SLIDER_MODE_LABELS)
 
 class VCSlider(VCWidget):
     """Vertikaler Fader — Level / Playback / Submaster."""
+
+    # ★ GM-THREAD: `OutputManager.set_grand_master` ruft seine Callbacks INLINE
+    # im aufrufenden Thread — und einer der Aufrufer ist der MidiDispatch-Thread
+    # (MidiMapper, ACTION_GRAND_MASTER; im ausgelieferten APC-mini-Profil liegt
+    # das auf CC 56, dem Master-Fader). `_on_grand_master_pushed` ruft
+    # `self.update()`, also Qt-Widget-Code. Dieselbe Ursache wie der Absturz aus
+    # crash.log 2026-06-14, den `MainWindow._page_changed_sig` bereits abfängt.
+    # AutoConnection: aus dem UI-Thread (eigener Drag) laufen die Emits DIREKT
+    # durch, damit `_gm_self_push` weiter greift; nur Fremd-Thread wird gequeued.
+    _gm_pushed_sig = Signal(float)
 
     # Soft-Takeover / „Pickup" (global, von der VC-Toolbar gesetzt): für nicht-
     # motorisierte Controller (APC mini & Co.). Nach einem Bank-/Seitenwechsel steht
@@ -203,7 +213,10 @@ class VCSlider(VCWidget):
         self._value = max(0, min(255, int(round(float(om.grand_master) * 255))))
         self.update()
         if self._gm_sync_cb is None:
-            self._gm_sync_cb = self._on_grand_master_pushed
+            # GM-THREAD: nicht die Methode selbst abonnieren, sondern das Signal
+            # emittieren — der Push kann aus dem MIDI-Thread kommen (s. Klassenkopf).
+            self._gm_pushed_sig.connect(self._on_grand_master_pushed)
+            self._gm_sync_cb = lambda gm: self._gm_pushed_sig.emit(float(gm))
             om.subscribe_grand_master(self._gm_sync_cb)
             # GC-sicher raeumen: die Lambda haelt NUR om + cb (nicht self ueber eine
             # zusaetzliche Closure) — bei Qt-Loeschung wird die Subscription geloest.

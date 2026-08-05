@@ -405,6 +405,13 @@ class MainWindow(QMainWindow):
     # marshallt die Label-Aktualisierung in den UI-Thread (crash.log 2026-06-14:
     # MIDI-Thread fasste Widgets direkt an -> Access Violation).
     _page_changed_sig = Signal(int)
+    # ★ Grand Master, GENAU DIESELBE Ursache wie eine Zeile darueber — und
+    # damals uebersehen. `OutputManager.set_grand_master` ruft seine Callbacks
+    # INLINE im aufrufenden Thread; der MidiMapper ruft es aus dem
+    # MidiDispatch-Thread (ACTION_GRAND_MASTER). `_sync_header_gm` fasst danach
+    # QSlider und QLabel direkt an. Das ausgelieferte APC-mini-Profil legt CC 56
+    # — den Master-Fader — auf genau diese Aktion, es ist also kein Exotenpfad.
+    _gm_changed_sig = Signal(float)
     # Marshallt beliebige State-Event-Zustellungen aus Worker-Threads (MIDI/OSC/
     # Web/Audio) in den UI-Thread. AutoConnection => Cross-Thread-Emits werden
     # gequeued, Emits aus dem UI-Thread laufen direkt.
@@ -418,6 +425,9 @@ class MainWindow(QMainWindow):
         # Widget-Code im Fremd-Thread (Crash-Quelle, Audit B1/C8).
         self._emit_marshal_sig.connect(self._run_in_ui)
         self._state.set_ui_marshaller(self._emit_marshal_sig.emit)
+        # GM-THREAD: vor dem Aufbau der Kopfleiste verbinden — das Abonnement
+        # unten emittiert nur noch, der Slot laeuft garantiert im UI-Thread.
+        self._gm_changed_sig.connect(self._sync_header_gm)
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
@@ -804,8 +814,17 @@ class MainWindow(QMainWindow):
         # GDS-1: Header-GM spiegelt externe grand_master-Aenderungen (VC-Grandmaster-
         # Fader, MIDI) zurueck — feedback-sicher via blockSignals (kein
         # valueChanged -> set_grand_master -> notify -> ...-Loop).
+        #
+        # ★ GM-THREAD: NICHT direkt abonnieren. `set_grand_master` ruft seine
+        # Callbacks inline im aufrufenden Thread, und einer der Aufrufer ist der
+        # MidiDispatch-Thread (MidiMapper, ACTION_GRAND_MASTER) — `_sync_header_gm`
+        # faende sich damit im Fremd-Thread an QSlider/QLabel wieder. Das Signal
+        # dazwischen ist AutoConnection: aus dem UI-Thread (VC-Fader-Drag) laeuft
+        # es direkt durch, damit der `_gm_self_push`-Guard der VC weiter greift;
+        # nur der Cross-Thread-Fall wird gequeued.
         try:
-            self._state.output_manager.subscribe_grand_master(self._sync_header_gm)
+            self._state.output_manager.subscribe_grand_master(
+                lambda gm: self._gm_changed_sig.emit(float(gm)))
         except Exception:
             pass
         gm_layout.addWidget(self._lbl_gm_val)
