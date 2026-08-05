@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-04 — Jedes Oeffnen der 3D-Ansicht liess einen Grafik-Kontext liegen
+
+#### Behoben
+
+- **Die 3D-Ansicht gab beim Start einen Grafik-Kontext nicht wieder frei.** Bevor
+  die Szene gebaut wird, fragt LightOS die Grenzen der Grafikkarte ab (davon
+  haengt ab, ob Kantenglaettung an ist) — und dafuer wird ein echter,
+  vollwertiger Grafik-Kontext geoeffnet. Der wurde danach nie geschlossen, also
+  belegte **jedes** Oeffnen der 3D-Ansicht zwei statt einen. Die Zahl solcher
+  Kontexte ist auf jedem Rechner begrenzt; ist das Budget erschoepft, bleibt die
+  Ansicht schwarz (`Error creating WebGL context`). Wer die 3D-Ansicht oft
+  hintereinander oeffnet und schliesst, kam dem Limit doppelt so schnell nahe wie
+  noetig. Der Probe-Kontext wird jetzt sofort nach der Messung freigegeben.
+
+  > **Was hier NICHT behauptet wird:** Anlass war ein sporadischer Testausfall
+  > mit genau dieser Meldung (rund 2 % der Laeufe). Ob der Fix ihn beseitigt,
+  > ist **nicht belegt** — ein A/B ueber 60 verschraenkte Paare ergab 1 Ausfall
+  > ohne und 0 mit Fix, was bei diesen Zahlen nichts beweist. Der Eintrag steht
+  > hier, weil ein nicht freigegebener Kontext unabhaengig davon falsch ist.
+
 ### 2026-08-04 — Die veroeffentlichten 3D-Leistungszahlen waren an der falschen Stelle gemessen
 
 #### Behoben

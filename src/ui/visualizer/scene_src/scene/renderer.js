@@ -14,11 +14,28 @@ scene.fog = new THREE.FogExp2(0x080808, 0.025);
 // Renderers, daher probt eine Wegwerf-Canvas VOR dem Bau die Limits.
 // Override fuer Tests/Debug: ?gputier=low|high in der Page-URL.
 function probeGpuTier() {
+  // ⚠️ Der Probe-Kontext MUSS wieder freigegeben werden.
+  //
+  // Diese Funktion holt einen ECHTEN WebGL-Kontext, nur um zwei Limits
+  // abzufragen. Ohne Freigabe haengt er bis zur Garbage Collection am
+  // Kontext-Budget des GPU-Prozesses — und der Renderer darunter holt sofort
+  // den zweiten. Macht ZWEI Kontexte je Seitenladung, von denen einer nie
+  // wieder benutzt wird.
+  //
+  // Das ist kein theoretisches Leck: das Kontext-Budget dieser Umgebung ist
+  // klein genug, dass es erreicht wird (in `tests/test_viz14_drag_scene.py`
+  // gemessen festgehalten — drei sichtbare Views nacheinander erschoepfen es
+  // reproduzierbar, „Error creating WebGL context"). Und es trifft nicht nur
+  // Tests: jedes Oeffnen des 3D-Fensters laedt die Seite neu.
+  //
+  // `WEBGL_lose_context` ist der einzige Weg, einen Kontext aktiv aufzugeben —
+  // Canvas wegwerfen und auf die GC hoffen reicht nicht.
+  let gl = null;
   try {
     const forced = new URLSearchParams(window.location.search).get('gputier');
     if (forced === 'low' || forced === 'high') return forced;
     const cv = document.createElement('canvas');
-    const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
+    gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
     if (!gl) return 'low';
     const maxTex = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
     let chip = '';
@@ -29,6 +46,15 @@ function probeGpuTier() {
     return (maxTex <= 16 || weakChip) ? 'low' : 'high';
   } catch (e) {
     return 'high';
+  } finally {
+    // `finally`, nicht am Ende des try-Blocks: die Funktion hat vier
+    // Ausstiege (Override, kein Kontext, Ergebnis, Wurf). Drei davon wuerden
+    // eine Freigabe am Blockende ueberspringen — und ausgerechnet der
+    // Fehlerpfad haelt den Kontext dann am laengsten.
+    try {
+      const verlust = gl && gl.getExtension('WEBGL_lose_context');
+      if (verlust) verlust.loseContext();
+    } catch (e) { /* Freigabe ist best effort — nie den Start daran haengen */ }
   }
 }
 export const gpuTier = probeGpuTier();
