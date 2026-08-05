@@ -66,18 +66,40 @@ export function loadModel(path, callback) {
 }
 
 // Helper: scale a loaded model into a target bounding box (size.x/y/z in world units)
+//
+// ★ MODELLOADER (2026-08-05): entartete Modelle konnten das Modell aus der Welt
+// schieben. Die Rechnung nahm frueher IMMER den Faktor `size/max(ms, 1e-6)` fuer
+// den Versatz — auch dann, wenn die Skalierung wegen einer Achse ohne
+// Ausdehnung gar nicht gesetzt worden war. Gemessen: eine in x flache Geometrie
+// (Plane statt Koerper) mit Mitte bei x = 5 landete danach bei
+// **x = -10.000.000**. Unsichtbar, ohne Fehlermeldung, und die Ursache liegt in
+// einer fremden Datei — genau die Sorte Fehler, die man am Rig sucht.
+//
+// Und ein Modell ganz OHNE Geometrie (leere/kaputte Datei) liefert eine leere
+// Bounding-Box: `getSize` gibt -Infinity, `getCenter` NaN. Das lief bis hierhin
+// ungebremst in `position` — NaN wandert von dort in die Matrix, in die
+// Bounding-Sphere und in den Frustum-Cull.
+//
+// Deshalb: der Versatz benutzt **denselben Faktor wie die Skalierung**, und wo
+// keine skaliert wurde, ist er 1. Nicht-endliche Werte fuehren zu gar keiner
+// Verschiebung — ein Modell an der falschen Stelle ist reparierbar, eines mit
+// NaN-Matrix nicht.
 export function fitModelToSize(model, size) {
   const bbox = new THREE.Box3().setFromObject(model);
   const ms = bbox.getSize(new THREE.Vector3());
-  if (ms.x > 0 && ms.y > 0 && ms.z > 0) {
-    model.scale.set(size.x / ms.x, size.y / ms.y, size.z / ms.z);
+  const brauchbar = (v) => Number.isFinite(v) && v > 0;
+  const fx = brauchbar(ms.x) ? size.x / ms.x : 1;
+  const fy = brauchbar(ms.y) ? size.y / ms.y : 1;
+  const fz = brauchbar(ms.z) ? size.z / ms.z : 1;
+  if (brauchbar(ms.x) && brauchbar(ms.y) && brauchbar(ms.z)) {
+    model.scale.set(fx, fy, fz);
   }
-  // Re-center on origin
+  // Re-center on origin — mit denselben Faktoren, mit denen wirklich skaliert
+  // wurde (siehe oben). Eine leere Bounding-Box liefert NaN/Infinity: dann gar
+  // nicht verschieben.
   const center = bbox.getCenter(new THREE.Vector3());
-  // After we scaled, offset by the (scaled) center
-  model.position.sub(new THREE.Vector3(
-    center.x * (size.x / Math.max(ms.x, 1e-6)),
-    center.y * (size.y / Math.max(ms.y, 1e-6)),
-    center.z * (size.z / Math.max(ms.z, 1e-6))
-  ));
+  const dx = center.x * fx, dy = center.y * fy, dz = center.z * fz;
+  if (Number.isFinite(dx) && Number.isFinite(dy) && Number.isFinite(dz)) {
+    model.position.sub(new THREE.Vector3(dx, dy, dz));
+  }
 }

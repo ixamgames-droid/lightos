@@ -11,6 +11,11 @@
 import { scene, renderer, gpuTier } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { disposeObj } from './scene/grid_floor.js';
+// VIZ-15/MODELLOADER: Test-Seams. `model_loader.js` haengt an sechs
+// Fixture-Buildern und an den Buehnen-Objekten, hatte aber NULL Tests —
+// weder fuer den Cache, die Sammel-Callbacks, die Format-Weiche noch fuer
+// `fitModelToSize`. Ohne Seam ist von aussen keine dieser Zusagen pruefbar.
+import { loadModel, fitModelToSize } from './scene/model_loader.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
 import './camera/cameras.js';
@@ -202,6 +207,8 @@ window.__lightos = {
   beamFalloffTexture,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
+  // MODELLOADER: Cache, Sammel-Callbacks, Format-Weiche, Groessen-Vertrag.
+  __loadModel: loadModel, __fitModelToSize: fitModelToSize,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
   // Gestik-Ende. Der Commit lag vorher inline in handlePointerUp und war nur ueber
   // echte Pointer-Events erreichbar — pointer.js hatte deshalb null
