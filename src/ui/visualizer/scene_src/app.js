@@ -46,7 +46,8 @@ import { setMouseFromCoords, intersectGround, mouse } from './interaction/pickin
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
-import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget } from './fixtures/fixtures.js';
+import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
+         beamFalloffTexture } from './fixtures/fixtures.js';  // VIZ-15
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
@@ -194,6 +195,11 @@ window.__lightos = {
   // ein 'weiss mit fallendem Alpha' waere im Gruenkanal konstant und der
   // Rand bliebe hart, ohne dass man es dem Code ansieht.
   floorPoolScale, poolFalloffTexture,
+  // VIZ-15 Laengs-Falloff im Kegel: derselbe Gruenkanal-Fallstrick, und
+  // zusaetzlich haengt die RICHTUNG an der UV-Orientierung von ConeGeometry
+  // (Spitze = v 1) und an CanvasTexture.flipY. Beides gemessen, beides im
+  // Test festgenagelt — sonst waere der Kegel still falschherum verlaufen.
+  beamFalloffTexture,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am

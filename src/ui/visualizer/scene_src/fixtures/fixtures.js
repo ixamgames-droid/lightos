@@ -160,6 +160,73 @@ export function rebuildFixtureMeshList() {
 }
 
 // ── Beam helpers ─────────────────────────────────────────────────────────────
+
+// VIZ-15 (Phase 5, Optik): LAENGS-FALLOFF im Lichtkegel.
+//
+// Der Kegel war bis hierhin ein `MeshBasicMaterial` mit ueber die ganze Laenge
+// GLEICHER Deckkraft — er endete deshalb an seiner Spitze mit einer sichtbaren
+// Kante, statt wie echtes Licht im Dunst auszulaufen. Dieselbe Loesung wie beim
+// Bodenfleck (floor_pool.js): EINE gemeinsame Textur als `alphaMap`, einmal
+// gezeichnet, kein Aufwand je Geraet und keiner je Frame — und ohne eine Zeile
+// GLSL, also ohne einen neuen `THREE.`-Namen (das three-Shim-Gate
+// tests/test_viz_three_shim_complete.py bleibt unberuehrt).
+//
+// ⚠️ DIESELBE FALLE WIE BEIM BODENFLECK: `alphaMap` liest in three.js den
+// **GRUENKANAL**, nicht den Alphakanal. Ein Verlauf „weiss mit fallendem Alpha"
+// ergaebe einen konstanten Gruenwert und damit gar keinen Verlauf. Gezeichnet
+// wird deshalb ein GRAUVERLAUF bei voller Deckkraft.
+//
+// ⚠️ UND DIE ORIENTIERUNG IST GEMESSEN, NICHT GERATEN (2026-08-05): bei
+// `ConeGeometry` liegt die SPITZE bei +y und traegt **v = 1**, die weite Basis
+// bei -y traegt **v = 0**. `createBeamCone` schiebt den Kegel um `-length/2`,
+// die Spitze sitzt damit AM GERAET und die Basis am fernen Ende. Zusammen mit
+// `CanvasTexture.flipY = true` (Default, ebenfalls nachgemessen) heisst das:
+// **Canvas-Oberkante = Spitze = am Geraet**. Oben also voll, unten ausgeduennt.
+// `tests/test_viz15_beam_falloff_scene.py` nagelt genau diese Beziehung fest —
+// dreht three.js die UVs einmal um, faellt der Verlauf sonst still herum, und
+// der Kegel waere am Geraet blass und am Ende hell.
+let _beamFalloff = null;
+
+/** Die gemeinsame Laengs-Falloff-Textur des Lichtkegels (Grauverlauf, s. o.). */
+export function beamFalloffTexture() {
+  if (_beamFalloff) return _beamFalloff;
+  try {
+    const B = 4, H = 128;          // nur die Hoehe traegt Information (v-Achse)
+    const cv = document.createElement('canvas');
+    cv.width = B; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, H);   // 0 = oben = Spitze
+    // Am Austritt voll und ein Stueck flach halten — genau wie beim Bodenfleck
+    // sieht ein von der ersten Zeile an fallender Verlauf nach Farbverlauf aus
+    // und nicht nach Licht. Das ferne Ende laeuft BEWUSST NICHT auf null:
+    // trifft der Strahl den Boden, ist genau dort der Auftreffpunkt, und ein
+    // dort unsichtbarer Kegel haette keinen Bodenkontakt mehr.
+    g.addColorStop(0.00, '#ffffff');
+    g.addColorStop(0.30, '#f2f2f2');
+    g.addColorStop(0.65, '#a8a8a8');
+    g.addColorStop(1.00, '#3c3c3c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, B, H);
+    _beamFalloff = new THREE.CanvasTexture(cv);
+  } catch (e) {
+    _beamFalloff = null;   // ohne Canvas (Testumgebung) bleibt der Kegel flach
+  }
+  return _beamFalloff;
+}
+
+/** Laengs-Falloff auf einen frisch gebauten Kegel legen.
+ *
+ *  Prisma-Faecher teilen sich Geometrie UND Material des Hauptstrahls
+ *  (prism.js) — sie erben den Verlauf damit von selbst, ohne eigenen Aufruf.
+ */
+export function applyBeamFalloff(cone) {
+  if (!cone || !cone.material) return;
+  const tex = beamFalloffTexture();
+  if (!tex) return;
+  cone.material.alphaMap = tex;
+  cone.material.needsUpdate = true;
+}
+
 export function createBeamCone(color, intensity, angle, length) {
   const radius = Math.tan(angle) * length;
   // Low-Spec: 48 additive Doppelseiten-Kegel sind Fill-Rate-Fresser — halbe
@@ -178,6 +245,7 @@ export function createBeamCone(color, intensity, angle, length) {
     blending: THREE.AdditiveBlending,
   });
   const cone = new THREE.Mesh(geo, mat);
+  applyBeamFalloff(cone);          // VIZ-15: Laengs-Falloff (s. o.)
   cone.position.y = -length / 2;
   cone.visible = settings.showCones;
   // Aus Fit/Fit-Auswahl-Bounds ausschliessen: der Kegel ist bis zu 8 m lang und
