@@ -123,14 +123,29 @@ class PlaceGhostSceneTest(unittest.TestCase):
         self._poll_until_true("!!window.__lightosAppReady")
 
     def _eval(self, js):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js, lambda r: box.append(r))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(box, f"runJavaScript ohne Callback: {js}")
-        return box[0]
+        self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js}")
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js}': {wert}")
+        return wert
 
     def _poll_until_true(self, js, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -152,6 +167,28 @@ class PlaceGhostSceneTest(unittest.TestCase):
             f"{{clientX: {x}, clientY: {y}, bubbles: true}})); true")
         _pump(0.2)
 
+    def _zurueck_auf_den_schirm(self, x, z):
+        """Den Boden-Punkt (x, 0, z) mit der Kamera der Szene zurueck auf den
+        Bildschirm rechnen — Gegenrichtung von `intersectGround()`.
+
+        ★ QA-VIZ-TESTS (2026-08-05): der Test belegte bisher nur, dass der Geist
+        sich BEWEGT. Eine vertauschte oder gespiegelte Achse haette er bestanden,
+        obwohl der Geist dann irgendwo anders stuende als der Zeiger — und genau
+        das ist die Zusicherung („folgt dem Zeiger"). Der Rueckweg prueft sie
+        ohne jede Annahme ueber die Kamerastellung: die Kamera steht schraeg,
+        Bildschirm-X und Welt-X sind NICHT dieselbe Achse.
+        Vector3 kommt ueber `.clone()` einer vorhandenen Position — das
+        THREE-Modul selbst ist nicht global.
+        """
+        roh = self._eval(
+            "JSON.stringify((function(){"
+            " var cam = window.__lightos.view.activeCam;"
+            f" var p = cam.position.clone().set({x}, 0, {z}).project(cam);"
+            " var r = document.querySelector('canvas').getBoundingClientRect();"
+            " return [((p.x + 1) / 2) * r.width + r.left,"
+            "         ((1 - p.y) / 2) * r.height + r.top];})())")
+        return json.loads(roh)
+
     def test_geist_folgt_dem_zeiger_nur_wenn_es_etwas_zu_platzieren_gibt(self):
         self._load_and_wait()
         self._eval("window.__lightos.setEditMode('edit'); true")
@@ -172,6 +209,19 @@ class PlaceGhostSceneTest(unittest.TestCase):
         self.assertNotEqual((round(g1["x"], 2), round(g1["z"], 2)),
                             (round(g2["x"], 2), round(g2["z"], 2)),
                             "der Geist folgt dem Zeiger nicht")
+
+        # ★ und er steht WO der Zeiger hinzeigt, nicht bloss irgendwo anders:
+        # den Bodenpunkt des Geistes zurueck auf den Schirm rechnen und mit der
+        # Zeigerposition vergleichen. Das Raster (settings.gridStep, 1 m) rundet
+        # den Punkt — bei rund 20 px je Meter sind das bis zu ~10 px; 60 px
+        # Toleranz laesst das durch und faengt eine vertauschte/gespiegelte
+        # Achse trotzdem sicher (die liegt hunderte Pixel daneben).
+        for (px, py), g in (((360, 300), g1), ((520, 380), g2)):
+            sx, sy = self._zurueck_auf_den_schirm(g["x"], g["z"])
+            self.assertLess(
+                ((sx - px) ** 2 + (sy - py) ** 2) ** 0.5, 60.0,
+                f"der Geist steht nicht unter dem Zeiger: Zeiger ({px}, {py}), "
+                f"Geist bei ({g['x']}, {g['z']}) = Schirm ({sx:.0f}, {sy:.0f})")
 
         # (4) er faengt keine Eingabe: ein Strahl von schraeg oben mitten
         # durch ihn darf ihn NICHT treffen — sonst schluckte ausgerechnet die

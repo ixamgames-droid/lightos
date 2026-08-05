@@ -143,14 +143,29 @@ class DeselectSceneTest(unittest.TestCase):
         self.fail("JS hat den WebChannel nicht verdrahtet")
 
     def _eval(self, js_expr):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js_expr) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js_expr, lambda r: box.append(r))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(box, f"runJavaScript ohne Callback: {js_expr}")
-        return box[0]
+        self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js_expr}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js_expr}': {wert}")
+        return wert
 
     def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -198,12 +213,33 @@ class DeselectSceneTest(unittest.TestCase):
                          "Shift addiert zur Auswahl, es waehlt nicht ab")
 
         # (2) Marquee MIT Treffer meldet kein Deselect (normaler Auswahl-Kanal)
+        #
+        # ★ QA-VIZ-TESTS (2026-08-05): zweites Geraet dazu, und die
+        # Auswahl-Meldungen werden VORHER zurueckgesetzt. Bis hierhin stuetzte
+        # sich die einzige Positivkontrolle dieses Tests auf
+        # `assertTrue(_selections)` — und die Liste war durch den Initial-Load
+        # und die drei vorangegangenen LEEREN Marquees laengst gefuellt
+        # (updateOutlines meldet bedingungslos). Waere die Treffer-Auswahl
+        # komplett ausgefallen, waere der Test gruen geblieben. Jetzt zaehlt der
+        # INHALT einer frischen Meldung: "[1,2]" kann nur aus der
+        # Treffer-Berechnung des Marquees stammen — Geraet 2 war vorher NICHT
+        # ausgewaehlt, es muss also im Rechteck gefunden worden sein.
+        self._bridge_obj.fixtureAdded.emit(json.dumps({
+            "fid": 2, "label": "P2", "type": "par", "model": "par", "nHeads": 0,
+            "x": 3, "y": 3, "z": 0, "rotX": 0, "rotY": 0, "rotZ": 0}))
+        self._poll_until_true("Object.keys(window.__lightos.fixtures).length === 2")
         self._eval("window.__lightos.view.selectedFids = [1]; true")
+        self._bridge_obj._selections = []
         self._marquee(0, 0, 800, 600)
         self.assertEqual(getattr(self._bridge_obj, "_cleared", 0), 1,
                          "ein Marquee mit Treffern ist kein Deselect")
-        self.assertTrue(getattr(self._bridge_obj, "_selections", []),
-                        "die normale Auswahl-Meldung muss weiter laufen")
+        frisch = list(getattr(self._bridge_obj, "_selections", []))
+        self.assertIn("[1,2]", frisch,
+                      "das Marquee hat die getroffenen Geraete nicht gemeldet — "
+                      f"die Treffer-Auswahl laeuft nicht (Meldungen: {frisch!r})")
+        self.assertEqual(
+            self._eval("JSON.stringify(window.__lightos.view.selectedFids)"), "[1,2]",
+            "die Szene selbst haelt nach dem Treffer-Marquee nicht beide Geraete")
 
 
 if __name__ == "__main__":

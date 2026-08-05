@@ -21,6 +21,7 @@ folgt der SICHTBAREN Anordnung, nicht der fid, (6) unbekannte Form fasst nichts
 an, (7) eine Ein-Geraet-Auswahl bleibt unberuehrt.
 """
 import json
+import math
 import os
 import time
 import unittest
@@ -147,14 +148,29 @@ class ArrangeSceneTest(unittest.TestCase):
         self.fail("JS hat den WebChannel nicht verdrahtet")
 
     def _eval(self, js_expr):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js_expr) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
         self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
-        return box[0]
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js_expr}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js_expr}': {wert}")
+        return wert
 
     def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -238,11 +254,32 @@ class ArrangeSceneTest(unittest.TestCase):
             " for (var k in f) if (Math.abs(f[k].group.position.z) > 0.001) return true;"
             " return false;})()")
         p = self._positionen()
-        cx = sum(v[0] for v in p.values()) / 4
-        cz = sum(v[1] for v in p.values()) / 4
-        radien = [((v[0] - cx) ** 2 + (v[1] - cz) ** 2) ** 0.5 for v in p.values()]
-        for r in radien:
-            self.assertAlmostEqual(r, 5.0, places=2, msg=f"Radien: {radien}")
+        # ★ QA-VIZ-TESTS (2026-08-05): der Mittelpunkt kommt aus dem
+        # URSPRUENGLICHEN Schwerpunkt, nicht aus dem Ergebnis. Vorher wurde er
+        # aus den vier neuen Positionen gemittelt — die Rechnung war zirkulaer:
+        # ein Kreis, der in den Weltnullpunkt springt, hat um SEINEN eigenen
+        # Mittelpunkt herum ebenfalls ueberall Radius 5, der Test blieb gruen.
+        # (Reihe und Raster oben halten den Schwerpunkt, er ist hier also
+        # unveraendert mitte_x/mitte_z — genau das prueft die Zeile mit.)
+        for fid, v in p.items():
+            r = ((v[0] - mitte_x) ** 2 + (v[1] - mitte_z) ** 2) ** 0.5
+            self.assertAlmostEqual(
+                r, 5.0, places=2,
+                msg=f"Geraet {fid} liegt nicht auf dem Kreis um den Schwerpunkt "
+                    f"({mitte_x:.3f}/{mitte_z:.3f}): r={r:.3f}")
+        # ★ und die Winkelabstaende: vier Geraete gehoeren gleichmaessig verteilt.
+        # Ohne das bestuende auch ein "Kreis", auf dem alle vier dicht an einer
+        # Stelle kleben — Radius stimmt, Formation ist trotzdem keine.
+        winkel = sorted(
+            math.degrees(math.atan2(v[1] - mitte_z, v[0] - mitte_x)) % 360
+            for v in p.values())
+        abstaende = [(b - a) for a, b in zip(winkel, winkel[1:])]
+        abstaende.append(360 - (winkel[-1] - winkel[0]))
+        for d in abstaende:
+            self.assertAlmostEqual(
+                d, 90.0, places=1,
+                msg=f"die Geraete stehen nicht gleichmaessig auf dem Kreis: "
+                    f"Winkel {[round(w, 1) for w in winkel]}")
 
         # (6) unbekannte Form fasst nichts an
         vor_unbekannt = self._positionen()

@@ -144,14 +144,29 @@ class ModeFrameSceneTest(unittest.TestCase):
         self.assertTrue(self._loaded_ok[-1], "loadFinished(ok=False)")
 
     def _eval(self, js_expr):
+        # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
+        # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
+        # Stellen wird der Rueckgabewert ohnehin verworfen ("...; true"), ein
+        # TypeError mitten im Ausdruck sah damit aus wie ein bestandener
+        # Schritt. Die Huelle faengt den Wurf im Seitenkontext und macht ihn zum
+        # Testfehler, statt ihn zu verschlucken.
+        # (0,eval) ist INDIREKTES eval: es liefert den Completion-Wert der
+        # LETZTEN Anweisung — "a(); true" bleibt also true, die bestehenden
+        # Aufrufe behalten ihre Bedeutung unveraendert.
+        _huelle = ("(function(){try{return JSON.stringify(['ok',(0,eval)("
+                   + json.dumps(js_expr) + ")]);}"
+                   "catch(e){return JSON.stringify(['err',String(e)]);}})()")
         box = []
-        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
+        self._view.page().runJavaScript(_huelle, lambda result: box.append(result))
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while not box and time.monotonic() < deadline:
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
         self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
-        return box[0]
+        self.assertTrue(box[0], f"runJavaScript lieferte nichts fuer: {js_expr}")
+        art, wert = json.loads(box[0])
+        self.assertNotEqual(art, "err", f"JS warf bei '{js_expr}': {wert}")
+        return wert
 
     def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
         deadline = time.monotonic() + timeout_s
@@ -222,6 +237,35 @@ class ModeFrameSceneTest(unittest.TestCase):
         self.assertEqual(
             self._eval(f"getComputedStyle({self.F}).pointerEvents"), "none",
             "#mode-frame ist interaktiv (schluckt Canvas-Klicks -> Auswahl/Gizmo/Orbit tot)")
+        # ★ QA-VIZ-TESTS (2026-08-05): auch JEDES KIND muss durchlassen.
+        # `pointer-events` wird zwar vererbt, ein Kind darf es aber auf `auto`
+        # zurueckstellen — und faengt dann in seinem Rechteck die Klicks ab,
+        # waehrend die Pruefung am Elternteil weiter gruen bleibt. Der Chip sitzt
+        # in der oberen rechten Ecke, genau ueber dem Canvas. Getroffen haette
+        # das bisher niemand.
+        durchlaessig = self._eval(
+            f"Array.prototype.every.call({self.F}.querySelectorAll('*'),"
+            " function(e){ return getComputedStyle(e).pointerEvents === 'none'; })")
+        self.assertEqual(
+            durchlaessig, True,
+            "ein Kind des Modus-Rahmens ist interaktiv und schluckt in seiner "
+            "Ecke die Canvas-Klicks")
+        # ★ und der Rahmen liegt wirklich VOLLFLAECHIG darueber — sonst waere die
+        # Zusicherung oben folgenlos und der Test ein Papiertiger. `inset: 0` auf
+        # `position: fixed` deckt den ganzen Sichtbereich ab, `z-index` legt ihn
+        # ueber das Canvas.
+        lage = self._eval(
+            f"(function(){{var s = getComputedStyle({self.F});"
+            " return [s.position, s.top, s.right, s.bottom, s.left,"
+            "         Number(s.zIndex)].join('|');})()")
+        teile = lage.split("|")
+        self.assertEqual(teile[0], "fixed",
+                         f"der Modus-Rahmen liegt nicht ueber dem Canvas: {lage}")
+        self.assertTrue(
+            all(v in ("0px", "auto") for v in teile[1:5]),
+            f"der Modus-Rahmen deckt nicht den ganzen Sichtbereich: {lage}")
+        self.assertGreater(int(teile[5]), 0,
+                           f"der Modus-Rahmen liegt nicht ueber dem Canvas: {lage}")
 
     def test_umschalten_treibt_rahmen_und_chip(self):
         """Direkt-Drive ueber die exponierte setEditMode — beide Bauen-Varianten
