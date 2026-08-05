@@ -1,0 +1,32 @@
+[
+  {
+    "num": 1,
+    "name": "EventPar (Art-Net .99)",
+    "output": "ArtNet",
+    "patch": "255.255.255.255"
+  },
+  {
+    "num": 3,
+    "name": "Hydra (Enttec /dev/ttyUSB0)",
+    "output": "Enttec",
+    "patch": "COM_FAKE"
+  },
+  {
+    "num": 4,
+    "name": "Universe 4",
+    "output": "ArtNet",
+    "patch": "255.255.255.255"
+  },
+  {
+    "num": 2,
+    "name": "Universe 2",
+    "output": "sACN",
+    "patch": ""
+  },
+  {
+    "num": 5,
+    "name": "Universe 5",
+    "output": "sACN",
+    "patch": ""
+  }
+]

@@ -2820,6 +2820,72 @@ def _stair_pp144_programs(first: int, last_label: str):
     return ranges
 
 
+
+def _zq06121_zonen(count: int, praefix: str):
+    """``count`` Zonen als je [Rot, Gruen, Blau], 1-basiert benannt."""
+    kanaele = []
+    for i in range(1, count + 1):
+        kanaele.append((f"{praefix}{i} Rot", "color_r", 0, 255))
+        kanaele.append((f"{praefix}{i} Gruen", "color_g", 0, 255))
+        kanaele.append((f"{praefix}{i} Blau", "color_b", 0, 255))
+    return kanaele
+
+
+def _add_uking_zq06121(s, mfr):
+    """U King / FODEXAZY ZQ06121 — 200-W-LED-Balken, 768 RGB + 96 weisse LEDs.
+
+    Davids Geraet (2026-08-05, am Enttec auf Universe 3). Auf dem Typenschild
+    steht als Modellname nur „stage light", die Typnummer ist ZQ06121; dieselbe
+    Nummernfamilie wie das bereits vorhandene ZQ02001.
+
+    ⚠️ HERLEITUNG STATT CHART — und das gehoert hierher, nicht in eine Fussnote.
+    Die Kanaltabelle des Herstellers war nicht zu beschaffen: die Handbuchseiten
+    liefern 404/403, der GDTF-Eintrag ist verschwunden. BELEGT sind aus
+    Produktbeschreibung und Datenblatt nur: 200 W, 768 RGB-SMD + 96 weisse LEDs,
+    und die Modi 4/6/12/144/154 Kanaele.
+
+    Daraus ergibt sich genau EINE Zerlegung, die aufgeht:
+
+        48 Zonen x RGB           = 144   (= der 144-Kanal-Modus)
+        +  8 Weiss-Zonen         =   8
+        +  Dimmer + Strobe       =   2
+        ---------------------------------
+                                   154
+
+    Was daraus NICHT folgt, ist die REIHENFOLGE — ob Dimmer/Strobe vorn oder
+    hinten sitzen und wo die acht Weiss-Zonen liegen. Diese Fassung nimmt die
+    branchenuebliche Anordnung (Dimmer, Strobe, dann die Zonen, Weiss zuletzt)
+    und ist damit eine BEGRUENDETE ANNAHME, kein Beleg.
+
+    ★ Deshalb traegt der Modusname das Wort „ungeprueft". Ein geratenes Profil,
+    das sich als geprueft ausgibt, ist schlimmer als gar keins: man sucht den
+    Fehler dann am Geraet. Sobald am echten Balken nachgesehen ist, faellt das
+    Wort weg — und falls die Reihenfolge anders ist, wird sie hier korrigiert.
+
+    Sicherheits-Defaults wie bei den uebrigen Panels: Dimmer 0 und Strobe 0.
+    Beim ERSTEN Patchen soll nichts von selbst hell werden oder blitzen — bei
+    einem 200-W-Balken mit 768 LEDs ist das kein theoretischer Komfortpunkt.
+    """
+    _add_fixture(s, mfr, "ZQ06121 LED-Balken 768 (stage light)", "ZQ06121",
+                 "matrix", 200, [
+        ("154-Kanal 48 Zonen RGB + 8x Weiss (ungeprueft)", [
+            ("Dimmer", "intensity", 0, 255),
+            ("Strobe langsam->schnell", "shutter", 0, 0, _SIMPLE_STROBE),
+        ] + _zq06121_zonen(48, "Zone ") + [
+            # Acht Weiss-Zonen. Bewusst ALLE als `color_w`: die attr#N-Konvention
+            # macht daraus color_w, color_w#1 … color_w#7 — dieselbe Mechanik,
+            # mit der die 48 RGB-Zonen zu Koepfen werden.
+            #
+            # Anmerkung fuer spaeter: die Kopfzahl leitet sich aus `color_r` ab,
+            # also 48. Die acht Weiss-Zonen landen damit auf den Koepfen 1-8,
+            # obwohl sie physisch vermutlich je SECHS RGB-Zonen abdecken. Das
+            # ist erst zu klaeren, wenn die Reihenfolge am Geraet feststeht —
+            # vorher waere jede Zuordnung genauso geraten wie die Reihenfolge.
+            (f"Weiss-Zone {i}", "color_w", 0, 255) for i in range(1, 9)
+        ]),
+        ("144-Kanal 48 Zonen RGB (ungeprueft)", _zq06121_zonen(48, "Zone ")),
+    ])
+
 def _add_stairville_pp144(s, mfr):
     """Stairville Pixel Panel 144 RGB (12×12 = 144 SMD-RGB-Pixel, 65 W).
 
@@ -3023,6 +3089,9 @@ def ensure_builtins():
             changed = True
         if "STAIRPP144" not in have:                      # FM-13 Slice 2: reale Panels
             _add_stairville_pp144(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+            changed = True
+        if "ZQ06121" not in have:                         # Davids LED-Balken (2026-08-05)
+            _add_uking_zq06121(s, _get_or_create_mfr(s, "U King", "UKING"))
             changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
