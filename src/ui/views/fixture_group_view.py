@@ -174,6 +174,11 @@ class FixtureGridWidget(QWidget):
     """
 
     positions_changed = Signal()
+    # FM-20: Rechtsklick auf eine Rasterzelle. Das Widget MELDET nur (Spalte,
+    # Zeile, Bildschirmpunkt) — gebaut wird das Menue von der View, die als
+    # einzige an Geraetedaten und Undo kommt. Gleiche Aufteilung wie in der
+    # Live-View (`context_menu_requested`), damit es nur EIN Muster gibt.
+    cell_context_menu = Signal(int, int, QPoint)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -358,6 +363,103 @@ class FixtureGridWidget(QWidget):
             placed.append(cell)
         return placed
 
+    def contextMenuEvent(self, event):
+        """Rechtsklick auf eine Zelle -> die View baut das Menue (FM-20).
+
+        Bewusst ueber ``contextMenuEvent`` und nicht im ``mousePressEvent``:
+        so kommt das Menue auch ueber die Kontextmenue-Taste der Tastatur und
+        auf Plattformen, die es anders ausloesen.
+        """
+        col, row = self._cell_at(event.pos())
+        if not (0 <= col < self.cols and 0 <= row < self.rows):
+            return
+        self.cell_context_menu.emit(col, row, event.globalPos())
+        event.accept()
+
+    def remove_cell(self, col: int, row: int) -> bool:
+        """Eine einzelne Zelle leeren. Rueckgabe: ob dort etwas war."""
+        if (col, row) not in self.positions:
+            return False
+        del self.positions[(col, row)]
+        return True
+
+    def place_fixture_block(self, fid: int, count: int, block_cols: int,
+                            col: int | None = None, row: int | None = None,
+                            *, order: str = "rowwise",
+                            rotation: int = 0, flip: bool = False
+                            ) -> list[tuple[int, int]]:
+        """FM-20: setzt die ``count`` Köpfe als RECHTECK ab statt als Streifen.
+
+        Der Streifen (``place_fixture_heads``) ist die richtige Form für eine
+        Bar — für ein Panel ist er falsch. Davids ZQ06121 hat 48 Zonen in 4
+        Reihen à 12; als 1×48-Streifen läuft darauf jeder Flächeneffekt als
+        Linie, und von Hand sind es 48 Zieh-Vorgänge.
+
+        ★ HIER wird ``pixel_order`` zum ersten Mal ausserhalb der 3D-Vorschau
+        wirksam. `place_element` verrechnet beides in einem Schritt: wie das
+        GERÄT nummeriert (Werkszustand/Schlangenlinie) und wie es HÄNGT
+        (Montage-Drehung, FM-ORIENT). Ein Panel, das ab Werk in Schlangenlinien
+        zählt und hochkant montiert ist, landet damit ohne Handarbeit richtig
+        im Raster — genau die Verbindung, die in FM-21 als fehlend notiert ist.
+
+        ``block_cols`` ist die Breite des Blocks VOR der Drehung. Bei 90°/270°
+        tauschen Zeilen und Spalten die Rollen, der belegte Bereich ist dann
+        entsprechend hoch statt breit; die tatsächlichen Maße kommen deshalb aus
+        `place_element` selbst und werden nicht danebenher gerechnet (FM16E:
+        genau daran laufen zwei Fassungen auseinander).
+
+        Regeln bewusst identisch zu ``place_fixture_heads``: eigene Zellen
+        zuerst freigeben (Move statt Duplikat), Block zusammenhängend halten
+        indem der Start zurückgeschoben wird, kein stilles Überschreiben
+        (Ausweichen auf die nächste freie Zelle), bei vollem Raster bleibt der
+        Rest ungesetzt statt etwas zu zerstören.
+
+        Rückgabe: die belegten Zellen in Kopf-Reihenfolge.
+        """
+        from src.core.pixel_order import place_element
+        try:
+            count = int(count)
+            block_cols = int(block_cols)
+        except (TypeError, ValueError):
+            return []
+        if count < 1 or block_cols < 1:
+            return []
+        block_rows = (count + block_cols - 1) // block_cols
+
+        # Maße NACH der Drehung aus derselben Quelle holen, die auch die Zellen
+        # rechnet — sonst driften Vorab-Klemmung und tatsächliche Belegung.
+        _r0, _c0, eff_rows, eff_cols = place_element(
+            0, block_cols, block_rows, order, rotation, flip)
+
+        self._drop_fid_cells(fid)
+        if col is None or row is None:
+            _free = self.first_free_cells(1)
+            want_c, want_r = _free[0] if _free else (0, 0)
+        else:
+            want_c, want_r = int(col), int(row)
+        start_c = max(0, min(want_c, self.cols - 1))
+        start_r = max(0, min(want_r, self.rows - 1))
+        if eff_cols <= self.cols:
+            start_c = min(start_c, self.cols - eff_cols)
+        if eff_rows <= self.rows:
+            start_r = min(start_r, self.rows - eff_rows)
+
+        placed: list[tuple[int, int]] = []
+        for h in range(count):
+            rr, cc, _nr, _nc = place_element(
+                h, block_cols, block_rows, order, rotation, flip)
+            c = start_c + cc
+            r = start_r + rr
+            if not (0 <= c < self.cols and 0 <= r < self.rows) or (c, r) in self.positions:
+                cell = self._nearest_free_cell(c, r)
+            else:
+                cell = (c, r)
+            if cell is None:
+                break               # Raster voll -> Rest bleibt ungesetzt
+            self.positions[cell] = f"{fid}:{h}"
+            placed.append(cell)
+        return placed
+
     def collapse_fixture_heads(self, fid: int) -> tuple[int, int] | None:
         """Gegenstück zu ``place_fixture_heads``: die Kopf-Zellen dieses fid durch
         EINE Ganz-Fixture-Zelle ersetzen (an der ersten bisherigen Kopf-Zelle in
@@ -523,12 +625,11 @@ class FixtureGridWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton:
-            # Right-click: remove fixture from cell
-            col, row = self._cell_at(event.position().toPoint())
-            if (col, row) in self.positions:
-                del self.positions[(col, row)]
-                self.update()
-                self.positions_changed.emit()
+            # FM-20: Rechtsklick loeschte die Zelle bis 2026-08-05 SOFORT und
+            # ohne Nachfrage — die einzige Rechtsklick-Aktion im ganzen Raster.
+            # Jetzt oeffnet er ein Menue (contextMenuEvent), „Zelle entfernen"
+            # ist dort der erste Eintrag. Hier bleibt nur das Verschlucken des
+            # Klicks, damit er nicht in den Links-Drag-Pfad darunter faellt.
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
@@ -792,6 +893,8 @@ class FixtureGroupView(QWidget):
 
         # Signal: Raster-Änderungen → Hervorhebung aktualisieren
         self._grid_widget.positions_changed.connect(self._highlight_group_members)
+        # FM-20: Rechtsklick auf eine Zelle → Kontextmenü (siehe _on_cell_menu)
+        self._grid_widget.cell_context_menu.connect(self._on_cell_menu)
 
         self._refresh_fixtures()
 
@@ -1342,6 +1445,174 @@ class FixtureGroupView(QWidget):
         if len(in_group) == 1:
             return int(in_group[0])
         return None
+
+    # ── FM-20: Rechtsklick-Menü im Raster ────────────────────────────────────
+
+    def _fixture_by_fid(self, fid: int):
+        return next((f for f in self._state.get_patched_fixtures()
+                     if f.fid == int(fid)), None)
+
+    def _on_cell_menu(self, col: int, row: int, global_pos):
+        """Rechtsklick-Menü bauen und anzeigen."""
+        menu = self._build_cell_menu(col, row)
+        if menu is None:
+            return
+        menu.exec(global_pos)
+
+    def _build_cell_menu(self, col: int, row: int):
+        """Menü für die ANGEKLICKTE Zelle — gebaut, aber NICHT gezeigt.
+
+        ★ Bewusst getrennt vom Anzeigen. `QMenu.exec` blockiert, bis jemand
+        klickt; ein Test, der den Inhalt prüfen will, müsste also entweder das
+        Menü aufreissen (headless unmöglich) oder `exec` wegpatchen — was bei
+        PySide6-Klassen nicht zuverlässig greift und den Lauf schlicht HÄNGEN
+        liess statt zu scheitern. Getrennt ist der Menüinhalt eine ganz normale,
+        prüfbare Rückgabe.
+
+        ★ Der Punkt dabei ist nicht das Menü, sondern woher das Zielgerät kommt:
+        aus der Zelle unter dem Mauszeiger. „Köpfe einzeln → Raster" und
+        „zusammenfassen" gab es schon, aber nur als Knöpfe, die das Gerät aus
+        der Baum-Auswahl LINKS nehmen — man musste also erst dort das richtige
+        Gerät finden, obwohl man mit der Maus längst auf ihm stand. Genau das
+        meinte David mit „intuitiv".
+        """
+        gw = self._grid_widget
+        wert = gw.positions.get((col, row))
+        fid, head = _split_cell(wert) if wert is not None else (None, None)
+        fx = self._fixture_by_fid(fid) if fid is not None else None
+
+        menu = QMenu(self)
+        if wert is not None:
+            act_del = menu.addAction("Zelle entfernen")
+            act_del.triggered.connect(lambda: self._cell_menu_remove(col, row))
+
+        if fx is not None:
+            from src.core.app_state import color_head_count
+            try:
+                n = int(color_head_count(fx))
+            except Exception:
+                n = 0
+            name = getattr(fx, "label", "") or f"Gerät {fid}"
+            if head is None and n >= 2:
+                # Ganze-Geräte-Zelle mit mehreren Köpfen -> aufteilen anbieten.
+                menu.addSeparator()
+                sub = menu.addMenu(f'„{name}“ aufteilen ({n} Elemente)')
+                sub.addAction("als Zeile").triggered.connect(
+                    lambda: self._cell_menu_split(fx, n, "row", col, row))
+                sub.addAction("als Spalte").triggered.connect(
+                    lambda: self._cell_menu_split(fx, n, "col", col, row))
+                sub.addAction("als Block…").triggered.connect(
+                    lambda: self._cell_menu_split(fx, n, "block", col, row))
+            elif head is not None:
+                menu.addSeparator()
+                menu.addAction(f'„{name}“ zu einer Zelle zusammenfassen'
+                               ).triggered.connect(
+                    lambda: self._cell_menu_collapse(fx))
+            if fid is not None:
+                menu.addSeparator()
+                menu.addAction(f'Alle Zellen von „{name}“ entfernen'
+                               ).triggered.connect(
+                    lambda: self._cell_menu_drop_all(fid))
+
+        return None if menu.isEmpty() else menu
+
+    def _cell_menu_remove(self, col: int, row: int):
+        gw = self._grid_widget
+        if gw.remove_cell(col, row):
+            gw.update()
+            gw.positions_changed.emit()
+
+    def _cell_menu_drop_all(self, fid: int):
+        gw = self._grid_widget
+        gw._drop_fid_cells(int(fid))
+        gw.update()
+        gw.positions_changed.emit()
+
+    def _cell_menu_collapse(self, fx):
+        gw = self._grid_widget
+        if gw.collapse_fixture_heads(fx.fid) is None:
+            return
+        gw.update()
+        gw.positions_changed.emit()
+
+    def _cell_menu_split(self, fx, n: int, wie: str, col: int, row: int):
+        """Aufteilen an der angeklickten Stelle — Zeile, Spalte oder Block."""
+        gw = self._grid_widget
+        titel = "Aufteilen"
+        if wie == "block":
+            spalten = self._ask_block_cols(n)
+            if spalten is None:
+                return
+            drehung = int(getattr(fx, "element_rotation", 0) or 0)
+            self._grow_grid_for_block(n, spalten, rotation=drehung)
+            placed = gw.place_fixture_block(
+                fx.fid, n, spalten, col, row,
+                order=getattr(fx, "pixel_order", "rowwise") or "rowwise",
+                rotation=drehung,
+                flip=bool(getattr(fx, "element_flip", False)))
+        else:
+            vertical = (wie == "col")
+            self._grow_grid_for_strip(n, vertical=vertical)
+            placed = gw.place_fixture_heads(fx.fid, n, col, row,
+                                            vertical=vertical)
+        if not placed:
+            QMessageBox.information(self, titel,
+                                    "Im Raster ist keine Zelle frei — erst "
+                                    "Spalten/Reihen erhöhen oder Platz machen.")
+            return
+        if len(placed) < n:
+            QMessageBox.information(
+                self, titel,
+                f"Nur {len(placed)} von {n} Elementen platziert — das Raster "
+                "war voll. Rest nach dem Vergrößern erneut einfügen.")
+        gw.update()
+        gw.positions_changed.emit()
+
+    def _ask_block_cols(self, n: int) -> int | None:
+        """Spaltenzahl für den Block erfragen — vorbelegt mit einem TEILER von
+        ``n``, damit der Block aufgeht (48 -> 12, nicht 7). Ein Rest wäre kein
+        Fehler (die letzte Zeile bliebe kürzer), aber bei einem Panel ist eine
+        angebrochene Zeile fast immer ein Vertipper."""
+        teiler = [t for t in range(2, n) if n % t == 0]
+        vorschlag = min(teiler, key=lambda t: abs(t - (n ** 0.5)), default=n)
+        wert, ok = QInputDialog.getInt(
+            self, "Als Block aufteilen",
+            f"Spalten (bei {n} Elementen):", vorschlag, 1, max(1, n), 1)
+        return int(wert) if ok else None
+
+    def _grow_grid_for_block(self, n: int, spalten: int, *,
+                             rotation: int = 0):
+        """Raster gross genug machen, sonst greift die Ausweich-Regel und die
+        Blockform kippt — dieselbe Falle wie beim Streifen
+        (`_grow_grid_for_strip`), nur in zwei Richtungen statt einer.
+
+        ★ Bei 90°/270° tauschen Breite und Höhe die Rollen: ein 12×4-Panel
+        braucht hochkant ein 4×12-Raster. Ohne diesen Tausch wäre das Raster in
+        der falschen Richtung zu klein, die Köpfe wichen aus, und das Ergebnis
+        sähe nach einem Fehler in der Drehung aus statt nach einem zu kleinen
+        Raster.
+
+        Verkleinert NIE, und zieht die Spinboxen mit ``blockSignals`` nach —
+        sonst läuft ``_apply_grid_size`` re-entrant (gleiche Begründung wie in
+        ``_grow_grid_for_strip`` und ``_add_all_fixtures``).
+        """
+        zeilen = (n + spalten - 1) // spalten
+        if int(rotation) % 180 == 90:
+            spalten, zeilen = zeilen, spalten
+        gw = self._grid_widget
+        cols, rows = gw.cols, gw.rows
+        if cols < spalten:
+            cols = spalten
+            self._spin_cols.blockSignals(True)
+            self._spin_cols.setValue(cols)
+            self._spin_cols.blockSignals(False)
+        if rows < zeilen:
+            rows = zeilen
+            self._spin_rows.blockSignals(True)
+            self._spin_rows.setValue(rows)
+            self._spin_rows.blockSignals(False)
+        if (cols, rows) != (gw.cols, gw.rows):
+            gw.set_grid(cols, rows)
 
     def _selected_tree_fixture(self, title: str):
         """Das Zielgerät (oder ``None`` + Hinweis-Dialog, der die blaue Markierung

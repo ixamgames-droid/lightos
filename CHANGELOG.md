@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Rechtsklick im Gruppenraster, und Panels lassen sich als Block anordnen
+
+#### Neu
+
+- **Rechtsklick auf eine Zelle im Gruppen-Raster oeffnet jetzt ein Menue.**
+  Bisher loeschte er die Zelle sofort und ohne Nachfrage — das war die einzige
+  Rechtsklick-Aktion im ganzen Raster. „Zelle entfernen" ist weiterhin der
+  erste Menuepunkt, dazu kommen:
+
+  - **„… aufteilen"** — ein Mehrelement-Geraet in seine Einzelelemente
+    zerlegen, wahlweise als Zeile, Spalte oder **Block**.
+  - **„… zu einer Zelle zusammenfassen"** — der Rueckweg.
+  - **„Alle Zellen von … entfernen"**.
+
+  Die beiden Aufteil-Funktionen gab es schon, aber nur als Knoepfe, die ihr
+  Zielgeraet aus der Baum-Auswahl LINKS nahmen: man musste dort erst das
+  richtige Geraet suchen, obwohl man mit der Maus laengst darauf stand. Jetzt
+  gilt das Geraet unter dem Mauszeiger.
+
+- **„Als Block aufteilen" ordnet ein Panel als Rechteck an statt als Streifen.**
+  Ein Panel mit 48 Zonen lag bisher als 1x48-Reihe im Raster — jeder
+  Flaechen-Effekt lief darauf als Linie, und von Hand waren es 48 einzelne
+  Zieh-Vorgaenge. Der Block fragt nach der Spaltenzahl (vorbelegt mit einem
+  Teiler, damit er aufgeht) und beruecksichtigt dabei **beides**: wie das
+  Geraet seine Pixel nummeriert und wie es haengt. Ein Panel, das ab Werk in
+  Schlangenlinien zaehlt und hochkant montiert ist, landet damit ohne
+  Handarbeit richtig im Raster.
+
+
 ### 2026-08-05 — Davids LED-Balken ist am Geraet bestaetigt
 
 #### Geaendert
