@@ -201,6 +201,28 @@ def _save_universe_config(rows: list[dict]) -> None:
         print(f"[output_config] save universes error: {e}")
 
 
+def _gespeichertes_enttec_universum(vorgabe: int = 1) -> int:
+    """Universumsnummer der gespeicherten Enttec-Zeile (OUT-ENTTECUNIV).
+
+    Liefert die Nummer des Universums, das zuletzt auf Enttec stand. Gibt es
+    mehrere, gewinnt die KLEINSTE — willkuerlich, aber vorhersehbar; ein Enttec
+    Pro hat ohnehin nur einen Ausgang, mehrere Zeilen sind bereits ein
+    Konfigurationsfehler.
+
+    Ohne gespeicherte Enttec-Zeile bleibt es bei ``vorgabe`` (1) — das ist der
+    Zustand einer frischen Installation und dort auch richtig.
+    """
+    nummern = []
+    for r in _load_universe_config():
+        try:
+            if (r.get("output") or "").strip() == "Enttec":
+                nummern.append(int(r.get("num", 0)))
+        except (TypeError, ValueError):
+            continue
+    gueltig = [n for n in nummern if 1 <= n <= 32]
+    return min(gueltig) if gueltig else int(vorgabe)
+
+
 _UNSET = object()   # A3D-15: "Argument nicht uebergeben" vs. explizit None unterscheiden.
 
 
@@ -270,6 +292,25 @@ class OutputConfigDialog(QDialog):
 
         self._spin_enttec_univ = QSpinBox()
         self._spin_enttec_univ.setRange(1, 32)
+        # ★ OUT-ENTTECUNIV: die gespeicherte Universumsnummer VORBELEGEN.
+        #
+        # Ohne das stand die Spinbox bei jedem Oeffnen des Ausgabe-Tabs auf dem
+        # Minimum der Range, also auf 1 — der gespeicherte Wert wurde nie
+        # gelesen (vier Fundstellen fuer dieses Widget, davon KEINE ladend).
+        # Ein Klick auf „Verbinden" nahm dann diese 1, oeffnete den Enttec auf
+        # Universum 1 und schrieb das ueber `_persist_output` auch noch zurueck
+        # in universes.json.
+        #
+        # Folgen, die genau so bei David auftraten (2026-08-05, echtes Geraet):
+        #  * Sein Balken haengt auf Universum 3. Nach jedem Besuch des
+        #    Ausgabe-Tabs sendete LightOS Universum 1 auf die Leitung — einen
+        #    LEEREN Puffer. Gemessen: Puffer U3 = 145 Kanaele > 0, gesendet
+        #    wurden 0 Bytes > 0. Die Software rechnete richtig und schickte das
+        #    falsche Universum.
+        #  * Die Auswahl „hielt nicht": Tab zu, Tab auf, wieder Universum 1.
+        #  * Und es erklaert HW-5c — den seit Wochen offenen „Rueckfall in
+        #    universes.json, Ursache offen". Die Ursache war dieses Widget.
+        self._spin_enttec_univ.setValue(_gespeichertes_enttec_universum())
         ef.addRow("Universe:", self._spin_enttec_univ)
 
         connect_btn = QPushButton("Verbinden")

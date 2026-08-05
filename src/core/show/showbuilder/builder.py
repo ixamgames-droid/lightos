@@ -66,6 +66,8 @@ class ShowBuilder:
         self.fm = get_function_manager()
         self.caps = get_capabilities()
         self._widgets: list = []
+        # VC-AUTOPOS: laufende Nummer je Bank fuer das automatische Raster.
+        self._auto_index: dict[int, int] = {}
         # A3D-35: mehrdeutiger short_name (kein Unique-Constraint) -> deterministisch
         # wählen + laut warnen; strict-Modus (opt-in / CI) macht daraus einen harten
         # BuildError. Default aus der Umgebung, explizites kwarg gewinnt.
@@ -238,12 +240,52 @@ class ShowBuilder:
         return Handle(self.fm.new_chaser(name))
 
     # ── Widgets (bauen ECHTE VC-Objekte -> vollständige, gültige Serialisierung) ─
+    # Automatisches Raster (VC-AUTOPOS). Masse orientieren sich an den von Hand
+    # gesetzten Werten der bestehenden Build-Skripte (Taster 150x66, Regler
+    # 90x230), damit skript- und handgebaute Seiten gleich aussehen.
+    _AP_RAND = 20
+    _AP_SPALTE = 170
+    _AP_ZEILE = 80
+    _AP_PRO_ZEILE = 7
+
+    def _auto_position(self, w, bank: int):
+        """Jedem Widget eine Rasterposition geben, falls der Aufrufer keine setzt.
+
+        ★ Ohne das landet JEDES skriptgebaute Widget auf (0,0) — also alle
+        uebereinander in der linken oberen Ecke. Die bestehenden Build-Skripte
+        umgehen es, indem sie `setGeometry` von Hand rufen; wer das vergisst,
+        bekommt eine Seite, die aussieht als waere sie leer. Genau so passiert
+        am 2026-08-05 mit Davids ZQ06121-Demo: 38 Widgets, gestapelt, und die
+        Show wirkte kaputt, obwohl jede Bindung stimmte.
+
+        Wer weiterhin selbst positioniert, ueberschreibt das hier einfach —
+        `setGeometry` nach dem Anlegen gewinnt.
+        """
+        i = self._auto_index.get(bank, 0)
+        self._auto_index[bank] = i + 1
+        breit, hoch = 150, 66
+        try:
+            from src.ui.virtualconsole.vc_slider import VCSlider
+            if isinstance(w, VCSlider):
+                breit, hoch = 90, 230
+        except Exception:
+            pass
+        spalte = i % self._AP_PRO_ZEILE
+        zeile = i // self._AP_PRO_ZEILE
+        x = self._AP_RAND + spalte * self._AP_SPALTE
+        y = self._AP_RAND + zeile * (self._AP_ZEILE + 180)
+        try:
+            w.setGeometry(x, y, breit, hoch)
+        except Exception:
+            pass
+
     def _add(self, w, bank):
         w.caption = w.caption  # noqa (caption schon im Konstruktor gesetzt)
         try:
             w.bank = int(bank)
         except (TypeError, ValueError):
             w.bank = -1
+        self._auto_position(w, w.bank)
         self._widgets.append(w)
         return w
 
