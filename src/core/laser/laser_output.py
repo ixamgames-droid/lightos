@@ -300,7 +300,13 @@ class LaserOutputManager:
                 min(int(self.limits.max_points), pps // max(1, self.TARGET_FPS)))
         ox = (_prog_value(self._state, fid, "laser_x", 128) - 128) / 127.0
         oy = (_prog_value(self._state, fid, "laser_y", 128) - 128) / 127.0
-        scale = _prog_value(self._state, fid, "zoom", 255) / 255.0
+        # LAS-VIEW (2026-08-05): Default 128 wie beim Testmuster (Zeile ~67).
+        # Vorher stand hier 255 — ohne gesetzten Programmer-Wert war eine
+        # gezeichnete Figur damit DOPPELT so gross wie das Testmuster desselben
+        # Geraets, und der Sprung passierte beim blossen Umschalten der
+        # Framequelle. Ein Default, der von der Quelle abhaengt, ist kein
+        # Default, sondern eine Ueberraschung.
+        scale = _prog_value(self._state, fid, "zoom", 128) / 255.0
         lit = _prog_value(self._state, fid, "shutter", 0) >= 128
         frame = figure.to_frame(n, pps, offset_x=ox, offset_y=oy, scale=scale)
         # Shutter-Gate wie beim Testmuster: unter 128 komplett dunkel.

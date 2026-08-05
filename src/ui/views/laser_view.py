@@ -35,7 +35,19 @@ from src.ui.weak_slots import weak_slot, weak_slot_fwd
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
 LASER_EXTRA_ATTRS = ("shutter", "gobo_wheel", "gobo_rotation", "zoom",
-                     "color_wheel", "macro", "speed")
+                     "color_wheel", "macro", "speed",
+                     # LAS-VIEW (2026-08-05): Profi-Laser bringen einen ganz
+                     # gewoehnlichen Master-Dimmer und RGB mit — der Pangolin
+                     # FB4 hat `intensity`, `color_r/g/b` und `strobe`
+                     # (fixture_db.py, 16ch UND 39ch), der PARTYLASER
+                     # ebenfalls. Keines davon begann mit `laser_`, keines
+                     # stand hier: sie erschienen damit weder in einer
+                     # _ROW_GROUPS-Gruppe noch unter „Weitere Kanaele" (das
+                     # baut sich ausschliesslich aus dem gefilterten Template).
+                     # Praktisch war der MASTER-DIMMER eines FB4 auf der
+                     # Laser-Seite nicht bedienbar — ausgerechnet der Regler,
+                     # den man zuerst sucht.
+                     "intensity", "color_r", "color_g", "color_b", "strobe")
 
 # LAS-11: Die Laser-Regler werden nach Bedeutung gruppiert statt als flache
 # Kanal-Liste gezeigt — die WICHTIGEN Achsen (Muster, Farbe, Geschwindigkeit)
@@ -43,7 +55,12 @@ LASER_EXTRA_ATTRS = ("shutter", "gobo_wheel", "gobo_rotation", "zoom",
 # `shutter` steckt in den Modus-Kacheln, taucht hier NICHT auf.
 _ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
     ("Muster", ("gobo_wheel", "laser_bank")),
-    ("Farbe", ("laser_color_change", "laser_color", "color_wheel")),
+    # Helligkeit steht bewusst GANZ OBEN: Dimmer und Strobe sind das, was man
+    # am Laser als Erstes braucht, und beim FB4 waren sie bis 2026-08-05 gar
+    # nicht erreichbar.
+    ("Helligkeit", ("intensity", "strobe")),
+    ("Farbe", ("laser_color_change", "laser_color", "color_wheel",
+               "color_r", "color_g", "color_b")),
     ("Bewegung & Geschwindigkeit",
      ("speed", "laser_scan_rate", "gobo_rotation", "laser_x", "laser_y",
       "zoom", "laser_zoom_x", "laser_zoom_y")),
