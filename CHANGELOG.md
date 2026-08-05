@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Der Master-Fader am APC mini griff der Oberflaeche in die Speichen
+
+#### Behoben
+
+- **Ein Absturzrisiko am Master-Fader des MIDI-Controllers.** Bewegt man am APC
+  mini den Master-Fader (Werkseinstellung: CC 56 = Grand Master), lief die
+  Nachfuehrung der Oberflaeche — der Regler oben in der Kopfleiste, seine
+  Prozentanzeige und ein etwaiger Grand-Master-Fader auf der Virtuellen Konsole
+  — **direkt im MIDI-Thread** statt im Bedien-Thread. Bedienelemente von aussen
+  anzufassen ist genau das, woran LightOS am **14.06.2026 schon einmal
+  abgestuerzt** ist (damals beim Seitenwechsel per MIDI). Der Schutz dagegen
+  wurde damals eingebaut — aber nur an der Stelle, an der es geknallt hatte; der
+  Grand Master direkt daneben blieb ungeschuetzt. Das ist jetzt nachgeholt.
+
+  > **Ehrlich dazu:** ein Absturz **muss** dabei nicht passieren, und auf diesem
+  > Rechner ist auch keiner beobachtet worden — solche Zugriffe gehen oft lange
+  > gut und kippen dann unter Last oder auf anderer Hardware. Genau deshalb
+  > prueft der neue Test nicht „ist es abgestuerzt?", sondern misst nach, in
+  > **welchem** Thread die Bedienelemente wirklich angefasst werden.
+
+  Am Verhalten aendert sich nichts: der Regler folgt wie bisher, und das
+  Ziehen des VC-Grandmasters mit der Maus laeuft weiterhin ohne Umweg durch
+  (sonst haette der Fader beim Ziehen seinen eigenen Griff-Wert ueberschrieben).
+
 ### 2026-08-05 — Der Netzwerk-Laser zog Linien durch Luecken, die du gezeichnet hattest
 
 #### Behoben
