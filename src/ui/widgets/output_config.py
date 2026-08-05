@@ -39,6 +39,23 @@ _UNIV_CONFIG_PATH = os.environ.get(
 _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 
 
+def _list_ifaces() -> list:
+    """NET-04: NICs fuer die Auswahl — Fehler kosten hoechstens die Liste."""
+    try:
+        from src.core.dmx.output_iface import list_output_interfaces
+        return list_output_interfaces()
+    except Exception:
+        return []
+
+
+def _iface_pref() -> str:
+    try:
+        from src.ui.views.programmer_view import _load_prefs
+        return (_load_prefs().get("output_iface_ip") or "").strip()
+    except Exception:
+        return ""
+
+
 def _effektives_ziel(typ: str, patch: str, extern: int | None = None) -> str:
     """Wohin geht diese Zeile WIRKLICH? — so, wie ``apply_output_config`` es aufloest.
 
@@ -270,6 +287,48 @@ class OutputConfigDialog(QDialog):
         self._check_artnet = QCheckBox("Art-Net aktivieren")
         af.addRow(self._check_artnet)
 
+        # ── NET-04: Ausgangs-Netzwerkkarte ───────────────────────────────────
+        # Bis hierhin ging das nur ueber die Env-Variable LIGHTOS_OUTPUT_IFACE,
+        # im Betrieb also gar nicht. Auf einem Venue-PC mit WLAN UND Lichtnetz
+        # sendet Linux den Broadcast nur ueber die Default-Route — die Fixtures
+        # bleiben schwarz, waehrend die Oberflaeche „Aktiv" meldet.
+        #
+        # Geraetegebunden gespeichert (ui_prefs.json), NICHT in der Show: die
+        # Netzwerkkarte ist eine Eigenschaft des RECHNERS, die Show wandert
+        # zwischen Rechnern. Dieselbe Ueberlegung wie bei viz_quality_tier.
+        self._combo_iface = QComboBox()
+        self._combo_iface.addItem("Automatisch (Betriebssystem entscheidet)", "")
+        for eintrag in _list_ifaces():
+            bcast = eintrag.get("broadcast")
+            text = f"{eintrag['name']} — {eintrag['ip']}"
+            if bcast:
+                text += f"  (Broadcast {bcast})"
+            else:
+                text += "  (kein Subnetz erkannt)"
+            self._combo_iface.addItem(text, eintrag["ip"])
+        gewaehlt = _iface_pref()
+        if gewaehlt:
+            i = self._combo_iface.findData(gewaehlt)
+            if i >= 0:
+                self._combo_iface.setCurrentIndex(i)
+            else:
+                # Die gespeicherte Karte gibt es nicht mehr (anderes Netz,
+                # USB-Adapter abgezogen). NICHT stillschweigend auf Automatik
+                # zuruecksetzen — dann suchte der Nutzer den Fehler im Rig.
+                self._combo_iface.addItem(
+                    f"{gewaehlt} — derzeit nicht gefunden", gewaehlt)
+                self._combo_iface.setCurrentIndex(self._combo_iface.count() - 1)
+        self._combo_iface.setToolTip(
+            "Ueber welche Netzwerkkarte Art-Net und sACN hinausgehen.\n"
+            "Automatisch = wie bisher ueber die Standardroute des Systems.\n"
+            "Mit gewaehlter Karte geht Art-Net an deren gerichteten\n"
+            "Broadcast (z. B. 192.168.1.255) statt an 255.255.255.255 —\n"
+            "der wird von Routern nicht weitergereicht.\n"
+            "Gilt fuer diesen Rechner, nicht fuer die Show. Neue Verbindungen\n"
+            "nutzen die Karte sofort, bestehende ab dem naechsten Start.")
+        self._combo_iface.currentIndexChanged.connect(self._apply_iface_choice)
+        af.addRow("Netzwerkkarte:", self._combo_iface)
+
         # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (analog Enttec) — nicht
         # mehr pauschal ALLE Universen. (Das separate „Startuniversum"-Feld unten ist
         # die EXTERNE Universe-Nummer und gehört zu OUT-03.)
@@ -439,6 +498,22 @@ class OutputConfigDialog(QDialog):
         btn_close = QPushButton("Schließen")
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close)
+
+    def _apply_iface_choice(self):
+        """NET-04: Auswahl geraetegebunden sichern.
+
+        Bewusst OHNE Neustart der laufenden Sender: die greifen die NIC beim
+        naechsten Aufbau ab (`ArtNetSender.__init__`, `bind_to_output_iface`).
+        Sie hier mitten im Betrieb neu zu bauen hiesse, den DMX-Strom fuer einen
+        Moment abreissen zu lassen — waehrend Licht auf der Buehne steht.
+        Der Hinweistext sagt genau das.
+        """
+        ip = self._combo_iface.currentData() or ""
+        try:
+            from src.ui.views.programmer_view import _save_prefs
+            _save_prefs({"output_iface_ip": ip})
+        except Exception as e:
+            print(f"[output_config] iface-Pref nicht gespeichert: {e}")
 
     def _refresh_ports(self):
         self._combo_port.clear()

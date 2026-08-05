@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Netzwerkkarte fuer DMX waehlbar (Fixtures blieben auf Multi-NIC-Rechnern schwarz)
+
+#### Neu
+
+- **Im Ausgabe-Dialog laesst sich jetzt die Netzwerkkarte waehlen, ueber die
+  Art-Net und sACN hinausgehen** (Reiter *Art-Net*, Feld „Netzwerkkarte").
+  Bisher entschied das allein das Betriebssystem — auf einem Rechner mit WLAN
+  **und** Lichtnetz ging der Ausgang dann ueber die falsche Karte, die Geraete
+  blieben dunkel, und die Oberflaeche meldete trotzdem „Aktiv". Die Auswahl
+  zeigt zu jeder Karte ihre Adresse und, wenn erkennbar, ihr Subnetz.
+
+  **Was sich mit gewaehlter Karte zusaetzlich aendert:** Art-Net geht dann an
+  den gerichteten Broadcast dieses Netzes (z. B. `192.168.1.255`) statt an
+  `255.255.255.255`. Letzterer wird von Routern nicht weitergereicht und unter
+  Linux nur ueber die Standardroute gesendet — genau die Ursache des Problems.
+
+  > **Ohne Auswahl aendert sich nichts.** Wer nichts einstellt, bekommt exakt
+  > das bisherige Verhalten. Das ist Absicht: den Standard fuer alle
+  > umzustellen waere die groessere Verbesserung — und genau deshalb falsch, es
+  > wuerde bestehende, funktionierende Rigs still veraendern, und zwar an der
+  > Stelle, an der ein Fehler „die Lampen bleiben aus" heisst.
+
+  Die Einstellung gilt fuer **diesen Rechner**, nicht fuer die Show (die wandert
+  ja zwischen Rechnern). Ist die gespeicherte Karte spaeter nicht mehr da —
+  anderes Netz, USB-Adapter abgezogen —, steht sie weiter in der Liste mit dem
+  Hinweis „derzeit nicht gefunden", statt stillschweigend auf Automatik zu
+  springen: sonst suchte man den Fehler im Rig.
+
+  Ein ausdruecklich eingetragenes Ziel im Universe-Manager bleibt unangetastet.
+
+
 ### 2026-08-05 — Die Lichtkegel laufen aus, statt an einer Kante zu enden
 
 #### Verbessert
