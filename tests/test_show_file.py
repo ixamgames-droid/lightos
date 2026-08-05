@@ -27,7 +27,11 @@ class _FakePatchedFixture:
     spider_mirrored: bool = True
     spider_dual_tilt: bool = False
     head_mode: str = "auto"          # FM-HEADLAYOUT (Default = Bestandsverhalten)
-    pixel_order: str = "rowwise"     # FM-13 (Default = zeilenweise, Bestand)
+    pixel_order: str = "rowwise"
+    # ORIENT: Montage-Orientierung. Das Double muss jedes Modellfeld kennen,
+    # sonst faellt das Laden mit einem TypeError durch — genau so gefunden.
+    element_rotation: int = 0
+    element_flip: bool = False     # FM-13 (Default = zeilenweise, Bestand)
     pan_range_deg: int = 540
     tilt_range_deg: int = 270
     pan_zero_dmx: int = 128

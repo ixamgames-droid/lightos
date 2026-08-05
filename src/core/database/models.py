@@ -146,6 +146,13 @@ class PatchedFixture(Base):
     # Darum eine Eigenschaft des gepatchten Geraets, nicht des Profils.
     # Werte/Umrechnung im Leaf-Modul core.pixel_order; "rowwise" = Bestand.
     pixel_order: Mapped[str] = mapped_column(String(16), default="rowwise")
+    # ORIENT: wie das Panel HAENGT — unabhaengig davon, wie es NUMMERIERT.
+    # Ein Panel kann in Schlangenlinien zaehlen UND hochkant montiert sein;
+    # `pixel_order` kann das nicht ausdruecken, weil es ausschliesslich die
+    # Spalte aendert (nie die Zeile) und das Raster nie umformt.
+    # 0/90/180/270 im Uhrzeigersinn, danach optional waagerecht gespiegelt.
+    element_rotation: Mapped[int] = mapped_column(Integer, default=0)
+    element_flip: Mapped[bool] = mapped_column(Boolean, default=False)
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
@@ -264,6 +271,21 @@ def migrate_show_db(engine) -> None:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN pixel_order "
                     "VARCHAR(16) DEFAULT 'rowwise'"))
+            # ORIENT: Montage-Orientierung. GLEICHZEITIG mit der Modell-Spalte
+            # hier eingetragen — genau das wurde bei `pixel_order` (PR #514)
+            # versaeumt, und jede vorher angelegte Show-DB war danach gar nicht
+            # mehr ladbar. Der Fehler steht drei Zeilen weiter oben als Notiz;
+            # eine Notiz allein hat ihn nicht verhindert, ein Test tut es
+            # (tests/test_show_db_migration_coverage.py prueft strukturell,
+            # dass JEDE Modell-Spalte migriert wird).
+            if pcols and "element_rotation" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN element_rotation "
+                    "INTEGER DEFAULT 0"))
+            if pcols and "element_flip" not in pcols:
+                conn.execute(text(
+                    "ALTER TABLE patched_fixtures ADD COLUMN element_flip "
+                    "BOOLEAN DEFAULT 0"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 

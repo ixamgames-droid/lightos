@@ -71,3 +71,85 @@ def pixel_cell(index: int, cols: int, order: str = DEFAULT_PIXEL_ORDER) -> tuple
     elif o == "mirrored":
         col = cols - 1 - col
     return row, col
+
+
+# ── ORIENT (2026-08-05): wie das Panel HAENGT, zusaetzlich zur Nummerierung ───
+#
+# `pixel_cell` oben beantwortet: „in welcher Reihenfolge legt das GERAET seine
+# Pixel auf DMX". Das ist eine Eigenschaft des Modells bzw. seines Flip-Schalters.
+# Offen blieb die zweite, davon UNABHAENGIGE Frage: „wie ist das Panel MONTIERT".
+#
+# ★ Warum das nicht dasselbe ist und deshalb NICHT in `pixel_order` gehoert:
+# ein Panel kann in Schlangenlinien zaehlen UND hochkant haengen. Beides in ein
+# Feld zu pressen hiesse, eine der beiden Aussagen zu verlieren.
+#
+# ★★ Und warum `mirrored` allein nicht reicht: `pixel_cell` aendert
+# AUSSCHLIESSLICH die Spalte, nie die Zeile. Damit ist
+#   - 180° (Zeilen- UND Spaltenumkehr) gar nicht ausdrueckbar — genau der Fall
+#     „Pixel Dir = invert", den das Stairville-Panel im Geraetemenue anbietet,
+#   - 90°/270° erst recht nicht, denn dort tauschen Zeilen und Spalten die
+#     Rollen und das RASTER selbst aendert seine Form.
+#
+# Deshalb gibt `place_element` das resultierende (rows, cols) MIT zurueck. Ohne
+# das rechnet es jeder Aufrufer wieder selbst — und dann laeuft es auseinander.
+
+ELEMENT_ROTATIONS = (0, 90, 180, 270)
+DEFAULT_ELEMENT_ROTATION = 0
+
+
+def normalize_element_rotation(value) -> int:
+    """Beliebige Eingabe -> 0/90/180/270. Nie werfen: der Wert kommt aus
+    Show-Dateien und aus der DB (dieselbe Politik wie normalize_pixel_order)."""
+    try:
+        v = int(round(float(value or 0))) % 360
+    except (TypeError, ValueError):
+        return DEFAULT_ELEMENT_ROTATION
+    return v if v in ELEMENT_ROTATIONS else DEFAULT_ELEMENT_ROTATION
+
+
+def rotate_cell(row: int, col: int, rows: int, cols: int,
+                rotation: int = 0, flip: bool = False) -> tuple:
+    """``(zeile, spalte)`` im gedrehten Raster + dessen neue ``(rows, cols)``.
+
+    Rueckgabe: ``(zeile, spalte, rows_neu, cols_neu)``.
+
+    Die Drehung ist im Uhrzeigersinn und beschreibt, wie das Geraet HAENGT.
+    ``flip`` spiegelt danach waagerecht (Panel um die Hochachse verbaut).
+
+    Bei 90°/270° tauschen Zeilen und Spalten die Rollen — aus einem 4x12 wird
+    ein 12x4. Genau deshalb reicht es nicht, nur die Position umzurechnen.
+    """
+    r, c = int(row), int(col)
+    nr, nc = max(1, int(rows or 1)), max(1, int(cols or 1))
+    rot = normalize_element_rotation(rotation)
+    if rot == 90:
+        r, c, nr, nc = c, nr - 1 - r, nc, nr
+    elif rot == 180:
+        r, c = nr - 1 - r, nc - 1 - c
+    elif rot == 270:
+        r, c, nr, nc = nc - 1 - c, r, nc, nr
+    if flip:
+        c = nc - 1 - c
+    return r, c, nr, nc
+
+
+def place_element(index: int, cols: int, rows: int,
+                  order: str = DEFAULT_PIXEL_ORDER,
+                  rotation: int = 0, flip: bool = False) -> tuple:
+    """DMX-Index -> endgueltige ``(zeile, spalte, rows, cols)`` im Raster.
+
+    Verbindet die zwei unabhaengigen Fragen in DIESER Reihenfolge:
+      1. `pixel_cell` — wie das Geraet nummeriert (Werkszustand/Flip-Schalter),
+      2. `rotate_cell` — wie es haengt.
+
+    Die Reihenfolge ist nicht beliebig: die Nummerierung ist eine Aussage ueber
+    das UNGEDREHTE Geraet. Erst drehen und dann die Schlangenlinie anwenden
+    haette die Schlange ueber die falsche Achse laufen lassen.
+
+    Ohne Drehung und ohne Spiegelung ist das Ergebnis elementweise identisch zu
+    ``pixel_cell`` — Bestandsgeraete verhalten sich unveraendert.
+    """
+    nc = max(1, int(cols or 1))
+    nr = max(1, int(rows or 1))
+    r, c = pixel_cell(index, nc, order)
+    return rotate_cell(r, c, nr, nc, rotation, flip)
