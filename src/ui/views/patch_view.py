@@ -10,7 +10,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
-from src.core.pixel_order import (PIXEL_ORDERS, PIXEL_ORDER_LABELS,
+from src.core.pixel_order import (ELEMENT_ROTATIONS, PIXEL_ORDERS,
+                                  PIXEL_ORDER_LABELS,
+                                  normalize_element_rotation,
                                   normalize_pixel_order)
 from src.core.app_state import (get_state, AppState, color_head_count,
                                  get_channels_for_patched, viz_model_for)
@@ -88,6 +90,8 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         # zurueck — man kopiert vier Panels und drei davon zaehlen anders als
         # das Original, ohne dass man etwas umgestellt haette.
         pixel_order=getattr(src, "pixel_order", "rowwise") or "rowwise",
+        element_rotation=int(getattr(src, "element_rotation", 0) or 0),
+        element_flip=bool(getattr(src, "element_flip", False)),
         pan_range_deg=src.pan_range_deg,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
@@ -355,6 +359,39 @@ class PatchFixtureEditDialog(QDialog):
                 "Aendert NUR die Darstellung/Zuordnung, nie die DMX-Adressen.")
             form.addRow("Pixel-Reihenfolge:", self._combo_pixel_order)
 
+            # ORIENT: wie das Panel HAENGT. Bewusst ein ZWEITES Feld neben der
+            # Pixel-Reihenfolge und nicht mit ihr verschmolzen: die Reihenfolge
+            # ist eine Aussage ueber das GERAET (Werkszustand/Flip-Schalter),
+            # die Orientierung eine ueber die MONTAGE. Ein Panel kann in
+            # Schlangenlinien zaehlen UND hochkant haengen — beides in ein Feld
+            # zu pressen hiesse, eine der beiden Aussagen zu verlieren.
+            self._combo_rotation = QComboBox()
+            for _g in ELEMENT_ROTATIONS:
+                self._combo_rotation.addItem(f"{_g}°", _g)
+            _cur_rot = normalize_element_rotation(
+                getattr(self._fixture, "element_rotation", 0))
+            _ir = self._combo_rotation.findData(_cur_rot)
+            self._combo_rotation.setCurrentIndex(_ir if _ir >= 0 else 0)
+            self._combo_rotation.setToolTip(
+                "Wie das Panel MONTIERT ist — unabhaengig davon, wie es NUMMERIERT\n"
+                "(das sagt die Zeile darueber).\n\n"
+                "Dasselbe Panel haengt mal waagerecht, mal hochkant. Ohne diese\n"
+                "Angabe laeuft ein waagerechtes Lauflicht am hochkant montierten\n"
+                "Geraet senkrecht — im 3D sieht es richtig aus, am Rig nicht.\n\n"
+                "180 Grad ist der Fall „kopfueber montiert\" und war mit der\n"
+                "Pixel-Reihenfolge allein gar nicht ausdrueckbar: die spiegelt\n"
+                "nur Spalten, nie Zeilen.\n\n"
+                "Aendert NUR die Zuordnung, nie die DMX-Adressen.")
+            form.addRow("Montage-Drehung:", self._combo_rotation)
+
+            self._chk_flip = QCheckBox("Waagerecht gespiegelt montiert")
+            self._chk_flip.setChecked(
+                bool(getattr(self._fixture, "element_flip", False)))
+            self._chk_flip.setToolTip(
+                "Panel um die Hochachse gedreht verbaut (Vorderseite zeigt\n"
+                "in die andere Richtung). Wirkt NACH der Drehung.")
+            form.addRow("", self._chk_flip)
+
             # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
             # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.
             _row = QHBoxLayout()
@@ -511,6 +548,11 @@ class PatchFixtureEditDialog(QDialog):
         if getattr(self, "_combo_pixel_order", None) is not None:
             self.result_updates["pixel_order"] = normalize_pixel_order(
                 self._combo_pixel_order.currentData())
+        if getattr(self, "_combo_rotation", None) is not None:
+            self.result_updates["element_rotation"] = normalize_element_rotation(
+                self._combo_rotation.currentData())
+        if getattr(self, "_chk_flip", None) is not None:
+            self.result_updates["element_flip"] = self._chk_flip.isChecked()
         self.accept()
 
     def _update_head_group_status(self):

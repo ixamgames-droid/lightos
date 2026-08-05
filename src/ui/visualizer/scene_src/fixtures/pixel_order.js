@@ -34,3 +34,52 @@ export function pixelCell(index, cols, order) {
   else if (o === 'mirrored') c = nc - 1 - c;
   return { r, c };
 }
+
+
+// ── ORIENT (2026-08-05): Zwilling zu core/pixel_order.py ────────────────────
+//
+// `pixelCell` sagt, wie das GERAET nummeriert. Das hier sagt, wie es HAENGT —
+// zwei unabhaengige Aussagen. Ein Panel kann in Schlangenlinien zaehlen UND
+// hochkant montiert sein.
+//
+// Bei 90°/270° tauschen Zeilen und Spalten die Rollen; das Raster selbst
+// aendert seine Form. Deshalb gibt `placeElement` `rows`/`cols` MIT zurueck —
+// sonst rechnet jeder Aufrufer es wieder selbst, und genau daran laufen zwei
+// Fassungen auseinander (FM16E-Lehre).
+
+export const ELEMENT_ROTATIONS = [0, 90, 180, 270];
+
+export function normalizeElementRotation(value) {
+  let v = Number(value || 0);
+  if (!Number.isFinite(v)) return 0;
+  v = ((Math.round(v) % 360) + 360) % 360;
+  return ELEMENT_ROTATIONS.indexOf(v) >= 0 ? v : 0;
+}
+
+/** (r, c) im gedrehten Raster + dessen neue Groesse. */
+export function rotateCell(row, col, rows, cols, rotation, flip) {
+  let r = Math.floor(row), c = Math.floor(col);
+  let nr = Math.max(1, Math.floor(rows || 1));
+  let nc = Math.max(1, Math.floor(cols || 1));
+  const rot = normalizeElementRotation(rotation);
+  if (rot === 90) {
+    const r2 = c, c2 = nr - 1 - r;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+  } else if (rot === 180) {
+    r = nr - 1 - r; c = nc - 1 - c;
+  } else if (rot === 270) {
+    const r2 = nc - 1 - c, c2 = r;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+  }
+  if (flip) c = nc - 1 - c;
+  return { r: r, c: c, rows: nr, cols: nc };
+}
+
+/** DMX-Index -> endgueltige Position + Rastergroesse.
+ *  Reihenfolge wie in Python: erst nummerieren, dann drehen. */
+export function placeElement(index, cols, rows, order, rotation, flip) {
+  const nc = Math.max(1, Math.floor(cols || 1));
+  const nr = Math.max(1, Math.floor(rows || 1));
+  const z = pixelCell(index, nc, order);
+  return rotateCell(z.r, z.c, nr, nc, rotation, flip);
+}

@@ -1157,10 +1157,20 @@ class AppState:
             # mitreisen. Ein Matrix-Panel im Werkszustand (Schlangen-Zaehlung)
             # liess sich damit gar nicht auf zeilenweise umstellen.
             "pixel_order",
+            # ORIENT: dieselben vier Nachzieh-Stellen wie `pixel_order` —
+            # Whitelist, Normalisierung, Undo-Schnappschuss, Wiederherstellung.
+            # Diesmal von Anfang an, statt sie beim naechsten Vorfall zu finden.
+            "element_rotation", "element_flip",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
             "protocol", "net_host",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
+        if "element_rotation" in values:
+            from .pixel_order import normalize_element_rotation
+            values["element_rotation"] = normalize_element_rotation(
+                values["element_rotation"])
+        if "element_flip" in values:
+            values["element_flip"] = bool(values["element_flip"])
         if "pixel_order" in values:
             # Garbage aus Skript-/Remote-Pfaden klemmen — kanonische Quelle ist
             # das Leaf-Modul core.pixel_order, dieselbe wie die Show-Persistenz.
@@ -1241,6 +1251,8 @@ class AppState:
             # `rowwise` zurueck — und ein Lauflicht laeuft danach wieder im
             # Zickzack, ohne dass jemand etwas umgestellt haette.
             "pixel_order": getattr(f, "pixel_order", "rowwise") or "rowwise",
+            "element_rotation": int(getattr(f, "element_rotation", 0) or 0),
+            "element_flip": bool(getattr(f, "element_flip", False)),
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -1270,6 +1282,8 @@ class AppState:
             # Gegenstueck zum Schnappschuss oben — ohne dies traegt der
             # Schnappschuss den Wert und das Zurueckholen wirft ihn wieder weg.
             pixel_order=d.get("pixel_order", "rowwise") or "rowwise",
+            element_rotation=int(d.get("element_rotation", 0) or 0),
+            element_flip=bool(d.get("element_flip", False)),
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),

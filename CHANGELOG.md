@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Matrix-Panels lassen sich jetzt gedreht montieren
+
+#### Neu
+
+- **Im Patch-Fenster gibt es fuer Matrix-Panels eine „Montage-Drehung"**
+  (0/90/180/270 Grad) und den Haken „waagerecht gespiegelt montiert". Damit
+  laeuft ein waagerechtes Lauflicht auch dann waagerecht ueber die Buehne, wenn
+  das Panel hochkant haengt — vorher lief es am echten Geraet senkrecht,
+  waehrend es im 3D richtig aussah.
+
+  **180 Grad — also kopfueber montiert — war bisher gar nicht einstellbar.** Die
+  vorhandene „Pixel-Reihenfolge" spiegelt ausschliesslich Spalten, nie Zeilen.
+  Wer ein Panel umgedreht haengt, hatte schlicht keine passende Einstellung.
+
+  > **Warum das ein zweites Feld ist und nicht in der Pixel-Reihenfolge steckt:**
+  > die Reihenfolge sagt, wie das GERAET seine Pixel nummeriert (Werkszustand
+  > bzw. sein Flip-Schalter) — die Drehung sagt, wie es HAENGT. Ein Panel kann in
+  > Schlangenlinien zaehlen *und* hochkant montiert sein. Beides in eine
+  > Einstellung zu pressen haette eine der beiden Aussagen verschluckt.
+
+  Ohne Einstellung aendert sich nichts: Bestandsgeraete verhalten sich
+  unveraendert, und alte Shows laden wie bisher.
+
+
 ### 2026-08-05 — Matrix-Panels liessen sich nicht bearbeiten, und die Pixel-Reihenfolge wirkte nie
 
 #### Behoben
