@@ -18,6 +18,32 @@ except Exception:  # pragma: no cover - PySide6/shiboken ist im App-Run immer da
     _qt_is_valid = None
 
 
+def _ist_umbenennung(alt: str | None, neu: str | None) -> bool:
+    """Ist der Unterschied zweier Modusnamen bloss ein Zusatz — in BEIDE
+    Richtungen?
+
+    UXT-08 fuehrte diese Pruefung ein, aber nur einseitig (`alt in neu`), also
+    nur fuer ANGEHAENGTE Zusaetze: „34-Kanal" -> „34-Kanal (Professional DMX)".
+
+    ★ Der umgekehrte Fall ist kein Exot, sondern der Regelfall jedes
+    Reifegrad-Vermerks: „… (ungeprueft)", „(Beta)", „(vorlaeufig)" stehen im
+    Namen, solange etwas unbestaetigt ist, und VERSCHWINDEN, sobald es geprueft
+    ist. Einseitig geprueft meldete genau das „Mode fehlt" — ein Fehlalarm
+    ausgerechnet in dem Moment, in dem sich ein Profil VERBESSERT.
+
+    Bewusst weiterhin Teilstring und nicht Praefix: beide bekannten Faelle sind
+    zwar Praefixe, aber eine Verschaerfung wuerde Umbenennungen mit
+    vorangestelltem Zusatz stillschweigend zu „fehlt" machen. Der Preis ist ein
+    seltenes falsch-positives „umbenannt" („34-Kanal" ⊂ „134-Kanal"); das
+    betrifft nur den MELDUNGSTEXT, beide Zweige reparieren identisch.
+    """
+    a = (alt or "").strip().lower()
+    b = (neu or "").strip().lower()
+    if not a or not b:
+        return False
+    return a in b or b in a
+
+
 # =============================================================================
 # Event Bus
 # =============================================================================
@@ -251,12 +277,20 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                     # In-memory Cache auch updaten
                                     f.mode_name = fallback.name
                                     f.channel_count = fallback.channel_count
-                                    # UXT-08: Ist der alte Name nur eine Kurzform
-                                    # des neuen (z. B. „34-Kanal" ⊂ „34-Kanal
+                                    # UXT-08: Ist der eine Name nur eine Kurzform
+                                    # des anderen (z. B. „34-Kanal" ⊂ „34-Kanal
                                     # (Professional DMX)"), ist das eine harmlose
                                     # Umbenennung — nicht als „fehlt" alarmieren.
-                                    _renamed = bool(old) and old.strip().lower() in (
-                                        fallback.name or "").strip().lower()
+                                    #
+                                    # ★ SYMMETRISCH, seit 2026-08-05. Die Pruefung
+                                    # lief nur in eine Richtung (alt ⊂ neu) und
+                                    # deckte damit nur ANGEHAENGTE Zusaetze ab. Der
+                                    # umgekehrte Fall — ein ENTFERNTER Zusatz — ist
+                                    # kein Sonderfall, sondern der Normalfall jedes
+                                    # Reifegrad-Vermerks: „… (ungeprueft)", „(Beta)",
+                                    # „(vorlaeufig)" verschwinden, sobald geprueft
+                                    # ist. Vorher meldete genau DAS „Mode fehlt".
+                                    _renamed = _ist_umbenennung(old, fallback.name)
                                     issues.append(ValidationIssue(
                                         'warn', location,
                                         (f"Modus '{old}' zu '{fallback.name}' "
@@ -272,8 +306,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                         f"Mode-Fix fehlgeschlagen: {e_fix}",
                                     ))
                             else:
-                                _renamed = bool(mode_name) and mode_name.strip().lower() in (
-                                    fallback.name or "").strip().lower()
+                                _renamed = _ist_umbenennung(mode_name, fallback.name)
                                 issues.append(ValidationIssue(
                                     'warn', location,
                                     (f"Modus '{mode_name}' wird als "

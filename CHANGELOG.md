@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Davids LED-Balken ist am Geraet bestaetigt
+
+#### Geaendert
+
+- **Der U-King-LED-Balken (ZQ06121) traegt kein „ungeprueft" mehr im Namen.**
+  Das Profil musste hergeleitet werden, weil vom Hersteller keine Kanaltabelle
+  zu bekommen war — deshalb stand der Vorbehalt im Modusnamen. Die Reihenfolge
+  ist jetzt am echten Geraet nachgesehen und stimmt: Dimmer, Blitzer, dann die
+  48 Farbzonen, die acht Warmweiss-Segmente zuletzt. Wer den Balken schon
+  gepatcht hat, sieht den neuen Namen automatisch — sein Geraet bleibt dabei
+  unveraendert eingestellt.
+
+#### Behoben
+
+- **Wurde ein Geraeteprofil umbenannt, meldete die Show-Pruefung faelschlich
+  „Modus fehlt".** Sie erkannte eine harmlose Umbenennung nur, wenn der Name
+  LAENGER wurde. Genau andersherum ist es aber der Normalfall: Zusaetze wie
+  „(ungeprueft)" oder „(Beta)" stehen im Namen, solange etwas unbestaetigt ist,
+  und verschwinden, sobald es geprueft wurde. Die Meldung kam also ausgerechnet
+  dann, wenn sich ein Profil verbessert hat.
+
+- **Der LED-Balken fehlte in der Erstbefuellung der Geraetebibliothek.** Beim
+  Benutzen war das folgenlos, weil er direkt danach nachgeruestet wurde; in den
+  Tests war er dadurch aber unsichtbar. Ein Geraet ohne wirksame Pruefung, ohne
+  dass irgendwo etwas rot wurde — jetzt strukturell abgesichert, damit das
+  keinem weiteren Geraet passiert.
 ### 2026-08-05 — Matrix-Panels lassen sich jetzt gedreht montieren
 
 #### Neu

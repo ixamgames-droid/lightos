@@ -2852,39 +2852,68 @@ def _add_uking_zq06121(s, mfr):
         ---------------------------------
                                    154
 
-    Was daraus NICHT folgt, ist die REIHENFOLGE — ob Dimmer/Strobe vorn oder
-    hinten sitzen und wo die acht Weiss-Zonen liegen. Diese Fassung nimmt die
-    branchenuebliche Anordnung (Dimmer, Strobe, dann die Zonen, Weiss zuletzt)
-    und ist damit eine BEGRUENDETE ANNAHME, kein Beleg.
+    Was daraus NICHT folgte, war die REIHENFOLGE — ob Dimmer/Strobe vorn oder
+    hinten sitzen und wo die acht Weiss-Zonen liegen. Diese Fassung nahm die
+    branchenuebliche Anordnung an (Dimmer, Strobe, dann die Zonen, Weiss
+    zuletzt); die Modusnamen trugen deshalb den Vorbehalt „(ungeprueft)".
 
-    ★ Deshalb traegt der Modusname das Wort „ungeprueft". Ein geratenes Profil,
-    das sich als geprueft ausgibt, ist schlimmer als gar keins: man sucht den
-    Fehler dann am Geraet. Sobald am echten Balken nachgesehen ist, faellt das
-    Wort weg — und falls die Reihenfolge anders ist, wird sie hier korrigiert.
+    ✅ AM GERAET BESTAETIGT (2026-08-05, David am echten Balken): die Anordnung
+    stimmt. Der Vorbehalt faellt damit aus BEIDEN Modusnamen, nicht nur aus dem
+    getesteten — es gab nur EINE Herleitung, und die 144 sind deren Zonen-Haelfte.
+
+    ★ WEIL DER VORBEHALT IM NAMEN STAND, ist sein Entfernen eine Umbenennung —
+    und Modusnamen sind in diesem Projekt faktisch Schluessel: vier Stellen
+    loesen den Modus ueber `FixtureMode.name` auf (app_state, sync, patch_view,
+    channel_range_lock_dialog). Zwei Dinge gehoeren deshalb dazu, sonst kommt
+    die Korrektur in einer bereits befuellten DB nie an:
+      (1) der Signatur-Block in `ensure_builtins` — `_mode_attr_signature` fuehrt
+          den Modusnamen als Dict-SCHLUESSEL, eine Umbenennung aendert die
+          Signatur also und wird dadurch ueberhaupt erst sichtbar;
+      (2) die symmetrische Umbenennungs-Erkennung in `sync.py` — UXT-08 prueft
+          nur `alt in neu`, also nur ANGEHAENGTE Zusaetze. Ein ENTFERNTER
+          Vorbehalt ist der umgekehrte Fall und galt faelschlich als „Mode
+          fehlt". Das trifft jeden Reifegrad-Zusatz, nicht nur diesen.
+
+    Geometrie (David, 2026-08-05): 4 Reihen x 12 RGB-Zonen, die Warmweiss-Leiste
+    laeuft MITTIG zwischen Reihe 2 und 3 durch und ihre Segmente sind nur halb
+    so hoch wie eine RGB-Zone. 8 Weiss-Segmente auf 12 Spalten Breite — jedes
+    deckt also anderthalb RGB-Spalten ab, weshalb sich beide Raster erst in
+    einem gemeinsamen Einheitsraster sauber ausdruecken lassen (FM-ORIENT
+    Folgerunde, `FixtureMode.layout_json`).
 
     Sicherheits-Defaults wie bei den uebrigen Panels: Dimmer 0 und Strobe 0.
     Beim ERSTEN Patchen soll nichts von selbst hell werden oder blitzen — bei
     einem 200-W-Balken mit 768 LEDs ist das kein theoretischer Komfortpunkt.
     """
     _add_fixture(s, mfr, "ZQ06121 LED-Balken 768 (stage light)", "ZQ06121",
-                 "matrix", 200, [
-        ("154-Kanal 48 Zonen RGB + 8x Weiss (ungeprueft)", [
+                 "matrix", 200, _zq06121_modes_data())
+
+
+def _zq06121_modes_data():
+    """Die Modi als reine Daten — EINE Quelle fuer das Anlegen UND fuer
+    `_ZQ06121_SIGNATURE`. Getrennt gefuehrt koennten beide auseinanderlaufen,
+    und dann migrierte `ensure_builtins` in einer Endlosschleife gegen ein Soll,
+    das es selbst nie herstellt."""
+    return [
+        ("154-Kanal 48 Zonen RGB + 8x Weiss", [
             ("Dimmer", "intensity", 0, 255),
             ("Strobe langsam->schnell", "shutter", 0, 0, _SIMPLE_STROBE),
         ] + _zq06121_zonen(48, "Zone ") + [
-            # Acht Weiss-Zonen. Bewusst ALLE als `color_w`: die attr#N-Konvention
-            # macht daraus color_w, color_w#1 … color_w#7 — dieselbe Mechanik,
-            # mit der die 48 RGB-Zonen zu Koepfen werden.
+            # Acht Weiss-Segmente. Bewusst ALLE als `color_w`: die attr#N-
+            # Konvention macht daraus color_w, color_w#1 … color_w#7 — dieselbe
+            # Mechanik, mit der die 48 RGB-Zonen zu Koepfen werden.
             #
-            # Anmerkung fuer spaeter: die Kopfzahl leitet sich aus `color_r` ab,
-            # also 48. Die acht Weiss-Zonen landen damit auf den Koepfen 1-8,
-            # obwohl sie physisch vermutlich je SECHS RGB-Zonen abdecken. Das
-            # ist erst zu klaeren, wenn die Reihenfolge am Geraet feststeht —
-            # vorher waere jede Zuordnung genauso geraten wie die Reihenfolge.
+            # Die Kopfzahl leitet sich aus `color_r` ab, also 48; die acht
+            # Weiss-Segmente landen damit auf den Koepfen 1-8. Physisch decken
+            # sie je anderthalb RGB-Spalten ab (8 Segmente auf 12 Spalten) und
+            # sitzen mittig zwischen Reihe 2 und 3 — die beiden Raster fallen
+            # also NICHT zusammen. Aufgeloest wird das nicht hier, sondern in
+            # `FixtureMode.layout_json` (FM-ORIENT Folgerunde); bis dahin sind
+            # die Segmente einzeln ansprechbar, aber ohne Ortsbezug.
             (f"Weiss-Zone {i}", "color_w", 0, 255) for i in range(1, 9)
         ]),
-        ("144-Kanal 48 Zonen RGB (ungeprueft)", _zq06121_zonen(48, "Zone ")),
-    ])
+        ("144-Kanal 48 Zonen RGB", _zq06121_zonen(48, "Zone ")),
+    ]
 
 def _add_stairville_pp144(s, mfr):
     """Stairville Pixel Panel 144 RGB (12×12 = 144 SMD-RGB-Pixel, 65 W).
@@ -2951,6 +2980,17 @@ def _mode_attr_signature(profile) -> dict[str, list[str]]:
 _ZQ02001_SIGNATURE = {
     mode_name: [ch[1] for ch in channels]
     for mode_name, channels in _zq02001_modes_data()
+}
+
+# Soll-Signatur des ZQ06121 (2026-08-05). Hier geht es NICHT um vertauschte
+# Attribute wie beim ZQ02001, sondern um eine reine UMBENENNUNG: der Vorbehalt
+# „(ungeprueft)" faellt weg, nachdem David die Kanalreihenfolge am Geraet
+# nachgesehen hat. Dass die Signatur das ueberhaupt bemerkt, liegt daran, dass
+# `_mode_attr_signature` den Modusnamen als Dict-SCHLUESSEL fuehrt — waere sie
+# nur eine Attribut-Liste, bliebe der alte Name in jeder befuellten DB stehen.
+_ZQ06121_SIGNATURE = {
+    mode_name: [ch[1] for ch in channels]
+    for mode_name, channels in _zq06121_modes_data()
 }
 
 # Soll-Signatur des Spider (2026-06-16): zwei separate Tilts (Bar L/R) statt
@@ -3093,6 +3133,23 @@ def ensure_builtins():
         if "ZQ06121" not in have:                         # Davids LED-Balken (2026-08-05)
             _add_uking_zq06121(s, _get_or_create_mfr(s, "U King", "UKING"))
             changed = True
+        if "ZQ06121" in have:
+            # Profil-Bestaetigung 2026-08-05: die Kanalreihenfolge ist am echten
+            # Geraet nachgesehen, „(ungeprueft)" faellt aus beiden Modusnamen.
+            # Reine Umbenennung — die Kanaele bleiben identisch; erkannt wird sie
+            # nur, weil der Modusname der Schluessel der Signatur ist.
+            prof = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == "ZQ06121",
+                       FixtureProfile.source == "builtin")
+            ).scalars().first()
+            if prof is not None and _mode_attr_signature(prof) != _ZQ06121_SIGNATURE:
+                prof.modes.clear()          # cascade loescht Kanaele + Ranges
+                s.flush()
+                _add_modes(s, prof, _zq06121_modes_data())
+                changed = True
         if "ZQ02001" in have:
             # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
             # 9-Kanal-Modus hatte faelschlich Fine-Kanaele statt FX/Reset.
@@ -3403,3 +3460,9 @@ def _seed(s: Session):
     # FM-13 Slice 2: benannte reale Panels (Hersteller sind oben schon angelegt).
     _add_adj_dotz_matrix(s, adj)
     _add_stairville_pp144(s, stairville)
+    # ★ Davids LED-Balken stand zunaechst NUR im Backfill von `ensure_builtins`
+    # und fehlte hier. Sichtbar geworden ist das erst durch den Profil-Test:
+    # `frische_library` seedet ueber genau diese Funktion, das Profil war dort
+    # also gar nicht vorhanden. Jedes Builtin gehoert an BEIDE Stellen — hier
+    # fuer die Erstbefuellung, oben im Backfill fuer bestehende Datenbanken.
+    _add_uking_zq06121(s, uking)
