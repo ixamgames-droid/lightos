@@ -7,6 +7,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Demo-Show fuer den LED-Balken, und drei Stolpersteine beim Bauen
+
+#### Neu
+
+- **`lightos --show <datei>` oeffnet eine Show direkt beim Start.** Bisher kam
+  immer die zuletzt benutzte Show hoch, und eine frisch gebaute musste man im
+  Oeffnen-Dialog erst suchen. Ein falscher Pfad wird sofort gemeldet, nicht erst
+  nach dem kompletten Hochfahren.
+
+- **Fertige Demo-Show fuer den U-King-LED-Balken** (`tools/build_zq06121_demo.py`):
+  zehn Flaechenmuster ueber die 48 Zonen, fuenf Lauflichter (Bars nacheinander,
+  hin und her, aufbauend, von aussen nach innen, Reihen von oben), Blitzer in
+  drei Stufen, die acht Warmweiss-Segmente einzeln — auf drei Seiten der
+  virtuellen Konsole verteilt.
+
+#### Behoben
+
+- **Der Ausgabe-Dialog verband immer Universum 1 — auch wenn etwas anderes
+  gespeichert war.** Das Feld „Universe" im Enttec-Bereich wurde beim Oeffnen
+  nie mit dem gespeicherten Wert gefuellt und stand deshalb jedes Mal wieder auf
+  1. Wer dann „Verbinden" drueckte, verband Universum 1 **und ueberschrieb damit
+  die eigene Einstellung**.
+
+  Das war der Grund fuer zwei Beschwerden, die wie verschiedene Probleme
+  aussahen: die Auswahl im Ausgabe-Tab „hielt nicht", und Geraete auf einem
+  anderen Universum blieben dunkel, obwohl in der Show alles richtig aussah —
+  die Software rechnete korrekt und schickte ein leeres Universum auf die
+  Leitung.
+
+- **Skript-gebaute Konsolen-Seiten stapelten alle Bedienelemente in der linken
+  oberen Ecke.** Sie lagen exakt uebereinander, sodass die Seite leer wirkte,
+  obwohl alle Taster und Regler da waren und funktionierten. Neue Seiten
+  bekommen jetzt automatisch ein Raster; wer Positionen selbst setzt, behaelt
+  sie unveraendert.
+
+- **Die Bau-Pruefung einer Show sah immer nur Universum 1.** Wessen Geraete auf
+  einem anderen Universum haengen, bekam „erzeugt kein DMX" gemeldet, obwohl
+  alles korrekt war — und suchte den Fehler dann in der Show oder am Geraet.
 ### 2026-08-05 — Rechtsklick im Gruppenraster, und Panels lassen sich als Block anordnen
 
 #### Neu

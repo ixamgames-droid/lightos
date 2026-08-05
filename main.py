@@ -510,6 +510,24 @@ def _report_already_running() -> None:
             pass
 
 
+def _open_show_at_startup(window, pfad: str):
+    """Die per ``--show`` genannte Show oeffnen, sobald die UI steht.
+
+    ★ Bewusst ueber ``QTimer.singleShot(0, …)`` und ueber ``_open_show_path``:
+
+    * **Verzoegert**, weil das Laden vor dem Start der Ereignisschleife auf halb
+      aufgebaute Views trifft. Erst wenn Qt einmal durchgelaufen ist, existiert
+      alles, was das Laden anfasst.
+    * **Ueber `_open_show_path`** und nicht ueber `load_show` direkt, weil an dem
+      Weg der Fenstertitel, die Zuletzt-benutzt-Liste und die Render-Schalter
+      haengen. `load_show` allein fuellt nur den Zustand — die Oberflaeche
+      zeigte dann weiter die alte Show an, obwohl die neue laeuft. Genau diese
+      Sorte halber Zustand kostet spaeter eine Stunde Fehlersuche.
+    """
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(0, lambda: window._open_show_path(pfad))
+
+
 def main():
     # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
     # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
@@ -520,7 +538,15 @@ def main():
                         help="Kiosk-Modus: Vollbild, nur Virtual Console, keine Bearbeitung")
     parser.add_argument("--touch", action="store_true",
                         help="Touch-Modus: groessere Buttons fuer Tablet-Bedienung")
+    parser.add_argument("--show", metavar="DATEI",
+                        help="Diese .lshow beim Start oeffnen (statt der zuletzt "
+                             "benutzten Show)")
     args = parser.parse_args()
+    # Fruehe, ehrliche Absage: ein Tippfehler im Pfad soll NICHT erst nach dem
+    # kompletten Hochfahren als stiller Fehlschlag auffallen — dann steht die
+    # alte Show da und man sucht den Fehler in der Show statt im Aufruf.
+    if args.show and not os.path.exists(args.show):
+        parser.error(f"Show-Datei nicht gefunden: {args.show}")
 
     # Vor Crash-Logging, Qt, ALSA/MIDI und WebEngine nur eine GUI-Instanz
     # zulassen. Mehrfachstarts konkurrieren sonst um native Ressourcen und
@@ -588,6 +614,9 @@ def main():
         window.showFullScreen()
     else:
         window.show()
+
+    if args.show:
+        _open_show_at_startup(window, args.show)
 
     _finalize_and_exit(app.exec())
 

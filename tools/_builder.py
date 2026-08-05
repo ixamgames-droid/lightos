@@ -46,12 +46,21 @@ __all__ = ["ShowBuilder", "Handle", "BuildError", "RgbAlgorithm", "MatrixStyle",
            "build_and_verify"]
 
 
-def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None) -> str:
+def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
+                     universe: int = 1) -> str:
     """Speichert + validiert die Show (statisch + live) und macht optional einen
-    Render-Smoke über ``render`` (Liste von Handles/IDs). Wirft bei Problemen."""
+    Render-Smoke über ``render`` (Liste von Handles/IDs). Wirft bei Problemen.
+
+    ★ ``universe`` muss zum Rig passen. ``render_diff`` schaut standardmäßig nur
+    auf Universum 1 — eine Show, deren Geräte woanders hängen, meldet dann
+    „erzeugt kein DMX", obwohl sie einwandfrei rendert. Gefunden am 2026-08-05
+    an Davids ZQ06121-Demo: sein Enttec ist Universum 3, und BEIDES, Matrix und
+    eine simple Szene, wirkte tot. Der Smoke misst nicht die Show, sondern das
+    falsche Universum.
+    """
     builder.save(out, name=name)
     if render:
-        lit, moved, _changed = builder.verify_render(render)
+        lit, moved, _changed = builder.verify_render(render, universe=universe)
         if not (lit or moved):
             raise SystemExit(f"Render-Smoke fehlgeschlagen: {out} erzeugt kein DMX")
     print(f"OK: {os.path.basename(out)} gebaut + validiert "
