@@ -133,7 +133,11 @@ class DeselectSceneTest(unittest.TestCase):
             _app.processEvents()
             time.sleep(_POLL_INTERVAL_S)
         self.assertTrue(self._loaded_ok and self._loaded_ok[-1], "Page nicht geladen")
-        self._poll_until_true("!!window.__lightosAppReady")
+        try:
+            self._poll_until_true("!!window.__lightosAppReady")
+        except AssertionError as e:                      # XPLAT-19
+            raise AssertionError(
+                f"{e} | Szenen-Diagnose: {self._szenen_diagnose()}") from None
         deadline = time.monotonic() + _POLL_TIMEOUT_S
         while time.monotonic() < deadline:
             if getattr(self._bridge_obj, "_request_fixtures_calls", 0) > 0:
@@ -176,6 +180,44 @@ class DeselectSceneTest(unittest.TestCase):
                 return last
             time.sleep(_POLL_INTERVAL_S)
         self.fail(f"Timeout bei '{js_expr}' (letzter: {last!r})")
+
+    # ── XPLAT-19: Diagnose, wenn die Szene nicht hochkommt ───────────────────
+    # Bisher meldete der Fehlschlag nur „Timeout bei '!!window.__lightosAppReady'
+    # (letzter: False)" — also genau null Information darueber, WORAN es lag.
+    # `__lightosSceneError` haelt den ersten Fehler des Szenen-Starts fest
+    # (stage_scene.html, VIZ-SCENE-SELFHEAL) und wird von der Produktseite
+    # laengst gelesen (visualizer_window.py) — von den Tests bis jetzt nicht.
+    _DIAG_JS = ("JSON.stringify({"
+                "err: String(window.__lightosSceneError || ''),"
+                "ready: !!window.__lightosAppReady,"
+                "three: typeof window.THREE,"
+                "api: typeof window.__lightos,"
+                "chan: !!(window.qt && window.qt.webChannelTransport),"
+                "canvas: document.getElementsByTagName('canvas').length,"
+                "doc: document.readyState})")
+
+    def _szenen_diagnose(self, timeout_s=2.0):
+        """Sieben Felder, die den Abbruch verorten: `three: "undefined"` heisst,
+        schon `three_local.js` kam nicht · `three` da und `api: "undefined"`
+        heisst, die ESM-Kette brach ab (typisch beim WebGLRenderer-Bau) ·
+        `canvas: 0` heisst, der Renderer haengte sein Canvas nie ein · `err`
+        traegt die echte Fehlerzeile.
+
+        Bewusst NICHT ueber `self._eval`: das assertet bei Zeitueberschreitung
+        und wuerde die eigentliche Fehlermeldung durch seine eigene ersetzen.
+        Und bewusst ohne `getContext` — das waere genau die Ressource, die hier
+        unter Verdacht steht.
+        """
+        box = []
+        try:
+            self._view.page().runJavaScript(self._DIAG_JS, box.append)
+            ende = time.monotonic() + timeout_s
+            while not box and time.monotonic() < ende:
+                _app.processEvents()
+                time.sleep(_POLL_INTERVAL_S)
+        except Exception as e:              # Page/View schon tot
+            return f"nicht lesbar: {e!r}"
+        return box[0] if box else "kein Rueckruf (Renderer-Prozess tot?)"
 
     def _marquee(self, x1, y1, x2, y2, shift=False):
         """Echter Zeigerpfad: Down -> Move -> Up (Marquee braucht Edit-Modus)."""

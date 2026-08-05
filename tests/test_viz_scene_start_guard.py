@@ -294,6 +294,27 @@ class SceneErrorListenerTest(unittest.TestCase):
         self.assertEqual(self._eval("window.__lightosSceneError"),
                          "Error creating WebGL context.")
 
+        # 4) ★ XPLAT-19: Der Vertrag, auf dem die Szenen-Diagnose der drei
+        #    show()-Testdateien steht. Die feuert nur im seltenen Fehlerfall —
+        #    verrottet einer dieser Namen, meldet sie ab da fuer JEDEN Ausfall
+        #    stumm „undefined", und niemand merkt es, weil das ja genau nach
+        #    einem kaputten Szenen-Start aussieht. Deshalb hier, auf der
+        #    laufenden Seite, einmal festgenagelt (kostet keine zweite Ladung).
+        for name, erwartet in (("window.__lightosAppReady", True),
+                               ("window.THREE", True),
+                               ("window.__lightos", True)):
+            self.assertNotEqual(
+                self._eval(f"typeof {name}"), "undefined",
+                f"{name} fehlt — die XPLAT-19-Diagnose koennte einen echten "
+                f"Ausfall nicht mehr von einer Namensaenderung unterscheiden")
+        self.assertTrue(
+            self._eval("(window.qt && !!window.qt.webChannelTransport) === true"),
+            "die Diagnose liest den WebChannel-Transport ueber window.qt")
+        self.assertGreater(
+            self._eval("document.getElementsByTagName('canvas').length"), 0,
+            "die Diagnose unterscheidet 'Renderer hing sein Canvas nie ein' "
+            "ueber die Canvas-Zahl — auf einer gesunden Seite ist sie > 0")
+
 
 if __name__ == "__main__":
     unittest.main()
