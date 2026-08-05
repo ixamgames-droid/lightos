@@ -180,25 +180,44 @@ class DownsampleTest(unittest.TestCase):
             f"der Blank-Anteil sinkt beim Kappen ({anteil_vorher:.3f} -> "
             f"{anteil_nachher:.3f}) — der Strahl bleibt laenger an als gezeichnet")
 
-    def test_stream_frame_haelt_die_blank_spruenge_bis_ins_paket(self):
+    def test_stream_frame_haelt_die_blank_spruenge_bis_auf_die_leitung(self):
         """End-to-End statt nur an der Hilfsfunktion: was wirklich auf die
-        Leitung geht, muss die Sprünge noch enthalten. Gelesen wird der
-        gesendete Sample-Block, nicht der Zwischenzustand."""
+        Leitung geht, muss die Sprünge noch enthalten.
+
+        ★ Seit LAS-07 wird FRAGMENTIERT statt ausgedünnt — der Frame geht als
+        mehrere Datagramme raus und **kein Punkt geht mehr verloren**. Der Test
+        setzt die Sample-Blöcke aller Pakete wieder zusammen und prüft die
+        Blank-Sprünge am Gesamtstrom; vorher (mit Downsampling auf 194 Punkte)
+        blieben von 11 Sprüngen 9 übrig.
+        """
         conn = idn.IDNConnection("127.0.0.1")
-        gesendet = {}
-        conn._send = lambda payload: gesendet.__setitem__("p", payload)  # type: ignore[method-assign]
+        gesendet = []
+        conn._send = gesendet.append   # type: ignore[method-assign]
         pts = self._figur_mit_spruengen(666, anzahl=11, laenge=3)
         conn.stream_frame(LaserFrame(pts, pps=20000))
-        rohdaten = gesendet["p"]
-        # Die Samples stehen am Ende des Datagramms (7 B je Punkt, XYRGB).
-        anzahl = idn.MAX_SAMPLES_PER_PACKET
-        block = rohdaten[-anzahl * 7:]
-        dunkel = [block[k * 7 + 4:k * 7 + 7] == b"\x00\x00\x00"
-                  for k in range(anzahl)]
+
+        self.assertGreater(len(gesendet), 1,
+                           "666 Punkte passen nicht in ein Paket — es muss "
+                           "fragmentiert worden sein")
+        dunkel = []
+        for nr, roh in enumerate(gesendet):
+            # Erstes Paket: 36 B Kopf (Hello+Msg+Config+Dict+Chunk-Header).
+            # Folge-Fragmente: nur 12 B (Hello+Msg), Samples direkt dahinter.
+            kopf = 36 if nr == 0 else idn._FRAGMENT_OVERHEAD
+            block = roh[kopf:]
+            self.assertEqual(len(block) % 7, 0,
+                             f"Paket {nr}: Sample-Block ist kein Vielfaches von 7 B")
+            for k in range(len(block) // 7):
+                dunkel.append(block[k * 7 + 4:k * 7 + 7] == b"\x00\x00\x00")
+
+        self.assertEqual(
+            len(dunkel), 666,
+            f"es kamen {len(dunkel)} statt 666 Punkte auf der Leitung an — "
+            f"die Fragmentierung verliert Punkte")
         runs = sum(1 for schluessel, _ in itertools.groupby(dunkel) if schluessel)
         self.assertEqual(
             runs, 11,
-            f"im gesendeten Paket sind nur noch {runs} von 11 Blank-Spruengen")
+            f"im gesendeten Strom sind nur noch {runs} von 11 Blank-Spruengen")
 
     def test_stream_frame_downsamples_over_mtu(self):
         """stream_frame darf niemals ein Paket über der MTU bauen."""
@@ -450,3 +469,134 @@ class ManagerProtocolRoutingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── LAS-07: App-Fragmentierung (ILDA IDN-Stream Rev. 001) ────────────────────
+#
+# Bis 2026-08-05 galt „ein Frame = ein Chunk = ein UDP-Paket": alles darueber
+# wurde ausgeduennt und verlor rund 71 % der Aufloesung. Die Spezifikation kennt
+# dafuer laengst Fragment-Chunks; ihre Codes standen nur nicht im Repo.
+#
+# Diese Tests halten die drei Regeln fest, die man sonst falsch macht — und die
+# ohne echten DAC sonst NIEMAND bemerkt, weil ein falsch fragmentierter Strom
+# beim Empfaenger einfach nicht erscheint.
+
+class FragmentTest(unittest.TestCase):
+    @staticmethod
+    def _zerlege(paket):
+        """Kopf-Felder eines IDN-Datagramms (nur die, um die es hier geht)."""
+        cmd, flags, seq = struct.unpack(">BBH", paket[:4])
+        total, cnl, typ, ts = struct.unpack(">HBBI", paket[4:12])
+        return dict(cmd=cmd, seq=seq, total=total, cnl=cnl, typ=typ, ts=ts,
+                    laenge=len(paket))
+
+    def _fragmente(self, n=1500, ts=7_000_000, seq=100):
+        pts = [LaserPoint(i / float(n), 0.0) for i in range(n)]
+        return idn.build_stream_fragments(LaserFrame(pts, pps=20000), seq, ts)
+
+    def test_kleiner_frame_bleibt_ein_einziges_paket(self):
+        """Bis zur MTU-Grenze aendert sich NICHTS — byte-identisch zum
+        Einzelpaket-Bau. Sonst haette diese Aenderung jedes bestehende Rig
+        beruehrt, nur um gezeichnete Figuren zu verbessern."""
+        pts = [LaserPoint(i / 100.0, 0.0) for i in range(100)]
+        frame = LaserFrame(pts, pps=20000)
+        einzeln = idn.build_stream_packet(frame, 5, 123456)
+        fragmente = idn.build_stream_fragments(frame, 5, 123456)
+        self.assertEqual(len(fragmente), 1)
+        self.assertEqual(fragmente[0], einzeln)
+        self.assertEqual(self._zerlege(fragmente[0])["typ"],
+                         idn.CHUNK_FRAME_SAMPLES)
+
+    def test_chunk_typen_folgen_der_spezifikation(self):
+        """0x02 ganzer Chunk · 0x03 erstes Fragment · 0xC0 Folge-Fragment
+        (ILDA IDN-Stream Rev. 001, Abschnitt „Chunk Type")."""
+        pakete = self._fragmente()
+        self.assertGreater(len(pakete), 1)
+        kopf = [self._zerlege(p) for p in pakete]
+        self.assertEqual(kopf[0]["typ"], idn.CHUNK_FRAME_SAMPLES_FIRST)
+        for k in kopf[1:]:
+            self.assertEqual(k["typ"], idn.CHUNK_FRAME_SAMPLES_SEQUEL)
+
+    def test_nur_das_letzte_fragment_traegt_das_ende_bit(self):
+        """★ Bei Folge-Fragmenten bedeutet CCLF NICHT „Config dabei", sondern
+        „letztes Fragment" (Spec: „this bit, if set to '1' indicates the message
+        with the last fragment"). Faellt es weg, wartet der Empfaenger auf ein
+        Fragment, das nie kommt — und gibt den Frame NIE aus."""
+        kopf = [self._zerlege(p) for p in self._fragmente()]
+        for k in kopf[1:-1]:
+            self.assertEqual(k["cnl"] & 0x40, 0,
+                             "ein mittleres Fragment ist als letztes markiert")
+        self.assertEqual(kopf[-1]["cnl"] & 0x40, 0x40,
+                         "das letzte Fragment traegt das Ende-Bit nicht — der "
+                         "Empfaenger wartet dann ewig")
+
+    def test_zeitstempel_ist_die_fragmentnummer(self):
+        """★ Spec: „the timestamp is shared with the fragment number and must be
+        equal to the timestamp used for the first fragment plus the (0-based)
+        number of the fragment". Wer hier die echte Uhrzeit einsetzt, sendet
+        fuer den Empfaenger unsortierbare Teile."""
+        ts = 7_000_000
+        kopf = [self._zerlege(p) for p in self._fragmente(ts=ts)]
+        self.assertEqual([k["ts"] for k in kopf],
+                         [ts + i for i in range(len(kopf))])
+
+    def test_config_nur_im_ersten_fragment(self):
+        """Config und Chunk-Header gehoeren an den ANFANG des Datenchunks. Ein
+        Folge-Fragment traegt reine Samples — 12 B Kopf statt 36."""
+        pakete = self._fragmente()
+        kopf = [self._zerlege(p) for p in pakete]
+        self.assertEqual(kopf[0]["cnl"] & 0x40, 0x40,
+                         "das erste Fragment muss die Config tragen")
+        for nr, (k, roh) in enumerate(zip(kopf[1:], pakete[1:]), start=1):
+            nutzlast = len(roh) - idn._FRAGMENT_OVERHEAD
+            self.assertEqual(nutzlast % 7, 0,
+                             f"Fragment {nr} traegt keine reinen Samples")
+
+    def test_kein_punkt_geht_verloren_und_keiner_doppelt(self):
+        """Der eigentliche Ertrag: volle Aufloesung. Rekonstruiert wird die
+        Punktzahl aus den Sample-Bloecken aller Pakete."""
+        n = 1500
+        pakete = self._fragmente(n=n)
+        summe = 0
+        for nr, roh in enumerate(pakete):
+            kopf = 36 if nr == 0 else idn._FRAGMENT_OVERHEAD
+            summe += (len(roh) - kopf) // 7
+        self.assertEqual(summe, n,
+                         f"{summe} statt {n} Punkte — die Zerlegung verliert "
+                         f"oder verdoppelt")
+
+    def test_jedes_fragment_bleibt_unter_der_mtu(self):
+        for nr, roh in enumerate(self._fragmente(n=5000)):
+            self.assertLessEqual(len(roh), 1400,
+                                 f"Fragment {nr} sprengt die MTU ({len(roh)} B)")
+
+    def test_dauer_gilt_fuer_den_ganzen_frame(self):
+        """★ Die Dauer steht im Chunk-Header des ERSTEN Fragments und meint den
+        GESAMTEN Frame. Bezoege sie sich auf dessen Teilstueck, spielte der
+        Empfaenger den Frame um den Faktor der Fragmentzahl zu schnell ab."""
+        n, pps = 1500, 20000
+        pakete = self._fragmente(n=n)
+        (flags_dauer,) = struct.unpack(">I", pakete[0][32:36])
+        dauer = flags_dauer & 0xFFFFFF
+        erwartet = round(n / pps * 1_000_000)
+        self.assertAlmostEqual(
+            dauer, erwartet, delta=2,
+            msg=f"Dauer {dauer} µs statt {erwartet} µs — sie beschreibt "
+                f"offenbar nur das erste Teilstueck")
+
+    def test_sequenznummern_zaehlen_pakete(self):
+        """Die Sequenznummer ist eine PAKET-Nummer. Wuerden alle Fragmente
+        dieselbe tragen, saehe der Empfaenger Wiederholungen."""
+        kopf = [self._zerlege(p) for p in self._fragmente(seq=100)]
+        self.assertEqual([k["seq"] for k in kopf],
+                         [100 + i for i in range(len(kopf))])
+
+    def test_stream_frame_dreht_die_sequenz_um_alle_pakete_weiter(self):
+        conn = idn.IDNConnection("127.0.0.1")
+        gesendet = []
+        conn._send = gesendet.append   # type: ignore[method-assign]
+        pts = [LaserPoint(i / 1500.0, 0.0) for i in range(1500)]
+        conn.stream_frame(LaserFrame(pts, pps=20000))
+        nummern = [struct.unpack(">BBH", p[:4])[2] for p in gesendet]
+        self.assertEqual(len(set(nummern)), len(nummern),
+                         f"doppelte Sequenznummern im Strom: {nummern}")

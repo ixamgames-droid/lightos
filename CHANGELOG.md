@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Gezeichnete Laser-Figuren gehen jetzt in voller Aufloesung raus
+
+#### Verbessert
+
+- **Der Netzwerk-Laser bekommt die ganze Figur, nicht mehr jeden dritten
+  Punkt.** Ein Bild passte bisher in genau ein Netzwerkpaket; alles darueber
+  wurde ausgeduennt — von rund 666 berechneten Punkten kamen 194 an, also knapp
+  ein Drittel. Feine Zeichnungen wurden dadurch eckig, und je mehr Details, desto
+  groeber. Jetzt wird ein grosses Bild auf mehrere Pakete aufgeteilt (das sieht
+  die Norm ausdruecklich vor), und **es geht kein Punkt mehr verloren**.
+
+  Fuer kleine Figuren aendert sich nichts — bis zur bisherigen Grenze wird
+  weiterhin genau ein Paket gesendet, byte-fuer-byte wie vorher.
+
+  > Damit ist auch der Nebeneffekt vom selben Tag erledigt: das Ausduennen
+  > konnte Luecken in der Zeichnung verschlucken, sodass der Strahl eine Linie
+  > zog, wo keine sein sollte. Beides hatte dieselbe Ursache — zu wenig Platz in
+  > einem Paket.
+
+
 ### 2026-08-05 — Ein fehlerhaftes 3D-Modell konnte im Visualizer unsichtbar werden
 
 #### Behoben
