@@ -2,6 +2,7 @@
 gegen Fake-UDP-Server, und LaserOutputManager-Protokoll-Weiche (Ether Dream vs.
 IDN nebeneinander) — alles ohne Hardware.
 """
+import itertools
 import os
 import socket
 import struct
@@ -107,6 +108,97 @@ class DownsampleTest(unittest.TestCase):
     def test_downsample_noop_when_small(self):
         pts = [LaserPoint(0, 0)] * 10
         self.assertIs(idn._downsample(pts, 190), pts)
+
+    # ── LAS-BLANK: Blank-Abschnitte überleben das Downsampling ───────────────
+    # Der Backlog beschrieb die MTU-Kappung als reinen AUFLÖSUNGS-Verlust
+    # („downgesampled auf ~194 Punkte"). Gemessen ist sie mehr: der alte
+    # „jeder n-te Punkt" warf den ``blanked``-Zustand der übersprungenen Punkte
+    # weg — und ein verschwundener Blank-Sprung heißt, dass der Galvo die
+    # Verbindungsstrecke MIT eingeschaltetem Strahl fährt.
+
+    @staticmethod
+    def _blank_runs(points) -> int:
+        """Zahl der zusammenhängenden Blank-Abschnitte (nicht der Blank-Punkte:
+        wie viel Blank übrig bleibt, ist eine Frage der Auflösung — DASS ein
+        Sprung noch da ist, ist die Sicherheitsfrage)."""
+        return sum(1 for schluessel, _ in
+                   itertools.groupby(p.blanked for p in points) if schluessel)
+
+    def _figur_mit_spruengen(self, n: int, anzahl: int, laenge: int):
+        blank = set()
+        for j in range(anzahl):
+            start = 20 + j * ((n - 40) // anzahl)
+            blank.update(range(start, start + laenge))
+        return [LaserPoint(i / float(n), 0.0, blanked=(i in blank))
+                for i in range(n)]
+
+    def test_downsample_verliert_keinen_blank_sprung(self):
+        """★ Kern des Fundes: 666 Punkte (pps 20000 / 30 fps) auf 194 gekappt.
+        Mit dem alten „jeder n-te Punkt" blieben von 11 Sprüngen 9 übrig."""
+        pts = self._figur_mit_spruengen(666, anzahl=11, laenge=3)
+        self.assertEqual(self._blank_runs(pts), 11, "Testfigur falsch gebaut")
+        out = idn._downsample(pts, idn.MAX_SAMPLES_PER_PACKET)
+        self.assertEqual(
+            self._blank_runs(out), 11,
+            "ein Blank-Sprung ist beim Downsampling verschwunden — der Galvo "
+            "faehrt diese Strecke mit eingeschaltetem Strahl")
+
+    def test_downsample_haelt_auch_den_kuerzesten_sprung(self):
+        """Der schlimmste Fall ist der häufigste: ein Blank-Sprung über EINEN
+        Punkt ging vorher in 71 % der Positionen komplett verloren. Geprüft
+        wird deshalb jede mögliche Position, nicht eine Stichprobe."""
+        n = 666
+        verloren = []
+        for start in range(0, n, 7):    # Raster über die ganze Figur
+            pts = [LaserPoint(i / float(n), 0.0, blanked=(i == start))
+                   for i in range(n)]
+            out = idn._downsample(pts, idn.MAX_SAMPLES_PER_PACKET)
+            if self._blank_runs(out) != 1:
+                verloren.append(start)
+        self.assertEqual(
+            verloren, [],
+            f"Einzel-Blank an {len(verloren)} von {len(range(0, n, 7))} "
+            f"Positionen verloren (erste: {verloren[:5]})")
+
+    def test_downsample_erfindet_kein_blank(self):
+        """Gegenrichtung — sonst bestünde der Test auch, wenn einfach ALLES
+        geblankt würde. Eine Figur ohne Blank bleibt ohne Blank."""
+        pts = [LaserPoint(i / 666.0, 0.0) for i in range(666)]
+        out = idn._downsample(pts, idn.MAX_SAMPLES_PER_PACKET)
+        self.assertEqual(self._blank_runs(out), 0)
+        self.assertFalse(any(p.blanked for p in out))
+
+    def test_downsample_blank_faellt_in_die_dunkle_richtung(self):
+        """Wo zusammengefasst wird, darf höchstens MEHR Blank herauskommen, nie
+        weniger: der Fehler muss den Strahl aus- und nicht anschalten."""
+        pts = self._figur_mit_spruengen(666, anzahl=11, laenge=3)
+        out = idn._downsample(pts, idn.MAX_SAMPLES_PER_PACKET)
+        anteil_vorher = sum(p.blanked for p in pts) / len(pts)
+        anteil_nachher = sum(p.blanked for p in out) / len(out)
+        self.assertGreaterEqual(
+            anteil_nachher, anteil_vorher * 0.99,
+            f"der Blank-Anteil sinkt beim Kappen ({anteil_vorher:.3f} -> "
+            f"{anteil_nachher:.3f}) — der Strahl bleibt laenger an als gezeichnet")
+
+    def test_stream_frame_haelt_die_blank_spruenge_bis_ins_paket(self):
+        """End-to-End statt nur an der Hilfsfunktion: was wirklich auf die
+        Leitung geht, muss die Sprünge noch enthalten. Gelesen wird der
+        gesendete Sample-Block, nicht der Zwischenzustand."""
+        conn = idn.IDNConnection("127.0.0.1")
+        gesendet = {}
+        conn._send = lambda payload: gesendet.__setitem__("p", payload)  # type: ignore[method-assign]
+        pts = self._figur_mit_spruengen(666, anzahl=11, laenge=3)
+        conn.stream_frame(LaserFrame(pts, pps=20000))
+        rohdaten = gesendet["p"]
+        # Die Samples stehen am Ende des Datagramms (7 B je Punkt, XYRGB).
+        anzahl = idn.MAX_SAMPLES_PER_PACKET
+        block = rohdaten[-anzahl * 7:]
+        dunkel = [block[k * 7 + 4:k * 7 + 7] == b"\x00\x00\x00"
+                  for k in range(anzahl)]
+        runs = sum(1 for schluessel, _ in itertools.groupby(dunkel) if schluessel)
+        self.assertEqual(
+            runs, 11,
+            f"im gesendeten Paket sind nur noch {runs} von 11 Blank-Spruengen")
 
     def test_stream_frame_downsamples_over_mtu(self):
         """stream_frame darf niemals ein Paket über der MTU bauen."""

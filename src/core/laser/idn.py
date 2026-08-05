@@ -21,15 +21,23 @@ Paketaufbau (ein kompletter Discrete-Graphic-Frame pro UDP-Paket):
 
 v1-Grenze: ein Frame = ein Chunk = ein UDP-Paket. Frames mit mehr Punkten als
 MTU-sicher (:data:`MAX_SAMPLES_PER_PACKET`) werden geometrie-erhaltend
-heruntergerechnet (jeder n-te Punkt — Kreis bleibt Kreis). Echte
-App-Fragmentierung (Frame-First/Sequel-Chunks) ist ein Folgeschritt, relevant
-erst mit dem freien Zeichenmodus (LAS-07).
+heruntergerechnet (jeder n-te Punkt — Kreis bleibt Kreis), wobei Blank-Abschnitte
+über den gesamten vertretenen Bereich ODER-verknüpft werden: ein Blank-Sprung
+darf nicht verschwinden, sonst führe der Galvo die Verbindungsstrecke mit
+eingeschaltetem Strahl (s. :func:`_downsample`).
+
+**Was das nicht rettet:** Auflösung. Bei 666 berechneten Punkten je Frame gehen
+rund 71 % verloren, und je dichter eine Figur blinkt, desto dunkler wird sie
+durch die ODER-Verknüpfung. Echte App-Fragmentierung (Frame-First/Sequel-Chunks)
+ist der eigentliche Folgeschritt und mit dem freien Zeichenmodus fällig
+(LAS-07-Rest).
 """
 from __future__ import annotations
 
 import socket
 import struct
 import time
+from dataclasses import replace
 
 from .frame import LaserFrame, LaserPoint
 
@@ -97,13 +105,49 @@ def _channel_config_bytes() -> bytes:
 
 def _downsample(points: list, limit: int) -> list:
     """Geometrie-erhaltende Reduktion auf höchstens ``limit`` Punkte (jeder
-    n-te). Erhält Form + Endpunkt, anders als simples Abschneiden."""
+    n-te). Erhält Form + Endpunkt, anders als simples Abschneiden.
+
+    ★ Und erhält **jeden Blank-Abschnitt**. Bis 2026-08-05 nahm diese Funktion
+    schlicht jeden n-ten Punkt — der ``blanked``-Zustand der übersprungenen
+    Punkte ging dabei ersatzlos verloren. Bei 666 berechneten Punkten je Frame
+    (``pps`` 20000 / ``TARGET_FPS`` 30) auf 194 gesendete verschwand ein
+    Blank-Sprung über **einen** Punkt in **71 %** der Fälle komplett, über zwei
+    Punkte in 42 %, über drei in 13 % (gemessen). Und ein verschwundener
+    Blank-Sprung heißt nicht „etwas gröber", sondern: **der Galvo fährt die
+    Verbindungsstrecke mit eingeschaltetem Strahl** — eine sichtbare Linie
+    genau dort, wo der Nutzer eine Lücke gezeichnet hat.
+
+    Deshalb wird jetzt über den gesamten Abschnitt, den ein Punkt vertritt,
+    ODER-verknüpft: war **irgendein** Punkt darin dunkel, ist es der Vertreter
+    auch. Der Fehler fällt damit in die **dunkle** Richtung — im Zweifel etwas
+    zu viel Blank statt eines ungewollten Strahls. Der Preis ist sichtbar: eine
+    Figur, die dichter blinkt als das Punktebudget hergibt, wird zunehmend
+    dunkel statt zunehmend falsch. Die richtige Antwort darauf ist die
+    App-Fragmentierung (LAS-07-Rest), nicht ein weicheres Blank-Kriterium.
+    """
     n = len(points)
     if n <= limit:
         return points
     step = n / float(limit)
-    out = [points[min(n - 1, int(i * step))] for i in range(limit)]
-    out[-1] = points[-1]
+    # Abschnittsgrenzen: die Vertreter-Indizes selbst, plus n als Abschluss.
+    # So decken die Abschnitte zusammen ALLE n Punkte ab — kein Punkt fällt
+    # zwischen zwei Abschnitte und wird dabei ungeprüft verworfen.
+    grenzen = [min(n - 1, int(i * step)) for i in range(limit)] + [n]
+    out = []
+    for i in range(limit):
+        anfang = grenzen[i]
+        ende = max(grenzen[i + 1], anfang + 1)
+        p = points[anfang]
+        if not p.blanked and any(q.blanked for q in points[anfang:ende]):
+            p = replace(p, blanked=True)
+        out.append(p)
+    # Endpunkt exakt erhalten (schließt die Form) — aber ohne den Blank-Zustand
+    # des letzten Abschnitts wieder wegzuwerfen, den die Schleife gerade
+    # eingesammelt hat.
+    letzter = points[-1]
+    if out[-1].blanked and not letzter.blanked:
+        letzter = replace(letzter, blanked=True)
+    out[-1] = letzter
     return out
 
 
