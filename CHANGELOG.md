@@ -7,6 +7,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Der Netzwerk-Laser zog Linien durch Luecken, die du gezeichnet hattest
+
+#### Behoben
+
+- **Gezeichnete Laser-Figuren verloren beim Senden ihre Luecken — der Strahl
+  blieb an, wo er aus sein sollte.** LightOS rechnet je Bild rund 666 Punkte
+  aus, in ein Netzwerkpaket passen aber nur 194. Beim Ausduennen wurde bisher
+  schlicht jeder n-te Punkt genommen — und die Information „hier ist der Strahl
+  AUS" der uebersprungenen Punkte fiel dabei ersatzlos weg. Fuer die *Form*
+  spielte das keine Rolle (ein Kreis blieb ein Kreis), fuer die *Luecken* sehr
+  wohl: eine Luecke von einem Punkt Laenge verschwand in **71 %** der Faelle
+  vollstaendig, eine von zwei Punkten in 42 %. An einer Figur aus elf Formen
+  mit je einem Punkt Abstand kamen von elf Luecken **drei** an.
+
+  Was am Rig davon zu sehen war: statt getrennter Formen zog der Laser eine
+  helle Verbindungslinie von einer zur naechsten — genau dort, wo im
+  Zeichen-Editor nichts steht. Jetzt zaehlt eine Luecke fuer den ganzen
+  Bereich, den ein gesendeter Punkt vertritt: war darin **irgendwo** der Strahl
+  aus, ist er es auch im gesendeten Punkt. Der Fehler faellt damit in die
+  dunkle Richtung — lieber ein Hauch zu viel Luecke als ein Strahl, der nicht
+  gemeint war.
+
+  > **Was das nicht loest:** die Aufloesung. Je mehr kurze Luecken eine Figur
+  > hat, desto mehr davon wird jetzt dunkel (bei 30 Formen steigt der
+  > Dunkel-Anteil von 9 % auf 20 %) — die Figur wird also gestrichelter, aber
+  > nie mehr falsch. Wer wirklich feine Figuren streamen will, braucht die
+  > Aufteilung eines Bildes auf mehrere Pakete; die steht als eigener Punkt an.
+  > Fuer die eingebauten Figuren (Kreis, Dreieck, Quadrat, Linie) aendert sich
+  > gar nichts, die haben keine Luecken.
+
 ### 2026-08-04 — Jedes Oeffnen der 3D-Ansicht liess einen Grafik-Kontext liegen
 
 #### Behoben
