@@ -183,3 +183,103 @@ class PythonUndJsSindDieselbeRegelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── PIXELORDER (2026-08-05): der Weg vom Dialog in den State ─────────────────
+#
+# ★ Die Persistenz ins Showformat war getestet (PersistenzTest oben) — der Weg
+# DORTHIN nicht. Und genau dort war das Feature seit dem Bau (PR #514) TOT:
+# `pixel_order` fehlte in der `allowed`-Whitelist von `AppState.update_fixture`,
+# der Wert wurde still verworfen, und die Methode meldete trotzdem True, weil
+# Label/Universum/Adresse mitreisen.
+#
+# Dieselbe Falle wie bei `head_mode` — deren Kommentar steht in derselben
+# Whitelist, zwei Zeilen darueber. Der Fix wurde damals am Ort angebracht, nicht
+# an der Klasse. Diese Tests sind das Gegenstueck zu
+# `test_head_mode_option.py::UpdateFixturePersistsHeadModeTest`.
+
+class _PixelOrderStateBase(unittest.TestCase):
+    def setUp(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        from src.core.database.fixture_db import ensure_builtins
+        from src.core.show.show_file import reset_show
+        from src.core.app_state import get_state
+        ensure_builtins()
+        reset_show()
+        self.state = get_state()
+
+    def _add(self, fid=1, pixel_order="rowwise"):
+        from src.core.database.models import PatchedFixture
+        f = PatchedFixture(fid=fid, label="Panel", fixture_profile_id=1,
+                           mode_name="52-Kanal", universe=1, address=1,
+                           channel_count=52, fixture_type="matrix",
+                           pixel_order=pixel_order)
+        self.state.add_fixture(f)
+        return fid
+
+    def _order_of(self, fid):
+        f = next((x for x in self.state.get_patched_fixtures() if x.fid == fid), None)
+        return None if f is None else getattr(f, "pixel_order", None)
+
+
+class UpdateFixtureBehaeltPixelOrderTest(_PixelOrderStateBase):
+    def test_die_wahl_kommt_ueberhaupt_an(self):
+        self._add(pixel_order="rowwise")
+        self.assertTrue(self.state.update_fixture(1, pixel_order="serpentine"))
+        self.assertEqual(self._order_of(1), "serpentine")
+
+    def test_realistische_dialog_nutzlast(self):
+        """★ Der Test, der den Fehler ueberhaupt sichtbar macht.
+
+        Der Patch-Dialog schickt IMMER Label, Universum, Adresse und Kanalzahl
+        mit. Genau deshalb lieferte `update_fixture` `True`, obwohl die
+        Pixel-Reihenfolge unterwegs verschwand — ein Test, der nur den
+        Rueckgabewert prueft, ist hier gruen und sagt nichts.
+        """
+        self._add(pixel_order="rowwise")
+        self.assertTrue(self.state.update_fixture(
+            1, label="Panel L", universe=1, address=1, channel_count=52,
+            pixel_order="serpentine"))
+        self.assertEqual(
+            self._order_of(1), "serpentine",
+            "die Pixel-Reihenfolge ging in der Dialog-Nutzlast unter — genau "
+            "der Zustand, in dem das Feature seit PR #514 war")
+
+    def test_muell_wird_geklemmt_statt_gespeichert(self):
+        self._add()
+        self.state.update_fixture(1, pixel_order="ZICKZACK")
+        self.assertEqual(self._order_of(1), "rowwise")
+        self.state.update_fixture(1, pixel_order=" Serpentine ")
+        self.assertEqual(self._order_of(1), "serpentine")
+
+
+class UndoBehaeltPixelOrderTest(_PixelOrderStateBase):
+    """Loeschen + Rueckgaengig darf die Reihenfolge nicht auf `rowwise`
+    zuruecksetzen — sonst laeuft ein Lauflicht danach wieder im Zickzack, ohne
+    dass jemand etwas umgestellt haette."""
+
+    def test_loeschen_und_zurueck(self):
+        self._add(pixel_order="serpentine")
+        self.state.remove_fixture(1)
+        from src.core.undo import get_undo_stack
+        get_undo_stack().undo()
+        self.assertEqual(self._order_of(1), "serpentine")
+
+
+class KopierenBehaeltPixelOrderTest(unittest.TestCase):
+    """„Mit Offset kopieren" baut das Ziel-Fixture aus dem Quell-Fixture neu —
+    ohne das Feld faellt jede Kopie auf den ORM-Default. Man kopiert vier
+    Panels und drei zaehlen anders als das Original."""
+
+    def test_kopie_erbt_die_reihenfolge(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        from src.core.database.models import PatchedFixture
+        from src.ui.views.patch_view import _copy_fixture
+        quelle = PatchedFixture(fid=1, label="Panel", fixture_profile_id=1,
+                                mode_name="52-Kanal", universe=1, address=1,
+                                channel_count=52, fixture_type="matrix",
+                                pixel_order="serpentine")
+        kopie = _copy_fixture(quelle, fid=2, universe=1, address=53)
+        self.assertEqual(getattr(kopie, "pixel_order", None), "serpentine")

@@ -84,6 +84,10 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         # FM-HEADLAYOUT: Mehrkopf-Programmiermodus mitkopieren (sonst faellt die
         # Kopie still auf den ORM-Default 'auto' zurueck).
         head_mode=getattr(src, "head_mode", "auto") or "auto",
+        # Ohne dies faellt eine mit Offset kopierte Matrix auf `rowwise`
+        # zurueck — man kopiert vier Panels und drei davon zaehlen anders als
+        # das Original, ohne dass man etwas umgestellt haette.
+        pixel_order=getattr(src, "pixel_order", "rowwise") or "rowwise",
         pan_range_deg=src.pan_range_deg,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
@@ -484,15 +488,29 @@ class PatchFixtureEditDialog(QDialog):
         if self._combo_head_mode is not None:
             _hm = str(self._combo_head_mode.currentData() or "auto")
             self.result_updates["head_mode"] = _hm
-        if getattr(self, "_combo_pixel_order", None) is not None:
-            self.result_updates["pixel_order"] = normalize_pixel_order(
-                self._combo_pixel_order.currentData())
-            # „Köpfe einzeln" heisst: die Kopf-Matrix SOLL existieren. NUR den
+            # ★ PIXELORDER-CRASH (2026-08-05): diese Zeile und ihr Kommentar
+            # standen bis hierhin im `pixel_order`-Zweig darunter — eine
+            # Einrueckungs-Verschiebung aus PR #514. Zwei Folgen, beide still:
+            #
+            #  (a) Ein Mehrkopf-Geraet, das KEIN Matrix-Panel ist (Spider,
+            #      Hydrabeam), hat keine Pixel-Reihenfolge-Combo. `wants_head_group`
+            #      blieb damit False, und „Koepfe einzeln" legte die Kopf-Matrix
+            #      GAR NICHT MEHR an — die Kernfunktion von FM-HEADLAYOUT.
+            #  (b) Ein Matrix-Panel mit nur EINEM `color_r` hat umgekehrt keine
+            #      Kopf-Modus-Combo: `_hm` war dann nie gesetzt, und das Speichern
+            #      starb mit UnboundLocalError. Das Geraet liess sich nicht
+            #      editieren. Betroffen sind vier reale Modi der eingebauten
+            #      Library (Dotz Matrix 3ch/6ch/7ch, Pixel Panel 144 „8-Kanal").
+            #
+            # „Koepfe einzeln" heisst: die Kopf-Matrix SOLL existieren. NUR den
             # Wunsch markieren — der Aufrufer legt sie NACH dem Persistieren aus
             # dem frischen Patch-Objekt an (sonst stale Label/Kanalzahl, und ein
             # spaeter abgebrochener Speichervorgang haette schon geschrieben).
             # Nicht-destruktiv: „Als EINE Lampe" loescht NICHTS.
             self.wants_head_group = (_hm == "heads")
+        if getattr(self, "_combo_pixel_order", None) is not None:
+            self.result_updates["pixel_order"] = normalize_pixel_order(
+                self._combo_pixel_order.currentData())
         self.accept()
 
     def _update_head_group_status(self):
