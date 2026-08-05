@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-05 — Am Profi-Laser fehlte der Dimmer, und gezeichnete Figuren sprangen in der Groesse
+
+#### Behoben
+
+- **Der Master-Dimmer eines Profi-Lasers war auf der Laser-Seite gar nicht da.**
+  Die Seite zeigte nur Regler, deren Name mit `laser_` beginnt, plus eine kurze
+  Liste von Ausnahmen. Ein Pangolin FB4 (und ebenso der einfache Party-Laser)
+  bringt aber einen ganz gewoehnlichen **Dimmer**, **RGB** und **Strobe** mit —
+  keiner davon tauchte auf, weder in einer Gruppe noch unter „Weitere Kanaele".
+  Das sah nicht kaputt aus, sondern schlicht so, als gaebe es die Regler nicht.
+  Jetzt stehen sie da, und **Helligkeit ganz oben** — das ist der Regler, den man
+  am Laser zuerst sucht.
+
+- **Eine gezeichnete Laser-Figur war doppelt so gross wie das Testmuster
+  desselben Geraets.** Solange kein Groessen-Wert gesetzt war, nahm die Figur
+  einen anderen Startwert als das Testmuster; beim blossen Umschalten zwischen
+  beiden sprang die Figur also in der Groesse. Beide nehmen jetzt denselben
+  Startwert.
+
+
 ### 2026-08-05 — Netzwerkkarte fuer DMX waehlbar (Fixtures blieben auf Multi-NIC-Rechnern schwarz)
 
 #### Neu

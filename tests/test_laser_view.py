@@ -459,3 +459,65 @@ def test_figure_combo_change_reaches_the_selection(monkeypatch):
     view._combo_figure.setCurrentIndex(view._combo_figure.count() - 1)
 
     assert calls, "Combo-Wechsel loest die Figur-Uebernahme nicht aus"
+
+
+# ── LAS-VIEW (2026-08-05): zwei Luecken, die in keinem Backlog standen ────────
+#
+# Ein Profi-Laser bringt einen ganz gewoehnlichen Master-Dimmer und RGB mit. Der
+# Filter der Laser-Seite liess bis hierhin nur Attribute durch, die mit `laser_`
+# beginnen, plus eine kurze Whitelist. Der Pangolin FB4 hat aber `intensity`,
+# `color_r/g/b` und `strobe` (fixture_db, 16ch UND 39ch) — keines davon kam
+# durch. Praktisch war der MASTER-DIMMER eines FB4 auf der Laser-Seite nicht
+# bedienbar; und zwar nicht sichtbar kaputt, sondern schlicht nicht vorhanden,
+# was man leicht fuer Absicht haelt.
+
+def test_dimmer_rgb_und_strobe_kommen_durch_den_filter():
+    from src.ui.views.laser_view import LASER_EXTRA_ATTRS
+    for attr in ("intensity", "color_r", "color_g", "color_b", "strobe"):
+        assert attr in LASER_EXTRA_ATTRS, (
+            f"'{attr}' faellt aus dem Regler-Template der Laser-Seite — "
+            f"am FB4 ist das der Regler, den man zuerst sucht")
+
+
+def test_sie_sind_auch_einer_gruppe_zugeordnet():
+    """Durch den Filter zu kommen reicht nicht: ohne Gruppe landen sie unter
+    „Weitere Kanaele" statt dort, wo man sie sucht."""
+    from src.ui.views.laser_view import _ROW_GROUPS
+    zugeordnet = {a for _titel, attrs in _ROW_GROUPS for a in attrs}
+    for attr in ("intensity", "strobe", "color_r", "color_g", "color_b"):
+        assert attr in zugeordnet, f"'{attr}' ist keiner Regler-Gruppe zugeordnet"
+
+
+def test_helligkeit_steht_vor_der_farbe():
+    """Dimmer und Strobe sind das, was man am Laser zuerst braucht."""
+    from src.ui.views.laser_view import _ROW_GROUPS
+    titel = [t for t, _ in _ROW_GROUPS]
+    assert "Helligkeit" in titel
+    assert titel.index("Helligkeit") < titel.index("Farbe")
+
+
+def test_der_notaus_bleibt_unberuehrt():
+    """★ Gegenprobe zur Abgrenzung: `test_laser_dmx_estop.py` schliesst
+    FB4-`intensity` BEWUSST aus der Rearm-Whitelist aus. Das ist eine ANDERE
+    Frage (NOT-AUS) und darf durch diese Bedien-Aenderung nicht mitwandern —
+    sonst haette ein Komfort-Fix still eine Sicherheitsregel verschoben."""
+    import src.core.laser.capability as cap
+    quelle = open(cap.__file__, encoding="utf-8").read()
+    assert "LASER_EXTRA_ATTRS" not in quelle, (
+        "die Regler-Whitelist der UI hat im Sicherheitspfad nichts zu suchen")
+
+
+def test_beide_pfade_nehmen_denselben_zoom_default():
+    """Ohne gesetzten Programmer-Wert war eine gezeichnete Figur DOPPELT so
+    gross wie das Testmuster desselben Geraets — der Sprung passierte beim
+    blossen Umschalten der Framequelle. Ein Default, der von der QUELLE
+    abhaengt, ist kein Default, sondern eine Ueberraschung."""
+    import re
+    import src.core.laser.laser_output as lo
+    quelle = open(lo.__file__, encoding="utf-8").read()
+    defaults = re.findall(r'_prog_value\([^)]*?"zoom",\s*(\d+)\)', quelle)
+    assert len(defaults) >= 2, (
+        "beide Zoom-Abfragen (Testmuster + Figur) muessen gefunden werden — "
+        "sonst misst dieser Test nichts")
+    assert len(set(defaults)) == 1, (
+        f"Testmuster und Figur nehmen verschiedene Zoom-Defaults: {defaults}")
