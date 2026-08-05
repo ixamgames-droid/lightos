@@ -4,11 +4,11 @@ In dieser Anleitung lernst du, wie du in LightOS aus deinen Fixtures drei Gruppe
 
 ## Schritte
 
-1. Öffne die **Live View**.
+1. Öffne die **Bühne**.
 
 2. Ziehe auf einer leeren Bühnenfläche einen Rahmen um die 8 PAR. Das Aufziehen eines Rahmens ist eine Mehrfachauswahl. Oben erscheint die Meldung **"Selektion: 8 Fixtures"**.
 
-![In der Live View ein Auswahl-Rahmen um die 8 PAR, Anzeige "Selektion: 8 Fixtures"](img/01_par_auswahl_rahmen.png)
+![In der Bühne ein Auswahl-Rahmen um die 8 PAR, Anzeige "Selektion: 8 Fixtures"](img/01_par_auswahl_rahmen.png)
 
 3. Klicke auf den Button **"＋ Gruppe aus Auswahl"**, vergib den Namen **"PAR"** und bestätige mit **OK**.
 

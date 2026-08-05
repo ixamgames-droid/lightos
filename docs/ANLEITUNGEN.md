@@ -29,6 +29,8 @@
 |---|---|
 | [3D-Bühne bauen & Fixtures hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Trassen, Stützen, Plattform bauen und Geräte daran hängen. |
 | [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und welche Helligkeit der Visualizer daraus ableitet. |
+| [VC-Bau-Elemente: Referenz aller Widget-Typen](anleitung_vc_widgets/README.md) | Eine Seite je Widget (Knopf, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialog-Felder, Fallstricke — zum Nachschlagen beim Bauen. |
+| [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer kompletten, ruhigeren Show — Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. |
 
 ## Schichten-Modell (so kombiniert die Show)
 

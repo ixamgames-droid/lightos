@@ -29,9 +29,9 @@ In dieser Anleitung lernst du, wie du in der Show `shows/Komplettshow_2026.lshow
 
    Diese Matrix schreibt nur die Farbkanäle und liefert die durchgehend rote Vollfläche.
 
-4. Starte **beide** Matrizen mit **"▶ Start"**. Die rote Farb-Matrix liefert die Farbe, die Dimmer-Matrix moduliert die Helligkeit darüber – das Ergebnis ist ein rotes Lauflicht. Das Badge **"FX2"** in der Live View zeigt an, dass je Gerät zwei Effekte aktiv sind.
+4. Starte **beide** Matrizen mit **"▶ Start"**. Die rote Farb-Matrix liefert die Farbe, die Dimmer-Matrix moduliert die Helligkeit darüber – das Ergebnis ist ein rotes Lauflicht. Das Badge **"FX2"** in der Bühne zeigt an, dass je Gerät zwei Effekte aktiv sind.
 
-![Live View: 8 PAR in Rot mit "FX2"-Badge und wandernder Helligkeit](img/03_mix_farbe_plus_dimmer_live.png)
+![Bühne: 8 PAR in Rot mit "FX2"-Badge und wandernder Helligkeit](img/03_mix_farbe_plus_dimmer_live.png)
 
 ![Animiertes rotes Lauflicht: rote Farbe mit durchwandernder Helligkeit](gif/mix_farbe_dimmer_chase.gif)
 

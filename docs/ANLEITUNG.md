@@ -23,13 +23,13 @@ Ganz oben liegt eine **Sektions-Leiste** mit 8 Hauptbereichen. Ein Klick (oder
 
 | # | Sektion | Unter-Tabs |
 |---|---------|------------|
-| 1 | **Live View** | (2D-Bühnenansicht von oben) |
+| 1 | **Bühne** | (2D-Bühnenansicht von oben) |
 | 2 | **Patchen** | Patch · Fixture-Gruppen |
 | 3 | **Programmer** | Attribute · Snapshots |
 | 4 | **Virtual Console** | (frei belegbare Live-Bedienoberfläche) |
 | 5 | **Simple Desk** | Simple Desk · Submaster/Kanal-Gruppen |
 | 6 | **Playback** | Playback · Show Manager · Kurven |
-| 7 | **Eingabe / Ausgabe** | Output · DMX Monitor · MIDI · Audio Input · Musik |
+| 7 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Audio Input · Musik |
 | 8 | **BPM** | BPM-Manager (AUTO/MANUAL, Quelle PC-Audio/Loopback, Tap, Lock) |
 
 > **Umgezogen:** **EFX**, **RGB Matrix**, **Funktionen** und **Paletten** sind
@@ -208,7 +208,7 @@ Der Tab **Programmer → Attribute → Assistent** enthält:
 > **MIDI lernen ist nicht hier.** Funktionen/Bedienelemente legst du per MIDI
 > nicht im Programmer auf den Controller, sondern in der **Virtual Console**
 > (Toolbar-Button **„MIDI Lernen"** → danach das Pad/den Fader am Controller
-> betätigen) bzw. über **Eingabe / Ausgabe → MIDI**.
+> betätigen) bzw. über **E/A → MIDI**.
 
 Geometrie- und Pixel-Effekte baust du in den Programmer-Tabs **EFX** und
 **Matrix**. Komplette Schritt-für-Schritt-Anleitungen + das Speed-Rezept
@@ -227,7 +227,7 @@ stehen in [EFFEKTE.md](EFFEKTE.md).
 
 ---
 
-## 7. Eingabe / Ausgabe
+## 7. E/A (Eingabe / Ausgabe)
 
 - **Output:** DMX-Ausgabe konfigurieren (Art-Net, Enttec …) – siehe
   Menü **Ausgabe → Konfigurieren…**.

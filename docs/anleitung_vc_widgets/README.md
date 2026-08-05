@@ -11,7 +11,7 @@ echten Screenshots aus der App.
 ![Alle VC-Widgets in der Übersicht](img/uebersicht_alle_widgets.png)
 
 > Diese Übersicht stammt aus der Vorlage-Show `shows/VC_Widgets_Showcase.lshow`
-> (Generator: `tools/build_vc_widgets_showcase.py`) — sie legt jeden der 18 Widget-Typen
+> (Generator: `tools/build_vc_widgets_showcase.py`) — sie legt jeden der 19 Widget-Typen
 > einmal beschriftet ab.
 
 ---

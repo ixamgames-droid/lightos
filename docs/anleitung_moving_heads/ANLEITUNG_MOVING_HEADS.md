@@ -56,10 +56,10 @@ man sie wieder ausschaltet, und öffnen automatisch den Strahl (Dimmer 255 + Shu
 | **MH Rechteck** | rechteckige Bahn |
 | **MH Zickzack (Pfad)** | selbst gezeichnete Custom-Path-Bahn |
 
-In der Live View werden die MH dabei als **aktive Strahl-Symbole** mit Richtung gezeigt
+In der Bühne werden die MH dabei als **aktive Strahl-Symbole** mit Richtung gezeigt
 (echte Schwenks am besten am Gerät oder im EFX-Editor-Preview ansehen):
 
-![MH live in der Live View](img/02_mh_live_beams.png)
+![MH live in der Bühne](img/02_mh_live_beams.png)
 
 ## 4. Bewegung anpassen (Reihe 3)
 

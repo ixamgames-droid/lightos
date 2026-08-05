@@ -39,7 +39,7 @@ Die Aktion wird im Button-Editor über deutsche Labels
 | `BLACKOUT` | Blackout | `output_manager.set_blackout(press)` (gehalten) | — |
 | `TOGGLE` / `FLASH` | Executor: Go / Flash | Wirkt auf `playback_engine.executors[function_id]` | `function_id` = Executor-Slot |
 | `ALL_WHITE` | Alles Weiß (gehalten) | Flasht die gebundene Weiß-Szene(n) | `function_id`(s) |
-| `FREEZE` | Freeze (BPM einfrieren) | `tempo_bus.toggle_freeze()` | — |
+| `FREEZE` | Freeze (alles anhalten) | `AppState.set_freeze()` — Renderer rechnet nicht mehr, Ausgabe hält ihren Stand, Tempo-Bus friert mit (BUG-FBW Slice 3) | — |
 | `AUTO_SYNC` | Auto-Sync an/aus | `tempo_bus.set_auto_sync(...)` | — |
 | `TAP` | Tap-Tempo | `bpm_manager.tap()` (globaler Leader) | — |
 | `AUDIO_BPM` | Musik-BPM | `bpm_manager.use_audio_source(...)` | — |

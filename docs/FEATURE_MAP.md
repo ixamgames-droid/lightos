@@ -10,24 +10,24 @@ den Modul-/Klassen-Docstrings. LOC = Zeilenzahl (grobe Größe). Kein Laufzeitte
 beschreibt die **Soll-Struktur laut Code**.
 
 Die App ist eine **PySide6/Qt**-Anwendung. Einstieg: `MainWindow`
-(`src/ui/main_window.py`, 1465 LOC). Oben eine **Sektions-Leiste mit 7 Schaltern**
+(`src/ui/main_window.py`, 1465 LOC). Oben eine **Sektions-Leiste mit 8 Schaltern**
 (QStackedWidget), darunter der Inhalt; viele Sektionen haben **Sub-Tabs**
 (`_SubTabs`). Dazu eine Menüleiste, eine Command-Line am unteren Rand und der
 Visualizer als separates Fenster.
 
 ---
 
-## 1. Sektionen (Haupt-Navigation, 7 Schalter)
+## 1. Sektionen (Haupt-Navigation, 8 Schalter)
 
 | # | Sektion (Schalter) | Sub-Tabs | Inhalt / Zweck |
 |---|--------------------|----------|----------------|
-| 0 | **Live View** | – | 2D-Top-Down-Ansicht aller gepatchten Fixtures aus der Vogelperspektive (`live_view.py`, 607) |
+| 0 | **Bühne** | – | 2D-Top-Down-Ansicht aller gepatchten Fixtures aus der Vogelperspektive (`live_view.py`, 607) |
 | 1 | **Patchen** | Patch · Gruppen | Geräte patchen + Fixture-Gruppen (EFX/RGB Matrix/Funktionen nach P-01 in den Programmer umgezogen) |
 | 2 | **Programmer** | Programmer · Funktionen · EFX · RGB Matrix · Paletten · Snapshots | Fixture-Attribute live setzen, Funktions-/Effekt-Editoren, Paletten, Snapshots |
 | 3 | **Virtual Console** | – | Frei konfigurierbare Konsole: Toolbar + Canvas + Snapshot-Seitenleiste (`virtual_console_view.py`, 619) |
 | 4 | **Simple Desk** | Simple Desk · Channel Groups | 512 direkte DMX-Fader + Kanal-Gruppen-Submaster |
 | 5 | **Playback** | Playback · Show Manager | Executor-Fader/Cuelisten + Timeline-Show-Editor |
-| 6 | **Eingabe / Ausgabe** | Output · DMX Monitor · MIDI · Audio Input | DMX-Ausgabe, Monitor, MIDI, Audio in einem Bereich |
+| 6 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Audio Input | DMX-Ausgabe, Monitor, MIDI, Audio in einem Bereich |
 
 ### Sub-Tabs im Detail
 

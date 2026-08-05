@@ -59,6 +59,28 @@ _ENTFERNT = {
                             "Modus 'Bauen' + Tab 'Fixtures'"),
     "Bühne bearbeiten": ("2026-08-02 (PR #552)",
                          "Modus 'Bauen' + Tab 'Bühne'"),
+    # DOC-10 (2026-08-05): zwei der drei gruenen Baukasten-Bloecke sind mit dem
+    # Live-Edit-Panel weggefallen. Aufgefallen sind sie, weil
+    # ANLEITUNG_VC_ELEMENTE.md den Color-Chase noch als „am bequemsten" und
+    # sogar als „neu" empfahl — der Abschnitt weiter unten war laengst als
+    # historisch markiert, Kopf und Zusammenfassung wurden dabei vergessen.
+    #
+    # ★ MIT EMOJI, und das ist keine Kosmetik: „Color-Chase" ist auch ein ganz
+    # normales Wort fuer einen Farb-Chase. Ohne das Emoji meldete dieses Gate
+    # sofort sechs Falschtreffer — einen Szenennamen in KOMPLETT_DEMO.md, eine
+    # APC-Seite, einen Look in EFFEKTE.md, eine Bank-Beschreibung. Gemeint ist
+    # der KNOPF, und der trug das Emoji. Ein Gate, das Falschmeldungen
+    # produziert, wird abgeschaltet — dann faengt es auch die echten nicht mehr.
+    "🎨 Color-Chase": ("2026-07 (Live-Edit-Panel)",
+                       "Live-Edit-Panel: Effekt hineinziehen, Ziele ankreuzen "
+                       "(docs/LIVE_EDIT_FENSTER.md)"),
+    "🟦 Chase-Bereich": ("2026-07 (Live-Edit-Panel)", "s. 🎨 Color-Chase"),
+    # NICHT aufgenommen: „Controller-Vorlage". Die Gegenprobe dieses Gates hat
+    # das zurueckgewiesen, und sie hatte recht — weggefallen ist nur der
+    # gleichnamige BAUKASTEN-BLOCK, die Funktion selbst lebt
+    # (`controller_browser.py`: „Controller-Vorlage einfuegen", Sektion MIDI).
+    # Der Satz in docs/LIVE_EDIT_FENSTER.md, das Panel ersetze
+    # „Controller-Vorlage, Color-Chase und Chase-Bereich", ist damit zu grob.
 }
 
 # Erwähnung als GESCHICHTE ist erlaubt — nur die aktive Anweisung ist das Problem.
