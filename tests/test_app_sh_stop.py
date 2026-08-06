@@ -30,6 +30,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP_SH = ROOT / "tools" / "app.sh"
 
+# ⚠️ `tools/app.sh` IST der Linux-Starter: die Attrappe unten baut ein
+# `venv/bin/python`, das Skript wird ueber `bash` gefahren, und geprueft wird mit
+# POSIX-Signalen. Auf Windows gibt es davon nichts — dort startet `tools/app.ps1`.
+#
+# Ein Guard auf `APP_SH.exists()` reicht NICHT: die Datei ist eingecheckt und
+# liegt auf einem Windows-Checkout selbstverstaendlich auch da. Der Aufruf lief
+# dann in `FileNotFoundError: [WinError 2]`, und die Datei war im Windows-Gate
+# rot, waehrend Linux gruen blieb (XPLAT-WIN — dieselbe Falle steckte in
+# test_gate_webengine_lane.py).
+_LAEUFT_HIER = (APP_SH.exists() and os.name != "nt"
+                and shutil.which("bash") is not None)
+_GRUND = ("tools/app.sh ist der Linux-Starter (bash + venv/bin/python + "
+          "POSIX-Signale); auf Windows uebernimmt tools/app.ps1")
+
 
 def _lebt(pid: int) -> bool:
     try:
@@ -41,6 +55,7 @@ def _lebt(pid: int) -> bool:
     return True
 
 
+@unittest.skipUnless(_LAEUFT_HIER, _GRUND)
 class AppShStopTest(unittest.TestCase):
     """Jeder Test baut sich seine eigene Attrappe und raeumt sie wieder ab."""
 
