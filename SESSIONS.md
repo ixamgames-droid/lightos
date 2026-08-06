@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| PROC-01 | A | fix/private-daten-raus | 2026-08-06T14:08Z | COORDINATION.md · tools/session_claim.py · .gitignore |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -20,3 +20,4 @@
 ## Verlauf
 
 - 2026-08-06T14:08Z A claim PROC-01
+- 2026-08-06T15:06Z A done PROC-01
