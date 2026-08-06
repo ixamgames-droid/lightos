@@ -321,6 +321,33 @@ if ($sig.Count) {
     Write-Host "[seg]   gruen, war es dieser Fall. ROT bleibt trotzdem ROT." -ForegroundColor DarkYellow
 }
 
+# Zweite bekannte Fremd-Ursache: das Seitenladen eines WebEngine-Segments reisst
+# unter paralleler Last sein Zeitbudget (40 s in den Szenen-Tests).
+#
+# Auch hier gilt: das Segment bleibt ROT, es wird nichts wiederholt und nichts
+# gruen gerechnet — Wiederholungslogik wuerde echte Fehler mitheilen. Der Name
+# ist der Zweck: ohne ihn steht der Mensch vor einem roten Viz-Segment und muss
+# raten, ob die Szene kaputt ist oder der Rechner nur beschaeftigt war.
+#
+# Gemessene Haeufigkeit (2026-08-06, -j 4): einmal ueber drei volle Laeufe; in
+# einer gezielten Messreihe unter Last 0 von 6. Selten, aber nicht null — wer
+# haeufiger darueber stolpert, senkt LIGHTOS_VERIFY_JOBS.
+$last = @()
+foreach ($rel in @($fail + $timeout)) {
+    $lg = Get-LogPfad $rel
+    if ((Test-Path $lg) -and (Select-String -Path $lg -SimpleMatch -Quiet `
+            -Pattern 'loadFinished nie ausgeloest', '__lightosAppReady')) {
+        $last += $rel
+    }
+}
+if ($last.Count) {
+    Write-Host "[seg] Zeitbudget beim Seitenladen gerissen (Last-Verdacht):" -ForegroundColor DarkYellow
+    $last | ForEach-Object { Write-Host ("    " + $_) -ForegroundColor DarkYellow }
+    Write-Host "[seg]   Gegenprobe: .\tools\verify_loop.ps1 <datei> - bleibt sie isoliert" -ForegroundColor DarkYellow
+    Write-Host "[seg]   gruen, war es die Last. ROT bleibt trotzdem ROT." -ForegroundColor DarkYellow
+    Write-Host "[seg]   Dauerhaft? LIGHTOS_VERIFY_JOBS kleiner setzen (Default 4)." -ForegroundColor DarkYellow
+}
+
 # Wichtig fuer die Triage: steht hier nichts, ist KEIN Test fehlgeschlagen -
 # dann sind die roten Segmente native Abbau-Crashes. Das ist aber nur eine
 # Dringlichkeits-Einstufung, keine Entwarnung (XPLAT-09 versteckte sich neun

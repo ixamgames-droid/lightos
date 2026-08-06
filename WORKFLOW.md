@@ -107,6 +107,26 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   serieller WebEngine-Spur. `tests/test_gate_runner_parity.py` nagelt fest, dass die vier Runner
   (2x Linux, 2x Windows) dieselbe Gate-Umgebung setzen.
 
+  **Preis der Parallelitaet (gemessen, nicht geschaetzt):** zeitkritische Visualizer-Tests
+  koennen unter Last rot werden, obwohl an der Szene nichts kaputt ist. Zwei Auspraegungen
+  beobachtet:
+  1. **Seitenladen reisst sein Budget** (40 s) — der Runner benennt den Fall
+     („Zeitbudget beim Seitenladen gerissen").
+  2. **Render-Zusicherung misst zu frueh**, z. B.
+     `test_viz14_selection_scene::test_identify_pulse_renders_settle_frame_on_expiry`
+     („Settle-Frame wurde nicht gerendert"). Gemessen: **ohne** Last 0 von 6 rot, **mit**
+     `-j 4`-Last 1 von 6. Der Test ist also lastempfindlich, nicht kaputt.
+
+  ⚠️ Es wird **nichts gruen gerechnet und nichts wiederholt** — Wiederholungslogik wuerde echte
+  Fehler mitheilen (dieselbe Begruendung wie auf Linux). Und die Namensgebung bleibt bewusst
+  ENG auf Auspraegung 1: „Fehler in einer WebEngine-Datei = wohl nur Last" waere genau die
+  Gewoehnung, hinter der sich XPLAT-09 neun Testdateien lang versteckt hat.
+
+  **Gegenprobe bei einem roten Viz-Segment:** `./tools/verify_loop.ps1 <datei>`. Bleibt sie
+  isoliert gruen, war es die Last. Wer haeufiger darueber stolpert, senkt
+  `LIGHTOS_VERIFY_JOBS` (Default 4) — der Default ist die gemessene Konfiguration, kein
+  Erfahrungswert.
+
   ⚠️ **Bewusster Unterschied zu Linux:** `verify_segmented.sh` zaehlt jeden `rc != 0` als rot,
   `verify_segmented.ps1` NICHT — native Abstuerze (NTSTATUS, grosse negative Codes wie
   `0xC0000005`) gelten als Umgebungs-Flakiness, echte pytest-Failures (kleine positive Codes)
