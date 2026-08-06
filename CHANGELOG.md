@@ -7,6 +7,39 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-06 — Der Ausgabe-Dialog merkt sich jetzt alles, was er anzeigt
+
+#### Behoben
+
+- **Art-Net, sACN und der COM-Port zeigten beim Oeffnen nie die gespeicherte
+  Einstellung — und ueberschrieben sie beim naechsten „Uebernehmen".** Es war
+  derselbe Fehler wie beim Enttec-Universum (behoben am 2026-08-05), nur noch
+  dreimal im selben Dialog. Was das konkret hiess:
+
+  - Der **COM-Port** stand nach jedem Oeffnen wieder auf dem ersten Port der
+    Liste. „Verbinden" nahm damit unter Umstaenden ein anderes angeschlossenes
+    Geraet und schrieb es auch noch als neue Einstellung fest.
+  - Der **Art-Net-Bereich** startete immer auf Universum 1 mit
+    `255.255.255.255`. Ein Klick auf „Uebernehmen" legte dadurch einen zweiten,
+    unerwuenschten Eintrag auf Universum 1 an.
+  - Im **sACN-Bereich** war der Haken „Multicast" fest gesetzt. „Uebernehmen"
+    loeschte damit eine eingetragene Unicast-Adresse.
+
+  Alle drei Bereiche werden jetzt aus der gespeicherten Konfiguration gefuellt.
+  Ein Durchklicken durch die Tabs veraendert nichts mehr an der Einstellung.
+
+- **Ein gespeicherter COM-Port, den es nicht mehr gibt, wird als solcher
+  angezeigt** („— derzeit nicht gefunden") statt stillschweigend durch das
+  erstbeste andere Geraet ersetzt zu werden. Ein Klick auf „Verbinden" sagt
+  dann, dass der Port fehlt — das ist die nuetzlichere Antwort als eine
+  Verbindung zum falschen Geraet.
+
+- **Der Ausgabe-Dialog laesst sich auch mit beschaedigter Konfigurationsdatei
+  oeffnen.** Stand in `data/universes.json` an einer Stelle eine Zahl, wo Text
+  erwartet wird (etwa nach einer Bearbeitung von Hand), liess sich der Dialog
+  gar nicht mehr aufrufen — ausgerechnet das Werkzeug, mit dem man es haette
+  richtigstellen koennen.
+
 ### 2026-08-05 — Demo-Show fuer den LED-Balken, und drei Stolpersteine beim Bauen
 
 #### Neu
