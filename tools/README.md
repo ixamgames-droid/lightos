@@ -76,6 +76,7 @@
 | `verify_color_dimmer_separation.py` | Verifikation: Trennung FARBE <-> DIMMER an Effekten (Color/Matrix/Chase). |
 | `verify_loop.ps1` | tools/verify_loop.ps1 - Test-Gate fuer den LightOS Loop-Modus |
 | `verify_loop.sh` | tools/verify_loop.sh — Test-Gate fuer Linux/macOS (Pendant zu verify_loop.ps1). |
+| `verify_segmented.ps1` | tools/verify_segmented.ps1 - Test-Gate in Segmenten (Windows-Pendant zu tools/verify_segmented.sh). |
 | `verify_segmented.sh` | tools/verify_segmented.sh — Test-Gate in Segmenten (Linux-Pendant zu run_tests.ps1 -Isolate). |
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 | `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |

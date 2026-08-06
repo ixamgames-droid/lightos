@@ -10,6 +10,7 @@ lebenden Canvases ab.
 import os
 import sys
 import tempfile
+import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # Tests auf SEPARATE, PRO-PROZESS-EINDEUTIGE Datenbanken umlenken. So fasst kein
@@ -27,9 +28,55 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # (app_state.SHOW_DB_PATH liest LIGHTOS_SHOW_DB beim Import EINMAL).
 _TEST_TMP = tempfile.gettempdir()
 _TEST_PID = os.getpid()
+# ⚠️ Die PID ALLEIN reicht als Isolations-Token NICHT, sobald Segmente PARALLEL
+# laufen (`verify_segmented.ps1 -j 4` / `verify_segmented.sh -j 3`). Beide
+# Betriebssysteme vergeben PIDs wieder, und bei ~570 kurzlebigen pytest-Prozessen
+# in zehn Minuten passiert das real — dass die PID recycelt wird, stand als
+# Moeglichkeit schon in `_purge_test_dbs()`, abgefangen war aber nur die DB.
+#
+# GEMESSEN 2026-08-04 im ersten parallelen Windows-Volllauf (569 Segmente):
+#   FileNotFoundError: [WinError 2] ... \lightos_test_appdata_16800
+# Hergang: Prozess A (PID 16800) raeumt am Sitzungsende sein `_TEST_APPDATA` per
+# `shutil.rmtree` ab, waehrend ein NEUER Prozess dieselbe PID zugeteilt bekommen
+# und denselben Pfad gerade angelegt hat -> dem neuen Prozess wird das
+# Verzeichnis mitten in der Sammelphase unter den Fuessen weggezogen. Zwei
+# Testdateien wurden dadurch rot, obwohl an ihnen nichts kaputt war -- die
+# gefaehrliche Sorte Fehlschlag, weil sie wie ein echter Regress aussieht.
+#
+# Deshalb PID + Zufallsmarke: die PID bleibt vorn (Diagnose, session_status.ps1),
+# die Marke macht den Pfad pro Prozess-INSTANZ eindeutig statt nur pro PID.
+_TEST_TOKEN = f"{_TEST_PID}_{uuid.uuid4().hex[:8]}"
+
+# Alle Test-Artefakte in EINEN Unterordner statt direkt in den Temp-Ordner.
+#
+# Das ist HYGIENE, kein Fehlerfix — die Abgrenzung ist wichtig, damit hier nicht
+# eine unbelegte Behauptung stehenbleibt: ein paralleler Gate-Lauf legte 569
+# Eintraege direkt im Temp-Ordner ab, und gemessen lagen dort am 2026-08-04
+# bereits 250 Leichen frueherer Laeufe. Gebuendelt bleibt genau EIN stabiler
+# Eintrag uebrig, und das Aufraeumen unten findet seine Kandidaten an einer
+# Stelle statt zwischen tausenden fremden Dateien.
+#
+# ⚠️ Was das NICHT behebt: den `FileNotFoundError` aus `os.lstat`, an dem
+# `test_harden_exit_keeps_report.py` im parallelen Lauf rot wurde. Die Ursache
+# liegt woanders — eine Windows-only-Stelle in pytest selbst
+# (`_pytest/main.py`, Arg-Matching):
+#     if sys.platform == "win32" and not is_match:
+#         is_match = samefile_nofollow(node.path, matchparts[0])   # -> lstat()
+# Zeigt ein pytest-Argument in den Temp-Ordner, sammelt pytest diesen Ordner und
+# lstat't JEDEN Eintrag darin. Gemessen lagen dort 7722 Eintraege, von denen
+# staendig welche entstehen und vergehen (gewoehnliche `tempfile`-Nutzung der
+# Tests, dutzende in 6 Sekunden) — irgendeiner ist beim `lstat` immer schon weg.
+# Unsere eigenen Artefakte waren daran nur ein kleiner Anteil; sie wegzuraeumen
+# aenderte an der Ausfallrate nichts (nachgemessen: weiterhin 2 von 3 Laeufen
+# rot). Der Fix gehoert deshalb dorthin, wo das Argument gesetzt wird — der
+# Unterprozess in test_harden_exit_keeps_report.py laeuft jetzt MIT cwd im
+# Probe-Ordner und uebergibt nur den Dateinamen, damit pytests Sammelbaum dort
+# beginnt und den Temp-Ordner nie anfasst (6/6 sauber unter derselben Last).
+_TEST_ROOT = os.path.join(_TEST_TMP, "lightos_tests")
+os.makedirs(_TEST_ROOT, exist_ok=True)
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
-    os.path.join(_TEST_TMP, f"lightos_test_show_{_TEST_PID}.db"))
+    os.path.join(_TEST_ROOT, f"lightos_test_show_{_TEST_TOKEN}.db"))
 
 # APPDATA in ein PID-eigenes Temp-Verzeichnis umlenken -> KEIN Test fasst je die
 # echte %APPDATA%/LightOS des Nutzers an. Zahlreiche Module lesen APPDATA in
@@ -61,7 +108,7 @@ from src.core.paths import app_data_dir as _app_data_dir  # noqa: E402
 os.environ.setdefault(
     "LIGHTOS_FIXTURE_DB", os.path.join(_app_data_dir(), "fixtures.db"))
 
-_TEST_APPDATA = os.path.join(_TEST_TMP, f"lightos_test_appdata_{_TEST_PID}")
+_TEST_APPDATA = os.path.join(_TEST_ROOT, f"lightos_test_appdata_{_TEST_TOKEN}")
 os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
 os.environ["APPDATA"] = _TEST_APPDATA
 
@@ -80,7 +127,7 @@ os.environ["APPDATA"] = _TEST_APPDATA
 # aufrufende Test-Frame darueber liegt. Deshalb trennt es hier die Schreibseite.
 os.environ.setdefault(
     "LIGHTOS_CRASH_LOG",
-    os.path.join(_TEST_TMP, f"lightos_test_crash_{_TEST_PID}.log"))
+    os.path.join(_TEST_ROOT, f"lightos_test_crash_{_TEST_TOKEN}.log"))
 
 # OUT-06: dieselbe Trennung fuer die persistente sACN-CID. Ohne sie legte JEDER
 # Testlauf, der irgendwo einen SACNSender baut (test_sacn_loopback,
@@ -89,7 +136,7 @@ os.environ.setdefault(
 # beim crash.log reicht die APPDATA-Umlenkung dafuer nur auf Windows.
 os.environ.setdefault(
     "LIGHTOS_SACN_CID",
-    os.path.join(_TEST_TMP, f"lightos_test_sacn_cid_{_TEST_PID}"))
+    os.path.join(_TEST_ROOT, f"lightos_test_sacn_cid_{_TEST_TOKEN}"))
 
 # QA-UNIVERSES-WRITE: dieselbe Trennung fuer die Ausgangs-Konfiguration.
 #
@@ -119,7 +166,7 @@ os.environ.setdefault(
 # Der Subprozess in `test_universes_json_isolation.py` erbt damit ebenfalls
 # einen Wegwerf-Pfad statt des geerbten Elternwerts.
 os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
-    _TEST_TMP, f"lightos_test_universes_{_TEST_PID}.json")
+    _TEST_ROOT, f"lightos_test_universes_{_TEST_TOKEN}.json")
 
 
 def _purge_test_dbs():
@@ -137,26 +184,49 @@ def _purge_test_dbs():
 
 
 def _purge_old_test_crash_logs():
-    """Test-crash.logs frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
+    """Reste frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
 
-    Die Datei traegt die PID, damit parallele Segmente (``verify_segmented.sh -j 3``)
-    sich nicht in die Quere kommen — sie entsteht lazy, also nur fuer Segmente, die
-    wirklich etwas loggen. Ohne dieses Aufraeumen sammeln sich die Reste in /tmp.
-    Die EIGENE Datei bleibt unangetastet.
+    Die Pfade tragen `_TEST_TOKEN`, damit parallele Segmente
+    (``verify_segmented.ps1 -j 4`` / ``verify_segmented.sh -j 3``) sich nicht in die
+    Quere kommen. Ohne dieses Aufraeumen sammeln sich die Reste im Temp-Ordner.
+    Die EIGENEN Pfade bleiben unangetastet.
+
+    ⚠️ Seit der Token eine Zufallsmarke traegt (statt nur der PID, s. oben) ist das
+    kein Komfort mehr, sondern noetig: vorher hat ein spaeterer Lauf mit derselben
+    recycelten PID die Reste ueberschrieben, jetzt bekommt JEDER Prozess einen
+    neuen Pfad. Ein hart abgestuerztes Segment — auf Windows der bekannte
+    0xC0000005 im nativen Qt-Abbau — kommt nie bis zu seinem eigenen rmtree und
+    wuerde sonst dauerhaft liegenbleiben.
+
+    Nur was aelter als 24 h ist: ein fremder LAUFENDER Lauf darf nie getroffen
+    werden. Best effort — Aufraeumen darf keinen Testlauf verhindern.
     """
-    own = os.environ.get("LIGHTOS_CRASH_LOG")
     try:
         import glob
+        import shutil as _shutil
         import time as _time
         cutoff = _time.time() - 24 * 3600
-        for path in glob.glob(os.path.join(_TEST_TMP, "lightos_test_crash_*.log")):
-            if path == own:
-                continue
-            try:
-                if os.path.getmtime(path) < cutoff:
-                    os.remove(path)
-            except OSError:
-                pass    # fremder Lauf haelt sie noch offen -> naechstes Mal
+        eigene = {os.environ.get("LIGHTOS_CRASH_LOG"),
+                  os.environ.get("LIGHTOS_SHOW_DB"),
+                  os.environ.get("LIGHTOS_SACN_CID"),
+                  os.environ.get("LIGHTOS_UNIVERSES_JSON"),
+                  _TEST_APPDATA}
+        muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
+                  "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
+                  "lightos_test_universes_*.json")
+        for m in muster:
+            for path in glob.glob(os.path.join(_TEST_ROOT, m)):
+                if path in eigene:
+                    continue
+                try:
+                    if os.path.getmtime(path) >= cutoff:
+                        continue
+                    if os.path.isdir(path):
+                        _shutil.rmtree(path, ignore_errors=True)
+                    else:
+                        os.remove(path)
+                except OSError:
+                    pass    # fremder Lauf haelt es noch offen -> naechstes Mal
     except Exception:
         pass            # Aufraeumen darf NIE einen Testlauf verhindern
 

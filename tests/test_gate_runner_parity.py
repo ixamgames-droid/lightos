@@ -28,6 +28,21 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _RUNNERS = ("tools/verify_loop.sh", "tools/verify_segmented.sh")
 
+# XPLAT-WIN (2026-08-04): dieselbe Zusicherung fuer die Windows-Kette. Sie hatte
+# exakt die Drift, gegen die diese Datei auf Linux gebaut wurde — nur andersherum:
+# die Gate-Umgebung stand AUSSERHALB des Repos (in Davids maschinenspezifischem
+# ../run_tests.ps1), waehrend tools/verify_loop.ps1 gar nichts setzte. Ein
+# frischer Windows-Checkout fuhr damit ein anderes Gate als der Entwicklungs-
+# rechner, und LIGHTOS_HARDEN_EXIT fehlte dort vollstaendig.
+_PS_RUNNERS = ("tools/verify_loop.ps1", "tools/verify_segmented.ps1")
+
+# if (-not $env:NAME) { $env:NAME = "wert" }   — die PowerShell-Entsprechung zu
+# `export NAME="${NAME:-wert}"`: setdefault, damit ein von aussen gesetzter Wert
+# (etwa der des Lock-Runners) Vorrang behaelt.
+_PS_SETDEFAULT = re.compile(
+    r'^\s*if\s*\(\s*-not\s+\$env:(?P<name>[A-Z_][A-Z0-9_]*)\s*\)\s*\{\s*'
+    r'\$env:(?P=name)\s*=\s*"(?P<value>[^"]*)"\s*\}', re.M)
+
 # Variablen, die das Testverhalten aendern. Wer hier eine ergaenzt, muss sie in
 # BEIDEN Runnern setzen — das ist der Sinn der Sache.
 _GATE_VARS = ("QT_QPA_PLATFORM", "LIGHTOS_HARDEN_EXIT")
@@ -104,6 +119,75 @@ def test_both_runners_set_the_same_gate_variable(var):
     assert len(distinct) == 1, (
         f"{var} hat je Runner einen anderen Default: {values}. Beide Gates muessen "
         "dasselbe messen.")
+
+
+def _ps_setdefaults(rel_path: str) -> dict[str, str]:
+    with open(os.path.join(_REPO_ROOT, rel_path), encoding="utf-8") as f:
+        return {m.group("name"): m.group("value")
+                for m in _PS_SETDEFAULT.finditer(f.read())}
+
+
+@pytest.mark.parametrize("rel", _PS_RUNNERS)
+def test_windows_runner_exists(rel):
+    """Kein Ausfuehrbar-Bit noetig: .ps1 wird ueber `powershell -File` gestartet.
+
+    Geprueft wird nur die Existenz — und die ist der Punkt: bis XPLAT-WIN gab es
+    ``tools/verify_segmented.ps1`` gar nicht, die Segmentierung lag ausschliesslich
+    im nicht-versionierten ``../run_tests.ps1``.
+    """
+    assert os.path.isfile(os.path.join(_REPO_ROOT, rel)), (
+        f"{rel} fehlt. Ohne den Segment-Runner im Repo faehrt ein frischer "
+        "Windows-Checkout die volle Suite in EINEM Prozess — genau die Variante, "
+        "die an akkumulierendem Qt-Zustand stirbt (XPLAT-WIN).")
+
+
+@pytest.mark.parametrize("var", _GATE_VARS)
+def test_both_windows_runners_set_the_same_gate_variable(var):
+    values = {rel: _ps_setdefaults(rel).get(var) for rel in _PS_RUNNERS}
+    missing = [rel for rel, v in values.items() if v is None]
+    assert not missing, (
+        f"{var} wird nicht in allen Windows-Gate-Runnern gesetzt — fehlt in: "
+        f"{missing}. Erwartete Schreibweise: "
+        f'if (-not $env:{var}) {{ $env:{var} = "wert" }}')
+    assert len(set(values.values())) == 1, (
+        f"{var} hat je Windows-Runner einen anderen Default: {values}.")
+
+
+@pytest.mark.parametrize("var", _GATE_VARS)
+def test_windows_and_linux_gates_measure_the_same_thing(var):
+    """Die eigentliche Zusicherung: beide PLATTFORMEN messen dasselbe.
+
+    Ohne diesen Test koennten die vier Runner je Plattform in sich stimmig sein
+    und trotzdem zwei verschiedene Gates ergeben — dann repariert man auf der
+    einen Seite etwas, das auf der anderen gar nicht ankommt. Genau diese
+    Verwechslung war XPLAT-11.
+    """
+    linux = _exports(_RUNNERS[0]).get(var)
+    windows = _ps_setdefaults(_PS_RUNNERS[0]).get(var)
+    # ⚠️ Ohne diese Zeile besteht der Test auch bei None == None — also genau
+    # dann, wenn BEIDE Regexe nichts finden, etwa weil jemand die Schreibweise
+    # umstellt. Ein Waechter, der bei kaputter Erkennung gruen wird, ist keiner.
+    assert linux is not None and windows is not None, (
+        f"{var} wurde in keinem der beiden Gates gefunden (linux={linux!r}, "
+        f"windows={windows!r}) — vermutlich hat sich die Schreibweise geaendert "
+        "und die Erkennung greift nicht mehr.")
+    assert linux == windows, (
+        f"{var}: Linux-Gate setzt {linux!r}, Windows-Gate {windows!r} — die "
+        "beiden Plattformen messen damit Unterschiedliches.")
+
+
+def test_windows_verify_loop_delegates_full_suite_to_the_segmented_runner():
+    """Pendant zu ``test_verify_loop_delegates_full_suite_to_the_segmented_runner``.
+
+    Ohne die Delegation faehrt ein ``verify_loop.ps1`` ohne Lock-Runner die Suite
+    in EINEM ``pytest tests/``-Prozess — die Variante, gegen die es den
+    Segment-Runner ueberhaupt gibt.
+    """
+    with open(os.path.join(_REPO_ROOT, "tools/verify_loop.ps1"), encoding="utf-8") as f:
+        src = f.read()
+    assert "verify_segmented.ps1" in src, (
+        "tools/verify_loop.ps1 delegiert die volle Suite nicht an "
+        "tools/verify_segmented.ps1 (XPLAT-WIN).")
 
 
 def test_verify_loop_delegates_full_suite_to_the_segmented_runner():

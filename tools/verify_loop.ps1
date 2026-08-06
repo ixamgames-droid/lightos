@@ -12,10 +12,26 @@
 # Fehlt der Runner, faellt das Gate mit deutlicher Warnung auf direktes pytest zurueck (OHNE Sperre).
 # Details: SecondBrain/reference_pytest_lock.md.
 #
-# Exit 0 = gruen, sonst rot. Headless: conftest.py / run_tests.ps1 setzen QT_QPA_PLATFORM=offscreen.
+# Exit 0 = gruen, sonst rot.
 param([Parameter(ValueFromRemainingArguments = $true)][string[]]$TestArgs)
 
 $ErrorActionPreference = "Stop"
+
+# ── Gate-Umgebung ───────────────────────────────────────────────────────────
+# MUSS identisch zu tools/verify_segmented.ps1 bleiben - tests/test_gate_runner_parity.py
+# nagelt das fest.
+#
+# XPLAT-WIN (2026-08-04): hier stand vorher NICHTS, nur der Kommentar "conftest.py /
+# run_tests.ps1 setzen QT_QPA_PLATFORM". Das war dieselbe Drift, die Linux mit
+# XPLAT-11 beseitigt hat, nur andersherum: die Gate-Umgebung war AUSSERHALB des
+# Repos definiert (run_tests.ps1 setzt beide Variablen). Ein frischer
+# Windows-Checkout ohne dieses maschinenspezifische Skript fuhr damit ein anderes
+# Gate als Davids Rechner - und LIGHTOS_HARDEN_EXIT fehlte dort ganz.
+#
+# setdefault-Semantik (wie `${VAR:-wert}` auf Linux), damit ein von aussen
+# gesetzter Wert - etwa der von run_tests.ps1 - Vorrang behaelt.
+if (-not $env:QT_QPA_PLATFORM)     { $env:QT_QPA_PLATFORM = "offscreen" }
+if (-not $env:LIGHTOS_HARDEN_EXIT) { $env:LIGHTOS_HARDEN_EXIT = "1" }
 $repo = Resolve-Path (Join-Path $PSScriptRoot "..")
 $outer = Split-Path $repo -Parent   # aeusserer Projektordner (Eltern des Repo-Roots)
 
@@ -84,12 +100,32 @@ try {
     }
     else {
         Write-Host "[verify] WARNUNG: Lock-Runner nicht gefunden: $runner" -ForegroundColor Yellow
-        Write-Host "[verify]          Fallback auf direktes pytest OHNE sitzungsuebergreifende Sperre!" -ForegroundColor Yellow
-        Write-Host "[verify]          Bei parallelen Sessions drohen Qt-Segfaults/Haenger - siehe reference_pytest_lock." -ForegroundColor Yellow
-        $target = if ($TestArgs) { $TestArgs } else { @("tests/") }
-        Write-Host "[verify] 2/2 pytest $($target -join ' ') ..."
-        & $py -m pytest @target -q --tb=short -p no:cacheprovider -o addopts=""
-        $code = $LASTEXITCODE
+        Write-Host "[verify]          Kein sitzungsuebergreifender Schutz - bei parallelen Sessions" -ForegroundColor Yellow
+        Write-Host "[verify]          drohen Qt-Segfaults/Haenger (siehe reference_pytest_lock)." -ForegroundColor Yellow
+        # XPLAT-WIN: die VOLLE Suite gehoert auch hier in den Segment-Runner, nicht
+        # in ein einzelnes `pytest tests/`. Pendant zu tools/verify_loop.sh, das auf
+        # Linux an verify_segmented.sh delegiert.
+        #
+        # Vorher stand hier genau dieser Sammellauf - also ausgerechnet die
+        # Variante, die an akkumulierendem nativem Qt-Zustand stirbt. Ein frischer
+        # Windows-Checkout (ohne Davids maschinenspezifisches run_tests.ps1) hatte
+        # damit KEIN belastbares Gate fuer die volle Suite.
+        #
+        # Gezielte Einzeldateien laufen weiterhin direkt: dort gibt es keinen
+        # akkumulierenden Zustand zu vermeiden, und der Segment-Overhead lohnt nicht.
+        $seg = Join-Path $PSScriptRoot "verify_segmented.ps1"
+        if (-not $TestArgs -and (Test-Path $seg)) {
+            $jobs = if ($env:LIGHTOS_VERIFY_JOBS) { $env:LIGHTOS_VERIFY_JOBS } else { "4" }
+            Write-Host "[verify] 2/2 VOLLE Suite segmentiert ($jobs parallel) ..."
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $seg -j $jobs
+            $code = $LASTEXITCODE
+        }
+        else {
+            $target = if ($TestArgs) { $TestArgs } else { @("tests/") }
+            Write-Host "[verify] 2/2 pytest $($target -join ' ') ..."
+            & $py -m pytest @target -q --tb=short -p no:cacheprovider -o addopts=""
+            $code = $LASTEXITCODE
+        }
         if ($code -ne 0) { Write-Host "[verify] TESTS ROT (exit $code)"; exit $code }
     }
 
