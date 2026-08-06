@@ -65,19 +65,19 @@ class FstypeTest(unittest.TestCase):
 
     def test_findet_den_typ_des_tragenden_mounts(self):
         q = self._quelle(_zeile("/", "ext4"))
-        self.assertEqual(A._linux_fstype("/home/maxi/show.db", q), "ext4")
+        self.assertEqual(A._linux_fstype("/home/user/show.db", q), "ext4")
 
     def test_der_laengste_passende_mountpunkt_gewinnt(self):
         """★ Bei verschachtelten Mounts trägt den Pfad der speziellere. Ohne
         diese Regel meldete ein NFS-``/home`` unter einem ext4-``/`` fälschlich
         „lokal" — also WAL auf einem Netzlaufwerk."""
         q = self._quelle(_zeile("/", "ext4"), _zeile("/home", "nfs4"))
-        self.assertEqual(A._linux_fstype("/home/maxi/show.db", q), "nfs4")
+        self.assertEqual(A._linux_fstype("/home/user/show.db", q), "nfs4")
         self.assertEqual(A._linux_fstype("/opt/show.db", q), "ext4")
 
     def test_reihenfolge_der_zeilen_ist_egal(self):
         q = self._quelle(_zeile("/home", "nfs4"), _zeile("/", "ext4"))
-        self.assertEqual(A._linux_fstype("/home/maxi/show.db", q), "nfs4")
+        self.assertEqual(A._linux_fstype("/home/user/show.db", q), "nfs4")
 
     def test_praefix_darf_nicht_auf_halbem_namen_greifen(self):
         """``/home2`` ist kein Unterpfad von ``/home``."""
@@ -148,9 +148,9 @@ class WalEntscheidungTest(unittest.TestCase):
         """Ein Sync-Client fasst die -wal/-shm-Sidecars an, egal wie lokal die
         Platte darunter ist."""
         self._mit_fstype("ext4")
-        for pfad in ("/home/maxi/Dropbox/show.db",
-                     "/home/maxi/OneDrive/daten/show.db",
-                     "/home/maxi/Nextcloud/show.db"):
+        for pfad in ("/home/user/Dropbox/show.db",
+                     "/home/user/OneDrive/daten/show.db",
+                     "/home/user/Nextcloud/show.db"):
             with self.subTest(pfad=pfad):
                 self.assertFalse(A._is_local_writable_path(pfad))
 

@@ -68,8 +68,10 @@
 | `lint_show.py` | CLI: prüft eine oder mehrere .lshow (oder show.json) gegen die echten |
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
 | `patch_quarantaene.py` | STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in |
+| `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |
 | `render_apc_pages.py` | Rendert jede Seite (VC-Bank) der APC-Test-Show als PNG — fuer die Anleitung. |
 | `render_neue_demo_pages.py` | Rendert die 5 Banks der Neue_Demo_2026-Show als PNG (für die Doku/Vorschau). |
+| `session_claim.py` | session_claim.py — Belegzettel fuer parallel arbeitende Claude-Sitzungen. |
 | `ui_verification_checklist.py` | QA-12 UI-Verifikations-Checklisten-Generator/-Checker. |
 | `upgrade_shows.py` | Alt-Shows auf das aktuelle Show-Format (``show_file.SHOW_VERSION``) heben. |
 | `vc_click_targets.py` | Berechnet aus einem Vollbild-Screenshot (mit der Magenta-Kalibrier-Kachel |

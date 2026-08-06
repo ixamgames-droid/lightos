@@ -75,7 +75,13 @@ for _bad in ("255.255.255.255", "192.168.", "10.0.", "COM", "/dev/tty"):
 from PySide6.QtCore import QTimer                                  # noqa: E402
 from PySide6.QtWidgets import QApplication                         # noqa: E402
 
-DEFAULT_SHOW = "/home/maxi/projects/lightos/repo/shows/Mega_Arena_2026.lshow"
+# PRIV-02: kein absoluter Pfad eines fremden Rechners (und keiner, der
+# den Kontonamen verraet). Repo-relativ aufloesen, ueberschreibbar per
+# LIGHTOS_VERIFY_SHOW — das Werkzeug lief vorher NUR auf genau einem
+# Rechner, ohne das zu sagen.
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_SHOW = os.environ.get("LIGHTOS_VERIFY_SHOW") or os.path.join(
+    _REPO, "shows", "Mega_Arena_2026.lshow")
 
 JS = """(function(){
   try {
