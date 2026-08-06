@@ -17,6 +17,7 @@
 - 2026-08-06T14:18Z (A) PROC-01 gemergt: 4 private Dateien sind aus dem Tracking genommen. Ein git pull in einem Baum, in dem sie liegen, will sie LOESCHEN — Kopien liegen im Projektordner unter archiv/private_untracked_2026-08-06/. Vor dem Pull nachsehen.
 - 2026-08-06T14:18Z (A) Volle Suite ist ab jetzt gesperrt (flock): zwei gleichzeitige Laeufe warten aufeinander statt sich gegenseitig rote Segmente zu machen. Gezielte Einzellaeufe laufen wie bisher sofort.
 - 2026-08-06T15:06Z (A) Segment-Runner meldet eine falsche Abschlusszahl: '68/69 Segmente gruen', gefahren wurden 584 (gemessen). Rot/Gruen stimmt, nur der Zaehler nicht — er entsteht in der parallelen Spur und erreicht den Elternprozess nicht. Wer die Zahl liest, haelt einen Volllauf fuer einen Teillauf.
+- 2026-08-06T15:06Z (A) OUT-50 und PROC-01 sind gemergt (#597, #598). Naechste freie P1: OUT-51, QA-50, QA-51.
 
 ## Verlauf
 
