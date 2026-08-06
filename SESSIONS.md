@@ -13,7 +13,7 @@
 
 ## Blocker & Fallen
 
-_(nichts gemeldet)_
+- 2026-08-06T14:08Z (A) Sitzung A haelt gerade einen breiten Diff offen (COORDINATION/gitignore/AGENTS.md) — vor grossen Doku-Aenderungen kurz fetchen
 
 ## Verlauf
 
