@@ -15,6 +15,7 @@
 
 - 2026-08-06T14:08Z (A) Sitzung A haelt gerade einen breiten Diff offen (COORDINATION/gitignore/AGENTS.md) — vor grossen Doku-Aenderungen kurz fetchen
 - 2026-08-06T14:18Z (A) PROC-01 gemergt: 4 private Dateien sind aus dem Tracking genommen. Ein git pull in einem Baum, in dem sie liegen, will sie LOESCHEN — Kopien liegen im Projektordner unter archiv/private_untracked_2026-08-06/. Vor dem Pull nachsehen.
+- 2026-08-06T14:18Z (A) Volle Suite ist ab jetzt gesperrt (flock): zwei gleichzeitige Laeufe warten aufeinander statt sich gegenseitig rote Segmente zu machen. Gezielte Einzellaeufe laufen wie bisher sofort.
 
 ## Verlauf
 
