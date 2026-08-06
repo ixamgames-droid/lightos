@@ -62,13 +62,55 @@ def _run_subsession(tmp_path, env_extra):
     env.update(env_extra)
     # Die Probe-Datei liegt ausserhalb von tests/ -> conftest.py greift nicht
     # automatisch. Explizit als Plugin laden, damit die Haertung aktiv ist.
-    env["PYTHONPATH"] = os.path.join(_REPO_ROOT, "tests") + os.pathsep + env.get("PYTHONPATH", "")
+    #
+    # ⚠️ Das Repo-Root MUSS mit in den PYTHONPATH: `tests/conftest.py` importiert
+    # `src.core.paths`, und das kam bisher nur ueber `cwd=_REPO_ROOT` in den
+    # sys.path — das faellt mit dem cwd-Wechsel unten weg.
+    env["PYTHONPATH"] = os.pathsep.join(
+        [os.path.join(_REPO_ROOT, "tests"), _REPO_ROOT, env.get("PYTHONPATH", "")])
 
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", str(testfile), "-q", "-rf",
-         "--tb=line", "-p", "no:cacheprovider", "-p", "conftest"],
-        cwd=_REPO_ROOT, env=env, capture_output=True, text=True, timeout=300)
-    return proc
+    return _run_pytest_in(tmp_path, testfile.name, env, ("-rf", "--tb=line"))
+
+
+def _run_pytest_in(ordner, dateiname, env, extra_args=()):
+    """pytest-Untersitzung starten — cwd IM Zielordner, Argument nur der Dateiname.
+
+    ⚠️ NIEMALS auf ``cwd=_REPO_ROOT`` + absoluten ``tmp_path``-Pfad zurueckbauen
+    (so stand es an BEIDEN Aufrufstellen dieser Datei bis 2026-08-04). Genau
+    deshalb gibt es diesen gemeinsamen Helfer: der Fehler war zweimal derselbe,
+    und beim ersten Anlauf wurde nur eine der beiden Stellen repariert — die
+    andere fiel im naechsten Messlauf durch (5 von 12 rot).
+
+    WARUM (XPLAT-WIN): ``tmp_path`` liegt unterhalb des Temp-Ordners. Zeigt ein
+    pytest-Argument dorthin, sammelt pytest den Temp-Ordner und vergleicht in
+    ``_pytest/main.py`` jeden Eintrag darin::
+
+        if sys.platform == "win32" and not is_match:
+            is_match = samefile_nofollow(node.path, matchparts[0])   # -> lstat()
+
+    Das ist eine WINDOWS-ONLY-Stelle (Kurzpfad-Behandlung, pytest #11895) — auf
+    Linux existiert sie nicht, deshalb faellt das dort nie auf.
+
+    Gemessen 2026-08-04 auf Davids Rechner: 7722 Eintraege im Temp-Ordner, von
+    denen dutzende pro 6 Sekunden entstehen und vergehen — gewoehnliche
+    ``tempfile``-Nutzung der parallel laufenden Segmente (``lightos_fixtures_*``,
+    ``tmp*``, …). Einer ist beim ``lstat`` immer schon weg ->
+    ``FileNotFoundError`` in der SAMMELPHASE der Untersitzung, also bevor
+    ueberhaupt ein Test lief.
+
+    Das war die gefaehrliche Sorte Fehlschlag: nach aussen fehlte schlicht das
+    „FAILED" in der Ausgabe — exakt das Bild des QA-REPORTLOSS-Defekts, den diese
+    Datei bewacht. Der Waechter meldete also seinen eigenen Befund, ausgeloest
+    von etwas voellig anderem.
+
+    Mit cwd im Zielordner beginnt pytests Sammelbaum dort (eine einzige Datei)
+    und fasst den Temp-Ordner nie an. Seriell faellt nichts davon auf — deshalb
+    war es bis zum ersten PARALLELEN Windows-Gate-Lauf unsichtbar.
+    """
+    return subprocess.run(
+        [sys.executable, "-m", "pytest", dateiname, "-q",
+         "-p", "no:cacheprovider", "-p", "conftest", *extra_args],
+        cwd=str(ordner), env=env, capture_output=True, text=True, timeout=300)
 
 
 @pytest.mark.parametrize("env_extra, label", [
@@ -99,12 +141,13 @@ def test_hardening_reports_the_real_exit_status(tmp_path):
     env = dict(os.environ)
     env["QT_QPA_PLATFORM"] = "offscreen"
     env["LIGHTOS_HARDEN_EXIT_ALL"] = "1"
-    env["PYTHONPATH"] = os.path.join(_REPO_ROOT, "tests") + os.pathsep + env.get("PYTHONPATH", "")
+    # Repo-Root MUSS mit rein: tests/conftest.py importiert src.core.paths, und
+    # das kam bisher nur ueber cwd=_REPO_ROOT in den sys.path.
+    env["PYTHONPATH"] = os.pathsep.join(
+        [os.path.join(_REPO_ROOT, "tests"), _REPO_ROOT, env.get("PYTHONPATH", "")])
 
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", str(gruen), "-q",
-         "-p", "no:cacheprovider", "-p", "conftest"],
-        cwd=_REPO_ROOT, env=env, capture_output=True, text=True, timeout=300)
+    # Ueber den gemeinsamen Helfer — cwd im Zielordner, s. dessen Docstring.
+    proc = _run_pytest_in(tmp_path, gruen.name, env)
     assert proc.returncode == 0, (
         "Eine gruene Session muss mit 0 enden, auch unter der Haertung.\n"
         f"{proc.stdout}{proc.stderr}")

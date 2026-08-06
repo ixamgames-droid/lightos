@@ -87,8 +87,31 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   Umgebungs-Flakiness, NICHT als Test-Fail, und liefert einen echten Pass/Fail-Zaehler.
 - **Belegt?** Laeuft bereits eine andere Session, wartet der Runner (Default, alle 15 s) bzw.
   meldet das. Exit 98 = Timeout beim Warten auf die Sperre, Exit 99 = uebersprungen (`-NoWait`).
-- **Fallback:** Fehlt `../run_tests.ps1`, faellt `verify_loop.ps1` mit deutlicher Warnung auf
-  direktes `pytest` zurueck (OHNE Sperre — nur Notnagel, nicht bei parallelen Sessions nutzen).
+- **Fallback (XPLAT-WIN, 2026-08-04):** Fehlt `../run_tests.ps1`, faellt `verify_loop.ps1` mit
+  deutlicher Warnung auf den **eingecheckten Segment-Runner** `tools/verify_segmented.ps1`
+  zurueck — nicht mehr auf ein einzelnes `pytest tests/`. Weiterhin OHNE Sperre (nicht bei
+  parallelen Sessions nutzen), aber wenigstens segmentiert.
+
+  ```
+  ./tools/verify_segmented.ps1 -j 6          # Segment-Runner direkt, 6 parallel
+  ./tools/verify_segmented.ps1 tests/test_x.py
+  ```
+
+  **Warum es das gibt:** die Segmentierung lag auf Windows ausschliesslich im
+  maschinenspezifischen `../run_tests.ps1`. Ein frischer Windows-Checkout hatte damit gar kein
+  belastbares Gate fuer die volle Suite (der alte Fallback war ausgerechnet der Sammellauf, der
+  an akkumulierendem Qt-Zustand stirbt), und die Gate-Umgebung war ausserhalb des Repos
+  definiert. Das ist dieselbe Drift, die Linux mit XPLAT-11 beseitigt hat. Arbeitsteilung jetzt:
+  **Sperre** bleibt maschinenspezifisch in `run_tests.ps1`, **Segmentierung** ist versioniert im
+  Repo und laeuft parallel (Default 4, per `LIGHTOS_VERIFY_JOBS` steuerbar) mit eigener
+  serieller WebEngine-Spur. `tests/test_gate_runner_parity.py` nagelt fest, dass die vier Runner
+  (2x Linux, 2x Windows) dieselbe Gate-Umgebung setzen.
+
+  ⚠️ **Bewusster Unterschied zu Linux:** `verify_segmented.sh` zaehlt jeden `rc != 0` als rot,
+  `verify_segmented.ps1` NICHT — native Abstuerze (NTSTATUS, grosse negative Codes wie
+  `0xC0000005`) gelten als Umgebungs-Flakiness, echte pytest-Failures (kleine positive Codes)
+  bleiben rot. Das ist die Regel, die `run_tests.ps1 -Isolate` seit jeher anwendet; ohne sie
+  waere das Windows-Gate wegen des bekannten sporadischen Teardown-Crashes dauerrot.
 - **Gate-Kriterium:** Exit 0 = gruen. Keine neuen Fehler ggue. Baseline; rot → selbst fixen,
   nicht mit kaputtem Stand committen/reporten.
 - **Linux/macOS (XPLAT-02):** `verify_loop.ps1` findet jetzt auch ein `venv/bin/python`
