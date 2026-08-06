@@ -37,6 +37,50 @@ export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 # interaktives pytest — dort soll ein Teardown-Crash sichtbar bleiben.
 export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 
+# ── PROC-02: Sperre gegen zwei gleichzeitige VOLLE Suiten ────────────────────
+#
+# ★ Die Annahme im Kopf dieser Datei — „auf einem gewoehnlichen Linux-Checkout
+# gibt es diese Parallelitaet nicht" — stimmt seit dem 2026-08-06 nicht mehr:
+# seitdem arbeiten zwei Claude-Sitzungen auf DEMSELBEN Linux-Rechner (s.
+# COORDINATION.md). Der Windows-Lock-Runner hat hier kein Gegenstueck, es gab
+# also gar nichts, was zwei volle Laeufe auseinandergehalten haette.
+#
+# Warum das nicht bloss langsam, sondern FALSCH ist: XPLAT-17 hat gemessen, dass
+# schon EIN rechenintensives Nachbar-Segment (~1,3 s CPU) die WebEngine-Spur in
+# 3 von 3 Laeufen reissen liess. Eine zweite komplette Suite ist ein sehr viel
+# groesserer Nachbar. Beide Sitzungen saehen dann rote Segmente, die nichts mit
+# ihrem Code zu tun haben — und wuerden sie deuten.
+#
+# Nur die VOLLE Suite wird gesperrt. Gezielte Einzellaeufe
+# (`verify_loop.sh tests/test_x.py`) sind kurz und billig; sie zu serialisieren
+# wuerde die Arbeit ausbremsen, ohne das Problem zu loesen.
+#
+# Die Sperrdatei liegt im PROJEKTORDNER, also ausserhalb des Repos — sonst
+# haette jeder Worktree seine eigene und die Sperre waere wirkungslos.
+# Ohne `flock` (z. B. macOS) laeuft alles wie bisher weiter, nur mit Hinweis:
+# eine fehlende Sperre darf das Gate nicht blockieren.
+_verify_lock() {
+    [ "$#" -gt 0 ] && return 0                      # gezielter Lauf: keine Sperre
+    [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ] && return 0
+    command -v flock >/dev/null 2>&1 || {
+        echo "[verify] Hinweis: kein flock — parallele Suiten sind nicht gesperrt"
+        return 0
+    }
+    # Umlenkbar — und das ist keine Bequemlichkeit: der Test zu dieser Sperre
+    # startet den Runner selbst und laeuft dabei INNERHALB der vollen Suite,
+    # die die echte Sperre bereits haelt. Ohne eigene Datei pruefte er sich
+    # gegen den eigenen Gate-Lauf und waere immer rot (bzw., schlimmer, gruen
+    # aus dem falschen Grund).
+    LOCKFILE="${LIGHTOS_LOCKFILE:-$(cd .. 2>/dev/null && pwd)/.pytest_lock}"
+    exec 9>"$LOCKFILE" 2>/dev/null || return 0
+    if ! flock -n 9; then
+        echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
+        flock 9
+        echo "[verify] Sperre frei, starte."
+    fi
+}
+_verify_lock "$@"
+
 echo "[verify] 1/2 Syntax-Check (compileall src) ..."
 if ! "$PY" -m compileall -q src; then
     echo "[verify] SYNTAX-FEHLER"

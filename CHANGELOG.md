@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-06 — Datenschutz im oeffentlichen Repo, und Spielregeln fuer zwei KI-Sitzungen
+
+#### Behoben
+
+- **Private Laufzeitdaten lagen im oeffentlichen Repo.** Eine Sicherung der
+  Show-Datenbank und eine Sicherung der Ausgabe-Konfiguration waren
+  versehentlich mit eingecheckt worden; die Ausschlussregeln griffen bei
+  Unterordnern und Namenszusaetzen hinter der Dateiendung nicht. Beide sind
+  jetzt aus der Versionsverwaltung genommen (die Dateien bleiben auf dem
+  Rechner liegen), die Regeln greifen rekursiv, und ein Test schlaegt Alarm,
+  falls wieder etwas Privates eingecheckt wird.
+
+  **Wichtig:** Wer das Repo vorher geklont hat, hat die Dateien weiterhin —
+  die Versionsgeschichte wurde bewusst nicht umgeschrieben.
+
+#### Neu
+
+- **`COORDINATION.md` — Spielregeln fuer mehrere gleichzeitige KI-Sitzungen.**
+  Wer arbeitet woran, wie wird ein Punkt belegt, was darf im oeffentlichen Repo
+  stehen, welche Fallen hat die Parallelarbeit. Dazu `tools/session_claim.py`,
+  das einen Arbeitspunkt so belegt, dass zwei gleichzeitige Sitzungen sich nicht
+  gegenseitig ueberschreiben.
+
 ### 2026-08-06 — Der Ausgabe-Dialog merkt sich jetzt alles, was er anzeigt
 
 #### Behoben

@@ -82,6 +82,19 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   `.pytest_lock.json`. Direktes `pytest tests/` NIE parallel starten — auf diesem Setup
   (Python 3.14 + PySide6 offscreen) fuehren mehrere gleichzeitige Suiten zu Speicher-Stau,
   minutenlangen Haengern und nativen Qt-Segfaults (Exit 139).
+- **Linux: dieselbe Sperre, anderer Mechanismus (PROC-02, 2026-08-06).** Der Lock-Runner oben
+  ist PowerShell-spezifisch; auf Linux gab es **gar keine** Sperre — der Kopf von
+  `verify_loop.sh` ging ausdruecklich davon aus, dass es dort keine parallelen Sitzungen gibt.
+  Seit dem 2026-08-06 arbeiten aber zwei Claude-Sitzungen auf demselben Linux-Rechner
+  (s. [`COORDINATION.md`](COORDINATION.md)). `./tools/verify_loop.sh` **ohne Argumente** nimmt
+  deshalb jetzt eine `flock`-Sperre auf `.pytest_lock` im **aeusseren** Projektordner (von allen
+  Worktrees erreichbar) und wartet, statt loszulaufen. Gezielte Einzellaeufe
+  (`verify_loop.sh tests/test_x.py`) sind bewusst **nicht** gesperrt. Ohne `flock` (macOS) laeuft
+  alles wie bisher, mit Hinweis — eine fehlende Sperre darf das Gate nicht blockieren.
+  **Warum das mehr ist als Bequemlichkeit:** XPLAT-17 hat gemessen, dass schon EIN
+  rechenintensives Nachbar-Segment die WebEngine-Spur in 3 von 3 Laeufen reissen liess. Eine
+  zweite komplette Suite ist ein weit groesserer Nachbar — beide Sitzungen saehen rote
+  Segmente, die nichts mit ihrem Code zu tun haben. Gate: `tests/test_verify_loop_sperre.py`.
 - **Warum `-Isolate`:** jede Testdatei laeuft in einem eigenen Prozess. So bricht ein einzelner
   Qt-Segfault nicht die ganze Suite ab; der Runner zaehlt Crashes (Exit 139) als
   Umgebungs-Flakiness, NICHT als Test-Fail, und liefert einen echten Pass/Fail-Zaehler.

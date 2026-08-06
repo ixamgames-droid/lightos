@@ -4,6 +4,18 @@
 > Sie ist die verbindliche Kurzanleitung. Ausführliche Regeln stehen in
 > [`WORKFLOW.md`](WORKFLOW.md), Architektur in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
+> ### 👥 Du bist nicht allein am Repo
+>
+> Seit 2026-08-06 arbeiten **mehrere KI-Sitzungen gleichzeitig** an LightOS. Sie
+> sehen einander **nur über dieses Repo** — was nicht gepusht ist, existiert für
+> die anderen nicht. **Vor dem ersten Item: [`COORDINATION.md`](COORDINATION.md)
+> lesen** (Rollen · Item belegen · was öffentlich stehen darf · bekannte Fallen).
+>
+> Kurzfassung: `git fetch` → `python tools/session_claim.py list` → Item mit
+> `claim` belegen → arbeiten → `release`. Das Repo ist **öffentlich**: private
+> Laufzeitdaten (`data/`, `shows/`) gehören nie hinein — dafür gibt es das Gate
+> `tests/test_keine_privaten_dateien.py`.
+
 ## Was ist LightOS?
 
 DMX-Lichtsteuerungs-Software in **Python / PySide6** (Qt). Quellcode unter `src/`

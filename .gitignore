@@ -21,11 +21,35 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/*.json
+#
+# ★ PRIV-01 (2026-08-06): Die Regeln oben griffen nur eine Ebene tief und nur
+# auf exakte Endungen. Das Repo ist OEFFENTLICH — und genau daran kamen am
+# 2026-08-05 mit PR #593 eine echte Show-Datenbank (30 gepatchte Geraete,
+# 8 Gruppen) und eine Sicherung der Ausgabe-Konfiguration hinein: die eine hiess
+# `data/_backup/current_show.db.20260805-202753` (Unterordner + Zeitstempel
+# HINTER der Endung), die andere `data/universes.json.bak-201618`.
+# Deshalb jetzt rekursiv und suffix-tolerant. Der Waechter dazu ist
+# `tests/test_keine_privaten_dateien.py` — eine Ignore-Regel schuetzt nur vor
+# Unachtsamkeit, nicht vor einem beherzten `git add -f`.
+data/**/*.db*
+data/**/*.json
+data/*.bak*
+data/**/*.bak*
+data/_backup/
+data/backup/
+# ...aber die Controller-Bibliothek ist mitgelieferter Inhalt, keine Nutzerdatei.
+# Ohne diese Ausnahme waere jedes neue Controller-Profil still unsichtbar —
+# eine Ignore-Regel, die zu viel faengt, faellt genauso auf die Fuesse.
+!data/controller_library/
+!data/controller_library/*.json
 
 # Eigene Shows (user-spezifisch, nicht versioniert)
 shows/*.lshow
 shows/*.lshow.layout.json
 shows/*.lshow.bak*
+# Show-Nebendateien (die VC-Altlast `shows/vc show 1.json` kam so herein)
+shows/*.json
+shows/**/*.json
 # Demo-Shows werden versioniert
 !shows/demo_*.lshow
 # Archiv alter Shows (User-Daten, nicht versioniert)
