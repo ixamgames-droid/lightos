@@ -201,6 +201,59 @@ def _save_universe_config(rows: list[dict]) -> None:
         print(f"[output_config] save universes error: {e}")
 
 
+def _gespeicherte_ausgabe_zeile(typ: str) -> dict | None:
+    """OUT-50: die gespeicherte ``universes.json``-Zeile fuer einen Ausgabetyp
+    (``"Enttec"`` / ``"ArtNet"`` / ``"sACN"``) — oder ``None``.
+
+    Der **gemeinsame Ladepfad** aller drei Tabs. Bis OUT-50 gab es ihn nur fuer
+    das Enttec-Universum (OUT-ENTTECUNIV); Art-Net, sACN und der COM-Port lasen
+    ihren gespeicherten Wert nie und starteten jedes Mal auf dem Widget-Default.
+
+    **Mehrere Zeilen -> die KLEINSTE Universumsnummer gewinnt** — willkuerlich,
+    aber vorhersehbar. Bei Enttec ist mehr als eine Zeile ohnehin schon ein
+    Konfigurationsfehler (ein Enttec Pro hat einen Ausgang). Bei Art-Net/sACN
+    ist es dagegen ein voellig normales Mehr-Universen-Setup: der Tab kann nur
+    EINES zeigen, und dann ist die kleinste Nummer die harmloseste Wahl. Wer
+    mehrere Universen pflegt, tut das im Universen-Tab — der zeigt alle.
+
+    ``num`` ausserhalb [1..32] und unparsbare Zeilen werden uebergangen: eine
+    kaputte Zeile darf den Dialog nicht aufhalten.
+
+    Der Typ-Vergleich ist bewusst **exakt und case-sensitiv** — genau wie in
+    ``AppState.apply_output_config``. Beide muessen dieselbe Zeile meinen, sonst
+    zeigt der Dialog etwas anderes an, als die App tatsaechlich eingerichtet hat.
+    """
+    treffer: list[tuple[int, dict]] = []
+    for r in _load_universe_config():
+        if not isinstance(r, dict):
+            continue
+        try:
+            if (r.get("output") or "").strip() != typ:
+                continue
+            num = int(r.get("num", 0))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if _UNIVERSE_MIN <= num <= _UNIVERSE_MAX:
+            treffer.append((num, r))
+    if not treffer:
+        return None
+    return min(treffer, key=lambda t: t[0])[1]
+
+
+def _patch_text(zeile: dict) -> str:
+    """Das ``patch``-Feld einer Zeile als getrimmter Text.
+
+    ``universes.json`` ist eine von Hand editierbare Datei. Steht dort etwas
+    anderes als ein String (``"patch": 3``), wuerde ``.strip()`` mit einem
+    ``AttributeError`` aus dem Konstruktor fliegen — und der Ausgabe-Dialog
+    liesse sich **gar nicht mehr oeffnen**, also ausgerechnet das Werkzeug,
+    mit dem man den Fehler beheben wuerde. Eine kaputte Zeile darf hoechstens
+    ihren eigenen Wert kosten.
+    """
+    wert = zeile.get("patch")
+    return "" if wert is None else str(wert).strip()
+
+
 def _gespeichertes_enttec_universum(vorgabe: int = 1) -> int:
     """Universumsnummer der gespeicherten Enttec-Zeile (OUT-ENTTECUNIV).
 
@@ -212,15 +265,23 @@ def _gespeichertes_enttec_universum(vorgabe: int = 1) -> int:
     Ohne gespeicherte Enttec-Zeile bleibt es bei ``vorgabe`` (1) — das ist der
     Zustand einer frischen Installation und dort auch richtig.
     """
-    nummern = []
-    for r in _load_universe_config():
-        try:
-            if (r.get("output") or "").strip() == "Enttec":
-                nummern.append(int(r.get("num", 0)))
-        except (TypeError, ValueError):
-            continue
-    gueltig = [n for n in nummern if 1 <= n <= 32]
-    return min(gueltig) if gueltig else int(vorgabe)
+    zeile = _gespeicherte_ausgabe_zeile("Enttec")
+    if zeile is None:
+        return int(vorgabe)
+    return int(zeile.get("num", vorgabe))
+
+
+def _gespeicherter_enttec_port() -> str:
+    """OUT-50 (a): der zuletzt benutzte COM-Port der Enttec-Zeile — oder ``""``.
+
+    Die zweite Haelfte von HW-5c: ``_refresh_ports`` fuellte die Liste, waehlte
+    aber nie den gespeicherten Port vor. „Verbinden" nahm damit den **ersten
+    Port der Liste** — auf einem Rechner mit mehreren FTDI-Geraeten also ein
+    beliebiges anderes — und schrieb ihn ueber ``_persist_output`` auch noch
+    nach ``universes.json`` zurueck. Genau dasselbe Muster wie beim Universum.
+    """
+    zeile = _gespeicherte_ausgabe_zeile("Enttec")
+    return _patch_text(zeile) if zeile else ""
 
 
 _UNSET = object()   # A3D-15: "Argument nicht uebergeben" vs. explizit None unterscheiden.
@@ -287,12 +348,23 @@ class OutputConfigDialog(QDialog):
         ef.addRow("COM-Port:", self._combo_port)
 
         refresh_btn = QPushButton("Ports aktualisieren")
-        refresh_btn.clicked.connect(self._refresh_ports)
+        # ★ Bewusst eine parameterlose Bound-Method statt eines Lambdas — aus
+        # ZWEI Gruenden, und beide sind schon einmal teuer geworden:
+        #  * `clicked` liefert ein `checked`-Bool als erstes Argument. Direkt an
+        #    `_refresh_ports` gehaengt landete das in `bevorzugt` und der
+        #    Parameter meinte etwas anderes als sein Name sagt.
+        #  * Ein `self` fangendes Lambda pinnt den Dialog GC-unsichtbar
+        #    (Dialog -> Button -> Lambda -> Dialog), Fallenklasse STAB-09/10.
+        #    Bound-Methods haelt PySide dagegen nur schwach.
+        refresh_btn.clicked.connect(self._ports_neu_einlesen)
         ef.addRow("", refresh_btn)
 
         self._spin_enttec_univ = QSpinBox()
         self._spin_enttec_univ.setRange(1, 32)
         # ★ OUT-ENTTECUNIV: die gespeicherte Universumsnummer VORBELEGEN.
+        # (Belegt wird sie jetzt im gemeinsamen `_lade_gespeicherte_ausgaben`
+        # am Ende von `_setup_ui` — zusammen mit Port, Art-Net und sACN, die
+        # nach OUT-50 an genau demselben fehlenden Ladeschritt litten.)
         #
         # Ohne das stand die Spinbox bei jedem Oeffnen des Ausgabe-Tabs auf dem
         # Minimum der Range, also auf 1 — der gespeicherte Wert wurde nie
@@ -310,7 +382,6 @@ class OutputConfigDialog(QDialog):
         #  * Die Auswahl „hielt nicht": Tab zu, Tab auf, wieder Universum 1.
         #  * Und es erklaert HW-5c — den seit Wochen offenen „Rueckfall in
         #    universes.json, Ursache offen". Die Ursache war dieses Widget.
-        self._spin_enttec_univ.setValue(_gespeichertes_enttec_universum())
         ef.addRow("Universe:", self._spin_enttec_univ)
 
         connect_btn = QPushButton("Verbinden")
@@ -534,11 +605,96 @@ class OutputConfigDialog(QDialog):
         tabs.addTab(univ_tab, "Universen")
         self._univ_load_table()
 
+        # ★ OUT-50: ALLE Ausgabe-Tabs aus universes.json vorbelegen — der eine
+        # Schritt, den es bis hierhin nur fuer das Enttec-Universum gab.
+        self._lade_gespeicherte_ausgaben()
+
         layout.addWidget(tabs)
 
         btn_close = QPushButton("Schließen")
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close)
+
+    def _lade_gespeicherte_ausgaben(self):
+        """★ OUT-50 — der gemeinsame Ladeschritt fuer Enttec, Art-Net und sACN.
+
+        **Warum es diesen Schritt braucht.** Am 2026-08-05 blieb Davids
+        LED-Balken dunkel, weil die Enttec-Universumsspinbox ihren gespeicherten
+        Wert nie las (OUT-ENTTECUNIV). Der Audit danach fand denselben Fehler
+        noch **dreimal im selben Dialog**: der COM-Port, der komplette
+        Art-Net-Tab und der komplette sACN-Tab wurden ebenfalls nie geladen.
+        Jedes Oeffnen des Dialogs zeigte also Widget-Defaults statt der
+        Wirklichkeit — und weil „Verbinden"/„Uebernehmen" den angezeigten Wert
+        **zurueckschreiben**, war das nicht nur eine falsche Anzeige, sondern
+        ein Ueberschreiben der echten Konfiguration:
+
+        * Art-Net: Universum 1 und ``255.255.255.255`` statt der gespeicherten
+          Zeile -> „Uebernehmen" legte eine **Phantom-Zeile auf Universum 1** an.
+        * sACN: der Multicast-Haken stand **hart auf True** -> „Uebernehmen"
+          ersetzte eine gespeicherte Unicast-IP durch einen Leerstring.
+        * COM-Port: siehe ``_gespeicherter_enttec_port``.
+
+        **Die Datei ist hier die richtige Quelle**, nicht der laufende
+        ``OutputManager``: genau diese Zeilen wendet ``apply_output_config``
+        beim Start an. Was hier steht, ist also das, was eingerichtet wurde.
+
+        **Und deshalb steht in den Status-Labels „Gespeichert", nicht „Aktiv".**
+        Ob der Adapter wirklich sendet, weiss dieser Dialog nicht — der Port
+        kann seit dem Start weg sein. Eine gruene „Aktiv"-Meldung aus einer
+        Datei zu bauen waere exakt die Fehlerklasse, die OUT-51 aufarbeitet
+        (Anzeige meldet Anwesenheit statt Zustand). Hier wird nur behauptet,
+        was belegt ist: was in ``universes.json`` steht.
+
+        Fehlt eine Zeile, bleibt der Tab bei seinen Defaults — der Zustand einer
+        frischen Installation, und dort sind sie richtig.
+        """
+        # ── Enttec ────────────────────────────────────────────────────────────
+        enttec = _gespeicherte_ausgabe_zeile("Enttec")
+        if enttec is not None:
+            num = int(enttec.get("num", 1))
+            port = _patch_text(enttec)
+            self._spin_enttec_univ.setValue(num)
+            if port:
+                self._enttec_port_waehlen(port)
+                self._lbl_enttec_status.setText(
+                    f"Gespeichert: {port} → Universe {num}")
+
+        # ── Art-Net ───────────────────────────────────────────────────────────
+        artnet = _gespeicherte_ausgabe_zeile("ArtNet")
+        if artnet is not None:
+            num = int(artnet.get("num", 1))
+            ip = _patch_text(artnet)
+            self._spin_artnet_univ.setValue(num)
+            if ip:
+                self._edit_artnet_ip.setText(ip)
+            self._check_artnet.setChecked(True)
+            # MU-02: das belegte Universum merken, sonst raeumt ein Abwaehlen
+            # („Art-Net aktivieren" aus + „Uebernehmen") gar nichts — der Haken
+            # waere zwar erstmals ehrlich gesetzt, aber wirkungslos abwaehlbar.
+            self._artnet_active_univ = num
+            self._lbl_artnet_status.setText(
+                f"Gespeichert: {ip or 'Broadcast'} · Universe {num}")
+        # Erst NACH dem Setzen des Universums: die externe Art-Net-Universe
+        # (A3D-15) haengt am gewaehlten internen Universum. Explizit gerufen,
+        # weil `setValue` bei unveraendertem Wert kein `valueChanged` sendet.
+        self._sync_artnet_start_univ_default()
+
+        # ── sACN ──────────────────────────────────────────────────────────────
+        sacn = _gespeicherte_ausgabe_zeile("sACN")
+        if sacn is not None:
+            num = int(sacn.get("num", 1))
+            ip = _patch_text(sacn)
+            self._spin_sacn_univ.setValue(num)
+            self._edit_sacn_ip.setText(ip)
+            # Leerer patch = Multicast (so liest es apply_output_config und so
+            # schreibt es `_apply_sacn`). Der Haken folgt der Datei, statt
+            # unabhaengig von ihr auf True zu stehen.
+            self._check_sacn_multicast.setChecked(not ip)
+            self._check_sacn.setChecked(True)
+            self._sacn_active_univ = num
+            self._lbl_sacn_status.setText(
+                f"Gespeichert: {('Unicast → ' + ip) if ip else 'Multicast'}"
+                f" · Universe {num}")
 
     def _apply_iface_choice(self):
         """NET-04: Auswahl geraetegebunden sichern.
@@ -556,20 +712,54 @@ class OutputConfigDialog(QDialog):
         except Exception as e:
             print(f"[output_config] iface-Pref nicht gespeichert: {e}")
 
-    def _refresh_ports(self):
+    def _ports_neu_einlesen(self):
+        """Slot des „Ports aktualisieren"-Knopfes (s. Begruendung dort)."""
+        self._refresh_ports()
+
+    def _refresh_ports(self, bevorzugt: str | None = None):
+        """Portliste neu aufbauen — **ohne die Auswahl zu verlieren**.
+
+        OUT-50 (a): vorher fuellte diese Methode nur die Liste. Damit stand nach
+        jedem Aufbau (und nach jedem Klick auf „Ports aktualisieren") der ERSTE
+        Port da, und „Verbinden" nahm ihn. Jetzt gewinnt in dieser Reihenfolge:
+        ein ausdruecklich uebergebener Port, sonst die aktuelle Auswahl, sonst
+        der in ``universes.json`` gespeicherte.
+        """
+        aktuell = (bevorzugt or self._combo_port.currentData()
+                   or _gespeicherter_enttec_port())
         self._combo_port.clear()
-        ports = list(serial.tools.list_ports.comports())
-        enttec_found = False
-        for p in ports:
+        for p in serial.tools.list_ports.comports():
             label = f"{p.device}"
             if p.description:
                 label += f"  —  {p.description}"
             if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
                 label += "  [Enttec Pro]"
-                enttec_found = True
             self._combo_port.addItem(label, p.device)
-        if not ports:
+        self._enttec_port_waehlen(aktuell)
+        if self._combo_port.count() == 0:
             self._combo_port.addItem("Kein Port gefunden", "")
+
+    def _enttec_port_waehlen(self, port: str | None):
+        """Einen Port in der Liste auswaehlen; fehlt er, ihn sichtbar machen.
+
+        ★ Der fehlende Port darf NICHT still auf den ersten zurueckfallen —
+        genau das ist der Fehler, den OUT-50 behebt. Ein Enttec-Kabel steckt mal
+        woanders, ein Portname kann von einer anderen Plattform stammen
+        (``COM3`` auf Linux, HW-5b). Faellt die Auswahl dann stumm auf ein
+        fremdes FTDI-Geraet, oeffnet „Verbinden" das falsche Geraet **und
+        speichert es**. Deshalb dasselbe Vorgehen wie bei der Netzwerkkarte
+        (NET-04): als „derzeit nicht gefunden" anhaengen und auswaehlen. Ein
+        Klick auf „Verbinden" scheitert dann sichtbar im Status-Label — das ist
+        die ehrlichere von zwei Fehlermeldungen.
+        """
+        if not port:
+            return
+        i = self._combo_port.findData(port)
+        if i >= 0:
+            self._combo_port.setCurrentIndex(i)
+            return
+        self._combo_port.addItem(f"{port} — derzeit nicht gefunden", port)
+        self._combo_port.setCurrentIndex(self._combo_port.count() - 1)
 
     def _connect_enttec(self):
         port = self._combo_port.currentData()
@@ -671,6 +861,13 @@ class OutputConfigDialog(QDialog):
 
     def _univ_load_table(self):
         rows = _load_universe_config()
+        # OUT-50 (Review-Fund am eigenen Diff): dieselbe Haertung wie in
+        # `_patch_text` — steht in der von Hand editierbaren Datei eine Zahl
+        # oder eine Liste, wo ein Text erwartet wird, warf der
+        # QTableWidgetItem-Konstruktor beim Dialog-Bau. Der Ausgabe-Dialog liess
+        # sich dann gar nicht mehr oeffnen, also ausgerechnet das Werkzeug zum
+        # Reparieren. Nicht-Zeilen fliegen raus, Werte werden zu Text gemacht.
+        rows = [r for r in rows if isinstance(r, dict)]
         if not rows:
             # Provide an initial example row
             rows = [{"num": 1, "name": "Main", "output": "Disabled", "patch": ""}]
@@ -679,13 +876,13 @@ class OutputConfigDialog(QDialog):
             num_item = QTableWidgetItem(str(r.get("num", i + 1)))
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._univ_table.setItem(i, 0, num_item)
-            self._univ_table.setItem(i, 1, QTableWidgetItem(r.get("name", "Universe")))
+            self._univ_table.setItem(i, 1, QTableWidgetItem(str(r.get("name", "Universe"))))
             combo = QComboBox()
             for opt in ("Disabled", "Enttec", "sACN", "ArtNet"):
                 combo.addItem(opt)
-            combo.setCurrentText(r.get("output", "Disabled"))
+            combo.setCurrentText(str(r.get("output", "Disabled")))
             self._univ_table.setCellWidget(i, 2, combo)
-            self._univ_table.setItem(i, 3, QTableWidgetItem(r.get("patch", "")))
+            self._univ_table.setItem(i, 3, QTableWidgetItem(_patch_text(r)))
             # OUT-03: externe Universe-Nummer (leer = Default). None/fehlt -> "".
             ext = r.get("out_universe")
             ext_item = QTableWidgetItem("" if ext is None else str(ext))
