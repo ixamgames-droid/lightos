@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| VIZ-51 | A | fix/viz51-pixelreihenfolge-3d | 2026-08-11T20:43Z | - |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -44,3 +44,4 @@
 - 2026-08-11T20:26Z A done QA-55
 - 2026-08-11T20:43Z A claim VIZ-51
 - 2026-08-11T20:50Z A done QA-52
+- 2026-08-11T21:09Z A done VIZ-51
