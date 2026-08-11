@@ -88,7 +88,7 @@ Daraus folgt: *Farbe wählen* und *Dimmer‑Effekt starten* ergeben zusammen ein
 
 ---
 
-## 5. Ein Dimmer‑Lauflicht starten
+## 5. Ein Dimmer-Lauflicht starten
 
 1. **Seite 2** (Scene‑Taste 2).
 2. Unten **Lauflicht ▶** drücken → das Licht „wandert" über die 4 PARs.
@@ -114,7 +114,7 @@ Das ist der Kern‑Workflow:
 
 ---
 
-## 7. Einen Matrix‑Effekt nutzen
+## 7. Einen Matrix-Effekt nutzen
 
 1. **Clear** (Track 1) drücken — wichtig, sonst überschreibt die Farb‑Ebene das Muster.
 2. **Seite 3** (Scene‑Taste 3) → z. B. **Regenbogen** oder **Feuer**.
@@ -141,7 +141,7 @@ Das ist der Kern‑Workflow:
 
 ---
 
-## 10. Live einen Color‑Chase bauen
+## 10. Live einen Color-Chase bauen
 
 Du wählst Farben an, der Effekt läuft dann durch **genau diese** Farben:
 
@@ -171,7 +171,7 @@ willst:
 
 ---
 
-## 12. Eigene Seite bauen (Editor‑Werkzeuge)
+## 12. Eigene Seite bauen (Editor-Werkzeuge)
 
 > ⚠ **Stand 2026‑07:** Die VC‑Werkzeugleiste wurde überarbeitet — die hier beschriebenen drei grünen
 > Baukasten‑Knöpfe (⌗ Controller / 🎨 Color‑Chase / 🟦 Chase‑Bereich) gibt es so **nicht mehr**. Die
