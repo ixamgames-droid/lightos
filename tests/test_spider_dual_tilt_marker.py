@@ -38,6 +38,7 @@ from src.core.database.models import (PatchedFixture, FixtureProfile, FixtureMod
                                        FixtureChannel)
 from src.core.engine.function_manager import get_function_manager
 from src.core.show.show_file import reset_show
+from _fixture_quelle import frische_library   # QA-54: eigene Temp-Bibliothek
 
 
 def _app() -> QApplication:
@@ -134,12 +135,31 @@ class _DbBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         _app()
+        # ★★ QA-54: Diese Klasse legte ihre Testprofile bis hierhin in DAVIDS
+        # ECHTER Fixture-Bibliothek an (`create_user_profile` ohne `engine=`
+        # laeuft auf der globalen Engine, und `LIGHTOS_FIXTURE_DB` zeigt
+        # bewusst auf `~/.local/share/LightOS/fixtures.db`).
+        #
+        # **Der Rueckstand ist gemessen:** in der echten Library steht der
+        # Hersteller `TEST-DualTilt` — `_delete_profile` raeumt das Profil weg,
+        # den ueber `_get_or_create_mfr` angelegten Hersteller aber **nie**. Er
+        # taucht seither in der Herstellerliste des Patch-Dialogs auf. Bricht
+        # der Test hart ab (auf Linux ein realer Fall, QA-24), bleiben
+        # zusaetzlich die Profile stehen.
+        #
+        # `frische_library` gibt der Klasse eine eigene temporaere Bibliothek
+        # und raeumt sie selbst wieder ab — die echte wird gar nicht erst
+        # angefasst.
+        frische_library(cls)
         cls.pid = _make_mismapped_spider_profile()
         cls.qlc_pid = _make_mismapped_spider_profile(
             source="qlcplus", name="TEST QLC Speider DualTilt")
 
     @classmethod
     def tearDownClass(cls):
+        # Die Temp-Library verschwindet ohnehin mit `frische_library`. Das
+        # Loeschen bleibt trotzdem stehen: es leert den Kanal-Cache, und den
+        # raeumt `frische_library` nicht mit.
         _delete_profile(cls.pid)
         _delete_profile(cls.qlc_pid)
 
