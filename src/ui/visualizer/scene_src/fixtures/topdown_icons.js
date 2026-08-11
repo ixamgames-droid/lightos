@@ -7,7 +7,7 @@
 // View) und EIN zentrales Tinting (tintTopDownIcon) statt vier Duplikat-
 // Bloecken in fixtures.js.
 import * as THREE from '../three/three.js';
-import { pixelCell } from './pixel_order.js';
+import { pixelCell, panelGrid } from './pixel_order.js';
 
 // Fuell-Farbe unbelichteter Icons (vorher 0x3a3a4a auf 0x282828-Boden).
 export const ICON_UNLIT_FILL = 0x4a4e5e;
@@ -88,9 +88,8 @@ function addBarCells(group, n, barW) {
 // userData.cells registriert -> tintTopDownIcon faerbt pro Pixel (heads[i],
 // Zeilen-Haupt, deckungsgleich mit buildMatrixPanel/updateMatrixPanelDmx).
 function addGridCells(group, n, size, pixelOrder) {
-  const count = Math.max(1, Math.min(256, Math.floor(n || 16)));
-  const cols = Math.ceil(Math.sqrt(count));
-  const rows = Math.ceil(count / cols);
+  // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
+  const { count, cols, rows } = panelGrid(n);
   const cells = [];
   const inner = size - 0.18;
   const gw = inner / cols, gh = inner / rows;

@@ -23,6 +23,23 @@ export function normalizePixelOrder(value) {
   return PIXEL_ORDERS.indexOf(v) >= 0 ? v : DEFAULT_PIXEL_ORDER;
 }
 
+/**
+ * ★ VIZ-51: Pixelzahl -> Rasterform {count, cols, rows}.
+ *
+ * Die Formel stand ZWEIMAL — in `buildMatrixPanel` (3D) und in `addGridCells`
+ * (2D-Icon), jeweils mit eigener Klemmung auf 1..256. Die FM-13-Zusage „nur
+ * eine Stelle rechnet" galt damit fuer die ZELLE (`pixelCell`), nicht fuer die
+ * FORM. Zwei Formeln fuer dieselbe Frage sind genau die Drift-Quelle, gegen die
+ * dieses Modul angetreten ist: waere eine der beiden je angefasst worden,
+ * haetten 2D und 3D dasselbe Panel verschieden geschnitten.
+ */
+export function panelGrid(n) {
+  const count = Math.max(1, Math.min(256, Math.floor(n || 16)));
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+  return { count, cols, rows };
+}
+
 /** DMX-Pixelindex -> {r, c} im sichtbaren Raster. */
 export function pixelCell(index, cols, order) {
   const nc = Math.max(1, Math.floor(cols || 1));
