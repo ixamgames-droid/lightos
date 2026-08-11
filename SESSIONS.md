@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| QA-54 | A | fix/qa54-fixture-db-schutz | 2026-08-11T19:44Z | tests/test_spider_dual_tilt_marker.py · tests/conftest.py |
 
 ## Blocker & Fallen
 
@@ -36,3 +36,4 @@
 - 2026-08-11T17:21Z A done QA-51
 - 2026-08-11T17:21Z A claim OUT-52
 - 2026-08-11T19:44Z A done OUT-52
+- 2026-08-11T19:44Z A claim QA-54
