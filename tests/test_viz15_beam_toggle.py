@@ -19,62 +19,109 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 class ShowPersistenzTest(unittest.TestCase):
-    """Speichern/Laden über den echten Show-Block."""
+    """★★ QA-52: Diese Klasse hat den gesamten Speichern/Laden-Vertrag NACHGEBAUT.
 
-    def _viz_block(self, state):
-        import src.core.show.show_file as SF
-        # Den Block so bauen, wie save_show ihn baut — ohne die ganze Datei zu
-        # schreiben. Aufgerufen wird dieselbe Quelle, nicht eine nachgebaute.
-        return {
-            "beams_off": sorted(
-                int(f) for f in (getattr(state, "visualizer_beams_off", set()) or set())
-            ),
-        }
+    ``_viz_block`` baute den Block „so wie ``save_show`` ihn baut" — der
+    Kommentar behauptete sogar „aufgerufen wird dieselbe Quelle, nicht eine
+    nachgebaute", und genau das stimmte nicht. Die Lade-Tests bauten ebenso
+    die Lade-Schleife im Testkoerper nach, und ein vierter suchte vier
+    Zeichenketten im Quelltext von ``show_file``. **``save_show`` und
+    ``load_show`` wurden nie gerufen.** Jede Umbenennung, jeder verschobene
+    Block und jeder vergessene Aufruf waere unbemerkt geblieben — der Test
+    haette weiter seine eigene Kopie bestaetigt.
 
-    def test_leere_menge_erzeugt_leeren_block(self):
-        st = SimpleNamespace(visualizer_beams_off=set())
-        self.assertEqual(self._viz_block(st)["beams_off"], [])
+    Jetzt laeuft der echte Round-Trip ueber eine echte Datei.
+    """
+
+    def _speichern_und_laden(self, beams_off):
+        """Show mit ``beams_off`` speichern, State leeren, zurueckladen."""
+        import tempfile
+        from src.core.app_state import get_state
+        from src.core.show.show_file import save_show, load_show, reset_show
+
+        reset_show()
+        st = get_state()
+        st.visualizer_beams_off = set(beams_off)
+        with tempfile.TemporaryDirectory() as tmp:
+            pfad = os.path.join(tmp, "viz15.lshow")
+            save_show(pfad)
+            reset_show()
+            self.assertEqual(set(), get_state().visualizer_beams_off,
+                             "Vorbedingung: reset_show muss die Menge leeren")
+            ok, msg = load_show(pfad)
+            self.assertTrue(ok, msg)
+            return set(get_state().visualizer_beams_off)
+
+    def test_round_trip_ueber_die_echte_datei(self):
+        self.assertEqual({2, 4, 7, 19}, self._speichern_und_laden({7, 2, 19, 4}))
+
+    def test_leere_menge_bleibt_leer(self):
+        self.assertEqual(set(), self._speichern_und_laden(set()))
 
     def test_sortiert_gespeichert(self):
-        """Zwei Speicherungen desselben Standes müssen byte-gleich sein — eine
-        Set-Reihenfolge erzeugte sonst grundlose Diffs in der Show-Datei."""
-        st = SimpleNamespace(visualizer_beams_off={7, 2, 19, 4})
-        self.assertEqual(self._viz_block(st)["beams_off"], [2, 4, 7, 19])
+        """Zwei Speicherungen desselben Standes muessen byte-gleich sein — eine
+        Set-Reihenfolge erzeugte sonst grundlose Diffs in der Show-Datei.
+
+        Geprueft wird jetzt am tatsaechlich geschriebenen JSON, nicht an einem
+        nachgebauten Block."""
+        import json
+        import tempfile
+        import zipfile
+        from src.core.app_state import get_state
+        from src.core.show.show_file import save_show, reset_show
+
+        reset_show()
+        get_state().visualizer_beams_off = {7, 2, 19, 4}
+        with tempfile.TemporaryDirectory() as tmp:
+            pfad = os.path.join(tmp, "viz15.lshow")
+            save_show(pfad)
+            with zipfile.ZipFile(pfad) as zf:
+                daten = json.loads(zf.read("show.json").decode("utf-8"))
+        self.assertEqual([2, 4, 7, 19],
+                         daten.get("visualizer", {}).get("beams_off"),
+                         f"Block in der Datei: {daten.get('visualizer')}")
 
     def test_alte_show_ohne_block_laedt_als_leer(self):
-        """Der Kern der Rückwärtskompatibilität: kein Key = nichts ausgeblendet,
-        also exakt das bisherige Aussehen."""
-        viz = {"positions": {}, "rotations": {}}
-        beams_off = {int(f) for f in (viz.get("beams_off", []) or [])}
-        self.assertEqual(beams_off, set())
+        """Rueckwaertskompatibilitaet am ECHTEN Loader: kein Key = nichts
+        ausgeblendet, also exakt das bisherige Aussehen."""
+        self.assertEqual(set(), self._laden_mit_viz_block(None))
 
-    def test_kaputte_eintraege_kippen_den_block_nicht(self):
-        """Ein unbrauchbarer Eintrag darf die Positionen nicht mit zu Fall
-        bringen — deshalb ein eigener Isolierungsblock beim Laden."""
-        viz = {"beams_off": ["3", 5, None, "abc"]}
-        try:
-            beams_off = {int(f) for f in (viz.get("beams_off", []) or [])}
-        except Exception:
-            beams_off = set()
-        self.assertEqual(beams_off, set(),
-                         "der ganze Block fällt weg, die Show lädt trotzdem")
+    def test_kaputte_eintraege_kippen_die_show_nicht(self):
+        """Ein unbrauchbarer Eintrag darf die Show nicht mit zu Fall bringen."""
+        self.assertEqual(set(), self._laden_mit_viz_block(
+            {"beams_off": ["3", 5, None, "abc"]}))
 
-    def test_appstate_startet_mit_leerer_menge(self):
-        import src.core.app_state as AS
-        self.assertIn("visualizer_beams_off", AS.AppState.__init__.__code__.co_names,
-                      "das Feld muss im Konstruktor gesetzt werden")
+    def _laden_mit_viz_block(self, viz):
+        """Eine echte Show schreiben, ihren ``visualizer``-Block ersetzen und
+        sie durch den ECHTEN Loader schicken."""
+        import json
+        import shutil
+        import tempfile
+        import zipfile
+        from src.core.app_state import get_state
+        from src.core.show.show_file import save_show, load_show, reset_show
 
-    def test_show_file_kennt_speichern_laden_und_reset(self):
-        import inspect
-        import src.core.show.show_file as SF
-        quelle = inspect.getsource(SF)
-        self.assertIn('"beams_off": sorted(', quelle, "Speichern fehlt")
-        self.assertIn('viz.get("beams_off"', quelle, "Laden fehlt")
-        self.assertIn("state.visualizer_beams_off = beams_off", quelle,
-                      "Zuweisung nach dem Laden fehlt")
-        self.assertIn("state.visualizer_beams_off = set()", quelle,
-                      "Reset (neue Show) fehlt — sonst schleppt eine neue Show "
-                      "die ausgeblendeten Kegel der vorigen mit")
+        reset_show()
+        get_state().visualizer_beams_off = {1, 2}
+        with tempfile.TemporaryDirectory() as tmp:
+            pfad = os.path.join(tmp, "a.lshow")
+            save_show(pfad)
+            with zipfile.ZipFile(pfad) as zf:
+                inhalt = {n: zf.read(n) for n in zf.namelist()}
+            daten = json.loads(inhalt["show.json"].decode("utf-8"))
+            if viz is None:
+                daten.pop("visualizer", None)
+            else:
+                daten["visualizer"] = viz
+            inhalt["show.json"] = json.dumps(daten).encode("utf-8")
+            ziel = os.path.join(tmp, "b.lshow")
+            with zipfile.ZipFile(ziel, "w") as zf:
+                for n, b in inhalt.items():
+                    zf.writestr(n, b)
+            reset_show()
+            ok, msg = load_show(ziel)
+            self.assertTrue(ok, msg)
+            return set(get_state().visualizer_beams_off)
 
 
 class UmschaltenTest(unittest.TestCase):

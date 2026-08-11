@@ -26,6 +26,35 @@ Betrifft die Bedienung — die Funktionen gab es schon, nur beschrieben waren si
   Weiß-Segmente eines Balkens verhalten. Zu finden über die Anleitungs-Übersicht.
   Die Raster sind als Zeichnungen im Text dargestellt; **Screenshots und ein
   Ablauf-Video fehlen noch** und werden am echten Aufbau nachgereicht.
+### 2026-08-11 — „Gerät hinzufügen" merkt sich, auf welchem Universum das Rig steht
+
+#### Behoben
+
+- **Das Universum-Feld stand jedes Mal auf 1.** Wer sein Rig auf Universum 3
+  fährt, musste es bei jedem einzelnen Gerät von Hand korrigieren — und wer es
+  vergaß, patchte auf ein Universum ohne Ausgang und suchte den Fehler
+  anschließend am Rig. Vorgeschlagen wird jetzt das Universum, auf dem zuletzt
+  gepatcht wurde. Ist noch nichts gepatcht, bleibt es bei 1.
+- **Der Adressvorschlag rechnet damit im richtigen Universum.** Er richtet sich
+  nach dem Feld darüber; stand dort die 1, während das Rig auf 3 läuft, schlug
+  er eine Adresse vor, die dort längst belegt war.
+- Das Feld bleibt frei einstellbar — der Vorschlag belegt nur vor. Ein
+  unsinniger Wert in einer von Hand bearbeiteten Show-Datei hält den Dialog
+  nicht auf, dann steht dort wieder die 1.
+### 2026-08-11 — Matrix-Panels standen im 3D anders da als in der Draufsicht
+
+#### Behoben
+
+- **Die Pixel-Reihenfolge eines Matrix-Panels erreichte die 3D-Ansicht nie.**
+  Bei einem Panel im Werkszustand — die Pixel sind dort in Schlangenlinien
+  nummeriert — lief eine horizontale Lauflicht-Figur am echten Geraet im
+  Zickzack, im 3D aber geradeaus. Die Draufsicht bekam die Information die
+  ganze Zeit korrekt; **dasselbe Geraet stand also in den beiden Ansichten
+  unterschiedlich da.**
+
+- Die Rasterform (wie viele Spalten und Zeilen ein Panel bekommt) wurde an zwei
+  Stellen getrennt berechnet. Jetzt an einer — sonst waere ein Eingriff an der
+  einen Stelle unbemerkt an der anderen vorbeigegangen.
 
 ### 2026-08-11 — Tote Sprungmarken in der Anleitung, und ein blinder Wächter
 

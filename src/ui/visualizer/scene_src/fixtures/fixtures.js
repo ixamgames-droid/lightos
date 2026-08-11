@@ -287,7 +287,17 @@ export function addFixture(data) {
   // >=6: 4er-Bars ("vier einzelne PAR-Lichter", PARBAR4/Dotz TPar) behalten
   // bewusst den PAR-Dosen-Look; 6/8/12+-Segment-Bars sind Pixel-Bars.
   const pixelBar = data.type === 'led_bar' && (data.nHeads || 0) >= 6;
-  const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads, pixelBar });
+  // ★ VIZ-51: `pixelOrder` MUSS mit. Die Registry ruft
+  // `buildMatrixPanel(o.nHeads, o.pixelOrder)` — dieses Objekt hier trug das
+  // Feld aber nicht, also kam beim 3D-Panel immer `undefined` an und der
+  // Renderer nahm „DMX-Index == Rasterposition" an. Das 2D-Icon bekam es
+  // gleichzeitig sehr wohl (`buildTopDownIcon(..., data.pixelOrder)`):
+  // **dasselbe Geraet stand in den beiden Ansichten unterschiedlich da**, und
+  // bei einem Panel im Werkszustand (Schlangenlinien) lief eine horizontale
+  // Figur im 3D im Zickzack. Eine Zeile, ein fehlendes Feld — und der ganze
+  // FM-13-Fix erreichte die 3D-Seite nie.
+  const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
+                                           pixelBar, pixelOrder: data.pixelOrder });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
