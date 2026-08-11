@@ -82,11 +82,49 @@ class VorbelegungTest(_Basis):
 
     def test_reihenfolge_der_fids_entscheidet_nicht_die_der_zeilen(self):
         """„Zuletzt gepatcht" = groesste fid. Wird eine LUECKE nachtraeglich
-        gefuellt (fid 2 zuletzt eingefuegt), bleibt fid 5 das juengste Geraet."""
+        gefuellt (fid 2 zuletzt eingefuegt), bleibt fid 5 das juengste Geraet.
+
+        ⚠️ Ueber den Dialog belegt dieser Fall die Aussage NICHT — und das war
+        ein Mangel der ersten Fassung: `_reload_patch_cache` laedt mit
+        `order_by(PatchedFixture.fid)` (`app_state.py:1314`), der Cache ist auf
+        diesem Pfad also IMMER nach fid sortiert. „Groesste fid" und „letzte
+        Zeile" sind hier nicht unterscheidbar; gemessen ueberlebte die Mutation
+        `max(..., key=fid)` -> `list(...)[-1]` alle zwoelf Tests.
+
+        Deshalb steht der Fall hier UND als direkter Aufruf mit unsortierter
+        Eingabe (s. `test_unsortierte_eingabe_...`) — sonst traegt die
+        Begruendung im Produktions-Docstring („unabhaengig davon, in welcher
+        Reihenfolge der Patch-Cache gerade sortiert ist") keinen Beleg.
+        """
         self._patch(1, universe=1)
         self._patch(5, universe=6)
         self._patch(2, universe=2)
         self.assertEqual(self._dlg()._spin_universe.value(), 6)
+
+    def test_unsortierte_eingabe_aendert_den_vorschlag_nicht(self):
+        """★ Der Beleg fuer die Unabhaengigkeit von der Cache-Reihenfolge.
+
+        Der einzige Codepfad, auf dem der Cache wirklich unsortiert entsteht,
+        ist der kopflose Zweig (`app_state.py:1126`, `_show_engine is None`) —
+        den faehrt der Dialog nie an. Also wird die freie Funktion direkt mit
+        einer unsortierten Liste gefuettert: nur so ist „groesste fid" von
+        „letzte Zeile" zu unterscheiden.
+        """
+        from types import SimpleNamespace
+        from src.ui.widgets.fixture_browser import universum_vorschlag
+
+        def geraet(fid, universe):
+            return SimpleNamespace(fid=fid, universe=universe)
+
+        # Groesste fid (5) steht in der MITTE, die letzte Zeile traegt fid 2.
+        unsortiert = [geraet(1, 1), geraet(5, 6), geraet(2, 2)]
+        self.assertEqual(6, universum_vorschlag(unsortiert),
+                         "der Vorschlag haengt an der groessten fid, nicht an "
+                         "der letzten Listenzeile")
+        # Gegenprobe: dieselbe Menge in anderer Reihenfolge -> dasselbe Ergebnis.
+        self.assertEqual(6, universum_vorschlag(list(reversed(unsortiert))))
+        self.assertEqual(6, universum_vorschlag(
+            sorted(unsortiert, key=lambda f: f.universe)))
 
 
 class PositivkontrolleTest(_Basis):

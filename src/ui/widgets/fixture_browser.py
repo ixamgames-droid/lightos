@@ -33,7 +33,12 @@ def universum_vorschlag(fixtures) -> int:
     **„Zuletzt gepatcht" = groesste fid.** ``AppState.next_fid()`` vergibt die
     fid streng aufsteigend (Maximum + 1), das juengste Geraet hat also immer die
     groesste — unabhaengig davon, in welcher Reihenfolge der Patch-Cache
-    gerade sortiert ist.
+    gerade sortiert ist. Diese Unabhaengigkeit ist eigens belegt
+    (``test_unsortierte_eingabe_aendert_den_vorschlag_nicht``): ueber den
+    Dialog allein waere sie NICHT nachweisbar, weil ``_reload_patch_cache``
+    mit ``order_by(fid)`` laedt — dort sind „groesste fid" und „letzte Zeile"
+    ununterscheidbar, und die Mutation auf ``list(fixtures)[-1]`` ueberlebte
+    genau deshalb die erste Testfassung.
 
     Leerer Patch -> 1: es gibt nichts zu erben. Ebenso bei einem Universum
     ausserhalb des Eingabebereichs (von Hand editierte Show-Datei) — eine
