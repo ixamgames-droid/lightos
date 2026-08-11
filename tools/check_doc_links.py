@@ -39,10 +39,44 @@ def _iter_md_files():
         for fn in files:
             if fn.lower().endswith(".md"):
                 yield os.path.join(base, fn)
-    for fn in TOP_LEVEL:
-        p = os.path.join(REPO, fn)
-        if os.path.exists(p):
-            yield p
+    # ★ QA-55: ALLE Markdown-Dateien im Repo-Wurzelverzeichnis, nicht mehr eine
+    # Liste von fuenf. Ungeprueft blieben sonst ausgerechnet die Dateien, die
+    # ein Neuzugang zuerst liest: WORKFLOW.md, INSTALL.md, ARCHITECTURE.md,
+    # CONTRIBUTING.md, AGENTS.md, COORDINATION.md. Eine Aufzaehlung vergisst
+    # jede kuenftige Datei automatisch — ein Verzeichnis-Scan nicht.
+    for fn in sorted(os.listdir(REPO)):
+        if fn.lower().endswith(".md"):
+            yield os.path.join(REPO, fn)
+
+
+def _slug(text: str) -> str:
+    """Ueberschrift -> Anker, nach GitHubs Regel.
+
+    ⚠️ Die Feinheit, an der eine erste Fassung dieses Gates scheiterte:
+    GitHub ersetzt **jedes einzelne** Leerzeichen durch ``-``; es fasst sie
+    NICHT zusammen. „Sync — der Teil" wird deshalb zu ``sync--der-teil`` mit
+    ZWEI Bindestrichen (der Gedankenstrich faellt weg, seine beiden
+    Leerzeichen bleiben). Mit ``\\s+`` zusammengefasst meldete das Gate
+    **neun** tote Anker, von denen fuenf gar keine waren — und der naechste
+    Schritt waere gewesen, korrekte Links „zu reparieren".
+    """
+    t = text.strip().lower()
+    t = re.sub(r"[^\w\s-]", "", t, flags=re.UNICODE)   # Emoji/Satzzeichen weg
+    return t.strip().replace(" ", "-")
+
+
+def _anker(pfad: str) -> set:
+    """Alle Sprungziele einer Datei: Ueberschriften + explizite HTML-Anker."""
+    try:
+        text = open(pfad, "r", encoding="utf-8", errors="replace").read()
+    except Exception:
+        return set()
+    text = CODE_FENCE.sub("", text)
+    anker = {_slug(m.group(1))
+             for m in re.finditer(r"^#{1,6}\s+(.+?)\s*$", text, re.M)}
+    anker |= {m.group(1).lower()
+              for m in re.finditer(r'<a\s+(?:name|id)="([^"]+)"', text)}
+    return anker
 
 
 def scan():
@@ -61,18 +95,31 @@ def scan():
         ok = 0
         for m in MD_LINK.finditer(text):
             ref = m.group(1).strip()
-            if ref.startswith(("http://", "https://", "data:", "#", "mailto:", "tel:")):
+            if ref.startswith(("http://", "https://", "data:", "mailto:", "tel:")):
                 continue
-            r = urllib.parse.unquote(ref.split("#", 1)[0])   # Anker abtrennen
-            if not r:
+            datei_teil, _, anker_teil = ref.partition("#")
+            r = urllib.parse.unquote(datei_teil)
+            anker_teil = urllib.parse.unquote(anker_teil).lower()
+            # ★ QA-55: Reine Anker (``#abschnitt``) zeigen in die EIGENE Datei
+            # und wurden bis hierhin komplett uebersprungen — dabei sind das
+            # die Inhaltsverzeichnisse, also die Links, die am haeufigsten
+            # benutzt werden.
+            if not r and not anker_teil:
                 continue
             total += 1
-            target = os.path.normpath(os.path.join(md_dir, r))
-            if os.path.exists(target):
-                ok += 1
-            else:
+            target = md if not r else os.path.normpath(os.path.join(md_dir, r))
+            if not os.path.exists(target):
                 dead.append((os.path.relpath(md, REPO).replace("\\", "/"),
                              ref, os.path.relpath(target, REPO).replace("\\", "/")))
+            elif anker_teil and anker_teil not in _anker(target):
+                # Die Datei gibt es, den Abschnitt nicht. Frueher galt das als
+                # heiler Link — dabei landet der Leser oben auf der Seite und
+                # sucht selbst.
+                dead.append((os.path.relpath(md, REPO).replace("\\", "/"),
+                             ref, os.path.relpath(target, REPO).replace("\\", "/")
+                             + f"  (Abschnitt '#{anker_teil}' fehlt)"))
+            else:
+                ok += 1
         if ok:
             per_file_ok[os.path.relpath(md, REPO).replace("\\", "/")] = ok
     return total, dead, per_file_ok
