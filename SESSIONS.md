@@ -22,6 +22,7 @@
 - 2026-08-11T16:32Z (A) QA-53 GEKLAERT und behoben (PR folgt): Ursache war NICHT die fixtures.db, sondern tests/test_verify_loop_sperre.py — es startete den Runner ohne Argumente, also die VOLLE Suite, mitten im Gate. Gemessen 95 pytest-Prozesse auf EINEM geerbten LIGHTOS_SHOW_DB. Schlimmer: der innere Lauf raeumt .pytest_segments per rm -rf, damit verschwinden auch die ROTEN Zeilen -> das Gate konnte GRUEN melden, obwohl Segmente rot waren.
 - 2026-08-11T17:05Z (A) QA-50 gemergt (#601). QA-51 im Gate. Neu erfasst: QA-54 (Testsuite schreibt in die echte fixtures.db, Rueckstand TEST-DualTilt) und QA-55 (Doku-Link-Pruefer sieht 20 von 280 Dateien nicht, ignoriert Anker; Backlog-Lint-Guard hat dieselbe Blindstelle wie sein eigenes Muster).
 - 2026-08-11T20:37Z (A) Stand 11.08. Abend: OUT-51/52, QA-50/51/53/54/55 gemergt (#599-#605). QA-52 (7 von 9 Test-Umbauten) im Gate. Neu erfasst: QA-56 (Rest aus QA-52), LAS-HW-VERIFY (war eine Backlog-Zeile OHNE ID und damit fuer Queue/Lint unsichtbar). Drei P2/P3-Items laufen parallel in Agenten-Worktrees.
+- 2026-08-11T21:13Z (A) NEUER BEFUND (aus TOOL-SMOKEDIM): tools/build_grosses_rig.py erzeugt SECHS Geraete, die nie hell werden — 4 Moving Heads (Master-Dimmer CH56/67/78/89) und 2 Spider (CH96/110). Per Render-Probe bestaetigt: die Dimmer bleiben ueber alle Funktionen der Show auf 0, waehrend Nachbarkanaele arbeiten. Ursache: die Geraete haben ein Farbrad statt RGB, ein faerbender Matrix-Effekt erreicht ihren Dimmer nicht. Wird eigenes Item, sobald der laufende PR durch ist.
 
 ## Verlauf
 
