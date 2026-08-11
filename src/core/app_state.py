@@ -1716,6 +1716,25 @@ class AppState:
         except Exception as e:
             print(f"[app_state] apply_output_config: konnte {path} nicht lesen: {e}")
             return
+        # ★★ OUT-52: Zuerst die Ausgaenge raeumen, deren Zeile GELOESCHT wurde.
+        #
+        # Die Schleife unten laeuft nur ueber die Zeilen, die es noch GIBT —
+        # ein im Universe-Manager geloeschtes Universum kam darin nicht mehr
+        # vor, und sein laufender Adapter wurde deshalb nie geschlossen. Das
+        # Loeschen sah aus wie erledigt, und das Rig bekam unveraendert weiter
+        # DMX: eine Aenderung, die man erst beim naechsten Programmstart sieht.
+        try:
+            konfiguriert = {int(r.get("num", 1)) for r in (rows or [])
+                            if isinstance(r, dict)}
+        except (TypeError, ValueError):
+            konfiguriert = set()
+        try:
+            for eintrag in self.output_manager.ausgabe_status():
+                if eintrag["universum"] not in konfiguriert:
+                    self.output_manager.remove_output(eintrag["universum"])
+        except Exception as e:
+            print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
+
         for r in rows or []:
             try:
                 num = int(r.get("num", 1))

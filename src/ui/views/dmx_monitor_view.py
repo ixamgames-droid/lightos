@@ -178,7 +178,11 @@ class DmxMonitorView(QWidget):
         top = QHBoxLayout()
         top.addWidget(QLabel("Universe:"))
         self._combo_univ = QComboBox()
-        for u in range(1, 17):
+        # OUT-52: 1–32 wie Patch und Ausgabe-Konfiguration. Das 1–16-Limit
+        # machte gepatchte Geraete auf U17–U32 im Monitor unsichtbar — im
+        # Output-Tab war genau das schon korrigiert (`output_view.py:73`),
+        # hier nicht.
+        for u in range(1, 33):
             self._combo_univ.addItem(f"Universe {u}", u)
         self._combo_univ.currentIndexChanged.connect(self._refresh_patched)
         top.addWidget(self._combo_univ)
@@ -190,6 +194,16 @@ class DmxMonitorView(QWidget):
         self._edit_filter.setFixedWidth(160)
         self._edit_filter.textChanged.connect(self._on_filter_changed)
         top.addWidget(self._edit_filter)
+
+        # ★ OUT-52: Sagt, ob das gezeigte Bild ueberhaupt irgendwo hingeht.
+        # Der Monitor zeigt `get_display_frame`, und das ist der GERECHNETE
+        # Frame — er entsteht, bevor nachgesehen wird, ob es einen Adapter
+        # gibt. Ohne diesen Hinweis sieht ein Universum ohne Ausgang exakt so
+        # aus wie eines, das sendet; genau diese Verwechslung hat am
+        # 2026-08-05 die Fehlersuche verlaengert.
+        self._lbl_ausgang = QLabel("")
+        self._lbl_ausgang.setStyleSheet("font-size: 11px;")
+        top.addWidget(self._lbl_ausgang)
 
         top.addStretch(1)
         self._lbl_legend = QLabel(
@@ -274,8 +288,47 @@ class DmxMonitorView(QWidget):
             om = getattr(self._state, "output_manager", None)
             if om is not None:
                 data = om.get_display_frame(univ)
+            gesendet = data is not None
             if data is None:
                 data = self._state.universes[univ].get_all()
             self._grid.set_values(data)
+            self._update_ausgang_label(om, univ, gesendet)
         except Exception:
             pass
+
+    def _update_ausgang_label(self, om, univ: int, gesendet: bool):
+        """OUT-52: kennzeichnet, ob das gezeigte Bild wirklich rausgeht.
+
+        Drei Faelle, weil es drei gibt: es geht raus · es wird nur gerechnet
+        (kein Adapter) · es wird zwar gerechnet und ein Adapter ist da, aber
+        der sendet nicht (OUT-51-Fehlerserie/toter Port).
+        """
+        lbl = getattr(self, "_lbl_ausgang", None)
+        if lbl is None:
+            return
+        if om is None or not getattr(om, "sendet_wirklich", None):
+            lbl.setText("")
+            return
+        if not om.sendet_wirklich(univ):
+            lbl.setText(f"⚠ Universe {univ} hat keinen Ausgang — nur gerechnet")
+            lbl.setStyleSheet("color: #ffb454; font-size: 11px;")
+            lbl.setToolTip(
+                "Diese Werte berechnet LightOS, aber kein Adapter gibt sie "
+                "aus. In den Output-Einstellungen einen Ausgang zuweisen.")
+            return
+        problem = next((p for p in om.sende_probleme()
+                        if p.get("universum") == univ), None)
+        if problem:
+            lbl.setText(f"⚠ Universe {univ}: {problem['weg']} sendet NICHT")
+            lbl.setStyleSheet("color: #ff4444; font-size: 11px;")
+            lbl.setToolTip(problem.get("text", ""))
+            return
+        if not gesendet:
+            # Adapter da, aber noch kein Frame gesendet (Output-Thread aus).
+            lbl.setText(f"Universe {univ}: Rohwerte (noch kein Frame gesendet)")
+            lbl.setStyleSheet("color: #b0b6c0; font-size: 11px;")
+            lbl.setToolTip("")
+            return
+        lbl.setText(f"Universe {univ} geht raus")
+        lbl.setStyleSheet("color: #9DFF52; font-size: 11px;")
+        lbl.setToolTip("")

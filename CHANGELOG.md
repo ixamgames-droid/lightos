@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Der DMX-Monitor sagt jetzt, ob das Bild wirklich rausgeht
+
+#### Behoben
+
+- **Der Monitor zeigte den gerechneten Frame, nicht den gesendeten.** Ein
+  Universum ganz ohne Ausgang sah dort exakt so aus wie eines, das sendet —
+  eine Verwechslung, die bei der Fehlersuche am 2026-08-05 Zeit gekostet hat.
+  Neben der Universumsauswahl steht jetzt, was Sache ist: *geht raus*, *hat
+  keinen Ausgang — nur gerechnet*, oder *Adapter da, sendet aber nicht*. Die
+  gerechneten Werte bleiben sichtbar; sie gelten nur nicht mehr als gesendet.
+
+- **Ein gelöschtes Universum sendete unverändert weiter.** Wer im
+  Universe-Manager eine Zeile entfernte und speicherte, sah eine erledigte
+  Änderung — der laufende Ausgang wurde aber nie geschlossen, das Rig bekam
+  weiter DMX. Auffällig wurde es erst beim nächsten Programmstart.
+
+- **Der Monitor bot nur 16 Universen an**, obwohl Patch und Ausgabe 32 können.
+  Geräte auf Universum 17–32 waren dort schlicht unsichtbar.
+
 ### 2026-08-11 — Die Prüfwerkzeuge prüfen jetzt das, wofür sie gebaut sind
 
 Anlass: am 2026-08-05 waren **alle Prüfungen grün, während das Gerät dunkel
