@@ -81,8 +81,14 @@ _verify_lock() {
 }
 _verify_lock "$@"
 
-echo "[verify] 1/2 Syntax-Check (compileall src) ..."
-if ! "$PY" -m compileall -q src; then
+# ★ QA-51: `tools` gehoert mit hinein. Bis hierhin kompilierte KEIN Gate die
+# Werkzeuge — ein Syntaxfehler dort fiel erst auf, wenn jemand das Werkzeug
+# benutzte. Besonders unangenehm bei `gen_tools_index.py`, das einen
+# SyntaxError beim Einlesen einer Datei in die harmlose Index-Zelle
+# „(Docstring nicht lesbar)" verwandelt: die kaputte Datei erscheint damit
+# ordentlich im Verzeichnis, und der Index bestaetigt sie sogar.
+echo "[verify] 1/2 Syntax-Check (compileall src tools) ..."
+if ! "$PY" -m compileall -q src tools; then
     echo "[verify] SYNTAX-FEHLER"
     exit 1
 fi
