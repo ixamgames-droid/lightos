@@ -256,8 +256,30 @@ class OutputManager:
         (DMX-Monitor, Output-Monitor, 3D-Visualizer). ``None``, solange noch kein
         Frame gesendet wurde (Output-Thread aus / kein Tick) -> der Aufrufer faellt
         dann auf den Rohpuffer (``universe.get_all()``) zurueck. NUR LESEN: der
-        Snapshot wird nie zurueck in den Puffer/Render geschrieben."""
+        Snapshot wird nie zurueck in den Puffer/Render geschrieben.
+
+        ⚠️ OUT-52: Dieser Snapshot entsteht, BEVOR nachgesehen wird, ob das
+        Universum ueberhaupt einen Adapter hat (``_send_all`` setzt ihn eine
+        Zeile vor dem Geraete-Block). Er zeigt also, was LightOS **gerechnet**
+        hat — nicht zwingend, was ein Geraet bekommen hat. Wer ihn anzeigt,
+        muss :meth:`sendet_wirklich` dazu befragen; sonst entsteht genau die
+        Verwechslung, die am 2026-08-05 die Fehlersuche verlaengert hat: der
+        Monitor sah richtig aus, waehrend ein leeres Universum gesendet wurde.
+        """
         return self._display_frame.get(universe)
+
+    def sendet_wirklich(self, universe: int) -> bool:
+        """OUT-52: Geht der Frame dieses Universums an IRGENDEIN Geraet?
+
+        ``False`` heisst: was :meth:`get_display_frame` liefert, ist eine reine
+        Rechnung — kein Adapter ist dafuer registriert. Die Frage, ob ein
+        registrierter Adapter auch wirklich sendet, beantwortet
+        :meth:`ausgabe_status` (OUT-51); hier geht es nur um „gibt es
+        ueberhaupt einen Ausgang".
+        """
+        return any(universe in reg for reg in
+                   (self._enttec_outputs, self._artnet_outputs,
+                    self._sacn_outputs))
 
     # ── OUT-51: Sendefehler buchen und auslesen ──────────────────────────────
 
