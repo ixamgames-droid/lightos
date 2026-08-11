@@ -7,6 +7,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Ein Ausfall der Ausgabe ist jetzt zu sehen
+
+#### Behoben
+
+- **Ein Geraet konnte mitten in der Show ausfallen, ohne dass irgendwo etwas
+  erschien.** Um jeden Sendeversuch lag ein Fehlerfilter, der alles verschluckte
+  — kein Zaehler, kein Log, kein Hinweis in der Oberflaeche. Dasselbe galt fuer
+  die Kanal-Modifikatoren und fuer die Taktgeber, an denen Funktionen und Chaser
+  haengen. Jetzt werden Fehler gezaehlt, und ein **anhaltender** Ausfall meldet
+  sich; ein einzelner Aussetzer weiterhin nicht — sonst waere die Anzeige nach
+  einem Abend Betrieb ein Rauschen, das niemand mehr liest.
+
+- **Die Statusanzeige meldete „aktiv", sobald ein Adapter eingerichtet war —
+  nicht, wenn er sendete.** Bei totem USB-Port stand dort gruen „Enttec: …
+  aktiv", waehrend das Rig dunkel blieb; bei der Fehlersuche am 2026-08-05 hat
+  genau das in die Irre gefuehrt. Die Anzeige fragt jetzt den Adapter selbst und
+  unterscheidet drei Faelle: *sendet*, *sendet nicht*, *verbindet gerade*. Ein
+  Geraet, das darueber keine Auskunft geben kann (Art-Net/sACN ueber UDP), wird
+  weder gruen noch rot dargestellt — nichts zu wissen ist kein Befund.
+
+- **Der Statusbalken prueft sich seither im Sekundentakt.** Vorher lief die
+  Pruefung nur beim Programmstart und nach dem Ausgabe-Dialog: ein Adapter, der
+  waehrend der Show ausfiel, blieb in der Anzeige fuer immer „aktiv". Ein
+  Ausfall, den man nur durch erneutes Oeffnen des Fensters bemerkt, ist keine
+  Anzeige.
+
+- **Die Universums-Anzeige unten rechts stand fest auf „Universe 1"** und wurde
+  nie aktualisiert — bei mehreren Universen schlicht falsch. Sie zeigt jetzt,
+  was tatsaechlich rausgeht (Universum und Weg), warnt bei einem Ausfall und
+  nennt im Tooltip Ziel und Grund. Ein ausgefallener Ausgang wird dabei zuerst
+  angezeigt, damit er bei einem groesseren Rig nicht aus der Kurzfassung faellt.
+
+- **„Verbinden" meldete Erfolg, bevor irgendetwas verbunden war.** Der Klick
+  startet den Ausgabe-Prozess — ob der Port aufgeht, weiss dieser Moment noch
+  nicht. Der Dialog meldet jetzt zuerst „eingerichtet und gespeichert" und
+  traegt das Ergebnis nach, sobald der Adapter antwortet: verbunden, oder
+  „Port laesst sich nicht oeffnen — es geht kein DMX raus".
+
 ### 2026-08-06 — Datenschutz im oeffentlichen Repo, und Spielregeln fuer zwei KI-Sitzungen
 
 #### Behoben

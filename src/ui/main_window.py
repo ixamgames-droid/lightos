@@ -443,6 +443,19 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._setup_statusbar()
         self._check_hardware()
+        # ★ OUT-51: Bis hierhin lief diese Pruefung nur beim Start und nach dem
+        # Output-Dialog. Ein Adapter, der WAEHREND der Show ausfaellt — Kabel
+        # raus, USB-Wackler, Netz weg — blieb in der Anzeige also fuer immer
+        # „aktiv". Ein Ausfall, den man nur bemerkt, indem man das Fenster neu
+        # oeffnet, ist keine Anzeige. Der Timer haengt am Fenster und stirbt
+        # mit ihm; die Pruefung selbst kostet im Live-Fall nur dict-Zugriffe
+        # (s. `_check_hardware` zur ausgelagerten Port-Enumeration).
+        self._hw_timer = QTimer(self)
+        self._hw_timer.setInterval(2000)
+        # Bound-Method statt Lambda: ein `self` fangendes Lambda haelt das
+        # Fenster GC-unsichtbar fest (Fallenklasse STAB-09/10).
+        self._hw_timer.timeout.connect(self._check_hardware)
+        self._hw_timer.start()
 
         # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
         if kiosk:
@@ -1182,7 +1195,12 @@ class MainWindow(QMainWindow):
         self._lbl_web      = QLabel("Web: aus")
         self._lbl_fixtures = QLabel("0 Geräte")
         self._lbl_mock     = QLabel("")
-        self._lbl_universe = QLabel("Universe 1")
+        # OUT-51: stand hier fest auf „Universe 1" und wurde NIE aktualisiert —
+        # zwei Vorkommen im ganzen Baum, eines davon dieses. Bei mehreren
+        # Universen war das schlicht falsch, und bei ausgefallener Ausgabe
+        # behauptete es weiter, es gaebe eine. Jetzt fuellt `_check_hardware` es
+        # mit dem, was tatsaechlich rausgeht.
+        self._lbl_universe = QLabel("Ausgabe: —")
 
         for w in [self._lbl_enttec, _sep(), self._lbl_web,
                   _sep(), self._lbl_fixtures, _sep(), self._lbl_mock]:
@@ -1199,7 +1217,13 @@ class MainWindow(QMainWindow):
         Windows-Rest ``COM_FAKE`` zeigte und gar nichts sendete. Ein Fehler,
         der sich als Erfolg meldete.
         """
-        port = find_enttec_port()
+        # OUT-51: `find_enttec_port()` zaehlt die seriellen Ports des Systems auf
+        # — auf Windows je nach Treiber einige zehn Millisekunden, und das im
+        # UI-Thread. Seit diese Pruefung im Sekundentakt laeuft (damit ein
+        # abgezogener Adapter im BETRIEB sichtbar wird), wird sie deshalb erst
+        # dort geholt, wo sie wirklich gebraucht wird: in den beiden Zweigen
+        # ohne offenen Ausgang. Im Live-Fall — Adapter offen — kostet der Takt
+        # jetzt nur noch dict-Zugriffe und ein Shared-Memory-Byte.
         offene = {}
         try:
             offene = dict(getattr(self._state.output_manager,
@@ -1224,12 +1248,44 @@ class MainWindow(QMainWindow):
             self._lbl_enttec.setToolTip(problem)
         elif offene:
             benutzt = sorted({getattr(d, "port", "?") for d in offene.values()})
-            self._lbl_enttec.setText(
-                f"Enttec: {', '.join(benutzt)} aktiv "
-                f"({len(offene)} Universe{'n' if len(offene) != 1 else ''})")
-            self._lbl_enttec.setStyleSheet("color: #9DFF52;")
-            self._lbl_enttec.setToolTip("")
-        elif port:
+            ziele = ", ".join(benutzt)
+            anzahl = f"{len(offene)} Universe{'n' if len(offene) != 1 else ''}"
+            # ★ OUT-51: Bis hierhin faerbte dieser Zweig gruen, sobald ein
+            # Adapter REGISTRIERT war — nicht, wenn er sendet. `is_connected()`
+            # (SERIAL-01) beantwortet genau diese Frage und stand seit Monaten
+            # ungenutzt im Code; ein toter COM-Port meldete deshalb „aktiv",
+            # waehrend das Rig dunkel blieb. Drei Zustaende, weil es drei gibt:
+            # sendet / sendet nicht / weiss es noch nicht.
+            from src.core.dmx.output_manager import (
+                geraet_zustand, ZUSTAND_TOT, ZUSTAND_VERBINDET)
+            zustand = {u: geraet_zustand(d) for u, d in offene.items()}
+            tot = sorted(u for u, z in zustand.items() if z == ZUSTAND_TOT)
+            # ★ NUR `verbindet` wartet — `unbekannt` nicht. Ein Geraet, das
+            # keine Auskunft geben kann, ist kein Befund: es gelb blinken zu
+            # lassen waere eine Warnung ohne Anlass, und die naechste echte
+            # Warnung ginge darin unter.
+            wartet = sorted(u for u, z in zustand.items()
+                            if z == ZUSTAND_VERBINDET)
+            if tot:
+                liste = ", ".join(str(u) for u in tot)
+                self._lbl_enttec.setText(
+                    f"Enttec: {ziele} sendet NICHT "
+                    f"(Universe {liste})")
+                self._lbl_enttec.setStyleSheet("color: #ff4444;")
+                self._lbl_enttec.setToolTip(
+                    "Der Adapter ist eingerichtet, aber der Port ist nicht "
+                    "offen — es geht kein DMX raus. USB-Kabel/Port pruefen.")
+            elif wartet:
+                self._lbl_enttec.setText(f"Enttec: {ziele} verbindet …")
+                self._lbl_enttec.setStyleSheet("color: #ffb454;")
+                self._lbl_enttec.setToolTip(
+                    "Der Port wird gerade geoeffnet. Bleibt es dabei, ist der "
+                    "Adapter nicht erreichbar.")
+            else:
+                self._lbl_enttec.setText(f"Enttec: {ziele} aktiv ({anzahl})")
+                self._lbl_enttec.setStyleSheet("color: #9DFF52;")
+                self._lbl_enttec.setToolTip("")
+        elif (port := self._enttec_port_gesucht()):
             # Adapter steckt, aber kein Universe ist ihm zugewiesen.
             self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
             self._lbl_enttec.setStyleSheet("color: #ffb454;")
@@ -1240,6 +1296,85 @@ class MainWindow(QMainWindow):
             self._lbl_enttec.setText("Enttec: nicht gefunden")
             self._lbl_enttec.setStyleSheet("color: #ff4444;")
             self._lbl_enttec.setToolTip("")
+        self._update_ausgabe_label()
+
+    # Hoechstens so oft werden die seriellen Ports durchsucht (Sekunden).
+    _PORTSUCHE_ALLE_S = 5.0
+
+    def _enttec_port_gesucht(self):
+        """``find_enttec_port()`` mit Drossel — der teure Teil der Pruefung.
+
+        Der zweite Fund der Selbstpruefung an diesem Fix: der neue Sekundentakt
+        macht aus einem seltenen Aufruf einen dauernden. Bei einem Rig OHNE
+        Enttec (reines Art-Net/sACN) landet `_check_hardware` immer in diesem
+        Zweig — die Portsuche liefe dann alle 2 s im UI-Thread, unter Windows
+        je nach Treiber einige zehn Millisekunden. Ein frisch eingesteckter
+        Adapter darf ein paar Sekunden brauchen; eine ruckelnde Oberflaeche
+        waehrend einer Show ist teurer als diese Verzoegerung.
+        """
+        import time as _t
+        jetzt = _t.monotonic()
+        letzte = getattr(self, "_portsuche_zeit", None)
+        if letzte is not None and (jetzt - letzte) < self._PORTSUCHE_ALLE_S:
+            return self._portsuche_wert
+        self._portsuche_zeit = jetzt
+        self._portsuche_wert = find_enttec_port()
+        return self._portsuche_wert
+
+    def _update_ausgabe_label(self):
+        """OUT-51: das Ausgabe-Label mit dem fuellen, was WIRKLICH rausgeht.
+
+        Deckt alle drei Wege ab, nicht nur Enttec — ein Art-Net-Ausfall war
+        bisher nirgends in der Oberflaeche zu sehen. Ein Ausfall schlaegt die
+        Aufzaehlung: wenn etwas nicht sendet, ist das die Information, nicht die
+        Liste der Universen.
+        """
+        # Der Statusbalken darf nie der Grund sein, warum das Fenster nicht
+        # aufgeht: waehrend des Hochfahrens (und in Tests) gibt es weder das
+        # Label noch einen fertigen OutputManager.
+        if getattr(self, "_lbl_universe", None) is None:
+            return
+        try:
+            om = self._state.output_manager
+            wege = om.ausgabe_status()
+            probleme = om.sende_probleme()
+        except Exception:
+            return
+        if not wege:
+            self._lbl_universe.setText("Ausgabe: —")
+            self._lbl_universe.setStyleSheet("color: #ffb454;")
+            self._lbl_universe.setToolTip(
+                "Kein Universum gibt DMX aus. Output-Einstellungen öffnen und "
+                "einem Universum einen Ausgang geben.")
+            return
+        kaputt = [w for w in wege if w["verbunden"] is False]
+        # Tick-/Modifier-Stoerungen haengen an keinem Ausgang, wuerden in `wege`
+        # also fehlen — sie gehoeren aber genauso gemeldet.
+        sonstige = [p for p in probleme if p["weg"] in ("Tick", "Modifier")]
+        # ★ Kaputte zuerst. Der Text zeigt nur die ersten drei Ausgaenge — bei
+        # einem groesseren Rig waere der ausgefallene sonst genau der, den man
+        # nicht sieht, waehrend drei funktionierende Platz wegnehmen.
+        sichtbar = kaputt + [w for w in wege if w not in kaputt]
+        teile = [f"U{w['universum']} {w['weg']}" for w in sichtbar[:3]]
+        if len(wege) > 3:
+            teile.append(f"+{len(wege) - 3}")
+        text = "Ausgabe: " + " · ".join(teile)
+        if kaputt or sonstige:
+            self._lbl_universe.setText(f"⚠ {text}")
+            self._lbl_universe.setStyleSheet("color: #ff4444;")
+            zeilen = [f"U{w['universum']} {w['weg']}: sendet nicht"
+                      + (f" ({w['problem']})" if w["problem"] else "")
+                      for w in kaputt]
+            zeilen += [f"{p['weg']}: {p['fehler']} Fehler in Folge ({p['text']})"
+                       for p in sonstige]
+            self._lbl_universe.setToolTip("\n".join(zeilen))
+        else:
+            self._lbl_universe.setText(text)
+            self._lbl_universe.setStyleSheet("")
+            self._lbl_universe.setToolTip(
+                "\n".join(f"U{w['universum']} {w['weg']}"
+                          + (f" → {w['ziel']}" if w["ziel"] else "")
+                          for w in wege))
 
     # ── Transport / Playback ──────────────────────────────────────────────────
 

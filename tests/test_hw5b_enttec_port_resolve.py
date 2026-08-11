@@ -221,6 +221,16 @@ class StatusbalkenTests(unittest.TestCase):
         lbl = _Label()
         stub = types.SimpleNamespace()
         stub._lbl_enttec = lbl
+        # OUT-51: Der Statusbalken fuellt seither auch das Ausgabe-Label. Der
+        # Stub bekommt beides und die ECHTE Methode gebunden — ein Stub, der
+        # den neuen Aufruf einfach wegattrappiert, wuerde still an einem
+        # Statusbalken vorbeitesten, den es so nicht mehr gibt.
+        stub._lbl_universe = _Label()
+        stub._update_ausgabe_label = types.MethodType(
+            mw.MainWindow._update_ausgabe_label, stub)
+        stub._PORTSUCHE_ALLE_S = mw.MainWindow._PORTSUCHE_ALLE_S
+        stub._enttec_port_gesucht = types.MethodType(
+            mw.MainWindow._enttec_port_gesucht, stub)
         stub._state = types.SimpleNamespace(
             output_manager=types.SimpleNamespace(_enttec_outputs=offene),
             enttec_port_notes=notes)
@@ -284,6 +294,11 @@ class StatusbalkenTests(unittest.TestCase):
         lbl = _Label()
         stub = types.SimpleNamespace(_lbl_enttec=lbl,
                                      _state=types.SimpleNamespace())
+        stub._update_ausgabe_label = types.MethodType(
+            mw.MainWindow._update_ausgabe_label, stub)
+        stub._PORTSUCHE_ALLE_S = mw.MainWindow._PORTSUCHE_ALLE_S
+        stub._enttec_port_gesucht = types.MethodType(
+            mw.MainWindow._enttec_port_gesucht, stub)
         with mock.patch.object(mw, "find_enttec_port", lambda: None):
             mw.MainWindow._check_hardware(stub)
         self.assertIn("nicht gefunden", lbl.text)
