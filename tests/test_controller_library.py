@@ -66,20 +66,59 @@ class TestBuiltinLibrary:
             assert p.source, f"{p.id}: Quelle fehlt"
             assert p.license, f"{p.id}: Lizenz fehlt"
 
-    def test_duplicate_id_gets_suffix(self):
+    def test_duplicate_id_gets_suffix(self, tmp_path, monkeypatch):
+        """★★ QA-52: Dieser Test hat die Suffix-Schleife SELBST nachgebaut.
+
+        Er lief ``while lib.find(f"akai_apc_mini-{n}")`` im Testkoerper und
+        prueste dann ``n == 2`` — also seine eigene Schleife, nicht die von
+        ``add_user_profile``. Die Produktionsfunktion wurde dabei nie gerufen;
+        sie hatte repo-weit **keinen einzigen** Test. Waere die Suffix-Logik
+        dort geloescht worden, waere dieser Test gruen geblieben.
+
+        Jetzt laeuft der echte Aufruf — gegen ein temporaeres Nutzer-
+        Verzeichnis, damit nichts in der echten Bibliothek landet.
+        """
+        import src.core.controllers.controller_library as cl
+        monkeypatch.setattr(cl, "_USER_DIR", str(tmp_path))
+
         lib = ControllerLibrary()
         lib.ensure_loaded()
         before = len(lib.all())
-        # gleiche id nochmal einspeisen (ohne Datei zu schreiben): über _profiles
+        assert lib.find("akai_apc_mini") is not None, "Vorbedingung"
+
         dup = ControllerProfile(id="akai_apc_mini", manufacturer="X", model="Y")
-        # add_user_profile würde auf Platte schreiben — hier nur die
-        # Suffix-Logik prüfen:
-        assert lib.find("akai_apc_mini") is not None
-        n = 2
-        while lib.find(f"akai_apc_mini-{n}") is not None:
-            n += 1
-        assert n == 2  # noch kein Duplikat vorhanden
-        assert len(lib.all()) == before
+        pfad = lib.add_user_profile(dup)
+
+        assert dup.id == "akai_apc_mini-2", "die Kollision muss ein Suffix bekommen"
+        assert os.path.basename(pfad) == "akai_apc_mini-2.json"
+        assert os.path.exists(pfad), "die Datei muss wirklich geschrieben sein"
+        assert lib.find("akai_apc_mini-2") is not None
+        assert lib.find("akai_apc_mini") is not dup, "das Original bleibt es selbst"
+        assert len(lib.all()) == before + 1
+
+        # Zweite Kollision -> -3, nicht wieder -2 (die Schleife muss zaehlen).
+        dup2 = ControllerProfile(id="akai_apc_mini", manufacturer="X", model="Z")
+        lib.add_user_profile(dup2)
+        assert dup2.id == "akai_apc_mini-3"
+
+    def test_neue_id_bekommt_kein_suffix(self):
+        """Positivkontrolle: ein Profil ohne Kollision behaelt seine ID —
+        sonst waere „bekommt ein Suffix" auch erfuellt, wenn IMMER eines
+        angehaengt wird."""
+        import tempfile
+        import src.core.controllers.controller_library as cl
+        with tempfile.TemporaryDirectory() as tmp:
+            alt = cl._USER_DIR
+            cl._USER_DIR = tmp
+            try:
+                lib = ControllerLibrary()
+                lib.ensure_loaded()
+                neu = ControllerProfile(id="voellig_neues_geraet",
+                                        manufacturer="X", model="Y")
+                lib.add_user_profile(neu)
+                assert neu.id == "voellig_neues_geraet"
+            finally:
+                cl._USER_DIR = alt
 
 
 class TestMidiOnlyFilter:

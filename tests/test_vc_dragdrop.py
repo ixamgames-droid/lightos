@@ -149,21 +149,74 @@ class VcDragDropTest(unittest.TestCase):
     # ── Kein Edit-Mode: Drop wird ignoriert ──────────────────────────────────
 
     def test_drop_ignored_outside_edit_mode(self):
-        """apply_drop ausserhalb des Bearbeitungs-Modus soll keinen Button erzeugen."""
+        """★★ QA-52: Dieser Test hatte KEINE einzige Zusicherung.
+
+        Er hiess „Drop wird ausserhalb des Bearbeitungs-Modus ignoriert", rief
+        dann aber ``apply_drop`` — die Ebene, die den Modus per Konstruktion
+        gar nicht prueft — und stellte im Kommentar selbst fest, dass dabei
+        sehr wohl ein Widget entsteht. Uebrig blieb „Hauptsache kein
+        Exception". Ein Test, der seinen eigenen Namen widerlegt und nichts
+        behauptet, kann nicht fehlschlagen.
+
+        Geprueft wird jetzt die Ebene, die den Vertrag WIRKLICH traegt:
+        ``dropEvent`` (``vc_canvas.py:617``) steigt bei ``_edit_mode == False``
+        aus. Mit Positivkontrolle im Bearbeitungs-Modus — sonst waere „es
+        entsteht kein Button" auch dann erfuellt, wenn Drops generell nicht
+        mehr funktionieren.
+        """
         from src.ui.virtualconsole.vc_canvas import VCCanvas
         from src.ui.virtualconsole.vc_button import VCButton
+        from PySide6.QtCore import QMimeData, QPointF, Qt
+        from PySide6.QtGui import QDropEvent
 
-        canvas = VCCanvas()
-        # edit_mode bleibt False (Standard)
-        # apply_drop laeuft intern immer — es ist nur dropEvent das abbricht;
-        # der Aufruf direkt soll dennoch ein Widget erzeugen wenn edit_mode False
-        # ist, WEIL apply_drop selbst das nicht prueft (das prueft dropEvent).
-        # Aber mindestens kein Crash:
-        canvas.apply_drop(function_id=self.m.id, pos=QPoint(10, 10))
-        # Im nicht-edit-Modus wurde dennoch ein Widget angelegt (apply_drop
-        # hat keinen Guard — nur dropEvent prueft _edit_mode).
-        # Wir pruefen, dass der Code nicht abstuerzt und geben keinen False-
-        # negative aus. Hauptsache: kein Exception.
+        def _drop(canvas):
+            md = QMimeData()
+            md.setText(str(self.m.id))
+            md.setData("application/x-lightos-function",
+                       str(self.m.id).encode())
+            ev = QDropEvent(QPointF(10, 10), Qt.DropAction.CopyAction, md,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+            canvas.dropEvent(ev)
+            return ev
+
+        from unittest import mock
+        from src.ui.virtualconsole import vc_drop_panel as vdp
+
+        def _ohne_dialog(panel):
+            """Der vom Panel selbst vorgesehene Testweg: Checkboxen setzen und
+            ``results()`` rufen (s. dessen Docstring). So entstehen ECHTE
+            SmartDropResults — ein selbst erfundener Rueckgabewert waere
+            wieder nur eine Nachbildung."""
+            panel._rows[0].check.setChecked(True)
+            return panel.results()
+
+        # ★ Auch der Anzeige-Modus laeuft mit gemocktem Dialog. Ohne das haengt
+        # die Mutationsprobe (Guard entfernt) in `exec()` statt sauber am
+        # Assert zu scheitern — ein Timeout ist ein schwaecherer Beleg als
+        # „es entstand ein Bedienelement, das nicht entstehen darf".
+        aus = VCCanvas()
+        aus._edit_mode = False
+        with mock.patch.object(vdp.VCDropPanel, "run", _ohne_dialog):
+            ev = _drop(aus)
+        self.assertFalse(ev.isAccepted(),
+                         "dropEvent muss den Drop ausserhalb des "
+                         "Bearbeitungs-Modus ablehnen")
+        self.assertEqual([], aus.findChildren(VCButton),
+                         "im Anzeige-Modus darf kein Bedienelement entstehen")
+
+        # Positivkontrolle: derselbe ECHTE `dropEvent`-Pfad, nur ohne den
+        # modalen Auswahl-Dialog. Ihn stehen zu lassen hiesse, den Test in
+        # `exec()` haengen zu lassen — und ihn zu umgehen, indem man wie frueher
+        # `apply_drop` direkt ruft, hiesse, die zu pruefende Ebene zu
+        # ueberspringen. Gemockt wird deshalb nur die Dialog-Antwort.
+        an = VCCanvas()
+        an._edit_mode = True
+        with mock.patch.object(vdp.VCDropPanel, "run", _ohne_dialog):
+            _drop(an)
+        self.assertTrue(an.findChildren(VCButton),
+                        "Positivkontrolle: im Bearbeitungs-Modus MUSS ein "
+                        "Bedienelement entstehen — sonst belegt der Fall "
+                        "darueber nur, dass Drops gar nicht mehr gehen")
 
     # ── default_param_key ─────────────────────────────────────────────────────
 
