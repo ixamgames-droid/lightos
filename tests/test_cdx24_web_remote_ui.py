@@ -79,7 +79,113 @@ class LanToggleRoundTripTest(unittest.TestCase):
 
 
 class MainWindowWiringTest(unittest.TestCase):
-    """Die Verdrahtung selbst — ohne das echte MainWindow hochzuziehen."""
+    """Die Verdrahtung selbst — ohne das echte MainWindow hochzuziehen.
+
+    ★★ QA-52: Drei dieser Tests suchten Zeichenketten im Quelltext von
+    ``_open_web_remote_dialog``. Bei einem SICHERHEITSdialog ist das die
+    falsche Art von Zuversicht: der Text bleibt auch dann stehen, wenn der
+    Aufruf in einem toten Zweig landet oder an keinem Knopf mehr haengt. Die
+    Helfer unten bauen den Dialog deshalb wirklich und druecken wirklich.
+    """
+
+    def _dialog_bauen(self, laeuft=False):
+        """``_open_web_remote_dialog`` gegen einen Stub fahren und die
+        erzeugten Bedienelemente zurueckgeben.
+
+        ``QDialog.exec`` wird ersetzt — der echte Aufruf blockiert bis zum
+        Schliessen. Alles davor (Aufbau, Verdrahtung, ``_refresh_labels``)
+        laeuft unveraendert.
+        """
+        import types
+        from unittest import mock
+        from PySide6.QtWidgets import (QApplication, QDialog, QPushButton,
+                                       QCheckBox)
+        from src.ui import main_window as mw
+        from src.web import remote_settings
+
+        QApplication.instance() or QApplication([])
+        self.regen_gerufen = False
+        self.refresh_gerufen = False
+        self.lan_gesetzt = False
+        self.server_aktionen = []
+
+        # ★ Ein ECHTES QWidget: `_open_web_remote_dialog` baut `QDialog(self)`,
+        # koppelt die Lebensdauer also an das Fenster. Ein SimpleNamespace
+        # scheitert dort mit TypeError — und genau diese Kopplung ist ja Teil
+        # dessen, was der Dialog richtig machen soll.
+        from PySide6.QtWidgets import QWidget
+
+        class _FensterStub(QWidget):
+            def statusBar(self):
+                return types.SimpleNamespace(showMessage=lambda *a, **k: None)
+
+        stub = _FensterStub()
+        self.addCleanup(stub.deleteLater)
+        stub._act_web = types.SimpleNamespace(setChecked=lambda _b: None)
+        stub._lbl_web = types.SimpleNamespace(setText=lambda _t: None,
+                                              setStyleSheet=lambda _s: None)
+        gebaut = {}
+
+        def _exec(dlg_self):
+            gebaut["dlg"] = dlg_self
+            gebaut["buttons"] = dlg_self.findChildren(QPushButton)
+            gebaut["checks"] = dlg_self.findChildren(QCheckBox)
+            return 0
+
+        def _regen():
+            self.regen_gerufen = True
+
+        def _refresh():
+            self.refresh_gerufen = True
+            return True
+
+        def _set_lan(wert):
+            self.lan_gesetzt = True
+
+        import src.web.app as web_app
+        # ★ Die Patches muessen den KLICK ueberleben, nicht nur den Aufbau:
+        # `remote_settings.regenerate_token()` und der `from src.web import app`
+        # in `_lan_toggled` werden erst beim Druecken aufgeloest. Mit einem
+        # `with`-Block waeren zur Klickzeit wieder die echten Funktionen aktiv —
+        # der Test haette dann das echte Token rotiert und den echten Server
+        # angefasst.
+        for ziel, name, wert in (
+                (QDialog, "exec", _exec),
+                (remote_settings, "regenerate_token", _regen),
+                (remote_settings, "set_lan_remote_enabled", _set_lan),
+                (remote_settings, "get_token", lambda: "abc"),
+                (remote_settings, "is_lan_remote_enabled", lambda: False),
+                (web_app, "refresh_running_token", _refresh),
+                (web_app, "is_running", lambda: laeuft),
+                (web_app, "stop_server",
+                 lambda: self.server_aktionen.append("stop")),
+                (web_app, "start_server",
+                 lambda *_a: self.server_aktionen.append("start")),
+        ):
+            fleck = mock.patch.object(ziel, name, wert)
+            fleck.start()
+            self.addCleanup(fleck.stop)
+        mw.MainWindow._open_web_remote_dialog(stub)
+        self.assertIn("dlg", gebaut, "der Dialog wurde nie aufgebaut")
+        return gebaut
+
+    def _drueck_token_knopf(self, *, bestaetigen: bool):
+        from unittest import mock
+        from PySide6.QtWidgets import QMessageBox
+        from src.ui import main_window as mw
+        gebaut = self._dialog_bauen()
+        knopf = next(b for b in gebaut["buttons"]
+                     if "Token" in b.text())
+        antwort = (QMessageBox.StandardButton.Yes if bestaetigen
+                   else QMessageBox.StandardButton.No)
+        with mock.patch.object(mw.QMessageBox, "question",
+                               lambda *a, **k: antwort):
+            knopf.click()
+
+    def _schalte_lan(self, *, laeuft: bool):
+        gebaut = self._dialog_bauen(laeuft=laeuft)
+        haken = gebaut["checks"][0]
+        haken.setChecked(True)      # loest `toggled` aus
 
     def test_dialog_handler_exists(self):
         from src.ui.main_window import MainWindow
@@ -97,22 +203,47 @@ class MainWindowWiringTest(unittest.TestCase):
         self.assertIn("_open_web_remote_dialog", src)
 
     def test_dialog_uses_both_controls_and_refreshes_the_server(self):
-        import inspect
-        from src.ui.main_window import MainWindow
-        src = inspect.getsource(MainWindow._open_web_remote_dialog)
-        for needle in ("regenerate_token", "set_lan_remote_enabled",
-                       "refresh_running_token"):
-            with self.subTest(needle=needle):
-                self.assertIn(needle, src)
+        """★★ QA-52: Dieser Test suchte drei Zeichenketten im QUELLTEXT.
+
+        Er blieb damit gruen, wenn die Aufrufe in einem toten Zweig stehen, an
+        einen nie verdrahteten Knopf haengen oder nur im Kommentar vorkommen —
+        und bei einem SICHERHEITSdialog ist das die falsche Art von Zuversicht.
+        Jetzt wird der Dialog gebaut, der Knopf gedrueckt und geprueft, was
+        wirklich passiert.
+        """
+        self._drueck_token_knopf(bestaetigen=True)
+        self.assertTrue(self.regen_gerufen,
+                        "'Token neu erzeugen' muss regenerate_token() rufen")
+        self.assertTrue(self.refresh_gerufen,
+                        "ohne refresh_running_token() akzeptiert der LAUFENDE "
+                        "Server weiter den alten ?k=-Link")
+
+    def test_abbrechen_erzeugt_kein_neues_token(self):
+        """Positivkontrolle: der Default der Rueckfrage ist bewusst 'Nein' —
+        ein Enter im Showbetrieb wuerde sonst alle Geraete rauswerfen."""
+        self._drueck_token_knopf(bestaetigen=False)
+        self.assertFalse(self.regen_gerufen)
+        self.assertFalse(self.refresh_gerufen)
 
     def test_lan_toggle_restarts_the_running_server(self):
         """NET-09-Falle: die Bind-Adresse wird NUR in start_server gelesen. Ohne
-        Neustart glaubt der Nutzer 'aus', der Port bleibt aber im LAN offen."""
-        import inspect
-        from src.ui.main_window import MainWindow
-        src = inspect.getsource(MainWindow._open_web_remote_dialog)
-        self.assertIn("stop_server", src)
-        self.assertIn("start_server", src)
+        Neustart glaubt der Nutzer 'aus', der Port bleibt aber im LAN offen.
+
+        ★ QA-52: Auch dieser Test las nur den Quelltext. Jetzt wird der Haken
+        wirklich umgelegt — bei LAUFENDEM Server, denn nur dann ist der
+        Neustart faellig.
+        """
+        self._schalte_lan(laeuft=True)
+        self.assertTrue(self.lan_gesetzt, "set_lan_remote_enabled() muss laufen")
+        self.assertEqual(["stop", "start"], self.server_aktionen,
+                         "der laufende Server muss neu gestartet werden")
+
+    def test_lan_toggle_startet_einen_gestoppten_server_nicht(self):
+        """Positivkontrolle: bei gestopptem Server waere ein start_server() ein
+        ungewolltes Einschalten — der Haken aendert die Einstellung, mehr nicht."""
+        self._schalte_lan(laeuft=False)
+        self.assertTrue(self.lan_gesetzt)
+        self.assertEqual([], self.server_aktionen)
 
 
 

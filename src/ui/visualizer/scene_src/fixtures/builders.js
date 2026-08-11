@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { pixelCell } from './pixel_order.js';
+import { pixelCell, panelGrid } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -941,9 +941,9 @@ export function buildMatrixPanel(n, pixelOrder) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
-  n = Math.max(1, Math.min(256, Math.floor(n || 16)));
-  const cols = Math.ceil(Math.sqrt(n));
-  const rows = Math.ceil(n / cols);
+  // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
+  const { count: n2, cols, rows } = panelGrid(n);
+  n = n2;
   const group = new THREE.Group();
   const PW = 0.5, PH = 0.5, PD = 0.05;    // feste Panel-Groesse (0,5-m-Kachel)
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x141414, metalness: 0.4, roughness: 0.6 });

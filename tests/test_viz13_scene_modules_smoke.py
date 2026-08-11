@@ -940,6 +940,95 @@ class SceneModulesSmokeTest(unittest.TestCase):
             timeout_s=6.0)
         self.assertTrue(ok, "Matrix-Panel faerbte Pixel 40 nicht (nur 16 gebaut? heads[40] verloren?)")
 
+    def test_pixel_order_reaches_the_3d_panel(self):
+        """★★ VIZ-51: `pixelOrder` kam beim 3D-Panel NIE an.
+
+        `fixtures.js` reichte das Feld nicht an `buildFixtureModel` weiter,
+        obwohl die Registry es dort erwartet (`buildMatrixPanel(o.nHeads,
+        o.pixelOrder)`). Das 2D-Icon bekam es gleichzeitig sehr wohl —
+        **dasselbe Geraet stand in beiden Ansichten unterschiedlich da**, und
+        bei einem Panel im Werkszustand (Schlangenlinien) lief eine
+        horizontale Figur im 3D im Zickzack.
+
+        Geprueft wird die Rasterzuordnung, nicht der Quelltext: bei 64 Pixeln
+        (8 Spalten) liegt DMX-Index 8 zeilenweise in Spalte 0, im
+        Schlangenmuster aber in Spalte 7 — die zweite Zeile laeuft rueckwaerts.
+        """
+        self._load_and_wait()
+        import json
+
+        def _spalte_von_pixel8(reihenfolge):
+            fid = 821 if reihenfolge == "rowwise" else 822
+            payload = json.dumps([{"fid": fid, "type": "matrix", "nHeads": 64,
+                                   "x": 0, "y": 3, "z": 0,
+                                   "pixelOrder": reihenfolge,
+                                   "r": 0, "g": 0, "b": 0, "intensity": 0}])
+            gebaut = self._emit_until_true(
+                lambda: self._bridge_obj.allFixtures.emit(payload),
+                f"(function(){{const f=window.__lightos.fixtures['{fid}'];"
+                f" return !!(f && f.pixels && f.pixels.length===64);}})()",
+                timeout_s=6.0)
+            self.assertTrue(gebaut, f"Panel ({reihenfolge}) wurde nicht gebaut")
+            return self._eval(
+                f"(function(){{const f=window.__lightos.fixtures['{fid}'];"
+                f" return f.pixels[8].c;}})()")
+
+        zeilenweise = _spalte_von_pixel8("rowwise")
+        schlange = _spalte_von_pixel8("serpentine")
+        self.assertEqual(0, zeilenweise,
+                         "zeilenweise gehoert DMX-Index 8 in Spalte 0")
+        self.assertEqual(7, schlange,
+                         "im Schlangenmuster laeuft die zweite Zeile rueckwaerts "
+                         "— Index 8 gehoert in Spalte 7. Kommt hier 0 an, hat "
+                         "das Panel `pixelOrder` gar nicht gesehen (VIZ-51).")
+
+    def test_2d_icon_und_3d_panel_teilen_dieselbe_rasterform(self):
+        """★ VIZ-51: Die Rasterformel stand ZWEIMAL.
+
+        `buildMatrixPanel` (3D) und `addGridCells` (2D-Icon) rechneten
+        `cols = ceil(sqrt(n))` jeweils selbst — die FM-13-Zusage „nur eine
+        Stelle rechnet" galt fuer die ZELLE, nicht fuer die FORM. Zwei Formeln
+        fuer dieselbe Frage sind eine Drift-Quelle: waere eine angefasst worden,
+        haetten die beiden Ansichten dasselbe Panel verschieden geschnitten.
+
+        Geprueft wird nicht die Funktion, sondern das Ergebnis an BEIDEN
+        Enden — mit 50 Pixeln, wo `ceil(sqrt(50))=8` und `ceil(50/8)=7` ein
+        NICHT quadratisches Raster ergibt (bei 64 waere jede Verwechslung
+        unsichtbar).
+        """
+        self._load_and_wait()
+        import json
+        payload = json.dumps([{"fid": 823, "type": "matrix", "nHeads": 50,
+                               "x": 0, "y": 3, "z": 0,
+                               "pixelOrder": "serpentine",
+                               "r": 0, "g": 0, "b": 0, "intensity": 0}])
+        gebaut = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            "(function(){const f=window.__lightos.fixtures['823'];"
+            " return !!(f && f.pixels && f.pixels.length===50"
+            "          && f.icon && f.icon.userData.cells);})()",
+            timeout_s=6.0)
+        self.assertTrue(gebaut, "Panel oder Icon wurde nicht gebaut")
+
+        def _js(ausdruck):
+            # Einzelwerte statt Array: eine Liste kommt ueber die Bridge nicht
+            # zuverlaessig zurueck (erster Wurf lief genau darauf auf).
+            return self._eval(
+                "(function(){const f=window.__lightos.fixtures['823']; return "
+                + ausdruck + ";})()")
+
+        anz3d = _js("f.pixels.length")
+        anz2d = _js("f.icon.userData.cells.length")
+        spalten = _js("Math.max.apply(null, f.pixels.map(function(x)"
+                      "{return x.c;}))+1")
+        zeilen = _js("Math.max.apply(null, f.pixels.map(function(x)"
+                     "{return x.r;}))+1")
+        self.assertEqual(50, anz3d, "3D-Panel hat nicht 50 Pixel")
+        self.assertEqual(anz3d, anz2d,
+                         f"2D-Icon hat {anz2d} Zellen, das 3D-Panel {anz3d}")
+        self.assertEqual(8, spalten, "erwartet ceil(sqrt(50)) = 8 Spalten")
+        self.assertEqual(7, zeilen, "erwartet ceil(50/8) = 7 Zeilen")
+
     def test_multihead_beams_resync_on_showcones_and_view_switch(self):
         """A3D-05 + A3D-24: Multi-Head-Pro-Kopf-Kegel folgen showCones-Toggle
         UND 2D<->3D-Wechsel SOFORT.

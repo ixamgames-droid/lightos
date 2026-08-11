@@ -29,6 +29,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   ablesen lässt, sagt sie lieber nichts als etwas Falsches. Über die vorhandenen
   Shows gefahren blieb sie bei 15 von 16 still; die eine Meldung war echt.
 
+### 2026-08-11 — Matrix-Panels standen im 3D anders da als in der Draufsicht
+
+#### Behoben
+
+- **Die Pixel-Reihenfolge eines Matrix-Panels erreichte die 3D-Ansicht nie.**
+  Bei einem Panel im Werkszustand — die Pixel sind dort in Schlangenlinien
+  nummeriert — lief eine horizontale Lauflicht-Figur am echten Geraet im
+  Zickzack, im 3D aber geradeaus. Die Draufsicht bekam die Information die
+  ganze Zeit korrekt; **dasselbe Geraet stand also in den beiden Ansichten
+  unterschiedlich da.**
+
+- Die Rasterform (wie viele Spalten und Zeilen ein Panel bekommt) wurde an zwei
+  Stellen getrennt berechnet. Jetzt an einer — sonst waere ein Eingriff an der
+  einen Stelle unbemerkt an der anderen vorbeigegangen.
+
+### 2026-08-11 — Tote Sprungmarken in der Anleitung, und ein blinder Wächter
+
+Betrifft Dokumentation und Entwicklungswerkzeuge.
+
+#### Behoben
+
+- **Vier Sprungmarken im Inhaltsverzeichnis der APC-Anleitung führten ins
+  Leere.** Wer auf „5. Ein Dimmer-Lauflicht starten" klickte, landete oben auf
+  der Seite. Ursache war ein geschützter Bindestrich in der Überschrift, den
+  die Anker-Erzeugung ersatzlos entfernt.
+
+- **Die Link-Prüfung sah Sprungmarken gar nicht an** — ein Verweis auf einen
+  Abschnitt, den es nicht gibt, galt als heil. Und sie prüfte fünf Dateien im
+  Hauptverzeichnis; ungeprüft blieben ausgerechnet jene, die man beim Einstieg
+  zuerst liest. Jetzt: alle Markdown-Dateien, Sprungmarken eingeschlossen —
+  694 Verweise, keiner tot.
+
+- **Ein Backlog-Eintrag war unsichtbar.** Der Wächter, der genau das verhindern
+  soll, hatte dieselbe blinde Stelle wie die Prüfung, die er absichert. Beim
+  Beheben kam sofort ein realer Fall zum Vorschein: ein blockierter Eintrag
+  ohne Kennung, der in keiner Auswertung auftauchte.
 ### 2026-08-11 — Die Testsuite fasst die echte Geräte-Bibliothek nicht mehr an
 
 Betrifft die Entwicklung, hat aber eine sichtbare Spur in der Anwendung.
