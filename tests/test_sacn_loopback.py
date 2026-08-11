@@ -80,6 +80,19 @@ class SacnLoopbackTest(unittest.TestCase):
             self.skipTest(f"kein UDP-Loopback auf 127.0.0.1:{SACN_PORT} ({e})")
         sender = SACNSender(target_ip="127.0.0.1", source_name="LoopTest")
         try:
+            # ★ CI-FLAKE (11.08.2026): Vor der Messung den Empfangspuffer leeren.
+            # Der Nachbartest sendet bis zu FUENF Pakete und bricht beim ersten
+            # Empfang ab — was liegen bleibt, las dieser Test als sein eigenes
+            # erstes Paket. Die Sequenzen passten dann nicht zueinander.
+            rx.setblocking(False)
+            try:
+                while True:
+                    rx.recvfrom(2048)
+            except (BlockingIOError, socket.timeout, OSError):
+                pass
+            rx.setblocking(True)
+            rx.settimeout(1.0)   # wie in _open_receiver
+
             seqs = []
             for _ in range(3):
                 sender.send_dmx(1, bytes(512))
@@ -91,9 +104,33 @@ class SacnLoopbackTest(unittest.TestCase):
                     self.fail("sACN-Paket trotz erfolgreichem Bind nicht empfangen "
                               "(Sender-Regression)")
                 seqs.append(pkt[111])
-            # Streng monoton (mod 256) — hier einfach +1 pro Frame.
-            self.assertEqual(seqs[1], (seqs[0] + 1) & 0xFF)
-            self.assertEqual(seqs[2], (seqs[1] + 1) & 0xFF)
+
+            # ★ Streng MONOTON (mod 256) — nicht exakt +1.
+            #
+            # Die vorige Fassung verlangte `seqs[1] == seqs[0]+1` und damit
+            # LUECKENLOSE Zustellung. Das sichert UDP nicht zu, auch nicht auf
+            # dem Loopback unter Last: die CI faehrt drei Segmente parallel,
+            # und der Test fiel dort sporadisch mit genau einem Schritt
+            # Abstand aus (13 != 14, 160 != 161) — auf `main` ebenso wie auf
+            # Feature-Branches, die sACN gar nicht anfassen.
+            #
+            # Geprueft wird jetzt, was der Kommentar immer schon sagte und was
+            # der Empfaenger wirklich braucht: die Nummer geht VORWAERTS und
+            # bleibt nicht stehen. Ein Rueckwaertssprung oder ein Stillstand
+            # (die echten Sender-Regressionen) faellt weiter durch; der Deckel
+            # haelt „irgendeine Zahl" draussen.
+            def _abstand(a, b):
+                return (b - a) & 0xFF
+
+            d1, d2 = _abstand(seqs[0], seqs[1]), _abstand(seqs[1], seqs[2])
+            for i, d in enumerate((d1, d2), start=1):
+                self.assertGreaterEqual(
+                    d, 1, f"Sequenz {i} steht still oder laeuft rueckwaerts "
+                          f"({seqs}) — Empfaenger koennen Reihenfolge und "
+                          f"Verluste dann nicht mehr erkennen")
+                self.assertLessEqual(
+                    d, 8, f"Sequenzsprung von {d} ({seqs}) ist zu gross fuer "
+                          f"drei gesendete Frames")
         finally:
             sender.close()
             rx.close()
