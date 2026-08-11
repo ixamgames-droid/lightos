@@ -33,6 +33,117 @@ def _make_enttec_device(port: str):
         return EnttecPro(port)
 
 
+# ── OUT-51: Sendefehler zaehlen statt schlucken ──────────────────────────────
+#
+# Vorher lagen um jeden ``send_dmx()`` drei blanke ``except Exception: pass``.
+# Ein Geraet konnte mitten in der Show ausfallen, ohne dass IRGENDWO etwas
+# erschien — kein Zaehler, kein Log, kein Signal an die UI.
+#
+# ★ Warum nicht einfach loggen? Weil dieser Pfad 44 Mal pro Sekunde laeuft.
+# Ein ``print`` je Fehlversuch waere bei abgezogenem Adapter eine Log-Flut, die
+# genau das begraebt, was sie zeigen soll. Deshalb: zaehlen (billig, im
+# Output-Thread), und die MELDUNG an eine Schwelle plus eine Drossel haengen.
+# Was die UI zeigt, holt sie sich gelesen — der Output-Thread ruft nie in die UI.
+
+# So viele Fehler IN FOLGE gelten als "anhaltender Ausfall" (bei 44 Hz gut eine
+# halbe Sekunde). Bewusst derselbe Wert wie ``EnttecPro.FAIL_LIMIT``: ein
+# einzelner Hickup — ein verpasstes UDP-Paket, ein Frame Timeout — ist kein
+# Ausfall und darf nichts melden.
+SENDE_FEHLER_SCHWELLE = 20
+# Wiederholte Meldung desselben, weiter bestehenden Ausfalls (Sekunden).
+SENDE_MELDE_INTERVALL_S = 30.0
+
+
+class _Sendezaehler:
+    """Fehlerzustand EINES Ausgabewegs (z. B. Enttec auf Universum 3).
+
+    ``fehler`` zaehlt AUFEINANDERFOLGENDE Fehlversuche und wird bei jedem
+    erfolgreichen Frame auf 0 gesetzt — nur ein anhaltender Abriss ueberschreitet
+    damit die Schwelle. ``gesamt`` zaehlt weiter und bleibt stehen: daran ist
+    hinterher zu sehen, dass es geruckelt hat, auch wenn gerade alles laeuft.
+    """
+    __slots__ = ("fehler", "gesamt", "text", "seit", "gemeldet_um")
+
+    def __init__(self):
+        self.fehler = 0            # Fehler in Folge (0 = laeuft)
+        self.gesamt = 0            # alle Fehler, seit der Manager laeuft
+        self.text = ""             # letzte Fehlermeldung (fuer Tooltip/Log)
+        self.seit = 0.0            # monotone Zeit des ersten Fehlers der Serie
+        self.gemeldet_um = 0.0     # wann zuletzt gemeldet (Drossel)
+
+    @property
+    def anhaltend(self) -> bool:
+        return self.fehler >= SENDE_FEHLER_SCHWELLE
+
+
+# Zustaende eines Ausgabegeraets. VERBINDET und UNBEKANNT sind BEIDE "nicht
+# gewiss", muessen aber getrennt bleiben: "verbindet gerade" ist ein bekannter
+# Uebergang und darf gelb angezeigt werden, "keine Auskunft moeglich" ist gar
+# kein Befund und darf deshalb WEDER Alarm ausloesen NOCH Erfolg behaupten.
+ZUSTAND_SENDET = "sendet"
+ZUSTAND_TOT = "tot"
+ZUSTAND_VERBINDET = "verbindet"
+ZUSTAND_UNBEKANNT = "unbekannt"
+
+
+def geraet_zustand(dev) -> str:
+    """Was macht dieses Ausgabegeraet gerade? — einer der vier ``ZUSTAND_*``.
+
+    ★ Der Unterschied, um den es in OUT-51 geht: *registriert* ist nicht
+    *verbunden*. ``EnttecProcessProxy.is_open()`` meldet nur, dass der
+    Worker-PROZESS lebt — bei totem COM-Port laeuft der munter weiter und
+    versucht gedrosselt neu zu oeffnen. Nur ``is_connected()`` (SERIAL-01) sagt,
+    ob Frames rausgehen; es stand bis hierhin dokumentiert im Code und hatte
+    **keinen einzigen Konsumenten** in der UI.
+
+    ``ZUSTAND_UNBEKANNT`` ist Absicht und kein Bequemlichkeitswert: ein
+    Art-Net-Socket KANN nicht wissen, ob am anderen Ende jemand zuhoert (UDP).
+    Daraus "tot" zu machen hiesse, eine funktionierende Ausgabe als kaputt zu
+    melden — und daraus "sendet" zu machen waere genau die Luege, die dieses
+    Item abstellt.
+
+    ``ZUSTAND_VERBINDET`` haelt keinen Ausfall verborgen, sondern verzoegert das
+    Urteil um die Anlaufzeit: bleibt der Port zu, setzt der Worker von selbst
+    ``ST_DISABLED``. Ohne diesen Zustand faerbte die Statusleiste in den ersten
+    Sekunden nach jedem „Verbinden" rot.
+    """
+    f = getattr(dev, "status", None)
+    if callable(f):
+        try:
+            from .serial_process import ST_CONNECTING
+            if f() == ST_CONNECTING:
+                return ZUSTAND_VERBINDET
+        except Exception:
+            pass
+    for name in ("is_connected", "is_disabled", "is_open"):
+        f = getattr(dev, name, None)
+        if not callable(f):
+            continue
+        try:
+            wert = bool(f())
+        except Exception:
+            return ZUSTAND_UNBEKANNT
+        if name == "is_disabled":
+            # Ein als tot markierter Port ist sicher NICHT verbunden; ein nicht
+            # markierter kann trotzdem geschlossen sein -> weiter zu is_open().
+            if wert:
+                return ZUSTAND_TOT
+            continue
+        return ZUSTAND_SENDET if wert else ZUSTAND_TOT
+    return ZUSTAND_UNBEKANNT
+
+
+def geraet_verbunden(dev) -> bool | None:
+    """Sendet dieses Geraet WIRKLICH? ``None`` = nicht gewiss (s.
+    :func:`geraet_zustand`, dessen zwei ungewisse Faelle hier zusammenfallen)."""
+    z = geraet_zustand(dev)
+    if z == ZUSTAND_SENDET:
+        return True
+    if z == ZUSTAND_TOT:
+        return False
+    return None
+
+
 class OutputManager:
     def __init__(self):
         self.universes: dict[int, Universe] = {}
@@ -91,6 +202,15 @@ class OutputManager:
         # {universe:int -> bytes(512)}. Leer, solange noch kein Frame gesendet wurde
         # -> Konsumenten fallen dann sauber auf den Rohpuffer zurueck.
         self._display_frame: dict[int, bytes] = {}
+        # OUT-51: Fehlerregister je Ausgabeweg. Schluessel (weg, universum), z. B.
+        # ("Enttec", 3); ("Tick", 0) und ("Modifier", u) fuer die beiden anderen
+        # Stellen, an denen der Frame-Pfad bisher still schluckte. Geschrieben
+        # NUR vom Output-Thread, gelesen von der UI: dict-Zuweisung und
+        # int-Inkrement auf einem bestehenden Objekt sind unter dem GIL atomar,
+        # ein Leser sieht also nie ein halbes Ergebnis. Kein Lock, weil dieser
+        # Pfad 44 Mal pro Sekunde laeuft und ein Lock hier den Frame-Takt
+        # belasten wuerde, ohne dass ein Leser mehr davon haette.
+        self._sende_fehler: dict[tuple[str, int], _Sendezaehler] = {}
 
     # ── Grand Master ─────────────────────────────────────────────────────────
 
@@ -138,6 +258,146 @@ class OutputManager:
         dann auf den Rohpuffer (``universe.get_all()``) zurueck. NUR LESEN: der
         Snapshot wird nie zurueck in den Puffer/Render geschrieben."""
         return self._display_frame.get(universe)
+
+    # ── OUT-51: Sendefehler buchen und auslesen ──────────────────────────────
+
+    def _buche_fehler(self, weg: str, universum: int, exc: BaseException,
+                      quelle: str = ""):
+        """Einen Fehlversuch buchen und bei anhaltendem Ausfall EINMAL melden.
+
+        Laeuft im Output-Thread (44 Hz) — deshalb passiert hier im Normalfall
+        nichts ausser einem dict-Lookup und zwei Inkrementen. Die Ausgabe auf
+        stderr haengt an Schwelle UND Drossel: sie kommt beim Kippen des
+        Zustands und danach hoechstens alle ``SENDE_MELDE_INTERVALL_S``.
+        """
+        z = self._sende_fehler.get((weg, universum))
+        if z is None:
+            z = _Sendezaehler()
+            self._sende_fehler[(weg, universum)] = z
+        if z.fehler == 0:
+            z.seit = time.monotonic()
+        z.fehler += 1
+        z.gesamt += 1
+        z.text = f"{type(exc).__name__}: {exc}"
+        if quelle:
+            z.text = f"{quelle} -> {z.text}"
+        if not z.anhaltend:
+            return
+        jetzt = time.monotonic()
+        # gemeldet_um == 0.0 -> erste Meldung dieser Serie, sofort raus.
+        if z.gemeldet_um and (jetzt - z.gemeldet_um) < SENDE_MELDE_INTERVALL_S:
+            return
+        z.gemeldet_um = jetzt
+        import sys
+        print(f"[OutputManager] {weg} Universum {universum}: {z.fehler} Frames "
+              f"in Folge nicht gesendet ({z.text})", file=sys.stderr)
+
+    def _buche_erfolg(self, weg: str, universum: int):
+        """Erfolgreiches Frame — Fehlerserie beenden (und eine Erholung melden).
+
+        Die Abfrage ``if z is None or z.fehler == 0: return`` steht bewusst
+        zuerst: im Normalbetrieb ist das der einzige Aufwand, den ein
+        erfolgreiches Frame verursacht.
+        """
+        z = self._sende_fehler.get((weg, universum))
+        if z is None or z.fehler == 0:
+            return
+        war_anhaltend = z.anhaltend
+        z.fehler = 0
+        z.gemeldet_um = 0.0
+        if war_anhaltend:
+            import sys
+            print(f"[OutputManager] {weg} Universum {universum}: sendet wieder.",
+                  file=sys.stderr)
+
+    def _vergiss_fehler(self, universum: int):
+        """Fehlerzaehler eines Universums verwerfen (Adapter entfernt/getauscht).
+
+        Ohne das meldete :meth:`sende_probleme` weiter einen Ausfall fuer einen
+        Adapter, den es gar nicht mehr gibt — und ein neu angelegter startete
+        mit der Fehlerserie seines Vorgaengers, waere also sofort "kaputt", ohne
+        je gesendet zu haben. Die Tick-Callbacks (Schluessel-Universum 0) haengen
+        an keinem Adapter und bleiben deshalb ausgenommen.
+        """
+        for schluessel in [k for k in list(self._sende_fehler)
+                           if k[1] == universum and k[0] != "Tick"]:
+            self._sende_fehler.pop(schluessel, None)
+
+    def sende_probleme(self) -> list[dict]:
+        """Ausgabewege, die GERADE anhaltend scheitern (fuer UI/Status/Log).
+
+        Liefert je Weg ``{"weg", "universum", "fehler", "gesamt", "seit_s",
+        "text"}``. Leere Liste = alles, was registriert ist, sendet auch.
+        Kurze Aussetzer unterhalb der Schwelle erscheinen hier NICHT — sie
+        stehen nur in ``gesamt`` (s. :meth:`sende_statistik`).
+        """
+        jetzt = time.monotonic()
+        raus = []
+        for (weg, universum), z in list(self._sende_fehler.items()):
+            if not z.anhaltend:
+                continue
+            raus.append({
+                "weg": weg, "universum": universum,
+                "fehler": z.fehler, "gesamt": z.gesamt,
+                "seit_s": max(0.0, jetzt - z.seit), "text": z.text,
+            })
+        raus.sort(key=lambda d: (d["weg"], d["universum"]))
+        return raus
+
+    def sende_statistik(self) -> dict[tuple[str, int], dict]:
+        """Vollstaendiges Fehlerregister — auch erholte Wege (``gesamt`` > 0,
+        ``fehler`` == 0). Fuer Diagnose und Tests; die UI nimmt
+        :meth:`sende_probleme`."""
+        return {k: {"fehler": z.fehler, "gesamt": z.gesamt, "text": z.text}
+                for k, z in list(self._sende_fehler.items())}
+
+    def ausgabe_status(self) -> list[dict]:
+        """Was gerade WIRKLICH sendet — pro Universum und Ausgabeweg.
+
+        Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem"}``.
+        ``verbunden`` ist dreiwertig: ``True`` sendet, ``False`` sendet nicht,
+        ``None`` = das Geraet kann darueber keine Auskunft geben (UDP-Ausgaenge
+        ohne Fehlerserie). Wer daraus eine gruene Anzeige baut, muss ``None``
+        anders behandeln als ``True`` — sonst entsteht wieder die Anzeige, die
+        Erfolg meldet, weil sie nichts weiss.
+        """
+        # ★ BEWUSST OHNE ``_io_lock``. Diese Methode laeuft im UI-Thread im
+        # Sekundentakt, und der Output-Thread haelt den Lock waehrend des
+        # Sendens — ein blockierender Serial-Write (write_timeout 0,5 s) wuerde
+        # die Oberflaeche also regelmaessig anhalten. Genau dieses Warten des
+        # UI-Threads auf den Output-Thread ist die Falle, gegen die es den Lock
+        # ueberhaupt gibt; ihn fuer eine ANZEIGE zu nehmen kehrte sie um.
+        # Sicher ist das, weil hier nur GELESEN wird: ``dict(...)`` ist unter
+        # dem GIL ein atomarer Schnappschuss, und ein Geraet, das inzwischen
+        # geschlossen wurde, beantwortet ``is_connected()`` weiterhin
+        # fehlerfrei (und `geraet_zustand` faengt ohnehin ab).
+        raus = []
+        gruppen = (("Enttec", dict(self._enttec_outputs)),
+                   ("Art-Net", dict(self._artnet_outputs)),
+                   ("sACN", dict(self._sacn_outputs)))
+        paare = [(weg, u, dev) for weg, reg in gruppen
+                 for u, dev in sorted(reg.items())]
+        anhaltend = {(p["weg"], p["universum"]): p for p in self.sende_probleme()}
+        for weg, universum, dev in paare:
+            problem = anhaltend.get((weg, universum))
+            verbunden = geraet_verbunden(dev)
+            if problem is not None:
+                # Eine laufende Fehlerserie schlaegt die Selbstauskunft des
+                # Geraets: ein UDP-Socket meldet sich nie als kaputt, aber wenn
+                # 20 sendto() hintereinander geworfen haben, geht nichts raus.
+                verbunden = False
+            raus.append({
+                "universum": universum, "weg": weg,
+                # Jeder Sendertyp nennt sein Ziel anders: Enttec den `port`,
+                # Art-Net `target_ip`, sACN `_target_ip` (dort leer = Multicast).
+                "ziel": str(getattr(dev, "port", "") or
+                            getattr(dev, "target_ip", "") or
+                            getattr(dev, "_target_ip", "") or ""),
+                "verbunden": verbunden,
+                "problem": problem["text"] if problem else "",
+            })
+        raus.sort(key=lambda d: (d["universum"], d["weg"]))
+        return raus
 
     def display_snapshot(self) -> dict[int, bytes]:
         """Flache Kopie des Anzeige-Snapshots {universe -> bytes(512)} (POST-
@@ -310,6 +570,7 @@ class OutputManager:
                        if getattr(d, "port", None) == port]
             for u, _ in victims:
                 self._enttec_outputs.pop(u, None)
+                self._vergiss_fehler(u)   # OUT-51, s. _vergiss_fehler
         for _, dev in victims:
             try:
                 dev.close()
@@ -359,6 +620,7 @@ class OutputManager:
             # entfernen, damit ein spaeter neu angelegter Adapter nicht die alte
             # Nummer erbt.
             self._out_universe.pop(universe, None)
+            self._vergiss_fehler(universe)
         for dev in victims:
             try:
                 dev.close()
@@ -449,6 +711,10 @@ class OutputManager:
                     except Exception:
                         pass
                 registry.clear()   # zweites stop() -> kein Doppel-Close
+            # OUT-51: Mit den Adaptern gehen ihre Fehlerzaehler. Sonst meldete
+            # die Statusleiste nach dem Stoppen weiter Ausfaelle von Geraeten,
+            # die es nicht mehr gibt.
+            self._sende_fehler.clear()
 
     def _loop(self):
         while self._running:
@@ -467,11 +733,32 @@ class OutputManager:
         # Drive all registered tick callbacks first (function_manager, etc.).
         # Ueber eine Kopie iterieren: add_/remove_tick_callback laufen im UI-Thread
         # und koennen die Liste waehrenddessen mutieren (list changed size).
+        # OUT-51: Ein dauerhaft werfender Tick-Callback heisst, dass Funktionen/
+        # Chaser nicht mehr weiterlaufen — die Show steht, ohne dass etwas dunkel
+        # wird. Genau der Fall, den man am schwersten erkennt, wenn er still ist.
+        #
+        # ★ Ueber das FRAME aggregiert, nicht je Callback gebucht: alle Ticks
+        # teilen sich einen Zaehler, und mit Buchung je Callback wuerde ein
+        # gesunder Nachbar die Serie des kranken bei jedem Frame wieder auf 0
+        # setzen — der Zaehler pendelte zwischen 0 und 1 und erreichte die
+        # Meldeschwelle nie. Ein Fehler in diesem Frame ist ein Fehler.
+        tick_exc = None
+        tick_name = ""
         for cb in list(self._tick_callbacks):
             try:
                 cb(FRAME_INTERVAL)
-            except Exception:
-                pass
+            except Exception as exc:
+                tick_exc = exc
+                # Namen nur im Fehlerfall bestimmen — im Normalbetrieb kostet
+                # dieser Block nichts.
+                tick_name = getattr(cb, "__qualname__", None) or type(cb).__name__
+        if tick_exc is None:
+            self._buche_erfolg("Tick", 0)
+        else:
+            # Derselbe Schluessel wie beim Erfolg — der Name des Callbacks
+            # gehoert in den TEXT, nicht in den Schluessel, sonst wuerde die
+            # Serie nie zurueckgesetzt.
+            self._buche_fehler("Tick", 0, tick_exc, quelle=tick_name)
 
         gefroren = self._freeze_frames
         for univ_num, universe in list(self.universes.items()):
@@ -485,8 +772,14 @@ class OutputManager:
             try:
                 from src.core.engine.channel_modifier import get_modifier_manager
                 data = get_modifier_manager().apply_to_universe(univ_num, data)
-            except Exception:
-                pass
+            except Exception as exc:
+                # OUT-51: Scheitert der Modifier-Pass dauerhaft, gehen INVERSE,
+                # Range-Lock und Kanaltausch verloren — das Licht bleibt an,
+                # sieht aber falsch aus. Ohne Meldung ist das nicht von einer
+                # falsch programmierten Szene zu unterscheiden.
+                self._buche_fehler("Modifier", univ_num, exc)
+            else:
+                self._buche_erfolg("Modifier", univ_num)
             if self._blackout:
                 data = bytes(512)
             elif self.grand_master < 0.999:
@@ -532,18 +825,28 @@ class OutputManager:
                 # OUT-03: konfigurierte externe Universe-Nummer (falls gesetzt),
                 # sonst abwaertskompatibler Default (Art-Net num-1, sACN num).
                 ext = self._out_universe.get(univ_num)
+                # OUT-51: Die drei Sendeaufrufe fangen weiterhin ALLES — eine
+                # Exception darf den Output-Thread nie beenden, sonst steht die
+                # ganze Ausgabe. Neu ist nur, dass der Fehler jetzt gezaehlt und
+                # bei anhaltendem Ausfall gemeldet wird, statt spurlos zu sein.
                 if enttec is not None:
                     try:
                         enttec.send_dmx(data)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        self._buche_fehler("Enttec", univ_num, exc)
+                    else:
+                        self._buche_erfolg("Enttec", univ_num)
                 if artnet is not None:
                     try:
                         artnet.send_dmx(ext if ext is not None else univ_num - 1, data)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        self._buche_fehler("Art-Net", univ_num, exc)
+                    else:
+                        self._buche_erfolg("Art-Net", univ_num)
                 if sacn is not None:
                     try:
                         sacn.send_dmx(ext if ext is not None else univ_num, data)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        self._buche_fehler("sACN", univ_num, exc)
+                    else:
+                        self._buche_erfolg("sACN", univ_num)

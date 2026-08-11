@@ -179,7 +179,17 @@ class EnttecPro:
 
     def _disable(self):
         """Port als tot markieren UND schliessen — stoppt das 44-Hz-Hammern auf ein
-        abgezogenes/wackliges USB-Geraet (Access-Violation-Schutz). Idempotent."""
+        abgezogenes/wackliges USB-Geraet (Access-Violation-Schutz). Idempotent.
+
+        OUT-51: **Das ist der Moment, in dem das Rig dunkel wird** — und bis
+        hierhin passierte er lautlos. Die Meldung steht genau hier und nicht in
+        ``_note_fail``, weil ``send_dmx`` bei gesetztem ``_disabled`` sofort
+        aussteigt: dieser Zweig wird also einmal je Ausfall durchlaufen, nicht
+        44 Mal pro Sekunde."""
+        import sys
+        print(f"[EnttecPro] Port {self.port} nach {self._fail_count} Schreib-"
+              f"Fehlern in Folge deaktiviert — DMX geht hier nicht mehr raus. "
+              f"Neuer Versuch alle {self._reconnect_every_s:g}s.", file=sys.stderr)
         self._disabled = True
         self._last_reconnect = self._now()
         try:
@@ -226,6 +236,11 @@ class EnttecPro:
         self.port = target
         self._disabled = False
         self._fail_count = 0
+        # OUT-51: Auch die Erholung gehoert gemeldet. Wer nur den Ausfall sieht,
+        # sucht sonst weiter an einem Problem, das sich selbst behoben hat.
+        import sys
+        print(f"[EnttecPro] Port {target} wieder offen — DMX geht wieder raus.",
+              file=sys.stderr)
 
     def is_disabled(self) -> bool:
         """True, wenn der Port nach zu vielen Schreib-Fehlern als tot gilt (OUT-02).

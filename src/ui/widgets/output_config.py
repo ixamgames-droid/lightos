@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QSpinBox, QTabWidget, QWidget, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QMessageBox,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
@@ -324,6 +324,12 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> N
 
 
 class OutputConfigDialog(QDialog):
+    # OUT-51: So oft wird nach „Verbinden" hoechstens nachgefragt, ob der Port
+    # wirklich offen ist (je ~0,9 s). Der Serial-Worker wird als eigener Prozess
+    # gestartet — bis der den Port offen hat, vergeht ein Moment, und in dieser
+    # Zeit waeren „Verbunden" und „geht nicht" beide gelogen.
+    _MAX_PRUEF_VERSUCHE = 6
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Ausgabe konfigurieren")
@@ -785,9 +791,85 @@ class OutputConfigDialog(QDialog):
             om.remove_output(univ)
             om.add_enttec(univ, port)
             _persist_output(univ, "Enttec", port)
-            self._lbl_enttec_status.setText(f"Verbunden: {port} -> Universe {univ} (gespeichert)")
+            # ★ OUT-51: NICHT „Verbunden" melden. `add_enttec` startet den
+            # Serial-Worker, mehr weiss es in diesem Moment nicht — der Port
+            # kann tot sein, und dann stand hier trotzdem gruen „Verbunden".
+            # Der Erfolg, den dieser Zweig sicher kennt, ist „eingerichtet und
+            # gespeichert"; ob DMX rausgeht, sagt erst der Adapter selbst,
+            # gleich, und dann traegt es `_enttec_status_nachtragen` nach.
+            self._lbl_enttec_status.setText(
+                f"Eingerichtet: {port} → Universe {univ} (gespeichert), "
+                f"verbinde …")
+            self._enttec_pruef_univ = univ
+            self._enttec_pruef_versuche = 0
+            self._enttec_status_pruefen_spaeter()
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
+
+    # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
+
+    def _enttec_status_pruefen_spaeter(self, ms: int = 900):
+        """Den Adapter gleich noch einmal fragen — der Timer haengt am Dialog.
+
+        ``QTimer(self)`` statt ``QTimer.singleShot``: so stirbt der Timer mit
+        dem Dialog. Ein freier SingleShot dagegen feuerte auch dann noch, wenn
+        der Nutzer den Dialog laengst geschlossen hat — der Slot liefe auf ein
+        zerstoertes C++-Objekt (``RuntimeError``).
+        """
+        t = getattr(self, "_enttec_pruef_timer", None)
+        if t is None:
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.timeout.connect(self._enttec_status_nachtragen)
+            self._enttec_pruef_timer = t
+        t.start(ms)
+
+    def _enttec_status_nachtragen(self):
+        """Meldet, ob der eben eingerichtete Adapter WIRKLICH sendet.
+
+        Solange der Worker noch im Verbindungsaufbau steckt, fragt die Methode
+        gedrosselt weiter (bis ``_MAX_PRUEF_VERSUCHE``) — der Spawn des
+        Serial-Prozesses und das Oeffnen des Ports brauchen ein paar hundert
+        Millisekunden, und in dieser Zeit waere jede der beiden Endaussagen
+        falsch.
+        """
+        from src.core.dmx.output_manager import (
+            geraet_zustand, ZUSTAND_SENDET, ZUSTAND_TOT, ZUSTAND_VERBINDET)
+        univ = getattr(self, "_enttec_pruef_univ", None)
+        if univ is None:
+            return
+        try:
+            dev = get_state().output_manager._enttec_outputs.get(univ)
+        except Exception:
+            dev = None
+        if dev is None:
+            # Adapter ist inzwischen wieder weg (anderer Tab, Universe-Wechsel)
+            # -> keine Meldung ueber etwas, das es nicht mehr gibt.
+            return
+        zustand = geraet_zustand(dev)
+        port = getattr(dev, "port", "?")
+        if zustand == ZUSTAND_VERBINDET:
+            self._enttec_pruef_versuche += 1
+            if self._enttec_pruef_versuche < self._MAX_PRUEF_VERSUCHE:
+                self._enttec_status_pruefen_spaeter()
+                return
+            # Nach der Anlaufzeit immer noch „verbindet": das ist keine
+            # Erfolgsmeldung mehr, aber auch kein bewiesener Ausfall.
+            self._lbl_enttec_status.setText(
+                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen")
+            return
+        if zustand == ZUSTAND_SENDET:
+            self._lbl_enttec_status.setText(
+                f"Verbunden: {port} → Universe {univ} (gespeichert)")
+        elif zustand == ZUSTAND_TOT:
+            self._lbl_enttec_status.setText(
+                f"{port} → Universe {univ}: Port lässt sich nicht öffnen — "
+                f"gespeichert, aber es geht kein DMX raus")
+        else:
+            # Der Adapter kann keine Auskunft geben (In-Prozess-Fallback ohne
+            # Statusfeld). Dann bleibt die ehrliche Teilaussage stehen.
+            self._lbl_enttec_status.setText(
+                f"Eingerichtet: {port} → Universe {univ} (gespeichert)")
 
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das

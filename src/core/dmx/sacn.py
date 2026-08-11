@@ -129,15 +129,20 @@ class SACNSender:
         seq = self._source.next_seq(universe, self._token)
         self._universes.add(universe)
 
-        try:
-            packet = _pack_framing(dmx, universe, seq, self._source_name, self._cid)
-        except struct.error:
-            return
-
-        try:
-            self._sock.sendto(packet, self._dest(universe))
-        except OSError:
-            pass
+        # OUT-51: Beide Fehler gehen jetzt NACH OBEN durch, statt hier zu
+        # verschwinden. Ein ``OSError`` aus ``sendto`` ist der Normalfall eines
+        # weggebrochenen Netzes (Kabel raus, WLAN weg, Route fort) — bis hierhin
+        # sendete LightOS dann 44 Mal pro Sekunde ins Leere und meldete nichts.
+        #
+        # ★ Warum Weiterreichen hier sicher ist: der einzige Aufrufer ist
+        # ``OutputManager._send_all``, und der faengt weiterhin ALLES ab (der
+        # Output-Thread darf nie sterben) — nur zaehlt er es jetzt und meldet
+        # anhaltende Ausfaelle. Die Alternative, den Zaehler hier einzubauen,
+        # haette dieselbe Buchhaltung ein drittes Mal ergeben, neben Enttec und
+        # Art-Net; ein Ausfall gehoert an die Stelle, die alle drei Wege kennt.
+        self._sock.sendto(
+            _pack_framing(dmx, universe, seq, self._source_name, self._cid),
+            self._dest(universe))
 
     def _dest(self, universe: int):
         if self._target_ip:
