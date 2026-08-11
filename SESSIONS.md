@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| OUT-52 | A | fix/out52-monitor-zeigt-gesendetes | 2026-08-11T17:21Z | src/core/dmx/output_manager.py · src/ui/views/output_view.py · src/ui/views/dmx_monitor_view.py · src/core/app_state.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -35,3 +35,4 @@
 - 2026-08-11T17:02Z A done QA-50
 - 2026-08-11T17:21Z A done QA-51
 - 2026-08-11T17:21Z A claim OUT-52
+- 2026-08-11T19:44Z A done OUT-52
