@@ -27,8 +27,17 @@ import unittest
 
 _TESTS = os.path.dirname(os.path.abspath(__file__))
 
-# Aufrufe, die IMMER schreiben, sobald sie auf der geteilten Engine landen.
-_SCHREIBER = {"create_user_profile", "add_user_profile"}
+# Aufrufe, die IMMER in die geteilte FIXTURE-Bibliothek schreiben.
+#
+# ⚠️ ``add_user_profile`` stand hier zuerst mit drin — und war ein Fehlalarm:
+# die Funktion gehoert zur **Controller**-Bibliothek
+# (``controller_library.py:228``, schreibt JSON nach ``_USER_DIR``) und hat mit
+# ``fixture_db`` nichts zu tun. Aufgefallen ist es, als QA-52 den
+# Controller-Test auf den echten Aufruf umstellte: das Gate wurde rot, obwohl
+# der Test sich sauber ueber ein Temp-Verzeichnis isoliert. Ein Waechter, der
+# auf Namensgleichklang anschlaegt, erzeugt genau die Fehlalarme, die ihn am
+# Ende abschalten.
+_SCHREIBER = {"create_user_profile"}
 # Aufrufe, die belegen, dass die Datei sich eine eigene Bibliothek baut.
 _ISOLIERER = {"frische_library", "get_engine"}
 

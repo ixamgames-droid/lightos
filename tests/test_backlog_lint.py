@@ -28,6 +28,12 @@ GH_PR_ISSUE_OK = re.compile(r"^https://github\.com/[\w.-]+/[\w.-]+/(pull|issues)
 # QA-18b: "GELANDET" ist die projektweite Vokabel fuer "ist gemergt" (Loop-Runden
 # schreiben sie in die Zeile, wenn eine Teil-Lieferung in main ist).
 LANDED = re.compile(r"gelandet", re.IGNORECASE)
+# QA-18d/QA-55: "sieht aus wie ein Item" — bewusst VIEL breiter als ``ROW``.
+# Auf Modulebene, damit der QA-55-Test es benutzen kann statt es nachzubauen:
+# ein Test, der das Muster nachbildet, prueft seine eigene Kopie und bleibt
+# gruen, wenn das Original zurueckfaellt (genau so blieb die Mutation hier
+# zuerst unentdeckt — Fehlerklasse QA-52).
+LOOKS_LIKE_ITEM = re.compile(r"^\|\s*([^|]+?)\s*\|\s*\**\s*(P[123])\b")
 
 
 def _rows():
@@ -137,7 +143,21 @@ class BacklogLintTest(unittest.TestCase):
         fuer Verdichtung, Queue, Stats und diesen Lint **gar nicht vorhanden**.
         Dieselbe stille Unsichtbarkeit, gegen die dieser Branch antritt.
         """
-        looks_like_item = re.compile(r"^\|\s*[A-Za-z][\w.-]*\s*\|\s*\**\s*(P[123])\b")
+        # ★★ QA-55: Der Guard hatte dieselbe Blindstelle wie das Muster, gegen
+        # das er schuetzt. Er verlangte selbst `[A-Za-z][\w.-]*` — also fast
+        # genau `ROW`. Eine Item-Zeile, deren ID-Zelle damit nicht anfaengt,
+        # war fuer BEIDE unsichtbar, und der Waechter meldete Ruhe.
+        #
+        # **Gemessen beim Umbau:** genau so ein Fall stand im Backlog — eine
+        # blockierte P3-Zeile mit einem Gedankenstrich statt einer ID
+        # (Hardware-Verifikation Ether Dream/IDN). Fuer Verdichtung, Queue,
+        # Stats und diesen Lint existierte sie schlicht nicht. Sie hat jetzt
+        # die ID `LAS-HW-VERIFY`.
+        #
+        # Das neue Muster nimmt JEDE nichtleere erste Zelle. Gegenprobe: es
+        # erfasst 435 statt 434 Zeilen — die eine Differenz war der echte Fund,
+        # es gibt also keinen Schwall Fehlalarme.
+        looks_like_item = LOOKS_LIKE_ITEM
         bad = []
         with open(BACKLOG, "r", encoding="utf-8") as f:
             for lineno, line in enumerate(f, 1):

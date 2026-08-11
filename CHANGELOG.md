@@ -23,6 +23,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   unsinniger Wert in einer von Hand bearbeiteten Show-Datei hält den Dialog
   nicht auf, dann steht dort wieder die 1.
 
+### 2026-08-11 — Tote Sprungmarken in der Anleitung, und ein blinder Wächter
+
+Betrifft Dokumentation und Entwicklungswerkzeuge.
+
+#### Behoben
+
+- **Vier Sprungmarken im Inhaltsverzeichnis der APC-Anleitung führten ins
+  Leere.** Wer auf „5. Ein Dimmer-Lauflicht starten" klickte, landete oben auf
+  der Seite. Ursache war ein geschützter Bindestrich in der Überschrift, den
+  die Anker-Erzeugung ersatzlos entfernt.
+
+- **Die Link-Prüfung sah Sprungmarken gar nicht an** — ein Verweis auf einen
+  Abschnitt, den es nicht gibt, galt als heil. Und sie prüfte fünf Dateien im
+  Hauptverzeichnis; ungeprüft blieben ausgerechnet jene, die man beim Einstieg
+  zuerst liest. Jetzt: alle Markdown-Dateien, Sprungmarken eingeschlossen —
+  694 Verweise, keiner tot.
+
+- **Ein Backlog-Eintrag war unsichtbar.** Der Wächter, der genau das verhindern
+  soll, hatte dieselbe blinde Stelle wie die Prüfung, die er absichert. Beim
+  Beheben kam sofort ein realer Fall zum Vorschein: ein blockierter Eintrag
+  ohne Kennung, der in keiner Auswertung auftauchte.
 ### 2026-08-11 — Die Testsuite fasst die echte Geräte-Bibliothek nicht mehr an
 
 Betrifft die Entwicklung, hat aber eine sichtbare Spur in der Anwendung.
