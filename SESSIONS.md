@@ -20,6 +20,7 @@
 - 2026-08-11T15:37Z (A) OUT-51 als PR #599 offen. Lokales Segment-Gate war in ZWEI Laeufen rot an je ANDEREN Dateien, alle isoliert gruen: die geteilte fixtures.db (journal_mode=delete, per LIGHTOS_FIXTURE_DB bewusst die echte Bibliothek) gegen drei parallele Segmente. Als QA-53 (P1) erfasst. Wer jetzt ein rotes Segment sieht: erst isoliert nachfahren, bevor der eigene Diff verdaechtigt wird.
 - 2026-08-11T15:46Z (A) OUT-51 gemergt (#599). CI-Volllauf gruen (7m28s, segmentiert) — waehrend das LOKALE Gate zweimal an je anderen Dateien riss. Der Unterschied ist die gewachsene lokale fixtures.db; CI startet mit einer frischen. Ist QA-53.
 - 2026-08-11T16:32Z (A) QA-53 GEKLAERT und behoben (PR folgt): Ursache war NICHT die fixtures.db, sondern tests/test_verify_loop_sperre.py — es startete den Runner ohne Argumente, also die VOLLE Suite, mitten im Gate. Gemessen 95 pytest-Prozesse auf EINEM geerbten LIGHTOS_SHOW_DB. Schlimmer: der innere Lauf raeumt .pytest_segments per rm -rf, damit verschwinden auch die ROTEN Zeilen -> das Gate konnte GRUEN melden, obwohl Segmente rot waren.
+- 2026-08-11T17:05Z (A) QA-50 gemergt (#601). QA-51 im Gate. Neu erfasst: QA-54 (Testsuite schreibt in die echte fixtures.db, Rueckstand TEST-DualTilt) und QA-55 (Doku-Link-Pruefer sieht 20 von 280 Dateien nicht, ignoriert Anker; Backlog-Lint-Guard hat dieselbe Blindstelle wie sein eigenes Muster).
 
 ## Verlauf
 
