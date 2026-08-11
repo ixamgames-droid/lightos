@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | QA-50 | A | fix/qa50-stille-speicherfehler | 2026-08-11T16:35Z | src/ui/main_window.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_canvas.py · src/core/midi/midi_mapper.py · src/ui/widgets/output_config.py |
+| QA-51 | A | fix/qa51-pruefwerkzeuge | 2026-08-11T16:56Z | tools/validate.py · tools/render_probe.py · src/core/show/showbuilder/builder.py · tools/check_doc_links.py · tools/gen_tools_index.py |
 
 ## Blocker & Fallen
 
@@ -30,3 +31,4 @@
 - 2026-08-11T15:46Z A done OUT-51
 - 2026-08-11T16:35Z A done QA-53
 - 2026-08-11T16:35Z A claim QA-50
+- 2026-08-11T16:56Z A claim QA-51
