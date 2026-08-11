@@ -199,6 +199,30 @@ if [ -f "$OUTDIR/gpu_wartete_vergeblich.txt" ]; then
     echo "[seg]   Laeuft nebenher eine LightOS-Instanz? Dann ist das erwartet."
 fi
 echo "[seg] $((TOT-BAD))/$TOT Segmente gruen"
+# ★ QA-53: Die Abschlusszahl gegen die WIRKLICH gefahrene Dateizahl halten.
+#
+# Am 2026-08-06 meldete dieser Lauf „68/69 Segmente gruen", gefahren wurden 584
+# Dateien. Die Vermutung damals — ein Zaehler aus der parallelen Spur erreicht
+# den Elternprozess nicht — war falsch. TOT zaehlt die Zeilen in results.tsv,
+# und ein ZWEITER Lauf im selben Repo beginnt mit `rm -rf "$OUTDIR"`: er raeumt
+# die Zeilen des ersten weg, der zaehlt danach nur noch seinen Rest. Wer die
+# Zahl liest, haelt einen Volllauf fuer einen Teillauf — und uebersieht, dass
+# die roten Zeilen darunter womoeglich aus einem FREMDEN Lauf stammen.
+#
+# Die Ursache ist mit dem DRYRUN-Ausstieg in verify_loop.sh behoben; diese
+# Pruefung bleibt, weil zwei Sitzungen auf einem Rechner denselben Fall jederzeit
+# wieder erzeugen koennen (COORDINATION.md). Sie rechnet nichts gruen: sie sagt
+# nur, dass die Zahl daneben nicht zu trauen ist.
+UNVOLLSTAENDIG=0
+if [ "$TOT" -ne "${#FILES[@]}" ]; then
+    UNVOLLSTAENDIG=1
+    echo "[seg] ⚠ WARNUNG: results.tsv hat $TOT Zeilen, gefahren wurden ${#FILES[@]} Dateien."
+    echo "[seg]   Die Zahl oben ist damit UNVOLLSTAENDIG — vermutlich hat ein zweiter"
+    echo "[seg]   Lauf im selben Repo das Ausgabeverzeichnis geleert ($OUTDIR)."
+    echo "[seg]   Rote Zeilen koennen aus dem fremden Lauf stammen. Vor dem Deuten:"
+    echo "[seg]   nachsehen, ob nebenher eine zweite Suite lief (QA-53)."
+    echo "[seg]   Dieser Lauf gilt als NICHT bestanden — s. Exit-Code unten."
+fi
 if [ "$BAD" -gt 0 ]; then
     echo "[seg] Rote Segmente:"
     awk -F'\t' '$1!=0 {printf "  exit %-4s %s\n", $1, $2}' "$OUTDIR/results.tsv"
@@ -247,5 +271,19 @@ if [ "$BAD" -gt 0 ]; then
     # neun Dateien lang genau hinter dieser Lesart.
     echo "[seg] Fehlgeschlagene Tests:"
     grep -h '^FAILED' "$OUTDIR"/*.log 2>/dev/null | sed 's/^/  /' | sort -u
+fi
+# ★★ QA-53: Eine unvollstaendige Ergebnisliste darf NICHT gruen sein.
+#
+# `BAD` zaehlt die roten Zeilen in results.tsv — aus derselben Datei, die ein
+# zweiter Lauf per `rm -rf` wegraeumt. Mit ihr verschwinden auch die ROTEN
+# Zeilen: BAD wird 0, der Exit-Code 0, und das Gate meldet **gruen, obwohl
+# Segmente rot waren**. Das ist die gefaehrlichere Haelfte des Befunds — die
+# falsche Zahl sieht man, das falsche Gruen nicht.
+#
+# Deshalb hier „im Zweifel rot": wer nicht weiss, ob alles gelaufen ist, hat
+# kein bestandenes Gate, sondern ein kaputtes Messgeraet.
+if [ "$UNVOLLSTAENDIG" -eq 1 ] && [ "$BAD" -eq 0 ]; then
+    echo "[seg] Ergebnisliste unvollstaendig -> KEIN Gruen (QA-53)."
+    exit 1
 fi
 exit "$BAD"

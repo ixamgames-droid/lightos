@@ -87,6 +87,34 @@ if ! "$PY" -m compileall -q src; then
     exit 1
 fi
 
+# ★ QA-53: Ausstieg NACH dem Syntax-Check, VOR dem Testlauf.
+#
+# Nur fuer den Test ZU dieser Sperre (test_verify_loop_sperre.py). Der startete
+# bis hierhin den Runner ohne Argumente — und das ist die VOLLE Suite. Er hat
+# damit mitten im laufenden Gate ein ZWEITES vollstaendiges Gate mit -j 3
+# gestartet: gemessen 95 pytest-Prozesse, die sich ueber das geerbte
+# LIGHTOS_SHOW_DB EINE Show-Datenbank teilten und sie einander beim
+# conftest-Import per os.remove wegloeschten, dazu ein `rm -rf` auf das
+# .pytest_segments des aeusseren Laufs. Das erklaert beides: die wandernden
+# roten Segmente UND die falsche Abschlusszahl.
+#
+# Warum der Ausstieg HIER steht und nicht direkt nach `_verify_lock`: die
+# Positivkontrolle des Tests ("der Runner laeuft ohne Sperre wirklich los")
+# prueft auf den Syntax-Check. Steigt er davor aus, bewiese sie nichts mehr.
+# Der zu testende Mechanismus — Sperre nehmen, warten, weitergehen — laeuft
+# vollstaendig echt; es entfaellt nur die Nutzlast.
+#
+# ⚠️ Der Schalter macht das Gate zum No-Op. Er gehoert NICHT in CI und nicht in
+# eine dauerhaft exportierte Umgebung: ein Lauf mit gesetztem DRYRUN beendet
+# sich mit 0, ohne einen einzigen Test gefahren zu haben. Deshalb bleibt die
+# Zeile „GRUEN - alles bestanden" hier bewusst aus — wer nur den Exit-Code
+# liest, findet in der Ausgabe darueber wenigstens den Grund.
+if [ -n "${LIGHTOS_VERIFY_DRYRUN:-}" ]; then
+    echo "[verify] LIGHTOS_VERIFY_DRYRUN - Sperre und Syntax-Check erledigt, KEIN Testlauf."
+    echo "[verify] Das ist KEINE bestandene Pruefung."
+    exit 0
+fi
+
 if [ "$#" -gt 0 ]; then
     # Gezielte Dateien: direkt, in EINEM Prozess. Hier gibt es keinen ueber
     # Dateigrenzen akkumulierenden Zustand zu vermeiden, und der Weg ist schnell.
