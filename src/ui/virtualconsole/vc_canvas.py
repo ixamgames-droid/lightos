@@ -1990,6 +1990,14 @@ class VCCanvas(QWidget):
         if (self.minimumWidth(), self.minimumHeight()) != (right, bottom):
             self.setMinimumSize(QSize(right, bottom))
 
+    def uebersprungene_widgets(self) -> list[str]:
+        """QA-50: VC-Widgets, die beim letzten Laden nicht gebaut werden konnten.
+
+        Sie stehen NICHT in :meth:`to_dict` — ein Speichern loescht sie also
+        endgueltig aus der Show. Leere Liste = vollstaendig geladen.
+        """
+        return list(getattr(self, "_uebersprungen", []))
+
     def to_dict(self) -> dict:
         widgets = []
         # VCI-11: NUR direkte Kinder serialisieren. Kinder, die in einem VCFrame
@@ -2007,6 +2015,13 @@ class VCCanvas(QWidget):
             self._undo_stack.clear()
             self._redo_stack.clear()
         self._clear()
+        # ★ QA-50: Was hier uebersprungen wird, ist beim naechsten Speichern
+        # WEG — `to_dict()` kennt nur die Widgets, die es auf die Flaeche
+        # geschafft haben. Das Ueberspringen selbst bleibt richtig (eine
+        # kaputte Taste darf nicht die ganze Konsole kosten), aber es darf
+        # nicht lautlos sein. Gesammelt wird hier, gewarnt wird beim Speichern —
+        # dort entsteht der Verlust, und dort ist die Warnung noch nutzbar.
+        self._uebersprungen: list[str] = []
         for wd in d.get("widgets", []):
             wtype = wd.get("type", "")
             # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
@@ -2016,6 +2031,7 @@ class VCCanvas(QWidget):
                 self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
             except Exception as e:
                 print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
+                self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
         if getattr(self, "_pe", None) is not None:

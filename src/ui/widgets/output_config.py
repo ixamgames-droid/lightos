@@ -192,13 +192,27 @@ def _load_universe_config() -> list[dict]:
         return []
 
 
-def _save_universe_config(rows: list[dict]) -> None:
+def _save_universe_config(rows: list[dict]) -> bool:
+    """Schreibt ``universes.json``. ``True`` = geschrieben, ``False`` = nicht.
+
+    QA-50: Der Rueckgabewert ist der ganze Punkt. Vorher verschwand ein
+    Schreibfehler in einem ``print``, und der Dialog meldete anschliessend
+    „Gespeichert" — bei vollem Datentraeger, fehlenden Rechten oder einem
+    schreibgeschuetzten Ordner also eine Erfolgsmeldung fuer etwas, das nie
+    passiert ist. Beim naechsten Start stand dann die alte Konfiguration da
+    und niemand wusste, warum.
+
+    Vorbild ist ``channel_groups_view.py``, das schon so gebaut ist: bool
+    zurueckgeben, der Aufrufer prueft und meldet.
+    """
     try:
         os.makedirs(os.path.dirname(_UNIV_CONFIG_PATH), exist_ok=True)
         with open(_UNIV_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(rows, f, indent=2, ensure_ascii=False)
+        return True
     except Exception as e:
         print(f"[output_config] save universes error: {e}")
+        return False
 
 
 def _gespeicherte_ausgabe_zeile(typ: str) -> dict | None:
@@ -287,7 +301,7 @@ def _gespeicherter_enttec_port() -> str:
 _UNSET = object()   # A3D-15: "Argument nicht uebergeben" vs. explizit None unterscheiden.
 
 
-def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> None:
+def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
@@ -301,7 +315,12 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> N
     - ``None`` = explizit entfernen (Art-Net-Default univ-1, leer = Default wie die
       Tabellen-Spalte).
     - Wert = setzen. So ueberlebt die im Art-Net-Tab gewaehlte externe Universe
-      einen Neustart (apply_output_config liest sie)."""
+      einen Neustart (apply_output_config liest sie).
+
+    QA-50: Gibt jetzt zurueck, ob die Datei wirklich geschrieben wurde. Die
+    Aufrufer haengen ihre „(gespeichert)"-Meldung daran — sonst steht dort
+    Erfolg, waehrend die Einstellung den naechsten Start nicht ueberlebt.
+    """
     rows = _load_universe_config()
     found = False
     for r in rows:
@@ -320,7 +339,7 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> N
         if out_universe is not None and out_universe is not _UNSET:
             entry["out_universe"] = int(out_universe)
         rows.append(entry)
-    _save_universe_config(rows)
+    return _save_universe_config(rows)
 
 
 class OutputConfigDialog(QDialog):
@@ -790,7 +809,8 @@ class OutputConfigDialog(QDialog):
             # Adapter aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
             om.remove_output(univ)
             om.add_enttec(univ, port)
-            _persist_output(univ, "Enttec", port)
+            # QA-50: „(gespeichert)" nur sagen, wenn es auch gespeichert ist.
+            gespeichert = _persist_output(univ, "Enttec", port)
             # ★ OUT-51: NICHT „Verbunden" melden. `add_enttec` startet den
             # Serial-Worker, mehr weiss es in diesem Moment nicht — der Port
             # kann tot sein, und dann stand hier trotzdem gruen „Verbunden".
@@ -798,7 +818,8 @@ class OutputConfigDialog(QDialog):
             # gespeichert"; ob DMX rausgeht, sagt erst der Adapter selbst,
             # gleich, und dann traegt es `_enttec_status_nachtragen` nach.
             self._lbl_enttec_status.setText(
-                f"Eingerichtet: {port} → Universe {univ} (gespeichert), "
+                f"Eingerichtet: {port} → Universe {univ} "
+                f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
                 f"verbinde …")
             self._enttec_pruef_univ = univ
             self._enttec_pruef_versuche = 0
@@ -925,7 +946,7 @@ class OutputConfigDialog(QDialog):
         out_u = start if start != univ - 1 else None
         state.output_manager.add_artnet(univ, ip, out_universe=out_u)
         self._artnet_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
-        _persist_output(univ, "ArtNet", ip, out_universe=out_u)
+        gespeichert = _persist_output(univ, "ArtNet", ip, out_universe=out_u)
         # A3D-15 (Review-Fund #2): die Universe-Tabelle wurde nur beim Setup gefuellt
         # und kennt die eben persistierte externe Universe nicht -> ein spaeteres
         # „Speichern" im Universen-Tab wuerde sie aus der (stalen, leeren) Ext-Zelle
@@ -936,8 +957,10 @@ class OutputConfigDialog(QDialog):
         except Exception:
             pass
         _ext_txt = f" → Art-Net-Universe {start}" if out_u is not None else ""
+        # QA-50: „(gespeichert)" nur, wenn die Datei wirklich geschrieben wurde.
         self._lbl_artnet_status.setText(
-            f"Aktiv → {ip} · Universe {univ}{_ext_txt} (gespeichert)")
+            f"Aktiv → {ip} · Universe {univ}{_ext_txt} "
+            f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
 
@@ -1046,13 +1069,33 @@ class OutputConfigDialog(QDialog):
                 f"Gespeichert wird trotzdem; wenn das Absicht ist, ignorieren "
                 f"Sie diesen Hinweis.")
 
-        _save_universe_config(rows)
+        # ★ QA-50: Hier stand ein „Gespeichert"-Dialog, der NICHTS geprueft hat
+        # — weder ob die Datei geschrieben wurde noch ob das Anwenden geklappt
+        # hat. Beide Fehler waren nur im Terminal zu sehen, das im Betrieb
+        # niemand offen hat. Ein Dialog, der Erfolg behauptet, ist schlimmer als
+        # gar keine Rueckmeldung: er beendet die Suche nach dem Fehler.
+        if not _save_universe_config(rows):
+            QMessageBox.critical(
+                self, "Nicht gespeichert",
+                f"Die Universen-Konfiguration konnte nicht geschrieben werden:\n"
+                f"{_UNIV_CONFIG_PATH}\n\nDie Aenderungen gelten nur bis zum "
+                f"Beenden. Schreibrechte und freien Speicherplatz pruefen.")
+            return
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
+        angewandt, fehler = True, ""
         try:
             get_state().apply_output_config()
         except Exception as e:
+            angewandt, fehler = False, str(e)
             print(f"[output_config] apply after save error: {e}")
-        QMessageBox.information(self, "Gespeichert", _UNIV_CONFIG_PATH)
+        if angewandt:
+            QMessageBox.information(self, "Gespeichert", _UNIV_CONFIG_PATH)
+        else:
+            QMessageBox.warning(
+                self, "Gespeichert, aber nicht angewendet",
+                f"Die Datei wurde geschrieben ({_UNIV_CONFIG_PATH}), das "
+                f"Einrichten der Ausgaenge ist aber gescheitert:\n\n{fehler}\n\n"
+                f"Nach einem Neustart wird es erneut versucht.")
 
     def _apply_sacn(self):
         univ = self._spin_sacn_univ.value()
@@ -1078,9 +1121,15 @@ class OutputConfigDialog(QDialog):
             state.output_manager.remove_output(univ)
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
-            _persist_output(univ, "sACN", target_ip or "")
+            gespeichert = _persist_output(univ, "sACN", target_ip or "")
             mode = "Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
-            self._lbl_sacn_status.setText(f"Aktiv · {mode} · Universe {univ} (gespeichert)")
+            # QA-50: Der Adapter laeuft — aber ob die Zeile auf der Platte steht,
+            # ist eine zweite Frage. Vorher stand „(gespeichert)" auch dann da,
+            # wenn das Schreiben scheiterte, und die Ausgabe war nach dem
+            # naechsten Start wieder weg.
+            self._lbl_sacn_status.setText(
+                f"Aktiv · {mode} · Universe {univ} "
+                f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}")
         except Exception as e:
             self._lbl_sacn_status.setText(f"Fehler: {e}")
 

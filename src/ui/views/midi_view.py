@@ -584,13 +584,30 @@ class MidiView(QWidget):
         self._append_log("✓ Vorlage: Note 0-9 → Executor GO 1-10")
 
     def _save_mappings(self):
-        self._mapper.save("data/midi_mappings.json")
-        self._append_log("✓ Mappings gespeichert: data/midi_mappings.json")
+        # QA-50: Haken nur bei geprueftem Erfolg.
+        if self._mapper.save("data/midi_mappings.json"):
+            self._append_log("✓ Mappings gespeichert: data/midi_mappings.json")
+        else:
+            self._append_log("✗ Mappings NICHT gespeichert — s. Terminal-Ausgabe")
 
     def _load_mappings(self):
-        self._mapper.load("data/midi_mappings.json")
+        """★ QA-50: Der Haken hier war die gefaehrlichste Meldung im Modul.
+
+        Scheiterte das Laden (kaputte oder fehlende Datei), passierte gar
+        nichts — die bestehende, beim Start leere Liste blieb stehen, und hier
+        stand „✓ Mappings geladen". Das naechste „Speichern" schrieb die leere
+        Liste ueber die noch vollstaendige Datei. Aus einem Lesefehler wurde so
+        ein Schreibverlust, ohne dass je ein Fehler zu sehen war.
+        """
+        geladen = self._mapper.load("data/midi_mappings.json")
         self._refresh_map_table()
-        self._append_log("✓ Mappings geladen")
+        if geladen:
+            self._append_log("✓ Mappings geladen")
+        else:
+            self._append_log(
+                "✗ Mappings NICHT geladen (Datei fehlt oder ist unlesbar) — "
+                "die angezeigte Liste ist unveraendert. VORSICHT: Speichern "
+                "wuerde die Datei damit ueberschreiben.")
 
     # ── MTC (MIDI Time Code) ─────────────────────────────────────────────────
 
