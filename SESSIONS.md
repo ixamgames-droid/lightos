@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | QA-52 | A | fix/qa52-tests-pruefen-echtes | 2026-08-11T20:08Z | - |
+| VIZ-51 | A | fix/viz51-pixelreihenfolge-3d | 2026-08-11T20:43Z | - |
 
 ## Blocker & Fallen
 
@@ -42,3 +43,4 @@
 - 2026-08-11T20:08Z A claim QA-52
 - 2026-08-11T20:17Z A done QA-54
 - 2026-08-11T20:26Z A done QA-55
+- 2026-08-11T20:43Z A claim VIZ-51
