@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Die Prüfwerkzeuge prüfen jetzt das, wofür sie gebaut sind
+
+Anlass: am 2026-08-05 waren **alle Prüfungen grün, während das Gerät dunkel
+blieb**. Drei Blindstellen zusammen haben das möglich gemacht.
+
+#### Behoben
+
+- **Die Show-Prüfung sah den Patch nicht an** — also ausgerechnet den Teil, der
+  bestimmt, wo das Licht physisch hingeht. Sie prüft jetzt drei Dinge, die ohne
+  angeschlossene Hardware entscheidbar sind: ein Gerät, dessen Kanäle über das
+  Universum hinausragen (ein 154-Kanal-Panel auf Adresse 400 ist zu 60 %
+  stumm); zwei Geräte, die sich im selben Universum überlappen (das zweite
+  gewinnt, das erste bleibt dunkel — und im Programm sieht alles normal aus);
+  und einen fehlenden Modusnamen.
+
+- **Der Render-Test konnte eine leere Szene nicht von einer funktionierenden
+  unterscheiden.** Er prüfte „ist irgendwo im Universum Licht an?" statt „macht
+  diese Funktion Licht?" — sobald ein anderer Effekt lief, bestand jede
+  Funktion. Jetzt wird der Zustand vorher und nachher verglichen. Ausserdem
+  beendet der Test jetzt, was er startet, und meldet ein nicht vorhandenes
+  Universum als eigenen Fall statt als „erzeugt kein DMX".
+
+- **Beim Prüfen mehrerer Effekte genügte einer, der funktionierte.** Alle
+  wurden gemeinsam gemessen — eine Show mit 20 Effekten, von denen 19 nichts
+  taten, galt als in Ordnung. Jetzt wird jeder Effekt einzeln geprüft.
+
+- **Der Syntax-Check erfasst jetzt auch die Werkzeuge** (`tools/`). Vorher fiel
+  ein Fehler dort erst auf, wenn jemand das Werkzeug benutzte.
+
 ### 2026-08-11 — „Gespeichert" heisst jetzt auch gespeichert
 
 #### Behoben

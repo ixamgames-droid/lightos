@@ -402,8 +402,34 @@ class ShowBuilder:
                 raise ShowValidationError(live)
         return path
 
-    def verify_render(self, functions, *, channels=None, **kw):
-        """Render-Smoke über die genannten Funktionen/Handles."""
+    def verify_render(self, functions, *, channels=None, einzeln: bool = True,
+                      **kw):
+        """Render-Smoke über die genannten Funktionen/Handles.
+
+        ★★ QA-51: ``einzeln=True`` (neuer Default) prüft jede Funktion in einem
+        EIGENEN Durchlauf. Vorher landeten alle in EINEM ``render_diff`` — und
+        weil das Ergebnis über alle zusammen gemessen wird, **maskierte eine
+        einzige funktionierende Funktion beliebig viele inerte.** Genau das ist
+        die Blindstelle, die dieses Werkzeug eigentlich schließen soll: eine
+        Show mit 20 Effekten, von denen 19 nichts tun, bestand die Prüfung.
+
+        Die Rückgabe bleibt kompatibel — ``(lit, moved, changed)`` über alle
+        Funktionen zusammen, mit ``lit``/``moved`` als UND über die einzelnen
+        Läufe: bestanden hat nur, wer als EINZELNER etwas erzeugt hat.
+
+        ``einzeln=False`` misst wie früher das Zusammenspiel (z. B. wenn erst
+        mehrere Funktionen gemeinsam ein Bild ergeben) — dann aber bewusst und
+        benannt, nicht als stiller Default.
+        """
         from src.core.capability.render_probe import render_diff
         fids = [int(f) for f in functions]
-        return render_diff(self.state, fids, channels=channels, **kw)
+        if not einzeln or len(fids) < 2:
+            return render_diff(self.state, fids, channels=channels, **kw)
+        alle_lit, alle_moved, alle_changed = True, True, []
+        for fid in fids:
+            lit, moved, changed = render_diff(
+                self.state, [fid], channels=channels, **kw)
+            alle_lit = alle_lit and lit
+            alle_moved = alle_moved and moved
+            alle_changed.extend(changed)
+        return alle_lit, alle_moved, sorted(set(alle_changed))

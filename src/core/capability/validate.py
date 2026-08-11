@@ -79,6 +79,86 @@ def _functions_list(show: dict) -> list:
     return []
 
 
+def _check_patch(show: dict) -> list[Finding]:
+    """★★ QA-51: Der ``patch``-Block war komplett ungeprüft.
+
+    Der Lint griff auf genau ZWEI der 27 Show-Blöcke zu (``functions`` und
+    ``virtual_console``) — ausgerechnet der Block, der bestimmt, **wo das Licht
+    physisch hingeht**, kam nicht vor. Am 2026-08-05 waren alle Gates grün,
+    während das Gerät dunkel blieb.
+
+    Geprüft wird, was ohne Hardware und ohne Fixture-Bibliothek entscheidbar
+    ist. Die drei Befunde sind bewusst gewählt:
+
+    * **Adressüberlauf** (``address + channel_count - 1 > 512``) — die letzten
+      Kanäle des Geräts existieren dann gar nicht; ein 154-Kanal-Panel auf
+      Adresse 400 ist zu 60 % stumm, und nichts sagt es.
+    * **Überlappung** zweier Geräte im selben Universum — beide schreiben auf
+      dieselben Kanäle, das zweite gewinnt. Der häufigste Patch-Fehler
+      überhaupt, und er sieht im Programm völlig normal aus.
+    * **Fehlender Modusname** — der Loader füllt ihn mit ``""`` auf; die
+      Kanalzahl stammt dann aus einer Annahme statt aus dem Profil.
+
+    Nicht geprüft wird, ob Profil und Modus in der Bibliothek existieren: das
+    hängt an ``fixtures.db`` und wäre auf einem anderen Rechner ein Fehlalarm.
+    Diese Grenze ist Absicht, nicht Vergesslichkeit.
+    """
+    findings: list[Finding] = []
+    patch = show.get("patch")
+    if not isinstance(patch, list):
+        return findings
+    belegt: dict[int, list[tuple[int, int, str]]] = {}
+    for i, pf in enumerate(patch):
+        if not isinstance(pf, dict):
+            continue
+        label = str(pf.get("label") or pf.get("name") or f"fid {pf.get('fid')}")
+        where = f"patch[{i}] '{label}'"
+        try:
+            universe = int(pf.get("universe", 1))
+            address = int(pf.get("address", 1))
+            count = int(pf.get("channel_count", 1))
+        except (TypeError, ValueError):
+            findings.append(Finding(
+                ERROR, "PATCH-ZAHL", where,
+                "Universum/Adresse/Kanalzahl ist keine Zahl",
+                "show_file.py:196-199 (_to_int schluckt es still)"))
+            continue
+        if address < 1 or address > 512:
+            findings.append(Finding(
+                ERROR, "PATCH-ADR", where,
+                f"Adresse {address} liegt ausserhalb 1..512",
+                "show_file.py:198 (wird still auf 1..512 geklemmt)"))
+        if count < 1:
+            findings.append(Finding(
+                ERROR, "PATCH-KANALZAHL", where,
+                f"Kanalzahl {count} ist kleiner als 1",
+                "show_file.py:199"))
+        ende = address + max(1, count) - 1
+        if ende > 512:
+            findings.append(Finding(
+                ERROR, "PATCH-UEBERLAUF", where,
+                f"belegt {address}..{ende} — die Kanaele ueber 512 gibt es "
+                f"nicht, das Geraet ist ab dort stumm",
+                "show_file.py:198-199"))
+        if not str(pf.get("mode_name") or pf.get("mode") or "").strip():
+            findings.append(Finding(
+                WARNING, "PATCH-MODUS", where,
+                "kein Modusname — die Kanalzahl stammt dann aus einer Annahme",
+                "show_file.py:196"))
+        belegt.setdefault(universe, []).append(
+            (address, min(512, ende), label))
+    for universe, eintraege in sorted(belegt.items()):
+        eintraege.sort()
+        for (a1, e1, l1), (a2, e2, l2) in zip(eintraege, eintraege[1:]):
+            if a2 <= e1:
+                findings.append(Finding(
+                    ERROR, "PATCH-UEBERLAPPUNG", f"patch (Universum {universe})",
+                    f"'{l1}' ({a1}..{e1}) und '{l2}' ({a2}..{e2}) ueberlappen "
+                    f"sich — beide schreiben auf dieselben Kanaele",
+                    "app_state.add_fixture (prueft die Belegung nicht)"))
+    return findings
+
+
 def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Finding]:
     """Validiert ein vollständiges ``show.json``-Dict. Liefert alle Findings
     (Errors + Warnings), nie eine Exception."""
@@ -120,6 +200,9 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
             findings += _check_matrix(fd, where, caps)
         elif ftype == "EFX":
             findings += _check_efx(fd, where, caps)
+
+    # ── Patch ───────────────────────────────────────────────────────────────────
+    findings += _check_patch(show)
 
     # ── Virtuelle Konsole ───────────────────────────────────────────────────────
     vc = show.get("virtual_console") or {}

@@ -15,10 +15,27 @@ class InertEffectError(Exception):
     """Eine Funktion erzeugt strukturell gültig, aber praktisch kein DMX."""
 
 
+class KeinUniversumError(Exception):
+    """QA-51: Das geprüfte Universum existiert gar nicht.
+
+    ★ Muss von :class:`InertEffectError` UNTERSCHIEDEN werden. Vorher lieferte
+    ``universe_snapshot`` für ein nicht existierendes Universum stumpf lauter
+    Nullen — die Probe meldete dann „erzeugt kein DMX", obwohl die Funktion
+    völlig in Ordnung sein kann und nur auf ein anderes Universum patcht.
+    Eine Diagnose, die den häufigsten Bedienfehler als Softwarefehler ausgibt,
+    schickt die Suche in die falsche Richtung (genau der Fall vom 2026-08-05).
+    """
+
+
 def universe_snapshot(state, universe: int = 1, channels=None) -> dict:
     chans = channels if channels is not None else range(1, 513)
     u = state.universes.get(universe)
-    return {c: (int(u.get_channel(c)) if u else 0) for c in chans}
+    if u is None:
+        raise KeinUniversumError(
+            f"Universum {universe} existiert nicht (vorhanden: "
+            f"{sorted(state.universes) or 'keins'}). Die Probe kann darüber "
+            f"keine Aussage treffen.")
+    return {c: int(u.get_channel(c)) for c in chans}
 
 
 def render_diff(state, function_ids, *, bpm: float = 128.0, warmup: int = 3,
@@ -37,9 +54,22 @@ def render_diff(state, function_ids, *, bpm: float = 128.0, warmup: int = 3,
         _mgr.request_bpm(bpm, "diag")
     except Exception:
         pass
+    gestartet: list[int] = []
     try:
+        # ★★ QA-51: Baseline VOR dem Start. Vorher wurde ``lit`` als „irgendein
+        # Kanal im GANZEN Universum ist > 0" gemessen — und zwar erst NACH dem
+        # Start der Funktion. Damit bestand jede Funktion die Probe, sobald
+        # irgendwo sonst im Universum Licht an war: ein anderer Effekt, ein
+        # Default, ein stehender Programmer-Wert. **Eine nachweislich leere
+        # Szene bestand so `assert_not_inert`.**
+        #
+        # Jetzt ist ``lit`` relativ: nur Kanäle, die DIESE Funktion gegenüber
+        # der Baseline auf > 0 gebracht hat, zählen. Das ist die Frage, die die
+        # Probe eigentlich beantworten soll.
+        basis = universe_snapshot(state, universe, channels)
         for fid in function_ids:
             fm.start(int(fid))
+            gestartet.append(int(fid))
         for _ in range(max(0, warmup)):
             state._render_frame(1 / 44.0)
         a = universe_snapshot(state, universe, channels)
@@ -47,9 +77,18 @@ def render_diff(state, function_ids, *, bpm: float = 128.0, warmup: int = 3,
             state._render_frame(1 / 44.0)
         b = universe_snapshot(state, universe, channels)
         changed = sorted(c for c in a if a[c] != b[c])
-        lit = any(v > 0 for v in b.values())
+        lit = any(b[c] > 0 and b[c] != basis.get(c, 0) for c in b)
         return lit, bool(changed), changed
     finally:
+        # QA-51: Was die Probe startet, beendet sie auch. Vorher liefen die
+        # Funktionen weiter — die nächste Probe im selben Prozess maß deren
+        # Ausgabe mit und konnte deshalb „lit" melden, ohne dass die gerade
+        # geprüfte Funktion irgendetwas getan hätte.
+        for fid in gestartet:
+            try:
+                fm.stop(fid)
+            except Exception:
+                pass
         # Test-Isolation: den NUR fuer diese Probe gesetzten Diag-BPM wieder
         # freigeben, sonst leakt er in nachfolgende Tests (bus-default Effekte
         # wie Chaser liefen dann faelschlich bus-getrieben statt zeitbasiert).
