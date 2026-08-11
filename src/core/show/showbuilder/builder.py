@@ -403,7 +403,7 @@ class ShowBuilder:
         return path
 
     def verify_render(self, functions, *, channels=None, einzeln: bool = True,
-                      **kw):
+                      return_snapshot: bool = False, **kw):
         """Render-Smoke über die genannten Funktionen/Handles.
 
         ★★ QA-51: ``einzeln=True`` (neuer Default) prüft jede Funktion in einem
@@ -420,16 +420,37 @@ class ShowBuilder:
         ``einzeln=False`` misst wie früher das Zusammenspiel (z. B. wenn erst
         mehrere Funktionen gemeinsam ein Bild ergeben) — dann aber bewusst und
         benannt, nicht als stiller Default.
+
+        ``return_snapshot=True`` (TOOL-SMOKEDIM) haengt einen
+        ``ProbeSchnappschuss`` an. Ueber mehrere Einzellaeufe hinweg ist sein
+        ``hoechstwert`` das Maximum je Kanal ueber ALLE Laeufe — genau die
+        Frage „zieht IRGENDEINE der geprueften Funktionen diesen Kanal hoch".
+        ``basis``/``ende`` stammen vom ersten bzw. letzten Lauf.
         """
-        from src.core.capability.render_probe import render_diff
+        from src.core.capability.render_probe import render_diff, ProbeSchnappschuss
         fids = [int(f) for f in functions]
         if not einzeln or len(fids) < 2:
-            return render_diff(self.state, fids, channels=channels, **kw)
+            return render_diff(self.state, fids, channels=channels,
+                               return_snapshot=return_snapshot, **kw)
         alle_lit, alle_moved, alle_changed = True, True, []
-        for fid in fids:
-            lit, moved, changed = render_diff(
-                self.state, [fid], channels=channels, **kw)
+        gesamt = ProbeSchnappschuss() if return_snapshot else None
+        for i, fid in enumerate(fids):
+            ergebnis = render_diff(self.state, [fid], channels=channels,
+                                   return_snapshot=return_snapshot, **kw)
+            lit, moved, changed = ergebnis[0], ergebnis[1], ergebnis[2]
             alle_lit = alle_lit and lit
             alle_moved = alle_moved and moved
             alle_changed.extend(changed)
+            if gesamt is not None:
+                snap = ergebnis[3]
+                if i == 0:
+                    gesamt.basis = dict(snap.basis)
+                gesamt.ende = dict(snap.ende)
+                for c, v in snap.hoechstwert.items():
+                    # ``not in`` MUSS mit — sonst fallen die durchweg dunklen
+                    # Kanaele aus dem Ergebnis, und genau die sind gesucht.
+                    if c not in gesamt.hoechstwert or v > gesamt.hoechstwert[c]:
+                        gesamt.hoechstwert[c] = v
+        if gesamt is not None:
+            return alle_lit, alle_moved, sorted(set(alle_changed)), gesamt
         return alle_lit, alle_moved, sorted(set(alle_changed))

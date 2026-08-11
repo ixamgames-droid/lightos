@@ -7,6 +7,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Die Show-Prüfung merkt jetzt, wenn ein Gerät dunkel bleibt
+
+#### Behoben
+
+- **„Die Show ist in Ordnung" hieß bisher nicht „es wird hell."** Ein Effekt
+  konnte alle Farbkanäle eines Geräts auf volle Stärke fahren und dessen
+  Haupt-Dimmer dabei unberührt lassen — das Gerät blieb stockdunkel, während
+  jede Prüfung grün meldete. Genau so ist es am 2026-08-05 passiert: ein
+  Muster-Effekt lief, und auf der Bühne tat sich nichts.
+
+- **Beim Erzeugen einer Show** wird jetzt für jedes Gerät mit Haupt-Dimmer
+  gemessen, ob der während der Probe überhaupt jemals hochgeht. Wenn nicht,
+  steht es als Warnung im Protokoll — mit Gerätename, Kanal und dem üblichen
+  Grund. Eine **Warnung**, kein Abbruch: ein Gerät darf bewusst dunkel bleiben.
+
+- **Die Show-Prüfung auf der Kommandozeile** sagt dasselbe, ohne etwas laufen
+  zu lassen: färbt ein Effekt ein Gerät, ohne dessen Haupt-Dimmer aufzuziehen,
+  wird das benannt. Sie hält sich dabei bewusst zurück — kennt der Rechner das
+  Geräteprofil nicht, oder gibt es in der Show etwas, dessen Wirkung sich nicht
+  ablesen lässt, sagt sie lieber nichts als etwas Falsches. Über die vorhandenen
+  Shows gefahren blieb sie bei 15 von 16 still; die eine Meldung war echt.
+
 ### 2026-08-11 — Die Testsuite fasst die echte Geräte-Bibliothek nicht mehr an
 
 Betrifft die Entwicklung, hat aber eine sichtbare Spur in der Anwendung.
