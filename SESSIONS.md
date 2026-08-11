@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| QA-50 | A | fix/qa50-stille-speicherfehler | 2026-08-11T16:35Z | src/ui/main_window.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_canvas.py · src/core/midi/midi_mapper.py · src/ui/widgets/output_config.py |
 
 ## Blocker & Fallen
 
@@ -29,3 +29,4 @@
 - 2026-08-11T15:44Z A claim QA-53
 - 2026-08-11T15:46Z A done OUT-51
 - 2026-08-11T16:35Z A done QA-53
+- 2026-08-11T16:35Z A claim QA-50
