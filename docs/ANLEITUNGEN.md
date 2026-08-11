@@ -31,6 +31,7 @@
 | [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und welche Helligkeit der Visualizer daraus ableitet. |
 | [VC-Bau-Elemente: Referenz aller Widget-Typen](anleitung_vc_widgets/README.md) | Eine Seite je Widget (Knopf, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialog-Felder, Fallstricke — zum Nachschlagen beim Bauen. |
 | [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer kompletten, ruhigeren Show — Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. |
+| [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster/Block aufteilen, zu **einer** Zelle zusammenfassen, neben andere Geräte legen, Matrizen zusammenlegen — beide Wege (Rechtsklick und Knopf-Menü). |
 
 ## Schichten-Modell (so kombiniert die Show)
 
