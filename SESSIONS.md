@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-53 | A | fix/qa53-fixture-db-isolation | 2026-08-11T15:44Z | tests/conftest.py · tools/verify_segmented.sh |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -28,3 +28,4 @@
 - 2026-08-11T14:52Z A claim OUT-51
 - 2026-08-11T15:44Z A claim QA-53
 - 2026-08-11T15:46Z A done OUT-51
+- 2026-08-11T16:35Z A done QA-53
