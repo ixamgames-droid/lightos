@@ -9,6 +9,47 @@ from PySide6.QtCore import Qt
 from src.core.database import fixture_db as fdb
 from src.core.database.models import FixtureProfile, PatchedFixture
 
+_UNIVERSE_MIN = 1
+_UNIVERSE_MAX = 32
+
+
+def universum_vorschlag(fixtures) -> int:
+    """UI-50: welches Universum der Patch-Dialog vorbelegen soll —
+    **das Universum des zuletzt gepatchten Geraets, sonst 1.**
+
+    Bis UI-50 startete das Feld immer auf 1. Wer sein Rig auf Universum 3
+    faehrt, korrigierte es bei JEDEM Geraet von Hand; wer es vergass, patchte
+    auf ein Universum ohne Ausgang und suchte den Fehler danach am Rig.
+
+    **Warum diese Regel** (drei standen zur Wahl — zuletzt benutzt, das mit den
+    meisten Geraeten, das des ausgewaehlten Fixtures): Ein Rig wird blockweise
+    gepatcht, ein Universum nach dem anderen. Der letzte Patch ist damit die
+    beste Vorhersage fuer den naechsten. Die Mehrheitsregel wuerde beim Wechsel
+    in ein neues Universum jedes Mal ins alte zurueckspringen — genau dort, wo
+    der Anwender gerade NICHT mehr ist. Und das ausgewaehlte Fixture sagt ueber
+    sein Universum gar nichts: die Auswahl kommt aus der geraeteweiten
+    Bibliothek, nicht aus dem Patch.
+
+    **„Zuletzt gepatcht" = groesste fid.** ``AppState.next_fid()`` vergibt die
+    fid streng aufsteigend (Maximum + 1), das juengste Geraet hat also immer die
+    groesste — unabhaengig davon, in welcher Reihenfolge der Patch-Cache
+    gerade sortiert ist.
+
+    Leerer Patch -> 1: es gibt nichts zu erben. Ebenso bei einem Universum
+    ausserhalb des Eingabebereichs (von Hand editierte Show-Datei) — eine
+    neutrale 1 ist ehrlicher als eine still auf 32 geklemmte Zahl.
+
+    Voellig unbrauchbare Werte (kein ``fid``, ``universe`` nicht in eine Zahl
+    wandelbar) faengt bewusst NUR der Aufrufer ab — ein zweiter Wall hier waere
+    toter Code, den kein Test erreicht.
+    """
+    if not fixtures:
+        return _UNIVERSE_MIN
+    universum = int(max(fixtures, key=lambda f: f.fid).universe)
+    if not _UNIVERSE_MIN <= universum <= _UNIVERSE_MAX:
+        return _UNIVERSE_MIN
+    return universum
+
 
 class FixtureBrowserDialog(QDialog):
     def __init__(self, next_fid: int, parent=None):
@@ -65,7 +106,8 @@ class FixtureBrowserDialog(QDialog):
         form.addRow("Label:", self._edit_label)
 
         self._spin_universe = QSpinBox()
-        self._spin_universe.setRange(1, 32)
+        self._spin_universe.setRange(_UNIVERSE_MIN, _UNIVERSE_MAX)
+        self._spin_universe.setValue(self._universum_vorbelegung())
         form.addRow("Universe:", self._spin_universe)
 
         self._spin_address = QSpinBox()
@@ -101,6 +143,19 @@ class FixtureBrowserDialog(QDialog):
         btn_row.addWidget(btn_cancel)
         btn_row.addWidget(self._btn_add)
         layout.addLayout(btn_row)
+
+    def _universum_vorbelegung(self) -> int:
+        """UI-50: Quelle der Vorbelegung ist der **Patch** — anders als im
+        Ausgabe-Dialog (OUT-50), der aus ``universes.json`` laedt. Der Patch
+        sagt, wo das Rig steht; ``universes.json`` sagt nur, was eingerichtet
+        ist. Der Import ist wie in ``_update_address_suggestion`` lazy, damit
+        der Dialog auch ohne lauffaehigen AppState aufgeht (dann Standard 1).
+        """
+        try:
+            from src.core.app_state import get_state
+            return universum_vorschlag(get_state().get_patched_fixtures())
+        except Exception:
+            return _UNIVERSE_MIN
 
     def _load_tree(self, query: str = ""):
         self._tree.clear()

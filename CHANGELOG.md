@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — „Gerät hinzufügen" merkt sich, auf welchem Universum das Rig steht
+
+#### Behoben
+
+- **Das Universum-Feld stand jedes Mal auf 1.** Wer sein Rig auf Universum 3
+  fährt, musste es bei jedem einzelnen Gerät von Hand korrigieren — und wer es
+  vergaß, patchte auf ein Universum ohne Ausgang und suchte den Fehler
+  anschließend am Rig. Vorgeschlagen wird jetzt das Universum, auf dem zuletzt
+  gepatcht wurde. Ist noch nichts gepatcht, bleibt es bei 1.
+- **Der Adressvorschlag rechnet damit im richtigen Universum.** Er richtet sich
+  nach dem Feld darüber; stand dort die 1, während das Rig auf 3 läuft, schlug
+  er eine Adresse vor, die dort längst belegt war.
+- Das Feld bleibt frei einstellbar — der Vorschlag belegt nur vor. Ein
+  unsinniger Wert in einer von Hand bearbeiteten Show-Datei hält den Dialog
+  nicht auf, dann steht dort wieder die 1.
 ### 2026-08-11 — Matrix-Panels standen im 3D anders da als in der Draufsicht
 
 #### Behoben
