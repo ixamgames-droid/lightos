@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-55 | A | fix/qa55-doku-und-backlog-gates | 2026-08-11T19:51Z | tools/check_doc_links.py · tests/test_backlog_lint.py |
 | QA-52 | A | fix/qa52-tests-pruefen-echtes | 2026-08-11T20:08Z | - |
 
 ## Blocker & Fallen
@@ -41,3 +40,4 @@
 - 2026-08-11T19:51Z A claim QA-55
 - 2026-08-11T20:08Z A claim QA-52
 - 2026-08-11T20:17Z A done QA-54
+- 2026-08-11T20:26Z A done QA-55
