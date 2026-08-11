@@ -26,6 +26,7 @@ nie genommen wird — also bei genau den Fehlern, um die es geht (QA-52-Klasse).
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -52,17 +53,46 @@ class VolleSuiteSerialisiertTest(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.mkdtemp(prefix="lightos_lock_")
         self.lockfile = os.path.join(self._dir, ".pytest_lock")
-        self.env = {**os.environ, "LIGHTOS_LOCKFILE": self.lockfile}
+        # ★★ QA-53 — die drei Zusaetze sind der eigentliche Fix an dieser Datei.
+        #
+        # Bis zum 2026-08-11 startete `_starte_volle_suite` den Runner ohne
+        # Argumente und liess ihn 25 s laufen. Ohne Argumente ist das die VOLLE
+        # SUITE: mitten im Gate lief damit ein ZWEITES vollstaendiges Gate mit
+        # -j 3. Gemessen wurden 95 gleichzeitig lebende pytest-Prozesse auf
+        # EINEM geerbten LIGHTOS_SHOW_DB, die sich die Datenbank beim
+        # conftest-Import gegenseitig wegloeschten — plus ein `rm -rf` auf das
+        # .pytest_segments des aeusseren Laufs.
+        #
+        # ★ Bitter daran: dieser Test wurde geschrieben, um zwei gleichzeitige
+        # Suiten zu VERHINDERN, und startete dabei selbst eine zweite. Der
+        # Kommentar in verify_loop.sh benannte die Verschachtelung sogar — nur
+        # die Folge daraus war nicht zu Ende gedacht.
+        self.segout = os.path.join(self._dir, "segments")
+        self.env = {
+            **os.environ,
+            "LIGHTOS_LOCKFILE": self.lockfile,
+            # (1) Kein Testlauf — nur Sperre + Syntax-Check. Der Mechanismus,
+            #     um den es hier geht, laeuft damit vollstaendig echt.
+            "LIGHTOS_VERIFY_DRYRUN": "1",
+            # (2) Eigenes Ausgabeverzeichnis, falls doch je ein Segmentlauf
+            #     entsteht: dann raeumt er nicht dem echten Gate die Ergebnisse ab.
+            "LIGHTOS_SEG_OUT": self.segout,
+            # (3) Eigene Show-DB. Der Kindprozess erbt sie sonst und faellt
+            #     seinem Elternprozess in die Datenbank (conftest schuetzt das
+            #     seit QA-53 zusaetzlich — hier steht der Guertel zum Hosentraeger).
+            "LIGHTOS_SHOW_DB": os.path.join(self._dir, "kind_show.db"),
+        }
 
     def tearDown(self):
         shutil.rmtree(self._dir, ignore_errors=True)
 
     def _starte_volle_suite(self, timeout: float):
-        """Runner ohne Argumente starten und nach `timeout` abwuergen.
+        """Den Runner auf dem Weg der vollen Suite starten (ohne Argumente).
 
-        Rueckgabe: die Ausgabe bis dahin. Es geht nur darum, ob er ueberhaupt
-        bis zum ersten Schritt kommt — die Suite selbst laeuft Minuten und wird
-        hier nie zu Ende gefahren.
+        Er nimmt dabei wirklich die Sperre und macht wirklich den Syntax-Check;
+        nur die Suite selbst entfaellt (``LIGHTOS_VERIFY_DRYRUN``, s. setUp).
+        Der `timeout` faengt weiterhin den Fall ab, dass er an der Sperre
+        haengenbleibt — das ist im Warte-Test der erwuenschte Ausgang.
         """
         p = subprocess.Popen([_RUNNER], cwd=_REPO, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT, text=True,
@@ -112,16 +142,90 @@ class VolleSuiteSerialisiertTest(unittest.TestCase):
         halter = subprocess.Popen(
             ["flock", self.lockfile, "sleep", "30"], start_new_session=True)
         try:
+            # ★ Hier bewusst OHNE DRYRUN: dieser Test lebt davon, dass der
+            # gezielte Lauf wirklich bis zum Ende durchgeht (returncode 0).
+            # Mit Abkuerzung waere er gruen, ohne noch etwas zu belegen — genau
+            # die Attrappen-Falle aus QA-52. Eine Datei ist billig.
+            env = {k: v for k, v in self.env.items()
+                   if k != "LIGHTOS_VERIFY_DRYRUN"}
             r = subprocess.run(
                 [_RUNNER, "tests/test_keine_privaten_dateien.py"],
                 cwd=_REPO, capture_output=True, text=True, timeout=180,
-                env=self.env)
+                env=env)
             self.assertNotIn("warte", r.stdout.lower())
             self.assertEqual(r.returncode, 0, r.stdout[-2000:])
         finally:
             import signal
             os.killpg(os.getpgid(halter.pid), signal.SIGKILL)
             halter.wait()
+
+
+@unittest.skipUnless(os.access(_RUNNER, os.X_OK), "verify_loop.sh nicht ausfuehrbar")
+class KeineZweiteSuiteAusEinemTestTest(unittest.TestCase):
+    """★★ QA-53 — die Regression, die diese Datei selbst verursacht hat.
+
+    Ein Test, der den Gate-Runner startet, darf keine zweite volle Suite
+    ausloesen. Gemessen am 2026-08-11 (vorher): 95 gleichzeitig lebende
+    pytest-Prozesse auf einer geerbten Show-DB, ein ``rm -rf`` auf das
+    Ausgabeverzeichnis des laufenden Gates, und in der Folge rote Segmente an
+    wechselnden Dateien, die alle isoliert gruen liefen.
+    """
+
+    def setUp(self):
+        self._dir = tempfile.mkdtemp(prefix="lightos_nozweite_")
+        self.addCleanup(shutil.rmtree, self._dir, ignore_errors=True)
+
+    def test_der_runner_raeumt_das_ausgabeverzeichnis_des_gates_nicht_ab(self):
+        """Das Verzeichnis wird beim Segmentlauf per ``rm -rf`` neu angelegt —
+        seine Inode-Nummer ist damit der direkte Beleg. Kein Eingriff in einen
+        laufenden Gate-Lauf: der Test schreibt nichts hinein, er sieht nur hin.
+        """
+        segdir = os.path.join(_REPO, ".pytest_segments")
+        vorher = os.stat(segdir).st_ino if os.path.isdir(segdir) else None
+
+        env = {**os.environ,
+               "LIGHTOS_LOCKFILE": os.path.join(self._dir, ".lock"),
+               "LIGHTOS_VERIFY_DRYRUN": "1",
+               "LIGHTOS_SHOW_DB": os.path.join(self._dir, "kind.db")}
+        r = subprocess.run([_RUNNER], cwd=_REPO, capture_output=True,
+                           text=True, timeout=180, env=env)
+
+        self.assertEqual(0, r.returncode, r.stdout[-2000:])
+        self.assertNotIn("segmentiert", r.stdout,
+                         "Der Runner hat die volle Suite gestartet:\n" + r.stdout)
+        nachher = os.stat(segdir).st_ino if os.path.isdir(segdir) else None
+        self.assertEqual(vorher, nachher,
+                         "Das Ausgabeverzeichnis wurde neu angelegt — ein "
+                         "zweiter Segmentlauf hat dem echten Gate die "
+                         "results.tsv abgeraeumt (QA-53).")
+
+    def test_ein_kindprozess_loescht_die_show_db_des_elternprozesses_nicht(self):
+        """★ Der conftest-Guard, direkt gemessen.
+
+        Ohne ihn ruft JEDER als Kind gestartete pytest beim blossen Import
+        ``_purge_test_dbs()`` — und das ``os.remove`` traf den GEERBTEN Pfad,
+        also die Datenbank, an der der Elternprozess gerade arbeitet.
+        """
+        db = os.path.join(self._dir, "eltern_show.db")
+        with open(db, "w", encoding="utf-8") as f:
+            f.write("nicht leer")
+
+        env = {**os.environ, "LIGHTOS_SHOW_DB": db}
+        # ★ Die Datei MUSS unter tests/ liegen, sonst laedt pytest das
+        # tests/conftest.py gar nicht — und genau dessen Import loest den
+        # Aufraeumschritt aus (conftest.py:255). Ein erster Versuch legte eine
+        # Wegwerfdatei in einen Temp-Ordner: das Kind lief, loeschte nichts,
+        # und der Test war gruen, ohne je den Fall gefahren zu haben.
+        # `-k` waehlt bewusst keinen einzigen Test aus: gebraucht wird nur der
+        # Import, nicht die Laufzeit fremder Tests.
+        subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/test_app_data_dir.py",
+             "-k", "diesen_namen_gibt_es_nicht", "-q", "-p", "no:cacheprovider"],
+            cwd=_REPO, capture_output=True, text=True, timeout=180, env=env)
+
+        self.assertTrue(os.path.exists(db),
+                        "Der Kindprozess hat die Show-DB des Elternprozesses "
+                        "geloescht — genau der Isolationsbruch aus QA-53.")
 
 
 if __name__ == "__main__":

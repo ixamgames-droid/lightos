@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Das Test-Gate konnte „bestanden" melden, ohne alles gefahren zu haben
+
+Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
+
+#### Behoben
+
+- **Ein Test startete mitten im Testlauf einen zweiten kompletten Testlauf.** Er
+  war eigentlich dafuer geschrieben, genau das zu verhindern — und rief das
+  Pruefwerkzeug dabei so auf, dass es die gesamte Suite noch einmal fuhr.
+  Gemessen: 95 gleichzeitig laufende Testprozesse, die sich eine einzige
+  Arbeitsdatenbank teilten und sie einander loeschten. Folge waren rote
+  Testergebnisse an staendig wechselnden Dateien, die einzeln alle
+  fehlerfrei durchliefen.
+
+- **Und der Lauf konnte sich dabei selbst gruen melden.** Der zweite Lauf raeumt
+  zu Beginn das Ergebnisverzeichnis leer — mit den bisherigen Ergebnissen
+  verschwanden auch die **fehlgeschlagenen**. Das Werkzeug zaehlte danach nur
+  noch seinen Rest und meldete „bestanden", obwohl Tests fehlgeschlagen waren.
+  Es prueft jetzt, ob die Ergebnisliste vollstaendig ist, sagt es deutlich, wenn
+  sie es nicht ist, und gilt in diesem Fall als **nicht bestanden**.
+
+- Damit ist auch die seit dem 2026-08-06 notierte falsche Abschlusszahl erklaert
+  („68/69 Segmente gruen" bei 584 gefahrenen Dateien). Die damalige Vermutung —
+  ein verlorener Zaehler — war falsch; die Datei war geloescht worden.
+
 ### 2026-08-11 — Ein Ausfall der Ausgabe ist jetzt zu sehen
 
 #### Behoben

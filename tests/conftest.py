@@ -74,6 +74,9 @@ _TEST_TOKEN = f"{_TEST_PID}_{uuid.uuid4().hex[:8]}"
 # beginnt und den Temp-Ordner nie anfasst (6/6 sauber unter derselben Last).
 _TEST_ROOT = os.path.join(_TEST_TMP, "lightos_tests")
 os.makedirs(_TEST_ROOT, exist_ok=True)
+# ★ QA-53: Merken, ob der Pfad GEERBT ist (also von aussen kam) — s.
+# _purge_test_dbs(). `setdefault` allein sagt das hinterher nicht mehr.
+_SHOW_DB_GEERBT = "LIGHTOS_SHOW_DB" in os.environ
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
     os.path.join(_TEST_ROOT, f"lightos_test_show_{_TEST_TOKEN}.db"))
@@ -170,9 +173,25 @@ os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
 
 
 def _purge_test_dbs():
-    """Die prozess-eigene Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
+    """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
     loeschen. Garantiert einen WIRKLICH leeren Start, falls ein frueherer Lauf
-    mit derselben (recycelten) PID Altzeilen hinterlassen hat."""
+    mit derselben (recycelten) PID Altzeilen hinterlassen hat.
+
+    ★ QA-53: „prozess-eigen" ist hier die ganze Bedingung. Ein pytest, das ein
+    Test als KIND startet, erbt ``LIGHTOS_SHOW_DB`` — und loeschte damit beim
+    blossen Import die Datenbank, an der sein Elternprozess gerade arbeitet.
+    Gemessen am 2026-08-11: 95 gleichzeitig lebende pytest-Prozesse auf EINEM
+    Pfad, weil ``test_verify_loop_sperre.py`` den Gate-Runner ohne Argumente
+    startete. Symptome waren ``no such table: patched_fixtures``, ``disk I/O
+    error`` und eine ``StopIteration`` auf einer Patch-Zeile, die es eben noch
+    gab — an wechselnden Dateien, alle isoliert gruen.
+
+    Der Token (PID + uuid4) war nie das Problem: er ist eindeutig. Vererbt wird
+    der fertige PFAD. Deshalb wird ein GEERBTER Pfad hier nicht angefasst — wem
+    die Datei gehoert, der raeumt sie auch auf.
+    """
+    if _SHOW_DB_GEERBT:
+        return
     _base = os.environ.get("LIGHTOS_SHOW_DB")
     if not _base:
         return
