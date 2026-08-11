@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | OUT-51 | A | fix/out51-sendefehler-sichtbar | 2026-08-11T14:52Z | src/core/dmx/output_manager.py · src/core/dmx/sacn.py · src/core/dmx/enttec_pro.py · src/ui/main_window.py · src/ui/widgets/output_config.py |
+| QA-53 | A | fix/qa53-fixture-db-isolation | 2026-08-11T15:44Z | tests/conftest.py · tools/verify_segmented.sh |
 
 ## Blocker & Fallen
 
@@ -24,3 +25,4 @@
 - 2026-08-06T14:08Z A claim PROC-01
 - 2026-08-06T15:06Z A done PROC-01
 - 2026-08-11T14:52Z A claim OUT-51
+- 2026-08-11T15:44Z A claim QA-53
