@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Die Testsuite fasst die echte Geräte-Bibliothek nicht mehr an
+
+Betrifft die Entwicklung, hat aber eine sichtbare Spur in der Anwendung.
+
+#### Behoben
+
+- **Ein Test legte seine Profile in der echten Geräte-Bibliothek an.** Beim
+  Aufräumen verschwand das Profil, der dabei angelegte **Hersteller** aber
+  nicht — er stand seither als `TEST-DualTilt` in der Herstellerliste des
+  Patch-Dialogs. Der Test baut sich jetzt eine eigene, temporäre Bibliothek;
+  nachgemessen bleibt die echte Datei danach unverändert.
+
+- **Ein neues Gate hält das offen:** ein Test, der Profile anlegt, ohne sich
+  eine eigene Bibliothek zu bauen, lässt die Prüfung fehlschlagen.
+
+#### Neu
+
+- `tools/library_testreste.py` findet solche Rückstände in der eigenen
+  Bibliothek und zeigt sie an. **Gelöscht wird nur auf ausdrückliche
+  Anweisung** (`--entfernen`) — und ein Hersteller nur dann, wenn kein Profil
+  mehr an ihm hängt.
 ### 2026-08-11 — Der DMX-Monitor sagt jetzt, ob das Bild wirklich rausgeht
 
 #### Behoben
