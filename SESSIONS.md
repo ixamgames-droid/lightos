@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-51 | A | fix/qa51-pruefwerkzeuge | 2026-08-11T16:56Z | tools/validate.py · tools/render_probe.py · src/core/show/showbuilder/builder.py · tools/check_doc_links.py · tools/gen_tools_index.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -33,3 +33,4 @@
 - 2026-08-11T16:35Z A claim QA-50
 - 2026-08-11T16:56Z A claim QA-51
 - 2026-08-11T17:02Z A done QA-50
+- 2026-08-11T17:21Z A done QA-51
