@@ -72,12 +72,39 @@ def _prune_ghost_placeholder_nodes(scene) -> None:
         scene.remove(nid)
 
 
+# ★ QA-50: Was der tolerante Loader unterwegs verworfen hat.
+#
+# Der Toleranz-Default ist richtig — eine Show mit einem kaputten Block soll
+# sich oeffnen lassen, statt gar nicht. Falsch war nur, dass davon **nichts
+# uebrig blieb**: `load_show` meldete „geladen", und das naechste Speichern
+# schrieb den unvollstaendigen Stand zurueck. Der Verlust entstand also nicht
+# beim Laden, sondern beim nachfolgenden Speichern — und war bis dahin fuer
+# niemanden sichtbar.
+#
+# Modul-global statt Rueckgabewert: `_lenient` wird an 31 Stellen gerufen,
+# quer durch den Loader. Ein durchgereichter Sammler haette jede davon
+# angefasst; hier reicht ein Ort. `load_show` leert die Liste am Anfang.
+_ladeprobleme: list[str] = []
+
+
+def letzte_ladeprobleme() -> list[str]:
+    """Die beim letzten :func:`load_show` verworfenen Teile (QA-50).
+
+    Leere Liste = alles gelesen. Die UI haengt ihre Warnung daran; wer nur
+    ``(ok, msg)`` auswertet, bekommt die Kurzfassung schon im Text.
+    """
+    return list(_ladeprobleme)
+
+
 def _lenient(msg: str, exc: Exception) -> None:
     """Strukturelle Schluck-Punkte im Lade-Pfad: druckt wie bisher und laesst den
     Loader weitermachen (toleranter Default) — AUSSER im Strict-Modus
     (LIGHTOS_STRICT), dann re-raised es den Fehler laut an der exakten Stelle.
-    Phase 6, siehe src/core/strict.py + SecondBrain entry_show_validation."""
+    Phase 6, siehe src/core/strict.py + SecondBrain entry_show_validation.
+
+    QA-50: merkt sich den Vorfall zusaetzlich in ``_ladeprobleme``."""
     print(f"[show_file] {msg}: {exc}")
+    _ladeprobleme.append(f"{msg}: {exc}")
     if strict_mode():
         raise exc
 
@@ -1072,6 +1099,8 @@ def load_show(path: str | os.PathLike):
     from src.core.engine.palette import get_palette_manager
     from src.core.engine.cue_stack import CueStack
 
+    _ladeprobleme.clear()   # QA-50: Sammler gehoert diesem Ladevorgang
+
     try:
         with zipfile.ZipFile(path, "r") as zf:
             raw = zf.read("show.json").decode("utf-8")
@@ -1713,4 +1742,12 @@ def load_show(path: str | os.PathLike):
     except Exception as e:
         print(f"[show_file] post-load events error: {e}")
 
+    # ★ QA-50: „geladen" nur sagen, wenn auch alles gelesen wurde. Sonst steht
+    # die Zahl im Text — die Einzelheiten holt die UI ueber
+    # `letzte_ladeprobleme()`. Der Rueckgabewert bleibt `True`: die Show IST
+    # offen und bedienbar, nur eben unvollstaendig. Ein `False` hier wuerde die
+    # Aufrufer dazu bringen, eine benutzbare Show als Fehlschlag zu behandeln.
+    if _ladeprobleme:
+        return True, (f"Show '{state.show_name}' geladen — ABER "
+                      f"{len(_ladeprobleme)} Teile konnten nicht gelesen werden.")
     return True, f"Show '{state.show_name}' geladen."

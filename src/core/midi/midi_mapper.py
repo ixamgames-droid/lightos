@@ -854,12 +854,35 @@ class MidiMapper:
 
     # Persistence --------------------------------------------------------
 
-    def save(self, path: str):
-        data = [mapping.to_config_dict() for mapping in self._mappings]
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+    def save(self, path: str) -> bool:
+        """Schreibt die Mappings. ``True`` = geschrieben (QA-50).
 
-    def load(self, path: str):
+        Vorher konnte ein Schreibfehler bis in den Aufrufer durchschlagen oder
+        — je nach Aufrufer — unbemerkt bleiben; jetzt ist die Antwort eindeutig
+        und die UI kann sie melden.
+        """
+        try:
+            data = [mapping.to_config_dict() for mapping in self._mappings]
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"[midi_mapper] save error: {e}")
+            return False
+
+    def load(self, path: str) -> bool:
+        """Laedt die Mappings. ``True`` = geladen, ``False`` = nichts geaendert.
+
+        ★ QA-50: Hier stand ``except Exception: pass``. Bei einer kaputten oder
+        fehlenden Datei passierte damit **gar nichts** — ``replace_mappings``
+        wurde nie erreicht, die bestehende (beim Start: leere) Liste blieb
+        stehen, und die Oberflaeche meldete trotzdem „✓ Mappings geladen".
+
+        **Der Schaden entsteht erst danach:** das naechste „Speichern" schreibt
+        die leere Liste ueber die Datei, die noch alle Mappings enthielt. Ein
+        Lesefehler wird so zu einem Schreibverlust — und niemand hat je einen
+        Fehler gesehen.
+        """
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
@@ -870,8 +893,15 @@ class MidiMapper:
                 elif isinstance(item, dict):
                     loaded.append(MidiMapping(**item))
             self.replace_mappings(loaded)
-        except Exception:
-            pass
+            return True
+        except FileNotFoundError:
+            # Kein Fehler, sondern der Normalfall beim ersten Start — aber auch
+            # kein „geladen": der Aufrufer soll nicht behaupten, es gaebe
+            # Mappings.
+            return False
+        except Exception as e:
+            print(f"[midi_mapper] load error: {e}")
+            return False
 
     def close(self):
         self._feedback_running = False

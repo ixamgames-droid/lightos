@@ -7,6 +7,40 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — „Gespeichert" heisst jetzt auch gespeichert
+
+#### Behoben
+
+- **Die Show meldete „Gespeichert", auch wenn Teile davon gar nicht in der
+  Datei landeten.** Das Einsammeln von Virtual Console, Snapshots,
+  Kanal-Gruppen oder Fensterlayout konnte scheitern, ohne dass etwas zu sehen
+  war — gespeichert wurde dann der **alte** Stand dieses Teils, und die
+  Statuszeile bestaetigte den Erfolg. Die Arbeit war weg, und beim naechsten
+  Speichern endgueltig. Jetzt sagt die Meldung, welcher Teil fehlt; gespeichert
+  wird trotzdem, damit die uebrigen Teile nicht auch noch verloren gehen.
+
+- **Eine unvollstaendig geladene Show sah aus wie eine vollstaendige.** Der
+  Loader ist bewusst nachsichtig — eine Show mit einem beschaedigten Block soll
+  sich oeffnen lassen. Nur blieb davon nichts uebrig: es stand „geladen" da.
+  **Der Verlust entsteht dabei nicht beim Laden, sondern beim naechsten
+  Speichern**, das den unvollstaendigen Stand festschreibt. Wer eine solche
+  Show oeffnet, wird jetzt gewarnt — mit der Empfehlung, vorher eine Kopie zu
+  sichern.
+
+- **Bedienelemente der Virtual Console, die beim Laden nicht gebaut werden
+  konnten, verschwanden beim Speichern lautlos.** Sie werden weiterhin
+  uebersprungen (eine defekte Taste darf nicht die ganze Konsole kosten) — aber
+  das Speichern sagt jetzt vorher, dass es sie loescht.
+
+- **„✓ Mappings geladen" erschien auch, wenn keine geladen wurden.** Bei
+  fehlender oder beschaedigter Datei passierte gar nichts, die Liste blieb leer
+  — und das naechste Speichern schrieb diese leere Liste ueber die noch
+  vollstaendige Datei. Aus einem Lesefehler wurde so ein Schreibverlust.
+
+- **Die Ausgabe-Einstellungen meldeten „Gespeichert", ohne es zu pruefen.**
+  Schreibfehler (Rechte, voller Datentraeger) verschwanden im Terminal; die
+  Einstellung war nach dem naechsten Start wieder weg. Gleiches gilt fuer ein
+  fehlgeschlagenes Anwenden der Universen-Tabelle.
 ### 2026-08-11 — Das Test-Gate konnte „bestanden" melden, ohne alles gefahren zu haben
 
 Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.

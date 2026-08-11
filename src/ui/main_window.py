@@ -1878,7 +1878,7 @@ class MainWindow(QMainWindow):
         self._open_show_path(path)
 
     def _open_show_path(self, path: str):
-        from src.core.show.show_file import load_show
+        from src.core.show.show_file import load_show, letzte_ladeprobleme
         ok, msg = load_show(path)
         if ok:
             self._current_show_path = path
@@ -1887,6 +1887,23 @@ class MainWindow(QMainWindow):
             _add_recent_file(path)
             self._rebuild_recent_menu()
             self._sync_render_toggles()
+            # ★★ QA-50: Der Loader ist bewusst tolerant — eine Show mit einem
+            # kaputten Block soll sich oeffnen lassen. Falsch war, dass davon
+            # NICHTS uebrig blieb: es stand „geladen" da, und das naechste
+            # Speichern schrieb den unvollstaendigen Stand zurueck. **Der
+            # Verlust entsteht nicht beim Laden, sondern beim Speichern
+            # danach** — und war bis dahin fuer niemanden sichtbar.
+            probleme = letzte_ladeprobleme()
+            if probleme:
+                gekuerzt = probleme[:8]
+                rest = len(probleme) - len(gekuerzt)
+                QMessageBox.warning(
+                    self, "Show unvollstaendig geladen",
+                    "Diese Teile der Show konnten nicht gelesen werden:\n\n  • "
+                    + "\n  • ".join(gekuerzt)
+                    + (f"\n  … und {rest} weitere" if rest else "")
+                    + "\n\n⚠ SPEICHERN SCHREIBT DEN VERLUST FEST. Wenn die "
+                      "Datei wichtig ist: erst eine Kopie sichern.")
         else:
             QMessageBox.warning(self, "Fehler", msg)
 
@@ -2019,11 +2036,35 @@ class MainWindow(QMainWindow):
                 self._backup_pre_viz11_show(path)
             except Exception as e:
                 print(f"[main_window] pre-viz11 backup error: {e}")
+            # ★★ QA-50: Jeder dieser Sammelschritte konnte still scheitern —
+            # gespeichert wurde dann der ALTE Stand des betroffenen Teils, und
+            # die Statuszeile meldete trotzdem „Gespeichert". Der Nutzer haelt
+            # seine Arbeit fuer gesichert, und beim naechsten Speichern ist sie
+            # endgueltig weg. Die Fehler landeten in einem `print`, also in
+            # einem Terminal, das im Betrieb niemand offen hat.
+            #
+            # Gespeichert wird trotzdem: nicht zu speichern hiesse, auch die
+            # Teile zu verlieren, die in Ordnung sind. Nur die MELDUNG sagt
+            # jetzt die Wahrheit.
+            verloren: list[str] = []
             # VC-Layout (Buttons/Fader) aus dem aktuellen Canvas uebernehmen
             try:
                 self._state._vc_layout = self._vc_view.to_dict()
+                # QA-50: Beim Laden uebersprungene Widgets stehen NICHT im
+                # to_dict — dieses Speichern loescht sie endgueltig. Der
+                # richtige Moment fuer die Warnung ist genau hier: beim Laden
+                # war der Verlust noch nicht eingetreten.
+                uebersprungen = getattr(
+                    self._vc_view, "uebersprungene_widgets", lambda: [])()
+                if uebersprungen:
+                    verloren.append(
+                        "Virtual Console: "
+                        f"{len(uebersprungen)} Bedienelement(e) konnten beim "
+                        f"Laden nicht gebaut werden und werden mit diesem "
+                        f"Speichern GELOESCHT — " + "; ".join(uebersprungen[:3]))
             except Exception as e:
                 print(f"[main_window] collect vc layout error: {e}")
+                verloren.append(f"Virtual Console ({e})")
             # Snapshots (pro Show) aus der View uebernehmen
             try:
                 sv = getattr(self, "_snapshots_view", None)
@@ -2031,6 +2072,7 @@ class MainWindow(QMainWindow):
                     self._state._snapshots_data = sv.to_dict()
             except Exception as e:
                 print(f"[main_window] collect snapshots error: {e}")
+                verloren.append(f"Snapshots ({e})")
             # Kanal-Gruppen (pro Show, SDK-02) aus der View uebernehmen
             try:
                 cg = getattr(self, "_channel_groups_view", None)
@@ -2038,6 +2080,7 @@ class MainWindow(QMainWindow):
                     self._state._channel_groups_data = cg.to_dict()
             except Exception as e:
                 print(f"[main_window] collect channel groups error: {e}")
+                verloren.append(f"Kanal-Gruppen ({e})")
             # T1.6 Layout-Persistenz: Layout dazupacken
             layout = None
             try:
@@ -2045,11 +2088,24 @@ class MainWindow(QMainWindow):
                 layout = collect_layout(self)
             except Exception as e:
                 print(f"[main_window] collect_layout error: {e}")
+                verloren.append(f"Fensterlayout ({e})")
             save_show(path, layout=layout)
             self.setWindowTitle(f"LightOS  -  {path}")
-            self.statusBar().showMessage(f"Gespeichert: {path}", 3000)
             _add_recent_file(path)
             self._rebuild_recent_menu()
+            if verloren:
+                self.statusBar().showMessage(
+                    f"Gespeichert MIT LUECKEN: {path}", 8000)
+                QMessageBox.warning(
+                    self, "Unvollstaendig gespeichert",
+                    "Die Show wurde geschrieben, aber diese Teile konnten nicht "
+                    "eingesammelt werden und stehen in der Datei im Stand von "
+                    "vorher:\n\n  • " + "\n  • ".join(verloren) +
+                    "\n\nAenderungen daran sind NICHT in der Datei. Vor dem "
+                    "naechsten Speichern pruefen — sonst wird der alte Stand "
+                    "endgueltig festgeschrieben.")
+            else:
+                self.statusBar().showMessage(f"Gespeichert: {path}", 3000)
         except Exception as e:
             QMessageBox.warning(self, "Speicherfehler", str(e))
 
