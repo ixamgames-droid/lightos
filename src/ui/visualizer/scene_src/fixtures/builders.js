@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { pixelCell, panelGrid } from './pixel_order.js';
+import { placeElement, panelGrid } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -936,14 +936,28 @@ export function buildMoverBar(n) {
 // i (Zeilen-Haupt, i=0 = oben links) wird von heads[i].r/g/b gefaerbt. Front = +Z
 // (Panel steht vertikal wie ein Backdrop). Reale Referenz: generische 0,5-m-LED-
 // Kachel (500 x 500 x 50 mm) — Pixel fuellen die feste Panel-Flaeche unabh. der
-// Aufloesung. Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols }.
-export function buildMatrixPanel(n, pixelOrder) {
+// Aufloesung. Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols };
+// `rows`/`cols` ist das SICHTBARE Raster — bei 90°/270° Montage-Drehung also
+// die getauschte Form, nicht die aus der Pixelzahl abgeleitete (VIZ-52).
+export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
   // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
-  const { count: n2, cols, rows } = panelGrid(n);
+  const { count: n2, cols: srcCols, rows: srcRows } = panelGrid(n);
   n = n2;
+  // ★ VIZ-52: erst nummerieren (pixelOrder), dann haengen (Drehung/Spiegelung) —
+  // `placeElement` verbindet beides in genau dieser Reihenfolge. Die Positionen
+  // werden VORAB berechnet, weil bei 90°/270° Zeilen und Spalten die Rollen
+  // tauschen: aus einem 7x8-Raster wird ein 8x7, und danach richtet sich die
+  // ganze Zellen-Geometrie. Wer diese neue Form selbst nachrechnet, hat die
+  // zweite Formel, an der die Fassungen auseinanderlaufen — deshalb bringt
+  // `placeElement` sie mit.
+  const plaetze = [];
+  for (let i = 0; i < n; i++)
+    plaetze.push(placeElement(i, srcCols, srcRows, pixelOrder,
+                              elementRotation, elementFlip));
+  const rows = plaetze[0].rows, cols = plaetze[0].cols;
   const group = new THREE.Group();
   const PW = 0.5, PH = 0.5, PD = 0.05;    // feste Panel-Groesse (0,5-m-Kachel)
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x141414, metalness: 0.4, roughness: 0.6 });
@@ -958,7 +972,7 @@ export function buildMatrixPanel(n, pixelOrder) {
   const y0 = PH / 2 - margin - gh / 2;     // Start oben links (Zeile 0 = oben)
   const pixels = [];
   for (let i = 0; i < n; i++) {
-    const { r, c } = pixelCell(i, cols, pixelOrder);
+    const { r, c } = plaetze[i];
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(pxW, pxH),
       new THREE.MeshStandardMaterial({
