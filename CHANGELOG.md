@@ -42,6 +42,92 @@ weggeschaut, an der es darauf ankommt.
   dann markiert, wenn das 3D-Bild selbst noch nicht bereit ist. Das ist kein
   Nebeneffekt, sondern der Zweck — bliebe die Markierung aus, stünde die Liste
   nach einer Auswahl im Programmer leer da.
+### 2026-08-11 — Der Patch-Dialog sagt jetzt, wo die Pixel-Reihenfolge wirkt
+
+#### Behoben
+
+- **Eine Einstellung, die sichtbar reagierte, ohne zu wirken.** Wer bei einem
+  Panel auf „Schlangenlinien" umstellte, sah die 3D-Vorschau sofort umspringen
+  und hielt die Sache damit für erledigt — am Gerät lief das Lauflicht
+  unverändert im Zickzack. Der Hinweistext im Dialog legte genau das nahe
+  („ohne diese Einstellung läuft ein Lauflicht am echten Gerät im Zickzack,
+  während es im 3D geradeaus läuft"), und keine Stelle sagte, was noch fehlt.
+
+- **Jetzt steht der Weg im Dialog**, sichtbar unter den drei Feldern
+  „Pixel-Reihenfolge", „Montage-Drehung" und „Waagerecht gespiegelt montiert":
+  die Angaben wirken in der 3D-Vorschau — und am Gerät erst über ein Raster,
+  das mit ihnen gebaut wurde. Der Hinweis nennt den Weg **vollständig**: Tab
+  „Fixture-Gruppen", das Gerät als GANZES auf eine Rasterzelle ziehen (in der
+  beim Patchen angelegten Gruppe „… · Köpfe" steht in jeder Zelle nur EIN Kopf
+  — dort erst Rechtsklick → „… zu einer Zelle zusammenfassen"), dann Rechtsklick
+  auf diese Zelle → „aufteilen …" → „als Block…". Dazu die ehrliche Grenze: die
+  Gruppe „… · Köpfe" selbst bleibt eine Reihe und ändert sich dadurch nicht.
+
+- **Der Hinweis nannte zuerst einen Weg, den es an der genannten Stelle nicht
+  gibt** (in der Gegenprüfung gefunden, bevor er ausgeliefert wurde): „Rechtsklick
+  auf das Gerät im Raster → „als Block…"" — nach dem Patchen steht dort aber
+  gar nicht das Gerät, sondern ein einzelner Kopf, und das Menü bietet an dieser
+  Stelle nur „Zelle entfernen", „… zu einer Zelle zusammenfassen" und „Alle
+  Zellen … entfernen" an. Wer dem Hinweis folgte, suchte einen Menüpunkt, den es
+  da nicht gibt. Der fehlende Zwischenschritt steht auch so in der Anleitung
+  *Gruppen und Matrizen anlegen* (Abschnitte 3 und 5).
+
+- **Und er erschien bei Panels, die den Weg gar nicht haben.** Gezeigt wurde er
+  bei jedem Gerät vom Typ Matrix — auch bei Modi, die das ganze Panel in EINER
+  Farbe färben (ADJ Dotz Matrix „3-Kanal RGB", Stairville „8-Kanal Panel
+  gesamt"). Dort gibt es weder eine Kopf-Gruppe noch „als Block…" (das beginnt
+  bei zwei färbbaren Köpfen); der Hinweis versprach also zwei Dinge, die es an
+  diesen Geräten nicht gibt. Jetzt erscheint er — samt des entsprechenden
+  Tooltip-Absatzes — nur ab zwei färbbaren Köpfen.
+
+- **Nachgemessen bis zum Ausgang:** dass die Wahl über den Block-Weg wirklich
+  bis an die DMX-Kanäle des richtigen Kopfes durchschlägt, prüft die Software
+  ab jetzt selbst — vom Dialogfenster über das echte Kontextmenü des
+  Gruppen-Rasters (der Menüpunkt wird ausgelöst, nicht umgangen) und den
+  Matrix-Effekt bis zum gesendeten Kanal.
+### 2026-08-12 — Reparatur: Konfliktmarker in der Aufgabenliste
+
+#### Behoben
+
+- In `BACKLOG.md` waren beim Zusammenführen zweier parallel bearbeiteter
+  Einträge drei Merge-Marker stehengeblieben. Sie sind entfernt; kein Inhalt
+  ging verloren.
+
+- **Ein neuer Test verhindert die Wiederholung.** Bemerkenswert daran: der
+  fehlerhafte Stand hat Review, volles Testgate und CI **grün** passiert —
+  keine der bestehenden Prüfungen sucht nach solchen Markern. Gefunden hat es
+  eine unabhängige Gegenprüfung.
+
+### 2026-08-11 — Ein gedreht montiertes Panel steht im Visualizer jetzt auch gedreht
+
+#### Behoben
+
+- **Wie ein Matrix-Panel montiert ist, hat der Visualizer bisher ignoriert.**
+  Man konnte am Gerät einstellen, dass es hochkant, kopfüber oder gespiegelt
+  hängt — die Bühnenansicht zeigte es trotzdem so, als hinge es ganz normal.
+  Eine waagerechte Lauflicht-Figur lief auf dem Bildschirm quer über das Panel,
+  während sie am echten Gerät von oben nach unten lief. Beim Programmieren nach
+  Bildschirm hieß das: es sah richtig aus und war falsch.
+
+- Jetzt kippt das Panel in beiden Ansichten mit: bei 90° oder 270° tauschen
+  Zeilen und Spalten auch die Rollen, aus einem breiten Panel wird ein hohes.
+  **Draufsicht und 3D zeigen dabei dasselbe** — die beiden Ansichten dürfen bei
+  einem Panel nicht auseinandergehen.
+
+- Ein normal montiertes Panel ändert sich dadurch nicht, und alte Shows, die
+  die Einstellung noch gar nicht kennen, bleiben unverändert.
+### 2026-08-11 — Sechs Geräte im großen Test-Rig blieben immer dunkel
+
+#### Behoben
+
+- **Die vier Moving Heads und zwei Spider im mitgelieferten Test-Rig wurden nie
+  hell.** Wer das Rig zum Ausprobieren lud, sah sechs tote Geräte und suchte den
+  Fehler in der Software. Zwei Ursachen: der Farbeffekt der Moving Heads konnte
+  an ihnen gar nichts bewirken — sie haben ein Farbrad statt Rot/Grün/Blau — und
+  der Spider-Farbeffekt ließ den Master-Dimmer liegen.
+
+- **Warum es niemandem auffiel:** für dieses Rig lief die Sichtprüfung beim
+  Bauen gar nicht mit. Sie läuft jetzt — und hätte den Fehler sofort gemeldet.
 
 ### 2026-08-11 — Die Show-Prüfung merkt jetzt, wenn ein Gerät dunkel bleibt
 
