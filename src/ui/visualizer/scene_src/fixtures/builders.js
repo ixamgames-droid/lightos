@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { placeElement, panelGrid } from './pixel_order.js';
+import { placeElement, panelGrid, rotatePoint } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -937,11 +937,13 @@ export function buildMoverBar(n) {
 // links) wird von heads[i].r/g/b gefaerbt. Front = +Z (Panel steht vertikal wie
 // ein Backdrop). Reale Referenz: generische 0,5-m-LED-Kachel — die 0,5 m sind
 // seit VIZ-50a die LAENGERE Kante, die kuerzere folgt dem Seitenverhaeltnis.
-// Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols };
+// Vertrag { group, pixels:[{mesh,r,c}], whites:[{mesh}], isMatrix, rows, cols };
 // `rows`/`cols` ist das SICHTBARE Raster — bei 90°/270° Montage-Drehung also
 // die getauschte Form, nicht die aus der Pixelzahl abgeleitete (VIZ-52).
+// `whites` ist das Warmweiss-Band (VIZ-50b), leer bei Geraeten ohne eigene
+// Weiss-Segmente.
 export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
-                                 gridCols, gridRows) {
+                                 gridCols, gridRows, nWhites) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
@@ -1009,7 +1011,62 @@ export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
     group.add(mesh);
     pixels.push({ mesh, r, c });
   }
-  return { group, pixels, isMatrix: true, rows, cols };
+
+  // ── ★ VIZ-50b: die Warmweiss-Leiste als EIGENES Band ───────────────────────
+  //
+  // Robins ZQ06121 hat neben den 48 RGB-Zonen acht Warmweiss-Segmente. Sie
+  // liegen NICHT auf dem Farbraster: die Leiste laeuft mittig zwischen Reihe 2
+  // und 3 durch, ist halb so hoch wie eine RGB-Zone und ihre acht Segmente
+  // decken die zwoelf Spalten ab — also je anderthalb Spalten.
+  //
+  // WOHER DIE ZAHL KOMMT — und warum es dafuer kein neues Feld gibt: aus den
+  // `color_w`-Kanaelen des Modus, gezaehlt in derselben Schleife, die `nHeads`
+  // aus `color_r` zaehlt (`_fixture_to_dict`). Die Bibliothek weiss das seit
+  // dem Anlegen des Geraets; die attr#N-Konvention legt die acht Segmente auf
+  // die Koepfe 0..7, und deren Werte reisen als `heads[j].cw` laengst mit. Es
+  // fehlte nur die GEOMETRIE, nicht die Angabe.
+  //
+  // Die Lage im Panel ist abgeleitet, nicht behauptet: `nw` Segmente gleich
+  // verteilt ueber die volle Rasterbreite, mittig auf der Waagerechten. Fuer
+  // den ZQ06121 ist genau das die am Geraet nachgesehene Anordnung; fuer ein
+  // kuenftiges Geraet mit anderer Verteilung braucht es ein Bandformat — bis
+  // dahin ist die Gleichverteilung die einzige Aussage, die aus der Kanalzahl
+  // wirklich folgt.
+  const whites = [];
+  const nw = Math.max(0, Math.floor(nWhites || 0));
+  if (nw > 0) {
+    // Ausdehnung EINES Segments im QUELL-Raster: `segCols` Spalten lang, eine
+    // halbe Zeile hoch. Beides dreht mit dem Panel mit (`quer`).
+    const segCols = srcCols / nw;
+    // Mitte der Waagerechten: bei 4 Reihen die Fuge zwischen Reihe 2 und 3
+    // ((4-1)/2 = 1.5), bei ungerader Reihenzahl die Mitte der mittleren Reihe.
+    const mitteZeile = (srcRows - 1) / 2;
+    for (let j = 0; j < nw; j++) {
+      const p = rotatePoint(mitteZeile, (j + 0.5) * segCols - 0.5,
+                            srcRows, srcCols, elementRotation, elementFlip);
+      // 0.85 wie bei den Pixeln — damit bleibt „halb so hoch wie eine RGB-Zone"
+      // auch als Quad-Mass exakt die Haelfte und nicht nur als Rasterangabe.
+      const segW = (p.quer ? gw * 0.5 : gw * segCols) * 0.85;
+      const segH = (p.quer ? gh * segCols : gh * 0.5) * 0.85;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(segW, segH),
+        new THREE.MeshStandardMaterial({
+          color: 0x0a0a0a, emissive: 0x000000, emissiveIntensity: 0,
+          roughness: 0.4, side: THREE.DoubleSide,
+        })
+      );
+      // Knapp VOR den Pixeln: das Band liegt physisch zwischen den Zonen, im
+      // 4x12-Raster ueberlappt sein Streifen sie unvermeidlich (0.85 + 0.85 +
+      // 0.425 Zellhoehen passen nicht in zwei). Ohne den Versatz flimmerten
+      // beide Flaechen gegeneinander (Z-Fighting).
+      mesh.position.set(x0 + p.c * gw, y0 - p.r * gh, PD / 2 + 0.004);
+      group.add(mesh);
+      // Nur das Mesh — der Listenplatz IST die Segmentnummer, und ein
+      // mitgefuehrter Index waere eine zweite Zaehlung derselben Sache.
+      whites.push({ mesh });
+    }
+  }
+  return { group, pixels, whites, isMatrix: true, rows, cols };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1157,6 +1214,26 @@ export function updateMatrixPanelDmx(f, dmx) {
       px.mesh.material.emissive = col;
       px.mesh.material.emissiveIntensity = intNorm * 1.6;   // Master-Dimmer skaliert alle Pixel
     }
+  }
+  // ★ VIZ-50b: das Warmweiss-Band hat EIGENE Kanaele. Segment j haengt nach der
+  // attr#N-Konvention an Kopf j — an DESSEN `color_w`, nicht an seiner
+  // Zonenfarbe. `heads[j].cw` ist genau dieser Rohwert (die Nutzlast fuehrt ihn
+  // seit FM-2 pro Kopf mit); `heads[j].r/g/b` waere die Farbe der RGB-Zone j
+  // und haette das Band zu einem zweiten Bild derselben acht Zonen gemacht.
+  //
+  // Neutrales Weiss und nicht warmgetoent, obwohl die LEDs warmweiss sind:
+  // LightOS rechnet `color_w` ueberall neutral (`visual_rgb` legt W gleich auf
+  // R, G und B; die W-LED des Spiders ist (1,1,1)). Eine zweite, waermere Regel
+  // nur an dieser Stelle waere die Drift, gegen die FM16E steht.
+  const ws = f.whites || [];
+  for (let j = 0; j < ws.length; j++) {
+    const seg = ws[j];
+    if (!seg.mesh || !seg.mesh.material) continue;
+    const v = ((hs[j] || {}).cw || 0) / 255;
+    const wcol = new THREE.Color(v, v, v);
+    seg.mesh.material.color = wcol;
+    seg.mesh.material.emissive = wcol;
+    seg.mesh.material.emissiveIntensity = intNorm * 1.6;   // derselbe Master-Dimmer
   }
   // Top-Down-Icon: Panel-Zellen aus den Kopf-Farben (3c-1 zentrales Tinting)
   tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
