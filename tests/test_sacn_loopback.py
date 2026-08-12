@@ -44,6 +44,12 @@ def _empfaenger_adresse(index: int, pid: int | None = None) -> str:
 
     127.0.0.0/8 ist vollstaendig Loopback; der Spec-Port 5568 bleibt, damit der
     Test weiterhin genau den Weg misst, den das Produkt geht.
+
+    **Restrisiko, benannt statt verschwiegen:** in die Adresse gehen nur die
+    unteren 16 Bit der PID ein. Bei `pid_max = 4194304` teilen sich je 64 PIDs
+    ein Muster — zwei GLEICHZEITIGE Laeufe kollidieren also mit rund 1:65536.
+    Das ist klein, aber nicht null; wer hier einmal einen unerklaerlichen
+    Fehlschlag sieht, soll wissen, dass es diesen Weg gibt.
     """
     if pid is None:
         pid = os.getpid()
