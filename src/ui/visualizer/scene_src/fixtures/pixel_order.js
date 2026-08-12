@@ -24,7 +24,7 @@ export function normalizePixelOrder(value) {
 }
 
 /**
- * ★ VIZ-51: Pixelzahl -> Rasterform {count, cols, rows}.
+ * ★ VIZ-51: Pixelzahl -> Rasterform {count, cols, rows, explizit}.
  *
  * Die Formel stand ZWEIMAL — in `buildMatrixPanel` (3D) und in `addGridCells`
  * (2D-Icon), jeweils mit eigener Klemmung auf 1..256. Die FM-13-Zusage „nur
@@ -32,12 +32,34 @@ export function normalizePixelOrder(value) {
  * FORM. Zwei Formeln fuer dieselbe Frage sind genau die Drift-Quelle, gegen die
  * dieses Modul angetreten ist: waere eine der beiden je angefasst worden,
  * haetten 2D und 3D dasselbe Panel verschieden geschnitten.
+ *
+ * ★★ VIZ-50a: `gridCols`/`gridRows` sind die HINTERLEGTE Form aus dem
+ * Fixture-Modus (`FixtureMode.grid_cols/grid_rows`). Ohne sie blieb nur der
+ * near-square-Rateweg — und der macht aus Robins 4x12-Balken ein 7x7-Quadrat
+ * mit 49 Feldern. Fehlt die Angabe (0/undefined), aendert sich nichts:
+ * dieselbe Wurzelformel wie bisher, `explizit: false`.
+ *
+ * `explizit` ist kein Beiwerk, sondern die Bedingung fuer die Panel-MASSE:
+ * eine geratene Form darf keine physische Behauptung tragen (s. builders.js).
  */
-export function panelGrid(n) {
+export function panelGrid(n, gridCols, gridRows) {
   const count = Math.max(1, Math.min(256, Math.floor(n || 16)));
+  let c = Math.floor(gridCols || 0);
+  let r = Math.floor(gridRows || 0);
+  if (c > 0 || r > 0) {
+    // Eine der beiden Zahlen genuegt — die andere folgt aus der Pixelzahl.
+    if (c <= 0) c = Math.ceil(count / r);
+    if (r <= 0) r = Math.ceil(count / c);
+    // Das Raster MUSS alle Pixel fassen. Passt die hinterlegte Form nicht zur
+    // Pixelzahl des Modus (falsch gepatcht, Profil nachtraeglich geaendert),
+    // waeren die ueberzaehligen Pixel sonst ausserhalb des Panels gelandet —
+    // sichtbar als Zeilen, die neben dem Gehaeuse schweben.
+    r = Math.max(r, Math.ceil(count / c));
+    return { count, cols: c, rows: r, explizit: true };
+  }
   const cols = Math.ceil(Math.sqrt(count));
   const rows = Math.ceil(count / cols);
-  return { count, cols, rows };
+  return { count, cols, rows, explizit: false };
 }
 
 /** DMX-Pixelindex -> {r, c} im sichtbaren Raster. */

@@ -87,9 +87,14 @@ function addBarCells(group, n, barW) {
 // FM-13: rows*cols kleine Quadrate als Raster (near-square aus n) — als
 // userData.cells registriert -> tintTopDownIcon faerbt pro Pixel (heads[i],
 // Zeilen-Haupt, deckungsgleich mit buildMatrixPanel/updateMatrixPanelDmx).
-function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip) {
+function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip,
+                      gridCols, gridRows) {
   // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
-  const { count, cols: srcCols, rows: srcRows } = panelGrid(n);
+  // VIZ-50a: mit hinterlegter Geometrie ist sie kein Ratewert mehr. Das ICON
+  // behaelt bewusst sein quadratisches Gehaeuse (S x S) — es ist ein Symbol in
+  // der Draufsicht, kein Massmodell; nur die ZELLEN folgen der echten Form,
+  // damit 2D und 3D denselben Pixel an dieselbe Stelle legen.
+  const { count, cols: srcCols, rows: srcRows } = panelGrid(n, gridCols, gridRows);
   // VIZ-52: wie im 3D-Panel — erst nummerieren, dann haengen. Die gedrehte
   // Rasterform kommt aus `placeElement` mit, statt hier nachgerechnet zu werden.
   const plaetze = [];
@@ -116,7 +121,8 @@ function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip) 
 }
 
 export function buildTopDownIcon(type, nHeads, pixelOrder,
-                                 elementRotation, elementFlip) {
+                                 elementRotation, elementFlip,
+                                 gridCols, gridRows) {
   const group = new THREE.Group();
   let body, ring, cells = null;
   // Bar-artige Typen brauchen einen groesseren Selektionsring (die 1.6 m
@@ -162,7 +168,7 @@ export function buildTopDownIcon(type, nHeads, pixelOrder,
     group.add(body);
     group.add(mkOutline(new THREE.PlaneGeometry(S, S)));
     cells = addGridCells(group, nHeads, S, pixelOrder,
-                         elementRotation, elementFlip);
+                         elementRotation, elementFlip, gridCols, gridRows);
     ringRadii = [0.98, 1.08];
   } else if (type === 'spider') {
     // zwei kurze parallele Bars (Top-Down); jede Bar ist eine Zelle ->

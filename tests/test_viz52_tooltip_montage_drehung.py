@@ -468,7 +468,13 @@ class AussageGegenVerhaltenTest(unittest.TestCase):
         Pixel 0), traefe die Laufrichtung zufaellig zu und die Auskunft „die
         Vorschau zeigt die Montage" waere trotz gruener Messung falsch.
 
-        48 Zonen ergeben ein 7x7-Raster, die Ecke liegt also in Spalte 6.
+        ★ Die Spaltennummer hat sich mit VIZ-50a geaendert, die Aussage nicht.
+        Vorher RIET der Renderer die Rasterform aus der Zonenzahl (48 ->
+        7x7), die rechte Ecke lag also in Spalte 6. Seit die echte Form des
+        ZQ06121 in der Bibliothek steht (4 Reihen x 12 Spalten), wird aus dem
+        gedrehten Panel ein 12x4 — und die rechte Ecke ist Spalte 3. Der Test
+        misst weiterhin dasselbe: obere Zeile wandert in die rechte Spalte,
+        Pixel 1 rutscht darunter.
         """
         from src.core.show.show_file import reset_show
         reset_show()
@@ -476,13 +482,16 @@ class AussageGegenVerhaltenTest(unittest.TestCase):
         gerade = self._panel_bauen(1, 1, 0)
         hochkant = self._panel_bauen(2, 200, 90)
 
+        # 4 Reihen x 12 Spalten, um 90 Grad gedreht -> 12 Zeilen x 4 Spalten.
+        RECHTE_SPALTE = 3
         for name, js, erwartet in (("normal montiert", gerade, (0, 0)),
-                                   ("auf 90 Grad", hochkant, (0, 6))):
+                                   ("auf 90 Grad", hochkant, (0, RECHTE_SPALTE))):
             self.assertEqual(
                 erwartet, (js("f.pixels[0].r"), js("f.pixels[0].c")),
                 f"{name}: Pixel 0 sitzt nicht in Zeile/Spalte {erwartet}")
         self.assertEqual(
-            (1, 6), (hochkant("f.pixels[1].r"), hochkant("f.pixels[1].c")),
+            (1, RECHTE_SPALTE),
+            (hochkant("f.pixels[1].r"), hochkant("f.pixels[1].c")),
             "bei 90 Grad muss Pixel 1 UNTER Pixel 0 rutschen — bliebe es "
             "daneben, waere das eine Spiegelung, keine Drehung")
 

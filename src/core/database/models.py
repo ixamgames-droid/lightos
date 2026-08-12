@@ -57,6 +57,27 @@ class FixtureMode(Base):
     name: Mapped[str] = mapped_column(String(80))
     channel_count: Mapped[int] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(Text, default="")
+    # VIZ-50a: PHYSISCHE Rasterform eines Pixel-Panels in DIESEM Modus —
+    # Zeilen x Spalten der Zonen/Pixel. ``0`` (beide) = nicht hinterlegt; dann
+    # raet der Renderer die Form wie bisher near-square aus der Pixelzahl
+    # (`panelGrid`), und nichts aendert sich.
+    #
+    # ★ Warum am MODUS und nicht am gepatchten Geraet: die Rasterform ist eine
+    #   Aussage ueber das MODELL. Jedes Exemplar eines ZQ06121 ist 4x12; was
+    #   sich von Exemplar zu Exemplar unterscheidet, ist die Nummerierung
+    #   (`pixel_order`, Geraetemenue) und die Montage (`element_rotation`) —
+    #   beides sitzt deshalb zu Recht auf ``PatchedFixture``. Und am Modus statt
+    #   am Profil, weil die Pixelzahl modusabhaengig ist (ZQ06121: 154ch/144ch;
+    #   Stairville: 8ch = 1 Zone, 432ch = 144 Pixel).
+    #
+    # ★ Warum zwei Zahlen und kein ``layout_json``: rows/cols beantwortet genau
+    #   die Frage, die `panelGrid` heute raet — nicht mehr. Ein Band-JSON muesste
+    #   zusaetzlich beantworten, WO die Warmweiss-Segmente sitzen (VIZ-50b);
+    #   dieser Verbraucher existiert noch nicht, und ein Format ohne Verbraucher
+    #   ist ungeprueft. Sackgasse ist die Zahlenfassung nicht: ein spaeteres
+    #   Bandformat hat ein Einheitsraster, aus dem rows/cols folgen.
+    grid_rows: Mapped[int] = mapped_column(Integer, default=0)
+    grid_cols: Mapped[int] = mapped_column(Integer, default=0)
 
     fixture: Mapped[FixtureProfile] = relationship(back_populates="modes")
     channels: Mapped[list[FixtureChannel]] = relationship(
@@ -306,6 +327,17 @@ def migrate_fixtures_db(engine) -> None:
             if fcols and "viz_model" not in fcols:
                 conn.execute(text(
                     "ALTER TABLE fixtures ADD COLUMN viz_model VARCHAR(40) DEFAULT ''"))
+            # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
+            # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
+            # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende
+            # fixtures.db unbrauchbar, weil das ORM alle Modell-Spalten abfragt
+            # ("no such column: fixture_modes.grid_rows") — und die Bibliothek
+            # ist die eine Datei, die der Nutzer nicht mal eben neu anlegt.
+            mcols = {row[1] for row in conn.execute(text("PRAGMA table_info(fixture_modes)"))}
+            for _gcol in ("grid_rows", "grid_cols"):
+                if mcols and _gcol not in mcols:
+                    conn.execute(text(
+                        f"ALTER TABLE fixture_modes ADD COLUMN {_gcol} INTEGER DEFAULT 0"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 
