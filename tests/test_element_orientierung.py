@@ -332,3 +332,61 @@ class ShowRundlaufTest(unittest.TestCase):
         f = _patched_fixture_from_data(alt, 3)
         self.assertEqual(f.element_rotation, 0)
         self.assertFalse(f.element_flip)
+
+
+# ── Weg fuenf: in den Visualizer (VIZ-52) ────────────────────────────────────
+#
+# ★ Die vier Wege oben pruefen, dass die Einstellung GESPEICHERT wird. Dass sie
+# auch ANKOMMT, prueft keiner davon — und genau daran ist das Feature bis
+# VIZ-52 gescheitert: `_fixture_to_dict` schickte `pixelOrder` mit, die
+# Orientierung aber nicht. Der Renderer konnte sie folglich nicht beachten, und
+# ein gedreht montiertes Panel sah im Visualizer aus wie ein normales.
+#
+# Der 3D-Weg dahinter (Nutzlast -> fixtures.js -> Panel-Bauer) haengt in
+# `tests/test_viz13_scene_modules_smoke.py` durch die echte QtWebEngine-Bridge.
+
+class VisualizerNutzlastTest(unittest.TestCase):
+    """Die Bridge-Nutzlast muss die Montage-Orientierung tragen."""
+
+    def _nutzlast(self, rotation=0, flip=False):
+        import types
+        from src.core.database.models import PatchedFixture
+        import src.ui.visualizer.visualizer_window as VW
+
+        f = PatchedFixture(fid=5, label="Panel", fixture_profile_id=1,
+                           mode_name="154-Kanal", channel_count=154,
+                           universe=1, address=1, fixture_type="matrix",
+                           element_rotation=rotation, element_flip=flip)
+        fake_state = types.SimpleNamespace(visualizer_positions={},
+                                           visualizer_rotations={},
+                                           visualizer_docks={})
+        fake_self = types.SimpleNamespace(_state=fake_state)
+        fake_self._viz_model_for = types.MethodType(
+            VW.VisualizerBridge._viz_model_for, fake_self)
+        gesichert = VW.get_channels_for_patched
+        VW.get_channels_for_patched = lambda _f: []
+        try:
+            return VW.VisualizerBridge._fixture_to_dict(fake_self, f)
+        finally:
+            VW.get_channels_for_patched = gesichert
+
+    def test_drehung_und_spiegelung_reisen_mit(self):
+        d = self._nutzlast(rotation=90, flip=True)
+        self.assertEqual(d["elementRotation"], 90,
+                         "ohne dieses Feld kann der Renderer die Montage-"
+                         "Drehung gar nicht beachten (VIZ-52)")
+        self.assertIs(d["elementFlip"], True)
+
+    def test_normal_montiert_bleibt_neutral(self):
+        """★ Positivkontrolle: das Bestandsgeraet schickt 0/false — der
+        Renderer darf nichts drehen, was nicht gedreht haengt."""
+        d = self._nutzlast()
+        self.assertEqual(d["elementRotation"], 0)
+        self.assertIs(d["elementFlip"], False)
+
+    def test_muell_kommt_geklemmt_an(self):
+        """Der Wert kommt aus Show-Dateien und aus der DB. Ein krummer Winkel
+        darf die Szene nicht in eine undefinierte Lage bringen."""
+        d = self._nutzlast(rotation=45)
+        self.assertEqual(d["elementRotation"], 0)
+        self.assertEqual(self._nutzlast(rotation=-90)["elementRotation"], 270)
