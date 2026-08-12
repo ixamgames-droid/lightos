@@ -26,6 +26,7 @@ except Exception:
 
 from src.core.capability.validate import (  # noqa: E402
     ERROR, WARNING, validate_lshow, format_findings)
+from src.core.capability.dimmer_check import befunde_lshow  # noqa: E402
 
 
 def _expand(args: list[str]) -> list[str]:
@@ -55,6 +56,11 @@ def main(argv: list[str]) -> int:
             print(f"\n[FAIL] {path}: konnte nicht gelesen werden: {exc}")
             total_err += 1
             continue
+        # TOOL-SMOKEDIM: „gueltig" hiess bisher nicht „leuchtet". Diese Pruefung
+        # braucht die Geraete-Bibliothek dieses Rechners und steht deshalb
+        # BEWUSST nicht in validate_show_dict — das bleibt DB-frei (sonst waere
+        # jedes fremde Profil hier ein Fehlalarm, s. _check_patch-Docstring).
+        findings = list(findings) + befunde_lshow(path)
         errs = [f for f in findings if f.severity == ERROR]
         warns = [f for f in findings if f.severity == WARNING]
         total_err += len(errs)

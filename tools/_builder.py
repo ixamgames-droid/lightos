@@ -57,12 +57,25 @@ def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
     an Davids ZQ06121-Demo: sein Enttec ist Universum 3, und BEIDES, Matrix und
     eine simple Szene, wirkte tot. Der Smoke misst nicht die Show, sondern das
     falsche Universum.
+
+    ★★ TOOL-SMOKEDIM: Der Smoke sagt „erzeugt DMX", sobald IRGENDEIN Kanal
+    brennt — 144 Farbkanäle auf 255 genügen dafür, während der Master-Dimmer
+    auf CH1 liegen bleibt und das Gerät stockdunkel dasteht. Deshalb wird
+    zusätzlich je gepatchtem Gerät geprüft, ob sein Master-Dimmer während der
+    Probe je hochgezogen wurde. Ergebnis ist eine **Warnung**, kein Abbruch:
+    ein Gerät darf bewusst dunkel bleiben, und ein harter Fehler würde
+    Bestandsskripte brechen.
     """
     builder.save(out, name=name)
     if render:
-        lit, moved, _changed = builder.verify_render(render, universe=universe)
+        lit, moved, _changed, probe = builder.verify_render(
+            render, universe=universe, return_snapshot=True)
         if not (lit or moved):
             raise SystemExit(f"Render-Smoke fehlgeschlagen: {out} erzeugt kein DMX")
+        from src.core.capability.dimmer_check import dunkle_geraete
+        for meldung in dunkle_geraete(builder.state, probe.hoechstwert,
+                                      universe=universe):
+            print(f"[warn] {meldung}")
     print(f"OK: {os.path.basename(out)} gebaut + validiert "
           f"({len(builder._widgets)} Widgets)")
     return out
