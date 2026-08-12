@@ -70,6 +70,26 @@ export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 # keine: sie laesst das Ergebnis vertrauenswuerdig aussehen.
 # Ohne `flock` (z. B. macOS) laeuft alles wie bisher weiter, nur mit Hinweis:
 # eine fehlende Sperre darf das Gate nicht blockieren.
+# Pfadbestimmung und Sperrnahme sind GETRENNT. Der Test zu dieser Sperre laeuft
+# innerhalb der vollen Suite, die die echte Sperre bereits haelt — er darf den
+# Pfad also erfragen koennen, ohne ihn zu belegen (sonst wartet er bis zum
+# Timeout auf den eigenen Gate-Lauf; genau so ist es am 12.08. passiert).
+_lockfile_pfad() {
+    if [ -n "${LIGHTOS_LOCKFILE:-}" ]; then
+        echo "$LIGHTOS_LOCKFILE"
+        return 0
+    fi
+    # Kein Git (Tarball-Kopie)? Dann wie bisher das Elternverzeichnis.
+    _common="$(git rev-parse --git-common-dir 2>/dev/null)"
+    if [ -n "$_common" ] && [ -d "$_common" ]; then
+        echo "$(cd "$_common" && pwd)/.pytest_lock"
+    else
+        echo "$(cd .. 2>/dev/null && pwd)/.pytest_lock"
+    fi
+}
+
+LOCKFILE="$(_lockfile_pfad)"
+
 _verify_lock() {
     [ "$#" -gt 0 ] && return 0                      # gezielter Lauf: keine Sperre
     [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ] && return 0
@@ -77,22 +97,6 @@ _verify_lock() {
         echo "[verify] Hinweis: kein flock — parallele Suiten sind nicht gesperrt"
         return 0
     }
-    # Umlenkbar — und das ist keine Bequemlichkeit: der Test zu dieser Sperre
-    # startet den Runner selbst und laeuft dabei INNERHALB der vollen Suite,
-    # die die echte Sperre bereits haelt. Ohne eigene Datei pruefte er sich
-    # gegen den eigenen Gate-Lauf und waere immer rot (bzw., schlimmer, gruen
-    # aus dem falschen Grund).
-    if [ -z "${LIGHTOS_LOCKFILE:-}" ]; then
-        # Kein Git (Tarball-Kopie)? Dann wie bisher das Elternverzeichnis.
-        _common="$(git rev-parse --git-common-dir 2>/dev/null)"
-        if [ -n "$_common" ] && [ -d "$_common" ]; then
-            LOCKFILE="$(cd "$_common" && pwd)/.pytest_lock"
-        else
-            LOCKFILE="$(cd .. 2>/dev/null && pwd)/.pytest_lock"
-        fi
-    else
-        LOCKFILE="$LIGHTOS_LOCKFILE"
-    fi
     exec 9>"$LOCKFILE" 2>/dev/null || return 0
     if ! flock -n 9; then
         echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."

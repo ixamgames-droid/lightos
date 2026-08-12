@@ -263,6 +263,12 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
         umgebung = {k: v for k, v in os.environ.items()
                     if k not in ("LIGHTOS_LOCKFILE",)}
         umgebung["LIGHTOS_VERIFY_DRYRUN"] = "1"
+        # ★ NOLOCK ist hier Pflicht, nicht Bequemlichkeit: dieser Test laeuft
+        # INNERHALB der vollen Suite, die die echte Sperre haelt. Ohne ihn wartet
+        # der Unterprozess auf den eigenen Gate-Lauf, bis das Segment-Timeout
+        # zuschlaegt — gemessen am 12.08.2026, genau so. Der Pfad wird trotzdem
+        # gemeldet, weil Bestimmung und Belegung getrennt sind.
+        umgebung["LIGHTOS_VERIFY_NOLOCK"] = "1"
         r = subprocess.run(["bash", os.path.join(wurzel, "tools", "verify_loop.sh")],
                            cwd=wurzel, env=umgebung, capture_output=True, text=True,
                            timeout=180)
