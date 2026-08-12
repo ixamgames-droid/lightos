@@ -47,7 +47,7 @@ __all__ = ["ShowBuilder", "Handle", "BuildError", "RgbAlgorithm", "MatrixStyle",
 
 
 def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
-                     universe: int = 1) -> str:
+                     universe: int = 1, frames: int = 44) -> str:
     """Speichert + validiert die Show (statisch + live) und macht optional einen
     Render-Smoke über ``render`` (Liste von Handles/IDs). Wirft bei Problemen.
 
@@ -57,6 +57,13 @@ def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
     an Davids ZQ06121-Demo: sein Enttec ist Universum 3, und BEIDES, Matrix und
     eine simple Szene, wirkte tot. Der Smoke misst nicht die Show, sondern das
     falsche Universum.
+
+    ★ RIG-DUNKEL: ``frames`` ist durchgereicht, weil die Vorgabe (44 Frames =
+    1 Sekunde) fuer einen CHASER zu kurz ist. Ein Lauflicht ueber sechs Geraete
+    mit je 0,35 s braucht 2,1 s; in einer Sekunde werden die hinteren Geraete
+    nie hell, und der Dimmer-Waechter meldet sie als dunkel — ein Fehlalarm,
+    der ihn auf Dauer unbrauchbar machen wuerde. Wer einen Chaser prueft, gibt
+    hier mindestens einen vollen Durchlauf an.
 
     ★★ TOOL-SMOKEDIM: Der Smoke sagt „erzeugt DMX", sobald IRGENDEIN Kanal
     brennt — 144 Farbkanäle auf 255 genügen dafür, während der Master-Dimmer
@@ -69,7 +76,7 @@ def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
     builder.save(out, name=name)
     if render:
         lit, moved, _changed, probe = builder.verify_render(
-            render, universe=universe, return_snapshot=True)
+            render, universe=universe, return_snapshot=True, frames=frames)
         if not (lit or moved):
             raise SystemExit(f"Render-Smoke fehlgeschlagen: {out} erzeugt kein DMX")
         from src.core.capability.dimmer_check import dunkle_geraete

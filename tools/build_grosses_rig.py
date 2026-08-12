@@ -53,16 +53,40 @@ def main():
     # ---- 3) EFFEKTE: Farbe / Bewegung / Dimmer ----
     par_rainbow = b.matrix("PAR Rainbow", RgbAlgorithm.RAINBOW, style="RGB",
                            fixtures=par_fids, colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)])
-    mh_colorfade = b.matrix("MH ColorFade", RgbAlgorithm.COLORFADE, style="RGB",
-                            fixtures=mh_fids, colors=[(255, 0, 255), (0, 255, 255)])
+    # ★★ RIG-DUNKEL: Die vier Moving Heads haben KEIN RGB — ihr 8-Kanal-Modus
+    # ist ['pan','tilt','color_wheel','gobo_wheel','intensity','shutter',
+    # 'speed','macro']. Ein RGB-Matrix-Effekt findet dort schlicht keine
+    # Kanaele: gemessen erzeugte "MH ColorFade" **null** DMX-Aenderungen.
+    # Der Effekt stand seit jeher in der Show, im 3D leuchtete nichts, und
+    # niemand hat es bemerkt — weil dieses Skript den Render-Smoke gar nicht
+    # erst gefahren hat (s. build_and_verify unten).
+    #
+    # Ein Geraet mit Farbrad wird ueber `intensity` hell, nicht ueber Farbe.
+    # Deshalb hier eine Szene statt eines RGB-Effekts: Dimmer auf, Farbrad auf
+    # eine sichtbare Position.
+    mh_licht = b.scene("MH Licht")
     spider_color = b.matrix("Spider Farbe", RgbAlgorithm.COLORFADE, style="RGB",
-                            fixtures=spider_fids, colors=[(255, 120, 0), (0, 120, 255)])
+                            fixtures=spider_fids, colors=[(255, 120, 0), (0, 120, 255)],
+                            # ★ Ohne `drive_intensity` faerbt der Effekt die
+                            # Spider, laesst ihren Master-Dimmer aber auf 0 —
+                            # das Geraet bleibt dunkel. Genau der Fall vom
+                            # 2026-08-05 (TOOL-SMOKEDIM).
+                            drive_intensity=True)
     # Bewegung nur fuer Moving Heads (Spider haben KEIN Pan -> keine Circle-EFX!)
     mh_circle = b.efx("MH Kreis", EfxAlgorithm.CIRCLE, fixtures=mh_fids)
 
     # Dimmer-Lauflicht ueber die PARs (Scene je PAR voll -> Chaser laeuft durch)
     ch = {f.fid: {c.attribute: c.channel_number for c in get_channels_for_patched(f)}
           for f in b.state.get_patched_fixtures()}
+    # RIG-DUNKEL: die MH-Szene erst hier fuellen — `ch` kennt die Kanalnummern.
+    for fid in mh_fids:
+        dim_ch = ch[fid].get("intensity") or ch[fid].get("dimmer")
+        if dim_ch is not None:
+            mh_licht.fn.set_value(fid, dim_ch, 255)
+        rad = ch[fid].get("color_wheel")
+        if rad is not None:
+            mh_licht.fn.set_value(fid, rad, 24)      # erste Farbe des Rads
+
     par_chase = b.chaser("PAR Lauflicht")
     par_chase.fn.run_order = RunOrder.Loop
     for fid in par_fids:
@@ -79,7 +103,7 @@ def main():
         w.setGeometry(x, 20, 130, 60)
         return w
     _btn("PAR Rainbow", par_rainbow, 20)
-    _btn("MH ColorFade", mh_colorfade, 160)
+    _btn("MH Licht", mh_licht, 160)
     _btn("MH Kreis", mh_circle, 300)
     _btn("Spider Farbe", spider_color, 440)
     _btn("PAR Lauflicht", par_chase, 580)
@@ -149,7 +173,18 @@ def main():
         dock[fid] = back.id
 
     # ---- 7) SPEICHERN + VALIDIEREN ----
-    build_and_verify(b, OUT, name="Grosses Rig 2026")
+    # ★ RIG-DUNKEL: `render=` fehlte — damit lief fuer dieses Rig WEDER der
+    # Render-Smoke NOCH der Dimmer-Waechter (TOOL-SMOKEDIM). Genau deshalb ist
+    # jahrelang niemandem aufgefallen, dass sechs Geraete nie hell werden: es
+    # hat schlicht nie jemand nachgesehen. Die geprueften Funktionen sind die,
+    # die auch die VC-Tasten ausloesen.
+    build_and_verify(b, OUT, name="Grosses Rig 2026",
+                     render=[par_rainbow, mh_licht, spider_color,
+                             mh_circle, par_chase],
+                     # Das PAR-Lauflicht braucht 6 x 0,35 s = 2,1 s fuer einen
+                     # Durchlauf. Mit der Vorgabe (1 s) werden die hinteren
+                     # PARs nie hell und der Dimmer-Waechter meldet Fehlalarm.
+                     frames=150)
     print(f"[ok] geschrieben: {OUT}")
     print(f"[ok] Stage '{STAGE_NAME}' -> %APPDATA%/LightOS/stages/{STAGE_NAME}.json")
 
