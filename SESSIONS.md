@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| RIG-DUNKEL | A | fix/rig-dunkel | 2026-08-12T07:46Z | - |
 
 ## Blocker & Fallen
 
@@ -49,3 +49,4 @@
 - 2026-08-11T20:43Z A claim VIZ-51
 - 2026-08-11T20:50Z A done QA-52
 - 2026-08-11T21:09Z A done VIZ-51
+- 2026-08-12T07:46Z A claim RIG-DUNKEL
