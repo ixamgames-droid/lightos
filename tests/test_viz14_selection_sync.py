@@ -95,10 +95,27 @@ class TestViz14ReverseSelection(unittest.TestCase):
         arg = stub._bridge.selectFixtures.emit.call_args[0][0]
         self.assertEqual(json.loads(arg), [])
 
-    def test_window_handler_without_bridge_is_noop(self):
-        # Defensiv: kein _bridge -> kein Crash (Test-Fakes/Teardown).
-        stub = SimpleNamespace()
-        VisualizerWindow._on_global_selection(stub, "SELECTION_CHANGED", [1])  # darf nicht werfen
+    def test_window_handler_ohne_bridge_markiert_trotzdem_die_liste(self):
+        """★★ QA-56: hier stand ein nacktes ``SimpleNamespace()`` und der Aufruf
+        „darf nicht werfen". Das belegte weder Wirkung noch Wirkungslosigkeit —
+        und wirkungslos IST der Handler ohne Bridge gerade nicht: die
+        Geraeteliste wird trotzdem markiert (die Markierung steht bewusst VOR der
+        Bridge-Wache, ``_mark_patch_list`` hat genau deshalb zwei Aufrufer).
+        Wandert die Wache nach oben, verschwindet die Markierung still — sichtbar
+        nur daran, dass die Liste nach einer Programmer-Auswahl leer bleibt.
+        Jetzt wird beides gemessen: die Markierung laeuft, und am Fenster
+        entsteht dabei kein neuer Zustand."""
+        markiert = []
+        stub = SimpleNamespace(
+            _mark_patch_list=lambda fids: markiert.append(list(fids)))
+        felder_vorher = dict(vars(stub))
+
+        VisualizerWindow._on_global_selection(stub, "SELECTION_CHANGED", [1, 4])
+
+        self.assertEqual(markiert, [[1, 4]],
+                         "ohne Bridge muss die Geraeteliste weiter markiert werden")
+        self.assertEqual(vars(stub), felder_vorher,
+                         "der Handler legt keinen Ersatz-Zustand am Fenster an")
 
 
 class TestViz14BridgePollMirror(unittest.TestCase):

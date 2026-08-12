@@ -203,12 +203,39 @@ def test_proxy_is_disabled_reflects_status():
         px._closed = True
 
 
-def test_proxy_send_noop_after_close():
-    proc = _FakeProc(alive=True)
-    px, _ = _proxy_with_proc(proc)
+def test_proxy_send_after_close_weckt_keinen_worker_und_publiziert_nichts():
+    """★★ QA-56: hier stand nur ``px.send_dmx(...)`` nach ``close()`` und danach
+    nichts — belegt war „wirft nicht", nicht die Wirkungslosigkeit.
+
+    Die eigentliche Gefahr ist die WIEDERBELEBUNG: ``close()`` setzt
+    ``_proc = None``; ohne die ``_closed``-Wache landet jedes weitere Frame in
+    ``_maybe_respawn()``, und sobald die Respawn-Drossel abgelaufen ist, startet
+    der Ausgabe-Prozess nach dem Beenden neu und haelt den seriellen Port weiter
+    belegt. Deshalb wird die Uhr hier ueber die Drossel hinausgedreht (mit der
+    echten Zeit haette die Drossel den Unterschied verdeckt) und gemessen, dass
+    nichts passiert.
+    Positivkontrollen: ``test_proxy_respawns_dead_worker_throttled`` (der Zaehler
+    steigt sehr wohl, wenn NICHT geschlossen wurde) und
+    ``test_proxy_publishes_frame_to_shared_buffer`` (der Puffer aendert sich)."""
+    spawns = {"n": 0}
+    clk = {"t": 100.0}
+
+    def factory():
+        spawns["n"] += 1
+        return _FakeProc(alive=True)
+
+    px = EnttecProcessProxy("COM_FAKE", _process_factory=factory,
+                            _clock=lambda: clk["t"])
+    puffer_vorher = bytes(px._buf.get_obj())
     px.close()
-    # darf nicht crashen / nichts publizieren
-    px.send_dmx(bytes(DMX_BYTES))
+
+    clk["t"] += px.RESPAWN_EVERY_S + 1.0          # Drossel abgelaufen
+    px.send_dmx(bytes(((i * 3) % 256 for i in range(DMX_BYTES))))
+
+    assert spawns["n"] == 1, "nach close() darf kein Worker mehr gespawnt werden"
+    assert px._proc is None, "der Proxy bleibt ohne Worker"
+    assert bytes(px._buf.get_obj()) == puffer_vorher, \
+        "nach close() darf kein Frame mehr veroeffentlicht werden"
 
 
 # ── 3) Echter Spawn-Smoke-Test ─────────────────────────────────────────────────

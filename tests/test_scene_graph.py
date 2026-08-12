@@ -19,6 +19,61 @@ from src.core.stage.scene_graph import (
 )
 
 
+def _zustand(g: SceneGraph) -> dict:
+    """Vollstaendiger, vergleichbarer Zustand des Graphen (QA-56).
+
+    Grundlage fuer „Zustand vorher == Zustand nachher": ein Aufruf, der nichts
+    bewirken darf, muss diesen Wert unveraendert lassen. Nur zu pruefen, dass er
+    nicht wirft, laesst genau die stillen Nebenwirkungen durch, um die es geht.
+    """
+    return {
+        n.id: (n.kind, n.parent_id, n.transform.pos_m, n.transform.rot_deg,
+               n.transform.scale, n.mount_type, n.fixture_id, n.pos_set)
+        for n in g._nodes.values()
+    }
+
+
+def _graph_mit_dock() -> SceneGraph:
+    """Truss + daran gedocktes Fixture + ein Fixture, dessen Parent (noch) fehlt.
+
+    Die dritte Zeile ist kein Kunstgriff: ``add()`` prueft ``parent_id`` NICHT
+    (erst ``from_dict`` raeumt am Ende auf), Kind-vor-Parent ist also eine real
+    erreichbare Zwischenlage.
+    """
+    g = SceneGraph()
+    g.add(SceneNode(id="truss", kind=NodeKind.TRUSS_H,
+                    transform=Transform(pos_m=(1.0, 3.0, 0.0), rot_deg=(0.0, 90.0, 0.0))))
+    g.add(SceneNode(id="fix_1", kind=NodeKind.FIXTURE, fixture_id=1, parent_id="truss",
+                    transform=Transform(pos_m=(2.0, 0.0, 0.0))))
+    g.add(SceneNode(id="fix_2", kind=NodeKind.FIXTURE, fixture_id=2, parent_id="ghost",
+                    transform=Transform(pos_m=(4.0, 1.0, 5.0))))
+    return g
+
+
+class TestZustandsvergleich(unittest.TestCase):
+    """Positivkontrolle fuer ``_zustand``: der Vergleich muss bei einer ECHTEN
+    Aenderung anschlagen — sonst waeren die Gleichheits-Zusicherungen der
+    No-Op-Tests wertlos (sie wuerden alles durchwinken)."""
+
+    def test_vergleich_erkennt_remove(self):
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+        g.remove("truss")
+        self.assertNotEqual(_zustand(g), vorher)
+
+    def test_vergleich_erkennt_reparent(self):
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+        g.reparent("fix_1", None, keep_world=True)
+        self.assertNotEqual(_zustand(g), vorher)
+
+    def test_vergleich_erkennt_set_transform(self):
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+        g.set_transform("fix_1", pos_m=(9.0, 9.0, 9.0))
+        self.assertNotEqual(_zustand(g), vorher)
+
+
 class TestAddRemove(unittest.TestCase):
     def test_add_and_get(self):
         g = SceneGraph()
@@ -27,9 +82,23 @@ class TestAddRemove(unittest.TestCase):
         self.assertIs(g.get("fix_1"), node)
         self.assertIsNone(g.get("does_not_exist"))
 
-    def test_remove_unknown_is_noop(self):
-        g = SceneGraph()
-        g.remove("nope")  # darf nicht werfen
+    def test_remove_unknown_laesst_den_graphen_unveraendert(self):
+        """★★ QA-56: hier stand ``g.remove("nope")`` auf einem LEEREN Graphen —
+        und danach nichts. Das belegte nur „wirft nicht", nicht, dass der Aufruf
+        wirkungslos IST. Gemessen: die Wache (``node_id not in self._nodes ->
+        return``) liess sich ersatzlos streichen, ohne dass der Test es merkte —
+        auf einem leeren Graphen ist der Rest (``children_of`` + ``pop`` mit
+        Default) tatsaechlich wirkungslos. Der Unterschied entsteht erst, wenn
+        ein Knoten den unbekannten Namen als Parent traegt: ein ungewachtes
+        ``remove`` reisst dieses Kind aus seiner Verankerung (parent_id -> None),
+        obwohl gar nichts entfernt wurde."""
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+
+        g.remove("ghost")
+
+        self.assertEqual(_zustand(g), vorher,
+                         "ein unbekannter Name darf KEINEN Knoten anfassen")
 
     def test_remove_reparents_children_to_root(self):
         g = SceneGraph()
@@ -182,9 +251,18 @@ class TestReparent(unittest.TestCase):
         g.reparent("fix_1", "ghost", keep_world=True)
         self.assertIsNone(g.get("fix_1").parent_id)
 
-    def test_reparent_unknown_node_is_noop(self):
-        g = SceneGraph()
-        g.reparent("ghost", None, keep_world=True)  # darf nicht werfen
+    def test_reparent_unknown_node_laesst_den_graphen_unveraendert(self):
+        """★★ QA-56: vorher nur ``g.reparent("ghost", None)`` auf einem leeren
+        Graphen, ohne Zusicherung. Jetzt wird gemessen, dass der Aufruf nichts
+        bewegt UND keinen Knoten entstehen laesst — ein ``setdefault`` statt
+        ``get`` an der Wache (klassischer Ausrutscher) blieb vorher unbemerkt."""
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+
+        g.reparent("ghost", "truss", keep_world=True)
+
+        self.assertEqual(_zustand(g), vorher)
+        self.assertIsNone(g.get("ghost"), "ein Phantom-Knoten darf nicht entstehen")
 
 
 class TestSetTransform(unittest.TestCase):
@@ -197,9 +275,17 @@ class TestSetTransform(unittest.TestCase):
         self.assertEqual(node.transform.pos_m, (1.0, 2.0, 3.0))
         self.assertEqual(node.transform.rot_deg, (0.0, 90.0, 0.0))
 
-    def test_set_transform_unknown_node_is_noop(self):
-        g = SceneGraph()
-        g.set_transform("ghost", pos_m=(1.0, 1.0, 1.0))  # darf nicht werfen
+    def test_set_transform_unknown_node_laesst_den_graphen_unveraendert(self):
+        """★★ QA-56: vorher nur der nackte Aufruf auf leerem Graphen. Jetzt gegen
+        einen gefuellten Graphen, mit Zustandsvergleich — ein still angelegter
+        Knoten (``setdefault``) oder ein danebengegriffener Knoten faellt auf."""
+        g = _graph_mit_dock()
+        vorher = _zustand(g)
+
+        g.set_transform("ghost", pos_m=(1.0, 1.0, 1.0), rot_deg=(0.0, 45.0, 0.0))
+
+        self.assertEqual(_zustand(g), vorher)
+        self.assertIsNone(g.get("ghost"), "ein Phantom-Knoten darf nicht entstehen")
 
     def test_set_world_pos_on_rotated_parent_roundtrips(self):
         g = SceneGraph()
