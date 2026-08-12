@@ -8,6 +8,7 @@ einem harten Crash fuehren. Diese Autouse-Fixture meldet nach JEDEM Test alle no
 lebenden Canvases ab.
 """
 import os
+import shutil
 import sys
 import tempfile
 import uuid
@@ -97,19 +98,81 @@ os.environ.setdefault(
 # LIGHTOS_CRASH_LOG (unten). Wer hier etwas aendert: der Waechter
 # test_app_data_dir.py::test_suite_never_writes_into_the_real_crash_log
 # prueft den TATSAECHLICH benutzten Pfad, nicht die Absicht.
-# Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) wird BEWUSST NICHT ins Test-
-# APPDATA umgelenkt. Die committeten shows/*.lshow referenzieren feste
-# fixture_profile_id-Werte aus der real geseedeten fixtures.db; eine frisch
-# geseedete Eigen-DB vergibt andere Auto-IDs -> Kanal-Lookups (Dimmer/Farbe)
-# liefen ins Leere (test_color_fx_show_render/test_strict_dimmer_render/
-# test_capability_live). Sie ist zudem reine LESE-/idempotente Seed-Last.
-# XPLAT-04: fixture_db.DB_PATH folgt jetzt app_data_dir() (also APPDATA). Damit die
-# Umlenkung unten die Fixture-DB NICHT mitzieht, pinnen wir sie hier EXPLIZIT auf
-# die reale DB via LIGHTOS_FIXTURE_DB -- SOLANGE APPDATA noch echt ist (app_data_dir
-# importiert nur os/sys, kein App-State -> sicher vor dem ersten App-Import).
+# Die Fixture-DEFINITIONS-DB (fixture_db.DB_PATH) bekommt eine SONDERBEHANDLUNG:
+# sie wird nicht ins Test-APPDATA umgelenkt (das gaebe eine leere DB), sondern
+# aus der echten Bibliothek KOPIERT.
+#
+# ★ QA-58 — WARUM NICHT MEHR DIE ECHTE DATEI. Bis 2026-08-12 stand hier ein
+# EXPLIZITER Pin auf ~/.local/share/LightOS/fixtures.db, begruendet mit „reine
+# LESE-/idempotente Seed-Last". Diese Annahme gilt nicht mehr, sobald eine
+# SCHEMA-Migration dazukommt: der VIZ-50a-Lauf hat `grid_rows`/`grid_cols` per
+# ALTER TABLE in die ECHTE Nutzerdatei geschrieben. QA-54 bewacht nur
+# Schreib-FUNKTIONEN (create_user_profile ...) — eine Migration faellt nicht
+# darunter, sie laeuft in get_engine() vor JEDEM ersten Zugriff. Die Bibliothek
+# sind Nutzerdaten (hier 1789 Profile); dass der Schaden diesmal additiv war,
+# war Glueck, nicht Mechanismus.
+#
+# WARUM EINE KOPIE UND NICHT EIN FRISCHER SEED — gemessen am 2026-08-13, weil
+# die urspruengliche Begruendung ueberprueft gehoerte und sie NICHT mehr traegt:
+#
+#   * Die alte Begruendung war „ein leerer Seed liess drei Tests ins Leere
+#     laufen" (test_color_fx_show_render/test_strict_dimmer_render/
+#     test_capability_live). Nachgestellt ist das heute NICHT reproduzierbar:
+#     die ersten beiden ueberspringen sich ohnehin selbst (ihre Show wird von
+#     tools/build_farb_fx_vc_show.py gebaut und ist nicht committet), der dritte
+#     ist mit frischem Seed genauso gruen. Ueber 68 bibliotheks-nahe Segmente
+#     A/B gefahren: 68 von 68 mit identischem Ergebnis. Wer die Kopie kippen
+#     will, hat also KEINEN roten Test gegen sich — umso wichtiger, dass der
+#     Grund hier steht statt in einer Erinnerung.
+#   * Was bleibt, ist TREUE: ein frischer Seed zeigt der Suite 47
+#     Quelltext-Profile mit eigenen Auto-IDs statt der 1789 der echten
+#     Bibliothek, auf die die committeten shows/*.lshow ihre
+#     fixture_profile_id-Werte beziehen. Die Kopie aendert genau EINE Sache
+#     (wohin Schreibzugriffe gehen); ein Seed aendert, WAS die Tests sehen.
+#   * Und Kosten: `fixture_db.engine()` das erste Mal zu oeffnen kostet mit
+#     Kopie 140 ms (Median aus 7, davon 3,4 ms die 9,6-MiB-Kopie selbst), mit
+#     frischem Seed 699 ms. Ueber die Suite ist der Unterschied im Rauschen
+#     (68 Segmente: 238 s mit Kopie, 227 s mit Seed) — die Kopie ist also
+#     jedenfalls nicht die teurere Variante.
+#   * Die dritte Moeglichkeit, „Migrationen gegen die reale Datei sperren",
+#     ist gemessen die schlechteste: mit gesperrter `migrate_fixtures_db` und
+#     einer Bibliothek, der EINE Modellspalte fehlt, wurden 9 von 20
+#     bibliotheks-nahen Segmenten rot (`no such column: fixture_modes.grid_rows`).
+#     Die Suite haengt dann daran, dass jemand vorher die App startet.
+#
+# XPLAT-04: fixture_db.DB_PATH folgt app_data_dir() (also APPDATA). Der Pfad wird
+# hier aufgeloest, SOLANGE APPDATA noch echt ist (app_data_dir importiert nur
+# os/sys, kein App-State -> sicher vor dem ersten App-Import).
 from src.core.paths import app_data_dir as _app_data_dir  # noqa: E402
-os.environ.setdefault(
-    "LIGHTOS_FIXTURE_DB", os.path.join(_app_data_dir(), "fixtures.db"))
+_ECHTE_FIXTURE_DB = os.path.join(_app_data_dir(), "fixtures.db")
+_FIXTURE_DB_VORGABE = os.environ.get("LIGHTOS_FIXTURE_DB")
+
+
+def _ist_schon_testkopie(pfad: str) -> bool:
+    """Liegt der vorgegebene Pfad bereits in ``_TEST_ROOT``, ist er die Kopie
+    eines ELTERN-pytest (mehrere Tests starten pytest als Kind und vererben die
+    Umgebung). Dann nicht noch einmal kopieren — und vor allem nicht aufraeumen,
+    denn wem die Datei gehoert, der raeumt sie auf (Lehre aus QA-53)."""
+    return os.path.dirname(os.path.realpath(pfad)) == os.path.realpath(_TEST_ROOT)
+
+
+if _FIXTURE_DB_VORGABE and _ist_schon_testkopie(_FIXTURE_DB_VORGABE):
+    _FIXTURE_DB_KOPIE = None
+else:
+    # ⚠️ Auch eine von AUSSEN gesetzte Vorgabe wird kopiert, nicht uebernommen.
+    # Wer sich LIGHTOS_FIXTURE_DB auf seine echte Bibliothek legt (etwa um die
+    # App mit einem anderen Bestand zu starten), haette den Schutz sonst genau
+    # dann abgeschaltet, wenn er am meisten kostet — dieselbe Ueberlegung wie bei
+    # LIGHTOS_UNIVERSES_JSON (CDX-49). Die Vorgabe bestimmt die QUELLE der Kopie,
+    # nicht das Ziel der Schreibzugriffe.
+    _FIXTURE_DB_KOPIE = os.path.join(
+        _TEST_ROOT, f"lightos_test_fixtures_{_TEST_TOKEN}.db")
+    try:
+        shutil.copyfile(_FIXTURE_DB_VORGABE or _ECHTE_FIXTURE_DB, _FIXTURE_DB_KOPIE)
+    except OSError:
+        pass    # noch keine Bibliothek da (frische Installation/CI) ->
+                # fixture_db._seed_if_empty() legt sich eine an, wie bisher auch
+    os.environ["LIGHTOS_FIXTURE_DB"] = _FIXTURE_DB_KOPIE
 
 _TEST_APPDATA = os.path.join(_TEST_ROOT, f"lightos_test_appdata_{_TEST_TOKEN}")
 os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
@@ -202,6 +265,39 @@ def _purge_test_dbs():
             pass
 
 
+def _purge_fixture_db_kopie():
+    """Die PROZESS-EIGENE Kopie der Fixture-Bibliothek loeschen (QA-58).
+
+    Nur die eigene: ein Kindprozess erbt den Pfad der Elternkopie
+    (``_ist_schon_testkopie``) und darf sie dem Elternprozess nicht unter den
+    Fuessen wegziehen — genau der Fehler, der in QA-53 an der Show-DB 95
+    gleichzeitige Prozesse auf EINE Datei gesetzt hat.
+
+    ⚠️ **Was hier NICHT restlos gelingt — gemessen am 2026-08-13, und die Grenze
+    der Messung steht dabei.** Nach einem vollen Gate-Lauf lagen **4 bzw. 7 von
+    604** Segmenten doch wieder unter diesem Pfad (zwei Laeufe, die Zahl
+    schwankt): 20-45 kB gross, mit ABGEBROCHENEM Schema (3 bzw. 7 der 8
+    Tabellen). Reproduzierbar an ``test_bpm_generator.py`` und
+    ``test_media_player.py``. Ein atexit-Spion zeigt, WANN: die Datei ist
+    bereits wieder da, wenn ``pytest.main()`` zurueckkehrt — sie entsteht also
+    zwischen diesem Aufraeumen und dem Sitzungsende, waehrend die Daemon-Threads
+    ``BPM-Beat`` und ``MidiFeedbackEngine`` noch laufen. Einer von ihnen fasst
+    dabei die Fixture-DB an, SQLite legt die geloeschte Datei neu an, und der
+    Prozess stirbt mitten im ``create_all``. **WELCHER der beiden es ist, ist
+    NICHT gemessen** — das gehoert einem eigenen Befund, nicht diesem Item; hier
+    faengt es das 24-h-Aufraeumen unten ab. Nebenbei ist es ein zweites Argument
+    fuer die Kopie: vor QA-58 traf dieser Zugriff die ECHTE Bibliothek — waehrend
+    der Prozess starb.
+    """
+    if not _FIXTURE_DB_KOPIE:
+        return
+    for _suffix in ("", "-wal", "-shm"):
+        try:
+            os.remove(_FIXTURE_DB_KOPIE + _suffix)
+        except OSError:
+            pass
+
+
 def _purge_old_test_crash_logs():
     """Reste frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
 
@@ -229,10 +325,12 @@ def _purge_old_test_crash_logs():
                   os.environ.get("LIGHTOS_SHOW_DB"),
                   os.environ.get("LIGHTOS_SACN_CID"),
                   os.environ.get("LIGHTOS_UNIVERSES_JSON"),
+                  os.environ.get("LIGHTOS_FIXTURE_DB"),
                   _TEST_APPDATA}
         muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
-                  "lightos_test_universes_*.json")
+                  "lightos_test_universes_*.json",
+                  "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):
                 if path in eigene:
@@ -451,6 +549,24 @@ def _stop_background_threads_at_end():
     except Exception:
         pass
     _purge_test_dbs()
+    # QA-58: dieselbe Behandlung fuer die eigene Kopie der Fixture-Bibliothek —
+    # erst die Engine schliessen (Windows-Handle), dann die Datei.
+    #
+    # ⚠️ Auf LINUX ist dieses `dispose()` nachweislich wirkungslos: die Mutation
+    # „Block ersatzlos streichen" liess alle 16 QA-58/QA-54-Tests gruen, weil
+    # POSIX eine offene Datei klaglos entlinkt. Es bleibt trotzdem stehen — als
+    # AEQUIVALENTE Mutante auf dieser Plattform, nicht als toter Code: auf
+    # Windows scheitert `os.remove` an „WinError 32: in use", und dann bliebe pro
+    # Segment eine 9,6-MiB-Leiche liegen. Genau denselben Block gibt es drei
+    # Zeilen darueber fuer die Show-DB, aus demselben Grund.
+    try:
+        _fdb = sys.modules.get("src.core.database.fixture_db")
+        _feng = getattr(_fdb, "_engine", None) if _fdb is not None else None
+        if _feng is not None:
+            _feng.dispose()
+    except Exception:
+        pass
+    _purge_fixture_db_kopie()
     # Das PID-eigene Temp-APPDATA am Suite-Ende best-effort abraeumen (crash.log/
     # stages/... koennen einen offenen Handle halten -> ignore_errors; ein
     # PID-scoped Rest ist harmlos).

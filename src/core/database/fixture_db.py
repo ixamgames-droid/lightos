@@ -9,9 +9,12 @@ from .models import (Manufacturer, FixtureProfile, FixtureMode,
                      create_all_idempotent)
 
 # XPLAT-04: standardmaessig im App-Datenordner (app_data_dir()). Override via
-# LIGHTOS_FIXTURE_DB (analog LIGHTOS_SHOW_DB) — die Test-Suite pinnt darueber die
-# reale, geseedete fixtures.db, obwohl sie APPDATA sonst in ein Temp umlenkt (die
-# committeten shows/*.lshow referenzieren feste fixture_profile_id aus der realen DB).
+# LIGHTOS_FIXTURE_DB (analog LIGHTOS_SHOW_DB) — die Test-Suite zeigt darueber auf
+# eine pro Prozess angelegte KOPIE der realen Bibliothek. Kopie statt Original,
+# weil get_engine() unten migrate_fixtures_db() ruft und damit das SCHEMA der
+# Datei aendert (QA-58); Kopie statt frischem Seed, damit die Suite denselben
+# Bestand und dieselben fixture_profile_id sieht, auf die die committeten
+# shows/*.lshow zeigen. Die Abwaegung steht mit Messwerten in tests/conftest.py.
 DB_PATH = os.environ.get("LIGHTOS_FIXTURE_DB") or os.path.join(app_data_dir(), "fixtures.db")
 
 
