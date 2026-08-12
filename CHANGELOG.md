@@ -29,6 +29,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   bis an die DMX-Kanäle des richtigen Kopfes durchschlägt, prüft die Software
   ab jetzt selbst — vom Dialogfenster über das Gruppen-Raster und den
   Matrix-Effekt bis zum gesendeten Kanal.
+### 2026-08-11 — Sechs Geräte im großen Test-Rig blieben immer dunkel
+
+#### Behoben
+
+- **Die vier Moving Heads und zwei Spider im mitgelieferten Test-Rig wurden nie
+  hell.** Wer das Rig zum Ausprobieren lud, sah sechs tote Geräte und suchte den
+  Fehler in der Software. Zwei Ursachen: der Farbeffekt der Moving Heads konnte
+  an ihnen gar nichts bewirken — sie haben ein Farbrad statt Rot/Grün/Blau — und
+  der Spider-Farbeffekt ließ den Master-Dimmer liegen.
+
+- **Warum es niemandem auffiel:** für dieses Rig lief die Sichtprüfung beim
+  Bauen gar nicht mit. Sie läuft jetzt — und hätte den Fehler sofort gemeldet.
 
 ### 2026-08-11 — Die Show-Prüfung merkt jetzt, wenn ein Gerät dunkel bleibt
 
