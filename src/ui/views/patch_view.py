@@ -447,8 +447,23 @@ class PatchFixtureEditDialog(QDialog):
                 _hinweis.setStyleSheet("color:#8b949e;")
                 form.addRow("", _hinweis)
 
-            # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
-            # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.
+        # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
+        # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.
+        #
+        # ★ FM-HEADLAYOUT-B: Dieser Block stand eine Ebene ZU TIEF — im
+        # `fixture_type == "matrix"`-Zweig darueber. Damit sah ihn nur ein
+        # Pixel-Panel; ein Spider/Mover-Bar/Hydrabeam (fixture_type
+        # „moving_head", aber >= 2 faerbbare Koepfe) bekam die Mehrkopf-Combo
+        # und trotzdem kein Status-/Wiederherstellen-Feld. Ausgerechnet die
+        # Geraete, fuer die FM-HEADLAYOUT die Falle „Kopf-Gruppe versehentlich
+        # geloescht" schliessen wollte, sahen den Ausweg nicht.
+        #
+        # Die richtige Grenze ist `_heads >= 2` — und zwar dieselbe, an der die
+        # Gruppe ueberhaupt entsteht: `create_head_matrix_group` liefert bei
+        # `color_head_count < 2` `None`. Darunter waere „Wiederherstellen" ein
+        # stiller No-Op und „fehlt" eine Behauptung ueber eine Gruppe, die es
+        # fuer dieses Geraet gar nicht geben kann.
+        if _heads >= 2:
             _row = QHBoxLayout()
             _row.setContentsMargins(0, 0, 0, 0)
             self._lbl_head_group = QLabel("")
