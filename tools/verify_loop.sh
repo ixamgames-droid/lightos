@@ -55,8 +55,19 @@ export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 # (`verify_loop.sh tests/test_x.py`) sind kurz und billig; sie zu serialisieren
 # wuerde die Arbeit ausbremsen, ohne das Problem zu loesen.
 #
-# Die Sperrdatei liegt im PROJEKTORDNER, also ausserhalb des Repos — sonst
-# haette jeder Worktree seine eigene und die Sperre waere wirkungslos.
+# Die Sperrdatei haengt am GEMEINSAMEN Git-Verzeichnis (`--git-common-dir`) —
+# das ist fuer jeden Worktree desselben Repos dieselbe Datei, egal wo er liegt.
+#
+# ★ PROC-02b: Vorher wurde sie als „Elternverzeichnis des Worktrees" bestimmt
+# (`cd .. && pwd`). Das stimmt nur, solange alle Worktrees GESCHWISTER von
+# `repo/` sind — die dokumentierte Konvention `~/projects/lightos/wt-<kurz>`.
+# Agenten-Worktrees liegen aber VERSCHACHTELT unter `repo/.claude/worktrees/`
+# und bekamen damit eine eigene Sperrdatei: die Serialisierung griff genau
+# dort nicht, wo tatsaechlich parallel gearbeitet wird. Gemessen am
+# 12.08.2026 — zwei volle Suiten liefen gleichzeitig, 11 WebEngine-Segmente
+# starteten mit noch laufenden Chromium-Kindprozessen, zwei Segmente wurden
+# rot. Eine Sperre, die stillschweigend nicht greift, ist schlimmer als
+# keine: sie laesst das Ergebnis vertrauenswuerdig aussehen.
 # Ohne `flock` (z. B. macOS) laeuft alles wie bisher weiter, nur mit Hinweis:
 # eine fehlende Sperre darf das Gate nicht blockieren.
 _verify_lock() {
@@ -71,7 +82,17 @@ _verify_lock() {
     # die die echte Sperre bereits haelt. Ohne eigene Datei pruefte er sich
     # gegen den eigenen Gate-Lauf und waere immer rot (bzw., schlimmer, gruen
     # aus dem falschen Grund).
-    LOCKFILE="${LIGHTOS_LOCKFILE:-$(cd .. 2>/dev/null && pwd)/.pytest_lock}"
+    if [ -z "${LIGHTOS_LOCKFILE:-}" ]; then
+        # Kein Git (Tarball-Kopie)? Dann wie bisher das Elternverzeichnis.
+        _common="$(git rev-parse --git-common-dir 2>/dev/null)"
+        if [ -n "$_common" ] && [ -d "$_common" ]; then
+            LOCKFILE="$(cd "$_common" && pwd)/.pytest_lock"
+        else
+            LOCKFILE="$(cd .. 2>/dev/null && pwd)/.pytest_lock"
+        fi
+    else
+        LOCKFILE="$LIGHTOS_LOCKFILE"
+    fi
     exec 9>"$LOCKFILE" 2>/dev/null || return 0
     if ! flock -n 9; then
         echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
@@ -116,6 +137,10 @@ fi
 # Zeile „GRUEN - alles bestanden" hier bewusst aus — wer nur den Exit-Code
 # liest, findet in der Ausgabe darueber wenigstens den Grund.
 if [ -n "${LIGHTOS_VERIFY_DRYRUN:-}" ]; then
+    # PROC-02b: Der Sperrpfad ist die einzige Angabe, die von aussen nicht
+    # nachpruefbar waere — ein Test muesste sonst die Shell-Logik nachbauen und
+    # damit seine eigene Kopie pruefen statt das Skript.
+    echo "[verify] Sperrdatei: ${LOCKFILE:-<keine>}"
     echo "[verify] LIGHTOS_VERIFY_DRYRUN - Sperre und Syntax-Check erledigt, KEIN Testlauf."
     echo "[verify] Das ist KEINE bestandene Pruefung."
     exit 0
