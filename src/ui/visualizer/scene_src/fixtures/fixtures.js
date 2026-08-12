@@ -296,8 +296,15 @@ export function addFixture(data) {
   // bei einem Panel im Werkszustand (Schlangenlinien) lief eine horizontale
   // Figur im 3D im Zickzack. Eine Zeile, ein fehlendes Feld — und der ganze
   // FM-13-Fix erreichte die 3D-Seite nie.
+  // ★ VIZ-52: `elementRotation`/`elementFlip` sagen, WIE das Panel haengt —
+  // unabhaengig davon, wie es nummeriert. Ohne die zwei Felder erreichte die
+  // Montage-Orientierung den Renderer nie (die JS-Helfer `placeElement`/
+  // `rotateCell` hatten gar keinen Aufrufer), und ein gedreht montiertes Panel
+  // sah aus wie ein normal montiertes.
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
-                                           pixelBar, pixelOrder: data.pixelOrder });
+                                           pixelBar, pixelOrder: data.pixelOrder,
+                                           elementRotation: data.elementRotation,
+                                           elementFlip: data.elementFlip });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
@@ -400,7 +407,11 @@ export function addFixture(data) {
   root.add(label);
 
   // 2D top-down icon (3c-1: nHeads fuer die Einzel-Zellen der Bar-Icons)
-  const icon = buildTopDownIcon(rtype, data.nHeads, data.pixelOrder);
+  // VIZ-52: die Orientierung MUSS auch hier mit — sonst zeigte das 2D-Icon
+  // dasselbe Panel ungedreht, waehrend das 3D-Modell gedreht steht (genau die
+  // 2D/3D-Abweichung, die VIZ-51 fuer die Reihenfolge beseitigt hat).
+  const icon = buildTopDownIcon(rtype, data.nHeads, data.pixelOrder,
+                                data.elementRotation, data.elementFlip);
   icon.position.set(root.position.x, 0.05, root.position.z);
   // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
   // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-

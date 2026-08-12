@@ -176,7 +176,10 @@ class PythonUndJsSindDieselbeRegelTest(unittest.TestCase):
         basis = os.path.dirname(JS_MODUL)
         for datei in ("builders.js", "topdown_icons.js"):
             quelle = open(os.path.join(basis, datei), encoding="utf-8").read()
-            self.assertIn("pixelCell(", quelle, datei)
+            # VIZ-52: beide gehen jetzt ueber `placeElement`, das intern
+            # `pixelCell` aufruft und die Montage-Orientierung dazunimmt — die
+            # Zelle rechnet weiterhin genau EINE Stelle aus.
+            self.assertIn("placeElement(", quelle, datei)
             self.assertNotIn("const r = Math.floor(i / cols), c = i % cols;",
                              quelle, f"{datei} rechnet die Zelle noch selbst aus")
 

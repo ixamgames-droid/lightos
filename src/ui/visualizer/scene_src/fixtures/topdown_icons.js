@@ -7,7 +7,7 @@
 // View) und EIN zentrales Tinting (tintTopDownIcon) statt vier Duplikat-
 // Bloecken in fixtures.js.
 import * as THREE from '../three/three.js';
-import { pixelCell, panelGrid } from './pixel_order.js';
+import { placeElement, panelGrid } from './pixel_order.js';
 
 // Fuell-Farbe unbelichteter Icons (vorher 0x3a3a4a auf 0x282828-Boden).
 export const ICON_UNLIT_FILL = 0x4a4e5e;
@@ -87,9 +87,16 @@ function addBarCells(group, n, barW) {
 // FM-13: rows*cols kleine Quadrate als Raster (near-square aus n) — als
 // userData.cells registriert -> tintTopDownIcon faerbt pro Pixel (heads[i],
 // Zeilen-Haupt, deckungsgleich mit buildMatrixPanel/updateMatrixPanelDmx).
-function addGridCells(group, n, size, pixelOrder) {
+function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip) {
   // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
-  const { count, cols, rows } = panelGrid(n);
+  const { count, cols: srcCols, rows: srcRows } = panelGrid(n);
+  // VIZ-52: wie im 3D-Panel — erst nummerieren, dann haengen. Die gedrehte
+  // Rasterform kommt aus `placeElement` mit, statt hier nachgerechnet zu werden.
+  const plaetze = [];
+  for (let i = 0; i < count; i++)
+    plaetze.push(placeElement(i, srcCols, srcRows, pixelOrder,
+                              elementRotation, elementFlip));
+  const rows = plaetze[0].rows, cols = plaetze[0].cols;
   const cells = [];
   const inner = size - 0.18;
   const gw = inner / cols, gh = inner / rows;
@@ -99,7 +106,7 @@ function addGridCells(group, n, size, pixelOrder) {
   for (let i = 0; i < count; i++) {
     // FM-13: dieselbe Quelle wie das 3D-Panel — sonst zeigen 2D und 3D
     // verschiedene Pixel-Positionen fuer denselben DMX-Kanal.
-    const { r, c } = pixelCell(i, cols, pixelOrder);
+    const { r, c } = plaetze[i];
     const cell = mkFill(new THREE.PlaneGeometry(cw, ch));
     cell.position.set(x0 + c * gw, 0.055, z0 + r * gh);
     group.add(cell);
@@ -108,7 +115,8 @@ function addGridCells(group, n, size, pixelOrder) {
   return cells;
 }
 
-export function buildTopDownIcon(type, nHeads, pixelOrder) {
+export function buildTopDownIcon(type, nHeads, pixelOrder,
+                                 elementRotation, elementFlip) {
   const group = new THREE.Group();
   let body, ring, cells = null;
   // Bar-artige Typen brauchen einen groesseren Selektionsring (die 1.6 m
@@ -153,7 +161,8 @@ export function buildTopDownIcon(type, nHeads, pixelOrder) {
     body = mkFill(new THREE.PlaneGeometry(S, S), BAR_BODY_FILL);
     group.add(body);
     group.add(mkOutline(new THREE.PlaneGeometry(S, S)));
-    cells = addGridCells(group, nHeads, S, pixelOrder);
+    cells = addGridCells(group, nHeads, S, pixelOrder,
+                         elementRotation, elementFlip);
     ringRadii = [0.98, 1.08];
   } else if (type === 'spider') {
     // zwei kurze parallele Bars (Top-Down); jede Bar ist eine Zelle ->

@@ -1029,6 +1029,196 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertEqual(8, spalten, "erwartet ceil(sqrt(50)) = 8 Spalten")
         self.assertEqual(7, zeilen, "erwartet ceil(50/8) = 7 Zeilen")
 
+    # ── VIZ-52: wie das Panel HAENGT ────────────────────────────────────────
+    #
+    # `pixelOrder` (VIZ-51) beantwortet, wie das Geraet NUMMERIERT. Die davon
+    # unabhaengige Frage — waagerecht oder hochkant, kopfueber, gespiegelt
+    # montiert — erreichte den Renderer ueberhaupt nicht: die JS-Helfer
+    # `placeElement`/`rotateCell` hatten in `src/` keinen einzigen Aufrufer und
+    # die Nutzlast trug die Felder nicht. Ein gedreht montiertes Panel sah im
+    # Visualizer aus wie ein normal montiertes.
+    #
+    # ★ Bewusst 50 Pixel: ceil(sqrt(50)) = 8 Spalten, ceil(50/8) = 7 Zeilen —
+    # ein NICHT quadratisches Raster. Bei 64 waere der Rollentausch von Zeilen
+    # und Spalten bei 90°/270° unsichtbar geblieben.
+
+    def _panel_bauen(self, fid, drehung=None, spiegel=None,
+                     reihenfolge="rowwise", pixel=50):
+        """Schickt ein Matrix-Panel durch die ECHTE Bridge und liefert einen
+        JS-Abfrager auf das gebaute Fixture zurueck.
+
+        ``drehung``/``spiegel`` auf ``None`` lassen die Felder GANZ weg — genau
+        so sah die Nutzlast aus, bevor es die Orientierung gab (Alt-Show)."""
+        import json
+        eintrag = {"fid": fid, "type": "matrix", "nHeads": pixel,
+                   "x": 0, "y": 3, "z": 0, "pixelOrder": reihenfolge,
+                   "r": 0, "g": 0, "b": 0, "intensity": 0}
+        if drehung is not None:
+            eintrag["elementRotation"] = drehung
+        if spiegel is not None:
+            eintrag["elementFlip"] = spiegel
+        payload = json.dumps([eintrag])
+        gebaut = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(payload),
+            f"(function(){{const f=window.__lightos.fixtures['{fid}'];"
+            f" return !!(f && f.pixels && f.pixels.length==={pixel}"
+            f"          && f.icon && f.icon.userData.cells);}})()",
+            timeout_s=6.0)
+        self.assertTrue(gebaut, f"Panel {fid} wurde nicht gebaut")
+
+        def _js(ausdruck):
+            # Einzelwerte statt Array: eine Liste kommt ueber die Bridge nicht
+            # zuverlaessig zurueck (die Falle aus VIZ-51).
+            return self._eval(
+                f"(function(){{const f=window.__lightos.fixtures['{fid}'];"
+                f" return {ausdruck};}})()")
+        return _js
+
+    @staticmethod
+    def _raster(js):
+        """Sichtbare Rasterform aus den WIRKLICH gebauten Pixeln."""
+        return (js("Math.max.apply(null, f.pixels.map(function(p)"
+                   "{return p.r;}))+1"),
+                js("Math.max.apply(null, f.pixels.map(function(p)"
+                   "{return p.c;}))+1"))
+
+    def test_element_rotation_dreht_das_3d_panel(self):
+        """★★ VIZ-52: ein um 90° gedreht montiertes Panel steht im 3D gedreht.
+
+        Vorher kam die Montage-Drehung nie an — dasselbe Panel stand im
+        Visualizer geradeaus, waehrend die Figur am echten Geraet quer lief.
+
+        Geprueft wird die Rasterposition am gebauten Modell, nicht der
+        Quelltext: Pixel 1 sitzt ungedreht in Zeile 0 / Spalte 1 (rechts neben
+        Pixel 0). Nach 90° im Uhrzeigersinn wird aus der obersten ZEILE die
+        rechte SPALTE — Pixel 1 gehoert dann in Zeile 1 / Spalte 6. Und das
+        Raster selbst kippt von 7x8 auf 8x7.
+        """
+        self._load_and_wait()
+        gerade = self._panel_bauen(831, drehung=0)
+        quer = self._panel_bauen(832, drehung=90)
+
+        self.assertEqual((0, 1), (gerade("f.pixels[1].r"), gerade("f.pixels[1].c")),
+                         "ungedreht gehoert Pixel 1 in Zeile 0 / Spalte 1")
+        self.assertEqual((1, 6), (quer("f.pixels[1].r"), quer("f.pixels[1].c")),
+                         "bei 90° gehoert Pixel 1 in Zeile 1 / Spalte 6. Kommt "
+                         "hier (0,1) an, hat das Panel `elementRotation` gar "
+                         "nicht gesehen (VIZ-52).")
+        self.assertEqual((7, 8), self._raster(gerade),
+                         "ungedreht: 7 Zeilen x 8 Spalten")
+        self.assertEqual((8, 7), self._raster(quer),
+                         "bei 90° tauschen Zeilen und Spalten die Rollen — "
+                         "aus 7x8 wird 8x7")
+
+        # Und zwar in der GEOMETRIE, nicht nur in den Buchfuehrungs-Feldern:
+        # Pixel 1 wandert von der linken Panel-Haelfte auf die rechte.
+        x_gerade = gerade("f.pixels[1].mesh.position.x")
+        x_quer = quer("f.pixels[1].mesh.position.x")
+        self.assertLess(x_gerade, 0.0,
+                        "ungedreht sitzt Pixel 1 links der Panel-Mitte")
+        self.assertGreater(x_quer, 0.0,
+                           "gedreht sitzt Pixel 1 rechts der Panel-Mitte — die "
+                           "Drehung muss im Mesh ankommen, nicht nur im r/c-Feld")
+
+        # ★ Und die Zellen-Geometrie muss der GEDREHTEN Rasterform folgen: wer
+        # die Positionen dreht, aber weiter mit 7 Zeilen rechnet, schiebt die
+        # achte Zeile unten aus dem Panel heraus. Sichtbares Merkmal dafuer:
+        # das Pixelraster sitzt dann nicht mehr mittig auf der Kachel.
+        for name, js in (("ungedreht", gerade), ("gedreht", quer)):
+            for achse in ("x", "y"):
+                summe = js(
+                    "(function(a){return Math.max.apply(null,a)"
+                    "+Math.min.apply(null,a);})(f.pixels.map(function(p)"
+                    "{return p.mesh.position." + achse + ";}))")
+                self.assertAlmostEqual(
+                    0.0, summe, places=6,
+                    msg=f"{name}: das Pixelraster sitzt auf der {achse}-Achse "
+                        f"nicht mittig — die Zellengroesse passt nicht zur "
+                        f"gedrehten Rasterform")
+
+    def test_element_flip_spiegelt_das_3d_panel(self):
+        """VIZ-52: das zweite Feld — Panel um die Hochachse verbaut.
+
+        Spiegeln ist NICHT dasselbe wie Drehen (180° kehrt Zeile UND Spalte um,
+        `elementFlip` nur die Spalte); beide Felder brauchen deshalb ihren
+        eigenen Beleg, dass sie durch die Nutzlast wirken.
+        """
+        self._load_and_wait()
+        normal = self._panel_bauen(833, spiegel=False)
+        gespiegelt = self._panel_bauen(834, spiegel=True)
+
+        self.assertEqual((0, 1),
+                         (normal("f.pixels[1].r"), normal("f.pixels[1].c")))
+        self.assertEqual((0, 6),
+                         (gespiegelt("f.pixels[1].r"), gespiegelt("f.pixels[1].c")),
+                         "gespiegelt zaehlt die Zeile von rechts: Pixel 1 "
+                         "gehoert bei 8 Spalten in Spalte 6")
+        self.assertEqual((7, 8), self._raster(gespiegelt),
+                         "Spiegeln aendert die Rasterform NICHT")
+
+    def test_ohne_orientierung_rendert_das_panel_unveraendert(self):
+        """★ Positivkontrolle: ein normal montiertes Panel darf sich durch
+        VIZ-52 NICHT veraendern.
+
+        Ein Weg, der alles verdreht, waere so wertlos wie einer, der nichts
+        durchreicht. Geprueft werden beide Bestandsfaelle nebeneinander: eine
+        Alt-Nutzlast, die die zwei Felder GAR NICHT kennt, und eine, die
+        ausdruecklich 0/false schickt. Beide muessen exakt das VIZ-51-Ergebnis
+        liefern — Schlangenlinien wirken weiter, das Raster bleibt 7x8.
+        """
+        self._load_and_wait()
+        ohne_felder = self._panel_bauen(835, reihenfolge="serpentine")
+        ausdruecklich_null = self._panel_bauen(836, drehung=0, spiegel=False,
+                                               reihenfolge="serpentine")
+
+        for name, js in (("Alt-Nutzlast ohne die Felder", ohne_felder),
+                         ("Nutzlast mit 0/false", ausdruecklich_null)):
+            self.assertEqual(
+                (1, 7), (js("f.pixels[8].r"), js("f.pixels[8].c")),
+                f"{name}: im Schlangenmuster gehoert DMX-Index 8 in Zeile 1 / "
+                f"Spalte 7 — die Reihenfolge muss durch den neuen Weg "
+                f"unveraendert wirken (VIZ-51)")
+            self.assertEqual((7, 8), self._raster(js),
+                             f"{name}: das Raster muss 7 Zeilen x 8 Spalten "
+                             f"bleiben")
+
+    def test_2d_icon_dreht_mit_dem_3d_panel(self):
+        """★ VIZ-52: die Orientierung muss BEIDE Ansichten erreichen.
+
+        VIZ-51 hat beseitigt, dass dasselbe Geraet in 2D und 3D unterschiedlich
+        dasteht. Haette nur das 3D-Modell die Drehung bekommen, waere genau
+        diese Abweichung zurueck — nur andersherum.
+
+        Gemessen wird an den gebauten Zellen: bei 90° hat das Panel 8 Zeilen und
+        7 Spalten, also muss auch das 2D-Icon 8 verschiedene Tiefen- und 7
+        verschiedene Seiten-Positionen belegen.
+        """
+        self._load_and_wait()
+        quer = self._panel_bauen(837, drehung=90)
+
+        self.assertEqual((8, 7), self._raster(quer), "3D-Panel bei 90°: 8x7")
+        # Ganzzahlig gerundet, damit Fliesskomma-Rauschen keine Scheinspalten
+        # erzeugt; Set.size ist eine ZAHL und kommt ueber die Bridge sauber an.
+        spalten2d = quer("new Set(f.icon.userData.cells.map(function(m)"
+                         "{return Math.round(m.position.x*1e4);})).size")
+        zeilen2d = quer("new Set(f.icon.userData.cells.map(function(m)"
+                        "{return Math.round(m.position.z*1e4);})).size")
+        self.assertEqual(7, spalten2d,
+                         "2D-Icon zeigt bei 90° nicht 7 Spalten — es steht dann "
+                         "ungedreht, waehrend das 3D-Modell gedreht ist")
+        self.assertEqual(8, zeilen2d, "2D-Icon zeigt bei 90° nicht 8 Zeilen")
+        # Wie beim 3D-Panel: die Zellengroesse muss der gedrehten Form folgen,
+        # sonst rutscht das Raster aus der Icon-Mitte (und unten heraus).
+        for achse in ("x", "z"):
+            summe = quer("(function(a){return Math.max.apply(null,a)"
+                         "+Math.min.apply(null,a);})("
+                         "f.icon.userData.cells.map(function(m)"
+                         "{return m.position." + achse + ";}))")
+            self.assertAlmostEqual(
+                0.0, summe, places=6,
+                msg=f"2D-Icon: das Raster sitzt auf der {achse}-Achse nicht "
+                    f"mittig — die Zellengroesse passt nicht zur gedrehten Form")
+
     def test_multihead_beams_resync_on_showcones_and_view_switch(self):
         """A3D-05 + A3D-24: Multi-Head-Pro-Kopf-Kegel folgen showCones-Toggle
         UND 2D<->3D-Wechsel SOFORT.
