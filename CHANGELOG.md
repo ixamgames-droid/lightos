@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Lauflichter auf einem LED-Panel gehen jetzt ohne Skript
+
+#### Neu
+
+- **„Raster aus Gerät" — ein Panel in zwei Klicks statt in 48 Zieh-Vorgängen.**
+  Ein LED-Balken oder eine Matrix mit vielen einzeln färbbaren Zonen lässt sich
+  im Effekt-Bereich direkt als Raster übernehmen: Gerät auswählen, Spaltenzahl
+  bestätigen, fertig. Bisher führte der einzige Weg über die Gruppen-Ansicht —
+  Raster vergrößern, Gerät suchen, aufteilen, zurückwechseln. Wie das Gerät ab
+  Werk zählt (manche laufen in Schlangenlinien) und wie es hängt (hochkant,
+  über Kopf, gespiegelt) wird dabei mitgerechnet, so wie es im Patch steht.
+  Bleibt die letzte Zeile angebrochen, ist sie sichtbar leer statt still
+  aufgefüllt.
+
+- **Muster-Assistent für Lauflichter.** Richtung wählen (Spalte für Spalte,
+  Reihe für Reihe oder diagonal), wie breit der Balken sein soll, Farbe und
+  Tempo — daraus entsteht ein fertiges Lauflicht, das man sofort starten kann.
+  Eine Vorschau im Dialog zeigt vorher, wie es läuft. Der Unterschied zu den
+  vorhandenen Flächen-Effekten ist die harte Kante: die laufen mit eigenem
+  Tempo über die Fläche und zeigen einen Verlauf, hier leuchtet in jedem
+  Schritt genau eine Spalte (oder zwei, wenn man das so einstellt).
+
+- **Das Gerät wird dabei auch wirklich hell.** Die erzeugten Lauflichter ziehen
+  den Haupt-Dimmer des Geräts mit hoch — auch den gemeinsamen Dimmer bei
+  Geräten, bei denen jeder Kopf zusätzlich seinen eigenen hat. Ohne den blieb
+  so ein Gerät stockdunkel, obwohl jede Farbe korrekt gesetzt war. Weiße
+  Zusatz-Segmente laufen bewusst nicht mit, und Zellen, die im aktuellen
+  Schritt dunkel sind, bleiben unangetastet — ein Grundlicht darunter wird
+  also nicht ausgeknipst.
+
+- Die fertigen Lauflichter stehen sofort im Funktionsbaum und lassen sich wie
+  gewohnt auf einen Taster der Virtuellen Konsole ziehen. Die vielen Einzel-
+  schritte, aus denen so ein Lauflicht besteht, liegen dabei aufgeräumt in
+  einem eigenen Ordner — in der Liste steht nur das Lauflicht selbst.
+
 ### 2026-08-12 — Die Prüfung des Effekt-Assistenten bedient ihn jetzt selbst
 
 An der Software ändert sich dadurch nichts — wohl aber daran, wie viel eine
