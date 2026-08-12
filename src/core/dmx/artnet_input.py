@@ -41,10 +41,12 @@ class ArtNetReceiver:
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            # XPLAT-03: Auf Linux teilt SO_REUSEADDR den Port NICHT (anders als
-            # Windows) -> ohne SO_REUSEPORT wirft bind() "Address already in use",
-            # sobald eine 2. Art-Net-App (QLC+, anderes Tool) schon auf 6454 lauscht,
-            # und der Input bleibt still. Wie der sACN-Input (sacn_input.py) angleichen.
+            # XPLAT-03: BEIDE Optionen, weil Linux den Port nur teilt, wenn beide
+            # Seiten DIESELBE gesetzt haben (gemessen in test_artnet_reuseport.py,
+            # Tabelle im Modulkopf). Mit nur einer bleibt der Input still, sobald
+            # die 2. Art-Net-App (QLC+, anderes Tool) auf 6454 sich fuer die andere
+            # entschieden hat -- und das faellt nicht als Fehler auf, sondern als
+            # Stille. Wie der sACN-Input (sacn_input.py).
             try:
                 self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
