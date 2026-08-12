@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-12 — Der Knopf „Kopf-Gruppe wiederherstellen" ist jetzt auch am Spider da
+
+#### Behoben
+
+- **Mehrkopf-Geräte zeigen im Patch-Dialog wieder den Weg zurück zu ihrer
+  Kopf-Gruppe.** Wenn beim Patchen eines Spiders, einer Moving-Bar oder eines
+  Hydrabeam automatisch die Gruppe „… · Köpfe" entsteht und man sie später
+  versehentlich löscht, gab es bisher nur einen Ausweg: das Gerät neu patchen.
+  Die Zeile „Kopf-Matrix-Gruppe: [Status] [Wiederherstellen]", die genau dafür
+  gedacht ist, war nämlich nur bei Pixel-Panels zu sehen — ausgerechnet die
+  Geräte, für die sie gebaut wurde, bekamen sie nie. Jetzt erscheint sie bei
+  jedem Gerät mit mindestens zwei einzeln färbbaren Köpfen. Der Status sagt, ob
+  die Gruppe da ist, fehlt oder von einer anderen Gruppe abgedeckt wird; der
+  Knopf legt sie sofort wieder an, ohne Adressen anzufassen und ohne Duplikat.
+
+- Umgekehrt verschwindet die Zeile bei Panels, die zwar als Matrix gepatcht
+  sind, aber nur eine einzige färbbare Fläche haben. Dort meldete sie dauerhaft
+  „fehlt" und der Knopf tat nichts — für so ein Gerät gibt es gar keine
+  Kopf-Gruppe.
+
 ### 2026-08-11 — Lauflichter auf einem LED-Panel gehen jetzt ohne Skript
 
 #### Neu
