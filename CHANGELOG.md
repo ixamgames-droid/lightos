@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-12 — Reparatur: Konfliktmarker in der Aufgabenliste
+
+#### Behoben
+
+- In `BACKLOG.md` waren beim Zusammenführen zweier parallel bearbeiteter
+  Einträge drei Merge-Marker stehengeblieben. Sie sind entfernt; kein Inhalt
+  ging verloren.
+
+- **Ein neuer Test verhindert die Wiederholung.** Bemerkenswert daran: der
+  fehlerhafte Stand hat Review, volles Testgate und CI **grün** passiert —
+  keine der bestehenden Prüfungen sucht nach solchen Markern. Gefunden hat es
+  eine unabhängige Gegenprüfung.
+
 ### 2026-08-11 — Ein gedreht montiertes Panel steht im Visualizer jetzt auch gedreht
 
 #### Behoben
