@@ -384,12 +384,24 @@ class PatchFixtureEditDialog(QDialog):
                 getattr(self._fixture, "element_rotation", 0))
             _ir = self._combo_rotation.findData(_cur_rot)
             self._combo_rotation.setCurrentIndex(_ir if _ir >= 0 else 0)
+            # ★ VIZ-52-TOOLTIP: Hier stand „im 3D sieht es richtig aus, am Rig
+            # nicht". Das war richtig, solange die Montage-Drehung den Renderer
+            # gar nicht erreichte — seit VIZ-52 kippt das Pixelraster in der
+            # Vorschau mit. Eine veraltete Erklaerung ist schlimmer als keine:
+            # sie schickt die Fehlersuche in die falsche Richtung („die
+            # Vorschau luegt sowieso"), obwohl die Vorschau seither genau die
+            # Stelle ist, an der man eine falsche Angabe sieht.
+            # Nachgemessen wird die Aussage am gebauten 3D-Modell, nicht am
+            # Wortlaut: tests/test_viz52_tooltip_montage_drehung.py.
             self._combo_rotation.setToolTip(
                 "Wie das Panel MONTIERT ist — unabhaengig davon, wie es NUMMERIERT\n"
                 "(das sagt die Zeile darueber).\n\n"
                 "Dasselbe Panel haengt mal waagerecht, mal hochkant. Ohne diese\n"
                 "Angabe laeuft ein waagerechtes Lauflicht am hochkant montierten\n"
-                "Geraet senkrecht — im 3D sieht es richtig aus, am Rig nicht.\n\n"
+                "Geraet senkrecht.\n\n"
+                "Die 3D-Vorschau zeigt die Montage mit: auf 90 Grad gestellt,\n"
+                "kippt dort das Pixelraster mit und das Lauflicht laeuft quer.\n"
+                "Eine falsche Angabe sieht man damit schon in der Vorschau.\n\n"
                 "180 Grad ist der Fall „kopfueber montiert\" und war mit der\n"
                 "Pixel-Reihenfolge allein gar nicht ausdrueckbar: die spiegelt\n"
                 "nur Spalten, nie Zeilen.\n\n"

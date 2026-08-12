@@ -42,6 +42,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   schritte, aus denen so ein Lauflicht besteht, liegen dabei aufgeräumt in
   einem eigenen Ordner — in der Liste steht nur das Lauflicht selbst.
 
+### 2026-08-12 — Der Hinweis zur Montage-Drehung stimmt wieder
+
+#### Behoben
+
+- **Die Erklärung zur „Montage-Drehung" im Patch-Dialog sagte das Gegenteil
+  dessen, was das Programm heute tut.** Dort stand, ein hochkant montiertes
+  Panel sehe „im 3D richtig aus, am Rig nicht" — das galt, solange die
+  3D-Vorschau die Montage gar nicht kannte. Inzwischen kennt sie sie: stellt
+  man 90 Grad ein, kippt das Pixelraster in der Vorschau mit und das Lauflicht
+  läuft dort quer. Wer dem alten Satz glaubte, hielt die Vorschau für
+  unbrauchbar und suchte den Fehler woanders — dabei ist sie genau die Stelle,
+  an der eine falsche Montage-Angabe jetzt auffällt, bevor man auf der Leiter
+  steht. Der Text beschreibt das nun so.
+
 ### 2026-08-12 — Die Prüfung des Effekt-Assistenten bedient ihn jetzt selbst
 
 An der Software ändert sich dadurch nichts — wohl aber daran, wie viel eine
