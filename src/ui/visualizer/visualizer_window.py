@@ -16,7 +16,8 @@ import os
 import time
 import weakref
 from src.core.paths import app_data_dir, crash_log_path
-from src.core.pixel_order import normalize_pixel_order
+from src.core.pixel_order import (normalize_element_rotation,
+                                  normalize_pixel_order)
 from typing import Optional
 
 from PySide6.QtWidgets import (
@@ -1901,6 +1902,14 @@ class VisualizerBridge(QObject):
             # (Schlangenlinien) eine horizontale Figur als Zickzack.
             "pixelOrder": normalize_pixel_order(
                 getattr(f, "pixel_order", "rowwise")),
+            # ★ VIZ-52: WIE das Panel haengt — eine von `pixelOrder` unabhaengige
+            # Aussage (ein Panel kann in Schlangenlinien zaehlen UND hochkant
+            # montiert sein). Ohne diese zwei Felder sah ein um 90° gedreht
+            # montiertes Panel im Visualizer aus wie ein normal montiertes: die
+            # Figur lief dort geradeaus, am echten Geraet quer.
+            "elementRotation": normalize_element_rotation(
+                getattr(f, "element_rotation", 0)),
+            "elementFlip": bool(getattr(f, "element_flip", False)),
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],

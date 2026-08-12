@@ -42,6 +42,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   schritte, aus denen so ein Lauflicht besteht, liegen dabei aufgeräumt in
   einem eigenen Ordner — in der Liste steht nur das Lauflicht selbst.
 
+### 2026-08-12 — Reparatur: Konfliktmarker in der Aufgabenliste
+
+#### Behoben
+
+- In `BACKLOG.md` waren beim Zusammenführen zweier parallel bearbeiteter
+  Einträge drei Merge-Marker stehengeblieben. Sie sind entfernt; kein Inhalt
+  ging verloren.
+
+- **Ein neuer Test verhindert die Wiederholung.** Bemerkenswert daran: der
+  fehlerhafte Stand hat Review, volles Testgate und CI **grün** passiert —
+  keine der bestehenden Prüfungen sucht nach solchen Markern. Gefunden hat es
+  eine unabhängige Gegenprüfung.
+
+### 2026-08-11 — Ein gedreht montiertes Panel steht im Visualizer jetzt auch gedreht
+
+#### Behoben
+
+- **Wie ein Matrix-Panel montiert ist, hat der Visualizer bisher ignoriert.**
+  Man konnte am Gerät einstellen, dass es hochkant, kopfüber oder gespiegelt
+  hängt — die Bühnenansicht zeigte es trotzdem so, als hinge es ganz normal.
+  Eine waagerechte Lauflicht-Figur lief auf dem Bildschirm quer über das Panel,
+  während sie am echten Gerät von oben nach unten lief. Beim Programmieren nach
+  Bildschirm hieß das: es sah richtig aus und war falsch.
+
+- Jetzt kippt das Panel in beiden Ansichten mit: bei 90° oder 270° tauschen
+  Zeilen und Spalten auch die Rollen, aus einem breiten Panel wird ein hohes.
+  **Draufsicht und 3D zeigen dabei dasselbe** — die beiden Ansichten dürfen bei
+  einem Panel nicht auseinandergehen.
+
+- Ein normal montiertes Panel ändert sich dadurch nicht, und alte Shows, die
+  die Einstellung noch gar nicht kennen, bleiben unverändert.
 ### 2026-08-11 — Sechs Geräte im großen Test-Rig blieben immer dunkel
 
 #### Behoben
