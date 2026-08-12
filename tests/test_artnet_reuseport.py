@@ -1,14 +1,36 @@
-"""XPLAT-03 — Art-Net-Input setzt SO_REUSEPORT (Linux-Port-Sharing).
+"""XPLAT-03 — Art-Net-Input setzt SO_REUSEADDR **und** SO_REUSEPORT.
 
-Auf Linux teilt ``SO_REUSEADDR`` den UDP-Port NICHT (anders als Windows) → ohne
-``SO_REUSEPORT`` wirft ``bind()`` "Address already in use", sobald eine 2. Art-Net-
-App (QLC+ …) schon auf 6454 lauscht, und der Input bleibt still. Der sACN-Input
-macht es bereits richtig; hier wird Art-Net angeglichen. Plattform-unabhängig über
-einen Fake-Socket getestet (echte Constants gibt es auf Windows nicht).
+Damit zwei Programme denselben UDP-Port teilen koennen, muessen auf Linux
+**beide Seiten** eine passende Option setzen — und zwar dieselbe. Das ist der
+Punkt, den die fruehere Fassung dieses Kommentars falsch hatte: sie behauptete,
+`SO_REUSEADDR` teile den Port auf Linux gar nicht. Gemessen (Unicast-Loopback,
+zweiter `bind()` auf denselben Port, `KernelPortSharingTest` unten):
+
+| fremde App | LightOS | zweiter `bind()` |
+|---|---|---|
+| ohne Option | egal | **scheitert** — dann geht es prinzipiell nicht |
+| `SO_REUSEADDR` | `SO_REUSEADDR` | gelingt |
+| `SO_REUSEADDR` | nur `SO_REUSEPORT` | **scheitert** |
+| `SO_REUSEPORT` | nur `SO_REUSEADDR` | **scheitert** |
+| `SO_REUSEPORT` | `SO_REUSEPORT` | gelingt |
+| beliebige Option | **beide** | gelingt |
+
+Daraus folgt die eigentliche Begruendung fuer den Code: **beide Optionen zu
+setzen ist die einzige Wahl, die gegen JEDE fremde Konfiguration haelt.** Mit
+nur einer der beiden bleibt der Input still, sobald die andere App sich fuer
+die jeweils andere entschieden hat (QLC+ … auf 6454) — und das faellt nicht als
+Fehler auf, sondern als Stille.
+
+Der sACN-Input macht es bereits so; hier wird Art-Net angeglichen. Die
+Verdrahtung selbst ist plattform-unabhaengig ueber einen Fake-Socket geprueft
+(echte Constants gibt es auf Windows nicht); die Tabelle oben misst echtes
+Kernel-Verhalten und laeuft nur auf Linux.
 """
 from __future__ import annotations
 import socket as _socket
+import sys
 import time
+import unittest
 
 import src.core.dmx.artnet_input as artnet_input
 
@@ -98,3 +120,76 @@ def test_reuseport_applied_before_bind(monkeypatch):
         assert opt_idxs and max(opt_idxs) < bind_idx     # alle Optionen vor bind
     finally:
         inp.stop()
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# XPLAT-03-DOC: die Tabelle im Modulkopf — gemessen statt behauptet
+# ════════════════════════════════════════════════════════════════════════════
+
+class KernelPortSharingTest(unittest.TestCase):
+    """Charakterisiert das Kernel-Verhalten, auf dem `_open_socket` beruht.
+
+    Das ist ausdruecklich **kein** Test unseres Codes, sondern der Beleg fuer
+    seine Begruendung: er wird rot, wenn Linux seine Regeln aendert — und genau
+    dann muesste der Kommentar im Modulkopf neu geschrieben werden. Ohne diesen
+    Test bliebe dort eine Behauptung stehen, die schon einmal falsch war.
+
+    Bindet auf einem vom Kernel vergebenen Port (`bind(..., 0)`), nicht auf
+    6454: ein fester Port waere genau der Fehler, den QA-57 aufgedeckt hat —
+    parallele Segmente wuerden sich den Endpunkt streitig machen.
+    """
+
+    def _zweiter_bind_gelingt(self, opts_a, opts_b) -> bool:
+        a = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        self.addCleanup(a.close)
+        for o in opts_a:
+            a.setsockopt(_socket.SOL_SOCKET, o, 1)
+        try:
+            a.bind(("127.0.0.1", 0))
+        except OSError as e:
+            self.skipTest(f"kein UDP-Loopback in dieser Umgebung ({e})")
+        port = a.getsockname()[1]
+        b = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        self.addCleanup(b.close)
+        for o in opts_b:
+            b.setsockopt(_socket.SOL_SOCKET, o, 1)
+        try:
+            b.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
+
+    def setUp(self):
+        if not sys.platform.startswith("linux"):
+            self.skipTest("misst Linux-Kernel-Verhalten")
+        self.RA = _socket.SO_REUSEADDR
+        self.RP = _socket.SO_REUSEPORT      # auf Windows nicht vorhanden
+
+    def test_ohne_option_scheitert_der_zweite_bind(self):
+        """POSITIVKONTROLLE der Messmethode: ohne Option MUSS es scheitern.
+
+        Fehlt diese Probe, koennte `_zweiter_bind_gelingt` immer True liefern
+        (z.B. weil der Port in Wahrheit gar nicht belegt war) und alle uebrigen
+        Faelle bestuenden, ohne etwas zu unterscheiden."""
+        self.assertFalse(self._zweiter_bind_gelingt([], []))
+
+    def test_dieselbe_option_auf_beiden_seiten_teilt_den_port(self):
+        self.assertTrue(self._zweiter_bind_gelingt([self.RA], [self.RA]),
+                        "SO_REUSEADDR teilt den UDP-Port sehr wohl — die alte "
+                        "Fassung des Modulkopfs behauptete das Gegenteil")
+        self.assertTrue(self._zweiter_bind_gelingt([self.RP], [self.RP]))
+
+    def test_gemischte_optionen_teilen_den_port_nicht(self):
+        """Der Fall, der den Input still bleiben laesst."""
+        self.assertFalse(self._zweiter_bind_gelingt([self.RA], [self.RP]))
+        self.assertFalse(self._zweiter_bind_gelingt([self.RP], [self.RA]))
+
+    def test_beide_optionen_halten_gegen_jede_fremde_wahl(self):
+        """★ Die eigentliche Begruendung fuer `_open_socket`.
+
+        Wer hier eine der beiden Optionen entfernt, verliert genau die Faelle,
+        in denen die fremde App sich anders entschieden hat."""
+        for fremd in ([self.RA], [self.RP], [self.RA, self.RP]):
+            with self.subTest(fremde_app=fremd):
+                self.assertTrue(
+                    self._zweiter_bind_gelingt(fremd, [self.RA, self.RP]))
