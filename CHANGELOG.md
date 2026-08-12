@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-12 — Die Prüfung des Effekt-Assistenten bedient ihn jetzt selbst
+
+An der Software ändert sich dadurch nichts — wohl aber daran, wie viel eine
+grüne Prüfung wert ist. Sieben Prüfungen haben bisher an der Stelle
+weggeschaut, an der es darauf ankommt.
+
+#### Geändert
+
+- **Der Effekt-Assistent wurde von seiner eigenen Prüfung nie angefasst.** Alle
+  vier Schritte — Effekt-Typ, Lampen, Farben, Tempo und Name — waren durch
+  Nachbauten ersetzt; geprüft wurde am Ende nur, ob die Nachbauten
+  zusammenpassen. Jetzt klickt die Prüfung den Assistenten durch wie ein
+  Anwender. Fünf Dinge, die dadurch überhaupt erst auffallen könnten: dass hinter
+  der angeklickten Zeile der richtige Effekt steckt, dass ein Effekt seine
+  vorgeschlagene Farbe bekommt (ein Wipe ist blau, nicht notdürftig weiß), dass
+  eine im Programmer gewählte Lampe vorgehakt ist, dass abgewählte Lampen wirklich
+  draußen bleiben, und dass Tempo und Takt-Kopplung des Effekts vom letzten
+  Schritt stammen. Auch die Rückmeldung „keine Lampe ausgewählt" wird jetzt
+  geprüft — vorher wäre ein leerer, wirkungsloser Effekt stillschweigend als
+  Erfolg durchgegangen.
+
+- **Sechs Prüfungen belegten nur, dass ein Aufruf nicht abstürzt** — nicht, dass
+  er wirklich nichts tut. Genau dazwischen liegt der Fehler, um den es geht: ein
+  Handgriff, der stillschweigend doch etwas verstellt. Jetzt wird der Zustand
+  davor und danach verglichen. Abgedeckt sind damit u. a.: ein Kanalgruppen-Regler
+  darf für eine nicht vorhandene Zeile **keinen einzigen** Kanal stellen (der
+  gefährliche Fall traf sonst klaglos die letzte Gruppe); nach dem Beenden der
+  seriellen Ausgabe darf sie sich nicht von selbst wieder starten und den
+  Anschluss belegt halten; und ein Bühnenaufbau darf sich nicht verändern, wenn
+  etwas Unbekanntes entfernt oder verschoben wird.
+
+- **Ein Testname war schlicht falsch:** Die Geräteliste im 3D-Fenster wird auch
+  dann markiert, wenn das 3D-Bild selbst noch nicht bereit ist. Das ist kein
+  Nebeneffekt, sondern der Zweck — bliebe die Markierung aus, stünde die Liste
+  nach einer Auswahl im Programmer leer da.
 ### 2026-08-11 — Der Patch-Dialog sagt jetzt, wo die Pixel-Reihenfolge wirkt
 
 #### Behoben

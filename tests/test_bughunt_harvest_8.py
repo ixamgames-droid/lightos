@@ -80,10 +80,30 @@ class ChannelGroupOverrideTest(unittest.TestCase):
         self.assertEqual(writes, [(2, 1, 200), (2, 5, 200)],
                          "muss ueber set_simple_desk_channel gehen (600 gefiltert)")
 
-    def test_apply_value_out_of_range_row_is_noop(self):
-        from src.ui.views.channel_groups_view import ChannelGroupsView
-        fake = SimpleNamespace(_groups=[], _state=None)
-        ChannelGroupsView._apply_value(fake, 0)   # kein Crash
+    def test_apply_value_out_of_range_row_schreibt_keinen_kanal(self):
+        """★★ QA-56: hier standen ``_groups=[]`` und ``_state=None`` — dieser
+        Aufbau KONNTE gar nichts schreiben, der Test belegte also nur „kein
+        Crash", nicht die Wirkungslosigkeit. Jetzt mit einer echten Gruppe und
+        einer mitschreibenden Override-Schicht: waere die Wache falsch, saehe man
+        den Schreibzugriff. Der negative Index ist der eigentliche Fall —
+        ``self._groups[-1]`` trifft in Python klaglos die LETZTE Gruppe, der
+        Slider haette dann die falsche Gruppe gestellt.
+        Positivkontrolle ist der Test darueber: mit gueltiger Zeile wird
+        geschrieben."""
+        from src.ui.views.channel_groups_view import ChannelGroupsView, ChannelGroup
+        writes = []
+        fake = SimpleNamespace(
+            _groups=[ChannelGroup(name="G", universe=2, channels=[1, 5])],
+            _state=SimpleNamespace(
+                set_simple_desk_channel=lambda u, c, v: writes.append((u, c, v))),
+        )
+        fake._groups[0].value = 200
+
+        for row in (1, 5, -1):
+            ChannelGroupsView._apply_value(fake, row)
+
+        self.assertEqual(writes, [],
+                         "Zeile ausserhalb -> kein einziger Kanal darf gestellt werden")
 
 
 class CurveDragInvalidateTest(unittest.TestCase):
