@@ -1007,6 +1007,28 @@ class RgbMatrixView(QWidget):
         self._btn_auto_assign.setStyleSheet(_assign_style)
         self._btn_auto_assign.clicked.connect(self._auto_assign)
         grid_l.addWidget(self._btn_auto_assign)
+
+        # FM-22 (1): der direkte Weg fuer ein Panel. „Aus Auswahl" braucht eine
+        # fertig angeordnete Fixture-Gruppe — fuer ein 48-Zonen-Geraet hiess das
+        # bisher: Gruppen-Tab, Raster vergroessern, Geraet finden, aufteilen,
+        # zurueck. Hier steht dasselbe Ergebnis in zwei Klicks.
+        self._btn_panel_grid = QPushButton("Raster aus Gerät…")
+        self._btn_panel_grid.setFixedHeight(26)
+        self._btn_panel_grid.setToolTip(
+            "Ein Gerät mit mehreren Zonen (Panel/Bar) direkt als Raster "
+            "übernehmen — mit Nummerierung und Montage-Drehung des Geräts")
+        self._btn_panel_grid.setStyleSheet(_assign_style)
+        self._btn_panel_grid.clicked.connect(self._grid_from_fixture)
+        grid_l.addWidget(self._btn_panel_grid)
+
+        # FM-22 (2): harte Kanten, die kein Flaechen-Algorithmus liefert.
+        self._btn_pattern = QPushButton("Muster-Assistent…")
+        self._btn_pattern.setFixedHeight(26)
+        self._btn_pattern.setToolTip(
+            "Spalten-/Reihen-/Diagonal-Lauflicht als fertigen Chaser erzeugen")
+        self._btn_pattern.setStyleSheet(_assign_style)
+        self._btn_pattern.clicked.connect(self._pattern_wizard)
+        grid_l.addWidget(self._btn_pattern)
         body.addWidget(grid_box)
 
         body.addStretch(1)
@@ -1679,6 +1701,11 @@ class RgbMatrixView(QWidget):
         Manuelle Geräte-Zuweisung wird ausgeblendet."""
         self._btn_from_sel.setVisible(False)
         self._btn_auto_assign.setVisible(False)
+        # FM-22: „Raster aus Gerät" setzt das Grid VON HAND — im Folgemodus wuerde
+        # der naechste SELECTION_CHANGED es sofort wieder ueberschreiben. Ein Knopf,
+        # dessen Wirkung Sekunden spaeter verschwindet, ist schlimmer als keiner.
+        # Der Muster-Assistent liest das Grid nur und bleibt deshalb sichtbar.
+        self._btn_panel_grid.setVisible(False)
         self._grid_box.setTitle("Geräte (folgen der Programmer-Auswahl)")
         self._grid_label.setText("Folgt automatisch der links gewählten Gruppe.")
         # KEIN Auto-Anlegen mehr: frueher wurde hier eine 8x4-Standardmatrix erzeugt.
@@ -1843,3 +1870,87 @@ class RgbMatrixView(QWidget):
         except Exception as e:
             self._grid_label.setText(f"Fehler: {e}")
         self._update_dirty()
+
+    # ── FM-22: Panel-Raster und Muster-Assistent ─────────────────────────────
+
+    def _apply_panel_grid(self, cols, rows, fixture_grid, head_grid, text):
+        """Raster in BEIDE Instanzen schreiben und die Anzeige nachziehen.
+
+        Gleiche Politik wie ``_assign_from_selection``: eine Grid-Zuweisung ist
+        LIVE, sie erzeugt also keinen ungespeicherten Zustand. Stuende sie nur
+        im Draft, waere der Effekt nach dem naechsten Umschalten in der Liste
+        wieder ohne Geraete — ohne dass ein Fehler zu sehen waere.
+        """
+        for inst in (self._current, self._saved):
+            if inst is None:
+                continue
+            inst.cols = cols
+            inst.rows = rows
+            inst.fixture_grid = list(fixture_grid)
+            inst.head_grid = list(head_grid)
+        for spin, val in ((self._cols_spin, cols), (self._rows_spin, rows)):
+            spin.blockSignals(True)
+            spin.setValue(val)
+            spin.blockSignals(False)
+        self._grid_label.setText(text)
+        self._sync_preview(self._current)
+        self._update_dirty()
+
+    def _grid_from_fixture(self):
+        """FM-22 (1): ein Mehrzonen-Geraet direkt als Raster uebernehmen."""
+        from src.ui.views.matrix_pattern_dialogs import (PanelGridDialog,
+                                                         panel_candidates)
+        if self._current is None:
+            self._grid_label.setText("Erst eine Matrix anlegen/auswählen.")
+            return
+        try:
+            from src.core.app_state import get_state
+            fixtures = get_state().get_patched_fixtures()
+        except Exception as e:
+            self._grid_label.setText(f"Fehler: {e}")
+            return
+        cands = panel_candidates(fixtures)
+        if not cands:
+            self._grid_label.setText(
+                "Kein Gerät mit mehreren Zonen im Patch — "
+                "ein einzonisches Gerät ergäbe ein 1×1-Raster.")
+            return
+        dlg = PanelGridDialog(cands, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        cols, rows, fixture_grid, head_grid = dlg.result_grid()
+        if not fixture_grid:
+            self._grid_label.setText("Raster leer — nichts übernommen.")
+            return
+        cand = dlg.candidate()
+        belegt = sum(1 for f in fixture_grid if f is not None)
+        name = cand.label if cand is not None else ""
+        self._apply_panel_grid(
+            cols, rows, fixture_grid, head_grid,
+            f"{rows}×{cols} = {belegt} Zonen aus »{name}«")
+
+    def _pattern_wizard(self):
+        """FM-22 (2): Muster-Assistent -> Szenen + Chaser mit harten Kanten."""
+        from src.ui.views.matrix_pattern_dialogs import PatternWizardDialog
+        from src.core.matrix_pattern import build_pattern_chaser
+        m = self._current
+        if m is None or not m.fixture_grid:
+            self._grid_label.setText(
+                "Erst ein Raster zuweisen — der Assistent braucht die Zellen.")
+            return
+        dlg = PatternWizardDialog(m.cols, m.rows,
+                                  default_name=f"{m.name} Lauflicht",
+                                  parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        res = dlg.result()
+        ch, szenen = build_pattern_chaser(
+            self._fm, m, dlg.frames(), name=res.name, color=res.color,
+            hold=res.hold)
+        if ch is None:
+            self._grid_label.setText(
+                "Kein Schritt erzeugt — im Raster steht kein gepatchtes Gerät.")
+            return
+        self._notify_change()
+        self._grid_label.setText(
+            f"Chaser »{ch.name}« mit {len(szenen)} Schritten angelegt.")
