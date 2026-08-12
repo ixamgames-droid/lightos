@@ -347,16 +347,28 @@ class PatchFixtureEditDialog(QDialog):
                 getattr(self._fixture, "pixel_order", "rowwise"))
             _ipo = self._combo_pixel_order.findData(_cur_po)
             self._combo_pixel_order.setCurrentIndex(_ipo if _ipo >= 0 else 0)
-            self._combo_pixel_order.setToolTip(
+            _tip = (
                 "Wie das Panel seine Pixel raeumlich anordnet — die DMX-Kanaele\n"
                 "sagen nur die REIHENFOLGE, nicht die Position:\n"
                 "• Zeilenweise – Pixel 1 oben links, dann nach rechts (Default).\n"
                 "• Schlangenlinien – jede zweite Zeile laeuft rueckwaerts. Das ist\n"
-                "  der Werkszustand der ADJ Dotz Matrix („Pixel Flip: Standard“);\n"
-                "  ohne diese Einstellung laeuft ein horizontales Lauflicht am\n"
-                "  echten Geraet im Zickzack, waehrend es im 3D geradeaus laeuft.\n"
+                "  der Werkszustand der ADJ Dotz Matrix („Pixel Flip: Standard“).\n"
                 "• Gespiegelt – jede Zeile rechts→links (Panel gedreht verbaut).\n\n"
-                "Aendert NUR die Darstellung/Zuordnung, nie die DMX-Adressen.")
+                "Aendert NUR die Zuordnung, nie die DMX-Adressen.")
+            if _heads >= 2:
+                # FM-21 (Nachbesserung): „als Block…" bietet das Rechtsklick-Menue
+                # nur an einer Zelle an, in der das Geraet als GANZES steht — und
+                # erst ab zwei faerbbaren Koepfen. Deshalb steht der Zwischen-
+                # schritt hier drin und der ganze Absatz nur bei >= 2 Koepfen: bei
+                # einem Kopf gaebe es weder das Menue noch das Raster, der Satz
+                # waere eine Behauptung ueber etwas, das dieses Geraet nicht hat.
+                _tip += (
+                    "\n\nAm GERAET wirkt die Wahl erst ueber ein Raster, das mit\n"
+                    "ihr gebaut wurde: das Geraet als GANZES in eine Rasterzelle,\n"
+                    "dann Rechtsklick → „aufteilen …“ → „als Block…“. Sonst laeuft\n"
+                    "ein horizontales Lauflicht dort weiter im Zickzack, obwohl die\n"
+                    "3D-Vorschau bereits umspringt.")
+            self._combo_pixel_order.setToolTip(_tip)
             form.addRow("Pixel-Reihenfolge:", self._combo_pixel_order)
 
             # ORIENT: wie das Panel HAENGT. Bewusst ein ZWEITES Feld neben der
@@ -391,6 +403,49 @@ class PatchFixtureEditDialog(QDialog):
                 "Panel um die Hochachse gedreht verbaut (Vorderseite zeigt\n"
                 "in die andere Richtung). Wirkt NACH der Drehung.")
             form.addRow("", self._chk_flip)
+
+            # FM-21: WO die drei Felder darueber wirken — sichtbar, nicht im
+            # Tooltip. Der Tooltip erreicht nur, wer ihn sucht; die Falle trifft
+            # aber genau den, der nicht sucht: die 3D-Vorschau springt beim
+            # Umstellen sofort um, also haelt man die Sache fuer erledigt — am
+            # Rig laeuft das Lauflicht unveraendert im Zickzack, weil das Raster,
+            # das die Matrix-Effekte benutzen, aus der Gruppe kommt und beim
+            # Patchen als EINE Reihe entsteht. Eine Einstellung, die sichtbar
+            # reagiert, ohne zu wirken, ist irrefuehrender als eine, die nichts
+            # tut — deshalb steht der Weg dorthin hier im Klartext.
+            #
+            # ★ Nachbesserung: Der Hinweis nannte einen Weg, den es an der
+            # genannten Stelle NICHT gibt. Das Rechtsklick-Menue bietet
+            # „als Block…" nur an einer Zelle an, in der das Geraet als GANZES
+            # steht (`_build_cell_menu`: `head is None and n >= 2`). In der beim
+            # Patchen angelegten Gruppe „… · Köpfe" steht dort aber je EIN Kopf —
+            # gemessen bietet das Menue dort nur „Zelle entfernen",
+            # „… zu einer Zelle zusammenfassen", „Alle Zellen … entfernen". Wer
+            # dem alten Hinweis folgte, suchte einen Menuepunkt, der da nicht ist.
+            # Der Zwischenschritt steht so auch in der Anleitung
+            # (docs/anleitung_gruppen_matrizen, Abschnitt 3 Schritt 1 und
+            # Abschnitt 5): Geraet als GANZES in eine Zelle ziehen bzw. die
+            # Kopf-Zellen vorher zusammenfassen.
+            #
+            # ★ Und er erschien ueberall, wo `fixture_type == "matrix"` steht —
+            # auch bei Ein-Kopf-Modi (nachgemessen: DOTZMATRIX „3-Kanal RGB",
+            # STAIRPP144 „8-Kanal Panel gesamt": color_head_count == 1, keine
+            # Kopf-Gruppe, kein „als Block…" im Menue). Dort behauptete er zwei
+            # Dinge, die es nicht gibt. Darum `_heads >= 2`: das ist genau die
+            # Schwelle, ab der `_build_cell_menu` das Aufteilen anbietet.
+            if _heads >= 2:
+                _hinweis = QLabel(
+                    "Wirkt in der 3D-Vorschau — und am Gerät erst über ein "
+                    "Raster, das damit gebaut wurde: Tab „Fixture-Gruppen“, das "
+                    "Gerät als GANZES auf eine Rasterzelle ziehen (in der beim "
+                    "Patchen angelegten Gruppe „… · Köpfe“ steht in jeder Zelle "
+                    "nur EIN Kopf — dort erst Rechtsklick → „… zu einer Zelle "
+                    "zusammenfassen“), dann Rechtsklick auf diese Zelle → "
+                    "„aufteilen …“ → „als Block…“. Die Gruppe „… · Köpfe“ selbst "
+                    "bleibt EINE Reihe und ändert sich dadurch nicht.")
+                _hinweis.setWordWrap(True)
+                _hinweis.setStyleSheet("color:#8b949e;")
+                form.addRow("", _hinweis)
 
             # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
             # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.

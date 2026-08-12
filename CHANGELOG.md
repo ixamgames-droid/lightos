@@ -42,6 +42,49 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   schritte, aus denen so ein Lauflicht besteht, liegen dabei aufgeräumt in
   einem eigenen Ordner — in der Liste steht nur das Lauflicht selbst.
 
+### 2026-08-11 — Der Patch-Dialog sagt jetzt, wo die Pixel-Reihenfolge wirkt
+
+#### Behoben
+
+- **Eine Einstellung, die sichtbar reagierte, ohne zu wirken.** Wer bei einem
+  Panel auf „Schlangenlinien" umstellte, sah die 3D-Vorschau sofort umspringen
+  und hielt die Sache damit für erledigt — am Gerät lief das Lauflicht
+  unverändert im Zickzack. Der Hinweistext im Dialog legte genau das nahe
+  („ohne diese Einstellung läuft ein Lauflicht am echten Gerät im Zickzack,
+  während es im 3D geradeaus läuft"), und keine Stelle sagte, was noch fehlt.
+
+- **Jetzt steht der Weg im Dialog**, sichtbar unter den drei Feldern
+  „Pixel-Reihenfolge", „Montage-Drehung" und „Waagerecht gespiegelt montiert":
+  die Angaben wirken in der 3D-Vorschau — und am Gerät erst über ein Raster,
+  das mit ihnen gebaut wurde. Der Hinweis nennt den Weg **vollständig**: Tab
+  „Fixture-Gruppen", das Gerät als GANZES auf eine Rasterzelle ziehen (in der
+  beim Patchen angelegten Gruppe „… · Köpfe" steht in jeder Zelle nur EIN Kopf
+  — dort erst Rechtsklick → „… zu einer Zelle zusammenfassen"), dann Rechtsklick
+  auf diese Zelle → „aufteilen …" → „als Block…". Dazu die ehrliche Grenze: die
+  Gruppe „… · Köpfe" selbst bleibt eine Reihe und ändert sich dadurch nicht.
+
+- **Der Hinweis nannte zuerst einen Weg, den es an der genannten Stelle nicht
+  gibt** (in der Gegenprüfung gefunden, bevor er ausgeliefert wurde): „Rechtsklick
+  auf das Gerät im Raster → „als Block…"" — nach dem Patchen steht dort aber
+  gar nicht das Gerät, sondern ein einzelner Kopf, und das Menü bietet an dieser
+  Stelle nur „Zelle entfernen", „… zu einer Zelle zusammenfassen" und „Alle
+  Zellen … entfernen" an. Wer dem Hinweis folgte, suchte einen Menüpunkt, den es
+  da nicht gibt. Der fehlende Zwischenschritt steht auch so in der Anleitung
+  *Gruppen und Matrizen anlegen* (Abschnitte 3 und 5).
+
+- **Und er erschien bei Panels, die den Weg gar nicht haben.** Gezeigt wurde er
+  bei jedem Gerät vom Typ Matrix — auch bei Modi, die das ganze Panel in EINER
+  Farbe färben (ADJ Dotz Matrix „3-Kanal RGB", Stairville „8-Kanal Panel
+  gesamt"). Dort gibt es weder eine Kopf-Gruppe noch „als Block…" (das beginnt
+  bei zwei färbbaren Köpfen); der Hinweis versprach also zwei Dinge, die es an
+  diesen Geräten nicht gibt. Jetzt erscheint er — samt des entsprechenden
+  Tooltip-Absatzes — nur ab zwei färbbaren Köpfen.
+
+- **Nachgemessen bis zum Ausgang:** dass die Wahl über den Block-Weg wirklich
+  bis an die DMX-Kanäle des richtigen Kopfes durchschlägt, prüft die Software
+  ab jetzt selbst — vom Dialogfenster über das echte Kontextmenü des
+  Gruppen-Rasters (der Menüpunkt wird ausgelöst, nicht umgangen) und den
+  Matrix-Effekt bis zum gesendeten Kanal.
 ### 2026-08-12 — Reparatur: Konfliktmarker in der Aufgabenliste
 
 #### Behoben
