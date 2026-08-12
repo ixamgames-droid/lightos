@@ -230,3 +230,110 @@ class KeineZweiteSuiteAusEinemTestTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
+    """★★ PROC-02b: Ein VERSCHACHTELTER Worktree bekam eine eigene Sperrdatei.
+
+    Der Sperrpfad wurde als „Elternverzeichnis des Worktrees" bestimmt. Das
+    stimmt fuer die dokumentierte Konvention (`~/projects/lightos/wt-<kurz>`,
+    alles Geschwister von `repo/`) — aber nicht fuer Agenten-Worktrees, die
+    unter `repo/.claude/worktrees/` liegen. Die bekamen ihre eigene Datei, und
+    damit lief die volle Suite doppelt.
+
+    **Gemessen am 12.08.2026**, waehrend genau das passierte: 11
+    WebEngine-Segmente starteten mit noch laufenden Chromium-Kindprozessen,
+    zwei Segmente wurden rot. Der Fehler sah aus wie ein Produktfehler.
+
+    Geprueft wird ueber den DRY-RUN des echten Skripts, nicht durch Nachbau
+    seiner Pfadlogik — eine nachgebaute Formel wuerde nur sich selbst pruefen
+    (QA-55-Falle).
+    """
+
+    def _sperrpfad(self, wurzel: str) -> str:
+        """Sperrpfad, den DIESER Worktree meldet.
+
+        ★ Aufgerufen wird das Skript AUS dem jeweiligen Worktree — nicht das
+        des Hauptrepos mit fremdem Arbeitsverzeichnis. `verify_loop.sh` macht
+        als erstes `cd "$(dirname "$0")/.."`; ein Aufruf der Hauptkopie haette
+        also immer denselben Pfad gemeldet, egal von wo. Genau daran ist die
+        erste Fassung dieses Tests gescheitert: die Mutation „alte Logik
+        zurueck" blieb gruen, weil der Test das Skript des Hauptrepos fuhr.
+        """
+        umgebung = {k: v for k, v in os.environ.items()
+                    if k not in ("LIGHTOS_LOCKFILE",)}
+        umgebung["LIGHTOS_VERIFY_DRYRUN"] = "1"
+        # ★ NOLOCK ist hier Pflicht, nicht Bequemlichkeit: dieser Test laeuft
+        # INNERHALB der vollen Suite, die die echte Sperre haelt. Ohne ihn wartet
+        # der Unterprozess auf den eigenen Gate-Lauf, bis das Segment-Timeout
+        # zuschlaegt — gemessen am 12.08.2026, genau so. Der Pfad wird trotzdem
+        # gemeldet, weil Bestimmung und Belegung getrennt sind.
+        umgebung["LIGHTOS_VERIFY_NOLOCK"] = "1"
+        r = subprocess.run(["bash", os.path.join(wurzel, "tools", "verify_loop.sh")],
+                           cwd=wurzel, env=umgebung, capture_output=True, text=True,
+                           timeout=180)
+        for zeile in r.stdout.splitlines():
+            if zeile.startswith("[verify] Sperrdatei:"):
+                return zeile.split(":", 1)[1].strip()
+        self.fail(f"keine Sperrdatei-Zeile in der Ausgabe:\n{r.stdout}\n{r.stderr}")
+
+    def test_geschwister_und_verschachtelter_worktree_teilen_die_sperre(self):
+        if not shutil.which("git"):
+            self.skipTest("kein git")
+        with tempfile.TemporaryDirectory() as tmp:
+            geschwister = os.path.join(tmp, "wt-geschwister")
+            tief = os.path.join(tmp, "a", "b", "c", "wt-tief")
+            os.makedirs(os.path.dirname(tief), exist_ok=True)
+            angelegt = []
+            try:
+                for ziel in (geschwister, tief):
+                    zweig = "proc02b-probe-" + os.path.basename(ziel)
+                    r = subprocess.run(
+                        ["git", "worktree", "add", "--detach", ziel, "HEAD"],
+                        cwd=_REPO, capture_output=True, text=True, timeout=120)
+                    if r.returncode != 0:
+                        self.skipTest(f"worktree add ging nicht: {r.stderr[:200]}")
+                    angelegt.append(ziel)
+                    # Ein frischer Worktree hat kein venv — dann steigt
+                    # verify_loop.sh mit exit 2 aus, BEVOR es die Sperrdatei
+                    # meldet. Genau so ist es am 12.08. auch von Hand passiert:
+                    # das Gate meldete "fertig", ohne einen Test gefahren zu
+                    # haben. Hier wird die reale Einrichtung nachgebildet.
+                    os.symlink(os.path.join(_REPO, "venv"),
+                               os.path.join(ziel, "venv"))
+                    # `git worktree add` liefert den COMMITTETEN Stand. Geprueft
+                    # werden soll aber die Arbeitsfassung — dieselbe, die jeder
+                    # andere Test sieht. Sonst misst dieser Test einen aelteren
+                    # Runner als den, der gerade laeuft.
+                    shutil.copy2(os.path.join(_REPO, "tools", "verify_loop.sh"),
+                                 os.path.join(ziel, "tools", "verify_loop.sh"))
+                a = self._sperrpfad(geschwister)
+                b = self._sperrpfad(tief)
+                self.assertEqual(
+                    a, b,
+                    "Zwei Worktrees desselben Repos muessen DIESELBE Sperrdatei "
+                    "benutzen — sonst faehrt die volle Suite doppelt, und das "
+                    "Ergebnis sieht trotzdem vertrauenswuerdig aus.")
+            finally:
+                for ziel in angelegt:
+                    subprocess.run(["git", "worktree", "remove", "--force", ziel],
+                                   cwd=_REPO, capture_output=True, timeout=120)
+
+    def test_die_messung_wuerde_einen_unterschied_auch_sehen(self):
+        """POSITIVKONTROLLE: mit gesetztem ``LIGHTOS_LOCKFILE`` melden zwei
+        Laeufe verschiedene Pfade — die Methode kann also unterscheiden und
+        bestaetigt nicht blind Gleichheit."""
+        with tempfile.TemporaryDirectory() as tmp:
+            pfade = []
+            for name in ("eins", "zwei"):
+                umgebung = dict(os.environ)
+                umgebung["LIGHTOS_VERIFY_DRYRUN"] = "1"
+                umgebung["LIGHTOS_LOCKFILE"] = os.path.join(tmp, name + ".lock")
+                r = subprocess.run(
+                    ["bash", os.path.join(_REPO, "tools", "verify_loop.sh")],
+                    cwd=_REPO, env=umgebung, capture_output=True, text=True,
+                    timeout=120)
+                pfade.append(next(z.split(":", 1)[1].strip()
+                                  for z in r.stdout.splitlines()
+                                  if z.startswith("[verify] Sperrdatei:")))
+            self.assertNotEqual(pfade[0], pfade[1])

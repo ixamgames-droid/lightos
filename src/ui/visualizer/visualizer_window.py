@@ -37,7 +37,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
-    viz_model_for,
+    panel_grid_for, viz_model_for,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1891,6 +1891,18 @@ class VisualizerBridge(QObject):
                               if (getattr(c, "attribute", "") or "") == "color_r")
             except Exception:
                 n_heads = 0
+        # ★ VIZ-50a: die PHYSISCHE Rasterform des Panels (Zeilen x Spalten) aus
+        # dem Fixture-Modus. Bis hierher bekam `buildMatrixPanel` nur die
+        # Pixel-ZAHL und musste die Form near-square RATEN — Robins 12x4-Balken
+        # stand im 3D als 7x7-Quadrat da. 0/0 = nichts hinterlegt: dann raet der
+        # Renderer weiter wie bisher, es gibt also keinen stillen Umbau fuer
+        # Geraete ohne Angabe.
+        grid_rows, grid_cols = (0, 0)
+        if model == "matrix":
+            try:
+                grid_rows, grid_cols = panel_grid_for(f)
+            except Exception:
+                grid_rows, grid_cols = (0, 0)
         return {
             "fid": f.fid,
             "label": f.label,
@@ -1910,6 +1922,9 @@ class VisualizerBridge(QObject):
             "elementRotation": normalize_element_rotation(
                 getattr(f, "element_rotation", 0)),
             "elementFlip": bool(getattr(f, "element_flip", False)),
+            # VIZ-50a: hinterlegte Rasterform (0 = keine Angabe -> JS raet).
+            "gridRows": grid_rows,
+            "gridCols": grid_cols,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],

@@ -274,13 +274,30 @@ def _add_fixture(s, mfr, name, short, ftype, power, modes_data):
     _add_modes(s, f, modes_data)
 
 
+def _mode_eintrag(eintrag):
+    """Ein Eintrag aus ``modes_data`` -> ``(name, channels, (rows, cols))``.
+
+    VIZ-50a: die physische Rasterform ist ein OPTIONALES drittes Tupel-Element.
+    Bewusst hier neben der Kanalliste und nicht in einer nach Modusnamen
+    geschluesselten Extra-Tabelle: Modusnamen sind in diesem Projekt faktisch
+    Schluessel und werden umbenannt (siehe `_ZQ06121_SIGNATURE`) — eine zweite,
+    namensgeschluesselte Quelle waere beim naechsten Umbenennen still leer.
+    ``(0, 0)`` = keine Geometrie hinterlegt (Bestand: der Renderer raet).
+    """
+    name, channels = eintrag[0], eintrag[1]
+    grid = tuple(eintrag[2]) if len(eintrag) > 2 else (0, 0)
+    return name, channels, (int(grid[0] or 0), int(grid[1] or 0))
+
+
 def _add_modes(s, profile, modes_data):
     """Haengt Modi/Kanaele/Ranges an ein (neues oder bestehendes) Profil.
     Range-Tupel: ``(from, to, name)`` oder ``(from, to, name, kind)`` — ohne
     expliziten ``kind`` wird er aus dem Namen abgeleitet (_infer_range_kind)."""
-    for mode_name, channels in modes_data:
+    for eintrag in modes_data:
+        mode_name, channels, (grid_rows, grid_cols) = _mode_eintrag(eintrag)
         ch_count = len(channels)
-        mode = FixtureMode(fixture=profile, name=mode_name, channel_count=ch_count)
+        mode = FixtureMode(fixture=profile, name=mode_name, channel_count=ch_count,
+                           grid_rows=grid_rows, grid_cols=grid_cols)
         s.add(mode)
         for i, ch_data in enumerate(channels, 1):
             ch_name, attr, default, highlight = ch_data[:4]
@@ -2641,11 +2658,24 @@ def _add_generic_matrix_panel(s, mfr):
     """Generisches RGB-Pixel-Panel (FM-13, fixture_type 'matrix'). Modi 4×4 (16px,
     49ch) + 8×8 (64px, 193ch). Master-Default 255 = voll (Pixel sind per Default
     schwarz -> keine Blend-Gefahr; per-Pixel-Farbe sofort sichtbar sobald RGB
-    gesetzt). Per-Pixel-Farbe reist ueber attr#N -> heads[] -> buildMatrixPanel."""
-    _add_fixture(s, mfr, "LED Matrix Panel", "MATRIXPANEL", "matrix", 100, [
-        ("4×4 (16 Pixel RGB)", _matrix_panel_mode(4, 4)),
-        ("8×8 (64 Pixel RGB)", _matrix_panel_mode(8, 8)),
-    ])
+    gesetzt). Per-Pixel-Farbe reist ueber attr#N -> heads[] -> buildMatrixPanel.
+
+    VIZ-50a: die Rasterform steht als drittes Tupel-Element mit dabei. Bei diesen
+    zwei Modi ist sie mit dem Ratewert der Pixelzahl IDENTISCH (16 -> 4x4,
+    64 -> 8x8) — sie aendert also nichts am Bild und ist genau deshalb der
+    Beleg, dass eine hinterlegte Geometrie kein Selbstzweck-Umbau ist."""
+    _add_fixture(s, mfr, "LED Matrix Panel", "MATRIXPANEL", "matrix", 100,
+                 _matrix_panel_modes_data())
+
+
+def _matrix_panel_modes_data():
+    """Modi des generischen Panels als reine Daten — wie bei ZQ02001/ZQ06121
+    getrennt gefuehrt, damit `ensure_builtins` sie in einer bereits befuellten
+    DB nachziehen kann (VIZ-50a: Rasterform)."""
+    return [
+        ("4×4 (16 Pixel RGB)", _matrix_panel_mode(4, 4), (4, 4)),
+        ("8×8 (64 Pixel RGB)", _matrix_panel_mode(8, 8), (8, 8)),
+    ]
 
 
 # ── FM-13 Slice 2: BENANNTE REALE Pixel-Panels ('matrix') ────────────────────
@@ -2777,8 +2807,10 @@ def _dotz_matrix_modes_data():
             ("Dimmerkurve", "raw", 0, 0, _DOTZ_TPAR_DIM_CURVES),
         ]),
         ("7-Kanal RGB Voll", rgb + controls),
-        ("48-Kanal 16 Pixel RGB", pixels),
-        ("52-Kanal 16 Pixel RGB Voll", pixels + controls),
+        # VIZ-50a: 16 COB-Pixel im 4×4-Raster (Manual S. 12) — deckungsgleich
+        # mit dem Ratewert, das Bild aendert sich dadurch nicht.
+        ("48-Kanal 16 Pixel RGB", pixels, (4, 4)),
+        ("52-Kanal 16 Pixel RGB Voll", pixels + controls, (4, 4)),
     ]
 
 
@@ -2819,6 +2851,11 @@ def _stair_pp144_programs(first: int, last_label: str):
         ranges.append((lo, hi, label, ""))
     return ranges
 
+
+
+# VIZ-50a: physische Rasterform des ZQ06121 (Zeilen, Spalten) — am Geraet
+# nachgesehen (Robin, 2026-08-05). Beide Pixel-Modi teilen dieselben 48 Zonen.
+_ZQ06121_RASTER = (4, 12)
 
 
 def _zq06121_zonen(count: int, praefix: str):
@@ -2893,7 +2930,15 @@ def _zq06121_modes_data():
     """Die Modi als reine Daten — EINE Quelle fuer das Anlegen UND fuer
     `_ZQ06121_SIGNATURE`. Getrennt gefuehrt koennten beide auseinanderlaufen,
     und dann migrierte `ensure_builtins` in einer Endlosschleife gegen ein Soll,
-    das es selbst nie herstellt."""
+    das es selbst nie herstellt.
+
+    VIZ-50a: drittes Tupel-Element = die physische Rasterform (Zeilen, Spalten).
+    Am echten Balken nachgesehen (Robin, 2026-08-05): **4 Reihen x 12 RGB-Zonen**
+    — bis dahin hat der 3D-Renderer daraus ein 7x7-Quadrat geraten (48 Zonen ->
+    ceil(sqrt(48)) = 7), also einen Klotz mit 49 Feldern anstelle einer Leiste.
+    Beide Modi haben dieselben 48 Zonen und damit dieselbe Form; der 154er hat
+    nur zusaetzlich die acht Weiss-Segmente, die auf EIGENEN Koepfen liegen und
+    das RGB-Raster nicht veraendern."""
     return [
         ("154-Kanal 48 Zonen RGB + 8x Weiss", [
             ("Dimmer", "intensity", 0, 255),
@@ -2911,8 +2956,8 @@ def _zq06121_modes_data():
             # `FixtureMode.layout_json` (FM-ORIENT Folgerunde); bis dahin sind
             # die Segmente einzeln ansprechbar, aber ohne Ortsbezug.
             (f"Weiss-Zone {i}", "color_w", 0, 255) for i in range(1, 9)
-        ]),
-        ("144-Kanal 48 Zonen RGB", _zq06121_zonen(48, "Zone ")),
+        ], _ZQ06121_RASTER),
+        ("144-Kanal 48 Zonen RGB", _zq06121_zonen(48, "Zone "), _ZQ06121_RASTER),
     ]
 
 def _add_stairville_pp144(s, mfr):
@@ -2933,7 +2978,15 @@ def _add_stairville_pp144(s, mfr):
     Strobe-Default 0 wie beim Dotz Matrix: das Manual schreibt „0 … 255 Strobe
     effect (slow … fast)" ohne dokumentiertes Aus-Band; 0 ist der kleinste und
     damit sicherste Wert (`_SIMPLE_STROBE` liest ihn als „kein Strobe")."""
-    _add_fixture(s, mfr, "Pixel Panel 144 RGB", "STAIRPP144", "matrix", 65, [
+    _add_fixture(s, mfr, "Pixel Panel 144 RGB", "STAIRPP144", "matrix", 65,
+                 _stairville_pp144_modes_data())
+
+
+def _stairville_pp144_modes_data():
+    """Modi als reine Daten (siehe `_add_stairville_pp144`) — getrennt gefuehrt,
+    damit `ensure_builtins` die Rasterform in einer bereits befuellten DB
+    nachziehen kann (VIZ-50a)."""
+    return [
         ("8-Kanal Panel gesamt", [
             ("Dimmer", "intensity", 255, 255),
             ("Strobe langsam→schnell", "shutter", 0, 0, _SIMPLE_STROBE),
@@ -2946,8 +2999,10 @@ def _add_stairville_pp144(s, mfr):
              _stair_pp144_programs(16, "Show-Programm-Mix")),
             ("Programm-Speed", "speed", 0, 0),
         ]),
-        ("432-Kanal 144 Pixel RGB", _pixel_rgb_channels(144)),
-    ])
+        # VIZ-50a: 12×12 laut Manual (Technische Daten S. 34) — wieder identisch
+        # mit dem Ratewert aus 144 Pixeln.
+        ("432-Kanal 144 Pixel RGB", _pixel_rgb_channels(144), (12, 12)),
+    ]
 
 
 def _get_or_create_mfr(s, name, short):
@@ -2974,13 +3029,24 @@ def _mode_attr_signature(profile) -> dict[str, list[str]]:
     return sig
 
 
+def _soll_signatur(modes_data) -> dict[str, list[str]]:
+    """Dieselbe Signatur aus den reinen Modus-DATEN (Gegenstueck zu
+    ``_mode_attr_signature``, das sie aus der DB liest).
+
+    Geht ueber ``_mode_eintrag``, damit ein Eintrag MIT Rasterform (VIZ-50a,
+    drittes Tupel-Element) hier nicht am Auspacken scheitert. Die Geometrie geht
+    bewusst NICHT in die Signatur ein: sie sagt nichts ueber das Kanal-Layout,
+    und ein Signatur-Treffer wuerde alle Modi/Kanaele/Ranges neu aufbauen — eine
+    reine Anzeige-Korrektur darf das nicht ausloesen (den Nachtrag erledigt
+    ``_ensure_panel_geometrie`` in-place)."""
+    return {name: [ch[1] for ch in channels]
+            for name, channels, _grid in map(_mode_eintrag, modes_data)}
+
+
 # Soll-Signatur des korrigierten ZQ02001 (2026-06-09). Weicht ein vorhandenes
 # builtin-Profil davon ab (z. B. alte DB mit vertauschtem Dimmer/Strobe),
 # werden seine Modi in-place neu aufgebaut.
-_ZQ02001_SIGNATURE = {
-    mode_name: [ch[1] for ch in channels]
-    for mode_name, channels in _zq02001_modes_data()
-}
+_ZQ02001_SIGNATURE = _soll_signatur(_zq02001_modes_data())
 
 # Soll-Signatur des ZQ06121 (2026-08-05). Hier geht es NICHT um vertauschte
 # Attribute wie beim ZQ02001, sondern um eine reine UMBENENNUNG: der Vorbehalt
@@ -2988,22 +3054,52 @@ _ZQ02001_SIGNATURE = {
 # nachgesehen hat. Dass die Signatur das ueberhaupt bemerkt, liegt daran, dass
 # `_mode_attr_signature` den Modusnamen als Dict-SCHLUESSEL fuehrt — waere sie
 # nur eine Attribut-Liste, bliebe der alte Name in jeder befuellten DB stehen.
-_ZQ06121_SIGNATURE = {
-    mode_name: [ch[1] for ch in channels]
-    for mode_name, channels in _zq06121_modes_data()
-}
+_ZQ06121_SIGNATURE = _soll_signatur(_zq06121_modes_data())
 
 # Soll-Signatur des Spider (2026-06-16): zwei separate Tilts (Bar L/R) statt
 # Pan/Tilt. Aeltere DBs (CH1=pan) werden in-place migriert.
-_EURON10_SIGNATURE = {
-    mode_name: [ch[1] for ch in channels]
-    for mode_name, channels in _fog_hazer_modes_data()
-}
+_EURON10_SIGNATURE = _soll_signatur(_fog_hazer_modes_data())
 
-_SPIDER14_SIGNATURE = {
-    mode_name: [ch[1] for ch in channels]
-    for mode_name, channels in _spider_modes_data()
-}
+_SPIDER14_SIGNATURE = _soll_signatur(_spider_modes_data())
+
+
+def _ensure_panel_geometrie(s, short_name: str, modes_data) -> bool:
+    """VIZ-50a: traegt die hinterlegte Rasterform in eine BEREITS BEFUELLTE
+    Bibliothek nach. Liefert True, wenn etwas geaendert wurde.
+
+    ★ Ohne diesen Nachtrag kaeme die Geometrie ausschliesslich in einer frisch
+    angelegten fixtures.db an. `ensure_builtins` baut ein vorhandenes Profil naemlich
+    nur dann neu, wenn die ATTRIBUT-Signatur abweicht (`_mode_attr_signature`) —
+    und eine Rasterform steht in keinem Attribut. Auf einem gewachsenen Rechner
+    (gemessen: 1789 Profile, 5120 Modi) waere das Feld also dauerhaft 0 geblieben
+    und der ZQ06121 im 3D weiter ein 7x7-Quadrat statt einer 12x4-Leiste.
+
+    ★★ Nur ERGAENZEND, nie ueberschreibend: ein Modus, der bereits eine Form
+    traegt, bleibt unangetastet. Sonst wuerde eine spaetere Korrektur des Nutzers
+    bei jedem Programmstart still zurueckgesetzt. Kanaele/Ranges fasst die
+    Funktion nicht an — im Gegensatz zum Signatur-Weg, der die Modi verwirft."""
+    soll = {name: grid for name, _ch, grid in map(_mode_eintrag, modes_data)
+            if grid != (0, 0)}
+    if not soll:
+        return False
+    prof = s.execute(
+        select(FixtureProfile)
+        .options(selectinload(FixtureProfile.modes))
+        .where(FixtureProfile.short_name == short_name,
+               FixtureProfile.source == "builtin")
+    ).scalars().first()
+    if prof is None:
+        return False
+    geaendert = False
+    for mode in prof.modes:
+        grid = soll.get(mode.name)
+        if grid is None:
+            continue
+        if int(mode.grid_rows or 0) or int(mode.grid_cols or 0):
+            continue
+        mode.grid_rows, mode.grid_cols = grid
+        geaendert = True
+    return geaendert
 
 
 def _ensure_wheel_ranges(s, short_name: str, modes_data) -> bool:
@@ -3196,6 +3292,15 @@ def ensure_builtins():
                 prof.modes.clear()
                 s.flush()
                 _add_modes(s, prof, _fog_hazer_modes_data())
+                changed = True
+        # VIZ-50a: Rasterform der Pixel-Panels in bestehende DBs nachtragen.
+        # NACH den Signatur-Bloecken oben: hat einer davon die Modi neu gebaut,
+        # tragen sie die Form schon und der Nachtrag findet nichts mehr zu tun.
+        for _kurz, _daten in (("MATRIXPANEL", _matrix_panel_modes_data()),
+                              ("DOTZMATRIX", _dotz_matrix_modes_data()),
+                              ("STAIRPP144", _stairville_pp144_modes_data()),
+                              ("ZQ06121", _zq06121_modes_data())):
+            if _ensure_panel_geometrie(s, _kurz, _daten):
                 changed = True
         # X-3: generische MH-Spots mit Farb-/Gobo-Rad-Slots nachruesten
         if _ensure_wheel_ranges(s, "MH8", _mh8_modes_data()):

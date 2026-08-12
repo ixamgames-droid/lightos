@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-12 — Ein LED-Balken steht im 3D endlich als Balken da
+
+#### Neu
+
+- **Pixel-Panels bringen ihre echte Form mit.** Die 3D-Vorschau wusste bisher
+  nur, WIE VIELE Zonen ein Panel hat, nicht wie sie angeordnet sind — und riet
+  daraus ein möglichst quadratisches Raster. Für den 48-Zonen-Balken ZQ06121
+  hieß das: ein 7×7-Quadrat mit 49 Feldern, eines davon leer, wo in Wirklichkeit
+  eine 12 Zonen breite und 4 Zonen hohe Leiste hängt. Die Anordnung steht jetzt
+  beim Gerätemodus in der Bibliothek und wird bis ins 3D durchgereicht; das
+  Gehäuse folgt dem Seitenverhältnis, statt immer eine quadratische
+  50-cm-Kachel zu sein.
+
+- **Damit stimmt auch die Bewegung.** Ein Lauflicht „Spalte für Spalte" lief in
+  der Vorschau nach dem siebten Pixel eine Zeile tiefer weiter, während es am
+  echten Balken geradeaus durchlief. Jetzt zeigt die Vorschau dieselbe Figur wie
+  das Gerät — die 2D-Draufsicht eingeschlossen. Und ein hochkant montiertes
+  Panel steht auch hochkant im Bild, nicht mehr nur mit umsortierten Pixeln.
+
+- Mitgeliefert ist die Form für den ZQ06121 (4×12), das generische Matrix-Panel
+  (4×4 / 8×8), die ADJ Dotz Matrix (4×4) und das Stairville Pixel Panel 144
+  (12×12). Bei allen außer dem Balken entspricht sie dem bisherigen Ratewert —
+  ihr Bild bleibt unverändert. **Geräte ohne hinterlegte Form sehen weiterhin
+  exakt so aus wie bisher**; die Vorschau erfindet keine Maße.
+
 ### 2026-08-12 — Der Knopf „Kopf-Gruppe wiederherstellen" ist jetzt auch am Spider da
 
 #### Behoben

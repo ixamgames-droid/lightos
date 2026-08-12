@@ -932,19 +932,23 @@ export function buildMoverBar(n) {
 
 // FM-13: LED-Matrix/Pixel-Panel — flaches Panel mit rows*cols einzeln faerbbaren
 // Pixel-Quads (Direkt-Emitter, KEIN Beam/Kein Pan-Tilt — einfachstes Multi-Head-
-// Modell). n = Pixel-Anzahl (aus head_count); Gitter near-square abgeleitet. Pixel
-// i (Zeilen-Haupt, i=0 = oben links) wird von heads[i].r/g/b gefaerbt. Front = +Z
-// (Panel steht vertikal wie ein Backdrop). Reale Referenz: generische 0,5-m-LED-
-// Kachel (500 x 500 x 50 mm) — Pixel fuellen die feste Panel-Flaeche unabh. der
-// Aufloesung. Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols };
+// Modell). n = Pixel-Anzahl (aus head_count); Gitter aus der hinterlegten
+// Geometrie, sonst near-square abgeleitet. Pixel i (Zeilen-Haupt, i=0 = oben
+// links) wird von heads[i].r/g/b gefaerbt. Front = +Z (Panel steht vertikal wie
+// ein Backdrop). Reale Referenz: generische 0,5-m-LED-Kachel — die 0,5 m sind
+// seit VIZ-50a die LAENGERE Kante, die kuerzere folgt dem Seitenverhaeltnis.
+// Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols };
 // `rows`/`cols` ist das SICHTBARE Raster — bei 90°/270° Montage-Drehung also
 // die getauschte Form, nicht die aus der Pixelzahl abgeleitete (VIZ-52).
-export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip) {
+export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
+                                 gridCols, gridRows) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
   // VIZ-51: Rasterform aus der EINEN Quelle (frueher hier nachgerechnet).
-  const { count: n2, cols: srcCols, rows: srcRows } = panelGrid(n);
+  // VIZ-50a: mit hinterlegter Geometrie ist die Form KEIN Ratewert mehr.
+  const { count: n2, cols: srcCols, rows: srcRows, explizit } =
+    panelGrid(n, gridCols, gridRows);
   n = n2;
   // ★ VIZ-52: erst nummerieren (pixelOrder), dann haengen (Drehung/Spiegelung) —
   // `placeElement` verbindet beides in genau dieser Reihenfolge. Die Positionen
@@ -959,17 +963,38 @@ export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip) {
                               elementRotation, elementFlip));
   const rows = plaetze[0].rows, cols = plaetze[0].cols;
   const group = new THREE.Group();
-  const PW = 0.5, PH = 0.5, PD = 0.05;    // feste Panel-Groesse (0,5-m-Kachel)
+  // ★ VIZ-50a: Panel-MASSE aus dem Seitenverhaeltnis des Rasters. Vorher stand
+  // hier `PW = 0.5, PH = 0.5` — eine fest quadratische Kachel, unabhaengig vom
+  // Geraet. Ein 12x4-Balken wurde damit in ein Quadrat gequetscht, seine Pixel
+  // dreifach ueberhoeht; im 3D war er von einem Panel nicht zu unterscheiden.
+  //
+  // Die LAENGERE Kante behaelt die bisherigen 0,5 m, die kuerzere folgt dem
+  // Verhaeltnis. Der Rand skaliert mit (SEITE), nicht als fester Betrag —
+  // sonst waeren die Zellen nicht mehr quadratisch, obwohl das Raster es ist.
+  // Fuer ein quadratisches Raster ist die ganze Rechnung die IDENTITAET zum
+  // Bestand (Faktor 1, also 0,5 x 0,5 und Rand 0,02).
+  //
+  // ★★ Und deshalb NUR bei `explizit`: eine geratene Rasterform (near-square
+  // aus der Pixelzahl) ist keine Aussage ueber das Geraet. Aus 12 Pixeln raet
+  // `panelGrid` ein 4x3 — daraus ein physisch flacheres Gehaeuse zu bauen,
+  // waere eine Behauptung, die niemand aufgestellt hat. Geraete ohne
+  // hinterlegte Geometrie sehen darum exakt aus wie bisher.
+  const SEITE = 0.5, PD = 0.05;
+  const lang = Math.max(rows, cols);
+  const fw = explizit ? cols / lang : 1;
+  const fh = explizit ? rows / lang : 1;
+  const PW = SEITE * fw, PH = SEITE * fh;
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x141414, metalness: 0.4, roughness: 0.6 });
   const body = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, PD), bodyMat);
   body.castShadow = true;
   group.add(body);
   const margin = 0.02;
-  const gw = (PW - 2 * margin) / cols;
-  const gh = (PH - 2 * margin) / rows;
+  const mx = margin * fw, my = margin * fh;
+  const gw = (PW - 2 * mx) / cols;
+  const gh = (PH - 2 * my) / rows;
   const pxW = gw * 0.85, pxH = gh * 0.85;
-  const x0 = -PW / 2 + margin + gw / 2;
-  const y0 = PH / 2 - margin - gh / 2;     // Start oben links (Zeile 0 = oben)
+  const x0 = -PW / 2 + mx + gw / 2;
+  const y0 = PH / 2 - my - gh / 2;         // Start oben links (Zeile 0 = oben)
   const pixels = [];
   for (let i = 0; i < n; i++) {
     const { r, c } = plaetze[i];

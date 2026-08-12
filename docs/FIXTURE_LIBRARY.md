@@ -18,7 +18,7 @@ Manufacturer ─< FixtureProfile ─< FixtureMode ─< FixtureChannel ─< Chann
 | Ebene | Wichtige Felder | Bedeutung |
 |---|---|---|
 | `FixtureProfile` | `short_name`, `fixture_type`, `source` | ein Geraetemodell (z. B. ZQ02001) |
-| `FixtureMode` | `name`, `channel_count` | DMX-Modus (z. B. „9-Kanal" / „11-Kanal") |
+| `FixtureMode` | `name`, `channel_count`, **`grid_rows`/`grid_cols`** | DMX-Modus (z. B. „9-Kanal" / „11-Kanal") |
 | `FixtureChannel` | `channel_number`, `name`, `attribute`, `default_value`, `highlight_value` | ein DMX-Kanal im Modus |
 | `ChannelRange` | `range_from`, `range_to`, `name`, **`kind`** | benannter Wertebereich (z. B. 10–19 „Rot") |
 
@@ -34,6 +34,19 @@ Manufacturer ─< FixtureProfile ─< FixtureMode ─< FixtureChannel ─< Chann
 `sound` · `reset` · `""` (unbekannt). Ohne expliziten kind wird er konservativ
 aus dem Namen abgeleitet (`_infer_range_kind`); im Seed koennen Ranges als
 4-Tupel `(from, to, name, kind)` exakt angegeben werden.
+
+**`FixtureMode.grid_rows`/`grid_cols`** (VIZ-50a) ist die **physische**
+Anordnung der Zonen/Pixel eines Panels in DIESEM Modus — `0/0` heisst „nicht
+hinterlegt". Ohne die Angabe leitet der 3D-Renderer die Form near-square aus der
+Pixelzahl ab (`panelGrid`), was fuer eine Leiste falsch ist: 48 Zonen wurden zu
+einem 7x7-Quadrat statt zu 12x4. Im Seed steht die Form als optionales drittes
+Tupel-Element `(mode_name, channels, (rows, cols))`; `ensure_builtins` traegt sie
+ueber `_ensure_panel_geometrie` auch in bereits befuellte Bibliotheken nach — der
+Signatur-Vergleich unten sieht sie naemlich nicht, weil sie in keinem Attribut
+steht. Sie sitzt am **Modus** und nicht am Profil, weil die Pixelzahl
+modusabhaengig ist; und nicht am gepatchten Geraet, weil sie fuer jedes Exemplar
+gilt (im Gegensatz zu `pixel_order`/`element_rotation`, die vom Geraetemenue bzw.
+von der Montage abhaengen).
 
 ## 2. Woher Profile kommen
 

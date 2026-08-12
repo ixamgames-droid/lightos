@@ -301,10 +301,16 @@ export function addFixture(data) {
   // Montage-Orientierung den Renderer nie (die JS-Helfer `placeElement`/
   // `rotateCell` hatten gar keinen Aufrufer), und ein gedreht montiertes Panel
   // sah aus wie ein normal montiertes.
+  // ★ VIZ-50a: `gridRows`/`gridCols` sind die HINTERLEGTE physische Rasterform
+  // aus dem Fixture-Modus. Ohne sie musste `buildMatrixPanel` die Form aus der
+  // Pixelzahl raten (near-square) — Robins 4x12-Balken stand als 7x7-Quadrat da.
+  // Fehlt das Feld (Alt-Payload, Geraet ohne Angabe), bleibt der Ratepfad.
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
                                            pixelBar, pixelOrder: data.pixelOrder,
                                            elementRotation: data.elementRotation,
-                                           elementFlip: data.elementFlip });
+                                           elementFlip: data.elementFlip,
+                                           gridRows: data.gridRows,
+                                           gridCols: data.gridCols });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
@@ -410,8 +416,11 @@ export function addFixture(data) {
   // VIZ-52: die Orientierung MUSS auch hier mit — sonst zeigte das 2D-Icon
   // dasselbe Panel ungedreht, waehrend das 3D-Modell gedreht steht (genau die
   // 2D/3D-Abweichung, die VIZ-51 fuer die Reihenfolge beseitigt hat).
+  // VIZ-50a: aus demselben Grund auch die Rasterform — ein Icon, das 7x7
+  // schneidet, waehrend das Modell daneben 12x4 zeigt, waere derselbe Bruch.
   const icon = buildTopDownIcon(rtype, data.nHeads, data.pixelOrder,
-                                data.elementRotation, data.elementFlip);
+                                data.elementRotation, data.elementFlip,
+                                data.gridCols, data.gridRows);
   icon.position.set(root.position.x, 0.05, root.position.z);
   // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
   // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-

@@ -3904,6 +3904,10 @@ def clear_channel_cache():
     aus Generator/Editor reisen ueber denselben Invalidierungs-Pfad."""
     _channel_cache.clear()
     _viz_model_override_cache.clear()
+    # VIZ-50a: die Rasterform haengt am selben Modus wie die Kanaele — sie MUSS
+    # ueber denselben Weg invalidiert werden, sonst zeigt das 3D-Panel nach einem
+    # Modus-Wechsel die Form des alten Modus.
+    _panel_grid_cache.clear()
     # FM-17: die Kopf-Karte haengt an genau diesen Kanal-Listen — zusammen
     # invalidieren, sonst zeigt sie auf Kanaele eines alten Modus (der Schluessel
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
@@ -4003,6 +4007,77 @@ def _as_dual_tilt_channels(channels):
     return out
 
 
+def _resolve_mode(s, fixture):
+    """Der ``FixtureMode`` eines gepatchten Geraets — mit der Fallback-Kette,
+    die dieses Projekt ueberall meint, wenn es „der Modus des Geraets" sagt:
+
+      1. exakter Name, 2. irgendein Modus mit passender Kanalzahl,
+      3. irgendein Modus des Profils, 4. ``None``.
+
+    VIZ-50a: aus ``get_channels_for_patched`` herausgezogen, weil die Rasterform
+    (``panel_grid_for``) DENSELBEN Modus meinen muss wie die Kanaele. Zweimal
+    ausprogrammiert waeren es zwei Regeln, die auseinanderlaufen — und dann
+    zeigte das 3D-Panel die Form des einen Modus mit den Pixeln des anderen."""
+    from sqlalchemy import select
+    from .database.models import FixtureMode
+    mode = s.execute(
+        select(FixtureMode)
+        .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
+        .where(FixtureMode.name == fixture.mode_name)
+    ).scalar_one_or_none()
+    if not mode:
+        mode = s.execute(
+            select(FixtureMode)
+            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
+            .where(FixtureMode.channel_count == fixture.channel_count)
+        ).scalar_one_or_none()
+    if not mode:
+        mode = s.execute(
+            select(FixtureMode)
+            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
+            .order_by(FixtureMode.id)
+        ).scalars().first()
+    return mode
+
+
+# VIZ-50a: Cache (profile_id, mode_name, channel_count) -> (rows, cols).
+# Wie der Channel-Cache noetig: `_fixture_to_dict` laeuft pro Fixture bei jedem
+# Szenen-Neuaufbau, und ohne Cache waere das je eine eigene DB-Session.
+_panel_grid_cache: dict = {}
+
+
+def panel_grid_for(fixture) -> tuple:
+    """Hinterlegte physische Rasterform des Geraets als ``(rows, cols)``.
+
+    ``(0, 0)`` heisst „nicht hinterlegt" — und ist damit die Aussage, auf die
+    sich der Renderer verlaesst, um wie bisher zu RATEN (`panelGrid`). Ein
+    erfundener Ersatzwert waere hier fatal: er waere von einer echten Angabe
+    nicht mehr unterscheidbar, und jedes Bestandsgeraet bekaeme still eine
+    behauptete Form."""
+    pid = getattr(fixture, "fixture_profile_id", None)
+    if pid is None:
+        return (0, 0)
+    key = (pid, getattr(fixture, "mode_name", None),
+           getattr(fixture, "channel_count", None))
+    cached = _panel_grid_cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        from .database.fixture_db import engine
+        with Session(engine()) as s:
+            mode = _resolve_mode(s, fixture)
+            grid = ((int(getattr(mode, "grid_rows", 0) or 0),
+                     int(getattr(mode, "grid_cols", 0) or 0))
+                    if mode is not None else (0, 0))
+    except Exception:
+        # Transienter DB-Fehler: NICHT cachen (gleiche Politik wie
+        # viz_model_override_for) — sonst friert der Fehlerfall als
+        # "keine Geometrie" ein und der naechste Aufruf sieht ihn nie neu.
+        return (0, 0)
+    _panel_grid_cache[key] = grid
+    return grid
+
+
 def get_channels_for_patched(fixture: PatchedFixture):
     """Laedt die Channel-Objekte fuer ein gepatchtes Geraet (gecached).
     Fallback: Wenn der exakte Mode-Name nicht existiert, wird der erste Mode
@@ -4023,31 +4098,9 @@ def get_channels_for_patched(fixture: PatchedFixture):
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from .database.fixture_db import engine, should_auto_mark_dual_tilt
-    from .database.models import FixtureProfile, FixtureMode, FixtureChannel
+    from .database.models import FixtureProfile, FixtureChannel
     with Session(engine()) as s:
-        # 1. Versuch: exakter Match
-        mode = s.execute(
-            select(FixtureMode)
-            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-            .where(FixtureMode.name == fixture.mode_name)
-        ).scalar_one_or_none()
-
-        # 2. Fallback: Mode mit passender Kanalanzahl
-        if not mode:
-            mode = s.execute(
-                select(FixtureMode)
-                .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-                .where(FixtureMode.channel_count == fixture.channel_count)
-            ).scalar_one_or_none()
-
-        # 3. Fallback: irgendein Mode des Profils
-        if not mode:
-            mode = s.execute(
-                select(FixtureMode)
-                .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-                .order_by(FixtureMode.id)
-            ).scalars().first()
-
+        mode = _resolve_mode(s, fixture)
         if not mode:
             _channel_cache[key] = []
             return []
