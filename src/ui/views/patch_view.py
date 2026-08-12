@@ -352,11 +352,12 @@ class PatchFixtureEditDialog(QDialog):
                 "sagen nur die REIHENFOLGE, nicht die Position:\n"
                 "• Zeilenweise – Pixel 1 oben links, dann nach rechts (Default).\n"
                 "• Schlangenlinien – jede zweite Zeile laeuft rueckwaerts. Das ist\n"
-                "  der Werkszustand der ADJ Dotz Matrix („Pixel Flip: Standard“);\n"
-                "  ohne diese Einstellung laeuft ein horizontales Lauflicht am\n"
-                "  echten Geraet im Zickzack, waehrend es im 3D geradeaus laeuft.\n"
+                "  der Werkszustand der ADJ Dotz Matrix („Pixel Flip: Standard“).\n"
                 "• Gespiegelt – jede Zeile rechts→links (Panel gedreht verbaut).\n\n"
-                "Aendert NUR die Darstellung/Zuordnung, nie die DMX-Adressen.")
+                "Aendert NUR die Zuordnung, nie die DMX-Adressen. Am GERAET wirkt\n"
+                "die Wahl erst ueber ein Raster, das mit ihr gebaut wurde\n"
+                "(„als Block…“) — sonst laeuft ein horizontales Lauflicht dort\n"
+                "weiter im Zickzack, obwohl die 3D-Vorschau bereits umspringt.")
             form.addRow("Pixel-Reihenfolge:", self._combo_pixel_order)
 
             # ORIENT: wie das Panel HAENGT. Bewusst ein ZWEITES Feld neben der
@@ -391,6 +392,25 @@ class PatchFixtureEditDialog(QDialog):
                 "Panel um die Hochachse gedreht verbaut (Vorderseite zeigt\n"
                 "in die andere Richtung). Wirkt NACH der Drehung.")
             form.addRow("", self._chk_flip)
+
+            # FM-21: WO die drei Felder darueber wirken — sichtbar, nicht im
+            # Tooltip. Der Tooltip erreicht nur, wer ihn sucht; die Falle trifft
+            # aber genau den, der nicht sucht: die 3D-Vorschau springt beim
+            # Umstellen sofort um, also haelt man die Sache fuer erledigt — am
+            # Rig laeuft das Lauflicht unveraendert im Zickzack, weil das Raster,
+            # das die Matrix-Effekte benutzen, aus der Gruppe kommt und beim
+            # Patchen als EINE Reihe entsteht. Eine Einstellung, die sichtbar
+            # reagiert, ohne zu wirken, ist irrefuehrender als eine, die nichts
+            # tut — deshalb steht der Weg dorthin hier im Klartext.
+            _hinweis = QLabel(
+                "Wirkt in der 3D-Vorschau — und am Gerät erst über ein Raster, "
+                "das damit gebaut wurde: Tab „Fixture-Gruppen“, Rechtsklick auf "
+                "das Gerät im Raster → „als Block…“. Die beim Patchen angelegte "
+                "Gruppe „… · Köpfe“ bleibt EINE Reihe und ändert sich dadurch "
+                "nicht.")
+            _hinweis.setWordWrap(True)
+            _hinweis.setStyleSheet("color:#8b949e;")
+            form.addRow("", _hinweis)
 
             # Status + Wiederherstellen: schliesst die „Kopf-Gruppe versehentlich
             # geloescht"-Falle, OHNE das Geraet neu patchen zu muessen.

@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-11 — Der Patch-Dialog sagt jetzt, wo die Pixel-Reihenfolge wirkt
+
+#### Behoben
+
+- **Eine Einstellung, die sichtbar reagierte, ohne zu wirken.** Wer bei einem
+  Panel auf „Schlangenlinien" umstellte, sah die 3D-Vorschau sofort umspringen
+  und hielt die Sache damit für erledigt — am Gerät lief das Lauflicht
+  unverändert im Zickzack. Der Hinweistext im Dialog legte genau das nahe
+  („ohne diese Einstellung läuft ein Lauflicht am echten Gerät im Zickzack,
+  während es im 3D geradeaus läuft"), und keine Stelle sagte, was noch fehlt.
+
+- **Jetzt steht der Weg im Dialog**, sichtbar unter den drei Feldern
+  „Pixel-Reihenfolge", „Montage-Drehung" und „Waagerecht gespiegelt montiert":
+  die Angaben wirken in der 3D-Vorschau — und am Gerät erst über ein Raster,
+  das mit ihnen gebaut wurde (Tab „Fixture-Gruppen", Rechtsklick auf das Gerät
+  → „als Block…"). Dazu die ehrliche Grenze: die beim Patchen automatisch
+  angelegte Gruppe „… · Köpfe" bleibt eine Reihe und ändert sich dadurch nicht.
+
+- **Nachgemessen bis zum Ausgang:** dass die Wahl über den Block-Weg wirklich
+  bis an die DMX-Kanäle des richtigen Kopfes durchschlägt, prüft die Software
+  ab jetzt selbst — vom Dialogfenster über das Gruppen-Raster und den
+  Matrix-Effekt bis zum gesendeten Kanal.
+
 ### 2026-08-11 — Die Show-Prüfung merkt jetzt, wenn ein Gerät dunkel bleibt
 
 #### Behoben
