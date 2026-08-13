@@ -28,6 +28,18 @@ aus welcher Datei sie stammt (``PRAGMA user_version`` als Marke) — mit
 Positivkontrolle, dass diese Messung ohne Vorgabe die echte Bibliothek anzeigt.
 
 ★ Die echte Bibliothek wird hier ausschliesslich LESEND (``mode=ro``) angefasst.
+
+★★ **Was in dieser Datei den vollen Lauf abdeckt und was nicht — die Korrektur
+aus der zweiten Runde.** Die Tests oben fahren jeweils EIN Segment als
+Kindprozess. Das Fertig-Kriterium von QA-58 spricht vom VOLLEN Suite-Lauf; eine
+Stichprobe von 1 aus 604 als Aussage ueber alle auszugeben, war die eigentliche
+Schwaeche des ersten Anlaufs — daneben der Umstand, dass die Messung „Schema
+vorher/nachher" auf einem Rechner mit aktueller Bibliothek gar nicht anschlagen
+KANN. Die Zusage haengt seither an einer Pruefung in ``tests/conftest.py``, die
+in jedem der 604 Segmente laeuft und am PFAD misst statt am Schema. Belegt wird
+sie von ``WaechterDeckungTest`` ganz unten: derselbe echte Segmentlauf einmal
+mit und einmal ohne den realistischen Rueckfall, in einem Sandkasten-Datenordner,
+damit der Rueckfall-Arm niemals die Datei des Nutzers trifft.
 """
 from __future__ import annotations
 
@@ -243,10 +255,22 @@ class BibliothekSchemaTest(unittest.TestCase):
 
     # ── Der Beleg an der echten Datei ───────────────────────────────────────
     def test_ein_echter_segmentlauf_laesst_die_echte_bibliothek_unberuehrt(self):
-        """Fertig-Kriterium aus QA-58, an der Datei des Nutzers gemessen.
+        """Eine STICHPROBE an der Datei des Nutzers — mehr ist es nicht.
 
-        Der Kindprozess bekommt KEIN ``LIGHTOS_FIXTURE_DB`` mit — er loest die
-        Bibliothek genauso auf wie jedes Segment des Gates.
+        Der Kindprozess bekommt KEIN ``LIGHTOS_FIXTURE_DB`` mit; er loest die
+        Bibliothek genauso auf wie jedes Segment des Gates. Das ist ein
+        Ende-zu-Ende-Beleg an der echten Datei, und er ist etwas wert, weil hier
+        wirklich nichts gestellt ist.
+
+        ⚠️ **Was er NICHT ist: das Fertig-Kriterium von QA-58.** Das spricht vom
+        VOLLEN Suite-Lauf — 604 Segmente —, hier laeuft EINES. Genau diese
+        Verwechslung (Stichprobe von 1 als Aussage ueber alle) hat das Item im
+        ersten Anlauf zurueckgeworfen. Und die Messung selbst ist auf einem
+        Rechner mit aktueller Bibliothek stumpf: dort gibt es nichts zu
+        migrieren, die Datei bliebe auch bei kaputter Isolation byte-identisch.
+        Den vollen Lauf deckt der Waechter in ``tests/conftest.py`` ab
+        (``pytest_collection_finish`` + ``_waechter_bibliothek_ist_eine_kopie``),
+        belegt in ``WaechterDeckungTest`` weiter unten.
         """
         echt = _echte_bibliothek()
         if not os.path.exists(echt):
@@ -489,6 +513,285 @@ class BibliothekSchemaTest(unittest.TestCase):
             _profil_kennzahl(echt), _profil_kennzahl(benutzt),
             "die Arbeits-Bibliothek ist keine Kopie der echten — damit stimmen "
             "die fixture_profile_id-Werte der committeten Shows nicht mehr")
+
+
+class WaechterDeckungTest(unittest.TestCase):
+    """★ Deckt der Waechter die ganze Zusage ab?
+
+    **Der Mangel, gegen den diese Klasse antritt.** Die Tests oben fahren EIN
+    Segment als Kindprozess. Das Fertig-Kriterium von QA-58 spricht aber vom
+    VOLLEN Suite-Lauf — 604 Segmente. Eine Stichprobe von 1 als Aussage ueber
+    alle auszugeben, ist genau die Sorte zu weit gefasster Zusage, an der das
+    Item im ersten Anlauf gescheitert ist.
+
+    **Die Zusage haengt seither an zwei Pruefungen in ``tests/conftest.py``** —
+    ``pytest_collection_finish`` fuer ``fixture_db.DB_PATH`` (bricht ab, bevor
+    ein Test laeuft) und ``_waechter_bibliothek_ist_eine_kopie`` fuer die
+    tatsaechlich gebaute Engine. Beide laufen in JEDEM Segment, weil jedes
+    Segment dieses ``conftest.py`` laedt. Hier wird belegt, dass sie das auch
+    tun: derselbe echte Segmentlauf einmal MIT und einmal OHNE den realistischen
+    Rueckfall, fuer beide Wege getrennt und jeweils mit Positivkontrolle.
+
+    ★ **Warum ein Stellvertreter-Datenordner und nicht die echte Bibliothek.**
+    Der Rueckfall-Arm laesst das Segment absichtlich auf ``app_data_dir()/
+    fixtures.db`` laufen und dort wird migriert. Das darf niemals die Datei des
+    Nutzers sein. Also bekommt der Kindprozess ein eigenes ``XDG_DATA_HOME`` mit
+    einer Kopie der Bibliothek: fuer ihn ist DAS die echte Bibliothek — der
+    Waechter im ``conftest`` rechnet sich seinen Vergleichspfad aus genau
+    derselben Quelle aus. Der gepruefte Weg ist Zeile fuer Zeile derselbe, nur
+    der Datenordner ist ein Sandkasten.
+    """
+
+    _NUR_SKIPS = "tests/test_color_fx_show_render.py"
+    """Ein Segment, dessen Tests sich ALLE ueberspringen (die Show ist nicht
+    committet), dessen Modul-Import aber ``app_state`` und damit ``fixture_db``
+    laedt. Genau der Fall, den eine Test-Fixture nicht sieht: sie laeuft nie."""
+
+    _FRUEH = "tests/test_dimmer_master.py"
+    """Ein Segment, das ``fixture_db`` schon beim MODUL-Import laedt (gemessen:
+    beim Kollektionsende ist es in ``sys.modules``) und dessen 7 Tests bestehen.
+    An ihm laesst sich belegen, dass der Waechter den Lauf abbricht, BEVOR ein
+    Test die Bibliothek anfassen kann."""
+
+    _SPAET = _OPFER
+    """Und die Gegenprobe: ``test_capability_live.py`` importiert die Bibliothek
+    erst IM Test (gemessen: beim Kollektionsende nicht in ``sys.modules``). Dort
+    kann der Kollektions-Waechter per Konstruktion nichts sehen — das faengt die
+    Fixture nach dem Test ab. Beide Faelle stehen hier, damit die Zusage nicht
+    mehr behauptet als der frueheste Zugriffszeitpunkt hergibt."""
+
+    def setUp(self):
+        echt = _echte_bibliothek()
+        if not os.path.exists(echt):
+            self.skipTest("keine echte Bibliothek auf diesem Rechner")
+
+    def _sandkasten_datenordner(self) -> str:
+        """Ein ``XDG_DATA_HOME``, in dem eine Kopie der Bibliothek liegt.
+
+        Kopie und nicht frischer Seed: das Opfer-Segment sucht seine Fixtures
+        ueber die ``fixture_profile_id`` der committeten Show. Die echte Datei
+        wird dabei ausschliesslich GELESEN.
+        """
+        tmp = tempfile.mkdtemp(prefix="qa58_sandkasten_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        ordner = os.path.join(tmp, "LightOS")
+        os.makedirs(ordner)
+        shutil.copyfile(_echte_bibliothek(), os.path.join(ordner, "fixtures.db"))
+        return tmp
+
+    def _lauf(self, opfer: str, xdg: str, plugin: str | None = None):
+        """Faehrt ``opfer`` als echtes Segment im Sandkasten-Datenordner.
+
+        ``plugin`` laedt eines der beiden Rueckfall-Module dazu
+        (``tests/_qa58_rueckfall.py`` = Umlenkung weg, also ``DB_PATH`` auf der
+        Bibliothek; ``tests/_qa58_engine_rueckfall.py`` = globale Engine auf der
+        Bibliothek). Ohne ``plugin`` laeuft das Segment voellig unveraendert —
+        das ist die Positivkontrolle.
+        """
+        tmp = tempfile.mkdtemp(prefix="qa58_waechter_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        env = dict(os.environ)
+        env.pop("LIGHTOS_FIXTURE_DB", None)
+        env["XDG_DATA_HOME"] = xdg
+        env["QT_QPA_PLATFORM"] = "offscreen"
+        env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")       # QA-53
+        env["LIGHTOS_CRASH_LOG"] = os.path.join(tmp, "crash.log")
+        env["PYTHONPATH"] = os.pathsep.join(
+            [os.path.join(_REPO, "tests")] + (
+                [env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+        befehl = [sys.executable, "-m", "pytest", "-q", "--tb=short",
+                  "-p", "no:cacheprovider"]
+        if plugin:
+            befehl += ["-p", plugin]
+        befehl.append(opfer)
+        fertig = subprocess.run(befehl, cwd=_REPO, capture_output=True,
+                                text=True, timeout=300, env=env)
+        return fertig.returncode, fertig.stdout + fertig.stderr
+
+    # ── Rueckfall 1: die Umlenkung faellt weg ───────────────────────────────
+    def test_ein_rueckfall_bricht_das_segment_ab_bevor_ein_test_laeuft(self):
+        """Der Kern der Zusage: faellt die Umlenkung, wird das Segment rot.
+
+        ⚠️ **Und zwar auf JEDEM Rechner.** Die Messung haengt bewusst am PFAD,
+        den ``fixture_db`` benutzt, nicht am Schema der Datei: auf einem Rechner
+        mit aktueller Bibliothek — dem Normalfall — gaebe es nichts mehr zu
+        migrieren, die Datei bliebe auch bei voellig kaputter Isolation
+        byte-identisch, und eine Schema-Messung waere gruen. Der Sandkasten hier
+        traegt eine vollstaendige, aktuelle Kopie: der Rueckfall wird also unter
+        genau der Bedingung rot, unter der die alte Messung blind ist.
+
+        ★ Geprueft wird zusaetzlich, dass **kein Test mehr laeuft**. Der
+        Waechter sitzt am Ende der Kollektion — bei einem Segment, das die
+        Bibliothek beim Modul-Import laedt, meldet er den Fehler also nicht
+        bloss, er kommt dem ersten Zugriff zuvor. Ohne diese Bedingung waere
+        der Test auch dann gruen, wenn nur die Fixture nach dem Test anschluege.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._FRUEH, xdg, plugin="_qa58_rueckfall")
+
+        self.assertNotEqual(0, rc,
+                            f"der Rueckfall blieb GRUEN:\n{aus[-3000:]}")
+        self.assertIn("QA-58", aus,
+                      f"rot, aber nicht wegen des Waechters:\n{aus[-3000:]}")
+        self.assertNotIn("passed", aus,
+                         "das Segment hat seine Tests noch ausgefuehrt — der "
+                         "Waechter greift zu spaet, der Zugriff auf die "
+                         f"Bibliothek war schon:\n{aus[-3000:]}")
+
+    def test_ohne_rueckfall_bleibt_dieses_segment_gruen(self):
+        """Positivkontrolle: der Waechter schlaegt im Normalfall NICHT an.
+
+        Gleiches Segment, gleicher Sandkasten, gleiche Umgebung — einziger
+        Unterschied ist das fehlende Rueckfall-Plugin. Ohne diesen Arm koennte
+        der Test darueber auch dann gruen sein, wenn der Waechter schlicht
+        immer meckert. Der Zaehlerstand steht mit dabei: er belegt, dass hier
+        ueberhaupt Tests laufen — sonst waere „kein Test lief" oben trivial.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._FRUEH, xdg)
+
+        self.assertEqual(0, rc, f"das unveraenderte Segment ist rot:\n{aus[-3000:]}")
+        self.assertRegex(aus, r"\d+ passed",
+                         f"das Segment lief gar nicht:\n{aus[-3000:]}")
+        self.assertNotIn("QA-58", aus,
+                         f"der Waechter meldet ohne Anlass:\n{aus[-3000:]}")
+
+    # ── … und die ehrliche Grenze: spaet importierende Segmente ─────────────
+    def test_ein_spaet_importierendes_segment_wird_nach_dem_test_rot(self):
+        """★ Was der Kollektions-Waechter NICHT kann — und wer es auffaengt.
+
+        ``test_capability_live.py`` laedt die Bibliothek erst IM Test (gemessen:
+        beim Kollektionsende steht ``src.core.database.fixture_db`` nicht in
+        ``sys.modules``). Zur Kollektionszeit gibt es dort also nichts zu sehen,
+        und ein Waechter, der nur dort steht, waere fuer solche Segmente blind.
+
+        Aufgefangen wird das von der Fixture nach jedem Test. Der Preis steht
+        damit auch fest und ist hier festgehalten statt beschoenigt: bei einem
+        spaet importierenden Segment ist der Zugriff bereits passiert, wenn die
+        Meldung kommt. Rot wird der Lauf trotzdem — und er nennt den Test.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._SPAET, xdg, plugin="_qa58_rueckfall")
+
+        self.assertNotEqual(0, rc, f"der Rueckfall blieb GRUEN:\n{aus[-3000:]}")
+        self.assertIn("QA-58", aus,
+                      f"rot, aber nicht wegen des Waechters:\n{aus[-3000:]}")
+        self.assertIn("test_render_probe_demo_show", aus,
+                      "die Meldung nennt den Test nicht — dann sagt ein rotes "
+                      f"Segment im Gate nicht, wo zu suchen ist:\n{aus[-3000:]}")
+
+    def test_ohne_rueckfall_bleibt_dasselbe_segment_gruen(self):
+        """Positivkontrolle zum spaet importierenden Segment."""
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._SPAET, xdg)
+
+        self.assertEqual(0, rc, f"das unveraenderte Segment ist rot:\n{aus[-3000:]}")
+        self.assertIn("1 passed", aus, f"das Segment lief gar nicht:\n{aus[-3000:]}")
+        self.assertNotIn("QA-58", aus,
+                         f"der Waechter meldet ohne Anlass:\n{aus[-3000:]}")
+
+    # ── Auch ein Segment, in dem KEIN Test laeuft ────────────────────────────
+    def test_ein_segment_ohne_laufenden_test_wird_trotzdem_rot(self):
+        """Die Luecke, die eine Test-Fixture per Konstruktion nicht schliesst.
+
+        ``test_color_fx_show_render.py`` meldet in jedem Gate-Lauf „5 skipped":
+        seine Show ist nicht committet. Der Modul-Import laeuft trotzdem, zieht
+        ``app_state`` und damit ``fixture_db`` herein — ``DB_PATH`` steht also
+        fest, waehrend keine einzige Test-Fixture je ausgefuehrt wird. Genau
+        deshalb sitzt der Waechter an der Kollektion und nicht in einer Fixture.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._NUR_SKIPS, xdg, plugin="_qa58_rueckfall")
+
+        self.assertNotEqual(0, rc,
+                            f"ein Segment ohne laufenden Test bleibt gruen:\n{aus[-3000:]}")
+        self.assertIn("QA-58", aus, f"rot, aber nicht wegen des Waechters:\n{aus[-3000:]}")
+
+    def test_dasselbe_segment_ohne_rueckfall_ueberspringt_sich_gruen(self):
+        """Positivkontrolle dazu — und die Gegenprobe zur Annahme des Tests.
+
+        Ohne Rueckfall muss dasselbe Segment gruen bleiben; und es muss sich
+        wirklich ueberspringen. Faengt die Datei eines Tages an, Tests
+        auszufuehren, prueft der Test darueber nicht mehr die Luecke, die er
+        zu pruefen behauptet — dann faellt es hier auf.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(self._NUR_SKIPS, xdg)
+
+        self.assertEqual(0, rc, f"das unveraenderte Segment ist rot:\n{aus[-3000:]}")
+        self.assertRegex(aus, r"\d+ skipped",
+                         "das Opfer-Segment fuehrt entgegen der Annahme Tests "
+                         f"aus:\n{aus[-3000:]}")
+        self.assertNotIn("passed", aus,
+                         "das Opfer-Segment laesst inzwischen Tests laufen — "
+                         "dann belegt der Test darueber die Luecke nicht mehr:"
+                         f"\n{aus[-3000:]}")
+        self.assertNotIn("QA-58", aus,
+                         f"der Waechter meldet ohne Anlass:\n{aus[-3000:]}")
+
+    # ── Rueckfall 2: die globale Engine haengt an der Bibliothek ────────────
+    def test_eine_umgesetzte_engine_wird_rot(self):
+        """``DB_PATH`` in Ordnung, ``_engine`` trotzdem auf der Bibliothek.
+
+        Der zweite Weg zur Datei, den der Kollektions-Waechter per Konstruktion
+        nicht sehen kann: ``get_engine(pfad)`` geht an ``DB_PATH`` vorbei, und
+        ``fixture_db._engine`` ist ein umsetzbares Modul-Global (``tests/
+        _fixture_quelle.frische_library`` macht genau das, dort richtig auf eine
+        Wegwerf-Datei). Hier muss die Fixture nach dem Test anschlagen — und
+        weil ein Test gelaufen ist, sagt sie auch WELCHER.
+        """
+        xdg = self._sandkasten_datenordner()
+
+        rc, aus = self._lauf(_OPFER, xdg, plugin="_qa58_engine_rueckfall")
+
+        self.assertNotEqual(0, rc, f"der Rueckfall blieb GRUEN:\n{aus[-3000:]}")
+        self.assertIn("QA-58", aus,
+                      f"rot, aber nicht wegen des Waechters:\n{aus[-3000:]}")
+        self.assertIn("test_render_probe_demo_show", aus,
+                      "die Meldung nennt den Test nicht — dann sagt ein rotes "
+                      f"Segment im Gate nicht, wo zu suchen ist:\n{aus[-3000:]}")
+
+    # ── Der Sandkasten muss auch wirklich einer sein ─────────────────────────
+    def test_der_rueckfall_trifft_den_sandkasten_und_nicht_die_echte_datei(self):
+        """★ Ohne diesen Test waere die ganze Klasse hier ein Risiko.
+
+        Der Rueckfall-Arm laesst ein Segment absichtlich auf
+        ``app_data_dir()/fixtures.db`` migrieren. Gemessen wird deshalb an
+        BEIDEN Dateien: die Kopie im Sandkasten hat danach die VIZ-50a-Spalten
+        (der Rueckfall ist also wirklich dort angekommen), die echte Bibliothek
+        des Nutzers ist byte-identisch geblieben.
+
+        Der Sandkasten startet dafuer ohne die beiden Spalten — sonst waere
+        „sie sind da" schon vorher wahr und belegte nichts.
+        """
+        xdg = self._sandkasten_datenordner()
+        sandkasten_db = os.path.join(xdg, "LightOS", "fixtures.db")
+        con = sqlite3.connect(sandkasten_db)
+        try:
+            for spalte in _VIZ50A_SPALTEN:
+                con.execute(f"ALTER TABLE fixture_modes DROP COLUMN {spalte}")
+            con.commit()
+        finally:
+            con.close()
+        echt = _echte_bibliothek()
+        vorher_echt = (os.stat(echt).st_size, os.stat(echt).st_mtime_ns)
+
+        self._lauf(_OPFER, xdg, plugin="_qa58_engine_rueckfall")
+
+        spalten = _schema(sandkasten_db)["fixture_modes"]
+        self.assertEqual(
+            [], [s for s in _VIZ50A_SPALTEN if s not in spalten],
+            "der Rueckfall hat den Sandkasten NICHT migriert — dann faehrt der "
+            "Waechter-Nachweis oben etwas anderes als den echten Vorfall")
+        self.assertEqual(
+            vorher_echt, (os.stat(echt).st_size, os.stat(echt).st_mtime_ns),
+            "der Rueckfall-Arm hat die ECHTE Bibliothek des Nutzers angefasst")
 
 
 if __name__ == "__main__":

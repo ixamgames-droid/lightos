@@ -298,6 +298,66 @@ def _purge_fixture_db_kopie():
             pass
 
 
+def _bibliotheks_pfade_dieses_prozesses() -> dict:
+    """Die Pfade, die ``fixture_db`` in DIESEM Prozess TATSAECHLICH benutzt.
+
+    Leeres Ergebnis, solange das Modul nicht geladen ist — dann hat der Prozess
+    die Bibliothek nie angefasst, und es gibt nichts zu pruefen. Genau deshalb
+    steht hier ``sys.modules.get`` und kein ``import``: der Waechter darf nicht
+    in 604 Segmenten SQLAlchemy nachladen, nur um zu fragen, ob es geladen ist.
+
+    Gemessen werden zwei Stellen, weil sie unabhaengig voneinander falsch sein
+    koennen:
+
+    * ``DB_PATH`` — der Modul-Wert, an den ``get_engine(path=DB_PATH)`` seinen
+      Default bindet. Er steht fest, sobald das Modul importiert ist, und ist
+      damit auch in Segmenten pruefbar, die gar keine Engine bauen.
+    * ``_engine.url.database`` — die Datei, die das ORM wirklich offen hat.
+      Nicht redundant: ``engine()`` ist nur EIN Weg zur Engine,
+      ``get_engine(pfad)`` nimmt einen expliziten Pfad an ``DB_PATH`` vorbei.
+    """
+    mod = sys.modules.get("src.core.database.fixture_db")
+    if mod is None:
+        return {}
+    gefunden = {}
+    pfad = getattr(mod, "DB_PATH", None)
+    if pfad:
+        gefunden["fixture_db.DB_PATH"] = pfad
+    motor = getattr(mod, "_engine", None)
+    if motor is not None:
+        try:
+            gefunden["die gebaute Engine"] = motor.url.database or ""
+        except Exception:
+            pass
+    return gefunden
+
+
+def _echte_bibliothek_beruehrt() -> list:
+    """Welche dieser Stellen zeigen auf die ECHTE Bibliothek des Nutzers?
+
+    Verglichen wird gegen ``_ECHTE_FIXTURE_DB`` — den Pfad, den ``app_data_dir()``
+    lieferte, BEVOR oben ``APPDATA`` ins Test-Temp umgebogen wurde. Auf Windows
+    ergaebe ein spaeteres ``app_data_dir()`` sonst den Test-Ordner, und der
+    Waechter vergliche gegen die falsche Datei.
+    """
+    echt = os.path.realpath(_ECHTE_FIXTURE_DB)
+    return [f"{wo} -> {pfad}"
+            for wo, pfad in _bibliotheks_pfade_dieses_prozesses().items()
+            if os.path.realpath(pfad) == echt]
+
+
+def _waechter_meldung(stellen: list) -> str:
+    return (
+        "QA-58: dieser Prozess arbeitet auf der ECHTEN Fixture-Bibliothek des "
+        f"Nutzers ({_ECHTE_FIXTURE_DB}).\n"
+        "  Betroffen: " + "; ".join(stellen) + "\n"
+        "  Die Bibliothek sind Nutzerdaten, und fixture_db.get_engine() ruft "
+        "migrate_fixtures_db() bei JEDEM ersten Zugriff — ein Suite-Lauf "
+        "aendert damit ihr SCHEMA (so geschehen bei VIZ-50a).\n"
+        "  tests/conftest.py legt dafuer pro Prozess eine KOPIE an und zeigt "
+        "ueber LIGHTOS_FIXTURE_DB darauf.")
+
+
 def _purge_old_test_crash_logs():
     """Reste frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
 
@@ -420,6 +480,49 @@ def _webengine_in_process() -> bool:
     genau daran haengt das Exit-Risiko, nicht am Importstil.
     """
     return any(m.startswith("PySide6.QtWebEngine") for m in list(sys.modules))
+
+
+def pytest_collection_finish(session):
+    """★ QA-58 — der Waechter, der JEDES Segment des Gates erreicht.
+
+    **Warum in ``conftest.py`` und nicht in einer Testdatei.** Das
+    Fertig-Kriterium von QA-58 spricht vom VOLLEN Suite-Lauf. Der erste Anlauf
+    hat das mit einem Test belegt, der EIN Segment als Kindprozess fuhr — eine
+    Stichprobe von 1 aus 604, ausgegeben als Aussage ueber alle. Eine Zusage
+    ueber jeden Prozess kann nur eine Pruefung einloesen, die in jedem Prozess
+    laeuft, und das ist auf dieser Suite genau eine Datei: diese hier.
+
+    **Warum bei der Kollektion und nicht am Ende.** ``DB_PATH`` steht fest,
+    sobald ``fixture_db`` importiert ist — und importiert wird es beim Einlesen
+    der Testmodule, also genau jetzt. Zwei Dinge folgen daraus:
+
+    * Der Abbruch kommt, BEVOR ein Test die Datei anfassen kann. Ein Waechter,
+      der erst nach dem letzten Test meldet, haette den Schaden schon zugelassen.
+    * Es haengt an keinem laufenden Test. ``tests/test_color_fx_show_render.py``
+      etwa meldet in jedem Gate-Lauf „5 skipped" (seine Show ist nicht
+      committet) — der Modul-Import laeuft trotzdem, eine Test-Fixture nie.
+
+    **Warum am PFAD gemessen wird und nicht am Schema.** Der naheliegende Test —
+    Schema der echten Datei vorher/nachher — ist auf einem Rechner mit aktueller
+    Bibliothek per Konstruktion blind: dort gibt es nichts mehr zu migrieren,
+    die Datei bliebe auch bei voellig kaputter Isolation byte-identisch. Er
+    schluege erst bei der NAECHSTEN neuen Modell-Spalte an, also wieder an der
+    Datei des Nutzers. Der Pfad dagegen ist sofort falsch, sobald die Umlenkung
+    faellt.
+
+    **Was er NICHT abdeckt** — steht auch so im Item, damit die Zusage nicht
+    weiter reicht als die Messung: Prozesse, die weder dieses ``conftest.py``
+    laden noch ``LIGHTOS_FIXTURE_DB`` erben. Wie gross diese Menge ist, ist
+    ueber einen ``/proc``-Zensus waehrend eines vollen Gate-Laufs gemessen (kein
+    ``sitecustomize``/``LD_PRELOAD``: beide haengen selbst an einer geerbten
+    Variablen und saehen genau die gesuchte Klasse nicht) — Ergebnis bei QA-58
+    im BACKLOG.
+
+    Belege: ``tests/test_qa58_bibliothek_schema_unberuehrt.py::WaechterDeckungTest``.
+    """
+    stellen = _echte_bibliothek_beruehrt()
+    if stellen:
+        pytest.exit(_waechter_meldung(stellen), returncode=1)
 
 
 def pytest_collection_modifyitems(session, config, items):
@@ -575,6 +678,31 @@ def _stop_background_threads_at_end():
         shutil.rmtree(_TEST_APPDATA, ignore_errors=True)
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def _waechter_bibliothek_ist_eine_kopie():
+    """★ QA-58 — die zweite Haelfte des Waechters: die GEBAUTE Engine.
+
+    ``pytest_collection_finish`` oben prueft ``DB_PATH``, und das ist eine
+    Prozess-Eigenschaft: sie steht beim Import fest. Sie deckt den realistischen
+    Rueckfall ab (Umlenkung faellt weg), aber NICHT den zweiten Weg zur
+    Bibliothek — ``get_engine(pfad)`` nimmt einen expliziten Pfad an ``DB_PATH``
+    vorbei, und ``fixture_db._engine`` laesst sich jederzeit umsetzen. Genau das
+    tut ``tests/_fixture_quelle.frische_library`` (dort auf eine Wegwerf-Datei),
+    und genau so richtet ``tools/verify_stage_reload.py`` sich auf die echte
+    Bibliothek aus.
+
+    Deshalb hier nach JEDEM Test noch einmal — und hier ist der Testname auch
+    etwas wert, waehrend er bei ``DB_PATH`` nichts sagen wuerde (die gilt fuer
+    den ganzen Prozess, nicht fuer einen Test).
+
+    Kosten: ein ``sys.modules``-Nachschlag pro Test.
+    Beleg: ``…::WaechterDeckungTest::test_eine_umgesetzte_engine_wird_rot``.
+    """
+    yield
+    stellen = _echte_bibliothek_beruehrt()
+    assert not stellen, _waechter_meldung(stellen)
 
 
 @pytest.fixture(autouse=True)
