@@ -1203,9 +1203,18 @@ class VisualizerBridge(QObject):
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
-        Doppelbar -> der wird hier nicht auto-geaimt)."""
+        Doppelbar -> der wird hier nicht auto-geaimt).
+
+        ★ FM-14: der Pixel-Moving-Head faellt unter ``is_spider_fixture`` — er hat
+        ja viele Farbbaenke — hat aber EINEN Pan- und EINEN Tilt-Motor wie jeder
+        andere Moving Head. Ohne diese Ausnahme laege er im statischen Zweig, der
+        nur ``visualizer_rotations`` setzt: im 3D drehte sich das Gehaeuse,
+        waehrend am echten Geraet gar nichts passiert — genau der Fehler, den
+        FM-10 fuer die Mover-Bar behoben hat. Die Ausnahme haengt am
+        Render-Modell (``viz_model_for``), nicht an einer zweiten Kanal-Regel.
+        """
         try:
-            if is_spider_fixture(f):
+            if is_spider_fixture(f) and viz_model_for(f) != "pixel_head":
                 return False
             attrs = {ch.attribute for ch in get_channels_for_patched(f)}
             return "pan" in attrs and "tilt" in attrs
@@ -1890,14 +1899,28 @@ class VisualizerBridge(QObject):
         # Koepfe 0..7. Bewusst KEIN neues Bibliotheksfeld: die Angabe steht seit
         # dem Anlegen des Geraets in den Kanaelen, ein zweites Feld waere eine
         # Kopie, die still danebenlaufen kann (FM16E).
+        # FM-14: 'pixel_head' zaehlt genauso — dort ist n_heads die Zahl der
+        # Farb-BAENKE, aus der `buildPixelHead` die Segmente ableitet (Bank 0 =
+        # Geraetefarbe). Ohne diese Zeile baute der Renderer immer genau ein
+        # Segment, egal wie viele Pixel das Geraet hat.
         n_heads = 0
         n_whites = 0
-        if model in ("par_bar", "spider", "mover_bar", "matrix"):
+        if model in ("par_bar", "spider", "mover_bar", "matrix", "pixel_head"):
             try:
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
                                for c in get_channels_for_patched(f)]
                 n_heads = kanal_attrs.count("color_r")
-                n_whites = kanal_attrs.count("color_w")
+                # ★ Das Weiss-BAND ist eine Aussage ueber PANELS (VIZ-50b:
+                # weniger Weiss-Kanaele als Farbzonen = eigene Leiste quer
+                # ueber die Mitte). Nur `buildMatrixPanel` liest `nWhites`;
+                # fuer alle anderen Modelle fiel der Wert unten ohnehin auf 0
+                # (nachgemessen an der ganzen Bibliothek: par_bar/spider/
+                # mover_bar haben entweder 0 Weiss-Kanaele oder genau so viele
+                # wie Baenke). Der Pixel-Kopf waere der erste, bei dem das
+                # NICHT gilt — er haette mit seiner einen Grundfarben-Weiss-
+                # Bank auf 20 Baenken ploetzlich ein „Band" gemeldet.
+                if model == "matrix":
+                    n_whites = kanal_attrs.count("color_w")
             except Exception:
                 n_heads = 0
                 n_whites = 0

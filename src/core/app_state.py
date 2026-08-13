@@ -3950,10 +3950,10 @@ def suggest_viz_model(fixture_type: str, attributes) -> str | None:
     """Reine Multi-Emitter-Heuristik OHNE DB-Zugriff (FM-12).
 
     ``attributes`` = Liste der Kanal-Attribut-Strings eines Modus. Liefert
-    'mover_bar' / 'par_bar' / 'spider' oder ``None`` (= Single-Head, Aufrufer
-    nutzt den ``fixture_type``). Identische Regeln wie ``viz_model_for``
-    (dort mit echten DB-Kanaelen); der Fixture-Generator nutzt sie fuer den
-    Live-Vorschlag auf noch ungespeicherten Kanallisten."""
+    'mover_bar' / 'par_bar' / 'pixel_head' / 'spider' oder ``None``
+    (= Single-Head, Aufrufer nutzt den ``fixture_type``). Identische Regeln wie
+    ``viz_model_for`` (dort mit echten DB-Kanaelen); der Fixture-Generator nutzt
+    sie fuer den Live-Vorschlag auf noch ungespeicherten Kanallisten."""
     if (fixture_type or "") in ("laser", "matrix"):
         # Laser = Punkt-Scanner (FLA-1); matrix = Pixel-Panel mit eigenem
         # Renderer (FM-13) — beide NIE ueber die Multi-Emitter-Heuristik routen.
@@ -3968,6 +3968,22 @@ def suggest_viz_model(fixture_type: str, attributes) -> str | None:
         return "mover_bar"
     if pan_count == 0 and tilt_count == 0:
         return "par_bar"
+    # ★ FM-14: EIN Pan + EIN Tilt, aber DREI ODER MEHR Farb-Baenke = ein
+    # einzelner Kopf, dessen Lichtquelle in Pixel/Ring-Segmente zerlegt ist
+    # (Robe Spiider: 1 Grundfarbe + 19 Pixel). Bis hierher landete so ein Geraet
+    # allein wegen der Bank-Zahl im Spider-Zweig und stand als zwei kippende
+    # Leisten da.
+    #
+    # ★ Warum die Grenze bei DREI und nicht bei zwei liegt: ZWEI Baenke sind die
+    # Signatur der Doppelbar — auch beim Einzelkopf-Spider ('Speider 14ch':
+    # 1 Pan, 1 Tilt, 2 Baenke), der im Docstring von `is_spider_fixture`
+    # ausdruecklich als Spider gefuehrt wird. Ihn hier mitzunehmen waere ein
+    # stiller Umbau eines Bestandsgeraets. Gemessen an der mitgelieferten
+    # Bibliothek (91 Modi): KEIN Modus hat 1 Pan + 1 Tilt + >=2 Baenke, die
+    # Regel aendert also an keinem Builtin etwas — sie greift erst fuer die
+    # Pixel-Koepfe, die FM-14 hinzufuegt bzw. die importiert werden.
+    if pan_count == 1 and tilt_count == 1 and banks >= 3:
+        return "pixel_head"
     return "spider"
 
 
@@ -4552,6 +4568,8 @@ def viz_model_for(fixture):
         den ``fixture_type``).
       * >=2 ``pan`` (Pro-Kopf-Pan)         -> ``'mover_bar'`` (FM-4: N Mini-MHs).
       * keine Bewegung (kein Pan, kein Tilt) -> ``'par_bar'`` (FM-3: N PARs).
+      * 1 Pan + 1 Tilt + >=3 Banks -> ``'pixel_head'`` (FM-14: EIN Kopf mit
+        Ring-/Pixel-Segmenten).
       * sonst (Bewegung, aber kein Pro-Kopf-Pan) -> ``'spider'`` (Doppelbar).
     """
     override = viz_model_override_for(fixture)

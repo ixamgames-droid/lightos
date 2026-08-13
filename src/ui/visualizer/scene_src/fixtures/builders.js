@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { placeElement, panelGrid, rotatePoint } from './pixel_order.js';
+import { placeElement, panelGrid, rotatePoint, wabenPlatz } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -191,6 +191,71 @@ export function buildMovingHead() {
   lens.position.y = -0.115; head.add(lens);
 
   return { group, yoke, head, lens };
+}
+
+// ── FM-14: Pixel-Moving-Head (LED-Ring/Segmente) ─────────────────────────────
+//
+// Reales Vorbild, Kanal fuer Kanal belegt: **Robe Robin Spiider** — ein
+// Wash/Beam-Moving-Head, dessen Lichtquelle aus 19 einzeln ansteuerbaren
+// RGBW-Multichips besteht (1x 60 W Mitte + 18x 40 W aussen). Quellen:
+// „Robin SPIIDER - DMX protocol" v2.3 (robe.cz, Modus 7 „Pixel RGB", 91 Kanaele:
+// Kanal 35-91 = Rot/Gruen/Blau je Pixel 1..19) und das User Manual Rev. 3.3,
+// S. 15 „Pixel order" (die Wabe: Mitte, Sechser-, Zwoelferring). Die Ring-
+// Ordnung selbst steht in `pixel_order.js#wabenPlatz`, damit 2D-Icon und
+// 3D-Modell denselben Pixel an dieselbe Stelle legen (Lehre VIZ-51).
+//
+// ★ Was dieses Modell vom Spider (Doppel-Bar) trennt: EIN Kopf mit EINEM
+//   Pan/Tilt — die Segmente bewegen sich nicht gegeneinander, sie sitzen in der
+//   Linsenflaeche. Bis FM-14 landete so ein Geraet ueber die Bank-Zahl
+//   (>=2 color_r) im Spider-Zweig und stand als zwei kippende Leisten da.
+//
+// ★ Wieso `nBaenke - 1` Segmente: Bank 0 (die Kanaele OHNE #N) ist in diesem
+//   Projekt ueberall die GERAETEFARBE — `visual_rgb` baut daraus `payload.r/g/b`,
+//   und die faerben bereits Kegel, SpotLight, Bodenfleck und die Hauptlinse.
+//   Beim Spiider ist das die „Background"-Bank, die genau diese Rolle hat.
+//   Wuerde Segment 0 ebenfalls aus Bank 0 leuchten, zeigte das Bild dieselbe
+//   Information zweimal — derselbe Fehler, den VIZ-50b beim Weissband vermieden
+//   hat. Ein Geraet OHNE eigene Grundfarben-Bank verliert dadurch kein Pixel:
+//   sein erstes Pixel wird zur Geraetefarbe und erscheint an Linse und Kegel.
+export function buildPixelHead(nBaenke) {
+  // Gehaeuse EXAKT der normale Moving Head — derselbe Aufruf, nicht eine Kopie:
+  // ein Pixel-Kopf ist mechanisch ein Moving Head, und zwei Fassungen desselben
+  // Gehaeuses waeren zwei Fassungen, die auseinanderlaufen.
+  const mh = buildMovingHead();
+  const n = Math.max(1, Math.min(64, Math.floor(nBaenke || 2) - 1));
+
+  // Die Segmente liegen in der LINSENEBENE (Ausgang -Y), also in der lokalen
+  // XZ-Ebene des Kopfes. `wabenPlatz` liefert die Zeichnung aus dem Manual —
+  // Blick von VORN auf die Linse, x nach rechts, y nach oben. Auf den gekippten
+  // Kopf gelegt heisst das: „rechts" ist lokal -X und „oben" ist lokal -Z (bei
+  // Tilt +90° zeigt der Kopf nach -Z, dann steht lokal -Z senkrecht nach oben
+  // und lokal -X liegt rechts vom Betrachter). Ohne diese Drehung stuende die
+  // Wabe spiegelverkehrt und ein Lauflicht liefe im 3D andersherum als am Rig.
+  const LINSE_R = 0.077;                      // Radius der Moving-Head-Linse
+  let maxRing = 0;
+  for (let i = 0; i < n; i++) maxRing = Math.max(maxRing, wabenPlatz(i).ring);
+  const teilung = LINSE_R / (maxRing + 0.55);
+  const zellR = teilung * 0.46;
+  const ringPixels = [];
+  for (let i = 0; i < n; i++) {
+    const p = wabenPlatz(i);
+    const seg = new THREE.Mesh(
+      new THREE.CircleGeometry(zellR, segs(14)),
+      new THREE.MeshStandardMaterial({
+        color: 0x303030, emissive: 0x000000, emissiveIntensity: 0,
+        roughness: 0.25, side: THREE.DoubleSide,
+      })
+    );
+    seg.rotation.x = -Math.PI / 2;            // Normale -Y (Lichtausgang)
+    // 0.008 unter der Hauptlinse: die beiden Flaechen wuerden sonst
+    // gegeneinander flimmern (Z-Fighting), und die Segmente gehoeren VOR die
+    // Linse — sie sind das, was man am Geraet sieht.
+    seg.position.set(-p.x * teilung, -0.123, -p.y * teilung);
+    mh.head.add(seg);
+    ringPixels.push({ mesh: seg, ring: p.ring });
+  }
+  return { group: mh.group, yoke: mh.yoke, head: mh.head, lens: mh.lens,
+           ringPixels, isPixelHead: true };
 }
 
 export function buildPar() {
@@ -1259,6 +1324,38 @@ export function updateMovingHeadDmx(f, dmx) {
   syncIconPos(f);
 }
 
+// ── FM-14: Pixel-Moving-Head — Kopf wie ein Moving Head, Segmente einzeln ───
+// Reihenfolge-Vertrag: ERST der volle Moving-Head-Durchlauf (Kegel, SpotLight,
+// Bodenfleck, Hauptlinse, Pan/Tilt, Optik), DANN die Segmente. Andersherum
+// wuerde der Icon-Tint aus `applyGenericColor` die Segment-Zellen wieder
+// ueberschreiben.
+export function updatePixelHeadDmx(f, dmx) {
+  updateMovingHeadDmx(f, dmx);
+  if (!f.isPixelHead || !f.ringPixels) return;
+  const { r, g, b, intNorm } = dmx;
+  const hs = f.lastHeads || [];
+  for (let i = 0; i < f.ringPixels.length; i++) {
+    const seg = f.ringPixels[i];
+    // Kopf 0 = Grundfarbe des Geraets (sie faerbt Linse und Kegel, s.
+    // buildPixelHead) -> Segment i haengt an Kopf i+1. Ohne Kopf-Daten bleibt
+    // das Segment DUNKEL statt auf die Geraetefarbe zurueckzufallen: ein Ring,
+    // der die Hauptfarbe spiegelt, behauptet Pixel-Werte, die es nicht gibt.
+    const h = hs[i + 1] || {};
+    const col = new THREE.Color((h.r || 0) / 255, (h.g || 0) / 255,
+                                (h.b || 0) / 255);
+    if (seg.mesh && seg.mesh.material) {
+      seg.mesh.material.color = col;
+      seg.mesh.material.emissive = col;
+      seg.mesh.material.emissiveIntensity = intNorm * 1.9;   // Master-Dimmer
+    }
+  }
+  // Top-Down-Icon: dieselbe Verschiebung. `slice(1)` statt eines zweiten
+  // Parameters an `tintTopDownIcon` — die Zelle i des Icons IST das Segment i,
+  // und die gemeinsame Faerbe-Funktion bleibt fuer alle Typen dieselbe.
+  tintTopDownIcon(f.icon, { r, g, b }, intNorm, hs.slice(1));
+  syncIconPos(f);
+}
+
 // Alle unbeweglichen Single-Head-Typen (par, led_bar, dimmer, strobe, laser,
 // smoke, hazer, Fallback): wie updateMovingHeadDmx, nur ohne den PanTilt-
 // Aufruf — der war fuer diese Typen im Monolith ein typ-geguardeter No-Op.
@@ -1330,11 +1427,22 @@ function applyGenericColor(f, dmx) {
   tintTopDownIcon(f.icon, color, intNorm);
 }
 
+// EINE Stelle beantwortet „richtet dieses Modell seinen KOPF ueber Pan/Tilt
+// aus?". Die Bedingung stand zweimal (applyPanTilt + applyFloorAim), und beide
+// Stellen muessen dieselbe Antwort geben: wer den Kopf dreht, muss auch den
+// Bodenfleck aus dem Kopf heraus zielen — sonst leuchtet der Fleck woanders hin
+// als der Kegel (A3D-26). FM-14 haengt 'pixel_head' hier ein; `f.type` ist das
+// RENDER-Modell (fixtures.js: `type: rtype`), nicht der fixture_type.
+export function schwenktKopf(f) {
+  return f.type === 'moving_head' || f.type === 'scanner'
+      || f.type === 'pixel_head';
+}
+
 // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt).
 // Der Typ-Guard bleibt bewusst 1:1 erhalten (Byte-Identitaet): fuer alle
 // anderen Typen ist der Aufruf ein No-Op wie im Monolith.
 function applyPanTilt(f, dmx) {
-  if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
+  if (schwenktKopf(f) && f.yoke && f.head) {
     const { pan, tilt } = dmx;
     // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
     // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
@@ -1423,7 +1531,7 @@ function applyFloorAim(f, dmx) {
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
     // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
     // Vorher blieb der Boden-Pool bei getilteten PARs/Scannern senkrecht drunter.
-    const aimObj = ((f.type === 'moving_head' || f.type === 'scanner') && f.head) ? f.head : f.group;
+    const aimObj = (schwenktKopf(f) && f.head) ? f.head : f.group;
     if (aimObj) {
       aimObj.updateMatrixWorld();
       const wq = new THREE.Quaternion();
