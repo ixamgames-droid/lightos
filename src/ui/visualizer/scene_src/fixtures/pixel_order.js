@@ -95,23 +95,47 @@ export function normalizeElementRotation(value) {
   return ELEMENT_ROTATIONS.indexOf(v) >= 0 ? v : 0;
 }
 
-/** (r, c) im gedrehten Raster + dessen neue Groesse. */
-export function rotateCell(row, col, rows, cols, rotation, flip) {
-  let r = Math.floor(row), c = Math.floor(col);
+/**
+ * ★ VIZ-50b: dieselbe Drehung fuer einen Punkt ZWISCHEN den Rasterzellen.
+ *
+ * Die Warmweiss-Leiste des ZQ06121 liegt NICHT auf dem Farbraster: sie laeuft
+ * mittig zwischen Reihe 2 und 3 (also auf einer halben Zellhoehe) und ihre acht
+ * Segmente decken je anderthalb Spalten ab. Ihre Mittelpunkte sind damit
+ * GEBROCHENE Rasterkoordinaten — und `rotateCell` floort seine Eingaben, was
+ * fuer einen Pixel-Index richtig und fuer 1.5 toedlich ist.
+ *
+ * Die Drehformel steht deshalb hier EINMAL und `rotateCell` floort davor,
+ * statt sie ein zweites Mal hinzuschreiben (FM16E-Lehre: zwei Fassungen
+ * derselben Regel laufen auseinander, und zwar genau dann, wenn eine angefasst
+ * wird). Die Abbildung ist affin — sie gilt fuer Bruchteile unveraendert.
+ *
+ * `quer` sagt, ob Zeilen und Spalten die Rollen getauscht haben (90°/270°).
+ * Wer eine AUSDEHNUNG mitdrehen muss — das Band ist breit und flach, nach der
+ * Drehung schmal und hoch — braucht diese Auskunft; sie aus dem Winkel neu
+ * abzuleiten waere wieder die zweite Formel.
+ */
+export function rotatePoint(row, col, rows, cols, rotation, flip) {
+  let r = row, c = col;
   let nr = Math.max(1, Math.floor(rows || 1));
   let nc = Math.max(1, Math.floor(cols || 1));
   const rot = normalizeElementRotation(rotation);
+  let quer = false;
   if (rot === 90) {
     const r2 = c, c2 = nr - 1 - r;
-    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t; quer = true;
   } else if (rot === 180) {
     r = nr - 1 - r; c = nc - 1 - c;
   } else if (rot === 270) {
     const r2 = nc - 1 - c, c2 = r;
-    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t; quer = true;
   }
   if (flip) c = nc - 1 - c;
-  return { r: r, c: c, rows: nr, cols: nc };
+  return { r: r, c: c, rows: nr, cols: nc, quer: quer };
+}
+
+/** (r, c) im gedrehten Raster + dessen neue Groesse. */
+export function rotateCell(row, col, rows, cols, rotation, flip) {
+  return rotatePoint(Math.floor(row), Math.floor(col), rows, cols, rotation, flip);
 }
 
 /** DMX-Index -> endgueltige Position + Rastergroesse.

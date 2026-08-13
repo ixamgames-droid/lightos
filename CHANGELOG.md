@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-13 — Die weiße Leiste des LED-Balkens leuchtet jetzt auch im 3D
+
+#### Neu
+
+- **Der ZQ06121 zeigt seine Warmweiß-Segmente.** Der Balken hat neben seinen 48
+  RGB-Zonen acht weiße Segmente, die als eigene Leiste quer durch die Mitte
+  laufen. In der 3D-Vorschau gab es sie schlicht nicht — sichtbar war nur das
+  Farbraster. Jetzt liegt zwischen der zweiten und dritten Zonenreihe ein
+  eigenes Band: acht Segmente, halb so hoch wie eine RGB-Zone, jedes anderthalb
+  Zonen breit. Ein hochkant montiertes Panel trägt sein Band längs statt quer.
+
+- **Die Segmente leuchten aus ihren eigenen Kanälen.** Sie hängen an den
+  Weiß-Kanälen des Geräts, nicht an der Farbe der benachbarten RGB-Zone — wer
+  Zone 1 rot fährt, bekommt kein rotes „Weiß"-Segment.
+
+- Dafür war **keine neue Angabe in der Bibliothek** nötig: dass dieses Gerät
+  acht getrennte Weiß-Segmente hat, steht seit dem Anlegen in seinen Kanälen.
+  **Geräte ohne eigene Weiß-Leiste bleiben unverändert** — ein RGBW-Panel, bei
+  dem jedes Pixel sein eigenes Weiß hat, bekommt kein Band, und ein gewöhnliches
+  8×8-Panel sieht aus wie zuvor.
+
 ### 2026-08-12 — Ein LED-Balken steht im 3D endlich als Balken da
 
 #### Neu

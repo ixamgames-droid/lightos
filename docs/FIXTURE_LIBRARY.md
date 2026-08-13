@@ -48,6 +48,18 @@ modusabhaengig ist; und nicht am gepatchten Geraet, weil sie fuer jedes Exemplar
 gilt (im Gegensatz zu `pixel_order`/`element_rotation`, die vom Geraetemenue bzw.
 von der Montage abhaengen).
 
+**Eine eigene Weiss-Leiste braucht KEIN Feld** (VIZ-50b). Manche Panels haben
+neben ihren RGB-Zonen einen getrennten Streifen weisser LEDs — der ZQ06121 acht
+Warmweiss-Segmente quer ueber die Panelmitte. Woran der Renderer das erkennt,
+steht schon in den Kanaelen: **weniger `color_w`-Kanaele als `color_r`-Kanaele**
+heisst „eigene Leiste" (8 auf 48), **gleich viele** heisst RGBW-Emitter (dort
+gehoert das Weiss zum Pixel und ist ueber `visual_rgb` in dessen Farbe schon
+eingerechnet). Wer ein solches Geraet anlegt, gibt die Weiss-Segmente also
+einfach als `color_w`-Kanaele an — die attr#N-Konvention legt sie auf die Koepfe
+0..N-1, und das 3D-Band zeichnet sich daraus von selbst. Ein zusaetzliches Feld
+„Anzahl Weiss-Segmente" waere eine Kopie dieser Zahl und koennte still daneben
+laufen.
+
 ## 2. Woher Profile kommen
 
 1. **Builtin-Seed** — `fixture_db._seed()` (Generic, Chauvet, Eurolite, ADJ,

@@ -305,12 +305,16 @@ export function addFixture(data) {
   // aus dem Fixture-Modus. Ohne sie musste `buildMatrixPanel` die Form aus der
   // Pixelzahl raten (near-square) — Robins 4x12-Balken stand als 7x7-Quadrat da.
   // Fehlt das Feld (Alt-Payload, Geraet ohne Angabe), bleibt der Ratepfad.
+  // ★ VIZ-50b: `nWhites` ist die Zahl der EIGENEN Weiss-Segmente (Robins
+  // ZQ06121: acht, quer ueber die Panelmitte). 0 heisst „dieses Geraet hat
+  // keine" — dann entsteht kein Band, und das Panel sieht aus wie bisher.
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
                                            pixelBar, pixelOrder: data.pixelOrder,
                                            elementRotation: data.elementRotation,
                                            elementFlip: data.elementFlip,
                                            gridRows: data.gridRows,
-                                           gridCols: data.gridCols });
+                                           gridCols: data.gridCols,
+                                           nWhites: data.nWhites });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
@@ -450,6 +454,9 @@ export function addFixture(data) {
     moverHeads: model.moverHeads || null,   // FM-4: Mover-Bar-Koepfe (je {yoke, head, lens, beam})
     isMoverBar: !!model.isMoverBar,
     pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
+    // VIZ-50b: Warmweiss-Band (je {mesh}) — leer/null bei Panels ohne eigene
+    // Weiss-Segmente. `updateMatrixPanelDmx` faerbt es aus `heads[j].cw`.
+    whites: (model.whites && model.whites.length) ? model.whites : null,
     isMatrix: !!model.isMatrix,
     // VIZ-15: die eigene fid am Objekt — beamsSichtbar() braucht sie, und die
     // DMX-Handler bekommen sonst nur `f` ohne Bezug zum Schluessel.
