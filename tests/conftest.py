@@ -522,6 +522,17 @@ def pytest_collection_finish(session):
     """
     stellen = _echte_bibliothek_beruehrt()
     if stellen:
+        # ★ Die FAILED-Zeile ist Pflicht, nicht Zierde. `verify_segmented.sh`
+        # sammelt am Ende `grep -h '^FAILED'` und schreibt das Ergebnis unter
+        # "Fehlgeschlagene Tests:". Steht dort nichts, deutet sein eigener
+        # Kommentar — und CLAUDE.md gleichlautend — rote Segmente als native
+        # Abbau-Crashes (QA-24). Bei einem echten Rueckfall gehen ALLE 604
+        # Segmente rot; ohne diese Zeile bliebe die Liste komplett leer und der
+        # Lauf laese sich wie ein Massen-Teardown-Crash. Genau die
+        # Fehldiagnose-Signatur, wegen der `pytest_unconfigure` + `os._exit`
+        # verworfen wurde — sie gilt fuer diesen Weg genauso.
+        print(f"FAILED {__name__}::qa58_waechter - die echte Geraete-Bibliothek "
+              f"wuerde beruehrt ({len(stellen)} Stelle(n))", flush=True)
         pytest.exit(_waechter_meldung(stellen), returncode=1)
 
 

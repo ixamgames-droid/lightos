@@ -592,7 +592,20 @@ class WaechterDeckungTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         env = dict(os.environ)
         env.pop("LIGHTOS_FIXTURE_DB", None)
+        # ★ Alle drei Datenordner-Variablen, nicht nur die von Linux. Sonst
+        # haengt dieser Beleg an einer Luecke, die im selben Item als
+        # Nebenbefund gemeldet ist: `conftest.py` lenkt heute NUR `APPDATA` um
+        # und leitet `_ECHTE_FIXTURE_DB` aus `app_data_dir()` ab. Wuerde es
+        # kuenftig auch `XDG_DATA_HOME` umlenken (genau das steht als Item an),
+        # rechnete der Kindprozess `_ECHTE_FIXTURE_DB` aus dem Sandkasten,
+        # `DB_PATH` aber aus seinem eigenen Testordner — der Vergleich schluege
+        # nie an, der Rueckfall bliebe gruen, und die Beweisfuehrung fiele in
+        # sich zusammen. Auf Windows ist das nach Codelage schon heute so.
+        # Die Schwesterfunktion `test_ohne_vorhandene_bibliothek_laeuft_die_
+        # suite_trotzdem` macht es laengst richtig; hier stand nur eine.
         env["XDG_DATA_HOME"] = xdg
+        env["APPDATA"] = xdg
+        env["HOME"] = xdg
         env["QT_QPA_PLATFORM"] = "offscreen"
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")       # QA-53
         env["LIGHTOS_CRASH_LOG"] = os.path.join(tmp, "crash.log")
@@ -607,6 +620,45 @@ class WaechterDeckungTest(unittest.TestCase):
         fertig = subprocess.run(befehl, cwd=_REPO, capture_output=True,
                                 text=True, timeout=300, env=env)
         return fertig.returncode, fertig.stdout + fertig.stderr
+
+    # ── Der Abbruch muss AUSSEHEN wie ein Fehlschlag ────────────────────────
+    def test_der_abbruch_hinterlaesst_eine_FAILED_zeile(self):
+        """Sonst liest sich ein echter Rueckfall wie ein Massen-Teardown-Crash.
+
+        ``tools/verify_segmented.sh`` sammelt am Ende ``grep -h '^FAILED'`` und
+        schreibt das Ergebnis unter „Fehlgeschlagene Tests:\". Steht dort
+        nichts, deutet sein eigener Kommentar — und ``CLAUDE.md`` gleichlautend
+        — rote Segmente als native Abbau-Crashes (QA-24), also als
+        Dringlichkeits-**Herabstufung**. Bei einem echten Rueckfall gehen ALLE
+        604 Segmente rot; ohne diese Zeile bliebe die Liste komplett leer, und
+        wer die QA-58-Meldung finden will, muesste ein Segment-Log oeffnen.
+
+        Genau die Fehldiagnose-Signatur, wegen der ``pytest_unconfigure`` +
+        ``os._exit`` verworfen wurde. Sie gilt fuer den Kollektions-Abbruch
+        genauso — deshalb steht sie hier unter Test statt unter Vertrauen.
+        """
+        rc, ausgabe = self._lauf(self._FRUEH, self._sandkasten_datenordner(),
+                                 plugin="_qa58_rueckfall")
+        self.assertEqual(1, rc, "der Rueckfall muss das Segment rot faerben")
+        failed = [z for z in ausgabe.splitlines() if z.startswith("FAILED")]
+        self.assertTrue(
+            failed,
+            "Keine Zeile beginnt mit FAILED — verify_segmented.sh listet dann "
+            "nichts unter „Fehlgeschlagene Tests\" und der Lauf liest sich als "
+            "nativer Abbau-Crash statt als QA-58-Rueckfall.\n"
+            f"Ausgabe:\n{ausgabe[-1500:]}")
+        self.assertTrue(
+            any("Bibliothek" in z for z in failed),
+            f"die FAILED-Zeile muss sagen, worum es geht: {failed}")
+
+    def test_ohne_rueckfall_gibt_es_keine_FAILED_zeile(self):
+        """POSITIVKONTROLLE: im Normalfall schweigt der Waechter. Ohne sie waere
+        der Test oben auch dann gruen, wenn bei JEDEM Lauf FAILED erschiene."""
+        rc, ausgabe = self._lauf(_OPFER, self._sandkasten_datenordner())
+        self.assertEqual(0, rc, ausgabe[-800:])
+        self.assertEqual(
+            [], [z for z in ausgabe.splitlines() if z.startswith("FAILED")],
+            "ein normaler Lauf darf keine FAILED-Zeile erzeugen")
 
     # ── Rueckfall 1: die Umlenkung faellt weg ───────────────────────────────
     def test_ein_rueckfall_bricht_das_segment_ab_bevor_ein_test_laeuft(self):
