@@ -154,6 +154,23 @@ ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
   **Direktes `pytest tests/` umgeht die Sperre und ist deshalb verboten**
   (s. `WORKFLOW.md`).
 
+  > **★ Eine Ausnahme seit PROC-02c (2026-08-19):** „kurz und billig" stimmt bei
+  > der Rechenzeit, nicht beim WebGL-Kontext — davon gibt es rechnerweit nur
+  > einen brauchbaren Satz, und Agenten fahren fast nur Einzellaeufe. Ein Lauf,
+  > der eine **WebEngine-Testdatei** beruehrt, nimmt deshalb zusaetzlich die
+  > schmale Sperre `.webengine_lock` (ebenfalls am `--git-common-dir`); die
+  > WebEngine-Spur der vollen Suite nimmt sie je Segment. Alles andere bleibt
+  > ungebremst. Gemessen 2026-08-18: unter Parallellast liefen **41 von 41**
+  > WebEngine-Segmenten in den alten 3-Sekunden-Deckel — der fragte rechnerweit
+  > nach `QtWebEngineProc` und wartete damit nur auf FREMDE Prozesse, denn die
+  > eigenen Chromium-Kinder sind nach spaetestens 0,037 s weg. 123 s je Lauf,
+  > Wirkung: keine.
+  >
+  > **Und wer pytest direkt startet, wird von ihr nicht aufgehalten.** Der
+  > Segment-Runner meldet das jetzt namentlich („WebEngine-Segmente starteten,
+  > waehrend FREMDE Chromium-Prozesse liefen") — steht die Zahl ueber 0, hat
+  > jemand beide Gates umgangen oder es laeuft eine LightOS-Instanz.
+
   > **★ Diese Zeile stand hier zuerst falsch.** Sie behauptete, das sei schon
   > geloest — „Lock-Runner, serialisiert ueber alle Sitzungen". Nachgesehen:
   > der Lock-Runner ist **Windows-spezifisch**, und der Kopf von

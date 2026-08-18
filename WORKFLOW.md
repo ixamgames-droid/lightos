@@ -91,6 +91,16 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   Worktrees erreichbar) und wartet, statt loszulaufen. Gezielte Einzellaeufe
   (`verify_loop.sh tests/test_x.py`) sind bewusst **nicht** gesperrt. Ohne `flock` (macOS) laeuft
   alles wie bisher, mit Hinweis — eine fehlende Sperre darf das Gate nicht blockieren.
+- **Eine ZWEITE, schmale Sperre nur fuer WebEngine (PROC-02c, 2026-08-19).** Von WebGL-Kontexten
+  gibt es rechnerweit nur einen brauchbaren Satz — bei Rechenzeit sind Einzellaeufe billig, hier
+  nicht. Und Agenten fahren fast ausschliesslich Einzellaeufe. Deshalb nimmt **jeder** Lauf, der
+  eine WebEngine-Testdatei beruehrt, die Sperre `.webengine_lock` (ebenfalls am
+  `--git-common-dir`): die WebEngine-Spur der vollen Suite je Segment, und
+  `verify_loop.sh tests/test_viz*.py` fuer seine Dauer. Alles andere laeuft unveraendert
+  ungebremst. Der frueher davorstehende 3-Sekunden-Deckel ist weg: er fragte rechnerweit nach
+  `QtWebEngineProc` und wartete damit nur auf FREMDE Prozesse — gemessen liefen unter Parallellast
+  41 von 41 WebEngine-Segmenten hinein (123 s je Lauf, Wirkung keine), waehrend die eigenen
+  Chromium-Kinder nach spaetestens 0,037 s weg sind. Gate: `tests/test_proc02c_webengine_sperre.py`.
   **Warum das mehr ist als Bequemlichkeit:** XPLAT-17 hat gemessen, dass schon EIN
   rechenintensives Nachbar-Segment die WebEngine-Spur in 3 von 3 Laeufen reissen liess. Eine
   zweite komplette Suite ist ein weit groesserer Nachbar — beide Sitzungen saehen rote

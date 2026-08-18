@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
+
+#### Behoben
+
+- **Rote Testsegmente, die isoliert gruen waren, wenn mehrere Sitzungen
+  gleichzeitig testeten.** Der Segment-Runner wartete vor jedem
+  WebEngine-Segment bis zu drei Sekunden darauf, dass „keine Chromium-Prozesse
+  mehr laufen" — gefragt wurde aber **rechnerweit**, ueber alle Sitzungen.
+  Nachgemessen sind die eigenen Chromium-Kinder eines Segments spaetestens nach
+  0,037 s weg; gewartet wurde also nie auf sie, sondern immer nur auf fremde
+  Prozesse, die davon nicht verschwinden. Unter Parallellast liefen dadurch
+  **41 von 41** WebEngine-Segmenten in den Deckel: 123 Sekunden Wartezeit je
+  Lauf, ohne Wirkung. An seiner Stelle steht jetzt eine schmale rechnerweite
+  Sperre, die genau **ein** WebEngine-Segment gleichzeitig zulaesst — auch fuer
+  gezielte Einzellaeufe (`./tools/verify_loop.sh tests/test_viz*.py`), die
+  bisher ausgenommen waren, obwohl Agenten fast nur solche fahren. Alles ohne
+  3D-Ansicht laeuft unveraendert ungebremst.
+
 ### 2026-08-13 — Moving Heads mit LED-Ring zeigen ihre Pixel einzeln
 
 #### Neu

@@ -42,6 +42,13 @@ if [ -z "$PY" ]; then
     exit 2
 fi
 
+# PROC-02c: die gemeinsame WebEngine-Absicherung beider Gate-Runner. Sie liegt
+# in einer eigenen Datei, weil verify_loop.sh sie fuer gezielte Einzellaeufe
+# genauso braucht — zwei Kopien derselben Sperre waeren die naechste XPLAT-11.
+# shellcheck source=tools/_gate_webengine.sh
+. "$REPO/tools/_gate_webengine.sh" || {
+    echo "[seg] FEHLER: tools/_gate_webengine.sh fehlt oder ist fehlerhaft"; exit 2; }
+
 JOBS=1
 if [ "${1:-}" = "-j" ]; then JOBS="${2:-1}"; shift 2; fi
 
@@ -60,75 +67,118 @@ export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 
 echo "[seg] ${#FILES[@]} Testdateien, $JOBS parallel, Ausgabe: $OUTDIR"
 
-# XPLAT-17: warten, bis die Chromium-Kindprozesse des VORIGEN WebEngine-Segments
-# wirklich weg sind.
+# XPLAT-17 / PROC-02c: was vor einem WebEngine-Segment passiert.
 #
-# Die serielle Spur aus XPLAT-16 serialisiert die pytest-Prozesse — nicht deren
-# Kinder. QtWebEngine startet einen eigenen GPU-Prozess, und der stirbt nach dem
-# Elternprozess, nicht mit ihm. Zwei GPU-Prozesse koennen sich damit trotz Spur
-# ueberlappen und um den GL-Kontext des Treibers konkurrieren.
+# Die serielle Spur aus XPLAT-16 serialisiert die pytest-Prozesse — aber nur die
+# DIESES Laufs. Bis 2026-08-18 stand hier zusaetzlich ein Warten von bis zu 3 s
+# auf die Bedingung `pgrep -u <uid> -x QtWebEngineProc`: rechnerweit, ueber alle
+# Sitzungen hinweg.
 #
-# ★ GEMESSEN 2026-08-01 (6 volle Laeufe, 3210 Segment-Logs) — und die Vermutung
-# oben stimmt so NICHT. Zwei harte Befunde:
+# ★ GEMESSEN 2026-08-18, und die Messung hat diesen Waechter widerlegt:
 #
-#  1. Es gibt gar keinen "--type=gpu"-Hilfsprozess. QtWebEngine faehrt den
-#     GPU-Dienst hier IM EIGENEN Prozess (nachgemessen waehrend eines Segments:
-#     3x --type=zygote, 1x --type=renderer, 0x gpu; und die GPU-Fehlerzeilen im
-#     Log tragen die pid:tid des pytest-Prozesses selbst). Die serielle Spur
-#     serialisiert den GPU-Dienst damit bereits vollstaendig — zwei
-#     konkurrierende GPU-Prozesse, die dieses Warten verhindern soll, kann es
-#     zwischen den Segmenten nicht geben.
-#  2. Der verbliebene Ausfall ist ein Kontextverlust INNERHALB des Prozesses:
-#       RasterDecoderImpl: Context lost during MakeCurrent
-#       -> SharedImageStub: context already lost
-#       -> THREE.WebGLRenderer: Error creating WebGL context.   (die FOLGE)
-#     Diese Signatur steht in genau 1 von 3210 Logs — sie ist der Fehler
-#     selbst, kein Hintergrundrauschen.
+#  1. Die EIGENEN Chromium-Kinder eines Segments sind nach spaetestens 0,037 s
+#     weg (41 WebEngine-Dateien, je ein eigener Segmentlauf, Zuordnung ueber die
+#     Prozessgruppe; Median 0,022 s). Sie waren schon tot, bevor `wait` auf den
+#     pytest-Prozess zurueckkam. Das Warten hat also NIE auf eigene Kinder
+#     gewartet.
+#  2. Unter Parallellast wartete es folglich nur auf FREMDE Prozesse — und die
+#     verschwinden nicht, weil wir warten. Mit drei nebenherlaufenden
+#     WebEngine-Schleifen liefen 41 von 41 Segmenten in den Deckel (3 Laeufe,
+#     41/41/41). Kosten: 123 s je Lauf. Wirkung: keine.
 #
-# Rate mit Spur + diesem Warten: 1 Ausfall in 6 vollen Laeufen (davor: rund
-# einer pro Lauf ohne Spur, 2 von 5 mit Spur ohne Warten).
+# Der Deckel "dynamisch" zu machen (Vorschlag (a) in PROC-02c) haette das
+# schlimmer gemacht, nicht besser: laenger auf etwas warten, worauf man keinen
+# Zugriff hat. Stattdessen jetzt zwei Dinge, beide in tools/_gate_webengine.sh:
 #
-# WARUM DAS WARTEN TROTZDEM BLEIBT: es wartet nachweislich auf etwas anderes
-# als gedacht (Zygote-/Renderer-Kinder, nicht auf einen GPU-Prozess), aber ob
-# es die Rate beeinflusst, ist NICHT gemessen — 1/6 gegen 2/5 ist bei diesen
-# Zahlen kein Unterschied, den man behaupten kann. Es zu entfernen, weil die
-# BEGRUENDUNG falsch war, hiesse eine unbelegte Behauptung durch die naechste
-# zu ersetzen. Der Kommentar sagt jetzt, was es wirklich tut.
+#   * eine RECHNERWEITE Sperre, die genau EIN WebEngine-Segment gleichzeitig
+#     zulaesst — ueber Worktrees, Sitzungen und auch ueber gezielte Einzellaeufe
+#     hinweg (verify_loop.sh nimmt dieselbe). Das trifft die Ursache: zwei
+#     gleichzeitig lebende WebGL-Kontexte.
+#   * das Warten auf die EIGENE Prozessgruppe, und zwar BEVOR die Sperre
+#     weitergereicht wird. So uebergibt kein Lauf die Sperre, waehrend seine
+#     eigenen Chromium-Kinder noch leben.
 #
-# Und die Konsequenz aus 2.: gegen einen Kontextverlust im eigenen Prozess
-# hilft dem Gate kein Warten mehr. Der Ausweg liegt im Produkt — der
-# Szenen-Start-Waechter (VIZ-SCENE-SELFHEAL, visualizer_window.py) laedt die
-# Szene nach genau einem verlorenen Kontext neu, statt schwarz zu bleiben.
+# Die Zahl aus dem Befund bleibt messbar: `fremdes_chromium.txt` zaehlt weiter,
+# wie viele WebEngine-Segmente mit lebenden FREMDEN Chromium-Prozessen starten —
+# nur kostet dieser Zustand jetzt keine Wartezeit mehr, sondern wird gemeldet.
 #
-# Gedeckelt, damit es nie haengt: laeuft nebenher Davids LightOS-Instanz, halten
-# deren Kindprozesse die Bedingung dauerhaft offen, und wir laufen sehenden Auges
-# in den Deckel statt in eine Endlosschleife.
-_warte_auf_freie_gpu() {
-    local deckel=30            # 30 * 0.1 s = 3 s
-    while [ "$deckel" -gt 0 ]; do
-        # -x auf den PROZESSNAMEN, nicht -f auf die Kommandozeile: mit -f
-        # trifft das Muster die eigene Shell (deren Kommandozeile den Text
-        # ja enthaelt), die Bedingung ist dann NIE erfuellt und jedes
-        # Segment laeuft stumpf in den Deckel. Genau das passierte in der
-        # ersten Fassung: 27 von 27 Segmenten meldeten den Deckel, das
-        # Warten war wirkungslos und kostete 81 s. Der Name ist "QtWeb-
-        # EngineProc" — Linux kuerzt comm auf 15 Zeichen ab.
-        pgrep -u "$(id -u)" -x QtWebEngineProc >/dev/null 2>&1 || return 0
-        sleep 0.1
-        deckel=$((deckel - 1))
-    done
-    return 1
-}
+# ── Was von XPLAT-17 gilt und hier nicht verlorengehen darf ─────────────────
+# Gemessen 2026-08-01 (6 volle Laeufe, 3210 Segment-Logs):
+#  * Es gibt gar keinen "--type=gpu"-Hilfsprozess. QtWebEngine faehrt den
+#    GPU-Dienst IM EIGENEN Prozess (waehrend eines Segments nachgezaehlt:
+#    3x --type=zygote, 1x --type=renderer, 0x gpu). Die serielle Spur
+#    serialisiert ihn damit bereits — zwei konkurrierende GPU-Prozesse ZWISCHEN
+#    zwei Segmenten desselben Laufs kann es nicht geben. Deshalb war das alte
+#    Warten schon innerhalb eines Laufs wirkungslos.
+#  * Der verbliebene Ausfall ist ein Kontextverlust INNERHALB des Prozesses:
+#      RasterDecoderImpl: Context lost during MakeCurrent
+#      -> SharedImageStub: context already lost
+#      -> THREE.WebGLRenderer: Error creating WebGL context.   (die FOLGE)
+#    Dagegen hilft dem Gate kein Warten; der Ausweg liegt im Produkt — der
+#    Szenen-Start-Waechter (VIZ-SCENE-SELFHEAL, visualizer_window.py) laedt die
+#    Szene nach genau einem verlorenen Kontext neu, statt schwarz zu bleiben.
+#
+# ⚠️ EHRLICH ZUR MESSGRENZE (2026-08-18): der Ausfall selbst liess sich hier
+# nicht reproduzieren. In 123 WebEngine-Segmenten unter Parallellast (3 volle
+# Durchlaeufe der Spur) plus 175 rohen pytest-Laeufen der Lastarbeiter kam KEIN
+# einziges rotes Segment vor — weder vor noch nach dieser Aenderung. Die
+# Wirkung ist deshalb an der Deckel-/Nachbarschaftszahl belegt (41 von 41 auf
+# 0), nicht an einer Rate roter Segmente. Wer sie messen will, braucht einen
+# Rechner, auf dem der Kontextverlust wieder auftritt.
 
 run_one() {
     local f="$1"
     local safe="${f//\//_}"
     local log="$OUTDIR/${safe}.log"
-    if [ "${SEG_WEBENGINE:-0}" = "1" ]; then
-        _warte_auf_freie_gpu || echo "$f" >> "$OUTDIR/gpu_wartete_vergeblich.txt"
+    # ★ PROC-02c: die Spur kommt als ARGUMENT, nicht aus der Umgebung.
+    #
+    # Vorher stand hier `SEG_WEBENGINE`, gesetzt per `export` in der Spur —
+    # und ein `export` erbt der pytest-Prozess mit. Startet ein Test darin
+    # wieder einen Segment-Runner (tests/test_gate_webengine_lane.py und
+    # tests/test_proc02c_webengine_sperre.py tun genau das), dann hielt der
+    # INNERE Runner jede seiner Dateien fuer ein WebEngine-Segment — auch die
+    # der schnellen Spur. Solange daran nur ein 3-s-Warten hing, fiel es nicht
+    # auf; mit einer rechnerweiten Sperre haette es die schnelle Spur des
+    # inneren Laufs serialisiert. Gefunden hat es der Test, nicht der Kopf:
+    # er meldete "2 WebEngine-Segmente" fuer einen Lauf mit "0 WebEngine
+    # seriell" in derselben Ausgabe.
+    local web="${2:-0}"
+
+    if [ "$web" = "1" ]; then
+        webengine_sperre_nehmen
+        case $? in
+            1) echo "$f" >> "$OUTDIR/sperre_gewartet.txt" ;;
+            3) echo "$f" >> "$OUTDIR/sperre_vergeblich.txt" ;;
+        esac
+        # Die Messgroesse aus PROC-02c, jetzt als reine Diagnose: laeuft JETZT
+        # fremdes Chromium? Ein Nachbar, der ueber eines der beiden Gates geht,
+        # kann das nicht mehr ausloesen — die Sperre haelt ihn auf. Bleibt die
+        # Zahl gross, faehrt jemand pytest direkt (an beiden Gates vorbei) oder
+        # es laeuft eine LightOS-Instanz.
+        if pgrep -u "$(id -u)" -x QtWebEngineProc >/dev/null 2>&1; then
+            echo "$f" >> "$OUTDIR/fremdes_chromium.txt"
+        fi
     fi
-    timeout 300 "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider > "$log" 2>&1
+
+    # Im Hintergrund, um die Prozessgruppe des Segments zu erfahren — `timeout`
+    # legt dafuer eine eigene an. `8>&-` schliesst den Sperr-Deskriptor im Kind:
+    # sonst haelt ein geerbtes Duplikat die Sperre ueber das Segmentende hinaus
+    # offen (flock loest erst, wenn die LETZTE Kopie zu ist).
+    timeout 300 "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider \
+        8>&- > "$log" 2>&1 &
+    local seg_pid=$! pgid=""
+    [ "$web" = "1" ] && pgid="$(webengine_pgid "$seg_pid")"
+    wait "$seg_pid"
     local rc=$?
+
+    if [ "$web" = "1" ]; then
+        # Erst warten, DANN freigeben — in dieser Reihenfolge liegt der Sinn:
+        # sonst uebernaehme der naechste Lauf die Sperre, waehrend unsere
+        # eigenen Chromium-Kinder noch leben.
+        webengine_warte_auf_kinder "$pgid" || echo "$f" >> "$OUTDIR/kinder_deckel.txt"
+        webengine_sperre_freigeben
+    fi
+
     printf '%s\t%s\n' "$rc" "$f" >> "$OUTDIR/results.tsv"
     case $rc in
         0)   printf '  \033[32m ok \033[0m %s\n' "$f" ;;
@@ -137,7 +187,9 @@ run_one() {
         *)   printf '  \033[31mROT \033[0m %s (exit %s)\n' "$f" "$rc" ;;
     esac
 }
-export -f run_one _warte_auf_freie_gpu; export PY OUTDIR
+export -f run_one webengine_sperre_nehmen webengine_sperre_freigeben \
+          webengine_warte_auf_kinder webengine_pgid webengine_sperrdatei
+export PY OUTDIR
 
 # ── Zwei Spuren: WebEngine seriell, Rest parallel ───────────────────────────
 # WARUM (2026-08-01): Segmente, die eine echte three.js-Szene hochfahren,
@@ -172,14 +224,14 @@ export -f run_one _warte_auf_freie_gpu; export PY OUTDIR
 # nur am Service und bleibt korrekt in der schnellen Spur).
 WEB=(); REST=()
 for f in "${FILES[@]}"; do
-    if grep -q 'QWebEngineView' "$f" 2>/dev/null; then WEB+=("$f"); else REST+=("$f"); fi
+    if webengine_datei "$f"; then WEB+=("$f"); else REST+=("$f"); fi
 done
 
 if [ "$JOBS" -gt 1 ] && command -v xargs >/dev/null 2>&1; then
     echo "[seg] Spuren: ${#REST[@]} parallel ($JOBS), ${#WEB[@]} WebEngine seriell"
     web_pid=""
     if [ "${#WEB[@]}" -gt 0 ]; then
-        ( export SEG_WEBENGINE=1; for f in "${WEB[@]}"; do run_one "$f"; done ) &
+        ( for f in "${WEB[@]}"; do run_one "$f" 1; done ) &
         web_pid=$!
     fi
     if [ "${#REST[@]}" -gt 0 ]; then
@@ -187,16 +239,38 @@ if [ "$JOBS" -gt 1 ] && command -v xargs >/dev/null 2>&1; then
     fi
     [ -n "$web_pid" ] && wait "$web_pid"
 else
-    for f in "${FILES[@]}"; do run_one "$f"; done
+    # Serieller Notweg (-j 1 oder kein xargs): die Spur-Trennung entfaellt hier,
+    # die WebEngine-Absicherung nicht — sie gilt rechnerweit und haengt nicht
+    # daran, wie DIESER Lauf seine Segmente verteilt.
+    for f in "${FILES[@]}"; do
+        if webengine_datei "$f"; then run_one "$f" 1; else run_one "$f" 0; fi
+    done
 fi
 
 echo
 BAD=$(awk -F'\t' '$1!=0' "$OUTDIR/results.tsv" 2>/dev/null | wc -l)
 TOT=$(wc -l < "$OUTDIR/results.tsv" 2>/dev/null || echo 0)
-if [ -f "$OUTDIR/gpu_wartete_vergeblich.txt" ]; then
-    echo "[seg] HINWEIS (XPLAT-17): $(wc -l < "$OUTDIR/gpu_wartete_vergeblich.txt") WebEngine-Segmente"
-    echo "[seg]   starteten, obwohl noch Chromium-Kindprozesse liefen (3-s-Deckel erreicht)."
-    echo "[seg]   Laeuft nebenher eine LightOS-Instanz? Dann ist das erwartet."
+if [ -f "$OUTDIR/sperre_gewartet.txt" ]; then
+    echo "[seg] $(wc -l < "$OUTDIR/sperre_gewartet.txt") WebEngine-Segmente warteten auf die rechnerweite"
+    echo "[seg]   Sperre (.webengine_lock). Das ist der Normalfall bei paralleler Arbeit —"
+    echo "[seg]   sie warten, statt sich gegenseitig den WebGL-Kontext wegzunehmen."
+fi
+if [ -f "$OUTDIR/sperre_vergeblich.txt" ]; then
+    echo "[seg] ⚠ $(wc -l < "$OUTDIR/sperre_vergeblich.txt") WebEngine-Segmente bekamen die Sperre nicht"
+    echo "[seg]   und liefen UNGESPERRT. Haengt ein Prozess auf .webengine_lock?"
+fi
+if [ -f "$OUTDIR/fremdes_chromium.txt" ]; then
+    echo "[seg] HINWEIS (PROC-02c): $(wc -l < "$OUTDIR/fremdes_chromium.txt") WebEngine-Segmente starteten,"
+    echo "[seg]   waehrend FREMDE Chromium-Prozesse liefen. Ueber eines der beiden Gates"
+    echo "[seg]   kann das nicht passieren — die Sperre haelt jeden Nachbarn auf. Also:"
+    echo "[seg]   laeuft eine LightOS-Instanz, oder faehrt jemand pytest direkt?"
+    echo "[seg]   (Vor PROC-02c kostete dieser Zustand 3 s Wartezeit je Segment und"
+    echo "[seg]   bewirkte nichts; gemessen 41 von 41 Segmenten unter Parallellast.)"
+fi
+if [ -f "$OUTDIR/kinder_deckel.txt" ]; then
+    echo "[seg] ⚠ $(wc -l < "$OUTDIR/kinder_deckel.txt") WebEngine-Segmente hatten nach dem Deckel noch"
+    echo "[seg]   EIGENE Chromium-Kinder. Gemessen sind die sonst nach <0,04 s weg —"
+    echo "[seg]   diese Zeile sollte praktisch nie erscheinen."
 fi
 echo "[seg] $((TOT-BAD))/$TOT Segmente gruen"
 # ★ QA-53: Die Abschlusszahl gegen die WIRKLICH gefahrene Dateizahl halten.

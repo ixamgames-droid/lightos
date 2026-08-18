@@ -29,6 +29,13 @@ fi
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 
+# PROC-02c: dieselbe WebEngine-Absicherung, die auch der Segment-Runner benutzt.
+# Ueber den Repo-Root, nicht ueber $(dirname "$0"): oben wurde bereits dorthin
+# gewechselt, ein relativer Aufrufpfad zeigte hier sonst ins Leere.
+# shellcheck source=tools/_gate_webengine.sh
+. "./tools/_gate_webengine.sh" || {
+    echo "[verify] FEHLER: tools/_gate_webengine.sh fehlt oder ist fehlerhaft"; exit 2; }
+
 # Exit-Haertung wie beim Windows-Lock-Runner: QtWebEngine-Sessions sterben auf
 # Linux beim FINALEN Interpreter-Exit sporadisch mit SIGSEGV — NACH dem
 # gemeldeten Ergebnis, die Assertions bestehen. conftest.py beendet den Prozess
@@ -153,8 +160,42 @@ fi
 if [ "$#" -gt 0 ]; then
     # Gezielte Dateien: direkt, in EINEM Prozess. Hier gibt es keinen ueber
     # Dateigrenzen akkumulierenden Zustand zu vermeiden, und der Weg ist schnell.
+    #
+    # ★ PROC-02c: von der VOLLEN-Suite-Sperre bleiben gezielte Laeufe bewusst
+    # ausgenommen — kurz und billig, sie zu serialisieren wuerde nur bremsen.
+    # Fuer WebEngine-Dateien stimmt das aber nur bei der Rechenzeit, nicht beim
+    # WebGL-Kontext: davon gibt es rechnerweit nur einen brauchbaren Satz. Und
+    # Agenten fahren fast ausschliesslich gezielte Laeufe — genau daran ging die
+    # Annahme kaputt. Ein solcher Lauf nimmt deshalb dieselbe schmale
+    # WebEngine-Sperre wie die WebEngine-Spur der vollen Suite. Alles andere
+    # (die grosse Mehrheit) laeuft unveraendert ungebremst.
+    _web=0
+    for _arg in "$@"; do
+        case "$_arg" in -*) continue ;; esac
+        _pfad="${_arg%%::*}"
+        if [ -f "$_pfad" ] && webengine_datei "$_pfad"; then _web=1; break; fi
+    done
     echo "[verify] 2/2 pytest $* ..."
-    if ! "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider; then
+    if [ "$_web" = "1" ]; then
+        webengine_sperre_nehmen
+        case $? in
+            1) echo "[verify] WebEngine-Sperre war belegt — gewartet, laufe jetzt exklusiv." ;;
+            3) echo "[verify] ⚠ WebEngine-Sperre nicht bekommen, laufe UNGESPERRT weiter." ;;
+        esac
+    fi
+    # `8>&-` schliesst den Sperr-Deskriptor im Kind: ein geerbtes Duplikat
+    # hielte die Sperre sonst ueber das Laufende hinaus offen.
+    "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider 8>&- &
+    _pid=$!
+    _pgid="$(webengine_pgid "$_pid")"
+    wait "$_pid"
+    _rc=$?
+    if [ "$_web" = "1" ]; then
+        # Erst die eigenen Chromium-Kinder abwarten, dann freigeben.
+        webengine_warte_auf_kinder "$_pgid" || true
+        webengine_sperre_freigeben
+    fi
+    if [ "$_rc" -ne 0 ]; then
         echo "[verify] TESTS ROT"
         exit 1
     fi
