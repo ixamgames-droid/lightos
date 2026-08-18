@@ -95,23 +95,47 @@ export function normalizeElementRotation(value) {
   return ELEMENT_ROTATIONS.indexOf(v) >= 0 ? v : 0;
 }
 
-/** (r, c) im gedrehten Raster + dessen neue Groesse. */
-export function rotateCell(row, col, rows, cols, rotation, flip) {
-  let r = Math.floor(row), c = Math.floor(col);
+/**
+ * ★ VIZ-50b: dieselbe Drehung fuer einen Punkt ZWISCHEN den Rasterzellen.
+ *
+ * Die Warmweiss-Leiste des ZQ06121 liegt NICHT auf dem Farbraster: sie laeuft
+ * mittig zwischen Reihe 2 und 3 (also auf einer halben Zellhoehe) und ihre acht
+ * Segmente decken je anderthalb Spalten ab. Ihre Mittelpunkte sind damit
+ * GEBROCHENE Rasterkoordinaten — und `rotateCell` floort seine Eingaben, was
+ * fuer einen Pixel-Index richtig und fuer 1.5 toedlich ist.
+ *
+ * Die Drehformel steht deshalb hier EINMAL und `rotateCell` floort davor,
+ * statt sie ein zweites Mal hinzuschreiben (FM16E-Lehre: zwei Fassungen
+ * derselben Regel laufen auseinander, und zwar genau dann, wenn eine angefasst
+ * wird). Die Abbildung ist affin — sie gilt fuer Bruchteile unveraendert.
+ *
+ * `quer` sagt, ob Zeilen und Spalten die Rollen getauscht haben (90°/270°).
+ * Wer eine AUSDEHNUNG mitdrehen muss — das Band ist breit und flach, nach der
+ * Drehung schmal und hoch — braucht diese Auskunft; sie aus dem Winkel neu
+ * abzuleiten waere wieder die zweite Formel.
+ */
+export function rotatePoint(row, col, rows, cols, rotation, flip) {
+  let r = row, c = col;
   let nr = Math.max(1, Math.floor(rows || 1));
   let nc = Math.max(1, Math.floor(cols || 1));
   const rot = normalizeElementRotation(rotation);
+  let quer = false;
   if (rot === 90) {
     const r2 = c, c2 = nr - 1 - r;
-    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t; quer = true;
   } else if (rot === 180) {
     r = nr - 1 - r; c = nc - 1 - c;
   } else if (rot === 270) {
     const r2 = nc - 1 - c, c2 = r;
-    r = r2; c = c2; const t = nr; nr = nc; nc = t;
+    r = r2; c = c2; const t = nr; nr = nc; nc = t; quer = true;
   }
   if (flip) c = nc - 1 - c;
-  return { r: r, c: c, rows: nr, cols: nc };
+  return { r: r, c: c, rows: nr, cols: nc, quer: quer };
+}
+
+/** (r, c) im gedrehten Raster + dessen neue Groesse. */
+export function rotateCell(row, col, rows, cols, rotation, flip) {
+  return rotatePoint(Math.floor(row), Math.floor(col), rows, cols, rotation, flip);
 }
 
 /** DMX-Index -> endgueltige Position + Rastergroesse.
@@ -121,4 +145,56 @@ export function placeElement(index, cols, rows, order, rotation, flip) {
   const nr = Math.max(1, Math.floor(rows || 1));
   const z = pixelCell(index, nc, order);
   return rotateCell(z.r, z.c, nr, nc, rotation, flip);
+}
+
+
+// ── FM-14: Ring-/Wabenordnung eines Pixel-Moving-Heads ──────────────────────
+//
+// Ein Panel nummeriert in Zeilen, ein Pixel-Kopf in RINGEN um die Mitte. Die
+// Ordnung ist am realen Geraet nachgesehen, nicht ausgedacht:
+//
+//   Robe Robin Spiider, User Manual (Rev. 3.3, robe.cz), S. 15 „Pixel order" —
+//   19 Pixel als Wabe: Pixel 1 = Mitte, Pixel 2-7 = innerer Sechserring,
+//   Pixel 8-19 = aeusserer Zwoelferring. Die Firmware selbst nennt diese drei
+//   Gruppen „Ring 1 (Middle pixel) / Ring 2 / Ring 3" (DMX-Chart v2.3,
+//   Kanal „Background - Active zone").
+//
+// Aus der Zeichnung abgelesen und fuer BEIDE Ringe gueltig (das ist die Probe,
+// die eine geratene Formel nicht bestanden haette): der erste Platz eines Rings
+// liegt eine HALBE Teilung links von „unten", danach geht es im Uhrzeigersinn
+// (Blick von vorn auf die Linse) einmal herum.
+//
+//   Ring k: 6k Plaetze, Winkelschritt 60°/k, Startwinkel 270° - Schritt/2.
+//   Innenring (k=1): 240°, 180°, 120°, 60°, 0°, 300°  -> Pixel 2 unten-links,
+//                    Pixel 3 links, Pixel 6 rechts (deckt sich mit S. 15).
+//   Aussenring (k=2): 255°, 225°, …, 285°             -> Pixel 13/14 oben,
+//                    Pixel 11 links, Pixel 16 rechts (deckt sich mit S. 15).
+//
+// Beide Ringe sind damit spiegelsymmetrisch zur Senkrechten — genau wie in der
+// Zeichnung. Zurueck kommen KREISRING-Koordinaten (Radius = Ringnummer), nicht
+// die exakte Wabenpackung: was das Modell tragen muss, ist die REIHENFOLGE um
+// den Kopf herum (ein Lauflicht muss herumlaufen, nicht huepfen); die
+// Wabenkanten sind Zierrat, den ein Segment-Mesh ohnehin nicht abbildet.
+//
+// `x` zeigt nach RECHTS, `y` nach OBEN — beides in der Ansicht von vorn auf die
+// Linse (dieselbe Ansicht wie die Zeichnung im Manual). Wer daraus 3D-Positionen
+// macht, muss diese Ebene auf das Geraet legen (siehe `buildPixelHead`).
+
+/** Wie viele Plaetze fassen die Ringe 0..k? (1, 7, 19, 37, …) */
+function wabenPlaetze(ring) {
+  const k = Math.max(0, Math.floor(ring || 0));
+  return 1 + 3 * k * (k + 1);
+}
+
+/** Pixelindex (0 = Mitte) -> {ring, x, y} in Ring-Einheiten. */
+export function wabenPlatz(index) {
+  const i = Math.max(0, Math.floor(index || 0));
+  if (i === 0) return { ring: 0, x: 0, y: 0 };
+  let k = 1;
+  while (i >= wabenPlaetze(k)) k++;
+  const j = i - wabenPlaetze(k - 1);          // Platz innerhalb des Rings
+  const schritt = (Math.PI / 3) / k;          // 60°/k
+  // 270° = -PI/2 (unten); MINUS j*Schritt = im Uhrzeigersinn.
+  const winkel = -Math.PI / 2 - schritt / 2 - j * schritt;
+  return { ring: k, x: k * Math.cos(winkel), y: k * Math.sin(winkel) };
 }

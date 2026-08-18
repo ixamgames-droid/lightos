@@ -7,6 +7,64 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-13 — Moving Heads mit LED-Ring zeigen ihre Pixel einzeln
+
+#### Neu
+
+- **Ein Moving Head kann jetzt viele Pixel haben.** Bisher hatte jeder Moving
+  Head im 3D genau eine Linse; Geräte, deren Lichtquelle aus einzeln
+  ansteuerbaren Segmenten besteht, standen deshalb als zwei kippende Leisten da
+  (das Spider-Modell) — ihre vielen Farbkanäle waren das einzige, woran LightOS
+  sie erkannte. Solche Geräte bekommen jetzt ein eigenes Modell: das gewohnte
+  Gehäuse, dazu ein Ring aus einzeln gefärbten Segmenten in der Linsenfläche.
+  Der Kopf schwenkt, strahlt und wirft seinen Lichtfleck wie jeder andere.
+
+- **Jedes Segment zeigt seinen eigenen Wert.** Die Grundfarbe des Geräts bleibt
+  bei Linse, Kegel und Bodenfleck; die Segmente hängen an ihren eigenen
+  Pixel-Kanälen. Ein Lauflicht über den Ring läuft im 3D in derselben Richtung
+  wie am echten Gerät — die Reihenfolge ist der Herstellerzeichnung entnommen,
+  nicht geraten. Das 2D-Symbol in der Draufsicht färbt dieselben Segmente.
+
+- **Neu in der Bibliothek: Robe Robin Spiider** mit 19 einzeln ansteuerbaren
+  RGBW-Chips, in zwei Modi — 27 Kanäle Wash und 91 Kanäle Pixel RGB. Beide
+  Kanallisten stammen aus dem Herstellerprotokoll. Im Wash-Modus ist dasselbe
+  Gerät ein ganz gewöhnlicher Moving Head: der Ring hängt an den Kanälen des
+  gewählten Modus, nicht am Gerätenamen.
+
+- **Gewöhnliche Moving Heads bleiben, wie sie waren.** Kein Gerät der
+  mitgelieferten Bibliothek wechselt sein 3D-Modell; ein Gerät mit einer
+  Farbbank bekommt keinen Ring, eines mit zwei bleibt ein Spider.
+
+#### Behoben
+
+- **„Auf Punkt ausrichten" wirkte bei Mehrbank-Köpfen nur im Bild.** Das
+  Werkzeug hielt jedes Gerät mit mehreren Farbbänken für einen Spider und drehte
+  in diesem Fall nur das Gehäuse in der 3D-Ansicht, statt Pan/Tilt zu schreiben
+  — am Rig passierte nichts. Ein Kopf mit einem Pan- und einem Tilt-Motor wird
+  jetzt ausgerichtet, auch wenn er viele Pixel hat. Doppelbar-Spider bleiben wie
+  bisher ausgenommen (sie kippen nur).
+
+### 2026-08-13 — Die weiße Leiste des LED-Balkens leuchtet jetzt auch im 3D
+
+#### Neu
+
+- **Der ZQ06121 zeigt seine Warmweiß-Segmente.** Der Balken hat neben seinen 48
+  RGB-Zonen acht weiße Segmente, die als eigene Leiste quer durch die Mitte
+  laufen. In der 3D-Vorschau gab es sie schlicht nicht — sichtbar war nur das
+  Farbraster. Jetzt liegt zwischen der zweiten und dritten Zonenreihe ein
+  eigenes Band: acht Segmente, halb so hoch wie eine RGB-Zone, jedes anderthalb
+  Zonen breit. Ein hochkant montiertes Panel trägt sein Band längs statt quer.
+
+- **Die Segmente leuchten aus ihren eigenen Kanälen.** Sie hängen an den
+  Weiß-Kanälen des Geräts, nicht an der Farbe der benachbarten RGB-Zone — wer
+  Zone 1 rot fährt, bekommt kein rotes „Weiß"-Segment.
+
+- Dafür war **keine neue Angabe in der Bibliothek** nötig: dass dieses Gerät
+  acht getrennte Weiß-Segmente hat, steht seit dem Anlegen in seinen Kanälen.
+  **Geräte ohne eigene Weiß-Leiste bleiben unverändert** — ein RGBW-Panel, bei
+  dem jedes Pixel sein eigenes Weiß hat, bekommt kein Band, und ein gewöhnliches
+  8×8-Panel sieht aus wie zuvor.
+
 ### 2026-08-12 — Ein LED-Balken steht im 3D endlich als Balken da
 
 #### Neu

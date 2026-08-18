@@ -1203,9 +1203,18 @@ class VisualizerBridge(QObject):
 
     def _is_moving_head(self, f) -> bool:
         """Echter Moving Head = hat Pan UND Tilt, ist aber kein Spider (Tilt-only-
-        Doppelbar -> der wird hier nicht auto-geaimt)."""
+        Doppelbar -> der wird hier nicht auto-geaimt).
+
+        ★ FM-14: der Pixel-Moving-Head faellt unter ``is_spider_fixture`` — er hat
+        ja viele Farbbaenke — hat aber EINEN Pan- und EINEN Tilt-Motor wie jeder
+        andere Moving Head. Ohne diese Ausnahme laege er im statischen Zweig, der
+        nur ``visualizer_rotations`` setzt: im 3D drehte sich das Gehaeuse,
+        waehrend am echten Geraet gar nichts passiert — genau der Fehler, den
+        FM-10 fuer die Mover-Bar behoben hat. Die Ausnahme haengt am
+        Render-Modell (``viz_model_for``), nicht an einer zweiten Kanal-Regel.
+        """
         try:
-            if is_spider_fixture(f):
+            if is_spider_fixture(f) and viz_model_for(f) != "pixel_head":
                 return False
             attrs = {ch.attribute for ch in get_channels_for_patched(f)}
             return "pan" in attrs and "tilt" in attrs
@@ -1884,13 +1893,48 @@ class VisualizerBridge(QObject):
         # n_heads = Pixel-Anzahl (color_r-Banks, 16/64) MUSS mitreisen, sonst baut
         # buildMatrixPanel(0->16) IMMER ein 4x4-Panel und das 8x8 (64px) verliert
         # heads[16..63] (adversariale Review HIGH).
+        # ★ VIZ-50b: in derselben Zaehlung faellt die Zahl der EIGENEN
+        # Weiss-Segmente ab — Robins ZQ06121 hat acht `color_w`-Kanaele neben
+        # seinen 48 `color_r`-Zonen, und die attr#N-Konvention legt sie auf die
+        # Koepfe 0..7. Bewusst KEIN neues Bibliotheksfeld: die Angabe steht seit
+        # dem Anlegen des Geraets in den Kanaelen, ein zweites Feld waere eine
+        # Kopie, die still danebenlaufen kann (FM16E).
+        # FM-14: 'pixel_head' zaehlt genauso — dort ist n_heads die Zahl der
+        # Farb-BAENKE, aus der `buildPixelHead` die Segmente ableitet (Bank 0 =
+        # Geraetefarbe). Ohne diese Zeile baute der Renderer immer genau ein
+        # Segment, egal wie viele Pixel das Geraet hat.
         n_heads = 0
-        if model in ("par_bar", "spider", "mover_bar", "matrix"):
+        n_whites = 0
+        if model in ("par_bar", "spider", "mover_bar", "matrix", "pixel_head"):
             try:
-                n_heads = sum(1 for c in get_channels_for_patched(f)
-                              if (getattr(c, "attribute", "") or "") == "color_r")
+                kanal_attrs = [(getattr(c, "attribute", "") or "")
+                               for c in get_channels_for_patched(f)]
+                n_heads = kanal_attrs.count("color_r")
+                # ★ Das Weiss-BAND ist eine Aussage ueber PANELS (VIZ-50b:
+                # weniger Weiss-Kanaele als Farbzonen = eigene Leiste quer
+                # ueber die Mitte). Nur `buildMatrixPanel` liest `nWhites`;
+                # fuer alle anderen Modelle fiel der Wert unten ohnehin auf 0
+                # (nachgemessen an der ganzen Bibliothek: par_bar/spider/
+                # mover_bar haben entweder 0 Weiss-Kanaele oder genau so viele
+                # wie Baenke). Der Pixel-Kopf waere der erste, bei dem das
+                # NICHT gilt — er haette mit seiner einen Grundfarben-Weiss-
+                # Bank auf 20 Baenken ploetzlich ein „Band" gemeldet.
+                if model == "matrix":
+                    n_whites = kanal_attrs.count("color_w")
             except Exception:
                 n_heads = 0
+                n_whites = 0
+        # ★ Die Regel, wann ein Geraet ein eigenes Weiss-BAND hat, steht hier —
+        # an der Stelle, die die Kanaele wirklich kennt, und nur einmal.
+        # WENIGER Weiss-Kanaele als Farbzonen heisst: die Weiss-LEDs sitzen
+        # NICHT in den Zonen, sondern bilden eine eigene Leiste (ZQ06121: 8 auf
+        # 48). GLEICH VIELE heisst RGBW-Emitter — dort gehoert das Weiss zum
+        # Pixel und ist ueber `visual_rgb` laengst in dessen Farbe eingerechnet;
+        # ein Band waere dieselbe Information ein zweites Mal. Gemessen an der
+        # Bibliothek trifft die Bedingung heute genau einen Modus (ZQ06121
+        # 154-Kanal); PARBAR4 (4x RGBW), SPIDER14 und HYDRA4000 fallen mit
+        # w == n_heads heraus, jedes Panel ohne Weiss-Kanaele mit w == 0.
+        n_whites = n_whites if 0 < n_whites < n_heads else 0
         # ★ VIZ-50a: die PHYSISCHE Rasterform des Panels (Zeilen x Spalten) aus
         # dem Fixture-Modus. Bis hierher bekam `buildMatrixPanel` nur die
         # Pixel-ZAHL und musste die Form near-square RATEN — Robins 12x4-Balken
@@ -1925,6 +1969,8 @@ class VisualizerBridge(QObject):
             # VIZ-50a: hinterlegte Rasterform (0 = keine Angabe -> JS raet).
             "gridRows": grid_rows,
             "gridCols": grid_cols,
+            # VIZ-50b: Zahl der eigenen Weiss-Segmente (0 = kein Band).
+            "nWhites": n_whites,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],

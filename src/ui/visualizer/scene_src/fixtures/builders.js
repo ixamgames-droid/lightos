@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { placeElement, panelGrid } from './pixel_order.js';
+import { placeElement, panelGrid, rotatePoint, wabenPlatz } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -191,6 +191,71 @@ export function buildMovingHead() {
   lens.position.y = -0.115; head.add(lens);
 
   return { group, yoke, head, lens };
+}
+
+// ── FM-14: Pixel-Moving-Head (LED-Ring/Segmente) ─────────────────────────────
+//
+// Reales Vorbild, Kanal fuer Kanal belegt: **Robe Robin Spiider** — ein
+// Wash/Beam-Moving-Head, dessen Lichtquelle aus 19 einzeln ansteuerbaren
+// RGBW-Multichips besteht (1x 60 W Mitte + 18x 40 W aussen). Quellen:
+// „Robin SPIIDER - DMX protocol" v2.3 (robe.cz, Modus 7 „Pixel RGB", 91 Kanaele:
+// Kanal 35-91 = Rot/Gruen/Blau je Pixel 1..19) und das User Manual Rev. 3.3,
+// S. 15 „Pixel order" (die Wabe: Mitte, Sechser-, Zwoelferring). Die Ring-
+// Ordnung selbst steht in `pixel_order.js#wabenPlatz`, damit 2D-Icon und
+// 3D-Modell denselben Pixel an dieselbe Stelle legen (Lehre VIZ-51).
+//
+// ★ Was dieses Modell vom Spider (Doppel-Bar) trennt: EIN Kopf mit EINEM
+//   Pan/Tilt — die Segmente bewegen sich nicht gegeneinander, sie sitzen in der
+//   Linsenflaeche. Bis FM-14 landete so ein Geraet ueber die Bank-Zahl
+//   (>=2 color_r) im Spider-Zweig und stand als zwei kippende Leisten da.
+//
+// ★ Wieso `nBaenke - 1` Segmente: Bank 0 (die Kanaele OHNE #N) ist in diesem
+//   Projekt ueberall die GERAETEFARBE — `visual_rgb` baut daraus `payload.r/g/b`,
+//   und die faerben bereits Kegel, SpotLight, Bodenfleck und die Hauptlinse.
+//   Beim Spiider ist das die „Background"-Bank, die genau diese Rolle hat.
+//   Wuerde Segment 0 ebenfalls aus Bank 0 leuchten, zeigte das Bild dieselbe
+//   Information zweimal — derselbe Fehler, den VIZ-50b beim Weissband vermieden
+//   hat. Ein Geraet OHNE eigene Grundfarben-Bank verliert dadurch kein Pixel:
+//   sein erstes Pixel wird zur Geraetefarbe und erscheint an Linse und Kegel.
+export function buildPixelHead(nBaenke) {
+  // Gehaeuse EXAKT der normale Moving Head — derselbe Aufruf, nicht eine Kopie:
+  // ein Pixel-Kopf ist mechanisch ein Moving Head, und zwei Fassungen desselben
+  // Gehaeuses waeren zwei Fassungen, die auseinanderlaufen.
+  const mh = buildMovingHead();
+  const n = Math.max(1, Math.min(64, Math.floor(nBaenke || 2) - 1));
+
+  // Die Segmente liegen in der LINSENEBENE (Ausgang -Y), also in der lokalen
+  // XZ-Ebene des Kopfes. `wabenPlatz` liefert die Zeichnung aus dem Manual —
+  // Blick von VORN auf die Linse, x nach rechts, y nach oben. Auf den gekippten
+  // Kopf gelegt heisst das: „rechts" ist lokal -X und „oben" ist lokal -Z (bei
+  // Tilt +90° zeigt der Kopf nach -Z, dann steht lokal -Z senkrecht nach oben
+  // und lokal -X liegt rechts vom Betrachter). Ohne diese Drehung stuende die
+  // Wabe spiegelverkehrt und ein Lauflicht liefe im 3D andersherum als am Rig.
+  const LINSE_R = 0.077;                      // Radius der Moving-Head-Linse
+  let maxRing = 0;
+  for (let i = 0; i < n; i++) maxRing = Math.max(maxRing, wabenPlatz(i).ring);
+  const teilung = LINSE_R / (maxRing + 0.55);
+  const zellR = teilung * 0.46;
+  const ringPixels = [];
+  for (let i = 0; i < n; i++) {
+    const p = wabenPlatz(i);
+    const seg = new THREE.Mesh(
+      new THREE.CircleGeometry(zellR, segs(14)),
+      new THREE.MeshStandardMaterial({
+        color: 0x303030, emissive: 0x000000, emissiveIntensity: 0,
+        roughness: 0.25, side: THREE.DoubleSide,
+      })
+    );
+    seg.rotation.x = -Math.PI / 2;            // Normale -Y (Lichtausgang)
+    // 0.008 unter der Hauptlinse: die beiden Flaechen wuerden sonst
+    // gegeneinander flimmern (Z-Fighting), und die Segmente gehoeren VOR die
+    // Linse — sie sind das, was man am Geraet sieht.
+    seg.position.set(-p.x * teilung, -0.123, -p.y * teilung);
+    mh.head.add(seg);
+    ringPixels.push({ mesh: seg, ring: p.ring });
+  }
+  return { group: mh.group, yoke: mh.yoke, head: mh.head, lens: mh.lens,
+           ringPixels, isPixelHead: true };
 }
 
 export function buildPar() {
@@ -937,11 +1002,13 @@ export function buildMoverBar(n) {
 // links) wird von heads[i].r/g/b gefaerbt. Front = +Z (Panel steht vertikal wie
 // ein Backdrop). Reale Referenz: generische 0,5-m-LED-Kachel — die 0,5 m sind
 // seit VIZ-50a die LAENGERE Kante, die kuerzere folgt dem Seitenverhaeltnis.
-// Vertrag { group, pixels:[{mesh,r,c}], isMatrix, rows, cols };
+// Vertrag { group, pixels:[{mesh,r,c}], whites:[{mesh}], isMatrix, rows, cols };
 // `rows`/`cols` ist das SICHTBARE Raster — bei 90°/270° Montage-Drehung also
 // die getauschte Form, nicht die aus der Pixelzahl abgeleitete (VIZ-52).
+// `whites` ist das Warmweiss-Band (VIZ-50b), leer bei Geraeten ohne eigene
+// Weiss-Segmente.
 export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
-                                 gridCols, gridRows) {
+                                 gridCols, gridRows, nWhites) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
@@ -1009,7 +1076,62 @@ export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
     group.add(mesh);
     pixels.push({ mesh, r, c });
   }
-  return { group, pixels, isMatrix: true, rows, cols };
+
+  // ── ★ VIZ-50b: die Warmweiss-Leiste als EIGENES Band ───────────────────────
+  //
+  // Robins ZQ06121 hat neben den 48 RGB-Zonen acht Warmweiss-Segmente. Sie
+  // liegen NICHT auf dem Farbraster: die Leiste laeuft mittig zwischen Reihe 2
+  // und 3 durch, ist halb so hoch wie eine RGB-Zone und ihre acht Segmente
+  // decken die zwoelf Spalten ab — also je anderthalb Spalten.
+  //
+  // WOHER DIE ZAHL KOMMT — und warum es dafuer kein neues Feld gibt: aus den
+  // `color_w`-Kanaelen des Modus, gezaehlt in derselben Schleife, die `nHeads`
+  // aus `color_r` zaehlt (`_fixture_to_dict`). Die Bibliothek weiss das seit
+  // dem Anlegen des Geraets; die attr#N-Konvention legt die acht Segmente auf
+  // die Koepfe 0..7, und deren Werte reisen als `heads[j].cw` laengst mit. Es
+  // fehlte nur die GEOMETRIE, nicht die Angabe.
+  //
+  // Die Lage im Panel ist abgeleitet, nicht behauptet: `nw` Segmente gleich
+  // verteilt ueber die volle Rasterbreite, mittig auf der Waagerechten. Fuer
+  // den ZQ06121 ist genau das die am Geraet nachgesehene Anordnung; fuer ein
+  // kuenftiges Geraet mit anderer Verteilung braucht es ein Bandformat — bis
+  // dahin ist die Gleichverteilung die einzige Aussage, die aus der Kanalzahl
+  // wirklich folgt.
+  const whites = [];
+  const nw = Math.max(0, Math.floor(nWhites || 0));
+  if (nw > 0) {
+    // Ausdehnung EINES Segments im QUELL-Raster: `segCols` Spalten lang, eine
+    // halbe Zeile hoch. Beides dreht mit dem Panel mit (`quer`).
+    const segCols = srcCols / nw;
+    // Mitte der Waagerechten: bei 4 Reihen die Fuge zwischen Reihe 2 und 3
+    // ((4-1)/2 = 1.5), bei ungerader Reihenzahl die Mitte der mittleren Reihe.
+    const mitteZeile = (srcRows - 1) / 2;
+    for (let j = 0; j < nw; j++) {
+      const p = rotatePoint(mitteZeile, (j + 0.5) * segCols - 0.5,
+                            srcRows, srcCols, elementRotation, elementFlip);
+      // 0.85 wie bei den Pixeln — damit bleibt „halb so hoch wie eine RGB-Zone"
+      // auch als Quad-Mass exakt die Haelfte und nicht nur als Rasterangabe.
+      const segW = (p.quer ? gw * 0.5 : gw * segCols) * 0.85;
+      const segH = (p.quer ? gh * segCols : gh * 0.5) * 0.85;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(segW, segH),
+        new THREE.MeshStandardMaterial({
+          color: 0x0a0a0a, emissive: 0x000000, emissiveIntensity: 0,
+          roughness: 0.4, side: THREE.DoubleSide,
+        })
+      );
+      // Knapp VOR den Pixeln: das Band liegt physisch zwischen den Zonen, im
+      // 4x12-Raster ueberlappt sein Streifen sie unvermeidlich (0.85 + 0.85 +
+      // 0.425 Zellhoehen passen nicht in zwei). Ohne den Versatz flimmerten
+      // beide Flaechen gegeneinander (Z-Fighting).
+      mesh.position.set(x0 + p.c * gw, y0 - p.r * gh, PD / 2 + 0.004);
+      group.add(mesh);
+      // Nur das Mesh — der Listenplatz IST die Segmentnummer, und ein
+      // mitgefuehrter Index waere eine zweite Zaehlung derselben Sache.
+      whites.push({ mesh });
+    }
+  }
+  return { group, pixels, whites, isMatrix: true, rows, cols };
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1158,6 +1280,26 @@ export function updateMatrixPanelDmx(f, dmx) {
       px.mesh.material.emissiveIntensity = intNorm * 1.6;   // Master-Dimmer skaliert alle Pixel
     }
   }
+  // ★ VIZ-50b: das Warmweiss-Band hat EIGENE Kanaele. Segment j haengt nach der
+  // attr#N-Konvention an Kopf j — an DESSEN `color_w`, nicht an seiner
+  // Zonenfarbe. `heads[j].cw` ist genau dieser Rohwert (die Nutzlast fuehrt ihn
+  // seit FM-2 pro Kopf mit); `heads[j].r/g/b` waere die Farbe der RGB-Zone j
+  // und haette das Band zu einem zweiten Bild derselben acht Zonen gemacht.
+  //
+  // Neutrales Weiss und nicht warmgetoent, obwohl die LEDs warmweiss sind:
+  // LightOS rechnet `color_w` ueberall neutral (`visual_rgb` legt W gleich auf
+  // R, G und B; die W-LED des Spiders ist (1,1,1)). Eine zweite, waermere Regel
+  // nur an dieser Stelle waere die Drift, gegen die FM16E steht.
+  const ws = f.whites || [];
+  for (let j = 0; j < ws.length; j++) {
+    const seg = ws[j];
+    if (!seg.mesh || !seg.mesh.material) continue;
+    const v = ((hs[j] || {}).cw || 0) / 255;
+    const wcol = new THREE.Color(v, v, v);
+    seg.mesh.material.color = wcol;
+    seg.mesh.material.emissive = wcol;
+    seg.mesh.material.emissiveIntensity = intNorm * 1.6;   // derselbe Master-Dimmer
+  }
   // Top-Down-Icon: Panel-Zellen aus den Kopf-Farben (3c-1 zentrales Tinting)
   tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
   syncIconPos(f);
@@ -1179,6 +1321,38 @@ export function updateMovingHeadDmx(f, dmx) {
   // VORIGEN Frames — sichtbar, sobald ein Kopf schwenkt und der
   // Bodenauftreffpunkt schnell wandert. Kostet nichts ohne Prisma.
   syncPrismToBeam(f);
+  syncIconPos(f);
+}
+
+// ── FM-14: Pixel-Moving-Head — Kopf wie ein Moving Head, Segmente einzeln ───
+// Reihenfolge-Vertrag: ERST der volle Moving-Head-Durchlauf (Kegel, SpotLight,
+// Bodenfleck, Hauptlinse, Pan/Tilt, Optik), DANN die Segmente. Andersherum
+// wuerde der Icon-Tint aus `applyGenericColor` die Segment-Zellen wieder
+// ueberschreiben.
+export function updatePixelHeadDmx(f, dmx) {
+  updateMovingHeadDmx(f, dmx);
+  if (!f.isPixelHead || !f.ringPixels) return;
+  const { r, g, b, intNorm } = dmx;
+  const hs = f.lastHeads || [];
+  for (let i = 0; i < f.ringPixels.length; i++) {
+    const seg = f.ringPixels[i];
+    // Kopf 0 = Grundfarbe des Geraets (sie faerbt Linse und Kegel, s.
+    // buildPixelHead) -> Segment i haengt an Kopf i+1. Ohne Kopf-Daten bleibt
+    // das Segment DUNKEL statt auf die Geraetefarbe zurueckzufallen: ein Ring,
+    // der die Hauptfarbe spiegelt, behauptet Pixel-Werte, die es nicht gibt.
+    const h = hs[i + 1] || {};
+    const col = new THREE.Color((h.r || 0) / 255, (h.g || 0) / 255,
+                                (h.b || 0) / 255);
+    if (seg.mesh && seg.mesh.material) {
+      seg.mesh.material.color = col;
+      seg.mesh.material.emissive = col;
+      seg.mesh.material.emissiveIntensity = intNorm * 1.9;   // Master-Dimmer
+    }
+  }
+  // Top-Down-Icon: dieselbe Verschiebung. `slice(1)` statt eines zweiten
+  // Parameters an `tintTopDownIcon` — die Zelle i des Icons IST das Segment i,
+  // und die gemeinsame Faerbe-Funktion bleibt fuer alle Typen dieselbe.
+  tintTopDownIcon(f.icon, { r, g, b }, intNorm, hs.slice(1));
   syncIconPos(f);
 }
 
@@ -1253,11 +1427,22 @@ function applyGenericColor(f, dmx) {
   tintTopDownIcon(f.icon, color, intNorm);
 }
 
+// EINE Stelle beantwortet „richtet dieses Modell seinen KOPF ueber Pan/Tilt
+// aus?". Die Bedingung stand zweimal (applyPanTilt + applyFloorAim), und beide
+// Stellen muessen dieselbe Antwort geben: wer den Kopf dreht, muss auch den
+// Bodenfleck aus dem Kopf heraus zielen — sonst leuchtet der Fleck woanders hin
+// als der Kegel (A3D-26). FM-14 haengt 'pixel_head' hier ein; `f.type` ist das
+// RENDER-Modell (fixtures.js: `type: rtype`), nicht der fixture_type.
+export function schwenktKopf(f) {
+  return f.type === 'moving_head' || f.type === 'scanner'
+      || f.type === 'pixel_head';
+}
+
 // Pan/Tilt (Moving Head UND Scanner — FM-1: Scanner-Spiegel bewegt sich jetzt).
 // Der Typ-Guard bleibt bewusst 1:1 erhalten (Byte-Identitaet): fuer alle
 // anderen Typen ist der Aufruf ein No-Op wie im Monolith.
 function applyPanTilt(f, dmx) {
-  if ((f.type === 'moving_head' || f.type === 'scanner') && f.yoke && f.head) {
+  if (schwenktKopf(f) && f.yoke && f.head) {
     const { pan, tilt } = dmx;
     // Pan/Tilt-DMX -> Winkel ueber den physischen Bereich des Geraets (halber
     // Bereich in Radiant = bereich*PI/360); Default 360/180 = generisch wie zuvor.
@@ -1346,7 +1531,7 @@ function applyFloorAim(f, dmx) {
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
     // ueber den Kopf (Pan/Tilt), statische ueber die Gruppen-Rotation (rotX/rotZ).
     // Vorher blieb der Boden-Pool bei getilteten PARs/Scannern senkrecht drunter.
-    const aimObj = ((f.type === 'moving_head' || f.type === 'scanner') && f.head) ? f.head : f.group;
+    const aimObj = (schwenktKopf(f) && f.head) ? f.head : f.group;
     if (aimObj) {
       aimObj.updateMatrixWorld();
       const wq = new THREE.Quaternion();
