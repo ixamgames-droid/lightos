@@ -2,8 +2,9 @@
 """Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek.
 
 QA-54: Bis zum 2026-08-11 legten Tests ihre Profile in der ECHTEN Bibliothek an
-(``LIGHTOS_FIXTURE_DB`` zeigt bewusst auf ``~/.local/share/LightOS/fixtures.db``,
-damit Tests gegen die reale Library laufen). Der Aufraeumschritt loeschte das
+(``LIGHTOS_FIXTURE_DB`` zeigte damals auf die reale ``fixtures.db``, damit Tests
+gegen die reale Library laufen; seit QA-58 ist es eine prozess-eigene KOPIE
+davon). Der Aufraeumschritt loeschte das
 Profil, den ueber ``_get_or_create_mfr`` angelegten **Hersteller** aber nie — er
 steht seither in der Herstellerliste des Patch-Dialogs.
 
