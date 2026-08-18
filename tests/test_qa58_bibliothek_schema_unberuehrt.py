@@ -86,6 +86,30 @@ def _echte_bibliothek() -> str:
     return conftest._ECHTE_FIXTURE_DB
 
 
+def _profil_ids(pfad: str) -> set:
+    """Die Menge der Profil-IDs — nicht ihre Anzahl.
+
+    ★ Frueher eine Kennzahl (Anzahl, min, max, Summe) und ein Vergleich auf
+    GLEICHHEIT. Das war falsch: ``ensure_builtins()`` legt beim ersten Oeffnen
+    der Arbeitskopie fehlende Quelltext-Profile an, und mit **FM-14** (#634) kam
+    genau eines dazu. Die Kopie hat dann 1790 Profile, die echte Datei 1789 —
+    der Test wurde rot, obwohl die Isolation einwandfrei arbeitete. Gemessen im
+    Gate-Lauf vom 18.08.2026: ``(1789, 1, 1789, 1601155) != (1790, 1, 1790,
+    1602945)``.
+
+    Was die Kopie zusichern muss, ist **Teilmengen**-Treue: jede ID der echten
+    Bibliothek muss auch in der Arbeitskopie stehen, damit die
+    ``fixture_profile_id``-Werte der committeten Shows zeigen, wohin sie sollen.
+    Dass ein neues Builtin hinzukommt, ist erlaubt — das tut die App beim
+    naechsten Start auch.
+    """
+    con = sqlite3.connect(f"file:{pfad}?mode=ro", uri=True)
+    try:
+        return {r[0] for r in con.execute("SELECT id FROM fixtures")}
+    finally:
+        con.close()
+
+
 def _profil_kennzahl(pfad: str):
     """Kennzahl ueber die Profil-IDs: (Anzahl, kleinste, groesste, Summe).
 
@@ -509,10 +533,20 @@ class BibliothekSchemaTest(unittest.TestCase):
             # Dann ist ein Unterschied richtig und kein Befund.
             self.skipTest("die echte Bibliothek hat sich nach dem Kopieren "
                           "geaendert")
+        echte_ids, benutzte_ids = _profil_ids(echt), _profil_ids(benutzt)
+        fehlend = echte_ids - benutzte_ids
         self.assertEqual(
-            _profil_kennzahl(echt), _profil_kennzahl(benutzt),
-            "die Arbeits-Bibliothek ist keine Kopie der echten — damit stimmen "
-            "die fixture_profile_id-Werte der committeten Shows nicht mehr")
+            set(), fehlend,
+            f"{len(fehlend)} Profil-ID(s) der echten Bibliothek fehlen in der "
+            f"Arbeits-Bibliothek — damit zeigen die fixture_profile_id-Werte "
+            f"der committeten Shows ins Leere. Beispiele: {sorted(fehlend)[:5]}")
+        # Zusaetzliche IDs sind erlaubt und erwartet: `ensure_builtins()` legt
+        # beim ersten Oeffnen fehlende Quelltext-Profile an. Nur eine LEERE
+        # Kopie mit frischem Seed waere der Fehler, den dieser Test sucht —
+        # und die faellt oben durch, weil ihr die echten IDs fehlen.
+        self.assertGreaterEqual(
+            len(benutzte_ids), len(echte_ids),
+            "die Arbeits-Bibliothek hat weniger Profile als die echte")
 
 
 class WaechterDeckungTest(unittest.TestCase):
