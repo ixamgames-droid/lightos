@@ -59,6 +59,7 @@ VIZ_MODEL_CHOICES = [
     ("PAR-Bar (N Köpfe)", "par_bar"),
     ("Mover-Bar (N bewegliche Köpfe)", "mover_bar"),
     ("Spider (Doppel-Bar)", "spider"),
+    ("Pixel-Moving-Head (LED-Ring)", "pixel_head"),   # FM-14
     ("Strobe", "strobe"),
     ("Dimmer-Pack", "dimmer"),
     ("Laser", "laser"),

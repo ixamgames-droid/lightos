@@ -2634,6 +2634,138 @@ def _add_martin_mac_aura(s, mfr):
     ])
 
 
+# ── FM-14: Pixel-/Segment-Moving-Head (LED-Ring) ─────────────────────────────
+#
+# Robe Robin Spiider — Wash/Beam-Moving-Head, dessen Lichtquelle aus 19 EINZELN
+# ansteuerbaren RGBW-Multichips besteht (1x 60 W Mitte + 18x 40 W aussen). Er ist
+# das erste Geraet der Bibliothek mit Per-Pixel-Adressierung auf EINEM
+# beweglichen Kopf; bis hierher gab es Per-Segment-Steuerung nur auf Bars
+# (par_bar/pixelBar), Doppelbars (spider) und flachen Panels (matrix).
+#
+# ★ Chart aus der PRIMAERQUELLE, kanalweise abgeschrieben — nichts geraten:
+#   „Robin SPIIDER - DMX protocol", Version 2.3 (10 Modi),
+#   https://www.robe.cz/res/downloads/dmx_charts/Robin_SPIIDER_DMX_charts.pdf
+#   Gegengelesen im User Manual Rev. 3.3 (robe.cz), das dieselben Kanaele und
+#   zusaetzlich die Pixel-Anordnung zeigt (S. 15 „Pixel order").
+#   Modus-Kanalzahlen laut Datenblatt: 49, 27, 33, 90, 27, 47, 91, 110, 104, 123.
+#
+# ★ Aufgenommen sind ZWEI Modi, und der zweite ist mit Absicht dabei:
+#   * „Mode 5 - Wash" (27ch): EINE Farb-Bank -> ein ganz normaler Moving Head.
+#   * „Mode 7 - Pixel RGB" (91ch): dieselbe Mechanik, dazu Kanal 35-91 =
+#     Rot/Gruen/Blau je Pixel 1..19 -> `suggest_viz_model` liefert 'pixel_head'.
+#   DASSELBE Geraet, einmal mit und einmal ohne Ring — das ist die Probe, dass
+#   der Ring an den KANAELEN haengt und nicht am Geraetenamen (dieselbe Bauart
+#   wie beim ZQ06121 mit/ohne Weissband, VIZ-50b).
+#
+# ★ Was NICHT als Farb-Bank durchgeht, obwohl es Rot/Gruen/Blau heisst: die vier
+#   „Flower Effect"-Farbkanaele. Das Geraet mischt drei LAGEN uebereinander
+#   (Background, Flower Effect, Pixel; Kanal „Colour Mix control" sagt wie) —
+#   die Blumeneffekt-Lage ist keine zweite Lampe. Als `color_r` gefuehrt haette
+#   sie eine 21. Bank ergeben und JEDES Segment um eins verschoben.
+#
+# ★ Zwei Dimmer, zwei Shutter — LightOS kennt je EINEN. Der MASTER bekommt
+#   `intensity`/`shutter` (er dunkelt und schliesst ALLES, also das, was Grand
+#   Master, Blackout und der 3D-Kegel meinen); die Background-Lage laeuft als
+#   `raw` und steht per Default OFFEN (Dimmer 255, Shutter 32 — beides der
+#   Werksdefault des Charts). Andersherum haette der Dimmer-Fader nur die
+#   Grundfarbe gedimmt, waehrend die Pixel weiterleuchten.
+_SPIIDER_SHUTTER = [
+    (0,   31,  "Shutter geschlossen",              "closed"),
+    (32,  63,  "Shutter offen",                    "open"),
+    (64,  95,  "Strobe langsam→schnell",           "strobe"),
+    (96,  127, "Shutter offen",                    "open"),
+    (128, 143, "Öffnungs-Puls langsam→schnell",    "strobe"),
+    (144, 159, "Schließ-Puls schnell→langsam",     "strobe"),
+    (160, 191, "Shutter offen",                    "open"),
+    (192, 223, "Zufalls-Strobe langsam→schnell",   "strobe"),
+    (224, 255, "Shutter offen",                    "open"),
+]
+# Kanal 1-6: in ALLEN Modi identisch (Chart-Spalten 5 und 7 stimmen ueberein).
+_SPIIDER_KOPF = [
+    ("Pan",                  "pan",       128, 128),
+    ("Pan Fein",             "pan_fine",  0,   0),
+    ("Tilt",                 "tilt",      128, 128),
+    ("Tilt Fein",            "tilt_fine", 0,   0),
+    ("P/T-Speed",            "speed",     0,   0),
+    ("Power/Spezialfunkt.",  "macro",     0,   0),
+]
+
+
+def _spiider_modes_data():
+    """Die zwei aufgenommenen Modi als reine Daten (wie ZQ06121/Panels getrennt
+    gefuehrt, damit `ensure_builtins` sie nachziehen kann)."""
+    wash = _SPIIDER_KOPF + [
+        ("Grundfarbe Virt. Farbrad",  "raw",       0,   0),
+        ("Grundfarbe Rot",            "color_r",   255, 255),
+        ("Grundfarbe Grün",           "color_g",   255, 255),
+        ("Grundfarbe Blau",           "color_b",   255, 255),
+        ("Grundfarbe Weiß",           "color_w",   255, 255),
+        ("Grundfarbe CTC",            "raw",       0,   0),
+        ("Grundfarbe Shutter",        "raw",       32,  32, _SPIIDER_SHUTTER),
+        ("Grundfarbe Dimmer",         "raw",       255, 255),
+        ("Grundfarbe Zone",           "raw",       0,   0),
+        ("Farbmisch-Modus",           "raw",       45,  45),
+        ("Blumeneffekt",              "raw",       0,   0),
+        ("Blumeneffekt Rot",          "raw",       255, 255),
+        ("Blumeneffekt Grün",         "raw",       255, 255),
+        ("Blumeneffekt Blau",         "raw",       255, 255),
+        ("Blumeneffekt Weiß",         "raw",       255, 255),
+        ("Blumeneffekt Farbmakros",   "raw",       0,   0),
+        ("Blumeneffekt Shutter",      "raw",       32,  32, _SPIIDER_SHUTTER),
+        ("Blumeneffekt Dimmer",       "raw",       255, 255),
+        ("Zoom",                      "zoom",      128, 128),
+        ("Master Shutter/Strobe",     "shutter",   32,  32, _SPIIDER_SHUTTER),
+        ("Master Dimmer",             "intensity", 0,   255),
+    ]
+    pixel = _SPIIDER_KOPF + [
+        ("Grundfarbe Virt. Farbrad",  "raw",       0,   0),
+        ("Grundfarbe Rot",            "color_r",   255, 255),
+        ("Grundfarbe Rot Fein",       "raw",       255, 255),
+        ("Grundfarbe Grün",           "color_g",   255, 255),
+        ("Grundfarbe Grün Fein",      "raw",       255, 255),
+        ("Grundfarbe Blau",           "color_b",   255, 255),
+        ("Grundfarbe Blau Fein",      "raw",       255, 255),
+        ("Grundfarbe Weiß",           "color_w",   255, 255),
+        ("Grundfarbe Weiß Fein",      "raw",       255, 255),
+        ("Grundfarbe CTC",            "raw",       0,   0),
+        ("Grundfarbe Shutter",        "raw",       32,  32, _SPIIDER_SHUTTER),
+        ("Grundfarbe Dimmer",         "raw",       255, 255),
+        ("Grundfarbe Dimmer Fein",    "raw",       255, 255),
+        ("Grundfarbe Zone",           "raw",       0,   0),
+        ("Farbmisch-Modus",           "raw",       45,  45),
+        ("Blumeneffekt",              "raw",       0,   0),
+        ("Blumeneffekt Rot",          "raw",       255, 255),
+        ("Blumeneffekt Grün",         "raw",       255, 255),
+        ("Blumeneffekt Blau",         "raw",       255, 255),
+        ("Blumeneffekt Weiß",         "raw",       255, 255),
+        ("Blumeneffekt Farbmakros",   "raw",       0,   0),
+        ("Blumeneffekt Shutter",      "raw",       32,  32, _SPIIDER_SHUTTER),
+        ("Blumeneffekt Dimmer",       "raw",       255, 255),
+        ("Zoom",                      "zoom",      128, 128),
+        ("Zoom Fein",                 "raw",       0,   0),
+        ("Master Shutter/Strobe",     "shutter",   32,  32, _SPIIDER_SHUTTER),
+        ("Master Dimmer",             "intensity", 0,   255),
+        ("Master Dimmer Fein",        "raw",       0,   0),
+        # Kanal 35-91: Pixel 1..19 je R,G,B NACHEINANDER — genau die
+        # attr#N-Konvention, auf der das heads[]-Array steht. Derselbe Helfer
+        # wie bei den realen Pixel-Panels, weil es dieselbe Kanalordnung ist.
+    ] + _pixel_rgb_channels(19)
+    return [
+        ("27-Kanal Wash (Mode 5)", wash),
+        ("91-Kanal Pixel RGB (Mode 7)", pixel),
+    ]
+
+
+def _add_robe_spiider(s, mfr):
+    """Robe Robin Spiider — Pixel-Wash-Moving-Head, 19 einzeln ansteuerbare
+    RGBW-Multichips (FM-14). fixture_type 'moving_head'; das Render-Modell
+    entscheidet der Modus: 27ch (eine Bank) -> normaler Moving Head, 91ch
+    (20 Baenke, 1 Pan, 1 Tilt) -> 'pixel_head' mit Ring-Segmenten.
+    Leistung 660 W laut Datenblatt (max. Aufnahme)."""
+    _add_fixture(s, mfr, "Robin Spiider (Pixel-Wash)", "SPIIDER",
+                 "moving_head", 660, _spiider_modes_data())
+
+
 # ── FM-13: LED-Matrix-/Pixel-Panel als EIGENER Fixture-Typ ('matrix') ─────────
 # Neuer Geraetetyp mit Per-Pixel-Adressierung EINES Fixtures. Kanal-Layout:
 # 1 Master-Dimmer + rows*cols Pixel je [R,G,B] in Zeilen-Haupt-Reihenfolge. Die
@@ -3217,6 +3349,9 @@ def ensure_builtins():
         if "MAC700P" not in have:                         # FM-15: Martin MAC 700 Profile
             _add_martin_mac700_profile(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
             changed = True
+        if "SPIIDER" not in have:                         # FM-14: Pixel-Moving-Head
+            _add_robe_spiider(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+            changed = True
         if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
             _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
             changed = True
@@ -3558,6 +3693,7 @@ def _seed(s: Session):
     s.add(robe)
     _add_robe_pointe(s, robe)
     _add_robe_megapointe(s, robe)                        # FM-15
+    _add_robe_spiider(s, robe)                           # FM-14 (Pixel-Kopf)
     _add_claypaky_mythos(s, claypaky)                    # FM-15
 
     # ── FM-13: LED-Matrix/Pixel-Panel als eigener Fixture-Typ ─────────────────

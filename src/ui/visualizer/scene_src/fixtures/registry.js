@@ -10,13 +10,17 @@
 import {
   buildMovingHead, buildSpider, buildPar, buildLedBar, buildStrobe,
   buildDimmer, buildOther, buildScanner, buildSmoke, buildHazer, buildLaser, buildParBar, buildMoverBar,
-  buildMatrixPanel,
+  buildMatrixPanel, buildPixelHead,
   updateSpiderDmx, updateParBarDmx, updateMoverBarDmx, updateMovingHeadDmx, updateGenericDmx,
-  updateMatrixPanelDmx,
+  updateMatrixPanelDmx, updatePixelHeadDmx,
 } from './builders.js';
 
 const REGISTRY = {
   moving_head: { build: ()  => buildMovingHead(),                   updateDmx: updateMovingHeadDmx },
+  // FM-14: Pixel-Moving-Head — EIN Kopf, dessen Linsenflaeche aus einzeln
+  // ansteuerbaren Ring-Segmenten besteht. `nHeads` ist die Zahl der Farb-BAENKE;
+  // Bank 0 ist die Geraetefarbe, die Segmente sind die restlichen (buildPixelHead).
+  pixel_head:  { build: (o) => buildPixelHead(o.nHeads),            updateDmx: updatePixelHeadDmx },
   spider:      { build: (o) => buildSpider(o.mirror),               updateDmx: updateSpiderDmx },
   par_bar:     { build: (o) => buildParBar(o.nHeads, o.pixelBar),   updateDmx: updateParBarDmx },   // FM-3 (+FM-8 Pixel-Variante)
   mover_bar:   { build: (o) => buildMoverBar(o.nHeads),             updateDmx: updateMoverBarDmx }, // FM-4

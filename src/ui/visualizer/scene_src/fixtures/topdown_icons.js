@@ -7,7 +7,7 @@
 // View) und EIN zentrales Tinting (tintTopDownIcon) statt vier Duplikat-
 // Bloecken in fixtures.js.
 import * as THREE from '../three/three.js';
-import { placeElement, panelGrid } from './pixel_order.js';
+import { placeElement, panelGrid, wabenPlatz } from './pixel_order.js';
 
 // Fuell-Farbe unbelichteter Icons (vorher 0x3a3a4a auf 0x282828-Boden).
 export const ICON_UNLIT_FILL = 0x4a4e5e;
@@ -120,6 +120,29 @@ function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip,
   return cells;
 }
 
+// FM-14: Ring-/Wabenzellen eines Pixel-Moving-Heads. DIESELBE Quelle wie das
+// 3D-Modell (`wabenPlatz`) und dieselbe Handedness (x aus -x, z aus -y) — sonst
+// laeuft ein Pixel-Chase in der 2D-Ansicht andersherum als im 3D, genau die
+// Abweichung, die VIZ-51 fuer die Panel-Reihenfolge beseitigt hat.
+// `n` = Zahl der SEGMENTE (Bank 0 ist die Geraetefarbe, s. buildPixelHead);
+// Zelle i faerbt `updatePixelHeadDmx` aus heads[i+1].
+function addRingCells(group, n, radius) {
+  const count = Math.max(1, Math.min(64, Math.floor(n || 1)));
+  let maxRing = 0;
+  for (let i = 0; i < count; i++) maxRing = Math.max(maxRing, wabenPlatz(i).ring);
+  const teilung = radius / (maxRing + 0.55);
+  const zellR = teilung * 0.46;
+  const cells = [];
+  for (let i = 0; i < count; i++) {
+    const p = wabenPlatz(i);
+    const cell = mkFill(new THREE.CircleGeometry(zellR, 12));
+    cell.position.set(-p.x * teilung, 0.055, -p.y * teilung);
+    group.add(cell);
+    cells.push(cell);
+  }
+  return cells;
+}
+
 export function buildTopDownIcon(type, nHeads, pixelOrder,
                                  elementRotation, elementFlip,
                                  gridCols, gridRows) {
@@ -134,6 +157,15 @@ export function buildTopDownIcon(type, nHeads, pixelOrder,
     group.add(body);
     group.add(mkOutline(new THREE.CircleGeometry(0.6, 24)));
     addArrow(group, 0, -0.7, 0.15);
+  } else if (type === 'pixel_head') {
+    // FM-14: dieselbe Silhouette wie der Moving Head (es IST einer) — plus die
+    // einzeln faerbbaren Ring-Segmente. Ohne die Zellen zeigte die 2D-Ansicht
+    // einen einfarbigen Kreis, waehrend im 3D ein Chase um den Ring lief.
+    body = mkFill(new THREE.CircleGeometry(0.6, 24), BAR_BODY_FILL);
+    group.add(body);
+    group.add(mkOutline(new THREE.CircleGeometry(0.6, 24)));
+    addArrow(group, 0, -0.7, 0.15);
+    cells = addRingCells(group, (nHeads || 2) - 1, 0.52);
   } else if (type === 'par') {
     body = mkFill(new THREE.CircleGeometry(0.55, 24));
     group.add(body);

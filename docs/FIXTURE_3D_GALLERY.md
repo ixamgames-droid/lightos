@@ -2,11 +2,17 @@
 
 Der 3D-Visualizer stellt jedes gepatchte Gerät als **prozedurales 3D-Modell** dar —
 gebaut in `src/ui/visualizer/scene_src/fixtures/builders.js` (Three.js). Diese Galerie
-zeigt **alle 13 `viz_model`-Klassen**, gerendert direkt aus den echten Produktions-Buildern
-(gleiche Szene, Lichter, Kamera wie im Programm) über das Werkzeug
+zeigt die **13 gerenderten `viz_model`-Klassen**, gerendert direkt aus den echten
+Produktions-Buildern (gleiche Szene, Lichter, Kamera wie im Programm) über das Werkzeug
 [`src/ui/visualizer/gallery_render.html`](../src/ui/visualizer/gallery_render.html) +
 [`tools/gallery_server.py`](../tools/gallery_server.py) — die Bilder sind also jederzeit
 reproduzierbar.
+
+> **Noch ohne Bild: `pixel_head`** (Pixel-Moving-Head mit LED-Ring, **FM-14**) — ein
+> Moving-Head-Gehäuse, dessen Linsenfläche aus einzeln gefärbten Ring-Segmenten besteht
+> (`buildPixelHead`). Die Klasse ist im Programm vollständig da; das Galerie-Bild fehlt,
+> weil der Render einen Browser mit GPU braucht (s. „Bilder neu erzeugen" unten) und die
+> Typenliste in `gallery_render.html` sie noch nicht führt.
 
 Die Maße jeder Klasse sind gegen ein recherchiertes Referenzgerät dimensioniert
 (Realismus-Pass **FM-11**, Quellen als Kommentare in `builders.js`). Welches Modell ein
@@ -146,8 +152,9 @@ Jedes Fixture bekommt sein 3D-Modell automatisch, ganz ohne manuelle Auswahl:
    Listen-Icon und Patch-Spiegel-Option gemeinsam um.
 2. **Kanal-Heuristik (Automatik).** Ohne Override leitet `suggest_viz_model()` das Modell aus
    den DMX-Kanälen/dem Gerätetyp ab (Pan+Tilt → Moving Head/Scanner, mehrere Farbköpfe →
-   Spider, Balken-Layout → PAR-/Mover-Bar, Nebel-/Hazer-Kennung → Atmosphäre, …). Unbekannt →
-   PAR-Fallback.
+   Spider, Balken-Layout → PAR-/Mover-Bar, **ein Pan + ein Tilt + ≥3 Farbbänke →
+   Pixel-Moving-Head** (FM-14: ein Kopf, viele Pixel), Nebel-/Hazer-Kennung → Atmosphäre, …).
+   Unbekannt → PAR-Fallback.
 3. **In Gruppen bleibt das Modell erhalten.** Fixtures werden in Gruppen (z. B. „alle Moving
    Heads links") organisiert; die Modell-Zuordnung hängt am Fixture selbst, nicht an der
    Gruppe — jedes Gerät behält also in jeder Gruppe sein korrektes 3D-Modell.

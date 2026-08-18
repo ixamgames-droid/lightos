@@ -454,6 +454,11 @@ export function addFixture(data) {
     moverHeads: model.moverHeads || null,   // FM-4: Mover-Bar-Koepfe (je {yoke, head, lens, beam})
     isMoverBar: !!model.isMoverBar,
     pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
+    // FM-14: Ring-Segmente eines Pixel-Moving-Heads (je {mesh, ring}).
+    // `updatePixelHeadDmx` faerbt Segment i aus heads[i+1] — Kopf 0 ist die
+    // Geraetefarbe und faerbt bereits Linse/Kegel.
+    ringPixels: model.ringPixels || null,
+    isPixelHead: !!model.isPixelHead,
     // VIZ-50b: Warmweiss-Band (je {mesh}) — leer/null bei Panels ohne eigene
     // Weiss-Segmente. `updateMatrixPanelDmx` faerbt es aus `heads[j].cw`.
     whites: (model.whites && model.whites.length) ? model.whites : null,
