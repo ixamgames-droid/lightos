@@ -197,9 +197,34 @@ os.environ["APPDATA"] = _TEST_APPDATA
 # SOLANGE die Datenordner-Variablen noch echt sind. Wer diese Umlenkung nach
 # oben schiebt, laesst den QA-58-Waechter gegen den Sandkasten statt gegen die
 # echte Bibliothek vergleichen — er wuerde nie wieder anschlagen.
-_TEST_XDG = os.path.join(_TEST_ROOT, f"lightos_test_xdg_{_TEST_TOKEN}")
-os.makedirs(os.path.join(_TEST_XDG, "LightOS"), exist_ok=True)
-os.environ["XDG_DATA_HOME"] = _TEST_XDG
+# ⚠️ Eine von AUSSEN gesetzte Vorgabe, die schon in den Testbereich zeigt, wird
+# RESPEKTIERT statt ueberschrieben — dasselbe Muster wie bei `LIGHTOS_SHOW_DB`
+# (`_SHOW_DB_GEERBT`) und `_ist_schon_testkopie`.
+#
+# Der Grund ist gemessen, nicht vorsorglich: mehrere Tests starten pytest als
+# KIND und geben ihm einen eigenen Datenordner mit (u. a. der QA-58-Waechter,
+# der den Rueckfall in einem Sandkasten nachstellt). Ueberschriebe conftest das,
+# rechnete der Kindprozess `_ECHTE_FIXTURE_DB` aus dem Sandkasten des Elters,
+# `DB_PATH` aber aus seinem eigenen — der Vergleich schluege nie an, und der
+# Rueckfall bliebe GRUEN. Genau das ist beim ersten Anlauf passiert: vier Tests
+# in `test_qa58_bibliothek_schema_unberuehrt.py` fielen aus, einer davon mit
+# „der Rueckfall blieb GRUEN".
+#
+# Eine Vorgabe AUSSERHALB des Testbereichs wird dagegen umgelenkt: sonst haette
+# man den Schutz genau dann abgeschaltet, wenn er am meisten kostet.
+# Kriterium ist der TEMP-Bereich, nicht `_TEST_ROOT`: die Sandkaesten der
+# Kindprozess-Tests entstehen per `tempfile.mkdtemp()` und liegen daneben. Der
+# echte Datenordner eines Nutzers liegt nie unter /tmp — der Schutz bleibt also
+# scharf.
+import tempfile as _tempfile                                    # noqa: E402
+_XDG_VORGABE = os.environ.get("XDG_DATA_HOME")
+if _XDG_VORGABE and os.path.realpath(_XDG_VORGABE).startswith(
+        os.path.realpath(_tempfile.gettempdir())):
+    _TEST_XDG = _XDG_VORGABE                      # geerbt, nicht selbst gebaut
+else:
+    _TEST_XDG = os.path.join(_TEST_ROOT, f"lightos_test_xdg_{_TEST_TOKEN}")
+    os.makedirs(os.path.join(_TEST_XDG, "LightOS"), exist_ok=True)
+    os.environ["XDG_DATA_HOME"] = _TEST_XDG
 
 # QA-CRASHLOG-TESTS: crash.log aus der ECHTEN Absturz-Historie heraushalten.
 # Die APPDATA-Umlenkung darueber reicht dafuer NUR auf Windows — auf Linux/macOS
