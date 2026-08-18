@@ -222,6 +222,14 @@ class BibliothekSchemaTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         env = dict(os.environ)
         env.pop("LIGHTOS_FIXTURE_DB", None)
+        # ★ QA-60: auch den geerbten Test-Datenordner wegnehmen. Seit conftest
+        # eine XDG-Vorgabe aus dem Temp-Bereich RESPEKTIERT (statt sie zu
+        # ueberschreiben), saehe das Kind sonst den Sandkasten dieses Prozesses
+        # als „echten" Datenordner — dort liegt keine Bibliothek, es gaebe
+        # nichts zu kopieren, und dieser Test pruefte ins Leere. Er misst
+        # gerade den Fall OHNE Vorgabe; dafuer muss das Kind den echten Ordner
+        # sehen.
+        env.pop("XDG_DATA_HOME", None)
         if vorgabe is not None:
             env["LIGHTOS_FIXTURE_DB"] = vorgabe
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")   # QA-53
