@@ -25,12 +25,31 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QLineEdit,
-                               QSpinBox)
+                               QPushButton, QSpinBox)
 
 from src.ui.virtualconsole.vc_button import VCButton
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 
 _VERFAELSCHT = "\x00QA59-ZERSTOERT\x00"
+
+
+# ★ CDX-54 (XPLAT-15): nach JEDEM Test die uebrig gebliebenen Top-Level-Widgets
+# WIRKLICH abbauen. `deleteLater()` allein stellt `DeferredDelete` nie zu —
+# ohne laufende Ereignisschleife ueberleben Canvas, Panel und ihre Kinder in die
+# naechste Testmethode und in den Interpreter-Abbau. Das Linux-Gate isoliert je
+# DATEI, nicht je Methode; die vier Methoden hier teilen sich also einen
+# Prozess. Muster und Begruendung: tests/_qt_lifecycle.py, Vorbild
+# tests/test_vc_inspector_panel.py:37-54 — dort ist derselbe Fehlerfall
+# beschrieben, und dieser Test hatte ihn trotzdem.
+import pytest as _pytest_cdx54                             # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets    # noqa: E402
+
+
+@_pytest_cdx54.fixture(autouse=True)
+def _cdx54_keine_uebrigen_widgets():
+    yield
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
 
 
 def _app():
@@ -45,14 +64,42 @@ def _formularzeilen(einstellungen):
     return zeilen
 
 
+# ★ CDX-53: Widgets, die ein Benutzer NICHT aendern kann — und nur diese duerfen
+# uebersprungen werden. Jedes andere unbekannte Bedienelement faellt den Test,
+# statt still durchzurutschen (siehe `test_kein_eingabefeld_bleibt_stumm`).
+_NICHT_BEDIENBAR = (
+    # Eine Auswahlliste mit hoechstens einem Eintrag laesst sich nicht
+    # umstellen — in einer leeren Show sind das u. a. Snapshot, Gruppe,
+    # Laser-Palette und Funktion/Chase. Dort kann auch der Benutzer nichts
+    # waehlen, es gibt also nichts zu committen.
+    "Auswahlliste mit weniger als zwei Eintraegen",
+    # Ein Knopf traegt keinen Wert. `Zusatz-Aktionen` und `2. Pad-Farbe`
+    # oeffnen einen Dialog; was dort entschieden wird, kommt ueber dessen
+    # eigenen Weg zurueck, nicht ueber ein Live-Signal am Knopf. Sie stehen
+    # hier, damit sie BENANNT uebersprungen werden statt still.
+    "Knopf ohne eigenen Wert (oeffnet einen Dialog)",
+)
+
+
 def _aendern(w) -> bool:
-    """Aendert das Widget wie ein Benutzer. False = nicht aenderbar."""
+    """Aendert das Widget wie ein Benutzer. False = nicht aenderbar.
+
+    ★ **CDX-53:** Frueher lieferte diese Funktion fuer `TargetListEditor`,
+    `SnapListEditor` und jedes unbekannte Element stillschweigend `False`, und
+    der Test uebersprang sie. Verlor ausgerechnet ein Listen-Editor seine
+    Live-Verbindung, blieb der Waechter **gruen** — obwohl er zusichert, dass
+    kein Eingabefeld stumm bleibt. Die Zusage war breiter als die Messung.
+
+    Jetzt werden die Listen-Editoren ueber ihr `changed`-Signal bedient (genau
+    das verdrahtet auch der Live-Modus: `target_editor.changed.connect(...)`),
+    und alles Unbekannte faellt dem Test zur Last.
+    """
     if isinstance(w, QLineEdit):
         w.setText((w.text() or "") + "x")
         return True
     if isinstance(w, QComboBox):
         if w.count() < 2:
-            return False            # in einer leeren Show oft nur ein Eintrag
+            return False            # s. _NICHT_BEDIENBAR
         w.setCurrentIndex((w.currentIndex() + 1) % w.count())
         return True
     if isinstance(w, QCheckBox):
@@ -61,6 +108,13 @@ def _aendern(w) -> bool:
     if isinstance(w, QSpinBox):
         neu = w.value() + 1
         w.setValue(w.minimum() if neu > w.maximum() else neu)
+        return True
+    # Zusammengesetzte Editoren (TargetListEditor, SnapListEditor, …) melden
+    # ihre Aenderung ueber ein eigenes `changed`-Signal. Das auszuloesen ist
+    # kein Kunstgriff, sondern genau der Weg, den der Live-Modus abhoert.
+    sig = getattr(w, "changed", None)
+    if sig is not None and hasattr(sig, "emit"):
+        sig.emit()
         return True
     return False
 
@@ -84,20 +138,29 @@ class JedesFeldCommittetLiveTest(unittest.TestCase):
         self.einstellungen = self.btn._build_settings(self.btn, live=True)
 
     def test_kein_eingabefeld_bleibt_stumm(self):
-        stumm, geprueft, uebersprungen = [], 0, []
+        stumm, geprueft, unbedienbar = [], 0, []
         for pfad, w in _formularzeilen(self.einstellungen):
             self.btn.caption = _VERFAELSCHT
             if not _aendern(w):
-                uebersprungen.append(f"{type(w).__name__} {pfad}")
+                unbedienbar.append((pfad, w))
                 continue
             geprueft += 1
             if self.btn.caption == _VERFAELSCHT:
                 stumm.append(f"{type(w).__name__} {pfad}")
 
-        self.assertGreaterEqual(
-            geprueft, 12,
-            f"Die Messung muss genug Felder erreichen, sonst sagt sie nichts "
-            f"(nur {geprueft} geprueft, uebersprungen: {uebersprungen})")
+        # ★ CDX-53: Was nicht bedienbar ist, muss BEGRUENDET sein — sonst
+        # rutscht ein Feld mit verlorener Live-Verbindung still durch.
+        unerwartet = [
+            f"{type(w).__name__} {pfad}" for pfad, w in unbedienbar
+            if not (isinstance(w, QComboBox) and w.count() < 2)
+            and not isinstance(w, QPushButton)]
+        self.assertEqual(
+            [], unerwartet,
+            "Diese Bedienelemente konnte die Messung nicht ausloesen und sie "
+            "stehen nicht auf der begruendeten Ausnahmeliste "
+            f"({_NICHT_BEDIENBAR}). Solange das so ist, sagt dieser Test "
+            "ueber sie NICHTS — obwohl er zusichert, dass kein Eingabefeld "
+            "stumm bleibt:\n  " + "\n  ".join(unerwartet))
         self.assertEqual(
             [], stumm,
             "Diese Felder loesen KEINEN Live-Commit aus — ihr Wert haengt dann "
