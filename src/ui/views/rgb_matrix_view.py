@@ -28,6 +28,16 @@ _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
                                   "color_order", "color_interval"})
 
 
+def _viz_modell(fixture) -> str:
+    """Render-Modell eines gepatchten Geraets — lokal importiert wie alle
+    app_state-Zugriffe dieser Datei (Zyklus Views <-> app_state)."""
+    try:
+        from src.core.app_state import viz_model_for
+        return viz_model_for(fixture) or ""
+    except Exception:
+        return ""
+
+
 class MatrixPreview(QWidget):
     """Live LED grid preview.
 
@@ -45,6 +55,7 @@ class MatrixPreview(QWidget):
         self._grid: list[Color] = []
         self._show_assignment = False
         self._labels: dict = {}
+        self._models: dict = {}          # FM-14b: fid -> Render-Modell
         self.setFixedSize(240, 160)
         self.setStyleSheet("background:#0d1117; border:1px solid #21262d; border-radius:4px;")
         self.setMouseTracking(True)          # Tooltip ohne Klick
@@ -63,9 +74,15 @@ class MatrixPreview(QWidget):
         self._show_assignment = bool(on)
         self.update()
 
-    def set_labels(self, labels: dict):
-        """fid -> Anzeigename (fuer Tooltip/Legende)."""
+    def set_labels(self, labels: dict, models: dict | None = None):
+        """fid -> Anzeigename (fuer Tooltip/Legende).
+
+        ``models`` (FM-14b) ist fid -> Render-Modell und entscheidet, wie eine
+        Kopf-Zelle heisst: am Pixel-Kopf ist Kopf 0 die GRUNDFARBE und Kopf N
+        das Pixel N. Ohne Angabe bleibt es bei „Kopf N" (Bestandsverhalten) —
+        die Vorschau haelt nur fids, das Modell muss von aussen kommen."""
         self._labels = dict(labels or {})
+        self._models = dict(models or {})
 
     def fid_order(self) -> list:
         """Basis-fids in Raster-Reihenfolge, dedupliziert — die Reihenfolge, aus
@@ -137,7 +154,10 @@ class MatrixPreview(QWidget):
             return ""
         name = self._labels.get(fid) or f"Fixture {fid}"
         head = self._head_at(idx)
-        return f"{name} · Kopf {head + 1}" if head is not None else str(name)
+        if head is None:
+            return str(name)
+        from src.core.app_state import head_label_for_model
+        return f"{name} · {head_label_for_model(self._models.get(fid, ''), head)}"
 
     def mouseMoveEvent(self, event):
         self.setToolTip(self.assignment_text(self.cell_index_at(event.position().toPoint())))
@@ -437,7 +457,9 @@ class RgbMatrixView(QWidget):
             return
         order = self._preview.fid_order()
         by_fid = self._patched_by_fid() if order else {}
-        self._preview.set_labels({f: self._fixture_label(by_fid.get(f), f) for f in order})
+        self._preview.set_labels(
+            {f: self._fixture_label(by_fid.get(f), f) for f in order},
+            {f: _viz_modell(by_fid[f]) for f in order if f in by_fid})
         heads: dict = {}
         m = getattr(self, "_current", None)
         for idx, h in enumerate(list(getattr(m, "head_grid", []) or []) if m else []):

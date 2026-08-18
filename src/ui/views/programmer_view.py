@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head)
+    programmer_key_for_head, head_label)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -866,11 +866,16 @@ class ProgrammerView(QWidget):
                 # ueber parse_group_cell lesen (int(v) wirft bei "5:2").
                 it.setData(Qt.ItemDataRole.UserRole, str(f.fid))
                 lst.addItem(it)
+                # FM-14b: Wie die Kopf-Zeile heisst, sagt EINE Quelle
+                # (app_state.head_label). Am Pixel-Kopf ist Kopf 0 die
+                # GRUNDFARBE des Geraets und nicht das erste Pixel — hiesse sie
+                # weiter „Kopf 1", griffe man beim ersten Pixel ins ganze Geraet.
                 for h in range(self._head_row_count(f)):
-                    hit = QListWidgetItem(f"      └ Kopf {h + 1}")
+                    _hl = head_label(f, h)
+                    hit = QListWidgetItem(f"      └ {_hl}")
                     hit.setData(Qt.ItemDataRole.UserRole, f"{f.fid}:{h}")
                     hit.setToolTip(
-                        f"Nur Kopf {h + 1} von „{f.label}“ programmieren "
+                        f"Nur „{_hl}“ von „{f.label}“ programmieren "
                         f"(Regler/Schnellwahl schreiben dann ausschließlich auf "
                         f"diesen Kopf). Das Geräte-Zeile darüber wählt alle Köpfe.")
                     lst.addItem(hit)

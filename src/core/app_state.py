@@ -912,7 +912,15 @@ class AppState:
         from src.core.database.models import FixtureGroup as _FG
         label = (getattr(fixture, "label", None)
                  or getattr(fixture, "fixture_name", None) or f"Fixture {fid}")
-        positions = {f"{i},0": f"{fid}:{i}" for i in range(n)}
+        # FM-14b: Wie die Koepfe im Raster liegen, sagt EINE Quelle
+        # (head_matrix_layout) — 1xN wie bisher, beim Pixel-Kopf das Ring-Raster.
+        cols, rows, plaetze, ist_ring = head_matrix_layout(fixture, n)
+        positions = {f"{c},{r}": f"{fid}:{h}" for h, (c, r) in plaetze.items()}
+        # Und dann heisst die Gruppe auch nach dem, was drinsteht: „Koepfe"
+        # waere beim Pixel-Kopf falsch — die Grundfarbe (Kopf 0) steht bewusst
+        # NICHT im Raster, die Zellen sind Pixel. Der Name kommt aus DERSELBEN
+        # Antwort wie das Raster, nicht aus einer zweiten Abfrage.
+        zusatz = "Pixel" if ist_ring else "Köpfe"
         try:
             # Idempotenz: adressiert schon IRGENDEINE Gruppe dieses fid kopfweise?
             # Der Scan liegt BEWUSST im try und wirft bei DB-Fehlern — sonst
@@ -923,7 +931,7 @@ class AppState:
             if existing is not None:
                 return existing
             with self._session() as s:
-                g = _FG(name=f"{label} · Köpfe", cols=n, rows=1,
+                g = _FG(name=f"{label} · {zusatz}", cols=cols, rows=rows,
                         positions_json=_json.dumps(positions), folder="Multi-Head")
                 s.add(g)
                 s.commit()
@@ -4587,6 +4595,117 @@ def viz_model_for(fixture):
     return suggest_viz_model(
         getattr(fixture, "fixture_type", ""),
         [(getattr(c, "attribute", "") or "") for c in chans]) or "spider"
+
+
+# ── FM-14b: Der Pixel-Kopf in der BEDIENUNG (Programmer/Matrix) ──────────────
+#
+# FM-14 hat den Ring gezeichnet und den Datenweg gelegt (20 Baenke -> Kopf 0 =
+# Grundfarbe, Kopf 1..19 = Pixel 1..19). Bedienbar war er damit noch nicht:
+#
+#  (1) Kopf 0 heisst ueberall „Kopf 1" — er ist aber die GRUNDFARBE des ganzen
+#      Geraets (faerbt Linse/Kegel/Bodenfleck), nicht das erste Pixel. Wer „das
+#      erste Pixel" anfasst, faerbt damit das ganze Geraet.
+#  (2) Die Auto-Kopf-Matrix (FM-16) ist eine 1xN-Reihe in DMX-Reihenfolge. Bei
+#      einem Ring-Kopf laeuft ein Lauflicht darueber am Ring VORBEI: es beginnt
+#      bei der Grundfarbe, faellt in die Mitte, dreht den Innenring, und der
+#      Aussenring kommt erst in den letzten 12 von 20 Schritten dran.
+
+
+_PIXEL_HEAD_MODEL = "pixel_head"
+
+
+def is_pixel_head_fixture(fixture) -> bool:
+    """Hat dieses Geraet Ring-/Pixel-Segmente statt gewoehnlicher Koepfe?
+
+    Genau dann, wenn das ZENTRALE Render-Modell-Routing ``pixel_head`` sagt
+    (``viz_model_for``) — dieselbe Quelle wie 3D-Modell und 2D-Symbol, inklusive
+    des ausdruecklichen Profil-Overrides aus dem Fixture-Generator. Eine zweite
+    Erkennungsregel (z. B. „viele Baenke") wuerde genau dort abweichen, wo der
+    Nutzer das Modell von Hand gesetzt hat.
+    """
+    try:
+        return viz_model_for(fixture) == _PIXEL_HEAD_MODEL
+    except Exception:
+        return False
+
+
+def head_label_for_model(model: str, head: int) -> str:
+    """Wie heisst Kopf ``head`` (0-basiert) in der Bedienung?
+
+    Normalfall ``"Kopf 3"`` (1-basiert, Bestandsbeschriftung). Beim PIXEL-KOPF
+    ist Bank 0 keine Lampe unter vielen, sondern die **Grundfarbe** des Geraets;
+    Pixel 1 liegt auf Kopf 1. Die Verschiebung um eins ist der eigentliche
+    Stolperstein — „Kopf 1" und „Pixel 1" waeren sonst zwei Namen fuer zwei
+    VERSCHIEDENE Dinge.
+
+    Nimmt das Modell (nicht das Fixture), damit Flaechen ohne Fixture-Objekt in
+    der Hand — die Matrix-Vorschau haelt nur fids — dieselbe Beschriftung
+    benutzen koennen statt eine zweite zu erfinden.
+    """
+    try:
+        h = int(head)
+    except (TypeError, ValueError):
+        return "Kopf ?"
+    if (model or "") == _PIXEL_HEAD_MODEL:
+        return "Grundfarbe" if h <= 0 else f"Pixel {h}"
+    return f"Kopf {h + 1}"
+
+
+def head_label_short(model: str, head: int) -> str:
+    """Kurzform derselben Beschriftung fuer ENGE Flaechen (Rasterzellen).
+
+    ``"Kopf 4"`` -> ``"K4"``, ``"Pixel 3"`` -> ``"P3"``, ``"Grundfarbe"`` ->
+    ``"GR"``. **Abgeleitet, nicht zweitgeschrieben** — schriebe man die Regel
+    hier ein zweites Mal, koennten enge und weite Flaechen denselben Kopf
+    verschieden nennen, und genau das ist der Fehler, den FM-14b behebt.
+    """
+    voll = head_label_for_model(model, head)
+    wort, _, rest = voll.partition(" ")
+    rest = rest.strip()
+    if rest.isdigit():
+        return f"{wort[:1].upper()}{rest}"
+    return voll[:2].upper()
+
+
+def head_label(fixture, head: int) -> str:
+    """``head_label_for_model`` fuer ein gepatchtes Geraet (EINE Quelle)."""
+    try:
+        model = viz_model_for(fixture) or ""
+    except Exception:
+        model = ""
+    return head_label_for_model(model, head)
+
+
+def head_matrix_layout(fixture, n_heads: int) -> tuple:
+    """Raster der Auto-Kopf-Matrix: ``(cols, rows, {kopf: (col, row)}, ist_ring)``.
+
+    **Gewoehnliches Mehrkopf-Geraet** (Spider, Mover-Bar, Hydrabeam): 1xN in
+    DMX-Reihenfolge, Kopf 0 inbegriffen — Bestandsverhalten, unveraendert.
+
+    **Pixel-Kopf**: das RING-Raster aus ``core.pixel_order.waben_raster``
+    (Zeile = Ring, Spalte = Winkel), gebaut ueber die PIXEL — Kopf h traegt
+    Pixel h, also Wabenindex h-1. Ohne Ausnahme: auch ein Pixel-Kopf mit nur
+    zwei Baenken (nur ueber einen Profil-Override erreichbar) wird nach dieser
+    Regel gelegt. Eine Sonderregel fuer den Randfall waere ein Zweig, den nie
+    jemand faehrt — und eine zweite Antwort auf dieselbe Frage.
+
+    ★ Kopf 0 (die Grundfarbe) steht bewusst NICHT im Raster. Sie faerbt Linse,
+    Kegel und Bodenfleck des ganzen Geraets; als Matrix-Zelle wuerde jeder
+    Effekt sie mitziehen und damit den Ring, den er gerade zeichnet, sofort
+    wieder ueberstrahlen. Es ist dasselbe Argument, mit dem FM-14 sie im 3D
+    nicht als 20. Segment gezeichnet hat: dieselbe Information zweimal. Ueber
+    den Programmer (Kanaele „Grundfarbe …") bleibt sie unveraendert bedienbar.
+
+    ``ist_ring`` sagt, WELCHE der beiden Regeln gegriffen hat. Der Aufrufer
+    benennt die Gruppe danach; wuerde er stattdessen selbst noch einmal nach dem
+    Modell fragen, koennten Name und Inhalt auseinanderlaufen.
+    """
+    n = max(0, int(n_heads or 0))
+    if is_pixel_head_fixture(fixture):
+        from .pixel_order import waben_raster
+        cols, rows, plaetze = waben_raster(n - 1)
+        return cols, rows, {i + 1: plaetze[i] for i in sorted(plaetze)}, True
+    return n, 1, {i: (i, 0) for i in range(n)}, False
 
 
 def tilt_head_count(fixture) -> int:

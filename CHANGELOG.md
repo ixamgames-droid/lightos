@@ -7,6 +7,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-18 — Die Pixel eines LED-Ring-Kopfes lassen sich jetzt auch bedienen
+
+#### Neu
+
+- **Der Ring ist im Programmer ein Ring.** Beim Patchen eines Pixel-Kopfes
+  entstand bisher — wie bei jedem Mehrkopf-Gerät — eine Gruppe mit einer langen
+  Reihe von Zellen, eine je Kanal-Bank. Ein Lauflicht darüber lief am Gerät
+  vorbei: es begann bei der Grundfarbe, fiel in die Mitte, drehte den inneren
+  Ring und erreichte den äußeren erst am Ende — dazwischen stand der Ring still.
+  Jetzt entsteht gleich das passende Raster: **eine Zeile je Ring, eine Spalte
+  je Winkelposition**. Ein waagerechtes Lauflicht dreht sich damit wirklich um
+  den Kopf (alle Ringe gleichzeitig), ein senkrechtes läuft von der Mitte nach
+  außen.
+
+- **Die Grundfarbe heißt Grundfarbe, nicht „Kopf 1".** Bei einem Pixel-Kopf ist
+  die erste Farbbank die Farbe des ganzen Geräts — Linse, Kegel, Bodenfleck.
+  Sie stand in der Geräteliste des Programmers unter derselben Beschriftung wie
+  ein Pixel, „Pixel 1" lag also eine Zeile tiefer als man denkt. Die Zeilen
+  heißen jetzt nach dem, was sie tun, und die Pixel tragen ihre Nummer aus dem
+  Geräte-Handbuch. Der Zell-Tooltip der Matrix-Vorschau und die Rasterzellen im
+  Fixture-Gruppen-Editor sagen dasselbe — dort als Kurzform.
+
+- **Im Ring-Raster steht die Grundfarbe bewusst nicht.** Als Matrix-Zelle würde
+  sie jeder Effekt mitziehen und damit den Ring, den er gerade zeichnet, sofort
+  überstrahlen. Über den Programmer bleibt sie unverändert bedienbar; die
+  Gruppe heißt deshalb „… · Pixel" statt „… · Köpfe".
+
+- **Geräte ohne Ringe verhalten sich unverändert.** Spider, Mover-Bars und
+  Pixel-Bars behalten ihre Reihe in Kanal-Reihenfolge, ihre Beschriftung und
+  ihr Verhalten Wort für Wort — auch die mit vier und mehr Farbbänken.
+
+
 ### 2026-08-13 — Moving Heads mit LED-Ring zeigen ihre Pixel einzeln
 
 #### Neu

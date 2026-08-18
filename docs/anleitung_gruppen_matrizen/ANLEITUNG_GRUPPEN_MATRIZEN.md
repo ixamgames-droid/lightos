@@ -63,6 +63,35 @@ Automatische Kopf-Gruppe (1 × 48):
 Lauflicht in einer Reihe. Für den Balken willst du 12 × 4. Genau das machen die
 Abschnitte 3 und 4.
 
+### Ausnahme: Pixel-Köpfe (LED-Ring) bekommen gleich ein Ring-Raster
+
+Ein **Pixel-Moving-Head** — ein Kopf, dessen Lichtaustritt in einzeln ansteuerbare
+Pixel zerlegt ist (z. B. *Robe Robin Spiider* im Pixel-Modus) — zählt seine Pixel nicht
+in Zeilen, sondern in **Ringen** um die Mitte. Eine 1×N-Reihe wäre dort keine Hilfe: ein
+Lauflicht darüber liefe am Ring vorbei. Deshalb legt LightOS für solche Geräte gleich
+das richtige Raster an:
+
+* **Name:** *Geräte-Label* + ` · Pixel` (nicht ` · Köpfe` — in den Zellen stehen Pixel)
+* **Raster:** **eine Zeile je Ring**, **eine Spalte je Winkelposition**
+
+```
+Ring-Raster eines 19-Pixel-Kopfes (3 × 12):
+        Spalte →   0    1    2    3    4    5    6    7    8    9   10   11
+Zeile 0 (Mitte)   P1    ·    ·    ·    ·    ·    ·    ·    ·    ·    ·    ·
+Zeile 1 (Ring 2)   ·   P2    ·   P3    ·   P4    ·   P5    ·   P6    ·   P7
+Zeile 2 (Ring 3)  P8   P9  P10  P11  P12  P13  P14  P15  P16  P17  P18  P19
+```
+
+Damit ist ein **waagerechtes** Lauflicht eine Drehung um den Kopf (alle Ringe drehen
+gleichzeitig mit), ein **senkrechtes** eine Welle von der Mitte nach außen.
+
+★ **Die Grundfarbe steht bewusst nicht im Raster.** Bank 0 eines Pixel-Kopfes ist die
+Farbe des *ganzen* Geräts (Linse, Kegel, Bodenfleck) — als Matrix-Zelle würde jeder
+Effekt sie mitziehen und den Ring, den er gerade zeichnet, sofort überstrahlen. In der
+Geräteliste des **Programmers** trägt sie deshalb ihren Funktionsnamen statt einer
+Kopfnummer, und die Zeilen darunter ihre **Pixelnummer** aus dem Geräte-Handbuch — sonst
+griffe man beim ersten Pixel versehentlich ins ganze Gerät.
+
 ### Was im Dialog *Gerät bearbeiten* dazugehört
 
 Doppelklick auf die Patch-Zeile öffnet den Dialog. Für Mehrkopf-Geräte gibt es dort:

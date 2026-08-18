@@ -37,6 +37,8 @@ auseinanderlaeuft, waere genau die Drift-Quelle aus der FM16E-Lehre).
 """
 from __future__ import annotations
 
+import math as _math
+
 PIXEL_ORDERS = ("rowwise", "serpentine", "mirrored")
 DEFAULT_PIXEL_ORDER = "rowwise"
 
@@ -153,3 +155,112 @@ def place_element(index: int, cols: int, rows: int,
     nr = max(1, int(rows or 1))
     r, c = pixel_cell(index, nc, order)
     return rotate_cell(r, c, nr, nc, rotation, flip)
+
+
+# ── FM-14b: Ring-/Wabenordnung eines PIXEL-KOPFES ────────────────────────────
+#
+# ★ Zwilling zu ``scene_src/fixtures/pixel_order.js#wabenPlatz`` — die Quellen-
+# lage steht dort ausfuehrlich (Robe Robin Spiider, User Manual Rev. 3.3 S. 15
+# „Pixel order"; die Firmware nennt die Gruppen selbst „Ring 1 (Middle pixel) /
+# Ring 2 / Ring 3"). Kurz:
+#
+#   Ring k hat 6k Plaetze, Winkelschritt 60°/k, Startwinkel 270° - Schritt/2;
+#   danach im Uhrzeigersinn (Blick von vorn auf die Linse) einmal herum.
+#
+# Hier steht dieselbe Regel EIN ZWEITES MAL — in einer anderen Sprache, nicht in
+# einer zweiten Fassung: ``tests/test_fm14b_pixel_ring_scene.py`` rechnet beide
+# Seiten Index fuer Index gegeneinander (in echter QWebEngine, ueber das echte
+# Modul). Ohne diesen Abgleich waere genau die Drift entstanden, gegen die
+# ``pixel_cell`` oben angetreten ist (Lehre FM16E/VIZ-51).
+#
+# Warum die Python-Seite sie ueberhaupt braucht: das 3D zeichnet den Ring, aber
+# BEDIENT wird er im Programmer. Die Pro-Kopf-Matrix (FM-16) schneidet Koepfe in
+# ein 1xN-Rechteck in DMX-Reihenfolge — ein Lauflicht darueber laeuft am Ring
+# vorbei, weil der Ring erst nach der Mitte und dem Innenring beginnt und
+# zwischendurch 8 von 20 Schritten gar nicht vorkommt.
+
+
+def waben_plaetze(ring) -> int:
+    """Wie viele Plaetze fassen die Ringe 0..k zusammen? (1, 7, 19, 37, …)"""
+    k = max(0, int(ring or 0))
+    return 1 + 3 * k * (k + 1)
+
+
+def waben_ring_platz(index) -> tuple:
+    """Pixelindex (0 = Mitte) -> ``(ring, platz-im-ring)``.
+
+    Die Zerlegung, auf der sowohl ``waben_platz`` (Winkel) als auch
+    ``waben_raster`` (Spalte) stehen — damit die Ringzugehoerigkeit NICHT
+    zweimal ausgerechnet wird.
+    """
+    i = max(0, int(index or 0))
+    if i == 0:
+        return 0, 0
+    k = 1
+    while i >= waben_plaetze(k):
+        k += 1
+    return k, i - waben_plaetze(k - 1)
+
+
+def waben_platz(index) -> tuple:
+    """Pixelindex (0 = Mitte) -> ``(ring, x, y)`` in Ring-Einheiten.
+
+    ``x`` zeigt nach RECHTS, ``y`` nach OBEN — Ansicht von vorn auf die Linse,
+    dieselbe wie die Zeichnung im Manual. Radius = Ringnummer (Kreisring, nicht
+    die exakte Wabenpackung): was das Modell tragen muss, ist die REIHENFOLGE um
+    den Kopf herum.
+
+    Elementweise identisch zu ``wabenPlatz`` im JS-Zwilling.
+    """
+    k, j = waben_ring_platz(index)
+    if k == 0:
+        return 0, 0.0, 0.0
+    schritt = (_math.pi / 3) / k                    # 60°/k
+    # 270° = -PI/2 (unten); MINUS j*Schritt = im Uhrzeigersinn.
+    winkel = -_math.pi / 2 - schritt / 2 - j * schritt
+    return k, k * _math.cos(winkel), k * _math.sin(winkel)
+
+
+def waben_raster(count) -> tuple:
+    """``count`` Pixel (0 = Mitte) -> ``(cols, rows, {pixelindex: (col, row)})``.
+
+    Das Ring-Raster fuer die Pro-Kopf-Matrix: **eine ZEILE je Ring** (Mitte =
+    Zeile 0), **eine SPALTE je Winkelposition des AEUSSERSTEN Rings**.
+
+    ★ Warum so und nicht als Wabe im Rechteck: die Matrix-Engine kennt nur
+    ``(col, row)``. Legt man die Wabe geometrisch ab (Zeile = y, Spalte = x),
+    laeuft ein Lauflicht ueber die Spalten als WISCHER quer ueber die Linse —
+    nicht als Ring. Mit „Zeile = Ring, Spalte = Winkel" ist die Spaltenachse die
+    Winkelachse: ein Lauflicht dreht sich um den Kopf, und **alle Ringe drehen
+    gleichzeitig und phasengleich** (der Zeiger einer Uhr). Die Ringachse bleibt
+    als ZEILE bedienbar — ein senkrechtes Lauflicht laeuft von der Mitte nach
+    aussen.
+
+    ★★ Die Spalte kommt aus demselben Winkel wie ``waben_platz``: Platz j des
+    Rings k liegt ``(j + 0.5) / (6k)`` einer Umdrehung hinter dem Ringanfang,
+    also in Spalte ``floor((2j+1) * cols / (12k))``. Ganzzahlig gerechnet statt
+    ueber ``atan2``, weil ein ``floor`` auf einer Winkel-Gleitkommazahl genau an
+    den Spaltengrenzen kippen kann.
+
+    ★★★ Ein Innenring-Platz liegt geometrisch GENAU ZWISCHEN zwei Aussenring-
+    Plaetzen (die Ringe sind um eine halbe Aussenring-Teilung versetzt). Bei
+    ganzzahligen Spalten bekommt er den naechstfolgenden im Uhrzeigersinn. Die
+    Alternative — doppelt so viele Spalten, damit beide Ringe eigene Spalten
+    haben — waere winkelgenauer, liesse aber jeden zweiten Schritt eines
+    Lauflichts LEER; der Aussenring soll lueckenlos durchlaufen.
+
+    Fehlende Plaetze eines angebrochenen Rings bleiben schlicht unbesetzt
+    (Luecken sind im Matrix-Raster ein regulaerer Zustand, ``is_gap``).
+    """
+    n = max(0, int(count or 0))
+    if n <= 0:
+        return 1, 1, {}
+    ring_max, _ = waben_ring_platz(n - 1)
+    cols = 6 * ring_max if ring_max >= 1 else 1
+    plaetze = {}
+    for i in range(n):
+        k, j = waben_ring_platz(i)
+        # Mitte: kein Winkel -> Spalte 0 (Anfang der Umdrehung).
+        col = 0 if k == 0 else ((2 * j + 1) * cols) // (12 * k)
+        plaetze[i] = (col, k)
+    return cols, ring_max + 1, plaetze

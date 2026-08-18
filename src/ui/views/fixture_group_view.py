@@ -188,6 +188,7 @@ class FixtureGridWidget(QWidget):
         self.setMinimumSize(320, 320)
         self.setAcceptDrops(True)
         self._labels: dict[int, str] = {}
+        self._models: dict[int, str] = {}   # FM-14b: fid -> Render-Modell
 
         # Internal drag state
         self._drag_from: tuple[int, int] | None = None
@@ -199,9 +200,34 @@ class FixtureGridWidget(QWidget):
         # External drag state (from fixture tree): live "so rastet es ein"-Ziel.
         self._drop_target: tuple[int, int] | None = None
 
-    def update_fixture_labels(self, labels: dict[int, str]):
+    def update_fixture_labels(self, labels: dict[int, str], models=None):
+        """fid -> Anzeigename; ``models`` (FM-14b) fid -> Render-Modell.
+
+        Das Modell entscheidet, wie eine KOPF-Zelle beschriftet wird: am
+        Pixel-Kopf ist Kopf 0 die Grundfarbe und Kopf N das Pixel N. Ohne
+        Angabe bleibt es bei „K{N+1}" (Bestandsverhalten)."""
         self._labels = labels
+        self._models = dict(models or {})
         self.update()
+
+    def zell_beschriftung(self, wert) -> str:
+        """Die grosse Aufschrift EINER Rasterzelle.
+
+        FM-16e: Kopf-Zelle als ``"fid·K4"`` (1-basiert), ganzes Fixture als
+        blosse fid. FM-14b: am Pixel-Kopf steht dort ``"fid·P3"`` — die
+        Kopfnummer waere um eins verschoben, weil Kopf 0 die Grundfarbe ist und
+        gar nicht im Ring-Raster steht.
+
+        Eigene Methode statt einer Zeile im ``paintEvent``: eine GEMALTE
+        Aufschrift laesst sich nicht zurueckmessen, eine berechnete schon.
+        """
+        fid, head = _split_cell(wert)
+        if fid is None:
+            return str(wert)
+        if head is None:
+            return f"{fid}"
+        from src.core.app_state import head_label_short
+        return f"{fid}·{head_label_short(self._models.get(fid, ''), head)}"
 
     def set_grid(self, cols: int, rows: int):
         self.cols = max(1, cols)
@@ -530,9 +556,7 @@ class FixtureGridWidget(QWidget):
             p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
             p.setFont(font)
-            # FM-16e: Kopf-Zelle als "fid·K{head+1}" (1-basiert), ganzes Fixture als fid.
-            big = f"{fid}·K{head + 1}" if (fid is not None and head is not None) \
-                else (f"{fid}" if fid is not None else str(v))
+            big = self.zell_beschriftung(v)
             p.drawText(rect[0], rect[1], rect[2], rect[3],
                        Qt.AlignmentFlag.AlignCenter, big)
             label = self._labels.get(fid, str(fid if fid is not None else v))
@@ -938,6 +962,7 @@ class FixtureGroupView(QWidget):
     def _refresh_fixtures(self):
         """Baut den Universe-Baum neu auf und aktualisiert Grid-Labels."""
         labels: dict[int, str] = {}
+        modelle: dict[int, str] = {}     # FM-14b: fid -> Render-Modell
         fixtures = self._state.get_patched_fixtures()
 
         # Gruppiere nach Universe
@@ -962,8 +987,13 @@ class FixtureGroupView(QWidget):
                 child.setData(0, Qt.ItemDataRole.UserRole, f.fid)
                 child.setIcon(0, _mini.fixture_icon_for(f))
                 labels[f.fid] = f.label
+                try:
+                    from src.core.app_state import viz_model_for
+                    modelle[f.fid] = viz_model_for(f) or ""
+                except Exception:
+                    modelle[f.fid] = ""
 
-        self._grid_widget.update_fixture_labels(labels)
+        self._grid_widget.update_fixture_labels(labels, modelle)
         self._highlight_group_members()
 
     def _refresh_legend(self):
