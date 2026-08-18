@@ -15,11 +15,27 @@ zweiter `bind()` auf denselben Port, `KernelPortSharingTest` unten):
 | `SO_REUSEPORT` | `SO_REUSEPORT` | gelingt |
 | beliebige Option | **beide** | gelingt |
 
-Daraus folgt die eigentliche Begruendung fuer den Code: **beide Optionen zu
-setzen ist die einzige Wahl, die gegen JEDE fremde Konfiguration haelt.** Mit
-nur einer der beiden bleibt der Input still, sobald die andere App sich fuer
-die jeweils andere entschieden hat (QLC+ … auf 6454) — und das faellt nicht als
+Daraus folgt die Begruendung fuer den Code: **beide Optionen zu setzen ist die
+einzige Wahl, bei der der `bind()` gegen jede fremde Konfiguration gelingt.**
+Mit nur einer der beiden scheitert er schon, sobald die andere App sich fuer die
+jeweils andere entschieden hat (QLC+ … auf 6454) — und das faellt nicht als
 Fehler auf, sondern als Stille.
+
+★ **Der Bind ist aber nur die halbe Frage — die andere ist die ZUSTELLUNG, und
+die haengt nicht an den Optionen, sondern an der Adressierung** (CDX-51,
+gemessen in `ZustellungTest`):
+
+| Adressierung | zwei Empfaenger auf demselben Port |
+|---|---|
+| **Broadcast** (Art-Net-Normalfall) | **beide** bekommen jedes Paket — mit jeder Optionskombination |
+| **Unicast** | **genau einer** bekommt alles, der andere nichts |
+
+Fuer den Regelbetrieb ist damit alles gut: Art-Net-Sender broadcasten auf
+255.255.255.255, und LightOS bekommt seine Kopie neben QLC+. Schickt eine
+Quelle dagegen **unicast** an genau diesen Rechner, kann das Paket bei der
+anderen App landen und LightOS bleibt still — daran aendert keine der beiden
+Optionen etwas. Eine frueherer Fassung dieses Kopfes hat aus dem gelungenen
+Bind auf die Zustellung geschlossen; das war zu weit gegriffen.
 
 Der sACN-Input macht es bereits so; hier wird Art-Net angeglichen. Die
 Verdrahtung selbst ist plattform-unabhaengig ueber einen Fake-Socket geprueft
@@ -193,3 +209,108 @@ class KernelPortSharingTest(unittest.TestCase):
             with self.subTest(fremde_app=fremd):
                 self.assertTrue(
                     self._zweiter_bind_gelingt(fremd, [self.RA, self.RP]))
+
+
+class ZustellungTest(unittest.TestCase):
+    """CDX-51: Der Bind ist nur die halbe Frage — die andere ist die Zustellung.
+
+    Die vorige Fassung dieser Datei pruefte ausschliesslich, ob der zweite
+    ``bind()`` gelingt, und der Modulkopf folgerte daraus, beide Optionen zu
+    setzen halte „gegen JEDE fremde Konfiguration". Das war zu weit gegriffen:
+    ein gelungener Bind sagt nichts darueber, wer die Pakete **bekommt**.
+
+    Gemessen (und deshalb steht es jetzt im Kopf):
+
+    * **Broadcast** — beide Empfaenger bekommen jedes Paket, mit jeder
+      Optionskombination. Das ist der Art-Net-Normalfall, und deshalb
+      funktioniert der Parallelbetrieb mit QLC+ ueberhaupt.
+    * **Unicast** — genau EIN Empfaenger bekommt alles. Daran aendert keine der
+      beiden Optionen etwas; es ist eine Eigenschaft der Adressierung.
+
+    Der Befund stammt aus einem Codex-Review und ist hier nachgemessen, statt
+    ihn zu uebernehmen oder abzutun.
+    """
+
+    def setUp(self):
+        if not sys.platform.startswith("linux"):
+            self.skipTest("misst Linux-Kernel-Verhalten")
+
+    def _zwei_empfaenger(self, opts, bind_addr="127.0.0.1"):
+        socks, port = [], None
+        for _ in range(2):
+            s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+            self.addCleanup(s.close)
+            for o in opts:
+                s.setsockopt(_socket.SOL_SOCKET, o, 1)
+            try:
+                s.bind((bind_addr, 0 if port is None else port))
+            except OSError as e:
+                self.skipTest(f"kein UDP-Loopback ({e})")
+            if port is None:
+                port = s.getsockname()[1]
+            s.settimeout(0.1)
+            socks.append(s)
+        return socks, port
+
+    @staticmethod
+    def _senden_und_zaehlen(socks, ziel, port, n=6):
+        tx = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        tx.setsockopt(_socket.SOL_SOCKET, _socket.SO_BROADCAST, 1)
+        try:
+            for i in range(n):
+                tx.sendto(b"artnet-probe-%d" % i, (ziel, port))
+            # ÄQUIVALENTE MUTANTE (nachgemessen): dieses Warten
+            # wegzulassen laesst alle Tests gruen — auf einem unbelasteten
+            # Loopback ist das Paket schon da, wenn `sendto` zurueckkehrt. Es
+            # bleibt trotzdem stehen: unter Last (Gate mit -j 3, parallele
+            # Agenten) ist die Zustellung nicht mehr instantan, und ein Test,
+            # der dann sporadisch „0 Pakete" misst, waere genau die Sorte
+            # Flake, die dieses Repo schon zweimal beschaeftigt hat (QA-57,
+            # PROC-02c). Vorsorge gegen Last, nicht gegen den Normalfall.
+            time.sleep(0.08)
+        finally:
+            tx.close()
+        zaehler = []
+        for s in socks:
+            c = 0
+            try:
+                while True:
+                    s.recvfrom(256)
+                    c += 1
+            except OSError:
+                pass
+            zaehler.append(c)
+        return zaehler
+
+    def test_broadcast_erreicht_BEIDE_empfaenger(self):
+        """Der Fall, der den Parallelbetrieb mit QLC+ traegt."""
+        for name, opts in (("REUSEADDR", [_socket.SO_REUSEADDR]),
+                           ("REUSEPORT", [_socket.SO_REUSEPORT]),
+                           ("beide", [_socket.SO_REUSEADDR,
+                                      _socket.SO_REUSEPORT])):
+            with self.subTest(optionen=name):
+                socks, port = self._zwei_empfaenger(opts, "0.0.0.0")
+                got = self._senden_und_zaehlen(socks, "255.255.255.255", port)
+                self.assertEqual(
+                    [6, 6], got,
+                    f"Broadcast muss BEIDE erreichen ({name}), bekam {got} — "
+                    "sonst traegt der Parallelbetrieb mit einer zweiten "
+                    "Art-Net-App nicht")
+
+    def test_unicast_erreicht_nur_EINEN_empfaenger(self):
+        """Die Grenze, die der Modulkopf frueher verschwieg.
+
+        Sie ist keine Schwaeche unseres Codes und durch keine Option zu
+        beheben — aber sie gehoert benannt, weil „beide Optionen gesetzt" sonst
+        als Zusicherung gelesen wird, die sie nicht ist.
+        """
+        socks, port = self._zwei_empfaenger([_socket.SO_REUSEADDR,
+                                             _socket.SO_REUSEPORT])
+        got = self._senden_und_zaehlen(socks, "127.0.0.1", port)
+        self.assertEqual(
+            6, sum(got), f"alle Pakete muessen ankommen, bekam {got}")
+        self.assertIn(
+            0, got,
+            f"bei Unicast darf genau EIN Empfaenger alles bekommen, bekam "
+            f"{got} — waere das anders, muesste der Modulkopf umgeschrieben "
+            f"werden")
