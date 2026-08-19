@@ -18,7 +18,7 @@ Manufacturer ─< FixtureProfile ─< FixtureMode ─< FixtureChannel ─< Chann
 | Ebene | Wichtige Felder | Bedeutung |
 |---|---|---|
 | `FixtureProfile` | `short_name`, `fixture_type`, `source` | ein Geraetemodell (z. B. ZQ02001) |
-| `FixtureMode` | `name`, `channel_count`, **`grid_rows`/`grid_cols`** | DMX-Modus (z. B. „9-Kanal" / „11-Kanal") |
+| `FixtureMode` | `name`, `channel_count`, **`grid_rows`/`grid_cols`**, **`white_rows`/`white_cols`** | DMX-Modus (z. B. „9-Kanal" / „11-Kanal") |
 | `FixtureChannel` | `channel_number`, `name`, `attribute`, `default_value`, `highlight_value` | ein DMX-Kanal im Modus |
 | `ChannelRange` | `range_from`, `range_to`, `name`, **`kind`** | benannter Wertebereich (z. B. 10–19 „Rot") |
 
@@ -48,17 +48,39 @@ modusabhaengig ist; und nicht am gepatchten Geraet, weil sie fuer jedes Exemplar
 gilt (im Gegensatz zu `pixel_order`/`element_rotation`, die vom Geraetemenue bzw.
 von der Montage abhaengen).
 
-**Eine eigene Weiss-Leiste braucht KEIN Feld** (VIZ-50b). Manche Panels haben
-neben ihren RGB-Zonen einen getrennten Streifen weisser LEDs — der ZQ06121 acht
-Warmweiss-Segmente quer ueber die Panelmitte. Woran der Renderer das erkennt,
-steht schon in den Kanaelen: **weniger `color_w`-Kanaele als `color_r`-Kanaele**
-heisst „eigene Leiste" (8 auf 48), **gleich viele** heisst RGBW-Emitter (dort
-gehoert das Weiss zum Pixel und ist ueber `visual_rgb` in dessen Farbe schon
-eingerechnet). Wer ein solches Geraet anlegt, gibt die Weiss-Segmente also
-einfach als `color_w`-Kanaele an — die attr#N-Konvention legt sie auf die Koepfe
-0..N-1, und das 3D-Band zeichnet sich daraus von selbst. Ein zusaetzliches Feld
-„Anzahl Weiss-Segmente" waere eine Kopie dieser Zahl und koennte still daneben
-laufen.
+**Wo die Angabe herkommt** (FM-23): aus dem Seed (Builtins), aus dem
+**Fixture-Editor** — jeder Mode-Tab hat eine Zeile „Pixel-Raster: Zeilen x
+Spalten" — oder aus dem **QXF-Import**, der sie aus `<Physical><Layout Width=
+Height=/>` uebernimmt (QLC+ fuehrt sie dort; `Width` sind Spalten, `Height`
+Zeilen). Ein `1x1` gilt dabei als KEINE Angabe: das ist QLC+' Vorgabewert, und
+uebernommen wuerde daraus fuer ein 48-Pixel-Panel eine 48 Zeilen hohe Saeule —
+`panelGrid` zieht die fehlende Zahl aus der Pixelzahl hoch und behandelt das
+Ergebnis dann als *explizit*, also samt physischer Panel-Masse.
+
+**`FixtureMode.white_rows`/`white_cols`** (CDX-52) ist die Rasterform einer
+**eigenen Weiss-Leiste** — eines Streifens weisser LEDs, der NICHT auf dem
+Farbraster liegt (der ZQ06121 hat acht Warmweiss-Segmente quer ueber die
+Panelmitte). `0/0` heisst „keine eigene Leiste", und dann gibt es im 3D auch
+keine. Das ist der Unterschied zur Rasterform oben: dort heisst „nichts
+hinterlegt" WEITERRATEN, hier heisst es NEIN.
+
+> ⚠️ Bis VIZ-50b stand hier, das Feld brauche es nicht — der Renderer erkenne
+> die Leiste an **weniger `color_w`- als `color_r`-Kanaelen**. Das galt fuer die
+> mitgelieferte Bibliothek und sonst nirgends: **eine Kanalzahl traegt keine
+> Ortsangabe.** Dieselbe Signatur (48x `color_r` + 8x `color_w`) passt auf eine
+> eigene Leiste, auf acht Weiss-LEDs, die IN den Zonen sitzen, und auf ein
+> globales Weiss in acht Dimmabschnitten. Ein selbstgebautes Panel mit 48 Zonen
+> und EINEM globalen Weiss-Kanal bekam so ein volles Band quer ueber die Mitte.
+
+Hinterlegt wird nur, was die Kanaele nicht sagen koennen: die **Form**, nicht
+die **Zahl**. Die Zahl der Segmente bleibt aus den `color_w`-Kanaelen
+abgeleitet — der ZQ06121 traegt deshalb `(1, 0)` und nicht `(1, 8)`; eine Kopie
+der 8 liefe still daneben. Eingetragen wird die Leiste im **Fixture-Editor**
+(Mode-Tab, „Weiss-Leiste: Zeilen x Spalten") oder im Seed als optionales
+**viertes** Tupel-Element `(mode_name, channels, (rows, cols), (wrows, wcols))`.
+Der **QXF-Import kann sie nicht ableiten**: das QLC+-Format kennt keinen Begriff
+fuer ein zweites Raster neben dem Farbraster — `<Layout>` beschreibt EIN Raster,
+ein `<Head>` ist eine Kanalgruppe ohne Ortsangabe.
 
 ## 2. Woher Profile kommen
 

@@ -40,11 +40,19 @@ CHANNEL_ATTRS = [
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]
 
+# FM-23: Obergrenze der Rastereingaben. 256 ist nicht gegriffen, sondern die
+# Zahl, bei der `panelGrid` (scene_src/fixtures/pixel_order.js) die PIXELZAHL
+# eines Panels kappt: `Math.min(256, ...)`. Eine Zeilen- oder Spaltenzahl
+# darueber koennte also nie ein Pixel mehr zeigen — sie stuende nur als stille
+# Fehlangabe in der Bibliothek.
+GEO_MAX = 256
+
 
 class _ModeTab(QWidget):
-    """Eine Mode-Tab: Channel-Tabelle."""
+    """Eine Mode-Tab: Kanaltabelle + die Panel-Geometrie dieses Modus."""
 
-    def __init__(self, name: str = "Default", description: str = "", parent=None):
+    def __init__(self, name: str = "Default", description: str = "", parent=None,
+                 grid: tuple = (0, 0), weiss: tuple = (0, 0)):
         super().__init__(parent)
         self.mode_name = name
         # Das einfache Editor-UI bearbeitet keine Beschreibung, muss sie beim
@@ -59,6 +67,55 @@ class _ModeTab(QWidget):
         self._edit_name.editingFinished.connect(self._on_name_changed)
         name_row.addWidget(self._edit_name, 1)
         layout.addLayout(name_row)
+
+        # ── FM-23: physische Panel-Geometrie dieses MODUS ────────────────────
+        #
+        # ★ Warum es diese Eingabe geben muss: `grid_rows`/`grid_cols` (VIZ-50a)
+        #   und `white_rows`/`white_cols` (CDX-52) wurden bis hierhin
+        #   AUSSCHLIESSLICH von den mitgelieferten Builtin-Daten und dem
+        #   Nachtrag `_ensure_panel_geometrie` gesetzt. Ein selbstgebautes Panel
+        #   hatte gar keinen Weg, seine Form zu hinterlegen — der Renderer riet
+        #   sie near-square aus der Pixelzahl (aus einem 4x12-Balken ein
+        #   7x7-Quadrat), und seit CDX-52 bekam es auch kein Weiss-Band mehr,
+        #   weil dessen Bedingung an der Geometrie haengt statt am
+        #   Zahlenverhaeltnis der Kanaele.
+        #
+        # ★ Warum am Mode-Tab und nicht im Kopfformular: die Rasterform gehoert
+        #   zum MODUS, weil die Pixelzahl modusabhaengig ist (ein Panel mit
+        #   8ch = 1 Zone und 432ch = 144 Pixel hat zwei verschiedene Raster).
+        #   Die ausfuehrliche Begruendung steht an `FixtureMode.grid_rows`.
+        #
+        # ★ Warum die Weiss-Leiste eine eigene FORM bekommt und keine Ja/Nein-
+        #   Marke: sie hat eine. Die ZAHL der Segmente bleibt abgeleitet (die
+        #   `color_w`-Kanaele des Modus) — hinterlegt wird nur, was die Kanaele
+        #   nicht sagen koennen. Eine Reihe quer ueber die Mitte ist deshalb
+        #   (1, 0) und NICHT (1, 8).
+        geo_row = QHBoxLayout()
+        geo_row.addWidget(QLabel("Pixel-Raster:"))
+        self._spin_grid_rows = self._geo_spin(
+            "Zeilen des Pixel-/Zonenrasters dieses Modus. 0 = nicht hinterlegt "
+            "(der 3D-Renderer raet die Form near-square aus der Pixelzahl).")
+        self._spin_grid_cols = self._geo_spin(
+            "Spalten des Pixel-/Zonenrasters. Eine der beiden Zahlen genuegt — "
+            "die andere folgt aus der Pixelzahl des Modus.")
+        geo_row.addWidget(self._spin_grid_rows)
+        geo_row.addWidget(QLabel("x"))
+        geo_row.addWidget(self._spin_grid_cols)
+        geo_row.addSpacing(18)
+        geo_row.addWidget(QLabel("Weiß-Leiste:"))
+        self._spin_white_rows = self._geo_spin(
+            "Zeilen einer EIGENEN Weiß-Leiste, die NICHT auf dem Farbraster "
+            "liegt. 0 = keine eigene Leiste — dann gibt es im 3D auch keine.")
+        self._spin_white_cols = self._geo_spin(
+            "Spalten der Weiß-Leiste. 0 lassen, wenn die Zahl der Segmente "
+            "schon in den color_w-Kanaelen des Modus steht.")
+        geo_row.addWidget(self._spin_white_rows)
+        geo_row.addWidget(QLabel("x"))
+        geo_row.addWidget(self._spin_white_cols)
+        geo_row.addWidget(QLabel("(0 = nicht hinterlegt)"))
+        geo_row.addStretch(1)
+        layout.addLayout(geo_row)
+        self.set_geometry(grid, weiss)
 
         self._tbl = QTableWidget(0, len(CHANNEL_COLS))
         self._tbl.setHorizontalHeaderLabels(CHANNEL_COLS)
@@ -81,6 +138,31 @@ class _ModeTab(QWidget):
             btn_row.addWidget(b)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
+
+    @staticmethod
+    def _geo_spin(tooltip: str) -> QSpinBox:
+        sp = QSpinBox()
+        sp.setRange(0, GEO_MAX)
+        sp.setToolTip(tooltip)
+        return sp
+
+    def set_geometry(self, grid: tuple = (0, 0), weiss: tuple = (0, 0)) -> None:
+        """Traegt ein Paar ``(rows, cols)`` je Raster in die Eingaben.
+
+        Geklemmt wird NICHT hier, sondern von den Spinboxen selbst
+        (``setRange(0, GEO_MAX)``) — eine zweite Klemmformel waere genau die
+        Drift-Quelle, gegen die `pixel_order.js` angetreten ist.
+        """
+        for spin, wert in ((self._spin_grid_rows, grid[0]),
+                           (self._spin_grid_cols, grid[1]),
+                           (self._spin_white_rows, weiss[0]),
+                           (self._spin_white_cols, weiss[1])):
+            spin.setValue(int(wert or 0))
+
+    def get_geometry(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        """``((grid_rows, grid_cols), (white_rows, white_cols))``."""
+        return ((self._spin_grid_rows.value(), self._spin_grid_cols.value()),
+                (self._spin_white_rows.value(), self._spin_white_cols.value()))
 
     def _on_name_changed(self):
         self.mode_name = self._edit_name.text().strip() or "Default"
@@ -174,6 +256,12 @@ class _ModeTab(QWidget):
                 pass
 
     def load_mode_data(self, name: str, channels: list[dict], description: str = ""):
+        # FM-23: die Rasterform steht bewusst NICHT hier — sie kommt ueber den
+        # Konstruktor (`_add_mode` reicht sie dorthin) bzw. ueber
+        # `set_geometry`. Sie hier ein zweites Mal zu setzen waere dieselbe
+        # Zuweisung an zwei Stellen, und die zweite haette keinen Aufrufer, der
+        # sie von der ersten unterscheidet. Wer diesen Tab je auf einen ANDEREN
+        # Modus umhaengt, muss `set_geometry` mit aufrufen.
         self.mode_name = name
         self.description = description
         self._edit_name.setText(name)
@@ -183,9 +271,10 @@ class _ModeTab(QWidget):
         # in die neuen channels schreiben (Korruption beim Mode-Wechsel).
         self._rebuild_rows()
 
-    def get_data(self) -> tuple[str, list[dict], str]:
+    def get_data(self) -> tuple[str, list[dict], str, tuple, tuple]:
         self._sync_from_table()
-        return self.mode_name, list(self.channels), self.description
+        grid, weiss = self.get_geometry()
+        return self.mode_name, list(self.channels), self.description, grid, weiss
 
 
 class FixtureEditorDialog(QDialog):
@@ -269,14 +358,14 @@ class FixtureEditorDialog(QDialog):
                 self._cb_manufacturer.addItem(m.name)
 
     def _add_mode(self, name: str | None = None, channels: list[dict] | None = None,
-                  description: str = ""):
+                  description: str = "", grid: tuple = (0, 0), weiss: tuple = (0, 0)):
         if name is None:
             existing = [self._tabs.tabText(i) for i in range(self._tabs.count())]
             i = 1
             while f"Mode {i}" in existing:
                 i += 1
             name = f"Mode {i}"
-        tab = _ModeTab(name, description=description)
+        tab = _ModeTab(name, description=description, grid=grid, weiss=weiss)
         if channels:
             tab.load_mode_data(name, channels, description=description)
         self._tabs.addTab(tab, name)
@@ -342,8 +431,15 @@ class FixtureEditorDialog(QDialog):
                         "name": r.name, "kind": r.kind,
                     } for r in c.ranges],
                 } for c in chans]
+                # ★★ FM-23 / bekannter Nebenbefund: `_save` LOESCHT alle Modi
+                # und baut sie neu. Alles, was hier nicht mitgelesen wird, ist
+                # nach dem naechsten Speichern weg. Fuer Builtins stellt
+                # `ensure_builtins` die Geometrie wieder her — ein Nutzerprofil
+                # haette sie endgueltig verloren. Deshalb faehrt sie hier mit.
                 self._add_mode(name=m.name, channels=ch_data,
-                               description=m.description)
+                               description=m.description,
+                               grid=(m.grid_rows, m.grid_cols),
+                               weiss=(m.white_rows, m.white_cols))
             if self._tabs.count() == 0:
                 self._add_mode()
 
@@ -364,12 +460,12 @@ class FixtureEditorDialog(QDialog):
         modes_data = []
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
-            mname, chans, description = tab.get_data()
+            mname, chans, description, grid, weiss = tab.get_data()
             if not chans:
                 QMessageBox.warning(self, "Speichern",
                                     f"Mode '{mname}' hat keine Channels.")
                 return
-            modes_data.append((mname, chans, description))
+            modes_data.append((mname, chans, description, grid, weiss))
 
         with Session(engine()) as s:
             # Manufacturer get-or-create
@@ -419,10 +515,15 @@ class FixtureEditorDialog(QDialog):
                 s.add(profile)
                 s.flush()
 
-            for mname, chans, description in modes_data:
+            for mname, chans, description, grid, weiss in modes_data:
                 mode = FixtureMode(
                     fixture_id=profile.id, name=mname,
                     channel_count=len(chans), description=description,
+                    # FM-23: Rasterform (VIZ-50a) und Form der eigenen
+                    # Weiss-Leiste (CDX-52) mitschreiben — sonst blieben die
+                    # Felder fuer jedes selbstgebaute Profil auf 0.
+                    grid_rows=grid[0], grid_cols=grid[1],
+                    white_rows=weiss[0], white_cols=weiss[1],
                 )
                 s.add(mode)
                 s.flush()
