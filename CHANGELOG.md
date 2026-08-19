@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Der Pixel-Ring zeigt jetzt jedes Pixel
+
+#### Behoben
+
+- **Geräte, deren Bänke alle echte Pixel sind, verloren ihr erstes Pixel.** Der
+  Ring nahm bisher unbesehen an, die erste Farbbank sei die Grundfarbe des
+  Geräts (so ist es beim Robe Spiider) und fing deshalb immer bei der zweiten
+  an. Bei einem importierten Gerät ohne eigene Grundfarben-Lage tauchte Pixel 1
+  damit nirgends im Ring auf. LightOS liest jetzt am Kanal-Layout ab, ob es eine
+  solche Lage gibt: ein Pixelfeld liegt in gleichmäßigen Schritten auf DMX, eine
+  Grundfarben-Lage mit eigenem Shutter und Dimmer tut das nicht. Die
+  mitgelieferten Geräte sehen unverändert aus.
+
+- **Ab 65 Segmenten fehlten die restlichen Pixel — ohne jeden Hinweis.** Der
+  3D-Ring und das 2D-Symbol zeichneten höchstens 64 Segmente, während die Werte
+  aller Pixel weiterhin ankamen. Ein Gerät mit mehr Pixeln zeigte also stumm nur
+  einen Teil davon. Jetzt wird jede gemeldete Bank gezeichnet; die Segmente
+  rücken enger zusammen und bleiben in der Lichtaustrittsfläche.
 ### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
 
 #### Behoben

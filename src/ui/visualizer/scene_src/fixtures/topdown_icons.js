@@ -7,7 +7,7 @@
 // View) und EIN zentrales Tinting (tintTopDownIcon) statt vier Duplikat-
 // Bloecken in fixtures.js.
 import * as THREE from '../three/three.js';
-import { placeElement, panelGrid, wabenPlatz } from './pixel_order.js';
+import { placeElement, panelGrid, ringSegmente, wabenPlatz } from './pixel_order.js';
 
 // Fuell-Farbe unbelichteter Icons (vorher 0x3a3a4a auf 0x282828-Boden).
 export const ICON_UNLIT_FILL = 0x4a4e5e;
@@ -124,10 +124,12 @@ function addGridCells(group, n, size, pixelOrder, elementRotation, elementFlip,
 // 3D-Modell (`wabenPlatz`) und dieselbe Handedness (x aus -x, z aus -y) — sonst
 // laeuft ein Pixel-Chase in der 2D-Ansicht andersherum als im 3D, genau die
 // Abweichung, die VIZ-51 fuer die Panel-Reihenfolge beseitigt hat.
-// `n` = Zahl der SEGMENTE (Bank 0 ist die Geraetefarbe, s. buildPixelHead);
-// Zelle i faerbt `updatePixelHeadDmx` aus heads[i+1].
-function addRingCells(group, n, radius) {
-  const count = Math.max(1, Math.min(64, Math.floor(n || 1)));
+// `nBaenke`/`basisBaenke` sind DIESELBEN Zahlen wie am 3D-Modell und laufen
+// durch DIESELBE Funktion (`ringSegmente`) — bis CDX-56 rechnete diese Zeile
+// die Segmentzahl selbst nach, mitsamt eigener 64er-Kappung.
+// Zelle i faerbt `updatePixelHeadDmx` aus heads[i + basisBaenke].
+function addRingCells(group, nBaenke, basisBaenke, radius) {
+  const { anzahl: count } = ringSegmente(nBaenke, basisBaenke);
   let maxRing = 0;
   for (let i = 0; i < count; i++) maxRing = Math.max(maxRing, wabenPlatz(i).ring);
   const teilung = radius / (maxRing + 0.55);
@@ -145,7 +147,7 @@ function addRingCells(group, n, radius) {
 
 export function buildTopDownIcon(type, nHeads, pixelOrder,
                                  elementRotation, elementFlip,
-                                 gridCols, gridRows) {
+                                 gridCols, gridRows, pixelBase) {
   const group = new THREE.Group();
   let body, ring, cells = null;
   // Bar-artige Typen brauchen einen groesseren Selektionsring (die 1.6 m
@@ -165,7 +167,7 @@ export function buildTopDownIcon(type, nHeads, pixelOrder,
     group.add(body);
     group.add(mkOutline(new THREE.CircleGeometry(0.6, 24)));
     addArrow(group, 0, -0.7, 0.15);
-    cells = addRingCells(group, (nHeads || 2) - 1, 0.52);
+    cells = addRingCells(group, nHeads, pixelBase, 0.52);
   } else if (type === 'par') {
     body = mkFill(new THREE.CircleGeometry(0.55, 24));
     group.add(body);

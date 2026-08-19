@@ -8,7 +8,7 @@ import { loadModel, fitModelToSize } from '../scene/model_loader.js';
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
-import { placeElement, panelGrid, rotatePoint, wabenPlatz } from './pixel_order.js';
+import { placeElement, panelGrid, rotatePoint, ringSegmente, wabenPlatz } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
@@ -209,20 +209,28 @@ export function buildMovingHead() {
 //   Linsenflaeche. Bis FM-14 landete so ein Geraet ueber die Bank-Zahl
 //   (>=2 color_r) im Spider-Zweig und stand als zwei kippende Leisten da.
 //
-// ★ Wieso `nBaenke - 1` Segmente: Bank 0 (die Kanaele OHNE #N) ist in diesem
-//   Projekt ueberall die GERAETEFARBE — `visual_rgb` baut daraus `payload.r/g/b`,
-//   und die faerben bereits Kegel, SpotLight, Bodenfleck und die Hauptlinse.
-//   Beim Spiider ist das die „Background"-Bank, die genau diese Rolle hat.
-//   Wuerde Segment 0 ebenfalls aus Bank 0 leuchten, zeigte das Bild dieselbe
-//   Information zweimal — derselbe Fehler, den VIZ-50b beim Weissband vermieden
-//   hat. Ein Geraet OHNE eigene Grundfarben-Bank verliert dadurch kein Pixel:
-//   sein erstes Pixel wird zur Geraetefarbe und erscheint an Linse und Kegel.
-export function buildPixelHead(nBaenke) {
+// ★ Wieso nicht jede Bank ein Segment wird: hat das Geraet eine eigene
+//   Grundfarben-Lage, dann ist deren Bank in diesem Projekt ueberall die
+//   GERAETEFARBE — `visual_rgb` baut daraus `payload.r/g/b`, und die faerben
+//   bereits Kegel, SpotLight, Bodenfleck und die Hauptlinse. Beim Spiider ist
+//   das die „Background"-Bank, die genau diese Rolle hat. Wuerde Segment 0
+//   ebenfalls daraus leuchten, zeigte das Bild dieselbe Information zweimal —
+//   derselbe Fehler, den VIZ-50b beim Weissband vermieden hat.
+//
+// ★ CDX-55: OB das Geraet so eine Lage hat, stand bis hierher nirgends — der
+//   Code rechnete fest `nBaenke - 1`. Jetzt sagt es `basisBaenke` (Payload
+//   `pixelBase`, abgeleitet in `app_state.pixel_ring_base_banks`). Ist es 0,
+//   sind alle Baenke physische Pixel und Pixel 0 bekommt sein eigenes Segment,
+//   statt nur noch als Geraetefarbe an Linse und Kegel zu erscheinen.
+export function buildPixelHead(nBaenke, basisBaenke) {
   // Gehaeuse EXAKT der normale Moving Head — derselbe Aufruf, nicht eine Kopie:
   // ein Pixel-Kopf ist mechanisch ein Moving Head, und zwei Fassungen desselben
   // Gehaeuses waeren zwei Fassungen, die auseinanderlaufen.
   const mh = buildMovingHead();
-  const n = Math.max(1, Math.min(64, Math.floor(nBaenke || 2) - 1));
+  // EINE Quelle mit dem 2D-Icon (`addRingCells`) — zwei Formeln fuer dieselbe
+  // Zahl waren genau der Weg, auf dem CDX-56 zwei Fassungen des 64er-Deckels
+  // bekommen hat.
+  const { basis, anzahl: n } = ringSegmente(nBaenke, basisBaenke);
 
   // Die Segmente liegen in der LINSENEBENE (Ausgang -Y), also in der lokalen
   // XZ-Ebene des Kopfes. `wabenPlatz` liefert die Zeichnung aus dem Manual —
@@ -255,7 +263,7 @@ export function buildPixelHead(nBaenke) {
     ringPixels.push({ mesh: seg, ring: p.ring });
   }
   return { group: mh.group, yoke: mh.yoke, head: mh.head, lens: mh.lens,
-           ringPixels, isPixelHead: true };
+           ringPixels, pixelBase: basis, isPixelHead: true };
 }
 
 export function buildPar() {
@@ -1348,13 +1356,17 @@ export function updatePixelHeadDmx(f, dmx) {
   if (!f.isPixelHead || !f.ringPixels) return;
   const { r, g, b, intNorm } = dmx;
   const hs = f.lastHeads || [];
+  // CDX-55: der Versatz kommt aus dem Profil (`pixelBase`) und wird nicht mehr
+  // unterstellt. 1 = das Geraet hat eine Grundfarben-Lage auf Bank 0 (sie
+  // faerbt Linse und Kegel, s. buildPixelHead) -> Segment i haengt an Kopf i+1.
+  // 0 = alle Baenke sind Pixel, dann IST Segment 0 das Pixel 0.
+  const basis = f.pixelBase || 0;
   for (let i = 0; i < f.ringPixels.length; i++) {
     const seg = f.ringPixels[i];
-    // Kopf 0 = Grundfarbe des Geraets (sie faerbt Linse und Kegel, s.
-    // buildPixelHead) -> Segment i haengt an Kopf i+1. Ohne Kopf-Daten bleibt
-    // das Segment DUNKEL statt auf die Geraetefarbe zurueckzufallen: ein Ring,
-    // der die Hauptfarbe spiegelt, behauptet Pixel-Werte, die es nicht gibt.
-    const h = hs[i + 1] || {};
+    // Ohne Kopf-Daten bleibt das Segment DUNKEL statt auf die Geraetefarbe
+    // zurueckzufallen: ein Ring, der die Hauptfarbe spiegelt, behauptet
+    // Pixel-Werte, die es nicht gibt.
+    const h = hs[i + basis] || {};
     const col = new THREE.Color((h.r || 0) / 255, (h.g || 0) / 255,
                                 (h.b || 0) / 255);
     if (seg.mesh && seg.mesh.material) {
@@ -1363,10 +1375,10 @@ export function updatePixelHeadDmx(f, dmx) {
       seg.mesh.material.emissiveIntensity = intNorm * 1.9;   // Master-Dimmer
     }
   }
-  // Top-Down-Icon: dieselbe Verschiebung. `slice(1)` statt eines zweiten
+  // Top-Down-Icon: dieselbe Verschiebung. `slice(basis)` statt eines zweiten
   // Parameters an `tintTopDownIcon` — die Zelle i des Icons IST das Segment i,
   // und die gemeinsame Faerbe-Funktion bleibt fuer alle Typen dieselbe.
-  tintTopDownIcon(f.icon, { r, g, b }, intNorm, hs.slice(1));
+  tintTopDownIcon(f.icon, { r, g, b }, intNorm, hs.slice(basis));
   syncIconPos(f);
 }
 
