@@ -1,9 +1,16 @@
 """QA-54 — kein Test schreibt in die echte Fixture-Bibliothek.
 
-★ **Warum das ueberhaupt passieren kann.** ``tests/conftest.py`` pinnt
-``LIGHTOS_FIXTURE_DB`` **absichtlich** auf die ECHTE
-``~/.local/share/LightOS/fixtures.db`` — die Tests sollen gegen die reale
-Library laufen. Die Show-DB ist prozess-isoliert, die Bibliothek nicht.
+★ **Warum das ueberhaupt passieren konnte.** ``tests/conftest.py`` pinnte
+``LIGHTOS_FIXTURE_DB`` **absichtlich** auf die ECHTE ``fixtures.db`` — die Tests
+sollen gegen die reale Library laufen. Die Show-DB war prozess-isoliert, die
+Bibliothek nicht.
+
+⚠️ **Seit QA-58 ist es eine KOPIE der realen Bibliothek** (pro Prozess, gleiche
+Profil-IDs). Der Waechter hier bleibt trotzdem sinnvoll und wird nicht schwaecher
+gebraucht: die Kopie ist eine Sperre gegen *versehentliche* Nebenwirkungen,
+kein Freibrief. Ein Test, der sich seine Profile in der GETEILTEN Library
+anlegt, faelscht weiterhin das Ergebnis jedes anderen Tests im selben Prozess —
+und wer die Kopie eines Tages wieder abschafft, haette sonst nichts mehr.
 
 **Der Schaden ist gemessen, nicht befuerchtet:** in der echten Library stand
 der Hersteller ``TEST-DualTilt`` aus ``test_spider_dual_tilt_marker.py``. Dessen
@@ -152,16 +159,32 @@ class FrischeLibraryZeigtNichtAufDieEchteTest(unittest.TestCase):
     was sie verspricht."""
 
     def test_die_engine_zeigt_auf_eine_temporaere_datei(self):
+        """⚠️ Gemessen wird gegen die ECHTE Bibliothek — **nicht** gegen
+        ``LIGHTOS_FIXTURE_DB``.
+
+        Seit QA-58 zeigt diese Variable auf die prozess-eigene Kopie. Wer sie
+        hier als „die echte" nimmt, prueft ab sofort etwas anderes als der
+        Docstring sagt (und die Kopie liegt im Temp-Ordner, dessen Name in
+        jedem Temp-Pfad steckt — die Bedingung waere fast von selbst erfuellt).
+        Beide Ziele sind verboten: die echte Bibliothek, weil sie Nutzerdaten
+        ist, und die Prozess-Kopie, weil ein Profil dort jeden anderen Test im
+        selben Prozess faelscht.
+        """
+        import conftest
         from _fixture_quelle import frische_library
         from src.core.database import fixture_db as FDB
 
-        echte = os.environ.get("LIGHTOS_FIXTURE_DB") or ""
+        echte = os.path.realpath(conftest._ECHTE_FIXTURE_DB)
+        kopie = os.path.realpath(os.environ.get("LIGHTOS_FIXTURE_DB") or "@@")
         frische_library(self)
-        url = str(FDB.engine().url)
-        self.assertNotIn(os.path.basename(os.path.dirname(echte)) or "@@", url,
-                         f"die Engine zeigt weiter auf die echte Library: {url}")
-        self.assertIn("lightos_fixtures_", url,
-                      f"erwartet eine Temp-Library, bekam: {url}")
+        benutzt = os.path.realpath(FDB.engine().url.database or "")
+        self.assertNotEqual(echte, benutzt,
+                            f"die Engine zeigt weiter auf die echte Library: {benutzt}")
+        self.assertNotEqual(kopie, benutzt,
+                            "die Engine zeigt auf die GETEILTE Prozess-Kopie: "
+                            f"{benutzt}")
+        self.assertIn("lightos_fixtures_", benutzt,
+                      f"erwartet eine Temp-Library, bekam: {benutzt}")
 
 
 if __name__ == "__main__":

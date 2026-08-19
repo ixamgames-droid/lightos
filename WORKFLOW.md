@@ -87,8 +87,13 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   `verify_loop.sh` ging ausdruecklich davon aus, dass es dort keine parallelen Sitzungen gibt.
   Seit dem 2026-08-06 arbeiten aber zwei Claude-Sitzungen auf demselben Linux-Rechner
   (s. [`COORDINATION.md`](COORDINATION.md)). `./tools/verify_loop.sh` **ohne Argumente** nimmt
-  deshalb jetzt eine `flock`-Sperre auf `.pytest_lock` im **aeusseren** Projektordner (von allen
-  Worktrees erreichbar) und wartet, statt loszulaufen. Gezielte Einzellaeufe
+  deshalb jetzt eine `flock`-Sperre auf `.pytest_lock` im **gemeinsamen Git-Verzeichnis**
+  (`git rev-parse --git-common-dir`, praktisch `repo/.git/.pytest_lock`) und wartet, statt
+  loszulaufen. ★ Bis PROC-02b (#625) lag sie im aeusseren Projektordner — das stimmte nur,
+  solange alle Worktrees GESCHWISTER von `repo/` sind. Agenten-Worktrees liegen verschachtelt
+  unter `repo/.claude/worktrees/` und bekamen so ihre eigene Datei; die Serialisierung griff
+  genau dort nicht, wo parallel gearbeitet wird. Wer eine haengende Sperre inspizieren oder
+  loesen will, sucht sie also am Git-Verzeichnis. Gezielte Einzellaeufe
   (`verify_loop.sh tests/test_x.py`) sind bewusst **nicht** gesperrt. Ohne `flock` (macOS) laeuft
   alles wie bisher, mit Hinweis — eine fehlende Sperre darf das Gate nicht blockieren.
 - **Eine ZWEITE, schmale Sperre nur fuer WebEngine (PROC-02c, 2026-08-19).** Von WebGL-Kontexten

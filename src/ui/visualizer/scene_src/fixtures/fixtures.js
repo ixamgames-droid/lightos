@@ -308,13 +308,18 @@ export function addFixture(data) {
   // ★ VIZ-50b: `nWhites` ist die Zahl der EIGENEN Weiss-Segmente (Robins
   // ZQ06121: acht, quer ueber die Panelmitte). 0 heisst „dieses Geraet hat
   // keine" — dann entsteht kein Band, und das Panel sieht aus wie bisher.
+  // ★ CDX-52: `whiteRows`/`whiteCols` ist die hinterlegte FORM dieser Leiste.
+  // Sie entscheidet auf der Python-Seite auch darueber, OB es eine gibt — die
+  // Zahl der Weiss-Kanaele tat das frueher und konnte es nie.
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
                                            pixelBar, pixelOrder: data.pixelOrder,
                                            elementRotation: data.elementRotation,
                                            elementFlip: data.elementFlip,
                                            gridRows: data.gridRows,
                                            gridCols: data.gridCols,
-                                           nWhites: data.nWhites });
+                                           nWhites: data.nWhites,
+                                           whiteRows: data.whiteRows,
+                                           whiteCols: data.whiteCols });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.

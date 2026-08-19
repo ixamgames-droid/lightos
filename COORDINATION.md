@@ -146,8 +146,9 @@ ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
 ## 4. Fallen der Parallelarbeit (gemessen, nicht vermutet)
 
 * **Test-Gate:** `./tools/verify_loop.sh` (ohne Argumente) serialisiert sich seit
-  PROC-02 ueber alle Sitzungen — `flock` auf `.pytest_lock` im **Projektordner**,
-  also ausserhalb des Repos, damit jeder Worktree dieselbe Sperre sieht. Zwei
+  PROC-02 ueber alle Sitzungen — `flock` auf `.pytest_lock` am **gemeinsamen
+  Git-Verzeichnis** (`repo/.git/.pytest_lock`), damit jeder Worktree dieselbe
+  Sperre sieht, auch ein verschachtelter (PROC-02b, #625). Zwei
   volle Suiten gleichzeitig zu starten ist erlaubt; die zweite wartet.
   Gezielte Einzellaeufe (`verify_loop.sh tests/test_x.py`) sind bewusst **nicht**
   gesperrt — kurz, billig, und sie zu serialisieren wuerde nur bremsen.

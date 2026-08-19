@@ -6,24 +6,34 @@ mittig zwischen Reihe 2 und 3 durch, ist halb so hoch wie eine RGB-Zone, und
 ihre acht Segmente decken die zwoelf Spalten ab — je anderthalb also. Im 3D gab
 es sie schlicht nicht; ``buildMatrixPanel`` kannte nur die Farbzonen.
 
-**Die Entscheidung, die dieses Item traegt: KEIN neues Bibliotheksfeld.**
-Woher weiss der Renderer, dass dieses Geraet acht Weiss-Segmente hat? Aus den
-KANAELEN des Modus — acht mit dem Attribut ``color_w`` neben 48 mit ``color_r``.
-Diese Angabe steht seit dem Anlegen des Geraets in der Bibliothek; die
-attr#N-Konvention macht daraus die Koepfe 0..7, und deren Werte reisen als
-``heads[j].cw`` laengst in jeder DMX-Nutzlast mit. Ein zusaetzliches Feld
-„Anzahl Weiss-Segmente" waere eine KOPIE dieser Zahl — und eine Kopie, die
-niemand gegenprueft, laeuft still daneben (FM16E). Gemessen wird deshalb nicht,
-ob ein Feld gesetzt ist, sondern ob die Ableitung stimmt: hier, an der
-Bibliothek und am echten DMX-Weg.
+**Die Entscheidung, die dieses Item traegt: die ZAHL der Segmente steht in
+keinem eigenen Feld.** Woher weiss der Renderer, dass dieses Geraet acht
+Weiss-Segmente hat? Aus den KANAELEN des Modus — acht mit dem Attribut
+``color_w`` neben 48 mit ``color_r``. Diese Angabe steht seit dem Anlegen des
+Geraets in der Bibliothek; die attr#N-Konvention macht daraus die Koepfe 0..7,
+und deren Werte reisen als ``heads[j].cw`` laengst in jeder DMX-Nutzlast mit.
+Ein zusaetzliches Feld „Anzahl Weiss-Segmente" waere eine KOPIE dieser Zahl —
+und eine Kopie, die niemand gegenprueft, laeuft still daneben (FM16E). Gemessen
+wird deshalb nicht, ob ein Feld gesetzt ist, sondern ob die Ableitung stimmt:
+hier, an der Bibliothek und am echten DMX-Weg.
+
+★ **Was CDX-52 daran korrigiert hat.** Aus derselben Zahl wurde damals auch
+geschlossen, OB das Geraet ueberhaupt eine eigene Leiste hat
+(``0 < weiss < zonen``) — und das trug sie nicht: eine Kanalzahl hat keine
+Ortsangabe. Diese eine Angabe hat seitdem ein Feld
+(``FixtureMode.white_rows/white_cols``, gemessen in
+``test_cdx52_weissband_geometrie.py``). Die Zahl der Segmente kommt weiterhin
+aus den Kanaelen — dieses Modul misst genau das.
 
 Was in dieser Datei geprueft wird, in der Reihenfolge des Datenwegs:
 
 1. **Die Quelle** — die Bibliothek traegt die acht ``color_w``-Kanaele wirklich,
    und zwar nur in dem Modus, der sie hat.
-2. **Die Regel** — ``0 < weiss < zonen`` heisst „eigenes Band"; gleich viele
-   heisst RGBW-Emitter (Weiss GEHOERT dann zum Pixel und ist in dessen Farbe
-   schon eingerechnet), keine heisst kein Band.
+2. **Die Regel** — die Zahl der Segmente ist die Zahl der ``color_w``-Kanaele,
+   und ohne solche Kanaele gibt es kein Band. (Dass ein Geraet ueberhaupt eine
+   eigene Leiste HAT, sagt seit CDX-52 die hinterlegte Form; RGBW-Emitter, deren
+   Weiss zum Pixel gehoert und ueber ``visual_rgb`` schon in dessen Farbe
+   steckt, bekommen darum keine.)
 3. **Der DMX-Weg** — Weiss-Segment j sitzt wirklich auf Kopf j: gemessen ueber
    ``_collect_attrs`` + ``_build_fixture_payload`` an einem echten Universum,
    nicht an einem von Hand gebauten attrs-Dict.
@@ -274,8 +284,12 @@ class BandRegelTest(_LibraryCase):
         steckt ueber ``visual_rgb`` schon in dessen Farbe; ein zusaetzliches
         Band waere dieselbe Information ein zweites Mal.
 
-        Ohne die Bedingung ``weiss < zonen`` wuerde genau dieses Geraet vier
-        Segmente melden."""
+        Sie kommt hier gar nicht erst in die Zaehlung: ein Geraet ohne
+        Bewegung wird als ``par_bar`` gerendert, und Weiss-Segmente zaehlt nur
+        das Panel-Modell. Seit CDX-52 haelt zusaetzlich die fehlende hinterlegte
+        Leiste den Fall auf — ein RGBW-Panel bleibt bandlos, auch wenn es eines
+        Tages als ``matrix`` gerendert wird (gemessen in
+        ``test_cdx52_weissband_geometrie.py``)."""
         pid, modi = self._ids("PARBAR4")
         name = "16-Kanal 4×RGBW"
         d = _dict_for(_patched(pid, name, modi[name], fid=4,

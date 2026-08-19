@@ -37,7 +37,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
-    panel_grid_for, viz_model_for,
+    panel_grid_for, viz_model_for, white_grid_for,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1910,43 +1910,52 @@ class VisualizerBridge(QObject):
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
                                for c in get_channels_for_patched(f)]
                 n_heads = kanal_attrs.count("color_r")
-                # ★ Das Weiss-BAND ist eine Aussage ueber PANELS (VIZ-50b:
-                # weniger Weiss-Kanaele als Farbzonen = eigene Leiste quer
-                # ueber die Mitte). Nur `buildMatrixPanel` liest `nWhites`;
-                # fuer alle anderen Modelle fiel der Wert unten ohnehin auf 0
-                # (nachgemessen an der ganzen Bibliothek: par_bar/spider/
-                # mover_bar haben entweder 0 Weiss-Kanaele oder genau so viele
-                # wie Baenke). Der Pixel-Kopf waere der erste, bei dem das
-                # NICHT gilt — er haette mit seiner einen Grundfarben-Weiss-
-                # Bank auf 20 Baenken ploetzlich ein „Band" gemeldet.
+                # ★ Die ZAHL der eigenen Weiss-Segmente faellt in derselben
+                # Zaehlung ab (VIZ-50b) — sie steht seit dem Anlegen des
+                # Geraets in den Kanaelen. Nur `buildMatrixPanel` liest
+                # `nWhites`; fuer alle anderen Modelle bleibt der Wert 0.
                 if model == "matrix":
                     n_whites = kanal_attrs.count("color_w")
             except Exception:
                 n_heads = 0
                 n_whites = 0
-        # ★ Die Regel, wann ein Geraet ein eigenes Weiss-BAND hat, steht hier —
-        # an der Stelle, die die Kanaele wirklich kennt, und nur einmal.
-        # WENIGER Weiss-Kanaele als Farbzonen heisst: die Weiss-LEDs sitzen
-        # NICHT in den Zonen, sondern bilden eine eigene Leiste (ZQ06121: 8 auf
-        # 48). GLEICH VIELE heisst RGBW-Emitter — dort gehoert das Weiss zum
-        # Pixel und ist ueber `visual_rgb` laengst in dessen Farbe eingerechnet;
-        # ein Band waere dieselbe Information ein zweites Mal. Gemessen an der
-        # Bibliothek trifft die Bedingung heute genau einen Modus (ZQ06121
-        # 154-Kanal); PARBAR4 (4x RGBW), SPIDER14 und HYDRA4000 fallen mit
-        # w == n_heads heraus, jedes Panel ohne Weiss-Kanaele mit w == 0.
-        n_whites = n_whites if 0 < n_whites < n_heads else 0
         # ★ VIZ-50a: die PHYSISCHE Rasterform des Panels (Zeilen x Spalten) aus
         # dem Fixture-Modus. Bis hierher bekam `buildMatrixPanel` nur die
         # Pixel-ZAHL und musste die Form near-square RATEN — Robins 12x4-Balken
         # stand im 3D als 7x7-Quadrat da. 0/0 = nichts hinterlegt: dann raet der
         # Renderer weiter wie bisher, es gibt also keinen stillen Umbau fuer
         # Geraete ohne Angabe.
+        #
+        # ★★ CDX-52: daneben die Rasterform der eigenen WEISS-Segmente. Beide
+        # kommen aus demselben Modus und werden deshalb hier zusammen geholt.
         grid_rows, grid_cols = (0, 0)
+        white_rows, white_cols = (0, 0)
         if model == "matrix":
             try:
                 grid_rows, grid_cols = panel_grid_for(f)
+                white_rows, white_cols = white_grid_for(f)
             except Exception:
                 grid_rows, grid_cols = (0, 0)
+                white_rows, white_cols = (0, 0)
+        # ★★★ Die Regel, wann ein Geraet ein eigenes Weiss-BAND hat, steht hier —
+        # an der Stelle, die Kanaele UND Geometrie kennt, und nur einmal.
+        #
+        # Sie fragt die GEOMETRIE, nicht das Zahlenverhaeltnis. Bis CDX-52 stand
+        # hier `0 < n_whites < n_heads`: weniger Weiss-Kanaele als Farbzonen
+        # galt als „eigene Leiste". Das war ein Schluss von einer KANALZAHL auf
+        # einen ORT — und eine Kanalzahl traegt keinen. Der Fixture-Editor
+        # erlaubt beliebige Profile; ein selbstgebautes Panel mit 48 RGB-Pixeln
+        # und EINEM globalen Weiss-Kanal erfuellte `0 < 1 < 48` und bekam ein
+        # volles Band quer ueber die Mitte, gefahren von `heads[0].cw`.
+        #
+        # Jetzt gilt: ein Band gibt es, wenn der Modus eines HINTERLEGT hat
+        # (`FixtureMode.white_rows`/`white_cols`). Die ZAHL der Segmente kommt
+        # weiter aus den Kanaelen — hinterlegt ist nur, was die Kanaele nicht
+        # sagen koennen. Kein Geraet ohne diese Angabe bekommt eine Leiste, auch
+        # kein RGBW-Panel mit w == n_heads (dessen Weiss gehoert zum Pixel und
+        # ist ueber `visual_rgb` laengst in dessen Farbe eingerechnet).
+        if not (white_rows or white_cols):
+            n_whites = 0
         return {
             "fid": f.fid,
             "label": f.label,
@@ -1971,6 +1980,10 @@ class VisualizerBridge(QObject):
             "gridCols": grid_cols,
             # VIZ-50b: Zahl der eigenen Weiss-Segmente (0 = kein Band).
             "nWhites": n_whites,
+            # CDX-52: hinterlegte Form der Weiss-Leiste (0 = nichts hinterlegt;
+            # dann steht `nWhites` schon auf 0 und es gibt kein Band).
+            "whiteRows": white_rows,
+            "whiteCols": white_cols,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],
