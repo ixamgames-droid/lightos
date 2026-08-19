@@ -390,7 +390,7 @@ class SelectionCommand(Command):
             # Ohne Kopf-Ziele bleibt die Meldung wortgleich zum Bestand.
             # FM-14b: die Modelle kommen aus DEM state, den dieser Befehl
             # bekommen hat — nicht aus dem globalen Zustand daneben.
-            liste = (_short_cells(zellen, modelle=_head_modelle(state))
+            liste = (_short_cells(zellen, _head_beschriftung(state))
                      if self.selection.cells else _short_list(fids))
             return CommandResult(True, f"Selektiert: {len(fids)} ({liste})")
         except Exception as e:
@@ -629,43 +629,49 @@ ATTR_MAP = {
 
 # ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-def _head_modelle(state) -> dict:
-    """``fid -> Render-Modell`` aus DEM uebergebenen State (FM-14b).
+def _head_beschriftung(state):
+    """Kopf-Beschriftung ``(fid, head, kurz=…)`` aus DEM uebergebenen State
+    (FM-14b).
 
     Die Command-Line arbeitet grundsaetzlich auf dem ``state``, den sie bekommen
     hat (Test-Fakes, zweite Instanz); ein Griff nach ``get_state()`` waere hier
-    eine zweite Quelle. Ein State ohne ``get_patched_fixtures`` faellt still auf
-    „kein Modell bekannt" zurueck — dann bleibt es bei ``K{head + 1}``."""
-    try:
-        from src.core.app_state import head_models_by_fid
-        return head_models_by_fid(state.get_patched_fixtures())
-    except Exception:
-        return {}
+    eine zweite Quelle — die Geraete kommen deshalb ausdruecklich aus DIESEM
+    State.
+
+    **Kein Rueckfall auf „kein Geraet bekannt".** Gerufen wird erst, nachdem
+    ``state.get_patched_fixtures()`` fuer die fid-Aufloesung schon geliefert hat
+    — ein Fehler ist hier also kein Normalfall, sondern ein kaputter State, und
+    der Aufrufer macht ihn als Fehlermeldung sichtbar. Ein stiller Rueckfall
+    waere eine zweite Beschriftungsregel an der Stelle, an der FM-14b gerade die
+    zweite Regel entfernt.
+    """
+    from src.core.app_state import head_labeller
+    return head_labeller(state.get_patched_fixtures())
 
 
-def _short_cells(cells: list[str], limit: int = 8, modelle: dict | None = None) -> str:
+def _short_cells(cells: list[str], beschriften, limit: int = 8) -> str:
     """Zellen fuer die Statuszeile — ``"2:1"`` wird zu ``"2·K2"``, weil jede
     Oberflaeche den Kopf 1-basiert beschriftet. Wer hier den rohen Zellwert
     zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als er getippt hat.
 
-    FM-14b: WIE der Kopf heisst, sagt ``app_state.head_label_short`` — dieselbe
-    EINE Quelle wie Programmer, Gruppen-Raster und EFX-Liste. ``modelle`` ist
-    ``fid -> Render-Modell``; ohne Angabe bleibt es bei ``K{head + 1}``. Am
-    Pixel-Kopf meldet die Statuszeile damit ``1·P3`` statt ``1·K4`` — und heisst
-    das Segment so, wie die Geraeteliste daneben es nennt.
-    """
-    from src.core.app_state import head_label_short
-    mods = modelle or {}
+    FM-14b: WIE der Kopf heisst, sagt ``beschriften`` — die EINE Quelle
+    (``app_state.head_labeller``), aus der auch Programmer, Gruppen-Raster und
+    EFX-Liste ihre Namen holen. Am Pixel-Kopf meldet die Statuszeile damit
+    ``1·P3`` statt ``1·K4`` — und heisst das Segment so, wie die Geraeteliste
+    daneben es nennt.
 
+    ★ Und **nur** dort, wo es das Segment gibt: die getippte Nummer wird hier
+    nicht geprueft, ``1:21`` erreicht diese Zeile also auch an einem Geraet mit
+    20 Baenken. ``P20`` waere der Name eines Segments, das der Spiider nicht hat
+    — und stuende zwei Zeilen neben der Fehlermeldung, die dieselbe Eingabe
+    ausdruecklich als ``K21`` (= die getippte Nummer) zurueckgibt. Die Kopfzahl
+    steckt deshalb in ``head_labeller``.
+    """
     def _label(z: str) -> str:
         fid, _sep, head = z.partition(":")
         if not head:
             return fid
-        try:
-            model = mods.get(int(fid), "")
-        except (TypeError, ValueError):
-            model = ""
-        return f"{fid}·{head_label_short(model, int(head))}"
+        return f"{fid}·{beschriften(int(fid), int(head), kurz=True)}"
     if len(cells) <= limit:
         return ",".join(_label(z) for z in cells)
     head = ",".join(_label(z) for z in cells[:limit])

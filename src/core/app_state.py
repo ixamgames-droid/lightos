@@ -4629,7 +4629,29 @@ def is_pixel_head_fixture(fixture) -> bool:
         return False
 
 
-def head_label_for_model(model: str, head: int) -> str:
+def _segment_vorhanden(head: int, n_segmente) -> bool:
+    """Gibt es das ``head``-te Segment an diesem Geraet ueberhaupt?
+
+    ★ FM-14b (vierte Runde). Ein Segmentname darf nur fuer ein Segment stehen,
+    das es GIBT. Am Spiider gibt es 20 Baenke, also die Koepfe 0..19
+    („Grundfarbe" + „Pixel 1..19") — ``head=20`` als „Pixel 20" zu benennen
+    erfindet ein Segment. Die index-basierte Bestandsbeschriftung tut das nie:
+    ``K21`` benennt kein Segment, sondern gibt die 1-basierte Nummer zurueck,
+    die der Nutzer getippt hat (dieselbe Ueberlegung, mit der die Fehlermeldung
+    der Command-Line ihre zu gross getippte Nummer als ``K21`` stehen laesst).
+
+    ``None`` = die Flaeche zaehlt ihre Koepfe selbst ab (Programmer-Liste,
+    Gruppen-Raster) und kann deshalb keinen erfinden -> unveraendert ja.
+    """
+    if n_segmente is None:
+        return True
+    try:
+        return 0 <= int(head) < int(n_segmente)
+    except (TypeError, ValueError):
+        return True
+
+
+def head_label_for_model(model: str, head: int, n_segmente=None) -> str:
     """Wie heisst Kopf ``head`` (0-basiert) in der Bedienung?
 
     Normalfall ``"Kopf 3"`` (1-basiert, Bestandsbeschriftung). Beim PIXEL-KOPF
@@ -4641,25 +4663,33 @@ def head_label_for_model(model: str, head: int) -> str:
     Nimmt das Modell (nicht das Fixture), damit Flaechen ohne Fixture-Objekt in
     der Hand — die Matrix-Vorschau haelt nur fids — dieselbe Beschriftung
     benutzen koennen statt eine zweite zu erfinden.
+
+    ``n_segmente`` = wie viele Koepfe das Geraet WIRKLICH hat, falls die Flaeche
+    das weiss (s. :func:`_segment_vorhanden`). Ein Kopf ausserhalb bekommt die
+    index-basierte Bestandsbeschriftung, damit hier kein Segment entsteht, das
+    es am Geraet nicht gibt.
     """
     try:
         h = int(head)
     except (TypeError, ValueError):
         return "Kopf ?"
-    if (model or "") == _PIXEL_HEAD_MODEL:
+    if (model or "") == _PIXEL_HEAD_MODEL and _segment_vorhanden(h, n_segmente):
         return "Grundfarbe" if h <= 0 else f"Pixel {h}"
     return f"Kopf {h + 1}"
 
 
-def head_label_short(model: str, head: int) -> str:
+def head_label_short(model: str, head: int, n_segmente=None) -> str:
     """Kurzform derselben Beschriftung fuer ENGE Flaechen (Rasterzellen).
 
     ``"Kopf 4"`` -> ``"K4"``, ``"Pixel 3"`` -> ``"P3"``, ``"Grundfarbe"`` ->
     ``"GR"``. **Abgeleitet, nicht zweitgeschrieben** — schriebe man die Regel
     hier ein zweites Mal, koennten enge und weite Flaechen denselben Kopf
     verschieden nennen, und genau das ist der Fehler, den FM-14b behebt.
+
+    ``n_segmente`` wird unveraendert durchgereicht: die Kurzform darf nicht
+    nennen, was die Vollform nicht nennt.
     """
-    voll = head_label_for_model(model, head)
+    voll = head_label_for_model(model, head, n_segmente)
     wort, _, rest = voll.partition(" ")
     rest = rest.strip()
     if rest.isdigit():
@@ -4800,14 +4830,25 @@ def head_channel_name(fixtures, attribute: str, head) -> str | None:
     return namen.pop() if len(namen) == 1 else None
 
 
-def head_models_by_fid(fixtures=None) -> dict:
-    """``fid -> Render-Modell`` fuer alle gepatchten Geraete — EINE Abfrage.
+def head_labeller(fixtures=None):
+    """``(fid, head, kurz=False) -> Beschriftung`` fuer Flaechen, die nur **fids**
+    in der Hand halten (EFX-Zielliste, Fan-Werkzeug, Command-Line-Statuszeile).
 
-    Fuer die Flaechen, die nur **fids** in der Hand halten (EFX-Zielliste,
-    Fan-Werkzeug, Command-Line-Statuszeile). Ohne sie muessten sie die
-    Kopf-Beschriftung selbst erfinden — und genau daran ist FM-14b in der ersten
-    Fassung gescheitert: dasselbe Pixel hiess im Programmer „Pixel 3" und drei
-    Flaechen weiter „K4".
+    Ohne sie muessten diese Flaechen die Kopf-Beschriftung selbst erfinden — und
+    genau daran ist FM-14b in der ersten Fassung gescheitert: dasselbe Pixel
+    hiess im Programmer „Pixel 3" und drei Flaechen weiter „K4".
+
+    ★ Die Karte traegt **Modell UND Kopfzahl**. Der Grund ist die vierte Runde:
+    diese drei Flaechen bekommen ihren Kopf-Index von aussen (getippt, aus einer
+    Show-Datei, aus einer Auswahl, die aelter ist als der heutige Modus) — sie
+    zaehlen ihn nicht selbst ab wie die Programmer-Liste. Mit dem Modell allein
+    wurde ``1:21`` am Spiider zu ``1·P20``, also zum Namen eines Segments, das
+    es nicht gibt. Die Kopfzahl kommt aus den **Farb-Baenken**: am Pixel-Kopf
+    SIND die Baenke die Segmente (``viz_model_for`` verlangt dafuer genau ein
+    Pan und ein Tilt), und die Beschriftung zaehlt genau sie ab.
+
+    Ein unbekanntes fid bleibt bei der index-basierten Bestandsbeschriftung —
+    dasselbe Verhalten wie bisher, wenn kein Modell zu finden war.
 
     ``fixtures`` uebergeben, wenn der Aufrufer die Liste schon hat (die
     Command-Line bekommt ihren ``state`` als Argument und darf nicht am globalen
@@ -4817,14 +4858,23 @@ def head_models_by_fid(fixtures=None) -> dict:
         try:
             fixtures = get_state().get_patched_fixtures()
         except Exception:
-            return {}
-    out: dict = {}
+            fixtures = []
+    karte: dict = {}
     for f in fixtures or []:
         try:
-            out[int(f.fid)] = viz_model_for(f) or ""
+            karte[int(f.fid)] = (viz_model_for(f) or "", int(color_head_count(f)))
         except Exception:
             continue
-    return out
+
+    def beschriftung(fid, head, *, kurz: bool = False) -> str:
+        try:
+            modell, n = karte[int(fid)]
+        except (KeyError, TypeError, ValueError):
+            modell, n = "", None
+        return (head_label_short(modell, head, n) if kurz
+                else head_label_for_model(modell, head, n))
+
+    return beschriftung
 
 
 def head_matrix_layout(fixture, n_heads: int) -> tuple:

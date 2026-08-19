@@ -66,7 +66,7 @@ from sqlalchemy.orm import Session, selectinload                 # noqa: E402
 from _fixture_quelle import frische_library                      # noqa: E402
 from src.core.app_state import (                                 # noqa: E402
     head_label_for_model, head_label_gemeinsam, head_label_short,
-    head_models_by_fid)
+    head_labeller)
 from src.core.database.models import (                           # noqa: E402
     FixtureProfile, PatchedFixture)
 
@@ -672,30 +672,51 @@ class GemischterReglerTest(_RigFall):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# 6. Die Nutzlast — kommt das Modell an den fid-Flaechen wirklich an?
+# 6. Die Nutzlast — kommt das Geraet an den fid-Flaechen wirklich an?
 # ════════════════════════════════════════════════════════════════════════════
 
 class NutzlastTest(_RigFall):
     """★★ Die VIZ-51-Lehre: „Feld vorhanden, Funktion richtig, Nutzlast leer".
     EFX-Liste, Fan-Werkzeug und Command-Line halten nur fids — sie MUESSEN das
-    Render-Modell von aussen bekommen."""
+    Geraet (Render-Modell UND Kopfzahl) von aussen bekommen."""
 
-    def test_die_modellkarte_kennt_beide_geraete(self):
-        m = head_models_by_fid()
-        self.assertEqual(m.get(1), _PIXEL_MODELL)
+    def test_die_kopfkarte_kennt_beide_geraete(self):
+        beschriften = head_labeller()
+        self.assertEqual(beschriften(1, 3, kurz=True),
+                         head_label_short(_PIXEL_MODELL, 3))
         # MOVBAR4 hat ein Modell — nur eben nicht das des Pixel-Kopfes. Genau
         # das entscheidet die Beschriftung; „irgendein Modell" reicht nicht.
-        self.assertTrue(m.get(2))
-        self.assertNotEqual(m.get(2), _PIXEL_MODELL)
-        self.assertEqual(head_label_short(m[2], 3), head_label_short("", 3))
+        self.assertEqual(beschriften(2, 3, kurz=True), head_label_short("", 3))
+        self.assertEqual(beschriften(1, 3), head_label_for_model(_PIXEL_MODELL, 3))
 
-    def test_ohne_modellkarte_bleibt_es_bei_der_indexbeschriftung(self):
-        """POSITIVKONTROLLE: ein Aufrufer ohne Modell-Angabe (Alt-Pfad, Test-Fake)
-        bekommt weiter die Bestandsbeschriftung — die Aenderung ist additiv."""
+    def test_die_kopfkarte_traegt_auch_die_KOPFZAHL(self):
+        """★★ Die zweite Haelfte der Nutzlast, und die, die in der dritten Runde
+        fehlte: mit dem Modell allein hiess Kopf 20 am Spiider „P20" — ein
+        Segment, das es nicht gibt. Gemessen an der Grenze (letzter vorhandener
+        Kopf vs. erster nicht vorhandener), nicht irgendwo weit draussen."""
+        from src.core.app_state import color_head_count
+        n = int(color_head_count(self.spiider))
+        self.assertEqual(n, 20, "der Spiider hat nicht mehr 20 Farb-Baenke")
+        beschriften = head_labeller()
+        self.assertEqual(beschriften(1, n - 1, kurz=True),
+                         head_label_short(_PIXEL_MODELL, n - 1))
+        self.assertEqual(beschriften(1, n, kurz=True), head_label_short("", n))
+        self.assertEqual(beschriften(1, n), head_label_for_model("", n))
+
+    def test_ohne_kopfkarte_bleibt_es_bei_der_indexbeschriftung(self):
+        """POSITIVKONTROLLE: ein Aufrufer ohne Geraete-Angabe (Alt-Pfad,
+        Test-Fake) bekommt weiter die Bestandsbeschriftung — die Aenderung ist
+        additiv."""
         from src.ui.views.efx_view import EfxView
         from src.core.engine.efx import EfxFixture
         self.assertEqual(EfxView._target_label(EfxFixture(fid=1, head=3)),
                          f"Fixture #1 · {head_label_short('', 3)}")
+
+    def test_ein_unbekanntes_fid_erfindet_keinen_kopfnamen(self):
+        """POSITIVKONTROLLE der Karte selbst: ein fid, das sie nicht kennt,
+        faellt auf die Bestandsbeschriftung zurueck (wie bisher ohne Modell)."""
+        beschriften = head_labeller()
+        self.assertEqual(beschriften(999, 3, kurz=True), head_label_short("", 3))
 
     def _efx_zeilen(self, view) -> list:
         return [view._fx_list.item(i).text()
@@ -756,19 +777,43 @@ class NutzlastTest(_RigFall):
         w.set_cells(["1:3"])
         self.assertEqual(w._table.item(0, 1).text(),
                          f"G1 · {head_label_short(_PIXEL_MODELL, 3)}")
-        orig = fan_tool.head_label_short
-        fan_tool.head_label_short = None
-        self.addCleanup(lambda: setattr(fan_tool, "head_label_short", orig))
+        orig = fan_tool.head_labeller
+        fan_tool.head_labeller = None
+        self.addCleanup(lambda: setattr(fan_tool, "head_labeller", orig))
         w.set_cells(["1:3"])
         self.assertEqual(w._table.item(0, 1).text(), "G1")
 
     def test_die_command_line_nimmt_den_state_den_sie_bekommt(self):
-        """Die Command-Line darf nicht am uebergebenen State vorbei nach dem
-        globalen greifen: ein State ohne Geraete kennt kein Modell."""
-        from src.core.cmdline.parser import _head_modelle
+        """★ Die Command-Line darf nicht am uebergebenen State vorbei nach dem
+        globalen greifen.
+
+        Gemessen mit einem State, der ANDERE Geraete kennt — ein State ohne
+        Geraete reicht dafuer NICHT: der globale Zustand liegt daneben und
+        antwortet dann an seiner Stelle, ohne dass es auffaellt."""
+        from src.core.cmdline.parser import _head_beschriftung
         import types
-        self.assertEqual(_head_modelle(types.SimpleNamespace()), {})
-        self.assertEqual(_head_modelle(self.state).get(1), _PIXEL_MODELL)
+        fremd = types.SimpleNamespace(
+            get_patched_fixtures=lambda: [self.movbar])
+        self.assertEqual(_head_beschriftung(fremd)(1, 3, kurz=True),
+                         head_label_short("", 3),
+                         "fid 1 ist in DIESEM State nicht gepatcht — die "
+                         "Beschriftung kam aus dem globalen Zustand")
+        self.assertEqual(_head_beschriftung(self.state)(1, 3, kurz=True),
+                         head_label_short(_PIXEL_MODELL, 3))
+        # Dasselbe eine Ebene tiefer: die Karte nimmt die uebergebene Liste.
+        self.assertEqual(head_labeller([self.movbar])(1, 3, kurz=True),
+                         head_label_short("", 3))
+
+    def test_ein_state_ohne_geraete_meldet_den_fehler_statt_zu_raten(self):
+        """★ Die Gegenprobe zum entfernten Rueckfall: ein State, der gar keine
+        Geraete liefern kann, kommt an der Statuszeile nie an — die Selektion
+        scheitert schon eine Zeile vorher an derselben Abfrage. Ein „stiller
+        Rueckfall auf K{N+1}" waere also toter Code gewesen."""
+        from src.core.cmdline.parser import parse
+        import types
+        res = parse("1:4").execute(types.SimpleNamespace())
+        self.assertFalse(res.ok)
+        self.assertTrue(res.message.startswith("Selektion Fehler:"), res.message)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -826,6 +871,29 @@ class KanalnameStattSegmentnameTest(_RigFall):
                         int(fx.address) + int(kanal.channel_number) - 1))
         return out
 
+    def test_baenke_und_rohkanaele_sind_ZWEI_zahlen(self):
+        """★★ Die Praemisse von ``attr_head_is_segment``, als Messung statt als
+        Behauptung: am Spiider im Pixelmodus stehen **20 Farb-Baenke** neben
+        **21 Rohkanaelen**. Genau weil die beiden Zahlen verschieden sind, kann
+        ``raw#3`` nicht Pixel 3 sein.
+
+        Die Zahlen stehen hier als Erwartung, weil sie in Commit-Text, Backlog
+        und Anleitung als Begruendung auftauchen — dort sind sie Prosa, hier
+        sind sie nachgezaehlt (die 21 Rohkanaele tragen ausserdem 21
+        VERSCHIEDENE Namen: „Grundfarbe Virt. Farbrad" … „Master Dimmer Fein")."""
+        from src.core.app_state import color_head_count
+        chans = self._channels(self.spiider)
+        roh = [c for c in chans if (c.attribute or "") == "raw"]
+        baenke = [c for c in chans if (c.attribute or "") == "color_r"]
+        # Die 20 aus der KANAL-Liste, nicht aus der Funktion, die auch zaehlt.
+        self.assertEqual(len(baenke), 20)
+        self.assertEqual(int(color_head_count(self.spiider)), len(baenke))
+        self.assertEqual(len(roh), 21)
+        self.assertEqual(len({(c.name or "").strip() for c in roh}), 21)
+        self.assertNotEqual(len(roh), int(color_head_count(self.spiider)),
+                            "Baenke und Rohkanaele sind gleich viele — dann "
+                            "misst dieser Test die Verwechslung nicht mehr")
+
     def test_der_griff_der_frueher_danebenging(self):
         """★★ Genau der gemeldete Fall, mit Kanalnummer aus dem CHART (Spiider
         Mode 7: Kanal 9 = „Grundfarbe Rot Fein", Kanal 13 = „Grundfarbe Blau
@@ -860,10 +928,15 @@ class KanalnameStattSegmentnameTest(_RigFall):
                         name, rf"(?<![\w]){re.escape(p)}(?![\w])",
                         f"Regler {name!r} (Kopf {head}) nennt {p!r}")
 
-    def test_ohne_aufloesbaren_kanal_bleibt_die_bestandsform(self):
-        """POSITIVKONTROLLE der Rueckfallkante: laesst sich der Kanal nicht
-        eindeutig aufloesen (hier: gar kein Geraet in der Hand), beschriftet der
-        Regler weiter wie bisher — die Aenderung ist additiv, nicht ersetzend."""
+    def test_ohne_geraet_bleibt_die_bestandsform(self):
+        """POSITIVKONTROLLE: ein Regler ganz OHNE Geraet in der Hand (Alt-Pfad,
+        Test-Fake) beschriftet weiter wie bisher — die Aenderung ist additiv.
+
+        ★ Was dieser Test NICHT misst — und in der dritten Runde faelschlich zu
+        messen behauptete: die Rueckfallkante des Pixel-Kopfes. Ohne Geraet gibt
+        es gar kein gemeinsames Modell, also entsteht hier auch ohne jede
+        Aenderung nie ein Pixelname; die Kante wird nicht einmal betreten. Sie
+        steht in ``RueckfallkanteTest`` — an einem echten Pixel-Kopf."""
         from src.core.app_state import head_channel_name
         from src.ui.views.programmer_view import ProgrammerView
         roh = next(c for c in self._channels(self.spiider)
@@ -1002,6 +1075,206 @@ class KontextfreieBeschriftungTest(_RigFall):
         self.assertIn("K21", res.message)
         self.assertNotIn("K21", {head_label_short(_PIXEL_MODELL, n)
                                  for n in range(0, 30)})
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 9. ★★ Die Rueckfallkante — an einem ECHTEN Pixel-Kopf
+# ════════════════════════════════════════════════════════════════════════════
+
+class RueckfallkanteTest(_RigFall):
+    """★★ Vierte Runde, Ruege 2: ``_head_slider_name`` stellte am Pixel-Kopf
+    still die Bestandsform MIT Pixelnamen wieder her, sobald ``head_channel_name``
+    keinen Namen fand — also genau die Form, gegen die die dritte Runde antrat.
+
+    Betreten wird die Kante, wenn EIN Regler mehrere Pixel-Koepfe traegt, deren
+    Kanal an diesem Kopf verschieden heisst. Gemessen am echten Programmer mit
+    Spiider + einem zweiten Pixel-Kopf (``viz_model='pixel_head'`` aus dem
+    Fixture-Generator — dasselbe zentrale Routing, das FM-14b ueberall benutzt);
+    VOR der Nachbesserung stand dort wortwoertlich ``Grundfarbe Shutter · P1``,
+    und dieser Regler schrieb ``raw#1`` = DMX 9 = ``Grundfarbe Rot Fein``.
+
+    Unbekannt ist an dieser Kante der KANAL, nicht der Kopf-Index — „das ist
+    Pixel 1" wird davon kein Stueck richtiger."""
+
+    _ZWEITER = ("DOTZTPAR", "18-Kanal 4x RGB Voll", 18)
+
+    def _zweiter_pixelkopf(self, fid=6):
+        """Ein ZWEITES Geraet, das dasselbe Render-Modell traegt — ueber den
+        ausdruecklichen Profil-Override, den der Fixture-Generator schreibt."""
+        from src.core.app_state import clear_channel_cache
+        short, mode, chans = self._ZWEITER
+        with Session(self._eng) as s:
+            p = s.execute(select(FixtureProfile).where(
+                FixtureProfile.short_name == short)).scalars().one()
+            p.viz_model = _PIXEL_MODELL
+            s.commit()
+        clear_channel_cache()
+        return self._patch(short, mode, chans, fid=fid, adresse=600)
+
+    def _gemeinsame_regler(self, fids: set, head: int) -> list:
+        """Beschriftungen der Regler, die WIRKLICH ueber alle genannten Geraete
+        laufen — echter Programmer-Aufbau, echte Kopf-Auswahl."""
+        from src.ui.views.programmer_view import ProgrammerView, AttributeSlider
+        from PySide6.QtCore import QEvent
+        view = ProgrammerView()
+        self.addCleanup(view.deleteLater)
+        lst = view._fixture_list
+        ziele = {f"{fid}:{head}" for fid in fids}
+        for i in range(lst.count()):
+            it = lst.item(i)
+            it.setSelected(it.data(Qt.ItemDataRole.UserRole) in ziele)
+        view._on_fixture_selected()
+        _app().sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        return sorted({w._display_name
+                       for w in view.findChildren(AttributeSlider)
+                       if w._display_name and w._head == head
+                       and {getattr(f, "fid", None) for f in w._fixtures} == fids})
+
+    def test_die_kante_wird_wirklich_betreten(self):
+        """★ Erst die Messung, dass der Aufbau die Kante ueberhaupt erreicht —
+        sonst prueft der Test darunter eine Lage, die es nicht gibt (genau der
+        Fehler der dritten Runde: gemessen wurde mit ``owners=[]``, wo gar kein
+        Modell existiert und deshalb nie ein Pixelname entstehen kann)."""
+        from src.core.app_state import (attr_head_is_segment, gemeinsames_modell,
+                                        head_channel_name)
+        zweiter = self._zweiter_pixelkopf()
+        paar = [self.spiider, zweiter]
+        self.assertEqual(gemeinsames_modell(paar), _PIXEL_MODELL,
+                         "die beiden Geraete sind gar kein gemeinsamer Pixel-Kopf")
+        self.assertFalse(attr_head_is_segment(_PIXEL_MODELL, "raw"))
+        self.assertIsNone(head_channel_name(paar, "raw", 1),
+                          "der Kanal ist aufloesbar — die Kante wird nicht "
+                          "betreten, der Test misst nichts")
+        # Und die Vorbedingung dahinter, wortwoertlich: BEIDE haben an Kopf 1
+        # einen raw-Kanal, sie heissen nur verschieden.
+        from src.core.app_state import channels_for_head, get_channels_for_patched
+        namen = [channels_for_head(get_channels_for_patched(f), 1).get("raw").name
+                 for f in paar]
+        self.assertEqual(len(set(namen)), 2, namen)
+
+    def test_der_gemeinsame_regler_nennt_kein_pixel(self):
+        """★★ Die Abnahme: kein Regler ueber beide Pixel-Koepfe traegt einen
+        Pixelnamen; er traegt die index-basierte Bestandsbeschriftung."""
+        zweiter = self._zweiter_pixelkopf()
+        pixelnamen = {head_label_for_model(_PIXEL_MODELL, n) for n in range(1, 20)} | {
+                      head_label_short(_PIXEL_MODELL, n) for n in range(1, 20)}
+        for head in (1, 2):
+            with self.subTest(head=head):
+                namen = self._gemeinsame_regler({1, zweiter.fid}, head)
+                self.assertTrue(namen, f"kein Regler ueber BEIDE Geraete "
+                                       f"(Kopf {head}) — nichts gemessen")
+                for name in namen:
+                    self.assertTrue(
+                        name.endswith(f" · {head_label_short('', head)}"),
+                        f"{name!r} traegt nicht die Bestandsbeschriftung")
+                    for p in pixelnamen:
+                        self.assertNotRegex(
+                            name, rf"(?<![\w]){re.escape(p)}(?![\w])",
+                            f"Regler {name!r} (Kopf {head}) nennt {p!r}")
+
+    def test_der_nuetzliche_fall_bleibt(self):
+        """POSITIVKONTROLLE: die Kante darf das Nuetzliche nicht mitnehmen —
+        steht nur EIN Pixel-Kopf unter dem Regler, loest sich der Kanal auf und
+        der Regler heisst weiter nach dem Kanal, den er wirklich schreibt."""
+        self._zweiter_pixelkopf()
+        namen = self._gemeinsame_regler({1}, 1)
+        self.assertTrue(namen, "kein Pro-Kopf-Regler des Spiiders")
+        for name in namen:
+            self.assertNotIn(" · ", name, f"{name!r} haengt einen Kopf an, "
+                                          f"obwohl der Kanal aufloesbar ist")
+        self.assertIn("Grundfarbe Rot Fein", namen)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 10. ★★ Kein Name fuer ein Segment, das es nicht gibt
+# ════════════════════════════════════════════════════════════════════════════
+
+class KeinErfundenesSegmentTest(_RigFall):
+    """★★ Vierte Runde, Ruege 1: die Statuszeile der Command-Line meldete fuer
+    ``1:21`` am Spiider ``Selektiert: 1 (1·P20)`` — ein Pixel, das es nicht
+    gibt (20 Baenke = Grundfarbe + Pixel 1..19). Vor FM-14b stand dort ``1·K21``,
+    also die getippte Nummer; die Beschriftung hat sich also sehr wohl geaendert,
+    und zwar in genau die Richtung, die die Fehlermeldung eine Funktion darueber
+    ausdruecklich vermeidet (``K21`` bleibt dort stehen).
+
+    Die drei Flaechen, die ihren Kopf-Index von AUSSEN bekommen — Statuszeile,
+    EFX-Zielliste, Fan-Werkzeug — messen deshalb hier alle drei an der GRENZE:
+    letzter vorhandener Kopf gegen ersten nicht vorhandenen."""
+
+    def setUp(self):
+        super().setUp()
+        from src.core.app_state import color_head_count
+        self.n = int(color_head_count(self.spiider))
+        self.assertEqual(self.n, 20, "der Spiider hat nicht mehr 20 Farb-Baenke")
+
+    def _status(self, befehl: str) -> str:
+        from src.core.cmdline.parser import parse
+        res = parse(befehl).execute(self.state)
+        self.assertTrue(res.ok, res.message)
+        return res.message
+
+    def test_die_statuszeile_benennt_nur_vorhandene_segmente(self):
+        """★ An der Grenze: Kopf 19 ist das letzte Pixel, Kopf 20 gibt es nicht."""
+        self.assertEqual(
+            self._status(f"1:{self.n}"),
+            f"Selektiert: 1 (1·{head_label_short(_PIXEL_MODELL, self.n - 1)})")
+        self.assertEqual(
+            self._status(f"1:{self.n + 1}"),
+            f"Selektiert: 1 (1·{head_label_short('', self.n)})")
+
+    def test_die_statuszeile_erfindet_auch_weit_draussen_kein_pixel(self):
+        for getippt in (self.n + 1, self.n + 2, 99):
+            with self.subTest(getippt=getippt):
+                meldung = self._status(f"1:{getippt}")
+                self.assertIn(head_label_short("", getippt - 1), meldung)
+                self.assertNotRegex(meldung, r"(?<![\w])P\d+(?![\w])")
+
+    def test_statuszeile_und_fehlermeldung_nennen_DIESELBE_nummer(self):
+        """★★ Der Kern der Ruege: zwei Meldungen ueber DERSELBEN Eingabe. Die
+        Fehlermeldung laesst die getippte ``K21`` ausdruecklich stehen — die
+        Statuszeile machte daraus ein ``P20``, also einen Segmentnamen fuer
+        dieselbe Nummer, die daneben als „gibt es nicht" gemeldet wird."""
+        from src.core.cmdline.parser import parse
+        getippt = head_label_short("", self.n)          # „K21"
+        self.assertIn(getippt, self._status(f"1:{self.n + 1}"))
+        fehler = parse(f"1:{self.n + 1} red 255").execute(self.state)
+        self.assertFalse(fehler.ok)
+        self.assertIn(getippt, fehler.message)
+
+    def test_efx_liste_und_fan_werkzeug_erfinden_auch_keines(self):
+        """Dieselbe Grenze an den beiden anderen fid-Flaechen, ueber ihren
+        echten Aufbau. Sie bekommen ihre Zelle aus der Auswahl — und die
+        Command-Line traegt eine zu grosse Kopf-Nummer dorthin (gemessen)."""
+        self._status(f"1:{self.n + 1}")
+        self.assertEqual(self.state.get_selected_cells(), [f"1:{self.n}"],
+                         "die zu grosse Kopf-Nummer kommt gar nicht erst an")
+        for flaeche in (self._efx, self._fan):
+            with self.subTest(flaeche=flaeche.__name__):
+                vorhanden = flaeche(1, self.n - 1)
+                fehlend = flaeche(1, self.n)
+                for text in vorhanden.values():
+                    self.assertIn(head_label_short(_PIXEL_MODELL, self.n - 1), text)
+                for text in fehlend.values():
+                    self.assertIn(head_label_short("", self.n), text)
+                    self.assertNotRegex(text, r"(?<![\w])P\d+(?![\w])")
+
+    def test_ein_geraet_ohne_ringe_bleibt_wort_fuer_wort(self):
+        """★★ POSITIVKONTROLLE, wortwoertlich: an der MOVBAR4 (VIER Baenke, aber
+        kein Pixel-Kopf) hiess und heisst eine zu grosse Kopf-Nummer genauso wie
+        die getippte — die neue Regel darf dort NICHTS aendern."""
+        self.assertEqual(self._status("2:4"), "Selektiert: 1 (2·K4)")
+        self.assertEqual(self._status("2:5"), "Selektiert: 1 (2·K5)")
+        self.assertEqual(self._status("2:99"), "Selektiert: 1 (2·K99)")
+
+    def test_die_vorhandenen_segmente_heissen_unveraendert(self):
+        """POSITIVKONTROLLE am Pixel-Kopf selbst: die Regel darf nur den einen
+        Fall treffen. Jeder vorhandene Kopf traegt weiter seinen Segmentnamen —
+        gemessen ueber ALLE 20, nicht an einem Beispiel."""
+        for h in range(self.n):
+            with self.subTest(head=h):
+                self.assertEqual(
+                    self._status(f"1:{h + 1}"),
+                    f"Selektiert: 1 (1·{head_label_short(_PIXEL_MODELL, h)})")
 
 
 if __name__ == "__main__":

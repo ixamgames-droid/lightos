@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head, head_label, head_label_gemeinsam,
+    programmer_key_for_head, head_label, head_label_gemeinsam, head_label_short,
     attr_head_is_segment, gemeinsames_modell, head_channel_name)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
@@ -1845,14 +1845,27 @@ class ProgrammerView(QWidget):
         Deshalb: adressiert der Kopf-Index KEIN Segment, traegt der Regler den
         Namen des Kanals, den er wirklich schreibt (``head_channel_name`` ueber
         dieselbe Quelle wie ``programmer_key_for_head``) — und gar keinen
-        Kopfnamen, weil es dort keinen zu nennen gibt. Laesst der Kanal sich
-        nicht eindeutig aufloesen, bleibt es bei der Bestandsform."""
+        Kopfnamen, weil es dort keinen zu nennen gibt.
+
+        ★★ Und laesst der Kanal sich NICHT eindeutig aufloesen (zwei Pixel-Koepfe
+        unter einem Regler, deren ``raw#1`` verschieden heisst), bleibt es bei
+        der Bestandsform — aber mit der INDEX-Beschriftung, nicht mit dem
+        Segmentnamen. Diese Kante hat in der dritten Runde still genau die Form
+        wiederhergestellt, gegen die dieser Commit antritt: gemessen am Spiider
+        plus einem zweiten Pixel-Kopf hiess der Regler wieder „Grundfarbe
+        Shutter · P1" und schrieb ``raw#1`` = DMX 9 = „Grundfarbe Rot Fein".
+        Unbekannt ist hier der KANAL, nicht der Kopf-Index — die Aussage „das
+        ist Pixel 1" wird davon kein Stueck richtiger."""
         basis = getattr(ch, "name", None) or fallback or getattr(ch, "attribute", "")
         modell = gemeinsames_modell(owners)
         if not attr_head_is_segment(modell, getattr(ch, "attribute", "")):
             echt = head_channel_name(owners, getattr(ch, "attribute", ""), head)
             if echt:
                 return echt
+            # Kein Segment und kein aufloesbarer Kanal -> die index-basierte
+            # Bestandsbeschriftung (``head_label_*`` mit leerem Modell, EINE
+            # Quelle) statt eines Pixelnamens fuer etwas, das kein Pixel ist.
+            return f"{basis} · {head_label_short('', head)}"
         return f"{basis} · {head_label_gemeinsam(owners, head, kurz=True)}"
 
     def _slider_head_buckets(self, fixtures, ch) -> list:

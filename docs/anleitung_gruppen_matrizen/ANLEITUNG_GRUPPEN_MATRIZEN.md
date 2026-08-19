@@ -133,9 +133,20 @@ den Tab *Weitere*, heißt der Regler dort nach dem Kanal, den er wirklich bewegt
 genau das sagt sein Name. Bei einem gewöhnlichen Mehrkopf-Gerät ändert sich nichts:
 dort heißt der Regler unverändert `Kopf 1 Pan · K4`.
 
+Trägt **ein** solcher Regler mehrere Pixel-Köpfe, an denen der Kanal verschieden heißt,
+gibt es keinen gemeinsamen Kanalnamen mehr. Dann steht dort die Kopfnummer (`· K2`) —
+und kein Pixelname: unbekannt ist der Kanal, nicht der Kopf-Index.
+
 Die Fehlermeldungen der Command-Line nennen die vorhandenen Köpfe ebenfalls beim Namen
 (`Gerät 1 hat für 'color_r' 20 Köpfe (GR–P19)`). Die zu groß **getippte** Nummer bleibt
 dagegen eine Nummer (`K21`) — sie beschreibt deine Eingabe und kein vorhandenes Segment.
+
+Dieselbe Regel gilt für die **Statuszeile** darunter und für jede andere Fläche, die nur
+eine Gerätenummer in der Hand hält (EFX-Zielliste, Fan-Werkzeug): ein Segmentname steht
+dort nur, wenn es das Segment am Gerät wirklich gibt. `1:20` meldet also `1·P19` (das
+letzte Pixel des Spiiders), `1:21` dagegen `1·K21` — deine Eingabe, unverändert
+zurückgegeben. Ein `Pixel 20` gibt es an diesem Gerät nicht, und die Statuszeile erfindet
+es auch nicht.
 
 ### Was im Dialog *Gerät bearbeiten* dazugehört
 

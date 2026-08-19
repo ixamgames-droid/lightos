@@ -23,18 +23,22 @@ DIRECTION_LABELS = {
 }
 
 
-def _head_modelle() -> dict:
-    """``fid -> Render-Modell`` fuer die Kopf-Beschriftung der Zielliste.
+def _head_beschriftung():
+    """Kopf-Beschriftung ``(fid, head, kurz=…)`` fuer die Zielliste — oder
+    ``None``, wenn ``app_state`` nicht erreichbar ist.
 
-    FM-14b: Die Liste haelt nur ``(fid, head)``. Ohne das Modell nennt sie den
+    FM-14b: Die Liste haelt nur ``(fid, head)``. Ohne die Geraete nennt sie den
     Kopf nach seinem Index (``K4``) — waehrend der Programmer dasselbe Segment
-    „Pixel 3" nennt. Lokal importiert wie alle app_state-Zugriffe dieser Datei
+    „Pixel 3" nennt. ``head_labeller`` bringt beides mit, Modell UND Kopfzahl:
+    ein Ziel kann aus einer gespeicherten Bewegung stammen, die aelter ist als
+    der heutige Modus des Geraets, und darf dann kein Segment benennen, das es
+    nicht mehr gibt. Lokal importiert wie alle app_state-Zugriffe dieser Datei
     (Zyklus Views <-> app_state)."""
     try:
-        from src.core.app_state import head_models_by_fid
-        return head_models_by_fid()
+        from src.core.app_state import head_labeller
+        return head_labeller()
     except Exception:
-        return {}
+        return None
 
 
 # Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
@@ -697,21 +701,23 @@ class EfxView(QWidget):
         return out
 
     @staticmethod
-    def _target_label(target, modelle=None) -> str:
+    def _target_label(target, beschriften=None) -> str:
         """Listen-Beschriftung eines EFX-Ziels — Kopf-Ziele ausdruecklich benennen,
         sonst stehen bei einem 4-Kopf-Geraet vier gleiche Zeilen untereinander.
 
-        FM-14b (Nachbesserung): ``modelle`` ist ``fid -> Render-Modell``
-        (``app_state.head_models_by_fid``) und holt den Kopf-Namen aus DERSELBEN
-        Quelle wie Programmer und Gruppen-Raster. Ohne Angabe bleibt es bei
-        ``K{N+1}`` — die Liste haelt nur fids, das Modell muss von aussen kommen.
+        FM-14b (Nachbesserung): ``beschriften`` ist die Kopf-Beschriftung aus
+        ``app_state.head_labeller`` und holt den Kopf-Namen aus DERSELBEN Quelle
+        wie Programmer und Gruppen-Raster. Ohne Angabe bleibt es bei ``K{N+1}``
+        — die Liste haelt nur fids, die Geraete muessen von aussen kommen.
         """
         from src.core.app_state import head_label_short
         head = getattr(target, "head", None)
         if head is None:
             return f"Fixture #{target.fid}"
+        if beschriften is None:
+            return f"Fixture #{target.fid} · {head_label_short('', int(head))}"
         return (f"Fixture #{target.fid} · "
-                f"{head_label_short((modelle or {}).get(int(target.fid), ''), int(head))}")
+                f"{beschriften(int(target.fid), int(head), kurz=True)}")
 
     def _active_group_fids(self) -> set[int]:
         """Fid-Set der aktuell gewaehlten Gruppe — fuer den Geraete-Zugehoerigkeits-
@@ -1664,9 +1670,9 @@ class EfxView(QWidget):
                     spiders += 1
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
-            _mods = _head_modelle()
+            _kopf = _head_beschriftung()
             for _t in self._current.fixtures:
-                self._fx_list.addItem(self._target_label(_t, _mods))
+                self._fx_list.addItem(self._target_label(_t, _kopf))
             if not movers:
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
@@ -1736,9 +1742,9 @@ class EfxView(QWidget):
             # „Fixture #1". Ein Ziel ohne Kopf ergibt weiterhin genau denselben
             # Text wie bisher.
             self._fx_list.clear()
-            _mods = _head_modelle()
+            _kopf = _head_beschriftung()
             for fx in efx.fixtures:
-                self._fx_list.addItem(f"{self._target_label(fx, _mods)}"
+                self._fx_list.addItem(f"{self._target_label(fx, _kopf)}"
                                       f"  offset={fx.start_offset:.2f}")
         finally:
             self._loading = False
@@ -2182,9 +2188,9 @@ class EfxView(QWidget):
         if movers:
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
-            _mods = _head_modelle()
+            _kopf = _head_beschriftung()
             for _t in self._current.fixtures:
-                self._fx_list.addItem(self._target_label(_t, _mods))
+                self._fx_list.addItem(self._target_label(_t, _kopf))
             if not self._follow:
                 self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
             self._notify_timer.start()  # Bibliothek/2. Ansicht aktualisieren
@@ -2238,13 +2244,13 @@ class EfxView(QWidget):
             # umgekehrt), obwohl es verschiedene Ziele sind.
             existing = {(f.fid, getattr(f, "head", None))
                         for f in self._current.fixtures}
-            _mods = _head_modelle()
+            _kopf = _head_beschriftung()
             for _t in self._targets_for(fids):
                 key = (_t.fid, getattr(_t, "head", None))
                 if key in existing:
                     continue
                 self._current.fixtures.append(_t)
-                self._fx_list.addItem(self._target_label(_t, _mods))
+                self._fx_list.addItem(self._target_label(_t, _kopf))
                 existing.add(key)
             self._update_spider_mode()
         except Exception:

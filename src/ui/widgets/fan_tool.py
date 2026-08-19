@@ -19,15 +19,14 @@ from PySide6.QtWidgets import (
 )
 
 try:
-    from src.core.app_state import get_state, head_label_short, head_models_by_fid
+    from src.core.app_state import get_state, head_labeller
 except Exception:
     # Das Werkzeug bleibt ohne app_state importierbar; dann fehlt ihm allerdings
     # die EINE Quelle fuer die Kopf-Beschriftung — und ohne sie schreibt es
     # KEINEN eigenen Kopfnamen hin (FM-14b: eine zweite Regel waere genau der
     # Fehler, den dieses Item behebt). Die Zeile nennt dann nur das Geraet.
     get_state = None            # type: ignore
-    head_label_short = None     # type: ignore
-    head_models_by_fid = None   # type: ignore
+    head_labeller = None        # type: ignore
 
 
 # (Anzeige-Label, interner Wert). Der interne Wert wird an
@@ -314,7 +313,7 @@ class FanTool(QWidget):
         values = compute_fan_values(len(fids), vmin, vmax, mode, curve)
         labels = self._lookup_labels(fids)
 
-        modelle = self._lookup_models()
+        beschriften = self._kopf_beschriftung()
         self._table.setRowCount(len(fids))
         for i, fid in enumerate(fids):
             self._table.setItem(i, 0, QTableWidgetItem(str(fid)))
@@ -325,8 +324,8 @@ class FanTool(QWidget):
             # Programmer — am Pixel-Kopf „P3" statt „K4".
             _h = self._head_of(i)
             _name = labels.get(fid, "?")
-            if _h is not None and head_label_short is not None:
-                _name = f"{_name} · {head_label_short(modelle.get(fid, ''), _h)}"
+            if _h is not None and beschriften is not None:
+                _name = f"{_name} · {beschriften(fid, _h, kurz=True)}"
             self._table.setItem(i, 1, QTableWidgetItem(_name))
             v = values[i] if i < len(values) else 0
             it = QTableWidgetItem(str(v))
@@ -334,18 +333,22 @@ class FanTool(QWidget):
             self._table.setItem(i, 2, it)
 
     @staticmethod
-    def _lookup_models() -> dict:
-        """``fid -> Render-Modell`` — die Nutzlast fuer die Kopf-Beschriftung.
+    def _kopf_beschriftung():
+        """``(fid, head, kurz=…) -> Kopfname`` — die Nutzlast fuer die
+        Kopf-Beschriftung, ``None`` wenn es sie nicht gibt.
 
         Getrennt von ``_lookup_labels``, weil die Tabelle beides braucht, aber
-        aus verschiedenen Gruenden: das Label steht in der Zeile, das Modell
-        entscheidet nur, WIE der Kopf heisst."""
-        if head_models_by_fid is None:
-            return {}
+        aus verschiedenen Gruenden: das Label steht in der Zeile, die
+        Beschriftung entscheidet nur, WIE der Kopf heisst. Sie bringt neben dem
+        Modell auch die Kopfzahl mit — das Werkzeug bekommt seine Zellen von
+        AUSSEN (``set_cells``) und darf deshalb kein Segment benennen, das es am
+        Geraet gar nicht gibt."""
+        if head_labeller is None:
+            return None
         try:
-            return head_models_by_fid()
+            return head_labeller()
         except Exception:
-            return {}
+            return None
 
     def _lookup_labels(self, fids: list[int]) -> dict[int, str]:
         out: dict[int, str] = {}

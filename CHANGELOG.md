@@ -7,6 +7,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Kein Name fuer ein Segment, das es nicht gibt
+
+#### Behoben
+
+- **Die Statuszeile der Command-Line erfand ein Pixel.** `1:21` meldete am Robe
+  Spiider „Selektiert: 1 (1·P20)" — das Gerät hat 20 Bänke, also die Grundfarbe
+  und `Pixel 1`…`Pixel 19`; ein `Pixel 20` gibt es dort nicht. Zwei Zeilen
+  daneben gab dieselbe Eingabe als Fehlermeldung ausdrücklich `K21` zurück
+  („beschreibt die Eingabe, kein vorhandenes Segment") — die Statuszeile machte
+  daraus einen Segmentnamen. Sie kennt jetzt die **Kopfzahl** des Geräts und
+  benennt nur, was es gibt: `1:20` → `1·P19`, `1:21` → `1·K21`. Dasselbe gilt
+  für die beiden anderen Flächen, die nur eine Gerätenummer in der Hand halten
+  (EFX-Zielliste, Fan-Werkzeug) — eine gespeicherte Bewegung oder eine
+  Rasterzelle kann älter sein als der heutige Modus des Geräts.
+
+- **Ein Pro-Kopf-Regler holte den Pixelnamen durch die Hintertür zurück.**
+  Trägt ein Regler mehrere Pixel-Köpfe, an denen derselbe Kanal verschieden
+  heißt, gibt es keinen gemeinsamen Kanalnamen — dort stand wieder
+  „Grundfarbe Shutter · P1", also genau die Aufschrift, die einen Tag vorher
+  entfernt wurde (der Regler schreibt `raw#1` = DMX 9 = „Grundfarbe Rot Fein").
+  Jetzt steht dort die Kopfnummer (`· K2`): unbekannt ist der **Kanal**, nicht
+  der Kopf-Index.
+
+#### Neu
+
+- **Geräte ohne Ringe bleiben Wort für Wort unverändert** — an der MOVBAR4
+  meldet die Statuszeile weiterhin `2·K4` für den vierten Kopf und `2·K5` für
+  eine zu groß getippte Nummer.
+
+
 ### 2026-08-19 — Ein Pixelname steht nur noch da, wo er stimmt
 
 #### Behoben
