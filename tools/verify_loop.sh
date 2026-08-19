@@ -273,7 +273,30 @@ else
             exit 2
         fi
         echo "[verify] 2/2 volle Suite segmentiert (${LIGHTOS_VERIFY_JOBS:-3} parallel) ..."
-        if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}" 9>&-; then
+        # ★ HIER bewusst OHNE `9>&-` — das ist eine Korrektur an der ersten
+        # Fassung dieses Fixes, und der Grund ist ein Tausch, den sie nicht
+        # benannt hat:
+        #
+        # `9>&-` an DIESER Stelle nimmt dem Segment-Runner die Sperre komplett,
+        # nicht nur seinen Blaettern. Stirbt dann die oberste
+        # `verify_loop.sh`-Shell (kill, Harness-Abbruch, OOM), waehrend
+        # `verify_segmented.sh` samt Segment-pytests weiterlaeuft, ist die
+        # rechnerweite Sperre SOFORT frei — und ein zweiter voller Lauf startet
+        # neben dem noch laufenden ersten. Genau dieser Zustand ist teuer
+        # belegt: PROC-02b (zwei gleichzeitige Suiten, 11 WebEngine-Segmente
+        # mit laufenden Chromium-Kindern) und QA-53 (der zweite Lauf raeumt das
+        # `.pytest_segments` des ersten ab).
+        #
+        # Vor dem Leck hielten die Kinder die Sperre in genau diesem Fall. Das
+        # war Nebenwirkung eines Fehlers — aber es war Schutz, und ihn
+        # kommentarlos einzutauschen waere eine Verschlechterung gewesen.
+        #
+        # Der Waisen-Fall ist stattdessen am BLATT geschlossen
+        # (`tools/verify_segmented.sh`, `timeout 300 … 8>&- 9>&-`): dort erbt
+        # kein timeout/pytest/Chromium mehr etwas, und der Runner selbst behaelt
+        # die Sperre ueber seine ganze Lebensdauer. Dasselbe Muster benutzt die
+        # WebEngine-Sperre fuer fd 8.
+        if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}"; then
             echo "[verify] TESTS ROT"
             exit 1
         fi

@@ -151,11 +151,29 @@ class _WegwerfRepo:
         return self.pfad / ".git" / ".pytest_lock"
 
     def entferne_fd9_schluss(self) -> int:
-        """Die Produktionsaenderung im KOPIERTEN Runner rueckgaengig machen."""
-        datei = self.pfad / "tools" / "verify_loop.sh"
-        alt = datei.read_text(encoding="utf-8")
-        anzahl = alt.count(" 9>&-")
-        datei.write_text(alt.replace(" 9>&-", ""), encoding="utf-8")
+        """Die Produktionsaenderung in den KOPIERTEN Runnern rueckgaengig machen.
+
+        ★ **Beide** Dateien, nicht nur `verify_loop.sh`. Die Zusicherung sitzt
+        seit der Nachbesserung an zwei Stellen, und zwar aus einem Grund:
+        `9>&-` an der Delegation an `verify_segmented.sh` haette dem
+        Segment-Runner die Sperre KOMPLETT genommen (stirbt die oberste Shell,
+        laeuft ein zweiter voller Lauf neben dem ersten — PROC-02b, QA-53).
+        Deshalb steht sie fuer den segmentierten Weg am **Blatt**, genau wie
+        die WebEngine-Sperre ihr `8>&-`.
+
+        Fasste diese Methode weiterhin nur `verify_loop.sh` an, bliebe die
+        Beschaedigung fuer den segmentierten Lauf wirkungslos — die
+        Positivkontrolle wuerde „kein Leck" messen und daraus faelschlich
+        schliessen, ihre Messung sei blind.
+        """
+        anzahl = 0
+        for name in ("verify_loop.sh", "verify_segmented.sh"):
+            datei = self.pfad / "tools" / name
+            if not datei.exists():
+                continue
+            alt = datei.read_text(encoding="utf-8")
+            anzahl += alt.count(" 9>&-")
+            datei.write_text(alt.replace(" 9>&-", ""), encoding="utf-8")
         return anzahl
 
     def starte_volle_suite(self, single=False, timeout=300):
@@ -175,6 +193,51 @@ class _WegwerfRepo:
             ["bash", str(self.pfad / "tools" / "verify_loop.sh")],
             cwd=str(self.pfad), env=umgebung, capture_output=True, text=True,
             timeout=timeout, start_new_session=True)
+
+    def _umgebung(self, single=False) -> dict:
+        """Die Umgebung eines Wegwerf-Laufs — einmal, statt zweimal gepflegt."""
+        umgebung = dict(os.environ)
+        for schluessel in ("LIGHTOS_LOCKFILE", "LIGHTOS_VERIFY_DRYRUN",
+                           "LIGHTOS_VERIFY_NOLOCK", "LIGHTOS_VERIFY_SINGLE"):
+            umgebung.pop(schluessel, None)
+        umgebung["LIGHTOS_SEG_OUT"] = str(self.pfad / "segout")
+        umgebung["LIGHTOS_SHOW_DB"] = str(self.pfad / "kind_show.db")
+        if single:
+            umgebung["LIGHTOS_VERIFY_SINGLE"] = "1"
+        return umgebung
+
+    def starte_volle_suite_async(self, single=False):
+        """Wie ``starte_volle_suite``, aber ohne zu warten — fuer die Messung
+        WAEHREND des Laufs. Eigene Sitzung, damit das Abraeumen die ganze
+        Gruppe trifft und kein Enkel ueberlebt."""
+        return subprocess.Popen(
+            ["bash", str(self.pfad / "tools" / "verify_loop.sh")],
+            cwd=str(self.pfad), env=self._umgebung(single),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            start_new_session=True)
+
+    @staticmethod
+    def beende_async(proc):
+        """Die ganze Prozessgruppe abraeumen, nicht nur den Elternprozess.
+
+        ★ `Popen.kill()` allein traefe nur die oberste Shell — genau der
+        Fehler, durch den bei PROC-02c ein `sleep 600` mit PPID 1 auf der
+        ECHTEN rechnerweiten Sperrdatei liegenblieb und jeden weiteren Lauf
+        blockiert haette."""
+        if proc.poll() is not None:
+            return
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            proc.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            proc.wait(timeout=10)
 
     def enkel_pid(self) -> int:
         try:
@@ -294,6 +357,57 @@ class UeberlebendesKindHaeltDieSperreNichtTest(unittest.TestCase):
         """
         self._lauf_und_waise(single=True)
         self._pruefe_keine_sperre_im_waisen()
+
+    # ── Die ANDERE Haelfte der Zusage ───────────────────────────────────
+    def test_waehrend_des_laufs_ist_die_sperre_belegt(self):
+        """★★ Ohne diesen Test war nur die halbe Zusage gemessen.
+
+        Belegt war bisher: „kein Nachkomme haelt die Sperre NACH dem Lauf".
+        Die andere Haelfte — „waehrend des Laufs wird sie ueberhaupt noch
+        gehalten" — pruefte **kein Test im Repo**, und ausgerechnet dieser Fix
+        gefaehrdet sie neu: er fuehrt `9>&-` ueberhaupt erst ein. Ein global
+        gesetztes `exec 9>&-` (statt je Befehl) waere die Freigabe der Sperre
+        selbst; die rechnerweite Serialisierung aus PROC-02/02b/02c waere dann
+        **vollstaendig und still weg**, waehrend das Gate „GRUEN — alles
+        bestanden" meldet.
+
+        Genau diesen Fehlermodus benennt `verify_loop.sh` drei Zeilen ueber der
+        Sperrnahme als den schlimmsten: *„Eine Sperre, die stillschweigend
+        nicht greift, ist schlimmer als keine: sie laesst das Ergebnis
+        vertrauenswuerdig aussehen."* Ein Kommentar davor genuegt dafuer nicht.
+        """
+        proc = self.repo.starte_volle_suite_async()
+        self.addCleanup(self.repo.beende_async, proc)
+        # Warten, bis der Lauf die Sperre wirklich genommen hat — nicht raten.
+        for _ in range(200):                      # bis 20 s
+            if self.repo.sperre.exists() and not self._sperre_frei():
+                break
+            if proc.poll() is not None:
+                break
+            time.sleep(0.1)
+        self.assertTrue(
+            self.repo.sperre.exists(),
+            "Der Lauf hat keine Sperrdatei angelegt — dann sagt die Messung "
+            "unten nichts aus.")
+        self.assertFalse(
+            self._sperre_frei(),
+            "WAEHREND des vollen Laufs ist die Sperre frei — die rechnerweite "
+            "Serialisierung greift nicht mehr. Ein zweiter voller Lauf koennte "
+            "jetzt danebenlaufen (PROC-02b: 11 kollidierende WebEngine-"
+            "Segmente; QA-53: der zweite Lauf raeumt das .pytest_segments des "
+            "ersten ab).")
+
+    def test_nach_dem_lauf_ist_sie_wieder_frei(self):
+        """POSITIVKONTROLLE zur Messung oben: haelt der Test die Sperre fuer
+        belegt, obwohl sie es nie war, waere er wertlos. Nach dem Ende **muss**
+        sie frei sein — sonst misst `_sperre_frei` gar nicht den Zustand,
+        sondern etwas Konstantes."""
+        proc = self.repo.starte_volle_suite_async()
+        proc.wait(timeout=120)
+        self.assertTrue(
+            self._sperre_frei(),
+            "Nach dem Lauf ist die Sperre noch belegt — dann unterscheidet "
+            "die Messung oben nicht zwischen „laeuft\" und „fertig\".")
 
     def test_die_messung_wuerde_das_leck_auch_sehen(self):
         """★ POSITIVKONTROLLE zur Empfindlichkeit — die wichtigste hier.
