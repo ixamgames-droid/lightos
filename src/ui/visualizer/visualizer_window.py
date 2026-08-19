@@ -37,7 +37,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
-    panel_grid_for, viz_model_for,
+    panel_grid_for, pixel_ring_base_banks, viz_model_for,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1900,16 +1900,25 @@ class VisualizerBridge(QObject):
         # dem Anlegen des Geraets in den Kanaelen, ein zweites Feld waere eine
         # Kopie, die still danebenlaufen kann (FM16E).
         # FM-14: 'pixel_head' zaehlt genauso — dort ist n_heads die Zahl der
-        # Farb-BAENKE, aus der `buildPixelHead` die Segmente ableitet (Bank 0 =
-        # Geraetefarbe). Ohne diese Zeile baute der Renderer immer genau ein
-        # Segment, egal wie viele Pixel das Geraet hat.
+        # Farb-BAENKE, aus der `buildPixelHead` zusammen mit `pixelBase` (s.
+        # unten) die Segmente ableitet. Ohne diese Zeile baute der Renderer
+        # immer genau ein Segment, egal wie viele Pixel das Geraet hat.
         n_heads = 0
         n_whites = 0
+        # ★ CDX-55: an welchem Kopf haengt Ring-Segment 0? Bis hierher stand die
+        # Antwort als feste 1 im JS („Bank 0 ist die Grundfarbe") — richtig fuer
+        # den Spiider, aber eine ANNAHME: die Routing-Regel belegt nur >=3
+        # Baenke, und der Generator-Override macht jedes Geraet zum Pixel-Kopf.
+        # `pixel_ring_base_banks` leitet den Versatz aus dem Kanal-Layout ab.
+        # 0 heisst „alle Baenke sind Pixel" — dann zeichnet der Ring auch Pixel 0.
+        pixel_base = 0
         if model in ("par_bar", "spider", "mover_bar", "matrix", "pixel_head"):
             try:
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
                                for c in get_channels_for_patched(f)]
                 n_heads = kanal_attrs.count("color_r")
+                if model == "pixel_head":
+                    pixel_base = pixel_ring_base_banks(kanal_attrs)
                 # ★ Das Weiss-BAND ist eine Aussage ueber PANELS (VIZ-50b:
                 # weniger Weiss-Kanaele als Farbzonen = eigene Leiste quer
                 # ueber die Mitte). Nur `buildMatrixPanel` liest `nWhites`;
@@ -1922,6 +1931,12 @@ class VisualizerBridge(QObject):
                 if model == "matrix":
                     n_whites = kanal_attrs.count("color_w")
             except Exception:
+                # `pixel_base` wird hier bewusst NICHT zurueckgesetzt: es steht
+                # oben schon auf 0, und die einzige Zeile, die es ueberhaupt
+                # setzt, laeuft nur im 'pixel_head'-Zweig — danach kann in
+                # diesem try nichts mehr werfen (der 'matrix'-Zweig schliesst
+                # den 'pixel_head'-Zweig aus). Ein Reset waere nicht
+                # kaputtzumachen und damit auch nicht zu messen.
                 n_heads = 0
                 n_whites = 0
         # ★ Die Regel, wann ein Geraet ein eigenes Weiss-BAND hat, steht hier —
@@ -1953,6 +1968,11 @@ class VisualizerBridge(QObject):
             "type": f.fixture_type,
             "model": model,
             "nHeads": n_heads,
+            # FM-14/CDX-55: Zahl der fuehrenden Baenke, die KEIN Ring-Pixel
+            # sind (nur 'pixel_head'; sonst 0). `buildPixelHead`/`addRingCells`
+            # zeichnen `nHeads - pixelBase` Segmente und haengen Segment i an
+            # Kopf i+pixelBase.
+            "pixelBase": pixel_base,
             # FM-13: in welcher raeumlichen Reihenfolge liegen die Pixel dieses
             # Panels auf DMX? Ohne das rendert ein Panel im Werkszustand
             # (Schlangenlinien) eine horizontale Figur als Zickzack.

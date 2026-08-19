@@ -3987,6 +3987,46 @@ def suggest_viz_model(fixture_type: str, attributes) -> str | None:
     return "spider"
 
 
+def pixel_ring_base_banks(attributes) -> int:
+    """Wie viele FUEHRENDE Farb-Baenke eines Pixel-Kopfes sind KEIN Ring-Pixel?
+
+    ``attributes`` = Kanal-Attribut-Strings eines Modus in KANALREIHENFOLGE
+    (dieselbe Liste, aus der ``suggest_viz_model`` die Baenke zaehlt). Ergebnis
+    0 oder 1; der Renderer haengt Ring-Segment ``i`` an Kopf ``i + Ergebnis``.
+
+    ★ CDX-55: bis hierher stand die 1 als ANNAHME im JS („Bank 0 ist die
+    Grundfarbe"). Fuer die Robe Spiider stimmt sie, belegt war sie nicht: die
+    Routing-Regel prueft nur ``>=3 Baenke``, und ueber den Generator-Override
+    (``FixtureProfile.viz_model``) kann JEDES Geraet ein Pixel-Kopf werden. Bei
+    einem importierten Geraet, dessen Baenke ALLE physische Pixel sind, fiel
+    Pixel 0 damit still aus dem Ring — der schlimmere der beiden Irrtuemer,
+    weil er Daten verschwinden laesst statt sie doppelt zu zeigen.
+
+    ★ Woran es sich MESSEN laesst: ein Pixel-Feld ist ein REGELMAESSIGER Block
+    — Pixel n+1 liegt immer gleich weit hinter Pixel n (RGB: 3 Kanaele, RGBW
+    oder RGB+Dimmer: 4, …). Eine Grundfarben-Lage ist das nicht: sie hat eigene
+    Fein-, CTC-, Shutter- und Dimmerkanaele und liegt am Spiider 27 Kanaele vor
+    Pixel 1, waehrend die Pixel untereinander 3 auseinanderliegen. Gemessen
+    wird genau dieser Vergleich: weicht der Abstand Bank 0 -> Bank 1 vom
+    Abstand Bank 1 -> Bank 2 ab, steht Bank 0 ausserhalb des Feldes.
+
+    ★ Und wenn es KEINEN Beleg gibt (weniger als drei Baenke, also kein
+    Abstands-Paar zum Vergleichen), lautet die Antwort 0 und nicht 1. Die
+    beiden Irrtuemer sind naemlich nicht gleich teuer: eine faelschlich
+    angenommene Grundfarben-Lage LOESCHT ein Pixel aus dem Bild, eine
+    faelschlich verneinte zeigt die Geraetefarbe ein zweites Mal — sichtbar,
+    nachvollziehbar, nichts verloren.
+
+    Die Zusage ist auf genau diesen Vergleich begrenzt: ein Geraet, dessen
+    Grundfarben-Lage zufaellig im selben Raster wie seine Pixel liegt, ist von
+    einem reinen Pixelfeld nicht unterscheidbar — es zaehlt dann als Pixel."""
+    attrs = [(a or "") for a in attributes]
+    stellen = [i for i, a in enumerate(attrs) if a == "color_r"]
+    if len(stellen) < 3:
+        return 0
+    return 1 if (stellen[1] - stellen[0]) != (stellen[2] - stellen[1]) else 0
+
+
 class _AttrOverrideChannel:
     """Leichter Proxy um ein ``FixtureChannel`` mit ueberschriebenem
     ``attribute`` (Spider-Dual-Tilt: Pan-Motor als zweiter Tilt). Alle anderen

@@ -18,9 +18,10 @@ import {
 const REGISTRY = {
   moving_head: { build: ()  => buildMovingHead(),                   updateDmx: updateMovingHeadDmx },
   // FM-14: Pixel-Moving-Head — EIN Kopf, dessen Linsenflaeche aus einzeln
-  // ansteuerbaren Ring-Segmenten besteht. `nHeads` ist die Zahl der Farb-BAENKE;
-  // Bank 0 ist die Geraetefarbe, die Segmente sind die restlichen (buildPixelHead).
-  pixel_head:  { build: (o) => buildPixelHead(o.nHeads),            updateDmx: updatePixelHeadDmx },
+  // ansteuerbaren Ring-Segmenten besteht. `nHeads` ist die Zahl der Farb-BAENKE.
+  // CDX-55: `pixelBase` sagt, wie viele davon KEIN Pixel sind (Grundfarben-Lage) —
+  // aus dem Kanal-Layout abgeleitet, nicht angenommen (buildPixelHead).
+  pixel_head:  { build: (o) => buildPixelHead(o.nHeads, o.pixelBase), updateDmx: updatePixelHeadDmx },
   spider:      { build: (o) => buildSpider(o.mirror),               updateDmx: updateSpiderDmx },
   par_bar:     { build: (o) => buildParBar(o.nHeads, o.pixelBar),   updateDmx: updateParBarDmx },   // FM-3 (+FM-8 Pixel-Variante)
   mover_bar:   { build: (o) => buildMoverBar(o.nHeads),             updateDmx: updateMoverBarDmx }, // FM-4

@@ -308,7 +308,13 @@ export function addFixture(data) {
   // ★ VIZ-50b: `nWhites` ist die Zahl der EIGENEN Weiss-Segmente (Robins
   // ZQ06121: acht, quer ueber die Panelmitte). 0 heisst „dieses Geraet hat
   // keine" — dann entsteht kein Band, und das Panel sieht aus wie bisher.
+  // ★ CDX-55: `pixelBase` MUSS mit — es ist die aus dem Profil abgeleitete
+  // Antwort auf „ist Bank 0 die Grundfarben-Lage oder schon Pixel 0?". Fehlt
+  // das Feld hier, faellt der Renderer auf 0 zurueck und ein Spiider zeigte
+  // seine Grundfarbe ein zweites Mal als Ring-Segment (genau die Klasse Fehler,
+  // an der VIZ-51 mit `pixelOrder` schon einmal gescheitert ist).
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
+                                           pixelBase: data.pixelBase,
                                            pixelBar, pixelOrder: data.pixelOrder,
                                            elementRotation: data.elementRotation,
                                            elementFlip: data.elementFlip,
@@ -422,9 +428,12 @@ export function addFixture(data) {
   // 2D/3D-Abweichung, die VIZ-51 fuer die Reihenfolge beseitigt hat).
   // VIZ-50a: aus demselben Grund auch die Rasterform — ein Icon, das 7x7
   // schneidet, waehrend das Modell daneben 12x4 zeigt, waere derselbe Bruch.
+  // CDX-55/56: `pixelBase` auch hier — 2D-Icon und 3D-Modell muessen dieselbe
+  // Segmentzahl und denselben Versatz haben, sonst faerbt Zelle i einen anderen
+  // Pixel als Segment i (Lehre VIZ-51).
   const icon = buildTopDownIcon(rtype, data.nHeads, data.pixelOrder,
                                 data.elementRotation, data.elementFlip,
-                                data.gridCols, data.gridRows);
+                                data.gridCols, data.gridRows, data.pixelBase);
   icon.position.set(root.position.x, 0.05, root.position.z);
   // Yaw uebernehmen: laengliche Icons (Bars/Spider) lagen sonst nach dem
   // Show-Reload quer, bis die erste Rotations-Geste sie synct (die Update-
@@ -455,9 +464,12 @@ export function addFixture(data) {
     isMoverBar: !!model.isMoverBar,
     pixels: model.pixels || null,       // FM-13: Matrix-Panel-Pixel (je {mesh,r,c})
     // FM-14: Ring-Segmente eines Pixel-Moving-Heads (je {mesh, ring}).
-    // `updatePixelHeadDmx` faerbt Segment i aus heads[i+1] — Kopf 0 ist die
-    // Geraetefarbe und faerbt bereits Linse/Kegel.
+    // `updatePixelHeadDmx` faerbt Segment i aus heads[i + pixelBase].
     ringPixels: model.ringPixels || null,
+    // CDX-55: der geklammerte Versatz, wie ihn `buildPixelHead` aus dem Profil
+    // uebernommen hat — NICHT `data.pixelBase` roh: der Builder klemmt ihn auf
+    // die Bankzahl, und beide Seiten muessen dieselbe Zahl benutzen.
+    pixelBase: model.pixelBase || 0,
     isPixelHead: !!model.isPixelHead,
     // VIZ-50b: Warmweiss-Band (je {mesh}) — leer/null bei Panels ohne eigene
     // Weiss-Segmente. `updateMatrixPanelDmx` faerbt es aus `heads[j].cw`.
