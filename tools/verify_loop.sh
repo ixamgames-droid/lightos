@@ -205,6 +205,18 @@ if [ "$#" -gt 0 ]; then
     # `8>&-` schliesst den Sperr-Deskriptor im Kind: ein geerbtes Duplikat
     # hielte die Sperre sonst ueber das Laufende hinaus offen (flock loest erst,
     # wenn die LETZTE Kopie zu ist).
+    #
+    # ★ PROC-02d: Hier steht bewusst KEIN `9>&-` daneben, obwohl fd 9 die
+    # Voll-Suiten-Sperre traegt. Auf diesem Zweig wird sie gar nicht genommen —
+    # `_verify_lock` steigt bei Argumenten aus, BEVOR `exec 9>` laeuft.
+    # Nachgemessen 2026-08-19 in einem Wegwerf-Repo: nach einem gezielten Lauf
+    # existiert die Sperrdatei nicht einmal, und im pytest-Prozess zeigt fd 9
+    # auf das, was der AUFRUFER dort offen hatte. Ein `9>&-` waere damit nicht
+    # pruefbar (die Mutation bliebe zwangslaeufig gruen) und schloesse nur einen
+    # fremden Deskriptor. Dass dieser Zweig sperrfrei bleibt, haelt
+    # tests/test_verify_loop_sperre.py fest
+    # (test_gezielter_lauf_wird_nicht_gesperrt) — wer das aendert, wird dort rot
+    # und findet ueber diesen Kommentar zurueck.
     "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider 8>&-
     _rc=$?
     if [ "$_web" = "1" ]; then
@@ -228,9 +240,29 @@ else
     # ~69 % an akkumulierendem nativem Qt-Zustand — an wechselnden Dateien, die
     # isoliert gruen laufen. Wer den Ein-Prozess-Lauf trotzdem will (z. B. um zu
     # pruefen, ob das noch gilt): LIGHTOS_VERIFY_SINGLE=1 setzen.
+    #
+    # ★★ PROC-02d — `9>&-` an BEIDEN Wegen der vollen Suite.
+    #
+    # Ab hier ist fd 9 die gehaltene Voll-Suiten-Sperre. Ohne den Schluss erbt
+    # sie JEDER Nachkomme: der Segment-Runner, jedes `timeout`, jeder
+    # Segment-pytest und jedes Chromium-Kind darunter. `flock` loest aber erst,
+    # wenn die LETZTE Kopie des Deskriptors zu ist — ein einziges ueberlebendes
+    # Kind haelt die Sperre damit ueber das Gate-Ende hinaus, und zwar
+    # rechnerweit (die Datei haengt am gemeinsamen Git-Verzeichnis, s. o.). Der
+    # naechste volle Lauf auf diesem Rechner wartet dann ohne Deckel: `flock 9`
+    # in `_verify_lock` hat keine Wartezeit, das Gate steht einfach.
+    #
+    # Gemessen 2026-08-19 in einem Wegwerf-Repo, vor der Aenderung, mit einem
+    # Testkind, das `sleep 300` abgekoppelt und mit `close_fds=False` startet
+    # (so startet Chromium seine Hilfsprozesse): in /proc/<enkel>/fd stand
+    # `9 -> .../.git/.pytest_lock`, und `flock -n` bekam die Sperre nicht — auf
+    # BEIDEN Wegen, dem segmentierten wie dem Ein-Prozess-Lauf.
+    #
+    # ⚠️ Der Deskriptor muss je Befehl geschlossen werden, nicht global: ein
+    # `exec 9>&-` waere die Freigabe der Sperre selbst.
     if [ -n "${LIGHTOS_VERIFY_SINGLE:-}" ]; then
         echo "[verify] 2/2 pytest tests/ (volle Suite, EIN Prozess - LIGHTOS_VERIFY_SINGLE) ..."
-        if ! "$PY" -m pytest tests/ -q --tb=short -p no:cacheprovider; then
+        if ! "$PY" -m pytest tests/ -q --tb=short -p no:cacheprovider 9>&-; then
             echo "[verify] TESTS ROT"
             exit 1
         fi
@@ -241,7 +273,7 @@ else
             exit 2
         fi
         echo "[verify] 2/2 volle Suite segmentiert (${LIGHTOS_VERIFY_JOBS:-3} parallel) ..."
-        if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}"; then
+        if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}" 9>&-; then
             echo "[verify] TESTS ROT"
             exit 1
         fi

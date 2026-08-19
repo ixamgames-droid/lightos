@@ -35,6 +35,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   `--trace` in **jedem** gezielten Lauf tot, auch in den 95 % ohne 3D-Ansicht.
   Der Umweg brachte hier ohnehin nichts (nachgemessen: ein Hintergrundjob bleibt
   in der Prozessgruppe des Skripts); `pytest` laeuft wieder im Vordergrund.
+- **Ein liegengebliebener Testprozess konnte das Gate dauerhaft lahmlegen.** Die
+  Sperre gegen zwei gleichzeitige volle Testlaeufe wird ueber einen offenen
+  Dateizeiger gehalten, und den erbte bisher **jeder** Prozess, den der Lauf
+  startete — bis hinunter zu den Hilfsprozessen der 3D-Ansicht. Gelockert wird
+  die Sperre aber erst, wenn die **letzte** Kopie geschlossen ist. Ein einziger
+  Prozess, der den Lauf ueberlebt, hielt sie damit ueber das Ende hinaus fest;
+  der naechste volle Lauf auf demselben Rechner haette dann ohne Zeitlimit und
+  ohne Meldung gewartet. Der Zeiger wird jetzt an beiden Wegen der vollen Suite
+  geschlossen, bevor die Testprozesse starten. Nachgemessen an einem
+  Wegwerf-Repo mit einem absichtlich ueberlebenden Kind: vorher blieb die Sperre
+  belegt, jetzt ist sie danach frei.
 ### 2026-08-19 — Die weiße Leiste bekommt nur noch, wer wirklich eine hat
 
 #### Behoben
