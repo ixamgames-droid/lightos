@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head)
+    channel_occurrence_keys, programmer_key_for_head)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -1502,7 +1502,8 @@ class ProgrammerView(QWidget):
                     ilay.addWidget(AttributeSlider(
                         ch, _owners, self._state, owner=self, head=_head,
                         display_name=(None if _head is None else
-                                      f"{ch.name or ch.attribute} · K{_head + 1}")))
+                                      self._head_slider_label(
+                                          _owners[0], ch, _head))))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1812,6 +1813,44 @@ class ProgrammerView(QWidget):
                 occ[ch.attribute] = h + 1
                 color_chs.append((ch, h))
         return color_chs, occ
+
+    @staticmethod
+    def _head_slider_label(fixture, ch, head: int) -> str:
+        """Beschriftung eines Pro-Kopf-Reglers — der Name des Kanals, den er
+        WIRKLICH schreibt.
+
+        ★ FM-24. Bisher stand hier ``ch.name``, und ``ch`` ist die VORLAGE aus
+        ``_template_channels``: dort bleibt pro Attribut nur EIN Kanal uebrig
+        (das erste Vorkommen, bevorzugt eines mit ``ranges``). An einem
+        Mehrkopf-Geraet gehoert dieser Name damit einem ANDEREN Kopf als dem,
+        den der Regler treibt. Gemessen:
+
+        * ``MOVBAR4 [22-Kanal]``, Kopf 4 gewaehlt -> „**Kopf 1 Pan** · K4",
+          geschrieben wird CH16 „Kopf 4 Pan".
+        * ``HYDRABEAM 4000 RGBW [19-Kanal]``, Kopf 1 gewaehlt -> „**Master
+          Dimmer** · K1", geschrieben wird ueber die Kopf-Karte (FM-17)
+          ``intensity#1`` = CH9 „Kopf 1 Dimmer".
+        * ``Robin Spiider [91-Kanal Pixel]``, Kopf 3 gewaehlt -> „**Grundfarbe
+          Shutter** · K3", waehrend der Regler ``raw#2`` = CH11 „Grundfarbe
+          Gruen Fein" schreibt — der Name nannte also einen DRITTEN Kanal.
+
+        Deshalb wird der Name ueber genau den Schluessel geholt, den
+        ``AttributeSlider._apply_value`` -> ``set_programmer_value(head=…)``
+        gleich schreibt (:func:`programmer_key_for_head`), und ueber
+        :func:`channel_occurrence_keys` auf den Kanal zurueckgefuehrt — die eine
+        Quelle, die auch die Kopf-Karte kennt. ``fixture`` ist der erste
+        Besitzer des Reglers.
+
+        Rueckfall auf den Vorlagen-Namen: hat dieser Besitzer das Attribut gar
+        nicht, traegt kein Kanal den Schluessel. Das ist ein realer Fall —
+        ``_slider_head_buckets`` behaelt ein Geraet ohne das Attribut fuer
+        Kopf 1 (``attr_head_count_for_channels`` antwortet dort ``1``), etwa
+        ``MOVBAR4`` + ``HYDRABEAM 19ch`` beim ``speed``-Regler."""
+        chans = get_channels_for_patched(fixture)
+        key = programmer_key_for_head(chans, ch.attribute, head)
+        eigen = {k: c for c, k in channel_occurrence_keys(chans)}.get(key)
+        name = eigen.name if eigen is not None else ""
+        return f"{name or ch.name or ch.attribute} · K{head + 1}"
 
     def _slider_head_buckets(self, fixtures, ch) -> list:
         """Auf welche Koepfe verteilt sich EIN Attribut-Regler? ``[(head, owners)]``.

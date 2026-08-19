@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Ein Kopf-Regler heisst wie sein eigener Kanal
+
+#### Behoben
+
+- **Die Pro-Kopf-Regler im Programmer trugen den Kanalnamen eines FREMDEN
+  Kopfes.** Waehlt man an einem Mehrkopf-Geraet einen Kopf aus, baut der
+  Programmer die Regler pro Kopf — die Aufschrift kam aber aus der pro Attribut
+  deduplizierten Kanal-Vorlage und damit immer vom **ersten** Vorkommen.
+  Gemessen: an der `LED Moving Bar 4x [22-Kanal]` stand am vierten Kopf
+  „**Kopf 1 Pan** · K4", waehrend der Regler CH16 „Kopf 4 Pan" schreibt; an der
+  `HYDRABEAM 4000 RGBW [19-Kanal]` hiess der Kopf-1-Dimmer „**Master Dimmer**
+  · K1", obwohl er ueber die Kopf-Karte auf CH9 „Kopf 1 Dimmer" geht; und am
+  `Robin Spiider [91-Kanal Pixel]` nannte die Aufschrift „**Grundfarbe
+  Shutter** · K3" sogar einen **dritten** Kanal — geschrieben wird dort
+  CH11 „Grundfarbe Gruen Fein". Jeder Pro-Kopf-Regler holt seinen Namen jetzt
+  ueber genau den Schluessel, den er beim Schieben auch schreibt. Betroffen war
+  **jedes** Mehrkopf-Geraet (Bars, Spider, Moving-Head-Bars, Pixel-Ringe), nicht
+  nur die neuen Ringe. **Einkopf-Geraete und Mehrkopf-Geraete ohne Kopf-Auswahl
+  bleiben unveraendert** — dort wird gar kein Anzeigename gesetzt.
+
 ### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
 
 #### Behoben
