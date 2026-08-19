@@ -24,6 +24,26 @@ hingeschrieben: sie kommt aus ``head_label_for_model`` / ``head_label_short``,
 der EINEN Quelle. Ein Test, der die Namen selbst hinschreibt, wuerde die zweite
 Quelle nur an eine dritte Stelle verschieben.
 
+★★ **Dritte Runde.** Zwei weitere Pruefer haben auch die zweite Fassung nicht
+freigegeben. Beide Ruegen sind nachgemessen und treffen zu — und beide fuehren
+auf dieselbe Wurzel: **der Kopf-Index gehoert dem ATTRIBUT, nicht dem Geraet.**
+``attr#N`` ist das N-te Vorkommen VON DIESEM Attribut. Am Pixel-Kopf sind die
+Segmente die 20 Farb-Baenke; die 21 Rohkanaele zaehlen davon unabhaengig.
+
+*Ruege 1* („wer den ersten Pixel greift, greift ins Falsche"), im Programmer
+gemessen: mit Pixel 1 gewaehlt hiess der einzige Pro-Kopf-Regler ``Grundfarbe
+Shutter · P1`` und schrieb ``raw#1`` = **DMX 9 = „Grundfarbe Rot Fein"**. Wer
+das erste Pixel anfasste, verstellte die Grundfarbe — buchstaeblich.
+
+*Ruege 2* (zwei Namen fuer ein Segment): ``attr_groups.attr_label`` uebersetzt
+kontextfrei, also hiess Pixel 3 im Snap-Speichern-Dialog und beim
+Kanal-Nachtragen weiter ``Rot (Kopf 4)``; die Grundfarbe hiess dort schlicht
+``Rot`` und sah damit aus wie das erste Pixel.
+
+Daraus die Trennung, die diese Datei misst: **Segmentname** nur dort, wo der
+Kopf-Index wirklich ein Segment adressiert (Abschnitte 3-6, 8) — sonst der
+**Kanalname** dessen, was der Regler wirklich schreibt (Abschnitt 7).
+
 ★★ **Positivkontrolle durchgehend am MOVBAR4** — VIER Farb-Baenke, also nicht
 schon an der Bank-Zahl aussortiert, nur eben kein Pixel-Kopf. Fuer ihn stehen die
 Erwartungen als **wortwoertliche Bestandsstrings** in dieser Datei (nicht aus der
@@ -141,10 +161,11 @@ class _RigFall(unittest.TestCase):
 
     # ── Die Flaechen, jede ueber ihren ECHTEN Aufbau ──────────────────────────
 
-    def _programmer(self, fid: int, head: int) -> dict:
-        """Geraeteliste, Kopfzeile und Regler des Programmers — gebaut vom
-        echten ``_refresh_fixture_list`` und der echten Auswahl-Naht."""
-        from src.ui.views.programmer_view import ProgrammerView, AttributeSlider
+    def _programmer_auf(self, fid: int, head: int):
+        """Programmer mit genau dieser Kopf-Zelle gewaehlt — echter Aufbau
+        (``_refresh_fixture_list``) und echte Auswahl-Naht. Gibt
+        ``(view, Listenzeile)`` zurueck."""
+        from src.ui.views.programmer_view import ProgrammerView
         view = ProgrammerView()
         self.addCleanup(view.deleteLater)
         lst = view._fixture_list
@@ -158,14 +179,93 @@ class _RigFall(unittest.TestCase):
                 treffer = it
         self.assertIsNotNone(treffer, f"keine Zeile fuer {zelle}")
         view._on_fixture_selected()
-        regler = sorted({w._display_name for w in view.findChildren(AttributeSlider)
-                         if w._display_name and w._head == head
-                         and all(getattr(f, "fid", None) == fid
-                                 for f in w._fixtures)})
-        self.assertTrue(regler, f"kein Kopf-Regler fuer {zelle}")
+        # ★ Der Tab-Aufbau raeumt die alten Regler per ``deleteLater`` weg — das
+        # wirkt erst, wenn die Ereignisschlange laeuft. Ohne diesen Schritt
+        # findet ``findChildren`` die Regler des VORIGEN Aufbaus mit und der
+        # Test misst Leichen (gemessen: derselbe Regler zweimal, der zweite
+        # schrieb dann nichts mehr).
+        from PySide6.QtCore import QEvent
+        _app().sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        return view, treffer
+
+    def _programmer(self, fid: int, head: int) -> dict:
+        """Die drei Programmer-Flaechen, die ein SEGMENT benennen: Zeile in der
+        Geraeteliste, Kopfzeile darueber und der FARB-Regler dieses Kopfes.
+
+        ★ Der Farbregler ist die Probe, dass „P3" keine Erfindung dieser
+        Ansicht ist: er traegt den Kanalnamen aus der Bibliothek
+        (``P3 Rot``/``Grundfarbe Rot``), waehrend die anderen Flaechen ihn aus
+        ``head_label_*`` bauen. Laufen die beiden auseinander, faellt es hier
+        auf. Die uebrigen Pro-Kopf-Regler benennen KEIN Segment mehr (ihr
+        Kopf-Index adressiert keins) — sie werden in ``_kopfregler`` gemessen."""
+        from src.ui.views.programmer_view import AttributeSlider
+        view, treffer = self._programmer_auf(fid, head)
+        farbe = sorted({w._channel.name for w in view.findChildren(AttributeSlider)
+                        if w._display_name is None and w._head == head
+                        and (w._channel.attribute or "").startswith("color_")
+                        and all(getattr(f, "fid", None) == fid
+                                for f in w._fixtures)})
+        self.assertTrue(farbe, f"kein Farbregler fuer {fid}:{head}")
         return {"Programmer-Geraeteliste": treffer.text().strip(),
                 "Programmer-Kopfzeile": view._lbl_selection.text(),
-                "Programmer-Regler": regler[0]}
+                "Programmer-Farbregler": farbe[0]}
+
+    def _kopfregler(self, fid: int, head: int) -> list:
+        """Die Pro-Kopf-Regler MIT eigener Beschriftung (die generischen, nicht
+        die Farbregler) — sortiert, nur die dieses einen Geraets."""
+        from src.ui.views.programmer_view import AttributeSlider
+        view, _ = self._programmer_auf(fid, head)
+        return sorted({w._display_name for w in view.findChildren(AttributeSlider)
+                       if w._display_name and w._head == head
+                       and all(getattr(f, "fid", None) == fid
+                               for f in w._fixtures)})
+
+    def _snap_flaechen(self, fid: int, head: int) -> dict:
+        """Die zwei Snap-Flaechen, die einen Kanal ueber seinen Kopf benennen:
+        der Speichern-Dialog (``ChannelSelectDialog``) und „➕ Kanal" im
+        Snap-Editor. Beide liefen ueber die kontextfreie ``attr_label`` und
+        nannten Pixel 3 „Rot (Kopf 4)".
+
+        Gefahren wird der ECHTE Weg: der Speichern-Dialog baut seine Liste im
+        Konstruktor, „➕ Kanal" laeuft durch ``_add_channel`` (das die Geraete
+        des Typs selbst zusammensucht) — nur der modale ``exec()`` wird
+        abgefangen, sonst haenge der Test."""
+        from src.core.app_state import (get_channels_for_patched,
+                                        programmer_key_for_head)
+        from src.core.engine.snap_library import get_snap_library
+        from src.ui.views import snap_editor as SE
+        from src.ui.views.snap_file_panel import ChannelSelectDialog
+        from PySide6.QtWidgets import QDialog
+        fx = next(f for f in self.state.get_patched_fixtures() if f.fid == fid)
+        key = programmer_key_for_head(get_channels_for_patched(fx), "color_r", head)
+
+        dlg = ChannelSelectDialog({fid: {key: 200}})
+        self.addCleanup(dlg.deleteLater)
+        self.assertIn(key, dlg._attr_checks, f"kein Kanal-Haken fuer {key}")
+
+        snap = get_snap_library().add_snap(f"FM14b {fid}:{head}", "",
+                                           {fid: {"intensity": 255}})
+        self.addCleanup(get_snap_library().remove_snap, snap.id)
+        ed = SE.SnapEditor(snap)
+        self.addCleanup(ed.deleteLater)
+        gefangen = []
+        orig = SE._AddChannelDialog
+
+        class _Fang(orig):
+            def exec(self):                       # noqa: A003 (Qt-Name)
+                gefangen.append(self)
+                return QDialog.DialogCode.Rejected
+
+        SE._AddChannelDialog = _Fang
+        try:
+            ed._add_channel(("typ",), [fid])
+        finally:
+            SE._AddChannelDialog = orig
+        self.assertTrue(gefangen, "der Nachtragen-Dialog wurde gar nicht gebaut")
+        haken = gefangen[0]._checks.get(key)
+        self.assertIsNotNone(haken, f"{key} steht nicht zum Nachtragen bereit")
+        return {"Snap-Speichern-Dialog": dlg._attr_checks[key].text(),
+                "Snap-Kanal-nachtragen": haken.text()}
 
     def _raster(self, fid: int, head: int) -> dict:
         """Rasterzelle + ihr Tooltip im Gruppen-Editor, ueber den echten Aufbau
@@ -239,10 +339,15 @@ class _RigFall(unittest.TestCase):
         return {"Command-Line-Statuszeile": res.message}
 
     def alle_flaechen(self, fid: int, head: int) -> dict:
+        """ALLE Flaechen, die ein SEGMENT benennen — je Flaeche ihr echter
+        Aufbau. Nicht dabei: die Pro-Kopf-Regler ohne Segment-Bezug
+        (``_kopfregler``), die benennen einen KANAL und werden eigens
+        gemessen."""
         out = {}
         for teil in (self._programmer(fid, head), self._raster(fid, head),
                      self._matrix(fid, head), self._efx(fid, head),
-                     self._fan(fid, head), self._cmdline(fid, head)):
+                     self._fan(fid, head), self._cmdline(fid, head),
+                     self._snap_flaechen(fid, head)):
             out.update(teil)
         return out
 
@@ -261,9 +366,9 @@ class PixelKopfBenennungTest(_RigFall):
         index_voll = head_label_for_model("", head)      # „Kopf N+1"
         index_kurz = head_label_short("", head)          # „KN+1"
         flaechen = self.alle_flaechen(1, head)
-        # 9 Flaechen; die Grundfarbe hat bewusst KEINE Rasterzelle und damit
+        # 11 Flaechen; die Grundfarbe hat bewusst KEINE Rasterzelle und damit
         # auch keinen Matrix-Tooltip (FM-14b) — sonst zoege jeder Effekt sie mit.
-        self.assertEqual(len(flaechen), 8 if head == 0 else 9, sorted(flaechen))
+        self.assertEqual(len(flaechen), 10 if head == 0 else 11, sorted(flaechen))
         for name, text in flaechen.items():
             with self.subTest(flaeche=name):
                 self.assertTrue(
@@ -398,16 +503,29 @@ class OhneRingeUnveraendertTest(_RigFall):
         self.assertEqual(flaechen, {
             "Programmer-Geraeteliste": "└ Kopf 4",
             "Programmer-Kopfzeile": "1 Gerät(e): [2] G2 · K4",
-            # Der Kanalname stammt aus dem Profil (Vorlage = erstes Vorkommen),
-            # nur das „· K4" dahinter ist die Kopf-Beschriftung.
-            "Programmer-Regler": "Kopf 1 Pan · K4",
+            "Programmer-Farbregler": "Kopf 4 Blau",
             "Gruppen-Rasterzelle": "2·K4",
             "Gruppen-Raster-Tooltip": "G2 · Kopf 4",
             "Matrix-Vorschau-Tooltip": "G2 · Kopf 4",
             "EFX-Zielliste": "Fixture #2 · K4  offset=0.00",
             "Fan-Werkzeug": "G2 · K4",
             "Command-Line-Statuszeile": "Selektiert: 1 (2·K4)",
+            "Snap-Speichern-Dialog": "Rot (Kopf 4)  (1)",
+            "Snap-Kanal-nachtragen": "Rot (Kopf 4)  ·  Color",
         })
+
+    def test_auch_die_pro_kopf_regler_bleiben_wort_fuer_wort(self):
+        """★★ Die Flaeche, an der sich am Pixel-Kopf am meisten aendert: dort
+        traegt ein Regler ohne Segment-Bezug jetzt den Namen des Kanals, den er
+        schreibt. Hier darf davon NICHTS ankommen — inklusive des bekannten
+        Schoenheitsfehlers, dass der Kanalname von der VORLAGE stammt
+        („Kopf 1 Pan · K4"). Ihn hier mitzukorrigieren waere eine Aenderung an
+        einem ringlosen Geraet."""
+        self.assertEqual(self._kopfregler(2, 3),
+                         ["Kopf 1 Pan · K4", "Kopf 1 Tilt · K4"])
+        self.assertEqual(self._kopfregler(2, 0),
+                         ["Kopf 1 Pan · K1", "Kopf 1 Tilt · K1",
+                          "Master Dimmer · K1", "Shutter/Strobe · K1"])
 
     def test_auch_der_erste_kopf_bleibt_kopf_1(self):
         """Kopf 0 heisst hier weiter „Kopf 1" — die Grundfarben-Regel darf NICHT
@@ -417,9 +535,23 @@ class OhneRingeUnveraendertTest(_RigFall):
         self.assertEqual(flaechen["Gruppen-Rasterzelle"], "2·K1")
         self.assertEqual(flaechen["Command-Line-Statuszeile"],
                          "Selektiert: 1 (2·K1)")
+        # Der erste Kopf traegt am ringlosen Geraet KEIN Suffix — genau wie
+        # bisher („Rot", nicht „Rot (Kopf 1)").
+        self.assertEqual(flaechen["Snap-Speichern-Dialog"], "Rot  (1)")
         for text in flaechen.values():
             self.assertNotIn("Grundfarbe", text)
             self.assertNotIn("Pixel", text)
+
+    def test_die_fehlermeldung_der_command_line_bleibt_wort_fuer_wort(self):
+        """Die Kopf-Spanne einer Fehlermeldung kommt jetzt aus der EINEN Quelle.
+        Am ringlosen Geraet muss dabei buchstabengleich derselbe Text
+        herauskommen."""
+        from src.core.cmdline.parser import parse
+        res = parse("2:9 red 255").execute(self.state)
+        self.assertFalse(res.ok)
+        self.assertEqual(
+            res.message,
+            "Gerät 2 hat für 'color_r' 4 Köpfe (K1–K4) — K9 gibt es dort nicht")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -491,15 +623,18 @@ class GemischterReglerTest(_RigFall):
         self.assertEqual(len(namen), 2, f"zwei Bar-Regler erwartet: {namen}")
         return namen
 
-    def test_die_bar_regler_eines_pixel_doppeltilters_folgen_der_quelle(self):
+    def test_die_bar_regler_eines_pixel_doppeltilters_nennen_ihren_kanal(self):
         """★ Der zweite ``· K{n+1}``-Regler im Programmer. Ein Doppeltilter mit
         ausdruecklich gesetztem ``viz_model = 'pixel_head'`` (Fixture-Generator)
-        muss auch hier heissen wie in der Geraeteliste. Der Kanalname davor
-        kommt unveraendert aus dem Profil."""
-        self.assertEqual(
-            self._tilt_regler(pixel=True),
-            [f"Tilt Bar Links · {head_label_short(_PIXEL_MODELL, 0)}",
-             f"Tilt Bar Rechts · {head_label_short(_PIXEL_MODELL, 1)}"])
+        hat ZWEI Farb-Baenke — die TILT-Achsen zaehlen davon unabhaengig. „Tilt
+        Bar Rechts · P1" behauptete also Pixel 1, obwohl der Regler die zweite
+        Bar kippt. Jetzt steht dort der Kanal, den er wirklich schreibt; ein
+        Segment nennt er gar nicht mehr."""
+        namen = self._tilt_regler(pixel=True)
+        self.assertEqual(namen, ["Tilt Bar Links", "Tilt Bar Rechts"])
+        for name in namen:
+            for h in (0, 1):
+                self.assertNotIn(head_label_short(_PIXEL_MODELL, h), name)
 
     def test_die_bar_regler_eines_gewoehnlichen_doppeltilters_bleiben(self):
         """POSITIVKONTROLLE: derselbe Spider OHNE Override — Wort fuer Wort wie
@@ -634,6 +769,239 @@ class NutzlastTest(_RigFall):
         import types
         self.assertEqual(_head_modelle(types.SimpleNamespace()), {})
         self.assertEqual(_head_modelle(self.state).get(1), _PIXEL_MODELL)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 7. ★★ Kanalname statt Segmentname — wo der Kopf-Index KEIN Segment ist
+# ════════════════════════════════════════════════════════════════════════════
+
+class KanalnameStattSegmentnameTest(_RigFall):
+    """★★ Ruege 1, an der Flaeche gemessen: „wer den ersten Pixel greift,
+    greift ins Falsche".
+
+    Der Kopf-Index gehoert dem ATTRIBUT, nicht dem Geraet: ``attr#N`` ist das
+    N-te Vorkommen VON DIESEM Attribut. Am Robe Spiider im Pixelmodus sind die
+    Segmente die 20 Farb-Baenke; die 21 Rohkanaele zaehlen davon voellig
+    unabhaengig. Vor dieser Runde bekam trotzdem JEDER Pro-Kopf-Regler den
+    Segmentnamen angehaengt::
+
+        Pixel 1 gewaehlt -> „Grundfarbe Shutter · P1"  schreibt DMX  9 (Grundfarbe Rot Fein)
+        Pixel 3 gewaehlt -> „Grundfarbe Shutter · P3"  schreibt DMX 13 (Grundfarbe Blau Fein)
+
+    Der Name war doppelt falsch: der Kanalname stammte von der Vorlage, und das
+    genannte Segment steuerte der Regler ueberhaupt nicht. Jetzt traegt so ein
+    Regler den Namen des Kanals, den er WIRKLICH schreibt — gemessen ueber den
+    echten Schreibweg (Slider bewegen, Programmer-Schluessel zurueckgelesen,
+    Kanal ueber ``channel_occurrence_keys`` aufgeloest), nicht ueber die
+    Funktion, die auch beschriftet."""
+
+    def _channels(self, fixture):
+        from src.core.app_state import get_channels_for_patched
+        return get_channels_for_patched(fixture)
+
+    def _regler_schreibt(self, fid: int, head: int) -> list:
+        """``[(Reglerbeschriftung, Kanalname, DMX-Adresse)]`` — jeder Pro-Kopf-
+        Regler EINZELN ueber den echten Weg gefahren."""
+        from src.core.app_state import channel_occurrence_keys
+        from src.ui.views.programmer_view import AttributeSlider
+        view, _ = self._programmer_auf(fid, head)
+        fx = next(f for f in self.state.get_patched_fixtures() if f.fid == fid)
+        chans = self._channels(fx)
+        regler = [w for w in view.findChildren(AttributeSlider)
+                  if w._display_name and w._head == head
+                  and all(getattr(f, "fid", None) == fid for f in w._fixtures)]
+        self.assertTrue(regler, f"kein Pro-Kopf-Regler fuer {fid}:{head}")
+        out = []
+        for w in sorted(regler, key=lambda x: x._display_name):
+            vorher = dict(self.state.programmer.get(fid, {}))
+            w._slider.setValue(7 if w._slider.value() != 7 else 9)
+            nachher = dict(self.state.programmer.get(fid, {}))
+            geaendert = [k for k, v in nachher.items() if vorher.get(k) != v]
+            self.assertEqual(len(geaendert), 1,
+                             f"{w._display_name!r} schrieb {geaendert}")
+            kanal = next((c for c, k in channel_occurrence_keys(chans)
+                          if k == geaendert[0]), None)
+            self.assertIsNotNone(kanal, f"{geaendert[0]!r} trifft keinen Kanal")
+            out.append((w._display_name, kanal.name,
+                        int(fx.address) + int(kanal.channel_number) - 1))
+        return out
+
+    def test_der_griff_der_frueher_danebenging(self):
+        """★★ Genau der gemeldete Fall, mit Kanalnummer aus dem CHART (Spiider
+        Mode 7: Kanal 9 = „Grundfarbe Rot Fein", Kanal 13 = „Grundfarbe Blau
+        Fein") — nicht aus der Funktion, die auch schreibt."""
+        self.assertEqual(self._regler_schreibt(1, 1),
+                         [("Grundfarbe Rot Fein", "Grundfarbe Rot Fein", 9)])
+        self.assertEqual(self._regler_schreibt(1, 3),
+                         [("Grundfarbe Blau Fein", "Grundfarbe Blau Fein", 13)])
+
+    def test_jeder_pro_kopf_regler_heisst_wie_sein_kanal(self):
+        """Ueber die ganze Breite: die Grundfarbe (10 Regler) und beide Raender
+        des Rings."""
+        for head in (0, 1, 3, 19):
+            with self.subTest(head=head):
+                gemessen = self._regler_schreibt(1, head)
+                self.assertTrue(gemessen)
+                for name, kanal, dmx in gemessen:
+                    self.assertEqual(name, kanal,
+                                     f"Regler {name!r} schreibt DMX {dmx} "
+                                     f"({kanal!r})")
+
+    def test_kein_pro_kopf_regler_behauptet_ein_pixel(self):
+        """Die Gegenrichtung: an einem Regler ohne Segment-Bezug darf KEIN
+        Pixelname stehen — auch nicht der des gerade gewaehlten Kopfes."""
+        pixelnamen = {head_label_for_model(_PIXEL_MODELL, n)
+                      for n in range(1, 20)} | {
+                      head_label_short(_PIXEL_MODELL, n) for n in range(1, 20)}
+        for head in (0, 1, 3, 19):
+            for name, _kanal, _dmx in self._regler_schreibt(1, head):
+                for p in pixelnamen:
+                    self.assertNotRegex(
+                        name, rf"(?<![\w]){re.escape(p)}(?![\w])",
+                        f"Regler {name!r} (Kopf {head}) nennt {p!r}")
+
+    def test_ohne_aufloesbaren_kanal_bleibt_die_bestandsform(self):
+        """POSITIVKONTROLLE der Rueckfallkante: laesst sich der Kanal nicht
+        eindeutig aufloesen (hier: gar kein Geraet in der Hand), beschriftet der
+        Regler weiter wie bisher — die Aenderung ist additiv, nicht ersetzend."""
+        from src.core.app_state import head_channel_name
+        from src.ui.views.programmer_view import ProgrammerView
+        roh = next(c for c in self._channels(self.spiider)
+                   if (c.attribute or "") == "raw")
+        self.assertIsNone(head_channel_name([], "raw", 3))
+        self.assertEqual(ProgrammerView._head_slider_name(roh, [], 3),
+                         f"{roh.name} · {head_label_short('', 3)}")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 8. ★★ Die Flaechen ohne Geraet — attr_label und ihre vier Aufrufer
+# ════════════════════════════════════════════════════════════════════════════
+
+class KontextfreieBeschriftungTest(_RigFall):
+    """``attr_groups.attr_label`` hat kein Geraet in der Hand und uebersetzt
+    ``color_r#3`` deshalb zu „Rot (Kopf 4)" — dasselbe Segment, das ueberall
+    sonst „Pixel 3" heisst. WELCHES Segment ein ``#N`` meint, kann nur das
+    GERAET sagen. Darum liegt die geraetebewusste Fassung
+    (``app_state.attr_label_for``) dort, wo die Geraete sind, und ``attr_label``
+    bleibt unveraendert die Fassung fuer Aufrufer ohne Geraet."""
+
+    def test_ohne_geraet_bleibt_alles_wie_bisher(self):
+        from src.core.app_state import attr_label_for
+        from src.core.attr_groups import attr_label
+        for a in ("color_r", "color_r#3", "tilt#1", "intensity", "color_r#x"):
+            with self.subTest(attr=a):
+                self.assertEqual(attr_label_for(a), attr_label(a))
+                self.assertEqual(attr_label_for(a, [self.movbar]), attr_label(a))
+
+    def test_am_pixel_kopf_heisst_das_segment_wie_ueberall(self):
+        from src.core.app_state import attr_label_for
+        for h in (0, 3, 19):
+            with self.subTest(head=h):
+                key = "color_r" if h == 0 else f"color_r#{h}"
+                self.assertEqual(
+                    attr_label_for(key, [self.spiider]),
+                    f"Rot ({head_label_for_model(_PIXEL_MODELL, h)})")
+
+    def test_ein_attribut_ohne_segment_bleibt_beim_index(self):
+        """★ ``tilt#1`` ist am Pixel-Kopf der zweite TILT-Kanal, nicht Pixel 1.
+        Ein Pixelname waere dort der Name eines anderen Dings."""
+        from src.core.app_state import attr_head_is_segment, attr_label_for
+        from src.core.attr_groups import attr_label
+        for a in ("tilt#1", "raw#3", "shutter#2", "intensity#1"):
+            with self.subTest(attr=a):
+                self.assertFalse(attr_head_is_segment(_PIXEL_MODELL, a))
+                self.assertEqual(attr_label_for(a, [self.spiider]), attr_label(a))
+        for a in ("color_r#3", "color_g", "color_w#2"):
+            self.assertTrue(attr_head_is_segment(_PIXEL_MODELL, a))
+        # POSITIVKONTROLLE: an jedem anderen Modell zaehlen ALLE Attribute ueber
+        # denselben Kopf — sonst wuerde die Regel ringlose Geraete umbauen.
+        for a in ("tilt#1", "raw#3", "color_r#3"):
+            self.assertTrue(attr_head_is_segment("", a))
+
+    def test_gemischte_geraete_benennen_kein_segment(self):
+        from src.core.app_state import attr_label_for
+        from src.core.attr_groups import attr_label
+        for paar in ([self.spiider, self.movbar], [self.movbar, self.spiider]):
+            self.assertEqual(attr_label_for("color_r#3", paar),
+                             attr_label("color_r#3"))
+
+    def test_der_kanalname_wird_nur_bei_EINIGKEIT_uebernommen(self):
+        """``head_channel_name`` darf nicht „irgendeinen" Namen nehmen: Kopf 3
+        heisst am Spiider „P3 Rot" und an der Mover-Bar „Kopf 4 Rot"."""
+        from src.core.app_state import head_channel_name
+        self.assertEqual(head_channel_name([self.spiider], "color_r", 3), "P3 Rot")
+        self.assertEqual(head_channel_name([self.movbar], "color_r", 3),
+                         "Kopf 4 Rot")
+        self.assertIsNone(head_channel_name([self.spiider, self.movbar],
+                                            "color_r", 3))
+        self.assertIsNone(head_channel_name([self.movbar], "raw", 3),
+                          "die Mover-Bar hat gar keinen Rohkanal")
+
+    def test_der_speichern_dialog_fragt_die_geraete_die_den_kanal_liefern(self):
+        """★★ Ein Snap umfasst mehrere Geraete. Wer die Beschriftung ueber ALLE
+        Geraete des Scopes bildet statt ueber die, die diesen Kanal wirklich
+        liefern, faellt still auf den Index zurueck — obwohl nur EIN Geraet den
+        Kanal ueberhaupt hat."""
+        from src.ui.views.snap_file_panel import ChannelSelectDialog
+        nur_pixel = ChannelSelectDialog({1: {"color_r#3": 200}, 2: {"pan": 10}})
+        self.addCleanup(nur_pixel.deleteLater)
+        self.assertEqual(nur_pixel._attr_checks["color_r#3"].text(),
+                         f"Rot ({head_label_for_model(_PIXEL_MODELL, 3)})  (1)")
+        # Liefern ihn BEIDE, benennt er kein einzelnes Segment mehr.
+        beide = ChannelSelectDialog({1: {"color_r#3": 200}, 2: {"color_r#3": 10}})
+        self.addCleanup(beide.deleteLater)
+        self.assertEqual(beide._attr_checks["color_r#3"].text(),
+                         "Rot (Kopf 4)  (2)")
+
+    def test_mapping_ziele_tragen_nie_einen_kopf_schluessel(self):
+        """★ Warum ``mapped_channel_editor`` unveraendert bleibt: seine Ziele
+        kommen direkt aus der Kanal-Liste und tragen nie ein ``#N`` — dort gibt
+        es gar keinen Kopf zu benennen. Am echten Ziel-Auswahlfeld gemessen,
+        mit dem Pixel-Kopf in der Auswahl."""
+        from src.ui.widgets.mapped_channel_editor import MappedChannelEditor
+        self.state.set_selected_fids([1])
+        ed = MappedChannelEditor()
+        self.addCleanup(ed.deleteLater)
+        ed._on_selection()
+        ziele = [ed._target_combo.itemData(i)
+                 for i in range(ed._target_combo.count())]
+        self.assertTrue(ziele, "keine Ziele — der Test misst nichts")
+        self.assertEqual([z for z in ziele if "#" in str(z)], [])
+
+    def test_laser_regler_tragen_nie_einen_kopf_schluessel(self):
+        """Dasselbe fuer ``laser_view``: eine Regler-Zeile bekommt einen KANAL,
+        und ein Kanal-Attribut traegt nie ein ``#N``. Am echten Widget mit dem
+        echten Profil gemessen — der Party-Laser hat sogar ZWEI ``color_r``."""
+        from PySide6.QtWidgets import QLabel
+        from src.core.app_state import get_channels_for_patched
+        from src.ui.views.laser_view import _ChannelRow
+        laser = self._patch("PARTYLASER", "7-Kanal", 7, fid=7, adresse=700)
+        chans = get_channels_for_patched(laser)
+        self.assertEqual(sum(1 for c in chans if c.attribute == "color_r"), 2,
+                         "ohne wiederholtes Attribut misst der Test nichts")
+        for ch in chans:
+            self.assertNotIn("#", ch.attribute or "")
+            row = _ChannelRow(ch, lambda *a: None)
+            self.addCleanup(row.deleteLater)
+            self.assertNotIn("Kopf", row.findChild(QLabel).text())
+
+    def test_die_command_line_nennt_die_vorhandenen_koepfe_beim_namen(self):
+        """★ Die Fehlermeldung nannte die vorhandenen Koepfe „(K1–K20)" — 20
+        Segmente mit einem zweiten Namen. Die zu gross getippte Nummer bleibt
+        bewusst in der getippten Zaehlung: sie beschreibt die EINGABE und
+        benennt kein vorhandenes Segment."""
+        from src.core.cmdline.parser import parse
+        res = parse("1:21 red 255").execute(self.state)
+        self.assertFalse(res.ok)
+        spanne = (f"({head_label_short(_PIXEL_MODELL, 0)}–"
+                  f"{head_label_short(_PIXEL_MODELL, 19)})")
+        self.assertIn(spanne, res.message)
+        self.assertNotIn("K1–K20", res.message)
+        # Und die getippte Nummer ist mit keinem Segmentnamen verwechselbar:
+        # am Pixel-Kopf heisst kein einziges Segment „K…".
+        self.assertIn("K21", res.message)
+        self.assertNotIn("K21", {head_label_short(_PIXEL_MODELL, n)
+                                 for n in range(0, 30)})
 
 
 if __name__ == "__main__":

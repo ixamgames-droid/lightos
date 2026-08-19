@@ -23,7 +23,8 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head, head_label, head_label_gemeinsam)
+    programmer_key_for_head, head_label, head_label_gemeinsam,
+    attr_head_is_segment, gemeinsames_modell, head_channel_name)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -1509,15 +1510,13 @@ class ProgrammerView(QWidget):
                 if not ziele:
                     continue
                 for _head, _owners in self._slider_head_buckets(ziele, ch):
-                    # FM-14b (Nachbesserung): dieselbe EINE Quelle wie die
-                    # Geraeteliste. Der Regler traegt oft MEHRERE Geraete —
-                    # head_label_gemeinsam faellt bei gemischten Modellen
-                    # bewusst auf die index-basierte Bestandsbeschriftung zurueck.
+                    # FM-14b: dieselbe EINE Quelle wie die Geraeteliste — und
+                    # sie nennt nur dort ein Segment, wo der Kopf-Index eines
+                    # adressiert (s. _head_slider_name).
                     ilay.addWidget(AttributeSlider(
                         ch, _owners, self._state, owner=self, head=_head,
                         display_name=(None if _head is None else
-                                      f"{ch.name or ch.attribute} · "
-                                      f"{head_label_gemeinsam(_owners, _head, kurz=True)}")))
+                                      self._head_slider_name(ch, _owners, _head))))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1626,7 +1625,9 @@ class ProgrammerView(QWidget):
         sonst entstuende ein ``tilt#N`` ohne Kanal, und der Kopf fiele im
         DMX-Pfad still auf seinen Default zurueck (Fehlerklasse FM-9/A5).
         Beschriftung aus derselben EINEN Quelle wie ueberall sonst
-        (``head_label_gemeinsam``) — am Pixel-Kopf also ``P1``/``P2``."""
+        (``_head_slider_name``): am gewoehnlichen Doppeltilter ``· K1``/``· K2``
+        wie bisher, an einem als ``pixel_head`` gefuehrten Geraet der Name des
+        Tilt-Kanals selbst — die zweite TILT-Achse ist dort kein Pixel."""
         if not fixtures:
             return
         template = max(fixtures, key=self._tilt_count)
@@ -1640,8 +1641,7 @@ class ProgrammerView(QWidget):
                     self._seed_separate_head(owners, ch, occ)
                 ilay.addWidget(AttributeSlider(
                     ch, owners, self._state, owner=self, head=occ,
-                    display_name=f"{ch.name or 'Tilt'} · "
-                                 f"{head_label_gemeinsam(owners, occ, kurz=True)}"))
+                    display_name=self._head_slider_name(ch, owners, occ, "Tilt")))
             occ += 1
 
     @staticmethod
@@ -1829,6 +1829,31 @@ class ProgrammerView(QWidget):
                 occ[ch.attribute] = h + 1
                 color_chs.append((ch, h))
         return color_chs, occ
+
+    @staticmethod
+    def _head_slider_name(ch, owners, head, fallback: str = "") -> str:
+        """Beschriftung EINES Pro-Kopf-Reglers — die EINE Quelle.
+
+        ★ FM-14b (dritter Anlauf). Bestandsform ist ``"<Kanalname> · <Kurzform
+        des Kopfnamens>"``. Sie setzt voraus, dass der Kopf-Index dieses
+        Attributs wirklich ein Segment adressiert. Am Pixel-Kopf gilt das nur
+        fuer die Farb-Baenke; ``raw#3`` ist dort der vierte Rohkanal
+        (``Grundfarbe Blau Fein``), nicht Pixel 3. Der Regler hiess trotzdem
+        „Grundfarbe Shutter · P3" — wer das erste Pixel griff, griff in die
+        Grundfarbe.
+
+        Deshalb: adressiert der Kopf-Index KEIN Segment, traegt der Regler den
+        Namen des Kanals, den er wirklich schreibt (``head_channel_name`` ueber
+        dieselbe Quelle wie ``programmer_key_for_head``) — und gar keinen
+        Kopfnamen, weil es dort keinen zu nennen gibt. Laesst der Kanal sich
+        nicht eindeutig aufloesen, bleibt es bei der Bestandsform."""
+        basis = getattr(ch, "name", None) or fallback or getattr(ch, "attribute", "")
+        modell = gemeinsames_modell(owners)
+        if not attr_head_is_segment(modell, getattr(ch, "attribute", "")):
+            echt = head_channel_name(owners, getattr(ch, "attribute", ""), head)
+            if echt:
+                return echt
+        return f"{basis} · {head_label_gemeinsam(owners, head, kurz=True)}"
 
     def _slider_head_buckets(self, fixtures, ch) -> list:
         """Auf welche Koepfe verteilt sich EIN Attribut-Regler? ``[(head, owners)]``.

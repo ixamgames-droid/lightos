@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Ein Pixelname steht nur noch da, wo er stimmt
+
+#### Behoben
+
+- **Wer das erste Pixel anfasste, verstellte die Grundfarbe.** Wählt man am Robe
+  Spiider (Pixelmodus) in der Geräteliste `Pixel 1`, so trug der einzige Regler
+  im Tab *Weitere* die Aufschrift „Grundfarbe Shutter · P1" — bewegte aber
+  DMX-Kanal 9, also „Grundfarbe Rot Fein". Grund: die Kopfnummer gehört dem
+  **Kanal-Typ**, nicht dem Gerät. Der Spiider hat 20 Farb-Bänke, aber 21
+  Roh-Kanäle; „der dritte Roh-Kanal" hat mit Pixel 3 nichts zu tun. Ein solcher
+  Regler heißt jetzt nach dem Kanal, den er wirklich schreibt
+  („Grundfarbe Blau Fein") und behauptet kein Segment mehr.
+
+- **Snap-Dialoge nannten dasselbe Pixel weiter „Kopf 4".** Beim Speichern eines
+  Snaps und beim nachträglichen „➕ Kanal" hieß `color_r#3` weiter „Rot (Kopf 4)"
+  — dasselbe Segment, das der Programmer daneben `Pixel 3` nennt. Und die
+  Grundfarbe stand dort schlicht als „Rot" ganz oben in der Liste, sah also aus
+  wie das erste Pixel. Beide Dialoge fragen jetzt die Geräte, die den Kanal
+  wirklich liefern: „Rot (Grundfarbe)" und „Rot (Pixel 3)". Liefern mehrere
+  Geräte verschiedener Bauart denselben Kanal, bleibt es beim Kopf-Index — dort
+  gibt es kein gemeinsames Segment zu benennen.
+
+- **Die Command-Line nannte vorhandene Köpfe mit einem zweiten Namen.**
+  `1:21 red 255` meldete „… 20 Köpfe (K1–K20) …" für ein Gerät, dessen Segmente
+  überall sonst `GR` und `P1`…`P19` heißen. Die Spanne kommt jetzt aus derselben
+  Quelle („(GR–P19)"). Die zu groß **getippte** Nummer bleibt bewusst eine
+  Nummer — sie beschreibt die Eingabe, nicht ein vorhandenes Segment.
+
+#### Neu
+
+- **Geräte ohne Ringe bleiben Wort für Wort unverändert** — auch die
+  Regler-Beschriftung („Kopf 1 Pan · K4"), die Snap-Dialoge („Rot (Kopf 4)") und
+  die Fehlermeldungen der Command-Line („(K1–K4)").
+
+
 ### 2026-08-19 — Ein Segment, ein Name — an jeder Stelle
 
 #### Behoben

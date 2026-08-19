@@ -95,9 +95,10 @@ griffe man beim ersten Pixel versehentlich ins ganze Gerät.
 ### Wie ein Segment überall heißt
 
 Ein Segment hat **einen** Namen, und den zeigt jede Fläche, die es benennt — die
-Geräteliste und die Kopfzeile des Programmers, die Reglerbeschriftung, die Rasterzelle
-im Gruppen-Editor, der Zell-Tooltip der Matrix-Vorschau, die EFX-Zielliste, das
-Fan-Werkzeug und die Statuszeile der Command-Line.
+Geräteliste und die Kopfzeile des Programmers, die Farbregler, die Rasterzelle im
+Gruppen-Editor, der Zell-Tooltip der Matrix-Vorschau, die EFX-Zielliste, das
+Fan-Werkzeug, die Statuszeile der Command-Line sowie die beiden Kanal-Dialoge rund um
+Snaps (beim Speichern und beim nachträglichen Ergänzen im Snap-Editor).
 
 | | gewöhnliches Mehrkopf-Gerät | Pixel-Kopf |
 |---|---|---|
@@ -117,7 +118,24 @@ Pixelkanäle des Spiiders selbst `P3 Rot`, `P3 Grün`, `P3 Blau` und die des gan
 > **Ein Regler über gemischte Geräte** — etwa ein Pixel-Kopf und eine Mover-Bar,
 > beide auf Kopf 4 eingeschränkt — trägt weiter die Kopfnummer (`K4`). Er benennt
 > dort kein einzelnes Segment mehr, sondern den Kopf-Index, den beide gemeinsam
-> haben; `Pixel 3` wäre für die Mover-Bar schlicht falsch.
+> haben; `Pixel 3` wäre für die Mover-Bar schlicht falsch. Dasselbe gilt beim
+> Speichern eines Snaps, wenn **mehrere** Geräte denselben Kanal liefern.
+
+### Warum nicht jeder Regler einen Pixelnamen trägt
+
+Die Kopfnummer gehört dem **Kanal-Typ**, nicht dem Gerät: der zweite Rot-Kanal ist Pixel 1,
+der zweite Roh-Kanal ist einfach der zweite Roh-Kanal. Am Spiider sind das 20 Farb-Bänke,
+aber 21 Roh-Kanäle — die zählen völlig unabhängig voneinander.
+
+Deshalb steht ein Pixelname nur dort, wo er auch stimmt. Wählst du `Pixel 3` und öffnest
+den Tab *Weitere*, heißt der Regler dort nach dem Kanal, den er wirklich bewegt
+(`Grundfarbe Blau Fein`) — **nicht** `… · P3`. Der Kanal gehört zur Grundfarbe, und
+genau das sagt sein Name. Bei einem gewöhnlichen Mehrkopf-Gerät ändert sich nichts:
+dort heißt der Regler unverändert `Kopf 1 Pan · K4`.
+
+Die Fehlermeldungen der Command-Line nennen die vorhandenen Köpfe ebenfalls beim Namen
+(`Gerät 1 hat für 'color_r' 20 Köpfe (GR–P19)`). Die zu groß **getippte** Nummer bleibt
+dagegen eine Nummer (`K21`) — sie beschreibt deine Eingabe und kein vorhandenes Segment.
 
 ### Was im Dialog *Gerät bearbeiten* dazugehört
 

@@ -121,6 +121,22 @@ class ChannelSelectDialog(QDialog):
             out[fid] = attrs
         return out
 
+    @staticmethod
+    def _attr_text(attr: str, attr_fids: dict) -> str:
+        """Beschriftung EINER Kanal-Checkbox — mit den Geraeten, die den Kanal
+        wirklich liefern (FM-14b, ``app_state.attr_label_for``).
+
+        Ohne ``AppState`` (Test-Fakes, Kopflos-Aufrufer) bleibt es bei der
+        kontextfreien ``attr_label`` — dann ist gar kein Geraet bekannt, und ein
+        Segmentname waere geraten."""
+        try:
+            from src.core.app_state import attr_label_for, get_state as _gs
+            gepatcht = {int(f.fid): f for f in _gs().get_patched_fixtures()}
+        except Exception:
+            return _attr_label(attr)
+        fixtures = [gepatcht[f] for f in attr_fids.get(attr, ()) if f in gepatcht]
+        return attr_label_for(attr, fixtures)
+
     def _setup_ui(self, programmer: dict):
         layout = QVBoxLayout(self)
         layout.setSpacing(6)
@@ -136,12 +152,19 @@ class ChannelSelectDialog(QDialog):
             layout.addWidget(info)
 
         # Werte pro Gruppe -> pro Attribut zaehlen (nur Geraete im aktiven Scope).
+        # FM-14b: nebenbei die fids MITSCHREIBEN, die dieses Attribut liefern —
+        # nur mit ihnen kann die Beschriftung sagen, WELCHES Segment ein ``#N``
+        # meint (am Pixel-Kopf „Pixel 3" statt „Kopf 4"). Kommen mehrere
+        # Geraete-Modelle zusammen, benennt sie wieder den Kopf-Index; das
+        # entscheidet ``attr_label_for`` an EINER Stelle.
         group_attr_counts: dict[str, dict[str, int]] = {}
-        for attrs in scoped.values():
+        attr_fids: dict[str, list[int]] = {}
+        for fid, attrs in scoped.items():
             for attr in attrs:
                 grp = _classify_attr(attr)
                 per = group_attr_counts.setdefault(grp, {})
                 per[attr] = per.get(attr, 0) + 1
+                attr_fids.setdefault(attr, []).append(int(fid))
 
         for grp in _ATTR_GROUP_ORDER:
             attr_counts = group_attr_counts.get(grp)
@@ -175,7 +198,7 @@ class ChannelSelectDialog(QDialog):
             cbl.setSpacing(2)
             for attr in sorted(attr_counts, key=lambda a: _attr_label(a).lower()):
                 c = attr_counts[attr]
-                acb = QCheckBox(f"{_attr_label(attr)}  ({c})")
+                acb = QCheckBox(f"{self._attr_text(attr, attr_fids)}  ({c})")
                 acb.setChecked(True)
                 self._attr_checks[attr] = acb
                 cbl.addWidget(acb)

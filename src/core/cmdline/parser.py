@@ -169,6 +169,27 @@ def _selection_heads(state, attribute: str) -> dict:
         return {}
 
 
+def _kopf_spanne(fixture, n: int) -> str:
+    """Die Koepfe, die es WIRKLICH gibt — in denselben Namen wie ueberall sonst.
+
+    ``K1–K4`` an einem gewoehnlichen Mehrkopf-Geraet (wortwoertlich der
+    Bestand), ``GR–P19`` am Pixel-Kopf. Beide kommen aus der EINEN Quelle
+    (``app_state.head_label_gemeinsam``), damit die Fehlermeldung nicht die
+    zweite Benennung ist, gegen die FM-14b angeht.
+
+    Die zu gross getippte Nummer daneben bleibt bewusst in der GETIPPTEN
+    Zaehlung (``K21``): sie beschreibt die Eingabe und benennt kein vorhandenes
+    Segment. Am Pixel-Kopf ist sie damit auch nicht verwechselbar — dort heisst
+    kein einziges Segment ``K…``.
+    """
+    try:
+        from src.core.app_state import head_label_gemeinsam
+        return (f"{head_label_gemeinsam([fixture], 0, kurz=True)}–"
+                f"{head_label_gemeinsam([fixture], n - 1, kurz=True)}")
+    except Exception:
+        return f"K1–K{n}"
+
+
 def _geraet_kopfzahl(fx, chans, zaehle_farbe, zaehle_bewegung) -> int:
     """Wie viele Koepfe hat das GERAET (nicht: das Attribut)? Pan/Tilt und
     Farbbaenke sind die beiden belastbaren Belege; ohne beide gibt es keinen.
@@ -264,7 +285,8 @@ def _typed_heads(state, selection: "SelectionExpr", attribute: str,
             zu_gross = [h for h in hs if h >= n]
             if zu_gross:
                 return {}, (f"Gerät {fid} hat für '{attribute}' {n} Köpfe "
-                            f"(K1–K{n}) — K{zu_gross[0] + 1} gibt es dort nicht")
+                            f"({_kopf_spanne(fx, n)}) — K{zu_gross[0] + 1} "
+                            f"gibt es dort nicht")
     validator = getattr(state, "validate_head_restrictions", None)
     if callable(validator) and counter is not None:
         try:

@@ -4692,14 +4692,112 @@ def head_label_gemeinsam(fixtures, head: int, *, kurz: bool = False) -> str:
     ``kurz`` waehlt die Kurzform DERSELBEN Beschriftung (``head_label_short``),
     nicht eine zweite Regel.
     """
+    model = gemeinsames_modell(fixtures)
+    return head_label_short(model, head) if kurz else head_label_for_model(model, head)
+
+
+def gemeinsames_modell(fixtures) -> str:
+    """Das Render-Modell, das ALLE uebergebenen Geraete teilen — sonst ``""``.
+
+    Die Bedingung, unter der eine Flaeche ueberhaupt ein einzelnes Segment
+    benennen darf. Steht ueber der Flaeche ein Pixel-Kopf UND eine Mover-Bar,
+    gibt es kein gemeinsames Segment mehr, nur noch den gemeinsamen Kopf-INDEX
+    — ``""`` fuehrt genau dorthin zurueck (``head_label_for_model`` liefert dann
+    die index-basierte Bestandsbeschriftung).
+    """
     modelle = set()
     for f in fixtures or []:
         try:
             modelle.add(viz_model_for(f) or "")
         except Exception:
             modelle.add("")
-    model = modelle.pop() if len(modelle) == 1 else ""
-    return head_label_short(model, head) if kurz else head_label_for_model(model, head)
+    return modelle.pop() if len(modelle) == 1 else ""
+
+
+def attr_head_is_segment(model: str, attribute: str) -> bool:
+    """Adressiert ``attribute#N`` an diesem Modell wirklich ein **Segment**?
+
+    ★ Die Trennlinie zwischen **Segmentname** und **Kanalname**. Der Kopf-Index
+    ist keine Geraete-Eigenschaft, sondern eine Eigenschaft **je Attribut**:
+    ``attr#N`` ist das N-te Vorkommen VON DIESEM Attribut
+    (``channel_occurrence_keys``). Am Pixel-Kopf sind die Segmente die
+    **Farb-Baenke** — dort ist ``color_r#3`` tatsaechlich Pixel 3 (die
+    Bibliothek nennt den Kanal selbst ``P3 Rot``). Jedes andere Attribut zaehlt
+    seine eigenen Kanaele: am Robe Spiider im Pixelmodus ist ``raw#3`` der
+    VIERTE Rohkanal des Geraets (``Grundfarbe Blau Fein``, DMX 13) und hat mit
+    Pixel 3 nichts zu tun. Ein Pixelname waere dort keine zweite Benennung
+    desselben Dings, sondern der Name eines ANDEREN Dings — genau der Griff
+    daneben, um den es in FM-14b geht.
+
+    An jedem anderen Modell zaehlt die Bedienung alle Attribute ueber denselben
+    Kopf-Index -> ``True``, und ein Geraet ohne Ringe bleibt damit unveraendert.
+    """
+    if (model or "") != _PIXEL_HEAD_MODEL:
+        return True
+    return (attribute or "").split("#", 1)[0].lower() in _DIM_COLOR_ATTRS
+
+
+def attr_label_for(attr: str, fixtures=None) -> str:
+    """Attribut-Beschriftung MIT Geraetekenntnis — die Flaechen-Fassung von
+    ``attr_groups.attr_label``.
+
+    ``attr_label`` uebersetzt kontextfrei: ``color_r#3`` -> „Rot (Kopf 4)".
+    Dasselbe Segment heisst im Programmer, im Gruppen-Raster und in der
+    Command-Line „Pixel 3" — zwei Namen fuer ein Ding. WELCHES Segment ein
+    ``#N`` meint, kann aber nur das **Geraet** sagen; ``attr_groups`` hat keines
+    in der Hand. Deshalb steht diese Fassung hier, wo die Geraete sind, und
+    ``attr_label`` bleibt unveraendert die kontextfreie Fassung fuer Aufrufer
+    ohne Geraet.
+
+    ``fixtures`` sind die Geraete, ueber denen die Beschriftung steht. Tragen
+    sie nicht alle dasselbe Render-Modell, benennt sie kein einzelnes Segment
+    mehr -> unveraendert ``attr_label`` (dieselbe Regel wie
+    ``head_label_gemeinsam``). Ebenso, wenn das Modell seine Koepfe gar nicht
+    umbenennt: dann ist die Bestandsbeschriftung schon die richtige.
+    """
+    from .attr_groups import attr_label as _attr_label
+    base, sep, head = (attr or "").partition("#")
+    model = gemeinsames_modell(fixtures)
+    if not attr_head_is_segment(model, base):
+        return _attr_label(attr)
+    if sep and head:
+        try:
+            h = int(head)
+        except (TypeError, ValueError):
+            return _attr_label(attr)
+    else:
+        # Ohne ``#`` meint die Mehrkopf-Konvention Kopf 0 — am Pixel-Kopf also
+        # die GRUNDFARBE. Genau die Zeile, die sonst schlicht „Rot" heisst und
+        # damit wie das erste Pixel aussieht.
+        h = 0
+    if head_label_for_model(model, h) == head_label_for_model("", h):
+        return _attr_label(attr)
+    return f"{_attr_label(base)} ({head_label_for_model(model, h)})"
+
+
+def head_channel_name(fixtures, attribute: str, head) -> str | None:
+    """Wie heisst der Kanal, den ``attribute``/``head`` an DIESEN Geraeten
+    wirklich trifft? ``None``, wenn er nicht bei allen denselben Namen traegt.
+
+    Aufloesung ueber ``channels_for_head`` — dieselbe EINE Quelle, aus der auch
+    ``programmer_key_for_head`` den Schluessel bildet, den ein Regler schreibt.
+    So kann eine Beschriftung den Kanal benennen, der wirklich bewegt wird,
+    statt den der Vorlage.
+    """
+    base = (attribute or "").split("#", 1)[0].lower()
+    if not base:
+        return None
+    namen = set()
+    for f in fixtures or []:
+        try:
+            ch = channels_for_head(get_channels_for_patched(f), int(head)).get(base)
+        except Exception:
+            return None
+        name = (getattr(ch, "name", "") or "").strip() if ch is not None else ""
+        if not name:
+            return None
+        namen.add(name)
+    return namen.pop() if len(namen) == 1 else None
 
 
 def head_models_by_fid(fixtures=None) -> dict:
