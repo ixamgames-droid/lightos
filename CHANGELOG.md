@@ -25,6 +25,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   aller Pixel weiterhin ankamen. Ein Gerät mit mehr Pixeln zeigte also stumm nur
   einen Teil davon. Jetzt wird jede gemeldete Bank gezeichnet; die Segmente
   rücken enger zusammen und bleiben in der Lichtaustrittsfläche.
+### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
+
+#### Behoben
+
+- **Rote Testsegmente, die isoliert gruen waren, wenn mehrere Sitzungen
+  gleichzeitig testeten.** Der Segment-Runner wartete vor jedem
+  WebEngine-Segment bis zu drei Sekunden darauf, dass „keine Chromium-Prozesse
+  mehr laufen" — gefragt wurde aber **rechnerweit**, ueber alle Sitzungen.
+  Nachgemessen sind die eigenen Chromium-Kinder eines Segments spaetestens nach
+  0,037 s weg; gewartet wurde also nie auf sie, sondern immer nur auf fremde
+  Prozesse, die davon nicht verschwinden. Unter Parallellast liefen dadurch
+  **41 von 41** WebEngine-Segmenten in den Deckel: 123 Sekunden Wartezeit je
+  Lauf, ohne Wirkung. An seiner Stelle steht jetzt eine schmale rechnerweite
+  Sperre, die genau **ein** WebEngine-Segment gleichzeitig zulaesst — auch fuer
+  gezielte Einzellaeufe (`./tools/verify_loop.sh tests/test_viz*.py`), die
+  bisher ausgenommen waren, obwohl Agenten fast nur solche fahren. Alles ohne
+  3D-Ansicht laeuft unveraendert ungebremst.
+- **Ein Verzeichnis als Argument fiel dabei durchs Raster.**
+  `./tools/verify_loop.sh tests/` faehrt alle 41 Dateien mit 3D-Ansicht in
+  einem einzigen Prozess — und lief trotzdem ungesperrt, weil die Erkennung nur
+  nach einer *Datei* sah. Derselbe blinde Fleck galt fuer einen Lauf ganz ohne
+  Pfadangabe. Beide nehmen die Sperre jetzt.
+- **Gezielte Laeufe hatten ihr Terminal verloren.** Um an die Prozessgruppe zu
+  kommen, startete das Gate `pytest` im Hintergrund — dabei legt die Shell die
+  Standardeingabe auf `/dev/null`. Damit waren `--pdb`, `breakpoint()` und
+  `--trace` in **jedem** gezielten Lauf tot, auch in den 95 % ohne 3D-Ansicht.
+  Der Umweg brachte hier ohnehin nichts (nachgemessen: ein Hintergrundjob bleibt
+  in der Prozessgruppe des Skripts); `pytest` laeuft wieder im Vordergrund.
+- **Ein liegengebliebener Testprozess konnte das Gate dauerhaft lahmlegen.** Die
+  Sperre gegen zwei gleichzeitige volle Testlaeufe wird ueber einen offenen
+  Dateizeiger gehalten, und den erbte bisher **jeder** Prozess, den der Lauf
+  startete — bis hinunter zu den Hilfsprozessen der 3D-Ansicht. Gelockert wird
+  die Sperre aber erst, wenn die **letzte** Kopie geschlossen ist. Ein einziger
+  Prozess, der den Lauf ueberlebt, hielt sie damit ueber das Ende hinaus fest;
+  der naechste volle Lauf auf demselben Rechner haette dann ohne Zeitlimit und
+  ohne Meldung gewartet. Der Zeiger wird jetzt an beiden Wegen der vollen Suite
+  geschlossen, bevor die Testprozesse starten. Nachgemessen an einem
+  Wegwerf-Repo mit einem absichtlich ueberlebenden Kind: vorher blieb die Sperre
+  belegt, jetzt ist sie danach frei.
 ### 2026-08-19 — Die weiße Leiste bekommt nur noch, wer wirklich eine hat
 
 #### Behoben

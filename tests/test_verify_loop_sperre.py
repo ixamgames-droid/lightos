@@ -305,8 +305,14 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
                     # werden soll aber die Arbeitsfassung — dieselbe, die jeder
                     # andere Test sieht. Sonst misst dieser Test einen aelteren
                     # Runner als den, der gerade laeuft.
-                    shutil.copy2(os.path.join(_REPO, "tools", "verify_loop.sh"),
-                                 os.path.join(ziel, "tools", "verify_loop.sh"))
+                    # ★ PROC-02c: `_gate_webengine.sh` muss mitkommen.
+                    # `verify_loop.sh` sourcet es und steigt sonst mit exit 2
+                    # aus — und dann meldet es die Sperrdatei nie. Wer hier nur
+                    # den Runner kopiert, testet eine Arbeitsfassung gegen einen
+                    # committeten Helfer: genau die Paarung, die es nirgends gibt.
+                    for datei in ("verify_loop.sh", "_gate_webengine.sh"):
+                        shutil.copy2(os.path.join(_REPO, "tools", datei),
+                                     os.path.join(ziel, "tools", datei))
                 a = self._sperrpfad(geschwister)
                 b = self._sperrpfad(tief)
                 self.assertEqual(
