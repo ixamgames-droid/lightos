@@ -13,6 +13,16 @@ reproduzierbar.
 > (`buildPixelHead`). Die Klasse ist im Programm vollständig da; das Galerie-Bild fehlt,
 > weil der Render einen Browser mit GPU braucht (s. „Bilder neu erzeugen" unten) und die
 > Typenliste in `gallery_render.html` sie noch nicht führt.
+>
+> **Wie viele Segmente entstehen (CDX-55/56):** grundsätzlich eines je Farbbank des
+> Modus — es gibt **keine Obergrenze**, die Segmente rücken bei vielen Pixeln enger
+> zusammen und bleiben in der Lichtaustrittsfläche. Hat das Gerät eine eigene
+> **Grundfarben-Lage** (Robe Spiider: „Background"), fällt deren Bank weg — sie färbt
+> ohnehin schon Linse, Kegel und Bodenfleck. Ob es eine solche Lage gibt, liest LightOS
+> am Kanal-Layout ab (`app_state.pixel_ring_base_banks`): ein Pixelfeld liegt in
+> gleichmäßigen Schritten auf DMX, eine Grundfarben-Lage mit eigenem Shutter/Dimmer nicht.
+> Ohne Beleg gilt „keine Lage" — ein unterstellter Versatz würde ein Pixel verschwinden
+> lassen.
 
 Die Maße jeder Klasse sind gegen ein recherchiertes Referenzgerät dimensioniert
 (Realismus-Pass **FM-11**, Quellen als Kommentare in `builders.js`). Welches Modell ein

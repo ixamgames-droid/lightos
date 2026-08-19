@@ -25,6 +25,21 @@ auf, wenn etwas gebaut, aber nirgends eingetragen wuerde.
 
 ★★★ Arrays reisen ueber die QtWebEngine-Bruecke nicht zuverlaessig zurueck.
 Jede Messung fragt deshalb einen EINZELNEN Zahlen-/Wahrheitswert ab.
+
+**Nachlese CDX-55/56 (Abschnitte 7 und 8).** Zwei Annahmen aus FM-14 sind hier
+widerlegt worden, beide im selben Codepfad:
+
+* **CDX-55** — Segment ``i`` hing fest an Kopf ``i+1``, weil „Bank 0 die
+  Grundfarbe" sei. Der Versatz kommt jetzt als ``pixelBase`` mit der Nutzlast
+  (abgeleitet in ``app_state.pixel_ring_base_banks``, gemessen in
+  ``test_cdx55_56_pixel_ring.py``). Ein Geraet aus lauter Pixel-Baenken steht
+  deshalb mit im Rig — sein Pixel 0 muss ein eigenes Segment haben.
+* **CDX-56** — bei 64 Segmenten wurde stillschweigend abgeschnitten, im 3D und
+  im 2D-Icon getrennt. Ein Geraet mit 100 Baenken steht deshalb ebenfalls mit
+  im Rig.
+
+Der Spiider bleibt daneben stehen und wird MIT GEMESSEN: er ist die
+Positivkontrolle dafuer, dass die eingebauten Geraete unveraendert aussehen.
 """
 import json
 import os
@@ -92,35 +107,50 @@ def _pump(seconds):
 
 
 # ── Die Geraete der Szene ───────────────────────────────────────────────────
-_SPIIDER = 510301   # Robe Spiider, Mode 7: 20 Baenke -> 19 Ring-Segmente
+_SPIIDER = 510301   # Robe Spiider, Mode 7: 20 Baenke, Versatz 1 -> 19 Segmente
 _NORMAL = 510302    # gewoehnlicher Moving Head (Positivkontrolle MH8/MH16)
 _WASH = 510303      # DERSELBE Spiider im Wash-Modus: eine Bank, kein Ring
 _KLEIN = 510304     # Pixel-Kopf mit nur EINEM Segment (Randfall)
+# CDX-55: importiertes Geraet, dessen Baenke ALLE physische Pixel sind
+# (`pixelBase` 0, aus dem Kanal-Layout abgeleitet — s.
+# test_cdx55_56_pixel_ring.py). Sein Pixel 0 muss ein eigenes Segment bekommen.
+_ALLPIXEL = 510305
+# CDX-56: 100 Baenke — weit ueber dem alten stillen 64er-Deckel.
+_GROSS = 510306
+# Entartete Nutzlasten. Sie kommen aus keinem Profil der Bibliothek, aber der
+# Renderer kann sie nicht pruefen — und ein Ring OHNE Segment waere ein
+# Pixel-Kopf, der als gewoehnlicher Moving Head dasteht.
+_EINE_BANK = 510307   # eine Bank, aber Versatz 1 -> der Versatz muss klemmen
+_OHNE_ZAHL = 510308   # gar keine Bank-Angabe -> genau ein Segment (wie bisher)
 
 
 def _payload():
     def p(fid, **kw):
         d = {"fid": fid, "label": f"F{fid}", "type": "moving_head",
-             "model": "moving_head", "nHeads": 0,
+             "model": "moving_head", "nHeads": 0, "pixelBase": 0,
              "x": 0, "y": 5, "z": 0, "rotX": 0, "rotY": 0, "rotZ": 0,
              "panRange": 540, "tiltRange": 220, "panZero": 128, "tiltZero": 128,
              "r": 0, "g": 0, "b": 0, "intensity": 0, "pan": 128, "tilt": 128}
         d.update(kw)
         return d
     return json.dumps([
-        p(_SPIIDER, model="pixel_head", nHeads=20, x=-4),
+        p(_SPIIDER, model="pixel_head", nHeads=20, pixelBase=1, x=-4),
         p(_NORMAL, x=0),
         p(_WASH, x=4),                       # nHeads 0 -> Modell moving_head
-        p(_KLEIN, model="pixel_head", nHeads=2, x=8),
+        p(_KLEIN, model="pixel_head", nHeads=2, pixelBase=1, x=8),
+        p(_ALLPIXEL, model="pixel_head", nHeads=19, pixelBase=0, x=12),
+        p(_EINE_BANK, model="pixel_head", nHeads=1, pixelBase=1, x=20),
+        p(_OHNE_ZAHL, model="pixel_head", x=24),
+        p(_GROSS, model="pixel_head", nHeads=100, pixelBase=1, x=16),
     ])
 
 
-def _heads(pro_kopf=None):
-    """20 Koepfe, wie ``_build_fixture_payload`` sie fuer den Pixel-Modus
-    liefert (Kopf 0 = Grundfarbe, Kopf 1..19 = Pixel 1..19)."""
+def _heads(pro_kopf=None, n=20):
+    """``n`` Koepfe, wie ``_build_fixture_payload`` sie liefert. Fuer den
+    Spiider (n=20, Versatz 1): Kopf 0 = Grundfarbe, Kopf 1..19 = Pixel 1..19."""
     pro_kopf = pro_kopf or {}
     hs = []
-    for j in range(20):
+    for j in range(n):
         h = {"r": 0, "g": 0, "b": 0, "cr": 0, "cg": 0, "cb": 0, "cw": 0,
              "pan": 128, "tilt": 128}
         h.update(pro_kopf.get(j, {}))
@@ -236,7 +266,9 @@ class PixelHeadSceneTest(unittest.TestCase):
         da = False
         while time.monotonic() < ende:
             self._bridge.allFixtures.emit(nutzlast)
-            if self._eval(f"typeof window.__lightos.fixtures['{_KLEIN}'] "
+            # Auf das ZULETZT gelistete Geraet warten — sonst laeuft eine
+            # Messung los, waehrend die Szene noch baut.
+            if self._eval(f"typeof window.__lightos.fixtures['{_GROSS}'] "
                           f"=== 'object'"):
                 da = True
                 break
@@ -533,6 +565,190 @@ class PixelHeadSceneTest(unittest.TestCase):
         self.assertEqual(
             self._zahl(f"window.__fm14.seg({_SPIIDER}, 0).material.color.r"), 0.0,
             "ohne Kopf-Daten darf kein Segment die Geraetefarbe zeigen")
+
+    # ── (7) CDX-55: der Versatz kommt aus dem Profil ────────────────────────
+
+    def test_ein_geraet_aus_lauter_pixel_baenken_zeigt_sein_pixel_null(self):
+        """★★ CDX-55, die Abnahme. FM-14 haengte Segment ``i`` fest an Kopf
+        ``i+1``, weil „Bank 0 die Grundfarbe" sei. Dieses Geraet hat keine
+        Grundfarben-Lage — alle 19 Baenke sind physische Pixel (``pixelBase``
+        0, aus dem Kanal-Layout abgeleitet). Es braucht also 19 Segmente, und
+        Segment 0 IST Pixel 0. Mit der alten festen 1 waeren es 18 Segmente,
+        und Pixel 0 erschiene nirgends im Ring."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.ring({_ALLPIXEL}).length"),
+                         19, "19 Pixel-Baenke brauchen 19 Segmente")
+        nur_null = json.dumps([{
+            "fid": _ALLPIXEL, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": _heads({0: {"b": 255}}, n=19),
+        }])
+        ok = self._dmx(nur_null,
+                       f"window.__fm14.seg({_ALLPIXEL}, 0).material.color.b"
+                       f" > 0.9")
+        self.assertTrue(ok, "Pixel 0 faerbt kein Segment")
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_ALLPIXEL}, 1).material.color.b"),
+            0.0, "der Ring ist um eins verschoben")
+
+    def test_und_das_letzte_pixel_faellt_dabei_nicht_hinten_raus(self):
+        """★ Die Gegenprobe am oberen Ende: ohne Versatz ist Kopf 18 das
+        LETZTE Segment. Ein Renderer, der die Zahl anpasst, aber den Zugriff
+        nicht (oder umgekehrt), greift hier daneben."""
+        self._aufbauen()
+        batch = json.dumps([{
+            "fid": _ALLPIXEL, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": _heads({18: {"g": 255}}, n=19),
+        }])
+        ok = self._dmx(batch,
+                       f"window.__fm14.seg({_ALLPIXEL}, 18).material.color.g"
+                       f" > 0.9")
+        self.assertTrue(ok, "Pixel 18 faerbt kein Segment")
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_ALLPIXEL}, 17).material.color.g"),
+            0.0)
+
+    def test_das_2d_icon_folgt_demselben_versatz(self):
+        """★ 2D und 3D duerfen nicht auseinanderlaufen (Lehre VIZ-51) — und
+        ``addRingCells`` rechnete die Segmentzahl bis CDX-56 SELBST nach. 19
+        Zellen fuer 19 Baenke, und Zelle 0 zeigt Pixel 0."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.zellen({_ALLPIXEL}).length"),
+                         19)
+        batch = json.dumps([{
+            "fid": _ALLPIXEL, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": _heads({0: {"b": 255}}, n=19),
+        }])
+        ok = self._dmx(batch,
+                       f"window.__fm14.zellen({_ALLPIXEL})[0].material.color.b"
+                       f" > 0.9")
+        self.assertTrue(ok, "die Icon-Zelle folgt dem Versatz nicht")
+        self.assertEqual(
+            self._zahl(f"window.__fm14.zellen({_ALLPIXEL})[1].material.color.b"),
+            0.0)
+
+    def test_der_spiider_daneben_behaelt_seinen_versatz(self):
+        """★★ Positivkontrolle zur ganzen Aenderung: im SELBEN Rig steht der
+        Spiider mit ``pixelBase`` 1. Er muss weiter 19 Segmente aus 20 Baenken
+        bauen und bei Kopf 1 anfangen — sonst zeigte sein Ring die Grundfarbe
+        ein zweites Mal."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.ring({_SPIIDER}).length"),
+                         19)
+        self.assertEqual(self._zahl(f"window.__fm14.zellen({_SPIIDER}).length"),
+                         19)
+        ok = self._dmx(_NUR_MITTE,
+                       f"window.__fm14.seg({_SPIIDER}, 0).material.color.b"
+                       f" > 0.9")
+        self.assertTrue(ok, "der DMX-Batch kam nie an")
+        # ... und die beiden Geraete widersprechen sich nicht: DASSELBE
+        # heads-Array faerbt beim Spiider Segment 0 (Kopf 1) und beim
+        # All-Pixel-Geraet Segment 1 (ebenfalls Kopf 1).
+        beide = json.dumps([
+            {"fid": _SPIIDER, "r": 0, "g": 0, "b": 0, "intensity": 255,
+             "heads": _heads({1: {"b": 255}})},
+            {"fid": _ALLPIXEL, "r": 0, "g": 0, "b": 0, "intensity": 255,
+             "heads": _heads({1: {"b": 255}}, n=19)},
+        ])
+        self.assertTrue(self._dmx(
+            beide,
+            f"window.__fm14.seg({_ALLPIXEL}, 1).material.color.b > 0.9"))
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_SPIIDER}, 0).material.color.b"),
+            1.0, "beim Spiider gehoert Kopf 1 auf Segment 0")
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_ALLPIXEL}, 0).material.color.b"),
+            0.0, "beim All-Pixel-Geraet gehoert Kopf 1 auf Segment 1")
+
+    # ── (8) CDX-56: nichts wird mehr stillschweigend abgeschnitten ──────────
+
+    def test_hundert_baenke_ergeben_neunundneunzig_segmente(self):
+        """★★ CDX-56, die Abnahme. ``buildPixelHead`` kappte per
+        ``Math.min(64, …)``, ``addRingCells`` unabhaengig davon genauso —
+        Python schickte weiter die volle Zahl samt ``heads``-Array, jedes Pixel
+        darueber fehlte im Bild OHNE jede Meldung. 100 Baenke, Versatz 1: 99
+        Segmente im 3D und 99 Zellen im 2D-Icon."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.ring({_GROSS}).length"), 99)
+        self.assertEqual(self._zahl(f"window.__fm14.zellen({_GROSS}).length"), 99)
+        # Und der Kopf selbst blieb, was er war: genau 99 Meshes mehr als der
+        # gewoehnliche Moving Head, kein einziges anderes.
+        normal = self._zahl(f"window.__fm14.meshes({_NORMAL})")
+        gross = self._zahl(f"window.__fm14.meshes({_GROSS})")
+        self.assertEqual(gross - normal, 99)
+
+    def test_ein_pixel_jenseits_des_alten_deckels_zeigt_seinen_wert(self):
+        """★★ Die Zusage ist nicht „es stehen genug Kreise da", sondern „jedes
+        Pixel zeigt SEINEN Wert". Kopf 80 liegt jenseits des alten 64er-
+        Deckels; er gehoert auf Segment 79. Und Kopf 99 — der letzte — auf
+        Segment 98, das letzte."""
+        self._aufbauen()
+        batch = json.dumps([{
+            "fid": _GROSS, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": _heads({80: {"r": 255}, 99: {"g": 255}}, n=100),
+        }])
+        ok = self._dmx(batch,
+                       f"window.__fm14.seg({_GROSS}, 79).material.color.r > 0.9")
+        self.assertTrue(ok, "Kopf 80 erreicht sein Segment nicht")
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_GROSS}, 78).material.color.r"), 0.0)
+        self.assertEqual(
+            self._zahl(f"window.__fm14.seg({_GROSS}, 98).material.color.g"), 1.0,
+            "das LETZTE Pixel fehlt")
+        # Dasselbe im 2D-Icon — die zweite Fassung des Deckels sass dort.
+        self.assertEqual(
+            self._zahl(f"window.__fm14.zellen({_GROSS})[79].material.color.r"),
+            1.0)
+        self.assertEqual(
+            self._zahl(f"window.__fm14.zellen({_GROSS})[98].material.color.g"),
+            1.0)
+
+    # ── (9) Entartete Nutzlasten ───────────────────────────────────────────
+
+    def test_ein_versatz_darf_nicht_alle_baenke_wegnehmen(self):
+        """★ Der Renderer kann die Nutzlast nicht pruefen. Meldet sie EINE Bank
+        und trotzdem einen Versatz, muss der Versatz klemmen: ein Ring ohne
+        Segment waere ein Pixel-Kopf, der als gewoehnlicher Moving Head
+        dasteht — sichtbar falsch und ohne jeden Hinweis darauf, warum."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.ring({_EINE_BANK}).length"),
+                         1)
+        batch = json.dumps([{
+            "fid": _EINE_BANK, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": [{"r": 0, "g": 255, "b": 0}],
+        }])
+        self.assertTrue(self._dmx(
+            batch,
+            f"window.__fm14.seg({_EINE_BANK}, 0).material.color.g > 0.9"),
+            "das geklemmte Segment haengt an keinem Kopf")
+
+    def test_ohne_bank_angabe_bleibt_es_bei_einem_segment(self):
+        """★ Positivkontrolle zur Klemme: eine Nutzlast ganz OHNE ``nHeads``
+        (Alt-Payload, Geraet ohne Farbkanaele) bekommt wie bisher genau ein
+        Segment — und es haengt an Kopf 0, nicht an einem negativen Index."""
+        self._aufbauen()
+        self.assertEqual(self._zahl(f"window.__fm14.ring({_OHNE_ZAHL}).length"),
+                         1)
+        batch = json.dumps([{
+            "fid": _OHNE_ZAHL, "r": 0, "g": 0, "b": 0, "intensity": 255,
+            "heads": [{"r": 255, "g": 0, "b": 0}],
+        }])
+        self.assertTrue(self._dmx(
+            batch,
+            f"window.__fm14.seg({_OHNE_ZAHL}, 0).material.color.r > 0.9"),
+            "das Segment haengt nicht an Kopf 0")
+
+    def test_auch_der_grosse_ring_passt_noch_in_die_linse(self):
+        """★ Alles zu zeichnen darf nicht heissen, ueber das Gehaeuse
+        hinauszuwachsen: die Segmente sitzen in der Lichtaustrittsflaeche, und
+        `wabenPlatz` legt bei 99 Pixeln sechs Ringe an — die Teilung schrumpft
+        mit. Ein Ring, der aus der Linse laeuft, stuende im Beam-Kegel."""
+        self._aufbauen()
+        for i in (0, 50, 98):
+            self.assertLess(self._zahl(f"window.__fm14.radius({_GROSS}, {i})"),
+                            0.077, f"Segment {i} liegt ausserhalb der Linse")
+        self.assertGreater(self._zahl(f"window.__fm14.radius({_GROSS}, 98)"),
+                           self._zahl(f"window.__fm14.radius({_GROSS}, 1)"),
+                           "die aeusseren Ringe liegen weiter aussen")
 
 
 if __name__ == "__main__":
