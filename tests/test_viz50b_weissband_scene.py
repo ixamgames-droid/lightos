@@ -10,6 +10,15 @@ Segment j auf Kopf j sitzt. Hier wird gemessen, was daraus im Bild wird:
 * gefaerbt aus den **eigenen** Kanaelen (``heads[j].cw``), nicht aus der Farbe
   der RGB-Zone j.
 
+★ CDX-52: die FORM dieser Leiste ist seit dem Item hinterlegt
+(``whiteRows``/``whiteCols`` aus ``FixtureMode.white_rows/white_cols``) und wird
+nicht mehr aus der Kanalzahl geschlossen. Die Nutzlast hier traegt sie deshalb
+so, wie ``_fixture_to_dict`` sie schickt — und ``_ZWEI_REIHEN`` belegt, dass der
+Renderer sie wirklich liest: ein Band aus ZWEI Reihen muss anders aussehen als
+dasselbe Band aus einer. Ohne diesen Fall waere das Feld Zierde, und die
+hinterlegte Form haette den Renderer nie erreicht (so ist VIZ-51 fuer
+``pixelOrder`` durchgefallen).
+
 ★ Gemessen ueber den ECHTEN Weg: ``bridge.allFixtures`` -> ``addFixture`` ->
 Registry -> ``buildMatrixPanel``, dazu ``bridge.dmxBatch`` -> ``updateFixture``
 -> ``updateMatrixPanelDmx``. Ein Test, der die Builder direkt aufruft, haette
@@ -96,6 +105,7 @@ _BALKEN = 500201      # ZQ06121: 48 Zonen 4x12 + 8 Weiss-Segmente
 _OHNE_WEISS = 500202  # DERSELBE Balken im 144-Kanal-Modus: kein Band
 _KACHEL = 500203      # 8x8-Standardpanel: darf sich um nichts aendern
 _HOCHKANT = 500204    # ZQ06121 um 90° montiert: das Band muss mitdrehen
+_ZWEI_REIHEN = 500205  # CDX-52: dieselben 8 Segmente, aber als 2x4 hinterlegt
 
 
 def _payload():
@@ -103,15 +113,20 @@ def _payload():
         d = {"fid": fid, "label": f"P{fid}", "type": "matrix", "model": "matrix",
              "nHeads": 48, "pixelOrder": "rowwise", "elementRotation": 0,
              "elementFlip": False, "gridRows": 4, "gridCols": 12, "nWhites": 0,
+             # CDX-52: hinterlegte Form der Weiss-Leiste (0 = keine).
+             "whiteRows": 0, "whiteCols": 0,
              "x": 0, "y": 5, "z": 0, "rotX": 0, "rotY": 0, "rotZ": 0,
              "r": 0, "g": 0, "b": 0, "intensity": 0, "pan": 128, "tilt": 128}
         d.update(kw)
         return d
     return json.dumps([
-        p(_BALKEN, nWhites=8),
+        # ★ Genau die Nutzlast, die `_fixture_to_dict` fuer Robins Balken baut:
+        # acht Segmente (aus den Kanaelen) in EINER Reihe (aus der Bibliothek).
+        p(_BALKEN, nWhites=8, whiteRows=1),
         p(_OHNE_WEISS),
         p(_KACHEL, nHeads=64, gridRows=8, gridCols=8),
-        p(_HOCHKANT, nWhites=8, elementRotation=90),
+        p(_HOCHKANT, nWhites=8, whiteRows=1, elementRotation=90),
+        p(_ZWEI_REIHEN, nWhites=8, whiteRows=2),
     ])
 
 
@@ -231,7 +246,7 @@ class WeissbandSceneTest(unittest.TestCase):
         da = False
         while time.monotonic() < ende:
             self._bridge.allFixtures.emit(nutzlast)
-            if self._eval(f"typeof window.__lightos.fixtures['{_HOCHKANT}'] "
+            if self._eval(f"typeof window.__lightos.fixtures['{_ZWEI_REIHEN}'] "
                           f"=== 'object'"):
                 da = True
                 break
@@ -461,6 +476,75 @@ class WeissbandSceneTest(unittest.TestCase):
         self.assertLess(px_links, px_rechts, "Vorbedingung: 4 Spalten breit")
         self.assertAlmostEqual(x0, (px_links + px_rechts) / 2, places=9,
                                msg="das gedrehte Band liegt nicht mittig")
+
+
+    # ── (5) CDX-52: die hinterlegte FORM bestimmt die Anordnung ────────────
+
+    def test_zwei_hinterlegte_reihen_ergeben_zwei_reihen(self):
+        """★ CDX-52: dieselben acht Segmente wie beim Balken, aber als ZWEI
+        Reihen hinterlegt. Der Renderer muss daraus 2x4 machen — sonst liest er
+        die Form gar nicht und die Bibliotheksangabe ist Zierde.
+
+        Gemessen wird die ganze Aussage, nicht nur „irgendwas ist anders":
+        vier Segmente je Reihe (also drei Spalten breit statt anderthalb), die
+        Reihen gleich verteilt ueber die Panelhoehe, und die Segmentnummern
+        zeilenweise vergeben (Segment 4 beginnt die zweite Reihe) — daran
+        haengt, welcher Weiss-Kanal welches Segment faerbt."""
+        self._aufbauen()
+
+        self.assertEqual(
+            self._zahl(f"window.__viz50b.band({_ZWEI_REIHEN}).length"), 8,
+            "die Segmentzahl kommt weiter aus den Kanaelen")
+
+        # (a) Vier Segmente je Reihe -> je DREI Spalten breit (12 / 4).
+        seg_w = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 0)"
+                           f".geometry.parameters.width")
+        px_w = self._zahl(f"window.__viz50b.px({_ZWEI_REIHEN})[0].mesh"
+                          f".geometry.parameters.width")
+        self.assertAlmostEqual(seg_w / px_w, 3.0, places=6,
+                               msg="vier Segmente muessen 12 Spalten abdecken")
+
+        # (b) Segment 0..3 in EINER Hoehe, Segment 4..7 in einer anderen.
+        y_oben = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 0).position.y")
+        y_unten = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 4).position.y")
+        for j in (1, 2, 3):
+            self.assertAlmostEqual(
+                self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, {j}).position.y"),
+                y_oben, places=9, msg=f"Segment {j} gehoert in die erste Reihe")
+        for j in (5, 6, 7):
+            self.assertAlmostEqual(
+                self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, {j}).position.y"),
+                y_unten, places=9, msg=f"Segment {j} gehoert in die zweite Reihe")
+        self.assertLess(y_unten, y_oben,
+                        "die zweite Reihe muss unter der ersten liegen")
+
+        # (c) Gleich verteilt ueber die Panelhoehe: bei 4 Zeilen liegt Reihe 1
+        # auf der Fuge zwischen Pixelzeile 1 und 2, Reihe 2 zwischen 3 und 4.
+        y_px = lambda i: self._zahl(                          # noqa: E731
+            f"window.__viz50b.px({_ZWEI_REIHEN})[{i}].mesh.position.y")
+        self.assertAlmostEqual(y_oben, (y_px(0) + y_px(12)) / 2, places=9)
+        self.assertAlmostEqual(y_unten, (y_px(24) + y_px(36)) / 2, places=9)
+
+        # (d) Und die Segmente stehen zeilenweise: 0 links, 3 rechts, dann
+        # beginnt 4 wieder links.
+        x0 = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 0).position.x")
+        x3 = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 3).position.x")
+        x4 = self._zahl(f"window.__viz50b.seg({_ZWEI_REIHEN}, 4).position.x")
+        self.assertLess(x0, x3, "Segment 0 liegt links von Segment 3")
+        self.assertAlmostEqual(x4, x0, places=9,
+                               msg="Segment 4 beginnt die zweite Reihe links")
+
+    def test_die_eine_reihe_des_balkens_bleibt_davon_unberuehrt(self):
+        """★★ Die Positivkontrolle zur Form: derselbe Renderer, dieselbe
+        Segmentzahl — mit ``whiteRows: 1`` muss der Balken exakt EINE Reihe
+        haben. Ein Renderer, der die Form ignoriert und stumpf zwei Reihen
+        baute, faellt hier auf."""
+        self._aufbauen()
+        y0 = self._zahl(f"window.__viz50b.seg({_BALKEN}, 0).position.y")
+        for j in range(1, 8):
+            self.assertAlmostEqual(
+                self._zahl(f"window.__viz50b.seg({_BALKEN}, {j}).position.y"),
+                y0, places=9, msg=f"Segment {j} liegt nicht in derselben Reihe")
 
 
 if __name__ == "__main__":
