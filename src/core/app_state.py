@@ -4676,6 +4676,59 @@ def head_label(fixture, head: int) -> str:
     return head_label_for_model(model, head)
 
 
+def head_label_gemeinsam(fixtures, head: int, *, kurz: bool = False) -> str:
+    """Beschriftung fuer einen Kopf, den MEHRERE Geraete gemeinsam tragen.
+
+    Ein Regler im Programmer treibt selten genau ein Geraet: ``head=3`` kann
+    gleichzeitig das Pixel 3 eines Spiiders und den vierten Kopf einer Mover-Bar
+    meinen. Deshalb:
+
+    * **einheitliches Render-Modell** -> dessen Beschriftung (``"Pixel 3"``);
+    * **uneinheitlich** -> die index-basierte Bestandsbeschriftung (``"Kopf 4"``
+      / ``"K4"``). Der Regler benennt dann kein einzelnes Segment mehr, sondern
+      den Kopf-INDEX, den alle gemeinsam haben — ein Pixel-Name waere fuer die
+      andere Haelfte der Auswahl schlicht falsch.
+
+    ``kurz`` waehlt die Kurzform DERSELBEN Beschriftung (``head_label_short``),
+    nicht eine zweite Regel.
+    """
+    modelle = set()
+    for f in fixtures or []:
+        try:
+            modelle.add(viz_model_for(f) or "")
+        except Exception:
+            modelle.add("")
+    model = modelle.pop() if len(modelle) == 1 else ""
+    return head_label_short(model, head) if kurz else head_label_for_model(model, head)
+
+
+def head_models_by_fid(fixtures=None) -> dict:
+    """``fid -> Render-Modell`` fuer alle gepatchten Geraete — EINE Abfrage.
+
+    Fuer die Flaechen, die nur **fids** in der Hand halten (EFX-Zielliste,
+    Fan-Werkzeug, Command-Line-Statuszeile). Ohne sie muessten sie die
+    Kopf-Beschriftung selbst erfinden — und genau daran ist FM-14b in der ersten
+    Fassung gescheitert: dasselbe Pixel hiess im Programmer „Pixel 3" und drei
+    Flaechen weiter „K4".
+
+    ``fixtures`` uebergeben, wenn der Aufrufer die Liste schon hat (die
+    Command-Line bekommt ihren ``state`` als Argument und darf nicht am globalen
+    Zustand vorbei arbeiten).
+    """
+    if fixtures is None:
+        try:
+            fixtures = get_state().get_patched_fixtures()
+        except Exception:
+            return {}
+    out: dict = {}
+    for f in fixtures or []:
+        try:
+            out[int(f.fid)] = viz_model_for(f) or ""
+        except Exception:
+            continue
+    return out
+
+
 def head_matrix_layout(fixture, n_heads: int) -> tuple:
     """Raster der Auto-Kopf-Matrix: ``(cols, rows, {kopf: (col, row)}, ist_ring)``.
 

@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head, head_label)
+    programmer_key_for_head, head_label, head_label_gemeinsam)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -1225,11 +1225,16 @@ class ProgrammerView(QWidget):
             # FM-HEADLAYOUT Slice 5: Ist die Auswahl auf Köpfe eingeschränkt, muss
             # die Kopfzeile das sagen — sonst steht dort „1 Gerät", während die
             # Regler nur einen Kopf treiben.
+            # FM-14b (Nachbesserung): der Kopf-Name kommt aus DERSELBEN Quelle
+            # wie die Zeile in der Geraeteliste. Vorher stand hier fest „K{h+1}"
+            # — die Liste sagte „Pixel 3", die Kopfzeile darueber „K4", und der
+            # Nutzer sah zwei Namen fuer dasselbe Segment nebeneinander.
             def _sel_name(f):
                 hs = self._heads_filter_for(f)
                 if not hs:
                     return f"[{f.fid}] {f.label}"
-                ks = ", ".join(f"K{h + 1}" for h in sorted(hs))
+                ks = ", ".join(head_label_gemeinsam([f], h, kurz=True)
+                               for h in sorted(hs))
                 return f"[{f.fid}] {f.label} · {ks}"
             self._lbl_selection.setText(
                 f"{len(selected)} Gerät(e): " +
@@ -1504,10 +1509,15 @@ class ProgrammerView(QWidget):
                 if not ziele:
                     continue
                 for _head, _owners in self._slider_head_buckets(ziele, ch):
+                    # FM-14b (Nachbesserung): dieselbe EINE Quelle wie die
+                    # Geraeteliste. Der Regler traegt oft MEHRERE Geraete —
+                    # head_label_gemeinsam faellt bei gemischten Modellen
+                    # bewusst auf die index-basierte Bestandsbeschriftung zurueck.
                     ilay.addWidget(AttributeSlider(
                         ch, _owners, self._state, owner=self, head=_head,
                         display_name=(None if _head is None else
-                                      f"{ch.name or ch.attribute} · K{_head + 1}")))
+                                      f"{ch.name or ch.attribute} · "
+                                      f"{head_label_gemeinsam(_owners, _head, kurz=True)}")))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1615,7 +1625,8 @@ class ProgrammerView(QWidget):
         jeder Regler bekommt nur die Geraete, die diesen Kopf wirklich haben —
         sonst entstuende ein ``tilt#N`` ohne Kanal, und der Kopf fiele im
         DMX-Pfad still auf seinen Default zurueck (Fehlerklasse FM-9/A5).
-        Beschriftung ``K1``/``K2`` wie ueberall sonst (1-basiert)."""
+        Beschriftung aus derselben EINEN Quelle wie ueberall sonst
+        (``head_label_gemeinsam``) — am Pixel-Kopf also ``P1``/``P2``."""
         if not fixtures:
             return
         template = max(fixtures, key=self._tilt_count)
@@ -1629,7 +1640,8 @@ class ProgrammerView(QWidget):
                     self._seed_separate_head(owners, ch, occ)
                 ilay.addWidget(AttributeSlider(
                     ch, owners, self._state, owner=self, head=occ,
-                    display_name=f"{ch.name or 'Tilt'} · K{occ + 1}"))
+                    display_name=f"{ch.name or 'Tilt'} · "
+                                 f"{head_label_gemeinsam(owners, occ, kurz=True)}"))
             occ += 1
 
     @staticmethod

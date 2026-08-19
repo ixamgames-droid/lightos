@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Ein Segment, ein Name — an jeder Stelle
+
+#### Behoben
+
+- **Dasselbe Pixel hieß an zwei Stellen verschieden.** Seit gestern heißt die
+  erste Farbbank eines Pixel-Kopfes in der Geräteliste des Programmers
+  „Grundfarbe" und die vierte „Pixel 3". Die Kopfzeile *desselben Fensters*
+  meldete danach aber weiter `K1` bzw. `K4` — und mit ihr die
+  Regler-Beschriftung, die EFX-Zielliste, das Fan-Werkzeug und die Statuszeile
+  der Command-Line. Wer eine Zeile anklickte, las zwei Zentimeter höher einen
+  anderen Namen für dasselbe Segment. Alle diese Flächen holen ihre
+  Beschriftung jetzt aus derselben Quelle.
+
+- **Die Grundfarbe hieß im Programmer weiter wie ein Pixel.** Die Zusage von
+  gestern war nur für die Geräteliste eingelöst: die Kopfzeile zeigte bei
+  gewählter Grundfarbe `K1` — also genau die Nummer, unter der man das erste
+  Pixel vermutet. Sie heißt jetzt überall „Grundfarbe" bzw. kurz `GR`.
+
+- **Ein EFX-Kopfziel verlor seinen Kopf.** Die EFX-Zielliste wird an vier
+  Stellen geschrieben; drei benannten den Kopf, die vierte (das Laden einer
+  gespeicherten Bewegung) nicht. Dieselbe Zeile hieß dadurch vor dem Anklicken
+  „Fixture #1 · P3" und danach nur noch „Fixture #1". Betrifft alle
+  Mehrkopf-Geräte, nicht nur Pixel-Köpfe.
+
+#### Neu
+
+- **Die Rasterzelle im Gruppen-Editor sagt beim Überfahren, was sie meint.**
+  Sie ist die einzige Fläche, auf die nur eine Kurzform passt (`1·P3`); ihr
+  Tooltip nennt jetzt den vollen Namen (`Spiider · Pixel 3`).
+
+- **Geräte ohne Ringe bleiben Wort für Wort unverändert** — Kopfzeile, Regler,
+  Rasterzelle, Matrix-Tooltip, EFX-Liste, Fan-Werkzeug und Command-Line zeigen
+  weiter `Kopf 4` bzw. `K4`.
+
+
 ### 2026-08-18 — Die Pixel eines LED-Ring-Kopfes lassen sich jetzt auch bedienen
 
 #### Neu

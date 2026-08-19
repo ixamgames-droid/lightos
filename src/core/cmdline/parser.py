@@ -366,8 +366,10 @@ class SelectionCommand(Command):
             if not fids:
                 return CommandResult(True, "Selektion leer")
             # Ohne Kopf-Ziele bleibt die Meldung wortgleich zum Bestand.
-            liste = (_short_cells(zellen) if self.selection.cells
-                     else _short_list(fids))
+            # FM-14b: die Modelle kommen aus DEM state, den dieser Befehl
+            # bekommen hat — nicht aus dem globalen Zustand daneben.
+            liste = (_short_cells(zellen, modelle=_head_modelle(state))
+                     if self.selection.cells else _short_list(fids))
             return CommandResult(True, f"Selektiert: {len(fids)} ({liste})")
         except Exception as e:
             return CommandResult(False, f"Selektion Fehler: {e}")
@@ -605,14 +607,43 @@ ATTR_MAP = {
 
 # ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-def _short_cells(cells: list[str], limit: int = 8) -> str:
+def _head_modelle(state) -> dict:
+    """``fid -> Render-Modell`` aus DEM uebergebenen State (FM-14b).
+
+    Die Command-Line arbeitet grundsaetzlich auf dem ``state``, den sie bekommen
+    hat (Test-Fakes, zweite Instanz); ein Griff nach ``get_state()`` waere hier
+    eine zweite Quelle. Ein State ohne ``get_patched_fixtures`` faellt still auf
+    „kein Modell bekannt" zurueck — dann bleibt es bei ``K{head + 1}``."""
+    try:
+        from src.core.app_state import head_models_by_fid
+        return head_models_by_fid(state.get_patched_fixtures())
+    except Exception:
+        return {}
+
+
+def _short_cells(cells: list[str], limit: int = 8, modelle: dict | None = None) -> str:
     """Zellen fuer die Statuszeile — ``"2:1"`` wird zu ``"2·K2"``, weil jede
-    Oberflaeche den Kopf 1-basiert beschriftet (``K{head + 1}``). Wer hier den
-    rohen Zellwert zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als
-    er getippt hat."""
+    Oberflaeche den Kopf 1-basiert beschriftet. Wer hier den rohen Zellwert
+    zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als er getippt hat.
+
+    FM-14b: WIE der Kopf heisst, sagt ``app_state.head_label_short`` — dieselbe
+    EINE Quelle wie Programmer, Gruppen-Raster und EFX-Liste. ``modelle`` ist
+    ``fid -> Render-Modell``; ohne Angabe bleibt es bei ``K{head + 1}``. Am
+    Pixel-Kopf meldet die Statuszeile damit ``1·P3`` statt ``1·K4`` — und heisst
+    das Segment so, wie die Geraeteliste daneben es nennt.
+    """
+    from src.core.app_state import head_label_short
+    mods = modelle or {}
+
     def _label(z: str) -> str:
         fid, _sep, head = z.partition(":")
-        return f"{fid}·K{int(head) + 1}" if head else fid
+        if not head:
+            return fid
+        try:
+            model = mods.get(int(fid), "")
+        except (TypeError, ValueError):
+            model = ""
+        return f"{fid}·{head_label_short(model, int(head))}"
     if len(cells) <= limit:
         return ",".join(_label(z) for z in cells)
     head = ",".join(_label(z) for z in cells[:limit])

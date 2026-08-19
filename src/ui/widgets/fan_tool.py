@@ -19,9 +19,15 @@ from PySide6.QtWidgets import (
 )
 
 try:
-    from src.core.app_state import get_state
+    from src.core.app_state import get_state, head_label_short, head_models_by_fid
 except Exception:
-    get_state = None  # type: ignore
+    # Das Werkzeug bleibt ohne app_state importierbar; dann fehlt ihm allerdings
+    # die EINE Quelle fuer die Kopf-Beschriftung — und ohne sie schreibt es
+    # KEINEN eigenen Kopfnamen hin (FM-14b: eine zweite Regel waere genau der
+    # Fehler, den dieses Item behebt). Die Zeile nennt dann nur das Geraet.
+    get_state = None            # type: ignore
+    head_label_short = None     # type: ignore
+    head_models_by_fid = None   # type: ignore
 
 
 # (Anzeige-Label, interner Wert). Der interne Wert wird an
@@ -308,21 +314,38 @@ class FanTool(QWidget):
         values = compute_fan_values(len(fids), vmin, vmax, mode, curve)
         labels = self._lookup_labels(fids)
 
+        modelle = self._lookup_models()
         self._table.setRowCount(len(fids))
         for i, fid in enumerate(fids):
             self._table.setItem(i, 0, QTableWidgetItem(str(fid)))
             # A2: Kopf-Ziele als "Label · K2" ausweisen — sonst stuenden vier
             # gleich benannte Zeilen untereinander und man wuesste nicht, welcher
             # Wert auf welchen Kopf geht.
+            # FM-14b: WIE der Kopf heisst, sagt dieselbe EINE Quelle wie im
+            # Programmer — am Pixel-Kopf „P3" statt „K4".
             _h = self._head_of(i)
             _name = labels.get(fid, "?")
-            if _h is not None:
-                _name = f"{_name} · K{int(_h) + 1}"
+            if _h is not None and head_label_short is not None:
+                _name = f"{_name} · {head_label_short(modelle.get(fid, ''), _h)}"
             self._table.setItem(i, 1, QTableWidgetItem(_name))
             v = values[i] if i < len(values) else 0
             it = QTableWidgetItem(str(v))
             it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._table.setItem(i, 2, it)
+
+    @staticmethod
+    def _lookup_models() -> dict:
+        """``fid -> Render-Modell`` — die Nutzlast fuer die Kopf-Beschriftung.
+
+        Getrennt von ``_lookup_labels``, weil die Tabelle beides braucht, aber
+        aus verschiedenen Gruenden: das Label steht in der Zeile, das Modell
+        entscheidet nur, WIE der Kopf heisst."""
+        if head_models_by_fid is None:
+            return {}
+        try:
+            return head_models_by_fid()
+        except Exception:
+            return {}
 
     def _lookup_labels(self, fids: list[int]) -> dict[int, str]:
         out: dict[int, str] = {}

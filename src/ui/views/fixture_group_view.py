@@ -187,6 +187,7 @@ class FixtureGridWidget(QWidget):
         self.positions: dict[tuple[int, int], "int | str"] = {}  # (col,row) -> fid ODER "fid:head" (FM-16e)
         self.setMinimumSize(320, 320)
         self.setAcceptDrops(True)
+        self.setMouseTracking(True)         # FM-14b: Tooltip ohne Klick
         self._labels: dict[int, str] = {}
         self._models: dict[int, str] = {}   # FM-14b: fid -> Render-Modell
 
@@ -228,6 +229,23 @@ class FixtureGridWidget(QWidget):
             return f"{fid}"
         from src.core.app_state import head_label_short
         return f"{fid}·{head_label_short(self._models.get(fid, ''), head)}"
+
+    def zell_tooltip(self, wert) -> str:
+        """Der VOLLE Name derselben Zelle — ``"Spiider · Pixel 3"``.
+
+        ★ Die Rasterzelle ist die einzige Flaeche, auf der nur eine Kurzform
+        Platz hat. Damit „P3" nicht ein zweiter Name neben „Pixel 3" bleibt,
+        steht die volle Beschriftung hier im Tooltip: derselbe Kopf, dieselbe
+        Quelle, an derselben Stelle nachlesbar.
+        """
+        fid, head = _split_cell(wert)
+        if fid is None:
+            return ""
+        name = self._labels.get(fid) or f"Fixture {fid}"
+        if head is None:
+            return str(name)
+        from src.core.app_state import head_label_for_model
+        return f"{name} · {head_label_for_model(self._models.get(fid, ''), head)}"
 
     def set_grid(self, cols: int, rows: int):
         self.cols = max(1, cols)
@@ -666,10 +684,15 @@ class FixtureGridWidget(QWidget):
                 self.update()
 
     def mouseMoveEvent(self, event):
+        col, row = self._cell_at(event.position().toPoint())
         if self._drag_from is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            col, row = self._cell_at(event.position().toPoint())
             self._drag_current = (col, row)
             self.update()
+        # FM-14b: der VOLLE Name der Zelle unter der Maus. Bewusst OHNE eigenen
+        # Zweig fuer den Drag — ein Zweig, den kein Test faehrt, ist eine
+        # Behauptung ohne Deckung.
+        wert = self.positions.get((col, row))
+        self.setToolTip("" if wert is None else self.zell_tooltip(wert))
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton and self._drag_from is not None:

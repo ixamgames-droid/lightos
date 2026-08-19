@@ -92,6 +92,33 @@ Geräteliste des **Programmers** trägt sie deshalb ihren Funktionsnamen statt e
 Kopfnummer, und die Zeilen darunter ihre **Pixelnummer** aus dem Geräte-Handbuch — sonst
 griffe man beim ersten Pixel versehentlich ins ganze Gerät.
 
+### Wie ein Segment überall heißt
+
+Ein Segment hat **einen** Namen, und den zeigt jede Fläche, die es benennt — die
+Geräteliste und die Kopfzeile des Programmers, die Reglerbeschriftung, die Rasterzelle
+im Gruppen-Editor, der Zell-Tooltip der Matrix-Vorschau, die EFX-Zielliste, das
+Fan-Werkzeug und die Statuszeile der Command-Line.
+
+| | gewöhnliches Mehrkopf-Gerät | Pixel-Kopf |
+|---|---|---|
+| Bank 0 | `Kopf 1` / kurz `K1` | `Grundfarbe` / kurz `GR` |
+| Bank 3 | `Kopf 4` / kurz `K4` | `Pixel 3` / kurz `P3` |
+
+Die **Kurzform** ist dieselbe Beschriftung, nur abgekürzt (Anfangsbuchstabe + Nummer);
+sie steht dort, wo nur wenige Zeichen Platz haben. Die Rasterzelle im Gruppen-Editor ist
+die engste dieser Flächen — **fährst du mit der Maus darüber, nennt der Tooltip den
+vollen Namen** (`Spiider · Pixel 3`).
+
+Die Kurzform ist keine Erfindung dieser Ansicht: die Gerätebibliothek nennt die
+Pixelkanäle des Spiiders selbst `P3 Rot`, `P3 Grün`, `P3 Blau` und die des ganzen Geräts
+`Grundfarbe Rot`. Wer im Programmer `Pixel 3` wählt, findet also im Kanalnamen dasselbe
+`P3` wieder.
+
+> **Ein Regler über gemischte Geräte** — etwa ein Pixel-Kopf und eine Mover-Bar,
+> beide auf Kopf 4 eingeschränkt — trägt weiter die Kopfnummer (`K4`). Er benennt
+> dort kein einzelnes Segment mehr, sondern den Kopf-Index, den beide gemeinsam
+> haben; `Pixel 3` wäre für die Mover-Bar schlicht falsch.
+
 ### Was im Dialog *Gerät bearbeiten* dazugehört
 
 Doppelklick auf die Patch-Zeile öffnet den Dialog. Für Mehrkopf-Geräte gibt es dort:
