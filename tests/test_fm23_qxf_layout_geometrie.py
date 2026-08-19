@@ -196,8 +196,15 @@ class KeineAngabeTest(_QxfFall):
                 _mode("text", _physical('   <Layout Width="acht" Height="4"/>')),
                 _mode("null", _physical('   <Layout Width="0" Height="4"/>')),
                 _mode("leer", _physical('   <Layout/>')),
+                # ★ Beide Zahlen negativ. Das ist der einzige Fall, den die
+                # Produktschranke `rows * cols <= 1` NICHT faengt — minus mal
+                # minus ist positiv. Ohne diesen Modus bliebe die Mutation
+                # „`rows < 1 or cols < 1` gestrichen" gruen (gemessen), und ein
+                # handgeschriebenes Profil traege eine Rasterform aus negativen
+                # Zeilen in der Bibliothek.
+                _mode("negativ", _physical('   <Layout Width="-4" Height="-3"/>')),
             ])))
-        for name in ("text", "null", "leer"):
+        for name in ("text", "null", "leer", "negativ"):
             self.assertEqual(modi[name], ((0, 0), (0, 0)), name)
 
 
