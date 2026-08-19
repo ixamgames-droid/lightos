@@ -27,7 +27,8 @@ const REGISTRY = {
   mover_bar:   { build: (o) => buildMoverBar(o.nHeads),             updateDmx: updateMoverBarDmx }, // FM-4
   // FM-13: Pixel-Panel (+ Reihenfolge). VIZ-52: + Montage-Orientierung.
   // VIZ-50a: + hinterlegte Rasterform. VIZ-50b: + Zahl der Weiss-Segmente.
-  matrix:      { build: (o) => buildMatrixPanel(o.nHeads, o.pixelOrder, o.elementRotation, o.elementFlip, o.gridCols, o.gridRows, o.nWhites), updateDmx: updateMatrixPanelDmx },
+  // CDX-52: + hinterlegte Form der Weiss-Leiste (ohne sie gibt es keine).
+  matrix:      { build: (o) => buildMatrixPanel(o.nHeads, o.pixelOrder, o.elementRotation, o.elementFlip, o.gridCols, o.gridRows, o.nWhites, o.whiteCols, o.whiteRows), updateDmx: updateMatrixPanelDmx },
   par:         { build: ()  => buildPar(),                          updateDmx: updateGenericDmx },
   led_bar:     { build: ()  => buildLedBar(),                       updateDmx: updateGenericDmx },
   strobe:      { build: ()  => buildStrobe(),                       updateDmx: updateGenericDmx },

@@ -278,7 +278,7 @@ def _add_fixture(s, mfr, name, short, ftype, power, modes_data):
 
 
 def _mode_eintrag(eintrag):
-    """Ein Eintrag aus ``modes_data`` -> ``(name, channels, (rows, cols))``.
+    """Ein Eintrag aus ``modes_data`` -> ``(name, channels, raster, weiss)``.
 
     VIZ-50a: die physische Rasterform ist ein OPTIONALES drittes Tupel-Element.
     Bewusst hier neben der Kanalliste und nicht in einer nach Modusnamen
@@ -286,10 +286,18 @@ def _mode_eintrag(eintrag):
     Schluessel und werden umbenannt (siehe `_ZQ06121_SIGNATURE`) — eine zweite,
     namensgeschluesselte Quelle waere beim naechsten Umbenennen still leer.
     ``(0, 0)`` = keine Geometrie hinterlegt (Bestand: der Renderer raet).
+
+    CDX-52: das VIERTE Element ist die Rasterform der eigenen Weiss-Segmente
+    (``(rows, cols)``, ``(0, 0)`` = keine eigene Leiste). Es steht aus demselben
+    Grund hier wie die Rasterform und nicht woanders.
     """
     name, channels = eintrag[0], eintrag[1]
-    grid = tuple(eintrag[2]) if len(eintrag) > 2 else (0, 0)
-    return name, channels, (int(grid[0] or 0), int(grid[1] or 0))
+
+    def _paar(i):
+        wert = tuple(eintrag[i]) if len(eintrag) > i else (0, 0)
+        return (int(wert[0] or 0), int(wert[1] or 0))
+
+    return name, channels, _paar(2), _paar(3)
 
 
 def _add_modes(s, profile, modes_data):
@@ -297,10 +305,12 @@ def _add_modes(s, profile, modes_data):
     Range-Tupel: ``(from, to, name)`` oder ``(from, to, name, kind)`` — ohne
     expliziten ``kind`` wird er aus dem Namen abgeleitet (_infer_range_kind)."""
     for eintrag in modes_data:
-        mode_name, channels, (grid_rows, grid_cols) = _mode_eintrag(eintrag)
+        (mode_name, channels, (grid_rows, grid_cols),
+         (white_rows, white_cols)) = _mode_eintrag(eintrag)
         ch_count = len(channels)
         mode = FixtureMode(fixture=profile, name=mode_name, channel_count=ch_count,
-                           grid_rows=grid_rows, grid_cols=grid_cols)
+                           grid_rows=grid_rows, grid_cols=grid_cols,
+                           white_rows=white_rows, white_cols=white_cols)
         s.add(mode)
         for i, ch_data in enumerate(channels, 1):
             ch_name, attr, default, highlight = ch_data[:4]
@@ -2992,6 +3002,18 @@ def _stair_pp144_programs(first: int, last_label: str):
 # nachgesehen (Robin, 2026-08-05). Beide Pixel-Modi teilen dieselben 48 Zonen.
 _ZQ06121_RASTER = (4, 12)
 
+# ★ CDX-52: die Warmweiss-Leiste ist EINE Reihe — dieselbe Messung, derselbe
+# Tag. Die Spaltenzahl bleibt bewusst 0: sie steht als acht ``color_w``-Kanaele
+# in diesem Modus, und `panelGrid` fuellt sie daraus. Eine 8 hier waere eine
+# Kopie, die beim naechsten Modus-Umbau still danebenliefe (FM16E).
+#
+# ★★ Warum diese Zeile ueberhaupt noetig ist: bis CDX-52 schloss der Renderer
+# aus „weniger Weiss-Kanaele als Farbzonen" auf eine eigene Leiste. Eine
+# Kanalzahl traegt aber keine Ortsangabe — dieselbe Signatur haette auch ein
+# Geraet, dessen acht Weiss-LEDs IN den Zonen sitzen. Nur der Modus, der die
+# Leiste wirklich hat, sagt es jetzt auch.
+_ZQ06121_WEISS = (1, 0)
+
 
 def _zq06121_zonen(count: int, praefix: str):
     """``count`` Zonen als je [Rot, Gruen, Blau], 1-basiert benannt."""
@@ -3087,11 +3109,13 @@ def _zq06121_modes_data():
             # Weiss-Segmente landen damit auf den Koepfen 1-8. Physisch decken
             # sie je anderthalb RGB-Spalten ab (8 Segmente auf 12 Spalten) und
             # sitzen mittig zwischen Reihe 2 und 3 — die beiden Raster fallen
-            # also NICHT zusammen. Aufgeloest wird das nicht hier, sondern in
-            # `FixtureMode.layout_json` (FM-ORIENT Folgerunde); bis dahin sind
-            # die Segmente einzeln ansprechbar, aber ohne Ortsbezug.
+            # also NICHT zusammen. WO sie sitzen, sagt seit CDX-52 das vierte
+            # Tupel-Element (`_ZQ06121_WEISS` = eine Reihe); die ZAHL steht
+            # weiterhin nur hier, in den Kanaelen.
             (f"Weiss-Zone {i}", "color_w", 0, 255) for i in range(1, 9)
-        ], _ZQ06121_RASTER),
+        ], _ZQ06121_RASTER, _ZQ06121_WEISS),
+        # Kein viertes Element: dieser Modus hat keine Weiss-Kanaele und damit
+        # auch keine Leiste — dasselbe Geraet, dieselbe Rasterform.
         ("144-Kanal 48 Zonen RGB", _zq06121_zonen(48, "Zone "), _ZQ06121_RASTER),
     ]
 
@@ -3175,7 +3199,7 @@ def _soll_signatur(modes_data) -> dict[str, list[str]]:
     reine Anzeige-Korrektur darf das nicht ausloesen (den Nachtrag erledigt
     ``_ensure_panel_geometrie`` in-place)."""
     return {name: [ch[1] for ch in channels]
-            for name, channels, _grid in map(_mode_eintrag, modes_data)}
+            for name, channels, _grid, _weiss in map(_mode_eintrag, modes_data)}
 
 
 # Soll-Signatur des korrigierten ZQ02001 (2026-06-09). Weicht ein vorhandenes
@@ -3212,9 +3236,19 @@ def _ensure_panel_geometrie(s, short_name: str, modes_data) -> bool:
     ★★ Nur ERGAENZEND, nie ueberschreibend: ein Modus, der bereits eine Form
     traegt, bleibt unangetastet. Sonst wuerde eine spaetere Korrektur des Nutzers
     bei jedem Programmstart still zurueckgesetzt. Kanaele/Ranges fasst die
-    Funktion nicht an — im Gegensatz zum Signatur-Weg, der die Modi verwirft."""
-    soll = {name: grid for name, _ch, grid in map(_mode_eintrag, modes_data)
-            if grid != (0, 0)}
+    Funktion nicht an — im Gegensatz zum Signatur-Weg, der die Modi verwirft.
+
+    ★★★ CDX-52: dasselbe gilt fuer die Rasterform der eigenen Weiss-Segmente
+    (``white_rows``/``white_cols``). Sie kommt SPAETER dazu als die Pixelform,
+    also gibt es befuellte Bibliotheken, in denen die eine Angabe schon steht
+    und die andere noch fehlt — beide werden deshalb EINZELN geprueft. Waeren
+    sie an einer gemeinsamen Bedingung gehaengt, bekaeme genau der Rechner, auf
+    dem VIZ-50a schon gelaufen ist, die Weiss-Leiste nie: sein ZQ06121 traegt
+    seit damals 4x12 und waere als „hat schon Geometrie" uebersprungen worden.
+    """
+    soll = {name: (grid, weiss)
+            for name, _ch, grid, weiss in map(_mode_eintrag, modes_data)
+            if grid != (0, 0) or weiss != (0, 0)}
     if not soll:
         return False
     prof = s.execute(
@@ -3227,13 +3261,19 @@ def _ensure_panel_geometrie(s, short_name: str, modes_data) -> bool:
         return False
     geaendert = False
     for mode in prof.modes:
-        grid = soll.get(mode.name)
-        if grid is None:
+        eintrag = soll.get(mode.name)
+        if eintrag is None:
             continue
-        if int(mode.grid_rows or 0) or int(mode.grid_cols or 0):
-            continue
-        mode.grid_rows, mode.grid_cols = grid
-        geaendert = True
+        for (f_rows, f_cols), wert in zip(
+                (("grid_rows", "grid_cols"), ("white_rows", "white_cols")),
+                eintrag):
+            if wert == (0, 0):
+                continue
+            if int(getattr(mode, f_rows) or 0) or int(getattr(mode, f_cols) or 0):
+                continue                       # Nutzer-/Bestandswert bleibt
+            setattr(mode, f_rows, wert[0])
+            setattr(mode, f_cols, wert[1])
+            geaendert = True
     return geaendert
 
 
