@@ -35,6 +35,16 @@ Positivkontrolle: Einkopf-Geraete sind die Mehrheit und duerfen sich NICHT
 aendern — dort darf gar kein Anzeigename gesetzt werden
 (``EinkopfBleibtUnveraendertTest``), und ein Mehrkopf-Geraet OHNE Kopf-Auswahl
 ebenso wenig.
+
+★ Nachbesserung (Gegenpruefung zur ersten Runde): der RUECKFALL — der erste
+Besitzer hat das Attribut gar nicht — war in einer Konstellation festgenagelt,
+in der der Vorlagen-Name zufaellig WAHR ist (``MOVBAR4`` + ``HYDRABEAM``, beide
+Kopf 1: die Vorlage kommt aus der Hydrabeam, und die steckt im selben Regler).
+``RueckfallTest`` baut jetzt die Auswahl, in der ein falscher Name wirklich
+entsteht: ein GANZ gewaehltes drittes Geraet stellt die Vorlage, steht aber
+nicht in den Besitzern. Gemessen an ``SHARPY`` ganz + ``MOVBAR4`` K1 +
+``HYDRABEAM`` K1 hiess der ``speed``-Regler vorher „P/T-Speed · K1" — ein Kanal
+des Sharpy, den dieser Regler gar nicht treibt.
 """
 from __future__ import annotations
 
@@ -43,7 +53,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication                          # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel                  # noqa: E402
 from sqlalchemy import select                                       # noqa: E402
 from sqlalchemy.orm import Session                                  # noqa: E402
 
@@ -63,6 +73,20 @@ _SUFFIX = " · K"
 
 def _app() -> QApplication:
     return QApplication.instance() or QApplication([])
+
+
+def _aufschrift(slider) -> str:
+    """Was am Regler STEHT — der Text des QLabels im Widget.
+
+    ★ Bewusst nicht ``slider._display_name``: das ist der Wert, den die View
+    hineinreicht. Gelesen wird, was ``AttributeSlider._setup_ui`` daraus
+    tatsaechlich anschreibt — sonst bliebe der Weg vom Namen zur Aufschrift
+    ungemessen (gegengeprueft: laesst man ``_setup_ui`` wieder ``_channel.name``
+    anschreiben, wird dieser Test rot)."""
+    lbls = [w for w in slider.findChildren(QLabel)
+            if w is not slider._lbl_val and w is not slider._lbl_pct]
+    assert len(lbls) == 1, f"{len(lbls)} Beschriftungen am Regler gefunden"
+    return lbls[0].text()
 
 
 def _pid(short: str) -> int:
@@ -107,8 +131,10 @@ class _Basis(unittest.TestCase):
     def _fx(self, fid: int) -> PatchedFixture:
         return next(f for f in self.state.get_patched_fixtures() if f.fid == fid)
 
-    def _regler(self, cells) -> list:
-        """``(attribut, kopf, aufschrift, anzeigename, fids)`` je Attribut-Regler.
+    def _slider_objs(self, cells) -> list:
+        """Die gebauten ``AttributeSlider`` einer Auswahl — der echte Bauweg
+        (View + ``set_selected_cells``), nicht ein direkter Aufruf der
+        Beschriftungsfunktion.
 
         Frische View je Messung — eine wiederverwendete View liefert per
         ``findChildren`` auch die Regler frueherer Auswahlen (Qt loescht sie
@@ -117,10 +143,16 @@ class _Basis(unittest.TestCase):
         self.addCleanup(v.deleteLater)
         self.state.set_selected_cells(list(cells))
         _app().processEvents()
+        return v.findChildren(AttributeSlider)
+
+    def _regler(self, cells) -> list:
+        """``(attribut, kopf, aufschrift, anzeigename, fids)`` je Attribut-Regler.
+        ``aufschrift`` ist der angeschriebene Text, ``anzeigename`` der von der
+        View gesetzte Wert (``None`` = geraeteweiter Regler)."""
         return [(s._channel.attribute, s._head,
-                 s._display_name or s._channel.name, s._display_name,
+                 _aufschrift(s), s._display_name,
                  tuple(f.fid for f in s._fixtures))
-                for s in v.findChildren(AttributeSlider)]
+                for s in self._slider_objs(cells)]
 
     def _kanalname(self, fx, attr: str, head: int):
         """Name des Kanals, den ``set_programmer_value(fid, attr, …, head=head)``
@@ -302,26 +334,127 @@ class EinkopfBleibtUnveraendertTest(_Basis):
 
 
 class RueckfallTest(_Basis):
-    """Der Regler treibt ein Geraet, das dieses Attribut gar nicht hat.
+    """Der erste Besitzer eines Reglers hat das Attribut gar nicht — woher darf
+    der Name dann kommen?
 
     ``_slider_head_buckets`` behaelt so ein Geraet fuer Kopf 1
-    (``attr_head_count_for_channels`` antwortet fuer ein fehlendes Attribut
-    ``1``). Steht es in der Auswahl vorn, gibt es keinen eigenen Kanal, aus dem
-    ein Name kommen koennte — dann muss der Vorlagen-Name stehenbleiben statt
-    einer leeren Aufschrift.
+    (``attr_head_count_for_channels`` antwortet fuer ein FEHLENDES Attribut
+    ``1``, s. FM-27). Der Rueckfall auf den VORLAGEN-Namen war die falsche
+    Antwort: die Vorlage ist ueber die GANZE Auswahl dedupliziert und kann aus
+    einem Geraet stammen, das dieser Regler ueberhaupt nicht treibt.
+
+    ★ **Die Konstellation entscheidet, ob das ueberhaupt messbar ist.** An
+    ``MOVBAR4`` + ``HYDRABEAM 19ch`` (beide Kopf 1) ist der Vorlagen-Name
+    zufaellig WAHR — die Vorlage kommt von der Hydrabeam, und die steckt im
+    selben Regler. Diese Auswahl misst die Kante also NICHT; sie steht hier nur
+    noch als Nachweis, dass die Suche nicht beim ersten Besitzer aufhoert. Die
+    Kante misst ``test_vorlage_aus_nicht_getriebenem_geraet_wird_nicht_genannt``:
+    ein ``SHARPY`` GANZ gewaehlt (er bekommt seinen eigenen geraeteweiten
+    Regler) neben den Kopf-Zellen der beiden anderen. Dann liefert der Sharpy
+    die Vorlage, steht aber nicht in den Besitzern.
     """
 
-    def test_geraet_ohne_diesen_kanal_faellt_auf_die_vorlage_zurueck(self):
+    def _kopfregler(self, cells, attr: str, head: int = 0):
+        """Der EINE Pro-Kopf-Regler dieses Attributs: ``(slider, aufschrift,
+        fids)``. Der Vorlagen-Kanal haengt als ``slider._channel`` dran — genau
+        das Objekt, aus dem die Aufschrift frueher kam."""
+        treffer = [s for s in self._slider_objs(cells)
+                   if s._channel.attribute == attr and s._head == head]
+        self.assertEqual(
+            len(treffer), 1,
+            f"{cells}: {len(treffer)} Pro-Kopf-Regler fuer {attr}/K{head + 1} "
+            f"— erwartet genau einer")
+        s = treffer[0]
+        return s, _aufschrift(s), tuple(f.fid for f in s._fixtures)
+
+    def test_zweiter_besitzer_liefert_den_namen(self):
+        """MOVBAR4 (kein ``speed``) vor HYDRABEAM (CH19 „Head Speed"): die Suche
+        darf beim ersten Besitzer nicht aufhoeren.
+
+        Diese Auswahl allein belegt den Rueckfall NICHT (s. Klassen-Docstring) —
+        der Vorlagen-Name waere hier derselbe."""
         self._patch(1, "MOVBAR4", 22)          # kein speed-Kanal
         self._patch(2, "HYDRA4000", 19)        # CH19 „Head Speed"
-        treffer = [(auf, fids) for attr, h, auf, _d, fids
-                   in self._regler(["1:0", "2:0"])
-                   if attr == "speed" and h == 0]
-        self.assertTrue(treffer, "kein speed-Kopf-Regler gebaut")
-        auf, fids = treffer[0]
-        self.assertIn(1, fids, "MOVBAR4 muss in diesem Regler stecken — sonst "
-                               "misst der Test den Rueckfall gar nicht")
+        _s, auf, fids = self._kopfregler(["1:0", "2:0"], "speed")
+        self.assertEqual(fids, (1, 2))
+        self.assertIsNone(
+            self._kanalname(self._fx(1), "speed", 0),
+            "MOVBAR4 muss dieses Attribut fehlen — sonst misst der Test den "
+            "Fall gar nicht")
         self.assertEqual(auf, f"Head Speed{_SUFFIX}1")
+
+    def test_vorlage_aus_nicht_getriebenem_geraet_wird_nicht_genannt(self):
+        """★★ Die Kante, an der es zaehlt: das VORLAGEN-Geraet steht nicht in
+        den Besitzern.
+
+        Ein ``SHARPY [16-Kanal]`` GANZ gewaehlt (eigener geraeteweiter Regler,
+        Vorlage fuer ``speed`` = CH7 „P/T-Speed") und dazu Kopf 1 von
+        ``MOVBAR4`` + ``HYDRABEAM 19ch``. Der Kopf-1-Regler treibt nur die
+        beiden letzten. Gemessen vor der Nachbesserung: „**P/T-Speed** · K1" —
+        der Kanal eines Geraets, das dieser Regler nicht anfasst, waehrend
+        „Head Speed" der getriebenen Hydrabeam ungenutzt danebenlag."""
+        self._patch(1, "MOVBAR4", 22)
+        self._patch(2, "HYDRA4000", 19)
+        self._patch(3, "SHARPY", 16)
+        s, auf, fids = self._kopfregler(["3", "1:0", "2:0"], "speed")
+        fremd = self._kanalname(self._fx(3), "speed", 0)
+        eigen = self._kanalname(self._fx(2), "speed", 0)
+        # Konstellation nachweisen, sonst misst der Test etwas anderes:
+        self.assertNotIn(3, fids,
+                         "der Sharpy ist GANZ gewaehlt und hat seinen eigenen "
+                         "geraeteweiten Regler — steckt er hier drin, ist die "
+                         "Kante nicht gemessen")
+        self.assertEqual(s._channel.name, fremd,
+                         "die Vorlage dieses Reglers muss vom Sharpy kommen — "
+                         "sonst gibt es gar keinen fremden Namen zu vermeiden")
+        self.assertIsNone(self._kanalname(self._fx(1), "speed", 0),
+                          "MOVBAR4 muss das Attribut fehlen (erster Besitzer)")
+        self.assertNotEqual(fremd, eigen,
+                            "beide Kanaele heissen gleich — dann waere jede "
+                            "Aufschrift zufaellig wahr")
+        self.assertNotEqual(auf, f"{fremd}{_SUFFIX}1",
+                            f"der Regler treibt {fids} und nennt trotzdem den "
+                            f"Kanal des Sharpy")
+        self.assertEqual(auf, f"{eigen}{_SUFFIX}1")
+
+    def test_ohne_besitzerkanal_steht_das_attribut_dran(self):
+        """★ Und wenn KEIN Besitzer den Kanal hat, gibt es keinen wahren
+        Kanalnamen — dann darf erst recht kein fremder dranstehen.
+
+        Dieselbe Auswahl ohne die Hydrabeam: der ``speed``-Regler von Kopf 1
+        treibt nur die MOVBAR4, die diesen Kanal nicht hat (FM-27). Gemessen
+        vorher „**P/T-Speed** · K1" (Sharpy), jetzt das ATTRIBUT."""
+        self._patch(1, "MOVBAR4", 22)
+        self._patch(3, "SHARPY", 16)
+        s, auf, fids = self._kopfregler(["3", "1:0"], "speed")
+        fremd = self._kanalname(self._fx(3), "speed", 0)
+        self.assertEqual(fids, (1,))
+        self.assertEqual(s._channel.name, fremd, "Vorlage muss vom Sharpy kommen")
+        self.assertIsNone(self._kanalname(self._fx(1), "speed", 0),
+                          "kein Besitzer darf diesen Kanal haben — sonst misst "
+                          "der Test den letzten Rueckfall nicht")
+        self.assertNotIn(fremd, auf,
+                         f"{auf!r} nennt einen Kanal des nicht getriebenen "
+                         f"Sharpy")
+        self.assertEqual(auf, f"Speed{_SUFFIX}1")
+
+    def test_erster_besitzer_hat_vorrang(self):
+        """★ Positivkontrolle zur Suche: haben MEHRERE Besitzer den Kanal, gilt
+        der ERSTE — die Suche darf sich nicht irgendeinen greifen.
+
+        ``MOVBAR4`` (ein einziges ``intensity``-Vorkommen, Kopf 1 schreibt also
+        den Basis-Schluessel CH21 „Master Dimmer") vor ``HYDRABEAM 19ch``
+        (Kopf-Karte -> ``intensity#1`` = CH9 „Kopf 1 Dimmer")."""
+        self._patch(1, "MOVBAR4", 22)
+        self._patch(2, "HYDRA4000", 19)
+        _s, auf, fids = self._kopfregler(["1:0", "2:0"], "intensity")
+        erster = self._kanalname(self._fx(1), "intensity", 0)
+        zweiter = self._kanalname(self._fx(2), "intensity", 0)
+        self.assertEqual(fids, (1, 2), "Besitzer stehen in Auswahlreihenfolge")
+        self.assertNotEqual(erster, zweiter,
+                            "beide Kanaele heissen gleich — dann misst der Test "
+                            "die Reihenfolge nicht")
+        self.assertEqual(auf, f"{erster}{_SUFFIX}1")
 
 
 if __name__ == "__main__":

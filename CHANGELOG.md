@@ -26,6 +26,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   **jedes** Mehrkopf-Geraet (Bars, Spider, Moving-Head-Bars, Pixel-Ringe), nicht
   nur die neuen Ringe. **Einkopf-Geraete und Mehrkopf-Geraete ohne Kopf-Auswahl
   bleiben unveraendert** — dort wird gar kein Anzeigename gesetzt.
+- **Der Rueckfall nannte den Kanal eines Geraets, das der Regler gar nicht
+  treibt.** Steht in einem Pro-Kopf-Regler ein Geraet vorn, dem das Attribut
+  fehlt, kam die Aufschrift aus der Kanal-Vorlage — und die ist ueber die GANZE
+  Auswahl dedupliziert. Gemessen an einem GANZ gewaehlten `Clay Paky Sharpy
+  [16-Kanal]` neben Kopf 1 der `LED Moving Bar 4x [22-Kanal]` und der
+  `HYDRABEAM 4000 RGBW [19-Kanal]`: der Kopf-1-Regler fuer Speed trieb Bar +
+  Hydrabeam und hiess „**P/T-Speed** · K1" — der Kanal des Sharpy, der seinen
+  eigenen geraeteweiten Regler hat und von diesem Regler nie angefasst wird,
+  waehrend „Head Speed" der getriebenen Hydrabeam danebenlag. Der Name kommt
+  jetzt vom ersten Besitzer, der den Kanal wirklich hat. Hat ihn **keiner**,
+  steht das Attribut dran („Speed · K1") statt eines fremden Kanalnamens.
 
 ### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
 
