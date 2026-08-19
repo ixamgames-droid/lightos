@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Die weiße Leiste bekommt nur noch, wer wirklich eine hat
+
+#### Behoben
+
+- **Selbstgebaute Panels bekamen ein Weiß-Band, das es nicht gibt.** Ob ein
+  Pixel-Panel eine eigene weiße Leiste quer über die Mitte hat, wurde bisher
+  aus den Kanalzahlen geschlossen: weniger Weiß-Kanäle als Farbzonen galt als
+  „eigene Leiste". Für die mitgelieferten Geräte stimmte das — der
+  Geräte-Editor erlaubt aber jedes Kanal-Layout. Ein selbst angelegtes Panel
+  mit 48 RGB-Pixeln und einem einzigen Weiß-Kanal bekam damit ein Band über die
+  volle Breite, gefahren von einem Kanal, der mit dieser Stelle des Geräts
+  nichts zu tun hat. Eine Kanalzahl sagt, wie viele Kanäle es gibt, nicht wo
+  ihre LEDs sitzen.
+
+- **Die Leiste steht jetzt in der Gerätebibliothek.** Sie ist eine Angabe über
+  das Gerät wie die Rasterform (Zeilen × Spalten) und wird wie diese am
+  Gerätemodus hinterlegt. Robins ZQ06121 trägt „eine Reihe" — am Gerät
+  nachgesehen — und zeigt sein Band unverändert: acht Segmente, halb so hoch
+  wie eine RGB-Zone, mittig zwischen Reihe 2 und 3. Wie viele Segmente es sind,
+  kommt weiterhin aus den Weiß-Kanälen des Modus; hinterlegt ist nur, was die
+  Kanäle nicht sagen können. Geräte ohne diese Angabe bekommen kein Band mehr —
+  auch dann nicht, wenn ihre Kanäle denen des ZQ06121 gleichen.
+
+- **Bestehende Bibliotheken bekommen die Angabe nachgetragen.** Sie wird beim
+  Programmstart ergänzt, ohne vorhandene Werte zu überschreiben; wer die Form
+  seines Geräts selbst korrigiert hat, behält seine Korrektur.
+
 ### 2026-08-13 — Moving Heads mit LED-Ring zeigen ihre Pixel einzeln
 
 #### Neu

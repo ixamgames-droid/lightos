@@ -1008,7 +1008,8 @@ export function buildMoverBar(n) {
 // `whites` ist das Warmweiss-Band (VIZ-50b), leer bei Geraeten ohne eigene
 // Weiss-Segmente.
 export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
-                                 gridCols, gridRows, nWhites) {
+                                 gridCols, gridRows, nWhites,
+                                 whiteCols, whiteRows) {
   // FM-13: `pixelOrder` uebersetzt den DMX-Index in die WIRKLICHE Rasterposition.
   // Ohne das nahm der Renderer an, beides sei dasselbe — bei einem Panel im
   // Werkszustand (Schlangenlinien) lief eine horizontale Figur damit im Zickzack.
@@ -1084,30 +1085,43 @@ export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
   // und 3 durch, ist halb so hoch wie eine RGB-Zone und ihre acht Segmente
   // decken die zwoelf Spalten ab — also je anderthalb Spalten.
   //
-  // WOHER DIE ZAHL KOMMT — und warum es dafuer kein neues Feld gibt: aus den
-  // `color_w`-Kanaelen des Modus, gezaehlt in derselben Schleife, die `nHeads`
-  // aus `color_r` zaehlt (`_fixture_to_dict`). Die Bibliothek weiss das seit
-  // dem Anlegen des Geraets; die attr#N-Konvention legt die acht Segmente auf
-  // die Koepfe 0..7, und deren Werte reisen als `heads[j].cw` laengst mit. Es
-  // fehlte nur die GEOMETRIE, nicht die Angabe.
+  // WOHER DIE ZAHL KOMMT: aus den `color_w`-Kanaelen des Modus, gezaehlt in
+  // derselben Schleife, die `nHeads` aus `color_r` zaehlt (`_fixture_to_dict`).
+  // Die attr#N-Konvention legt die acht Segmente auf die Koepfe 0..7, und deren
+  // Werte reisen als `heads[j].cw` laengst mit.
   //
-  // Die Lage im Panel ist abgeleitet, nicht behauptet: `nw` Segmente gleich
-  // verteilt ueber die volle Rasterbreite, mittig auf der Waagerechten. Fuer
-  // den ZQ06121 ist genau das die am Geraet nachgesehene Anordnung; fuer ein
-  // kuenftiges Geraet mit anderer Verteilung braucht es ein Bandformat — bis
-  // dahin ist die Gleichverteilung die einzige Aussage, die aus der Kanalzahl
-  // wirklich folgt.
+  // ★ CDX-52: WOHER DIE FORM KOMMT — und warum sie ein eigenes Feld braucht.
+  // Aus der Zahl folgt sie NICHT. `0 < nWhites < n` galt bis dahin als „eigene
+  // Leiste"; das ist ein Schluss von einer Kanalzahl auf einen Ort, und den
+  // traegt keine Kanalzahl. Die Leiste ist jetzt am Modus hinterlegt
+  // (`FixtureMode.white_rows/white_cols`, hier als `whiteRows`/`whiteCols`) —
+  // beim ZQ06121 „eine Reihe", am Geraet nachgesehen. Ob es ueberhaupt ein Band
+  // gibt, entscheidet dieselbe Angabe schon auf der Python-Seite: ohne sie
+  // kommt `nWhites` als 0 an.
+  //
+  // Innerhalb der Leiste bleibt die Lage abgeleitet, nicht behauptet: die
+  // Segmente gleich verteilt ueber die volle Rasterbreite, die Reihen gleich
+  // verteilt ueber die Rasterhoehe. Fuer die EINE Reihe des ZQ06121 ist das
+  // exakt die Mitte — die Fuge zwischen Reihe 2 und 3 seines 4x12-Rasters.
   const whites = [];
   const nw = Math.max(0, Math.floor(nWhites || 0));
   if (nw > 0) {
+    // Dieselbe Raster-Rechnung wie fuer die Farbzonen (VIZ-51: EINE Quelle):
+    // eine der beiden Zahlen genuegt, die andere folgt aus der Segmentzahl.
+    // Ohne jede Angabe bleibt es bei EINER Reihe — der Bestandsform; ueber das
+    // OB ist an dieser Stelle laengst entschieden.
+    const wg = panelGrid(nw, whiteCols,
+                         (whiteRows || whiteCols) ? whiteRows : 1);
+    const wRows = wg.rows, wCols = wg.cols, anzahl = wg.count;
     // Ausdehnung EINES Segments im QUELL-Raster: `segCols` Spalten lang, eine
     // halbe Zeile hoch. Beides dreht mit dem Panel mit (`quer`).
-    const segCols = srcCols / nw;
-    // Mitte der Waagerechten: bei 4 Reihen die Fuge zwischen Reihe 2 und 3
-    // ((4-1)/2 = 1.5), bei ungerader Reihenzahl die Mitte der mittleren Reihe.
-    const mitteZeile = (srcRows - 1) / 2;
-    for (let j = 0; j < nw; j++) {
-      const p = rotatePoint(mitteZeile, (j + 0.5) * segCols - 0.5,
+    const segCols = srcCols / wCols;
+    for (let j = 0; j < anzahl; j++) {
+      const jr = Math.floor(j / wCols), jc = j % wCols;
+      // Reihe jr von wRows, gleich verteilt: bei EINER Reihe und 4 Zeilen die
+      // Fuge zwischen Reihe 2 und 3 ((4-1)/2 = 1.5).
+      const zeile = ((jr + 0.5) / wRows) * srcRows - 0.5;
+      const p = rotatePoint(zeile, (jc + 0.5) * segCols - 0.5,
                             srcRows, srcCols, elementRotation, elementFlip);
       // 0.85 wie bei den Pixeln — damit bleibt „halb so hoch wie eine RGB-Zone"
       // auch als Quad-Mass exakt die Haelfte und nicht nur als Rasterangabe.

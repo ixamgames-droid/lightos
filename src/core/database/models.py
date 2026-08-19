@@ -78,6 +78,28 @@ class FixtureMode(Base):
     #   Bandformat hat ein Einheitsraster, aus dem rows/cols folgen.
     grid_rows: Mapped[int] = mapped_column(Integer, default=0)
     grid_cols: Mapped[int] = mapped_column(Integer, default=0)
+    # ★ CDX-52: Rasterform der EIGENEN Weiss-Segmente desselben Modus — die
+    # Warmweiss-Leiste, die NICHT auf dem Farbraster liegt (ZQ06121: eine Reihe
+    # quer ueber die Mitte). ``0`` (beide) = keine eigene Leiste hinterlegt;
+    # dann gibt es im 3D auch keine.
+    #
+    # ★ Warum das nicht abgeleitet werden kann — und warum es die Kanalzahl
+    #   NICHT tut: ``0 < color_w < color_r`` war bis CDX-52 die Regel, und eine
+    #   Kanalzahl traegt keine Ortsangabe. Dieselbe Signatur (48x ``color_r`` +
+    #   8x ``color_w``) passt auf mindestens drei physisch verschiedene Geraete:
+    #   auf eine eigene Leiste (ZQ06121), auf acht Weiss-LEDs, die IN den Zonen
+    #   sitzen und je sechs davon teilen, und auf ein Geraet mit einem globalen
+    #   Weiss, das in acht Dimmabschnitte zerfaellt. Welches davon vorliegt,
+    #   entscheidet der Blick aufs Geraet — beim ZQ06121 Robins Messung vom
+    #   2026-08-05. Die stand bis dahin nur in einem Quellkommentar.
+    #
+    # ★ Warum ZWEI Zahlen wie oben und nicht eine Ja/Nein-Marke: die Leiste hat
+    #   eine Form. ``panelGrid`` fuellt die fehlende der beiden aus der Zahl der
+    #   ``color_w``-Kanaele — der ZQ06121 traegt deshalb (1, 0) und NICHT (1, 8):
+    #   die 8 stehen in den Kanaelen, und eine Kopie davon liefe still daneben
+    #   (FM16E). Hinterlegt wird nur, was die Kanaele nicht sagen koennen.
+    white_rows: Mapped[int] = mapped_column(Integer, default=0)
+    white_cols: Mapped[int] = mapped_column(Integer, default=0)
 
     fixture: Mapped[FixtureProfile] = relationship(back_populates="modes")
     channels: Mapped[list[FixtureChannel]] = relationship(
@@ -333,8 +355,10 @@ def migrate_fixtures_db(engine) -> None:
             # fixtures.db unbrauchbar, weil das ORM alle Modell-Spalten abfragt
             # ("no such column: fixture_modes.grid_rows") — und die Bibliothek
             # ist die eine Datei, die der Nutzer nicht mal eben neu anlegt.
+            # CDX-52: dazu die Rasterform der eigenen Weiss-Segmente
+            # (white_rows/white_cols) — dieselbe Falle, dieselbe Behandlung.
             mcols = {row[1] for row in conn.execute(text("PRAGMA table_info(fixture_modes)"))}
-            for _gcol in ("grid_rows", "grid_cols"):
+            for _gcol in ("grid_rows", "grid_cols", "white_rows", "white_cols"):
                 if mcols and _gcol not in mcols:
                     conn.execute(text(
                         f"ALTER TABLE fixture_modes ADD COLUMN {_gcol} INTEGER DEFAULT 0"))

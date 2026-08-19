@@ -4056,24 +4056,31 @@ def _resolve_mode(s, fixture):
     return mode
 
 
-# VIZ-50a: Cache (profile_id, mode_name, channel_count) -> (rows, cols).
+# VIZ-50a: Cache (felder, profile_id, mode_name, channel_count) -> (rows, cols).
 # Wie der Channel-Cache noetig: `_fixture_to_dict` laeuft pro Fixture bei jedem
 # Szenen-Neuaufbau, und ohne Cache waere das je eine eigene DB-Session.
+# CDX-52: `felder` steht im Schluessel, weil zwei Raster desselben Modus
+# gefragt werden (Farbzonen und Weiss-Leiste) — ohne das gaebe der zweite
+# Aufruf die Antwort des ersten zurueck.
 _panel_grid_cache: dict = {}
 
 
-def panel_grid_for(fixture) -> tuple:
-    """Hinterlegte physische Rasterform des Geraets als ``(rows, cols)``.
+def _mode_raster_for(fixture, feld_rows: str, feld_cols: str) -> tuple:
+    """Ein hinterlegtes Raster des Fixture-MODUS als ``(rows, cols)``.
 
     ``(0, 0)`` heisst „nicht hinterlegt" — und ist damit die Aussage, auf die
-    sich der Renderer verlaesst, um wie bisher zu RATEN (`panelGrid`). Ein
-    erfundener Ersatzwert waere hier fatal: er waere von einer echten Angabe
-    nicht mehr unterscheidbar, und jedes Bestandsgeraet bekaeme still eine
-    behauptete Form."""
+    sich der Renderer verlaesst. Ein erfundener Ersatzwert waere hier fatal: er
+    waere von einer echten Angabe nicht mehr unterscheidbar, und jedes
+    Bestandsgeraet bekaeme still eine behauptete Form.
+
+    ★ EIN Weg fuer beide Raster (Farbzonen wie Weiss-Leiste): sie kommen aus
+    demselben Modus, muessen denselben Modus MEINEN (`_resolve_mode`) und
+    denselben Cache-/Fehlerpfad haben. Zweimal ausprogrammiert waeren es zwei
+    Regeln, die auseinanderlaufen (FM16E-Lehre)."""
     pid = getattr(fixture, "fixture_profile_id", None)
     if pid is None:
         return (0, 0)
-    key = (pid, getattr(fixture, "mode_name", None),
+    key = (feld_rows, pid, getattr(fixture, "mode_name", None),
            getattr(fixture, "channel_count", None))
     cached = _panel_grid_cache.get(key)
     if cached is not None:
@@ -4082,8 +4089,8 @@ def panel_grid_for(fixture) -> tuple:
         from .database.fixture_db import engine
         with Session(engine()) as s:
             mode = _resolve_mode(s, fixture)
-            grid = ((int(getattr(mode, "grid_rows", 0) or 0),
-                     int(getattr(mode, "grid_cols", 0) or 0))
+            grid = ((int(getattr(mode, feld_rows, 0) or 0),
+                     int(getattr(mode, feld_cols, 0) or 0))
                     if mode is not None else (0, 0))
     except Exception:
         # Transienter DB-Fehler: NICHT cachen (gleiche Politik wie
@@ -4092,6 +4099,28 @@ def panel_grid_for(fixture) -> tuple:
         return (0, 0)
     _panel_grid_cache[key] = grid
     return grid
+
+
+def panel_grid_for(fixture) -> tuple:
+    """VIZ-50a: hinterlegte physische Rasterform der Farbzonen ``(rows, cols)``.
+    ``(0, 0)`` = nicht hinterlegt, dann raet der Renderer wie bisher near-square
+    aus der Pixelzahl (`panelGrid`)."""
+    return _mode_raster_for(fixture, "grid_rows", "grid_cols")
+
+
+def white_grid_for(fixture) -> tuple:
+    """CDX-52: hinterlegte Rasterform der EIGENEN Weiss-Segmente ``(rows, cols)``.
+
+    ``(0, 0)`` = keine eigene Weiss-Leiste hinterlegt — und damit gibt es im 3D
+    auch keine. Das ist der Unterschied zur Rasterform der Farbzonen: dort
+    bedeutet „nichts hinterlegt" WEITERRATEN, hier bedeutet es NEIN.
+
+    ★ Der Grund steht in ``FixtureMode.white_rows``: die Zahl der
+    ``color_w``-Kanaele sagt, WIE VIELE Weiss-Kanaele es gibt, nicht WO ihre
+    LEDs sitzen. Bis CDX-52 wurde daraus geschlossen (``0 < weiss < zonen``) —
+    ein selbstgebautes Panel mit 48 Zonen und EINEM globalen Weiss-Kanal bekam
+    so eine volle Leiste quer ueber die Mitte, gefahren von ``heads[0].cw``."""
+    return _mode_raster_for(fixture, "white_rows", "white_cols")
 
 
 def get_channels_for_patched(fixture: PatchedFixture):
