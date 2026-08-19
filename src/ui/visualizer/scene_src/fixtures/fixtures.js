@@ -308,17 +308,14 @@ export function addFixture(data) {
   // ★ VIZ-50b: `nWhites` ist die Zahl der EIGENEN Weiss-Segmente (Robins
   // ZQ06121: acht, quer ueber die Panelmitte). 0 heisst „dieses Geraet hat
   // keine" — dann entsteht kein Band, und das Panel sieht aus wie bisher.
-<<<<<<< HEAD
   // ★ CDX-55: `pixelBase` MUSS mit — es ist die aus dem Profil abgeleitete
   // Antwort auf „ist Bank 0 die Grundfarben-Lage oder schon Pixel 0?". Fehlt
   // das Feld hier, faellt der Renderer auf 0 zurueck und ein Spiider zeigte
   // seine Grundfarbe ein zweites Mal als Ring-Segment (genau die Klasse Fehler,
   // an der VIZ-51 mit `pixelOrder` schon einmal gescheitert ist).
-=======
   // ★ CDX-52: `whiteRows`/`whiteCols` ist die hinterlegte FORM dieser Leiste.
   // Sie entscheidet auf der Python-Seite auch darueber, OB es eine gibt — die
   // Zahl der Weiss-Kanaele tat das frueher und konnte es nie.
->>>>>>> origin/main
   const model = buildFixtureModel(rtype, { mirror: data.mirror, nHeads: data.nHeads,
                                            pixelBase: data.pixelBase,
                                            pixelBar, pixelOrder: data.pixelOrder,

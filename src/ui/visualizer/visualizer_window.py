@@ -37,11 +37,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
-<<<<<<< HEAD
-    panel_grid_for, pixel_ring_base_banks, viz_model_for,
-=======
-    panel_grid_for, viz_model_for, white_grid_for,
->>>>>>> origin/main
+    panel_grid_for, pixel_ring_base_banks, viz_model_for, white_grid_for,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1921,24 +1917,16 @@ class VisualizerBridge(QObject):
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
                                for c in get_channels_for_patched(f)]
                 n_heads = kanal_attrs.count("color_r")
-<<<<<<< HEAD
+                # ★ CDX-55: wie viele fuehrende Baenke KEINE Ring-Pixel sind.
+                # Der Versatz wird aus den Kanaelen abgeleitet statt unterstellt.
                 if model == "pixel_head":
                     pixel_base = pixel_ring_base_banks(kanal_attrs)
-                # ★ Das Weiss-BAND ist eine Aussage ueber PANELS (VIZ-50b:
-                # weniger Weiss-Kanaele als Farbzonen = eigene Leiste quer
-                # ueber die Mitte). Nur `buildMatrixPanel` liest `nWhites`;
-                # fuer alle anderen Modelle fiel der Wert unten ohnehin auf 0
-                # (nachgemessen an der ganzen Bibliothek: par_bar/spider/
-                # mover_bar haben entweder 0 Weiss-Kanaele oder genau so viele
-                # wie Baenke). Der Pixel-Kopf waere der erste, bei dem das
-                # NICHT gilt — er haette mit seiner einen Grundfarben-Weiss-
-                # Bank auf 20 Baenken ploetzlich ein „Band" gemeldet.
-=======
                 # ★ Die ZAHL der eigenen Weiss-Segmente faellt in derselben
                 # Zaehlung ab (VIZ-50b) — sie steht seit dem Anlegen des
                 # Geraets in den Kanaelen. Nur `buildMatrixPanel` liest
                 # `nWhites`; fuer alle anderen Modelle bleibt der Wert 0.
->>>>>>> origin/main
+                # Ob daraus ein BAND wird, entscheidet seit CDX-52 die
+                # Geometrie weiter unten, nicht mehr diese Zahl.
                 if model == "matrix":
                     n_whites = kanal_attrs.count("color_w")
             except Exception:
