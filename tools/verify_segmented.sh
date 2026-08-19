@@ -165,7 +165,7 @@ run_one() {
     # sonst haelt ein geerbtes Duplikat die Sperre ueber das Segmentende hinaus
     # offen (flock loest erst, wenn die LETZTE Kopie zu ist).
     timeout 300 "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider \
-        8>&- > "$log" 2>&1 &
+        8>&- 9>&- > "$log" 2>&1 &
     local seg_pid=$! pgid=""
     [ "$web" = "1" ] && pgid="$(webengine_pgid "$seg_pid")"
     wait "$seg_pid"

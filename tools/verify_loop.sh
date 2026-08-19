@@ -205,6 +205,18 @@ if [ "$#" -gt 0 ]; then
     # `8>&-` schliesst den Sperr-Deskriptor im Kind: ein geerbtes Duplikat
     # hielte die Sperre sonst ueber das Laufende hinaus offen (flock loest erst,
     # wenn die LETZTE Kopie zu ist).
+    #
+    # ★ PROC-02d: Hier steht bewusst KEIN `9>&-` daneben, obwohl fd 9 die
+    # Voll-Suiten-Sperre traegt. Auf diesem Zweig wird sie gar nicht genommen —
+    # `_verify_lock` steigt bei Argumenten aus, BEVOR `exec 9>` laeuft.
+    # Nachgemessen 2026-08-19 in einem Wegwerf-Repo: nach einem gezielten Lauf
+    # existiert die Sperrdatei nicht einmal, und im pytest-Prozess zeigt fd 9
+    # auf das, was der AUFRUFER dort offen hatte. Ein `9>&-` waere damit nicht
+    # pruefbar (die Mutation bliebe zwangslaeufig gruen) und schloesse nur einen
+    # fremden Deskriptor. Dass dieser Zweig sperrfrei bleibt, haelt
+    # tests/test_verify_loop_sperre.py fest
+    # (test_gezielter_lauf_wird_nicht_gesperrt) — wer das aendert, wird dort rot
+    # und findet ueber diesen Kommentar zurueck.
     "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider 8>&-
     _rc=$?
     if [ "$_web" = "1" ]; then
@@ -228,9 +240,29 @@ else
     # ~69 % an akkumulierendem nativem Qt-Zustand — an wechselnden Dateien, die
     # isoliert gruen laufen. Wer den Ein-Prozess-Lauf trotzdem will (z. B. um zu
     # pruefen, ob das noch gilt): LIGHTOS_VERIFY_SINGLE=1 setzen.
+    #
+    # ★★ PROC-02d — `9>&-` an BEIDEN Wegen der vollen Suite.
+    #
+    # Ab hier ist fd 9 die gehaltene Voll-Suiten-Sperre. Ohne den Schluss erbt
+    # sie JEDER Nachkomme: der Segment-Runner, jedes `timeout`, jeder
+    # Segment-pytest und jedes Chromium-Kind darunter. `flock` loest aber erst,
+    # wenn die LETZTE Kopie des Deskriptors zu ist — ein einziges ueberlebendes
+    # Kind haelt die Sperre damit ueber das Gate-Ende hinaus, und zwar
+    # rechnerweit (die Datei haengt am gemeinsamen Git-Verzeichnis, s. o.). Der
+    # naechste volle Lauf auf diesem Rechner wartet dann ohne Deckel: `flock 9`
+    # in `_verify_lock` hat keine Wartezeit, das Gate steht einfach.
+    #
+    # Gemessen 2026-08-19 in einem Wegwerf-Repo, vor der Aenderung, mit einem
+    # Testkind, das `sleep 300` abgekoppelt und mit `close_fds=False` startet
+    # (so startet Chromium seine Hilfsprozesse): in /proc/<enkel>/fd stand
+    # `9 -> .../.git/.pytest_lock`, und `flock -n` bekam die Sperre nicht — auf
+    # BEIDEN Wegen, dem segmentierten wie dem Ein-Prozess-Lauf.
+    #
+    # ⚠️ Der Deskriptor muss je Befehl geschlossen werden, nicht global: ein
+    # `exec 9>&-` waere die Freigabe der Sperre selbst.
     if [ -n "${LIGHTOS_VERIFY_SINGLE:-}" ]; then
         echo "[verify] 2/2 pytest tests/ (volle Suite, EIN Prozess - LIGHTOS_VERIFY_SINGLE) ..."
-        if ! "$PY" -m pytest tests/ -q --tb=short -p no:cacheprovider; then
+        if ! "$PY" -m pytest tests/ -q --tb=short -p no:cacheprovider 9>&-; then
             echo "[verify] TESTS ROT"
             exit 1
         fi
@@ -241,6 +273,29 @@ else
             exit 2
         fi
         echo "[verify] 2/2 volle Suite segmentiert (${LIGHTOS_VERIFY_JOBS:-3} parallel) ..."
+        # ★ HIER bewusst OHNE `9>&-` — das ist eine Korrektur an der ersten
+        # Fassung dieses Fixes, und der Grund ist ein Tausch, den sie nicht
+        # benannt hat:
+        #
+        # `9>&-` an DIESER Stelle nimmt dem Segment-Runner die Sperre komplett,
+        # nicht nur seinen Blaettern. Stirbt dann die oberste
+        # `verify_loop.sh`-Shell (kill, Harness-Abbruch, OOM), waehrend
+        # `verify_segmented.sh` samt Segment-pytests weiterlaeuft, ist die
+        # rechnerweite Sperre SOFORT frei — und ein zweiter voller Lauf startet
+        # neben dem noch laufenden ersten. Genau dieser Zustand ist teuer
+        # belegt: PROC-02b (zwei gleichzeitige Suiten, 11 WebEngine-Segmente
+        # mit laufenden Chromium-Kindern) und QA-53 (der zweite Lauf raeumt das
+        # `.pytest_segments` des ersten ab).
+        #
+        # Vor dem Leck hielten die Kinder die Sperre in genau diesem Fall. Das
+        # war Nebenwirkung eines Fehlers — aber es war Schutz, und ihn
+        # kommentarlos einzutauschen waere eine Verschlechterung gewesen.
+        #
+        # Der Waisen-Fall ist stattdessen am BLATT geschlossen
+        # (`tools/verify_segmented.sh`, `timeout 300 … 8>&- 9>&-`): dort erbt
+        # kein timeout/pytest/Chromium mehr etwas, und der Runner selbst behaelt
+        # die Sperre ueber seine ganze Lebensdauer. Dasselbe Muster benutzt die
+        # WebEngine-Sperre fuer fd 8.
         if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}"; then
             echo "[verify] TESTS ROT"
             exit 1
