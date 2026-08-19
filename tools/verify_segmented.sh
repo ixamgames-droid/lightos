@@ -214,7 +214,7 @@ export PY OUTDIR
 # gedacht. Der urspruengliche Eintrag sagte "Ursache weg", das war zu frueh
 # geschlossen. Gemessen (6 volle Laeufe): 1 Ausfall, und zwar ein
 # Kontextverlust IM EIGENEN Prozess, nicht zwischen zweien (Herleitung im
-# Block bei _warte_auf_freie_gpu). Die Spur bleibt richtig und billig, sie
+# XPLAT-17-Block weiter oben). Die Spur bleibt richtig und billig, sie
 # kann diesen Rest aber prinzipiell nicht abfangen. Getroffen werden
 # ausschliesslich Dateien, die view.show() aufrufen (5 der 29) — nur die
 # realisieren eine echte Fensterflaeche.
@@ -224,7 +224,7 @@ export PY OUTDIR
 # nur am Service und bleibt korrekt in der schnellen Spur).
 WEB=(); REST=()
 for f in "${FILES[@]}"; do
-    if webengine_datei "$f"; then WEB+=("$f"); else REST+=("$f"); fi
+    if webengine_pfad "$f"; then WEB+=("$f"); else REST+=("$f"); fi
 done
 
 if [ "$JOBS" -gt 1 ] && command -v xargs >/dev/null 2>&1; then
@@ -243,7 +243,7 @@ else
     # die WebEngine-Absicherung nicht — sie gilt rechnerweit und haengt nicht
     # daran, wie DIESER Lauf seine Segmente verteilt.
     for f in "${FILES[@]}"; do
-        if webengine_datei "$f"; then run_one "$f" 1; else run_one "$f" 0; fi
+        if webengine_pfad "$f"; then run_one "$f" 1; else run_one "$f" 0; fi
     done
 fi
 
@@ -261,9 +261,12 @@ if [ -f "$OUTDIR/sperre_vergeblich.txt" ]; then
 fi
 if [ -f "$OUTDIR/fremdes_chromium.txt" ]; then
     echo "[seg] HINWEIS (PROC-02c): $(wc -l < "$OUTDIR/fremdes_chromium.txt") WebEngine-Segmente starteten,"
-    echo "[seg]   waehrend FREMDE Chromium-Prozesse liefen. Ueber eines der beiden Gates"
-    echo "[seg]   kann das nicht passieren — die Sperre haelt jeden Nachbarn auf. Also:"
-    echo "[seg]   laeuft eine LightOS-Instanz, oder faehrt jemand pytest direkt?"
+    echo "[seg]   waehrend FREMDE Chromium-Prozesse liefen. Ein Nachbar, der ueber eines"
+    echo "[seg]   der beiden Gates geht, wird von der Sperre aufgehalten — bleibt also:"
+    echo "[seg]   eine laufende LightOS-Instanz, jemand mit direktem pytest, ein Lauf mit"
+    echo "[seg]   LIGHTOS_VERIFY_SINGLE, oder ein Nachbar, dem die Sperre abgelaufen ist"
+    echo "[seg]   (der meldet das seinerseits). Die vollstaendige Liste steht im Kopf von"
+    echo "[seg]   tools/_gate_webengine.sh — sie ist ausdruecklich nicht leer."
     echo "[seg]   (Vor PROC-02c kostete dieser Zustand 3 s Wartezeit je Segment und"
     echo "[seg]   bewirkte nichts; gemessen 41 von 41 Segmenten unter Parallellast.)"
 fi

@@ -101,6 +101,12 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   `QtWebEngineProc` und wartete damit nur auf FREMDE Prozesse — gemessen liefen unter Parallellast
   41 von 41 WebEngine-Segmenten hinein (123 s je Lauf, Wirkung keine), waehrend die eigenen
   Chromium-Kinder nach spaetestens 0,037 s weg sind. Gate: `tests/test_proc02c_webengine_sperre.py`.
+  **Was als „beruehrt eine WebEngine-Datei" zaehlt:** eine genannte Datei, ein genanntes
+  **Verzeichnis** mit einer solchen Datei darin, und ein Lauf **ohne Pfadangabe** (`-k viz`) —
+  der sammelt die ganze Suite. Die ersten Fassung sah nur auf Dateien und liess damit
+  ausgerechnet `verify_loop.sh tests/` ungesperrt durch (41 WebEngine-Dateien in EINEM Prozess).
+  **Nicht gedeckt und ausdruecklich so gemeint:** direktes `pytest` und `LIGHTOS_VERIFY_SINGLE=1`.
+  Die vollstaendige Liste steht im Kopf von `tools/_gate_webengine.sh`.
   **Warum das mehr ist als Bequemlichkeit:** XPLAT-17 hat gemessen, dass schon EIN
   rechenintensives Nachbar-Segment die WebEngine-Spur in 3 von 3 Laeufen reissen liess. Eine
   zweite komplette Suite ist ein weit groesserer Nachbar — beide Sitzungen saehen rote

@@ -37,6 +37,7 @@ Runner**, nicht am Skripttext:
 
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -88,6 +89,34 @@ def _umgebung(**extra):
 
 def _ueberlappt(a, b):
     return a[0] < b[1] and b[0] < a[1]
+
+
+def _halte_sperre(pfad):
+    """Ein Fremder, der die Sperre haelt — als Prozess, den man RESTLOS los wird.
+
+    ★ Gemessen 2026-08-19, und es ist genau der Fehler, gegen den die
+    Produktionsseite ``8>&-`` einsetzt: ``flock DATEI BEFEHL`` forkt (util-linux,
+    ohne ``-F``). ``Popen.kill()`` trifft damit nur den flock-Elternprozess —
+    das KIND laeuft weiter und haelt den geerbten Deskriptor. Nachgesehen:
+    ``sleep 600``, PID 8903, PPID 1 (an init umgehaengt), Sperre BELEGT, obwohl
+    der Test laengst durch war.
+
+    Deshalb: eigene Sitzung beim Start, und abgeraeumt wird die ganze
+    Prozessgruppe.
+    """
+    return subprocess.Popen(["flock", str(pfad), "sleep", "600"],
+                            start_new_session=True)
+
+
+def _halter_abraeumen(halter):
+    try:
+        os.killpg(halter.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    try:
+        halter.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        pass
 
 
 def _lebt(pid):
@@ -205,8 +234,7 @@ class SperreUeberLaeufeHinwegTest(unittest.TestCase):
                 try:
                     mit.wait(timeout=60)
                 except subprocess.TimeoutExpired:
-                    mit.kill()
-                    mit.wait(timeout=60)
+                    _halter_abraeumen(mit)
         self.assertEqual(0, runner.returncode, aus_r)
         self.assertTrue(stempel.exists(),
                         "Der Mitbewerber hat die Sperre nie bekommen.")
@@ -240,8 +268,7 @@ class SperreUeberLaeufeHinwegTest(unittest.TestCase):
         nach 1 s nicht an sie heran), und genau diese Protokolldateien duerfen
         nicht entstehen.
         """
-        halter = subprocess.Popen(
-            ["flock", str(self.sperre), "sleep", "600"], start_new_session=True)
+        halter = _halte_sperre(self.sperre)
         try:
             dateien = self._dateien("rest", HARMLOS, anzahl=2, schlaf=0.2)
             aus_dir = self._tmp / "out1"
@@ -261,8 +288,7 @@ class SperreUeberLaeufeHinwegTest(unittest.TestCase):
                                  cwd=str(REPO), env=env, capture_output=True,
                                  text=True, timeout=300)
         finally:
-            halter.kill()
-            halter.wait(timeout=60)
+            _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout)
         self.assertEqual(2, len(_lies_protokoll(self.protokoll)))
         beruehrt = [n for n in ("sperre_gewartet.txt", "sperre_vergeblich.txt")
@@ -343,8 +369,7 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
             erg = self._lauf(MARKER, timeout=200,
                              LIGHTOS_WEBENGINE_SPERRE_WARTE="2")
         finally:
-            halter.kill()
-            halter.wait(timeout=60)
+            _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
         self.assertIn("ungesperrt", erg.stdout.lower(),
                       "Der Lauf lief zwar durch, sagte aber nicht, dass die "
@@ -359,13 +384,11 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
         1 s. Ein Lauf ohne WebEngine-Datei darf sie gar nicht erst anfassen —
         taete er es, meldete er nach 1 s, dass er sie nicht bekommen hat.
         """
-        halter = subprocess.Popen(
-            ["flock", str(self.sperre), "sleep", "600"], start_new_session=True)
+        halter = _halte_sperre(self.sperre)
         try:
             erg = self._lauf(HARMLOS, LIGHTOS_WEBENGINE_SPERRE_WARTE="1")
         finally:
-            halter.kill()
-            halter.wait(timeout=60)
+            _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
         self.assertEqual(1, len(_lies_protokoll(self.protokoll)))
         for satz in ("WebEngine-Sperre war belegt", "Sperre nicht bekommen"):
@@ -373,6 +396,158 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
                 satz, erg.stdout,
                 "Ein Lauf ohne WebEngine-Datei hat die WebEngine-Sperre "
                 f"angefasst — sie greift zu weit:\n{erg.stdout[-3000:]}")
+
+    # ── Nachtrag 2026-08-19: welche ARGUMENTE gelten als WebEngine-Lauf? ─────
+
+    def _verzeichnis(self, marker, name):
+        verz = self._tmp / name
+        verz.mkdir()
+        (verz / "test_drin.py").write_text(
+            VORLAGE.format(marker=marker, schlaf=0.1,
+                           protokoll=str(self.protokoll), name=name),
+            encoding="utf-8")
+        return verz
+
+    def _lauf_mit(self, *argumente, timeout=200, **extra):
+        env = _umgebung(LIGHTOS_WEBENGINE_LOCKFILE=str(self.sperre),
+                        LIGHTOS_SEG_OUT=str(self._tmp / "out"),
+                        LIGHTOS_SHOW_DB=str(self._tmp / "kind.db"), **extra)
+        return subprocess.run([str(LOOP_RUNNER), *argumente], cwd=str(REPO),
+                              env=env, capture_output=True, text=True,
+                              timeout=timeout)
+
+    def test_ein_verzeichnis_als_argument_nimmt_die_sperre_auch(self):
+        """★★ Der Fall, den die erste Fassung STILL uebersprang.
+
+        Sie fragte ``[ -f "$pfad" ]`` und liess damit ausgerechnet den
+        schlimmsten Aufruf durch: ``./tools/verify_loop.sh tests/`` faehrt ALLE
+        41 WebEngine-Dateien in EINEM pytest-Prozess — und lief dabei komplett
+        an der Sperre vorbei. Gemessen am 19.08.2026 an der damaligen
+        Arbeitsfassung: mit Datei-Argument meldete der Runner „Sperre nicht
+        bekommen", mit Verzeichnis-Argument gar nichts.
+
+        Ohne Zeitannahme: die Sperre wird gehalten, die Wartezeit steht auf 1 s.
+        Ein Lauf, der sie nimmt, kommt nicht an sie heran und sagt das.
+        """
+        verz = self._verzeichnis(MARKER, "mit_web")
+        halter = _halte_sperre(self.sperre)
+        try:
+            erg = self._lauf_mit(str(verz), LIGHTOS_WEBENGINE_SPERRE_WARTE="1")
+        finally:
+            _halter_abraeumen(halter)
+        self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+        self.assertIn(
+            "UNGESPERRT", erg.stdout.upper(),
+            "Ein Verzeichnis-Argument hat die WebEngine-Sperre nicht genommen. "
+            "Genau dieser Aufruf laedt die meisten WebEngine-Dateien von "
+            f"allen:\n{erg.stdout[-3000:]}")
+
+    def test_ein_verzeichnis_OHNE_webengine_datei_nimmt_sie_nicht(self):
+        """★ Positivkontrolle zum Test darueber.
+
+        Sonst waere die billigste Loesung „jedes Verzeichnis sperren" — und
+        damit saesse die halbe Suite hinter einer rechnerweiten Sperre.
+        """
+        verz = self._verzeichnis(HARMLOS, "ohne_web")
+        halter = _halte_sperre(self.sperre)
+        try:
+            erg = self._lauf_mit(str(verz), LIGHTOS_WEBENGINE_SPERRE_WARTE="1")
+        finally:
+            _halter_abraeumen(halter)
+        self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+        self.assertEqual(1, len(_lies_protokoll(self.protokoll)))
+        for satz in ("WebEngine-Sperre war belegt", "Sperre nicht bekommen"):
+            self.assertNotIn(satz, erg.stdout,
+                             f"Verzeichnis ohne WebEngine-Datei gesperrt:\n"
+                             f"{erg.stdout[-3000:]}")
+
+    def test_auch_der_segment_runner_sieht_in_ein_verzeichnis(self):
+        """Dieselbe Erkennung, anderer Runner — sonst driften die beiden.
+
+        Der Segment-Runner bekommt seine Dateien meist aus ``find``, also immer
+        einzeln. Ein Verzeichnis als Argument ist aber moeglich, und dann galt
+        dieselbe Luecke wie in ``verify_loop.sh``. Zwei Runner mit zwei
+        Antworten auf dieselbe Frage waeren genau die Drift, gegen die
+        ``tools/_gate_webengine.sh`` ueberhaupt existiert (XPLAT-11).
+
+        Gemessen an den Protokolldateien der Segmentausgabe, nicht am Text:
+        ``sperre_vergeblich.txt`` entsteht nur, wenn ein Segment die Sperre
+        genommen — und nach 1 s nicht bekommen — hat.
+        """
+        # ★ Beide Wege des Runners: die Zwei-Spuren-Fassung (-j 2) UND der
+        # serielle Notweg (-j 1), der die Spur-Trennung gar nicht erst macht.
+        # Die Sperre gilt rechnerweit und darf nicht davon abhaengen, wie DIESER
+        # Lauf seine Segmente verteilt.
+        faelle = (("seg_mit_parallel", "2", MARKER, True),
+                  ("seg_mit_seriell", "1", MARKER, True),
+                  ("seg_ohne", "2", HARMLOS, False))
+        for name, jobs, marker, erwartet in faelle:
+            with self.subTest(verzeichnis=name, jobs=jobs):
+                verz = self._verzeichnis(marker, name)
+                aus_dir = self._tmp / f"out_{name}"
+                halter = _halte_sperre(self.sperre)
+                try:
+                    env = _umgebung(
+                        LIGHTOS_SEG_OUT=str(aus_dir),
+                        LIGHTOS_WEBENGINE_LOCKFILE=str(self.sperre),
+                        LIGHTOS_WEBENGINE_SPERRE_WARTE="1",
+                        LIGHTOS_SHOW_DB=str(self._tmp / f"{name}.db"))
+                    erg = subprocess.run(
+                        ["bash", str(SEG_RUNNER), "-j", jobs, str(verz)],
+                        cwd=str(REPO), env=env, capture_output=True,
+                        text=True, timeout=300)
+                finally:
+                    _halter_abraeumen(halter)
+                self.assertEqual(0, erg.returncode, erg.stdout)
+                self.assertEqual(
+                    erwartet, (aus_dir / "sperre_vergeblich.txt").exists(),
+                    "Der Segment-Runner beantwortet die Frage „WebEngine?\" "
+                    "fuer ein Verzeichnis anders als verify_loop.sh:\n"
+                    f"{erg.stdout}")
+
+    def _entscheidung(self, cwd, *argumente):
+        """Ruft die ECHTE Entscheidungsfunktion aus tools/_gate_webengine.sh.
+
+        Der Weg ueber den Runner steht in den beiden Tests darueber; hier geht
+        es um den Fall „gar kein Pfad dabei", den man ueber den Runner nur mit
+        einem Voll-Suiten-Lauf messen koennte. Aufgerufen wird die
+        Produktionsfunktion selbst, kein Nachbau.
+        """
+        skript = f'. "{HELFER}"; webengine_argumente "$@" && echo JA || echo NEIN'
+        erg = subprocess.run(["bash", "-c", skript, "_", *argumente],
+                             cwd=str(cwd), capture_output=True, text=True,
+                             timeout=60)
+        return erg.stdout.strip()
+
+    def test_ohne_pfadargument_zaehlt_die_vorgabe_von_pytest(self):
+        """``verify_loop.sh -k viz`` gibt pytest keinen Pfad — dann sammelt es
+        die Vorgabe, also die ganze Suite samt WebEngine.
+
+        Beide Richtungen an einem gestellten Arbeitsverzeichnis, damit die
+        Aussage nicht davon abhaengt, was gerade in ``tests/`` liegt.
+        """
+        mit = self._tmp / "wurzel_mit" / "tests"
+        ohne = self._tmp / "wurzel_ohne" / "tests"
+        for verz, marker in ((mit, MARKER), (ohne, HARMLOS)):
+            verz.mkdir(parents=True)
+            (verz / "test_x.py").write_text(marker + "\n", encoding="utf-8")
+        self.assertEqual("JA", self._entscheidung(mit.parent, "-k", "viz"),
+                         "Ein Lauf ohne Pfadargument sammelt tests/ — dort "
+                         "liegen WebEngine-Dateien, er muss die Sperre nehmen.")
+        self.assertEqual("NEIN", self._entscheidung(ohne.parent, "-k", "viz"),
+                         "★ Positivkontrolle: ohne WebEngine-Datei in tests/ "
+                         "darf auch ein Lauf ohne Pfadargument frei laufen.")
+        # ★ Und die Vorgabe darf nur greifen, wenn WIRKLICH kein Pfad dabei ist:
+        # ein genannter harmloser Pfad schlaegt sie, obwohl tests/ hier voller
+        # WebEngine-Dateien ist. Ohne diese Zusicherung waere die billigste
+        # Loesung „im Zweifel immer sperren" — und die haette den gezielten
+        # Einzellauf, um den es in PROC-02c geht, hinter die Sperre gestellt.
+        harmlos = mit.parent / "extra_harmlos.py"
+        harmlos.write_text(HARMLOS + "\n", encoding="utf-8")
+        self.assertEqual("NEIN",
+                         self._entscheidung(mit.parent, str(harmlos), "-k", "viz"),
+                         "Ein ausdruecklich genannter harmloser Pfad wurde von "
+                         "der Vorgabe ueberstimmt — die Erkennung sperrt zu weit.")
 
 
 @unittest.skipUnless(_LAEUFT, _GRUND)
@@ -522,8 +697,7 @@ def test_spur():
         Nachgestellt mit einem Halter, der nie freigibt (= das aeussere
         Segment), und der Umgebung, die das aeussere Segment vererbt.
         """
-        halter = subprocess.Popen(
-            ["flock", str(self.sperre), "sleep", "600"], start_new_session=True)
+        halter = _halte_sperre(self.sperre)
         p = self._tmp / "test_innen.py"
         p.write_text(VORLAGE.format(marker=MARKER, schlaf=0.1,
                                     protokoll=str(self._tmp / "spuren.txt"),
@@ -538,14 +712,341 @@ def test_spur():
                                  cwd=str(REPO), env=env, capture_output=True,
                                  text=True, timeout=120)
         finally:
-            halter.kill()
-            halter.wait(timeout=60)
+            _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout)
         self.assertNotIn(
             "bekamen die Sperre nicht", erg.stdout,
             "Der innere Lauf hat auf die Sperre seines eigenen Elternlaufs "
             f"gewartet — im echten Gate steht damit alles still:\n{erg.stdout}")
 
+
+@unittest.skipUnless(_LAEUFT, _GRUND)
+class GezielterLaufGibtDieSperreEbensoFreiTest(unittest.TestCase):
+    """★★ Dieselben Zusicherungen wie oben — nur fuer ``verify_loop.sh``.
+
+    Nachtrag 2026-08-19. Die erste Fassung von PROC-02c hat beide
+    Selbstbefreiungs-Wege NUR am Segment-Runner gemessen. Das ist die falsche
+    Haelfte: der Befund des Items lautet ja gerade, dass **Agenten fast
+    ausschliesslich gezielte Einzellaeufe fahren** — der Weg durch
+    ``verify_loop.sh`` ist der haeufigere, nicht der seltenere.
+
+    Nachgemessen an der damaligen Arbeitsfassung, beide Mutationen blieben
+    GRUEN (19 Tests, 46 s):
+
+      * ``8>&-`` aus der pytest-Zeile entfernt  -> alles gruen
+      * ``webengine_warte_auf_kinder`` entfernt -> alles gruen
+
+    Dieselben Mutationen im Segment-Runner sind rot. Die Luecke sass also
+    genau dort, wo die Zusage am meisten wiegt.
+    """
+
+    def setUp(self):
+        self._tmp = Path(tempfile.mkdtemp(prefix="proc02c_loopfrei_"))
+        self.addCleanup(shutil.rmtree, self._tmp, ignore_errors=True)
+        self.sperre = self._tmp / ".webengine_lock"
+        self.sperre.touch()
+
+    def _sperre_frei(self):
+        return subprocess.run(["flock", "-n", str(self.sperre), "true"]).returncode == 0
+
+    def _starte(self, datei, timeout=200, **extra):
+        env = _umgebung(LIGHTOS_WEBENGINE_LOCKFILE=str(self.sperre),
+                        LIGHTOS_SHOW_DB=str(self._tmp / "kind.db"), **extra)
+        # ★ Eigene Sitzung: damit ist die Prozessgruppe des Laufs genau seine
+        # eigene. Ohne das erbte er die Gruppe DIESES pytest-Prozesses, und die
+        # Positivkontrolle unten haenge davon ab, was im Gate sonst noch in
+        # derselben Gruppe steckt — eine Lastfalle, und ausgerechnet in diesem
+        # Item die falsche Antwort.
+        return subprocess.run([str(LOOP_RUNNER), str(datei)], cwd=str(REPO),
+                              env=env, capture_output=True, text=True,
+                              timeout=timeout, start_new_session=True)
+
+    def test_ein_ueberlebender_enkel_haelt_die_sperre_des_einzellaufs_nicht_fest(self):
+        """★ Der teuerste denkbare Fehler — hier auf dem Weg, den Agenten fahren.
+
+        ``flock`` loest erst, wenn die LETZTE Kopie des Deskriptors zu ist. Erbt
+        ein Chromium-Kind ihn und ueberlebt den Lauf, bliebe die Sperre
+        RECHNERWEIT haengen: jeder kuenftige WebEngine-Lauf wartet dann 15
+        Minuten und laeuft danach ungesperrt.
+        """
+        pidfile = self._tmp / "enkel.pid"
+        p = self._tmp / "test_enkel.py"
+        p.write_text(MARKER + f'''
+import subprocess
+
+def test_spur():
+    k = subprocess.Popen(["sleep", "300"], start_new_session=True, close_fds=False)
+    open({str(pidfile)!r}, "w").write(str(k.pid))
+''', encoding="utf-8")
+        erg = self._starte(p)
+        enkel = int(pidfile.read_text(encoding="utf-8")) if pidfile.exists() else 0
+        try:
+            self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+            self.assertTrue(enkel and _lebt(enkel),
+                            "Der ueberlebende Enkel war schon tot — die "
+                            "Pruefung waere nichtssagend gewesen.")
+            self.assertTrue(
+                self._sperre_frei(),
+                "Nach dem gezielten Lauf haelt noch jemand die WebEngine-"
+                "Sperre — ein geerbter Deskriptor in einem ueberlebenden Kind. "
+                "Ab jetzt wartet jeder WebEngine-Lauf auf diesem Rechner ins "
+                "Leere, und zwar rechnerweit.")
+        finally:
+            if enkel:
+                try:
+                    os.kill(enkel, 9)
+                except ProcessLookupError:
+                    pass
+
+    def test_der_einzellauf_wartet_auf_seine_eigenen_kinder(self):
+        """Die Einbaustelle: erst warten, dann freigeben.
+
+        Nachgestellt mit einem Prozess, der den Namen traegt, auf den der Runner
+        prueft (``QtWebEngineProc``), und der den Lauf ueberlebt — er bleibt in
+        dessen Prozessgruppe, weil er NICHT abgekoppelt gestartet wird. Genau so
+        verhalten sich Chromiums Hilfsprozesse.
+        """
+        fake = self._tmp / "QtWebEngineProc"      # comm: genau 15 Zeichen
+        shutil.copy2("/bin/sleep", fake)
+        pidfile = self._tmp / "fake.pid"
+        p = self._tmp / "test_langlebig.py"
+        p.write_text(MARKER + f'''
+import subprocess
+
+def test_spur():
+    k = subprocess.Popen([{str(fake)!r}, "300"])
+    open({str(pidfile)!r}, "w").write(str(k.pid))
+''', encoding="utf-8")
+        erg = self._starte(p, LIGHTOS_WEBENGINE_KIND_DECKEL="0.5")
+        fake_pid = int(pidfile.read_text(encoding="utf-8")) if pidfile.exists() else 0
+        try:
+            self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+            self.assertIn(
+                "EIGENE Chromium-Kinder", erg.stdout,
+                "Der gezielte Lauf hat die Sperre freigegeben, ohne auf seine "
+                f"eigenen Kinder zu sehen:\n{erg.stdout[-3000:]}")
+        finally:
+            if fake_pid:
+                try:
+                    os.kill(fake_pid, 9)
+                except ProcessLookupError:
+                    pass
+
+    def test_ein_gewoehnlicher_einzellauf_meldet_keine_uebrigen_kinder(self):
+        """★ Positivkontrolle. Schlaegt die Meldung im Normalfall an, wartet
+        jeder gezielte WebEngine-Lauf wieder auf etwas, das es nicht gibt —
+        genau der Zustand vor PROC-02c."""
+        p = self._tmp / "test_normal.py"
+        p.write_text(VORLAGE.format(marker=MARKER, schlaf=0.1,
+                                    protokoll=str(self._tmp / "spuren.txt"),
+                                    name="normal"), encoding="utf-8")
+        erg = self._starte(p, LIGHTOS_WEBENGINE_KIND_DECKEL="0.5")
+        self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+        self.assertNotIn("EIGENE Chromium-Kinder", erg.stdout, erg.stdout[-3000:])
+
+    def test_der_gezielte_lauf_behaelt_sein_terminal(self):
+        """★★ Was die Sperre fuer ALLES kaputtmacht, was nicht dieses Item ist.
+
+        Die erste Fassung startete pytest mit ``&`` — nur, um ueber ``$!`` an
+        die Prozessgruppe zu kommen. Gemessen 2026-08-19: das bringt hier gar
+        nichts (ein Hintergrundjob einer nicht-interaktiven Shell BLEIBT in der
+        Gruppe des Skripts — Skript 7346, Kind 7346; nur das ``timeout`` des
+        Segment-Runners legt eine eigene an, 7356). Es kostet aber die
+        Standardeingabe: bei einem asynchronen Befehl legt die Shell fd 0 auf
+        /dev/null. Unter echtem Terminal gemessen — mit ``&`` meldete
+        ``pytest -s`` fd 0 als ``/dev/null``, ohne als ``/dev/pts/1``.
+
+        Damit waren ``--pdb``, ``breakpoint()`` und ``--trace`` in JEDEM
+        gezielten Lauf tot, auch in den 95 % ohne WebEngine. Bewusst mit einer
+        HARMLOSEN Datei gemessen: die Zusicherung haengt nicht an der Sperre.
+        """
+        import pty
+        ziel = self._tmp / "fd0.txt"
+        p = self._tmp / "test_terminal.py"
+        p.write_text(HARMLOS + f'''
+import os
+
+def test_spur():
+    try:
+        wohin = os.readlink("/proc/self/fd/0")
+    except OSError:
+        wohin = "<kein fd 0>"
+    open({str(ziel)!r}, "w").write(wohin)
+''', encoding="utf-8")
+        env = _umgebung(LIGHTOS_WEBENGINE_LOCKFILE=str(self.sperre),
+                        LIGHTOS_SHOW_DB=str(self._tmp / "kind.db"))
+        haupt, neben = pty.openpty()
+        try:
+            proc = subprocess.Popen(
+                [str(LOOP_RUNNER), str(p), "-s"], cwd=str(REPO), env=env,
+                stdin=neben, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, text=True)
+            os.close(neben)
+            neben = None
+            aus = proc.communicate(timeout=200)[0]
+        finally:
+            if neben is not None:
+                os.close(neben)
+            os.close(haupt)
+        self.assertEqual(0, proc.returncode, aus[-3000:])
+        wohin = ziel.read_text(encoding="utf-8")
+        self.assertTrue(
+            wohin.startswith("/dev/pts/"),
+            "Der gezielte Lauf hat pytest sein Terminal genommen "
+            f"(fd 0 -> {wohin!r}). Damit sind --pdb, breakpoint() und --trace "
+            "in jedem gezielten Lauf tot — auch in denen ohne WebEngine.")
+
+
+@unittest.skipUnless(_LAEUFT, _GRUND)
+class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
+    """★★ Die Zusage, an der die ganze Sache haengt: „rechnerweit, ueber
+    Worktrees und Sitzungen hinweg."
+
+    Nachtrag 2026-08-19. Bis hierhin setzte JEDER Test dieser Datei
+    ``LIGHTOS_WEBENGINE_LOCKFILE`` — der Zweig, der die Sperrdatei wirklich
+    bestimmt (``git rev-parse --git-common-dir``), wurde damit von keiner
+    Messung beruehrt. Nachgemessen: ihn auf ``$(pwd)/.webengine_lock``
+    umzustellen — also **exakt der Fehler von PROC-02b, eine eigene Sperrdatei
+    je Worktree** — liess alle 35 Gate-Tests gruen.
+
+    Der Fehler ist dort teuer: Agenten arbeiten in verschachtelten Worktrees
+    unter ``repo/.claude/worktrees/``. Eine Sperre je Worktree greift genau
+    dort nicht, wo tatsaechlich parallel gearbeitet wird.
+
+    Gemessen wird zweifach — der gemeldete Pfad UND seine Wirkung. Der Pfad
+    allein waere nur eine Zeichenkette; die Wirkung allein sagte nicht, dass
+    beide Worktrees dieselbe Datei meinen.
+
+    ⚠️ Und zwar an einem WEGWERF-Repo, nicht am eigenen. Zwei Gruende, beide
+    hart:
+
+      * Diese Datei laeuft im Gate selbst als WebEngine-Segment — der
+        Segment-Runner HAELT dann die echte rechnerweite Sperre. Ein Test, der
+        sie zum Messen selbst nehmen will, bekaeme sie nie und muesste sich
+        wegskippen: im Gate waere er also immer stumm.
+      * Ein Halter, der die echte Sperrdatei ueberlebt, legt jeden
+        WebEngine-Lauf auf diesem Rechner lahm (s. ``_halte_sperre``).
+
+    Das Wegwerf-Repo hat dieselbe Struktur, die es hier braucht — ein
+    ``.git``-Verzeichnis mit Worktrees — und ist von nichts anderem beruehrt.
+    """
+
+    def setUp(self):
+        if not shutil.which("git"):
+            self.skipTest("kein git")
+        self._tmp = Path(tempfile.mkdtemp(prefix="proc02c_wt_"))
+        self.addCleanup(shutil.rmtree, self._tmp, ignore_errors=True)
+        self.basis = self._tmp / "repo"
+        self.basis.mkdir()
+        self._git("init", "-q")
+        (self.basis / "README").write_text("wegwerf\n", encoding="utf-8")
+        self._git("add", "README")
+        self._git("-c", "user.email=t@t", "-c", "user.name=T", "commit", "-qm", "start")
+
+    def _git(self, *args):
+        erg = subprocess.run(["git", *args], cwd=str(self.basis),
+                             capture_output=True, text=True, timeout=120)
+        if erg.returncode != 0:
+            self.skipTest(f"git {args[0]} ging nicht: {erg.stderr[:200]}")
+        return erg
+
+    def _worktree(self, ziel):
+        """Ein echter Worktree des Wegwerf-Repos mit den ARBEITSfassungen.
+
+        Kopiert werden die beiden Dateien, die zusammen die Sperre bestimmen —
+        ``verify_loop.sh`` und ``_gate_webengine.sh``. Wer nur eine kopiert,
+        misst eine Arbeitsfassung gegen einen committeten Helfer: die Paarung
+        gibt es nirgends (die Lehre steht schon in test_verify_loop_sperre.py).
+        """
+        ziel.parent.mkdir(parents=True, exist_ok=True)
+        self._git("worktree", "add", "-q", "--detach", str(ziel), "HEAD")
+        (ziel / "tools").mkdir(exist_ok=True)
+        (ziel / "src").mkdir(exist_ok=True)
+        for datei in ("verify_loop.sh", "_gate_webengine.sh"):
+            shutil.copy2(REPO / "tools" / datei, ziel / "tools" / datei)
+        os.symlink(REPO / "venv", ziel / "venv")
+        return ziel
+
+    def _gemeldeter_pfad(self, wurzel, **extra):
+        env = _umgebung(LIGHTOS_VERIFY_DRYRUN="1", LIGHTOS_VERIFY_NOLOCK="1")
+        env.pop("LIGHTOS_WEBENGINE_LOCKFILE", None)
+        env.update(extra)
+        r = subprocess.run(["bash", str(wurzel / "tools" / "verify_loop.sh")],
+                           cwd=str(wurzel), env=env, capture_output=True,
+                           text=True, timeout=300)
+        for zeile in r.stdout.splitlines():
+            if zeile.startswith("[verify] WebEngine-Sperrdatei:"):
+                return zeile.split(":", 1)[1].strip()
+        self.fail(f"keine WebEngine-Sperrdatei-Zeile:\n{r.stdout}\n{r.stderr}")
+
+    def _webengine_lauf(self, wurzel, **extra):
+        datei = wurzel / "test_wt_web.py"
+        datei.write_text(MARKER + "\n\ndef test_spur():\n    assert True\n",
+                         encoding="utf-8")
+        env = _umgebung(LIGHTOS_SHOW_DB=str(self._tmp / f"{wurzel.name}.db"))
+        env.pop("LIGHTOS_WEBENGINE_LOCKFILE", None)
+        env.update(extra)
+        return subprocess.run([str(wurzel / "tools" / "verify_loop.sh"), str(datei)],
+                              cwd=str(wurzel), env=env, capture_output=True,
+                              text=True, timeout=300)
+
+    def test_verschachtelter_und_geschwister_worktree_teilen_die_sperre(self):
+        # Die beiden Lagen aus PROC-02b: einmal Geschwister von `repo/`, einmal
+        # UNTER `repo/.claude/worktrees/` — die Lage, in der Agenten arbeiten.
+        geschwister = self._worktree(self._tmp / "wt-geschwister")
+        tief = self._worktree(self.basis / ".claude" / "worktrees" / "wf-tief")
+        a = self._gemeldeter_pfad(geschwister)
+        b = self._gemeldeter_pfad(tief)
+        self.assertEqual(
+            a, b,
+            "Zwei Worktrees desselben Repos melden VERSCHIEDENE "
+            "WebEngine-Sperrdateien — dann serialisiert die Sperre genau dort "
+            "nicht, wo parallel gearbeitet wird (PROC-02b, dieselbe Falle).")
+
+        # ★ Und der gemeldete Pfad ist auch der, auf dem wirklich gesperrt wird:
+        # ein Fremder haelt ihn, ein Lauf im ANDEREN Worktree kommt nicht daran.
+        halter = _halte_sperre(a)
+        try:
+            erg = self._webengine_lauf(tief, LIGHTOS_WEBENGINE_SPERRE_WARTE="1")
+        finally:
+            _halter_abraeumen(halter)
+        self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+        self.assertIn(
+            "UNGESPERRT", erg.stdout.upper(),
+            "Ein WebEngine-Lauf im verschachtelten Worktree lief los, obwohl "
+            "die gemeinsame Sperre gehalten wurde — die gemeldete Datei ist "
+            f"nicht die, auf der gesperrt wird:\n{erg.stdout[-3000:]}")
+
+    def test_die_messung_saehe_zwei_verschiedene_sperren_auch(self):
+        """★ Positivkontrolle in beide Richtungen.
+
+        (1) Die Pfadmessung darf nicht blind Gleichheit bestaetigen — mit
+        gesetzter Sperrdatei muss sie einen Unterschied sehen.
+        (2) Die Wirkungsmessung darf nicht blind blockieren — wird eine ANDERE
+        Datei gehalten, muss derselbe Lauf durchlaufen. Ohne (2) waere der Test
+        oben auch dann gruen, wenn der Lauf aus irgendeinem anderen Grund
+        UNGESPERRT meldete.
+        """
+        wt = self._worktree(self._tmp / "wt-kontrolle")
+        eins = self._gemeldeter_pfad(
+            wt, LIGHTOS_WEBENGINE_LOCKFILE=str(self._tmp / "eins.lock"))
+        zwei = self._gemeldeter_pfad(
+            wt, LIGHTOS_WEBENGINE_LOCKFILE=str(self._tmp / "zwei.lock"))
+        self.assertNotEqual(eins, zwei,
+                            "Die Pfadmessung kann gar nicht unterscheiden.")
+
+        fremd = self._tmp / "fremde.lock"
+        fremd.touch()
+        halter = _halte_sperre(fremd)
+        try:
+            erg = self._webengine_lauf(wt, LIGHTOS_WEBENGINE_SPERRE_WARTE="1")
+        finally:
+            _halter_abraeumen(halter)
+        self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
+        self.assertNotIn(
+            "UNGESPERRT", erg.stdout.upper(),
+            "Der Lauf meldete UNGESPERRT, obwohl eine ganz FREMDE Datei "
+            f"gehalten wurde:\n{erg.stdout[-3000:]}")
 
 @unittest.skipUnless(_LAEUFT and HELFER.exists(), _GRUND)
 class WartenAufEigeneKinderTest(unittest.TestCase):

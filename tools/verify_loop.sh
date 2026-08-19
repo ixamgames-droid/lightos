@@ -152,6 +152,12 @@ if [ -n "${LIGHTOS_VERIFY_DRYRUN:-}" ]; then
     # nachpruefbar waere — ein Test muesste sonst die Shell-Logik nachbauen und
     # damit seine eigene Kopie pruefen statt das Skript.
     echo "[verify] Sperrdatei: ${LOCKFILE:-<keine>}"
+    # ★ PROC-02c hat eine ZWEITE Sperrdatei dazugestellt — und dieselbe Frage
+    # wie PROC-02b: gilt sie ueber Worktree-Grenzen? Sie hier zu melden ist der
+    # einzige Weg, das an der ECHTEN Aufloesung zu messen statt an einer
+    # nachgebauten Formel. Ohne diese Zeile blieb die Mutation „je Worktree eine
+    # eigene Datei" gruen — nachgemessen 2026-08-19, alle 35 Gate-Tests gruen.
+    echo "[verify] WebEngine-Sperrdatei: $(webengine_sperrdatei)"
     echo "[verify] LIGHTOS_VERIFY_DRYRUN - Sperre und Syntax-Check erledigt, KEIN Testlauf."
     echo "[verify] Das ist KEINE bestandene Pruefung."
     exit 0
@@ -169,12 +175,12 @@ if [ "$#" -gt 0 ]; then
     # Annahme kaputt. Ein solcher Lauf nimmt deshalb dieselbe schmale
     # WebEngine-Sperre wie die WebEngine-Spur der vollen Suite. Alles andere
     # (die grosse Mehrheit) laeuft unveraendert ungebremst.
+    # Die Entscheidung liegt in webengine_argumente (tools/_gate_webengine.sh),
+    # weil sie mehr Faelle kennt als „ist das eine Datei mit dem Marker": ein
+    # VERZEICHNIS-Argument und ein Lauf ganz ohne Pfad laden beide die ganze
+    # Suite — die frueheste Fassung hier uebersprang genau die, still.
     _web=0
-    for _arg in "$@"; do
-        case "$_arg" in -*) continue ;; esac
-        _pfad="${_arg%%::*}"
-        if [ -f "$_pfad" ] && webengine_datei "$_pfad"; then _web=1; break; fi
-    done
+    if webengine_argumente "$@"; then _web=1; fi
     echo "[verify] 2/2 pytest $* ..."
     if [ "$_web" = "1" ]; then
         webengine_sperre_nehmen
@@ -183,16 +189,32 @@ if [ "$#" -gt 0 ]; then
             3) echo "[verify] ⚠ WebEngine-Sperre nicht bekommen, laufe UNGESPERRT weiter." ;;
         esac
     fi
+    # ★ VORDERGRUND, anders als im Segment-Runner — und das ist gemessen, nicht
+    # Geschmack. Dort laeuft pytest unter `timeout`, das per setpgid eine eigene
+    # Prozessgruppe anlegt; nur deshalb braucht es dort den Umweg ueber `&` und
+    # `wait`, um die Gruppen-ID zu erfahren. Hier gibt es kein `timeout`: ein
+    # Hintergrundjob einer nicht-interaktiven Shell bleibt in der Gruppe des
+    # Skripts (nachgemessen 2026-08-19: Skript pgid 7346, Hintergrundkind pgid
+    # 7346, `timeout`-Kind pgid 7356). Das `&` haette hier also NICHTS gebracht
+    # und eines gekostet: die Standardeingabe eines asynchronen Befehls wird auf
+    # /dev/null gelegt. Gemessen am selben Tag unter echtem Terminal — mit `&`
+    # meldete `pytest -s` fd 0 als /dev/null (isatty False), ohne als /dev/pts/1.
+    # Damit waren `--pdb`, `breakpoint()` und `--trace` in JEDEM gezielten Lauf
+    # tot, WebEngine hin oder her.
+    #
     # `8>&-` schliesst den Sperr-Deskriptor im Kind: ein geerbtes Duplikat
-    # hielte die Sperre sonst ueber das Laufende hinaus offen.
-    "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider 8>&- &
-    _pid=$!
-    _pgid="$(webengine_pgid "$_pid")"
-    wait "$_pid"
+    # hielte die Sperre sonst ueber das Laufende hinaus offen (flock loest erst,
+    # wenn die LETZTE Kopie zu ist).
+    "$PY" -m pytest "$@" -q --tb=short -p no:cacheprovider 8>&-
     _rc=$?
     if [ "$_web" = "1" ]; then
-        # Erst die eigenen Chromium-Kinder abwarten, dann freigeben.
-        webengine_warte_auf_kinder "$_pgid" || true
+        # Erst die eigenen Chromium-Kinder abwarten, DANN freigeben — sonst
+        # uebernimmt der naechste Lauf die Sperre, waehrend unsere noch leben.
+        # Die Prozessgruppe ist die dieses Laufs (Skript + Nachkommen): enger
+        # als rechnerweit, weiter als nur der pytest-Prozess. Genau die Gruppe,
+        # in der die Chromium-Kinder haengen bleiben.
+        webengine_warte_auf_kinder "$(webengine_pgid $$)" || \
+            echo "[verify] ⚠ Nach dem Deckel liefen noch EIGENE Chromium-Kinder. Gemessen sind die sonst nach <0,04 s weg."
         webengine_sperre_freigeben
     fi
     if [ "$_rc" -ne 0 ]; then

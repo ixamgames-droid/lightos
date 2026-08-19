@@ -24,6 +24,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   gezielte Einzellaeufe (`./tools/verify_loop.sh tests/test_viz*.py`), die
   bisher ausgenommen waren, obwohl Agenten fast nur solche fahren. Alles ohne
   3D-Ansicht laeuft unveraendert ungebremst.
+- **Ein Verzeichnis als Argument fiel dabei durchs Raster.**
+  `./tools/verify_loop.sh tests/` faehrt alle 41 Dateien mit 3D-Ansicht in
+  einem einzigen Prozess — und lief trotzdem ungesperrt, weil die Erkennung nur
+  nach einer *Datei* sah. Derselbe blinde Fleck galt fuer einen Lauf ganz ohne
+  Pfadangabe. Beide nehmen die Sperre jetzt.
+- **Gezielte Laeufe hatten ihr Terminal verloren.** Um an die Prozessgruppe zu
+  kommen, startete das Gate `pytest` im Hintergrund — dabei legt die Shell die
+  Standardeingabe auf `/dev/null`. Damit waren `--pdb`, `breakpoint()` und
+  `--trace` in **jedem** gezielten Lauf tot, auch in den 95 % ohne 3D-Ansicht.
+  Der Umweg brachte hier ohnehin nichts (nachgemessen: ein Hintergrundjob bleibt
+  in der Prozessgruppe des Skripts); `pytest` laeuft wieder im Vordergrund.
 
 ### 2026-08-13 — Moving Heads mit LED-Ring zeigen ihre Pixel einzeln
 

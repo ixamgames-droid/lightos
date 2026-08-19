@@ -48,10 +48,22 @@
 # Wartezeit ab, wird gewarnt und weitergemacht — eine Sperre, die haengt, waere
 # schlimmer als keine.
 #
-# ⚠️ Was das NICHT kann: Wer pytest direkt startet, an beiden Gate-Runnern
-# vorbei, nimmt die Sperre nicht und wird von ihr auch nicht aufgehalten. Der
-# Segment-Runner meldet diesen Fall deshalb ausdruecklich, statt ihn zu
-# verschweigen (Datei `fremdes_chromium.txt` in der Segmentausgabe).
+# ⚠️ Was das NICHT kann — vollstaendig, damit niemand die Zahl in
+# `fremdes_chromium.txt` fuer unmoeglich haelt und sie deshalb falsch deutet:
+#
+#   * Wer pytest DIREKT startet, an beiden Gate-Runnern vorbei, nimmt die Sperre
+#     nicht und wird von ihr auch nicht aufgehalten (WORKFLOW.md verbietet das,
+#     die Sperre kann es nicht erzwingen).
+#   * `LIGHTOS_VERIFY_SINGLE=1` faehrt die volle Suite bewusst in EINEM
+#     pytest-Prozess. Dieser Weg nimmt die WebEngine-Sperre nicht — er haelt
+#     die Voll-Suiten-Sperre ohnehin ueber die ganze Laufzeit, und die schmale
+#     Sperre 7 Minuten am Stueck zu halten waere genau der Zustand, den PROC-02c
+#     abstellt (jeder gezielte Lauf wartete dann auf die ganze Spur).
+#   * Ein Lauf, dessen Wartezeit abgelaufen ist (Rueckgabe 3), laeuft
+#     ausdruecklich UNGESPERRT weiter — eine haengende Sperre waere schlimmer
+#     als keine.
+#   * Ein Runner INNERHALB eines gesperrten Segments laeuft per
+#     Wiedereintritts-Schutz ohne eigene Sperre (er ist ja schon gedeckt).
 
 # ── Erkennung: zaehlt eine Testdatei als WebEngine-Datei? ────────────────────
 # Dasselbe Merkmal wie in der Spur-Aufteilung von verify_segmented.sh: den
@@ -59,6 +71,50 @@
 # keine andere (test_viz12_service.py etwa arbeitet nur am Service).
 webengine_datei() {
     grep -q 'QWebEngineView' "$1" 2>/dev/null
+}
+
+# Dasselbe fuer einen beliebigen Pfad: Datei ODER Verzeichnis.
+webengine_pfad() {
+    if [ -d "$1" ]; then
+        grep -rq --include='test_*.py' 'QWebEngineView' "$1" 2>/dev/null
+    else
+        webengine_datei "$1"
+    fi
+}
+
+# ── Erkennung: beruehrt ein GEZIELTER Lauf WebEngine? ───────────────────────
+# Bekommt die pytest-Argumente, antwortet 0 = ja (Sperre noetig), 1 = nein.
+#
+# ★ NACHTRAG 2026-08-19 — die erste Fassung von PROC-02c pruefte nur
+# `[ -f "$pfad" ]` und uebersprang damit STILL genau die beiden Aufrufe, die am
+# meisten WebEngine laden. Gemessen an der Arbeitsfassung, mit gehaltener
+# Sperre und `LIGHTOS_WEBENGINE_SPERRE_WARTE=2`:
+#
+#   ./tools/verify_loop.sh <datei>.py   -> "Sperre nicht bekommen"  (gesperrt)
+#   ./tools/verify_loop.sh <verz>/      -> keine Zeile              (UNGESPERRT!)
+#
+# Ein Verzeichnis ist kein Sonderfall, sondern der schlimmste Fall: `verify_loop.sh
+# tests/` faehrt ALLE 41 WebEngine-Dateien in EINEM pytest-Prozess — und lief
+# genau dabei an der Sperre vorbei. Ohne Pfadargument (`verify_loop.sh -k viz`)
+# sammelt pytest die Vorgabe, also ebenfalls die ganze Suite.
+#
+# Die Richtung des Zweifels ist Absicht: im Unklaren wird gesperrt. Falsch
+# gesperrt kostet Wartezeit, falsch offen kostet ein rotes Segment, das isoliert
+# gruen ist — und das ist der Fehler, den dieses Item behebt.
+webengine_argumente() {
+    local hatte_pfad=0 arg pfad
+    for arg in "$@"; do
+        case "$arg" in -*) continue ;; esac
+        pfad="${arg%%::*}"
+        [ -e "$pfad" ] || continue          # z. B. der Wert hinter `-k`
+        hatte_pfad=1
+        webengine_pfad "$pfad" && return 0
+    done
+    [ "$hatte_pfad" = "1" ] && return 1
+    # Kein Pfad dabei: pytest sammelt ab dem Arbeitsverzeichnis (pytest.ini setzt
+    # kein `testpaths`), und beide Runner haben vorher in den Repo-Root
+    # gewechselt — `tests/` ist damit immer Teil der Sammlung.
+    webengine_pfad tests
 }
 
 # ── Sperrdatei ──────────────────────────────────────────────────────────────
