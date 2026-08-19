@@ -180,6 +180,40 @@ export function placeElement(index, cols, rows, order, rotation, flip) {
 // Linse (dieselbe Ansicht wie die Zeichnung im Manual). Wer daraus 3D-Positionen
 // macht, muss diese Ebene auf das Geraet legen (siehe `buildPixelHead`).
 
+/**
+ * FM-14 / CDX-55+56: EINE Quelle fuer „welche Farb-Baenke werden zu
+ * Ring-Segmenten?" — 3D-Modell (`buildPixelHead`) und 2D-Icon (`addRingCells`)
+ * rechneten das bis hierher getrennt nach, mit je eigener Formel.
+ *
+ * `basisBaenke` (Python: `pixelBase`) ist die Zahl der FUEHRENDEN Baenke, die
+ * KEIN Ring-Pixel sind — abgeleitet aus dem Kanal-Layout des Profils
+ * (`app_state.pixel_ring_base_banks`), nicht angenommen. 1 = das Geraet hat
+ * eine eigene Grundfarben-Lage (Robe Spiider), die bereits Linse und Kegel
+ * faerbt; 0 = alle Baenke sind physische Pixel, dann gehoert auch Pixel 0 in
+ * den Ring. Fehlt das Feld, gilt 0: ein faelschlich angenommener Versatz
+ * LOESCHT ein Pixel aus dem Bild, ein faelschlich verneinter zeigt die
+ * Geraetefarbe doppelt.
+ *
+ * ★ CDX-56: hier wird NICHTS mehr gekappt. Bis hierher stand in beiden
+ * Fassungen ein `Math.min(64, …)`, das jedes Pixel darueber ohne jede Meldung
+ * verschwinden liess — waehrend Python weiter die volle `nHeads`-Zahl samt
+ * `heads`-Feld schickte. Die Zahl der Baenke ist durch das Profil begrenzt
+ * (ein Modus hat hoechstens so viele Baenke wie Kanaele), `wabenPlatz` legt
+ * beliebig viele Ringe an, und die Segmente schrumpfen mit der Ringzahl in die
+ * Linse hinein — es gibt also nichts abzuschneiden.
+ *
+ * @returns {{basis: number, anzahl: number}} Versatz und Segmentzahl.
+ */
+export function ringSegmente(nBaenke, basisBaenke) {
+  // Ohne Bank-Angabe EIN Segment (wie bisher): ein Pixel-Kopf ohne Kopfzahl ist
+  // eine unvollstaendige Nutzlast, kein Geraet ohne Pixel.
+  const baenke = Math.max(1, Math.floor(nBaenke || 0));
+  // Der Versatz darf nie ALLE Baenke wegnehmen: ein Ring ohne Segment waere
+  // ein Pixel-Kopf, der als gewoehnlicher Moving Head dasteht.
+  const basis = Math.min(Math.max(0, Math.floor(basisBaenke || 0)), baenke - 1);
+  return { basis, anzahl: baenke - basis };
+}
+
 /** Wie viele Plaetze fassen die Ringe 0..k? (1, 7, 19, 37, …) */
 function wabenPlaetze(ring) {
   const k = Math.max(0, Math.floor(ring || 0));

@@ -41,6 +41,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   dritten Speichern ueber jeweils neu geoeffnete Dialoge.
 
 
+### 2026-08-19 — Der Pixel-Ring zeigt jetzt jedes Pixel
+
+#### Behoben
+
+- **Geräte, deren Bänke alle echte Pixel sind, verloren ihr erstes Pixel.** Der
+  Ring nahm bisher unbesehen an, die erste Farbbank sei die Grundfarbe des
+  Geräts (so ist es beim Robe Spiider) und fing deshalb immer bei der zweiten
+  an. Bei einem importierten Gerät ohne eigene Grundfarben-Lage tauchte Pixel 1
+  damit nirgends im Ring auf. LightOS liest jetzt am Kanal-Layout ab, ob es eine
+  solche Lage gibt: ein Pixelfeld liegt in gleichmäßigen Schritten auf DMX, eine
+  Grundfarben-Lage mit eigenem Shutter und Dimmer tut das nicht. Die
+  mitgelieferten Geräte sehen unverändert aus.
+
+- **Ab 65 Segmenten fehlten die restlichen Pixel — ohne jeden Hinweis.** Der
+  3D-Ring und das 2D-Symbol zeichneten höchstens 64 Segmente, während die Werte
+  aller Pixel weiterhin ankamen. Ein Gerät mit mehr Pixeln zeigte also stumm nur
+  einen Teil davon. Jetzt wird jede gemeldete Bank gezeichnet; die Segmente
+  rücken enger zusammen und bleiben in der Lichtaustrittsfläche.
 ### 2026-08-19 — Das Test-Gate haelt parallel arbeitende Sitzungen auseinander
 
 #### Behoben
@@ -69,6 +87,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   `--trace` in **jedem** gezielten Lauf tot, auch in den 95 % ohne 3D-Ansicht.
   Der Umweg brachte hier ohnehin nichts (nachgemessen: ein Hintergrundjob bleibt
   in der Prozessgruppe des Skripts); `pytest` laeuft wieder im Vordergrund.
+- **Ein liegengebliebener Testprozess konnte das Gate dauerhaft lahmlegen.** Die
+  Sperre gegen zwei gleichzeitige volle Testlaeufe wird ueber einen offenen
+  Dateizeiger gehalten, und den erbte bisher **jeder** Prozess, den der Lauf
+  startete — bis hinunter zu den Hilfsprozessen der 3D-Ansicht. Gelockert wird
+  die Sperre aber erst, wenn die **letzte** Kopie geschlossen ist. Ein einziger
+  Prozess, der den Lauf ueberlebt, hielt sie damit ueber das Ende hinaus fest;
+  der naechste volle Lauf auf demselben Rechner haette dann ohne Zeitlimit und
+  ohne Meldung gewartet. Der Zeiger wird jetzt an beiden Wegen der vollen Suite
+  geschlossen, bevor die Testprozesse starten. Nachgemessen an einem
+  Wegwerf-Repo mit einem absichtlich ueberlebenden Kind: vorher blieb die Sperre
+  belegt, jetzt ist sie danach frei.
 ### 2026-08-19 — Die weiße Leiste bekommt nur noch, wer wirklich eine hat
 
 #### Behoben
