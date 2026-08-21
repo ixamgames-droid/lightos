@@ -208,10 +208,29 @@ class RecencyTest(unittest.TestCase):
     Prioritaet im Backlog war falsch.
     """
 
+    # ★★ ZEITBOMBE, behoben 22.08.2026. Hier standen feste Daten: 2026-01-01
+    # als „alt" und 2026-07-20 als „neu". Die Kaelte-Schwelle ist aber
+    # **30 Tage vor HEUTE** (`_cold_before`) — am 22.08. war damit auch das
+    # „neue" Datum kalt, und `test_report_marks_cold_signatures` wurde rot,
+    # OHNE dass jemand etwas geaendert hatte. Auf `main`, in jedem PR, und
+    # niemand konnte es einem Commit zuordnen.
+    #
+    # Beide Daten haengen jetzt am Lauftag: „alt" weit jenseits der Schwelle,
+    # „neu" klar diesseits. Der Test misst damit die REGEL statt eines
+    # Kalenderstands — und laeuft auch in einem Jahr noch.
+    ALT_TAGE, NEU_TAGE = 200, 3
+
+    def _stempel(self, tage_zurueck: int) -> str:
+        import datetime as _d
+        return (_d.datetime.now() - _d.timedelta(days=tage_zurueck)) \
+            .strftime("%Y-%m-%dT%H:%M:%S")
+
     def _log(self):
-        return (_exception_block("2026-01-01T10:00:00", "OldError", "alt",
+        self._alt = self._stempel(self.ALT_TAGE)
+        self._neu = self._stempel(self.NEU_TAGE)
+        return (_exception_block(self._alt, "OldError", "alt",
                                  [(SRC, 1, "a")]) * 5
-                + _exception_block("2026-07-20T10:00:00", "NewError", "neu",
+                + _exception_block(self._neu, "NewError", "neu",
                                    [(SRC, 2, "b")]))
 
     def test_newest_signature_comes_first(self):
@@ -223,12 +242,16 @@ class RecencyTest(unittest.TestCase):
     def test_report_marks_cold_signatures(self):
         found = cci.parse_log(self._log())
         report = cci.format_report(found, seen=set())
-        old_line = next(l for l in report.splitlines()
-                        if "2026-01-01" in l)
-        new_line = next(l for l in report.splitlines()
-                        if "2026-07-20" in l)
-        self.assertIn("❄", old_line, "alte Signatur muss als kalt erkennbar sein")
-        self.assertNotIn("❄", new_line)
+        old_line = next(l for l in report.splitlines() if self._alt in l)
+        new_line = next(l for l in report.splitlines() if self._neu in l)
+        self.assertIn("❄", old_line,
+                      f"eine Signatur von vor {self.ALT_TAGE} Tagen muss als "
+                      f"kalt erkennbar sein (Schwelle: {cci._cold_before()})")
+        self.assertNotIn(
+            "❄", new_line,
+            f"eine Signatur von vor {self.NEU_TAGE} Tagen darf NICHT kalt "
+            f"sein (Schwelle: {cci._cold_before()}) — sonst meldet die Triage "
+            f"einen noch lebenden Fehler als erledigt")
 
     def test_cold_threshold_is_a_date_in_the_past(self):
         import datetime as d
