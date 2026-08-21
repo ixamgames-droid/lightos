@@ -276,7 +276,14 @@ class KopfReglerNennenIhrenKanalTest(_Basis):
         """Gemischt ist der Fall, in dem der Tilt-Block (eigener Bauweg) und die
         allgemeinen Regler NEBENEINANDER stehen — beide muessen stimmen."""
         self._patch(1, "MOVBAR4", 22)
-        self._patch(2, "Speider", 14, ftype="spider")
+        # ★ "SPIIDER" mit 27 Kanaelen, nicht "Speider" mit 14: letzteres ist ein
+        # LOKAL importiertes
+        # Profil (Tippfehler im Namen) und existiert nur auf Robins Rechner.
+        # In der CI mit frisch geseedeter Bibliothek lieferte die Suche `None`,
+        # und `int(None)` warf — der Test war auf diesem Rechner gruen und dort
+        # rot. Genau die Fallenklasse, vor der der Kommentar an `_pid` warnt:
+        # er nennt den Anzeigenamen, aber ein KURZname kann ebenso lokal sein.
+        self._patch(2, "SPIIDER", 27, ftype="spider")
         self._pruefe(["1:1", "2:1"], mindestens=4)
 
 
