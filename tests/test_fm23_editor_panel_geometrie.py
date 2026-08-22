@@ -144,6 +144,18 @@ class _EditorFall(unittest.TestCase):
             dlg._edit_name.setText(neuer_name)
         return dlg
 
+    def _form_nachtragen(self, pid: int, *, grid, weiss):
+        """Traegt die Form ueber den ECHTEN Editor-Dialog nach und speichert.
+
+        Bewusst OHNE `clear_channel_cache()` drumherum: dieser Weg soll den
+        Cache selbst verwerfen — genau das ist die Zusage, die geprueft wird.
+        """
+        dlg = editor_module.FixtureEditorDialog(fixture_id=pid)
+        self.addCleanup(dlg.deleteLater)
+        dlg._tabs.widget(0).set_geometry(grid, weiss)
+        dlg._save()
+        return dlg
+
     def _modi(self, pid: int) -> dict:
         with Session(self.engine) as s:
             prof = s.execute(
@@ -275,6 +287,49 @@ class KetteBisZumVerbraucherTest(_EditorFall):
         f = _patched(pid, "Standard", 152)
         self.assertEqual(panel_grid_for(f), (4, 12))
         self.assertEqual(white_grid_for(f), (1, 0))
+
+    def test_die_form_kommt_an_OBWOHL_der_cache_schon_gefuellt_ist(self):
+        """★★ Der Alltagsfall — und der einzige, der im Betrieb wirklich eintritt.
+
+        Alle uebrigen Tests dieser Datei treffen einen LEEREN Cache: `setUp`
+        ruft `clear_channel_cache()`, und das Profil wird im selben Test frisch
+        angelegt, wurde also nie gezeichnet. Damit stellen sie per API einen
+        Zustand her, den im Betrieb niemand herstellt.
+
+        Real laeuft es andersherum: das Panel steht als geratenes Quadrat im
+        3D — `_panel_grid_cache` ist also mit `(0, 0)` gefuellt —, und **genau
+        deshalb** geht der Nutzer in den Editor und traegt 4x12 ein. Ohne
+        `clear_channel_cache()` in `_save` liefert `panel_grid_for` danach
+        weiter `(0, 0)`, bis jemand den Patch aendert oder das Programm neu
+        startet. Der Nutzer sieht sein Panel unveraendert falsch und hat keinen
+        Anhaltspunkt, warum.
+
+        Gefunden von einer adversarialen Gegenpruefung; der Docstring von
+        `clear_channel_cache` behauptete, Profil-Aenderungen aus
+        „Generator/Editor" reisten ueber denselben Weg — die Editor-Haelfte
+        stimmte nicht.
+        """
+        from src.core.app_state import panel_grid_for, white_grid_for
+        # 1. Das Panel existiert und wurde schon einmal gezeichnet (ohne Form).
+        pid = self._neues_panel(short="EIGENCACHE")
+        f = _patched(pid, "Standard", 152)
+        self.assertEqual(panel_grid_for(f), (0, 0),
+                         "Vorbedingung: ohne Angabe raet der Renderer")
+        self.assertEqual(white_grid_for(f), (0, 0))
+
+        # 2. Der Nutzer traegt die Form nach — ueber den ECHTEN Editor-Dialog,
+        #    und OHNE dass der Test den Cache anfasst.
+        self._form_nachtragen(pid, grid=(4, 12), weiss=(1, 0))
+
+        # 3. Der Renderer muss die neue Form sehen.
+        self.assertEqual(
+            panel_grid_for(f), (4, 12),
+            "Die eingetragene Rasterform kommt nicht beim Renderer an — der "
+            "Cache haelt den geratenen Wert fest. `_save` muss "
+            "`clear_channel_cache()` rufen, wie es `fixture_generator._save` "
+            "laengst tut.")
+        self.assertEqual(white_grid_for(f), (1, 0),
+                         "dasselbe fuer die Weiss-Leiste")
 
     def test_positivkontrolle_ohne_eingabe_raet_der_renderer_weiter(self):
         """``(0, 0)`` heisst bei der Rasterform WEITERRATEN und beim Weiss-Band

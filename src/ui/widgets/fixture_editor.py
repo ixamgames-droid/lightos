@@ -551,6 +551,27 @@ class FixtureEditorDialog(QDialog):
             s.commit()
             self._saved_id = profile.id
 
+        # ★★ FM-23: den Kanal-/Geometrie-Cache verwerfen — sonst kommt die
+        # eingetippte Rasterform im laufenden Programm NIE beim Renderer an.
+        #
+        # `panel_grid_for`/`white_grid_for` liegen hinter `_panel_grid_cache`
+        # (Schluessel: Feld, Profil-ID, Modusname, Kanalzahl). Der Alltagsfall
+        # dieses Items ist genau der schlechte: das Panel steht als geratenes
+        # Quadrat im 3D — der Cache ist also mit (0,0) gefuellt —, der Nutzer
+        # geht deshalb in den Editor und traegt 4x12 ein. Ohne diese Zeile
+        # liefert `_fixture_to_dict` danach weiter (0,0), bis jemand den Patch
+        # aendert oder das Programm neu startet.
+        #
+        # Der Schwesterdialog `fixture_generator._save` macht es laengst
+        # (dort Zeile ~1264), und der Docstring von `clear_channel_cache`
+        # behauptet ausdruecklich, Profil-Aenderungen aus „Generator/Editor"
+        # reisten ueber denselben Weg — die Editor-Haelfte stimmte nicht.
+        try:
+            from src.core.app_state import clear_channel_cache
+            clear_channel_cache()
+        except Exception:
+            pass
+
         QMessageBox.information(self, "Gespeichert",
                                 f"Fixture-Profil '{mfr_name} {name}' gespeichert.")
         # Sync UI
