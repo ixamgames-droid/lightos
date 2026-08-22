@@ -17,8 +17,10 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
 from src.core.app_state import (
-    get_state, get_channels_for_patched, viz_model_for)
+    channel_occurrence_keys, get_state, get_channels_for_patched,
+    pixel_ring_banks_for, viz_model_for)
 from src.core.color_utils import visual_intensity, visual_rgb
+from src.core.pixel_order import ring_segmente, waben_platz
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
@@ -86,6 +88,29 @@ def _has_pan_tilt(fixture, render_type: str | None = None) -> bool:
     return "pan" in attrs or "tilt" in attrs
 
 
+# 2D-Helligkeit an die Intensitaet koppeln (wie 3D): bei niedriger Intensitaet
+# die Fixture-Farbe Richtung dunkel mischen, statt sie immer voll gesaettigt zu
+# zeichnen — ein auf 0% geparktes Geraet sieht dann auch im 2D dunkel aus (3D
+# faerbt das Icon bei ~0% nach 0x3a3a4a).
+#
+# ★ VIZ-53: als EINE Funktion, weil der Pixel-Ring seine Segmentfarben durch
+# dieselbe Abdunklung schicken muss wie die Geraetefarbe. Zwei Fassungen
+# derselben Mischung waeren wieder die Drift-Quelle aus VIZ-51/52 — hier
+# innerhalb EINES Glyphs: der Kopf haette anders reagiert als seine Segmente.
+_ICON_OFF_COLOR = QColor(0x3a, 0x3a, 0x4a)
+
+
+def dim_to_intensity(color: QColor, inorm: float) -> QColor:
+    """Farbe Richtung ``0x3a3a4a`` mischen, ``inorm`` = Intensitaet 0..1."""
+    i = max(0.0, min(1.0, inorm))
+    o = _ICON_OFF_COLOR
+    return QColor(
+        int(o.red()   + (color.red()   - o.red())   * i),
+        int(o.green() + (color.green() - o.green()) * i),
+        int(o.blue()  + (color.blue()  - o.blue())  * i),
+    )
+
+
 # ── Fixture-Renderer ──────────────────────────────────────────────────────────
 
 class FixtureRenderer:
@@ -99,7 +124,15 @@ class FixtureRenderer:
              blink_off: bool = False, highlighted: bool = False,
              zoom: float = 1.0, pan_range_deg: float = 540.0,
              tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
-             tilt_zero_dmx: float = 128.0, lod: int = 0):
+             tilt_zero_dmx: float = 128.0, lod: int = 0,
+             pixel_banks: int = 0, pixel_base: int = 0,
+             pixel_colors: list | None = None):
+        # pixel_banks/pixel_base/pixel_colors (VIZ-53): NUR fuer 'pixel_head'.
+        # Zahl der Farb-Baenke und Versatz kommen aus `pixel_ring_banks_for` —
+        # derselben Quelle wie die 3D-Nutzlast; `pixel_colors[k]` ist die Farbe
+        # der Bank k (dieselbe Ableitung wie das `heads[]`-Array des 3D-Pfads).
+        # Jeder andere Typ ignoriert sie: ein gewoehnlicher Moving Head wird
+        # nicht dadurch zum Pixel-Kopf, dass er Kanaele mit Farbe hat.
         # lod (Level-of-Detail, QOL/UI-26): 0 = volles Label + Intensity% + FX-Badge,
         # 1 = nur Kurz-Label (ohne Typ-Praefix), 2 = gar kein Text. Wird vom Canvas
         # aus dem Bildschirm-Nachbarabstand bestimmt -> keine ueberlappenden Labels
@@ -118,17 +151,10 @@ class FixtureRenderer:
             color = QColor(18, 18, 22)
             intensity = 0
 
-        # 2D-Helligkeit an die Intensitaet koppeln (wie 3D): bei niedriger
-        # Intensitaet die Fixture-Farbe Richtung dunkel mischen, statt sie immer
-        # voll gesaettigt zu zeichnen — ein auf 0% geparktes Geraet sieht dann
-        # auch im 2D dunkel aus (3D faerbt das Icon bei ~0% nach 0x3a3a4a).
+        # Abdunkeln ueber `dim_to_intensity` (s. dort) — dieselbe Mischung, die
+        # gleich auch die Ring-Segmente eines Pixel-Kopfes durchlaufen.
         _inorm = max(0.0, min(1.0, intensity / 255.0))
-        _off = QColor(0x3a, 0x3a, 0x4a)
-        color = QColor(
-            int(_off.red()   + (color.red()   - _off.red())   * _inorm),
-            int(_off.green() + (color.green() - _off.green()) * _inorm),
-            int(_off.blue()  + (color.blue()  - _off.blue())  * _inorm),
-        )
+        color = dim_to_intensity(color, _inorm)
 
         # Effekt-Ring (pulsierend, blau) — hinter Selection-Ring
         if effects:
@@ -224,6 +250,66 @@ class FixtureRenderer:
                     cy = x0 + r*step
                     painter.drawRoundedRect(QRectF(cx - cw/2, cy - cw/2, cw, cw), 1.5, 1.5)
             label_prefix = "MTX"
+
+        elif ft == "pixel_head":
+            # FM-14/VIZ-53: EIN Moving Head, dessen Lichtquelle in Ring-Segmente
+            # zerlegt ist (Robe Spiider). Bis hierher fiel er durch — "head"
+            # steckt in "pixel_head", also zeichnete ihn der generische
+            # Moving-Head-Zweig als einfarbige Linse, waehrend das
+            # 3D-Top-Down-Icon seinen Ring zeigte. Ein Chase lief im 3D um den
+            # Kopf herum und im 2D gar nicht.
+            #
+            # ★ Exakter Match VOR dem "head"-Substring-Zweig — die Reihenfolge
+            # dieser elif-Kette IST die Regel.
+            from math import cos, sin
+            # Silhouette wie beim Moving Head (es IST einer, s. buildTopDownIcon):
+            # Yoke (2 Arme links/rechts).
+            painter.setBrush(QBrush(QColor("#2a2a2a")))
+            painter.setPen(QPen(QColor("#666"), 1))
+            painter.drawRect(QRectF(-size*0.5, -size*0.15, size*0.15, size*0.3))
+            painter.drawRect(QRectF(size*0.35, -size*0.15, size*0.15, size*0.3))
+            # Kopf-Gehaeuse DUNKEL statt in der Geraetefarbe: die Farbe tragen
+            # die Segmente (3D nimmt dafuer BAR_BODY_FILL). Eine flaechig
+            # eingefaerbte Linse haette den Ring wieder unsichtbar gemacht.
+            painter.setBrush(QBrush(QColor("#1a1a20")))
+            painter.setPen(QPen(QColor("#888"), 1.5))
+            painter.drawEllipse(QPointF(0, 0), size*0.4, size*0.4)
+            # Segmente: Zahl, Versatz und Plaetze aus DERSELBEN Quelle wie das
+            # 3D (`ring_segmente`/`waben_platz`, gespiegelt in
+            # scene_src/fixtures/pixel_order.js).
+            _basis, _anzahl = ring_segmente(pixel_banks, pixel_base)
+            _max_ring = 0
+            for _i in range(_anzahl):
+                _max_ring = max(_max_ring, waben_platz(_i)[0])
+            # Ringradius im selben Verhaeltnis zum Kopf wie im 3D-Icon
+            # (addRingCells: 0.52 auf 0.6 Koerperradius).
+            _ring_r = size * 0.4 * (0.52 / 0.6)
+            _teilung = _ring_r / (_max_ring + 0.55)
+            _zell_r = _teilung * 0.46
+            _lit = intensity > 12
+            _cols = pixel_colors or []
+            painter.setPen(Qt.PenStyle.NoPen)
+            for _i in range(_anzahl):
+                _k, _px, _py = waben_platz(_i)
+                # Handedness wie im 3D-Icon (x aus -x, z aus -y), und die
+                # Live-View-Achsen sind dieselben wie die 3D-Top-Down-Achsen
+                # (`stage.coords.world3d_to_live`: px=x, py=z). Ein Vorzeichen
+                # hier liesse denselben Chase in beiden Ansichten
+                # gegenlaeufig erscheinen.
+                _bank = _basis + _i
+                if _lit and _bank < len(_cols):
+                    painter.setBrush(QBrush(dim_to_intensity(_cols[_bank], _inorm)))
+                else:
+                    painter.setBrush(QBrush(QColor("#3a3a44")))
+                painter.drawEllipse(QPointF(-_px * _teilung, -_py * _teilung),
+                                    _zell_r, _zell_r)
+            # Beam-Richtung wie beim Moving Head — derselbe Winkel, dieselbe Quelle.
+            pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
+            painter.setPen(QPen(color, 2))
+            painter.drawLine(QPointF(0, 0),
+                             QPointF(cos(pan_rad - 1.5708) * size * 0.6,
+                                     sin(pan_rad - 1.5708) * size * 0.6))
+            label_prefix = "PIX"
 
         elif "moving" in ft or "head" in ft:
             # Moving Head: Diamant + Yoke
@@ -1151,6 +1237,39 @@ class StageCanvas(QWidget):
         except Exception:
             return QColor(60, 60, 60), 0
 
+    def _bank_colors(self, fixture, n_banks: int) -> list:
+        """Farbe JE Farb-Bank (Kopf) — die Segmentfarben des Pixel-Rings.
+
+        Dieselbe Ableitung wie der 3D-Pfad
+        (``visualizer_service._build_fixture_payload`` -> ``heads[]``):
+        vorkommens-bewusste Schluessel (``attr#N``, ``channel_occurrence_keys``)
+        und ``visual_rgb`` mit demselben Suffix. Ohne das zeigte der Ring
+        N-mal die Bank-0-Farbe, und ein Pixel-Chase stuende im 2D still,
+        waehrend er im 3D laeuft.
+
+        Nie werfen (Renderer-Hot-Path): im Fehlerfall eine leere Liste — dann
+        bleiben die Segmente dunkel, statt eine Farbe zu behaupten."""
+        if n_banks <= 0:
+            return []
+        try:
+            universe = self._state.universes.get(fixture.universe)
+            if universe is None:
+                return []
+            channels = get_channels_for_patched(fixture)
+            attrs: dict[str, int] = {}
+            for ch, key in channel_occurrence_keys(channels):
+                addr = fixture.address + ch.channel_number - 1
+                if 1 <= addr <= 512:
+                    attrs[key] = universe.get_channel(addr)
+            out = []
+            for h in range(n_banks):
+                sfx = "" if h == 0 else f"#{h}"
+                r, g, b = visual_rgb(attrs, channels, sfx)
+                out.append(QColor(r, g, b))
+            return out
+        except Exception:
+            return []
+
     # ── Paint ─────────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):
@@ -1251,6 +1370,15 @@ class StageCanvas(QWidget):
             _lod = _lod_for_screen_gap(self._nn_gap.get(fixture.fid, 1e9) * self.zoom)
             if fixture.fid in self._selected_fids or fixture.fid in self._highlight_fids:
                 _lod = 0
+            # VIZ-53: der Ring eines Pixel-Kopfes. Zahl der Baenke und Versatz
+            # kommen aus `pixel_ring_banks_for` — DERSELBEN Funktion, aus der
+            # auch die 3D-Nutzlast `nHeads`/`pixelBase` holt. Nur fuer diesen
+            # Typ geholt: jedes andere Geraet zahlt keine Kanal-Runde dafuer.
+            _pix_banks = _pix_base = 0
+            _pix_colors = None
+            if _render_type == "pixel_head":
+                _pix_banks, _pix_base = pixel_ring_banks_for(fixture)
+                _pix_colors = self._bank_colors(fixture, _pix_banks)
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
@@ -1263,6 +1391,8 @@ class StageCanvas(QWidget):
                 pan_range_deg=_pr, tilt_range_deg=_tr,
                 pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
                 lod=_lod,
+                pixel_banks=_pix_banks, pixel_base=_pix_base,
+                pixel_colors=_pix_colors,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:

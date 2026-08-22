@@ -153,3 +153,74 @@ def place_element(index: int, cols: int, rows: int,
     nr = max(1, int(rows or 1))
     r, c = pixel_cell(index, nc, order)
     return rotate_cell(r, c, nr, nc, rotation, flip)
+
+
+# ── FM-14 / VIZ-53: der RING eines Pixel-Kopfes ──────────────────────────────
+#
+# Ein Pixel-Moving-Head (Robe Spiider) ist EIN Kopf, dessen Lichtquelle in
+# Waben-/Ring-Segmente zerlegt ist — kein Raster. Die Plaetze rechnet deshalb
+# nicht ``pixel_cell``, sondern die zwei Funktionen unten.
+#
+# ★ Sie sind die PYTHON-Fassung von ``ringSegmente``/``wabenPlatz`` aus
+# ``scene_src/fixtures/pixel_order.js`` — dieselbe Spiegelung wie
+# ``pixel_cell`` <-> ``pixelCell`` weiter oben, und aus demselben Grund: das
+# 3D-Modell und das 3D-Top-Down-Icon leben in JS, die 2D-Live-View
+# (``live_view.FixtureRenderer``) in Python. Zwei Fassungen, die still
+# auseinanderlaufen, waeren genau der 2D/3D-Riss, den VIZ-51/52 fuer die
+# Panel-Reihenfolge geschlossen haben. ``test_viz53_pixel_head_2d.py`` haelt
+# beide Fassungen ZAHL FUER ZAHL gegeneinander — durch echtes Ausfuehren des
+# JS-Moduls in QtWebEngine, nicht ueber den Quelltext.
+#
+# Aus dem Spiider-Manual (S. 15) abgelesen und fuer BEIDE Ringe gueltig:
+#   Ring k: 6k Plaetze, Winkelschritt 60°/k, Startwinkel 270° - Schritt/2,
+#   danach im Uhrzeigersinn einmal herum.
+# ``x`` zeigt nach RECHTS, ``y`` nach OBEN (Ansicht von vorn auf die Linse).
+
+import math as _math
+
+
+def _abrunden(wert) -> int:
+    """``Math.floor(wert || 0)`` — nie werfen (die Zahl kommt aus Show-Dateien,
+    aus der DB und aus der Kanalzaehlung eines beliebigen Profils)."""
+    try:
+        return int(_math.floor(float(wert or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def ring_segmente(n_baenke, basis_baenke) -> tuple:
+    """``(basis, anzahl)`` — welche Farb-Baenke werden zu Ring-Segmenten?
+
+    ``basis_baenke`` ist die Zahl der FUEHRENDEN Baenke, die KEIN Ring-Pixel
+    sind (``app_state.pixel_ring_base_banks`` leitet sie aus dem Kanal-Layout
+    ab). Segment ``i`` haengt an Bank ``i + basis``.
+
+    Ohne Bank-Angabe EIN Segment — ein Pixel-Kopf ohne Kopfzahl ist eine
+    unvollstaendige Nutzlast, kein Geraet ohne Pixel. Der Versatz darf nie ALLE
+    Baenke wegnehmen: ein Ring ohne Segment waere ein Pixel-Kopf, der als
+    gewoehnlicher Moving Head dasteht. Gekappt wird NICHTS (CDX-56).
+    """
+    baenke = max(1, _abrunden(n_baenke))
+    basis = min(max(0, _abrunden(basis_baenke)), baenke - 1)
+    return basis, baenke - basis
+
+
+def waben_plaetze(ring) -> int:
+    """Wie viele Plaetze fassen die Ringe 0..k? (1, 7, 19, 37, …)"""
+    k = max(0, _abrunden(ring))
+    return 1 + 3 * k * (k + 1)
+
+
+def waben_platz(index) -> tuple:
+    """Segmentindex (0 = Mitte) -> ``(ring, x, y)`` in Ring-Einheiten."""
+    i = max(0, _abrunden(index))
+    if i == 0:
+        return 0, 0.0, 0.0
+    k = 1
+    while i >= waben_plaetze(k):
+        k += 1
+    j = i - waben_plaetze(k - 1)          # Platz innerhalb des Rings
+    schritt = (_math.pi / 3) / k          # 60°/k
+    # 270° = -PI/2 (unten); MINUS j*Schritt = im Uhrzeigersinn.
+    winkel = -_math.pi / 2 - schritt / 2 - j * schritt
+    return k, k * _math.cos(winkel), k * _math.sin(winkel)

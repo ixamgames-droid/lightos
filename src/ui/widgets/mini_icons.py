@@ -466,6 +466,38 @@ def _draw_mover_bar(p: QPainter, s: int, color):
         p.drawEllipse(QRectF(cx - r * 0.45, s * 0.52 + r * 0.55, r * 0.9, r * 0.9))
 
 
+def _draw_pixel_head(p: QPainter, s: int, color):
+    """Pixel-Moving-Head (FM-14/VIZ-53): Kopf auf Buegel — mit Ring-Segmenten
+    statt einer geschlossenen Linse.
+
+    Schematisch (Mitte + 6 Innenring-Punkte) wie das PAR-Bar-Glyph seine 4
+    Zellen: die ECHTE Segmentzahl kennt das Listen-Icon nicht (es haengt am
+    kind, nicht am Geraet). Es muss den Kopf nur vom gewoehnlichen Moving Head
+    UNTERSCHEIDBAR machen — die maßstäbliche Ansicht ist die Live-View."""
+    from math import cos, pi, sin
+    col = _qc(color)
+    # Basis/Buegel — identisch zu _draw_moving_head (es IST einer).
+    p.setPen(QPen(col.darker(150), max(1.2, s * 0.08)))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawArc(QRectF(s * 0.22, s * 0.30, s * 0.56, s * 0.56), 20 * 16, 140 * 16)
+    # Kopf-Gehaeuse dunkel: die Farbe tragen die Segmente (wie im 2D-Glyph).
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.05)))
+    p.setBrush(QBrush(col.darker(220)))
+    p.drawEllipse(QRectF(s * 0.34, s * 0.30, s * 0.32, s * 0.32))
+    # Segmente: Mitte + Innenring, Startwinkel/Drehsinn wie `waben_platz`
+    # (unten beginnend, im Uhrzeigersinn).
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(col.lighter(150)))
+    cx, cy = s * 0.5, s * 0.46
+    r = max(0.6, s * 0.045)
+    teilung = s * 0.085
+    p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
+    for j in range(6):
+        w = -pi / 2 - (pi / 3) / 2 - j * (pi / 3)
+        px, py = cx - cos(w) * teilung, cy - sin(w) * teilung
+        p.drawEllipse(QRectF(px - r, py - r, r * 2, r * 2))
+
+
 def _draw_hazer(p: QPainter, s: int, color):
     """Hazer: Maschinengehaeuse mit Duese und feinerer Nebelwolke."""
     col = _qc(color)
@@ -509,6 +541,7 @@ _PAINTERS = {
     "fx_led_bar":     (_draw_bar,         _FX_BAR),
     "fx_par_bar":     (_draw_par_bar,     _FX_PAR),
     "fx_mover_bar":   (_draw_mover_bar,   _FX_MOVING),
+    "fx_pixel_head":  (_draw_pixel_head,  _FX_MOVING),  # FM-14/VIZ-53
     "fx_strobe":      (_draw_strobe,      _FX_STROBE),
     "fx_dimmer":      (_draw_dimmer,      _FX_DIMMER),
     "fx_scanner":     (_draw_scanner,     _FX_SCANNER),
@@ -589,9 +622,14 @@ def fixture_icon_for(fixture, size: int = 16) -> QIcon:
 
     Nutzt das zentrale ``viz_model_for`` (lazy import aus src.core.app_state) —
     dieselbe Quelle wie 3D-Modell und 2D-Symbol — und liefert bei 'spider' /
-    'par_bar' / 'mover_bar' das jeweilige Icon. Bei jedem anderen Geraet (Rueckgabe
-    None) delegiert es an fixture_icon. Schlaegt der Import fehl, wird immer auf
-    das Typ-Icon zurueckgefallen — mini_icons bleibt standalone importierbar.
+    'par_bar' / 'mover_bar' / 'pixel_head' das jeweilige Icon. Bei jedem anderen
+    Geraet (Rueckgabe None) delegiert es an fixture_icon. Schlaegt der Import
+    fehl, wird immer auf das Typ-Icon zurueckgefallen — mini_icons bleibt
+    standalone importierbar.
+
+    ★ VIZ-53: 'pixel_head' fehlte in dieser Liste. Sein ``fixture_type`` ist
+    "moving_head", er bekam also das gewoehnliche Moving-Head-Icon — dieselbe
+    Luecke, die die 2D-Live-View hatte.
     """
     global _viz_model_for_fn, _viz_model_for_loaded
     if not _viz_model_for_loaded:
@@ -604,7 +642,7 @@ def fixture_icon_for(fixture, size: int = 16) -> QIcon:
     try:
         if _viz_model_for_fn is not None:
             model = _viz_model_for_fn(fixture)
-            if model in ("spider", "par_bar", "mover_bar"):
+            if model in ("spider", "par_bar", "mover_bar", "pixel_head"):
                 return icon_for_kind(f"fx_{model}", size)
     except Exception:
         pass

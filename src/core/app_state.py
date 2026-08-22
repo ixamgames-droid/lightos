@@ -4027,6 +4027,32 @@ def pixel_ring_base_banks(attributes) -> int:
     return 1 if (stellen[1] - stellen[0]) != (stellen[2] - stellen[1]) else 0
 
 
+def pixel_ring_banks_for(fixture) -> tuple:
+    """``(Zahl der Farb-Baenke, Versatz)`` eines Pixel-Kopfes.
+
+    ★ VIZ-53: die EINE Stelle, die diese zwei Zahlen aus den Kanaelen des
+    GEPATCHTEN Geraets holt. Sie beantwortet, wie viele Ring-Segmente das
+    Geraet hat und an welcher Bank Segment 0 haengt — und beide Ansichten
+    fragen hier: die 3D-Nutzlast (``visualizer_window._fixture_to_dict`` ->
+    ``nHeads``/``pixelBase``) und die 2D-Live-View
+    (``live_view.StageCanvas._draw_fixtures``).
+
+    Warum nicht jeder fuer sich zaehlt: genau so ist der 2D/3D-Riss
+    entstanden, den VIZ-51/52 fuer die Panel-Reihenfolge geschlossen haben.
+    Zwei Zaehlungen laufen still auseinander, und die Abweichung ist erst am
+    echten Geraet zu sehen.
+
+    Nie werfen (Renderer-Hot-Path): ohne lesbare Kanaele ``(0, 0)`` — dann
+    zeichnet der Ring-Bauer sein Minimum von einem Segment, statt dass die
+    ganze Ansicht ausfaellt."""
+    try:
+        attrs = [(getattr(c, "attribute", "") or "")
+                 for c in get_channels_for_patched(fixture)]
+    except Exception:
+        return 0, 0
+    return attrs.count("color_r"), pixel_ring_base_banks(attrs)
+
+
 class _AttrOverrideChannel:
     """Leichter Proxy um ein ``FixtureChannel`` mit ueberschriebenem
     ``attribute`` (Spider-Dual-Tilt: Pan-Motor als zweiter Tilt). Alle anderen
