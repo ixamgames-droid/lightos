@@ -84,6 +84,7 @@
 | `verify_segmented.sh` | tools/verify_segmented.sh — Test-Gate in Segmenten (Linux-Pendant zu run_tests.ps1 -Isolate). |
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 | `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |
+| `zeitbomben_gate.py` | Waechter gegen Zeitbomben — Tests, die von selbst rot werden (QA-63). |
 
 ## _archiv/ — ausgemustert
 
