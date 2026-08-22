@@ -40,6 +40,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   endgueltig verloren. Der Ladeweg liest sie jetzt mit — gemessen bis zum
   dritten Speichern ueber jeweils neu geoeffnete Dialoge.
 
+### 2026-08-19 — Ein Kopf-Regler heisst wie sein eigener Kanal
+
+#### Behoben
+
+- **Die Pro-Kopf-Regler im Programmer trugen den Kanalnamen eines FREMDEN
+  Kopfes.** Waehlt man an einem Mehrkopf-Geraet einen Kopf aus, baut der
+  Programmer die Regler pro Kopf — die Aufschrift kam aber aus der pro Attribut
+  deduplizierten Kanal-Vorlage und damit immer vom **ersten** Vorkommen.
+  Gemessen: an der `LED Moving Bar 4x [22-Kanal]` stand am vierten Kopf
+  „**Kopf 1 Pan** · K4", waehrend der Regler CH16 „Kopf 4 Pan" schreibt; an der
+  `HYDRABEAM 4000 RGBW [19-Kanal]` hiess der Kopf-1-Dimmer „**Master Dimmer**
+  · K1", obwohl er ueber die Kopf-Karte auf CH9 „Kopf 1 Dimmer" geht; und am
+  `Robin Spiider [91-Kanal Pixel]` nannte die Aufschrift „**Grundfarbe
+  Shutter** · K3" sogar einen **dritten** Kanal — geschrieben wird dort
+  CH11 „Grundfarbe Gruen Fein". Jeder Pro-Kopf-Regler holt seinen Namen jetzt
+  ueber genau den Schluessel, den er beim Schieben auch schreibt. Betroffen war
+  **jedes** Mehrkopf-Geraet (Bars, Spider, Moving-Head-Bars, Pixel-Ringe), nicht
+  nur die neuen Ringe. **Einkopf-Geraete und Mehrkopf-Geraete ohne Kopf-Auswahl
+  bleiben unveraendert** — dort wird gar kein Anzeigename gesetzt.
+- **Der Rueckfall nannte den Kanal eines Geraets, das der Regler gar nicht
+  treibt.** Steht in einem Pro-Kopf-Regler ein Geraet vorn, dem das Attribut
+  fehlt, kam die Aufschrift aus der Kanal-Vorlage — und die ist ueber die GANZE
+  Auswahl dedupliziert. Gemessen an einem GANZ gewaehlten `Clay Paky Sharpy
+  [16-Kanal]` neben Kopf 1 der `LED Moving Bar 4x [22-Kanal]` und der
+  `HYDRABEAM 4000 RGBW [19-Kanal]`: der Kopf-1-Regler fuer Speed trieb Bar +
+  Hydrabeam und hiess „**P/T-Speed** · K1" — der Kanal des Sharpy, der seinen
+  eigenen geraeteweiten Regler hat und von diesem Regler nie angefasst wird,
+  waehrend „Head Speed" der getriebenen Hydrabeam danebenlag. Der Name kommt
+  jetzt vom ersten Besitzer, der den Kanal wirklich hat. Hat ihn **keiner**,
+  steht das Attribut dran („Speed · K1") statt eines fremden Kanalnamens.
 
 ### 2026-08-19 — Der Pixel-Ring zeigt jetzt jedes Pixel
 
