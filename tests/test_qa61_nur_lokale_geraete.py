@@ -77,6 +77,15 @@ _AUSNAHMEN: dict[tuple[str, str], str] = {
     ("test_showbuilder.py", "NICHTEXISTENT_XYZ_999"):
         "Negativtest: ShowBuilder.patch MUSS bei einem unbekannten Profil "
         "BuildError werfen statt eine inerte Fixture zu patchen.",
+    # ★ Diese Datei legt ihre Geraete SELBST an — ueber den echten
+    # Editor-Dialog, per `QTest.keyClicks` in das Kurznamen-Feld. Der Wert
+    # reist als Parameter durch; das ist Luecke 1+2 der Liste unten.
+    # Ohne diese Eintraege beanstandet der Waechter ELF gesunde Fundstellen
+    # (gemessen 24.08.2026). Ein Gate, das gesunden Code anschlaegt, wird
+    # abgeschaltet und ist dann schlechter als keines (QA-54).
+    **{("test_fm23_geometrie_ueber_die_bedienelemente.py", n):
+       "Vom Test selbst ueber den Editor-Dialog eingetippt (Praefix TIPP)."
+       for n in ("TIPP48", "TIPP00", "TIPP0C", "TIPP2M", "TIPP256", "TIPP300")},
     ("test_qa61_nur_lokale_geraete.py", "Speider"):
         "Der Waechter selbst: die Negativkontrolle unten fragt die frische "
         "Bibliothek nach genau dem Namen aus FM-24 und erwartet ein Nein. "
