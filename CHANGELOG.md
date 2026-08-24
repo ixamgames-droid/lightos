@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
+
+#### Behoben
+
+- **Der Linux-CI-Lauf wurde faelschlich rot, weil ein Testprozess NACH seinem
+  Ergebnis abstuerzte.** `conftest.py::pytest_unconfigure` beendet den Prozess
+  per `os._exit(exitstatus)` und ueberspringt damit die native Abbauphase, in
+  der der Qt-Teardown sporadisch mit SIGSEGV stirbt. Diese Haertung war ueber
+  `LIGHTOS_HARDEN_EXIT_ALL` aber nur in der **Windows**-Leg gesetzt. Auf Linux
+  griff nur der enge Weg — und der ist ausdruecklich auf WebEngine-Module
+  beschraenkt. Ein gewoehnlicher Qt-View-Test wie `test_simple_desk_tint.py`
+  fiel durch: sein Segment meldete `exit 139`, waehrend die Liste der
+  fehlgeschlagenen Tests **leer** blieb. Genau diesen Fall nennt die Docstring
+  von `pytest_unconfigure` seit XPLAT-14 samt "Linux: SIGSEGV" — nur die
+  Gegenmassnahme kam nie dort an.
+- **Gemessen, nicht vermutet:** mit einem `atexit`-Marker an genau dieser
+  Testdatei (`os._exit` ueberspringt `atexit`) laeuft der Marker unter
+  `LIGHTOS_HARDEN_EXIT=1` — also normaler Abbau, genau die crashende Phase —
+  und unter `LIGHTOS_HARDEN_EXIT_ALL=1` nicht.
+- **Was das kostet, steht dabei:** die Erkennung ECHTER Teardown-Abstuerze in
+  der CI. Sie bleibt dem lokalen Gate erhalten, das den engen Weg weiterfaehrt
+  — und dort wurde XPLAT-09 auch gefunden.
+
+#### Hinzugefuegt
+
+- **`test_gate_runner_parity.py` nagelt jetzt auch die beiden CI-Legs fest.**
+  Die Datei hielt bisher die Umgebung der zwei Linux-*Runner* zusammen; dieselbe
+  Drift gab es eine Ebene hoeher zwischen den zwei CI-*Jobs*. Mit
+  Positivkontrolle: ein Waechter, der auch den vollstaendigen Fall beanstandet,
+  zwingt zu einer Angabe, die nichts bewirkt, und wird abgeschaltet.
+
 ### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
 
 #### Behoben
