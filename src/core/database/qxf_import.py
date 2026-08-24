@@ -415,6 +415,56 @@ def _physical_power(root: ET.Element) -> int:
     return 0
 
 
+def _physical_layout(el) -> tuple[int, int]:
+    """FM-23: Rasterform ``(rows, cols)`` aus ``<Physical><Layout Width= Height=/>``
+    — ``(0, 0)``, wenn das Quellformat nichts Brauchbares sagt.
+
+    QLC+ fuehrt die Panel-Form eines Matrix-Geraets in ``QLCPhysical`` als
+    ``<Layout>``. Sie steht entweder je ``<Mode>`` (neuere Dateien) oder einmal
+    unter ``<FixtureDefinition>`` (aeltere) — deshalb nimmt diese Funktion das
+    Element entgegen, unter dem gesucht werden soll, statt selbst zu iterieren.
+    ``<Dimensions Width= Height=>`` im selben ``<Physical>`` ist NICHT gemeint:
+    das sind Millimeter Gehaeusemass.
+
+    ★★ ``1x1`` wird verworfen. QLC+ initialisiert ``m_layout`` mit
+    ``QSize(1, 1)`` und laesst das Element beim Speichern in diesem Fall weg
+    (``qlcphysical.cpp``: ``if (layoutSize() != QSize(1, 1))``) — aus QLC+
+    selbst kommt ein ``1x1`` also nicht, und die Pruefung ist gegen die
+    ANDEREN Quellen gerichtet: handgeschriebene Profile, Konverter, aeltere
+    Fassungen. Sie ist kein blosser Gurt, denn ``1x1`` ist keine Aussage ueber
+    die Form, sondern der Vorgabewert. Uebernaehme man ihn, bekaeme ein
+    48-Pixel-Modus die Form 1 Spalte x 48 Zeilen: `panelGrid` zieht die
+    fehlende Zahl aus der Pixelzahl hoch UND markiert das Ergebnis als
+    ``explizit`` — womit die geratene Form auch noch die physischen
+    Panel-MASSE traegt. Das waere schlechter als der Rateweg, den es ersetzt.
+    Aus demselben Grund faellt ``<=0`` heraus (vom Schema verboten, in einer
+    kaputten Datei trotzdem moeglich).
+
+    Was NICHT abgeleitet werden kann: ``white_rows``/``white_cols`` (CDX-52).
+    Das QLC+-Format kennt ueberhaupt keinen Begriff fuer eine Weiss-Leiste, die
+    neben dem Farbraster sitzt — ``<Layout>`` beschreibt EIN Raster, und ein
+    ``<Head>`` ist eine Kanalgruppe ohne Ortsangabe. Aus den ``color_w``-Kanaelen
+    liesse sich die Leiste nicht schliessen: genau das war der Befund von
+    CDX-52. Die Angabe bleibt darum dem Fixture-Editor vorbehalten.
+    """
+    if el is None:
+        return (0, 0)
+    phys = el.find(_tag("Physical"))
+    if phys is None:
+        return (0, 0)
+    lay = phys.find(_tag("Layout"))
+    if lay is None:
+        return (0, 0)
+    try:
+        cols = int(float(lay.get("Width", "") or 0))
+        rows = int(float(lay.get("Height", "") or 0))
+    except (TypeError, ValueError):
+        return (0, 0)
+    if rows < 1 or cols < 1 or rows * cols <= 1:
+        return (0, 0)
+    return (rows, cols)
+
+
 def import_qxf_file(path: str, session: Session,
                     mfr_cache: dict[str, Manufacturer]) -> bool:
     """Importiert eine einzelne .qxf-Datei. Gibt True bei Erfolg (neu angelegt)
@@ -464,6 +514,14 @@ def import_qxf_file(path: str, session: Session,
     session.add(fixture)
     session.flush()
 
+    # FM-23: fixture-weite Rasterform als Rueckfallebene. Bewusst ueber das
+    # DIREKTE Kind ``<Physical>`` von root und nicht ueber ``root.iter()`` wie
+    # `_physical_power`: ein iter() faende das ``<Physical>`` des ERSTEN Modus
+    # und schriebe dessen Form allen anderen Modi zu — bei einem Panel mit
+    # 1-Zonen- und 144-Pixel-Modus ist das die falsche Form fuer beide bis auf
+    # einen.
+    fallback_grid = _physical_layout(root)
+
     # Channel-Definitionen (Name → Element)
     channel_defs: dict[str, ET.Element] = {}
     for ch_el in _findall(root, "Channel"):
@@ -504,7 +562,8 @@ def import_qxf_file(path: str, session: Session,
         all_ch = list(channel_defs.items())
         if all_ch:
             mode_obj = FixtureMode(
-                fixture=fixture, name="Standard", channel_count=len(all_ch)
+                fixture=fixture, name="Standard", channel_count=len(all_ch),
+                grid_rows=fallback_grid[0], grid_cols=fallback_grid[1],
             )
             session.add(mode_obj)
             for i, (ch_name, ch_el) in enumerate(all_ch, 1):
@@ -512,10 +571,16 @@ def import_qxf_file(path: str, session: Session,
     else:
         for mode_el in modes:
             ch_refs = _findall(mode_el, "Channel")
+            # FM-23: die eigene Angabe des Modus schlaegt die fixture-weite.
+            # `(0, 0)` ist ein wahres Tupel — deshalb explizit vergleichen.
+            mode_grid = _physical_layout(mode_el)
+            if mode_grid == (0, 0):
+                mode_grid = fallback_grid
             mode_obj = FixtureMode(
                 fixture=fixture,
                 name=mode_el.get("Name", "Standard"),
                 channel_count=len(ch_refs),
+                grid_rows=mode_grid[0], grid_cols=mode_grid[1],
             )
             session.add(mode_obj)
             # CDX-03 (Review): ZWEI Durchlaeufe. Ein FEHLENDES ``Number`` (frueher
