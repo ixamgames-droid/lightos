@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
+
+#### Behoben
+
+- **Die Segment-Logs eines roten Linux-Laufs kamen nie an.** Der
+  Artefakt-Upload zeigt auf `.pytest_segments/`, und `actions/upload-artifact`
+  ueberspringt versteckte Pfade seit v4.4 standardmaessig. Der Schritt lief bei
+  jedem roten Lauf, wurde gruen und lud **nichts** hoch; die einzige Spur war
+  eine Zeile mitten im Log (`No files were found with the provided path`), und
+  `if-no-files-found: ignore` machte auch die stumm. Der Preis war konkret: ein
+  Segment, das mit `exit 139` stirbt, schreibt keine `FAILED`-Zeile — die
+  Erklaerung stuende in seinem Segment-Log, und genau das war nie abrufbar.
+  Jetzt `include-hidden-files: true`, und `if-no-files-found` steht auf `warn`
+  statt `ignore`: derselbe Zustand ist ab sofort hoerbar.
+
+#### Hinzugefuegt
+
+- **Ein Waechter dagegen** (`tests/test_ci_artefakte_nicht_versteckt.py`): jeder
+  `upload-artifact`-Schritt, dessen Pfad eine versteckte Komponente enthaelt,
+  muss `include-hidden-files: true` setzen. Er prueft die **echte** `ci.yml`,
+  nicht nur Nachbildungen, und traegt eine Positivkontrolle — ein sichtbarer
+  Pfad wie `build/reports/` darf nicht beanstandet werden, sonst erzwaenge der
+  Waechter eine Angabe, die dort nichts bewirkt, und wuerde abgeschaltet.
+  Gemessen in beide Richtungen: ohne die Zeile in `ci.yml` wird er rot, und mit
+  einer Bedingung, die alles beanstandet, faellt die Positivkontrolle.
+
 ### 2026-08-19 — Selbstgebaute Panels koennen endlich sagen, welche Form sie haben
 
 #### Hinzugefuegt
