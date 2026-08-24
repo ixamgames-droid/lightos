@@ -7,6 +7,70 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-19 — Selbstgebaute Panels koennen endlich sagen, welche Form sie haben
+
+#### Hinzugefuegt
+
+- **Der Fixture-Editor hat jetzt Felder fuer die Panel-Geometrie.** Jeder
+  Mode-Tab traegt zwei Angaben: „Pixel-Raster: Zeilen x Spalten" — die physische
+  Anordnung der Zonen/Pixel — und „Weiss-Leiste: Zeilen x Spalten" fuer einen
+  getrennten Streifen weisser LEDs, der nicht auf dem Farbraster liegt. `0`
+  heisst wie bisher „nicht hinterlegt". Bis hierhin konnten diese Felder
+  **ausschliesslich** die mitgelieferten Profile setzen; ein selbstgebautes
+  Panel riet seine Form weiter near-square aus der Pixelzahl (aus einem
+  4x12-Balken ein 7x7-Quadrat) und bekam auch kein weisses Band mehr, weil
+  dessen Bedingung seit dem letzten Umbau an der Geometrie haengt. Die Angaben
+  sitzen am **Modus**, weil die Pixelzahl modusabhaengig ist: dasselbe Geraet
+  hat als 1-Zonen-Modus ein anderes Raster als als 48-Zonen-Modus.
+- **Der QXF-Import uebernimmt die Rasterform aus dem Quellformat.** QLC+ fuehrt
+  sie als `<Physical><Layout Width= Height=/>`; steht sie am Modus, gilt sie fuer
+  diesen, sonst die Angabe des ganzen Geraets. `1x1` wird bewusst ignoriert — das
+  ist der Vorgabewert des Formats, und uebernommen wuerde daraus fuer ein
+  48-Pixel-Panel eine 48 Zeilen hohe Saeule. Die **Weiss-Leiste** laesst sich aus
+  einer .qxf nicht ableiten: das Format kennt kein zweites Raster neben dem
+  Farbraster, und aus der Zahl der Weiss-Kanaele auf ihren Ort zu schliessen war
+  genau der Fehler, den der letzte Umbau abgestellt hat.
+
+#### Behoben
+
+- **Ein zweites Speichern haette die Form wieder geloescht.** Der Editor
+  verwirft beim Speichern alle Modi und baut sie neu; alles, was er beim
+  Oeffnen nicht mitliest, ist danach weg. Fuer mitgelieferte Profile stellt der
+  Programmstart die Geometrie wieder her, ein eigenes Profil haette sie
+  endgueltig verloren. Der Ladeweg liest sie jetzt mit — gemessen bis zum
+  dritten Speichern ueber jeweils neu geoeffnete Dialoge.
+
+### 2026-08-19 — Ein Kopf-Regler heisst wie sein eigener Kanal
+
+#### Behoben
+
+- **Die Pro-Kopf-Regler im Programmer trugen den Kanalnamen eines FREMDEN
+  Kopfes.** Waehlt man an einem Mehrkopf-Geraet einen Kopf aus, baut der
+  Programmer die Regler pro Kopf — die Aufschrift kam aber aus der pro Attribut
+  deduplizierten Kanal-Vorlage und damit immer vom **ersten** Vorkommen.
+  Gemessen: an der `LED Moving Bar 4x [22-Kanal]` stand am vierten Kopf
+  „**Kopf 1 Pan** · K4", waehrend der Regler CH16 „Kopf 4 Pan" schreibt; an der
+  `HYDRABEAM 4000 RGBW [19-Kanal]` hiess der Kopf-1-Dimmer „**Master Dimmer**
+  · K1", obwohl er ueber die Kopf-Karte auf CH9 „Kopf 1 Dimmer" geht; und am
+  `Robin Spiider [91-Kanal Pixel]` nannte die Aufschrift „**Grundfarbe
+  Shutter** · K3" sogar einen **dritten** Kanal — geschrieben wird dort
+  CH11 „Grundfarbe Gruen Fein". Jeder Pro-Kopf-Regler holt seinen Namen jetzt
+  ueber genau den Schluessel, den er beim Schieben auch schreibt. Betroffen war
+  **jedes** Mehrkopf-Geraet (Bars, Spider, Moving-Head-Bars, Pixel-Ringe), nicht
+  nur die neuen Ringe. **Einkopf-Geraete und Mehrkopf-Geraete ohne Kopf-Auswahl
+  bleiben unveraendert** — dort wird gar kein Anzeigename gesetzt.
+- **Der Rueckfall nannte den Kanal eines Geraets, das der Regler gar nicht
+  treibt.** Steht in einem Pro-Kopf-Regler ein Geraet vorn, dem das Attribut
+  fehlt, kam die Aufschrift aus der Kanal-Vorlage — und die ist ueber die GANZE
+  Auswahl dedupliziert. Gemessen an einem GANZ gewaehlten `Clay Paky Sharpy
+  [16-Kanal]` neben Kopf 1 der `LED Moving Bar 4x [22-Kanal]` und der
+  `HYDRABEAM 4000 RGBW [19-Kanal]`: der Kopf-1-Regler fuer Speed trieb Bar +
+  Hydrabeam und hiess „**P/T-Speed** · K1" — der Kanal des Sharpy, der seinen
+  eigenen geraeteweiten Regler hat und von diesem Regler nie angefasst wird,
+  waehrend „Head Speed" der getriebenen Hydrabeam danebenlag. Der Name kommt
+  jetzt vom ersten Besitzer, der den Kanal wirklich hat. Hat ihn **keiner**,
+  steht das Attribut dran („Speed · K1") statt eines fremden Kanalnamens.
+
 ### 2026-08-19 — Der Pixel-Ring zeigt jetzt jedes Pixel
 
 #### Behoben

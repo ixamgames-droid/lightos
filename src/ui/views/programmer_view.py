@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    programmer_key_for_head)
+    channel_occurrence_keys, programmer_key_for_head)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -127,7 +127,8 @@ INTENSITY_ATTRS = {"intensity", "dimmer", "master"}
 # Attribut-Gruppen + Klassifikation: kanonisch aus src/core/attr_groups,
 # gemeinsam mit dem Save-Kanal-Dialog (snap_file_panel) -> kein Auseinanderdriften
 # mehr (siehe Bug E: Strobe wurde im Save-Dialog faelschlich "Beam" genannt).
-from src.core.attr_groups import ATTR_GROUPS, classify_attr as _classify_attribute
+from src.core.attr_groups import (ATTR_GROUPS, attr_label,
+                                  classify_attr as _classify_attribute)
 
 
 class ProgrammerView(QWidget):
@@ -1502,7 +1503,8 @@ class ProgrammerView(QWidget):
                     ilay.addWidget(AttributeSlider(
                         ch, _owners, self._state, owner=self, head=_head,
                         display_name=(None if _head is None else
-                                      f"{ch.name or ch.attribute} · K{_head + 1}")))
+                                      self._head_slider_label(
+                                          _owners, ch, _head))))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -1812,6 +1814,61 @@ class ProgrammerView(QWidget):
                 occ[ch.attribute] = h + 1
                 color_chs.append((ch, h))
         return color_chs, occ
+
+    @staticmethod
+    def _head_slider_label(owners, ch, head: int) -> str:
+        """Beschriftung eines Pro-Kopf-Reglers — der Name des Kanals, den er
+        WIRKLICH schreibt.
+
+        ★ FM-24. Bisher stand hier ``ch.name``, und ``ch`` ist die VORLAGE aus
+        ``_template_channels``: dort bleibt pro Attribut nur EIN Kanal uebrig
+        (das erste Vorkommen, bevorzugt eines mit ``ranges``) — und zwar ueber
+        die GANZE Auswahl hinweg, der Kanal kann also aus einem anderen Geraet
+        stammen. An einem Mehrkopf-Geraet gehoerte der Name damit einem ANDEREN
+        Kopf. Gemessen:
+
+        * ``MOVBAR4 [22-Kanal]``, Kopf 4 gewaehlt -> „**Kopf 1 Pan** · K4",
+          geschrieben wird CH16 „Kopf 4 Pan".
+        * ``HYDRABEAM 4000 RGBW [19-Kanal]``, Kopf 1 gewaehlt -> „**Master
+          Dimmer** · K1", geschrieben wird ueber die Kopf-Karte (FM-17)
+          ``intensity#1`` = CH9 „Kopf 1 Dimmer".
+        * ``Robin Spiider [91-Kanal Pixel]``, Kopf 3 gewaehlt -> „**Grundfarbe
+          Shutter** · K3", waehrend der Regler ``raw#2`` = CH11 „Grundfarbe
+          Gruen Fein" schreibt — der Name nannte also einen DRITTEN Kanal.
+
+        Deshalb wird der Name ueber genau den Schluessel geholt, den
+        ``AttributeSlider._apply_value`` -> ``set_programmer_value(head=…)``
+        gleich schreibt (:func:`programmer_key_for_head`), und ueber
+        :func:`channel_occurrence_keys` auf den Kanal zurueckgefuehrt — die eine
+        Quelle, die auch die Kopf-Karte kennt.
+
+        ★ Nachbesserung: gefragt werden ALLE ``owners`` des Reglers in ihrer
+        Reihenfolge, und der Rueckfall nennt **kein fremdes Geraet** mehr. Der
+        erste Besitzer hat das Attribut naemlich nicht immer:
+        ``_slider_head_buckets`` behaelt fuer Kopf 1 auch ein Geraet, das den
+        Kanal gar nicht hat (``attr_head_count_for_channels`` antwortet fuer ein
+        fehlendes Attribut ``1``, s. FM-27). Vorher fiel die Aufschrift dann auf
+        die Vorlage zurueck — auf einen Kanal aus einem Geraet, das dieser
+        Regler womoeglich ueberhaupt nicht treibt. Gemessen an ``SHARPY
+        [16-Kanal]`` GANZ gewaehlt + ``MOVBAR4 [22-Kanal]`` Kopf 1 +
+        ``HYDRABEAM 19ch`` Kopf 1: der ``speed``-Regler von Kopf 1 treibt
+        MOVBAR4 + HYDRABEAM und hiess „**P/T-Speed** · K1" — das ist der Kanal
+        des SHARPY, der seinen eigenen geraeteweiten Regler hat und von diesem
+        Regler nicht angefasst wird, waehrend „Head Speed" der getriebenen
+        HYDRABEAM danebenlag und ungenutzt blieb.
+
+        Hat KEIN Besitzer diesen Kanal (dieselbe Auswahl ohne die HYDRABEAM),
+        gibt es keinen wahren Kanalnamen — dann steht das ATTRIBUT dran
+        (:func:`attr_label`, „Speed · K1") statt des fremden „P/T-Speed"."""
+        attr = getattr(ch, "attribute", "") or ""
+        for fx in owners:
+            chans = get_channels_for_patched(fx)
+            key = programmer_key_for_head(chans, attr, head)
+            eigen = {k: c for c, k in channel_occurrence_keys(chans)}.get(key)
+            name = getattr(eigen, "name", None)
+            if name:
+                return f"{name} · K{head + 1}"
+        return f"{attr_label(attr)} · K{head + 1}"
 
     def _slider_head_buckets(self, fixtures, ch) -> list:
         """Auf welche Koepfe verteilt sich EIN Attribut-Regler? ``[(head, owners)]``.
