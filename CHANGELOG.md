@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-24 — Der Pixel-Kopf sieht in der 2D-Ansicht auch wie einer aus
+
+#### Behoben
+
+- **Ein Moving Head mit LED-Ring stand in der 2D-Live-View als gewöhnlicher
+  Moving Head da.** Im 3D zeigt er seit Längem seinen Ring, in der Draufsicht
+  bekam er den Diamant-mit-Linse-Kopf aller anderen Mover — dasselbe Gerät sah
+  in beiden Ansichten verschieden aus, und wer den Ring suchte, musste in die
+  3D-Vorschau wechseln. Jetzt zeichnet die 2D-Ansicht seine Segmente: **so
+  viele, wie das Gerät wirklich hat** (Robe Spiider im Pixel-Modus: 19, nicht
+  20 — die erste Farbbank ist die Grundfarbe des Kopfes und kein Ring-Pixel).
+  Gewöhnliche Moving Heads behalten ihr bisheriges Symbol unverändert.
+
+- **In Listen und im Gruppenbaum fehlte dieselbe Unterscheidung.** Ein
+  Pixel-Kopf ist als `moving_head` gepatcht und bekam deshalb auch dort das
+  gewöhnliche Icon. Er hat jetzt sein eigenes — Kopf mit Ring statt
+  geschlossener Linse, ebenfalls mit der echten Segmentzahl.
+
 ### 2026-08-19 — Selbstgebaute Panels koennen endlich sagen, welche Form sie haben
 
 #### Hinzugefuegt
