@@ -3901,7 +3901,13 @@ _channel_cache: dict = {}
 def clear_channel_cache():
     """Invalidiert den Channel-Cache (bei jeder Patch-Aenderung aufrufen).
     Leert auch den viz_model-Override-Cache (FM-12) mit — Profil-Aenderungen
-    aus Generator/Editor reisen ueber denselben Invalidierungs-Pfad."""
+    aus Generator/Editor reisen ueber denselben Invalidierungs-Pfad.
+
+    ★ Dieser Satz war bis FM-23 (22.08.2026) zur Haelfte falsch: der
+    Generator rief die Funktion, der **Editor nicht**. Wer dort eine
+    Panel-Geometrie nachtrug, sah sie im laufenden Programm nie — der Cache
+    hielt den geratenen Wert fest, bis jemand den Patch aenderte oder das
+    Programm neu startete. Wer hier etwas aendert, prueft beide Aufrufer."""
     _channel_cache.clear()
     _viz_model_override_cache.clear()
     # VIZ-50a: die Rasterform haengt am selben Modus wie die Kanaele — sie MUSS
