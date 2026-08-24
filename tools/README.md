@@ -42,6 +42,7 @@
 | `build_movinghead_show.py` | LEIT-DEMO-SHOW: Moving Heads + PARs + APC mini (Moving-Head-Initiative). |
 | `build_musik_show_2026.py` | MUSIK SHOW 2026 — Auto-Lichtshow, die zur Musik im BPM-Takt mitläuft. |
 | `build_neue_demo_show.py` | NEUE DEMO 2026 — Quadranten-Layout + echtes PLAYBACK, alles auf einer Show. |
+| `build_neuheiten_demo.py` | Vorfuehr-Show fuer die Neuerungen aus dem Lauf vom 19.-24.08.2026. |
 | `build_party_demo_show.py` | PARTY DEMO 2026 — BPM-getaktete Party-Show + Musik-Playlist. |
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |
@@ -84,6 +85,7 @@
 | `verify_segmented.sh` | tools/verify_segmented.sh — Test-Gate in Segmenten (Linux-Pendant zu run_tests.ps1 -Isolate). |
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 | `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |
+| `zeitbomben_gate.py` | Waechter gegen Zeitbomben — Tests, die von selbst rot werden (QA-63). |
 
 ## _archiv/ — ausgemustert
 
