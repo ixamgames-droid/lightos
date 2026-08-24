@@ -4290,32 +4290,87 @@ def move_head_count_for_channels(fixture, channels) -> int:
         return 1
 
 
+# FM-28: Sammel-Attribute OHNE Kopf-Achse. ``raw`` ist kein Attribut, sondern der
+# Auffangkorb fuer jeden Kanal, dessen Funktion der Import nicht erkannt hat. Am
+# ``Robin Spiider [91-Kanal Pixel]`` tragen **21 voellig verschiedene Kanaele**
+# genau dieses Attribut: „Grundfarbe Virt. Farbrad", „Grundfarbe Rot Fein",
+# „Grundfarbe CTC", „Grundfarbe Shutter", „Blumeneffekt", „Zoom Fein" …  Ihre
+# Vorkommen zu zaehlen ergibt keine Koepfe, sondern eine Zahl ohne Bedeutung —
+# „Kopf 3" landete darueber auf ``raw#2`` = CH11 „Grundfarbe Gruen Fein". Ein
+# solches Attribut wird deshalb ausschliesslich GERAETEWEIT bedient.
+_NON_HEAD_ATTRS = frozenset({"raw"})
+
+
+def attr_has_head_axis(attribute: str) -> bool:
+    """Laesst sich dieses Attribut ueberhaupt PRO KOPF adressieren? (FM-28)
+
+    ``False`` heisst: das N-te Vorkommen ist kein „Kopf N", sondern eine voellig
+    andere Funktion — dann darf kein Pro-Kopf-Regler und keine Kopf-Einschraenkung
+    daraus gebaut werden. Betrifft heute nur das Sammel-Attribut ``raw``
+    (:data:`_NON_HEAD_ATTRS`); die Begruendung steht dort."""
+    a = (attribute or "").split("#", 1)[0].lower()
+    return bool(a) and a not in _NON_HEAD_ATTRS
+
+
 def attr_head_count_for_channels(fixture, channels, attribute: str) -> int:
     """Wie viele Koepfe hat dieses Geraet **fuer genau dieses Attribut**?
 
-    ★ Die allgemeinste der drei Zaehlungen — und die einzige, die immer stimmt.
-    ``color_head_count`` zaehlt ``color_r``, ``move_head_count`` zaehlt Pan/Tilt;
-    beide sind Spezialfaelle davon. Dass sie noetig sind, zeigt der Blick in die
-    Library: eine ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, **5**
-    Intensity und **1** Farbbank. „Wie viele Koepfe hat das Geraet" hat dort also
-    drei verschiedene richtige Antworten, je nachdem was man schreibt.
+    ★ Die allgemeinste der drei Zaehlungen. ``color_head_count`` zaehlt
+    ``color_r``, ``move_head_count`` zaehlt Pan/Tilt; beide sind Spezialfaelle
+    davon. Dass es sie braucht, zeigt der Blick in die Library: eine
+    ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, **5** Intensity-Kanaele
+    und **1** Farbbank. „Wie viele Koepfe hat das Geraet" hat dort also mehrere
+    richtige Antworten, je nachdem was man schreibt.
 
-    Genau das spiegelt ``channel_occurrence_keys``: jedes Attribut wird fuer sich
-    gezaehlt, das N-te Vorkommen von ``A`` heisst ``A#N``. Wer eine
-    Kopf-Einschraenkung fuer einen Schreibvorgang auf ``A`` validiert, muss also
-    die Vorkommen von ``A`` zaehlen — sonst entsteht ein ``A#N`` ohne Kanal
-    (Kopf faellt auf seinen Default) oder die Einschraenkung faellt weg (alle
-    Koepfe reagieren). Beide Fehlrichtungen sind stumm, s. FM-9/A5.
+    ★★ FM-27/28/29: bis 2026-08-24 zaehlte diese Funktion **Vorkommen** und
+    behauptete, das seien Koepfe. Drei Fehler derselben Ursache — alle drei
+    gemessen an echten Profilen der Geraetebibliothek:
+
+    * **FM-29 — Vorkommen sind nicht Koepfe.** Die 5 Intensity-Kanaele der
+      Hydrabeam 19ch sind ``CH1 Master Dimmer`` + ``CH9/12/15/18 Kopf 1..4
+      Dimmer``, also **4** Koepfe und ein geteilter Master. Die Antwort „5" liess
+      die Gruppen-Zelle ``1:4`` einen Regler „· K5" bauen, der ueber
+      ``intensity#4`` auf CH18 „Kopf 4 Dimmer" schrieb — **zwei Regler auf
+      demselben Kanal**, einer davon falsch beschriftet. Wo es eine
+      :func:`head_channel_map` gibt, ist SIE die Kopfzahl; sie kennt den
+      geteilten Master (FM-17).
+    * **FM-27 — ein fehlendes Attribut ist kein Kopf.** Fuer ein Attribut, das
+      das Geraet GAR NICHT hat, kam ``1`` zurueck. Damit galt jedes Geraet als
+      „hat Kopf 1" und blieb im Regler stehen: der ``speed``-Regler von Kopf 1
+      trieb ``MOVBAR4 [22-Kanal]`` mit, obwohl die gar keinen ``speed``-Kanal
+      hat — der Wert landete im Programmer-Dict und **nirgends** auf DMX
+      (stille Klasse FM-9/A5). Die Antwort ist jetzt **0** = „gibt es hier
+      nicht".
+    * **FM-28 — ``raw`` hat keine Kopf-Achse.** s. :data:`_NON_HEAD_ATTRS`.
+
+    Weiterhin ``1`` (statt 0) kommt zurueck, wenn gar keine lesbaren Kanaele
+    vorliegen — „unbekannt" darf ein Geraet nicht aus dem geraeteweiten
+    Bestandspfad werfen.
+
+    Wer eine Kopf-Einschraenkung fuer einen Schreibvorgang auf ``A`` validiert,
+    fragt hier: sonst entsteht ein ``A#N`` ohne Kanal (Kopf faellt auf seinen
+    Default) oder die Einschraenkung faellt weg (alle Koepfe reagieren). Beide
+    Fehlrichtungen sind stumm, s. FM-9/A5.
     """
     a = (attribute or "").split("#", 1)[0].lower()
     if not a:
         return 1
     try:
-        n = sum(1 for c in channels
-                if (getattr(c, "attribute", "") or "").lower() == a)
-        return n if n >= 1 else 1
+        positions, hmap = _channel_index(channels)
     except Exception:
         return 1
+    if not positions:
+        # Keine (lesbaren) Kanaele — nichts messbar. Bestandsverhalten: 1.
+        return 1
+    occurrences = positions.get(a, ())
+    if not occurrences:
+        return 0                      # FM-27: das Geraet hat dieses Attribut nicht
+    if a in _NON_HEAD_ATTRS:
+        return 1                      # FM-28: geraeteweit, nie pro Kopf
+    per_head = hmap.get(a)
+    if per_head:
+        return len(per_head)          # FM-29: die Kopf-Karte weiss es genauer
+    return len(occurrences)
 
 
 def head_counter_for_attr(attribute: str):

@@ -193,8 +193,9 @@ class EchterAppStateTests(unittest.TestCase):
         self.assertFalse(parse("1:5 pan 20").execute(self.st).ok,
                          "Pan hat nur 4")
 
-    def test_widersprechende_kanalzahl_wird_nicht_geraten(self):
-        """★★ Zonen-Master-Falle, an der echten Library gemessen.
+    def test_geteilter_master_wird_aufgeloest_statt_abgewiesen(self):
+        """★★ Zonen-Master-Falle, an der echten Library gemessen — und seit
+        FM-29 (2026-08-24) **aufgeloest** statt abgewiesen.
 
         Die HYDRABEAM 4000 RGBW [19-Kanal] legt ihre **5** Intensity-Kanaele so
         an::
@@ -205,17 +206,79 @@ class EchterAppStateTests(unittest.TestCase):
             CH15 Kopf 3 Dimmer
             CH18 Kopf 4 Dimmer
 
-        Das ``attr#N``-Vokabular zaehlt stur die Vorkommen — ``1:2 @ 50`` waere
-        also ``intensity#1`` = **CH9 = „Kopf 1 Dimmer"**, ein Kopf daneben, und
-        ``1:1`` traefe den gemeinsamen Master. In der eingebauten Library
-        widerspricht die Intensity-Kanalzahl bei **123 von 5116 Modi** der
-        Kopfzahl. Statt zu raten, sagt die Kommandozeile warum sie es nicht
-        kann."""
+        Solange ``attr_head_count_for_channels`` die VORKOMMEN zaehlte, standen
+        hier „5 Kanaele" gegen „4 Koepfe" — ein Widerspruch, den die
+        Kommandozeile lieber meldete als riet (``1:2 @ 50`` waere sonst
+        ``intensity#1`` = CH9 = „Kopf 1 Dimmer" gewesen, ein Kopf daneben).
+        Seit FM-29 antwortet die Zaehlung mit der Kopf-KARTE aus FM-17: 4
+        Koepfe, kein Widerspruch mehr — und dieselbe Karte sagt auch, welcher
+        Kanal K2 gehoert.
+
+        Gemessen wird deshalb der AUSGANG auf DMX, nicht die Erfolgsmeldung."""
+        from src.core.app_state import get_channels_for_patched
+        fx = next(f for f in self.st.get_patched_fixtures() if f.fid == 1)
+        uni = self.st.universes[fx.universe]
+
+        def dmx_jetzt():
+            return {c.name: uni.get_channel(fx.address + c.channel_number - 1)
+                    for c in get_channels_for_patched(fx)}
+
+        # Die Show wird zwischen den Testmethoden nicht geleert — Ausgangslage
+        # ausdruecklich pruefen, sonst koennte ein Restwert das Ergebnis
+        # vortaeuschen.
+        vorher = dmx_jetzt()
+        for name in ("Master Dimmer", "Kopf 1 Dimmer", "Kopf 2 Dimmer",
+                     "Kopf 3 Dimmer", "Kopf 4 Dimmer"):
+            self.assertEqual(vorher[name], 0, f"{name} war schon gesetzt")
         res = parse("1:2 @ 50").execute(self.st)
-        self.assertFalse(res.ok, "still auf CH9 zu schreiben waere der falsche "
-                                 "Kopf, still geraeteweit die falsche Menge")
+        self.assertTrue(res.ok, res.message)
+        dmx = dmx_jetzt()
+        self.assertEqual(dmx["Kopf 2 Dimmer"], 128, "K2 = CH12, nicht CH9")
+        self.assertEqual(dmx["Master Dimmer"], 128,
+                         "der geteilte Master kommt ueber FM-17 mit — sonst "
+                         "bliebe der richtig adressierte Kopf dunkel")
+        for anderer in ("Kopf 1 Dimmer", "Kopf 3 Dimmer", "Kopf 4 Dimmer"):
+            self.assertEqual(dmx[anderer], 0,
+                             f"{anderer} darf nicht mitziehen")
+
+    def test_echter_widerspruch_wird_weiter_gemeldet(self):
+        """★ Positivkontrolle zum Test darueber: die Verweigerung ist NICHT
+        abgeschafft, sie greift nur nicht mehr dort, wo die Kopf-Karte die
+        Zuordnung kennt.
+
+        Ueber die eingebauten Profile ausgezaehlt bleibt genau ein Fall uebrig:
+        ``ZQ06121 [154-Kanal 48 Zonen RGB + 8x Weiss]`` — 48 Farbzonen, aber nur
+        **8** Weiss-Kanaele. Welcher davon zu „K2" gehoert, ist nicht
+        entscheidbar, also wird nicht geraten."""
+        from src.core.app_state import get_channels_for_patched
+        from src.core.database import fixture_db
+        from src.core.database.models import PatchedFixture
+        prof = next(p for p in fixture_db.search_fixtures("")
+                    if p.short_name == "ZQ06121")
+        mode = next(m for m in fixture_db.get_modes(prof.id)
+                    if m.channel_count == 154)
+        # ★ Freie fid/Adresse suchen statt „3" zu tippen: ``setUp`` laeuft je
+        # Testmethode und die Show wird zwischen den Methoden NICHT geleert —
+        # ein belegtes fid wird beim Patchen still weitergezaehlt, und der Test
+        # haette dann eine Hydrabeam gemessen statt des Zonen-Panels.
+        vorhanden = list(self.st.get_patched_fixtures())
+        fid = max((int(f.fid) for f in vorhanden), default=0) + 1
+        adr = max((int(f.address) + int(f.channel_count) for f in vorhanden
+                   if int(f.universe) == 1), default=1)
+        self.st.add_fixture(
+            PatchedFixture(fid=fid, label="Zone", fixture_profile_id=prof.id,
+                           mode_name=mode.name, universe=1, address=adr,
+                           channel_count=154), undoable=False)
+        fx = next(f for f in self.st.get_patched_fixtures() if f.fid == fid)
+        self.assertEqual(
+            sum(1 for c in get_channels_for_patched(fx)
+                if (c.attribute or "") == "color_w"), 8,
+            "das gepatchte Geraet muss wirklich das Zonen-Panel sein")
+        res = parse(f"{fid}:2 white 50").execute(self.st)
+        self.assertFalse(res.ok, "48 Zonen gegen 8 Weiss-Kanaele — hier gibt es "
+                                 "keine richtige Antwort zu raten")
         self.assertIn("nicht eindeutig", res.message)
-        self.assertEqual(self.st.programmer.get(1, {}), {})
+        self.assertEqual(self.st.programmer.get(fid, {}), {})
 
     def test_fehlender_beleg_ist_kein_widerspruch(self):
         """Ohne Pan/Farb-Beleg (reiner Dimmer-Balken, 338 Modi der Library)

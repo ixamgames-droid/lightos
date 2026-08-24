@@ -33,6 +33,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Gemessen in beide Richtungen: ohne die Zeile in `ci.yml` wird er rot, und mit
   einer Bedingung, die alles beanstandet, faellt die Positivkontrolle.
 
+### 2026-08-24 — Die Pro-Kopf-Regler zaehlen jetzt Koepfe statt Kanaele
+
+#### Behoben
+
+- **Ein geteilter Master-Dimmer machte einen Kopf zu viel (FM-29).** Die
+  Kopfzahl eines Attributs war bisher die Zahl der Kanaele, die es tragen. An
+  der `HYDRABEAM 4000 RGBW [19-Kanal]` sind das fuenf Dimmer-Kanaele — ein
+  gemeinsamer Master plus je einer pro Kopf — also galt das Geraet fuer den
+  Dimmer als Fuenf-Kopf-Geraet. Ueber eine Gruppen-Zelle „Kopf 5" erschien
+  dadurch ein zweiter Dimmer-Regler, der auf **denselben** Kanal wie „Kopf 4"
+  schrieb: wer erst K4 hochzog und dann K5, sah seinen ersten Zug wortlos
+  ueberschrieben. Gezaehlt wird jetzt ueber die Kopf-Karte, die den geteilten
+  Master kennt — vier Koepfe, vier Regler. Ueber die Geraeteliste im Programmer
+  war der falsche Regler nie erreichbar, nur ueber Kopf-Zellen im Raster.
+- **Ein Regler trieb Geraete an, die den Kanal gar nicht haben (FM-27).** Fuer
+  ein Attribut, das ein Geraet nicht besitzt, kam „ein Kopf" zurueck statt
+  „keiner". Damit blieb ein solches Geraet im Regler stehen und bekam Werte, die
+  **nirgends** auf DMX ankamen — die stille Sorte Fehler, die man erst auf der
+  Buehne bemerkt. Gemessen an einer `MOVBAR4` neben einer Hydrabeam: der
+  Speed-Regler zeigte beide an, die MOVBAR4 hat aber keinen Speed-Kanal.
+  Betroffen war auch der geraeteweite Regler, weil die Regler-Vorlage die
+  Attribute der GANZEN Auswahl zusammenfasst. Wer den Kanal nicht hat, steht
+  jetzt nicht mehr im Regler; hat ihn keines der gewaehlten Geraete, entsteht
+  gar keiner.
+- **Unerkannte Kanaele bekamen Pro-Kopf-Regler (FM-28).** Kanaele, deren
+  Funktion beim Import nicht erkannt wurde, tragen alle dasselbe Sammel-Attribut
+  — am `Robin Spiider [91-Kanal Pixel]` sind das 21 voellig verschiedene
+  Funktionen (Virt. Farbrad, Rot Fein, CTC, Shutter, Blumeneffekt, Zoom Fein …).
+  Aus ihrer Zahl wurden „21 Koepfe", und „Kopf 3" verstellte dann das Feinbyte
+  einer Grundfarbe. Solche Kanaele werden jetzt ausschliesslich geraeteweit
+  bedient.
+- **Die Kommandozeile muss beim Hydrabeam-Dimmer nicht mehr passen.** `1:2 @ 50`
+  wurde bisher mit „nicht eindeutig" abgewiesen, weil fuenf Kanaele gegen vier
+  Koepfe standen. Mit der richtigen Zaehlung gibt es den Widerspruch nicht mehr:
+  der Befehl trifft „Kopf 2 Dimmer" und nimmt den gemeinsamen Master mit. Wo die
+  Zuordnung wirklich unklar ist (etwa ein Zonen-Panel mit 48 Farbzonen, aber nur
+  acht Weiss-Kanaelen), wird weiterhin nicht geraten.
+
 ### 2026-08-24 — Eine Show, in der die neuen Sachen wirklich zu sehen sind
 
 #### Hinzugefuegt
