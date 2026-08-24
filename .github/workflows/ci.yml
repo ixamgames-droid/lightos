@@ -105,7 +105,18 @@ jobs:
           name: linux-segment-logs
           path: .pytest_segments/
           retention-days: 7
-          if-no-files-found: ignore
+          # ★ `.pytest_segments` faengt mit einem PUNKT an, und upload-artifact
+          # ueberspringt versteckte Dateien seit v4.4 standardmaessig. Der
+          # Schritt lief deshalb bei JEDEM roten Lauf und lud NICHTS hoch —
+          # sichtbar nur an einer Zeile mitten im Log ("No files were found
+          # with the provided path"). Genau die Segment-Logs, die einen
+          # `exit 139` ohne FAILED-Zeile erklaeren koennten, waren damit nie
+          # da. Eine Absicherung, die stillschweigend nicht greift, ist
+          # schlimmer als keine (PROC-02b).
+          include-hidden-files: true
+          # Und nicht mehr schweigen, wenn wirklich nichts da ist: `ignore`
+          # macht denselben Zustand unsichtbar, der uns hierher gebracht hat.
+          if-no-files-found: warn
 
   test:
     name: Windows-Smoke (Python ${{ matrix.python-version }})
