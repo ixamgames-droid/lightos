@@ -527,27 +527,43 @@ class FixtureEditorDialog(QDialog):
                 )
                 s.add(mode)
                 s.flush()
+                # ★★ FM-25: `s.add(fc)` und die Range-Schleife gehoeren IN die
+                # Kanalschleife. Sie standen eine Einrueckungsebene zu weit
+                # links und liefen damit erst NACH ihr — angelegt wurde genau
+                # ein Kanal je Modus, der letzte, samt seiner Ranges.
+                #
+                # Verschleiert hat es die Fortsetzungs-Einrueckung der
+                # `FixtureChannel(...)`-Zuweisung: ab `attribute=` sprang sie
+                # zurueck auf die Ebene des `for`, sodass das Auge den
+                # Schleifenkoerper dort enden sah. Deshalb stehen die
+                # Argumente jetzt buendig.
+                #
+                # `channel_count` kam aus `len(chans)` und stimmte — die
+                # Datenbank widersprach sich also selbst: gemessen ein ueber
+                # den Dialog angelegtes Panel mit `channel_count` 152 und
+                # genau EINEM gespeicherten Kanal. Beim BEARBEITEN ist das
+                # zerstoerend, weil `_save` die alten Modi vorher loescht.
                 for i, ch in enumerate(chans, 1):
                     fc = FixtureChannel(
                         mode_id=mode.id, channel_number=i,
                         name=ch.get("name", f"Ch {i}"),
-                    attribute=ch.get("attribute", "raw"),
-                    default_value=int(ch.get("default", 0)),
-                    highlight_value=int(ch.get("highlight", 255)),
-                    invert=bool(ch.get("invert", False)),
-                    resolution=str(ch.get("resolution", "8bit") or "8bit"),
-                )
-                s.add(fc)
-                for r in ch.get("ranges", []) or []:
-                    try:
-                        fc.ranges.append(ChannelRange(
-                            range_from=int(r.get("range_from", 0)),
-                            range_to=int(r.get("range_to", 255)),
-                            name=str(r.get("name", "") or ""),
-                            kind=str(r.get("kind", "") or ""),
-                        ))
-                    except (AttributeError, TypeError, ValueError):
-                        continue
+                        attribute=ch.get("attribute", "raw"),
+                        default_value=int(ch.get("default", 0)),
+                        highlight_value=int(ch.get("highlight", 255)),
+                        invert=bool(ch.get("invert", False)),
+                        resolution=str(ch.get("resolution", "8bit") or "8bit"),
+                    )
+                    s.add(fc)
+                    for r in ch.get("ranges", []) or []:
+                        try:
+                            fc.ranges.append(ChannelRange(
+                                range_from=int(r.get("range_from", 0)),
+                                range_to=int(r.get("range_to", 255)),
+                                name=str(r.get("name", "") or ""),
+                                kind=str(r.get("kind", "") or ""),
+                            ))
+                        except (AttributeError, TypeError, ValueError):
+                            continue
             s.commit()
             self._saved_id = profile.id
 
