@@ -327,6 +327,22 @@ def _add_modes(s, profile, modes_data):
                                    name=r_name, kind=r_kind))
 
 
+def _geo_wert(v) -> int:
+    """Eine Rasterzahl aus einem Payload (FM-26). Fehlt/kaputt -> ``0``.
+
+    ``0`` ist die Aussage "nicht hinterlegt" und damit der einzige sichere
+    Ersatzwert: ein geratener waere von einer echten Angabe nicht mehr zu
+    unterscheiden (siehe ``FixtureMode.grid_rows``). Negatives faellt hier
+    ebenfalls auf 0 — nicht als zweite Klemmformel neben ``_clamp_geo`` des
+    Generators, sondern weil diese Funktion JEDES Payload sieht, auch eines,
+    das nie durch den Generator gelaufen ist."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return 0
+    return n if n > 0 else 0
+
+
 def create_user_profile(payload: dict, *, engine=None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
@@ -337,7 +353,10 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
     ``fixture_generator.build_profile_payload`` (Modi → Kanaele → Ranges) und
     haelt sich an das gleiche Speicher-Muster wie ``_add_modes``: pro Kanal
     werden ``attribute``/``invert``/``resolution`` und je Bereich
-    ``range_from/to``/``name``/``kind`` uebernommen.
+    ``range_from/to``/``name``/``kind`` uebernommen — und je MODUS seit FM-26
+    die physische Rasterform (``grid_rows``/``grid_cols``/``white_rows``/
+    ``white_cols``), damit ein ueber den Generator angelegtes Panel dieselbe
+    Form traegt wie ein ueber den Fixture-Editor angelegtes.
     """
     eng = engine if engine is not None else globals()["engine"]()
     with Session(eng) as s:
@@ -365,6 +384,18 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
                 fixture_id=prof.id, name=(m.get("name") or "Modus").strip(),
                 channel_count=int(m.get("channel_count", len(channels))),
                 description="",
+                # FM-26: die physische Rasterform des Modus mitschreiben —
+                # Farbzonen (VIZ-50a) und eigene Weiss-Leiste (CDX-52). Ohne
+                # diese vier Spalten endet die Eingabe des Generators an
+                # dieser Stelle: der Modus entstuende mit den Default-Nullen
+                # der Spalten, also "nicht hinterlegt", und `panel_grid_for`
+                # gaebe dem Renderer weiter (0, 0). Fehlende Schluessel sind
+                # ausdruecklich erlaubt (aeltere Payloads, Handbau) und
+                # bedeuten dasselbe wie 0.
+                grid_rows=_geo_wert(m.get("grid_rows")),
+                grid_cols=_geo_wert(m.get("grid_cols")),
+                white_rows=_geo_wert(m.get("white_rows")),
+                white_cols=_geo_wert(m.get("white_cols")),
             )
             s.add(mode)
             s.flush()

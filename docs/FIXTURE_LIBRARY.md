@@ -48,9 +48,10 @@ modusabhaengig ist; und nicht am gepatchten Geraet, weil sie fuer jedes Exemplar
 gilt (im Gegensatz zu `pixel_order`/`element_rotation`, die vom Geraetemenue bzw.
 von der Montage abhaengen).
 
-**Wo die Angabe herkommt** (FM-23): aus dem Seed (Builtins), aus dem
-**Fixture-Editor** — jeder Mode-Tab hat eine Zeile „Pixel-Raster: Zeilen x
-Spalten" — oder aus dem **QXF-Import**, der sie aus `<Physical><Layout Width=
+**Wo die Angabe herkommt** (FM-23/FM-26): aus dem Seed (Builtins), aus dem
+**Fixture-Editor** UND aus dem **Fixture-Generator** (Patch-View → „Generator")
+— beide Dialoge tragen die Zeile „Pixel-Raster: Zeilen x Spalten" an jedem
+Mode-Tab — oder aus dem **QXF-Import**, der sie aus `<Physical><Layout Width=
 Height=/>` uebernimmt (QLC+ fuehrt sie dort; `Width` sind Spalten, `Height`
 Zeilen). Ein `1x1` gilt dabei als KEINE Angabe: das ist QLC+' Vorgabewert, und
 uebernommen wuerde daraus fuer ein 48-Pixel-Panel eine 48 Zeilen hohe Saeule —
@@ -76,11 +77,19 @@ Hinterlegt wird nur, was die Kanaele nicht sagen koennen: die **Form**, nicht
 die **Zahl**. Die Zahl der Segmente bleibt aus den `color_w`-Kanaelen
 abgeleitet — der ZQ06121 traegt deshalb `(1, 0)` und nicht `(1, 8)`; eine Kopie
 der 8 liefe still daneben. Eingetragen wird die Leiste im **Fixture-Editor**
-(Mode-Tab, „Weiss-Leiste: Zeilen x Spalten") oder im Seed als optionales
-**viertes** Tupel-Element `(mode_name, channels, (rows, cols), (wrows, wcols))`.
+oder im **Fixture-Generator** (in beiden am Mode-Tab, „Weiss-Leiste: Zeilen x
+Spalten") oder im Seed als optionales **viertes** Tupel-Element `(mode_name, channels, (rows, cols), (wrows, wcols))`.
 Der **QXF-Import kann sie nicht ableiten**: das QLC+-Format kennt keinen Begriff
 fuer ein zweites Raster neben dem Farbraster — `<Layout>` beschreibt EIN Raster,
 ein `<Head>` ist eine Kanalgruppe ohne Ortsangabe.
+
+> **Zwei Dialoge, eine Angabe** (FM-26): den Fixture-Editor erreicht man ueber
+> die Fixture-Bibliothek, den reicheren **Fixture-Generator** ueber die
+> Patch-View. Der Generator hat den Live-Test am echten Geraet und ist damit der
+> Weg, auf dem ein selbstgebautes Panel ueblicherweise entsteht — er schreibt
+> die vier Zahlen seit FM-26 genauso in den Modus wie der Editor. Wer an einem
+> der beiden Dialoge etwas an dieser Zeile aendert, prueft den anderen mit;
+> zwischen FM-23 und FM-26 hatte nur einer von beiden die Felder.
 
 ## 2. Woher Profile kommen
 

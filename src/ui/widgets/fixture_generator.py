@@ -32,7 +32,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 
 # Wiederverwendung der bereits gepflegten Listen aus dem einfachen Editor.
-from src.ui.widgets.fixture_editor import FIXTURE_TYPES, CHANNEL_ATTRS
+# GEO_MAX (FM-23/FM-26): die Obergrenze der Rastereingabe steht dort, wo sie
+# herkommt — sie ist die Stelle, an der `panelGrid` die Pixelzahl kappt.
+from src.ui.widgets.fixture_editor import (
+    FIXTURE_TYPES, CHANNEL_ATTRS, GEO_MAX)
 
 
 # Attribute, die fuer eine 16-bit-Aufloesung (coarse + Fine-Kanal) sinnvoll
@@ -110,12 +113,37 @@ class GenChannel:
 
 @dataclass
 class GenMode:
-    """Ein Modus (z. B. "9-Kanal") mit geordneter Kanalliste."""
+    """Ein Modus (z. B. "9-Kanal") mit geordneter Kanalliste.
+
+    FM-26: dazu die physische Rasterform DIESES Modus — ``grid_rows``/
+    ``grid_cols`` fuer die Farbzonen (VIZ-50a) und ``white_rows``/
+    ``white_cols`` fuer eine EIGENE Weiss-Leiste (CDX-52). ``0`` heisst
+    "nicht hinterlegt"; die ausfuehrliche Begruendung, warum die Angabe am
+    MODUS haengt und nicht am Profil, steht an ``FixtureMode.grid_rows``.
+
+    ★ Warum diese vier Zahlen hier stehen muessen: der Generator hat sein
+      EIGENES Modell. Der einfache Editor bekam die Eingabe mit FM-23, der
+      Generator nicht — wer sein Panel ueber den naheliegenden Weg anlegt
+      (der Generator hat den Live-Test am echten Geraet), stand danach
+      weiter vor dem FM-23-Befund: der Renderer riet die Form near-square
+      aus der Pixelzahl, und ein Weiss-Band gab es seit CDX-52 gar nicht
+      mehr. Zwei Dialoge, ein Datenmodell in der DB — die Eingabe muss es
+      in BEIDEN geben, sonst haengt die Form daran, welchen Dialog der
+      Nutzer erwischt hat.
+    """
     name: str = "Modus"
     channels: list[GenChannel] = field(default_factory=list)
+    grid_rows: int = 0
+    grid_cols: int = 0
+    white_rows: int = 0
+    white_cols: int = 0
 
     def to_dict(self) -> dict:
         return {"name": self.name,
+                "grid_rows": _clamp_geo(self.grid_rows),
+                "grid_cols": _clamp_geo(self.grid_cols),
+                "white_rows": _clamp_geo(self.white_rows),
+                "white_cols": _clamp_geo(self.white_cols),
                 "channels": [c.to_dict() for c in self.channels]}
 
 
@@ -169,6 +197,13 @@ def build_profile_payload(model: GeneratorModel) -> dict:
         modes_out.append({
             "name": (mode.name or "Modus").strip(),
             "channel_count": len(mode.channels),
+            # FM-26: die Rasterform des Modus mitgeben. Ohne sie endet die
+            # Eingabe im Dialog — `create_user_profile` kann nur schreiben,
+            # was im Payload steht.
+            "grid_rows": _clamp_geo(mode.grid_rows),
+            "grid_cols": _clamp_geo(mode.grid_cols),
+            "white_rows": _clamp_geo(mode.white_rows),
+            "white_cols": _clamp_geo(mode.white_cols),
             "channels": chans_out,
         })
     short = (model.short_name or model.model[:8]).strip().upper()[:40]
@@ -193,6 +228,24 @@ def _clamp(v) -> int:
     except (TypeError, ValueError):
         return 0
     return 0 if v < 0 else 255 if v > 255 else v
+
+
+def _clamp_geo(v) -> int:
+    """Eine Rasterzahl auf ``0 .. GEO_MAX`` (FM-26).
+
+    ★ Die GRENZE steht nur einmal im Projekt (``fixture_editor.GEO_MAX`` =
+    die Stelle, an der `panelGrid` die Pixelzahl kappt) — hier wird sie
+    angewandt, nicht neu erfunden. Geklemmt werden muss trotz Spinbox:
+    ``build_profile_payload`` ist eine reine Funktion und wird auch ohne
+    Dialog aufgerufen (``GeneratorModel.to_payload``, Import, Tests). Eine
+    NEGATIVE Zahl ist dabei der Fall, der wehtut — sie stuende als
+    behauptete Form in der Bibliothek (FM-23 hat genau das im QXF-Weg
+    gefunden: ``rows * cols <= 1`` faengt zwei negative Zahlen nicht)."""
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return 0
+    return 0 if v < 0 else GEO_MAX if v > GEO_MAX else v
 
 
 # ── Speichern in die Fixture-DB ──────────────────────────────────────────────
@@ -607,6 +660,44 @@ class _ModeTab(QWidget):
         name_row.addWidget(self._edit_name, 1)
         lay.addLayout(name_row)
 
+        # ── FM-26: physische Panel-Geometrie dieses MODUS ────────────────────
+        #
+        # Dieselbe Zeile wie im einfachen Fixture-Editor (FM-23), bis auf die
+        # Aufschriften bewusst identisch: es ist DIESELBE Angabe in derselben
+        # Spalte der DB, und wer sie in einem der beiden Dialoge gelernt hat,
+        # soll sie im anderen wiedererkennen. Warum sie zum MODUS gehoert und
+        # nicht zum Profil, steht an `GenMode` bzw. `FixtureMode.grid_rows`.
+        geo_row = QHBoxLayout()
+        geo_row.addWidget(QLabel("Pixel-Raster:"))
+        self._spin_grid_rows = self._geo_spin(
+            "Zeilen des Pixel-/Zonenrasters dieses Modus. 0 = nicht hinterlegt "
+            "(der 3D-Renderer raet die Form near-square aus der Pixelzahl).")
+        self._spin_grid_cols = self._geo_spin(
+            "Spalten des Pixel-/Zonenrasters. Eine der beiden Zahlen genuegt — "
+            "die andere folgt aus der Pixelzahl des Modus.")
+        geo_row.addWidget(self._spin_grid_rows)
+        geo_row.addWidget(QLabel("x"))
+        geo_row.addWidget(self._spin_grid_cols)
+        geo_row.addSpacing(18)
+        geo_row.addWidget(QLabel("Weiß-Leiste:"))
+        self._spin_white_rows = self._geo_spin(
+            "Zeilen einer EIGENEN Weiß-Leiste, die NICHT auf dem Farbraster "
+            "liegt. 0 = keine eigene Leiste — dann gibt es im 3D auch keine.")
+        self._spin_white_cols = self._geo_spin(
+            "Spalten der Weiß-Leiste. 0 lassen, wenn die Zahl der Segmente "
+            "schon in den color_w-Kanaelen des Modus steht.")
+        geo_row.addWidget(self._spin_white_rows)
+        geo_row.addWidget(QLabel("x"))
+        geo_row.addWidget(self._spin_white_cols)
+        geo_row.addWidget(QLabel("(0 = nicht hinterlegt)"))
+        geo_row.addStretch(1)
+        lay.addLayout(geo_row)
+        # Der Modus IST hier das Modell (anders als im Editor, der eine Kopie
+        # haelt) — die Felder starten deshalb auf seinen Werten, damit ein
+        # importiertes oder wieder geoeffnetes Modell seine Form zeigt.
+        self.set_geometry((mode.grid_rows, mode.grid_cols),
+                          (mode.white_rows, mode.white_cols))
+
         split = QSplitter(Qt.Orientation.Horizontal)
 
         left = QWidget()
@@ -651,6 +742,27 @@ class _ModeTab(QWidget):
         self._refresh()
 
     # ── Daten ────────────────────────────────────────────────────────────
+    @staticmethod
+    def _geo_spin(tooltip: str) -> QSpinBox:
+        sp = QSpinBox()
+        sp.setRange(0, GEO_MAX)
+        sp.setToolTip(tooltip)
+        return sp
+
+    def set_geometry(self, grid: tuple = (0, 0), weiss: tuple = (0, 0)) -> None:
+        """Traegt ein Paar ``(rows, cols)`` je Raster in die Eingaben.
+        Geklemmt wird von den Spinboxen selbst (``setRange(0, GEO_MAX)``)."""
+        for spin, wert in ((self._spin_grid_rows, grid[0]),
+                           (self._spin_grid_cols, grid[1]),
+                           (self._spin_white_rows, weiss[0]),
+                           (self._spin_white_cols, weiss[1])):
+            spin.setValue(int(wert or 0))
+
+    def get_geometry(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        """``((grid_rows, grid_cols), (white_rows, white_cols))``."""
+        return ((self._spin_grid_rows.value(), self._spin_grid_cols.value()),
+                (self._spin_white_rows.value(), self._spin_white_cols.value()))
+
     def _on_name_changed(self):
         self.mode.name = self._edit_name.text().strip() or "Modus"
 
@@ -766,7 +878,16 @@ class _ModeTab(QWidget):
         self._cb_fine.blockSignals(False)
 
     def sync_from_widgets(self):
-        """Liest Texteingaben (Name/Default/Highlight) aus der Tabelle zurueck."""
+        """Liest Texteingaben (Name/Default/Highlight) aus der Tabelle zurueck
+        — und die Rasterform des Modus (FM-26).
+
+        ★ Das ist der EINZIGE Weg der Geometrie ins Modell: `_save` ruft
+        `_sync_all`, das ruft diese Methode je Tab. Fehlt sie hier, bleibt die
+        Eingabe im Dialog stehen und das gespeicherte Profil traegt vier
+        Nullen — genau der Zustand vor FM-26.
+        """
+        (self.mode.grid_rows, self.mode.grid_cols), \
+            (self.mode.white_rows, self.mode.white_cols) = self.get_geometry()
         self._range_editor.sync_from_table()
         for i in range(min(self._tbl.rowCount(), len(self.mode.channels))):
             ch = self.mode.channels[i]

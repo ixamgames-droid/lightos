@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-24 — Auch der Fixture-Generator kann die Panel-Geometrie hinterlegen
+
+#### Hinzugefuegt
+
+- **Der Fixture-Generator hat jetzt dieselben Felder fuer die Panel-Geometrie
+  wie der einfache Fixture-Editor.** Jeder Modus-Tab traegt „Pixel-Raster:
+  Zeilen x Spalten" und „Weiss-Leiste: Zeilen x Spalten", `0` heisst wie
+  gewohnt „nicht hinterlegt". Bisher gab es die Eingabe nur im einfachen
+  Editor — wer sein selbstgebautes Panel ueber den **Generator** anlegte (den
+  naheliegenden Weg: er hat den Live-Test am echten Geraet, mit dem man
+  ueberhaupt erst herausfindet, welcher Kanal welche Zone schaltet), konnte die
+  Form nirgends eintragen. Das Panel wurde im 3D weiter als geratenes Quadrat
+  gezeichnet (aus einem 4x12-Balken ein 7x7-Quadrat) und bekam auch kein
+  weisses Band. Ein ueber den Generator angelegtes Panel traegt jetzt dieselbe
+  Form wie ein ueber den Editor angelegtes.
+
+#### Behoben
+
+- **Der Speicherweg des Generators liess die Rasterform fallen.** Selbst ein
+  Profil, das die Angabe mitbrachte, verlor sie beim Schreiben: die Funktion,
+  die aus dem Generator ein neues Profil anlegt, legte die vier Spalten gar
+  nicht erst an. Sie werden jetzt mitgeschrieben; Profile ohne die Angabe
+  bleiben unveraendert bei „nicht hinterlegt" — der Generator erfindet keine
+  Form, sonst haette jedes selbstgebaute Panel wieder ein weisses Band.
+
+
 ### 2026-08-19 — Selbstgebaute Panels koennen endlich sagen, welche Form sie haben
 
 #### Hinzugefuegt
