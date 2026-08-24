@@ -33,6 +33,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Gemessen in beide Richtungen: ohne die Zeile in `ci.yml` wird er rot, und mit
   einer Bedingung, die alles beanstandet, faellt die Positivkontrolle.
 
+### 2026-08-24 — Eine Show, in der die neuen Sachen wirklich zu sehen sind
+
+#### Hinzugefuegt
+
+- **`tools/build_neuheiten_demo.py` baut eine Vorfuehr-Show fuer die
+  Panel-Geometrie und den Pixel-Kopf.** Beide Neuerungen sind an einem
+  gewoehnlichen Rig unsichtbar, weil die noetigen Geraete dort gar nicht
+  gepatcht sind: ein ZQ06121 im 154-Kanal-Modus und ein Spiider im
+  91-Kanal-Pixel-Modus. Das Skript patcht genau die — und daneben denselben
+  Spiider als 27-Kanal-Wash, damit der Unterschied nicht behauptet, sondern
+  nebeneinandergestellt wird. Drei Szenen mit je einem Knopf in der Virtual
+  Console: der Balken zeigt seine Form (vier Zeilen in vier Farben, die bei
+  einem geratenen 7x7-Raster als Schachbrett laufen), dann nur seine
+  Weiss-Leiste, dann ein Farbverlauf ueber die 19 Ring-Pixel gegen die eine
+  Flaeche des Wash-Kopfs. Die Show landet in `shows/` und laesst die laufende
+  Show unangetastet.
+- **Die Kanalnummern im Skript sind an der Geraetebibliothek nachgeschlagen,
+  nicht gerechnet** — und der Kommentar sagt, warum das noetig war: beim
+  Spiider liegt auf CH1 **Pan**, der Master-Dimmer auf CH33 und die Pixel
+  P1..P19 auf CH35..91. Die naheliegende Annahme („CH1 ist der Dimmer, die
+  Pixel kommen direkt hinter den Grundfarben") legt die ganze Szene um 24
+  Kanaele daneben, und weil die Szene trotzdem DMX erzeugt, faellt es keinem
+  Smoke-Test auf.
+
 ### 2026-08-19 — Selbstgebaute Panels koennen endlich sagen, welche Form sie haben
 
 #### Hinzugefuegt
