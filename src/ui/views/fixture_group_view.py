@@ -981,16 +981,26 @@ class FixtureGroupView(QWidget):
             lg.hide()
             lg.setText("")
             return
-        heads: dict[int, int] = {}
+        # UI-52: die tatsaechlich belegten Kopf-Zellen zaehlen, NICHT aus dem
+        # hoechsten Kopf-Index schliessen. `max(head)+1` unterstellt eine
+        # luecken lose Nummerierung ab 0 — das gilt nur fuer den Streifen aus
+        # `place_fixture_heads`. Das Ring-Raster eines Robin Spiiders traegt die
+        # Pixel 1..19 (Kopf 0 ist die GRUNDFARBE des Geraets und liegt nicht im
+        # Ring) und meldete deshalb „20 Koepfe" fuer 19 Zellen; dieselbe Luecke
+        # entsteht, sobald jemand per Rechtsklick eine einzelne Kopf-Zelle
+        # entfernt. Ein Set (statt eines Zaehlers) haelt die Zahl auch dann
+        # richtig, wenn derselbe Kopf zweimal im Raster steht — gezaehlt wird,
+        # wie viele VERSCHIEDENE Koepfe die Legende faerbt.
+        heads: dict[int, set[int]] = {}
         for v in self._grid_widget.positions.values():
             fid, head = _split_cell(v)
             if fid is not None and head is not None:
-                heads[fid] = max(heads.get(fid, 0), int(head) + 1)
+                heads.setdefault(fid, set()).add(int(head))
         parts = []
         for fid in order:
             col = fixture_cell_color(fid, None, order).name()
             name = self._labels_by_fid().get(fid, f"Fixture {fid}")
-            n = heads.get(fid)
+            n = len(heads[fid]) if fid in heads else None
             suffix = f" ({n} Köpfe)" if n and n > 1 else ""
             parts.append(
                 f"<span style='background:{col}; color:#fff;'>&nbsp;&nbsp;&nbsp;</span>"

@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-24 — Die Gruppen-Legende zaehlt, was wirklich im Raster liegt
+
+#### Behoben
+
+- **Die Farb-Legende unter dem Gruppen-Raster nannte zu viele Koepfe.** Sie
+  erschloss die Zahl aus dem hoechsten Kopf-Index (`max(head)+1`) statt die
+  belegten Zellen zu zaehlen. Das stimmt nur, solange die Koepfe luecken los ab
+  Kopf 0 nebeneinander liegen — also genau bei dem Streifen, den
+  „Koepfe einzeln → Raster" erzeugt. Beim Ring-Raster eines Robin Spiiders
+  stand deshalb „(20 Koepfe)", obwohl **19 Pixel** darin liegen: Kopf 0 ist die
+  Grundfarbe des Geraets und gehoert nicht in den Ring. Dieselbe Luecke entsteht,
+  sobald man per Rechtsklick eine einzelne Kopf-Zelle entfernt — der entfernte
+  Kopf wurde weitergezaehlt. Jetzt zaehlt die Legende die tatsaechlich belegten
+  Kopf-Zellen; ein luecken loser Streifen meldet unveraendert dieselbe Zahl wie
+  vorher.
+
 ### 2026-08-24 — Eine Show, in der die neuen Sachen wirklich zu sehen sind
 
 #### Hinzugefuegt
