@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
+
+#### Hinzugefuegt
+
+- **`tools/backlog_ids.py` sagt, welche ID wirklich frei ist** — gerechnet ueber
+  `main` **und alle offenen PR-Zweige**, nicht nur ueber das `BACKLOG.md`, das
+  der Fragende gerade vor sich hat. Genau daran lag es: am 22.08. vergaben zwei
+  Sitzungen gleichzeitig `FM-26`, am 25.08. drei Zweige `FM-30`.
+  `test_ids_are_unique` faengt das erst, wenn zwei davon gelandet sind — dann
+  steht die Kollision schon auf `main`.
+- **Die Kollisionsprobe meldet nur, was auch wirklich eine ist.** Der Zuschnitt
+  ist zweimal nachgemessen worden: die erste Fassung las alle 148 Remote-Zweige
+  und beanstandete **316 von rund 500 IDs** — Titel werden ueber Monate
+  umformuliert, also unterscheidet sich fast jede ID irgendwo. Die zweite
+  meldete noch `UI-52`, weil zwei Zweige denselben geerbten Eintrag verschieden
+  formulierten. Erst der Filter „die ID darf auf `main` noch nicht existieren"
+  — eine echte Kollision ist per Definition **neu** — liess genau die eine echte
+  uebrig.
+- **Nummern werden nicht wiederverwendet.** Der erste Entwurf gab die kleinste
+  freie Nummer aus und lieferte bei `{FM-29, FM-30}` prompt `FM-1`; der eigene
+  Test hat es gefangen. Luecken entstehen durch archivierte Items, deren Nummern
+  weiter in Commit-Nachrichten und Code-Kommentaren stehen — eine solche Nummer
+  neu zu vergeben waere eine zweite Kollision, nur eine, die kein Gate mehr
+  findet.
+- **`AGENTS.md` sagt es jetzt vor der ersten Runde:** Nummer nicht raten,
+  Werkzeug fragen.
+
 ### 2026-08-25 — „Ist irgendein Check rot?" ist die falsche Frage
 
 #### Hinzugefuegt

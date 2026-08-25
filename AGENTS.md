@@ -111,6 +111,14 @@ Code- und Git-Root.
   mit Fallback. Harte Regel: kein Linux-Fix darf Windows-ARM regredieren — und
   umgekehrt. `python-rtmidi` gibt es nur auf Linux/x64, auf ARM-Windows laeuft
   der WinMM-Pfad; MIDI-Aenderungen immer fuer BEIDE Zweige durchdenken.
+- **Neues BACKLOG-Item? Nummer NICHT selbst raten:**
+  `./venv/bin/python tools/backlog_ids.py --gruppe FM` (bzw. QA/VIZ/PROC/…).
+  Das Werkzeug rechnet ueber `main` **und alle offenen PR-Zweige** — dein eigenes
+  `BACKLOG.md` zeigt nur deinen Stand. Zweimal in vier Tagen haben parallel
+  arbeitende Sitzungen dieselbe Nummer vergeben (22.08. zweimal `FM-26`, 25.08.
+  **dreimal** `FM-30`); `test_ids_are_unique` faengt das erst, wenn zwei davon
+  gelandet sind, und dann kostet die Umbenennung einen Durchgang durch BACKLOG,
+  CHANGELOG, Tests und Code-Kommentare.
 - **Neue Dependency?** `requirements.txt` aktualisieren + Hinweis.
 - **Was NIE passiert:** Force-Push auf `main`; Löschen von `data/`/`shows/`/
   `fixtures/custom/` ohne Anweisung; Commit von `__pycache__/`, `venv/`, `.claude/`,
