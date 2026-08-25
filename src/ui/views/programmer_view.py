@@ -23,7 +23,7 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    channel_occurrence_keys, programmer_key_for_head)
+    attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
@@ -1844,22 +1844,25 @@ class ProgrammerView(QWidget):
 
         ★ Nachbesserung: gefragt werden ALLE ``owners`` des Reglers in ihrer
         Reihenfolge, und der Rueckfall nennt **kein fremdes Geraet** mehr. Der
-        erste Besitzer hat das Attribut naemlich nicht immer:
-        ``_slider_head_buckets`` behaelt fuer Kopf 1 auch ein Geraet, das den
-        Kanal gar nicht hat (``attr_head_count_for_channels`` antwortet fuer ein
-        fehlendes Attribut ``1``, s. FM-27). Vorher fiel die Aufschrift dann auf
-        die Vorlage zurueck — auf einen Kanal aus einem Geraet, das dieser
-        Regler womoeglich ueberhaupt nicht treibt. Gemessen an ``SHARPY
-        [16-Kanal]`` GANZ gewaehlt + ``MOVBAR4 [22-Kanal]`` Kopf 1 +
-        ``HYDRABEAM 19ch`` Kopf 1: der ``speed``-Regler von Kopf 1 treibt
-        MOVBAR4 + HYDRABEAM und hiess „**P/T-Speed** · K1" — das ist der Kanal
-        des SHARPY, der seinen eigenen geraeteweiten Regler hat und von diesem
-        Regler nicht angefasst wird, waehrend „Head Speed" der getriebenen
-        HYDRABEAM danebenlag und ungenutzt blieb.
+        erste Besitzer hatte das Attribut naemlich nicht immer:
+        ``_slider_head_buckets`` behielt fuer Kopf 1 auch ein Geraet, das den
+        Kanal gar nicht hat (``attr_head_count_for_channels`` antwortete fuer
+        ein fehlendes Attribut ``1``). Vorher fiel die Aufschrift dann auf die
+        Vorlage zurueck — auf einen Kanal aus einem Geraet, das dieser Regler
+        womoeglich ueberhaupt nicht treibt. Gemessen an ``SHARPY [16-Kanal]``
+        GANZ gewaehlt + ``MOVBAR4 [22-Kanal]`` Kopf 1 + ``HYDRABEAM 19ch``
+        Kopf 1: der ``speed``-Regler von Kopf 1 trieb MOVBAR4 + HYDRABEAM und
+        hiess „**P/T-Speed** · K1" — das ist der Kanal des SHARPY, der seinen
+        eigenen geraeteweiten Regler hat und von diesem Regler nicht angefasst
+        wird, waehrend „Head Speed" der getriebenen HYDRABEAM danebenlag und
+        ungenutzt blieb.
 
-        Hat KEIN Besitzer diesen Kanal (dieselbe Auswahl ohne die HYDRABEAM),
-        gibt es keinen wahren Kanalnamen — dann steht das ATTRIBUT dran
-        (:func:`attr_label`, „Speed · K1") statt des fremden „P/T-Speed"."""
+        ★★ Seit **FM-27** (2026-08-24) hat JEDER Besitzer den Kanal wirklich —
+        ``_slider_head_buckets`` wirft die anderen heraus, und hat ihn keiner,
+        entsteht der Regler gar nicht. Die Suche ueber alle Besitzer und der
+        Rueckfall auf das ATTRIBUT (:func:`attr_label`, „Speed · K1") bleiben
+        als Absicherung stehen; ueber die Oberflaeche sind sie nicht mehr
+        erreichbar."""
         attr = getattr(ch, "attribute", "") or ""
         for fx in owners:
             chans = get_channels_for_patched(fx)
@@ -1887,19 +1890,38 @@ class ProgrammerView(QWidget):
         Kopf **fuer dieses Attribut wirklich haben** — ein ``attr#N`` ohne Kanal
         faellt im DMX-Pfad still auf den ``default_value`` zurueck (FM-9/A5).
         Geraete ohne Kopf-Einschraenkung behalten ihren geraeteweiten Regler,
-        auch wenn danebenstehende Geraete einen Kopf gewaehlt haben."""
+        auch wenn danebenstehende Geraete einen Kopf gewaehlt haben.
+
+        ★★ FM-27/28/29 — hier landen alle drei Befunde, weil hier aus einer
+        Kopfzahl ein Regler wird:
+
+        * **FM-27:** die Vorlage (``_template_channels``) ist die UNION aller
+          Attribute der Auswahl, also steht ein ``speed``-Regler auch dann da,
+          wenn ihn nur EIN Geraet hat. Wer den Kanal nicht hat, faellt jetzt aus
+          dem Regler heraus — **auch aus dem geraeteweiten** (``frei``), nicht
+          nur aus den Kopf-Eimern. Vorher antwortete die Zaehlung fuer ein
+          fehlendes Attribut ``1``, also blieb jedes Geraet als „Kopf 1" drin
+          und bekam einen Wert, der nirgends auf DMX ankommt.
+        * **FM-28:** ein Attribut ohne Kopf-Achse (``raw``) wird gar nicht erst
+          auf Koepfe verteilt — das Geraet geht in den geraeteweiten Eimer,
+          selbst wenn eine Kopf-Zelle gewaehlt ist
+          (:func:`attr_has_head_axis`).
+        * **FM-29:** die Kopfzahl kommt aus :func:`attr_head_count_for_channels`
+          und damit aus der Kopf-Karte statt aus der Vorkommens-Zahl — die
+          Gruppen-Zelle ``1:4`` einer Hydrabeam 19ch erzeugt deshalb keinen
+          fuenften Dimmer-Regler mehr."""
         attr = getattr(ch, "attribute", "") or ""
-        frei, per_head = [], {}
+        pro_kopf_moeglich = attr_has_head_axis(attr)
+        frei, per_head, hat_attr = [], {}, []
         for f in fixtures:
+            have = self._attr_head_count(f, attr)
+            if have < 1:
+                continue              # FM-27: Geraet hat diesen Kanal gar nicht
+            hat_attr.append(f)
             sel = self._heads_filter_for(f)
-            if sel is None:
+            if sel is None or not pro_kopf_moeglich:
                 frei.append(f)
                 continue
-            try:
-                have = int(attr_head_count_for_channels(
-                    f, get_channels_for_patched(f), attr))
-            except Exception:
-                have = 1
             for h in sorted(sel):
                 if 0 <= h < have:
                     per_head.setdefault(h, []).append(f)
@@ -1909,11 +1931,48 @@ class ProgrammerView(QWidget):
         for h in sorted(per_head):
             self._anchor_other_heads(per_head[h], ch, h)
             out.append((h, per_head[h]))
+        if out:
+            return out
         # Hat KEIN Geraet den gewaehlten Kopf fuer dieses Attribut (z. B. Farbe
         # auf einer Hydrabeam mit EINER gemeinsamen RGBW-Bank), bleibt der
         # geraeteweite Regler stehen — sonst verschwaende der Regler ganz und
-        # das Attribut waere gar nicht mehr bedienbar.
-        return out or [(None, list(fixtures))]
+        # das Attribut waere gar nicht mehr bedienbar. Besitzer sind dann die
+        # Geraete, die den Kanal WIRKLICH haben; ist das keines, entsteht auch
+        # kein Regler (er koennte ohnehin nichts ausgeben).
+        return [(None, hat_attr)] if hat_attr else []
+
+    def _attr_head_count(self, fixture, attr: str) -> int:
+        """Kopfzahl dieses Geraets fuer dieses Attribut — ``0`` = hat es nicht.
+
+        Eine Zeile Kapselung, damit **jeder** Regler-Bauweg dieselbe Antwort
+        bekommt: ``_slider_head_buckets`` fragte sie schon, die Schnellwahl und
+        die Farb-Synchronregler taten es nicht (Gegenpruefung zu #663). Der
+        ``except``-Rueckfall auf ``1`` ist Absicht: „nicht messbar" darf ein
+        Geraet nicht aus dem Bestandspfad werfen."""
+        try:
+            return int(attr_head_count_for_channels(
+                fixture, get_channels_for_patched(fixture), attr))
+        except Exception:
+            return 1
+
+    def _fixtures_with_attr(self, fixtures, attr: str) -> list:
+        """Nur die Geraete, die diesen Kanal WIRKLICH haben (FM-27).
+
+        ★★ Gegenpruefung zu #663: ``_slider_head_buckets`` warf die anderen
+        heraus, aber es ist nicht der einzige Weg, auf dem ein Regler entsteht.
+        Die **Schnellwahl** des Position-Tabs baut ihren Pan/Tilt-Speed-Regler
+        selbst (``_add_quick_select``), und die **Farb-Synchronregler**
+        (``_add_sync_color_sliders``) ebenso — beide bekamen bis dahin die
+        ganze Auswahl. Gemessen an ``MOVBAR4 [22-Kanal]`` (kein ``speed``-Kanal)
+        neben einer ``HYDRABEAM 4000 RGBW [19-Kanal]``: ein Zug am
+        „Pan/Tilt-Speed"-Regler schrieb ``speed=177`` ins Programmer-Dict der
+        MOVBAR4 und bewegte dort **keinen einzigen DMX-Kanal** — die stille
+        Klasse FM-9/A5, die FM-27 beseitigen sollte. Dasselbe am Farb-Pfad mit
+        ``SHARPY [16-Kanal]`` (kein ``color_r``) neben einem Spiider.
+
+        Bleibt KEIN Geraet uebrig, baut der Aufrufer den Regler gar nicht erst
+        — er koennte ohnehin nichts ausgeben."""
+        return [f for f in fixtures if self._attr_head_count(f, attr) >= 1]
 
     def _anchor_other_heads(self, owners, ch, head: int) -> None:
         """Verankert die ANDEREN Koepfe, wenn dieser Kopf ueber den BASIS-Schluessel
@@ -1996,13 +2055,24 @@ class ProgrammerView(QWidget):
         ``sync_heads`` ist die Kopfzahl der Block-Vorlage; der Regler raeumt beim
         Schreiben etwaige "attr#N"-Abweichungen weg (AttributeSlider._apply_value)
         — so wird ein auf „als eine Lampe" gestelltes Geraet auch dann wieder
-        einheitlich, wenn frueher pro Kopf programmiert wurde."""
+        einheitlich, wenn frueher pro Kopf programmiert wurde.
+
+        ★★ FM-27, Gegenpruefung zu #663: die Farb-Vorlage ist die UNION der
+        Auswahl, ``fixtures`` ging hier aber unveraendert an den Regler. Gemessen
+        an ``SHARPY [16-Kanal]`` (kein ``color_r``) neben einem ``Robin Spiider
+        [91-Kanal Pixel]``: der Regler „Grundfarbe Rot" zeigte beide Geraete an,
+        bewegte am SHARPY aber **keinen einzigen Kanal** und legte den Wert nur
+        ins Programmer-Dict. Jetzt bekommt jeder Farbregler nur die Geraete, die
+        seine Farbe wirklich haben (:meth:`_fixtures_with_attr`)."""
         color_chs, occ = self._color_template_channels(fixtures)
         for ch, h in color_chs:
             if h != 0:
                 continue
+            besitzer = self._fixtures_with_attr(fixtures, ch.attribute)
+            if not besitzer:
+                continue
             ilay.addWidget(AttributeSlider(
-                ch, fixtures, self._state, owner=self,
+                ch, besitzer, self._state, owner=self,
                 sync_heads=occ.get(ch.attribute, 1),
                 display_name=self._color_label(ch)))
 
@@ -2098,9 +2168,16 @@ class ProgrammerView(QWidget):
                         layout.addWidget(bar)
                 sp = self._template_channel_in(("speed",))
                 if sp is not None:
-                    layout.addWidget(QLabel("Bewegungs-Speed:" if spider
-                                            else "Pan/Tilt-Speed:"))
-                    layout.addWidget(AttributeSlider(sp, fixtures, self._state, owner=self))
+                    # FM-27, Gegenpruefung zu #663: die Vorlage ist die UNION der
+                    # Auswahl — ``speed`` steht hier also auch dann, wenn ihn nur
+                    # EIN Geraet hat. Wer den Kanal nicht hat, gehoert nicht an
+                    # diesen Regler (sonst Wert im Dict, nichts auf DMX).
+                    sp_fixtures = self._fixtures_with_attr(fixtures, "speed")
+                    if sp_fixtures:
+                        layout.addWidget(QLabel("Bewegungs-Speed:" if spider
+                                                else "Pan/Tilt-Speed:"))
+                        layout.addWidget(AttributeSlider(sp, sp_fixtures,
+                                                         self._state, owner=self))
             elif group_name == "Weitere":
                 rs = self._template_channel_in(("reset",))
                 if rs is not None:
