@@ -25,6 +25,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Dialog unveraendert. Ebenfalls unveraendert: `Return` in einem offenen
   Zellen-Editor der Kanaltabelle uebernimmt weiterhin nur diese Zelle.
 
+- **Nachtrag aus der Gegenpruefung:** die Bedingung bildet jetzt die von
+  `QDialog::keyPressEvent` NACH, statt sie zu raten. Die erste Fassung verglich
+  `e.modifiers()` per **Gleichheit** gegen `KeypadModifier`; ein
+  Ziffernblock-Enter, bei dem Qt noch ein weiteres Flag meldet, fiel dadurch
+  durch, landete in `super()` und klickte den Standardknopf — der Fehler waere
+  zurueck gewesen. Qt fragt `modifiers() & KeypadModifier`, nicht `==`.
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt

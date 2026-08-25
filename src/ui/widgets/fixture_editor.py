@@ -380,11 +380,25 @@ class FixtureEditorDialog(QDialog):
     # behandelt die Taste selbst, sie erreicht den Dialog nicht).
     # Nachgemessen in tests/test_fixture_dialoge_return_speichert_nicht.py.
     def keyPressEvent(self, e):
-        if (e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
-                and e.modifiers() in (Qt.KeyboardModifier.NoModifier,
-                                      Qt.KeyboardModifier.KeypadModifier)):
-            e.accept()
-            return
+        # ★ Die Bedingung bildet die von ``QDialog::keyPressEvent`` NACH, statt
+        # sie zu raten — sonst haelt sie genau die Faelle nicht auf, die Qt
+        # trotzdem weiterleitet. Qt fragt:
+        #     !e->modifiers() || (e->modifiers() & Qt::KeypadModifier
+        #                         && e->key() == Qt::Key_Enter)
+        #
+        # Die erste Fassung verglich `e.modifiers() in (NoModifier,
+        # KeypadModifier)` — also das Flag-Objekt per GLEICHHEIT. Ein
+        # Ziffernblock-Enter, bei dem Qt neben `KeypadModifier` noch ein
+        # weiteres Flag meldet, faellt dort durch, landet in `super()` und
+        # klickt den Standardknopf: der Fehler waere zurueck. Gefunden in der
+        # Gegenpruefung.
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            mods = e.modifiers()
+            if (not mods
+                    or (bool(mods & Qt.KeyboardModifier.KeypadModifier)
+                        and e.key() == Qt.Key.Key_Enter)):
+                e.accept()
+                return
         super().keyPressEvent(e)
 
     def _refresh_manufacturers(self):

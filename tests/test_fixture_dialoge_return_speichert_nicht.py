@@ -15,7 +15,7 @@ nicht wieder OEFFNEN kann: die Fehlangabe ist mit ihm nicht mehr zu berichtigen.
   ``dlg.accept()`` haette den Befund gar nicht sichtbar gemacht — er liegt
   ausschliesslich in der Tastenzustellung von Qt.
 
-★ Gemessen werden ALLE DREI Tasten, die ``QDialog::keyPressEvent`` auf den
+★ Gemessen werden alle Tastenvarianten, die ``QDialog::keyPressEvent`` auf den
   Standardknopf leitet — ``Key_Return``, ``Key_Enter`` und der ECHTE
   Ziffernblock-Enter (``Key_Enter`` MIT ``KeypadModifier``). Nachbesserung nach
   Gegenpruefung zu PR #669: vorher stand hier nur ``Key_Enter`` ohne Modifier,
@@ -71,8 +71,12 @@ from src.ui.widgets import fixture_generator as generator_module
 _app = QApplication.instance() or QApplication([])
 
 
-#: Die drei Tastenvarianten, die ``QDialog::keyPressEvent`` allesamt auf den
-#: Standardknopf leitet — und die der Fix darum allesamt abfangen muss.
+#: Die Tastenvarianten, die ``QDialog::keyPressEvent`` auf den Standardknopf
+#: leitet — und die der Fix darum allesamt abfangen muss. Seine Bedingung
+#: lautet dort woertlich::
+#:
+#:     !e->modifiers() || (e->modifiers() & Qt::KeypadModifier
+#:                         && e->key() == Qt::Key_Enter)
 #: Die dritte ist die entscheidende: ``QTest.keyClick(w, Qt.Key_Enter)`` sendet
 #: NoModifier und ist damit NICHT die Taste des Ziffernblocks; ein echter
 #: Numpad-Enter traegt ``KeypadModifier``, und genau diesen Fall behandelt
@@ -81,6 +85,13 @@ RETURN_TASTEN = (
     ("Return", Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier),
     ("Enter", Qt.Key.Key_Enter, Qt.KeyboardModifier.NoModifier),
     ("Ziffernblock-Enter", Qt.Key.Key_Enter, Qt.KeyboardModifier.KeypadModifier),
+    # ★ Die vierte ist der Fall, an dem die erste Fassung des Fixes zerbrach:
+    # sie verglich `e.modifiers()` per GLEICHHEIT gegen `KeypadModifier`, und
+    # ein Ziffernblock-Enter, bei dem Qt noch ein weiteres Flag meldet, fiel
+    # durch — landete in `super()` und klickte den Standardknopf. Qts eigene
+    # Bedingung fragt `modifiers() & KeypadModifier`, nicht `==`.
+    ("Ziffernblock-Enter mit Zusatzflag", Qt.Key.Key_Enter,
+     Qt.KeyboardModifier.KeypadModifier | Qt.KeyboardModifier.GroupSwitchModifier),
 )
 
 
