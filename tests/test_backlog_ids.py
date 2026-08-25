@@ -168,17 +168,33 @@ class FailClosedTest(unittest.TestCase):
     Exit-Code IST hier die Aussage.
     """
 
-    def _main_mit(self, zweige, warnung):
+    # ★ Die CI hat diesen Test beim ersten Anlauf gekippt, und sie hatte recht:
+    # `main()` liest `origin/main` ueber git, und `actions/checkout@v4` holt
+    # EINEN Commit ohne weitere Refs. Der Positivkontroll-Fall lief dort also in
+    # dieselbe Luecke, die er ausschliessen soll — Ergebnis `2 != 0`.
+    #
+    # Genau deshalb ist der Griff nach git hier zugehalten: gemessen wird die
+    # ENTSCHEIDUNG von `main()` (Exit-Code, Auskunft ja/nein), nicht die
+    # Faehigkeit der Umgebung, Refs zu liefern. Das ist derselbe Zuschnitt, den
+    # der Gegenpruefer an #668 vorgemacht hat.
+    _BACKLOG = ("| ID | Prio | Status | Titel | Details |\n|---|---|---|---|---|\n"
+                "| FM-29 | P2 | done | **Alt** | x |\n")
+
+    def _main_mit(self, zweige, warnung, refs_lesbar=True):
         import backlog_ids as bi
-        orig = bi.offene_pr_zweige
+        orig_pr, orig_je = bi.offene_pr_zweige, bi.backlog_je_zweig
         bi.offene_pr_zweige = lambda: (zweige, warnung)
+        bi.backlog_je_zweig = lambda refs: (
+            {r: bi.items_aus_backlog(self._BACKLOG) for r in refs}
+            if refs_lesbar else {"origin/main": bi.items_aus_backlog(self._BACKLOG)})
         try:
             return bi.main(["--gruppe", "FM", "--kein-fetch"])
         finally:
-            bi.offene_pr_zweige = orig
+            bi.offene_pr_zweige, bi.backlog_je_zweig = orig_pr, orig_je
 
     def test_ein_unlesbarer_ref_verhindert_die_auskunft(self):
-        self.assertEqual(self._main_mit(["gibt-es-garantiert-nicht"], None), 2)
+        self.assertEqual(
+            self._main_mit(["gibt-es-garantiert-nicht"], None, refs_lesbar=False), 2)
 
     def test_eine_warnung_aus_gh_verhindert_die_auskunft(self):
         self.assertEqual(self._main_mit([], "`gh pr list` fehlgeschlagen: …"), 2)
