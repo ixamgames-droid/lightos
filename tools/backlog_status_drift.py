@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""QA-64 — misst, ob der Status im BACKLOG.md noch zum CODE auf `main` passt.
+
+Warum es dieses Werkzeug gibt
+-----------------------------
+Der Backlog-Status driftet gegen `main`, viermal in einer Woche beobachtet, jedes
+Mal nach einer Merge-Runde. **Beide Richtungen kosten:**
+
+* Ein Item auf ``todo``, dessen Arbeit laengst auf ``main`` steht, wird beim
+  naechsten Lauf **erneut angeboten** — und jemand baut es ein zweites Mal.
+* Ein Item auf ``review``/``done``, dessen Zweig nie gelandet ist, **rutscht als
+  erledigt durch** — und niemand baut es ueberhaupt.
+
+★ **Warum die naheliegende Pruefung NICHT geht.** „Ist der Zweig in ``main``?"
+beantwortet ``git merge-base --is-ancestor`` — und liefert in diesem Repo fuer
+JEDEN Zweig ``nein``, auch fuer die laengst gelandeten. Grund: hier wird
+**squash-gemerged**; der Squash erzeugt einen neuen Commit, die Zweigspitze wird
+nie ein Vorfahr von ``main``. Gemessen am 25.08.2026 an vier Zweigen, davon zwei
+nachweislich gelandet (#653, #654) — ``is-ancestor`` sagte bei allen vieren
+„nicht gemerged".
+
+Ein Waechter, der alles beanstandet, wird abgeschaltet. Deshalb fragt dieses
+Werkzeug nicht nach dem ZWEIG, sondern nach dem **Inhalt**: jedes Item kann eine
+*Spur* hinterlegen — eine Datei und ein Kennzeichen darin, das es genau dann auf
+``main`` gibt, wenn die Arbeit gelandet ist.
+
+Die Spur steht als unsichtbarer Kommentar in der Item-Zeile::
+
+    <!-- spur: tools/zeitbomben_gate.py :: ZEITSPRUNG-WIRKSAM -->
+
+Ohne Kennzeichen genuegt die Existenz der Datei::
+
+    <!-- spur: tools/zeitbomben_gate.py -->
+
+Zwei getrennte Pruefungen
+-------------------------
+1. **Spur-Probe** (die eigentliche): Status ``done``/``✅`` -> Spur MUSS auf
+   ``main`` sein. Status ``todo`` -> Spur darf NICHT auf ``main`` sein. Status
+   ``review``/``blocked``/``decision`` -> beides zulaessig, es wird nur berichtet.
+2. **Zweig-Behauptung**: nennt der Status „Umsetzung auf ``X``", muss ``X`` auf
+   ``origin`` existieren und darf keine neuere ``-vN``-Fassung haben. Genau das
+   ist am 25.08. aufgefallen: FM-14b zeigte auf die erste von **drei** Fassungen,
+   und die enthielt drei von vier Commits nicht.
+
+   ★ Diese zweite Pruefung war zuerst breiter gebaut — sie las jeden Backtick der
+   Form ``a/b`` als Zweignamen und beanstandete **60 Zeilen**, fast alle davon
+   gewoehnliche Dateipfade (``tools/verify_loop.sh``, ``docs/…``). Der enge
+   Zuschnitt „nur was der STATUS als Umsetzungszweig behauptet" fand dieselbe
+   eine echte Drift und sonst nichts.
+
+Warum ein Werkzeug und kein CI-Test
+-----------------------------------
+Beide Pruefungen brauchen Git-Refs, die es in der CI nicht gibt:
+``actions/checkout@v4`` holt standardmaessig **einen** Commit ohne weitere Refs —
+kein ``origin/main``, keine Zweigliste. Ein Test, der dort still ueberspringt,
+waere genau die Sorte Absicherung, die dieses Repo schon zweimal teuer bezahlt
+hat (PROC-02b, PROC-04): sie laeuft, wird gruen und wirkt nicht.
+
+Die LOGIK ist trotzdem festgenagelt — ``tests/test_qa64_status_drift.py`` fuettert
+sie mit Nachbildungen und prueft beide Richtungen. Was dort nicht geht, ist der
+Griff nach dem echten Repo; genau dafuer ist diese Datei da.
+
+Aufruf::
+
+    ./venv/bin/python tools/backlog_status_drift.py           # Bericht
+    ./venv/bin/python tools/backlog_status_drift.py --strict  # Exit 1 bei Drift
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import re
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKLOG = os.path.join(REPO, "BACKLOG.md")
+
+# <!-- spur: pfad/zur/datei.py :: KENNZEICHEN -->   (Kennzeichen optional)
+SPUR = re.compile(r"<!--\s*spur:\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
+# Nur was der STATUS behauptet — nicht jeder Backtick in der Beschreibung.
+ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
+
+ERLEDIGT = ("done", "✅")
+OFFEN = ("todo",)
+
+
+def zeilen_mit_items(text: str) -> list[tuple[str, str, str]]:
+    """``(item, status, ganze Zeile)`` fuer jede Tabellenzeile mit einer ID."""
+    treffer = []
+    for z in text.splitlines():
+        if not z.startswith("| "):
+            continue
+        sp = z.split("|")
+        if len(sp) < 5:
+            continue
+        item, status = sp[1].strip(), sp[3].strip()
+        # Kopf- und Trennzeilen haben keine ID-artige erste Spalte …
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", item):
+            continue
+        # … mit EINER Ausnahme: die Kopfzeile `| ID | Prio | Status | …` sieht
+        # genauso aus wie ein Item namens "ID". Der eigene Test hat das gefangen
+        # (sonst haette jede der Tabellen ein Geister-Item beigesteuert), und die
+        # zweite Spalte entscheidet es sauber: jedes echte Item traegt dort eine
+        # Prioritaet, die Kopfzeile das Wort "Prio".
+        if not re.fullmatch(r"P[0-9]", sp[2].strip()):
+            continue
+        treffer.append((item, status, z))
+    return treffer
+
+
+def status_klasse(status: str) -> str:
+    s = status.lower()
+    if any(k in s for k in ERLEDIGT):
+        return "erledigt"
+    if any(s.startswith(k) for k in OFFEN):
+        return "offen"
+    return "unterwegs"
+
+
+def spur_urteil(klasse: str, auf_main: bool) -> str | None:
+    """``None`` = in Ordnung, sonst der Text der Beanstandung.
+
+    Die Regel steht bewusst hier und nicht im Aufrufer: sie ist die eigentliche
+    Aussage des Werkzeugs, und der Test misst genau diese Funktion.
+    """
+    if klasse == "erledigt" and not auf_main:
+        return "Status sagt erledigt, aber die Spur steht NICHT auf main"
+    if klasse == "offen" and auf_main:
+        return "Status sagt todo, aber die Spur steht bereits auf main"
+    return None
+
+
+# ── Der Griff nach dem echten Repo (in der CI nicht verfuegbar) ──────────────
+
+def _git(*args: str) -> tuple[int, str]:
+    p = subprocess.run(("git",) + args, cwd=REPO, capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+
+def spur_auf_main(datei: str, kennzeichen: str | None) -> bool:
+    rc, inhalt = _git("show", f"origin/main:{datei}")
+    if rc != 0:
+        return False
+    return True if not kennzeichen else (kennzeichen in inhalt)
+
+
+def zweige_auf_origin() -> set[str]:
+    rc, out = _git("ls-remote", "--heads", "origin")
+    if rc != 0:
+        return set()
+    return {l.split("refs/heads/")[1] for l in out.splitlines() if "refs/heads/" in l}
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--strict", action="store_true",
+                    help="Exit 1, wenn eine Drift gefunden wurde")
+    args = ap.parse_args(argv)
+
+    with open(BACKLOG, encoding="utf-8") as f:
+        text = f.read()
+    items = zeilen_mit_items(text)
+
+    rc, _ = _git("rev-parse", "--verify", "-q", "origin/main")
+    if rc != 0:
+        print("FEHLER: kein origin/main — dieses Werkzeug braucht die Refs des "
+              "echten Repos (siehe Docstring: deshalb ist es kein CI-Test).")
+        return 2
+
+    beanstandet = []
+
+    # ── 1) Spur-Probe ────────────────────────────────────────────────────────
+    mit_spur = 0
+    for item, status, zeile in items:
+        m = SPUR.search(zeile)
+        if not m:
+            continue
+        mit_spur += 1
+        datei, kennzeichen = m.group(1), m.group(2)
+        auf_main = spur_auf_main(datei, kennzeichen)
+        klasse = status_klasse(status)
+        urteil = spur_urteil(klasse, auf_main)
+        if urteil:
+            wo = f"{datei}" + (f" :: {kennzeichen}" if kennzeichen else "")
+            beanstandet.append(f"{item}: {urteil}  ({wo})")
+
+    # ★ Die Abdeckung MUSS mitgemeldet werden. Ohne sie sieht „0 Beanstandungen"
+    # bei null hinterlegten Spuren aus wie ein sauberer Backlog.
+    print(f"[spur]  {mit_spur} von {len(items)} Items haben eine Spur hinterlegt")
+    if mit_spur == 0:
+        print("        -> es wurde NICHTS geprueft. Spuren hinterlegen:"
+              " <!-- spur: datei :: kennzeichen -->")
+
+    # ── 2) Zweig-Behauptung ──────────────────────────────────────────────────
+    zweige = zweige_auf_origin()
+    if not zweige:
+        print("[zweig] origin nicht erreichbar — Zweig-Behauptungen ungeprueft")
+    else:
+        geprueft = 0
+        for item, status, _zeile in items:
+            m = ZWEIG.search(status)
+            if not m:
+                continue
+            geprueft += 1
+            b = m.group(1)
+            if b not in zweige:
+                beanstandet.append(f"{item}: nennt Zweig '{b}' — der existiert auf origin nicht")
+                continue
+            neuer = sorted(x for x in zweige if x.startswith(b + "-v"))
+            if neuer:
+                beanstandet.append(
+                    f"{item}: nennt Zweig '{b}', aber es gibt eine neuere Fassung: {', '.join(neuer)}")
+        print(f"[zweig] {geprueft} Items nennen einen Umsetzungszweig")
+
+    print()
+    if beanstandet:
+        print(f"⚠ {len(beanstandet)} Drift(s):")
+        for b in beanstandet:
+            print(f"  - {b}")
+    else:
+        print("✓ keine Drift in dem, was geprueft werden konnte.")
+    return 1 if (beanstandet and args.strict) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
