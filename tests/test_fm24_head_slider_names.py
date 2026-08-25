@@ -19,6 +19,8 @@ Geraet / gewaehlter Kopf                     Aufschrift VORHER          geschrie
 
 Der Spiider-Fall zeigt die Fehlerart am deutlichsten: der Name nannte einen
 DRITTEN Kanal — weder den eigenen noch den, der zufaellig Kopf 1 gehoert.
+Seit **FM-28** (2026-08-24) wird dieser Regler gar nicht mehr gebaut: ``raw``
+ist kein Kopf-Attribut. Der zugehoerige Test misst jetzt seine Abwesenheit.
 
 Die Zusage dieses Items ist deshalb bewusst am Ausgang festgemacht und nicht an
 erwarteten Zeichenketten: **jeder Pro-Kopf-Regler traegt den Namen des Kanals,
@@ -45,6 +47,11 @@ entsteht: ein GANZ gewaehltes drittes Geraet stellt die Vorlage, steht aber
 nicht in den Besitzern. Gemessen an ``SHARPY`` ganz + ``MOVBAR4`` K1 +
 ``HYDRABEAM`` K1 hiess der ``speed``-Regler vorher „P/T-Speed · K1" — ein Kanal
 des Sharpy, den dieser Regler gar nicht treibt.
+
+★★ **FM-27** (2026-08-24) hat dieser Klasse die Grundlage entzogen: ein Geraet
+ohne den Kanal steckt gar nicht mehr im Regler. ``RueckfallTest`` misst deshalb
+jetzt die staerkere Zusage — jeder Besitzer hat den Kanal wirklich, und hat ihn
+keiner, entsteht der Regler nicht.
 """
 from __future__ import annotations
 
@@ -182,13 +189,25 @@ class GemeldeteSymptomeTest(_Basis):
         auf = {a: t for a, h, t, _d, _f in self._regler(["1:0"]) if h == 0}
         self.assertEqual(auf.get("intensity"), "Kopf 1 Dimmer · K1")
 
-    def test_spiider_pixel_nennt_nicht_einen_dritten_kanal(self):
-        """Am Spiider im Pixel-Modus tragen 20 verschiedene Funktionen das
+    def test_spiider_pixel_baut_fuer_raw_gar_keinen_kopf_regler(self):
+        """Am Spiider im Pixel-Modus tragen 21 verschiedene Funktionen das
         Sammel-Attribut ``raw``; die Vorlage zog davon „Grundfarbe Shutter"
-        heran, geschrieben wird ``raw#2``."""
+        heran, geschrieben wurde ``raw#2`` = CH11 „Grundfarbe Grün Fein".
+
+        ★ FM-24 hat die Aufschrift auf den wirklich geschriebenen Kanal
+        umgestellt („Grundfarbe Grün Fein · K3") — wahr, aber sinnlos: ein
+        „Kopf 3", der ein Feinbyte einer Grundfarbe verstellt, ist kein Kopf.
+        Seit FM-28 (2026-08-24) entsteht dieser Regler gar nicht mehr; ``raw``
+        wird ausschliesslich geraeteweit bedient."""
         self._patch(1, "SPIIDER", 91)
-        auf = {a: t for a, h, t, _d, _f in self._regler(["1:2"]) if h == 2}
-        self.assertEqual(auf.get("raw"), "Grundfarbe Grün Fein · K3")
+        regler = self._regler(["1:2"])
+        self.assertEqual(
+            [(a, h, t) for a, h, t, _d, _f in regler if a == "raw" and h is not None],
+            [], "fuer ``raw`` darf kein Pro-Kopf-Regler gebaut werden")
+        self.assertTrue(
+            [a for a, h, _t, _d, _f in regler if a == "raw" and h is None],
+            "der geraeteweite raw-Regler muss bleiben — sonst waeren die "
+            "unerkannten Kanaele gar nicht mehr bedienbar")
 
 
 class KopfReglerNennenIhrenKanalTest(_Basis):
@@ -344,21 +363,20 @@ class RueckfallTest(_Basis):
     """Der erste Besitzer eines Reglers hat das Attribut gar nicht — woher darf
     der Name dann kommen?
 
-    ``_slider_head_buckets`` behaelt so ein Geraet fuer Kopf 1
-    (``attr_head_count_for_channels`` antwortet fuer ein FEHLENDES Attribut
-    ``1``, s. FM-27). Der Rueckfall auf den VORLAGEN-Namen war die falsche
-    Antwort: die Vorlage ist ueber die GANZE Auswahl dedupliziert und kann aus
-    einem Geraet stammen, das dieser Regler ueberhaupt nicht treibt.
+    ★★ **Seit FM-27 (2026-08-24) kann das gar nicht mehr passieren.** Damals
+    behielt ``_slider_head_buckets`` fuer Kopf 1 auch ein Geraet, das den Kanal
+    ueberhaupt nicht hat (``attr_head_count_for_channels`` antwortete fuer ein
+    FEHLENDES Attribut ``1``). Der Rueckfall auf den VORLAGEN-Namen war darauf
+    die falsche Antwort: die Vorlage ist ueber die GANZE Auswahl dedupliziert
+    und kann aus einem Geraet stammen, das dieser Regler nicht treibt. FM-24 hat
+    daraufhin ALLE Besitzer der Reihe nach gefragt — FM-27 nimmt die Frage weg,
+    indem so ein Geraet gar nicht mehr in den Regler kommt.
 
-    ★ **Die Konstellation entscheidet, ob das ueberhaupt messbar ist.** An
-    ``MOVBAR4`` + ``HYDRABEAM 19ch`` (beide Kopf 1) ist der Vorlagen-Name
-    zufaellig WAHR — die Vorlage kommt von der Hydrabeam, und die steckt im
-    selben Regler. Diese Auswahl misst die Kante also NICHT; sie steht hier nur
-    noch als Nachweis, dass die Suche nicht beim ersten Besitzer aufhoert. Die
-    Kante misst ``test_vorlage_aus_nicht_getriebenem_geraet_wird_nicht_genannt``:
-    ein ``SHARPY`` GANZ gewaehlt (er bekommt seinen eigenen geraeteweiten
-    Regler) neben den Kopf-Zellen der beiden anderen. Dann liefert der Sharpy
-    die Vorlage, steht aber nicht in den Besitzern.
+    Diese Klasse misst deshalb jetzt die staerkere Zusage: **jeder Besitzer
+    eines Pro-Kopf-Reglers hat den Kanal wirklich**, und der Name kommt vom
+    ersten. Die Suche ueber alle Besitzer und der Attribut-Rueckfall in
+    ``_head_slider_label`` bleiben als Absicherung im Code stehen; erreichbar
+    sind sie ueber die Oberflaeche nicht mehr.
     """
 
     def _kopfregler(self, cells, attr: str, head: int = 0):
@@ -374,20 +392,23 @@ class RueckfallTest(_Basis):
         s = treffer[0]
         return s, _aufschrift(s), tuple(f.fid for f in s._fixtures)
 
-    def test_zweiter_besitzer_liefert_den_namen(self):
-        """MOVBAR4 (kein ``speed``) vor HYDRABEAM (CH19 „Head Speed"): die Suche
-        darf beim ersten Besitzer nicht aufhoeren.
+    def test_geraet_ohne_den_kanal_steckt_nicht_mehr_im_regler(self):
+        """★ FM-27, an derselben Auswahl wie frueher gemessen: MOVBAR4 (kein
+        ``speed``) vor HYDRABEAM (CH19 „Head Speed"), beide Kopf 1.
 
-        Diese Auswahl allein belegt den Rueckfall NICHT (s. Klassen-Docstring) —
-        der Vorlagen-Name waere hier derselbe."""
+        Vorher trieb der ``speed``-Regler **beide** Geraete — bei der MOVBAR4
+        landete der Wert im Programmer-Dict und nirgends auf DMX. Jetzt bleibt
+        nur das Geraet uebrig, das den Kanal hat, und der Name kommt von ihm."""
         self._patch(1, "MOVBAR4", 22)          # kein speed-Kanal
         self._patch(2, "HYDRA4000", 19)        # CH19 „Head Speed"
         _s, auf, fids = self._kopfregler(["1:0", "2:0"], "speed")
-        self.assertEqual(fids, (1, 2))
         self.assertIsNone(
             self._kanalname(self._fx(1), "speed", 0),
             "MOVBAR4 muss dieses Attribut fehlen — sonst misst der Test den "
             "Fall gar nicht")
+        self.assertEqual(fids, (2,),
+                         "die MOVBAR4 hat keinen speed-Kanal und darf in diesem "
+                         "Regler nicht mehr stecken")
         self.assertEqual(auf, f"Head Speed{_SUFFIX}1")
 
     def test_vorlage_aus_nicht_getriebenem_geraet_wird_nicht_genannt(self):
@@ -396,9 +417,10 @@ class RueckfallTest(_Basis):
 
         Ein ``SHARPY [16-Kanal]`` GANZ gewaehlt (eigener geraeteweiter Regler,
         Vorlage fuer ``speed`` = CH7 „P/T-Speed") und dazu Kopf 1 von
-        ``MOVBAR4`` + ``HYDRABEAM 19ch``. Der Kopf-1-Regler treibt nur die
-        beiden letzten. Gemessen vor der Nachbesserung: „**P/T-Speed** · K1" —
-        der Kanal eines Geraets, das dieser Regler nicht anfasst, waehrend
+        ``MOVBAR4`` + ``HYDRABEAM 19ch``. Der Kopf-1-Regler treibt davon nur die
+        Hydrabeam (die MOVBAR4 hat den Kanal nicht und faellt seit FM-27 ganz
+        heraus). Gemessen vor der Nachbesserung: „**P/T-Speed** · K1" — der
+        Kanal eines Geraets, das dieser Regler nicht anfasst, waehrend
         „Head Speed" der getriebenen Hydrabeam ungenutzt danebenlag."""
         self._patch(1, "MOVBAR4", 22)
         self._patch(2, "HYDRA4000", 19)
@@ -415,7 +437,7 @@ class RueckfallTest(_Basis):
                          "die Vorlage dieses Reglers muss vom Sharpy kommen — "
                          "sonst gibt es gar keinen fremden Namen zu vermeiden")
         self.assertIsNone(self._kanalname(self._fx(1), "speed", 0),
-                          "MOVBAR4 muss das Attribut fehlen (erster Besitzer)")
+                          "MOVBAR4 muss das Attribut fehlen")
         self.assertNotEqual(fremd, eigen,
                             "beide Kanaele heissen gleich — dann waere jede "
                             "Aufschrift zufaellig wahr")
@@ -424,26 +446,28 @@ class RueckfallTest(_Basis):
                             f"Kanal des Sharpy")
         self.assertEqual(auf, f"{eigen}{_SUFFIX}1")
 
-    def test_ohne_besitzerkanal_steht_das_attribut_dran(self):
-        """★ Und wenn KEIN Besitzer den Kanal hat, gibt es keinen wahren
-        Kanalnamen — dann darf erst recht kein fremder dranstehen.
+    def test_ohne_besitzerkanal_entsteht_gar_kein_kopf_regler(self):
+        """★ Und wenn KEIN Geraet der Kopf-Auswahl den Kanal hat, gab es keinen
+        wahren Kanalnamen — FM-24 schrieb dann das ATTRIBUT dran („Speed · K1")
+        statt des fremden „P/T-Speed" aus der Vorlage.
 
-        Dieselbe Auswahl ohne die Hydrabeam: der ``speed``-Regler von Kopf 1
-        treibt nur die MOVBAR4, die diesen Kanal nicht hat (FM-27). Gemessen
-        vorher „**P/T-Speed** · K1" (Sharpy), jetzt das ATTRIBUT."""
+        Seit FM-27 gibt es diesen Regler nicht mehr: dieselbe Auswahl, aber die
+        einzige Kopf-Zelle gehoert der MOVBAR4, die keinen ``speed``-Kanal hat.
+        Ein Regler, der nichts ausgeben kann, wird gar nicht erst gebaut — der
+        geraeteweite Regler des GANZ gewaehlten Sharpy bleibt daneben stehen."""
         self._patch(1, "MOVBAR4", 22)
         self._patch(3, "SHARPY", 16)
-        s, auf, fids = self._kopfregler(["3", "1:0"], "speed")
-        fremd = self._kanalname(self._fx(3), "speed", 0)
-        self.assertEqual(fids, (1,))
-        self.assertEqual(s._channel.name, fremd, "Vorlage muss vom Sharpy kommen")
         self.assertIsNone(self._kanalname(self._fx(1), "speed", 0),
-                          "kein Besitzer darf diesen Kanal haben — sonst misst "
-                          "der Test den letzten Rueckfall nicht")
-        self.assertNotIn(fremd, auf,
-                         f"{auf!r} nennt einen Kanal des nicht getriebenen "
-                         f"Sharpy")
-        self.assertEqual(auf, f"Speed{_SUFFIX}1")
+                          "MOVBAR4 darf diesen Kanal nicht haben — sonst misst "
+                          "der Test den Fall gar nicht")
+        regler = [(h, fids) for a, h, _t, _d, fids
+                  in self._regler(["3", "1:0"]) if a == "speed"]
+        self.assertEqual([r for r in regler if r[0] is not None], [],
+                         "kein Geraet der Kopf-Auswahl hat den Kanal — dann "
+                         "darf auch kein Pro-Kopf-Regler entstehen")
+        self.assertIn((None, (3,)), regler,
+                      "der geraeteweite Regler des Sharpy muss bleiben, und "
+                      "zwar OHNE die MOVBAR4 (FM-27 gilt auch dort)")
 
     def test_erster_besitzer_hat_vorrang(self):
         """★ Positivkontrolle zur Suche: haben MEHRERE Besitzer den Kanal, gilt

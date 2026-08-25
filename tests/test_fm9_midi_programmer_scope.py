@@ -10,11 +10,17 @@ Zwei Dinge waren kaputt, das zweite ist das groebere:
    gewaehlt sind, ist auf keinem Lichtpult das erwartete Verhalten.
 
 ★ Der interessante Teil ist die Kopf-ZAEHLUNG. Sie haengt am **Attribut**, nicht
-am Geraet: eine ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, **5**
-Intensity und **1** Farbbank. „Wie viele Koepfe hat das Geraet" hat dort also drei
-verschiedene richtige Antworten. ``AttributBezogeneZaehlungTests`` faehrt genau
-dieses Geraet und zeigt, dass ein Pan-Schreibvorgang die Kopf-Auswahl behaelt,
-ein Farb-Schreibvorgang auf demselben Geraet sie aber fallen lassen muss.
+am Geraet: eine ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, **5
+Intensity-KANAELE** (Master + je Kopf einer) und **1** Farbbank. „Wie viele
+Koepfe hat das Geraet" hat dort also mehrere richtige Antworten.
+``AttributBezogeneZaehlungTests`` faehrt genau dieses Geraet und zeigt, dass ein
+Pan-Schreibvorgang die Kopf-Auswahl behaelt, ein Farb-Schreibvorgang auf
+demselben Geraet sie aber fallen lassen muss.
+
+★★ Seit FM-27/29 (2026-08-24) zaehlt ``attr_head_count_for_channels`` KOEPFE
+statt Vorkommen: die 5 Intensity-Kanaele sind **4** Koepfe plus ein geteilter
+Master (die Kopf-Karte aus FM-17 weiss das), und ein Attribut, das das Geraet
+gar nicht hat, ist **0** Koepfe statt 1. ``ZaehlerTests`` misst beides.
 """
 import unittest
 
@@ -188,24 +194,38 @@ class AttributBezogeneZaehlungTests(unittest.TestCase):
             "und der Kopf fiele auf seinen Default-Wert")
 
     def test_intensity_hat_wieder_eine_andere_kopfzahl(self):
-        """5 Intensity-Kanaele (4 pro Kopf + 1 Master) — Kopf 3 existiert also."""
+        """5 Intensity-KANAELE (4 pro Kopf + 1 Master) = 4 Koepfe — Kopf 3 gibt
+        es also, und er adressiert seinen eigenen Dimmer."""
         st = _State([_hydrabeam19(1)], cells=["1:2"])
         _fire(_mapper(self, st), "intensity")
         self.assertEqual(_keys(st, 1), ["intensity#2"])
 
 
 class ZaehlerTests(unittest.TestCase):
-    def test_zaehlt_vorkommen_des_attributs(self):
+    def test_zaehlt_koepfe_nicht_vorkommen(self):
+        """★ FM-29: die 5 Intensity-Kanaele der Hydrabeam sind **4** Koepfe plus
+        ein geteilter Master. Wer hier 5 antwortet, laesst die Kopf-Zelle ``1:4``
+        einen fuenften Regler bauen, der auf denselben Kanal wie „K4" schreibt."""
         fx = _hydrabeam19(1)
         n = A.attr_head_count_for_channels
         self.assertEqual(n(fx, fx.channels, "pan"), 4)
         self.assertEqual(n(fx, fx.channels, "tilt"), 4)
-        self.assertEqual(n(fx, fx.channels, "intensity"), 5)
+        self.assertEqual(n(fx, fx.channels, "intensity"), 4)
         self.assertEqual(n(fx, fx.channels, "color_r"), 1)
 
-    def test_unbekanntes_attribut_ist_ein_kopf(self):
+    def test_fehlendes_attribut_ist_null_koepfe(self):
+        """★ FM-27: ``1`` hiess „hat Kopf 1" und liess ein Geraet ohne diesen
+        Kanal im Regler stehen — der Wert landete dann nirgends auf DMX."""
         fx = _hydrabeam19(1)
-        self.assertEqual(A.attr_head_count_for_channels(fx, fx.channels, "gobo"), 1)
+        self.assertEqual(A.attr_head_count_for_channels(fx, fx.channels, "gobo"), 0)
+
+    def test_raw_ist_kein_kopf_attribut(self):
+        """★ FM-28: die Vorkommen von ``raw`` sind verschiedene Funktionen, keine
+        Koepfe — geraeteweit ist die einzige richtige Antwort."""
+        fx = _Fx(1, [_Ch("raw") for _ in range(20)] + [_Ch("pan"), _Ch("pan")])
+        self.assertEqual(A.attr_head_count_for_channels(fx, fx.channels, "raw"), 1)
+        self.assertFalse(A.attr_has_head_axis("raw"))
+        self.assertTrue(A.attr_has_head_axis("pan"))
 
     def test_composite_key_wird_auf_den_basisnamen_reduziert(self):
         """Snap-/VC-Restore-Pfade reichen ``attr#N`` direkt durch."""
