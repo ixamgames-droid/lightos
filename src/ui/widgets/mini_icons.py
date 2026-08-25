@@ -16,6 +16,8 @@ die bereits genutzte Bibliotheks-Farbcodierung (snap_file_panel) angelehnt.
 """
 from __future__ import annotations
 
+import math
+
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import (
     QIcon, QPixmap, QPainter, QColor, QPen, QBrush, QPolygonF, QPainterPath, QFont,
@@ -49,7 +51,7 @@ _FX_SPIDER  = "#5ab0ff"
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
-_cache: dict[tuple[str, int], QIcon] = {}
+_cache: dict[tuple[str, int, int], QIcon] = {}
 
 
 def _pixmap(size: int) -> tuple[QPixmap, QPainter]:
@@ -466,6 +468,80 @@ def _draw_mover_bar(p: QPainter, s: int, color):
         p.drawEllipse(QRectF(cx - r * 0.45, s * 0.52 + r * 0.55, r * 0.9, r * 0.9))
 
 
+# ── FM-14/VIZ-53: der Ring eines Pixel-Kopfes (beide 2D-Stellen) ─────────────
+
+# Schematische Segmentzahl, wenn der Aufrufer keine kennt (Icon-Galerie,
+# `fixture_icon("pixel_head")` ueber den blossen Typ-String). Ein Pixel-Kopf
+# OHNE Ring saehe aus wie ein gewoehnlicher Moving Head — also genau wie der
+# Zustand, den VIZ-53 beseitigt. Fuer ein gepatchtes Geraet kommt die echte
+# Zahl aus `fixture_icon_for` und wird hier nie gebraucht.
+RING_SCHEMA_SEGMENTE = 7
+
+
+def ring_offsets(segments: int, radius: float, max_cell: float = 0.0) -> list:
+    """Ring-Segmente als ``(dx, dy, r)`` relativ zur Ringmitte (VIZ-53).
+
+    EINE Quelle fuer beide 2D-Stellen: das Listen-Icon hier und das
+    Top-Down-Glyph der Live-View (``live_view.FixtureRenderer``). Zwei eigene
+    Kraenze waeren zwei Stellen, an denen die Segmentzahl falsch werden kann.
+
+    ``segments`` ist die ECHTE Zahl aus ``app_state.pixel_ring_segments`` —
+    dieselbe, die das 3D bekommt. Gekappt wird sie hier NICHT (CDX-56): die
+    Punkte werden eng, aber der Kranz bleibt vollzaehlig.
+
+    ★ Warum ein gleichmaessiger Kranz und nicht die Wabe des 3D-Icons: im 2D
+    tragen ALLE Segmente dieselbe Farbe (die Live-View faerbt ein Geraet mit
+    EINER Farbe, per-Pixel zeigt nur das 3D). Die Plaetze tragen hier also
+    keine Information, nur ihre ANZAHL — und ein Kranz bleibt in Icon-Groesse
+    lesbar, wo drei ineinanderliegende Wabenringe zu einem Fleck verlaufen.
+    EIN Segment sitzt in der Mitte, genau wie ``wabenPlatz(0)`` im 3D.
+    """
+    n = max(0, int(segments or 0))
+    kappe = float(max_cell) if max_cell else float(radius)
+    if n <= 0:
+        return []
+    if n == 1:
+        return [(0.0, 0.0, kappe)]
+    # Abstand benachbarter Segmente auf dem Kranz -> Punktgroesse, damit sich
+    # 19 Segmente nicht ueberlappen und 3 nicht wie Kruemel aussehen.
+    abstand = 2.0 * radius * math.sin(math.pi / n)
+    r = max(0.35, min(kappe, abstand * 0.45))
+    # Unten beginnend, im Uhrzeigersinn — dieselbe Leserichtung wie `wabenPlatz`
+    # im 3D (270°, dann im Uhrzeigersinn).
+    return [(math.cos(w) * radius, math.sin(w) * radius, r)
+            for w in (math.pi / 2 + 2 * math.pi * i / n for i in range(n))]
+
+
+def _draw_pixel_head(p: QPainter, s: int, color, segments: int = 0):
+    """Pixel-Moving-Head (FM-14/VIZ-53): Kopf auf Buegel — Ring statt Linse.
+
+    Dieselbe Silhouette wie ``_draw_moving_head`` (es IST einer), aber die
+    Lichtquelle ist in einzeln ansteuerbare Segmente zerlegt. Bis VIZ-53 gab es
+    dieses Glyph nicht: ein Pixel-Kopf ist als ``moving_head`` gepatcht und bekam
+    deshalb das gewoehnliche Moving-Head-Icon, waehrend das 3D-Top-Down-Icon
+    laengst seinen Ring zeigte.
+    """
+    col = _qc(color)
+    # Basis/Buegel — identisch zu _draw_moving_head.
+    p.setPen(QPen(col.darker(150), max(1.2, s * 0.08)))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawArc(QRectF(s * 0.22, s * 0.30, s * 0.56, s * 0.56), 20 * 16, 140 * 16)
+    # Kopf-Gehaeuse dunkel: die Farbe tragen die Segmente.
+    p.setPen(QPen(col.darker(160), max(1.0, s * 0.05)))
+    p.setBrush(QBrush(col.darker(240)))
+    p.drawEllipse(QRectF(s * 0.34, s * 0.30, s * 0.32, s * 0.32))
+    # Segmente. Der Kranz sitzt dicht an der Gehaeuse-Innenkante: bei 16 px
+    # Icon-Groesse hat der Spiider-Ring 19 Punkte auf gut 2 px Radius — sie
+    # verlaufen dann zu einem hellen Ring, und genau das soll man sehen. Die
+    # ZAHL bleibt vollzaehlig, gekappt wird nichts.
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(col.lighter(150)))
+    n = int(segments or 0) or RING_SCHEMA_SEGMENTE
+    cx, cy = s * 0.5, s * 0.46
+    for dx, dy, r in ring_offsets(n, s * 0.115, s * 0.055):
+        p.drawEllipse(QRectF(cx + dx - r, cy + dy - r, r * 2, r * 2))
+
+
 def _draw_hazer(p: QPainter, s: int, color):
     """Hazer: Maschinengehaeuse mit Duese und feinerer Nebelwolke."""
     col = _qc(color)
@@ -509,6 +585,7 @@ _PAINTERS = {
     "fx_led_bar":     (_draw_bar,         _FX_BAR),
     "fx_par_bar":     (_draw_par_bar,     _FX_PAR),
     "fx_mover_bar":   (_draw_mover_bar,   _FX_MOVING),
+    "fx_pixel_head":  (_draw_pixel_head,  _FX_MOVING),  # FM-14/VIZ-53
     "fx_strobe":      (_draw_strobe,      _FX_STROBE),
     "fx_dimmer":      (_draw_dimmer,      _FX_DIMMER),
     "fx_scanner":     (_draw_scanner,     _FX_SCANNER),
@@ -520,19 +597,30 @@ _PAINTERS = {
     "fx_other":       (_draw_other,       _FX_OTHER),
 }
 
+# Maler, die neben Groesse und Farbe eine Geraete-Zahl brauchen (VIZ-53).
+_KINDS_MIT_SEGMENTEN = frozenset({"fx_pixel_head"})
 
-def icon_for_kind(kind: str, size: int = 16) -> QIcon:
+
+def icon_for_kind(kind: str, size: int = 16, segments: int = 0) -> QIcon:
     """Liefert (gecacht) ein Mini-Icon fuer einen normalisierten kind-String.
 
-    Unbekannte kinds → kleiner grauer Punkt (nie ein Fehler/leeres Icon)."""
-    key = (kind, size)
+    Unbekannte kinds → kleiner grauer Punkt (nie ein Fehler/leeres Icon).
+
+    ``segments`` (VIZ-53) benutzt nur ``fx_pixel_head``: die Zahl der Ring-
+    Segmente ist eine Eigenschaft des GEPATCHTEN Geraets, nicht des kinds — sie
+    gehoert deshalb in den Cache-Schluessel, sonst bekaeme der zweite Pixel-Kopf
+    das Bild des ersten."""
+    key = (kind, size, segments)
     cached = _cache.get(key)
     if cached is not None:
         return cached
     painter_fn, color = _PAINTERS.get(kind, (_draw_dot, _FX_OTHER))
     pm, p = _pixmap(size)
     try:
-        painter_fn(p, size, color)
+        if kind in _KINDS_MIT_SEGMENTEN:
+            painter_fn(p, size, color, segments)
+        else:
+            painter_fn(p, size, color)
     finally:
         p.end()
     icon = QIcon(pm)
@@ -582,6 +670,11 @@ def fixture_icon(fixture_type: str, size: int = 16) -> QIcon:
 # Module-level cache for the lazy-imported viz_model_for callable.
 _viz_model_for_fn = None
 _viz_model_for_loaded = False
+# dito fuer die Segmentzahl des Pixel-Rings (VIZ-53) — eigener Schalter, damit
+# ein alter Stand von app_state ohne diese Funktion nur den Ring kostet und
+# nicht die ganze Multi-Emitter-Erkennung.
+_pixel_ring_segments_fn = None
+_pixel_ring_segments_loaded = False
 
 
 def fixture_icon_for(fixture, size: int = 16) -> QIcon:
@@ -589,11 +682,19 @@ def fixture_icon_for(fixture, size: int = 16) -> QIcon:
 
     Nutzt das zentrale ``viz_model_for`` (lazy import aus src.core.app_state) —
     dieselbe Quelle wie 3D-Modell und 2D-Symbol — und liefert bei 'spider' /
-    'par_bar' / 'mover_bar' das jeweilige Icon. Bei jedem anderen Geraet (Rueckgabe
-    None) delegiert es an fixture_icon. Schlaegt der Import fehl, wird immer auf
-    das Typ-Icon zurueckgefallen — mini_icons bleibt standalone importierbar.
+    'par_bar' / 'mover_bar' / 'pixel_head' das jeweilige Icon. Bei jedem anderen
+    Geraet (Rueckgabe None) delegiert es an fixture_icon. Schlaegt der Import
+    fehl, wird immer auf das Typ-Icon zurueckgefallen — mini_icons bleibt
+    standalone importierbar.
+
+    ★ VIZ-53: 'pixel_head' fehlte in dieser Liste. Ein Pixel-Kopf ist als
+    ``moving_head`` gepatcht und bekam deshalb das gewoehnliche Moving-Head-Icon
+    — dieselbe Luecke wie in der 2D-Live-View. Seine Segmentzahl kommt aus
+    ``app_state.pixel_ring_segments``, also aus derselben Rechnung wie die
+    3D-Nutzlast; wer sie hier neu ausrechnete, haette wieder zwei Zahlen.
     """
     global _viz_model_for_fn, _viz_model_for_loaded
+    global _pixel_ring_segments_fn, _pixel_ring_segments_loaded
     if not _viz_model_for_loaded:
         _viz_model_for_loaded = True
         try:
@@ -604,6 +705,17 @@ def fixture_icon_for(fixture, size: int = 16) -> QIcon:
     try:
         if _viz_model_for_fn is not None:
             model = _viz_model_for_fn(fixture)
+            if model == "pixel_head":
+                if not _pixel_ring_segments_loaded:
+                    _pixel_ring_segments_loaded = True
+                    try:
+                        from src.core.app_state import pixel_ring_segments as _seg
+                        _pixel_ring_segments_fn = _seg
+                    except Exception:
+                        _pixel_ring_segments_fn = None
+                segmente = (_pixel_ring_segments_fn(fixture)
+                            if _pixel_ring_segments_fn is not None else 0)
+                return icon_for_kind("fx_pixel_head", size, segmente)
             if model in ("spider", "par_bar", "mover_bar"):
                 return icon_for_kind(f"fx_{model}", size)
     except Exception:

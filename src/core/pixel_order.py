@@ -153,3 +153,52 @@ def place_element(index: int, cols: int, rows: int,
     nr = max(1, int(rows or 1))
     r, c = pixel_cell(index, nc, order)
     return rotate_cell(r, c, nr, nc, rotation, flip)
+
+
+# ── FM-14 / VIZ-53: der RING eines Pixel-Kopfes ──────────────────────────────
+#
+# Ein Pixel-Moving-Head (Robe Spiider) ist EIN Kopf, dessen Lichtquelle in
+# Ring-Segmente zerlegt ist — kein Raster. Wie viele Segmente das sind, sagt
+# weder das Profil noch ein eigenes Feld: die Zahl faellt aus den Farb-BAENKEN
+# ab, abzueglich der fuehrenden Baenke, die keine Pixel sind
+# (``app_state.pixel_ring_base_banks``, CDX-55).
+#
+# ★ Diese Funktion ist die PYTHON-Fassung von ``ringSegmente`` aus
+# ``scene_src/fixtures/pixel_order.js`` — dieselbe Spiegelung wie
+# ``pixel_cell`` <-> ``pixelCell`` weiter oben, und aus demselben Grund: das
+# 3D-Modell und das 3D-Top-Down-Icon leben in JS, die 2D-Live-View und die
+# Listen-Icons in Python. Bis VIZ-53 gab es die Regel nur in JS; die 2D-Seite
+# kannte den Typ gar nicht und zeichnete ein gewoehnliches Moving-Head-Symbol.
+# ``test_viz53_pixel_head_2d.py`` haelt beide Fassungen gegeneinander.
+#
+# ★★ Die Segmentzahl ist NICHT die Bankzahl. Beim Robin Spiider im 91-Kanal-
+# Pixelmodus sind es 20 Baenke, aber 19 Segmente — Bank 0 ist die Grundfarbe
+# des Kopfes. Wer die Bankzahl zeichnet, baut den Fehler von UI-52 nach.
+
+
+def _ganzzahl(wert) -> int:
+    """``Math.floor(wert || 0)`` in Python — und ohne Ausnahme bei Unsinn."""
+    try:
+        return int(wert or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def ring_segmente(n_baenke, basis_baenke) -> tuple:
+    """``(basis, anzahl)`` — welche Farb-Baenke werden zu Ring-Segmenten?
+
+    ``basis_baenke`` = Zahl der FUEHRENDEN Baenke, die KEIN Ring-Pixel sind.
+    Segment ``i`` haengt an Bank ``i + basis``.
+
+    Ohne Bank-Angabe EIN Segment (wie im JS): ein Pixel-Kopf ohne Kopfzahl ist
+    eine unvollstaendige Nutzlast, kein Geraet ohne Pixel. Der Versatz darf nie
+    ALLE Baenke wegnehmen — ein Ring ohne Segment waere ein Pixel-Kopf, der als
+    gewoehnlicher Moving Head dasteht, also genau der Zustand vor VIZ-53. Nach
+    oben wird NICHTS gekappt (CDX-56).
+
+    Nie werfen: die Zahlen kommen aus der Kanalzaehlung eines beliebigen
+    Profils (dieselbe Politik wie ``normalize_pixel_order``).
+    """
+    baenke = max(1, _ganzzahl(n_baenke))
+    basis = min(max(0, _ganzzahl(basis_baenke)), baenke - 1)
+    return basis, baenke - basis
