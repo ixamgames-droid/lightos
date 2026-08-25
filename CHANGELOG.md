@@ -107,12 +107,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Kopfzahl eines Attributs war bisher die Zahl der Kanaele, die es tragen. An
   der `HYDRABEAM 4000 RGBW [19-Kanal]` sind das fuenf Dimmer-Kanaele — ein
   gemeinsamer Master plus je einer pro Kopf — also galt das Geraet fuer den
-  Dimmer als Fuenf-Kopf-Geraet. Ueber eine Gruppen-Zelle „Kopf 5" erschien
-  dadurch ein zweiter Dimmer-Regler, der auf **denselben** Kanal wie „Kopf 4"
-  schrieb: wer erst K4 hochzog und dann K5, sah seinen ersten Zug wortlos
-  ueberschrieben. Gezaehlt wird jetzt ueber die Kopf-Karte, die den geteilten
-  Master kennt — vier Koepfe, vier Regler. Ueber die Geraeteliste im Programmer
-  war der falsche Regler nie erreichbar, nur ueber Kopf-Zellen im Raster.
+  Dimmer als Fuenf-Kopf-Geraet. Eine Kopf-Zelle „Kopf 5" erzeugte dadurch einen
+  zweiten Dimmer-Regler, der auf **denselben** Kanal wie „Kopf 4" schrieb —
+  zwei Regler auf einem Kanal, einer davon falsch beschriftet. Gezaehlt wird
+  jetzt ueber die Kopf-Karte, die den geteilten Master kennt: vier Koepfe, vier
+  Regler.
+  **Ehrlich dazugesagt:** diese Zelle konntest du gar nicht neu anlegen. Die
+  Geraeteliste im Programmer bietet fuer dieses Profil vier Kopf-Zeilen, das
+  Gruppen-Raster teilt es ueberhaupt nicht auf (es hat nur eine faerbbare Bank),
+  und die Kommandozeile weist `1:5` ab. Der falsche Regler war also kein
+  vorgefuehrter Bedienfehler, sondern eine Absicherung dagegen.
+  **Was sich dabei auf der Buehne aendert — bitte lesen:** eine solche Zelle
+  kann trotzdem in einer gespeicherten Gruppe liegen, denn Kopf-Zellen
+  ueberleben einen Kanal-Modus-Wechsel des Geraets. Bisher trieb so eine
+  Altlast-Zelle **einen** Kopf (den letzten), jetzt nennt sie keinen gueltigen
+  Kopf mehr und faellt auf das **ganze Geraet** zurueck: statt eines Kopfes
+  gehen alle vier auf voll. Wer so eine Gruppe hat, sieht den Unterschied
+  sofort — gemessen am DMX-Ausgang ueber den echten MIDI-Weg
+  (`AltlastKopfZelleAufDemMidiWegTest`). Abhilfe: die Zelle in der Gruppe neu
+  setzen, dann steht wieder der Kopf drin, den du meinst.
 - **Ein Regler trieb Geraete an, die den Kanal gar nicht haben (FM-27).** Fuer
   ein Attribut, das ein Geraet nicht besitzt, kam „ein Kopf" zurueck statt
   „keiner". Damit blieb ein solches Geraet im Regler stehen und bekam Werte, die

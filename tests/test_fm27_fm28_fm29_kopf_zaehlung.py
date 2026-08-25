@@ -705,9 +705,9 @@ class AltlastKopfZelleAufDemMidiWegTest(_Basis):
 
 
 class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
-    """★★ Die BESTANDS-Frage, ueber die ganze echte Bibliothek gemessen.
+    """★★ Die BESTANDS-Frage, ueber die ganze Geraetebibliothek gemessen.
 
-    Die neue Zaehlung faellt fuer 41 Modi niedriger aus als die alte (FM-29,
+    Die neue Zaehlung faellt fuer manche Modi niedriger aus als die alte (FM-29,
     geteilter Master). Die Frage ist nicht „aendert sich etwas", sondern:
     **verliert dadurch eine Kopf-Zelle ihren Kopf, die der Nutzer ueberhaupt
     erzeugen kann?** Erreichbar sind die Kopf-Zeilen der Geraeteliste,
@@ -716,8 +716,19 @@ class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
 
     Der Test rechnet die ALTE Zaehlung (Vorkommen) hier woertlich nach und
     verlangt fuer jedes ``(Modus, Attribut)``-Paar: die neue Antwort darf nicht
-    unter ``min(alt, erreichbare Koepfe)`` fallen. Gemessen ueber **33.980
-    Paare in 5.122 Modi**: kein einziger Verlust.
+    unter ``min(alt, erreichbare Koepfe)`` fallen.
+
+    ★ **Der Massstab kommt aus dem Bestand, den JEDER Rechner hat.** Gemessen
+    wird alles, was in der Bibliothek liegt — geprueft wird aber gegen die
+    **mitgelieferten** Profile (``source == "builtin"``, von
+    ``ensure_builtins()`` garantiert): jeder mitgelieferte Modus muss im
+    Messbestand stecken, und der Fall, um den es geht, muss darin vorkommen —
+    die ``HYDRABEAM 4000 RGBW [19ch]``, deren ``intensity``-Antwort von 5 auf 4
+    faellt, bei vier erreichbaren Kopf-Zeilen. Auf einem Rechner mit
+    importierter Bibliothek laeuft dieselbe Rechnung ueber entsprechend mehr
+    Modi. Eine feste Zahl als Schwelle waere genau die Falle, in die dieser Test
+    schon einmal gelaufen ist: sie war auf einem Entwicklungsrechner erfuellt
+    und in der CI nicht (FM-24, QA-61).
 
     ``raw`` ist ausgenommen — dort ist der Wegfall der Kopf-Achse der ERKLAERTE
     Zweck von FM-28 (``attr_has_head_axis``), und ``FM28RawBekommtKeinenKopf
@@ -725,6 +736,9 @@ class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
 
     Nur lesend auf der Bibliothek; eine Sammelabfrage statt einer Abfrage je
     Modus, damit der Durchlauf unter zwei Sekunden bleibt."""
+
+    #: Der Fall, der diesen Waechter traegt: Kurzname, Kanalzahl, Attribut.
+    ANKER = ("HYDRA4000", 19, "intensity")
 
     def test_bibliothek_weit_keine_erreichbare_zelle_verliert_ihren_kopf(self):
         from collections import defaultdict
@@ -741,13 +755,17 @@ class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
             return n if n >= 1 else 1
 
         with Session(fdb_engine()) as s:
-            namen = {mid: f"{short} [{cc}ch] {mname}" for mid, mname, cc, short
-                     in s.execute(
-                         select(FixtureMode.id, FixtureMode.name,
-                                FixtureMode.channel_count,
-                                FixtureProfile.short_name)
-                         .join(FixtureProfile,
-                               FixtureProfile.id == FixtureMode.fixture_id)).all()}
+            namen, kennung, mitgeliefert = {}, {}, set()
+            for mid, mname, cc, short, quelle in s.execute(
+                    select(FixtureMode.id, FixtureMode.name,
+                           FixtureMode.channel_count,
+                           FixtureProfile.short_name, FixtureProfile.source)
+                    .join(FixtureProfile,
+                          FixtureProfile.id == FixtureMode.fixture_id)).all():
+                namen[mid] = f"{short} [{cc}ch] {mname}"
+                kennung[mid] = (short, int(cc))
+                if (quelle or "") == "builtin":
+                    mitgeliefert.add(mid)
             kanaele = defaultdict(list)
             for c in s.execute(select(FixtureChannel).order_by(
                     FixtureChannel.mode_id,
@@ -755,10 +773,16 @@ class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
                 kanaele[c.mode_id].append(c)
             s.expunge_all()
 
-        self.assertGreater(len(kanaele), 1000,
-                           "die Bibliothek ist leer — der Test wuerde nichts "
-                           "messen und trotzdem gruen sein")
-        verlust, paare = [], 0
+        # Die Schwelle wird nicht gesetzt, sondern abgeleitet: was
+        # ``ensure_builtins()`` mitliefert, muss auch gemessen worden sein.
+        self.assertTrue(mitgeliefert,
+                        "die Bibliothek traegt kein einziges mitgeliefertes "
+                        "Profil — der Test wuerde nichts messen und trotzdem "
+                        "gruen sein")
+        self.assertEqual(sorted(mitgeliefert - set(kanaele)), [],
+                         "mitgelieferte Modi ohne Kanaele — sie waeren "
+                         "ungemessen durchgerutscht")
+        verlust, paare, anker = [], 0, None
         for mid, chans in kanaele.items():
             erreichbar = max(int(color_head_count_for_channels(None, chans)),
                              int(move_head_count_for_channels(None, chans)))
@@ -767,13 +791,25 @@ class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
                 paare += 1
                 alt = alte_zaehlung(chans, a)
                 neu = int(attr_head_count_for_channels(None, chans, a))
+                if kennung.get(mid, ()) + (a,) == self.ANKER:
+                    anker = (alt, neu, erreichbar)
                 if neu < min(alt, erreichbar):
                     verlust.append(f"{namen.get(mid, mid)} attr={a} "
                                    f"{alt}->{neu}, erreichbar {erreichbar}")
-        self.assertGreater(paare, 10000, "zu wenige Paare geprueft")
+        self.assertIsNotNone(
+            anker, f"{self.ANKER} fehlt im gemessenen Bestand — ohne diesen "
+                   f"Fall prueft der Waechter die Absenkung gar nicht")
+        alt_a, neu_a, erreichbar_a = anker
+        self.assertGreater(alt_a, neu_a,
+                           f"{self.ANKER}: die neue Zaehlung senkt hier nichts "
+                           f"mehr ab ({alt_a}->{neu_a}) — der Waechter haette "
+                           f"nichts zu bewachen")
+        self.assertGreaterEqual(erreichbar_a, 2,
+                                f"{self.ANKER}: keine erreichbare Kopf-Zeile — "
+                                f"``min(alt, erreichbar)`` waere unbelastet")
         self.assertEqual(verlust[:10], [],
-                         f"{len(verlust)} (Modus, Attribut)-Paare verlieren "
-                         f"einen ERREICHBAREN Kopf")
+                         f"{len(verlust)} von {paare} (Modus, Attribut)-Paaren "
+                         f"verlieren einen ERREICHBAREN Kopf")
 
 
 if __name__ == "__main__":
