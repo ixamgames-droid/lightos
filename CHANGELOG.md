@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — „Ist irgendein Check rot?" ist die falsche Frage
+
+#### Hinzugefuegt
+
+- **`tools/pr_bereit.py` beantwortet die andere Frage: sind Checks tatsaechlich
+  GELAUFEN, und gilt ihr Ergebnis noch?** Die uebliche Frage uebersieht drei
+  Zustaende, die alle wie gruen aussehen und alle vorgekommen sind:
+  **nie geprueft** (zwei PRs bekamen am 24.08. fuer keinen ihrer Commits einen
+  einzigen Check-Run — die Merge-Schaltflaeche unterscheidet das nicht von
+  „alles gruen"), **gruen auf altem Stand** (die Checks liefen, `main` ist
+  seither weitergezogen; so wurde ein PR gruen gemeldet und war Minuten spaeter
+  `CONFLICTING`) und **teilweise geprueft**. Der erste Lauf ueber die fuenf
+  offenen PRs meldete **0 von 5 bereit**, jeden aus einem anderen Grund.
+- **Was dabei sonst noch auffiel:** `cancelled` und `timed_out` sind
+  Fehlschlaege, sehen in `gh pr checks` aber nicht rot aus — wer nur auf
+  `failure` prueft, merged darueber hinweg. Umgekehrt duerfen `neutral`,
+  `skipped` und `mergeable: UNKNOWN` **nicht** blockieren: sonst meldet das
+  Werkzeug bei jedem frisch gepushten PR Fehlalarm und wird umgangen.
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
