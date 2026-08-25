@@ -34,6 +34,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **`AGENTS.md` sagt es jetzt vor der ersten Runde:** Nummer nicht raten,
   Werkzeug fragen.
 
+### 2026-08-25 — „Ist irgendein Check rot?" ist die falsche Frage
+
+#### Hinzugefuegt
+
+- **`tools/pr_bereit.py` beantwortet die andere Frage: sind Checks tatsaechlich
+  GELAUFEN, und gilt ihr Ergebnis noch?** Die uebliche Frage uebersieht drei
+  Zustaende, die alle wie gruen aussehen und alle vorgekommen sind:
+  **nie geprueft** (zwei PRs bekamen am 24.08. fuer keinen ihrer Commits einen
+  einzigen Check-Run — die Merge-Schaltflaeche unterscheidet das nicht von
+  „alles gruen"), **gruen auf altem Stand** (die Checks liefen, `main` ist
+  seither weitergezogen; so wurde ein PR gruen gemeldet und war Minuten spaeter
+  `CONFLICTING`) und **teilweise geprueft**. Der erste Lauf ueber die fuenf
+  offenen PRs meldete **0 von 5 bereit**, jeden aus einem anderen Grund.
+- **„Nie geprueft" und „gerade gepusht" sehen gleich aus — und werden jetzt
+  unterschieden.** GitHub legt die Check-Runs erst ein paar Sekunden nach dem
+  Push an; am 25.08. an zwei PRs beobachtet, beide erholten sich von selbst. Ein
+  Kopf-Commit, der juenger als drei Minuten ist, wird darum nicht als „nie
+  geprueft" gemeldet. Ohne diese Unterscheidung meldet das Werkzeug bei jedem
+  Push Fehlalarm — und ein Waechter, der das tut, wird umgangen. Fehlt die
+  Zeitangabe, bleibt es beim strengen Urteil: wer die Zeit nicht kennt, darf den
+  gefaehrlichen Zustand nicht wegerklaeren.
+- **Was dabei sonst noch auffiel:** `cancelled` und `timed_out` sind
+  Fehlschlaege, sehen in `gh pr checks` aber nicht rot aus — wer nur auf
+  `failure` prueft, merged darueber hinweg. Umgekehrt duerfen `neutral`,
+  `skipped` und `mergeable: UNKNOWN` **nicht** blockieren: sonst meldet das
+  Werkzeug bei jedem frisch gepushten PR Fehlalarm und wird umgangen.
+
 ### 2026-08-25 — Der Backlog kann jetzt sagen, ob er noch stimmt
 
 #### Hinzugefuegt
