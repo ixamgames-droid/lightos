@@ -296,6 +296,7 @@ def main(argv=None) -> int:
 
     # ── 1) Spur-Probe ────────────────────────────────────────────────────────
     mit_spur = 0
+    geurteilt = 0
     for item, status, zeile in items:
         m = SPUR.search(zeile)
         if not m:
@@ -304,6 +305,14 @@ def main(argv=None) -> int:
         datei, kennzeichen = m.group(1), m.group(2)
         auf_main = spur_auf_main(datei, kennzeichen)
         klasse = status_klasse(status)
+        # ★ Ueber welche Klassen ueberhaupt geurteilt wird, entscheidet
+        # `spur_urteil`. Eine Spur an einem Item, dessen Klasse einen Freibrief
+        # hat (`teils`, `blocked`, `decision`), wird gezaehlt, aber nie
+        # beurteilt — das ist Absicht, muss aber im Bericht stehen.
+        # `status_klasse` liefert Klassennamen, nicht Leitworte — die
+        # Freibrief-Klasse heisst hier „unterwegs".
+        if klasse != "unterwegs":
+            geurteilt += 1
         urteil = spur_urteil(klasse, auf_main)
         if urteil:
             wo = f"{datei}" + (f" :: {kennzeichen}" if kennzeichen else "")
@@ -311,7 +320,16 @@ def main(argv=None) -> int:
 
     # ★ Die Abdeckung MUSS mitgemeldet werden. Ohne sie sieht „0 Beanstandungen"
     # bei null hinterlegten Spuren aus wie ein sauberer Backlog.
-    print(f"[spur]  {mit_spur} von {len(items)} Items haben eine Spur hinterlegt")
+    #
+    # ★★ Und sie muss die GEURTEILTEN nennen, nicht nur die vorhandenen Spuren:
+    # in der Gegenpruefung stand hier „19 von 478 Items haben eine Spur", waehrend
+    # nur 15 davon ueberhaupt ein Urteil bekamen — die restlichen vier lagen an
+    # Items der Freibrief-Klasse. In kleiner Form war der Fleck damit zurueck,
+    # gegen den diese Zeile gebaut ist.
+    ungeurteilt = mit_spur - geurteilt
+    print(f"[spur]  {mit_spur} von {len(items)} Items haben eine Spur — "
+          f"beurteilt: {geurteilt}"
+          + (f", ohne Urteil (Freibrief-Klasse): {ungeurteilt}" if ungeurteilt else ""))
     if mit_spur == 0:
         print("        -> es wurde NICHTS geprueft. Spuren hinterlegen:"
               " <!-- spur: datei :: kennzeichen -->")

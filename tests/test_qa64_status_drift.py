@@ -360,6 +360,12 @@ class WerkzeugEndeZuEndeTest(unittest.TestCase):
             f.write(self.KOPF + tabelle)
 
         gerufen = []
+        # ★ Aus der Gegenpruefung: `zweige_auf_origin` war fest auf `set()`
+        # gepatcht — damit schnitt der Harnisch die ZWEITE der beiden Pruefungen
+        # (die Zweig-Behauptung) ab, und der Fix dafuer war nur an der
+        # ausgelagerten Funktion gemessen, nicht auf dem Weg durch `main()`.
+        # Jetzt kann jeder Fall seine Zweigliste mitgeben.
+        self.zweige = getattr(self, "zweige", ())
 
         def falsches_git(*args):
             gerufen.append(args)
@@ -374,7 +380,8 @@ class WerkzeugEndeZuEndeTest(unittest.TestCase):
                 mock.patch.object(bsd, "_git", falsches_git), \
                 mock.patch.object(bsd, "spur_auf_main",
                                   lambda d, k: (d, k) in spuren_auf_main), \
-                mock.patch.object(bsd, "zweige_auf_origin", lambda: set()), \
+                mock.patch.object(bsd, "zweige_auf_origin",
+                                  lambda: set(self.zweige)), \
                 contextlib.redirect_stdout(puffer):
             rc = bsd.main(list(argv))
         self.gerufen = gerufen
@@ -411,7 +418,70 @@ class WerkzeugEndeZuEndeTest(unittest.TestCase):
         rc, bericht = self._lauf(tabelle, {("tools/zeitbomben_gate.py", None)})
         self.assertEqual(rc, 0, bericht)
         self.assertIn("✓ keine Drift", bericht)
-        self.assertIn("[spur]  2 von 3 Items haben eine Spur hinterlegt", bericht)
+        self.assertIn("2 von 3 Items haben eine Spur", bericht)
+        self.assertIn("beurteilt: 2", bericht)
+
+    def test_die_abdeckungszeile_nennt_die_BEURTEILTEN_nicht_nur_die_spuren(self):
+        """★ Aus der Gegenpruefung: die Zeile sagte „19 von 478 Items haben eine
+        Spur", waehrend nur 15 davon ueberhaupt ein Urteil bekamen — die
+        restlichen vier lagen an Items der Freibrief-Klasse (`teils`, `blocked`,
+        `decision`). In kleiner Form war damit genau der Fleck zurueck, gegen den
+        diese Zeile gebaut ist: eine Zahl, die mehr Pruefung behauptet, als
+        stattfindet.
+        """
+        tabelle = (
+            "| QA-63 | P2 | ✅ done (2026-08-24) | Fertig |"
+            " Text <!-- spur: tools/zeitbomben_gate.py --> |\n"
+            "| VIZ-15 | P2 | teils (Teil 1 ✅) | Halb |"
+            " Text <!-- spur: tools/zeitbomben_gate.py --> |\n"
+            "| HW-1 | P1 | blocked (Hardware) | Wartet |"
+            " Text <!-- spur: tools/zeitbomben_gate.py --> |\n")
+        rc, bericht = self._lauf(tabelle, {("tools/zeitbomben_gate.py", None)})
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("3 von 3 Items haben eine Spur", bericht)
+        self.assertIn("beurteilt: 1", bericht)
+        self.assertIn("ohne Urteil (Freibrief-Klasse): 2", bericht)
+
+    # ── Die ZWEITE Pruefung des Werkzeugs, jetzt auch end-zu-ende ──────────
+    def test_eine_neuere_zweigfassung_macht_das_werkzeug_rot(self):
+        """★ Der Codex-Befund, gemessen auf dem Weg durch ``main()``.
+
+        Vorher lief die Zweig-Behauptung nur ueber die ausgelagerte Funktion —
+        also an der Naht. Drei Mutationen im Werkzeug blieben deshalb gruen.
+        """
+        self.zweige = ("feature/ring-v3", "feature/ring-v4")
+        tabelle = ("| FM-14b | P3 | review (Umsetzung auf `feature/ring-v3`) |"
+                   " Ring | ohne Spur |\n")
+        rc, bericht = self._lauf(tabelle, set(), argv=("--strict",))
+        self.assertEqual(rc, 1, bericht)
+        self.assertIn("neuere Fassung", bericht)
+        self.assertIn("feature/ring-v4", bericht)
+
+    def test_ein_genannter_zweig_der_gar_nicht_existiert_macht_rot(self):
+        self.zweige = ("feature/etwas-anderes",)
+        tabelle = ("| FM-14b | P3 | review (Umsetzung auf `feature/weg`) |"
+                   " Ring | ohne Spur |\n")
+        rc, bericht = self._lauf(tabelle, set(), argv=("--strict",))
+        self.assertEqual(rc, 1, bericht)
+        self.assertIn("existiert auf origin nicht", bericht)
+
+    def test_der_neueste_zweig_wird_NICHT_beanstandet(self):
+        # Positivkontrolle: sonst meldete das Werkzeug bei jedem Item mit
+        # Zweig-Angabe, und niemand traegt sie mehr ein.
+        self.zweige = ("feature/ring-v3",)
+        tabelle = ("| FM-14b | P3 | review (Umsetzung auf `feature/ring-v3`) |"
+                   " Ring | ohne Spur |\n")
+        rc, bericht = self._lauf(tabelle, set(), argv=("--strict",))
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("✓ keine Drift", bericht)
+
+    def test_ohne_freibrief_items_steht_kein_zusatz_in_der_zeile(self):
+        # Positivkontrolle: der Normalfall soll die Zeile nicht laenger machen.
+        tabelle = ("| QA-63 | P2 | ✅ done (2026-08-24) | Fertig |"
+                   " Text <!-- spur: tools/zeitbomben_gate.py --> |\n")
+        _rc, bericht = self._lauf(tabelle, {("tools/zeitbomben_gate.py", None)})
+        self.assertIn("beurteilt: 1", bericht)
+        self.assertNotIn("Freibrief-Klasse", bericht)
 
     def test_ein_teils_item_mit_haken_im_text_wird_nicht_beanstandet(self):
         """★ CDX-57 am ECHTEN Weg: sieben `teils`-Items nennen ein `✅` im
