@@ -118,12 +118,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   und die Kommandozeile weist `1:5` ab. Der falsche Regler war also kein
   vorgefuehrter Bedienfehler, sondern eine Absicherung dagegen.
   **Was sich dabei auf der Buehne aendert — bitte lesen:** eine solche Zelle
-  kann trotzdem in einer gespeicherten Gruppe liegen, denn Kopf-Zellen
-  ueberleben einen Kanal-Modus-Wechsel des Geraets. Bisher trieb so eine
-  Altlast-Zelle **einen** Kopf (den letzten), jetzt nennt sie keinen gueltigen
-  Kopf mehr und faellt auf das **ganze Geraet** zurueck: statt eines Kopfes
-  gehen alle vier auf voll. Wer so eine Gruppe hat, sieht den Unterschied
-  sofort — gemessen am DMX-Ausgang ueber den echten MIDI-Weg
+  kann trotzdem in einer gespeicherten Gruppe liegen — dann naemlich, wenn das
+  Geraet auf ein **anderes Profil** umgepatcht wurde und vorher mehr Koepfe
+  hatte; `update_fixture` raeumt die Auto-Gruppe nicht auf. (Ein blosser
+  Kanal-Modus-WECHSEL reicht dafuer nicht: kein Modus der HYDRABEAM erzeugt je
+  einen Kopf-Index ueber 3 — nachgemessen an allen fuenf Modi.) Bisher trieb so
+  eine Altlast-Zelle **einen** Kopf (den letzten), jetzt nennt sie keinen
+  gueltigen Kopf mehr und faellt auf das **ganze Geraet** zurueck: statt eines
+  Kopfes gehen alle vier auf voll. Wer so eine Gruppe hat, sieht den
+  Unterschied sofort — gemessen am DMX-Ausgang ueber den echten MIDI-Weg
   (`AltlastKopfZelleAufDemMidiWegTest`). Abhilfe: die Zelle in der Gruppe neu
   setzen, dann steht wieder der Kopf drin, den du meinst.
 - **Ein Regler trieb Geraete an, die den Kanal gar nicht haben (FM-27).** Fuer

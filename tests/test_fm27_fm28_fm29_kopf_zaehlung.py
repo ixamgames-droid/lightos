@@ -26,7 +26,7 @@ Was daraus in der Oberflaeche wurde, ist am gebauten Regler gemessen:
   (``_head_row_count`` = 4), das Gruppen-Raster teilt erst ab zwei Farbbaenken
   auf (die Hydrabeam 19ch hat eine), und die Kommandozeile weist ``1:5`` ab.
   Erreichbar wird sie als **Altlast**: Kopf-Zellen ueberleben einen
-  Kanal-Modus-Wechsel. Was sie dann auf der Buehne tut, misst
+  Profil-Wechsel. Was sie dann auf der Buehne tut, misst
   ``AltlastKopfZelleAufDemMidiWegTest`` am echten MIDI-Weg — und dass keine
   ERREICHBARE Zelle durch die neue Zaehlung ihren Kopf verliert, misst
   ``KeineErreichbareKopfZelleVerliertIhrenKopfTest`` ueber die ganze Bibliothek.
@@ -248,7 +248,7 @@ class FM29ZweiReglerAufEinemKanalTest(_Basis):
     Raster teilt dieses Profil nicht auf, die Kommandozeile weist ``1:5`` ab.
     Gemessen wird also die ZAEHLUNG und ihre Wirkung auf den Regler-Bau, nicht
     ein erreichbarer Nutzerschaden; die Zelle entsteht in der Praxis als
-    Altlast eines Kanal-Modus-Wechsels. Deren Buehnenwirkung misst
+    Altlast eines Profil-Wechsels. Deren Buehnenwirkung misst
     ``AltlastKopfZelleAufDemMidiWegTest`` am echten MIDI-Weg."""
 
     def _dimmer_regler(self, cells) -> dict:
@@ -620,8 +620,17 @@ class AltlastKopfZelleAufDemMidiWegTest(_Basis):
     Die Zelle ``1:4`` einer ``HYDRABEAM 19ch`` ist ueber die Oberflaeche nicht
     erzeugbar (die Geraeteliste bietet 4 Kopf-Zeilen, die Kommandozeile weist
     ``1:5`` ab). Sie kann aber als **Altlast** in einer gespeicherten Gruppe
-    stehen: Kopf-Zellen ueberleben einen Kanal-Modus-Wechsel, ``update_fixture``
-    raeumt die Auto-Gruppe nicht auf (s. ``validate_head_restrictions``).
+    stehen — dann naemlich, wenn das Geraet auf ein ANDERES Profil umgepatcht
+    wurde und vorher mehr Koepfe hatte; ``update_fixture`` raeumt die
+    Auto-Gruppe nicht auf (s. ``validate_head_restrictions``).
+
+    ★ Ein blosser Kanal-Modus-Wechsel reicht dafuer NICHT, und der erste
+    Entwurf dieses Docstrings behauptete es trotzdem. An allen fuenf Modi der
+    HYDRABEAM nachgemessen: ``color_r`` ist 0/0/1/1/4, und
+    ``create_head_matrix_group`` legt die Zellen ueber ``color_head_count`` an —
+    der hoechste je erzeugbare Kopf-Index ist damit 3. Die Zelle ``1:4``
+    entsteht erst, wenn ein Geraet mit MEHR Farbkoepfen auf dieses Profil
+    umgepatcht wird.
 
     Vorher schrieb dieselbe Zelle ueber ``intensity#4`` auf CH18 „Kopf 4 Dimmer"
     — also auf den Kanal, den der Regler „K4" schon hatte. Jetzt greift die
