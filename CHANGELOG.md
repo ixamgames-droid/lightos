@@ -37,6 +37,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Nummer ausgegeben und mit 2 beendet. Eine Nummer aus lueckenhafter Abdeckung
   ist schlimmer als keine — sie sieht aus wie eine Auskunft.
 
+### 2026-08-25 — Return legt kein halbes Fixture-Profil mehr an
+
+#### Behoben
+
+- **`Return` in einem Eingabefeld speichert nicht mehr sofort das ganze
+  Fixture-Profil** (FM-30). Beide Profil-Dialoge — der einfache Fixture-Editor
+  und der Fixture-Generator — hatten ueber ihre `QDialogButtonBox` einen
+  Standardknopf am Speichern; ein `Return` in IRGENDEINEM Feld loeste ihn aus.
+  Gemessen im Generator: eine getippte Rasterzahl plus Return legte ein halb
+  eingegebenes Profil in der Bibliothek an (Raster `4x0`, Weiss-Leiste `0x0`)
+  und schloss den Dialog — ohne Warnung. Im Generator wog das schwerer, weil er
+  ein bestehendes Profil nicht wieder oeffnen kann: die Fehlangabe blieb stehen,
+  und ein zweiter Anlauf legte ein zweites Profil mit demselben Kurznamen an.
+  Gespeichert wird jetzt nur noch ueber den Speichern-Knopf selbst — per Mausklick
+  oder mit `Return`, waehrend der Knopf den Fokus hat; `Escape` schliesst den
+  Dialog unveraendert. Ebenfalls unveraendert: `Return` in einem offenen
+  Zellen-Editor der Kanaltabelle uebernimmt weiterhin nur diese Zelle.
+
+- **Nachtrag aus der Gegenpruefung:** die Bedingung bildet jetzt die von
+  `QDialog::keyPressEvent` NACH, statt sie zu raten. Die erste Fassung verglich
+  `e.modifiers()` per **Gleichheit** gegen `KeypadModifier`; ein
+  Ziffernblock-Enter, bei dem Qt noch ein weiteres Flag meldet, fiel dadurch
+  durch, landete in `super()` und klickte den Standardknopf — der Fehler waere
+  zurueck gewesen. Qt fragt `modifiers() & KeypadModifier`, nicht `==`.
+
 ### 2026-08-25 — Neun gelandete Items standen auf `review`, der Waechter schwieg
 
 #### Behoben
