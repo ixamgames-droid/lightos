@@ -33,6 +33,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Die neun Zeilen im `BACKLOG.md` sind nachgezogen** — je mit der echten
   PR-Nummer; wo das Item selbst einen Rest nennt (PROC-03, PROC-04, PROC-06,
   QA-64), steht `✅ teils` statt `✅ done` und der Restsatz bleibt.
+- **Der Status wird jetzt am LEITWORT gelesen, nicht an der ganzen Zelle**
+  (von Codex gefunden). `any(k in s for k in ("done", "✅"))` stufte jede Zelle
+  als erledigt ein, die irgendwo einen Haken fuer einen fertigen TEILschritt
+  nennt — gemessen **sieben** Items (VIZ-15, VIZ-PERF2, VIZ-BEAM-OCCLUSION,
+  FM-20, FM-13, XPLAT-19, DOC-10). Dieselbe Bauart las umgekehrt
+  `teils (2026-07-09)` ohne Haken (QA-LIVE, LAS-08) als „unterwegs": zwei
+  Zellen mit derselben Aussage, zwei verschiedene Urteile.
+- **Die `-vN`-Nachfolgersuche findet jetzt die naechste Fassung** (von Codex
+  gefunden). `x.startswith(b + "-v")` suchte bei `…-v3` nach `…-v3-v…`; genau
+  ein `-v4` fiel durch — der einzige Fall, der zaehlt. Verglichen wird der
+  Stamm, die Nummer numerisch (sonst sortiert `-v10` vor `-v9`).
+- **Ein fehlgeschlagenes `git fetch` bricht jetzt ab** statt folgenlos zu
+  bleiben (*fail closed*, Exit 2 mit Begruendung — dieselbe Behandlung wie in
+  `tools/backlog_ids.py`). Mit veralteten Refs meldet der Waechter eine gerade
+  gelandete Spur als „fehlt", also einen Fehlalarm genau gegen die Items, die
+  eben durchgegangen sind. `--kein-fetch` faehrt bewusst auf dem geholten Stand.
+- **FM-27 und FM-28 nachgezogen:** beide standen seit dem Merge von #663 auf
+  `review (nicht gemerged)`, obwohl der PR gelandet ist. Der Waechter sah sie
+  nicht, weil ihre Zeilen keine Spur trugen — jetzt tragen sie eine.
+
+#### Tests
+
+- **Der Waechter wird jetzt auf seinem ECHTEN Weg gemessen:**
+  `tests/test_qa64_status_drift.py` faehrt `main(["--strict"])` gegen eine
+  temporaere BACKLOG-Tabelle und prueft **Exit-Code und Berichtszeile**, nicht
+  nur den Rueckgabewert einer inneren Funktion. Bis dahin riefen alle Faelle
+  `spur_urteil`/`status_klasse` direkt: haengt man in die Spur-Schleife von
+  `main()` ein `if klasse == "review": continue`, blieben alle 26 gruen und das
+  Werkzeug meldete „keine Drift" mit Exit 0. Ersetzt sind nur die Naehte zum
+  Netz (`_git`, `spur_auf_main`, `zweige_auf_origin`) — damit laeuft die Probe
+  auch in der CI, wo es keine Refs gibt.
+- **Die Leerlauf-Wache war invertiert und ist entschaerft.** Sie verlangte
+  `assertGreater(len(review), 0)` ueber den echten `BACKLOG.md` — und wurde
+  damit von genau dem Zustand rot gemacht, den QA-65 herstellen will: kein Item
+  mehr faelschlich auf `review`. Sie haengt jetzt an einer Eigenschaft des
+  Werkzeugs: gibt es `review`-Items, muessen sie so gelesen werden; gibt es
+  keine, ist nichts zu pruefen.
 
 
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer

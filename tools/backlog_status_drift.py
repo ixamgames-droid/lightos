@@ -86,6 +86,11 @@ Aufruf::
 
     ./venv/bin/python tools/backlog_status_drift.py           # Bericht
     ./venv/bin/python tools/backlog_status_drift.py --strict  # Exit 1 bei Drift
+
+Es wird zuvor ``git fetch`` gefahren; schlaegt das fehl, bricht das Werkzeug mit
+Exit 2 ab (*fail closed*, wie ``tools/backlog_ids.py``) — mit veralteten Refs
+meldet es eine gerade gelandete Spur als „fehlt". ``--kein-fetch`` faehrt bewusst
+auf dem zuletzt geholten Stand.
 """
 from __future__ import annotations
 
@@ -103,12 +108,28 @@ SPUR = re.compile(r"<!--\s*spur:\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
 # Nur was der STATUS behauptet — nicht jeder Backtick in der Beschreibung.
 ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
 
-ERLEDIGT = ("done", "✅")
+# ★★ Das LEITWORT entscheidet, nicht die ganze Zelle (CDX-57, von Codex
+# gefunden). Die erste Fassung fragte `any(k in s for k in ("done", "✅"))` —
+# und stufte damit jede Zelle als erledigt ein, die IRGENDWO einen Haken nennt.
+# Gemessen auf `main` 28e137f2: **sieben** Items stehen auf `teils` und nennen
+# im Fliesstext ein `✅` fuer einen fertigen TEILschritt (VIZ-15, VIZ-PERF2,
+# VIZ-BEAM-OCCLUSION, FM-20, FM-13, XPLAT-19, DOC-10). Sobald eines davon eine
+# Spur bekommt, verlangt der Waechter sie faelschlich auf `main`. Dieselbe
+# Bauart las umgekehrt `teils (2026-07-09)` OHNE Haken (QA-LIVE, LAS-08) als
+# „unterwegs" — zwei Zellen mit derselben Aussage, zwei verschiedene Klassen.
+_LEITWORT = re.compile(r"^(?P<vor>[^0-9A-Za-zÄÖÜäöüß]*)(?P<wort>[0-9A-Za-zÄÖÜäöüß/]*)")
+
+ERLEDIGT = ("done",)
 OFFEN = ("todo",)
 # ★ QA-65: `review` ist KEIN beliebiges „unterwegs" — der Status behauptet
 # ausdruecklich, die Arbeit liege in einem PR und sei NICHT gelandet. Steht die
 # Spur trotzdem auf `main`, widerspricht der Status sich selbst.
 REVIEW = ("review",)
+# ★ Diese Leitworte behaupten NICHTS ueber `main` — beide Spur-Zustaende sind
+# richtig. Sie stehen namentlich hier und nicht im Default, weil ein Haken VOR
+# dem Leitwort sie sonst nach „erledigt" zoege: `✅ teils (…)` ist teils, nicht
+# fertig. Genau diese Verwechslung ist oben gemessen.
+FREIBRIEF = ("teils", "blocked", "decision", "n/a")
 
 REVIEW_SPUR_AUF_MAIN = ("Status sagt review, aber die Spur steht schon auf main"
                         " — der PR ist gelandet, nur der Status wurde nie"
@@ -139,16 +160,31 @@ def zeilen_mit_items(text: str) -> list[tuple[str, str, str]]:
     return treffer
 
 
+def leitwort(status: str) -> tuple[str, str]:
+    """``(Auszeichnung davor, Leitwort)`` — das erste WORT der Status-Zelle.
+
+    ``"✅ done (2026-08-24)"`` -> ``("✅ ", "done")``,
+    ``"⛔ n/a — kein Fund"`` -> ``("⛔ ", "n/a")``.
+    """
+    m = _LEITWORT.match(status.strip())
+    return m.group("vor"), m.group("wort").lower()
+
+
 def status_klasse(status: str) -> str:
-    s = status.lower()
-    if any(k in s for k in ERLEDIGT):
+    vor, wort = leitwort(status)
+    if wort in ERLEDIGT:
         return "erledigt"
-    if any(s.startswith(k) for k in OFFEN):
+    if wort in OFFEN:
         return "offen"
-    # ★ `startswith` wie bei OFFEN: ein Status „done (Rest ging in review)" darf
-    # nicht in dieser Klasse landen — er ist erledigt und oben schon gefangen.
-    if any(s.startswith(k) for k in REVIEW):
+    if wort in REVIEW:
         return "review"
+    if wort in FREIBRIEF:
+        return "unterwegs"
+    # Ein Haken VOR dem Leitwort heisst erledigt, auch wenn das Wort selbst
+    # unbekannt ist (`✅ verifiziert → 🎨 Design`). Ein Haken IM Fliesstext
+    # heisst es nicht — das ist der ganze Unterschied zur alten Fassung.
+    if "✅" in vor:
+        return "erledigt"
     return "unterwegs"
 
 
@@ -196,11 +232,55 @@ def zweige_auf_origin() -> set[str]:
     return {l.split("refs/heads/")[1] for l in out.splitlines() if "refs/heads/" in l}
 
 
+# ``feature/fm14b-ring-bedienung-v3`` -> ``("feature/fm14b-ring-bedienung", 3)``
+_VERSION = re.compile(r"^(?P<stamm>.+)-v(?P<nr>\d+)$")
+
+
+def stamm_und_version(zweig: str) -> tuple[str, int]:
+    """Zweigname ohne ``-vN`` plus die Nummer (ohne Suffix: Fassung 1)."""
+    m = _VERSION.match(zweig)
+    return (m.group("stamm"), int(m.group("nr"))) if m else (zweig, 1)
+
+
+def neuere_fassungen(zweig: str, zweige) -> list[str]:
+    """Zweige mit demselben Stamm und HOEHERER Nummer, aufsteigend.
+
+    ★★ CDX-57, von Codex gefunden: die erste Fassung suchte
+    ``x.startswith(b + "-v")`` — bei ``…-v3`` also nach ``…-v3-v…``. Genau die
+    naechste Fassung (``…-v4``) fiel damit durch, und das ist der einzige Fall,
+    der zaehlt: FM-14b zeigte am 25.08. auf ``-v1``, waehrend ``-v3`` die Arbeit
+    trug. Verglichen wird deshalb der STAMM, und die Nummer NUMERISCH — sonst
+    sortiert ``-v10`` vor ``-v9``.
+    """
+    stamm, nr = stamm_und_version(zweig)
+    treffer = []
+    for x in zweige:
+        x_stamm, x_nr = stamm_und_version(x)
+        if x_stamm == stamm and x_nr > nr:
+            treffer.append((x_nr, x))
+    return [x for _nr, x in sorted(treffer)]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--strict", action="store_true",
                     help="Exit 1, wenn eine Drift gefunden wurde")
+    ap.add_argument("--kein-fetch", action="store_true",
+                    help="nicht vorher `git fetch` — dann gilt der zuletzt geholte Stand")
     args = ap.parse_args(argv)
+
+    if not args.kein_fetch:
+        rc, _ = _git("fetch", "--quiet", "--prune", "origin")
+        if rc != 0:
+            # ★ CDX-57: fail closed, gleiche Behandlung wie in
+            # `tools/backlog_ids.py` (#670). Mit veralteten Refs meldet dieses
+            # Werkzeug eine gerade GELANDETE Spur als „fehlt" — also einen
+            # Fehlalarm genau gegen die Items, die eben durchgegangen sind. Ein
+            # Waechter, der das still tut, wird abgeschaltet.
+            print("FEHLER: `git fetch` fehlgeschlagen — mit veralteten Refs waere "
+                  "jedes Urteil hier wertlos. Netz/Zugang pruefen, oder bewusst "
+                  "mit --kein-fetch fahren.")
+            return 2
 
     with open(BACKLOG, encoding="utf-8") as f:
         text = f.read()
@@ -251,7 +331,7 @@ def main(argv=None) -> int:
             if b not in zweige:
                 beanstandet.append(f"{item}: nennt Zweig '{b}' — der existiert auf origin nicht")
                 continue
-            neuer = sorted(x for x in zweige if x.startswith(b + "-v"))
+            neuer = neuere_fassungen(b, zweige)
             if neuer:
                 beanstandet.append(
                     f"{item}: nennt Zweig '{b}', aber es gibt eine neuere Fassung: {', '.join(neuer)}")

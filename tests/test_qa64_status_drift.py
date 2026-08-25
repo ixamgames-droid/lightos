@@ -29,16 +29,22 @@ Waeren sie in der Hauptschleife verwoben, koennte dieser Test nur den Aufruf
 nachbilden — und pruefte dann seine eigene Nachbildung statt des Produktionscodes
 (QA-52).
 """
+import contextlib
+import io
 import os
+import shutil
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
+import backlog_status_drift as bsd          # noqa: E402
 from backlog_status_drift import (          # noqa: E402
-    REVIEW_SPUR_AUF_MAIN, SPUR, ZWEIG, spur_urteil, status_klasse,
-    zeilen_mit_items)
+    REVIEW_SPUR_AUF_MAIN, SPUR, ZWEIG, neuere_fassungen, spur_urteil,
+    status_klasse, zeilen_mit_items)
 
 
 TABELLE = """
@@ -69,9 +75,35 @@ class ZeilenTest(unittest.TestCase):
 
 class StatusKlasseTest(unittest.TestCase):
     def test_erledigt(self):
-        for s in ("✅ done (2026-08-24)", "done", "✅ teils (2026-08-11)",
-                  "done → Archiv"):
+        for s in ("✅ done (2026-08-24)", "done", "done → Archiv",
+                  # Ein Haken VOR einem unbekannten Leitwort zaehlt weiter.
+                  "✅ verifiziert → 🎨 Design"):
             self.assertEqual(status_klasse(s), "erledigt", s)
+
+    def test_ein_haken_im_fliesstext_macht_teils_nicht_fertig(self):
+        """★★ CDX-57, von Codex gefunden — der Grund fuer das Leitwort.
+
+        Die erste Fassung fragte ``any(k in s for k in ("done", "✅"))``. Jede
+        Zelle, die IRGENDWO einen Haken fuer einen fertigen TEILschritt nennt,
+        galt damit als erledigt. Gemessen auf `main` 28e137f2: sieben Items
+        stehen so da (VIZ-15, VIZ-PERF2, VIZ-BEAM-OCCLUSION, FM-20, FM-13,
+        XPLAT-19, DOC-10). Sobald eines eine Spur bekaeme, verlangte der
+        Waechter sie faelschlich auf `main`.
+        """
+        for s in (
+                "teils (**Kegel-Laengs-Falloff ✅ 2026-08-05**; Bloom offen)",
+                "teils — **Teil 1 ✅ done (2026-08-05)**: Rest offen",
+                "teils (Diagnose ✅ 2026-08-05; Ursache weiter offen)",
+                "✅ teils (2026-08-11)"):
+            self.assertEqual(status_klasse(s), "unterwegs", s)
+
+    def test_dieselbe_aussage_bekommt_dieselbe_klasse(self):
+        """★ Die zweite Form, die Codex fand: `teils` OHNE Haken (QA-LIVE,
+        LAS-08) landete in einer ANDEREN Klasse als `✅ teils` — zwei Zellen mit
+        derselben Aussage, zwei verschiedene Urteile.
+        """
+        self.assertEqual(status_klasse("teils (2026-07-09)"),
+                         status_klasse("✅ teils (2026-07-09)"))
 
     def test_offen(self):
         self.assertEqual(status_klasse("todo"), "offen")
@@ -97,7 +129,7 @@ class StatusKlasseTest(unittest.TestCase):
         # sonst wuerde ausgerechnet ein FERTIGES Item beanstandet.
         self.assertEqual(status_klasse("✅ done (Rest ging in review)"),
                          "erledigt")
-        self.assertEqual(status_klasse("✅ teils (2026-08-25, [#664](…))"),
+        self.assertEqual(status_klasse("done (2026-08-25, review folgt)"),
                          "erledigt")
 
     def test_todo_als_teil_eines_wortes_zaehlt_nicht_als_offen(self):
@@ -223,19 +255,22 @@ class EchterBacklogTest(unittest.TestCase):
         self.assertGreater(gefunden, 0, "kein erledigtes Item mit Spur gefunden")
         self.assertEqual(fehlend, [], f"Spuren ohne Datei: {fehlend}")
 
-    def test_es_gibt_ueberhaupt_review_items_und_sie_werden_so_gelesen(self):
-        """Wache gegen Leerlauf fuer die QA-65-Regel.
+    def test_review_items_im_echten_backlog_werden_als_review_gelesen(self):
+        """Die QA-65-Klasse am echten Backlog — ohne Zeitbombe.
 
-        Die Regel kann nur greifen, wenn ``status_klasse`` im ECHTEN Backlog
-        auch wirklich ``review`` zurueckgibt. Die Schwelle ist abgeleitet, nicht
-        gesetzt: es genuegt, dass es die Klasse ueberhaupt gibt — wie viele
-        Items gerade in einem PR liegen, schwankt taeglich.
+        ★★ **Die erste Fassung war invertiert** und stand als Zeitbombe ohne
+        Datum: sie verlangte ``assertGreater(len(review), 0)`` und wurde damit
+        ausgerechnet von dem Zustand rot gemacht, den QA-65 herstellen will —
+        kein Item mehr faelschlich auf ``review``. Der GESUNDE Fall darf nicht
+        beanstandet werden. Die Wache haengt deshalb jetzt an einer Eigenschaft
+        des WERKZEUGS, nicht am Aufraeumgrad des Backlogs: gibt es
+        ``review``-Items, muessen sie so gelesen werden; gibt es keine, ist
+        nichts zu pruefen. Dass die Klasse ueberhaupt existiert, nagelt
+        ``StatusKlasseTest`` an Nachbildungen fest — dafuer braucht es den
+        echten Backlog nicht.
         """
         review = [(i, s) for i, s, _z in self.items
                   if status_klasse(s) == "review"]
-        self.assertGreater(len(review), 0,
-                           "kein Item auf `review` — dann prueft die QA-65-Regel"
-                           " im echten Backlog nichts")
         for item, status in review:
             self.assertTrue(status.lower().startswith("review"), f"{item}: {status}")
             self.assertNotIn("✅", status, f"{item}: erledigt UND review?")
@@ -257,6 +292,159 @@ class EchterBacklogTest(unittest.TestCase):
             if not os.path.isdir(ordner):
                 schlecht.append(f"{item} -> {m.group(1)}")
         self.assertEqual(schlecht, [], f"Spuren in unbekanntem Verzeichnis: {schlecht}")
+
+
+class NeuereFassungTest(unittest.TestCase):
+    """★★ CDX-57, von Codex gefunden: die ``-vN``-Suche uebersah die naechste
+    Fassung. ``x.startswith(b + "-v")`` sucht bei ``…-v3`` nach ``…-v3-v…`` —
+    ein ``-v4`` faellt durch, und genau das ist der Fall, der zaehlt.
+    """
+
+    ZWEIGE = {"feature/ring", "feature/ring-v2", "feature/ring-v3",
+              "feature/ring-v4", "feature/ring-v10", "feature/anderes-v9"}
+
+    def test_findet_die_naechste_fassung_einer_vN_behauptung(self):
+        self.assertEqual(neuere_fassungen("feature/ring-v3", self.ZWEIGE),
+                         ["feature/ring-v4", "feature/ring-v10"])
+
+    def test_ohne_suffix_ist_fassung_1(self):
+        self.assertEqual(neuere_fassungen("feature/ring", self.ZWEIGE),
+                         ["feature/ring-v2", "feature/ring-v3",
+                          "feature/ring-v4", "feature/ring-v10"])
+
+    def test_numerisch_sortiert_nicht_alphabetisch(self):
+        # Alphabetisch stuende `-v10` vor `-v2`; die Meldung nennt dann die
+        # falsche „neueste" Fassung.
+        self.assertEqual(neuere_fassungen("feature/ring-v9", self.ZWEIGE),
+                         ["feature/ring-v10"])
+
+    def test_ein_fremder_stamm_ist_keine_neuere_fassung(self):
+        self.assertEqual(neuere_fassungen("feature/anderes-v9", self.ZWEIGE), [])
+
+    def test_die_juengste_fassung_hat_keine_juengere(self):
+        # Positivkontrolle: der GESUNDE Fall darf nicht beanstandet werden.
+        self.assertEqual(neuere_fassungen("feature/ring-v10", self.ZWEIGE), [])
+
+
+class WerkzeugEndeZuEndeTest(unittest.TestCase):
+    """★★ Der ECHTE Weg: ``main(["--strict"])``, gemessen an Exit-Code und Bericht.
+
+    Alle Regeltests darueber rufen ``spur_urteil``/``status_klasse`` direkt. Das
+    laesst ``main()`` selbst ungeprueft — und der Pruefer hat vorgefuehrt, was
+    das kostet: haengt man in die Spur-Schleife von ``main()``, direkt nach
+    ``klasse = status_klasse(status)``, ein ``if klasse == "review": continue``
+    (also den QA-65-Fehler eine Ebene tiefer), bleiben die Regeltests gruen und
+    das Werkzeug meldet „keine Drift" mit Exit 0.
+
+    Der Griff nach dem echten Repo ist ersetzt, nicht die Logik: ``BACKLOG``
+    zeigt auf eine temporaere Tabelle, ``_git``/``spur_auf_main``/
+    ``zweige_auf_origin`` sind die Naht zum Netz. Alles dazwischen — Einlesen,
+    Klassifizieren, Urteilen, Berichten, Exit-Code — ist der Produktionscode.
+    Damit laeuft diese Probe auch in der CI, wo es keine Refs gibt.
+    """
+
+    KOPF = ("| ID | Prio | Status | Titel | Details |\n"
+            "|---|---|---|---|---|\n")
+    SPUR_TXT = "tools/backlog_status_drift.py :: REVIEW_SPUR_AUF_MAIN"
+    SPUR_KEY = ("tools/backlog_status_drift.py", "REVIEW_SPUR_AUF_MAIN")
+    GELANDET = (
+        "| QA-65 | P2 | review (PR [#668](https://example/pull/668)) | Waechter"
+        " | Text <!-- spur: " + SPUR_TXT + " --> |\n")
+
+    def _lauf(self, tabelle, spuren_auf_main, fetch_rc=0, argv=("--strict",)):
+        """Faehrt das Werkzeug wie die Kommandozeile. ``(Exit-Code, Bericht)``."""
+        verz = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, verz)
+        pfad = os.path.join(verz, "BACKLOG.md")
+        with open(pfad, "w", encoding="utf-8") as f:
+            f.write(self.KOPF + tabelle)
+
+        gerufen = []
+
+        def falsches_git(*args):
+            gerufen.append(args)
+            if args[:1] == ("fetch",):
+                return fetch_rc, ""
+            if args[:1] == ("rev-parse",):
+                return 0, "0123456789abcdef\n"
+            raise AssertionError(f"unerwarteter git-Aufruf: {args}")
+
+        puffer = io.StringIO()
+        with mock.patch.object(bsd, "BACKLOG", pfad), \
+                mock.patch.object(bsd, "_git", falsches_git), \
+                mock.patch.object(bsd, "spur_auf_main",
+                                  lambda d, k: (d, k) in spuren_auf_main), \
+                mock.patch.object(bsd, "zweige_auf_origin", lambda: set()), \
+                contextlib.redirect_stdout(puffer):
+            rc = bsd.main(list(argv))
+        self.gerufen = gerufen
+        return rc, puffer.getvalue()
+
+    # ── Die Abnahmebedingung von QA-65, am Werkzeug gemessen ────────────────
+    def test_gelandetes_item_auf_review_macht_das_werkzeug_rot(self):
+        rc, bericht = self._lauf(self.GELANDET, {self.SPUR_KEY})
+        self.assertEqual(rc, 1, bericht)
+        self.assertIn("1 Drift(s)", bericht)
+        self.assertIn("QA-65: " + REVIEW_SPUR_AUF_MAIN, bericht)
+        self.assertIn(self.SPUR_TXT, bericht)
+        self.assertNotIn("keine Drift", bericht)
+
+    def test_ohne_strict_bleibt_der_exit_code_0_der_fund_steht_trotzdem(self):
+        # Der Bericht ist der Standardlauf; erst `--strict` macht daraus ein Gate.
+        rc, bericht = self._lauf(self.GELANDET, {self.SPUR_KEY}, argv=())
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("QA-65: " + REVIEW_SPUR_AUF_MAIN, bericht)
+
+    # ── Positivkontrolle: der GESUNDE Backlog darf nicht rot werden ─────────
+    def test_laufendes_review_item_ohne_spur_auf_main_ist_keine_drift(self):
+        rc, bericht = self._lauf(self.GELANDET, set())
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("✓ keine Drift", bericht)
+
+    def test_sauberer_backlog_meldet_nichts_und_nennt_die_abdeckung(self):
+        tabelle = (
+            "| QA-63 | P2 | ✅ done (2026-08-24) | Fertig |"
+            " Text <!-- spur: tools/zeitbomben_gate.py --> |\n"
+            "| FM-30 | P2 | todo | Offen |"
+            " Text <!-- spur: src/ui/widgets/fixture_generator.py :: grid_rows --> |\n"
+            "| HW-1 | P1 | blocked (Hardware) | Wartet | ohne Spur |\n")
+        rc, bericht = self._lauf(tabelle, {("tools/zeitbomben_gate.py", None)})
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("✓ keine Drift", bericht)
+        self.assertIn("[spur]  2 von 3 Items haben eine Spur hinterlegt", bericht)
+
+    def test_ein_teils_item_mit_haken_im_text_wird_nicht_beanstandet(self):
+        """★ CDX-57 am ECHTEN Weg: sieben `teils`-Items nennen ein `✅` im
+        Fliesstext. Galten sie als erledigt, verlangte das Werkzeug ihre Spur
+        auf `main` — hier liegt sie NICHT dort, und trotzdem ist das kein Fund.
+        """
+        tabelle = ("| VIZ-15 | P2 | teils (Falloff ✅ 2026-08-05; Bloom offen)"
+                   " | Teilweise | Text <!-- spur: src/core/viz/beam.py --> |\n")
+        rc, bericht = self._lauf(tabelle, set())
+        self.assertEqual(rc, 0, bericht)
+        self.assertIn("✓ keine Drift", bericht)
+
+    # ── CDX-57: ein fehlgeschlagenes `git fetch` bleibt nicht folgenlos ─────
+    def test_fehlgeschlagenes_fetch_bricht_ab_statt_zu_urteilen(self):
+        """*Fail closed*, gleiche Behandlung wie `tools/backlog_ids.py` (#670).
+
+        Mit veralteten Refs meldet das Werkzeug eine gerade GELANDETE Spur als
+        „fehlt" — ein Fehlalarm genau gegen die Items, die eben durchgegangen
+        sind. Vorher blieb der Fehlschlag folgenlos.
+        """
+        rc, bericht = self._lauf(self.GELANDET, {self.SPUR_KEY}, fetch_rc=1)
+        self.assertEqual(rc, 2, bericht)
+        self.assertIn("`git fetch` fehlgeschlagen", bericht)
+        self.assertNotIn("keine Drift", bericht)
+        self.assertNotIn("Drift(s)", bericht)
+
+    def test_kein_fetch_faehrt_bewusst_auf_dem_geholten_stand(self):
+        # Positivkontrolle zur Sperre: der Ausweg existiert und holt nicht.
+        rc, bericht = self._lauf(self.GELANDET, {self.SPUR_KEY},
+                                 fetch_rc=1, argv=("--strict", "--kein-fetch"))
+        self.assertEqual(rc, 1, bericht)
+        self.assertEqual([a for a in self.gerufen if a[:1] == ("fetch",)], [])
+
 
 
 if __name__ == "__main__":
