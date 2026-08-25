@@ -987,9 +987,36 @@ class ModellUndSpeicherwegTest(unittest.TestCase):
         Gemessen wird am Quelltext und nicht mit ``assertIs``: 256 liegt im
         Zwischenspeicher kleiner Ganzzahlen von CPython, zwei unabhaengige
         Zuweisungen waeren also dasselbe Objekt und der Vergleich stumm gruen.
+
+        Gezaehlt wird ueber den SYNTAXBAUM, nicht Zeile fuer Zeile mit einem
+        Muster: die Docstrings in diesem Projekt sind lang und zitieren
+        staendig Code, ein Textvergleich meldete eine reine Prosazeile als
+        zweite Wahrheit und schickte den naechsten in die falsche Richtung.
+        ``ast`` sieht nur echte Zuweisungen auf Modul-Ebene — und zwar beide
+        Schreibweisen, die schlichte wie die annotierte; letztere rutschte
+        durch das alte Muster hindurch, weil dort ein Doppelpunkt vor dem
+        Gleichheitszeichen steht.
+        ``tests/test_qa61_nur_lokale_geraete.py`` macht dasselbe vor.
         """
+        import ast
         import pathlib
-        import re
+
+        def _setzt_geo_max(pfad: pathlib.Path) -> bool:
+            # "utf-8-sig", weil mindestens eine Datei unter src/ noch ein BOM
+            # aus der Windows-Zeit traegt (ui/views/snap_file_panel.py) —
+            # "utf-8" laesst es stehen und ast.parse bricht darauf ab.
+            baum = ast.parse(pfad.read_text(encoding="utf-8-sig"))
+            for knoten in baum.body:          # nur Modul-Ebene
+                if isinstance(knoten, ast.Assign):
+                    if any(isinstance(z, ast.Name) and z.id == "GEO_MAX"
+                           for z in knoten.targets):
+                        return True
+                elif isinstance(knoten, ast.AnnAssign) and knoten.value is not None:
+                    if isinstance(knoten.target, ast.Name) and \
+                            knoten.target.id == "GEO_MAX":
+                        return True
+            return False
+
         wurzel = pathlib.Path(__file__).resolve().parent.parent / "src"
         # Nur die DATEI wird festgehalten, nicht die Zeilennummer — sonst
         # waere der Test eine Zeitbombe, die beim naechsten Einschub darueber
@@ -997,8 +1024,7 @@ class ModellUndSpeicherwegTest(unittest.TestCase):
         zuweisungen = sorted({
             str(pfad.relative_to(wurzel))
             for pfad in wurzel.rglob("*.py")
-            for zeile in pfad.read_text(encoding="utf-8").splitlines()
-            if re.match(r"\s*GEO_MAX\s*=[^=]", zeile)
+            if _setzt_geo_max(pfad)
         })
         self.assertEqual(
             zuweisungen, ["core/database/models.py"],
