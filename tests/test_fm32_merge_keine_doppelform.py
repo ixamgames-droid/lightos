@@ -278,9 +278,17 @@ class MergeKeineDoppelformTest(_RigBasis):
         self.assertEqual(cols, self._koepfe(1))
         self.assertEqual(rows, 3)
 
-    def test_kein_geraet_steht_zweimal_egal_in_welcher_stapelreihenfolge(self):
+    def test_nur_noch_kopfform_egal_in_welcher_stapelreihenfolge(self):
         """Heute entscheidet die Reihenfolge, WELCHE Form auf DMX gewinnt. Die
-        Regel darf nicht von ihr abhaengen."""
+        Regel darf nicht von ihr abhaengen.
+
+        ★ Der Name sagt bewusst „nur noch Kopfform" und NICHT „kein Geraet steht
+        zweimal": geprueft werden die FORMEN eines Geraets, nicht die Zahl seiner
+        Zellen. Ein Geraet kann danach immer noch mehrfach im Raster stehen —
+        naemlich kopfweise doppelt (FM-37). Der frueherer Name trug genau die
+        breitere Zusage, und wer ihn greppt, haelt FM-37 fuer bewacht. Gefunden
+        in der Gegenpruefung, gemessen: 28 statt 24 Zellen, `2:0` liegt an `0,1`
+        UND `0,2` — und diese Zusicherung hier bleibt dabei gruen."""
         rig = self._rig_mit_ganzer_bar()
         auto2 = self._auto_gid(2)
         for reihenfolge in ([rig, auto2], [auto2, rig]):

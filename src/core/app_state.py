@@ -981,10 +981,16 @@ class AppState:
         "Matrizen" (nicht "Multi-Head" -> remove_fixture raeumt sie nicht mit weg).
         Rueckgabe: neue gid, oder None (<2 gueltige Gruppen / keine Show-DB).
 
-        FM-32: Bringt eine Quell-Gruppe ein Geraet als GANZ-Zelle mit, das eine
-        andere kopfweise fuehrt, gewinnen im Ergebnis die KOPF-Zellen — die
-        Ganz-Zelle wird nicht mitgestapelt (``_stack_group_grids``). Die
-        Quell-Gruppen bleiben davon unberuehrt."""
+        FM-32: Steht ein Geraet im ERGEBNIS-Raster sowohl als GANZ-Zelle als
+        auch kopfweise, gewinnen die KOPF-Zellen — die Ganz-Zelle wird
+        verworfen. Die Quell-Gruppen bleiben davon unberuehrt.
+
+        ★ Die Bedingung haengt am fertig gestapelten Raster, nicht daran, aus
+        WELCHER Quell-Gruppe die beiden Formen kommen: bringt eine einzelne
+        Alt-Show-Gruppe beide Formen schon selbst mit, faellt die Ganz-Zelle
+        ebenso — auch wenn die zweite Gruppe voellig unbeteiligt ist. Das ist
+        gewollt (die Regel gilt dem Ergebnis) und stand vorher enger im Text,
+        als der Code sie umsetzt; gefunden in der Gegenpruefung."""
         eng = getattr(self, "_show_engine", None)
         if eng is None:
             return None
