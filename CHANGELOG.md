@@ -7,6 +7,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Der Aufraeumer nach jedem Test lief durch ALLE Widgets
+
+#### Behoben
+
+- **Die autouse-Fixture `_cleanup_vc_canvases` brachte den Testprozess zum
+  Absturz.** Sie suchte ihre `VCCanvas`-Objekte ueber
+  `QApplication.allWidgets()` — und das baut eine Liste ueber alle lebenden
+  QWidgets, auch ueber die, deren C++-Seite schon fort ist, waehrend der
+  Python-Wrapper noch existiert. Beim Bauen dieser Liste stirbt der Prozess mit
+  SIGSEGV. Gemessen an `tests/test_viz10_ui_repairs.py` auf unveraendertem
+  `main`: **5 von 6 Laeufen** enden mit `exit 139`, der Traceback zeigt jedes Mal
+  auf die `allWidgets()`-Zeile. Nach dem Umbau: **0 von 6**.
+- **Gesucht wird jetzt ueber den QObject-Baum** (`topLevelWidgets()` +
+  `findChildren`): Kinder eines lebenden Fensters sind per Konstruktion selbst
+  lebendig, es gibt keinen Schritt, der einen halbtoten Wrapper erzeugt. Verliert
+  ein Wrapper waehrenddessen doch seine C++-Seite, meldet PySide einen
+  `RuntimeError` — die Rueckmeldung, die `allWidgets()` einem nicht gibt, weil es
+  den Prozess vorher beendet.
+
+#### Bemerkenswert
+
+- **Das war NICHT der Absturz aus PROC-04.** Der lag in der
+  Interpreter-Abbauphase, nach dem letzten Test, und wurde von
+  `LIGHTOS_HARDEN_EXIT_ALL` erschlagen. Dieser hier passiert **mitten im Lauf**,
+  im Teardown des ersten Tests, und tritt mit derselben Variable weiter auf
+  (2 von 3 gemessen). Gleicher Exit-Code, andere Ursache — ein Grund mehr, einen
+  `exit 139` nicht als „das bekannte Rauschen" abzutun.
+- **Im Repo war es zweimal notiert, aber als Eigenschaft der Tests behandelt.**
+  `test_viz_quality_tier.py` raeumt parentlose Widgets ausdruecklich vorher weg
+  („sonst native AV im Isolate-Gate (halbtote Wrapper in allWidgets)"), und
+  `test_views.py::_drop_view` begruendet seinen Abbau ebenso. Beide Umgehungen
+  bleiben richtig — aber eine Fixture, die nach JEDEM Test durch alle Widgets
+  laeuft, darf nicht darauf angewiesen sein, dass jede Datei der Suite vorher
+  aufgeraeumt hat.
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
