@@ -90,6 +90,27 @@ jobs:
             --use-gl=angle --use-angle=swiftshader --in-process-gpu
           LIBGL_ALWAYS_SOFTWARE: "1"
           GALLIUM_DRIVER: llvmpipe
+          # ★★ PROC-04: dieselbe Exit-Haertung wie die Windows-Leg (dort steht
+          # sie seit XPLAT-14). `conftest.py::pytest_unconfigure` beendet den
+          # Prozess NACH der Session-Auswertung per `os._exit(exitstatus)` und
+          # ueberspringt damit die native Abbauphase, in der der QApplication-
+          # Teardown sporadisch mit SIGSEGV stirbt.
+          #
+          # Ohne diese Variable greift auf Linux nur der ENGE Weg: `armed and
+          # LIGHTOS_HARDEN_EXIT`, und `armed` wird ausschliesslich fuer
+          # WebEngine-Module gesetzt. Ein gewoehnlicher Qt-View-Test wie
+          # `test_simple_desk_tint.py` faellt also durch — sein Segment stirbt
+          # mit `exit 139`, waehrend die Liste der fehlgeschlagenen Tests LEER
+          # bleibt, und der Lauf wird faelschlich rot. Die Docstring von
+          # `pytest_unconfigure` nennt genau diesen Fall samt "Linux: SIGSEGV";
+          # nur die Gegenmassnahme kam nie hier an.
+          #
+          # Maskiert KEINE Failures: `exitstatus` traegt das echte Ergebnis, 0
+          # nur wenn ALLE Tests bestanden haben. Was sie kostet, ist die
+          # Erkennung ECHTER Teardown-Abstuerze in der CI — die bleibt dem
+          # lokalen Gate erhalten, das den engen Weg weiterfaehrt, und genau
+          # dort wurde XPLAT-09 auch gefunden.
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
           nproc
           # xvfb: QT_QPA_PLATFORM=offscreen setzt verify_loop.sh selbst, aber der
@@ -105,7 +126,18 @@ jobs:
           name: linux-segment-logs
           path: .pytest_segments/
           retention-days: 7
-          if-no-files-found: ignore
+          # ★ `.pytest_segments` faengt mit einem PUNKT an, und upload-artifact
+          # ueberspringt versteckte Dateien seit v4.4 standardmaessig. Der
+          # Schritt lief deshalb bei JEDEM roten Lauf und lud NICHTS hoch —
+          # sichtbar nur an einer Zeile mitten im Log ("No files were found
+          # with the provided path"). Genau die Segment-Logs, die einen
+          # `exit 139` ohne FAILED-Zeile erklaeren koennten, waren damit nie
+          # da. Eine Absicherung, die stillschweigend nicht greift, ist
+          # schlimmer als keine (PROC-02b).
+          include-hidden-files: true
+          # Und nicht mehr schweigen, wenn wirklich nichts da ist: `ignore`
+          # macht denselben Zustand unsichtbar, der uns hierher gebracht hat.
+          if-no-files-found: warn
 
   test:
     name: Windows-Smoke (Python ${{ matrix.python-version }})
