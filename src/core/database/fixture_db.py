@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
 from .models import (Manufacturer, FixtureProfile, FixtureMode,
                      FixtureChannel, ChannelRange, migrate_fixtures_db,
-                     create_all_idempotent)
+                     create_all_idempotent, GEO_MAX)
 
 # XPLAT-04: standardmaessig im App-Datenordner (app_data_dir()). Override via
 # LIGHTOS_FIXTURE_DB (analog LIGHTOS_SHOW_DB) — die Test-Suite zeigt darueber auf
@@ -327,6 +327,32 @@ def _add_modes(s, profile, modes_data):
                                    name=r_name, kind=r_kind))
 
 
+def _geo_wert(v) -> int:
+    """Eine Rasterzahl aus einem Payload (FM-26). Fehlt/kaputt -> ``0``,
+    zu gross -> ``GEO_MAX``.
+
+    ``0`` ist die Aussage "nicht hinterlegt" und damit der einzige sichere
+    Ersatzwert: ein geratener waere von einer echten Angabe nicht mehr zu
+    unterscheiden (siehe ``FixtureMode.grid_rows``). Negatives faellt hier
+    ebenfalls auf 0 — nicht als zweite Klemmformel neben ``_clamp_geo`` des
+    Generators, sondern weil diese Funktion JEDES Payload sieht, auch eines,
+    das nie durch den Generator gelaufen ist.
+
+    ★ **Und aus genau demselben Grund auch die OBERgrenze** (nachgetragen nach
+    der Gegenpruefung von #659). Sie stand zuerst nur im Generator; ein von
+    Hand gebautes Payload schrieb damit ``grid_cols=99999`` in die Bibliothek,
+    und der Wert kam beim Renderer an. Das Argument des Absatzes darueber gilt
+    Wort fuer Wort in beide Richtungen: wer hier nur die eine Haelfte klemmt,
+    verlaesst sich darauf, dass jedes Payload durch den Generator lief. Ueber
+    ``GEO_MAX`` koennte ohnehin nie ein Pixel mehr erscheinen — die Zahl waere
+    eine stille Fehlangabe."""
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return 0
+    return 0 if n < 0 else GEO_MAX if n > GEO_MAX else n
+
+
 def create_user_profile(payload: dict, *, engine=None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
@@ -337,7 +363,10 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
     ``fixture_generator.build_profile_payload`` (Modi → Kanaele → Ranges) und
     haelt sich an das gleiche Speicher-Muster wie ``_add_modes``: pro Kanal
     werden ``attribute``/``invert``/``resolution`` und je Bereich
-    ``range_from/to``/``name``/``kind`` uebernommen.
+    ``range_from/to``/``name``/``kind`` uebernommen — und je MODUS seit FM-26
+    die physische Rasterform (``grid_rows``/``grid_cols``/``white_rows``/
+    ``white_cols``), damit ein ueber den Generator angelegtes Panel dieselbe
+    Form traegt wie ein ueber den Fixture-Editor angelegtes.
     """
     eng = engine if engine is not None else globals()["engine"]()
     with Session(eng) as s:
@@ -365,6 +394,18 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
                 fixture_id=prof.id, name=(m.get("name") or "Modus").strip(),
                 channel_count=int(m.get("channel_count", len(channels))),
                 description="",
+                # FM-26: die physische Rasterform des Modus mitschreiben —
+                # Farbzonen (VIZ-50a) und eigene Weiss-Leiste (CDX-52). Ohne
+                # diese vier Spalten endet die Eingabe des Generators an
+                # dieser Stelle: der Modus entstuende mit den Default-Nullen
+                # der Spalten, also "nicht hinterlegt", und `panel_grid_for`
+                # gaebe dem Renderer weiter (0, 0). Fehlende Schluessel sind
+                # ausdruecklich erlaubt (aeltere Payloads, Handbau) und
+                # bedeuten dasselbe wie 0.
+                grid_rows=_geo_wert(m.get("grid_rows")),
+                grid_cols=_geo_wert(m.get("grid_cols")),
+                white_rows=_geo_wert(m.get("white_rows")),
+                white_cols=_geo_wert(m.get("white_cols")),
             )
             s.add(mode)
             s.flush()
