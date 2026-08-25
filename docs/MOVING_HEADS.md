@@ -237,6 +237,16 @@ anderen fallen aus der Liste des Reglers bzw. der Kachelreihe heraus. Die
 RGB-Geraete, Farbrad-Kacheln die Farbrad-Geraete — ein `Sharpy` hat ein
 Farbrad und kein RGB, ein `Robin Spiider` umgekehrt.
 
+**Range-basierte Kachelreihen brauchen mehr als den Kanal (UI-07 / FM-34).**
+Shutter-, Gobo- und Farbrad-Kacheln tragen den DMX-Mittelwert eines Bereichs
+der Vorlage. Sie treiben deshalb nur Geraete mit dem GLEICHEN Range-Layout —
+ein Farbrad, das seine Farben anders einteilt, bekaeme denselben Zahlenwert und
+zeigte eine andere Farbe (`Sharpy`: Rot 7–14, `LED Moving Head 8ch`: 0–15 =
+Weiss/Offen). Kachelreihen mit absoluten Werten (RGB 0–255) brauchen das nicht,
+dort genuegt der Kanal. Und was eine Kachel schreibt, wird pro Geraet auf
+dessen vorhandene Kanaele beschnitten: die Kachel „Aus" setzt auch Amber und
+UV, ein Geraet ohne diese Kanaele bekommt dafuer keinen Eintrag mehr.
+
 Modi (9ch vs. 11ch) sind regulaere `FixtureMode`-Eintraege — beim Patchen wird
 der Modus gewaehlt, die Kanalnummern kommen vollstaendig aus der DB
 (Details: [FIXTURE_LIBRARY.md](FIXTURE_LIBRARY.md)).

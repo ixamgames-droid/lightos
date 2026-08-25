@@ -2163,9 +2163,21 @@ class ProgrammerView(QWidget):
                 # bekommen deshalb getrennte Listen; wer den Kanal nicht hat,
                 # gehoert an keine von beiden (sonst Wert im Dict, nichts auf
                 # DMX — stille Klasse FM-9/A5).
+                #
+                # ★ Die beiden Familien fragen VERSCHIEDENE Eigenschaften ab:
+                # die RGB-Kacheln tragen absolute Farbwerte (0..255 sind an
+                # jedem RGB-Geraet dasselbe) — da genuegt „hat den Kanal".
+                # Die Farbrad-Kacheln sind dagegen RANGE-basiert wie Shutter
+                # und Gobo: die Kachel traegt den Mittelwert eines Bereichs
+                # der VORLAGE. Ein Farbrad mit anderem Slot-Layout bekaeme
+                # denselben Literal-Wert und damit eine ANDERE Farbe — also
+                # derselbe Weg wie oben/unten: ``_range_compatible_fixtures``
+                # (UI-07). Der ist strikt staerker als
+                # ``_fixtures_with_attr`` (ohne den Kanal -> ``ch is None``)
+                # und deckt FM-34 fuers Farbrad mit ab.
                 rgb_fixtures = self._fixtures_with_any_attr(
                     fixtures, ("color_r", "color_g", "color_b", "color_w"))
-                cw_fixtures = (self._fixtures_with_attr(fixtures, cw.attribute)
+                cw_fixtures = (self._range_compatible_fixtures(cw, fixtures)
                                if cw is not None else [])
                 if rgb_fixtures or cw_fixtures:
                     from src.ui.widgets.preset_tile import ColorQuickBar

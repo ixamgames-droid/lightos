@@ -262,13 +262,30 @@ class _ApplyMixin:
         verschiedene Kanaele schreiben (RGB-Presets und Farbrad-Slots). Wer das
         eine hat, hat noch lange nicht das andere — ein ``SHARPY`` hat ein
         Farbrad und kein RGB. Beide Familien duerfen deshalb nicht dieselbe
-        Liste bedienen."""
+        Liste bedienen.
+
+        ★ FM-34, zweite Haelfte: der Geraete-Filter des Aufrufers fragt „hat
+        das Geraet EINEN der Farbkanaele" — die Nutzlast schreibt aber MEHRERE
+        auf einmal. Ein Teil-RGB-Geraet (``color_g`` + ``color_b``, kein
+        ``color_r``) und die Kachel „Aus" (traegt zusaetzlich ``color_a`` und
+        ``color_uv``) haetten sonst weiter tote Eintraege im Programmer-Dict.
+        Deshalb wird JEDER Schluessel noch einmal gegen die Kanaele DIESES
+        Geraets geprueft. Das ist die richtige Ebene: das Geraet wegzuwerfen,
+        nur weil ihm EIN Kanal fehlt, wuerde auch die vorhandenen Kanaele
+        nicht mehr bedienen — der Nutzer klickt Rot und ein Geraet, das
+        Gruen/Blau herunterfahren koennte, bliebe stehen."""
         # P6: Farb-Payloads pro Fixture an dessen Farbsystem anpassen —
         # RGBW-Geraete bekommen Weiss ueber den W-Kanal statt RGB+W doppelt.
         from src.core.color_utils import adapt_color_payload, fixture_attr_set
         for f in fixtures:
-            adapted = adapt_color_payload(fixture_attr_set(f), payload)
+            vorhanden = fixture_attr_set(f)
+            adapted = adapt_color_payload(vorhanden, payload)
             for attr, value in adapted.items():
+                # ``vorhanden`` leer heisst „Kanaele unbekannt" (Test-Double,
+                # Lesefehler) — dann wie bisher alles schreiben, statt still
+                # gar nichts mehr auszugeben.
+                if vorhanden and attr not in vorhanden:
+                    continue
                 self._state.set_programmer_value(f.fid, attr, int(value))
                 # Mehrkopf (Spider): etwaige Pro-Kopf-Overrides dieser Farbe
                 # ("attr#N") entfernen, damit ein Preset das GANZE Geraet faerbt
@@ -287,8 +304,10 @@ class ColorQuickBar(QWidget, _ApplyMixin):
     ★ FM-34: ``fixtures`` sind die Geraete der RGB-Kacheln, ``wheel_fixtures``
     die des Farbrads — beide Familien werden vom Aufrufer getrennt gefiltert
     (``ProgrammerView._fixtures_with_any_attr`` fuer RGB — die Nutzlast
-    schreibt vier Kanaele auf einmal — und ``_fixtures_with_attr`` fuers
-    Farbrad; dieselbe Quelle wie die Regler seit #663).
+    schreibt vier Kanaele auf einmal — und ``_range_compatible_fixtures``
+    fuers Farbrad, das wie Shutter/Gobo den Bereichs-Mittelwert der VORLAGE
+    einbackt und deshalb ein GLEICHES Slot-Layout braucht, nicht bloss den
+    Kanal; dieselbe Quelle wie die Regler seit #663 bzw. UI-07).
     ``wheel_fixtures=None`` heisst „wie ``fixtures``" und haelt Aufrufer am
     Leben, die nur EINE Familie bauen. Ist eine Liste leer, entsteht ihre
     Kachelreihe gar nicht erst — sie koennte ohnehin nichts ausgeben."""

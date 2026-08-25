@@ -276,6 +276,117 @@ class FarbradKachelTrifftNurRadGeraeteTest(_Basis):
         self.assertTrue(dmx, "der SHARPY muss sein Farbrad weiterhin drehen")
 
 
+class FarbradNurRangeKompatibleTest(_Basis):
+    """★ Die Farbrad-Kacheln sind RANGE-basiert wie Shutter und Gobo: die Kachel
+    traegt den Mittelwert eines Bereichs der VORLAGE, nicht eine absolute Farbe.
+    „Hat den Kanal" ist deshalb die falsche Frage — zwei Farbraeder mit
+    verschiedenem Slot-Layout bekaemen denselben Literal-Wert und zeigten
+    VERSCHIEDENE Farben. Gefiltert wird darum wie bei Shutter/Gobo ueber
+    ``_range_compatible_fixtures`` (UI-07), das den fehlenden Kanal mit
+    erschlaegt (``ch is None``).
+
+    Gemessen an ``SHARPY`` (16ch, 16 Slots, Rot 7–14) neben ``MH8`` (8ch,
+    9 Slots, 0–15 = Weiss/Offen): DMX 10 heisst am einen Rot, am anderen Offen.
+    """
+
+    def _auswahl(self):
+        self._patch(3, "SHARPY", 16)
+        self._patch(5, "MH8", 8)
+        return self._eine_bar(["3", "5"])
+
+    def _wheel_channel(self, fid):
+        return next(c for c in get_channels_for_patched(self._fx(fid))
+                    if c.attribute == "color_wheel")
+
+    def test_beide_haben_ein_farbrad_mit_VERSCHIEDENEM_layout(self):
+        """Wache gegen Leerlauf: ohne diesen Unterschied misst der Rest nichts."""
+        self._patch(3, "SHARPY", 16)
+        self._patch(5, "MH8", 8)
+        self._hat(3, "color_wheel")
+        self._hat(5, "color_wheel")
+        sig = ProgrammerView._range_signature
+        self.assertNotEqual(sig(self._wheel_channel(3)),
+                            sig(self._wheel_channel(5)),
+                            "gleiche Slot-Layouts — dann gibt es den Befund "
+                            "an diesem Paar gar nicht")
+
+    def test_bar_traegt_das_fremde_farbrad_nicht(self):
+        bar = self._auswahl()
+        self.assertEqual(tuple(f.fid for f in bar._wheel_fixtures), (3,),
+                         "der MH8 hat ein ANDERES Slot-Layout und darf nicht "
+                         "an die Kacheln der SHARPY-Vorlage")
+
+    def test_klick_laesst_das_fremde_farbrad_unberuehrt(self):
+        """★★ Der Kern: der Nutzer klickt „Rot" — am MH8 laege derselbe
+        DMX-Wert im Bereich „Weiss / Offen"."""
+        bar = self._auswahl()
+        kacheln = self._kacheln(bar, ("color_wheel",))
+        self.assertTrue(kacheln, "keine Farbrad-Kachel gebaut — nichts zu messen")
+        ziel = kacheln[1]
+        wert = ziel._payload["color_wheel"]
+        erg = self._klick(ziel, (3, 5))
+        self.assertEqual(erg[5], ({}, {}),
+                         "der MH8 wuerde bei diesem Wert eine andere Farbe "
+                         "zeigen als die Kachel verspricht")
+        dmx, _prog = erg[3]
+        self.assertEqual(sorted(dmx.values()), [wert],
+                         f"der SHARPY (die Vorlage) muss {wert} bekommen, "
+                         f"geaendert: {dmx}")
+
+
+class KachelSchreibtNurVorhandeneKanaeleTest(_Basis):
+    """★ Der Geraete-Filter fragt „hat EINEN der Farbkanaele" — die Nutzlast
+    schreibt aber MEHRERE auf einmal. Deshalb wird beim Anwenden jeder
+    Schluessel noch einmal gegen die Kanaele DIESES Geraets geprueft
+    (``_apply_payload_on``), sonst bleibt die Klasse FM-9/A5 im Kleinen stehen.
+
+    Gemessen an der Kachel „Aus": sie traegt zusaetzlich ``color_a`` und
+    ``color_uv``; der Spiider hat beide nicht.
+
+    ★ Warum nicht an einem Teil-RGB-Geraet gemessen: unter den mitgelieferten
+    Profilen gibt es KEINS (0 von 94) — nur in einer importierten Bibliothek
+    (dort 43 Modi). Ein Test darauf haette in der CI nichts zu messen (QA-61).
+    Die Kachel „Aus" ist derselbe Mechanismus an einem Builtin-Geraet.
+    """
+
+    def _bar_und_kachel(self):
+        self._patch(2, "SPIIDER", 91)
+        self._hat(2, "color_r", "color_g", "color_b", "color_w")
+        self._hat_nicht(2, "color_a", "color_uv")
+        bar = self._eine_bar(["2"])
+        kacheln = self._kacheln(bar, ("color_a",))
+        self.assertEqual(len(kacheln), 1,
+                         "genau eine Kachel traegt color_a ('Aus')")
+        return bar, kacheln[0]
+
+    def test_aus_kachel_hinterlaesst_keine_toten_eintraege(self):
+        bar, aus = self._bar_und_kachel()
+        self.assertIn("color_uv", aus._payload,
+                      "die Kachel muss die fehlenden Kanaele wirklich tragen")
+        _dmx, prog = self._klick(aus, (2,))[2]
+        ohne_kanal = sorted(k for k in prog if k not in self._attrs(2))
+        self.assertEqual(ohne_kanal, [],
+                         "Wert im Programmer-Dict, nichts auf DMX — genau die "
+                         "Klasse, die FM-34 beseitigen soll (wandert in "
+                         "Szenen/Snaps mit)")
+
+    def test_die_vorhandenen_kanaele_kommen_weiterhin_an(self):
+        """Positivkontrolle: der Filter darf nicht die ganze Nutzlast fressen.
+        Erst faerben, dann „Aus" — so ist die Ruecknahme auf DMX sichtbar."""
+        bar, aus = self._bar_und_kachel()
+        farbe = self._kacheln(bar, RGB_ATTRS)[5]      # 'Cyan' — g/b auf 255
+        self._klick(farbe, (2,))
+        dmx, _prog = self._klick(aus, (2,))[2]
+        self.assertTrue(dmx, "der Spiider bewegt gar keinen Kanal mehr")
+        self.assertEqual({v for v in dmx.values()}, {0},
+                         f"'Aus' muss die Farbkanaele auf 0 ziehen: {dmx}")
+        stand = self._prog(2)
+        for attr in ("color_r", "color_g", "color_b", "color_w"):
+            self.assertEqual(stand.get(attr), 0,
+                             f"{attr} hat einen Kanal und muss ankommen, "
+                             f"Stand: {stand}")
+
+
 class ResetKnopfTrifftNurResetGeraeteTest(_Basis):
     """Der Reset-Knopf verspricht eine Rekalibrierung — an einem Geraet ohne
     ``reset``-Kanal fuehrt sie niemand aus."""
@@ -357,9 +468,15 @@ class PositivkontrolleAlleHabenDenKanalTest(_Basis):
         bar = self._eine_bar(["3", "4"])
         self.assertEqual(tuple(f.fid for f in bar._wheel_fixtures), (3, 4))
         kacheln = self._kacheln(bar, ("color_wheel",))
+        wert = kacheln[0]._payload["color_wheel"]
         erg = self._klick(kacheln[0], (3, 4))
         for fid in (3, 4):
             self.assertTrue(erg[fid][0], f"fid {fid} dreht sein Farbrad nicht")
+            # ★ Nicht nur DASS sich etwas bewegt, sondern WELCHER Wert ankommt:
+            # bei gleichem Slot-Layout muss beiden derselbe Bereich zugehen.
+            self.assertEqual(sorted(erg[fid][0].values()), [wert],
+                             f"fid {fid} bekam nicht den Kachel-Wert {wert}, "
+                             f"sondern {erg[fid][0]}")
 
     def test_reines_rgb_geraet_behaelt_seine_kacheln(self):
         self._patch(2, "SPIIDER", 91)
