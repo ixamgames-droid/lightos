@@ -811,6 +811,57 @@ def _reset_sync_subscribers():
         pass
 
 
+# ── PROC-05: warum hier NICHT ``QApplication.allWidgets()`` steht ────────────
+#
+# ``allWidgets()`` baut eine Liste ueber ALLE lebenden QWidgets — auch ueber die,
+# deren C++-Seite schon fort ist, waehrend der Python-Wrapper noch existiert.
+# Genau beim Bauen dieser Liste stirbt der Prozess mit SIGSEGV. Gemessen an
+# ``tests/test_viz10_ui_repairs.py`` auf unveraendertem ``main``: **5 von 6
+# Laeufen** enden mit ``exit 139``, und der Traceback zeigt jedes Mal auf die
+# Zeile mit ``allWidgets()`` — mitten im Lauf, im Teardown des ERSTEN Tests,
+# nicht in der Abbauphase am Ende.
+#
+# ★ Das ist NICHT der Absturz aus PROC-04. Der lag in der Interpreter-
+# Abbauphase und wurde von ``LIGHTOS_HARDEN_EXIT_ALL`` (#662) erschlagen; dieser
+# hier tritt mit derselben Variable weiter auf (2 von 3). Gleicher Exit-Code,
+# andere Ursache — deshalb ein eigenes Item.
+#
+# Dass ``allWidgets()`` die gefaehrliche Stelle ist, war im Repo schon zweimal
+# notiert, aber als Eigenschaft der TESTS behandelt statt als Fehler HIER:
+# ``test_viz_quality_tier.py`` raeumt parentlose Widgets ausdruecklich vorher weg
+# („sonst native AV im Isolate-Gate (halbtote Wrapper in allWidgets)"), und
+# ``test_views.py::_drop_view`` begruendet seinen Abbau ebenso. Beide Umgehungen
+# bleiben richtig; sie halten den Zustand sauber. Aber eine autouse-Fixture, die
+# nach JEDEM Test durch alle Widgets laeuft, darf nicht darauf angewiesen sein,
+# dass jede Testdatei der Suite vorher aufgeraeumt hat.
+#
+# Der Ersatz sucht dieselben Objekte ueber den QObject-Baum: Kinder eines
+# lebenden Top-Level-Widgets sind per Konstruktion selbst lebendig — es gibt
+# keinen Schritt, der einen halbtoten Wrapper erzeugt.
+def _lebende_canvases(app, VCCanvas) -> list:
+    """Alle lebenden ``VCCanvas`` — ohne ``allWidgets()``.
+
+    Bewusst als eigene Funktion: so ist sie messbar, ohne dass ein Test die
+    Fixture nachbilden muss (QA-52).
+    """
+    gefunden, gesehen = [], set()
+    for top in list(app.topLevelWidgets()):
+        try:
+            if isinstance(top, VCCanvas) and id(top) not in gesehen:
+                gesehen.add(id(top))
+                gefunden.append(top)
+            for kind in top.findChildren(VCCanvas):
+                if id(kind) not in gesehen:
+                    gesehen.add(id(kind))
+                    gefunden.append(kind)
+        except RuntimeError:
+            # Der Wrapper hat seine C++-Seite verloren, WAEHREND wir laufen —
+            # PySide meldet das als RuntimeError, nicht als Absturz. Genau die
+            # Rueckmeldung, die ``allWidgets()`` einem nicht gibt.
+            continue
+    return gefunden
+
+
 @pytest.fixture(autouse=True)
 def _cleanup_vc_canvases():
     yield
@@ -823,12 +874,11 @@ def _cleanup_vc_canvases():
         return
     try:
         from src.ui.virtualconsole.vc_canvas import VCCanvas
-        for w in list(app.allWidgets()):
-            if isinstance(w, VCCanvas):
-                try:
-                    w._teardown_midi()
-                except Exception:
-                    pass
+        for w in _lebende_canvases(app, VCCanvas):
+            try:
+                w._teardown_midi()
+            except Exception:
+                pass
     except Exception:
         pass
     try:
