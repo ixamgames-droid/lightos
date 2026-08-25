@@ -62,6 +62,14 @@ uebernommen wuerde daraus fuer ein 48-Pixel-Panel eine 48 Zeilen hohe Saeule —
 `panelGrid` zieht die fehlende Zahl aus der Pixelzahl hoch und behandelt das
 Ergebnis dann als *explizit*, also samt physischer Panel-Masse.
 
+> **Bedienung beider Dialoge (FM-30):** `Return` in einem Eingabefeld speichert
+> **nicht**. Gespeichert wird ausschliesslich ueber den Knopf „Speichern",
+> geschlossen ohne Speichern ueber „Abbrechen" oder `Escape`. Vorher loeste ein
+> `Return` in irgendeinem Feld den Standardknopf aus — eine getippte Rasterzahl
+> plus Return legte ein halb eingegebenes Profil in der Bibliothek an. Im
+> Generator war das nicht mehr zu berichtigen, weil er ein bestehendes Profil
+> nicht wieder oeffnen kann.
+
 **`FixtureMode.white_rows`/`white_cols`** (CDX-52) ist die Rasterform einer
 **eigenen Weiss-Leiste** — eines Streifens weisser LEDs, der NICHT auf dem
 Farbraster liegt (der ZQ06121 hat acht Warmweiss-Segmente quer ueber die
