@@ -207,6 +207,12 @@ def main(argv=None) -> int:
                   "mit --kein-fetch fahren.")
             return 2
 
+    # ★ CDX-57 (zweite Runde, ebenfalls von Codex): jede Luecke in der Abdeckung
+    # wird gesammelt — eine Warnung allein genuegt nicht. Wer eine Nummer bekommt
+    # UND einen Exit-Code 0, darf sich darauf verlassen koennen; sonst legt der
+    # naechste genau die Kollision an, gegen die es dieses Werkzeug gibt.
+    luecken: list = []
+
     if args.alle_zweige:
         rc, out = _git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
         refs = [r for r in out.split() if r and not r.endswith("/HEAD")] if rc == 0 else []
@@ -217,6 +223,7 @@ def main(argv=None) -> int:
         zweige, warnung = offene_pr_zweige()
         if warnung:
             print(f"[ids] ⚠ {warnung}")
+            luecken.append(warnung)
         elif not zweige:
             print("[ids] HINWEIS: keine offenen PRs — geprueft wird nur "
                   "`origin/main`. Das ist WENIGER, als der Name verspricht.")
@@ -228,6 +235,7 @@ def main(argv=None) -> int:
     fehlend = [r for r in refs if r not in je_zweig]
     if fehlend:
         print(f"[ids] ⚠ nicht lesbar (uebersprungen): {', '.join(fehlend)}")
+        luecken.append(f"nicht lesbar: {', '.join(fehlend)}")
     if not je_zweig:
         print("FEHLER: kein Ref mit BACKLOG.md gefunden — sind die Remote-Refs da?")
         return 2
@@ -257,9 +265,19 @@ def main(argv=None) -> int:
         print("✓ keine ID mit verschiedenen Titeln.")
 
     if args.gruppe:
-        n = naechste_freie(je_zweig, args.gruppe)
-        print(f"\n[ids] naechste freie Nummer der Gruppe {args.gruppe}: "
-              f"{args.gruppe}-{n}")
+        if luecken:
+            # ★ Fail closed. Eine Nummer aus unvollstaendiger Abdeckung ist
+            # schlimmer als keine: sie sieht aus wie eine Auskunft.
+            print(f"\n[ids] KEINE Nummer ausgegeben — die Abdeckung ist "
+                  f"unvollstaendig ({'; '.join(luecken)}). Eine Nummer aus "
+                  "lueckenhafter Abdeckung koennte auf einem ungelesenen Zweig "
+                  "laengst vergeben sein.")
+        else:
+            n = naechste_freie(je_zweig, args.gruppe)
+            print(f"\n[ids] naechste freie Nummer der Gruppe {args.gruppe}: "
+                  f"{args.gruppe}-{n}")
+    if luecken:
+        return 2
     return 1 if (treffer and args.strict) else 0
 
 

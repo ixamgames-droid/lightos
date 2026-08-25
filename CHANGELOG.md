@@ -30,6 +30,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Auskunft wertlos); und Fork-PRs, deren Kopf es als `origin/<branch>` nicht
   gibt, fielen still aus der Liste. Jetzt: Grenze auf 200 mit Warnung beim
   Erreichen, `fetch`-Fehler beendet mit 2, nicht lesbare Refs werden benannt.
+- **Und eine Warnung allein genuegt nicht.** Codex hat im selben PR nachgelegt:
+  die erste Fassung meldete die Luecke — und gab trotzdem eine Nummer aus und
+  beendete mit 0. Wer den Exit-Code prueft, bekam gruenes Licht auf
+  unvollstaendigen Daten. Jetzt: bei jeder Luecke in der Abdeckung wird KEINE
+  Nummer ausgegeben und mit 2 beendet. Eine Nummer aus lueckenhafter Abdeckung
+  ist schlimmer als keine — sie sieht aus wie eine Auskunft.
 
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 

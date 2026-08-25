@@ -156,6 +156,38 @@ class KollisionenTest(unittest.TestCase):
         self.assertEqual(kollisionen(jz, auf_main=set()), [])
 
 
+class FailClosedTest(unittest.TestCase):
+    """★ CDX-57 (zweite Codex-Runde): eine Warnung allein genuegt nicht.
+
+    Die erste Fassung meldete Luecken in der Abdeckung — und gab trotzdem eine
+    Nummer aus und beendete mit 0. Wer den Exit-Code prueft, bekam gruenes Licht
+    auf unvollstaendigen Daten und legt genau die Kollision an, gegen die es
+    dieses Werkzeug gibt.
+
+    Gemessen wird ueber ``main()``, nicht ueber eine innere Funktion: der
+    Exit-Code IST hier die Aussage.
+    """
+
+    def _main_mit(self, zweige, warnung):
+        import backlog_ids as bi
+        orig = bi.offene_pr_zweige
+        bi.offene_pr_zweige = lambda: (zweige, warnung)
+        try:
+            return bi.main(["--gruppe", "FM", "--kein-fetch"])
+        finally:
+            bi.offene_pr_zweige = orig
+
+    def test_ein_unlesbarer_ref_verhindert_die_auskunft(self):
+        self.assertEqual(self._main_mit(["gibt-es-garantiert-nicht"], None), 2)
+
+    def test_eine_warnung_aus_gh_verhindert_die_auskunft(self):
+        self.assertEqual(self._main_mit([], "`gh pr list` fehlgeschlagen: …"), 2)
+
+    def test_ohne_luecke_gibt_es_die_auskunft(self):
+        # Positivkontrolle: sonst waere das Werkzeug nie zu gebrauchen.
+        self.assertEqual(self._main_mit([], None), 0)
+
+
 class AbdeckungTest(unittest.TestCase):
     """★ CDX-57: das Werkzeug darf nie weniger liefern, als sein Name verspricht.
 
