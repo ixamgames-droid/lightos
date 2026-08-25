@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Return legt kein halbes Fixture-Profil mehr an
+
+#### Behoben
+
+- **`Return` in einem Eingabefeld speichert nicht mehr sofort das ganze
+  Fixture-Profil** (FM-30). Beide Profil-Dialoge — der einfache Fixture-Editor
+  und der Fixture-Generator — hatten ueber ihre `QDialogButtonBox` einen
+  Standardknopf am Speichern; ein `Return` in IRGENDEINEM Feld loeste ihn aus.
+  Gemessen im Generator: eine getippte Rasterzahl plus Return legte ein halb
+  eingegebenes Profil in der Bibliothek an (Raster `4x0`, Weiss-Leiste `0x0`)
+  und schloss den Dialog — ohne Warnung. Im Generator wog das schwerer, weil er
+  ein bestehendes Profil nicht wieder oeffnen kann: die Fehlangabe blieb stehen,
+  und ein zweiter Anlauf legte ein zweites Profil mit demselben Kurznamen an.
+  Gespeichert wird jetzt nur noch ueber den Klick auf "Speichern"; `Escape`
+  schliesst den Dialog unveraendert.
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt
