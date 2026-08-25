@@ -46,12 +46,20 @@ hinterlegt (der Generator darf keine Form ERFINDEN — sonst haette jedes
 selbstgebaute Panel das Weiss-Band zurueck, das CDX-52 abgeschafft hat), eine
 einzelne Zahl genuegt, und jeder Modus behaelt seine EIGENE Form.
 
+★ **Die beiden anderen Wege in den Dialog** (nach der Gegenpruefung
+ergaenzt). Erstens: der Generator muss ueberhaupt ERREICHBAR sein —
+:class:`DerGeneratorIstAusDemPatchViewErreichbarTest` klickt den Knopf
+„Gerät erstellen…" der Patch-View und prueft, WELCHER Dialog aufgeht; ohne das
+liesse sich der Menuepunkt auf einen beliebigen anderen Dialog umbiegen, ohne
+dass etwas rot wird. Zweitens: der **Import-Knopf**
+(:class:`ImportTraegtDieFormInDenDialogTest`) — eine `.qxf` traegt die
+Rasterform in ``<Physical><Layout/>``, und bis FM-26 ging sie auf diesem Weg
+verloren, waehrend der Bibliotheks-Import sie seit FM-23 liest.
+
 ⚠️ **Was diese Datei NICHT behauptet.** Sie prueft keine Kanalzahlen und keine
 Bereiche des Generators — das tut ``tests/test_fixture_generator.py``. Und sie
-sagt nichts ueber den QXF-Import des Generators (``model_from_qxf``), der die
-Rasterform aus ``<Physical><Layout/>`` weiterhin nicht uebernimmt, obwohl der
-QXF-Import der Bibliothek (``qxf_import``) es seit FM-23 tut; das ist ein
-gemeldeter Nebenbefund und kein Gegenstand dieses Items.
+sagt nichts ueber den Bedienfehler „Return speichert sofort" (Item FM-30) — sie
+vermeidet ihn nur (siehe ``_tippe``).
 """
 from __future__ import annotations
 
