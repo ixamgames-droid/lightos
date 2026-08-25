@@ -38,26 +38,56 @@ Datei gruen bleibt. Gemessen (Pruefer): ``ring_offsets(...)[:1]`` an BEIDEN
 wurde. **Die Zusage war breiter als die Messung** — genau die Fehlerklasse,
 gegen die dieses Projekt seine Testdisziplin gebaut hat.
 
-Deshalb gibt es jetzt zwei Messungen AM PIXEL:
+**★★★ Zweite Gegenpruefung (25.08., dieselbe Fehlerklasse eine Ebene tiefer).**
+Die Bildmessung selbst war zu weich, an zwei Stellen:
+
+  * ``kranz_messung`` zaehlte den **Richtungs-Strahl des Kopfes** als
+    zusaetzliche Flaeche mit, obwohl ihr Docstring ihn ausschloss. Die 19 hielt
+    nur, weil zufaellig bei Pan-DMX 0 und Glyphgroesse 160 gemessen wurde —
+    beides ungesetzt und ungeprueft. Bei anderen Pan-Winkeln und Groessen kam
+    derselbe GESUNDE Spiider auf **20**, also auf die Zahl, die der UI-52-Fehler
+    ("Bankzahl statt Segmentzahl") erzeugt; ein gesunder Vier-Bank-Kopf kam auf
+    5 statt 4.
+  * Am Listen-Icon wurde die Segment-ZAHL weiterhin nur an der Naht gemessen;
+    die Bildmessung war ein grober Flaechenanteil. Das Icon durfte **8 seiner 19
+    Segmente verlieren** und die Datei blieb gruen.
+
+Daraus die heutige Fassung:
+
+  * ``strahl_fenster`` **findet** den Strahl, statt ihn wegzuschwellen: er ist
+    eine Gerade durch die Kopfmitte, und auf einem Kreis mit halbem Kranzradius
+    liegt nur er. Seine Proben werden aus der Kranzfolge entfernt — liegt er in
+    einer Luecke, faellt seine Flaeche weg; schneidet er ein Segment durch,
+    ruecken die Bruchstuecke zusammen und zaehlen als eines.
+  * **Pan-Stellung und Glyphgroesse sind jetzt Voraussetzungen, keine Zufaelle.**
+    Die Pan-Stellung wird ueber das echte DMX-Universe gesetzt und
+    zurueckgelesen; gemessen wird ueber fuenf Stellungen und drei Groessen.
+    Nachgemessen wurde ueber ALLE 256 Pan-Stellungen: Spiider 19, Vier-Bank-Kopf
+    4, Drei-Zonen-Wash 3, gewoehnlicher Moving Head 0 — ausnahmslos.
+  * ``icon_kranz`` misst am 16-px-Icon zusaetzlich die **groesste Luecke im
+    Kranz**. Gesund 39,6 Grad; schon vier fehlende Segmente heben sie auf
+    106,7 Grad, elf von neunzehn auf 151,8 Grad.
+
+Die drei Messungen am Pixel:
 
   * ``kranz_messung`` legt ein Helligkeitsprofil auf den Kranzkreis des
     gerenderten Glyphs und zaehlt die **zusammenhaengenden leuchtenden
     Flaechen**. Der Spiider muss auf 19 kommen, ein gewoehnlicher Moving Head
-    auf 0 — und ein 3-Zonen-Wash auf 3: der Waechter ZAEHLT, er erkennt nicht
-    bloss „Pixel-Kopf ja/nein".
+    auf 0, ein Vier-Bank-Kopf auf 4 und ein 3-Zonen-Wash auf 3: der Waechter
+    ZAEHLT, er erkennt nicht bloss „Pixel-Kopf ja/nein".
+  * ``strahl_fenster`` sagt, wo der Richtungs-Strahl den Kranz kreuzt.
   * ``icon_kranz`` misst am Listen-Icon in der **Vorgabegroesse 16**, mit der
-    jeder Produktionsaufrufer ruft: wie viel der Kopfflaeche leuchtet heller als
-    die Kopfmitte. Beim Pixel-Kopf die Haelfte, beim Moving Head nichts (dessen
-    Mitte IST das Hellste).
+    jeder Produktionsaufrufer ruft: Kopfmitte, leuchtender Anteil und die
+    groesste Luecke im Kranz.
 
 **Was dabei ueber das Produkt herauskam.** Die Segmente sind nicht in jeder
 Groesse einzeln zaehlbar: bei der Live-View-Vorgabegroesse 30 px liegen 19
-Punkte auf 8 px Radius und verlaufen zum leuchtenden Kranz (gemessen 15 von 19
-trennbar), beim 16-px-Icon erst recht. Das ist so gewollt und in der Sache
-richtig — was der Nutzer dort unterscheiden muss, ist *Ring* gegen
-*geschlossene Linse*, und das ist auch klein noch messbar. Die ZAHL wird
-deshalb dort gemessen, wo sie sichtbar ist (lesbare Glyphgroesse), die
-*Erkennbarkeit* dort, wo der Nutzer sie wirklich sieht (Vorgabegroesse).
+Punkte auf 8 px Radius und verlaufen zum leuchtenden Kranz, beim 16-px-Icon erst
+recht. Das ist so gewollt und in der Sache richtig — was der Nutzer dort
+unterscheiden muss, ist *Ring* gegen *geschlossene Linse*, und ob der Ring
+Loecher hat; beides ist auch klein noch messbar. Die ZAHL wird deshalb dort
+gemessen, wo sie sichtbar ist (``MESS_GROESSEN``), die *Erkennbarkeit* dort, wo
+der Nutzer sie wirklich sieht (Vorgabegroesse).
 """
 from __future__ import annotations
 
@@ -83,8 +113,8 @@ from src.ui.visualizer.visualizer_window import VisualizerBridge  # noqa: E402
 
 from _fixture_quelle import frische_library                    # noqa: E402
 from src.core.app_state import (                               # noqa: E402
-    clear_channel_cache, pixel_ring_banks_for, pixel_ring_segments,
-    viz_model_for)
+    clear_channel_cache, get_channels_for_patched, pixel_ring_banks_for,
+    pixel_ring_segments, viz_model_for)
 from src.core.pixel_order import ring_segmente                 # noqa: E402
 from src.core.database.models import (                         # noqa: E402
     FixtureChannel, FixtureMode, FixtureProfile, Manufacturer, PatchedFixture)
@@ -98,16 +128,36 @@ _WASH = "27-Kanal Wash (Mode 5)"
 # Die Zahl aus dem Chart: 20 Farb-Baenke (Grundfarbe + 19 Pixel), Versatz 1.
 ERWARTETE_SEGMENTE = 19
 
-# Glyph-Groesse, bei der die Segmente EINZELN im Bild liegen. Die Vorgabe der
-# Live-View ist 30 px (`live_view.StageCanvas._fixture_size`); dort liegen 19
-# Punkte auf 8 px Radius und verlaufen zum Kranz — gemessen 15 statt 19
-# trennbare Flaechen. Die ZAHL laesst sich nur messen, wo sie sichtbar ist;
-# gemessen ist der Wert 19 stabil ab Glyphgroesse 70 (70/80/90/100/120/160/
-# 200/240 alle 19). 160 ist eine Groesse, die der Nutzer per Zoom und
-# Fixture-Groesse wirklich einstellen kann.
-LESBARE_GROESSE = 160
+# Glyph-Groessen, bei denen die Segmente EINZELN im Bild liegen. Die Vorgabe der
+# Live-View ist 30 px (`live_view.StageCanvas._fixture_size`, mal Zoom); dort
+# liegen 19 Punkte auf 8 px Radius und verlaufen zum Kranz — dann ist die ZAHL
+# im Bild nicht mehr enthalten und wird hier auch nicht behauptet (siehe
+# `test_in_der_vorgabegroesse_bleibt_der_ring_ein_ring`).
+#
+# ★ Warum erst ab 200 und warum mehrere: die erste Fassung mass bei genau EINER
+# Groesse (160) und pinnte sie nicht als Voraussetzung. Der Pruefer hat bei 50
+# und 60 20 statt 19 Flaechen gemessen. Nachgemessen ueber ALLE 256
+# Pan-Stellungen: ab Glyphgroesse 200 stimmt die Zahl ausnahmslos (200/240/320
+# je 256 Stellungen, dazu Vier-Bank- und Drei-Zonen-Kopf), bei 160 kippt sie bei
+# 3 von 256 Stellungen. Der Grund ist Aufloesung, nicht Logik: der
+# Richtungs-Strahl ist 2 px breit — unabhaengig von der Glyphgroesse —, ein
+# Segment auf dem Kranzkreis dagegen nur rund 10 Grad; bei 160 px sind das 7 px,
+# von denen der Strahl bis auf einen Rest zehren kann.
+MESS_GROESSEN = (200, 240, 320)
+LESBARE_GROESSE = MESS_GROESSEN[0]
 # Die Vorgabe der Live-View — die Groesse, in der der Ring beim ersten Start steht.
 VORGABE_GROESSE = 30.0
+# ★ Und nicht an EINER Pan-Stellung: der Strahl dreht mit dem Pan-Kanal ueber
+# den Kranz. Die erste Fassung mass, was der DMX-Zustand des Prozesses gerade
+# hergab (0), und pinnte ihn nicht. Diese Stellungen werden ausdruecklich in das
+# echte DMX-Universe geschrieben; die Winkel dahinter (Pan-Bereich 540 Grad,
+# Nullpunkt DMX 128) sind -271 / 0 / +45 / +123 / +180 Grad.
+PAN_STELLUNGEN = (0, 128, 149, 186, 213)
+# Aufloesung der Kreisabtastung: 0,2 Grad. Feiner bringt nichts — der Kranzkreis
+# ist bei Glyphgroesse 200 nur rund 340 Bildpunkte lang.
+SCHRITTE = 1800
+# Zuschlag auf die Halbbreite des Strahl-Fensters, siehe `strahl_fenster`.
+STRAHL_ZUSCHLAG_GRAD = 2.0
 # Die Vorgabe von `fixture_icon_for(f)`: JEDER Produktionsaufrufer ruft ohne
 # Groessenangabe (patch_view.py, fixture_group_view.py, live_view.py 2x), keine
 # Ansicht setzt `setIconSize`.
@@ -147,8 +197,8 @@ def _hell(bild, x, y) -> int:
     return max(c.red(), c.green(), c.blue())
 
 
-def _kranz_profil(bild, mx, my, radius, schritte=3600) -> list:
-    """Helligkeit entlang des Kranzkreises, in ``schritte`` Winkelschritten."""
+def _kranz_profil(bild, mx, my, radius, schritte=SCHRITTE) -> list:
+    """Helligkeit entlang eines Kreises, in ``schritte`` Winkelschritten."""
     werte = []
     for i in range(schritte):
         w = math.radians(i * 360.0 / schritte)
@@ -157,12 +207,69 @@ def _kranz_profil(bild, mx, my, radius, schritte=3600) -> list:
     return werte
 
 
-def kranz_messung(bild, mx, my, radius, schritte=3600) -> tuple:
+def _winkelabstand(a: float, b: float) -> float:
+    """Kuerzester Abstand zweier Winkel in Grad (0..180)."""
+    return abs((a - b + 180.0) % 360.0 - 180.0)
+
+
+def _laeufe(leuchtet: list) -> list:
+    """Zyklische Laeufe ``(Startindex, Laenge)`` der wahren Stellen."""
+    n = len(leuchtet)
+    return [(i, next(j for j in range(i, i + n + 1)
+                     if not leuchtet[j % n]) - i)
+            for i in range(n) if leuchtet[i] and not leuchtet[i - 1]]
+
+
+def strahl_fenster(bild, mx, my, radius, schritte=SCHRITTE):
+    """``(Winkel, Halbbreite)`` des Richtungs-Strahls — oder ``None``.
+
+    ★★★ Der Befund der zweiten Gegenpruefung (25.08.): die Zaehlung hat den
+    **Pan-Strahl des Kopfes mitgezaehlt**, obwohl ihr Docstring ihn ausschloss.
+    Ein Anteils-Schwellwert reicht dafuer nicht: der Strahl wird NACH den
+    Segmenten gezeichnet (``QPen(color, 2)`` ueber ``color.lighter(160)``), er
+    kann also beides — als eigene Flaeche in einer Luecke auftauchen ODER ein
+    Segment mitten durchschneiden. Gemessen wurde bei gesundem Code je nach
+    Pan-Stellung 19 **oder 20**; 20 ist genau die Zahl, die der UI-52-Fehler
+    ("Bankzahl statt Segmentzahl") erzeugt.
+
+    Deshalb wird der Strahl jetzt **gefunden statt weggeschwellt**. Er ist eine
+    Gerade durch die Kopfmitte; auf einem Kreis mit **halbem** Kranzradius liegt
+    nur er: das Gehaeuse ist dort dunkel (``#1c1c22``), und kein Segmentpunkt
+    reicht so weit nach innen (die Punktgroesse ist auf ``size*0.10`` gedeckelt,
+    der Kranz sitzt auf ``size*0.27`` — die Innenkante liegt also nie unter
+    ``0.63`` Kranzradien). Der laengste leuchtende Lauf auf diesem Kreis ist der
+    Strahl; sein Mittelwinkel ist die Strahlrichtung.
+
+    Weil eine Gerade durch die Mitte auf dem doppelten Radius den **halben**
+    Winkel ueberdeckt, wird die dort gemessene Halbbreite halbiert. Dazu kommt
+    ``STRAHL_ZUSCHLAG_GRAD``: der Messmittelpunkt ist die WELT-Position des
+    Geraets, der gerenderte Glyph-Mittelpunkt liegt bis zu einem halben
+    Bildpunkt daneben — auf dem inneren Kreis schlaegt dieser Versatz doppelt so
+    stark durch wie auf dem Kranz, der geschaetzte Strahlwinkel wandert dadurch
+    um bis zu einem Grad. Der Zuschlag deckt das ab und bleibt weit unter der
+    Breite eines Segments (rund 10 Grad).
+    """
+    innen = _kranz_profil(bild, mx, my, radius * 0.5, schritte)
+    tief, hoch = min(innen), max(innen)
+    if hoch - tief < 15:
+        return None                     # kein Strahl (geschlossene Linse)
+    leuchtet = [v > tief + 0.5 * (hoch - tief) for v in innen]
+    if all(leuchtet):
+        return None
+    laeufe = _laeufe(leuchtet)
+    if not laeufe:
+        return None
+    start, breite = max(laeufe, key=lambda t: t[1])
+    grad = 360.0 / schritte
+    return ((start + breite / 2.0) * grad,
+            STRAHL_ZUSCHLAG_GRAD + 0.5 * (breite / 2.0) * grad)
+
+
+def kranz_messung(bild, mx, my, radius, schritte=SCHRITTE) -> tuple:
     """``(Kontrast, Zahl der leuchtenden Flaechen)`` — gemessen AM BILD.
 
-    ★★★ Die Antwort auf den Gegenpruefungs-Befund vom 25.08.: gezaehlt wird
-    nicht mehr, mit welcher Zahl ``ring_offsets`` gerufen wird, sondern wie
-    viele zusammenhaengende helle Stellen auf dem Kranzkreis tatsaechlich
+    Gezaehlt wird nicht, mit welcher Zahl ``ring_offsets`` gerufen wird, sondern
+    wie viele zusammenhaengende helle Stellen auf dem Kranzkreis tatsaechlich
     LIEGEN. Alles, was zwischen Naht und Bild schiefgehen kann — ein ``break``,
     ein ``[:1]``, eine Farbe mit Alpha 0, ein Platz ausserhalb des Rechtecks —
     faellt damit auf.
@@ -171,15 +278,22 @@ def kranz_messung(bild, mx, my, radius, schritte=3600) -> tuple:
     Er entscheidet, ob ueberhaupt etwas moduliert ist: die geschlossene Linse
     eines gewoehnlichen Moving Heads ist auf diesem Kreis praktisch gleichmaessig
     hell (gemessen Spanne 2..8 von 255), der Ring des Pixel-Kopfes nicht
-    (gemessen 73..84).
+    (gemessen 76..83).
 
     Die Schwelle ist bewusst **absolut nach unten begrenzt** (mindestens 40 ueber
     dem dunkelsten Punkt): eine reine Anteils-Schwelle wuerde auf einer flachen
     Flaeche das Quantisierungsrauschen abtasten und dort Dutzende „Segmente"
-    finden — ein Waechter, der alles beanstandet. Nach oben zaehlt der Anteil
-    (55 % der Spanne), damit der Richtungs-Strahl des Kopfes (er kreuzt den
-    Kranzkreis, ist aber nur ``color`` statt ``color.lighter(160)``) nicht als
-    zusaetzliches Segment durchgeht.
+    finden — ein Waechter, der alles beanstandet.
+
+    ★★★ Der **Richtungs-Strahl** wird nicht weggeschwellt, sondern
+    ausgeschnitten: ``strahl_fenster`` liefert, wo er den Kranzkreis kreuzt; die
+    Proben in diesem Fenster werden aus der Folge ENTFERNT (nicht auf dunkel
+    gesetzt). Damit stimmt die Zahl in beiden Faellen, die der Strahl anrichten
+    kann: liegt er in einer Luecke, faellt seine Flaeche ersatzlos weg;
+    schneidet er ein Segment durch, ruecken die beiden Bruchstuecke zusammen und
+    zaehlen wieder als EINES. Gemessen ueber alle 256 Pan-Stellungen und die
+    Glyphgroessen 200/240/320: Spiider 19, Vier-Bank-Kopf 4, Drei-Zonen-Wash 3
+    — ausnahmslos.
 
     Der Kreis wird zyklisch ausgewertet: eine Flaeche ueber 0 Grad hinweg zaehlt
     einmal, nicht zweimal.
@@ -188,35 +302,77 @@ def kranz_messung(bild, mx, my, radius, schritte=3600) -> tuple:
     tief, hoch = min(werte), max(werte)
     schwelle = tief + max(40.0, 0.55 * (hoch - tief))
     leuchtet = [v > schwelle for v in werte]
-    flaechen = sum(1 for i in range(schritte)
-                   if leuchtet[i] and not leuchtet[i - 1])
-    return hoch - tief, flaechen
+    fenster = strahl_fenster(bild, mx, my, radius, schritte)
+    if fenster is not None:
+        winkel, halb = fenster
+        grad = 360.0 / schritte
+        leuchtet = [leuchtet[i] for i in range(schritte)
+                    if _winkelabstand(i * grad, winkel) > halb]
+    if not any(leuchtet):
+        return hoch - tief, 0
+    if all(leuchtet):
+        return hoch - tief, 1
+    return hoch - tief, sum(1 for i in range(len(leuchtet))
+                            if leuchtet[i] and not leuchtet[i - 1])
 
 
 def icon_kranz(bild, s) -> tuple:
-    """``(Helligkeit der Kopfmitte, leuchtender Anteil der Kopfflaeche)``.
+    """``(Kopfmitte, leuchtender Anteil, groesste Luecke im Kranz)`` — am BILD.
 
-    Fuer das Listen-Icon in der Vorgabegroesse 16. Dort verlaufen 19 Punkte auf
-    knapp 2 px Kranzradius zu einem Ring — EINZELN zaehlbar sind sie nicht mehr,
-    und der Kranzkreis selbst trifft nur rund zehn verschiedene Bildpunkte. Ein
-    Winkelprofil misst in dieser Groesse mehr Rundungsfehler als Ring.
+    Fuer das Listen-Icon in der Vorgabegroesse 16, mit der jeder
+    Produktionsaufrufer ruft. Dort verlaufen 19 Punkte auf knapp 2 px
+    Kranzradius zu einem Ring — EINZELN zaehlbar sind sie nicht mehr, und der
+    Kranzkreis selbst trifft nur rund zehn verschiedene Bildpunkte. Ein
+    Winkelprofil wie in der Live-View misst in dieser Groesse mehr
+    Rundungsfehler als Ring.
 
-    Gemessen wird deshalb die **Flaeche**: alle Bildpunkte innerhalb des
-    Kopfgehaeuses (``d <= 0.17s`` um ``(0.5s, 0.46s)`` — die Kreisdaten des
-    Zeichners ``mini_icons._draw_pixel_head``), und davon der Anteil, der
-    deutlich heller ist als die Kopfmitte.
+    Gemessen werden deshalb die Bildpunkte des Kopfgehaeuses (``d <= 0.17s`` um
+    ``(0.5s, 0.46s)`` — die Kreisdaten des Zeichners
+    ``mini_icons._draw_pixel_head``), und zwar zweierlei:
 
-    Das ist genau die Unterscheidung, auf die es in dieser Groesse ankommt:
-    **Ring gegen geschlossene Linse.** Beim Pixel-Kopf ist die Mitte das dunkle
-    Gehaeuse und der Kranz traegt die Farbe; beim gewoehnlichen Moving Head ist
-    die Mitte das Hellste im Bild, der Anteil also 0.
+      * **Anteil** — wie viele davon deutlich heller sind als die Kopfmitte.
+        Das unterscheidet *Ring* von *geschlossener Linse*: beim Pixel-Kopf ist
+        die Mitte das dunkle Gehaeuse, beim gewoehnlichen Moving Head das
+        Hellste im Bild (Anteil 0).
+      * **★★★ Groesste Luecke** — der groesste Winkelabstand zwischen zwei
+        benachbarten leuchtenden Bildpunkten (zyklisch, in Grad). Das ist die
+        Antwort auf den Befund der zweiten Gegenpruefung: der Anteil allein ist
+        nur ein Flaechenmass, und mit Schwelle 0.30 durfte das Icon **8 seiner
+        19 Segmente verlieren** (Anteil faellt nur von 0.50 auf 0.33), ohne dass
+        etwas rot wurde. Die Luecke faellt sofort auf: gesund 39,6 Grad, mit
+        15 statt 19 Segmenten 106,7 Grad, mit 11 dann 151,8 Grad, mit einem
+        einzigen 333,7 Grad.
+
+    **Was diese Messung deckt und was nicht.** Sie deckt: *ist ein
+    geschlossener Kranz gezeichnet worden, oder fehlt ein Stueck davon* — und
+    das ist genau die Frage, die bei 16 px ueberhaupt entscheidbar ist. Sie
+    deckt NICHT die genaue Segment-ZAHL; 19 gegen 18 ist in dieser Groesse kein
+    Bildunterschied mehr. Die Zahl wird dort gemessen, wo sie sichtbar ist — in
+    der Live-View bei lesbarer Glyphgroesse (``kranz_messung``) — und die
+    Zeichenschleife dahinter ist dieselbe ``ring_offsets``-Schleife.
+    Geraete mit wenigen Segmenten haben naturgemaess Luecken (Drei-Zonen-Wash
+    gemessen 85 Grad); die Luecken-Zusage gilt deshalb dem dichten Kranz des
+    Spiiders.
     """
     mx, my = s * 0.5, s * 0.46
     mitte = _hell(bild, mx, my)
-    kopf = [_hell(bild, x, y)
-            for y in range(s) for x in range(s)
-            if math.hypot(x + 0.5 - mx, y + 0.5 - my) <= s * 0.17]
-    return mitte, sum(1 for v in kopf if v > mitte + 60) / max(1, len(kopf))
+    kopf, winkel = [], []
+    for y in range(s):
+        for x in range(s):
+            if math.hypot(x + 0.5 - mx, y + 0.5 - my) > s * 0.17:
+                continue
+            v = _hell(bild, x, y)
+            kopf.append(v)
+            if v > mitte + 60:
+                winkel.append(math.degrees(
+                    math.atan2(y + 0.5 - my, x + 0.5 - mx)) % 360.0)
+    anteil = sum(1 for v in kopf if v > mitte + 60) / max(1, len(kopf))
+    if len(winkel) < 2:
+        return mitte, anteil, 360.0
+    winkel.sort()
+    luecke = max([b - a for a, b in zip(winkel, winkel[1:])]
+                 + [winkel[0] + 360.0 - winkel[-1]])
+    return mitte, anteil, luecke
 
 
 class _RingZaehler:
@@ -395,6 +551,35 @@ class _LiveViewCase(_LibraryCase):
         self.addCleanup(lambda: c._state.__dict__.pop("get_patched_fixtures", None))
         return c
 
+    def _pan_setzen(self, fixture, dmx: int) -> int:
+        """Schreibt die Pan-Stellung in das ECHTE DMX-Universe und prueft sie.
+
+        ★ Der Befund der zweiten Gegenpruefung: die Bildmessung hing an einer
+        Pan-Stellung, die NIEMAND gesetzt hatte — sie kam aus dem DMX-Zustand
+        des Prozesses (alles 0) und war damit eine unausgesprochene
+        Voraussetzung. Hier wird sie ausdruecklich gesetzt, und zwar auf dem
+        Weg, den auch der Betrieb geht: ``paintEvent`` liest den Pan-Wert ueber
+        ``universe.get_channel`` aus demselben Universe, in das Renderer, MIDI
+        und Netz schreiben. Der alte Wert wird danach wiederhergestellt — die
+        Universes leben modulweit und ueberdauern die Testdatei.
+        """
+        universe = self._canvas_state().universes.get(fixture.universe)
+        self.assertIsNotNone(universe, "Universe 1 fehlt — nichts zu setzen")
+        kanaele = [ch for ch in get_channels_for_patched(fixture)
+                   if ch.attribute == "pan"]
+        self.assertEqual(len(kanaele), 1,
+                         "das Testgeraet muss genau einen Pan-Kanal haben")
+        addr = fixture.address + kanaele[0].channel_number - 1
+        vorher = universe.get_channel(addr)
+        self.addCleanup(universe.set_channel, addr, vorher)
+        universe.set_channel(addr, dmx)
+        self.assertEqual(universe.get_channel(addr), dmx,
+                         "die Pan-Stellung ist nicht im Universe angekommen")
+        return addr
+
+    def _canvas_state(self):
+        return live_view.get_state()
+
     def _gezeichnet(self, fixture):
         """Rendert die Canvas EINMAL ueber den echten paintEvent."""
         zaehler = _RingZaehler(self)
@@ -482,20 +667,35 @@ class LiveViewBildTest(_LiveViewCase):
 
     def test_das_bild_zeigt_neunzehn_leuchtende_segmente(self):
         """★★★ Die Zusage des Items, am Bild gepruefte Fassung: der Ring hat
-        genau so viele SICHTBARE Segmente, wie das 3D Segmente bekommt."""
-        kontrast, flaechen = self._kranz(self._spiider(_PIXEL))
-        self.assertGreaterEqual(
-            kontrast, 40,
-            "auf dem Kranzkreis ist gar nichts moduliert — es wurde kein Ring "
-            "gezeichnet")
-        self.assertEqual(flaechen, ERWARTETE_SEGMENTE,
-                         "so viele leuchtende Flaechen liegen wirklich auf dem "
-                         "Kranz")
+        genau so viele SICHTBARE Segmente, wie das 3D Segmente bekommt.
+
+        ★ Und zwar **ohne unausgesprochene Voraussetzung**: die erste Fassung
+        mass bei genau einer Glyphgroesse und der Pan-Stellung, die der
+        DMX-Zustand des Prozesses gerade hergab. Der Pruefer hat gezeigt, dass
+        derselbe gesunde Spiider bei anderen Pan-Winkeln und Groessen auf 20
+        kam — auf die Zahl also, die der UI-52-Fehler erzeugt. Jetzt werden
+        beide Voraussetzungen gesetzt und durchgefahren.
+        """
+        f = self._spiider(_PIXEL)
+        for dmx in PAN_STELLUNGEN:
+            self._pan_setzen(f, dmx)
+            for groesse in MESS_GROESSEN:
+                with self.subTest(pan=dmx, groesse=groesse):
+                    kontrast, flaechen = self._kranz(f, groesse)
+                    self.assertGreaterEqual(
+                        kontrast, 40,
+                        "auf dem Kranzkreis ist gar nichts moduliert — es wurde "
+                        "kein Ring gezeichnet")
+                    self.assertEqual(
+                        flaechen, ERWARTETE_SEGMENTE,
+                        "so viele leuchtende Flaechen liegen wirklich auf dem "
+                        "Kranz")
 
     def test_die_gezaehlten_flaechen_sind_die_zahl_der_3d_nutzlast(self):
         """★★ 2D-Bild gegen 3D-Nutzlast, ohne Zwischenhaendler."""
         f = self._spiider(_PIXEL)
         d = _dict_for(f)
+        self._pan_setzen(f, PAN_STELLUNGEN[-1])
         _kontrast, flaechen = self._kranz(f)
         self.assertEqual(flaechen, ring_segmente(d["nHeads"], d["pixelBase"])[1])
 
@@ -503,10 +703,36 @@ class LiveViewBildTest(_LiveViewCase):
         """★ Die geforderte Gegenprobe: dieselbe Zaehlung am Wash-Kopf. Seine
         Linse ist auf dem Kranzkreis gleichmaessig hell — keine Flaeche, kein
         Kontrast. Ein Waechter, der auch hier 19 faende, wuerde nichts messen."""
-        kontrast, flaechen = self._kranz(self._spiider(_WASH, fid=2))
-        self.assertEqual(flaechen, 0)
-        self.assertLess(kontrast, 20,
+        f = self._spiider(_WASH, fid=2)
+        for dmx in PAN_STELLUNGEN:
+            self._pan_setzen(f, dmx)
+            for groesse in MESS_GROESSEN:
+                with self.subTest(pan=dmx, groesse=groesse):
+                    kontrast, flaechen = self._kranz(f, groesse)
+                    self.assertEqual(flaechen, 0)
+                    self.assertLess(
+                        kontrast, 20,
                         "die geschlossene Linse darf nicht moduliert sein")
+
+    def test_ein_vier_bank_kopf_wird_als_vier_gezaehlt(self):
+        """★★★ Die Positivkontrolle, die der Pruefer verlangt hat: der GESUNDE
+        Fall darf nicht beanstandet werden.
+
+        Ein Vier-Bank-Pixel-Kopf ist keine Randerscheinung — 21 der 88
+        ``pixel_head``-Modi in der Bibliothek des Nutzers haben genau vier
+        Segmente. Die alte Messung zaehlte ihn wegen des Richtungs-Strahls als
+        FUENF. Hier muss bei jeder Pan-Stellung und jeder Groesse die Vier
+        stehen."""
+        f = self._zonen_wash(4, fid=4, label="Wash4")
+        self.assertEqual(viz_model_for(f), "pixel_head")
+        self.assertEqual(pixel_ring_banks_for(f), (4, 0))
+        for dmx in PAN_STELLUNGEN:
+            self._pan_setzen(f, dmx)
+            for groesse in MESS_GROESSEN:
+                with self.subTest(pan=dmx, groesse=groesse):
+                    kontrast, flaechen = self._kranz(f, groesse)
+                    self.assertGreaterEqual(kontrast, 40)
+                    self.assertEqual(flaechen, 4)
 
     def test_ein_drei_zonen_wash_zeigt_genau_drei_flaechen(self):
         """★★ Der Waechter ZAEHLT, er erkennt nicht bloss den Typ: dasselbe
@@ -516,9 +742,13 @@ class LiveViewBildTest(_LiveViewCase):
         f = self._zonen_wash(3)
         self.assertEqual(viz_model_for(f), "pixel_head")
         self.assertEqual(pixel_ring_banks_for(f), (3, 0))
-        kontrast, flaechen = self._kranz(f)
-        self.assertGreaterEqual(kontrast, 40)
-        self.assertEqual(flaechen, 3)
+        for dmx in PAN_STELLUNGEN:
+            self._pan_setzen(f, dmx)
+            for groesse in MESS_GROESSEN:
+                with self.subTest(pan=dmx, groesse=groesse):
+                    kontrast, flaechen = self._kranz(f, groesse)
+                    self.assertGreaterEqual(kontrast, 40)
+                    self.assertEqual(flaechen, 3)
 
     def test_in_der_vorgabegroesse_bleibt_der_ring_ein_ring(self):
         """★★ Die Groesse, die beim ersten Start steht (30 px). Einzeln zaehlbar
@@ -526,14 +756,18 @@ class LiveViewBildTest(_LiveViewCase):
         Flaechen) — der Unterschied, auf den es hier ankommt, ist auch ein
         anderer: **moduliertes Leuchten gegen geschlossene Linse.** Genau das
         wird gemessen, und der Moving Head daneben."""
-        kontrast, flaechen = self._kranz(self._spiider(_PIXEL),
-                                         VORGABE_GROESSE)
-        self.assertGreaterEqual(kontrast, 40)
-        self.assertGreater(flaechen, 0)
-        mh_kontrast, mh_flaechen = self._kranz(self._spiider(_WASH, fid=2),
-                                               VORGABE_GROESSE)
-        self.assertEqual(mh_flaechen, 0)
-        self.assertLess(mh_kontrast, 20)
+        pixel = self._spiider(_PIXEL)
+        mh = self._spiider(_WASH, fid=2)
+        for dmx in PAN_STELLUNGEN:
+            self._pan_setzen(pixel, dmx)
+            self._pan_setzen(mh, dmx)
+            with self.subTest(pan=dmx):
+                kontrast, flaechen = self._kranz(pixel, VORGABE_GROESSE)
+                self.assertGreaterEqual(kontrast, 40)
+                self.assertGreater(flaechen, 0)
+                mh_kontrast, mh_flaechen = self._kranz(mh, VORGABE_GROESSE)
+                self.assertEqual(mh_flaechen, 0)
+                self.assertLess(mh_kontrast, 20)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -603,32 +837,56 @@ class ListenIconVorgabeTest(_LibraryCase):
         return bild
 
     def test_der_pixel_kopf_zeigt_auch_bei_sechzehn_pixeln_einen_ring(self):
-        """★★★ Das Produkt-Urteil: in der Groesse, die der Nutzer wirklich
-        sieht, ist die Kopfmitte dunkel und rundherum leuchtet es — der Ring ist
-        als Ring erkennbar. Gemessen: Mitte 106, 12 der 24 Kopfpunkte deutlich
-        heller (mit nur EINEM gezeichneten Segment waeren es 2)."""
-        mitte, anteil = icon_kranz(self._bild(self._spiider(_PIXEL)),
-                                   ICON_VORGABE)
+        """★★★ Das Produkt-Urteil in der Groesse, die der Nutzer wirklich sieht:
+        die Kopfmitte ist dunkel, rundherum leuchtet es, und der Kranz ist
+        **geschlossen**.
+
+        ★ Der Befund der zweiten Gegenpruefung: die Zahl der Segmente wurde beim
+        Listen-Icon nur an der Naht gemessen (``_RingZaehler`` auf
+        ``ring_offsets``), am Bild nur ein grober Flaechenanteil mit Schwelle
+        0.30. Damit durfte das Icon **8 seiner 19 Segmente verlieren** — ein
+        Ring mit 42 Prozent Luecke — und die Datei blieb gruen. Zwischen Naht
+        und Bild liegt aber dieselbe Zeichenschleife wie in der Live-View.
+
+        Deshalb misst dieser Test jetzt die groesste Luecke im Kranz. Gemessen
+        am gesunden Icon: Mitte 106, 12 der 24 Kopfpunkte deutlich heller,
+        groesste Luecke 39,6 Grad. Schon vier fehlende Segmente heben sie auf
+        106,7 Grad. Was diese Messung deckt und was nicht, steht bei
+        ``icon_kranz``."""
+        mitte, anteil, luecke = icon_kranz(self._bild(self._spiider(_PIXEL)),
+                                           ICON_VORGABE)
         self.assertGreaterEqual(
             anteil, 0.30,
             "im Kopf leuchtet fast nichts — was gezeichnet wurde, ist kein Ring")
         self.assertLess(mitte, 160, "die Kopfmitte muss das dunkle Gehaeuse "
                                     "sein, nicht die Linse")
+        self.assertLessEqual(
+            luecke, 50.0,
+            "der Kranz hat ein Loch — es sind Segmente verlorengegangen "
+            "(gesund 39,6 Grad; mit 15 von 19 Segmenten schon 106,7 Grad)")
 
     def test_der_moving_head_hat_dort_keinen_ring(self):
         """★ Die Gegenprobe mit derselben Messung: beim gewoehnlichen Kopf IST
-        die Mitte das Hellste — kein Punkt im Kopf liegt darueber."""
-        mitte, anteil = icon_kranz(self._bild(self._spiider(_WASH, fid=2)),
-                                   ICON_VORGABE)
+        die Mitte das Hellste — kein Punkt im Kopf liegt darueber, es gibt
+        keinen Kranz und damit auch keine Luecke zu messen."""
+        mitte, anteil, luecke = icon_kranz(
+            self._bild(self._spiider(_WASH, fid=2)), ICON_VORGABE)
         self.assertEqual(anteil, 0.0)
+        self.assertEqual(luecke, 360.0)
         self.assertGreaterEqual(mitte, 200)
 
     def test_ein_drei_zonen_wash_zeigt_dort_ebenfalls_seinen_ring(self):
-        """Die Geraeteklasse aus der Gegenpruefung, auch im Listen-Icon."""
-        mitte, anteil = icon_kranz(self._bild(self._zonen_wash(3)),
-                                   ICON_VORGABE)
+        """Die Geraeteklasse aus der Gegenpruefung, auch im Listen-Icon.
+
+        Bei DREI Segmenten ist der Kranz naturgemaess nicht geschlossen
+        (gemessen 85,3 Grad Luecke) — hier deckt die Messung nur, dass ueberhaupt
+        ein Kranz statt einer Linse gezeichnet ist. Die Luecken-Zusage oben gilt
+        dem dichten Kranz des Spiiders."""
+        mitte, anteil, luecke = icon_kranz(self._bild(self._zonen_wash(3)),
+                                           ICON_VORGABE)
         self.assertGreaterEqual(anteil, 0.30)
         self.assertLess(mitte, 160)
+        self.assertLess(luecke, 360.0, "es leuchtet gar kein Kranz")
 
     def test_die_segmentzahl_erreicht_auch_das_bild_der_vorgabegroesse(self):
         """★★ Dass bei 16 px ueberhaupt noch die ZAHL ankommt und nicht nur
