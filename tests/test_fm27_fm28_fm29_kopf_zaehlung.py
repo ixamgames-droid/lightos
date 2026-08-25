@@ -17,11 +17,20 @@ Befund      Geraet (echtes Library-Profil)        Antwort VORHER             ric
 Was daraus in der Oberflaeche wurde, ist am gebauten Regler gemessen:
 
 * **FM-29** Die 5 Intensity-Kanaele der Hydrabeam sind ``CH1 Master Dimmer`` +
-  ``CH9/12/15/18 Kopf 1..4 Dimmer``. Die Gruppen-Zelle ``1:4`` (Kopf-Index 4)
-  erzeugte damit einen Regler „Kopf 4 Dimmer · **K5**" — und der schrieb ueber
+  ``CH9/12/15/18 Kopf 1..4 Dimmer``. Die Zelle ``1:4`` (Kopf-Index 4) erzeugte
+  damit einen Regler „Kopf 4 Dimmer · **K5**" — und der schrieb ueber
   ``intensity#4`` auf **denselben** CH18 wie der danebenstehende „· K4".
-  **Zwei Regler auf einem Kanal**, einer davon falsch beschriftet: wer K4
-  hochzieht und danach K5, sieht seinen ersten Zug ueberschrieben.
+  **Zwei Regler auf einem Kanal**, einer davon falsch beschriftet.
+  ★ **Ehrlich dazugesagt** (Gegenpruefung zu #663): diese Zelle ist ueber die
+  Oberflaeche NICHT erzeugbar. Die Geraeteliste bietet vier Kopf-Zeilen
+  (``_head_row_count`` = 4), das Gruppen-Raster teilt erst ab zwei Farbbaenken
+  auf (die Hydrabeam 19ch hat eine), und die Kommandozeile weist ``1:5`` ab.
+  Erreichbar wird sie als **Altlast**: Kopf-Zellen ueberleben einen
+  Kanal-Modus-Wechsel. Was sie dann auf der Buehne tut, misst
+  ``AltlastKopfZelleAufDemMidiWegTest`` am echten MIDI-Weg — und dass keine
+  ERREICHBARE Zelle durch die neue Zaehlung ihren Kopf verliert, misst
+  ``KeineErreichbareKopfZelleVerliertIhrenKopfTest`` ueber die ganze Bibliothek.
+  Der Rest von FM-29 ist damit Absicherung, kein vorgefuehrter Nutzerschaden.
 * **FM-27** Ein Attribut, das ein Geraet gar nicht hat, galt als „hat Kopf 1".
   Der ``speed``-Regler von Kopf 1 trieb damit ``MOVBAR4`` mit, obwohl die
   keinen ``speed``-Kanal hat: der Wert landete im Programmer-Dict und
@@ -231,8 +240,16 @@ class KopfzahlGegenDieBibliothekTest(_Basis):
 
 
 class FM29ZweiReglerAufEinemKanalTest(_Basis):
-    """Der gemeldete Ausgang: die Gruppen-Zelle ``1:4`` baute einen fuenften
-    Dimmer-Regler, der auf den Kanal des vierten schrieb."""
+    """Der gemeldete Ausgang: die Zelle ``1:4`` baute einen fuenften
+    Dimmer-Regler, der auf den Kanal des vierten schrieb.
+
+    ★ Die Zelle wird hier ueber ``set_selected_cells`` gesetzt, weil es fuer sie
+    **keinen Bedienweg gibt** — die Geraeteliste bietet vier Kopf-Zeilen, das
+    Raster teilt dieses Profil nicht auf, die Kommandozeile weist ``1:5`` ab.
+    Gemessen wird also die ZAEHLUNG und ihre Wirkung auf den Regler-Bau, nicht
+    ein erreichbarer Nutzerschaden; die Zelle entsteht in der Praxis als
+    Altlast eines Kanal-Modus-Wechsels. Deren Buehnenwirkung misst
+    ``AltlastKopfZelleAufDemMidiWegTest`` am echten MIDI-Weg."""
 
     def _dimmer_regler(self, cells) -> dict:
         return {kopf: (fids, s) for kopf, fids, s
