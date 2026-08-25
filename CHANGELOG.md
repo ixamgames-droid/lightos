@@ -69,6 +69,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   laeuft, darf nicht darauf angewiesen sein, dass jede Datei der Suite vorher
   aufgeraeumt hat.
 
+### 2026-08-24 — Der Pixel-Kopf sieht in der 2D-Ansicht auch wie einer aus
+
+#### Behoben
+
+- **Ein Moving Head mit LED-Ring stand in der 2D-Live-View als gewöhnlicher
+  Moving Head da.** Im 3D zeigt er seit Längem seinen Ring, in der Draufsicht
+  bekam er den Diamant-mit-Linse-Kopf aller anderen Mover — dasselbe Gerät sah
+  in beiden Ansichten verschieden aus, und wer den Ring suchte, musste in die
+  3D-Vorschau wechseln. Jetzt zeichnet die 2D-Ansicht seine Segmente: **so
+  viele, wie das Gerät wirklich hat** (Robe Spiider im Pixel-Modus: 19, nicht
+  20 — die erste Farbbank ist die Grundfarbe des Kopfes und kein Ring-Pixel).
+
+- **In Listen und im Gruppenbaum fehlte dieselbe Unterscheidung.** Ein
+  Pixel-Kopf ist als `moving_head` gepatcht und bekam deshalb auch dort das
+  gewöhnliche Icon. Er hat jetzt sein eigenes — Kopf mit Ring statt
+  geschlossener Linse, ebenfalls mit der echten Segmentzahl.
+
+- **Welche Geräte das betrifft — genauer als beim ersten Anlauf.** Das neue
+  Symbol bekommt jeder Kopf, den LightOS schon vorher als Ring-/Zonen-Kopf
+  geführt hat: **ein Pan, ein Tilt und mindestens drei Farbbänke.** Das sind
+  nicht nur die offensichtlichen Pixel-Köpfe: in der mitgelieferten Bibliothek
+  fällt der Spiider darunter, in einer großen importierten Bibliothek auch
+  Wash-Köpfe mit drei Zonen (Robin 600 LED Wash, Robin 800 LEDWash, A.leda
+  B-EYE, Intimidator Trio — nachgezählt 88 von 5122 Modi). **Neu ist daran nur
+  die 2D-Ansicht:** die Einstufung gilt seit FM-14, und die 3D-Vorschau zeigt
+  diesen Geräten längst ihren Ring — bis hierher widersprachen sich die beiden
+  Ansichten, jetzt nicht mehr. Ein Kopf mit **weniger als drei** Farbbänken
+  (jeder gewöhnliche Mover, jeder Ein-Farb-Wash) behält sein bisheriges Symbol
+  Pixel für Pixel.
+
+- **Wie groß der Ring zu sehen ist.** In lesbarer Darstellung liegt für jedes
+  Segment ein eigener Punkt auf dem Kranz; in der Vorgabegröße der Live-View
+  (30 px) und erst recht im 16-px-Listen-Icon verlaufen 19 Punkte zu einem
+  leuchtenden Ring. Das ist so gewollt — was auf einen Blick zu erkennen sein
+  muss, ist *Ring gegen geschlossene Linse*, und das bleibt auch klein sichtbar
+  (nachgemessen an den gerenderten Bildern, nicht am Code).
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
