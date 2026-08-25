@@ -7,6 +7,46 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Der Backlog kann jetzt sagen, ob er noch stimmt
+
+#### Hinzugefuegt
+
+- **`tools/backlog_status_drift.py` misst, ob der Status im `BACKLOG.md` noch
+  zum Code auf `main` passt.** Beide Driftrichtungen kosten: ein Item auf `todo`,
+  dessen Arbeit laengst gelandet ist, wird erneut angeboten und ein zweites Mal
+  gebaut; eines auf `done`, dessen Zweig nie landete, rutscht als erledigt durch.
+  Jedes Item kann eine *Spur* hinterlegen — eine Datei und ein Kennzeichen darin,
+  das es genau dann auf `main` gibt, wenn die Arbeit gelandet ist:
+  `<!-- spur: tools/zeitbomben_gate.py :: ZEITSPRUNG-WIRKSAM -->`. Der erste Lauf
+  fand vier Drifts, darunter ein Item, das auf die **erste von drei**
+  Zweigfassungen zeigte.
+- **Der Bericht nennt immer die Abdeckung** („10 von 471 Items haben eine Spur").
+  Ohne sie saehe „keine Drift" bei null hinterlegten Spuren aus wie ein sauberer
+  Backlog — und das waere derselbe stille Ausfall wie bei PROC-04.
+
+#### Verworfen (und warum es hier steht)
+
+- **Die naheliegende Pruefung „ist der Zweig in `main`?" funktioniert nicht.**
+  Hier wird squash-gemerged; der Squash erzeugt einen neuen Commit, die
+  Zweigspitze wird nie ein Vorfahr von `main`. An vier Zweigen gemessen, davon
+  zwei nachweislich gelandet — `git merge-base --is-ancestor` sagte bei allen
+  vieren „nicht gemerged". Ein Waechter, der alles beanstandet, wird abgeschaltet.
+- **Die breite Zweig-Erkennung ebenso.** Jeder Backtick der Form `a/b` als
+  Zweigname gelesen: 60 beanstandete Zeilen, fast alle davon gewoehnliche
+  Dateipfade. Der enge Zuschnitt fand dieselbe eine echte Drift und sonst nichts.
+
+#### Nebenbei
+
+- **Das Werkzeug hat sich selbst beanstandet — und hatte recht.** QA-64 stand
+  kurzzeitig auf `teils`, waehrend seine eigene Spur noch in diesem PR lag und
+  nicht auf `main`. Genau die Drift, gegen die es gebaut ist. Der Status steht
+  jetzt auf `review`, bis der PR landet.
+- **Vier Drifts im Bestand behoben:** QA-63 und FM-25 standen auf `review (nicht
+  gemerged)`, obwohl beide seit dem 24.08. auf `main` sind; PROC-04 ebenso; und
+  FM-14b nannte die erste von drei Zweigfassungen — die enthielt drei von vier
+  Commits nicht. Wer das Item aufgenommen haette, haette die aelteste Fassung
+  gefunden und die Nacharbeit ein zweites Mal gemacht.
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
