@@ -100,6 +100,15 @@ Datenschutz, sondern Arbeitsverweigerung.
 
 **Deshalb die Regel: Inhalt vollstaendig, Person und Nutzdaten pseudonym.**
 
+> ★ **Entscheidung vom 26.08.2026 (PRIV-03): die Regel gilt ab jetzt, NICHT
+> rueckwirkend.** Der Bestand — 495 Stellen in 184 Dateien — bleibt stehen;
+> `tools/pseudonymisieren.py --anwenden` wird nicht gefahren. Der Grund ist
+> nicht der Aufwand, sondern dass die Ersetzung fast jede Datei anfasst und
+> damit jeden offenen Zweig in einen Konflikt zwingt — und dass die
+> Git-Historie den Namen ohnehin behielte. Das Werkzeug bleibt erhalten, die
+> Entscheidung ist umkehrbar. **Fuer neue Texte gilt die Tabelle unten ohne
+> Ausnahme.**
+
 | Darf hinein | Muss draussen bleiben / pseudonymisiert werden |
 |---|---|
 | Befunde, Messwerte, `file:line`, Repro-Wege | Show-Dateien, Show-Datenbank, `universes.json`, MIDI-Mappings |
