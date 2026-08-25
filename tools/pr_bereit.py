@@ -7,6 +7,13 @@ sind:
 
 1. **Nie geprueft.** Am 24.08.2026 bekamen zwei PRs (#653, #659) fuer keinen
    ihrer Commits einen einzigen Check-Run — ``total_count`` = 0, Run-Liste leer.
+
+   ★ **Frisch gepusht sieht genauso aus.** GitHub legt die Check-Runs erst ein
+   paar Sekunden nach dem Push an; am 25.08. an #661 und #665 beobachtet, beide
+   erholten sich von selbst. Deshalb wird ein Kopf-Commit, der juenger als
+   ``FRISCH_SEKUNDEN`` ist, NICHT als "nie geprueft" gemeldet, sondern als
+   "gerade gepusht". Ohne diese Unterscheidung meldet das Werkzeug bei jedem
+   Push Fehlalarm — und ein Waechter, der das tut, wird umgangen.
    Kein Draft, Basis ``main``, Trigger passend, Nachbar-PRs derselben Stunde
    liefen normal. Die Merge-Schaltflaeche unterscheidet diesen Zustand nicht von
    „alles gruen", und ``gh pr merge`` fuehrt ihn kommentarlos aus.
@@ -44,6 +51,10 @@ import sys
 
 BEREIT = "bereit"
 NIE_GEPRUEFT = "nie geprueft"
+FRISCH = "gerade gepusht"
+# Wie lange nach einem Push "noch keine Check-Runs" normal ist. Grosszuegig
+# gewaehlt: ein Fehlalarm kostet Vertrauen, ein paar Minuten Geduld nichts.
+FRISCH_SEKUNDEN = 180
 ROT = "rot"
 UNFERTIG = "laeuft noch"
 ALT = "gruen auf altem Stand"
@@ -51,7 +62,7 @@ KONFLIKT = "Konflikt"
 
 
 def urteil(anzahl_checks: int, schluesse: list[str], main_neuer: bool,
-           mergeable: str | None) -> tuple[str, str]:
+           mergeable: str | None, kopf_alter_s: float | None = None) -> tuple[str, str]:
     """``(Urteil, Begruendung)`` — die ganze Entscheidungsregel an einer Stelle.
 
     Bewusst ohne Netz und ohne ``gh``: so misst der Test diese Funktion und
@@ -62,6 +73,9 @@ def urteil(anzahl_checks: int, schluesse: list[str], main_neuer: bool,
     Konflikt zeigt die Oberflaeche von selbst.
     """
     if anzahl_checks == 0:
+        if kopf_alter_s is not None and kopf_alter_s < FRISCH_SEKUNDEN:
+            return FRISCH, (f"Kopf-Commit ist {int(kopf_alter_s)} s alt — GitHub legt "
+                            "die Check-Runs erst kurz nach dem Push an. Gleich nochmal sehen.")
         return NIE_GEPRUEFT, ("kein einziger Check-Run auf dem Kopf-Commit — "
                               "das sieht aus wie gruen und ist es nicht")
     offen = [s for s in schluesse if s in (None, "", "pending", "queued", "in_progress")]
@@ -124,7 +138,16 @@ def main(argv=None) -> int:
         # „main juenger als der letzte Check" — reine Zeichenkettenfolge genuegt,
         # beide Zeiten kommen als ISO-8601 in UTC von derselben API.
         main_neuer = bool(fertig) and main_zeit > max(fertig)
-        u, grund = urteil(len(liste), schluesse, main_neuer, info.get("mergeable"))
+        # Alter des Kopf-Commits — dieselbe Uhr wie main_zeit (beide aus der API).
+        kopf = _gh_json("api", f"repos/:owner/:repo/commits/{info['headRefOid']}")
+        kopf_zeit = kopf.get("commit", {}).get("committer", {}).get("date")
+        alter = None
+        if kopf_zeit:
+            from datetime import datetime, timezone
+            alter = (datetime.now(timezone.utc)
+                     - datetime.fromisoformat(kopf_zeit.replace("Z", "+00:00"))).total_seconds()
+        u, grund = urteil(len(liste), schluesse, main_neuer,
+                          info.get("mergeable"), alter)
         if u != BEREIT:
             nicht_bereit += 1
         zeilen.append((nr, u, grund, info["title"], info.get("isDraft")))

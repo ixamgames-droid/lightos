@@ -20,6 +20,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   seither weitergezogen; so wurde ein PR gruen gemeldet und war Minuten spaeter
   `CONFLICTING`) und **teilweise geprueft**. Der erste Lauf ueber die fuenf
   offenen PRs meldete **0 von 5 bereit**, jeden aus einem anderen Grund.
+- **„Nie geprueft" und „gerade gepusht" sehen gleich aus — und werden jetzt
+  unterschieden.** GitHub legt die Check-Runs erst ein paar Sekunden nach dem
+  Push an; am 25.08. an zwei PRs beobachtet, beide erholten sich von selbst. Ein
+  Kopf-Commit, der juenger als drei Minuten ist, wird darum nicht als „nie
+  geprueft" gemeldet. Ohne diese Unterscheidung meldet das Werkzeug bei jedem
+  Push Fehlalarm — und ein Waechter, der das tut, wird umgangen. Fehlt die
+  Zeitangabe, bleibt es beim strengen Urteil: wer die Zeit nicht kennt, darf den
+  gefaehrlichen Zustand nicht wegerklaeren.
 - **Was dabei sonst noch auffiel:** `cancelled` und `timed_out` sind
   Fehlschlaege, sehen in `gh pr checks` aber nicht rot aus — wer nur auf
   `failure` prueft, merged darueber hinweg. Umgekehrt duerfen `neutral`,

@@ -25,8 +25,8 @@ import unittest
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
-from pr_bereit import (ALT, BEREIT, KONFLIKT, NIE_GEPRUEFT,  # noqa: E402
-                       ROT, UNFERTIG, urteil)
+from pr_bereit import (ALT, BEREIT, FRISCH, KONFLIKT,  # noqa: E402
+                       NIE_GEPRUEFT, ROT, UNFERTIG, urteil)
 
 GRUEN3 = ["success", "success", "success"]
 
@@ -44,6 +44,38 @@ class NieGepruefstTest(unittest.TestCase):
         # harmloseren Zustand und verschweigt den gefaehrlichen.
         u, _ = urteil(0, [], main_neuer=True, mergeable="CONFLICTING")
         self.assertEqual(u, NIE_GEPRUEFT)
+
+
+class FrischGepushtTest(unittest.TestCase):
+    """★ Die Unterscheidung, ohne die das Werkzeug bei jedem Push Fehlalarm meldet.
+
+    GitHub legt die Check-Runs erst ein paar Sekunden nach dem Push an. Am
+    25.08. an #661 und #665 beobachtet — beide standen kurz auf „kein einziger
+    Check-Run" und erholten sich von selbst.
+    """
+
+    def test_frisch_gepusht_ist_nicht_nie_geprueft(self):
+        u, grund = urteil(0, [], main_neuer=False, mergeable="UNKNOWN",
+                          kopf_alter_s=12)
+        self.assertEqual(u, FRISCH)
+        self.assertIn("Push", grund)
+
+    def test_alt_und_ohne_checks_bleibt_nie_geprueft(self):
+        u, _ = urteil(0, [], main_neuer=False, mergeable="MERGEABLE",
+                      kopf_alter_s=3600)
+        self.assertEqual(u, NIE_GEPRUEFT)
+
+    def test_ohne_altersangabe_bleibt_es_beim_strengen_urteil(self):
+        # Kein Alter = keine Entschuldigung. Wer die Zeit nicht kennt, darf den
+        # gefaehrlichen Zustand nicht wegerklaeren.
+        u, _ = urteil(0, [], main_neuer=False, mergeable="MERGEABLE")
+        self.assertEqual(u, NIE_GEPRUEFT)
+
+    def test_frisch_gilt_nur_ohne_checks(self):
+        # Laufen schon Checks, ist „laeuft noch" die genauere Aussage.
+        u, _ = urteil(3, ["success", "pending", "success"], main_neuer=False,
+                      mergeable="MERGEABLE", kopf_alter_s=5)
+        self.assertEqual(u, UNFERTIG)
 
 
 class RangfolgeTest(unittest.TestCase):
