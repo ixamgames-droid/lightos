@@ -36,7 +36,29 @@ Zwei getrennte Pruefungen
 -------------------------
 1. **Spur-Probe** (die eigentliche): Status ``done``/``✅`` -> Spur MUSS auf
    ``main`` sein. Status ``todo`` -> Spur darf NICHT auf ``main`` sein. Status
-   ``review``/``blocked``/``decision`` -> beides zulaessig, es wird nur berichtet.
+   ``review`` -> Spur darf NICHT auf ``main`` sein. Status ``blocked``/
+   ``decision`` -> beides zulaessig, es wird nur berichtet.
+
+   ★★ **QA-65 — die dritte Zeile war zur Haelfte falsch.** QA-64 gab jedem
+   „unterwegs" einen Freibrief, begruendet mit „ein Item im PR hat seine Spur
+   naturgemaess nicht auf ``main``". Das stimmt fuer diese eine Richtung. Die
+   andere ist der **haeufigste Drift-Fall ueberhaupt**: ``review`` + Spur IST auf
+   ``main`` heisst, der PR ist gelandet und nur der Status wurde nie nachgezogen.
+   Gemessen auf ``main`` 28e137f2: **neun** Items standen genau so da (PROC-03,
+   PROC-04, PROC-06, QA-63, QA-64, VIZ-53, FM-25, FM-29, UI-52) — alle neun
+   gelandet, alle neun auf ``review``, Bericht „keine Drift".
+
+   ★ **Warum ``blocked``/``decision`` den Freibrief behalten.** Gemessen an den
+   11 Items dieser beiden Status im BACKLOG (25.08.2026): vier von ihnen nennen
+   ueberhaupt Dateien, und **alle 8 genannten Dateien liegen bereits auf ``main``**
+   (VCG-02: ``src/core/show/vc_assets.py``, ``vc_gallery.py``, ``stage/aim.py``;
+   HW-4: ``docs/OPEN_POINTS_OVERVIEW.md``; VIZ-16: ``docs/VIZ3D_OVERHAUL_PLAN.md``,
+   ``src/core/engine/tempo_bus.py``, ``tools/viz_render_benchmark.py``; PRIV-03:
+   ``tools/pseudonymisieren.py``). Diese Status behaupten NICHT, dass etwas in
+   einem PR haengt — sie behaupten, dass jemand auf Hardware oder eine
+   Produktentscheidung wartet, waehrend die Vorarbeit laengst gelandet sein darf.
+   Dieselbe Schaerfung dort haette also jedes blockierte Item mit Vorarbeit
+   beanstandet: 4 Fehlalarme, 0 echte Funde.
 2. **Zweig-Behauptung**: nennt der Status „Umsetzung auf ``X``", muss ``X`` auf
    ``origin`` existieren und darf keine neuere ``-vN``-Fassung haben. Genau das
    ist am 25.08. aufgefallen: FM-14b zeigte auf die erste von **drei** Fassungen,
@@ -64,6 +86,11 @@ Aufruf::
 
     ./venv/bin/python tools/backlog_status_drift.py           # Bericht
     ./venv/bin/python tools/backlog_status_drift.py --strict  # Exit 1 bei Drift
+
+Es wird zuvor ``git fetch`` gefahren; schlaegt das fehl, bricht das Werkzeug mit
+Exit 2 ab (*fail closed*, wie ``tools/backlog_ids.py``) — mit veralteten Refs
+meldet es eine gerade gelandete Spur als „fehlt". ``--kein-fetch`` faehrt bewusst
+auf dem zuletzt geholten Stand.
 """
 from __future__ import annotations
 
@@ -81,8 +108,32 @@ SPUR = re.compile(r"<!--\s*spur:\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
 # Nur was der STATUS behauptet — nicht jeder Backtick in der Beschreibung.
 ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
 
-ERLEDIGT = ("done", "✅")
+# ★★ Das LEITWORT entscheidet, nicht die ganze Zelle (CDX-57, von Codex
+# gefunden). Die erste Fassung fragte `any(k in s for k in ("done", "✅"))` —
+# und stufte damit jede Zelle als erledigt ein, die IRGENDWO einen Haken nennt.
+# Gemessen auf `main` 28e137f2: **sieben** Items stehen auf `teils` und nennen
+# im Fliesstext ein `✅` fuer einen fertigen TEILschritt (VIZ-15, VIZ-PERF2,
+# VIZ-BEAM-OCCLUSION, FM-20, FM-13, XPLAT-19, DOC-10). Sobald eines davon eine
+# Spur bekommt, verlangt der Waechter sie faelschlich auf `main`. Dieselbe
+# Bauart las umgekehrt `teils (2026-07-09)` OHNE Haken (QA-LIVE, LAS-08) als
+# „unterwegs" — zwei Zellen mit derselben Aussage, zwei verschiedene Klassen.
+_LEITWORT = re.compile(r"^(?P<vor>[^0-9A-Za-zÄÖÜäöüß]*)(?P<wort>[0-9A-Za-zÄÖÜäöüß/]*)")
+
+ERLEDIGT = ("done",)
 OFFEN = ("todo",)
+# ★ QA-65: `review` ist KEIN beliebiges „unterwegs" — der Status behauptet
+# ausdruecklich, die Arbeit liege in einem PR und sei NICHT gelandet. Steht die
+# Spur trotzdem auf `main`, widerspricht der Status sich selbst.
+REVIEW = ("review",)
+# ★ Diese Leitworte behaupten NICHTS ueber `main` — beide Spur-Zustaende sind
+# richtig. Sie stehen namentlich hier und nicht im Default, weil ein Haken VOR
+# dem Leitwort sie sonst nach „erledigt" zoege: `✅ teils (…)` ist teils, nicht
+# fertig. Genau diese Verwechslung ist oben gemessen.
+FREIBRIEF = ("teils", "blocked", "decision", "n/a")
+
+REVIEW_SPUR_AUF_MAIN = ("Status sagt review, aber die Spur steht schon auf main"
+                        " — der PR ist gelandet, nur der Status wurde nie"
+                        " nachgezogen")
 
 
 def zeilen_mit_items(text: str) -> list[tuple[str, str, str]]:
@@ -109,12 +160,31 @@ def zeilen_mit_items(text: str) -> list[tuple[str, str, str]]:
     return treffer
 
 
+def leitwort(status: str) -> tuple[str, str]:
+    """``(Auszeichnung davor, Leitwort)`` — das erste WORT der Status-Zelle.
+
+    ``"✅ done (2026-08-24)"`` -> ``("✅ ", "done")``,
+    ``"⛔ n/a — kein Fund"`` -> ``("⛔ ", "n/a")``.
+    """
+    m = _LEITWORT.match(status.strip())
+    return m.group("vor"), m.group("wort").lower()
+
+
 def status_klasse(status: str) -> str:
-    s = status.lower()
-    if any(k in s for k in ERLEDIGT):
+    vor, wort = leitwort(status)
+    if wort in ERLEDIGT:
         return "erledigt"
-    if any(s.startswith(k) for k in OFFEN):
+    if wort in OFFEN:
         return "offen"
+    if wort in REVIEW:
+        return "review"
+    if wort in FREIBRIEF:
+        return "unterwegs"
+    # Ein Haken VOR dem Leitwort heisst erledigt, auch wenn das Wort selbst
+    # unbekannt ist (`✅ verifiziert → 🎨 Design`). Ein Haken IM Fliesstext
+    # heisst es nicht — das ist der ganze Unterschied zur alten Fassung.
+    if "✅" in vor:
+        return "erledigt"
     return "unterwegs"
 
 
@@ -128,6 +198,16 @@ def spur_urteil(klasse: str, auf_main: bool) -> str | None:
         return "Status sagt erledigt, aber die Spur steht NICHT auf main"
     if klasse == "offen" and auf_main:
         return "Status sagt todo, aber die Spur steht bereits auf main"
+    # ★ QA-65 — der haeufigste Drift-Fall ueberhaupt, und QA-64 hat ihn per
+    # Bauart nicht angesehen: am 25.08.2026 standen NEUN gelandete Items auf
+    # `review` (PROC-03/04/06, QA-63/64, VIZ-53, FM-25/29, UI-52), und der
+    # Bericht meldete „keine Drift".
+    if klasse == "review" and auf_main:
+        return REVIEW_SPUR_AUF_MAIN
+    # ★ Die GEGENRICHTUNG bleibt frei: `review` + Spur nicht auf main ist der
+    # voellig normale Zustand eines Items, an dem gerade jemand arbeitet. Wer
+    # beide meldet, hat einen Waechter gebaut, der bei jedem laufenden PR
+    # anschlaegt — der wird abgeschaltet.
     return None
 
 
@@ -152,11 +232,55 @@ def zweige_auf_origin() -> set[str]:
     return {l.split("refs/heads/")[1] for l in out.splitlines() if "refs/heads/" in l}
 
 
+# ``feature/fm14b-ring-bedienung-v3`` -> ``("feature/fm14b-ring-bedienung", 3)``
+_VERSION = re.compile(r"^(?P<stamm>.+)-v(?P<nr>\d+)$")
+
+
+def stamm_und_version(zweig: str) -> tuple[str, int]:
+    """Zweigname ohne ``-vN`` plus die Nummer (ohne Suffix: Fassung 1)."""
+    m = _VERSION.match(zweig)
+    return (m.group("stamm"), int(m.group("nr"))) if m else (zweig, 1)
+
+
+def neuere_fassungen(zweig: str, zweige) -> list[str]:
+    """Zweige mit demselben Stamm und HOEHERER Nummer, aufsteigend.
+
+    ★★ CDX-57, von Codex gefunden: die erste Fassung suchte
+    ``x.startswith(b + "-v")`` — bei ``…-v3`` also nach ``…-v3-v…``. Genau die
+    naechste Fassung (``…-v4``) fiel damit durch, und das ist der einzige Fall,
+    der zaehlt: FM-14b zeigte am 25.08. auf ``-v1``, waehrend ``-v3`` die Arbeit
+    trug. Verglichen wird deshalb der STAMM, und die Nummer NUMERISCH — sonst
+    sortiert ``-v10`` vor ``-v9``.
+    """
+    stamm, nr = stamm_und_version(zweig)
+    treffer = []
+    for x in zweige:
+        x_stamm, x_nr = stamm_und_version(x)
+        if x_stamm == stamm and x_nr > nr:
+            treffer.append((x_nr, x))
+    return [x for _nr, x in sorted(treffer)]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--strict", action="store_true",
                     help="Exit 1, wenn eine Drift gefunden wurde")
+    ap.add_argument("--kein-fetch", action="store_true",
+                    help="nicht vorher `git fetch` — dann gilt der zuletzt geholte Stand")
     args = ap.parse_args(argv)
+
+    if not args.kein_fetch:
+        rc, _ = _git("fetch", "--quiet", "--prune", "origin")
+        if rc != 0:
+            # ★ CDX-57: fail closed, gleiche Behandlung wie in
+            # `tools/backlog_ids.py` (#670). Mit veralteten Refs meldet dieses
+            # Werkzeug eine gerade GELANDETE Spur als „fehlt" — also einen
+            # Fehlalarm genau gegen die Items, die eben durchgegangen sind. Ein
+            # Waechter, der das still tut, wird abgeschaltet.
+            print("FEHLER: `git fetch` fehlgeschlagen — mit veralteten Refs waere "
+                  "jedes Urteil hier wertlos. Netz/Zugang pruefen, oder bewusst "
+                  "mit --kein-fetch fahren.")
+            return 2
 
     with open(BACKLOG, encoding="utf-8") as f:
         text = f.read()
@@ -172,6 +296,7 @@ def main(argv=None) -> int:
 
     # ── 1) Spur-Probe ────────────────────────────────────────────────────────
     mit_spur = 0
+    geurteilt = 0
     for item, status, zeile in items:
         m = SPUR.search(zeile)
         if not m:
@@ -180,6 +305,14 @@ def main(argv=None) -> int:
         datei, kennzeichen = m.group(1), m.group(2)
         auf_main = spur_auf_main(datei, kennzeichen)
         klasse = status_klasse(status)
+        # ★ Ueber welche Klassen ueberhaupt geurteilt wird, entscheidet
+        # `spur_urteil`. Eine Spur an einem Item, dessen Klasse einen Freibrief
+        # hat (`teils`, `blocked`, `decision`), wird gezaehlt, aber nie
+        # beurteilt — das ist Absicht, muss aber im Bericht stehen.
+        # `status_klasse` liefert Klassennamen, nicht Leitworte — die
+        # Freibrief-Klasse heisst hier „unterwegs".
+        if klasse != "unterwegs":
+            geurteilt += 1
         urteil = spur_urteil(klasse, auf_main)
         if urteil:
             wo = f"{datei}" + (f" :: {kennzeichen}" if kennzeichen else "")
@@ -187,7 +320,16 @@ def main(argv=None) -> int:
 
     # ★ Die Abdeckung MUSS mitgemeldet werden. Ohne sie sieht „0 Beanstandungen"
     # bei null hinterlegten Spuren aus wie ein sauberer Backlog.
-    print(f"[spur]  {mit_spur} von {len(items)} Items haben eine Spur hinterlegt")
+    #
+    # ★★ Und sie muss die GEURTEILTEN nennen, nicht nur die vorhandenen Spuren:
+    # in der Gegenpruefung stand hier „19 von 478 Items haben eine Spur", waehrend
+    # nur 15 davon ueberhaupt ein Urteil bekamen — die restlichen vier lagen an
+    # Items der Freibrief-Klasse. In kleiner Form war der Fleck damit zurueck,
+    # gegen den diese Zeile gebaut ist.
+    ungeurteilt = mit_spur - geurteilt
+    print(f"[spur]  {mit_spur} von {len(items)} Items haben eine Spur — "
+          f"beurteilt: {geurteilt}"
+          + (f", ohne Urteil (Freibrief-Klasse): {ungeurteilt}" if ungeurteilt else ""))
     if mit_spur == 0:
         print("        -> es wurde NICHTS geprueft. Spuren hinterlegen:"
               " <!-- spur: datei :: kennzeichen -->")
@@ -207,7 +349,7 @@ def main(argv=None) -> int:
             if b not in zweige:
                 beanstandet.append(f"{item}: nennt Zweig '{b}' — der existiert auf origin nicht")
                 continue
-            neuer = sorted(x for x in zweige if x.startswith(b + "-v"))
+            neuer = neuere_fassungen(b, zweige)
             if neuer:
                 beanstandet.append(
                     f"{item}: nennt Zweig '{b}', aber es gibt eine neuere Fassung: {', '.join(neuer)}")
