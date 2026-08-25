@@ -73,6 +73,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Positivkontrolle: ein Waechter, der auch den vollstaendigen Fall beanstandet,
   zwingt zu einer Angabe, die nichts bewirkt, und wird abgeschaltet.
 
+### 2026-08-24 — Auch der Fixture-Generator kann die Panel-Geometrie hinterlegen
+
+#### Hinzugefuegt
+
+- **Der Fixture-Generator hat jetzt dieselben Felder fuer die Panel-Geometrie
+  wie der einfache Fixture-Editor.** Jeder Modus-Tab traegt „Pixel-Raster:
+  Zeilen x Spalten" und „Weiss-Leiste: Zeilen x Spalten", `0` heisst wie
+  gewohnt „nicht hinterlegt". Bisher gab es die Eingabe nur im einfachen
+  Editor — wer sein selbstgebautes Panel ueber den **Generator** anlegte (den
+  naheliegenden Weg: er hat den Live-Test am echten Geraet, mit dem man
+  ueberhaupt erst herausfindet, welcher Kanal welche Zone schaltet), konnte die
+  Form nirgends eintragen. Das Panel wurde im 3D weiter als geratenes Quadrat
+  gezeichnet (aus einem 4x12-Balken ein 7x7-Quadrat) und bekam auch kein
+  weisses Band. Ein ueber den Generator angelegtes Panel traegt jetzt dieselbe
+  Form wie ein ueber den Editor angelegtes.
+- **Der QLC+-Import des Generators uebernimmt die Rasterform jetzt auch.** Wer
+  eine `.qxf` ueber „QLC+ (.qxf) importieren…" als Startpunkt hereinholt, bekam
+  bisher alles ausser der Panel-Form — obwohl sie in der Datei steht und der
+  Bibliotheks-Import sie seit FM-23 liest. Dieselbe Datei ergab je nach Weg
+  4x12 oder gar nichts. Jetzt steht die Zahl nach dem Import im sichtbaren
+  Feld und laesst sich vor dem Speichern noch aendern. Eine Weiss-Leiste wird
+  weiterhin nicht erfunden: das QLC+-Format kennt sie nicht.
+
+#### Behoben
+
+- **Der Speicherweg des Generators liess die Rasterform fallen.** Selbst ein
+  Profil, das die Angabe mitbrachte, verlor sie beim Schreiben: die Funktion,
+  die aus dem Generator ein neues Profil anlegt, legte die vier Spalten gar
+  nicht erst an. Sie werden jetzt mitgeschrieben; Profile ohne die Angabe
+  bleiben unveraendert bei „nicht hinterlegt" — der Generator erfindet keine
+  Form, sonst haette jedes selbstgebaute Panel wieder ein weisses Band.
+- **Eine unsinnig grosse Rasterzahl wird jetzt auch beim Schreiben gekappt.**
+  Die Obergrenze (256 — die Zahl, ab der ein Pixel mehr im 3D ohnehin nicht
+  mehr erscheint) galt nur in den Dialogen. Ein Profil, das auf anderem Weg in
+  die Bibliothek kam, konnte „99999 Spalten" hinterlegen, und der 3D-Renderer
+  bekam das so zu sehen. Die Grenze steht jetzt an einer einzigen Stelle und
+  gilt fuer jeden Schreibweg.
+
+
 ### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
 
 #### Behoben
