@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Zusammengelegte Matrizen setzen kein Geraet mehr doppelt ins Raster
+
+#### Behoben
+
+- **„Matrizen zusammenlegen" verwirft die Ganz-Zelle, wenn dasselbe Geraet
+  kopfweise dazukommt (FM-32).** Bisher wurden die Raster roh gestapelt: lag eine
+  Bar in der einen Gruppe als ganzes Geraet und in der anderen als Kopf-Matrix,
+  stand sie danach in **fuenf** Zellen — einmal ganz, viermal kopfweise. Zwei
+  Zellen fuhren dasselbe Geraet, und welche am Ende auf DMX steht, entschied
+  allein die Stapelreihenfolge: dieselben zwei Gruppen, Reihenfolge getauscht,
+  ergaben einmal vier verschiedene Pixelfarben und einmal vier gleiche. Das
+  Ergebnis haelt jetzt dieselbe Zusicherung wie jede Platzier-Funktion des
+  Gruppen-Editors (`_drop_fid_cells`): ein Geraet steht nie in zwei Formen im
+  Raster.
+- **Die feinere Form gewinnt** — begruendet und an beiden Varianten am DMX
+  gemessen: die Kopf-Zellen koennen alles, was die Ganz-Zelle kann (vier gleiche
+  Farben sind auch vier Farben), umgekehrt nicht; und liesse man die Ganz-Zelle
+  gewinnen, verloere das Raster genau die Aufloesung, fuer die man es
+  zusammenlegt (gemessen: 24 belegte Zellen -> 21, vier Bar-Pixel auf einen
+  uniformen Wert). Die **Quellgruppen bleiben unberuehrt**, die Rastergroesse
+  aendert sich nicht — die frei gewordene Zelle bleibt eine Luecke. Gruppen aus
+  aelteren Shows, die beide Formen tragen, werden weiterhin unveraendert geladen
+  und angezeigt.
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt

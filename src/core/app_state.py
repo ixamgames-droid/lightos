@@ -948,7 +948,17 @@ class AppState:
         ODER Kopf-Zelle ``"fid:head"``). Raster k beginnt bei ``row = Summe der Hoehen
         davor``; Spalten auf die max. Breite. Zellwerte bleiben UNVERAENDERT (das
         ``fid:head``-Encoding ueberlebt) -> die Matrix-Engine (grids_from_positions)
-        spricht die Koepfe weiter einzeln an. Rueckgabe ``(cols, rows, merged)``."""
+        spricht die Koepfe weiter einzeln an. Rueckgabe ``(cols, rows, merged)``.
+
+        FM-32: Beim Stapeln kann dasselbe Geraet aus zwei Rastern in ZWEI FORMEN
+        zusammenkommen — einmal als GANZ-Zelle, einmal kopfweise. Das Ergebnis
+        haelt dieselbe Zusicherung wie jede Platzier-Funktion des Gruppen-Editors
+        (``_drop_fid_cells``): ein Geraet steht nie in zwei Formen im Raster. Die
+        KOPF-Zellen gewinnen, die Ganz-Zelle faellt weg (Begruendung und Messung:
+        ``group_cells.drop_whole_cells_with_heads``). Die Rastergroesse aendert
+        das NICHT — die frei gewordene Zelle bleibt als Luecke stehen, genau wie
+        nach „Zelle entfernen"."""
+        from .group_cells import drop_whole_cells_with_heads
         max_cols = 1
         total_rows = 0
         merged: dict = {}
@@ -957,6 +967,7 @@ class AppState:
             for (c, r), val in positions.items():
                 merged[(c, total_rows + r)] = val
             total_rows += max(1, int(rows or 1))
+        merged = drop_whole_cells_with_heads(merged)
         return max_cols, max(1, total_rows), merged
 
     def merge_head_matrix_groups(self, gids, name=None, *, emit: bool = True):
@@ -968,7 +979,12 @@ class AppState:
         ansprechbar bleibt (z. B. 2× Hydrabeam 1×4 -> eine 4×2-Matrix). Die
         QUELL-Gruppen bleiben unangetastet (nicht-destruktiv). Neue Gruppe im Ordner
         "Matrizen" (nicht "Multi-Head" -> remove_fixture raeumt sie nicht mit weg).
-        Rueckgabe: neue gid, oder None (<2 gueltige Gruppen / keine Show-DB)."""
+        Rueckgabe: neue gid, oder None (<2 gueltige Gruppen / keine Show-DB).
+
+        FM-32: Bringt eine Quell-Gruppe ein Geraet als GANZ-Zelle mit, das eine
+        andere kopfweise fuehrt, gewinnen im Ergebnis die KOPF-Zellen — die
+        Ganz-Zelle wird nicht mitgestapelt (``_stack_group_grids``). Die
+        Quell-Gruppen bleiben davon unberuehrt."""
         eng = getattr(self, "_show_engine", None)
         if eng is None:
             return None
