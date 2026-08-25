@@ -44,6 +44,63 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   muss, ist *Ring gegen geschlossene Linse*, und das bleibt auch klein sichtbar
   (nachgemessen an den gerenderten Bildern, nicht am Code).
 
+### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
+
+#### Behoben
+
+- **Der Linux-CI-Lauf wurde faelschlich rot, weil ein Testprozess NACH seinem
+  Ergebnis abstuerzte.** `conftest.py::pytest_unconfigure` beendet den Prozess
+  per `os._exit(exitstatus)` und ueberspringt damit die native Abbauphase, in
+  der der Qt-Teardown sporadisch mit SIGSEGV stirbt. Diese Haertung war ueber
+  `LIGHTOS_HARDEN_EXIT_ALL` aber nur in der **Windows**-Leg gesetzt. Auf Linux
+  griff nur der enge Weg — und der ist ausdruecklich auf WebEngine-Module
+  beschraenkt. Ein gewoehnlicher Qt-View-Test wie `test_simple_desk_tint.py`
+  fiel durch: sein Segment meldete `exit 139`, waehrend die Liste der
+  fehlgeschlagenen Tests **leer** blieb. Genau diesen Fall nennt die Docstring
+  von `pytest_unconfigure` seit XPLAT-14 samt "Linux: SIGSEGV" — nur die
+  Gegenmassnahme kam nie dort an.
+- **Gemessen, nicht vermutet:** mit einem `atexit`-Marker an genau dieser
+  Testdatei (`os._exit` ueberspringt `atexit`) laeuft der Marker unter
+  `LIGHTOS_HARDEN_EXIT=1` — also normaler Abbau, genau die crashende Phase —
+  und unter `LIGHTOS_HARDEN_EXIT_ALL=1` nicht.
+- **Was das kostet, steht dabei:** die Erkennung ECHTER Teardown-Abstuerze in
+  der CI. Sie bleibt dem lokalen Gate erhalten, das den engen Weg weiterfaehrt
+  — und dort wurde XPLAT-09 auch gefunden.
+
+#### Hinzugefuegt
+
+- **`test_gate_runner_parity.py` nagelt jetzt auch die beiden CI-Legs fest.**
+  Die Datei hielt bisher die Umgebung der zwei Linux-*Runner* zusammen; dieselbe
+  Drift gab es eine Ebene hoeher zwischen den zwei CI-*Jobs*. Mit
+  Positivkontrolle: ein Waechter, der auch den vollstaendigen Fall beanstandet,
+  zwingt zu einer Angabe, die nichts bewirkt, und wird abgeschaltet.
+
+### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
+
+#### Behoben
+
+- **Die Segment-Logs eines roten Linux-Laufs kamen nie an.** Der
+  Artefakt-Upload zeigt auf `.pytest_segments/`, und `actions/upload-artifact`
+  ueberspringt versteckte Pfade seit v4.4 standardmaessig. Der Schritt lief bei
+  jedem roten Lauf, wurde gruen und lud **nichts** hoch; die einzige Spur war
+  eine Zeile mitten im Log (`No files were found with the provided path`), und
+  `if-no-files-found: ignore` machte auch die stumm. Der Preis war konkret: ein
+  Segment, das mit `exit 139` stirbt, schreibt keine `FAILED`-Zeile — die
+  Erklaerung stuende in seinem Segment-Log, und genau das war nie abrufbar.
+  Jetzt `include-hidden-files: true`, und `if-no-files-found` steht auf `warn`
+  statt `ignore`: derselbe Zustand ist ab sofort hoerbar.
+
+#### Hinzugefuegt
+
+- **Ein Waechter dagegen** (`tests/test_ci_artefakte_nicht_versteckt.py`): jeder
+  `upload-artifact`-Schritt, dessen Pfad eine versteckte Komponente enthaelt,
+  muss `include-hidden-files: true` setzen. Er prueft die **echte** `ci.yml`,
+  nicht nur Nachbildungen, und traegt eine Positivkontrolle — ein sichtbarer
+  Pfad wie `build/reports/` darf nicht beanstandet werden, sonst erzwaenge der
+  Waechter eine Angabe, die dort nichts bewirkt, und wuerde abgeschaltet.
+  Gemessen in beide Richtungen: ohne die Zeile in `ci.yml` wird er rot, und mit
+  einer Bedingung, die alles beanstandet, faellt die Positivkontrolle.
+
 ### 2026-08-24 — Eine Show, in der die neuen Sachen wirklich zu sehen sind
 
 #### Hinzugefuegt

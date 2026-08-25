@@ -233,6 +233,54 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
+### Keine Zeitbomben: festes Datum + gleitende Schwelle (QA-62/QA-63)
+
+**Die Regel:** ein Test darf ein festes Kalenderdatum nicht gegen eine Schwelle
+halten, die an HEUTE haengt. Er wird sonst irgendwann rot, **ohne dass jemand
+etwas aendert** — und der Fehlschlag gehoert zu keinem Commit. Genau das hat am
+22.08.2026 `main` rot gemacht: `test_crash_intake.py::RecencyTest` verglich
+`2026-07-20` („neu") mit der Kaeltegrenze `30 Tage vor heute`; am 22.08. war das
+33 Tage her. Ein reiner BACKLOG-PR fiel damit durch wie ein Feature-PR, und
+niemand konnte den Fehler seinen eigenen Aenderungen zuordnen, weil er dort
+nicht war.
+
+**Was stattdessen:** das Datum am Lauftag ausrechnen, damit der Test die REGEL
+misst statt eines Kalenderstands — Vorbild `RecencyTest` heute:
+
+```python
+ALT_TAGE, NEU_TAGE = 200, 3          # statt "2026-01-01" / "2026-07-20"
+stempel = (datetime.now() - timedelta(days=NEU_TAGE)).strftime("%Y-%m-%dT%H:%M:%S")
+```
+
+Feste Daten sind ansonsten **erlaubt** und ueblich (neun Testdateien tragen
+welche, alle gesund): gefaehrlich ist erst die Verbindung mit der gleitenden
+Schwelle.
+
+**Der Waechter:** `tests/test_zeitbomben_gate.py` (Werkzeug:
+`tools/zeitbomben_gate.py`) waehlt statisch die Testdateien mit festem Datum aus
+und **faehrt** sie mit einer um zehn Jahre vorgerueckten Uhr
+(`tools/_zeitsprung/`). Wer dann rot wird und heute gruen ist, ist eine
+Zeitbombe; wer schon heute rot ist, gehoert einem anderen Gate.
+
+```bash
+./venv/bin/python tools/zeitbomben_gate.py                 # Befund + Reparaturhinweis
+./venv/bin/python tools/zeitbomben_gate.py --nur-kandidaten # nur die Vorauswahl
+
+# Streifzug ueber die GANZE Suite (langsam, dafuer ohne Vorauswahl).
+# Ueber verify_loop.sh, NICHT ueber verify_segmented.sh: nur das erste nimmt
+# die PROC-02-Sperre. Direkt gestartet laeuft der Streifzug neben einer fremden
+# vollen Suite — gemessen 21 rote Segmente, davon 18 einzeln kerngesund.
+PYTHONPATH=tools/_zeitsprung LIGHTOS_ZEITSPRUNG_TAGE=3653 \
+    ./tools/verify_loop.sh
+```
+
+⚠️ `LIGHTOS_ZEITSPRUNG_UHR=alle` zieht zusaetzlich `time.time` mit. Das ist fuer
+einen bewussten Streifzug da, **nicht** fuer das Gate: Datei-Zeitstempel
+(`st_mtime`) kommen aus der echten Uhr und lassen sich nicht mitverschieben —
+gemessen werden dadurch drei kerngesunde Dateien rot (`test_vc_asset_gc`,
+`test_janitor`, `test_qa58_bibliothek_schema_unberuehrt`), bei null
+zusaetzlichen Funden.
+
 ## Token-schonende Regeln fuer Agents
 
 - Bei groesseren Implementierungen **Sub-Tasks parallelisieren**
