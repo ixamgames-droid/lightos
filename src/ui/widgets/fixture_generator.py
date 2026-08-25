@@ -211,9 +211,9 @@ def _clamp(v) -> int:
 def _clamp_geo(v) -> int:
     """Eine Rasterzahl auf ``0 .. GEO_MAX`` (FM-26).
 
-    ★ Die GRENZE steht nur einmal im Projekt (``fixture_editor.GEO_MAX`` =
-    die Stelle, an der `panelGrid` die Pixelzahl kappt) — hier wird sie
-    angewandt, nicht neu erfunden. Geklemmt werden muss trotz Spinbox:
+    ★ Die GRENZE steht nur einmal im Projekt (``models.GEO_MAX``, bei den
+    Spalten, auf die sie sich bezieht = die Stelle, an der `panelGrid` die
+    Pixelzahl kappt) — hier wird sie angewandt, nicht neu erfunden. Geklemmt werden muss trotz Spinbox:
     ``build_profile_payload`` ist eine reine Funktion und wird auch ohne
     Dialog aufgerufen (``GeneratorModel.to_payload``, Import, Tests). Eine
     NEGATIVE Zahl ist dabei der Fall, der wehtut — sie stuende als
