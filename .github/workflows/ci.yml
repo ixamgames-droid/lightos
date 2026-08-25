@@ -90,6 +90,27 @@ jobs:
             --use-gl=angle --use-angle=swiftshader --in-process-gpu
           LIBGL_ALWAYS_SOFTWARE: "1"
           GALLIUM_DRIVER: llvmpipe
+          # ★★ PROC-04: dieselbe Exit-Haertung wie die Windows-Leg (dort steht
+          # sie seit XPLAT-14). `conftest.py::pytest_unconfigure` beendet den
+          # Prozess NACH der Session-Auswertung per `os._exit(exitstatus)` und
+          # ueberspringt damit die native Abbauphase, in der der QApplication-
+          # Teardown sporadisch mit SIGSEGV stirbt.
+          #
+          # Ohne diese Variable greift auf Linux nur der ENGE Weg: `armed and
+          # LIGHTOS_HARDEN_EXIT`, und `armed` wird ausschliesslich fuer
+          # WebEngine-Module gesetzt. Ein gewoehnlicher Qt-View-Test wie
+          # `test_simple_desk_tint.py` faellt also durch — sein Segment stirbt
+          # mit `exit 139`, waehrend die Liste der fehlgeschlagenen Tests LEER
+          # bleibt, und der Lauf wird faelschlich rot. Die Docstring von
+          # `pytest_unconfigure` nennt genau diesen Fall samt "Linux: SIGSEGV";
+          # nur die Gegenmassnahme kam nie hier an.
+          #
+          # Maskiert KEINE Failures: `exitstatus` traegt das echte Ergebnis, 0
+          # nur wenn ALLE Tests bestanden haben. Was sie kostet, ist die
+          # Erkennung ECHTER Teardown-Abstuerze in der CI — die bleibt dem
+          # lokalen Gate erhalten, das den engen Weg weiterfaehrt, und genau
+          # dort wurde XPLAT-09 auch gefunden.
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
           nproc
           # xvfb: QT_QPA_PLATFORM=offscreen setzt verify_loop.sh selbst, aber der

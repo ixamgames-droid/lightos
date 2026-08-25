@@ -204,3 +204,114 @@ def test_verify_loop_delegates_full_suite_to_the_segmented_runner():
         "tools/verify_segmented.sh (XPLAT-11). Ohne Delegation faehrt ein "
         "'./tools/verify_loop.sh' ohne Argumente die Suite in EINEM Prozess — "
         "genau die Variante, die auf Linux an akkumulierendem Qt-Zustand starb.")
+
+
+# ── PROC-04: dieselbe Zusicherung fuer die BEIDEN CI-Legs ────────────────────
+#
+# Die Datei oben nagelt die Umgebung der zwei Linux-RUNNER fest. Dieselbe Drift
+# gab es eine Ebene hoeher, zwischen den zwei CI-JOBS: die Exit-Haertung
+# (`LIGHTOS_HARDEN_EXIT_ALL`) stand nur in der Windows-Leg. Auf Linux griff
+# damit nur der enge Weg — `armed and LIGHTOS_HARDEN_EXIT`, und `armed` wird
+# ausschliesslich fuer WebEngine-Module gesetzt. Ein gewoehnlicher Qt-View-Test
+# starb im nativen Abbau mit SIGSEGV, das Segment meldete `exit 139` bei LEERER
+# Liste fehlgeschlagener Tests, und der Lauf wurde faelschlich rot.
+#
+# PyYAML ist in dieser Umgebung nicht installiert, und ein Waechter, der eine
+# Abhaengigkeit mitbringt, wird nicht gefahren. Der Parser unten liest deshalb
+# nur die eine Form, um die es geht: die Job-Bloecke unter `jobs:`, an der
+# Einrueckung erkannt.
+
+_HAERTUNG = "LIGHTOS_HARDEN_EXIT_ALL"
+
+
+def ci_jobs(text: str) -> dict[str, str]:
+    """``{Job-Name: Rohtext des Blocks}`` fuer alles unter ``jobs:``."""
+    zeilen = text.splitlines()
+    start = None
+    for i, z in enumerate(zeilen):
+        if z.rstrip() == "jobs:":
+            start = i + 1
+            break
+    if start is None:
+        return {}
+    jobs: dict[str, list[str]] = {}
+    aktuell = None
+    for z in zeilen[start:]:
+        if z.strip() and not z.startswith(" "):
+            break                       # naechster Top-Level-Schluessel
+        gestrippt = z.strip()
+        if (len(z) - len(z.lstrip(" "))) == 2 and gestrippt.endswith(":") \
+                and not gestrippt.startswith("#") and ": " not in gestrippt:
+            aktuell = gestrippt[:-1]
+            jobs[aktuell] = []
+            continue
+        if aktuell is not None:
+            jobs[aktuell].append(z)
+    return {k: "\n".join(v) for k, v in jobs.items()}
+
+
+def jobs_ohne_haertung(text: str) -> list[str]:
+    return [name for name, block in ci_jobs(text).items()
+            if _HAERTUNG not in block]
+
+
+_CI_BEIDE = """
+name: CI
+on:
+  push:
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Suite
+        env:
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
+        run: ./tools/verify_loop.sh
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Suite
+        env:
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
+        run: pytest
+"""
+
+_CI_NUR_WINDOWS = _CI_BEIDE.replace(
+    """      - name: Suite
+        env:
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
+        run: ./tools/verify_loop.sh""",
+    """      - name: Suite
+        run: ./tools/verify_loop.sh""")
+
+
+def test_beide_ci_legs_haerten_den_exit_gleich():
+    """Der eigentliche Waechter — an der ECHTEN ci.yml."""
+    with open(os.path.join(_REPO_ROOT, ".github", "workflows", "ci.yml"),
+              encoding="utf-8") as f:
+        text = f.read()
+    fehlt = jobs_ohne_haertung(text)
+    assert fehlt == [], (
+        f"CI-Jobs ohne {_HAERTUNG}: {fehlt}. Ohne die Variable greift die "
+        "Exit-Haertung nur fuer WebEngine-Sessions; ein gewoehnlicher "
+        "Qt-View-Test stirbt im nativen Abbau mit SIGSEGV und macht den Lauf "
+        "faelschlich rot (PROC-04, exit 139 bei leerer FAILED-Liste).")
+
+
+def test_die_echte_ci_hat_ueberhaupt_zwei_jobs():
+    """Ohne das waere der Waechter oben trivial gruen: keine Jobs, keine Luecken."""
+    with open(os.path.join(_REPO_ROOT, ".github", "workflows", "ci.yml"),
+              encoding="utf-8") as f:
+        jobs = ci_jobs(f.read())
+    assert len(jobs) >= 2, f"nur {len(jobs)} Job(s) erkannt: {sorted(jobs)}"
+    assert "linux" in jobs
+
+
+def test_fehlende_haertung_wird_beanstandet():
+    assert jobs_ohne_haertung(_CI_NUR_WINDOWS) == ["linux"]
+
+
+def test_vollstaendige_haertung_wird_nicht_beanstandet():
+    # Positivkontrolle: ein Waechter, der auch den gesunden Fall beanstandet,
+    # zwingt zu einer Angabe, die nichts bewirkt — und wird abgeschaltet.
+    assert jobs_ohne_haertung(_CI_BEIDE) == []
