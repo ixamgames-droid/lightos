@@ -201,6 +201,78 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Gemessen in beide Richtungen: ohne die Zeile in `ci.yml` wird er rot, und mit
   einer Bedingung, die alles beanstandet, faellt die Positivkontrolle.
 
+### 2026-08-24 — Die Pro-Kopf-Regler zaehlen jetzt Koepfe statt Kanaele
+
+#### Behoben
+
+- **Ein geteilter Master-Dimmer machte einen Kopf zu viel (FM-29).** Die
+  Kopfzahl eines Attributs war bisher die Zahl der Kanaele, die es tragen. An
+  der `HYDRABEAM 4000 RGBW [19-Kanal]` sind das fuenf Dimmer-Kanaele — ein
+  gemeinsamer Master plus je einer pro Kopf — also galt das Geraet fuer den
+  Dimmer als Fuenf-Kopf-Geraet. Eine Kopf-Zelle „Kopf 5" erzeugte dadurch einen
+  zweiten Dimmer-Regler, der auf **denselben** Kanal wie „Kopf 4" schrieb —
+  zwei Regler auf einem Kanal, einer davon falsch beschriftet. Gezaehlt wird
+  jetzt ueber die Kopf-Karte, die den geteilten Master kennt: vier Koepfe, vier
+  Regler.
+  **Ehrlich dazugesagt:** diese Zelle konntest du gar nicht neu anlegen. Die
+  Geraeteliste im Programmer bietet fuer dieses Profil vier Kopf-Zeilen, das
+  Gruppen-Raster teilt es ueberhaupt nicht auf (es hat nur eine faerbbare Bank),
+  und die Kommandozeile weist `1:5` ab. Der falsche Regler war also kein
+  vorgefuehrter Bedienfehler, sondern eine Absicherung dagegen.
+  **Was sich dabei auf der Buehne aendert — bitte lesen:** eine solche Zelle
+  kann trotzdem in einer gespeicherten Gruppe liegen — dann naemlich, wenn das
+  Geraet auf ein **anderes Profil** umgepatcht wurde und vorher mehr Koepfe
+  hatte; `update_fixture` raeumt die Auto-Gruppe nicht auf. (Ein blosser
+  Kanal-Modus-WECHSEL reicht dafuer nicht: kein Modus der HYDRABEAM erzeugt je
+  einen Kopf-Index ueber 3 — nachgemessen an allen fuenf Modi.) Bisher trieb so
+  eine Altlast-Zelle **einen** Kopf (den letzten), jetzt nennt sie keinen
+  gueltigen Kopf mehr und faellt auf das **ganze Geraet** zurueck: statt eines
+  Kopfes gehen alle vier auf voll. Wer so eine Gruppe hat, sieht den
+  Unterschied sofort — gemessen am DMX-Ausgang ueber den echten MIDI-Weg
+  (`AltlastKopfZelleAufDemMidiWegTest`). Abhilfe: die Zelle in der Gruppe neu
+  setzen, dann steht wieder der Kopf drin, den du meinst.
+- **Ein Regler trieb Geraete an, die den Kanal gar nicht haben (FM-27).** Fuer
+  ein Attribut, das ein Geraet nicht besitzt, kam „ein Kopf" zurueck statt
+  „keiner". Damit blieb ein solches Geraet im Regler stehen und bekam Werte, die
+  **nirgends** auf DMX ankamen — die stille Sorte Fehler, die man erst auf der
+  Buehne bemerkt. Gemessen an einer `MOVBAR4` neben einer Hydrabeam: der
+  Speed-Regler zeigte beide an, die MOVBAR4 hat aber keinen Speed-Kanal.
+  Betroffen war auch der geraeteweite Regler, weil die Regler-Vorlage die
+  Attribute der GANZEN Auswahl zusammenfasst. Wer den Kanal nicht hat, steht
+  jetzt nicht mehr im Regler; hat ihn keines der gewaehlten Geraete, entsteht
+  gar keiner.
+- **Unerkannte Kanaele bekamen Pro-Kopf-Regler (FM-28).** Kanaele, deren
+  Funktion beim Import nicht erkannt wurde, tragen alle dasselbe Sammel-Attribut
+  — am `Robin Spiider [91-Kanal Pixel]` sind das 21 voellig verschiedene
+  Funktionen (Virt. Farbrad, Rot Fein, CTC, Shutter, Blumeneffekt, Zoom Fein …).
+  Aus ihrer Zahl wurden „21 Koepfe", und „Kopf 3" verstellte dann das Feinbyte
+  einer Grundfarbe. Solche Kanaele werden jetzt ausschliesslich geraeteweit
+  bedient.
+  **Was du dabei verlierst — bitte lesen:** dieser eine geraeteweite Regler
+  schreibt seinen Wert auf **alle** unerkannten Kanaele gleichzeitig. Am
+  Spiider bewegt ein einziger Zug 21 verschiedene Funktionen auf denselben Wert
+  (Shutter, CTC, Blumeneffekt, Zoom Fein, Master Dimmer Fein …). Die
+  Pro-Kopf-Regler, die es vorher gab, waren zwar richtig BESCHRIFTET und damit
+  einzeln adressierbar — sie trafen aber nicht den Kopf, den ihre Aufschrift
+  nannte. Einzeln ansprechbar werden diese Kanaele erst wieder mit FM-33
+  (je Kanal ein eigener Regler statt einer Kopf-Achse, die es nicht gibt); bis
+  dahin ist der geraeteweite Regler hier ein grobes Werkzeug.
+- **Zwei weitere Regler zaehlten weiter falsch (Nachlese zu FM-27).** Die
+  Pro-Kopf-Regler sind nicht der einzige Weg, auf dem ein Regler entsteht: die
+  **Schnellwahl** des Position-Tabs baut ihren „Pan/Tilt-Speed"-Regler selbst,
+  die **Grundfarben-Regler** des Color-Tabs ebenso. Beide bekamen die ganze
+  Auswahl. Gemessen: ein Zug am Pan/Tilt-Speed-Regler schrieb einer `MOVBAR4`
+  (hat keinen Speed-Kanal) still einen Wert zu, ohne dort einen einzigen
+  DMX-Kanal zu bewegen; dasselbe am Rot-Regler mit einem `SHARPY [16-Kanal]`
+  (Farbrad statt RGB) neben einem Spiider. Auch diese beiden Regler zeigen jetzt
+  nur noch die Geraete, die den Kanal wirklich haben.
+- **Die Kommandozeile muss beim Hydrabeam-Dimmer nicht mehr passen.** `1:2 @ 50`
+  wurde bisher mit „nicht eindeutig" abgewiesen, weil fuenf Kanaele gegen vier
+  Koepfe standen. Mit der richtigen Zaehlung gibt es den Widerspruch nicht mehr:
+  der Befehl trifft „Kopf 2 Dimmer" und nimmt den gemeinsamen Master mit. Wo die
+  Zuordnung wirklich unklar ist (etwa ein Zonen-Panel mit 48 Farbzonen, aber nur
+  acht Weiss-Kanaelen), wird weiterhin nicht geraten.
+
 ### 2026-08-24 — Eine Show, in der die neuen Sachen wirklich zu sehen sind
 
 #### Hinzugefuegt
