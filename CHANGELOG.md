@@ -26,6 +26,41 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   `skipped` und `mergeable: UNKNOWN` **nicht** blockieren: sonst meldet das
   Werkzeug bei jedem frisch gepushten PR Fehlalarm und wird umgangen.
 
+### 2026-08-25 — Der Aufraeumer nach jedem Test lief durch ALLE Widgets
+
+#### Behoben
+
+- **Die autouse-Fixture `_cleanup_vc_canvases` brachte den Testprozess zum
+  Absturz.** Sie suchte ihre `VCCanvas`-Objekte ueber
+  `QApplication.allWidgets()` — und das baut eine Liste ueber alle lebenden
+  QWidgets, auch ueber die, deren C++-Seite schon fort ist, waehrend der
+  Python-Wrapper noch existiert. Beim Bauen dieser Liste stirbt der Prozess mit
+  SIGSEGV. Gemessen an `tests/test_viz10_ui_repairs.py` auf unveraendertem
+  `main`: **5 von 6 Laeufen** enden mit `exit 139`, der Traceback zeigt jedes Mal
+  auf die `allWidgets()`-Zeile. Nach dem Umbau: **0 von 6**.
+- **Gesucht wird jetzt ueber den QObject-Baum** (`topLevelWidgets()` +
+  `findChildren`): Kinder eines lebenden Fensters sind per Konstruktion selbst
+  lebendig, es gibt keinen Schritt, der einen halbtoten Wrapper erzeugt. Verliert
+  ein Wrapper waehrenddessen doch seine C++-Seite, meldet PySide einen
+  `RuntimeError` — die Rueckmeldung, die `allWidgets()` einem nicht gibt, weil es
+  den Prozess vorher beendet.
+
+#### Bemerkenswert
+
+- **Das war NICHT der Absturz aus PROC-04.** Der lag in der
+  Interpreter-Abbauphase, nach dem letzten Test, und wurde von
+  `LIGHTOS_HARDEN_EXIT_ALL` erschlagen. Dieser hier passiert **mitten im Lauf**,
+  im Teardown des ersten Tests, und tritt mit derselben Variable weiter auf
+  (2 von 3 gemessen). Gleicher Exit-Code, andere Ursache — ein Grund mehr, einen
+  `exit 139` nicht als „das bekannte Rauschen" abzutun.
+- **Im Repo war es zweimal notiert, aber als Eigenschaft der Tests behandelt.**
+  `test_viz_quality_tier.py` raeumt parentlose Widgets ausdruecklich vorher weg
+  („sonst native AV im Isolate-Gate (halbtote Wrapper in allWidgets)"), und
+  `test_views.py::_drop_view` begruendet seinen Abbau ebenso. Beide Umgehungen
+  bleiben richtig — aber eine Fixture, die nach JEDEM Test durch alle Widgets
+  laeuft, darf nicht darauf angewiesen sein, dass jede Datei der Suite vorher
+  aufgeraeumt hat.
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
@@ -56,6 +91,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Drift gab es eine Ebene hoeher zwischen den zwei CI-*Jobs*. Mit
   Positivkontrolle: ein Waechter, der auch den vollstaendigen Fall beanstandet,
   zwingt zu einer Angabe, die nichts bewirkt, und wird abgeschaltet.
+
+### 2026-08-24 — Auch der Fixture-Generator kann die Panel-Geometrie hinterlegen
+
+#### Hinzugefuegt
+
+- **Der Fixture-Generator hat jetzt dieselben Felder fuer die Panel-Geometrie
+  wie der einfache Fixture-Editor.** Jeder Modus-Tab traegt „Pixel-Raster:
+  Zeilen x Spalten" und „Weiss-Leiste: Zeilen x Spalten", `0` heisst wie
+  gewohnt „nicht hinterlegt". Bisher gab es die Eingabe nur im einfachen
+  Editor — wer sein selbstgebautes Panel ueber den **Generator** anlegte (den
+  naheliegenden Weg: er hat den Live-Test am echten Geraet, mit dem man
+  ueberhaupt erst herausfindet, welcher Kanal welche Zone schaltet), konnte die
+  Form nirgends eintragen. Das Panel wurde im 3D weiter als geratenes Quadrat
+  gezeichnet (aus einem 4x12-Balken ein 7x7-Quadrat) und bekam auch kein
+  weisses Band. Ein ueber den Generator angelegtes Panel traegt jetzt dieselbe
+  Form wie ein ueber den Editor angelegtes.
+- **Der QLC+-Import des Generators uebernimmt die Rasterform jetzt auch.** Wer
+  eine `.qxf` ueber „QLC+ (.qxf) importieren…" als Startpunkt hereinholt, bekam
+  bisher alles ausser der Panel-Form — obwohl sie in der Datei steht und der
+  Bibliotheks-Import sie seit FM-23 liest. Dieselbe Datei ergab je nach Weg
+  4x12 oder gar nichts. Jetzt steht die Zahl nach dem Import im sichtbaren
+  Feld und laesst sich vor dem Speichern noch aendern. Eine Weiss-Leiste wird
+  weiterhin nicht erfunden: das QLC+-Format kennt sie nicht.
+
+#### Behoben
+
+- **Der Speicherweg des Generators liess die Rasterform fallen.** Selbst ein
+  Profil, das die Angabe mitbrachte, verlor sie beim Schreiben: die Funktion,
+  die aus dem Generator ein neues Profil anlegt, legte die vier Spalten gar
+  nicht erst an. Sie werden jetzt mitgeschrieben; Profile ohne die Angabe
+  bleiben unveraendert bei „nicht hinterlegt" — der Generator erfindet keine
+  Form, sonst haette jedes selbstgebaute Panel wieder ein weisses Band.
+- **Eine unsinnig grosse Rasterzahl wird jetzt auch beim Schreiben gekappt.**
+  Die Obergrenze (256 — die Zahl, ab der ein Pixel mehr im 3D ohnehin nicht
+  mehr erscheint) galt nur in den Dialogen. Ein Profil, das auf anderem Weg in
+  die Bibliothek kam, konnte „99999 Spalten" hinterlegen, und der 3D-Renderer
+  bekam das so zu sehen. Die Grenze steht jetzt an einer einzigen Stelle und
+  gilt fuer jeden Schreibweg.
+
 
 ### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
 
