@@ -4033,6 +4033,44 @@ def pixel_ring_base_banks(attributes) -> int:
     return 1 if (stellen[1] - stellen[0]) != (stellen[2] - stellen[1]) else 0
 
 
+def pixel_ring_banks_for(fixture) -> tuple:
+    """``(Zahl der Farb-Baenke, Versatz)`` eines gepatchten Pixel-Kopfes.
+
+    ★ VIZ-53: die EINE Stelle, die diese zwei Zahlen aus den Kanaelen des
+    GEPATCHTEN Geraets holt. Beide Ansichten fragen hier — die 3D-Nutzlast
+    (``visualizer_window._fixture_to_dict`` -> ``nHeads``/``pixelBase``) und
+    die 2D-Seite (``live_view.FixtureRenderer``, ``mini_icons``). Warum nicht
+    jeder fuer sich zaehlt: genau daraus entsteht der 2D/3D-Riss, den VIZ-51/52
+    fuer die Panel-Reihenfolge geschlossen haben — zwei Zaehlungen laufen still
+    auseinander, und die Abweichung faellt erst am echten Geraet auf.
+
+    Nie werfen (Renderer-Hot-Path): ohne lesbare Kanaele ``(0, 0)``. Daraus
+    macht ``ring_segmente`` sein Minimum von EINEM Segment, statt dass die
+    ganze Ansicht ausfaellt.
+    """
+    try:
+        attrs = [(getattr(c, "attribute", "") or "")
+                 for c in get_channels_for_patched(fixture)]
+    except Exception:
+        return 0, 0
+    return attrs.count("color_r"), pixel_ring_base_banks(attrs)
+
+
+def pixel_ring_segments(fixture) -> int:
+    """Wie viele Ring-Segmente zeichnet dieses Geraet? — dieselbe Zahl wie 3D.
+
+    ★ VIZ-53: Bank-Zahl UND Versatz kommen aus ``pixel_ring_banks_for``, die
+    Verrechnung aus ``pixel_order.ring_segmente`` (der Python-Fassung von
+    ``ringSegmente``, die das JS auf ``nHeads``/``pixelBase`` anwendet). Damit
+    ist es nicht eine ZWEITE Rechnung, die zufaellig dasselbe ergibt, sondern
+    dieselbe Rechnung auf denselben zwei Zahlen.
+
+    Robin Spiider, 91-Kanal-Pixelmodus: 20 Baenke, Versatz 1 -> **19**.
+    """
+    from .pixel_order import ring_segmente
+    return ring_segmente(*pixel_ring_banks_for(fixture))[1]
+
+
 class _AttrOverrideChannel:
     """Leichter Proxy um ein ``FixtureChannel`` mit ueberschriebenem
     ``attribute`` (Spider-Dual-Tilt: Pan-Motor als zweiter Tilt). Alle anderen

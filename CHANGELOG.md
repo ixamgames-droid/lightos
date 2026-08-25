@@ -42,6 +42,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   laeuft, darf nicht darauf angewiesen sein, dass jede Datei der Suite vorher
   aufgeraeumt hat.
 
+### 2026-08-24 — Der Pixel-Kopf sieht in der 2D-Ansicht auch wie einer aus
+
+#### Behoben
+
+- **Ein Moving Head mit LED-Ring stand in der 2D-Live-View als gewöhnlicher
+  Moving Head da.** Im 3D zeigt er seit Längem seinen Ring, in der Draufsicht
+  bekam er den Diamant-mit-Linse-Kopf aller anderen Mover — dasselbe Gerät sah
+  in beiden Ansichten verschieden aus, und wer den Ring suchte, musste in die
+  3D-Vorschau wechseln. Jetzt zeichnet die 2D-Ansicht seine Segmente: **so
+  viele, wie das Gerät wirklich hat** (Robe Spiider im Pixel-Modus: 19, nicht
+  20 — die erste Farbbank ist die Grundfarbe des Kopfes und kein Ring-Pixel).
+
+- **In Listen und im Gruppenbaum fehlte dieselbe Unterscheidung.** Ein
+  Pixel-Kopf ist als `moving_head` gepatcht und bekam deshalb auch dort das
+  gewöhnliche Icon. Er hat jetzt sein eigenes — Kopf mit Ring statt
+  geschlossener Linse, ebenfalls mit der echten Segmentzahl.
+
+- **Welche Geräte das betrifft — genauer als beim ersten Anlauf.** Das neue
+  Symbol bekommt jeder Kopf, den LightOS schon vorher als Ring-/Zonen-Kopf
+  geführt hat: **ein Pan, ein Tilt und mindestens drei Farbbänke.** Das sind
+  nicht nur die offensichtlichen Pixel-Köpfe: in der mitgelieferten Bibliothek
+  fällt der Spiider darunter, in einer großen importierten Bibliothek auch
+  Wash-Köpfe mit drei Zonen (Robin 600 LED Wash, Robin 800 LEDWash, A.leda
+  B-EYE, Intimidator Trio — nachgezählt 88 von 5122 Modi). **Neu ist daran nur
+  die 2D-Ansicht:** die Einstufung gilt seit FM-14, und die 3D-Vorschau zeigt
+  diesen Geräten längst ihren Ring — bis hierher widersprachen sich die beiden
+  Ansichten, jetzt nicht mehr. Ein Kopf mit **weniger als drei** Farbbänken
+  (jeder gewöhnliche Mover, jeder Ein-Farb-Wash) behält sein bisheriges Symbol
+  Pixel für Pixel.
+
+- **Wie groß der Ring zu sehen ist.** In lesbarer Darstellung liegt für jedes
+  Segment ein eigener Punkt auf dem Kranz; in der Vorgabegröße der Live-View
+  (30 px) und erst recht im 16-px-Listen-Icon verlaufen 19 Punkte zu einem
+  leuchtenden Ring. Das ist so gewollt — was auf einen Blick zu erkennen sein
+  muss, ist *Ring gegen geschlossene Linse*, und das bleibt auch klein sichtbar
+  (nachgemessen an den gerenderten Bildern, nicht am Code).
+
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
 #### Behoben
@@ -72,6 +109,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Drift gab es eine Ebene hoeher zwischen den zwei CI-*Jobs*. Mit
   Positivkontrolle: ein Waechter, der auch den vollstaendigen Fall beanstandet,
   zwingt zu einer Angabe, die nichts bewirkt, und wird abgeschaltet.
+
+### 2026-08-24 — Auch der Fixture-Generator kann die Panel-Geometrie hinterlegen
+
+#### Hinzugefuegt
+
+- **Der Fixture-Generator hat jetzt dieselben Felder fuer die Panel-Geometrie
+  wie der einfache Fixture-Editor.** Jeder Modus-Tab traegt „Pixel-Raster:
+  Zeilen x Spalten" und „Weiss-Leiste: Zeilen x Spalten", `0` heisst wie
+  gewohnt „nicht hinterlegt". Bisher gab es die Eingabe nur im einfachen
+  Editor — wer sein selbstgebautes Panel ueber den **Generator** anlegte (den
+  naheliegenden Weg: er hat den Live-Test am echten Geraet, mit dem man
+  ueberhaupt erst herausfindet, welcher Kanal welche Zone schaltet), konnte die
+  Form nirgends eintragen. Das Panel wurde im 3D weiter als geratenes Quadrat
+  gezeichnet (aus einem 4x12-Balken ein 7x7-Quadrat) und bekam auch kein
+  weisses Band. Ein ueber den Generator angelegtes Panel traegt jetzt dieselbe
+  Form wie ein ueber den Editor angelegtes.
+- **Der QLC+-Import des Generators uebernimmt die Rasterform jetzt auch.** Wer
+  eine `.qxf` ueber „QLC+ (.qxf) importieren…" als Startpunkt hereinholt, bekam
+  bisher alles ausser der Panel-Form — obwohl sie in der Datei steht und der
+  Bibliotheks-Import sie seit FM-23 liest. Dieselbe Datei ergab je nach Weg
+  4x12 oder gar nichts. Jetzt steht die Zahl nach dem Import im sichtbaren
+  Feld und laesst sich vor dem Speichern noch aendern. Eine Weiss-Leiste wird
+  weiterhin nicht erfunden: das QLC+-Format kennt sie nicht.
+
+#### Behoben
+
+- **Der Speicherweg des Generators liess die Rasterform fallen.** Selbst ein
+  Profil, das die Angabe mitbrachte, verlor sie beim Schreiben: die Funktion,
+  die aus dem Generator ein neues Profil anlegt, legte die vier Spalten gar
+  nicht erst an. Sie werden jetzt mitgeschrieben; Profile ohne die Angabe
+  bleiben unveraendert bei „nicht hinterlegt" — der Generator erfindet keine
+  Form, sonst haette jedes selbstgebaute Panel wieder ein weisses Band.
+- **Eine unsinnig grosse Rasterzahl wird jetzt auch beim Schreiben gekappt.**
+  Die Obergrenze (256 — die Zahl, ab der ein Pixel mehr im 3D ohnehin nicht
+  mehr erscheint) galt nur in den Dialogen. Ein Profil, das auf anderem Weg in
+  die Bibliothek kam, konnte „99999 Spalten" hinterlegen, und der 3D-Renderer
+  bekam das so zu sehen. Die Grenze steht jetzt an einer einzigen Stelle und
+  gilt fuer jeden Schreibweg.
+
 
 ### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
 
@@ -152,7 +228,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   (Shutter, CTC, Blumeneffekt, Zoom Fein, Master Dimmer Fein …). Die
   Pro-Kopf-Regler, die es vorher gab, waren zwar richtig BESCHRIFTET und damit
   einzeln adressierbar — sie trafen aber nicht den Kopf, den ihre Aufschrift
-  nannte. Einzeln ansprechbar werden diese Kanaele erst wieder mit FM-30
+  nannte. Einzeln ansprechbar werden diese Kanaele erst wieder mit FM-33
   (je Kanal ein eigener Regler statt einer Kopf-Achse, die es nicht gibt); bis
   dahin ist der geraeteweite Regler hier ein grobes Werkzeug.
 - **Zwei weitere Regler zaehlten weiter falsch (Nachlese zu FM-27).** Die

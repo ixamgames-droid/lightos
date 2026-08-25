@@ -37,7 +37,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
-    panel_grid_for, pixel_ring_base_banks, viz_model_for, white_grid_for,
+    panel_grid_for, pixel_ring_banks_for, viz_model_for, white_grid_for,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1909,18 +1909,23 @@ class VisualizerBridge(QObject):
         # Antwort als feste 1 im JS („Bank 0 ist die Grundfarbe") — richtig fuer
         # den Spiider, aber eine ANNAHME: die Routing-Regel belegt nur >=3
         # Baenke, und der Generator-Override macht jedes Geraet zum Pixel-Kopf.
-        # `pixel_ring_base_banks` leitet den Versatz aus dem Kanal-Layout ab.
+        # `pixel_ring_banks_for` leitet den Versatz aus dem Kanal-Layout ab.
         # 0 heisst „alle Baenke sind Pixel" — dann zeichnet der Ring auch Pixel 0.
         pixel_base = 0
-        if model in ("par_bar", "spider", "mover_bar", "matrix", "pixel_head"):
+        if model == "pixel_head":
+            # ★ VIZ-53: beide Zahlen kommen aus `pixel_ring_banks_for` — der
+            # EINEN Stelle, die seither auch die 2D-Seite fragt (Live-View und
+            # Listen-Icon). Bis hierher zaehlte nur diese Methode, und die
+            # 2D-Ansicht kannte den Typ gar nicht; eine zweite Zaehlung daneben
+            # waere derselbe 2D/3D-Riss noch einmal gewesen. Die Zaehlung selbst
+            # ist unveraendert (Farb-Baenke + CDX-55-Versatz), sie steht nur
+            # nicht mehr nur hier.
+            n_heads, pixel_base = pixel_ring_banks_for(f)
+        elif model in ("par_bar", "spider", "mover_bar", "matrix"):
             try:
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
                                for c in get_channels_for_patched(f)]
                 n_heads = kanal_attrs.count("color_r")
-                # ★ CDX-55: wie viele fuehrende Baenke KEINE Ring-Pixel sind.
-                # Der Versatz wird aus den Kanaelen abgeleitet statt unterstellt.
-                if model == "pixel_head":
-                    pixel_base = pixel_ring_base_banks(kanal_attrs)
                 # ★ Die ZAHL der eigenen Weiss-Segmente faellt in derselben
                 # Zaehlung ab (VIZ-50b) — sie steht seit dem Anlegen des
                 # Geraets in den Kanaelen. Nur `buildMatrixPanel` liest
@@ -1930,12 +1935,9 @@ class VisualizerBridge(QObject):
                 if model == "matrix":
                     n_whites = kanal_attrs.count("color_w")
             except Exception:
-                # `pixel_base` wird hier bewusst NICHT zurueckgesetzt: es steht
-                # oben schon auf 0, und die einzige Zeile, die es ueberhaupt
-                # setzt, laeuft nur im 'pixel_head'-Zweig — danach kann in
-                # diesem try nichts mehr werfen (der 'matrix'-Zweig schliesst
-                # den 'pixel_head'-Zweig aus). Ein Reset waere nicht
-                # kaputtzumachen und damit auch nicht zu messen.
+                # `pixel_base` kommt in diesem Zweig gar nicht mehr vor: seit
+                # VIZ-53 ist 'pixel_head' ein eigener Zweig, der seine Fehler
+                # in `pixel_ring_banks_for` selbst abfaengt.
                 n_heads = 0
                 n_whites = 0
         # ★ VIZ-50a: die PHYSISCHE Rasterform des Panels (Zeilen x Spalten) aus
