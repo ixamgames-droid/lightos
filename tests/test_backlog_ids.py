@@ -22,8 +22,8 @@ import unittest
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
-from backlog_ids import (items_aus_backlog, kollisionen,   # noqa: E402
-                         naechste_freie, zerlege)
+from backlog_ids import (_PR_LIMIT, items_aus_backlog,  # noqa: E402
+                         kollisionen, naechste_freie, zerlege)
 
 KOPF = "| ID | Prio | Status | Titel | Details |\n|---|---|---|---|---|\n"
 
@@ -154,6 +154,25 @@ class KollisionenTest(unittest.TestCase):
     def test_ein_einziger_zweig_meldet_nie(self):
         jz = {"origin/main": items_aus_backlog(tabelle("| FM-30 | P2 | todo | **A** | x |"))}
         self.assertEqual(kollisionen(jz, auf_main=set()), [])
+
+
+class AbdeckungTest(unittest.TestCase):
+    """★ CDX-57: das Werkzeug darf nie weniger liefern, als sein Name verspricht.
+
+    Codex hat drei Wege gefunden, auf denen die erste Fassung stillschweigend
+    unvollstaendig wurde: ein `--limit`, das hart abschneidet; ein
+    fehlgeschlagenes `git fetch`, dessen Rueckgabewert verworfen wurde; und
+    Fork-PRs, deren Kopf es als `origin/<branch>` gar nicht gibt. Alle drei
+    enden im selben Schaden — eine Nummer wird als frei gemeldet, die es nicht
+    ist.
+    """
+
+    def test_das_pr_limit_liegt_weit_ueber_dem_realistischen_bestand(self):
+        # Kein Ersatz fuer echtes Blaettern, aber der Wert darf nicht in der
+        # Naehe dessen liegen, was das Repo je offen hat. Ueberschreitet die
+        # Zahl der PRs ihn doch, meldet das Werkzeug eine Warnung statt einer
+        # kuerzeren Liste — das ist der eigentliche Schutz.
+        self.assertGreaterEqual(_PR_LIMIT, 200)
 
 
 if __name__ == "__main__":

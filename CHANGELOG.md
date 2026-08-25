@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Codex hat zwei Werkzeuge genau dort erwischt, wofuer sie gebaut sind
+
+#### Behoben
+
+- **`tools/pr_bereit.py` mass den Rueckstand mit der Uhr statt mit der
+  Abstammung.** Die Regel lautete „ist der letzte `main`-Commit juenger als der
+  letzte Check?". Das hat ein Loch: die drei CI-Legs enden zu verschiedenen
+  Zeiten, und zieht `main` weiter, **waehrend** sie laufen, endet die letzte Leg
+  nach dem neuen `main`-Commit. Die Zeitprobe sagt dann „Stand aktuell", obwohl
+  der gepruefte Stand diesen Commit nie enthalten hat — das Werkzeug haette
+  ausgerechnet den Zustand durchgewunken, gegen den es gebaut wurde. Gezaehlt
+  wird jetzt `behind_by` aus `repos/:owner/:repo/compare/main...<head>`: eine
+  Aussage ueber Commits, die keine Uhr braucht.
+- **Ein Entwurf galt als bereit.** `isDraft` haengte nur ein `[DRAFT]` an die
+  Anzeige und ging nicht ins Urteil ein; `--strict` gab fuer einen Draft eine 0
+  zurueck. Neuer Zustand „Entwurf" — aber nach den echten Problemen: ein roter
+  Draft heisst weiter „rot", das ist die nuetzlichere Auskunft.
+- **`tools/backlog_ids.py` behauptete Abdeckung, die es nicht hatte** — an drei
+  Stellen: `gh pr list --limit 50` schneidet hart ab, statt zu blaettern; der
+  Rueckgabewert von `git fetch` wurde verworfen (mit veralteten Refs ist jede
+  Auskunft wertlos); und Fork-PRs, deren Kopf es als `origin/<branch>` nicht
+  gibt, fielen still aus der Liste. Jetzt: Grenze auf 200 mit Warnung beim
+  Erreichen, `fetch`-Fehler beendet mit 2, nicht lesbare Refs werden benannt.
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt

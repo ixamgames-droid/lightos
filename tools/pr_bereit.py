@@ -24,10 +24,25 @@ sind:
 2. **Gruen auf altem Stand.** Die Checks liefen, aber ``main`` ist seither
    weitergezogen. Das Ergebnis gilt fuer einen Stand, den es nicht mehr gibt —
    und genau so ist am 24.08. ein PR gruen gemeldet und Minuten spaeter
-   ``CONFLICTING`` geworden. Gemessen wird ueber die Zeit: ist der letzte
-   ``main``-Commit **juenger** als der letzte Check des PR, ist das Urteil alt.
+   ``CONFLICTING`` geworden.
 
-3. **Teilweise geprueft.** Ein Teil der Legs hat abgeschlossen, der Rest nicht.
+   ★★ **Gemessen wird ueber die ABSTAMMUNG, nicht ueber die Uhr** (CDX-57, von
+   Codex gefunden). Die erste Fassung verglich Zeiten: „ist der letzte
+   ``main``-Commit juenger als der letzte Check?". Das hat ein Loch, und zwar
+   genau dort, wo es weh tut: die drei Legs (Linux + zwei Windows) enden zu
+   verschiedenen Zeiten. Zieht ``main`` weiter, WAEHREND sie laufen, endet die
+   letzte Leg NACH dem neuen ``main``-Commit — die Zeitprobe sagt dann „aktuell",
+   obwohl der gepruefte Stand diesen ``main``-Commit nie enthalten hat. Das
+   Werkzeug haette also ausgerechnet den Zustand durchgewunken, gegen den es
+   gebaut ist. Jetzt zaehlt ``behind_by`` aus
+   ``repos/:owner/:repo/compare/main...<head>`` — eine Aussage ueber Commits,
+   die keine Uhr braucht.
+
+3. **Entwurf.** Ein Draft mit gruenen Checks ist nicht bereit, egal wie gruen er
+   ist. Bis CDX-57 trug ``isDraft`` nur ein ``[DRAFT]`` an die Anzeige und ging
+   nicht ins Urteil ein — ``--strict`` gab fuer einen Draft eine 0 zurueck.
+
+4. **Teilweise geprueft.** Ein Teil der Legs hat abgeschlossen, der Rest nicht.
    ``gh pr checks`` zeigt das, aber „kein Fehlschlag" liest sich auch hier gruen.
 
 Das Werkzeug beantwortet die andere Frage: **sind Checks tatsaechlich GELAUFEN,
@@ -59,10 +74,12 @@ ROT = "rot"
 UNFERTIG = "laeuft noch"
 ALT = "gruen auf altem Stand"
 KONFLIKT = "Konflikt"
+ENTWURF = "Entwurf"
 
 
-def urteil(anzahl_checks: int, schluesse: list[str], main_neuer: bool,
-           mergeable: str | None, kopf_alter_s: float | None = None) -> tuple[str, str]:
+def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
+           mergeable: str | None, kopf_alter_s: float | None = None,
+           entwurf: bool = False) -> tuple[str, str]:
     """``(Urteil, Begruendung)`` — die ganze Entscheidungsregel an einer Stelle.
 
     Bewusst ohne Netz und ohne ``gh``: so misst der Test diese Funktion und
@@ -86,9 +103,14 @@ def urteil(anzahl_checks: int, schluesse: list[str], main_neuer: bool,
         return UNFERTIG, f"{len(offen)} von {len(schluesse)} Checks noch ohne Ergebnis"
     if mergeable == "CONFLICTING":
         return KONFLIKT, "Checks gruen, aber der Zweig kollidiert mit der Basis"
-    if main_neuer:
-        return ALT, ("alle Checks gruen, aber main ist seither weitergezogen — "
-                     "das Urteil gilt fuer einen Stand, den es nicht mehr gibt")
+    if zurueck > 0:
+        return ALT, (f"alle Checks gruen, aber der gepruefte Stand liegt {zurueck} "
+                     "Commit(s) hinter main — das Urteil gilt fuer einen Stand, "
+                     "den es nicht mehr gibt")
+    if entwurf:
+        # Zuletzt, weil die Zustaende darueber ECHTE Probleme sind: ein roter
+        # Draft soll „rot" heissen, nicht „Entwurf".
+        return ENTWURF, "Checks gruen und aktuell, aber der PR ist ein Entwurf"
     return BEREIT, f"{len(schluesse)} Checks gruen, Stand aktuell"
 
 
@@ -115,8 +137,6 @@ def main(argv=None) -> int:
                     help="Exit 1, wenn ein PR nicht bereit ist")
     args = ap.parse_args(argv)
 
-    main_zeit = _gh_json("api", "repos/:owner/:repo/commits/main")[
-        "commit"]["committer"]["date"]
     if args.pr:
         nummern = [int(n) for n in args.pr]
     else:
@@ -126,7 +146,6 @@ def main(argv=None) -> int:
         print("keine offenen PRs.")
         return 0
 
-    print(f"main zuletzt bewegt: {main_zeit}\n")
     zeilen, nicht_bereit = [], 0
     for nr in sorted(nummern):
         info = _gh_json("pr", "view", str(nr), "--json",
@@ -134,11 +153,11 @@ def main(argv=None) -> int:
         runs = _gh_json("api", f"repos/:owner/:repo/commits/{info['headRefOid']}/check-runs")
         liste = runs.get("check_runs") or []
         schluesse = [c.get("conclusion") for c in liste]
-        fertig = [c.get("completed_at") for c in liste if c.get("completed_at")]
-        # „main juenger als der letzte Check" — reine Zeichenkettenfolge genuegt,
-        # beide Zeiten kommen als ISO-8601 in UTC von derselben API.
-        main_neuer = bool(fertig) and main_zeit > max(fertig)
-        # Alter des Kopf-Commits — dieselbe Uhr wie main_zeit (beide aus der API).
+        # ★ CDX-57: wie weit haengt der GEPRUEFTE Stand hinter main? Eine Aussage
+        # ueber Commits — im Gegensatz zur frueheren Zeitprobe unabhaengig davon,
+        # wann welche Leg fertig wurde.
+        vgl = _gh_json("api", f"repos/:owner/:repo/compare/main...{info['headRefOid']}")
+        zurueck = int(vgl.get("behind_by") or 0)
         kopf = _gh_json("api", f"repos/:owner/:repo/commits/{info['headRefOid']}")
         kopf_zeit = kopf.get("commit", {}).get("committer", {}).get("date")
         alter = None
@@ -146,8 +165,9 @@ def main(argv=None) -> int:
             from datetime import datetime, timezone
             alter = (datetime.now(timezone.utc)
                      - datetime.fromisoformat(kopf_zeit.replace("Z", "+00:00"))).total_seconds()
-        u, grund = urteil(len(liste), schluesse, main_neuer,
-                          info.get("mergeable"), alter)
+        u, grund = urteil(len(liste), schluesse, zurueck,
+                          info.get("mergeable"), alter,
+                          bool(info.get("isDraft")))
         if u != BEREIT:
             nicht_bereit += 1
         zeilen.append((nr, u, grund, info["title"], info.get("isDraft")))

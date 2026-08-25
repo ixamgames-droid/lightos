@@ -144,13 +144,36 @@ def _git(*args: str) -> tuple[int, str]:
     return p.returncode, p.stdout
 
 
-def offene_pr_zweige() -> list:
-    """Zweignamen der offenen PRs — oder ``[]``, wenn ``gh`` nicht antwortet."""
+# `gh pr list --limit` ist ein HARTES Abschneiden, kein Seitenwechsel. Bei mehr
+# offenen PRs als hier faellt der Rest still weg — und ein Werkzeug, das „alle
+# offenen PRs" verspricht, darf nicht stillschweigend weniger liefern (CDX-57).
+_PR_LIMIT = 200
+
+
+def offene_pr_zweige() -> tuple:
+    """``(Zweignamen, Warnung|None)`` der offenen PRs.
+
+    **Nie stillschweigend weniger liefern:** wer die Liste nicht vollstaendig
+    bekommt, bekommt hier einen Grund statt einer kuerzeren Liste.
+    """
     p = subprocess.run(
-        ("gh", "pr", "list", "--state", "open", "--limit", "50",
-         "--json", "headRefName", "-q", ".[].headRefName"),
+        ("gh", "pr", "list", "--state", "open", "--limit", str(_PR_LIMIT),
+         "--json", "headRefName,isCrossRepository,number",
+         "-q", ".[] | [.number, .headRefName, (.isCrossRepository|tostring)] | @tsv"),
         capture_output=True, text=True)
-    return p.stdout.split() if p.returncode == 0 else []
+    if p.returncode != 0:
+        return [], f"`gh pr list` fehlgeschlagen: {p.stderr.strip()[:160]}"
+    zeilen = [z.split("\t") for z in p.stdout.splitlines() if z.strip()]
+    if len(zeilen) >= _PR_LIMIT:
+        return [], (f"mehr als {_PR_LIMIT} offene PRs — `gh pr list --limit` "
+                    "schneidet ab, die Liste waere unvollstaendig")
+    # ★ Fork-PRs haben keinen `origin/<headRefName>`; sie stumm zu ueberspringen
+    # hiesse, Abdeckung zu behaupten, die es nicht gibt.
+    fremd = [f"#{n}" for n, _b, cross in zeilen if cross == "true"]
+    zweige = [b for _n, b, cross in zeilen if cross != "true"]
+    if fremd:
+        return zweige, f"aus einem Fork und darum nicht lesbar: {', '.join(fremd)}"
+    return zweige, None
 
 
 def backlog_je_zweig(refs: list) -> dict:
@@ -174,7 +197,15 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     if not args.kein_fetch:
-        _git("fetch", "--quiet", "--prune", "origin")
+        rc, _ = _git("fetch", "--quiet", "--prune", "origin")
+        if rc != 0:
+            # ★ CDX-57: fail closed. Mit veralteten Refs koennte eine Nummer als
+            # frei gemeldet werden, die auf einem neueren Zweig laengst vergeben
+            # ist — genau der Schaden, den dieses Werkzeug verhindern soll.
+            print("FEHLER: `git fetch` fehlgeschlagen — mit veralteten Refs waere "
+                  "jede Auskunft hier wertlos. Netz/Zugang pruefen, oder bewusst "
+                  "mit --kein-fetch fahren.")
+            return 2
 
     if args.alle_zweige:
         rc, out = _git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin")
@@ -183,13 +214,20 @@ def main(argv=None) -> int:
               "Titel werden ueber Monate umformuliert, das meiste davon ist "
               "Rauschen (gemessen: 316 von ~500 IDs).")
     else:
-        zweige = offene_pr_zweige()
-        if not zweige:
-            print("[ids] HINWEIS: `gh` liefert keine offenen PRs — geprueft wird "
-                  "nur `origin/main`. Das ist WENIGER, als der Name verspricht.")
+        zweige, warnung = offene_pr_zweige()
+        if warnung:
+            print(f"[ids] ⚠ {warnung}")
+        elif not zweige:
+            print("[ids] HINWEIS: keine offenen PRs — geprueft wird nur "
+                  "`origin/main`. Das ist WENIGER, als der Name verspricht.")
         refs = ["origin/main"] + [f"origin/{b}" for b in zweige]
 
     je_zweig = backlog_je_zweig(refs)
+    # ★ CDX-57: ein Ref, das nicht lesbar ist, wurde bisher still uebersprungen —
+    # das Werkzeug behauptete dann Abdeckung, die es nicht hatte.
+    fehlend = [r for r in refs if r not in je_zweig]
+    if fehlend:
+        print(f"[ids] ⚠ nicht lesbar (uebersprungen): {', '.join(fehlend)}")
     if not je_zweig:
         print("FEHLER: kein Ref mit BACKLOG.md gefunden — sind die Remote-Refs da?")
         return 2
