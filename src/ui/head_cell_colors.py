@@ -62,3 +62,53 @@ def fixture_cell_color(fid, head, fid_order) -> QColor:
     out = QColor()
     out.setHsl(h, s, light, a)
     return out
+
+
+def head_counts(cells) -> dict[int, int]:
+    """UI-52: **wie viele VERSCHIEDENE Koepfe** je Geraet im Raster liegen.
+
+    ``cells`` = Folge von ``(fid, head)`` je Rasterzelle; ``head is None`` =
+    Zelle des GANZEN Geraets (zaehlt nicht als Kopf-Zelle).
+
+    Beide Legenden („Farbe → Gerät" im Fixture-Gruppen-Editor und im
+    Matrix-Editor) schlossen die Zahl frueher aus dem hoechsten Kopf-Index:
+    ``heads[fid] = max(heads.get(fid, 0), head + 1)``. Das ist nur dann die Zahl
+    der Zellen, wenn die Koepfe **luecken los ab 0** liegen — was nur der
+    Streifen aus ``place_fixture_heads``/``create_head_matrix_group`` tut. Sobald
+    eine Zelle fehlt (Rechtsklick → „Zelle entfernen"; Ring-Raster eines Robin
+    Spiiders, dessen 19 Pixel als Koepfe 1..19 liegen, weil Kopf 0 die Grundfarbe
+    des Geraets ist), zaehlte die Formel entfernte bzw. nie platzierte Koepfe mit.
+
+    Bewusst HIER und nicht in einer der beiden Views: die Formel stand zweimal im
+    Code und war zweimal falsch — dieselbe Drift, gegen die dieses Modul schon
+    fuer die Farben angelegt wurde. Ein Set statt eines Zaehlers haelt die Zahl
+    auch dann richtig, wenn derselbe Kopf zweimal im Raster steht.
+
+    Reine Funktion -> headless testbar."""
+    sets: dict[int, set[int]] = {}
+    for fid, head in cells:
+        if fid is None or head is None:
+            continue
+        try:
+            sets.setdefault(int(fid), set()).add(int(head))
+        except (TypeError, ValueError):
+            continue
+    return {fid: len(heads) for fid, heads in sets.items()}
+
+
+def head_count_suffix(n) -> str:
+    """Der Zusatz hinter dem Geraetenamen in der Legende — ``""`` ohne Kopf-Zelle.
+
+    UI-52: **auch EINE Kopf-Zelle bekommt den Zusatz** (in der Einzahl). Vorher
+    galt die Schwelle ``n > 1``; zusammen mit der alten ``max(head)+1``-Formel
+    fiel das nie auf, weil eine einzelne Kopf-Zelle mit Index > 0 faelschlich
+    eine groessere Zahl meldete. Mit der richtigen Zaehlung waere der Eintrag
+    sonst von einer GANZ-Geraete-Zelle nicht mehr zu unterscheiden — genau die
+    Unterscheidung, fuer die es die Legende gibt."""
+    try:
+        n = int(n or 0)
+    except (TypeError, ValueError):
+        return ""
+    if n < 1:
+        return ""
+    return " (1 Kopf)" if n == 1 else f" ({n} Köpfe)"
