@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-08-24 — Die Gruppen-Legende zaehlt, was wirklich im Raster liegt
+### 2026-08-24 — Die Legende zaehlt, was wirklich im Raster liegt
 
 #### Behoben
 
@@ -22,6 +22,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Kopf wurde weitergezaehlt. Jetzt zaehlt die Legende die tatsaechlich belegten
   Kopf-Zellen; ein luecken loser Streifen meldet unveraendert dieselbe Zahl wie
   vorher.
+- **Der Matrix-Editor sagte fuer dasselbe Raster etwas anderes.** Seine Legende
+  „Farbe → Gerät" trug die gleiche Formel und damit den gleichen Fehler: das aus
+  einer Gruppe uebernommene Ring-Raster meldete dort weiter „(20 Koepfe)".
+  Beide Ansichten zeigen dasselbe Rig und nennen jetzt dieselbe Zahl — die
+  Zaehlung liegt in einem gemeinsamen Modul, wie die Zellfarben schon vorher.
+- **Eine einzelne Kopf-Zelle heisst jetzt „(1 Kopf)" statt gar nichts.** Bisher
+  bekam ein Geraet den Zusatz erst ab zwei Koepfen; blieb nach dem Entfernen von
+  Zellen genau einer uebrig, sah sein Eintrag exakt so aus wie der eines
+  Geraets, das als GANZES im Raster liegt — die Unterscheidung, fuer die es die
+  Legende gibt.
 
 ### 2026-08-24 — Die Exit-Haertung stand nur auf der Windows-Seite
 
