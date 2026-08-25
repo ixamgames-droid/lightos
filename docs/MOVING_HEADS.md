@@ -202,6 +202,11 @@ Bedienung (`ResetActionButton`, Tab „Weitere"):
   gesendet, der Button ist gesperrt, und nach **4 s** wird der Kanal
   automatisch auf den Default (0) zurueckgesetzt — der Reset kann nicht
   haengen bleiben.
+- **Nur Geraete mit `reset`-Kanal (FM-34).** In einer gemischten Auswahl traegt
+  der Knopf ausschliesslich die Geraete, die den Kanal wirklich haben; hat ihn
+  keines, erscheint er gar nicht. Vorher bekamen die anderen den Reset-Wert ins
+  Programmer-Dict, ohne dass ein DMX-Kanal ihn ausgab — der Knopf versprach
+  eine Rekalibrierung, die dort niemand ausfuehrt.
 
 ---
 
@@ -215,12 +220,22 @@ auf Geraetenamen — keine Sonderlogik im UI-Code:
 | Dimmer | Attribut `intensity`/`dimmer`/`master` | Fader im Intensity-Tab |
 | Strobe | Attribut `shutter`/`strobe` (+ Ranges `open`/`closed`/`strobe`) | Status-Kacheln + Speed-Slider + Fader im Intensity-Tab |
 | Color Wheel | Attribut `color_wheel` + Ranges kind `color`/`open` | Farb-/Split-Kacheln + Fader |
+| RGB-Schnellwahl | Attribut `color_r`/`color_g`/`color_b`/`color_w` | Farbkacheln im Color-Tab |
 | Auto-Farbwechsel | Range kind `rotate` am Farbrad | Hardware-/Software-Rotation |
 | Gobos | Attribut `gobo_wheel` + Ranges kind `gobo` | Gobo-Tab + Icon-Kacheln |
 | Gobo Shake | Ranges kind `shake` | Shake-Kacheln + Speed-Slider |
 | Gobo-Wechsel | Range kind `rotate` am Gobo-Rad | Wechsel-Slider + Stopp |
 | Gobo Effects | Attribut `gobo_fx` | Fader im Gobo-Tab |
 | Reset | Attribut `reset` (+ Range kind `reset`) | Sicherer Button, kein Fader |
+
+**Jede Zeile gilt geraeteweise, nicht auswahlweise (FM-27 / FM-34).** Die
+Regler- und Kachel-Vorlage des Programmers ist die UNION der Auswahl — eine
+Faehigkeit steht dort also schon, wenn EIN gewaehltes Geraet sie hat. Bedient
+wird sie trotzdem nur an den Geraeten, die den Kanal wirklich tragen; die
+anderen fallen aus der Liste des Reglers bzw. der Kachelreihe heraus. Die
+`ColorQuickBar` fuehrt beide Familien getrennt: RGB-Kacheln treiben die
+RGB-Geraete, Farbrad-Kacheln die Farbrad-Geraete — ein `Sharpy` hat ein
+Farbrad und kein RGB, ein `Robin Spiider` umgekehrt.
 
 Modi (9ch vs. 11ch) sind regulaere `FixtureMode`-Eintraege — beim Patchen wird
 der Modus gewaehlt, die Kanalnummern kommen vollstaendig aus der DB

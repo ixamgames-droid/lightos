@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Die Schnellwahl fasste Geraete an, die den Kanal nicht haben
+
+#### Behoben
+
+- **Farb-Schnellwahl und Reset-Knopf treiben nur noch Geraete, die den Kanal
+  wirklich haben (FM-34).** In einer Auswahl aus `Robin Spiider [91-Kanal
+  Pixel]` und `Sharpy (Beam 16ch)` traf ein Klick auf eine Farbkachel bisher
+  **beide** — der SHARPY hat aber ein Farbrad statt RGB. Gemessen am
+  DMX-Ausgang: `DMX-Diff SHARPY: {}`, waehrend im Programmer
+  `{'color_r': 255, 'color_g': 255, 'color_b': 255}` stehenblieb. Ein Wert, den
+  kein Kanal ausgibt, der aber in Szenen und Snaps mitwandert. Umgekehrt bekam
+  der Reset-Knopf den Spiider mit, der gar keinen `reset`-Kanal hat — der Knopf
+  versprach eine Rekalibrierung, die dieses Geraet nie ausfuehrt.
+- **Was sich dabei auf der Buehne aendert:** nichts, was vorher wirkte. Die
+  weggefilterten Geraete haben den Kanal nicht; ihr Programmer-Eintrag kam nie
+  auf DMX an. Sichtbar wird es an zwei Stellen: der Reset-Knopf steht in einer
+  gemischten Auswahl jetzt nur noch fuer die Geraete mit Reset-Kanal, und die
+  Farbrad-Kacheln erscheinen weiterhin, treiben aber nur die Geraete mit
+  Farbrad. Wer ein solches Geraet vorher versehentlich „mitgefaerbt" hat und
+  diesen toten Eintrag in einer Szene gespeichert hat, findet ihn dort
+  unveraendert — gespeicherte Shows werden nicht angefasst.
+- **Eine Regel statt zwei:** die Filterung laeuft ueber dieselbe Quelle, die
+  seit #663 die Regler des Programmers filtert
+  (`ProgrammerView._fixtures_with_attr`). Die `ColorQuickBar` traegt zwei
+  Kachelfamilien, die verschiedene Kanaele schreiben (RGB-Presets und
+  Farbrad-Slots); sie bekommen jetzt getrennte Geraetelisten, denn wer das eine
+  hat, hat noch lange nicht das andere.
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt
