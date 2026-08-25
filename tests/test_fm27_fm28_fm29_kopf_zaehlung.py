@@ -474,5 +474,290 @@ class PositivkontrolleSauberesMultiHeadTest(_Basis):
             self.assertEqual(koepfe, {None}, f"{attr}: {koepfe}")
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Gegenpruefung zu #663 — die Regler, die NICHT aus _slider_head_buckets kommen
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ReglerAusserhalbDesBucketWegsTest(_Basis):
+    """★★ ``_slider_head_buckets`` ist **nicht der einzige** Bauweg fuer Regler.
+
+    Der Gegenprueferbericht zu PR #663 hat das an zwei Stellen belegt, beide mit
+    demselben Muster: die Vorlage (``_template_channels`` bzw.
+    ``_color_template_channels``) ist die UNION der Attribute der Auswahl, also
+    steht ein Regler auch dann da, wenn ihn nur EIN Geraet hat — und diese
+    beiden Wege reichten ``fixtures`` unveraendert weiter:
+
+    * ``_add_quick_select`` (Position-Tab) baut den mit „Pan/Tilt-Speed:"
+      beschrifteten ``speed``-Regler selbst. Genau ``speed`` ist das
+      Beispiel-Attribut von FM-27 — der Fix ging bis dahin an dem Regler vorbei,
+      den der Nutzer dafuer wirklich anfasst.
+    * ``_add_sync_color_sliders`` (Color-Tab) baut die Grundfarben-Regler.
+
+    Gemessen wird deshalb **ueber alle** gebauten Regler eines Attributs, egal
+    welcher Bauweg sie erzeugt hat, und am **Ausgang**: welcher DMX-Kanal
+    bewegt sich, wenn man den Regler zieht.
+    """
+
+    def _zieh_am_regler(self, slider, fids, wert: int) -> dict:
+        """Den Regler wirklich BEWEGEN — ``QSlider.setValue`` loest das Signal
+        aus, das der Nutzer ausloest (``_on_value_changed``), und der entscheidet
+        selbst, welche Geraete er anfasst.
+
+        ``_apply_value(fid, …)`` waere hier die Seitentuer: sie SETZT das Geraet,
+        statt zu messen, ob der Regler es ueberhaupt anfasst."""
+        self._grundstellung(*fids)
+        vorher = {fid: self._dmx(fid) for fid in fids}
+        slider._slider.setValue(wert)
+        return {fid: {k: v for k, v in self._dmx(fid).items()
+                      if vorher[fid].get(k) != v} for fid in fids}
+
+    # ── FM-27 am Schnellwahl-Regler ──────────────────────────────────────
+    def test_kein_speed_regler_traegt_ein_geraet_ohne_speed(self):
+        """``MOVBAR4 [22-Kanal]`` hat keinen ``speed``-Kanal, die
+        ``HYDRABEAM 19ch`` schon. KEIN gebauter ``speed``-Regler darf die
+        MOVBAR4 tragen — auch nicht der der Schnellwahl."""
+        self._patch(1, "MOVBAR4", 22)
+        self._patch(2, "HYDRA4000", 19)
+        self.assertNotIn("speed", {(c.attribute or "") for c
+                                   in get_channels_for_patched(self._fx(1))})
+        regler = self._regler(["1:0", "2:0"], "speed")
+        self.assertTrue(regler, "es gibt gar keinen speed-Regler mehr")
+        for kopf, fids, _s in regler:
+            self.assertNotIn(1, fids,
+                             f"Regler (Kopf {kopf}) traegt die MOVBAR4, die "
+                             f"gar keinen speed-Kanal hat")
+
+    def test_schnellwahl_speed_kommt_am_geraet_ohne_kanal_nicht_an(self):
+        """★★ Der gemeldete Schaden am Ausgang: ein Zug am „Pan/Tilt-Speed"-
+        Regler schrieb ``speed=177`` ins Programmer-Dict der MOVBAR4 und
+        bewegte dort **keinen einzigen** DMX-Kanal — stille Klasse FM-9/A5."""
+        self._patch(1, "MOVBAR4", 22)
+        self._patch(2, "HYDRA4000", 19)
+        # Der geraeteweite speed-Regler ist der der Schnellwahl: der Bucket-Weg
+        # liefert bei gewaehlten Kopf-Zellen einen Kopf-Regler (head=0).
+        frei = [s for kopf, _f, s in self._regler(["1:0", "2:0"], "speed")
+                if kopf is None]
+        self.assertTrue(frei, "die Schnellwahl baut ihren speed-Regler nicht mehr")
+        d = self._zieh_am_regler(frei[0], (1, 2), 177)
+        self.assertEqual(d[1], {}, "die MOVBAR4 hat keinen speed-Kanal — an ihr "
+                                   "darf sich nichts bewegen")
+        self.assertEqual(d[2].get("Head Speed"), 177,
+                         "an der HYDRABEAM muss der Regler weiter wirken")
+        self.assertIsNone(self._state_wert(1, "speed"),
+                          "der Wert darf auch nicht im Programmer-Dict landen — "
+                          "genau das war der stumme Rest")
+
+    def test_positivkontrolle_beide_haben_speed(self):
+        """★ Der Waechter darf nicht alles beanstanden: haben BEIDE Geraete den
+        Kanal, treibt derselbe Regler auch beide."""
+        self._patch(1, "HYDRA4000", 19)
+        self._patch(2, "HYDRA4000", 19)
+        frei = [s for kopf, _f, s in self._regler(["1:0", "2:0"], "speed")
+                if kopf is None]
+        self.assertTrue(frei)
+        d = self._zieh_am_regler(frei[0], (1, 2), 177)
+        for fid in (1, 2):
+            self.assertEqual(d[fid].get("Head Speed"), 177,
+                             f"Geraet {fid} wurde ausgesperrt, obwohl es den "
+                             f"Kanal hat")
+
+    # ── FM-27 an den Farb-Synchronreglern ────────────────────────────────
+    def test_farb_synchronregler_laesst_geraete_ohne_die_farbe_heraus(self):
+        """``SHARPY [16-Kanal]`` hat kein ``color_r`` (Farbrad statt RGB), der
+        ``Robin Spiider [91-Kanal Pixel]`` schon. Der Regler „Grundfarbe Rot"
+        zeigte beide an und bewegte am SHARPY nichts."""
+        self._patch(2, "SPIIDER", 91)
+        self._patch(3, "SHARPY", 16)
+        self.assertNotIn("color_r", {(c.attribute or "") for c
+                                     in get_channels_for_patched(self._fx(3))})
+        regler = self._regler(["2", "3"], "color_r")
+        self.assertTrue(regler, "der Rot-Regler ist ganz verschwunden")
+        for _kopf, fids, _s in regler:
+            self.assertNotIn(3, fids, "der SHARPY hat kein color_r")
+        d = self._zieh_am_regler(regler[0][2], (2, 3), 200)
+        self.assertEqual(d[3], {}, "am SHARPY darf sich nichts bewegen")
+        self.assertEqual(d[2].get("Grundfarbe Rot"), 200,
+                         "am Spiider muss der Regler weiter wirken")
+        self.assertIsNone(self._state_wert(3, "color_r"))
+
+    def test_positivkontrolle_beide_haben_die_farbe(self):
+        """★ Zwei Geraete mit RGB: der Synchronregler treibt weiter beide."""
+        self._patch(2, "SPIIDER", 91)
+        self._patch(3, "MOVBAR4", 22)
+        self.assertIn("color_r", {(c.attribute or "") for c
+                                  in get_channels_for_patched(self._fx(3))})
+        regler = self._regler(["2", "3"], "color_r")
+        self.assertTrue(regler)
+        traeger = {fid for _k, fids, _s in regler for fid in fids}
+        self.assertEqual(traeger, {2, 3},
+                         "ein Geraet MIT der Farbe wurde ausgesperrt")
+
+    def _state_wert(self, fid: int, attr: str):
+        return self.state.get_programmer_value(fid, attr, head=None)
+
+
+class AltlastKopfZelleAufDemMidiWegTest(_Basis):
+    """★★ Was die neue Zaehlung mit einer Kopf-Zelle macht, die es NICHT MEHR
+    gibt — der ungemessene Rest aus der Gegenpruefung zu #663.
+
+    Die Zelle ``1:4`` einer ``HYDRABEAM 19ch`` ist ueber die Oberflaeche nicht
+    erzeugbar (die Geraeteliste bietet 4 Kopf-Zeilen, die Kommandozeile weist
+    ``1:5`` ab). Sie kann aber als **Altlast** in einer gespeicherten Gruppe
+    stehen: Kopf-Zellen ueberleben einen Kanal-Modus-Wechsel, ``update_fixture``
+    raeumt die Auto-Gruppe nicht auf (s. ``validate_head_restrictions``).
+
+    Vorher schrieb dieselbe Zelle ueber ``intensity#4`` auf CH18 „Kopf 4 Dimmer"
+    — also auf den Kanal, den der Regler „K4" schon hatte. Jetzt greift die
+    dokumentierte Klemm-Regel: bleibt nach dem Klemmen kein gueltiger Kopf,
+    faellt das Geraet in den GERAETEWEITEN Bestandspfad. Das ist eine
+    Verhaltensaenderung auf der Buehne und wird deshalb hier festgehalten —
+    gemessen am DMX-Ausgang, auf dem echten MIDI-Weg.
+    """
+
+    def _midi(self):
+        from src.core.midi import midi_mapper as mm
+
+        class _NoMidi:
+            def subscribe(self, cb):
+                pass
+
+            def send_note(self, *a, **k):
+                pass
+
+            def send_cc(self, *a, **k):
+                pass
+
+            def open_output(self, *a, **k):
+                pass
+
+            def current_output_name(self):
+                return ""
+
+        orig = mm.get_midi_manager
+        mm.get_midi_manager = lambda: _NoMidi()
+        m = mm.MidiMapper(self.state)
+
+        def _restore():
+            try:
+                m.close()
+            except Exception:
+                pass
+            mm.get_midi_manager = orig
+
+        self.addCleanup(_restore)
+        m.add_mapping(mm.MidiMapping(
+            name="Dimmer", msg_type="cc", channel=1, data1=7,
+            action=mm.ACTION_PROGRAMMER_VAL, param="intensity",
+            button_mode=mm.BUTTON_CONTINUOUS))
+        return m, mm
+
+    def _fahre(self, cells, data2: int = 127) -> dict:
+        """Eine echte MIDI-Nachricht einspeisen (``_on_midi`` ist der Einstieg,
+        den der MIDI-Manager aufruft) und den DMX-Ausgang ablesen."""
+        m, mm = self._midi()
+        self.state.set_selected_cells(list(cells))
+        self._grundstellung(1)
+        m._on_midi(mm.MidiMessage(port_name="T", channel=1, msg_type="cc",
+                                  data1=7, data2=data2))
+        self.state._flush_programmer_to_dmx(1)
+        return self._dmx(1)
+
+    def test_erreichbare_kopfzelle_trifft_weiter_genau_ihren_dimmer(self):
+        """★ Positivkontrolle — und der Bestandsfall, auf den es ankommt: die
+        ueber die Geraeteliste erreichbaren Zellen ``1:0``…``1:3`` verhalten
+        sich unveraendert."""
+        self._patch(1, "HYDRA4000", 19)
+        dmx = self._fahre(["1:2"])
+        self.assertEqual(dmx["Kopf 3 Dimmer"], 255)
+        for anderer in ("Kopf 1 Dimmer", "Kopf 2 Dimmer", "Kopf 4 Dimmer"):
+            self.assertEqual(dmx[anderer], 0, f"{anderer} zieht mit")
+
+    def test_altlast_zelle_faellt_auf_das_ganze_geraet(self):
+        """Die Zelle ``1:4`` nennt einen Kopf, den es an diesem Geraet nicht
+        gibt. Sie wird geklemmt, es bleibt kein gueltiger Kopf — also
+        geraeteweit. **Alle vier Koepfe** gehen hoch, nicht nur einer; wer diese
+        Altlast in einer Gruppe hat, merkt den Unterschied auf der Buehne."""
+        self._patch(1, "HYDRA4000", 19)
+        dmx = self._fahre(["1:4"])
+        self.assertEqual(dmx["Master Dimmer"], 255)
+        for kopf in ("Kopf 1 Dimmer", "Kopf 2 Dimmer", "Kopf 3 Dimmer",
+                     "Kopf 4 Dimmer"):
+            self.assertEqual(dmx[kopf], 255,
+                             f"{kopf} muesste beim geraeteweiten Rueckfall "
+                             f"mitkommen")
+
+
+class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
+    """★★ Die BESTANDS-Frage, ueber die ganze echte Bibliothek gemessen.
+
+    Die neue Zaehlung faellt fuer 41 Modi niedriger aus als die alte (FM-29,
+    geteilter Master). Die Frage ist nicht „aendert sich etwas", sondern:
+    **verliert dadurch eine Kopf-Zelle ihren Kopf, die der Nutzer ueberhaupt
+    erzeugen kann?** Erreichbar sind die Kopf-Zeilen der Geraeteliste,
+    ``max(Farbbaenke, Pan/Tilt-Koepfe)`` (``ProgrammerView._head_row_count``) —
+    darueber hinaus gibt es keinen Bedienweg.
+
+    Der Test rechnet die ALTE Zaehlung (Vorkommen) hier woertlich nach und
+    verlangt fuer jedes ``(Modus, Attribut)``-Paar: die neue Antwort darf nicht
+    unter ``min(alt, erreichbare Koepfe)`` fallen. Gemessen ueber **33.980
+    Paare in 5.122 Modi**: kein einziger Verlust.
+
+    ``raw`` ist ausgenommen — dort ist der Wegfall der Kopf-Achse der ERKLAERTE
+    Zweck von FM-28 (``attr_has_head_axis``), und ``FM28RawBekommtKeinenKopf
+    ReglerTest`` misst ihn.
+
+    Nur lesend auf der Bibliothek; eine Sammelabfrage statt einer Abfrage je
+    Modus, damit der Durchlauf unter zwei Sekunden bleibt."""
+
+    def test_bibliothek_weit_keine_erreichbare_zelle_verliert_ihren_kopf(self):
+        from collections import defaultdict
+
+        from src.core.app_state import (color_head_count_for_channels,
+                                        move_head_count_for_channels)
+        from src.core.database.models import FixtureChannel
+
+        ensure_builtins()
+
+        def alte_zaehlung(chans, a):
+            n = sum(1 for c in chans
+                    if (getattr(c, "attribute", "") or "").lower() == a)
+            return n if n >= 1 else 1
+
+        with Session(fdb_engine()) as s:
+            namen = {mid: f"{short} [{cc}ch] {mname}" for mid, mname, cc, short
+                     in s.execute(
+                         select(FixtureMode.id, FixtureMode.name,
+                                FixtureMode.channel_count,
+                                FixtureProfile.short_name)
+                         .join(FixtureProfile,
+                               FixtureProfile.id == FixtureMode.fixture_id)).all()}
+            kanaele = defaultdict(list)
+            for c in s.execute(select(FixtureChannel).order_by(
+                    FixtureChannel.mode_id,
+                    FixtureChannel.channel_number)).scalars():
+                kanaele[c.mode_id].append(c)
+            s.expunge_all()
+
+        self.assertGreater(len(kanaele), 1000,
+                           "die Bibliothek ist leer — der Test wuerde nichts "
+                           "messen und trotzdem gruen sein")
+        verlust, paare = [], 0
+        for mid, chans in kanaele.items():
+            erreichbar = max(int(color_head_count_for_channels(None, chans)),
+                             int(move_head_count_for_channels(None, chans)))
+            for a in sorted({(getattr(c, "attribute", "") or "").lower()
+                             for c in chans} - {"", "raw"}):
+                paare += 1
+                alt = alte_zaehlung(chans, a)
+                neu = int(attr_head_count_for_channels(None, chans, a))
+                if neu < min(alt, erreichbar):
+                    verlust.append(f"{namen.get(mid, mid)} attr={a} "
+                                   f"{alt}->{neu}, erreichbar {erreichbar}")
+        self.assertGreater(paare, 10000, "zu wenige Paare geprueft")
+        self.assertEqual(verlust[:10], [],
+                         f"{len(verlust)} (Modus, Attribut)-Paare verlieren "
+                         f"einen ERREICHBAREN Kopf")
+
+
 if __name__ == "__main__":
     unittest.main()

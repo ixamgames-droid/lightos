@@ -64,6 +64,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Aus ihrer Zahl wurden „21 Koepfe", und „Kopf 3" verstellte dann das Feinbyte
   einer Grundfarbe. Solche Kanaele werden jetzt ausschliesslich geraeteweit
   bedient.
+  **Was du dabei verlierst — bitte lesen:** dieser eine geraeteweite Regler
+  schreibt seinen Wert auf **alle** unerkannten Kanaele gleichzeitig. Am
+  Spiider bewegt ein einziger Zug 21 verschiedene Funktionen auf denselben Wert
+  (Shutter, CTC, Blumeneffekt, Zoom Fein, Master Dimmer Fein …). Die
+  Pro-Kopf-Regler, die es vorher gab, waren zwar richtig BESCHRIFTET und damit
+  einzeln adressierbar — sie trafen aber nicht den Kopf, den ihre Aufschrift
+  nannte. Einzeln ansprechbar werden diese Kanaele erst wieder mit FM-30
+  (je Kanal ein eigener Regler statt einer Kopf-Achse, die es nicht gibt); bis
+  dahin ist der geraeteweite Regler hier ein grobes Werkzeug.
+- **Zwei weitere Regler zaehlten weiter falsch (Nachlese zu FM-27).** Die
+  Pro-Kopf-Regler sind nicht der einzige Weg, auf dem ein Regler entsteht: die
+  **Schnellwahl** des Position-Tabs baut ihren „Pan/Tilt-Speed"-Regler selbst,
+  die **Grundfarben-Regler** des Color-Tabs ebenso. Beide bekamen die ganze
+  Auswahl. Gemessen: ein Zug am Pan/Tilt-Speed-Regler schrieb einer `MOVBAR4`
+  (hat keinen Speed-Kanal) still einen Wert zu, ohne dort einen einzigen
+  DMX-Kanal zu bewegen; dasselbe am Rot-Regler mit einem `SHARPY [16-Kanal]`
+  (Farbrad statt RGB) neben einem Spiider. Auch diese beiden Regler zeigen jetzt
+  nur noch die Geraete, die den Kanal wirklich haben.
 - **Die Kommandozeile muss beim Hydrabeam-Dimmer nicht mehr passen.** `1:2 @ 50`
   wurde bisher mit „nicht eindeutig" abgewiesen, weil fuenf Kanaele gegen vier
   Koepfe standen. Mit der richtigen Zaehlung gibt es den Widerspruch nicht mehr:

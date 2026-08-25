@@ -1914,11 +1914,7 @@ class ProgrammerView(QWidget):
         pro_kopf_moeglich = attr_has_head_axis(attr)
         frei, per_head, hat_attr = [], {}, []
         for f in fixtures:
-            try:
-                have = int(attr_head_count_for_channels(
-                    f, get_channels_for_patched(f), attr))
-            except Exception:
-                have = 1
+            have = self._attr_head_count(f, attr)
             if have < 1:
                 continue              # FM-27: Geraet hat diesen Kanal gar nicht
             hat_attr.append(f)
@@ -1944,6 +1940,39 @@ class ProgrammerView(QWidget):
         # Geraete, die den Kanal WIRKLICH haben; ist das keines, entsteht auch
         # kein Regler (er koennte ohnehin nichts ausgeben).
         return [(None, hat_attr)] if hat_attr else []
+
+    def _attr_head_count(self, fixture, attr: str) -> int:
+        """Kopfzahl dieses Geraets fuer dieses Attribut — ``0`` = hat es nicht.
+
+        Eine Zeile Kapselung, damit **jeder** Regler-Bauweg dieselbe Antwort
+        bekommt: ``_slider_head_buckets`` fragte sie schon, die Schnellwahl und
+        die Farb-Synchronregler taten es nicht (Gegenpruefung zu #663). Der
+        ``except``-Rueckfall auf ``1`` ist Absicht: „nicht messbar" darf ein
+        Geraet nicht aus dem Bestandspfad werfen."""
+        try:
+            return int(attr_head_count_for_channels(
+                fixture, get_channels_for_patched(fixture), attr))
+        except Exception:
+            return 1
+
+    def _fixtures_with_attr(self, fixtures, attr: str) -> list:
+        """Nur die Geraete, die diesen Kanal WIRKLICH haben (FM-27).
+
+        ★★ Gegenpruefung zu #663: ``_slider_head_buckets`` warf die anderen
+        heraus, aber es ist nicht der einzige Weg, auf dem ein Regler entsteht.
+        Die **Schnellwahl** des Position-Tabs baut ihren Pan/Tilt-Speed-Regler
+        selbst (``_add_quick_select``), und die **Farb-Synchronregler**
+        (``_add_sync_color_sliders``) ebenso — beide bekamen bis dahin die
+        ganze Auswahl. Gemessen an ``MOVBAR4 [22-Kanal]`` (kein ``speed``-Kanal)
+        neben einer ``HYDRABEAM 4000 RGBW [19-Kanal]``: ein Zug am
+        „Pan/Tilt-Speed"-Regler schrieb ``speed=177`` ins Programmer-Dict der
+        MOVBAR4 und bewegte dort **keinen einzigen DMX-Kanal** — die stille
+        Klasse FM-9/A5, die FM-27 beseitigen sollte. Dasselbe am Farb-Pfad mit
+        ``SHARPY [16-Kanal]`` (kein ``color_r``) neben einem Spiider.
+
+        Bleibt KEIN Geraet uebrig, baut der Aufrufer den Regler gar nicht erst
+        — er koennte ohnehin nichts ausgeben."""
+        return [f for f in fixtures if self._attr_head_count(f, attr) >= 1]
 
     def _anchor_other_heads(self, owners, ch, head: int) -> None:
         """Verankert die ANDEREN Koepfe, wenn dieser Kopf ueber den BASIS-Schluessel
@@ -2026,13 +2055,24 @@ class ProgrammerView(QWidget):
         ``sync_heads`` ist die Kopfzahl der Block-Vorlage; der Regler raeumt beim
         Schreiben etwaige "attr#N"-Abweichungen weg (AttributeSlider._apply_value)
         — so wird ein auf „als eine Lampe" gestelltes Geraet auch dann wieder
-        einheitlich, wenn frueher pro Kopf programmiert wurde."""
+        einheitlich, wenn frueher pro Kopf programmiert wurde.
+
+        ★★ FM-27, Gegenpruefung zu #663: die Farb-Vorlage ist die UNION der
+        Auswahl, ``fixtures`` ging hier aber unveraendert an den Regler. Gemessen
+        an ``SHARPY [16-Kanal]`` (kein ``color_r``) neben einem ``Robin Spiider
+        [91-Kanal Pixel]``: der Regler „Grundfarbe Rot" zeigte beide Geraete an,
+        bewegte am SHARPY aber **keinen einzigen Kanal** und legte den Wert nur
+        ins Programmer-Dict. Jetzt bekommt jeder Farbregler nur die Geraete, die
+        seine Farbe wirklich haben (:meth:`_fixtures_with_attr`)."""
         color_chs, occ = self._color_template_channels(fixtures)
         for ch, h in color_chs:
             if h != 0:
                 continue
+            besitzer = self._fixtures_with_attr(fixtures, ch.attribute)
+            if not besitzer:
+                continue
             ilay.addWidget(AttributeSlider(
-                ch, fixtures, self._state, owner=self,
+                ch, besitzer, self._state, owner=self,
                 sync_heads=occ.get(ch.attribute, 1),
                 display_name=self._color_label(ch)))
 
@@ -2128,9 +2168,16 @@ class ProgrammerView(QWidget):
                         layout.addWidget(bar)
                 sp = self._template_channel_in(("speed",))
                 if sp is not None:
-                    layout.addWidget(QLabel("Bewegungs-Speed:" if spider
-                                            else "Pan/Tilt-Speed:"))
-                    layout.addWidget(AttributeSlider(sp, fixtures, self._state, owner=self))
+                    # FM-27, Gegenpruefung zu #663: die Vorlage ist die UNION der
+                    # Auswahl — ``speed`` steht hier also auch dann, wenn ihn nur
+                    # EIN Geraet hat. Wer den Kanal nicht hat, gehoert nicht an
+                    # diesen Regler (sonst Wert im Dict, nichts auf DMX).
+                    sp_fixtures = self._fixtures_with_attr(fixtures, "speed")
+                    if sp_fixtures:
+                        layout.addWidget(QLabel("Bewegungs-Speed:" if spider
+                                                else "Pan/Tilt-Speed:"))
+                        layout.addWidget(AttributeSlider(sp, sp_fixtures,
+                                                         self._state, owner=self))
             elif group_name == "Weitere":
                 rs = self._template_channel_in(("reset",))
                 if rs is not None:
