@@ -1211,6 +1211,63 @@ class FixtureGeneratorDialog(QDialog):
         btns.addWidget(self._btn_box)
         root.addLayout(btns)
 
+    # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
+    #
+    # `QDialogButtonBox` macht den ersten Knopf mit AcceptRole zum
+    # Standardknopf des Dialogs. Ein `Return` in IRGENDEINEM Feld loeste
+    # damit `_save()` aus: gemessen genuegte eine getippte Rasterzahl plus
+    # Return, um ein halb eingegebenes Profil kommentarlos in der
+    # Bibliothek anzulegen und den Dialog zu schliessen — ohne Warnung.
+    #
+    # ★ Warum NICHT der naheliegende `setAutoDefault(False)` /
+    #   `setDefault(False)` am Speichern-Knopf: nachgemessen wirkungslos.
+    #   Im Konstruktor gesetzt halten sie bis zum `show()` — danach steht
+    #   der Knopf wieder auf Standard (`vor show: []`, `nach show:
+    #   ['Save']`), weil `QDialogButtonBox` seinen ersten Accept-Knopf
+    #   erneut zum Standard macht, sobald KEIN Knopf des Dialogs
+    #   `isDefault()` ist; `autoDefault` fragt es dabei gar nicht. Auch
+    #   danach gesetzt haelt es nicht: der naechste Klick auf einen anderen
+    #   Knopf des Dialogs bringt den Standard zurueck (im Fixture-Editor an
+    #   "+ Channel" gemessen). Die Knopf-Eigenschaft ist also kein Halt.
+    #
+    # ★ Der Halt liegt deshalb eine Ebene tiefer und haengt an keiner
+    #   Qt-Interna: `QDialog::keyPressEvent` klickt den Standardknopf —
+    #   und bekommt das Return hier gar nicht mehr zu sehen.
+    #
+    # Was ABSICHTLICH weiter geht: der Mausklick auf "Speichern" (der
+    # eigentliche Bedienweg), `Escape` (eigener Zweig in
+    # `QDialog::keyPressEvent`, laeuft ueber `super()`), Return in einem
+    # Zellen-Editor der Kanaltabelle (der Delegate verbraucht die Taste
+    # selbst) und Return auf einem FOKUSSIERTEN Knopf (`QPushButton`
+    # behandelt die Taste selbst, sie erreicht den Dialog nicht).
+    #
+    # ★ Hier wiegt der Befund schwerer als im Fixture-Editor: der Generator
+    #   kann ein bestehendes Profil nicht wieder OEFFNEN. Ein so
+    #   entstandenes Halb-Profil ist mit ihm nicht mehr zu berichtigen, und
+    #   ein zweiter Anlauf legt ein ZWEITES mit demselben Kurznamen an.
+    # Nachgemessen in tests/test_fixture_dialoge_return_speichert_nicht.py.
+    def keyPressEvent(self, e):
+        # ★ Die Bedingung bildet die von ``QDialog::keyPressEvent`` NACH, statt
+        # sie zu raten — sonst haelt sie genau die Faelle nicht auf, die Qt
+        # trotzdem weiterleitet. Qt fragt:
+        #     !e->modifiers() || (e->modifiers() & Qt::KeypadModifier
+        #                         && e->key() == Qt::Key_Enter)
+        #
+        # Die erste Fassung verglich `e.modifiers() in (NoModifier,
+        # KeypadModifier)` — also das Flag-Objekt per GLEICHHEIT. Ein
+        # Ziffernblock-Enter, bei dem Qt neben `KeypadModifier` noch ein
+        # weiteres Flag meldet, faellt dort durch, landet in `super()` und
+        # klickt den Standardknopf: der Fehler waere zurueck. Gefunden in der
+        # Gegenpruefung.
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            mods = e.modifiers()
+            if (not mods
+                    or (bool(mods & Qt.KeyboardModifier.KeypadModifier)
+                        and e.key() == Qt.Key.Key_Enter)):
+                e.accept()
+                return
+        super().keyPressEvent(e)
+
     def _reload_modes(self):
         while self._tabs.count():
             self._tabs.removeTab(0)
