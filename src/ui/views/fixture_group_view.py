@@ -990,7 +990,7 @@ class FixtureGroupView(QWidget):
         # Code und war zweimal falsch. Gezaehlt werden die Kopf-Zellen, NICHT die
         # eingefaerbten Zellen: eine Zelle des GANZEN Geraets traegt zwar den
         # Grundton des Geraets, ist aber kein Kopf (beides zugleich entsteht nur
-        # ueber „Matrizen zusammenlegen", s. FM-30).
+        # ueber „Matrizen zusammenlegen", s. FM-32).
         heads = head_counts(_split_cell(v)
                             for v in self._grid_widget.positions.values())
         parts = []

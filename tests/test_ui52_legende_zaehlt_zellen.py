@@ -308,7 +308,7 @@ class LegendeZaehltZellenTest(_RigBasis):
 
     def test_ganz_zelle_zaehlt_nicht_als_kopf(self):
         """Ueber „Matrizen zusammenlegen" kann ein Geraet zugleich als GANZ-Zelle
-        und kopfweise im selben Raster stehen (FM-30). Die Legende faerbt dann 5
+        und kopfweise im selben Raster stehen (FM-32). Die Legende faerbt dann 5
         Zellen und nennt 4 — sie zaehlt KOPF-Zellen, nicht Farbfelder. Der Test
         haelt genau diese Lesart fest, damit die Begruendung im Code stimmt."""
         rig = self._rig_gid()
