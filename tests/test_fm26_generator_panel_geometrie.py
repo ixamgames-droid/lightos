@@ -65,15 +65,16 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt                                  # noqa: E402
 from PySide6.QtTest import QTest                               # noqa: E402
 from PySide6.QtWidgets import (                                # noqa: E402
-    QApplication, QDialogButtonBox, QLabel, QLayout, QPushButton, QSpinBox,
-    QWidget)
+    QApplication, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLayout,
+    QPushButton, QSpinBox, QWidget)
 from sqlalchemy import select                                  # noqa: E402
 from sqlalchemy.orm import Session, selectinload               # noqa: E402
 
 from src.core.database import fixture_db as FDB                # noqa: E402
+from src.core.database.qxf_import import QXF_NS                # noqa: E402
 from src.core.database.fixture_db import get_engine            # noqa: E402
 from src.core.database.models import (                         # noqa: E402
-    FixtureProfile, PatchedFixture, create_all_idempotent)
+    GEO_MAX, FixtureProfile, PatchedFixture, create_all_idempotent)
 from src.ui.widgets import fixture_editor as editor_module     # noqa: E402
 from src.ui.widgets import fixture_generator as gen_module     # noqa: E402
 
@@ -158,18 +159,89 @@ def _geo_eingaben(tab: QWidget) -> dict[str, QSpinBox]:
     return felder
 
 
+def _rasterzeile(tab: QWidget) -> QLayout:
+    """Das Layout, in dem die Aufschrift "Pixel-Raster:" steht.
+
+    ★ Warum die ZEILE und nicht der ganze Tab (Gegenpruefung zu #659): eine
+    Aussage ueber "alle Zahlenfelder des Mode-Tabs" kann diese Datei gar nicht
+    treffen — `_geo_eingaben` ordnet je Aufschrift genau zwei Felder zu, jedes
+    weitere faellt zwangslaeufig heraus. Ein Waechter darueber wuerde bei einer
+    voellig gesunden, beschrifteten Zusatzeingabe irgendwo im Tab rot und
+    meldete dabei das Gegenteil der Wahrheit ("ohne Aufschrift"). Gefaehrlich
+    ist nur das Feld, das in DIESER Zeile steht: es verschiebt die Zuordnung
+    Zeile/Spalte bzw. Farbe/Weiss um eins, und dann tippt der Test still in das
+    falsche Feld.
+    """
+    def suche(layout: QLayout) -> QLayout | None:
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            w = item.widget()
+            if isinstance(w, QLabel) and "raster" in w.text().casefold():
+                return layout
+            unter = (w.layout() if w is not None else item.layout())
+            if unter is not None:
+                gefunden = suche(unter)
+                if gefunden is not None:
+                    return gefunden
+        return None
+
+    wurzel = tab.layout()
+    treffer = suche(wurzel) if wurzel is not None else None
+    if treffer is None:
+        raise AssertionError("Keine Zeile mit der Aufschrift 'Pixel-Raster:' "
+                             "im Mode-Tab")
+    return treffer
+
+
+def _zahlenfelder_in(layout: QLayout) -> list[QSpinBox]:
+    """Die Zahlenfelder, die DIREKT in diesem Layout haengen."""
+    out = []
+    for i in range(layout.count()):
+        w = layout.itemAt(i).widget()
+        if isinstance(w, QSpinBox):
+            out.append(w)
+    return out
+
+
 def _tippe(spin: QSpinBox, wert) -> None:
     """Traegt ``wert`` so ein, wie ein Mensch es tut: markieren, tippen.
 
-    Kein ``setValue`` — das waere wieder die Programmierschnittstelle. Und kein
-    abschliessendes Return: in einem ``QDialog`` mit Standardknopf loest Return
-    das Speichern des GANZEN Profils aus (siehe den gemeldeten Nebenbefund),
-    hier waere es ein zweiter Klick.
+    Kein ``setValue`` — das waere wieder die Programmierschnittstelle.
+
+    ⚠️ Und kein abschliessendes Return, und zwar aus einem schaerferen Grund
+    als "es waere ein zweiter Klick" (so stand es hier, bis die Gegenpruefung
+    zu #659 es nachgemessen hat): in einem ``QDialog`` mit Standardknopf loest
+    Return SOFORT das Speichern des ganzen Profils aus. Gemessen mit einem
+    ``Key_Return`` nach der ersten getippten Zahl: ``saved_id`` springt von
+    ``None`` auf ``1``, der Dialog schliesst sich, und in der Bibliothek liegt
+    ein HALB eingegebenes Profil (``grid=(4, 0)``, Weiss-Leiste ``(0, 0)``) —
+    ohne Warnung. Es waere also kein zweiter Klick auf dasselbe Ergebnis,
+    sondern ein falsches Ergebnis: ausgerechnet die Angabe, um die dieses Item
+    geht, stuende falsch in der Bibliothek, und der Generator kann ein
+    bestehendes Profil nicht wieder oeffnen, um sie zu berichtigen. Der
+    Bedienfehler selbst ist ein gemeldeter Nebenbefund (Item FM-30), kein
+    Gegenstand dieser Datei.
     """
     zeile = spin.lineEdit()
     zeile.setFocus()
     QTest.keyClick(zeile, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
     QTest.keyClicks(zeile, str(wert))
+
+
+def _tab_anklicken(dlg, index: int) -> QWidget:
+    """Wechselt den Modus-Tab so, wie ein Mensch es tut: Klick auf die Lasche.
+
+    Nicht ``setCurrentIndex`` — der Tabwechsel IST hier der Bediengriff, um den
+    es geht (die Eingabe eines nicht sichtbaren Modus muss ihn ueberleben).
+    """
+    bar = dlg._tabs.tabBar()
+    QTest.mouseClick(bar, Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, bar.tabRect(index).center())
+    _app.processEvents()
+    assert dlg._tabs.currentIndex() == index, (
+        f"Der Klick auf Lasche {index} hat den Tab nicht gewechselt "
+        f"(steht auf {dlg._tabs.currentIndex()})")
+    return dlg._tabs.currentWidget()
 
 
 def _knopf(wurzel: QWidget, aufschrift: str) -> QPushButton:
@@ -235,17 +307,38 @@ class _GeneratorFall(unittest.TestCase):
         self.addCleanup(clear_channel_cache)
 
     # ── Bedienung: Generator ────────────────────────────────────────────────
+    #
+    # ⚠️ Der Parameter heisst ueberall `short_name` und nicht `kurz`, und das
+    #    ist keine Geschmacksfrage: der QA-61-Waechter
+    #    (`tests/test_qa61_nur_lokale_geraete.py`) liest an genau diesem
+    #    Schluesselwort ab, dass ein Test sein Profil SELBST anlegt statt ein
+    #    vorhandenes zu benennen. Diese Datei tippt ihre Geraete in den Dialog
+    #    — sie stehen in keiner Bibliothek, weder in Robins noch in der frisch
+    #    geseedeten der CI. Ohne den Namen `short_name` beanstandet der
+    #    Waechter zehn gesunde Fundstellen (gemessen 25.08.2026: FAILED
+    #    NurLokaleGeraeteTest::test_kein_test_nennt_ein_nur_lokales_geraet),
+    #    und die Alternative waeren zehn Ausnahmen in seiner Liste — also ein
+    #    blinder Fleck fuer diese Datei. Wer hier umbenennt, macht den
+    #    Waechter fuer sie blind ODER rot; beides faellt sofort auf.
 
     def _generator(self):
         dlg = gen_module.FixtureGeneratorDialog()
         self.addCleanup(dlg.deleteLater)
+        # Gemessen: headless (`QT_QPA_PLATFORM=offscreen`) bekommt der Dialog
+        # ohne ausdrueckliche Groesse eine Zeile mit HOEHE 0 — der Import-Knopf
+        # ist dann zwar `isVisible()`, belegt aber keine Flaeche, und ein Klick
+        # landet neben ihm (still, ohne Fehler). Ein echtes Fenster hat eine
+        # echte Groesse; die wird hier nachgestellt, sonst misst der Test etwas
+        # anderes als der Nutzer bedient.
+        dlg.resize(1000, 900)
         dlg.show()
         _app.processEvents()
         return dlg
 
-    def _gen_kopf(self, dlg, *, name: str, kurz: str, hersteller="Eigenbau"):
+    def _gen_kopf(self, dlg, *, name: str, short_name: str,
+                  hersteller="Eigenbau"):
         for feld, text in ((dlg._edit_mfr, hersteller), (dlg._edit_model, name),
-                           (dlg._edit_short, kurz)):
+                           (dlg._edit_short, short_name)):
             feld.setFocus()
             QTest.keyClick(feld, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
             QTest.keyClicks(feld, text)
@@ -265,12 +358,12 @@ class _GeneratorFall(unittest.TestCase):
                          f"{warnung.call_args_list}")
 
     def _panel_ueber_generator(self, *, grid=(4, 12), weiss=(1, 3),
-                               name="Getipptes Panel", kurz="GEN48"):
+                               name="Getipptes Panel", short_name="GEN48"):
         """Der ganze Weg eines Menschen durch den Generator: Dialog auf, Kopf
         ausfuellen, Rasterfelder ueber ihre Aufschrift finden, tippen,
         Speichern klicken."""
         dlg = self._generator()
-        self._gen_kopf(dlg, name=name, kurz=kurz)
+        self._gen_kopf(dlg, name=name, short_name=short_name)
         tab = dlg._tabs.currentWidget()
         felder = _geo_eingaben(tab)
         self.assertEqual(sorted(felder), ["grid_cols", "grid_rows",
@@ -285,13 +378,14 @@ class _GeneratorFall(unittest.TestCase):
     # ── Bedienung: der einfache Editor (fuer den Vergleich) ─────────────────
 
     def _panel_ueber_editor(self, *, grid=(4, 12), weiss=(1, 3),
-                            name="Getipptes Panel", kurz="EDI48"):
+                            name="Getipptes Panel", short_name="EDI48"):
         dlg = editor_module.FixtureEditorDialog()
         self.addCleanup(dlg.deleteLater)
         dlg.show()
         _app.processEvents()
         QTest.keyClicks(dlg._cb_manufacturer.lineEdit(), "Eigenbau")
-        for feld, text in ((dlg._edit_name, name), (dlg._edit_short, kurz)):
+        for feld, text in ((dlg._edit_name, name),
+                           (dlg._edit_short, short_name)):
             feld.setFocus()
             QTest.keyClick(feld, Qt.Key.Key_A, Qt.KeyboardModifier.ControlModifier)
             QTest.keyClicks(feld, text)
@@ -307,6 +401,22 @@ class _GeneratorFall(unittest.TestCase):
         for rolle, wert in (("grid_rows", grid[0]), ("grid_cols", grid[1]),
                             ("white_rows", weiss[0]), ("white_cols", weiss[1])):
             _tippe(felder[rolle], wert)
+        self._speichern_klicken(dlg, editor_module.__name__)
+        return dlg
+
+    def _leeres_panel_ueber_editor(self, *, name: str, short_name: str):
+        """Dasselbe ueber den Editor, aber OHNE einen einzigen Tastendruck in
+        die Rasterfelder — die Positivkontrolle braucht den Fall "nichts
+        eingegeben", nicht den Fall "0 getippt"."""
+        dlg = editor_module.FixtureEditorDialog()
+        self.addCleanup(dlg.deleteLater)
+        dlg.show()
+        _app.processEvents()
+        QTest.keyClicks(dlg._cb_manufacturer.lineEdit(), "Eigenbau")
+        dlg._edit_name.setText(name)
+        dlg._edit_short.setText(short_name)
+        tab = dlg._tabs.currentWidget()
+        QTest.mouseClick(_knopf(tab, "+ Channel"), Qt.MouseButton.LeftButton)
         self._speichern_klicken(dlg, editor_module.__name__)
         return dlg
 
@@ -364,20 +474,59 @@ class EingabefelderImGeneratorTest(_GeneratorFall):
                                  f"{rolle} belegt keine Flaeche")
                 self.assertTrue(spin.isEnabled(), f"{rolle} ist gesperrt")
 
-    def test_kein_zahlenfeld_steht_ohne_aufschrift_im_modustab(self):
+    def test_in_der_rasterzeile_steht_kein_fuenftes_zahlenfeld(self):
         """Zwei Aussagen in einer: die vier Rollen zeigen auf vier
-        VERSCHIEDENE Felder, und im Mode-Tab steht kein weiteres Zahlenfeld
-        ohne zugehoerige Aufschrift (ein solches waere nicht deutbar)."""
+        VERSCHIEDENE Felder, und in der Rasterzeile steht kein weiteres
+        Zahlenfeld.
+
+        ★ Nur die ZEILE, nicht der ganze Tab (Begruendung an `_rasterzeile`).
+        Ein fuenftes Feld genau hier verschiebt die Zuordnung um eins — dann
+        tippt jede Messung dieser Datei still ins falsche Feld und bleibt
+        trotzdem gruen. Die Positivkontrolle unten misst die andere Richtung.
+        """
         dlg = self._generator()
         tab = dlg._tabs.currentWidget()
         zugeordnet = _geo_eingaben(tab)
         self.assertEqual(len({id(s) for s in zugeordnet.values()}), 4,
                          "Zwei Rollen zeigen auf dasselbe Feld")
-        ohne = [w for w in _in_layout_reihenfolge(tab)
-                if isinstance(w, QSpinBox)
-                and id(w) not in {id(s) for s in zugeordnet.values()}]
-        self.assertEqual(ohne, [],
-                         "Zahlenfeld im Mode-Tab ohne zugehoerige Aufschrift")
+        in_der_zeile = _zahlenfelder_in(_rasterzeile(tab))
+        self.assertEqual(
+            {id(w) for w in in_der_zeile},
+            {id(w) for w in zugeordnet.values()},
+            "Die Rasterzeile enthaelt andere Zahlenfelder als die vier, die "
+            "ueber ihre Aufschrift zugeordnet werden — die Zuordnung "
+            "Zeile/Spalte bzw. Farbe/Weiss verschiebt sich damit. Wer hier "
+            "ein Feld ergaenzt, muss `_geo_eingaben` mitziehen.")
+
+    def test_positivkontrolle_ein_gesundes_zusatzfeld_macht_nicht_rot(self):
+        """★ Der Waechter darueber darf NUR die Rasterzeile bewachen.
+
+        Wer dem Mode-Tab spaeter eine gesunde, beschriftete Zahleneingabe
+        gibt (eigene Zeile, eigene Aufschrift, Tooltip), aendert an der
+        Zuordnung der vier Rasterfelder nichts — und darf davon nicht rot
+        werden. Ein Gate, das Gesundes beanstandet, wird abgeschaltet und ist
+        dann schlechter als keines (QA-54).
+        """
+        dlg = self._generator()
+        tab = dlg._tabs.currentWidget()
+        zusatz_zeile = QHBoxLayout()
+        zusatz_zeile.addWidget(QLabel("Wiederholungen:"))
+        gesundes_feld = QSpinBox()
+        gesundes_feld.setToolTip("Nur eine Probe.")
+        zusatz_zeile.addWidget(gesundes_feld)
+        tab.layout().addLayout(zusatz_zeile)
+        _app.processEvents()
+
+        # Das Zusatzfeld liegt wirklich im Tab — sonst prueft die Probe nichts.
+        self.assertIn(id(gesundes_feld),
+                      {id(w) for w in _in_layout_reihenfolge(tab)})
+        felder = _geo_eingaben(tab)
+        self.assertEqual(sorted(felder), ["grid_cols", "grid_rows",
+                                          "white_cols", "white_rows"])
+        self.assertEqual({id(w) for w in _zahlenfelder_in(_rasterzeile(tab))},
+                         {id(w) for w in felder.values()},
+                         "Ein gesundes Zusatzfeld ausserhalb der Rasterzeile "
+                         "macht den Waechter rot")
 
     def test_jedes_rasterfeld_erklaert_sich_beim_hinsehen(self):
         """Die Zeile zeigt nur "Pixel-Raster: [0] x [0]". Was die 0 bedeutet —
@@ -433,7 +582,7 @@ class VomGeneratorBisZumRendererTest(_GeneratorFall):
         NEIN — genau die CDX-52-Aussage. Der Generator darf keine Form
         ERFINDEN, sonst haette jedes selbstgebaute Panel sein Band zurueck."""
         dlg = self._generator()
-        self._gen_kopf(dlg, name="Panel ohne Angabe", kurz="GEN00")
+        self._gen_kopf(dlg, name="Panel ohne Angabe", short_name="GEN00")
         # Kein einziger Tastendruck in die Rasterfelder.
         self._speichern_klicken(dlg, gen_module.__name__)
         self.assertEqual(self._beim_renderer("GEN00", "Default", 4),
@@ -444,7 +593,7 @@ class VomGeneratorBisZumRendererTest(_GeneratorFall):
         uebrigen Felder duerfen dadurch nichts bekommen — ``panelGrid`` zieht
         die fehlende Zahl aus der Pixelzahl."""
         dlg = self._generator()
-        self._gen_kopf(dlg, name="Nur Spalten", kurz="GEN0C")
+        self._gen_kopf(dlg, name="Nur Spalten", short_name="GEN0C")
         _tippe(_geo_eingaben(dlg._tabs.currentWidget())["grid_cols"], 12)
         self._speichern_klicken(dlg, gen_module.__name__)
         self.assertEqual(self._beim_renderer("GEN0C", "Default", 4),
@@ -455,7 +604,7 @@ class VomGeneratorBisZumRendererTest(_GeneratorFall):
         48-Pixel-Modus hat zwei Raster. '+ Modus' ist der einzige Weg, einen
         zweiten anzulegen — und der neue Tab braucht die Felder auch."""
         dlg = self._generator()
-        self._gen_kopf(dlg, name="Zwei Modi", kurz="GEN2M")
+        self._gen_kopf(dlg, name="Zwei Modi", short_name="GEN2M")
         erster = dlg._tabs.currentWidget()
         _tippe(_geo_eingaben(erster)["grid_rows"], 1)
         _tippe(_geo_eingaben(erster)["grid_cols"], 1)
@@ -480,6 +629,46 @@ class VomGeneratorBisZumRendererTest(_GeneratorFall):
         self.assertEqual(self._beim_renderer("GEN2M", "Modus 1", 1),
                          ((4, 12), (1, 0)))
 
+    def test_eingabe_in_einem_nicht_sichtbaren_modus_ueberlebt_das_speichern(self):
+        """★★ Der Bediengriff, an dem die Eingabe im Alltag wirklich verloren
+        gehen kann (Gegenpruefung zu #659): Zahlen in einem Modus-Tab tippen,
+        dann den Tab WECHSELN und erst danach speichern.
+
+        Der Test darueber besteht diesen Griff NICHT: '+ Modus' ruft intern
+        selbst `_sync_all`, wodurch der erste Tab schon vor dem Tippen im
+        zweiten gesichert ist — gespeichert wird dort immer aus dem gerade
+        sichtbaren Tab. Damit hielt kein Test fest, dass `_sync_all` ALLE Tabs
+        liest. Genau diese Zeile rettet die Form eines Modus, den der Nutzer
+        beim Speichern nicht vor sich hat; ohne sie steht die Eingabe still
+        wieder auf Null, ohne Warnung.
+        """
+        dlg = self._generator()
+        self._gen_kopf(dlg, name="Tabwechsel", short_name="GEN2T")
+        _tippe(_geo_eingaben(dlg._tabs.currentWidget())["grid_rows"], 1)
+
+        QTest.mouseClick(_knopf(dlg, "+ Modus"), Qt.MouseButton.LeftButton)
+        _app.processEvents()
+        zweiter = dlg._tabs.currentWidget()
+        felder = _geo_eingaben(zweiter)
+        for rolle, wert in (("grid_rows", 4), ("grid_cols", 12),
+                            ("white_rows", 1), ("white_cols", 3)):
+            _tippe(felder[rolle], wert)
+
+        # ... und jetzt zurueck auf den ERSTEN Tab, bevor gespeichert wird.
+        erster = _tab_anklicken(dlg, 0)
+        self.assertIsNot(erster, zweiter, "Der Tabwechsel hat nichts bewirkt")
+        self._speichern_klicken(dlg, gen_module.__name__)
+
+        _, modi = self._profil("GEN2T")
+        self.assertEqual(modi["Modus 1"], ((4, 12), (1, 3)),
+                         "Die Eingabe des nicht sichtbaren Modus ist beim "
+                         "Speichern verloren gegangen")
+        self.assertEqual(self._beim_renderer("GEN2T", "Modus 1", 1),
+                         ((4, 12), (1, 3)))
+        # Positivkontrolle in derselben Messung: der sichtbare Tab traegt
+        # weiterhin SEINE eigene Form und hat die des anderen nicht bekommen.
+        self.assertEqual(modi["Default"], ((1, 0), (0, 0)))
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # 3. ★★ Die Abschlussmessung: Generator == Editor
@@ -493,8 +682,10 @@ class GeneratorUndEditorErgebenDasselbeTest(_GeneratorFall):
 
         ★ Verglichen wird NICHT nur "gleich": vier Nullen waeren auch gleich.
         Deshalb steht der erwartete Wert daneben."""
-        self._panel_ueber_generator(grid=(4, 12), weiss=(1, 3), kurz="GEN48")
-        self._panel_ueber_editor(grid=(4, 12), weiss=(1, 3), kurz="EDI48")
+        self._panel_ueber_generator(grid=(4, 12), weiss=(1, 3),
+                                    short_name="GEN48")
+        self._panel_ueber_editor(grid=(4, 12), weiss=(1, 3),
+                                 short_name="EDI48")
 
         aus_generator = self._beim_renderer("GEN48", "Default", 4)
         aus_editor = self._beim_renderer("EDI48", "Default", 4)
@@ -509,24 +700,156 @@ class GeneratorUndEditorErgebenDasselbeTest(_GeneratorFall):
         Ein Dialog, der eine Form erfaende, waere hier rot — und die
         Gleichheit oben waere sonst auch mit zwei erfundenen Formen zu haben."""
         dlg = self._generator()
-        self._gen_kopf(dlg, name="Leer Generator", kurz="GEN0X")
+        self._gen_kopf(dlg, name="Leer Generator", short_name="GEN0X")
         self._speichern_klicken(dlg, gen_module.__name__)
 
-        dlg2 = editor_module.FixtureEditorDialog()
-        self.addCleanup(dlg2.deleteLater)
-        dlg2.show()
-        _app.processEvents()
-        QTest.keyClicks(dlg2._cb_manufacturer.lineEdit(), "Eigenbau")
-        dlg2._edit_name.setText("Leer Editor")
-        dlg2._edit_short.setText("EDI0X")
-        tab = dlg2._tabs.currentWidget()
-        QTest.mouseClick(_knopf(tab, "+ Channel"), Qt.MouseButton.LeftButton)
-        self._speichern_klicken(dlg2, editor_module.__name__)
+        self._leeres_panel_ueber_editor(name="Leer Editor", short_name="EDI0X")
 
         self.assertEqual(self._beim_renderer("GEN0X", "Default", 4),
                          ((0, 0), (0, 0)))
         self.assertEqual(self._beim_renderer("EDI0X", "Default", 1),
                          ((0, 0), (0, 0)))
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 3b. Der Generator ist ueberhaupt erreichbar — und der Import bringt die Form
+#     bis in die sichtbaren Felder
+# ════════════════════════════════════════════════════════════════════════════
+
+class DerGeneratorIstAusDemPatchViewErreichbarTest(_GeneratorFall):
+    """Die erste Haelfte der Kette, die das Item begruendet.
+
+    ★ Ohne diese Messung war nur „der Generator traegt die Form ein" gemessen,
+    nicht „der Nutzer kommt ueberhaupt an den Generator". `_open_generator` in
+    `src/ui/views/patch_view.py` ist der EINZIGE Aufrufer im Produktionscode
+    und wurde von keinem Test des Repos beruehrt — man konnte den Menuepunkt
+    auf einen voellig anderen Dialog umbiegen, ohne dass irgendetwas rot wurde
+    (gemessen in der Gegenpruefung zu #659).
+    """
+
+    def test_der_knopf_geraet_erstellen_oeffnet_wirklich_den_generator(self):
+        import src.ui.views.patch_view as PV
+        geoeffnet: list = []
+
+        def _statt_exec(dialog):
+            """Nur das modale Warten wird ersetzt — WELCHER Dialog aufgeht,
+            entscheidet weiter der Produktionscode. Ersetzt wird an `QDialog`
+            und nicht an der Generator-Klasse: sonst haenge der Test still im
+            fremden Dialog, statt ihn zu melden."""
+            geoeffnet.append(dialog)
+            return 0                     # QDialog.Rejected: nichts speichern
+
+        pv = PV.PatchView()
+        self.addCleanup(pv.deleteLater)
+        with mock.patch.object(QDialog, "exec", _statt_exec):
+            QTest.mouseClick(_knopf(pv, "Gerät erstellen…"),
+                             Qt.MouseButton.LeftButton)
+            _app.processEvents()
+        for dlg in geoeffnet:
+            self.addCleanup(dlg.deleteLater)
+
+        self.assertEqual(len(geoeffnet), 1,
+                         "Der Knopf 'Gerät erstellen…' im Patch-View oeffnet "
+                         f"nicht genau einen Dialog: {geoeffnet}")
+        self.assertIsInstance(
+            geoeffnet[0], gen_module.FixtureGeneratorDialog,
+            "Der Knopf oeffnet einen anderen Dialog als den Fixture-Generator "
+            f"({type(geoeffnet[0]).__name__})")
+        # Und es ist derselbe Dialog, der die Rasterfelder traegt — sonst
+        # waere die Kette nur zur Haelfte gemessen.
+        felder = _geo_eingaben(geoeffnet[0]._tabs.currentWidget())
+        self.assertEqual(sorted(felder), ["grid_cols", "grid_rows",
+                                          "white_cols", "white_rows"])
+
+
+def _qxf_mit_layout(layout: str) -> str:
+    """Eine kleine, gueltige .qxf mit vier Kanaelen und einem Modus."""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>TestCo</Manufacturer>
+ <Model>Importiertes Panel</Model>
+ <Type>LED Bar (Pixels)</Type>
+ <Channel Name="Red" Preset="IntensityRed"/>
+ <Channel Name="Green" Preset="IntensityGreen"/>
+ <Channel Name="Blue" Preset="IntensityBlue"/>
+ <Channel Name="White" Preset="IntensityWhite"/>
+ <Mode Name="Default">
+  <Physical>
+   <Bulb Type="LED" Lumens="0" ColourTemperature="0"/>
+   <Dimensions Weight="3" Width="1000" Height="200" Depth="120"/>
+   <Technical PowerConsumption="60" DmxConnector="3-pin"/>
+{layout}
+  </Physical>
+  <Channel Number="0">Red</Channel>
+  <Channel Number="1">Green</Channel>
+  <Channel Number="2">Blue</Channel>
+  <Channel Number="3">White</Channel>
+ </Mode>
+</FixtureDefinition>
+"""
+
+
+class ImportTraegtDieFormInDenDialogTest(_GeneratorFall):
+    """★★ Der Import-Knopf des Generators — der zweite Weg, auf dem eine
+    Rasterform in diesen Dialog kommt.
+
+    Der Bibliotheks-Import (`qxf_import`) leitet sie seit FM-23 aus
+    ``<Physical><Layout/>`` ab; der Import-Knopf des Generators tat es nicht
+    (gemessen in der Gegenpruefung zu #659: dieselbe Datei ergab ueber den
+    einen Weg ``(4, 12)``, ueber den anderen ``(0, 0)``). Damit war zugleich
+    die Vorbelegung der Felder in `_ModeTab.__init__` unerreichbar — sie
+    konnte nur Nullen setzen. Beides haengt zusammen und wird hier zusammen
+    gemessen: erst muss die Zahl im FELD stehen, dann darf sie gespeichert
+    werden.
+    """
+
+    def _importieren(self, dlg, inhalt: str) -> None:
+        fd, pfad = tempfile.mkstemp(suffix=".qxf")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(inhalt)
+        self.addCleanup(lambda: os.path.exists(pfad) and os.remove(pfad))
+        # Nur die DATEIAUSWAHL wird ersetzt — headless gibt es niemanden, der
+        # im Dateidialog klickt. Alles danach ist Produktionscode.
+        with mock.patch.object(gen_module.QFileDialog, "getOpenFileName",
+                               return_value=(pfad, "")):
+            QTest.mouseClick(_knopf(dlg, "QLC+ (.qxf) importieren…"),
+                             Qt.MouseButton.LeftButton)
+            _app.processEvents()
+
+    def test_die_form_aus_der_datei_steht_danach_im_sichtbaren_feld(self):
+        dlg = self._generator()
+        self._importieren(dlg, _qxf_mit_layout(
+            '   <Layout Width="12" Height="4"/>'))
+        felder = _geo_eingaben(dlg._tabs.currentWidget())
+        self.assertEqual((felder["grid_rows"].value(),
+                          felder["grid_cols"].value()), (4, 12),
+                         "Der Import hat die Rasterform der Datei nicht in "
+                         "die Felder gebracht")
+        # Die Weiss-Leiste kennt das QLC+-Format nicht — sie darf NICHT
+        # erfunden werden.
+        self.assertEqual((felder["white_rows"].value(),
+                          felder["white_cols"].value()), (0, 0))
+
+    def test_die_importierte_form_ueberlebt_das_speichern(self):
+        """Der ganze Weg: importieren, Kopf ausfuellen, speichern — und dann
+        am Renderer ablesen. Ohne die Vorbelegung der Felder schriebe das
+        Speichern die Nullen des frisch gebauten Tabs ins Modell zurueck."""
+        dlg = self._generator()
+        self._importieren(dlg, _qxf_mit_layout(
+            '   <Layout Width="12" Height="4"/>'))
+        self._gen_kopf(dlg, name="Importiertes Panel", short_name="IMP48")
+        self._speichern_klicken(dlg, gen_module.__name__)
+        self.assertEqual(self._beim_renderer("IMP48", "Default", 4),
+                         ((4, 12), (0, 0)))
+
+    def test_positivkontrolle_eine_datei_ohne_layout_erfindet_nichts(self):
+        """Die andere Richtung: sagt die Datei nichts ueber die Form, bleibt
+        das Feld auf 0 — der Import darf keine Form RATEN."""
+        dlg = self._generator()
+        self._importieren(dlg, _qxf_mit_layout(""))
+        felder = _geo_eingaben(dlg._tabs.currentWidget())
+        self.assertEqual((felder["grid_rows"].value(),
+                          felder["grid_cols"].value()), (0, 0))
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -620,7 +943,63 @@ class ModellUndSpeicherwegTest(unittest.TestCase):
         payload = gen_module.build_profile_payload(
             self._modell(grid_rows=1, grid_cols=99999))
         self.assertEqual(self._gespeicherte_form(payload),
-                         ((1, editor_module.GEO_MAX), (0, 0)))
+                         ((1, GEO_MAX), (0, 0)))
+
+    def test_ein_fremdes_payload_mit_riesigen_zahlen_wird_auch_gekappt(self):
+        """★ Die zweite Haelfte des Schreibweg-Waechters (nachgetragen nach
+        der Gegenpruefung von #659).
+
+        ``create_user_profile`` fing negative Zahlen, aber keine zu grossen —
+        die Obergrenze stand nur im Generator. Ein von Hand gebautes Payload
+        schrieb damit ``grid_cols=99999`` in die Bibliothek, und der Wert kam
+        beim Renderer an. Die Begruendung der Funktion ("sie sieht JEDES
+        Payload, auch eines, das nie durch den Generator lief") gilt in beide
+        Richtungen; hier steht die Messung dazu. Bewusst wieder von Hand
+        gebaut und NICHT ueber ``build_profile_payload`` — sonst haette der
+        Waechter des Generators den hier gemeinten schon verdeckt.
+        """
+        payload = {
+            "manufacturer": "Eigenbau", "short_mfr": "EIGEN",
+            "name": "Handgebautes Riesenpanel", "short_name": "HANDBIG",
+            "fixture_type": "matrix", "source": "user",
+            "modes": [{"name": "Default", "channel_count": 1,
+                       "grid_rows": 1, "grid_cols": 99999,
+                       "white_rows": 5000, "white_cols": 2,
+                       "channels": [{"name": "Rot", "attribute": "color_r"}]}],
+        }
+        self.assertEqual(self._gespeicherte_form(payload),
+                         ((1, GEO_MAX), (GEO_MAX, 2)))
+
+    def test_die_obergrenze_steht_nur_an_einer_stelle_im_quelltext(self):
+        """★ Drei Stellen klemmen gegen ``GEO_MAX`` — der einfache Editor, der
+        Generator und der Schreibweg der Bibliothek. Waeren es drei ZAHLEN,
+        liefen sie beim naechsten Umbau auseinander, und der Nutzer bekaeme je
+        nach Dialog eine andere Grenze.
+
+        Gemessen wird am Quelltext und nicht mit ``assertIs``: 256 liegt im
+        Zwischenspeicher kleiner Ganzzahlen von CPython, zwei unabhaengige
+        Zuweisungen waeren also dasselbe Objekt und der Vergleich stumm gruen.
+        """
+        import pathlib
+        import re
+        wurzel = pathlib.Path(__file__).resolve().parent.parent / "src"
+        # Nur die DATEI wird festgehalten, nicht die Zeilennummer — sonst
+        # waere der Test eine Zeitbombe, die beim naechsten Einschub darueber
+        # rot wird, ohne dass sich etwas geaendert hat.
+        zuweisungen = sorted({
+            str(pfad.relative_to(wurzel))
+            for pfad in wurzel.rglob("*.py")
+            for zeile in pfad.read_text(encoding="utf-8").splitlines()
+            if re.match(r"\s*GEO_MAX\s*=[^=]", zeile)
+        })
+        self.assertEqual(
+            zuweisungen, ["core/database/models.py"],
+            "GEO_MAX wird an mehr als einer Stelle gesetzt — die Grenze "
+            f"gehoert zu den SPALTEN, nicht zu einem Dialog: {zuweisungen}")
+        from src.core.database import fixture_db as _FDB
+        for modul in (editor_module, gen_module, _FDB):
+            with self.subTest(modul=modul.__name__):
+                self.assertEqual(modul.GEO_MAX, GEO_MAX)
 
 
 if __name__ == "__main__":

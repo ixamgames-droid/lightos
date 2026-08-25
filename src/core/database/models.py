@@ -49,6 +49,22 @@ class FixtureProfile(Base):
         return f"<Fixture {self.name}>"
 
 
+# FM-23/FM-26: Obergrenze der Rasterangaben eines Modus (siehe
+# ``FixtureMode.grid_rows``). 256 ist nicht gegriffen, sondern die Zahl, bei der
+# ``panelGrid`` (``scene_src/fixtures/pixel_order.js``) die PIXELZAHL eines
+# Panels kappt: ``Math.min(256, ...)``. Eine Zeilen- oder Spaltenzahl darueber
+# koennte also nie ein Pixel mehr zeigen — sie stuende nur als stille
+# Fehlangabe in der Bibliothek.
+#
+# ★ Warum die Zahl HIER steht und nicht im Fixture-Editor, wo sie mit FM-23
+#   entstand: sie gehoert zu den SPALTEN, nicht zu einem der Dialoge. Inzwischen
+#   klemmen drei Stellen dagegen — der einfache Editor, der Generator und
+#   ``fixture_db.create_user_profile``, das JEDES Payload sieht (auch von Hand
+#   gebaute, die nie durch einen Dialog liefen). Eine UI-Datei als Heimat haette
+#   den Schreibweg der Bibliothek von einem Qt-Dialog abhaengig gemacht.
+GEO_MAX = 256
+
+
 class FixtureMode(Base):
     __tablename__ = "fixture_modes"
 

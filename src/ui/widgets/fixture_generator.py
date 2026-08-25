@@ -32,10 +32,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 
 # Wiederverwendung der bereits gepflegten Listen aus dem einfachen Editor.
-# GEO_MAX (FM-23/FM-26): die Obergrenze der Rastereingabe steht dort, wo sie
-# herkommt — sie ist die Stelle, an der `panelGrid` die Pixelzahl kappt.
-from src.ui.widgets.fixture_editor import (
-    FIXTURE_TYPES, CHANNEL_ATTRS, GEO_MAX)
+from src.ui.widgets.fixture_editor import FIXTURE_TYPES, CHANNEL_ATTRS
+# GEO_MAX (FM-23/FM-26): die Obergrenze der Rastereingabe steht bei den SPALTEN
+# und nicht im anderen Dialog — Begruendung an `models.GEO_MAX`.
+from src.core.database.models import GEO_MAX
 
 
 # Attribute, die fuer eine 16-bit-Aufloesung (coarse + Fine-Kanal) sinnvoll
@@ -83,10 +83,6 @@ class GenRange:
     name: str = ""
     kind: str = ""
 
-    def to_dict(self) -> dict:
-        return {"range_from": int(self.range_from), "range_to": int(self.range_to),
-                "name": self.name, "kind": self.kind}
-
 
 @dataclass
 class GenChannel:
@@ -99,16 +95,6 @@ class GenChannel:
     resolution: str = "8bit"        # "8bit" | "16bit"
     fine_channel: str = ""          # Name des gekoppelten Fine-Kanals (16bit)
     ranges: list[GenRange] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name, "attribute": self.attribute,
-            "default_value": int(self.default_value),
-            "highlight_value": int(self.highlight_value),
-            "invert": bool(self.invert), "resolution": self.resolution,
-            "fine_channel": self.fine_channel,
-            "ranges": [r.to_dict() for r in self.ranges],
-        }
 
 
 @dataclass
@@ -137,14 +123,6 @@ class GenMode:
     grid_cols: int = 0
     white_rows: int = 0
     white_cols: int = 0
-
-    def to_dict(self) -> dict:
-        return {"name": self.name,
-                "grid_rows": _clamp_geo(self.grid_rows),
-                "grid_cols": _clamp_geo(self.grid_cols),
-                "white_rows": _clamp_geo(self.white_rows),
-                "white_cols": _clamp_geo(self.white_cols),
-                "channels": [c.to_dict() for c in self.channels]}
 
 
 @dataclass
@@ -693,8 +671,18 @@ class _ModeTab(QWidget):
         geo_row.addStretch(1)
         lay.addLayout(geo_row)
         # Der Modus IST hier das Modell (anders als im Editor, der eine Kopie
-        # haelt) — die Felder starten deshalb auf seinen Werten, damit ein
-        # importiertes oder wieder geoeffnetes Modell seine Form zeigt.
+        # haelt) — die Felder starten deshalb auf seinen Werten.
+        #
+        # ★ Der Weg, der das braucht, ist der **Import-Knopf**: `_import_qxf`
+        #   ersetzt `self._model` und ruft `_reload_modes()`, das jeden Tab neu
+        #   baut. Ohne diese Zeile zeigte der frisch gebaute Tab vier Nullen,
+        #   waehrend das Modell die Form der Datei traegt — und der naechste
+        #   `sync_from_widgets` (jedes Speichern) schriebe die Nullen ins
+        #   Modell zurueck. Die Angabe waere also nicht nur unsichtbar, sondern
+        #   beim Speichern geloescht. Bis FM-26 konnte hier nur `(0, 0)`
+        #   ankommen, weil `model_from_qxf` das `<Layout>` nicht las; genau das
+        #   ist mit demselben Item behoben, und erst dadurch ist diese Zeile
+        #   ueberhaupt messbar (`ImportTraegtDieFormInDenDialogTest`).
         self.set_geometry((mode.grid_rows, mode.grid_cols),
                           (mode.white_rows, mode.white_cols))
 
@@ -1428,10 +1416,23 @@ def _default_model() -> GeneratorModel:
 def model_from_qxf(path: str) -> GeneratorModel:
     """Liest eine QLC+ .qxf-Datei in ein :class:`GeneratorModel` (Startpunkt zum
     Weiterbearbeiten — KEIN direkter DB-Schreibvorgang). Nutzt dieselbe
-    Attribut-/Typ-Aufloesung wie der vorhandene qxf_import."""
+    Attribut-/Typ-Aufloesung wie der vorhandene qxf_import.
+
+    ★ FM-26: **auch dieselbe Rasterform.** Der Bibliotheks-Import
+    (``qxf_import``) leitet sie seit FM-23 aus ``<Physical><Layout Width=
+    Height=/>`` ab, dieser Weg nicht — dieselbe Datei ergab ueber den
+    Bibliotheks-Import ``(4, 12)`` und ueber den Import-Knopf des Generators
+    ``(0, 0)``. Wer eine .qxf zum Weiterbearbeiten hereinholt, verlor also eine
+    Angabe, die in der Datei steht. Abgeleitet wird mit derselben Funktion —
+    eine zweite Lesart waere eine zweite Wahrheit ueber dasselbe Format, samt
+    der ``1x1``-Regel, die dort begruendet ist. Die Modus-Angabe schlaegt die
+    fixture-weite, genau wie im Bibliotheks-Import.
+
+    Was NICHT abgeleitet werden kann, ist die Weiss-Leiste (CDX-52): das
+    QLC+-Format kennt sie nicht (Begruendung an ``_physical_layout``)."""
     import xml.etree.ElementTree as ET
     from src.core.database.qxf_import import (
-        QXF_NS, TYPE_MAP, _resolve_attribute, _tag)
+        QXF_NS, TYPE_MAP, _resolve_attribute, _tag, _physical_layout)
 
     tree = ET.parse(path)
     root = tree.getroot()
@@ -1469,12 +1470,19 @@ def model_from_qxf(path: str) -> GeneratorModel:
         return GenChannel(name=name, attribute=attr, default_value=0,
                           highlight_value=highlight, resolution=res, ranges=ranges)
 
+    # FM-26/FM-23: fixture-weite Rasterform als Rueckfallebene. Bewusst ueber
+    # das DIREKTE Kind <Physical> von root — ein `iter()` faende das <Physical>
+    # des ERSTEN Modus und schriebe dessen Form allen anderen zu.
+    fallback_grid = _physical_layout(root)
+
     modes_out: list[GenMode] = []
     mode_els = root.findall(_tag("Mode"))
     if not mode_els:
         chans = [_build_channel(el, nm) for nm, el in channel_defs.items()]
         if chans:
-            modes_out.append(GenMode("Standard", chans))
+            modes_out.append(GenMode("Standard", chans,
+                                     grid_rows=fallback_grid[0],
+                                     grid_cols=fallback_grid[1]))
     else:
         for mode_el in mode_els:
             mname = mode_el.get("Name", "Standard")
@@ -1486,7 +1494,14 @@ def model_from_qxf(path: str) -> GeneratorModel:
                     chans.append(GenChannel(name=nm or "Kanal", attribute="raw"))
                 else:
                     chans.append(_build_channel(el, nm))
-            modes_out.append(GenMode(mname, chans))
+            # Die eigene Angabe des Modus schlaegt die fixture-weite.
+            # `(0, 0)` ist ein wahres Tupel — deshalb explizit vergleichen.
+            mode_grid = _physical_layout(mode_el)
+            if mode_grid == (0, 0):
+                mode_grid = fallback_grid
+            modes_out.append(GenMode(mname, chans,
+                                     grid_rows=mode_grid[0],
+                                     grid_cols=mode_grid[1]))
 
     return GeneratorModel(
         manufacturer=mfr, model=model_name,

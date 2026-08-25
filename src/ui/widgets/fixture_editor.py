@@ -16,6 +16,7 @@ from sqlalchemy import select, delete
 from src.core.database.fixture_db import engine
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
+    GEO_MAX,
 )
 
 
@@ -40,12 +41,10 @@ CHANNEL_ATTRS = [
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]
 
-# FM-23: Obergrenze der Rastereingaben. 256 ist nicht gegriffen, sondern die
-# Zahl, bei der `panelGrid` (scene_src/fixtures/pixel_order.js) die PIXELZAHL
-# eines Panels kappt: `Math.min(256, ...)`. Eine Zeilen- oder Spaltenzahl
-# darueber koennte also nie ein Pixel mehr zeigen — sie stuende nur als stille
-# Fehlangabe in der Bibliothek.
-GEO_MAX = 256
+# FM-23: Obergrenze der Rastereingaben. Sie steht seit FM-26 bei den SPALTEN
+# (``src.core.database.models.GEO_MAX``) und wird hier nur benutzt — die
+# Begruendung fuer die 256 steht dort. Der Name bleibt aus diesem Modul
+# erreichbar (``fixture_editor.GEO_MAX``), weil er hier entstand.
 
 
 class _ModeTab(QWidget):

@@ -53,7 +53,11 @@ von der Montage abhaengen).
 — beide Dialoge tragen die Zeile „Pixel-Raster: Zeilen x Spalten" an jedem
 Mode-Tab — oder aus dem **QXF-Import**, der sie aus `<Physical><Layout Width=
 Height=/>` uebernimmt (QLC+ fuehrt sie dort; `Width` sind Spalten, `Height`
-Zeilen). Ein `1x1` gilt dabei als KEINE Angabe: das ist QLC+' Vorgabewert, und
+Zeilen). Das gilt fuer **beide** QXF-Wege: den Import in die Bibliothek
+(`qxf_import`) und den Import-Knopf des Generators, der eine `.qxf` als
+Startpunkt zum Weiterbearbeiten laedt — dort steht die Zahl danach im
+sichtbaren Feld und laesst sich vor dem Speichern noch aendern (bis FM-26 ging
+sie auf diesem Weg verloren). Ein `1x1` gilt dabei als KEINE Angabe: das ist QLC+' Vorgabewert, und
 uebernommen wuerde daraus fuer ein 48-Pixel-Panel eine 48 Zeilen hohe Saeule —
 `panelGrid` zieht die fehlende Zahl aus der Pixelzahl hoch und behandelt das
 Ergebnis dann als *explizit*, also samt physischer Panel-Masse.

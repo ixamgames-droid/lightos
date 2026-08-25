@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, selectinload
 from .models import (Manufacturer, FixtureProfile, FixtureMode,
                      FixtureChannel, ChannelRange, migrate_fixtures_db,
-                     create_all_idempotent)
+                     create_all_idempotent, GEO_MAX)
 
 # XPLAT-04: standardmaessig im App-Datenordner (app_data_dir()). Override via
 # LIGHTOS_FIXTURE_DB (analog LIGHTOS_SHOW_DB) — die Test-Suite zeigt darueber auf
@@ -328,19 +328,29 @@ def _add_modes(s, profile, modes_data):
 
 
 def _geo_wert(v) -> int:
-    """Eine Rasterzahl aus einem Payload (FM-26). Fehlt/kaputt -> ``0``.
+    """Eine Rasterzahl aus einem Payload (FM-26). Fehlt/kaputt -> ``0``,
+    zu gross -> ``GEO_MAX``.
 
     ``0`` ist die Aussage "nicht hinterlegt" und damit der einzige sichere
     Ersatzwert: ein geratener waere von einer echten Angabe nicht mehr zu
     unterscheiden (siehe ``FixtureMode.grid_rows``). Negatives faellt hier
     ebenfalls auf 0 — nicht als zweite Klemmformel neben ``_clamp_geo`` des
     Generators, sondern weil diese Funktion JEDES Payload sieht, auch eines,
-    das nie durch den Generator gelaufen ist."""
+    das nie durch den Generator gelaufen ist.
+
+    ★ **Und aus genau demselben Grund auch die OBERgrenze** (nachgetragen nach
+    der Gegenpruefung von #659). Sie stand zuerst nur im Generator; ein von
+    Hand gebautes Payload schrieb damit ``grid_cols=99999`` in die Bibliothek,
+    und der Wert kam beim Renderer an. Das Argument des Absatzes darueber gilt
+    Wort fuer Wort in beide Richtungen: wer hier nur die eine Haelfte klemmt,
+    verlaesst sich darauf, dass jedes Payload durch den Generator lief. Ueber
+    ``GEO_MAX`` koennte ohnehin nie ein Pixel mehr erscheinen — die Zahl waere
+    eine stille Fehlangabe."""
     try:
         n = int(v)
     except (TypeError, ValueError):
         return 0
-    return n if n > 0 else 0
+    return 0 if n < 0 else GEO_MAX if n > GEO_MAX else n
 
 
 def create_user_profile(payload: dict, *, engine=None) -> int:
