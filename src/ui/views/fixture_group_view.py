@@ -47,6 +47,8 @@ def _split_cell(v):
 from src.ui.head_cell_colors import (           # noqa: E402  (bewusst nach den Qt-Importen)
     FIXTURE_CELL_COLORS as _FIXTURE_CELL_COLORS,
     fixture_cell_color,
+    head_count_suffix,
+    head_counts,
 )
 
 
@@ -981,17 +983,21 @@ class FixtureGroupView(QWidget):
             lg.hide()
             lg.setText("")
             return
-        heads: dict[int, int] = {}
-        for v in self._grid_widget.positions.values():
-            fid, head = _split_cell(v)
-            if fid is not None and head is not None:
-                heads[fid] = max(heads.get(fid, 0), int(head) + 1)
+        # UI-52: die tatsaechlich belegten KOPF-ZELLEN zaehlen, NICHT aus dem
+        # hoechsten Kopf-Index schliessen (`max(head)+1`). Die Regel liegt in
+        # `head_cell_colors.head_counts` — dieselbe Quelle, aus der auch der
+        # Matrix-Editor seine Legende speist; die Formel stand vorher zweimal im
+        # Code und war zweimal falsch. Gezaehlt werden die Kopf-Zellen, NICHT die
+        # eingefaerbten Zellen: eine Zelle des GANZEN Geraets traegt zwar den
+        # Grundton des Geraets, ist aber kein Kopf (beides zugleich entsteht nur
+        # ueber „Matrizen zusammenlegen", s. FM-32).
+        heads = head_counts(_split_cell(v)
+                            for v in self._grid_widget.positions.values())
         parts = []
         for fid in order:
             col = fixture_cell_color(fid, None, order).name()
             name = self._labels_by_fid().get(fid, f"Fixture {fid}")
-            n = heads.get(fid)
-            suffix = f" ({n} Köpfe)" if n and n > 1 else ""
+            suffix = head_count_suffix(heads.get(fid))
             parts.append(
                 f"<span style='background:{col}; color:#fff;'>&nbsp;&nbsp;&nbsp;</span>"
                 f" {name}{suffix}")

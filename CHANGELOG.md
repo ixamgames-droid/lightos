@@ -42,6 +42,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   laeuft, darf nicht darauf angewiesen sein, dass jede Datei der Suite vorher
   aufgeraeumt hat.
 
+### 2026-08-24 — Die Legende zaehlt, was wirklich im Raster liegt
+
+#### Behoben
+
+- **Die Farb-Legende unter dem Gruppen-Raster nannte zu viele Koepfe.** Sie
+  erschloss die Zahl aus dem hoechsten Kopf-Index (`max(head)+1`) statt die
+  belegten Zellen zu zaehlen. Das stimmt nur, solange die Koepfe luecken los ab
+  Kopf 0 nebeneinander liegen — also genau bei dem Streifen, den
+  „Koepfe einzeln → Raster" erzeugt. Beim Ring-Raster eines Robin Spiiders
+  stand deshalb „(20 Koepfe)", obwohl **19 Pixel** darin liegen: Kopf 0 ist die
+  Grundfarbe des Geraets und gehoert nicht in den Ring. Dieselbe Luecke entsteht,
+  sobald man per Rechtsklick eine einzelne Kopf-Zelle entfernt — der entfernte
+  Kopf wurde weitergezaehlt. Jetzt zaehlt die Legende die tatsaechlich belegten
+  Kopf-Zellen; ein luecken loser Streifen meldet unveraendert dieselbe Zahl wie
+  vorher.
+- **Der Matrix-Editor sagte fuer dasselbe Raster etwas anderes.** Seine Legende
+  „Farbe → Gerät" trug die gleiche Formel und damit den gleichen Fehler: das aus
+  einer Gruppe uebernommene Ring-Raster meldete dort weiter „(20 Koepfe)".
+  Beide Ansichten zeigen dasselbe Rig und nennen jetzt dieselbe Zahl — die
+  Zaehlung liegt in einem gemeinsamen Modul, wie die Zellfarben schon vorher.
+- **Eine einzelne Kopf-Zelle heisst jetzt „(1 Kopf)" statt gar nichts.** Bisher
+  bekam ein Geraet den Zusatz erst ab zwei Koepfen; blieb nach dem Entfernen von
+  Zellen genau einer uebrig, sah sein Eintrag exakt so aus wie der eines
+  Geraets, das als GANZES im Raster liegt — die Unterscheidung, fuer die es die
+  Legende gibt.
+
 ### 2026-08-24 — Der Pixel-Kopf sieht in der 2D-Ansicht auch wie einer aus
 
 #### Behoben

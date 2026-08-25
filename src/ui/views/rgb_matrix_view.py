@@ -14,7 +14,9 @@ from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
-from src.ui.head_cell_colors import fixture_cell_color
+from src.ui.head_cell_colors import (
+    fixture_cell_color, head_count_suffix, head_counts,
+)
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -392,8 +394,7 @@ class RgbMatrixView(QWidget):
         for fid in order:
             col = fixture_cell_color(fid, None, order).name()
             name = self._fixture_label(by_fid.get(fid), fid)
-            n = heads.get(fid)
-            suffix = f" ({n} Köpfe)" if n and n > 1 else ""
+            suffix = head_count_suffix(heads.get(fid))
             parts.append(
                 f"<span style='background:{col}; color:#fff;'>&nbsp;&nbsp;&nbsp;</span>"
                 f" {name}{suffix}")
@@ -438,16 +439,18 @@ class RgbMatrixView(QWidget):
         order = self._preview.fid_order()
         by_fid = self._patched_by_fid() if order else {}
         self._preview.set_labels({f: self._fixture_label(by_fid.get(f), f) for f in order})
-        heads: dict = {}
+        # UI-52: die belegten KOPF-ZELLEN zaehlen (gemeinsame Regel mit dem
+        # Fixture-Gruppen-Editor: `head_cell_colors.head_counts`). Frueher stand
+        # hier `heads[fid] = max(heads.get(fid, 0), int(h) + 1)` — dieselbe
+        # Formel, die der Gruppen-Editor trug, mit demselben Fehler: das aus
+        # einer Gruppe uebernommene Ring-Raster eines Robin Spiiders (Koepfe
+        # 1..19, Kopf 0 = Grundfarbe) meldete „20 Koepfe" fuer 19 Zellen. Beide
+        # Ansichten zeigen dasselbe Raster; sie duerfen nicht zwei Zahlen nennen.
         m = getattr(self, "_current", None)
-        for idx, h in enumerate(list(getattr(m, "head_grid", []) or []) if m else []):
-            if h is None:
-                continue
-            try:
-                fid = int((getattr(m, "fixture_grid", []) or [])[idx])
-            except (TypeError, ValueError, IndexError):
-                continue
-            heads[fid] = max(heads.get(fid, 0), int(h) + 1)
+        _fg = list(getattr(m, "fixture_grid", []) or []) if m else []
+        heads: dict = head_counts(
+            ((_fg[idx] if idx < len(_fg) else None), h)
+            for idx, h in enumerate(list(getattr(m, "head_grid", []) or []) if m else []))
         # Legende nur zusammen mit dem Overlay — sonst erklärt sie Farben, die
         # gerade niemand sieht.
         txt = self.legend_html(order, by_fid, heads) if self._chk_assignment.isChecked() else ""
