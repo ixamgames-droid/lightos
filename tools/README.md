@@ -17,6 +17,7 @@
 | `audit_bilder_stand.py` | Welche Punkte eines Bilder-Audits sind noch offen? |
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
+| `backlog_status_drift.py` | QA-64 — misst, ob der Status im BACKLOG.md noch zum CODE auf `main` passt. |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
