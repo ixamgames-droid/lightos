@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Neun gelandete Items standen auf `review`, der Waechter schwieg
+
+#### Behoben
+
+- **`tools/backlog_status_drift.py` sieht jetzt den haeufigsten Drift-Fall
+  ueberhaupt** (QA-65): Status `review` + Spur **auf** `main` heisst, der PR ist
+  gelandet und nur der Status wurde nie nachgezogen. Bis dahin bekam jeder
+  Status zwischen `todo` und `done` einen Freibrief in beide Richtungen —
+  begruendet mit „ein Item im PR hat seine Spur naturgemaess nicht auf `main`".
+  Das stimmt fuer die eine Richtung; die andere war blind. Auf `main` 28e137f2
+  standen **neun** Items genau so da (PROC-03, PROC-04, PROC-06, QA-63, QA-64,
+  VIZ-53, FM-25, FM-29, UI-52) — alle gelandet, alle auf `review`, Bericht
+  „keine Drift".
+- **Die Gegenrichtung bleibt bewusst frei:** `review` + Spur **nicht** auf
+  `main` ist der normale Zustand eines Items, an dem gerade jemand arbeitet.
+  Wer beide Richtungen meldet, hat einen Waechter gebaut, der bei jedem
+  laufenden PR anschlaegt — der wird abgeschaltet.
+- **`blocked`/`decision` behalten den Freibrief — gemessen, nicht gefuehlt:**
+  von den 11 Items dieser beiden Status nennen vier ueberhaupt Dateien, und
+  alle 8 genannten liegen bereits auf `main`. Sie behaupten keinen offenen PR,
+  sondern dass jemand auf Hardware oder eine Produktentscheidung wartet,
+  waehrend die Vorarbeit laengst gelandet sein darf. Dieselbe Schaerfung haette
+  dort **4 Fehlalarme und 0 echte Funde** gebracht.
+- **Die neun Zeilen im `BACKLOG.md` sind nachgezogen** — je mit der echten
+  PR-Nummer; wo das Item selbst einen Rest nennt (PROC-03, PROC-04, PROC-06,
+  QA-64), steht `✅ teils` statt `✅ done` und der Restsatz bleibt.
+
+
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 
 #### Hinzugefuegt

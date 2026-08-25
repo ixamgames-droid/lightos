@@ -13,6 +13,16 @@ Deshalb die Trennung: das **Werkzeug** greift nach dem echten Repo, dieser
 **Test** nagelt seine Entscheidungsregeln an Nachbildungen fest — beide
 Richtungen, plus die Formen, die es NICHT beanstanden darf.
 
+★★ **QA-65 hat die Regel geschaerft, und dieser Test ist der Grund, warum das
+auffiel.** Die erste Fassung gab jedem Status zwischen ``todo`` und ``done``
+einen Freibrief in beide Richtungen — festgehalten in
+``test_unterwegs_wird_in_keiner_richtung_beanstandet``. Die eine Richtung war
+richtig, die andere blind: ``review`` + Spur AUF ``main`` heisst, der PR ist
+gelandet und nur der Status wurde nie nachgezogen. Am 25.08.2026 standen neun
+Items genau so da. Seither ist ``review`` eine eigene Klasse; ``blocked`` und
+``decision`` behalten den Freibrief (Begruendung samt Messung im Docstring des
+Werkzeugs).
+
 ★ Die Regeln stecken absichtlich in eigenen, ref-freien Funktionen
 (``zeilen_mit_items``, ``status_klasse``, ``spur_urteil``, ``SPUR``, ``ZWEIG``).
 Waeren sie in der Hauptschleife verwoben, koennte dieser Test nur den Aufruf
@@ -27,7 +37,8 @@ sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
 from backlog_status_drift import (          # noqa: E402
-    SPUR, ZWEIG, spur_urteil, status_klasse, zeilen_mit_items)
+    REVIEW_SPUR_AUF_MAIN, SPUR, ZWEIG, spur_urteil, status_klasse,
+    zeilen_mit_items)
 
 
 TABELLE = """
@@ -35,7 +46,7 @@ TABELLE = """
 |---|---|---|---|---|
 | QA-63 | P2 | ✅ done (2026-08-24) | Waechter | Text <!-- spur: tools/zeitbomben_gate.py --> |
 | FM-26 | P2 | todo | Generator | Text <!-- spur: src/ui/widgets/fixture_generator.py :: grid_rows --> |
-| FM-14b | P3 | review (Umsetzung auf `feature/fm14b-ring-bedienung-v3`) | Ring | Text |
+| FM-14b | P3 | review (Umsetzung auf `feature/fm14b-ring-bedienung-v3`) | Ring | Text <!-- spur: tests/test_fm14b_ring.py --> |
 | HW-1 | P1 | blocked (Hardware) | Kopf-Reihenfolge | Ohne Spur, ohne Zweig |
 """
 
@@ -65,13 +76,29 @@ class StatusKlasseTest(unittest.TestCase):
     def test_offen(self):
         self.assertEqual(status_klasse("todo"), "offen")
 
-    def test_dazwischen_bekommt_kein_urteil(self):
+    def test_review_ist_eine_eigene_klasse(self):
+        # ★ QA-65. `review` behauptet etwas Pruefbares: „liegt in einem PR, ist
+        # NICHT gelandet". Nur deshalb kann eine Spur auf `main` dem Status
+        # widersprechen. `blocked`/`decision` behaupten das nicht.
+        for s in ("review (Umsetzung auf `x`)", "review (PR #660)",
+                  "review (Werkzeug in [#664](https://example/pull/664))"):
+            self.assertEqual(status_klasse(s), "review", s)
+
+    def test_blocked_und_decision_bleiben_ohne_urteil(self):
         # Wer hier „offen" oder „erledigt" erzwingt, erzeugt Fehlalarme fuer
-        # jedes Item, das gerade in einem PR liegt — und das sind die meisten,
-        # an denen ueberhaupt gearbeitet wird.
-        for s in ("review (Umsetzung auf `x`)", "blocked (Hardware)",
-                  "decision (Produktentscheidung)"):
+        # jedes Item, das auf Hardware oder eine Entscheidung wartet.
+        for s in ("blocked (Hardware)", "blocked (Robin — Produktentscheidung)",
+                  "decision (Produktentscheidung + Hardware)"):
             self.assertEqual(status_klasse(s), "unterwegs", s)
+
+    def test_erledigt_schlaegt_review(self):
+        # `startswith` fuer REVIEW, und die Erledigt-Probe steht davor: ein
+        # Status „done (Rest ging in review)" ist erledigt, nicht `review` —
+        # sonst wuerde ausgerechnet ein FERTIGES Item beanstandet.
+        self.assertEqual(status_klasse("✅ done (Rest ging in review)"),
+                         "erledigt")
+        self.assertEqual(status_klasse("✅ teils (2026-08-25, [#664](…))"),
+                         "erledigt")
 
     def test_todo_als_teil_eines_wortes_zaehlt_nicht_als_offen(self):
         # `startswith` statt `in`: sonst faengt ein Status wie
@@ -95,11 +122,29 @@ class SpurUrteilTest(unittest.TestCase):
     def test_todo_ohne_spur_auf_main_ist_in_ordnung(self):
         self.assertIsNone(spur_urteil("offen", auf_main=False))
 
-    def test_unterwegs_wird_in_keiner_richtung_beanstandet(self):
-        # Ein Item im PR hat seine Spur naturgemaess NICHT auf main — und ein
-        # Item, dessen Zweig teilweise gelandet ist, sehr wohl. Beides ist
-        # normal. Ein Waechter, der das beanstandet, meldet bei jedem laufenden
-        # PR und wird abgeschaltet.
+    def test_review_mit_spur_auf_main_ist_drift(self):
+        """★★ QA-65 — der haeufigste Drift-Fall, den QA-64 per Bauart uebersah.
+
+        Die Spur ist auf `main`, der Status sagt trotzdem „liegt im PR": der PR
+        ist gelandet, nur der Status wurde nie nachgezogen. Am 25.08.2026 traf
+        das auf NEUN Items zugleich zu, und der Bericht meldete „keine Drift".
+        """
+        self.assertEqual(spur_urteil("review", auf_main=True),
+                         REVIEW_SPUR_AUF_MAIN)
+
+    def test_review_ohne_spur_auf_main_ist_in_ordnung(self):
+        # ★ Die Gegenrichtung. Ein Item, an dem gerade jemand arbeitet, hat
+        # seine Spur naturgemaess NICHT auf main. Wer beide Richtungen meldet,
+        # hat einen Waechter gebaut, der bei JEDEM laufenden PR anschlaegt —
+        # der wird abgeschaltet.
+        self.assertIsNone(spur_urteil("review", auf_main=False))
+
+    def test_blocked_und_decision_werden_in_keiner_richtung_beanstandet(self):
+        # Gemessen (25.08.2026): von den 11 `blocked`/`decision`-Items nennen
+        # vier ueberhaupt Dateien, und alle 8 genannten liegen bereits auf
+        # `main`. Diese Status behaupten keinen offenen PR, sondern dass jemand
+        # auf Hardware/Entscheidung wartet — die Vorarbeit darf gelandet sein.
+        # Dieselbe Schaerfung haette dort 4 Fehlalarme und 0 Funde gebracht.
         self.assertIsNone(spur_urteil("unterwegs", auf_main=True))
         self.assertIsNone(spur_urteil("unterwegs", auf_main=False))
 
@@ -177,6 +222,23 @@ class EchterBacklogTest(unittest.TestCase):
                 fehlend.append(f"{item} -> {m.group(1)}")
         self.assertGreater(gefunden, 0, "kein erledigtes Item mit Spur gefunden")
         self.assertEqual(fehlend, [], f"Spuren ohne Datei: {fehlend}")
+
+    def test_es_gibt_ueberhaupt_review_items_und_sie_werden_so_gelesen(self):
+        """Wache gegen Leerlauf fuer die QA-65-Regel.
+
+        Die Regel kann nur greifen, wenn ``status_klasse`` im ECHTEN Backlog
+        auch wirklich ``review`` zurueckgibt. Die Schwelle ist abgeleitet, nicht
+        gesetzt: es genuegt, dass es die Klasse ueberhaupt gibt — wie viele
+        Items gerade in einem PR liegen, schwankt taeglich.
+        """
+        review = [(i, s) for i, s, _z in self.items
+                  if status_klasse(s) == "review"]
+        self.assertGreater(len(review), 0,
+                           "kein Item auf `review` — dann prueft die QA-65-Regel"
+                           " im echten Backlog nichts")
+        for item, status in review:
+            self.assertTrue(status.lower().startswith("review"), f"{item}: {status}")
+            self.assertNotIn("✅", status, f"{item}: erledigt UND review?")
 
     def test_spur_eines_offenen_items_zeigt_wenigstens_in_ein_vorhandenes_verzeichnis(self):
         """Der Tippfehler-Fang fuer noch nicht gelandete Arbeit.

@@ -36,7 +36,29 @@ Zwei getrennte Pruefungen
 -------------------------
 1. **Spur-Probe** (die eigentliche): Status ``done``/``✅`` -> Spur MUSS auf
    ``main`` sein. Status ``todo`` -> Spur darf NICHT auf ``main`` sein. Status
-   ``review``/``blocked``/``decision`` -> beides zulaessig, es wird nur berichtet.
+   ``review`` -> Spur darf NICHT auf ``main`` sein. Status ``blocked``/
+   ``decision`` -> beides zulaessig, es wird nur berichtet.
+
+   ★★ **QA-65 — die dritte Zeile war zur Haelfte falsch.** QA-64 gab jedem
+   „unterwegs" einen Freibrief, begruendet mit „ein Item im PR hat seine Spur
+   naturgemaess nicht auf ``main``". Das stimmt fuer diese eine Richtung. Die
+   andere ist der **haeufigste Drift-Fall ueberhaupt**: ``review`` + Spur IST auf
+   ``main`` heisst, der PR ist gelandet und nur der Status wurde nie nachgezogen.
+   Gemessen auf ``main`` 28e137f2: **neun** Items standen genau so da (PROC-03,
+   PROC-04, PROC-06, QA-63, QA-64, VIZ-53, FM-25, FM-29, UI-52) — alle neun
+   gelandet, alle neun auf ``review``, Bericht „keine Drift".
+
+   ★ **Warum ``blocked``/``decision`` den Freibrief behalten.** Gemessen an den
+   11 Items dieser beiden Status im BACKLOG (25.08.2026): vier von ihnen nennen
+   ueberhaupt Dateien, und **alle 8 genannten Dateien liegen bereits auf ``main``**
+   (VCG-02: ``src/core/show/vc_assets.py``, ``vc_gallery.py``, ``stage/aim.py``;
+   HW-4: ``docs/OPEN_POINTS_OVERVIEW.md``; VIZ-16: ``docs/VIZ3D_OVERHAUL_PLAN.md``,
+   ``src/core/engine/tempo_bus.py``, ``tools/viz_render_benchmark.py``; PRIV-03:
+   ``tools/pseudonymisieren.py``). Diese Status behaupten NICHT, dass etwas in
+   einem PR haengt — sie behaupten, dass jemand auf Hardware oder eine
+   Produktentscheidung wartet, waehrend die Vorarbeit laengst gelandet sein darf.
+   Dieselbe Schaerfung dort haette also jedes blockierte Item mit Vorarbeit
+   beanstandet: 4 Fehlalarme, 0 echte Funde.
 2. **Zweig-Behauptung**: nennt der Status „Umsetzung auf ``X``", muss ``X`` auf
    ``origin`` existieren und darf keine neuere ``-vN``-Fassung haben. Genau das
    ist am 25.08. aufgefallen: FM-14b zeigte auf die erste von **drei** Fassungen,
@@ -83,6 +105,14 @@ ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
 
 ERLEDIGT = ("done", "✅")
 OFFEN = ("todo",)
+# ★ QA-65: `review` ist KEIN beliebiges „unterwegs" — der Status behauptet
+# ausdruecklich, die Arbeit liege in einem PR und sei NICHT gelandet. Steht die
+# Spur trotzdem auf `main`, widerspricht der Status sich selbst.
+REVIEW = ("review",)
+
+REVIEW_SPUR_AUF_MAIN = ("Status sagt review, aber die Spur steht schon auf main"
+                        " — der PR ist gelandet, nur der Status wurde nie"
+                        " nachgezogen")
 
 
 def zeilen_mit_items(text: str) -> list[tuple[str, str, str]]:
@@ -115,6 +145,10 @@ def status_klasse(status: str) -> str:
         return "erledigt"
     if any(s.startswith(k) for k in OFFEN):
         return "offen"
+    # ★ `startswith` wie bei OFFEN: ein Status „done (Rest ging in review)" darf
+    # nicht in dieser Klasse landen — er ist erledigt und oben schon gefangen.
+    if any(s.startswith(k) for k in REVIEW):
+        return "review"
     return "unterwegs"
 
 
@@ -128,6 +162,16 @@ def spur_urteil(klasse: str, auf_main: bool) -> str | None:
         return "Status sagt erledigt, aber die Spur steht NICHT auf main"
     if klasse == "offen" and auf_main:
         return "Status sagt todo, aber die Spur steht bereits auf main"
+    # ★ QA-65 — der haeufigste Drift-Fall ueberhaupt, und QA-64 hat ihn per
+    # Bauart nicht angesehen: am 25.08.2026 standen NEUN gelandete Items auf
+    # `review` (PROC-03/04/06, QA-63/64, VIZ-53, FM-25/29, UI-52), und der
+    # Bericht meldete „keine Drift".
+    if klasse == "review" and auf_main:
+        return REVIEW_SPUR_AUF_MAIN
+    # ★ Die GEGENRICHTUNG bleibt frei: `review` + Spur nicht auf main ist der
+    # voellig normale Zustand eines Items, an dem gerade jemand arbeitet. Wer
+    # beide meldet, hat einen Waechter gebaut, der bei jedem laufenden PR
+    # anschlaegt — der wird abgeschaltet.
     return None
 
 
