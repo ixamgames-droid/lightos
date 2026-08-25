@@ -17,7 +17,7 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
 from src.core.app_state import (
-    get_state, get_channels_for_patched, viz_model_for)
+    get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for)
 from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
@@ -63,7 +63,9 @@ def dmx_to_angle_deg(dmx: float, zero_dmx: float = 128.0,
 
 # Render-Typen, deren 2D-Glyph einen RICHTUNGS-gedrehten Strahl zeichnet.
 # Muss zu den beam-zeichnenden Zweigen des FixtureRenderer passen.
-_BEAM_DIRECTED_TYPES = frozenset({"moving_head", "scanner", "mover_bar"})
+# VIZ-53: 'pixel_head' zeichnet seit dem eigenen Zweig ebenfalls einen Strahl.
+_BEAM_DIRECTED_TYPES = frozenset({"moving_head", "scanner", "mover_bar",
+                                  "pixel_head"})
 
 
 def _has_pan_tilt(fixture, render_type: str | None = None) -> bool:
@@ -99,7 +101,12 @@ class FixtureRenderer:
              blink_off: bool = False, highlighted: bool = False,
              zoom: float = 1.0, pan_range_deg: float = 540.0,
              tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
-             tilt_zero_dmx: float = 128.0, lod: int = 0):
+             tilt_zero_dmx: float = 128.0, lod: int = 0,
+             ring_segments: int = 0):
+        # ring_segments (VIZ-53): Zahl der Ring-Segmente eines 'pixel_head'.
+        # Sie ist eine Eigenschaft des GEPATCHTEN Geraets und kommt deshalb vom
+        # Canvas mit (`app_state.pixel_ring_segments`) — dieselbe Zahl, die auch
+        # die 3D-Nutzlast bekommt. 0 = unbekannt -> schematischer Kranz.
         # lod (Level-of-Detail, QOL/UI-26): 0 = volles Label + Intensity% + FX-Badge,
         # 1 = nur Kurz-Label (ohne Typ-Praefix), 2 = gar kein Text. Wird vom Canvas
         # aus dem Bildschirm-Nachbarabstand bestimmt -> keine ueberlappenden Labels
@@ -224,6 +231,45 @@ class FixtureRenderer:
                     cy = x0 + r*step
                     painter.drawRoundedRect(QRectF(cx - cw/2, cy - cw/2, cw, cw), 1.5, 1.5)
             label_prefix = "MTX"
+
+        elif ft == "pixel_head":
+            # FM-14/VIZ-53: Pixel-Moving-Head (Robe Spiider) — EIN Kopf, dessen
+            # Lichtquelle in Ring-Segmente zerlegt ist. Exakter Match VOR dem
+            # Moving-Head-Zweig: `"head" in ft` faengt ihn sonst ab, und genau
+            # dort stand er bis hierher als gewoehnlicher Kopf, waehrend das
+            # 3D-Top-Down-Icon laengst seinen Ring zeigte.
+            from math import cos, sin
+            # Yoke wie beim Moving Head (es IST einer).
+            painter.setBrush(QBrush(QColor("#2a2a2a")))
+            painter.setPen(QPen(QColor("#666"), 1))
+            painter.drawRect(QRectF(-size*0.5, -size*0.15, size*0.15, size*0.3))
+            painter.drawRect(QRectF(size*0.35, -size*0.15, size*0.15, size*0.3))
+            # Kopf-Gehaeuse dunkel: die Farbe tragen die Segmente, nicht die
+            # geschlossene Linse des gewoehnlichen Kopfes.
+            painter.setBrush(QBrush(QColor("#1c1c22")))
+            painter.setPen(QPen(QColor("#888"), 1.5))
+            painter.drawEllipse(QRectF(-size*0.42, -size*0.42, size*0.84, size*0.84))
+            # Die Segmente: so viele, wie das Geraet hat — dieselbe Zahl, die
+            # das 3D bekommt (`app_state.pixel_ring_segments`), und dieselbe
+            # Kranz-Geometrie wie das Listen-Icon (`mini_icons.ring_offsets`).
+            painter.setPen(Qt.PenStyle.NoPen)
+            for dx, dy, cell_r in _mini.ring_offsets(
+                    ring_segments or _mini.RING_SCHEMA_SEGMENTE,
+                    size*0.27, size*0.10):
+                grad = QRadialGradient(dx, dy, max(0.5, cell_r))
+                grad.setColorAt(0, color.lighter(160))
+                grad.setColorAt(0.7, color)
+                grad.setColorAt(1, glow_color)
+                painter.setBrush(QBrush(grad))
+                painter.drawEllipse(QRectF(dx - cell_r, dy - cell_r,
+                                           cell_r*2, cell_r*2))
+            # Beam-Richtung (Pan) wie beim Moving Head — der Kopf bewegt sich.
+            pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
+            painter.setPen(QPen(color, 2))
+            painter.drawLine(QPointF(0, 0),
+                             QPointF(cos(pan_rad - 1.5708) * size * 0.6,
+                                     sin(pan_rad - 1.5708) * size * 0.6))
+            label_prefix = "PIX"
 
         elif "moving" in ft or "head" in ft:
             # Moving Head: Diamant + Yoke
@@ -1239,6 +1285,17 @@ class StageCanvas(QWidget):
                 _render_type = viz_model_for(fixture) or _base_type
             except Exception:
                 _render_type = _base_type
+            # VIZ-53: Wie viele Ring-Segmente hat dieser Pixel-Kopf? Die Zahl
+            # steht in den Kanaelen des GEPATCHTEN Geraets, nicht am Modell —
+            # sie muss also hier ermittelt und mitgegeben werden. Dieselbe
+            # Funktion beliefert die 3D-Nutzlast, sonst zeigten 2D und 3D
+            # verschieden viele Segmente (der Riss aus VIZ-51/52, neuer Typ).
+            _ring = 0
+            if _render_type == "pixel_head":
+                try:
+                    _ring = pixel_ring_segments(fixture)
+                except Exception:
+                    _ring = 0
             _pr = float(getattr(fixture, "pan_range_deg", 540) or 540)
             _tr = float(getattr(fixture, "tilt_range_deg", 270) or 270)
             _pz = getattr(fixture, "pan_zero_dmx", 128)
@@ -1262,7 +1319,7 @@ class StageCanvas(QWidget):
                 zoom=self.zoom,
                 pan_range_deg=_pr, tilt_range_deg=_tr,
                 pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
-                lod=_lod,
+                lod=_lod, ring_segments=_ring,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
