@@ -7,7 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-08-25 — Zusammengelegte Matrizen setzen kein Geraet mehr doppelt ins Raster
+### 2026-08-25 — Zusammengelegte Matrizen: die Ganz-Zelle weicht den Kopf-Zellen
 
 #### Behoben
 
@@ -30,6 +30,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   aendert sich nicht — die frei gewordene Zelle bleibt eine Luecke. Gruppen aus
   aelteren Shows, die beide Formen tragen, werden weiterhin unveraendert geladen
   und angezeigt.
+- **Was das NICHT abdeckt:** gemeint ist ausschliesslich das Zusammentreffen von
+  ZWEI FORMEN. Bringen beide Gruppen dasselbe Geraet in DERSELBEN Form mit (zweimal
+  ganz oder zweimal kopfweise), steht es weiterhin doppelt im Raster, und wie
+  bisher entscheidet die Stapelreihenfolge, was auf DMX landet (gemessen: zwei
+  Gruppen mit der Bar je als Ganz-Zelle -> zwei Bar-Zellen, alle vier Pixel auf
+  einem Wert). Dafuer gibt es ein eigenes Item (FM-37).
 
 ### 2026-08-25 — Drei Zweige, dreimal dieselbe Backlog-Nummer
 

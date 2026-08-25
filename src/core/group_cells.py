@@ -42,6 +42,13 @@ def head_restrictions(cells) -> dict:
     ausdruecklich „keine Kopf-Einschraenkung" (= Bestandsverhalten), NICHT
     „nichts gewaehlt".
 
+    ★ Die Vorrang-Regel ist hier BEWUSST die umgekehrte wie in
+    ``drop_whole_cells_with_heads`` (FM-32), wo beim Zusammenlegen die KOPF-Zellen
+    gewinnen: dort geht es um den Raster-INHALT, und die groebere Zelle nimmt
+    Information weg; hier um eine AUSWAHL, wo die groebere Aussage („alle Koepfe")
+    die sichere ist. Wer eine der beiden Stellen anfasst, muss die andere mitlesen
+    — das ist kein Fluechtigkeitsfehler.
+
     EINE Quelle fuer Auswahl-Zellen (``get_selected_cells``) UND Gruppen-
     Rasterzellen (``positions_json``), damit „Nur Auswahl" und „Feste Gruppe"
     beim VC-Submaster nicht auseinanderdriften."""

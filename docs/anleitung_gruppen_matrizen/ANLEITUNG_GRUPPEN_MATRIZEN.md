@@ -228,6 +228,10 @@ mit der Liste „Gruppen wählen (von oben nach unten gestapelt):".
   dasselbe Gerät, und welche davon am Ende auf DMX steht, entscheidet allein die
   Stapelreihenfolge. Die feinere Form kann alles, was die gröbere kann — vier gleiche
   Farben sind auch vier Farben. In den **Quellgruppen** ändert sich nichts.
+* **Das gilt nur für zwei _verschiedene_ Formen.** Liegt dasselbe Gerät in beiden
+  Gruppen in der **gleichen** Form (zweimal als ganzes Gerät oder zweimal kopfweise),
+  bleibt es doppelt im Raster — dann entscheidet weiterhin die Stapelreihenfolge,
+  welche der beiden Zellen das Gerät am Ende fährt.
 
 Typischer Fall: zwei Mehrkopf-Geräte mit je 1×4 Köpfen ergeben eine 4×2-Matrix, über die
 ein Effekt dann als Fläche läuft.
