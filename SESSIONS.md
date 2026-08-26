@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | VIZ-60 | B | feature/viz60-einmessen | 2026-08-26T20:26Z | tools/mh_einmessen.py |
-| UI-55 | B | fix/ui55-violet | 2026-08-26T20:42Z | src/core/color_utils.py · src/ui/widgets/preset_tile.py |
 | OUT-53 | B | fix/out53-waisen-worker | 2026-08-26T22:46Z | src/core/dmx/serial_process.py |
 
 ## Blocker & Fallen
@@ -61,3 +60,4 @@
 - 2026-08-26T20:26Z B claim VIZ-60
 - 2026-08-26T20:42Z B claim UI-55
 - 2026-08-26T22:46Z B claim OUT-53
+- 2026-08-26T23:10Z B done UI-55
