@@ -42,6 +42,13 @@ def head_restrictions(cells) -> dict:
     ausdruecklich „keine Kopf-Einschraenkung" (= Bestandsverhalten), NICHT
     „nichts gewaehlt".
 
+    ★ Die Vorrang-Regel ist hier BEWUSST die umgekehrte wie in
+    ``drop_whole_cells_with_heads`` (FM-32), wo beim Zusammenlegen die KOPF-Zellen
+    gewinnen: dort geht es um den Raster-INHALT, und die groebere Zelle nimmt
+    Information weg; hier um eine AUSWAHL, wo die groebere Aussage („alle Koepfe")
+    die sichere ist. Wer eine der beiden Stellen anfasst, muss die andere mitlesen
+    — das ist kein Fluechtigkeitsfehler.
+
     EINE Quelle fuer Auswahl-Zellen (``get_selected_cells``) UND Gruppen-
     Rasterzellen (``positions_json``), damit „Nur Auswahl" und „Feste Gruppe"
     beim VC-Submaster nicht auseinanderdriften."""
@@ -56,6 +63,53 @@ def head_restrictions(cells) -> dict:
         else:
             heads.setdefault(fid, set()).add(int(head))
     return {f: hs for f, hs in heads.items() if hs and f not in whole}
+
+
+def drop_whole_cells_with_heads(cells: dict) -> dict:
+    """Raster-Zellen -> dieselben Zellen OHNE die GANZ-Zellen der Geraete, die im
+    selben Raster auch KOPFWEISE liegen (FM-32). Eingabe/Ausgabe: eine beliebig
+    geschluesselte Map ``{zelle: fid|"fid:head"}`` (``(col,row)``-Tupel wie im
+    Gruppen-Editor oder ``"col,row"``-Strings wie im ``positions_json``).
+
+    **Die Regel: die feinere Form gewinnt.** Ein Geraet, das zugleich als ganzes
+    UND kopfweise im Raster steht, wird von zwei Zellen gleichzeitig gefahren —
+    die Ganz-Zelle faerbt ALLE Koepfe uniform, die Kopf-Zellen jeden einzeln. Wer
+    von beiden am Ende auf DMX steht, entscheidet die Schreib-Reihenfolge
+    (``RgbMatrixInstance.write`` laeuft row-major ueber das Raster), also die
+    Stapelreihenfolge beim Zusammenlegen — am selben Geraetepaar gemessen einmal
+    vier verschiedene Pixelwerte, einmal vier gleiche. Das ist kein Zustand, den
+    der Nutzer gewaehlt hat.
+
+    Verworfen wird die GANZ-Zelle, weil die Kopf-Zellen alles koennen, was sie
+    kann (alle Koepfe dieselbe Farbe), umgekehrt aber nicht — und weil das
+    Zusammenlegen genau dafuer da ist, aus Kopf-Matrizen EINE groessere Matrix zu
+    machen: liesse man die Ganz-Zelle gewinnen, verloere das Raster dabei die
+    Aufloesung, fuer die es gebaut wurde (gemessen: 24 belegte Zellen -> 21, die
+    vier Bar-Pixel auf einen uniformen Wert).
+
+    ★ Bewusst die UMGEKEHRTE Vorrangregel wie ``head_restrictions``: dort geht es
+    um eine AUSWAHL, und „auch als Ganzes gewaehlt" heisst „nicht auf Koepfe
+    einschraenken" — die groebere Aussage ist die sichere. Hier geht es um den
+    Raster-INHALT, und dort ist die groebere Zelle die, die Information wegnimmt.
+
+    Nicht betroffen: Zellwerte, die kein Geraet nennen (bleiben unveraendert), und
+    Geraete, die nur in EINER Form vorkommen — ein Raster ohne Ueberschneidung
+    kommt unveraendert zurueck."""
+    quelle = cells or {}
+    mit_koepfen = set()
+    for value in quelle.values():
+        fid, head = parse_group_cell(value)
+        if fid is not None and head is not None:
+            mit_koepfen.add(fid)
+    if not mit_koepfen:
+        return dict(quelle)
+    out = {}
+    for key, value in quelle.items():
+        fid, head = parse_group_cell(value)
+        if head is None and fid is not None and fid in mit_koepfen:
+            continue                      # Ganz-Zelle weicht den Kopf-Zellen
+        out[key] = value
+    return out
 
 
 def base_fids_in_grid_order(positions: dict) -> list[int]:
