@@ -362,5 +362,108 @@ class LiveViewPopoutFlowTest(unittest.TestCase):
             _pump(0.15)
 
 
+class ShowLoadedResyncTest(unittest.TestCase):
+    """VIZ-59: ein offenes Zweitmonitor-Fenster muss einen Show-Wechsel nachziehen.
+
+    ★ Der Fehler war nicht die Logik, sondern die fehlende VERDRAHTUNG. Das
+    Vollfenster zieht Buehne, Geraete und Kameras beim ``show_loaded`` selbst
+    nach (``VisualizerWindow._on_state``, A3D-13/A3D-22). Die
+    ``Visualizer3DView`` — und damit auch das ausgeklinkte Fenster, das dieselbe
+    Klasse hostet — war dabei nie beruecksichtigt: ihr ``_apply_active_stage``
+    lief ausschliesslich aus ``_push_initial_state``, also nur nach einem
+    Seitenladen. Wer die 3D-Ansicht dauerhaft auf dem zweiten Schirm offen hat
+    und eine andere Show laedt, sah weiter die ALTE Buehne.
+
+    Geprueft wird die ganze Kette an einer ECHTEN View: AppState-Ereignis ->
+    Bridge -> Signal -> View. Nur den Handler direkt zu rufen wuerde genau den
+    Teil ueberspringen, der gefehlt hat.
+    """
+
+    def setUp(self):
+        _app()
+        self.state = get_state()
+
+    def test_show_wechsel_zieht_buehne_und_geraete_nach(self):
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+        view = Visualizer3DView(None)
+        try:
+            gezaehlt = {"stage": 0, "fixtures": 0}
+            view._apply_active_stage = lambda: gezaehlt.__setitem__(
+                "stage", gezaehlt["stage"] + 1)
+            view._bridge.requestFixtures = lambda: gezaehlt.__setitem__(
+                "fixtures", gezaehlt["fixtures"] + 1)
+
+            # der ECHTE Weg: AppState meldet, die Bridge reicht weiter
+            view._bridge._on_state("show_loaded", None)
+            _pump(0.1)
+
+            self.assertEqual(gezaehlt["stage"], 1,
+                             "Buehne nicht nachgezogen — das Zweitfenster zeigt "
+                             "nach dem Show-Wechsel weiter die alte Buehne")
+            self.assertEqual(gezaehlt["fixtures"], 1,
+                             "Geraete nicht neu angefordert")
+        finally:
+            _dispose_view(view)
+
+    def test_andere_ereignisse_loesen_keinen_resync_aus(self):
+        """Gegenprobe: ein Resync bei JEDEM Ereignis waere teuer (voller
+        Stage-Push + Fixture-Neuaufbau) und wuerde im 44-Hz-Betrieb stoeren."""
+        from src.ui.visualizer.visualizer_view import Visualizer3DView
+        view = Visualizer3DView(None)
+        try:
+            gezaehlt = {"n": 0}
+            view._apply_active_stage = lambda: gezaehlt.__setitem__("n", gezaehlt["n"] + 1)
+            for ereignis in ("patch_changed", "programmer_changed", "irgendwas"):
+                view._bridge._on_state(ereignis, None)
+            _pump(0.1)
+            self.assertEqual(gezaehlt["n"], 0)
+        finally:
+            _dispose_view(view)
+
+    def test_bridge_zieht_nicht_selbst_nach(self):
+        """★ Die Bridge MELDET nur. Zoege sie selbst nach, liefe der Resync im
+        Vollfenster doppelt — das hat dort naemlich schon einen eigenen
+        ``show_loaded``-Zweig."""
+        from src.ui.visualizer.visualizer_window import VisualizerBridge
+        bridge = VisualizerBridge(self.state, None)
+        try:
+            gesehen = []
+            bridge.pyShowLoaded.connect(lambda: gesehen.append(1))
+            bridge.push_stage_definition = lambda *a, **k: self.fail(
+                "die Bridge hat die Buehne selbst gepusht")
+            bridge._on_state("show_loaded", None)
+            _pump(0.05)
+            self.assertEqual(gesehen, [1], "pyShowLoaded wurde nicht gemeldet")
+        finally:
+            try:
+                bridge.dispose()
+            except Exception:
+                pass
+
+    def test_popout_fenster_zieht_ebenfalls_nach(self):
+        """Der eigentliche Anwendungsfall: das Fenster auf dem zweiten Schirm
+        hostet dieselbe View-Klasse — der Resync muss also auch dort ankommen."""
+        from src.ui.visualizer.visualizer_view import VisualizerPopoutWindow
+        win = VisualizerPopoutWindow(None)
+        try:
+            gezaehlt = {"n": 0}
+            win.view._apply_active_stage = lambda: gezaehlt.__setitem__("n", gezaehlt["n"] + 1)
+            win.view._bridge.requestFixtures = lambda: None
+            win.view._bridge._on_state("show_loaded", None)
+            _pump(0.1)
+            self.assertEqual(gezaehlt["n"], 1,
+                             "das Zweitmonitor-Fenster zieht den Show-Wechsel nicht nach")
+        finally:
+            try:
+                _dispose_view(win.view)
+            except Exception:
+                pass
+            try:
+                win.close()
+            except Exception:
+                pass
+            _pump(0.1)
+
+
 if __name__ == "__main__":
     unittest.main()

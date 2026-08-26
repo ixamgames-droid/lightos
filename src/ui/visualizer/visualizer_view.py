@@ -159,6 +159,13 @@ class Visualizer3DView(QWidget):
     # ── WebChannel ──────────────────────────────────────────────────────────
     def _setup_channel(self):
         self._bridge = VisualizerBridge(self._state, self)
+        # VIZ-59: Show-Wechsel nachziehen. Ohne das zeigte ein offenes
+        # Zweitmonitor-Fenster nach dem Laden einer anderen Show weiter die
+        # ALTE Buehne — ihr _apply_active_stage lief bisher ausschliesslich
+        # einmal aus _push_initial_state, also nur nach einem Seitenladen.
+        # weak_slot_fwd wie beim Crash-Guard: die Bridge ist an diese View
+        # geparentet, eine Bound-Method waere self -> bridge -> self.
+        self._bridge.pyShowLoaded.connect(weak_slot_fwd(self._on_show_loaded))
         self._channel = QWebChannel(self)
         self._channel.registerObject("bridge", self._bridge)
         self._view.page().setWebChannel(self._channel)
@@ -292,6 +299,25 @@ class Visualizer3DView(QWidget):
             self._bridge.requestFixtures()
         except Exception as e:
             print(f"[Visualizer3DView] push_initial_state error: {e}")
+
+    def _on_show_loaded(self):
+        """VIZ-59: eine andere Show wurde geladen -> Buehne und Geraete neu ziehen.
+
+        Dasselbe, was ``VisualizerWindow._on_state`` fuer das Vollfenster tut
+        (A3D-13/A3D-22). Die eingebettete View — und damit auch das
+        ausgeklinkte Zweitmonitor-Fenster, das dieselbe Klasse hostet — war
+        dabei nie beruecksichtigt: sie zeigte nach dem Show-Wechsel weiter die
+        Buehne der alten Show, bis die Seite irgendwann neu lud.
+
+        Benannte Kameras werden hier bewusst NICHT gepusht: diese View hat dafuer
+        keine Bedienung (ihr einziges Kamera-Element ist "Zuruecksetzen"). Sie zu
+        schicken waere ein Vorrat ohne Verbraucher.
+        """
+        try:
+            self._apply_active_stage()
+            self._bridge.requestFixtures()
+        except Exception as e:                           # noqa: BLE001
+            print(f"[Visualizer3DView] show_loaded handling error: {e}")
 
     def _apply_active_stage(self):
         """Aktive Buehne (read-only Anzeige) anhand AppState laden."""
