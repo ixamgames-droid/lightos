@@ -252,12 +252,40 @@ class _ApplyMixin:
             self._state.set_programmer_value(f.fid, attr, int(value))
 
     def _apply_payload(self, payload: dict):
+        self._apply_payload_on(self._fixtures, payload)
+
+    def _apply_payload_on(self, fixtures, payload: dict):
+        """Wie :meth:`_apply_payload`, aber auf einer AUSDRUECKLICH uebergebenen
+        Geraeteliste.
+
+        FM-34: eine ``ColorQuickBar`` traegt zwei Kachel-Familien, die
+        verschiedene Kanaele schreiben (RGB-Presets und Farbrad-Slots). Wer das
+        eine hat, hat noch lange nicht das andere — ein ``SHARPY`` hat ein
+        Farbrad und kein RGB. Beide Familien duerfen deshalb nicht dieselbe
+        Liste bedienen.
+
+        ★ FM-34, zweite Haelfte: der Geraete-Filter des Aufrufers fragt „hat
+        das Geraet EINEN der Farbkanaele" — die Nutzlast schreibt aber MEHRERE
+        auf einmal. Ein Teil-RGB-Geraet (``color_g`` + ``color_b``, kein
+        ``color_r``) und die Kachel „Aus" (traegt zusaetzlich ``color_a`` und
+        ``color_uv``) haetten sonst weiter tote Eintraege im Programmer-Dict.
+        Deshalb wird JEDER Schluessel noch einmal gegen die Kanaele DIESES
+        Geraets geprueft. Das ist die richtige Ebene: das Geraet wegzuwerfen,
+        nur weil ihm EIN Kanal fehlt, wuerde auch die vorhandenen Kanaele
+        nicht mehr bedienen — der Nutzer klickt Rot und ein Geraet, das
+        Gruen/Blau herunterfahren koennte, bliebe stehen."""
         # P6: Farb-Payloads pro Fixture an dessen Farbsystem anpassen —
         # RGBW-Geraete bekommen Weiss ueber den W-Kanal statt RGB+W doppelt.
         from src.core.color_utils import adapt_color_payload, fixture_attr_set
-        for f in self._fixtures:
-            adapted = adapt_color_payload(fixture_attr_set(f), payload)
+        for f in fixtures:
+            vorhanden = fixture_attr_set(f)
+            adapted = adapt_color_payload(vorhanden, payload)
             for attr, value in adapted.items():
+                # ``vorhanden`` leer heisst „Kanaele unbekannt" (Test-Double,
+                # Lesefehler) — dann wie bisher alles schreiben, statt still
+                # gar nichts mehr auszugeben.
+                if vorhanden and attr not in vorhanden:
+                    continue
                 self._state.set_programmer_value(f.fid, attr, int(value))
                 # Mehrkopf (Spider): etwaige Pro-Kopf-Overrides dieser Farbe
                 # ("attr#N") entfernen, damit ein Preset das GANZE Geraet faerbt
@@ -271,18 +299,33 @@ class _ApplyMixin:
 
 class ColorQuickBar(QWidget, _ApplyMixin):
     """Benannte Farb-Kacheln (RGB) + Color-Wheel-Slots als farbige Kacheln
-    (inkl. Split-Farben) + Auto-Farbwechsel-Steuerung."""
+    (inkl. Split-Farben) + Auto-Farbwechsel-Steuerung.
+
+    ★ FM-34: ``fixtures`` sind die Geraete der RGB-Kacheln, ``wheel_fixtures``
+    die des Farbrads — beide Familien werden vom Aufrufer getrennt gefiltert
+    (``ProgrammerView._fixtures_with_any_attr`` fuer RGB — die Nutzlast
+    schreibt vier Kanaele auf einmal — und ``_range_compatible_fixtures``
+    fuers Farbrad, das wie Shutter/Gobo den Bereichs-Mittelwert der VORLAGE
+    einbackt und deshalb ein GLEICHES Slot-Layout braucht, nicht bloss den
+    Kanal; dieselbe Quelle wie die Regler seit #663 bzw. UI-07).
+    ``wheel_fixtures=None`` heisst „wie ``fixtures``" und haelt Aufrufer am
+    Leben, die nur EINE Familie bauen. Ist eine Liste leer, entsteht ihre
+    Kachelreihe gar nicht erst — sie koennte ohnehin nichts ausgeben."""
 
     def __init__(self, fixtures, state, attrs_present: set,
-                 color_wheel_channel=None, touch: bool = False, parent=None):
+                 color_wheel_channel=None, touch: bool = False,
+                 wheel_fixtures=None, parent=None):
         super().__init__(parent)
-        self._fixtures = fixtures
+        self._fixtures = list(fixtures or [])
+        self._wheel_fixtures = (list(self._fixtures) if wheel_fixtures is None
+                                else list(wheel_fixtures))
         self._state = state
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
-        has_rgb = bool(attrs_present & {"color_r", "color_g", "color_b", "color_w"})
+        has_rgb = bool(self._fixtures) and bool(
+            attrs_present & {"color_r", "color_g", "color_b", "color_w"})
         if has_rgb:
             tiles = []
             for name, hexc, payload in COLOR_PRESETS:
@@ -291,7 +334,8 @@ class ColorQuickBar(QWidget, _ApplyMixin):
                 tiles.append(t)
             lay.addWidget(_grid(tiles, cols=5))
 
-        slots = wheel_slot_info(color_wheel_channel) if color_wheel_channel else []
+        slots = (wheel_slot_info(color_wheel_channel)
+                 if color_wheel_channel and self._wheel_fixtures else [])
         if slots:
             attr = color_wheel_channel.attribute
             # Farb-Slots (Voll- und Split-Farben) als farbige Direktwahl-Kacheln.
@@ -312,7 +356,7 @@ class ColorQuickBar(QWidget, _ApplyMixin):
                     color=colors[0] if colors else None,
                     color2=colors[1] if len(colors) > 1 else None,
                     touch=touch, tooltip=f"DMX {s['from']}–{s['to']}")
-                t.clicked.connect(self._apply_payload)
+                t.clicked.connect(self._apply_wheel_payload)   # FM-34
                 # Zwei Anzeigefarben = Split-/Half-Color -> in den
                 # Aufklapp-Bereich, damit Raeder mit vielen Farben
                 # uebersichtlich bleiben (Vollfarben bleiben direkt sichtbar).
@@ -335,7 +379,12 @@ class ColorQuickBar(QWidget, _ApplyMixin):
             if rotate is not None or len(color_slots) >= 2:
                 lay.addWidget(ColorWheelAutoBar(
                     attr, color_slots, rotate, open_slot,
-                    fixtures, state, touch=touch))
+                    self._wheel_fixtures, state, touch=touch))   # FM-34
+
+    def _apply_wheel_payload(self, payload: dict):
+        """Farbrad-Kachel: schreibt auf die Farbrad-Geraete, nicht auf die
+        RGB-Geraete (FM-34)."""
+        self._apply_payload_on(self._wheel_fixtures, payload)
 
 
 class ColorWheelAutoBar(QWidget, _ApplyMixin):

@@ -1974,6 +1974,18 @@ class ProgrammerView(QWidget):
         — er koennte ohnehin nichts ausgeben."""
         return [f for f in fixtures if self._attr_head_count(f, attr) >= 1]
 
+    def _fixtures_with_any_attr(self, fixtures, attrs) -> list:
+        """Geraete, die MINDESTENS EINEN dieser Kanaele haben (FM-34).
+
+        Fuer Kachelreihen, deren Nutzlast mehrere Kanaele auf einmal schreibt:
+        die RGB-Schnellwahl setzt ``color_r/g/b`` (und ``color_w``, wo es ihn
+        gibt) in EINEM Klick. Ein Geraet, das keinen davon hat, gehoert nicht
+        an diese Kacheln — dieselbe Regel und dieselbe Quelle wie
+        :meth:`_fixtures_with_attr`, nur ueber eine Attribut-MENGE."""
+        attrs = tuple(attrs)
+        return [f for f in fixtures
+                if any(self._attr_head_count(f, a) >= 1 for a in attrs)]
+
     def _anchor_other_heads(self, owners, ch, head: int) -> None:
         """Verankert die ANDEREN Koepfe, wenn dieser Kopf ueber den BASIS-Schluessel
         schreibt — sonst hielte die Kopf-Einschraenkung nicht.
@@ -2144,11 +2156,36 @@ class ProgrammerView(QWidget):
             elif group_name == "Color":
                 attrs_present = {c.attribute for c in getattr(self, "_template_channels", [])}
                 cw = self._template_channel_in(("color_wheel",))
-                if (attrs_present & {"color_r", "color_g", "color_b", "color_w"}) or cw is not None:
+                # FM-34, dieselbe Filterung wie in #663: die Vorlage ist die
+                # UNION der Auswahl — ``color_r`` und ``color_wheel`` stehen
+                # hier also auch dann, wenn sie je nur EIN Geraet hat. Die
+                # beiden Kachelfamilien schreiben verschiedene Kanaele und
+                # bekommen deshalb getrennte Listen; wer den Kanal nicht hat,
+                # gehoert an keine von beiden (sonst Wert im Dict, nichts auf
+                # DMX — stille Klasse FM-9/A5).
+                #
+                # ★ Die beiden Familien fragen VERSCHIEDENE Eigenschaften ab:
+                # die RGB-Kacheln tragen absolute Farbwerte (0..255 sind an
+                # jedem RGB-Geraet dasselbe) — da genuegt „hat den Kanal".
+                # Die Farbrad-Kacheln sind dagegen RANGE-basiert wie Shutter
+                # und Gobo: die Kachel traegt den Mittelwert eines Bereichs
+                # der VORLAGE. Ein Farbrad mit anderem Slot-Layout bekaeme
+                # denselben Literal-Wert und damit eine ANDERE Farbe — also
+                # derselbe Weg wie oben/unten: ``_range_compatible_fixtures``
+                # (UI-07). Der ist strikt staerker als
+                # ``_fixtures_with_attr`` (ohne den Kanal -> ``ch is None``)
+                # und deckt FM-34 fuers Farbrad mit ab.
+                rgb_fixtures = self._fixtures_with_any_attr(
+                    fixtures, ("color_r", "color_g", "color_b", "color_w"))
+                cw_fixtures = (self._range_compatible_fixtures(cw, fixtures)
+                               if cw is not None else [])
+                if rgb_fixtures or cw_fixtures:
                     from src.ui.widgets.preset_tile import ColorQuickBar
                     layout.addWidget(QLabel("Schnellwahl:"))
-                    layout.addWidget(ColorQuickBar(fixtures, self._state, attrs_present,
-                                                   cw, touch=touch))
+                    layout.addWidget(ColorQuickBar(
+                        rgb_fixtures, self._state, attrs_present,
+                        cw if cw_fixtures else None, touch=touch,
+                        wheel_fixtures=cw_fixtures))
             elif group_name == "Gobo":
                 gw = self._template_channel_in(("gobo_wheel",))
                 if gw is not None:
@@ -2181,9 +2218,17 @@ class ProgrammerView(QWidget):
             elif group_name == "Weitere":
                 rs = self._template_channel_in(("reset",))
                 if rs is not None:
-                    from src.ui.widgets.preset_tile import ResetActionButton
-                    layout.addWidget(QLabel("Reset / Rekalibrierung:"))
-                    layout.addWidget(ResetActionButton(rs, fixtures, self._state))
+                    # FM-34: nur die Geraete, die den Reset-Kanal WIRKLICH
+                    # haben. Ein Spiider neben einem SHARPY bekam bisher den
+                    # Reset-Wert ins Programmer-Dict, ohne einen DMX-Kanal zu
+                    # bewegen — und der Knopf versprach eine Rekalibrierung,
+                    # die dieses Geraet nie ausfuehrt.
+                    rs_fixtures = self._fixtures_with_attr(fixtures, rs.attribute)
+                    if rs_fixtures:
+                        from src.ui.widgets.preset_tile import ResetActionButton
+                        layout.addWidget(QLabel("Reset / Rekalibrierung:"))
+                        layout.addWidget(ResetActionButton(rs, rs_fixtures,
+                                                           self._state))
         except Exception as e:
             print(f"[programmer_view] quick-select error: {e}")
 

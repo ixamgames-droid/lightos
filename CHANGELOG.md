@@ -7,6 +7,47 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-25 — Die Schnellwahl fasste Geraete an, die den Kanal nicht haben
+
+#### Behoben
+
+- **Farb-Schnellwahl und Reset-Knopf treiben nur noch Geraete, die den Kanal
+  wirklich haben (FM-34).** In einer Auswahl aus `Robin Spiider [91-Kanal
+  Pixel]` und `Sharpy (Beam 16ch)` traf ein Klick auf eine Farbkachel bisher
+  **beide** — der SHARPY hat aber ein Farbrad statt RGB. Gemessen am
+  DMX-Ausgang: `DMX-Diff SHARPY: {}`, waehrend im Programmer
+  `{'color_r': 255, 'color_g': 255, 'color_b': 255}` stehenblieb. Ein Wert, den
+  kein Kanal ausgibt, der aber in Szenen und Snaps mitwandert. Umgekehrt bekam
+  der Reset-Knopf den Spiider mit, der gar keinen `reset`-Kanal hat — der Knopf
+  versprach eine Rekalibrierung, die dieses Geraet nie ausfuehrt.
+- **Was sich dabei auf der Buehne aendert:** nichts, was vorher wirkte. Die
+  weggefilterten Geraete haben den Kanal nicht; ihr Programmer-Eintrag kam nie
+  auf DMX an. Sichtbar wird es an zwei Stellen: der Reset-Knopf steht in einer
+  gemischten Auswahl jetzt nur noch fuer die Geraete mit Reset-Kanal, und die
+  Farbrad-Kacheln erscheinen weiterhin, treiben aber nur die Geraete mit
+  Farbrad. Wer ein solches Geraet vorher versehentlich „mitgefaerbt" hat und
+  diesen toten Eintrag in einer Szene gespeichert hat, findet ihn dort
+  unveraendert — gespeicherte Shows werden nicht angefasst.
+- **Die `ColorQuickBar` traegt zwei Kachelfamilien**, die verschiedene Kanaele
+  schreiben (RGB-Presets und Farbrad-Slots); sie bekommen jetzt getrennte
+  Geraetelisten, denn wer das eine hat, hat noch lange nicht das andere. Die
+  RGB-Kacheln filtern wie die Regler seit #663 ueber „hat den Kanal".
+- **Eine Farbrad-Kachel dreht nur noch Farbraeder mit demselben Slot-Layout
+  (FM-34).** Die Kacheln kommen aus den DMX-Bereichen EINES Geraets der
+  Auswahl; ein anderes Farbrad teilt seine Farben oft anders ein. Gemessen an
+  `Sharpy (Beam 16ch)` neben `LED Moving Head 8ch`: die Kachel „Rot" schickte
+  beiden DMX 10 — beim SHARPY liegt das im Bereich „Rot" (7–14), beim MH8 im
+  Bereich „Weiß / Offen" (0–15). Man klickte Rot und ein Kopf blieb weiss. Die
+  Farbrad-Kacheln laufen jetzt ueber denselben Weg wie Shutter- und
+  Gobo-Kacheln, die das seit UI-07 so halten.
+- **Eine Farbkachel schreibt nur die Kanaele, die das Geraet auch hat.** Die
+  Kachel „Aus" setzt zusaetzlich Amber und UV — an einem Geraet ohne diese
+  Kanaele blieben zwei Eintraege im Programmer stehen, die nie auf DMX
+  ankamen. Dasselbe an Geraeten mit unvollstaendigem RGB (etwa nur Gruen und
+  Blau). Diese Geraete bleiben absichtlich an den Kacheln: sie sollen ihre
+  vorhandenen Farbkanaele weiterhin mitfahren — nur der tote Eintrag
+  verschwindet.
+
 ### 2026-08-25 — Zusammengelegte Matrizen: die Ganz-Zelle weicht den Kopf-Zellen
 
 #### Behoben
