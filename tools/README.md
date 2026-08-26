@@ -72,6 +72,7 @@
 | `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek. |
 | `lint_show.py` | CLI: prüft eine oder mehrere .lshow (oder show.json) gegen die echten |
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
+| `mh_einmessen.py` | VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei. |
 | `patch_quarantaene.py` | STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in |
 | `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? |
 | `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |

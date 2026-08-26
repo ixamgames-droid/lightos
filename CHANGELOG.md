@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-26 — Werkzeug zum Einmessen von Moving Heads
+
+#### Neu
+
+- **`tools/mh_einmessen.py`** richtet zwei Moving Heads per Pfeiltasten auf
+  denselben Punkt und rechnet daraus aus, wie sie wirklich stehen — Abstand,
+  Höhenversatz und die DMX-Nullpunkte beider Achsen. Diese Werte stehen in
+  keinem Datenblatt; wer sie rät, zielt daneben.
+
+  Es prüft vorher, ob ein anderer Prozess den DMX-Port belegt, und sagt
+  ausdrücklich, wenn eine Messung mehrdeutig ist, statt eine Zahl zu behaupten.
 ### 2026-08-27 — Abgestürztes LightOS blockiert nicht mehr den DMX-Ausgang
 
 #### Behoben
