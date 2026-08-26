@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| STAB-22 | B | fix/stab22-gruppen-scan | 2026-08-26T18:16Z | src/core/show/patch_dedup.py · tests/test_stab_dedup_quarantaene.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -53,3 +53,4 @@
 - 2026-08-12T07:46Z A claim RIG-DUNKEL
 - 2026-08-12T08:09Z A done RIG-DUNKEL
 - 2026-08-26T18:16Z B claim STAB-22
+- 2026-08-26T18:44Z B done STAB-22
