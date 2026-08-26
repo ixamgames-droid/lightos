@@ -33,7 +33,7 @@ from sqlalchemy import create_engine, select                          # noqa: E4
 from sqlalchemy.orm import Session                                    # noqa: E402
 
 from src.core.database.models import (                                # noqa: E402
-    Base, PatchedFixture, QuarantinedFixture,
+    Base, FixtureGroup, PatchedFixture, QuarantinedFixture,
 )
 from src.core.show import patch_dedup                                 # noqa: E402
 
@@ -159,8 +159,12 @@ class ReferenzVetoTest(unittest.TestCase):
         """positions_json ist ein JSON-STRING mit String-Schlüsseln — genau die
         Form, an der eine naive `fid in dict`-Prüfung scheitern würde."""
         st = self._ohne_referenz()
+        # Die ECHTE Rueckgabeform von AppState.list_fixture_groups.
+        # Die erste Fassung dieses Tests stellte {"positions_json": ...} — eine
+        # Form, die es nie gab. Er war gruen, waehrend der Scan-Ort im Betrieb
+        # nie ansprang (STAB-22).
         st.list_fixture_groups = lambda: [
-            {"name": "G", "positions_json": json.dumps({"0,0": 7})}]
+            {"id": 1, "name": "G", "folder": "", "fids": [7]}]
         self.assertIn("geraetegruppen", patch_dedup.referenzen(st, 7))
 
     def test_snap_verhindert(self):
@@ -211,7 +215,7 @@ class ReferenzVetoTest(unittest.TestCase):
         st.selected_fids = [7]
         st.cue_stacks = [types.SimpleNamespace(
             cues=[types.SimpleNamespace(values={7: {}})])]
-        st.list_fixture_groups = lambda: [{"positions_json": json.dumps({"0,0": 7})}]
+        st.list_fixture_groups = lambda: [{"id": 1, "name": "G", "folder": "", "fids": [7]}]
         st.visualizer_positions = {7: (0, 0, 0)}
         st.visualizer_rotations = {7: 0}
         st.live_view_positions = {7: (0, 0)}
@@ -462,6 +466,117 @@ class WerkzeugTest(unittest.TestCase):
         self.assertLess(quelle.index("wirkt_unbeladen(state)"),
                         quelle.index("patch_dedup.analysiere(state)"),
                         "der Riegel steht hinter der Analyse")
+
+
+class EchterGruppenDienstTest(unittest.TestCase):
+    """★ STAB-22 — der Test, den es damals gebraucht haette.
+
+    Alle anderen Tests dieser Datei stellen ``list_fixture_groups`` als
+    Attrappe. Sie waren gruen, waehrend der Scan-Ort im Betrieb **nie** ansprang:
+    die Attrappe lieferte ``{"positions_json": ...}``, die echte Methode liefert
+    ``{"id", "name", "folder", "fids"}``. Geprueft wurde damit die Form, die ich
+    ENTWORFEN hatte — nicht die, die es gibt. Ein Geraet, das nur in einer
+    Gruppe steckt, galt als Waise und war per ``--anwenden`` aus dem Patch zu
+    entfernen.
+
+    Hier laeuft deshalb die ECHTE ``AppState.list_fixture_groups`` gegen eine
+    eigene Wegwerf-DB. Sie braucht nur ``_show_engine``, also genuegt eine nackte
+    Instanz — kein App-Start, keine Show, und vor allem nicht Davids
+    ``data/current_show.db``.
+    """
+
+    def setUp(self):
+        self._snap = _SnapBibPatch(_LeereSnapBib())
+        self._snap.__enter__()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.engine = create_engine(f"sqlite:///{self._tmp.name}/show.db")
+        Base.metadata.create_all(self.engine)
+
+    def tearDown(self):
+        self.engine.dispose()
+        self._tmp.cleanup()
+        self._snap.__exit__()
+
+    def _state_mit_gruppe(self, positions):
+        from src.core.app_state import AppState
+        with Session(self.engine) as s:
+            s.add(PatchedFixture(fid=7, label="Nur in einer Gruppe",
+                                 fixture_profile_id=1, mode_name="m",
+                                 universe=1, address=100, channel_count=4))
+            s.add(FixtureGroup(name="Front", cols=1, rows=1,
+                               positions_json=json.dumps(positions)))
+            s.commit()
+        return self._binde_echte_methode(_state([_Fx(7, address=100)],
+                                                 _show_engine=self.engine))
+
+    @staticmethod
+    def _binde_echte_methode(st):
+        """Die ECHTE Methode an den Test-Zustand binden — samt Mitspieler.
+
+        ``list_fixture_groups`` ruft ``self._session()``. Wird nur sie gebunden,
+        wirft sie AttributeError, ihr eigenes ``except Exception: return []``
+        schluckt ihn, und der Test misst wieder eine Attrappe statt der Sache.
+        Genau diese Verwechslung ist STAB-22.
+        """
+        from src.core.app_state import AppState
+        st._session = AppState._session.__get__(st, AppState)
+        st.list_fixture_groups = AppState.list_fixture_groups.__get__(st, AppState)
+        return st
+
+    def test_geraet_nur_in_einer_gruppe_ist_KEINE_waise(self):
+        st = self._state_mit_gruppe({"0,0": 7})
+        self.assertIn("geraetegruppen", patch_dedup.referenzen(st, 7))
+        self.assertEqual(patch_dedup.finde_kandidaten(st), [],
+                         "Geraet steckt in einer Gruppe und gilt trotzdem als Waise")
+
+    def test_auch_kopfzellen_schuetzen_das_geraet(self):
+        """Kopf-Zellen stehen als ``"7:0"`` im Raster.
+
+        Genau hier waere ein „sicherheitshalber" behaltener Rueckfall auf das
+        rohe ``positions_json`` blind gewesen: ``_als_ints`` akzeptiert nur reine
+        Ziffernfolgen. ``fids`` ist bereits durch ``base_fids_in_grid_order``
+        aufgeloest — deshalb ist es die richtige Quelle, nicht nur die vorhandene.
+        """
+        st = self._state_mit_gruppe({"0,0": "7:0", "1,0": "7:1"})
+        self.assertIn("geraetegruppen", patch_dedup.referenzen(st, 7))
+
+    def test_die_zugesagte_form_wird_wirklich_geliefert(self):
+        """Nagelt den Vertrag fest: wer ``fids`` umbenennt, wird hier rot —
+        nicht erst dann, wenn ein Geraet verschwunden ist."""
+        st = self._state_mit_gruppe({"0,0": 7})
+        gruppen = st.list_fixture_groups()
+        self.assertTrue(gruppen)
+        self.assertIn("fids", gruppen[0],
+                      "list_fixture_groups liefert kein 'fids' mehr — der "
+                      "Scan-Ort in patch_dedup liest dann ins Leere")
+        self.assertEqual(list(gruppen[0]["fids"]), [7])
+
+    def test_verschluckter_lesefehler_bricht_ab_statt_waise_zu_melden(self):
+        """★ Die zweite Haelfte von STAB-22.
+
+        ``list_fixture_groups`` endet auf ``except Exception: return []``. Fuer
+        den Preset-Browser ist das richtig; fuer ein Werkzeug, das daraufhin
+        Geraete VERSCHIEBT, sieht ein unlesbarer Bestand exakt aus wie „keine
+        Gruppen". Die Abbruch-Regel konnte an dieser Stelle prinzipiell nie
+        greifen.
+        """
+        st = self._state_mit_gruppe({"0,0": 7})
+        st.list_fixture_groups = lambda: []          # der verschluckte Fehler
+        with self.assertRaises(patch_dedup.ScanUnvollstaendig) as ctx:
+            patch_dedup.referenzen(st, 7)
+        self.assertIn("verschluckt", str(ctx.exception))
+
+    def test_leerer_bestand_ist_kein_verschluckter_fehler(self):
+        """Gegenprobe, damit die Kreuzprobe nicht bei jeder Show ohne Gruppen
+        Fehlalarm schlaegt — ein Waechter, der das tut, wird umgangen."""
+        with Session(self.engine) as s:
+            s.add(PatchedFixture(fid=7, label="Ohne Gruppe", fixture_profile_id=1,
+                                 mode_name="m", universe=1, address=100,
+                                 channel_count=4))
+            s.commit()
+        st = self._binde_echte_methode(
+            _state([_Fx(7, address=100)], _show_engine=self.engine))
+        self.assertEqual(patch_dedup.referenzen(st, 7), [])
 
 
 if __name__ == "__main__":
