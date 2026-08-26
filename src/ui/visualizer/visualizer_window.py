@@ -651,6 +651,12 @@ class VisualizerBridge(QObject):
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
     pyCameraSaved           = Signal(str)     # VIZ-13 3b-K: Name der neu gespeicherten Kamera (Menue-Refresh)
+    # VIZ-59: eine neue Show wurde geladen. Das VOLLFENSTER zieht Buehne,
+    # Fixtures und Kameras selbst nach (VisualizerWindow._on_state,
+    # A3D-13/A3D-22) — die eingebettete und die AUSGEKLINKTE Visualizer3DView
+    # hatten dafuer gar keinen Weg und zeigten nach einem Show-Wechsel weiter
+    # die alte Buehne. Sie haengen sich hier ein.
+    pyShowLoaded            = Signal()
 
     def __init__(self, state: AppState, parent=None):
         super().__init__(parent)
@@ -2033,6 +2039,17 @@ class VisualizerBridge(QObject):
         ]
 
     def _on_state(self, event: str, data):
+        if event == "show_loaded":
+            # VIZ-59: nur MELDEN, nicht selbst nachziehen. Was zu tun ist, weiss
+            # der Besitzer der Bridge: das Vollfenster macht es laengst in seinem
+            # eigenen _on_state, die Visualizer3DView haengt sich an dieses
+            # Signal. Wuerde die Bridge es selbst tun, liefe der Resync im
+            # Vollfenster doppelt.
+            try:
+                self.pyShowLoaded.emit()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] show_loaded emit error: {e}")
+            return
         if event == "patch_changed":
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]

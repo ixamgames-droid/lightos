@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-26 — 3D-Fenster auf dem zweiten Bildschirm folgt dem Show-Wechsel
+
+#### Behoben
+
+- **Ein ausgeklinktes 3D-Fenster zeigte nach dem Laden einer anderen Show weiter
+  die alte Bühne.** Es aktualisierte sich bisher nur beim Öffnen. Jetzt zieht es
+  Bühne und Geräte nach, genau wie das große Visualizer-Fenster.
+
 ### 2026-08-26 — Aufräum-Werkzeug übersah Geräte, die nur in einer Gruppe stecken
 
 #### Behoben
