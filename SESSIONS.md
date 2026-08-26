@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | VIZ-60 | B | feature/viz60-einmessen | 2026-08-26T20:26Z | tools/mh_einmessen.py |
+| UI-55 | B | fix/ui55-violet | 2026-08-26T20:42Z | src/core/color_utils.py · src/ui/widgets/preset_tile.py |
 
 ## Blocker & Fallen
 
@@ -57,3 +58,4 @@
 - 2026-08-26T18:48Z B claim VIZ-59
 - 2026-08-26T19:14Z B done VIZ-59
 - 2026-08-26T20:26Z B claim VIZ-60
+- 2026-08-26T20:42Z B claim UI-55
