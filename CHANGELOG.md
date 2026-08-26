@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-27 — Abgestürztes LightOS blockiert nicht mehr den DMX-Ausgang
+
+#### Behoben
+
+- **Nach einem Absturz oder harten Beenden lief die DMX-Ausgabe im Hintergrund
+  weiter** und belegte die Schnittstelle. Beim nächsten Start schrieben dann
+  zwei Programme gleichzeitig auf dieselbe Leitung — die Geräte blinkten und
+  reagierten nicht mehr auf die Konsole, während der Blackout-Knopf scheinbar
+  noch funktionierte.
+
+  Die Ausgabe beendet sich jetzt selbst, sobald das Hauptprogramm weg ist.
 ### 2026-08-26 — Violette Farbrad-Positionen werden wieder farbig angezeigt
 
 #### Behoben

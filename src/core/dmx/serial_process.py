@@ -26,6 +26,7 @@ Qt/app_state — die ``src/core/dmx``-Pakete haben leere ``__init__``). Auf Wind
 from __future__ import annotations
 import ctypes
 import multiprocessing as mp
+import os
 import time
 
 FRAME_INTERVAL = 1.0 / 44
@@ -41,18 +42,27 @@ ST_DISABLED = 2
 def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                         frame_interval: float = FRAME_INTERVAL,
                         sleep=time.sleep, clock=time.perf_counter,
-                        open_retry_s: float = OPEN_RETRY_S):
+                        open_retry_s: float = OPEN_RETRY_S,
+                        parent_alive=None):
     """Reine Sende-Schleife (in-Prozess testbar; alles injizierbar).
 
     ``dev_factory()`` liefert ein EnttecPro-aehnliches Geraet (send_dmx / is_disabled
     / close) oder wirft, wenn der Port (noch) nicht da ist. ``buf`` ist ein shared
     ``Array('B', 512)`` (oder ein Stub mit ``[:]``). ``stop_flag``/``status`` haben
     ein ``.value``.
+
+    ``parent_alive()`` (OUT-53) beendet die Schleife, sobald der Elternprozess
+    weg ist. ``stop_flag`` allein reicht dafuer NICHT: es wird vom Parent
+    gesetzt, und ein hart beendeter oder abgestuerzter Parent kommt dazu nie.
+    ``daemon=True`` hilft ebenfalls nur beim SAUBEREN Exit. Ohne diese Wache
+    sendet der Worker fuer immer weiter und haelt den Port.
     """
     dev = None
     last_open_try = float("-inf")
     local = bytearray(DMX_BYTES)
     while not stop_flag.value:
+        if parent_alive is not None and not parent_alive():
+            break
         t0 = clock()
         if dev is None:
             # Port (noch) zu -> gedrosselt (wieder) oeffnen, ohne den Worker zu beenden.
@@ -91,7 +101,19 @@ def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL):
     except Exception:
         status.value = ST_DISABLED
         return
-    _serial_worker_loop(lambda: EnttecPro(port), buf, stop_flag, status, frame_interval)
+    # OUT-53: Elternwache ueber die PID, nicht ueber multiprocessing.
+    # ``parent_process().is_alive()`` waere der naheliegende Weg, meldet aber
+    # nur den Zustand des multiprocessing-Objekts. Der GEMESSENE Fall am
+    # 26.08.2026 war ein anderer: die verwaisten Worker liefen unter
+    # ``PPID = 989 = systemd`` weiter — der Kernel hatte sie beim Tod des
+    # Parents an den Subreaper umgehaengt. Genau das faengt der PID-Vergleich.
+    _ppid0 = os.getppid()
+
+    def _eltern_leben() -> bool:
+        return os.getppid() == _ppid0
+
+    _serial_worker_loop(lambda: EnttecPro(port), buf, stop_flag, status,
+                        frame_interval, parent_alive=_eltern_leben)
 
 
 class EnttecProcessProxy:
