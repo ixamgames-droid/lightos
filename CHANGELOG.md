@@ -18,6 +18,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
   Es prüft vorher, ob ein anderer Prozess den DMX-Port belegt, und sagt
   ausdrücklich, wenn eine Messung mehrdeutig ist, statt eine Zahl zu behaupten.
+### 2026-08-27 — Abgestürztes LightOS blockiert nicht mehr den DMX-Ausgang
+
+#### Behoben
+
+- **Nach einem Absturz oder harten Beenden lief die DMX-Ausgabe im Hintergrund
+  weiter** und belegte die Schnittstelle. Beim nächsten Start schrieben dann
+  zwei Programme gleichzeitig auf dieselbe Leitung — die Geräte blinkten und
+  reagierten nicht mehr auf die Konsole, während der Blackout-Knopf scheinbar
+  noch funktionierte.
+
+  Die Ausgabe beendet sich jetzt selbst, sobald das Hauptprogramm weg ist.
+### 2026-08-26 — Violette Farbrad-Positionen werden wieder farbig angezeigt
+
+#### Behoben
+
+- **Ein Farbrad-Slot namens „Violet" bekam keine Anzeigefarbe**, und
+  „Light Blue/Violet" zeigte nur die hellblaue Hälfte. Grund war die englische
+  Schreibweise mit einem t — erkannt wurde bisher nur „violett".
 
 ### 2026-08-26 — 3D-Fenster auf dem zweiten Bildschirm folgt dem Show-Wechsel
 
