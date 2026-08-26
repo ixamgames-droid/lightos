@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-26 — Aufräum-Werkzeug übersah Geräte, die nur in einer Gruppe stecken
+
+#### Behoben
+
+- **Der Befehl zum Aufräumen verwaister Geräte hielt ein Gerät für unbenutzt,
+  wenn es ausschließlich in einer Gerätegruppe vorkam** — und hätte es damit auf
+  Wunsch in die Quarantäne verschoben. Die Prüfung „steckt es in einer Gruppe?"
+  hat seit ihrer Einführung nie angeschlagen.
+
+  Sie greift jetzt, auch bei Kopf-Zellen. Zusätzlich bricht der Befehl ab, wenn
+  der Gruppen-Bestand nicht lesbar ist, statt ihn stillschweigend für leer zu
+  halten.
+
 ### 2026-08-25 — Die Schnellwahl fasste Geraete an, die den Kanal nicht haben
 
 #### Behoben

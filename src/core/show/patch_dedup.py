@@ -104,11 +104,52 @@ def _pflicht(ort: str, fn):
     """Einen Scan-Ort auswerten — oder abbrechen, statt ihn zu überspringen."""
     try:
         return fn()
+    except ScanUnvollstaendig:
+        raise                                    # schon praezise — nicht neu verpacken
     except Exception as e:                       # noqa: BLE001
         raise ScanUnvollstaendig(
             f"Referenz-Ort '{ort}' war nicht auswertbar ({e!r}). Es wird NICHT "
             f"geraten — ohne diesen Ort kann keine Waise sicher bestimmt werden."
         ) from e
+
+
+def _pruefe_gruppen_lesbar(state, gruppen) -> None:
+    """Wirft, wenn ``list_fixture_groups`` einen Lesefehler VERSCHLUCKT hat.
+
+    ★ Die zweite Haelfte von STAB-22. ``AppState.list_fixture_groups`` endet auf
+    ``except Exception: return []`` — fuer den Preset-Browser ist das richtig
+    (eine leere Liste ist dort ein ertraeglicher Anzeigefehler), fuer ein
+    Werkzeug, das daraufhin GERAETE VERSCHIEBT, ist es das Gegenteil: ein
+    unlesbarer Gruppen-Bestand sieht exakt aus wie "keine Gruppen", und die
+    Abbruch-Regel dieses Moduls kann an dieser Stelle prinzipiell nie greifen.
+
+    Statt die Abfrage nachzubauen — das waere die zweite Quelle, und die zweite
+    ist immer die veraltete — wird nur GEZAEHLT: stehen Zeilen in der Tabelle,
+    darf die Liste nicht leer sein. Die Auswertung selbst bleibt allein bei
+    ``list_fixture_groups``.
+
+    Ohne Show-DB (Test-Attrappen) gibt es nichts gegenzupruefen; dann still
+    zurueck — das ist kein verschluckter Fehler, sondern kein Bestand.
+    """
+    engine = getattr(state, "_show_engine", None)
+    if engine is None:
+        return
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            anzahl = conn.execute(
+                text("SELECT count(*) FROM fixture_groups")).scalar() or 0
+    except Exception as e:                       # noqa: BLE001
+        raise ScanUnvollstaendig(
+            f"Der Gruppen-Bestand war nicht zaehlbar ({e!r}). Ohne ihn kann "
+            f"keine Waise sicher bestimmt werden — es wird NICHT geraten."
+        ) from e
+    if anzahl and not gruppen:
+        raise ScanUnvollstaendig(
+            f"{anzahl} Gruppe(n) stehen in der Show-DB, aber "
+            f"list_fixture_groups() liefert keine — der Lesefehler wurde dort "
+            f"verschluckt (except Exception: return []). Es wird NICHT geraten."
+        )
 
 
 def referenzen(state, fid: int) -> list[str]:
@@ -154,14 +195,30 @@ def referenzen(state, fid: int) -> list[str]:
     _melde("cuelisten", _cuelisten)
 
     def _gruppen():
-        for g in state.list_fixture_groups():
-            roh = g.get("positions_json") if isinstance(g, dict) else None
-            if roh is None and isinstance(g, dict):
-                roh = g.get("positions")
-            if isinstance(roh, str):
-                roh = json.loads(roh or "{}")
-            if fid in _als_ints(roh or {}):
-                return True
+        # ★ STAB-22: Dieser Ort hat seit PR #535 NIE angeschlagen. Er las
+        # ``positions_json``/``positions`` — Felder, die ``list_fixture_groups``
+        # gar nicht liefert; sie gibt ``{id, name, folder, fids}`` zurueck. Der
+        # Wert war also immer ``None``, die Suche immer leer, und ein Geraet,
+        # das NUR in einer Gruppe steckt, galt als Waise. Ein ``--anwenden``
+        # haette es aus dem Patch entfernt.
+        #
+        # ``fids`` ist zugleich die RICHTIGE Quelle, nicht nur die vorhandene:
+        # es entsteht aus ``base_fids_in_grid_order``, der einen Parse-Quelle
+        # des Hauses, und loest Kopf-Zellen ("7:0") bereits auf ihre Basis-fid
+        # auf. Ein Rueckfall auf das rohe ``positions_json`` waere genau dort
+        # blind, weil ``_als_ints`` nur reine Ziffernfolgen akzeptiert — er
+        # ist deshalb ersatzlos gestrichen statt "sicherheitshalber" behalten.
+        gruppen = state.list_fixture_groups()
+        _pruefe_gruppen_lesbar(state, gruppen)
+        for g in gruppen:
+            if not isinstance(g, dict):
+                continue
+            for x in (g.get("fids") or ()):
+                try:
+                    if int(x) == fid:
+                        return True
+                except (TypeError, ValueError):
+                    continue
         return False
     _melde("geraetegruppen", _gruppen)
 
