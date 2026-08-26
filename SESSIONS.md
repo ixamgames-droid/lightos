@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| VIZ-59 | B | fix/viz59-popout-showload | 2026-08-26T18:48Z | src/ui/visualizer/visualizer_window.py · src/ui/visualizer/visualizer_view.py |
 
 ## Blocker & Fallen
 
@@ -54,3 +54,4 @@
 - 2026-08-12T08:09Z A done RIG-DUNKEL
 - 2026-08-26T18:16Z B claim STAB-22
 - 2026-08-26T18:44Z B done STAB-22
+- 2026-08-26T18:48Z B claim VIZ-59
