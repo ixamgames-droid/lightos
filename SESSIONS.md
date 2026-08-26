@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | VIZ-60 | B | feature/viz60-einmessen | 2026-08-26T20:26Z | tools/mh_einmessen.py |
-| OUT-53 | B | fix/out53-waisen-worker | 2026-08-26T22:46Z | src/core/dmx/serial_process.py |
 
 ## Blocker & Fallen
 
@@ -31,7 +30,6 @@
 
 ## Verlauf
 
-- 2026-08-06T14:08Z A claim PROC-01
 - 2026-08-06T15:06Z A done PROC-01
 - 2026-08-11T14:52Z A claim OUT-51
 - 2026-08-11T15:44Z A claim QA-53
@@ -61,3 +59,4 @@
 - 2026-08-26T20:42Z B claim UI-55
 - 2026-08-26T22:46Z B claim OUT-53
 - 2026-08-26T23:10Z B done UI-55
+- 2026-08-26T23:32Z B done OUT-53
