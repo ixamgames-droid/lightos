@@ -34,9 +34,15 @@ Gemessen wird auf dem Weg, den der Nutzer nimmt — **kein Raster von Hand ins
 Auch die zwei Knoepfe, die das Raster sonst noch aendern, werden echt gedrueckt:
 „Köpfe einzeln → Raster" im Gruppen-Editor und „Aus Auswahl" im Matrix-Editor.
 
+Eine Ausnahme mit Ansage (seit FM-32): ein Raster, in dem dasselbe Geraet ganz
+UND kopfweise liegt, entsteht ueber „Matrizen zusammenlegen" nicht mehr — es
+kommt nur noch aus einer **aelteren Show**. `_alte_gemischte_gruppe` baut genau
+die: aus Zellen, die die Bedienung erzeugt hat, roh gestapelt wie bis FM-32.
+
 Headless (QT_QPA_PLATFORM=offscreen).
 """
 from __future__ import annotations
+import json
 import os
 import re
 import unittest
@@ -123,6 +129,36 @@ class _RigBasis(unittest.TestCase):
             [self._auto_gid(1), self._auto_gid(2)], "Rig")
         self.assertIsNotNone(gid, "Zusammenlegen hat keine Gruppe geliefert")
         return int(gid)
+
+    def _alte_gemischte_gruppe(self) -> int:
+        """Eine Gruppe, wie sie in einer Show VOR FM-32 steht: die Bar liegt als
+        GANZ-Zelle UND kopfweise im selben Raster.
+
+        Die Zellen stammen aus der Bedienung — das Rig aus „Matrizen
+        zusammenlegen" plus Rechtsklick „zu einer Zelle zusammenfassen", die
+        Kopf-Zellen aus der Auto-Kopf-Matrix des Patchens. Nur das ROHE Stapeln
+        macht der Test selbst: genau das tat `merge_head_matrix_groups` bis
+        FM-32, seither wirft es die Ganz-Zelle weg."""
+        rig = self._rig_gid()
+        self._gruppe_waehlen(rig)
+        self._rechtsklick("2:0", '„Bar“ zu einer Zelle zusammenfassen')
+        with patch("src.ui.views.fixture_group_view.QMessageBox"):
+            self.view._save_group()          # Ganz-Zelle in die Show-DB
+        auto2 = self._auto_gid(2)
+        with Session(self.state._show_engine) as s:
+            oben = s.get(FixtureGroup, int(rig))
+            unten = s.get(FixtureGroup, int(auto2))
+            pos = json.loads(oben.positions_json or "{}")
+            for k, v in json.loads(unten.positions_json or "{}").items():
+                c, r = (int(x) for x in k.split(","))
+                pos[f"{c},{r + int(oben.rows)}"] = v
+            alt = FixtureGroup(name="Rig + Bar-Köpfe (Alt-Show)",
+                               cols=max(int(oben.cols), int(unten.cols)),
+                               rows=int(oben.rows) + int(unten.rows),
+                               positions_json=json.dumps(pos), folder="Matrizen")
+            s.add(alt)
+            s.commit()
+            return int(alt.id)
 
     def _gruppe_waehlen(self, gid: int):
         """Wie der Nutzer: Gruppenliste nachziehen (das macht GROUP_CHANGED) und
@@ -307,19 +343,17 @@ class LegendeZaehltZellenTest(_RigBasis):
     # ── 6) Gezaehlt werden Kopf-Zellen, nicht eingefaerbte Zellen ────────────
 
     def test_ganz_zelle_zaehlt_nicht_als_kopf(self):
-        """Ueber „Matrizen zusammenlegen" kann ein Geraet zugleich als GANZ-Zelle
-        und kopfweise im selben Raster stehen (FM-32). Die Legende faerbt dann 5
-        Zellen und nennt 4 — sie zaehlt KOPF-Zellen, nicht Farbfelder. Der Test
-        haelt genau diese Lesart fest, damit die Begruendung im Code stimmt."""
-        rig = self._rig_gid()
-        self._gruppe_waehlen(rig)
-        self._rechtsklick("2:0", '„Bar“ zu einer Zelle zusammenfassen')
-        with patch("src.ui.views.fixture_group_view.QMessageBox"):
-            self.view._save_group()          # Ganz-Zelle in die Show-DB
-        gemischt = self.state.merge_head_matrix_groups([rig, self._auto_gid(2)],
-                                                       "Rig + Bar-Köpfe")
-        self.assertIsNotNone(gemischt)
-        self._gruppe_waehlen(int(gemischt))
+        """Ein Geraet kann zugleich als GANZ-Zelle und kopfweise im selben Raster
+        stehen. Die Legende faerbt dann 5 Zellen und nennt 4 — sie zaehlt
+        KOPF-Zellen, nicht Farbfelder. Der Test haelt genau diese Lesart fest,
+        damit die Begruendung im Code stimmt.
+
+        ★ Woher so ein Raster kommt: bis FM-32 aus „Matrizen zusammenlegen"
+        (dort stapelt jetzt `drop_whole_cells_with_heads` die Ganz-Zelle weg).
+        Uebrig bleibt der Weg, den die Legende weiter bedienen muss — eine
+        **Gruppe aus einer aelteren Show**, die noch beide Formen traegt und
+        ueber die Combo in den Editor geladen wird (`_alte_gemischte_gruppe`)."""
+        self._gruppe_waehlen(self._alte_gemischte_gruppe())
 
         self.assertEqual(self._zellen_mit_farbe_von(2), 5,
                          "Vorbedingung: Bar liegt als Ganz-Zelle UND kopfweise")

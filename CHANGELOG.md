@@ -48,6 +48,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   vorhandenen Farbkanaele weiterhin mitfahren — nur der tote Eintrag
   verschwindet.
 
+### 2026-08-25 — Zusammengelegte Matrizen: die Ganz-Zelle weicht den Kopf-Zellen
+
+#### Behoben
+
+- **„Matrizen zusammenlegen" verwirft die Ganz-Zelle, wenn dasselbe Geraet
+  kopfweise dazukommt (FM-32).** Bisher wurden die Raster roh gestapelt: lag eine
+  Bar in der einen Gruppe als ganzes Geraet und in der anderen als Kopf-Matrix,
+  stand sie danach in **fuenf** Zellen — einmal ganz, viermal kopfweise. Zwei
+  Zellen fuhren dasselbe Geraet, und welche am Ende auf DMX steht, entschied
+  allein die Stapelreihenfolge: dieselben zwei Gruppen, Reihenfolge getauscht,
+  ergaben einmal vier verschiedene Pixelfarben und einmal vier gleiche. Das
+  Ergebnis haelt jetzt dieselbe Zusicherung wie jede Platzier-Funktion des
+  Gruppen-Editors (`_drop_fid_cells`): ein Geraet steht nie in zwei Formen im
+  Raster.
+- **Die feinere Form gewinnt** — begruendet und an beiden Varianten am DMX
+  gemessen: die Kopf-Zellen koennen alles, was die Ganz-Zelle kann (vier gleiche
+  Farben sind auch vier Farben), umgekehrt nicht; und liesse man die Ganz-Zelle
+  gewinnen, verloere das Raster genau die Aufloesung, fuer die man es
+  zusammenlegt (gemessen: 24 belegte Zellen -> 21, vier Bar-Pixel auf einen
+  uniformen Wert). Die **Quellgruppen bleiben unberuehrt**, die Rastergroesse
+  aendert sich nicht — die frei gewordene Zelle bleibt eine Luecke. Gruppen aus
+  aelteren Shows, die beide Formen tragen, werden weiterhin unveraendert geladen
+  und angezeigt.
+- **Was das NICHT abdeckt:** gemeint ist ausschliesslich das Zusammentreffen von
+  ZWEI FORMEN. Bringen beide Gruppen dasselbe Geraet in DERSELBEN Form mit (zweimal
+  ganz oder zweimal kopfweise), steht es weiterhin doppelt im Raster, und wie
+  bisher entscheidet die Stapelreihenfolge, was auf DMX landet (gemessen: zwei
+  Gruppen mit der Bar je als Ganz-Zelle -> zwei Bar-Zellen, alle vier Pixel auf
+  einem Wert). Dafuer gibt es ein eigenes Item (FM-37).
+
 ### 2026-08-25 — Codex hat zwei Werkzeuge genau dort erwischt, wofuer sie gebaut sind
 
 #### Behoben

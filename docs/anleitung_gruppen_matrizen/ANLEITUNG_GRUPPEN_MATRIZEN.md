@@ -222,6 +222,16 @@ mit der Liste „Gruppen wählen (von oben nach unten gestapelt):".
 * Die Zellen behalten ihre Bedeutung — Kopf-Zellen bleiben **pro Kopf** ansprechbar.
 * Ergebnis ist eine **neue** Gruppe im Ordner `Matrizen`. Die **Quellgruppen bleiben
   erhalten** (nichts wird ersetzt oder gelöscht).
+* **Kommt dasselbe Gerät aus zwei Gruppen, gewinnen die Kopf-Zellen.** Liegt eine Bar
+  in der einen Gruppe als **ganzes Gerät** und in der anderen **kopfweise**, steht sie im
+  Ergebnis nur noch kopfweise; die Ganz-Zelle bleibt leer. Sonst führen zwei Zellen
+  dasselbe Gerät, und welche davon am Ende auf DMX steht, entscheidet allein die
+  Stapelreihenfolge. Die feinere Form kann alles, was die gröbere kann — vier gleiche
+  Farben sind auch vier Farben. In den **Quellgruppen** ändert sich nichts.
+* **Das gilt nur für zwei _verschiedene_ Formen.** Liegt dasselbe Gerät in beiden
+  Gruppen in der **gleichen** Form (zweimal als ganzes Gerät oder zweimal kopfweise),
+  bleibt es doppelt im Raster — dann entscheidet weiterhin die Stapelreihenfolge,
+  welche der beiden Zellen das Gerät am Ende fährt.
 
 Typischer Fall: zwei Mehrkopf-Geräte mit je 1×4 Köpfen ergeben eine 4×2-Matrix, über die
 ein Effekt dann als Fläche läuft.
