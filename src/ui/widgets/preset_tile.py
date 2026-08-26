@@ -142,7 +142,13 @@ _NAME_COLOR_WORDS = [
     ("hellblau", "#7fd4ff"), ("light blue", "#7fd4ff"), ("lightblue", "#7fd4ff"),
     ("tuerkis", "#00d0d0"), ("türkis", "#00d0d0"), ("cyan", "#00d0d0"),
     ("magenta", "#ff40c0"),
-    ("violett", "#a040ff"), ("purple", "#a040ff"), ("lila", "#a040ff"),
+    # UI-55: "violet" (englisch, EIN t) fehlte. Das Tabellenwort ist laenger
+    # als der Name, also greift die Teilstring-Suche nicht: "violett" in
+    # "violet" ist False. Farbraeder aus QLC+ sind englisch beschriftet —
+    # ein "Violet"-Slot blieb dadurch OHNE Farbe, und "Light Blue/Violet"
+    # verlor seine zweite Haelfte und sah aus wie reines Hellblau.
+    ("violett", "#a040ff"), ("violet", "#a040ff"),
+    ("purple", "#a040ff"), ("lila", "#a040ff"),
     ("rosa", "#ff8fc8"), ("pink", "#ff8fc8"),
     ("orange", "#ff8000"), ("amber", "#ffbf00"),
     ("gelb", "#ffe000"), ("yellow", "#ffe000"),

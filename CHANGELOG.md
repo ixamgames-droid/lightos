@@ -18,6 +18,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   noch funktionierte.
 
   Die Ausgabe beendet sich jetzt selbst, sobald das Hauptprogramm weg ist.
+### 2026-08-26 — Violette Farbrad-Positionen werden wieder farbig angezeigt
+
+#### Behoben
+
+- **Ein Farbrad-Slot namens „Violet" bekam keine Anzeigefarbe**, und
+  „Light Blue/Violet" zeigte nur die hellblaue Hälfte. Grund war die englische
+  Schreibweise mit einem t — erkannt wurde bisher nur „violett".
 
 ### 2026-08-26 — 3D-Fenster auf dem zweiten Bildschirm folgt dem Show-Wechsel
 
