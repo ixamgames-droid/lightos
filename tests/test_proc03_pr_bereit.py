@@ -25,8 +25,8 @@ import unittest
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 
-from pr_bereit import (ALT, BEREIT, FRISCH, KONFLIKT,  # noqa: E402
-                       NIE_GEPRUEFT, ROT, UNFERTIG, urteil)
+from pr_bereit import (ALT, BEREIT, ENTWURF, FRISCH,  # noqa: E402
+                       KONFLIKT, NIE_GEPRUEFT, ROT, UNFERTIG, urteil)
 
 GRUEN3 = ["success", "success", "success"]
 
@@ -35,14 +35,14 @@ class NieGepruefstTest(unittest.TestCase):
     """Der Zustand, den man am PR nicht sieht — deshalb steht er ganz oben."""
 
     def test_kein_check_run_ist_nie_geprueft(self):
-        u, _ = urteil(0, [], main_neuer=False, mergeable="MERGEABLE")
+        u, _ = urteil(0, [], zurueck=0, mergeable="MERGEABLE")
         self.assertEqual(u, NIE_GEPRUEFT)
 
     def test_nie_geprueft_schlaegt_jeden_anderen_zustand(self):
         # Ohne Checks ist auch „mergeable\" bedeutungslos: es gibt nichts, was
         # gruen sein koennte. Wer hier erst auf den Konflikt schaut, meldet den
         # harmloseren Zustand und verschweigt den gefaehrlichen.
-        u, _ = urteil(0, [], main_neuer=True, mergeable="CONFLICTING")
+        u, _ = urteil(0, [], zurueck=2, mergeable="CONFLICTING")
         self.assertEqual(u, NIE_GEPRUEFT)
 
 
@@ -55,25 +55,25 @@ class FrischGepushtTest(unittest.TestCase):
     """
 
     def test_frisch_gepusht_ist_nicht_nie_geprueft(self):
-        u, grund = urteil(0, [], main_neuer=False, mergeable="UNKNOWN",
+        u, grund = urteil(0, [], zurueck=0, mergeable="UNKNOWN",
                           kopf_alter_s=12)
         self.assertEqual(u, FRISCH)
         self.assertIn("Push", grund)
 
     def test_alt_und_ohne_checks_bleibt_nie_geprueft(self):
-        u, _ = urteil(0, [], main_neuer=False, mergeable="MERGEABLE",
+        u, _ = urteil(0, [], zurueck=0, mergeable="MERGEABLE",
                       kopf_alter_s=3600)
         self.assertEqual(u, NIE_GEPRUEFT)
 
     def test_ohne_altersangabe_bleibt_es_beim_strengen_urteil(self):
         # Kein Alter = keine Entschuldigung. Wer die Zeit nicht kennt, darf den
         # gefaehrlichen Zustand nicht wegerklaeren.
-        u, _ = urteil(0, [], main_neuer=False, mergeable="MERGEABLE")
+        u, _ = urteil(0, [], zurueck=0, mergeable="MERGEABLE")
         self.assertEqual(u, NIE_GEPRUEFT)
 
     def test_frisch_gilt_nur_ohne_checks(self):
         # Laufen schon Checks, ist „laeuft noch" die genauere Aussage.
-        u, _ = urteil(3, ["success", "pending", "success"], main_neuer=False,
+        u, _ = urteil(3, ["success", "pending", "success"], zurueck=0,
                       mergeable="MERGEABLE", kopf_alter_s=5)
         self.assertEqual(u, UNFERTIG)
 
@@ -81,7 +81,7 @@ class FrischGepushtTest(unittest.TestCase):
 class RangfolgeTest(unittest.TestCase):
     def test_ein_fehlschlag_schlaegt_alles_uebrige(self):
         u, _ = urteil(3, ["success", "failure", "success"],
-                      main_neuer=True, mergeable="CONFLICTING")
+                      zurueck=2, mergeable="CONFLICTING")
         self.assertEqual(u, ROT)
 
     def test_abgebrochen_und_zeitueberschreitung_zaehlen_als_fehlschlag(self):
@@ -89,31 +89,73 @@ class RangfolgeTest(unittest.TestCase):
         # rot aus. Wer nur auf "failure" prueft, merged darueber hinweg.
         for schluss in ("cancelled", "timed_out", "action_required"):
             u, _ = urteil(3, ["success", schluss, "success"],
-                          main_neuer=False, mergeable="MERGEABLE")
+                          zurueck=0, mergeable="MERGEABLE")
             self.assertEqual(u, ROT, schluss)
 
     def test_laufende_checks_sind_kein_urteil(self):
         for offen in (None, "", "pending", "queued", "in_progress"):
             u, _ = urteil(3, ["success", offen, "success"],
-                          main_neuer=False, mergeable="MERGEABLE")
+                          zurueck=0, mergeable="MERGEABLE")
             self.assertEqual(u, UNFERTIG, repr(offen))
 
     def test_konflikt_kommt_vor_dem_alten_stand(self):
         # Beides trifft oft zusammen; der Konflikt ist die konkretere Aussage.
-        u, _ = urteil(3, GRUEN3, main_neuer=True, mergeable="CONFLICTING")
+        u, _ = urteil(3, GRUEN3, zurueck=2, mergeable="CONFLICTING")
         self.assertEqual(u, KONFLIKT)
 
     def test_gruen_aber_main_ist_weitergezogen(self):
-        u, grund = urteil(3, GRUEN3, main_neuer=True, mergeable="MERGEABLE")
+        u, grund = urteil(3, GRUEN3, zurueck=2, mergeable="MERGEABLE")
         self.assertEqual(u, ALT)
         self.assertIn("main", grund)
+
+    def test_ein_einziger_commit_rueckstand_genuegt(self):
+        # ★ CDX-57: die alte Zeitprobe konnte genau das uebersehen, wenn die
+        # letzte CI-Leg NACH dem neuen main-Commit fertig wurde.
+        u, _ = urteil(3, GRUEN3, zurueck=1, mergeable="MERGEABLE")
+        self.assertEqual(u, ALT)
+
+
+class EntwurfTest(unittest.TestCase):
+    """★ CDX-57: ein Draft mit gruenen Checks ist nicht bereit.
+
+    Bis dahin trug ``isDraft`` nur ein ``[DRAFT]`` an die Anzeige und ging nicht
+    ins Urteil ein — ``--strict`` gab fuer einen Draft eine 0 zurueck, und genau
+    das ist der Zweck des Werkzeugs: eine Antwort auf „darf ich mergen?".
+    """
+
+    def test_entwurf_ist_nicht_bereit(self):
+        u, grund = urteil(3, GRUEN3, zurueck=0, mergeable="MERGEABLE",
+                          entwurf=True)
+        self.assertEqual(u, ENTWURF)
+        self.assertIn("Entwurf", grund)
+
+    def test_kein_entwurf_bleibt_bereit(self):
+        u, _ = urteil(3, GRUEN3, zurueck=0, mergeable="MERGEABLE", entwurf=False)
+        self.assertEqual(u, BEREIT)
+
+    def test_der_vorgabewert_macht_aus_nichts_einen_entwurf(self):
+        # Wer `entwurf` nicht uebergibt, bekommt das alte Verhalten — sonst
+        # meldete das Werkzeug jeden PR als Entwurf.
+        u, _ = urteil(3, GRUEN3, zurueck=0, mergeable="MERGEABLE")
+        self.assertEqual(u, BEREIT)
+
+    def test_ein_roter_entwurf_heisst_ROT_nicht_entwurf(self):
+        # Die Rangfolge: echte Probleme zuerst. „Entwurf" waere hier die
+        # harmlosere und damit irrefuehrende Auskunft.
+        u, _ = urteil(3, ["failure"] + GRUEN3, zurueck=0, mergeable="MERGEABLE",
+                      entwurf=True)
+        self.assertEqual(u, ROT)
+
+    def test_ein_veralteter_entwurf_heisst_ALT(self):
+        u, _ = urteil(3, GRUEN3, zurueck=3, mergeable="MERGEABLE", entwurf=True)
+        self.assertEqual(u, ALT)
 
 
 class PositivkontrolleTest(unittest.TestCase):
     """Ein Waechter, der jeden Merge blockiert, wird umgangen und ist damit keiner."""
 
     def test_alles_gruen_und_aktuell_ist_bereit(self):
-        u, _ = urteil(3, GRUEN3, main_neuer=False, mergeable="MERGEABLE")
+        u, _ = urteil(3, GRUEN3, zurueck=0, mergeable="MERGEABLE")
         self.assertEqual(u, BEREIT)
 
     def test_unbekannte_mergefaehigkeit_blockiert_nicht(self):
@@ -121,7 +163,7 @@ class PositivkontrolleTest(unittest.TestCase):
         # rechnet. Wer das als Konflikt wertet, meldet Fehlalarm bei jedem
         # frisch gepushten PR.
         for m in ("UNKNOWN", None, ""):
-            u, _ = urteil(3, GRUEN3, main_neuer=False, mergeable=m)
+            u, _ = urteil(3, GRUEN3, zurueck=0, mergeable=m)
             self.assertEqual(u, BEREIT, repr(m))
 
     def test_neutral_und_uebersprungen_blockieren_nicht(self):
@@ -129,19 +171,19 @@ class PositivkontrolleTest(unittest.TestCase):
         # ein uebersprungener Job (z. B. per `if:`) darf nicht rot faerben.
         for schluss in ("neutral", "skipped"):
             u, _ = urteil(3, ["success", schluss, "success"],
-                          main_neuer=False, mergeable="MERGEABLE")
+                          zurueck=0, mergeable="MERGEABLE")
             self.assertEqual(u, BEREIT, schluss)
 
 
 class BegruendungTest(unittest.TestCase):
     def test_jedes_urteil_traegt_eine_begruendung(self):
         faelle = [
-            (0, [], False, "MERGEABLE"),
-            (3, ["failure"] + GRUEN3, False, "MERGEABLE"),
-            (3, ["pending"] + GRUEN3, False, "MERGEABLE"),
-            (3, GRUEN3, True, "CONFLICTING"),
-            (3, GRUEN3, True, "MERGEABLE"),
-            (3, GRUEN3, False, "MERGEABLE"),
+            (0, [], 0, "MERGEABLE"),
+            (3, ["failure"] + GRUEN3, 0, "MERGEABLE"),
+            (3, ["pending"] + GRUEN3, 0, "MERGEABLE"),
+            (3, GRUEN3, 2, "CONFLICTING"),
+            (3, GRUEN3, 2, "MERGEABLE"),
+            (3, GRUEN3, 0, "MERGEABLE"),
         ]
         for f in faelle:
             _u, grund = urteil(*f)

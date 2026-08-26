@@ -48,6 +48,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   vorhandenen Farbkanaele weiterhin mitfahren — nur der tote Eintrag
   verschwindet.
 
+### 2026-08-25 — Codex hat zwei Werkzeuge genau dort erwischt, wofuer sie gebaut sind
+
+#### Behoben
+
+- **`tools/pr_bereit.py` mass den Rueckstand mit der Uhr statt mit der
+  Abstammung.** Die Regel lautete „ist der letzte `main`-Commit juenger als der
+  letzte Check?". Das hat ein Loch: die drei CI-Legs enden zu verschiedenen
+  Zeiten, und zieht `main` weiter, **waehrend** sie laufen, endet die letzte Leg
+  nach dem neuen `main`-Commit. Die Zeitprobe sagt dann „Stand aktuell", obwohl
+  der gepruefte Stand diesen Commit nie enthalten hat — das Werkzeug haette
+  ausgerechnet den Zustand durchgewunken, gegen den es gebaut wurde. Gezaehlt
+  wird jetzt `behind_by` aus `repos/:owner/:repo/compare/main...<head>`: eine
+  Aussage ueber Commits, die keine Uhr braucht.
+- **Ein Entwurf galt als bereit.** `isDraft` haengte nur ein `[DRAFT]` an die
+  Anzeige und ging nicht ins Urteil ein; `--strict` gab fuer einen Draft eine 0
+  zurueck. Neuer Zustand „Entwurf" — aber nach den echten Problemen: ein roter
+  Draft heisst weiter „rot", das ist die nuetzlichere Auskunft.
+- **`tools/backlog_ids.py` behauptete Abdeckung, die es nicht hatte** — an drei
+  Stellen: `gh pr list --limit 50` schneidet hart ab, statt zu blaettern; der
+  Rueckgabewert von `git fetch` wurde verworfen (mit veralteten Refs ist jede
+  Auskunft wertlos); und Fork-PRs, deren Kopf es als `origin/<branch>` nicht
+  gibt, fielen still aus der Liste. Jetzt: Grenze auf 200 mit Warnung beim
+  Erreichen, `fetch`-Fehler beendet mit 2, nicht lesbare Refs werden benannt.
+- **Und eine Warnung allein genuegt nicht.** Codex hat im selben PR nachgelegt:
+  die erste Fassung meldete die Luecke — und gab trotzdem eine Nummer aus und
+  beendete mit 0. Wer den Exit-Code prueft, bekam gruenes Licht auf
+  unvollstaendigen Daten. Jetzt: bei jeder Luecke in der Abdeckung wird KEINE
+  Nummer ausgegeben und mit 2 beendet. Eine Nummer aus lueckenhafter Abdeckung
+  ist schlimmer als keine — sie sieht aus wie eine Auskunft.
+
 ### 2026-08-25 — Return legt kein halbes Fixture-Profil mehr an
 
 #### Behoben
