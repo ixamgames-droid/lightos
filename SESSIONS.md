@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| VIZ-60 | B | feature/viz60-einmessen | 2026-08-26T20:26Z | tools/mh_einmessen.py |
 
 ## Blocker & Fallen
 
@@ -56,3 +56,4 @@
 - 2026-08-26T18:44Z B done STAB-22
 - 2026-08-26T18:48Z B claim VIZ-59
 - 2026-08-26T19:14Z B done VIZ-59
+- 2026-08-26T20:26Z B claim VIZ-60
