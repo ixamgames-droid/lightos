@@ -21,6 +21,16 @@ def _make_enttec_device(port: str):
     In-Prozess-:class:`EnttecPro` benutzt. Schlaegt der Proxy-Start fehl, faellt es
     ebenfalls auf In-Prozess zurueck — die Isolation darf die Ausgabe nie ganz
     verhindern."""
+    # OUT-54: fremde Halter des Ports melden, BEVOR wir selbst oeffnen. Nur
+    # warnen, nicht blockieren — ein Ausgang, der sich wegen einer Vermutung
+    # abschaltet, ist im Live-Betrieb schlimmer als einer, der sich die Leitung
+    # teilt. Die Meldung nennt PID und Kommandozeile; genau die fehlten am
+    # 26.08.2026, als fuenf Sender gleichzeitig auf /dev/ttyUSB0 schrieben.
+    try:
+        from .port_check import warne_wenn_belegt
+        warne_wenn_belegt(port)
+    except Exception:                                    # noqa: BLE001
+        pass                                             # Diagnose darf nie stoeren
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
         return EnttecPro(port)
     try:
