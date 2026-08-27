@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-27 — Warnung, wenn ein anderes Programm den DMX-Ausgang belegt
+
+#### Neu
+
+- **LightOS sagt jetzt Bescheid, wenn die DMX-Schnittstelle schon von einem
+  anderen Programm gehalten wird** — mit Prozessnummer und Befehl. Vorher fiel
+  das gar nicht auf: beide schrieben gleichzeitig, die Geräte blinkten und
+  reagierten nicht, während der Blackout-Knopf scheinbar noch funktionierte.
+
+  Die Ausgabe wird dabei **nicht** blockiert — im Live-Betrieb ist ein
+  geteilter Ausgang immer noch besser als gar keiner.
+
 ### 2026-08-27 — Testshow für zwei Varytec Hero Spot 90
 
 #### Neu
