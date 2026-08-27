@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| OUT-54 | B | fix/out54-port-belegt | 2026-08-27T04:35Z | src/core/dmx/port_check.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -30,7 +30,6 @@
 
 ## Verlauf
 
-- 2026-08-11T16:35Z A done QA-53
 - 2026-08-11T16:35Z A claim QA-50
 - 2026-08-11T16:56Z A claim QA-51
 - 2026-08-11T17:02Z A done QA-50
@@ -60,3 +59,4 @@
 - 2026-08-26T23:45Z B claim TOOL-SPOT90
 - 2026-08-27T00:31Z B done TOOL-SPOT90
 - 2026-08-27T04:35Z B claim OUT-54
+- 2026-08-27T04:56Z B done OUT-54
