@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-27 — Testshow für zwei Varytec Hero Spot 90
+
+#### Neu
+
+- **`tools/build_spot90_testshow.py`** baut eine Show, mit der sich am echten
+  Rig prüfen lässt, ob das Zielen stimmt: dieselben Pan/Tilt-Werte auf beiden
+  Köpfen (parallele Strahlen) gegen denselben Punkt im Raum (jeder Kopf mit
+  eigenen Werten). Dazu Bewegungsfiguren, Farbrad, Gobos, Prisma und Strobe auf
+  einer virtuellen Konsole.
+
 ### 2026-08-26 — Werkzeug zum Einmessen von Moving Heads
 
 #### Neu

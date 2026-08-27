@@ -46,6 +46,7 @@
 | `build_neue_demo_show.py` | NEUE DEMO 2026 — Quadranten-Layout + echtes PLAYBACK, alles auf einer Show. |
 | `build_neuheiten_demo.py` | Vorfuehr-Show fuer die Neuerungen aus dem Lauf vom 19.-24.08.2026. |
 | `build_party_demo_show.py` | PARTY DEMO 2026 — BPM-getaktete Party-Show + Musik-Playlist. |
+| `build_spot90_testshow.py` | Test-Show fuer ZWEI Varytec Hero Spot 90 (David, 26.08.2026). |
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |
 | `build_tutorial_matrix_show.py` | TUTORIAL_MATRIX — Begleit-Show zur bebilderten Schritt-fuer-Schritt-Anleitung. |
