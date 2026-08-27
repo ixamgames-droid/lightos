@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| TOOL-SPOT90 | B | feature/tool-spot90-show | 2026-08-26T23:45Z | tools/build_spot90_testshow.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -30,7 +30,6 @@
 
 ## Verlauf
 
-- 2026-08-11T15:44Z A claim QA-53
 - 2026-08-11T15:46Z A done OUT-51
 - 2026-08-11T16:35Z A done QA-53
 - 2026-08-11T16:35Z A claim QA-50
@@ -60,3 +59,4 @@
 - 2026-08-26T23:32Z B done OUT-53
 - 2026-08-26T23:44Z B done VIZ-60
 - 2026-08-26T23:45Z B claim TOOL-SPOT90
+- 2026-08-27T00:31Z B done TOOL-SPOT90
