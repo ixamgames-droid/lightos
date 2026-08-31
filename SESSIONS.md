@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| VIZ-55 | A | feature/viz55-einmessen | 2026-08-30T19:39Z | src/core/stage/aim.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -31,7 +31,6 @@
 
 ## Verlauf
 
-- 2026-08-11T16:56Z A claim QA-51
 - 2026-08-11T17:02Z A done QA-50
 - 2026-08-11T17:21Z A done QA-51
 - 2026-08-11T17:21Z A claim OUT-52
@@ -61,3 +60,4 @@
 - 2026-08-27T04:35Z B claim OUT-54
 - 2026-08-27T04:56Z B done OUT-54
 - 2026-08-30T19:39Z A claim VIZ-55
+- 2026-08-31T14:30Z A uebergeben VIZ-55
