@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| STAB-23 | A | fix/stab23-load-show-meldet-erfolg | 2026-08-31T20:58Z | src/core/show/show_file.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -36,7 +36,6 @@
 
 ## Verlauf
 
-- 2026-08-11T20:43Z A claim VIZ-51
 - 2026-08-11T20:50Z A done QA-52
 - 2026-08-11T21:09Z A done VIZ-51
 - 2026-08-12T07:46Z A claim RIG-DUNKEL
@@ -66,3 +65,4 @@
 - 2026-08-31T20:47Z A uebergeben DOC-10
 - 2026-08-31T20:58Z A claim STAB-23
 - 2026-08-31T21:03Z B uebergeben QA-69
+- 2026-08-31T21:11Z A uebergeben STAB-23
