@@ -198,12 +198,20 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     255)``: Geraete ohne RGB-Kanaele (Dimmer-PAR, Strobe/Blinder, CMY- und
     Farbrad-Mover) wurden sonst SCHWARZ gerendert, Geraete ohne Dimmer-Kanal
     dauerhaft voll hell."""
+    from src.core.app_state import unapply_pan_tilt_orientation
     from src.core.color_utils import visual_intensity, visual_rgb
 
     r, g, b = visual_rgb(attrs, channels)
     intensity = visual_intensity(attrs, channels)
-    pan = attrs.get("pan", 128)
-    tilt = attrs.get("tilt", 128)
+    # VIZ-55: ``attrs`` kommt aus dem GESENDETEN DMX-Frame, traegt also bereits
+    # invert/swap des Geraets. Die Winkelformel im JS (builders.js::applyPanTilt)
+    # kennt diese Flags nicht — ohne Ruecknahme zeigte der Strahl im Bild
+    # gespiegelt zu dem, was der echte Kopf tut. Nur Pan/Tilt betroffen; ohne
+    # gesetzte Flag gibt die Funktion das Original unveraendert zurueck (kein
+    # Overhead im Takt).
+    pt = unapply_pan_tilt_orientation(fixture, attrs)
+    pan = pt.get("pan", 128)
+    tilt = pt.get("tilt", 128)
     payload: dict[str, object] = {
         "fid": fixture.fid,
         "r": r,

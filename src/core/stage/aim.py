@@ -21,6 +21,20 @@ Die Montage-Rotation ``R`` (Euler XYZ, Grad) wird zuerst entfernt:
 untere Halbkugel ab; Ziele oberhalb der Kopf-Hoehe werden auf „horizontal"
 geklemmt (Grenze des Visualizer-Modells — echte 270-Grad-Tilt-Geraete koennen
 weiter, das braucht aber Kalibrierung pro Fixture, siehe TODO im Projekt-Memo).
+
+**Dieses Modul liefert MODELL-Werte, keine Draht-Werte** (VIZ-55).
+``invert_pan``/``invert_tilt``/``swap_pan_tilt`` sind Eigenschaften des GERAETS
+und werden ausschliesslich von der Ausgabestufe angewandt
+(``app_state.apply_pan_tilt_orientation``, aufgerufen im Programmer-Flush und im
+Render-Pfad). Genau dieselbe Konvention haelt ``core/engine/efx.py`` ein.
+
+Bis 2026-08-30 nahm ``aim_pan_tilt`` diese drei Flags selbst entgegen und
+wendete sie an — das Ergebnis ging in den Programmer und wurde von der
+Ausgabestufe ein ZWEITES Mal gedreht. An Davids Varytec Hero Spot 90
+(``invert_pan=True``, eingemessen 26.08.2026) verfehlte der Strahl die Wand
+dadurch vollstaendig: er zeigte nach HINTEN statt auf den angetippten Punkt.
+Die Flags gibt es hier deshalb nicht mehr; wer einen DRAHT-Wert braucht, schickt
+das Ergebnis durch ``apply_pan_tilt_orientation``.
 """
 from __future__ import annotations
 
@@ -67,10 +81,6 @@ def aim_pan_tilt(
     tilt_range_deg: float = 180.0,
     pan_zero_dmx: float = 128.0,
     tilt_zero_dmx: float = 128.0,
-    *,
-    invert_pan: bool = False,
-    invert_tilt: bool = False,
-    swap_pan_tilt: bool = False,
 ):
     """Pan/Tilt-DMX (0..255) berechnen, damit der Strahl von ``pos`` (mit Montage-
     Ausrichtung ``rot_deg`` = (rx,ry,rz) Grad) auf ``target`` zeigt.
@@ -82,6 +92,10 @@ def aim_pan_tilt(
 
     ``pos`` / ``target``: (x, y, z) in Metern. Gibt ``(pan, tilt)`` als ints zurueck.
     Bei ``pos == target`` (kein Richtungsvektor) -> Ruhelage (Nullpunkt).
+
+    Das Ergebnis ist ein MODELL-Wert und gehoert so in den Programmer bzw. in
+    eine Szene. ``invert_pan``/``invert_tilt``/``swap_pan_tilt`` dreht erst die
+    Ausgabestufe (siehe Modulkopf) — hier werden sie bewusst NICHT angewandt.
     """
     dx = float(target[0]) - float(pos[0])
     dy = float(target[1]) - float(pos[1])
@@ -113,13 +127,6 @@ def aim_pan_tilt(
     half_tilt = max(1.0, tilt_range_deg / 2.0)
     pan = pan_zero_dmx + (math.degrees(pan_rad) / half_pan) * 128.0
     tilt = tilt_zero_dmx + (math.degrees(theta) / half_tilt) * 128.0
-
-    if swap_pan_tilt:
-        pan, tilt = tilt, pan
-    if invert_pan:
-        pan = 255.0 - pan
-    if invert_tilt:
-        tilt = 255.0 - tilt
 
     pi = int(round(_clamp(pan, 0.0, 255.0)))
     ti = int(round(_clamp(tilt, 0.0, 255.0)))
@@ -265,16 +272,17 @@ def rect_points(center, width, height, normal, per_side=8):
 
 def trace_pan_tilt(pos, points, rot_deg=(0.0, 0.0, 0.0),
                    pan_range_deg=360.0, tilt_range_deg=180.0,
-                   pan_zero_dmx=128.0, tilt_zero_dmx=128.0,
-                   invert_pan=False, invert_tilt=False, swap_pan_tilt=False):
+                   pan_zero_dmx=128.0, tilt_zero_dmx=128.0):
     """Pan/Tilt-DMX-Folge fuer EINEN Kopf an ``pos``, der ``points`` der Reihe
-    nach anpeilt. Rueckgabe: Liste ``[(pan, tilt), ...]``."""
+    nach anpeilt. Rueckgabe: Liste ``[(pan, tilt), ...]``.
+
+    Wie :func:`aim_pan_tilt` MODELL-Werte — die Geraete-Flags dreht die
+    Ausgabestufe (siehe Modulkopf)."""
     out = []
     for p in points:
         out.append(aim_pan_tilt(
             pos, p, rot_deg,
             pan_range_deg=pan_range_deg, tilt_range_deg=tilt_range_deg,
             pan_zero_dmx=pan_zero_dmx, tilt_zero_dmx=tilt_zero_dmx,
-            invert_pan=invert_pan, invert_tilt=invert_tilt, swap_pan_tilt=swap_pan_tilt,
         ))
     return out

@@ -194,10 +194,14 @@ for name, ziel in ZIELE:
     s.fade_in = s.fade_out = 0.4
     zeile = []
     for fid in fids:
+        # VIZ-55: aim_pan_tilt liefert MODELL-Werte. invert/swap dreht die
+        # Ausgabestufe beim Rendern der Szene (apply_pan_tilt_orientation) —
+        # sie hier mitzugeben hiesse, sie zweimal anzuwenden. Genau daran
+        # zeigten die absoluten Ziele dieser Show bis zum 2026-08-30 nach
+        # hinten statt an die Wand (INVERT_PAN ist True).
         pan, tilt = aim_pan_tilt(POS[fid], ziel, ROT[fid],
                                  pan_range_deg=PAN_RANGE, tilt_range_deg=TILT_RANGE,
-                                 pan_zero_dmx=PAN_ZERO, tilt_zero_dmx=TILT_ZERO,
-                                 invert_pan=INVERT_PAN, invert_tilt=INVERT_TILT)
+                                 pan_zero_dmx=PAN_ZERO, tilt_zero_dmx=TILT_ZERO)
         _pt(fid, pan, tilt, s)
         zeile.append(f"fid{fid} pan={pan:3d} tilt={tilt:3d}")
     print(f"  {name:8s} -> {ziel}   " + " | ".join(zeile))
@@ -213,8 +217,7 @@ par_szenen = []
 for name, ziel in ZIELE:
     pan, tilt = aim_pan_tilt(POS[1], ziel, ROT[1],
                              pan_range_deg=PAN_RANGE, tilt_range_deg=TILT_RANGE,
-                             pan_zero_dmx=PAN_ZERO, tilt_zero_dmx=TILT_ZERO,
-                             invert_pan=INVERT_PAN, invert_tilt=INVERT_TILT)
+                             pan_zero_dmx=PAN_ZERO, tilt_zero_dmx=TILT_ZERO)
     s = fm.new_scene(f"Parallel · {name}")
     s.fade_in = s.fade_out = 0.4
     for fid in fids:

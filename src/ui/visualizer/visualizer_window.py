@@ -1295,15 +1295,19 @@ class VisualizerBridge(QObject):
                     tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
                     pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
                     tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                    invert_pan=bool(getattr(f, "invert_pan", False)),
-                    invert_tilt=bool(getattr(f, "invert_tilt", False)),
-                    swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
                 )
                 for _h in range(n_bar):
                     self._state.set_programmer_value(fid, "pan", pan, head=_h)
                     self._state.set_programmer_value(fid, "tilt", tilt, head=_h)
                 n_mh += 1
             elif self._is_moving_head(f):
+                # VIZ-55: KEINE invert/swap-Flags an aim_pan_tilt. Der Programmer
+                # traegt Modell-Werte; die Geraete-Flags dreht ausschliesslich die
+                # Ausgabestufe (apply_pan_tilt_orientation im Flush/Render-Pfad) —
+                # dieselbe Konvention wie in core/engine/efx.py. Bis 2026-08-30
+                # standen sie hier und wurden damit ZWEIMAL angewandt: an Davids
+                # Hero Spot 90 (invert_pan) zeigte der Strahl dadurch nach hinten
+                # statt auf den angetippten Punkt (gemessen, nicht geschlossen).
                 rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
                 pan, tilt = aim_pan_tilt(
                     pos, target, rot,
@@ -1311,9 +1315,6 @@ class VisualizerBridge(QObject):
                     tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
                     pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
                     tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                    invert_pan=bool(getattr(f, "invert_pan", False)),
-                    invert_tilt=bool(getattr(f, "invert_tilt", False)),
-                    swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
                 )
                 self._state.set_programmer_value(fid, "pan", pan)
                 self._state.set_programmer_value(fid, "tilt", tilt)
@@ -1357,9 +1358,6 @@ class VisualizerBridge(QObject):
                 tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
                 pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
                 tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                invert_pan=bool(getattr(f, "invert_pan", False)),
-                invert_tilt=bool(getattr(f, "invert_tilt", False)),
-                swap_pan_tilt=bool(getattr(f, "swap_pan_tilt", False)),
             )
         return seqs
 

@@ -4961,6 +4961,74 @@ def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     return out
 
 
+def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
+    """Umkehrung von :func:`apply_pan_tilt_orientation` — DRAHT-Wert -> MODELL-Wert.
+
+    Wofuer: der 3D-Visualizer speist sich aus dem GESENDETEN DMX-Frame, seine
+    Winkelformel kennt aber weder ``invert_*`` noch ``swap_pan_tilt``
+    (``scene_src/fixtures/builders.js::applyPanTilt``). Bei einem Geraet mit
+    gesetzter Flag zeigte der Strahl im Bild deshalb GESPIEGELT zu dem, was der
+    echte Kopf tut. Hier wird die Drehung der Ausgabestufe zurueckgenommen,
+    bevor der Payload gebaut wird — das Bild zeigt damit die Richtung des
+    PHYSISCHEN Geraets (VIZ-55, 2026-08-30).
+
+    Reihenfolge ist die exakte Umkehrung: vorwaerts erst Swap, dann Invert —
+    hier also erst Invert, dann Swap. Beides sind Involutionen, aber ihre
+    Komposition ist es NICHT: bei gleichzeitig gesetztem Swap und Invert liefert
+    zweimaliges Anwenden der Vorwaertsfunktion ein falsches Ergebnis.
+    """
+    inv_pan = bool(getattr(fx, "invert_pan", False))
+    inv_tilt = bool(getattr(fx, "invert_tilt", False))
+    swap = bool(getattr(fx, "swap_pan_tilt", False))
+    if not (inv_pan or inv_tilt or swap):
+        return attrs
+    if not any(k in attrs for k in ("pan", "pan_fine", "tilt", "tilt_fine")):
+        return attrs
+    out = dict(attrs)
+
+    def _invert(coarse: str, fine: str):
+        if coarse not in out:
+            return
+        # Defensiv wie in der Vorwaertsrichtung: ein kaputter Wert (None/String
+        # aus OSC/Web/MIDI) darf den Visualizer-Takt nicht stoppen.
+        try:
+            c = max(0, min(255, int(out[coarse])))
+        except (TypeError, ValueError):
+            out.pop(coarse, None)
+            out.pop(fine, None)
+            return
+        if fine in out:
+            try:
+                f = max(0, min(255, int(out[fine])))
+            except (TypeError, ValueError):
+                f = 0
+            combined = 65535 - ((c << 8) | f)
+            out[coarse] = (combined >> 8) & 0xFF
+            out[fine] = combined & 0xFF
+        else:
+            out[coarse] = 255 - c
+
+    if inv_pan:
+        _invert("pan", "pan_fine")
+    if inv_tilt:
+        _invert("tilt", "tilt_fine")
+
+    if swap:
+        for a, b in (("pan", "tilt"), ("pan_fine", "tilt_fine")):
+            va, vb = out.get(a), out.get(b)
+            if va is None and vb is None:
+                continue
+            if vb is not None:
+                out[a] = vb
+            else:
+                out.pop(a, None)
+            if va is not None:
+                out[b] = va
+            else:
+                out.pop(b, None)
+    return out
+
+
 # Singleton
 _state: AppState | None = None
 

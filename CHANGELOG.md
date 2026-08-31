@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-30 — „Zielen" trifft jetzt auch bei Geräten mit invertierter Bewegung
+
+#### Behoben
+
+- **Ein Moving Head mit gesetztem „Pan invertieren" fuhr beim Zielen an eine
+  ganz andere Stelle** — nicht knapp daneben, sondern in die Gegenrichtung. Wer
+  im 3D-Visualizer einen Punkt antippte, sah den Strahl im Bild richtig
+  ankommen, während das Gerät im Saal woanders hin leuchtete. Gemessen an zwei
+  Varytec Hero Spot 90: der Strahl verfehlte die Wand vollständig.
+
+  Ursache: die Zielrechnung drehte die Bewegungsrichtung selbst um, und die
+  Ausgabe drehte sie danach ein zweites Mal. Zweimal umgedreht ist wie gar
+  nicht. Die Umdrehung passiert jetzt an genau einer Stelle — dort, wo sie für
+  Effekte und Szenen schon immer passierte.
+
+  Betroffen waren das Zielen und das Formen-Nachfahren. Geräte **ohne** die
+  Schalter „Pan/Tilt invertieren" bzw. „Pan/Tilt tauschen" verhalten sich
+  unverändert.
+
+- **Der 3D-Visualizer zeigte den Strahl solcher Geräte gespiegelt** — und zwar
+  bei jeder Quelle: Fader, Effekt, Cue. Das Bild zeigt jetzt die Richtung, in
+  die der echte Kopf leuchtet. Damit lässt sich am Bildschirm überhaupt erst
+  erkennen, ob ein Gerät richtig gepatcht ist.
+
+- **Die Testshow für die Hero Spot 90** (`tools/build_spot90_testshow.py`)
+  erzeugte durch denselben Fehler falsche Zielwerte. Wer sie benutzt, baut sie
+  einmal neu.
+
 ### 2026-08-27 — Warnung, wenn ein anderes Programm den DMX-Ausgang belegt
 
 #### Neu
