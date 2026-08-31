@@ -1021,8 +1021,14 @@ class ModellUndSpeicherwegTest(unittest.TestCase):
         # Nur die DATEI wird festgehalten, nicht die Zeilennummer — sonst
         # waere der Test eine Zeitbombe, die beim naechsten Einschub darueber
         # rot wird, ohne dass sich etwas geaendert hat.
+        # QA-69: ``as_posix()`` statt ``str()``. ``str()`` liefert auf Windows
+        # ``core\database\models.py``, verglichen wird gegen die Schreibweise
+        # mit ``/`` — der Test war dort also rot, ohne dass am Code etwas falsch
+        # war. Der Pfad ist hier eine ANZEIGE fuer die Fehlermeldung, kein
+        # Dateisystem-Zugriff; eine plattformabhaengige Schreibweise hat darin
+        # nichts zu suchen.
         zuweisungen = sorted({
-            str(pfad.relative_to(wurzel))
+            pfad.relative_to(wurzel).as_posix()
             for pfad in wurzel.rglob("*.py")
             if _setzt_geo_max(pfad)
         })

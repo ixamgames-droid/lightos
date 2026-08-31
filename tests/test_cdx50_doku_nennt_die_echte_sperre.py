@@ -12,11 +12,32 @@ denselben Ort nennt — er wird also rot, sobald die beiden auseinanderlaufen.
 """
 import os
 import re
+import shutil
 import subprocess
 import unittest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DOKU = ("WORKFLOW.md", "COORDINATION.md")
+
+# ⚠️ QA-69: dieser Test fragt ``verify_loop.sh`` per ``bash`` nach seinem
+# Sperrpfad — und hatte dafuer gar keinen Guard.
+#
+# ★ Warum das besonders tueckisch war: auf Windows haengt das Ergebnis davon ab,
+# WER pytest startet. In einer Git-Bash liegt ``bash`` im PATH, der Test lief und
+# war gruen. Im Gate laeuft pytest aus der PowerShell — dort ist ``bash`` NICHT
+# im PATH (nachgemessen), der Aufruf starb mit ``FileNotFoundError [WinError 2]``.
+# Dieselbe Datei war damit im Gate rot und einzeln nachgefahren gruen, was
+# zuverlaessig nach einem Parallellast-Artefakt aussieht und keines war. Wer den
+# Unterschied so deutet, sucht den Fehler dauerhaft an der falschen Stelle.
+#
+# Die Zusicherung selbst (Doku nennt den echten Sperrort) ist nicht
+# plattformabhaengig — nur ihre Messung, weil sie das Linux-Gate befragt. Auf
+# Windows gibt es dafuer kein Gegenstueck (XPLAT-23).
+_BASH_DA = shutil.which("bash") is not None and os.name != "nt"
+_BASH_GRUND = ("fragt verify_loop.sh per bash nach dem Sperrpfad — auf Windows "
+               "ist bash je nach startender Shell da oder nicht (im Gate: "
+               "nicht), und das Linux-Gate ist dort ohnehin nicht das echte "
+               "(XPLAT-23)")
 
 
 def _sperrpfad_laut_skript() -> str:
@@ -35,9 +56,15 @@ def _sperrpfad_laut_skript() -> str:
 
 
 class DokuNenntDieEchteSperreTest(unittest.TestCase):
-    def setUp(self):
-        self.pfad = _sperrpfad_laut_skript()
+    # ★ Kein ``setUp``, das ``_sperrpfad_laut_skript()`` holt. Es lief fuer JEDE
+    # Testmethode dieser Klasse — auch fuer die Positivkontrolle, die bloss eine
+    # Datei liest. Ein Skip auf der bash-Methode allein haette also nichts
+    # genuetzt: die andere Methode waere im Gate weiter an ``setUp`` gestorben.
+    # Der Aufruf steht deshalb dort, wo er gebraucht wird, hinter dem Guard.
 
+    # Guard NUR hier, nicht auf der Klasse: die Positivkontrolle unten
+    # liest bloss WORKFLOW.md und muss auf jeder Plattform laufen.
+    @unittest.skipUnless(_BASH_DA, _BASH_GRUND)
     def test_die_doku_nennt_den_ort_den_das_skript_benutzt(self):
         """Das Verzeichnis, an dem die Sperre haengt, muss in der Doku stehen.
 
@@ -45,7 +72,8 @@ class DokuNenntDieEchteSperreTest(unittest.TestCase):
         Arbeitsverzeichnis dieses Rechners und haette in einem oeffentlichen
         Repo nichts zu suchen. Verglichen wird das VERZEICHNIS: heute `.git`.
         """
-        anker = os.path.basename(os.path.dirname(self.pfad))    # ".git"
+        pfad = _sperrpfad_laut_skript()
+        anker = os.path.basename(os.path.dirname(pfad))    # ".git"
         for datei in _DOKU:
             text = open(os.path.join(_REPO, datei), encoding="utf-8").read()
             self.assertIn(".pytest_lock", text,
@@ -54,7 +82,7 @@ class DokuNenntDieEchteSperreTest(unittest.TestCase):
                 f"{anker}/.pytest_lock", text,
                 f"{datei} nennt die Sperrdatei, aber nicht das Verzeichnis "
                 f"'{anker}', an dem sie laut verify_loop.sh haengt "
-                f"({self.pfad}). Wer sie loesen will, sucht falsch.")
+                f"({pfad}). Wer sie loesen will, sucht falsch.")
 
     # ★ Bewusst KEIN Test „der alte Ort darf nicht mehr vorkommen".
     #
