@@ -103,4 +103,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     raise SystemExit(main())

@@ -56,7 +56,7 @@ def _repo() -> str:
 
 def _dateien(repo: str) -> list[str]:
     r = subprocess.run(["git", "ls-files", "-z"], cwd=repo,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8")
     if r.returncode != 0:
         return []
     return [p for p in r.stdout.split("\0")
@@ -164,4 +164,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     raise SystemExit(main())

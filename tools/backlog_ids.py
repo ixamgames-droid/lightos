@@ -140,7 +140,7 @@ def naechste_freie(je_zweig: dict, gruppe: str) -> int:
 # ── Alles ab hier redet mit git ──────────────────────────────────────────────
 
 def _git(*args: str) -> tuple[int, str]:
-    p = subprocess.run(("git",) + args, capture_output=True, text=True)
+    p = subprocess.run(("git",) + args, capture_output=True, text=True, encoding="utf-8")
     return p.returncode, p.stdout
 
 
@@ -160,7 +160,7 @@ def offene_pr_zweige() -> tuple:
         ("gh", "pr", "list", "--state", "open", "--limit", str(_PR_LIMIT),
          "--json", "headRefName,isCrossRepository,number",
          "-q", ".[] | [.number, .headRefName, (.isCrossRepository|tostring)] | @tsv"),
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8")
     if p.returncode != 0:
         return [], f"`gh pr list` fehlgeschlagen: {p.stderr.strip()[:160]}"
     zeilen = [z.split("\t") for z in p.stdout.splitlines() if z.strip()]
@@ -282,4 +282,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     sys.exit(main())

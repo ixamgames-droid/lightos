@@ -214,7 +214,7 @@ def spur_urteil(klasse: str, auf_main: bool) -> str | None:
 # ── Der Griff nach dem echten Repo (in der CI nicht verfuegbar) ──────────────
 
 def _git(*args: str) -> tuple[int, str]:
-    p = subprocess.run(("git",) + args, cwd=REPO, capture_output=True, text=True)
+    p = subprocess.run(("git",) + args, cwd=REPO, capture_output=True, text=True, encoding="utf-8")
     return p.returncode, p.stdout
 
 
@@ -366,4 +366,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     sys.exit(main())
