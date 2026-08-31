@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | QA-69 | B | fix/qa69-windows-testannahmen | 2026-08-31T20:02Z | tests/test_fm26_generator_panel_geometrie.py,tests/test_qa60_datenordner_unberuehrt.py,tests/test_qa53_segment_zaehler_ehrlich.py,tests/test_verify_loop_sperre.py,tests/test_zeitbomben_gate.py |
+| STAB-23 | A | fix/stab23-load-show-meldet-erfolg | 2026-08-31T20:58Z | src/core/show/show_file.py |
 
 ## Blocker & Fallen
 
@@ -35,7 +36,6 @@
 
 ## Verlauf
 
-- 2026-08-11T20:17Z A done QA-54
 - 2026-08-11T20:26Z A done QA-55
 - 2026-08-11T20:43Z A claim VIZ-51
 - 2026-08-11T20:50Z A done QA-52
@@ -65,3 +65,4 @@
 - 2026-08-31T20:16Z A done UI-57
 - 2026-08-31T20:17Z A claim DOC-10
 - 2026-08-31T20:47Z A uebergeben DOC-10
+- 2026-08-31T20:58Z A claim STAB-23
