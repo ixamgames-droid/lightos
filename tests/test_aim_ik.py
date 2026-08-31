@@ -98,10 +98,19 @@ class AimPanTiltTest(unittest.TestCase):
         self.assertEqual(aim_pan_tilt((0, 0, 0), (0, 0, 0), (0, 0, 0),
                                       pan_zero_dmx=100, tilt_zero_dmx=90), (100, 90))
 
-    def test_invert_pan_flips(self):
-        p0, _ = aim_pan_tilt((-3, 5, 0), (0, 0, 0), (0, 0, 0))
-        p1, _ = aim_pan_tilt((-3, 5, 0), (0, 0, 0), (0, 0, 0), invert_pan=True)
-        self.assertEqual(p1, 255 - p0)
+    def test_geraete_flags_gehoeren_nicht_hierher(self):
+        """VIZ-55: aim_pan_tilt liefert MODELL-Werte und kennt invert/swap NICHT.
+
+        Bis 2026-08-30 nahm die Funktion die drei Flags entgegen und wendete sie
+        an — die Ausgabestufe drehte sie danach ein zweites Mal. Der frühere
+        Test hielt genau diese falsche Konvention fest (``p1 == 255 - p0``).
+        Jetzt ist die Abwesenheit der Flags die Zusicherung: wer sie wieder
+        einführt, macht diesen Test rot statt still das Rig zu verdrehen.
+        """
+        for flag in ("invert_pan", "invert_tilt", "swap_pan_tilt"):
+            with self.subTest(flag=flag):
+                with self.assertRaises(TypeError):
+                    aim_pan_tilt((-3, 5, 0), (0, 0, 0), (0, 0, 0), **{flag: True})
 
     def test_same_pos_target_is_rest(self):
         self.assertEqual(aim_pan_tilt((1, 1, 1), (1, 1, 1), (0, 0, 0)), (128, 128))
