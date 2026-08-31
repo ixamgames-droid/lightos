@@ -78,7 +78,7 @@ def _audit_zeitpunkt(pfad: str) -> str:
         return ""
     r = subprocess.run(
         ["git", "log", "--diff-filter=A", "--format=%ad", "--date=iso-strict",
-         "--", pfad], cwd=_REPO, capture_output=True, text=True)
+         "--", pfad], cwd=_REPO, capture_output=True, text=True, encoding="utf-8")
     if r.returncode != 0:
         # Ein GESCHEITERTES `git log` ist etwas anderes als eines, das nichts
         # findet — auch wenn beide leeres stdout liefern. Kein Repo, beschaedigte
@@ -112,7 +112,7 @@ def _audit_zeitpunkt(pfad: str) -> str:
 
 def _ist_flach() -> bool:
     r = subprocess.run(["git", "rev-parse", "--is-shallow-repository"],
-                       cwd=_REPO, capture_output=True, text=True)
+                       cwd=_REPO, capture_output=True, text=True, encoding="utf-8")
     return r.stdout.strip() == "true"
 
 
@@ -132,7 +132,7 @@ def _passt_zum_dateinamen(zeit: str, tag: str) -> bool:
 
 def _letztes_git_datum(pfad: str) -> str:
     r = subprocess.run(["git", "log", "-1", "--format=%ad", "--date=iso-strict",
-                        "--", pfad], cwd=_REPO, capture_output=True, text=True)
+                        "--", pfad], cwd=_REPO, capture_output=True, text=True, encoding="utf-8")
     return r.stdout.strip()
 
 

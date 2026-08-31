@@ -324,7 +324,7 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
             befehl += ["-p", KANARIE_PLUGIN]
         befehl += [os.path.relpath(d, REPO) if d.startswith(REPO) else d
                    for d in dateien]
-        fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True,
+        fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True, encoding="utf-8",
                                 capture_output=True, timeout=zeitlimit)
     ausgabe = (fertig.stdout or "") + (fertig.stderr or "")
     wirksam = (not tage) or (MARKE_OK in ausgabe)
@@ -529,4 +529,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     raise SystemExit(main())

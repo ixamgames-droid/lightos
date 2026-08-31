@@ -187,11 +187,52 @@ def pruefe_oeffentlich(text: str) -> list[str]:
 
 def _git(*args: str, eingabe: str | None = None, repo: str | None = None,
          pruefen: bool = True) -> str:
-    r = subprocess.run(["git", *args], cwd=repo, input=eingabe,
-                       capture_output=True, text=True)
+    """git aufrufen — ueber BYTES, nicht ueber ``text=True``.
+
+    ★ XPLAT-20 (31.08.2026): hier stand ``text=True`` ohne ``encoding``. Das
+    hat auf Windows ZWEI verschiedene Fehler gleichzeitig gemacht, und der
+    zweite hat die geteilte Tafel tatsaechlich zerstoert:
+
+    1. **Dekodierung.** ``text=True`` nimmt die LOCALE-Kodierung, auf Windows
+       cp1252. ``BACKLOG.md`` enthaelt ★/⚠/⏳ — Bytes, die cp1252 nicht kennt.
+       Der ``UnicodeDecodeError`` faellt im subprocess-Reader-Thread und wird
+       verschluckt: ``stdout`` ist danach ``None`` bei ``returncode == 0``, das
+       Werkzeug stirbt also an einem irrefuehrenden ``AttributeError`` statt an
+       einer Kodierungsmeldung.
+    2. **Zeilenenden.** ``text=True`` uebersetzt beim SCHREIBEN ``\\n`` in
+       ``os.linesep``. Auf Windows bekam damit die mktree-Zeile
+       ``"100644 blob <hash>\\tSESSIONS.md\\n"`` ein ``\\r`` angehaengt — die
+       Tafel landete als Datei **"SESSIONS.md\\r"** im Git-Baum. Fuer die
+       andere Sitzung war sie damit spurlos verschwunden
+       (``git show origin/sessions:SESSIONS.md`` -> "does not exist").
+       Genau das ist am 31.08.2026 beim ersten Windows-Claim passiert.
+
+    ``encoding="utf-8"`` allein behebt nur Punkt 1 — Punkt 2 bleibt, weil die
+    Newline-Uebersetzung an ``newline=None`` haengt und ``subprocess.run`` kein
+    ``newline``-Argument kennt. Gemessen:
+
+    ==============================  =========================
+    Aufruf                          Blob-Inhalt
+    ==============================  =========================
+    ``text=True``                   ``b'a\\r\\nb\\r\\n'``
+    ``text=True, encoding='utf-8'``  ``b'a\\r\\nb\\r\\n'``
+    bytes (dieser Weg)              ``b'a\\nb\\n'``
+    ==============================  =========================
+
+    Deshalb: Eingabe explizit nach UTF-8 kodieren, Ausgabe explizit dekodieren.
+    """
+    roh = eingabe.encode("utf-8") if eingabe is not None else None
+    r = subprocess.run(["git", *args], cwd=repo, input=roh,
+                       capture_output=True)
     if pruefen and r.returncode != 0:
-        raise RuntimeError(f"git {' '.join(args)}: {r.stderr.strip()}")
-    return r.stdout.strip()
+        fehler = r.stderr.decode("utf-8", "replace").strip()
+        raise RuntimeError(f"git {' '.join(args)}: {fehler}")
+    # stdout OHNE ``errors=``: die Tafel ist Nutzdaten. Ein Ersatzzeichen waere
+    # hier eine stille Verfaelschung, die genau so wieder zurueckgeschrieben
+    # wuerde — dann lieber ein lauter UnicodeDecodeError.
+    # ``\r\n`` beim LESEN normalisieren: ein alter, von einer fruehen
+    # Windows-Sitzung geschriebener Stand soll die Tafel nicht unlesbar machen.
+    return r.stdout.decode("utf-8").replace("\r\n", "\n").strip()
 
 
 def lade_tafel(repo: str) -> tuple[dict, str | None]:
@@ -226,8 +267,11 @@ def schreibe_tafel(repo: str, tafel: dict, eltern: str | None,
     if eltern:
         args += ["-p", eltern]
     commit = _git(*args, repo=repo)
+    # XPLAT-20: wie ``_git`` ueber Bytes — hier wird zwar nichts geschrieben,
+    # aber git meldet Fehler auf stderr mit UTF-8-Zeichen, und die duerfen den
+    # Aufruf nicht an der cp1252-Dekodierung sterben lassen.
     r = subprocess.run(["git", "push", "origin", f"{commit}:refs/heads/{BRANCH}"],
-                       cwd=repo, capture_output=True, text=True)
+                       cwd=repo, capture_output=True)
     return r.returncode == 0
 
 
@@ -395,4 +439,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     raise SystemExit(main())
