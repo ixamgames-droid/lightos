@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-31 — Ein misslungenes Laden meldet sich wieder
+
+#### Behoben
+
+- **„Show öffnen" meldete Erfolg, obwohl die Geräte gar nicht ausgetauscht
+  wurden.** Passiert, wenn ein zweites Programm gerade auf dieselbe Show-Datenbank
+  schreibt: der Austausch scheitert, auf der Bühne steht weiter die **alte** Show —
+  und LightOS sagte trotzdem „Show geladen." Wer dann speichert, schreibt die alte
+  Show in die gerade geöffnete Datei; die Show, die man öffnen wollte, ist damit weg.
+
+  Die Warnung dafür gab es längst („⚠ Speichern schreibt den Verlust fest") — sie
+  wurde nur nie erreicht, weil der Fehler eine Ebene tiefer stillschweigend
+  verschluckt wurde. Dasselbe galt für verlorene Gerätegruppen.
+
+
 ### 2026-08-31 — Zwei Bedien-Elemente der virtuellen Konsole waren nirgends beschrieben
 
 #### Neu

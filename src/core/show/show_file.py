@@ -385,7 +385,20 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
             else:
                 _replace_patch_legacy(state, pfs)
         except Exception as e:
-            print(f"[show_file] patch replace failed: {e}")
+            # STAB-23: NICHT nur drucken. Dieses `except` sass INNERHALB des
+            # Aufrufers, der seinerseits schon `_lenient("load patch error")`
+            # gehabt haette — es schluckte den Fehler also, BEVOR die
+            # Meldekette ihn sehen konnte. Folge: `load_show` gab
+            # „Show 'X' geladen." zurueck, `letzte_ladeprobleme()` war leer,
+            # der Warndialog in `main_window._open_show_path` blieb aus — und
+            # auf der Buehne stand weiter der ALTE Patch. Wer danach speichert,
+            # schreibt den alten Patch in die gerade geoeffnete Datei; die Show,
+            # die er oeffnen wollte, ist auf der Platte weg.
+            # 31 andere Schluckpunkte des Loaders waren angebunden, ausgerechnet
+            # der Patch-Block nicht — der, der bestimmt, wo das Licht hingeht.
+            # `_lenient` behaelt das gewollte Verhalten bei (loggen, weiterlaufen,
+            # nicht propagieren) und meldet es zusaetzlich.
+            _lenient("patch replace failed", e)
     finally:
         state._suppress_emits = _prev_suppress
 
@@ -547,7 +560,10 @@ def _restore_fixture_groups(state, groups: list) -> None:
                 ))
             s.commit()
     except Exception as e:
-        print(f"[show_file] restore groups error: {e}")
+        # STAB-23: ebenfalls im LADE-Pfad (`load_show` -> `_restore_fixture_groups`)
+        # und ebenfalls stumm. Verlorene Gruppen sind derselbe Fall: sie fallen
+        # erst beim naechsten Speichern endgueltig weg.
+        _lenient("restore groups error", e)
     try:
         state.notify_groups_changed()
     except Exception:
