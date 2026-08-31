@@ -8,11 +8,12 @@ Diese Referenz beschreibt **jedes Bedien-Element einzeln**: wozu es da ist, wie 
 Betrieb aussieht, **welcher Knopf was macht** und welche Einstellungen es hat — jeweils mit
 echten Screenshots aus der App.
 
-![Alle VC-Widgets in der Übersicht](img/uebersicht_alle_widgets.png)
+![Übersicht der VC-Widgets](img/uebersicht_alle_widgets.png)
 
 > Diese Übersicht stammt aus der Vorlage-Show `shows/VC_Widgets_Showcase.lshow`
-> (Generator: `tools/build_vc_widgets_showcase.py`) — sie legt jeden der 19 Widget-Typen
-> einmal beschriftet ab.
+> (Generator: `tools/build_vc_widgets_showcase.py`) — sie legt **17 der 19** Widget-Typen
+> einmal beschriftet ab. Es fehlen **Tempo-Controller** und **Live-Edit-Panel**; beide sind
+> unten einzeln beschrieben ([22](22_tempo_controller.md), [23](23_live_edit.md)).
 
 ---
 
@@ -22,7 +23,14 @@ echten Screenshots aus der App.
 Modi um:
 
 - **Bearbeiten ✓** — Elemente **anlegen, verschieben, skalieren, einstellen**. Es
-  erscheinen zusätzliche Toolbar-Knöpfe (alle Widget-Typen, Baukasten, Undo/Redo, Raster).
+  erscheinen zusätzliche Toolbar-Knöpfe: **ein Knopf je Widget-Typ** (16 Stück),
+  **⊞ Raster**, **Undo/Redo** (`↶ ↷`), **Alle löschen** und **⚙ Inspector**.
+
+  ![Werkzeugleiste im Bearbeiten-Modus](img/toolbar_bearbeiten_modus.png)
+
+  > Früher stand hier auch ein „Baukasten". Die grünen Baukasten-Blöcke wurden
+  > **2026-07 entfernt** (siehe [21 · Smart-Drop & Baukasten](21_baukasten.md)); den
+  > schnellen Weg übernimmt heute der Smart-Drop.
 - **Betrieb** (Bearbeiten aus) — Elemente **steuern live** die Show. Klick/Touch/MIDI lösen
   ihre Funktion aus.
 
@@ -32,8 +40,9 @@ Modi um:
 2. **Effekt aus der Bibliothek auf die Canvas ziehen** (*Smart-Drop*): LightOS baut das
    passende Bedien-Element praktisch von selbst → siehe **[Smart-Drop & Baukasten](21_baukasten.md)**.
 
-> Drei Typen haben **keinen** eigenen Toolbar-Knopf und entstehen nur über Smart-Drop /
-> die Widget-Galerie: **Stepper**, **Effekt-Anzeige** und **Effekt-Editor-Box**.
+> Drei der 19 Typen haben **keinen** eigenen Toolbar-Knopf und entstehen nur über
+> Smart-Drop / die Widget-Galerie: **Stepper**, **Effekt-Anzeige** und
+> **Effekt-Editor-Box**. Die übrigen 16 haben je einen Knopf.
 
 **Einstellen & Kontextmenü.** **Doppelklick** auf ein Element öffnet seine **Einstellungen**
 (Ausnahme Farb-Kachel: Doppelklick = Farb-Picker). **Rechtsklick** (im Bearbeiten-Modus)
@@ -56,7 +65,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 
 ---
 
-## Die 18 Bedien-Elemente
+## Die 19 Bedien-Elemente
 
 | # | Element | Kurz | Seite |
 |---|---|---|---|
@@ -77,6 +86,8 @@ Antippen) — **MIDI/APC steuert weiter**.
 | 16 | **Effekt-Anzeige** (`VCEffectDisplay`) | Live-Vorschau des gebundenen Effekts | [16_effekt_anzeige.md](16_effekt_anzeige.md) |
 | 17 | **Container** (`VCFrame`) | Rahmen/Gruppe, nimmt Elemente auf (Seiten/Tabs) | [17_container.md](17_container.md) |
 | 18 | **Effekt-Editor-Box** (`VCEffectEditor`) | Bewegliche Box: Vorschau + passende Regler eines Effekts | [18_effekt_editor.md](18_effekt_editor.md) |
+| 22 | **Tempo-Controller** (`VCTempoBusController`) | Bus, Quelle, Faktor, Effekt-Zuordnung und Sync auf einer Kachel | [22_tempo_controller.md](22_tempo_controller.md) |
+| 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | Regler-Arbeitsplatz für MEHRERE Effekte, mit Haken-Auswahl | [23_live_edit.md](23_live_edit.md) |
 
 ## Große Editoren (aus der VC erreichbar)
 
