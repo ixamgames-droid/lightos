@@ -24,6 +24,17 @@ def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> 
 class VCWidget(QFrame):
     """Basisklasse — abstrakt, nicht direkt instanziieren."""
 
+    def release_if_held(self) -> bool:
+        """UI-57: einen physisch GEHALTENEN Zustand freigeben, als waere das
+        Loslassen eingetroffen. Basis: no-op — die meisten Widgets halten nichts.
+
+        Wird beim Bank-/Seitenwechsel fuer die verlassene Bank gerufen
+        (``VCCanvas._release_held_widgets``), weil das ``note_off`` dorthin nicht
+        mehr zugestellt wird. Rueckgabe: True, wenn wirklich etwas freigegeben
+        wurde.
+        """
+        return False
+
     HANDLE_SIZE = 8            # praezise Greifzone (Maus) — immer aktiv
     TOUCH_HANDLE_SIZE = 24     # grosse Greifzone (Finger) — erst nach Verweilen
     MIN_SIZE = (40, 30)

@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-31 — Panik-Taster bleibt nicht mehr haengen
+
+#### Behoben
+
+- **Wer BLACKOUT oder „Alles Weiß" gedrückt hält und dabei die Seite der
+  virtuellen Konsole wechselt, blieb darin stecken.** Das Loslassen kam beim
+  Taster nicht mehr an — verdeckte Seiten sind für den Controller stumm. Das
+  Rig blieb stockdunkel bzw. voll weiß, und zurück kam man nur, indem man exakt
+  auf die alte Seite zurückschaltete und dort noch einmal losließ. Ein
+  Seitenwechsel gibt gehaltene Taster jetzt selbst frei.
+
+  Ein laufender Effekt-Taster (Umschalter) bleibt dabei ausdrücklich an — der
+  soll einen Seitenwechsel überleben.
+
+- **„Alles Weiß" und Freeze überlebten sogar „Neue Show".** Danach wirkte die
+  Weiß-Übersteuerung auf die Geräte der *neuen* Show, und ein eingefrorener
+  Ausgang ließ die neue Show gar nicht erst erscheinen. Beides wird jetzt beim
+  Zurücksetzen mit aufgehoben. Das war der einzige Panik-Zustand ohne
+  Notausgang: die naheliegende Rettung — einfach eine neue Show anfangen —
+  erreichte ihn nicht.
+
 ### 2026-08-31 — Die Projektwerkzeuge laufen jetzt auch auf einem Windows-Rechner
 
 #### Behoben
