@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | QA-69 | B | fix/qa69-windows-testannahmen | 2026-08-31T20:02Z | tests/test_fm26_generator_panel_geometrie.py,tests/test_qa60_datenordner_unberuehrt.py,tests/test_qa53_segment_zaehler_ehrlich.py,tests/test_verify_loop_sperre.py,tests/test_zeitbomben_gate.py |
+| DOC-10 | A | docs/doc10-vc-widgets-sichtpruefung | 2026-08-31T20:17Z | docs/anleitung_vc_widgets |
 
 ## Blocker & Fallen
 
@@ -33,7 +34,6 @@
 
 ## Verlauf
 
-- 2026-08-11T19:51Z A claim QA-55
 - 2026-08-11T20:08Z A claim QA-52
 - 2026-08-11T20:17Z A done QA-54
 - 2026-08-11T20:26Z A done QA-55
@@ -63,3 +63,4 @@
 - 2026-08-31T20:02Z B done XPLAT-20
 - 2026-08-31T20:02Z B claim QA-69
 - 2026-08-31T20:16Z A done UI-57
+- 2026-08-31T20:17Z A claim DOC-10
