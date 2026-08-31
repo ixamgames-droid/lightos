@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| UI-57 | A | fix/ui57-panik-taster-bankwechsel | 2026-08-31T19:10Z | src/ui/virtualconsole/vc_canvas.py,src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -32,7 +32,6 @@
 
 ## Verlauf
 
-- 2026-08-11T17:02Z A done QA-50
 - 2026-08-11T17:21Z A done QA-51
 - 2026-08-11T17:21Z A claim OUT-52
 - 2026-08-11T19:44Z A done OUT-52
@@ -62,3 +61,4 @@
 - 2026-08-27T04:56Z B done OUT-54
 - 2026-08-30T19:39Z A claim VIZ-55
 - 2026-08-31T14:30Z A uebergeben VIZ-55
+- 2026-08-31T19:10Z A claim UI-57
