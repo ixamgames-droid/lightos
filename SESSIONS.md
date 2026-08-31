@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-57 | A | fix/ui57-panik-taster-bankwechsel | 2026-08-31T19:10Z | src/ui/virtualconsole/vc_canvas.py,src/core/app_state.py |
 | QA-69 | B | fix/qa69-windows-testannahmen | 2026-08-31T20:02Z | tests/test_fm26_generator_panel_geometrie.py,tests/test_qa60_datenordner_unberuehrt.py,tests/test_qa53_segment_zaehler_ehrlich.py,tests/test_verify_loop_sperre.py,tests/test_zeitbomben_gate.py |
 
 ## Blocker & Fallen
@@ -34,7 +33,6 @@
 
 ## Verlauf
 
-- 2026-08-11T19:44Z A claim QA-54
 - 2026-08-11T19:51Z A claim QA-55
 - 2026-08-11T20:08Z A claim QA-52
 - 2026-08-11T20:17Z A done QA-54
@@ -64,3 +62,4 @@
 - 2026-08-31T19:10Z B claim XPLAT-20
 - 2026-08-31T20:02Z B done XPLAT-20
 - 2026-08-31T20:02Z B claim QA-69
+- 2026-08-31T20:16Z A done UI-57
