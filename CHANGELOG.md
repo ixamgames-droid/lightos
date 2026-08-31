@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-31 — Zwei Bedien-Elemente der virtuellen Konsole waren nirgends beschrieben
+
+#### Neu
+
+- **Anleitungen für den `Tempo-Controller` und das `Live-Edit-Panel`.** Beide
+  haben seit Langem einen eigenen Knopf in der Werkzeugleiste, kamen in der
+  Widget-Referenz aber gar nicht vor — das Live-Edit-Panel nur als *Eigenschaft*
+  anderer Elemente („Live-Edit-Slot"), nicht als eigenes Element. Mit
+  Screenshots aus der laufenden App.
+
+- **Audit-Bericht** `docs/ANLEITUNGEN_AUDIT_2026-08-31.md`.
+
+#### Behoben
+
+- **Die Widget-Übersicht zählte falsch.** Drei Stellen nannten drei verschiedene
+  Zahlen für dieselbe Sache (18, 19 und tatsächlich 17 beschriebene von 19
+  vorhandenen Typen). Jetzt stimmt sie — und wo das Übersichtsbild unvollständig
+  ist, steht es daneben.
+
+- **Die Anleitung versprach einen „Baukasten"-Knopf, den es nicht gibt.** Die
+  Baukasten-Blöcke wurden 2026-07 entfernt; eine Nachbarseite hielt das bereits
+  fest, die Übersicht nicht. Die Aufzählung nennt jetzt die Knöpfe, die wirklich
+  da sind, mit einem aktuellen Bild der Werkzeugleiste.
+
+
 ### 2026-08-31 — Panik-Taster bleibt nicht mehr haengen
 
 #### Behoben

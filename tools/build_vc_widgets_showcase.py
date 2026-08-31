@@ -1,4 +1,11 @@
-"""VC-Widgets-Schaukasten (Doku) — legt JEDEN der 18 VC-Widget-Typen einmal
+"""VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal
+# DOC-10 (2026-08-31): hier stand "JEDEN der 18". Beides war falsch — die
+# Selbstpruefung am Ende zaehlt 17, und die Registry in
+# virtual_console_view.py kennt 19 Typen (16 Toolbar-Knoepfe + Stepper,
+# Effekt-Anzeige, Effekt-Editor-Box ohne Knopf). Es fehlen
+# VCTempoBusController und VCMultiLiveEditor; beide sind seit heute in
+# docs/anleitung_vc_widgets/22_*.md und 23_*.md beschrieben. Sie hier
+# nachzuruesten ist als DOC-11 erfasst.
 beschriftet in ein klares Raster auf Bank 1 (active_bank 0), bindet sie an einen
 Demo-Effekt (damit Farb-/Chase-/Vorschau-Widgets Inhalt zeigen) und legt zwei
 KALIBRIER-Kacheln (reines Magenta/Cyan) an bekannten Canvas-Koordinaten ab.
