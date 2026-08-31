@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | UI-57 | A | fix/ui57-panik-taster-bankwechsel | 2026-08-31T19:10Z | src/ui/virtualconsole/vc_canvas.py,src/core/app_state.py |
-| XPLAT-20 | B | fix/xplat20-werkzeuge-utf8 | 2026-08-31T19:10Z | tools/session_claim.py,tools/backlog_ids.py,tools/pr_bereit.py,tools/zeitbomben_gate.py,tools/backlog_status_drift.py,tools/pseudonymisieren.py,tools/verify_loop.ps1 |
 
 ## Blocker & Fallen
 
@@ -34,7 +33,6 @@
 
 ## Verlauf
 
-- 2026-08-11T17:21Z A claim OUT-52
 - 2026-08-11T19:44Z A done OUT-52
 - 2026-08-11T19:44Z A claim QA-54
 - 2026-08-11T19:51Z A claim QA-55
@@ -64,3 +62,4 @@
 - 2026-08-31T14:30Z A uebergeben VIZ-55
 - 2026-08-31T19:10Z A claim UI-57
 - 2026-08-31T19:10Z B claim XPLAT-20
+- 2026-08-31T20:02Z B done XPLAT-20
