@@ -117,7 +117,7 @@ def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
 # ── Alles ab hier redet mit gh ───────────────────────────────────────────────
 
 def _gh(*args: str) -> str:
-    p = subprocess.run(("gh",) + args, capture_output=True, text=True)
+    p = subprocess.run(("gh",) + args, capture_output=True, text=True, encoding="utf-8")
     if p.returncode != 0:
         raise SystemExit(f"gh fehlgeschlagen: {' '.join(args)}\n{p.stderr.strip()}")
     return p.stdout.strip()
@@ -184,4 +184,12 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    # XPLAT-20: Windows-Konsolen und -Pipes laufen ohne PYTHONUTF8 auf cp1252.
+    # Die Statuszeichen dieses Werkzeugs (✓ ⚠ ★ ⏳) haben dort keine Abbildung,
+    # der Bericht stirbt also mitten in der Ausgabe an einem UnicodeEncodeError.
+    # Bewusst HIER und nicht auf Modulebene: beim Import (Tests laden die
+    # Werkzeuge per exec_module) bleibt der Datenstrom des Aufrufers unberuehrt.
+    for _strom in (sys.stdout, sys.stderr):
+        if hasattr(_strom, "reconfigure"):
+            _strom.reconfigure(encoding="utf-8")
     sys.exit(main())

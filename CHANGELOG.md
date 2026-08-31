@@ -28,6 +28,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Notausgang: die naheliegende Rettung — einfach eine neue Show anfangen —
   erreichte ihn nicht.
 
+### 2026-08-31 — Die Projektwerkzeuge laufen jetzt auch auf einem Windows-Rechner
+
+#### Behoben
+
+- **Die Tafel, über die sich zwei parallel arbeitende Sitzungen abstimmen, ging
+  beim ersten Windows-Eintrag verloren.** Nicht ihr Inhalt — ihr *Dateiname*:
+  im Repo lag danach eine Datei `SESSIONS.md` mit einem angehängten
+  Steuerzeichen, und wer die echte `SESSIONS.md` aufrief, bekam „gibt es
+  nicht". Der Eintrag selbst war erfolgreich gemeldet worden, der Verlust
+  passierte lautlos.
+
+  Ursache war eine einzige Zeile, die Text an `git` übergab, ohne die
+  Zeichenkodierung festzulegen. Auf Linux ist das folgenlos, auf Windows macht
+  es gleich zwei Dinge falsch: Es liest Dateien in der alten
+  Windows-Kodierung — an den Sonderzeichen ★ ⚠ ⏳ in `BACKLOG.md` und
+  `CHANGELOG.md` bricht das ab, und der Fehler wird dabei verschluckt statt
+  gemeldet. Und es tauscht beim *Schreiben* Zeilenenden aus. Genau dieser Tausch
+  landete mitten in einer Git-Datenstruktur, in der das Zeilenende ein
+  Trennzeichen ist — daher der kaputte Dateiname.
+
+  Beides ist behoben, und zwar unterschiedlich: Der Schreibweg arbeitet jetzt
+  auf Bytes (nur das verhindert den Zeilenende-Tausch — die naheliegende
+  Reparatur, bloß die Kodierung zu benennen, hätte den Dateinamen-Fehler
+  bestehen lassen; nachgemessen). Die neun lesenden Aufrufe in acht Werkzeugen
+  legen die Kodierung ausdrücklich auf UTF-8 fest.
+
+- **Die Werkzeuge brachen mitten im Bericht ab, sobald sie ein Statuszeichen
+  ausgeben wollten.** `✓`, `⚠` und `★` lassen sich in der alten
+  Windows-Kodierung nicht darstellen; `backlog_ids.py` etwa starb an genau der
+  Zeile, mit der es sein Ergebnis melden wollte. Die Werkzeuge stellen ihre
+  Ausgabe jetzt beim Start auf UTF-8 um — nur beim direkten Aufruf, damit ein
+  Test, der ein Werkzeug importiert, davon unberührt bleibt.
+
+  Das Test-Gate setzt dafür bewusst **keine** Umgebungsvariable: das würde den
+  Fehler zwar im Gate verschwinden lassen, aber genau dort bestehen lassen, wo
+  die Werkzeuge tatsächlich benutzt werden.
+
+
 
 ### 2026-08-30 — „Zielen" trifft jetzt auch bei Geräten mit invertierter Bewegung
 
