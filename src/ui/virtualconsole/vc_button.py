@@ -743,6 +743,22 @@ class VCButton(VCWidget):
         finally:
             self._snap_prev = {}
 
+    def release_if_held(self) -> bool:
+        """UI-57: das verschluckte Loslassen nachholen.
+
+        Genau das, was ``trigger_from_midi`` bei einem ``note_off`` taete — nicht
+        mehr. Ein laufender FUNCTION_TOGGLE oder ein aktiver Library-Snap bleibt
+        ausdruecklich bestehen: Toggles sollen einen Bankwechsel ueberleben, das
+        ist ihr Zweck. Beendet werden sie nur im Solo-Fall
+        (:meth:`deactivate_for_solo`), und das ist eine andere Frage.
+        """
+        if not self._pressed:
+            return False
+        self._pressed = False
+        self._trigger(False)
+        self.update()
+        return True
+
     def deactivate_for_solo(self):
         """Schaltet diesen Button fuer einen Solo-Frame gezielt aus.
 

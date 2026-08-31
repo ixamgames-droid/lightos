@@ -319,11 +319,51 @@ class VCCanvas(QWidget):
 
     def set_active_bank(self, b: int):
         b = max(0, min(9, int(b)))
+        if b != self._active_bank:
+            self._release_held_widgets()
         self._active_bank = b
         self._apply_bank_visibility()
         self._rearm_slider_pickup()    # Soft-Takeover: Fader nach Seitenwechsel neu armieren
         self.update()
         self.bank_changed.emit(b)
+
+    def _release_held_widgets(self):
+        """UI-57: gehaltene Moment-Taster der VERLASSENEN Bank freigeben.
+
+        Der MIDI-Dispatch laesst nur Widgets der aktiven Bank durch
+        (:meth:`on_active_bank` in :meth:`_handle_midi`). Wer einen Moment-Taster
+        HAELT und dabei die Bank wechselt, dessen ``note_off`` erreicht den
+        Taster deshalb nie mehr — er bleibt gedrueckt. Bei BLACKOUT oder
+        „Alles Weiss" heisst das: das Rig bleibt stockdunkel bzw. voll weiss, und
+        zurueck kommt man nur, indem man exakt auf die alte Bank schaltet und
+        dort noch einmal loslaesst. Vor Publikum ist das die falsche Suche.
+
+        Deshalb wird beim Verlassen einer Bank genau das nachgeholt, was das
+        verschluckte ``note_off`` getan haette. **Nur physisch GEHALTENE**
+        Widgets: ein laufender FUNCTION_TOGGLE gehoert NICHT dazu — Toggles
+        sollen ueber Bankwechsel hinweg weiterlaufen, das ist ihr Zweck. Genau
+        darin unterscheidet sich das hier von ``deactivate_for_solo``, das fuer
+        den Solo-Frame zusaetzlich laufende Toggles beendet.
+
+        Aufgerufen VOR dem Umsetzen von ``_active_bank``, damit
+        :meth:`on_active_bank` noch die alte Bank bewertet.
+        """
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return                      # Canvas wird gerade zerstoert
+        for w in widgets:
+            if not self.on_active_bank(w):
+                continue
+            fn = getattr(w, "release_if_held", None)
+            if not callable(fn):
+                continue
+            try:
+                fn()
+            except Exception as e:
+                # Ein haengender Taster ist schlimm, aber ein Fehler beim
+                # Freigeben darf den Bankwechsel nicht verschlucken.
+                print(f"[VCCanvas] Release beim Bankwechsel fehlgeschlagen: {e}")
 
     def _rearm_slider_pickup(self):
         """Soft-Takeover: nach einem Bank-/Seitenwechsel alle Fader neu armieren,

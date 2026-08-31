@@ -835,6 +835,25 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     """
     from src.core.engine.palette import get_palette_manager
 
+    # UI-57: LIVE-Uebersteuerungen ZUERST aufheben — vor allem anderen.
+    #
+    # „Alles Weiss" legt einen Moment-Override in den Render-Pfad
+    # (`AppState._all_white_map`), Freeze haelt die ganze Ausgabe an. Beide
+    # ueberlebten bisher JEDE globale Ruecksetzung: nach „Neue Show" wirkte der
+    # Weiss-Override auf die fids der NEUEN Show, also auf voellig andere
+    # Geraete, und ein eingefrorener Ausgang liess die neue Show gar nicht erst
+    # erscheinen. Beides ist ein Zustand, aus dem der Nutzer nicht mehr
+    # herausfindet, weil die naheliegende Rettung („dann eben neue Show") ihn
+    # nicht erreicht.
+    #
+    # Bewusst am ANFANG: der Rest des Resets nullt die DMX-Puffer und flusht;
+    # bei noch stehendem Freeze ginge dieser Flush nicht auf die Leitung.
+    state._all_white_map = None
+    try:
+        state.set_freeze(False)
+    except Exception as e:
+        print(f"[show_file] reset unfreeze error: {e}")
+
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
 
