@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| XPLAT-28 | B | docs/xplat28-gate-vertrag-begruenden | 2026-09-01T19:45Z | tools/verify_segmented.ps1,BACKLOG.md |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -43,7 +43,6 @@
 
 ## Verlauf
 
-- 2026-08-27T04:56Z B done OUT-54
 - 2026-08-30T19:39Z A claim VIZ-55
 - 2026-08-31T14:30Z A uebergeben VIZ-55
 - 2026-08-31T19:10Z A claim UI-57
@@ -73,3 +72,4 @@
 - 2026-09-01T19:33Z B done XPLAT-27
 - 2026-09-01T19:42Z A uebergeben XPLAT-30
 - 2026-09-01T19:45Z B claim XPLAT-28
+- 2026-09-01T20:39Z B done XPLAT-28
