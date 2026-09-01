@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | PROC-07 | A | chore/proc07-werkzeuge-token | 2026-09-01T13:40Z | tools/ |
+| XPLAT-22 | B | feature/xplat22-port-belegt-windows | 2026-09-01T13:44Z | src/core/dmx/port_check.py,tests/test_out54_port_belegt.py |
 
 ## Blocker & Fallen
 
@@ -37,7 +38,6 @@
 
 ## Verlauf
 
-- 2026-08-11T21:09Z A done VIZ-51
 - 2026-08-12T07:46Z A claim RIG-DUNKEL
 - 2026-08-12T08:09Z A done RIG-DUNKEL
 - 2026-08-26T18:16Z B claim STAB-22
@@ -67,3 +67,4 @@
 - 2026-08-31T21:03Z B uebergeben QA-69
 - 2026-08-31T21:11Z A uebergeben STAB-23
 - 2026-09-01T13:40Z A claim PROC-07
+- 2026-09-01T13:44Z B claim XPLAT-22
