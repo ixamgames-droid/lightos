@@ -13,13 +13,40 @@ from __future__ import annotations
 
 import io
 import os
+import sys
 import tempfile
 import unittest
 
 from src.core.dmx.port_check import port_belegt_von, warne_wenn_belegt
 
+# ⚠️ XPLAT-22: Diese Datei prueft den ``/proc``-Weg — den LINUX-Weg.
+#
+# Auf Windows lief sie bis zum 01.09.2026 trotzdem mit und war rot, aus zwei
+# Gruenden gleichzeitig: das gestellte ``/proc`` braucht ``os.symlink``
+# (dort ``WinError 1314``, Symlinks verlangen Adminrechte oder den
+# Entwicklermodus), und ein echtes ``/proc`` gibt es ohnehin nicht. Das las
+# sich wie ein kaputter Waechter und war eine Linux-Annahme.
+#
+# ★ Seit XPLAT-22 hat ``warne_wenn_belegt`` einen eigenen Windows-Zweig
+# (exklusiver Oeffnungsversuch statt ``/proc``). Die Warnungs-Tests unten
+# messen ausdruecklich die LINUX-Formulierung („PID und Kommandozeile") — auf
+# Windows nennt die Meldung bewusst etwas anderes, weil dort ein anderer
+# Fehler auftritt. Der Windows-Zweig hat seine eigene Datei:
+# ``tests/test_xplat22_port_belegt_windows.py``. Beide zusammen decken das ab,
+# was frueher eine Datei zur Haelfte blind geprueft hat.
+#
+# ``sys.platform`` ueber eine Variable statt direkt verglichen — sonst wertet
+# Pyright den Vergleich statisch aus und meldet den anderen Zweig als toten
+# Code (dieselbe Schreibweise wie in ``src/core/paths.py``).
+_PLAT = sys.platform
+_PROC_WEG = _PLAT != "win32" and os.path.isdir("/proc")
+_PROC_GRUND = ("prueft den /proc-Weg von port_check; auf Windows faehrt "
+               "warne_wenn_belegt einen eigenen Zweig — siehe "
+               "tests/test_xplat22_port_belegt_windows.py (XPLAT-22)")
+
 
 class PortHalterTest(unittest.TestCase):
+    @unittest.skipUnless(_PROC_WEG, _PROC_GRUND)
     def test_findet_einen_fremden_halter(self):
         """Gestelltes /proc: ein anderer Prozess haelt den Port."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -35,6 +62,7 @@ class PortHalterTest(unittest.TestCase):
             self.assertEqual([p for p, _ in treffer], [4242])
             self.assertIn("main.py", treffer[0][1])
 
+    @unittest.skipUnless(_PROC_WEG, _PROC_GRUND)
     def test_eigener_prozess_wird_ausgelassen(self):
         """★ Sonst meldete jede Pruefung nach dem eigenen Oeffnen einen Treffer
         — der Waechter wuerde bei jedem Start Fehlalarm schlagen und damit
@@ -57,6 +85,7 @@ class PortHalterTest(unittest.TestCase):
         """Ein Diagnose-Helfer darf den Start der Ausgabe niemals verhindern."""
         self.assertEqual(port_belegt_von("/dev/x", proc_root="/gibt/es/nicht"), [])
 
+    @unittest.skipUnless(_PROC_WEG, _PROC_GRUND)
     def test_echter_offener_deskriptor_wird_gefunden(self):
         """Gegenprobe am laufenden System: was WIRKLICH offen ist, muss der
         Waechter finden. Ein Waechter, der nie anschlaegt, ist keiner."""
@@ -67,6 +96,7 @@ class PortHalterTest(unittest.TestCase):
 
 
 class WarnungTest(unittest.TestCase):
+    @unittest.skipUnless(_PROC_WEG, _PROC_GRUND)
     def test_warnung_nennt_pid_und_befehl(self):
         with tempfile.TemporaryDirectory() as tmp:
             port = os.path.join(tmp, "ttyFAKE"); open(port, "w").close()
