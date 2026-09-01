@@ -60,6 +60,7 @@ import argparse
 import ast
 import datetime
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -473,20 +474,35 @@ def probe_schreiben(ordner: str, art: str, tage_alt: int = 3,
 
 # ─────────────────────────────────── CLI ────────────────────────────────────
 
+def _anzeigepfad(pfad: str) -> str:
+    """Repo-relativer Pfad mit ``/`` — auf jedem Betriebssystem gleich.
+
+    QA-69: hier stand blankes ``os.path.relpath``. Das liefert auf Windows
+    ``tests\\test_x.py``, waehrend derselbe Bericht zwei Zeilen weiter
+    ``tests/test_crash_intake.py::RecencyTest`` als Vorbild nennt — die Ausgabe
+    widersprach sich also in ihrer eigenen Schreibweise, und der Test darauf war
+    auf Windows rot, ohne dass am Gate etwas falsch war.
+
+    Ein Anzeigepfad ist kein Dateisystem-Zugriff: er wird gelesen, kopiert und
+    in Testvergleiche gesteckt. Deshalb hat er genau eine Schreibweise.
+    """
+    return pathlib.PurePath(os.path.relpath(pfad, REPO)).as_posix()
+
+
 def bericht_text(bericht: Bericht) -> str:
     """Der Befund als Text — getrennt von ``main``, damit er pruefbar ist,
     ohne einen ganzen Waechter-Lauf zu fahren."""
     zeilen = [f"Uhr um {bericht.tage} Tage vorgerueckt "
               f"({echt_heute() + datetime.timedelta(days=bericht.tage)})."]
     for pfad, _ in bericht.schon_rot:
-        zeilen.append(f"  … {os.path.relpath(pfad, REPO)} ist schon HEUTE rot "
+        zeilen.append(f"  … {_anzeigepfad(pfad)} ist schon HEUTE rot "
                       f"— nicht Sache dieses Gates")
     if not bericht.bomben:
         zeilen.append("GRUEN — keine Zeitbombe.")
         return "\n".join(zeilen)
     for pfad, ausgabe in bericht.bomben:
         zeilen.append("")
-        zeilen.append(f"★ ZEITBOMBE: {os.path.relpath(pfad, REPO)}")
+        zeilen.append(f"★ ZEITBOMBE: {_anzeigepfad(pfad)}")
         zeilen.append("   heute gruen, mit vorgerueckter Uhr rot — sie wird "
                       "ohne Codeaenderung rot.")
         zeilen.append("   Reparatur: das feste Datum am Lauftag ausrechnen "
@@ -514,7 +530,7 @@ def main(argv=None) -> int:
     for pfad, funde in kand:
         kurz = ", ".join(f"{f.zeile}:{f.text}" for f in funde[:4])
         marke = "  [ausgenommen]" if os.path.basename(pfad) in SELBST else ""
-        print(f"  {os.path.relpath(pfad, REPO)}  ({len(funde)}) {kurz}{marke}")
+        print(f"  {_anzeigepfad(pfad)}  ({len(funde)}) {kurz}{marke}")
     if a.nur_kandidaten:
         return 0
 

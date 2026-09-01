@@ -17,6 +17,7 @@ ihr steht die Liste der roten Segmente, und die kann dann Zeilen eines FREMDEN
 Laufs enthalten.
 """
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -41,7 +42,31 @@ def test_harmlos():
 """
 
 
-@unittest.skipUnless(os.access(RUNNER, os.X_OK), "verify_segmented.sh fehlt")
+# ⚠️ QA-69: der Guard war ``os.access(RUNNER, os.X_OK)`` — und der greift auf
+# Windows NIE, weil ``os.access(..., X_OK)`` dort fuer jede existierende Datei
+# ``True`` liefert (ein Ausfuehrbar-Bit gibt es nicht). Die ``.sh`` ist mit
+# eingecheckt, liegt also auch auf einem Windows-Checkout. Der Test lief damit
+# los, startete den LINUX-Runner und faerbte sich rot, ohne irgendetwas ueber
+# den Zaehler auszusagen.
+#
+# Dieselbe Falle wurde in ``tests/test_gate_webengine_lane.py`` bereits
+# behoben; hier steht bewusst dieselbe Formulierung, damit beide Stellen
+# gemeinsam auffallen, wenn sich die Lage aendert.
+#
+# Der Segment-Runner IST das Linux-Gate: er startet je Segment ein
+# ``venv/bin/python``, das es auf einem Windows-Checkout nicht gibt. Auf
+# Windows faehrt das Gate ueber ``verify_segmented.ps1`` bzw.
+# ``run_tests.ps1 -Isolate``. Dass fuer DIESE Zusicherung („der Zaehler luegt
+# nicht") auf der Windows-Seite kein Gegenstueck existiert, ist als
+# **XPLAT-23** erfasst — die Luecke wird hier benannt, nicht versteckt.
+_RUNNER_LAEUFT = (RUNNER.exists() and os.name != "nt"
+                  and shutil.which("bash") is not None)
+_RUNNER_GRUND = ("verify_segmented.sh ist das Linux-Gate — auf Windows faehrt "
+                 "verify_segmented.ps1 / run_tests.ps1 -Isolate (XPLAT-23), "
+                 "und bash fehlt im PATH")
+
+
+@unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
 class ZaehlerWarntWennErgebnisseFehlenTest(unittest.TestCase):
 
     def _lauf(self, raeumen: bool):
