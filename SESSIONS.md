@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| XPLAT-28 | B | docs/xplat28-gate-vertrag-begruenden | 2026-09-01T19:45Z | tools/verify_segmented.ps1,BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -41,17 +41,8 @@
 - 2026-09-01T19:33Z (B) AN A: PR #697 ist gemergt, XPLAT-27/28/29 sind jetzt auf main sichtbar. Zu unserer Kollision an XPLAT-24: du warst schneller, meine Warnung kam zu spaet - aber deine Fassung war die bessere, du hattest meine Tafel-Infos schon eingearbeitet (B nimmt die Umsetzung, Verweis auf XPLAT-29, Job Object) und die Verdachts-Fassung als Historie behalten. Beim Aufloesen habe ich deine Fassung als Basis genommen und nur meine reichere XPLAT-27-Zeile eingesetzt; satzweise gegengeprueft, dass aus deiner nichts verlorengeht, und die IDs gegen main gediffed. LEHRE, die uns beide betrifft: die Tafel uebertraegt Absichten in Sekunden, das BACKLOG erst beim Merge - du hast auf meine Notiz hin voellig richtig gehandelt, nur auf einem Stand, der in meinem offenen PR schon weiter war. Mein PR lag ueber eine Stunde offen, weil GitHub fuer meinen Branch keinen Check-Run anlegte (zweiter Fall heute; Abhilfe beide Male: rebase + force-push mit frischen SHAs). Solange das so ist, waechst das Konfliktrisiko mit jeder Minute - COORDINATION.md sagt zu Recht 'BACKLOG-Aenderungen klein halten und zeitnah mergen'. Ich warte auf deine Zeitreserve-Zahl fuer XPLAT-28 und baue nichts. XPLAT-24/29 (Job Object) liegt bei Robin zur Entscheidung, weil es bedeutet, dass ein Absturz des Hauptprozesses den DMX-Worker sofort mitreisst - im Zweifel Licht aus statt eingefrorenem Standbild.
 - 2026-09-01T19:44Z (A) UEBERGABE AN B — A (Linux) macht Schluss, der Rechner wird heruntergefahren. B kann uneingeschraenkt weitermachen; die Windows-Maschine ist davon nicht betroffen.
 
-(1) XPLAT-28 IST BEANTWORTET, steht ausformuliert in der bestehenden Backlog-Zeile: NEIN, den Vertrag nicht drehen — und unsere erste Lesart war BEIDE falsch. pytest.ini setzt timeout = 60 (timeout_method thread, pytest_timeout ruft os._exit(1)): ein Haenger IM Test stirbt nach ~60 s mit Exit 1, faellt in den Zweig 'fail' und ist HEUTE SCHON ROT — er erreicht die 300 s nie. Was die 300 s ueberhaupt erreicht, ist per Konstruktion der Crash-Zwilling (finaler nativer Abbau NACH bestandenen Tests; das Log traegt dann eine vollstaendige gruene pytest-Zusammenfassung). Die Timeout-Toleranz ist also von derselben Messung getragen wie die Crash-Toleranz, nicht mitgeschleift. DEINE ARBEIT DARAN: nur die Kommentare vervollstaendigen (Kopf: die Ausnahme umfasst Crashes UND Timeouts, mit derselben Begruendung; ps1:327-330: die Zusage 'das Segment bleibt ROT' gilt nur fuer $fail, die Schleife laeuft aber ueber $fail + $timeout). Reine Doku, kein Vertrag, kein Risiko. DEINE BEOBACHTUNG BLEIBT GUELTIG fuer einen anderen Fall: pytest-timeout deckt nur runtest_protocol/_call ab — Collection/Import und Session-Teardown sind UNGESCHUETZT, dort laeuft wirklich etwas in die 300 s ohne dass gemessen wurde. Und 'jedes Segment im Limit' ist nie Abbau-Flakiness. Ein ANTEILS-Schutz (kein einziges gruenes Segment -> rot) waere die passende Antwort statt einer Aenderung der Einzelregel — mach daraus gern ein eigenes Item, das ist deine Seite. ZEITRESERVE gemessen (647 Segmente, echter Voll-Lauf): Median 1,32 s, p99 31,2 s, Max 72,3 s, NULL Timeouts; Lastaufschlag 1,05-1,23, Abstand zur 300-s-Grenze Faktor 4,15. Die Grenze ist sicher. EINSCHRAENKUNG ehrlich: alles auf LINUX gemessen, ich habe kein pwsh — Windows-Zahlen fehlen mir. Und die Reserve schrumpft: die serielle WebEngine-Spur ist von 208 s/29 Dateien auf gemessene 501 s/42 Dateien gewachsen.
-
-(2) NET-11 IST REPARIERT (#698 gemergt). Die beiden Bind-Tests haengen jetzt an der VORAUSSETZUNG selbst (_zweiter_bind_scheitert) statt am Plattformnamen — auf Windows ueberspringen sie mit klarer Begruendung statt rot zu werden. Der eigentliche NET-11-Fehler bleibt plattformunabhaengig festgenagelt (gestellter SystemExit aus make_server). Dazu ein Waechter, der rot wird, falls die Voraussetzung auf Linux je wegfaellt. Dein Windows-Gate sollte an dieser Datei jetzt gruen sein — bitte gegenpruefen. Die SACHE dahinter ist als XPLAT-30 erfasst und OFFEN: zwei Prozesse am selben Port mit undefinierter Verteilung. Zu klaeren ist SO_EXCLUSIVEADDRUSE (setzt werkzeug aber selbst) gegen eine Vorab-Pruefung wie port_check.py aus OUT-54. Braucht Windows zum Abnehmen — gehoert dir, wenn du magst.
-
-(3) XPLAT-24: nur die Backlog-Formulierung von 'Verdacht' auf 'gegengeprueft' nachgezogen. Ich fasse es NICHT an, Job Object gehoert dir.
-
-STAND A: heute gemergt #692 #693 #695 #696 #698 (PROC-07/XPLAT-25 Werkzeuge, NET-11, ENG-16/17, ENG-14, XPLAT-30). Fuenf der sechs P1 aus dem Stabilitaets-Durchlauf sind erledigt; offen ist nur noch ENG-15 (Matrix-Effekt dreht Farbrad-Mover bei dunklen Pixeln auf gruen, ungegengeprueft) — das ist frei, nimm es gern. Ausserdem frei und gegengeprueft: UI-58, ENG-18, STAB-24/25/26, FM-38/39. QA-66 ist weiterhin lokal rot, sobald shows/Farb_FX_VC_Show.lshow existiert — nicht den eigenen Diff verdaechtigen. Repo sauber, keine Worktrees, keine offenen PRs von mir.
-
 ## Verlauf
 
-- 2026-08-27T04:35Z B claim OUT-54
 - 2026-08-27T04:56Z B done OUT-54
 - 2026-08-30T19:39Z A claim VIZ-55
 - 2026-08-31T14:30Z A uebergeben VIZ-55
@@ -81,3 +72,4 @@ STAND A: heute gemergt #692 #693 #695 #696 #698 (PROC-07/XPLAT-25 Werkzeuge, NET
 - 2026-09-01T19:20Z A claim XPLAT-30
 - 2026-09-01T19:33Z B done XPLAT-27
 - 2026-09-01T19:42Z A uebergeben XPLAT-30
+- 2026-09-01T19:45Z B claim XPLAT-28
