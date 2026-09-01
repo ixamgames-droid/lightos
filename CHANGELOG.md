@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Ein hängender Test beendete den ganzen Testlauf
+
+#### Behoben
+
+- **Das Test-Gate brach unter Windows mittendrin ab, statt weiterzulaufen.**
+  Bleibt eine einzelne Testdatei hängen, wird sie nach einem Zeitlimit
+  abgebrochen — und genau dieser Abbruch riss den kompletten Lauf mit. Gemessen
+  am 01.09.: Der Durchlauf endete nach **404 von 646 Dateien**.
+
+  Das Tückische daran ist nicht der Abbruch selbst, sondern wie er aussah: wie
+  ein *rotes* Gate. Tatsächlich waren 242 Dateien schlicht nicht gefahren, und
+  die Bilanz darunter zählt nur, was sie gesehen hat — wer die Zahl liest, hält
+  einen Teillauf für einen vollständigen.
+
+  Ursache war eine Eigenheit von PowerShell: Meldet ein Windows-Programm etwas
+  auf dem Fehlerkanal, wertet PowerShell das je nach Einstellung als
+  Abbruchgrund für das ganze Skript. Beim Beenden eines hängenden Testprozesses
+  ist so eine Meldung der Normalfall, nicht die Ausnahme.
+
+  Dieselbe Stelle war im Schwesterskript längst bekannt und entschärft; hier
+  fehlte sie. Ein hängender Test wird jetzt abgebrochen, gemeldet und der Lauf
+  fährt mit der nächsten Datei fort.
+
 ### 2026-09-01 — STOP ALL kommt wieder durch
 
 #### Behoben
@@ -34,7 +57,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Bei Mehrkopf-Geräten bewegte ein Layer-Effekt nur den ersten Kopf.** An einer
   Vierkopf-Bar blieben drei stehen, während dieselbe Bewegung über den Programmer
   alle vier erreichte.
-
 ### 2026-09-01 — Das Einmess-Werkzeug für Moving Heads startet jetzt auch unter Windows
 
 #### Behoben

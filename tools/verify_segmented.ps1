@@ -77,6 +77,18 @@ if (-not $py) {
 if (-not $env:QT_QPA_PLATFORM)   { $env:QT_QPA_PLATFORM = "offscreen" }
 if (-not $env:LIGHTOS_HARDEN_EXIT) { $env:LIGHTOS_HARDEN_EXIT = "1" }
 
+# XPLAT-27: Merkmal fuer die Kinder — "du laeufst als Segment eines Gate-Laufs".
+# Bewusst HART gesetzt und nicht per setdefault: die Aussage gilt hier immer,
+# und ein von aussen geerbter Wert duerfte sie nicht ueberschreiben.
+#
+# WOFUER: ein Test, der selbst einen Runner startet, erzeugt im Volllauf ein
+# Gate IM Gate (QA-53). Bisher konnte er das gar nicht erkennen - es gab kein
+# Merkmal. `LIGHTOS_SEG_OUT` sieht danach aus, taugt aber nicht: der Runner
+# LIEST es nur (mit Default) und setzt es nie, ein Kind sieht es also nur,
+# wenn der Mensch es von Hand gesetzt hat. Genau diese Annahme hat mich hier
+# einen Anlauf gekostet.
+$env:LIGHTOS_IM_SEGMENT = "1"
+
 if ($Jobs -le 0) {
     if ($env:LIGHTOS_VERIFY_JOBS) { $Jobs = [int]$env:LIGHTOS_VERIFY_JOBS } else { $Jobs = 4 }
 }
@@ -279,7 +291,34 @@ while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
         }
         elseif (((Get-Date) - $rec.Start).TotalSeconds -gt $TimeoutSec) {
             # Prozessbaum beenden - pytest kann Qt-/WebEngine-Kinder haben.
-            & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+            #
+            # ★ XPLAT-27: `$ErrorActionPreference` MUSS hier lokal auf 'Continue'.
+            # `taskkill` schreibt auf stderr, sobald ein Kind nicht beendet werden
+            # kann ("FEHLER: Der Prozess mit PID <n> (untergeordnetem Prozess von
+            # PID <m>) konnte nicht beendet werden") - und genau das ist bei einem
+            # haengenden Qt-/WebEngine-Segment der Normalfall, nicht die Ausnahme.
+            # PowerShell 5.1 wertet native stderr-Zeilen unter 'Stop' als
+            # TERMINIERENDEN NativeCommandError; `2>$null` unterdrueckt nur die
+            # Anzeige, nicht den ErrorRecord. Der ganze Gate-Lauf brach damit an
+            # dieser Zeile ab, statt das eine Segment als "zeit" zu zaehlen und
+            # weiterzumachen.
+            #
+            # Gemessen am 01.09.2026 auf `main`: der Lauf endete nach 404 von 646
+            # Segmenten mit Exit 1. Das sah aus wie ein rotes Gate und war ein
+            # abgebrochenes - der Unterschied ist erheblich, denn 242 Dateien
+            # waren schlicht nicht gefahren, und die Bilanz darunter zaehlt nur,
+            # was sie gesehen hat.
+            #
+            # Dieselbe Falle ist in `verify_loop.ps1` (beim `& powershell`-Aufruf
+            # des Lock-Runners) laengst benannt und genauso geloest; hier fehlte
+            # sie noch. Der Timeout selbst ist die Aussage - ob `taskkill` jedes
+            # Kind erwischt, aendert daran nichts.
+            $prevEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+            }
+            finally { $ErrorActionPreference = $prevEAP }
             Start-Sleep -Milliseconds 300     # taskkill nachlaufen lassen, dann Log lesbar
             Merge-SegmentLog $rec
             Complete-Segment $rec 124 "zeit"
