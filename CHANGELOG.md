@@ -7,6 +7,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Das Einmess-Werkzeug für Moving Heads startet jetzt auch unter Windows
+
+#### Behoben
+
+- **`tools/mh_einmessen.py` ließ sich unter Windows nicht einmal aufrufen.** Schon
+  `--help` brach mit einer Fehlermeldung über ein fehlendes Modul ab. Das
+  Werkzeug misst zwei Moving Heads am Aufbau ein — es war damit ausgerechnet auf
+  dem Rechner unbenutzbar, an dem die Geräte hängen.
+
+  Ursache waren vier Stellen, die es nur unter Linux gibt: das Einlesen
+  einzelner Tastendrücke, die Abfrage „liegt eine Taste an", die Suche nach
+  Programmen, die den Anschluss belegen, und die Vorgabe für `--port`.
+
+- **Der Anschluss wird jetzt über dieselbe Stelle geprüft wie im Programm
+  selbst.** Das Werkzeug hatte dafür eine eigene zweite Fassung — mit dem
+  Risiko, dass beide mit der Zeit auseinanderlaufen. Nebenbei erbt es damit die
+  Windows-Prüfung, die es vorher gar nicht gab.
+
+  Der Unterschied zwischen beiden Systemen bleibt dabei sichtbar: Unter Linux
+  lässt sich sicher sagen, *wer* den Anschluss hält, unter Windows nur *dass* er
+  belegt ist. Die Meldung sagt das ausdrücklich dazu, statt eine Vermutung wie
+  eine Tatsache aussehen zu lassen.
+
+- **`--port` darf jetzt entfallen.** Unter Windows sucht das Werkzeug den ersten
+  vorhandenen Anschluss selbst, statt auf einer Linux-Vorgabe zu bestehen, die
+  es dort nie gibt.
+
+#### Geändert
+
+- **Grobe Bewegung unter Windows: Strg statt Umschalt.** Windows reicht an
+  dieser Stelle nicht durch, ob die Umschalttaste gedrückt ist — Umschalt+Pfeil
+  kommt dort als gewöhnlicher Pfeil an. Die schnellen Schritte liegen deshalb
+  auf Strg+Pfeil, und zusätzlich auf Bild auf/ab sowie Pos1/Ende, falls ein
+  Terminalfenster die Strg-Kombination selbst abfängt. Unter Linux und macOS
+  bleibt alles wie gewohnt bei Umschalt+Pfeil.
+
+
+
 ### 2026-09-01 — Windows warnt jetzt auch, wenn der DMX-Port schon belegt ist
 
 #### Neu
