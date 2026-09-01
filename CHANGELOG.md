@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Layer-Effekte beachten die Geräte-Einstellungen
+
+#### Behoben
+
+- **Ein Layer-Effekt auf Pan/Tilt ignorierte „Pan invertieren", „Tilt
+  invertieren" und „Pan/Tilt tauschen".** Bei jedem anderen Weg — Fader, Szene,
+  Cue — wirken diese Schalter; nur hier nicht. An einem Gerät mit invertiertem
+  Pan lief der Effekt damit in die Gegenrichtung, und bei getauschten Achsen auf
+  den falschen Kanal.
+
+- **Bei Mehrkopf-Geräten bewegte ein Layer-Effekt nur den ersten Kopf.** An einer
+  Vierkopf-Bar blieben drei stehen, während dieselbe Bewegung über den Programmer
+  alle vier erreichte.
+
+
 ### 2026-09-01 — Ein belegter Web-Port beendet LightOS nicht mehr
 
 #### Behoben
