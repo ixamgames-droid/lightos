@@ -480,7 +480,26 @@ def start_server(port: int = 5000):
     # identisch zu vorher, und ``srv.shutdown()`` beendet ``serve_forever()``
     # thread-safe (Socket schliesst beim Toggle 'aus').
     from werkzeug.serving import make_server
-    _server = make_server(host, port, app, threaded=True)
+    # NET-11: ``make_server`` ruft bei belegtem Port ``sys.exit(1)`` — es wirft
+    # also ``SystemExit``, und das ist KEINE ``Exception``. Jeder Aufrufer, der
+    # ``except Exception`` schreibt (der Menue-Schalter in main_window tut genau
+    # das, und richtigerweise), laesst es durch: der SystemExit steigt aus dem
+    # Qt-Slot heraus und beendet LightOS auf der Stelle. Gemessen: Port belegt ->
+    # ``SystemExit(1)``, Prozess weg, ohne Dialog und ohne Meldung im Menue.
+    #
+    # Deshalb wird hier aus dem Kontrollfluss-Signal ein gewoehnlicher Fehler:
+    # ``OSError`` ist der Typ, den ein fehlgeschlagenes Binden ohnehin haette,
+    # und den die Aufrufer schon behandeln. Das schuetzt ALLE Aufrufer (Menue,
+    # OSC, Kommandozeile) statt nur den einen, der zuerst auffiel.
+    try:
+        _server = make_server(host, port, app, threaded=True)
+    except SystemExit as e:
+        raise OSError(
+            f"Port {port} ist belegt — ein anderes Programm (oder eine zweite "
+            f"LightOS-Instanz) haelt ihn bereits. Das Web-Interface wurde NICHT "
+            f"gestartet; LightOS laeuft weiter. Wer den Halter sucht: "
+            f"`ss -lptn 'sport = :{port}'`."
+        ) from e
     _running = True
     _thread = threading.Thread(
         target=_server.serve_forever,
