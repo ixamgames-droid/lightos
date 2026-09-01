@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| PROC-07 | A | chore/proc07-werkzeuge-token | 2026-09-01T13:40Z | tools/ |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -38,7 +38,6 @@
 
 ## Verlauf
 
-- 2026-08-12T08:09Z A done RIG-DUNKEL
 - 2026-08-26T18:16Z B claim STAB-22
 - 2026-08-26T18:44Z B done STAB-22
 - 2026-08-26T18:48Z B claim VIZ-59
@@ -68,3 +67,4 @@
 - 2026-09-01T13:40Z A claim PROC-07
 - 2026-09-01T13:44Z B claim XPLAT-22
 - 2026-09-01T14:26Z B uebergeben XPLAT-22
+- 2026-09-01T15:24Z A done PROC-07
