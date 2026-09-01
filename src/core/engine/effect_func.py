@@ -65,15 +65,40 @@ class LayeredEffect(Function):
                 print(f"[LayeredEffect] channel lookup error: {exc}")
                 continue
 
+            # ENG-16: die Geraete-Flags anwenden lassen, statt sie zu ignorieren.
+            # `apply_pan_tilt_orientation` ist die EINE Stelle, die invert_pan/
+            # invert_tilt/swap_pan_tilt umsetzt — Programmer-Flush und Render-Pfad
+            # gehen durch sie, dieser Schreiber ging als einziger daran vorbei.
+            # Gemessen an einem Geraet mit `invert_pan`: Programmer schrieb 55,
+            # der Layer-Effekt 200; bei `swap` schrieb der Programmer auf den
+            # Tilt-Kanal, der Layer-Effekt weiter auf Pan.
+            #
+            # ★ Deshalb wird das ERGEBNIS-dict geschrieben und nicht das
+            # Ziel-Attribut: bei `swap` wandert der Wert auf einen ANDEREN
+            # Schluessel (`{'pan': v}` -> `{'tilt': v}`). Wer stur auf
+            # `target_attribute` schreibt, verliert ihn genau dann.
+            try:
+                from src.core.app_state import apply_pan_tilt_orientation
+                werte = apply_pan_tilt_orientation(
+                    fixture, {self.target_attribute: dmx_val})
+            except Exception as exc:
+                print(f"[LayeredEffect] orientation error: {exc}")
+                werte = {self.target_attribute: dmx_val}
+
+            # ENG-17: ALLE Vorkommen des Attributs bedienen, nicht nur das erste.
+            # Ein `break` nach dem ersten Treffer liess an einer Vierkopf-Bar drei
+            # Koepfe stehen (gemessen: Layer [200,0,0,0] gegen Programmer
+            # [200,200,200,200]) — die Aufschrift des Effekts versprach das Geraet
+            # und traf einen Kopf.
             for ch in channels:
-                if ch.attribute == self.target_attribute:
-                    try:
-                        addr = fixture.address + ch.channel_number - 1
-                        if 1 <= addr <= 512:
-                            universe.set_channel(addr, dmx_val)
-                    except Exception as exc:
-                        print(f"[LayeredEffect] set_channel error: {exc}")
-                    break
+                if ch.attribute not in werte:
+                    continue
+                try:
+                    addr = fixture.address + ch.channel_number - 1
+                    if 1 <= addr <= 512:
+                        universe.set_channel(addr, werte[ch.attribute])
+                except Exception as exc:
+                    print(f"[LayeredEffect] set_channel error: {exc}")
 
     def to_dict(self):
         d = super().to_dict()
